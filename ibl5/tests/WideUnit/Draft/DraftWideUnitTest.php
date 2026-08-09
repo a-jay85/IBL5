@@ -7,6 +7,11 @@ namespace Tests\WideUnit\Draft;
 use Tests\WideUnit\WideUnitTestCase;
 use Tests\WideUnit\Mocks\TestDataFactory;
 use Draft\DraftController;
+use Draft\DraftProcessor;
+use Draft\DraftRepository;
+use Draft\DraftValidator;
+use Draft\DraftView;
+use Draft\Contracts\DraftServiceInterface;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Season\Season;
 
@@ -44,10 +49,21 @@ class DraftWideUnitTest extends WideUnitTestCase
         $this->mockSeason->endingYear = 2025;
         $this->mockSeason->freeAgencyNotificationsState = 'Off';
 
+        $validator = new DraftValidator();
+        $repository = new DraftRepository($this->mockDb, $this->mockCommonRepository);
+        $processor = new DraftProcessor();
+        $view = new DraftView();
+        $stubService = self::createStub(DraftServiceInterface::class);
+
         $this->handler = new DraftController(
             $this->mockDb,
             $this->mockCommonRepository,
-            $this->mockSeason
+            $this->mockSeason,
+            $validator,
+            $repository,
+            $processor,
+            $view,
+            $stubService
         );
 
         // Prevent Discord notifications during tests

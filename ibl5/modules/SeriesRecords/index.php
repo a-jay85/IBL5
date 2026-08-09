@@ -22,5 +22,9 @@ get_lang($module_name);
 global $mysqli_db, $user;
 
 $commonRepo = new \Repositories\TeamIdentityRepository($mysqli_db);
-$controller = new \SeriesRecords\SeriesRecordsController($mysqli_db, $commonRepo);
+$repository = new \SeriesRecords\SeriesRecordsRepository($mysqli_db);
+$service = new \SeriesRecords\SeriesRecordsService();
+$view = new \SeriesRecords\SeriesRecordsView($service);
+$nukeCompat = new \Utilities\NukeCompat();
+$controller = new \SeriesRecords\SeriesRecordsController($commonRepo, $repository, $service, $view, $nukeCompat);
 $controller->main($user);

@@ -5,15 +5,16 @@ declare(strict_types=1);
 namespace DepthChartEntry;
 
 use DepthChartEntry\Contracts\DepthChartEntryControllerInterface;
+use DepthChartEntry\Contracts\DepthChartEntryRepositoryInterface;
 use DepthChartEntry\Contracts\DepthChartEntryServiceInterface;
+use DepthChartEntry\Contracts\DepthChartEntrySubmissionHandlerInterface;
+use DepthChartEntry\Contracts\DepthChartEntryViewInterface;
 use NextSim\NextSimService;
 use NextSim\NextSimView;
 use SavedDepthChart\SavedDepthChartService;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Standings\StandingsRepository;
 use Team\Contracts\TeamTableServiceInterface;
-use Team\TeamRepository;
-use Team\TeamTableService;
 use TeamSchedule\TeamScheduleRepository;
 use UI\Components\TableViewDropdown;
 use Team\Team;
@@ -26,26 +27,35 @@ use EventLog\EventLogger;
 class DepthChartEntryController implements DepthChartEntryControllerInterface
 {
     private \mysqli $db;
-    private DepthChartEntryRepository $repository;
-    private DepthChartEntryView $view;
+    private DepthChartEntryRepositoryInterface $repository;
+    private DepthChartEntryViewInterface $view;
     private TeamIdentityRepositoryInterface $commonRepository;
     private TeamTableServiceInterface $teamTableService;
     private DepthChartEntryServiceInterface $service;
+    private DepthChartEntrySubmissionHandlerInterface $submissionHandler;
     /**
      * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
      */
     private ?Season $season = null;
 
-    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepository, \League\LeagueContext $leagueContext, ?Season $season = null)
-    {
+    public function __construct(
+        \mysqli $db,
+        TeamIdentityRepositoryInterface $commonRepository,
+        DepthChartEntryRepositoryInterface $repository,
+        DepthChartEntryServiceInterface $service,
+        DepthChartEntryViewInterface $view,
+        TeamTableServiceInterface $teamTableService,
+        DepthChartEntrySubmissionHandlerInterface $submissionHandler,
+        ?Season $season = null
+    ) {
         $this->db = $db;
         $this->season = $season;
-        $this->repository = new DepthChartEntryRepository($db);
-        $this->service = new DepthChartEntryService();
-        $this->view = new DepthChartEntryView($leagueContext, $this->service);
+        $this->repository = $repository;
+        $this->service = $service;
+        $this->view = $view;
         $this->commonRepository = $commonRepository;
-        $teamRepository = new TeamRepository($db);
-        $this->teamTableService = new TeamTableService($db, $teamRepository);
+        $this->teamTableService = $teamTableService;
+        $this->submissionHandler = $submissionHandler;
     }
 
     /**
@@ -54,8 +64,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
      */
     public function handleSubmit(array $postData, string $sessionUsername): void
     {
-        $handler = new DepthChartEntrySubmissionHandler($this->db, $this->commonRepository);
-        $result = $handler->handleSubmission($postData, $sessionUsername);
+        $result = $this->submissionHandler->handleSubmission($postData, $sessionUsername);
 
         if ($result['success']) {
             EventLogger::setAction('depth_chart_saved');

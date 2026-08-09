@@ -2225,6 +2225,17 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 
 **Table evidence (2026-07-25):** Premise invalid: `modules.php` already has two guards — `preg_match('/^[a-zA-Z0-9_]+$/', $name)` at line 26 AND `ModuleRegistry::isValid($name)` (42-entry allowlist) at line 31; `index.php:50` also uses `ModuleRegistry::isValid`. The "single `str_contains('..')`" description was wrong; no `str_contains` exists.
 
+### 14.6 Inconsistent Constructor Injection — Raw `\mysqli` in 24 Controllers
+**Location:** `FreeAgency/FreeAgencyController.php`, `DepthChartEntry/DepthChartEntryController.php`, `RookieOption/RookieOptionController.php`, `Team/TeamController.php`, `Player/PlayerPageController.php`, `Schedule/ScheduleController.php`, `SeriesRecords/SeriesRecordsController.php`; 25 controllers total
+**Problem:** Waivers receives fully-constructed interfaces (canonical); FreeAgency/DepthChart take only `\mysqli` and `new` 10-15 collaborators inside.
+**Suggested direction:** Adopt Waivers pattern across all 24 controllers.
+**Est. effort:** M
+**Risk if untouched:** Untestable controllers; new collaborators added ad-hoc.
+**Note:** IDOR PRs #1107–1110 merged 2026-06-29; sequencing blocker removed.
+**Status:** ✅ Implemented 2026-08-08 — Batch 1 (17 Api/Controller/*) done in maint-14-6-mysqli-di-batch-1; Batch 2 (8 module controllers) done in maint-14-6-mysqli-di-batch-2. All 8 controllers — `SeriesRecordsController`, `FreeAgencyController`, `RookieOptionController`, `DepthChartEntryController`, `TeamController`, `PlayerPageController`, `ScheduleController` — now accept fully-constructed collaborator interfaces; internal `new` calls removed; call sites in `modules/*/index.php` and `DepthChartEntryApiHandler` updated. PHPStan + full test suite green.
+
+**Table evidence (2026-08-08):** Batch 2 — 7 controllers refactored to Waivers DI pattern; properties re-typed to interfaces; call sites in modules/ and ApiHandler updated; 4 test files updated; `DepthChartEntrySubmissionHandler` extracted from `handleSubmit()` to injected `DepthChartEntrySubmissionHandlerInterface`.
+
 ### 14.15 `AppPaths::root()` Stateful Static Singleton
 **Location:** `Bootstrap/AppPaths.php`; actual consumers (repo-wide sweep 2026-06-09): `Updater/ScheduleUpdater.php:149,234`, `PageLayout/PageLayout.php:78,111`. The previously listed consumers (`Cache/PageCache.php`, `Mail/MailService.php`, `Logging/LoggerFactory.php`, `Auth/DevAutoLogin.php`) use raw `dirname(__DIR__, 2)` / `__DIR__` — not `AppPaths::root()`.
 **Problem:** Global mutable state for path resolution; not injectable.

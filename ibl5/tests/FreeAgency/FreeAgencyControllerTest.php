@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\FreeAgency;
 
+use FreeAgency\Contracts\FreeAgencyProcessorInterface;
+use FreeAgency\Contracts\FreeAgencyServiceInterface;
 use FreeAgency\FreeAgencyController;
+use FreeAgency\FreeAgencyView;
 use PHPUnit\Framework\TestCase;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
@@ -31,7 +34,10 @@ class FreeAgencyControllerTest extends TestCase
 
         $commonRepo = self::createStub(TeamIdentityRepositoryInterface::class);
         $authService = self::createStub(\Auth\AuthService::class);
-        $controller = new FreeAgencyController($mockDb, $commonRepo, $authService, $nukeCompat);
+        $service = self::createStub(FreeAgencyServiceInterface::class);
+        $view = self::createStub(FreeAgencyView::class);
+        $processor = self::createStub(FreeAgencyProcessorInterface::class);
+        $controller = new FreeAgencyController($mockDb, $commonRepo, $authService, $service, $view, $processor, $nukeCompat);
         $controller->handleRequest(null, '', 0);
 
         $this->assertTrue($loginBoxCalled);

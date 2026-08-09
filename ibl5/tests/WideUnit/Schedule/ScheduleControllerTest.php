@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace Tests\WideUnit\Schedule;
 
 use League\LeagueContext;
+use LeagueSchedule\LeagueScheduleRepository;
 use Repositories\TeamIdentityRepository;
 use Schedule\Contracts\ScheduleControllerInterface;
 use Schedule\ScheduleController;
+use Standings\StandingsRepository;
+use TeamSchedule\TeamScheduleRepository;
 use Tests\WideUnit\Mocks\TestDataFactory;
 use Tests\WideUnit\WideUnitTestCase;
 
@@ -30,7 +33,15 @@ class ScheduleControllerTest extends WideUnitTestCase
         $this->mockDb->setMockTeamData([TestDataFactory::createTeam(['teamid' => 1])]);
         $this->mockDb->setMockData([]);
 
-        $controller = new ScheduleController($this->mockDb, new LeagueContext(), new TeamIdentityRepository($this->mockDb));
+        $leagueContext = new LeagueContext();
+        $controller = new ScheduleController(
+            $this->mockDb,
+            $leagueContext,
+            new TeamIdentityRepository($this->mockDb),
+            new StandingsRepository($this->mockDb, $leagueContext),
+            new TeamScheduleRepository($this->mockDb, $leagueContext),
+            new LeagueScheduleRepository($this->mockDb, $leagueContext)
+        );
         $output = $controller->render(1);
 
         $this->assertStringContainsString('schedule-container--team', $output);
@@ -40,7 +51,15 @@ class ScheduleControllerTest extends WideUnitTestCase
     {
         $this->mockDb->setMockData([]);
 
-        $controller = new ScheduleController($this->mockDb, new LeagueContext(), new TeamIdentityRepository($this->mockDb));
+        $leagueContext = new LeagueContext();
+        $controller = new ScheduleController(
+            $this->mockDb,
+            $leagueContext,
+            new TeamIdentityRepository($this->mockDb),
+            new StandingsRepository($this->mockDb, $leagueContext),
+            new TeamScheduleRepository($this->mockDb, $leagueContext),
+            new LeagueScheduleRepository($this->mockDb, $leagueContext)
+        );
         $output = $controller->render(0);
 
         $this->assertStringContainsString('<h1 class="ibl-title">Schedule</h1>', $output);
@@ -55,7 +74,15 @@ class ScheduleControllerTest extends WideUnitTestCase
         $this->mockDb->setMockTeamData([]);
         $this->mockDb->setMockData([]);
 
-        $controller = new ScheduleController($this->mockDb, new LeagueContext(), new TeamIdentityRepository($this->mockDb));
+        $leagueContext = new LeagueContext();
+        $controller = new ScheduleController(
+            $this->mockDb,
+            $leagueContext,
+            new TeamIdentityRepository($this->mockDb),
+            new StandingsRepository($this->mockDb, $leagueContext),
+            new TeamScheduleRepository($this->mockDb, $leagueContext),
+            new LeagueScheduleRepository($this->mockDb, $leagueContext)
+        );
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessageIsOrContains('Team not found: 99999');

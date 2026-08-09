@@ -14,6 +14,7 @@ use Player\Views\PlayerStatsCardView;
 use Player\Views\PlayerStatsFlipCardView;
 use Player\Views\PlayerViewFactory;
 use Player\Views\TeamColorHelper;
+use Player\Contracts\PlayerPageServiceInterface;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Security\HtmlSanitizer;
 use Team\Team;
@@ -29,6 +30,7 @@ class PlayerPageController
 {
     private \mysqli $mysqliDb;
     private TeamIdentityRepositoryInterface $commonRepo;
+    private PlayerPageServiceInterface $pageService;
     /**
      * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
      */
@@ -37,11 +39,13 @@ class PlayerPageController
     /**
      * @param \mysqli $mysqliDb MySQLi database connection
      * @param TeamIdentityRepositoryInterface $commonRepo Common repository for shared queries
+     * @param PlayerPageServiceInterface $pageService Service for player page business logic
      */
-    public function __construct(\mysqli $mysqliDb, TeamIdentityRepositoryInterface $commonRepo, ?Season $season = null)
+    public function __construct(\mysqli $mysqliDb, TeamIdentityRepositoryInterface $commonRepo, PlayerPageServiceInterface $pageService, ?Season $season = null)
     {
         $this->mysqliDb = $mysqliDb;
         $this->commonRepo = $commonRepo;
+        $this->pageService = $pageService;
         $this->season = $season;
     }
 
@@ -59,7 +63,7 @@ class PlayerPageController
 
         $player = Player::withPlayerID($this->mysqliDb, $playerID);
         $playerStats = PlayerStats::withPlayerID($this->mysqliDb, $playerID);
-        $pageService = new PlayerPageService($this->mysqliDb, $this->commonRepo);
+        $pageService = $this->pageService;
 
         $html = '';
 
@@ -142,7 +146,7 @@ class PlayerPageController
      * Render action buttons (renegotiation, rookie option)
      */
     private function renderActionButtons(
-        PlayerPageService $pageService,
+        PlayerPageServiceInterface $pageService,
         Player $player,
         int $playerID,
         Team $userTeam,

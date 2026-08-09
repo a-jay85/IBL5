@@ -6,6 +6,9 @@ namespace SeriesRecords;
 
 use League\League;
 use SeriesRecords\Contracts\SeriesRecordsControllerInterface;
+use SeriesRecords\Contracts\SeriesRecordsRepositoryInterface;
+use SeriesRecords\Contracts\SeriesRecordsServiceInterface;
+use SeriesRecords\Contracts\SeriesRecordsViewInterface;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 
 /**
@@ -18,19 +21,24 @@ use Repositories\Contracts\TeamIdentityRepositoryInterface;
  */
 class SeriesRecordsController implements SeriesRecordsControllerInterface
 {
-    private SeriesRecordsRepository $repository;
-    private SeriesRecordsService $service;
-    private SeriesRecordsView $view;
+    private SeriesRecordsRepositoryInterface $repository;
+    private SeriesRecordsServiceInterface $service;
+    private SeriesRecordsViewInterface $view;
     private TeamIdentityRepositoryInterface $commonRepository;
     private \Utilities\NukeCompat $nukeCompat;
 
-    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepository, ?\Utilities\NukeCompat $nukeCompat = null)
-    {
-        $this->repository = new SeriesRecordsRepository($db);
-        $this->service = new SeriesRecordsService();
-        $this->view = new SeriesRecordsView($this->service);
+    public function __construct(
+        TeamIdentityRepositoryInterface $commonRepository,
+        SeriesRecordsRepositoryInterface $repository,
+        SeriesRecordsServiceInterface $service,
+        SeriesRecordsViewInterface $view,
+        \Utilities\NukeCompat $nukeCompat
+    ) {
         $this->commonRepository = $commonRepository;
-        $this->nukeCompat = $nukeCompat ?? new \Utilities\NukeCompat();
+        $this->repository = $repository;
+        $this->service = $service;
+        $this->view = $view;
+        $this->nukeCompat = $nukeCompat;
     }
 
     /**

@@ -20,7 +20,10 @@ $pagetitle = "- Team Pages";
 global $mysqli_db, $authService, $leagueContext;
 
 $commonRepo = new \Repositories\TeamIdentityRepository($mysqli_db);
-$controller = new Team\TeamController($mysqli_db, $commonRepo, $authService, $leagueContext);
+$teamRepository = new Team\TeamRepository($mysqli_db);
+$service = new Team\TeamService($mysqli_db, $teamRepository, $leagueContext);
+$view = new Team\TeamView();
+$controller = new Team\TeamController($mysqli_db, $commonRepo, $authService, $service, $view);
 
 switch ($op) {
     case "team":

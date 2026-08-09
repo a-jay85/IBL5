@@ -1,6 +1,11 @@
 <?php
 
-if (php_sapi_name() !== 'cli') {
+// ── CLI-only guard (security constraint 4) — must stay the FIRST executable
+//    statement: a web hit must be refused before any resource is touched.
+//    Paired with a <Files> deny in ibl5/scripts/.htaccess (defense in depth).
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    echo 'This script must be run from the command line.';
     exit(1);
 }
 

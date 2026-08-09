@@ -6,6 +6,11 @@ namespace Tests\Draft;
 
 use PHPUnit\Framework\TestCase;
 use Draft\DraftController;
+use Draft\DraftProcessor;
+use Draft\DraftRepository;
+use Draft\DraftValidator;
+use Draft\DraftView;
+use Draft\Contracts\DraftServiceInterface;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Security\CsrfGuard;
 use Season\Season;
@@ -26,6 +31,11 @@ class DraftControllerTest extends TestCase
     private MockDatabase $mockDb;
     private TeamIdentityRepositoryInterface $mockCommonRepository;
     private Season $mockSeason;
+    private DraftValidator $validator;
+    private DraftRepository $repository;
+    private DraftProcessor $processor;
+    private DraftView $view;
+    private DraftServiceInterface $stubService;
 
     protected function setUp(): void
     {
@@ -52,6 +62,12 @@ class DraftControllerTest extends TestCase
         $this->mockSeason->beginningYear = 2024;
         $this->mockSeason->endingYear = 2025;
         $this->mockSeason->phase = 'Draft';
+
+        $this->validator = new DraftValidator();
+        $this->repository = new DraftRepository($this->mockDb, $this->mockCommonRepository);
+        $this->processor = new DraftProcessor();
+        $this->view = new DraftView();
+        $this->stubService = self::createStub(DraftServiceInterface::class);
     }
 
     /**
@@ -106,7 +122,12 @@ class DraftControllerTest extends TestCase
         $controller = new DraftController(
             $this->mockDb,
             $this->mockCommonRepository,
-            $this->mockSeason
+            $this->mockSeason,
+            $this->validator,
+            $this->repository,
+            $this->processor,
+            $this->view,
+            $this->stubService
         );
 
         $this->assertIsObject($controller);
@@ -121,7 +142,12 @@ class DraftControllerTest extends TestCase
         $controller = new DraftController(
             $this->mockDb,
             $this->mockCommonRepository,
-            $this->mockSeason
+            $this->mockSeason,
+            $this->validator,
+            $this->repository,
+            $this->processor,
+            $this->view,
+            $this->stubService
         );
 
         $result = $controller->handleDraftSelection('Test Team', null, 1, 1);
@@ -135,7 +161,12 @@ class DraftControllerTest extends TestCase
         $controller = new DraftController(
             $this->mockDb,
             $this->mockCommonRepository,
-            $this->mockSeason
+            $this->mockSeason,
+            $this->validator,
+            $this->repository,
+            $this->processor,
+            $this->view,
+            $this->stubService
         );
 
         $result = $controller->handleDraftSelection('Test Team', '', 1, 1);
@@ -157,6 +188,11 @@ class DraftControllerTest extends TestCase
             $this->mockDb,
             $this->repoWithSessionTeam('Test Team'),
             $this->mockSeason,
+            $this->validator,
+            $this->repository,
+            $this->processor,
+            $this->view,
+            $this->stubService,
             null,
             null,
             $this->authedNukeCompat()
@@ -191,6 +227,11 @@ class DraftControllerTest extends TestCase
             $this->mockDb,
             $this->mockCommonRepository,
             $this->mockSeason,
+            $this->validator,
+            $this->repository,
+            $this->processor,
+            $this->view,
+            $this->stubService,
             null,
             null,
             $nuke
@@ -217,6 +258,11 @@ class DraftControllerTest extends TestCase
             $this->mockDb,
             $this->repoWithSessionTeam('Test Team'),
             $this->mockSeason,
+            $this->validator,
+            $this->repository,
+            $this->processor,
+            $this->view,
+            $this->stubService,
             null,
             null,
             $this->authedNukeCompat()
@@ -242,6 +288,11 @@ class DraftControllerTest extends TestCase
             $this->mockDb,
             $this->repoWithSessionTeam('Metros'),
             $this->mockSeason,
+            $this->validator,
+            $this->repository,
+            $this->processor,
+            $this->view,
+            $this->stubService,
             null,
             null,
             $this->authedNukeCompat()
@@ -267,6 +318,11 @@ class DraftControllerTest extends TestCase
             $this->mockDb,
             $this->repoWithSessionTeam(null),
             $this->mockSeason,
+            $this->validator,
+            $this->repository,
+            $this->processor,
+            $this->view,
+            $this->stubService,
             null,
             null,
             $this->authedNukeCompat()
@@ -293,6 +349,11 @@ class DraftControllerTest extends TestCase
             $this->mockDb,
             $this->repoWithSessionTeam('Metros'),
             $this->mockSeason,
+            $this->validator,
+            $this->repository,
+            $this->processor,
+            $this->view,
+            $this->stubService,
             null,
             null,
             $this->authedNukeCompat()
@@ -322,12 +383,22 @@ class DraftControllerTest extends TestCase
         $controller1 = new DraftController(
             $this->mockDb,
             $this->mockCommonRepository,
-            $this->mockSeason
+            $this->mockSeason,
+            $this->validator,
+            $this->repository,
+            $this->processor,
+            $this->view,
+            $this->stubService
         );
         $controller2 = new DraftController(
             $this->mockDb,
             $this->mockCommonRepository,
-            $this->mockSeason
+            $this->mockSeason,
+            $this->validator,
+            $this->repository,
+            $this->processor,
+            $this->view,
+            $this->stubService
         );
 
         $this->assertNotSame($controller1, $controller2);

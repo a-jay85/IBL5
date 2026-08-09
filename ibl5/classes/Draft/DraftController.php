@@ -5,6 +5,11 @@ declare(strict_types=1);
 namespace Draft;
 
 use Draft\Contracts\DraftControllerInterface;
+use Draft\Contracts\DraftProcessorInterface;
+use Draft\Contracts\DraftRepositoryInterface;
+use Draft\Contracts\DraftServiceInterface;
+use Draft\Contracts\DraftValidatorInterface;
+use Draft\Contracts\DraftViewInterface;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Season\Season;
 use Discord\Discord;
@@ -16,23 +21,28 @@ use EventLog\EventLogger;
 class DraftController implements DraftControllerInterface
 {
     private \mysqli $db;
-    private DraftValidator $validator;
-    private DraftRepository $repository;
+    private DraftValidatorInterface $validator;
+    private DraftRepositoryInterface $repository;
     private TeamIdentityRepositoryInterface $commonRepository;
-    private DraftProcessor $processor;
-    private DraftView $view;
+    private DraftProcessorInterface $processor;
+    private DraftViewInterface $view;
     private Season $season;
     /** Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit'). */
     private \Psr\Log\LoggerInterface $auditLogger;
     /** Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('draft'). */
     private \Psr\Log\LoggerInterface $draftLogger;
-    private DraftService $service;
+    private DraftServiceInterface $service;
     private \Utilities\NukeCompat $nukeCompat;
 
     public function __construct(
         \mysqli $db,
         TeamIdentityRepositoryInterface $commonRepository,
         Season $season,
+        DraftValidatorInterface $validator,
+        DraftRepositoryInterface $repository,
+        DraftProcessorInterface $processor,
+        DraftViewInterface $view,
+        DraftServiceInterface $service,
         ?\Psr\Log\LoggerInterface $auditLogger = null,
         ?\Psr\Log\LoggerInterface $draftLogger = null,
         ?\Utilities\NukeCompat $nukeCompat = null
@@ -40,14 +50,13 @@ class DraftController implements DraftControllerInterface
         $this->db = $db;
         $this->commonRepository = $commonRepository;
         $this->season = $season;
-
-        $this->validator = new DraftValidator();
-        $this->repository = new DraftRepository($db, $commonRepository);
-        $this->processor = new DraftProcessor();
-        $this->view = new DraftView();
+        $this->validator = $validator;
+        $this->repository = $repository;
+        $this->processor = $processor;
+        $this->view = $view;
+        $this->service = $service;
         $this->auditLogger = $auditLogger ?? \Logging\LoggerFactory::getChannel('audit');
         $this->draftLogger = $draftLogger ?? \Logging\LoggerFactory::getChannel('draft');
-        $this->service = new DraftService($db, $commonRepository, $season);
         $this->nukeCompat = $nukeCompat ?? new \Utilities\NukeCompat();
     }
 

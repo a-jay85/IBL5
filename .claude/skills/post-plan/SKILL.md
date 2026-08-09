@@ -386,6 +386,15 @@ never edit or delete an existing row.
 
 Save to memory only if something was learned that would **prevent a bug** in a future session AND cannot be mechanized AND isn't already in MEMORY.md, CLAUDE.md, `.claude/rules/`, or an existing PHPStan rule. Read the target memory file first to avoid duplicates. If nothing qualifies, skip silently.
 
+**Engine divergence.** The escalation ladder and the registry append are **skill-only**. The compiled
+harness (`tools/postplan-harness`) never computes `IS_FIX_OF_PLAN_BEHAVIOR` — its `Classification`
+dataclass has no such field, and its Phase 3 port sees only the file list and the diff text, never
+commit subjects — and its Phase 9 is a bounded Haiku retrospective that records a memory-save intent
+without reading this file. So a harness-driven run routes nothing up the ladder and appends no
+registry row, whatever the fix was. Like Phase 2.5's housekeeping, that is an accepted scope
+reduction, not a bug in this section. Only a skill run (the fallback path, or
+`POST_PLAN_SKILL=1 bin/post-plan-now`) exercises the ladder.
+
 ---
 
 ## Phase 10: Preview Environment

@@ -34,56 +34,71 @@ async function fetchJson(
   return { status: lastStatus, body: null, contentType: lastContentType };
 }
 
+type TabApiSuite = {
+  label: string;
+  ratingsUrl: string;
+  modes: string[];
+  modeUrlFn: (mode: string) => string;
+  modeMsgPrefix: string;
+  allModesTitle: string;
+  hxPushUrl: string;
+  hxPushContains: string[];
+};
+
+function describeTabApi(cfg: TabApiSuite): void {
+  test.describe(cfg.label, () => {
+    test('ratings display returns HTML with table', async ({ request }) => {
+      const response = await request.get(cfg.ratingsUrl);
+      const contentType = response.headers()['content-type'] ?? '';
+      expect(contentType, 'API endpoint must return HTML').toContain('text/html');
+      expect(response.status()).toBe(200);
+      const html = await response.text();
+      expect(html).toContain('<table');
+    });
+
+    test(cfg.allModesTitle, async ({ request }) => {
+      for (const mode of cfg.modes) {
+        const response = await request.get(cfg.modeUrlFn(mode));
+        expect(response.status(), `${cfg.modeMsgPrefix}${mode} should return 200`).toBe(200);
+        const html = await response.text();
+        expect(html.length, `${cfg.modeMsgPrefix}${mode} should return non-empty html`).toBeGreaterThan(0);
+      }
+    });
+
+    test('response includes HX-Push-Url header', async ({ request }) => {
+      const response = await request.get(cfg.hxPushUrl);
+      const pushUrl = response.headers()['hx-push-url'] ?? '';
+      for (const expected of cfg.hxPushContains) {
+        expect(pushUrl).toContain(expected);
+      }
+    });
+  });
+}
+
 // ============================================================
 // DCE Tab API (DepthChartEntry&op=tab-api)
 // Returns HTML table fragment for a given display mode
 // ============================================================
 
+describeTabApi({
+  label: 'DCE Tab API',
+  ratingsUrl: 'modules.php?name=DepthChartEntry&op=tab-api&teamid=1&display=ratings',
+  modes: ['ratings', 'total_s', 'avg_s', 'per36mins', 'contracts'],
+  modeUrlFn: (mode) => `modules.php?name=DepthChartEntry&op=tab-api&teamid=1&display=${mode}`,
+  modeMsgPrefix: '',
+  allModesTitle: 'all valid display modes return table html',
+  hxPushUrl: 'modules.php?name=DepthChartEntry&op=tab-api&teamid=1&display=contracts',
+  hxPushContains: ['display=contracts'],
+});
+
 test.describe('DCE Tab API', () => {
-  test('ratings display returns HTML with table', async ({ request }) => {
-    const response = await request.get(
-      'modules.php?name=DepthChartEntry&op=tab-api&teamid=1&display=ratings',
-    );
-
-    const contentType = response.headers()['content-type'] ?? '';
-    expect(contentType, 'API endpoint must return HTML').toContain('text/html');
-
-    expect(response.status()).toBe(200);
-    const html = await response.text();
-    expect(html).toContain('<table');
-  });
-
-  test('all valid display modes return table html', async ({ request }) => {
-    const modes = ['ratings', 'total_s', 'avg_s', 'per36mins', 'contracts'];
-
-    for (const mode of modes) {
-      const response = await request.get(
-        `modules.php?name=DepthChartEntry&op=tab-api&teamid=1&display=${mode}`,
-      );
-
-      expect(response.status(), `${mode} should return 200`).toBe(200);
-      const html = await response.text();
-      expect(html.length, `${mode} should return non-empty html`).toBeGreaterThan(0);
-    }
-  });
-
   test('invalid display mode falls back to ratings', async ({ request }) => {
     const response = await request.get(
       'modules.php?name=DepthChartEntry&op=tab-api&teamid=1&display=invalid_mode',
     );
-
     expect(response.status()).toBe(200);
     const html = await response.text();
     expect(html).toContain('<table');
-  });
-
-  test('response includes HX-Push-Url header', async ({ request }) => {
-    const response = await request.get(
-      'modules.php?name=DepthChartEntry&op=tab-api&teamid=1&display=contracts',
-    );
-
-    const pushUrl = response.headers()['hx-push-url'] ?? '';
-    expect(pushUrl).toContain('display=contracts');
   });
 });
 
@@ -125,51 +140,22 @@ test.describe('NextSim Tab API', () => {
 // Returns HTML table fragment — public endpoint, no auth required
 // ============================================================
 
+describeTabApi({
+  label: 'Team API',
+  ratingsUrl: 'modules.php?name=Team&op=api&teamid=1&display=ratings',
+  modes: ['ratings', 'total_s', 'avg_s', 'per36mins', 'contracts'],
+  modeUrlFn: (mode) => `modules.php?name=Team&op=api&teamid=1&display=${mode}`,
+  modeMsgPrefix: 'Team API ',
+  allModesTitle: 'all valid display modes return html',
+  hxPushUrl: 'modules.php?name=Team&op=api&teamid=1&display=contracts',
+  hxPushContains: ['display=contracts', 'teamid=1'],
+});
+
 test.describe('Team API', () => {
-  test('ratings display returns HTML with table', async ({ request }) => {
-    const response = await request.get(
-      'modules.php?name=Team&op=api&teamid=1&display=ratings',
-    );
-
-    const contentType = response.headers()['content-type'] ?? '';
-    expect(contentType, 'API endpoint must return HTML').toContain('text/html');
-
-    expect(response.status()).toBe(200);
-    const html = await response.text();
-    expect(html).toContain('<table');
-  });
-
-  test('all valid display modes return html', async ({ request }) => {
-    const modes = ['ratings', 'total_s', 'avg_s', 'per36mins', 'contracts'];
-
-    for (const mode of modes) {
-      const response = await request.get(
-        `modules.php?name=Team&op=api&teamid=1&display=${mode}`,
-      );
-
-      expect(response.status(), `Team API ${mode} should return 200`).toBe(200);
-      const html = await response.text();
-      expect(html.length, `Team API ${mode} should return non-empty html`).toBeGreaterThan(0);
-    }
-  });
-
-  test('response includes HX-Push-Url header', async ({ request }) => {
-    const response = await request.get(
-      'modules.php?name=Team&op=api&teamid=1&display=contracts',
-    );
-
-    const pushUrl = response.headers()['hx-push-url'] ?? '';
-    expect(pushUrl).toContain('display=contracts');
-    expect(pushUrl).toContain('teamid=1');
-  });
-
   test('invalid teamID returns a 4xx client error', async ({ request }) => {
     const response = await request.get(
       'modules.php?name=Team&op=api&teamid=99999&display=ratings',
     );
-
-    // An unknown teamID is a client error: TeamApiHandler guards it with a 404
-    // before Team initialization would otherwise throw a 500.
     expect(response.status()).toBeGreaterThanOrEqual(400);
     expect(response.status()).toBeLessThan(500);
   });
@@ -228,57 +214,25 @@ test.describe('Saved Depth Chart API', () => {
 // Returns HTML position tables fragment for a given display mode
 // ============================================================
 
+describeTabApi({
+  label: 'LeagueStarters API',
+  ratingsUrl: 'modules.php?name=LeagueStarters&op=api&display=ratings',
+  modes: ['ratings', 'total_s', 'avg_s', 'per36mins'],
+  modeUrlFn: (mode) => `modules.php?name=LeagueStarters&op=api&display=${mode}`,
+  modeMsgPrefix: 'LeagueStarters API ',
+  allModesTitle: 'all valid display modes return html',
+  hxPushUrl: 'modules.php?name=LeagueStarters&op=api&display=total_s',
+  hxPushContains: ['display=total_s'],
+});
+
 test.describe('LeagueStarters API', () => {
-  test('ratings display returns HTML with table', async ({ request }) => {
-    const response = await request.get(
-      'modules.php?name=LeagueStarters&op=api&display=ratings',
-    );
-
-    const contentType = response.headers()['content-type'] ?? '';
-    expect(contentType, 'API endpoint must return HTML').toContain('text/html');
-    expect(response.status()).toBe(200);
-
-    const html = await response.text();
-    expect(html).toContain('<table');
-  });
-
-  test('all valid display modes return html', async ({ request }) => {
-    const modes = ['ratings', 'total_s', 'avg_s', 'per36mins'];
-
-    for (const mode of modes) {
-      const response = await request.get(
-        `modules.php?name=LeagueStarters&op=api&display=${mode}`,
-      );
-
-      expect(
-        response.status(),
-        `LeagueStarters API ${mode} should return 200`,
-      ).toBe(200);
-      const html = await response.text();
-      expect(
-        html.length,
-        `LeagueStarters API ${mode} should return non-empty html`,
-      ).toBeGreaterThan(0);
-    }
-  });
-
   test('invalid display mode falls back to ratings', async ({ request }) => {
     const response = await request.get(
       'modules.php?name=LeagueStarters&op=api&display=invalid_mode',
     );
-
     expect(response.status()).toBe(200);
     const html = await response.text();
     expect(html).toContain('<table');
-  });
-
-  test('response includes HX-Push-Url header', async ({ request }) => {
-    const response = await request.get(
-      'modules.php?name=LeagueStarters&op=api&display=total_s',
-    );
-
-    const pushUrl = response.headers()['hx-push-url'] ?? '';
-    expect(pushUrl).toContain('display=total_s');
   });
 });
 

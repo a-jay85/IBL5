@@ -56,9 +56,15 @@ class FreeAgencyProcessor implements FreeAgencyProcessorInterface
     /**
      * @see FreeAgencyProcessorInterface::processOfferSubmission()
      */
-    public function processOfferSubmission(array $postData, string $verifiedTeamName): array
+    public function processOfferSubmission(array $postData, ?string $verifiedTeamName): array
     {
         // Acting team is the verified session team — never read from POST (IDOR fix D-07).
+        // Refuse before touching any collaborator when the caller could not establish an
+        // acting team (null/empty/free-agent pseudo-team). This is the authz verdict the
+        // controller previously enforced via an inline redirect.
+        if ($verifiedTeamName === null || $verifiedTeamName === '' || $verifiedTeamName === \League\League::FREE_AGENTS_TEAM_NAME) {
+            return ['success' => false, 'type' => 'unauthorized', 'message' => 'Unable to determine your team.', 'playerID' => 0];
+        }
         $teamName = $verifiedTeamName;
         $rawPlayerID = $postData['playerID'] ?? 0;
         $playerID = is_numeric($rawPlayerID) ? (int) $rawPlayerID : 0;
@@ -330,8 +336,15 @@ _**{$playerTeam}** GM <@!$playerTeamDiscordID> could not be reached for comment.
     /**
      * @see FreeAgencyProcessorInterface::deleteOffers()
      */
-    public function deleteOffers(string $teamName, int $playerID): array
+    public function deleteOffers(?string $teamName, int $playerID): array
     {
+        // Refuse before touching any collaborator when the caller could not establish an
+        // acting team (null/empty/free-agent pseudo-team). This is the authz verdict the
+        // controller previously enforced via an inline redirect.
+        if ($teamName === null || $teamName === '' || $teamName === \League\League::FREE_AGENTS_TEAM_NAME) {
+            return ['success' => false, 'error' => 'Unable to determine your team.'];
+        }
+
         $teamid = $this->commonRepo->getTidFromTeamname($teamName) ?? 0;
 
         $this->repository->deleteOffer($teamid, $playerID);

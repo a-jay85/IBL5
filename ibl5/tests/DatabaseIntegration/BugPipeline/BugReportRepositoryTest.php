@@ -162,6 +162,29 @@ class BugReportRepositoryTest extends DatabaseTestCase
         self::assertSame(1, $row['cnt']);
     }
 
+    /**
+     * Atomicity pin for the 1.26 split: the delegated watermark write must run on the
+     * facade's OWN mysqli handle. DatabaseTestCase already opens a transaction on that
+     * handle, so rolling it back here discards every write that joined it. If a
+     * sub-repository ever gets its own connection, its watermark write commits
+     * independently and survives this rollback — which is exactly the regression the
+     * split risks and which replay-safety alone does not detect.
+     */
+    public function testEnqueueAuthorizedAndAdvanceWatermarkJoinsTheFacadeTransaction(): void
+    {
+        $id = $this->repo->enqueueAuthorizedAndAdvance(self::AUTHOR, self::CHANNEL, self::MSG_ID, 'bug text');
+        self::assertNotNull($this->repo->findById($id));
+        self::assertSame(self::MSG_ID, $this->repo->findPipelineState(self::CHANNEL));
+
+        $this->db->rollback();
+
+        self::assertNull($this->repo->findById($id), 'report row must roll back with the transaction');
+        self::assertNull(
+            $this->repo->findPipelineState(self::CHANNEL),
+            'watermark must roll back with it — a second connection would have committed it'
+        );
+    }
+
     // ── stampThreadReply ───────────────────────────────────────────────────────
 
     public function testStampThreadReplyReturnsFalseWhenNoMatch(): void

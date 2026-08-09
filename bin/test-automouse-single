@@ -2,7 +2,7 @@
 # shellcheck shell=bash
 #
 # bin/test-automouse-single — characterization + regression test for the
-# bin/automouse-run plan <slug> single-plan mode.
+# bin/automouse/run plan <slug> single-plan mode.
 #
 # Verifies: selection guard (only the named plan runs), untouched-queue contract,
 # self-heal gated OFF in single mode, auto-queue-if-absent, hard-fail on
@@ -80,10 +80,11 @@ STUB
 chmod +x "$STUBDIR/claude"
 
 # --- Copy real runner; redirect NIGHTLY_DIR + stub PATH --------------------
-RUNNER="$ROOT/automouse-run"
+RUNNER="$ROOT/automouse/run"
 sed -e "s#^NIGHTLY_DIR=.*#NIGHTLY_DIR=\"$NDIR\"#" \
+    -e "s#^REPO=.*#REPO=\"$REPO\"#" \
     -e "s#^export PATH=.*#export PATH=\"$STUBDIR:/usr/local/bin:/opt/homebrew/bin:\$PATH\"#" \
-    "$REPO/bin/automouse-run" > "$RUNNER"
+    "$REPO/bin/automouse/run" > "$RUNNER"
 chmod +x "$RUNNER"
 
 # --- Helpers ---------------------------------------------------------------
@@ -140,7 +141,7 @@ touch "$NDIR/skipped/plan-skip.md.staleness"
 # Clone the state to a temp copy and run self-heal on it.
 CLONE="$ROOT/clone-case2"
 cp -r "$NDIR" "$CLONE"
-if NIGHTLY_DIR="$CLONE" PLANS_DIR="$PDIR" "$REPO/bin/automouse-self-heal" >/dev/null 2>&1; then
+if NIGHTLY_DIR="$CLONE" PLANS_DIR="$PDIR" "$REPO/bin/automouse/self-heal" >/dev/null 2>&1; then
     if [ -e "$CLONE/queue/plan-skip.md" ]; then
         echo "positive-control: self-heal WOULD requeue plan-skip — fixture is non-vacuous."
     else

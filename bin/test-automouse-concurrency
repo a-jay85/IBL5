@@ -2,7 +2,7 @@
 # shellcheck shell=bash
 #
 # bin/test-automouse-concurrency — regression test proving two simultaneous
-# `bin/automouse-run` sessions are safe: the atomic-mkdir claim lock
+# `bin/automouse/run` sessions are safe: the atomic-mkdir claim lock
 # (claim_next_plan) guarantees each queued plan is executed exactly once, the
 # queue drains correctly under contention, and all locks/attempt files are reaped.
 #
@@ -81,10 +81,11 @@ chmod +x "$STUBDIR/claude"
 #   1. point the hardcoded NIGHTLY_DIR at our temp dir;
 #   2. replace the runner's own `export PATH=` (which re-prepends system bins and
 #      would shadow our stub) with one that puts STUBDIR first.
-RUNNER="$ROOT/automouse-run"
+RUNNER="$ROOT/automouse/run"
 sed -e "s#^NIGHTLY_DIR=.*#NIGHTLY_DIR=\"$NDIR\"#" \
+    -e "s#^REPO=.*#REPO=\"$REPO\"#" \
     -e "s#^export PATH=.*#export PATH=\"$STUBDIR:/usr/local/bin:/opt/homebrew/bin:\$PATH\"#" \
-    "$REPO/bin/automouse-run" > "$RUNNER"
+    "$REPO/bin/automouse/run" > "$RUNNER"
 chmod +x "$RUNNER"
 
 echo "Seeded $N_PLANS plans. Launching two concurrent runners..."

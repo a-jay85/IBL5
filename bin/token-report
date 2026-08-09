@@ -2,7 +2,7 @@
 # bin/token-report — on-demand token-spend analysis of interactive Claude Code
 # session transcripts. Sums usage tokens per model over a trailing window and
 # prints a markdown table. Companion to the automouse nightly cost roll-up
-# (bin/automouse-run): that measures headless queue spend; this measures the
+# (bin/automouse/run): that measures headless queue spend; this measures the
 # interactive sessions the nightly ledger never sees. See T1 in
 # ibl5/docs/backlog/token-spend-backlog.md.
 #

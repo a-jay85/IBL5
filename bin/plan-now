@@ -45,10 +45,10 @@
 # still landed unconfirmed on a 1294-byte transcript containing only its closing
 # message). If you ever move that marker instruction, it must stay in the final
 # message — or this job must switch to `--output-format stream-json --verbose` and
-# parse the event stream, the way bin/automouse-run and bin/bug-pipeline-tick do.
+# parse the event stream, the way bin/automouse/run and bin/bug-pipeline-tick do.
 # That was considered and not taken: it turns $OUT from the human-readable transcript
 # the log `cat`s into a multi-MB JSON event stream, which would need a filter
-# (bin/lib/automouse-stream-filter) this job has no other use for. The only thing the
+# (bin/lib/automouse-stream-filter.sh) this job has no other use for. The only thing the
 # early print bought was identifying a TIMED-OUT run, and rc != 0 is already a
 # never-green path below that skips check-plan regardless.
 #
@@ -132,14 +132,14 @@ cp "$PROMPT_SRC" "$PROMPT"
 # The headless coda. It lives HERE, not in the skill's drafted block, so every
 # fired run carries it even when the drafting session forgets — and so the block
 # on the clipboard stays a clean paste for a human-run session.
-# Never run \`bin/automouse-queue\` yourself — under BOTH dispositions. This job
+# Never run \`bin/automouse/queue\` yourself — under BOTH dispositions. This job
 # queues (or doesn't) after its own check-plan verdict; a second queue call from
 # inside the run would bypass that gate. The two lines differ only in what the plan
 # author needs to know about where the plan lands.
 if [ "$DISPOSITION" = "queue" ]; then
-    DISPOSITION_LINE="Disposition: **--queue** (the default). Write the plan and stop — do NOT run \`bin/automouse-queue\` yourself. This job queues it for automouse automatically, but ONLY if you exit cleanly AND \`bin/check-plan\` passes on your plan. So a plan that does not pass simply never runs: fix everything \`check-plan\` reports before you finish. Automouse will implement this plan unattended and open its PR — write it to be executed, not to be skimmed."
+    DISPOSITION_LINE="Disposition: **--queue** (the default). Write the plan and stop — do NOT run \`bin/automouse/queue\` yourself. This job queues it for automouse automatically, but ONLY if you exit cleanly AND \`bin/check-plan\` passes on your plan. So a plan that does not pass simply never runs: fix everything \`check-plan\` reports before you finish. Automouse will implement this plan unattended and open its PR — write it to be executed, not to be skimmed."
 else
-    DISPOSITION_LINE="Disposition: **--implement**. Write the plan and stop — do NOT run \`bin/automouse-queue\`. The plan stays on disk at \`~/claude-plans/<slug>.md\` and a human reviews it before it implements."
+    DISPOSITION_LINE="Disposition: **--implement**. Write the plan and stop — do NOT run \`bin/automouse/queue\`. The plan stays on disk at \`~/claude-plans/<slug>.md\` and a human reviews it before it implements."
 fi
 
 cat >> "$PROMPT" <<CODA
@@ -203,13 +203,13 @@ CODA
     printf 'PLIST=%q\n'      "$PLIST"
     printf 'DISPOSITION=%q\n' "$DISPOSITION"
     printf 'CHECK_PLAN=%q\n' "$ROOT/bin/check-plan"
-    printf 'AUTOMOUSE_QUEUE=%q\n' "$ROOT/bin/automouse-queue"
+    printf 'AUTOMOUSE_QUEUE=%q\n' "$ROOT/bin/automouse/queue"
     # PLAN_NOW_CLAUDE lets a smoke test stub the model call and exercise the
     # detection + check-plan half of the runner (same shape as bug-pipeline-tick's
     # $CLAUDE_BIN). Unset in real use.
     printf 'CLAUDE_BIN=%q\n' "${PLAN_NOW_CLAUDE:-claude}"
     cat <<'RUNNER_EOF'
-# launchd runs with a minimal env — same PATH prelude bin/automouse-run uses.
+# launchd runs with a minimal env — same PATH prelude bin/automouse/run uses.
 export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
 cd "$ROOT" || exit 1
 
@@ -296,7 +296,7 @@ promote_draft() {
 
 # CLAUDE_HEADLESS=1 marks the run unattended (skills branch on it).
 # CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000 lifts the interactive 120K
-# autoCompactWindow pin — rationale in bin/automouse-run.
+# autoCompactWindow pin — rationale in bin/automouse/run.
 # caffeinate -s keeps the Mac awake on AC for the run's duration.
 # 5400s: the first two real runs took 36 and 42 minutes, too close to the old
 # 3600s cap. claude -p does not stream, so $OUT stays empty until it exits — and with
@@ -367,7 +367,7 @@ elif [ -n "$plan" ]; then
         if [ "$DISPOSITION" = "queue" ]; then
             if "$AUTOMOUSE_QUEUE" "$plan"; then
                 echo "plan-now: queued for automouse — it will implement this plan and open its PR."
-                echo "plan-now: to pull it back out: bin/automouse-queue remove $(basename "${plan%.md}")"
+                echo "plan-now: to pull it back out: bin/automouse/queue remove $(basename "${plan%.md}")"
             else
                 echo "plan-now: WARNING — check-plan passed but automouse-queue failed; the plan is on disk, unqueued."
             fi
@@ -493,7 +493,7 @@ else
             if [ "$DISPOSITION" = "queue" ]; then
                 if "$AUTOMOUSE_QUEUE" "$recovered"; then
                     echo "plan-now: queued for automouse (recovered plan) — it will implement this plan and open its PR."
-                    echo "plan-now: to pull it back out: bin/automouse-queue remove $(basename "${recovered%.md}")"
+                    echo "plan-now: to pull it back out: bin/automouse/queue remove $(basename "${recovered%.md}")"
                 else
                     echo "plan-now: WARNING — check-plan passed but automouse-queue failed; the recovered plan is on disk, unqueued."
                 fi

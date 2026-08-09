@@ -16,7 +16,7 @@
 # survives closing Claude Code or the terminal — a plain `nohup … &` launched
 # from Claude Code's Bash tool shares the tool-shell's process group and dies
 # with it, so launchd is the load-bearing detach mechanism (same reason
-# bin/automouse-run uses launchd).
+# bin/automouse/run uses launchd).
 #
 # The plan is resolved from the branch slug — by harness Phase 1 (plan-blind if
 # absent) or /post-plan skill Phase 1. No handoff file is needed.
@@ -150,13 +150,13 @@ if [ "${POST_PLAN_SKILL:-0}" != "1" ] && [ -x "$HARNESS/run" ]; then
     ENGINE="compiled post-plan harness (fails CLOSED on rebase conflict; falls back to the skill on other failures)"
 fi
 
-# launchd runs with a minimal env, so prepend the same PATH bin/automouse-run uses
+# launchd runs with a minimal env, so prepend the same PATH bin/automouse/run uses
 # (proven to find claude/gh/docker/node for full post-plan runs). CLAUDE_HEADLESS=1
 # marks the detached run unattended: /post-plan skips the Phase 10 preview rebuild
 # and BLOCKS auto-merge on a golden-snapshot change instead of merely warning.
 # caffeinate -s keeps the Mac awake on AC for the run's duration.
 # CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000 lifts the interactive 120K
-# autoCompactWindow pin for this headless run — rationale in bin/automouse-run.
+# autoCompactWindow pin for this headless run — rationale in bin/automouse/run.
 # CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 stops the harness terminating a
 # long-running backgrounded sub-agent mid-run (see bin/plan-now for the full
 # rationale). Applies to the /post-plan skill fallback only.

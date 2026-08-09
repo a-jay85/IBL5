@@ -399,9 +399,9 @@ For every plan that passed `bin/check-plan` in Step 5, decide its disposition by
 
 1. **Explicit token in `$ARGUMENTS`** wins outright: `--implement` (or "implement now") → do NOT queue; leave the plan on disk and report it ready to implement. `--queue` → queue.
 2. **Else, clear session intent to implement now** (the user said they will implement it in this session, or implementation is already underway) → do NOT queue.
-3. **Else, default: auto-queue.** Run `bin/automouse-queue <slug>` for the plan.
+3. **Else, default: auto-queue.** Run `bin/automouse/queue <slug>` for the plan.
 
-When the work was split into multiple PRs (Step 2.5), queue **every** queue-safe unit, running `bin/automouse-queue <slug>` once per plan in dependency order (the order they must merge). A plan that did not pass `bin/check-plan` is never queued — fix it first.
+When the work was split into multiple PRs (Step 2.5), queue **every** queue-safe unit, running `bin/automouse/queue <slug>` once per plan in dependency order (the order they must merge). A plan that did not pass `bin/check-plan` is never queued — fix it first.
 
 Report which plans were queued (and which were left for in-session implementation) in Step 6.
 
@@ -409,7 +409,7 @@ Report which plans were queued (and which were left for in-session implementatio
 
 Tell the user:
 - The plan file path — **all of them** when the work was split into multiple PRs
-- The **disposition** of each plan: auto-queued for automouse (default), or left for in-session implementation (`--implement` / clear implement-now intent) — and the resulting `bin/automouse-queue` state
+- The **disposition** of each plan: auto-queued for automouse (default), or left for in-session implementation (`--implement` / clear implement-now intent) — and the resulting `bin/automouse/queue` state
 - A one-line matrix summary per plan (e.g., "12 items: 7 PHPUnit, 3 E2E, 2 CLI-executable, 0 truly-manual")
 - Whether any security surface was flagged and how each is defended (or "no security surface touched")
 - Whether the PR is eligible to auto-merge on green CI (default) or is held for a human merge (`auto_merge: false`, per Step 4 gate 14) — and why, if held

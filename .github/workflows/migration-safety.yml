@@ -62,7 +62,7 @@ jobs:
         mysql -h 127.0.0.1 -u root -proot -e "CREATE DATABASE ibl5_php;"
 
     - name: "Bash path: apply all migrations"
-      run: ibl5/bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5_bash
+      run: ibl5/bin/run-migrations-ci -h 127.0.0.1 -u root -proot ibl5_bash
 
     - name: "PHP path: apply baseline via mysql client, then PHP runner for the rest"
       working-directory: ibl5
@@ -140,8 +140,8 @@ jobs:
 
     - name: Apply all migrations
       run: |
-        chmod +x ibl5/bin/run-migrations-ci.sh
-        ibl5/bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5_completeness
+        chmod +x ibl5/bin/run-migrations-ci
+        ibl5/bin/run-migrations-ci -h 127.0.0.1 -u root -proot ibl5_completeness
 
     - name: Seed PHP migration tracker
       working-directory: ibl5
@@ -298,7 +298,7 @@ jobs:
       uses: ./.github/actions/setup-php-env
 
     - name: Apply all migrations to scratch DB
-      run: ibl5/bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5_schema
+      run: ibl5/bin/run-migrations-ci -h 127.0.0.1 -u root -proot ibl5_schema
 
     - name: Regenerate current-schema.sql
       run: |

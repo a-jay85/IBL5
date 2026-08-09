@@ -2,7 +2,7 @@
 # shellcheck shell=bash
 #
 # bin/test-automouse-queue — regression test for evict_dispositions in
-# bin/automouse-queue. Covers the duplicate-disposition symlink bug: queuing a
+# bin/automouse/queue. Covers the duplicate-disposition symlink bug: queuing a
 # previously-done/skipped plan must evict the stale sibling before creating the
 # new queue/ entry.
 #
@@ -11,7 +11,7 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-SCRIPT="$SCRIPT_DIR/automouse-queue"
+SCRIPT="$SCRIPT_DIR/automouse/queue"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
@@ -232,7 +232,7 @@ echo "ok: row16 — queues a clean, correctly-marked plan"
 # ===========================================================================
 # reorder subcommand — permutation validation + spaced ascending-mtime touch.
 # Order is asserted via `ls -1tr` (oldest-first) — exactly how
-# bin/automouse-run claims the next plan.  GNU ls uses symlink lstat mtime;
+# bin/automouse/run claims the next plan.  GNU ls uses symlink lstat mtime;
 # BSD ls uses target stat mtime.  reorder touches both, so results agree.
 # ===========================================================================
 

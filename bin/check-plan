@@ -47,7 +47,7 @@
 #                              `impl_model: sonnet`; a zero-manual matrix
 #                              requires a deliberate `impl_model:` marker
 #                              (sonnet, or an explicit opus). Shared with
-#                              bin/automouse-queue's queue-time backstop via
+#                              bin/automouse/queue's queue-time backstop via
 #                              bin/lib/plan-model-consistency so the two call
 #                              sites cannot drift — see that script for the
 #                              full rule table.
@@ -497,7 +497,7 @@ fi
 # Gate 13: impl_model <-> Verification Matrix consistency.
 # ---------------------------------------------------------------------------
 # Delegates to bin/lib/plan-model-consistency, which BOTH this gate and
-# bin/automouse-queue's queue-time backstop call — kept in one place so the
+# bin/automouse/queue's queue-time backstop call — kept in one place so the
 # two cannot drift. That script already skips silently (exit 0, no output)
 # when the plan has no Verification Matrix at all, so this gate never
 # double-reports gate 1's failure.
@@ -803,7 +803,7 @@ rm -f "$_PHASE_TMP"
 # ---------------------------------------------------------------------------
 # Gate T: below-run-model tier labels are bound (packet or inline marker).
 # ---------------------------------------------------------------------------
-# Resolve the whole-plan run model with the same resolver bin/automouse-run uses,
+# Resolve the whole-plan run model with the same resolver bin/automouse/run uses,
 # then rank it opus=3 > sonnet=2 > haiku=1 (unknown/default → opus). A phase whose
 # **Tier:** line names a tier BELOW that rank must be acted on: a ### Delegate
 # packet, or an `(inline — reason)` marker on the Tier line. A bare below-run-model

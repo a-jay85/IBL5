@@ -1,11 +1,11 @@
 <?php
 // Router for `php -S 127.0.0.1:<port> bin/lib/automouse-reorder-router.php`,
-// spawned by bin/automouse-queue-reorder-ui. Serves a self-contained
+// spawned by bin/automouse/queue-reorder-ui. Serves a self-contained
 // drag-and-drop page (GET /) and applies a reorder (POST /apply) by shelling
-// out to the tested `bin/automouse-queue reorder` engine — this layer holds no
+// out to the tested `bin/automouse/queue reorder` engine — this layer holds no
 // validation of its own. Inputs arrive via inherited env from the launcher:
 //   AUTOMOUSE_QUEUE_ORDER  newline-separated queue basenames, ls -1tr order
-//   AUTOMOUSE_QUEUE_CMD    absolute path to bin/automouse-queue
+//   AUTOMOUSE_QUEUE_CMD    absolute path to bin/automouse/queue
 //   AUTOMOUSE_SENTINEL     file the router writes ONLY on a successful apply
 //   NIGHTLY_DIR / PLANS_DIR  inherited so the shelled-out engine sees the same queue
 //
@@ -48,7 +48,7 @@ function apply_reorder(): void
         }
     }
 
-    $queueCmd = getenv('AUTOMOUSE_QUEUE_CMD') ?: 'automouse-queue';
+    $queueCmd = getenv('AUTOMOUSE_QUEUE_CMD') ?: 'automouse/queue';
     // escapeshellarg every token (defense-in-depth on top of the engine's own
     // permutation validation); 2>&1 so the engine's error text flows back.
     $cmd = escapeshellarg($queueCmd) . ' reorder '

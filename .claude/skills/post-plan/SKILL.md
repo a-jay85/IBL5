@@ -415,12 +415,12 @@ PR_STATE=$(gh pr view <PR_NUMBER> --json state --jq '.state')
 
 **You MUST execute this phase before ending your turn.** This is not optional even if all earlier phases succeeded cleanly.
 
-Background shells from earlier phases (`bin/e2e-wt.sh` in Phase 5, `gh pr checks --watch` in Phase 7) may still be running. If they hold the pipeline open after you emit your final response, the automouse runner's stall-kill fires after 10 minutes and burns an attempt — three burns poison-pill the plan.
+Background shells from earlier phases (`bin/e2e-wt` in Phase 5, `gh pr checks --watch` in Phase 7) may still be running. If they hold the pipeline open after you emit your final response, the automouse runner's stall-kill fires after 10 minutes and burns an attempt — three burns poison-pill the plan.
 
 Kill known lingering patterns so their tool results deliver immediately (cache warm) rather than hours later (cache miss):
 
 ```bash
-pkill -f 'bin/e2e-wt\.sh' 2>/dev/null
+pkill -f 'bin/e2e-wt' 2>/dev/null
 pkill -f 'bunx.*playwright' 2>/dev/null
 pkill -f 'gh pr checks.*--watch' 2>/dev/null
 rm -f /tmp/post-plan-spec-diff-$PPID /tmp/post-plan-spec-prod-diff-$PPID /tmp/post-plan-missing-tests-$PPID /tmp/post-plan-conformance-done-$PPID 2>/dev/null

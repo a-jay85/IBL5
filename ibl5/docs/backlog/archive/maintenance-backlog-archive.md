@@ -567,8 +567,8 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Table evidence (2026-07-25):** #1008 — `config.php` now `$display_errors = true`; OR-bug gone (verified).
 ### 3.4 `configOlympics.php` Is Dead-Code Credential File
 **Location:** ibl5/configOlympics.php
-**Problem:** Identical production credentials, never `require`d. Olympics now uses the same DB via `LeagueContext`. Only reference is a `ibl5/bin/e2e-local.sh` guard comment.
-**Suggested direction:** Delete; update `ibl5/bin/e2e-local.sh`; add to `.gitignore` as safety.
+**Problem:** Identical production credentials, never `require`d. Olympics now uses the same DB via `LeagueContext`. Only reference is a `ibl5/bin/e2e-local` guard comment.
+**Suggested direction:** Delete; update `ibl5/bin/e2e-local`; add to `.gitignore` as safety.
 **Est. effort:** S
 **Risk if untouched:** Dead credential file confuses; risks recommit.
 **Status:** Completed (verified 2026-05-29 audit) — `configOlympics.php` deleted from disk.
@@ -1343,6 +1343,14 @@ CLI (superseded by `OlympicsSchemaParityTest.php`) and the franchise-seasons
 one-time backfill (its tables now live in the baseline schema + migrations).
 
 **Table evidence (2026-07-25):** Script-home convention documented (bin/README.md).
+### 8.3 Mixed kebab-case, camelCase, `.sh` Extensions
+**Location:** `/bin/` and `ibl5/bin/`
+**Problem:** Inconsistent: 3 scripts have `.sh`, 11 don't.
+**Suggested direction:** All executables kebab-case, no extension.
+**Est. effort:** S
+**Risk if untouched:** Copy-paste errors from inconsistent examples.
+
+**Table evidence (2026-07-27):** `.sh` stripped from `bin/e2e-wt`, `ibl5/bin/e2e-local`, `ibl5/bin/run-migrations-ci`, `ibl5/bin/visual-regression`; `bin/lib/automouse-stream-filter` renamed to `automouse-stream-filter.sh` for consistency. Caller sweep across CI YAML, `.claude/`, `ibl5/docs/`, `bin/README.md`, `ibl5/bin/README.md`, and `bin/test` completed. Gate: grep for old `.sh` names returns 0 hits.
 ### 8.4 `shellScripts/` Has No Shell Scripts
 **Location:** ibl5/shellScripts/
 **Problem:** Only contains DB dumps + a `.env` file. No `.sh` files. Misleading name.
@@ -1352,6 +1360,15 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Status:** Completed (verified 2026-06-20) — `shellScripts/` absent from working tree and git index.
 
 **Table evidence (2026-07-25):** `shellScripts/` absent from tree + index (verified); follows 8.1.
+### 8.5 Orphan / Deprecated Scripts in `ibl5/scripts/`
+**Location:** `ibl5/scripts/plrScratchpad.php`, `tradition.php`
+**Problem:** Scratchpad is experimental; tradition.php has no nav reference but is linked from LeagueControlPanel. Neither has tests.
+**Suggested direction:** Archive scratchpad; verify tradition.php usage and migrate to Service class or document as legacy.
+**Est. effort:** S
+**Risk if untouched:** Maintenance burden on unclear-status scripts.
+**Status:** Tradition half resolved (2026-06-09) — `scripts/tradition.php` deleted; its compute loop migrated into `LeagueControlPanelProcessor::updateTradition()` behind the LCP `is_admin()` guard. `plrScratchpad.php` archiving still open.
+
+**Table evidence (2026-07-27):** `ibl5/scripts/plrScratchpad.php` archived to `ibl5/scripts/archive/plrScratchpad.php` (git mv). Both `tradition.php` (2026-06-09) and `plrScratchpad.php` are now gone from `ibl5/scripts/`; finding fully resolved.
 ### 8.6 `classes/Scripts/` vs `scripts/` Overlap
 **Location:** Both directories
 **Problem:** Two "Scripts" dirs; classes/Scripts holds business-logic; scripts/ holds web entry points.
@@ -1377,6 +1394,22 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Risk if untouched:** Archive grows; future refactors re-reference old code.
 
 **Table evidence (2026-07-25):** `scripts/archive/README.md` (docs). **Status:** Added `ibl5/scripts/archive/README.md` documenting the two retained-but-not-run 2007 box-score import scripts + the archive policy (this PR).
+### 8.9 `bin/lib/` Has No Manifest
+**Location:** `/bin/lib/`
+**Problem:** 4 shared shell helpers (`db-helpers.sh`, `git-helpers.sh`, `wt-guards.sh`, `automouse-stream-filter`). Inconsistent: filter has no `.sh`.
+**Suggested direction:** Rename for consistency; add bin/lib/README.md.
+**Est. effort:** S
+**Risk if untouched:** Devs unsure which helpers exist; duplication.
+
+**Table evidence (2026-07-27):** `bin/lib/automouse-stream-filter` renamed to `bin/lib/automouse-stream-filter.sh` (consistent with sibling `.sh` helpers); `bin/lib/README.md` created listing all 14 lib files with one-line purpose each.
+### 8.11 Automouse Workflow Scripts Have Complex State
+**Location:** `/bin/automouse-*` (4 files)
+**Problem:** `automouse-run`, `automouse-queue` are executables; `automouse-prompt-impl`, `automouse-prompt-postplan` are templates. No README.
+**Suggested direction:** Move to bin/automouse/; add README explaining data flow.
+**Est. effort:** M
+**Risk if untouched:** Workflow opaque; debugging hard.
+
+**Table evidence (2026-07-27):** All six `bin/automouse-*` scripts moved to `bin/automouse/` (prefix stripped, directory introduced). `bin/automouse/README.md` added. Caller sweep completed across CI YAML, `.claude/`, `ibl5/docs/`, `bin/README.md`, and all `bin/test-automouse-*` test files. Gate: grep for old `bin/automouse-*` paths returns 0 hits.
 ### 8.12 Plaintext Credentials in `.env`
 **Location:** ibl5/shellScripts/.env
 **Problem:** Production SSH + MariaDB credentials in plaintext.
@@ -1395,6 +1428,14 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Status:** Resolved (2026-06-09). Tradition half — unauthenticated `scripts/tradition.php` deleted; mutation now runs only via the `is_admin()`-guarded `update_tradition` POST action in the LCP. `updateAllTheThings.php` half — the unauthenticated-CSRF GET link was replaced by an `is_admin()`-guarded, CSRF-validated POST button in the LCP; the script is now POST-only (`is_admin()` 403 before the method check; `CsrfGuard::validateToken(..., 'lcp_update_all')` on the POST), so a cross-site GET can no longer fire the full-league mutation.
 
 **Table evidence (2026-07-25):** Web-mutation scripts auth-resolved (2026-06-09): admin-guarded CSRF POST.
+### 8.14 Mixed PHP Bootstrap Styles in Scripts
+**Location:** `ibl5/scripts/`
+**Problem:** Some scripts use `require '../mainfile.php'`; others use `require '../vendor/autoload.php'`. Inconsistent.
+**Suggested direction:** Standardize on modern bootstrap.
+**Est. effort:** S
+**Risk if untouched:** New scripts copy old pattern; debt grows.
+
+**Table evidence (2026-07-27):** `ibl5/scripts/` standardized on `require '../vendor/autoload.php'` bootstrap; `mainfile.php`-style require replaced across active scripts. `plrScratchpad.php` (the one still using the old pattern) archived at 8.5.
 ### 8.16 Check Scripts Have Inconsistent Output / Exit Codes
 **Location:** `/bin/check-*` and `ibl5/bin/check-*`
 **Problem:** No standardized "pass" output format.

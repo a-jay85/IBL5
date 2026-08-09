@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 #
-# bin/test-automouse-stream-filter — regression test for bin/lib/automouse-stream-filter.
+# bin/test-automouse-stream-filter — regression test for bin/lib/automouse-stream-filter.sh.
 #
 # The filter reads `claude -p --output-format stream-json` NDJSON and emits the
 # per-phase automouse log lines (tool: / exit: / COMPACTION:). This pins the
@@ -19,7 +19,7 @@
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-FILTER="$SCRIPT_DIR/lib/automouse-stream-filter"
+FILTER="$SCRIPT_DIR/lib/automouse-stream-filter.sh"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP" 2>/dev/null' EXIT
 

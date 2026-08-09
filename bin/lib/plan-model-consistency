@@ -3,7 +3,7 @@
 #
 # bin/lib/plan-model-consistency — shared impl_model <-> Verification-Matrix
 # consistency check. Used by BOTH bin/check-plan (gate M) and
-# bin/automouse-queue (queue-time backstop) so the two call sites cannot drift.
+# bin/automouse/queue (queue-time backstop) so the two call sites cannot drift.
 #
 # Mechanizes /plan Step-4 gate 13's prose rule: a plan whose Verification Matrix
 # carries zero Truly-manual rows is (by definition) uniformly machine-checkable,

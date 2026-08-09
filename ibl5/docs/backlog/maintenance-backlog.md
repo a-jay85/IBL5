@@ -452,40 +452,13 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
-> ✅ resolved (10): 8.1, 8.2, 8.4, 8.6, 8.7, 8.8, 8.12, 8.13, 8.16, 8.17 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (15): 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8, 8.9, 8.11, 8.12, 8.13, 8.14, 8.16, 8.17 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 8.3 | ⬜ Open | 🟩 | kebab-case/`.sh` consistency. Rename + caller sweep (CI/hooks refs); green-green. |
-| 8.5 | ◑ Partial | 🟩 | `tradition.php` deleted; `scripts/plrScratchpad.php` still present (verified) → archive it. |
-| 8.9 | ⬜ Open | 🟩 | bin/lib manifest + helper rename. |
 | 8.10 | ⬜ Open | 🟨 | Interactive-vs-CI convention — upfront decision (`check-*`/`test-*` prefix vs a dedicated `ci/` subdir). |
-| 8.11 | ⬜ Open | 🟩 | Move `automouse-*` to bin/automouse/ + README; caller sweep (launchd plist refs). |
-| 8.14 | ⬜ Open | 🟩 | Standardize script bootstrap; green-green per script. |
 | 8.15 | ⬜ Open | 🟨 | Consolidate the two E2E drivers — context-detection design; mind the outside-repo `e2e-for-pr` gotcha. |
 | 8.18 | ⬜ Open | 🟨 | `bin/bug-pipeline-tick` parses and writes DB timestamps in **host-local** time while MariaDB stores UTC — idle reminders fire ~7h late and `blocked_until` backoffs expire on write. Fix is mechanical (force UTC on both sides); 🟨 because the bash driver has no regression pin, so one must ship with it. (discovered 2026-08-09 during the PR #1683 review) |
-
-### 8.3 Mixed kebab-case, camelCase, `.sh` Extensions
-**Location:** `/bin/` and `ibl5/bin/`
-**Problem:** Inconsistent: 3 scripts have `.sh`, 11 don't.
-**Suggested direction:** All executables kebab-case, no extension.
-**Est. effort:** S
-**Risk if untouched:** Copy-paste errors from inconsistent examples.
-
-### 8.5 Orphan / Deprecated Scripts in `ibl5/scripts/`
-**Location:** `ibl5/scripts/plrScratchpad.php`, `tradition.php`
-**Problem:** Scratchpad is experimental; tradition.php has no nav reference but is linked from LeagueControlPanel. Neither has tests.
-**Suggested direction:** Archive scratchpad; verify tradition.php usage and migrate to Service class or document as legacy.
-**Est. effort:** S
-**Risk if untouched:** Maintenance burden on unclear-status scripts.
-**Status:** Tradition half resolved (2026-06-09) — `scripts/tradition.php` deleted; its compute loop migrated into `LeagueControlPanelProcessor::updateTradition()` behind the LCP `is_admin()` guard. `plrScratchpad.php` archiving still open.
-
-### 8.9 `bin/lib/` Has No Manifest
-**Location:** `/bin/lib/`
-**Problem:** 4 shared shell helpers (`db-helpers.sh`, `git-helpers.sh`, `wt-guards.sh`, `automouse-stream-filter`). Inconsistent: filter has no `.sh`.
-**Suggested direction:** Rename for consistency; add bin/lib/README.md.
-**Est. effort:** S
-**Risk if untouched:** Devs unsure which helpers exist; duplication.
 
 ### 8.10 No Convention for Interactive vs CI Scripts
 **Location:** `/bin/`
@@ -494,22 +467,8 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Est. effort:** M
 **Risk if untouched:** Accidental human runs of CI scripts; CI-tuned scripts break locally.
 
-### 8.11 Automouse Workflow Scripts Have Complex State
-**Location:** `/bin/automouse-*` (4 files)
-**Problem:** `automouse-run`, `automouse-queue` are executables; `automouse-prompt-impl`, `automouse-prompt-postplan` are templates. No README.
-**Suggested direction:** Move to bin/automouse/; add README explaining data flow.
-**Est. effort:** M
-**Risk if untouched:** Workflow opaque; debugging hard.
-
-### 8.14 Mixed PHP Bootstrap Styles in Scripts
-**Location:** `ibl5/scripts/`
-**Problem:** Some scripts use `require '../mainfile.php'`; others use `require '../vendor/autoload.php'`. Inconsistent.
-**Suggested direction:** Standardize on modern bootstrap.
-**Est. effort:** S
-**Risk if untouched:** New scripts copy old pattern; debt grows.
-
 ### 8.15 Two E2E Drivers
-**Location:** `/bin/e2e-wt.sh` (worktrees) vs `ibl5/bin/e2e-local.sh` (local)
+**Location:** `/bin/e2e-wt` (worktrees) vs `ibl5/bin/e2e-local` (local)
 **Problem:** Both do similar work; developer must know which.
 **Suggested direction:** Consolidate into single bin/e2e that detects context.
 **Est. effort:** M

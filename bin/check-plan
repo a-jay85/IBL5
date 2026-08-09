@@ -1005,7 +1005,8 @@ gatep_declared_tokens() {
         # annotation are split exactly as cf_parse_section does it -- first
         # backtick span is the path, and ALL backtick spans are stripped before
         # the exemption test, so a backticked path inside the parenthetical
-        # (`(edits `bin/reference-helper`)`) cannot exempt on its own name.
+        # -- `(edits `bin/reference-helper`)` (example) -- cannot exempt on its
+        # own name.
         # shellcheck disable=SC2016  # backticks are literal markdown-span delimiters
         awk '
             /^## Critical Files/ { in_cf=1; next }

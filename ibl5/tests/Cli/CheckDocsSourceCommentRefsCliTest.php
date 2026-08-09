@@ -159,6 +159,27 @@ final class CheckDocsSourceCommentRefsCliTest extends TestCase
         $this->assertSuppressed('bin/foo');
     }
 
+    public function testExampleMarkerSuppressedAfterClosingBacktick(): void
+    {
+        // The canonical markdown form documented in doc-freshness.md wraps the
+        // path in backticks; the marker must still suppress through them.
+        file_put_contents(
+            $this->tmpDir . '/ibl5/classes/Foo/Bar.php',
+            "<?php\n// See `bin/foo` (example) for the shape.\nclass Bar {}\n"
+        );
+        $this->assertSuppressed('bin/foo');
+    }
+
+    public function testExampleMarkerSuppressedThroughNestedDelimiters(): void
+    {
+        // Mirrors bin/check-plan:1008 — the token closes several spans before the marker.
+        file_put_contents(
+            $this->tmpDir . '/ibl5/classes/Foo/Bar.php',
+            "<?php\n// A parenthetical -- `(edits `bin/foo`)` (example) -- cannot exempt.\nclass Bar {}\n"
+        );
+        $this->assertSuppressed('bin/foo');
+    }
+
     // -----------------------------------------------------------------------
     // Exclusions (requirement 4)
     // -----------------------------------------------------------------------

@@ -1,6 +1,6 @@
 ---
 description: Frontmatter schema (including `paths:` residency semantics — repo-relative only, never glob an always-loaded rule), 60-day staleness policy, on-touch verification rule, dead-reference rule, and the retired-figure rule enforced by bin/check-docs
-last_verified: 2026-08-08
+last_verified: 2026-08-09
 paths: "**/*.md"
 ---
 
@@ -42,7 +42,7 @@ Enforced in CI by `bin/check-docs --since=<base-ref>`, which fails any PR that c
 
 `bin/check-docs` scans doc bodies for repo-path tokens (`bin/<name>`, `ibl5/<path>`, `.claude/<path>`, `.github/<path>`) and fails on any token that does not resolve to an existing file or directory. Shell variables like `$FOO/bar` are ignored, and paths with glob characters (`*`, `?`, `[`, `]`) are skipped automatically. For intentional non-resolving literal paths, append `(example)` immediately after the closing backtick — e.g. `` `bin/some-path` (example) `` — and `bin/check-docs` will skip the reference.
 
-**Source-file comments are in scope too (full-scan mode only).** The same resolution rules apply to leading comment bodies in `bin/`, `bin/lib/`, `ibl5/classes/`, `ibl5/phpstan-rules/`, and `ibl5/migrations/` — PHP `//`, `#`, `/* */` and `*` docblock continuations; shell and TypeScript `#` / `//`. Test harnesses (`bin/test-` (example) prefixed scripts, `ibl5/tests/`) are excluded because their non-resolving paths are deliberate negative fixtures. A trailing ` (example)` marker works in comments exactly as it does in markdown. Five named false-positive suppressions run before resolution — trailing punctuation, directory-shaped tokens, ADR-slug placeholders, runtime-generated artifacts, and the `ibl5/bin/<x>` working-directory ambiguity; read them in `checkSourceCommentReferences()` before trusting a suppressed finding. This is whole-tree only, never `--since`: source files carry no frontmatter and so never participate in the on-touch bump rule.
+**Source-file comments are in scope too (full-scan mode only).** The same resolution rules apply to leading comment bodies in `bin/`, `bin/lib/`, `ibl5/classes/`, `ibl5/phpstan-rules/`, and `ibl5/migrations/` — PHP `//`, `#`, `/* */` and `*` docblock continuations; shell and TypeScript `#` / `//`. Test harnesses (`bin/test-` (example) prefixed scripts, `ibl5/tests/`) are excluded because their non-resolving paths are deliberate negative fixtures. A trailing ` (example)` marker works in comments exactly as it does in markdown, and tolerates the closing delimiters prose wraps the path in (`` `path` `` (example)). Five named false-positive suppressions run before resolution — trailing punctuation, directory-shaped tokens, ADR-slug placeholders, runtime-generated artifacts, and the `ibl5/bin/<x>` working-directory ambiguity; read them in `checkSourceCommentReferences()` before trusting a suppressed finding. This is whole-tree only, never `--since`: source files carry no frontmatter and so never participate in the on-touch bump rule.
 
 ## Retired-Figure Rule
 

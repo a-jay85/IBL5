@@ -1083,7 +1083,7 @@ function collectSourceFiles(string $repoRoot): array
 }
 
 /**
- * Candidate repo-path tokens from a source file's *leading* comment lines.
+ * Candidate repo-path tokens from every comment line in a source file.
  *
  * @return list<array{token: string, line: int, text: string}>
  */
@@ -1172,8 +1172,10 @@ function checkSourceCommentReferences(string $repoRoot): array
             // suppressTrailingPunctuation — normalize before glob-char test
             $tok = rtrim($tok, '.,:;)]}>');
 
-            // (example) escape hatch: raw line contains normalized token followed by ' (example)'
-            if (str_contains($line, $tok . ' (example)')) {
+            // (example) escape hatch, matching markdown's `path` (example) shape: the
+            // normalized token, any run of closing delimiters the prose wraps it in
+            // (backtick, quote, bracket, punctuation), then the marker.
+            if (preg_match('/' . preg_quote($tok, '/') . '[.,:;)\]}>\'"`]*\s*\(example\)/', $line) === 1) {
                 continue;
             }
 

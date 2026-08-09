@@ -214,9 +214,8 @@ test.describe('Trivia-mode hidden modules: non-admin sees notice', () => {
 //
 // These pages don't enforce admin or team-membership in code today; the plan
 // intentionally exercises the "no team" branch to document current behavior.
-// Assertions are intentionally permissive (HTTP 200 + no PHP fatal) — Phase 3
-// of the plan calls these out as exploratory; tighten assertions in a
-// follow-up PR once the response shape is observed in CI artifacts.
+// Each page renders module chrome for a no-team user; assertions below were
+// grounded against the running stack. IBL_TEST_USER_REGULAR must be set to run.
 // ---------------------------------------------------------------------------
 
 test.describe('GM-only pages: non-admin / no-team behavior', () => {
@@ -231,6 +230,7 @@ test.describe('GM-only pages: non-admin / no-team behavior', () => {
     const response = await page.goto('modules.php?name=Trading');
     expect(response?.status()).toBe(200);
     await assertNoPhpErrors(page, 'on Trading as non-admin');
+    await expect(page.locator('.ibl-title, .ibl-card__title, h1, h2').first()).toBeVisible();
   });
 
   test('FreeAgency negotiate renders without PHP errors for a user with no team', async ({
@@ -243,6 +243,7 @@ test.describe('GM-only pages: non-admin / no-team behavior', () => {
     );
     expect(response?.status()).toBe(200);
     await assertNoPhpErrors(page, 'on FreeAgency negotiate as non-admin');
+    await expect(page.locator('.ibl-title, .ibl-card__title, h1, h2').first()).toBeVisible();
   });
 
   test('Player negotiate renders without PHP errors for a user with no team', async ({
@@ -258,6 +259,7 @@ test.describe('GM-only pages: non-admin / no-team behavior', () => {
     );
     expect(response?.status()).toBe(200);
     await assertNoPhpErrors(page, 'on Player negotiate as non-admin');
+    await expect(page.locator('.ibl-title, .ibl-card__title, h1, h2').first()).toBeVisible();
   });
 
   test('DepthChartEntry renders without PHP errors for a user with no team', async ({
@@ -266,6 +268,7 @@ test.describe('GM-only pages: non-admin / no-team behavior', () => {
     const response = await page.goto('modules.php?name=DepthChartEntry');
     expect(response?.status()).toBe(200);
     await assertNoPhpErrors(page, 'on DepthChartEntry as non-admin');
+    await expect(page.locator('.ibl-title, .ibl-card__title, h1, h2').first()).toBeVisible();
   });
 });
 

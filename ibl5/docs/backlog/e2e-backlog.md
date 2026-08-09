@@ -154,13 +154,12 @@ were softened after direct re-check (C6 partially a false positive, C16 lower-co
 | C14 | ⬜ | 🟩 | `homepage.spec.ts` main | `#site-content` on every page. |
 | C15 | ⬜ | 🟩 | `contract-list.spec.ts` wrapper | asserts `.ibl-data-table` (already asserted), not the wrapper. |
 | C16 | ⬜ | 🟩 | `olympics-coverage.spec.ts:20` | header-scoped `/w\|l\|.../i` — weak single-char, lower confidence. |
-| C17 | ⬜ | 🟨 | `api-e2e/api.test.ts assertGetRoute` | **High impact:** silently passes on 401 → 30+ tests skip body validation. May be masking a CI-key/config issue → triage. |
+| C17 | ✅ | — | `api-e2e/api.test.ts assertGetRoute` | **High impact:** silently passes on 401 → 30+ tests skip body validation. May be masking a CI-key/config issue → triage. ✓verified — 401 early-return removed; 14 validateBody callbacks now execute. ✓done |
 | C18 | ⬜ | 🟩 | `api-e2e/api.test.ts` CSV | bare `return` L373/395/396 + true-only guard L415 (DON'T rules 12/14). |
 
 **Suggested direction (axis):** Replace each with an assertion tied to feature-specific content (a known seed
-value, a specific column/class, a real sort effect). C17 needs investigation first — confirm the CI API key
-is present and the 401 branch is dead, then remove the silent skip.
-**Est. effort:** S per item (C17 = S+investigation). **Risk if untouched:** these tests give false green.
+value, a specific column/class, a real sort effect). C17 resolved — 401 early-return removed from assertGetRoute; 14 validateBody callbacks now execute.
+**Est. effort:** S per item. **Risk if untouched:** these tests give false green.
 
 ---
 
@@ -179,12 +178,12 @@ Green tests that don't guard the behavior they're named for. **Fix first.** D1/D
 | D7 | ✅ | — | `waivers-submission.spec.ts:83` | "success banner" navigates straight to `&result=player_added`, never POSTs. ✓verified (real POST covered separately → redundant-weak). ✓done — deleted the redundant add + waive query-param banner tests; the real-POST add/waive tests already assert `.ibl-alert--success`. |
 | D8 | ⬜ | 🟨 | `trading-submission.spec.ts` accept-offer readBack | re-asserts URL `waitForURL` already confirmed; never checks the card was consumed. |
 | D9 | ⬜ | 🟨 | `all-star-rename-submission.spec.ts` & `projected-draft-order-submission.spec.ts` 405/0 | assert `success===false` only; any error payload passes — add error-code check. |
-| D10 | ⬜ | 🟨 | `admin-pages.spec.ts` block.php | `status not 403 / <500` → 404/blank passes; no content assertion. |
-| D11 | ⬜ | 🟨 | `olympics-coverage.spec.ts` test 2 | titled "shows gating message" but only `assertNoPhpErrors`; `olympics-module-gating` already asserts the message → strengthen or drop. |
-| D12 | ⬜ | 🟨 | `ajax-api-endpoints.spec.ts` all-modes / fallback | `html.length>0` (or only content-type) → error page passes; first test in each block does `toContain('<table')`. |
-| D13 | ⬜ | 🟩 | `next-sim.spec.ts` opponent colors | asserts `style` contains `--team-color-primary`, not that it resolves to data. Borderline. |
-| D14 | ⬜ | 🟩 | `cross-module-navigation.spec.ts` chain | `if(playerCount>0){…}` silent-passes (no-silent-pass rule); also subsumed by two prior chain tests. |
-| D15 | ⬜ | 🟨 | `role-gating-non-admin.spec.ts` Block F | self-labelled exploratory; 4 no-team-user tests assert only HTTP 200 + no PHP error. |
+| D10 | ✅ | — | `admin-pages.spec.ts` block.php | `status not 403 / <500` → 404/blank passes; no content assertion. ✓verified — block.php returns 200 + "Free Agent Processing" title; assertion tightened. ✓done |
+| D11 | ◑ | 🟨 | `olympics-coverage.spec.ts` test 2 | titled "shows gating message" but only `assertNoPhpErrors`; `olympics-module-gating` already asserts the message → strengthen or drop. ✓assertion tightened; ships RED — real bug: FranchiseHistory leaks for authenticated users in olympics context. Separate fix needed. |
+| D12 | ✅ | — | `ajax-api-endpoints.spec.ts` all-modes / fallback | `html.length>0` (or only content-type) → error page passes; first test in each block does `toContain('<table')`. ✓verified — 5 table assertion sites added; all green. ✓done |
+| D13 | ✅ | — | `next-sim.spec.ts` opponent colors | asserts `style` contains `--team-color-primary`, not that it resolves to data. Borderline. ✓verified — hex-color regex verified green against live stack. ✓done |
+| D14 | ✅ | — | `cross-module-navigation.spec.ts` chain | `if(playerCount>0){…}` silent-passes (no-silent-pass rule); also subsumed by two prior chain tests. ✓verified — hard count assertion replaces silent if-block; green. ✓done |
+| D15 | ◑ | 🟨 | `role-gating-non-admin.spec.ts` Block F | self-labelled exploratory; 4 no-team-user tests assert only HTTP 200 + no PHP error. ✓.ibl-title visibility assertions added; tests skip until IBL_TEST_USER_REGULAR is configured. |
 
 **Suggested direction (axis):** Replace "accept-either-outcome" with "require the success signal **and** read
 back the mutated state" (DB read-back via test-state where available, or re-navigate and assert the changed
@@ -195,7 +194,7 @@ value). For fake-POST tests (D7), assert the banner *after a real submit*, not a
 
 - **D-cluster-1 — submission tests that accept a failed mutation as success** *(plan this first)*: **D1, D2, D7** (all ✓verified) — uniform fix: require the success redirect/banner *after a real submit*, then read back the mutation. Tightest, highest-confidence, one coherent worktree.
 - **D-cluster-2 — submission tests with no read-back of mutated state:** D3, D4, D5, D6, D8, D9. (D6 folded in here — same "no read-back" planning shape as D3/D4/D5/D8/D9, even though its accept-info-as-success symptom resembles cluster-1; cluster-1 is already ✓verified/done, so D6 groups with the still-open cluster.)
-- **D-cluster-3 — smoke/gating tests that don't prove the gate:** D10, D11, D12, D14, D15 (+ C17 as a sibling).
+- **D-cluster-3 — smoke/gating tests that don't prove the gate:** D10, D11, D12, D14, D15 (+ C17 as a sibling). ✓done — shipped in this PR (D13 folded in; D11 surfaces real bug — separate fix needed).
 
 ---
 
@@ -238,7 +237,7 @@ use the swap/`waitForURL` signal. E9 needs the real submit signal (waitForRespon
 - All 11 `test.skip` are env/ownership-gated, not dead tests.
 
 ## Recommended order
-1. **D-cluster-1 (D1/D2/D7) + C17** — green tests not guarding their feature; cheapest correctness win. *(first plan)*
+1. **D-cluster-1 (D1/D2/D7) + C17 ✅** — green tests not guarding their feature; cheapest correctness win. *(first plan)* ✓done
 2. **D-cluster-2** — add the missing read-back / error-code assertion.
 3. **A1, A2, A3** — clear DRY wins, low risk.
 4. **Axis E** `networkidle`/`waitForTimeout` sweep (especially `depth-chart-entry-mobile`).

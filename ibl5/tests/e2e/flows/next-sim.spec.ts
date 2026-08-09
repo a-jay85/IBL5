@@ -23,9 +23,12 @@ test.describe('NextSim flow', () => {
     const opponentRows = page.locator('.next-sim-row--opponent');
     await expect(opponentRows.first()).toBeVisible();
 
-    // Opponent rows should have team color CSS variables
+    // Opponent rows should have team color CSS variables resolving to real hex values
     const firstOpponent = opponentRows.first();
-    const style = await firstOpponent.getAttribute('style');
-    expect(style).toContain('--team-color-primary');
+    const style = (await firstOpponent.getAttribute('style')) ?? '';
+    expect(
+      style,
+      'opponent row must carry a resolved team color, not an empty --team-color-primary declaration',
+    ).toMatch(/--team-color-primary:\s*#[0-9a-fA-F]{3,8}/);
   });
 });

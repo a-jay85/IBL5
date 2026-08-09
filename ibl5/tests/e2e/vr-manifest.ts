@@ -183,7 +183,7 @@ export const VR_MANIFEST: VrRow[] = [
     ],
     viewports: ['desktop', 'mobile'],
     dataDriven: true },
-  { name: 'game-boxscore', auth: 'auth', url: 'modules.php?name=GameBoxscore',
+  { name: 'game-boxscore', auth: 'auth', url: 'modules.php?name=GameBoxscore&date=2026-02-20&game=1',
     anchor: '.ibl-data-table', viewports: ['desktop', 'mobile'] },
   { name: 'negotiation', auth: 'auth', url: 'modules.php?name=Player&pa=negotiate&pid=30',
     anchor: 'form[name="ExtensionOffer"]',

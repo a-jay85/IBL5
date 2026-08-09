@@ -3,7 +3,7 @@
 
 /* Legacy player page colors (intentionally retro) */
 :root {
-    --player-legacy-header: var(--black)0cc;
+    --player-legacy-header: #0000cc;
     --player-legacy-danger: #ff0000;
     --player-legacy-highlight: #ffbb00;
 }
@@ -137,7 +137,7 @@
 }
 
 .rookie-option-button a {
-    color: var(--black)000;
+    color: var(--black);
     text-decoration: none;
     font-weight: bold;
 }

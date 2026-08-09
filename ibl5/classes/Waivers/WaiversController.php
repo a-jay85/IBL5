@@ -27,6 +27,7 @@ class WaiversController implements WaiversControllerInterface
 
     private WaiversServiceInterface $service;
     private WaiversProcessorInterface $processor;
+    private \Waivers\Contracts\WaiversSubmissionServiceInterface $submissionService;
     private WaiversViewInterface $view;
     private \Repositories\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepo;
     private \Repositories\Contracts\SalaryCapRepositoryInterface $salaryCapRepo;
@@ -53,7 +54,8 @@ class WaiversController implements WaiversControllerInterface
         \mysqli $db,
         AuthServiceInterface $authService,
         ?\Psr\Log\LoggerInterface $logger = null,
-        ?Season $season = null
+        ?Season $season = null,
+        ?\Waivers\Contracts\WaiversSubmissionServiceInterface $submissionService = null
     ) {
         $this->service = $service;
         $this->processor = $processor;
@@ -65,6 +67,10 @@ class WaiversController implements WaiversControllerInterface
         $this->authService = $authService;
         $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
         $this->season = $season;
+        // Built last, after $this->processor and $this->salaryCapRepo are assigned, so the
+        // fallback construction reads populated properties — no assignment-order null risk.
+        $this->submissionService = $submissionService
+            ?? new \Waivers\WaiversSubmissionService($this->processor, $this->salaryCapRepo);
     }
 
     /**
@@ -119,7 +125,7 @@ class WaiversController implements WaiversControllerInterface
             try {
                 /** @var array<string, string> $postData */
                 $postData = $_POST;
-                $result = $this->processWaiverSubmission($postData, $verifiedTeamName);
+                $result = $this->submissionService->submit($postData, $verifiedTeamName);
             } catch (\Throwable $e) {
                 $this->logger->error('waiver_submission_error', [
                     'error' => $e->getMessage(),
@@ -141,36 +147,6 @@ class WaiversController implements WaiversControllerInterface
 
         // Display the waiver form (GET request)
         $this->displayWaiverForm($userInfo, $action);
-    }
-
-    /**
-     * @param array<string, string> $postData
-     * @param ?string $verifiedTeamName Acting team derived from the authenticated session — never from POST
-     * @return array{success: bool, result?: string, error?: string}
-     */
-    private function processWaiverSubmission(array $postData, ?string $verifiedTeamName): array
-    {
-        // Acting team is the verified session team — never read from POST (IDOR fix D-08).
-        if ($verifiedTeamName === null || $verifiedTeamName === '') {
-            return ['success' => false, 'error' => 'Unable to determine your team.'];
-        }
-        $teamName = $verifiedTeamName;
-        $action = $postData['Action'] ?? '';
-        $playerID = isset($postData['Player_ID']) ? (int) $postData['Player_ID'] : null;
-        $rosterSlots = isset($postData['rosterslots']) ? (int) $postData['rosterslots'] : 0;
-        $healthyRosterSlots = isset($postData['healthyrosterslots']) ? (int) $postData['healthyrosterslots'] : 0;
-
-        if (!in_array($action, ['add', 'waive'], true)) {
-            return ['success' => false, 'error' => 'Invalid submission data.'];
-        }
-
-        $totalSalary = $this->salaryCapRepo->getTeamTotalSalary($teamName);
-
-        if ($action === 'waive') {
-            return $this->processor->processDrop($playerID, $teamName, $rosterSlots, $totalSalary);
-        }
-
-        return $this->processor->processAdd($playerID, $teamName, $healthyRosterSlots, $totalSalary);
     }
 
     /**

@@ -25,7 +25,7 @@ Effort scale:
 - **M** — multi-step plan, 1-3 days, may touch several modules
 - **L** — refactor or platform shift, > 3 days, likely needs ADR
 
-**Status:** Complete — 15-axis audit, 312 findings (+2 post-audit follow-ups from the PR #1107 review, +1 from the #1066 reject-IDOR review → 315 tracked; +11 Axis-1 size seeds 1.21–1.31 from the hot-files comment→backlog migration 2026-07-24 → 326 tracked; +5 Axis-1 size seeds 1.32–1.36 from the ground-truth audit 2026-07-24 → 331 tracked; +1 Axis-2 robustness item 2.39 discovered 2026-07-27 during trading-1-31-api-handler-extract → 332 tracked; +1 Axis-15 data-integrity item 15.24 discovered 2026-08-04 during the PR #1771 review → 333 tracked).
+**Status:** Complete — 15-axis audit, 312 findings (+2 post-audit follow-ups from the PR #1107 review, +1 from the #1066 reject-IDOR review → 315 tracked; +11 Axis-1 size seeds 1.21–1.31 from the hot-files comment→backlog migration 2026-07-24 → 326 tracked; +5 Axis-1 size seeds 1.32–1.36 from the ground-truth audit 2026-07-24 → 331 tracked; +1 Axis-2 robustness item 2.39 discovered 2026-07-27 during trading-1-31-api-handler-extract → 332 tracked; +1 Axis-15 data-integrity item 15.24 discovered 2026-08-04 during the PR #1771 review → 333 tracked; +1 Axis-6 coverage item 6.23 discovered 2026-08-08 during the PR #1670 review → 334 tracked).
 
 ---
 
@@ -355,9 +355,9 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 ## Axis 6: Test Coverage Gaps
 
-**Summary:** 6 zero-test modules; 6 thin-test modules (>5 files, <3 tests); 4 large modules below 0.5 ratio; +2 post-audit E2E-coverage follow-ups (6.20, 6.21) from the PR #1107 review; +1 (6.22) from the #1066 reject-IDOR review.
+**Summary:** 6 zero-test modules; 6 thin-test modules (>5 files, <3 tests); 4 large modules below 0.5 ratio; +2 post-audit E2E-coverage follow-ups (6.20, 6.21) from the PR #1107 review; +1 (6.22) from the #1066 reject-IDOR review; +1 (6.23) from the #1670 ibl_events-enrichment review.
 
-**Automouse audit (verified 2026-06-20):** Adding tests is inherently green-green (no production change) → every open coverage gap is 🟩 auto-mergeable. If writing a test surfaces a real bug, the *fix* becomes its own finding with its own classification. (Exception: **6.21** is 🟨, not 🟩 — its handler `exit()`s, so the test isn't writable until a teamless-fixture / non-`exit()` refactor infra decision is made.)
+**Automouse audit (verified 2026-06-20):** Adding tests is inherently green-green (no production change) → every open coverage gap is 🟩 auto-mergeable. If writing a test surfaces a real bug, the *fix* becomes its own finding with its own classification. (Exceptions: **6.21** and **6.23** are 🟨, not 🟩 — in each the target code is unreachable from PHPUnit, so no test is writable until a production seam is decided: a teamless-fixture / non-`exit()` refactor for 6.21, a SAPI-independent hashing seam for 6.23.)
 
 > ✅ resolved (15): 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 6.15, 6.16, 6.20 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
@@ -370,6 +370,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 6.19 | ◑ Partial | 🟩 | AllStarAppearances + GMContactList repo unit tests added. Season entity predicates blocked by `Season\Season`→mock alias (QueryRepo plumbing covered). `Shared` N/A (deleted 2.23). |
 | 6.21 | ⬜ Open | 🟨 | Row-12 (Free-Agents/teamless session) `processrookieoption` ownership-rejection path untested: PHPUnit entry-point test impossible (handler `exit()`s), E2E auth fixture always has a session team. Needs a teamless-fixture / non-`exit()` refactor decision before it's writable → 🟨. From PR #1107 Phase 5.0 note. |
 | 6.22 | ⬜ Open | 🟨 | **Pattern behind 6.20/6.21.** Authz/IDOR gates inline in controllers end in `HtmxHelper::redirect()→exit()`, so the security-critical "non-party refused + no mutation" property is E2E-only (forced the D-05 reject test, #1066). `Trading\TradeExecutionService` (accept path, #1066) proves the fix: a gate returning a *verdict* is unit-testable exit-free (`testValidateAndExecuteRejectsNonPartyWithoutExecuting`). Convert the inline gates (Waivers, FreeAgency, Trade API accept/decline, Trading reject) to verdict + thin redirect-shim → security logic becomes unit-testable; unblocks 6.21. 🟨: production refactor on a security surface; needs a verdict-shape decision. From the #1066 reject-IDOR review. |
+| 6.23 | ⬜ Open | 🟨 | **Same family as 6.22, different guard.** `RequestEventLoggingBootstrap::boot()` returns at line 35 when `\PHP_SAPI === 'cli'`, and PHPUnit is always CLI (DB group included), so the `hash('sha256', session_id())` derivation at lines 66–70 is unreachable from any PHPUnit test — the file's three existing tests are all `expectNotToPerformAssertions()` for exactly this reason. A regression storing the **raw** session id would break zero tests. Extract the derivation to a pure static (or inject the SAPI) so the PII boundary is unit-pinnable. 🟨: production change on a PII boundary; needs a seam decision. (discovered 2026-08-08 during #1670) |
 
 ### 6.13 Player Module — Large + Subthreshold (69 prod / 31 test files, ~0.45 ratio)
 **Location:** `ibl5/classes/Player`
@@ -426,6 +427,14 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Est. effort:** M
 **Risk if untouched:** Security-critical authz gates rest on untested invariants (`redirect()` keeps `exit()`ing; the destructive call stays after the gate). A future edit can silently restore unauthorized access with nothing red in unit CI — the only guard is an E2E on a slower cadence.
 **Status:** ⬜ Open — raised from the #1066 reject-IDOR review. 🟨 conditional: a production refactor touching a security surface, gated on a verdict-shape design decision (best done in concert with the accept/reject symmetry call from the same review — the user chose to keep #1066's asymmetry, prioritizing testability over the inline-gate convention).
+
+### 6.23 Session-id hashing is unreachable from PHPUnit (CLI-SAPI guard)
+**Location:** `ibl5/classes/Bootstrap/RequestEventLoggingBootstrap.php` (SAPI guard at line 35; `hash('sha256', …)` derivation at lines 66–70); `ibl5/tests/Bootstrap/RequestEventLoggingBootstrapTest.php`
+**Problem:** `boot()` early-returns when `\PHP_SAPI === 'cli'`, and `PHP_SAPI` is a compile-time constant that is always `'cli'` under PHPUnit — including the `#[Group('database')]` suite. Every statement past line 35, notably the sha256 derivation that is the PII boundary for `ibl_events.session_id`, is therefore unreachable from any unit or DB-integration test of `boot()`. The existing test file concedes this: all three of its tests are `expectNotToPerformAssertions()` no-ops that only prove `boot()` does not throw. The **column** round-trip is covered by the EventLog repository tests, but the **derivation** is not — an edit that stored the raw `session_id()` would break zero tests, and the only evidence the hash is applied today is a manual live-stack check (`sid_len: 64`, `sid_hex: 1`) from the #1670 review. Same shape as 6.22: a control-flow guard, not the test design, is what makes the security-critical line untestable.
+**Suggested direction:** Extract the derivation into a pure static (e.g. `EventLog\SessionIdHasher::hash(?string $rawSessionId): ?string`) that `boot()` calls, so the hashing contract — non-null input yields 64 lowercase hex, the raw value never appears in the output, null/empty yields null — is unit-pinnable without a SAPI. Injecting the SAPI into the bootstrap is the alternative seam; it is the larger change and leaves the derivation inline.
+**Est. effort:** S
+**Risk if untouched:** The `session_id` column is documented and reviewed as a non-replayable digest. If the derivation regresses to the raw token, every CI gate stays green and the failure is only visible by inspecting production rows — a PII exposure with no automated detector.
+**Status:** ⬜ Open — raised from the #1670 review (the plan listed the bootstrap test as `[modify]`; the item was not implementable as specified). 🟨 conditional: a production change on a PII boundary, gated on the seam decision above.
 
 ---
 

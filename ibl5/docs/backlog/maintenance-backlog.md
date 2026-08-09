@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-08-08
+last_verified: 2026-08-09
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -25,7 +25,7 @@ Effort scale:
 - **M** — multi-step plan, 1-3 days, may touch several modules
 - **L** — refactor or platform shift, > 3 days, likely needs ADR
 
-**Status:** Complete — 15-axis audit, 312 findings (+2 post-audit follow-ups from the PR #1107 review, +1 from the #1066 reject-IDOR review → 315 tracked; +11 Axis-1 size seeds 1.21–1.31 from the hot-files comment→backlog migration 2026-07-24 → 326 tracked; +5 Axis-1 size seeds 1.32–1.36 from the ground-truth audit 2026-07-24 → 331 tracked; +1 Axis-2 robustness item 2.39 discovered 2026-07-27 during trading-1-31-api-handler-extract → 332 tracked; +1 Axis-15 data-integrity item 15.24 discovered 2026-08-04 during the PR #1771 review → 333 tracked; +1 Axis-6 coverage item 6.23 discovered 2026-08-08 during the PR #1670 review → 334 tracked).
+**Status:** Complete — 15-axis audit, 312 findings (+2 post-audit follow-ups from the PR #1107 review, +1 from the #1066 reject-IDOR review → 315 tracked; +11 Axis-1 size seeds 1.21–1.31 from the hot-files comment→backlog migration 2026-07-24 → 326 tracked; +5 Axis-1 size seeds 1.32–1.36 from the ground-truth audit 2026-07-24 → 331 tracked; +1 Axis-2 robustness item 2.39 discovered 2026-07-27 during trading-1-31-api-handler-extract → 332 tracked; +1 Axis-15 data-integrity item 15.24 discovered 2026-08-04 during the PR #1771 review → 333 tracked; +1 Axis-6 coverage item 6.23 discovered 2026-08-08 during the PR #1670 review → 334 tracked; +1 Axis-8 correctness item 8.18 discovered 2026-08-09 during the PR #1683 review → 335 tracked).
 
 ---
 
@@ -472,6 +472,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 8.11 | ⬜ Open | 🟩 | Move `automouse-*` to bin/automouse/ + README; caller sweep (launchd plist refs). |
 | 8.14 | ⬜ Open | 🟩 | Standardize script bootstrap; green-green per script. |
 | 8.15 | ⬜ Open | 🟨 | Consolidate the two E2E drivers — context-detection design; mind the outside-repo `e2e-for-pr` gotcha. |
+| 8.18 | ⬜ Open | 🟨 | `bin/bug-pipeline-tick` parses and writes DB timestamps in **host-local** time while MariaDB stores UTC — idle reminders fire ~7h late and `blocked_until` backoffs expire on write. Fix is mechanical (force UTC on both sides); 🟨 because the bash driver has no regression pin, so one must ship with it. (discovered 2026-08-09 during the PR #1683 review) |
 
 ### 8.3 Mixed kebab-case, camelCase, `.sh` Extensions
 **Location:** `/bin/` and `ibl5/bin/`
@@ -522,6 +523,13 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Consolidate into single bin/e2e that detects context.
 **Est. effort:** M
 **Risk if untouched:** Devs run the wrong script.
+
+### 8.18 `bug-pipeline-tick` Compares Host-Local Time Against UTC Database Timestamps
+**Location:** `bin/bug-pipeline-tick:136-142` (`epoch_of`, `future_ts`)
+**Problem:** `epoch_of()` parses `ibl_bug_reports` timestamps with host-local `date -j`, and `future_ts()` writes host-local strings back, but MariaDB stores UTC. On this PDT host that is a 7-hour skew, verified 2026-08-09 against a scratch DB: a row seeded idle by 3 hours of DB time yields a **negative** elapsed value, so `handle_idle_or_blocked()` (`bin/bug-pipeline-tick:482-518`) never sends its reminder; and `future_ts 1800` returned `2026-08-09 00:49:05` against a UTC `NOW()` of `07:19:05`, i.e. a `blocked_until` backoff is written ~6.5h in the past and expires the instant it is set. The pipeline still ticks every 180s and exits 0 throughout — it is silently a no-op, not visibly broken. PHP↔DB is unaffected (`date_default_timezone_get()` is UTC), so this is confined to the bash driver.
+**Suggested direction:** Force UTC on both helpers (`date -u`, or `TZ=UTC` for the whole driver) so the driver's clock matches the DB's; ship a regression pin that seeds a row idle by DB time and asserts the reminder fires, using the scratch-MariaDB + fake-bot harness rather than the live pipeline.
+**Est. effort:** S
+**Risk if untouched:** Idle reminders and `parked_idle` transitions fire ~7h late or not at all, and blocked-row backoff is effectively disabled — every retry runs on the next tick.
 
 ---
 

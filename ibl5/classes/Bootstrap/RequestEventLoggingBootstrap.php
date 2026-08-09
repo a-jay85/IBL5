@@ -6,7 +6,10 @@ namespace Bootstrap;
 
 use Bootstrap\Contracts\BootstrapStepInterface;
 use Bootstrap\Contracts\ContainerInterface;
+use EventLog\EventLogger;
 use EventLog\EventLogRepository;
+use EventLog\RouteNameNormalizer;
+use EventLog\TrafficClassifier;
 use Logging\LoggerFactory;
 use Repositories\TeamIdentityRepository;
 
@@ -40,11 +43,13 @@ class RequestEventLoggingBootstrap implements BootstrapStepInterface
 
             // Read ?name= RAW (bootstrap runs before modules.php sanitizes it at :24-29);
             // sanitize independently to a module-name charset, null when absent/empty.
+            // Normalization runs before truncation (normalization can lengthen a value).
             $routeName = null;
             if (isset($_GET['name']) && \is_string($_GET['name'])) {
                 $clean = preg_replace('/[^A-Za-z0-9_-]/', '', $_GET['name']);
                 if ($clean !== null && $clean !== '') {
-                    $routeName = $this->trunc($clean, self::MAX_ROUTE);
+                    $normalized = RouteNameNormalizer::normalize($clean);
+                    $routeName = $normalized === null ? null : $this->trunc($normalized, self::MAX_ROUTE);
                 }
             }
 
@@ -56,6 +61,15 @@ class RequestEventLoggingBootstrap implements BootstrapStepInterface
 
             $ua = $_SERVER['HTTP_USER_AGENT'] ?? null;
             $userAgent = \is_string($ua) ? $this->trunc($ua, self::MAX_HEADER) : null;
+
+            // Session id — hashed for storage; never the raw token (D5).
+            $sessionId = null;
+            if (session_status() === \PHP_SESSION_ACTIVE) {
+                $rawSession = session_id();
+                if (is_string($rawSession) && $rawSession !== '') {
+                    $sessionId = hash('sha256', $rawSession);
+                }
+            }
 
             // (3) Resolve effective user + current team.
             $authService = $GLOBALS['authService'] ?? null;
@@ -76,16 +90,25 @@ class RequestEventLoggingBootstrap implements BootstrapStepInterface
                     }
                 }
 
-                // (4) Synchronous guarded INSERT.
-                (new EventLogRepository($db))->insert(
+                // Classify traffic — read op from $_GET, not REQUEST_URI scan (D4).
+                $op = isset($_GET['op']) && \is_string($_GET['op']) ? $_GET['op'] : null;
+                $trafficClass = TrafficClassifier::classify($username, $userAgent, $op);
+
+                // (4) Synchronous guarded INSERT, then arm the outcome flush.
+                $eventId = (new EventLogRepository($db))->insert(
                     $requestUri,
                     $routeName,
                     $httpMethod,
                     $username,
                     $teamId,
                     $referer,
-                    $userAgent
+                    $userAgent,
+                    $sessionId,
+                    $trafficClass
                 );
+                if ($eventId > 0) {
+                    EventLogger::arm($eventId, $db);
+                }
             }
         } catch (\Throwable $e) {
             // Fire-and-forget: never break the page. Log and move on.

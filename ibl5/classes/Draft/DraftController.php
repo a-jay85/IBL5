@@ -8,6 +8,7 @@ use Draft\Contracts\DraftControllerInterface;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Season\Season;
 use Discord\Discord;
+use EventLog\EventLogger;
 
 /**
  * @see DraftControllerInterface
@@ -159,6 +160,7 @@ class DraftController implements DraftControllerInterface
             'pick' => $draftPick,
         ]);
 
+        EventLogger::setAction('draft_pick_submitted');
         return $this->sendNotifications($teamName, $playerName, $draftRound, $draftPick);
     }
 

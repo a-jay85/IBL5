@@ -105,6 +105,25 @@ export async function collectNewOfferIds(
 }
 
 /**
+ * Collect all offer IDs currently on the review page as a Set.
+ *
+ * Unlike `collectNewOfferIds`, this collects every visible offer with no
+ * exclusion filter — use it to snapshot the full offer set before an action,
+ * then diff against the result to find what changed.
+ */
+export async function collectOfferIdSet(page: Page): Promise<Set<number>> {
+  await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
+  const buttons = page.locator('[data-preview-offer]');
+  const count = await buttons.count();
+  const ids = new Set<number>();
+  for (let i = 0; i < count; i++) {
+    const idStr = await buttons.nth(i).getAttribute('data-preview-offer');
+    ids.add(parseInt(idStr ?? '0', 10));
+  }
+  return ids;
+}
+
+/**
  * Reject a trade offer via API POST for cleanup (best-effort).
  */
 export async function rejectOfferSafe(

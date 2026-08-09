@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
-import type { APIRequestContext } from '@playwright/test';
 import { test, expect } from '../fixtures/auth';
+import { fetchToken } from '../helpers/csrf';
 
 /**
  * Forged-CSRF-token rejection — the negative security path the rest of the
@@ -23,55 +23,6 @@ import { test, expect } from '../fixtures/auth';
 /** A random 64-hex token — correct format, wrong value. */
 function forgedToken(): string {
   return randomBytes(32).toString('hex');
-}
-
-/**
- * Fetch a fresh, valid `_csrf_token` from a GET-rendered form on `path`.
- *
- * A page can render several CSRF tokens (each gate has its own per-action
- * token — e.g. the admin DebugMenu toggle in the page chrome). Pass `formName`
- * to scope extraction to a specific `<form name="...">`; the token for that
- * form is the first `_csrf_token` after the form's opening tag.
- *
- * Without `formName`, the page must contain exactly one token — if it has
- * more, extraction is ambiguous (the first match may be the chrome's token,
- * not the form under test) and this throws rather than silently picking one.
- */
-async function fetchToken(
-  request: APIRequestContext,
-  path: string,
-  formName?: string,
-): Promise<string> {
-  const resp = await request.get(path);
-  if (!resp.ok()) {
-    throw new Error(`token fetch GET ${path} failed: ${resp.status()}`);
-  }
-  let body = await resp.text();
-  if (formName === undefined) {
-    const tokenCount = (
-      body.match(/name="_csrf_token" value="[0-9a-f]+"/g) ?? []
-    ).length;
-    if (tokenCount > 1) {
-      throw new Error(
-        `ambiguous _csrf_token on ${path}: ${tokenCount} tokens found — ` +
-          `pass a formName to scope extraction to the form under test`,
-      );
-    }
-  } else {
-    const formIdx = body.indexOf(`name="${formName}"`);
-    if (formIdx === -1) {
-      throw new Error(`form name="${formName}" not found on ${path}`);
-    }
-    body = body.slice(formIdx);
-  }
-  const match = body.match(/name="_csrf_token" value="([0-9a-f]+)"/);
-  if (match === null) {
-    throw new Error(
-      `no _csrf_token found on ${path}` +
-        (formName !== undefined ? ` in form "${formName}"` : ''),
-    );
-  }
-  return match[1];
 }
 
 test.describe('Forged CSRF token is rejected', () => {

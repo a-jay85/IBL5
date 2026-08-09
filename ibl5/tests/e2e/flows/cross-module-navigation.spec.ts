@@ -114,16 +114,18 @@ test.describe('Cross-module navigation', () => {
     await assertNoPhpErrors(page, 'on Standings (chain)');
 
     const teamLink = page.locator('.ibl-data-table a[href*="name=Team"]').first();
+    await expect(teamLink).toBeVisible();
+
     const teamHref = await teamLink.getAttribute('href');
     await page.goto(teamHref!);
     await assertNoPhpErrors(page, 'on Team page (chain)');
 
     const playerLink = page.locator('a[href*="name=Player"][href*="pid="]').first();
-    const playerCount = await playerLink.count();
-    if (playerCount > 0) {
-      const playerHref = await playerLink.getAttribute('href');
-      await page.goto(playerHref!);
-      await assertNoPhpErrors(page, 'on Player page (chain)');
-    }
+    await expect(playerLink).toBeVisible();
+
+    const playerHref = await playerLink.getAttribute('href');
+    expect(playerHref, 'player link must carry an href').toBeTruthy();
+    await page.goto(playerHref!);
+    await assertNoPhpErrors(page, 'on Player page (chain)');
   });
 });

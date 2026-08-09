@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-08-08
+last_verified: 2026-08-09
 ---
 
 # Loop-Engineering Backlog
@@ -253,14 +253,16 @@ is the signal that the previously chosen rung was too weak — escalate one rung
 to the same place. This is a **prompted** loop, not an automated one: nothing scans this table on a
 schedule, and no gate fails on it.
 
-The table is fenced so the forward-referenced section names inside it do not resolve as live
-documentation references while the PR that adds them is still open.
+The table is fenced and every path inside it is written bare — no backticks, no link syntax. The
+bare paths are what keep a row naming a destination that does not exist yet from failing the
+dead-reference check; the fence alone would not, since the checker does not strip fenced blocks. Do
+not add backticks or markdown links to a row.
 
 ```
 | Date       | PR   | Class                                                                 | Routed to rung                                                                                          | Prior          |
 | ---------- | ---- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | -------------- |
-| 2026-07-25 | #1633 | class: env/supervisor precondition unverified before a long-running job | routed to: Rung 3 - forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger, lands with verification-forced-integration-triggers) | prior: -- |
-| 2026-07-25 | --   | class: shared-context wire contract between two scripts is unasserted   | routed to: Rung 3 - forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger, lands with verification-forced-integration-triggers) | prior: -- |
+| 2026-07-25 | #1633 | class: env/supervisor precondition unverified before a long-running job | routed to: Rung 3 - forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger) | prior: -- |
+| 2026-07-25 | --   | class: shared-context wire contract between two scripts is unasserted   | routed to: Rung 3 - forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger) | prior: -- |
 | 2026-07-25 | #1654 | class: CLI entrypoint accepts an unknown flag silently instead of erroring | routed to: Rung 1 - PHPStan rule over argv option parsing; queued, and a fourth occurrence forces it      | prior: #1354, #1496 |
 ```
 

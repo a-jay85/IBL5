@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-07-30
+last_verified: 2026-08-09
 ---
 
 # Post-Plan Orchestrator
@@ -360,11 +360,10 @@ CI. Use when the defect is decidable from repo state (files, docs, config) but n
 source file. Extend an existing gate; do not add a new one.
 
 **Rung 3 — a forced-trigger row in `.claude/review-shared/_plan-verification.md`.** Use when the
-defect is only catchable by a test the plan should have required. That file already carries the
-forced E2E trigger table and the forced manual-verification trigger table; add a row to whichever
-fits. A forced integration-verification trigger table is being added by the
-verification-forced-integration-triggers work — once it lands, cross-script wire contracts and
-environment preconditions belong there.
+defect is only catchable by a test the plan should have required. That file carries the forced E2E
+trigger table, the forced manual-verification trigger table, and the forced
+integration-verification trigger table; add a row to whichever fits. Cross-script wire contracts and
+environment preconditions belong in the integration-verification table.
 
 **Rung 4 — a rule doc.** A new or amended file under `.claude/rules/`. Use when the defect needs
 judgment applied at a decision point, so no gate can decide it, but the guidance applies to every

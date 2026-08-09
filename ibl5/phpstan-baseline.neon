@@ -1949,3 +1949,441 @@ parameters:
 			identifier: ternary.shortNotAllowed
 			count: 1
 			path: scripts/updateAllTheThings.php
+
+		-
+			rawMessage: Binary operation "." between "</div>\r\n        …" and mixed results in an error.
+			identifier: binaryOp.invalid
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Binary operation "." between ''<div class="news…'' and mixed results in an error.'
+			identifier: binaryOp.invalid
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Binary operation "." between ''<p class="news…'' and mixed results in an error.'
+			identifier: binaryOp.invalid
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Binary operation "." between ''<span class="news…'' and mixed results in an error.'
+			identifier: binaryOp.invalid
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: Binary operation "." between non-falsy-string and mixed results in an error.
+			identifier: binaryOp.invalid
+			count: 3
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Cannot call method getCurrentLeague() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Cannot call method getUsername() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: Cannot cast mixed to int.
+			identifier: cast.int
+			count: 5
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: Constant _NOTE not found.
+			identifier: constant.notFound
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: Constant _POSTEDON not found.
+			identifier: constant.notFound
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: Constant _READS not found.
+			identifier: constant.notFound
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: Constant _WRITES not found.
+			identifier: constant.notFound
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Construct empty() is not allowed. Use more strict comparison.'
+			identifier: empty.notAllowed
+			count: 5
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Direct is_admin() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Direct is_user() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function CloseTable() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function OpenTable() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function OpenTable2() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function themearticle() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function themearticle() has parameter $aid with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function themearticle() has parameter $datetime with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function themearticle() has parameter $informant with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function themearticle() has parameter $thetext with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function themearticle() has parameter $title with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function themearticle() has parameter $topic with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function themearticle() has parameter $topicimage with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function themearticle() has parameter $topicname with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function themearticle() has parameter $topictext with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function themecenterbox() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function themefooter() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function themeheader() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function themeindex() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function themeindex() has parameter $aid with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function themeindex() has parameter $counter with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function themeindex() has parameter $informant with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function themeindex() has parameter $morelink with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function themeindex() has parameter $notes with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function themeindex() has parameter $thetext with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function themeindex() has parameter $time with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function themeindex() has parameter $title with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function themeindex() has parameter $topic with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function themeindex() has parameter $topicimage with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function themeindex() has parameter $topicname with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Function themeindex() has parameter $topictext with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Loose comparison via "!=" between mixed and string is not allowed.'
+			identifier: notEqual.notAllowed
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Loose comparison via "!=" between string and string is not allowed.'
+			identifier: notEqual.notAllowed
+			count: 2
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Only booleans are allowed in &&, int given on the left side.'
+			identifier: booleanAnd.leftNotBoolean
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Only booleans are allowed in a ternary operator condition, int|null given.'
+			identifier: ternary.condNotBoolean
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Only booleans are allowed in an if condition, int given.'
+			identifier: if.condNotBoolean
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Navigation\NavigationRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class ProjectedDraftOrder\ProjectedDraftOrderRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
+			identifier: argument.type
+			count: 4
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Parameter #1 $timestamp of method Utilities\NukeCompat::formatLocalTime() expects int|string, mixed given.'
+			identifier: argument.type
+			count: 2
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Parameter #1 $username of class Debug\DebugSession constructor expects string|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Parameter #1 $username of method Navigation\NavigationRepository::resolveTeamId() expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Parameter #1 (mixed) of echo cannot be converted to string.'
+			identifier: echo.nonString
+			count: 2
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Parameter #2 $leagueContext of class Season\Season constructor expects League\LeagueContext|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Parameter #2 $serverName of class Debug\DebugSession constructor expects string|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Parameter #3 $cookieValue of class Debug\DebugSession constructor expects string|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Parameter #3 $subject of function str_replace expects array<string>|string, mixed given.'
+			identifier: argument.type
+			count: 2
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Parameter $currentLeague of class Navigation\NavigationConfig constructor expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Parameter $isLoggedIn of class Navigation\NavigationConfig constructor expects bool, int given.'
+			identifier: argument.type
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Parameter $requestUri of class Navigation\NavigationConfig constructor expects string|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Parameter $serverName of class Navigation\NavigationConfig constructor expects string|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Parameter $username of class Navigation\NavigationConfig constructor expects string|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Part $aid (mixed) of encapsed string cannot be cast to string.'
+			identifier: encapsedStringPart.nonString
+			count: 2
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Part $bgcolor1 (mixed) of encapsed string cannot be cast to string.'
+			identifier: encapsedStringPart.nonString
+			count: 4
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Part $bgcolor2 (mixed) of encapsed string cannot be cast to string.'
+			identifier: encapsedStringPart.nonString
+			count: 2
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Part $informant (mixed) of encapsed string cannot be cast to string.'
+			identifier: encapsedStringPart.nonString
+			count: 2
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Part $tipath (mixed) of encapsed string cannot be cast to string.'
+			identifier: encapsedStringPart.nonString
+			count: 2
+			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'Part $topicimage (mixed) of encapsed string cannot be cast to string.'
+			identifier: encapsedStringPart.nonString
+			count: 6
+			path: themes/IBL/theme.php

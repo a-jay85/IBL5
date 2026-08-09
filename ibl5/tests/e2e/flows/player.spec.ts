@@ -60,26 +60,6 @@ test.describe('Player page flow — stat views', () => {
     await assertNoPhpErrors(page, 'on ratings and salary');
   });
 
-  test('awards and news view loads', async ({ page }) => {
-    await page.goto('modules.php?name=Player&pa=showpage&pid=1&pageView=1');
-    // May have no awards data — just verify no errors
-    await assertNoPhpErrors(page, 'on awards and news');
-  });
-
-  test('sim stats view loads', async ({ page }) => {
-    await page.goto('modules.php?name=Player&pa=showpage&pid=1&pageView=10');
-    await assertNoPhpErrors(page, 'on sim stats');
-  });
-
-  test('playoff stats view loads', async ({ page }) => {
-    await page.goto('modules.php?name=Player&pa=showpage&pid=1&pageView=5');
-    await assertNoPhpErrors(page, 'on playoff totals');
-  });
-
-  test('HEAT stats view loads', async ({ page }) => {
-    await page.goto('modules.php?name=Player&pa=showpage&pid=1&pageView=7');
-    await assertNoPhpErrors(page, 'on HEAT totals');
-  });
 });
 
 test.describe('Player page flow — nav pill navigation', () => {

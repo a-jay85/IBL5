@@ -42,24 +42,12 @@ test.describe('Compare Players flow', () => {
     await expect(submitBtn).toContainText('Compare');
   });
 
-  test('comparing two players shows ratings table', async ({ page }) => {
+  test('comparison shows ratings, season stats, and career stats tables', async ({ page }) => {
     await submitComparison(page);
 
     const allTitles = await page.locator('.ibl-title').allTextContents();
     expect(allTitles.some((t) => t.includes('Current Ratings'))).toBe(true);
-  });
-
-  test('comparison shows season stats table', async ({ page }) => {
-    await submitComparison(page);
-
-    const allTitles = await page.locator('.ibl-title').allTextContents();
     expect(allTitles.some((t) => t.includes('Current Season Stats'))).toBe(true);
-  });
-
-  test('comparison shows career stats table', async ({ page }) => {
-    await submitComparison(page);
-
-    const allTitles = await page.locator('.ibl-title').allTextContents();
     expect(allTitles.some((t) => t.includes('Career Stats'))).toBe(true);
   });
 

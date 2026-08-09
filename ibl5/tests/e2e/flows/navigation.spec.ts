@@ -4,15 +4,17 @@ import { desktopNav, openMobileMenu } from '../helpers/navigation';
 // Authenticated navigation flow tests — verify logged-in user experience.
 
 test.describe('Navigation bar (authenticated, desktop)', () => {
-  test('my team menu is visible for logged-in users', async ({ page }) => {
+  test.beforeEach(async ({ page }) => {
     await page.goto('index.php');
+  });
+
+  test('my team menu is visible for logged-in users', async ({ page }) => {
     await expect(
       desktopNav(page).getByRole('button', { name: 'My Team' }),
     ).toBeVisible();
   });
 
   test('account button shows username instead of login', async ({ page }) => {
-    await page.goto('index.php');
     const nav = desktopNav(page);
 
     // "Login" button should NOT be present when authenticated
@@ -22,7 +24,6 @@ test.describe('Navigation bar (authenticated, desktop)', () => {
   });
 
   test('my team dropdown opens and shows team links', async ({ page }) => {
-    await page.goto('index.php');
     const nav = desktopNav(page);
     await nav.getByRole('button', { name: 'My Team' }).click();
 
@@ -37,7 +38,6 @@ test.describe('Navigation bar (authenticated, desktop)', () => {
     // setup-docker-e2e action.yml ~L128) and gm_username on team Metros
     // (action.yml ~L133). So isLoggedIn && teamId !== null && isAdmin all
     // hold — the My Team menu renders AND the admin-gated link appears.
-    await page.goto('index.php');
     const nav = desktopNav(page);
     await nav.getByRole('button', { name: 'My Team' }).click();
 
@@ -52,7 +52,6 @@ test.describe('Navigation bar (authenticated, desktop)', () => {
   });
 
   test('my team dropdown shows logout footer', async ({ page }) => {
-    await page.goto('index.php');
     const nav = desktopNav(page);
 
     // Logout is now folded into the My Team dropdown footer for
@@ -64,7 +63,6 @@ test.describe('Navigation bar (authenticated, desktop)', () => {
   });
 
   test('teams mega-menu shows team links', async ({ page }) => {
-    await page.goto('index.php');
     await desktopNav(page).getByRole('button', { name: 'Teams' }).click();
 
     const teamLinks = page.locator('a[href*="teamid="]');
@@ -72,7 +70,6 @@ test.describe('Navigation bar (authenticated, desktop)', () => {
   });
 
   test('dropdown link navigates to correct page', async ({ page }) => {
-    await page.goto('index.php');
     const nav = desktopNav(page);
     await nav.getByRole('button', { name: 'Season' }).click();
 

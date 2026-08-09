@@ -76,17 +76,6 @@ test.describe('League Starters flow', () => {
     expect(count).toBeGreaterThanOrEqual(4);
   });
 
-  test('switching to Season Totals view works', async ({ page }) => {
-    await page.goto('modules.php?name=LeagueStarters&display=total_s');
-    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
-    await assertNoPhpErrors(page, 'on League Starters Season Totals view');
-  });
-
-  test('switching to Season Averages view works', async ({ page }) => {
-    await page.goto('modules.php?name=LeagueStarters&display=avg_s');
-    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
-    await assertNoPhpErrors(page, 'on League Starters Season Averages view');
-  });
 
   test('no PHP errors', async ({ page }) => {
     await assertNoPhpErrors(page, 'on League Starters page');
@@ -96,6 +85,7 @@ test.describe('League Starters flow', () => {
     const displays = ['total_s', 'avg_s', 'per36mins'];
     for (const display of displays) {
       await page.goto(`modules.php?name=LeagueStarters&display=${display}`);
+      await expect(page.locator('.ibl-data-table').first()).toBeVisible();
       await assertNoPhpErrors(page, `on League Starters ${display} view`);
     }
   });

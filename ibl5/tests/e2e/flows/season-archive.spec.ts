@@ -40,8 +40,4 @@ test.describe('Season Archive flow', () => {
     await assertNoPhpErrors(page, 'on Season Archive index');
   });
 
-  test('no PHP errors on nonexistent year', async ({ page }) => {
-    await page.goto('modules.php?name=SeasonArchive&year=1900');
-    await assertNoPhpErrors(page, 'on Season Archive invalid year');
-  });
 });

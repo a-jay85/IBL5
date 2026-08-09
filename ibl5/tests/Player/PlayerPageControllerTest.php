@@ -304,4 +304,106 @@ class PlayerPageControllerTest extends WideUnitTestCase
 
         $this->assertStringContainsString('Rookie option has been exercised successfully', $html);
     }
+
+    // ── Result-banner branches ──────────────────────────────────────
+
+    public function testRenderPageShowsEmailFailedBanner(): void
+    {
+        $_GET['result'] = 'email_failed';
+        $html = $this->controller->renderPage(1, null, 'testuser');
+
+        $this->assertStringContainsString('notification email failed to send', $html);
+        $this->assertStringContainsString('ibl-alert--warning', $html);
+    }
+
+    public function testRenderPageShowsNoBannerForUnknownResultCode(): void
+    {
+        $_GET['result'] = 'unknown_code_xyz';
+        $html = $this->controller->renderPage(1, null, 'testuser');
+
+        $this->assertStringNotContainsString('ibl-alert', $html);
+    }
+
+    // ── Default-fallback branch (invalid pageView integer) ──────────
+
+    public function testRenderPageDefaultFallbackForInvalidPageViewActivePlayer(): void
+    {
+        // pageView=999 matches no PlayerPageType constant → falls through to
+        // the default-fallback block at PlayerPageController.php line 264.
+        // Active player (retired=0) → renderOverview path.
+        $html = $this->controller->renderPage(1, 999, 'testuser');
+
+        $this->assertStringContainsString('Test Player', $html);
+        $this->assertStringContainsString('Game Log', $html);
+    }
+
+    public function testRenderPageDefaultFallbackForInvalidPageViewRetiredPlayer(): void
+    {
+        // Mirror the retired-player mock setup from testRenderPageOverviewForRetiredPlayer
+        // (line 137), then pass pageView=999 to reach the default-fallback block
+        // at PlayerPageController.php line 265–273 (retired branch → Regular Season view).
+        $retiredRow = array_merge($this->playerStatsRow(), ['retired' => 1]);
+        $playerWithRetired = [
+            'pid' => 1, 'ordinal' => 1, 'name' => 'Retired Player', 'nickname' => null,
+            'age' => 40, 'teamid' => 0, 'pos' => 'SG',
+            'r_fga' => 70, 'r_fgp' => 50, 'r_fta' => 60, 'r_ftp' => 80,
+            'r_3ga' => 40, 'r_3gp' => 35, 'r_orb' => 30, 'r_drb' => 50,
+            'r_ast' => 60, 'r_stl' => 50, 'r_tvr' => 40, 'r_blk' => 30,
+            'r_foul' => 40, 'oo' => 70, 'od' => 60, 'r_drive_off' => 65,
+            'dd' => 55, 'po' => 50, 'pd' => 45, 'r_trans_off' => 70,
+            'td' => 60, 'clutch' => 75, 'consistency' => 80,
+            'talent' => 85, 'skill' => 80, 'intangibles' => 70,
+            'loyalty' => 50, 'playing_time' => 60, 'winner' => 40,
+            'tradition' => 30, 'security' => 55,
+            'exp' => 15, 'bird' => 0, 'cy' => 0, 'cyt' => 0,
+            'salary_yr1' => 0, 'salary_yr2' => 0, 'salary_yr3' => 0,
+            'salary_yr4' => 0, 'salary_yr5' => 0, 'salary_yr6' => 0,
+            'draftyear' => 2010, 'draftround' => 1, 'draftpickno' => 3,
+            'draftedby' => 'Heat', 'draftedbycurrentname' => 'Heat',
+            'college' => 'U of Test',
+            'htft' => 6, 'htin' => 5, 'wt' => 210,
+            'injured' => 0, 'retired' => 1, 'droptime' => 0,
+            'teamname' => 'Free Agents', 'color1' => 'D4AF37', 'color2' => '1e3a5f',
+            'rookie_option_used' => 0, 'uuid' => 'retired-uuid',
+            'gm_username' => '',
+        ];
+
+        $this->mockDb = new \Tests\WideUnit\Mocks\MockDatabase();
+        $this->injectGlobalMockDb();
+        $this->mockDb->onQuery('team_name AS teamname', [$playerWithRetired]);
+        $this->mockDb->onQuery('SELECT color1, color2', [['color1' => 'D4AF37', 'color2' => '1e3a5f']]);
+        $this->mockDb->onQuery('SUM.*CASE.*ibl_awards', [['allStar' => 0, 'threePoint' => 0, 'dunkContest' => 0, 'rookieSoph' => 0]]);
+        $this->mockDb->onQuery('ibl_awards.*WHERE name', []);
+        $this->mockDb->onQuery('ibl_standings', [[
+            'teamid' => 0, 'team_city' => '', 'team_name' => 'Free Agents',
+            'color1' => 'D4AF37', 'color2' => '1e3a5f',
+            'arena' => '', 'capacity' => 0,
+            'owner_name' => '', 'owner_email' => '',
+            'discord_id' => null, 'used_extension_this_chunk' => 0,
+            'used_extension_this_season' => 0, 'has_mle' => 0, 'has_lle' => 0,
+            'league_record' => '0-0', 'uuid' => 'fa-uuid',
+            'gm_username' => '',
+        ]]);
+        $this->mockDb->onQuery('ibl_hist', [[
+            'pid' => 1, 'year' => 2020, 'teamid' => 5, 'team' => 'Heat',
+            'games' => 55, 'minutes' => 1500,
+            'fgm' => 400, 'fga' => 800, 'ftm' => 200, 'fta' => 250,
+            'tgm' => 100, 'tga' => 280,
+            'orb' => 50, 'reb' => 200, 'ast' => 300, 'stl' => 80,
+            'tvr' => 120, 'blk' => 40, 'pf' => 130, 'pts' => 1100,
+            'salary' => 1000,
+        ]]);
+        $this->mockDb->setMockData([$retiredRow]);
+
+        $stubRepo = self::createStub(TeamIdentityRepositoryInterface::class);
+        $stubRepo->method('getTeamnameFromUsername')->willReturn('Free Agents');
+        $controller = new PlayerPageController($this->mockDb, $stubRepo, new PlayerPageService($this->mockDb, $stubRepo));
+
+        $html = $controller->renderPage(1, 999, 'nobody');
+
+        $this->assertStringContainsString('Retired Player', $html);
+        $this->assertStringContainsString('Regular Season', $html);
+        // Confirm NOT the active-player overview path (no Game Log for retired fallback)
+        $this->assertStringNotContainsString('Game Log', $html);
+    }
 }

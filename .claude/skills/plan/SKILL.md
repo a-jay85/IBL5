@@ -4,7 +4,7 @@ description: "Plan an implementation task: enforces a verification matrix, direc
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
-last_verified: 2026-08-08
+last_verified: 2026-08-09
 ---
 
 # /plan — Implementation Planning with Verification Matrix

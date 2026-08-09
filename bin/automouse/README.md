@@ -54,9 +54,12 @@ steps **by hand on the Mac host, after this PR is merged to master and pulled**:
    grep -l "bin/automouse-run" ~/Library/LaunchAgents/*.plist 2>/dev/null \
      | while read -r p; do launchctl unload "$p"; rm "$p"; done
    ```
-4. **Sweep `~/.claude/hooks/`** for stale `bin/automouse-*` mentions (deny-message
-   text / comments — cosmetic, but keep them accurate). These files are outside the
-   repo, so they are **not** part of this PR:
+4. ~~**Sweep `~/.claude/hooks/`**~~ — **already done (2026-08-09), before merge.**
+   The three stale mentions (`bash-guard.sh` and `plans-write-guard.sh` deny-message
+   text, `subagent-persist-gate.py` comment) were pure prose, so correcting them early
+   could not break a running pipeline. These files live outside the repo, so the fix is
+   **not** in this PR's diff and is **not** covered by CI or by a revert of this PR.
+   Re-check (expect zero output):
    ```bash
    grep -rl "bin/automouse-run\|bin/automouse-queue\|bin/automouse-self-heal" \
      ~/.claude/hooks/

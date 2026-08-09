@@ -25,13 +25,13 @@
 #
 # ── Why the predicates are what they are ────────────────────────────────────────
 # PRIMARY is the stream filter's own per-phase verdict line, emitted by
-# bin/lib/automouse-stream-filter the instant the phase's `claude -p` returns:
+# bin/lib/automouse-stream-filter.sh the instant the phase's `claude -p` returns:
 #
 #   [00:45:00] <slug>/postplan exit: stop_reason=end_turn turns=61 ...
 #
 # It carries the slug, so it attributes correctly even when the queue holds
 # several plans — the runner's other marker ("--- Plan #N postplan finished ---",
-# bin/automouse-run) does NOT, and a watcher keyed on that fires on a *sibling*
+# bin/automouse/run) does NOT, and a watcher keyed on that fires on a *sibling*
 # plan's finish. Baseline-and-compare (count at start, fire when it rises) rather
 # than plain grep, so a same-slug line left in an older log from a previous run
 # can't fire us at t=0.
@@ -135,12 +135,12 @@ if [ "$FORCE" != 1 ] && ! exists "$AM/queue/$PLAN"; then
     cat >&2 <<EOF
 watch-automouse-plan: $PLAN is $where, not in queue/.
 Watching now would fire immediately on that stale state. Queue it first
-(bin/automouse-queue), or pass --force if you know what you're watching for.
+(bin/automouse/queue), or pass --force if you know what you're watching for.
 EOF
     exit 2
 fi
 
-runner_pid() { pgrep -f 'automouse-run' 2>/dev/null | grep -v "^$$\$" | head -1; }
+runner_pid() { pgrep -f 'automouse/run' 2>/dev/null | grep -v "^$$\$" | head -1; }
 
 # Baseline the slug-attributed verdict line; fire when the count rises.
 count_hits() {
@@ -212,7 +212,7 @@ while true; do
                 fire "⚠️ automouse **$PHASE** finished for **$SLUG** but the plan landed in **skipped/** — needs a look." ;;
             *)
                 # Still in queue/ means opposite things per phase. A healthy impl
-                # ALWAYS ends here — bin/automouse-run only moves the plan out of
+                # ALWAYS ends here — bin/automouse/run only moves the plan out of
                 # queue/ on a deliberate impl disposition (already-merged → done/,
                 # the rest → skipped/); a normal impl writes a handoff and leaves
                 # the plan queued for postplan, which is the phase that does the

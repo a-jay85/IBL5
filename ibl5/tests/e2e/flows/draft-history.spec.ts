@@ -180,8 +180,6 @@ test.describe('HTMX year switching', () => {
       expectedUrl: new RegExp('year=' + YEAR_WITH_ONE_PICK),
       contentSelector: '#draft-history-content',
     });
-
-    expect(page.url()).toContain('year=' + YEAR_WITH_ONE_PICK);
   });
 });
 

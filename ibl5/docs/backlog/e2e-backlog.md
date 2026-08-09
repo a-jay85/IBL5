@@ -89,19 +89,20 @@ asserters, console-error watcher auto-wired into the base fixture, cookie-based 
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| B1 | ⬜ Open | 🟩 | `award-history` 8× goto → beforeEach. |
-| B2 | ⬜ Open | 🟩 | `navigation` desktop 6× goto → beforeEach. |
-| B3 | ⬜ Open | 🟩 | `team-off-def-stats` 5× repeated appState+goto. |
-| B4 | ⬜ Open | 🟩 | `team` two describes both goto teamid=1 → merge. |
-| B5 | ⬜ Open | 🟩 | `team-off-def-stats` 3 phase tests → test.each. |
-| B6 | ⬜ Open | 🟩 | `team` 5 dropdown-switch tests → table-driven. |
-| B7 | ⬜ Open | 🟩 | `news` 3 article tests; 3rd is superset → 1. |
-| B8 | ⬜ Open | 🟩 | `compare-players` 3 submits → 1 submit, 3 expects. |
-| B9 | ⬜ Open | 🟩 | `season-archive` 2 invalid-year → 1. |
-| B10 | ⬜ Open | 🟩 | `league-starters` view tests subsumed by loop. |
-| B11 | ⬜ Open | 🟩 | `player` stat-view loop re-covers 7 individual PHP-only tests. |
-| B12 | ⬜ Open | 🟩 | `draft` "visible without scrolling" subsumed by "after scrolling". |
-| B13 | ⬜ Open | 🟩 | `draft-history` probe runs in 5 tests → beforeAll once; + merge HTMX double-call tests. |
+| B1 | ✅ | — | `award-history` 8× goto → beforeEach. ✓done (implemented before this PR; confirmed at characterization) |
+| B2 | ✅ | — | `navigation` desktop 6× goto → beforeEach. ✓done |
+| B3 | ✅ | — | `team-off-def-stats` 5× repeated appState+goto. ✓done |
+| B4 | ✅ | — | `team` two describes both goto teamid=1 → merge. ✓done |
+| B5 | ✅ | — | `team-off-def-stats` 3 phase tests → test.each. ✓done |
+| B6 | ✅ | — | `team` 5 dropdown-switch tests → table-driven. ✓done |
+| B7 | ✅ | — | `news` 3 article tests; 3rd is superset → 1. ✓done |
+| B8 | ✅ | — | `compare-players` 3 submits → 1 submit, 3 expects. ✓done |
+| B9 | ✅ | — | `season-archive` 2 invalid-year → 1. ✓done |
+| B10 | ✅ | — | `league-starters` view tests subsumed by loop. ✓done |
+| B11 | ✅ | — | `player` stat-view loop re-covers 7 individual PHP-only tests. ✓done |
+| B12 | ✅ | — | `draft` "visible without scrolling" subsumed by "after scrolling". ✓done |
+| B13 | ✅ | — | `draft-history` probe runs in 5 tests → beforeAll once; + merge HTMX double-call tests. ✓done (HTMX URL assertion removals applied; probe beforeAll consolidation deferred — plan defect: `page` fixture is test-scoped and invalid in `beforeAll`) |
+| B14 | ⬜ Open | 🟩 | `draft-history` `navigateToDraftYearWithData` still runs 5× per suite; probe requires `page` fixture which is test-scoped. Alternative: `workerScope` fixture or module-level `let dataYear` populated by `beforeAll` using a headless HTTP GET or seed-data lookup. (discovered 2026-08-08 during #1811) |
 
 **B1–B4 — missing `beforeEach` (each test re-`goto`s the same URL):**
 `award-history.spec.ts` (8 tests → save 7 loads), `navigation.spec.ts` desktop describe (6 → save 5; mobile

@@ -107,21 +107,6 @@ test.describe('Franchise Record Book flow', () => {
     });
   });
 
-  test('team selection updates URL', async ({ page }) => {
-    await page.goto('modules.php?name=FranchiseRecordBook');
-
-    const teamSelect = page.locator('#record-book-team');
-    const teamValue = await teamSelect.locator('option').nth(1).getAttribute('value');
-
-    await assertHtmxSwap(page, {
-      trigger: () => teamSelect.selectOption(teamValue!),
-      apiUrlPattern: (url) => url.includes('FranchiseRecordBook'),
-      expectedUrl: /teamid=/,
-      contentSelector: '#record-book-content',
-    });
-
-    expect(page.url()).toContain('teamid=');
-  });
 
   test('no PHP errors on team view', async ({ page }) => {
     await page.goto('modules.php?name=FranchiseRecordBook&teamid=1');

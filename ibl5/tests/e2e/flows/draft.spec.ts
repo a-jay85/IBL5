@@ -71,12 +71,6 @@ test.describe('Draft board: renders', () => {
     await expect(container).toHaveCSS('position', 'fixed');
   });
 
-  test('submit button visible without scrolling', async ({ page }) => {
-    const submitBtn = page.locator('.draft-submit-container .ibl-btn');
-    await expect(submitBtn).toBeVisible();
-    await expect(submitBtn).toBeInViewport();
-  });
-
   test('submit button remains visible after scrolling', async ({ page }) => {
     const submitBtn = page.locator('.draft-submit-container .ibl-btn');
     await expect(submitBtn).toBeVisible();

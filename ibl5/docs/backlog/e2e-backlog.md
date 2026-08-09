@@ -1,6 +1,6 @@
 ---
 description: E2E (Playwright + api-e2e) test-quality backlog — refactoring, perf, weak/tautological assertions, tests that don't prove functionality, and flake-prone patterns, with per-entry status + automouse-readiness. Each open entry is a candidate for a /plan.
-last_verified: 2026-08-05
+last_verified: 2026-08-08
 ---
 
 # E2E Test-Quality Backlog
@@ -65,78 +65,23 @@ asserters, console-error watcher auto-wired into the base fixture, cookie-based 
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| A1 | ⬜ Open | 🟩 | `loginViaForm` reimplemented 4× — clear extract. |
-| A2 | ⬜ Open | 🟩 | `schedule-contrast` hand-rolls `PHP_ERROR_PATTERNS`; low sev (documented fallback). |
-| A3 | ⬜ Open | 🟩 | voting category-expand block ×4 → helper. |
-| A4 | ⬜ Open | 🟩 | ajax-api 4-test pattern ×3 (~120 LOC) → parametrize. |
-| A5 | ⬜ Open | 🟩 | depth-chart MutationObserver block dup. |
-| A6 | ⬜ Open | 🟩 | `collectAllOfferIds` overlaps `helpers/trading.ts`. |
-| A7 | ⬜ Open | 🟩 | `fetchToken()` CSRF-scraper trapped file-local (1 consumer; low urgency). |
-| A8 | ⬜ Open | 🟩 | `.projected-draft-order-table, .ibl-data-table` locator ×5. |
+| A1 | ✅ Implemented | 🟩 | `loginViaForm` reimplemented 4× — clear extract. |
+| A2 | ✅ Implemented | 🟩 | `schedule-contrast` hand-rolls `PHP_ERROR_PATTERNS`; low sev (documented fallback). |
+| A3 | ✅ Implemented | 🟩 | voting category-expand block ×4 → helper. |
+| A4 | ✅ Implemented | 🟩 | ajax-api 4-test pattern ×3 (~120 LOC) → parametrize. |
+| A5 | ✅ Implemented | 🟩 | depth-chart MutationObserver block dup. |
+| A6 | ✅ Implemented | 🟩 | `collectAllOfferIds` overlaps `helpers/trading.ts`. |
+| A7 | ✅ Implemented | 🟩 | `fetchToken()` CSRF-scraper trapped file-local (1 consumer; low urgency). |
+| A8 | ✅ Implemented | 🟩 | `.projected-draft-order-table, .ibl-data-table` locator ×5. |
 
-### A1 `loginViaForm` reimplemented in 4 specs
-**Location:** `flows/auth.spec.ts` (`loginWithRemember`), `flows/password-reset.spec.ts`, `flows/your-account.spec.ts`, `smoke/auth-regular-user-provisioned.spec.ts`
-**Problem:** Each fills `#login-username`/`#login-password` and `Promise.all([waitForURL, click])` independently; same shape as the two `*.setup.ts` files.
-**Suggested direction:** Extract `helpers/login.ts loginViaForm(page, user, pass, {remember?})`. Setup files keep their copy (they run pre-fixture).
-**Est. effort:** S
-**Risk if untouched:** Five copies drift; a login-flow change must be made in each.
-**Status:** ⬜ Open
-
-### A2 `assertNoPhpErrors` hand-rolled inline
-**Location:** `smoke/schedule-contrast.spec.ts:13,42`
-**Problem:** Only spec that re-declares `const PHP_ERROR_STRINGS=[...]` + loop instead of importing `assertNoPhpErrors`. NB: the inline loop is the documented fallback in `playwright-tests.md`, so it's not wrong — just the lone hold-out.
-**Suggested direction:** Import `assertNoPhpErrors`.
-**Est. effort:** S
-**Risk if untouched:** Pattern set drifts from the canonical helper.
-**Status:** ⬜ Open — low severity.
-
-### A3 Voting category-expand block copy-pasted 4×
-**Location:** `flows/voting-submission.spec.ts:32,160,210,301`
-**Problem:** find-header-by-regex → check `aria-expanded` → click-if-collapsed, ~10 LOC each.
-**Suggested direction:** Extract `expandVotingCategory(page, cat)`.
-**Est. effort:** S
-**Risk if untouched:** Voting-DOM change requires 4 edits.
-**Status:** ⬜ Open
-
-### A4 ajax-api 4-test pattern repeated 3×
-**Location:** `flows/ajax-api-endpoints.spec.ts` (DCE / Team / LeagueStarters blocks)
-**Problem:** ratings-returns-table / all-modes / invalid-fallback / HX-Push-Url repeated ~120 LOC, only the URL prefix varies.
-**Suggested direction:** `describe` factory over `{module, url}`.
-**Est. effort:** M
-**Risk if untouched:** New API module → copy 4 tests; the weak `length>0` asserts (see C) propagate.
-**Status:** ⬜ Open
-
-### A5 Depth-chart MutationObserver setup duplicated
-**Location:** `flows/depth-chart-entry.spec.ts:182,245`
-**Problem:** Identical observer-install block across two preview tests.
-**Suggested direction:** Local `installPreviewObserver(page)`.
-**Est. effort:** S
-**Risk if untouched:** Two copies drift.
-**Status:** ⬜ Open
-
-### A6 `collectAllOfferIds` overlaps shared helper
-**Location:** `flows/trading-submission.spec.ts:197` vs `helpers/trading.ts collectNewOfferIds`
-**Problem:** Same navigate-to-reviewtrade + scrape `[data-preview-offer]`, differs only `Set` vs array.
-**Suggested direction:** Make the helper return both shapes, or wrap it locally.
-**Est. effort:** S
-**Risk if untouched:** Two scrapers to maintain.
-**Status:** ⬜ Open
-
-### A7 `fetchToken()` CSRF-scraper trapped file-local
-**Location:** `flows/csrf-rejection.spec.ts:43`
-**Problem:** Good util; same need exists in `helpers/updater.ts` (regex-scrape token).
-**Suggested direction:** Promote to `helpers/csrf.ts`.
-**Est. effort:** S
-**Risk if untouched:** Future positive-token tests reimplement it. (Low urgency — 1 current consumer.)
-**Status:** ⬜ Open
-
-### A8 Repeated combined locator
-**Location:** `flows/projected-draft-order.spec.ts`
-**Problem:** `.projected-draft-order-table, .ibl-data-table` in 5 of 7 tests.
-**Suggested direction:** Hoist to a const / page-object.
-**Est. effort:** S
-**Risk if untouched:** Minor.
-**Status:** ⬜ Open
+➜ A1 `loginViaForm` reimplemented in 4 specs — ✅ Implemented (2026-08-08): see [archive](archive/e2e-backlog-archive.md).
+➜ A2 `assertNoPhpErrors` hand-rolled inline — ✅ Implemented (2026-08-08): see [archive](archive/e2e-backlog-archive.md).
+➜ A3 Voting category-expand block copy-pasted 4× — ✅ Implemented (2026-08-08): see [archive](archive/e2e-backlog-archive.md).
+➜ A4 ajax-api 4-test pattern repeated 3× — ✅ Implemented (2026-08-08): see [archive](archive/e2e-backlog-archive.md).
+➜ A5 Depth-chart MutationObserver setup duplicated — ✅ Implemented (2026-08-08): see [archive](archive/e2e-backlog-archive.md).
+➜ A6 `collectAllOfferIds` overlaps shared helper — ✅ Implemented (2026-08-08): see [archive](archive/e2e-backlog-archive.md).
+➜ A7 `fetchToken()` CSRF-scraper trapped file-local — ✅ Implemented (2026-08-08): see [archive](archive/e2e-backlog-archive.md).
+➜ A8 Repeated combined locator — ✅ Implemented (2026-08-08): see [archive](archive/e2e-backlog-archive.md).
 
 ---
 

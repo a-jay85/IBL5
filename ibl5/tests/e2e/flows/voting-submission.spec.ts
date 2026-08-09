@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/auth';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { expandVotingCategory } from '../helpers/voting';
 import { submitFormAndAssertEffect } from '../helpers/submit-form';
 import { getVotes, resetVote } from '../helpers/test-state';
 
@@ -28,20 +29,7 @@ test.describe('ASG Voting: submission', () => {
     const categories = ['ECF', 'ECB', 'WCF', 'WCB'];
 
     for (const cat of categories) {
-      // Click category header to reveal table
-      const header = page.locator(`.voting-category`).filter({
-        hasText: new RegExp(cat === 'ECF' ? 'Eastern.*Frontcourt|ECF' :
-          cat === 'ECB' ? 'Eastern.*Backcourt|ECB' :
-          cat === 'WCF' ? 'Western.*Frontcourt|WCF' :
-          'Western.*Backcourt|WCB', 'i'),
-      });
-
-      await expect(header.first(), 'voting category header must render').toBeVisible();
-      const isExpanded = await header.first().getAttribute('aria-expanded');
-      // e2e-hygiene-allow: branch is an observable-state toggle, not a silent guard
-      if (isExpanded !== 'true') {
-        await header.first().click();
-      }
+      await expandVotingCategory(page, cat);
 
       const table = page.locator(`#${cat}`);
       // Wait for table visibility
@@ -157,23 +145,7 @@ test.describe('EOY Voting: validation errors', () => {
 
     // Fill ROY, Six, GM but leave MVP empty
     for (const cat of ['ROY', 'Six', 'GM']) {
-      const header = page.locator('.voting-category').filter({
-        hasText: new RegExp(
-          cat === 'ROY'
-            ? 'Rookie|ROY'
-            : cat === 'Six'
-              ? 'Sixth|6th'
-              : 'GM|General Manager',
-          'i',
-        ),
-      });
-
-      await expect(header.first(), 'voting category header must render').toBeVisible();
-      const isExpanded = await header.first().getAttribute('aria-expanded');
-      // e2e-hygiene-allow: branch is an observable-state toggle, not a silent guard
-      if (isExpanded !== 'true') {
-        await header.first().click();
-      }
+      await expandVotingCategory(page, cat);
 
       const table = page.locator(`#${cat}`);
       await expect(table).toBeVisible();
@@ -208,25 +180,7 @@ test.describe('EOY Voting: validation errors', () => {
 
     // Expand all categories and fill them
     for (const cat of ['MVP', 'Six', 'ROY', 'GM']) {
-      const header = page.locator('.voting-category').filter({
-        hasText: new RegExp(
-          cat === 'MVP'
-            ? 'MVP|Most Valuable'
-            : cat === 'Six'
-              ? 'Sixth|6th'
-              : cat === 'ROY'
-                ? 'Rookie|ROY'
-                : 'GM|General Manager',
-          'i',
-        ),
-      });
-
-      await expect(header.first(), 'voting category header must render').toBeVisible();
-      const isExpanded = await header.first().getAttribute('aria-expanded');
-      // e2e-hygiene-allow: branch is an observable-state toggle, not a silent guard
-      if (isExpanded !== 'true') {
-        await header.first().click();
-      }
+      await expandVotingCategory(page, cat);
 
       const table = page.locator(`#${cat}`);
       await expect(table).toBeVisible();
@@ -299,19 +253,7 @@ test.describe('EOY Voting: submission', () => {
     const categories = ['MVP', 'Six', 'ROY', 'GM'];
 
     for (const cat of categories) {
-      const header = page.locator('.voting-category').filter({
-        hasText: new RegExp(cat === 'MVP' ? 'MVP|Most Valuable' :
-          cat === 'Six' ? 'Sixth|6th' :
-          cat === 'ROY' ? 'Rookie|ROY' :
-          'GM|General Manager', 'i'),
-      });
-
-      await expect(header.first(), 'voting category header must render').toBeVisible();
-      const isExpanded = await header.first().getAttribute('aria-expanded');
-      // e2e-hygiene-allow: branch is an observable-state toggle, not a silent guard
-      if (isExpanded !== 'true') {
-        await header.first().click();
-      }
+      await expandVotingCategory(page, cat);
 
       const table = page.locator(`#${cat}`);
       await expect(table).toBeVisible();

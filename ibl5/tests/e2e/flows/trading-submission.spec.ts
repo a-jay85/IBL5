@@ -6,6 +6,7 @@ import { submitFormAndAssertEffect } from '../helpers/submit-form';
 import {
   buildFormBody,
   collectNewOfferIds,
+  collectOfferIdSet,
   rejectOfferSafe,
   type FormData,
 } from '../helpers/trading';
@@ -205,21 +206,6 @@ async function submitOffer(
   return response.headers()['location'] ?? '';
 }
 
-/**
- * Collect all offer IDs currently on the review page.
- */
-async function collectAllOfferIds(page: Page): Promise<Set<number>> {
-  await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
-  const buttons = page.locator('[data-preview-offer]');
-  const count = await buttons.count();
-  const ids = new Set<number>();
-  for (let i = 0; i < count; i++) {
-    const idStr = await buttons.nth(i).getAttribute('data-preview-offer');
-    ids.add(parseInt(idStr ?? '0', 10));
-  }
-  return ids;
-}
-
 // ---------------------------------------------------------------------------
 // Block 1: Players-only trade (UI-driven)
 // ---------------------------------------------------------------------------
@@ -318,7 +304,7 @@ test.describe('Trade submission: draft pick trade (API)', () => {
     expect(fd, 'CI seed must provide a partner with user pick + partner player').toBeTruthy();
 
     const token = await getCsrfToken(page);
-    const existingIds = await collectAllOfferIds(page);
+    const existingIds = await collectOfferIdSet(page);
 
     const pickIdx = getUserPickIndices(fd!)[0];
     const partnerIdx = getPartnerPlayerIndices(fd!)[0];
@@ -357,7 +343,7 @@ test.describe('Trade submission: cash-only trade (API)', () => {
     expect(fd, 'CI seed must provide a trade partner').toBeTruthy();
 
     const token = await getCsrfToken(page);
-    const existingIds = await collectAllOfferIds(page);
+    const existingIds = await collectOfferIdSet(page);
 
     const cashYear = fd!.cashStartYear;
     const body = buildFormBody(fd!, [], { [cashYear]: 200 }, undefined, token);
@@ -399,7 +385,7 @@ test.describe('Trade submission: mixed trade (API)', () => {
     expect(fd, 'CI seed must provide a partner with tradeable players on both sides').toBeTruthy();
 
     const token = await getCsrfToken(page);
-    const existingIds = await collectAllOfferIds(page);
+    const existingIds = await collectOfferIdSet(page);
 
     // Player+cash adds the partner's player salary to the offering team — the
     // genuine cap-risk case. Make the selection cap-safe (seed-independent):
@@ -516,7 +502,7 @@ test.describe('Trade submission: accept and reject', () => {
 
     const tokenA = await getCsrfToken(page);
     const tradeFormUrl = page.url();
-    const existingIds = await collectAllOfferIds(page);
+    const existingIds = await collectOfferIdSet(page);
     const userPlayers = getUserPlayerIndices(fd!);
     const partnerPlayers = getPartnerPlayerIndices(fd!);
     const bodyA = buildFormBody(fd!, [userPlayers[0], partnerPlayers[0]], undefined, undefined, tokenA);

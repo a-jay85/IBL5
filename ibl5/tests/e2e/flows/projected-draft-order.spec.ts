@@ -5,6 +5,11 @@ import { publicStorageState } from '../helpers/public-storage-state';
 // Projected Draft Order — public page.
 test.use({ storageState: publicStorageState() });
 
+const TABLE_SEL = '.projected-draft-order-table, .ibl-data-table';
+
+const TEAM_LINK_SEL =
+  '.projected-draft-order-table a[href*="teamid="], .ibl-data-table a[href*="teamid="]';
+
 test.describe('Projected Draft Order flow', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('modules.php?name=ProjectedDraftOrder');
@@ -15,12 +20,12 @@ test.describe('Projected Draft Order flow', () => {
   });
 
   test('draft order table is visible', async ({ page }) => {
-    const table = page.locator('.projected-draft-order-table, .ibl-data-table').first();
+    const table = page.locator(TABLE_SEL).first();
     await expect(table).toBeVisible();
   });
 
   test('table has expected columns', async ({ page }) => {
-    const table = page.locator('.projected-draft-order-table, .ibl-data-table').first();
+    const table = page.locator(TABLE_SEL).first();
     await expect(table).toBeVisible();
 
     const headerText = await table.locator('thead').textContent();
@@ -30,20 +35,20 @@ test.describe('Projected Draft Order flow', () => {
 
   test('table has at least 28 team rows', async ({ page }) => {
     // CI seed has 28 teams in standings — all should appear in round 1
-    const table = page.locator('.projected-draft-order-table, .ibl-data-table').first();
+    const table = page.locator(TABLE_SEL).first();
     const rows = table.locator('tbody tr:not(.projected-draft-order-separator)');
     expect(await rows.count()).toBeGreaterThanOrEqual(28);
   });
 
   test('pick numbers start at 1', async ({ page }) => {
-    const table = page.locator('.projected-draft-order-table, .ibl-data-table').first();
+    const table = page.locator(TABLE_SEL).first();
     const pickCells = table.locator('tbody tr:not(.projected-draft-order-separator) td:first-child');
     const firstPick = await pickCells.first().textContent();
     expect(parseInt(firstPick?.trim() ?? '', 10)).toBe(1);
   });
 
   test('team cells link to team pages', async ({ page }) => {
-    const teamLinks = page.locator('.projected-draft-order-table a[href*="teamid="], .ibl-data-table a[href*="teamid="]');
+    const teamLinks = page.locator(TEAM_LINK_SEL);
     const count = await teamLinks.count();
     expect(count).toBeGreaterThanOrEqual(1);
 

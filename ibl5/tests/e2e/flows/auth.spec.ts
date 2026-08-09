@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/public';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import { loginViaForm } from '../helpers/login';
 
 // Login/Logout flow — uses public (unauthenticated) fixture throughout.
 // IMPORTANT: Do NOT use the auth fixture here. The logout test destroys the
@@ -48,20 +49,7 @@ test.describe('Login page', () => {
     expect(username, 'IBL_TEST_USER must be set in .env.test').toBeTruthy();
     expect(password, 'IBL_TEST_PASS must be set in .env.test').toBeTruthy();
 
-    await page.goto('modules.php?name=YourAccount');
-
-    const loginForm = page.locator('form', {
-      has: page.locator('#login-username'),
-    });
-    await loginForm.locator('#login-username').fill(username!);
-    await loginForm.locator('#login-password').fill(password!);
-    await loginForm.locator('button[type="submit"]').click();
-
-    // Successful login redirects away from YourAccount
-    await page.waitForURL(
-      (url) => !url.href.includes('name=YourAccount'),
-      { timeout: 10000 },
-    );
+    await loginViaForm(page, username!, password!);
 
     // Should be on a different page now
     expect(page.url()).not.toContain('name=YourAccount');
@@ -190,19 +178,7 @@ test.describe('Logout flow', () => {
     expect(username, 'IBL_TEST_USER must be set in .env.test').toBeTruthy();
     expect(password, 'IBL_TEST_PASS must be set in .env.test').toBeTruthy();
 
-    // Log in manually with a fresh session
-    await page.goto('modules.php?name=YourAccount');
-    const loginForm = page.locator('form', {
-      has: page.locator('#login-username'),
-    });
-    await loginForm.locator('#login-username').fill(username!);
-    await loginForm.locator('#login-password').fill(password!);
-    await loginForm.locator('button[type="submit"]').click();
-
-    await page.waitForURL(
-      (url) => !url.href.includes('name=YourAccount'),
-      { timeout: 10000 },
-    );
+    await loginViaForm(page, username!, password!);
 
     // Verify we're logged in — can access a protected page
     await page.goto('modules.php?name=DepthChartEntry');

@@ -1,9 +1,28 @@
 import { test, expect } from '../fixtures/auth';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import type { Page } from '@playwright/test';
 
 // Depth Chart Entry — authenticated page.
 // The roster form may load asynchronously after the page header renders.
 // NOTE: Do NOT submit the form — that would mutate data.
+
+async function installPreviewObserver(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const container = document.getElementById('dc-lineup-preview');
+    if (!container) return;
+    const w = window as typeof window & {
+      __ibl_preview_mutations?: number;
+      __ibl_preview_observer?: MutationObserver;
+    };
+    w.__ibl_preview_mutations = 0;
+    w.__ibl_preview_observer?.disconnect();
+    const observer = new MutationObserver(() => {
+      w.__ibl_preview_mutations = (w.__ibl_preview_mutations ?? 0) + 1;
+    });
+    observer.observe(container, { childList: true, subtree: true });
+    w.__ibl_preview_observer = observer;
+  });
+}
 
 test.describe('Depth Chart Entry flow', () => {
   test.beforeEach(async ({ page }) => {
@@ -172,28 +191,7 @@ test.describe('Depth Chart Entry flow', () => {
       preview.locator('.dc-lineup-preview-table--desktop'),
     ).toBeVisible();
 
-    // Install a MutationObserver on the preview container. depth-chart-lineup-
-    // preview.js re-renders via `container.innerHTML = html`, which replaces
-    // the entire childList subtree — the observer fires even when the new
-    // HTML is byte-identical, so we get a clean "recalculate happened"
-    // signal without depending on the pg change producing a visible diff.
-    // (For many rosters a pg=0→1 promotion produces identical output
-    // because the new candidate's score doesn't beat the incumbents.)
-    await page.evaluate(() => {
-      const container = document.getElementById('dc-lineup-preview');
-      if (!container) return;
-      const w = window as typeof window & {
-        __ibl_preview_mutations?: number;
-        __ibl_preview_observer?: MutationObserver;
-      };
-      w.__ibl_preview_mutations = 0;
-      w.__ibl_preview_observer?.disconnect();
-      const observer = new MutationObserver(() => {
-        w.__ibl_preview_mutations = (w.__ibl_preview_mutations ?? 0) + 1;
-      });
-      observer.observe(container, { childList: true, subtree: true });
-      w.__ibl_preview_observer = observer;
-    });
+    await installPreviewObserver(page);
 
     // Change a desktop pg select (scoped to `.depth-chart-table` to avoid
     // strict-mode collisions with the mobile card duplicates). Any change
@@ -229,31 +227,7 @@ test.describe('Depth Chart Entry flow', () => {
       preview.locator('.dc-lineup-preview-table--desktop .dc-lineup-preview__starter').first(),
     ).toBeVisible();
 
-    // Install a MutationObserver on the preview container — depth-chart-
-    // lineup-preview.js re-renders via `container.innerHTML = html`, which
-    // replaces the entire childList subtree. The observer fires whenever
-    // recalculate() runs, regardless of whether the new HTML happens to be
-    // byte-identical to the previous render. This is more robust than text
-    // comparison: in seed scenarios where the dc_minutes change doesn't move
-    // any rendered annotation (e.g. starter is also the dump-to-last entry
-    // when bench-scan can't fill 3 backups), the recalculate still fires and
-    // the wiring is what we're verifying. The number-input listener is on a
-    // separate code path from the position-depth SELECT listener covered above.
-    await page.evaluate(() => {
-      const container = document.getElementById('dc-lineup-preview');
-      if (!container) return;
-      const w = window as typeof window & {
-        __ibl_preview_mutations?: number;
-        __ibl_preview_observer?: MutationObserver;
-      };
-      w.__ibl_preview_mutations = 0;
-      w.__ibl_preview_observer?.disconnect();
-      const observer = new MutationObserver(() => {
-        w.__ibl_preview_mutations = (w.__ibl_preview_mutations ?? 0) + 1;
-      });
-      observer.observe(container, { childList: true, subtree: true });
-      w.__ibl_preview_observer = observer;
-    });
+    await installPreviewObserver(page);
 
     // Mutate the first desktop minutes input. Scoped to `.depth-chart-table`
     // to avoid strict-mode collisions with the mobile card duplicates.

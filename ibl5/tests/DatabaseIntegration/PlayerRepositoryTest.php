@@ -210,6 +210,54 @@ class PlayerRepositoryTest extends DatabaseTestCase
         self::assertSame([], $this->repo->getPlayerNews('PLR NoNewsAtAll'));
     }
 
+    public function testGetPlayerNewsReturnsRowsMentioningPlayer(): void
+    {
+        // hometext match — newer datetime, must come first in DESC order
+        $this->insertRow('nuke_stories', [
+            'sid' => 9001, 'catid' => 1, 'aid' => 'admin',
+            'title' => 'Player Spotlight', 'time' => '2023-11-14 22:36:40',
+            'hometext' => 'Article about PLR DataTest in the starting lineup.',
+            'bodytext' => '',
+            'comments' => 0, 'counter' => 0, 'topic' => 1,
+            'informant' => '', 'ihome' => 0, 'acomm' => 0,
+            'haspoll' => 0, 'poll_id' => 0, 'score' => 0, 'ratings' => 0,
+        ]);
+        // bodytext match — older datetime, must come second
+        $this->insertRow('nuke_stories', [
+            'sid' => 9002, 'catid' => 1, 'aid' => 'admin',
+            'title' => 'Trade Rumours', 'time' => '2023-11-14 22:35:00',
+            'hometext' => 'Unrelated intro text.',
+            'bodytext' => 'Further detail mentioning PLR DataTest in trade talks.',
+            'comments' => 0, 'counter' => 0, 'topic' => 1,
+            'informant' => '', 'ihome' => 0, 'acomm' => 0,
+            'haspoll' => 0, 'poll_id' => 0, 'score' => 0, 'ratings' => 0,
+        ]);
+
+        $news = $this->repo->getPlayerNews('PLR DataTest');
+
+        self::assertCount(2, $news);
+        // DESC order: sid 9001 (newer time) before sid 9002 (older time)
+        self::assertSame(9001, $news[0]['sid']);
+        self::assertSame('Player Spotlight', $news[0]['title']);
+        self::assertSame('2023-11-14 22:36:40', $news[0]['time']);
+        self::assertSame(9002, $news[1]['sid']);
+    }
+
+    public function testGetPlayerNewsExcludesUnrelatedRows(): void
+    {
+        $this->insertRow('nuke_stories', [
+            'sid' => 9003, 'catid' => 1, 'aid' => 'admin',
+            'title' => 'Other Player News', 'time' => '2023-11-14 22:38:20',
+            'hometext' => 'Story about PLR OtherPlayer only — not the search target.',
+            'bodytext' => '',
+            'comments' => 0, 'counter' => 0, 'topic' => 1,
+            'informant' => '', 'ihome' => 0, 'acomm' => 0,
+            'haspoll' => 0, 'poll_id' => 0, 'score' => 0, 'ratings' => 0,
+        ]);
+
+        self::assertSame([], $this->repo->getPlayerNews('PLR DataTest'));
+    }
+
     // ── getFreeAgencyDemands with data ──────────────────────────
 
     public function testGetFreeAgencyDemandsReturnsDemandValues(): void

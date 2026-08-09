@@ -717,11 +717,16 @@ CREATE TABLE `ibl_events` (
   `team_id` int(11) DEFAULT NULL COMMENT 'Resolved current team id; NULL when anonymous or unresolved',
   `referer` varchar(512) DEFAULT NULL COMMENT 'HTTP_REFERER, truncated to 512 chars; NULL if absent',
   `user_agent` varchar(512) DEFAULT NULL COMMENT 'HTTP_USER_AGENT, truncated to 512 chars; NULL if absent',
+  `session_id` varchar(64) DEFAULT NULL COMMENT 'sha256 of PHP session id; NOT the raw id, never replayable. Rotates on login (session_regenerate_id), so one visit spanning a login yields two values.',
+  `traffic_class` varchar(32) DEFAULT NULL COMMENT 'smoke-test | authenticated | crawler | spam | anonymous-human. Reporting label derived from user_agent/username; NEVER an authorization signal.',
+  `http_status` smallint(6) DEFAULT NULL COMMENT 'Response status captured at shutdown; NULL when the request died before shutdown or the code was outside 100-599.',
+  `action` varchar(64) DEFAULT NULL COMMENT 'Domain event set by a controller via EventLogger::setAction(); hardcoded literal, never user input. NULL for plain pageviews.',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp() COMMENT 'Request timestamp',
   PRIMARY KEY (`id`),
   KEY `idx_created_at` (`created_at`),
   KEY `idx_team_id` (`team_id`),
-  KEY `idx_route_name` (`route_name`)
+  KEY `idx_route_name` (`route_name`),
+  KEY `idx_traffic_created` (`traffic_class`,`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_fa_offers`;

@@ -77,16 +77,42 @@ cf_table_detected() {
 # Width-aware fence stripping: a fenced block inside the section (or before it)
 # is skipped so illustrative examples do not yield phantom entries.
 # <heading> is matched as the literal text after `## ` (case-sensitive).
+#
+# Blockquote fence handling: quote markers (> prefixes) are stripped before the
+# backtick run is counted, closing the blindspot where `> ``` ` yielded n=0 and
+# never opened a fence.  Blockquote fence state (bq_fence / bq_fence_len) is
+# deliberately CONFINED and not shared with in_fence: any non->-prefixed line
+# (including the blank line that ends a CommonMark blockquote) resets bq state,
+# so an unclosed quoted fence cannot swallow the rest of the plan.  Merging the
+# two would fail OPEN — one stray `> ``` ` would set in_fence=1, and the blank
+# line ending the blockquote would never close it.  This is class consistency
+# with bin/check-plan-staleness (PR #1809), not a fix for a live breakage:
+# every consumer is ^-anchored, so a >-prefixed line can never satisfy
+# CF_LINE_PATTERN or any other downstream pattern today.
 cf_section_named() {
     awk -v want="$2" '
+        BEGIN { in_fence = 0; fence_len = 0; bq_fence = 0; bq_fence_len = 0 }
         {
             line = $0
             sub(/^[[:space:]]*/, "", line)
-            n = 0
-            while (substr(line, n + 1, 1) == "`") n++
-            if (n >= 3) {
-                if (!in_fence) { in_fence = 1; fence_len = n; next }
-                else if (n >= fence_len) { in_fence = 0; next }
+            is_bq = (substr(line, 1, 1) == ">")
+            if (!is_bq) { bq_fence = 0; bq_fence_len = 0 }
+            if (is_bq && !in_fence) {
+                sub(/^([[:space:]]*>)+[[:space:]]*/, "", line)
+                n = 0
+                while (substr(line, n + 1, 1) == "`") n++
+                if (n >= 3) {
+                    if (!bq_fence) { bq_fence = 1; bq_fence_len = n; next }
+                    else if (n >= bq_fence_len) { bq_fence = 0; bq_fence_len = 0; next }
+                }
+                if (bq_fence) next
+            } else {
+                n = 0
+                while (substr(line, n + 1, 1) == "`") n++
+                if (n >= 3) {
+                    if (!in_fence) { in_fence = 1; fence_len = n; next }
+                    else if (n >= fence_len) { in_fence = 0; next }
+                }
             }
         }
         in_fence { next }
@@ -121,16 +147,36 @@ cf_section() { cf_section_named "$1" "Critical Files"; }
 # parses to zero entries — bin/check-plan gate [F] reports that rather than
 # passing clean. Measured on the 260-plan corpus: exactly 1 plan trips this
 # (sonnet-recipe-completeness-lint.md, already shipped), zero false positives.
+#
+# The blockquote branch is carried for textual parity with cf_section_named (the
+# two machines should stay diffable) and cannot change this function's exit code:
+# a >-prefixed line yielded n=0 before (> is not stripped by sub(/^[[:space:]]*/))
+# and so never touched in_fence.  A quoted fence left unclosed at EOF is still
+# reported as balanced (exit non-zero), deliberately — only a document-level
+# unclosed fence is the unbalanced condition this gate detects.
 cf_fence_unbalanced() {
     awk '
+        BEGIN { in_fence = 0; fence_len = 0; bq_fence = 0; bq_fence_len = 0 }
         {
             line = $0
             sub(/^[[:space:]]*/, "", line)
-            n = 0
-            while (substr(line, n + 1, 1) == "`") n++
-            if (n >= 3) {
-                if (!in_fence) { in_fence = 1; fence_len = n }
-                else if (n >= fence_len) { in_fence = 0 }
+            is_bq = (substr(line, 1, 1) == ">")
+            if (!is_bq) { bq_fence = 0; bq_fence_len = 0 }
+            if (is_bq && !in_fence) {
+                sub(/^([[:space:]]*>)+[[:space:]]*/, "", line)
+                n = 0
+                while (substr(line, n + 1, 1) == "`") n++
+                if (n >= 3) {
+                    if (!bq_fence) { bq_fence = 1; bq_fence_len = n }
+                    else if (n >= bq_fence_len) { bq_fence = 0; bq_fence_len = 0 }
+                }
+            } else {
+                n = 0
+                while (substr(line, n + 1, 1) == "`") n++
+                if (n >= 3) {
+                    if (!in_fence) { in_fence = 1; fence_len = n }
+                    else if (n >= fence_len) { in_fence = 0 }
+                }
             }
         }
         END { exit !in_fence }

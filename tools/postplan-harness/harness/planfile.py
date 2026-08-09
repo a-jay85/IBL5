@@ -111,23 +111,56 @@ def _strip_fenced(content: str) -> list[str]:
     machine in bin/lib/critical-files.sh. Width-aware: per CommonMark a closing fence
     must be at least as long as the opening one, so this repo's 4-backtick outer block
     wrapping 3-backtick inner ones does not toggle parity once and silently swallow the
-    whole section."""
+    whole section.
+
+    Fences inside a `>` blockquote get a SEPARATE, confined state: quote markers are
+    stripped before the backtick run is counted, and any line that does not continue
+    the quote (a blank line ends it in CommonMark) drops that state, so an unclosed
+    quoted fence cannot swallow the rest of the file. Sharing state with in_fence
+    would fail open. Inert at every current consumer — parse_matrix, parse_critical_files
+    and parse_required_test_methods all match `^`-anchored shapes a `>`-prefixed line
+    can never satisfy — so this is class consistency with the shell mirror, not a fix
+    for a live miscount.
+    """
     out: list[str] = []
     in_fence = False
     fence_len = 0
+    bq_fence = False
+    bq_fence_len = 0
     for line in content.splitlines():
         stripped = line.lstrip()
-        n = 0
-        while n < len(stripped) and stripped[n] == "`":
-            n += 1
-        if n >= 3:
-            if not in_fence:
-                in_fence = True
-                fence_len = n
+        is_bq = stripped.startswith(">")
+        if not is_bq:
+            bq_fence = False
+            bq_fence_len = 0
+        if is_bq and not in_fence:
+            body = re.sub(r"^(\s*>)+\s*", "", stripped)
+            n = 0
+            while n < len(body) and body[n] == "`":
+                n += 1
+            if n >= 3:
+                if not bq_fence:
+                    bq_fence = True
+                    bq_fence_len = n
+                    continue
+                if n >= bq_fence_len:
+                    bq_fence = False
+                    bq_fence_len = 0
+                    continue
+            if bq_fence:
                 continue
-            if n >= fence_len:
-                in_fence = False
-                continue
+        else:
+            n = 0
+            while n < len(stripped) and stripped[n] == "`":
+                n += 1
+            if n >= 3:
+                if not in_fence:
+                    in_fence = True
+                    fence_len = n
+                    continue
+                if n >= fence_len:
+                    in_fence = False
+                    continue
         if in_fence:
             continue
         out.append(line)

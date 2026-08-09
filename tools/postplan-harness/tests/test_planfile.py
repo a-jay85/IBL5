@@ -9,8 +9,8 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import conformance
-from harness.planfile import (EXEMPT_RE, frontmatter_auto_merge_false, locate_plan,
-                              parse_critical_files, parse_matrix,
+from harness.planfile import (EXEMPT_RE, _strip_fenced, frontmatter_auto_merge_false,
+                              locate_plan, parse_critical_files, parse_matrix,
                               parse_required_test_methods)
 from harness.state import PlanInfo, RunResult
 
@@ -238,6 +238,213 @@ def test_lib_pattern_sync():
     assert m, "CF_EXEMPT_PATTERN not found in " + LIB
     ere = m.group(1).replace("[(]", r"\(").replace("[)]", r"\)")
     assert EXEMPT_RE.pattern.replace("(?:", "(") == ere
+
+
+# ---------------------------------------------------------------------------
+# Blockquote-fence parity tests
+#
+# These tests pin the bq_fence state machine added to bin/lib/critical-files.sh
+# and planfile._strip_fenced for class consistency with bin/check-plan-staleness
+# (PR #1809).  The blindspot is INERT BY CONSTRUCTION today — every downstream
+# consumer is ^-anchored, so a >-prefixed line can never satisfy CF_LINE_PATTERN
+# or the ^\s*-\s*` shape — but the fix must hold so a future unanchored consumer
+# doesn't silently re-open it.
+#
+# Green/red summary:
+#   test_bq_quoted_fence_stripped_python  — RED before Edit 3, GREEN after
+#   test_bq_quoted_fence_stripped_shell   — RED before Edit 1, GREEN after
+#   test_bq_prose_retained                — GREEN before and after (no fix needed)
+#   test_bq_confinement_unclosed_does_not_swallow — GREEN before and after; guards
+#       against a naive shared-state fix that merges bq_fence into in_fence
+#   test_bq_fence_unbalanced_unaffected   — GREEN before and after; a >` line
+#       yielded n=0 before the fix so in_fence was never touched
+#   test_bq_shell_python_section_agreement:
+#       (a) py == shell — GREEN before and after (same blindspot, then same fix)
+#       (b) absolute value == expected — RED before Edits 1/3, GREEN after
+# ---------------------------------------------------------------------------
+
+# Fixture: section with a >-blockquote fence wrapping a phantom bullet, plus a
+# real entry outside the quote.  The fence open/close lines carry no language
+# specifier so the backtick run is exactly 3 — the minimum to open a fence.
+BQ_FENCE_PLAN = """\
+## Critical Files
+
+> ```
+> - `ibl5/classes/PhantomInQuotedFence.php`
+> ```
+- `ibl5/classes/RealEntry.php` — CHANGE.
+"""
+
+# Fixture: an unclosed quoted fence precedes the section, separated by a blank
+# line (which ends the CommonMark blockquote).  A naive shared-state fix that
+# merges bq_fence into in_fence without a blank-line reset would leave in_fence=1
+# at the heading, swallowing the entire section.  Confinement means any non->
+# line resets bq state before the heading is reached.
+BQ_CONFINEMENT_PLAN = """\
+> ```bash
+> snippet
+
+## Critical Files
+- `ibl5/classes/RealEntry.php` — CHANGE.
+"""
+
+# Fixture: a >-prefixed prose line (no fence markers) inside a section.
+# A blockquote is not an exempt position; the line must survive fence stripping.
+BQ_PROSE_PLAN = """\
+## Critical Files
+
+> This is a blockquote prose note about the change.
+- `ibl5/classes/RealEntry.php` — CHANGE.
+"""
+
+
+def _py_section(text: str, want: str = "Critical Files") -> list[str]:
+    """Lines inside the named section as seen by _strip_fenced, blanks included."""
+    out, in_sec = [], False
+    for ln in _strip_fenced(text):
+        if re.match(r"^##\s*" + re.escape(want), ln):
+            in_sec = True
+            continue
+        if re.match(r"^## ", ln):
+            in_sec = False
+            continue
+        if in_sec:
+            out.append(ln)
+    return out
+
+
+def test_bq_quoted_fence_stripped_python():
+    """_strip_fenced drops lines inside a >-blockquote fence.
+
+    RED before Edit 3, GREEN after.  Before the fix lstrip() leaves > in place,
+    so '> ```' counts 0 backticks and the fence never opens; the three quoted
+    lines (open, phantom bullet, close) are appended unchanged.
+    """
+    lines = _strip_fenced(BQ_FENCE_PLAN)
+    joined = "\n".join(lines)
+    assert "PhantomInQuotedFence.php" not in joined, (
+        "phantom path inside a quoted fence leaked into _strip_fenced output")
+    assert "RealEntry.php" in joined, "real entry was stripped — overcorrection"
+
+
+def test_bq_quoted_fence_stripped_shell(tmp_path):
+    """cf_section_named drops lines inside a >-blockquote fence.
+
+    RED before Edit 1, GREEN after.  Before the fix sub(/^[[:space:]]*/, ...)
+    leaves > in place so '> ```' counts 0 backticks and the fence never opens.
+    """
+    f = tmp_path / "bq_fence.md"
+    f.write_text(BQ_FENCE_PLAN)
+    proc = subprocess.run(
+        ["bash", "-c",
+         'source "$1" && cf_section_named "$2" "Critical Files"',
+         "_", LIB, str(f)],
+        capture_output=True, text=True, check=True)
+    assert "PhantomInQuotedFence.php" not in proc.stdout, (
+        "phantom path inside a quoted fence leaked into cf_section_named output")
+    assert "RealEntry.php" in proc.stdout, "real entry missing — overcorrection"
+
+
+def test_bq_prose_retained(tmp_path):
+    """>-prefixed prose (no fence markers) is retained by both parsers.
+
+    A blockquote is not an exempt position.  GREEN before and after the fix.
+    """
+    f = tmp_path / "bq_prose.md"
+    f.write_text(BQ_PROSE_PLAN)
+    # Python
+    joined = "\n".join(_strip_fenced(BQ_PROSE_PLAN))
+    assert "blockquote prose note" in joined, (
+        "_strip_fenced incorrectly stripped a blockquote prose line")
+    # Shell
+    proc = subprocess.run(
+        ["bash", "-c",
+         'source "$1" && cf_section_named "$2" "Critical Files"',
+         "_", LIB, str(f)],
+        capture_output=True, text=True, check=True)
+    assert "blockquote prose note" in proc.stdout, (
+        "cf_section_named incorrectly stripped a blockquote prose line")
+
+
+def test_bq_confinement_unclosed_does_not_swallow(tmp_path):
+    """An unclosed >-quoted fence must not swallow the section that follows.
+
+    GREEN before AND after: the current code never opens a bq_fence so it
+    never swallows anything; the fix must not regress this.  This guards against
+    a naive shared-state fix that merges bq_fence into in_fence without the
+    blank-line reset — that would fail open, leaving in_fence=1 through the
+    heading and swallowing the real entry.
+    """
+    f = tmp_path / "bq_confinement.md"
+    f.write_text(BQ_CONFINEMENT_PLAN)
+    # Shell
+    proc = subprocess.run(
+        ["bash", "-c",
+         'source "$1" && cf_section_named "$2" "Critical Files"',
+         "_", LIB, str(f)],
+        capture_output=True, text=True, check=True)
+    assert "RealEntry.php" in proc.stdout, (
+        "confinement failed: unclosed quoted fence swallowed Critical Files section (shell)")
+    # Python
+    lines = _strip_fenced(BQ_CONFINEMENT_PLAN)
+    assert any("RealEntry.php" in ln for ln in lines), (
+        "_strip_fenced confinement failed: unclosed quoted fence swallowed later content")
+
+
+def test_bq_fence_unbalanced_unaffected(tmp_path):
+    """cf_fence_unbalanced exit code is unchanged by the blockquote branch.
+
+    Exit-code polarity: exit 0 = fence still OPEN at EOF (unbalanced);
+    non-zero = fence CLOSED (balanced).  GREEN before and after: before the fix
+    a '> ```' line yielded n=0 and never touched in_fence, so the exit was
+    already correct — this test pins that invariant against future regressions.
+    """
+    # Fence only inside a quote — bq_fence=1, in_fence=0 → exit !0 = 1 = balanced
+    f_quote = tmp_path / "bq_only.md"
+    f_quote.write_text("> ```bash\n> snippet\n")
+    proc = subprocess.run(
+        ["bash", "-c", 'source "$1" && cf_fence_unbalanced "$2"', "_", LIB, str(f_quote)],
+        capture_output=True, text=True)
+    assert proc.returncode != 0, (
+        "cf_fence_unbalanced: unclosed quoted fence incorrectly reported as unbalanced; "
+        "bq_fence must not affect in_fence (exit should be non-zero = balanced)")
+    # Genuinely unclosed document-level fence → in_fence=1 → exit !1 = 0 = unbalanced
+    f_real = tmp_path / "real_open.md"
+    f_real.write_text("```bash\nsome code\n")
+    proc2 = subprocess.run(
+        ["bash", "-c", 'source "$1" && cf_fence_unbalanced "$2"', "_", LIB, str(f_real)],
+        capture_output=True, text=True)
+    assert proc2.returncode == 0, (
+        "cf_fence_unbalanced: real unclosed fence was not detected (exit should be 0 = unbalanced)")
+
+
+def test_bq_shell_python_section_agreement(tmp_path):
+    """Shell and Python agree on which section lines survive for BQ_FENCE_PLAN.
+
+    Two assertions:
+      (a) Agreement: non-blank lines from cf_section_named == non-blank lines
+          from _py_section.  GREEN before and after — both have the same blindspot
+          before the fix and the same correction after.
+      (b) Absolute value: non-blank section lines == exactly the real entry.
+          RED before Edits 1/3 (both include the three phantom > lines); GREEN
+          after (both strip them).
+    """
+    f = tmp_path / "bq_agree.md"
+    f.write_text(BQ_FENCE_PLAN)
+    proc = subprocess.run(
+        ["bash", "-c",
+         'source "$1" && cf_section_named "$2" "Critical Files"',
+         "_", LIB, str(f)],
+        capture_output=True, text=True, check=True)
+    shell_lines = [ln for ln in proc.stdout.splitlines() if ln.strip()]
+    py_lines = [ln for ln in _py_section(BQ_FENCE_PLAN) if ln.strip()]
+    # (a) agreement — mirrors test_lib_sync's spirit; GREEN before and after
+    assert py_lines == shell_lines, (
+        "parser divergence on BQ_FENCE_PLAN\n py:    %s\n shell: %s" % (py_lines, shell_lines))
+    # (b) absolute value — RED before fix; GREEN after
+    expected = ["- `ibl5/classes/RealEntry.php` — CHANGE."]
+    assert py_lines == expected, (
+        "unexpected section content\n got:      %s\n expected: %s" % (py_lines, expected))
 
 
 # ---------------------------------------------------------------------------

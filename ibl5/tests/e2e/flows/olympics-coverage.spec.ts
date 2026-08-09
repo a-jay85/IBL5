@@ -25,8 +25,16 @@ test.describe('Olympics module coverage', () => {
     await appState({ 'Trivia Mode': 'Off' });
     // FranchiseHistory is IBL-only
     await page.goto('modules.php?name=FranchiseHistory&league=olympics');
-    // Should either redirect, show a message, or the module should still work
     await assertNoPhpErrors(page, 'on IBL-only module in olympics context');
+
+    // FranchiseHistory is IBL-only, so the olympics context must gate it for an
+    // AUTHENTICATED user too — olympics-module-gating.spec.ts:34 covers only the
+    // public path, and gating that leaks once logged in is the failure this guards.
+    const body = await page.locator('body').textContent();
+    expect(
+      body,
+      'IBL-only module should show the gating message in olympics context',
+    ).toContain("Module isn't active");
   });
 
   // The former 'no PHP errors across olympics pages' loop test was removed: it

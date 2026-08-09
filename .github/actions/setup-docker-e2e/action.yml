@@ -102,8 +102,8 @@ runs:
     - name: Create database and apply migrations
       shell: bash
       run: |
-        chmod +x ibl5/bin/run-migrations-ci.sh
-        ibl5/bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5
+        chmod +x ibl5/bin/run-migrations-ci
+        ibl5/bin/run-migrations-ci -h 127.0.0.1 -u root -proot ibl5
 
     - name: Import seed data
       shell: bash

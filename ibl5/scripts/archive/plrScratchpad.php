@@ -1,6 +1,6 @@
 <?php
 
-require __DIR__ . '/../mainfile.php';
+require __DIR__ . '/../../mainfile.php';
 
 $plrFile = fopen("IBL5.plr", "rb+");
 while (!feof($plrFile)) {

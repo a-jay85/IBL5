@@ -4,8 +4,8 @@
 # Same image locally and in CI = deterministic font rendering = no dimension drift.
 #
 # Usage:
-#   ./bin/visual-regression.sh                    # Compare against baselines
-#   ./bin/visual-regression.sh --update-snapshots # Generate/update baselines
+#   ./bin/visual-regression                    # Compare against baselines
+#   ./bin/visual-regression --update-snapshots # Generate/update baselines
 
 set -euo pipefail
 

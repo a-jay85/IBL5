@@ -308,7 +308,7 @@ jobs:
 
     - name: Apply migrations
       working-directory: ibl5
-      run: bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5
+      run: bin/run-migrations-ci -h 127.0.0.1 -u root -proot ibl5
 
     - name: Import seed data
       working-directory: ibl5
@@ -424,7 +424,7 @@ jobs:
           #   SC2034 — unused variables (bin/lib/wt-guards.sh)
           #   SC1090 — non-const source (db-sync-prod, log-fetch-prod
           #            source dynamic .env file)
-          #   SC2207 — array splitting suggestion (ibl5/bin/run-migrations-ci.sh:20,
+          #   SC2207 — array splitting suggestion (ibl5/bin/run-migrations-ci:20,
           #            CI-only script, suggestion uses bash 4 mapfile)
           # Bash portability checks (SC3xxx) remain fully enforced.
           shellcheck --severity=warning --shell=bash \

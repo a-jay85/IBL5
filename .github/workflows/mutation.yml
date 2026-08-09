@@ -55,7 +55,7 @@ jobs:
 
     - name: Apply migrations
       working-directory: ibl5
-      run: bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5
+      run: bin/run-migrations-ci -h 127.0.0.1 -u root -proot ibl5
 
     - name: Import seed data
       working-directory: ibl5
@@ -184,7 +184,7 @@ jobs:
     - name: Apply migrations
       if: steps.changes.outputs.skip == 'false'
       working-directory: ibl5
-      run: bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5
+      run: bin/run-migrations-ci -h 127.0.0.1 -u root -proot ibl5
 
     - name: Import seed data
       if: steps.changes.outputs.skip == 'false'

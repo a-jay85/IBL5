@@ -1,6 +1,6 @@
 ---
 description: Why ibl5/scripts/archive/ exists and the policy for what lands here — retained-but-not-run one-time scripts kept for reference.
-last_verified: 2026-06-21
+last_verified: 2026-08-09
 ---
 
 # `scripts/archive/` — retained-but-not-run scripts
@@ -21,6 +21,7 @@ data operation was performed, in case a similar fix-up is ever needed again.
 |--------|----------|---------|
 | `importBoxscoresFromHtml.php` | 2026-02-12 | One-time import of Dec 11-13 2007 box scores from HTML pages on iblhoops.net, plus backfill of Dec 7-10 quarter scores / attendance / capacity / W-L. Writes via `Boxscore\BoxscoreRepository`. |
 | `importBxsMissing.php` | 2026-02-12 | One-time extraction of Dec 7-10 2007 box scores from the legacy `IBL5.bxs` binary (3000-byte records, 94-byte player entries — differs from the `.sco` 2000/53 format). Writes via `Boxscore\BoxscoreRepository`. |
+| `plrScratchpad.php` | 2026-08-09 | Ad-hoc scratchpad that walks the legacy `IBL5.plr` binary record-by-record and echoes each player's name, id, and contract-owner bytes — a one-off debugging aid for verifying `.plr` field offsets. |
 
 ## Policy — what lands here
 

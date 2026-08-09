@@ -42,6 +42,32 @@ const REFERENCE_PREFIXES = [
     'engine/.claude/',
 ];
 
+// Non-markdown source trees whose *comment bodies* are also dead-ref-checked
+// (checkSourceCommentReferences). Whole-tree only — never --since. Deliberately
+// narrow: these are the trees where the 2026-07-27 audit found real rot.
+const SOURCE_SCAN_GLOBS = [
+    'bin/*',
+    'bin/lib/*',
+    'ibl5/classes',        // recursive: **/*.php
+    'ibl5/phpstan-rules/*.php',
+    'ibl5/migrations/*.php',
+];
+
+// Test harnesses deliberately contain non-resolving fixture paths.
+// Scanning them would flag the fixtures themselves.
+const SOURCE_SCAN_EXCLUDED_PREFIXES = [
+    'bin/test-',
+    'ibl5/tests/',
+];
+
+// Local-only paths referenced in source comments that never exist on clean checkout.
+// Kept separate from REFERENCE_ALLOWLIST so that constant governs markdown only.
+const SOURCE_SCAN_RUNTIME_ARTIFACTS = [
+    'ibl5/vr-gallery.json',   // written by bin/vr-build-gallery at CI runtime
+    'ibl5/backups',           // gitignored local data dir (~55 GB season zip files)
+    'ibl5/bin/jsbsim',        // compiled native binary, gitignored
+];
+
 // Paths that are intentionally local-only, user-managed, or generated at runtime.
 // Keep this list tiny — prefer fixing references over extending the allowlist.
 const REFERENCE_ALLOWLIST = [
@@ -116,7 +142,12 @@ Enforces the Living Documentation policy defined in
 .claude/rules/doc-freshness.md. Validates YAML frontmatter
 (description, last_verified), staleness (60-day max),
 dead repo-path references, and un-stamped citations of retired
-figures on every in-scope markdown file.
+figures on every in-scope markdown file. Full-scan mode additionally
+checks non-markdown source-file comment bodies (bin/, bin/lib/,
+ibl5/classes/, ibl5/phpstan-rules/, ibl5/migrations/) for dead
+repo-path references; test harnesses are excluded and five named
+false-positive suppressions apply (see checkSourceCommentReferences).
+Mark an intentionally non-resolving path with a trailing "(example)".
 
 Options:
   --fix-dates        Requires --since=<ref>. Bumps last_verified to today only
@@ -251,26 +282,21 @@ function parseFrontmatter(string $content): ?array
     return $fields;
 }
 
-/** @return list<string> */
-function scanReferences(string $content, string $repoRoot): array
+/**
+ * Shared dead-reference resolution. Takes raw candidate tokens (however they
+ * were extracted — markdown backtick spans, markdown links, or source-file
+ * comment bodies) and returns the subset that is a repo path AND does not
+ * resolve on disk.
+ *
+ * Extraction is the caller's job; resolution policy lives here so the
+ * markdown scanner and the source-comment scanner can never disagree about
+ * what "dead" means.
+ *
+ * @param list<string> $tokens
+ * @return list<string>
+ */
+function resolveReferenceTokens(array $tokens, string $repoRoot): array
 {
-    $tokens = [];
-
-    if (preg_match_all('/\[[^\]]*\]\(([^)\s]+)\)/', $content, $m) > 0) {
-        foreach ($m[1] as $target) {
-            $tokens[] = $target;
-        }
-    }
-    // Capture optional trailing (example) marker after closing backtick — signals intentional non-resolving path.
-    if (preg_match_all('/`([^`\n]+)`(\s*\(example\))?/', $content, $m) > 0) {
-        foreach ($m[1] as $i => $span) {
-            if (isset($m[2][$i]) && $m[2][$i] !== '') {
-                continue;
-            }
-            $tokens[] = $span;
-        }
-    }
-
     $issues = [];
     foreach (array_unique($tokens) as $token) {
         $parts = preg_split('/[\s#?]/', $token, 2);
@@ -319,6 +345,29 @@ function scanReferences(string $content, string $repoRoot): array
         $issues[] = $token;
     }
     return array_values(array_unique($issues));
+}
+
+/** @return list<string> */
+function scanReferences(string $content, string $repoRoot): array
+{
+    $tokens = [];
+
+    if (preg_match_all('/\[[^\]]*\]\(([^)\s]+)\)/', $content, $m) > 0) {
+        foreach ($m[1] as $target) {
+            $tokens[] = $target;
+        }
+    }
+    // Capture optional trailing (example) marker after closing backtick — signals intentional non-resolving path.
+    if (preg_match_all('/`([^`\n]+)`(\s*\(example\))?/', $content, $m) > 0) {
+        foreach ($m[1] as $i => $span) {
+            if (isset($m[2][$i]) && $m[2][$i] !== '') {
+                continue;
+            }
+            $tokens[] = $span;
+        }
+    }
+
+    return resolveReferenceTokens($tokens, $repoRoot);
 }
 
 /**
@@ -971,6 +1020,98 @@ function retiredFigureHits(string $content): array
 }
 
 /**
+ * Non-markdown source files whose comment bodies are dead-ref-checked.
+ *
+ * @return list<string> absolute paths, sorted
+ */
+function collectSourceFiles(string $repoRoot): array
+{
+    $files = [];
+    foreach (SOURCE_SCAN_GLOBS as $entry) {
+        if (str_contains($entry, '*')) {
+            $matches = glob($repoRoot . '/' . $entry);
+            if ($matches !== false) {
+                foreach ($matches as $path) {
+                    if (is_file($path)) {
+                        $files[] = $path;
+                    }
+                }
+            }
+        } else {
+            $dir = $repoRoot . '/' . $entry;
+            if (is_dir($dir)) {
+                $iter = new \RecursiveIteratorIterator(
+                    new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS)
+                );
+                foreach ($iter as $fileInfo) {
+                    if ($fileInfo->isFile() && $fileInfo->getExtension() === 'php') {
+                        $files[] = $fileInfo->getPathname();
+                    }
+                }
+            }
+        }
+    }
+
+    $prefix = $repoRoot . '/';
+    $files = array_filter($files, static function (string $path) use ($prefix, $repoRoot): bool {
+        $rel = str_starts_with($path, $prefix) ? substr($path, strlen($prefix)) : $path;
+        foreach (SOURCE_SCAN_EXCLUDED_PREFIXES as $excl) {
+            if (str_starts_with($rel, $excl)) {
+                return false;
+            }
+        }
+        foreach (EXCLUDED_RELATIVE_FRAGMENTS as $frag) {
+            if (str_starts_with($rel, $frag)) {
+                return false;
+            }
+        }
+        // Type sniff
+        $head = @file_get_contents($path, false, null, 0, 512);
+        if ($head === false) {
+            return false;
+        }
+        $ext = pathinfo($path, PATHINFO_EXTENSION);
+        return str_starts_with($head, '<?php')
+            || str_starts_with($head, '#!')
+            || $ext === 'php'
+            || $ext === 'sh';
+    });
+
+    $files = array_values($files);
+    sort($files);
+    return $files;
+}
+
+/**
+ * Candidate repo-path tokens from every comment line in a source file.
+ *
+ * @return list<array{token: string, line: int, text: string}>
+ */
+function sourceCommentTokens(string $content, bool $isPhp): array
+{
+    $lines = explode("\n", $content);
+    $results = [];
+    $phpPattern = '/^\s*(?:\/\/|#|\/\*+|\*)\s?(.*)/';
+    $nonPhpPattern = '/^\s*(?:#|\/\/)\s?(.*)/';
+    $pattern = $isPhp ? $phpPattern : $nonPhpPattern;
+    // Lookbehind excludes word chars + hyphen + slash to reject compound words like storage-engine/config
+    $tokenPattern = '#(?<![A-Za-z0-9/_-])(?:bin|ibl5|\.claude|\.github|docs|migrations|engine)/[A-Za-z0-9._/*?\[\]{}<>-]+#';
+
+    foreach ($lines as $idx => $line) {
+        if (preg_match($pattern, $line, $m) !== 1) {
+            continue;
+        }
+        $body = $m[1];
+        if (preg_match_all($tokenPattern, $body, $tm) > 0) {
+            foreach ($tm[0] as $token) {
+                $results[] = ['token' => $token, 'line' => $idx + 1, 'text' => $line];
+            }
+        }
+    }
+    return $results;
+}
+
+/**
  * @param list<string> $files absolute paths, as returned by collectFiles()
  * @return list<string>
  */
@@ -993,6 +1134,102 @@ function checkRetiredFigures(array $files, string $repoRoot): array
                 $hit['why'],
                 $hit['use'],
                 $hit['text']
+            );
+        }
+    }
+    return $issues;
+}
+
+/**
+ * Dead repo-path references inside non-markdown source-file comment bodies.
+ *
+ * Peer of checkRetiredFigures(): corpus-wide, full-scan only, never --since.
+ * Extraction is sourceCommentTokens(); resolution is the SAME
+ * resolveReferenceTokens() the markdown scanner uses.
+ *
+ * Between the two sit five NAMED false-positive suppressions.
+ *
+ * @return list<string>
+ */
+function checkSourceCommentReferences(string $repoRoot): array
+{
+    $issues = [];
+    foreach (collectSourceFiles($repoRoot) as $path) {
+        $content = @file_get_contents($path);
+        if ($content === false) {
+            continue;
+        }
+        $rel = str_starts_with($path, $repoRoot . '/') ? substr($path, strlen($repoRoot) + 1) : $path;
+        $head = substr($content, 0, 512);
+        $isPhp = str_starts_with($head, '<?php') || pathinfo($path, PATHINFO_EXTENSION) === 'php';
+
+        $surviving = [];
+        foreach (sourceCommentTokens($content, $isPhp) as $entry) {
+            $tok = $entry['token'];
+            $lno = $entry['line'];
+            $line = $entry['text'];
+
+            // suppressTrailingPunctuation — normalize before glob-char test
+            $tok = rtrim($tok, '.,:;)]}>');
+
+            // (example) escape hatch, matching markdown's `path` (example) shape: the
+            // normalized token, any run of closing delimiters the prose wraps it in
+            // (backtick, quote, bracket, punctuation), then the marker.
+            if (preg_match('/' . preg_quote($tok, '/') . '[.,:;)\]}>\'"`]*\s*\(example\)/', $line) === 1) {
+                continue;
+            }
+
+            // suppressDirectoryToken — trailing slash signals a category mention
+            if (str_ends_with($tok, '/')) {
+                continue;
+            }
+
+            // suppressAdrSlugPlaceholder — N-run in numeric slug or literal -x.md stand-in
+            if (preg_match('/(^|\/)[0-9]*N+[0-9N]*-/', $tok) === 1) {
+                continue;
+            }
+            if (preg_match('/(^|\/)\d{4}-x\.md$/', $tok) === 1) {
+                continue;
+            }
+
+            // suppressRuntimeArtifact — CI-generated paths never committed
+            if (in_array($tok, SOURCE_SCAN_RUNTIME_ARTIFACTS, true)) {
+                continue;
+            }
+
+            $surviving[] = ['token' => $tok, 'line' => $lno, 'text' => $line];
+        }
+
+        if ($surviving === []) {
+            continue;
+        }
+
+        $rawTokens = array_map(fn($e) => $e['token'], $surviving);
+        $dead = resolveReferenceTokens($rawTokens, $repoRoot);
+
+        if ($dead === []) {
+            continue;
+        }
+
+        $deadSet = array_flip($dead);
+
+        foreach ($surviving as $entry) {
+            $tok = $entry['token'];
+            if (!isset($deadSet[$tok])) {
+                continue;
+            }
+
+            // suppressIbl5BinAmbiguity — bin/<x> that resolves at ibl5/bin/<x>
+            if (str_starts_with($tok, 'bin/') && file_exists($repoRoot . '/ibl5/' . $tok)) {
+                continue;
+            }
+
+            $issues[] = sprintf(
+                "%s:%d dead reference in comment: `%s`\n         > %s",
+                $rel,
+                $entry['line'],
+                $tok,
+                trim($entry['text'])
             );
         }
     }
@@ -1210,6 +1447,19 @@ $retiredIssues = checkRetiredFigures($files, $root);
 if ($retiredIssues !== []) {
     echo "FAIL retired-figure citations\n";
     foreach ($retiredIssues as $issue) {
+        echo "     - {$issue}\n";
+    }
+    $failures++;
+}
+
+// Source-file comment bodies, corpus-wide. Full-scan only, deliberately not in
+// the --since branch above: source files carry no frontmatter, so they never
+// participate in the on-touch bump rule, and a rotted reference in a file this
+// PR did not touch is exactly the miss this exists to catch.
+$sourceRefIssues = checkSourceCommentReferences($root);
+if ($sourceRefIssues !== []) {
+    echo "FAIL dead references in source comments\n";
+    foreach ($sourceRefIssues as $issue) {
         echo "     - {$issue}\n";
     }
     $failures++;

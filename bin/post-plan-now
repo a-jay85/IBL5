@@ -41,6 +41,17 @@
 # `declare -f`, so the tested logic here is exactly what runs there.
 should_fallback() { case "$1" in 0|3) return 1 ;; *) return 0 ;; esac; }
 
+# shq <string> — single-quote <string> for the FAR side of the launchd boundary.
+# Everything this script assembles into $CMD is parsed by a shell a SECOND time, when
+# launchd runs `/bin/bash -lc "$CMD"`. Embedding a variable there in DOUBLE quotes leaves
+# `…`, $(…), $VAR and \ live at that second parse. That is not theoretical: the prompt's
+# literal backticks around <slug>-N.md fired as command substitution in every plan-blind
+# run, bash logged `line 10: slug: No such file or directory`, and the backticked span was
+# SILENTLY DELETED from the prompt the model received — the plan-disambiguation
+# instruction never arrived. Single quotes close the whole class for any future wording.
+# Defined above the sourced-guard so the unit test can source and exercise it.
+shq() { local q="'\\''"; printf "'%s'" "${1//\'/$q}"; }
+
 # Sourced-guard: the unit test does `source bin/post-plan-now` to load should_fallback, then this
 # returns before the body executes. Must sit before `set -euo pipefail` (sourcing must not alter
 # the caller's shell options).
@@ -132,7 +143,7 @@ GATE_CLOSE=""
 ENGINE="Sonnet 4.6 /post-plan skill session"
 if [ "${POST_PLAN_SKILL:-0}" != "1" ] && [ -x "$HARNESS/run" ]; then
     FALLBACK_FN="$(declare -f should_fallback); "
-    PLAN_ARG="${PLAN_OVERRIDE:+ --plan \"$PLAN_OVERRIDE\"}"
+    PLAN_ARG="${PLAN_OVERRIDE:+ --plan $(shq "$PLAN_OVERRIDE")}"
     HARNESS_SEG="CLAUDE_HEADLESS=1 caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS/out/live-$SLUG-$TS\" --live${PLAN_ARG}; rc=\$?; "
     GATE_OPEN="if should_fallback \"\$rc\"; then "
     GATE_CLOSE="; elif [ \"\$rc\" = 3 ]; then echo \"post-plan-now: harness exited 3 (rebase-conflict fail-closed sentinel). SKIPPING the /post-plan skill fallback; a human must resolve the stacked-branch rebase conflict, then re-run bin/post-plan-now. See $LOG.\"; fi"
@@ -156,9 +167,18 @@ fi
 # what broke this script before: a prompt containing `<slug>-N.md` made the
 # <string> element malformed XML, so `launchctl bootstrap` died with
 # "Bootstrap failed: 5: Input/output error" and no log was ever written.
+#
+# XML escaping is only HALF the boundary. $CMD is also re-parsed as SHELL by
+# `/bin/bash -lc` at the far end, so every variable carrying FREE-FORM TEXT — the
+# prompt and the --plan path — is quoted with shq() (see its header) rather than
+# interpolated inside \"…\". (The rest — $ROOT, $LABEL, $PLIST, $LOG — are values
+# this script controls, so \"…\" is fine for them.) Interpolation is what let
+# the same `<slug>-N.md` string break a second way — as command substitution that
+# silently deleted itself from the prompt. Both hazards, one string, different fixes:
+# do not "simplify" either one away.
 xml_escape() { printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
 
-CMD="export PATH=\"/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH\"; cd \"$ROOT\" && { ${FALLBACK_FN}${HARNESS_SEG}${GATE_OPEN}CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000 caffeinate -s claude -p \"$PROMPT\" --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name \"$LABEL\"${GATE_CLOSE}; }; rm -f \"$PLIST\"; launchctl bootout gui/\$(id -u)/$LABEL"
+CMD="export PATH=\"/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH\"; cd \"$ROOT\" && { ${FALLBACK_FN}${HARNESS_SEG}${GATE_OPEN}CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000 caffeinate -s claude -p $(shq "$PROMPT") --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name \"$LABEL\"${GATE_CLOSE}; }; rm -f \"$PLIST\"; launchctl bootout gui/\$(id -u)/$LABEL"
 
 CMD_XML=$(xml_escape "$CMD")
 LABEL_XML=$(xml_escape "$LABEL")

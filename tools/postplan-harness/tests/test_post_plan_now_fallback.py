@@ -18,6 +18,65 @@ def test_generic_failures_fall_back():            # negative path: real failures
     assert _fb(2) == "0"
     assert _fb(130) == "0"
 
+def _bash(script):
+    return subprocess.run(["bash", "-c", script], capture_output=True, text=True)
+
+
+def test_shq_survives_a_second_shell_parse():
+    """shq() output must reproduce its input byte-for-byte when a SECOND shell parses it.
+
+    $CMD is re-parsed by `/bin/bash -lc` inside the launchd plist, so anything the
+    prompt carries gets a second round of shell evaluation. Grepping the source for
+    backticks would not catch this — only a real round-trip does.
+    """
+    hostile = [
+        "plain",
+        "has `backticks` here",
+        "has $(cmd) and $VAR",
+        "it's got a single quote",
+        r"a\b backslash",
+        "<slug>-N.md",
+        "mix: `x` $y 'z' \\w",
+    ]
+    for s in hostile:
+        script = f'source "{PPN}" >/dev/null 2>&1; q=$(shq "$1"); bash -c "printf %s $q"'
+        r = subprocess.run(["bash", "-c", script, "_", s], capture_output=True, text=True)
+        assert r.stderr == "", f"{s!r}: second parse wrote to stderr: {r.stderr!r}"
+        assert r.stdout == s, f"{s!r}: round-tripped to {r.stdout!r}"
+
+
+def test_plan_blind_prompt_reaches_the_model_intact():
+    """The real plan-blind prompt literal, round-tripped through the far-side shell.
+
+    Regression: it carried literal backticks around <slug>-N.md, was embedded as
+    `claude -p \\"$PROMPT\\"`, and `/bin/bash -lc` ran the backticks as command
+    substitution — logging `slug: No such file or directory` and silently deleting the
+    plan-disambiguation clause from the prompt the model received.
+    """
+    import re
+    src = open(PPN).read()
+    prompts = re.findall(r'^\s*(PROMPT="(?:[^"\\]|\\.)*")$', src, re.M)
+    assert len(prompts) == 2, f"expected the --plan and plan-blind prompts, got {len(prompts)}"
+    plan_blind = prompts[1]
+    assert "<slug>-N.md" in plan_blind, "plan-blind prompt no longer names the variant rule"
+
+    script = (f'source "{PPN}" >/dev/null 2>&1\n'
+              f'{plan_blind}\n'
+              'q=$(shq "$PROMPT")\n'
+              'bash -c "printf %s $q"\n')
+    r = _bash(script)
+    assert r.stderr == "", f"far-side shell wrote to stderr: {r.stderr!r}"
+    assert "`<slug>-N.md`" in r.stdout, f"backticked span did not survive: {r.stdout!r}"
+    assert "never ask questions" in r.stdout
+
+
+def test_embed_sites_are_shell_quoted():
+    src = open(PPN).read()
+    assert 'claude -p $(shq "$PROMPT")' in src      # not \"$PROMPT\" — see shq() header
+    assert r'claude -p \"$PROMPT\"' not in src
+    assert '--plan $(shq "$PLAN_OVERRIDE")' in src
+
+
 def test_plist_wiring_regression():
     src = open(PPN).read()
     assert "--live || " not in src               # old unconditional fallback chain removed

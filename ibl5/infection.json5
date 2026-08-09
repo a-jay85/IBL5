@@ -11,15 +11,6 @@
             // (MySQL.php lives at classes/Database/MySQL.php, already covered by the
             //  "Database" dir exclude above — no separate entry needed.)
             "JSB.php", // infra-exclude: low-level JSB engine glue, coverage-excluded — never mutated
-            // Group-B Views: no output-assertion test yet — honest per-file deferral
-            // reasons below; gate 2 in check-infection-excludes fires if a test later
-            // appears for one of these and it is not re-included. See ADR 0065.
-            "Player/Views/PlayerAwardsView.php", // no output-assertion test yet — deferred Pass 2
-            "Player/Views/PlayerButtonsView.php", // no output-assertion test yet — deferred Pass 2
-            "Player/Views/PlayerMenuView.php", // no output-assertion test yet — deferred Pass 2
-            "Player/Views/PlayerTradingCardBackView.php", // no output-assertion test yet — deferred Pass 2
-            "Player/Views/PlayerTradingCardFlipView.php", // no output-assertion test yet — deferred Pass 2
-            "Player/Views/PlayerTradingCardFrontView.php" // no output-assertion test yet — deferred Pass 2
         ]
     },
     "phpUnit": {

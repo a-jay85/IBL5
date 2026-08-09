@@ -173,16 +173,6 @@ class PageLayout
         // Google Fonts (inlined from includes/custom_files/custom_head.php)
         echo self::renderFontPreconnectLinks();
 
-        // @phpstan-ignore ibl.inlineCss (FOUT prevention: must load before external stylesheet)
-        echo '<style id="font-loading-styles">
-.fonts-loading {
-    visibility: hidden;
-}
-.fonts-loaded {
-    visibility: visible;
-}
-</style>';
-
         // Font loading detection script
         echo '<script>
 // Add fonts-loading class immediately
@@ -218,20 +208,12 @@ if (document.fonts && document.fonts.check("1em Barlow")) {
 }
 </script>';
 
-        // @phpstan-ignore ibl.inlineCss (FOUT prevention: must load before external stylesheet)
-        echo '<style>
-/* FOUT Prevention - Hide body until fonts are loaded */
-.fonts-loading body {
-    visibility: hidden;
-}
-.fonts-loaded body {
-    visibility: visible;
-}
-</style>';
-
         // CSS stylesheet — loaded once (fixes duplicate CSS loading bug)
         $cssPath = "themes/$ThemeSel/style/style.css";
         $cssVersion = file_exists($cssPath) ? filemtime($cssPath) : '';
+        // FOUT-prevention invariant: this tag must remain render-blocking.
+        // The .fonts-loading { visibility: hidden } rule lives in design/base.css (compiled here).
+        // Making it async, lazy, or rel="preload" will silently reintroduce FOUT — no test catches it.
         echo "<LINK REL=\"StyleSheet\" HREF=\"{$cssPath}?v={$cssVersion}\" TYPE=\"text/css\">\n";
 
         echo "\n\n\n</head>\n\n";

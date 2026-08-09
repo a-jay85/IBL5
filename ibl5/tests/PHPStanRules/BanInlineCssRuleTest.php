@@ -62,6 +62,21 @@ final class BanInlineCssRuleTest extends RuleTestCase
         );
     }
 
+    public function testFlagsInlineStyleAttributeInThemes(): void
+    {
+        $this->analyse(
+            [__DIR__ . '/Fixtures/themes/InlineStyleInThemes.php'],
+            [
+                [
+                    'Inline `style="..."` attributes are banned in PHP. Move CSS to '
+                    . 'ibl5/design/components/. Exception: `style="--foo: ..."` CSS '
+                    . 'custom properties are allowed.',
+                    5,
+                ],
+            ],
+        );
+    }
+
     public function testAllowsCssCustomPropertyStyleAttribute(): void
     {
         $this->analyse(

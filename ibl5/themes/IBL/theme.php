@@ -247,10 +247,10 @@ function themearticle($aid, $informant, $datetime, $title, $thetext, $topic, $to
         $topicIconHtml = '<a href="modules.php?name=News&amp;new_topic=' . (int)$topic . '" class="news-article__topic-icon-link" aria-label="' . $topicLinkLabel . '"><img src="' . \Security\HtmlSanitizer::safeHtmlOutput($t_image) . '" alt="' . $safeTopictext . '" class="news-article__topic-icon" loading="lazy"></a>';
     }
 
-    echo '<article class="news-article" style="max-width: 900px;">
+    echo '<article class="news-article news-article--detail">
         <header class="news-article__header">
             ' . $topicIconHtml . '
-            <h1 class="news-article__title" style="font-size: 1.5rem;">' . $safeTitle . '</h1>
+            <h1 class="news-article__title">' . $safeTitle . '</h1>
             <div class="news-article__meta">
                 <span class="news-article__meta-item">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -291,15 +291,15 @@ function themecenterbox($title, $content, ?string $type = null)
     if ($type !== null) {
         // Explicit type: select branch directly without content inspection
         if ($type === 'leaders') {
-            echo '<div class="leaders-grid-item" style="overflow: hidden;">'
+            echo '<div class="leaders-grid-item">'
                 . $content
                 . '</div>';
         } elseif ($type === 'injury') {
-            echo '<div style="max-width: 100%; overflow: hidden;">'
+            echo '<div class="centerbox-item">'
                 . $content
                 . '</div>';
         } else {
-            echo '<div style="margin-bottom: 1rem; max-width: 100%; overflow: hidden;">'
+            echo '<div class="centerbox-item centerbox-item--spaced">'
                 . $content
                 . '</div>';
         }
@@ -318,15 +318,15 @@ function themecenterbox($title, $content, ?string $type = null)
         $isInjuryBlock = strpos($content, 'injury-block') !== false;
 
         if ($isLeadersBlock) {
-            echo '<div class="leaders-grid-item" style="overflow: hidden;">'
+            echo '<div class="leaders-grid-item">'
                 . $content
                 . '</div>';
         } elseif ($isInjuryBlock) {
-            echo '<div style="max-width: 100%; overflow: hidden;">'
+            echo '<div class="centerbox-item">'
                 . $content
                 . '</div>';
         } else {
-            echo '<div style="margin-bottom: 1rem; max-width: 100%; overflow: hidden;">'
+            echo '<div class="centerbox-item centerbox-item--spaced">'
                 . $content
                 . '</div>';
         }

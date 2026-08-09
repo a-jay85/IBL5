@@ -16,6 +16,11 @@
     transition: box-shadow var(--transition-base);
 }
 
+/* Single-article detail view: narrower measure than the 1400px list view. */
+.news-article--detail {
+    max-width: 900px;
+}
+
 .news-article:hover {
     box-shadow: var(--shadow-lg);
 }

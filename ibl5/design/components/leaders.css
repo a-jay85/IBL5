@@ -8,6 +8,7 @@
 .leaders-grid-item {
     max-width: 680px;
     margin: 0 auto 1rem;
+    overflow: hidden; /* was an inline style on the themecenterbox() wrappers */
 }
 
 /* Display leaders blocks side-by-side on desktop */

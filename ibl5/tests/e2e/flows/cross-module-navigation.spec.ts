@@ -114,21 +114,14 @@ test.describe('Cross-module navigation', () => {
     await assertNoPhpErrors(page, 'on Standings (chain)');
 
     const teamLink = page.locator('.ibl-data-table a[href*="name=Team"]').first();
-    expect(
-      await teamLink.count(),
-      'Standings must expose at least one team link — CI seed provides ibl_team_info rows',
-    ).toBeGreaterThan(0);
+    await expect(teamLink).toBeVisible();
 
     const teamHref = await teamLink.getAttribute('href');
     await page.goto(teamHref!);
     await assertNoPhpErrors(page, 'on Team page (chain)');
 
     const playerLink = page.locator('a[href*="name=Player"][href*="pid="]').first();
-    const playerCount = await playerLink.count();
-    expect(
-      playerCount,
-      'Team page must expose at least one player link — CI seed gives teamid 1 a roster (ci-seed.sql, ibl_plr)',
-    ).toBeGreaterThan(0);
+    await expect(playerLink).toBeVisible();
 
     const playerHref = await playerLink.getAttribute('href');
     expect(playerHref, 'player link must carry an href').toBeTruthy();

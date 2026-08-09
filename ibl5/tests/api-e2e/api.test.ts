@@ -7,8 +7,9 @@
  * Transient failures (server returning HTML under load) are handled by
  * Vitest's built-in retry (retry: 2 in vitest.api.config.ts).
  *
- * Locally without a seeded API key, tests validate 401 error structure.
- * In CI with the key seeded, tests validate actual API responses.
+ * The client always sends a key (API_KEY falls back to the seeded e2e key),
+ * so every route is expected to return 200 and validate its body. A 401
+ * is a failure indicating a real auth/config problem, not an accepted alternative.
  */
 
 import { describe, test, expect } from 'vitest';
@@ -29,8 +30,9 @@ function assertJson(res: Response, context: string): void {
 }
 
 /**
- * Assert a GET route returns either 200 (with optional body validation)
- * or 401 (with error structure). Both are valid depending on API key config.
+ * Assert a GET route returns 200 and validates its body. A 401 is a failure:
+ * the client always sends a key (client.ts falls back to the seeded e2e key),
+ * so a 401 indicates a real auth/config failure, not an accepted alternative.
  */
 async function assertGetRoute(
   path: string,
@@ -39,13 +41,12 @@ async function assertGetRoute(
   const res = await apiFetch(path);
   assertJson(res, path);
 
-  if (res.status === 401) {
-    const body = await res.json();
-    expect(body).toHaveProperty('error');
-    return;
-  }
-
-  expect(res.status).toBe(200);
+  expect(
+    res.status,
+    `${path}: expected 200 but got ${res.status}. API_KEY is always configured ` +
+      `(client.ts falls back to the seeded e2e key), so a 401 here is a real ` +
+      `auth/config failure — not a reason to skip body validation.`,
+  ).toBe(200);
   const body = await res.json();
   expect(body).toBeTruthy();
   if (validateBody) validateBody(body);

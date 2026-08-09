@@ -4,35 +4,31 @@ declare(strict_types=1);
 
 namespace BugPipeline;
 
+use BugPipeline\Contracts\BugPipelineStateRepositoryInterface;
+use BugPipeline\Contracts\BugReportClaimRepositoryInterface;
+use BugPipeline\Contracts\BugReporterProfileRepositoryInterface;
+
 /**
- * Single source of all queue DB logic for the Discord bug pipeline.
+ * Facade over the Discord bug-pipeline queue DB logic (backlog 1.26 split).
  *
- * All snowflake columns are (string)-cast on read (see castRow()) because
- * db/db.php:100 sets MYSQLI_OPT_INT_AND_FLOAT_NATIVE — BIGINT reads back as
- * PHP int, and json_encode of a bare int loses precision above 2^53.
+ * The read path + crash-safe enqueue live here; the lease/claim + state-machine
+ * writers, reporter-profile store, and per-channel watermark store are delegated
+ * to three sub-repositories behind {@see BugReportClaimRepositoryInterface},
+ * {@see BugReporterProfileRepositoryInterface}, and
+ * {@see BugPipelineStateRepositoryInterface}. All 14 call sites keep calling this
+ * facade unchanged — the split is behavior-preserving.
  *
- * @phpstan-type BugReportRow array{
- *   id: int,
- *   discord_author_id: string,
- *   channel_id: string,
- *   original_message_id: string,
- *   original_text: string,
- *   thread_id: ?string,
- *   class: ?string,
- *   status: string,
- *   lease_owner: ?string,
- *   lease_expires: ?string,
- *   hunt_attempts: int,
- *   pr_number: ?int,
- *   issue_number: ?int,
- *   approval_message_id: ?string,
- *   blocked_until: ?string,
- *   last_gm_reply_at: ?string,
- *   last_processed_at: ?string,
- *   reminder_sent_at: ?string,
- *   created_at: string,
- *   updated_at: string
- * }
+ * The sub-repositories are built in the constructor from the facade's OWN mysqli
+ * handle, so a call the facade wraps in {@see \BaseMysqliRepository::transactional()}
+ * (enqueueAuthorizedAndAdvance) and the delegated write it makes share one
+ * connection and one transaction/SAVEPOINT — the enqueue stays atomic.
+ *
+ * Snowflake casting (castRow / SNOWFLAKE_COLUMNS) and the BugReportRow row shape
+ * live in {@see BugReportRowCasting}, shared with the sub-repositories. The
+ * `ibl_bug_report_attachments` child table stays on the facade alongside its
+ * parent's read path — see the attachment methods below.
+ *
+ * @phpstan-import-type BugReportRow from \BugPipeline\BugReportRowCasting
  * @phpstan-type BugAttachmentRow array{
  *   id: int,
  *   report_id: int,
@@ -55,48 +51,24 @@ namespace BugPipeline;
  */
 class BugReportRepository extends \BaseMysqliRepository
 {
-    /** Snowflake columns of ibl_bug_reports that must serialize as JSON strings (see db.php:100). */
-    private const SNOWFLAKE_COLUMNS = [
-        'discord_author_id',
-        'channel_id',
-        'original_message_id',
-        'thread_id',
-        'approval_message_id',
-    ];
+    use BugReportRowCasting;
 
-    /**
-     * Optional column => mysqli type map for transition(). Column names are compile-time
-     * literals from this fixed map (never caller input); values are always bound.
-     *
-     * @var array<string, string>
-     */
-    private const OPTIONAL_TRANSITION_COLUMNS = [
-        'class'               => 's',
-        'pr_number'           => 'i',
-        'issue_number'        => 'i',
-        'thread_id'           => 's',
-        'approval_message_id' => 's',
-        'blocked_until'       => 's',
-        'hunt_attempts'       => 'i',
-    ];
+    private readonly BugReportClaimRepositoryInterface $claims;
+    private readonly BugReporterProfileRepositoryInterface $reporterProfile;
+    private readonly BugPipelineStateRepositoryInterface $pipelineState;
 
-    /**
-     * @param array<string, mixed> $row
-     * @phpstan-return BugReportRow
-     */
-    private function castRow(array $row): array
+    public function __construct(\mysqli $db, ?\League\LeagueContext $leagueContext = null)
     {
-        foreach (self::SNOWFLAKE_COLUMNS as $col) {
-            if (isset($row[$col]) && is_scalar($row[$col])) {
-                $row[$col] = (string) $row[$col];
-            }
-        }
-        /** @var BugReportRow $row */
-        return $row;
+        parent::__construct($db, $leagueContext);
+        // Share the facade's own $db handle so a delegated write inside
+        // enqueueAuthorizedAndAdvance()'s transaction runs on the same connection.
+        $this->claims = new BugReportClaimRepository($db, $leagueContext);
+        $this->reporterProfile = new BugReporterProfileRepository($db, $leagueContext);
+        $this->pipelineState = new BugPipelineStateRepository($db, $leagueContext);
     }
 
     // -------------------------------------------------------------------------
-    // Read methods (Phase 2)
+    // Read methods
     // -------------------------------------------------------------------------
 
     /**
@@ -128,8 +100,81 @@ class BugReportRepository extends \BaseMysqliRepository
         return $row === null ? null : $this->castRow($row);
     }
 
+    /**
+     * Every row currently in the `pr_open` terminal-ish state, for the cron's async reconcile
+     * pass (PR #5b Phase 5 Fork B). The hunter leaves a shipped row at `pr_open` immediately
+     * (before the PR number is known); the trusted cron later fills `pr_number` from `gh` and,
+     * on merge, advances `pr_open` → `fixed`. Read-only enumerator — no lease, no state change.
+     *
+     * @phpstan-return list<BugReportRow>
+     */
+    public function listPrOpen(): array
+    {
+        $rows = $this->fetchAll(
+            "SELECT * FROM `ibl_bug_reports` WHERE status = 'pr_open' ORDER BY id ASC"
+        );
+        return array_values(array_map(fn (array $row): array => $this->castRow($row), $rows));
+    }
+
+    /**
+     * The tick's actionable set — every row the poll-only driver must inspect this tick.
+     *
+     * Union (see discord-bug-pipeline-shared-context.md §3d + PR #5a Phase 3/5):
+     *   (a) queued AND class IS NULL          — needs first-classification
+     *   (b) awaiting_info / gathering          — GM reply re-assessment OR idle/park candidate
+     *                                            (the 1h idle POLICY lives in the bash driver, not here)
+     *   (c) awaiting_ajay AND approval_message_id IS NULL — ready-for-plan (A-Jay reacted ✅)
+     *   (d) blocked                              — a usage-limit-parked hunt whose backoff has
+     *                                              elapsed; the outer blocked_until gate only lets
+     *                                              a RIPE one through, so the bash driver resumes it
+     *                                              (blocked → hunting) via resumeBlockedHunt (#5b Phase 7)
+     *
+     * Global gates: excludes `hunting` (an in-flight hunt is invisible — the single-flight
+     * constraint) and all terminal states, and excludes any row still parked by a future
+     * `blocked_until` (usage-limit backoff). A row whose `blocked_until` has passed re-surfaces in
+     * its real status and retries — so "skip while parked" and "auto-resume" both fall out of the
+     * one blocked-until gate.
+     *
+     * @phpstan-return list<BugReportRow>
+     */
+    public function listActiveConversations(): array
+    {
+        $rows = $this->fetchAll(
+            "SELECT * FROM `ibl_bug_reports`
+             WHERE status NOT IN ('hunting','dropped','fixed','needs_human','parked_idle','pr_open')
+               AND (blocked_until IS NULL OR blocked_until <= NOW())
+               AND (
+                     (status = 'queued' AND class IS NULL)
+                  OR (status IN ('awaiting_info','gathering'))
+                  OR (status = 'awaiting_ajay' AND approval_message_id IS NULL)
+                  OR (status = 'blocked')
+               )
+             ORDER BY id ASC"
+        );
+        return array_values(array_map(fn (array $row): array => $this->castRow($row), $rows));
+    }
+
+    /**
+     * PR #4 /prMerged resolver. pr_number is a PR number (small INT, bound "i"), NOT a snowflake.
+     * Returns the thread_id snowflake as a STRING, or null if unresolved.
+     */
+    public function findThreadIdByPrNumber(int $prNumber): ?string
+    {
+        $row = $this->fetchOne(
+            'SELECT thread_id FROM `ibl_bug_reports` WHERE pr_number = ? LIMIT 1',
+            'i',
+            $prNumber
+        );
+        if ($row === null) {
+            return null;
+        }
+        return isset($row['thread_id']) && is_scalar($row['thread_id'])
+            ? (string) $row['thread_id']
+            : null;
+    }
+
     // -------------------------------------------------------------------------
-    // Write path — insert, upserts, mutators (Phase 3)
+    // Crash-safe enqueue (owns its own transaction; delegates the watermark write)
     // -------------------------------------------------------------------------
 
     public function insertQueuedReport(string $authorId, string $channelId, string $messageId, string $text): int
@@ -147,52 +192,12 @@ class BugReportRepository extends \BaseMysqliRepository
         return $this->getLastInsertId();
     }
 
-    public function upsertReporterProfile(string $discordId, string $techLevel): void
-    {
-        // ON DUPLICATE KEY UPDATE => affected-rows is 0|1|2; success is "no exception", not "=== 1".
-        $this->execute(
-            'INSERT INTO `ibl_bug_reporter_profile` (discord_author_id, tech_level, created_at, updated_at)
-             VALUES (?, ?, NOW(), NOW())
-             ON DUPLICATE KEY UPDATE tech_level = VALUES(tech_level), updated_at = NOW()',
-            'ss',
-            $discordId,
-            $techLevel
-        );
-    }
-
-    public function getReporterTechLevel(string $discordId): ?string
-    {
-        $row = $this->fetchOne(
-            'SELECT tech_level FROM `ibl_bug_reporter_profile` WHERE discord_author_id = ? LIMIT 1',
-            's',
-            $discordId
-        );
-        if ($row === null) {
-            return null;
-        }
-        /** @var string $techLevel */
-        $techLevel = $row['tech_level'];
-        return $techLevel;
-    }
-
-    public function upsertPipelineState(string $channelId, string $messageId): void
-    {
-        // Monotonic: GREATEST() keeps the highest snowflake seen — the cursor only moves forward.
-        $this->execute(
-            'INSERT INTO `ibl_bug_pipeline_state` (channel_id, last_processed_message_id, updated_at)
-             VALUES (?, ?, NOW())
-             ON DUPLICATE KEY UPDATE
-                 last_processed_message_id = GREATEST(last_processed_message_id, VALUES(last_processed_message_id)),
-                 updated_at = NOW()',
-            'ss',
-            $channelId,
-            $messageId
-        );
-    }
-
     /**
      * Crash-safe, replay-safe enqueue: INSERT + watermark advance run in one transaction.
      * Pre-insert findByOriginalMessageId dedupe makes it replay-safe for PR #4's backfill.
+     *
+     * The watermark write is delegated to the pipeline-state sub-repository, which shares
+     * this facade's mysqli handle — so it runs inside the same transaction opened here.
      */
     public function enqueueAuthorizedAndAdvance(string $authorId, string $channelId, string $messageId, string $text): int
     {
@@ -201,16 +206,24 @@ class BugReportRepository extends \BaseMysqliRepository
             // Replay-safe: a message already enqueued returns its existing id, no 2nd row.
             $existing = $this->findByOriginalMessageId($messageId);
             if ($existing !== null) {
-                $this->upsertPipelineState($channelId, $messageId);
+                $this->pipelineState->upsertPipelineState($channelId, $messageId);
                 return $existing['id'];
             }
             // Insert + watermark advance in the SAME transaction => crash between them rolls back both.
             $newId = $this->insertQueuedReport($authorId, $channelId, $messageId, $text);
-            $this->upsertPipelineState($channelId, $messageId);
+            $this->pipelineState->upsertPipelineState($channelId, $messageId);
             return $newId;
         });
         return $id;
     }
+
+    // -------------------------------------------------------------------------
+    // Attachment child table (ibl_bug_report_attachments)
+    //
+    // Stays on the facade alongside the parent row it hangs off: the child table carries no
+    // lease/claim, reporter-profile, or watermark concern, and insertAttachments() runs AFTER
+    // the enqueue transaction above commits — so it needs no shared-transaction sub-repository.
+    // -------------------------------------------------------------------------
 
     /**
      * Persist attachment metadata for a report. Best-effort, replay-safe, storage-idempotent.
@@ -292,354 +305,139 @@ class BugReportRepository extends \BaseMysqliRepository
         return $grouped;
     }
 
-    public function stampThreadReply(string $threadId): bool
-    {
-        return $this->execute(
-            'UPDATE `ibl_bug_reports` SET last_gm_reply_at = NOW() WHERE thread_id = ?',
-            's',
-            $threadId
-        ) >= 1;
-    }
+    // -------------------------------------------------------------------------
+    // Reporter-profile delegations
+    // -------------------------------------------------------------------------
 
     /**
-     * Advance a report from awaiting_ajay to the ready-for-plan sub-state by NULLing
-     * approval_message_id. Status stays 'awaiting_ajay' — the cron drives /plan then sets 'planned'.
+     * @see BugReporterProfileRepository::upsertReporterProfile()
      */
-    public function advanceOnApproval(string $messageId): bool
+    public function upsertReporterProfile(string $discordId, string $techLevel): void
     {
-        // ✅ = "ready-for-plan", NOT "planned". NULL the approval pointer and keep
-        // status='awaiting_ajay' so the cron can enumerate awaiting_ajay AND approval_message_id IS NULL.
-        return $this->execute(
-            "UPDATE `ibl_bug_reports` SET approval_message_id = NULL
-             WHERE approval_message_id = ? AND status = 'awaiting_ajay'",
-            's',
-            $messageId
-        ) === 1;
+        $this->reporterProfile->upsertReporterProfile($discordId, $techLevel);
+    }
+
+    /**
+     * @see BugReporterProfileRepository::getReporterTechLevel()
+     */
+    public function getReporterTechLevel(string $discordId): ?string
+    {
+        return $this->reporterProfile->getReporterTechLevel($discordId);
     }
 
     // -------------------------------------------------------------------------
-    // Atomic lease primitives (Phase 4)
+    // Pipeline-state (watermark) delegations
     // -------------------------------------------------------------------------
 
     /**
-     * Single-flight claim: the "AND status='queued'" guard makes this atomic.
-     * A row already 'hunting' (claimed by another worker) matches 0 rows => returns false.
+     * @see BugPipelineStateRepository::upsertPipelineState()
+     */
+    public function upsertPipelineState(string $channelId, string $messageId): void
+    {
+        $this->pipelineState->upsertPipelineState($channelId, $messageId);
+    }
+
+    /**
+     * @see BugPipelineStateRepository::findPipelineState()
+     */
+    public function findPipelineState(string $channelId): ?string
+    {
+        return $this->pipelineState->findPipelineState($channelId);
+    }
+
+    // -------------------------------------------------------------------------
+    // Lease/claim + state-machine writer delegations
+    // -------------------------------------------------------------------------
+
+    /**
+     * @see BugReportClaimRepository::claimQueued()
      */
     public function claimQueued(int $id, string $leaseOwner, string $leaseExpires): bool
     {
-        return $this->execute(
-            "UPDATE `ibl_bug_reports` SET status = 'hunting', lease_owner = ?, lease_expires = ?
-             WHERE id = ? AND status = 'queued'",
-            'ssi',
-            $leaseOwner,
-            $leaseExpires,
-            $id
-        ) === 1;
+        return $this->claims->claimQueued($id, $leaseOwner, $leaseExpires);
     }
 
     /**
-     * Pick oldest queued report and claim it. One attempt — lost-race returns null.
+     * @see BugReportClaimRepository::claimNextQueued()
      * @phpstan-return BugReportRow|null
      */
     public function claimNextQueued(string $leaseOwner, string $leaseExpires): ?array
     {
-        $row = $this->fetchOne(
-            "SELECT id FROM `ibl_bug_reports` WHERE status = 'queued' ORDER BY id ASC LIMIT 1"
-        );
-        if ($row === null) {
-            return null;
-        }
-        /** @var int $id */
-        $id = $row['id'];
-
-        // Lost-race safe: if another worker claimed $id, claimQueued matches 0 rows => null.
-        if (!$this->claimQueued($id, $leaseOwner, $leaseExpires)) {
-            return null;
-        }
-        return $this->findById($id);
+        return $this->claims->claimNextQueued($leaseOwner, $leaseExpires);
     }
 
     /**
-     * Reclaim a crashed hunt whose lease expired. Separate primitive — never widens claimQueued.
+     * @see BugReportClaimRepository::reclaimStaleLease()
      * @phpstan-return BugReportRow|null
      */
     public function reclaimStaleLease(string $newLeaseOwner, string $leaseExpires): ?array
     {
-        $row = $this->fetchOne(
-            "SELECT id FROM `ibl_bug_reports`
-             WHERE status = 'hunting' AND lease_expires < NOW()
-             ORDER BY id ASC LIMIT 1"
-        );
-        if ($row === null) {
-            return null;
-        }
-        /** @var int $id */
-        $id = $row['id'];
-
-        // Re-assert both predicates in the UPDATE so a concurrent reclaimer can't double-claim.
-        $claimed = $this->execute(
-            "UPDATE `ibl_bug_reports` SET lease_owner = ?, lease_expires = ?
-             WHERE id = ? AND status = 'hunting' AND lease_expires < NOW()",
-            'ssi',
-            $newLeaseOwner,
-            $leaseExpires,
-            $id
-        ) === 1;
-        if (!$claimed) {
-            return null;
-        }
-        return $this->findById($id);
+        return $this->claims->reclaimStaleLease($newLeaseOwner, $leaseExpires);
     }
 
     /**
-     * Pick the oldest queued report that is READY TO HUNT and claim it into `hunting`.
-     * One attempt — lost-race returns null (PR #5b Phase 2 — the deadlock-closing claim).
-     *
-     * Narrower than claimNextQueued() by design: a hunt may only start on a row that has
-     * already been classified (`class IS NOT NULL`) and is not parked by a usage-limit
-     * backoff (`blocked_until` in the future). claimNextQueued() stays as-is for any caller
-     * that wants the raw oldest-queued primitive; this method never widens it.
-     *
+     * @see BugReportClaimRepository::claimNextHuntable()
      * @phpstan-return BugReportRow|null
      */
     public function claimNextHuntable(string $leaseOwner, string $leaseExpires): ?array
     {
-        $row = $this->fetchOne(
-            "SELECT id FROM `ibl_bug_reports`
-             WHERE status = 'queued'
-               AND class IS NOT NULL
-               AND (blocked_until IS NULL OR blocked_until <= NOW())
-             ORDER BY id ASC LIMIT 1"
-        );
-        if ($row === null) {
-            return null;
-        }
-        /** @var int $id */
-        $id = $row['id'];
-
-        // Lost-race safe: claimQueued re-asserts `status='queued'` in the UPDATE (0 rows => null).
-        if (!$this->claimQueued($id, $leaseOwner, $leaseExpires)) {
-            return null;
-        }
-        return $this->findById($id);
+        return $this->claims->claimNextHuntable($leaseOwner, $leaseExpires);
     }
 
     /**
-     * Atomically resume a usage-limit-parked hunt: `blocked` → `hunting`, re-stamping the lease.
-     * Returns true only when THIS call flipped the row (PR #5b Phase 7 — the resume guard).
-     *
-     * transition() is an unconditional `WHERE id = ?` write, so it cannot express the
-     * single-flight predicate two overlapping ticks need: both surface the ripe `blocked`
-     * row, both call this, only the one whose UPDATE still sees `status='blocked'` wins
-     * (affected_rows == 1); the loser gets 0 and skips. Re-stamping lease_expires closes the
-     * window where reclaimStaleLease() could immediately steal the freshly-resumed hunt.
+     * @see BugReportClaimRepository::resumeBlockedHunt()
      */
     public function resumeBlockedHunt(string $leaseOwner, string $leaseExpires, int $id): bool
     {
-        return $this->execute(
-            "UPDATE `ibl_bug_reports`
-                SET status = 'hunting', lease_owner = ?, lease_expires = ?, updated_at = NOW()
-             WHERE id = ?
-               AND status = 'blocked'
-               AND (blocked_until IS NULL OR blocked_until <= NOW())",
-            'ssi',
-            $leaseOwner,
-            $leaseExpires,
-            $id
-        ) === 1;
+        return $this->claims->resumeBlockedHunt($leaseOwner, $leaseExpires, $id);
     }
 
     /**
-     * Every row currently in the `pr_open` terminal-ish state, for the cron's async reconcile
-     * pass (PR #5b Phase 5 Fork B). The hunter leaves a shipped row at `pr_open` immediately
-     * (before the PR number is known); the trusted cron later fills `pr_number` from `gh` and,
-     * on merge, advances `pr_open` → `fixed`. Read-only enumerator — no lease, no state change.
-     *
-     * @phpstan-return list<BugReportRow>
-     */
-    public function listPrOpen(): array
-    {
-        $rows = $this->fetchAll(
-            "SELECT * FROM `ibl_bug_reports` WHERE status = 'pr_open' ORDER BY id ASC"
-        );
-        return array_values(array_map(fn (array $row): array => $this->castRow($row), $rows));
-    }
-
-    // -------------------------------------------------------------------------
-    // General state/metadata writer (Phase 4b)
-    // -------------------------------------------------------------------------
-
-    /**
-     * General state-machine writer: set status plus any subset of optional metadata columns.
-     * The §3d cron CLI (transition <id> <status> [opts]) is a thin wrapper over this method.
-     *
-     * Conditional-SQL, NOT null-bind: only columns whose key is present in $opts are written;
-     * an absent key keeps the column's current value ("build conditional SQL; bind_param has no
-     * NULL type" — core-coding.md). Keys outside OPTIONAL_TRANSITION_COLUMNS are ignored.
-     *
-     * $setClauses fragments ('status = ?', 'pr_number = ?', …) derive from the fixed
-     * OPTIONAL_TRANSITION_COLUMNS constant (compile-time literal column names / bound params) —
-     * concatenate literal fragments, do NOT interpolate values.
-     *
-     * @param array<string, int|string> $opts Accepted keys: pr_number, issue_number, hunt_attempts
-     *   (ints); class (ENUM string); thread_id, approval_message_id (snowflakes, bound "s");
-     *   blocked_until (DATETIME string). Any other key is ignored.
-     * @param bool $releaseLease When true, atomically NULLs lease_owner + lease_expires in the
-     *   SAME UPDATE. Required for →needs_human / →queued reset to be a single-flight-safe op.
-     * @return bool True when the row (PK $id) was updated.
+     * @see BugReportClaimRepository::transition()
+     * @param array<string, int|string> $opts
      */
     public function transition(int $id, string $status, array $opts = [], bool $releaseLease = false): bool
     {
-        $setClauses = ['status = ?'];
-        $types = 's';
-        $values = [$status];
-
-        foreach (self::OPTIONAL_TRANSITION_COLUMNS as $col => $type) {
-            if (array_key_exists($col, $opts)) {
-                $setClauses[] = $col . ' = ?';
-                $types .= $type;
-                $values[] = $opts[$col];
-            }
-        }
-        if ($releaseLease) {
-            // Literal NULLs (no bound param) — atomic lease-drop for →needs_human / →queued reset.
-            $setClauses[] = 'lease_owner = NULL';
-            $setClauses[] = 'lease_expires = NULL';
-        }
-        $setClauses[] = 'updated_at = NOW()';
-
-        // $setClauses elements are literal fragments from the fixed constant map above;
-        // no runtime value is interpolated into column names — only ? placeholders for values.
-        $query = 'UPDATE `ibl_bug_reports` SET ' . implode(', ', $setClauses) . ' WHERE id = ?';
-        $types .= 'i';
-        $values[] = $id;
-
-        return $this->execute($query, $types, ...$values) === 1;
+        return $this->claims->transition($id, $status, $opts, $releaseLease);
     }
 
-    // -------------------------------------------------------------------------
-    // Reader methods for PR #4 (Phase 9)
-    // -------------------------------------------------------------------------
-
     /**
-     * PR #4 backfill cursor. Returns the watermark snowflake as a STRING, or null on first boot.
+     * @see BugReportClaimRepository::advanceOnApproval()
      */
-    public function findPipelineState(string $channelId): ?string
+    public function advanceOnApproval(string $messageId): bool
     {
-        $row = $this->fetchOne(
-            'SELECT last_processed_message_id FROM `ibl_bug_pipeline_state` WHERE channel_id = ? LIMIT 1',
-            's',
-            $channelId
-        );
-        if ($row === null) {
-            return null;
-        }
-        return isset($row['last_processed_message_id']) && is_scalar($row['last_processed_message_id'])
-            ? (string) $row['last_processed_message_id']
-            : null;
+        return $this->claims->advanceOnApproval($messageId);
     }
 
     /**
-     * PR #4 /prMerged resolver. pr_number is a PR number (small INT, bound "i"), NOT a snowflake.
-     * Returns the thread_id snowflake as a STRING, or null if unresolved.
+     * @see BugReportClaimRepository::stampThreadReply()
      */
-    public function findThreadIdByPrNumber(int $prNumber): ?string
+    public function stampThreadReply(string $threadId): bool
     {
-        $row = $this->fetchOne(
-            'SELECT thread_id FROM `ibl_bug_reports` WHERE pr_number = ? LIMIT 1',
-            'i',
-            $prNumber
-        );
-        if ($row === null) {
-            return null;
-        }
-        return isset($row['thread_id']) && is_scalar($row['thread_id'])
-            ? (string) $row['thread_id']
-            : null;
-    }
-
-    // -------------------------------------------------------------------------
-    // Cron enumerator + conditional writers (PR #5a — the poll-only orchestrator)
-    //
-    // NOTE (scope): PR #3 deliberately deferred the cron's actionable-set query to
-    // #5a (see advanceOnApproval()'s comment: "so the cron can enumerate awaiting_ajay
-    // AND approval_message_id IS NULL"). These methods are the single home of that
-    // enumerator + the three conditional writers transition()'s value-bind can't express.
-    // -------------------------------------------------------------------------
-
-    /**
-     * The tick's actionable set — every row the poll-only driver must inspect this tick.
-     *
-     * Union (see discord-bug-pipeline-shared-context.md §3d + PR #5a Phase 3/5):
-     *   (a) queued AND class IS NULL          — needs first-classification
-     *   (b) awaiting_info / gathering          — GM reply re-assessment OR idle/park candidate
-     *                                            (the 1h idle POLICY lives in the bash driver, not here)
-     *   (c) awaiting_ajay AND approval_message_id IS NULL — ready-for-plan (A-Jay reacted ✅)
-     *   (d) blocked                              — a usage-limit-parked hunt whose backoff has
-     *                                              elapsed; the outer blocked_until gate only lets
-     *                                              a RIPE one through, so the bash driver resumes it
-     *                                              (blocked → hunting) via resumeBlockedHunt (#5b Phase 7)
-     *
-     * Global gates: excludes `hunting` (an in-flight hunt is invisible — the single-flight
-     * constraint) and all terminal states, and excludes any row still parked by a future
-     * `blocked_until` (usage-limit backoff). A row whose `blocked_until` has passed re-surfaces in
-     * its real status and retries — so "skip while parked" and "auto-resume" both fall out of the
-     * one blocked-until gate.
-     *
-     * @phpstan-return list<BugReportRow>
-     */
-    public function listActiveConversations(): array
-    {
-        $rows = $this->fetchAll(
-            "SELECT * FROM `ibl_bug_reports`
-             WHERE status NOT IN ('hunting','dropped','fixed','needs_human','parked_idle','pr_open')
-               AND (blocked_until IS NULL OR blocked_until <= NOW())
-               AND (
-                     (status = 'queued' AND class IS NULL)
-                  OR (status IN ('awaiting_info','gathering'))
-                  OR (status = 'awaiting_ajay' AND approval_message_id IS NULL)
-                  OR (status = 'blocked')
-               )
-             ORDER BY id ASC"
-        );
-        return array_values(array_map(fn (array $row): array => $this->castRow($row), $rows));
+        return $this->claims->stampThreadReply($threadId);
     }
 
     /**
-     * At-most-once idle reminder stamp. The `AND reminder_sent_at IS NULL` guard makes a repeat
-     * call a no-op, so a row can receive at most one reminder over its lifetime (PR #5a Phase 6).
-     * transition()'s value-bind cannot express this conditional WHERE, hence a dedicated method.
+     * @see BugReportClaimRepository::markReminderSent()
      */
     public function markReminderSent(int $id): bool
     {
-        return $this->execute(
-            "UPDATE `ibl_bug_reports` SET reminder_sent_at = NOW(), updated_at = NOW()
-             WHERE id = ? AND reminder_sent_at IS NULL",
-            'i',
-            $id
-        ) === 1;
-    }
-
-    /** Stamp last_processed_at = NOW() so the same GM reply is not re-processed next tick. */
-    public function stampLastProcessed(int $id): bool
-    {
-        return $this->execute(
-            'UPDATE `ibl_bug_reports` SET last_processed_at = NOW(), updated_at = NOW() WHERE id = ?',
-            'i',
-            $id
-        ) === 1;
+        return $this->claims->markReminderSent($id);
     }
 
     /**
-     * Clear a usage-limit park stamp (blocked_until = NULL). Literal NULL, no bound value —
-     * mirrors transition()'s $releaseLease idiom (bind_param has no NULL type). PR #5a Phase 6 resume.
+     * @see BugReportClaimRepository::stampLastProcessed()
+     */
+    public function stampLastProcessed(int $id): bool
+    {
+        return $this->claims->stampLastProcessed($id);
+    }
+
+    /**
+     * @see BugReportClaimRepository::clearBlocked()
      */
     public function clearBlocked(int $id): bool
     {
-        return $this->execute(
-            'UPDATE `ibl_bug_reports` SET blocked_until = NULL, updated_at = NOW() WHERE id = ?',
-            'i',
-            $id
-        ) === 1;
+        return $this->claims->clearBlocked($id);
     }
 }

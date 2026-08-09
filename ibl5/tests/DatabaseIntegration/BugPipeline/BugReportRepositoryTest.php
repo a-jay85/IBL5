@@ -162,6 +162,29 @@ class BugReportRepositoryTest extends DatabaseTestCase
         self::assertSame(1, $row['cnt']);
     }
 
+    /**
+     * Atomicity pin for the 1.26 split: the delegated watermark write must run on the
+     * facade's OWN mysqli handle. DatabaseTestCase already opens a transaction on that
+     * handle, so rolling it back here discards every write that joined it. If a
+     * sub-repository ever gets its own connection, its watermark write commits
+     * independently and survives this rollback — which is exactly the regression the
+     * split risks and which replay-safety alone does not detect.
+     */
+    public function testEnqueueAuthorizedAndAdvanceWatermarkJoinsTheFacadeTransaction(): void
+    {
+        $id = $this->repo->enqueueAuthorizedAndAdvance(self::AUTHOR, self::CHANNEL, self::MSG_ID, 'bug text');
+        self::assertNotNull($this->repo->findById($id));
+        self::assertSame(self::MSG_ID, $this->repo->findPipelineState(self::CHANNEL));
+
+        $this->db->rollback();
+
+        self::assertNull($this->repo->findById($id), 'report row must roll back with the transaction');
+        self::assertNull(
+            $this->repo->findPipelineState(self::CHANNEL),
+            'watermark must roll back with it — a second connection would have committed it'
+        );
+    }
+
     // ── stampThreadReply ───────────────────────────────────────────────────────
 
     public function testStampThreadReplyReturnsFalseWhenNoMatch(): void
@@ -402,7 +425,200 @@ class BugReportRepositoryTest extends DatabaseTestCase
         self::assertCount(1, $map[$reportB]);
     }
 
+    // ── claimNextHuntable (pre-impl characterization pins) ─────────────────────
+
+    public function testClaimNextHuntableSkipsUnclassifiedRow(): void
+    {
+        // Unclassified (class IS NULL) row is skipped even though it is the oldest queued row.
+        $this->insertBugReport(['original_message_id' => self::MSG_ID]); // class NULL by default
+        $classified = $this->insertBugReport(['original_message_id' => self::REPLY_ID, 'class' => 'bug']);
+
+        $row = $this->repo->claimNextHuntable('worker-1', '2099-01-01 00:00:00');
+        self::assertNotNull($row);
+        self::assertSame($classified, $row['id'], 'Only a classified (class IS NOT NULL) queued row is huntable');
+        self::assertSame('hunting', $row['status']);
+        self::assertSame('worker-1', $row['lease_owner']);
+
+        // The classified row is now hunting; only the unclassified queued row remains → null.
+        self::assertNull($this->repo->claimNextHuntable('worker-2', '2099-01-01 00:00:00'));
+    }
+
+    public function testClaimNextHuntableSkipsRowParkedByBackoff(): void
+    {
+        // Future backoff → parked → not huntable (even though classified + queued).
+        $this->insertBugReport([
+            'original_message_id' => self::MSG_ID,
+            'class'               => 'bug',
+            'blocked_until'       => '2099-01-01 00:00:00',
+        ]);
+        self::assertNull($this->repo->claimNextHuntable('worker-1', '2099-01-01 00:00:00'));
+
+        // A ripe (past) backoff is claimable.
+        $ripe = $this->insertBugReport([
+            'original_message_id' => self::REPLY_ID,
+            'class'               => 'bug',
+            'blocked_until'       => '2000-01-01 00:00:00',
+        ]);
+        // Distinct lease args from the parked-row attempt above: a byte-identical
+        // claimNextHuntable() call would make PHPStan carry the earlier assertNull()
+        // narrowing forward (it can't see the ripe INSERT between the two calls).
+        $row = $this->repo->claimNextHuntable('worker-2', '2099-06-01 00:00:00');
+        self::assertNotNull($row);
+        self::assertSame($ripe, $row['id']);
+        self::assertSame('hunting', $row['status']);
+    }
+
+    // ── resumeBlockedHunt (pre-impl characterization pins) ─────────────────────
+
+    public function testResumeBlockedHuntFlipsBlockedToHunting(): void
+    {
+        $id = $this->insertBugReport([
+            'status'        => 'blocked',
+            'blocked_until' => '2000-01-01 00:00:00',
+        ]);
+        self::assertTrue($this->repo->resumeBlockedHunt('worker-1', '2099-01-01 00:00:00', $id));
+        $row = $this->repo->findById($id);
+        self::assertNotNull($row);
+        self::assertSame('hunting', $row['status']);
+        self::assertSame('worker-1', $row['lease_owner']);
+        self::assertSame('2099-01-01 00:00:00', $row['lease_expires']);
+
+        // Single-flight: the row is no longer 'blocked', so a second immediate call flips nothing.
+        self::assertFalse($this->repo->resumeBlockedHunt('worker-2', '2099-01-01 00:00:00', $id));
+    }
+
+    public function testResumeBlockedHuntRejectsUnripeBackoff(): void
+    {
+        $id = $this->insertBugReport([
+            'status'        => 'blocked',
+            'blocked_until' => '2099-01-01 00:00:00',
+        ]);
+        self::assertFalse($this->repo->resumeBlockedHunt('worker-1', '2099-01-01 00:00:00', $id));
+        $row = $this->repo->findById($id);
+        self::assertNotNull($row);
+        self::assertSame('blocked', $row['status']);
+    }
+
+    // ── markReminderSent (pre-impl characterization pin) ───────────────────────
+
+    public function testMarkReminderSentIsAtMostOnce(): void
+    {
+        $id = $this->insertBugReport();
+        self::assertTrue($this->repo->markReminderSent($id));
+        $first = $this->repo->findById($id);
+        self::assertNotNull($first);
+        self::assertNotNull($first['reminder_sent_at']);
+
+        // At-most-once: a second call is a no-op and the original stamp is preserved.
+        self::assertFalse($this->repo->markReminderSent($id));
+        $second = $this->repo->findById($id);
+        self::assertNotNull($second);
+        self::assertSame($first['reminder_sent_at'], $second['reminder_sent_at']);
+    }
+
+    // ── stampLastProcessed (pre-impl characterization pin) ─────────────────────
+
+    public function testStampLastProcessedUpdatesTimestamp(): void
+    {
+        $id = $this->insertBugReport();
+        self::assertTrue($this->repo->stampLastProcessed($id));
+        $row = $this->repo->findById($id);
+        self::assertNotNull($row);
+        self::assertNotNull($row['last_processed_at']);
+
+        self::assertFalse($this->repo->stampLastProcessed(999999));
+    }
+
+    // ── clearBlocked (pre-impl characterization pin) ───────────────────────────
+
+    public function testClearBlockedNullsBackoff(): void
+    {
+        $id = $this->insertBugReport(['blocked_until' => '2099-01-01 00:00:00']);
+        self::assertTrue($this->repo->clearBlocked($id));
+        $row = $this->repo->findById($id);
+        self::assertNotNull($row);
+        self::assertNull($row['blocked_until']);
+
+        self::assertFalse($this->repo->clearBlocked(999999));
+    }
+
+    // ── listPrOpen (pre-impl characterization pin) ─────────────────────────────
+
+    public function testListPrOpenReturnsOnlyPrOpenRowsWithCastSnowflakes(): void
+    {
+        // Empty table → empty list.
+        self::assertSame([], $this->repo->listPrOpen());
+
+        $prOpen = $this->insertBugReport(['original_message_id' => self::MSG_ID, 'status' => 'pr_open']);
+        $this->insertBugReport(['original_message_id' => self::REPLY_ID, 'status' => 'fixed']);
+        $this->insertBugReport(['original_message_id' => self::APPROVAL, 'status' => 'queued']);
+
+        $rows = $this->repo->listPrOpen();
+        self::assertCount(1, $rows);
+        self::assertSame($prOpen, $rows[0]['id']);
+        self::assertIsString($rows[0]['channel_id'], 'snowflake must be cast to string');
+        self::assertSame(self::CHANNEL, $rows[0]['channel_id']);
+    }
+
+    // ── listActiveConversations (pre-impl characterization pin) ────────────────
+
+    public function testListActiveConversationsUnionAndExclusions(): void
+    {
+        // Included — one row per union branch, captured in id (insertion) order.
+        $queuedUnclassified = $this->insertBugReport([
+            'original_message_id' => '700000000000000001',
+            'status'              => 'queued', // class IS NULL by default → branch (a)
+        ]);
+        $awaitingInfo = $this->insertBugReport([
+            'original_message_id' => '700000000000000002',
+            'status'              => 'awaiting_info', // branch (b)
+        ]);
+        $readyForPlan = $this->insertBugReport([
+            'original_message_id' => '700000000000000003',
+            'status'              => 'awaiting_ajay', // approval_message_id NULL → branch (c)
+        ]);
+        $blockedRipe = $this->insertBugReport([
+            'original_message_id' => '700000000000000004',
+            'status'              => 'blocked', // blocked_until NULL → branch (d)
+        ]);
+
+        // Excluded — each fails a branch predicate or a global gate.
+        $this->insertBugReport(['original_message_id' => '800000000000000001', 'status' => 'queued', 'class' => 'bug']);
+        $this->insertBugReport(['original_message_id' => '800000000000000002', 'status' => 'awaiting_ajay', 'approval_message_id' => self::APPROVAL]);
+        $this->insertBugReport(['original_message_id' => '800000000000000003', 'status' => 'hunting']);
+        $this->insertBugReport(['original_message_id' => '800000000000000004', 'status' => 'fixed']);
+        $this->insertBugReport(['original_message_id' => '800000000000000005', 'status' => 'dropped']);
+        $this->insertBugReport(['original_message_id' => '800000000000000006', 'status' => 'pr_open']);
+        $this->insertBugReport(['original_message_id' => '800000000000000007', 'status' => 'needs_human']);
+        $this->insertBugReport(['original_message_id' => '800000000000000008', 'status' => 'parked_idle']);
+        $this->insertBugReport(['original_message_id' => '800000000000000009', 'status' => 'blocked', 'blocked_until' => '2099-01-01 00:00:00']);
+
+        $rows = $this->repo->listActiveConversations();
+        $ids  = array_map(static fn (array $r): int => $r['id'], $rows);
+        self::assertSame(
+            [$queuedUnclassified, $awaitingInfo, $readyForPlan, $blockedRipe],
+            $ids,
+            'Exactly the four union branches, in id ASC order'
+        );
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────
+
+    /**
+     * @param array<string, int|string> $overrides
+     */
+    private function insertBugReport(array $overrides = []): int
+    {
+        return $this->insertRow('ibl_bug_reports', array_merge([
+            'discord_author_id'   => self::AUTHOR,
+            'channel_id'          => self::CHANNEL,
+            'original_message_id' => self::MSG_ID,
+            'original_text'       => 'test bug report',
+            'status'              => 'queued',
+            'created_at'          => date('Y-m-d H:i:s'),
+            'updated_at'          => date('Y-m-d H:i:s'),
+        ], $overrides));
+    }
 
     /**
      * @param array<string, int|string|null> $overrides
@@ -420,21 +636,5 @@ class BugReportRepositoryTest extends DatabaseTestCase
             'file_size'     => 12345,
         ], $overrides);
         return $input;
-    }
-
-    /**
-     * @param array<string, int|string> $overrides
-     */
-    private function insertBugReport(array $overrides = []): int
-    {
-        return $this->insertRow('ibl_bug_reports', array_merge([
-            'discord_author_id'   => self::AUTHOR,
-            'channel_id'          => self::CHANNEL,
-            'original_message_id' => self::MSG_ID,
-            'original_text'       => 'test bug report',
-            'status'              => 'queued',
-            'created_at'          => date('Y-m-d H:i:s'),
-            'updated_at'          => date('Y-m-d H:i:s'),
-        ], $overrides));
     }
 }

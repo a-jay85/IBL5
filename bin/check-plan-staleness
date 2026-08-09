@@ -98,16 +98,47 @@ trap 'rm -f "$TOKENS_FILE" "$SEEN_FILE" "$MISSING_FILE" "$SCAN_FILE"' EXIT
 # can only miss a stale path, never invent one. No non-zero exit is added here —
 # check-plan-staleness non-zero drives automouse Step 2.5 skip and the .staleness
 # sidecar has no retry cap, so a never-self-resolving condition must not exit 1.
+#
+# Fences inside a `>` BLOCKQUOTE are tracked in a SEPARATE state (bq_fence),
+# stripped of their quote markers before the backtick run is counted. The old
+# whitespace-only strip left the `>` in place, so "> ```bash" counted zero
+# backticks and the fence never opened — quoted snippets were scanned as
+# dependencies. The state is deliberately NOT shared with in_fence: any line that
+# does not continue the quote (a blank line ends it in CommonMark) drops it, so an
+# UNCLOSED fence inside a quote cannot exempt the rest of the plan. Folding the
+# two together would fail the guard OPEN — one stray "> ```" would swallow every
+# Critical File and phase body below it, passing a poison-pill plan clean. That is
+# the opposite of the conservative under-scan above, which only loses coverage.
+#
+# Blockquote PROSE stays in scope: a quote is not an exempt position, and the
+# authoring convention in .claude/skills/plan says so explicitly (a "Path
+# correction" callout naming a nonexistent path is what skipped
+# e2e-axis-c-weak-assertions). Only 2 of 316 plans carry a blockquoted fence, and
+# the fix changes 0 verdicts across the corpus — a latent blindspot closed for
+# class consistency with the width-aware fix above, not a live breakage.
 awk '
-    BEGIN { in_fence = 0; fence_len = 0; exempt_level = 0 }
+    BEGIN { in_fence = 0; fence_len = 0; bq_fence = 0; bq_fence_len = 0; exempt_level = 0 }
     {
         fl = $0
         sub(/^[[:space:]]*/, "", fl)
-        fn = 0
-        while (substr(fl, fn + 1, 1) == "`") fn++
-        if (fn >= 3) {
-            if (!in_fence) { in_fence = 1; fence_len = fn; next }
-            else if (fn >= fence_len) { in_fence = 0; next }
+        is_bq = (substr(fl, 1, 1) == ">")
+        if (!is_bq) { bq_fence = 0; bq_fence_len = 0 }
+        if (is_bq && !in_fence) {
+            sub(/^([[:space:]]*>)+[[:space:]]*/, "", fl)
+            fn = 0
+            while (substr(fl, fn + 1, 1) == "`") fn++
+            if (fn >= 3) {
+                if (!bq_fence) { bq_fence = 1; bq_fence_len = fn; next }
+                else if (fn >= bq_fence_len) { bq_fence = 0; bq_fence_len = 0; next }
+            }
+            if (bq_fence) next
+        } else {
+            fn = 0
+            while (substr(fl, fn + 1, 1) == "`") fn++
+            if (fn >= 3) {
+                if (!in_fence) { in_fence = 1; fence_len = fn; next }
+                else if (fn >= fence_len) { in_fence = 0; next }
+            }
         }
     }
     in_fence { next }

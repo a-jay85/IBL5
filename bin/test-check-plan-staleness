@@ -138,6 +138,32 @@ assert "oos-subsection-exempt" 0 $'## Out of Scope\n### Detail\nFuture `bin/none
 # not $PLAN_FILE, so fenced cues are invisible to it).
 assert "cue-in-fence-leaks" 1 $'## Phase 1\nModify the existing `ibl5/classes/DefinitelyGoneXyz.php`.\n```\nCreate `ibl5/classes/DefinitelyGoneXyz.php`\n```'
 
+# --- Blockquote-scoped fences -----------------------------------------------
+# A fence opened inside a `>` blockquote exempts its own contents: the quote
+# markers are stripped before the backtick run is counted. Before this, the `>`
+# hid the fence entirely and quoted snippets were scanned as dependencies.
+assert "bq-fence-exempt" 0 $'> ```\n> Modify the existing `ibl5/classes/NoSuchQuotedThing.php`.\n> ```\nDone.'
+
+# A closing run inside the quote re-enables scanning for what follows.
+assert "bq-fence-closes" 1 $'> ```\n> example line\n> ```\nModify the existing `ibl5/classes/StaleAfterQuotedFenceXyz.php`.'
+
+# Load-bearing negative: blockquote fence state is CONFINED to the quote. An
+# unclosed fence inside a quote must not exempt the rest of the plan — a naive
+# fix (strip `>` into the shared fence state) fails the guard OPEN here,
+# swallowing Critical Files and every phase body below.
+assert "bq-fence-unclosed-confined" 1 $'> ```bash\n> snippet\n\n## Critical Files\nModify the existing `ibl5/classes/DeletedAfterQuoteXyz.php`.'
+
+# Blockquote PROSE stays scanned exactly like body prose — a quote is not an
+# exempt position. Regression for the axis-c skip: a "Path correction" callout
+# citing a nonexistent path as a bare backtick token must still flag.
+assert "bq-prose-still-scanned" 1 $'> **Path correction:** the brief says `ibl5/tests/e2e/gone-search.spec.ts`; use the real one.'
+
+# ...so the other two safe positions must work inside a quote too, since the
+# authoring convention in .claude/skills/plan tells the architect to use them
+# there. Same-line creation cue (a) and a non-dependency heading (c):
+assert "bq-cue-still-works"  0 $'> Create `ibl5/classes/QuotedNewThing.php` for the callout.'
+assert "bq-under-oos-exempt" 0 $'## Out of Scope\n> The `bin/future-quoted-thing` lands in a later PR.'
+
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"
     exit 1

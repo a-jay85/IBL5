@@ -9,11 +9,13 @@ on:
     paths:
       - 'tools/postplan-harness/**'
       - '.github/workflows/python-tests.yml'
+      - 'bin/post-plan-now'
   push:
     branches: [master]
     paths:
       - 'tools/postplan-harness/**'
       - '.github/workflows/python-tests.yml'
+      - 'bin/post-plan-now'
 
 permissions:
   contents: read

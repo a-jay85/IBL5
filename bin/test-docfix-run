@@ -455,5 +455,41 @@ SB="$(build_sandbox)"
   && ok "(19c) poll completes under launchd's minimal PATH and fires the launcher" \
   || bad "(19c) poll broken under launchd minimal PATH"
 
+# --- Case 20: prompt-fidelity round-trip ----------------------------------------
+# Verifies that backticks in $PROMPT survive the launchd double-parse intact.
+# Fix: shq() single-quotes $PROMPT so bash treats backticks as literals at the
+# second parse (the one launchd triggers with `/bin/bash -lc`).
+# Old failure: every `backtick span` was executed and then DELETED from the prompt
+# the model received (2026-08-08 run: `bin/post-plan-now` fired mid-assembly).
+SB="$(build_sandbox)"
+run_docfix "$SB" "" "" "9999" "probe.md" >/dev/null
+PLIST_F20="$(plist_of "$SB")"
+if [ -n "$PLIST_F20" ]; then
+    # Extract the <string> element bearing the bash command; XML-unescape (&amp; LAST
+    # to avoid double-unescaping e.g. &amp;lt; → <).
+    CMD_LINE20=$(grep 'claude -p' "$PLIST_F20" \
+        | sed 's/&lt;/</g; s/&gt;/>/g; s/&amp;/\&/g')
+    # Pull the claude -p token (single-quoted after fix; double-quoted in old script).
+    PROMPT_TOKEN20=$(printf '%s' "$CMD_LINE20" \
+        | sed -n 's/.*claude -p \(.*\) --dangerously.*/\1/p')
+    if [ -n "$PROMPT_TOKEN20" ]; then
+        # Run from an empty scratch dir so relative paths like bin/check-docs and
+        # bin/post-plan-now cannot resolve if the old double-quoted token executes them.
+        STDERR_F20="$(mktemp)"
+        RT_DIR20="$(mktemp -d)"
+        ROUND_TRIP20="$(cd "$RT_DIR20" && bash -c "printf '%s' $PROMPT_TOKEN20" 2>"$STDERR_F20")"
+        STDERR_OUT20="$(cat "$STDERR_F20")"; rm -f "$STDERR_F20"
+        rmdir "$RT_DIR20" 2>/dev/null || true
+        { [ -z "$STDERR_OUT20" ] \
+            && printf '%s' "$ROUND_TRIP20" | grep -qF '`bin/check-docs --staleness-report`'; } \
+          && ok "(20) prompt-fidelity: backticks survive bash second-parse (no stderr; literal text present)" \
+          || bad "(20) prompt-fidelity: backticks corrupted at bash second parse"
+    else
+        bad "(20) prompt-fidelity: could not extract claude -p argument from plist"
+    fi
+else
+    bad "(20) prompt-fidelity: plist not generated"
+fi
+
 if [ "$FAILED" -eq 0 ]; then echo "All docfix-run checks passed."; else echo "Some docfix-run checks FAILED."; fi
 exit "$FAILED"

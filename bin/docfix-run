@@ -13,6 +13,17 @@
 
 set -euo pipefail
 
+# shq <string> — single-quote for the FAR side of the launchd boundary; xml_escape —
+# entity-escape for the plist <string> element. Both are needed, and for different
+# hazards: the plist text is parsed as XML by launchd AND as shell by `/bin/bash -lc`.
+# Interpolating $PROMPT inside \"…\" left its many `backticks` live at that second
+# parse — every backticked span was EXECUTED and then deleted from what the model
+# received (2026-08-08 run: `bin/post-plan-now` actually fired mid-assembly; see the
+# "command not found" lines in /tmp/docfix-run-*.log). Twin of the same defect in
+# bin/post-plan-now, whose shq() header carries the full rationale.
+shq()        { local q="'\\''"; printf "'%s'" "${1//\'/$q}"; }
+xml_escape() { printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
+
 # --- 1. Validate args (negative path) -----------------------------------------
 ISSUE_NUM="${1:-}"
 SIG="${2:-}"
@@ -74,6 +85,9 @@ PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 TODAY="$(date -u +%Y-%m-%d)"
 
 PROMPT="You are fixing doc findings with NO human present — never ask questions or wait for input; make the safe choice and continue. The findings are the nightly Doc Freshness Audit set for issue #$ISSUE_NUM. Work ONLY on these paths (comma-separated): $SIG. First run \`bin/check-docs --staleness-report\` and split its JSON with jq into entries whose \`reason\` is \`stale\` and entries whose \`reason\` is \`dead-glob\`; that command is the authoritative finding list, and the body of issue #$ISSUE_NUM shows the same two tables for reference. For each \`stale\` entry: re-verify its content against the current reality of the codebase, correct drifted content, and bump its \`last_verified\` to today ($TODAY). For each \`dead-glob\` entry: the named file declares a \`paths:\` frontmatter glob matching no tracked file, so that rule can never load — PREFER correcting the glob so it matches the tracked files it was meant to cover, and delete the \`paths:\` entry only when no correction is identifiable. IF you delete a glob you MUST disclose it: add one line per deletion to the commit message body AND to the PR body under a heading reading \`## Dead globs deleted\`, in exactly this form: \`Dead glob deleted: in FILE_PATH, removed paths: entry GLOB — REASON\`, substituting the real repo-relative path, the exact glob text, and one clause saying why no correction was possible, so the maintainer can review the deletion without opening the diff. Never delete a whole file, and never remove a \`paths:\` key that still carries a working glob. Then run \`bin/check-docs --fix-dates --since=master\` to bump any in-scope doc you changed but did not hand-bump, and re-run \`bin/check-docs --staleness-report\` to confirm every finding you were given is gone. Do NOT touch any doc outside the list above. Commit with a message whose body contains the line \`Closes #$ISSUE_NUM\`. Then fire \`bin/post-plan-now\` (NOT --auto) to open the PR; the PR body MUST include \`Closes #$ISSUE_NUM\` so merging it closes the stale-docs issue."
+# Shell-quote first (far-side bash), then XML-escape (launchd's plist parser). Order
+# matters: shq's output is what has to survive into the <string> element intact.
+PROMPT_ARG=$(xml_escape "$(shq "$PROMPT")")
 
 # launchd runs a minimal env → same PATH prelude as bin/post-plan-now:94.
 cat > "$PLIST" <<PLIST_EOF
@@ -87,7 +101,7 @@ cat > "$PLIST" <<PLIST_EOF
 	<array>
 		<string>/bin/bash</string>
 		<string>-lc</string>
-		<string>export PATH="/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH"; cd "$WT_ROOT" &amp;&amp; CLAUDE_HEADLESS=1 caffeinate -s claude -p "$PROMPT" --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name "$LABEL"; rm -f "$PLIST"; launchctl bootout gui/\$(id -u)/$LABEL</string>
+		<string>export PATH="/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH"; cd "$WT_ROOT" &amp;&amp; CLAUDE_HEADLESS=1 caffeinate -s claude -p $PROMPT_ARG --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name "$LABEL"; rm -f "$PLIST"; launchctl bootout gui/\$(id -u)/$LABEL</string>
 	</array>
 	<key>RunAtLoad</key>
 	<true/>

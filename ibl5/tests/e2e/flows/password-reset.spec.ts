@@ -2,6 +2,7 @@ import { test, expect } from '../fixtures/public';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { seedResetUser, type SeedResetUser } from '../helpers/test-state';
 import { deleteTestUser } from '../helpers/cleanup';
+import { loginViaForm } from '../helpers/login';
 
 // Password reset flow — uses public (unauthenticated) fixture.
 // Full end-to-end reset not covered: intercepting the password-reset email
@@ -133,17 +134,7 @@ test.describe('Password reset round-trip', () => {
   });
 
   test('new password logs in successfully', async ({ page }) => {
-    await page.goto('modules.php?name=YourAccount');
-    const loginForm = page.locator('form', {
-      has: page.locator('#login-username'),
-    });
-    await loginForm.locator('#login-username').fill(seeded.username);
-    await loginForm.locator('#login-password').fill(NEW_PASSWORD);
-    await loginForm.locator('button[type="submit"]').click();
-
-    await page.waitForURL((url) => !url.href.includes('name=YourAccount'), {
-      timeout: 10_000,
-    });
+    await loginViaForm(page, seeded.username, NEW_PASSWORD);
     expect(page.url()).not.toContain('name=YourAccount');
   });
 

@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import { loginViaForm } from '../helpers/login';
 import { test, expect } from '../fixtures/base';
 
 /**
@@ -13,17 +13,6 @@ import { test, expect } from '../fixtures/base';
  */
 
 test.use({ storageState: { cookies: [], origins: [] } });
-
-async function loginViaForm(page: Page, username: string, password: string): Promise<void> {
-  await page.goto('modules.php?name=YourAccount');
-  const loginForm = page.locator('form', { has: page.locator('#login-username') });
-  await loginForm.locator('#login-username').fill(username);
-  await loginForm.locator('#login-password').fill(password);
-  await Promise.all([
-    page.waitForURL((url) => !url.href.includes('name=YourAccount'), { timeout: 20_000 }),
-    loginForm.locator('button[type="submit"]').click(),
-  ]);
-}
 
 test.describe('Regular (non-admin) test user provisioning', () => {
   test.beforeEach(async ({ request }) => {

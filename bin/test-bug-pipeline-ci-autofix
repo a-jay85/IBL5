@@ -1,0 +1,411 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-bug-pipeline-ci-autofix — unattended CI-failure autofix (ADR-0099)
+#
+# Covers: detection, ledger gates, dispatch, apply-result, giveup, wiring
+# (ci_autofix runs after maybe_hunt), and trust-split (SECURITY — LAST).
+#
+# Run: bin/test-bug-pipeline-ci-autofix  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+# shellcheck source=bin/lib/bug-pipeline-test-stubs.sh
+source "$(cd "$(dirname "$0")" && pwd)/lib/bug-pipeline-test-stubs.sh"
+DRIVER="$(cd "$(dirname "$0")" && pwd)/bug-pipeline-tick"
+
+bpt_setup
+# Override the bpt_setup default (ENABLED=0) — CI autofix must be active for this suite.
+export BUG_PIPELINE_CI_AUTOFIX_ENABLED=1
+# The driver DEFAULTS to dry-run (ship-safety soak). Dry-run returns before rendering the
+# prompt, spawning claude, or commenting — so without this override every dispatch/apply/
+# giveup row below would silently become a no-op and still pass. Rows that mean to test the
+# dry-run path set it to 1 themselves and reset it to 0 (never `unset`) afterwards.
+export BUG_PIPELINE_CI_AUTOFIX_DRY_RUN=0
+
+# Add a git worktree to the fake-repo so ci_wt_for_branch can resolve a branch.
+# Reuses an existing branch on subsequent calls (after bpt_reset prunes the worktree).
+bpt_add_wt() {
+    local branch="$1"
+    if git -C "$STUB/fake-repo" rev-parse --verify "refs/heads/$branch" >/dev/null 2>&1; then
+        git -C "$STUB/fake-repo" worktree add "$STUB/wt/$branch" "$branch" >/dev/null 2>&1 || true
+    else
+        git -C "$STUB/fake-repo" worktree add "$STUB/wt/$branch" -b "$branch" >/dev/null 2>&1 || true
+    fi
+    mkdir -p "$STUB/wt/$branch/ibl5"
+    # Age all tracked files so ci_wt_is_idle sees an idle worktree. The suite runs with
+    # CI_AUTOFIX_IDLE_SECS=1, which the driver clamps to a 1-minute `-mmin` window, so
+    # freshly-created worktree files are inside it and would block every dispatch row.
+    find "$STUB/wt/$branch" -not -path "*/.git/*" -type f \
+        -exec touch -t 200001010000 {} + 2>/dev/null || true
+    git -C "$STUB/wt/$branch" rev-parse HEAD 2>/dev/null
+}
+
+# Run bpgh_pr_failing_checks in a subshell (sources only the gh lib — no full driver).
+# Prints whatever the function emits to stdout.
+GH_LIB="$(cd "$(dirname "$0")" && pwd)/lib/bug-pipeline-gh.sh"
+bpt_detect() {
+    BUG_PIPELINE_CODE_REPO="test/code-fake" \
+    GH_BIN="$STUB/bin/gh" \
+        bash -c 'source "$1"; bpgh_pr_failing_checks' bpt-unit-shim \
+        "$GH_LIB" 2>/dev/null
+}
+
+# ═══════════════════════════════════════════════════════════════════
+# DETECTION ROWS — unit-test bpgh_pr_failing_checks via subshell
+# ═══════════════════════════════════════════════════════════════════
+
+# r-detect-1 — settled FAILURE → line emitted (basic path)
+bpt_reset
+bpt_set_gh_pr_list_ci "42 feature-tests abc123"
+bpt_set_gh_pr_checks_for 42 "SUCCESS lint
+FAILURE phpunit"
+out="$(bpt_detect)"
+bpt_expect_eq "r-detect-1: FAILURE emitted" "42 feature-tests abc123 phpunit" "$out"
+
+# r-detect-2 — any PENDING check → PR skipped (not settled)
+bpt_reset
+bpt_set_gh_pr_list_ci "42 feature-tests abc123"
+bpt_set_gh_pr_checks_for 42 "PENDING phpunit
+FAILURE lint"
+out="$(bpt_detect)"
+bpt_expect_eq "r-detect-2: PENDING → skip (not settled)" "" "$out"
+
+# r-detect-3 — only human-signoff failing → excluded, no output
+bpt_reset
+bpt_set_gh_pr_list_ci "42 feature-tests abc123"
+bpt_set_gh_pr_checks_for 42 "FAILURE human-sign-off"
+out="$(bpt_detect)"
+bpt_expect_eq "r-detect-3: human-signoff only → skip" "" "$out"
+
+# r-detect-4 — CONFLICTING merge state → skip (phantom-dispatch guard)
+bpt_reset
+bpt_set_gh_pr_list_ci "42 feature-tests abc123"
+bpt_set_gh_pr_checks_for 42 "FAILURE phpunit"
+export STUB_MERGE_STATE=CONFLICTING
+out="$(bpt_detect)"
+unset STUB_MERGE_STATE
+bpt_expect_eq "r-detect-4: CONFLICTING → skip" "" "$out"
+
+# r-detect-5 — unreadable merge state (gh pr view fails) → skip (fail-closed)
+bpt_reset
+bpt_set_gh_pr_list_ci "42 feature-tests abc123"
+bpt_set_gh_pr_checks_for 42 "FAILURE phpunit"
+export STUB_PR_VIEW_FAIL=1
+out="$(bpt_detect)"
+# STUB_PR_VIEW_FAIL unset inside bpt_reset on next call; unset here for safety
+unset STUB_PR_VIEW_FAIL
+bpt_expect_eq "r-detect-5: unreadable merge state → skip (fail-closed)" "" "$out"
+
+# ═══════════════════════════════════════════════════════════════════
+# DISPATCH ROWS — integration via bpt_run
+# ═══════════════════════════════════════════════════════════════════
+
+# r-dispatch-1 — no red PRs → ci_autofix returns 1, tick falls through to empty-tick exit
+bpt_reset
+bpt_run
+bpt_expect_eq "r-dispatch-1: exit 0" 0 "$BPT_RC"
+bpt_file_absent "$STUB/ci-autofix.log" "r-dispatch-1: no CI-autofix log on empty red-pr set"
+bpt_log_has "$STUB" tick.out "no actionable rows" "r-dispatch-1: fell through to empty-tick exit"
+
+# r-dispatch-2 — kill switch off → logged, ci_autofix returns 1 (tick falls through to empty-tick exit)
+bpt_reset
+bpt_set_gh_pr_list_ci "42 feature-tests abc123"
+bpt_set_gh_pr_checks_for 42 "FAILURE phpunit"
+export BUG_PIPELINE_CI_AUTOFIX_ENABLED=0
+bpt_run
+unset BUG_PIPELINE_CI_AUTOFIX_ENABLED
+bpt_expect_eq "r-dispatch-2: exit 0" 0 "$BPT_RC"
+bpt_log_has "$STUB" ci-autofix.log "kill switch off" "r-dispatch-2: kill switch logged"
+bpt_file_absent "$STUB/claude.log" "r-dispatch-2: no claude spawned with kill switch off"
+
+# r-dispatch-3 — dry-run mode → "would-dispatch" in log, no claude spawned
+bpt_reset
+sha="$(bpt_add_wt "fix-dryrun")"
+bpt_set_gh_pr_list_ci "42 fix-dryrun $sha"
+bpt_set_gh_pr_checks_for 42 "FAILURE phpunit"
+export BUG_PIPELINE_CI_AUTOFIX_DRY_RUN=1
+bpt_run
+export BUG_PIPELINE_CI_AUTOFIX_DRY_RUN=0
+bpt_expect_eq "r-dispatch-3: exit 0" 0 "$BPT_RC"
+bpt_log_has "$STUB" ci-autofix.log "would-dispatch" "r-dispatch-3: dry-run logs would-dispatch"
+bpt_file_absent "$STUB/claude.log" "r-dispatch-3: no claude spawned in dry-run"
+
+# r-dispatch-4 — PR branch has no local worktree → skipped, no dispatch
+bpt_reset
+bpt_set_gh_pr_list_ci "42 no-such-branch abc123"
+bpt_set_gh_pr_checks_for 42 "FAILURE phpunit"
+bpt_run
+bpt_expect_eq "r-dispatch-4: exit 0" 0 "$BPT_RC"
+bpt_log_has "$STUB" ci-autofix.log "no local worktree" "r-dispatch-4: no-worktree branch skipped"
+bpt_file_absent "$STUB/claude.log" "r-dispatch-4: no claude on missing worktree"
+
+# r-dispatch-5 — DEFAULT (seam unset) is dry-run: the ship-safety default, asserted directly.
+# If someone flips the driver default back to live, this row fails.
+bpt_reset
+sha="$(bpt_add_wt "fix-default")"
+bpt_set_gh_pr_list_ci "42 fix-default $sha"
+bpt_set_gh_pr_checks_for 42 "FAILURE phpunit"
+unset BUG_PIPELINE_CI_AUTOFIX_DRY_RUN
+bpt_run
+export BUG_PIPELINE_CI_AUTOFIX_DRY_RUN=0
+bpt_expect_eq "r-dispatch-5: exit 0" 0 "$BPT_RC"
+bpt_log_has "$STUB" ci-autofix.log "would-dispatch" "r-dispatch-5: unset seam defaults to dry-run"
+bpt_file_absent "$STUB/claude.log" "r-dispatch-5: no claude spawned on default settings"
+
+# r-dispatch-6 — dirty worktree → no dispatch. The fix agent must never be pointed at a tree
+# holding someone else's uncommitted work; "idle" alone does not imply "clean".
+bpt_reset
+sha="$(bpt_add_wt "fix-dirty")"
+printf 'a human was mid-edit here\n' > "$STUB/wt/fix-dirty/unfinished.txt"
+# Age it: the idle gate runs BEFORE the clean gate, so a freshly-written file would trip
+# "not idle" and this row would pass for the wrong reason.
+touch -t 200001010000 "$STUB/wt/fix-dirty/unfinished.txt"
+bpt_set_gh_pr_list_ci "42 fix-dirty $sha"
+bpt_set_gh_pr_checks_for 42 "FAILURE phpunit"
+bpt_run
+rm -f "$STUB/wt/fix-dirty/unfinished.txt"
+bpt_expect_eq "r-dispatch-6: exit 0" 0 "$BPT_RC"
+bpt_log_has "$STUB" ci-autofix.log "worktree dirty" "r-dispatch-6: dirty worktree blocks dispatch"
+bpt_file_absent "$STUB/claude.log" "r-dispatch-6: no claude spawned on dirty worktree"
+
+# r-dispatch-7 — sub-minute IDLE_SECS must NOT read as "always idle". Integer division floors
+# 1s to `-mmin -0`, which matches nothing and inverts the gate; the driver clamps to 1 minute.
+# The recently-edited file is inside the idle window, so this must be reported NOT idle.
+#
+# The edit is backdated 30s ON PURPOSE. `find -mmin -N` compares floor(age_seconds/60) < N,
+# so a 30s-old file matches `-mmin -1` (0 < 1) and never matches `-mmin -0` (0 < 0) — the row
+# then fails deterministically if the clamp is removed. A touched-NOW file is the wrong probe:
+# APFS nanosecond mtimes can land a hair in the future, making age negative, and `-mmin -0`
+# then matches (-1 < 0) on macOS but not on Linux CI — the row would pass on this machine with
+# the clamp deleted, which is exactly the vacuous negative control this comment exists to stop.
+bpt_reset
+sha="$(bpt_add_wt "fix-idlefloor")"
+printf 'just edited\n' > "$STUB/wt/fix-idlefloor/ibl5/live.txt"
+git -C "$STUB/wt/fix-idlefloor" add ibl5/live.txt >/dev/null 2>&1
+git -C "$STUB/wt/fix-idlefloor" commit -qm "live edit" >/dev/null 2>&1
+# 30 seconds ago, portably. BSD `touch -t` and GNU `touch -d` disagree on relative time
+# strings, and BSD `date -r <epoch>` vs GNU `date -d @<epoch>` disagree on epoch input —
+# so try the BSD form and fall back to the GNU form. Both print LOCAL time, which is what
+# `touch -t` expects; do not introduce -u on one side only.
+_ago=$(( $(date +%s) - 30 ))
+_stamp="$(date -r "$_ago" +%Y%m%d%H%M.%S 2>/dev/null || date -d "@$_ago" +%Y%m%d%H%M.%S)"
+touch -t "$_stamp" "$STUB/wt/fix-idlefloor/ibl5/live.txt"
+bpt_set_gh_pr_list_ci "42 fix-idlefloor $sha"
+bpt_set_gh_pr_checks_for 42 "FAILURE phpunit"
+bpt_run
+bpt_expect_eq "r-dispatch-7: exit 0" 0 "$BPT_RC"
+bpt_log_has "$STUB" ci-autofix.log "not idle" "r-dispatch-7: sub-minute IDLE_SECS clamps to 1min, gate holds"
+bpt_file_absent "$STUB/claude.log" "r-dispatch-7: no claude spawned on a live worktree"
+
+# ═══════════════════════════════════════════════════════════════════
+# FAILURE-LOG ROWS — the agent must receive the REAL failing job log
+# ═══════════════════════════════════════════════════════════════════
+
+# r-log-1 — the fetched CI log body reaches .bug-pipeline/ci-failure.log. Asserting only that
+# "a gh call happened" is what let a no-op collector ship green; assert the CONTENT lands.
+bpt_reset
+sha="$(bpt_add_wt "fix-log1")"
+bpt_set_gh_pr_list_ci "42 fix-log1 $sha"
+bpt_set_gh_pr_checks_for 42 "FAILURE phpunit"
+bpt_set_gh_run_log 987654321 "PHPUnit
+1) Ibl5\\Tests\\TradeTest::testTradeButton
+Failed asserting that false is true.
+/app/ibl5/tests/TradeTest.php:42"
+export STUB_CI_AUTOFIX_MODE=1
+export STUB_CI_AUTOFIX_RESULT='{"result":"no_change","commit_sha":null,"changes":[],"reason":"stub"}'
+bpt_run
+unset STUB_CI_AUTOFIX_MODE STUB_CI_AUTOFIX_RESULT
+bpt_expect_eq "r-log-1: exit 0" 0 "$BPT_RC"
+bpt_log_has "$STUB/wt/fix-log1/.bug-pipeline" ci-failure.log \
+    "Failed asserting that false is true." "r-log-1: real CI log body reaches the agent's log file"
+bpt_log_has "$STUB/wt/fix-log1/.bug-pipeline" ci-failure.log \
+    "/app/ibl5/tests/TradeTest.php:42" "r-log-1: failing file:line survives into the log file"
+bpt_log_has "$STUB" gh.log "run view 987654321" "r-log-1: log fetched via gh run view --log-failed"
+bpt_log_has "$STUB" gh.log "--log-failed" "r-log-1: --log-failed used (failed steps only)"
+
+# r-log-2 — no failed workflow run for the head SHA → header still written, no crash, still dispatches.
+bpt_reset
+sha="$(bpt_add_wt "fix-log2")"
+bpt_set_gh_pr_list_ci "42 fix-log2 $sha"
+bpt_set_gh_pr_checks_for 42 "FAILURE phpunit"
+bpt_set_gh_run_log "" ""
+bpt_run
+bpt_expect_eq "r-log-2: exit 0" 0 "$BPT_RC"
+bpt_log_has "$STUB/wt/fix-log2/.bug-pipeline" ci-failure.log \
+    "no failed workflow run" "r-log-2: missing run degrades to a note, not a crash"
+bpt_log_has "$STUB/wt/fix-log2/.bug-pipeline" ci-failure.log \
+    "Failing checks: phpunit" "r-log-2: header names the failing check even without a run"
+
+# ═══════════════════════════════════════════════════════════════════
+# LEDGER ROWS — ledger-gated dispatch (integration via bpt_run)
+# ═══════════════════════════════════════════════════════════════════
+
+# r-ledger-1 — new sha resets attempts when ledger stored old sha (ceiling → eligible)
+bpt_reset
+sha="$(bpt_add_wt "fix-ledger")"
+bpt_set_gh_pr_list_ci "55 fix-ledger $sha"
+bpt_set_gh_pr_checks_for 55 "FAILURE phpunit"
+printf '{"55":{"attempts":3,"head_sha_at_start":"old-sha-xyz"}}' > "$STUB/ledger.json"
+bpt_run
+bpt_expect_eq "r-ledger-1: exit 0" 0 "$BPT_RC"
+bpt_log_has "$STUB" ci-autofix.log "dispatching PR #55" "r-ledger-1: new sha resets budget → dispatch"
+
+# ═══════════════════════════════════════════════════════════════════
+# APPLY-RESULT ROWS — verdict handling (integration via bpt_run)
+# ═══════════════════════════════════════════════════════════════════
+
+# r-apply-1 — no_change result → ledger written, gh comment posted, Sonnet on attempt 1
+bpt_reset
+sha="$(bpt_add_wt "fix-apply1")"
+bpt_set_gh_pr_list_ci "42 fix-apply1 $sha"
+bpt_set_gh_pr_checks_for 42 "FAILURE phpunit"
+export STUB_CI_AUTOFIX_MODE=1
+export STUB_CI_AUTOFIX_RESULT='{"result":"no_change","commit_sha":null,"changes":[],"reason":"checks appear green"}'
+bpt_run
+unset STUB_CI_AUTOFIX_MODE STUB_CI_AUTOFIX_RESULT
+bpt_expect_eq "r-apply-1: exit 0" 0 "$BPT_RC"
+bpt_log_has "$STUB" ci-autofix.log "no_change at attempt 1" "r-apply-1: no_change logged"
+bpt_log_has "$STUB" gh.log "pr comment" "r-apply-1: gh comment posted"
+bpt_log_has "$STUB" claude.log "--model claude-sonnet-4-6" "r-apply-1: Sonnet used on attempt 1"
+
+# r-apply-2 — no result file (agent crash/timeout) → abort path, comment posted
+bpt_reset
+sha="$(bpt_add_wt "fix-apply2")"
+bpt_set_gh_pr_list_ci "42 fix-apply2 $sha"
+bpt_set_gh_pr_checks_for 42 "FAILURE phpunit"
+# STUB_CI_AUTOFIX_MODE NOT set → stub exits 0 without writing result file
+bpt_run
+bpt_expect_eq "r-apply-2: exit 0" 0 "$BPT_RC"
+bpt_log_has "$STUB" ci-autofix.log "abort at attempt 1" "r-apply-2: abort logged on missing result"
+bpt_log_has "$STUB" gh.log "pr comment" "r-apply-2: gh comment posted on abort"
+
+# r-apply-3 — mutation check → Opus regardless of attempt count
+bpt_reset
+sha="$(bpt_add_wt "fix-apply3")"
+bpt_set_gh_pr_list_ci "42 fix-apply3 $sha"
+bpt_set_gh_pr_checks_for 42 "FAILURE mutation-tests"
+bpt_run
+bpt_expect_eq "r-apply-3: exit 0" 0 "$BPT_RC"
+bpt_log_has "$STUB" claude.log "--model claude-opus-4-8" "r-apply-3: Opus on mutation check regardless of attempt"
+
+# ═══════════════════════════════════════════════════════════════════
+# GIVEUP ROWS — attempt ceiling / idempotent ⛔ comment
+# ═══════════════════════════════════════════════════════════════════
+
+# r-giveup-1 — attempts at ceiling → ⛔ giveup comment posted
+bpt_reset
+sha="$(bpt_add_wt "fix-giveup")"
+bpt_set_gh_pr_list_ci "42 fix-giveup $sha"
+bpt_set_gh_pr_checks_for 42 "FAILURE phpunit"
+printf '{"42":{"attempts":3,"head_sha_at_start":"%s"}}' "$sha" > "$STUB/ledger.json"
+bpt_run
+bpt_expect_eq "r-giveup-1: exit 0" 0 "$BPT_RC"
+bpt_log_has "$STUB" ci-autofix.log "giveup posted" "r-giveup-1: giveup logged after ceiling"
+bpt_log_has "$STUB" gh.log "pr comment 42" "r-giveup-1: ⛔ comment posted on ceiling"
+
+# r-giveup-2 — ceiling_notified=true → no second comment (idempotent)
+bpt_reset
+sha="$(bpt_add_wt "fix-giveup")"
+bpt_set_gh_pr_list_ci "42 fix-giveup $sha"
+bpt_set_gh_pr_checks_for 42 "FAILURE phpunit"
+printf '{"42":{"attempts":3,"head_sha_at_start":"%s","ceiling_notified":true}}' "$sha" \
+    > "$STUB/ledger.json"
+bpt_run
+bpt_expect_eq "r-giveup-2: exit 0" 0 "$BPT_RC"
+bpt_log_lacks "$STUB" ci-autofix.log "giveup posted" "r-giveup-2: no second giveup comment (ceiling_notified)"
+
+# ═══════════════════════════════════════════════════════════════════
+# WIRING ROWS — ordering: hunt takes priority; positive dispatch control
+# ═══════════════════════════════════════════════════════════════════
+
+# r-wire-1 — maybe_hunt claims a bug → ci_autofix_main NEVER runs (hunt first)
+bpt_reset
+export STUB_HUNT_MODE=1
+CLAIM='{"id":"7","status":"hunting","class":"bug","thread_id":"880000000000000001","issue_number":"4242","original_text":"the trade button is broken","hunt_attempts":0}'
+bpt_set_claim "$CLAIM"
+bpt_set_result '{"verdict":"fixed"}'; bpt_hunt_dirty
+bpt_set_gh_pr_list_ci "42 feature-tests abc123"
+bpt_set_gh_pr_checks_for 42 "FAILURE phpunit"
+bpt_run
+unset STUB_HUNT_MODE
+bpt_expect_eq "r-wire-1: exit 0" 0 "$BPT_RC"
+bpt_log_has "$STUB" tick.out "claimed bug 7 into hunting" "r-wire-1: hunt ran"
+bpt_file_absent "$STUB/ci-autofix.log" "r-wire-1: ci_autofix_main never ran (hunt took priority)"
+
+# r-wire-2 — single-flight: dispatching ci-autofix ends the tick (return 0 propagates up)
+bpt_reset
+sha="$(bpt_add_wt "fix-wire2")"
+bpt_set_gh_pr_list_ci "42 fix-wire2 $sha"
+bpt_set_gh_pr_checks_for 42 "FAILURE phpunit"
+export STUB_CI_AUTOFIX_MODE=1
+export STUB_CI_AUTOFIX_RESULT='{"result":"no_change","commit_sha":null,"changes":[],"reason":"stub"}'
+bpt_run
+unset STUB_CI_AUTOFIX_MODE STUB_CI_AUTOFIX_RESULT
+bpt_expect_eq "r-wire-2: exit 0" 0 "$BPT_RC"
+bpt_log_has "$STUB" ci-autofix.log "dispatching PR #42" "r-wire-2: dispatch logged (ci_autofix ran)"
+bpt_log_lacks "$STUB" tick.out "no actionable rows" "r-wire-2: tick ended at ci_autofix, never reached empty-tick"
+
+# r-wire-3 (positive control) — claude.log non-empty proves agent was actually spawned
+bpt_reset
+sha="$(bpt_add_wt "fix-wire3")"
+bpt_set_gh_pr_list_ci "42 fix-wire3 $sha"
+bpt_set_gh_pr_checks_for 42 "FAILURE phpunit"
+export STUB_CI_AUTOFIX_MODE=1
+export STUB_CI_AUTOFIX_RESULT='{"result":"no_change","commit_sha":null,"changes":[],"reason":"stub"}'
+bpt_run
+unset STUB_CI_AUTOFIX_MODE STUB_CI_AUTOFIX_RESULT
+if [ -s "$STUB/claude.log" ]; then
+    bpt_ok "r-wire-3: claude.log non-empty (agent spawned)"
+else
+    bpt_fail "r-wire-3: claude.log absent or empty — fix agent was not spawned"
+fi
+
+# ═══════════════════════════════════════════════════════════════════
+# TRUST-SPLIT ROW — ★ SECURITY (exercised, ALWAYS LAST)
+# ci-autofix re-uses run_under_starved_env from the hunter — verify the
+# seam strips GH_TOKEN, SSH_AUTH_SOCK, ANTHROPIC_API_KEY, and that a real
+# push to an auth-required remote fails. Mirrors Row 9 of test-bug-pipeline-hunt.
+# ═══════════════════════════════════════════════════════════════════
+
+export GIT_TERMINAL_PROMPT=0
+# shellcheck disable=SC1090
+source "$DRIVER"
+
+R_TRUST="$(mktemp -d)"
+git -C "$R_TRUST" init -q
+git -C "$R_TRUST" config user.email t@t; git -C "$R_TRUST" config user.name t
+printf 'x\n' > "$R_TRUST/f"; git -C "$R_TRUST" add -A; git -C "$R_TRUST" commit -qm x
+
+tok="$(run_under_starved_env "$R_TRUST" sh -c 'printf %s "$GH_TOKEN$GITHUB_TOKEN"')"
+bpt_expect_eq "r-trust: GH_TOKEN/GITHUB_TOKEN blank in starved env" "" "$tok"
+
+sock="$(run_under_starved_env "$R_TRUST" sh -c 'printf %s "${SSH_AUTH_SOCK:-}"')"
+bpt_expect_eq "r-trust: SSH_AUTH_SOCK empty in starved env" "" "$sock"
+
+apikey="$(run_under_starved_env "$R_TRUST" sh -c 'printf %s "${ANTHROPIC_API_KEY:-}"')"
+bpt_expect_eq "r-trust: ANTHROPIC_API_KEY blank in starved env" "" "$apikey"
+
+# EXERCISE: a real push to an auth-required remote must FAIL (no reachable credential)
+if timeout 30 run_under_starved_env "$R_TRUST" \
+        git push https://github.com/ibl5-pipeline-nonexistent/repo.git HEAD:refs/heads/x \
+        >/dev/null 2>&1; then
+    bpt_fail "r-trust: git push under starved env unexpectedly SUCCEEDED"
+else
+    bpt_ok "r-trust: git push under starved env fails (no token/keychain/SSH cred)"
+fi
+
+if command -v gh >/dev/null 2>&1; then
+    if timeout 30 run_under_starved_env "$R_TRUST" gh pr create --fill >/dev/null 2>&1; then
+        bpt_fail "r-trust: gh pr create under starved env unexpectedly SUCCEEDED"
+    else
+        bpt_ok "r-trust: gh pr create under starved env fails (no token)"
+    fi
+else
+    bpt_ok "r-trust: gh not installed — git-push vector suffices"
+fi
+
+rm -rf "$R_TRUST"
+
+echo "----"
+if [ "$FAILED" -eq 0 ]; then echo "ALL PASS"; else echo "SOME FAILED"; fi
+exit "$FAILED"

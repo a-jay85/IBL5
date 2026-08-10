@@ -11,7 +11,7 @@ use Updater\StepResult;
 /**
  * Step 4: Update standings.
  *
- * Wraps StandingsUpdater::update() and captures any echoed output.
+ * Wraps StandingsUpdater::update() and drains its output buffer via takeOutputBuffer().
  */
 class UpdateStandingsStep implements PipelineStepInterface
 {
@@ -27,9 +27,8 @@ class UpdateStandingsStep implements PipelineStepInterface
 
     public function execute(): StepResult
     {
-        ob_start();
         $this->updater->update();
-        $log = (string) ob_get_clean();
+        $log = $this->updater->takeOutputBuffer();
 
         return StepResult::success($this->getLabel(), capturedLog: $log, collapsibleLog: true);
     }

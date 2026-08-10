@@ -21,13 +21,15 @@
 : "${GH_BIN:=gh}"
 : "${BUG_PIPELINE_ISSUE_REPO:=}"
 
-# Prefer the driver's log(); fall back to a timestamped stderr line when sourced bare.
+# STDERR, ALWAYS. Do NOT route this through the driver's log() — that writes to STDOUT,
+# and every value-returning function below is consumed by the caller as $( ). A diagnostic
+# on stdout IS the captured value: bpgh_ensure_issue's failure line sails past its callers'
+# `[ -n "$n" ]` guard and becomes an --issue= argument; bpgh_pr_failing_checks' lines are
+# parsed as PR rows. That is the same failure mode that dispatched 84 hunters against
+# report id "" on 2026-08-04 (see cli() in bin/bug-pipeline-tick). launchd captures our
+# stderr separately (StandardErrorPath), so nothing is lost by keeping diagnostics here.
 _bpgh_log() {
-    if command -v log >/dev/null 2>&1; then
-        log "$*"
-    else
-        printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*" >&2
-    fi
+    printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*" >&2
 }
 
 # Returns 0 iff issue tracking is configured and gh is available.

@@ -42,11 +42,19 @@ bpt_add_wt() {
 
 # Run bpgh_pr_failing_checks in a subshell (sources only the gh lib — no full driver).
 # Prints whatever the function emits to stdout.
+#
+# The shim DEFINES log() writing to stdout, exactly as bin/bug-pipeline-tick does. That is
+# load-bearing, not scenery: _bpgh_log once preferred an in-scope log(), so under the real
+# driver its diagnostics landed on stdout — the stream the caller command-substitutes — and
+# were parsed as PR rows. A shim without log() exercised the stderr fallback instead, so
+# every skip row below passed while production was corrupted. Keep log() here so the rows
+# assert the production stream, and see r-detect-6 for the explicit regression.
 GH_LIB="$(cd "$(dirname "$0")" && pwd)/lib/bug-pipeline-gh.sh"
 bpt_detect() {
     BUG_PIPELINE_CODE_REPO="test/code-fake" \
     GH_BIN="$STUB/bin/gh" \
-        bash -c 'source "$1"; bpgh_pr_failing_checks' bpt-unit-shim \
+        bash -c 'log() { printf "[%s] %s\n" "$(date "+%Y-%m-%dT%H:%M:%S")" "$*"; }
+                 source "$1"; bpgh_pr_failing_checks' bpt-unit-shim \
         "$GH_LIB" 2>/dev/null
 }
 
@@ -95,6 +103,23 @@ out="$(bpt_detect)"
 # STUB_PR_VIEW_FAIL unset inside bpt_reset on next call; unset here for safety
 unset STUB_PR_VIEW_FAIL
 bpt_expect_eq "r-detect-5: unreadable merge state → skip (fail-closed)" "" "$out"
+
+# r-detect-6 — ★ REGRESSION: every stdout line is a PR row, never a diagnostic.
+# The caller does red_prs="$(bpgh_pr_failing_checks 2>/dev/null)" and splits each line on
+# spaces into num/branch/sha/failing, so a diagnostic on stdout becomes a phantom PR row
+# (num="[2026-08-09T23:03:23]", branch="bpgh_pr_failing_checks:"). Observed in production
+# on 2026-08-09; same class as the 84-hunters-against-report-id-"" outage of 2026-08-04.
+# Two skip paths that BOTH log, in one run, so the shape assertion has something to catch.
+bpt_reset
+bpt_set_gh_pr_list_ci "42 feature-tests abc123
+43 other-branch def456"
+bpt_set_gh_pr_checks_for 42 "FAILURE phpunit"
+bpt_set_gh_pr_checks_for 43 "PENDING phpunit"
+export STUB_MERGE_STATE=CONFLICTING
+out="$(bpt_detect)"
+unset STUB_MERGE_STATE
+bad="$(printf '%s\n' "$out" | grep -vE '^[0-9]+ |^$' || true)"
+bpt_expect_eq "r-detect-6: no diagnostic reaches stdout (parsed as a PR row)" "" "$bad"
 
 # ═══════════════════════════════════════════════════════════════════
 # DISPATCH ROWS — integration via bpt_run

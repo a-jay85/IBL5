@@ -40,6 +40,11 @@ bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true,"issue_title":"
 GH_FAIL=1 bpt_run
 bpt_expect_eq "gh-failure tick still exits 0" 0 "$BPT_RC"
 bpt_log_has "$STUB" transition.log "queued --class=bug" "gh failure → DB transition still fires"
+# ★ REGRESSION: bpgh_ensure_issue's callers capture it as $( ) and gate on [ -n "$n" ].
+# When its create-failed diagnostic went to stdout it BECAME the return value — non-empty,
+# so it sailed past that guard and rode into `cli transition --issue=<timestamped log line>`
+# and bpgh_add_label. Diagnostics are stderr-only now; a failed create must yield NO issue.
+bpt_log_lacks "$STUB" transition.log "--issue=" "gh create failure → no phantom --issue= argument"
 
 # ── state->label: thin-bug → needs-info ───────────────────────────────────────
 bpt_reset; bpt_set_actionable "$BUG_NEW"

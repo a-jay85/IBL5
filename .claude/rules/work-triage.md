@@ -30,7 +30,7 @@ Even when the bar says ad-hoc, run a quick safety check — the surfaces `/plan`
 - a **gate removal or weakening** in the ship-pipeline surface (`.claude/skills`, `.claude/rules`, `~/.claude/hooks`) — deletes, relaxes, or disables an enforcement mechanism — or a **bootstrap hazard** (it rewrites the rules governing its own merge); *not* an additive gate, a decision-procedure-preserving prose edit, or a mechanism/plumbing change, or
 - a property needing **subjective human judgment** to confirm,
 
-then prefer `/plan`, so the defense and its verification are designed up front. Why the PR-time backstop is not a substitute: `work-triage-detail.md` § Safety mirror backstop.
+then prefer `/plan`, so the defense and its verification are designed up front. Which mechanisms count, and why the PR-time backstop isn't a substitute: `work-triage-detail.md` § Safety mirror backstop.
 
 ## Execution routing: an ad-hoc verdict does not mean Opus edits inline
 

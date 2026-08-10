@@ -350,13 +350,12 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):** Adding tests is inherently green-green (no production change) → every open coverage gap is 🟩 auto-mergeable. If writing a test surfaces a real bug, the *fix* becomes its own finding with its own classification. (Exceptions: **6.21** and **6.23** are 🟨, not 🟩 — in each the target code is unreachable from PHPUnit, so no test is writable until a production seam is decided: a teamless-fixture / non-`exit()` refactor for 6.21, a SAPI-independent hashing seam for 6.23.)
 
-> ✅ resolved (15): 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 6.15, 6.16, 6.20 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (16): 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 6.15, 6.16, 6.17, 6.20 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 6.13 | ◑ Partial | 🟩 | Player (69 prod / 48 test files); additive (L — chunked; 3 of 3 done). |
 | 6.14 | ◑ Partial | 🟩 | ProcessBoxscoresStep/GenerateSeasonAwardsStep/ParseJsbFilesStep added (2026-07-24); ~19 step classes + OlympicsFlatStandingsUpdater/UpdaterView/JsbSourceResolver remain. |
-| 6.17 | ◑ Partial | 🟩 | TradeAssetRepositoryTest + TradeOfferRepositoryTest added (draft-pick mapping, offer lifecycle); TradeExecutionRepository untested + TradeFormRepository partial. |
 | 6.18 | ◑ Partial | 🟩 | Unit tests added: DraftPickLocator repo, LeagueSchedule Game, TransactionHistory repo, CapSpace repo. NextSim/SavedDepthChart/DepthChartEntry verified covered. Residual: SQL aggregation/ordering + SDC write-path are DB-integration-only. |
 | 6.19 | ◑ Partial | 🟩 | AllStarAppearances + GMContactList repo unit tests added. Season entity predicates blocked by `Season\Season`→mock alias (QueryRepo plumbing covered). `Shared` N/A (deleted 2.23). |
 | 6.21 | ⬜ Open | 🟨 | Row-12 (Free-Agents/teamless session) `processrookieoption` ownership-rejection path untested: PHPUnit entry-point test impossible (handler `exit()`s), E2E auth fixture always has a session team. Needs a teamless-fixture / non-`exit()` refactor decision before it's writable → 🟨. From PR #1107 Phase 5.0 note. |
@@ -385,7 +384,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Validation (cap/roster/eligibility), draft-pick mapping, rejection reasons.
 **Est. effort:** M
 **Risk if untouched:** Trades bypass validation; cap exploits; pick duplication.
-**Status:** Partial (verified 2026-06-27) — tests/Trading/TradeAssetRepositoryTest.php (draft-pick mapping, pick-owner reassignment, player lookups) + tests/Trading/TradeOfferRepositoryTest.php (offer-id generation + failure path, transactional delete with cash coordination) added. Validation/rejection-reasons already covered by TradeValidatorTest. Residual: TradeExecutionRepository (untested) + TradeFormRepository (partial).
+**Status:** ✅ Implemented (2026-08-09) — TradeExecutionRepositoryTest.php + TradeFormRepositoryTest.php added.
 
 ### 6.18 Moderate-Gap Modules (0.40–0.50 ratio)
 **Location:** `DraftPickLocator` (5/2), `LeagueSchedule` (7/3), `NextSim` (5/2), `SavedDepthChart` (5/2), `TransactionHistory` (5/2), `CapSpace` (5/2), `DepthChartEntry` (15/8)

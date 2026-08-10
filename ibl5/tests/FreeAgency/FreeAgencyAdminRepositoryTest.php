@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\FreeAgency;
 
-use FreeAgency\FreeAgencyAdminRepository;
+use FreeAgency\Admin\FreeAgencyAdminRepository;
 use PHPUnit\Framework\TestCase;
 use Tests\WideUnit\Mocks\MockDatabase;
 

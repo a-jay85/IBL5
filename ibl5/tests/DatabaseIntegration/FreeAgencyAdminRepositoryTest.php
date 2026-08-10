@@ -6,7 +6,7 @@ namespace Tests\DatabaseIntegration;
 
 use PHPUnit\Framework\Attributes\Group;
 
-use FreeAgency\FreeAgencyAdminRepository;
+use FreeAgency\Admin\FreeAgencyAdminRepository;
 
 /**
  * Tests FreeAgencyAdminRepository against real MariaDB — offers, demands,

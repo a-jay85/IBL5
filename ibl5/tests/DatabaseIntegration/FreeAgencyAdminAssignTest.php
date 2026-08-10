@@ -6,8 +6,8 @@ namespace Tests\DatabaseIntegration;
 
 use PHPUnit\Framework\Attributes\Group;
 
+use FreeAgency\Admin\FreeAgencyAdminRepository;
 use FreeAgency\DayAlreadyProcessedException;
-use FreeAgency\FreeAgencyAdminRepository;
 use League\LeagueContext;
 
 /**

@@ -21,8 +21,8 @@ require_once __DIR__ . '/mainfile.php';
 
 global $mysqli_db, $authService;
 
-use FreeAgency\FreeAgencyAdminProcessor;
-use FreeAgency\FreeAgencyAdminRepository;
+use FreeAgency\Admin\FreeAgencyAdminProcessor;
+use FreeAgency\Admin\FreeAgencyAdminRepository;
 use League\LeagueContext;
 use Security\CsrfGuard;
 use Security\HtmlSanitizer;

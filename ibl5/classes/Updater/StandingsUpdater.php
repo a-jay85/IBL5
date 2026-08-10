@@ -45,11 +45,35 @@ class StandingsUpdater {
     protected Season $season;
     protected StandingsRepositoryInterface $repository;
     private bool $isOlympics;
+    private string $outputBuffer = '';
 
     public function __construct(StandingsRepositoryInterface $repository, Season $season, bool $isOlympics = false) {
         $this->repository = $repository;
         $this->season = $season;
         $this->isOlympics = $isOlympics;
+    }
+
+    /**
+     * Append GM-facing progress text to the output buffer.
+     *
+     * Replaces the direct `echo` statements this class used to emit. Subclasses
+     * (e.g. OlympicsFlatStandingsUpdater) route their output through this seam so
+     * a single drain point owns all emitted text.
+     */
+    protected function appendOutput(string $text): void {
+        $this->outputBuffer .= $text;
+    }
+
+    /**
+     * Return the accumulated output and clear the buffer (drain-on-read).
+     *
+     * A second call before the next append returns an empty string.
+     */
+    public function takeOutputBuffer(): string {
+        $buffer = $this->outputBuffer;
+        $this->outputBuffer = '';
+
+        return $buffer;
     }
 
     protected function extractWins(string $record): int {

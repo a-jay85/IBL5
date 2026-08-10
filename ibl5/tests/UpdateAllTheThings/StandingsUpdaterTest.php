@@ -174,6 +174,11 @@ class StandingsUpdaterTest extends TestCase
         $this->assertLessThan($closing, $magic);
     }
 
+    public function testTakeOutputBufferReturnsEmptyWhenUpdateNeverCalled(): void
+    {
+        $this->assertSame('', $this->updater->takeOutputBuffer());
+    }
+
     public function testUpdateDoesNotTruncateStandingsTable(): void
     {
         $this->mockDb->setReturnTrue(true);

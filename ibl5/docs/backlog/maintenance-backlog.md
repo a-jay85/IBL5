@@ -378,14 +378,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Risk if untouched:** Nightly automation corrupts standings/schedules/stats silently.
 **Status:** ◑ Partial (this PR, 2026-06-27). Added `ibl5/tests/Updater/StandingsUpdaterTest.php` (league/home/away/conference/division W-L aggregation, plus unknown-team-skip, empty-config, and zero-games boundaries) and `ibl5/tests/Updater/PowerRankingsUpdaterTest.php` (ranking formula + div-by-zero guard); extended `ibl5/tests/Updater/RecordParserTest.php` with empty/non-numeric/leading-dash boundaries. `ScheduleUpdater` already covered (`ibl5/tests/Updater/ScheduleUpdaterTest.php`). Added `ibl5/tests/Updater/ProcessBoxscoresStepTest.php`, `ibl5/tests/Updater/GenerateSeasonAwardsStepTest.php`, `ibl5/tests/Updater/ParseJsbFilesStepTest.php` (2026-07-24). **Residual:** `Updater/Steps/` (~19 step classes remain), `OlympicsFlatStandingsUpdater`, `UpdaterView`, and `JsbSourceResolver` untested; module still below 0.5 ratio.
 
-### 6.17 Trading Module — Subthreshold (27 files, 12 tests, 0.44 ratio)
-**Location:** `ibl5/classes/Trading`
-**Problem:** 6 repositories + service + 2 processors with 12 tests.
-**Suggested direction:** Validation (cap/roster/eligibility), draft-pick mapping, rejection reasons.
-**Est. effort:** M
-**Risk if untouched:** Trades bypass validation; cap exploits; pick duplication.
-**Status:** ✅ Implemented (2026-08-09) — TradeExecutionRepositoryTest.php + TradeFormRepositoryTest.php added.
-
 ### 6.18 Moderate-Gap Modules (0.40–0.50 ratio)
 **Location:** `DraftPickLocator` (5/2), `LeagueSchedule` (7/3), `NextSim` (5/2), `SavedDepthChart` (5/2), `TransactionHistory` (5/2), `CapSpace` (5/2), `DepthChartEntry` (15/8)
 **Problem:** Each module has thin or moderate coverage on critical paths.

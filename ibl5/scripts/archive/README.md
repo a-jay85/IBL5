@@ -15,6 +15,8 @@ data operation was performed, in case a similar fix-up is ever needed again.
 > for a specific point-in-time backfill and hard-code dates, team-id maps, and
 > file-format offsets.
 
+Web access to this directory is denied outright by `ibl5/scripts/archive/.htaccess`, and each script additionally refuses non-CLI SAPIs (security constraint 4). Run them only as `php ibl5/scripts/archive/<name>.php`.
+
 ## Contents
 
 | Script | Archived | Purpose |

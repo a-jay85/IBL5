@@ -16,7 +16,17 @@
 
 declare(strict_types=1);
 
-require __DIR__ . '/../mainfile.php';
+// ── CLI-only guard (security constraint 4) — must stay the FIRST executable
+//    statement: a web hit must be refused before any resource is touched.
+//    Paired with the directory-wide deny in ibl5/scripts/archive/.htaccess
+//    (defense in depth).
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    echo 'This script must be run from the command line.';
+    exit(1);
+}
+
+require __DIR__ . '/../../mainfile.php';
 
 global $mysqli_db;
 
@@ -26,11 +36,10 @@ $repository = new Boxscore\BoxscoreRepository($mysqli_db);
 
 // --- Configuration ---
 
-$bxsPath = $_SERVER['DOCUMENT_ROOT'] . '/ibl5/../IBL5.bxs';
-if (!is_file($bxsPath)) {
-    // Fallback: try from script directory
-    $bxsPath = dirname(__DIR__, 2) . '/IBL5.bxs';
-}
+// The JSB data files live in ibl5/ (see .gitignore's ibl5/*.plr, ibl5/*.sco).
+// Resolved from __DIR__ rather than $_SERVER['DOCUMENT_ROOT'], which is unset
+// under CLI — this script is CLI-only.
+$bxsPath = dirname(__DIR__, 2) . '/IBL5.bxs';
 
 $BXS_RECORD_SIZE = 3000;
 $BXS_PLAYER_SIZE = 94;

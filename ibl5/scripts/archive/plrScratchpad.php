@@ -1,5 +1,15 @@
 <?php
 
+// ── CLI-only guard (security constraint 4) — must stay the FIRST executable
+//    statement: a web hit must be refused before any resource is touched.
+//    Paired with the directory-wide deny in ibl5/scripts/archive/.htaccess
+//    (defense in depth).
+if (PHP_SAPI !== 'cli') {
+    http_response_code(403);
+    echo 'This script must be run from the command line.';
+    exit(1);
+}
+
 require __DIR__ . '/../../mainfile.php';
 
 $plrFile = fopen("IBL5.plr", "rb+");

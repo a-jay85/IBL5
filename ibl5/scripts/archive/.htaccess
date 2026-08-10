@@ -1,0 +1,6 @@
+# Retained one-time scripts — none is browser-invoked, so unlike the
+# file-scoped denies in ibl5/scripts/.htaccess this deny is directory-wide.
+# They connect with production credentials and write via BoxscoreRepository or
+# rewrite IBL5.plr in place. Defense in depth: each script also refuses non-CLI
+# SAPIs with a PHP_SAPI guard (security constraint 4).
+Require all denied

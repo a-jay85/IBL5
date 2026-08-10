@@ -62,7 +62,7 @@ jobs:
         mysql -h 127.0.0.1 -u root -proot -e "CREATE DATABASE ibl5_php;"
 
     - name: "Bash path: apply all migrations"
-      run: ibl5/bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5_bash
+      run: ibl5/bin/run-migrations-ci -h 127.0.0.1 -u root -proot ibl5_bash
 
     - name: "PHP path: apply baseline via mysql client, then PHP runner for the rest"
       working-directory: ibl5
@@ -140,8 +140,8 @@ jobs:
 
     - name: Apply all migrations
       run: |
-        chmod +x ibl5/bin/run-migrations-ci.sh
-        ibl5/bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5_completeness
+        chmod +x ibl5/bin/run-migrations-ci
+        ibl5/bin/run-migrations-ci -h 127.0.0.1 -u root -proot ibl5_completeness
 
     - name: Seed PHP migration tracker
       working-directory: ibl5
@@ -260,6 +260,35 @@ jobs:
               --since=${{ steps.base.outputs.sha }}
           fi
 
+  migration-naming-check:
+    name: Migration Naming Convention
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Compute diff base
+        id: base
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "sha=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${{ github.event.before }}" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Check migration naming convention
+        run: |
+          bad=$(git diff --diff-filter=A --name-only \
+            "${{ steps.base.outputs.sha }}" HEAD \
+            -- 'ibl5/migrations/*.sql' \
+            | grep -E '/[0-9]+[a-z][^/]*\.sql$' || true)
+          if [ -n "$bad" ]; then
+            printf 'FAIL: new letter-suffix migration names (legacy — use next number or timestamp):\n%s\n' "$bad"
+            exit 1
+          fi
+          echo "OK: no new letter-suffix migrations"
+
   regen-schema-dump:
     name: Regenerate current-schema.sql
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
@@ -298,7 +327,7 @@ jobs:
       uses: ./.github/actions/setup-php-env
 
     - name: Apply all migrations to scratch DB
-      run: ibl5/bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5_schema
+      run: ibl5/bin/run-migrations-ci -h 127.0.0.1 -u root -proot ibl5_schema
 
     - name: Regenerate current-schema.sql
       run: |
@@ -320,7 +349,7 @@ jobs:
   gate:
     name: Migration Safety
     if: always()
-    needs: [schema-parity-check, schema-completeness, destructive-migration-scan]
+    needs: [schema-parity-check, schema-completeness, destructive-migration-scan, migration-naming-check]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

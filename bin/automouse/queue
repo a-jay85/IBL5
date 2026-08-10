@@ -6,17 +6,17 @@
 # is what gets moved to done/ or skipped/ after execution.
 #
 # Usage:
-#   bin/automouse-queue <plan-slug-or-filename>
-#   bin/automouse-queue                          # show current queue
-#   bin/automouse-queue requeue                  # move all skipped plans back to queue
-#   bin/automouse-queue remove <plan-slug>       # remove a plan from the queue
+#   bin/automouse/queue <plan-slug-or-filename>
+#   bin/automouse/queue                          # show current queue
+#   bin/automouse/queue requeue                  # move all skipped plans back to queue
+#   bin/automouse/queue remove <plan-slug>       # remove a plan from the queue
 #
 # Examples:
-#   bin/automouse-queue velvet-brewing-starlight
-#   bin/automouse-queue velvet-brewing-starlight.md
-#   bin/automouse-queue ~/claude-plans/velvet-brewing-starlight.md
-#   bin/automouse-queue requeue
-#   bin/automouse-queue remove velvet-brewing-starlight
+#   bin/automouse/queue velvet-brewing-starlight
+#   bin/automouse/queue velvet-brewing-starlight.md
+#   bin/automouse/queue ~/claude-plans/velvet-brewing-starlight.md
+#   bin/automouse/queue requeue
+#   bin/automouse/queue remove velvet-brewing-starlight
 
 set -euo pipefail
 
@@ -75,7 +75,7 @@ fi
 if [ "$1" = "remove" ] || [ "$1" = "rm" ]; then
     if [ $# -lt 2 ]; then
         echo "Error: remove requires a plan slug or filename." >&2
-        echo "Usage: bin/automouse-queue remove <plan-slug>" >&2
+        echo "Usage: bin/automouse/queue remove <plan-slug>" >&2
         exit 1
     fi
     TARGET=$(basename "$2")
@@ -131,7 +131,7 @@ if [ "$1" = "reorder" ]; then
     shift
     if [ $# -lt 1 ]; then
         echo "Error: reorder requires the full queue in the desired order." >&2
-        echo "Usage: bin/automouse-queue reorder <slug1> <slug2> ... <slugN>" >&2
+        echo "Usage: bin/automouse/queue reorder <slug1> <slug2> ... <slugN>" >&2
         exit 1
     fi
 
@@ -241,7 +241,7 @@ fi
 # automouse-run burn a full Opus-default implementation session (or a
 # forbidden Truly-manual-row-under-Sonnet run) on it. Shares the exact rule
 # with check-plan via bin/lib/plan-model-consistency so the two cannot drift.
-LIB_DIR="$(cd "$(dirname "$0")" && pwd)/lib"
+LIB_DIR="$(cd "$(dirname "$0")/.." && pwd)/lib"
 # `if VAR=$(cmd); then` (not a bare assignment) so `set -e` does not abort the
 # script on the script's non-zero exit — the exit code is tested, not thrown.
 if CONSISTENCY_MSG=$("$LIB_DIR/plan-model-consistency" "$SOURCE"); then

@@ -3,7 +3,7 @@
 # Discord) and is invoked only as `php ibl5/scripts/storeSimRecap.php --sim=N`.
 # Defense in depth: the script itself refuses non-CLI SAPIs (security constraint 4).
 #
-# Scoped to storeSimRecap.php only — a directory-wide deny would block
+# Every deny below is file-scoped — a directory-wide deny would block
 # the other browser-invoked scripts in this directory.
 <Files "storeSimRecap.php">
     Require all denied
@@ -22,5 +22,21 @@
 # `php ibl5/scripts/simRecapContext.php --sim=N`. Same file-scoped deny; the
 # PHP_SAPI guard in the script is the real control (security constraint 4).
 <Files "simRecapContext.php">
+    Require all denied
+</Files>
+
+# The three plr* offseason scripts rewrite IBL5.plr in place with production
+# credentials and are invoked only as `php ibl5/scripts/<name>.php`. Same
+# file-scoped deny; the PHP_SAPI guard in each script is the real control
+# (security constraint 4).
+<Files "plrAdvanceBirdYears.php">
+    Require all denied
+</Files>
+
+<Files "plrAdvanceYearsOfExperience.php">
+    Require all denied
+</Files>
+
+<Files "plrDropUnsignedFreeAgentsToWaivers.php">
     Require all denied
 </Files>

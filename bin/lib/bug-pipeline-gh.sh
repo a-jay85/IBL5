@@ -21,13 +21,15 @@
 : "${GH_BIN:=gh}"
 : "${BUG_PIPELINE_ISSUE_REPO:=}"
 
-# Prefer the driver's log(); fall back to a timestamped stderr line when sourced bare.
+# STDERR, ALWAYS. Do NOT route this through the driver's log() — that writes to STDOUT,
+# and every value-returning function below is consumed by the caller as $( ). A diagnostic
+# on stdout IS the captured value: bpgh_ensure_issue's failure line sails past its callers'
+# `[ -n "$n" ]` guard and becomes an --issue= argument; bpgh_pr_failing_checks' lines are
+# parsed as PR rows. That is the same failure mode that dispatched 84 hunters against
+# report id "" on 2026-08-04 (see cli() in bin/bug-pipeline-tick). launchd captures our
+# stderr separately (StandardErrorPath), so nothing is lost by keeping diagnostics here.
 _bpgh_log() {
-    if command -v log >/dev/null 2>&1; then
-        log "$*"
-    else
-        printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*" >&2
-    fi
+    printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*" >&2
 }
 
 # Returns 0 iff issue tracking is configured and gh is available.
@@ -146,5 +148,71 @@ bpgh_assign() {
     bpgh_available || return 0
     [ -n "$issue" ] && [ "$issue" != "null" ] || return 0
     "$GH_BIN" issue edit "$issue" --repo "$BUG_PIPELINE_ISSUE_REPO" --add-assignee "$login" 2>/dev/null || true
+    return 0
+}
+
+# bpgh_code_repo_available — true when BUG_PIPELINE_CODE_REPO and gh are both present.
+bpgh_code_repo_available() {
+    [ -n "${BUG_PIPELINE_CODE_REPO:-}" ] && command -v "$GH_BIN" >/dev/null 2>&1
+}
+
+# bpgh_pr_comment <pr_number> <body> — post a comment on a code-repo PR (best-effort).
+bpgh_pr_comment() {
+    local pr="$1" body="$2"
+    bpgh_code_repo_available || return 0
+    [ -n "$pr" ] && [ "$pr" != "null" ] || return 0
+    "$GH_BIN" pr comment "$pr" --repo "$BUG_PIPELINE_CODE_REPO" --body "$body" 2>/dev/null \
+        || _bpgh_log "bpgh_pr_comment: failed commenting on PR #$pr (best-effort)"
+    return 0
+}
+
+# bpgh_pr_failing_checks — emit one line per open, non-draft PR with settled red checks.
+#
+# Output format (one line per PR): NUM BRANCH HEAD_SHA failing_name,...
+#   Names are LAST — GitHub check names may contain spaces.
+#
+# Skips PRs with CONFLICTING/DIRTY/empty merge state (fail-closed phantom-dispatch guard).
+# Skips PRs with any PENDING check (not settled).
+# Excludes human-signoff check (case-insensitive grep — not in jq; stub bypasses jq).
+# No writes, no comments, no claude — detection only.
+bpgh_pr_failing_checks() {
+    bpgh_code_repo_available || return 0
+    local prs
+    prs="$("$GH_BIN" pr list --repo "$BUG_PIPELINE_CODE_REPO" --state open --limit 50 \
+             --json number,headRefName,headRefOid,isDraft \
+             --jq '.[] | select(.isDraft == false) | "\(.number) \(.headRefName) \(.headRefOid)"' \
+             2>/dev/null)" || {
+        _bpgh_log "bpgh_pr_failing_checks: pr list failed (best-effort)"; return 0; }
+    [ -n "$prs" ] || return 0
+    local num branch sha ms checks pending failing
+    while IFS=' ' read -r num branch sha; do
+        [ -n "${num:-}" ] || continue
+        ms="$("$GH_BIN" pr view "$num" --repo "$BUG_PIPELINE_CODE_REPO" \
+                --json mergeable,mergeStateStatus \
+                --jq '[.mergeable,.mergeStateStatus]|@tsv' \
+                2>/dev/null || true)"
+        case "$ms" in
+          *CONFLICTING*|*DIRTY*|"")
+              _bpgh_log "bpgh_pr_failing_checks: PR #$num merge state '${ms:-unreadable}' — checks unreliable, skipping"
+              continue ;;
+        esac
+        checks="$("$GH_BIN" pr checks "$num" --repo "$BUG_PIPELINE_CODE_REPO" \
+                    --json name,state \
+                    --jq '.[] | "\(.state) \(.name)"' 2>/dev/null || true)"
+        [ -n "$checks" ] || continue
+        # Exclude human-signoff at shell level (case-insensitive); stub bypasses jq
+        checks="$(printf '%s\n' "$checks" | grep -viE 'human.?sign.?off' || true)"
+        [ -n "$checks" ] || continue
+        pending="$(printf '%s\n' "$checks" | grep -c '^PENDING ' 2>/dev/null || echo 0)"
+        if [ "${pending:-0}" -gt 0 ]; then
+            _bpgh_log "bpgh_pr_failing_checks: PR #$num has $pending pending check(s) — not settled, skipping"
+            continue
+        fi
+        failing="$(printf '%s\n' "$checks" | sed -n 's/^FAILURE //p' | paste -sd, -)"
+        [ -n "$failing" ] || continue
+        printf '%s %s %s %s\n' "$num" "$branch" "$sha" "$failing"
+    done <<INNER_EOF
+$prs
+INNER_EOF
     return 0
 }

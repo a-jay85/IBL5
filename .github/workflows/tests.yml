@@ -308,7 +308,7 @@ jobs:
 
     - name: Apply migrations
       working-directory: ibl5
-      run: bin/run-migrations-ci.sh -h 127.0.0.1 -u root -proot ibl5
+      run: bin/run-migrations-ci -h 127.0.0.1 -u root -proot ibl5
 
     - name: Import seed data
       working-directory: ibl5
@@ -424,7 +424,7 @@ jobs:
           #   SC2034 — unused variables (bin/lib/wt-guards.sh)
           #   SC1090 — non-const source (db-sync-prod, log-fetch-prod
           #            source dynamic .env file)
-          #   SC2207 — array splitting suggestion (ibl5/bin/run-migrations-ci.sh:20,
+          #   SC2207 — array splitting suggestion (ibl5/bin/run-migrations-ci:20,
           #            CI-only script, suggestion uses bash 4 mapfile)
           # Bash portability checks (SC3xxx) remain fully enforced.
           shellcheck --severity=warning --shell=bash \
@@ -559,6 +559,42 @@ jobs:
           echo "No baseline changes detected"
         else
           git commit -m "ci: update coverage & PHPStan baseline snapshots [auto]"
+          git push
+        fi
+
+  regen-codebase-map:
+    name: Regenerate codebase-map
+    # Master-push only, mirroring `regen-schema-dump` in migration-safety.yml.
+    # Replaces the old PR-side `git diff --exit-code` check, which measured the
+    # PR's map against master-merged classes/ and so fired on base drift rather
+    # than on real signal. Regenerating on master instead makes the map
+    # self-healing: whatever squash-merge landed, master converges within one
+    # push. `bin/generate-codebase-map` normalizes the date before comparing, so
+    # a bot commit only happens when module content actually changed.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        token: ${{ secrets.CI_PAT }}
+
+    - name: Regenerate codebase map
+      run: bin/generate-codebase-map
+
+    - name: Commit regenerated map if changed
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add .claude/rules/codebase-map.md
+        if git diff --cached --quiet; then
+          echo "No codebase-map changes"
+        else
+          git commit -m "ci: regenerate codebase-map [auto]"
           git push
         fi
 
@@ -729,6 +765,8 @@ jobs:
         run: bin/test-bug-pipeline-issue
       - name: bin/test-bug-pipeline-hunt
         run: bin/test-bug-pipeline-hunt
+      - name: bin/test-bug-pipeline-ci-autofix
+        run: bin/test-bug-pipeline-ci-autofix
       - name: bin/test-sim-recap-tick
         run: bin/test-sim-recap-tick
       - name: bin/test-plan-now
@@ -741,7 +779,7 @@ jobs:
   gate:
     name: Tests and Analysis
     if: always()
-    needs: [changes, test, audit-php, audit-js, ibl5-ts-unit, iblbot, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, automouse-impl-model-test, update-baselines, static-guards, harness-tests, pinact-check]
+    needs: [changes, test, audit-php, audit-js, ibl5-ts-unit, iblbot, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, automouse-impl-model-test, update-baselines, regen-codebase-map, static-guards, harness-tests, pinact-check]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

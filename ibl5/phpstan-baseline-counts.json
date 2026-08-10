@@ -1,7 +1,7 @@
 {
     "phpstan-baseline.neon": {
         "argument.type": 92,
-        "binaryOp.invalid": 10,
+        "binaryOp.invalid": 9,
         "booleanAnd.leftNotBoolean": 1,
         "booleanNot.alwaysTrue": 1,
         "booleanNot.exprNotBoolean": 4,
@@ -32,7 +32,6 @@
         "offsetAccess.nonArray": 1,
         "offsetAccess.nonOffsetAccessible": 2,
         "property.nonObject": 1,
-        "require.fileNotFound": 2,
         "return.type": 1,
         "ternary.condNotBoolean": 1,
         "ternary.shortNotAllowed": 1,

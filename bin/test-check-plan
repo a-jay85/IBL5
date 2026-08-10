@@ -816,12 +816,12 @@ The baseline 1 approach handles this; see guideline 5 for reference.
 '
 
 # ---------------------------------------------------------------------------
-# Directive presence: the runtime prompt (bin/automouse-prompt-impl) must keep
+# Directive presence: the runtime prompt (bin/automouse/prompt-impl) must keep
 # BOTH the packet-delegation instruction AND the exhaustive-and-pre-resolved
 # tier mandate that gate T's authoring contract binds to. A silent deletion of
 # either unbinds the label from the act at runtime — the layer gate T cannot see.
 # ---------------------------------------------------------------------------
-PROMPT_IMPL="$SCRIPT_DIR/automouse-prompt-impl"
+PROMPT_IMPL="$SCRIPT_DIR/automouse/prompt-impl"
 if ! grep -qF 'do NOT implement that phase inline' "$PROMPT_IMPL"; then
     echo "FAIL: automouse-prompt-impl missing 'do NOT implement that phase inline' directive"
     FAILED=1

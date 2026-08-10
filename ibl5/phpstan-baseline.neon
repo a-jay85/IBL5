@@ -1093,18 +1093,6 @@ parameters:
 			path: scripts/archive/importBoxscoresFromHtml.php
 
 		-
-			rawMessage: 'Path in require() __DIR__ . ''/../mainfile.php'' is not a file or it does not exist.'
-			identifier: require.fileNotFound
-			count: 1
-			path: scripts/archive/importBoxscoresFromHtml.php
-
-		-
-			rawMessage: Binary operation "." between mixed and '/ibl5/../IBL5.bxs' results in an error.
-			identifier: binaryOp.invalid
-			count: 1
-			path: scripts/archive/importBxsMissing.php
-
-		-
 			rawMessage: 'Function parseBxsHeader() has parameter $teamNameToId with no value type specified in iterable type array.'
 			identifier: missingType.iterableValue
 			count: 1
@@ -1123,10 +1111,52 @@ parameters:
 			path: scripts/archive/importBxsMissing.php
 
 		-
-			rawMessage: 'Path in require() __DIR__ . ''/../mainfile.php'' is not a file or it does not exist.'
-			identifier: require.fileNotFound
+			rawMessage: 'Loose comparison via "!=" between string and int is not allowed.'
+			identifier: notEqual.notAllowed
 			count: 1
-			path: scripts/archive/importBxsMissing.php
+			path: scripts/archive/plrScratchpad.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function fclose expects resource, resource|false given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/archive/plrScratchpad.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function feof expects resource, resource|false given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/archive/plrScratchpad.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function fgets expects resource, resource|false given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/archive/plrScratchpad.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function fread expects resource, resource|false given.'
+			identifier: argument.type
+			count: 1
+			path: scripts/archive/plrScratchpad.php
+
+		-
+			rawMessage: 'Parameter #1 $stream of function fseek expects resource, resource|false given.'
+			identifier: argument.type
+			count: 2
+			path: scripts/archive/plrScratchpad.php
+
+		-
+			rawMessage: 'Parameter #1 $string of function substr expects string, string|false given.'
+			identifier: argument.type
+			count: 3
+			path: scripts/archive/plrScratchpad.php
+
+		-
+			rawMessage: 'addslashes() is banned. Use prepared statements for database escaping or json_encode()/htmlspecialchars() for output escaping.'
+			identifier: ibl.bannedAddslashes
+			count: 1
+			path: scripts/archive/plrScratchpad.php
 
 		-
 			rawMessage: 'Parameter #1 $db of class BugPipeline\BugReportRepository constructor expects mysqli, mixed given.'
@@ -1577,54 +1607,6 @@ parameters:
 			identifier: ibl.bannedAddslashes
 			count: 1
 			path: scripts/plrDropUnsignedFreeAgentsToWaivers.php
-
-		-
-			rawMessage: 'Loose comparison via "!=" between string and int is not allowed.'
-			identifier: notEqual.notAllowed
-			count: 1
-			path: scripts/plrScratchpad.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function fclose expects resource, resource|false given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/plrScratchpad.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function feof expects resource, resource|false given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/plrScratchpad.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function fgets expects resource, resource|false given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/plrScratchpad.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function fread expects resource, resource|false given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/plrScratchpad.php
-
-		-
-			rawMessage: 'Parameter #1 $stream of function fseek expects resource, resource|false given.'
-			identifier: argument.type
-			count: 2
-			path: scripts/plrScratchpad.php
-
-		-
-			rawMessage: 'Parameter #1 $string of function substr expects string, string|false given.'
-			identifier: argument.type
-			count: 3
-			path: scripts/plrScratchpad.php
-
-		-
-			rawMessage: 'addslashes() is banned. Use prepared statements for database escaping or json_encode()/htmlspecialchars() for output escaping.'
-			identifier: ibl.bannedAddslashes
-			count: 1
-			path: scripts/plrScratchpad.php
 
 		-
 			rawMessage: 'Only booleans are allowed in a negated boolean, int|false given.'

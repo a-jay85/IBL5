@@ -72,8 +72,8 @@ run_case "unit-explicit"         "$MAIN"   0 'cd .*/ibl5 && vendor/bin/phpunit' 
 run_case "unit-default-no-sub"   "$MAIN"   0 'vendor/bin/phpunit'                   -- --dry-run
 run_case "db-worktree-derives-name" "$WT_DB"  0 'db-test-up[[:space:]]+db-slug([[:space:]]|$)'  -- --dry-run db
 run_case "db-main-no-arg"        "$MAIN"   0 'db-test-up[[:space:]]*$'              -- --dry-run db
-run_case "e2e-worktree"          "$WT_E2E" 0 'e2e-wt\.sh[[:space:]]+e2e-slug'       -- --dry-run e2e
-run_case "e2e-main"              "$MAIN"   0 'e2e-local\.sh([[:space:]]|$)'          -- --dry-run e2e
+run_case "e2e-worktree"          "$WT_E2E" 0 'e2e-wt[[:space:]]+e2e-slug'          -- --dry-run e2e
+run_case "e2e-main"              "$MAIN"   0 'e2e-local([[:space:]]|$)'              -- --dry-run e2e
 run_case "unknown-subcommand"    "$MAIN"   2 'Usage|Unknown subcommand'              -- --dry-run bogus
 run_case "unknown-option"        "$MAIN"   2 'Unknown option|Usage'                  -- --bogus
 

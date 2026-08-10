@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed/declined maintenance-audit findings, extracted from maintenance-backlog.md.
-last_verified: 2026-08-08
+last_verified: 2026-08-09
 ---
 
 # Maintenance-Cost Reduction Backlog — Archive
@@ -567,8 +567,8 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Table evidence (2026-07-25):** #1008 — `config.php` now `$display_errors = true`; OR-bug gone (verified).
 ### 3.4 `configOlympics.php` Is Dead-Code Credential File
 **Location:** ibl5/configOlympics.php
-**Problem:** Identical production credentials, never `require`d. Olympics now uses the same DB via `LeagueContext`. Only reference is a `ibl5/bin/e2e-local.sh` guard comment.
-**Suggested direction:** Delete; update `ibl5/bin/e2e-local.sh`; add to `.gitignore` as safety.
+**Problem:** Identical production credentials, never `require`d. Olympics now uses the same DB via `LeagueContext`. Only reference is a `ibl5/bin/e2e-local` guard comment.
+**Suggested direction:** Delete; update `ibl5/bin/e2e-local`; add to `.gitignore` as safety.
 **Est. effort:** S
 **Risk if untouched:** Dead credential file confuses; risks recommit.
 **Status:** Completed (verified 2026-05-29 audit) — `configOlympics.php` deleted from disk.
@@ -1343,6 +1343,14 @@ CLI (superseded by `OlympicsSchemaParityTest.php`) and the franchise-seasons
 one-time backfill (its tables now live in the baseline schema + migrations).
 
 **Table evidence (2026-07-25):** Script-home convention documented (bin/README.md).
+### 8.3 Mixed kebab-case, camelCase, `.sh` Extensions
+**Location:** `/bin/` and `ibl5/bin/`
+**Problem:** Inconsistent: 3 scripts have `.sh`, 11 don't.
+**Suggested direction:** All executables kebab-case, no extension.
+**Est. effort:** S
+**Risk if untouched:** Copy-paste errors from inconsistent examples.
+
+**Table evidence (2026-07-27):** `.sh` stripped from `bin/e2e-wt`, `ibl5/bin/e2e-local`, `ibl5/bin/run-migrations-ci`, `ibl5/bin/visual-regression`; `bin/lib/automouse-stream-filter` renamed to `automouse-stream-filter.sh` for consistency. Caller sweep across CI YAML, `.claude/`, `ibl5/docs/`, `bin/README.md`, `ibl5/bin/README.md`, and `bin/test` completed. Gate: grep for old `.sh` names returns 0 hits.
 ### 8.4 `shellScripts/` Has No Shell Scripts
 **Location:** ibl5/shellScripts/
 **Problem:** Only contains DB dumps + a `.env` file. No `.sh` files. Misleading name.
@@ -1352,6 +1360,15 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Status:** Completed (verified 2026-06-20) — `shellScripts/` absent from working tree and git index.
 
 **Table evidence (2026-07-25):** `shellScripts/` absent from tree + index (verified); follows 8.1.
+### 8.5 Orphan / Deprecated Scripts in `ibl5/scripts/`
+**Location:** `ibl5/scripts/plrScratchpad.php`, `tradition.php`
+**Problem:** Scratchpad is experimental; tradition.php has no nav reference but is linked from LeagueControlPanel. Neither has tests.
+**Suggested direction:** Archive scratchpad; verify tradition.php usage and migrate to Service class or document as legacy.
+**Est. effort:** S
+**Risk if untouched:** Maintenance burden on unclear-status scripts.
+**Status:** Tradition half resolved (2026-06-09) — `scripts/tradition.php` deleted; its compute loop migrated into `LeagueControlPanelProcessor::updateTradition()` behind the LCP `is_admin()` guard. `plrScratchpad.php` archiving still open.
+
+**Table evidence (2026-07-27):** `ibl5/scripts/plrScratchpad.php` archived to `ibl5/scripts/archive/plrScratchpad.php` (git mv). Both `tradition.php` (2026-06-09) and `plrScratchpad.php` are now gone from `ibl5/scripts/`; finding fully resolved.
 ### 8.6 `classes/Scripts/` vs `scripts/` Overlap
 **Location:** Both directories
 **Problem:** Two "Scripts" dirs; classes/Scripts holds business-logic; scripts/ holds web entry points.
@@ -1377,6 +1394,22 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Risk if untouched:** Archive grows; future refactors re-reference old code.
 
 **Table evidence (2026-07-25):** `scripts/archive/README.md` (docs). **Status:** Added `ibl5/scripts/archive/README.md` documenting the two retained-but-not-run 2007 box-score import scripts + the archive policy (this PR).
+### 8.9 `bin/lib/` Has No Manifest
+**Location:** `/bin/lib/`
+**Problem:** 4 shared shell helpers (`db-helpers.sh`, `git-helpers.sh`, `wt-guards.sh`, `automouse-stream-filter`). Inconsistent: filter has no `.sh`.
+**Suggested direction:** Rename for consistency; add bin/lib/README.md.
+**Est. effort:** S
+**Risk if untouched:** Devs unsure which helpers exist; duplication.
+
+**Table evidence (2026-07-27):** `bin/lib/automouse-stream-filter` renamed to `bin/lib/automouse-stream-filter.sh` (consistent with sibling `.sh` helpers); `bin/lib/README.md` created listing all 14 lib files with one-line purpose each.
+### 8.11 Automouse Workflow Scripts Have Complex State
+**Location:** `/bin/automouse-*` (4 files)
+**Problem:** `automouse-run`, `automouse-queue` are executables; `automouse-prompt-impl`, `automouse-prompt-postplan` are templates. No README.
+**Suggested direction:** Move to bin/automouse/; add README explaining data flow.
+**Est. effort:** M
+**Risk if untouched:** Workflow opaque; debugging hard.
+
+**Table evidence (2026-07-27):** All six `bin/automouse-*` scripts moved to `bin/automouse/` (prefix stripped, directory introduced). `bin/automouse/README.md` added. Caller sweep completed across CI YAML, `.claude/`, `ibl5/docs/`, `bin/README.md`, and all `bin/test-automouse-*` test files. Gate: grep for old `bin/automouse-*` paths returns 0 hits.
 ### 8.12 Plaintext Credentials in `.env`
 **Location:** ibl5/shellScripts/.env
 **Problem:** Production SSH + MariaDB credentials in plaintext.
@@ -1395,6 +1428,14 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Status:** Resolved (2026-06-09). Tradition half — unauthenticated `scripts/tradition.php` deleted; mutation now runs only via the `is_admin()`-guarded `update_tradition` POST action in the LCP. `updateAllTheThings.php` half — the unauthenticated-CSRF GET link was replaced by an `is_admin()`-guarded, CSRF-validated POST button in the LCP; the script is now POST-only (`is_admin()` 403 before the method check; `CsrfGuard::validateToken(..., 'lcp_update_all')` on the POST), so a cross-site GET can no longer fire the full-league mutation.
 
 **Table evidence (2026-07-25):** Web-mutation scripts auth-resolved (2026-06-09): admin-guarded CSRF POST.
+### 8.14 Mixed PHP Bootstrap Styles in Scripts
+**Location:** `ibl5/scripts/`
+**Problem:** Some scripts use `require '../mainfile.php'`; others use `require '../vendor/autoload.php'`. Inconsistent.
+**Suggested direction:** Standardize on modern bootstrap.
+**Est. effort:** S
+**Risk if untouched:** New scripts copy old pattern; debt grows.
+
+**Table evidence (2026-08-09):** The CLI scripts in `ibl5/scripts/` are standardized on the `require '../vendor/autoload.php'` bootstrap — `plrAdvanceBirdYears.php`, `plrAdvanceYearsOfExperience.php`, `plrDropUnsignedFreeAgentsToWaivers.php` converted here; `plrScratchpad.php` (the remaining CLI holdout) archived at 8.5. The three **web-invoked** scripts — `jsbExport.php`, `updateAllTheThings.php`, `allStarRename.php` — deliberately keep `require '../mainfile.php'`, because they depend on the web bootstrap it performs — `updateAllTheThings.php` and `allStarRename.php` for the session/auth globals their `is_user()`/`is_admin()` gates read, and `jsbExport.php` for the `WebApplicationFactory::build()` bootstrap behind its self-POSTed confirmation modal, which is where its `$mysqli_db` comes from (it calls no auth function of its own). `jsbExport.php` was converted during implementation and reverted for exactly that reason. The split is therefore now intentional and documented rather than accidental: **CLI ⇒ autoload; web-invoked ⇒ `mainfile.php`.**
 ### 8.16 Check Scripts Have Inconsistent Output / Exit Codes
 **Location:** `/bin/check-*` and `ibl5/bin/check-*`
 **Problem:** No standardized "pass" output format.
@@ -1443,6 +1484,15 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Status:** Completed branch `doc-freshness-catchup` (2026-05-19) — schema-reference.md now cites auth_users with ibl_team_info.gm_username mapping.
 
 **Table evidence (2026-07-25):** schema-reference cites auth_users.
+### 9.4 API_GUIDE Claims API "Not Yet Implemented" — It's Fully Built
+**Location:** `ibl5/docs/API_GUIDE.md`
+**Problem:** Header says "Not Yet Implemented"; body is "proposed design." Reality: 48 PHP files under `Api/`, 17 controllers with auth, rate limiting, ETag caching.
+**Suggested direction:** Rewrite as endpoint reference; archive design content.
+**Est. effort:** M
+**Risk if untouched:** Agents treat the API as absent and reimplement endpoints.
+**Status (2026-07-26):** ✅ Done — API_GUIDE.md correctly framed as architectural overview with controller inventory (`last_verified: 2026-07-24`); full endpoint-by-endpoint reference deferred. See 9.4b (still open in the live backlog).
+
+**Table evidence (2026-08-09):** API_GUIDE.md correctly framed (last_verified 2026-07-24); full endpoint reference deferred to 9.4b.
 ### 9.5 `ibl5/docs/README.md` Lists API_GUIDE as "(planned)"
 **Location:** `ibl5/docs/README.md` line 23
 **Problem:** Index contradicts the 17-controller API reality.
@@ -1614,6 +1664,15 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Status:** Completed (merged #1044, maintenance-30) — documentation-drift sweep.
 
 **Table evidence (2026-07-25):** IBL6/README replaced (#1044).
+### 9.24 `codebase-map.md` — Machine-Generated But No Auto-Regen
+**Location:** CLAUDE.md line 36 + repo-root `.claude/rules/codebase-map.md` (NOT under `ibl5/` — corrected 2026-05-29 audit)
+**Problem:** No CI regenerates it; drifts on module add/rename.
+**Suggested direction:** CI step running `bin/generate-codebase-map` with diff-fail; or add to post-plan.
+**Est. effort:** S
+**Risk if untouched:** Map silently stale after module changes.
+**Status (2026-07-26):** ✅ Implemented — removed from `.gitignore` and `bin/check-docs` allowlist; file tracked; `static-guards` job in `tests.yml` runs `bin/generate-codebase-map` + `git diff --exit-code` on every push.
+
+**Table evidence (2026-08-09):** Removed from .gitignore (PR #1671 reversal — no SessionStart hook existed); CI drift-check step added to static-guards in tests.yml.
 ### 9.25 STRATEGIC_PRIORITIES — Lists Completed Work as Pending
 **Location:** `ibl5/docs/STRATEGIC_PRIORITIES.md`
 **Problem:** Section 1 still lists `nuke_users` as remaining (already dropped in migration 102).
@@ -2338,6 +2397,15 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Risk if untouched:** Future `019` or `111` could execute out of dependency order.
 
 **Table evidence (2026-07-25):** Document migration numbering gaps in README; docs-only. **Status:** Documented numbering gaps (018-023, 111, 136, 146-148) in `ibl5/migrations/README.md` (this PR).
+### 15.12 `033b` / `037b` / `037c` / `044b` — Non-Sortable Suffix Convention
+**Location:** Four migrations with letter suffixes
+**Problem:** Natural sort places `033b` after `033` — correct but informal and undocumented.
+**Suggested direction:** Codify in README as legacy-only; require timestamp-based names for new migrations >126; CI lint to reject.
+**Est. effort:** S
+**Risk if untouched:** A new `037d` added after `038` could execute out of order on fresh install.
+**Status (2026-07-26):** ✅ Implemented — convention codified in `ibl5/migrations/README.md`; `migration-naming-check` job added to `migration-safety.yml` rejects new letter-suffix `.sql` files (existing `033b`/`037b`/`037c`/`044b` unaffected by `--diff-filter=A`).
+
+**Table evidence (2026-08-09):** Letter-suffix convention documented in migrations/README.md; `migration-naming-check` job added to migration-safety.yml (--diff-filter=A; legacy files unaffected).
 ### 15.13 `ibl_box_scores_teams.name` — Denormalized Snapshot Without Clear Lifecycle
 **Location:** `ibl_box_scores_teams.name varchar(16)` line 356
 **Problem:** Denormalized team name; `DEFAULT ''` (empty); indexed; queried actively. No FK, no trigger maintaining it.

@@ -83,7 +83,7 @@ For a phase that is **genuinely verbose or parallelizable** — a multi-step run
 
 **Binding rule — every below-run-model phase declares packet-or-inline explicitly.** For any implementation phase assigned a tier **below the plan's whole-run model** (`impl_model`, resolved by `bin/lib/plan-impl-model`), the packet-vs-inline choice MUST be made **explicit**, one of exactly two ways:
 
-- **(a) Delegate** — the moved work clears the ~15K bar → emit a full `### Delegate` packet (the packet's own `**Tier:**` line is its tier declaration). `bin/automouse-prompt-impl` binds it at runtime.
+- **(a) Delegate** — the moved work clears the ~15K bar → emit a full `### Delegate` packet (the packet's own `**Tier:**` line is its tier declaration). `bin/automouse/prompt-impl` binds it at runtime.
 - **(b) Inline** — the work is genuinely tiny (a one- or two-edit phase, moved work below the ~15K bar) → the phase carries a `**Tier:** <Haiku|Sonnet> (inline — <one-clause reason>)` line. The `(inline — …)` marker is what makes the packetless-ness provably intentional.
 
 A below-run-model phase with **neither** a packet nor an `(inline — …)` marker is **forbidden** — it is an un-acted-on tiering intent; `bin/check-plan` rejects it mechanically (gate `[T]`). Phases **at or above** the whole-run model (`self`, or `Sonnet` under `impl_model: sonnet`) need no marker — the rule keys only on *below-run-model* labels.

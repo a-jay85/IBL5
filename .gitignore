@@ -17,7 +17,6 @@ settings.local.json
 .claude/scheduled_tasks.lock
 .claude/automouse/handoff/
 .nightly/
-.claude/rules/codebase-map.md
 
 config.json
 config.php
@@ -42,6 +41,7 @@ depthcharts
 .htaccess
 !/ibl5/ibl/IBL/.htaccess
 !/ibl5/scripts/.htaccess
+!/ibl5/scripts/archive/.htaccess
 
 # Logs — runtime-generated (e.g. ibl5/IBL5.log, the multi-GB simulation log).
 # Never committed; lives next to source only because the sim writes it there.

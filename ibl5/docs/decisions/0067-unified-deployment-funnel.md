@@ -1,6 +1,6 @@
 ---
 description: Unifies the deployment funnel so every PR-opening path flows through /post-plan; triage is a loaded rule, /plan auto-queues, /ship drops merge-intent tokens.
-last_verified: 2026-07-03
+last_verified: 2026-07-27
 ---
 
 # ADR-0067: Unified deployment funnel — one pipeline through /post-plan
@@ -18,7 +18,7 @@ Collapse the funnel to a single pipeline with one variable:
 
 - **Triage is a loaded rule.** `.claude/rules/work-triage.md` decides plan-vs-ad-hoc before any non-trivial work, with an ad-hoc safety mirror (the gate-14 surfaces). It is the single gateway.
 - **Every PR-opening path flows through `/post-plan`.** `/post-plan` always opens the PR and runs review + audit + verification; **auto-merge arming is the only variable**, decided by Phase 6.5's conditions.
-- **`/plan` auto-queues queue-safe plans.** When `bin/check-plan` passes (which already enforces no-unresolved-decisions), `/plan` auto-invokes `bin/automouse-queue` unless the session opts to implement now. Queue-safety is independent of `auto_merge`.
+- **`/plan` auto-queues queue-safe plans.** When `bin/check-plan` passes (which already enforces no-unresolved-decisions), `/plan` auto-invokes `bin/automouse/queue` unless the session opts to implement now. Queue-safety is independent of `auto_merge`.
 - **`/ship` collapses to a thin `/post-plan` wrapper.** The `--no-merge` / `--merge` tokens and the merge-intent resolution are removed; `/ship` fires bare `bin/post-plan-now` after its precondition gate. A reviewed-but-held PR still happens automatically whenever Phase 6.5 holds the work — no token to remember.
 
 ## Alternatives Considered
@@ -39,4 +39,4 @@ Collapse the funnel to a single pipeline with one variable:
 - `.claude/skills/plan/SKILL.md` — `/plan` (auto-queue added in PR B).
 - `.claude/skills/ship/SKILL.md` — `/ship` (simplified in PR C).
 - `.claude/skills/post-plan/SKILL.md` — Phase 6.5, the single arming authority.
-- `bin/automouse-queue` — the queue command `/plan` invokes.
+- `bin/automouse/queue` — the queue command `/plan` invokes.

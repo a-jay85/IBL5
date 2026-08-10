@@ -4,9 +4,9 @@
 # firing two claude -p invocations per plan (implementation + post-plan)
 # until the queue is empty or the time guard is exceeded.
 #
-# To test manually: bin/automouse-run
+# To test manually: bin/automouse/run
 # To force-trigger via launchd: launchctl start com.ibl5.automouse
-# To schedule a one-shot run: bin/automouse-run schedule "2026-05-28 20:00 PDT"
+# To schedule a one-shot run: bin/automouse/run schedule "2026-05-28 20:00 PDT"
 
 set -euo pipefail
 
@@ -14,16 +14,16 @@ set -euo pipefail
 export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
 
 # --- One-shot scheduler subcommand ----------------------------------------
-# Usage: bin/automouse-run schedule "YYYY-MM-DD HH:MM [TZ]"
-# Creates a self-cleaning launchd agent that fires bin/automouse-run once at the
+# Usage: bin/automouse/run schedule "YYYY-MM-DD HH:MM [TZ]"
+# Creates a self-cleaning launchd agent that fires bin/automouse/run once at the
 # given time, then removes its own plist and boots itself out. The timezone
 # abbreviation is optional and defaults to the system's local zone.
-# Example: bin/automouse-run schedule "2026-05-28 20:00 PDT"
+# Example: bin/automouse/run schedule "2026-05-28 20:00 PDT"
 if [ "${1:-}" = "schedule" ]; then
     WHEN="${2:-}"
     if [ -z "$WHEN" ]; then
-        echo "usage: bin/automouse-run schedule \"YYYY-MM-DD HH:MM [TZ]\"" >&2
-        echo "example: bin/automouse-run schedule \"2026-05-28 20:00 PDT\"" >&2
+        echo "usage: bin/automouse/run schedule \"YYYY-MM-DD HH:MM [TZ]\"" >&2
+        echo "example: bin/automouse/run schedule \"2026-05-28 20:00 PDT\"" >&2
         exit 1
     fi
 
@@ -54,7 +54,7 @@ if [ "${1:-}" = "schedule" ]; then
 
     LABEL="com.ibl5.automouse-oneshot-$EPOCH"
     PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
-    SELF="/Users/ajaynicolas/GitHub/IBL5/bin/automouse-run"
+    SELF="/Users/ajaynicolas/GitHub/IBL5/bin/automouse/run"
     OUT_LOG="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/logs/launchd-oneshot-stdout.log"
     ERR_LOG="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/logs/launchd-oneshot-stderr.log"
     mkdir -p "$(dirname "$OUT_LOG")"
@@ -218,7 +218,7 @@ MIN_VIABLE_SECS=60   # a real impl/postplan never finishes (pass OR fail) under 
 HANDOFF_DIR="$NIGHTLY_DIR/handoff"
 mkdir -p "$LOG_DIR" "$QUEUE_DIR" "$HANDOFF_DIR"
 
-# One-off single-plan mode: bin/automouse-run plan <slug>
+# One-off single-plan mode: bin/automouse/run plan <slug>
 # Runs impl + post-plan for exactly ONE named plan, then stops. Reuses all
 # guard machinery (heartbeat/stall-kill, env-breaker, handoff resume, cost
 # roll-up, reports, lock). Foreground, streams to the dated log like a manual run.
@@ -226,7 +226,7 @@ SINGLE_PLAN=""
 if [ "${1:-}" = "plan" ]; then
     slug="${2:-}"
     if [ -z "$slug" ]; then
-        echo "usage: bin/automouse-run plan <slug>" >&2
+        echo "usage: bin/automouse/run plan <slug>" >&2
         exit 1
     fi
     FILENAME="${slug%.md}.md"
@@ -235,7 +235,7 @@ if [ "${1:-}" = "plan" ]; then
         # resolution (INPUT / $PLANS_DIR/$INPUT / $PLANS_DIR/$INPUT.md) and its
         # evict_dispositions() cleanup of stale skipped/ + done/ sidecars.
         if ! NIGHTLY_DIR="$NIGHTLY_DIR" PLANS_DIR="$PLANS_DIR" \
-                "$REPO/bin/automouse-queue" "$slug"; then
+                "$REPO/bin/automouse/queue" "$slug"; then
             echo "automouse-run plan: cannot resolve or queue '$slug' — " \
                  "no such plan under $PLANS_DIR" >&2
             exit 1
@@ -311,7 +311,7 @@ run_heartbeat_watcher() {
 }
 
 # Map a Claude model id to its tier label for the cost roll-up. Prefix match so
-# a version bump (claude-opus-4-8 → claude-opus-5) keeps resolving; an unknown or
+# a version bump (claude-opus-5 → claude-opus-5) keeps resolving; an unknown or
 # empty id yields "?" rather than a blank cell.
 model_tier() {
     case "${1:-}" in
@@ -323,7 +323,7 @@ model_tier() {
 }
 
 # Append a per-phase cost row to the night's cost roll-up. Cost is parsed from
-# the phase's `exit:` line (emitted by automouse-stream-filter into the log). One
+# the phase's `exit:` line (emitted by automouse-stream-filter.sh into the log). One
 # row per phase keeps this robust across split impl/postplan invocations — no
 # cross-phase variable dependency. See .claude/rules/automouse-workflow.md.
 append_cost_row() {
@@ -464,7 +464,7 @@ phase_stalled() {
 #
 # The in_queue guard is the fix for the false positive that stopped the loop on a
 # legitimate disposition: every deliberate impl disposition (already-merged,
-# stale-plan, ambiguity, wt-new failure, missing-info — see bin/automouse-prompt-impl)
+# stale-plan, ambiguity, wt-new failure, missing-info — see bin/automouse/prompt-impl)
 # runs `mv queue/$PLAN → done/` (already-merged) or `→ skipped/` (the rest), so the
 # plan leaves queue/ (in_queue=0) and exits
 # fast with no handoff. Without this guard the sub-minute check misreads that
@@ -502,7 +502,7 @@ write_env_stop_report() {
 # Persist a per-attempt failure report for the escalated final retry (ADR-0085).
 # Writes a CAPPED tail of THIS attempt's log slice to a `.failure` sidecar in
 # QUEUE_DIR, a sibling of the `.attempts` counter, so it shares that counter's
-# lifecycle and is fed to the next attempt by bin/automouse-prompt-impl. Capped
+# lifecycle and is fed to the next attempt by bin/automouse/prompt-impl. Capped
 # because the slice can be a multi-hour transcript; a crashed/stall-killed agent
 # may have written nothing structured, so a raw log tail is the reliable,
 # agent-cooperation-free baseline.
@@ -633,7 +633,7 @@ git -C "$REPO" merge --ff-only origin/master >> "$LOG" 2>&1 || true
 # Skipped in single-plan mode: requeuing other staleness-skipped plans would
 # violate "leaves the rest of the queue untouched".
 if [ -z "${SINGLE_PLAN:-}" ]; then
-    "$REPO/bin/automouse-self-heal" >> "$LOG" 2>&1 || true
+    "$REPO/bin/automouse/self-heal" >> "$LOG" 2>&1 || true
 fi
 
 # Startup archival: shrink the accumulating output dirs by moving entries idle
@@ -762,7 +762,7 @@ while true; do
         # second trailing context line (PRIOR_FAILURE_REPORT=<path>) in the same
         # style as PLAN_FILE — report-if-present, decoupled from the escalation
         # trigger (ADR-0085).
-        IMPL_PROMPT="$(cat bin/automouse-prompt-impl)
+        IMPL_PROMPT="$(cat bin/automouse/prompt-impl)
 
 PLAN_FILE=$PLAN_NAME"
         if should_feed_failure_report "$BASE_MODEL" "$IMPL_MODEL" "$FAILURE_FILE"; then
@@ -780,7 +780,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 --verbose \
                 --name "automouse-impl-$(date +%Y-%m-%d-%H%M)" \
             2> >(grep -v 'thinking.type=enabled' >> "$LOG") \
-            | bin/lib/automouse-stream-filter "$HEARTBEAT_FILE" "$CMDPID_FILE" "$PLAN_SLUG" impl \
+            | bin/lib/automouse-stream-filter.sh "$HEARTBEAT_FILE" "$CMDPID_FILE" "$PLAN_SLUG" impl \
             >> "$LOG" || IMPL_STATUS=$?
 
         kill "$WATCHER_PID" 2>/dev/null || true
@@ -876,7 +876,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         PP_START=$(date +%s)
         NIGHTLY_CMDPID_FILE="$CMDPID_FILE" \
         timeout "$REMAINING_SECS" \
-            claude -p "$(cat bin/automouse-prompt-postplan)
+            claude -p "$(cat bin/automouse/prompt-postplan)
 
 PLAN_FILE=$PLAN_NAME" \
                 --dangerously-skip-permissions \
@@ -886,7 +886,7 @@ PLAN_FILE=$PLAN_NAME" \
                 --verbose \
                 --name "automouse-postplan-$(date +%Y-%m-%d-%H%M)" \
             2> >(grep -v 'thinking.type=enabled' >> "$LOG") \
-            | bin/lib/automouse-stream-filter "$HEARTBEAT_FILE" "$CMDPID_FILE" "$PLAN_SLUG" postplan \
+            | bin/lib/automouse-stream-filter.sh "$HEARTBEAT_FILE" "$CMDPID_FILE" "$PLAN_SLUG" postplan \
             >> "$LOG" || PP_STATUS=$?
 
         kill "$WATCHER_PID" 2>/dev/null || true

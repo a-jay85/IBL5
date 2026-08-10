@@ -7,7 +7,7 @@ last_verified: 2026-08-10
 
 ## Triage before non-trivial work
 
-Before starting **any non-trivial unit of work** — whether you proposed it or the user assigned it — decide: implement **ad-hoc** (just do it, then `/ship`) or route through **`/plan`**. State the call and one line of why, then proceed. Deployment context and rationale: `work-triage-detail.md` § Execution routing context.
+Before starting **any non-trivial unit of work** — whether you proposed it or the user assigned it — decide: implement **ad-hoc** (just do it, then `/ship`) or route through **`/plan`**. State the call and one line of why, then proceed.
 
 ## The ad-hoc bar
 
@@ -27,7 +27,7 @@ Even when the bar says ad-hoc, run a quick safety check — the surfaces `/plan`
 - a **security surface** (SQL, POST/form endpoint, auth/authz-gated route, user-facing output rendering),
 - a **destructive or schema-tightening migration**,
 - **new or redesigned user-visible UI/UX**,
-- a **gate removal or weakening** in the ship-pipeline surface (`.claude/skills`, `.claude/rules`, `~/.claude/hooks`) or a **bootstrap hazard** (it rewrites the rules governing its own merge); *not* an additive gate, a decision-procedure-preserving prose edit, or a mechanism/plumbing change, or
+- a **gate removal or weakening** in the ship-pipeline surface (`.claude/skills`, `.claude/rules`, `~/.claude/hooks`) — deletes, relaxes, or disables an enforcement mechanism — or a **bootstrap hazard** (it rewrites the rules governing its own merge); *not* an additive gate, a decision-procedure-preserving prose edit, or a mechanism/plumbing change, or
 - a property needing **subjective human judgment** to confirm,
 
 then prefer `/plan`, so the defense and its verification are designed up front. Why the PR-time backstop is not a substitute: `work-triage-detail.md` § Safety mirror backstop.

@@ -177,15 +177,25 @@ fi
 # Worktree Preview Environment — no human present to verify)
 export CLAUDE_HEADLESS=1
 
-# Headless sessions carry ~44K of fixed context (system prompt + rules +
-# memory + compaction summary). Under the interactive 120K autoCompactWindow
-# pin (~/.claude/settings.json, advisor-timeout fix) that leaves ~44K of
-# working room before the ~73% trigger — a compaction-thrash loop that
-# invalidates the whole prompt cache every few minutes (2026-07-07: 5
-# compactions in 19 min, 21% of the 5h budget, zero edits made). 200K keeps
-# peak context at/below the ~200K degradation and 2x-cost edge while tripling
-# working room. Env var overrides the settings.json pin per-process.
-export CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000
+# Match the interactive autoCompactWindow pin (~/.claude/settings.json, which
+# is 140000 — NOT the 120K this comment claimed until 2026-08-10). The export
+# stays rather than being deleted so the window is versioned with the repo
+# instead of inherited from unversioned host state, and so the "rationale in
+# bin/automouse/run" pointers in bin/post-plan-now and bin/plan-now still land
+# somewhere. Env var overrides the settings.json pin per-process.
+#
+# Tripwire — this is a real regression risk, deliberately accepted. Headless
+# sessions carry ~44K of fixed context (system prompt + rules + memory +
+# compaction summary) and compaction fires at ~73% of the window, so working
+# room drops from ~102K (200K window) to ~58K (140K). The 2026-08-10 run that
+# was aborted by hand had already reached peak_ctx=72063 during reconnaissance
+# — 21 tools in, before a single edit — i.e. most of the way to the 140K
+# trigger point (~102K) with the whole implementation still ahead of it. If
+# impl runs start showing repeated compactions (2026-07-07, at a window around
+# 120K: 5 compactions in 19 min, 21% of the 5h budget, zero edits made), raise
+# this back toward 200000, which keeps peak context at/below the ~200K
+# degradation and 2x-cost edge.
+export CLAUDE_CODE_AUTO_COMPACT_WINDOW=140000
 
 REPO="/Users/ajaynicolas/GitHub/IBL5"
 NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"

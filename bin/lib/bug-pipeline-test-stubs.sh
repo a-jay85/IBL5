@@ -146,6 +146,13 @@ case "$*" in
       pr_num=""; prev=""
       for a in "$@"; do [ "$prev" = "checks" ] && pr_num="$a"; prev="$a"; done
       cat "$STUB/gh-pr-checks-${pr_num:-0}.out" 2>/dev/null || true ;;
+  *"run list"*)
+      # CI-autofix log fetch: driver's --jq already applied → emit the bare run id
+      [ "${GH_FAIL:-0}" = 1 ] && exit 1
+      cat "$STUB/gh-run-list.out" 2>/dev/null || true ;;
+  *"run view"*log-failed*)
+      [ "${GH_FAIL:-0}" = 1 ] && exit 1
+      cat "$STUB/gh-run-log.out" 2>/dev/null || true ;;
   *"pr comment"*)
       # Best-effort — gh.log already records the full call including body; nothing else needed
       : ;;
@@ -239,7 +246,7 @@ SH
     export BUG_PIPELINE_HUNT_LOG="$STUB/hunt.log"
     export BUG_PIPELINE_CODE_REPO="test/code-fake"
     mkdir -p "$STUB/wt"
-    # ── CI-autofix seams (ADR-0097) ──────────────────────────────────────────────
+    # ── CI-autofix seams (ADR-0099) ──────────────────────────────────────────────
     # Default DISABLED so the six existing suites (tick/classify/feature/park/issue/hunt)
     # don't emit gh pr list calls. test-bug-pipeline-ci-autofix overrides to 1 after bpt_setup.
     export BUG_PIPELINE_CI_AUTOFIX_ENABLED=0
@@ -305,6 +312,9 @@ bpt_set_gh_pr_view()   { printf '%s' "$1" > "$STUB/gh-pr-view.out"; }
 bpt_set_gh_pr_list_ci()  { printf '%s\n' "$1" > "$STUB/gh-pr-list-ci.out"; }
 # bpt_set_gh_pr_checks_for <pr_num> <lines> — pre-filtered "STATE name" lines for a PR
 bpt_set_gh_pr_checks_for() { printf '%s\n' "$2" > "$STUB/gh-pr-checks-$1.out"; }
+# bpt_set_gh_run_log <run_id> <log_text> — CI-autofix log fetch: the run id `gh run list`
+# resolves to, and the body `gh run view --log-failed` returns for it.
+bpt_set_gh_run_log() { printf '%s\n' "$1" > "$STUB/gh-run-list.out"; printf '%s\n' "$2" > "$STUB/gh-run-log.out"; }
 # bpt_count <name> <want> <file>  — assert a stub log has exactly <want> non-blank lines
 # (grep -c prints 0 and exits 1 on no-match, so read its stdout and default empty→0; no `|| echo`).
 bpt_count() { local got; got="$(grep -c . "$3" 2>/dev/null)"; bpt_expect_eq "$1" "$2" "${got:-0}"; }

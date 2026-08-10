@@ -27,5 +27,5 @@ RAW=$(awk '
 case "$RAW" in
   sonnet) echo "claude-sonnet-4-6" ;;
   haiku)  echo "claude-haiku-4-5"  ;;
-  *)      echo "claude-opus-4-8"   ;;   # opus, empty, garbled, or unknown → safe default
+  *)      echo "claude-opus-5"   ;;   # opus, empty, garbled, or unknown → safe default
 esac

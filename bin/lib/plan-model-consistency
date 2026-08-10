@@ -22,7 +22,7 @@
 # Deliberately NOT bin/lib/plan-impl-model: that script RESOLVES impl_model to a
 # model id for `claude -p --model`, and its `case` statement collapses explicit
 # `impl_model: opus`, an absent field, and any garbled value to the same
-# `claude-opus-4-8` output (the "safe default" fallback) — so it cannot
+# `claude-opus-5` output (the "safe default" fallback) — so it cannot
 # distinguish "deliberately opus" from "never set," which is exactly the
 # distinction rule (b) above needs. Re-implementing the same line-1-anchored
 # frontmatter parse here (RAW value, not resolved) is the only way to keep that

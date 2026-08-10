@@ -311,7 +311,7 @@ bpt_set_gh_pr_list_ci "42 fix-apply3 $sha"
 bpt_set_gh_pr_checks_for 42 "FAILURE mutation-tests"
 bpt_run
 bpt_expect_eq "r-apply-3: exit 0" 0 "$BPT_RC"
-bpt_log_has "$STUB" claude.log "--model claude-opus-4-8" "r-apply-3: Opus on mutation check regardless of attempt"
+bpt_log_has "$STUB" claude.log "--model claude-opus-5" "r-apply-3: Opus on mutation check regardless of attempt"
 
 # ═══════════════════════════════════════════════════════════════════
 # GIVEUP ROWS — attempt ceiling / idempotent ⛔ comment

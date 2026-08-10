@@ -83,12 +83,12 @@ bpt_reset
 bpt_set_claim "$CLAIM"
 bpt_set_result_for claude-haiku-4-5  '{"verdict":"escalate"}'
 bpt_set_result_for claude-sonnet-4-6 '{"verdict":"escalate"}'
-bpt_set_result_for claude-opus-4-8   '{"verdict":"fixed"}'
+bpt_set_result_for claude-opus-5   '{"verdict":"fixed"}'
 bpt_hunt_dirty
 bpt_run
 bpt_count "r11: full ladder = 3 tiers" 3 "$STUB/hunt-models.log"
 order="$(tr '\n' ' ' < "$STUB/hunt-models.log")"
-bpt_expect_eq "r11: ladder order cheap→dear, Opus last" "claude-haiku-4-5 claude-sonnet-4-6 claude-opus-4-8 " "$order"
+bpt_expect_eq "r11: ladder order cheap→dear, Opus last" "claude-haiku-4-5 claude-sonnet-4-6 claude-opus-5 " "$order"
 
 # ── Row 12 — hunter-success ships; worktree is DIRTY (uncommitted) at handoff ──
 bpt_reset

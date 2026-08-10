@@ -487,28 +487,18 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):** All open items here are docs-only → 🟩 auto-mergeable (a docs PR never trips the `feat:` human-signoff hold), except 9.26 which needs one upfront decision.
 
-> ✅ resolved (24): 9.1, 9.2, 9.3, 9.5, 9.6, 9.7, 9.8, 9.9, 9.10, 9.11, 9.12, 9.13, 9.14, 9.15, 9.16, 9.17, 9.18, 9.19, 9.20, 9.21, 9.22, 9.23, 9.25, 9.27 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (26): 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 9.9, 9.10, 9.11, 9.12, 9.13, 9.14, 9.15, 9.16, 9.17, 9.18, 9.19, 9.20, 9.21, 9.22, 9.23, 9.24, 9.25, 9.27 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 9.4 | ◑ Partial | 🟩 | Header/framing fixed; full endpoint-by-endpoint reference deferred (9.4b). Docs-only. |
-| 9.24 | ⬜ Open | 🟩 | `codebase-map.md` is **tracked** (verified — not gitignored); add CI regen-and-diff step. |
+| 9.4b | ⬜ Open | 🟩 | Full endpoint-by-endpoint OpenAPI reference for API_GUIDE.md (deferred from 9.4). Docs-only. |
 | 9.26 | ⬜ Open | 🟨 | No CHANGELOG — upfront decision: ADRs-as-substitute (document) vs post-plan-fed CHANGELOG tooling. |
 
-### 9.4 API_GUIDE Claims API "Not Yet Implemented" — It's Fully Built
+### 9.4b API_GUIDE — Full Endpoint-by-Endpoint OpenAPI Reference (Deferred from 9.4)
 **Location:** `ibl5/docs/API_GUIDE.md`
-**Problem:** Header says "Not Yet Implemented"; body is "proposed design." Reality: 48 PHP files under `Api/`, 17 controllers with auth, rate limiting, ETag caching.
-**Suggested direction:** Rewrite as endpoint reference; archive design content.
+**Problem:** Architectural overview is correct; no per-endpoint request/response reference exists.
+**Suggested direction:** Author a per-controller endpoint reference; consider OpenAPI/Swagger generation from annotations.
 **Est. effort:** M
-**Risk if untouched:** Agents treat the API as absent and reimplement endpoints.
-**Status:** Partially completed branch `doc-freshness-catchup` (2026-05-19) — header/"planned" framing fixed; rewrote as architectural overview with controller inventory. Full endpoint-by-endpoint reference deferred. Re-open as 9.4b when an endpoint reference is authored.
-
-### 9.24 `codebase-map.md` — Machine-Generated But No Auto-Regen
-**Location:** CLAUDE.md line 36 + repo-root `.claude/rules/codebase-map.md` (NOT under `ibl5/` — corrected 2026-05-29 audit)
-**Problem:** No CI regenerates it; drifts on module add/rename.
-**Suggested direction:** CI step running `bin/generate-codebase-map` with diff-fail; or add to post-plan.
-**Est. effort:** S
-**Risk if untouched:** Map silently stale after module changes.
 
 ### 9.26 No CHANGELOG Exists
 **Location:** `ibl5/` (absent)
@@ -710,7 +700,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):** Most FK/type/idempotency work is done (maintenance-27/28/41–44). Open items are mostly **column renames / destructive schema** → 🟦 human-merge (gate-14c + rename-sweep blast radius); a *reversible* type-narrowing (15.17) can arm 🟨 via the `/plan` schema-safety guard; doc items are 🟩.
 
-> ✅ resolved (17): 15.2, 15.4, 15.5, 15.8, 15.9, 15.10, 15.11, 15.13, 15.14, 15.15, 15.16, 15.18, 15.19, 15.20, 15.21, 15.22, 15.23 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (18): 15.2, 15.4, 15.5, 15.8, 15.9, 15.10, 15.11, 15.12, 15.13, 15.14, 15.15, 15.16, 15.18, 15.19, 15.20, 15.21, 15.22, 15.23 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
@@ -718,7 +708,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 15.3 | ⬜ Open | 🟦 | cy/dem/offer 1NF child-table normalization (L). Major destructive redesign → human-merge. (cy1→salary_yr1 rename already done in 119.) |
 | 15.6 | ⬜ Open | 🟦 | Awards tables PascalCase PK/column rename (Tier-7). Destructive rename + sweep → human-merge. |
 | 15.7 | ◑ Partial | 🟦 | `name`→`setting_key` done (#143); `value`→`setting_value` deferred (reserved-word rename + sweep → human-merge). |
-| 15.12 | ⬜ Open | 🟩 | Codify suffix convention + CI lint for new names; docs + additive gate. |
 | 15.17 | ⬜ Open | 🟨 | olympics_career int(11)→smallint/mediumint. Reversible narrowing → arm via the `/plan` schema-safety guard (apply-time fail-closed + DatabaseIntegration test); else 🟦. |
 | 15.24 | ⬜ Open | 🟦 | Pre-existing duplicate rows in `ibl_box_scores`: 1993 (29), 1994 (7), 2002 (1), 2004 (24) — 61 excess by `(game_date, name)`. Distinct signature from the 2007 HEAT re-import (no schedule overload, no `created_at` batch, no month shift); cause unknown. Destructive delete → human-merge. (discovered 2026-08-04 during the PR #1771 review) |
 
@@ -750,13 +739,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Est. effort:** M
 **Risk if untouched:** Unbacktick'd queries are valid MariaDB but fail strict parsers.
 **Status:** `name` portion **Completed** (maintenance-42, migration 143). `ibl_settings.name` → `setting_key`: the composite PK was rebuilt `(name, league)` → `(setting_key, league)` and **three** triggers reading the column were recreated against `setting_key` — `trg_team_identity_sync` (mig 140 body), `trg_gm_tenure_track` (mig 100 body, which the original brief missed), and `trg_season_rollover` (mig 017 body) — preserving the live `ibl_team_info` activation order 1→2 via the drop-both / recreate-with-`FOLLOWS` dance. The full PHP/SQL read-write sweep (`League`, `LeagueControlPanelRepository`, `ModuleAccessControl`, `ProjectedDraftOrderRepository`, `MaintenanceRepository`, `SeasonQueryRepository`, `test-state.php`, fixtures) shipped in the same PR so migration + code deploy atomically. `config/schema-assertions.php` now asserts `setting_key`, hard-failing `SchemaValidator` at boot if the rename regresses. **Still deferred:** `ibl_settings.value` → `setting_value` (name-only PR). `cache`/`cache_locks` remain out of scope (upstream Laravel scaffolding).
-
-### 15.12 `033b` / `037b` / `037c` / `044b` — Non-Sortable Suffix Convention
-**Location:** Four migrations with letter suffixes
-**Problem:** Natural sort places `033b` after `033` — correct but informal and undocumented.
-**Suggested direction:** Codify in README as legacy-only; require timestamp-based names for new migrations >126; CI lint to reject.
-**Est. effort:** S
-**Risk if untouched:** A new `037d` added after `038` could execute out of order on fresh install.
 
 ### 15.17 `ibl_olympics_career_*` — `int(11)` Stat Columns Where Smaller Suffices
 **Location:** `ibl_olympics_career_avgs` (games as int(11), retired as int(11)); `ibl_olympics_career_totals` (all counting stats int(11))

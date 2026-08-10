@@ -1,6 +1,6 @@
 ---
 description: Git worktrees are created OUTSIDE the repo tree (a canonical-case sibling, IBL5-worktrees/<slug>) instead of nested at $REPO_ROOT/worktrees/<slug>. Nesting made the repo-root .claude/rules a filesystem ancestor of every worktree file, so Claude Code's path-conditional rule loader injected each matching rule twice. Records the layout decision, the git-based worktree detection it requires, and the safe migration path.
-last_verified: 2026-07-27
+last_verified: 2026-08-08
 ---
 
 # ADR-0046: Worktrees live outside the repo tree

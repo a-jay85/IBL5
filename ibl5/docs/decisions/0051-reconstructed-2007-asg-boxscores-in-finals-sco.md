@@ -2,7 +2,7 @@
 description: >
   Why and how the 2006-07 All-Star Weekend box-score records were reconstructed
   and patched into 06-07_36_finals.zip's IBL5.sco binary.
-last_verified: 2026-06-08
+last_verified: 2026-08-08
 ---
 
 # 0051 — Reconstructed 2006-07 All-Star Weekend Box Scores in Finals SCO

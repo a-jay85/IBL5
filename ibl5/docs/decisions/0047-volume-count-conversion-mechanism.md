@@ -1,6 +1,6 @@
 ---
 description: RE-trace verdict on the volume→shot-COUNT conversion mechanism (ADR-0042 follow-on, PR 1 of 2). Refutes pace (PPS-neutral) and the +0xD90 cold/Branch-A bucket composite (shared structure; ADR-0040-A null) as the lever, and disambiguates the miss→ORB empty loop (level) from the wrong-signed covariance (dispersion, non-arm per the exhausted freeze lattice). Names a PRIME suspect: the deferred Branch-B usage path — the only bucket-side 5.60/engine difference, team-quality-gated (TransOff × team DRB+AST), plausibly a half-court→transition allocation, upstream of the four exhausted arms. Its net Cov sign is unmeasured; the build PR's first task is to implement it behind a freeze toggle and measure.
-last_verified: 2026-06-05
+last_verified: 2026-08-08
 ---
 
 # ADR-0047: Volume → shot-COUNT conversion mechanism

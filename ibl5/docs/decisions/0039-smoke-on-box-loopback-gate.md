@@ -1,6 +1,6 @@
 ---
 description: Both the gating IBL5 probe and the notify-only IBL6 check run on the production box over SSH and curl their public hostnames from the box's own whitelisted IP, removing the per-IP WAF from the auto-rollback path (IBL5) and eliminating the WAF 415 false positive (IBL6); SSH-unreachable is treated as inconclusive (never rollback). Loopback probing was rejected because the box serves a non-matching default-vhost cert on 127.0.0.1.
-last_verified: 2026-06-08
+last_verified: 2026-08-08
 ---
 
 # ADR-0039: On-Box Smoke Gates Auto-Rollback

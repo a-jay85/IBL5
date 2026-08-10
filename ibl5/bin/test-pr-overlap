@@ -1,0 +1,278 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-pr-overlap — regression harness for bin/pr-overlap.
+#
+# Fully offline and self-contained: every fixture is a synthetic unified diff this
+# script writes under mktemp. No gh, no git, no network — bin/pr-overlap parses diff
+# TEXT only, which is exactly why it can be pinned this cheaply.
+#
+# Pins: false-positive suppression (same file, disjoint hunks -> CLEAN), true
+# collision (overlapping hunks -> HAND-RESOLUTION), the adjacency off-by-one from
+# both sides of the boundary, omitted hunk counts, zero-count/new-file hunks,
+# hunkless (binary) contended files, non-contended files staying silent, label
+# rendering, and every non-zero exit path.
+#
+# Wired into the "Shell harness regression tests" job in .github/workflows/tests.yml,
+# alongside bin/test-check-pr-collisions.
+#
+# Run: bin/test-pr-overlap  (exit 0 = all pass, 1 = a case failed)
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+OVERLAP="$SCRIPT_DIR/pr-overlap"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP" 2>/dev/null' EXIT
+
+FAILED=0
+
+pass()     { echo "ok: $1"; }
+failcase() { echo "FAIL: $1"; FAILED=1; }
+
+# assert_match <name> <ERE> <output>
+assert_match() {
+    if printf '%s\n' "$3" | grep -qE "$2"; then
+        pass "$1"
+    else
+        failcase "$1 - expected to match: $2"
+        printf '%s\n' "$3" | sed 's/^/    /'
+    fi
+}
+
+# assert_absent <name> <ERE> <output>
+assert_absent() {
+    if printf '%s\n' "$3" | grep -qE "$2"; then
+        failcase "$1 - expected NOT to match: $2"
+        printf '%s\n' "$3" | sed 's/^/    /'
+    else
+        pass "$1"
+    fi
+}
+
+# assert_status <name> <expected> <actual>
+assert_status() {
+    if [ "$3" = "$2" ]; then pass "$1"; else failcase "$1 - expected exit $2, got $3"; fi
+}
+
+# run [args...] -> sets OUT (stdout+stderr) and ST (exit status)
+run() {
+    ST=0
+    OUT="$("$OVERLAP" "$@" 2>&1)" || ST=$?
+}
+
+if [ ! -x "$OVERLAP" ]; then
+    echo "FAIL: $OVERLAP is missing or not executable" >&2
+    exit 1
+fi
+
+# --- Fixtures -------------------------------------------------------------
+
+cat > "$TMP/base.diff" <<'EOF'
+diff --git a/ibl5/x.php b/ibl5/x.php
+index 1111111..2222222 100644
+--- a/ibl5/x.php
++++ b/ibl5/x.php
+@@ -10,5 +10,5 @@ class X
+-    $a = 1;
++    $a = 2;
+EOF
+
+# Disjoint from base (starts one line past base's last line 14) and carries a
+# second file base never touches, so "not contended" can be asserted.
+cat > "$TMP/disjoint.diff" <<'EOF'
+diff --git a/ibl5/x.php b/ibl5/x.php
+--- a/ibl5/x.php
++++ b/ibl5/x.php
+@@ -15,3 +15,4 @@ class X
+-    $b = 1;
++    $b = 2;
+diff --git a/ibl5/solo.php b/ibl5/solo.php
+--- a/ibl5/solo.php
++++ b/ibl5/solo.php
+@@ -1,2 +1,2 @@
+-    $c = 1;
++    $c = 2;
+EOF
+
+cat > "$TMP/overlap.diff" <<'EOF'
+diff --git a/ibl5/x.php b/ibl5/x.php
+@@ -12,4 +12,4 @@ class X
+-    $a = 1;
++    $a = 3;
+EOF
+
+# Shares exactly one line (14) with base's [10,14] - the boundary case.
+cat > "$TMP/touch.diff" <<'EOF'
+diff --git a/ibl5/x.php b/ibl5/x.php
+@@ -14,3 +14,3 @@ class X
+-    $a = 1;
++    $a = 4;
+EOF
+
+cat > "$TMP/other.diff" <<'EOF'
+diff --git a/ibl5/y.php b/ibl5/y.php
+@@ -10,5 +10,5 @@ class Y
+-    $y = 1;
++    $y = 2;
+EOF
+
+cat > "$TMP/nocount-a.diff" <<'EOF'
+diff --git a/ibl5/x.php b/ibl5/x.php
+@@ -12 +12 @@ class X
+-    $a = 1;
++    $a = 2;
+EOF
+
+cat > "$TMP/nocount-b.diff" <<'EOF'
+diff --git a/ibl5/x.php b/ibl5/x.php
+@@ -13,2 +13,2 @@ class X
+-    $b = 1;
++    $b = 2;
+EOF
+
+cat > "$TMP/newfile.diff" <<'EOF'
+diff --git a/ibl5/new.php b/ibl5/new.php
+new file mode 100644
+--- /dev/null
++++ b/ibl5/new.php
+@@ -0,0 +1,3 @@
++<?php
+EOF
+cp "$TMP/newfile.diff" "$TMP/newfile-2.diff"
+
+cat > "$TMP/binary.diff" <<'EOF'
+diff --git a/ibl5/assets/logo.png b/ibl5/assets/logo.png
+index 3333333..4444444 100644
+Binary files a/ibl5/assets/logo.png and b/ibl5/assets/logo.png differ
+EOF
+cp "$TMP/binary.diff" "$TMP/binary-2.diff"
+
+cat > "$TMP/multi-a.diff" <<'EOF'
+diff --git a/ibl5/x.php b/ibl5/x.php
+@@ -10,5 +10,5 @@ class X
+-    $a = 1;
++    $a = 2;
+@@ -100,5 +100,5 @@ class X
+-    $z = 1;
++    $z = 2;
+EOF
+
+cat > "$TMP/multi-b.diff" <<'EOF'
+diff --git a/ibl5/x.php b/ibl5/x.php
+@@ -50,2 +50,2 @@ class X
+-    $m = 1;
++    $m = 2;
+@@ -102,3 +102,3 @@ class X
+-    $z = 1;
++    $z = 3;
+EOF
+
+cat > "$TMP/space-a.diff" <<'EOF'
+diff --git a/docs/my file.md b/docs/my file.md
+@@ -5,4 +5,4 @@
+-one
++two
+EOF
+
+cat > "$TMP/space-b.diff" <<'EOF'
+diff --git a/docs/my file.md b/docs/my file.md
+@@ -6,2 +6,2 @@
+-one
++three
+EOF
+
+printf 'this is not a diff at all\n' > "$TMP/junk.diff"
+: > "$TMP/empty.diff"
+
+# --- Case 1: disjoint hunks in the same file (false-positive suppression) --
+
+run "$TMP/base.diff" "$TMP/disjoint.diff" '#101' '#102'
+assert_match  "1a disjoint hunks in the same file report CLEAN" '^CLEAN ibl5/x\.php$' "$OUT"
+assert_absent "1b disjoint hunks never report HAND-RESOLUTION" 'HAND-RESOLUTION' "$OUT"
+assert_match  "1c summary counts one contended, clean file" 'SUMMARY contended=1 clean=1 hand=0' "$OUT"
+assert_absent "1d a file present in only one diff is not reported" 'solo\.php' "$OUT"
+assert_status "1e a clean analysis exits 0" 0 "$ST"
+
+# --- Case 2: overlapping hunks in the same file ---------------------------
+
+run "$TMP/base.diff" "$TMP/overlap.diff" '#101' '#102'
+assert_match  "2a overlapping hunks report HAND-RESOLUTION" '^HAND-RESOLUTION ibl5/x\.php ' "$OUT"
+assert_match  "2b the finding names both labels and both hunk headers" '\(#101 @@ -10,5 vs #102 @@ -12,4\)' "$OUT"
+assert_absent "2c a colliding file is never also reported CLEAN" '^CLEAN ' "$OUT"
+assert_match  "2d summary counts one hand-resolution" 'SUMMARY contended=1 clean=0 hand=1' "$OUT"
+assert_status "2e findings do not leak into the exit status" 0 "$ST"
+
+# --- Case 3: no shared files (negative path) ------------------------------
+
+run "$TMP/base.diff" "$TMP/other.diff" '#101' '#103'
+assert_absent "3a no shared file produces no per-file line" '^(CLEAN|HAND-RESOLUTION) ' "$OUT"
+assert_match  "3b summary reports zero contended files" 'SUMMARY contended=0 clean=0 hand=0' "$OUT"
+assert_status "3c disjoint file sets still exit 0" 0 "$ST"
+
+# --- Case 4: the adjacency boundary, from both sides ----------------------
+
+run "$TMP/base.diff" "$TMP/touch.diff" '#101' '#104'
+assert_match  "4a hunks sharing a single line do collide" '^HAND-RESOLUTION ibl5/x\.php ' "$OUT"
+run "$TMP/base.diff" "$TMP/disjoint.diff" '#101' '#102'
+assert_match  "4b hunks one line clear of each other do not collide" '^CLEAN ibl5/x\.php$' "$OUT"
+
+# --- Case 5: omitted hunk count means exactly one line --------------------
+
+run "$TMP/nocount-a.diff" "$TMP/nocount-b.diff"
+assert_match  "5a an omitted hunk count spans one line only" '^CLEAN ibl5/x\.php$' "$OUT"
+assert_match  "5b summary agrees" 'SUMMARY contended=1 clean=1 hand=0' "$OUT"
+
+# --- Case 6: both diffs create the same file (zero-count hunk) ------------
+
+run "$TMP/newfile.diff" "$TMP/newfile-2.diff" '#105' '#106'
+assert_match  "6a two PRs creating the same file collide" '^HAND-RESOLUTION ibl5/new\.php ' "$OUT"
+
+# --- Case 7: contended file with no hunk ranges is fail-safe --------------
+
+run "$TMP/binary.diff" "$TMP/binary-2.diff" '#107' '#108'
+assert_match  "7a a contended binary file reports HAND-RESOLUTION" '^HAND-RESOLUTION ibl5/assets/logo\.png ' "$OUT"
+assert_match  "7b the finding explains the missing hunk ranges" '\(no hunk ranges - binary or metadata-only change\)' "$OUT"
+assert_absent "7c a hunkless contended file is never CLEAN" '^CLEAN ' "$OUT"
+
+# --- Case 8: multi-hunk diffs report the pair that actually collides ------
+
+run "$TMP/multi-a.diff" "$TMP/multi-b.diff" '#101' '#102'
+assert_match  "8a the colliding hunk pair is named" '\(#101 @@ -100,5 vs #102 @@ -102,3\)' "$OUT"
+assert_match  "8b one file, one finding" 'SUMMARY contended=1 clean=0 hand=1' "$OUT"
+
+# --- Case 9: a path containing a space survives parsing ------------------
+
+run "$TMP/space-a.diff" "$TMP/space-b.diff" '#109' '#110'
+assert_match  "9a a spaced path is parsed and rendered intact" '^HAND-RESOLUTION docs/my file\.md ' "$OUT"
+
+# --- Case 10: labels default to A / B ------------------------------------
+
+run "$TMP/base.diff" "$TMP/overlap.diff"
+assert_match  "10a omitted labels fall back to A and B" '\(A @@ -10,5 vs B @@ -12,4\)' "$OUT"
+
+# --- Case 11: every non-zero exit path ------------------------------------
+
+run
+assert_status "11a no arguments is a usage error" 2 "$ST"
+run "$TMP/base.diff"
+assert_status "11b one argument is a usage error" 2 "$ST"
+run "$TMP/base.diff" "$TMP/does-not-exist.diff"
+assert_status "11c an unreadable diff file exits 2" 2 "$ST"
+run "$TMP/empty.diff" "$TMP/base.diff"
+assert_status "11d an empty diff file exits 2" 2 "$ST"
+run "$TMP/junk.diff" "$TMP/base.diff"
+assert_status "11e a diff with no headers exits 3" 3 "$ST"
+assert_absent "11f malformed input never reports CLEAN" '^CLEAN ' "$OUT"
+run --help
+assert_status "11g --help exits 0" 0 "$ST"
+assert_match  "11h --help prints usage" 'Usage: bin/pr-overlap' "$OUT"
+
+# --- Verdict --------------------------------------------------------------
+
+if [ "$FAILED" -eq 0 ]; then
+    echo "All bin/pr-overlap cases passed."
+    exit 0
+fi
+echo "bin/test-pr-overlap: one or more cases failed (see FAIL lines above)." >&2
+exit 1

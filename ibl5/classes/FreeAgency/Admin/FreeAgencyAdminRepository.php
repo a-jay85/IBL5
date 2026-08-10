@@ -2,10 +2,11 @@
 
 declare(strict_types=1);
 
-namespace FreeAgency;
+namespace FreeAgency\Admin;
 
 use BaseMysqliRepository;
-use FreeAgency\Contracts\FreeAgencyAdminRepositoryInterface;
+use FreeAgency\Admin\Contracts\FreeAgencyAdminRepositoryInterface;
+use FreeAgency\DayAlreadyProcessedException;
 use League\LeagueContext;
 
 /**

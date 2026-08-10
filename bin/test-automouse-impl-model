@@ -47,7 +47,7 @@ impl_model: sonnet
 body'
 
 # c2 (FOOTGUN, negative) — no frontmatter; an impl_model example in the BODY is ignored
-assert "c2-footgun-body-example" "claude-opus-4-8" '# Plan
+assert "c2-footgun-body-example" "claude-opus-5" '# Plan
 Documenting the syntax:
 ```
 ---
@@ -57,7 +57,7 @@ impl_model: haiku
 more body'
 
 # c3 (negative) — real frontmatter without impl_model; trailing body example ignored
-assert "c3-no-field" "claude-opus-4-8" '---
+assert "c3-no-field" "claude-opus-5" '---
 description: x
 ---
 # Plan
@@ -66,7 +66,7 @@ impl_model: haiku
 ---'
 
 # c4 (negative) — explicit opus falls through to the default
-assert "c4-explicit-opus" "claude-opus-4-8" '---
+assert "c4-explicit-opus" "claude-opus-5" '---
 impl_model: opus
 ---
 # Plan'

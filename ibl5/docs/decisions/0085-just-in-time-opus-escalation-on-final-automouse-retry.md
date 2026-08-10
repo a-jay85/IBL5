@@ -12,7 +12,7 @@ owner: A-Jay
 
 ## Context
 
-`bin/automouse/run` runs each queued plan through an attempt loop capped at `MAX_ATTEMPTS=3`. The impl model for a run is resolved once per attempt by `bin/lib/plan-impl-model`, which reads a line-1-anchored `impl_model:` frontmatter field and maps `sonnet`→`claude-sonnet-4-6`, `haiku`→`claude-haiku-4-5`, and everything else (missing/unknown/`opus`) to the safe default `claude-opus-4-8`. With per-plan tier labels bound (L13), a non-Opus model is now the common case for cheap plans.
+`bin/automouse/run` runs each queued plan through an attempt loop capped at `MAX_ATTEMPTS=3`. The impl model for a run is resolved once per attempt by `bin/lib/plan-impl-model`, which reads a line-1-anchored `impl_model:` frontmatter field and maps `sonnet`→`claude-sonnet-4-6`, `haiku`→`claude-haiku-4-5`, and everything else (missing/unknown/`opus`) to the safe default `claude-opus-5`. With per-plan tier labels bound (L13), a non-Opus model is now the common case for cheap plans.
 
 Two gaps make a non-Opus night brittle:
 
@@ -25,7 +25,7 @@ This is nightly-ship-pipeline machinery: a wrong decision here burns whole unatt
 
 ## Decision
 
-On the **final** attempt only (the attempt numbered `MAX_ATTEMPTS`), if the plan's resolved base model is **not** `claude-opus-4-8`, `bin/automouse/run` overrides the impl model to `claude-opus-4-8` for that one attempt — a just-in-time escalation. Earlier attempts run at the plan's declared tier unchanged.
+On the **final** attempt only (the attempt numbered `MAX_ATTEMPTS`), if the plan's resolved base model is **not** `claude-opus-5`, `bin/automouse/run` overrides the impl model to `claude-opus-5` for that one attempt — a just-in-time escalation. Earlier attempts run at the plan's declared tier unchanged.
 
 Four rules make this safe:
 

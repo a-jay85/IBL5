@@ -311,7 +311,7 @@ run_heartbeat_watcher() {
 }
 
 # Map a Claude model id to its tier label for the cost roll-up. Prefix match so
-# a version bump (claude-opus-4-8 → claude-opus-5) keeps resolving; an unknown or
+# a version bump (claude-opus-5 → claude-opus-5) keeps resolving; an unknown or
 # empty id yields "?" rather than a blank cell.
 model_tier() {
     case "${1:-}" in

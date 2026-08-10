@@ -1484,6 +1484,15 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Status:** Completed branch `doc-freshness-catchup` (2026-05-19) — schema-reference.md now cites auth_users with ibl_team_info.gm_username mapping.
 
 **Table evidence (2026-07-25):** schema-reference cites auth_users.
+### 9.4 API_GUIDE Claims API "Not Yet Implemented" — It's Fully Built
+**Location:** `ibl5/docs/API_GUIDE.md`
+**Problem:** Header says "Not Yet Implemented"; body is "proposed design." Reality: 48 PHP files under `Api/`, 17 controllers with auth, rate limiting, ETag caching.
+**Suggested direction:** Rewrite as endpoint reference; archive design content.
+**Est. effort:** M
+**Risk if untouched:** Agents treat the API as absent and reimplement endpoints.
+**Status (2026-07-26):** ✅ Done — API_GUIDE.md correctly framed as architectural overview with controller inventory (`last_verified: 2026-07-24`); full endpoint-by-endpoint reference deferred. See 9.4b (still open in the live backlog).
+
+**Table evidence (2026-08-09):** API_GUIDE.md correctly framed (last_verified 2026-07-24); full endpoint reference deferred to 9.4b.
 ### 9.5 `ibl5/docs/README.md` Lists API_GUIDE as "(planned)"
 **Location:** `ibl5/docs/README.md` line 23
 **Problem:** Index contradicts the 17-controller API reality.
@@ -1655,6 +1664,15 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Status:** Completed (merged #1044, maintenance-30) — documentation-drift sweep.
 
 **Table evidence (2026-07-25):** IBL6/README replaced (#1044).
+### 9.24 `codebase-map.md` — Machine-Generated But No Auto-Regen
+**Location:** CLAUDE.md line 36 + repo-root `.claude/rules/codebase-map.md` (NOT under `ibl5/` — corrected 2026-05-29 audit)
+**Problem:** No CI regenerates it; drifts on module add/rename.
+**Suggested direction:** CI step running `bin/generate-codebase-map` with diff-fail; or add to post-plan.
+**Est. effort:** S
+**Risk if untouched:** Map silently stale after module changes.
+**Status (2026-07-26):** ✅ Implemented — removed from `.gitignore` and `bin/check-docs` allowlist; file tracked; `static-guards` job in `tests.yml` runs `bin/generate-codebase-map` + `git diff --exit-code` on every push.
+
+**Table evidence (2026-08-09):** Removed from .gitignore (PR #1671 reversal — no SessionStart hook existed); CI drift-check step added to static-guards in tests.yml.
 ### 9.25 STRATEGIC_PRIORITIES — Lists Completed Work as Pending
 **Location:** `ibl5/docs/STRATEGIC_PRIORITIES.md`
 **Problem:** Section 1 still lists `nuke_users` as remaining (already dropped in migration 102).
@@ -2379,6 +2397,15 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Risk if untouched:** Future `019` or `111` could execute out of dependency order.
 
 **Table evidence (2026-07-25):** Document migration numbering gaps in README; docs-only. **Status:** Documented numbering gaps (018-023, 111, 136, 146-148) in `ibl5/migrations/README.md` (this PR).
+### 15.12 `033b` / `037b` / `037c` / `044b` — Non-Sortable Suffix Convention
+**Location:** Four migrations with letter suffixes
+**Problem:** Natural sort places `033b` after `033` — correct but informal and undocumented.
+**Suggested direction:** Codify in README as legacy-only; require timestamp-based names for new migrations >126; CI lint to reject.
+**Est. effort:** S
+**Risk if untouched:** A new `037d` added after `038` could execute out of order on fresh install.
+**Status (2026-07-26):** ✅ Implemented — convention codified in `ibl5/migrations/README.md`; `migration-naming-check` job added to `migration-safety.yml` rejects new letter-suffix `.sql` files (existing `033b`/`037b`/`037c`/`044b` unaffected by `--diff-filter=A`).
+
+**Table evidence (2026-08-09):** Letter-suffix convention documented in migrations/README.md; `migration-naming-check` job added to migration-safety.yml (--diff-filter=A; legacy files unaffected).
 ### 15.13 `ibl_box_scores_teams.name` — Denormalized Snapshot Without Clear Lifecycle
 **Location:** `ibl_box_scores_teams.name varchar(16)` line 356
 **Problem:** Denormalized team name; `DEFAULT ''` (empty); indexed; queried actively. No FK, no trigger maintaining it.

@@ -491,30 +491,14 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 9.4b | ⬜ Open | — | Full endpoint-by-endpoint OpenAPI reference for API_GUIDE.md (deferred from 9.4). |
+| 9.4b | ⬜ Open | 🟩 | Full endpoint-by-endpoint OpenAPI reference for API_GUIDE.md (deferred from 9.4). Docs-only. |
 | 9.26 | ⬜ Open | 🟨 | No CHANGELOG — upfront decision: ADRs-as-substitute (document) vs post-plan-fed CHANGELOG tooling. |
-
-### 9.4 API_GUIDE Claims API "Not Yet Implemented" — It's Fully Built
-**Location:** `ibl5/docs/API_GUIDE.md`
-**Problem:** Header says "Not Yet Implemented"; body is "proposed design." Reality: 48 PHP files under `Api/`, 17 controllers with auth, rate limiting, ETag caching.
-**Suggested direction:** Rewrite as endpoint reference; archive design content.
-**Est. effort:** M
-**Risk if untouched:** Agents treat the API as absent and reimplement endpoints.
-**Status (2026-07-26):** ✅ Done — API_GUIDE.md correctly framed as architectural overview with controller inventory (`last_verified: 2026-07-24`); full endpoint-by-endpoint reference deferred. See 9.4b.
 
 ### 9.4b API_GUIDE — Full Endpoint-by-Endpoint OpenAPI Reference (Deferred from 9.4)
 **Location:** `ibl5/docs/API_GUIDE.md`
 **Problem:** Architectural overview is correct; no per-endpoint request/response reference exists.
 **Suggested direction:** Author a per-controller endpoint reference; consider OpenAPI/Swagger generation from annotations.
 **Est. effort:** M
-
-### 9.24 `codebase-map.md` — Machine-Generated But No Auto-Regen
-**Location:** CLAUDE.md line 36 + repo-root `.claude/rules/codebase-map.md` (NOT under `ibl5/` — corrected 2026-05-29 audit)
-**Problem:** No CI regenerates it; drifts on module add/rename.
-**Suggested direction:** CI step running `bin/generate-codebase-map` with diff-fail; or add to post-plan.
-**Est. effort:** S
-**Risk if untouched:** Map silently stale after module changes.
-**Status (2026-07-26):** ✅ Implemented — removed from `.gitignore` and `bin/check-docs` allowlist; file tracked; `static-guards` job in `tests.yml` runs `bin/generate-codebase-map` + `git diff --exit-code` on every push.
 
 ### 9.26 No CHANGELOG Exists
 **Location:** `ibl5/` (absent)
@@ -755,14 +739,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Est. effort:** M
 **Risk if untouched:** Unbacktick'd queries are valid MariaDB but fail strict parsers.
 **Status:** `name` portion **Completed** (maintenance-42, migration 143). `ibl_settings.name` → `setting_key`: the composite PK was rebuilt `(name, league)` → `(setting_key, league)` and **three** triggers reading the column were recreated against `setting_key` — `trg_team_identity_sync` (mig 140 body), `trg_gm_tenure_track` (mig 100 body, which the original brief missed), and `trg_season_rollover` (mig 017 body) — preserving the live `ibl_team_info` activation order 1→2 via the drop-both / recreate-with-`FOLLOWS` dance. The full PHP/SQL read-write sweep (`League`, `LeagueControlPanelRepository`, `ModuleAccessControl`, `ProjectedDraftOrderRepository`, `MaintenanceRepository`, `SeasonQueryRepository`, `test-state.php`, fixtures) shipped in the same PR so migration + code deploy atomically. `config/schema-assertions.php` now asserts `setting_key`, hard-failing `SchemaValidator` at boot if the rename regresses. **Still deferred:** `ibl_settings.value` → `setting_value` (name-only PR). `cache`/`cache_locks` remain out of scope (upstream Laravel scaffolding).
-
-### 15.12 `033b` / `037b` / `037c` / `044b` — Non-Sortable Suffix Convention
-**Location:** Four migrations with letter suffixes
-**Problem:** Natural sort places `033b` after `033` — correct but informal and undocumented.
-**Suggested direction:** Codify in README as legacy-only; require timestamp-based names for new migrations >126; CI lint to reject.
-**Est. effort:** S
-**Risk if untouched:** A new `037d` added after `038` could execute out of order on fresh install.
-**Status (2026-07-26):** ✅ Implemented — convention codified in `ibl5/migrations/README.md`; `migration-naming-check` job added to `migration-safety.yml` rejects new letter-suffix `.sql` files (existing `033b`/`037b`/`037c`/`044b` unaffected by `--diff-filter=A`).
 
 ### 15.17 `ibl_olympics_career_*` — `int(11)` Stat Columns Where Smaller Suffices
 **Location:** `ibl_olympics_career_avgs` (games as int(11), retired as int(11)); `ibl_olympics_career_totals` (all counting stats int(11))

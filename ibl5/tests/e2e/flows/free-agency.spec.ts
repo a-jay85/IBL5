@@ -187,9 +187,17 @@ test.describe('Free Agency -- negotiation page', () => {
   });
 
   test('notes/reminders card shows rules', async ({ page }) => {
-    await expect(page.locator('.ibl-card__title').filter({ hasText: 'Notes / Reminders' })).toBeVisible();
-    const body = await page.locator('body').textContent();
-    expect(body).toContain('cap');
+    const notes = page
+      .locator('.ibl-card')
+      .filter({ has: page.locator('.ibl-card__title', { hasText: 'Notes / Reminders' }) });
+    await expect(notes).toBeVisible();
+    // [rendered] PHP-emitted static rule text from FreeAgencyOfferView.php — env-independent.
+    await expect(notes).toContainText('soft cap space available');
+    await expect(notes).toContainText('must equal or exceed the previous year');
+    // Boundary: the card must carry rule content beyond just its heading.
+    expect(((await notes.textContent()) ?? '').length).toBeGreaterThan(
+      'Notes / Reminders'.length + 40,
+    );
   });
 
   test('no PHP errors on negotiation page', async ({ page }) => {

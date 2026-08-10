@@ -36,11 +36,25 @@ test.describe('Draft board: renders', () => {
   });
 
   test('current pick indicator shows team on the clock', async ({ page }) => {
-    // The draft page should show which team is picking
-    // Metros (pick 1) should be on the clock in seed data
-    const body = await page.locator('body').textContent();
-    // Look for pick/round indicator text
-    expect(body).toMatch(/round|pick|on the clock|draft/i);
+    // The draft page should show which team is picking.
+    // ci-seed pick 1 = 'Metros'; wtdb pick 1 = 'Aces' — disagree per §1.2 rule 3.
+    // Using structural invariant: on-clock indicator names one of the known teams.
+    const board = page.locator('#site-content').first();
+    const allTeamNames = [
+      'Free Agents', 'Celtics', 'Heat', 'Knicks', 'Nets', 'Magic', 'Bucks', 'Bulls',
+      'Pelicans', 'Hawks', 'Sting', 'Pacers', 'Raptors', 'Jazz', 'Timberwolves', 'Nuggets',
+      'Aces', 'Rockets', 'Trailblazers', 'Clippers', 'Grizzlies', 'Lakers', 'Braves',
+      'Suns', 'Warriors', 'Pistons', 'Kings', 'Bullets', 'Mavericks', 'Metros',
+      'Rookies', 'Sophomores',
+    ];
+    await expect(board).toBeVisible();
+    // The draft form encodes the picking team in a hidden input — no visible "on the clock" text.
+    const teamInput = board.locator('input[name="teamname"]');
+    await expect(teamInput).toHaveCount(1);
+    const teamValue = (await teamInput.getAttribute('value')) ?? '';
+    expect(allTeamNames.includes(teamValue.trim()), `teamname "${teamValue}" not in known teams`).toBe(true);
+    // Round is also encoded — confirms draft form rendered, not an empty shell.
+    await expect(board.locator('input[name="draft_round"]')).toHaveCount(1);
   });
 
   test('undrafted players listed with radio buttons', async ({ page }) => {

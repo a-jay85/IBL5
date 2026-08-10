@@ -113,17 +113,14 @@ test.describe('Search flow', () => {
     await page.locator('input[name="query"]').fill('ab');
     await page.locator('.ibl-search__btn').click();
 
-    // Should show an error about minimum query length
-    const body = await page.locator('body').textContent();
-
-    // The error should mention character length requirement
-    const hasError =
-      body?.includes('3') ||
-      body?.includes('character') ||
-      body?.includes('short') ||
-      page.url().includes('qlen=1');
-
-    expect(hasError).toBe(true);
+    // A 2-char query must be rejected: the module redirects with the qlen marker
+    // and renders the min-length error in the alert, not merely somewhere in <body>.
+    await expect(page).toHaveURL(/qlen=1/);
+    const alert = page.locator('.ibl-alert').first();
+    await expect(alert).toBeVisible();
+    await expect(alert).toContainText('Your query should be at least 3 characters long.');
+    // Negative path: a rejected query must render no results.
+    await expect(page.locator('.search-result__title')).toHaveCount(0);
 
     // No PHP errors
     await assertNoPhpErrors(page);

@@ -24,8 +24,10 @@ test.describe('Contract Extension flow', () => {
     // The negotiate page renders either the extension form (offerYear inputs) or a
     // validation message (eligibility/ownership). Both are valid renders — pid=30's
     // exact eligibility depends on parallel-test contract state, so assert that the
-    // page produced a meaningful render rather than over-pinning the form. // e2e-hygiene-allow: form-or-message is the asserted contract here, not a silent fallback
-    const formOrMessage = page.locator('input[name^="offerYear"], .ibl-alert, .ibl-card__title').first();
+    // page produced a meaningful render rather than over-pinning the form.
+    // .ibl-card__title was removed: it renders on every page in the site chrome and
+    // satisfied the OR even when the negotiate page rendered neither form nor message. // e2e-hygiene-allow: form-or-message is the asserted contract here, not a silent fallback
+    const formOrMessage = page.locator('input[name^="offerYear"], .ibl-alert').first();
     await expect(formOrMessage).toBeVisible();
   });
 

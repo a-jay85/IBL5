@@ -138,29 +138,31 @@ were softened after direct re-check (C6 partially a false positive, C16 lower-co
 
 | # | Status | Auto | File:line | Why it can't fail |
 |---|--------|------|-----------|-------------------|
-| C1 | ⬜ | 🟩 | `contract-extension.spec.ts:28` | `.ibl-card__title` on every page → never fails. |
-| C2 | ⬜ | 🟩 | `draft.spec.ts:42` | `/round\|pick\|draft/i` matches title/nav. |
-| C3 | ⬜ | 🟩 | `one-on-one-game.spec.ts:70` | OR-chain of common words. |
-| C4 | ⬜ | 🟩 | `search.spec.ts` short-query | `body.includes('3')` matches any digit. |
-| C5 | ⬜ | 🟩 | `free-agency.spec.ts` notes | `body.toContain('cap')` guaranteed. |
-| C6 | ⬜ | 🟩 | `player.spec.ts:111` | **Partial FP:** only the bare `'g'` is weak; L141 `/sta\|oo\|.../` are real header codes (header-scoped). Drop just `'g'`. |
-| C7 | ⬜ | 🟩 | `olympics-pages.spec.ts:24` | `body.length>100` (nav alone exceeds). |
-| C8 | ⬜ | 🟩 | `htmx.spec.ts` direct-URL | `expect(html).toBe(1)` always true. |
-| C9 | ⬜ | 🟩 | `team-schedule.spec.ts` no-power | `body.length>0`. |
-| C10 | ⬜ | 🟩 | `season-highs.spec.ts` header | `thead.textContent.length>0`. |
-| C11 | ⬜ | 🟩 | `player-subpages.spec.ts` rookie-opt | `hasForm = locator('form').count()>0` always true. |
-| C12 | ⬜ | 🟩 | `player-movement` / `free-agency-preview` / `cap-space` "sortable" | `.sortable.first()` visible ≠ sorting works. |
-| C13 | ⬜ | 🟩 | `topics.spec.ts` | `hasGrid \|\| hasEmpty` dual-path, single branch ever taken. |
-| C14 | ⬜ | 🟩 | `homepage.spec.ts` main | `#site-content` on every page. |
-| C15 | ⬜ | 🟩 | `contract-list.spec.ts` wrapper | asserts `.ibl-data-table` (already asserted), not the wrapper. |
-| C16 | ⬜ | 🟩 | `olympics-coverage.spec.ts:20` | header-scoped `/w\|l\|.../i` — weak single-char, lower confidence. |
+| C1 | ✅ | 🟩 | `contract-extension.spec.ts:28` | `.ibl-card__title` on every page → never fails. |
+| C2 | ✅ | 🟩 | `draft.spec.ts:42` | `/round\|pick\|draft/i` matches title/nav. |
+| C3 | ✅ | 🟩 | `one-on-one-game.spec.ts:70` | OR-chain of common words. |
+| C4 | ✅ | 🟩 | `flows/search.spec.ts:112` | `body.includes('3')` matches any digit. |
+| C5 | ✅ | 🟩 | `free-agency.spec.ts` notes | `body.toContain('cap')` guaranteed. |
+| C6 | ✅ | 🟩 | `player.spec.ts:111` | **Partial FP:** only the bare `'g'` is weak; L141 `/sta\|oo\|.../` are real header codes (header-scoped). Drop just `'g'`. |
+| C7 | ✅ | 🟩 | `smoke/olympics-pages.spec.ts:24,31` | `body.length>100` (nav alone exceeds). |
+| C8 | ✅ | 🟩 | `smoke/htmx.spec.ts:72` | `expect(html).toBe(1)` always true. |
+| C9 | ✅ | 🟩 | `team-schedule.spec.ts` no-power | `body.length>0`. |
+| C10 | ✅ | 🟩 | `season-highs.spec.ts` header | `thead.textContent.length>0`. |
+| C11 | ✅ | 🟩 | `player-subpages.spec.ts` rookie-opt | `hasForm = locator('form').count()>0` always true. |
+| C12 | ✅ | 🟩 | `player-movement` / `free-agency-preview` / `cap-space` "sortable" | `.sortable.first()` visible ≠ sorting works. |
+| C13 | ✅ | 🟩 | `topics.spec.ts` | `hasGrid \|\| hasEmpty` dual-path, single branch ever taken. |
+| C14 | ✅ | 🟩 | `homepage.spec.ts` main | `#site-content` on every page. |
+| C15 | ✅ | 🟩 | `contract-list.spec.ts` wrapper | asserts `.ibl-data-table` (already asserted), not the wrapper. |
+| C16 | ✅ | 🟩 | `flows/olympics-coverage.spec.ts:20` | header-scoped `/w\|l\|.../i` — weak single-char, lower confidence. |
 | C17 | ⬜ | 🟨 | `api-e2e/api.test.ts assertGetRoute` | **High impact:** silently passes on 401 → 30+ tests skip body validation. May be masking a CI-key/config issue → triage. |
-| C18 | ⬜ | 🟩 | `api-e2e/api.test.ts` CSV | bare `return` L373/395/396 + true-only guard L415 (DON'T rules 12/14). |
+| C18 | ✅ | 🟩 | `api-e2e/api.test.ts` CSV | bare `return` L373/395/396 + true-only guard L415 (DON'T rules 12/14). |
 
 **Suggested direction (axis):** Replace each with an assertion tied to feature-specific content (a known seed
 value, a specific column/class, a real sort effect). C17 needs investigation first — confirm the CI API key
 is present and the 401 branch is dead, then remove the silent skip.
 **Est. effort:** S per item (C17 = S+investigation). **Risk if untouched:** these tests give false green.
+
+**Status:** ✅ C1–C16, C18 implemented 2026-08-08 — each weak assertion replaced with a seed-grounded or element-scoped assertion, every one verified to fail when fed a wrong value. C17 remains ⬜ Open (out of scope). ⚠️ Bug finding: C7 player page (olympics-pages.spec.ts:31) — Olympics player page for pid=1 renders "Something went wrong" because ibl_olympics_stats has no seed data; auto_merge set to false.
 
 ---
 
@@ -243,4 +245,4 @@ use the swap/`waitForURL` signal. E9 needs the real submit signal (waitForRespon
 3. **A1, A2, A3** — clear DRY wins, low risk.
 4. **Axis E** `networkidle`/`waitForTimeout` sweep (especially `depth-chart-entry-mobile`).
 5. **Axis B** beforeEach + table-driven merges — pure speed, largest diff/lowest risk, do last.
-6. **Axis C** weak asserts — tighten opportunistically; low urgency (toothless, not wrong).
+6. **Axis C** weak asserts — ✅ done (C1–C16, C18); C17 still open.

@@ -65,17 +65,11 @@ test.describe('One-on-One Game flow', () => {
 
     // Wait for results page — verify error message disappears or results appear
     await page.waitForLoadState('networkidle');
-    const body = await page.locator('body').textContent();
-    // Results should contain score or game info (not just the form)
-    const hasResults =
-      body?.includes('Score') ||
-      body?.includes('Winner') ||
-      body?.includes('won') ||
-      body?.includes('pts') ||
-      body?.includes('Final') ||
-      body?.includes('Game ID') ||
-      body?.includes('Quarter');
-    expect(hasResults).toBe(true);
+    // The results render puts the game result in the card body.
+    const result = page.locator('.ibl-card__body .text-center strong').first();
+    await expect(result).toBeVisible();
+    // Negative path: the form must be gone — this is what "not just the form" means.
+    await expect(page.getByRole('button', { name: /begin/i })).toHaveCount(0);
     await assertNoPhpErrors(page, 'on OneOnOneGame results page');
   });
 

@@ -21,15 +21,21 @@ test.describe('Olympics page smoke tests', () => {
   test('team page loads in Olympics context', async ({ page }) => {
     await page.goto('modules.php?name=Team&op=team&teamid=1&league=olympics');
     await assertNoPhpErrors(page, 'on modules.php?name=Team&op=team&teamid=1&league=olympics');
-    const body = await page.locator('body').textContent();
-    expect(body?.length).toBeGreaterThan(100);
+    // teamid=1 in Olympics context must resolve against ibl_olympics_team_info.
+    // Seed (Eagles) vs wtdb (USA) disagree on team name — using structural invariant per §1.2 rule 3.
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+    await expect(page.locator('h2').filter({ hasText: 'Current Season' }).first()).toBeVisible();
   });
 
   test('player page loads in Olympics context', async ({ page }) => {
     await page.goto('modules.php?name=Player&pa=showpage&pid=1&league=olympics');
     await assertNoPhpErrors(page, 'on modules.php?name=Player&pa=showpage&pid=1&league=olympics');
-    const body = await page.locator('body').textContent();
-    expect(body?.length).toBeGreaterThan(100);
+    // pid=1 rendered in Olympics context — .ibl-title must be visible.
+    // BUG FINDING: Olympics player page renders "Something went wrong" because
+    // ibl_olympics_stats has no data for pid=1 in either environment. The prior
+    // tautological assertion was masking this error. auto_merge: false flagged.
+    await expect(page.locator('.ibl-title').first()).toBeVisible();
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
   });
 });
 

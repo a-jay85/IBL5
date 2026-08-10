@@ -20,17 +20,12 @@ test.describe('Topics flow', () => {
     await expect(page.locator('.ibl-title').first()).toBeVisible();
   });
 
-  test('topic cards or empty state render', async ({ page }) => {
-    const grid = page.locator('.topics-grid');
-    const emptyState = page.locator('.ibl-empty-state');
-    const hasGrid = (await grid.count()) > 0;
-    const hasEmpty = (await emptyState.count()) > 0;
-
-    expect(hasGrid || hasEmpty).toBe(true);
-
-    if (hasGrid) {
-      await expect(page.locator('.topic-card').first()).toBeVisible();
-    }
+  test('topic cards render for the seeded topics', async ({ page }) => {
+    await expect(page.locator('.topics-grid')).toBeVisible();
+    await expect(page.locator('.ibl-empty-state')).toHaveCount(0);
+    await expect(page.locator('.topic-card').first()).toBeVisible();
+    // AGREE: no — ci-seed has 3 topics, wtdb has 33; using toBeGreaterThanOrEqual(1)
+    expect(await page.locator('.topic-card').count()).toBeGreaterThanOrEqual(1);
   });
 
   // CI seed has 3 nuke_topics rows and stories linked to topic=1,

@@ -23,3 +23,31 @@ export async function assertSortableTablePage(
     .toBeGreaterThanOrEqual(opts.minRows);
   await assertNoPhpErrors(page, `on ${opts.url}`);
 }
+
+/**
+ * Assert a sortable table's column actually sorts: sorttable initialised, the
+ * header takes the sorted-reverse state, aria-sort advances, and the column's
+ * cell order genuinely changes. `columnIndex` is 1-based (CSS nth-child).
+ */
+export async function assertColumnSorts(
+  page: Page,
+  opts: { tableSelector: string; columnIndex: number; minRows: number },
+): Promise<void> {
+  const table = page.locator(opts.tableSelector).first();
+  await expect(table).toHaveAttribute('data-sorttable', 'true');
+
+  const cells = table.locator(`tbody tr td:nth-child(${opts.columnIndex})`);
+  expect(await cells.count()).toBeGreaterThanOrEqual(opts.minRows);
+  const before = await cells.allTextContents();
+
+  const header = table.locator(`thead th:nth-child(${opts.columnIndex})`);
+  await expect(header).toHaveAttribute('aria-sort', 'none');
+  await header.click();
+
+  await expect(header).toHaveClass(/sorttable_sorted_reverse/);
+  await expect(header).toHaveAttribute('aria-sort', 'descending');
+  await expect(page.locator('#sorttable_sortrevind')).toBeAttached();
+
+  const after = await cells.allTextContents();
+  expect(after).not.toEqual(before);
+}

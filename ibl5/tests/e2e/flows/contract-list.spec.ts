@@ -32,9 +32,10 @@ test.describe('Contract List flow', () => {
   });
 
   test('table has responsive scroll wrapper', async ({ page }) => {
-    // Contract list uses responsive-table pattern
-    const table = page.locator('.responsive-table, .ibl-data-table').first();
-    await expect(table).toBeVisible();
+    // Contract list uses .responsive-table on the table element itself (confirmed via render)
+    const wrapper = page.locator('.responsive-table').first();
+    await expect(wrapper).toBeVisible();
+    await expect(wrapper.locator('th').first()).toBeVisible();
   });
 
   test('table has sticky column for player names', async ({ page }) => {

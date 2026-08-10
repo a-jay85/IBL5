@@ -297,11 +297,11 @@ test.describe('Team Schedule — no SOS data', () => {
   });
 
   test('page renders schedule without power data', async ({ page }) => {
-    // teamid=5 has no ibl_power row, but the page still renders.
-    // Tier dots may appear for opponents (derived from global power rankings).
-    // The key assertion is the SOS summary absence (tested above) + no PHP errors.
-    const body = await page.locator('body').textContent();
-    expect(body?.length).toBeGreaterThan(0);
+    // The schedule page must render its structure even when teamid=5 has no ibl_power row.
+    // ci-seed has no games for teamid=5; wtdb has 82 — using structural invariant.
+    await expect(page.locator('.schedule-team-banner').first()).toBeVisible();
+    // Negative path: a crash from missing ibl_power data would take down the container.
+    await expect(page.locator('.schedule-container--team').first()).toBeVisible();
   });
 });
 

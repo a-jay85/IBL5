@@ -368,11 +368,9 @@ describe('API v1 — player export CSV', () => {
       headers: AUTH_HEADERS,
     });
 
-    if (res.status !== 200) return;
-
-    // CI Apache sometimes returns HTML under load — skip if not CSV
+    expect(res.status).toBe(200);
     const ct = res.headers.get('content-type') ?? '';
-    if (!ct.includes('text/csv')) return;
+    expect(ct).toContain('text/csv');
 
     const text = await res.text();
     // Strip BOM if present
@@ -390,10 +388,9 @@ describe('API v1 — player export CSV', () => {
       headers: AUTH_HEADERS,
     });
 
-    if (res.status !== 200) return;
-
+    expect(res.status).toBe(200);
     const ct = res.headers.get('content-type') ?? '';
-    if (!ct.includes('text/csv')) return;
+    expect(ct).toContain('text/csv');
 
     const text = await res.text();
     const clean = text.replace(/^\uFEFF/, '');
@@ -405,16 +402,11 @@ describe('API v1 — player export CSV', () => {
   test('GET /players/export with ?key= param returns CSV', async () => {
     const res = await fetch(`${API_BASE}/players/export?key=${API_KEY}`);
 
-    // Either 200 (key valid) or 401 (key not in DB)
-    expect([200, 401]).toContain(res.status);
-
-    if (res.status === 200) {
-      const ct = res.headers.get('content-type') ?? '';
-      // CI Apache sometimes returns HTML under load — only assert CSV when content-type is correct
-      if (ct.includes('text/csv')) {
-        expect(ct).toContain('text/csv');
-      }
-    }
+    expect(res.status).toBe(200);
+    const ct = res.headers.get('content-type') ?? '';
+    expect(ct).toContain('text/csv');
+    const firstLine = (await res.text()).replace(/^\uFEFF/, '').split('\n')[0] ?? '';
+    expect(firstLine).toContain('Name');
   });
 });
 

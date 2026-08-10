@@ -49,7 +49,10 @@ test.describe('Draft board: renders', () => {
     ];
     await expect(board).toBeVisible();
     await expect(board).toContainText(/on the clock|round\s*1/i);
-    const onClockText = (await board.locator('.draft-current-pick, .ibl-card__title').first().textContent()) ?? '';
+    // Narrow to .draft-current-pick only — .ibl-card__title appears on every page
+    // and 'Free Agents' in allTeamNames would make the membership check vacuous.
+    await expect(board.locator('.draft-current-pick')).toHaveCount(1);
+    const onClockText = (await board.locator('.draft-current-pick').first().textContent()) ?? '';
     expect(allTeamNames.some((n) => onClockText.includes(n))).toBe(true);
   });
 

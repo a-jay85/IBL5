@@ -1,13 +1,13 @@
 ---
 description: Triage every non-trivial unit of work as ad-hoc vs /plan before starting; ad-hoc bar, ad-hoc safety mirror, Sonnet execution-routing (trigger stays resident, reasoning in work-triage-detail.md), hard trigger (≥5 files), and calibration.
-last_verified: 2026-07-27
+last_verified: 2026-08-10
 ---
 
 # Work Triage Rule
 
 ## Triage before non-trivial work
 
-Before starting **any non-trivial unit of work** — whether you proposed it or the user assigned it — decide: implement **ad-hoc** (just do it, then `/ship`) or route through **`/plan`**. State the call and one line of why, then proceed. Deployment context and rationale: `work-triage-detail.md` § Execution routing context.
+Before starting **any non-trivial unit of work** — whether you proposed it or the user assigned it — decide: implement **ad-hoc** (just do it, then `/ship`) or route through **`/plan`**. State the call and one line of why, then proceed.
 
 ## The ad-hoc bar
 
@@ -23,14 +23,14 @@ If any are open, it wants a `/plan`.
 
 ## Ad-hoc safety mirror
 
-Even when the bar says ad-hoc, run a quick safety check — the surfaces `/plan` Step 4 gate 14 holds the merge for, plus the ship-pipeline surface `/plan` Step 3 escalates to `plan-architect-xhigh`. If the change touches any of:
+Even when the bar says ad-hoc, run a quick safety check — the surfaces `/plan` Step 4 gate 14 holds the merge for, plus the `plan-architect-xhigh` escalation surface. If the change touches any of:
 - a **security surface** (SQL, POST/form endpoint, auth/authz-gated route, user-facing output rendering),
 - a **destructive or schema-tightening migration**,
 - **new or redesigned user-visible UI/UX**,
-- a **`.claude/skills` ship-pipeline invariant** — a change to what fires, what gates, or which disposition applies; *not* a prose edit that preserves the decision procedure, or
+- a **gate removal or weakening** in the ship-pipeline surface (`.claude/skills`, `.claude/rules`, `~/.claude/hooks`) — deletes, relaxes, or disables an enforcement mechanism — or a **bootstrap hazard** (it rewrites the rules governing its own merge); *not* an additive gate, a decision-procedure-preserving prose edit, or a mechanism/plumbing change, or
 - a property needing **subjective human judgment** to confirm,
 
-then prefer `/plan`, so the defense and its verification are designed up front. Why the PR-time backstop is not a substitute: `work-triage-detail.md` § Safety mirror backstop.
+then prefer `/plan`, so the defense and its verification are designed up front. Which mechanisms count, and why the PR-time backstop isn't a substitute: `work-triage-detail.md` § Safety mirror backstop.
 
 ## Execution routing: an ad-hoc verdict does not mean Opus edits inline
 

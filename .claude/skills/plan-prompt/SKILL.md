@@ -2,7 +2,7 @@
 name: plan-prompt
 description: "Draft a /plan prompt distilled from the current conversation — ground-truth pointers, already-measured evidence, scope, constraints, verification, and the Step-3 architect tier — then, unless the Step-1.5 size triage says the work clears the ad-hoc bar, fire it as a detached headless Sonnet 4.6 run via bin/plan-now. Use after a design discussion when the planning run should be offloaded off the expensive session."
 disable-model-invocation: true
-last_verified: 2026-07-30
+last_verified: 2026-08-10
 ---
 
 # Draft a `/plan` handoff prompt and fire it headless
@@ -132,8 +132,10 @@ which a Sonnet orchestrator still gets Opus-grade design. Abbreviated below;
 `.claude/rules/agent-tiering.md` § Tiers is authoritative — read it when the call
 isn't obvious:
 
-- security surface / trust boundary / destructive migration / ship-pipeline
-  invariant → **`plan-architect-xhigh`**
+- security surface / trust boundary / destructive migration / a **gate removal
+  or weakening** in the ship-pipeline surface (`.claude/skills`, `.claude/rules`,
+  `~/.claude/hooks`) or a **bootstrap hazard** (the change rewrites the rules
+  governing its own merge) → **`plan-architect-xhigh`**
 - explicit recipe **plus** a named existing pattern to copy →
   **`plan-architect-sonnet`**
 - otherwise → **`plan-architect`**

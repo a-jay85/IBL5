@@ -1,6 +1,6 @@
 ---
 name: plan-architect-xhigh
-description: Software architect for high-stakes implementation plans — tasks touching a security surface, trust boundary (auth/authz-gated route), destructive migration, or .claude/skills ship-pipeline invariants. Runs at xhigh effort. Use only as the Step-3 escalated planning agent invoked by /plan.
+description: Software architect for high-stakes implementation plans — tasks touching a security surface, trust boundary (auth/authz-gated route), destructive migration, or a gate removal/weakening or bootstrap hazard in the ship-pipeline surface (.claude/skills, .claude/rules, ~/.claude/hooks). Additive gates and decision-procedure-preserving prose edits are NOT triggers. Runs at xhigh effort. Use only as the Step-3 escalated planning agent invoked by /plan.
 model: opus
 effort: xhigh
 disallowedTools: Agent, ExitPlanMode, Edit, Write, NotebookEdit

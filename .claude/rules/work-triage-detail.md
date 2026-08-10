@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for work-triage — NO auto-attach trigger (its only `paths:` entry is out-of-repo and never matches); Read it when work-triage.md cites it. Covers measurement context for the inline-Opus leak, ADR-0067 gateway framing, hard-trigger gate properties (sub-agent exemption, per-turn scoping, escape hatch, self-test), the cross-worktree straddle gate's four-rung remedy ladder, inline-vs-delegated criteria, safety-mirror backstop, and repeat-polling spend rationale.
-last_verified: 2026-07-28
+last_verified: 2026-08-10
 paths:
   - "~/.claude/hooks/plan-gate-edit.sh"
 ---
@@ -68,6 +68,8 @@ Moving the poll off the main thread fixes *where* it runs, not whether it is ask
 Observed 2026-07-27: a watcher for detached headless `/plan` runs (`bin/plan-now`) used "final plan is newer than its draft" as the done-test. `/plan` appends the final plan section-by-section, so the predicate went true while the file was still truncated, `bin/check-plan` failed on the partial text, and a passing plan was reported as `CHECK-PLAN FAILED`. Three valid signals were available and unused: the launchd label vanishing, `bin/plan-now`'s own `RESULT ok — check-plan PASSED` log line, and the draft file being deleted. This is the same family as the ADR-0096 identity bug — a verdict trusted from a heuristic instead of from the run's own self-report.
 
 ## Safety mirror backstop
+
+**What counts as a gate removal/weakening** (the resident bullet carries the trigger; these are the examples): deleting, relaxing, or disabling an enforcement mechanism — a hook deny, a `bin/check-plan` gate condition, a `plan-gate-edit` check, a `/post-plan` Phase 6.5 arming condition. **Bootstrap hazard** means the change rewrites the arming, escalation, or auto-merge rules that govern its own merge. Same trigger as `/plan` Step 3's `plan-architect-xhigh` escalation — full clause in `.claude/skills/plan/SKILL.md` Step 3 check 1.
 
 Whatever still ships ad-hoc is caught at PR time by `/post-plan` Phase 6.5 condition (9) — but designing it in the plan beats relying on the backstop. The safety-mirror trigger list in `work-triage.md` routes security work into `/plan` *before* the backstop exists; losing it strands the backstop as the only protection.
 

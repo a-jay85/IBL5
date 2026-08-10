@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed/declined E2E test-quality backlog entries, extracted from e2e-backlog.md.
-last_verified: 2026-08-08
+last_verified: 2026-08-10
 ---
 
 # E2E Test-Quality Backlog — Archive
@@ -72,3 +72,13 @@ Read-only historical record of ✅ Implemented / 🚫 Declined findings. For OPE
 **Est. effort:** S
 **Risk if untouched:** Minor.
 **Status (2026-08-08):** ✅ Implemented — `TABLE_SEL` const hoisted in `projected-draft-order.spec.ts`; 5 locators updated. (#1808)
+
+---
+
+### Axis C — C1–C16, C18 weak/tautological E2E assertions
+**Location:** 17 assertions across `contract-extension.spec.ts`, `draft.spec.ts`, `one-on-one-game.spec.ts`, `flows/search.spec.ts`, `free-agency.spec.ts`, `player.spec.ts`, `smoke/olympics-pages.spec.ts`, `smoke/htmx.spec.ts`, `team-schedule.spec.ts`, `season-highs.spec.ts`, `player-subpages.spec.ts`, `player-movement` / `free-agency-preview` / `cap-space` sortable, `topics.spec.ts`, `homepage.spec.ts`, `contract-list.spec.ts`, `flows/olympics-coverage.spec.ts:20`, and `api-e2e/api.test.ts` CSV paths.
+**Problem:** Each assertion passes regardless of the feature under test — body-length thresholds, header-only regex, tautological locators, or bare `return`/true-only guards. Full per-item breakdown in the Axis C table in e2e-backlog.md.
+**Suggested direction:** Replace each with an assertion tied to feature-specific content (seed value, specific column/class, real sort effect).
+**Est. effort:** S per item.
+**Risk if untouched:** Tests give false green; broken features pass CI undetected.
+**Status (2026-08-08):** ✅ Implemented — each weak assertion replaced with a seed-grounded or element-scoped assertion, every one verified to fail when fed a wrong value. C17 remains ⬜ Open (out of scope). Bug finding: C7 player page (`smoke/olympics-pages.spec.ts:31`) — Olympics player page for `pid=1` renders "Something went wrong" because `ibl_olympics_stats` has no seed data; tracked as maintenance-backlog 6.24; `auto_merge` set to false on #1825. Implementation notes: (1) C12 shipped the shared `assertColumnSorts` helper WITHOUT the exact-descending-sequence line `expect(after).toEqual([...before].sort().reverse())` — `sorttable.js` uses a diacritic-insensitive comparator that diverges from JS `.sort()`'s UTF-16 order on non-ASCII names (e.g. "Dariuš Lavrinovich"), producing false reds; the retained state assertions (`aria-sort`, `sorttable_sorted_reverse`, `#sorttable_sortrevind`) plus `after !== before` still discriminate; V36 is retired for that reason, not left unimplemented. (2) The plan's V40 completeness greps over-catch: the bare-return grep also matches the DON'T-12-compliant 401 branches at `api-e2e/api.test.ts` L45/L275, and the `if (ct.includes` grep matches three pre-existing, uncatalogued query-param-auth JSON guards at L423/438/450 — same Axis-C class, now tracked as C19 in e2e-backlog.md; both are documented knowns, not surviving escapes. (#1825)

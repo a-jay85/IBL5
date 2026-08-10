@@ -156,13 +156,14 @@ were softened after direct re-check (C6 partially a false positive, C16 lower-co
 | C16 | ✅ | 🟩 | `flows/olympics-coverage.spec.ts:20` | header-scoped `/w\|l\|.../i` — weak single-char, lower confidence. |
 | C17 | ⬜ | 🟨 | `api-e2e/api.test.ts assertGetRoute` | **High impact:** silently passes on 401 → 30+ tests skip body validation. May be masking a CI-key/config issue → triage. |
 | C18 | ✅ | 🟩 | `api-e2e/api.test.ts` CSV | bare `return` L373/395/396 + true-only guard L415 (DON'T rules 12/14). |
+| C19 | ⬜ | 🟨 | `api-e2e/api.test.ts` L423/438/450 | Three pre-existing `if (ct.includes` query-param-auth JSON guards — same Axis-C class (sibling debt; like C17). (discovered 2026-08-10 during #1825) |
 
 **Suggested direction (axis):** Replace each with an assertion tied to feature-specific content (a known seed
 value, a specific column/class, a real sort effect). C17 needs investigation first — confirm the CI API key
 is present and the 401 branch is dead, then remove the silent skip.
 **Est. effort:** S per item (C17 = S+investigation). **Risk if untouched:** these tests give false green.
 
-**Status:** ✅ C1–C16, C18 implemented 2026-08-08 — each weak assertion replaced with a seed-grounded or element-scoped assertion, every one verified to fail when fed a wrong value. C17 remains ⬜ Open (out of scope). ⚠️ Bug finding: C7 player page (olympics-pages.spec.ts:31) — Olympics player page for pid=1 renders "Something went wrong" because ibl_olympics_stats has no seed data; auto_merge set to false. Two implementation notes: (1) C12 shipped the shared `assertColumnSorts` helper WITHOUT the exact-descending-sequence line `expect(after).toEqual([...before].sort().reverse())` the plan's V36 mutates — sorttable.js uses a diacritic-insensitive comparator that diverges from JS `.sort()`'s UTF-16 order on non-ASCII names (e.g. "Dariuš Lavrinovich"), producing false reds; the retained state assertions (`aria-sort`, `sorttable_sorted_reverse`, `#sorttable_sortrevind`) plus `after !== before` still discriminate. V36 is retired for that reason, not left unimplemented. (2) The plan's V40 completeness greps over-catch: the bare-return grep also matches the DON'T-12-compliant 401 branches at `api-e2e/api.test.ts` L45/L275, and the `if (ct.includes` grep matches three pre-existing, uncatalogued query-param-auth JSON guards at L423/438/450 — same Axis-C class but outside C1–C18 scope (sibling debt, like C17). Both are documented knowns, not surviving escapes.
+➜ C1–C16, C18 weak/tautological assertions — ✅ Implemented (2026-08-08): see [archive](archive/e2e-backlog-archive.md).
 
 ---
 

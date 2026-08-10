@@ -102,8 +102,9 @@ class StandingsUpdaterTest extends TestCase
     /**
      * Runs update() against the happy-path fixture and returns everything emitted.
      *
-     * Pins today's echo-based output so the Phase 3 echo->buffer migration can be
-     * proven byte-for-byte faithful. Rewired to takeOutputBuffer() in Phase 7.
+     * Pins the byte-for-byte progress output from update(). The literals asserted
+     * against this were captured while StandingsUpdater still echoed; the migration
+     * to the output buffer must keep them identical.
      */
     private function captureUpdateOutput(): string
     {
@@ -111,10 +112,9 @@ class StandingsUpdaterTest extends TestCase
         $this->updater->setTestTeamMap($this->defaultTeamMap);
         $this->updater->setTestGames([]);
 
-        ob_start();
         $this->updater->update();
 
-        return (string) ob_get_clean();
+        return $this->updater->takeOutputBuffer();
     }
 
     public function testCharacterizationEchoOutputContainsStartMessage(): void
@@ -148,9 +148,8 @@ class StandingsUpdaterTest extends TestCase
         $this->updater->setTestTeamMap([]);
         $this->updater->setTestGames([]);
 
-        ob_start();
         $this->updater->update();
-        $output = (string) ob_get_clean();
+        $output = $this->updater->takeOutputBuffer();
 
         $this->assertStringContainsString('<p>Error: No league config found for season ending year 2007</p>', $output);
         $this->assertStringNotContainsString('Inserted standings for team', $output);
@@ -176,6 +175,25 @@ class StandingsUpdaterTest extends TestCase
 
     public function testTakeOutputBufferReturnsEmptyWhenUpdateNeverCalled(): void
     {
+        $this->assertSame('', $this->updater->takeOutputBuffer());
+    }
+
+    public function testTakeOutputBufferReturnsSameContentAsPreMigrationCapture(): void
+    {
+        $output = $this->captureUpdateOutput();
+
+        // The exact strings StandingsUpdater emitted via echo before the migration.
+        $this->assertStringContainsString('<p>Updating the standings database table...<p>', $output);
+        $this->assertStringContainsString('<p>Computing standings from game results...<p>', $output);
+        $this->assertStringContainsString('<p>Magic numbers for all teams have been updated.<p>', $output);
+        $this->assertStringContainsString('<p>The standings table has been updated.<p>', $output);
+    }
+
+    public function testTakeOutputBufferReturnsEmptyOnSecondCall(): void
+    {
+        $first = $this->captureUpdateOutput();
+        $this->assertNotSame('', $first);
+
         $this->assertSame('', $this->updater->takeOutputBuffer());
     }
 

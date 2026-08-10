@@ -93,7 +93,7 @@ class StandingsUpdater {
     }
 
     public function update(): void {
-        echo "<p>Updating the standings database table...<p>";
+        $this->appendOutput("<p>Updating the standings database table...<p>");
 
         $this->computeAndInsertStandings();
 
@@ -106,19 +106,19 @@ class StandingsUpdater {
 
         $this->checkClinched(null, null);
 
-        echo '<p>Magic numbers for all teams have been updated.<p>';
-        echo "<p>The standings table has been updated.<p>";
+        $this->appendOutput('<p>Magic numbers for all teams have been updated.<p>');
+        $this->appendOutput("<p>The standings table has been updated.<p>");
     }
 
     /**
      * Compute standings from `ibl_schedule` game results and insert into `ibl_standings`
      */
     protected function computeAndInsertStandings(): void {
-        echo '<p>Computing standings from game results...<p>';
+        $this->appendOutput('<p>Computing standings from game results...<p>');
 
         $teamMap = $this->fetchTeamMap();
         if ($teamMap === []) {
-            echo '<p>Error: No league config found for season ending year ' . $this->season->endingYear . '</p>';
+            $this->appendOutput('<p>Error: No league config found for season ending year ' . $this->season->endingYear . '</p>');
             return;
         }
 
@@ -302,8 +302,6 @@ class StandingsUpdater {
             $divLeaderGB[$div] = ($leader['wins'] - $leader['losses']) / 2.0;
         }
 
-        $log = '';
-
         foreach ($standings as $team) {
             $totalGames = $team['wins'] + $team['losses'];
             $pct = $totalGames > 0 ? round($team['wins'] / $totalGames, 3) : 0.000;
@@ -344,27 +342,21 @@ class StandingsUpdater {
                 'awayWins' => $team['away_wins'],
                 'awayLosses' => $team['away_losses'],
             ]);
-
-            $log .= "Inserted standings for team: {$team['teamName']}<br>";
         }
-
-        \UI\DebugOutput::display($log, 'Computed Standings');
     }
 
     private function updateMagicNumbers(string $region): void {
-        echo "<p>Updating the magic numbers for the {$region}...<br>";
+        $this->appendOutput("<p>Updating the magic numbers for the {$region}...<br>");
         list($grouping, $groupingGB, $groupingMagicNumber) = $this->assignGroupingsFor($region);
 
         $teams = $this->repository->fetchTeamsByRegion($grouping, $region);
 
-        $log = '';
         $numTeams = count($teams);
 
         for ($i = 0; $i < $numTeams; $i++) {
             /** @var array{teamid: int, team_name: string, home_wins: int, home_losses: int, away_wins: int, away_losses: int} $teamRow */
             $teamRow = $teams[$i];
             $teamid = $teamRow['teamid'];
-            $teamName = $teamRow['team_name'];
             $teamTotalWins = $teamRow['home_wins'] + $teamRow['away_wins'];
 
             if ($i + 1 !== $numTeams) {
@@ -378,10 +370,7 @@ class StandingsUpdater {
             $magicNumber = League::REGULAR_SEASON_GAMES + 1 - $teamTotalWins - $belowTeamTotalLosses;
 
             $this->repository->updateMagicNumber($teamid, $magicNumber, $groupingMagicNumber);
-            $log .= "Updated {$groupingMagicNumber} for {$teamName} to {$magicNumber}<br>";
         }
-
-        \UI\DebugOutput::display($log, "{$region} Magic Number Update Log");
 
         $this->checkClinched($grouping, $region);
         if ($grouping === 'conference') {
@@ -399,7 +388,7 @@ class StandingsUpdater {
         $label = $grouping !== null && $region !== null
             ? "{$region} {$grouping}"
             : 'best league record';
-        echo "<p>Checking if the {$label} has been clinched...<br>";
+        $this->appendOutput("<p>Checking if the {$label} has been clinched...<br>");
 
         $topTeams = $this->repository->fetchTopTeamsByWins($grouping, $region);
 
@@ -449,20 +438,20 @@ class StandingsUpdater {
             $this->repository->updateClinchedFlag($winningestTeamName, $clinchedColumn);
 
             if ($grouping !== null && $region !== null) {
-                echo "The {$winningestTeamName} have clinched the {$region} {$grouping}!";
+                $this->appendOutput("The {$winningestTeamName} have clinched the {$region} {$grouping}!");
 
                 $awardName = self::REGION_AWARD_MAP[$region] ?? null;
                 if ($awardName !== null && !$this->isOlympics) {
                     $this->repository->upsertTeamAward($this->season->endingYear, $winningestTeamName, $awardName);
                 }
             } else {
-                echo "The {$winningestTeamName} have clinched the best record in the league!";
+                $this->appendOutput("The {$winningestTeamName} have clinched the best record in the league!");
             }
         }
     }
 
     private function checkIfPlayoffsClinched(string $conference): void {
-        echo "<p>Checking if any teams have clinched playoff spots in the {$conference} Conference...<br>";
+        $this->appendOutput("<p>Checking if any teams have clinched playoff spots in the {$conference} Conference...<br>");
 
         $eightWinningestTeams = $this->repository->fetchWinningestTeams($conference);
         $sixLosingestTeams = $this->repository->fetchMostLosingTeams($conference);
@@ -494,7 +483,7 @@ class StandingsUpdater {
 
             if ($teamsEliminated === 6) {
                 $this->repository->updateClinchedFlag($contendingTeamName, 'clinched_playoffs');
-                echo "The {$contendingTeamName} have clinched a playoff spot!<br>";
+                $this->appendOutput("The {$contendingTeamName} have clinched a playoff spot!<br>");
             }
         }
     }

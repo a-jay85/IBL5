@@ -83,9 +83,7 @@ class OlympicsFlatStandingsUpdaterTest extends TestCase
         ]);
         $this->updater->setTestGames([]);
 
-        ob_start();
         $this->updater->update();
-        ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
         $magicNumberUpdateQueries = array_filter(
@@ -105,9 +103,7 @@ class OlympicsFlatStandingsUpdaterTest extends TestCase
         ]);
         $this->updater->setTestGames([]);
 
-        ob_start();
         $this->updater->update();
-        ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
         $clinchQueries = array_filter(
@@ -132,9 +128,7 @@ class OlympicsFlatStandingsUpdaterTest extends TestCase
             ['visitor_teamid' => 1, 'visitor_score' => 80, 'home_teamid' => 2, 'home_score' => 75],
         ]);
 
-        ob_start();
         $this->updater->update();
-        ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
         $insertQueries = array_filter($queries, static fn (string $q): bool => str_contains($q, 'ON DUPLICATE KEY UPDATE'));
@@ -171,9 +165,7 @@ class OlympicsFlatStandingsUpdaterTest extends TestCase
             ['visitor_teamid' => 2, 'visitor_score' => 90, 'home_teamid' => 1, 'home_score' => 85],
         ]);
 
-        ob_start();
         $this->updater->update();
-        ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
         $insertQueries = array_values(array_filter(

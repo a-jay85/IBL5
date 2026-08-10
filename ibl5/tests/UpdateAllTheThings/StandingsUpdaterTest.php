@@ -203,9 +203,7 @@ class StandingsUpdaterTest extends TestCase
         $this->updater->setTestTeamMap($this->defaultTeamMap);
         $this->updater->setTestGames([]);
 
-        ob_start();
         $this->updater->update();
-        ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
         foreach ($queries as $query) {
@@ -225,9 +223,7 @@ class StandingsUpdaterTest extends TestCase
             ['visitor_teamid' => 1, 'visitor_score' => 80, 'home_teamid' => 4, 'home_score' => 90],
         ]);
 
-        ob_start();
         $this->updater->update();
-        ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
         $insertQueries = $this->filterInsertQueries($queries);
@@ -254,9 +250,7 @@ class StandingsUpdaterTest extends TestCase
             ['visitor_teamid' => 4, 'visitor_score' => 80, 'home_teamid' => 1, 'home_score' => 95],
         ]);
 
-        ob_start();
         $this->updater->update();
-        ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
         $insertQueries = $this->filterInsertQueries($queries);
@@ -275,9 +269,7 @@ class StandingsUpdaterTest extends TestCase
             ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 4, 'home_score' => 90],
         ]);
 
-        ob_start();
         $this->updater->update();
-        ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
         $insertQueries = $this->filterInsertQueries($queries);
@@ -296,9 +288,7 @@ class StandingsUpdaterTest extends TestCase
             ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 3, 'home_score' => 90],
         ]);
 
-        ob_start();
         $this->updater->update();
-        ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
         $insertQueries = $this->filterInsertQueries($queries);
@@ -321,9 +311,7 @@ class StandingsUpdaterTest extends TestCase
             ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 90],
         ]);
 
-        ob_start();
         $this->updater->update();
-        ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
         $insertQueries = $this->filterInsertQueries($queries);
@@ -354,9 +342,7 @@ class StandingsUpdaterTest extends TestCase
         }
         $this->updater->setTestGames($games);
 
-        ob_start();
         $this->updater->update();
-        ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
         $insertQueries = $this->filterInsertQueries($queries);
@@ -375,9 +361,7 @@ class StandingsUpdaterTest extends TestCase
         ]);
         $this->updater->setTestGames([]);
 
-        ob_start();
         $this->updater->update();
-        ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
         $insertQueries = $this->filterInsertQueries($queries);
@@ -404,9 +388,7 @@ class StandingsUpdaterTest extends TestCase
             ['visitor_teamid' => 2, 'visitor_score' => 100, 'home_teamid' => 1, 'home_score' => 90],
         ]);
 
-        ob_start();
         $this->updater->update();
-        ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
         $insertQueries = $this->filterInsertQueries($queries);
@@ -425,9 +407,7 @@ class StandingsUpdaterTest extends TestCase
         $this->updater->setTestTeamMap([]);
         $this->updater->setTestGames([]);
 
-        ob_start();
         $this->updater->update();
-        ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
         $insertQueries = $this->filterInsertQueries($queries);
@@ -469,9 +449,7 @@ class StandingsUpdaterTest extends TestCase
         $this->updater->setTestTeamMap([]);
         $this->updater->setTestGames([]);
 
-        ob_start();
         $this->updater->update();
-        ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
 
@@ -514,9 +492,7 @@ class StandingsUpdaterTest extends TestCase
             ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 99, 'home_score' => 90],
         ]);
 
-        ob_start();
         $this->updater->update();
-        ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
         $insertQueries = $this->filterInsertQueries($queries);
@@ -532,9 +508,7 @@ class StandingsUpdaterTest extends TestCase
         $this->updater->setTestTeamMap($this->defaultTeamMap);
         $this->updater->setTestGames([]);
 
-        ob_start();
         $this->updater->update();
-        ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
         $insertQueries = $this->filterInsertQueries($queries);
@@ -555,9 +529,7 @@ class StandingsUpdaterTest extends TestCase
             ['visitor_teamid' => 1, 'visitor_score' => 100, 'home_teamid' => 2, 'home_score' => 90],
         ]);
 
-        ob_start();
         $this->updater->update();
-        ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
         $insertQueries = $this->filterInsertQueries($queries);
@@ -610,9 +582,7 @@ class StandingsUpdaterTest extends TestCase
         $this->updater->setTestTeamMap($this->defaultTeamMap);
         $this->updater->setTestGames([]);
 
-        ob_start();
         $this->updater->update();
-        ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
         $awardQueries = array_filter($queries, static function (string $q): bool {
@@ -637,9 +607,7 @@ class StandingsUpdaterTest extends TestCase
         $this->updater->setTestTeamMap($this->defaultTeamMap);
         $this->updater->setTestGames([]);
 
-        ob_start();
         $this->updater->update();
-        ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
         $awardQueries = array_values(array_filter($queries, static function (string $q): bool {
@@ -686,9 +654,7 @@ class StandingsUpdaterTest extends TestCase
         $this->mockDb->onQuery('ORDER BY pct DESC', $clinchData);
         $this->mockDb->onQuery('games_unplayed', [['maxLeft' => 0]]);
 
-        ob_start();
         $updater->update();
-        ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
         $awardQueries = array_filter($queries, static function (string $q): bool {
@@ -735,9 +701,7 @@ class StandingsUpdaterTest extends TestCase
         $updater->setTestGames([]);
         $this->mockDb->setReturnTrue(true);
 
-        ob_start();
         $updater->update();
-        ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
         foreach ($queries as $query) {
@@ -758,9 +722,7 @@ class StandingsUpdaterTest extends TestCase
         $this->mockDb->setReturnTrue(true);
         $this->mockDb->setMockData([]);
 
-        ob_start();
         $updater->update();
-        ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
 

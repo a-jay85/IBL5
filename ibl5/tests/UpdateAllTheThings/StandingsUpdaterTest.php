@@ -99,6 +99,81 @@ class StandingsUpdaterTest extends TestCase
         unset($this->updater, $this->repository, $this->mockDb, $this->mockSeason);
     }
 
+    /**
+     * Runs update() against the happy-path fixture and returns everything emitted.
+     *
+     * Pins today's echo-based output so the Phase 3 echo->buffer migration can be
+     * proven byte-for-byte faithful. Rewired to takeOutputBuffer() in Phase 7.
+     */
+    private function captureUpdateOutput(): string
+    {
+        $this->mockDb->setReturnTrue(true);
+        $this->updater->setTestTeamMap($this->defaultTeamMap);
+        $this->updater->setTestGames([]);
+
+        ob_start();
+        $this->updater->update();
+
+        return (string) ob_get_clean();
+    }
+
+    public function testCharacterizationEchoOutputContainsStartMessage(): void
+    {
+        $output = $this->captureUpdateOutput();
+
+        $this->assertStringContainsString('<p>Updating the standings database table...<p>', $output);
+    }
+
+    public function testCharacterizationEchoOutputContainsMagicNumbersMessage(): void
+    {
+        $output = $this->captureUpdateOutput();
+
+        $this->assertStringContainsString('<p>Updating the magic numbers for the Eastern...<br>', $output);
+        $this->assertStringContainsString('<p>Updating the magic numbers for the Pacific...<br>', $output);
+        $this->assertStringContainsString('<p>Magic numbers for all teams have been updated.<p>', $output);
+    }
+
+    public function testCharacterizationEchoOutputContainsComputingMessage(): void
+    {
+        $output = $this->captureUpdateOutput();
+
+        $this->assertStringContainsString('<p>Computing standings from game results...<p>', $output);
+        $this->assertStringContainsString('<p>Checking if the ', $output);
+        $this->assertStringContainsString('<p>The standings table has been updated.<p>', $output);
+    }
+
+    public function testCharacterizationEchoOutputContainsErrorMessageWhenTeamMapEmpty(): void
+    {
+        $this->mockDb->setReturnTrue(true);
+        $this->updater->setTestTeamMap([]);
+        $this->updater->setTestGames([]);
+
+        ob_start();
+        $this->updater->update();
+        $output = (string) ob_get_clean();
+
+        $this->assertStringContainsString('<p>Error: No league config found for season ending year 2007</p>', $output);
+        $this->assertStringNotContainsString('Inserted standings for team', $output);
+    }
+
+    public function testCharacterizationEchoOutputPreservesSourceOrder(): void
+    {
+        $output = $this->captureUpdateOutput();
+
+        $start = strpos($output, '<p>Updating the standings database table...<p>');
+        $computing = strpos($output, '<p>Computing standings from game results...<p>');
+        $magic = strpos($output, '<p>Magic numbers for all teams have been updated.<p>');
+        $closing = strpos($output, '<p>The standings table has been updated.<p>');
+
+        $this->assertNotFalse($start);
+        $this->assertNotFalse($computing);
+        $this->assertNotFalse($magic);
+        $this->assertNotFalse($closing);
+        $this->assertLessThan($computing, $start);
+        $this->assertLessThan($magic, $computing);
+        $this->assertLessThan($closing, $magic);
+    }
+
     public function testUpdateDoesNotTruncateStandingsTable(): void
     {
         $this->mockDb->setReturnTrue(true);

@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -53,7 +53,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 🟨 Conditional | needs one mechanical-scope add, one upfront decision, or a collision-PR to merge first |
 | 🟥 Not automouse-safe | 12.11 — `git filter-repo` history rewrite (irreversible, coordinated) |
 
-**Highest-leverage 🟩 auto-mergeable clusters** (no human needed): the open god-class extractions (1.3/1.9/1.11/1.13/1.17/1.18/1.20, 7.14/7.15, 1.33–1.36), the entire Axis-6 coverage backlog (bar 6.21, now 🟨), the Axis-9 docs items, and the PHPStan-baseline burndowns (10.12/10.13/10.19/10.21).
+**Highest-leverage 🟩 auto-mergeable clusters** (no human needed): the open god-class extractions (1.3/1.9/1.11/1.13/1.17/1.20, 7.14/7.15, 1.33–1.36), the entire Axis-6 coverage backlog (bar 6.21, now 🟨), the Axis-9 docs items, and the PHPStan-baseline burndowns (10.12/10.13/10.19/10.21).
 
 ---
 
@@ -61,22 +61,13 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
-> ✅ resolved (34): 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.19, 1.20, 1.21, 1.22, 1.23, 1.24, 1.25, 1.26, 1.27, 1.28, 1.29, 1.30, 1.31, 1.32, 1.34, 1.35, 1.36 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (35): 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.18, 1.19, 1.20, 1.21, 1.22, 1.23, 1.24, 1.25, 1.26, 1.27, 1.28, 1.29, 1.30, 1.31, 1.32, 1.34, 1.35, 1.36 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 1.18 | ◑ Partial | 🟩 | StandingsUpdater. `82`→`League::REGULAR_SEASON_GAMES` DONE (refactor PR). echo→logger + `$log` removal DEFERRED: behavior-changing — echoes feed the rendered pipeline `capturedLog` (UpdateStandingsStep→UpdaterController); `$log` feeds admin-rendered `DebugOutput::display`. Needs a non-`refactor:` PR. |
 | 1.33 | ⬜ Open | 🟩 | Player 671 LOC — typed-getter accumulation. Extract per-domain typed-getter groups (contract, stats, identity); green-green. |
 
 > **Note:** `BaseMysqliRepository.php` (602 LOC) is the 18th hot file but is tracked under **2.29** (global-namespace elimination sweep) and is not seeded as a standalone god-class item here.
-
-### 1.18 StandingsUpdater — `echo` Mixed with Data Computation
-**Location:** `ibl5/classes/Updater/StandingsUpdater.php` (echoes at update()/computeAndInsertStandings()/computeAndInsertAll(); magic `82` at the gamesUnplayed and magic-number sites).
-**Status:** PARTIAL — magic `82` extracted to `League::REGULAR_SEASON_GAMES` (refactor PR, this batch). The echo cleanup is DEFERRED.
-**Problem:** `update()`, `computeAndInsertStandings()`, `computeAndInsertAll()` use `echo` for progress. The echoed output is NOT discardable: `UpdateStandingsStep::execute()` captures it (`ob_start`/`ob_get_clean`) into `StepResult::capturedLog` and `UpdaterController` renders it to the user as a collapsible log; the two `$log` accumulators are rendered to admins via `\UI\DebugOutput::display()`. So echo→logger and `$log` removal are behavior-changing, not a pure refactor.
-**Suggested direction:** Separate non-`refactor:` PR that migrates the echoes to a logger while preserving (or deliberately changing) the rendered pipeline/admin output; `auto_merge: false`.
-**Est. effort:** S
-**Risk if untouched:** Progress output mixed with computation in the updater; logging intent unrealized.
 
 ### 1.19 PlrParserService — Duplicate Pass-1 Logic
 **Location:** `ibl5/classes/PlrParser/PlrParserService.php`

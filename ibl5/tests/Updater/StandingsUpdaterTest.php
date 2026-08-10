@@ -37,9 +37,8 @@ class StandingsUpdaterTest extends TestCase
 
     private function runCompute(TestableStandingsUpdater $u): string
     {
-        ob_start();
         $u->exposedComputeAndInsertStandings();
-        return (string) ob_get_clean();
+        return $u->takeOutputBuffer();
     }
 
     /** @return array{visitor_teamid:int,visitor_score:int,home_teamid:int,home_score:int} */

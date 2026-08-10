@@ -83,9 +83,7 @@ class OlympicsFlatStandingsUpdaterTest extends TestCase
         ]);
         $this->updater->setTestGames([]);
 
-        ob_start();
         $this->updater->update();
-        ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
         $magicNumberUpdateQueries = array_filter(
@@ -105,9 +103,7 @@ class OlympicsFlatStandingsUpdaterTest extends TestCase
         ]);
         $this->updater->setTestGames([]);
 
-        ob_start();
         $this->updater->update();
-        ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
         $clinchQueries = array_filter(
@@ -132,9 +128,7 @@ class OlympicsFlatStandingsUpdaterTest extends TestCase
             ['visitor_teamid' => 1, 'visitor_score' => 80, 'home_teamid' => 2, 'home_score' => 75],
         ]);
 
-        ob_start();
         $this->updater->update();
-        ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
         $insertQueries = array_filter($queries, static fn (string $q): bool => str_contains($q, 'ON DUPLICATE KEY UPDATE'));
@@ -171,9 +165,7 @@ class OlympicsFlatStandingsUpdaterTest extends TestCase
             ['visitor_teamid' => 2, 'visitor_score' => 90, 'home_teamid' => 1, 'home_score' => 85],
         ]);
 
-        ob_start();
         $this->updater->update();
-        ob_end_clean();
 
         $queries = $this->mockDb->getExecutedQueries();
         $insertQueries = array_values(array_filter(
@@ -194,5 +186,61 @@ class OlympicsFlatStandingsUpdaterTest extends TestCase
         foreach ($insertQueries as $q) {
             $this->assertStringContainsString("'N/A'", $q);
         }
+    }
+
+    /**
+     * @param array<int, array{conference: string, division: string, teamName: string}> $teamMap
+     */
+    private function setUpHappyFixture(array $teamMap): void
+    {
+        $this->mockDb->setReturnTrue(true);
+        $this->mockDb->onQuery('SELECT teamid, COUNT', [
+            ['teamid' => 1, 'game_count' => 14],
+            ['teamid' => 2, 'game_count' => 14],
+        ]);
+        $this->updater->setTestTeamMap($teamMap);
+        $this->updater->setTestGames([]);
+    }
+
+    public function testOlympicsUpdaterBufferContainsStartMessage(): void
+    {
+        $this->setUpHappyFixture([
+            1 => ['conference' => 'N/A', 'division' => 'N/A', 'teamName' => 'USA'],
+            2 => ['conference' => 'N/A', 'division' => 'N/A', 'teamName' => 'France'],
+        ]);
+
+        $this->updater->update();
+
+        $this->assertStringContainsString(
+            '<p>Updating the Olympics standings database table...<p>',
+            $this->updater->takeOutputBuffer(),
+        );
+    }
+
+    public function testOlympicsUpdaterBufferContainsInheritedComputingMessageAndClosingMessage(): void
+    {
+        $this->setUpHappyFixture([
+            1 => ['conference' => 'N/A', 'division' => 'N/A', 'teamName' => 'USA'],
+            2 => ['conference' => 'N/A', 'division' => 'N/A', 'teamName' => 'France'],
+        ]);
+
+        $this->updater->update();
+        $output = $this->updater->takeOutputBuffer();
+
+        // Inherited from StandingsUpdater::computeAndInsertStandings()
+        $this->assertStringContainsString('<p>Computing standings from game results...<p>', $output);
+        $this->assertStringContainsString('<p>The Olympics standings table has been updated.<p>', $output);
+    }
+
+    public function testOlympicsUpdaterBufferContainsLeagueConfigErrorWhenTeamMapEmpty(): void
+    {
+        $this->mockDb->setReturnTrue(true);
+        $this->updater->setTestTeamMap([]);
+        $this->updater->setTestGames([]);
+
+        $this->updater->update();
+        $output = $this->updater->takeOutputBuffer();
+
+        $this->assertStringContainsString('<p>Error: No league config found for season ending year 2003</p>', $output);
     }
 }

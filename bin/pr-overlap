@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/pr-overlap — hunk-range overlap detector for two PR diffs.
+#
+# Pure textual analysis. Reads two unified-diff FILES and reports, for every file
+# that appears in BOTH diffs, whether their changed line ranges actually collide.
+# Makes NO network and NO GitHub API calls: the caller (.claude/skills/pr-attack/SKILL.md)
+# fetches diffs with `gh pr diff` and hands the saved files to this script. That
+# separation is what lets bin/test-pr-overlap drive it from synthetic fixtures.
+#
+# Comparison uses the OLD-side range (`@@ -N,M`) because both diffs are taken
+# against the same base (master), so old-side line numbers are a shared coordinate
+# system; the new-side range is per-PR and not comparable. Filename-level
+# comparison over-reports — git's default 3 lines of context are already folded
+# into M, so two non-overlapping ranges in one file really do merge cleanly.
+#
+# Unlike bin/check-pr-collisions, which watches a hardcoded allowlist of
+# regenerated-artifact paths, this tool is path-agnostic and range-aware. Unlike
+# bin/pr-triage it needs no gh seam, because it never calls gh.
+#
+# Usage: bin/pr-overlap <diff-a> <diff-b> [label-a] [label-b]
+#
+# Output (stdout), sorted by path, then one summary line:
+#   CLEAN <file>
+#   HAND-RESOLUTION <file> (<label-a> @@ -N,M vs <label-b> @@ -N,M)
+#   SUMMARY contended=<n> clean=<n> hand=<n>
+#
+# Exit codes: 0 = analysis completed (findings are on stdout, not in the status)
+#             2 = usage error / unreadable or empty input file
+#             3 = malformed input (no `diff --git` header found)
+
+set -u
+
+usage() {
+    cat <<'EOF'
+Usage: bin/pr-overlap <diff-a> <diff-b> [label-a] [label-b]
+
+Compares two unified-diff FILES (fetch them first, e.g. `gh pr diff 123 > a.diff`)
+and reports, for every file present in BOTH diffs, whether their changed old-side
+line ranges overlap. Makes no network calls.
+
+Arguments:
+  diff-a, diff-b   Paths to saved unified diffs, both taken against the same base.
+  label-a/label-b  Optional display labels (default: A / B). Pass PR numbers.
+
+Output:
+  CLEAN <file>                                  ranges are disjoint; merges clean
+  HAND-RESOLUTION <file> (<a> @@ ... vs <b> @@ ...)  ranges collide
+  SUMMARY contended=<n> clean=<n> hand=<n>
+
+Exit: 0 analysis completed | 2 usage / unreadable / empty input | 3 malformed diff.
+EOF
+}
+
+case "${1:-}" in
+    -h|--help) usage; exit 0 ;;
+esac
+
+if [ "$#" -lt 2 ] || [ "$#" -gt 4 ]; then
+    usage >&2
+    exit 2
+fi
+
+DIFF_A="$1"
+DIFF_B="$2"
+LABEL_A="${3:-A}"
+LABEL_B="${4:-B}"
+
+for f in "$DIFF_A" "$DIFF_B"; do
+    if [ ! -r "$f" ]; then
+        echo "pr-overlap: cannot read diff file: $f" >&2
+        exit 2
+    fi
+    if [ ! -s "$f" ]; then
+        echo "pr-overlap: empty diff file: $f" >&2
+        exit 2
+    fi
+done
+
+awk -v LA="$LABEL_A" -v LB="$LABEL_B" -v FA="$DIFF_A" -v FB="$DIFF_B" '
+# Index of the LAST occurrence of t in s (0 when absent).
+function lastidx(s, t,    i, p, last) {
+    p = 0; last = 0
+    while ((i = index(substr(s, p + 1), t)) > 0) { p += i; last = p }
+    return last
+}
+# "diff --git a/<path> b/<path>" -> the a-side <path> (the shared coordinate).
+function apath(line,    rest, k) {
+    rest = substr(line, 12)                       # strip the 11 chars "diff --git "
+    if (substr(rest, 1, 2) == "a/") rest = substr(rest, 3)
+    k = lastidx(rest, " b/")                      # last, so spaces in names survive
+    if (k > 0) rest = substr(rest, 1, k - 1)
+    return rest
+}
+FNR == 1 { fileno++; side = (fileno == 1) ? "A" : "B" }
+/^diff --git / {
+    cur[side] = apath($0)
+    hdr[side]++
+    seen[side, cur[side]] = 1
+    next
+}
+/^@@ / {
+    if (cur[side] == "") next
+    tok = $2                                      # "-N,M"
+    sub(/^-/, "", tok)
+    n  = split(tok, p, ",")
+    st = p[1] + 0
+    ct = (n > 1) ? p[2] + 0 : 1                   # absent count means exactly 1 line
+    en = (ct > 0) ? st + ct - 1 : st              # count 0 collapses to a point
+    k  = ++cnt[side, cur[side]]
+    HS[side, cur[side], k] = st
+    HE[side, cur[side], k] = en
+    HT[side, cur[side], k] = "@@ -" tok
+    next
+}
+END {
+    if (hdr["A"] + 0 == 0 || hdr["B"] + 0 == 0) {
+        printf("pr-overlap: no `diff --git` header found in %s or %s - malformed diff input\n",
+               FA, FB) > "/dev/stderr"
+        exit 3
+    }
+    SORT = "LC_ALL=C sort"
+    contended = 0; nclean = 0; nhand = 0
+    for (key in seen) {
+        split(key, part, SUBSEP)
+        if (part[1] != "A") continue
+        f = part[2]
+        if (!(("B" SUBSEP f) in seen)) continue   # not contended: skip silently
+        contended++
+        na = cnt["A", f] + 0
+        nb = cnt["B", f] + 0
+        if (na == 0 || nb == 0) {                 # binary / mode-only: fail safe
+            nhand++
+            print "HAND-RESOLUTION " f " (no hunk ranges - binary or metadata-only change)" | SORT
+            continue
+        }
+        hit = ""
+        for (i = 1; i <= na && hit == ""; i++) {
+            for (j = 1; j <= nb && hit == ""; j++) {
+                if (HS["A", f, i] <= HE["B", f, j] && HS["B", f, j] <= HE["A", f, i]) {
+                    hit = LA " " HT["A", f, i] " vs " LB " " HT["B", f, j]
+                }
+            }
+        }
+        if (hit == "") { nclean++; print "CLEAN " f | SORT }
+        else           { nhand++;  print "HAND-RESOLUTION " f " (" hit ")" | SORT }
+    }
+    close(SORT)
+    printf("SUMMARY contended=%d clean=%d hand=%d\n", contended, nclean, nhand)
+}
+' "$DIFF_A" "$DIFF_B"

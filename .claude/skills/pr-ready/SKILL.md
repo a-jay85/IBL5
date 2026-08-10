@@ -101,12 +101,12 @@ Read `.claude/skills/pr-ready/_rebase-and-conflicts.md` now and follow it end-to
 
 1. **Load the deferred watcher tools here, not in Phase 0:** `ToolSearch("select:Monitor,TaskStop")`. Deferring keeps `Monitor`'s long schema out of context for the phases that never use it.
 
-2. **Lost-work proof, two signals.** `git cherry -v origin/<branch> HEAD` is the weak signal: after a squash **every** replayed commit shows `+` by design, so `git cherry` alone cannot carry the proof. The authoritative check is content equivalence of the tree diff captured before and after the rebase (the Phase 2 include wrote `/tmp/pr-ready-diff-pre-$$.patch`):
+2. **Lost-work proof, two signals.** `git cherry -v origin/<branch> HEAD` is the weak signal: after a squash **every** replayed commit shows `+` by design, so `git cherry` alone cannot carry the proof. The authoritative check is content equivalence of the tree diff captured before and after the rebase (the Phase 2 include wrote `/tmp/pr-ready-diff-pre-<N>.patch`, keyed to the PR number — **never `$$`**, which differs between that call's shell and this one's):
 
    ```bash
-   git diff origin/master...HEAD > /tmp/pr-ready-diff-post-$$.patch
-   diff <(git apply --numstat /tmp/pr-ready-diff-pre-$$.patch | sort) \
-        <(git apply --numstat /tmp/pr-ready-diff-post-$$.patch | sort) \
+   git diff origin/master...HEAD > /tmp/pr-ready-diff-post-<N>.patch
+   diff <(git apply --numstat /tmp/pr-ready-diff-pre-<N>.patch | sort) \
+        <(git apply --numstat /tmp/pr-ready-diff-post-<N>.patch | sort) \
      && echo "TREE-EQUIVALENT" || echo "TREE DIVERGED — inspect before pushing"
    ```
 
@@ -114,13 +114,15 @@ Read `.claude/skills/pr-ready/_rebase-and-conflicts.md` now and follow it end-to
 
 3. `git push --force-with-lease` — never a bare `--force`. The lease is what catches a concurrent push into the same branch.
 
-4. **`mergeable=UNKNOWN` handling — bounded, no loop.** GitHub computes mergeability asynchronously, so the first read right after a push is usually `UNKNOWN`. Check once; if `UNKNOWN`, wait ~30s and check exactly once more; then report whatever the second read says. Do **not** loop:
+4. **`mergeable=UNKNOWN` handling — bounded, and never with a foreground `sleep`.** GitHub computes mergeability asynchronously, so the first read right after a push is usually `UNKNOWN`. Read once:
 
    ```bash
-   gh pr view <N> --json mergeable,mergeStateStatus
-   sleep 30
    gh pr view <N> --json mergeable,mergeStateStatus,state
    ```
+
+   If the answer is anything other than `UNKNOWN`, act on it now — in particular `mergeStateStatus=DIRTY` means the rebase did not actually clear the conflict, so stop and re-run Phases 2–3 rather than pushing on. If it **is** `UNKNOWN`, **do not wait here**: proceed to step 5, whose watcher polls `mergeStateStatus` on every iteration and breaks immediately on `DIRTY`. That is the resolution path — the watcher is the wait, and a conflict surfaces on its first poll rather than after CI finishes. Do not re-read here, and do not loop.
+
+   **Never insert a foreground `sleep` to bridge the gap.** The harness refuses one (`Blocked: sleep 30 … To wait for a condition, use Monitor with an until-loop … Do not chain shorter sleeps to work around this block`), so a `sleep`-based wait does not merely cost time — it hard-fails the call and stalls the run.
 
 5. **CI watcher — exactly one, keyed to the head SHA.** If a watcher from an earlier iteration is live, kill it first with `TaskStop(task_id: "<the id recorded when it was armed>")`. **Record the id `Monitor` returns in the run notes at arm time** — `TaskStop` has no "stop all" form, so an unrecorded id is an orphaned watcher. **Never** poll with `sleep N; gh pr checks` on the main thread: that re-reads the full orchestrator context on every call, the spend bug `.claude/rules/work-triage.md` names.
 
@@ -136,11 +138,17 @@ Read `.claude/skills/pr-ready/_rebase-and-conflicts.md` now and follow it end-to
    ```
 
    ```bash
-   HEAD_SHA="$(git rev-parse HEAD)"; prev=""
+   HEAD_SHA="$(git rev-parse HEAD)"; prev=""; prev_ms=""
    while true; do
-     live="$(gh pr view <N> --json headRefOid --jq .headRefOid 2>/dev/null || echo "")"
+     v="$(gh pr view <N> --json headRefOid,mergeStateStatus 2>/dev/null || echo '{}')"
+     live="$(jq -r '.headRefOid // ""' <<<"$v")"
      if [ -n "$live" ] && [ "$live" != "$HEAD_SHA" ]; then
        echo "STALE: head moved $HEAD_SHA -> $live; this watcher is obsolete"; break
+     fi
+     ms="$(jq -r '.mergeStateStatus // ""' <<<"$v")"
+     if [ -n "$ms" ] && [ "$ms" != "$prev_ms" ]; then echo "mergeStateStatus: $ms"; prev_ms="$ms"; fi
+     if [ "$ms" = "DIRTY" ]; then
+       echo "MERGE CONFLICT: mergeStateStatus=DIRTY; stop and re-run Phases 2-3"; break
      fi
      s="$(gh pr checks <N> --json name,bucket 2>/dev/null || echo '[]')"
      cur="$(jq -r '.[] | select(.bucket!="pending") | "\(.name): \(.bucket)"' <<<"$s" | sort)"
@@ -151,7 +159,7 @@ Read `.claude/skills/pr-ready/_rebase-and-conflicts.md` now and follow it end-to
    done
    ```
 
-   The emitted line is `"\(.name): \(.bucket)"` and **not** a success-only filter because **silence is not success**. A filter matching only `pass` stays mute through `fail`, `cancel`, `skipping`, and `action_required`, and mute is indistinguishable from "still running". The stale-SHA break is what stops an orphaned watcher from reporting on a superseded push.
+   The emitted line is `"\(.name): \(.bucket)"` and **not** a success-only filter because **silence is not success**. A filter matching only `pass` stays mute through `fail`, `cancel`, `skipping`, and `action_required`, and mute is indistinguishable from "still running". The stale-SHA break is what stops an orphaned watcher from reporting on a superseded push. The `mergeStateStatus` line is emitted on **change**, which is what resolves step 4's `UNKNOWN` without a wait — the first poll prints the real value, and `DIRTY` breaks out on that same poll rather than after CI finishes.
 
 **Phase 5 — strict re-check loop.**
 
@@ -192,15 +200,18 @@ Read `.claude/skills/pr-ready/_plan-fidelity-review.md` now and perform the revi
 
    `<!-- pr-ready-verdict -->`
 
+   **First write the composed comment body to `/tmp/pr-ready-verdict-<N>.md` with the `Write` tool.** The path is keyed to the PR number for the same reason Phase 2a's is: a `tmpfile=$(mktemp)` assigned in one Bash call is gone by the next one, so the post below would send an empty `--body-file`. Compose the body in full, write it, then run the post.
+
    There is no helper in `bin/lib/` for this, so use the find-and-update-else-create shape from `bin/pr-canary-check` (`STICKY_MARKER` at line 19, `post_sticky()` below it):
 
    ```bash
    id=$(gh api "repos/{owner}/{repo}/issues/<N>/comments" --paginate \
      --jq '.[] | select(.body | contains("<!-- pr-ready-verdict -->")) | .id' | head -1)
    if [ -n "$id" ]; then
-     gh api --method PATCH "repos/{owner}/{repo}/issues/comments/$id" -F body=@"$tmpfile"
+     gh api --method PATCH "repos/{owner}/{repo}/issues/comments/$id" \
+       -F body=@/tmp/pr-ready-verdict-<N>.md --jq .html_url
    else
-     gh pr comment <N> --body-file "$tmpfile"
+     gh pr comment <N> --body-file /tmp/pr-ready-verdict-<N>.md
    fi
    ```
 

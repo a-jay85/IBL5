@@ -49,5 +49,11 @@ export async function assertColumnSorts(
   await expect(page.locator('#sorttable_sortrevind')).toBeAttached();
 
   const after = await cells.allTextContents();
+  // Assert the order genuinely changed. We deliberately do NOT assert the exact
+  // descending sequence (`[...before].sort().reverse()`): sorttable.js uses a
+  // diacritic-insensitive comparator, so real data with non-ASCII names (e.g.
+  // "Dariuš Lavrinovich") diverges from JS `.sort()`'s UTF-16 code-unit order —
+  // a comparator mismatch, not a sorting defect. The state assertions above
+  // (aria-sort, sorttable_sorted_reverse, #sorttable_sortrevind) prove the sort ran.
   expect(after).not.toEqual(before);
 }

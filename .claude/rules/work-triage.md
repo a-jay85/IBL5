@@ -23,11 +23,11 @@ If any are open, it wants a `/plan`.
 
 ## Ad-hoc safety mirror
 
-Even when the bar says ad-hoc, run a quick safety check — the surfaces `/plan` Step 4 gate 14 holds the merge for, plus the ship-pipeline surface `/plan` Step 3 escalates to `plan-architect-xhigh`. If the change touches any of:
+Even when the bar says ad-hoc, run a quick safety check — the surfaces `/plan` Step 4 gate 14 holds the merge for, plus the `plan-architect-xhigh` escalation surface. If the change touches any of:
 - a **security surface** (SQL, POST/form endpoint, auth/authz-gated route, user-facing output rendering),
 - a **destructive or schema-tightening migration**,
 - **new or redesigned user-visible UI/UX**,
-- a **gate removal or weakening** in the ship-pipeline surface (`.claude/skills`, `.claude/rules`, or `~/.claude/hooks`) — a change that deletes, relaxes, or disables an enforcement mechanism (a hook deny, a `bin/check-plan` gate condition, a plan-gate-edit check, a `/post-plan` Phase 6.5 arming condition) — or a **bootstrap hazard** (the change rewrites the arming, escalation, or auto-merge rules governing its own merge); *not* an additive gate, a decision-procedure-preserving prose edit, or a mechanism/plumbing change, or
+- a **gate removal or weakening** in the ship-pipeline surface (`.claude/skills`, `.claude/rules`, `~/.claude/hooks`) or a **bootstrap hazard** (it rewrites the rules governing its own merge); *not* an additive gate, a decision-procedure-preserving prose edit, or a mechanism/plumbing change, or
 - a property needing **subjective human judgment** to confirm,
 
 then prefer `/plan`, so the defense and its verification are designed up front. Why the PR-time backstop is not a substitute: `work-triage-detail.md` § Safety mirror backstop.

@@ -33,7 +33,7 @@ if [ "${1:-}" = "--report-mode" ]; then REPORT_MODE=1; shift || true; fi
 
 MAX_BYTES="${RULES_BYTE_BUDGET:-5000}"
 # NOTE: do NOT ratchet MAX_BYTES / RULES_BYTE_BUDGET — agent-tiering.md sits at
-# 4,971 bytes with only 29 bytes of headroom, and it cannot be path-scoped (it must
+# ~4,950 bytes with only ~50 bytes of headroom, and it cannot be path-scoped (it must
 # reach every sub-agent). Ratcheting would legislate away the only slack it has.
 MAX_TOTAL="${RULES_TOTAL_BUDGET:-16000}"
 ROOT="$(git rev-parse --show-toplevel)"

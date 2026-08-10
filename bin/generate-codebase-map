@@ -1,7 +1,7 @@
 #!/bin/bash
 # Generate .claude/rules/codebase-map.md from ibl5/classes/ structure.
 # Run: bin/generate-codebase-map
-# Auto-run: SessionStart hook + git pre-commit hook
+# Auto-run: SessionStart hook + git pre-commit hook + master-push CI job in .github/workflows/tests.yml
 
 set -euo pipefail
 

@@ -295,8 +295,9 @@ promote_draft() {
 }
 
 # CLAUDE_HEADLESS=1 marks the run unattended (skills branch on it).
-# CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000 lifts the interactive 120K
-# autoCompactWindow pin — rationale in bin/automouse/run.
+# No CLAUDE_CODE_AUTO_COMPACT_WINDOW is set: with no override the run inherits
+# the same autoCompactWindow setting an interactive session uses — rationale and
+# the tripwire for re-adding an explicit window in bin/automouse/run.
 # caffeinate -s keeps the Mac awake on AC for the run's duration.
 # 5400s: the first two real runs took 36 and 42 minutes, too close to the old
 # 3600s cap. claude -p does not stream, so $OUT stays empty until it exits — and with
@@ -311,7 +312,7 @@ promote_draft() {
 # $PLANS_DIR/.drafts/. 0 means wait indefinitely (the CLI says so itself);
 # timeout 5400 above remains the hard cap.
 CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
-    CLAUDE_HEADLESS=1 CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000 caffeinate -s \
+    CLAUDE_HEADLESS=1 caffeinate -s \
     timeout 5400 "$CLAUDE_BIN" -p "$(cat "$PROMPT")" \
     --dangerously-skip-permissions \
     --model "$MODEL" \

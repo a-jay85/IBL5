@@ -48,12 +48,13 @@ test.describe('Draft board: renders', () => {
       'Rookies', 'Sophomores',
     ];
     await expect(board).toBeVisible();
-    await expect(board).toContainText(/on the clock|round\s*1/i);
-    // Narrow to .draft-current-pick only — .ibl-card__title appears on every page
-    // and 'Free Agents' in allTeamNames would make the membership check vacuous.
-    await expect(board.locator('.draft-current-pick')).toHaveCount(1);
-    const onClockText = (await board.locator('.draft-current-pick').first().textContent()) ?? '';
-    expect(allTeamNames.some((n) => onClockText.includes(n))).toBe(true);
+    // The draft form encodes the picking team in a hidden input — no visible "on the clock" text.
+    const teamInput = board.locator('input[name="teamname"]');
+    await expect(teamInput).toHaveCount(1);
+    const teamValue = (await teamInput.getAttribute('value')) ?? '';
+    expect(allTeamNames.includes(teamValue.trim()), `teamname "${teamValue}" not in known teams`).toBe(true);
+    // Round is also encoded — confirms draft form rendered, not an empty shell.
+    await expect(board.locator('input[name="draft_round"]')).toHaveCount(1);
   });
 
   test('undrafted players listed with radio buttons', async ({ page }) => {

@@ -221,12 +221,114 @@ cmd_prove_tree() {
     exit 1
 }
 
+# cmd_holds — run every auto-merge hold predicate and report, fail-closed.
+#
+# Replaces the SKILL.md Phase 7 step 1 block, which the isolation guard refuses because
+# it sources a library and then calls what that library defined. Shell state does not
+# survive between Bash tool calls, so decomposition provably cannot fix it; a single
+# process can.
+#
+# The prohibited failure mode for this subcommand is a wrapper that swallows a non-zero
+# rc and reports "no hold". Everything below is shaped against that: one guarded fetch,
+# no `|| true` anywhere, and `set -euo pipefail` left free to abort loudly if any
+# predicate returns non-zero. A loud abort is a correct outcome here; a clean report
+# built on a failed fetch is not.
+cmd_holds() {
+    require_pr_number "${1:-}"
+    local n="$1"
+
+    if [[ ! -f "$ARMABLE_LIB" ]]; then
+        echo "HOLD: hold-predicate library not found at $ARMABLE_LIB"
+        exit 1
+    fi
+    # shellcheck source=bin/lib/pr-armable.sh
+    source "$ARMABLE_LIB"
+
+    # ONE fetch, not four. Four `gh pr view` calls cost four round-trips and can observe
+    # four different states of the PR mid-run; one fetch is cheaper and atomic.
+    local raw
+    raw="$("$GH_CMD" pr view "$n" --json body,title,labels,files)" \
+        || { echo "HOLD: gh pr view failed for PR $n"; exit 1; }
+    if [[ -z "$raw" ]]; then
+        echo "HOLD: gh pr view returned an empty payload for PR $n"
+        exit 1
+    fi
+    # A non-JSON payload is a failed fetch, not a PR with empty fields. Letting it
+    # through would hand pr_feat_hold an empty TITLE, which silently neuters the
+    # `feat:` floor — the exact fail-OPEN this subcommand exists to prevent.
+    if ! printf '%s' "$raw" | jq -e . >/dev/null 2>&1; then
+        echo "HOLD: gh pr view returned a non-JSON payload for PR $n"
+        exit 1
+    fi
+
+    local body title labels files
+    body="$(printf '%s' "$raw" | jq -r '.body // ""')"
+    title="$(printf '%s' "$raw" | jq -r '.title // ""')"
+    labels="$(printf '%s' "$raw" | jq -c '.labels // []')"
+    files="$(printf '%s' "$raw" | jq -c '.files // []')"
+
+    # All six predicates from bin/lib/pr-armable.sh — never re-derive, never relax, never swallow non-zero rc
+    #
+    # Argument mapping copied from the only other consumer, bin/pr-triage:178-182, plus
+    # pr_pipeline_authored_hold (labels, unconditional — there is NO override label).
+    # pr_unresolved_findings_hold takes the PR number and makes its own API calls
+    # internally through GH_CMD / REPO_SLUG, so it needs nothing pre-fetched.
+    local clearance golden deps feat pipeline unresolved
+    clearance="$(pr_manual_testing_clearance "$body")"
+    golden="$(pr_golden_hold "$files")"
+    deps="$(pr_dep_holds "$body" | tr '\n' ' ')"
+    feat="$(pr_feat_hold "$title" "$labels")"
+    pipeline="$(pr_pipeline_authored_hold "$labels")"
+    unresolved="$(pr_unresolved_findings_hold "$n" | tr '\n' ' ')"
+
+    local held=0
+
+    # Clearance is the ONE positive-signal axis: clear only on exactly CLEARED.
+    # HELD holds (real manual rows), and UNKNOWN holds too (no `## Manual Testing`
+    # section at all — a hand-made PR, or one /post-plan never processed). Fail-closed
+    # means clear requires a positive clearance signal, never the mere absence of a hold.
+    if [[ "$clearance" == "CLEARED" ]]; then
+        echo "CLEAR: pr_manual_testing_clearance — CLEARED"
+    else
+        echo "HOLD:  pr_manual_testing_clearance — ${clearance:-(no output)}"
+        held=1
+    fi
+
+    # The other five clear on EMPTY output; any non-empty value is the hold reason.
+    # All six lines print on every run, hold or not, so a missing line reads as a bug
+    # rather than as an absent hold.
+    local name value
+    for name in pr_golden_hold pr_dep_holds pr_feat_hold pr_pipeline_authored_hold pr_unresolved_findings_hold; do
+        case "$name" in
+            pr_golden_hold)                 value="$golden" ;;
+            pr_dep_holds)                   value="$deps" ;;
+            pr_feat_hold)                   value="$feat" ;;
+            pr_pipeline_authored_hold)      value="$pipeline" ;;
+            pr_unresolved_findings_hold)    value="$unresolved" ;;
+        esac
+        # Trim the trailing separator `tr` leaves on the two multi-line predicates.
+        value="${value%"${value##*[![:space:]]}"}"
+        if [[ -z "$value" ]]; then
+            echo "CLEAR: $name — (none)"
+        else
+            echo "HOLD:  $name — $value"
+            held=1
+        fi
+    done
+
+    # Exit 1 on ANY hold — the skill gates its subsequent steps on this exit code.
+    [[ "$held" -eq 0 ]] || exit 1
+}
+
 case "${1:-}" in
     capture-pre)
         cmd_capture_pre "${2:-}" "${3:-}"
         ;;
     prove-tree)
         cmd_prove_tree "${2:-}"
+        ;;
+    holds)
+        cmd_holds "${2:-}"
         ;;
     selftest)
         cmd_selftest

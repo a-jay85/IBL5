@@ -1,5 +1,7 @@
 import type {
+    Client,
     Message,
+    PartialMessage,
     MessageReaction,
     PartialMessageReaction,
     User,
@@ -126,6 +128,80 @@ export async function handleReaction(
         emoji: reaction.emoji.name ?? '',   // custom emoji may have null name
         reactor_id: user.id,
     });
+}
+
+// ── Source-message reconciliation: edits and deletes ────────────────────────
+// `original_text` is snapshotted at enqueue and was never reconciled again, so a GM
+// who edited in the missing repro steps left an awaiting_info row parked forever and
+// a deleted report left a zombie row the tick retried every 180s. These two handlers
+// push gateway state at PHP, which owns EVERY state decision — see the controllers.
+
+// Fixed literals, following the /prMerged 'Fixed! ✅' precedent. The GM's report text
+// is NEVER echoed back into Discord: interpolating attacker-controlled content into a
+// bot message is exactly the injection surface this path has to stay clear of.
+const SOURCE_EDITED_NOTE = 'ℹ️ The original report was edited after this thread was opened.';
+const SOURCE_DELETED_NOTE = 'ℹ️ The original report was deleted.';
+
+// Best-effort thread note. Swallows its own failures: the DB write already landed and
+// is what the pipeline runs on — a send failure must never surface as a handler throw.
+async function postSourceNote(client: Client, threadId: string, note: string): Promise<void> {
+    try {
+        const thread = await client.channels.fetch(threadId);
+        if (thread?.isSendable()) await thread.send(note);
+    } catch (err) {
+        console.error('source note post failed (swallowed):', err);
+    }
+}
+
+export async function handleSourceUpdate(
+    oldMessage: Message | PartialMessage,
+    newMessage: Message | PartialMessage,
+): Promise<void> {
+    const msg = newMessage.partial ? await newMessage.fetch() : newMessage;
+
+    if (msg.author.bot) return;
+
+    // SCOPE GUARD: only a TOP-LEVEL bug-channel message is ever a row's source. A
+    // thread reply is handled by handleThreadReply and must never rewrite original_text.
+    if (msg.channelId !== config.bugChannelId || msg.channel.isThread()) return;
+
+    // Cheap short-circuit, valid ONLY when both sides are real messages. This is an
+    // optimisation, never the correctness boundary: Discord fires MessageUpdate on
+    // embed hydration ~1s after any report containing a URL, frequently with a partial
+    // `old` whose content is null. A listener-side comparison therefore cannot be
+    // trusted — the authoritative one is PHP's `original_text === $text`.
+    if (!oldMessage.partial && !newMessage.partial && oldMessage.content === msg.content) return;
+
+    // Guard empty content BEFORE the call. A failed hydration must never overwrite the
+    // stored snapshot with '' and revive the row to be reclassified against empty text.
+    if (!msg.content) return;
+
+    const r = await phpClient.sourceUpdated({ message_id: msg.id, text: msg.content });
+
+    // A row that changed but was NOT revived is terminal or mid-flight (hunting,
+    // pr_open, …): the tick will never re-classify it, so the humans already in its
+    // thread are the only ones who can act on the new text. revived:true posts nothing
+    // — the next tick re-classifies and speaks for itself.
+    if (r.matched && r.changed && !r.revived && r.thread_id) {
+        await postSourceNote(msg.client, r.thread_id, SOURCE_EDITED_NOTE);
+    }
+}
+
+export async function handleSourceDelete(message: Message | PartialMessage): Promise<void> {
+    // A deleted message is ALWAYS partial and can never be fetched — only `id` and
+    // `channelId` are reliably present, so neither content nor author is available.
+    // No bot/author filter is possible OR needed: an unmatched snowflake comes back
+    // matched:false and no-ops.
+    if (message.channelId !== config.bugChannelId) return;
+
+    const r = await phpClient.sourceDeleted({ message_id: message.id });
+
+    // dropped:false on a matched row means a human or hunter is mid-flight on it
+    // (hunting / pr_open / …). markSourceDeleted deliberately leaves that status
+    // alone; the thread just needs to know its source is gone.
+    if (r.matched && !r.dropped && r.thread_id) {
+        await postSourceNote(message.client, r.thread_id, SOURCE_DELETED_NOTE);
+    }
 }
 
 // ── Optional convenience dispatcher (thin) ──────────────────────────────────

@@ -45,6 +45,13 @@ function clientWithChannel(channel: unknown): Client {
     return { channels: { fetch: vi.fn().mockResolvedValue(channel) } } as unknown as Client;
 }
 
+// discord.js's "Unknown Message" REST failure — what the gateway raises once the GM
+// has deleted their own report. server.ts duck-types on `.code`, so a plain Error
+// carrying the code exercises the real branch without constructing a REST error.
+function unknownMessageError(): Error {
+    return Object.assign(new Error('Unknown Message'), { code: 10008 });
+}
+
 async function invoke(path: string, body: unknown, client: Client) {
     h.routes = {};
     startBugBotServer(client);
@@ -118,6 +125,16 @@ describe('/create-thread', () => {
         };
         const res = await invoke('/create-thread', { message_id: '1', name: 'bug' }, clientWithChannel(bad));
         expect(res.statusCode).toBe(500);
+    });
+
+    it('410 when the source message was deleted (10008), not 500', async () => {
+        const gone = {
+            isTextBased: () => true,
+            messages: { fetch: vi.fn().mockRejectedValue(unknownMessageError()) },
+        };
+        const res = await invoke('/create-thread', { message_id: '1', name: 'bug' }, clientWithChannel(gone));
+        expect(res.statusCode).toBe(410);
+        expect(res.send).toHaveBeenCalledWith('Source message deleted');
     });
 });
 
@@ -278,6 +295,89 @@ describe('/prMerged', () => {
         vi.mocked(phpClient.threadByPr).mockResolvedValue({ thread_id: 'THREAD_ID' });
         const bad = { isSendable: () => true, send: vi.fn().mockRejectedValue(new Error('x')) };
         const res = await invoke('/prMerged', { pr_number: 5 }, clientWithChannel(bad));
+        expect(res.statusCode).toBe(500);
+    });
+});
+
+describe('/get-message', () => {
+    it('400 when message_id is missing', async () => {
+        const channel = { isTextBased: () => true, messages: { fetch: vi.fn() } };
+        const res = await invoke('/get-message', {}, clientWithChannel(channel));
+        expect(res.statusCode).toBe(400);
+    });
+
+    it('returns the live content with deleted:false', async () => {
+        const channel = {
+            isTextBased: () => true,
+            messages: { fetch: vi.fn().mockResolvedValue({ content: 'edited text' }) },
+        };
+        const res = await invoke('/get-message', { message_id: '1' }, clientWithChannel(channel));
+        expect(res.statusCode).toBe(200);
+        expect(res.json).toHaveBeenCalledWith({ content: 'edited text', deleted: false });
+    });
+
+    // The tick reads this in a $( ) subshell — 200-always is what makes it fail open.
+    it('200 with deleted:true on a 10008, NOT a 4xx', async () => {
+        const gone = {
+            isTextBased: () => true,
+            messages: { fetch: vi.fn().mockRejectedValue(unknownMessageError()) },
+        };
+        const res = await invoke('/get-message', { message_id: '1' }, clientWithChannel(gone));
+        expect(res.statusCode).toBe(200);
+        expect(res.json).toHaveBeenCalledWith({ content: null, deleted: true });
+    });
+
+    it('200 with deleted:false on a generic error (fails open)', async () => {
+        const bad = {
+            isTextBased: () => true,
+            messages: { fetch: vi.fn().mockRejectedValue(new Error('bot restarting')) },
+        };
+        const res = await invoke('/get-message', { message_id: '1' }, clientWithChannel(bad));
+        expect(res.statusCode).toBe(200);
+        expect(res.json).toHaveBeenCalledWith({ content: null, deleted: false });
+    });
+});
+
+describe('/reply-to-message', () => {
+    function channelWithSource(source: unknown) {
+        return { isTextBased: () => true, messages: { fetch: vi.fn().mockResolvedValue(source) } };
+    }
+
+    it('400 when message is missing', async () => {
+        const res = await invoke('/reply-to-message', { message_id: '1' }, clientWithChannel(channelWithSource({})));
+        expect(res.statusCode).toBe(400);
+    });
+
+    it('replies once with the literal argument and returns the sent id as a string', async () => {
+        const reply = vi.fn().mockResolvedValue({ id: 'REPLY_MSG_ID' });
+        const res = await invoke(
+            '/reply-to-message',
+            { message_id: '1', message: 'Not a bug — closing.' },
+            clientWithChannel(channelWithSource({ reply })),
+        );
+        expect(reply).toHaveBeenCalledTimes(1);
+        expect(reply).toHaveBeenCalledWith('Not a bug — closing.');
+        expect(res.json).toHaveBeenCalledWith({ message_id: 'REPLY_MSG_ID' });
+        expect(typeof res.json.mock.calls[0][0].message_id).toBe('string');
+    });
+
+    it('410 when the source message was deleted (10008)', async () => {
+        const gone = {
+            isTextBased: () => true,
+            messages: { fetch: vi.fn().mockRejectedValue(unknownMessageError()) },
+        };
+        const res = await invoke('/reply-to-message', { message_id: '1', message: 'x' }, clientWithChannel(gone));
+        expect(res.statusCode).toBe(410);
+        expect(res.send).toHaveBeenCalledWith('Source message deleted');
+    });
+
+    it('500 when reply rejects for any other reason', async () => {
+        const reply = vi.fn().mockRejectedValue(new Error('rate limited'));
+        const res = await invoke(
+            '/reply-to-message',
+            { message_id: '1', message: 'x' },
+            clientWithChannel(channelWithSource({ reply })),
+        );
         expect(res.statusCode).toBe(500);
     });
 });

@@ -287,4 +287,46 @@ class BugReportClaimRepository extends \BaseMysqliRepository implements BugRepor
             $id
         ) === 1;
     }
+
+    /** Replace the stored snapshot after the GM edits the source message. Text only — no state. */
+    public function updateSourceText(string $originalMessageId, string $text): bool
+    {
+        return $this->execute(
+            'UPDATE `ibl_bug_reports` SET original_text = ?, updated_at = NOW()
+             WHERE original_message_id = ?',
+            'ss',
+            $text,
+            $originalMessageId
+        ) >= 1;
+    }
+
+    /**
+     * Re-open an edited row for reclassification. hunt_attempts is deliberately ABSENT from the
+     * SET list — an edit must never buy a GM extra Opus hunts. class = NULL keeps
+     * claimNextHuntable() (status='queued' AND class IS NOT NULL) from firing before reclassify.
+     */
+    public function reviveForReclassify(string $originalMessageId): bool
+    {
+        // Literal fragments only: the IN list is built from a constant of compile-time literals,
+        // never from input — same idiom as transition()'s OPTIONAL_TRANSITION_COLUMNS.
+        $in = "'" . implode("','", self::RECLASSIFIABLE_ON_EDIT) . "'";
+        return $this->execute(
+            "UPDATE `ibl_bug_reports` SET status = 'queued', class = NULL, updated_at = NOW()
+              WHERE original_message_id = ? AND status IN ($in)",
+            's',
+            $originalMessageId
+        ) === 1;
+    }
+
+    /** Source message deleted: drop only rows no human/hunter is mid-flight on. */
+    public function markSourceDeleted(string $originalMessageId): bool
+    {
+        return $this->execute(
+            "UPDATE `ibl_bug_reports` SET status = 'dropped', updated_at = NOW()
+              WHERE original_message_id = ?
+                AND status IN ('queued','gathering','awaiting_info')",
+            's',
+            $originalMessageId
+        ) === 1;
+    }
 }

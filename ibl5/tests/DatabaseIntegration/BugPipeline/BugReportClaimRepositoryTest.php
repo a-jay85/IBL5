@@ -289,6 +289,115 @@ class BugReportClaimRepositoryTest extends DatabaseTestCase
         self::assertFalse($this->repo->clearBlocked(999999));
     }
 
+    // ── updateSourceText ───────────────────────────────────────────────────────
+
+    public function testUpdateSourceTextReplacesStoredSnapshot(): void
+    {
+        $id = $this->insertBugReport([
+            'original_message_id' => self::MSG_ID,
+            'original_text'       => 'old bug text',
+        ]);
+        $this->repo->updateSourceText(self::MSG_ID, 'new bug text');
+        $row = $this->fetchBugReport($id);
+        self::assertNotNull($row);
+        self::assertSame('new bug text', $row['original_text']);
+        self::assertSame('queued', $row['status'], 'updateSourceText must not change status');
+    }
+
+    // ── reviveForReclassify ────────────────────────────────────────────────────
+
+    public function testReviveForReclassifyQueuesRowAndNullsClass(): void
+    {
+        // Use a row that genuinely changes: 'gathering' → 'queued', class 'bug' → NULL.
+        $id = $this->insertBugReport([
+            'original_message_id' => self::MSG_ID,
+            'status'              => 'gathering',
+            'class'               => 'bug',
+        ]);
+        $result = $this->repo->reviveForReclassify(self::MSG_ID);
+        self::assertTrue($result);
+        $row = $this->fetchBugReport($id);
+        self::assertNotNull($row);
+        self::assertSame('queued', $row['status']);
+        self::assertNull($row['class']);
+    }
+
+    public function testReviveForReclassifyNeverResetsHuntAttempts(): void
+    {
+        $id = $this->insertBugReport([
+            'original_message_id' => self::MSG_ID,
+            'status'              => 'gathering',
+            'class'               => 'bug',
+            'hunt_attempts'       => 3,
+        ]);
+        $this->repo->reviveForReclassify(self::MSG_ID);
+        $row = $this->fetchBugReport($id);
+        self::assertNotNull($row);
+        self::assertSame(3, $row['hunt_attempts'], 'hunt_attempts must survive a revive');
+    }
+
+    public function testReviveForReclassifyLeavesHuntingRowUntouched(): void
+    {
+        $id = $this->insertBugReport([
+            'original_message_id' => self::MSG_ID,
+            'status'              => 'hunting',
+            'class'               => 'bug',
+        ]);
+        $before = $this->fetchBugReport($id);
+        self::assertNotNull($before);
+        $result = $this->repo->reviveForReclassify(self::MSG_ID);
+        self::assertFalse($result);
+        $after = $this->fetchBugReport($id);
+        self::assertNotNull($after);
+        self::assertSame($before['status'], $after['status']);
+        self::assertSame($before['class'], $after['class']);
+    }
+
+    // ── markSourceDeleted ──────────────────────────────────────────────────────
+
+    public function testMarkSourceDeletedDropsQueuedRow(): void
+    {
+        $id = $this->insertBugReport([
+            'original_message_id' => self::MSG_ID,
+            'status'              => 'queued',
+        ]);
+        $result = $this->repo->markSourceDeleted(self::MSG_ID);
+        self::assertTrue($result);
+        $row = $this->fetchBugReport($id);
+        self::assertNotNull($row);
+        self::assertSame('dropped', $row['status']);
+    }
+
+    public function testMarkSourceDeletedLeavesPrOpenRowUntouched(): void
+    {
+        $id = $this->insertBugReport([
+            'original_message_id' => self::MSG_ID,
+            'status'              => 'pr_open',
+        ]);
+        $before = $this->fetchBugReport($id);
+        self::assertNotNull($before);
+        $result = $this->repo->markSourceDeleted(self::MSG_ID);
+        self::assertFalse($result);
+        $after = $this->fetchBugReport($id);
+        self::assertNotNull($after);
+        self::assertSame($before['status'], $after['status']);
+    }
+
+    public function testMarkSourceDeletedIsNoOpOnAlreadyDroppedRow(): void
+    {
+        $id = $this->insertBugReport([
+            'original_message_id' => self::MSG_ID,
+            'status'              => 'dropped',
+        ]);
+        $before = $this->fetchBugReport($id);
+        self::assertNotNull($before);
+        $result = $this->repo->markSourceDeleted(self::MSG_ID);
+        self::assertFalse($result);
+        $after = $this->fetchBugReport($id);
+        self::assertNotNull($after);
+        self::assertSame('dropped', $after['status']);
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────
 
     /**

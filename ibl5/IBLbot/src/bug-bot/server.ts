@@ -15,6 +15,19 @@ import * as phpClient from './php-client.js';
  * All ids are strings — NEVER Number()/parseInt; discord.js accepts string
  * snowflakes directly. `pr_number` is the one numeric field.
  */
+
+/**
+ * discord.js raises DiscordAPIError code 10008 ("Unknown Message") when the source
+ * message no longer exists — the GM deleted their own report. Duck-typed on `.code`
+ * rather than `instanceof DiscordAPIError` so the check survives a re-thrown or
+ * wrapped error and stays assertable from the unit tests without constructing a real
+ * REST error object.
+ */
+function isUnknownMessage(error: unknown): boolean {
+    return typeof error === 'object' && error !== null
+        && (error as { code?: unknown }).code === 10008;
+}
+
 export function startBugBotServer(client: Client): void {
     const app = express();
     app.use(express.json());
@@ -58,6 +71,15 @@ export function startBugBotServer(client: Client): void {
             const thread = await message.startThread({ name });
             res.json({ thread_id: thread.id });   // thread_id is a string snowflake
         } catch (error) {
+            // The GM deleted their report before the tick got here. 410 tells the
+            // caller "gone, stop retrying" — bin/bug-pipeline-tick treats it exactly
+            // like its existing create-thread failure path: log, no thread, row
+            // unchanged. /get-message is the single deletion-detection point; a
+            // message deleted between the two calls self-heals on the next tick.
+            if (isUnknownMessage(error)) {
+                res.status(410).send('Source message deleted');
+                return;
+            }
             console.error('/create-thread failed:', error);
             res.status(500).send('Failed to create thread');
         }
@@ -174,6 +196,68 @@ export function startBugBotServer(client: Client): void {
         } catch (error) {
             console.error('/prMerged failed:', error);
             res.status(500).send('Failed to post fixed confirmation');
+        }
+    });
+
+    // POST /get-message — { message_id } → ALWAYS HTTP 200 { content, deleted }.
+    // The 200-always shape is deliberate. bin/bug-pipeline-tick reads this inside a
+    // $( ) subshell immediately before building the classify prompt; signalling
+    // deletion through an HTTP status would force a `curl -w '%{http_code}'` channel
+    // that has to cross that subshell via a tempfile, where a stale 410 from one row
+    // could leak into the next row's decision and drop a healthy report. Carrying
+    // `deleted` in the body instead makes failing OPEN the default: a bot restart, an
+    // unparseable body, or any generic error all land on `deleted:false` and the tick
+    // falls through on its stored text.
+    app.post('/get-message', async (req, res) => {
+        const { message_id } = req.body ?? {};
+        if (!message_id) {
+            res.status(400).send('Missing message_id');
+            return;
+        }
+        try {
+            const channel = await client.channels.fetch(config.bugChannelId);
+            if (!channel || !channel.isTextBased()) {
+                res.status(500).send('Bug channel is not text-based');
+                return;
+            }
+            const message = await channel.messages.fetch(message_id);
+            res.json({ content: message.content, deleted: false });
+        } catch (error) {
+            if (isUnknownMessage(error)) {
+                res.json({ content: null, deleted: true });
+                return;
+            }
+            console.error('/get-message failed:', error);
+            res.json({ content: null, deleted: false });   // fail open
+        }
+    });
+
+    // POST /reply-to-message — { message_id, message } → { message_id: sent.id }
+    // Replies IN-CHANNEL, unlike /post-to-thread (needs a thread_id) and /mention
+    // (posts into a thread). The not_a_thing drop has no thread to post into, so this
+    // is the only way the GM ever hears back. 10008 → 410; other failures → 500.
+    app.post('/reply-to-message', async (req, res) => {
+        const { message_id, message } = req.body ?? {};
+        if (!message_id || !message) {
+            res.status(400).send('Missing message_id or message');
+            return;
+        }
+        try {
+            const channel = await client.channels.fetch(config.bugChannelId);
+            if (!channel || !channel.isTextBased()) {
+                res.status(500).send('Bug channel is not text-based');
+                return;
+            }
+            const source = await channel.messages.fetch(message_id);
+            const sent = await source.reply(message);
+            res.json({ message_id: sent.id });   // the posted reply's id (string)
+        } catch (error) {
+            if (isUnknownMessage(error)) {
+                res.status(410).send('Source message deleted');
+                return;
+            }
+            console.error('/reply-to-message failed:', error);
+            res.status(500).send('Failed to reply');
         }
     });
 

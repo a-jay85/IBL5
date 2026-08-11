@@ -3,7 +3,7 @@ description: CSS architecture: all styles live in ibl5/design/components/; inlin
 paths:
   - "**/design/**/*.css"
   - "**/*View.php"
-last_verified: 2026-06-11
+last_verified: 2026-08-11
 ---
 
 # CSS Architecture Reference

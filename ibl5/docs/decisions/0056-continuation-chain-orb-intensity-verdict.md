@@ -1,6 +1,6 @@
 ---
 description: Verdict from the L1 continuation-chain / ORB-intensity instrument (#1045). The instrument RULES OUT ORB-continuation intensity as the home of the engine's wrong-signed Cov(lnFGA,lnPPS): Cov(ORB/POSS,lnPPS) is engine −0.000151 vs real −0.000115 (same sign, near-equal magnitude — the channel is faithful), so the residual shots-per-possession anti-coupling (Cov(ln(FGA/POSS),lnPPS) engine −0.000800 vs real +0.000027) does NOT live in the offensive-rebound loop. A decay/cap fix aimed at the ORB↔inefficiency coupling would be misdirected. The instrument DID surface a separate, same-units defect: engine ORB/POSS level ~23% too high (0.194 vs 0.158) and Var(ORB/POSS) ~2.3× too compressed (0.000084 vs 0.000190) — a rebound level/dispersion gap, not a coupling-sign gap, with read #2 showing the engine's continuation tail decays faster than memoryless (realized k≥3 0.0022 vs geometric 0.0041). Decision: NO ORB decay/cap-for-coupling PR; the coupling search stays on the broader shots-per-possession structure (initial vs transition shot-frequency↔efficiency) and the still-open count axis (Var(lnPOSS) ~2.5× narrow). Any ORB level/dispersion fix is independently warranted but must be scoped as a rebound-fidelity fix with its own faithfulness gate, never sold as the coupling fix.
-last_verified: 2026-06-10
+last_verified: 2026-08-11
 ---
 
 # ADR-0056: Continuation-chain / ORB-intensity verdict — ORB-continuation ruled out as the coupling culprit

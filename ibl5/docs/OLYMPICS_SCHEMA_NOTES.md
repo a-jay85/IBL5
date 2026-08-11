@@ -1,6 +1,6 @@
 ---
 description: Schema notes for Olympics event data.
-last_verified: 2026-06-10
+last_verified: 2026-08-11
 ---
 
 # Olympics Schema Notes

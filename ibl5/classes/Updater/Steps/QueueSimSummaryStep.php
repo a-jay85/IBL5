@@ -30,6 +30,14 @@ class QueueSimSummaryStep implements PipelineStepInterface
 
     public function execute(): StepResult
     {
+        $phase = $this->seasonQuery->getSeasonPhase();
+        if (!\SimRecap\RecapPhasePolicy::isEnabled($phase)) {
+            $reason = $phase !== ''
+                ? "Sim recaps are disabled during the {$phase} phase."
+                : "Sim recaps are disabled — no season phase is set.";
+            return StepResult::skipped($this->getLabel(), $reason);
+        }
+
         $sim = $this->seasonQuery->getLastSimDatesArray()['sim'];
 
         if ($sim <= 0) {

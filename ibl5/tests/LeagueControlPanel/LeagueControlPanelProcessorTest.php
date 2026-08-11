@@ -668,6 +668,51 @@ class LeagueControlPanelProcessorTest extends TestCase
         $this->assertStringContainsString('maintenance repository not configured', $result['message']);
     }
 
+    // --- simRecapPollerNotice ---
+
+    public function testSimRecapPollerNoticeReturnsNullForPlayoffs(): void
+    {
+        $processor = $this->createProcessorWithStub();
+
+        $this->assertNull($processor->simRecapPollerNotice('Playoffs'));
+    }
+
+    public function testSimRecapPollerNoticeReturnsNullForPreseason(): void
+    {
+        $processor = $this->createProcessorWithStub();
+
+        $this->assertNull($processor->simRecapPollerNotice('Preseason'));
+    }
+
+    public function testSimRecapPollerNoticeReturnsNullForEmptyPhase(): void
+    {
+        $processor = $this->createProcessorWithStub();
+
+        $this->assertNull($processor->simRecapPollerNotice(''));
+    }
+
+    public function testSimRecapPollerNoticeReturnsStringForRegularSeason(): void
+    {
+        $processor = $this->createProcessorWithStub();
+
+        $notice = $processor->simRecapPollerNotice('Regular Season');
+
+        $this->assertNotNull($notice);
+        $this->assertIsString($notice);
+    }
+
+    public function testSimRecapPollerNoticeContainsPhaseNameAndKeywords(): void
+    {
+        $processor = $this->createProcessorWithStub();
+
+        $notice = $processor->simRecapPollerNotice('Regular Season');
+
+        $this->assertIsString($notice);
+        $this->assertStringContainsString('Regular Season', $notice);
+        $this->assertStringContainsString('sim-recap-cron-setup --resume', $notice);
+        $this->assertStringContainsString('com.ibl5.sim-recap-poll', $notice);
+    }
+
     private function createProcessorWithStub(): LeagueControlPanelProcessor
     {
         $stub = self::createStub(LeagueControlPanelRepositoryInterface::class);

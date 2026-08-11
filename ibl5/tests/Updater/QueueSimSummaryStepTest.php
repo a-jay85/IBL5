@@ -19,6 +19,7 @@ class QueueSimSummaryStepTest extends TestCase
 
     public function testQueuesTheLatestSim(): void
     {
+        $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
         $this->mockDb->onQuery('ibl_sim_dates', [['sim' => 412, 'start_date' => '2026-01-01', 'end_date' => '2026-01-07']]);
         $this->mockDb->setAffectedRows(1);
 
@@ -41,6 +42,7 @@ class QueueSimSummaryStepTest extends TestCase
 
     public function testSkipsWhenARowAlreadyExists(): void
     {
+        $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
         $this->mockDb->onQuery('ibl_sim_dates', [['sim' => 412, 'start_date' => '2026-01-01', 'end_date' => '2026-01-07']]);
         $this->mockDb->setAffectedRows(0);
 
@@ -53,6 +55,7 @@ class QueueSimSummaryStepTest extends TestCase
 
     public function testSkipsWhenNoSimDatesExist(): void
     {
+        $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
         $this->mockDb->onQuery('ibl_sim_dates', []);
 
         $step = $this->buildStep();
@@ -92,6 +95,7 @@ class QueueSimSummaryStepTest extends TestCase
 
     public function testQueuedInlineHtmlContainsSimAndLink(): void
     {
+        $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
         $this->mockDb->onQuery('ibl_sim_dates', [['sim' => 412, 'start_date' => '2026-01-01', 'end_date' => '2026-01-07']]);
         $this->mockDb->setAffectedRows(1);
 
@@ -103,6 +107,7 @@ class QueueSimSummaryStepTest extends TestCase
 
     public function testStateBLinksLastDoneSimNotCurrentSim(): void
     {
+        $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
         $this->mockDb->onQuery('ibl_sim_dates', [['sim' => 412, 'start_date' => '2026-01-01', 'end_date' => '2026-01-07']]);
         $this->mockDb->setAffectedRows(0);
         $this->mockDb->onQuery('ibl_sim_summaries', [
@@ -119,6 +124,7 @@ class QueueSimSummaryStepTest extends TestCase
 
     public function testStateBRendersTextOnlyWhenNoDoneRecapExists(): void
     {
+        $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
         $this->mockDb->onQuery('ibl_sim_dates', [['sim' => 412, 'start_date' => '2026-01-01', 'end_date' => '2026-01-07']]);
         $this->mockDb->setAffectedRows(0);
         $this->mockDb->onQuery('ibl_sim_summaries', []);
@@ -133,11 +139,55 @@ class QueueSimSummaryStepTest extends TestCase
 
     public function testSentinelSimZeroProducesEmptyInlineHtml(): void
     {
+        $this->mockDb->onQuery('ibl_settings', [['value' => 'Regular Season']]);
         $this->mockDb->onQuery('ibl_sim_dates', []);
 
         $result = $this->buildStep()->execute();
 
         self::assertSame('', $result->inlineHtml);
+    }
+
+    public function testSkippedWhenPhaseIsPlayoffs(): void
+    {
+        $this->mockDb->onQuery('ibl_settings', [['value' => 'Playoffs']]);
+
+        $result = $this->buildStep()->execute();
+
+        // skipped() sets success=true; detail contains the reason.
+        self::assertTrue($result->success);
+        self::assertStringContainsString('Playoffs', $result->detail);
+    }
+
+    public function testSkippedWhenNoPhaseIsSet(): void
+    {
+        // getSeasonPhase() returns '' when the setting row is absent.
+        $this->mockDb->onQuery('ibl_settings', []);
+
+        $result = $this->buildStep()->execute();
+
+        self::assertTrue($result->success);
+        self::assertStringContainsString('no season phase', $result->detail);
+    }
+
+    public function testPhaseGateSkipDoesNotTouchSimDatesOrSummaries(): void
+    {
+        $this->mockDb->onQuery('ibl_settings', [['value' => 'Draft']]);
+
+        $this->buildStep()->execute();
+
+        $queries = $this->mockDb->getExecutedQueries();
+        foreach ($queries as $q) {
+            self::assertStringNotContainsStringIgnoringCase(
+                'ibl_sim_dates',
+                $q,
+                'Phase-gated skip must not read ibl_sim_dates',
+            );
+            self::assertStringNotContainsStringIgnoringCase(
+                'ibl_sim_summaries',
+                $q,
+                'Phase-gated skip must not touch ibl_sim_summaries',
+            );
+        }
     }
 
     public function testEscapingPrimitiveNeutralizesHtmlPayload(): void

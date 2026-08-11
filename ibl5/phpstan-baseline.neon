@@ -1699,39 +1699,15 @@ parameters:
 			path: scripts/simRecapContext.php
 
 		-
-			rawMessage: PHPDoc tag @var above a function has no effect.
-			identifier: varTag.misplaced
-			count: 1
-			path: scripts/simRecapQueue.php
-
-		-
 			rawMessage: 'PHPDoc tag @var with type int is not subtype of native type int<1, max>|null.'
 			identifier: varTag.nativeType
 			count: 3
 			path: scripts/simRecapQueue.php
 
 		-
-			rawMessage: 'Parameter #1 $db of class SimRecap\SimSummaryRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/simRecapQueue.php
-
-		-
-			rawMessage: 'Parameter #1 $db of function buildMentionMap expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: scripts/simRecapQueue.php
-
-		-
 			rawMessage: Variable $argv might not be defined.
 			identifier: variable.undefined
 			count: 1
-			path: scripts/simRecapQueue.php
-
-		-
-			rawMessage: Variable $mysqli_db might not be defined.
-			identifier: variable.undefined
-			count: 2
 			path: scripts/simRecapQueue.php
 
 		-

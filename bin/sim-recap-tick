@@ -13,6 +13,14 @@
 # main() aborts the tick rather than reporting a cheap exit. Without that, a
 # broken pipeline is indistinguishable from a quiet one in the launchd log.
 #
+# Phase gate (RecapPhasePolicy): sim recaps are enabled only during Regular
+# Season. When claim-next reports recaps_enabled=false and there is no pending
+# sim (nothing to drain), the tick self-unloads via `launchctl bootout` rather
+# than spinning every 300s doing nothing. Run `bin/sim-recap-cron-setup --resume`
+# to re-arm the poller when Regular Season begins (Discord #admin-chat posts a
+# reminder automatically when the phase is changed via LeagueControlPanel).
+# Self-unload never fires in --dry-run mode or when --sim=N is supplied.
+#
 # Trust split (ADR-0092): the Mac holds ONE credential — a SELECT-only MySQL
 # user reached over an SSH tunnel — handed only to the generation agent for game
 # data. Every privileged queue action is a prod-side `ssh php simRecapQueue.php`
@@ -49,6 +57,7 @@ SIM_RECAP_DB_NAME="${SIM_RECAP_DB_NAME:-}"
 # its own copy so preflight_mysql can check the binary the agent will actually be
 # told to run, and exports it so both sides can never disagree.
 SIM_RECAP_MYSQL_BIN="${SIM_RECAP_MYSQL_BIN:-/opt/homebrew/opt/mysql@8.4/bin/mysql}"
+SIM_RECAP_LAUNCHCTL_BIN="${SIM_RECAP_LAUNCHCTL_BIN:-launchctl}"
 # SIM_RECAP_DB_PASSWORD is read from the environment ONLY (never defaulted, never
 # argv, never logged). require_password() enforces its presence on the live path.
 
@@ -428,6 +437,25 @@ main() {
 
     sim="$(printf '%s' "$claim" | "$SIM_RECAP_JQ_BIN" -r '.sim // empty' 2>/dev/null)"
     if [ -z "$sim" ] || [ "$sim" = "null" ]; then
+        # Phase gate: if recaps are disabled and there is nothing left to drain,
+        # self-unload rather than spinning every 300s for nothing. Fail-safe:
+        # a missing/unparseable recaps_enabled field = treat as true (no unload).
+        # Skipped when --sim=N was supplied (a human drove this tick by hand);
+        # --dry-run never reaches here at all — it returns from dry_run() above.
+        #
+        # A self-initiated bootout SIGTERMs this very process, so the `return 0`
+        # below is unreachable in production (verified 2026-08-10: the job leaves
+        # `launchctl print` and stays gone past a StartInterval window). Log
+        # BEFORE the call, and keep this branch free of cleanup that must run —
+        # WORKDIR is still empty here, so the EXIT trap has nothing to lose.
+        if [ -z "$DRY_SIM" ] && jq_ok "$claim" '.recaps_enabled == false'; then
+            local phase_log
+            phase_log="$(printf '%s' "$claim" | \
+                "$SIM_RECAP_JQ_BIN" -r '.phase // "unknown"' 2>/dev/null)"
+            log "recaps disabled (phase: ${phase_log}) and no pending sim — booting out poller (label: com.ibl5.sim-recap-poll)"
+            "$SIM_RECAP_LAUNCHCTL_BIN" bootout "gui/$(id -u)/com.ibl5.sim-recap-poll"
+            return 0
+        fi
         log "no pending sim — exiting cheap"
         return 0
     fi

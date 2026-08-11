@@ -114,6 +114,8 @@ $app->getContainer()->set('api.controllerFactory', static function (): \Closure 
             \Api\Controller\LastSeenController::class,
             \Api\Controller\PipelineStateController::class,
             \Api\Controller\ThreadByPrController::class,
+            \Api\Controller\SourceUpdatedController::class,
+            \Api\Controller\SourceDeletedController::class,
         ];
         if (in_array($controllerClass, $bugPipelineControllers, true)) {
             return new $controllerClass(new \BugPipeline\BugReportRepository($db));

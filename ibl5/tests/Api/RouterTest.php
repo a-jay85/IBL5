@@ -241,6 +241,19 @@ class RouterTest extends TestCase
         ];
     }
 
+    public function testSourceRoutesResolveToTheirControllers(): void
+    {
+        $updated = $this->router->match('bug-pipeline/source-updated', 'POST');
+        $this->assertNotNull($updated);
+        $this->assertSame('Api\Controller\SourceUpdatedController', $updated['controller']);
+        $this->assertSame([], $updated['params']);
+
+        $deleted = $this->router->match('bug-pipeline/source-deleted', 'POST');
+        $this->assertNotNull($deleted);
+        $this->assertSame('Api\Controller\SourceDeletedController', $deleted['controller']);
+        $this->assertSame([], $deleted['params']);
+    }
+
     public function testReturnsNullForUnknownRoute(): void
     {
         $result = $this->router->match('nonexistent', 'GET');

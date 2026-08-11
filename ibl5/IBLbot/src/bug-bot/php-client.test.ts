@@ -6,7 +6,7 @@ vi.mock('./config.js', () => ({
     },
 }));
 
-import { apiPost, enqueue, ApiError } from './php-client.js';
+import { apiPost, enqueue, sourceUpdated, sourceDeleted, ApiError } from './php-client.js';
 
 function mockFetchOnce(body: unknown, init?: { ok?: boolean; status?: number }): ReturnType<typeof vi.fn> {
     const fn = vi.fn().mockResolvedValue({
@@ -74,5 +74,67 @@ describe('apiPost', () => {
         mockFetchOnce({ status: 'error', error: { code: 'x', message: 'y' } }, { ok: true, status: 200 });
 
         await expect(apiPost('enqueue', {})).rejects.toBeInstanceOf(ApiError);
+    });
+});
+
+describe('sourceUpdated', () => {
+    beforeEach(() => {
+        vi.restoreAllMocks();
+        vi.unstubAllGlobals();
+    });
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it('posts to /api/v1/bug-pipeline/source-updated with X-API-Key header', async () => {
+        const fetchFn = mockFetchOnce({
+            status: 'success',
+            data: { matched: true, changed: true, revived: false, status: 'open', thread_id: '111111111111111111' },
+        });
+
+        await sourceUpdated({ message_id: '222222222222222222', text: 'updated text' });
+
+        expect(fetchFn).toHaveBeenCalledTimes(1);
+        const [url, opts] = fetchFn.mock.calls[0];
+        expect(url).toBe('http://test.localhost/api/v1/bug-pipeline/source-updated');
+        expect(opts.headers['X-API-Key']).toBe('test-api-key');
+        expect(JSON.parse(opts.body)).toEqual({ message_id: '222222222222222222', text: 'updated text' });
+    });
+
+    it('rejects with ApiError on {status:"error"} envelope', async () => {
+        mockFetchOnce({ status: 'error', error: { code: 'NOT_FOUND', message: 'no match' } }, { ok: true, status: 200 });
+
+        await expect(sourceUpdated({ message_id: '222222222222222222', text: 'x' })).rejects.toBeInstanceOf(ApiError);
+    });
+});
+
+describe('sourceDeleted', () => {
+    beforeEach(() => {
+        vi.restoreAllMocks();
+        vi.unstubAllGlobals();
+    });
+    afterEach(() => {
+        vi.unstubAllGlobals();
+    });
+
+    it('posts to /api/v1/bug-pipeline/source-deleted with X-API-Key header', async () => {
+        const fetchFn = mockFetchOnce({
+            status: 'success',
+            data: { matched: true, dropped: true, status: null, thread_id: '333333333333333333' },
+        });
+
+        await sourceDeleted({ message_id: '444444444444444444' });
+
+        expect(fetchFn).toHaveBeenCalledTimes(1);
+        const [url, opts] = fetchFn.mock.calls[0];
+        expect(url).toBe('http://test.localhost/api/v1/bug-pipeline/source-deleted');
+        expect(opts.headers['X-API-Key']).toBe('test-api-key');
+        expect(JSON.parse(opts.body)).toEqual({ message_id: '444444444444444444' });
+    });
+
+    it('rejects with ApiError on {status:"error"} envelope', async () => {
+        mockFetchOnce({ status: 'error', error: { code: 'NOT_FOUND', message: 'no match' } }, { ok: true, status: 200 });
+
+        await expect(sourceDeleted({ message_id: '444444444444444444' })).rejects.toBeInstanceOf(ApiError);
     });
 });

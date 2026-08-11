@@ -44,6 +44,11 @@ PLAN_TIMEOUT="${BUG_PIPELINE_PLAN_TIMEOUT:-1800}"
 CLASSIFY_PROMPT_FILE="${BUG_PIPELINE_CLASSIFY_PROMPT:-$SCRIPT_DIR/bug-pipeline-classify-prompt}"
 GATHER_PROMPT_FILE="${BUG_PIPELINE_GATHER_PROMPT:-$SCRIPT_DIR/bug-pipeline-gather-prompt}"
 
+# Posted in-channel when a report classifies as not_a_thing. A FIXED literal, like
+# the /prMerged "Fixed!" precedent: GM text is never interpolated into a message the
+# bot echoes back to Discord — that is the injection surface this constant closes.
+DROP_REPLY_TEXT="Thanks for the note! I didn't read this as a bug report or a feature request, so I'm not queueing it up. If I got that wrong, edit your message and I'll take another look."
+
 # Attachment byte cache — the bot (ibl5/IBLbot/src/bug-bot/attachments.ts) writes
 # downloaded attachment bytes here; this default MUST resolve to the same absolute
 # path as that module's cacheDir() (cross-process invariant, matrix-checked).
@@ -146,6 +151,20 @@ bot_mention() { # thread_id discord_id message  -> echoes message_id
         -H 'Content-Type: application/json' \
         -d "$(jq -nc --arg t "$1" --arg d "$2" --arg m "$3" '{thread_id:$t,discord_id:$d,message:$m}')" 2>/dev/null \
         | jq -r '.message_id // empty' 2>/dev/null
+}
+# /get-message answers 200 ALWAYS — {content, deleted} — so the tick never needs a
+# `curl -w '%{http_code}'` status channel across a $( ) subshell. Anything that isn't
+# a well-formed body (bot down, curl failure) degrades to `{}`, whose .deleted and
+# .content are both null, i.e. fail-open by construction.
+bot_get_message() { # message_id -> echoes the raw JSON body ({} on any failure)
+    "$CURL_BIN" -s -X POST "$BOT_BASE_URL/get-message" \
+        -H 'Content-Type: application/json' \
+        -d "$(jq -nc --arg m "$1" '{message_id:$m}')" 2>/dev/null || echo '{}'
+}
+bot_reply_to_message() { # message_id message
+    "$CURL_BIN" -s -X POST "$BOT_BASE_URL/reply-to-message" \
+        -H 'Content-Type: application/json' \
+        -d "$(jq -nc --arg m "$1" --arg t "$2" '{message_id:$m,message:$t}')" 2>/dev/null >/dev/null
 }
 
 # ── Time helpers — the cron is Mac-local (BSD date), but the test harnesses run
@@ -264,7 +283,25 @@ classify_row() { # row_json
     thread_id="$(printf '%s' "$row" | jq -r '.thread_id // empty')"
     blocked="$(printf '%s' "$row" | jq -r '.blocked_until // empty')"
     local original_text; original_text="$(printf '%s' "$row" | jq -r '.original_text // ""')"
+    local msg_id; msg_id="$(printf '%s' "$row" | jq -r '.original_message_id // empty')"
     clear_opt=""; [ -n "$blocked" ] && clear_opt="--clear-blocked"
+
+    # ── Reconcile the snapshot against the live Discord message ──────────────
+    # original_text was captured at enqueue and is never rewritten by the pipeline,
+    # so a GM who edits or deletes their report would otherwise be invisible here.
+    # PHP owns every state decision; this is the read side only.
+    local live deleted live_text
+    live="$(bot_get_message "$msg_id")"
+    deleted="$(printf '%s' "$live" | jq -r '.deleted // empty' 2>/dev/null)"
+    live_text="$(printf '%s' "$live" | jq -r '.content // empty' 2>/dev/null)"
+    if [ "$deleted" = "true" ]; then
+        cli transition "$id" dropped $clear_opt >/dev/null
+        log "classify $id: source message deleted → dropped"
+        return 0
+    fi
+    # Prompt-local ONLY — deliberately not written back to original_text, because
+    # persisting it here would make the next MessageUpdate see no diff and skip the revive.
+    [ -n "$live_text" ] && original_text="$live_text"
 
     local transcript attachments_text prompt
     transcript="$(row_transcript "$thread_id")"
@@ -309,14 +346,32 @@ classify_row() { # row_json
     if [ "$class" = "bug" ] || [ "$class" = "feature" ]; then
         if [ -z "$issue_number" ] || [ "$issue_number" = "null" ]; then
             local n; n="$(bpgh_ensure_issue "$row")"
-            [ -n "$n" ] && { issue_opt="--issue=$n"; issue_number="$n"; }
+            # Persist AT THE CREATION SITE. open_thread_and_ask returns early without
+            # any transition when create-thread yields no id, so a number written only
+            # by the routing transition would be lost and the next tick would mint a
+            # second issue. "$status" — never a literal `queued`: flipping an
+            # awaiting_info row (which already carries class='bug') to queued would
+            # satisfy claimNextHuntable()'s `status='queued' AND class IS NOT NULL`
+            # and dispatch a hunt on a report still waiting on the GM. The later
+            # routing transition re-sends the same --issue value and is idempotent.
+            [ -n "$n" ] && {
+                issue_opt="--issue=$n"; issue_number="$n"
+                cli transition "$id" "$status" --issue="$n" >/dev/null
+            }
         fi
     fi
 
     # ── §3e routing — NO `hunting` anywhere ──────────────────────────────────
+    # Transition FIRST — it is load-bearing, the reply is cosmetic, so a failing
+    # reply must never be able to strand the row. Dedup is structural: a `dropped`
+    # row is outside listActiveConversations(), so classify_row cannot re-fire on it;
+    # a later edit that revives it to queued/class=NULL earns exactly one NEW reply.
     if [ "$class" = "not_a_thing" ]; then
-        cli transition "$id" dropped --class=not_a_thing $clear_opt >/dev/null && \
-            log "classify $id: not_a_thing → dropped (silent)"
+        if cli transition "$id" dropped --class=not_a_thing $clear_opt >/dev/null; then
+            log "classify $id: not_a_thing → dropped (replied)"
+            bot_reply_to_message "$msg_id" "$DROP_REPLY_TEXT" \
+                >/dev/null || log "classify $id: drop reply failed (continuing)"
+        fi
         return 0
     fi
 

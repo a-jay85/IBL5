@@ -440,4 +440,28 @@ class BugReportRepository extends \BaseMysqliRepository
     {
         return $this->claims->clearBlocked($id);
     }
+
+    /**
+     * @see BugReportClaimRepository::updateSourceText()
+     */
+    public function updateSourceText(string $originalMessageId, string $text): bool
+    {
+        return $this->claims->updateSourceText($originalMessageId, $text);
+    }
+
+    /**
+     * @see BugReportClaimRepository::reviveForReclassify()
+     */
+    public function reviveForReclassify(string $originalMessageId): bool
+    {
+        return $this->claims->reviveForReclassify($originalMessageId);
+    }
+
+    /**
+     * @see BugReportClaimRepository::markSourceDeleted()
+     */
+    public function markSourceDeleted(string $originalMessageId): bool
+    {
+        return $this->claims->markSourceDeleted($originalMessageId);
+    }
 }

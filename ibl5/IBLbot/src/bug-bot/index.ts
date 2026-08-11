@@ -6,6 +6,8 @@ import {
     handleEnqueue,
     handleThreadReply,
     handleReaction,
+    handleSourceUpdate,
+    handleSourceDelete,
 } from './handlers.js';
 import { startBugBotServer } from './server.js';
 import { runBackfill } from './backfill.js';
@@ -72,6 +74,28 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
         await handleReaction(reaction, user, clientUserId);
     } catch (err) {
         console.error('MessageReactionAdd handler error:', err);
+    }
+});
+
+// MessageUpdate / MessageDelete are deliberately NOT gated on backfillReady, for the
+// same reason as MessageReactionAdd: runBackfill enqueues with the content it fetches
+// at replay time, so a backfilled row already carries the edited text, and an event
+// for a not-yet-enqueued message comes back matched:false — a harmless no-op either
+// way. Partials.Message and GatewayIntentBits.GuildMessages above already cover both
+// events; no intent or partial change is needed.
+client.on(Events.MessageUpdate, async (oldMessage, newMessage) => {
+    try {
+        await handleSourceUpdate(oldMessage, newMessage);
+    } catch (err) {
+        console.error('MessageUpdate handler error:', err);
+    }
+});
+
+client.on(Events.MessageDelete, async (message) => {
+    try {
+        await handleSourceDelete(message);
+    } catch (err) {
+        console.error('MessageDelete handler error:', err);
     }
 });
 

@@ -12,16 +12,55 @@ source "$(cd "$(dirname "$0")" && pwd)/lib/bug-pipeline-test-stubs.sh"
 
 bpt_setup
 
-QUEUED='[{"id":7,"status":"queued","class":null,"original_text":"the box score is wrong","thread_id":null,"issue_number":null}]'
+QUEUED='[{"id":7,"status":"queued","class":null,"original_text":"the box score is wrong","original_message_id":"1420000000000000007","thread_id":null,"issue_number":null}]'
 
 order_of() { grep -n "^$1" "$STUB/calls.log" 2>/dev/null | head -1 | cut -d: -f1; }
+# The ROUTING transition, specifically. Since the issue number is now persisted at
+# its creation site (before the thread is attempted, so a failed create-thread can
+# never lose it), a plain `order_of TRANSITION` would find that earlier write instead.
+# Only routing transitions carry --class=.
+order_of_routing() { grep -n "^TRANSITION .*--class=" "$STUB/calls.log" 2>/dev/null | head -1 | cut -d: -f1; }
 
-# ── not_a_thing → dropped, no Discord output ──────────────────────────────────
+# ── not_a_thing → dropped, replied in-channel, still no thread ────────────────
 bpt_reset; bpt_set_actionable "$QUEUED"
 bpt_set_claude_result '{"class":"not_a_thing"}'
 bpt_run
 bpt_log_has  "$STUB" transition.log "dropped --class=not_a_thing" "not_a_thing → dropped"
-bpt_log_lacks "$STUB" calls.log "POST_TO_THREAD" "not_a_thing posts nothing to Discord"
+bpt_log_has  "$STUB" calls.log "REPLY_TO_MESSAGE" "not_a_thing replies in-channel"
+bpt_log_lacks "$STUB" calls.log "POST_TO_THREAD" "not_a_thing opens no thread"
+
+# ── ★ NEGATIVE — the drop reply fails → the row is still dropped, tick exits 0 ─
+# The transition is load-bearing; the reply is cosmetic and must never strand the row.
+bpt_reset; bpt_set_actionable "$QUEUED"
+bpt_set_claude_result '{"class":"not_a_thing"}'
+STUB_REPLY_FAIL=1 bpt_run
+bpt_expect_eq "reply failure still exits 0" 0 "$BPT_RC"
+bpt_log_has "$STUB" transition.log "dropped --class=not_a_thing" "reply failure does NOT block the drop transition"
+
+# ── ★ source message deleted → dropped, with no issue, thread, or reply ───────
+bpt_reset; bpt_set_actionable "$QUEUED"
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true,"issue_title":"Box score wrong","severity":"medium"}'
+STUB_GET_MESSAGE_DELETED=1 bpt_run
+bpt_expect_eq "deleted source exits 0" 0 "$BPT_RC"
+bpt_log_has   "$STUB" transition.log "dropped" "deleted source → dropped"
+bpt_log_lacks "$STUB" calls.log "CREATE_THREAD" "deleted source opens no thread"
+bpt_log_lacks "$STUB" calls.log "REPLY_TO_MESSAGE" "deleted source posts no reply"
+bpt_file_absent "$STUB/gh.log" "deleted source mints no GitHub issue"
+
+# ── ★ live edited text wins over the stored snapshot, for this pass only ──────
+bpt_reset; bpt_set_actionable "$QUEUED"
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true,"issue_title":"Box score wrong","severity":"medium"}'
+STUB_GET_MESSAGE_CONTENT='actually the standings page 500s on load' bpt_run
+bpt_log_has   "$STUB" claude.args.log "actually the standings page 500s on load" "live message text reaches the classify prompt"
+bpt_log_lacks "$STUB" claude.args.log "the box score is wrong" "stale snapshot does not reach the classify prompt"
+bpt_log_lacks "$STUB" transition.log "--text=" "live text is never written back to original_text"
+
+# ── the default {} get-message body leaves behaviour byte-identical ───────────
+bpt_reset; bpt_set_actionable "$QUEUED"
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true,"issue_title":"Box score wrong","severity":"medium"}'
+bpt_run
+bpt_log_has "$STUB" calls.log "GET_MESSAGE" "every classify pass reconciles against the live message"
+bpt_log_has "$STUB" claude.args.log "the box score is wrong" "empty get-message body falls back to the stored snapshot"
 
 # ── bug + enough → thread opened, ack posted, thread_id persisted, NEVER hunting ──
 bpt_reset; bpt_set_actionable "$QUEUED"
@@ -37,7 +76,7 @@ bpt_log_lacks "$STUB" transition.log "hunting" "bug+enough never emits hunting"
 bpt_reset; bpt_set_actionable "$QUEUED"
 bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true,"issue_title":"Box score wrong","severity":"medium"}'
 bpt_run
-ct="$(order_of CREATE_THREAD)"; pt="$(order_of POST_TO_THREAD)"; tr_line="$(order_of TRANSITION)"
+ct="$(order_of CREATE_THREAD)"; pt="$(order_of POST_TO_THREAD)"; tr_line="$(order_of_routing)"
 if [ -n "$ct" ] && [ -n "$pt" ] && [ -n "$tr_line" ] && [ "$ct" -lt "$pt" ] && [ "$pt" -lt "$tr_line" ]; then
     bpt_ok "bug-fast-path order: create-thread < post-ack < queued transition"
 else
@@ -64,7 +103,7 @@ bpt_log_has "$STUB" transition.log "gathering --class=feature" "feature+new → 
 bpt_reset; bpt_set_actionable "$QUEUED"
 bpt_set_claude_result '{"class":"bug","bug_has_enough_info":false,"clarifying_question":"which team?","issue_title":"Bug","severity":"low"}'
 bpt_run
-ct="$(order_of CREATE_THREAD)"; pt="$(order_of POST_TO_THREAD)"; tr_line="$(order_of TRANSITION)"
+ct="$(order_of CREATE_THREAD)"; pt="$(order_of POST_TO_THREAD)"; tr_line="$(order_of_routing)"
 if [ -n "$ct" ] && [ -n "$pt" ] && [ -n "$tr_line" ] && [ "$ct" -lt "$pt" ] && [ "$pt" -lt "$tr_line" ]; then
     bpt_ok "thin-bug order: create-thread < post-question < awaiting_info transition"
 else

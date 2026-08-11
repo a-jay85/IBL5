@@ -149,3 +149,26 @@ export interface ThreadByPrResult {
 export function threadByPr(body: ThreadByPrBody): Promise<ThreadByPrResult> {
     return apiPost<ThreadByPrResult>('thread-by-pr', body);
 }
+
+// The 2 message-state writers (PR #4 additions — source-updated / source-deleted):
+
+export interface SourceUpdatedResult {
+    matched: boolean;
+    changed: boolean;
+    revived: boolean;
+    status: string | null;
+    thread_id: string | null;
+}
+export function sourceUpdated(body: { message_id: string; text: string }): Promise<SourceUpdatedResult> {
+    return apiPost<SourceUpdatedResult>('source-updated', body);
+}
+
+export interface SourceDeletedResult {
+    matched: boolean;
+    dropped: boolean;
+    status: string | null;
+    thread_id: string | null;
+}
+export function sourceDeleted(body: { message_id: string }): Promise<SourceDeletedResult> {
+    return apiPost<SourceDeletedResult>('source-deleted', body);
+}

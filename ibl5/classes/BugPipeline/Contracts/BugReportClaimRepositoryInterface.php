@@ -74,4 +74,11 @@ interface BugReportClaimRepositoryInterface
      * @see \BugPipeline\BugReportClaimRepository::clearBlocked()
      */
     public function clearBlocked(int $id): bool;
+
+    /** Statuses an edited source message may re-open for reclassification. */
+    public const RECLASSIFIABLE_ON_EDIT = ['queued', 'gathering', 'awaiting_info', 'dropped'];
+
+    public function updateSourceText(string $originalMessageId, string $text): bool;
+    public function reviveForReclassify(string $originalMessageId): bool;
+    public function markSourceDeleted(string $originalMessageId): bool;
 }

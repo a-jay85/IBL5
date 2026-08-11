@@ -6,7 +6,7 @@
 # The guard skips several documented non-dependency path classes: bare bin/
 # tokens that live at ibl5/bin/, ellipsis (`ibl5/...`) meta-notation, ADR numeric
 # placeholders (`docs/decisions/00NN-…`), and to-be-created/non-dependency paths
-# carried by a same-line cue (create / new file / Write / **NEW** / Reject(ed) /
+# carried by a same-line cue (create / new file / Write / **NEW** / (new) / Reject(ed) /
 # fixture / scaffold / throwaway / scratch / post-impl). This test pins each
 # relaxation AND the load-bearing negative: a missing path on a cue-LESS line
 # must still flag stale. Without the negatives, a relaxed guard could silently
@@ -93,6 +93,14 @@ assert "dash-new-cue"        0 '`ibl5/classes/Negotiation/Views/DemandsBreakdown
 assert "rename-cue"          0 'Rename to `ibl5/tests/Foo/RenamedThingTest.php` from the old name.'
 assert "relocate-cue"        0 'Relocate `ibl5/classes/Foo/RelocatedBar.php` into the shared dir.'
 assert "arrow-rename-cue"    0 '`ibl5/classes/FreeAgency/FreeAgencyDemandCalculator.php` → `…/FreeAgencyMarketDemandCalculator.php` (4.8).'
+
+# Parenthesised (new) cue: the real-world "Files (new):" header form used in plans.
+# Neither path exists on disk; (new) on the same line must exempt both (exit 0).
+assert "files-new-paren-cue" 0 '**Files (new):** `ibl5/classes/Api/Controller/SourceUpdatedController.php`, `ibl5/classes/Api/Controller/SourceDeletedController.php`'
+
+# Load-bearing negative: (new location TBD) must NOT match — the closing paren must
+# follow immediately after "new". A Remove line with this phrase stays stale (exit 1).
+assert "remove-with-new-paren-not-cue" 1 'Remove `ibl5/classes/Api/Stale/GoneController.php` (new location TBD) from the router.'
 
 # Over-widening guard: "remove"/"removed" must NOT be read as a creation cue (word
 # boundary on the move verb). A removed file on a cue-less-of-creation line stays stale.

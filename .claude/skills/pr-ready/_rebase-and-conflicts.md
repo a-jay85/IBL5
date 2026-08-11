@@ -7,8 +7,7 @@ Read this file at runtime Phase 2 and follow it end-to-end before returning to t
 **2a. Capture the pre-rebase tree diff first.** This is the input to Phase 4's lost-work proof, so it must be written *before* any history is rewritten:
 
 ```bash
-git diff origin/master...HEAD > /tmp/pr-ready-diff-pre-<N>.patch
-git rev-list --count "$MASTER_SHA"..HEAD   # commit count drives the squash decision
+bin/pr-ready-helper capture-pre <N> "$MASTER_SHA"   # stdout = commit count, drives the squash decision
 ```
 
 **The filename is keyed to the PR number, deliberately — never `$$`.** Each Bash call gets a fresh shell, so `$$` differs between the call that writes this file and Phase 4's call that reads it; a PID-keyed name is guaranteed to miss, and Phase 4 would then report `TREE DIVERGED` on every run. The PR number is stable across calls and still unique per concurrent run. Substitute the real number before running.

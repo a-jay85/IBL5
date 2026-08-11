@@ -127,7 +127,107 @@ cmd_selftest() {
     echo "GUARD-CLEAN"
 }
 
+# cmd_capture_pre — capture the pre-rebase tree state.
+#
+# Called by the /pr-ready skill BEFORE the rebase delegate runs, so HEAD at that moment
+# is the pre-rebase branch tip. The patch file must survive until cmd_prove_tree reads
+# it; deliberately no trap is installed here — cleanup is prove-tree's responsibility,
+# since prove-tree owns the end of the pre/post lifecycle.
+#
+# stdout is the integer commit count and NOTHING ELSE — the caller captures it into
+# commits_before for the squash decision. Informational output goes to stderr.
+cmd_capture_pre() {
+    require_pr_number "${1:-}"
+    local pr_number="$1"
+    local master_sha="${2:-}"
+    if [[ -z "$master_sha" ]]; then
+        echo "pr-ready-helper capture-pre: missing required argument <master-sha>" >&2
+        exit 2
+    fi
+
+    local pre="/tmp/pr-ready-diff-pre-${pr_number}.patch"
+    # Three-dot range captures everything the branch adds over master.
+    git diff origin/master...HEAD > "$pre"
+    # Deliberately no trap here — the patch must survive for prove-tree to read.
+    echo "captured pre-rebase state to $pre" >&2
+
+    # TWO-dot range against the pinned SHA — never re-resolve origin/master.
+    # The three-dot range above and the two-dot range here differ deliberately;
+    # both are carried over verbatim from the _rebase-and-conflicts.md block.
+    git rev-list --count "$master_sha"..HEAD
+}
+
+# cmd_prove_tree — compare the post-rebase tree against the captured pre-rebase state.
+#
+# Materialises both git-apply --numstat streams into temp files under set -euo pipefail
+# before comparing with diff. Process substitution (diff <(…) <(…)) is not used:
+# it discards the exit status of both substituted commands, so a git apply failure
+# would masquerade as equivalence. The materialised form makes that failure loud.
+#
+# silence is not success — if either patch is empty, diff still passes because two empty
+# streams are equivalent; that is correct behaviour here, since an empty pre-patch means
+# the branch had no changes to lose.
+#
+# The numstat comparison is deliberately fail-loud-biased. If origin/master itself
+# changed the same files between the two captures, the counts can differ without any
+# work being lost, producing a TREE DIVERGED false alarm. That direction is safe — it
+# stops the run for a human to inspect. The inverse (a silent TREE-EQUIVALENT on real
+# loss) is the failure this check exists to prevent.
+cmd_prove_tree() {
+    require_pr_number "${1:-}"
+    local pr_number="$1"
+
+    local pre="/tmp/pr-ready-diff-pre-${pr_number}.patch"
+    local post="/tmp/pr-ready-diff-post-${pr_number}.patch"
+
+    # Guard the input FIRST — the highest-value negative path in the whole plan.
+    # Two failed git apply --numstat calls produce two empty streams; diff returns 0,
+    # and the run would print TREE-EQUIVALENT having proven nothing. A missing pre-patch
+    # must never fall through to the comparison. A zero-byte pre-patch is a legitimate
+    # state (the branch had no changes) and proceeds normally — guard on existence, not size.
+    if [[ ! -e "$pre" ]]; then
+        echo "pr-ready-helper prove-tree: pre-rebase patch not found: $pre" >&2
+        echo "pr-ready-helper prove-tree: run capture-pre before the rebase delegate" >&2
+        exit 2
+    fi
+
+    local tmp_pre tmp_post tmp_diff
+    tmp_pre=$(mktemp "/tmp/pr-ready-numstat-pre-XXXXXX")
+    tmp_post=$(mktemp "/tmp/pr-ready-numstat-post-XXXXXX")
+    tmp_diff=$(mktemp "/tmp/pr-ready-diff-result-XXXXXX")
+
+    # Install the trap only AFTER the missing-pre-patch guard has passed,
+    # so the exit-2 path does not delete a file it did not create.
+    # prove-tree owns the teardown for the pre/post lifecycle.
+    # shellcheck disable=SC2064  # expand vars now, at trap-install time
+    trap "rm -f '$pre' '$post' '$tmp_pre' '$tmp_post' '$tmp_diff'" EXIT
+
+    git diff origin/master...HEAD > "$post"
+
+    # Materialise both numstat streams separately — rc-checked under set -euo pipefail.
+    # Process substitution is intentionally avoided: see comment above.
+    # --allow-empty is required so that a zero-byte patch (branch with no changes)
+    # produces an empty stream at rc 0 rather than aborting under set -e.
+    git apply --numstat --allow-empty "$pre" | sort > "$tmp_pre"
+    git apply --numstat --allow-empty "$post" | sort > "$tmp_post"
+
+    if diff "$tmp_pre" "$tmp_post" > "$tmp_diff"; then
+        echo "TREE-EQUIVALENT"
+        exit 0
+    fi
+
+    echo "TREE DIVERGED — lost work detected"
+    cat "$tmp_diff"
+    exit 1
+}
+
 case "${1:-}" in
+    capture-pre)
+        cmd_capture_pre "${2:-}" "${3:-}"
+        ;;
+    prove-tree)
+        cmd_prove_tree "${2:-}"
+        ;;
     selftest)
         cmd_selftest
         ;;

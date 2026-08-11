@@ -50,7 +50,9 @@ class Router implements RouterInterface
         'bug-pipeline/reaction'     => Controller\ReactionController::class,
         'bug-pipeline/last-seen'    => Controller\LastSeenController::class,
         'bug-pipeline/state'        => Controller\PipelineStateController::class,
-        'bug-pipeline/thread-by-pr' => Controller\ThreadByPrController::class,
+        'bug-pipeline/thread-by-pr'    => Controller\ThreadByPrController::class,
+        'bug-pipeline/source-updated'  => Controller\SourceUpdatedController::class,
+        'bug-pipeline/source-deleted'  => Controller\SourceDeletedController::class,
     ];
 
     /**

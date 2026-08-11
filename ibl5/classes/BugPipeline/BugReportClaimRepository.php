@@ -307,14 +307,15 @@ class BugReportClaimRepository extends \BaseMysqliRepository implements BugRepor
      */
     public function reviveForReclassify(string $originalMessageId): bool
     {
-        // Literal fragments only: the IN list is built from a constant of compile-time literals,
-        // never from input — same idiom as transition()'s OPTIONAL_TRANSITION_COLUMNS.
-        $in = "'" . implode("','", self::RECLASSIFIABLE_ON_EDIT) . "'";
+        // The IN list is BOUND, not spliced: only the '?' placeholders are generated, and
+        // their count comes from a constant of compile-time literals rather than any input.
+        $placeholders = implode(',', array_fill(0, count(self::RECLASSIFIABLE_ON_EDIT), '?'));
         return $this->execute(
-            "UPDATE `ibl_bug_reports` SET status = 'queued', class = NULL, updated_at = NOW()
-              WHERE original_message_id = ? AND status IN ($in)",
-            's',
-            $originalMessageId
+            'UPDATE `ibl_bug_reports` SET status = \'queued\', class = NULL, updated_at = NOW()
+              WHERE original_message_id = ? AND status IN (' . $placeholders . ')',
+            's' . str_repeat('s', count(self::RECLASSIFIABLE_ON_EDIT)),
+            $originalMessageId,
+            ...self::RECLASSIFIABLE_ON_EDIT
         ) === 1;
     }
 

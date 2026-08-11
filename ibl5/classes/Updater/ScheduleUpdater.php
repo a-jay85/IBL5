@@ -160,6 +160,14 @@ class ScheduleUpdater extends \BaseMysqliRepository {
         $scheduleHtmPath = $ibl5Root . '/ibl/' . $leagueDir . '/Schedule.htm';
 
         if (!file_exists($scheduleHtmPath)) {
+            $this->channelLogger->warning('ScheduleUpdater could not read Schedule.htm — no playoff games imported', [
+                'path' => $scheduleHtmPath,
+                'reason' => 'missing',
+                'league' => $leagueDir,
+                'season_phase' => $this->season->phase,
+                'season_ending_year' => $this->season->endingYear,
+            ]);
+
             return "Schedule.htm not found at {$scheduleHtmPath} — skipping playoff games<br>";
         }
 

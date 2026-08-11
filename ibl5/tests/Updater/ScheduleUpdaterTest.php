@@ -62,6 +62,7 @@ class ScheduleUpdaterTest extends TestCase
         bool $olympics = false,
         ?JsbSourceResolverInterface $sourceResolver = null,
         ?string $basePath = null,
+        ?\Psr\Log\LoggerInterface $logger = null,
     ): TestableScheduleUpdater {
         $season = self::createStub(Season::class);
         $season->endingYear = $endingYear;
@@ -77,7 +78,14 @@ class ScheduleUpdaterTest extends TestCase
                 : $table,
         );
 
-        return new TestableScheduleUpdater($this->mockDb, $season, $leagueContext, $sourceResolver, $basePath);
+        return new TestableScheduleUpdater(
+            $this->mockDb,
+            $season,
+            $leagueContext,
+            $sourceResolver,
+            $basePath,
+            $logger ?? new \Psr\Log\NullLogger(),
+        );
     }
 
     /**
@@ -418,6 +426,36 @@ class ScheduleUpdaterTest extends TestCase
         $queries = $this->mockDb->getExecutedQueries();
         $inserts = array_filter($queries, static fn (string $q): bool => str_contains($q, 'INSERT INTO ibl_schedule'));
         $this->assertCount(0, $inserts);
+    }
+
+    /**
+     * A missing Schedule.htm silently drops every playoff game from ibl_schedule
+     * (the whole 2008 postseason vanished from Last Sim this way). The import still
+     * reports success, so the warning is the only signal anything went wrong.
+     */
+    public function testMissingScheduleHtmLogsWarning(): void
+    {
+        $root = sys_get_temp_dir() . '/' . uniqid('sch_missing_log_', true);
+        mkdir($root, 0777, true);
+        $this->tempDirs[] = $root;
+
+        $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
+        $logger->expects($this->once())
+            ->method('warning')
+            ->with(
+                self::stringContains('Schedule.htm'),
+                self::callback(static function (array $context) use ($root): bool {
+                    return ($context['path'] ?? null) === $root . '/ibl/IBL/Schedule.htm'
+                        && ($context['reason'] ?? null) === 'missing'
+                        && ($context['league'] ?? null) === 'IBL'
+                        && ($context['season_phase'] ?? null) === 'Playoffs'
+                        && ($context['season_ending_year'] ?? null) === 2025;
+                }),
+            );
+
+        $updater = $this->createUpdater('Playoffs', 2025, false, null, $root, $logger);
+
+        $updater->exposedInsertPlayoffGamesFromScheduleHtm();
     }
 }
 

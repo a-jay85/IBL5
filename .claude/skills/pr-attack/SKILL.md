@@ -3,7 +3,7 @@ name: pr-attack
 description: Compute an optimal merge order for all open PRs — ordered table, excluded set, and hand-resolution forecast — printed to chat and written to a dated file under the home directory.
 disable-model-invocation: true
 model: claude-sonnet-4-6
-last_verified: 2026-08-10
+last_verified: 2026-08-11
 allowed-tools: Bash(bin/pr-triage), Bash(bin/pr-overlap:*), Bash(gh pr list:*),
   Bash(gh pr view:*), Bash(gh pr diff:*), Bash(git rev-parse:*), Bash(date:*),
   Bash(mktemp:*), Bash(awk:*), Bash(sort:*), Bash(grep:*), Write
@@ -52,12 +52,18 @@ awk '/^#[0-9]+/ {
      }' "$WORK/triage.txt" > "$WORK/triage.tsv"
 ```
 
-`SIGNALS` is a `;`-separated `key=value` list. The three keys this skill reads
-are `clearance=` (`CLEARED` | `HELD` | `UNKNOWN`), `feat=` (`yes` | `no`), and
-`deps=` (`none`, or one or more `depends-on:#N` tokens). `deps=` is the
-authoritative declared-dependency signal: it comes from `pr_dep_holds()` in
-`bin/lib/pr-armable.sh`, which reads only **anchored** `Depends-on: #N` lines and
-ignores inline prose mentions. Never re-scrape PR bodies for dependencies here.
+`SIGNALS` is a `;`-separated `key=value` list. The keys this skill reads are
+`clearance=` (`CLEARED` | `HELD` | `UNKNOWN`), `feat=` (`yes` | `no`), `deps=`
+(`none`, or one or more `depends-on:#N` tokens), and the three remaining
+hold signals the `Needs you?` table consumes — `held_body=` (`yes` | `no`),
+`golden=` (`yes` | `no`), and `unresolved=` (`none`, or one or more finding
+tokens). The awk above already captures all of them: `clearance=` is emitted
+first, so anchoring on it carries the whole `key=value` tail into field 3.
+
+`deps=` is the authoritative declared-dependency signal: it comes from
+`pr_dep_holds()` in `bin/lib/pr-armable.sh`, which reads only **anchored**
+`Depends-on: #N` lines and ignores inline prose mentions. Never re-scrape PR
+bodies for dependencies here.
 
 `bin/pr-triage` reports every OPEN PR **including drafts**, and does not emit
 draft state, so fetch the missing metadata in one more call (this same call also
@@ -97,10 +103,21 @@ wins**:
 
 | Condition | `Needs you?` |
 |---|---|
-| bucket `HELD`, or `clearance=HELD` | `manual test` |
+| bucket `HELD`, or **any** hold signal — `clearance=HELD`, `held_body=yes`, `golden=yes`, `unresolved` ≠ `none` | `manual test` |
 | bucket `FEAT-AWAITING-SIGNOFF`, or `feat=yes` | `sign feat:` |
 | bucket `UNCLEARED`, or `clearance=UNKNOWN` | `manual test` |
 | otherwise | `—` |
+
+**Read the signals, not just the bucket.** `bin/pr-triage` assigns buckets
+**first-match-wins**, so `DIRTY` and `BLOCKED-CHECK` are evaluated *before*
+`HELD` — a PR with a live hold plus a red check buckets `BLOCKED-CHECK` and its
+hold never reaches the bucket name. That is why row 1 enumerates the raw signals:
+they are exactly the four disjuncts of the `HELD` branch in `bin/pr-triage`
+(`clearance=HELD` OR `golden` OR `held_body` OR `unresolved`). Rows 2 and 3 read
+`feat=` and `clearance=` directly for the same reason — `BLOCKED-DEP` outranks
+both of their buckets. **If a fifth disjunct is ever added to that branch, add it
+here too**; `bin/pr-triage`'s `HELD` branch is the source of truth, this table
+mirrors it.
 
 The third row is deliberate and fail-closed: no `## Manual Testing` section means
 `bin/pr-triage` never evaluated a clearance, so a human must look. Treating an

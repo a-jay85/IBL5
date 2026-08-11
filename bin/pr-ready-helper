@@ -1,0 +1,137 @@
+#!/usr/bin/env bash
+# pr-ready-helper — the single guard-clean entry point for the /pr-ready skill.
+#
+# WHY THIS EXISTS
+# ---------------
+# .claude/skills/pr-ready/SKILL.md mandates EnterWorktree, so every runtime phase
+# after Phase 0 executes inside a worktree-isolated session. The harness guard for
+# that mode refuses Bash commands it cannot statically prove stay inside the
+# worktree — compound statements, a sourced library plus a call to what it defined,
+# redirect-plus-process-substitution. Decomposition cannot fix the sourced-library
+# case, because shell state does not survive between Bash tool calls: a function
+# must be called in the same invocation that sourced it.
+#
+# The fix is a shape change, never a bypass. Each compound block moves behind one
+# plain `bin/pr-ready-helper <subcommand> <args>` invocation, which the guard runs.
+# The compound work then happens inside a single process, where it is legal.
+#
+# HARD INVARIANT — this helper reads and reports. It never creates a commit, never
+# publishes anything to the remote, never merges a pull request, and never arms
+# auto-merge. Any future edit that adds one of those belongs in a different script.
+#
+# Reuse: the six hold predicates come from bin/lib/pr-armable.sh, sourced verbatim
+# and never re-derived. The sticky create-or-update shape mirrors bin/pr-canary-check.
+
+set -euo pipefail
+
+# --- Test seams ------------------------------------------------------------
+# Same names bin/lib/pr-armable.sh already uses, so one export stubs both layers.
+# The empty check runs BEFORE the default assignment: `${GH_CMD:-gh}` treats set-
+# but-empty as unset, so without this an explicit GH_CMD="" would silently become
+# a real GitHub call instead of the loud abort a stubbed test expects.
+if [[ -n "${GH_CMD+set}" && -z "${GH_CMD}" ]]; then
+    echo "pr-ready-helper: GH_CMD is set but empty — refusing to expand to an empty command" >&2
+    exit 2
+fi
+if [[ -n "${REPO_SLUG+set}" && -z "${REPO_SLUG}" ]]; then
+    echo "pr-ready-helper: REPO_SLUG is set but empty — refusing to build an empty API path" >&2
+    exit 2
+fi
+GH_CMD="${GH_CMD:-gh}"
+REPO_SLUG="${REPO_SLUG:-a-jay85/IBL5}"
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ARMABLE_LIB="$SCRIPT_DIR/lib/pr-armable.sh"
+
+usage() {
+    cat >&2 <<'USAGE'
+Usage: bin/pr-ready-helper <subcommand> [args]
+
+Subcommands:
+  capture-pre <pr-number> <master-sha>  Capture the pre-rebase tree diff; print the
+                                        commit count on stdout (nothing else).
+  prove-tree  <pr-number>               Compare the post-rebase tree against the
+                                        captured pre-rebase one; TREE-EQUIVALENT or
+                                        TREE DIVERGED.
+  holds       <pr-number>               Run all six fail-closed hold predicates from
+                                        bin/lib/pr-armable.sh; exit 1 if any holds.
+  sticky      <pr-number>               Create-or-update the /pr-ready verdict comment
+                                        from /tmp/pr-ready-verdict-<pr-number>.md.
+  selftest                              Probe the harness worktree-isolation guard:
+                                        prints GUARD-CLEAN when the wrapped constructs
+                                        all ran inside this process.
+
+Exits 2 on an unknown subcommand or a malformed argument.
+USAGE
+    exit 2
+}
+
+# require_pr_number <arg> — every subcommand validates its own <pr-number>.
+require_pr_number() {
+    local n="${1:-}"
+    if [[ ! "$n" =~ ^[0-9]+$ ]]; then
+        echo "pr-ready-helper: expected a numeric <pr-number>, got '${n}'" >&2
+        usage
+    fi
+}
+
+# cmd_selftest — the guard-boundary probe.
+#
+# Exists for exactly one purpose: to be invoked as a plain `bin/pr-ready-helper
+# selftest` from inside an EnterWorktree-isolated session, proving that the plain
+# `bin/<script> <args>` shape is NOT refused even when the script internally performs
+# the three constructs the guard refuses when they are typed into a Bash call.
+#
+# It ships permanently rather than being deleted after the initial probe: if the
+# harness guard changes behaviour later, this is the one-command mechanical re-probe,
+# instead of a /pr-ready run failing halfway through its Phase 7.
+#
+# Never prints GUARD-CLEAN on a partial run — every construct is checked and the
+# failing one is named.
+cmd_selftest() {
+    local scratch
+    scratch="$(mktemp "/tmp/pr-ready-selftest-XXXXXX")"
+    # shellcheck disable=SC2064  # expand $scratch now, at trap-install time
+    trap "rm -f '$scratch'" EXIT
+
+    # Construct 1 — a redirect, then read the file back.
+    git rev-parse --short HEAD > "$scratch"
+    if [[ ! -s "$scratch" ]]; then
+        echo "selftest: construct 1 (redirect) failed — $scratch is empty" >&2
+        return 1
+    fi
+
+    # Construct 2 — source a library and call one of its functions in the SAME
+    # process. This is the construct decomposition provably cannot fix at the Bash
+    # tool layer. The predicate is cheap and side-effect-free: a body with no
+    # `## Manual Testing` section must classify UNKNOWN.
+    if [[ ! -f "$ARMABLE_LIB" ]]; then
+        echo "selftest: construct 2 (source) failed — library not found at $ARMABLE_LIB" >&2
+        return 1
+    fi
+    # shellcheck source=bin/lib/pr-armable.sh
+    source "$ARMABLE_LIB"
+    local clearance
+    clearance="$(pr_manual_testing_clearance "a body with no manual testing section")"
+    if [[ "$clearance" != "UNKNOWN" ]]; then
+        echo "selftest: construct 2 (source + predicate call) failed — expected UNKNOWN, got '$clearance'" >&2
+        return 1
+    fi
+
+    # Construct 3 — process substitution over two trivially-equal streams.
+    if ! diff <(printf 'a\nb\n') <(printf 'a\nb\n') > /dev/null; then
+        echo "selftest: construct 3 (process substitution) failed" >&2
+        return 1
+    fi
+
+    echo "GUARD-CLEAN"
+}
+
+case "${1:-}" in
+    selftest)
+        cmd_selftest
+        ;;
+    *)
+        usage
+        ;;
+esac

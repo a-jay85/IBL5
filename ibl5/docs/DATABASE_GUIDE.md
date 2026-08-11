@@ -1,6 +1,6 @@
 ---
 description: Schema reference and query patterns for IBL5 database work.
-last_verified: 2026-06-11
+last_verified: 2026-08-11
 ---
 
 # IBL5 Database Guide

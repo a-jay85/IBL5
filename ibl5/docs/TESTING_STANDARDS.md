@@ -1,6 +1,6 @@
 ---
 description: Testing philosophy, conventions, and requirements for IBL5.
-last_verified: 2026-06-10
+last_verified: 2026-08-11
 ---
 
 # IBL5 Testing Standards

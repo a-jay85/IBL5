@@ -1,6 +1,6 @@
 ---
 description: RE faithfulness gate (read-only) for the L1 defect — the engine's empty-FGA offensive-rebound continuation loop, the suspected Cov(ORB/POSS,lnPPS) over-coupling carrier behind the residual Var(lnFGA) ~0.000397 over real that budget-blocks the count axis. Static decompile of jumpshot.exe 5.60's rebound chain answers the narrow loop question (does 5.60 decay P(OREB) per trip and/or cap continuations below the engine's maxOffensiveRebounds=8?). VERDICT two-part: FAITHFUL on decay/cap — 5.60's continuation loop is a flat-probability do/while with no per-trip decay and no hard cap (the engine's cap-8 is tighter but unreached, P(8 ORBs)≈1e-3..1e-5), so the engine's flat cap-8 loop matches 5.60; DIVERGENT on the determination formula — 5.60 gates each continuation behind TWO sequential rolls (gate-1 sqrt diminishing-returns team pick FUN_004e22a0, gate-2 linear off/(off+def)*0.5+0.25 retention FUN_004d6f00) and the engine models ONLY gate-2, omitting the sqrt gate-1. NO-GO on the loop-decay/cap hypothesis; L1 carrier positively identified as the dropped sqrt team-determination gate (mean inflation from the dropped multiplicative gate + linear-vs-sqrt curvature over-coupling, separable only by the future dynamic L1 instrument). Status Proposed; no engine code changed. Next /plan reproduces the two-gate structure, not a decay/cap.
-last_verified: 2026-06-11
+last_verified: 2026-08-11
 ---
 
 # ADR-0057: Rebound-continuation faithfulness gate — L1 loop is faithful; carrier is the dropped sqrt team-determination gate

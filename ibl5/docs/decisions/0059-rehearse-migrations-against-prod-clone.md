@@ -1,6 +1,6 @@
 ---
 description: Deploy Rehearsal dry-runs pending migrations against a filtered clone of production data, catching content-dependent failures before the live deploy.
-last_verified: 2026-06-11
+last_verified: 2026-08-11
 ---
 
 # ADR-0059: Rehearse Migrations Against a Filtered Production Clone

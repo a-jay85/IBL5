@@ -1,6 +1,6 @@
 ---
 description: Rationale for renaming reserved-word rating columns and fixing the r_to meaning-flip across ibl_plr and ibl_hist, enforced by a new PHPStan rule.
-last_verified: 2026-06-10
+last_verified: 2026-08-11
 ---
 
 # ADR-0008: Ban Reserved-Word Rating Columns

@@ -6,7 +6,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-08-10
+last_verified: 2026-08-11
 ---
 <!-- NO `model:` KEY — DELIBERATE, DO NOT ADD ONE.
      Runtime Phase 6 (plan-intent fidelity review) is Opus-column judgment:
@@ -30,6 +30,10 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
 - **Flat fan-out only.** A delegate may not spawn a delegate.
 - **Every glob is quoted** — `--include="*.md"`, never `--include=*.md`.
 - **The run STOPS at the verdict.** No merge, no auto-merge arming, no backlog housekeeping, no `/post-plan` chain, no worktree teardown.
+- **After `EnterWorktree`, no Bash command may contain `$(…)` or `<(…)`.** The worktree-isolated session refuses command and process substitution outright — "too complex to verify that it stays inside the worktree"; the refusal's "…without the redirect" wording is canned and misleading. Pipelines, redirects, conditionals and `;`-separated statements all run fine: substitution is the only trigger. **Exempt:** Phases 0.1–0.4, which run *before* `EnterWorktree` (`git rev-parse --show-toplevel` at 0.3 and the `SLUG=` capture at 0.4 are fine as written, and converting them buys nothing), and any command passed to `Monitor`, which is not gated (probed: `Monitor(command: 'X=$(echo hi); echo "$X"')` emits `hi`, so the Phase 4.5 watcher loop runs as written). Everywhere else, use one of two shapes:
+  - **Multi-command blocks** — `Write` the block to `/tmp/pr-ready-<step>-<N>.sh`, then run `bash /tmp/pr-ready-<step>-<N>.sh` as one plain command. Key the filename to the PR number, never `$$`.
+  - **Single-value captures** (the master pin, `STRICT`, the branch name) — run the bare command so it **prints** the value, then hold that value as a **literal** in the run notes and substitute it into every later command.
+- **A value captured in one Bash call does not survive to the next — hold it as a literal, not a shell variable.** Every Bash call is a fresh shell, so `MASTER_SHA=$(git rev-parse origin/master)` in one call is *empty* in the next, and `git rev-list --count "$MASTER_SHA"..HEAD` then degrades to `git rev-list --count ..HEAD`, which exits 0 printing `0` — a silent wrong answer that skips the Phase 2c squash gate for every PR. `<MASTER_SHA>` in a later block therefore means **substitute the recorded literal here**. That form also fails *closed*: forget to substitute and git rejects the literal `<MASTER_SHA>` as a bad rev, where `"$MASTER_SHA"` would have failed open. The same rule is why every `/tmp` path in this skill is keyed to `<N>` rather than `$$`.
 - **`STOP:` lines are hard stops for the model, not just for the shell.** Three blocks below print a `STOP:` line: the Phase 0 argument gate, the Phase 0 canonical-root guard, and the Phase 1 plan check. Where such a block runs `exit 1`, that `exit` terminates **only that Bash invocation** — it does not terminate the skill, because a skill's blocks are run by the model. The contract is therefore: **on a non-zero rc, or on printing a `STOP:` line, stop the run and make no further tool call.** None of the three relies on shell exit status to halt anything but the shell.
 
 ## Runtime phases
@@ -69,48 +73,63 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
 
    and stop. Otherwise call `EnterWorktree(path: "/Users/ajaynicolas/GitHub/IBL5-worktrees/$SLUG")`.
 
-5. **Docker note** — only if a later step needs the app running. Derive the slug from the tree you are actually in, `basename "$(git rev-parse --show-toplevel)"`, then `docker start ibl5-db-<slug> ibl5-php-<slug>`. Never hardcode a slug from a previous session; never use `main.localhost` from a worktree; always navigate `/ibl5/` paths, never bare `/`.
+5. **Docker note** — only if a later step needs the app running. Derive the slug from the tree you are actually in — run `git rev-parse --show-toplevel` bare and take the basename yourself (this runs post-`EnterWorktree`, so no `$(…)`) — then `docker start ibl5-db-<slug> ibl5-php-<slug>`. Never hardcode a slug from a previous session; never use `main.localhost` from a worktree; always navigate `/ibl5/` paths, never bare `/`.
 
 **Phase 1 — plan, master pin, protection, prior-review probe.**
 
-1. **Read the plan.** `PLAN=~/claude-plans/"$(git rev-parse --abbrev-ref HEAD)".md`. If it does not exist, print loudly
+1. **Read the plan.** Run `git rev-parse --abbrev-ref HEAD` bare, then `Read` `~/claude-plans/<branch>.md` with the printed branch name substituted. The path is deterministic — resolve it, never search for it. If it does not exist, print loudly
 
-   `STOP: no plan at $PLAN. /pr-ready's Phase 6 judges implementation against the plan's stated intent; without the plan there is nothing to judge against. Re-run once the plan file is restored, or run /pr-review instead for a plain code review.`
+   `STOP: no plan at ~/claude-plans/<branch>.md. /pr-ready's Phase 6 judges implementation against the plan's stated intent; without the plan there is nothing to judge against. Re-run once the plan file is restored, or run /pr-review instead for a plain code review.`
 
    and stop. Do **not** fall back to the PR body for plan intent — the PR body is one of the things Phase 6 audits.
 
 2. `git fetch origin`. Nothing in this skill ever runs a bare `git rebase` against `origin/master`; see the `--onto` recipe in the Phase 2 include.
 
-3. **Pin master before spawning anything:** `MASTER_SHA=$(git rev-parse origin/master)`. Every later step, and the Phase 2 delegate, use this pinned SHA — never a re-resolved `origin/master`.
+3. **Pin master before spawning anything.** Run `git rev-parse origin/master` bare and record the printed SHA as `<MASTER_SHA>` in the run notes — a **literal**, per the invariants above, never a shell variable. Every later step, and the Phase 2 delegate, substitute that literal — never a re-resolved `origin/master`.
 
 4. **Branch-protection strict flag.**
 
    ```bash
-   STRICT=$(gh api "repos/{owner}/{repo}/branches/master/protection" --jq '.required_status_checks.strict // false')
+   gh api "repos/{owner}/{repo}/branches/master/protection" --jq '.required_status_checks.strict // false'
    ```
 
-   On a 403/404 (a token without admin read), set `STRICT=true` and say so in the verdict. Failing closed costs one extra divergence check; failing open ships a stale-base merge.
+   Record the printed value as `<STRICT>` in the run notes. On a 403/404 (a token without admin read), record `<STRICT>` as `true` and say so in the verdict. Failing closed costs one extra divergence check; failing open ships a stale-base merge.
 
 5. **Prior-Phase-4B probe.** `gh pr view <N> --json comments,reviews` and look for a `### Code review` heading from the post-plan bot in **both** the issue comments and the review bodies — findings are posted as a review body with inline threads, not only as issue comments. Record the boolean as `PHASE_4B_RAN`. This is a **probe, not a gate**: the value is reported in Phase 6 and never used to skip work.
 
 **Phases 2 and 3 — rebase and conflict resolution.**
 
-Read `.claude/skills/pr-ready/_rebase-and-conflicts.md` now and follow it end-to-end before continuing. It holds the Phase 2 delegation packet and the Phase 3 three-way conflict-resolution procedure. Pass the delegate the pinned `$MASTER_SHA` — never let it resolve `origin/master` itself.
+Read `.claude/skills/pr-ready/_rebase-and-conflicts.md` now and follow it end-to-end before continuing. It holds the Phase 2 delegation packet and the Phase 3 three-way conflict-resolution procedure. Pass the delegate the pinned `<MASTER_SHA>` literal from Phase 1.3 — never let it resolve `origin/master` itself.
 
 **Phase 4 — prove nothing was lost, push, watch CI.**
 
 1. **Load the deferred watcher tools here, not in Phase 0:** `ToolSearch("select:Monitor,TaskStop")`. Deferring keeps `Monitor`'s long schema out of context for the phases that never use it.
 
-2. **Lost-work proof, two signals.** `git cherry -v origin/<branch> HEAD` is the weak signal: after a squash **every** replayed commit shows `+` by design, so `git cherry` alone cannot carry the proof. The authoritative check is content equivalence of the tree diff captured before and after the rebase (the Phase 2 include wrote `/tmp/pr-ready-diff-pre-<N>.patch`, keyed to the PR number — **never `$$`**, which differs between that call's shell and this one's):
+2. **Lost-work proof, two signals.** `git cherry -v origin/<branch> HEAD` is the weak signal: after a squash **every** replayed commit shows `+` by design, so `git cherry` alone cannot carry the proof. The authoritative check is content equivalence of the tree diff captured before and after the rebase (the Phase 2 include wrote `/tmp/pr-ready-diff-pre-<N>.patch`, keyed to the PR number — **never `$$`**, which differs between that call's shell and this one's).
+
+   The block below is multi-command, so per the invariants it runs via the script-file shape: `Write` it to `/tmp/pr-ready-lostwork-<N>.sh`, then run `bash /tmp/pr-ready-lostwork-<N>.sh`.
 
    ```bash
-   git diff origin/master...HEAD > /tmp/pr-ready-diff-post-<N>.patch
-   diff <(git apply --numstat /tmp/pr-ready-diff-pre-<N>.patch | sort) \
-        <(git apply --numstat /tmp/pr-ready-diff-post-<N>.patch | sort) \
-     && echo "TREE-EQUIVALENT" || echo "TREE DIVERGED — inspect before pushing"
+   set -o pipefail   # without this, the `||` guards below catch `sort`'s status, not `git apply`'s
+   PRE=/tmp/pr-ready-diff-pre-<N>.patch
+   POST=/tmp/pr-ready-diff-post-<N>.patch
+   git diff origin/master...HEAD > "$POST" || { echo "TREE DIVERGED — could not capture the post-rebase diff"; exit 1; }
+   for f in "$PRE" "$POST"; do
+     [ -s "$f" ] || { echo "TREE DIVERGED — $f is missing or empty; nothing was compared"; exit 1; }
+   done
+   git apply --numstat "$PRE"  | sort > /tmp/pr-ready-numstat-pre-<N>.txt  || { echo "TREE DIVERGED — git apply --numstat failed on $PRE"; exit 1; }
+   git apply --numstat "$POST" | sort > /tmp/pr-ready-numstat-post-<N>.txt || { echo "TREE DIVERGED — git apply --numstat failed on $POST"; exit 1; }
+   [ -s /tmp/pr-ready-numstat-pre-<N>.txt ] || { echo "TREE DIVERGED — numstat of $PRE is empty"; exit 1; }
+   if diff /tmp/pr-ready-numstat-pre-<N>.txt /tmp/pr-ready-numstat-post-<N>.txt; then
+     echo "TREE-EQUIVALENT"
+   else
+     echo "TREE DIVERGED — inspect before pushing"
+   fi
    ```
 
-   `TREE DIVERGED` is expected **only** when Phase 3 resolved a real conflict; in that case name each diverging path in the Phase 6 verdict. Any other divergence stops the run.
+   **The guards are the point: this proof must fail closed.** The naked `diff <(…) <(…) && echo "TREE-EQUIVALENT"` form it replaces printed the *proceed* word when it had compared nothing — `git apply --numstat` on a missing patch exits 128 writing only to stderr, `sort` of empty input is empty, and `diff` of two empty streams exits 0. So a `/tmp` clean, a re-invocation, or a silently failed Phase 2a capture all produced `TREE-EQUIVALENT`, and Phase 4.3 pushed on it. Every failure path above emits the stop word instead.
+
+   `TREE DIVERGED` is expected **only** when Phase 3 resolved a real conflict; in that case name each diverging path in the Phase 6 verdict. Any other divergence — including a guard trip, which means the comparison never happened — stops the run.
 
 3. `git push --force-with-lease` — never a bare `--force`. The lease is what catches a concurrent push into the same branch.
 
@@ -173,14 +192,14 @@ Read `.claude/skills/pr-ready/_rebase-and-conflicts.md` now and follow it end-to
 
 **Phase 5 — strict re-check loop.**
 
-If `STRICT` is false, skip this phase. If true, then after CI reports complete and green, re-check divergence against the *current* master:
+If `<STRICT>` is false, skip this phase. If true, then after CI reports complete and green, re-check divergence against the *current* master:
 
 ```bash
 git fetch origin
 gh pr view <N> --json mergeStateStatus --jq .mergeStateStatus   # BEHIND => must re-base
 ```
 
-If `BEHIND`, re-pin `MASTER_SHA=$(git rev-parse origin/master)` and loop back to Phase 2 with a fresh delegate on the new pin. **Bound the loop at 3 iterations**; on the fourth, stop and report `master is moving faster than this branch can rebase — merge manually or retry when master quiets`. An unbounded loop is the failure mode a strict-protection repo with a busy master produces.
+If `BEHIND`, re-pin — run `git rev-parse origin/master` bare again and record the new printed SHA as `<MASTER_SHA>`, replacing the Phase 1.3 literal — then loop back to Phase 2 with a fresh delegate on the new pin. **Bound the loop at 3 iterations**; on the fourth, stop and report `master is moving faster than this branch can rebase — merge manually or retry when master quiets`. An unbounded loop is the failure mode a strict-protection repo with a busy master produces.
 
 **Phase 6 — plan-intent fidelity review.**
 
@@ -190,7 +209,10 @@ Read `.claude/skills/pr-ready/_plan-fidelity-review.md` now and perform the revi
 
 1. **Run the shared hold predicates.** `bin/lib/pr-armable.sh` is **sourced, not executed** — it carries no `set -euo pipefail` at file scope by design. Reuse its six predicates rather than re-deriving any hold logic:
 
+   Substitutions again, so this is a script file: `Write` it to `/tmp/pr-ready-holds-<N>.sh`, then run `bash /tmp/pr-ready-holds-<N>.sh`. Sourcing and the six calls have to land in **one** invocation anyway — the predicates are shell functions, and a `source` in one Bash call is gone by the next.
+
    ```bash
+   cd /Users/ajaynicolas/GitHub/IBL5-worktrees/<slug> || exit 1
    source bin/lib/pr-armable.sh
    BODY="$(gh pr view <N> --json body --jq .body)"
    TITLE="$(gh pr view <N> --json title --jq .title)"
@@ -212,9 +234,12 @@ Read `.claude/skills/pr-ready/_plan-fidelity-review.md` now and perform the revi
 
    **First write the composed comment body to `/tmp/pr-ready-verdict-<N>.md` with the `Write` tool.** The path is keyed to the PR number for the same reason Phase 2a's is: a `tmpfile=$(mktemp)` assigned in one Bash call is gone by the next one, so the post below would send an empty `--body-file`. Compose the body in full, write it, then run the post.
 
-   There is no helper in `bin/lib/` for this, so use the find-and-update-else-create shape from `bin/pr-canary-check` (`STICKY_MARKER` at line 19, `post_sticky()` below it):
+   There is no helper in `bin/lib/` for this, so use the find-and-update-else-create shape from `bin/pr-canary-check` (see its `STICKY_MARKER` constant and the `post_sticky()` below it — grep the symbols rather than trusting a line number, which drifts).
+
+   The post itself substitutes, so it is a script file too: `Write` it to `/tmp/pr-ready-post-<N>.sh`, then run `bash /tmp/pr-ready-post-<N>.sh`.
 
    ```bash
+   cd /Users/ajaynicolas/GitHub/IBL5-worktrees/<slug> || exit 1
    id=$(gh api "repos/{owner}/{repo}/issues/<N>/comments" --paginate \
      --jq '.[] | select(.body | contains("<!-- pr-ready-verdict -->")) | .id' | head -1)
    if [ -n "$id" ]; then

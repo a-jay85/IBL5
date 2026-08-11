@@ -1,0 +1,38 @@
+#!/bin/bash
+# bin/check-claude-dir-placement — CI gate: skills and agent defs must live in the
+# REPO-ROOT .claude/ tree, never in a nested one.
+#
+# Why: a worktree's working directory is <worktree>/ibl5, so anything authored
+# relative to cwd lands at ibl5/.claude/... — one level too deep. The harness
+# discovers skills and agents only under the repo-root .claude/, so a misplaced
+# file is committed, merged, and CI-green while the skill is simply never
+# available. That is exactly how /pr-attack shipped dead in PR #1831: the file was
+# correct, the path was not, and nothing failed.
+#
+# Nested .claude/rules/ IS legitimate (engine/.claude/rules is directory-scoped
+# context that loads only when working in engine/), so rules are deliberately NOT
+# flagged — only skills/ and agents/.
+#
+# Usage: bin/check-claude-dir-placement   (scans the repo root, from anywhere)
+set -eu
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+# Every .claude/{skills,agents} directory in the tree except the repo-root one.
+offenders="$(
+  find . -path ./.git -prune -o -type d \
+    \( -path '*/.claude/skills' -o -path '*/.claude/agents' \) -print 2>/dev/null \
+    | grep -v '^\./\.claude/' || true
+)"
+
+if [ -n "$offenders" ]; then
+  echo "check-claude-dir-placement: skill/agent definitions found outside the repo-root .claude/ tree:" >&2
+  printf '%s\n' "$offenders" | sed 's/^/  /' >&2
+  echo "" >&2
+  echo "The harness discovers skills and agents only under <repo-root>/.claude/, so these are dead files — move them:" >&2
+  echo "  git mv <path>/.claude/skills/<name> .claude/skills/<name>" >&2
+  echo "(Nested .claude/rules/ is fine — it is directory-scoped context, not a discovery surface.)" >&2
+  exit 1
+fi
+exit 0

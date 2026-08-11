@@ -5,7 +5,7 @@
 #
 # Pure textual analysis. Reads two unified-diff FILES and reports, for every file
 # that appears in BOTH diffs, whether their changed line ranges actually collide.
-# Makes NO network and NO GitHub API calls: the caller (ibl5/.claude/skills/pr-attack/SKILL.md)
+# Makes NO network and NO GitHub API calls: the caller (.claude/skills/pr-attack/SKILL.md)
 # fetches diffs with `gh pr diff` and hands the saved files to this script. That
 # separation is what lets bin/test-pr-overlap drive it from synthetic fixtures.
 #

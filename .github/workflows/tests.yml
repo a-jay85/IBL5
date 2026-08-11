@@ -661,6 +661,12 @@ jobs:
       # Phase 1) caps it. Backlog: token-spend-backlog T2.
       - name: Check path-unscoped rules byte budget
         run: bin/check-rules-byte-budget
+      # claude-dir-placement: a worktree's cwd is <worktree>/ibl5, so a skill or
+      # agent def authored relative to cwd lands at ibl5/.claude/... — one level
+      # too deep. The harness discovers neither, so the file merges CI-green and
+      # the skill is simply never available (PR #1831 shipped /pr-attack dead).
+      - name: Check skill/agent defs live in repo-root .claude
+        run: bin/check-claude-dir-placement
       # shallow-fetch guard: a shallow fetch inside repo tooling is safe on a CI
       # runner but silently CREATES .git/shallow in a full local clone, grafting
       # origin/<base> to one commit. merge-base then returns nothing and the next

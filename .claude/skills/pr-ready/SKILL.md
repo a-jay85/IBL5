@@ -104,10 +104,7 @@ Read `.claude/skills/pr-ready/_rebase-and-conflicts.md` now and follow it end-to
 2. **Lost-work proof, two signals.** `git cherry -v origin/<branch> HEAD` is the weak signal: after a squash **every** replayed commit shows `+` by design, so `git cherry` alone cannot carry the proof. The authoritative check is content equivalence of the tree diff captured before and after the rebase (the Phase 2 include wrote `/tmp/pr-ready-diff-pre-<N>.patch`, keyed to the PR number — **never `$$`**, which differs between that call's shell and this one's):
 
    ```bash
-   git diff origin/master...HEAD > /tmp/pr-ready-diff-post-<N>.patch
-   diff <(git apply --numstat /tmp/pr-ready-diff-pre-<N>.patch | sort) \
-        <(git apply --numstat /tmp/pr-ready-diff-post-<N>.patch | sort) \
-     && echo "TREE-EQUIVALENT" || echo "TREE DIVERGED — inspect before pushing"
+   bin/pr-ready-helper prove-tree <N>
    ```
 
    `TREE DIVERGED` is expected **only** when Phase 3 resolved a real conflict; in that case name each diverging path in the Phase 6 verdict. Any other divergence stops the run.
@@ -181,17 +178,8 @@ Read `.claude/skills/pr-ready/_plan-fidelity-review.md` now and perform the revi
 1. **Run the shared hold predicates.** `bin/lib/pr-armable.sh` is **sourced, not executed** — it carries no `set -euo pipefail` at file scope by design. Reuse its six predicates rather than re-deriving any hold logic:
 
    ```bash
-   source bin/lib/pr-armable.sh
-   BODY="$(gh pr view <N> --json body --jq .body)"
-   TITLE="$(gh pr view <N> --json title --jq .title)"
-   LABELS="$(gh pr view <N> --json labels --jq '.labels')"
-   FILES="$(gh pr view <N> --json files --jq '.files')"
-   pr_manual_testing_clearance "$BODY"
-   pr_golden_hold "$FILES"
-   pr_dep_holds "$BODY"
-   pr_feat_hold "$TITLE" "$LABELS"
-   pr_pipeline_authored_hold "$LABELS"
-   pr_unresolved_findings_hold <N>
+   # Runs all six fail-closed hold predicates from bin/lib/pr-armable.sh in one process
+   bin/pr-ready-helper holds <N>
    ```
 
    Report each predicate's result as one line in the verdict. These are **advisory inputs to the human's merge decision** — `/pr-ready` never arms auto-merge and never merges.
@@ -202,17 +190,10 @@ Read `.claude/skills/pr-ready/_plan-fidelity-review.md` now and perform the revi
 
    **First write the composed comment body to `/tmp/pr-ready-verdict-<N>.md` with the `Write` tool.** The path is keyed to the PR number for the same reason Phase 2a's is: a `tmpfile=$(mktemp)` assigned in one Bash call is gone by the next one, so the post below would send an empty `--body-file`. Compose the body in full, write it, then run the post.
 
-   There is no helper in `bin/lib/` for this, so use the find-and-update-else-create shape from `bin/pr-canary-check` (`STICKY_MARKER` at line 19, `post_sticky()` below it):
+   `bin/pr-ready-helper sticky` owns the find-and-update-else-create shape, mirrored from `bin/pr-canary-check` (`STICKY_MARKER` at line 18, `post_sticky()` below it) — minus that script's advisory `|| true`, because a failed post here must be loud. It reads the body from the path you just wrote and prints `updated <url>` or `created <url>`:
 
    ```bash
-   id=$(gh api "repos/{owner}/{repo}/issues/<N>/comments" --paginate \
-     --jq '.[] | select(.body | contains("<!-- pr-ready-verdict -->")) | .id' | head -1)
-   if [ -n "$id" ]; then
-     gh api --method PATCH "repos/{owner}/{repo}/issues/comments/$id" \
-       -F body=@/tmp/pr-ready-verdict-<N>.md --jq .html_url
-   else
-     gh pr comment <N> --body-file /tmp/pr-ready-verdict-<N>.md
-   fi
+   bin/pr-ready-helper sticky <N>
    ```
 
    Comment body sections, in order: **rebase result** (the master SHA used, conflicts resolved), **CI result**, **plan-fidelity verdict**, **hold predicates**, and one explicit **READY / NOT READY** line.

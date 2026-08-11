@@ -230,7 +230,7 @@ when no edge survives judgment:
 ```
 | Gate PR | Adds/tightens | Affects | Direction |
 |---|---|---|---|
-| #NNNN | new `bin/check-x` scan over `ibl5/**` | #NNNN, #NNNN | gate merges LAST (let them land under the old gate) or FIRST (force them to comply) — state which and why |
+| #NNNN | new gate script scanning `ibl5/**` | #NNNN, #NNNN | gate merges LAST (let them land under the old gate) or FIRST (force them to comply) — state which and why |
 ```
 
 State the direction explicitly. "Gate last" is right when the affected PRs are

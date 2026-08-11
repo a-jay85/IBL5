@@ -21,7 +21,7 @@ git rev-list --count <MASTER_SHA>..HEAD   # commit count drives the squash decis
 ### Delegate — rebase onto pinned master
 - **Tier:** Sonnet
 - **Spawn:** `subagent_type: "sonnet-4-6"`, **omit `model`** — never `model: "sonnet"` (that alias resolves to Sonnet 5). Flat fan-out: this delegate must NOT spawn a sub-agent of its own.
-- **Rules:** Read `.claude/rules/linear-history-squash-merge.md` first. It is path-scoped and its `paths:` list does NOT cover this skill's files, so it will not auto-attach — Read it by name.
+- **Rules:** run `git show <MASTER_SHA>:.claude/rules/linear-history-squash-merge.md` first and read the printed file. It is path-scoped and its `paths:` list does NOT cover this skill's files, so it will not auto-attach. Load it from the pin, not by path — the tree you are in is behind master by construction (that is why you are rebasing), so a path read can miss it or read a stale copy. If `git show` errors, `Read` it by path and say so in your report line 1.
 - **First returned line, before any other work:** `pwd` and `git rev-parse --show-toplevel`. A mismatch against the expected worktree means the EnterWorktree switch did not take, and everything after it would rebase the wrong tree.
 - **Inputs:** the pinned `<MASTER_SHA>` (use this literal SHA; do NOT resolve `origin/master` yourself, and do NOT reference it as a shell variable), the branch name, the commit count from 2a.
 - **Recipe:** squash (best-effort) then rebase, per 2c/2d below.

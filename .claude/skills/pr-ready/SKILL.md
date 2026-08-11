@@ -34,6 +34,8 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
   - **Multi-command blocks** — `Write` the block to `/tmp/pr-ready-<step>-<N>.sh`, then run `bash /tmp/pr-ready-<step>-<N>.sh` as one plain command. Key the filename to the PR number, never `$$`.
   - **Single-value captures** (the master pin, `STRICT`, the branch name) — run the bare command so it **prints** the value, then hold that value as a **literal** in the run notes and substitute it into every later command.
 - **A value captured in one Bash call does not survive to the next — hold it as a literal, not a shell variable.** Every Bash call is a fresh shell, so `MASTER_SHA=$(git rev-parse origin/master)` in one call is *empty* in the next, and `git rev-list --count "$MASTER_SHA"..HEAD` then degrades to `git rev-list --count ..HEAD`, which exits 0 printing `0` — a silent wrong answer that skips the Phase 2c squash gate for every PR. `<MASTER_SHA>` in a later block therefore means **substitute the recorded literal here**. That form also fails *closed*: forget to substitute and git rejects the literal `<MASTER_SHA>` as a bad rev, where `"$MASTER_SHA"` would have failed open. The same rule is why every `/tmp` path in this skill is keyed to `<N>` rather than `$$`.
+- **Every repo file this skill reads after Phase 0 comes from `git show <MASTER_SHA>:<path>` — never a bare repo-relative `Read`.** That covers both progressive-disclosure includes and the linear-history rule the Phase 2 include names. The reason is structural, not stylistic: the harness loads this `SKILL.md` from the **main checkout** (skill discovery never resolves into a worktree), but Phase 0.4 then `EnterWorktree`s into the *target PR's* worktree — and that tree is by definition behind master, so the skill's own files are simply **absent** there until the branch rebases, which is Phase 2, the phase whose instructions live in the missing file. The main-checkout path is not a fallback: reading it from a worktree-entered session is **denied** by the cross-worktree straddle gate in `~/.claude/hooks/plan-gate-edit.sh`. `git show` against the Phase 1.3 pin sidesteps both horns — same shared object store, no gate crossed, no `$(…)` needed, and the include is guaranteed to be the revision that matches the `SKILL.md` the harness loaded. Measured before this was fixed: `_rebase-and-conflicts.md` existed in **1 of 34** worktrees on this machine — the skill's own.
+  - **Exactly one fallback, and it must be declared.** `git show` fails with `fatal: invalid object name` or `path … does not exist` when the pinned master predates this skill — which, once merged, happens only when you are dogfooding `/pr-ready` on its own still-open PR. In that case, and only when the file is genuinely present in the current worktree, `Read` it by path and record `include-source: worktree (pin predates skill)` in the verdict. If neither source yields the file, print `STOP: cannot load <file> from <MASTER_SHA> or from the worktree` and stop. Never reach for the main-checkout path — that is the gated horn, and a denial there is not a signal to retry.
 - **`STOP:` lines are hard stops for the model, not just for the shell.** Three blocks below print a `STOP:` line: the Phase 0 argument gate, the Phase 0 canonical-root guard, and the Phase 1 plan check. Where such a block runs `exit 1`, that `exit` terminates **only that Bash invocation** — it does not terminate the skill, because a skill's blocks are run by the model. The contract is therefore: **on a non-zero rc, or on printing a `STOP:` line, stop the run and make no further tool call.** None of the three relies on shell exit status to halt anything but the shell.
 
 ## Runtime phases
@@ -99,7 +101,7 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
 
 **Phases 2 and 3 — rebase and conflict resolution.**
 
-Read `.claude/skills/pr-ready/_rebase-and-conflicts.md` now and follow it end-to-end before continuing. It holds the Phase 2 delegation packet and the Phase 3 three-way conflict-resolution procedure. Pass the delegate the pinned `<MASTER_SHA>` literal from Phase 1.3 — never let it resolve `origin/master` itself.
+Run `git show <MASTER_SHA>:.claude/skills/pr-ready/_rebase-and-conflicts.md` — the Phase 1.3 literal substituted — and follow the printed file end-to-end before continuing. **Do not reach for it by path first**: per the `git show` invariant above, the worktree you are now in almost certainly does not contain it, and the main-checkout copy is behind the straddle gate. On a `git show` failure take the single declared fallback in that invariant — nothing else. It holds the Phase 2 delegation packet and the Phase 3 three-way conflict-resolution procedure. Pass the delegate the pinned `<MASTER_SHA>` literal from Phase 1.3 — never let it resolve `origin/master` itself.
 
 **Phase 4 — prove nothing was lost, push, watch CI.**
 
@@ -203,7 +205,7 @@ If `BEHIND`, re-pin — run `git rev-parse origin/master` bare again and record 
 
 **Phase 6 — plan-intent fidelity review.**
 
-Read `.claude/skills/pr-ready/_plan-fidelity-review.md` now and perform the review **yourself**. This phase is NEVER delegated — `.claude/rules/agent-tiering.md`: "Never delegate understanding." Spawning any sub-agent for this phase is a defect.
+Run `git show <MASTER_SHA>:.claude/skills/pr-ready/_plan-fidelity-review.md` — same pin, same reason as the Phase 2 include (`git show` invariant above) — and perform the printed review **yourself**. By this phase the rebase has landed, so a path read would *usually* work; it is loaded from the pin anyway, so that the procedure applied never depends on how far behind master the branch started, and never silently reads an older copy of itself off the branch. This phase is NEVER delegated — `.claude/rules/agent-tiering.md`: "Never delegate understanding." Spawning any sub-agent for this phase is a defect.
 
 **Phase 7 — verdict and stop.**
 
@@ -250,6 +252,6 @@ Read `.claude/skills/pr-ready/_plan-fidelity-review.md` now and perform the revi
    fi
    ```
 
-   Comment body sections, in order: **rebase result** (the master SHA used, conflicts resolved), **CI result**, **plan-fidelity verdict**, **hold predicates**, and one explicit **READY / NOT READY** line.
+   Comment body sections, in order: **rebase result** (the master SHA used, conflicts resolved), **CI result**, **plan-fidelity verdict**, **hold predicates**, and one explicit **READY / NOT READY** line. If either include was loaded by the declared fallback rather than from the pin, say so here — one `include-source:` line — so the verdict states which revision of its own procedure it followed.
 
 3. **STOP — hard terminator.** The run ends at the posted comment. No merge. No auto-merge arming. No backlog housekeeping. No `/post-plan` chain. No worktree teardown. The user reviews every PR deliberately.

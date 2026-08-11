@@ -50,7 +50,11 @@ if ($localClassesDir !== false) {
 require_once __DIR__ . '/../config.php';
 require_once __DIR__ . '/../db/db.php';
 
+// db/db.php populates the untyped global $mysqli_db; narrow it once, here, so
+// every downstream call site is type-checked. (A @var directly above a function
+// declaration has no effect — that is why this needs its own statement.)
 /** @var \mysqli $mysqli_db */
+$db = $mysqli_db;
 
 function fail(string $msg): never
 {
@@ -149,11 +153,19 @@ if (in_array($verb, ['claim', 'park', 'find'], true)) {
 }
 
 // ── Dispatch ──────────────────────────────────────────────────────────────────
-$repo = new \SimRecap\SimSummaryRepository($mysqli_db);
+$repo = new \SimRecap\SimSummaryRepository($db);
+$seasonQuery = new \Season\SeasonQueryRepository($db);
 
 switch ($verb) {
     case 'claim-next':
-        $out = ['ok' => true, 'cmd' => 'claim-next', 'sim' => $repo->claimNextPending()];
+        $phase = $seasonQuery->getSeasonPhase();
+        $out = [
+            'ok' => true,
+            'cmd' => 'claim-next',
+            'sim' => $repo->claimNextPending(),
+            'phase' => $phase,
+            'recaps_enabled' => \SimRecap\RecapPhasePolicy::isEnabled($phase),
+        ];
         break;
 
     case 'claim':
@@ -192,7 +204,7 @@ switch ($verb) {
         break;
 
     case 'mention-map':
-        $out = ['ok' => true, 'cmd' => 'mention-map', 'teams' => buildMentionMap($mysqli_db)];
+        $out = ['ok' => true, 'cmd' => 'mention-map', 'teams' => buildMentionMap($db)];
         break;
 
     default:

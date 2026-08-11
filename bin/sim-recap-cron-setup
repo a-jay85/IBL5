@@ -11,6 +11,7 @@
 #   bin/sim-recap-cron-setup --print-schedule      # emit the plist to stdout (no side effect; masks DB password)
 #   bin/sim-recap-cron-setup --install-schedule    # install + load the LaunchAgent
 #   bin/sim-recap-cron-setup --uninstall-schedule  # unload + remove the LaunchAgent
+#   bin/sim-recap-cron-setup --resume              # re-arm an existing plist after the phase-gate self-unloaded it
 #
 # Install AFTER this lands on master — the launchd Program points at the main
 # checkout's bin/sim-recap-tick, which must exist there.
@@ -37,6 +38,7 @@ while [ $# -gt 0 ]; do
     --install-schedule)   ACTION="install";   shift ;;
     --uninstall-schedule) ACTION="uninstall"; shift ;;
     --print-schedule)     ACTION="print";     shift ;;
+    --resume)             ACTION="resume";    shift ;;
     -h|--help) awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
@@ -151,5 +153,18 @@ case "$ACTION" in
     launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true  # idempotent
     rm -f "$PLIST_PATH"                                                    # idempotent: no error if absent
     echo "Uninstalled ${PLIST_LABEL}."
+    ;;
+  resume)
+    # Re-arm an existing plist — intended for the case where the phase-gate in
+    # bin/sim-recap-tick self-unloaded the job when recaps were disabled and the
+    # Regular Season phase has now begun.  No env vars required: the plist
+    # already embeds everything it needs.
+    if [ ! -f "$PLIST_PATH" ]; then
+      echo "Error: ${PLIST_PATH} does not exist — run --install-schedule first." >&2
+      exit 1
+    fi
+    launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true  # idempotent: ignore "not loaded"
+    launchctl bootstrap "gui/$(id -u)" "$PLIST_PATH"
+    echo "Resumed ${PLIST_LABEL}."
     ;;
 esac

@@ -1,6 +1,6 @@
 ---
 description: Production operations runbook — deploy, rollback, DB restore, sim-file recovery, logs, and running the app without the Claude Code harness.
-last_verified: 2026-07-28
+last_verified: 2026-08-10
 ---
 
 # IBL5 Operations Runbook
@@ -392,3 +392,31 @@ php ibl5/bin/validate-schema   # config in ibl5/config/schema-assertions.php
 4. **CI PAT** — generate a new token in GitHub (scoped to `contents: write` for this repo), update `CI_PAT` secret in GitHub Actions settings, then revoke the old token.
 
 All config files are `.gitignore`d — never commit them. See the `.example` templates for the expected structure.
+
+---
+
+## 8. Sim Recap Poller
+
+The sim recap poller is a macOS LaunchAgent (`com.ibl5.sim-recap-poll`, label managed by `bin/sim-recap-cron-setup`) that fires `bin/sim-recap-tick` every 300 s.
+
+### Phase gate — when the poller stops itself
+
+Recap generation is gated to **Regular Season only** (`RecapPhasePolicy::ENABLED_PHASES`). When the season phase is advanced via the League Control Panel admin, `setSeasonPhase()` posts a notice to `#admin-chat` if the new phase is enabled. When the phase changes **away** from Regular Season, the next tick that finds no pending sim and `recaps_enabled: false` will self-unload the LaunchAgent via `launchctl bootout`. The poller logs the reason before unloading.
+
+### Resuming the poller after a phase change
+
+When the season phase is set to Regular Season, `#admin-chat` receives a notification. To re-arm the poller:
+
+```bash
+bin/sim-recap-cron-setup --resume
+```
+
+This runs `launchctl bootout` (no-op if not loaded) followed by `launchctl bootstrap` against the existing plist. It refuses with an error if the plist does not exist — run `bin/sim-recap-cron-setup --install-schedule` first if the LaunchAgent was never installed.
+
+### Manual self-unload guard
+
+`bin/sim-recap-tick` never self-unloads when:
+- `--dry-run` is passed, or
+- `--sim=N` is passed (a specific sim was requested manually).
+
+This prevents a manual invocation from pulling the rug out during debugging.

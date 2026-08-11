@@ -167,13 +167,23 @@ SH
 exit 0
 SH
 
-    chmod +x "$STUB/ssh" "$STUB/claude" "$STUB/prompt" "$STUB/mysql"
+    # launchctl stub: log every call; always exit 0 (real bootout would SIGTERM
+    # the caller, but the stub lets the script's `return 0` exit cleanly so the
+    # test harness can see the call happened without killing itself).
+    cat > "$STUB/launchctl" <<'SH'
+#!/usr/bin/env bash
+echo "launchctl $*" >> "$STUB/launchctl.log"
+exit 0
+SH
+
+    chmod +x "$STUB/ssh" "$STUB/claude" "$STUB/prompt" "$STUB/mysql" "$STUB/launchctl"
 
     export STUB
     export SIM_RECAP_SSH_BIN="$STUB/ssh"
     export SIM_RECAP_CLAUDE_BIN="$STUB/claude"
     export SIM_RECAP_PROMPT_BIN="$STUB/prompt"
     export SIM_RECAP_MYSQL_BIN="$STUB/mysql"
+    export SIM_RECAP_LAUNCHCTL_BIN="$STUB/launchctl"
     export SIM_RECAP_SSH_HOST="test-host"
     export SIM_RECAP_REMOTE_ROOT=""
     export SIM_RECAP_DB_HOST="127.0.0.1"
@@ -191,7 +201,8 @@ srt_reset() {
           "$STUB"/tick.out "$STUB"/agent-fails "$STUB"/agent-usage-limit \
           "$STUB"/store-fails "$STUB"/store-banner "$STUB"/resp.* "$STUB"/fail.* \
           "$STUB"/record-stdin "$STUB"/store.cmd "$STUB"/store.stdin \
-          "$STUB"/prompt.argv 2>/dev/null
+          "$STUB"/prompt.argv "$STUB"/launchctl.log "$STUB"/launchctl.sentinel \
+          2>/dev/null
     export SIM_RECAP_DB_PASSWORD="test_db_password"
     export SIM_RECAP_MYSQL_BIN="$STUB/mysql"
     unset SIM_RECAP_KEEP_WORKDIR 2>/dev/null || true
@@ -794,6 +805,73 @@ else
     srt_fail "negative_roster_fetch_failure_does_not_park — workdir not found or roster-context.json missing (KEEP_WORKDIR=1 set)"
 fi
 unset SIM_RECAP_KEEP_WORKDIR
+
+# ── phase_gate_boots_out_when_recaps_disabled ─────────────────────────────────
+# When claim-next reports recaps_enabled:false and sim is null (nothing left to
+# drain), the tick must log the reason, call launchctl bootout, and exit 0.
+# Real launchctl would SIGTERM the caller; the stub exits 0 so the script's
+# `return 0` after the bootout call gives us a clean exit to inspect.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":null,"phase":"Playoffs","recaps_enabled":false}\n' \
+    > "$STUB/resp.claim-next"
+srt_run
+srt_expect_eq "phase_gate_boots_out_when_recaps_disabled — exit 0" 0 "$SRT_RC"
+srt_log_has "$STUB" tick.out "booting out poller" \
+    "phase_gate_boots_out_when_recaps_disabled — logged reason"
+srt_log_has "$STUB" launchctl.log "bootout" \
+    "phase_gate_boots_out_when_recaps_disabled — launchctl bootout called"
+srt_log_has "$STUB" launchctl.log "com.ibl5.sim-recap-poll" \
+    "phase_gate_boots_out_when_recaps_disabled — correct label"
+
+# ── phase_gate_no_bootout_when_recaps_enabled ─────────────────────────────────
+# Regular Season (recaps_enabled:true) with no pending sim → cheap exit, no
+# unload. The poller should stay running and wait for the next sim.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":null,"phase":"Regular Season","recaps_enabled":true}\n' \
+    > "$STUB/resp.claim-next"
+srt_run
+srt_expect_eq "phase_gate_no_bootout_when_recaps_enabled — exit 0" 0 "$SRT_RC"
+srt_log_has "$STUB" tick.out "no pending sim — exiting cheap" \
+    "phase_gate_no_bootout_when_recaps_enabled — cheap exit"
+srt_file_absent "$STUB/launchctl.log" \
+    "phase_gate_no_bootout_when_recaps_enabled — launchctl never called"
+
+# ── phase_gate_no_bootout_in_dry_run ─────────────────────────────────────────
+# --dry-run goes to dry_run(), which never calls claim-next or touches the phase
+# gate. Even if we put a hostile resp.claim-next, launchctl must never be called.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":null,"phase":"Playoffs","recaps_enabled":false}\n' \
+    > "$STUB/resp.claim-next"
+srt_run --dry-run --sim=42
+srt_expect_eq "phase_gate_no_bootout_in_dry_run — exit 0" 0 "$SRT_RC"
+srt_file_absent "$STUB/launchctl.log" \
+    "phase_gate_no_bootout_in_dry_run — launchctl never called in dry-run mode"
+
+# ── phase_gate_no_bootout_when_sim_flag ──────────────────────────────────────
+# When --sim=N is supplied (DRY_SIM non-empty) and recaps_enabled:false, the
+# bootout guard must be skipped — a human explicitly invoked the tick for a
+# specific sim and we must never pull the rug out from under them.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":null,"phase":"Playoffs","recaps_enabled":false}\n' \
+    > "$STUB/resp.claim-next"
+srt_run --sim=42
+srt_expect_eq "phase_gate_no_bootout_when_sim_flag — exit 0" 0 "$SRT_RC"
+srt_file_absent "$STUB/launchctl.log" \
+    "phase_gate_no_bootout_when_sim_flag — launchctl not called when --sim=N supplied"
+
+# ── phase_gate_fail_safe_missing_field ────────────────────────────────────────
+# If claim-next returns a response without the recaps_enabled field (e.g. the
+# remote script was not yet deployed), jq evaluates `.recaps_enabled == false`
+# as `null == false` → false, so jq_ok returns non-zero → no bootout.
+# Fail-safe: absence of the field must be treated as "recaps enabled."
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":null}\n' > "$STUB/resp.claim-next"
+srt_run
+srt_expect_eq "phase_gate_fail_safe_missing_field — exit 0" 0 "$SRT_RC"
+srt_log_has "$STUB" tick.out "no pending sim — exiting cheap" \
+    "phase_gate_fail_safe_missing_field — cheap exit (not bootout)"
+srt_file_absent "$STUB/launchctl.log" \
+    "phase_gate_fail_safe_missing_field — launchctl never called on missing field"
 
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"

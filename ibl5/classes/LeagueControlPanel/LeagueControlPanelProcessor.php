@@ -112,6 +112,11 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
 
         $this->repository->setSeasonPhase($phase);
 
+        $notice = $this->simRecapPollerNotice($phase);
+        if ($notice !== null) {
+            Discord::postToChannel('#admin-chat', $notice);
+        }
+
         return ['success' => true, 'message' => 'Season Phase has been set to ' . $phase . '.'];
     }
 
@@ -380,6 +385,27 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
         $this->repository->upsertAward($year, 'IBL Finals MVP', $name);
 
         return ['success' => true, 'message' => 'IBL Finals MVP set to ' . $name . ' for ' . $year . '.'];
+    }
+
+    /**
+     * Returns a Discord notice to post to #admin-chat when the season phase is
+     * changed to one that enables sim recaps, or null for phases that disable them.
+     *
+     * When the approver Discord ID is empty (unconfigured), the ping prefix is
+     * omitted and the message is sent without a mention.
+     */
+    public function simRecapPollerNotice(string $phase): ?string
+    {
+        if (!\SimRecap\RecapPhasePolicy::isEnabled($phase)) {
+            return null;
+        }
+
+        $approverId = Discord::getBugPipelineApproverDiscordId();
+        $ping = $approverId !== '' ? "<@{$approverId}> " : '';
+
+        return "{$ping}Season phase is now **{$phase}** — sim recap poller is enabled. "
+            . 'Run `bin/sim-recap-cron-setup --resume` to restart the LaunchAgent '
+            . '(label: `com.ibl5.sim-recap-poll`).';
     }
 
     /**

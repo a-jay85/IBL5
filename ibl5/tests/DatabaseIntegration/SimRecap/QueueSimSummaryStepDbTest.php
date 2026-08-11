@@ -33,6 +33,9 @@ final class QueueSimSummaryStepDbTest extends DatabaseTestCase
         $this->repo = new SimSummaryRepository($this->db);
         $this->seasonQuery = new SeasonQueryRepository($this->db);
 
+        // Pin the phase explicitly rather than inheriting ambient fixture state.
+        $this->setSeasonPhase('Regular Season');
+
         // Insert an ibl_sim_dates row so getLastSimDatesArray() returns sim 9001
         // (highest value in the table within this transaction).
         $this->insertRow('ibl_sim_dates', [
@@ -85,6 +88,40 @@ final class QueueSimSummaryStepDbTest extends DatabaseTestCase
             (int) ($countRow['cnt'] ?? 0),
             'queuePendingIfAbsent must be idempotent — exactly one row after two execute() calls'
         );
+    }
+
+    /**
+     * execute() returns a skipped result when the phase is not Regular Season.
+     *
+     * RecapPhasePolicy::isEnabled() gates the step before any sim-dates read.
+     */
+    public function testSkippedForPlayoffsPhase(): void
+    {
+        // Override the phase set in setUp() — still inside the same transaction.
+        $this->setSeasonPhase('Playoffs');
+
+        $step = new QueueSimSummaryStep($this->repo, $this->seasonQuery);
+        $result = $step->execute();
+
+        self::assertTrue($result->success, 'skipped() result has success=true');
+        self::assertStringContainsString('Playoffs', $result->detail);
+    }
+
+    /**
+     * Updates the Current Season Phase setting to the given value.
+     *
+     * The seed fixture (db-seed.sql) already carries this row; the PK is
+     * (setting_key, league), so the phase must be UPDATEd, never re-inserted.
+     */
+    private function setSeasonPhase(string $phase): void
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE `ibl_settings` SET `value` = ? WHERE `setting_key` = \'Current Season Phase\''
+        );
+        self::assertNotFalse($stmt, 'Prepare must succeed: ' . $this->db->error);
+        $stmt->bind_param('s', $phase);
+        $stmt->execute();
+        $stmt->close();
     }
 
     /**

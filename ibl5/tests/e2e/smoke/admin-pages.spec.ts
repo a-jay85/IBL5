@@ -20,11 +20,20 @@ test.describe('Admin page smoke tests', () => {
     // The page renders an Initialization section and a completion summary.
     expect(body).toContain('Initialization');
     expect(body).toMatch(/\d+\s+(steps?\s+completed|succeeded)/i);
-    // (20) QueueSimSummaryStep state (b): CI seed has sim 689 as 'done', so
-    // queuePendingIfAbsent returns false → noNewSimHtml() runs every time.
-    expect(body, 'updater output must contain state-(b) no-new-sim copy').toContain('No new sim to recap this run');
-    // (21) The step always renders a simSummaries.php viewer link (state a or b).
-    expect(body, 'updater output must contain a sim recap viewer href').toContain('simSummaries.php?sim=');
+    // (20) QueueSimSummaryStep ran — its label renders at every phase (skipped
+    // results go through renderStepComplete too), so this holds phase-independently.
+    expect(body, 'updater output must render the sim recap step').toContain('Sim recap queued');
+    // (21) SimRecap\RecapPhasePolicy gates generation to Regular Season. This test
+    // deliberately never writes the phase row (see the describe comment), and the
+    // preceding mutator spec (league-control-panel.spec.ts) restores it to the CI
+    // seed default of Free Agency, so the step short-circuits here — no queue write,
+    // no simSummaries.php viewer link. The regex stays phase-agnostic so a change to
+    // the seed default is not a spurious failure. The enabled path (state (a)/(b)
+    // copy + viewer href) is pinned by QueueSimSummaryStepTest and
+    // QueueSimSummaryStepDbTest, which can set the phase without a shared-row race.
+    expect(body, 'updater output must contain the phase-gate skip copy').toMatch(
+      /Sim recaps are disabled during .+ phase\./,
+    );
     // (22) No PHP warnings, notices, or undefined-variable errors from the new step.
     expect(body, 'PHP Warning in updater output').not.toMatch(PHP_WARNING_REGEX);
     expect(body, 'Undefined variable/constant in updater output').not.toContain('Undefined');

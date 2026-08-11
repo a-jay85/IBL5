@@ -230,7 +230,7 @@ cmd_prove_tree() {
 #
 # The prohibited failure mode for this subcommand is a wrapper that swallows a non-zero
 # rc and reports "no hold". Everything below is shaped against that: one guarded fetch,
-# no `|| true` anywhere, and `set -euo pipefail` left free to abort loudly if any
+# no rc-swallowing suffix anywhere, and `set -euo pipefail` left free to abort loudly if any
 # predicate returns non-zero. A loud abort is a correct outcome here; a clean report
 # built on a failed fetch is not.
 cmd_holds() {
@@ -320,6 +320,61 @@ cmd_holds() {
     [[ "$held" -eq 0 ]] || exit 1
 }
 
+# cmd_sticky — create-or-update the /pr-ready verdict comment.
+#
+# Reads the verdict body from /tmp/pr-ready-verdict-<n>.md (written by the skill's
+# Write tool in Phase 7) and posts it as a sticky comment on the PR.
+# A missing body file means the caller skipped a Phase 7 Write step — exit 2, loud,
+# not silently posting an empty comment.
+#
+# Both create and update route through "$GH_CMD" api rather than `gh pr comment
+# --body-file`, so one GH_CMD stub can exercise both branches in the Phase 6 tests.
+#
+# Divergence from bin/pr-canary-check's post_sticky: that function is advisory and
+# intentionally swallows a failed PATCH/POST rc (it is a canary, not a gate).
+# This subcommand is a gate: the rc is deliberately left unswallowed so
+# set -euo pipefail aborts on any API failure.
+# Do not add an rc-swallowing suffix to the PATCH or POST call below.
+cmd_sticky() {
+    require_pr_number "${1:-}"
+    local n="$1"
+
+    # Marker declared once — passed to jq via env.M rather than interpolated into the
+    # filter string, guarding against characters jq would misparse.
+    local marker='<!-- pr-ready-verdict -->'
+
+    # Guard the body file BEFORE any network call. A missing file means the Phase 7
+    # Write step was skipped; fail loud rather than posting a silently empty comment.
+    [[ -f "/tmp/pr-ready-verdict-$n.md" ]] \
+        || { echo "sticky: verdict body not found at /tmp/pr-ready-verdict-$n.md" >&2; exit 2; }
+
+    # Discover any existing sticky comment. The marker is exposed to jq via env.M
+    # (M="$marker" scopes M into the environment of the gh invocation so jq inherits it).
+    # Two-step ids/id split: gh --paginate runs to completion before head reads the first
+    # line, avoiding a SIGPIPE abort under set -euo pipefail.
+    local ids
+    ids="$(M="$marker" "$GH_CMD" api "repos/$REPO_SLUG/issues/$n/comments" --paginate \
+        --jq '.[] | select(.body | contains(env.M)) | .id')"
+    local id
+    id="$(printf '%s\n' "$ids" | head -1)"
+
+    local url
+    if [[ -n "$id" ]]; then
+        # Update the existing comment.
+        # Gate (not advisory): rc deliberately left unswallowed — see function header.
+        url="$("$GH_CMD" api --method PATCH "repos/$REPO_SLUG/issues/comments/$id" \
+            -F "body=@/tmp/pr-ready-verdict-$n.md" --jq .html_url)"
+        echo "updated $url"
+    else
+        # Create a new comment via api --method POST, not `gh pr comment --body-file`,
+        # so create and update both use the same "$GH_CMD" api seam for test stubs.
+        # Gate (not advisory): rc deliberately left unswallowed — see function header.
+        url="$("$GH_CMD" api --method POST "repos/$REPO_SLUG/issues/$n/comments" \
+            -F "body=@/tmp/pr-ready-verdict-$n.md" --jq .html_url)"
+        echo "created $url"
+    fi
+}
+
 case "${1:-}" in
     capture-pre)
         cmd_capture_pre "${2:-}" "${3:-}"
@@ -329,6 +384,9 @@ case "${1:-}" in
         ;;
     holds)
         cmd_holds "${2:-}"
+        ;;
+    sticky)
+        cmd_sticky "${2:-}"
         ;;
     selftest)
         cmd_selftest

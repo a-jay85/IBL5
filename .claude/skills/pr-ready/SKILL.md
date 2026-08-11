@@ -30,7 +30,7 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
 - **Flat fan-out only.** A delegate may not spawn a delegate.
 - **Every glob is quoted** — `--include="*.md"`, never `--include=*.md`.
 - **The run STOPS at the verdict.** No merge, no auto-merge arming, no backlog housekeeping, no `/post-plan` chain, no worktree teardown.
-- **`STOP:` lines are hard stops for the model, not just for the shell.** Three blocks below print a `STOP:` line: the Phase 0 argument gate, the Phase 0 worktree guard, and the Phase 1 plan check. Where such a block runs `exit 1`, that `exit` terminates **only that Bash invocation** — it does not terminate the skill, because a skill's blocks are run by the model. The contract is therefore: **on a non-zero rc, or on printing a `STOP:` line, stop the run and make no further tool call.** None of the three relies on shell exit status to halt anything but the shell.
+- **`STOP:` lines are hard stops for the model, not just for the shell.** Three blocks below print a `STOP:` line: the Phase 0 argument gate, the Phase 0 canonical-root guard, and the Phase 1 plan check. Where such a block runs `exit 1`, that `exit` terminates **only that Bash invocation** — it does not terminate the skill, because a skill's blocks are run by the model. The contract is therefore: **on a non-zero rc, or on printing a `STOP:` line, stop the run and make no further tool call.** None of the three relies on shell exit status to halt anything but the shell.
 
 ## Runtime phases
 
@@ -44,29 +44,22 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
 
 2. **Load the deferred tool first.** `ToolSearch("select:EnterWorktree")` is the **first** tool call of the run, before any worktree read. `EnterWorktree` is deferred, so calling it without loading the schema fails with `InputValidationError`; and a worktree read attempted first trips the cross-worktree straddle gate in `~/.claude/hooks/plan-gate-edit.sh`.
 
-3. **Worktree guard — resolve the slug first, then branch three ways.** The invariant this guard protects is *"the run operates in the PR's own worktree"*, **not** *"the run starts from the main checkout"*. Those differ in exactly one case, and it is the case a self-dogfooding run hits: the session is already sitting in the target PR's worktree, where the invariant holds with no switch at all. Resolve `$SLUG` before testing anything, so the branch can tell that case apart:
+3. **Canonical-root guard.** `EnterWorktree`'s `path:` form only accepts a target listed in `git worktree list` *for the current repo* and, from inside a worktree, only targets under that repo's `.claude/worktrees/` (example) directory. This repo's worktrees live at `~/GitHub/IBL5-worktrees/<slug>`, so a worktree→worktree switch is rejected — the skill must be invoked from the main checkout. Run this block first:
 
    ```bash
    source "$(git rev-parse --show-toplevel)/bin/lib/git-helpers.sh"
-   SLUG=$(gh pr view <N> --json headRefName --jq .headRefName)
-   HERE=$(basename "$(git rev-parse --show-toplevel)")
-   if ! is_in_worktree; then
-     echo "MAIN-CHECKOUT — enter the '$SLUG' worktree via step 4."
-   elif [ "$HERE" = "$SLUG" ]; then
-     echo "ALREADY-IN-TARGET ($SLUG) — skip step 4 entirely; do NOT call EnterWorktree."
-   else
-     echo "STOP: /pr-ready is running in the '$HERE' worktree but PR <N> lives on '$SLUG'. Re-invoke from the main checkout (/Users/ajaynicolas/GitHub/IBL5) or from the '$SLUG' worktree directly. EnterWorktree cannot switch worktree-to-worktree for IBL5-worktrees paths."
+   if is_in_worktree; then
+     echo "STOP: /pr-ready must be invoked from the main checkout (/Users/ajaynicolas/GitHub/IBL5), not from a worktree. EnterWorktree cannot switch worktree-to-worktree for IBL5-worktrees paths."
      exit 1
    fi
    ```
 
-   Why the third branch still stops: `EnterWorktree`'s `path:` form only accepts a target listed in `git worktree list` *for the current repo* and, from inside a worktree, only targets under that repo's `.claude/worktrees/` (example) directory. This repo's worktrees live at `~/GitHub/IBL5-worktrees/<slug>`, so a worktree→worktree switch is rejected and there is no in-session route to the right tree.
-
    Source via `$(git rev-parse --show-toplevel)`, not a bare relative path: the skill's cwd is not guaranteed to be the repo root. `is_in_worktree()` is defined in `bin/lib/git-helpers.sh` and compares `--absolute-git-dir` against `--git-common-dir`. Per the invariants above, a non-zero rc here ends the run.
 
-4. **Enter the worktree — only on `MAIN-CHECKOUT`.** On `ALREADY-IN-TARGET`, skip this step and go straight to Phase 1; the tree is already correct and calling `EnterWorktree` on it would be a rejected no-op round trip.
+4. **Resolve the slug and enter.**
 
    ```bash
+   SLUG=$(gh pr view <N> --json headRefName --jq .headRefName)
    git worktree list
    ```
 
@@ -145,10 +138,18 @@ Read `.claude/skills/pr-ready/_rebase-and-conflicts.md` now and follow it end-to
    ```
 
    ```bash
-   HEAD_SHA="$(git rev-parse HEAD)"; prev=""; prev_ms=""
+   HEAD_SHA="$(git rev-parse HEAD)"; prev=""; prev_ms=""; seen=""; grace=10
    while true; do
      v="$(gh pr view <N> --json headRefOid,mergeStateStatus 2>/dev/null || echo '{}')"
      live="$(jq -r '.headRefOid // ""' <<<"$v")"
+     [ "$live" = "$HEAD_SHA" ] && seen=1
+     if [ -z "$seen" ]; then
+       grace=$((grace - 1))
+       if [ "$grace" -le 0 ]; then
+         echo "STALE: head never reached $HEAD_SHA (last seen ${live:-none}); this watcher is obsolete"; break
+       fi
+       sleep 30; continue
+     fi
      if [ -n "$live" ] && [ "$live" != "$HEAD_SHA" ]; then
        echo "STALE: head moved $HEAD_SHA -> $live; this watcher is obsolete"; break
      fi
@@ -166,7 +167,9 @@ Read `.claude/skills/pr-ready/_rebase-and-conflicts.md` now and follow it end-to
    done
    ```
 
-   The emitted line is `"\(.name): \(.bucket)"` and **not** a success-only filter because **silence is not success**. A filter matching only `pass` stays mute through `fail`, `cancel`, `skipping`, and `action_required`, and mute is indistinguishable from "still running". The stale-SHA break is what stops an orphaned watcher from reporting on a superseded push. The `mergeStateStatus` line is emitted on **change**, which is what resolves step 4's `UNKNOWN` without a wait — the first poll prints the real value, and `DIRTY` breaks out on that same poll rather than after CI finishes.
+   The emitted line is `"\(.name): \(.bucket)"` and **not** a success-only filter because **silence is not success**. A filter matching only `pass` stays mute through `fail`, `cancel`, `skipping`, and `action_required`, and mute is indistinguishable from "still running". The `mergeStateStatus` line is emitted on **change**, which is what resolves step 4's `UNKNOWN` without a wait — the first poll prints the real value, and `DIRTY` breaks out on that same poll rather than after CI finishes.
+
+   **The `seen` gate is what makes the rest of the loop trustworthy — do not remove it.** This watcher is armed immediately after the Phase 4.3 push, and GitHub's API serves the **previous** head for a window of seconds afterwards. Without the gate that window produces two failures, and the second is the dangerous one: the stale-SHA break false-fires and kills a watcher that is not actually obsolete; and, worse, `gh pr checks` returns the *old* head's already-finished buckets, so `all(.[]; .bucket!="pending")` is true on iteration one and the loop prints a **false `CI COMPLETE`** — the run then proceeds to a verdict having never watched the current head's CI at all. Observed live while dogfooding this skill on its own PR (#1830). So: until `live` has matched `HEAD_SHA` at least once, evaluate **nothing** — not the stale break, not `mergeStateStatus`, not the checks predicate. `grace` bounds that silence at 10 polls (~5 min) so a genuinely superseded push still reports `STALE` promptly instead of idling to the `timeout_ms`.
 
 **Phase 5 — strict re-check loop.**
 

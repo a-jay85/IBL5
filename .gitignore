@@ -32,8 +32,6 @@ ibl5/themes/IBL/style/style.css
 backups
 depthcharts
 /ibl5/ibl/IBL/*
-!/ibl5/ibl/IBL/Schedule.htm
-!/ibl5/ibl/IBL/Standings.htm
 !/ibl5/ibl/IBL/index.php
 !/ibl5/classes/
 !/ibl5/modules/

@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed/declined maintenance-audit findings, extracted from maintenance-backlog.md.
-last_verified: 2026-08-09
+last_verified: 2026-08-10
 ---
 
 # Maintenance-Cost Reduction Backlog — Archive
@@ -2116,10 +2116,20 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Risk if untouched:** False impression of working pipeline; ongoing binary drift.
 **Status:** Resolved — keep tracked (NOT deleted). gitignore !ibl5/Olympics.sch exception added to document deliberate retention.
 
+**Table evidence (2026-07-25):** Olympics.sch kept tracked + gitignore exception (runtime fallback).
+
+### 12.4 `ibl5/ibl/IBL/Schedule.htm` (example) — 284 KB HTML, 86 Commits
+**Location:** `ibl5/ibl/IBL/Schedule.htm` (example)
+**Problem:** JSB-generated HTML parsed at runtime by `ScheduleUpdater`. Updated after every sim — 86 commits in history. ~2 MB accumulated bloat. Root cause of the stale-playoff-rows bug: the deploy workflow's `git reset --hard origin/production` clobbered JSB's freshly-written Schedule.htm with the stale 2006-07 copy committed to the repo; `ScheduleUpdater::insertPlayoffGamesFromScheduleHtm()` then parsed the stale rows and wrote them into `ibl_schedule` with the current season's ending year, producing phantom June games that never occurred.
+**Suggested direction:** Move to ibl5/backups/ (gitignored); have ScheduleUpdater source from there.
+**Est. effort:** M
+**Risk if untouched:** Weekly merge conflicts during active season; ongoing bloat; stale playoff data re-inserted on every sim import.
+**Status:** ✅ Implemented (2026-08-10, branch `fix-playoff-schedule-stale-season`) — the stale Season.htm bug is resolved end-to-end. Phase 2 added a season guard to `ScheduleUpdater::insertPlayoffGamesFromScheduleHtm()` that skips rows whose "Post N YYYY" label year does not match the current season's ending year. Phase 4 untracked `Schedule.htm` (and `Standings.htm`) from git so `git reset --hard` can never clobber a fresh export again. Migration 160 (`160_remove_stale_playoff_rows.sql`) deletes phantom June rows (box_id < 100000, month = 6, season_year = current ending year from `ibl_settings`) that already landed in `ibl_schedule`. `StalePlayoffRowsMigrationTest` (`tests/DatabaseIntegration/StalePlayoffRowsMigrationTest.php`) verifies the migration's correctness, idempotency, cross-season isolation, and unplayed-sentinel preservation.
+
+**Table evidence (2026-08-10):** Season guard added to `ScheduleUpdater::insertPlayoffGamesFromScheduleHtm()`; `ibl/IBL/Schedule.htm` and `ibl/IBL/Standings.htm` untracked from git (Phase 4); migration 160 removes stale phantom playoff rows; `StalePlayoffRowsMigrationTest` covers all scope boundaries.
+
 ---
 
-
-**Table evidence (2026-07-25):** Olympics.sch kept tracked + gitignore exception (runtime fallback).
 ## Axis 13: Duplication Across Modules
 
 ### 13.1 Player Averages Views — Near-Identical Quartet

@@ -171,8 +171,29 @@ class ScheduleUpdater extends \BaseMysqliRepository {
         $playoffGames = ScheduleHtmParser::parsePlayoffGames($html);
 
         $log = '';
+        $skippedCount = 0;
+        /** @var array<int|string, true> $skippedYears */
+        $skippedYears = [];
 
         foreach ($playoffGames as $game) {
+            // Season guard: Schedule.htm is a JSB export that can be left over
+            // from a prior season. Every row in a given export carries that
+            // season's ENDING year in its "Post N YYYY" header, so a year
+            // mismatch means the whole file is stale and its rows must not be
+            // relabelled into the current season. This must run before
+            // extractDate(), which discards the label's year by design
+            // (required for regular-season rows).
+            $postYear = null;
+            if (preg_match('/(\d{4})\s*$/', $game['date_label'], $yearMatch) === 1) {
+                $postYear = (int) $yearMatch[1];
+            }
+
+            if ($postYear !== $this->season->endingYear) {
+                $skippedCount++;
+                $skippedYears[$postYear ?? 'unparseable'] = true;
+                continue;
+            }
+
             $fullDate = $this->extractDate($game['date_label']);
             if ($fullDate === null) {
                 continue;
@@ -211,6 +232,18 @@ class ScheduleUpdater extends \BaseMysqliRepository {
                 $uuid
             );
             $log .= "Inserted playoff game: {$game['visitor']} @ {$game['home']} on {$fullDate['date']}<br>";
+        }
+
+        if ($skippedCount > 0) {
+            $years = implode(', ', array_map('strval', array_keys($skippedYears)));
+            $message = "Skipped {$skippedCount} stale playoff row(s) from Schedule.htm year(s) {$years}"
+                . " — current season ending year is {$this->season->endingYear}";
+            $log .= $message . '<br>';
+            $this->channelLogger->warning('ScheduleUpdater skipped stale playoff rows', [
+                'skipped' => $skippedCount,
+                'file_years' => array_keys($skippedYears),
+                'season_ending_year' => $this->season->endingYear,
+            ]);
         }
 
         return $log;

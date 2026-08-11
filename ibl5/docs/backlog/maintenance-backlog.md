@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-08-09
+last_verified: 2026-08-10
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -558,32 +558,23 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):** Several here are intentionally-tracked (declined) or need infra/history-rewrite decisions — the one true 🟥 is 12.11 (history rewrite).
 
-> ✅ resolved (5): 12.1, 12.2, 12.6, 12.10, 12.14 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (6): 12.1, 12.2, 12.4, 12.6, 12.10, 12.14 — evidence in [archive](archive/maintenance-backlog-archive.md)
 > 🚫 declined (3): 12.3, 12.12, 12.13 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 12.4 | ⬜ Open | 🟨 | Deferred — delivery is via tracked git commits (see Status). |
-| 12.5 | ⬜ Open | 🟨 | Standings.htm — upfront: verify legacy view unused → delete + redirect. |
+| 12.5 | ⬜ Open | 🟨 | Standings.htm — now untracked from git (Phase 4, fix-playoff-schedule-stale-season); upfront decision remaining: verify the legacy view is fully unused, then delete the file and add a redirect. |
 | 12.7 | ⬜ Open | 🟨 | VR PNG baselines — 121 PNGs / 27 MB (grown 2.5× from original audit); infra decision (Git LFS vs force-updated baselines branch). **Deferred 2026-07-25** — see Status below. |
 | 12.8 | ⬜ Open | 🟨 | Player images 20MB — decision + infra (S3/CDN vs LFS) + admin upload tooling. |
 | 12.9 | ⬜ Open | 🟨 | HoF images — bundle with the 12.8 decision. |
 | 12.11 | ⬜ Open | 🟥 | ~80MB orphaned history objects — needs `git filter-repo` + force-push + coordinated rebase. **ADR-0034 set a no-history-rewrite precedent** (declined as too disruptive), so this is likely 🚫 in practice unless that stance changes. Irreversible; human-only. |
 
-### 12.4 `ibl5/ibl/IBL/Schedule.htm` — 284 KB HTML, 86 Commits
-**Location:** `ibl5/ibl/IBL/Schedule.htm`
-**Problem:** JSB-generated HTML parsed at runtime by `ScheduleUpdater`. Updated after every sim — 86 commits in history. ~2 MB accumulated bloat.
-**Suggested direction:** Move to ibl5/backups/ (gitignored); have ScheduleUpdater source from there.
-**Est. effort:** M
-**Risk if untouched:** Weekly merge conflicts during active season; ongoing bloat.
-**Status:** Deferred (verified 2026-06-28) — `ibl/IBL/Schedule.htm` is delivered to the runtime by tracked git commits (86 "Update sim files" commits), not out-of-band; gitignoring/moving it removes it from any git-fed runtime, and `ScheduleUpdater::insertPlayoffGamesFromScheduleHtm()` guards only the absent-file case, so a stale/relocated copy would parse silently-wrong playoff data. A safe fix must first route `Schedule.htm` through the archive-first `JsbSourceResolver` (carry it inside the uploaded backup archive like `.sch`/`.lge`) — M-effort architecture change, reclassified 🟨 conditional; not a green-green micro-fix.
-
-### 12.5 `ibl5/ibl/IBL/Standings.htm` — Orphaned Legacy View
-**Location:** `ibl5/ibl/IBL/Standings.htm`
-**Problem:** Legacy view (standings is now DB-driven per REFACTORING_HISTORY); 81 commits.
-**Suggested direction:** Verify legacy view usage; delete if unused; redirect route.
-**Est. effort:** M
-**Risk if untouched:** Ongoing conflicts; confusion about source of truth.
+### 12.5 `ibl5/ibl/IBL/Standings.htm` (example) — Orphaned Legacy View
+**Location:** `ibl5/ibl/IBL/Standings.htm` (example)
+**Problem:** Legacy view (standings is now DB-driven per REFACTORING_HISTORY); 81 commits. The git-tracking / clobber-on-deploy concern was resolved in Phase 4 of fix-playoff-schedule-stale-season (file untracked; `git reset --hard` can no longer clobber a fresh export). Residual: the file on disk may still be in use as a runtime fallback — verify, delete if truly unused, add a redirect if any route referenced it.
+**Suggested direction:** Verify legacy view usage (check if `ScheduleUpdater` or any view references `Standings.htm`); if unused, delete the file and add a redirect for any surviving legacy URL.
+**Est. effort:** S (verify) / M (if redirect needed)
+**Risk if untouched:** Stale `.htm` file on disk causes confusion about standings source of truth; if it is still referenced by a runtime path, it would surface stale data.
 
 ### 12.7 Visual Regression PNG Baselines — 27 MB, 121 Files
 **Location:** `ibl5/tests/e2e/smoke/visual-regression.spec.ts-snapshots/`

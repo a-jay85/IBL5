@@ -101,7 +101,7 @@ SH
     cat > "$STUB/bin/curl" <<'SH'
 #!/usr/bin/env bash
 echo "curl $*" >> "$STUB/curl.log"
-case "$*" in *create-thread*) echo "CREATE_THREAD" >> "$STUB/calls.log";; *post-to-thread*) echo "POST_TO_THREAD" >> "$STUB/calls.log";; *mention*) echo "MENTION" >> "$STUB/calls.log";; esac
+case "$*" in *create-thread*) echo "CREATE_THREAD" >> "$STUB/calls.log";; *post-to-thread*) echo "POST_TO_THREAD" >> "$STUB/calls.log";; *reply-to-message*) echo "REPLY_TO_MESSAGE" >> "$STUB/calls.log";; *get-message*) echo "GET_MESSAGE" >> "$STUB/calls.log";; *mention*) echo "MENTION" >> "$STUB/calls.log";; esac
 case "$*" in
   *create-thread*)
     if [ "${STUB_CREATE_THREAD_FAIL:-0}" = 1 ]; then
@@ -110,6 +110,18 @@ case "$*" in
       echo '{"thread_id":"'"${STUB_THREAD_ID:-880000000000000001}"'"}'
     fi
     ;;
+  # Default '{}' — .deleted and .content both null — is what keeps every existing
+  # harness byte-identical: the tick falls through on its stored original_text.
+  *get-message*)
+    if [ "${STUB_GET_MESSAGE_DELETED:-0}" = 1 ]; then
+      echo '{"content":null,"deleted":true}'
+    elif [ -n "${STUB_GET_MESSAGE_CONTENT:-}" ]; then
+      jq -nc --arg c "$STUB_GET_MESSAGE_CONTENT" '{content:$c,deleted:false}'
+    else
+      echo '{}'
+    fi
+    ;;
+  *reply-to-message*)    [ "${STUB_REPLY_FAIL:-0}" = 1 ] && exit 7; echo '{}' ;;
   *mention*)             echo '{"message_id":"'"${STUB_MESSAGE_ID:-1420098765432109876}"'"}' ;;
   *get-thread-messages*) cat "$STUB/transcript.json" 2>/dev/null || echo '{"messages":[]}' ;;
   *)                     echo '{}' ;;

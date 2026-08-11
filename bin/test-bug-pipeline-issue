@@ -46,6 +46,37 @@ bpt_log_has "$STUB" transition.log "queued --class=bug" "gh failure → DB trans
 # and bpgh_add_label. Diagnostics are stderr-only now; a failed create must yield NO issue.
 bpt_log_lacks "$STUB" transition.log "--issue=" "gh create failure → no phantom --issue= argument"
 
+# ── ★ the number is persisted even when create-thread fails ───────────────────
+# open_thread_and_ask returns early WITHOUT any transition when it gets no thread id,
+# so an issue number written only by the routing transition was lost and the next tick
+# minted a second issue. Persisting at the creation site closes that.
+bpt_reset; bpt_set_actionable "$BUG_NEW"
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":false,"clarifying_question":"which team?","issue_title":"t","severity":"low"}'
+STUB_ISSUE_NUMBER=4242 STUB_CREATE_THREAD_FAIL=1 bpt_run
+bpt_expect_eq "create-thread failure still exits 0" 0 "$BPT_RC"
+bpt_log_has "$STUB" transition.log "--issue=4242" "create-thread failure → number still persisted"
+
+# ── ★ …and the persist write carries the row's OWN status, never a bare queued ─
+# An awaiting_info row already carries class='bug'. Flipping it to queued would satisfy
+# claimNextHuntable()'s `status='queued' AND class IS NOT NULL` and dispatch a hunt on a
+# report still waiting on the GM.
+bpt_reset
+NOW="$(date '+%Y-%m-%d %H:%M:%S')"; OLD='2020-01-01 00:00:00'
+AWAITING_NO_ISSUE='[{"id":7,"status":"awaiting_info","class":"bug","original_text":"x","thread_id":null,"issue_number":null,"last_gm_reply_at":"'"$NOW"'","last_processed_at":"'"$OLD"'"}]'
+bpt_set_actionable "$AWAITING_NO_ISSUE"
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":false,"clarifying_question":"which team?","issue_title":"t","severity":"low"}'
+STUB_ISSUE_NUMBER=4242 STUB_CREATE_THREAD_FAIL=1 bpt_run
+bpt_log_has   "$STUB" transition.log "awaiting_info --issue=4242" "awaiting_info row keeps its status on the persist write"
+bpt_log_lacks "$STUB" transition.log "7 queued" "the persist write never flips a row to queued"
+
+# ── ★ …and the now-numbered row mints ZERO further issues on the next tick ─────
+bpt_reset
+AWAITING_NUMBERED='[{"id":7,"status":"awaiting_info","class":"bug","original_text":"x","thread_id":null,"issue_number":4242,"last_gm_reply_at":"'"$NOW"'","last_processed_at":"'"$OLD"'"}]'
+bpt_set_actionable "$AWAITING_NUMBERED"
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":false,"clarifying_question":"which team?","issue_title":"t","severity":"low"}'
+STUB_CREATE_THREAD_FAIL=1 bpt_run
+bpt_log_lacks "$STUB" gh.log "issue create" "a persisted number means the next tick creates no second issue"
+
 # ── state->label: thin-bug → needs-info ───────────────────────────────────────
 bpt_reset; bpt_set_actionable "$BUG_NEW"
 bpt_set_claude_result '{"class":"bug","bug_has_enough_info":false,"clarifying_question":"which team?","issue_title":"t","severity":"low"}'

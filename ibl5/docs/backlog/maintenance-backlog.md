@@ -569,8 +569,8 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 12.9 | ⬜ Open | 🟨 | HoF images — bundle with the 12.8 decision. |
 | 12.11 | ⬜ Open | 🟥 | ~80MB orphaned history objects — needs `git filter-repo` + force-push + coordinated rebase. **ADR-0034 set a no-history-rewrite precedent** (declined as too disruptive), so this is likely 🚫 in practice unless that stance changes. Irreversible; human-only. |
 
-### 12.5 `ibl5/ibl/IBL/Standings.htm` — Orphaned Legacy View
-**Location:** `ibl5/ibl/IBL/Standings.htm`
+### 12.5 `ibl5/ibl/IBL/Standings.htm` (example) — Orphaned Legacy View
+**Location:** `ibl5/ibl/IBL/Standings.htm` (example)
 **Problem:** Legacy view (standings is now DB-driven per REFACTORING_HISTORY); 81 commits. The git-tracking / clobber-on-deploy concern was resolved in Phase 4 of fix-playoff-schedule-stale-season (file untracked; `git reset --hard` can no longer clobber a fresh export). Residual: the file on disk may still be in use as a runtime fallback — verify, delete if truly unused, add a redirect if any route referenced it.
 **Suggested direction:** Verify legacy view usage (check if `ScheduleUpdater` or any view references `Standings.htm`); if unused, delete the file and add a redirect for any surviving legacy URL.
 **Est. effort:** S (verify) / M (if redirect needed)

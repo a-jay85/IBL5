@@ -2118,8 +2118,8 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 
 **Table evidence (2026-07-25):** Olympics.sch kept tracked + gitignore exception (runtime fallback).
 
-### 12.4 `ibl5/ibl/IBL/Schedule.htm` — 284 KB HTML, 86 Commits
-**Location:** `ibl5/ibl/IBL/Schedule.htm`
+### 12.4 `ibl5/ibl/IBL/Schedule.htm` (example) — 284 KB HTML, 86 Commits
+**Location:** `ibl5/ibl/IBL/Schedule.htm` (example)
 **Problem:** JSB-generated HTML parsed at runtime by `ScheduleUpdater`. Updated after every sim — 86 commits in history. ~2 MB accumulated bloat. Root cause of the stale-playoff-rows bug: the deploy workflow's `git reset --hard origin/production` clobbered JSB's freshly-written Schedule.htm with the stale 2006-07 copy committed to the repo; `ScheduleUpdater::insertPlayoffGamesFromScheduleHtm()` then parsed the stale rows and wrote them into `ibl_schedule` with the current season's ending year, producing phantom June games that never occurred.
 **Suggested direction:** Move to ibl5/backups/ (gitignored); have ScheduleUpdater source from there.
 **Est. effort:** M

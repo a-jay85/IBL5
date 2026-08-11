@@ -1,0 +1,192 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-pr-ready-helper — regression harness for bin/pr-ready-helper.
+#
+# All GitHub calls are intercepted by a stub gh (via GH_CMD). No network,
+# no live PR. Proves the holding vs. all-clear classification pair, fail-closed
+# on API failure, fail-closed on empty seam, and sticky create-vs-update routing.
+#
+# Run: bin/test-pr-ready-helper  (exit 0 = all pass, exit 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+GUARD="$SCRIPT_DIR/pr-ready-helper"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP" 2>/dev/null; rm -f /tmp/pr-ready-verdict-4242.md' EXIT
+
+FAILED=0
+
+pass()     { echo "ok: $1"; }
+failcase() { echo "FAIL: $1"; FAILED=1; }
+
+assert_match() {
+    if printf '%s' "$3" | grep -qE "$2"; then
+        pass "$1"
+    else
+        failcase "$1 — expected to match: $2"
+        printf '%s\n' "$3" | sed 's/^/    /'
+    fi
+}
+
+assert_absent() {
+    if printf '%s' "$3" | grep -qE "$2"; then
+        failcase "$1 — expected NOT to match: $2"
+        printf '%s\n' "$3" | sed 's/^/    /'
+    else
+        pass "$1"
+    fi
+}
+
+# --- Fixtures ---
+# JSON body uses \n as the JSON escape for newline; jq -r decodes them correctly
+# so pr_manual_testing_clearance receives a real multi-line body string.
+
+# Holding fixture: Manual Testing section has real rows (not the sentinel).
+cat > "$TMP/fixture-hold.json" <<'JSON'
+{"body":"## PR Description\nSome changes.\n\n## Manual Testing\n- [ ] Check the UI works","title":"chore: update something","labels":[],"files":[]}
+JSON
+
+# All-clear fixture: Manual Testing section carries the sentinel phrase;
+# non-feat title, no labels, no files, no Depends-on lines (avoids hazard D).
+cat > "$TMP/fixture-clear.json" <<'JSON'
+{"body":"## PR Description\nSome changes.\n\n## Manual Testing\nNo manual testing needed - covered by automated tests","title":"chore: update docs","labels":[],"files":[]}
+JSON
+
+# --- Stub gh setup ---
+
+STUBBIN="$TMP/stubbin"
+GH_API_LOG="$TMP/api.log"
+export GH_API_LOG
+
+mkdir -p "$STUBBIN"
+
+cat > "$STUBBIN/gh" <<'STUB'
+#!/usr/bin/env bash
+set -u
+cmd="$1 ${2:-}"
+shift 2 2>/dev/null || shift 1 2>/dev/null || true
+
+case "$cmd" in
+    "api --method")
+        # PATCH or POST — log the method and path for routing assertion.
+        # $1 is the METHOD token; shift once so $* is the remaining args.
+        method="${1:-UNKNOWN}"; shift 2>/dev/null || true
+        echo "$method $*" >> "${GH_API_LOG:-/dev/null}"
+        # Echo a fake URL so url= captures a non-empty value in cmd_sticky.
+        echo "https://github.com/a-jay85/IBL5/pull/4242#issuecomment-fake"
+        ;;
+    "api graphql")
+        # pr_unresolved_findings_hold — return an empty (all-clear) response.
+        # An empty nodes array passes all three fail-closed guards in the predicate.
+        echo '{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[]}}}}}'
+        ;;
+    "api "*)
+        # cmd_sticky comments list — echo the comment id if the update case is
+        # active (GH_STUB_COMMENT_ID set and non-empty), nothing for create case.
+        if [[ -n "${GH_STUB_COMMENT_ID:-}" ]]; then
+            printf '%s\n' "$GH_STUB_COMMENT_ID"
+        fi
+        ;;
+    "pr view")
+        # cmd_holds fetch — return the fixture JSON named by GH_STUB_FIXTURE.
+        if [[ -n "${GH_STUB_FIXTURE:-}" && -f "${GH_STUB_FIXTURE}" ]]; then
+            cat "$GH_STUB_FIXTURE"
+        else
+            echo '{}'
+        fi
+        ;;
+    *)
+        exit 0
+        ;;
+esac
+STUB
+
+chmod +x "$STUBBIN/gh"
+
+# Fixed verdict body path that cmd_sticky expects; PR number 4242 is obviously
+# fake and can never collide with a real in-flight verdict file.
+printf '<!-- pr-ready-verdict -->\nTest verdict body.\n' > /tmp/pr-ready-verdict-4242.md
+
+# --- Case 1: Holding case ---
+# The fixture body has a real Manual Testing section (not the sentinel), so
+# pr_manual_testing_clearance returns HELD.  cmd_holds must exit 1 and emit a
+# HOLD: line naming the predicate that fired.
+
+out1="$(env GH_CMD="$STUBBIN/gh" GH_STUB_FIXTURE="$TMP/fixture-hold.json" \
+    "$GUARD" holds 4242 2>&1)"
+rc1=$?
+[ "$rc1" -ne 0 ] && pass "case1-holds-exits-nonzero" \
+    || failcase "case1-holds-exits-nonzero (got exit $rc1)"
+assert_match "case1-hold-line-present" 'HOLD:' "$out1"
+
+# --- Case 2: All-clear case ---
+# The fixture has the sentinel phrase in Manual Testing, non-feat title, no
+# golden files, no dep lines, no pipeline-authored label.  The graphql stub
+# returns an empty reviewThreads.nodes array, so pr_unresolved_findings_hold
+# clears too.  cmd_holds must exit 0 with no HOLD: lines.
+
+out2="$(env GH_CMD="$STUBBIN/gh" GH_STUB_FIXTURE="$TMP/fixture-clear.json" \
+    "$GUARD" holds 4242 2>&1)"
+rc2=$?
+[ "$rc2" -eq 0 ] && pass "case2-holds-exits0" \
+    || failcase "case2-holds-exits0 (got exit $rc2)"
+assert_absent "case2-no-hold-line" 'HOLD:' "$out2"
+
+# --- Case 3: Total API failure is fail-closed ---
+# GH_CMD=false means every gh invocation exits 1 with no output.  The raw=
+# fetch line in cmd_holds triggers its failure handler: no CLEAR: lines must
+# appear and the exit code must be non-zero.  This mechanically forbids the
+# prohibited behaviour (a wrapper that swallows a failed fetch and reports clear).
+
+out3="$(env GH_CMD=false "$GUARD" holds 4242 2>&1)"
+rc3=$?
+[ "$rc3" -ne 0 ] && pass "case3-false-cmd-exits-nonzero" \
+    || failcase "case3-false-cmd-exits-nonzero (got exit $rc3)"
+assert_absent "case3-no-clear-line"  'CLEAR:' "$out3"
+assert_absent "case3-no-guard-clean" 'GUARD-CLEAN' "$out3"
+
+# --- Case 4: Empty seam ---
+# GH_CMD="" triggers the early guard in pr-ready-helper (set-but-empty check).
+# Must exit 2 and emit the refusal message rather than attempting to expand
+# an empty command.
+
+out4="$(env GH_CMD= "$GUARD" holds 4242 2>&1)"
+rc4=$?
+[ "$rc4" -eq 2 ] && pass "case4-empty-seam-exits2" \
+    || failcase "case4-empty-seam-exits2 (got exit $rc4)"
+assert_match "case4-refusal-message" 'GH_CMD is set but empty' "$out4"
+
+# --- Case 5: sticky update routing ---
+# The stub returns a comment id (999) for the list call, so cmd_sticky issues
+# a PATCH to update that comment.  Assert the API log records the PATCH call
+# and that the output says "updated".
+
+rm -f "$GH_API_LOG"
+out5="$(env GH_CMD="$STUBBIN/gh" GH_STUB_COMMENT_ID=999 \
+    "$GUARD" sticky 4242 2>&1)"
+api_log5="$(cat "$GH_API_LOG" 2>/dev/null || true)"
+assert_match "case5-patch-issued"   'PATCH.*issues/comments/999' "$api_log5"
+assert_match "case5-output-updated" 'updated'                    "$out5"
+
+# --- Case 6: sticky create routing ---
+# The stub returns nothing for the list call (GH_STUB_COMMENT_ID not set), so
+# cmd_sticky issues a POST to create a new comment.  Assert the log records the
+# POST call and the output says "created".
+
+rm -f "$GH_API_LOG"
+out6="$(env GH_CMD="$STUBBIN/gh" \
+    "$GUARD" sticky 4242 2>&1)"
+api_log6="$(cat "$GH_API_LOG" 2>/dev/null || true)"
+assert_match "case6-post-issued"    'POST.*issues/4242/comments' "$api_log6"
+assert_match "case6-output-created" 'created'                    "$out6"
+
+# --- Results ---
+
+if [[ "$FAILED" -ne 0 ]]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

@@ -745,6 +745,8 @@ jobs:
         run: bin/test-playwright-version
       - name: bin/test-pr-canary-check
         run: bin/test-pr-canary-check
+      - name: bin/test-pr-ready-helper
+        run: bin/test-pr-ready-helper
       - name: bin/test-check-workflow-checkout
         run: bin/test-check-workflow-checkout
       - name: bin/test-check-composite-contracts

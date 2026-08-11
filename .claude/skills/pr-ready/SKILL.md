@@ -30,7 +30,7 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
 - **Flat fan-out only.** A delegate may not spawn a delegate.
 - **Every glob is quoted** — `--include="*.md"`, never `--include=*.md`.
 - **The run STOPS at the verdict.** No merge, no auto-merge arming, no backlog housekeeping, no `/post-plan` chain, no worktree teardown.
-- **`STOP:` lines are hard stops for the model, not just for the shell.** Three blocks below print a `STOP:` line: the Phase 0 argument gate, the Phase 0 canonical-root guard, and the Phase 1 plan check. Where such a block runs `exit 1`, that `exit` terminates **only that Bash invocation** — it does not terminate the skill, because a skill's blocks are run by the model. The contract is therefore: **on a non-zero rc, or on printing a `STOP:` line, stop the run and make no further tool call.** None of the three relies on shell exit status to halt anything but the shell.
+- **`STOP:` lines are hard stops for the model, not just for the shell.** Three blocks below print a `STOP:` line: the Phase 0 argument gate, the Phase 0 worktree guard, and the Phase 1 plan check. Where such a block runs `exit 1`, that `exit` terminates **only that Bash invocation** — it does not terminate the skill, because a skill's blocks are run by the model. The contract is therefore: **on a non-zero rc, or on printing a `STOP:` line, stop the run and make no further tool call.** None of the three relies on shell exit status to halt anything but the shell.
 
 ## Runtime phases
 
@@ -44,22 +44,29 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
 
 2. **Load the deferred tool first.** `ToolSearch("select:EnterWorktree")` is the **first** tool call of the run, before any worktree read. `EnterWorktree` is deferred, so calling it without loading the schema fails with `InputValidationError`; and a worktree read attempted first trips the cross-worktree straddle gate in `~/.claude/hooks/plan-gate-edit.sh`.
 
-3. **Canonical-root guard.** `EnterWorktree`'s `path:` form only accepts a target listed in `git worktree list` *for the current repo* and, from inside a worktree, only targets under that repo's `.claude/worktrees/` (example) directory. This repo's worktrees live at `~/GitHub/IBL5-worktrees/<slug>`, so a worktree→worktree switch is rejected — the skill must be invoked from the main checkout. Run this block first:
+3. **Worktree guard — resolve the slug first, then branch three ways.** The invariant this guard protects is *"the run operates in the PR's own worktree"*, **not** *"the run starts from the main checkout"*. Those differ in exactly one case, and it is the case a self-dogfooding run hits: the session is already sitting in the target PR's worktree, where the invariant holds with no switch at all. Resolve `$SLUG` before testing anything, so the branch can tell that case apart:
 
    ```bash
    source "$(git rev-parse --show-toplevel)/bin/lib/git-helpers.sh"
-   if is_in_worktree; then
-     echo "STOP: /pr-ready must be invoked from the main checkout (/Users/ajaynicolas/GitHub/IBL5), not from a worktree. EnterWorktree cannot switch worktree-to-worktree for IBL5-worktrees paths."
+   SLUG=$(gh pr view <N> --json headRefName --jq .headRefName)
+   HERE=$(basename "$(git rev-parse --show-toplevel)")
+   if ! is_in_worktree; then
+     echo "MAIN-CHECKOUT — enter the '$SLUG' worktree via step 4."
+   elif [ "$HERE" = "$SLUG" ]; then
+     echo "ALREADY-IN-TARGET ($SLUG) — skip step 4 entirely; do NOT call EnterWorktree."
+   else
+     echo "STOP: /pr-ready is running in the '$HERE' worktree but PR <N> lives on '$SLUG'. Re-invoke from the main checkout (/Users/ajaynicolas/GitHub/IBL5) or from the '$SLUG' worktree directly. EnterWorktree cannot switch worktree-to-worktree for IBL5-worktrees paths."
      exit 1
    fi
    ```
 
+   Why the third branch still stops: `EnterWorktree`'s `path:` form only accepts a target listed in `git worktree list` *for the current repo* and, from inside a worktree, only targets under that repo's `.claude/worktrees/` (example) directory. This repo's worktrees live at `~/GitHub/IBL5-worktrees/<slug>`, so a worktree→worktree switch is rejected and there is no in-session route to the right tree.
+
    Source via `$(git rev-parse --show-toplevel)`, not a bare relative path: the skill's cwd is not guaranteed to be the repo root. `is_in_worktree()` is defined in `bin/lib/git-helpers.sh` and compares `--absolute-git-dir` against `--git-common-dir`. Per the invariants above, a non-zero rc here ends the run.
 
-4. **Resolve the slug and enter.**
+4. **Enter the worktree — only on `MAIN-CHECKOUT`.** On `ALREADY-IN-TARGET`, skip this step and go straight to Phase 1; the tree is already correct and calling `EnterWorktree` on it would be a rejected no-op round trip.
 
    ```bash
-   SLUG=$(gh pr view <N> --json headRefName --jq .headRefName)
    git worktree list
    ```
 

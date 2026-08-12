@@ -30,12 +30,13 @@ test.describe('Olympics page smoke tests', () => {
   test('player page loads in Olympics context', async ({ page }) => {
     await page.goto('modules.php?name=Player&pa=showpage&pid=1&league=olympics');
     await assertNoPhpErrors(page, 'on modules.php?name=Player&pa=showpage&pid=1&league=olympics');
-    // pid=1 rendered in Olympics context — .ibl-title must be visible.
-    // BUG FINDING: Olympics player page renders "Something went wrong" because
-    // ibl_olympics_stats has no data for pid=1 in either environment. The prior
-    // tautological assertion was masking this error. auto_merge: false flagged.
+    // pid=1 rendered in Olympics context — player page must render without crashing.
+    // Root cause (bug 6.24): ibl_olympics_plr had no seed row for pid=1, so
+    // PlayerRepository::loadByID threw RuntimeException → HTTP 500. Fixed by seeding
+    // ibl_olympics_plr. Player overview renders .player-stats-card (game log), not
+    // .ibl-data-table (that class is used by standings/team pages, not player overview).
     await expect(page.locator('.ibl-title').first()).toBeVisible();
-    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+    await expect(page.locator('.player-stats-card').first()).toBeVisible();
   });
 });
 

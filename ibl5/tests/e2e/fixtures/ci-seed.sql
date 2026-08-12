@@ -935,6 +935,9 @@ INSERT INTO ibl_olympics_league_config (season_ending_year, team_slot, team_name
   (2026, 3, 'Bulls',  'Group B', '', 4),
   (2026, 4, 'Coqs',   'Group B', '', 4);
 
+INSERT INTO ibl_olympics_plr (pid, name, teamid, pos) VALUES
+  (1, 'Test Player', 1, 'SG');
+
 -- ============================================================
 -- Trade offers (for Trading review E2E tests)
 -- Test user is on Metros (tid=1). Offers must involve Metros.

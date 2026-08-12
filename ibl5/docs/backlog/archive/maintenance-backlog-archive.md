@@ -1155,6 +1155,16 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Status:** ✅ Implemented (2026-07-24). Prior coverage: ApiKeyAuthenticator/RateLimiter/Paginator/ApiKeyRepository/RateLimitRepository. All named residuals now covered: `ibl5/tests/Api/Repository/ApiGameRepositoryTest.php`, `ApiInjuriesRepositoryTest.php`, `ApiLeadersRepositoryTest.php`, `ApiPlayerRepositoryTest.php`, `ApiPlayerStatsRepositoryTest.php`, `ApiStandingsRepositoryTest.php`, `ApiTeamRepositoryTest.php`, `HealthRepositoryTest.php` (unreachable-false branch via anonymous subclass override), `ibl5/tests/Api/Response/JsonResponderTest.php` (ob_start/ob_get_clean capture pattern), `ibl5/tests/Clock/SystemClockTest.php` (Clock module testsuite added to phpunit.xml).
 
 **Table evidence (2026-07-25):** All data repos (ApiGame/Injuries/Leaders/Player/PlayerStats/Standings/Team + Health) + JsonResponder + SystemClock tested (2026-07-24).
+### 6.17 Trading Module — Subthreshold (27 files, 12 tests, 0.44 ratio)
+**Location:** `ibl5/classes/Trading`
+**Problem:** 6 repositories + service + 2 processors with 12 tests.
+**Suggested direction:** Validation (cap/roster/eligibility), draft-pick mapping, rejection reasons.
+**Est. effort:** M
+**Risk if untouched:** Trades bypass validation; cap exploits; pick duplication.
+**Status:** ✅ Implemented (2026-08-10) — TradeAssetRepositoryTest + TradeOfferRepositoryTest (draft-pick mapping, offer lifecycle) + TradeExecutionRepositoryTest + TradeFormRepositoryTest added (PR #1826).
+
+**Table evidence (2026-08-10):** TradeAssetRepositoryTest + TradeOfferRepositoryTest added (draft-pick mapping, offer lifecycle); TradeExecutionRepository untested + TradeFormRepository partial. Residual closed: TradeExecutionRepositoryTest.php + TradeFormRepositoryTest.php added (PR #1826).
+
 ### 6.20 Anonymous rookie-option lockdown E2E assertion is non-discriminating
 **Location:** `tests/e2e/security/draft-rookie-anon-lockdown.spec.ts` (under `ibl5/`; added by PR #1107, not yet on `master`)
 **Problem:** The unauthenticated `processrookieoption` lockdown test asserts the response `toContain('YourAccount')` — a string emitted by `loginbox()` / global nav chrome on *every* anonymous page. It therefore does not discriminate a working auth gate from a broken one: if the `is_user()` gate regressed, the success marker (`result=rookie_option_success`) appears only in the redirect *URL*, not the response body, so the test would still pass. (The sibling Draft lockdown test is independently saved by its `not.toMatch(/select\s*\*\*.*!\*\*/)` negative matcher; the rookie test has no such backstop.)

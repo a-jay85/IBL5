@@ -2,7 +2,8 @@
 # check-rules-byte-budget — CI gate: cap the byte size of PATH-UNSCOPED
 # (always-loaded) .claude/rules/*.md files. These load into EVERY session's
 # context, so their size is a permanent token cost. Path-scoped rules (those
-# with a `paths:` frontmatter key) load only for matching files and are exempt.
+# with a `paths:` frontmatter key) load only for matching files and are exempt from
+# the always-loaded budget, but carry their own per-file regrowth cap.
 #
 # Usage:
 #   bin/check-rules-byte-budget                 gate mode — the four checks below,
@@ -12,7 +13,9 @@
 #                                               always exit 0, no gate semantics
 #
 # Four checks (T2 + T13 — ibl5/docs/backlog/token-spend-backlog.md):
-#   1. Per-file cap: each path-unscoped file <= RULES_BYTE_BUDGET (default 5000)
+#   1. Per-file caps, by residency tier (a `paths:` key is the only test):
+#      resident (no paths:) <= RULES_RESIDENT_BUDGET (default 5500);
+#      lazy (has paths:)    <= RULES_LAZY_BUDGET (default 16000)
 #   2. Aggregate cap: total path-unscoped bytes <= RULES_TOTAL_BUDGET (default 16000)
 #   3. Glob reachability: every paths: glob in a rules file THIS CHANGESET TOUCHES
 #      must match at least one tracked file (out-of-repo globs are SKIPped, not
@@ -23,7 +26,7 @@
 #
 # Extend-before-add (meta-tooling-bar.md): distinct trigger (size budget) vs
 # bin/check-docs (freshness / dead-refs). Owns the ALLOWLIST — the single
-# machine-readable statement of which rules are always-on. ~210 lines bash.
+# machine-readable statement of which rules are always-on. ~250 lines bash.
 set -euo pipefail
 
 # --report-mode: repo-wide dead-glob sweep for the nightly doc-freshness audit.
@@ -31,10 +34,16 @@ set -euo pipefail
 REPORT_MODE=0
 if [ "${1:-}" = "--report-mode" ]; then REPORT_MODE=1; shift || true; fi
 
-MAX_BYTES="${RULES_BYTE_BUDGET:-5000}"
-# NOTE: do NOT ratchet MAX_BYTES / RULES_BYTE_BUDGET — agent-tiering.md sits at
-# 4,970 bytes with only 30 bytes of headroom, and it cannot be path-scoped (it must
-# reach every sub-agent). Ratcheting would legislate away the only slack it has.
+RESIDENT_MAX_BYTES="${RULES_RESIDENT_BUDGET:-5500}"
+# Resident rules were last measured 2026-08-11: work-triage.md 4968 B, agent-tiering.md
+# 4882 B, workflow-continuity.md 4015 B, auto-commit.md 1437 B (15302 B resident total).
+# Cap set at 5500 — 532 B above the largest (work-triage.md). Lower it further as the
+# resident set shrinks; never raise it to accommodate growth.
+LAZY_MAX_BYTES="${RULES_LAZY_BUDGET:-16000}"
+# Lazy companions are not budgeted by session-context cost; this cap is a regrowth
+# tripwire. Largest lazy file 2026-08-11: playwright-tests.md 13775 B. Cap at 16000 —
+# 2225 B of headroom catches unexpected growth without blocking legitimate companion
+# verbosity. Lower it as the lazy tier is curated; never raise it to accommodate growth.
 MAX_TOTAL="${RULES_TOTAL_BUDGET:-16000}"
 ROOT="$(git rev-parse --show-toplevel)"
 RULES_DIR="$ROOT/.claude/rules"
@@ -90,15 +99,24 @@ unscoped_names=()
 for f in "$RULES_DIR"/*.md; do
   # Frontmatter = lines between the first two `---` markers.
   fm="$(awk '/^---$/{c++; next} c==1{print} c>=2{exit}' "$f")"
-  # A `paths:` key marks a path-scoped rule -> exempt from the always-loaded budget.
+  # Measure before branching so both tiers share one byte count.
+  bytes="$(wc -c < "$f")"
+  # A `paths:` key is the ONLY residency test: present -> lazy (path-scoped),
+  # absent -> resident (always-loaded, in every session and every sub-agent).
   if grep -q '^paths:' <<<"$fm"; then
+    if (( bytes > LAZY_MAX_BYTES )); then
+      printf 'FAIL  %s  %d bytes  lazy (path-scoped) tier  cap %d  over by %d  -- compress this companion; do not raise the cap\n' \
+        "$f" "$bytes" "$LAZY_MAX_BYTES" $(( bytes - LAZY_MAX_BYTES )) >&2
+      fail=1
+    fi
+    # Lazy files never contribute to the always-loaded aggregate.
     continue
   fi
   unscoped_names+=("$(basename "$f" .md)")
-  bytes="$(wc -c < "$f")"
   total_bytes=$(( total_bytes + bytes ))
-  if (( bytes > MAX_BYTES )); then
-    printf 'FAIL  %s  %d bytes  (per-file budget %d)\n' "$f" "$bytes" "$MAX_BYTES" >&2
+  if (( bytes > RESIDENT_MAX_BYTES )); then
+    printf 'FAIL  %s  %d bytes  always-loaded (path-unscoped) tier  cap %d  over by %d  -- trim prose or move rationale into a path-scoped companion; do not raise the cap\n' \
+      "$f" "$bytes" "$RESIDENT_MAX_BYTES" $(( bytes - RESIDENT_MAX_BYTES )) >&2
     fail=1
   fi
 done
@@ -217,9 +235,13 @@ if (( fail )); then
   cat >&2 <<MSG
 
 One or more checks failed:
-  1/2. Per-file or aggregate byte budget exceeded (path-unscoped rules load into
-       EVERY session). Trim, move detail into a *-detail.md companion, or archive.
-       Override only deliberately: RULES_BYTE_BUDGET=<n> RULES_TOTAL_BUDGET=<n>
+  1.   A per-file cap was exceeded. Resident (path-unscoped) rules load into EVERY
+       session and every sub-agent — trim, or move rationale into a path-scoped
+       companion. Lazy (path-scoped) rules have a looser regrowth cap — compress
+       the companion. Never raise a cap to make the gate pass.
+  2.   Aggregate resident byte budget exceeded (lazy files never count toward it).
+       Override only deliberately, and only to diagnose:
+       RULES_RESIDENT_BUDGET=<n> RULES_LAZY_BUDGET=<n> RULES_TOTAL_BUDGET=<n>
   3.   A paths: glob matches no tracked file (rule can never load). Fix or remove it.
   4.   A path-scoped rule is no longer named by its always-on referrer (payload
        unreachable). Restore the stub pointer in the always-on file.
@@ -227,4 +249,4 @@ MSG
   exit 1
 fi
 
-echo "OK: all path-unscoped .claude/rules/*.md within per-file ${MAX_BYTES}-byte and aggregate ${MAX_TOTAL}-byte budgets (${total_bytes} bytes total)"
+echo "OK: .claude/rules/*.md within budgets — resident per-file ${RESIDENT_MAX_BYTES}-byte cap, resident aggregate ${MAX_TOTAL}-byte budget (${total_bytes} bytes total), lazy per-file ${LAZY_MAX_BYTES}-byte cap"

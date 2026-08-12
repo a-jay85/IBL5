@@ -31,10 +31,13 @@ test.describe('Olympics page smoke tests', () => {
     await page.goto('modules.php?name=Player&pa=showpage&pid=1&league=olympics');
     await assertNoPhpErrors(page, 'on modules.php?name=Player&pa=showpage&pid=1&league=olympics');
     // pid=1 rendered in Olympics context — player page must render without crashing.
-    // Root cause (bug 6.24): ibl_olympics_plr had no seed row for pid=1, so
-    // PlayerRepository::loadByID threw RuntimeException → HTTP 500. Fixed by seeding
-    // ibl_olympics_plr. Player overview renders .player-stats-card (game log), not
-    // .ibl-data-table (that class is used by standings/team pages, not player overview).
+    // Root cause (bug 6.24): PlayerPageController resolved the viewer's team via
+    // Team::initialize(), which LeagueContext rewrites onto ibl_olympics_team_info —
+    // a table with no 'Free Agents' row — so Team::load() threw RuntimeException and
+    // the page 500'd for every viewer. Fixed by skipping owner action buttons when the
+    // viewer's team is absent from the active league. Player overview renders
+    // .player-stats-card (game log), not .ibl-data-table (that class is used by
+    // standings/team pages, not player overview).
     await expect(page.locator('.ibl-title').first()).toBeVisible();
     await expect(page.locator('.player-stats-card').first()).toBeVisible();
   });

@@ -1221,6 +1221,13 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 
 
 **Table evidence (2026-07-25):** Anon rookie-option lockdown E2E (`draft-rookie-anon-lockdown.spec.ts`) asserts `toContain('YourAccount')` — emitted by nav chrome on every anon page, so a regressed `is_user()` gate still passes. Strengthen to `maxRedirects:0` + redirect/`Location` assert. Test-only, green-green. From PR #1107 review.
+### 6.24 Olympics Player Page — HTTP 500 From Viewer-Team Lookup Against Rewritten Table
+**Location:** `ibl5/classes/Player/PlayerPageController.php` (`renderPage()`, action-buttons block); `ibl5/tests/e2e/smoke/olympics-pages.spec.ts`
+**Problem:** The original stated cause (missing `ibl_olympics_stats` rows for `pid=1`) was wrong — empirical testing of that path did not fix the 500. The actual root cause: `PlayerPageController::renderPage()` calls `Team::initialize($this->mysqliDb, $userTeamName)` for the viewer's team. `League\LeagueContext::TABLE_MAP` rewrites `ibl_team_info` → `ibl_olympics_team_info`, a table that contains no 'Free Agents' row and no IBL franchises. `Team::load()` throws `RuntimeException: Team not found: Free Agents`, crashing the page for **every viewer on every Olympics player page**, not just `pid=1`. The "seed-only (🟩 seed-only path)" option listed in the original entry was empirically tested and does NOT fix the 500 — it was based on the wrong diagnosis and is deleted here. The production-path fix (🟦) was the correct one.
+**Suggested direction:** Wrap the `Team::initialize()` + `renderActionButtons()` call in a `\RuntimeException` catch; on catch, set `$actionButtons = ''` and continue. Owner action buttons are meaningless in an Olympics context (none of the viewer teams exist there), so rendering none is correct behaviour.
+**Est. effort:** S
+**Risk if untouched:** Every Olympics player page returns HTTP 500 for every viewer — a complete production outage of that page class.
+**Status:** ✅ Fixed in #1825 (2026-08-11) — `PlayerPageController::renderPage()` now catches `\RuntimeException` from the viewer-team lookup and renders no action buttons rather than crashing. `smoke/olympics-pages.spec.ts` player-page test passes.
 ## Axis 7: Repository Contract Gaps / Shared Abstractions
 
 ### 7.1 `CommonMysqliRepository` Has No Interface

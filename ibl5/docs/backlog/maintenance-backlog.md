@@ -316,7 +316,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):** Adding tests is inherently green-green (no production change) → every open coverage gap is 🟩 auto-mergeable. If writing a test surfaces a real bug, the *fix* becomes its own finding with its own classification. (Exceptions: **6.21** and **6.23** are 🟨, not 🟩 — in each the target code is unreachable from PHPUnit, so no test is writable until a production seam is decided: a teamless-fixture / non-`exit()` refactor for 6.21, a SAPI-independent hashing seam for 6.23.)
 
-> ✅ resolved (17): 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 6.15, 6.16, 6.17, 6.18, 6.20 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (18): 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 6.15, 6.16, 6.17, 6.18, 6.20, 6.24 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
@@ -326,7 +326,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 6.21 | ⬜ Open | 🟨 | Row-12 (Free-Agents/teamless session) `processrookieoption` ownership-rejection path untested: PHPUnit entry-point test impossible (handler `exit()`s), E2E auth fixture always has a session team. Needs a teamless-fixture / non-`exit()` refactor decision before it's writable → 🟨. From PR #1107 Phase 5.0 note. |
 | 6.22 | ⬜ Open | 🟨 | **Pattern behind 6.20/6.21.** Authz/IDOR gates inline in controllers end in `HtmxHelper::redirect()→exit()`, so the security-critical "non-party refused + no mutation" property is E2E-only (forced the D-05 reject test, #1066). `Trading\TradeExecutionService` (accept path, #1066) proves the fix: a gate returning a *verdict* is unit-testable exit-free (`testValidateAndExecuteRejectsNonPartyWithoutExecuting`). Convert the inline gates (Waivers, FreeAgency, Trade API accept/decline, Trading reject) to verdict + thin redirect-shim → security logic becomes unit-testable; unblocks 6.21. 🟨: production refactor on a security surface; needs a verdict-shape decision. From the #1066 reject-IDOR review. |
 | 6.23 | ⬜ Open | 🟨 | **Same family as 6.22, different guard.** `RequestEventLoggingBootstrap::boot()` returns at line 35 when `\PHP_SAPI === 'cli'`, and PHPUnit is always CLI (DB group included), so the `hash('sha256', session_id())` derivation at lines 66–70 is unreachable from any PHPUnit test — the file's three existing tests are all `expectNotToPerformAssertions()` for exactly this reason. A regression storing the **raw** session id would break zero tests. Extract the derivation to a pure static (or inject the SAPI) so the PII boundary is unit-pinnable. 🟨: production change on a PII boundary; needs a seam decision. (discovered 2026-08-08 during #1670) |
-| 6.24 | ⬜ Open | 🟨 | Olympics player page crashes (HTTP 500) when `ibl_olympics_stats` has no rows for the requested `pid`. CI `smoke/olympics-pages.spec.ts:31` fails; team page `teamid=1` renders 200. Fix: add `ibl_olympics_stats` rows for `pid=1` to `ci-seed.sql` (🟩 seed-only path) or handle missing stats gracefully in the Olympics player controller (🟦 production path). 🟨 pending fix-path decision. (discovered 2026-08-10 during #1825) |
 
 ### 6.13 Player Module — Large + Subthreshold (69 prod / 31 test files, ~0.45 ratio)
 **Location:** `ibl5/classes/Player`
@@ -375,13 +374,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Est. effort:** S
 **Risk if untouched:** The `session_id` column is documented and reviewed as a non-replayable digest. If the derivation regresses to the raw token, every CI gate stays green and the failure is only visible by inspecting production rows — a PII exposure with no automated detector.
 **Status:** ⬜ Open — raised from the #1670 review (the plan listed the bootstrap test as `[modify]`; the item was not implementable as specified). 🟨 conditional: a production change on a PII boundary, gated on the seam decision above.
-
-### 6.24 Olympics Player Page — HTTP 500 on Missing `ibl_olympics_stats` Data
-**Location:** Olympics player page controller (modules or classes handling `?name=Player&pa=showpage&pid=N&league=olympics`); `ibl5/tests/e2e/fixtures/ci-seed.sql`
-**Problem:** `pid=1` with `?league=olympics` returns HTTP 500 ("Something went wrong") because `ibl_olympics_stats` has no rows for `pid=1` in `ci-seed.sql`. The controller has no guard for missing Olympics stats and crashes rather than returning an empty-state or informative message. Surfaced when `smoke/olympics-pages.spec.ts:31` was tightened from `body.length > 100` to a content assertion — the old assertion passed on the 500 error page; the new one reveals the crash. The sibling team page (`teamid=1`) renders 200 in the same test file.
-**Suggested direction:** Two paths: (a) seed-only — add `ibl_olympics_stats` rows for `pid=1` to `ci-seed.sql` (S effort, 🟩 auto-mergeable, makes the E2E test pass without touching PHP); (b) production — add a guard in the Olympics player controller to return an empty-state or error page when stats are missing (S effort, 🟦 needs human-merge, fixes production for any player with no Olympics stats). Path (a) is the CI fix; path (b) is the production robustness fix; both may be done independently.
-**Est. effort:** S (either path)
-**Risk if untouched:** `smoke/olympics-pages.spec.ts:31` stays red in CI (held by PR #1825 with the failing assertion retained, `auto_merge: false`); any Olympics player with no stats crashes in production.
 
 ---
 

@@ -2,14 +2,14 @@
 
 .debug-panel {
     margin: 10px 0;
-    border: 1px solid #ccc;
+    border: 1px solid var(--gray-300);
     border-radius: var(--radius-sm);
 }
 
 .debug-panel__header {
     padding: 8px;
-    background-color: #f5f5f5;
-    border-bottom: 1px solid #ccc;
+    background-color: var(--gray-100);
+    border-bottom: 1px solid var(--gray-300);
     cursor: pointer;
 }
 
@@ -24,29 +24,32 @@
 
 .debug-breakdown {
     margin-top: 1rem;
-    border: 1px solid #444;
+    --debug-bg-deep: #1a1a2e;
+    --debug-bg-panel: #16213e;
+    --debug-accent: #a5d8ff;
+    border: 1px solid var(--gray-700);
     border-radius: var(--radius-md);
-    background: #1a1a2e;
-    color: #e0e0e0;
+    background: var(--debug-bg-deep);
+    color: var(--gray-200);
 }
 
 .debug-breakdown__summary {
     padding: 0.75rem 1rem;
     font-weight: 600;
     cursor: pointer;
-    background: #16213e;
+    background: var(--debug-bg-panel);
     border-radius: var(--radius-md);
-    color: #a5d8ff;
+    color: var(--debug-accent);
 }
 
 .debug-breakdown[open] > .debug-breakdown__summary {
-    border-bottom: 1px solid #444;
+    border-bottom: 1px solid var(--gray-700);
     border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
 
 .debug-breakdown__section {
     padding: 0.75rem 1rem;
-    border-bottom: 1px solid #333;
+    border-bottom: 1px solid var(--gray-800);
 }
 
 .debug-breakdown__section:last-child {
@@ -56,7 +59,7 @@
 .debug-breakdown__heading {
     font-size: var(--text-sm);
     font-weight: 600;
-    color: #a5d8ff;
+    color: var(--debug-accent);
     margin: 0 0 0.5rem;
     text-transform: uppercase;
     letter-spacing: var(--tracking-display);
@@ -65,17 +68,17 @@
 .debug-breakdown .ibl-data-table {
     font-size: var(--text-sm);
     background: transparent;
-    color: #e0e0e0;
+    color: var(--gray-200);
 }
 
 .debug-breakdown .ibl-data-table th {
-    background: #16213e;
-    color: #a5d8ff;
-    border-color: #444;
+    background: var(--debug-bg-panel);
+    color: var(--debug-accent);
+    border-color: var(--gray-700);
 }
 
 .debug-breakdown .ibl-data-table td {
-    border-color: #333;
+    border-color: var(--gray-800);
 }
 
 .debug-breakdown__kv {
@@ -87,11 +90,11 @@
     display: flex;
     justify-content: space-between;
     padding: 0.25rem 0;
-    border-bottom: 1px dotted #333;
+    border-bottom: 1px dotted var(--gray-800);
 }
 
 .debug-breakdown__kv dt {
-    color: #ccc;
+    color: var(--gray-300);
 }
 
 .debug-breakdown__kv dd {
@@ -109,11 +112,11 @@
     font-family: monospace;
     font-size: 1rem;
     margin: 0;
-    color: #ccc;
+    color: var(--gray-300);
 }
 
 .debug-breakdown__total-row td {
-    border-top: 2px solid #a5d8ff;
+    border-top: 2px solid var(--debug-accent);
 }
 
 /* Debug toggle in navigation */

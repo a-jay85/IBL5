@@ -5,7 +5,7 @@
    ============================================================ */
 
 .last-sim-recap {
-    background: #fff;
+    background: var(--white);
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-xl);
     overflow: hidden;
@@ -23,7 +23,7 @@
     align-items: center;
     padding: .65rem 1.2rem;
     background: linear-gradient(90deg, var(--navy-900), var(--navy-800));
-    color: #fff;
+    color: var(--white);
 }
 .last-sim-recap__head-dates {
     justify-self: start;
@@ -60,7 +60,7 @@
     text-transform: uppercase;
     letter-spacing: .1em;
 }
-.last-sim-recap__meta-value { color: #fff; font-weight: 700 }
+.last-sim-recap__meta-value { color: var(--white); font-weight: 700 }
 .last-sim-recap__meta-bw {
     display: flex;
     flex-direction: column;
@@ -76,7 +76,7 @@
 .last-sim-recap__tabs {
     display: grid;
     grid-template-columns: repeat(var(--last-sim-recap-tab-count, 7), 1fr);
-    background: #fff;
+    background: var(--white);
     border-bottom: 1px solid var(--gray-200);
     position: relative;
 }
@@ -220,7 +220,7 @@
     height: 14px;
     border-radius: 50%;
     background: var(--error-600);
-    color: #fff;
+    color: var(--white);
     font-family: var(--font-mono);
     font-size: 9px;
     font-weight: 800;
@@ -230,7 +230,7 @@
 /* ============================================================
    Panel under the active tab — single-game detail.
    ============================================================ */
-.last-sim-recap__panel { background: #fff; animation: last-sim-recap-fade .22s ease-out }
+.last-sim-recap__panel { background: var(--white); animation: last-sim-recap-fade .22s ease-out }
 @keyframes last-sim-recap-fade {
     from { opacity: 0; transform: translateY(-3px) }
     to   { opacity: 1; transform: none }
@@ -243,7 +243,7 @@
     gap: .7rem;
     padding: .5rem 1.2rem;
     background: linear-gradient(90deg, var(--success-700) 0%, var(--success-600) 100%);
-    color: #fff;
+    color: var(--white);
 }
 .last-sim-recap__strip--loss {
     background: linear-gradient(90deg, var(--error-700) 0%, var(--error-600) 100%);
@@ -535,7 +535,7 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
     height: 14px;
     border-radius: 50%;
     background: var(--error-600);
-    color: #fff;
+    color: var(--white);
     font-family: var(--font-mono);
     font-size: 9px;
     font-weight: 800;
@@ -610,7 +610,7 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
 }
 .last-sim-recap__pos-chip {
     background: var(--navy-800);
-    color: #fff;
+    color: var(--white);
     padding: 1px 6px;
     border-radius: var(--radius-sm);
     letter-spacing: .1em;
@@ -647,7 +647,7 @@ a.last-sim-recap__player-name:hover { text-decoration: underline }
     height: 11px;
     border-radius: 50%;
     background: var(--error-600);
-    color: #fff;
+    color: var(--white);
     border: 2px solid var(--gray-50);
     display: flex;
     align-items: center;

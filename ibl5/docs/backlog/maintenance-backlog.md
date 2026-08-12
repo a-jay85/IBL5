@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-08-10
+last_verified: 2026-08-11
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -516,9 +516,9 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 11.3 | ◑ Partial | 🟩 | Split ongoing (#1234 + earlier): 15 component files now under `design/components/tables/`; `components/tables.css` still ~1296 LOC. Continue relocation; VR pin. |
+| 11.3 | ◑ Partial | 🟩 | Round 2 landed: `tables/standings-rows.css` extracted (clinch tiers + bottom-locked); 15 files now under `tables/`. ~1180 LOC base system remains (shared infrastructure — no clear module extractions pending). Round 3 deferred. VR pin. |
 | 11.4 | ⬜ Open | 🟨 | player-views.css parallel table system → `.ibl-data-table`. Visual consolidation = VR-affecting → human review / baseline update. |
-| 11.14 | ◑ Partial | 🟩 | Exact-match hex→token aliases landed (#1234, merged 2026-06-28); ~62 raw hex still in `design/components/` (no exact token match). Continue aliasing; VR pin. |
+| 11.14 | ◑ Partial | 🟩 | Round 2 landed: 4 new global tokens (white, black, gold, gold-dark); gray-snaps + semantic snaps across 9 component files. Bootstrap button colors deferred. VR coverage added for 4 pages. |
 
 ### 11.3 `tables.css` Is a ~1,410-Line Monolith Covering 25+ Feature Areas
 **Location:** `ibl5/design/components/tables.css`

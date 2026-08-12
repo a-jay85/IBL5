@@ -90,6 +90,12 @@
     --discord: var(--color-discord);
     --discord-hover: var(--color-discord-hover);
 
+    /* Neutral + brand utility colors */
+    --white: var(--color-white);
+    --black: var(--color-black);
+    --gold: var(--color-gold);
+    --gold-dark: var(--color-gold-dark);
+
     /* ========================================================================
        Typography
        ======================================================================== */

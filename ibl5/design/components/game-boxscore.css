@@ -20,7 +20,7 @@
     box-shadow: var(--shadow-md);
     overflow: hidden;
     padding: 1rem 1.2rem;
-    color: #fff;
+    color: var(--white);
     background: linear-gradient(
         90deg,
         var(--team-color-primary, var(--navy-900)),
@@ -110,7 +110,7 @@
     padding: .45rem 1.4rem;
     border: 1px solid var(--gray-200);
     border-radius: var(--radius-md);
-    background: #fff;
+    background: var(--white);
     font-weight: 700;
     font-size: .9rem;
     letter-spacing: .03em;
@@ -126,7 +126,7 @@
 #boxscore-team-home:checked ~ .game-boxscore__tabs .game-boxscore__tab[for="boxscore-team-home"] {
     background: var(--navy-900);
     border-color: var(--navy-900);
-    color: #fff;
+    color: var(--white);
 }
 
 /* Keyboard focus must remain visible even though the input is off-screen. */

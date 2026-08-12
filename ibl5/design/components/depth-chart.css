@@ -840,7 +840,7 @@ tr.depth-chart-traded-player select {
     font-weight: 700;
     text-transform: uppercase;
     background-color: var(--error-500);
-    color: #fff;
+    color: var(--white);
     padding: 0.05rem 0.3rem;
     border-radius: var(--radius-sm);
     margin-left: 0.35rem;

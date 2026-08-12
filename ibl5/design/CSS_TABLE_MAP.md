@@ -196,6 +196,7 @@ Module-specific table styles live in `design/components/tables/<feature>.css`. E
 | `tables/player-movement.css` | `.player-movement-table` |
 | `tables/franchise-record-book.css` | `.record-book-section-title`, `.record-book-team-selector`, `.record-book-retired-cell` |
 | `tables/free-agency.css` | `.fa-table`, `.fa-*` selectors |
+| `tables/standings-rows.css` | `.ibl-data-table tbody tr.clinch-league`, `.clinch-conference`, `.clinch-division`, `.clinch-playoffs`, `.bottom-locked` row variants; responsive sticky-col backgrounds for same rows — NEW |
 
 ### When to add a new module file
 

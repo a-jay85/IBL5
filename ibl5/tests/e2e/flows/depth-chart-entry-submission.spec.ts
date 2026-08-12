@@ -365,10 +365,18 @@ test.describe('Depth Chart submission', () => {
       expect(val).not.toBe('0');
     }).toPass({ timeout: 5000 });
 
-    // Verify at least one pg select was populated (non-zero means DC loaded into form)
+    // Verify at least one pg select was populated. populateForm() writes each
+    // player's own dc_PGDepth (jslib/saved-depth-charts.js:147), which is
+    // legitimately 0 for most of a roster — so assert across the whole pg column
+    // rather than .first(), which asserts a property the product never guarantees.
     await expect(async () => {
-      const pgVal = await page.locator('select[name^="pg"]').first().inputValue();
-      expect(pgVal, 'pg select must be populated after loading saved DC').not.toBe('0');
+      const pgVals = await page
+        .locator('select[name^="pg"]')
+        .evaluateAll((els) => els.map((el) => (el as HTMLSelectElement).value));
+      expect(
+        pgVals.some((v) => v !== '0'),
+        'at least one pg select must be populated after loading saved DC',
+      ).toBe(true);
     }).toPass({ timeout: 5000 });
   });
 

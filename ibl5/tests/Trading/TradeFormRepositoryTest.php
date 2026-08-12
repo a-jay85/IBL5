@@ -62,14 +62,15 @@ class TradeFormRepositoryTest extends WideUnitTestCase
     public function testGetAllTeamsWithCityReturnsTeams(): void
     {
         $this->mockDb->setMockData([
-            ['team_name' => 'Boston', 'city' => 'Boston'],
-            ['team_name' => 'Miami', 'city' => 'Miami'],
+            ['teamid' => 1, 'team_name' => 'Metros', 'team_city' => 'Boston', 'color1' => '#008348', 'color2' => '#ffffff'],
+            ['teamid' => 2, 'team_name' => 'Stars', 'team_city' => 'Miami', 'color1' => '#98002e', 'color2' => '#f9a01b'],
         ]);
 
         $result = $this->repository->getAllTeamsWithCity();
 
         $this->assertCount(2, $result);
-        $this->assertNotEmpty($result);
+        $this->assertSame('Boston', $result[0]['team_city']);
+        $this->assertSame('Stars', $result[1]['team_name']);
     }
 
     public function testGetTeamPlayerCountReturnsCount(): void

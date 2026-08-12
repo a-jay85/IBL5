@@ -34,7 +34,7 @@ class TradeExecutionRepositoryTest extends WideUnitTestCase
 
         $result = $this->repository->getQueuedTrades();
 
-        $this->assertSame(2, count($result));
+        $this->assertCount(2, $result);
     }
 
     public function testGetQueuedTradesReturnsEmptyWhenQueueEmpty(): void

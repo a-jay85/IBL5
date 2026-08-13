@@ -14,7 +14,7 @@
 #
 # Four checks (T2 + T13 — ibl5/docs/backlog/token-spend-backlog.md):
 #   1. Per-file caps, by residency tier (a `paths:` key is the only test):
-#      resident (no paths:) <= RULES_RESIDENT_BUDGET (default 5500);
+#      resident (no paths:) <= RULES_RESIDENT_BUDGET (default 5200);
 #      lazy (has paths:)    <= RULES_LAZY_BUDGET (default 16000)
 #   2. Aggregate cap: total path-unscoped bytes <= RULES_TOTAL_BUDGET (default 16000)
 #   3. Glob reachability: every paths: glob in a rules file THIS CHANGESET TOUCHES
@@ -34,11 +34,13 @@ set -euo pipefail
 REPORT_MODE=0
 if [ "${1:-}" = "--report-mode" ]; then REPORT_MODE=1; shift || true; fi
 
-RESIDENT_MAX_BYTES="${RULES_RESIDENT_BUDGET:-5500}"
-# Resident rules were last measured 2026-08-11: work-triage.md 4968 B, agent-tiering.md
+RESIDENT_MAX_BYTES="${RULES_RESIDENT_BUDGET:-5200}"
+# Resident rules were last measured 2026-08-12: work-triage.md 4968 B, agent-tiering.md
 # 4882 B, workflow-continuity.md 4015 B, auto-commit.md 1437 B (15302 B resident total).
-# Cap set at 5500 — 532 B above the largest (work-triage.md). Lower it further as the
-# resident set shrinks; never raise it to accommodate growth.
+# Cap set at 5200 — 232 B above the largest (work-triage.md 4968 B). A 2026-08-12 audit
+# of the four resident files found only ~123 B of compressible prose (rationale already
+# re-taught by a hook deny), so the floor is not moving down soon: ratchet the cap instead.
+# Lower it further as the resident set shrinks; never raise it to accommodate growth.
 LAZY_MAX_BYTES="${RULES_LAZY_BUDGET:-16000}"
 # Lazy companions are not budgeted by session-context cost; this cap is a regrowth
 # tripwire. Largest lazy file 2026-08-11: playwright-tests.md 13775 B. Cap at 16000 —

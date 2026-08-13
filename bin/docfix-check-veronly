@@ -1,0 +1,204 @@
+#!/bin/bash
+set -euo pipefail
+
+# bin/docfix-check-veronly [<slug>]
+#
+# Decides whether the worktree's realized diff is verification-only — every
+# change is a lone last_verified: date bump, strictly advancing, exactly one
+# plus/minus pair per file.  If so, arms the seeded plan file atomically:
+#   (a) flips auto_merge: false → true (frontmatter only)
+#   (b) deletes the ## Automouse Hold Justification section (to EOF or next ##)
+#
+# The predicate is fail-closed: any doubt holds.
+#
+# Exit codes / verdict lines:
+#   0  docfix-check-veronly: PASS — armed <plan-path>
+#   1  docfix-check-veronly: HOLD — <specific reason>     (predicate not met)
+#   2  docfix-check-veronly: HOLD — <environment reason>  (usage/env failure)
+#
+# Env overrides (for tests):
+#   PLAN_FILE       — absolute path to the plan file (default: ~/claude-plans/<slug>.md)
+#   DOCFIX_BASE_REF — base branch for the merge-base diff (default: master)
+
+# --- Env check: must be inside a git repository (before SLUG derivation) -----
+if ! git rev-parse --show-toplevel >/dev/null 2>&1; then
+    echo "docfix-check-veronly: HOLD — not inside a git repository"
+    exit 2
+fi
+
+# --- Step 2.1: Resolvable inputs ---------------------------------------------
+SLUG="${1:-$(git rev-parse --abbrev-ref HEAD)}"
+PLAN_FILE="${PLAN_FILE:-$HOME/claude-plans/$SLUG.md}"
+BASE_REF="${DOCFIX_BASE_REF:-master}"
+
+# Compile the per-line regexes once.  Do NOT quote these variables when used
+# in [[ =~ ]] — quoted right-hand sides match literally, not as ERE.
+MINUS_RE='^-last_verified: [0-9]{4}-[0-9]{2}-[0-9]{2}$'
+PLUS_RE='^[+]last_verified: [0-9]{4}-[0-9]{2}-[0-9]{2}$'
+
+# --- Step 2.2: Merge-base against working tree -------------------------------
+# Compare merge-base..working-tree so that an uncommitted prose edit is visible
+# and cannot slip past this predicate into the post-plan commit.
+if ! BASE="$(git merge-base "$BASE_REF" HEAD 2>/dev/null)"; then
+    echo "docfix-check-veronly: HOLD — could not compute merge-base against '$BASE_REF' (branch not found or no common ancestor)"
+    exit 2
+fi
+
+# --- Step 2.3: Untracked files — unconditional hold -------------------------
+# git diff cannot see untracked files, but post-plan Phase 2's commit step
+# picks them up — so they must block here before the diff inspection.
+UNTRACKED="$(git ls-files --others --exclude-standard)"
+if [ -n "$UNTRACKED" ]; then
+    FIRST_UNTRACKED="${UNTRACKED%%$'\n'*}"
+    echo "docfix-check-veronly: HOLD — untracked file(s) present (post-plan would commit them): $FIRST_UNTRACKED"
+    exit 1
+fi
+
+# --- Step 2.4: Name-status gate ----------------------------------------------
+# Every changed file must carry status exactly 'M'.  An empty diff is not a
+# pass — it would make "every file is M" vacuously true with zero rows.
+ROW_COUNT=0
+NAME_STATUS_HOLD=""
+
+while IFS=$'\t' read -r status path; do
+    ROW_COUNT=$(( ROW_COUNT + 1 ))
+    if [ "$status" != "M" ]; then
+        NAME_STATUS_HOLD="non-M change in diff: status '$status' on '$path'"
+        break
+    fi
+done < <(git diff "$BASE" --name-status)
+
+if [ -n "$NAME_STATUS_HOLD" ]; then
+    echo "docfix-check-veronly: HOLD — $NAME_STATUS_HOLD"
+    exit 1
+fi
+
+if [ "$ROW_COUNT" -eq 0 ]; then
+    echo "docfix-check-veronly: HOLD — diff is empty (no changed files between merge-base and working tree)"
+    exit 1
+fi
+
+# --- Step 2.5: Per-file content gate -----------------------------------------
+# For each M file: every diff change line must be exactly one last_verified:
+# date pair (one - line, one + line), and the date must strictly advance.
+# Two-level process substitution: outer iterates files, inner reads each diff.
+
+while IFS=$'\t' read -r _status path; do
+
+    MINUS_COUNT=0
+    PLUS_COUNT=0
+    OLD_DATE=""
+    NEW_DATE=""
+    CONTENT_HOLD=""
+
+    while IFS= read -r line; do
+        # Skip diff file-header lines.  Trailing space after --- / +++ is
+        # load-bearing: "----" (removed frontmatter delimiter) and "+---"
+        # (added delimiter) do NOT have a space in the 4th position, so they
+        # correctly fall through to the change-line check below.
+        case "$line" in
+            "--- "*|"+++ "*) continue ;;
+            "diff --git "*|"index "*) continue ;;
+            "@@"*) continue ;;
+            " "*|"") continue ;;  # context lines (leading space) or empty
+        esac
+
+        # Remaining lines are change lines (start with + or -).
+        case "$line" in
+            -*)
+                if [[ "$line" =~ $MINUS_RE ]]; then
+                    MINUS_COUNT=$(( MINUS_COUNT + 1 ))
+                    OLD_DATE="${line#-last_verified: }"
+                else
+                    CONTENT_HOLD="non-date change line in '$path': ${line:0:80}"
+                    break
+                fi
+                ;;
+            +*)
+                if [[ "$line" =~ $PLUS_RE ]]; then
+                    PLUS_COUNT=$(( PLUS_COUNT + 1 ))
+                    NEW_DATE="${line#+last_verified: }"
+                else
+                    CONTENT_HOLD="non-date change line in '$path': ${line:0:80}"
+                    break
+                fi
+                ;;
+            *)
+                # Unexpected line type — hold; diff format changed or corrupted.
+                CONTENT_HOLD="unexpected diff line in '$path': ${line:0:80}"
+                break
+                ;;
+        esac
+    done < <(git diff --no-color "$BASE" -- "$path")
+
+    if [ -n "$CONTENT_HOLD" ]; then
+        echo "docfix-check-veronly: HOLD — $CONTENT_HOLD"
+        exit 1
+    fi
+
+    # Exactly one minus line and one plus line per file.  Two pairs catch docs
+    # like doc-freshness.md whose fenced YAML example also has last_verified:.
+    if [ "$MINUS_COUNT" -ne 1 ] || [ "$PLUS_COUNT" -ne 1 ]; then
+        echo "docfix-check-veronly: HOLD — expected exactly 1 date-change pair in '$path', found ${MINUS_COUNT} removed / ${PLUS_COUNT} added last_verified lines"
+        exit 1
+    fi
+
+    # Strict advance: new date must be lexically GREATER than old date.
+    # ISO-8601 (YYYY-MM-DD) sorts correctly as plain strings — no date parsing.
+    # Equal dates are not a pass (nothing was re-verified).
+    if [[ ! "$NEW_DATE" > "$OLD_DATE" ]]; then
+        echo "docfix-check-veronly: HOLD — date not strictly advancing in '$path': '$OLD_DATE' → '$NEW_DATE' (equal or backwards)"
+        exit 1
+    fi
+
+done < <(git diff "$BASE" --name-status)
+
+# --- Step 2.6: Arm the plan (PASS branch only) --------------------------------
+# Predicate passed.  Mutate the plan file atomically via a mktemp sibling + mv.
+# Both mutations are idempotent: a second run on an already-armed plan exits 0.
+
+if [ ! -f "$PLAN_FILE" ]; then
+    echo "docfix-check-veronly: HOLD — plan file not found: $PLAN_FILE"
+    exit 2
+fi
+
+TMPFILE="$(mktemp "${PLAN_FILE}.XXXXXX")"
+trap 'rm -f "$TMPFILE"' EXIT
+
+awk '
+    BEGIN { infm=0; fm_closed=0; in_hold=0 }
+
+    # Open frontmatter (line 1 must be ---)
+    NR==1 && /^---[[:space:]]*$/ { infm=1; print; next }
+
+    # Close frontmatter
+    infm && /^---[[:space:]]*$/ { infm=0; fm_closed=1; print; next }
+
+    # Inside frontmatter: flip auto_merge: false → true.
+    # auto_merge: true already present → no match → printed as-is (idempotent).
+    infm {
+        if (/^auto_merge:[[:space:]]*false[[:space:]]*$/) {
+            print "auto_merge: true"
+        } else {
+            print
+        }
+        next
+    }
+
+    # Body: delete ## Automouse Hold Justification through EOF or the next ##.
+    # If the section was already removed, in_hold never becomes 1 → idempotent.
+    fm_closed {
+        if (/^## Automouse Hold Justification/) { in_hold=1; next }
+        if (in_hold && /^## /) { in_hold=0 }
+        if (!in_hold) { print }
+        next
+    }
+
+    # Lines before frontmatter opens (should not occur in seeded plans).
+    { print }
+' "$PLAN_FILE" > "$TMPFILE"
+
+mv "$TMPFILE" "$PLAN_FILE"
+
+echo "docfix-check-veronly: PASS — armed $PLAN_FILE"
+exit 0

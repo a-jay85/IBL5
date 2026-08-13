@@ -13,6 +13,7 @@ REAL_DOCFIX="$REPO_ROOT/bin/docfix-run"
 REAL_POLL="$REPO_ROOT/bin/docfix-poll"
 WORKFLOW="$REPO_ROOT/.github/workflows/doc-freshness-audit.yml"
 NOTIFY_WORKFLOW="$REPO_ROOT/.github/workflows/docs-refreshed-notify.yml"
+REAL_VERONLY="$REPO_ROOT/bin/docfix-check-veronly"
 FAILED=0
 ok()   { echo "ok: $1"; }
 bad()  { echo "FAIL: $1"; FAILED=1; }
@@ -55,9 +56,30 @@ if [ "$1" = "ls-remote" ]; then
     [ -n "${SHIM_LS_REMOTE:-}" ] && printf '%s\n' "$SHIM_LS_REMOTE" || true
     exit 0
 fi
+IS_BRANCH=0
+NEXT_IS_PAT=0
+LIST_PAT=""
 for a in "$@"; do
-    [ "$a" = "branch" ] && { [ -n "${SHIM_BRANCH_OUT:-}" ] && printf '%s\n' "$SHIM_BRANCH_OUT" || true; exit 0; }
+    [ "$a" = "branch" ] && IS_BRANCH=1
+    if [ "$IS_BRANCH" = "1" ]; then
+        if [ "$NEXT_IS_PAT" = "1" ]; then
+            case "$a" in -*) : ;; *) LIST_PAT="$a"; NEXT_IS_PAT=0 ;; esac
+        fi
+        [ "$a" = "--list" ] && NEXT_IS_PAT=1
+    fi
 done
+if [ "$IS_BRANCH" = "1" ]; then
+    if [ -n "${SHIM_BRANCH_OUT:-}" ]; then
+        if [ -z "$LIST_PAT" ]; then
+            printf '%s\n' "$SHIM_BRANCH_OUT"
+        else
+            case "$SHIM_BRANCH_OUT" in
+                $LIST_PAT) printf '%s\n' "$SHIM_BRANCH_OUT" ;;
+            esac
+        fi
+    fi
+    exit 0
+fi
 exec /usr/bin/git "$@"
 G
 
@@ -78,13 +100,21 @@ case "$1 $2" in
       case "$args" in
         *"--state all"*)    printf '%s' "${SHIM_PR_FOR_BRANCH:-0}" ;;
         *"--state closed"*) printf '%s' "${SHIM_PR_CLOSED:-[]}" ;;
-        *)                  printf '%s' "${SHIM_PR_OPEN:-}" ;;
+        *"number,headRefName,autoMergeRequest"*) printf '%s' "${SHIM_PR_DM:-}" ;;
+        *autoMergeRequest*)                      printf '%s' "${SHIM_PR_UNARMED:-}" ;;
+        *)                                       printf '%s' "${SHIM_PR_OPEN:-}" ;;
       esac ;;
   "pr view")
       case "$args" in
-        *statusCheckRollup*) printf '%s' "${SHIM_PR_ROLLUP:-0}" ;;
-        *)                   printf '%s' "${SHIM_PR_STATE:-}" ;;
+        *statusCheckRollup*)       printf '%s' "${SHIM_PR_ROLLUP:-0}" ;;
+        *"headRefName,state,url"*) printf '%s' "${SHIM_PR_META:-}"
+                                   printf '%s\n' "$args" >> "${SHIM_GH_CALLS:-/dev/null}" ;;
+        *"--json files"*)          printf '%s' "${SHIM_PR_FILES:-}"
+                                   printf '%s\n' "$args" >> "${SHIM_GH_CALLS:-/dev/null}" ;;
+        *)                         printf '%s' "${SHIM_PR_STATE:-}" ;;
       esac ;;
+  "workflow run") printf '%s\n' "$args" >> "${SHIM_GH_CALLS:-/dev/null}"
+                  exit "${SHIM_WFRUN_RC:-0}" ;;
 esac
 exit 0
 H
@@ -94,11 +124,14 @@ H
 }
 
 # run_docfix: drives the REAL bin/docfix-run with IBL5_MAIN=$SB.
-# $2=SHIM_BRANCH_OUT  $3=SHIM_PR_OPEN (renamed from old SHIM_PR_OUT)
+# $2=SHIM_BRANCH_OUT  $3=SHIM_PR_OPEN
+# Inherited env: SHIM_PR_UNARMED, SHIM_GH_FAIL (set as caller env-prefix vars).
 run_docfix() {
     local SB="$1"
     IBL5_MAIN="$SB" HOME="$SB/home" PATH="$SB/shim:$PATH" \
         SHIM_BRANCH_OUT="$2" SHIM_PR_OPEN="$3" \
+        SHIM_PR_UNARMED="${SHIM_PR_UNARMED:-}" \
+        SHIM_GH_FAIL="${SHIM_GH_FAIL:-}" \
         "$REAL_DOCFIX" "$4" "$5" >/dev/null 2>&1
     echo "rc=$?"
 }
@@ -138,12 +171,12 @@ P="$(plist_of "$SB")"; PLAN="$(plan_of "$SB")"
   || bad "(2) hold plan seeding"
 
 SB="$(build_sandbox)"
-run_docfix "$SB" "docs-stale-refresh-20260704" "" "1" "a.md" >/dev/null
+run_docfix "$SB" "docs-stale-refresh-$(date +%Y%m%d)" "" "1" "a.md" >/dev/null
 [ -z "$(plist_of "$SB")" ] && ok "(3a) dedupe-skip on existing branch (no plist)" \
                            || bad "(3a) dedupe branch skip"
 SB="$(build_sandbox)"
-run_docfix "$SB" "" "docs-stale-refresh-20260703" "1" "a.md" >/dev/null
-[ -z "$(plist_of "$SB")" ] && ok "(3b) dedupe-skip on open PR head (no plist)" \
+SHIM_PR_UNARMED="docs-stale-refresh-20260703" run_docfix "$SB" "" "" "1" "a.md" >/dev/null
+[ -z "$(plist_of "$SB")" ] && ok "(3b) dedupe-skip on open unarmed PR head (no plist)" \
                            || bad "(3b) dedupe PR skip"
 
 SB="$(build_sandbox)"
@@ -165,9 +198,11 @@ SB="$(build_sandbox)"
   || bad "(6) audit static assertions"
 
 # --- Case 7: docs-refreshed-notify.yml static assertion -----------------------
-{ grep -q "github.event.pull_request.head.repo.full_name == github.repository" "$NOTIFY_WORKFLOW" \
-    && grep -q "startsWith(github.event.pull_request.head.ref, 'docs-stale-refresh-')" "$NOTIFY_WORKFLOW"; } \
-  && ok "(7) docs-refreshed-notify ANDs same-repo guard and head prefix" \
+{ grep -q 'workflow_dispatch' "$NOTIFY_WORKFLOW" \
+    && grep -q 'pr_number' "$NOTIFY_WORKFLOW" \
+    && ! grep -qF 'github.event.pull_request' "$NOTIFY_WORKFLOW" \
+    && [ -f "$REPO_ROOT/bin/lib/docfix-dm.sh" ]; } \
+  && ok "(7) docs-refreshed-notify: workflow_dispatch+pr_number; guard moved to docfix-dm.sh" \
   || bad "(7) docs-refreshed-notify static assertion"
 
 # --- Case 8: carry-forward — bin/docfix-run still has auto_merge:false --------
@@ -490,6 +525,378 @@ if [ -n "$PLIST_F20" ]; then
 else
     bad "(20) prompt-fidelity: plist not generated"
 fi
+
+# --- Helper: dm_marker_of ---------------------------------------------------
+# $1=SB $2=PR-number → absolute path to the marker file docfix-poll writes/checks.
+dm_marker_of() {
+    printf '%s/home/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/docfix-poll/dm-sent/pr-%s' "$1" "$2"
+}
+
+# --- Helper: run_dm_compose -------------------------------------------------
+# Sources bin/lib/docfix-dm.sh in a subshell with the sandbox gh shim on PATH,
+# then calls docfix_dm_compose "$PR" "$OUTF".
+# Caller passes SHIM_PR_META / SHIM_PR_FILES / SHIM_GH_CALLS as env-prefix vars.
+run_dm_compose() {
+    local SB="$1" PR="$2" OUTF="$3"
+    (
+        PATH="$SB/shim:$PATH"
+        # shellcheck source=bin/lib/docfix-dm.sh
+        source "$REPO_ROOT/bin/lib/docfix-dm.sh"
+        docfix_dm_compose "$PR" "$OUTF"
+    )
+}
+
+# --- Helper: build_veronly_repo ---------------------------------------------
+# Creates a throwaway git repo seeded with:
+#   master branch: docs/x.md (last_verified: 2026-01-01), one commit
+#   feature branch: docs-stale-refresh-veronly-test (no extra commits)
+#   plan file: $SB2/home/claude-plans/docs-stale-refresh-veronly-test.md
+#              seeded with auto_merge:false + hold section
+# Prints the sandbox root (SB2). No gh/git shims — veronly cases need real git.
+# Use: R="$SB2/repo"  SLUG="docs-stale-refresh-veronly-test"
+#      PLAN_V="$SB2/home/claude-plans/$SLUG.md"
+build_veronly_repo() {
+    local SB2 R SLUG PLAN_DIR
+    SB2="$(mktemp -d)"
+    R="$SB2/repo"
+    SLUG="docs-stale-refresh-veronly-test"
+    PLAN_DIR="$SB2/home/claude-plans"
+    mkdir -p "$R" "$PLAN_DIR"
+    git -C "$R" init -b master >/dev/null 2>&1
+    git -C "$R" config user.email "test@example.com"
+    git -C "$R" config user.name "Test"
+    git -C "$R" config commit.gpgsign false
+    mkdir -p "$R/docs"
+    printf 'last_verified: 2026-01-01\n' > "$R/docs/x.md"
+    git -C "$R" add docs/x.md
+    git -C "$R" commit -m "initial" >/dev/null 2>&1
+    git -C "$R" checkout -b "$SLUG" >/dev/null 2>&1
+    printf '%s\n' '---' 'auto_merge: false' '---' '' '# Stale-docs auto-refresh' \
+        '' '## Automouse Hold Justification' '' 'auto_merge: false — hold.' \
+        > "$PLAN_DIR/$SLUG.md"
+    printf '%s' "$SB2"
+}
+
+VR_SLUG="docs-stale-refresh-veronly-test"
+
+# --- Helper: veronly_reseed_base --------------------------------------------
+# Rewrites docs/x.md on master with the given lines and re-points the feature
+# branch at the new tip, so merge-base..worktree still sees ONLY the case's own
+# edit. For cases whose fixture needs a multi-line base file.
+# Use: veronly_reseed_base "$R" 'line1' 'line2' ...
+veronly_reseed_base() {
+    local R="$1"; shift
+    git -C "$R" checkout -q master
+    printf '%s\n' "$@" > "$R/docs/x.md"
+    git -C "$R" commit -qam "reseed base" >/dev/null 2>&1
+    git -C "$R" branch -f "$VR_SLUG" master
+    git -C "$R" checkout -q "$VR_SLUG"
+}
+
+# --- Cases 21-26: bin/docfix-check-veronly predicate -------------------------
+
+# Case 21: valid date bump (only) → rc 0; plan armed; hold section removed
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+printf 'last_verified: 2026-08-13\n' > "$R/docs/x.md"
+( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" >/dev/null 2>&1 ) && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 0 ] \
+    && grep -q '^auto_merge: true$' "$PLAN_V" \
+    && ! grep -q '## Automouse Hold Justification' "$PLAN_V"; } \
+  && ok "(21) veronly: date-only bump arms the plan (rc 0)" \
+  || bad "(21) veronly: date-only bump"
+
+# Case 22: date bump + extra prose line → rc 1; plan unchanged
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+printf 'last_verified: 2026-08-13\nextra prose\n' > "$R/docs/x.md"
+( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" >/dev/null 2>&1 ) && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] \
+    && grep -q '^auto_merge: false$' "$PLAN_V" \
+    && grep -q '## Automouse Hold Justification' "$PLAN_V"; } \
+  && ok "(22) veronly: prose change holds plan (rc 1)" \
+  || bad "(22) veronly: prose change"
+
+# Case 23: date bump + new file git-added → rc 1 (non-M status in name-status)
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+printf 'last_verified: 2026-08-13\n' > "$R/docs/x.md"
+printf 'new doc\n' > "$R/docs/new.md"
+git -C "$R" add docs/new.md
+( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" >/dev/null 2>&1 ) && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V"; } \
+  && ok "(23) veronly: staged new file holds (rc 1)" \
+  || bad "(23) veronly: staged new file"
+
+# Case 24: date bump + untracked file → rc 1 (untracked guard fires first)
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+printf 'last_verified: 2026-08-13\n' > "$R/docs/x.md"
+printf 'untracked\n' > "$R/docs/untracked.md"
+( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" >/dev/null 2>&1 ) && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V"; } \
+  && ok "(24) veronly: untracked file holds (rc 1)" \
+  || bad "(24) veronly: untracked file"
+
+# Case 25: backwards date (2025-12-31 < 2026-01-01) → rc 1
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+printf 'last_verified: 2025-12-31\n' > "$R/docs/x.md"
+( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" >/dev/null 2>&1 ) && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V"; } \
+  && ok "(25) veronly: backwards date holds (rc 1)" \
+  || bad "(25) veronly: backwards date"
+
+# Case 26: empty diff (branch identical to base) → rc 1
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" >/dev/null 2>&1 ) && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V"; } \
+  && ok "(26) veronly: empty diff holds (rc 1)" \
+  || bad "(26) veronly: empty diff"
+
+# --- Case 27: static — bin/docfix-run calls bin/docfix-check-veronly ---------
+grep -qF 'bin/docfix-check-veronly' "$REAL_DOCFIX" \
+  && ok "(27) veronly: bin/docfix-run calls bin/docfix-check-veronly" \
+  || bad "(27) veronly: bin/docfix-run missing docfix-check-veronly"
+
+# --- Cases 28-31: bin/docfix-run dedupe and fail-closed gates ----------------
+
+# Case 28: SHIM_PR_UNARMED set → unarmed-PR dedupe skips (no plist)
+SB="$(build_sandbox)"
+SHIM_PR_UNARMED="docs-stale-refresh-20260703" run_docfix "$SB" "" "" "1" "a.md" >/dev/null
+[ -z "$(plist_of "$SB")" ] \
+  && ok "(28) veronly: unarmed-PR dedupe skips (no plist)" \
+  || bad "(28) veronly: unarmed-PR dedupe"
+
+# Case 29: prior-day SHIM_BRANCH_OUT + empty SHIM_PR_UNARMED → plist created
+SB="$(build_sandbox)"
+SHIM_PR_UNARMED="" run_docfix "$SB" "docs-stale-refresh-20260703" "" "1" "a.md" >/dev/null
+[ -n "$(plist_of "$SB")" ] \
+  && ok "(29) veronly: prior-day branch allows today's run (plist created)" \
+  || bad "(29) veronly: prior-day branch blocked today's run"
+
+# Case 30: today's SHIM_BRANCH_OUT → branch dedupe skips (no plist)
+SB="$(build_sandbox)"
+run_docfix "$SB" "docs-stale-refresh-$(date +%Y%m%d)" "" "1" "a.md" >/dev/null
+[ -z "$(plist_of "$SB")" ] \
+  && ok "(30) veronly: today's branch dedupe skips (no plist)" \
+  || bad "(30) veronly: today's branch dedupe"
+
+# Case 31: SHIM_GH_FAIL=1 → fail-closed skip (no plist)
+SB="$(build_sandbox)"
+SHIM_GH_FAIL=1 run_docfix "$SB" "" "" "1" "a.md" >/dev/null
+[ -z "$(plist_of "$SB")" ] \
+  && ok "(31) veronly: gh-fail skips fail-closed (no plist)" \
+  || bad "(31) veronly: gh-fail should skip"
+
+# --- Cases 32-36: poll DM dispatch -------------------------------------------
+
+# Case 32: SHIM_PR_DM="4242" → dispatch logged; marker created
+SB="$(build_sandbox)"
+CALLS32="$SB/gh-calls"
+SHIM_PR_DM="4242" SHIM_GH_CALLS="$CALLS32" SHIM_STALE_JSON='[]' run_poll "$SB"
+MARKER32="$(dm_marker_of "$SB" 4242)"
+{ grep -qF 'workflow run docs-refreshed-notify.yml' "$CALLS32" \
+    && grep -qF 'pr_number=4242' "$CALLS32" \
+    && [ -e "$MARKER32" ]; } \
+  && ok "(32) poll: DM dispatched for unarmed PR #4242 (marker + gh-calls logged)" \
+  || bad "(32) poll: DM dispatch"
+
+# Case 33: SHIM_PR_DM="" → no dispatch; no marker
+SB="$(build_sandbox)"
+CALLS33="$SB/gh-calls"
+SHIM_PR_DM="" SHIM_GH_CALLS="$CALLS33" SHIM_STALE_JSON='[]' run_poll "$SB"
+MARKER33="$(dm_marker_of "$SB" 4242)"
+{ [ ! -e "$MARKER33" ] && { [ ! -e "$CALLS33" ] || [ ! -s "$CALLS33" ]; }; } \
+  && ok "(33) poll: no DM when no unarmed PRs" \
+  || bad "(33) poll: DM should not fire for empty PR_DM"
+
+# Case 34: marker pre-created → no re-dispatch
+SB="$(build_sandbox)"
+CALLS34="$SB/gh-calls"
+MARKER34="$(dm_marker_of "$SB" 4242)"
+mkdir -p "$(dirname "$MARKER34")"
+: > "$MARKER34"
+SHIM_PR_DM="4242" SHIM_GH_CALLS="$CALLS34" SHIM_STALE_JSON='[]' run_poll "$SB"
+{ [ ! -e "$CALLS34" ] || [ ! -s "$CALLS34" ]; } \
+  && ok "(34) poll: no DM re-dispatch when marker pre-exists" \
+  || bad "(34) poll: DM re-dispatch with existing marker"
+
+# Case 35: SHIM_WFRUN_RC=1 → gh call logged but no marker written
+SB="$(build_sandbox)"
+CALLS35="$SB/gh-calls"
+SHIM_PR_DM="4242" SHIM_GH_CALLS="$CALLS35" SHIM_STALE_JSON='[]' SHIM_WFRUN_RC=1 run_poll "$SB"
+MARKER35="$(dm_marker_of "$SB" 4242)"
+{ [ ! -e "$MARKER35" ] && grep -qF 'workflow run' "$CALLS35"; } \
+  && ok "(35) poll: failed dispatch preserved for retry (no marker)" \
+  || bad "(35) poll: marker written despite dispatch failure"
+
+# Case 36: SHIM_STALE_JSON='[]' + SHIM_PR_DM set → DM fires before stale-count exit
+SB="$(build_sandbox)"
+CALLS36="$SB/gh-calls"
+SHIM_STALE_JSON='[]' SHIM_PR_DM="4242" SHIM_GH_CALLS="$CALLS36" run_poll "$SB"
+MARKER36="$(dm_marker_of "$SB" 4242)"
+{ grep -qF 'workflow run docs-refreshed-notify.yml' "$CALLS36" \
+    && [ -e "$MARKER36" ]; } \
+  && ok "(36) poll: DM fires before stale-count exit (proves Step 6.1 placement)" \
+  || bad "(36) poll: DM should fire even on empty stale set"
+
+# --- Cases 37-40: bin/lib/docfix-dm.sh compose function ----------------------
+
+# Case 37: OPEN docs-stale-refresh-* PR → rc 0; out-file has PR#, paths, URL
+SB="$(build_sandbox)"
+OUTF37="$SB/dm-out.txt"
+META37=$'docs-stale-refresh-20260813\tOPEN\thttps://example.com/pull/77'
+FILES37=$'docs/a.md\ndocs/b.md'
+SHIM_PR_META="$META37" SHIM_PR_FILES="$FILES37" \
+    run_dm_compose "$SB" "77" "$OUTF37" && DRC=0 || DRC=$?
+{ [ "$DRC" -eq 0 ] \
+    && grep -qF '77' "$OUTF37" \
+    && grep -qF 'docs/a.md' "$OUTF37" \
+    && grep -qF 'docs/b.md' "$OUTF37" \
+    && grep -qF 'https://example.com/pull/77' "$OUTF37"; } \
+  && ok "(37) lib: docfix_dm_compose rc 0; out-file has PR#, paths, URL" \
+  || bad "(37) lib: docfix_dm_compose failed"
+
+# Case 38: head ref feat/other → rc 1; out-file absent
+SB="$(build_sandbox)"
+OUTF38="$SB/dm-out.txt"
+META38=$'feat/other\tOPEN\thttps://example.com/pull/99'
+SHIM_PR_META="$META38" run_dm_compose "$SB" "99" "$OUTF38" && DRC=0 || DRC=$?
+{ [ "$DRC" -eq 1 ] && [ ! -f "$OUTF38" ]; } \
+  && ok "(38) lib: wrong head ref refused (rc 1, no out-file)" \
+  || bad "(38) lib: wrong head ref should be refused"
+
+# Case 39: state MERGED → rc 1; out-file absent
+SB="$(build_sandbox)"
+OUTF39="$SB/dm-out.txt"
+META39=$'docs-stale-refresh-20260813\tMERGED\thttps://example.com/pull/77'
+SHIM_PR_META="$META39" run_dm_compose "$SB" "77" "$OUTF39" && DRC=0 || DRC=$?
+{ [ "$DRC" -eq 1 ] && [ ! -f "$OUTF39" ]; } \
+  && ok "(39) lib: MERGED state refused (rc 1)" \
+  || bad "(39) lib: MERGED state should be refused"
+
+# Case 40: non-numeric PR (injection probe) → rc 1; no gh call recorded
+SB="$(build_sandbox)"
+OUTF40="$SB/dm-out.txt"
+CALLS40="$SB/gh-calls"
+SHIM_GH_CALLS="$CALLS40" run_dm_compose "$SB" '12; rm -rf /' "$OUTF40" && DRC=0 || DRC=$?
+{ [ "$DRC" -eq 1 ] && [ ! -f "$OUTF40" ] \
+    && { [ ! -e "$CALLS40" ] || [ ! -s "$CALLS40" ]; }; } \
+  && ok "(40) lib: non-numeric PR refused (rc 1, no gh call)" \
+  || bad "(40) lib: non-numeric PR should be refused"
+
+# --- Cases 41-47: bin/docfix-check-veronly boundaries ------------------------
+# Verification Matrix rows 11-14, 18, 19: the fail-open holes the predicate is
+# the sole defense against. Each asserts the verdict LINE, not just the exit
+# code, so a case cannot pass by holding for an unrelated reason.
+
+# Case 41: renamed file → rc 1 (name-status is R/D+A, never M)
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+git -C "$R" mv docs/x.md docs/y.md
+printf 'last_verified: 2026-08-13\n' > "$R/docs/y.md"
+VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
+    && printf '%s' "$VOUT" | grep -qF 'non-M change in diff'; } \
+  && ok "(41) veronly: renamed file holds (rc 1, non-M status)" \
+  || bad "(41) veronly: renamed file"
+
+# Case 42: deleted file → rc 1 (status D)
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+git -C "$R" rm -q docs/x.md
+VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
+    && printf '%s' "$VOUT" | grep -qF "status 'D'"; } \
+  && ok "(42) veronly: deleted file holds (rc 1, status D)" \
+  || bad "(42) veronly: deleted file"
+
+# Case 43: equal date → rc 1. The pair is realized by MOVING the date line, the
+# only way a diff carries a -/+ last_verified pair whose dates are identical.
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_reseed_base "$R" 'last_verified: 2026-01-01' 'body'
+printf '%s\n' 'body' 'last_verified: 2026-01-01' > "$R/docs/x.md"
+VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
+    && printf '%s' "$VOUT" | grep -qF 'not strictly advancing'; } \
+  && ok "(43) veronly: equal date holds (rc 1, not strictly advancing)" \
+  || bad "(43) veronly: equal date"
+
+# Case 44: malformed date (2026-8-9) → rc 1 on the anchored regex
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+printf 'last_verified: 2026-8-9\n' > "$R/docs/x.md"
+VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
+    && printf '%s' "$VOUT" | grep -qF 'non-date change line'; } \
+  && ok "(44) veronly: malformed date holds (rc 1)" \
+  || bad "(44) veronly: malformed date"
+
+# Case 45: two last_verified pairs in one file (fenced example + real
+# frontmatter) → rc 1. Both dates advance, so only the pair count catches it.
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_reseed_base "$R" 'last_verified: 2026-01-01' '' 'example:' 'last_verified: 2026-01-01'
+printf '%s\n' 'last_verified: 2026-08-13' '' 'example:' 'last_verified: 2026-08-13' \
+    > "$R/docs/x.md"
+VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
+    && printf '%s' "$VOUT" | grep -qF 'expected exactly 1 date-change pair'; } \
+  && ok "(45) veronly: two date pairs in one file hold (rc 1)" \
+  || bad "(45) veronly: two date pairs"
+
+# Case 46: a removed markdown --- delimiter renders as "----", which has no
+# space in the 4th position and so must NOT be swallowed by the "--- " header
+# skip. Guards the load-bearing trailing space in the predicate's case pattern.
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_reseed_base "$R" '---' 'last_verified: 2026-01-01' '---'
+printf '%s\n' 'last_verified: 2026-08-13' > "$R/docs/x.md"
+VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
+    && printf '%s' "$VOUT" | grep -qF 'non-date change line'; } \
+  && ok "(46) veronly: removed --- delimiter holds (rc 1, not a header line)" \
+  || bad "(46) veronly: removed --- delimiter"
+
+# Case 47: valid date bump but the plan file is gone → rc 2, no silent grant
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+printf 'last_verified: 2026-08-13\n' > "$R/docs/x.md"
+rm -f "$PLAN_V"
+VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 2 ] && [ ! -f "$PLAN_V" ] \
+    && printf '%s' "$VOUT" | grep -qF 'plan file not found'; } \
+  && ok "(47) veronly: missing plan file is rc 2, not a grant" \
+  || bad "(47) veronly: missing plan file"
 
 if [ "$FAILED" -eq 0 ]; then echo "All docfix-run checks passed."; else echo "Some docfix-run checks FAILED."; fi
 exit "$FAILED"

@@ -14,6 +14,15 @@ on:
       # blanket-true on push, so such a push also fans out to the PHP jobs;
       # that is pre-existing sibling behaviour (`bin/**` does the same), not new.
       - 'ibl5/IBLbot/**'
+      # audit-js has no other CI host either, and a dependency bump lands on
+      # master as a manifest/lockfile-only commit — so without these lines the
+      # merge of such a commit never triggers this workflow and master's JS audit
+      # simply never runs. Verified on d0d87473d (#1853, a three-lockfile merge):
+      # `gh run list --commit d0d87473d` returned nothing. Same blanket-true
+      # fan-out caveat as the sibling entries above applies.
+      - 'ibl5/package.json'
+      - 'ibl5/package-lock.json'
+      - 'ibl5/bun.lock'
   pull_request:
     branches: [ master, develop ]
     types: [opened, synchronize, reopened, ready_for_review]
@@ -37,6 +46,7 @@ jobs:
       shell: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.shell == 'true' }}
       ibl5ts: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.ibl5ts == 'true' }}
       iblbot: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.iblbot == 'true' }}
+      jsdeps: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.jsdeps == 'true' }}
     steps:
       - uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
         id: filter
@@ -94,6 +104,23 @@ jobs:
               # (src/bug-bot/*.test.ts). Whole-directory glob: every source file
               # is either compiled by tsc or exercised by the suite.
               - 'ibl5/IBLbot/**'
+              - '.github/workflows/tests.yml'
+
+            jsdeps:
+              # Everything audit-js reads. It was gated on `src` alone, which
+              # lists no JS manifest — so a dependency-only PR SKIPPED the audit
+              # entirely. That is how #1850 ("npm audit fix") merged green while
+              # leaving the extract-zip chain unfixed: the gate never ran on it,
+              # and only unrelated PHP PRs afterwards showed the red X.
+              # audit-js runs `npm ci`, so package.json + package-lock.json are
+              # its literal inputs; bun.lock is here because it is what the
+              # bun-based jobs actually install from and must not drift from the
+              # audited npm tree. Deliberately its OWN output rather than added
+              # to `src`: `src` also gates PHPUnit, PHPStan and Database
+              # Integration Tests, which a lockfile-only PR has no reason to run.
+              - 'ibl5/package.json'
+              - 'ibl5/package-lock.json'
+              - 'ibl5/bun.lock'
               - '.github/workflows/tests.yml'
 
   test:
@@ -201,7 +228,7 @@ jobs:
   audit-js:
     name: JS Dependency Audit
     needs: [changes]
-    if: needs.changes.outputs.src == 'true'
+    if: needs.changes.outputs.src == 'true' || needs.changes.outputs.jsdeps == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 

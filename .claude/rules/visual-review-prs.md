@@ -45,15 +45,19 @@ They are skipped only during baseline regen (the `update-baselines` label).
    preserved under `<sha>/visual-review/playwright-report/`. The `gh-pages` branch is only the
    durable accumulator; the site is **served** by `.github/workflows/pages-deploy.yml` (Pages
    source = GitHub Actions, no Jekyll), which fires on `E2E Tests` completion and re-publishes the
-   whole tree.
+   whole tree. Because every open PR's VR job pushes to the same `gh-pages` ref, concurrent runs
+   collide on the ref lock; the deploy is spelled out as **one attempt plus two retries** (the
+   action re-clones `gh-pages` each time, so a retry sees the ref that beat it). An **assert step**
+   fails the job if all three are exhausted — the retries absorb contention, they never soften the
+   gate.
 4. **Build comment** — `bin/vr-review-comment` consumes the pre-classified `gallery.json` and renders
    the sticky markdown.
 5. **Post sticky comment** — `marocchino/sticky-pull-request-comment@v3`, header `visual-review`.
 
 A `vr-pages-cleanup` job (push-to-master only, not part of the required gate) prunes
-per-SHA gallery dirs whose newest commit is older than 14 days. Its `gh-pages` push is unchanged;
-a prune reaches the served site when `pages-deploy.yml` next re-publishes the tree (on the master
-run's `E2E Tests` completion).
+per-SHA gallery dirs whose newest commit is older than 14 days. Its `gh-pages` push carries the same
+rebase-and-retry loop for the same ref contention. A prune reaches the served site when
+`pages-deploy.yml` next re-publishes the tree (on the master run's `E2E Tests` completion).
 
 ## Reading the comment
 

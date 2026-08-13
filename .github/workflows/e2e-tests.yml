@@ -245,9 +245,19 @@ jobs:
             --gallery=ibl5/vr-gallery.json \
             --copy-new-screens=ibl5/vr-gallery/new-screens
 
+      # gh-pages is a single shared ref and EVERY open PR's VR job pushes its own
+      # <sha>/visual-review/ dir to it, so runs that finish together collide on the
+      # ref lock ("cannot lock ref 'refs/heads/gh-pages': is at X but expected Y").
+      # The contention is pure ref-locking, never content: each run writes a distinct
+      # per-SHA directory under keep_files, and the action re-clones gh-pages on every
+      # invocation — so a retry re-reads the ref that beat us and succeeds. That makes
+      # retry a complete fix, not a mitigation. Actions has no native step-level retry,
+      # so the attempts are spelled out; the assert step below keeps an exhausted chain
+      # a hard job failure, so this does not weaken the gate.
       - name: Deploy VR gallery to per-SHA GitHub Pages
         id: vr-pages
         if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
+        continue-on-error: true
         uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -257,6 +267,38 @@ jobs:
           # One subdirectory per commit SHA so multiple open PRs/SHAs coexist.
           destination_dir: ${{ github.sha }}/visual-review
           keep_files: true
+
+      # Retries: identical inputs, guarded on the previous attempt having FAILED (a
+      # `skipped` outcome — fork PR, update-baselines run — never triggers one).
+      - name: Deploy VR gallery to per-SHA GitHub Pages (retry 1)
+        id: vr-pages-retry-1
+        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && steps.vr-pages.outcome == 'failure'
+        continue-on-error: true
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ibl5/vr-gallery
+          destination_dir: ${{ github.sha }}/visual-review
+          keep_files: true
+
+      - name: Deploy VR gallery to per-SHA GitHub Pages (retry 2)
+        id: vr-pages-retry-2
+        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && steps.vr-pages.outcome == 'failure' && steps.vr-pages-retry-1.outcome == 'failure'
+        continue-on-error: true
+        uses: peaceiris/actions-gh-pages@84c30a85c19949d7eee79c4ff27748b70285e453 # v4.1.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ibl5/vr-gallery
+          destination_dir: ${{ github.sha }}/visual-review
+          keep_files: true
+
+      # Restores the pre-retry failure semantics: three exhausted attempts is not a
+      # lock collision, it is a real deploy break (bad token, Pages misconfigured).
+      - name: Assert VR gallery deploy succeeded
+        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && steps.vr-pages.outcome == 'failure' && steps.vr-pages-retry-1.outcome == 'failure' && steps.vr-pages-retry-2.outcome == 'failure'
+        run: |
+          echo "::error::Deploying the VR gallery to gh-pages failed on all 3 attempts — see the deploy step logs above."
+          exit 1
 
       - name: Build visual-review comment
         if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines')
@@ -798,7 +840,19 @@ jobs:
           done < <(find . -mindepth 1 -maxdepth 1 -type d -not -name '.git')
           if [ "$removed" -gt 0 ]; then
             git commit -m "chore(vr-pages): prune ${removed} per-SHA report dir(s) older than 14d"
-            git push origin gh-pages
+            # Same shared-ref contention as the per-SHA deploy above: in-flight PR VR
+            # jobs push their own <sha>/ dirs to gh-pages while we prune. Those commits
+            # add paths we never touch, so a rejected push is always contention and a
+            # rebase-then-retry resolves it.
+            for attempt in 1 2 3; do
+              if git push origin gh-pages; then
+                exit 0
+              fi
+              echo "gh-pages push rejected (attempt ${attempt}/3) — rebasing onto the updated ref."
+              git pull --rebase origin gh-pages
+            done
+            echo "::error::gh-pages prune push failed after 3 attempts."
+            exit 1
           else
             echo "Nothing to prune."
           fi

@@ -330,17 +330,16 @@ final class TeamRecordRepository extends \BaseMysqliRepository
         /** @var list<array{game_date: string, visitor_teamid: int, home_teamid: int, visitorScore: int, homeScore: int}> $rows */
         $rows = $this->fetchAll(
             "SELECT
-                game_date,
-                visitor_teamid,
-                home_teamid,
-                visitorScore,
-                homeScore
-            FROM vw_team_total_score
+                bs.game_date,
+                bs.visitor_teamid,
+                bs.home_teamid,
+                bs.visitor_q1_points + bs.visitor_q2_points + bs.visitor_q3_points + bs.visitor_q4_points + COALESCE(bs.visitor_ot_points, 0) AS visitorScore,
+                bs.home_q1_points + bs.home_q2_points + bs.home_q3_points + bs.home_q4_points + COALESCE(bs.home_ot_points, 0) AS homeScore
+            FROM `ibl_box_scores_teams` bs
             WHERE " . $regularSeasonFilter . "
-                AND visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-                AND home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
-            GROUP BY game_date, visitor_teamid, home_teamid
-            ORDER BY game_date ASC"
+                AND bs.visitor_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
+                AND bs.home_teamid BETWEEN 1 AND " . League::MAX_REAL_TEAMID . "
+            ORDER BY bs.game_date ASC, bs.id ASC"
         );
 
         $this->regularSeasonGamesCache = $rows;

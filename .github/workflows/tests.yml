@@ -113,14 +113,13 @@ jobs:
               # entirely. That is how #1850 ("npm audit fix") merged green while
               # leaving the extract-zip chain unfixed: the gate never ran on it,
               # and only unrelated PHP PRs afterwards showed the red X.
-              # audit-js runs `npm ci`, so package.json + package-lock.json are
-              # its literal inputs; bun.lock is here because it is what the
-              # bun-based jobs actually install from and must not drift from the
-              # audited npm tree. Deliberately its OWN output rather than added
-              # to `src`: `src` also gates PHPUnit, PHPStan and Database
-              # Integration Tests, which a lockfile-only PR has no reason to run.
+              # audit-js runs `bun install --frozen-lockfile` + `bun audit`, so
+              # package.json + bun.lock are its literal inputs — and they are now
+              # the ONLY dependency manifests for ibl5 (package-lock.json is gone;
+              # ADR-0100). Deliberately its OWN output rather than added to `src`:
+              # `src` also gates PHPUnit, PHPStan and Database Integration Tests,
+              # which a lockfile-only PR has no reason to run.
               - 'ibl5/package.json'
-              - 'ibl5/package-lock.json'
               - 'ibl5/bun.lock'
               - '.github/workflows/tests.yml'
 
@@ -236,7 +235,7 @@ jobs:
       run: composer audit
 
   audit-js:
-    name: JS Dependency Audit
+    name: JS Dependency Audit (bun)
     needs: [changes]
     if: needs.changes.outputs.src == 'true' || needs.changes.outputs.jsdeps == 'true'
     runs-on: ubuntu-latest
@@ -246,18 +245,20 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-    - name: Setup Node
-      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-      with:
-        node-version: '22'
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
-    - name: Install JS dependencies
+    # Drift gate. Runs BEFORE the plain install so a package.json bumped without
+    # a regenerated bun.lock fails here with a precise message rather than being
+    # silently papered over by a lockfile-updating install. Exits 1 with
+    # "lockfile had changes, but lockfile is frozen".
+    - name: Verify lockfile is up-to-date (frozen-lockfile drift gate)
       working-directory: ibl5
-      run: npm ci
+      run: bun install --frozen-lockfile
 
-    - name: Audit JS dependencies
+    - name: Audit JS dependencies (bun)
       working-directory: ibl5
-      run: npm audit --audit-level=high
+      run: bun audit --audit-level=high
 
   ibl5-ts-unit:
     name: IBL5 TS Unit Tests

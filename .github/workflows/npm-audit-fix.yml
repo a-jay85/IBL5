@@ -1,8 +1,9 @@
-name: npm audit fix
+name: npm audit fix (IBLbot)
 
 on:
-  # Weekly keeps the ibl5 transitive vulns (body-parser, brace-expansion,
-  # js-yaml) fixed so the audit-js gate stops red-Xing unrelated PRs.
+  # Weekly keeps the ibl5/IBLbot transitive vulns fixed. ibl5 itself is no longer
+  # in scope: it is bun-only (ADR-0100) and `bun audit` has no --fix, so its
+  # advisories are surfaced by bun-audit-issue.yml as a tracking issue instead.
   schedule:
     - cron: '0 6 * * 1'   # Mondays 06:00 UTC
   # On-demand escape hatch: a newly-published vuln reds open PRs until the next
@@ -18,7 +19,7 @@ concurrency:
 
 jobs:
   audit-fix:
-    name: npm audit fix across lockfile dirs
+    name: npm audit fix — IBLbot
     runs-on: ubuntu-latest
     steps:
       - name: Checkout master
@@ -56,7 +57,7 @@ jobs:
 
           # Semver-safe transitive fixes only — NO --force (never a breaking
           # major bump). Loop every lockfile directory.
-          for dir in ibl5 ibl5/IBLbot; do
+          for dir in ibl5/IBLbot; do
             echo "::group::npm audit fix — $dir"
             ( cd "$dir" && npm ci && npm audit fix || true )
             echo "::endgroup::"
@@ -83,7 +84,7 @@ jobs:
               --base master \
               --head "$BRANCH" \
               --title "chore(deps): npm audit fix" \
-              --body "Automated \`npm audit fix\` across ibl5 and ibl5/IBLbot. Keeps transitive vulns fixed so the audit-js gate stops failing unrelated PRs."
+              --body "Automated \`npm audit fix\` for ibl5/IBLbot. ibl5 moved to a bun-only lockfile (ADR-0100) and is covered by bun-audit-issue.yml instead."
           else
             echo "PR already open for $BRANCH (#$open_pr) — force-push updated it."
           fi

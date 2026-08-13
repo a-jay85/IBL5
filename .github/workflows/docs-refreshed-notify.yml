@@ -1,37 +1,32 @@
 name: Docs Refreshed Notify
 
-# Fires when a pull_request is opened or reopened. The job below guards on
-# same-repo origin AND a docs-stale-refresh-* head ref, so only doc-fix PRs
-# opened from this repo send a DM.
+# Fires only on explicit dispatch from bin/docfix-poll on the Mac.
+# Recursion is impossible: nothing in CI dispatches this workflow.
 #
-# Why this trigger fires at all (load-bearing fact): a PR opened by the default
-# Actions GITHUB_TOKEN does NOT trigger pull_request workflows. This one fires
-# because bin/docfix-run opens its PR from the Mac with the owner's persistent
-# `gh` PAT, so GitHub attributes it to a real user. That same fact is the
-# anti-recursion guarantee.
+# Load-bearing deployment note: GitHub only dispatches a workflow whose
+# workflow_dispatch trigger already exists on the default branch. The first
+# real dispatch is therefore only possible after this PR merges onto master.
+#
+# The head-ref guard (docs-stale-refresh- prefix) has moved into
+# bin/lib/docfix-dm.sh where it is exercisable by the test harness.
 on:
-  pull_request:
-    types: [opened, reopened]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: PR number of the docs-stale-refresh-* PR to notify about
+        required: true
+        type: string
 
 permissions:
   contents: read
   pull-requests: read      # `gh pr view --json files` for the refreshed file list
 
 concurrency:
-  group: docs-refreshed-notify-${{ github.event.pull_request.number }}
+  group: docs-refreshed-notify-${{ inputs.pr_number }}
   cancel-in-progress: false
 
 jobs:
   notify-refreshed:
-    # Guard: BOTH conditions ANDed.
-    #  - same-repo: a FORK PR is skipped. This repo is PUBLIC, the event fires for
-    #    fork PRs, and a fork can name its branch docs-stale-refresh-x to pass a
-    #    head-ref-only guard. (Not an RCE — pull_request is read-only and secretless —
-    #    but it is fork-triggerable noise, gated out at the source.)
-    #  - head.ref prefix: only doc-refresh PRs send a DM.
-    if: >-
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      startsWith(github.event.pull_request.head.ref, 'docs-stale-refresh-')
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
@@ -41,18 +36,12 @@ jobs:
 
       - name: Build Discord message
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
+          PR_NUMBER: ${{ inputs.pr_number }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # PR_NUMBER travels via env, never interpolated inline — prevents shell injection.
-          # PR title is deliberately excluded: it is author-controlled text.
-          FILES=$(gh pr view "$PR_NUMBER" --json files --jq '.files[].path')
-          {
-            printf 'Claude refreshed your stale docs — ready for your review. PR #%s:\n' "$PR_NUMBER"
-            echo "$FILES" | sed 's/^/  /'
-            printf 'Review and merge: %s\n' "$PR_URL"
-          } > /tmp/discord-msg.txt
+          source bin/lib/docfix-dm.sh
+          docfix_dm_compose "$PR_NUMBER" /tmp/discord-msg.txt
 
       - name: Setup SSH
         uses: ./.github/actions/setup-ssh

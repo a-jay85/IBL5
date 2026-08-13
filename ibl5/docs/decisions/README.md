@@ -38,6 +38,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0101](0101-bun-only-lockfile-collapse.md) | bun-only lockfile for ibl5 | Accepted | Collapsed ibl5 to a single `bun.lock`; npm audit gate replaced by `bun audit` + weekly tracking issue. |
 | [0102](0102-pre-commit-gate-in-version-control.md) | Version-control the pre-commit gate body | Accepted | Moves the git pre-commit gate body out of the untracked common hooks dir into `bin/pre-commit-hook`, installed via a fail-closed shim. |
 | [0103](0103-htmx-transient-dom-state-repair-on-history-restore.md) | Repair transient htmx request-time DOM state on history restore | Accepted | htmx snapshots the DOM between `beforeRequest` and the swap, so pre-request mutations must be undone in `htmx:historyRestore` too, scoped to a `data-*` marker; enforced by rule doc + review, not a gate. |
+| [0103](0103-verification-only-doc-refresh-auto-merge.md) | Verification-only doc refreshes may self-ship | Accepted | A docfix PR is released to auto-merge only when `bin/docfix-check-veronly` proves every changed line is a strictly-advancing `last_verified:` date on an already-tracked file; the release is a frontmatter flip in the seeded plan, not a merge-gate special case, and Phase 6.5's (9) safety verdict and (11) finding floor still gate the arm. |
 
 ## When an ADR is Required
 

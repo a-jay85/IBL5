@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-08-09
+last_verified: 2026-08-13
 ---
 
 # IBL5 Architecture Decision Records
@@ -34,6 +34,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0097](0097-single-retrying-host-notification-transport.md) | A single retrying host-side notification transport | Accepted | All host-side Discord sends go through `bin/discord-dm` — retries past a pm2 restart window, spools + exits non-zero rather than dropping a message silently. |
 | [0098](0098-attachment-ingest-trust-boundary.md) | The attachment-ingest trust boundary | Accepted | The pipeline's first attacker-controlled binary ingest path: untrusted bytes/metadata, filenames never form paths, snowflakes stay strings, capped downloads against an https allowlist, cache pruned outside the repo, only a sanitized text reference reaches the model, `--allowedTools ''` untouched. |
 | [0099](0099-unattended-ci-failure-autofix.md) | Unattended CI-failure autofix via `bug-pipeline-tick` | Accepted | Settled red PRs get one credential-starved fix agent per tick, capped at 3 attempts per head SHA; the trusted tick side publishes and comments, never merges and never arms auto-merge. |
+| [0100](0100-actionlint-workflow-gate.md) | actionlint as the workflow-validation gate | Accepted | Pinned actionlint via `bin/lint-workflows` in the `gate`; its shellcheck pass over `run:` blocks is mandatory, with shell policy single-sourced from the ShellCheck job. |
 
 ## When an ADR is Required
 

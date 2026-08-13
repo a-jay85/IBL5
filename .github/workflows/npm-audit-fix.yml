@@ -2,7 +2,7 @@ name: npm audit fix (IBLbot)
 
 on:
   # Weekly keeps the ibl5/IBLbot transitive vulns fixed. ibl5 itself is no longer
-  # in scope: it is bun-only (ADR-0100) and `bun audit` has no --fix, so its
+  # in scope: it is bun-only (ADR-0101) and `bun audit` has no --fix, so its
   # advisories are surfaced by bun-audit-issue.yml as a tracking issue instead.
   schedule:
     - cron: '0 6 * * 1'   # Mondays 06:00 UTC
@@ -84,7 +84,7 @@ jobs:
               --base master \
               --head "$BRANCH" \
               --title "chore(deps): npm audit fix" \
-              --body "Automated \`npm audit fix\` for ibl5/IBLbot. ibl5 moved to a bun-only lockfile (ADR-0100) and is covered by bun-audit-issue.yml instead."
+              --body "Automated \`npm audit fix\` for ibl5/IBLbot. ibl5 moved to a bun-only lockfile (ADR-0101) and is covered by bun-audit-issue.yml instead."
           else
             echo "PR already open for $BRANCH (#$open_pr) — force-push updated it."
           fi

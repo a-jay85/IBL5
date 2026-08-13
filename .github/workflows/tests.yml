@@ -21,7 +21,6 @@ on:
       # `gh run list --commit d0d87473d` returned nothing. Same blanket-true
       # fan-out caveat as the sibling entries above applies.
       - 'ibl5/package.json'
-      - 'ibl5/package-lock.json'
       - 'ibl5/bun.lock'
   pull_request:
     branches: [ master, develop ]
@@ -116,7 +115,7 @@ jobs:
               # audit-js runs `bun install --frozen-lockfile` + `bun audit`, so
               # package.json + bun.lock are its literal inputs — and they are now
               # the ONLY dependency manifests for ibl5 (package-lock.json is gone;
-              # ADR-0100). Deliberately its OWN output rather than added to `src`:
+              # ADR-0101). Deliberately its OWN output rather than added to `src`:
               # `src` also gates PHPUnit, PHPStan and Database Integration Tests,
               # which a lockfile-only PR has no reason to run.
               - 'ibl5/package.json'
@@ -859,6 +858,8 @@ jobs:
         run: bin/test-token-report
       - name: bin/test-automouse-escalation
         run: bin/test-automouse-escalation
+      - name: bin/test-bun-audit-triage
+        run: bin/test-bun-audit-triage
 
   gate:
     name: Tests and Analysis

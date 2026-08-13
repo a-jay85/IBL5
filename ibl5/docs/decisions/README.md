@@ -35,6 +35,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0098](0098-attachment-ingest-trust-boundary.md) | The attachment-ingest trust boundary | Accepted | The pipeline's first attacker-controlled binary ingest path: untrusted bytes/metadata, filenames never form paths, snowflakes stay strings, capped downloads against an https allowlist, cache pruned outside the repo, only a sanitized text reference reaches the model, `--allowedTools ''` untouched. |
 | [0099](0099-unattended-ci-failure-autofix.md) | Unattended CI-failure autofix via `bug-pipeline-tick` | Accepted | Settled red PRs get one credential-starved fix agent per tick, capped at 3 attempts per head SHA; the trusted tick side publishes and comments, never merges and never arms auto-merge. |
 | [0100](0100-actionlint-workflow-gate.md) | actionlint as the workflow-validation gate | Accepted | Pinned actionlint via `bin/lint-workflows` in the `gate`; its shellcheck pass over `run:` blocks is mandatory, with shell policy single-sourced from the ShellCheck job. |
+| [0101](0101-bun-only-lockfile-collapse.md) | bun-only lockfile for ibl5 | Accepted | Collapsed ibl5 to a single `bun.lock`; npm audit gate replaced by `bun audit` + weekly tracking issue. |
 
 ## When an ADR is Required
 

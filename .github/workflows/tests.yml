@@ -47,6 +47,7 @@ jobs:
       ibl5ts: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.ibl5ts == 'true' }}
       iblbot: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.iblbot == 'true' }}
       jsdeps: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.jsdeps == 'true' }}
+      workflows: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.workflows == 'true' }}
     steps:
       - uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
         id: filter
@@ -122,6 +123,15 @@ jobs:
               - 'ibl5/package-lock.json'
               - 'ibl5/bun.lock'
               - '.github/workflows/tests.yml'
+
+            workflows:
+              # Everything actionlint reads. .github/actions/** is NOT optional
+              # here: actionlint validates each caller's `with:` keys against the
+              # called composite's action.yml, so "changed setup-php-env's inputs,
+              # broke a caller" is a composite-only diff that must still run it.
+              - '.github/workflows/**'
+              - '.github/actions/**'
+              - 'bin/lint-workflows'
 
   test:
     name: PHPUnit Tests
@@ -472,7 +482,45 @@ jobs:
       - name: Verify every external action is SHA-pinned
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: $(go env GOPATH)/bin/pinact run --check
+        run: '"$(go env GOPATH)/bin/pinact" run --check'
+
+  actionlint:
+    name: Workflow lint (actionlint)
+    needs: [changes]
+    if: needs.changes.outputs.workflows == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Explicit setup-go rather than the runner's preinstalled toolchain:
+      # actionlint v1.7.12's go.mod requires go >= 1.25.0, and `go install`
+      # hard-fails when the toolchain is older. The sibling pinact-check job
+      # rides the preinstalled Go only because its pin needs less.
+      - name: Setup Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.25'
+
+      # Version-pinned, not @latest: a new upstream rule would otherwise land as
+      # a red X on an unrelated PR that touched no workflow logic. Bump
+      # deliberately, with the resulting findings in the same commit.
+      - name: Install actionlint
+        run: go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+
+      # Installed explicitly, exactly as the sibling ShellCheck job does — this
+      # repo does not assume the runner image ships it. actionlint's run:-block
+      # pass is half this gate; bin/lint-workflows hard-fails without it rather
+      # than letting actionlint skip the pass and still exit 0.
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      # No working-directory — the script lives in repo-root bin/ and cds to the
+      # repo root itself. Shell policy (severity + excludes) lives in the script
+      # so a local run and this job cannot drift.
+      - name: Lint workflows
+        run: bin/lint-workflows
 
   host-mariadb-guard:
     name: Host mariadb grep guard
@@ -814,7 +862,7 @@ jobs:
   gate:
     name: Tests and Analysis
     if: always()
-    needs: [changes, test, audit-php, audit-js, ibl5-ts-unit, iblbot, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, automouse-impl-model-test, update-baselines, regen-codebase-map, static-guards, harness-tests, pinact-check]
+    needs: [changes, test, audit-php, audit-js, ibl5-ts-unit, iblbot, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, automouse-impl-model-test, update-baselines, regen-codebase-map, static-guards, harness-tests, pinact-check, actionlint]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

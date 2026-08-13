@@ -1,0 +1,61 @@
+#!/bin/bash
+# bin/lint-workflows — CI gate: run actionlint over .github/workflows/**.
+#
+# actionlint catches what YAML alone cannot: unknown `runs-on` labels, bad
+# `needs:` graphs, type errors inside ${{ }} expressions, `with:` keys that no
+# longer exist on a called action (including the LOCAL composites under
+# .github/actions/**), and dead `paths:`/`branches:` globs. Those are the
+# failures that otherwise surface only when the workflow actually runs.
+#
+# It is deliberately NOT a replacement for bin/check-workflow-checkout or
+# bin/check-composite-contracts — actionlint does not model step ordering or
+# composite behavior contracts. The three are complementary.
+#
+# Shell policy: actionlint also pipes every `run:` block through shellcheck.
+# We mirror bin/** policy from the ShellCheck job in .github/workflows/tests.yml
+# verbatim (--severity=warning plus the same three burn-down excludes) so there
+# is one shell standard in this repo, not two:
+#   SC2034 — unused variables
+#   SC1090 — non-const source
+#   SC2207 — array splitting suggestion (fix uses bash 4 mapfile)
+#
+# SC2170 has no such exclude and is handled per-site: actionlint replaces each
+# ${{ ... }} with a placeholder literal before invoking shellcheck, so the
+# correct idiom `[ "${{ steps.x.outputs.n }}" -gt 0 ]` reads as a string-vs-int
+# comparison. Those sites carry an inline `# shellcheck disable=SC2170`, which
+# actionlint honors — that keeps SC2170 live everywhere else.
+#
+# Usage: bin/lint-workflows [file ...]   (no args = every workflow in the repo)
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+
+# CI installs actionlint with `go install`, which lands it in GOPATH/bin — not
+# necessarily on PATH. Fall back there before giving up.
+actionlint_bin="$(command -v actionlint || true)"
+if [ -z "$actionlint_bin" ] && command -v go >/dev/null 2>&1; then
+  candidate="$(go env GOPATH)/bin/actionlint"
+  [ -x "$candidate" ] && actionlint_bin="$candidate"
+fi
+
+if [ -z "$actionlint_bin" ]; then
+  echo "FAIL: actionlint not found."
+  echo "  macOS:  brew install actionlint"
+  echo "  any:    go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12"
+  exit 1
+fi
+
+# Hard-require shellcheck rather than letting actionlint proceed without it.
+# actionlint treats a missing -shellcheck binary as "skip that pass" and still
+# exits 0 — every `run:` block would go unchecked with no signal at all. Half
+# this gate's value is that pass, so a silent skip is a false green.
+if ! command -v shellcheck >/dev/null 2>&1; then
+  echo "FAIL: shellcheck not found — actionlint would silently skip every run: block."
+  echo "  macOS:  brew install shellcheck"
+  echo "  ubuntu: sudo apt-get update && sudo apt-get install -y shellcheck"
+  exit 1
+fi
+
+exec "$actionlint_bin" \
+  -shellcheck 'shellcheck --severity=warning --exclude=SC2034,SC1090,SC2207' \
+  "$@"

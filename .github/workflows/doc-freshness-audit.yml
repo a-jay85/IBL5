@@ -51,6 +51,11 @@ jobs:
 
       - name: Build issue body
         run: |
+          # actionlint substitutes each workflow expression with a placeholder
+          # literal before running shellcheck, so the quoted-expression form
+          # below reads to shellcheck as a string-vs-int comparison. It is
+          # correct as written; the disable suppresses that artifact only.
+          # shellcheck disable=SC2170
           {
             echo "Repo-wide doc audit ($(date -u +%Y-%m-%d))."
             echo ""
@@ -131,6 +136,8 @@ jobs:
 
       - name: Publish to job summary
         run: |
+          # See the SC2170 note in "Build issue body" above — placeholder artifact.
+          # shellcheck disable=SC2170
           if [ "${{ steps.report.outputs.count }}" -gt 0 ]; then
             cat /tmp/issue-body.md >> "$GITHUB_STEP_SUMMARY"
           else

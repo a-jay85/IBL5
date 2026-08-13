@@ -143,7 +143,7 @@ jobs:
           orphan_total=0
           for i in "${!branches[@]}"; do
             [ -n "${stacked_on[$i]:-}" ] && continue
-            > "${tmpdir}/${i}.drop"
+            : > "${tmpdir}/${i}.drop"
             while read pid sha; do
               if [ "${pid_count[$pid]:-0}" -ge 2 ]; then
                 echo "$sha" >> "${tmpdir}/${i}.drop"
@@ -198,7 +198,7 @@ jobs:
               # Build a sed script that changes "pick <sha>" → "drop <sha>" for
               # each orphaned commit. Uses address matching (/^pick SHA/) so it
               # works regardless of git's abbreviated SHA length (core.abbrev).
-              > "${tmpdir}/${i}.sed"
+              : > "${tmpdir}/${i}.sed"
               while read sha; do
                 echo "/^pick ${sha:0:7}/s/^pick/drop/" >> "${tmpdir}/${i}.sed"
               done < "${tmpdir}/${i}.drop"

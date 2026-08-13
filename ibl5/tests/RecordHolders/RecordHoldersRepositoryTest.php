@@ -245,10 +245,10 @@ final class RecordHoldersRepositoryTest extends WideUnitTestCase
         $this->mockDb->setMockData([]);
 
         $this->repository->getLongestStreak('winning');
-        $after1 = $this->countQueriesMatching('vw_team_total_score');
+        $after1 = $this->countQueriesMatching('ibl_box_scores_teams');
         $this->assertSame(1, $after1); // guard: needle matched at least once
 
         $this->repository->getBestWorstSeasonStart('best');
-        $this->assertSame($after1, $this->countQueriesMatching('vw_team_total_score'));
+        $this->assertSame($after1, $this->countQueriesMatching('ibl_box_scores_teams'));
     }
 }

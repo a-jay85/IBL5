@@ -1,11 +1,11 @@
 ---
-description: Lever-2 narrows the foul-bucket team-quality dispersion (foulCompress) toward the corpus league mean, calibrated to the engine's too-wide FTA-rate dispersion; the paired offVolumeScale raise is refuted on its own Var(lnFGA) target, and the Cov(lnFGA,lnPPS) sign is the emergent (never tuned) readout. Records the partial three-axis verdict.
-last_verified: 2026-06-12
+description: Historical calibration record for Lever-2 foul-bucket team-quality compression (foulCompress = 0.45); off-side superseded by ADR-0061, def-side and foulCompress fully superseded by ADR-0084. Records the three-axis verdict and FTADispersionRatio target rationale.
+last_verified: 2026-08-12
 ---
 
 # ADR-0044: Foul-bucket team-quality compression (Lever-2)
 
-**Status:** Accepted; **off-side mechanism partially superseded by ADR-0061** (2026-06-12)
+**Status:** Accepted; **off-side superseded by ADR-0061** (2026-06-12); **def-side `foulCompress`/`defMatchupQuality` fully superseded by ADR-0082 and ADR-0084** (2026-07-10/12)
 **Date:** 2026-06-04
 
 ## Superseded in part by ADR-0061
@@ -21,14 +21,41 @@ made that change, which **partially supersedes** this ADR:
   on the off side to compress, and the claims below that the lever "works mainly through
   the uncapped offQ divisor" and that `offQualityRatingScale` sets both the margin and the
   FTA dispersion **no longer describe current behavior**.
-- **Survives, unchanged:** the **def-side** `foulCompress` compression (still applied to
+- **Survives, unchanged (true as of 2026-06-12; no longer current behavior — see next
+  section):** the **def-side** `foulCompress` compression (still applied to
   `defMatchupQuality`), the **FTA-dispersion target** (`FTADispersionRatio`), and the
   three-axis dispersion verdict / honest null on total `Var(lnPF)` recorded below.
+  **ADR-0082 and ADR-0084 subsequently deleted `defMatchupQuality` and `foulCompress`
+  entirely.** `FTADispersionRatio` continues to exist as a measurement field.
 - The home-margin calibration knob moved from `offQualityRatingScale` to
   `offQualityConstant` (ADR-0061 GATE-1).
 
 The verdict tables below are retained as the **dated record** of the Lever-2 calibration
 (true as of 2026-06-04); read them as history, not as the current off-side mechanism.
+
+## Further superseded by ADR-0082 and ADR-0084
+
+ADR-0082 (2026-07-10) replaced the foul-bucket mechanism: `offQualityConstant`
+(ADR-0061) was deleted, and the bucket was restructured around `defMatchupQuality =
+Σ floor1(OD)×0.25 → compressQuality(8.21, 0.45) → cap 7.5` with a corpus-calibrated
+basis constant (`foulBucketScale`). At that point `defMatchupQuality` and the def-side
+`foulCompress` were carried forward corpus-deferred — not settled.
+
+ADR-0084 (2026-07-12) completed the supersession: faithful RE of 5.60 (J6/J16 RE
+artifacts, 2026-07-10) established that the defensive quality signal is a live
+per-player composite `defQ = Σ STL/MIN×44` (+0xDD0, LIVE), not the compressed
+floor-capped sum. `defMatchupQuality`, `foulCompress`, `compressQuality`, and
+`defQualityNeutral` were deleted from `engine/internal/sim/teamquality.go`. The
+off-quality divisor was rewired to `offQ = Σ TOV/MIN×48 − HCA` (+0xDE0, LIVE),
+replacing the `offQualityConstant` stand-in from ADR-0061.
+
+**What this means for the content below:** the calibration record (foulCompress sweep,
+three-axis verdict, FTA level measurements) describes the engine as of 2026-06-04 and is
+retained as the historical Lever-2 context for the ADR-0041→0043→0044 fidelity chain.
+`FTADispersionRatio` continues to exist as a measurement field
+(`engine/internal/calibrate/standings.go`); its role as the FTA-spread tuning target is
+inherited by ADR-0084's `foulBucketScale = 0.47` anchor against the paired `.sco`
+archive.
 
 ## Context
 
@@ -242,19 +269,25 @@ FTADispersionRatio recorded as residual.
   too narrow (an honest null on the total-spread magnitude).
 - (As of 2026-06-04) `offQualityNeutral` co-varied with `offQualityRatingScale`, so the
   HCA-margin re-tune kept the off-side compression mean-preserving automatically. **ADR-0061
-  deleted these off-side consts** — the off-side no longer compresses; `foulCompress` now
-  mean-preserves the def side only (`defQualityNeutral`).
+  deleted these off-side consts** — the off-side no longer compresses; at that point
+  `foulCompress` mean-preserved the def side only (`defQualityNeutral`). **ADR-0084**
+  subsequently deleted `defQualityNeutral`, `foulCompress`, and `compressQuality` entirely
+  — no compression of either side remains in the current engine.
 - The golden fixture was regenerated (intentional output change). The `FTADispersionRatio`
   metric is now available to all future calibration runs as the foul-rate target.
-- A new archive-tagged derivation harness (`TestDeriveQualityNeutrals`) reproduces the
-  committed neutrals. **ADR-0061** stripped its off-side derivation; it now derives only
-  `defQualityNeutral`.
+- An archive-tagged derivation harness (`TestDeriveQualityNeutrals`) was added in this
+  PR; **ADR-0061** stripped its off-side derivation. **ADR-0084** deleted
+  `engine/internal/sim/neutral_archive_test.go` (which housed this harness) —
+  `TestDeriveQualityNeutrals` no longer exists.
 
 ## References
 
 - ADR-0041 (three-axis defect), ADR-0042 (coupling mechanism), ADR-0043 (foul-arm
   attribution — the 47.6% figure this lever targets).
-- `engine/internal/sim/teamquality.go` (`foulCompress`, `compressQuality`, neutrals),
+- `engine/internal/sim/teamquality.go` (historical: `foulCompress`, `compressQuality`,
+  neutrals — all deleted by ADR-0084; current file: `defQuality`/`offQuality` faithful
+  composites per ADR-0084),
   `engine/internal/sim/tempo.go` (`offVolumeScale` Lever-2 re-test note),
-  `engine/internal/calibrate/standings.go` (`FTADispersionRatio`),
-  `engine/internal/sim/neutral_archive_test.go` (neutral derivation).
+  `engine/internal/calibrate/standings.go` (`FTADispersionRatio`).
+  The neutral derivation harness (`TestDeriveQualityNeutrals`) lived in
+  `engine/internal/sim/neutral_archive_test.go` — deleted by ADR-0084 (see Consequences).

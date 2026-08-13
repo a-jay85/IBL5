@@ -199,6 +199,12 @@ export CLAUDE_HEADLESS=1
 # interactive setting.
 
 REPO="/Users/ajaynicolas/GitHub/IBL5"
+# This script's OWN tree, used to resolve the two prompt files it feeds to
+# `claude -p`. Without it the prompts resolve against the `cd "$REPO"` below, so a
+# worktree copy of this script would run MAIN's prompts — meaning a prompt change
+# cannot be exercised until after it merges. $REPO stays main-pinned deliberately:
+# it is the bin/wt-new base and the target of the git ops.
+SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NIGHTLY_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
 LOG_DIR="$NIGHTLY_DIR/logs"
 QUEUE_DIR="$NIGHTLY_DIR/queue"
@@ -215,7 +221,24 @@ MAX_PP_SECS=3600     # per-phase cap: post-plan gets at most 1h
 LOCK_TTL_SECS=9000   # max a single plan legitimately holds its claim lock
                      # (impl 1h + postplan 1h + overhead); a lock older than this
                      # whose owner PID is gone is presumed crashed and stolen.
-STALL_KILL_SECS=600  # kill phase if no stream events for 10 minutes
+STALL_KILL_SECS=1800 # kill phase if no stream events for 30 minutes.
+                     # Was 600. The Agent/Task tool is now ASYNCHRONOUS: it returns
+                     # "Async agent launched successfully" immediately and the parent
+                     # is re-invoked by a task notification when the delegate finishes.
+                     # A live sub-agent emits NOTHING on the parent's stream, so a
+                     # correctly-working impl looks identical to a wedged one for the
+                     # whole delegate runtime (the 2026-08-13 docfix run sat event-free
+                     # for 440s with three delegates in flight, then lost a 4th at the
+                     # 600s harness ceiling). The watcher never actually fired in that
+                     # run — the harness ceiling got there first — but lifting that
+                     # ceiling to 0 hands the kill straight to this watcher, and the
+                     # dead window was exactly 600s, so 600 would now be lethal at the
+                     # same instant. A stall-kill classifies as environmental, so an
+                     # over-tight threshold costs a refund, not a burned attempt. This
+                     # is a fast-fail on top of the real cap, not the only backstop:
+                     # `timeout "$REMAINING_SECS"` (<= MAX_IMPL_SECS/MAX_PP_SECS = 1h)
+                     # is the hard ceiling, so raising this trades detection latency
+                     # for correctness and can never extend a phase past 1h.
 KILL_GRACE_SECS=15   # after SIGTERM, wait this long then SIGKILL — a phase wedged
                      # on a dead inference stream traps SIGTERM and ignores it
                      # (the 2026-06-11 run hung 7h on a SIGTERM that never landed)
@@ -773,7 +796,7 @@ while true; do
         # second trailing context line (PRIOR_FAILURE_REPORT=<path>) in the same
         # style as PLAN_FILE — report-if-present, decoupled from the escalation
         # trigger (ADR-0085).
-        IMPL_PROMPT="$(cat bin/automouse/prompt-impl)
+        IMPL_PROMPT="$(cat "$SELF_DIR/prompt-impl")
 
 PLAN_FILE=$PLAN_NAME"
         if should_feed_failure_report "$BASE_MODEL" "$IMPL_MODEL" "$FAILURE_FILE"; then
@@ -781,6 +804,16 @@ PLAN_FILE=$PLAN_NAME"
 PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             echo "[$(date +%H:%M:%S)] feeding prior failure report to escalated retry: $FAILURE_FILE for $PLAN_NAME" >> "$LOG"
         fi
+        # CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 disables the harness's background-task
+        # sweep (same reason bin/plan-now sets it). At the default (~600s) the harness
+        # TERMINATES a still-running background task after the final turn and prints
+        # "Background tasks still running after 600s; terminating." — which is exactly
+        # how the 2026-08-13 docfix-veronly-self-ship impl lost its Phase 7 delegate
+        # after phases 1-6 had already landed green. Since Agent/Task is asynchronous,
+        # EVERY delegate is a background task, so any packet slower than the ceiling
+        # was unwinnable. 0 = wait indefinitely; `timeout "$REMAINING_SECS"` and the
+        # heartbeat watcher (STALL_KILL_SECS) remain the real bounds.
+        CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
         NIGHTLY_CMDPID_FILE="$CMDPID_FILE" \
         timeout "$REMAINING_SECS" \
             claude -p "$IMPL_PROMPT" \
@@ -885,9 +918,15 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
 
         PP_STATUS=0
         PP_START=$(date +%s)
+        # Same background-task ceiling as the impl phase above — /post-plan spawns
+        # review/E2E sub-agents, which are asynchronous too. The skill's own "drain
+        # every background shell before ending your turn" rule is unchanged and still
+        # the primary contract; this only stops the harness from severing an agent
+        # that is legitimately still working.
+        CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
         NIGHTLY_CMDPID_FILE="$CMDPID_FILE" \
         timeout "$REMAINING_SECS" \
-            claude -p "$(cat bin/automouse/prompt-postplan)
+            claude -p "$(cat "$SELF_DIR/prompt-postplan")
 
 PLAN_FILE=$PLAN_NAME" \
                 --dangerously-skip-permissions \

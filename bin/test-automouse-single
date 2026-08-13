@@ -83,6 +83,7 @@ chmod +x "$STUBDIR/claude"
 RUNNER="$ROOT/automouse/run"
 sed -e "s#^NIGHTLY_DIR=.*#NIGHTLY_DIR=\"$NDIR\"#" \
     -e "s#^REPO=.*#REPO=\"$REPO\"#" \
+    -e "s#^SELF_DIR=.*#SELF_DIR=\"$REPO/bin/automouse\"#" \
     -e "s#^export PATH=.*#export PATH=\"$STUBDIR:/usr/local/bin:/opt/homebrew/bin:\$PATH\"#" \
     "$REPO/bin/automouse/run" > "$RUNNER"
 chmod +x "$RUNNER"

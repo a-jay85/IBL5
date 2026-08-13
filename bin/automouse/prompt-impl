@@ -164,20 +164,29 @@ The worktree may exist from a previous interrupted run. Check its state:
 ```bash
 cd /Users/ajaynicolas/GitHub/IBL5-worktrees/<slug>
 git log --oneline origin/master..HEAD
+git status --porcelain
 ```
 
 - If the branch is already merged on origin/master (git log shows nothing or branch doesn't exist on remote), this is a stale worktree. Remove it with `bin/wt-remove <slug>` and start fresh (run the "Fresh start" path above).
 - If there are commits ahead of master, this is a partial implementation. Read the commit messages and the plan to determine what steps are already complete. Continue from where the previous session left off — do NOT redo completed work.
-- If the worktree exists but has no commits ahead of master (just created, never committed), treat it as a fresh worktree and start implementation from Step 6.
+- **If `git status --porcelain` is non-empty, this is a partial implementation too — even with zero commits ahead of master.** A previous attempt that was killed mid-run (harness background-task ceiling, watchdog stall-kill, `timeout`) leaves finished work staged-but-uncommitted, because Step 6's checkpoint commits are best-effort. Read the actual diff (`git diff HEAD`) against the plan's phases, determine which phases already landed, and implement **only** the remainder. Re-running a landed phase burns the attempt's budget and can conflict with its own prior edits.
+- Only when the worktree has **no commits ahead of master AND a clean working tree** (just created, never touched) is it fresh — start implementation from Step 6.
 
 ## Step 6: Implement the Plan
 
 Work in /Users/ajaynicolas/GitHub/IBL5-worktrees/<slug>/ibl5/. CLAUDE.md is auto-loaded — follow all project rules. Follow the plan step by step.
 
-When a plan phase carries a `### Delegate` packet, do NOT implement that phase inline: fire **one** Agent/Task call per packet at the packet's declared tier, pass the packet **verbatim** as the sub-agent prompt, and absorb only the sub-agent's one-line summary. Spawn at the declared tier exactly as follows:
+When a plan phase carries a `### Delegate` packet, do NOT implement that phase inline: fire **one** Agent/Task call per packet at the packet's declared tier, and pass the packet **verbatim** as the sub-agent prompt. Spawn at the declared tier exactly as follows:
 
 - **Sonnet** → `subagent_type: "automouse-delegate"` (byte-match the def's `name:`) and **omit the `model` param**. The def (`.claude/agents/automouse-delegate.md`) pins `claude-sonnet-4-6`; passing `model: "sonnet"` resolves to Sonnet 5 and overrides the pin, spending ~30% more of the weekly token budget on identical work.
 - **Haiku** → `subagent_type: "general-purpose"` with `model: "haiku"`. No def is needed — the `haiku` alias already resolves to the only Haiku. The packet is self-verifying — the sub-agent runs the packet's self-verify command before returning — and CI plus post-plan review remain the backstop. This keeps your own context flat across the run; inlining a verbose packet's tool output defeats its purpose.
+
+**Delegates are asynchronous — the Agent call does NOT return the sub-agent's work.** It returns immediately with `Async agent launched successfully … working in the background` and an agent id. That string is a *launch receipt*, never a result and never a summary. What you do with it:
+
+- **You WILL be re-invoked** by a task notification carrying the delegate's report when it finishes. Ending your turn with delegates still in flight is the correct, expected way to wait — it is not a stop, and the runner is configured to wait indefinitely for them (`CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0` in `bin/automouse/run`).
+- **A launched delegate is unfinished work until its report arrives.** Do NOT run Step 6.5, do NOT write the handoff file, and do NOT report the plan complete while any delegate you launched has not reported back. A handoff written over an in-flight delegate ships a half-implemented plan to post-plan.
+- **Name what you are waiting on** whenever you end a turn with delegates outstanding — list each pending phase by number. That is the only record that survives into the resumed turn.
+- **Never re-launch a packet** because no summary came back. Absence of a summary means still running, not failed; re-launching double-implements the phase and the second delegate will fight the first one's edits.
 
 The plan's tiering is **exhaustive and pre-resolved** — there is no tier decision left for you to make at runtime. Every phase assigned a tier **below the run model** (`impl_model`) is authored as exactly one of two forms, and you act on the form present, never on a bare label: (1) a `### Delegate` packet → delegate it per the paragraph above; (2) a `**Tier:** <Haiku|Sonnet> (inline — <reason>)` marker → the label is a *record of a decision already made* that this small phase stays inline, so implement it yourself directly, do NOT spawn a sub-agent for it (a one/two-edit phase is below a sub-agent's ~15K startup — spawning would cost more than it saves). A below-run-model phase should never reach you as a bare `**Tier:** Haiku`/`Sonnet` with neither a packet nor an `(inline — …)` marker — `bin/check-plan` gate `[T]` rejects that at author time — so treat any such bare label as a plan defect, not a delegation instruction: implement it inline and note it in your report.
 

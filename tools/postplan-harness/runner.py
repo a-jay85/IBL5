@@ -29,7 +29,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from harness import ciwatch, conformance, llm_calls, schemas
 from harness.armable import ArmInputs, evaluate, manual_testing_clearance
-from harness.classify import classify, files_from_diff, modified_files_from_diff
+from harness.classify import (classify, files_from_diff, modified_files_from_diff,
+                              render_files_changed, upsert_files_changed)
 from harness.planfile import locate_plan
 from harness.review import ReviewPhase
 from harness.state import (HarnessError, RunResult, TerminalState, UsageLedger)
@@ -110,7 +111,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             pr = gh.pr_number()
             log(f"phase2: PR #{pr} exists — updated head to {sha or '(clean)'}")
         else:
-            pr = gh.pr_create(copy["title"], copy["summary_md"], "master")
+            create_body = upsert_files_changed(copy["summary_md"], render_files_changed(diff))
+            pr = gh.pr_create(copy["title"], create_body, "master")
             log(f"phase2: pr_create intent recorded (title={copy['title']!r})")
         res.pr_number = pr
         meta = gh.pr_meta() or {"number": pr, "title": copy["title"], "body": copy["summary_md"]}
@@ -138,13 +140,11 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         if clearance == "UNKNOWN":
             if plan.found and not plan.truly_manual_rows:
                 body += "\n\n## Manual Testing\n\nNo manual testing needed — verified by automated tests.\n"
-                gh.pr_edit_body(pr, body)
                 clearance = "CLEARED"
                 log("phase6: plan matrix fully automated — sentinel appended (CLEARED)")
             elif plan.found:
                 body += ("\n\n## Manual Testing\n\n"
                          + "\n".join(f"- [ ] {r}" for r in plan.truly_manual_rows) + "\n")
-                gh.pr_edit_body(pr, body)
                 clearance = "HELD"
                 log(f"phase6: {len(plan.truly_manual_rows)} truly-manual plan rows — HELD")
             else:
@@ -162,10 +162,13 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 else:
                     body += "\n\n## Manual Testing\n\nNo manual testing needed — verified by automated tests.\n"
                     clearance = "CLEARED"
-                gh.pr_edit_body(pr, body)
                 log(f"phase6 (plan-blind): {len(manual)} truly-manual steps -> {clearance}")
         else:
             log(f"phase6: PR body already carries clearance state {clearance}")
+        # files-changed block is machine-generated: refresh it on every run so the
+        # PR body's scope can't silently drift from the actual diff.
+        body = upsert_files_changed(body, render_files_changed(diff))
+        gh.pr_edit_body(pr, body)
 
         # ---- Phase 6.5: arming ----------------------------------------
         inputs = ArmInputs(

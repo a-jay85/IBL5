@@ -1,12 +1,14 @@
 #!/bin/bash
 # Wrapper script for the IBL5 automouse autonomous workflow.
-# Called by launchd at 00:03 and 11:00 daily. Loops through queued plans,
-# firing two claude -p invocations per plan (implementation + post-plan)
-# until the queue is empty or the time guard is exceeded.
+# Called by launchd on the recurring com.ibl5.automouse schedule. Loops through
+# queued plans, firing two claude -p invocations per plan (implementation +
+# post-plan) until the queue is empty or the time guard is exceeded.
 #
 # To test manually: bin/automouse/run
 # To force-trigger via launchd: launchctl start com.ibl5.automouse
 # To schedule a one-shot run: bin/automouse/run schedule "2026-05-28 20:00 PDT"
+# To pause tonight's run:      bin/automouse/run disarm-tonight
+# To pause until a given time: bin/automouse/run disarm-until "2026-08-20 09:00 PDT"
 
 set -euo pipefail
 
@@ -101,6 +103,247 @@ PLIST_EOF
     echo "  label:  $LABEL"
     echo "  plist:  $PLIST"
     echo "  note:   runs only if the Mac is awake then; self-removes after firing."
+    exit 0
+fi
+
+# --- Disarm subcommands ----------------------------------------------------
+# Usage: bin/automouse/run disarm-tonight
+#        bin/automouse/run disarm-until "YYYY-MM-DD HH:MM [TZ]"
+#
+# Takes the recurring com.ibl5.automouse job out of launchd and arms a one-shot
+# agent that bootstraps the SAME plist back at the given time.
+#
+# The ordering is deliberate and fail-safe: the re-arm agent is bootstrapped and
+# VERIFIED first, and only then is the recurring job booted out — so a failure to
+# arm leaves the pipeline running instead of silently off. That is the exact
+# failure mode of the 2026-08-11 outage, where the re-enable was queued with
+# `at` and never fired because macOS ships com.apple.atrun disabled; four
+# scheduled runs were lost before anyone noticed.
+#
+# Every launchctl call goes through $LAUNCHCTL so bin/test-automouse-disarm can
+# stub it with a recording shim and assert the arm-before-disarm ordering.
+
+# Resolve "YYYY-MM-DD HH:MM [TZ]" to an epoch. BSD (macOS) forms first, GNU
+# fallback last so these helpers stay exercisable on the Linux CI runner.
+parse_when_epoch() {
+    local when="$1" epoch=""
+    epoch=$(date -j -f '%Y-%m-%d %H:%M %Z' "$when" +%s 2>/dev/null || true)
+    [ -n "$epoch" ] || epoch=$(date -j -f '%Y-%m-%d %H:%M' "$when" +%s 2>/dev/null || true)
+    [ -n "$epoch" ] || epoch=$(date -d "$when" +%s 2>/dev/null || true)
+    [ -n "$epoch" ] || return 1
+    printf '%s\n' "$epoch"
+}
+
+# Format an epoch with a strftime spec: BSD `date -r`, GNU `date -d @`.
+epoch_fmt() {
+    date -r "$1" "+$2" 2>/dev/null || date -d "@$1" "+$2"
+}
+
+# Hour and Minute of the recurring job's StartCalendarInterval, space-separated.
+# Returns 1 when the key is absent or holds an ARRAY of intervals (which has no
+# single Hour) — callers must error out rather than fall through to a guessed
+# fire time.
+daily_fire_hhmm() {
+    local plist="$1" h m
+    h=$(plutil -extract StartCalendarInterval.Hour raw -o - -- "$plist" 2>/dev/null || true)
+    m=$(plutil -extract StartCalendarInterval.Minute raw -o - -- "$plist" 2>/dev/null || true)
+    case "$h" in ''|*[!0-9]*) return 1 ;; esac
+    case "$m" in ''|*[!0-9]*) m=0 ;; esac
+    printf '%s %s\n' "$((10#$h))" "$((10#$m))"
+}
+
+# Next local-wall-clock occurrence of hour:minute strictly after now_epoch.
+# Re-parses tomorrow's calendar date instead of adding 86400 so a DST transition
+# doesn't slide the fire time by an hour.
+next_daily_epoch() {
+    local hour="$1" min="$2" now="$3" day cand
+    day=$(epoch_fmt "$now" '%Y-%m-%d')
+    cand=$(parse_when_epoch "$(printf '%s %02d:%02d' "$day" "$hour" "$min")") || return 1
+    if [ "$cand" -le "$now" ]; then
+        day=$(epoch_fmt "$((now + 86400))" '%Y-%m-%d')
+        cand=$(parse_when_epoch "$(printf '%s %02d:%02d' "$day" "$hour" "$min")") || return 1
+    fi
+    printf '%s\n' "$cand"
+}
+
+# PID of an in-flight automouse run; returns 1 when idle or not loaded.
+automouse_running_pid() {
+    local out pid
+    out=$("${LAUNCHCTL:-launchctl}" list com.ibl5.automouse 2>/dev/null) || return 1
+    pid=$(printf '%s\n' "$out" | sed -n 's/.*"PID"[[:space:]]*=[[:space:]]*\([0-9][0-9]*\);.*/\1/p' | head -1)
+    [ -n "$pid" ] || return 1
+    printf '%s\n' "$pid"
+}
+
+disarm_until_epoch() {
+    local rearm_epoch="$1"
+    local lc="${LAUNCHCTL:-launchctl}"
+    local agents="${LAUNCH_AGENTS_DIR:-$HOME/Library/LaunchAgents}"
+    local state="${AUTOMOUSE_STATE_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse}"
+    local daily="$agents/com.ibl5.automouse.plist"
+    local label="com.ibl5.automouse-rearm-$rearm_epoch"
+    local plist="$agents/$label.plist"
+    local breadcrumb="$state/.disarmed-until"
+    local log="$state/logs/launchd-rearm.log"
+    local uid pid stale cal_month cal_day cal_hour cal_min hhmm next_fire
+
+    if [ ! -f "$daily" ]; then
+        echo "error: recurring plist not found: $daily" >&2
+        return 1
+    fi
+    uid=$(id -u)
+
+    # launchctl bootout SIGTERMs a running instance — never take down a run in
+    # flight just to pause the schedule.
+    if pid=$(automouse_running_pid); then
+        echo "error: an automouse run is in flight (PID $pid)." >&2
+        echo "       Disarming now would SIGTERM it. Retry once it finishes." >&2
+        return 1
+    fi
+
+    mkdir -p "$agents" "$state/logs"
+
+    # Clear only OUR re-arm agents so repeated disarms don't stack. Deliberately
+    # NOT the broader com.ibl5.automouse-* glob — that would also boot out and
+    # delete a one-shot run the user scheduled with `run schedule`.
+    for stale in "$agents"/com.ibl5.automouse-rearm-*.plist; do
+        [ -e "$stale" ] || continue
+        "$lc" bootout "gui/$uid/$(basename "$stale" .plist)" 2>/dev/null || true
+        rm -f "$stale"
+    done
+
+    # 10# forces base-10 so values like 08/09 don't trip bash's octal parser.
+    cal_month=$((10#$(epoch_fmt "$rearm_epoch" '%m')))
+    cal_day=$((10#$(epoch_fmt "$rearm_epoch" '%d')))
+    cal_hour=$((10#$(epoch_fmt "$rearm_epoch" '%H')))
+    cal_min=$((10#$(epoch_fmt "$rearm_epoch" '%M')))
+
+    # The re-arm command chains on success only: if the bootstrap fails, the
+    # plist and the breadcrumb are KEPT and the failure is logged, so the
+    # evidence and the retry both survive. A `;`-chained self-delete would erase
+    # both and leave a zero-byte log indistinguishable from success.
+    cat > "$plist" <<PLIST_EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>$label</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/bin/bash</string>
+		<string>-lc</string>
+		<string>if launchctl list com.ibl5.automouse >/dev/null 2>/dev/null; then echo "[\$(date '+%Y-%m-%d %H:%M:%S')] $label: com.ibl5.automouse already loaded, nothing to re-arm"; rm -f "$breadcrumb" "$plist"; launchctl bootout gui/$uid/$label; elif launchctl bootstrap gui/$uid "$daily"; then echo "[\$(date '+%Y-%m-%d %H:%M:%S')] $label: re-armed com.ibl5.automouse"; rm -f "$breadcrumb" "$plist"; launchctl bootout gui/$uid/$label; else echo "[\$(date '+%Y-%m-%d %H:%M:%S')] $label: FAILED to re-arm com.ibl5.automouse - keeping $plist for retry"; fi</string>
+	</array>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Month</key>
+		<integer>$cal_month</integer>
+		<key>Day</key>
+		<integer>$cal_day</integer>
+		<key>Hour</key>
+		<integer>$cal_hour</integer>
+		<key>Minute</key>
+		<integer>$cal_min</integer>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>$log</string>
+	<key>StandardErrorPath</key>
+	<string>$log</string>
+</dict>
+</plist>
+PLIST_EOF
+
+    # ARM FIRST. Both failure paths below return with the recurring job still
+    # loaded — pausing is never allowed to become an unnoticed permanent stop.
+    if ! "$lc" bootstrap "gui/$uid" "$plist"; then
+        rm -f "$plist"
+        echo "error: could not bootstrap the re-arm agent." >&2
+        echo "       Recurring job left ENABLED — nothing was disarmed." >&2
+        return 1
+    fi
+    if ! "$lc" list "$label" >/dev/null 2>/dev/null; then
+        "$lc" bootout "gui/$uid/$label" 2>/dev/null || true
+        rm -f "$plist"
+        echo "error: the re-arm agent did not register with launchd." >&2
+        echo "       Recurring job left ENABLED — nothing was disarmed." >&2
+        return 1
+    fi
+
+    # Only now is it safe to take the recurring job down. Tolerate rc != 0: the
+    # job may already be unloaded, which is the desired end state anyway.
+    "$lc" bootout "gui/$uid/com.ibl5.automouse" 2>/dev/null || true
+
+    {
+        echo "disarmed_at=$(epoch_fmt "$(date +%s)" '%Y-%m-%d %H:%M %Z')"
+        echo "rearm_epoch=$rearm_epoch"
+        echo "rearm_at=$(epoch_fmt "$rearm_epoch" '%Y-%m-%d %H:%M %Z')"
+        echo "rearm_label=$label"
+        echo "rearm_plist=$plist"
+        echo "requested_by=${USER:-unknown}"
+    } > "$breadcrumb"
+
+    # Report the first run that actually happens after the re-arm — a re-arm
+    # time earlier in the day than the recurring fire time disarms nothing, and
+    # this line makes that visible instead of surprising.
+    next_fire=""
+    if hhmm=$(daily_fire_hhmm "$daily"); then
+        # $hhmm is "<hour> <minute>" — unquoted on purpose so it splits in two.
+        next_fire=$(next_daily_epoch $hhmm "$rearm_epoch" 2>/dev/null || true)
+    fi
+
+    echo "Disarmed com.ibl5.automouse."
+    echo "  re-arms:   $(epoch_fmt "$rearm_epoch" '%Y-%m-%d %H:%M %Z')  (local time)"
+    if [ -n "$next_fire" ]; then
+        echo "  next run:  $(epoch_fmt "$next_fire" '%Y-%m-%d %H:%M %Z')  (first scheduled run after re-arm)"
+    fi
+    echo "  label:     $label"
+    echo "  plist:     $plist"
+    echo "  state:     $breadcrumb"
+    echo "  log:       $log"
+    echo "  note:      the re-arm needs the Mac awake then. If it is missed, re-enable by hand:"
+    echo "             launchctl bootstrap gui/$uid $daily"
+}
+
+if [ "${1:-}" = "disarm-tonight" ] || [ "${1:-}" = "disarm-until" ]; then
+    DISARM_AGENTS="${LAUNCH_AGENTS_DIR:-$HOME/Library/LaunchAgents}"
+    DISARM_DAILY="$DISARM_AGENTS/com.ibl5.automouse.plist"
+    NOW=$(date +%s)
+
+    if [ "$1" = "disarm-tonight" ]; then
+        if ! DAILY_HHMM=$(daily_fire_hhmm "$DISARM_DAILY"); then
+            echo "error: could not read StartCalendarInterval.Hour from $DISARM_DAILY" >&2
+            echo "       (an array of intervals has no single Hour — use disarm-until instead)" >&2
+            exit 1
+        fi
+        # $DAILY_HHMM is "<hour> <minute>" — unquoted on purpose so it splits.
+        DISARM_FIRE=$(next_daily_epoch $DAILY_HHMM "$NOW")
+        # Re-arm an hour after the run we're skipping would have started, so the
+        # bootstrap can't land inside that interval. launchd does not fire a
+        # catch-up run for an interval missed while the job was unloaded
+        # (verified by hand 2026-08-14), so the margin is about ordering, not
+        # about suppressing a replay.
+        REARM_EPOCH=$((DISARM_FIRE + 3600))
+    else
+        WHEN="${2:-}"
+        if [ -z "$WHEN" ]; then
+            echo "usage: bin/automouse/run disarm-until \"YYYY-MM-DD HH:MM [TZ]\"" >&2
+            echo "example: bin/automouse/run disarm-until \"2026-08-20 09:00 PDT\"" >&2
+            exit 1
+        fi
+        if ! REARM_EPOCH=$(parse_when_epoch "$WHEN"); then
+            echo "error: could not parse time '$WHEN'" >&2
+            echo "expected: YYYY-MM-DD HH:MM [TZ]  (e.g. 2026-08-20 09:00 PDT)" >&2
+            exit 1
+        fi
+    fi
+
+    if [ "$REARM_EPOCH" -le "$NOW" ]; then
+        echo "error: re-arm time resolves to the past ($(epoch_fmt "$REARM_EPOCH" '%Y-%m-%d %H:%M %Z'))" >&2
+        exit 1
+    fi
+
+    disarm_until_epoch "$REARM_EPOCH"
     exit 0
 fi
 

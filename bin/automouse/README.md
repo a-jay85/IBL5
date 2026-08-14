@@ -18,7 +18,7 @@ queue ◄──── queue-reorder-ui (browser drag-reorder UI, writes queue or
 
 | Script | Role |
 |--------|------|
-| `run` | Outer loop. Drains the queue, fires two `claude -p` invocations per plan (implementation, then post-plan review), manages logs/heartbeat, and schedules one-shot launchd runs (`run schedule "…"`). Holds the `SELF` absolute-path pin used to generate one-shot plists (ADR-0092). |
+| `run` | Outer loop. Drains the queue, fires two `claude -p` invocations per plan (implementation, then post-plan review), manages logs/heartbeat, and schedules one-shot launchd runs (`run schedule "…"`) or temporary disarms with automatic re-enabling (`run disarm-tonight`, `run disarm-until "YYYY-MM-DD HH:MM [TZ]"`). Holds the `SELF` absolute-path pin used to generate one-shot plists (ADR-0092). |
 | `queue` | Add/remove/list/requeue/reorder plans in the nightly queue. Enforces the `impl_model` ↔ Verification-Matrix consistency backstop via `../lib/plan-model-consistency`. |
 | `queue-reorder-ui` | Local browser UI to drag-reorder the queue; shells out to `queue reorder` and `../lib/automouse-reorder-router.php`. |
 | `self-heal` | Top-of-run recovery. Requeues plans skipped by the staleness gate that now pass `../check-plan-staleness` (only those carrying a `.md.staleness` sidecar marker). |

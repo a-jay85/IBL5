@@ -1,6 +1,6 @@
 ---
 description: Automouse autonomous workflow (formerly "nightly") — launchd fires claude -p on a recurring schedule, running two context-isolated agents per plan (implementation + post-plan) with time guards and incremental checkpoints.
-last_verified: 2026-08-13
+last_verified: 2026-08-14
 paths: "bin/automouse/**"
 ---
 
@@ -21,6 +21,8 @@ A headless `claude -p` process runs on a recurring schedule via macOS `launchd`.
 | Cancel the next run | `rm ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/queue/*.md` |
 | Schedule a one-shot run | `bin/automouse/run schedule "2026-05-28 20:00 PDT"` (self-cleaning launchd agent; TZ optional) |
 | Run one plan (one-off, foreground) | `bin/automouse/run plan <slug>` (impl + post-plan for exactly one named plan, then stops; auto-queues if absent, leaves the rest of the queue untouched) |
+| Pause tonight's run (auto re-enables) | `bin/automouse/run disarm-tonight` (re-arms the existing plist ~1 h after the skipped run; the manual `launchctl unload` row below stays off until re-armed by hand) |
+| Pause until a given time | `bin/automouse/run disarm-until "2026-08-20 09:00 PDT"` (re-arms the existing plist at the given time; the manual `launchctl unload` row below stays off until re-armed by hand) |
 | Disable the automouse job | `launchctl unload ~/Library/LaunchAgents/com.ibl5.automouse.plist` |
 | Re-enable the automouse job | `launchctl load ~/Library/LaunchAgents/com.ibl5.automouse.plist` |
 | Force-trigger now | `launchctl start com.ibl5.automouse` |
@@ -28,6 +30,10 @@ A headless `claude -p` process runs on a recurring schedule via macOS `launchd`.
 | Self-heal staleness-FP skips | `bin/automouse/self-heal` |
 | Preview self-heal (no changes) | `bin/automouse/self-heal --dry-run` |
 | Check logs | `cat ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/logs/$(date +%Y-%m-%d).log` |
+
+### Disarm ordering and safety
+
+`disarm-tonight` and `disarm-until` follow an arm-before-disarm sequence: the one-shot re-arm launchd agent is bootstrapped and verified **before** the recurring job is unloaded, so if arming fails the pipeline keeps running and nothing is interrupted. Both subcommands refuse to act while a run is in flight (booting out the recurring job would SIGTERM the active process). After a successful disarm, a breadcrumb is written to `~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/.disarmed-until` (epoch, human-readable re-arm time, re-arm agent label, and requester), so `cat` on that file immediately answers "why is automouse off?". Repeated disarms clear any prior `com.ibl5.automouse-rearm-*` agents first so disarms never stack; one-shot agents from `run schedule` are deliberately left alone.
 
 ## Directory Layout
 

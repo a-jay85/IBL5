@@ -1,0 +1,75 @@
+#!/bin/bash
+# shellcheck shell=bash
+#
+# bin/pre-commit-hook — the git pre-commit gate body, version-controlled.
+#
+# Installed by bin/install-git-hooks, which writes a thin shim to the COMMON git
+# hooks dir (git rev-parse --git-common-dir) that exec's this file. Living in the
+# repo means the gate is editable from any worktree and travels with a clone,
+# instead of being a machine-local untracked hook one developer happens to have.
+#
+# Four independent blocks, each gated on what is staged. Only the codebase-map
+# regen is advisory; the rest fail the commit.
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+# Auto-regenerate codebase map when classes/ files are staged.
+# Never fails the commit — map freshness is a convenience, not a gate.
+if git diff --cached --name-only | grep -q '^ibl5/classes/.*\.php$'; then
+    if [ -x "$REPO_ROOT/bin/generate-codebase-map" ]; then
+        "$REPO_ROOT/bin/generate-codebase-map" 2>/dev/null
+        git add "$REPO_ROOT/.claude/rules/codebase-map.md" 2>/dev/null
+    fi
+fi
+
+# Enforce gofmt on staged Go files.
+staged_go=$(git diff --cached --name-only | grep '\.go$')
+if [ -n "$staged_go" ]; then
+    unformatted=$(echo "$staged_go" | xargs gofmt -l 2>/dev/null)
+    if [ -n "$unformatted" ]; then
+        echo "gofmt: unformatted Go files (run gofmt -w):"
+        echo "$unformatted"
+        exit 1
+    fi
+fi
+
+# Validate doc frontmatter and references when .md files are staged.
+if git diff --cached --name-only | grep -qE '\.md$'; then
+    if ! "$REPO_ROOT/bin/check-docs" --no-staleness 2>&1; then
+        echo ""
+        echo "Fix the above doc issues before committing."
+        exit 1
+    fi
+
+    # On-touch bump rule. Only --since mode evaluates it, so the full scan above
+    # is structurally unable to catch a missing last_verified bump -- that is how
+    # PR #1878 merged one. check-docs unions the staged view into its changed set,
+    # so this sees the very edit being committed. Fail-and-tell, never --fix-dates:
+    # auto-bumping would stamp "verified" on content nobody re-read.
+    # Scope note: like the --no-staleness pass above, this reads the WORKING TREE,
+    # so an unbumped doc you left unstaged blocks a commit of some other file.
+    # Accepted, not a bug: that doc fails CI either way, and --no-verify is the
+    # escape hatch for a deliberate partial commit.
+    # Skipped when origin/master is unresolvable, so a fetch-less clone still commits.
+    doc_base=$(git merge-base HEAD origin/master 2>/dev/null) || doc_base=""
+    if [ -n "$doc_base" ]; then
+        if ! "$REPO_ROOT/bin/check-docs" --since="$doc_base" 2>&1; then
+            echo ""
+            echo "Bump last_verified on the doc(s) above (and confirm the content is"
+            echo "still accurate) before committing."
+            exit 1
+        fi
+    fi
+fi
+
+# Cap the always-loaded rules byte budget when a path-unscoped .claude/rules/*.md
+# file is staged. Mirrors the check-docs gate above so a byte-budget overflow is
+# caught at commit time instead of surfacing only in CI (Static guards job).
+if git diff --cached --name-only | grep -qE '^\.claude/rules/.*\.md$'; then
+    if ! "$REPO_ROOT/bin/check-rules-byte-budget" 2>&1; then
+        echo ""
+        echo "Trim the rule(s) above (or move detail into a path-scoped *-detail.md"
+        echo "companion) before committing."
+        exit 1
+    fi
+fi

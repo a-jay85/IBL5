@@ -1,13 +1,15 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 #
-# bin/install-git-hooks — install the pre-push ADR decision-trigger gate and the
-# CSS auto-heal trigger into the COMMON git hooks dir.
+# bin/install-git-hooks — install the pre-commit gate, the pre-push ADR
+# decision-trigger gate, and the CSS auto-heal trigger into the COMMON git hooks dir.
 #
 # Copies thin shims into the COMMON git hooks dir (git rev-parse
 # --git-common-dir), so a single install covers every worktree (worktrees share
-# the common .git). The pre-push shim chains git-lfs (preserving LFS pushes) then
-# exec's bin/pre-push-adr-hook, where the gate logic lives version-controlled.
+# the common .git). The pre-commit shim exec's bin/pre-commit-hook (the gate
+# body, version-controlled) and fails closed if that file is absent. The pre-push
+# shim chains git-lfs (preserving LFS pushes) then exec's bin/pre-push-adr-hook,
+# where the gate logic lives version-controlled.
 #
 # It also injects a version-controlled CSS auto-heal call into post-checkout,
 # post-merge, and post-rewrite. These git ops bulk-rewrite the working tree in a
@@ -16,22 +18,54 @@
 #
 # We deliberately do NOT use core.hooksPath: it is all-or-nothing across the
 # shared common git dir and would orphan the existing untracked hooks (the git-lfs
-# pre-push, pre-commit's codebase-map + check-docs, post-merge wt-cleanup,
-# post-checkout). Copying/injecting shims is surgical.
+# pre-push, post-merge wt-cleanup, post-checkout). Copying/injecting shims is
+# surgical.
 #
 # Idempotent: re-running detects our sentinel markers and rewrites/skips in
 # place; a pre-existing NON-shim pre-push (the default git-lfs one) is backed up
-# once to pre-push.pre-adr.bak before we overwrite it. The CSS injection is a
+# once to pre-push.pre-adr.bak before we overwrite it; a pre-existing non-shim
+# pre-commit is backed up once to pre-commit.pre-shim.bak. The CSS injection is a
 # no-op when its sentinel is already present, and preserves any existing hook
 # body (it inserts our call right after the shebang so it runs before a hook's
 # branch-gated early-exit).
 
 set -euo pipefail
 
-SENTINEL='# IBL5-ADR-HOOK'
+PRECOMMIT_SENTINEL='# IBL5-PRECOMMIT-HOOK'
 
 HOOKS_DIR="$(git rev-parse --git-common-dir)/hooks"
 mkdir -p "$HOOKS_DIR"
+PRECOMMIT_SHIM="$HOOKS_DIR/pre-commit"
+
+# Back up a pre-existing non-shim pre-commit exactly once (preserves whatever a
+# developer already had). Re-running over our own shim makes no backup.
+if [ -e "$PRECOMMIT_SHIM" ] && ! grep -qF "$PRECOMMIT_SENTINEL" "$PRECOMMIT_SHIM"; then
+    BACKUP="$HOOKS_DIR/pre-commit.pre-shim.bak"
+    if [ ! -e "$BACKUP" ]; then
+        cp "$PRECOMMIT_SHIM" "$BACKUP"
+        echo "Backed up existing pre-commit hook to $BACKUP"
+    fi
+fi
+
+cat > "$PRECOMMIT_SHIM" <<'EOF'
+#!/bin/sh
+# IBL5-PRECOMMIT-HOOK (installed by bin/install-git-hooks)
+# The gate body lives version-controlled at bin/pre-commit-hook.
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+if [ ! -x "$REPO_ROOT/bin/pre-commit-hook" ]; then
+    echo "pre-commit: $REPO_ROOT/bin/pre-commit-hook is missing or not executable." >&2
+    echo "This shim fails closed rather than silently skipping the doc/gofmt/byte-budget gates." >&2
+    echo "Run bin/install-git-hooks from a checkout that has it, or use --no-verify deliberately." >&2
+    exit 1
+fi
+exec "$REPO_ROOT/bin/pre-commit-hook" "$@"
+EOF
+chmod 0755 "$PRECOMMIT_SHIM"
+
+echo "Installed pre-commit hook shim: $PRECOMMIT_SHIM"
+
+SENTINEL='# IBL5-ADR-HOOK'
+
 SHIM="$HOOKS_DIR/pre-push"
 
 # Back up a pre-existing non-shim pre-push exactly once (preserves the default

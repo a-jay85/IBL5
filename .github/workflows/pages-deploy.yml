@@ -1,9 +1,11 @@
 name: Deploy VR gallery to Pages
 
+# Fired by `gh workflow run` from the jobs that actually push to gh-pages (e2e-tests.yml:
+# the `e2e` job after a successful gallery push, and `vr-pages-cleanup` after a prune push),
+# so a deploy happens once per real gh-pages content change instead of once per E2E run.
+# `workflow_dispatch` is deliberately UNGUARDED: it doubles as the manual recovery path when
+# the site is left half-published.
 on:
-  workflow_run:
-    workflows: ["E2E Tests"]
-    types: [completed]
   workflow_dispatch: {}
 
 permissions:

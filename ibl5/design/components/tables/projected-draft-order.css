@@ -120,7 +120,7 @@
 }
 
 .draft-draggable:hover td {
-    background-color: var(--gray-50);
+    background-color: var(--accent-100);
 }
 
 .draft-drag-placeholder td {
@@ -129,13 +129,14 @@
     height: 2.5rem;
 }
 
-/* Team and Record cells keep their own team background — the movement tint
-   would sit under text still painted in the team's secondary color (often
-   white), leaving the team name unreadable. Must stay after the hover rule
-   above: same specificity, so source order decides. The Pick and Notes cells
-   still carry the tint, and the movement badge reinforces it. */
+/* Team and Record cells keep their own team background — a movement or hover
+   tint would sit under text still painted in the team's secondary color (often
+   white), leaving the team name unreadable. Must stay after the rules above:
+   these are more specific, but source order also keeps it unambiguous. The Pick
+   and Notes cells still carry the tint, and the movement badge reinforces it. */
 .draft-moved-up td.ibl-team-cell--colored,
-.draft-moved-down td.ibl-team-cell--colored {
+.draft-moved-down td.ibl-team-cell--colored,
+.draft-draggable:hover td.ibl-team-cell--colored {
     background-color: var(--team-cell-bg);
 }
 

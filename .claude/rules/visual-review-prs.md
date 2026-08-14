@@ -11,7 +11,7 @@ paths:
   - "bin/vr-changed-coverage"
   - "bin/vr-build-gallery"
   - "bin/vr-review-comment"
-last_verified: 2026-07-03
+last_verified: 2026-08-14
 ---
 
 # Visual-review PRs
@@ -44,7 +44,8 @@ They are skipped only during baseline regen (the `update-baselines` label).
    `<sha>/visual-review/` (multiple open PRs/SHAs coexist). The Playwright HTML report (traces) is
    preserved under `<sha>/visual-review/playwright-report/`. The `gh-pages` branch is only the
    durable accumulator; the site is **served** by `.github/workflows/pages-deploy.yml` (Pages
-   source = GitHub Actions, no Jekyll), which fires on `E2E Tests` completion and re-publishes the
+   source = GitHub Actions, no Jekyll), which is dispatched by the deploy step below once the
+   gh-pages push lands (one deploy per real content change, not one per E2E run) and re-publishes the
    whole tree. Because every open PR's VR job pushes to the same `gh-pages` ref, concurrent runs
    collide on the ref lock; the deploy is spelled out as **one attempt plus two retries** (the
    action re-clones `gh-pages` each time, so a retry sees the ref that beat it). An **assert step**
@@ -57,7 +58,7 @@ They are skipped only during baseline regen (the `update-baselines` label).
 A `vr-pages-cleanup` job (push-to-master only, not part of the required gate) prunes
 per-SHA gallery dirs whose newest commit is older than 14 days. Its `gh-pages` push carries the same
 rebase-and-retry loop for the same ref contention. A prune reaches the served site when
-`pages-deploy.yml` next re-publishes the tree (on the master run's `E2E Tests` completion).
+`pages-deploy.yml` next re-publishes the tree (the cleanup job dispatches `pages-deploy.yml` itself once its prune push lands).
 
 ## Reading the comment
 

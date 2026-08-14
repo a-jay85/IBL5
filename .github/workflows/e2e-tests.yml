@@ -127,10 +127,12 @@ jobs:
     timeout-minutes: 30
     # contents: write → push the Playwright HTML report to the gh-pages branch.
     # pull-requests: write → post the sticky visual-review comment.
+    # actions: write → `gh workflow run pages-deploy.yml` after the gallery push lands.
     # (Job-level scope: only this job gets write; the top-level default stays read.)
     permissions:
       contents: write
       pull-requests: write
+      actions: write
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -298,6 +300,32 @@ jobs:
         if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && steps.vr-pages.outcome == 'failure' && steps.vr-pages-retry-1.outcome == 'failure' && steps.vr-pages-retry-2.outcome == 'failure'
         run: |
           echo "::error::Deploying the VR gallery to gh-pages failed on all 3 attempts — see the deploy step logs above."
+          exit 1
+
+      # pages-deploy.yml re-serves the tree. It used to fire on `workflow_run: E2E Tests completed`
+      # — ~100 deploys per 6.5h against ~63 real gh-pages changes. Dispatching here ties one deploy
+      # to one landed push. `always()` is REQUIRED: the Playwright VR step above has no
+      # continue-on-error, so a real regression makes success() false — and that is exactly when the
+      # gallery must still be served. The outcome cascade (not success()) proves a push landed: a
+      # fork PR's read-only token never yields `success`, and an exhausted chain leaves all three at
+      # `failure`, so both skip this step.
+      - name: Re-serve the gh-pages tree (dispatch Pages deploy)
+        if: always() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'update-baselines') && (steps.vr-pages.outcome == 'success' || steps.vr-pages-retry-1.outcome == 'success' || steps.vr-pages-retry-2.outcome == 'success')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # --ref pins the DEFAULT branch on purpose: workflow_run always ran the deploy job body
+          # from the default branch, and a PR branch must not get its own pages:write/id-token:write
+          # job onto the live site. The deploy job checks out `ref: gh-pages` for content, so this
+          # ref never affects what is published.
+          for attempt in 1 2 3; do
+            if gh workflow run pages-deploy.yml --ref "${{ github.event.repository.default_branch }}"; then
+              exit 0
+            fi
+            echo "workflow dispatch failed (attempt ${attempt}/3) — retrying."
+            sleep 5
+          done
+          echo "::error::Could not dispatch pages-deploy.yml after 3 attempts — the gallery is pushed to gh-pages but not served. Re-run it manually: gh workflow run pages-deploy.yml"
           exit 1
 
       - name: Build visual-review comment
@@ -814,6 +842,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write
     steps:
       - name: Checkout gh-pages (skip if it does not exist yet)
         id: checkout-pages
@@ -824,6 +853,7 @@ jobs:
           fetch-depth: 0
 
       - name: Prune per-SHA report dirs older than 14 days
+        id: prune
         if: steps.checkout-pages.outcome == 'success'
         run: |
           git config user.name "github-actions[bot]"
@@ -846,6 +876,7 @@ jobs:
             # rebase-then-retry resolves it.
             for attempt in 1 2 3; do
               if git push origin gh-pages; then
+                echo "pruned=true" >> "$GITHUB_OUTPUT"
                 exit 0
               fi
               echo "gh-pages push rejected (attempt ${attempt}/3) — rebasing onto the updated ref."
@@ -856,3 +887,11 @@ jobs:
           else
             echo "Nothing to prune."
           fi
+
+      # A prune only reaches the SERVED site when pages-deploy.yml re-publishes the tree. Under the
+      # old workflow_run trigger the master E2E completion did that implicitly; now it is explicit.
+      - name: Re-serve the gh-pages tree (dispatch Pages deploy)
+        if: steps.prune.outputs.pruned == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages-deploy.yml --ref "${{ github.event.repository.default_branch }}"

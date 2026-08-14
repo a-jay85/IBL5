@@ -1,6 +1,6 @@
 ---
 description: CI/GitHub-Actions workflow simplification backlog — duplicated setup/notify boilerplate, job consolidation, and verified-not-redundant workflows, with per-entry status + automouse-readiness.
-last_verified: 2026-08-08
+last_verified: 2026-08-14
 ---
 
 # CI Workflow Simplification Backlog
@@ -149,6 +149,31 @@ Entries 6.1 and 6.2 are CI/coverage gaps surfaced by the 2026-07-31 audit of PR 
 **Closes gap:** #8 from `$HOME/claude-plans/sim-recap-testing-gaps-breakdown.md`
 **Tracked here** by PR #1753 audit origin, not by theme (no existing backlog covers payload-validation gaps).
 **Status (2026-07-31):** 📋 Planned — `~/claude-plans/game-of-that-day-validation-floor.md` (written 2026-07-31). Not yet implemented. 🟥.
+
+---
+
+## Axis 7: VR Pages deploy / gh-pages tree spin-offs (PR #1874)
+
+| # | Title | Status | Automouse | Effort |
+|---|-------|--------|-----------|-------:|
+| 7.1 | `gh-pages` tree unbounded by size — p95 deploy 540s | ⬜ Open | 🟨 | M |
+| 7.2 | Fork-PR hard failure in VR gallery push (peaceiris hard-assert) | ⬜ Open | 🟥 | M |
+
+### 7.1 `gh-pages` tree unbounded by size — p95 deploy 540s
+*(discovered 2026-08-14 during #1874)*
+**Location:** `.github/workflows/e2e-tests.yml` `vr-pages-cleanup` job (14-day age prune); `.github/workflows/pages-deploy.yml` (uploads the whole `gh-pages` tree as the Pages artifact).
+**Problem:** The 14-day prune bounds age, not size. As of the audit: 1861 commits, 692 per-SHA dirs, 1595 files — the tree re-uploads entirely on every Pages deploy, which is why p95 wall-clock is 540s. Against `concurrency: group: pages, cancel-in-progress: false`, a queue of one plus the in-flight deploy is always building. The trigger-dedupe in #1874 cuts dispatch frequency (~100 → ~63 per 6.5h) but not upload size.
+**Suggested direction:** Prune by count (keep the N most recent SHAs), or switch to serving only the N most recent SHAs by generating a thin index that re-points `/<sha>/` to a shared CDN copy. The former is simpler; the latter also reduces storage. Either direction requires deciding N.
+**Risk if untouched:** Deploy wall-clock drifts up as more SHAs accumulate; the 14-day prune converges on a steady state only if SHAs age out before the tree grows past some threshold, which is not guaranteed under high-velocity usage.
+**Status (2026-08-14):** ⬜ Open — out of scope for #1874; needs a design decision on N before a `/plan` can be written. 🟨.
+
+### 7.2 Fork-PR hard failure in VR gallery push (peaceiris hard-assert)
+*(discovered 2026-08-14 during #1874)*
+**Location:** `.github/workflows/e2e-tests.yml:257-301` — three peaceiris `actions-gh-pages` attempts + a hard `exit 1` assert; commented at line 221 that fork PRs get a read-only `GITHUB_TOKEN` regardless of `permissions:`.
+**Problem:** On a fork PR every peaceiris attempt fails (the token cannot push), the assert at line 297 fires, and the `e2e` job exits non-zero. The new dispatch step in #1874 correctly skips in this state (outcome cascade never reaches `success`), but the upstream hard failure is pre-existing and unresolved. Lines 257-301 must stay byte-identical to preserve the `GITHUB_TOKEN` / `secrets.CI_PAT` decision, so it is explicitly out of scope for #1874.
+**Suggested direction:** Gate the three peaceiris steps (and the hard assert) behind `if: github.event.pull_request.head.repo.full_name == github.repository` so fork PRs skip the entire push-and-assert block gracefully. The dispatch step's existing outcome cascade already skips it correctly, so only the upstream assert needs to be conditionalized.
+**Risk if untouched:** Every fork-PR E2E run fails at the gallery-push step, producing a red required check and a confusing error message for the contributor. The new dispatch step in #1874 masks the symptom (no spurious deploy dispatched from a fork) but leaves the root cause.
+**Status (2026-08-14):** ⬜ Open — out of scope for #1874; a targeted `if:` fix is straightforward but requires care around the `always()` + outcome-cascade interaction. 🟥 (open design question: should the assert still fire for non-fork failures after the gate is added?).
 
 ---
 

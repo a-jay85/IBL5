@@ -136,9 +136,11 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
         $dragAttr = $isDraggable ? ' draggable="true" data-team-id="' . HtmlSanitizer::e($slot['teamId']) . '"' : '';
         $html = '<tr' . $classAttr . $dragAttr . '>';
 
+        $pickNumber = '<span class="draft-pick-number">' . HtmlSanitizer::e($slot['pick']) . '</span>'
+            . $this->renderMovementBadge($slot['movement']);
         $pickHtml = $isDraggable
-            ? '<td class="draft-pick-cell"><span class="draft-drag-handle">⠿</span>' . HtmlSanitizer::e($slot['pick']) . '</td>'
-            : '<td>' . HtmlSanitizer::e($slot['pick']) . '</td>';
+            ? '<td class="draft-pick-cell"><span class="draft-drag-handle">⠿</span>' . $pickNumber . '</td>'
+            : '<td>' . $pickNumber . '</td>';
         $html .= $pickHtml;
 
         if ($slot['isTraded']) {
@@ -170,6 +172,24 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
 
         $html .= '</tr>';
         return $html;
+    }
+
+    /**
+     * How many spots this pick moved from its projected position, shown beside the
+     * pick number. Movement is non-zero only for saved lottery results, so nothing
+     * renders on the projected order.
+     */
+    private function renderMovementBadge(int $movement): string
+    {
+        if ($movement === 0) {
+            return '';
+        }
+
+        $modifier = $movement > 0 ? 'draft-movement--up' : 'draft-movement--down';
+        $sign = $movement > 0 ? '+' : '';
+
+        return '<span class="draft-movement ' . $modifier . '">'
+            . $sign . HtmlSanitizer::e($movement) . '</span>';
     }
 
     /** @param DraftSlot $slot */

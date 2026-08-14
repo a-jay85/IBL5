@@ -131,13 +131,18 @@
         currentRows.forEach(function (row, index) {
             var pickCell = row.querySelector('td:first-child');
             if (!pickCell) return;
-            // Update only the text node after the drag handle span
-            var textNode = pickCell.lastChild;
-            if (textNode && textNode.nodeType === Node.TEXT_NODE) {
-                textNode.textContent = String(index + 1);
-            } else {
-                pickCell.appendChild(document.createTextNode(String(index + 1)));
+            // Update only the pick number, leaving the drag handle alone
+            var numberEl = pickCell.querySelector('.draft-pick-number');
+            if (numberEl) {
+                numberEl.textContent = String(index + 1);
             }
+            // The saved movement no longer describes this row's new position;
+            // the correct values come back on reload after Save.
+            var badge = pickCell.querySelector('.draft-movement');
+            if (badge) {
+                badge.remove();
+            }
+            row.classList.remove('draft-moved-up', 'draft-moved-down');
         });
     }
 

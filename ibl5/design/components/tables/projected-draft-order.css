@@ -129,4 +129,29 @@
     height: 2.5rem;
 }
 
+/* Team and Record cells keep their own team background — the movement tint
+   would sit under text still painted in the team's secondary color (often
+   white), leaving the team name unreadable. Must stay after the hover rule
+   above: same specificity, so source order decides. The Pick and Notes cells
+   still carry the tint, and the movement badge reinforces it. */
+.draft-moved-up td.ibl-team-cell--colored,
+.draft-moved-down td.ibl-team-cell--colored {
+    background-color: var(--team-cell-bg);
+}
+
+/* +/- spots moved relative to the projected order (finalized picks only) */
+.draft-movement {
+    font-size: var(--text-xs);
+    font-weight: 700;
+    margin-left: 0.25rem;
+}
+
+.draft-movement--up {
+    color: var(--success-700);
+}
+
+.draft-movement--down {
+    color: var(--error-700);
+}
+
 } /* end @layer components */

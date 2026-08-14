@@ -436,6 +436,38 @@ class ProjectedDraftOrderViewTest extends TestCase
         $this->assertStringContainsString('draft-moved-up', $result);
     }
 
+    public function testMovedUpRowShowsPositiveMovementBadge(): void
+    {
+        $order = [
+            'round1' => [
+                $this->makeSlot(1, 1, 'Heat', 20, 62, '98002E', 'F9A01B', 1, 'Heat', '98002E', 'F9A01B', false, '', movement: 4),
+            ],
+            'round2' => [],
+        ];
+        $result = $this->view->render($order, 2026);
+
+        $this->assertStringContainsString(
+            '<span class="draft-pick-number">1</span><span class="draft-movement draft-movement--up">+4</span>',
+            $result,
+        );
+    }
+
+    public function testMovedDownRowShowsNegativeMovementBadge(): void
+    {
+        $order = [
+            'round1' => [
+                $this->makeSlot(5, 1, 'Heat', 20, 62, '98002E', 'F9A01B', 1, 'Heat', '98002E', 'F9A01B', false, '', movement: -3),
+            ],
+            'round2' => [],
+        ];
+        $result = $this->view->render($order, 2026);
+
+        $this->assertStringContainsString(
+            '<span class="draft-pick-number">5</span><span class="draft-movement draft-movement--down">-3</span>',
+            $result,
+        );
+    }
+
     public function testMovedDownRowGetsRedHighlight(): void
     {
         $order = [
@@ -461,6 +493,7 @@ class ProjectedDraftOrderViewTest extends TestCase
 
         $this->assertStringNotContainsString('draft-moved-up', $result);
         $this->assertStringNotContainsString('draft-moved-down', $result);
+        $this->assertStringNotContainsString('draft-movement', $result);
     }
 
     public function testLotteryResultsLabelWhenFinalized(): void

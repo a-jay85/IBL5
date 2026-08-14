@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for work-triage — NO auto-attach trigger (its only `paths:` entry is out-of-repo and never matches); Read it when work-triage.md cites it. Covers measurement context for the inline-Opus leak, ADR-0067 gateway framing, hard-trigger gate properties (sub-agent exemption, per-turn scoping, escape hatch, self-test), the cross-worktree straddle gate's four-rung remedy ladder, inline-vs-delegated criteria, safety-mirror backstop, and repeat-polling spend rationale.
-last_verified: 2026-08-10
+last_verified: 2026-08-14
 paths:
   - "~/.claude/hooks/plan-gate-edit.sh"
 ---
@@ -77,6 +77,6 @@ Whatever still ships ad-hoc is caught at PR time by `/post-plan` Phase 6.5 condi
 
 Stay inline (Opus edits directly) only when:
 - the edits and the design are genuinely **entangled** — writing the recipe would mean making each edit-level judgment anyway, so the handoff buys nothing; or
-- the chunk is **trivial** — a one-or-two-edit change where the sub-agent's fixed spawn cost (~3–5K tokens, `agent-tiering-detail.md` § Skip the Agent) exceeds the work being moved.
+- the chunk is **trivial** — a one-or-two-edit change where the sub-agent's fixed spawn cost (~17–23K tokens [CORRECTED 2026-08-14: was "~3–5K"; measured p50 spawn context is 17–23K], `agent-tiering-detail.md` § Skip the Agent) exceeds the work being moved.
 
 Either way the routing decision is **stated, not silent** — one line, like the triage verdict. The user should see which way it went and be able to override in the moment.

@@ -118,12 +118,12 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
 
    ```bash
    gh api "repos/{owner}/{repo}/issues/<N>/comments" --paginate \
-     --jq '.[] | select((.body // "") | test("^#{1,6} +Code review\\b")) | "comment\t\(.id)\t\(.user.login)\t\(.created_at)"'
+     --jq '.[] | select((.body // "") | test("(?m)^#{1,6} +Code review\\b")) | "comment\t\(.id)\t\(.user.login)\t\(.created_at)"'
    gh api "repos/{owner}/{repo}/pulls/<N>/reviews" --paginate \
-     --jq '.[] | select((.body // "") | test("^#{1,6} +Code review\\b")) | "review\t\(.id)\t\(.user.login)\t\(.submitted_at)"'
+     --jq '.[] | select((.body // "") | test("(?m)^#{1,6} +Code review\\b")) | "review\t\(.id)\t\(.user.login)\t\(.submitted_at)"'
    ```
 
-   (`^` is already line-anchored in jq's Oniguruma engine — do **not** add `(?m)` to "make it multiline". There `(?m)` means *dot matches newline*, a different flag entirely; verified 2026-08-14 that the pattern matches identically with and without it.)
+   (**The `(?m)` is load-bearing — never reduce it to a bare `^`.** In jq's Oniguruma engine a bare `^` anchors to **string start only**, not to each line start; `(?m)` is what makes it line-anchored. Dropping it breaks the probe on the shape every review actually has — the helper wraps its output in `<details><summary>…`, so the heading is never at offset 0. Measured 2026-08-14 on jq 1.7.1 against a `<details>`-wrapped body: bare `^…` ⇒ `false`, `(?m)^…` ⇒ `true`, engine-agnostic `(^|\n)…` ⇒ `true`. This failure is the **mirror image** of the false-positive risk flagged at the end of this step: it makes `PHASE_4B_RAN` falsely *false*, so Phase 6 reports "never reviewed" for a PR that was reviewed, and re-recommends `/pr-review` needlessly. Do not "correct" `(?m)` to `(?s)` either — `(?s)` is dot-matches-newline, a different flag, verified the same day.)
 
    **Match the heading at any level (`#{1,6}`), never a fixed one.** The helper that posts it — `post_review_summary` / `post_review_findings` in `bin/lib/post-review-findings.sh` — emits `### Code review` in its source today, yet **every** review comment actually on a PR right now carries `## Code review`, and GitHub renders both identically so nothing looks wrong. Measured 2026-08-14 across PRs #1790, #1872 and #1876: an h3-pinned probe matched **zero** of the six genuine review comments those PRs carry between them. So the level-pinned form was not "occasionally stale" — it made `PHASE_4B_RAN` structurally false for every PR, which reads as "this PR was never reviewed" and sends the verdict's headline recommendation the wrong way. This is why the probe is a command rather than an instruction to eyeball the output: a heading is prose, and prose gets matched by whatever regex the reader assumes.
 

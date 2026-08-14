@@ -120,13 +120,62 @@
 }
 
 .draft-draggable:hover td {
-    background-color: var(--gray-50);
+    background-color: var(--accent-100);
 }
 
 .draft-drag-placeholder td {
     background-color: var(--gray-200);
     box-shadow: inset 0 1px 4px rgba(0, 0, 0, 0.12);
     height: 2.5rem;
+}
+
+/* Team and Record cells keep their own team background — a movement or hover
+   tint would sit under text still painted in the team's secondary color (often
+   white), leaving the team name unreadable. Must stay after the rules above:
+   these are more specific, but source order also keeps it unambiguous. The Pick
+   and Notes cells still carry the tint, and the movement badge reinforces it. */
+.draft-moved-up td.ibl-team-cell--colored,
+.draft-moved-down td.ibl-team-cell--colored,
+.draft-draggable:hover td.ibl-team-cell--colored {
+    background-color: var(--team-cell-bg);
+}
+
+/* Team and Record text stays in the team's own secondary color on hover. The
+   global .ibl-data-table a:hover recolors links to --accent-500 and dims them to
+   0.85, which is unreadable over most team backgrounds. Lottery rows never show
+   it only because .draft-draggable a is pointer-events: none — this gives every
+   other row the same static text. (0,4,1) outranks .ibl-data-table a:hover. */
+.projected-draft-order-table td.ibl-team-cell--colored .ibl-team-cell__name:hover {
+    color: var(--team-cell-color);
+    opacity: 1;
+}
+
+/* One hover tint for the whole table: the accent the draggable lottery rows
+   already use, rather than the global --gray-100. Row-level is enough — cells
+   that paint their own background (team cells, separators, movement tints) sit
+   on top of it, and non-lottery rows never carry a movement tint. */
+.ibl-data-table.projected-draft-order-table tbody tr:hover {
+    background-color: var(--accent-100);
+}
+
+/* +/- spots moved relative to the projected order (finalized picks only) */
+.draft-movement {
+    font-size: var(--text-xs);
+    font-weight: 700;
+    margin-left: 0.25rem;
+}
+
+.draft-movement--up {
+    color: var(--success-700);
+}
+
+.draft-movement--down {
+    color: var(--error-700);
+}
+
+/* Landed exactly on its projected pick — shown, but muted */
+.draft-movement--none {
+    color: var(--gray-600);
 }
 
 } /* end @layer components */

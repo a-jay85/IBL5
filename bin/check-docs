@@ -170,9 +170,11 @@ Options:
                      ([{path, last_verified, age_days, days_over}]) and exit 0
                      regardless of whether any doc is stale. A report, not a
                      gate. Consumed by the doc-freshness-audit workflow.
-  --self-test        Run the retired-figure exemption fixtures and exit. No repo
-                     scan. Covers the exemption logic only — a wrong pattern
-                     fails loudly on the next PR, a wrong exemption is silent.
+  --self-test        Run the offline fixtures and exit — retired-figure
+                     exemptions, plus the changed-doc diff union (in a throwaway
+                     temp repo). Never scans this repo. Both cover logic whose
+                     bug is a SILENT false negative; the loud failure modes are
+                     left to the next PR.
   --verbose, -v      Show passing files too.
   --help, -h         Show this message.
 
@@ -752,12 +754,71 @@ function checkChanged(string $base, string $repoRoot, \DateTimeImmutable $today)
 }
 
 /**
+ * Repo-relative `.md` paths changed vs $base, as the UNION of three git views:
+ *
+ *   1. `<base>...HEAD`  — committed on this branch (the merge-base diff CI sees)
+ *   2. `HEAD`           — unstaged working-tree edits
+ *   3. `--cached`       — staged-but-uncommitted edits
+ *
+ * View 1 alone is HEAD-anchored, and that was a silent false negative: a caller
+ * that edits docs and then runs `--since` to check ITSELF before committing
+ * (backlog-housekeep op 7, post-plan Phase 2.5) cannot see its own edits, so the
+ * gate printed "On-touch doc check passed" four seconds before committing the
+ * very edit CI then failed on (PR #1878, 2026-08-14). Views 2 and 3 close it.
+ *
+ * CI checks out a clean tree, so views 2 and 3 are empty there and CI behavior is
+ * unchanged — this only adds signal to a dirty tree. The `*.md` pathspec keeps
+ * unrelated build dirt (a lockfile, a compiled stylesheet) out of the union;
+ * scoping to the in-scope doc set still happens in iterChangedDocs().
+ *
+ * Untracked files are deliberately NOT unioned in: a never-committed doc has no
+ * base blob, so the on-touch predicate cannot fire on it, and the full scan
+ * (which walks the tree) already checks its frontmatter.
+ *
+ * @return list<string> repo-relative paths, deduplicated, order not significant
+ */
+function changedDocPaths(string $base, string $escapedRoot, string $escapedBase): array
+{
+    $views = [
+        sprintf('%s...HEAD', $escapedBase),
+        'HEAD',
+        '--cached',
+    ];
+
+    $union = [];
+    foreach ($views as $view) {
+        $cmd = sprintf(
+            "git -C %s diff --name-only --diff-filter=AM %s -- '*.md' 2>/dev/null",
+            $escapedRoot,
+            $view
+        );
+        $out = [];
+        $code = 0;
+        exec($cmd, $out, $code);
+        if ($code !== 0) {
+            fwrite(STDERR, sprintf("check-docs: unable to diff '%s' against base ref '%s' (git exit %d). Is it a valid commit? In CI, ensure fetch-depth: 0.\n", $view, $base, $code));
+            exit(2);
+        }
+        foreach ($out as $rel) {
+            $rel = trim($rel);
+            if ($rel !== '') {
+                $union[] = $rel;
+            }
+        }
+    }
+
+    return array_values(array_unique($union));
+}
+
+/**
  * Enumerate in-scope docs changed between $base and HEAD, returning the
  * frontmatter facts both the on-touch check and --fix-dates consume. `needsBump`
  * is the SINGLE source of the On-Touch predicate: body changed vs base but
  * last_verified did not move past the edit's commit date. Both callers share
- * this enumeration (and its `A...HEAD` three-dot diff) so the failing set and
- * the --fix-dates fixable set can never silently diverge.
+ * this enumeration (and its diff-view union) so the failing set and the
+ * --fix-dates fixable set can never silently diverge.
+ *
+ * The changed set is the UNION of three views — see changedDocPaths().
  *
  * The freshness escape (`$verifiedAtEdit`): an unchanged date still passes when
  * it is `>=` the edit's git commit date — a verification at least as fresh as the
@@ -774,18 +835,7 @@ function iterChangedDocs(string $base, string $repoRoot): array
     $escapedRoot = escapeshellarg($repoRoot);
     $escapedBase = escapeshellarg($base);
 
-    $diffCmd = sprintf(
-        'git -C %s diff --name-only --diff-filter=AM %s...HEAD 2>/dev/null',
-        $escapedRoot,
-        $escapedBase
-    );
-    $changedRel = [];
-    $diffCode = 0;
-    exec($diffCmd, $changedRel, $diffCode);
-    if ($diffCode !== 0) {
-        fwrite(STDERR, sprintf("check-docs: unable to diff against base ref '%s' (git exit %d). Is it a valid commit? In CI, ensure fetch-depth: 0.\n", $base, $diffCode));
-        exit(2);
-    }
+    $changedRel = changedDocPaths($base, $escapedRoot, $escapedBase);
 
     // Intersect with the in-scope set so scoping/exclusions are reused, not
     // re-implemented.
@@ -1291,6 +1341,88 @@ function selfTestRetiredFigures(): int
 }
 
 /**
+ * Fixtures for changedDocPaths()' three-view union, in a throwaway git repo under
+ * sys_get_temp_dir() (never this repo). Peer of selfTestRetiredFigures() and here
+ * for the same reason: a union that silently drops a view fails OPEN — the gate
+ * prints "passed" on a doc it never looked at, which is exactly how PR #1878
+ * merged a stale last_verified. A wrong view is invisible without a fixture.
+ */
+function selfTestChangedDocPaths(): int
+{
+    $tmp = sys_get_temp_dir() . '/check-docs-selftest-' . getmypid();
+    $q = escapeshellarg($tmp);
+    exec(sprintf('rm -rf %s && mkdir -p %s', $q, $q));
+
+    // Base commit: one committed doc. -c flags keep the fixture independent of
+    // the machine's git identity and of init.defaultBranch.
+    $git = sprintf('git -C %s -c user.email=t@t -c user.name=t -c commit.gpgsign=false', $q);
+    exec(sprintf('git init -q %s 2>/dev/null', $q));
+    file_put_contents($tmp . '/base.md', "# base\n");
+    exec(sprintf('%s add -A && %s commit -qm base 2>/dev/null', $git, $git));
+    $baseSha = trim((string) shell_exec(sprintf('%s rev-parse HEAD 2>/dev/null', $git)));
+
+    $cases = [];
+
+    // View 1 — committed on the branch vs base.
+    file_put_contents($tmp . '/committed.md', "# committed\n");
+    exec(sprintf('%s add -A && %s commit -qm second 2>/dev/null', $git, $git));
+    $cases[] = ['view 1: committed vs base', 'committed.md'];
+
+    // View 3 — staged, not committed.
+    file_put_contents($tmp . '/staged.md', "# staged\n");
+    exec(sprintf('%s add staged.md 2>/dev/null', $git));
+    $cases[] = ['view 3: staged, uncommitted', 'staged.md'];
+
+    // View 2 — modified in the working tree, never staged. This is the view whose
+    // absence caused PR #1878.
+    file_put_contents($tmp . '/base.md', "# base\n\nedited\n");
+    $cases[] = ['view 2: unstaged working-tree edit', 'base.md'];
+
+    $got = changedDocPaths($baseSha, $q, escapeshellarg($baseSha));
+
+    $failed = 0;
+    foreach ($cases as [$name, $want]) {
+        if (in_array($want, $got, true)) {
+            echo "ok   {$name}\n";
+            continue;
+        }
+        echo "FAIL {$name}: '{$want}' missing from union [" . implode(', ', $got) . "]\n";
+        $failed++;
+    }
+
+    // Negative: a non-.md dirty file must not enter the union (keeps build dirt
+    // and lockfiles out, so CI's clean-tree behavior stays byte-identical).
+    file_put_contents($tmp . '/notes.txt', "dirty\n");
+    $withNoise = changedDocPaths($baseSha, $q, escapeshellarg($baseSha));
+    if (in_array('notes.txt', $withNoise, true)) {
+        echo "FAIL pathspec: non-.md file leaked into the union\n";
+        $failed++;
+    } else {
+        echo "ok   pathspec: non-.md dirt excluded\n";
+    }
+
+    // Dedup: a file both staged AND further edited unstaged appears once.
+    file_put_contents($tmp . '/staged.md', "# staged\n\nfurther\n");
+    $dupes = array_count_values(changedDocPaths($baseSha, $q, escapeshellarg($baseSha)));
+    if (($dupes['staged.md'] ?? 0) !== 1) {
+        echo "FAIL dedup: 'staged.md' appears " . ($dupes['staged.md'] ?? 0) . " time(s), want 1\n";
+        $failed++;
+    } else {
+        echo "ok   dedup: file in two views listed once\n";
+    }
+
+    exec(sprintf('rm -rf %s', $q));
+
+    $total = count($cases) + 2;
+    if ($failed === 0) {
+        echo "\nchanged-doc union self-test: {$total} case(s) passed.\n";
+        return 0;
+    }
+    echo "\nchanged-doc union self-test: {$failed}/{$total} case(s) FAILED.\n";
+    return 1;
+}
+
+/**
  * Resolved (✅/🚫) findings must not remain as rows in a per-axis table — they collapse
  * to the axis's `> ✅ resolved (N): …` summary line with evidence moved to the sibling
  * archive (ibl5/docs/backlog/README.md § Archiving an item).
@@ -1348,7 +1480,11 @@ foreach (array_slice($argv, 1) as $arg) {
             $opts['staleness_report'] = true;
             break;
         case '--self-test':
-            exit(selfTestRetiredFigures());
+            // Run both suites unconditionally (no short-circuit) so one failure
+            // never hides the other's result.
+            $rc = selfTestRetiredFigures();
+            echo "\n";
+            exit(max($rc, selfTestChangedDocPaths()));
         case '--help':
         case '-h':
             echo usage();

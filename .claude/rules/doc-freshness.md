@@ -1,6 +1,6 @@
 ---
 description: Frontmatter schema (including `paths:` residency semantics — repo-relative only, never glob an always-loaded rule), 60-day staleness policy, on-touch verification rule, dead-reference rule, and the retired-figure rule enforced by bin/check-docs
-last_verified: 2026-08-09
+last_verified: 2026-08-14
 paths: "**/*.md"
 ---
 
@@ -37,6 +37,8 @@ A companion left with no live trigger is **Read-on-demand only**. That is legiti
 When editing any in-scope `.md` file, verify its content still matches reality, confirm the `description` field accurately reflects the content, and bump `last_verified` to today — all in the same edit. A `last_verified` over **60 days** old is stale (the PR gate runs `--no-staleness`, so an untouched stale doc never blocks an unrelated change; the nightly audit owns repo-wide staleness).
 
 Enforced in CI by `bin/check-docs --since=<base-ref>`, which fails any PR that changes an in-scope `.md` body without bumping `last_verified`. The comparison is base-vs-head, never date-equality-to-today, so a PR opened one day and merged later does not false-fail; and an unchanged value still passes when it equals the edit's **git commit date**, so a same-UTC-day re-edit of a doc verified earlier that day need not wait for UTC rollover.
+
+**`--since` sees an uncommitted edit.** The changed set is the union of `<base>...HEAD`, unstaged (`git diff HEAD`), and staged (`--cached`) `.md` changes, so running the check *before* committing gives the same verdict CI gives after. This matters because the callers that self-verify — `/backlog-housekeep` op 7, `/post-plan` Phase 2.5 — run it on a dirty tree; with the old HEAD-anchored set alone they were structurally blind to their own edits and printed a false green (PR #1878 merged a stale `last_verified` that way on 2026-08-14). CI checks out a clean tree, so the two working-tree views are empty there and CI behavior is unchanged. Untracked files stay out: with no base blob the on-touch predicate cannot fire, and the full scan already checks their frontmatter.
 
 ## Dead-Reference Rule
 

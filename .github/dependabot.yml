@@ -1,3 +1,13 @@
+# Grouping policy (backlog E2): batch minor+patch bumps into ONE PR per
+# ecosystem; majors stay individual so a breaking bump is never entangled with
+# routine ones. This is a CI-cost lever, not a review-scope one — master's
+# protection sets `strict: true`, so every merge strands the other open PRs as
+# BEHIND and update-behind-prs.yml re-runs each one's full matrix. N separate
+# PRs therefore cost up to ~N^2/2 matrix runs to drain (upper bound — merges
+# that land between refresh ticks coalesce); one grouped PR costs one.
+# Security updates are unaffected: they are a separate flow and stay individual.
+# Note: a dependency lands in the FIRST group it matches, so any narrower group
+# (e.g. codeql-action) MUST be listed above the catch-all.
 version: 2
 updates:
   - package-ecosystem: "github-actions"
@@ -8,11 +18,24 @@ updates:
       codeql-action:
         patterns:
           - "github/codeql-action*"
+      actions-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: "composer"
     directory: "/ibl5"
     schedule:
       interval: "weekly"
+    groups:
+      composer-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
   # bun ecosystem: version updates only — Dependabot does NOT raise security PRs
   # for the bun ecosystem. The weekly bun-audit-issue.yml workflow is the
@@ -22,16 +45,37 @@ updates:
     directory: "/ibl5"
     schedule:
       interval: "weekly"
+    groups:
+      bun-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
       interval: "weekly"
+    groups:
+      docker-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: "npm"
     directory: "/ibl5/IBLbot"
     schedule:
       interval: "weekly"
+    groups:
+      iblbot-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
     ignore:
       # TypeScript 7+ is the native Go compiler; its `tsc` fatally fails with
       # `newosproc` on the memory-tight deploy droplet (can't spawn OS threads).

@@ -9,6 +9,9 @@ import re
 
 from .state import Classification
 
+FILES_CHANGED_BEGIN = "<!-- files-changed:begin -->"
+FILES_CHANGED_END = "<!-- files-changed:end -->"
+
 STRIP_RE = re.compile(r"(migrations/|composer\.lock|package-lock\.json|bun\.lock|__snapshots__/|\.snap$)")
 _PHP = re.compile(r"\.php$")
 _CSS = re.compile(r"\.css$|^ibl5/design/")
@@ -60,6 +63,113 @@ def modified_files_from_diff(diff_text: str) -> list[str]:
             is_del = True
     flush()
     return out
+
+
+def name_status_from_diff(diff_text: str) -> list[tuple[str, str]]:
+    """Name-status pairs from unified diff, diff order, de-duplicated by path.
+
+    Pure port of `git diff --name-status origin/master...HEAD` parsed from the
+    unified diff text.  Status letters: A=added, D=deleted, R=renamed, M=modified.
+    Rename paths are rendered as ``<from> → <to>`` (U+2192).
+    """
+    out: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    cur_a: str | None = None
+    cur_b: str | None = None
+    is_new = is_del = is_rename = False
+    rename_from: str | None = None
+    rename_to: str | None = None
+
+    def flush() -> None:
+        if cur_b is None and cur_a is None:
+            return
+        if is_rename and rename_from and rename_to:
+            path = f"{rename_from} → {rename_to}"
+            if path not in seen:
+                out.append(("R", path))
+                seen.add(path)
+        elif is_new and cur_b:
+            if cur_b not in seen:
+                out.append(("A", cur_b))
+                seen.add(cur_b)
+        elif is_del and cur_a:
+            if cur_a not in seen:
+                out.append(("D", cur_a))
+                seen.add(cur_a)
+        elif cur_b:
+            if cur_b not in seen:
+                out.append(("M", cur_b))
+                seen.add(cur_b)
+
+    for line in diff_text.splitlines():
+        if line.startswith("diff --git "):
+            flush()
+            m = re.match(r"diff --git a/(.*?) b/(.*)$", line)
+            if m:
+                cur_a, cur_b = m.group(1), m.group(2)
+            else:
+                cur_a = cur_b = None
+            is_new = is_del = is_rename = False
+            rename_from = rename_to = None
+        elif line.startswith("new file mode"):
+            is_new = True
+        elif line.startswith("deleted file mode"):
+            is_del = True
+        elif line.startswith("rename from "):
+            is_rename = True
+            rename_from = line[len("rename from "):]
+        elif line.startswith("rename to "):
+            rename_to = line[len("rename to "):]
+    flush()
+    return out
+
+
+def render_files_changed(diff_text: str) -> str:
+    """Marker-delimited files-changed block derived from diff text.
+
+    Returns a string bounded by FILES_CHANGED_BEGIN / FILES_CHANGED_END with one
+    ``- `<status>` `<path>``` bullet per file.  Empty diff yields the two markers
+    and the header line with no bullets and no trailing blank line inside the block.
+    """
+    pairs = name_status_from_diff(diff_text)
+    header = ("**Files changed** (generated from "
+              "`git diff --name-status origin/master...HEAD` — do not edit by hand):")
+    parts: list[str] = [FILES_CHANGED_BEGIN, header]
+    if pairs:
+        parts.append("")
+        for status, path in pairs:
+            parts.append(f"- `{status}` `{path}`")
+    parts.append(FILES_CHANGED_END)
+    return "\n".join(parts)
+
+
+def upsert_files_changed(body: str, block: str) -> str:
+    """Insert or replace the files-changed block in a PR body.
+
+    Both markers present, BEGIN before END:
+        Replace everything from BEGIN through END inclusive with ``block``;
+        surrounding text is left byte-identical.
+    Neither marker present:
+        Strip trailing whitespace from ``body``, then append ``"\\n\\n" + block + "\\n"``.
+    Exactly one marker, or END before BEGIN:
+        Do not attempt surgery on the body.  Append a fresh block exactly as in
+        the neither-present case, leaving the orphan marker untouched.
+    Empty/None body:
+        Return ``block`` alone.
+    """
+    body = body or ""
+    if not body.strip():
+        return block
+
+    begin_idx = body.find(FILES_CHANGED_BEGIN)
+    end_idx = body.find(FILES_CHANGED_END)
+
+    if begin_idx != -1 and end_idx != -1 and begin_idx < end_idx:
+        after_end = end_idx + len(FILES_CHANGED_END)
+        return body[:begin_idx] + block + body[after_end:]
+
+    # Neither both present and in order: append fresh, leave any orphan in place.
+    return body.rstrip() + "\n\n" + block + "\n"
 
 
 def filter_diff(diff_text: str) -> str:

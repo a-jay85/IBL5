@@ -1,0 +1,169 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-bun-audit-triage — regression harness for bin/bun-audit-triage.
+#
+# Exercises the full input/output contract: clean tree, empty stdin, severity
+# selection (high vs critical), level filtering, mixed multi-package input,
+# error paths (unknown flag, malformed JSON), --json mode, and file-argument mode.
+#
+# Run: bin/test-bun-audit-triage  (exit 0 = all pass, 1 = a case failed)
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$SCRIPT_DIR/..")"
+SCRIPT="$SCRIPT_DIR/bun-audit-triage"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+# Suppress unused ROOT — it satisfies the conventional ROOT declaration pattern.
+: "${ROOT}"
+
+FAILED=0
+
+expect() { # name want-exit got-exit
+    if [ "$3" -eq "$2" ]; then
+        echo "ok: $1 (exit $3)"
+    else
+        echo "FAIL: $1 — expected exit $2, got $3"
+        FAILED=1
+    fi
+}
+
+expect_empty() { # name got-output
+    if [ -z "$2" ]; then
+        echo "ok: $1 (no output)"
+    else
+        echo "FAIL: $1 — expected no output, got: $2"
+        FAILED=1
+    fi
+}
+
+expect_advisory_count() { # name want-count got-output
+    ACTUAL=0
+    if [ -n "$3" ]; then
+        ACTUAL=$(printf '%s\n' "$3" | grep -c 'ADVISORY:' || printf '0')
+    fi
+    if [ "$ACTUAL" -eq "$2" ]; then
+        echo "ok: $1 (ADVISORY lines: $ACTUAL)"
+    else
+        echo "FAIL: $1 — expected $2 ADVISORY line(s), got $ACTUAL"
+        printf '%s\n' "$3" | sed 's/^/    /'
+        FAILED=1
+    fi
+}
+
+# Fixtures inline as variables (bash 3.2 compatible — no heredocs needed for JSON).
+CRITICAL_FIXTURE='{"minimist":[{"id":1097678,"url":"https://github.com/advisories/GHSA-xvch-5gv4-984h","title":"Prototype Pollution in minimist","severity":"critical","vulnerable_versions":">=1.0.0 <1.2.6","cwe":["CWE-1321"],"cvss":{"score":9.8,"vectorString":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}}]}'
+
+HIGH_FIXTURE='{"lodash":[{"id":12345,"url":"https://github.com/advisories/GHSA-test","title":"Prototype Pollution in lodash","severity":"high","vulnerable_versions":"<4.17.21","cwe":["CWE-1321"],"cvss":{"score":7.4,"vectorString":"CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:N"}}]}'
+
+MODERATE_FIXTURE='{"semver":[{"id":99999,"url":"https://github.com/advisories/GHSA-mod","title":"RegExp DoS in semver","severity":"moderate","vulnerable_versions":">=7.0.0 <7.5.2","cwe":["CWE-400"],"cvss":{"score":5.3,"vectorString":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"}}]}'
+
+# Mixed: minimist (critical) + lodash (high) + semver (moderate) in one JSON object.
+MIXED_FIXTURE='{"minimist":[{"id":1097678,"url":"https://github.com/advisories/GHSA-xvch-5gv4-984h","title":"Prototype Pollution in minimist","severity":"critical","vulnerable_versions":">=1.0.0 <1.2.6","cwe":["CWE-1321"],"cvss":{"score":9.8,"vectorString":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H"}}],"lodash":[{"id":12345,"url":"https://github.com/advisories/GHSA-test","title":"Prototype Pollution in lodash","severity":"high","vulnerable_versions":"<4.17.21","cwe":["CWE-1321"],"cvss":{"score":7.4,"vectorString":"CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:H/I:H/A:N"}}],"semver":[{"id":99999,"url":"https://github.com/advisories/GHSA-mod","title":"RegExp DoS in semver","severity":"moderate","vulnerable_versions":">=7.0.0 <7.5.2","cwe":["CWE-400"],"cvss":{"score":5.3,"vectorString":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"}}]}'
+
+# ---------------------------------------------------------------------------
+# Case 1: clean tree — {} → exit 0, no stdout
+# ---------------------------------------------------------------------------
+RC=0; OUT=$(printf '%s' '{}' | "$SCRIPT" 2>/dev/null) || RC=$?
+expect "clean tree: exit 0" 0 "$RC"
+expect_empty "clean tree: no output" "$OUT"
+
+# ---------------------------------------------------------------------------
+# Case 2: empty stdin → treated as {} → exit 0, no stdout
+# ---------------------------------------------------------------------------
+RC=0; OUT=$(printf '' | "$SCRIPT" 2>/dev/null) || RC=$?
+expect "empty stdin: exit 0" 0 "$RC"
+expect_empty "empty stdin: no output" "$OUT"
+
+# ---------------------------------------------------------------------------
+# Case 3: one critical advisory → exit 1, one ADVISORY line
+# ---------------------------------------------------------------------------
+RC=0; OUT=$(printf '%s' "$CRITICAL_FIXTURE" | "$SCRIPT" 2>/dev/null) || RC=$?
+expect "critical: exit 1" 1 "$RC"
+expect_advisory_count "critical: one ADVISORY line" 1 "$OUT"
+
+# ---------------------------------------------------------------------------
+# Case 4: one high advisory → exit 1, one ADVISORY line
+# ---------------------------------------------------------------------------
+RC=0; OUT=$(printf '%s' "$HIGH_FIXTURE" | "$SCRIPT" 2>/dev/null) || RC=$?
+expect "high: exit 1" 1 "$RC"
+expect_advisory_count "high: one ADVISORY line" 1 "$OUT"
+
+# ---------------------------------------------------------------------------
+# Case 5: moderate only → exit 0, no output (below threshold)
+# ---------------------------------------------------------------------------
+RC=0; OUT=$(printf '%s' "$MODERATE_FIXTURE" | "$SCRIPT" 2>/dev/null) || RC=$?
+expect "moderate-only: exit 0" 0 "$RC"
+expect_empty "moderate-only: no output" "$OUT"
+
+# ---------------------------------------------------------------------------
+# Case 6: --level=critical with high-only advisory → exit 0 (high is below critical)
+# ---------------------------------------------------------------------------
+RC=0; OUT=$(printf '%s' "$HIGH_FIXTURE" | "$SCRIPT" --level=critical 2>/dev/null) || RC=$?
+expect "--level=critical with high-only: exit 0" 0 "$RC"
+expect_empty "--level=critical with high-only: no output" "$OUT"
+
+# ---------------------------------------------------------------------------
+# Case 7: --level=critical with critical advisory → exit 1
+# ---------------------------------------------------------------------------
+RC=0; OUT=$(printf '%s' "$CRITICAL_FIXTURE" | "$SCRIPT" --level=critical 2>/dev/null) || RC=$?
+expect "--level=critical with critical: exit 1" 1 "$RC"
+expect_advisory_count "--level=critical with critical: one ADVISORY line" 1 "$OUT"
+
+# ---------------------------------------------------------------------------
+# Case 8: mixed (critical + high + moderate, two packages selected) → exit 1, exactly 2 lines
+# ---------------------------------------------------------------------------
+RC=0; OUT=$(printf '%s' "$MIXED_FIXTURE" | "$SCRIPT" 2>/dev/null) || RC=$?
+expect "mixed: exit 1" 1 "$RC"
+expect_advisory_count "mixed: exactly 2 ADVISORY lines" 2 "$OUT"
+
+# ---------------------------------------------------------------------------
+# Case 9: unknown flag --nope → exit 2, usage on stderr
+# ---------------------------------------------------------------------------
+RC=0; ERR=$(printf '' | "$SCRIPT" --nope 2>&1 >/dev/null) || RC=$?
+expect "unknown flag: exit 2" 2 "$RC"
+if printf '%s' "$ERR" | grep -q 'unknown flag\|Usage:'; then
+    echo "ok: unknown flag: usage on stderr"
+else
+    echo "FAIL: unknown flag: expected usage/error on stderr"
+    FAILED=1
+fi
+
+# ---------------------------------------------------------------------------
+# Case 10: malformed JSON → exit 2
+# ---------------------------------------------------------------------------
+RC=0; OUT=$(printf '%s' 'not json' | "$SCRIPT" 2>/dev/null) || RC=$?
+expect "malformed JSON: exit 2" 2 "$RC"
+
+# ---------------------------------------------------------------------------
+# Case 11: --json mode with one high advisory → exit 1, valid JSON array of length 1
+# ---------------------------------------------------------------------------
+RC=0; OUT=$(printf '%s' "$HIGH_FIXTURE" | "$SCRIPT" --json 2>/dev/null) || RC=$?
+expect "--json mode: exit 1" 1 "$RC"
+JSON_LEN=$(printf '%s\n' "$OUT" | jq 'length' 2>/dev/null || printf '-1')
+if [ "$JSON_LEN" -eq 1 ]; then
+    echo "ok: --json mode: output is JSON array of length 1"
+else
+    echo "FAIL: --json mode: expected JSON array length 1, got: $JSON_LEN"
+    FAILED=1
+fi
+
+# ---------------------------------------------------------------------------
+# Case 12: file-argument mode — write high fixture to temp file, pass as argument
+# ---------------------------------------------------------------------------
+FIXTURE_FILE="$TMP/fixture.json"
+printf '%s' "$HIGH_FIXTURE" > "$FIXTURE_FILE"
+RC=0; OUT=$("$SCRIPT" "$FIXTURE_FILE" 2>/dev/null) || RC=$?
+expect "file-arg mode: exit 1" 1 "$RC"
+expect_advisory_count "file-arg mode: one ADVISORY line" 1 "$OUT"
+
+# ---------------------------------------------------------------------------
+echo ""
+if [ "$FAILED" -eq 0 ]; then
+    echo "All tests passed."
+else
+    echo "$FAILED test(s) FAILED."
+fi
+exit "$FAILED"

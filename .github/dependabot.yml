@@ -14,7 +14,11 @@ updates:
     schedule:
       interval: "weekly"
 
-  - package-ecosystem: "npm"
+  # bun ecosystem: version updates only — Dependabot does NOT raise security PRs
+  # for the bun ecosystem. The weekly bun-audit-issue.yml workflow is the
+  # compensating control that detects high/critical advisories and opens a
+  # tracking issue for manual remediation. See ADR-0101.
+  - package-ecosystem: "bun"
     directory: "/ibl5"
     schedule:
       interval: "weekly"

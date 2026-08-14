@@ -1,0 +1,95 @@
+name: bun audit — tracking issue
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/bun-audit-issue.yml'
+      - 'bin/bun-audit-triage'
+      - 'ibl5/package.json'
+      - 'ibl5/bun.lock'
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: bun-audit-issue
+  cancel-in-progress: false
+
+jobs:
+  audit-issue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      DRY_RUN: ${{ github.event_name == 'pull_request' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+
+      - name: Capture audit JSON
+        run: |
+          cd ibl5 && bun audit --json > "$RUNNER_TEMP/bun-audit.json" 2>"$RUNNER_TEMP/bun-audit.err" || true
+
+      - name: Triage audit output
+        id: triage
+        run: |
+          set +e
+          bin/bun-audit-triage --level=high "$RUNNER_TEMP/bun-audit.json" > "$RUNNER_TEMP/advisories.txt"
+          TRIAGE_EXIT=$?
+          set -e
+          [ "$TRIAGE_EXIT" -le 1 ] || { echo "::error::bun-audit-triage usage error"; exit 1; }
+          echo "found=$([ "$TRIAGE_EXIT" -eq 1 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve existing tracking issue
+        id: resolve
+        run: |
+          ISSUE=$(gh issue list --label bun-audit-highs --state open --limit 1 --json number --jq '.[0].number // empty')
+          echo "issue=$ISSUE" >> "$GITHUB_OUTPUT"
+
+      - name: Act on verdict
+        run: |
+          FOUND="${{ steps.triage.outputs.found }}"
+          ISSUE="${{ steps.resolve.outputs.issue }}"
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          if [ "$DRY_RUN" = "true" ]; then
+            if [ "$FOUND" = "true" ] && [ -z "$ISSUE" ]; then
+              echo "would create new tracking issue (bun-audit-highs)"
+            elif [ "$FOUND" = "true" ] && [ -n "$ISSUE" ]; then
+              echo "would update #$ISSUE"
+            elif [ "$FOUND" = "false" ] && [ -n "$ISSUE" ]; then
+              echo "would close #$ISSUE"
+            else
+              echo "nothing to do (clean tree, no open issue)"
+            fi
+            exit 0
+          fi
+
+          {
+            echo "## bun audit advisories — ibl5"
+            echo ""
+            echo "Run: $RUN_URL"
+            echo ""
+            cat "$RUNNER_TEMP/advisories.txt"
+          } > "$RUNNER_TEMP/issue-body.txt"
+
+          if [ "$FOUND" = "true" ] && [ -z "$ISSUE" ]; then
+            gh issue create \
+              --title "chore: bun audit high/critical advisories in ibl5" \
+              --label bun-audit-highs \
+              --body-file "$RUNNER_TEMP/issue-body.txt"
+          elif [ "$FOUND" = "true" ] && [ -n "$ISSUE" ]; then
+            gh issue edit "$ISSUE" --body-file "$RUNNER_TEMP/issue-body.txt"
+          elif [ "$FOUND" = "false" ] && [ -n "$ISSUE" ]; then
+            gh issue close "$ISSUE" --comment "bun audit is clean at or above high severity as of $(date -u +%F). Closing automatically."
+          else
+            echo "nothing to do (clean tree, no open issue)"
+          fi

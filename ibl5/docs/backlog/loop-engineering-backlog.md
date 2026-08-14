@@ -169,14 +169,7 @@ last_verified: 2026-08-10
 **Risk if untouched:** The predicate lives in one skill while its peers keep subjective carve-outs, so the queue-vs-review decision stays inconsistent across the pipeline and each gate drifts independently.
 **Status (2026-07-30):** ⬜ Open — 🟦 (the design is already resolved by the originating PR, so the sweep itself is mechanical; human-merge per this doc's burn-down default for loop-machinery changes). (discovered 2026-07-30 during plan-prompt-blast-radius-disposition)
 
-### L23 sim-recap degraded path emits no Discord signal; qctx() failure ships roster-blind with CI green
-*(discovered 2026-07-31 during #1753)*
-**Location:** `bin/sim-recap-tick` (calls `qctx()`; on failure logs `WARNING` to launchd only and continues with `{}`); `ibl5/classes/Discord/Discord.php` (Discord class surface); `bin/bug-pipeline-tick` + `bin/lib/bug-pipeline-gh.sh` (existing pattern to copy).
-**Problem:** When `qctx()` fails, the recap ships roster-blind. CI stays green — the fix can no-op in prod indefinitely with no visible signal. Only a human reading launchd logs would notice. Also: Block 8's "authoritative" header always emits followed by bare `{}`, so the documented roster-blind mode (Block 8 omitted) is unreachable in prod.
-**Suggested direction:** Emit a Discord signal on `qctx()` failure, copying the `bin/bug-pipeline-tick` + `bin/lib/bug-pipeline-gh.sh` pattern. Also decide Block 8's empty-`{}` behavior at plan time.
-**Risk if untouched:** A qctx() failure in prod is undetectable until a GM notices the recap is wrong — the exact failure mode PR #1753 was written to fix.
-**Closes gap:** #9 from `$HOME/claude-plans/sim-recap-testing-gaps-breakdown.md`
-**Status (2026-07-31):** 📋 Planned — `~/claude-plans/sim-recap-degraded-discord-alert.md` (written 2026-07-31). Not yet implemented. 🟦.
+➜ L23 sim-recap degraded path emits no Discord signal; qctx() failure ships roster-blind with CI green — ✅ Implemented (2026-08-14): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ### L24 Phase 5.0 conformance is path-level only; planned method names absent from diff pass undetected
 ➜ L24 Phase 5.0 conformance is path-level only — ✅ Implemented (2026-08-04): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).

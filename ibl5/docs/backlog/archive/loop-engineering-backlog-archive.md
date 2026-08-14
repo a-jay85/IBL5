@@ -93,6 +93,15 @@ Read-only historical record of ✅ Implemented entries. For OPEN items see ../lo
 **Dedup:** reconciled 2026-07-31 — uncovered by #1668 / #1665 / #1667 / #1714.
 **Status (2026-08-04):** ✅ Implemented — gate 15 in `plan/SKILL.md` gains a second unconditional arm keyed on the *diff* rather than on the hold's justification: a new silent-fallback or degraded path in a synchronous sim path or a `bin/*-tick` script requires a loud failure signal (Discord, a required-blocking CI check, or an equivalent alarm), regardless of whether the hold is security-, destructive-migration-, UI/UX- or verification-gap-motivated. PR #1765.
 
+### L23 sim-recap degraded path emits no Discord signal; qctx() failure ships roster-blind with CI green
+*(discovered 2026-07-31 during #1753)*
+**Location:** `bin/sim-recap-tick` (calls `qctx()`; on failure logs `WARNING` to launchd only and continues with `{}`); `ibl5/classes/Discord/Discord.php` (Discord class surface); `bin/bug-pipeline-tick` + `bin/lib/bug-pipeline-gh.sh` (existing pattern to copy).
+**Problem (was):** When `qctx()` fails, the recap ships roster-blind. CI stays green — the fix can no-op in prod indefinitely with no visible signal. Only a human reading launchd logs would notice. Also: Block 8's "authoritative" header always emits followed by bare `{}`, so the documented roster-blind mode (Block 8 omitted) is unreachable in prod.
+**Suggested direction (was):** Emit a Discord signal on `qctx()` failure, copying the `bin/bug-pipeline-tick` + `bin/lib/bug-pipeline-gh.sh` pattern. Also decide Block 8's empty-`{}` behavior at plan time.
+**Risk if untouched (was):** A qctx() failure in prod is undetectable until a GM notices the recap is wrong — the exact failure mode PR #1753 was written to fix.
+**Closes gap:** #9 from `$HOME/claude-plans/sim-recap-testing-gaps-breakdown.md`
+**Status (2026-08-14):** ✅ Implemented — edge-triggered Discord alert on roster-context degradation (healthy→degraded) and recovery (degraded→healthy); state persisted in `~/.claude/projects/.../sim-recap/ops-alert.json` to prevent notification floods; opt-in via `SIM_RECAP_OPS_ALERT_THREAD_ID`; Block 8 empty-`{}` gate fixed to require `.sim` key. PR #1878.
+
 ### L7 Queue-add shift-left preflight
 **Location:** `bin/automouse-queue` `add` runs zero preflight (verified); staleness is caught only at 2am by the impl agent, then self-heal requeues (L8). Plan: `$HOME/claude-plans/staleness-guard-fp-fix-and-queue-check.md` (not yet queued).
 **Problem (was):** A stale anchor costs a night when it could be fixed in 30 seconds at queue-add time, while a human is at the keyboard.

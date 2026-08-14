@@ -102,6 +102,14 @@ build_plist() {
 		<string>${SIM_RECAP_DB_NAME:-}</string>
 		<key>SIM_RECAP_DB_PASSWORD</key>
 		<string>${db_pw}</string>
+		<!-- SIM_RECAP_OPS_ALERT_THREAD_ID is deliberately ABSENT. Its absence is
+		     what makes the roster-degraded Discord alert a no-op in production:
+		     roster_health_transition() in bin/sim-recap-tick returns immediately
+		     on an empty thread ID. Adding it here is the step that ARMS the
+		     alert, so read that function first — it is edge-triggered (one ping
+		     on healthy->degraded, one on degraded->healthy, silence in between)
+		     precisely so arming it cannot turn a sustained simRecapContext.php
+		     outage into a ping per claimed sim. -->
 	</dict>
 	<key>StandardOutPath</key>
 	<string>${LOG_DIR}/launchd-stdout.log</string>

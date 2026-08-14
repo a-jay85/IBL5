@@ -858,6 +858,8 @@ jobs:
         run: bin/test-token-report
       - name: bin/test-automouse-escalation
         run: bin/test-automouse-escalation
+      - name: bin/test-automouse-disarm
+        run: bin/test-automouse-disarm
       - name: bin/test-bun-audit-triage
         run: bin/test-bun-audit-triage
 

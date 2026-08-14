@@ -1,0 +1,219 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-automouse-disarm — regression test for `automouse/run disarm-*`.
+#
+# The failure this pins is a SEQUENCING failure, not a time-math one. On
+# 2026-08-11 the recurring com.ibl5.automouse job was unloaded and its re-enable
+# was queued with `at`. macOS ships com.apple.atrun disabled, so the at-job never
+# fired; the pipeline stayed off for four scheduled nights and 14 plans piled up
+# in the queue before anyone looked. A "disarm" that takes the job down before
+# it has proven the re-arm is live reproduces that outage exactly — and a test
+# that only checks epoch arithmetic passes green while it happens.
+#
+# So the load-bearing assertions are about ORDER and ABORT:
+#   1. the re-arm agent is bootstrapped BEFORE the recurring job is booted out;
+#   2. if the re-arm bootstrap fails, the recurring job is NEVER booted out;
+#   3. if the re-arm agent doesn't register, the recurring job is NEVER booted out;
+#   4. stale-plist cleanup touches only com.ibl5.automouse-rearm-* labels, never
+#      a one-shot the user scheduled with `run schedule`;
+#   5. an in-flight run blocks the disarm rather than being SIGTERMed.
+#
+# launchctl is stubbed via $LAUNCHCTL with a recording shim, so this runs
+# unchanged on the Linux CI runner.
+#
+# Run: bin/test-automouse-disarm  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+RUN="$REPO_ROOT/bin/automouse/run"
+FAILED=0
+
+pass() { printf '  ok   %s\n' "$1"; }
+fail() { printf '  FAIL %s\n' "$1"; FAILED=1; }
+
+assert_eq() {
+    if [ "$1" = "$2" ]; then pass "$3 ($1)"; else fail "$3: got '$1', expected '$2'"; fi
+}
+
+# assert_before <needle-a> <needle-b> <call-log> <label>
+# Passes only when a's first occurrence precedes b's first occurrence, and both
+# are present. This is the arm-before-disarm invariant.
+assert_before() {
+    local a="$1" b="$2" log="$3" label="$4" ia ib
+    ia=$(grep -n -- "$a" "$log" 2>/dev/null | head -1 | cut -d: -f1)
+    ib=$(grep -n -- "$b" "$log" 2>/dev/null | head -1 | cut -d: -f1)
+    if [ -z "$ia" ]; then fail "$label: '$a' never called"; return; fi
+    if [ -z "$ib" ]; then fail "$label: '$b' never called"; return; fi
+    if [ "$ia" -lt "$ib" ]; then pass "$label"; else fail "$label: '$a' (line $ia) did not precede '$b' (line $ib)"; fi
+}
+
+assert_absent() {
+    if grep -q -- "$1" "$2" 2>/dev/null; then fail "$3: found '$1' in call log"; else pass "$3"; fi
+}
+
+# --- Source only the functions under test ----------------------------------
+# automouse/run is a long-running script with side effects at import; extracting
+# the functions by name keeps the test on the real implementation without drift.
+eval "$(awk '/^parse_when_epoch\(\)/,/^}/'      "$RUN")"
+eval "$(awk '/^epoch_fmt\(\)/,/^}/'             "$RUN")"
+eval "$(awk '/^daily_fire_hhmm\(\)/,/^}/'       "$RUN")"
+eval "$(awk '/^next_daily_epoch\(\)/,/^}/'      "$RUN")"
+eval "$(awk '/^automouse_running_pid\(\)/,/^}/' "$RUN")"
+eval "$(awk '/^disarm_until_epoch\(\)/,/^}/'    "$RUN")"
+
+TMPROOT=$(mktemp -d)
+trap 'rm -rf "$TMPROOT"' EXIT
+
+# --- The recording launchctl shim ------------------------------------------
+SHIM="$TMPROOT/launchctl"
+cat > "$SHIM" <<'SHIM_EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$LC_CALL_LOG"
+if [ "$1" = "list" ] && [ "${2:-}" = "com.ibl5.automouse" ]; then
+    if [ "${STUB_RUN_IN_FLIGHT:-0}" = "1" ]; then
+        printf '{\n\t"Label" = "com.ibl5.automouse";\n\t"PID" = 4242;\n};\n'
+    else
+        printf '{\n\t"Label" = "com.ibl5.automouse";\n\t"LastExitStatus" = 0;\n};\n'
+    fi
+    exit 0
+fi
+case "$1" in
+    bootstrap) exit "${STUB_BOOTSTRAP_RC:-0}" ;;
+    list)      exit "${STUB_LIST_RC:-0}" ;;
+esac
+exit 0
+SHIM_EOF
+chmod +x "$SHIM"
+
+export LAUNCHCTL="$SHIM"
+
+# setup_case <name> — fresh agents/state dirs + call log for one scenario.
+setup_case() {
+    CASE="$TMPROOT/$1"
+    mkdir -p "$CASE/agents" "$CASE/state"
+    printf 'stand-in for the recurring plist\n' > "$CASE/agents/com.ibl5.automouse.plist"
+    export LAUNCH_AGENTS_DIR="$CASE/agents"
+    export AUTOMOUSE_STATE_DIR="$CASE/state"
+    export LC_CALL_LOG="$CASE/calls.log"
+    : > "$LC_CALL_LOG"
+    unset STUB_BOOTSTRAP_RC STUB_LIST_RC STUB_RUN_IN_FLIGHT
+}
+
+FUTURE=$(( $(date +%s) + 90000 ))
+
+echo "== time helpers =="
+
+assert_eq "$(parse_when_epoch 'not a time' >/dev/null 2>&1; echo $?)" "1" "parse_when_epoch rejects garbage"
+
+# Round-trip: whatever the parser resolves must format back to the same wall clock.
+RT_EPOCH=$(parse_when_epoch '2026-08-20 09:00')
+assert_eq "$(epoch_fmt "$RT_EPOCH" '%Y-%m-%d %H:%M')" "2026-08-20 09:00" "parse/format round-trip"
+
+# next_daily_epoch rolls forward when the time has already passed today, and
+# stays on today when it hasn't. Both are checked against the wall clock, not
+# against a +86400 assumption, so a DST day cannot false-fail this.
+NOON=$(parse_when_epoch '2026-08-20 12:00')
+NEXT_PAST=$(next_daily_epoch 3 0 "$NOON")
+assert_eq "$(epoch_fmt "$NEXT_PAST" '%Y-%m-%d %H:%M')" "2026-08-21 03:00" "next_daily_epoch rolls to tomorrow when passed"
+NEXT_FUTURE=$(next_daily_epoch 23 30 "$NOON")
+assert_eq "$(epoch_fmt "$NEXT_FUTURE" '%Y-%m-%d %H:%M')" "2026-08-20 23:30" "next_daily_epoch stays on today when ahead"
+
+# An absent StartCalendarInterval.Hour must FAIL, never resolve to a guess —
+# the plist has historically held an array of intervals, which has no single Hour.
+assert_eq "$(daily_fire_hhmm "$TMPROOT/nonexistent.plist" >/dev/null 2>&1; echo $?)" "1" "daily_fire_hhmm fails on unreadable plist"
+
+echo "== happy path: arm before disarm =="
+setup_case happy
+if disarm_until_epoch "$FUTURE" > "$CASE/out.txt" 2>&1; then
+    pass "disarm_until_epoch succeeded"
+else
+    fail "disarm_until_epoch returned non-zero: $(cat "$CASE/out.txt")"
+fi
+assert_before "bootstrap gui/" "bootout gui/.*/com.ibl5.automouse\$" "$LC_CALL_LOG" \
+    "re-arm bootstrapped BEFORE the recurring job is booted out"
+if [ -f "$CASE/agents/com.ibl5.automouse-rearm-$FUTURE.plist" ]; then
+    pass "re-arm plist written"
+else
+    fail "re-arm plist missing"
+fi
+if grep -q "rearm_epoch=$FUTURE" "$CASE/state/.disarmed-until" 2>/dev/null; then
+    pass "breadcrumb records the re-arm epoch"
+else
+    fail "breadcrumb missing or lacks rearm_epoch"
+fi
+# The generated plist must chain its self-delete on SUCCESS only, so a failed
+# re-arm keeps both the evidence and the retry.
+if grep -q 'elif launchctl bootstrap' "$CASE/agents/com.ibl5.automouse-rearm-$FUTURE.plist"; then
+    pass "re-arm plist guards its self-delete behind the bootstrap result"
+else
+    fail "re-arm plist does not condition its self-delete on the bootstrap"
+fi
+
+echo "== bootstrap failure leaves the recurring job up =="
+setup_case armfail
+export STUB_BOOTSTRAP_RC=1
+if disarm_until_epoch "$FUTURE" > "$CASE/out.txt" 2>&1; then
+    fail "disarm_until_epoch should fail when the re-arm bootstrap fails"
+else
+    pass "disarm_until_epoch aborts on a failed re-arm bootstrap"
+fi
+assert_absent "bootout gui/.*/com.ibl5.automouse\$" "$LC_CALL_LOG" \
+    "recurring job NOT booted out when arming failed"
+if [ -f "$CASE/state/.disarmed-until" ]; then
+    fail "breadcrumb written despite the abort"
+else
+    pass "no breadcrumb written on abort"
+fi
+
+echo "== unregistered re-arm agent leaves the recurring job up =="
+setup_case verifyfail
+export STUB_LIST_RC=1
+if disarm_until_epoch "$FUTURE" > "$CASE/out.txt" 2>&1; then
+    fail "disarm_until_epoch should fail when the re-arm agent does not register"
+else
+    pass "disarm_until_epoch aborts when the re-arm agent does not register"
+fi
+assert_absent "bootout gui/.*/com.ibl5.automouse\$" "$LC_CALL_LOG" \
+    "recurring job NOT booted out when verification failed"
+
+echo "== cleanup scope =="
+setup_case cleanup
+touch "$CASE/agents/com.ibl5.automouse-rearm-1111111111.plist"
+touch "$CASE/agents/com.ibl5.automouse-oneshot-2222222222.plist"
+disarm_until_epoch "$FUTURE" > "$CASE/out.txt" 2>&1
+if [ -f "$CASE/agents/com.ibl5.automouse-rearm-1111111111.plist" ]; then
+    fail "a prior re-arm plist was not cleared (disarms would stack)"
+else
+    pass "prior re-arm plist cleared"
+fi
+if [ -f "$CASE/agents/com.ibl5.automouse-oneshot-2222222222.plist" ]; then
+    pass "user's scheduled one-shot plist left alone"
+else
+    fail "cleanup deleted a one-shot plist scheduled with 'run schedule'"
+fi
+assert_absent "oneshot-2222222222" "$LC_CALL_LOG" "one-shot label never booted out"
+
+echo "== in-flight run blocks the disarm =="
+setup_case inflight
+export STUB_RUN_IN_FLIGHT=1
+if disarm_until_epoch "$FUTURE" > "$CASE/out.txt" 2>&1; then
+    fail "disarm_until_epoch should refuse while a run is in flight"
+else
+    pass "disarm_until_epoch refuses while a run is in flight"
+fi
+assert_absent "bootout" "$LC_CALL_LOG" "nothing booted out while a run is in flight"
+if grep -q '4242' "$CASE/out.txt"; then
+    pass "error names the in-flight PID"
+else
+    fail "error does not name the in-flight PID"
+fi
+
+echo
+if [ "$FAILED" -eq 0 ]; then
+    echo "All bin/test-automouse-disarm cases passed."
+else
+    echo "bin/test-automouse-disarm FAILED"
+fi
+exit "$FAILED"

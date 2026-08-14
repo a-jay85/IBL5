@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for agent-tiering — the skip-vs-spawn heuristic, flat-fan-out (nested sub-agent) rationale, boundary keys on task type, orchestrator context economics (delegate-don't-dismiss, split-don't-self-clear), the measured evidence behind the offload-`/plan`-by-default rule, and per-tier prompt style. Fable approval gate moved to `agent-tiering-fable-gate.md`; bounded-checklist diff-triage rationale moved to `agent-tiering-bounded-checklist.md`. Loads only when editing workflow orchestration defs.
-last_verified: 2026-08-08
+last_verified: 2026-08-14
 paths:
   - ".claude/skills/**/*.md"
 ---
@@ -14,13 +14,13 @@ and prompt style — pulled out of the always-loaded budget.
 
 ## Skip the Agent — Direct Tool Calls
 
-Each sub-agent costs ~3–5K tokens (system prompt + rules + memory, loaded before its prompt), and its output re-loads in Opus's context every later turn.
+Each sub-agent costs ~17–23K tokens (system prompt + rules + memory, loaded before its prompt) [CORRECTED 2026-08-14: was "~3–5K"; measured p50 spawn context is 17–23K], and its output re-loads in Opus's context every later turn.
 
 **Run directly (no agent) when ALL hold:** single command/tool call · output under ~50 lines · nothing else to run in parallel · output won't persist across turns.
 
 **Spawn an agent when ANY hold:** output unpredictably verbose (large grep, failing suites with stack traces) and the agent can return a summary · multiple independent verbose tasks run concurrently · the task is multiple sequential tool calls.
 
-**When you spawn, minimize invocation count** — the question is *how many agents are needed*, not *parallel vs. sequential*; token spend outranks wall-clock time. Batch N related tasks into one agent (or do them yourself) — each spawn re-pays the ~3–5K overhead. Separate agents only when each genuinely needs its own context (independent worktrees, isolating verbose output), not because tasks are logically distinct.
+**When you spawn, minimize invocation count** — the question is *how many agents are needed*, not *parallel vs. sequential*; token spend outranks wall-clock time. Batch N related tasks into one agent (or do them yourself) — each spawn re-pays the ~17–23K overhead. Separate agents only when each genuinely needs its own context (independent worktrees, isolating verbose output), not because tasks are logically distinct.
 
 **PHPUnit and PHPStan are always direct Bash calls** — passing output is ~5 lines, failures usually under 50; agent overhead dwarfs it. Use `run_in_background` for parallelism without an agent — **but only in the interactive harness**, where a finished background task re-invokes you. In a **headless** run (`claude -p`, e.g. `/post-plan` under automouse) there is no re-invocation: a live background task at turn-end stall-kills the run — run blocking, or poll `BashOutput` to completion in-turn (post-plan `SKILL.md` Phase 5).
 
@@ -53,7 +53,7 @@ Sub-agents can spawn sub-agents (5 deep), but we keep **flat fan-out**: the orch
 
 The context saving from a sub-agent comes from **delegation, not dismissal**. A sub-agent runs in its own window; when it finishes, only its final message returns — every intermediate tool call and result stays isolated and evaporates. So "spin up → dismiss → spin up fresh" beats inlining the same work because the bulk **never entered the orchestrator**, not because dismissal evicts it (dismissal reclaims nothing — the internals were never in the parent). Corollary: keep returns **thin** — pointers (`path:line`), not file bodies (`feedback_orchestrator_pass_pointers_not_contents`).
 
-**The orchestrator cannot clear itself.** Its context grows monotonically by the sum of return summaries across a run. The `/clear`-equivalent lives one layer down, in sub-agent lifecycle: a fresh `Agent()` spawn = clean context + cold cache + the ~3–5K spawn overhead; continuing an agent via `SendMessage` = warm cache but carries the prior task's context forward. **Fresh spawn = clear; `SendMessage` = keep talking** — pick by whether the next task actually needs the prior one's context.
+**The orchestrator cannot clear itself.** Its context grows monotonically by the sum of return summaries across a run. The `/clear`-equivalent lives one layer down, in sub-agent lifecycle: a fresh `Agent()` spawn = clean context + cold cache + the ~17–23K spawn overhead; continuing an agent via `SendMessage` = warm cache but carries the prior task's context forward. **Fresh spawn = clear; `SendMessage` = keep talking** — pick by whether the next task actually needs the prior one's context.
 
 **The only true reset is the session boundary.** That is exactly why `/post-plan` runs in a **fresh** session (`workflow-continuity.md`: inline re-reads full implementation context every phase, costing several times a fresh run). For a run too large to fit one orchestrator context, the fix is **split into multiple plans/sessions**, not orchestrator-level sub-agent juggling — and nesting orchestrators is closed by design (see Nested Sub-Agents above).
 

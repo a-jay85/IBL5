@@ -140,6 +140,24 @@
     background-color: var(--team-cell-bg);
 }
 
+/* Team and Record text stays in the team's own secondary color on hover. The
+   global .ibl-data-table a:hover recolors links to --accent-500 and dims them to
+   0.85, which is unreadable over most team backgrounds. Lottery rows never show
+   it only because .draft-draggable a is pointer-events: none — this gives every
+   other row the same static text. (0,4,1) outranks .ibl-data-table a:hover. */
+.projected-draft-order-table td.ibl-team-cell--colored .ibl-team-cell__name:hover {
+    color: var(--team-cell-color);
+    opacity: 1;
+}
+
+/* One hover tint for the whole table: the accent the draggable lottery rows
+   already use, rather than the global --gray-100. Row-level is enough — cells
+   that paint their own background (team cells, separators, movement tints) sit
+   on top of it, and non-lottery rows never carry a movement tint. */
+.ibl-data-table.projected-draft-order-table tbody tr:hover {
+    background-color: var(--accent-100);
+}
+
 /* +/- spots moved relative to the projected order (finalized picks only) */
 .draft-movement {
     font-size: var(--text-xs);

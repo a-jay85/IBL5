@@ -828,6 +828,17 @@ function changedDocPaths(string $base, string $escapedRoot, string $escapedBase)
  * it does not reintroduce a midnight false-fail; a strictly-newer value can only
  * be a future date, which checkFile() rejects separately.
  *
+ * Null-editDate fallback: editCommitDate() returns null when base..HEAD is empty
+ * (first commit on the branch — no commits exist in that range yet) or when the
+ * git log command fails. In that case we fall back to PHP's process-local "today"
+ * so the same-day escape still fires: a file whose last_verified == today passes
+ * even before the commit lands (headLv >= today is true, matching the behavior
+ * immediately after). Exception to the wall-clock-avoidance above: this path
+ * uses the CI wall clock, so a developer who sets last_verified at 11:58 PM and
+ * whose CI run crosses midnight sees a false-fail. Exposure is limited to the
+ * first-commit-on-branch edge case; rebased or multi-commit branches still key
+ * off the immutable author date.
+ *
  * @return list<array{rel: string, abs: string, headLv: ?string, baseLv: ?string, needsBump: bool}>
  */
 function iterChangedDocs(string $base, string $repoRoot): array
@@ -869,7 +880,9 @@ function iterChangedDocs(string $base, string $repoRoot): array
         $headLv = $headFm['last_verified'] ?? null;
         $baseLv = $baseFm['last_verified'] ?? null;
         $editDate = editCommitDate($repoRoot, $base, $rel);
-        $verifiedAtEdit = $headLv !== null && $editDate !== null && $headLv >= $editDate;
+        // Fall back to today when editDate is null (first commit on branch — base..HEAD empty).
+        $effectiveEditDate = $editDate ?? (new \DateTimeImmutable('today'))->format('Y-m-d');
+        $verifiedAtEdit = $headLv !== null && $headLv >= $effectiveEditDate;
 
         $docs[] = [
             'rel' => $rel,

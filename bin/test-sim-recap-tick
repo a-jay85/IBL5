@@ -201,6 +201,10 @@ SH
     export SIM_RECAP_CURL_BIN="$STUB/curl"
     export SIM_RECAP_BOT_BASE_URL="http://test.invalid"
     export SIM_RECAP_OPS_ALERT_THREAD_ID="test-ops-thread"
+    # Aim the ops-alert edge state at the stub dir. Without this the suite would
+    # read and WRITE the developer's real ~/.claude state file, and every degraded
+    # case would then depend on whatever the last real tick left behind.
+    export SIM_RECAP_OPS_ALERT_STATE="$STUB/ops-alert.json"
 }
 
 # Per-case reset: wipe logs and all per-case control sentinels.
@@ -210,17 +214,37 @@ srt_reset() {
           "$STUB"/store-fails "$STUB"/store-banner "$STUB"/resp.* "$STUB"/fail.* \
           "$STUB"/record-stdin "$STUB"/store.cmd "$STUB"/store.stdin \
           "$STUB"/curl.log "$STUB"/prompt.argv "$STUB"/launchctl.log "$STUB"/launchctl.sentinel \
+          "$STUB"/ops-alert.json "$STUB"/ops-alert.json.tmp* \
           2>/dev/null
     export SIM_RECAP_DB_PASSWORD="test_db_password"
     export SIM_RECAP_MYSQL_BIN="$STUB/mysql"
     unset SIM_RECAP_KEEP_WORKDIR 2>/dev/null || true
     export SIM_RECAP_OPS_ALERT_THREAD_ID="test-ops-thread"
+    # The ops alert is EDGE-triggered: a leftover state file reads as "already
+    # degraded" and silences the next onset ping. Leaving it here would make the
+    # suite order-dependent — degraded_path_discord_alert would pass or fail
+    # depending on which case ran before it.
+    export SIM_RECAP_OPS_ALERT_STATE="$STUB/ops-alert.json"
 }
 
 # srt_run [args…] — invoke the tick with combined stdout+stderr → tick.out.
 srt_run() {
     "$SRT_DRIVER" "$@" > "$STUB/tick.out" 2>&1
     SRT_RC=$?
+}
+
+# srt_matches <logfile> <pattern> — match count, 0 when the log does not exist.
+# Named srt_matches, NOT srt_count: srt_count already exists above with a totally
+# different contract (<name> <want> <file>, and it ASSERTS rather than printing).
+# A same-name redefinition here would silently rebind every later srt_count call
+# site to this one — no error, just an assertion that quietly stops asserting.
+# Not `grep -c … || echo 0`: on no-match grep PRINTS "0" and exits 1, so that
+# idiom emits "0\n0" and every count comparison silently fails.
+srt_matches() {
+    local n
+    n=$(grep -c -- "$2" "$STUB/$1" 2>/dev/null)
+    [ -n "$n" ] || n=0
+    printf '%s' "$n"
 }
 
 srt_setup
@@ -917,6 +941,96 @@ cat > "$STUB/curl" <<'SH'
 echo "$*" >> "$STUB/curl.log"
 SH
 chmod +x "$STUB/curl"
+
+# ══ OPS-ALERT EDGE TRIGGERING ═════════════════════════════════════════════════
+# The four (observation × state) cases, plus the two ways state can be wrong.
+# None of these need a clock: the mechanism has no cooldown by design.
+
+# ── ops_alert_second_degraded_sim_is_silent ───────────────────────────────────
+# The defect this closes: a sustained outage alerted once per CLAIMED SIM for as
+# long as it lasted. Two consecutive degraded ticks must yield exactly ONE post.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":42}\n' > "$STUB/resp.claim-next"
+touch "$STUB/fail.simRecapContext"
+srt_run
+srt_run
+srt_expect_eq "ops_alert_second_degraded_sim_is_silent — one post across two degraded ticks" \
+    1 "$(srt_matches curl.log '/post-to-thread')"
+srt_log_has "$STUB" curl.log "roster-blind" \
+    "ops_alert_second_degraded_sim_is_silent — the single post is the onset warning"
+
+# ── ops_alert_recovery_ping_on_healthy_after_degraded ─────────────────────────
+# The recovery ping is what makes the silence readable — without it "no ping"
+# would be ambiguous between "still down" and "fixed", and a periodic reminder
+# would be the only way to tell. Exactly two posts per outage, then state gone.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":42}\n' > "$STUB/resp.claim-next"
+touch "$STUB/fail.simRecapContext"
+srt_run
+rm -f "$STUB/fail.simRecapContext"
+srt_run
+srt_expect_eq "ops_alert_recovery_ping_on_healthy_after_degraded — exactly two posts" \
+    2 "$(srt_matches curl.log '/post-to-thread')"
+srt_log_has "$STUB" curl.log "RECOVERED" \
+    "ops_alert_recovery_ping_on_healthy_after_degraded — recovery ping fired"
+srt_file_absent "$STUB/ops-alert.json" \
+    "ops_alert_recovery_ping_on_healthy_after_degraded — state cleared on recovery"
+
+# ── ops_alert_silent_when_never_degraded ──────────────────────────────────────
+# Healthy observation with no state: the fourth case, and the common one. A
+# healthy tick must never post — otherwise every successful sim pings the thread.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":42}\n' > "$STUB/resp.claim-next"
+srt_run
+srt_expect_eq "ops_alert_silent_when_never_degraded — zero posts" \
+    0 "$(srt_matches curl.log '/post-to-thread')"
+
+# ── ops_alert_dry_run_does_not_consume_edge ───────────────────────────────────
+# A human's --dry-run against a degraded endpoint must not write state: doing so
+# would consume the onset edge and silence the alert the next live tick owes us.
+srt_reset
+touch "$STUB/fail.simRecapContext"
+srt_run --dry-run --sim=42
+srt_expect_eq "ops_alert_dry_run_does_not_consume_edge — dry-run posts nothing" \
+    0 "$(srt_matches curl.log '/post-to-thread')"
+srt_file_absent "$STUB/ops-alert.json" \
+    "ops_alert_dry_run_does_not_consume_edge — dry-run wrote no state"
+# Clear the log so the next assertion measures the LIVE tick alone — otherwise a
+# dry-run post would satisfy the count and the assertion would pass vacuously.
+rm -f "$STUB/curl.log"
+printf '{"ok":true,"cmd":"claim-next","sim":42}\n' > "$STUB/resp.claim-next"
+srt_run
+srt_expect_eq "ops_alert_dry_run_does_not_consume_edge — live onset still fires afterwards" \
+    1 "$(srt_matches curl.log '/post-to-thread')"
+
+# ── ops_alert_state_write_failure_is_loud ─────────────────────────────────────
+# An unwritable state path silently restores the flood, so it must leave a
+# breadcrumb. $STUB/mysql is a FILE, so mkdir -p of it as a directory fails.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":42}\n' > "$STUB/resp.claim-next"
+touch "$STUB/fail.simRecapContext"
+export SIM_RECAP_OPS_ALERT_STATE="$STUB/mysql/ops-alert.json"
+srt_run
+srt_expect_eq "ops_alert_state_write_failure_is_loud — exit 0" 0 "$SRT_RC"
+srt_log_has "$STUB" tick.out "repeat-alert suppression is OFF" \
+    "ops_alert_state_write_failure_is_loud — warning logged"
+srt_log_has "$STUB" curl.log "/post-to-thread" \
+    "ops_alert_state_write_failure_is_loud — alert still fires despite the write failure"
+export SIM_RECAP_OPS_ALERT_STATE="$STUB/ops-alert.json"
+
+# ── ops_alert_corrupt_count_does_not_kill_the_tick ────────────────────────────
+# A state file that is valid JSON but carries a STRING degraded_count used to
+# reach $((count + 1)), which is an unbound variable under `set -u` — fatal to
+# the whole tick, not just the alert. A corrupt state file may cost a
+# suppression; it must never cost the recap.
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":42}\n' > "$STUB/resp.claim-next"
+touch "$STUB/fail.simRecapContext"
+printf '{"degraded_since":"2026-08-14T00:00:00","degraded_count":"lots"}\n' > "$STUB/ops-alert.json"
+srt_run
+srt_expect_eq "ops_alert_corrupt_count_does_not_kill_the_tick — exit 0" 0 "$SRT_RC"
+srt_count "ops_alert_corrupt_count_does_not_kill_the_tick — the recap still ran" \
+    1 "$STUB/claude.log"
 
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"

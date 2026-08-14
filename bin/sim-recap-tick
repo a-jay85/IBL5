@@ -60,6 +60,15 @@ SIM_RECAP_MYSQL_BIN="${SIM_RECAP_MYSQL_BIN:-/opt/homebrew/opt/mysql@8.4/bin/mysq
 SIM_RECAP_CURL_BIN="${SIM_RECAP_CURL_BIN:-curl}"
 SIM_RECAP_BOT_BASE_URL="${SIM_RECAP_BOT_BASE_URL:-http://127.0.0.1:50001}"
 SIM_RECAP_OPS_ALERT_THREAD_ID="${SIM_RECAP_OPS_ALERT_THREAD_ID:-}"
+# Where the ops-alert edge state lives. Deliberately NOT under WORKDIR (mktemp -d,
+# rm -rf'd on EXIT) — suppressing a repeat across ticks needs a path that outlives
+# the run. Sits in the sim-recap dir sim-recap-cron-setup already creates (for its
+# logs/ subdir); ops_state_write mkdir -p's it anyway so neither depends on order.
+# HOME is defaulted, not bare: this is the only HOME reference in the file, we run
+# under `set -u`, and the plist's EnvironmentVariables does not set it — so a bare
+# $HOME would abort the tick at expansion time, on EVERY poll, if launchd ever
+# handed us an environment without it.
+SIM_RECAP_OPS_ALERT_STATE="${SIM_RECAP_OPS_ALERT_STATE:-${HOME:-/tmp}/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/sim-recap/ops-alert.json}"
 SIM_RECAP_LAUNCHCTL_BIN="${SIM_RECAP_LAUNCHCTL_BIN:-launchctl}"
 # SIM_RECAP_DB_PASSWORD is read from the environment ONLY (never defaulted, never
 # argv, never logged). require_password() enforces its presence on the live path.
@@ -72,6 +81,10 @@ export SIM_RECAP_MYSQL_BIN
 # ── Per-run temp working dir (security constraint 7 / ADR-0062) ───────────────
 # Global so the EXIT trap can see it; assigned in generate()/dry_run().
 WORKDIR=""
+
+# Set by dry_run() before it fetches anything. Global rather than main()'s local
+# DRY_RUN because roster_health_transition() — five frames down — has to know.
+DRY_RUN_MODE=0
 cleanup_workdir() {
     [ -n "${SIM_RECAP_KEEP_WORKDIR:-}" ] && return 0
     [ -n "$WORKDIR" ] && rm -rf "$WORKDIR"
@@ -84,13 +97,94 @@ trap cleanup_workdir EXIT
 # generated payload.json alone (a clean, pipeable document — row 60/61), so no
 # log line may interleave with it. launchd captures both streams in live mode.
 log() { printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*" >&2; }
-notify_roster_degraded() { # sim
-    [ -z "${SIM_RECAP_OPS_ALERT_THREAD_ID:-}" ] && return 0
-    local msg="WARNING: sim $1 recap proceeding roster-blind — simRecapContext.php fetch failed"
+
+# ── Ops alert on roster-context health — EDGE-triggered, exactly two pings ────
+# One ping on healthy→degraded, one on degraded→healthy, and silence in between.
+# A sustained simRecapContext.php outage otherwise pings once per claimed sim for
+# as long as it lasts, which trades an upstream fault for a notification bleed
+# (bin/bug-pipeline-tick makes the same argument for its CI-autofix ceiling).
+#
+# Why no periodic "still degraded" reminder: the RECOVERY ping is what makes the
+# silence readable. Once you know a recovery ping is coming, "no ping since the
+# onset" unambiguously means the outage is still open, so a reminder buys nothing
+# and reintroduces exactly the annoyance this closes. It also keeps the whole
+# mechanism CLOCKLESS — no cooldown means no time seam, and all four
+# (observation × state) cases below are deterministic to test.
+#
+# State is the presence of $SIM_RECAP_OPS_ALERT_STATE: absent means healthy. So a
+# wiped ~/.claude, or a fresh machine, re-alerts on the next failure — which is
+# the correct behaviour, not a bug to design around.
+#
+# Both edges are observed only where a sim is CLAIMED, so an empty queue neither
+# alerts nor recovers: if the outage ends while nothing is pending, the RECOVERED
+# ping waits for the first sim after it. That is the right trade — the alert is
+# about recaps shipping roster-blind, and no recap is shipping.
+ops_post() { # message — fault-tolerant by contract; never fails the tick
     "$SIM_RECAP_CURL_BIN" -s -X POST "$SIM_RECAP_BOT_BASE_URL/post-to-thread" \
         -H 'Content-Type: application/json' \
-        -d "$("$SIM_RECAP_JQ_BIN" -nc --arg t "$SIM_RECAP_OPS_ALERT_THREAD_ID" --arg m "$msg" \
+        -d "$("$SIM_RECAP_JQ_BIN" -nc --arg t "$SIM_RECAP_OPS_ALERT_THREAD_ID" --arg m "$1" \
              '{thread_id:$t,message:$m}')" 2>/dev/null >/dev/null || true
+}
+
+# Write via temp + mv so a failed write can never leave a TRUNCATED state file:
+# an empty file reads as "healthy", which would silently restore the flood. The
+# write is still non-fatal, but it logs — a flood must leave a breadcrumb rather
+# than being indistinguishable from "no suppression was ever added."
+ops_state_write() { # degraded_since  degraded_count
+    # $$ keeps the temp per-process. A FIXED .tmp name would be shared by
+    # overlapping ticks (the claude timeout is 1800s, the poll interval 300s):
+    # both truncate the same inode, their writes interleave, and both mv — moving
+    # garbled JSON into place, which jq then fails to read, which reads as
+    # "healthy", which restores the very flood temp+mv exists to prevent. And
+    # each writer would think it succeeded, so nothing would log.
+    local tmp="$SIM_RECAP_OPS_ALERT_STATE.tmp.$$"
+    if mkdir -p "$(dirname "$SIM_RECAP_OPS_ALERT_STATE")" 2>/dev/null \
+       && "$SIM_RECAP_JQ_BIN" -nc --arg s "$1" --argjson c "$2" \
+              '{degraded_since:$s,degraded_count:$c}' > "$tmp" 2>/dev/null \
+       && mv -f "$tmp" "$SIM_RECAP_OPS_ALERT_STATE" 2>/dev/null; then
+        return 0
+    fi
+    rm -f "$tmp" 2>/dev/null
+    log "WARNING: could not write ops-alert state to $SIM_RECAP_OPS_ALERT_STATE — repeat-alert suppression is OFF until this is fixed"
+    return 0
+}
+
+roster_health_transition() { # sim  ok|degraded
+    [ -z "${SIM_RECAP_OPS_ALERT_THREAD_ID:-}" ] && return 0
+    # --dry-run must never touch the shared edge state. A human regenerating a
+    # recap while the endpoint is down would consume the onset edge and silence
+    # the real alert; a dry-run while it is up would clear state and fire a false
+    # "recovered". The plan's "both call sites alert, it is a no-op anyway"
+    # premise held for a STATELESS alert and stops holding once it carries state.
+    [ "$DRY_RUN_MODE" -eq 1 ] && return 0
+
+    local sim="$1" health="$2" since count
+    since="$("$SIM_RECAP_JQ_BIN" -r '.degraded_since // empty' "$SIM_RECAP_OPS_ALERT_STATE" 2>/dev/null)"
+    count="$("$SIM_RECAP_JQ_BIN" -r '.degraded_count // 0' "$SIM_RECAP_OPS_ALERT_STATE" 2>/dev/null)"
+    # Non-numeric, not just empty: a state file that is valid JSON with a STRING
+    # degraded_count makes $((count + 1)) below expand as a variable name, which
+    # is unbound under `set -u` and kills the whole tick. A corrupt state file may
+    # cost a suppression; it must never cost the recap.
+    case "$count" in ''|*[!0-9]*) count=0 ;; esac
+
+    if [ "$health" = "degraded" ]; then
+        if [ -n "$since" ]; then
+            # Already alerted — stay silent, just keep the running tally so the
+            # recovery ping can say how much damage the outage did.
+            ops_state_write "$since" "$((count + 1))"
+            return 0
+        fi
+        # Record BEFORE posting: if the POST fails we would rather lose one ping
+        # than re-alert on every subsequent sim, which is the bug being fixed.
+        since="$(date '+%Y-%m-%dT%H:%M:%S')"
+        ops_state_write "$since" 1
+        ops_post "WARNING: sim $sim recap proceeding roster-blind — simRecapContext.php fetch failed. Further roster-blind sims will NOT re-alert; expect a single RECOVERED message when it comes back."
+    else
+        [ -z "$since" ] && return 0   # healthy, and it was healthy — say nothing
+        rm -f "$SIM_RECAP_OPS_ALERT_STATE" 2>/dev/null
+        ops_post "RECOVERED: simRecapContext.php is answering again (sim $sim). $count sim recap(s) ran roster-blind since $since."
+    fi
+    return 0
 }
 
 # ── Usage/rate-limit detector (regex copied from bin/bug-pipeline-tick:76-79) ──
@@ -183,9 +277,10 @@ fetch_agent_inputs() { # sim  (writes mentions.json + themes-ledger.json into WO
     ctx="$(qctx "$sim")"; ctx_rc=$?
     if [ "$ctx_rc" -eq 0 ] && jq_ok "$ctx" '.sim != null'; then
         printf '%s' "$ctx" > "$WORKDIR/roster-context.json"
+        roster_health_transition "$sim" ok
     else
         log "sim $sim: roster-context unavailable — writing empty context"
-        notify_roster_degraded "$sim"
+        roster_health_transition "$sim" degraded
         printf '{}' > "$WORKDIR/roster-context.json"
     fi
     return 0
@@ -315,6 +410,9 @@ generate() { # sim
 # Fetches read-only inputs, runs the agent, prints the complete payload.json to
 # stdout (themes included, under .themes). Never claims, parks, stores, or posts.
 dry_run() {
+    # Set before ANY fetch: roster_health_transition() reads this to keep a
+    # human's tuning run from consuming the ops-alert edge (see that function).
+    DRY_RUN_MODE=1
     local sim="$DRY_SIM"
     if [ -z "$sim" ] || ! printf '%s' "$sim" | grep -qE '^[0-9]+$'; then
         log "ERROR: --dry-run requires an explicit --sim=N (it never chooses a sim implicitly)"

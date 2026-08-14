@@ -11,6 +11,7 @@ use PHPUnit\Framework\TestCase;
 use Tests\Support\AuditLogAssertions;
 
 /**
+ * @phpstan-import-type ProjectedDraftOrderResult from ProjectedDraftOrderServiceInterface
  * @covers \ProjectedDraftOrder\ProjectedDraftOrderService
  */
 class ProjectedDraftOrderServiceTest extends TestCase
@@ -478,6 +479,69 @@ class ProjectedDraftOrderServiceTest extends TestCase
         $this->assertCount(28, $result['round1']);
     }
 
+    // =========================================================================
+    // Movement (finalized pick vs. its projected slot)
+    // =========================================================================
+
+    public function testFinalizedLotteryPickThatMovedUpHasPositiveMovement(): void
+    {
+        $result = $this->finalizeProjectedOrder(reverseLottery: true);
+
+        // Reversing picks 1-12 puts the team projected 12th at pick 1: 12 - 1 = +11.
+        $this->assertSame(11, $result['round1'][0]['movement']);
+    }
+
+    public function testFinalizedLotteryPickThatMovedDownHasNegativeMovement(): void
+    {
+        $result = $this->finalizeProjectedOrder(reverseLottery: true);
+
+        // ...and the team projected 1st at pick 12: 1 - 12 = -11.
+        $this->assertSame(-11, $result['round1'][11]['movement']);
+    }
+
+    public function testFinalizedLotteryPickAtItsProjectedSlotHasZeroMovement(): void
+    {
+        $result = $this->finalizeProjectedOrder(reverseLottery: false);
+
+        // Zero is a real result (landed exactly where projected), not "unknown" —
+        // the View renders a muted 0 for it and nothing at all for null.
+        for ($i = 0; $i < 12; $i++) {
+            $this->assertSame(0, $result['round1'][$i]['movement'], 'pick ' . ($i + 1));
+        }
+    }
+
+    public function testFinalizedNonLotteryPickHasNullMovement(): void
+    {
+        $result = $this->finalizeProjectedOrder(reverseLottery: true);
+
+        // Only lottery teams (projected picks 1-12) have a projection to compare against.
+        for ($i = 12; $i < 28; $i++) {
+            $this->assertNull($result['round1'][$i]['movement'], 'pick ' . ($i + 1));
+        }
+    }
+
+    public function testFinalizedRound2PicksAllHaveNullMovement(): void
+    {
+        $result = $this->finalizeProjectedOrder(reverseLottery: true);
+
+        $this->assertCount(28, $result['round2']);
+        foreach ($result['round2'] as $slot) {
+            $this->assertNull($slot['movement'], 'round 2 pick ' . $slot['pick']);
+        }
+    }
+
+    public function testProjectedOrderHasNullMovementForEveryPick(): void
+    {
+        $this->configureStubWithFullLeague();
+
+        $result = $this->service->calculateDraftOrder(2026);
+
+        // Nothing has been finalized yet, so there is no movement to report.
+        foreach ([...$result['round1'], ...$result['round2']] as $slot) {
+            $this->assertNull($slot['movement']);
+        }
+    }
+
     public function testSaveLotteryOrderDelegatesToRepository(): void
     {
         $standings = $this->buildFullLeagueStandings();
@@ -641,6 +705,55 @@ class ProjectedDraftOrderServiceTest extends TestCase
     // =========================================================================
     // Helper methods to build test fixtures
     // =========================================================================
+
+    /**
+     * Save the projected order back as the finalized order and re-read it, so every
+     * movement value is the difference between a known projected slot and a known
+     * saved slot. With `$reverseLottery` the 12 lottery picks are flipped (leaving
+     * picks 13-28 and all of round 2 alone); without it the saved order is identical
+     * to the projection.
+     *
+     * @return ProjectedDraftOrderResult
+     */
+    private function finalizeProjectedOrder(bool $reverseLottery): array
+    {
+        $this->configureStubWithFullLeague();
+        $projected = $this->service->calculateDraftOrder(2026);
+
+        $lottery = array_slice($projected['round1'], 0, 12);
+        if ($reverseLottery) {
+            $lottery = array_reverse($lottery);
+        }
+        $round1Order = array_merge($lottery, array_slice($projected['round1'], 12));
+
+        $savedRound1 = [];
+        foreach ($round1Order as $index => $slot) {
+            $savedRound1[] = [
+                'pick' => $index + 1,
+                'team' => $slot['teamName'],
+                'teamid' => $slot['teamId'],
+                'player' => '',
+            ];
+        }
+
+        $savedRound2 = [];
+        foreach ($projected['round2'] as $slot) {
+            $savedRound2[] = [
+                'pick' => $slot['pick'],
+                'team' => $slot['teamName'],
+                'teamid' => $slot['teamId'],
+                'player' => '',
+            ];
+        }
+
+        $this->stubRepository->method('isDraftOrderFinalized')->willReturn(true);
+        $this->stubRepository->method('getFinalDraftOrder')->willReturnMap([
+            [2026, 1, $savedRound1],
+            [2026, 2, $savedRound2],
+        ]);
+
+        return $this->service->getFinalOrProjectedDraftOrder(2026);
+    }
 
     private function configureStubWithFullLeague(): void
     {

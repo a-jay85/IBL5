@@ -380,6 +380,20 @@ class ProjectedDraftOrderViewTest extends TestCase
         $this->assertStringNotContainsString('draft-pick-cell', $result);
     }
 
+    public function testDraggablePickCellKeepsPickNumberInItsOwnSpan(): void
+    {
+        $order = $this->sampleDraftOrderWithPlayoffSeparator();
+        $result = $this->view->render($order, 2026, true, false);
+
+        // draft-order-drag.js renumbers rows by writing to `.draft-pick-number`
+        // inside `.draft-pick-cell` (and strips `.draft-movement`); it silently
+        // no-ops if that span stops being emitted, so lock the markup contract.
+        $this->assertStringContainsString(
+            '<td class="draft-pick-cell"><span class="draft-drag-handle">⠿</span><span class="draft-pick-number">1</span>',
+            $result,
+        );
+    }
+
     public function testNoDraggableAttributesForNonAdmin(): void
     {
         $order = $this->sampleDraftOrderWithPlayoffSeparator();

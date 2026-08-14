@@ -10,11 +10,13 @@ Purpose: the criteria and verdict shape for the semantic judgment this skill exi
 2. The full **post-rebase** diff — `gh pr diff <N>`, or `git diff origin/master...HEAD` locally.
 3. The PR body.
 4. The list of conflict-resolved paths recorded in runtime Phase 3.
-5. `PHASE_4B_RAN`, the boolean from runtime Phase 1's prior-review probe.
+5. `PHASE_4B_RAN` and the review timestamp, from runtime Phase 1's prior-review probe.
 
 **6c. Two mandatory statements.** The review is incomplete without both, worded explicitly in the verdict:
 
 - **(a) Whether Phase 4B structured code review ran on this PR** (from `PHASE_4B_RAN`). If it did not, say so plainly and recommend running `/pr-review <N>` before the PR is merged. `/pr-ready` deliberately does **not** substitute for structured code review — it neither defines nor references the shared review-agent definitions, and it produces no scored findings.
+
+  If it **did** run, give its date and link, then **bound how much of today's head it actually covers** — a long-lived branch is typically dozens of auto-rebase force-pushes past the head that was reviewed, and reporting "review ran, no issues" without that bound endorses code the review never saw. Recover the reviewed head from the branch reflog (`git reflog show <branch>` — the pre-rebase entries survive locally) or, failing that, from the earliest `head_ref_force_pushed` entry after the review timestamp in `gh api "repos/{owner}/{repo}/issues/<N>/timeline" --paginate`. With both SHAs, compare **net changed lines** rather than whole patches: strip context and hunk headers from each side (`grep -E '^[+-]' <patch> | grep -v -E '^(\+\+\+|---)'`) and diff the results, so pure rebase churn — shifted `@@` offsets, new surrounding context from master — does not read as a change to this PR. Report the surviving delta line-by-line; if it is empty, say the review covers the current head verbatim. If the reviewed head is unrecoverable, **say that** rather than implying coverage.
 - **(b) That Phase 4B, when it ran, reviewed the PRE-REBASE diff.** Therefore every line produced by runtime Phase 3 conflict resolution is code no structured review has ever covered, and this fidelity review is its only coverage. **Name each conflict-resolved path** in the statement — do not summarise them as a count.
 
 **6d. The fidelity checks.** Each produces an explicit finding or an explicit "matches" — never silence. Each check names what makes its finding **blocking** (`NOT READY`) rather than a note (`READY WITH NOTES`); when a finding is blocking, say which clause below made it so:

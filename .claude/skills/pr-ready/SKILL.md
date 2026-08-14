@@ -114,7 +114,22 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
 
    Record the printed value as `<STRICT>` in the run notes. On a 403/404 (a token without admin read), record `<STRICT>` as `true` and say so in the verdict. Failing closed costs one extra divergence check; failing open ships a stale-base merge.
 
-5. **Prior-Phase-4B probe.** `gh pr view <N> --json comments,reviews` and look for a `### Code review` heading from the post-plan bot in **both** the issue comments and the review bodies — findings are posted as a review body with inline threads, not only as issue comments. Record the boolean as `PHASE_4B_RAN`. This is a **probe, not a gate**: the value is reported in Phase 6 and never used to skip work.
+5. **Prior-Phase-4B probe.** Look for the review heading in **both** the issue comments and the review bodies — findings are posted as a review body with inline threads, not only as issue comments. Multi-command, so per the invariants it runs via the script-file shape: `Write` this to `/tmp/pr-ready-4bprobe-<N>.sh`, then run `bash /tmp/pr-ready-4bprobe-<N>.sh`.
+
+   ```bash
+   gh api "repos/{owner}/{repo}/issues/<N>/comments" --paginate \
+     --jq '.[] | select((.body // "") | test("^#{1,6} +Code review\\b")) | "comment\t\(.id)\t\(.user.login)\t\(.created_at)"'
+   gh api "repos/{owner}/{repo}/pulls/<N>/reviews" --paginate \
+     --jq '.[] | select((.body // "") | test("^#{1,6} +Code review\\b")) | "review\t\(.id)\t\(.user.login)\t\(.submitted_at)"'
+   ```
+
+   (`^` is already line-anchored in jq's Oniguruma engine — do **not** add `(?m)` to "make it multiline". There `(?m)` means *dot matches newline*, a different flag entirely; verified 2026-08-14 that the pattern matches identically with and without it.)
+
+   **Match the heading at any level (`#{1,6}`), never a fixed one.** The helper that posts it — `post_review_summary` / `post_review_findings` in `bin/lib/post-review-findings.sh` — emits `### Code review` in its source today, yet **every** review comment actually on a PR right now carries `## Code review`, and GitHub renders both identically so nothing looks wrong. Measured 2026-08-14 across PRs #1790, #1872 and #1876: an h3-pinned probe matched **zero** of the six genuine review comments those PRs carry between them. So the level-pinned form was not "occasionally stale" — it made `PHASE_4B_RAN` structurally false for every PR, which reads as "this PR was never reviewed" and sends the verdict's headline recommendation the wrong way. This is why the probe is a command rather than an instruction to eyeball the output: a heading is prose, and prose gets matched by whatever regex the reader assumes.
+
+   Record `PHASE_4B_RAN` (any line printed ⇒ true) **and the earliest timestamp printed**, which runtime Phase 6 reports. This is a **probe, not a gate**: the value is reported in Phase 6 and never used to skip work.
+
+   **A match is evidence, not proof — read the lines before recording `true`.** Loosening the level trades one error for its mirror: a comment that merely *quotes* a review heading at line-start (another `/pr-ready` verdict, a pasted excerpt) matches too, and a false `PHASE_4B_RAN=true` is the worse failure — Phase 6 then asserts a review ran and **suppresses** the `/pr-review <N>` recommendation on a PR that never got one. The `.user.login` field above is there for this check: confirm each hit is from the reviewing identity and that the heading is the comment's own, not something it is citing. On PRs #1790/#1872/#1876 all six hits were genuine and none of the surrounding `/pr-ready` verdicts matched — their heading mentions are inline-backticked, not line-initial — but that is an observation, not a guarantee.
 
 **Phases 2 and 3 — rebase and conflict resolution.**
 

@@ -6,7 +6,7 @@ name: pr-review
 description: Token-efficient code review for pull requests
 disable-model-invocation: true
 model: claude-sonnet-4-6
-last_verified: 2026-07-28
+last_verified: 2026-08-14
 ---
 
 Provide a code review for the given pull request. This command optimizes token usage by fetching the diff once and distributing only what each agent needs.
@@ -14,7 +14,7 @@ Provide a code review for the given pull request. This command optimizes token u
 ## Step 1: Eligibility check
 
 Use a **Haiku** agent to check if the pull request:
-(a) is closed, (b) is a draft, (c) does not need a code review (e.g. automated PR, or very simple and obviously ok), or (d) already has a code review from you earlier (check both PR issue comments and PR **reviews** — `gh pr view --json comments,reviews` — for a prior `### Code review` heading from you, since findings are now posted as a review body with inline threads, not only as issue comments).
+(a) is closed, (b) is a draft, (c) does not need a code review (e.g. automated PR, or very simple and obviously ok), or (d) already has a code review from you earlier (check both PR issue comments and PR **reviews** — `gh pr view --json comments,reviews` — for a prior `Code review` heading from you **at any heading level** — regex `^#{1,6} +Code review`, since `bin/lib/post-review-findings.sh` emits `### Code review` in its source but every such comment currently on a PR carries `## Code review`, so a level-pinned match finds nothing and re-reviews an already-reviewed PR. Check reviews as well as issue comments, since findings are now posted as a review body with inline threads, not only as issue comments. A match must be **from the reviewing identity and be that comment's own heading** — a `/pr-ready` verdict quoting the heading is not a prior review, and treating it as one skips a review that was never done).
 
 If any of these are true, do not proceed. Tell the user why.
 

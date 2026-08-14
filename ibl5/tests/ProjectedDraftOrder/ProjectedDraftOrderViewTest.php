@@ -481,7 +481,22 @@ class ProjectedDraftOrderViewTest extends TestCase
         $this->assertStringContainsString('draft-moved-down', $result);
     }
 
-    public function testNoMovementNoHighlight(): void
+    public function testUnknownMovementRendersNoBadge(): void
+    {
+        $order = [
+            'round1' => [
+                $this->makeSlot(1, 1, 'Heat', 20, 62, '98002E', 'F9A01B', 1, 'Heat', '98002E', 'F9A01B', false, '', movement: null),
+            ],
+            'round2' => [],
+        ];
+        $result = $this->view->render($order, 2026);
+
+        $this->assertStringNotContainsString('draft-moved-up', $result);
+        $this->assertStringNotContainsString('draft-moved-down', $result);
+        $this->assertStringNotContainsString('draft-movement', $result);
+    }
+
+    public function testZeroMovementShowsMutedZeroBadgeWithoutHighlight(): void
     {
         $order = [
             'round1' => [
@@ -491,9 +506,12 @@ class ProjectedDraftOrderViewTest extends TestCase
         ];
         $result = $this->view->render($order, 2026);
 
+        $this->assertStringContainsString(
+            '<span class="draft-pick-number">1</span><span class="draft-movement draft-movement--none">0</span>',
+            $result,
+        );
         $this->assertStringNotContainsString('draft-moved-up', $result);
         $this->assertStringNotContainsString('draft-moved-down', $result);
-        $this->assertStringNotContainsString('draft-movement', $result);
     }
 
     public function testLotteryResultsLabelWhenFinalized(): void
@@ -559,7 +577,7 @@ class ProjectedDraftOrderViewTest extends TestCase
     // =========================================================================
 
     /**
-     * @return array{round1: list<array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ownerName: string, ownerColor1: string, ownerColor2: string, isTraded: bool, notes: string, movement: int, player: string}>, round2: list<array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ownerName: string, ownerColor1: string, ownerColor2: string, isTraded: bool, notes: string, movement: int, player: string}>}
+     * @return array{round1: list<array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ownerName: string, ownerColor1: string, ownerColor2: string, isTraded: bool, notes: string, movement: int|null, player: string}>, round2: list<array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ownerName: string, ownerColor1: string, ownerColor2: string, isTraded: bool, notes: string, movement: int|null, player: string}>}
      */
     private function emptyDraftOrder(): array
     {
@@ -567,7 +585,7 @@ class ProjectedDraftOrderViewTest extends TestCase
     }
 
     /**
-     * @return array{round1: list<array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ownerName: string, ownerColor1: string, ownerColor2: string, isTraded: bool, notes: string, movement: int, player: string}>, round2: list<array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ownerName: string, ownerColor1: string, ownerColor2: string, isTraded: bool, notes: string, movement: int, player: string}>}
+     * @return array{round1: list<array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ownerName: string, ownerColor1: string, ownerColor2: string, isTraded: bool, notes: string, movement: int|null, player: string}>, round2: list<array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ownerName: string, ownerColor1: string, ownerColor2: string, isTraded: bool, notes: string, movement: int|null, player: string}>}
      */
     private function sampleDraftOrder(): array
     {
@@ -582,7 +600,7 @@ class ProjectedDraftOrderViewTest extends TestCase
     }
 
     /**
-     * @return array{round1: list<array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ownerName: string, ownerColor1: string, ownerColor2: string, isTraded: bool, notes: string, movement: int, player: string}>, round2: list<array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ownerName: string, ownerColor1: string, ownerColor2: string, isTraded: bool, notes: string, movement: int, player: string}>}
+     * @return array{round1: list<array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ownerName: string, ownerColor1: string, ownerColor2: string, isTraded: bool, notes: string, movement: int|null, player: string}>, round2: list<array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ownerName: string, ownerColor1: string, ownerColor2: string, isTraded: bool, notes: string, movement: int|null, player: string}>}
      */
     private function sampleDraftOrderWithPlayoffSeparator(): array
     {
@@ -595,7 +613,7 @@ class ProjectedDraftOrderViewTest extends TestCase
     }
 
     /**
-     * @return array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ownerName: string, ownerColor1: string, ownerColor2: string, isTraded: bool, notes: string, movement: int, player: string}
+     * @return array{pick: int, teamId: int, teamName: string, wins: int, losses: int, color1: string, color2: string, ownerId: int, ownerName: string, ownerColor1: string, ownerColor2: string, isTraded: bool, notes: string, movement: int|null, player: string}
      */
     private function makeSlot(
         int $pick,
@@ -611,7 +629,7 @@ class ProjectedDraftOrderViewTest extends TestCase
         string $ownerColor2,
         bool $isTraded,
         string $notes,
-        int $movement = 0,
+        ?int $movement = null,
         string $player = '',
     ): array {
         return [

@@ -230,8 +230,10 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
             $ownerId = $nameToIdMap[$ownerName] ?? $savedPick['teamid'];
             $ownerTeam = $teamMap[$ownerId] ?? $team;
 
-            $projectedPick = $projectedPickByTeam[$savedPick['teamid']] ?? $savedPick['pick'];
-            $movement = $projectedPick - $savedPick['pick'];
+            // Null where this team has no projected pick to compare against (non-lottery,
+            // round 2). Zero means the team landed exactly where it was projected.
+            $projectedPick = $projectedPickByTeam[$savedPick['teamid']] ?? null;
+            $movement = $projectedPick !== null ? $projectedPick - $savedPick['pick'] : null;
 
             $slots[] = [
                 'pick' => $savedPick['pick'],
@@ -376,7 +378,7 @@ class ProjectedDraftOrderService implements ProjectedDraftOrderServiceInterface
                 'ownerColor2' => $ownerTeam['color2'],
                 'isTraded' => $isTraded,
                 'notes' => $notes,
-                'movement' => 0,
+                'movement' => null,
                 'player' => '',
             ];
         }

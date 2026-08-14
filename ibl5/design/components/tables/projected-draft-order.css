@@ -154,4 +154,9 @@
     color: var(--error-700);
 }
 
+/* Landed exactly on its projected pick — shown, but muted */
+.draft-movement--none {
+    color: var(--gray-600);
+}
+
 } /* end @layer components */

@@ -124,9 +124,10 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
         if ($slot['isTraded']) {
             $classes[] = 'projected-draft-order-traded';
         }
-        if ($slot['movement'] > 0) {
+        $movement = $slot['movement'];
+        if ($movement !== null && $movement > 0) {
             $classes[] = 'draft-moved-up';
-        } elseif ($slot['movement'] < 0) {
+        } elseif ($movement !== null && $movement < 0) {
             $classes[] = 'draft-moved-down';
         }
         if ($isDraggable) {
@@ -137,7 +138,7 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
         $html = '<tr' . $classAttr . $dragAttr . '>';
 
         $pickNumber = '<span class="draft-pick-number">' . HtmlSanitizer::e($slot['pick']) . '</span>'
-            . $this->renderMovementBadge($slot['movement']);
+            . $this->renderMovementBadge($movement);
         $pickHtml = $isDraggable
             ? '<td class="draft-pick-cell"><span class="draft-drag-handle">⠿</span>' . $pickNumber . '</td>'
             : '<td>' . $pickNumber . '</td>';
@@ -176,13 +177,19 @@ class ProjectedDraftOrderView implements ProjectedDraftOrderViewInterface
 
     /**
      * How many spots this pick moved from its projected position, shown beside the
-     * pick number. Movement is non-zero only for saved lottery results, so nothing
-     * renders on the projected order.
+     * pick number. A null movement means there is no projected pick to compare
+     * against (the projected order itself, round 2, non-lottery picks), so nothing
+     * renders; zero is a real result — the pick landed exactly where projected —
+     * and shows a muted 0.
      */
-    private function renderMovementBadge(int $movement): string
+    private function renderMovementBadge(?int $movement): string
     {
-        if ($movement === 0) {
+        if ($movement === null) {
             return '';
+        }
+
+        if ($movement === 0) {
+            return '<span class="draft-movement draft-movement--none">0</span>';
         }
 
         $modifier = $movement > 0 ? 'draft-movement--up' : 'draft-movement--down';

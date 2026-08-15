@@ -27,4 +27,15 @@ class ResetExtensionAttemptsStepTest extends TestCase
         $this->assertTrue($result->success);
         $this->assertSame('Extension attempts reset', $result->label);
     }
+
+    public function testExecuteRunsUpdateToTeamInfoTable(): void
+    {
+        $mockDb = new MockDatabase();
+        (new ResetExtensionAttemptsStep($mockDb))->execute();
+
+        $queries = $mockDb->getExecutedQueries();
+        $found = array_filter($queries, static fn (string $q): bool => str_contains($q, 'ibl_team_info'));
+
+        $this->assertNotEmpty($found, 'Expected at least one query targeting ibl_team_info');
+    }
 }

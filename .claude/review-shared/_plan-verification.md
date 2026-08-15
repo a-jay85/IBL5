@@ -1,6 +1,6 @@
 ---
 description: Requires plans to classify every verification step into the test-type taxonomy at plan-write time, preventing manual-testing items from deferring to post-plan cleanup, and grounds seed/DOM-dependent E2E assertions in real fixtures.
-last_verified: 2026-08-10
+last_verified: 2026-08-14
 ---
 
 # Plan Verification Matrix
@@ -178,6 +178,7 @@ The taxonomy above classifies *how* a thing is verified; this table names five s
 | reads a new environment variable | asserts **unset** and **empty** separately, and states which is legal. An unset-with-a-safe-default var needs only the empty case; a required var must fail on both |
 | writes a file or directory inside the repo tree | asserts it is gitignored, or explicitly declares it committed |
 | adds or modifies an updater or importer that reads a generated file from a repo-relative path | asserts the source path is NOT git-tracked: `git ls-files --error-unmatch <path>` exits nonzero (untracked — expected); a negation line in .gitignore force-tracks the file so deploy git-reset clobbers live content with stale committed data |
+| adds or modifies an escape path in a CI check gate that calls a git-range helper (`git log base..HEAD` or similar) | asserts the **empty-range** case: when no commits exist in the range (first commit on branch), the gate passes or fails gracefully without the escape path becoming permanently unreachable |
 
 The header intentionally differs from the two tables above (`| Trigger pattern | Why PHPUnit is insufficient |`, `| Trigger | Example surface |`): those map a trigger to a rationale or an example, while this one mandates a **row shape**. Do not harmonize the headers.
 

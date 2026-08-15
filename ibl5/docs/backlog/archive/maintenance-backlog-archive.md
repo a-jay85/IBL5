@@ -191,6 +191,17 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Status (2026-08-08):** ✅ Implemented — extracted to four query collaborators (`PlayerRecordRepository`, `TeamRecordRepository`, `FranchiseRecordRepository`, `RecordAnnouncementRepository`) behind the unchanged `RecordHoldersRepositoryInterface` aggregator (this PR). DB-integration pins green; memoization test added.
 **Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
 
+### 1.22 TradingView — Multi-Page Trade Renderer (606 LOC)
+**Location:** `ibl5/classes/Trading/TradingView.php` (606 lines)
+**Problem:** One view renders the offer form, trade review, and trades-closed pages and also builds player/pick/cash rows and roster previews — several page concerns plus row-building helpers in a single class.
+**Suggested direction:** Split into per-page views (offer / review / closed) or extract the row-builder helpers into a shared collaborator.
+**Est. effort:** M
+**Risk if untouched:** Every trade-page tweak inflates one class; row-building logic can't be reused. Distinct from 11.13 (a CSS `str_replace` fix, already done).
+**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
+**Status (2026-08-15):** ✅ Implemented — split into `TradeOfferFormView`, `TradeReviewView`, and `TradeClosedView`; `TradingView` reduced to a pure delegating facade with injected sub-views; golden-master pins preserved; full PHPStan baseline re-split across the new files.
+
+**Table evidence (2026-08-15):** TradingView 606 LOC — offer-form/review/closed renderers + row/pick/cash builders in one view. Split into per-page views or extract row-builders; behavior-preserving golden-master pin.
+
 ### 1.23 OneOnOneGameEngine — Monolithic Simulation Engine (604 LOC)
 **Location:** `ibl5/classes/OneOnOneGame/OneOnOneGameEngine.php` (604 lines)
 **Problem:** Possession loop, shot-type selection, shot-attempt resolution, rebound/block/steal/foul checks, and final-score rendering all live in one engine class.

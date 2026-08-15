@@ -20,7 +20,7 @@
         "ibl.hardcodedEnvString": 8,
         "ibl.orderByMissingTiebreaker": 84,
         "ibl.sqlStringConcatenation": 33,
-        "ibl.trustedVariable": 16,
+        "ibl.trustedVariable": 17,
         "identical.alwaysFalse": 1,
         "if.condNotBoolean": 2,
         "method.nonObject": 18,

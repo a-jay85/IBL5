@@ -1,0 +1,105 @@
+<div class="trading-layout__header">
+    <h1 class="ibl-title">Trading</h1>
+    <img src="images/logo/1.jpg" alt="Team Logo" class="team-logo-banner">
+</div>
+<div class="trading-review-wrapper">
+    <div class="trading-review-offers">
+            <div class="trade-offer-card">
+    <div class="trade-offer-card__header">
+        <strong>Trade Offer #1</strong>
+    </div>
+    <div class="trade-offer-card__actions">
+        <span class="trade-offer-card__awaiting">Awaiting Approval</span>
+        <form name="tradereject" method="post" action="/ibl5/modules/Trading/rejecttradeoffer.php" class="trade-offer-card__form">
+            <input type="hidden" name="_csrf_token" value="__CSRF__">
+            <input type="hidden" name="offer" value="1">
+            <input type="hidden" name="teamRejecting" value="Lakers">
+            <input type="hidden" name="teamReceiving" value="Celtics">
+            <button type="submit" class="ibl-btn ibl-btn--danger">Reject</button>
+        </form>
+    </div>
+    <div class="trade-offer-items">
+            <p>Trade item.</p>
+                </div>
+    <div class="trade-offer-card__preview-wrap">
+        <button type="button" class="ibl-btn ibl-btn--neutral ibl-btn--sm" data-preview-offer="1">Preview</button>
+    </div>
+</div>
+<div id="trade-review-preview-1" class="trade-roster-preview" style="--preview-user-color: #552583; --preview-partner-color: #007A33;" hidden>
+    <div class="trade-roster-preview__header">
+        <img src="images/logo/new1.png" alt="From Team" class="trade-roster-preview__logo trade-roster-preview__logo--active" data-team-id="1">
+        <div class="trade-roster-preview__title">Roster Preview</div>
+        <img src="images/logo/new2.png" alt="To Team" class="trade-roster-preview__logo" data-team-id="2">
+    </div>
+    <div class="trade-roster-preview__tabs ibl-tabs" role="tablist" style="--team-color-primary: #552583; --team-color-secondary: #552583;">
+        <button type="button" class="ibl-tab ibl-tab--active" data-display="ratings" role="tab">Ratings</button>
+        <button type="button" class="ibl-tab" data-display="total_s" role="tab">Totals</button>
+        <button type="button" class="ibl-tab" data-display="avg_s" role="tab">Averages</button>
+        <button type="button" class="ibl-tab" data-display="per36mins" role="tab">Per 36</button>
+        <button type="button" class="ibl-tab" data-display="contracts" role="tab">Contracts</button>
+    </div>
+    <div class="table-scroll-wrapper">
+        <div class="table-scroll-container" tabindex="0" role="region" aria-label="Trade review roster preview">
+            <div class="trade-roster-preview__loading">Loading</div>
+        </div>
+    </div>
+</div>
+                            <div class="trade-offer-card">
+    <div class="trade-offer-card__header">
+        <strong>Trade Offer #2</strong>
+    </div>
+    <div class="trade-offer-card__actions">
+        <form name="tradeaccept" method="post" action="/ibl5/modules/Trading/accepttradeoffer.php" class="trade-offer-card__form">
+            <input type="hidden" name="_csrf_token" value="__CSRF__">
+            <input type="hidden" name="offer" value="2">
+            <button type="submit" class="ibl-btn ibl-btn--success">Accept</button>
+        </form>
+        <form name="tradereject" method="post" action="/ibl5/modules/Trading/rejecttradeoffer.php" class="trade-offer-card__form">
+            <input type="hidden" name="_csrf_token" value="__CSRF__">
+            <input type="hidden" name="offer" value="2">
+            <input type="hidden" name="teamRejecting" value="Lakers">
+            <input type="hidden" name="teamReceiving" value="Heat">
+            <button type="submit" class="ibl-btn ibl-btn--danger">Reject</button>
+        </form>
+    </div>
+    <div class="trade-offer-items">
+            <p>Trade item.</p>
+                </div>
+    <div class="trade-offer-card__preview-wrap">
+        <button type="button" class="ibl-btn ibl-btn--neutral ibl-btn--sm" data-preview-offer="2">Preview</button>
+    </div>
+</div>
+<div id="trade-review-preview-2" class="trade-roster-preview" style="--preview-user-color: #552583; --preview-partner-color: #007A33;" hidden>
+    <div class="trade-roster-preview__header">
+        <img src="images/logo/new1.png" alt="From Team" class="trade-roster-preview__logo trade-roster-preview__logo--active" data-team-id="1">
+        <div class="trade-roster-preview__title">Roster Preview</div>
+        <img src="images/logo/new2.png" alt="To Team" class="trade-roster-preview__logo" data-team-id="2">
+    </div>
+    <div class="trade-roster-preview__tabs ibl-tabs" role="tablist" style="--team-color-primary: #552583; --team-color-secondary: #552583;">
+        <button type="button" class="ibl-tab ibl-tab--active" data-display="ratings" role="tab">Ratings</button>
+        <button type="button" class="ibl-tab" data-display="total_s" role="tab">Totals</button>
+        <button type="button" class="ibl-tab" data-display="avg_s" role="tab">Averages</button>
+        <button type="button" class="ibl-tab" data-display="per36mins" role="tab">Per 36</button>
+        <button type="button" class="ibl-tab" data-display="contracts" role="tab">Contracts</button>
+    </div>
+    <div class="table-scroll-wrapper">
+        <div class="table-scroll-container" tabindex="0" role="region" aria-label="Trade review roster preview">
+            <div class="trade-roster-preview__loading">Loading</div>
+        </div>
+    </div>
+</div>
+                        </div>
+    <table class="ibl-data-table trading-team-select">
+    <thead>
+        <tr>
+            <th>West</th>
+            <th>East</th>
+        </tr>
+    </thead>
+    <tbody>
+    </tbody>
+</table>
+        </div>
+<script>window.IBL_TRADE_REVIEW_CONFIGS = {"1":{"rosterPreviewApiBaseUrl":"modules.php?name=Trading&op=roster-preview-api","fromTeam":"Lakers","toTeam":"Celtics","fromTeamId":1,"toTeamId":2,"fromPids":[100],"toPids":[200],"fromCash":{"1":0,"2":0,"3":0,"4":0,"5":0,"6":0},"toCash":{"1":0,"2":0,"3":0,"4":0,"5":0,"6":0},"cashStartYear":1,"cashEndYear":6,"seasonEndingYear":2025,"fromColor1":"552583","toColor1":"007A33","userTeamId":1},"2":{"rosterPreviewApiBaseUrl":"modules.php?name=Trading&op=roster-preview-api","fromTeam":"Lakers","toTeam":"Celtics","fromTeamId":1,"toTeamId":2,"fromPids":[100],"toPids":[200],"fromCash":{"1":0,"2":0,"3":0,"4":0,"5":0,"6":0},"toCash":{"1":0,"2":0,"3":0,"4":0,"5":0,"6":0},"cashStartYear":1,"cashEndYear":6,"seasonEndingYear":2025,"fromColor1":"552583","toColor1":"007A33","userTeamId":1}};</script>
+<script src="jslib/trade-review-preview.js" defer></script>
+        

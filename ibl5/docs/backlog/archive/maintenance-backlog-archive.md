@@ -260,7 +260,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Risk if untouched:** Trade page-data logic concentrated in one service; green-green.
 **Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
 **Table evidence (2026-08-09):** TradingService 516 LOC — page-data orchestration + offer-grouping + future-salary calc. Extract offer-grouping and salary collaborators; green-green.
-**Status (2026-08-15):** ✅ Implemented — PR pending. Extracted `FutureSalaryCalculator` (+ interface) and `TradeOfferGrouper` (+ interface), both constructor-injected into `TradingService` as interfaces; `calculateFutureSalaries()` retained as a delegation on `TradingServiceInterface`. Green-green: identical `TradingServiceTest`/`TradingViewTest` assertions pass unchanged, plus new direct unit tests in `ibl5/tests/Trading/`.
+**Status (2026-08-15):** ✅ Implemented — PR #1889. Extracted `FutureSalaryCalculator` (+ interface) and `TradeOfferGrouper` (+ interface), both constructor-injected into `TradingService` as interfaces; `calculateFutureSalaries()` retained as a delegation on `TradingServiceInterface`. Green-green: identical `TradingServiceTest`/`TradingViewTest` assertions pass unchanged, plus new direct unit tests in `ibl5/tests/Trading/`.
 
 ### 1.31 TradeRosterPreviewApiHandler — Validation + Cash + Render in One Handler (508 LOC)
 **Location:** `ibl5/classes/Trading/TradeRosterPreviewApiHandler.php` (508 lines)

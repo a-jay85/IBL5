@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Api\Response;
 
-class JsonResponder
+use Api\Contracts\JsonResponderInterface;
+
+class JsonResponder implements JsonResponderInterface
 {
     /**
      * Send a success response with data and optional pagination metadata.

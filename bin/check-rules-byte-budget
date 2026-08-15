@@ -161,15 +161,25 @@ fi
 # the bug this gate carried: `-n … &&` degraded an empty changeset into a
 # repo-wide sweep, so the guard is `-z … ||`. Do not "simplify" it back.
 #
-# `--depth=1` is CI-ONLY and MUST stay behind the is-shallow guard. In a full
-# clone a shallow fetch CREATES .git/shallow, grafting origin/<base> to a single
-# commit — `git merge-base` then returns nothing and any later rebase replays the
-# entire history and conflicts. This hook also runs at commit time (.git/hooks/
-# pre-commit) against the shared main .git, so one unguarded run breaks the ship
-# pipeline for every worktree. Locally origin/<base> already exists, so the fetch
-# is unnecessary; if it somehow doesn't, fetch it at FULL depth.
+# `--depth=1` is CI-ONLY and MUST stay behind BOTH the GITHUB_ACTIONS guard and
+# the is-shallow guard. In a full clone a shallow fetch CREATES .git/shallow,
+# grafting origin/<base> to a single commit — `git merge-base` then returns
+# nothing and any later rebase replays the entire history and conflicts. This
+# hook also runs at commit time (.git/hooks/pre-commit) against the shared main
+# .git, so one unguarded run breaks the ship pipeline for every worktree.
+#
+# is-shallow alone was NOT enough. Once the main .git went shallow (2026-08-15;
+# original cause never identified), every local commit re-entered this branch and
+# re-grafted at the new master HEAD, so .git/shallow could never empty and the
+# repo could not self-heal: bin/merge-master-to-prod failed with "refusing to
+# merge unrelated histories", and .git/hooks/pre-commit's `git merge-base HEAD
+# origin/master` returned empty, silently disabling the on-touch last_verified
+# doc gate. GITHUB_ACTIONS makes the branch unreachable locally, so a shallow
+# main checkout heals on the next full fetch instead of being re-poisoned here.
+# Locally origin/<base> already exists, so the fetch is unnecessary anyway; if it
+# somehow doesn't, the elif fetches it at FULL depth.
 _BASE_BRANCH="${GITHUB_BASE_REF:-master}"
-if [ "$(git rev-parse --is-shallow-repository 2>/dev/null)" = "true" ]; then
+if [ -n "${GITHUB_ACTIONS:-}" ] && [ "$(git rev-parse --is-shallow-repository 2>/dev/null)" = "true" ]; then
   git fetch --depth=1 origin "$_BASE_BRANCH" 2>/dev/null || true  # shallow-ok
 elif ! git rev-parse --verify --quiet "origin/$_BASE_BRANCH" >/dev/null 2>&1; then
   git fetch origin "$_BASE_BRANCH" 2>/dev/null || true

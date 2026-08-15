@@ -27,6 +27,7 @@ _ENGINE = re.compile(r"^engine/")
 GOLDEN_PATH = "engine/internal/sim/testdata/golden.json"
 _COMMENT_ADDED = re.compile(r"^\+\s*(//|#|/\*|\*)")
 _MODULE_REF = re.compile(r"(modules\.php\?name=[A-Za-z][A-Za-z0-9_]*|modules/[A-Za-z][A-Za-z0-9_]*/)")
+_RETRO_ROW_RE = re.compile(r"^\|\s*\d{4}-\d{2}-\d{2}\b.*class:.*routed to:")
 
 
 def files_from_diff(diff_text: str) -> list[str]:
@@ -188,6 +189,26 @@ def _count(files: list[str], rx: re.Pattern) -> int:
     return sum(1 for f in files if rx.search(f))
 
 
+def retro_registry_row_from_diff(diff_text: str) -> str:
+    """First `## Class registry` row ADDED by this diff, or "".
+
+    Phase 9 routing rows live in ibl5/docs/backlog/loop-engineering-backlog.md and
+    have the shape `| <YYYY-MM-DD> | #<PR> | class: ... | routed to: Rung <n> - ... | prior: ... |`.
+    An added row means this branch materializes a retrospective routing, which
+    obliges the PR body to explain the class (see /post-plan Phase 2).
+    """
+    in_backlog = False
+    for line in diff_text.splitlines():
+        if line.startswith("diff --git "):
+            m = re.match(r"diff --git a/(.*?) b/(.*)$", line)
+            in_backlog = bool(m and m.group(2) == "ibl5/docs/backlog/loop-engineering-backlog.md")
+        elif in_backlog and line.startswith("+") and not line.startswith("+++"):
+            candidate = line[1:].strip()
+            if _RETRO_ROW_RE.match(candidate):
+                return candidate
+    return ""
+
+
 def classify(files: list[str], diff_text: str, modified_files: list[str] | None = None) -> Classification:
     """Port of the Phase 3 bash block. `modified_files` defaults to derivation
     from the diff headers (live mode passes `git diff --diff-filter=M` output)."""
@@ -228,6 +249,7 @@ def classify(files: list[str], diff_text: str, modified_files: list[str] | None 
     c.has_modified = len(modified_files) > 0
 
     c.filtered_diff = filter_diff(diff_text)
+    c.retro_registry_row = retro_registry_row_from_diff(diff_text)
 
     c.has_comments_in_diff = any(
         _COMMENT_ADDED.match(l) for l in c.filtered_diff.splitlines()

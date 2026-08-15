@@ -10,6 +10,7 @@ from harness.armable import manual_testing_clearance
 from harness.classify import (classify, files_from_diff, filter_diff,
                                FILES_CHANGED_BEGIN, FILES_CHANGED_END,
                                name_status_from_diff, render_files_changed,
+                               retro_registry_row_from_diff,
                                upsert_files_changed)
 
 SYN_DIFF = """diff --git a/ibl5/foo.php b/ibl5/foo.php
@@ -312,3 +313,72 @@ def test_predicate_safety():
         upsert_files_changed(unknown_body, block)
         + "\n\n## Manual Testing\n\n- [ ] Verify the widget renders.\n"
     ) == "HELD"
+
+
+# ---------------------------------------------------------------------------
+# retro_registry_row_from_diff tests
+# ---------------------------------------------------------------------------
+
+_REAL_REGISTRY_ROW = (
+    "| 2026-08-14 | #1880 | class: gate escape path conditioned on a git-range query "
+    "silently blocks when the range is empty (first-branch-commit), with no null fallback "
+    "| routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md "
+    "(section: Forced integration-verification trigger): any plan adding or modifying an escape "
+    "path in a CI check gate that calls a git-range helper must test the empty-range "
+    "(no-prior-commits-on-branch) scenario | prior: -- |"
+)
+
+_BACKLOG_FILE = "ibl5/docs/backlog/loop-engineering-backlog.md"
+
+
+def _diff_adding_row_in_file(path: str, row: str, leading: str = "+") -> str:
+    """Minimal unified diff that adds `row` (prefixed by `leading`) inside `path`'s section."""
+    return (
+        f"diff --git a/{path} b/{path}\n"
+        f"index 111..222 100644\n"
+        f"--- a/{path}\n"
+        f"+++ b/{path}\n"
+        f"@@ -1,1 +1,2 @@\n"
+        f" | existing row |\n"
+        f"{leading}{row}\n"
+    )
+
+
+def test_retro_registry_row_positive():
+    diff = _diff_adding_row_in_file(_BACKLOG_FILE, _REAL_REGISTRY_ROW)
+    result = retro_registry_row_from_diff(diff)
+    assert result == _REAL_REGISTRY_ROW
+
+
+def test_retro_registry_row_positive_via_classify():
+    diff = _diff_adding_row_in_file(_BACKLOG_FILE, _REAL_REGISTRY_ROW)
+    files = files_from_diff(diff)
+    cls = classify(files, diff, modified_files=[_BACKLOG_FILE])
+    assert cls.retro_registry_row == _REAL_REGISTRY_ROW
+
+
+def test_retro_registry_row_negative_wrong_file():
+    diff = _diff_adding_row_in_file("ibl5/docs/backlog/other-backlog.md", _REAL_REGISTRY_ROW)
+    assert retro_registry_row_from_diff(diff) == ""
+
+
+def test_retro_registry_row_negative_context_line():
+    # The row is present as an unchanged context line (space prefix, not +)
+    diff = _diff_adding_row_in_file(_BACKLOG_FILE, _REAL_REGISTRY_ROW, leading=" ")
+    assert retro_registry_row_from_diff(diff) == ""
+
+
+def test_retro_registry_row_negative_unrelated_addition():
+    # An ordinary prose addition in the backlog file — no date, no class:, no routed to:
+    diff = _diff_adding_row_in_file(_BACKLOG_FILE, "Some prose paragraph about engineering.")
+    assert retro_registry_row_from_diff(diff) == ""
+
+
+def test_retro_registry_row_negative_non_registry_table_row():
+    # A table row that lacks both class: and routed to:
+    diff = _diff_adding_row_in_file(_BACKLOG_FILE, "| 2026-08-14 | #1880 | ordinary table row |")
+    assert retro_registry_row_from_diff(diff) == ""
+
+
+def test_retro_registry_row_empty_diff():
+    assert retro_registry_row_from_diff("") == ""

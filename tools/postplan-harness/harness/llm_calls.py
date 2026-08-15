@@ -12,6 +12,26 @@ def pr_copy_prompt(slug: str, cls: Classification, plan: PlanInfo, plan_excerpt:
     """Commit/PR title + summary. Judgment retained: the feat-vs-chore GM test
     and a faithful summary of intent. Type rubric inlined from
     .claude/rules/auto-commit.md."""
+    retro_block = ""
+    if cls.retro_registry_row:
+        retro_block = (
+            "\nRETROSPECTIVE ROUTING — this branch adds a row to the `## Class registry` "
+            "in `ibl5/docs/backlog/loop-engineering-backlog.md`, so it materializes a "
+            "`/post-plan` Phase 9 retrospective routing. The `summary_md` field MUST "
+            "contain a `## Why this PR exists` section derivable from the registry row "
+            "alone. Four required elements in that section:\n"
+            "1. Origin defect — the `#<PR>` the row names and what it actually broke.\n"
+            "2. The class — quoted from the row's `class:` field, framed as what got "
+            "past planning rather than the single instance.\n"
+            "3. Why that rung — the ladder stops at the first rung that can express the "
+            "class; name each lower rung and say in one clause why it cannot express "
+            "this class.\n"
+            "4. What the routing now forces — the obligation placed on future plans.\n"
+            "If the row's `prior:` field is not `--`, state explicitly that this is a "
+            "recurrence of those PRs' class and that the routing moved one rung more "
+            "mechanical.\n\n"
+            f"RETROSPECTIVE REGISTRY ROW:\n{cls.retro_registry_row}\n"
+        )
     return (
         "Write the commit/PR copy for this branch.\n\n"
         "TYPE RUBRIC — decision test: \"Would a league GM notice a new ability they "
@@ -20,6 +40,7 @@ def pr_copy_prompt(slug: str, cls: Classification, plan: PlanInfo, plan_excerpt:
         "Classify by what the diff IS, never by desired merge outcome.\n\n"
         f"BRANCH: {slug}\n"
         f"CLASSIFICATION:\n{cls.summary()}\n"
+        + retro_block
         + (f"\nPLAN EXCERPT (intent):\n{plan_excerpt[:4000]}\n" if plan.found else "")
         + "\nDIFF:\n" + cls.filtered_diff[:60000]
         + '\n\nReturn ONLY JSON: {"type": "chore", "title": "chore(scope): ...", '

@@ -67,6 +67,7 @@ class Classification:
     e2e_spec_modules: list[str] = field(default_factory=list)
     has_e2e_prod_overlap: bool = False
     filtered_diff: str = ""          # migrations/lockfiles/snapshots stripped
+    retro_registry_row: str = ""     # added `## Class registry` row (Phase 9 routing), if any
 
     def summary(self) -> str:
         return (

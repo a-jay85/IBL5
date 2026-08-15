@@ -1,6 +1,6 @@
 ---
 description: Development-efficiency backlog — inner-loop speed (diff-scoped analysis, parallel tests), CI caching, dependency-bump batching, and worktree lifecycle automation, with per-entry status.
-last_verified: 2026-08-08
+last_verified: 2026-08-15
 ---
 
 # Development-Efficiency Backlog
@@ -28,7 +28,7 @@ last_verified: 2026-08-08
 | # | Title | Status | Automouse | Effort |
 |---|-------|--------|-----------|-------:|
 | E1 | Warm-standby worktree pool | ⬜ Open | 🟨 | M |
-| E2 | Dependabot grouping | ⬜ Open | 🟩 | S |
+| E2 | Dependabot grouping | ✅ Implemented | — | S |
 | E3 | PHPStan result-cache in CI | ✅ Implemented | — | S |
 | E4 | Flake-quarantine ledger | ⬜ Open | 🟨 | M |
 | E5 | Scheduled stale-worktree GC | ◑ Partial | 🟨 | S |
@@ -47,12 +47,7 @@ last_verified: 2026-08-08
 **Risk if untouched:** Minutes of dead time multiplied by every queue slot and every new task.
 **Status (2026-07-07):** ⬜ Open — 🟨 (needs one design decision: how a claimed pool worktree gets its branch/route identity swapped safely).
 
-### E2 Dependabot grouping
-**Location:** `.github/dependabot.yml` — no `groups:` key (verified).
-**Problem:** Minor/patch bumps arrive as separate PRs, each running full CI (observed: 5 dep PRs in one day).
-**Suggested direction:** Dependabot `groups:` batching minor+patch per ecosystem into one weekly PR; majors stay individual.
-**Risk if untouched:** ~5× redundant CI runs per bump wave.
-**Status (2026-07-07):** ⬜ Open — 🟩.
+➜ E2 Dependabot grouping — ✅ Implemented (2026-08-14): see [archive](archive/dev-efficiency-backlog-archive.md).
 
 ➜ E3 PHPStan result-cache in CI — ✅ Implemented (2026-07-03): see [archive](archive/dev-efficiency-backlog-archive.md).
 

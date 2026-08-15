@@ -7,6 +7,8 @@ namespace Tests\Trading;
 use PHPUnit\Framework\TestCase;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Trading\TradingService;
+use Trading\TradeOfferGrouper;
+use Trading\FutureSalaryCalculator;
 use Trading\Contracts\TradeOfferRepositoryInterface;
 use Trading\Contracts\TradeAssetRepositoryInterface;
 use Trading\Contracts\TradeFormRepositoryInterface;
@@ -193,7 +195,9 @@ class TradingServiceTest extends TestCase
         $common->method('getTeamnameFromUsername')->willReturn('Jazz');
         $common->method('getTidFromTeamname')->willReturn(13);
 
-        $service = new TradingService($offerRepo, $assetRepo, $formRepo, $common, $this->mockDb, $cashRepo);
+        $grouper = new TradeOfferGrouper($assetRepo, $cashRepo);
+        $calculator = new FutureSalaryCalculator();
+        $service = new TradingService($offerRepo, $formRepo, $common, $this->mockDb, $grouper, $calculator);
         $teams = $service->getTradeReviewPageData('testuser')['teams'];
 
         $this->assertSame([6, 1, 24, 2, 13, 7], array_column($teams, 'teamid'));
@@ -222,7 +226,9 @@ class TradingServiceTest extends TestCase
         $mockFormRepo->expects($this->once())->method('getAllTeamsWithCity')
             ->willReturn([]);
 
-        $service = new TradingService($mockOfferRepo, $mockAssetRepo, $mockFormRepo, $mockCommon, $this->mockDb, $mockCashRepo);
+        $grouper = new TradeOfferGrouper($mockAssetRepo, $mockCashRepo);
+        $calculator = new FutureSalaryCalculator();
+        $service = new TradingService($mockOfferRepo, $mockFormRepo, $mockCommon, $this->mockDb, $grouper, $calculator);
         $result = $service->getTradeReviewPageData('testuser');
 
         $this->assertSame('Lakers', $result['userTeam']);
@@ -252,7 +258,9 @@ class TradingServiceTest extends TestCase
         $mockFormRepo->expects($this->once())->method('getAllTeamsWithCity')
             ->willReturn([]);
 
-        $service = new TradingService($mockOfferRepo, $mockAssetRepo, $mockFormRepo, $mockCommon, $this->mockDb, $mockCashRepo);
+        $grouper = new TradeOfferGrouper($mockAssetRepo, $mockCashRepo);
+        $calculator = new FutureSalaryCalculator();
+        $service = new TradingService($mockOfferRepo, $mockFormRepo, $mockCommon, $this->mockDb, $grouper, $calculator);
         $result = $service->getTradeReviewPageData('testuser');
 
         $this->assertCount(1, $result['tradeOffers']);
@@ -281,7 +289,9 @@ class TradingServiceTest extends TestCase
         $mockFormRepo->expects($this->once())->method('getAllTeamsWithCity')
             ->willReturn([]);
 
-        $service = new TradingService($mockOfferRepo, $mockAssetRepo, $mockFormRepo, $mockCommon, $this->mockDb, $mockCashRepo);
+        $grouper = new TradeOfferGrouper($mockAssetRepo, $mockCashRepo);
+        $calculator = new FutureSalaryCalculator();
+        $service = new TradingService($mockOfferRepo, $mockFormRepo, $mockCommon, $this->mockDb, $grouper, $calculator);
         $result = $service->getTradeReviewPageData('testuser');
 
         $this->assertTrue($result['tradeOffers'][1]['hasHammer']);
@@ -308,7 +318,9 @@ class TradingServiceTest extends TestCase
                 ['teamid' => 0, 'team_name' => 'Free Agents', 'team_city' => '', 'color1' => '333333', 'color2' => 'FFFFFF'],
             ]);
 
-        $service = new TradingService($mockOfferRepo, $mockAssetRepo, $mockFormRepo, $mockCommon, $this->mockDb, $mockCashRepo);
+        $grouper = new TradeOfferGrouper($mockAssetRepo, $mockCashRepo);
+        $calculator = new FutureSalaryCalculator();
+        $service = new TradingService($mockOfferRepo, $mockFormRepo, $mockCommon, $this->mockDb, $grouper, $calculator);
         $result = $service->getTradeReviewPageData('testuser');
 
         $this->assertCount(1, $result['teams']);
@@ -338,7 +350,9 @@ class TradingServiceTest extends TestCase
         ]);
         $mockFormRepo->method('getAllTeamsWithCity')->willReturn([]);
 
-        $service = new TradingService($mockOfferRepo, $mockAssetRepo, $mockFormRepo, $mockCommon, $this->mockDb, $mockCashRepo);
+        $grouper = new TradeOfferGrouper($mockAssetRepo, $mockCashRepo);
+        $calculator = new FutureSalaryCalculator();
+        $service = new TradingService($mockOfferRepo, $mockFormRepo, $mockCommon, $this->mockDb, $grouper, $calculator);
         $result = $service->getTradeReviewPageData('testuser');
 
         $items = $result['tradeOffers'][1]['items'];
@@ -367,7 +381,9 @@ class TradingServiceTest extends TestCase
         ]);
         $mockFormRepo->method('getAllTeamsWithCity')->willReturn([]);
 
-        $service = new TradingService($mockOfferRepo, $mockAssetRepo, $mockFormRepo, $mockCommon, $this->mockDb, $mockCashRepo);
+        $grouper = new TradeOfferGrouper($mockAssetRepo, $mockCashRepo);
+        $calculator = new FutureSalaryCalculator();
+        $service = new TradingService($mockOfferRepo, $mockFormRepo, $mockCommon, $this->mockDb, $grouper, $calculator);
         $result = $service->getTradeReviewPageData('testuser');
 
         $items = $result['tradeOffers'][1]['items'];
@@ -395,7 +411,9 @@ class TradingServiceTest extends TestCase
         ]);
         $mockFormRepo->method('getAllTeamsWithCity')->willReturn([]);
 
-        $service = new TradingService($mockOfferRepo, $mockAssetRepo, $mockFormRepo, $mockCommon, $this->mockDb, $mockCashRepo);
+        $grouper = new TradeOfferGrouper($mockAssetRepo, $mockCashRepo);
+        $calculator = new FutureSalaryCalculator();
+        $service = new TradingService($mockOfferRepo, $mockFormRepo, $mockCommon, $this->mockDb, $grouper, $calculator);
         $result = $service->getTradeReviewPageData('testuser');
 
         $items = $result['tradeOffers'][1]['items'];
@@ -437,7 +455,9 @@ class TradingServiceTest extends TestCase
         ]);
         $mockFormRepo->method('getAllTeamsWithCity')->willReturn([]);
 
-        $service = new TradingService($mockOfferRepo, $mockAssetRepo, $mockFormRepo, $mockCommon, $this->mockDb, $mockCashRepo);
+        $grouper = new TradeOfferGrouper($mockAssetRepo, $mockCashRepo);
+        $calculator = new FutureSalaryCalculator();
+        $service = new TradingService($mockOfferRepo, $mockFormRepo, $mockCommon, $this->mockDb, $grouper, $calculator);
         $result = $service->getTradeReviewPageData('testuser');
 
         $items = $result['tradeOffers'][1]['items'];
@@ -460,7 +480,9 @@ class TradingServiceTest extends TestCase
         $mockCashRepo->method('getCashTransactionsByOfferIds')->willReturn([]);
         $mockFormRepo->method('getAllTeamsWithCity')->willReturn([]);
 
-        $service = new TradingService($mockOfferRepo, $mockAssetRepo, $mockFormRepo, $mockCommon, $this->mockDb, $mockCashRepo);
+        $grouper = new TradeOfferGrouper($mockAssetRepo, $mockCashRepo);
+        $calculator = new FutureSalaryCalculator();
+        $service = new TradingService($mockOfferRepo, $mockFormRepo, $mockCommon, $this->mockDb, $grouper, $calculator);
         $result = $service->getTradeReviewPageData('testuser');
 
         $items = $result['tradeOffers'][1]['items'];
@@ -486,7 +508,9 @@ class TradingServiceTest extends TestCase
         ]);
         $mockFormRepo->method('getAllTeamsWithCity')->willReturn([]);
 
-        $service = new TradingService($mockOfferRepo, $mockAssetRepo, $mockFormRepo, $mockCommon, $this->mockDb, $mockCashRepo);
+        $grouper = new TradeOfferGrouper($mockAssetRepo, $mockCashRepo);
+        $calculator = new FutureSalaryCalculator();
+        $service = new TradingService($mockOfferRepo, $mockFormRepo, $mockCommon, $this->mockDb, $grouper, $calculator);
         $result = $service->getTradeReviewPageData('testuser');
 
         $items = $result['tradeOffers'][1]['items'];
@@ -521,7 +545,9 @@ class TradingServiceTest extends TestCase
             ['teamid' => 2, 'team_name' => 'Celtics', 'team_city' => 'Boston', 'color1' => '007A33', 'color2' => 'FFFFFF'],
         ]);
 
-        $service = new TradingService($mockOfferRepo, $mockAssetRepo, $mockFormRepo, $mockCommon, $this->mockDb, $mockCashRepo);
+        $grouper = new TradeOfferGrouper($mockAssetRepo, $mockCashRepo);
+        $calculator = new FutureSalaryCalculator();
+        $service = new TradingService($mockOfferRepo, $mockFormRepo, $mockCommon, $this->mockDb, $grouper, $calculator);
         $result = $service->getTradeReviewPageData('testuser');
 
         $preview = $result['tradeOffers'][1]['previewData'];
@@ -549,7 +575,9 @@ class TradingServiceTest extends TestCase
             ['teamid' => 2, 'team_name' => 'Celtics', 'team_city' => 'Boston', 'color1' => '007A33', 'color2' => 'FFFFFF'],
         ]);
 
-        $service = new TradingService($mockOfferRepo, $mockAssetRepo, $mockFormRepo, $mockCommon, $this->mockDb, $mockCashRepo);
+        $grouper = new TradeOfferGrouper($mockAssetRepo, $mockCashRepo);
+        $calculator = new FutureSalaryCalculator();
+        $service = new TradingService($mockOfferRepo, $mockFormRepo, $mockCommon, $this->mockDb, $grouper, $calculator);
         $result = $service->getTradeReviewPageData('testuser');
 
         $preview = $result['tradeOffers'][1]['previewData'];
@@ -583,7 +611,9 @@ class TradingServiceTest extends TestCase
                 'salary_yr1' => 300, 'salary_yr2' => null, 'salary_yr3' => null, 'salary_yr4' => null, 'salary_yr5' => null, 'salary_yr6' => null],
         ]);
 
-        $service = new TradingService($mockOfferRepo, $mockAssetRepo, $mockFormRepo, $mockCommon, $this->mockDb, $mockCashRepo);
+        $grouper = new TradeOfferGrouper($mockAssetRepo, $mockCashRepo);
+        $calculator = new FutureSalaryCalculator();
+        $service = new TradingService($mockOfferRepo, $mockFormRepo, $mockCommon, $this->mockDb, $grouper, $calculator);
         $result = $service->getTradeReviewPageData('testuser');
 
         $preview = $result['tradeOffers'][1]['previewData'];
@@ -611,7 +641,9 @@ class TradingServiceTest extends TestCase
             ['teamid' => 1, 'team_name' => 'Lakers', 'team_city' => 'Los Angeles', 'color1' => '552583', 'color2' => 'FDB927'],
         ]);
 
-        $service = new TradingService($mockOfferRepo, $mockAssetRepo, $mockFormRepo, $mockCommon, $this->mockDb, $mockCashRepo);
+        $grouper = new TradeOfferGrouper($mockAssetRepo, $mockCashRepo);
+        $calculator = new FutureSalaryCalculator();
+        $service = new TradingService($mockOfferRepo, $mockFormRepo, $mockCommon, $this->mockDb, $grouper, $calculator);
         $result = $service->getTradeReviewPageData('testuser');
 
         $preview = $result['tradeOffers'][1]['previewData'];
@@ -633,7 +665,9 @@ class TradingServiceTest extends TestCase
         $stubCashRepo = self::createStub(TradeCashRepositoryInterface::class);
         $stubCommon = self::createStub(TeamIdentityRepositoryInterface::class);
 
-        return new TradingService($stubOfferRepo, $stubAssetRepo, $stubFormRepo, $stubCommon, $this->mockDb, $stubCashRepo);
+        $grouper = new TradeOfferGrouper($stubAssetRepo, $stubCashRepo);
+        $calculator = new FutureSalaryCalculator();
+        return new TradingService($stubOfferRepo, $stubFormRepo, $stubCommon, $this->mockDb, $grouper, $calculator);
     }
 
     private function createSeasonStub(string $phase): Season

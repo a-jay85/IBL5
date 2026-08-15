@@ -6,7 +6,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-08-14
+last_verified: 2026-08-15
 ---
 <!-- NO `model:` KEY — DELIBERATE, DO NOT ADD ONE.
      Runtime Phase 6 (plan-intent fidelity review) is Opus-column judgment:
@@ -30,13 +30,13 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
 - **Flat fan-out only.** A delegate may not spawn a delegate.
 - **Every glob is quoted** — `--include="*.md"`, never `--include=*.md`.
 - **The run STOPS at the verdict.** No merge, no auto-merge arming, no backlog housekeeping, no `/post-plan` chain, no worktree teardown.
-- **After `EnterWorktree`, no Bash command may contain `$(…)` or `<(…)`.** The worktree-isolated session refuses command and process substitution outright — "too complex to verify that it stays inside the worktree"; the refusal's "…without the redirect" wording is canned and misleading. Pipelines, redirects, conditionals and `;`-separated statements all run fine: substitution is the only trigger. On the 0.3 `ALREADY-IN-TARGET` path no `EnterWorktree` call is ever made, so no isolation engages and substitution would in fact work everywhere — the later phases are written substitution-free regardless, so the same text runs unchanged on both paths. Do not "simplify" them back on the strength of that. **Exempt:** Phases 0.1–0.4, which run *before* `EnterWorktree` (the `git rev-parse --show-toplevel` source and the `SLUG=`/`HERE=` captures at 0.3 are fine as written, and converting them buys nothing), and any command passed to `Monitor`, which is not gated (probed: `Monitor(command: 'X=$(echo hi); echo "$X"')` emits `hi`, so the Phase 4.5 watcher loop runs as written). Everywhere else, use one of two shapes:
+- **After `EnterWorktree`, no Bash command may contain `$(…)` or `<(…)`.** The worktree-isolated session refuses command and process substitution outright — "too complex to verify that it stays inside the worktree"; the refusal's "…without the redirect" wording is canned and misleading. Pipelines, redirects, conditionals and `;`-separated statements all run fine: substitution is the only trigger. On the 0.3 `ALREADY-IN-TARGET` path no `EnterWorktree` call is ever made, so — *unless the session was already isolated when `/pr-ready` was invoked* — substitution would in fact work everywhere. That caveat is why the exception is worthless: you cannot tell from inside which regime you are in without probing. The later phases are written substitution-free regardless, so the same text runs unchanged on all three paths. Do not "simplify" them back on the strength of that. **Phase 0 is NOT exempt.** The gate keys on the *session* being `EnterWorktree`-tracked, not on the cwd being a worktree — a session launched directly in a worktree is unrestricted (probed: `X=$(echo hi); echo "subst-ok $X"` printed `subst-ok hi` from a worktree cwd), but a session that called `EnterWorktree` **before** `/pr-ready` was invoked is already isolated at 0.3. Phase 0 therefore has to run under both regimes, and the 0.3 guard block is written in the script-file shape for exactly that reason. It is also **re-run** after step 4's `EnterWorktree`, which is isolated by definition — so `Write` the guard file once at 0.3, *before* any `EnterWorktree`, then `bash` it up to three times; no `Write` ever needs to land post-isolation. **Exempt:** any command passed to `Monitor`, which is not gated (probed: `Monitor(command: 'X=$(echo hi); echo "$X"')` emits `hi`, so the Phase 4.5 watcher loop runs as written). Everywhere else, use one of two shapes:
   - **Multi-command blocks** — `Write` the block to `/tmp/pr-ready-<step>-<N>.sh`, then run `bash /tmp/pr-ready-<step>-<N>.sh` as one plain command. Key the filename to the PR number, never `$$`.
   - **Single-value captures** (the master pin, `STRICT`, the branch name) — run the bare command so it **prints** the value, then hold that value as a **literal** in the run notes and substitute it into every later command.
 - **A value captured in one Bash call does not survive to the next — hold it as a literal, not a shell variable.** Every Bash call is a fresh shell, so `MASTER_SHA=$(git rev-parse origin/master)` in one call is *empty* in the next, and `git rev-list --count "$MASTER_SHA"..HEAD` then degrades to `git rev-list --count ..HEAD`, which exits 0 printing `0` — a silent wrong answer that skips the Phase 2c squash gate for every PR. `<MASTER_SHA>` in a later block therefore means **substitute the recorded literal here**. That form also fails *closed*: forget to substitute and git rejects the literal `<MASTER_SHA>` as a bad rev, where `"$MASTER_SHA"` would have failed open. The same rule is why every `/tmp` path in this skill is keyed to `<N>` rather than `$$`.
-- **Every repo file this skill reads after Phase 0 comes from `git show <MASTER_SHA>:<path>` — never a bare repo-relative `Read`.** That covers both progressive-disclosure includes and the linear-history rule the Phase 2 include names. The reason is structural, not stylistic: on the ordinary path the harness loads this `SKILL.md` from the **main checkout** and Phase 0.4 then `EnterWorktree`s into the *target PR's* worktree — and that tree is by definition behind master, so the skill's own files are simply **absent** there until the branch rebases, which is Phase 2, the phase whose instructions live in the missing file. (On the 0.3 `ALREADY-IN-TARGET` path the loaded `SKILL.md` is the target worktree's own copy, so skill discovery *did* resolve inside a worktree — the rule holds unchanged there, because that tree is exactly the one whose includes may be missing.) The main-checkout path is not a fallback: reading it from a worktree-entered session is **denied** by the cross-worktree straddle gate in `~/.claude/hooks/plan-gate-edit.sh`. `git show` against the Phase 1.3 pin sidesteps both horns — same shared object store, no gate crossed, no `$(…)` needed, and the include is guaranteed to be the revision that matches the `SKILL.md` the harness loaded. Measured before this was fixed: `_rebase-and-conflicts.md` existed in **1 of 34** worktrees on this machine — the skill's own.
+- **Every repo file this skill reads after Phase 0 comes from `git show <MASTER_SHA>:<path>` — never a bare repo-relative `Read`.** That covers both progressive-disclosure includes and the linear-history rule the Phase 2 include names. The reason is structural, not stylistic: on the ordinary path the harness loads this `SKILL.md` from the **main checkout** and Phase 0.4 then `EnterWorktree`s into the *target PR's* worktree — and that tree is by definition behind master, so the skill's own files are simply **absent** there until the branch rebases, which is Phase 2, the phase whose instructions live in the missing file. (On the 0.3 `ALREADY-IN-TARGET` path the loaded `SKILL.md` is the target worktree's own copy, so skill discovery *did* resolve inside a worktree — the rule holds unchanged there, because that tree is exactly the one whose includes may be missing. On the 0.3b `WRONG-WORKTREE` path the loaded copy came from a *third* tree — the one the session started in, which has nothing to do with the PR — while the includes still come from `<MASTER_SHA>`; that is documentation, not a new case, because the rule already forbids reading any include by repo-relative path.) The main-checkout path is not a fallback: reading it from a worktree-entered session is **denied** by the cross-worktree straddle gate in `~/.claude/hooks/plan-gate-edit.sh`. `git show` against the Phase 1.3 pin sidesteps both horns — same shared object store, no gate crossed, no `$(…)` needed, and the include is guaranteed to be the revision that matches the `SKILL.md` the harness loaded. Measured before this was fixed: `_rebase-and-conflicts.md` existed in **1 of 34** worktrees on this machine — the skill's own.
   - **Exactly one fallback for the orchestrator's two progressive-disclosure includes, and it must be declared.** (The Phase 2 delegation packet carries its own separate fallback for the rule file it names — declared in the delegate's report line 1, per `_rebase-and-conflicts.md`. That one is not covered by, and does not violate, this clause.) `git show` fails with `fatal: invalid object name` or `path … does not exist` when the pinned master predates this skill — which, once merged, happens only when you are dogfooding `/pr-ready` on its own still-open PR. In that case, and only when the file is genuinely present in the current worktree, `Read` it by path and record `include-source: worktree (pin predates skill)` in the verdict. If neither source yields the file, print `STOP: cannot load <file> from <MASTER_SHA> or from the worktree` and stop. Never reach for the main-checkout path — that is the gated horn, and a denial there is not a signal to retry.
-- **`STOP:` lines are hard stops for the model, not just for the shell.** Four runtime blocks below print a `STOP:` line: the Phase 0 argument gate (0.1), the Phase 0 worktree guard (0.3, which prints one on either an unresolvable head branch or a wrong-worktree invocation), the Phase 0 no-existing-worktree guard (0.4), and the Phase 1 plan check (1.1). The include-fallback clause above prints a fifth, from whichever phase was loading an include. Where such a block runs `exit 1`, that `exit` terminates **only that Bash invocation** — it does not terminate the skill, because a skill's blocks are run by the model. The contract is therefore: **on a non-zero rc, or on printing a `STOP:` line, stop the run and make no further tool call.** None of the four relies on shell exit status to halt anything but the shell, so in all four the printed line *is* the gate. Only 0.3 gates via `exit 1`; 0.1 and 1.1 have no shell block at all; and 0.4 *does* have one, but it is a bare `git worktree list` that only captures data, so its rc carries no signal and its stop has to be read out of the output. The `gh pr view` whose failure that rc used to mask now lives in 0.3, behind an explicit empty-`SLUG` check that does exit non-zero.
+- **`STOP:` lines are hard stops for the model, not just for the shell.** Five runtime blocks below print a `STOP:` line: the Phase 0 argument gate (0.1), the Phase 0 worktree guard (0.3, on an unresolvable head branch or a missing `bin/lib/git-helpers.sh`), the Phase 0 exit-recovery check (0.3b, when the post-`ExitWorktree` re-run does not print `MAIN-CHECKOUT`), the Phase 0 worktree-entry step (0.4, on a missing worktree or a post-`EnterWorktree` re-run that does not print `ALREADY-IN-TARGET`), and the Phase 1 plan check (1.1). The include-fallback clause above prints a sixth, from whichever phase was loading an include. Where such a block runs `exit 1`, that `exit` terminates **only that Bash invocation** — it does not terminate the skill, because a skill's blocks are run by the model. The contract is therefore: **on a non-zero rc, or on printing a `STOP:` line, stop the run and make no further tool call.** None of the five relies on shell exit status to halt anything but the shell, so in all five the printed line *is* the gate. Only 0.3's own two failure arms gate via `exit 1`; 0.1 and 1.1 have no shell block at all. **0.3b and 0.4 gate on the printed word, never on the rc** — both re-run the *same* guard script, and its remaining arms all exit 0, so a re-printed `WRONG-WORKTREE` (or a `MAIN-CHECKOUT` where `ALREADY-IN-TARGET` was required) is a passing shell carrying a failing verdict. 0.4's `git worktree list` likewise only captures data, so its rc carries no signal either. The `gh pr view` whose failure that rc used to mask now lives in 0.3, behind an explicit empty-`SLUG` check that does exit non-zero.
 
 ## Runtime phases
 
@@ -48,12 +48,19 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
 
    and stop without any further tool call.
 
-2. **Load the deferred tool first.** `ToolSearch("select:EnterWorktree")` is the **first** tool call of the run, before any worktree read. `EnterWorktree` is deferred, so calling it without loading the schema fails with `InputValidationError`; and a worktree read attempted first trips the cross-worktree straddle gate in `~/.claude/hooks/plan-gate-edit.sh`.
+2. **Load the deferred tools first.** `ToolSearch("select:EnterWorktree,ExitWorktree")` is the **first** tool call of the run, before any worktree read. Both are deferred, so calling either without loading the schema fails with `InputValidationError`; and a worktree read attempted first trips the cross-worktree straddle gate in `~/.claude/hooks/plan-gate-edit.sh`. Load both up front even though `ExitWorktree` is only used on the 0.3b path — by the time 0.3b is reached the session may already be isolated, and a schema load is cheap.
 
-3. **Worktree guard — resolve the PR's head branch first, then branch three ways.** `EnterWorktree`'s `path:` form only accepts a target listed in `git worktree list` *for the current repo* and, from inside a worktree, only targets under that repo's `.claude/worktrees/` (example) directory. This repo's worktrees live at `~/GitHub/IBL5-worktrees/<slug>`, so a worktree→worktree *switch* is rejected. What that forbids is switching — not running. When the session is **already in the PR's own worktree** there is nothing to switch to and the run proceeds in place, which is why the head branch has to be resolved before the guard can decide. Run this block first:
+3. **Worktree guard — resolve the PR's head branch first, then branch three ways.** `EnterWorktree`'s `path:` form only accepts a target listed in `git worktree list` *for the current repo* and, from inside a worktree, only targets under that repo's `.claude/worktrees/` (example) directory. This repo's worktrees live at `~/GitHub/IBL5-worktrees/<slug>`, so a worktree→worktree *switch* is rejected. What that forbids is switching **directly** — not running, and not going the long way round via `ExitWorktree` to the main checkout and entering from there (step 3b). When the session is **already in the PR's own worktree** there is nothing to switch to and the run proceeds in place, which is why the head branch has to be resolved before the guard can decide. Each of the three arms routes somewhere: `MAIN-CHECKOUT` → step 4, `ALREADY-IN-TARGET` → Phase 1, `WRONG-WORKTREE` → step 3b, then step 4. Run this block first:
+
+   `Write` this to `/tmp/pr-ready-guard-<N>.sh` with `<N>` substituted, then run `bash /tmp/pr-ready-guard-<N>.sh`:
 
    ```bash
-   source "$(git rev-parse --show-toplevel)/bin/lib/git-helpers.sh"
+   TOP=$(git rev-parse --show-toplevel)
+   if [ ! -r "$TOP/bin/lib/git-helpers.sh" ]; then
+     echo "STOP: $TOP/bin/lib/git-helpers.sh is missing — cannot resolve is_in_worktree."
+     exit 1
+   fi
+   source "$TOP/bin/lib/git-helpers.sh"
    SLUG=$(gh pr view <N> --json headRefName --jq .headRefName)
    HERE=$(git rev-parse --abbrev-ref HEAD)
    echo "SLUG: $SLUG"
@@ -65,10 +72,11 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
    elif [ "$HERE" = "$SLUG" ]; then
      echo "ALREADY-IN-TARGET — skip step 4 entirely; do NOT call EnterWorktree."
    else
-     echo "STOP: /pr-ready is running in the '$HERE' worktree, but PR <N> lives on '$SLUG'. Re-invoke from the main checkout (/Users/ajaynicolas/GitHub/IBL5) or from the '$SLUG' worktree directly. EnterWorktree cannot switch worktree-to-worktree for IBL5-worktrees paths."
-     exit 1
+     echo "WRONG-WORKTREE — session is in '$HERE'; PR <N> lives on '$SLUG'. Recover in step 3b."
    fi
    ```
+
+   **This file is written once and run up to three times** — here, again in 3b after `ExitWorktree`, and again in 4 after `EnterWorktree`. Write it *now*, before any `EnterWorktree` call: the later two runs happen in an isolated session where `$(…)` is refused, and re-`Write`ing the same content there would be a second chance to get the substitution wrong. The script-file shape is load-bearing rather than stylistic, per the Phase-0-is-not-exempt invariant above.
 
    **Record the printed `SLUG:` value as the `<SLUG>` literal** in the run notes — per the invariants above it does not survive into the next Bash call, and step 4 substitutes it into an `EnterWorktree` path.
 
@@ -76,11 +84,29 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
 
    **The discriminator is the checked-out branch, not the worktree's directory name.** `bin/wt-new` keeps the two equal, but the branch is what the PR actually names, so it is the authoritative test — a renamed or manually-created worktree directory would fool a basename comparison.
 
-   **Why the third arm still stops.** From the wrong worktree there is no way forward: `EnterWorktree` will not switch to a sibling `IBL5-worktrees` path, and this skill never creates a worktree. Re-invoking from the main checkout or from the target worktree are the only two fixes, so the message names both.
+   **Why the third arm no longer stops.** `EnterWorktree` will not switch worktree→worktree for sibling `IBL5-worktrees` paths, but `ExitWorktree` *does* return the session to the main checkout, and entering from there is the ordinary supported move. The wrong-worktree case is therefore a two-hop route, not a dead end — step 3b performs the exit, and the guard's own re-run is what proves the hop landed.
 
-   Source via `$(git rev-parse --show-toplevel)`, not a bare relative path: the skill's cwd is not guaranteed to be the repo root. `is_in_worktree()` is defined in `bin/lib/git-helpers.sh` and compares `--absolute-git-dir` against `--git-common-dir`. Per the invariants above, a non-zero rc here ends the run.
+   Source via `$TOP` from a bare `git rev-parse --show-toplevel`, not a relative path: the skill's cwd is not guaranteed to be the repo root, and on the 3b/4 re-runs the repo root is a *different* directory than it was at 0.3 — which is precisely the state change being tested. The explicit readability check ahead of the `source` keeps a worktree predating `bin/lib/git-helpers.sh` from failing as an obscure `is_in_worktree: command not found`. `is_in_worktree()` compares `--absolute-git-dir` against `--git-common-dir`. Per the invariants above, a non-zero rc here ends the run.
 
-4. **Enter the worktree — only on `MAIN-CHECKOUT`.** On `ALREADY-IN-TARGET`, skip this step entirely and go straight to Phase 1; the session is where it needs to be, and calling `EnterWorktree` from there would be the rejected worktree→worktree switch.
+3b. **Exit to the main checkout — only on `WRONG-WORKTREE`.** On the other two verdicts skip this step entirely. Call
+
+   `ExitWorktree(action: "keep")`
+
+   then re-run the guard, unchanged:
+
+   ```bash
+   bash /tmp/pr-ready-guard-<N>.sh
+   ```
+
+   **It must now print `MAIN-CHECKOUT`.** If it prints anything else — `WRONG-WORKTREE` again, a `STOP:` line, or nothing — print
+
+   `STOP: ExitWorktree did not return the session to the main checkout — the guard still reports <verdict>. Re-invoke /pr-ready from /Users/ajaynicolas/GitHub/IBL5 or from the <SLUG> worktree directly.`
+
+   and stop. This is a fail-**closed** post-condition, and it is the whole reason the wrong-worktree case can be recovered rather than refused: the guard is not weakened, it is re-asserted after the move. Never infer success from the tool's return message — re-running the guard is the only evidence that counts. Note that `ExitWorktree`'s own schema claims it is a no-op outside a session that called `EnterWorktree`; observed behavior contradicts that (it returned a directly-launched worktree session to the main checkout), so the skill relies on neither claim and simply re-checks.
+
+   **`action: "keep"` is mandatory — never `"remove"`, never `discard_changes`.** The session did not create this worktree; it is a peer's active workspace, quite possibly with uncommitted work, and `remove` deletes the worktree *and its branch*. `/pr-ready` is a read-and-rebase skill for one PR; destroying an unrelated worktree is never part of its contract.
+
+4. **Enter the worktree — on `MAIN-CHECKOUT`, whether that was the original verdict or the one 3b produced.** On `ALREADY-IN-TARGET`, skip this step entirely and go straight to Phase 1; the session is where it needs to be, and calling `EnterWorktree` from there would be the rejected worktree→worktree switch.
 
    ```bash
    git worktree list
@@ -91,6 +117,18 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
    `STOP: no existing worktree for branch <SLUG> — /pr-ready enters an existing worktree, it never creates one.`
 
    and stop. Otherwise call `EnterWorktree(path: "/Users/ajaynicolas/GitHub/IBL5-worktrees/<SLUG>")`, with the literal substituted.
+
+   **Then re-run the guard a final time and require `ALREADY-IN-TARGET`:**
+
+   ```bash
+   bash /tmp/pr-ready-guard-<N>.sh
+   ```
+
+   If it prints anything else, print
+
+   `STOP: EnterWorktree did not land in the <SLUG> worktree — the guard reports <verdict>. Phases 2–4 rebase and force-push, which ADR-0062 forbids outside the PR's own worktree.`
+
+   and stop. **Do not substitute a bare branch comparison for this check.** A main checkout that happens to have `<SLUG>` checked out passes a branch-only test while the session is still in the main checkout — the exact hazard the arm order guards against. `ALREADY-IN-TARGET` is the only verdict that asserts location *and* branch, in that order. This post-condition matters more since 3b exists: before it, a wrong-worktree session could never reach step 4 at all, so a silent `EnterWorktree` failure had no path to Phase 2.
 
 5. **Docker note** — only if a later step needs the app running. Derive the slug from the tree you are actually in — run `git rev-parse --show-toplevel` bare and take the basename yourself (this runs post-`EnterWorktree`, so no `$(…)`) — then `docker start ibl5-db-<slug> ibl5-php-<slug>`. Never hardcode a slug from a previous session; never use `main.localhost` from a worktree; always navigate `/ibl5/` paths, never bare `/`.
 

@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace Api\Transformer;
 
+use Api\Contracts\PlayerStatsTransformerInterface;
 use BasketballStats\StatsFormatter;
 
 /**
  * @phpstan-import-type CareerStatsRow from \Api\Repository\ApiPlayerStatsRepository
  * @phpstan-import-type SeasonHistoryRow from \Api\Repository\ApiPlayerStatsRepository
  */
-class PlayerStatsTransformer
+class PlayerStatsTransformer implements PlayerStatsTransformerInterface
 {
     /**
      * Transform a career stats row from vw_player_career_stats.

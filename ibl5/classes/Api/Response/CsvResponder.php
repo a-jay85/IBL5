@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Api\Response;
 
-class CsvResponder
+use Api\Contracts\CsvResponderInterface;
+
+class CsvResponder implements CsvResponderInterface
 {
     /**
      * Send CSV response with appropriate headers.

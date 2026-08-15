@@ -545,6 +545,10 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 
 **Table evidence (2026-06-29):** UI/ 1 interface of 15; add interfaces systematically. Additive. → PR #1230.
 
+### 2.32
+
+**Table evidence (2026-08-09):** Shipped: common `Api\Contracts\TransformerInterface` (7 uniform transformers) + flattened `Middleware/Contracts/`→`Api/Contracts/`. **Status:** partial 2026-06-26; residual = divergent-transformer interfaces (Boxscore/PlayerStats), responder interfaces (Csv/Json — disjoint shapes), `Response/Contracts/` flatten.
+
 ## Axis 3: Top-Level Legacy PHP Files
 
 ### 3.2 `DEMO_LOGIN_TOKEN` Hardcoded to `'demo'`

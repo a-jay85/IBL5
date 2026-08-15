@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Api\Response;
 
-use Api\Response\Contracts\HtmlResponderInterface;
+use Api\Contracts\HtmlResponderInterface;
 
 class HtmlResponder implements HtmlResponderInterface
 {

@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Api\Transformer;
 
+use Api\Contracts\BoxscoreTransformerInterface;
+
 /**
  * @phpstan-import-type BoxscoreTeamRow from \Api\Repository\ApiGameRepository
  * @phpstan-import-type BoxscorePlayerRow from \Api\Repository\ApiGameRepository
  */
-class BoxscoreTransformer
+class BoxscoreTransformer implements BoxscoreTransformerInterface
 {
     /**
      * Transform a team box score row from `ibl_box_scores_teams`.

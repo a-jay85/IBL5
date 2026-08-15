@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Api\Response\Contracts;
+namespace Api\Contracts;
 
 interface HtmlResponderInterface
 {

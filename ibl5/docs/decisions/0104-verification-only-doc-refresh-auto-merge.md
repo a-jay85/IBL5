@@ -3,7 +3,7 @@ description: A nightly doc-refresh PR may self-ship only when `bin/docfix-check-
 last_verified: 2026-08-15
 ---
 
-# ADR-0103: Verification-only doc refreshes may self-ship
+# ADR-0104: Verification-only doc refreshes may self-ship
 
 **Status:** Accepted
 **Date:** 2026-08-13

@@ -140,6 +140,118 @@ class TradeOfferGrouperTest extends TestCase
         $this->assertFalse($result[2]['hasHammer']);
     }
 
+    public function testTwoRowsSharingOfferIdMergeIntoOneGroup(): void
+    {
+        $assetRepo = self::createStub(TradeAssetRepositoryInterface::class);
+        $cashRepo = self::createStub(TradeCashRepositoryInterface::class);
+        $assetRepo->method('getPlayersByIds')->willReturn([
+            100 => ['name' => 'Player A', 'pos' => 'PG', 'pid' => 100],
+            200 => ['name' => 'Player B', 'pos' => 'SG', 'pid' => 200],
+        ]);
+        $assetRepo->method('getDraftPicksByIds')->willReturn([]);
+        $cashRepo->method('getCashTransactionsByOfferIds')->willReturn([]);
+        $grouper = new TradeOfferGrouper($assetRepo, $cashRepo);
+
+        $rows = [
+            $this->makeRow(1, 100, '1', 'Lakers', 'Celtics', 'Celtics'),
+            $this->makeRow(1, 200, '1', 'Celtics', 'Lakers', 'Celtics'),
+        ];
+
+        $result = $grouper->groupOffers($rows, 'Lakers', 2025);
+
+        $this->assertCount(1, $result);
+        $this->assertCount(2, $result[1]['items']);
+    }
+
+    public function testUnresolvedItemIdEmitsDocumentedFallbackShape(): void
+    {
+        $assetRepo = self::createStub(TradeAssetRepositoryInterface::class);
+        $cashRepo = self::createStub(TradeCashRepositoryInterface::class);
+        $assetRepo->method('getPlayersByIds')->willReturn([]);
+        $assetRepo->method('getDraftPicksByIds')->willReturn([]);
+        $cashRepo->method('getCashTransactionsByOfferIds')->willReturn([]);
+        $grouper = new TradeOfferGrouper($assetRepo, $cashRepo);
+
+        $rows = [
+            $this->makeRow(1, 999, '1', 'Lakers', 'Celtics', 'Celtics'),
+        ];
+
+        $result = $grouper->groupOffers($rows, 'Lakers', 2025);
+
+        $item = $result[1]['items'][0];
+        $this->assertSame('player', $item['type']);
+        $this->assertSame('', $item['description']);
+        $this->assertNull($item['notes']);
+    }
+
+    public function testCashStartYearShiftsWhenSeasonAdvancesContractYears(): void
+    {
+        $assetRepo = self::createStub(TradeAssetRepositoryInterface::class);
+        $cashRepo = self::createStub(TradeCashRepositoryInterface::class);
+        $cashRepo->method('getCashTransactionsByOfferIds')->willReturn([]);
+        $grouper = new TradeOfferGrouper($assetRepo, $cashRepo);
+
+        $tradeOffers = [
+            1 => [
+                'from' => 'Lakers',
+                'to' => 'Celtics',
+                'approval' => 'Celtics',
+                'oppositeTeam' => 'Celtics',
+                'hasHammer' => false,
+                'items' => [],
+                'previewData' => ['fromPids' => [], 'toPids' => []],
+            ],
+        ];
+
+        $allTeams = [
+            ['teamid' => 5, 'team_name' => 'Lakers', 'team_city' => 'Los Angeles', 'color1' => '552583', 'color2' => 'FDB927'],
+            ['teamid' => 9, 'team_name' => 'Celtics', 'team_city' => 'Boston', 'color1' => '007A33', 'color2' => 'BA9653'],
+        ];
+
+        $season = self::createStub(\Season\Season::class);
+        $season->method('advancesContractYears')->willReturn(true);
+        $season->endingYear = 2025;
+
+        $result = $grouper->enrichWithPreviewData($tradeOffers, $allTeams, $season);
+
+        $this->assertSame(2, $result[1]['previewData']['cashStartYear']);
+    }
+
+    public function testEnrichWithPreviewDataHandlesTeamMissingFromAllTeams(): void
+    {
+        $assetRepo = self::createStub(TradeAssetRepositoryInterface::class);
+        $cashRepo = self::createStub(TradeCashRepositoryInterface::class);
+        $cashRepo->method('getCashTransactionsByOfferIds')->willReturn([]);
+        $grouper = new TradeOfferGrouper($assetRepo, $cashRepo);
+
+        $tradeOffers = [
+            1 => [
+                'from' => 'Lakers',
+                'to' => 'UnknownTeam',
+                'approval' => 'UnknownTeam',
+                'oppositeTeam' => 'UnknownTeam',
+                'hasHammer' => false,
+                'items' => [],
+                'previewData' => ['fromPids' => [], 'toPids' => []],
+            ],
+        ];
+
+        $allTeams = [
+            ['teamid' => 5, 'team_name' => 'Lakers', 'team_city' => 'Los Angeles', 'color1' => '552583', 'color2' => 'FDB927'],
+        ];
+
+        $season = self::createStub(\Season\Season::class);
+        $season->method('advancesContractYears')->willReturn(false);
+        $season->endingYear = 2025;
+
+        $result = $grouper->enrichWithPreviewData($tradeOffers, $allTeams, $season);
+
+        $preview = $result[1]['previewData'];
+        $this->assertSame(5, $preview['fromTeamId']);
+        $this->assertSame(0, $preview['toTeamId']);
+        $this->assertSame('000000', $preview['toColor1']);
+    }
+
     public function testEnrichWithPreviewDataAddsTeamIds(): void
     {
         $assetRepo = self::createStub(TradeAssetRepositoryInterface::class);

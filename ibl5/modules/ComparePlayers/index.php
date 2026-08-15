@@ -23,74 +23,16 @@ get_lang($module_name);
 // inputs are now read from $_REQUEST explicitly here.
 $op = is_string($_REQUEST['op'] ?? null) ? $_REQUEST['op'] : '';
 
-/**
- * Display compare players interface
- */
-function userinfo($username, $bypass = 0, $hid = 0, $url = 0): void
-{
-    global $user, $prefix, $user_prefix, $mysqli_db;
-    $commonRepository = new \Repositories\TeamIdentityRepository($mysqli_db);
+global $mysqli_db, $user;
 
-    if (!$bypass) {
-        cookiedecode($user);
-    }
-
-    $teamlogo = $commonRepository->getTeamnameFromUsername($username) ?? '';
-    $teamid = $commonRepository->getTidFromTeamname($teamlogo);
-
-    PageLayout\PageLayout::header();
-
-    $repository = new \ComparePlayers\ComparePlayersRepository($mysqli_db);
-    $service = new \ComparePlayers\ComparePlayersService($repository);
-    $view = new \ComparePlayers\ComparePlayersView();
-
-    $playerNames = $repository->getAllPlayerNames();
-
-    if (!isset($_POST['Player1'])) {
-        echo $view->renderSearchForm($playerNames);
-    } else {
-        $player1Name = trim((string) ($_POST['Player1'] ?? ''));
-        $player2Name = trim((string) ($_POST['Player2'] ?? ''));
-
-        if (strlen($player1Name) > 100 || strlen($player2Name) > 100) {
-            echo '<div class="ibl-empty-state"><p class="ibl-empty-state__text">Player names must be 100 characters or less.</p></div>';
-            echo $view->renderSearchForm($playerNames);
-            PageLayout\PageLayout::footer();
-            return;
-        }
-
-        $comparison = $service->comparePlayers($player1Name, $player2Name);
-
-        if ($comparison !== null) {
-            echo $view->renderSearchForm($playerNames);
-            echo $view->renderComparisonResults($comparison);
-        } else {
-            echo '<div class="ibl-empty-state"><p class="ibl-empty-state__text">One or both players not found. Please check the player names and try again.</p></div>';
-            echo $view->renderSearchForm($playerNames);
-        }
-    }
-
-    PageLayout\PageLayout::footer();
-}
-
-/**
- * Main entry point - display interface for all users (no login required)
- */
-function main($user): void
-{
-    if (is_user($user)) {
-        global $authService;
-        cookiedecode($user);
-        userinfo($authService->getUsername() ?? '');
-    } else {
-        userinfo('', 1);
-    }
-}
-
-global $user;
+$repository = new \ComparePlayers\ComparePlayersRepository($mysqli_db);
+$service    = new \ComparePlayers\ComparePlayersService($repository);
+$view       = new \ComparePlayers\ComparePlayersView();
+$nukeCompat = new \Utilities\NukeCompat();
+$controller = new \ComparePlayers\ComparePlayersController($repository, $service, $view, $nukeCompat);
 
 switch ($op) {
     default:
-        main($user);
+        $controller->main($user);
         break;
 }

@@ -981,6 +981,18 @@ class TradingServiceTest extends TestCase
 
         unset($_SERVER['SERVER_NAME']);
     }
+
+    public function testTradingServiceNoLongerHoldsExtractedRepositories(): void
+    {
+        $names = array_map(
+            static fn (\ReflectionProperty $p): string => $p->getName(),
+            (new \ReflectionClass(\Trading\TradingService::class))->getProperties()
+        );
+        self::assertNotContains('assetRepository', $names);
+        self::assertNotContains('cashRepository', $names);
+        self::assertContains('offerGrouper', $names);
+        self::assertContains('futureSalaryCalculator', $names);
+    }
 }
 
 /**

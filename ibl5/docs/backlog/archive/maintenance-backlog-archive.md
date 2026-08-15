@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed/declined maintenance-audit findings, extracted from maintenance-backlog.md.
-last_verified: 2026-08-10
+last_verified: 2026-08-15
 ---
 
 # Maintenance-Cost Reduction Backlog — Archive
@@ -1164,6 +1164,16 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Status:** ✅ Implemented (2026-08-10) — TradeAssetRepositoryTest + TradeOfferRepositoryTest (draft-pick mapping, offer lifecycle) + TradeExecutionRepositoryTest + TradeFormRepositoryTest added (PR #1826).
 
 **Table evidence (2026-08-10):** TradeAssetRepositoryTest + TradeOfferRepositoryTest added (draft-pick mapping, offer lifecycle); TradeExecutionRepository untested + TradeFormRepository partial. Residual closed: TradeExecutionRepositoryTest.php + TradeFormRepositoryTest.php added (PR #1826).
+
+### 6.18 Moderate-Gap Modules (0.40–0.50 ratio)
+**Location:** `DraftPickLocator` (5/2), `LeagueSchedule` (7/3), `NextSim` (5/2), `SavedDepthChart` (5/2), `TransactionHistory` (5/2), `CapSpace` (5/2), `DepthChartEntry` (15/8)
+**Problem:** Each module has thin or moderate coverage on critical paths.
+**Suggested direction:** Per-module targeted PHPUnit — see test-coverage audit detail.
+**Est. effort:** S each (M for CapSpace, NextSim, DepthChartEntry)
+**Risk if untouched:** Per-module: stashed picks mislocated; schedule phase boundaries wrong; cap floor misreported; saved DC corrupted; transaction log misordered; cap exploitation; invalid DC entries saved.
+**Status:** ✅ Done (2026-08-15) — All DB-integration residuals resolved: TransactionHistory ORDER BY correctness covered by testGetTransactionsOrdersNewestFirst (#1885); SavedDepthChart write-path covered by testGetSavedDepthChartByIdReturnsRow; win-loss aggregation covered by testGetWinLossRecord* tests.
+
+**Table evidence (2026-08-15):** Unit tests added: DraftPickLocator repo, LeagueSchedule Game, TransactionHistory repo, CapSpace repo. NextSim/SavedDepthChart/DepthChartEntry verified covered. Residual: SQL aggregation/ordering + SDC write-path are DB-integration-only. Residual closed: testGetTransactionsOrdersNewestFirst added (PR #1885); SDC write-path covered by testGetSavedDepthChartByIdReturnsRow; aggregation covered by testGetWinLossRecord* tests.
 
 ### 6.20 Anonymous rookie-option lockdown E2E assertion is non-discriminating
 **Location:** `tests/e2e/security/draft-rookie-anon-lockdown.spec.ts` (under `ibl5/`; added by PR #1107, not yet on `master`)

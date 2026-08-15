@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-08-11
+last_verified: 2026-08-15
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -350,13 +350,12 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):** Adding tests is inherently green-green (no production change) → every open coverage gap is 🟩 auto-mergeable. If writing a test surfaces a real bug, the *fix* becomes its own finding with its own classification. (Exceptions: **6.21** and **6.23** are 🟨, not 🟩 — in each the target code is unreachable from PHPUnit, so no test is writable until a production seam is decided: a teamless-fixture / non-`exit()` refactor for 6.21, a SAPI-independent hashing seam for 6.23.)
 
-> ✅ resolved (16): 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 6.15, 6.16, 6.17, 6.20 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (17): 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 6.15, 6.16, 6.17, 6.18, 6.20 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 6.13 | ◑ Partial | 🟩 | Player (69 prod / 48 test files); additive (L — chunked; 3 of 3 done). |
 | 6.14 | ◑ Partial | 🟩 | ProcessBoxscoresStep/GenerateSeasonAwardsStep/ParseJsbFilesStep added (2026-07-24); ~19 step classes + OlympicsFlatStandingsUpdater/UpdaterView/JsbSourceResolver remain. |
-| 6.18 | ◑ Partial | 🟩 | Unit tests added: DraftPickLocator repo, LeagueSchedule Game, TransactionHistory repo, CapSpace repo. NextSim/SavedDepthChart/DepthChartEntry verified covered. Residual: SQL aggregation/ordering + SDC write-path are DB-integration-only. |
 | 6.19 | ◑ Partial | 🟩 | AllStarAppearances + GMContactList repo unit tests added. Season entity predicates blocked by `Season\Season`→mock alias (QueryRepo plumbing covered). `Shared` N/A (deleted 2.23). |
 | 6.21 | ⬜ Open | 🟨 | Row-12 (Free-Agents/teamless session) `processrookieoption` ownership-rejection path untested: PHPUnit entry-point test impossible (handler `exit()`s), E2E auth fixture always has a session team. Needs a teamless-fixture / non-`exit()` refactor decision before it's writable → 🟨. From PR #1107 Phase 5.0 note. |
 | 6.22 | ⬜ Open | 🟨 | **Pattern behind 6.20/6.21.** Authz/IDOR gates inline in controllers end in `HtmxHelper::redirect()→exit()`, so the security-critical "non-party refused + no mutation" property is E2E-only (forced the D-05 reject test, #1066). `Trading\TradeExecutionService` (accept path, #1066) proves the fix: a gate returning a *verdict* is unit-testable exit-free (`testValidateAndExecuteRejectsNonPartyWithoutExecuting`). Convert the inline gates (Waivers, FreeAgency, Trade API accept/decline, Trading reject) to verdict + thin redirect-shim → security logic becomes unit-testable; unblocks 6.21. 🟨: production refactor on a security surface; needs a verdict-shape decision. From the #1066 reject-IDOR review. |
@@ -377,14 +376,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Est. effort:** L
 **Risk if untouched:** Nightly automation corrupts standings/schedules/stats silently.
 **Status:** ◑ Partial (this PR, 2026-06-27). Added `ibl5/tests/Updater/StandingsUpdaterTest.php` (league/home/away/conference/division W-L aggregation, plus unknown-team-skip, empty-config, and zero-games boundaries) and `ibl5/tests/Updater/PowerRankingsUpdaterTest.php` (ranking formula + div-by-zero guard); extended `ibl5/tests/Updater/RecordParserTest.php` with empty/non-numeric/leading-dash boundaries. `ScheduleUpdater` already covered (`ibl5/tests/Updater/ScheduleUpdaterTest.php`). Added `ibl5/tests/Updater/ProcessBoxscoresStepTest.php`, `ibl5/tests/Updater/GenerateSeasonAwardsStepTest.php`, `ibl5/tests/Updater/ParseJsbFilesStepTest.php` (2026-07-24). **Residual:** `Updater/Steps/` (~19 step classes remain), `OlympicsFlatStandingsUpdater`, `UpdaterView`, and `JsbSourceResolver` untested; module still below 0.5 ratio.
-
-### 6.18 Moderate-Gap Modules (0.40–0.50 ratio)
-**Location:** `DraftPickLocator` (5/2), `LeagueSchedule` (7/3), `NextSim` (5/2), `SavedDepthChart` (5/2), `TransactionHistory` (5/2), `CapSpace` (5/2), `DepthChartEntry` (15/8)
-**Problem:** Each module has thin or moderate coverage on critical paths.
-**Suggested direction:** Per-module targeted PHPUnit — see test-coverage audit detail.
-**Est. effort:** S each (M for CapSpace, NextSim, DepthChartEntry)
-**Risk if untouched:** Per-module: stashed picks mislocated; schedule phase boundaries wrong; cap floor misreported; saved DC corrupted; transaction log misordered; cap exploitation; invalid DC entries saved.
-**Status:** ◑ Partial (2026-06-26) — added unit coverage: DraftPickLocatorRepositoryTest (pick grouping), LeagueScheduleGameTest (Game value object), TransactionHistoryRepositoryTest (year int-cast + filter branches), CapSpaceRepositoryTest (post-season contract rows). Verified already covered: NextSim (all classes tested; Service is a thin delegator), SavedDepthChart (22-test WideUnit service suite exercises repo read paths), DepthChartEntry (11-test Validator covers "invalid DC entries"). CapSpace cap-math is already covered by CapSpaceServiceTest. Residual (DatabaseIntegration-only): transaction ORDER BY correctness, SavedDepthChart write-path (insert_id), aggregation correctness.
 
 ### 6.19 Small Modules With Single-Test Coverage
 **Location:** `AllStarAppearances` (4/1), `GMContactList` (4/1), `Season` (3/1), `Shared` (3/1)

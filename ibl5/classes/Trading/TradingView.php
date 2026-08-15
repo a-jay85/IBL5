@@ -79,7 +79,7 @@ class TradingView implements TradingViewInterface
         $k--;
 
         ob_start();
-        echo \UI\AlertRenderer::fromCode($pageData['result'] ?? null, self::TRADE_ALERT_MAP, $pageData['error'] ?? null);
+        echo \UI\AlertRenderer::fromCode($pageData['result'] ?? null, \Trading\TradeAlertMap::MAP, $pageData['error'] ?? null);
         ?>
 <form name="Trade_Offer" method="post" action="/ibl5/modules/Trading/maketradeoffer.php">
     <?= \Security\CsrfGuard::generateToken('trade_offer') ?>
@@ -231,7 +231,7 @@ $tradeConfig = [
         $reviewConfigs = [];
 
         ob_start();
-        echo \UI\AlertRenderer::fromCode($pageData['result'] ?? null, self::TRADE_ALERT_MAP, $pageData['error'] ?? null);
+        echo \UI\AlertRenderer::fromCode($pageData['result'] ?? null, \Trading\TradeAlertMap::MAP, $pageData['error'] ?? null);
         ?>
 <div class="trading-layout__header">
     <h1 class="ibl-title">Trading</h1>

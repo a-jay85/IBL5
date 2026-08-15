@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed development-efficiency backlog entries, extracted from dev-efficiency-backlog.md.
-last_verified: 2026-08-08
+last_verified: 2026-08-15
 ---
 
 # Development-Efficiency Backlog — Archive
@@ -8,6 +8,11 @@ last_verified: 2026-08-08
 Read-only historical record of ✅ Implemented / 🚫 Declined entries. For OPEN items see ../dev-efficiency-backlog.md. Not governed by bin/check-docs (historical dead refs tolerated).
 
 ---
+
+### E2 Dependabot grouping
+**Location:** `.github/dependabot.yml`.
+**What shipped:** Added `groups:` blocks to all 5 ecosystems (github-actions, composer, bun, docker, npm@IBLbot) batching minor/patch bumps into one weekly PR per ecosystem; majors stay individual so a breaking bump is never entangled with routine ones. TypeScript `semver-major` ignore entry in IBLbot block preserved verbatim.
+**Status (2026-08-14):** ✅ Implemented — shipped in PR #1873.
 
 ### E6 Diff-scoped PHPStan wrapper
 **Location:** `ibl5/bin/analyse-diff`.

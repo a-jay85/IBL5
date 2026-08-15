@@ -219,13 +219,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Est. effort:** M (namespace sweep)
 **Risk if untouched:** Global class-name collision risk; PHPStan ban rules don't protect root files.
 
-### 2.32 Api/ — Internal Subdirectory Structure Diverges
-**Location:** `classes/Api/`
-**Problem:** 43 files across `Controller/`, `Repository/`, `Transformer/`, `Middleware/`, `Cache/`, `Response/`, `Pagination/`. `Middleware/` has own `Contracts/` (inconsistent with module root). Only 2 interfaces in `Api/Contracts/` for 43 files.
-**Suggested direction:** Flatten `Middleware/Contracts/` into `Api/Contracts/`; add interfaces for Transformer + Response classes; document the Api module's different structure.
-**Est. effort:** S (flatten) / M (full interface coverage)
-**Risk if untouched:** Two `Contracts/` directories confuse discovery; Transformers can't be substituted.
-
 ### 2.39 TradeRosterPreviewCashRowBuilder — Unbounded Cash-Year Range From `$_GET`
 **Location:** `ibl5/classes/Trading/TradeRosterPreviewCashRowBuilder.php` (`buildCashRows()`)
 **Problem:** `cashStartYear` and `cashEndYear` come directly from `$_GET` with no upper bound and no ordering check. `cashStartYear=1&cashEndYear=999999` drives an ~1M-iteration loop in `buildCashRows()` — a DoS vector on an authenticated endpoint.

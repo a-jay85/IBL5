@@ -294,7 +294,7 @@ final class CheckDocsCliTest extends TestCase
 
         [$code, $output] = $this->runScript('--since=deadbeef123nonexistent');
         $this->assertSame(2, $code, $output);
-        $this->assertStringContainsString('unable to diff against base ref', $output);
+        $this->assertStringContainsString("against base ref 'deadbeef123nonexistent'", $output);
     }
 
     #[Test]

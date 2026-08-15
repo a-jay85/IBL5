@@ -106,6 +106,34 @@ class TransactionHistoryRepositoryTest extends DatabaseTestCase
         self::assertSame(array_reverse($sids), $resultSids);
     }
 
+    public function testGetTransactionsOrdersNewestFirst(): void
+    {
+        $olderSid = $this->insertRow('nuke_stories', [
+            'catid' => 1,
+            'title' => 'OrderTest Older',
+            'time' => '2097-01-15 10:00:00',
+            'aid' => '',
+        ]);
+        $newerSid = $this->insertRow('nuke_stories', [
+            'catid' => 1,
+            'title' => 'OrderTest Newer',
+            'time' => '2097-06-15 10:00:00',
+            'aid' => '',
+        ]);
+
+        $transactions = $this->repo->getTransactions(1, 2097, null);
+
+        /** @var list<int> $resultSids */
+        $resultSids = array_map(static fn(array $row): int => (int) $row['sid'], $transactions);
+        $olderPos = array_search($olderSid, $resultSids, true);
+        $newerPos = array_search($newerSid, $resultSids, true);
+
+        self::assertNotFalse($olderPos, 'Older row not found in getTransactions results');
+        self::assertNotFalse($newerPos, 'Newer row not found in getTransactions results');
+        // ORDER BY time DESC: June 2097 (newer) must appear before January 2097 (older).
+        self::assertLessThan($olderPos, $newerPos, 'Newer transaction should precede older one in results');
+    }
+
     public function testGetTransactionsReturnsEmptyForNoMatches(): void
     {
         $transactions = $this->repo->getTransactions(null, 1900, null);

@@ -1,0 +1,181 @@
+<form name="Trade_Offer" method="post" action="/ibl5/modules/Trading/maketradeoffer.php">
+    <input type="hidden" name="_csrf_token" value="__CSRF__">    <input type="hidden" name="offeringTeam" value="Lakers">
+    <div class="trading-layout">
+        <h1 class="ibl-title">Trading</h1>
+        <div class="team-cards-row">
+            <div class="trading-layout__card">
+                <details class="trading-roster-details" open>
+                    <summary class="trading-roster-details__summary" style="--team-color-primary: #552583; --team-color-secondary: #FDB927;">
+                        <img src="images/logo/1.jpg" alt="Lakers" class="trading-roster-details__logo">
+                        <span class="trading-roster-details__chevron"></span>
+                    </summary>
+                    <div class="trading-roster-details__tabs ibl-tabs" role="tablist" style="--team-color-primary: #552583; --team-color-secondary: #552583;">
+                        <button type="button" class="ibl-tab ibl-tab--active" data-panel="players" role="tab">Players</button>
+                        <button type="button" class="ibl-tab" data-panel="picks" role="tab">Picks</button>
+                        <button type="button" class="ibl-tab" data-panel="cash" role="tab">Cash</button>
+                    </div>
+                    <div class="trading-roster-details__panel trading-roster-details__panel--active" data-panel-id="players">
+                        <table class="ibl-data-table trading-roster team-table" data-team-id="1" style="--team-color-primary: #552583; --team-color-secondary: #FDB927;">
+                            <colgroup>
+                                <col class="trading-col--checkbox">
+                                <col>
+                                <col class="trading-col--stat">
+                                <col class="trading-col--stat">
+                            </colgroup>
+                            <tbody>
+                                                            </tbody>
+                        </table>
+                    </div>
+                    <div class="trading-roster-details__panel" data-panel-id="picks">
+                        <table class="ibl-data-table trading-roster" data-no-responsive>
+                            <colgroup>
+                                <col class="trading-col--checkbox">
+                                <col>
+                            </colgroup>
+                            <tbody>
+                                                            </tbody>
+                        </table>
+                    </div>
+                    <div class="trading-roster-details__panel" data-panel-id="cash">
+                        <table class="ibl-data-table trading-cash-exchange" data-no-responsive data-side="user">
+                            <tbody>
+                <tr>
+                    <td>
+                        <input type="number" name="userSendsCash1" value="0" min="0" max="2000" aria-label="Lakers cash for 2024-2025">
+                        for 2024-2025                    </td>
+                </tr>
+                        <tr>
+                    <td>
+                        <input type="number" name="userSendsCash2" value="0" min="0" max="2000" aria-label="Lakers cash for 2025-2026">
+                        for 2025-2026                    </td>
+                </tr>
+                        <tr>
+                    <td>
+                        <input type="number" name="userSendsCash3" value="0" min="0" max="2000" aria-label="Lakers cash for 2026-2027">
+                        for 2026-2027                    </td>
+                </tr>
+                        <tr>
+                    <td>
+                        <input type="number" name="userSendsCash4" value="0" min="0" max="2000" aria-label="Lakers cash for 2027-2028">
+                        for 2027-2028                    </td>
+                </tr>
+                        <tr>
+                    <td>
+                        <input type="number" name="userSendsCash5" value="0" min="0" max="2000" aria-label="Lakers cash for 2028-2029">
+                        for 2028-2029                    </td>
+                </tr>
+                        <tr>
+                    <td>
+                        <input type="number" name="userSendsCash6" value="0" min="0" max="2000" aria-label="Lakers cash for 2029-2030">
+                        for 2029-2030                    </td>
+                </tr>
+                                    </tbody>
+                        </table>
+                    </div>
+                </details>
+            </div>
+            <div class="trading-layout__card">
+                <input type="hidden" name="switchCounter" value="0">
+                <input type="hidden" name="listeningTeam" value="Celtics">
+                <details class="trading-roster-details" open>
+                    <summary class="trading-roster-details__summary" style="--team-color-primary: #007A33; --team-color-secondary: #FFFFFF;">
+                        <img src="images/logo/2.jpg" alt="Celtics" class="trading-roster-details__logo">
+                        <span class="trading-roster-details__chevron"></span>
+                    </summary>
+                    <div class="trading-roster-details__tabs ibl-tabs" role="tablist" style="--team-color-primary: #007A33; --team-color-secondary: #007A33;">
+                        <button type="button" class="ibl-tab ibl-tab--active" data-panel="players" role="tab">Players</button>
+                        <button type="button" class="ibl-tab" data-panel="picks" role="tab">Picks</button>
+                        <button type="button" class="ibl-tab" data-panel="cash" role="tab">Cash</button>
+                    </div>
+                    <div class="trading-roster-details__panel trading-roster-details__panel--active" data-panel-id="players">
+                        <table class="ibl-data-table trading-roster team-table" data-team-id="2" style="--team-color-primary: #007A33; --team-color-secondary: #FFFFFF;">
+                            <colgroup>
+                                <col class="trading-col--checkbox">
+                                <col>
+                                <col class="trading-col--stat">
+                                <col class="trading-col--stat">
+                            </colgroup>
+                            <tbody>
+                                                            </tbody>
+                        </table>
+                    </div>
+                    <div class="trading-roster-details__panel" data-panel-id="picks">
+                        <table class="ibl-data-table trading-roster" data-no-responsive>
+                            <colgroup>
+                                <col class="trading-col--checkbox">
+                                <col>
+                            </colgroup>
+                            <tbody>
+                                                            </tbody>
+                        </table>
+                    </div>
+                    <div class="trading-roster-details__panel" data-panel-id="cash">
+                        <table class="ibl-data-table trading-cash-exchange" data-no-responsive data-side="partner">
+                            <tbody>
+                <tr>
+                    <td>
+                        <input type="number" name="partnerSendsCash1" value="0" min="0" max="2000" aria-label="Celtics cash for 2024-2025">
+                        for 2024-2025                    </td>
+                </tr>
+                        <tr>
+                    <td>
+                        <input type="number" name="partnerSendsCash2" value="0" min="0" max="2000" aria-label="Celtics cash for 2025-2026">
+                        for 2025-2026                    </td>
+                </tr>
+                        <tr>
+                    <td>
+                        <input type="number" name="partnerSendsCash3" value="0" min="0" max="2000" aria-label="Celtics cash for 2026-2027">
+                        for 2026-2027                    </td>
+                </tr>
+                        <tr>
+                    <td>
+                        <input type="number" name="partnerSendsCash4" value="0" min="0" max="2000" aria-label="Celtics cash for 2027-2028">
+                        for 2027-2028                    </td>
+                </tr>
+                        <tr>
+                    <td>
+                        <input type="number" name="partnerSendsCash5" value="0" min="0" max="2000" aria-label="Celtics cash for 2028-2029">
+                        for 2028-2029                    </td>
+                </tr>
+                        <tr>
+                    <td>
+                        <input type="number" name="partnerSendsCash6" value="0" min="0" max="2000" aria-label="Celtics cash for 2029-2030">
+                        for 2029-2030                    </td>
+                </tr>
+                                    </tbody>
+                        </table>
+                    </div>
+                </details>
+            </div>
+        </div>
+<div id="trade-roster-preview" class="trade-roster-preview" style="--preview-user-color: #552583; --preview-partner-color: #007A33;" hidden>
+    <div class="trade-roster-preview__header">
+        <img src="images/logo/new1.png" alt="Lakers" class="trade-roster-preview__logo trade-roster-preview__logo--active" data-team-id="1">
+        <div class="trade-roster-preview__title">Roster Preview</div>
+        <img src="images/logo/new2.png" alt="Celtics" class="trade-roster-preview__logo" data-team-id="2">
+    </div>
+    <div class="trade-roster-preview__tabs ibl-tabs" role="tablist" style="--team-color-primary: #552583; --team-color-secondary: #552583;">
+        <button type="button" class="ibl-tab ibl-tab--active" data-display="ratings" role="tab">Ratings</button>
+        <button type="button" class="ibl-tab" data-display="total_s" role="tab">Totals</button>
+        <button type="button" class="ibl-tab" data-display="avg_s" role="tab">Averages</button>
+        <button type="button" class="ibl-tab" data-display="per36mins" role="tab">Per 36</button>
+        <button type="button" class="ibl-tab" data-display="contracts" role="tab">Contracts</button>
+    </div>
+    <div class="table-scroll-wrapper">
+        <div class="table-scroll-container" tabindex="0" role="region" aria-label="Trade roster preview">
+            <div class="trade-roster-preview__empty">Select players to preview roster changes</div>
+        </div>
+    </div>
+</div>
+                <div class="trading-layout__submit">
+            <input type="hidden" name="fieldsCounter" value="-1">
+            <button type="submit" class="ibl-btn ibl-btn--primary" id="trade-submit-btn" disabled>Make Trade Offer</button>
+        </div>
+    </div>
+<script>window.IBL_TRADE_CONFIG = {"rosterPreviewApiBaseUrl":"modules.php?name=Trading&op=roster-preview-api","userTeam":"Lakers","partnerTeam":"Celtics","userTeamId":1,"partnerTeamId":2,"switchCounter":0,"userFutureSalary":[0,0,0,0,0,0],"partnerFutureSalary":[0,0,0,0,0,0],"hardCap":7000,"seasonEndingYear":2025,"seasonPhase":"Regular Season","cashStartYear":1,"cashEndYear":6,"userTeamColor1":"552583","partnerTeamColor1":"007A33"};</script>
+<script src="jslib/trading-roster-tabs.js"></script>
+<script src="jslib/trade-roster-preview.js"></script>
+<script src="jslib/trade-submit-guard.js"></script>
+<script src="jslib/contract-hint.js"></script>
+</form>
+        

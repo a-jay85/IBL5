@@ -13,6 +13,17 @@ git rev-parse --git-dir > /dev/null 2>&1 || fail "Not a git repository"
 git rev-parse origin/master > /dev/null 2>&1 || fail "master branch not found on origin"
 git rev-parse origin/production > /dev/null 2>&1 || fail "production branch not found on origin"
 
+# A shallow object store grafts origin/master to a single commit, so it shares no
+# ancestor with production and the `merge --ff-only` below dies with "refusing to
+# merge unrelated histories". Heal it before we get there. Deliberately NOT under
+# -q: this refetches the whole history and can run for minutes, and a silent
+# multi-GB stall inside a ship command is its own bug.
+if [ "$(git rev-parse --is-shallow-repository 2>/dev/null)" = "true" ]; then
+    echo "Shallow clone detected — origin/master is grafted and has no usable ancestry."
+    echo "Restoring full history (git fetch --unshallow origin); this can take several minutes..."
+    git fetch --unshallow origin || fail "unshallow failed — run 'git fetch --unshallow origin' by hand, then re-run"
+fi
+
 export SKIP_WT_CLEANUP=1
 
 git checkout master -q
@@ -28,6 +39,13 @@ git push origin master -q 2>/dev/null || fail "push master"
 
 git checkout production -q
 git pull origin production -q
+# Separate the two failure modes before merging. "No common ancestor" and "really
+# diverged" both surface as a failed --ff-only, but they want opposite remedies:
+# the cherry-pick advice below is DESTRUCTIVE if the truth is a grafted history,
+# because every commit looks production-only when master's ancestry is missing.
+if [ -z "$(git merge-base origin/master production 2>/dev/null)" ]; then
+    fail "master and production share no common ancestor — the object store is grafted, not diverged. Run 'git fetch --unshallow origin' (do NOT cherry-pick)."
+fi
 git merge --ff-only origin/master -q || fail "fast-forward failed — production has diverged from master (cherry-pick the production-only commits onto master first)"
 git push origin production -q 2>/dev/null || fail "push production"
 

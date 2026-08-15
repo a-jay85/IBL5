@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-08-14
+last_verified: 2026-08-15
 ---
 
 # Post-Plan Orchestrator
@@ -107,6 +107,15 @@ If the working tree is clean and `git diff origin/master...HEAD` is also empty (
 2. **If no PR exists for the current branch:** create one with `gh pr create`.
 
    > **Files-changed block:** the PR body must carry a machine-generated scope block, so the hand-written Scope prose can never silently disagree with the diff. Build it from `git diff --name-status origin/master...HEAD` and include it in the body at creation, delimited exactly by `<!-- files-changed:begin -->` / `<!-- files-changed:end -->`, one `- \`<status>\` \`<path>\`` bullet per file. On any later body write (including Phase 6 below), regenerate the block and **replace what sits between the two markers** rather than appending a second copy; if only one marker is present, append a fresh block and leave the orphan alone. Generated data cannot drift — the prose Scope line then carries *why*, not *what*.
+
+   > **Retrospective-origin block:** if `git diff origin/master...HEAD` **adds** a row to the `## Class registry` table in `ibl5/docs/backlog/loop-engineering-backlog.md`, this branch is a Phase 9 retrospective routing that got materialized as its own PR — usually because the origin PR had already merged. The body must then carry a `## Why this PR exists` section immediately above `## Manual Testing`. Without it the PR reads as an unexplained doc edit: the files-changed block shows *what* row was added, never why the class exists. Derive the section from the **added row alone** — it is self-sufficient (`#<origin PR>`, `class:`, `routed to: Rung <n>`, `prior:`), so this works on a plan-blind run, or a run months later that never saw the retrospective. Four required elements:
+   >
+   > 1. **Origin defect** — the `#<PR>` the row names and what it actually broke. Read its title/body with `gh pr view <n>` rather than guessing from the class sentence.
+   > 2. **The class** — quoted from the row's `class:` field, framed as what got past planning, not as this one instance.
+   > 3. **Why that rung** — the ladder stops at the *first* rung that can express the class, so a reader will ask why not a lower one. Name each lower rung and say in one clause why it cannot express this class.
+   > 4. **What it now forces** — the obligation the routing places on future plans.
+   >
+   > If the row's `prior:` field is not `--`, say so explicitly: this is a recurrence of those PRs' class, which is why the routing moved one rung more mechanical than last time.
 
    **Stacked PRs:** If branched from a feature branch (not `master`), use `--base <parent-branch>`. Skip if a PR already exists. **Merge-order dependency:** When this PR shares files with, or must merge after, a sibling PR that is also based on `master` (so stacking via `--base` is unavailable / fragile under squash-merge), add a `Depends-on: #<n>[, #<n>...]` line to the PR body — **on its own line** (the parser anchors to start-of-line, so an inline prose mention of the marker is ignored). Phase 6.5 condition (6) reads it and refuses to arm auto-merge until every named PR is `MERGED`, so the series cannot ship out of order. Use this rather than stacking when the repo squash-merges (a squash collapses the parent's commits, leaving a stacked child's branch carrying the pre-squash commits → conflict on auto-retarget).
 3. **Manual testing in PR description:** Check the plan file for a Verification Matrix. If one exists, copy only the rows classified as `Truly-manual` into the PR's `## Manual Testing` section — **reformat each row as a checkbox item; never paste the raw matrix row**. Format: `- [ ] **<row ID>** — <what to do, and why it can't be automated>`. The classification and timing columns are plan-internal bookkeeping; drop them, and drop the pipes. If the matrix has zero truly-manual rows (or the plan says "All verification is automated"), write: `No manual testing needed — all changes are covered by unit and E2E tests.` If no plan file or no matrix exists, fall back to the original rule: list only steps requiring subjective human judgment on new or redesigned UI/UX ("does this look/feel good?", "does this flow work well?"). Production comparison and "does output still match?" are visual-regression-replaceable, not manual. Do NOT list CLI commands or script invocations — Phase 6 executes those.
@@ -388,6 +397,12 @@ Before writing it, scan the existing rows for the same class. If one matches, pu
 rung chosen last time was too weak. If none matches, `prior:` is `--`. The table is append-only:
 never edit or delete an existing row.
 
+**If the routing lands on its own branch** — the origin PR already merged, so the registry row and
+its destination edit cannot ride along and ship as a separate PR — that PR's body must carry the
+`## Why this PR exists` section required by Phase 2's *Retrospective-origin block*. The added
+registry row is the only input it needs, which is why the requirement lives in Phase 2 (where PR
+bodies are composed) and still fires on a later run that never executed this phase.
+
 Save to memory only if something was learned that would **prevent a bug** in a future session AND cannot be mechanized AND isn't already in MEMORY.md, CLAUDE.md, `.claude/rules/`, or an existing PHPStan rule. Read the target memory file first to avoid duplicates. If nothing qualifies, skip silently.
 
 **Engine divergence.** The escalation ladder and the registry append are **skill-only**. The compiled
@@ -398,6 +413,12 @@ without reading this file. So a harness-driven run routes nothing up the ladder 
 registry row, whatever the fix was. Like Phase 2.5's housekeeping, that is an accepted scope
 reduction, not a bug in this section. Only a skill run (the fallback path, or
 `POST_PLAN_SKILL=1 bin/post-plan-now`) exercises the ladder.
+
+The **body** half is not divergent. Phase 2's *Retrospective-origin block* keys on a registry row
+appearing in the diff, not on session state, so the harness implements it too: `classify.py` sets
+`Classification.retro_registry_row` from the added row and `pr_copy_prompt` requires the
+`## Why this PR exists` section. A retrospective routing post-planned by the harness therefore still
+ships its why — the harness just never *produces* such a row itself.
 
 ---
 

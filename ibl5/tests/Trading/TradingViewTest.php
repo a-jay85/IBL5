@@ -11,6 +11,8 @@ use Trading\Contracts\TradeCashRepositoryInterface;
 use Trading\Contracts\TradeFormRepositoryInterface;
 use Trading\Contracts\TradeOfferRepositoryInterface;
 use Trading\TradingService;
+use Trading\TradeOfferGrouper;
+use Trading\FutureSalaryCalculator;
 use Trading\TradingView;
 use Season\Season;
 use Tests\WideUnit\Mocks\MockDatabase;
@@ -586,7 +588,9 @@ class TradingViewTest extends TestCase
         $common->method('getTeamnameFromUsername')->willReturn('Jazz');
         $common->method('getTidFromTeamname')->willReturn(13);
 
-        return new TradingService($offerRepo, $assetRepo, $formRepo, $common, new MockDatabase(), $cashRepo);
+        $grouper = new TradeOfferGrouper($assetRepo, $cashRepo);
+        $calculator = new FutureSalaryCalculator();
+        return new TradingService($offerRepo, $formRepo, $common, new MockDatabase(), $grouper, $calculator);
     }
 
     // ============================================

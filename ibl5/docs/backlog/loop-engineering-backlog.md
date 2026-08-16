@@ -79,6 +79,7 @@ last_verified: 2026-09-06
 | L50 | `bin/pr-cycle` logs gate nominees as "excluded this run" but then orders and readies them (`--gate-edges /dev/null` re-admits every nominee) | ⬜ Open | 🟦 | S |
 | L51 | Plan Phase 5 dry-run count propagated to archive only, not PR body; reviewer blast-radius instruction stale by ~23% | ⬜ Open | 🟦 | S |
 | L52 | Test harness case comment over-claims assertion scope; adjacent cases leave `run_block` exit codes unchecked | ✅ fixed this pass | — | S |
+| L51 | PR #1899 Phase 6 notes: (F3) `fixed`+`terminal:true` reject skips tier-climbing and goes direct to `give_up_needs_human`; (F6) loop-engineering backlog changed by PR but not declared in Scope prose | 📝 Note | — | XS |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -473,6 +474,7 @@ not add backticks or markdown links to a row.
 | 2026-09-05 | #2117 | class: proc_open subprocess contract violations (unchecked proc_close exit, undrained stderr, NUL-unsafe delimiter) shipped undetected when a plan adds or modifies a proc_open call site without requiring subprocess contract verification | routed to: Rung 1 (partial, shipped in #2117) - BanProcOpenUncheckedExitRule in ibl5/phpstan-rules/ enforces checked proc_close exit; broader contract (stderr drain, NUL-delimiter correctness) routed to Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger) | prior: -- |
 | 2026-09-05 | #2121 | class: new always-loaded rule doc committed to wrong directory tree during implementation — bin/check-rules-byte-budget scans only the correct $RULES_DIR, so the misplaced file passes the gate silently until manually relocated | routed to: Rung 4 - note in .claude/rules/doc-freshness.md clarifying always-loaded .claude/rules/*.md files must be created at the exact repo-root path, not inside any subdirectory (e.g. not ibl5/.claude/rules/) | prior: -- |
 | 2026-09-05 | #2140 | class: a plan phase prescribes a specific numeric expected value for a phase-sensitive salary boundary case (e.g., cy=0) without tracing the resolver chain under each phase condition, producing an incorrect assertion that a later plan phase must overwrite | routed to: Rung 4 - new path-scoped rule doc .claude/rules/plan-phase-sensitive-expected-values.md: when a plan phase specifies an expected value for a characterization test involving resolveCurrentContractYear() or Season::advancesContractYears(), trace the resolver path under each phase condition to derive the value — domain intuition is insufficient for boundary cases where the dispatch chain collapses apparent differences | prior: -- |
+| 2026-08-16 | #1899 | class: shell-function-as-timeout-argument — timeout(1) execvp()s its argument; wrapping a shell function name exits 127 at exec time, undetectable at plan-authoring time | routed to: Rung 4 - verification test at the execution site (row 9 of bin/test-bug-pipeline-hunt exercises run_under_starved_env+timeout under the credential-starved env); the exit-127 failure surfaced and fixed the argument order inline during implementation | prior: -- |
 ```
 
 ---
@@ -722,6 +724,9 @@ The static-guard case in `bin/test-pr-cycle` should pin whichever wording lands,
 *(discovered 2026-09-05 during #2108)*
 
 **class:** A plan Phase 5 stated deliverable — recording the dry-run-measured blast-radius count in the PR body — propagated to the archive entry but not the PR body, leaving a reviewer-facing instruction citing the planning-time estimate (~772) rather than the measured figure (~626), a ~23% overstatement.
+### L51 PR #1899 Phase 6 notes — `fixed`+`terminal` skip and undeclared backlog addition
+
+**class:** two notes from Phase 6 review of #1899, both non-blocking.
 
 **occurrence table:**
 
@@ -771,6 +776,22 @@ Landing rung: **no gate warranted** — neither occurrence exists in the tree af
 **provenance:** (discovered 2026-09-05 during #2108)
 
 **Status (2026-09-05):** ✅ moot — harness retired this PR.
+| 1 | `bin/bug-pipeline-tick` — `terminal:true` check fires before a Gate-1 reject exits the tier-1 loop, sending the hunt to `give_up_needs_human` without climbing further tiers; the plan described rejection at tier 1 as never reaching a human directly (F3) | yes | live | 📝 Note — fail-safe direction; warrants its own plan |
+| 2 | `ibl5/docs/backlog/loop-engineering-backlog.md` — PR #1899 added a shell-function-as-timeout-argument row but did not mention the backlog change in the body Scope prose (F6) | near-miss | resolved | 📝 Note — additive and doc-only |
+
+**F3 detail:** A result carrying `verdict="fixed"` AND `terminal:true` that fails Gate 1 (`observed_before != reported`) triggers the `terminal` branch and calls `give_up_needs_human` immediately. The plan stated tier-1 rejections climb to tier 2 before giving up. The observed behavior is fail-safe — the hunter never ships a bad fix; a human receives the findings — but the escalation path is bypassed. Fixing it requires either clearing `terminal` before the reject exits, or adding a dedicated test row for this combination. Neither is a quick tweak; file as its own plan.
+
+**F6 detail:** `ibl5/docs/backlog/loop-engineering-backlog.md` is listed in the `files-changed` block, but the Scope prose does not mention it. The change is additive and doc-only. Phase 5.9 already surfaces it via the files-changed block.
+
+**prevention_ladder:**
+- F3: no gate warranted — the combination of `fixed`+`terminal:true` being rejected by Gate 1 is not exercised in rows 50–55; fixing correctly requires a dedicated plan.
+- F6: no gate warranted — additive backlog additions are already surfaced by Phase 5.9 files-changed; a rule requiring Scope prose for every backlog touch would be low-value.
+
+`prevention_ladder: no gate warranted for either finding`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-05 during Phase 6 review of #1899)*
 
 ---
 

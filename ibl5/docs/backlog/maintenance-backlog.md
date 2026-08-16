@@ -123,13 +123,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 2.29 | ⬜ Open | 🟨 | DEFERRED — global-namespace elimination: JSB 291 callers, BaseMysqliRepository 257, ContractRules 37 (585 caller files). L-effort, high-collision; needs its own sequenced PR (one class at a time), not an unattended wave item. |
 | 2.39 | ⬜ Open | 🟨 | `TradeRosterPreviewCashRowBuilder::buildCashRows()` iterates `cashStartYear`..`cashEndYear` from `$_GET` with no upper bound and no ordering check — `cashStartYear=1&cashEndYear=999999` drives an ~1M-iteration loop. Add bounds + ordering enforcement; upfront: choose max-year cap. (discovered 2026-07-27 during trading-1-31-api-handler-extract) |
 
-### 2.1 Legacy Global Functions in Module Entrypoints (5 modules)
-**Location:** `modules/Voting/index.php` (lines 40, 74, 85, 156), `modules/Waivers/index.php` (:25), `modules/ComparePlayers/index.php` (:29, :79), `modules/ApiKeys/index.php` (:85, :99), `modules/News/index.php` (:28)
-**Problem:** Top-level PHP functions (`waivers()`, `handleMain()`, `handleGenerate()`, `theindex()`, etc.) contain routing/wiring logic — bypassing the Controller pattern (PHP-Nuke legacy). Draft module is now clean.
-**Suggested direction:** Extract into `<Module>Controller::handle()`; reduce `index.php` to 5-line bootstrap.
-**Est. effort:** S per module (M for News, 3 entrypoints)
-**Risk if untouched:** Logic invisible to PHPStan; unmockable; un-findable via class search.
-
 ### 2.10 Extension — No View; Routed Through modules/Player
 **Location:** `classes/Extension/`, `modules/Player/extension.php`
 **Problem:** Processor/Repository/Service/Validator/Evaluator but no View. Form display lives in Player Views; submission is a standalone PHP file. No `modules/Extension/`.

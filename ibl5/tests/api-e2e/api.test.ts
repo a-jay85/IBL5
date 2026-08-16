@@ -269,13 +269,15 @@ describe('API v1 — ETag caching', () => {
     const res = await apiFetch('/standings', { headers: noGzip });
     assertJson(res, '/standings');
 
-    if (res.status === 401) {
-      // Without a valid API key, verify error structure instead.
-      const body = await res.json();
-      expect(body).toHaveProperty('error');
-      return;
-    }
-    expect(res.status).toBe(200);
+    // No 401 bypass: the client always sends a key, so a 401 here is a real
+    // auth/config failure and must fail the test rather than short-circuit it.
+    expect(
+      res.status,
+      '/standings: expected 200 but got ' +
+        res.status +
+        '. API_KEY is always configured, so a 401 here is a real auth/config ' +
+        'failure — not a reason to skip ETag validation.',
+    ).toBe(200);
 
     const etag = res.headers.get('etag');
     expect(etag, 'Standings endpoint should return ETag header').toBeTruthy();

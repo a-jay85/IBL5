@@ -1,6 +1,6 @@
 ---
 description: E2E (Playwright + api-e2e) test-quality backlog — refactoring, perf, weak/tautological assertions, tests that don't prove functionality, and flake-prone patterns, with per-entry status + automouse-readiness. Each open entry is a candidate for a /plan.
-last_verified: 2026-08-08
+last_verified: 2026-08-15
 ---
 
 # E2E Test-Quality Backlog
@@ -179,11 +179,11 @@ Green tests that don't guard the behavior they're named for. **Fix first.** D1/D
 | D8 | ⬜ | 🟨 | `trading-submission.spec.ts` accept-offer readBack | re-asserts URL `waitForURL` already confirmed; never checks the card was consumed. |
 | D9 | ⬜ | 🟨 | `all-star-rename-submission.spec.ts` & `projected-draft-order-submission.spec.ts` 405/0 | assert `success===false` only; any error payload passes — add error-code check. |
 | D10 | ✅ | — | `admin-pages.spec.ts` block.php | `status not 403 / <500` → 404/blank passes; no content assertion. ✓verified — block.php returns 200 + "Free Agent Processing" title; assertion tightened. ✓done |
-| D11 | ◑ | 🟨 | `olympics-coverage.spec.ts` test 2 | titled "shows gating message" but only `assertNoPhpErrors`; `olympics-module-gating` already asserts the message → strengthen or drop. ✓assertion tightened; ships RED — real bug: FranchiseHistory leaks for authenticated users in olympics context. Separate fix needed. |
+| D11 | ✅ | — | `olympics-coverage.spec.ts` test 2 | titled "shows gating message" but only `assertNoPhpErrors`; `olympics-module-gating` already asserts the message → strengthen or drop. ✓verified — gating must be asserted as a **non-admin**: `modules.php:91` is `if (!$isModuleAccessible && !is_admin())`, so the admin fixture bypasses `ModuleAccessControl` by design and an admin seeing FranchiseHistory in olympics context is not a bug. Re-asserted via `fixtures/auth-regular`; green in CI. ✓done |
 | D12 | ✅ | — | `ajax-api-endpoints.spec.ts` all-modes / fallback | `html.length>0` (or only content-type) → error page passes; first test in each block does `toContain('<table')`. ✓verified — 5 table assertion sites added; all green. ✓done |
 | D13 | ✅ | — | `next-sim.spec.ts` opponent colors | asserts `style` contains `--team-color-primary`, not that it resolves to data. Borderline. ✓verified — hex-color regex verified green against live stack. ✓done |
 | D14 | ✅ | — | `cross-module-navigation.spec.ts` chain | `if(playerCount>0){…}` silent-passes (no-silent-pass rule); also subsumed by two prior chain tests. ✓verified — hard count assertion replaces silent if-block; green. ✓done |
-| D15 | ◑ | 🟨 | `role-gating-non-admin.spec.ts` Block F | self-labelled exploratory; 4 no-team-user tests assert only HTTP 200 + no PHP error. ✓.ibl-title visibility assertions added; tests skip until IBL_TEST_USER_REGULAR is configured. |
+| D15 | ◑ | 🟨 | `role-gating-non-admin.spec.ts` Block F | self-labelled exploratory; 4 no-team-user tests assert only HTTP 200 + no PHP error. ✓content assertions added and green in CI (`e2e-tests.yml` supplies `IBL_TEST_USER_REGULAR`/`IBL_TEST_PASS_REGULAR` with fallbacks, so the pre-existing skip gate is false there). Left ◑ because the selector had to stay `.ibl-title, .ibl-card__title, h1, h2` — narrowing to `.ibl-title` alone failed CI, so these pages still lack a single canonical title hook. |
 
 **Suggested direction (axis):** Replace "accept-either-outcome" with "require the success signal **and** read
 back the mutated state" (DB read-back via test-state where available, or re-navigate and assert the changed
@@ -194,7 +194,7 @@ value). For fake-POST tests (D7), assert the banner *after a real submit*, not a
 
 - **D-cluster-1 — submission tests that accept a failed mutation as success** *(plan this first)*: **D1, D2, D7** (all ✓verified) — uniform fix: require the success redirect/banner *after a real submit*, then read back the mutation. Tightest, highest-confidence, one coherent worktree.
 - **D-cluster-2 — submission tests with no read-back of mutated state:** D3, D4, D5, D6, D8, D9. (D6 folded in here — same "no read-back" planning shape as D3/D4/D5/D8/D9, even though its accept-info-as-success symptom resembles cluster-1; cluster-1 is already ✓verified/done, so D6 groups with the still-open cluster.)
-- **D-cluster-3 — smoke/gating tests that don't prove the gate:** D10, D11, D12, D14, D15 (+ C17 as a sibling). ✓done — shipped in this PR (D13 folded in; D11 surfaces real bug — separate fix needed).
+- **D-cluster-3 — smoke/gating tests that don't prove the gate:** D10, D11, D12, D14, D15 (+ C17 as a sibling). ✓done — shipped in this PR (D13 folded in; D15 left ◑ pending a canonical page-title hook). The cluster's one real bug was in `Player/index.php`: `getTeamnameFromUsername()` returns null for a user with no team, which raised a `TypeError` under `strict_types=1` — surfaced by D15's Player-negotiate test and fixed in-PR.
 
 ---
 

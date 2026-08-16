@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed/declined maintenance-audit findings, extracted from maintenance-backlog.md.
-last_verified: 2026-08-15
+last_verified: 2026-08-16
 ---
 
 # Maintenance-Cost Reduction Backlog — Archive
@@ -325,6 +325,17 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Status (2026-07-26):** ✅ Implemented — branch `freeagency-1-36-7-7-extract-and-di`. Extracted `FreeAgencyTableRendererView` (7 shared helpers) and four section renderers behind `Contracts/` interfaces; `FreeAgencyView` reduced to a thin orchestrator (590 → 77 LOC). Behavior-preserving: 4 golden fixtures byte-identical.
 
 ## Axis 2: Module Structure Inconsistency
+
+### 2.1 Legacy Global Functions in Module Entrypoints (5 modules)
+**Location:** `modules/Voting/index.php` (lines 40, 74, 85, 156), `modules/Waivers/index.php` (:25), `modules/ComparePlayers/index.php` (:29, :79), `modules/ApiKeys/index.php` (:85, :99), `modules/News/index.php` (:28)
+**Problem:** Top-level PHP functions (`waivers()`, `handleMain()`, `handleGenerate()`, `theindex()`, etc.) contain routing/wiring logic — bypassing the Controller pattern (PHP-Nuke legacy). Draft module is now clean.
+**Suggested direction:** Extract into `<Module>Controller::handle()`; reduce `index.php` to 5-line bootstrap.
+**Est. effort:** S per module (M for News, 3 entrypoints)
+**Risk if untouched:** Logic invisible to PHPStan; unmockable; un-findable via class search.
+
+**Status:** Implemented — global wrapper functions removed from all 5 module entrypoints; WaiversController (existing), ComparePlayersController, ApiKeysController, VotingController, and Topics\News\NewsController extracted; all 5 ModuleEntryPoints characterization tests remain green.
+
+**Table evidence (2026-08-16):** Globals still in 5 (Voting, Waivers, ComparePlayers, ApiKeys, News). Extract→Controller, green-green E2E pin.
 
 ### 2.2 ActivityTracker / AllStarAppearances — No Service Layer
 **Location:** `classes/ActivityTracker/`, `classes/AllStarAppearances/`

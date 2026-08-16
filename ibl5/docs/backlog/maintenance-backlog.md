@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-08-15
+last_verified: 2026-08-16
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -106,12 +106,11 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
-> ✅ resolved (21): 2.6, 2.7, 2.11, 2.12, 2.16, 2.17, 2.19, 2.20, 2.22, 2.23, 2.24, 2.26, 2.30, 2.31, 2.32, 2.33, 2.34, 2.35, 2.36, 2.37, 2.38 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (22): 2.1, 2.6, 2.7, 2.11, 2.12, 2.16, 2.17, 2.19, 2.20, 2.22, 2.23, 2.24, 2.26, 2.30, 2.31, 2.32, 2.33, 2.34, 2.35, 2.36, 2.37, 2.38 — evidence in [archive](archive/maintenance-backlog-archive.md)
 > 🚫 declined (6): 2.2, 2.3, 2.4, 2.5, 2.8, 2.9 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 2.1 | ⬜ Open | 🟩 | Globals still in 5 (Voting, Waivers, ComparePlayers, ApiKeys, News). Extract→Controller, green-green E2E pin. |
 | 2.10 | ⬜ Open | 🟨 | Extension R+S+P+Vl, no View. Upfront decision (own module vs Player sub-action) still needed. |
 | 2.13 | 📋 Planned | 🟨 | Characterization-pins plan queued (`freeagency-2-13-characterization-pins`); the admin/user split touches admin-mutation surface (→ human-merge). |
 | 2.14 | ◑ Partial | 🟨 | TradingController+Service exist (#802) but `maketradeoffer/accepttradeoffer/rejecttradeoffer.php` standalone endpoints remain (verified). Promoting touches trade-mutation surface → upfront decision needed. |
@@ -123,13 +122,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 2.28 | ⬜ Open | 🟨 | `faprep.php` exists (verified), inline SQL + unescaped output. Resolve with 3.9 (delete); if absorbed instead, XSS/admin-SQL = human-merge. |
 | 2.29 | ⬜ Open | 🟨 | DEFERRED — global-namespace elimination: JSB 291 callers, BaseMysqliRepository 257, ContractRules 37 (585 caller files). L-effort, high-collision; needs its own sequenced PR (one class at a time), not an unattended wave item. |
 | 2.39 | ⬜ Open | 🟨 | `TradeRosterPreviewCashRowBuilder::buildCashRows()` iterates `cashStartYear`..`cashEndYear` from `$_GET` with no upper bound and no ordering check — `cashStartYear=1&cashEndYear=999999` drives an ~1M-iteration loop. Add bounds + ordering enforcement; upfront: choose max-year cap. (discovered 2026-07-27 during trading-1-31-api-handler-extract) |
-
-### 2.1 Legacy Global Functions in Module Entrypoints (5 modules)
-**Location:** `modules/Voting/index.php` (lines 40, 74, 85, 156), `modules/Waivers/index.php` (:25), `modules/ComparePlayers/index.php` (:29, :79), `modules/ApiKeys/index.php` (:85, :99), `modules/News/index.php` (:28)
-**Problem:** Top-level PHP functions (`waivers()`, `handleMain()`, `handleGenerate()`, `theindex()`, etc.) contain routing/wiring logic — bypassing the Controller pattern (PHP-Nuke legacy). Draft module is now clean.
-**Suggested direction:** Extract into `<Module>Controller::handle()`; reduce `index.php` to 5-line bootstrap.
-**Est. effort:** S per module (M for News, 3 entrypoints)
-**Risk if untouched:** Logic invisible to PHPStan; unmockable; un-findable via class search.
 
 ### 2.10 Extension — No View; Routed Through modules/Player
 **Location:** `classes/Extension/`, `modules/Player/extension.php`

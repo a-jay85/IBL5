@@ -94,4 +94,30 @@ class FreeAgencyEntryPointTest extends ModuleEntryPointTestCase
 
         $this->assertNotEmpty($output);
     }
+
+    public function testQueryParameterReachesRenderedOutputThroughHttpRequest(): void
+    {
+        $this->authenticateAs('testgm');
+        $this->seedSeasonMocks();
+        $this->mockDb->onQuery('FROM ibl_plr', []);
+        $this->mockDb->setMockTeamData([self::fullTeamData()]);
+        $this->mockDb->setMockData([]);
+
+        $baseGlobals = array_merge($this->dbGlobals(), [
+            'user' => $GLOBALS['user'],
+            'pa' => '',
+            'pid' => '0',
+        ]);
+
+        $outputWithoutResult = $this->runModule('FreeAgency', [], [], $baseGlobals);
+
+        $this->seedSeasonMocks();
+        $this->mockDb->onQuery('FROM ibl_plr', []);
+        $this->mockDb->setMockTeamData([self::fullTeamData()]);
+        $this->mockDb->setMockData([]);
+
+        $outputWithResult = $this->runModule('FreeAgency', ['result' => 'offer_success'], [], $baseGlobals);
+
+        $this->assertNotSame($outputWithoutResult, $outputWithResult);
+    }
 }

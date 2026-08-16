@@ -30,15 +30,15 @@ final class BanRawSuperglobalsRule implements Rule
     private const ALLOWLIST_BY_SUPERGLOBAL = [
         '_GET' => [
             'suffixes' => ['Controller.php', 'ApiHandler.php', 'Bootstrap.php', 'Authenticator.php'],
-            'files' => ['CsrfGuard.php', 'LeagueContext.php', 'TestCookieOverrides.php', 'TradeRosterPreviewParamValidator.php'],
+            'files' => ['CsrfGuard.php', 'LeagueContext.php', 'TestCookieOverrides.php', 'TradeRosterPreviewParamValidator.php', 'HttpRequest.php'],
         ],
         '_POST' => [
             'suffixes' => ['Controller.php', 'ApiHandler.php', 'Bootstrap.php', 'Authenticator.php'],
-            'files' => ['CsrfGuard.php', 'TestCookieOverrides.php'],
+            'files' => ['CsrfGuard.php', 'TestCookieOverrides.php', 'HttpRequest.php'],
         ],
         '_REQUEST' => [
             'suffixes' => ['Controller.php', 'ApiHandler.php', 'Bootstrap.php'],
-            'files' => [],
+            'files' => ['HttpRequest.php'],
         ],
         '_COOKIE' => [
             'suffixes' => ['Controller.php', 'ApiHandler.php', 'Bootstrap.php', 'Authenticator.php'],
@@ -50,7 +50,7 @@ final class BanRawSuperglobalsRule implements Rule
         ],
         '_SERVER' => [
             'suffixes' => ['Bootstrap.php', 'ApiHandler.php', 'Controller.php', 'Authenticator.php'],
-            'files' => ['HtmxHelper.php', 'ETagHandler.php', 'LeagueContext.php', 'PageLayout.php', 'DevAutoLogin.php', 'ApiApplicationFactory.php', 'WebApplicationFactory.php'],
+            'files' => ['HtmxHelper.php', 'ETagHandler.php', 'LeagueContext.php', 'PageLayout.php', 'DevAutoLogin.php', 'ApiApplicationFactory.php', 'WebApplicationFactory.php', 'HttpRequest.php'],
         ],
         '_FILES' => [
             'suffixes' => ['Bootstrap.php', 'Controller.php'],

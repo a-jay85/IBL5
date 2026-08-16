@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Http\HttpRequest;
 use Player\Player;
 use Player\PlayerPageController;
 use Player\PlayerRepository;
@@ -17,7 +18,7 @@ use Negotiation\NegotiationRepository;
 use Negotiation\NegotiationService;
 use Negotiation\NegotiationValidator;
 
-global $mysqli_db, $commonRepository, $salaryCapRepo;
+global $mysqli_db, $commonRepository, $salaryCapRepo, $httpRequest;
 
 $commonRepository = new TeamIdentityRepository($mysqli_db);
 $salaryCapRepo = new SalaryCapRepository($mysqli_db);
@@ -36,6 +37,10 @@ $pa       = is_string($_REQUEST['pa']       ?? null) ? $_REQUEST['pa']       : '
 $pid      = is_string($_REQUEST['pid']      ?? null) ? $_REQUEST['pid']      : null;
 $pageView = is_string($_REQUEST['pageView'] ?? null) ? $_REQUEST['pageView'] : null;
 
+// Single request snapshot for this request, injected into controllers so they
+// never read superglobals themselves (maintenance items 14.8 + 14.12).
+$httpRequest = HttpRequest::fromGlobals();
+
 $pagetitle = "- Player Archives";
 
 /**
@@ -46,7 +51,7 @@ $pagetitle = "- Player Archives";
  */
 function showpage($playerID, $pageView): void
 {
-    global $mysqli_db, $commonRepository, $authService;
+    global $mysqli_db, $commonRepository, $authService, $httpRequest;
 
     // Resolve UUID to numeric PID if a UUID string was passed instead of an integer
     if (!is_numeric($playerID) && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', (string) $playerID)) {
@@ -60,7 +65,7 @@ function showpage($playerID, $pageView): void
     $pageView = ($pageView !== null) ? intval($pageView) : null;
 
     $pageService = new \Player\PlayerPageService($mysqli_db, $commonRepository);
-    $controller = new PlayerPageController($mysqli_db, $commonRepository, $pageService);
+    $controller = new PlayerPageController($mysqli_db, $commonRepository, $pageService, $httpRequest);
 
     PageLayout\PageLayout::header();
     echo $controller->renderPage($playerID, $pageView, $authService->getUsername() ?? '');

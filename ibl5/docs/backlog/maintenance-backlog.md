@@ -603,9 +603,9 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 14.5 | ⬜ Open | 🟨 | Module index.php → front-controller composition root (42 modules). Very large; routing/auth-sensitive → decompose + sequence (some modules touch mutations). |
-| 14.8 | ⬜ Open | 🟩 | Introduce `HttpRequest` VO wrapping superglobals; green-green abstraction. |
+| 14.8 | ◑ Partial | 🟩 | `Http\HttpRequest` VO shipped and wired into 4 controllers (Player, Team, DepthChartEntry, FreeAgency) + their module entry points; residual: `Waivers/WaiversController.php` (6 superglobal reads) and the `BanRawSuperglobalsRule` `_REQUEST` ratchet. |
 | 14.10 | ◑ Partial | 🟨 | Container accessor registered (PR1); side-effect removal deferred to PR3 (boosted-HTMX cookie-population hazard) → careful sequencing. |
-| 14.12 | ◑ Partial | 🟩 | Wholesale `$_REQUEST`→`$GLOBALS` gone; modules still read `$op/$pid` from `$_REQUEST` → Request object is the residual (folds into 14.8). |
+| 14.12 | ◑ Partial | 🟩 | `HttpRequest` VO shipped (14.8) and wired into 4 module entry points; residual: `ComparePlayers`, `Draft`, `ProjectedDraftOrder`, `Voting`, `ApiKeys` `index.php` still read `$op` from `$_REQUEST` directly. |
 
 ### 14.5 Module `index.php` Files Are the Real Composition Root (42 of 47)
 **Location:** `ibl5/modules/*/index.php`
@@ -615,11 +615,12 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Risk if untouched:** New collaborators added module-by-module (42x); shared services instantiated N times per request.
 
 ### 14.8 Controllers Directly Read `$_GET`/`$_POST`/`$_REQUEST`
-**Location:** `Waivers/WaiversController.php:87-154`, `FreeAgency/FreeAgencyController.php:111-166`, `DepthChartEntry/DepthChartEntryController.php`, `Team/TeamController.php`, `Player/PlayerPageController.php`
+**Location:** `Waivers/WaiversController.php:87-154` (residual), `FreeAgency/FreeAgencyController.php`, `DepthChartEntry/DepthChartEntryController.php`, `Team/TeamController.php`, `Player/PlayerPageController.php` (all four converted)
 **Problem:** No `Request` abstraction; controllers can't be invoked with synthetic input.
 **Suggested direction:** Thin `HttpRequest` value object wrapping `$_GET`/`$_POST`/`$_SERVER`; composition root creates from superglobals.
-**Est. effort:** M
+**Est. effort:** M (residual: S)
 **Risk if untouched:** PRG/HTMX redirect logic untestable; superglobals must be polluted in tests.
+**Status:** ◑ Partial (2026-09-04) — `ibl5/classes/Http/HttpRequest.php` landed and four of the five named controllers convert cleanly (`grep -c '$_GET\|$_POST\|$_REQUEST'` returns 0 for each). **Residual:** `WaiversController.php` still holds 6 superglobal reads, and because `Controller.php` therefore stays on the `_REQUEST` suffix allowlist in `ibl5/phpstan-rules/BanRawSuperglobalsRule.php`, the conversion is not yet self-enforcing. Converting Waivers and removing that allowlist entry closes the item.
 
 ### 14.10 `PageLayout::header()` Has Side Effect Controllers Depend On
 **Location:** `PageLayout/PageLayout.php:16` (`cookiedecode($user)`); `FreeAgency/FreeAgencyController.php:55` comment "Must come first"
@@ -635,7 +636,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Replace with explicit `Request` object; module entry points read named parameters by key.
 **Est. effort:** L
 **Risk if untouched:** Name collisions silently overwrite globals; PHPStan needs per-site `@var` annotations.
-**Status:** Partially completed (verified 2026-05-29 audit) — the wholesale `$_REQUEST`→`$GLOBALS` copy is gone; `ConfigBootstrap` now allowlists only `newlang`/`redirect` (see [[3.6]]). Modules still read `$op`/`$pid`/`$action` directly from `$_REQUEST` — a `Request` object remains the longer-term fix.
+**Status:** Partially completed (verified 2026-05-29 audit) — the wholesale `$_REQUEST`→`$GLOBALS` copy is gone; `ConfigBootstrap` now allowlists only `newlang`/`redirect` (see [[3.6]]). Modules still read `$op`/`$pid`/`$action` directly from `$_REQUEST` — a `Request` object remains the longer-term fix. A `Http\HttpRequest` value object shipped 2026-08-16 (item 14.8) and is now the boundary for the Waivers, FreeAgency, DepthChartEntry, Team and Player entry points; five modules — ComparePlayers, Draft, ProjectedDraftOrder, Voting, ApiKeys — still read `$op` from `$_REQUEST` and remain the residual.
 
 ---
 

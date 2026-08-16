@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Player;
 
+use Http\HttpRequest;
 use Player\PlayerPageController;
 use Player\PlayerPageService;
 use Player\PlayerPageType;
@@ -24,13 +25,21 @@ class PlayerPageControllerTest extends WideUnitTestCase
         $this->stubRepo->method('getTeamnameFromTeamID')->willReturn('Heat');
 
         $this->seedInvariantQueries();
-        $this->controller = new PlayerPageController($this->mockDb, $this->stubRepo, new PlayerPageService($this->mockDb, $this->stubRepo));
+        $this->controller = $this->buildController();
     }
 
-    protected function tearDown(): void
+    /**
+     * Build the controller under test with an explicit request snapshot, so each
+     * test supplies its own input instead of mutating global state.
+     */
+    private function buildController(?HttpRequest $request = null): PlayerPageController
     {
-        unset($_GET['result']);
-        parent::tearDown();
+        return new PlayerPageController(
+            $this->mockDb,
+            $this->stubRepo,
+            new PlayerPageService($this->mockDb, $this->stubRepo),
+            $request ?? new HttpRequest(),
+        );
     }
 
     private function seedInvariantQueries(): void
@@ -196,7 +205,7 @@ class PlayerPageControllerTest extends WideUnitTestCase
         $this->stubRepo = self::createStub(TeamIdentityRepositoryInterface::class);
         $this->stubRepo->method('getTeamnameFromUsername')->willReturn('Free Agents');
 
-        $controller = new PlayerPageController($this->mockDb, $this->stubRepo, new PlayerPageService($this->mockDb, $this->stubRepo));
+        $controller = $this->buildController();
         $html = $controller->renderPage(1, null, 'nobody');
 
         $this->assertStringContainsString('Retired Player', $html);
@@ -299,8 +308,8 @@ class PlayerPageControllerTest extends WideUnitTestCase
 
     public function testRenderPageShowsResultBanner(): void
     {
-        $_GET['result'] = 'rookie_option_success';
-        $html = $this->controller->renderPage(1, null, 'testuser');
+        $controller = $this->buildController(new HttpRequest(get: ['result' => 'rookie_option_success']));
+        $html = $controller->renderPage(1, null, 'testuser');
 
         $this->assertStringContainsString('Rookie option has been exercised successfully', $html);
     }
@@ -309,8 +318,8 @@ class PlayerPageControllerTest extends WideUnitTestCase
 
     public function testRenderPageShowsEmailFailedBanner(): void
     {
-        $_GET['result'] = 'email_failed';
-        $html = $this->controller->renderPage(1, null, 'testuser');
+        $controller = $this->buildController(new HttpRequest(get: ['result' => 'email_failed']));
+        $html = $controller->renderPage(1, null, 'testuser');
 
         $this->assertStringContainsString('notification email failed to send', $html);
         $this->assertStringContainsString('ibl-alert--warning', $html);
@@ -318,10 +327,43 @@ class PlayerPageControllerTest extends WideUnitTestCase
 
     public function testRenderPageShowsNoBannerForUnknownResultCode(): void
     {
-        $_GET['result'] = 'unknown_code_xyz';
-        $html = $this->controller->renderPage(1, null, 'testuser');
+        $controller = $this->buildController(new HttpRequest(get: ['result' => 'unknown_code_xyz']));
+        $html = $controller->renderPage(1, null, 'testuser');
 
         $this->assertStringNotContainsString('ibl-alert', $html);
+    }
+
+    // ── Result-parameter characterization (14.8 equivalence harness) ─
+    //
+    // These three pin the accepted-value set of the `result` parameter. They were
+    // written against the raw superglobal read and assert identically now that the
+    // read moves behind Http\HttpRequest — only how the input is supplied changed.
+
+    public function testRenderPageShowsRookieOptionBannerWhenResultParameterPresent(): void
+    {
+        $controller = $this->buildController(new HttpRequest(get: ['result' => 'rookie_option_success']));
+        $html = $controller->renderPage(1, null, 'testuser');
+
+        $this->assertStringContainsString('Rookie option has been exercised successfully', $html);
+    }
+
+    public function testRenderPageShowsNoBannerWhenResultParameterIsArray(): void
+    {
+        // `?result[]=rookie_option_success` yields an array — the is_string() guard
+        // at the call site must reject it.
+        $controller = $this->buildController(new HttpRequest(get: ['result' => ['rookie_option_success']]));
+        $html = $controller->renderPage(1, null, 'testuser');
+
+        $this->assertStringNotContainsString('Rookie option has been exercised successfully', $html);
+    }
+
+    public function testRenderPageShowsNoBannerWhenResultParameterAbsent(): void
+    {
+        $controller = $this->buildController(new HttpRequest());
+        $html = $controller->renderPage(1, null, 'testuser');
+
+        $this->assertStringNotContainsString('Rookie option has been exercised successfully', $html);
+        $this->assertStringNotContainsString('notification email failed to send', $html);
     }
 
     // ── Default-fallback branch (invalid pageView integer) ──────────
@@ -397,7 +439,7 @@ class PlayerPageControllerTest extends WideUnitTestCase
 
         $stubRepo = self::createStub(TeamIdentityRepositoryInterface::class);
         $stubRepo->method('getTeamnameFromUsername')->willReturn('Free Agents');
-        $controller = new PlayerPageController($this->mockDb, $stubRepo, new PlayerPageService($this->mockDb, $stubRepo));
+        $controller = new PlayerPageController($this->mockDb, $stubRepo, new PlayerPageService($this->mockDb, $stubRepo), new HttpRequest());
 
         $html = $controller->renderPage(1, 999, 'nobody');
 

@@ -1,0 +1,202 @@
+#!/usr/bin/env bash
+# bin/bug-pipeline-check — read-only liveness + staleness diagnostic for the
+# com.ibl5.bug-pipeline-cron LaunchAgent (ADR-0080). Detect and alert only.
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Env seams — override via env vars in tests; defaults are production values
+TICK_HEARTBEAT="${BUG_PIPELINE_TICK_HEARTBEAT:-$HOME/.claude/logs/bug-pipeline-tick-heartbeat}"
+HEARTBEAT_MAX_AGE="${BUG_PIPELINE_HEARTBEAT_MAX_AGE:-600}"   # seconds; 3.3x the 180s StartInterval
+LAUNCHD_LABEL="${BUG_PIPELINE_LAUNCHD_LABEL:-com.ibl5.bug-pipeline-cron}"
+LAUNCHCTL_BIN="${BUG_PIPELINE_CHECK_LAUNCHCTL_BIN:-launchctl}"
+DB_QUERY_BIN="${BUG_PIPELINE_CHECK_DB_QUERY_BIN:-$SCRIPT_DIR/db-query}"
+
+DEGRADED_SIGNALS=""
+UNKNOWN_SIGNALS=""
+
+usage() {
+    printf 'Usage: %s [--help]\n' "$(basename "$0")"
+    printf '\n'
+    printf 'Read-only liveness + staleness diagnostic for the %s LaunchAgent.\n' "$LAUNCHD_LABEL"
+    printf '\n'
+    printf 'Options:\n'
+    printf '  --help, -h    Show this help and exit\n'
+    printf '\n'
+    printf 'Exit codes:\n'
+    printf '  0  healthy  — every signal OK\n'
+    printf '  1  degraded — at least one signal degraded\n'
+    printf '  2  unknown  — at least one unprobeable, none degraded\n'
+}
+
+# emit <level> <signal> <detail>
+# Levels: OK, DEGRADED, UNKNOWN
+emit() {
+    local level="$1"
+    local signal="$2"
+    local detail="$3"
+
+    case "$level" in
+        OK)
+            printf '  ok: %s — %s\n' "$signal" "$detail"
+            ;;
+        DEGRADED)
+            printf 'SIGNAL: %s — %s\n' "$signal" "$detail"
+            if [ -z "$DEGRADED_SIGNALS" ]; then
+                DEGRADED_SIGNALS="$signal"
+            else
+                DEGRADED_SIGNALS="$DEGRADED_SIGNALS
+$signal"
+            fi
+            ;;
+        UNKNOWN)
+            printf 'SIGNAL: %s — %s\n' "$signal" "$detail"
+            if [ -z "$UNKNOWN_SIGNALS" ]; then
+                UNKNOWN_SIGNALS="$signal"
+            else
+                UNKNOWN_SIGNALS="$UNKNOWN_SIGNALS
+$signal"
+            fi
+            ;;
+    esac
+}
+
+# join_csv — convert newline-delimited list to comma-separated string
+# bash-3.2 safe, no arrays
+join_csv() {
+    tr '\n' ',' | sed 's/,$//; s/,/, /g'
+}
+
+check_process_liveness() {
+    # --- Sub-check 1: is the job loaded? ---
+    _lc_loaded=0
+    if ! command -v "$LAUNCHCTL_BIN" >/dev/null 2>&1; then
+        emit UNKNOWN process:launchctl-unavailable "launchctl not on PATH — not a macOS host; liveness unprobeable"
+    elif ! "$LAUNCHCTL_BIN" list "$LAUNCHD_LABEL" >/dev/null 2>&1; then
+        emit DEGRADED process:unloaded "LaunchAgent $LAUNCHD_LABEL is not loaded (launchctl list exit non-zero)"
+    else
+        emit OK process:loaded "LaunchAgent $LAUNCHD_LABEL is loaded"
+        _lc_loaded=1
+    fi
+
+    # --- Sub-check 2: last exit code ---
+    if [ "$_lc_loaded" -eq 1 ]; then
+        print_out="$("$LAUNCHCTL_BIN" print "gui/$(id -u)/$LAUNCHD_LABEL" 2>/dev/null)" || print_out=""
+        last_rc="$(printf '%s\n' "$print_out" | grep 'last exit code' | awk '{print $NF}')"
+        if [ -z "$last_rc" ]; then
+            emit UNKNOWN process:launchctl-unavailable "'last exit code' field absent from launchctl print output"
+        elif [ "$last_rc" = "0" ]; then
+            emit OK process:last-exit "last tick exited 0"
+        else
+            emit DEGRADED process:last-exit-nonzero "last tick exited $last_rc"
+        fi
+    else
+        emit OK process:last-exit-skipped "job not loaded — last exit code not probed"
+    fi
+
+    # --- Sub-check 3: heartbeat recency (epoch-integer only) ---
+    # NAMED INVARIANT — heartbeat-recency-is-epoch-only: age = date '+%s' minus file integer content only
+    if [ ! -f "$TICK_HEARTBEAT" ]; then
+        emit DEGRADED process:no-heartbeat "no heartbeat at $TICK_HEARTBEAT — driver has not started since deploy (main checkout may be behind master)"
+    else
+        hb="$(head -n 1 "$TICK_HEARTBEAT" 2>/dev/null | tr -dc '0-9')"
+        if [ -z "$hb" ]; then
+            emit UNKNOWN process:heartbeat-unreadable "heartbeat file present but holds no integer epoch"
+        else
+            now="$(date '+%s')"
+            age=$(( now - hb ))
+            if [ "$age" -lt 0 ]; then
+                emit DEGRADED process:heartbeat-future "heartbeat epoch is ${age#-}s in the future — clock or writer anomaly"
+            elif [ "$age" -gt "$HEARTBEAT_MAX_AGE" ]; then
+                emit DEGRADED process:heartbeat-stale "last tick started ${age}s ago (threshold ${HEARTBEAT_MAX_AGE}s)"
+            else
+                emit OK process:heartbeat "last tick started ${age}s ago"
+            fi
+        fi
+    fi
+}
+
+check_staleness() {
+    local sql out rc n
+
+    # --- Query 1: blocked rows past their backoff (the timezone-bug signature) ---
+    sql="SELECT COUNT(*) AS n FROM ibl_bug_reports
+ WHERE status = 'blocked'
+   AND blocked_until IS NOT NULL
+   AND blocked_until < NOW() - INTERVAL 10 MINUTE"
+    out="$("$DB_QUERY_BIN" "$sql" 2>&1)"; rc=$?
+    if [ "$rc" -ne 0 ]; then
+        emit UNKNOWN stale:db-unavailable "db-query exited $rc — staleness unprobeable (${out%%$'\n'*})"
+        return 0
+    fi
+    n="$(printf '%s\n' "$out" | grep -E '^\|' | tail -n 1 | tr -dc '0-9')"
+    [ -n "$n" ] || { emit UNKNOWN stale:db-parse-failed "could not parse a count from db-query output"; return 0; }
+    [ "$n" -gt 0 ] && emit DEGRADED stale:blocked-backoff-expired "$n blocked row(s) past their backoff by >10 minutes"
+
+    # --- Query 2: hunting rows holding a stale lease ---
+    sql="SELECT COUNT(*) AS n FROM ibl_bug_reports
+ WHERE status = 'hunting'
+   AND lease_expires IS NOT NULL
+   AND lease_expires < NOW() - INTERVAL 30 MINUTE"
+    out="$("$DB_QUERY_BIN" "$sql" 2>&1)"; rc=$?
+    if [ "$rc" -ne 0 ]; then
+        emit UNKNOWN stale:db-unavailable "db-query exited $rc — staleness unprobeable (${out%%$'\n'*})"
+        return 0
+    fi
+    n="$(printf '%s\n' "$out" | grep -E '^\|' | tail -n 1 | tr -dc '0-9')"
+    [ -n "$n" ] || { emit UNKNOWN stale:db-parse-failed "could not parse a count from db-query output"; return 0; }
+    [ "$n" -gt 0 ] && emit DEGRADED stale:hunting-stale-lease "$n hunting row(s) with a lease expired >30 minutes ago"
+
+    # --- Query 3: non-terminal rows stuck past per-status freshness threshold ---
+    sql="SELECT COUNT(*) AS n FROM ibl_bug_reports
+ WHERE (
+        (status = 'queued'
+             AND updated_at < NOW() - INTERVAL 2 HOUR)
+     OR (status IN ('awaiting_info','gathering','awaiting_ajay','planned')
+             AND updated_at < NOW() - INTERVAL 72 HOUR)
+     OR (status = 'pr_open'
+             AND updated_at < NOW() - INTERVAL 48 HOUR)
+   )"
+    out="$("$DB_QUERY_BIN" "$sql" 2>&1)"; rc=$?
+    if [ "$rc" -ne 0 ]; then
+        emit UNKNOWN stale:db-unavailable "db-query exited $rc — staleness unprobeable (${out%%$'\n'*})"
+        return 0
+    fi
+    n="$(printf '%s\n' "$out" | grep -E '^\|' | tail -n 1 | tr -dc '0-9')"
+    [ -n "$n" ] || { emit UNKNOWN stale:db-parse-failed "could not parse a count from db-query output"; return 0; }
+    [ "$n" -gt 0 ] && emit DEGRADED stale:rows-stuck "$n non-terminal row(s) past their per-status staleness threshold"
+}
+
+main() {
+    check_process_liveness
+    check_staleness
+
+    if [ -n "$DEGRADED_SIGNALS" ]; then
+        if [ -n "$UNKNOWN_SIGNALS" ]; then
+            printf 'UNKNOWN: [%s]\n' "$(printf '%s' "$UNKNOWN_SIGNALS" | join_csv)"
+        fi
+        printf 'VERDICT: degraded [%s]\n' "$(printf '%s' "$DEGRADED_SIGNALS" | join_csv)"
+        exit 1
+    elif [ -n "$UNKNOWN_SIGNALS" ]; then
+        printf 'VERDICT: unknown [%s]\n' "$(printf '%s' "$UNKNOWN_SIGNALS" | join_csv)"
+        exit 2
+    else
+        printf 'VERDICT: healthy\n'
+        exit 0
+    fi
+}
+
+# Argument handling
+case "${1:-}" in
+    --help|-h)
+        usage
+        exit 0
+        ;;
+    "")
+        main
+        ;;
+    *)
+        usage >&2
+        exit 64
+        ;;
+esac

@@ -69,6 +69,10 @@ HUNT_PROMPT_FILE="${BUG_PIPELINE_HUNT_PROMPT:-$SCRIPT_DIR/bug-pipeline-hunter-pr
 HUNT_MODELS="${BUG_PIPELINE_HUNT_MODELS:-claude-haiku-4-5 claude-sonnet-4-6 claude-opus-5}"  # cheap→dear, Opus last
 HUNTER_TIMEOUT_SECS="${BUG_PIPELINE_HUNTER_TIMEOUT:-1800}"
 HUNT_LOG="${BUG_PIPELINE_HUNT_LOG:-$HOME/.claude/logs/bug-pipeline-hunt.log}"
+# Liveness heartbeat: epoch of the last tick START (bin/bug-pipeline-check reads it).
+# Deliberately epoch-only — never a formatted timestamp — so the host-local `date -j`
+# skew in epoch_of()/future_ts() cannot leak into the recency comparison.
+TICK_HEARTBEAT="${BUG_PIPELINE_TICK_HEARTBEAT:-$HOME/.claude/logs/bug-pipeline-tick-heartbeat}"
 WT_NEW_BIN="${BUG_PIPELINE_WT_NEW_BIN:-$REPO_ROOT/bin/wt-new}"
 POST_PLAN_NOW_BIN="${BUG_PIPELINE_POST_PLAN_NOW_BIN:-$REPO_ROOT/bin/post-plan-now}"
 # Worktrees live OUTSIDE the repo (ADR-0046): a canonical sibling of the checkout.
@@ -1381,6 +1385,13 @@ reconcile_pr_open_rows() {
 
 # ── Main: empty-tick guard then dispatch ──────────────────────────────────────
 main() {
+    # Heartbeat FIRST — before the preflight can `return 1`. This records "launchd fired
+    # and the driver started", which is a strictly different fact from "the tick succeeded"
+    # (that one is carried by launchctl's `last exit code`). Both writes are failure-tolerant:
+    # the driver runs without `set -e`, and a monitoring line must never be able to fail a tick.
+    mkdir -p "$(dirname "$TICK_HEARTBEAT")" 2>/dev/null || true
+    date '+%s' > "$TICK_HEARTBEAT" 2>/dev/null || true
+
     # Preflight: the agent binary must actually resolve, BEFORE any row is claimed.
     # An unresolvable $CLAUDE_BIN makes `timeout` exit 127, and nothing downstream
     # reads that as environmental: claude_env_error only matches usage/rate-limit

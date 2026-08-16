@@ -39,6 +39,7 @@ last_verified: 2026-08-16
 | E10 | Schema baseline auto-regen | ✅ Implemented | — | M |
 | E11 | In-PR pre-baked image build | ✅ Implemented | — | M |
 | E12 | `bin/wt-new` fails with misleading error when invoked from inside a worktree | ✅ Implemented | — | S |
+| E13 | `bin/wt-new --base <feature>` fast-forwards master instead of the base branch | ⬜ Open | 🟨 | S |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -90,6 +91,13 @@ last_verified: 2026-08-16
 ➜ E11 In-PR pre-baked image build — ✅ Implemented (2026-07-09): see [archive](archive/dev-efficiency-backlog-archive.md).
 
 ➜ E12 `bin/wt-new` fails with misleading error when invoked from inside a worktree — ✅ Implemented (2026-08-16): see [archive](archive/dev-efficiency-backlog-archive.md).
+
+### E13 `bin/wt-new --base <feature>` fast-forwards master instead of the base branch
+**Location:** `bin/wt-new` — the `git -C "$MAIN_CHECKOUT" merge --ff-only "origin/$BASE_BRANCH"` call.
+**Problem:** `git -C <repo> merge --ff-only origin/$BASE_BRANCH` fast-forwards whatever branch is checked out in `<repo>`, not `$BASE_BRANCH`. With `--base master` (the default) this is harmless: the main checkout has `master` checked out, so HEAD *is* the base branch. With `--base <feature>` it means the main checkout's `master` would be fast-forwarded onto `origin/<feature>` whenever that remote branch is ahead of the local one, silently moving the main checkout's `master`. The fix needs a different mechanism: either `git fetch origin <b>:<b>` (fetches directly into the local ref without checking it out) or skipping the sync when the base branch is not the currently-checked-out branch.
+**Suggested direction:** Replace the `merge --ff-only` with `git fetch origin "$BASE_BRANCH":"$BASE_BRANCH"` (local-ref update, no checkout required), preceded by the same fetch `if`/`else` guard and behind-count already in place. The `merge` line goes away entirely; the guard and count stay.
+**Risk if untouched:** With `--base <feature>`, the `--base` stacked-PR form silently advances `master` in the main checkout to `origin/<feature>` if that remote branch is ahead — a subtle state corruption that is hard to notice and hard to trace post-hoc.
+**Status (2026-08-16):** ⬜ Open — 🟨 (the `--base master` default path is safe and commonly used; the `--base <feature>` stacked form is the risky path and is rare). (discovered 2026-08-16 during #1896 — deliberately left out of that PR per § Out of Scope)
 
 ---
 

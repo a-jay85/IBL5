@@ -287,6 +287,9 @@
         <testsuite name="SimRecap Module Tests">
             <directory>tests/SimRecap</directory>
         </testsuite>
+        <testsuite name="Http Tests">
+            <directory>tests/Http</directory>
+        </testsuite>
     </testsuites>
     <groups>
         <exclude>

@@ -166,6 +166,14 @@ final class BanRawSuperglobalsRuleTest extends RuleTestCase
         );
     }
 
+    public function testAllowsAllFourRequestSuperglobalsInHttpRequest(): void
+    {
+        $this->analyse(
+            [__DIR__ . '/Fixtures/classes/Allowed/HttpRequest.php'],
+            [],
+        );
+    }
+
     public function testFlagsGlobalsAccessOutsideBootstrap(): void
     {
         $this->analyse(

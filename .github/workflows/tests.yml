@@ -871,6 +871,8 @@ jobs:
         run: bin/test-bun-audit-triage
       - name: bin/test-db-query-routing
         run: bin/test-db-query-routing
+      - name: bin/test-db-sync-now
+        run: bin/test-db-sync-now
 
   gate:
     name: Tests and Analysis

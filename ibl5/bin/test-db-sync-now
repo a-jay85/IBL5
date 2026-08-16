@@ -1,0 +1,458 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-db-sync-now — harness for bin/db-sync-now and bin/db-sync-cron-setup.
+#
+# Stubs injected via env seams only — no PATH modification.
+#
+# Run: bin/test-db-sync-now  (exit 0 = all pass, 1 = failures)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+DRIVER="$SCRIPT_DIR/db-sync-now"
+CRON_SETUP="$SCRIPT_DIR/db-sync-cron-setup"
+
+FAILED=0
+STUB=""
+
+dsn_ok()   { echo "ok: $1"; }
+dsn_fail() { echo "FAIL: $1"; FAILED=1; }
+
+dsn_expect_eq() {
+    if [ "$2" = "$3" ]; then dsn_ok "$1"
+    else dsn_fail "$1 — want [$2] got [$3]"; fi
+}
+
+dsn_log_has() {
+    if grep -qF -- "$2" "$STUB/out.log" 2>/dev/null; then dsn_ok "$1"
+    else dsn_fail "$1 — '$2' absent from out.log"; fi
+}
+
+dsn_log_lacks() {
+    if grep -qF -- "$2" "$STUB/out.log" 2>/dev/null; then dsn_fail "$1 — '$2' unexpectedly in out.log"
+    else dsn_ok "$1"; fi
+}
+
+# dsn_count <want> <file> — count non-blank lines
+dsn_count() {
+    local want="$1" file="$2" got
+    got="$(grep -c . "$file" 2>/dev/null || echo 0)"
+    dsn_expect_eq "call count ($file)" "$want" "${got:-0}"
+}
+
+dsn_setup() {
+    [ -n "$STUB" ] && rm -rf "$STUB"
+    STUB="$(mktemp -d)"
+    trap 'rm -rf "$STUB"' EXIT
+
+    # db-sync-prod stub: appends "called" per invocation; fails if sync-fails sentinel exists
+    cat > "$STUB/db-sync-prod" <<'SH'
+#!/bin/bash
+echo "called" >> "$STUB/calls"
+[ -f "$STUB/sync-fails" ] && exit 1
+exit 0
+SH
+
+    # db-query stub: echoes a date normally; nothing when db-empty sentinel exists
+    cat > "$STUB/db-query" <<'SH'
+#!/bin/bash
+[ -f "$STUB/db-empty" ] && exit 0
+echo "2026-08-11"
+SH
+
+    # docker stub: prints the container name (simulates a running container)
+    cat > "$STUB/docker" <<'SH'
+#!/bin/bash
+[ -f "$STUB/container-absent" ] && exit 0
+echo "ibl5-mariadb"
+SH
+
+    # pgrep stub: exits 1 (not busy) by default; exits 0 when bug-busy sentinel exists
+    cat > "$STUB/pgrep" <<'SH'
+#!/bin/bash
+[ -f "$STUB/bug-busy" ] && exit 0
+exit 1
+SH
+
+    # ssh stub for --from-backup: list one artifact by default
+    cat > "$STUB/ssh" <<'SH'
+#!/bin/bash
+echo "ssh-called $*" >> "$STUB/ssh-calls"
+[ -f "$STUB/ssh-no-artifact" ] && exit 0
+cat "$STUB/ssh-artifact-name" 2>/dev/null || echo "backups/db/ibl5-2026-08-10.sql.gz"
+SH
+
+    # scp stub: writes a minimal valid gzip to the destination dir
+    # Called as: scp host:remote_path  local_dir/
+    cat > "$STUB/scp" <<'SH'
+#!/bin/bash
+echo "scp-called $*" >> "$STUB/scp-calls"
+[ -f "$STUB/scp-fails" ] && exit 1
+src="$1"                          # host:path/to/ibl5-DATE.sql.gz
+artifact="$(basename "${src##*:}")"
+dest_dir="$2"                     # /tmp/tmp.XXX/
+if [ -f "$STUB/corrupt-artifact" ]; then
+    printf 'NOT_GZIP_DATA\n' > "$dest_dir/$artifact"
+else
+    # Minimal valid gzip (empty content)
+    printf '\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\x03\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00' > "$dest_dir/$artifact"
+fi
+exit 0
+SH
+
+    # db-helpers.sh stub: provides db_import_sql without real Docker
+    cat > "$STUB/db-helpers.sh" <<'SH'
+#!/bin/bash
+db_import_sql() {
+    echo "import-called $*" >> "$STUB/import-calls"
+    [ -f "$STUB/import-fails" ] && return 1
+    cat > /dev/null
+    return 0
+}
+db_exec() { true; }
+db_strip_warnings() { cat; }
+worktrees_parent_dir() { echo "/tmp"; }
+SH
+
+    chmod +x "$STUB/db-sync-prod" "$STUB/db-query" "$STUB/docker" \
+              "$STUB/pgrep" "$STUB/ssh" "$STUB/scp"
+    export STUB
+}
+
+# ── Run wrapper (live mode) ────────────────────────────────────────────────────
+dsn_run() {
+    DB_SYNC_PROD_BIN="$STUB/db-sync-prod" \
+    DB_QUERY_BIN="$STUB/db-query" \
+    DB_SYNC_LOCK_DIR="$STUB/lock" \
+    DB_SYNC_MARKER="$STUB/marker" \
+    DB_SYNC_MIN_INTERVAL=1800 \
+    DB_SYNC_DOCKER_BIN="$STUB/docker" \
+    DB_SYNC_PGREP_BIN="$STUB/pgrep" \
+    "$DRIVER" "$@" > "$STUB/out.log" 2>&1
+    echo $?
+}
+
+# ── Run wrapper (--from-backup mode) ──────────────────────────────────────────
+dsn_run_backup() {
+    DB_SYNC_PROD_BIN="$STUB/db-sync-prod" \
+    DB_QUERY_BIN="$STUB/db-query" \
+    DB_SYNC_LOCK_DIR="$STUB/lock" \
+    DB_SYNC_MARKER="$STUB/marker" \
+    DB_SYNC_MIN_INTERVAL=1800 \
+    DB_SYNC_DOCKER_BIN="$STUB/docker" \
+    DB_SYNC_PGREP_BIN="$STUB/pgrep" \
+    DB_SYNC_SSH_BIN="$STUB/ssh" \
+    DB_SYNC_SCP_BIN="$STUB/scp" \
+    DB_SYNC_BACKUP_DIR="backups/db" \
+    DB_SYNC_DB_HELPERS="$STUB/db-helpers.sh" \
+    "$DRIVER" --from-backup --ssh-host "test-prod" > "$STUB/out.log" 2>&1
+    echo $?
+}
+
+now="$(date +%s)"
+
+# ── Case 1: Happy path ──────────────────────────────────────────────────────────
+dsn_setup
+rc="$(dsn_run)"
+dsn_expect_eq "1: happy path exit 0" "0" "$rc"
+dsn_count 1 "$STUB/calls"
+dsn_expect_eq "1: marker OK" "OK" "$(sed -n '1p' "$STUB/marker" 2>/dev/null)"
+
+# ── Case 2: Lock held by live PID ──────────────────────────────────────────────
+dsn_setup
+mkdir "$STUB/lock"
+printf '%s\n' "$$" > "$STUB/lock/pid"
+rc="$(dsn_run)"
+dsn_expect_eq "2: lock held exits 0" "0" "$rc"
+dsn_log_has "2: already running logged" "already running"
+dsn_count 0 "$STUB/calls"
+
+# ── Case 3: Stale lock (dead PID 999999) ──────────────────────────────────────
+dsn_setup
+mkdir "$STUB/lock"
+printf '999999\n' > "$STUB/lock/pid"
+rc="$(dsn_run)"
+dsn_expect_eq "3: stale lock reaped exits 0" "0" "$rc"
+dsn_count 1 "$STUB/calls"
+dsn_log_has "3: stale lock logged" "stale lock"
+
+# ── Case 4: Throttled (marker 60s old) ────────────────────────────────────────
+dsn_setup
+recent=$(( now - 60 ))
+printf 'OK\n%s\n2026-08-11T00:00:00+0000\t2026-08-11\n' "$recent" > "$STUB/marker"
+rc="$(dsn_run)"
+dsn_expect_eq "4: throttled exits 0" "0" "$rc"
+dsn_count 0 "$STUB/calls"
+dsn_log_has "4: throttle logged" "skip: last sync"
+
+# ── Case 5: Throttle expired (marker 3600s old) ──────────────────────────────
+dsn_setup
+old=$(( now - 3600 ))
+printf 'OK\n%s\n2026-08-11T00:00:00+0000\t2026-08-11\n' "$old" > "$STUB/marker"
+rc="$(dsn_run)"
+dsn_expect_eq "5: expired throttle proceeds" "0" "$rc"
+dsn_count 1 "$STUB/calls"
+
+# ── Case 6: --force inside throttle window ───────────────────────────────────
+dsn_setup
+printf 'OK\n%s\n2026-08-11T00:00:00+0000\t2026-08-11\n' "$recent" > "$STUB/marker"
+rc="$(dsn_run --force)"
+dsn_expect_eq "6: --force exits 0" "0" "$rc"
+dsn_count 1 "$STUB/calls"
+
+# ── Case 7: --dry-run ─────────────────────────────────────────────────────────
+# No prior marker → not throttled → reaches the dry-run log line without syncing
+dsn_setup
+rc="$(dsn_run --dry-run)"
+dsn_expect_eq "7: --dry-run exits 0" "0" "$rc"
+dsn_count 0 "$STUB/calls"
+dsn_log_has "7: dry-run logged" "dry-run"
+if [ ! -f "$STUB/marker" ]; then
+    dsn_ok "7: dry-run did not create marker"
+else
+    dsn_fail "7: --dry-run unexpectedly created a marker"
+fi
+
+# ── Case 8: Bug-pipeline busy ─────────────────────────────────────────────────
+dsn_setup
+touch "$STUB/bug-busy"
+rc="$(dsn_run)"
+dsn_expect_eq "8: bug-busy exits 0" "0" "$rc"
+dsn_count 0 "$STUB/calls"
+dsn_log_has "8: bug-pipeline logged" "bug-pipeline"
+
+# ── Case 9: Container absent ──────────────────────────────────────────────────
+dsn_setup
+touch "$STUB/container-absent"
+rc="$(dsn_run)"
+dsn_expect_eq "9: container absent exits 0" "0" "$rc"
+dsn_count 0 "$STUB/calls"
+
+# ── Case 10: Negative — sync fails ────────────────────────────────────────────
+dsn_setup
+old_ts=$(( now - 7200 ))
+printf 'OK\n%s\n2026-08-10T00:00:00+0000\t2026-08-10\n' "$old_ts" > "$STUB/marker"
+cp "$STUB/marker" "$STUB/marker.before"
+touch "$STUB/sync-fails"
+rc="$(dsn_run)"
+dsn_expect_eq "10: sync fail exits 1" "1" "$rc"
+dsn_expect_eq "10: marker BROKEN" "BROKEN" "$(sed -n '1p' "$STUB/marker" 2>/dev/null)"
+before23="$(tail -n +2 "$STUB/marker.before")"
+after23="$(tail -n +2 "$STUB/marker")"
+if [ "$before23" = "$after23" ]; then dsn_ok "10: marker timestamp lines unchanged"
+else dsn_fail "10: marker timestamp lines changed on failure"; fi
+dsn_log_has "10: ERROR logged" "ERROR"
+
+# ── Case 11: Negative — sync rc 0 but db-empty ───────────────────────────────
+dsn_setup
+printf 'OK\n%s\n2026-08-10T00:00:00+0000\t2026-08-10\n' "$old_ts" > "$STUB/marker"
+cp "$STUB/marker" "$STUB/marker.before"
+touch "$STUB/db-empty"
+rc="$(dsn_run)"
+dsn_expect_eq "11: empty db exits 1" "1" "$rc"
+dsn_expect_eq "11: marker BROKEN" "BROKEN" "$(sed -n '1p' "$STUB/marker" 2>/dev/null)"
+before23="$(tail -n +2 "$STUB/marker.before")"
+after23="$(tail -n +2 "$STUB/marker")"
+if [ "$before23" = "$after23" ]; then dsn_ok "11: marker timestamp lines unchanged"
+else dsn_fail "11: marker timestamp lines changed on empty"; fi
+
+# ── Case 12: Negative — unknown flag → exit 2 ────────────────────────────────
+dsn_setup
+DB_SYNC_PROD_BIN="$STUB/db-sync-prod" \
+DB_QUERY_BIN="$STUB/db-query" \
+DB_SYNC_LOCK_DIR="$STUB/lock" \
+DB_SYNC_MARKER="$STUB/marker" \
+DB_SYNC_MIN_INTERVAL=1800 \
+DB_SYNC_DOCKER_BIN="$STUB/docker" \
+DB_SYNC_PGREP_BIN="$STUB/pgrep" \
+"$DRIVER" --bogus > "$STUB/out.log" 2> "$STUB/err.log"
+rc=$?
+dsn_expect_eq "12: --bogus exits 2" "2" "$rc"
+if grep -qiEF 'unknown' "$STUB/err.log" 2>/dev/null || grep -qiF 'usage' "$STUB/err.log" 2>/dev/null; then
+    dsn_ok "12: usage/unknown on stderr"
+else
+    dsn_fail "12: no usage/unknown on stderr"
+fi
+
+# ── Case 13a: --status no marker ─────────────────────────────────────────────
+dsn_setup
+DB_SYNC_MARKER="$STUB/no-such-marker" \
+"$DRIVER" --status > "$STUB/out.log" 2>&1
+rc=$?
+dsn_expect_eq "13a: --status no marker exits 0" "0" "$rc"
+dsn_log_has "13a: never synced" "never synced"
+
+# ── Case 13b: --status BROKEN marker ─────────────────────────────────────────
+dsn_setup
+printf 'BROKEN\n%s\n2026-08-10T00:00:00+0000\t2026-08-10\n' "$(( now - 3600 ))" > "$STUB/marker"
+DB_SYNC_MARKER="$STUB/marker" \
+"$DRIVER" --status > "$STUB/out.log" 2>&1
+rc=$?
+dsn_expect_eq "13b: --status BROKEN exits 0" "0" "$rc"
+dsn_log_has "13b: BROKEN in output" "BROKEN"
+
+# ── Case 14: Boundary — lock removed after exit 1 ────────────────────────────
+dsn_setup
+touch "$STUB/sync-fails"
+DB_SYNC_PROD_BIN="$STUB/db-sync-prod" \
+DB_QUERY_BIN="$STUB/db-query" \
+DB_SYNC_LOCK_DIR="$STUB/lock" \
+DB_SYNC_MARKER="$STUB/marker" \
+DB_SYNC_MIN_INTERVAL=1800 \
+DB_SYNC_DOCKER_BIN="$STUB/docker" \
+DB_SYNC_PGREP_BIN="$STUB/pgrep" \
+"$DRIVER" > /dev/null 2>&1 || true
+if [ ! -d "$STUB/lock" ]; then
+    dsn_ok "14: lock removed after exit 1"
+else
+    dsn_fail "14: lock dir still exists after exit 1"
+fi
+
+# ── --from-backup cases ────────────────────────────────────────────────────────
+
+# FB-1: Injection attack name rejected, zero scp calls
+dsn_setup
+cat > "$STUB/ssh" <<'SH'
+#!/bin/bash
+echo "ssh-called $*" >> "$STUB/ssh-calls"
+echo 'backups/db/ibl5-2026-08-13.sql.gz; rm -rf /'
+SH
+chmod +x "$STUB/ssh"
+rc="$(dsn_run_backup)"
+dsn_expect_eq "FB-1: injection rejected exit 1" "1" "$rc"
+dsn_count 0 "$STUB/scp-calls"
+dsn_log_has "FB-1: refusing logged" "refusing"
+
+# FB-2: Plain evil name (no date)
+dsn_setup
+cat > "$STUB/ssh" <<'SH'
+#!/bin/bash
+echo "ssh-called $*" >> "$STUB/ssh-calls"
+echo 'backups/db/evil.sql.gz'
+SH
+chmod +x "$STUB/ssh"
+rc="$(dsn_run_backup)"
+dsn_expect_eq "FB-2: evil name rejected exit 1" "1" "$rc"
+dsn_count 0 "$STUB/scp-calls"
+
+# FB-3: No artifact on remote → exit 0, zero scp calls
+dsn_setup
+cat > "$STUB/ssh" <<'SH'
+#!/bin/bash
+echo "ssh-called $*" >> "$STUB/ssh-calls"
+exit 0
+SH
+chmod +x "$STUB/ssh"
+rc="$(dsn_run_backup)"
+dsn_expect_eq "FB-3: no artifact exits 0" "0" "$rc"
+dsn_count 0 "$STUB/scp-calls"
+dsn_log_has "FB-3: no artifact logged" "no backup artifact"
+
+# FB-4: Corrupt artifact fails gzip -t → exit 1, zero import calls
+dsn_setup
+touch "$STUB/corrupt-artifact"
+rc="$(dsn_run_backup)"
+dsn_expect_eq "FB-4: corrupt artifact exits 1" "1" "$rc"
+dsn_count 0 "$STUB/import-calls"
+dsn_log_has "FB-4: integrity check logged" "integrity check"
+
+# FB-5: Marker newer than artifact date → freshness skip
+# Marker is 1h old (bypasses 30-min throttle) but still newer than the 2026-08-10 artifact
+dsn_setup
+printf 'OK\n%s\n2026-08-16T03:00:00+0000\t2026-08-11\n' "$(( $(date +%s) - 3600 ))" > "$STUB/marker"
+rc="$(dsn_run_backup)"
+dsn_expect_eq "FB-5: freshness skip exits 0" "0" "$rc"
+dsn_count 0 "$STUB/scp-calls"
+dsn_log_has "FB-5: fresher logged" "is fresher"
+
+# FB-6: Marker older than artifact → proceeds (scp called)
+dsn_setup
+printf 'OK\n1\n2000-01-01T00:00:00+0000\t2000-01-01\n' > "$STUB/marker"
+rc="$(dsn_run_backup)"
+# scp should have been called; restore may or may not complete — we assert scp ran
+scp_cnt="$(grep -c . "$STUB/scp-calls" 2>/dev/null || echo 0)"
+if [ "${scp_cnt:-0}" -ge 1 ]; then dsn_ok "FB-6: scp called for older marker"
+else dsn_fail "FB-6: scp not called — freshness skip fired incorrectly"; fi
+
+# ── Schedule cases (Darwin only) ──────────────────────────────────────────────
+if [ "$(uname)" = "Darwin" ] && [ -x "$CRON_SETUP" ]; then
+    plist_out="/tmp/dbsync-test-$$.plist"
+    if "$CRON_SETUP" --print-schedule > "$plist_out" 2>/dev/null; then
+        if plutil -lint "$plist_out" > /dev/null 2>&1; then
+            dsn_ok "S-1: plist well-formed (plutil -lint)"
+        else
+            dsn_fail "S-1: plist failed plutil -lint"
+        fi
+
+        if grep -q '/bin/db-sync-now' "$plist_out" && grep -q -- '--from-backup' "$plist_out"; then
+            dsn_ok "S-2: --from-backup and db-sync-now in plist"
+        else
+            dsn_fail "S-2: --from-backup or db-sync-now missing from plist"
+        fi
+
+        if grep -q 'StartCalendarInterval' "$plist_out"; then
+            dsn_ok "S-3: StartCalendarInterval present"
+        else
+            dsn_fail "S-3: StartCalendarInterval absent"
+        fi
+
+        if grep -q '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin' "$plist_out"; then
+            dsn_ok "S-4: PATH includes expected dirs"
+        else
+            dsn_fail "S-4: PATH missing expected dirs"
+        fi
+
+        if ! grep -q '\$HOME' "$plist_out"; then
+            dsn_ok "S-5: no unexpanded \$HOME"
+        else
+            dsn_fail "S-5: unexpanded \$HOME in plist"
+        fi
+
+        if ! grep -qE '\$[A-Z_]{2,}' "$plist_out"; then
+            dsn_ok "S-6: no unexpanded shell variables"
+        else
+            dsn_fail "S-6: unexpanded variables in plist"
+        fi
+
+        if ! grep -q '<string></string>' "$plist_out"; then
+            dsn_ok "S-7: no empty string values"
+        else
+            dsn_fail "S-7: empty <string></string> in plist"
+        fi
+
+        if ! grep -qi 'password\|secret' "$plist_out"; then
+            dsn_ok "S-8: no credential in plist"
+        else
+            dsn_fail "S-8: credential found in plist"
+        fi
+
+        plist_path="$(grep -A1 '<key>PATH</key>' "$plist_out" | tail -1 | sed 's/.*<string>\(.*\)<\/string>/\1/')"
+        missing=""
+        for b in docker ssh scp gzip date mkdir; do
+            env -i PATH="$plist_path" sh -c "command -v $b" > /dev/null 2>&1 || missing="$missing $b"
+        done
+        if [ -z "$missing" ]; then dsn_ok "S-9: all required binaries on plist PATH"
+        else dsn_fail "S-9: missing binaries on plist PATH:$missing"; fi
+    else
+        dsn_fail "S-1: --print-schedule failed"
+    fi
+    rm -f "$plist_out"
+
+    # S-10: --install-schedule refuses when PROD_SSH_HOST unset
+    rc="$(PROD_SSH_HOST="" "$CRON_SETUP" --install-schedule > /dev/null 2>&1; echo $?)"
+    dsn_expect_eq "S-10: --install-schedule refuses without PROD_SSH_HOST" "1" "$rc"
+
+    # S-11: --bogus exits 2
+    rc="$("$CRON_SETUP" --bogus > /dev/null 2>&1; echo $?)"
+    dsn_expect_eq "S-11: --bogus exits 2" "2" "$rc"
+fi
+
+# ── Final result ──────────────────────────────────────────────────────────────
+if [ "$FAILED" -eq 0 ]; then
+    echo "All tests passed."
+    exit 0
+else
+    echo "Some tests FAILED."
+    exit 1
+fi

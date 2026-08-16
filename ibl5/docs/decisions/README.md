@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-08-16
+last_verified: 2026-08-17
 ---
 
 # IBL5 Architecture Decision Records
@@ -38,6 +38,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0101](0101-bun-only-lockfile-collapse.md) | bun-only lockfile for ibl5 | Accepted | Collapsed ibl5 to a single `bun.lock`; npm audit gate replaced by `bun audit` + weekly tracking issue. |
 | [0102](0102-pre-commit-gate-in-version-control.md) | Version-control the pre-commit gate body | Accepted | Moves the git pre-commit gate body out of the untracked common hooks dir into `bin/pre-commit-hook`, installed via a fail-closed shim. |
 | [0103](0103-htmx-transient-dom-state-repair-on-history-restore.md) | Repair transient htmx request-time DOM state on history restore | Accepted | htmx snapshots the DOM between `beforeRequest` and the swap, so pre-request mutations must be undone in `htmx:historyRestore` too, scoped to a `data-*` marker; enforced by rule doc + review, not a gate. |
+| [0104](0104-local-db-snapshot-freshness.md) | Local DB snapshot freshness | Accepted | Adds `ibl5/bin/db-sync-now` (lock, throttle, marker, `--from-backup`), a detached sim-hook in `bin/sim-recap-tick`, a main-stack guard in `bin/db-test-up`, and `bin/db-sync-cron-setup` for a nightly launchd restore. |
 
 ## When an ADR is Required
 

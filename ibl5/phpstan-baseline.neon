@@ -865,6 +865,370 @@ parameters:
 			path: classes/TeamSchedule/TeamScheduleRepository.php
 
 		-
+			rawMessage: 'Binary operation "." between ''&amp;mode='' and mixed results in an error.'
+			identifier: binaryOp.invalid
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: 'Binary operation "." between ''&amp;order='' and mixed results in an error.'
+			identifier: binaryOp.invalid
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: 'Binary operation "." between ''&amp;thold='' and mixed results in an error.'
+			identifier: binaryOp.invalid
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: Binary operation "." between non-falsy-string and mixed results in an error.
+			identifier: binaryOp.invalid
+			count: 11
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: '''
+				Call to deprecated function CloseTable():
+				Use CSS classes directly: </div> (closing .ibl-card)
+				Legacy PHP-Nuke table closer. Prefer modern CSS components.
+				Remaining callers: ~60 legacy PHP-Nuke module files (News, Your_Account, Trading, etc.)
+			'''
+			identifier: function.deprecated
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: '''
+				Call to deprecated function OpenTable():
+				Use CSS classes directly: <div class="ibl-card">
+				Legacy PHP-Nuke table wrapper. Prefer modern CSS components.
+				Remaining callers: ~60 legacy PHP-Nuke module files (News, Your_Account, Trading, etc.)
+			'''
+			identifier: function.deprecated
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: Cannot access offset 'storynum' on mixed.
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: Cannot access offset 'thold' on mixed.
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: Cannot access offset 'umode' on mixed.
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: Cannot access offset 'uorder' on mixed.
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: Cannot access offset 'username' on mixed.
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: 'Cannot call method getUserInfo() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: Cannot cast mixed to int.
+			identifier: cast.int
+			count: 3
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: Cannot cast mixed to string.
+			identifier: cast.string
+			count: 2
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: 'Casting to int something that''s already int<min, -1>|int<1, max>.'
+			identifier: cast.useless
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: Constant _BYTESMORE not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: Constant _COMMENT not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: Constant _COMMENTS not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: Constant _COMMENTSQ not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: Constant _GOTOHOME not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: Constant _GOTONEWSINDEX not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: Constant _NOINFO4TOPIC not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: Constant _READMORE not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: Constant _SEARCHONTOPIC not found.
+			identifier: constant.notFound
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: Constant _SELECTNEWTOPIC not found.
+			identifier: constant.notFound
+			count: 2
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: Direct instantiation of PlayerLookupRepository is banned in class files. Inject the corresponding interface via the constructor instead.
+			identifier: ibl.directRepoInstantiation
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: Direct instantiation of TeamIdentityRepository is banned in class files. Inject the corresponding interface via the constructor instead.
+			identifier: ibl.directRepoInstantiation
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: 'Direct is_user() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 2
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: 'Loose comparison via "!=" between int and int is not allowed.'
+			identifier: notEqual.notAllowed
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: 'Loose comparison via "==" between int and int is not allowed.'
+			identifier: equal.notAllowed
+			count: 5
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: 'Loose comparison via "==" between int<min, -1>|int<1, max> and int is not allowed.'
+			identifier: equal.notAllowed
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: 'Loose comparison via "==" between mixed and int is not allowed.'
+			identifier: equal.notAllowed
+			count: 4
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: 'Only booleans are allowed in an if condition, int given.'
+			identifier: if.condNotBoolean
+			count: 2
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class LastSimRecap\LastSimRecapRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Repositories\PlayerLookupRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Topics\News\NewsService constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: 'Parameter #1 $time of method Topics\News\NewsService::normalizeStoryTime() expects int|string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: 'Parameter #1 $username of method Repositories\TeamIdentityRepository::getTeamnameFromUsername() expects string|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: 'Parameter #1 $value of function intval expects array|bool|float|GMP|int|resource|SimpleXMLElement|string|null, mixed given.'
+			identifier: argument.type
+			count: 7
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: 'Part $currentlang (mixed) of encapsed string cannot be cast to string.'
+			identifier: encapsedStringPart.nonString
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: 'Part $sitename (mixed) of encapsed string cannot be cast to string.'
+			identifier: encapsedStringPart.nonString
+			count: 2
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: '`global $articlecomm;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
+			identifier: ibl.globalKeyword
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: '`global $authService;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
+			identifier: ibl.globalKeyword
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: '`global $currentlang;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
+			identifier: ibl.globalKeyword
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: '`global $db;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
+			identifier: ibl.globalKeyword
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: '`global $multilingual;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
+			identifier: ibl.globalKeyword
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: '`global $mysqli_db;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
+			identifier: ibl.globalKeyword
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: '`global $prefix;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
+			identifier: ibl.globalKeyword
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: '`global $sitename;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
+			identifier: ibl.globalKeyword
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: '`global $storyhome;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
+			identifier: ibl.globalKeyword
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: '`global $topicimage;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
+			identifier: ibl.globalKeyword
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: '`global $topicname;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
+			identifier: ibl.globalKeyword
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: '`global $topictext;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
+			identifier: ibl.globalKeyword
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: '`global $user;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
+			identifier: ibl.globalKeyword
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: '`global $user_news;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
+			identifier: ibl.globalKeyword
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: '`global $userinfo;` is banned outside Bootstrap and legacy-compat files. Inject collaborators via constructor.'
+			identifier: ibl.globalKeyword
+			count: 1
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
+			identifier: ibl.echoInNonView
+			count: 6
+			path: classes/Topics/News/NewsController.php
+
+		-
+			rawMessage: 'intval() is banned. Use (int) cast instead. PHPStan can narrow types through casts but not through these functions, and intval(''08'') silently returns 0 (octal radix surprise).'
+			identifier: ibl.castFunction
+			count: 8
+			path: classes/Topics/News/NewsController.php
+
+		-
 			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
 			identifier: ibl.directTime
 			count: 1

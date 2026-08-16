@@ -135,7 +135,7 @@ EngineShadow -> EngineBundle EngineRunner League
 Extension -> BasketballStats Discord FreeAgency Player Team
 FranchiseHistory -> League Security UI
 FranchiseRecordBook -> BasketballStats League Player Security UI
-FreeAgency -> Auth BaseMysqliRepository Discord EventLog League Player Repositories Season Security Team Trading UI
+FreeAgency -> Auth BaseMysqliRepository Discord EventLog Http League Player Repositories Season Security Team Trading UI
 FreeAgencyPreview -> Player Security UI
 GMContactList -> League Security UI
 GameBoxscore -> League Player Security UI

@@ -38,5 +38,6 @@ $view = new FreeAgency\FreeAgencyView(
     new FreeAgency\FreeAgencyOtherFreeAgentsSectionView($tableRenderer)
 );
 $processor = new FreeAgency\FreeAgencyProcessor($mysqli_db, $commonRepo);
-$controller = new FreeAgencyController($mysqli_db, $commonRepo, $authService, $service, $view, $processor);
+$request = \Http\HttpRequest::fromGlobals();
+$controller = new FreeAgencyController($mysqli_db, $commonRepo, $authService, $service, $view, $processor, $request);
 $controller->handleRequest($user, $pa, $pid);

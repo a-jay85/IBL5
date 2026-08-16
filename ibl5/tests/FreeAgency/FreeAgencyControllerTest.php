@@ -8,6 +8,7 @@ use FreeAgency\Contracts\FreeAgencyProcessorInterface;
 use FreeAgency\Contracts\FreeAgencyServiceInterface;
 use FreeAgency\FreeAgencyController;
 use FreeAgency\FreeAgencyView;
+use Http\HttpRequest;
 use PHPUnit\Framework\TestCase;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Tests\WideUnit\Mocks\MockDatabase;
@@ -37,10 +38,58 @@ class FreeAgencyControllerTest extends TestCase
         $service = self::createStub(FreeAgencyServiceInterface::class);
         $view = self::createStub(FreeAgencyView::class);
         $processor = self::createStub(FreeAgencyProcessorInterface::class);
-        $controller = new FreeAgencyController($mockDb, $commonRepo, $authService, $service, $view, $processor, $nukeCompat);
+        $controller = new FreeAgencyController($mockDb, $commonRepo, $authService, $service, $view, $processor, new HttpRequest(), $nukeCompat);
         $controller->handleRequest(null, '', 0);
 
         $this->assertTrue($loginBoxCalled);
+    }
+
+    public function testExtractSubmittedOfferFromQueryReturnsNullWhenFirstOfferAbsent(): void
+    {
+        $method = new \ReflectionMethod(FreeAgencyController::class, 'extractSubmittedOfferFromQuery');
+
+        $this->assertNull($method->invoke($this->buildStubController(new HttpRequest(get: []))));
+    }
+
+    public function testExtractSubmittedOfferFromQueryCoercesNumericOfferValues(): void
+    {
+        $method = new \ReflectionMethod(FreeAgencyController::class, 'extractSubmittedOfferFromQuery');
+        $result = $method->invoke($this->buildStubController(new HttpRequest(get: ['offer1' => '5', 'offer2' => 'abc'])));
+
+        $this->assertIsArray($result);
+        $this->assertSame(['offer1' => 5, 'offer2' => 0, 'offer3' => 0, 'offer4' => 0, 'offer5' => 0, 'offer6' => 0], $result);
+    }
+
+    public function testExtractSubmittedOfferFromQueryZeroesNonNumericOfferValues(): void
+    {
+        $method = new \ReflectionMethod(FreeAgencyController::class, 'extractSubmittedOfferFromQuery');
+        $result = $method->invoke($this->buildStubController(new HttpRequest(get: ['offer1' => '5', 'offer2' => 'abc'])));
+
+        $this->assertIsArray($result);
+        $this->assertSame(0, $result['offer2']);
+    }
+
+    public function testExtractSubmittedOfferFromQueryReturnsZeroedOfferForArrayValuedFirstOffer(): void
+    {
+        $method = new \ReflectionMethod(FreeAgencyController::class, 'extractSubmittedOfferFromQuery');
+        $result = $method->invoke($this->buildStubController(new HttpRequest(get: ['offer1' => ['5']])));
+
+        $this->assertIsArray($result);
+        $this->assertSame(0, $result['offer1']);
+    }
+
+    private function buildStubController(HttpRequest $request): FreeAgencyController
+    {
+        return new FreeAgencyController(
+            new MockDatabase(),
+            self::createStub(TeamIdentityRepositoryInterface::class),
+            self::createStub(\Auth\AuthService::class),
+            self::createStub(FreeAgencyServiceInterface::class),
+            self::createStub(FreeAgencyView::class),
+            self::createStub(FreeAgencyProcessorInterface::class),
+            $request,
+            self::createStub(\Utilities\NukeCompat::class),
+        );
     }
 
 }

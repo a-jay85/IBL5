@@ -79,6 +79,7 @@ last_verified: 2026-09-06
 | L50 | `bin/pr-cycle` logs gate nominees as "excluded this run" but then orders and readies them (`--gate-edges /dev/null` re-admits every nominee) | ⬜ Open | 🟦 | S |
 | L51 | Plan Phase 5 dry-run count propagated to archive only, not PR body; reviewer blast-radius instruction stale by ~23% | ⬜ Open | 🟦 | S |
 | L52 | Test harness case comment over-claims assertion scope; adjacent cases leave `run_block` exit codes unchecked | ✅ fixed this pass | — | S |
+| L53 | PR #1900 Phase 6.5 — PR body misidentified ADR (0104→0114), omitted plan-mandated consent statement, undercounted test cases, contradicted pre-prod exception; all four fixed this pass | ⬜ Open | — | XS |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -461,6 +462,7 @@ not add backticks or markdown links to a row.
 | 2026-08-16 | #1901 | class: htmx request-lifecycle handlers (beforeRequest/afterRequest) that mutate DOM state leave that mutation serialized in the history cache; browser Back restores request-time snapshot, making the mutation permanent until a historyRestore handler repairs it | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced E2E triggers): plan adding/modifying htmx beforeRequest/afterRequest DOM mutations must require E2E coverage of browser Back behavior | prior: -- |
 | 2026-08-19 | #1925 | class: queue enqueue operation inherits mtime from the queued file rather than stamping the ordering key at insertion time, silently misordering entries with old authoring dates | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan adding or modifying an enqueue or requeue path in bin/automouse/queue must test back-of-queue placement with an ancient-mtime plan | prior: -- |
 | 2026-08-19 | #1930 | class: a plan that stops ongoing data corruption in an import or upsert path ships without a compensating backfill migration for rows already corrupted before the fix | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan removing or modifying an importer or upsert path that was writing an incorrect value must verify a compensating backfill ships in the same PR or explicitly scope out already-corrupted rows in the plan | prior: -- |
+| 2026-08-17 | #1900 | class: shell scripts use BSD-specific stat/date invocations without GNU/Linux fallbacks, failing on Linux CI but passing macOS dev — not caught by shellcheck | routed to: Rung 4 - new rule doc .claude/rules/shell-portability.md guiding dual-form stat/date patterns (stat -c %Y ... || stat -f %m ...) for cross-platform shell scripts | prior: -- |
 | 2026-08-21 | #1953 | class: cap-validation or salary-comparison logic selects a salary-basis column (current vs. next-year) without consulting the league phase, producing incorrect hard-cap outcomes during offseason | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan adding or modifying salary-comparison or cap-enforcement logic must carry verification rows for both the in-season path (advancesContractYears()=false, current_salary basis) and the offseason path (advancesContractYears()=true, next_year_salary basis) | prior: -- |
 | 2026-08-22 | #1963 | class: a fail-closed validation gate on a store/import path is relaxed to warn-only before the compensating resolution path that makes relaxation safe is shipped, allowing uncorrectable orphaned rows to accumulate undetected | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan that relaxes a fail-closed guard on a store or import path (error → warn or removed) must verify that the compensating resolution path ships in the same PR or is already in prod, OR explicitly scope out orphan accumulation with a follow-up | prior: -- |
 | 2026-08-23 | #1969 | class: an importer writes to a secondary tracking table but omits the corresponding write to the canonical flag column in the primary table — the secondary write satisfies the importer's narrow contract while the flag silently stays at its default | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan adding or modifying an importer that writes to a secondary/audit table must carry an integration test verifying the canonical flag column in the primary table is also updated after a full import cycle | prior: -- |
@@ -779,3 +781,25 @@ Landing rung: **no gate warranted** — neither occurrence exists in the tree af
 1. Pick an entry; `/plan` it. Loop-machinery changes should default to `auto_merge: false` — a bug here costs whole nights.
 2. Ship the measurement half first (T1, L3) so later entries' effects are visible.
 3. Update this doc's status; bump `last_verified` (CI enforces via `bin/check-docs`).
+
+### L53 PR body inaccuracies on PR #1900 (findings 4A/4B/4C/4D)
+
+**class:** A PR body written before or shortly after a renumber commit landed, and never re-read after that commit, leaving an incorrect ADR reference, a missing plan-mandated consent statement for a destructive operation, an understated test-coverage claim, and a manual-testing declaration that contradicted the plan's own pre-prod exception.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #1900 body — "ADR-0104" should be "ADR-0114" (4A) | yes | yes | fixed this pass |
+| 2 | PR #1900 body — missing "ships uninstalled; arming is reviewer's call" statement (4B) | yes | yes | fixed this pass |
+| 3 | PR #1900 body — "14-case harness" understated (FB-1..FB-6 + S-1..S-11 omitted) (4C) | yes | yes | fixed this pass |
+| 4 | PR #1900 body — "No manual testing needed" contradicted plan's pre-prod exception (4D) | yes | yes | fixed this pass |
+
+**prevention_ladder:**
+- rung 0 — `.claude/rules/pr-body-negative-claim-recheck.md` covers stale negative-scope claims (finding 4D is adjacent to this class but is a contradicted exception, not a negative scope claim per se). Finding 4A (positive ADR reference) and 4B (missing mandated statement) are not covered by any existing rule.
+- rung 2 — extend or add to `.claude/rules/`: (a) re-read ADR references after any renumber commit; (b) verify plan-mandated body statements are present before the PR is opened (destructive operations and scheduling-slice pre-prod exceptions each mandate a specific body sentence in this plan class).
+- **landing rung:** rung 2 — two rule-doc additions or one combined rule covering ADR-reference re-check and plan-mandated-statement verification. Zero gate overhead; surfaced at the authoring step where the cost of a miss is lowest.
+
+`artifact destination: this entry`
+
+*(discovered 2026-09-05 during PR #1900 Phase 6 plan-intent fidelity review)*

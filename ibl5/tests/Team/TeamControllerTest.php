@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Tests\Team;
 
 use Auth\Contracts\AuthServiceInterface;
+use Http\HttpRequest;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Team\Contracts\TeamControllerInterface;
 use Team\Contracts\TeamServiceInterface;
 use Team\Contracts\TeamViewInterface;
+use Team\Team;
 use Team\TeamController;
 use Tests\WideUnit\WideUnitTestCase;
 
@@ -27,7 +29,7 @@ class TeamControllerTest extends WideUnitTestCase
 
         require_once dirname(__DIR__, 2) . '/classes/Bootstrap/LegacyFunctions.php';
 
-        $this->stubAuthService = $this->createStub(AuthServiceInterface::class);
+        $this->stubAuthService = self::createStub(AuthServiceInterface::class);
         $this->stubAuthService->method('getCookieArray')->willReturn(null);
         $this->stubAuthService->method('getUsername')->willReturn(null);
         $GLOBALS['authService'] = $this->stubAuthService;
@@ -40,27 +42,26 @@ class TeamControllerTest extends WideUnitTestCase
             $_SESSION = [];
         }
 
-        $this->stubCommonRepo = $this->createStub(TeamIdentityRepositoryInterface::class);
-        $this->stubView = $this->createStub(TeamViewInterface::class);
+        $this->stubCommonRepo = self::createStub(TeamIdentityRepositoryInterface::class);
+        $this->stubView = self::createStub(TeamViewInterface::class);
     }
 
     protected function tearDown(): void
     {
         unset($GLOBALS['authService'], $GLOBALS['user'], $GLOBALS['sitename'], $GLOBALS['pagetitle']);
-        unset($_REQUEST['yr'], $_REQUEST['display'], $_REQUEST['split']);
-        unset($_GET['result'], $_GET['msg']);
         unset($_SERVER['HTTP_HX_BOOSTED']);
         parent::tearDown();
     }
 
-    private function buildController(TeamServiceInterface $service): TeamController
+    private function buildController(TeamServiceInterface $service, ?TeamViewInterface $view = null, ?HttpRequest $request = null): TeamController
     {
         return new TeamController(
             $this->mockDb,
             $this->stubCommonRepo,
             $this->stubAuthService,
             $service,
-            $this->stubView
+            $view ?? $this->stubView,
+            $request ?? new HttpRequest()
         );
     }
 
@@ -107,9 +108,9 @@ class TeamControllerTest extends WideUnitTestCase
     // and the mock expectation is also verified at test teardown.
     // ============================================
 
-    public function testDisplayTeamPagePassesValidYrToService(): void
+    public function testDisplayTeamPagePassesValidYearToService(): void
     {
-        $_REQUEST['yr'] = '2024';
+        $request = new HttpRequest(request: ['yr' => '2024']);
         /** @var list<mixed>|null $captured */
         $captured = null;
         $mockService = $this->createMock(TeamServiceInterface::class);
@@ -120,15 +121,15 @@ class TeamControllerTest extends WideUnitTestCase
                 throw new \RuntimeException('short-circuit');
             });
 
-        $this->runDisplayTeamPage($this->buildController($mockService));
+        $this->runDisplayTeamPage($this->buildController($mockService, null, $request));
 
         $this->assertIsArray($captured);
         self::assertSame('2024', $captured[1]);
     }
 
-    public function testDisplayTeamPageDropsInvalidYrFromService(): void
+    public function testDisplayTeamPagePassesNullYearForMalformedYearParameter(): void
     {
-        $_REQUEST['yr'] = 'not-a-year';
+        $request = new HttpRequest(request: ['yr' => 'not-a-year']);
         /** @var list<mixed>|null $captured */
         $captured = null;
         $mockService = $this->createMock(TeamServiceInterface::class);
@@ -139,15 +140,15 @@ class TeamControllerTest extends WideUnitTestCase
                 throw new \RuntimeException('short-circuit');
             });
 
-        $this->runDisplayTeamPage($this->buildController($mockService));
+        $this->runDisplayTeamPage($this->buildController($mockService, null, $request));
 
         $this->assertIsArray($captured);
         self::assertNull($captured[1]);
     }
 
-    public function testDisplayTeamPagePassesValidDisplayToService(): void
+    public function testDisplayTeamPagePassesWhitelistedDisplayModeToService(): void
     {
-        $_REQUEST['display'] = 'contracts';
+        $request = new HttpRequest(request: ['display' => 'contracts']);
         /** @var list<mixed>|null $captured */
         $captured = null;
         $mockService = $this->createMock(TeamServiceInterface::class);
@@ -158,15 +159,15 @@ class TeamControllerTest extends WideUnitTestCase
                 throw new \RuntimeException('short-circuit');
             });
 
-        $this->runDisplayTeamPage($this->buildController($mockService));
+        $this->runDisplayTeamPage($this->buildController($mockService, null, $request));
 
         $this->assertIsArray($captured);
         self::assertSame('contracts', $captured[2]);
     }
 
-    public function testDisplayTeamPageFallsBackToRatingsWhenDisplayIsArray(): void
+    public function testDisplayTeamPageFallsBackToRatingsForArrayValuedDisplay(): void
     {
-        $_REQUEST['display'] = ['contracts'];
+        $request = new HttpRequest(request: ['display' => ['contracts']]);
         /** @var list<mixed>|null $captured */
         $captured = null;
         $mockService = $this->createMock(TeamServiceInterface::class);
@@ -177,15 +178,15 @@ class TeamControllerTest extends WideUnitTestCase
                 throw new \RuntimeException('short-circuit');
             });
 
-        $this->runDisplayTeamPage($this->buildController($mockService));
+        $this->runDisplayTeamPage($this->buildController($mockService, null, $request));
 
         $this->assertIsArray($captured);
         self::assertSame('ratings', $captured[2]);
     }
 
-    public function testDisplayTeamPageFallsBackToRatingsWhenDisplayIsSplitWithNoSplitKey(): void
+    public function testDisplayTeamPageFallsBackToRatingsWhenSplitDisplayHasNoSplitKey(): void
     {
-        $_REQUEST['display'] = 'split';
+        $request = new HttpRequest(request: ['display' => 'split']);
         /** @var list<mixed>|null $captured */
         $captured = null;
         $mockService = $this->createMock(TeamServiceInterface::class);
@@ -196,10 +197,72 @@ class TeamControllerTest extends WideUnitTestCase
                 throw new \RuntimeException('short-circuit');
             });
 
-        $this->runDisplayTeamPage($this->buildController($mockService));
+        $this->runDisplayTeamPage($this->buildController($mockService, null, $request));
 
         $this->assertIsArray($captured);
         self::assertSame('ratings', $captured[2]);
         self::assertNull($captured[4]);
+    }
+
+    public function testDisplayTeamPageFallsBackToRatingsForUnknownDisplayMode(): void
+    {
+        $request = new HttpRequest(request: ['display' => 'unknown_mode']);
+        /** @var list<mixed>|null $captured */
+        $captured = null;
+        $mockService = $this->createMock(TeamServiceInterface::class);
+        $mockService->expects($this->once())
+            ->method('getTeamPageData')
+            ->willReturnCallback(function (mixed ...$args) use (&$captured): never {
+                $captured = array_values($args);
+                throw new \RuntimeException('short-circuit');
+            });
+
+        $this->runDisplayTeamPage($this->buildController($mockService, null, $request));
+
+        $this->assertIsArray($captured);
+        self::assertSame('ratings', $captured[2]);
+    }
+
+    public function testDisplayTeamPagePassesExtensionResultAndMessageToView(): void
+    {
+        $request = new HttpRequest(get: ['result' => 'ok', 'msg' => 'saved']);
+
+        /** @var array<string, mixed>|null $capturedPageData */
+        $capturedPageData = null;
+
+        $stubService = self::createStub(TeamServiceInterface::class);
+        $stubService->method('getTeamPageData')->willReturn([
+            'teamid' => 1,
+            'team' => self::createStub(Team::class),
+            'imagesPath' => '',
+            'yr' => null,
+            'display' => 'ratings',
+            'insertyear' => '',
+            'isActualTeam' => false,
+            'tableOutput' => '',
+            'draftPicksTable' => '',
+            'currentSeasonCard' => '',
+            'awardsCard' => '',
+            'franchiseHistoryCard' => '',
+            'rafters' => '',
+            'userTeamName' => '',
+            'isOwnTeam' => false,
+            'extensionResult' => null,
+            'extensionMsg' => null,
+        ]);
+
+        $mockView = $this->createMock(TeamViewInterface::class);
+        $mockView->expects($this->once())
+            ->method('render')
+            ->willReturnCallback(function (mixed $pageData) use (&$capturedPageData): string {
+                $capturedPageData = $pageData;
+                return '';
+            });
+
+        $this->runDisplayTeamPage($this->buildController($stubService, $mockView, $request));
+
+        $this->assertIsArray($capturedPageData);
+        self::assertSame('ok', $capturedPageData['extensionResult']);
+        self::assertSame('saved', $capturedPageData['extensionMsg']);
     }
 }

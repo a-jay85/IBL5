@@ -77,7 +77,7 @@ class DepthChartEntryApiHandler
         $teamRepository = new \Team\TeamRepository($this->db);
         $teamTableService = new \Team\TeamTableService($this->db, $teamRepository);
         $submissionHandler = new DepthChartEntrySubmissionHandler($this->db, $this->commonRepo);
-        $controller = new DepthChartEntryController($this->db, $this->commonRepo, $repository, $service, $view, $teamTableService, $submissionHandler);
+        $controller = new DepthChartEntryController($this->db, $this->commonRepo, $repository, $service, $view, $teamTableService, $submissionHandler, \Http\HttpRequest::fromGlobals());
         $responder = new \Api\Response\HtmlResponder();
         $responder->html($controller->getTableOutput($teamid, $display, $split));
     }

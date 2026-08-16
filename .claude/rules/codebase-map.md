@@ -125,7 +125,7 @@ Cli -> Module
 ComparePlayers -> BasketballStats Player Security UI
 ContractList -> Player Security UI
 Debug -> Auth Security Utilities
-DepthChartEntry -> EventLog League NextSim Repositories SavedDepthChart Season Security Standings Team TeamSchedule UI
+DepthChartEntry -> EventLog Http League NextSim Repositories SavedDepthChart Season Security Standings Team TeamSchedule UI
 Discord -> Repositories
 Draft -> Discord EventLog Repositories Season Security UI Validation
 DraftHistory -> Player Security Team UI
@@ -175,7 +175,7 @@ SeriesRecords -> League Repositories Security UI
 Settings -> Season
 SimRecap -> JsbParser LastSimRecap League PageLayout Security
 Standings -> League Security SeriesRecords UI
-Team -> Auth BasketballStats Discord League Player Repositories Season Security Trading UI
+Team -> Auth BasketballStats Discord Http League Player Repositories Season Security Trading UI
 TeamOffDefStats -> BasketballStats League Security UI
 TeamSchedule -> BasketballStats League LeagueSchedule Season Security Team
 Topics -> BaseMysqliRepository Search Security

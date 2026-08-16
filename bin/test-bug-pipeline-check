@@ -10,8 +10,9 @@
 
 set -u
 
-WORKTREE_ROOT="/Users/ajaynicolas/GitHub/IBL5-worktrees/bug-pipeline-liveness-check"
-CHECK_BIN="$WORKTREE_ROOT/bin/bug-pipeline-check"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+CHECK_BIN="$SCRIPT_DIR/bug-pipeline-check"
 
 PASSED=0
 FAILED=0
@@ -36,7 +37,7 @@ export STUB
 mkdir -p "$STUB/bin"
 _cleanup_all() {
     if [ -n "$SCRATCH_DB" ]; then
-        DB_NAME="$MAIN_DB" "$WORKTREE_ROOT/bin/db-query" \
+        DB_NAME="$MAIN_DB" "$SCRIPT_DIR/db-query" \
             "DROP DATABASE IF EXISTS \`$SCRATCH_DB\`" >/dev/null 2>&1 || true
     fi
     rm -rf "$STUB"
@@ -388,7 +389,7 @@ fi
 
 # ── Real-DB gate ──────────────────────────────────────────────────────────────
 REQUIRE_DB="${BUG_PIPELINE_CHECK_REQUIRE_DB:-0}"
-if ! DB_NAME="$MAIN_DB" "$WORKTREE_ROOT/bin/db-query" "SELECT 1" >/dev/null 2>&1; then
+if ! DB_NAME="$MAIN_DB" "$SCRIPT_DIR/db-query" "SELECT 1" >/dev/null 2>&1; then
     if [ "$REQUIRE_DB" = "1" ]; then
         bpt_fail "real-DB cases REQUIRED but MariaDB is unreachable at 127.0.0.1:3306"
         printf '\npassed %d / failed %d\n' "$PASSED" "$FAILED"
@@ -401,17 +402,17 @@ fi
 
 # ── Real-DB scratch schema ─────────────────────────────────────────────────────
 SCRATCH_DB="ibl5_check_test_$$"
-DB_NAME="$MAIN_DB" "$WORKTREE_ROOT/bin/db-query" \
+DB_NAME="$MAIN_DB" "$SCRIPT_DIR/db-query" \
     "CREATE DATABASE IF NOT EXISTS \`$SCRATCH_DB\`" >/dev/null 2>&1
 
-if ! DB_NAME="$SCRATCH_DB" "$WORKTREE_ROOT/bin/db-query" \
-        "$(cat "$WORKTREE_ROOT/ibl5/migrations/153_create_bug_pipeline_tables.sql")" >/dev/null 2>&1; then
+if ! DB_NAME="$SCRATCH_DB" "$SCRIPT_DIR/db-query" \
+        "$(cat "$REPO_ROOT/ibl5/migrations/153_create_bug_pipeline_tables.sql")" >/dev/null 2>&1; then
     bpt_fail "real-DB schema load: migration 153 failed"
     printf '\npassed %d / failed %d\n' "$PASSED" "$FAILED"
     exit 1
 fi
-if ! DB_NAME="$SCRATCH_DB" "$WORKTREE_ROOT/bin/db-query" \
-        "$(cat "$WORKTREE_ROOT/ibl5/migrations/158_create_bug_report_attachments.sql")" >/dev/null 2>&1; then
+if ! DB_NAME="$SCRATCH_DB" "$SCRIPT_DIR/db-query" \
+        "$(cat "$REPO_ROOT/ibl5/migrations/158_create_bug_report_attachments.sql")" >/dev/null 2>&1; then
     bpt_fail "real-DB schema load: migration 158 failed"
     printf '\npassed %d / failed %d\n' "$PASSED" "$FAILED"
     exit 1
@@ -421,7 +422,7 @@ fi
 # db-query-wrap: redirect every checker DB call to the scratch database
 cat > "$STUB/bin/db-query-wrap" << WRAPPER_EOF
 #!/bin/sh
-DB_NAME="$SCRATCH_DB" exec "$WORKTREE_ROOT/bin/db-query" "\$@"
+DB_NAME="$SCRATCH_DB" exec "$SCRIPT_DIR/db-query" "\$@"
 WRAPPER_EOF
 chmod +x "$STUB/bin/db-query-wrap"
 
@@ -452,11 +453,11 @@ seed_row() {
     msg_id=$(( $$ * 10000 + _SEED_CTR ))
     local sql
     sql="INSERT INTO ibl_bug_reports (discord_author_id, channel_id, original_message_id, original_text, status, blocked_until, lease_expires, updated_at) VALUES (1, 2, $msg_id, 'test text', '$status', $blocked_until, $lease_expires, $updated_at)"
-    DB_NAME="$SCRATCH_DB" "$WORKTREE_ROOT/bin/db-query" "$sql" >/dev/null 2>&1
+    DB_NAME="$SCRATCH_DB" "$SCRIPT_DIR/db-query" "$sql" >/dev/null 2>&1
 }
 
 truncate_table() {
-    DB_NAME="$SCRATCH_DB" "$WORKTREE_ROOT/bin/db-query" \
+    DB_NAME="$SCRATCH_DB" "$SCRIPT_DIR/db-query" \
         "DELETE FROM ibl_bug_reports" >/dev/null 2>&1
 }
 
@@ -594,10 +595,10 @@ bpt_expect_eq "R10: rc=0" "0" "$CHECK_RC"
 # ── Case R11: checker performs no writes to the scratch DB ────────────────────
 truncate_table
 seed_row 'queued' 'NULL' 'NULL' 'NOW()'
-_r11_before="$(DB_NAME="$SCRATCH_DB" "$WORKTREE_ROOT/bin/db-query" \
+_r11_before="$(DB_NAME="$SCRATCH_DB" "$SCRIPT_DIR/db-query" \
     "SELECT COUNT(*) AS n, IFNULL(MAX(updated_at),'-') AS m FROM ibl_bug_reports" 2>/dev/null)"
 run_real_check
-_r11_after="$(DB_NAME="$SCRATCH_DB" "$WORKTREE_ROOT/bin/db-query" \
+_r11_after="$(DB_NAME="$SCRATCH_DB" "$SCRIPT_DIR/db-query" \
     "SELECT COUNT(*) AS n, IFNULL(MAX(updated_at),'-') AS m FROM ibl_bug_reports" 2>/dev/null)"
 bpt_expect_eq "R11: no writes — scratch DB snapshot unchanged" "$_r11_before" "$_r11_after"
 

@@ -7,6 +7,10 @@ namespace Tests\Team;
 use PHPUnit\Framework\TestCase;
 use Team\TeamView;
 
+/**
+ * @phpstan-import-type TeamPageData from \Team\Contracts\TeamServiceInterface
+ * @phpstan-type TeamPageDataOverrides array{teamid?: int, team?: \Team\Team, imagesPath?: string, yr?: ?string, display?: string, insertyear?: string, isActualTeam?: bool, tableOutput?: string, draftPicksTable?: string, currentSeasonCard?: string, awardsCard?: string, franchiseHistoryCard?: string, rafters?: string, userTeamName?: string, isOwnTeam?: bool, extensionResult?: ?string, extensionMsg?: ?string}
+ */
 final class TeamViewXssTest extends TestCase
 {
     private TeamView $view;
@@ -17,15 +21,15 @@ final class TeamViewXssTest extends TestCase
     }
 
     /**
-     * Build a minimal pageData array with a stdClass team object.
+     * Build a minimal pageData array with a Team stub.
      *
-     * @param array<string, mixed> $overrides
-     * @return array<string, mixed>
+     * @param TeamPageDataOverrides $overrides
+     * @return TeamPageData
      */
-    private function makePageData(array $overrides = []): array
+    private function makePageData(array $overrides = [], string $teamName = 'Safe Team'): array
     {
-        $team = new \stdClass();
-        $team->name = $overrides['teamName'] ?? 'Safe Team';
+        $team = self::createStub(\Team\Team::class);
+        $team->name = $teamName;
         $team->color1 = 'FF0000';
         $team->color2 = '000000';
         $team->discord_id = null;
@@ -35,6 +39,8 @@ final class TeamViewXssTest extends TestCase
             'team' => $team,
             'imagesPath' => 'images/',
             'yr' => null,
+            'display' => 'ratings',
+            'insertyear' => '',
             'isActualTeam' => false,
             'tableOutput' => '',
             'draftPicksTable' => '',

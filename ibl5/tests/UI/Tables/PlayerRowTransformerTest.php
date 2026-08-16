@@ -56,18 +56,6 @@ class PlayerRowTransformerTest extends TestCase
         $this->assertSame($player, $result[0]);
     }
 
-    public function testResolveWithStatsSkipsNonArrayNonPlayerForCurrentSeason(): void
-    {
-        $db = self::createStub(\mysqli::class);
-
-        // Pass an iterable with a non-array/non-Player element. The stdClass argument.type
-        // mismatch is a documented baseline defer, not a defect to "fix" by swapping in a
-        // real Player — that would delete the non-Player skip path this test exists to prove.
-        $result = PlayerRowTransformer::resolveWithStats($db, [new \stdClass()], '');
-
-        $this->assertSame([], $result);
-    }
-
     public function testResolvePlayersSkipsNonArrayForHistorical(): void
     {
         $db = self::createStub(\mysqli::class);
@@ -89,6 +77,16 @@ class PlayerRowTransformerTest extends TestCase
         // For historical ($yr !== ""), non-array items should be skipped
         $result = PlayerRowTransformer::resolveWithStats($db, [$player], '2024');
 
+        $this->assertSame([], $result);
+    }
+
+    public function testResolveWithStatsSkipsNonArrayNonPlayerForCurrentSeason(): void
+    {
+        $db = self::createStub(\mysqli::class);
+        // Pass an iterable with a non-array/non-Player element. The stdClass argument.type
+        // mismatch is a documented baseline defer, not a defect to "fix" by swapping in a
+        // real Player — that would delete the non-Player skip path this test exists to prove.
+        $result = PlayerRowTransformer::resolveWithStats($db, [new \stdClass()], '');
         $this->assertSame([], $result);
     }
 }

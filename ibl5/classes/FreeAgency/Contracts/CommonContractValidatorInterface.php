@@ -21,7 +21,7 @@ interface CommonContractValidatorInterface
      * Raises are limited based on Bird Rights status. The maximum raise
      * is calculated from the first year salary and applied to all subsequent years.
      * 
-     * @param array{year1: int, year2: int, year3: int, year4?: int, year5?: int, year6?: int} $offer
+     * @param array{year1?: int, year2?: int, year3?: int, year4?: int, year5?: int, year6?: int} $offer
      *        Contract offer with yearly salary amounts in thousands
      * @param int $birdYears Years of Bird Rights with current team (0-10+)
      * @return array{valid: bool, error: string|null} Validation result:
@@ -55,7 +55,7 @@ interface CommonContractValidatorInterface
      * Contract salaries must be flat or increasing year-over-year.
      * A year with zero salary indicates the contract ends (allowed).
      * 
-     * @param array{year1: int, year2: int, year3: int, year4?: int, year5?: int, year6?: int} $offer
+     * @param array{year1?: int, year2?: int, year3?: int, year4?: int, year5?: int, year6?: int} $offer
      *        Contract offer with yearly salary amounts in thousands
      * @return array{valid: bool, error: string|null} Validation result:
      *         - 'valid': bool - True if no illegal decreases
@@ -87,7 +87,7 @@ interface CommonContractValidatorInterface
      * 
      * Maximum first-year contract salary is tiered by years of service.
      * 
-     * @param array{year1: int, year2?: int, year3?: int, year4?: int, year5?: int, year6?: int} $offer
+     * @param array{year1?: int, year2?: int, year3?: int, year4?: int, year5?: int, year6?: int} $offer
      *        Contract offer with yearly salary amounts in thousands
      * @param int $yearsExperience Player's years of NBA experience (0-20+)
      * @return array{valid: bool, error: string|null} Validation result:
@@ -119,7 +119,7 @@ interface CommonContractValidatorInterface
      * Contracts cannot have gaps - if year N has zero salary, all years
      * after N must also have zero salary.
      * 
-     * @param array{year1: int, year2: int, year3: int, year4?: int, year5?: int, year6?: int} $offer
+     * @param array{year1?: int, year2?: int, year3?: int, year4?: int, year5?: int, year6?: int} $offer
      *        Contract offer with yearly salary amounts in thousands
      * @return array{valid: bool, error: string|null} Validation result:
      *         - 'valid': bool - True if no gaps in contract
@@ -146,7 +146,7 @@ interface CommonContractValidatorInterface
      * 
      * Utility method to calculate total value and number of years from an offer.
      * 
-     * @param array{year1: int, year2: int, year3: int, year4?: int, year5?: int, year6?: int} $offer
+     * @param array{year1?: int, year2?: int, year3?: int, year4?: int, year5?: int, year6?: int} $offer
      *        Contract offer with yearly salary amounts in thousands
      * @return array{total: int, years: int, averagePerYear: float} Contract metrics:
      *         - 'total': int - Sum of all non-zero years

@@ -17,6 +17,8 @@ use Team\Team;
  * - Team banner with logo
  * - Game cards with win/loss formatting
  * - Month headers and navigation
+ *
+ * @phpstan-import-type ScheduleGameRow from \TeamSchedule\Contracts\TeamScheduleServiceInterface
  */
 #[AllowMockObjectsWithoutExpectations]
 class TeamScheduleViewTest extends TestCase
@@ -185,7 +187,7 @@ class TeamScheduleViewTest extends TestCase
      *
      * Returns the full data structure expected by TeamScheduleView
      *
-     * @return array<string, mixed>
+     * @return ScheduleGameRow
      */
     private function createMockGame(
         string $month,
@@ -193,8 +195,8 @@ class TeamScheduleViewTest extends TestCase
         bool $isUnplayed = false,
         string $winLossColor = 'green'
     ): array {
-        // Create mock Game object
-        $game = new \stdClass();
+        // Create stub Game object
+        $game = self::createStub(\LeagueSchedule\Game::class);
         $game->date = $date;
         $game->visitorScore = 105;
         $game->homeScore = 98;
@@ -203,8 +205,8 @@ class TeamScheduleViewTest extends TestCase
         $game->visitor_teamid = 1;  // User's team is visitor
         $game->home_teamid = 2;     // Opponent is home team
 
-        // Create mock opposing Team object
-        $opposingTeam = new \stdClass();
+        // Create stub opposing Team object
+        $opposingTeam = self::createStub(\Team\Team::class);
         $opposingTeam->teamid = 2;
         $opposingTeam->name = 'Boston';
         $opposingTeam->seasonRecord = '10-5';  // Added for opponent record display
@@ -221,6 +223,7 @@ class TeamScheduleViewTest extends TestCase
             'wins' => 10,
             'losses' => 5,
             'streak' => 'W3',
+            'opponentTier' => '',
         ];
     }
 }

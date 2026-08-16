@@ -226,16 +226,15 @@ class WaiversProcessorTest extends TestCase
         $this->assertStringContainsString('1 h', $waitTime); // Should be 1 hour remaining
     }
     
-    // The $playerData arrays below are intentionally partial (salary_yr1/exp/cy/cyt only);
-    // each omits keys that the tested code-path never reads, exercising specific defaulting
-    // branches. The array{} shape mismatch for the missing keys is a documented baseline
-    // defer, not a defect to fix by completing the arrays (that would obscure which keys
-    // determineContractData actually requires for each path).
     public function testDetermineContractDataForNewContract(): void
     {
         $playerData = [
+            'pid' => 1,
+            'name' => 'Test Player',
+            'teamid' => 0,
+            'pos' => 'PG',
             'salary_yr1' => 0,
-            'exp' => 8
+            'exp' => 8,
         ];
         
         $contractData = $this->processor->determineContractData($playerData, $this->mockSeasonRegular);
@@ -247,11 +246,15 @@ class WaiversProcessorTest extends TestCase
     public function testDetermineContractDataForExistingContract(): void
     {
         $playerData = [
+            'pid' => 1,
+            'name' => 'Test Player',
+            'teamid' => 1,
+            'pos' => 'PG',
             'salary_yr1' => 500,
             'cy' => 1,
             'cyt' => 3,
             'salary_yr2' => 550,
-            'salary_yr3' => 600
+            'salary_yr3' => 600,
         ];
         
         $contractData = $this->processor->determineContractData($playerData, $this->mockSeasonRegular);
@@ -263,11 +266,15 @@ class WaiversProcessorTest extends TestCase
     public function testDetermineContractDataForMidContract(): void
     {
         $playerData = [
+            'pid' => 1,
+            'name' => 'Test Player',
+            'teamid' => 1,
+            'pos' => 'PG',
             'salary_yr1' => 500,
             'cy' => 2,
             'cyt' => 3,
             'salary_yr2' => 550,
-            'salary_yr3' => 600
+            'salary_yr3' => 600,
         ];
         
         $contractData = $this->processor->determineContractData($playerData, $this->mockSeasonRegular);
@@ -304,9 +311,13 @@ class WaiversProcessorTest extends TestCase
     public function testDetermineContractDataForNewContractDuringFreeAgency(): void
     {
         $playerData = [
+            'pid' => 1,
+            'name' => 'Test Player',
+            'teamid' => 0,
+            'pos' => 'PG',
             'salary_yr1' => 0,
             'salary_yr2' => 0,
-            'exp' => 6
+            'exp' => 6,
         ];
         
         $contractData = $this->processor->determineContractData($playerData, $this->mockSeasonFreeAgency);

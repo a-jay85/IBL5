@@ -14,6 +14,9 @@ use BasketballStats\StatsFormatter;
  *
  * Verifies team statistics processing, league totals calculation,
  * and offense/defense differential computation.
+ *
+ * @phpstan-import-type ProcessedTeamStats from \TeamOffDefStats\Contracts\TeamOffDefStatsServiceInterface
+ * @phpstan-import-type RawStatValues from \TeamOffDefStats\Contracts\TeamOffDefStatsServiceInterface
  */
 class TeamOffDefStatsServiceTest extends TestCase
 {
@@ -296,16 +299,12 @@ class TeamOffDefStatsServiceTest extends TestCase
     public function testCalculateLeagueTotalsSumsAllTeams(): void
     {
         $processedStats = [
-            [
-                'teamid' => 1,
-                'offense_games' => 10,
-                'raw_offense' => ['fgm' => 100, 'fga' => 200, 'ftm' => 50, 'fta' => 60, 'tgm' => 30, 'tga' => 80, 'orb' => 40, 'reb' => 100, 'ast' => 60, 'stl' => 20, 'tvr' => 30, 'blk' => 15, 'pf' => 50, 'pts' => 280],
-            ],
-            [
-                'teamid' => 2,
-                'offense_games' => 10,
-                'raw_offense' => ['fgm' => 120, 'fga' => 220, 'ftm' => 60, 'fta' => 70, 'tgm' => 40, 'tga' => 90, 'orb' => 45, 'reb' => 110, 'ast' => 70, 'stl' => 25, 'tvr' => 35, 'blk' => 18, 'pf' => 55, 'pts' => 340],
-            ],
+            $this->createProcessedTeamData(1, 'Team1', 'T1', 10, 82,
+                ['fgm' => 100, 'fga' => 200, 'ftm' => 50, 'fta' => 60, 'tgm' => 30, 'tga' => 80, 'orb' => 40, 'reb' => 100, 'ast' => 60, 'stl' => 20, 'tvr' => 30, 'blk' => 15, 'pf' => 50, 'pts' => 280]
+            ),
+            $this->createProcessedTeamData(2, 'Team2', 'T2', 10, 82,
+                ['fgm' => 120, 'fga' => 220, 'ftm' => 60, 'fta' => 70, 'tgm' => 40, 'tga' => 90, 'orb' => 45, 'reb' => 110, 'ast' => 70, 'stl' => 25, 'tvr' => 35, 'blk' => 18, 'pf' => 55, 'pts' => 340]
+            ),
         ];
 
         $result = $this->service->calculateLeagueTotals($processedStats);
@@ -342,17 +341,10 @@ class TeamOffDefStatsServiceTest extends TestCase
     public function testCalculateDifferentialsReturnsExpectedStructure(): void
     {
         $processedStats = [
-            [
-                'teamid' => 1,
-                'team_city' => 'Boston',
-                'team_name' => 'Celtics',
-                'color1' => '#007A33',
-                'color2' => '#FFFFFF',
-                'offense_games' => 10,
-                'defense_games' => 10,
-                'raw_offense' => ['fgm' => 100, 'fga' => 200, 'ftm' => 50, 'fta' => 60, 'tgm' => 30, 'tga' => 80, 'orb' => 40, 'reb' => 100, 'ast' => 60, 'stl' => 20, 'tvr' => 30, 'blk' => 15, 'pf' => 50, 'pts' => 280],
-                'raw_defense' => ['fgm' => 90, 'fga' => 180, 'ftm' => 45, 'fta' => 55, 'tgm' => 25, 'tga' => 70, 'orb' => 35, 'reb' => 90, 'ast' => 55, 'stl' => 18, 'tvr' => 28, 'blk' => 12, 'pf' => 45, 'pts' => 250],
-            ],
+            $this->createProcessedTeamData(1, 'Boston', 'Celtics', 10, 10,
+                ['fgm' => 100, 'fga' => 200, 'ftm' => 50, 'fta' => 60, 'tgm' => 30, 'tga' => 80, 'orb' => 40, 'reb' => 100, 'ast' => 60, 'stl' => 20, 'tvr' => 30, 'blk' => 15, 'pf' => 50, 'pts' => 280],
+                ['fgm' => 90, 'fga' => 180, 'ftm' => 45, 'fta' => 55, 'tgm' => 25, 'tga' => 70, 'orb' => 35, 'reb' => 90, 'ast' => 55, 'stl' => 18, 'tvr' => 28, 'blk' => 12, 'pf' => 45, 'pts' => 250]
+            ),
         ];
 
         $result = $this->service->calculateDifferentials($processedStats);
@@ -370,17 +362,10 @@ class TeamOffDefStatsServiceTest extends TestCase
     public function testCalculateDifferentialsCalculatesCorrectly(): void
     {
         $processedStats = [
-            [
-                'teamid' => 1,
-                'team_city' => 'Test',
-                'team_name' => 'Team',
-                'color1' => '#000',
-                'color2' => '#FFF',
-                'offense_games' => 10,
-                'defense_games' => 10,
-                'raw_offense' => ['fgm' => 400, 'fga' => 800, 'ftm' => 200, 'fta' => 250, 'tgm' => 100, 'tga' => 300, 'orb' => 100, 'reb' => 400, 'ast' => 250, 'stl' => 80, 'tvr' => 120, 'blk' => 50, 'pf' => 200, 'pts' => 1100],
-                'raw_defense' => ['fgm' => 350, 'fga' => 750, 'ftm' => 180, 'fta' => 230, 'tgm' => 90, 'tga' => 280, 'orb' => 90, 'reb' => 380, 'ast' => 230, 'stl' => 70, 'tvr' => 130, 'blk' => 45, 'pf' => 190, 'pts' => 970],
-            ],
+            $this->createProcessedTeamData(1, 'Test', 'Team', 10, 10,
+                ['fgm' => 400, 'fga' => 800, 'ftm' => 200, 'fta' => 250, 'tgm' => 100, 'tga' => 300, 'orb' => 100, 'reb' => 400, 'ast' => 250, 'stl' => 80, 'tvr' => 120, 'blk' => 50, 'pf' => 200, 'pts' => 1100],
+                ['fgm' => 350, 'fga' => 750, 'ftm' => 180, 'fta' => 230, 'tgm' => 90, 'tga' => 280, 'orb' => 90, 'reb' => 380, 'ast' => 230, 'stl' => 70, 'tvr' => 130, 'blk' => 45, 'pf' => 190, 'pts' => 970]
+            ),
         ];
 
         $result = $this->service->calculateDifferentials($processedStats);
@@ -399,17 +384,10 @@ class TeamOffDefStatsServiceTest extends TestCase
     public function testCalculateDifferentialsNegativeValues(): void
     {
         $processedStats = [
-            [
-                'teamid' => 1,
-                'team_city' => 'Test',
-                'team_name' => 'Team',
-                'color1' => '#000',
-                'color2' => '#FFF',
-                'offense_games' => 10,
-                'defense_games' => 10,
-                'raw_offense' => ['fgm' => 300, 'fga' => 700, 'ftm' => 150, 'fta' => 200, 'tgm' => 80, 'tga' => 250, 'orb' => 80, 'reb' => 350, 'ast' => 200, 'stl' => 60, 'tvr' => 150, 'blk' => 40, 'pf' => 180, 'pts' => 830],
-                'raw_defense' => ['fgm' => 350, 'fga' => 750, 'ftm' => 180, 'fta' => 230, 'tgm' => 90, 'tga' => 280, 'orb' => 90, 'reb' => 380, 'ast' => 230, 'stl' => 70, 'tvr' => 130, 'blk' => 45, 'pf' => 190, 'pts' => 970],
-            ],
+            $this->createProcessedTeamData(1, 'Test', 'Team', 10, 10,
+                ['fgm' => 300, 'fga' => 700, 'ftm' => 150, 'fta' => 200, 'tgm' => 80, 'tga' => 250, 'orb' => 80, 'reb' => 350, 'ast' => 200, 'stl' => 60, 'tvr' => 150, 'blk' => 40, 'pf' => 180, 'pts' => 830],
+                ['fgm' => 350, 'fga' => 750, 'ftm' => 180, 'fta' => 230, 'tgm' => 90, 'tga' => 280, 'orb' => 90, 'reb' => 380, 'ast' => 230, 'stl' => 70, 'tvr' => 130, 'blk' => 45, 'pf' => 190, 'pts' => 970]
+            ),
         ];
 
         $result = $this->service->calculateDifferentials($processedStats);
@@ -470,18 +448,59 @@ class TeamOffDefStatsServiceTest extends TestCase
     /**
      * Create a processed team data structure for testing
      *
-     * @return array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, offense_games: int, defense_games: int, offense_totals: array<string, string>, offense_averages: array<string, string>, defense_totals: array<string, string>, defense_averages: array<string, string>, raw_offense: array<string, int>, raw_defense: array<string, int>}
+     * @param RawStatValues|null $rawOffense Custom raw offense values (null = use defaults)
+     * @param RawStatValues|null $rawDefense Custom raw defense values (null = use defaults)
+     * @return ProcessedTeamStats
      */
-    private function createProcessedTeamData(int $teamId, string $city, string $name): array
-    {
+    private function createProcessedTeamData(
+        int $teamId,
+        string $city,
+        string $name,
+        int $offenseGames = 82,
+        int $defenseGames = 82,
+        ?array $rawOffense = null,
+        ?array $rawDefense = null,
+    ): array {
+        $rawO = $rawOffense ?? [
+            'fgm' => 3200,
+            'fga' => 7000,
+            'ftm' => 1500,
+            'fta' => 2000,
+            'tgm' => 1000,
+            'tga' => 2800,
+            'orb' => 900,
+            'reb' => 3600,
+            'ast' => 2000,
+            'stl' => 600,
+            'tvr' => 1200,
+            'blk' => 400,
+            'pf' => 1700,
+            'pts' => 8900,
+        ];
+        $rawD = $rawDefense ?? [
+            'fgm' => 3100,
+            'fga' => 6900,
+            'ftm' => 1400,
+            'fta' => 1900,
+            'tgm' => 950,
+            'tga' => 2700,
+            'orb' => 850,
+            'reb' => 3500,
+            'ast' => 1900,
+            'stl' => 580,
+            'tvr' => 1250,
+            'blk' => 380,
+            'pf' => 1650,
+            'pts' => 8600,
+        ];
         return [
             'teamid' => $teamId,
             'team_city' => $city,
             'team_name' => $name,
             'color1' => '#007A33',
             'color2' => '#FFFFFF',
-            'offense_games' => 82,
-            'defense_games' => 82,
+            'offense_games' => $offenseGames,
+            'defense_games' => $defenseGames,
             'offense_totals' => [
                 'games' => '82',
                 'fgm' => '3,200',
@@ -518,40 +537,44 @@ class TeamOffDefStatsServiceTest extends TestCase
                 'pf' => '20.7',
                 'pts' => '108.5',
             ],
-            'defense_totals' => [],
-            'defense_averages' => [],
-            'raw_offense' => [
-                'fgm' => 3200,
-                'fga' => 7000,
-                'ftm' => 1500,
-                'fta' => 2000,
-                'tgm' => 1000,
-                'tga' => 2800,
-                'orb' => 900,
-                'reb' => 3600,
-                'ast' => 2000,
-                'stl' => 600,
-                'tvr' => 1200,
-                'blk' => 400,
-                'pf' => 1700,
-                'pts' => 8900,
+            'defense_totals' => [
+                'games' => '82',
+                'fgm' => '3,100',
+                'fga' => '6,900',
+                'ftm' => '1,400',
+                'fta' => '1,900',
+                'tgm' => '950',
+                'tga' => '2,700',
+                'orb' => '850',
+                'reb' => '3,500',
+                'ast' => '1,900',
+                'stl' => '580',
+                'tvr' => '1,250',
+                'blk' => '380',
+                'pf' => '1,650',
+                'pts' => '8,600',
             ],
-            'raw_defense' => [
-                'fgm' => 3100,
-                'fga' => 6900,
-                'ftm' => 1400,
-                'fta' => 1900,
-                'tgm' => 950,
-                'tga' => 2700,
-                'orb' => 850,
-                'reb' => 3500,
-                'ast' => 1900,
-                'stl' => 580,
-                'tvr' => 1250,
-                'blk' => 380,
-                'pf' => 1650,
-                'pts' => 8600,
+            'defense_averages' => [
+                'fgm' => '37.8',
+                'fga' => '84.1',
+                'fgp' => '0.449',
+                'ftm' => '17.1',
+                'fta' => '23.2',
+                'ftp' => '0.737',
+                'tgm' => '11.6',
+                'tga' => '32.9',
+                'tgp' => '0.352',
+                'orb' => '10.4',
+                'reb' => '42.7',
+                'ast' => '23.2',
+                'stl' => '7.1',
+                'tvr' => '15.2',
+                'blk' => '4.6',
+                'pf' => '20.1',
+                'pts' => '104.9',
             ],
+            'raw_offense' => $rawO,
+            'raw_defense' => $rawD,
         ];
     }
 }

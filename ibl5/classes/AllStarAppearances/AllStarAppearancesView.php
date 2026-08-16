@@ -57,7 +57,7 @@ class AllStarAppearancesView implements AllStarAppearancesViewInterface
     /**
      * Render all table rows.
      *
-     * @param array<int, array{name: string, appearances: int, pid?: int}> $appearances Array of appearance data
+     * @param array<int, array{name: string, appearances: int, pid?: int|null}> $appearances Array of appearance data
      * @return string HTML table rows
      */
     private function renderTableRows(array $appearances): string

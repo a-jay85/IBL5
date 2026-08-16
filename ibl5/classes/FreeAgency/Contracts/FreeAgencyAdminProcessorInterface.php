@@ -79,6 +79,7 @@ interface FreeAgencyAdminProcessorInterface
      *     teamName: string,
      *     offers: array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int},
      *     offerYears: int,
+     *     offerTotal?: float,
      *     usedMle: bool,
      *     usedLle: bool
      * }> $signings Array of signing data to execute

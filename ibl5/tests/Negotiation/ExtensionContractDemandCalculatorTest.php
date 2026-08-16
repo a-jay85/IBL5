@@ -572,17 +572,16 @@ class ExtensionContractDemandCalculatorTest extends TestCase
         $this->assertSame(1.0, $demands['modifier']);
     }
 
-    public function testHandlesMissingTeamFactors(): void
+    public function testHandlesDefaultTeamFactors(): void
     {
         $player = $this->createPlayerWithRatings(50);
         $this->setupMarketMaximums(100);
 
-        // Missing keys - should use defaults
-        $teamFactors = [];
+        // All TeamFactors keys are required; use the neutral .500 defaults
+        $teamFactors = $this->getDefaultTeamFactors();
 
         $demands = $this->calculator->calculateDemands($player, $teamFactors);
 
-        // Should use default values
         $this->assertIsArray($demands);
     }
 

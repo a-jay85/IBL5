@@ -60,14 +60,12 @@ class CapSpaceViewTest extends TestCase
     {
         $teams = [
             [
-                'teamid' => 1,
+                'team' => self::createStub(\Team\Team::class),
                 'teamId' => 1,
                 'teamCity' => 'Test<script>',
                 'teamName' => 'Team&Name',
                 'color1' => '000000',
                 'color2' => 'FFFFFF',
-                'mle' => false,
-                'lle' => false,
                 'has_mle' => false,
                 'has_lle' => false,
                 'freeAgencySlots' => 0,

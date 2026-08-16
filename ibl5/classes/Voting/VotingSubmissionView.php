@@ -31,6 +31,9 @@ class VotingSubmissionView implements VotingSubmissionViewInterface
 <p class="voting-submission-error"><?= HtmlSanitizer::e($error) ?></p>
 <?php
         }
+        ?>
+<p class="voting-submission-error__recovery"><a href="modules.php?name=Voting">Return to the ballot</a></p>
+<?php
         return (string) ob_get_clean();
     }
 

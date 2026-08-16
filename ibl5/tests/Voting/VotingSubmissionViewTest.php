@@ -43,7 +43,20 @@ final class VotingSubmissionViewTest extends TestCase
         $this->assertStringContainsString('Error one', $html);
         $this->assertStringContainsString('Error two', $html);
         $this->assertStringContainsString('Error three', $html);
-        $this->assertSame(3, substr_count($html, 'voting-submission-error'));
+        // Match the exact class so the recovery-link paragraph
+        // (voting-submission-error__recovery) isn't counted as a fourth error.
+        $this->assertSame(3, substr_count($html, 'class="voting-submission-error"'));
+    }
+
+    public function testRenderErrorsIncludesRecoveryLinkBackToTheBallot(): void
+    {
+        // A validation failure consumes the single-use CSRF token, so browser Back
+        // lands on a ballot whose token is already dead. The link gives the GM a
+        // fresh ballot with a fresh token instead of a dead end.
+        $html = $this->view->renderErrors(['Some error message']);
+
+        $this->assertStringContainsString('voting-submission-error__recovery', $html);
+        $this->assertStringContainsString('href="modules.php?name=Voting"', $html);
     }
 
     public function testRenderErrorsEscapesHtml(): void

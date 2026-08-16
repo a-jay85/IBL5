@@ -100,6 +100,69 @@ test.describe('ASG Voting: validation errors', () => {
     await expect(page.locator('body')).toContainText('less than FOUR');
   });
 
+  // Regression: htmx snapshots the DOM into its history cache *between*
+  // htmx:beforeRequest and the swap, so the submit-button disable applied in
+  // beforeRequest is baked into the snapshot and the afterRequest re-enable
+  // never reaches it. Browser Back then restored a ballot whose Submit button
+  // was permanently disabled and still read "Submitting…".
+  test('submit button is usable after browser Back from a validation error', async ({
+    appState,
+    page,
+  }) => {
+    // Witness that the ballot comes back from htmx's history cache rather than
+    // a fresh server fetch — a cache miss would render a clean page and make
+    // this test pass even with the fix reverted.
+    await page.addInitScript(() => {
+      (window as unknown as Record<string, unknown>).__iblHistoryRestored = false;
+      document.addEventListener('htmx:historyRestore', () => {
+        (window as unknown as Record<string, unknown>).__iblHistoryRestored = true;
+      });
+    });
+
+    await appState({
+      'Current Season Phase': 'Regular Season',
+      'ASG Voting': 'Yes',
+    });
+    await page.goto('modules.php?name=Voting');
+
+    await expandVotingCategory(page, 'ECF');
+    const ecfTable = page.locator('#ECF');
+    await expect(ecfTable).toBeVisible();
+    await ecfTable.locator('input[type="checkbox"]').first().check();
+
+    await page
+      .locator('button, input[type="submit"]')
+      .filter({ hasText: /submit votes/i })
+      .first()
+      .click();
+    await expect(page.locator('body')).toContainText('less than FOUR');
+
+    await page.goBack();
+
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            () => (window as unknown as Record<string, unknown>).__iblHistoryRestored,
+          ),
+        { message: 'ballot must be restored from the htmx history cache' },
+      )
+      .toBe(true);
+
+    // Locate by form, not by label — pre-fix the button reads "Submitting…".
+    const restoredBtns = page.locator(
+      'form[name="ASGVote"] button[type="submit"], form[name="ASGVote"] input[type="submit"]',
+    );
+    await expect(restoredBtns.first(), 'restored ballot must render a submit button').toBeVisible();
+    await expect(restoredBtns.first(), 'submit label must be restored').toHaveText(
+      /submit votes/i,
+    );
+    const disabledCount = await restoredBtns.evaluateAll(
+      (els) => els.filter((el) => (el as HTMLButtonElement).disabled).length,
+    );
+    expect(disabledCount, 'no submit button may stay disabled after Back').toBe(0);
+  });
+
   test('no PHP errors on validation page', async ({ appState, page }) => {
     await appState({
       'Current Season Phase': 'Regular Season',

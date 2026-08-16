@@ -975,6 +975,8 @@ jobs:
         run: bin/test-db-query-routing
       - name: bin/test-watch-run
         run: bin/test-watch-run
+      - name: ibl5/bin/test-db-sync-now
+        run: ibl5/bin/test-db-sync-now
 
   gate:
     name: Tests and Analysis

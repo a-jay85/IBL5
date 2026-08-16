@@ -11,6 +11,8 @@ use Trading\Contracts\TradeRosterPreviewParamValidatorInterface;
 
 class TradeRosterPreviewCashRowBuilderTest extends TestCase
 {
+    private const MAX_YEAR = TradeRosterPreviewCashRowBuilder::CASH_YEAR_FORWARD_HORIZON;
+
     private TradeRosterPreviewCashRowBuilder $sut;
 
     protected function setUp(): void
@@ -149,7 +151,7 @@ class TradeRosterPreviewCashRowBuilderTest extends TestCase
             'userCash1' => '500',
         ];
 
-        $this->assertSame([], $this->sut->buildCashRows(1));
+        $this->assertSame([], $this->sut->buildCashRows(1, self::MAX_YEAR));
     }
 
     public function testBuildCashRowsReturnsEmptyWhenPartnerTeamIsEmpty(): void
@@ -163,7 +165,7 @@ class TradeRosterPreviewCashRowBuilderTest extends TestCase
             'userCash1' => '500',
         ];
 
-        $this->assertSame([], $this->sut->buildCashRows(1));
+        $this->assertSame([], $this->sut->buildCashRows(1, self::MAX_YEAR));
     }
 
     public function testBuildCashRowsReturnsEmptyWhenCashStartYearIsZero(): void
@@ -177,7 +179,7 @@ class TradeRosterPreviewCashRowBuilderTest extends TestCase
             'userCash1' => '500',
         ];
 
-        $this->assertSame([], $this->sut->buildCashRows(1));
+        $this->assertSame([], $this->sut->buildCashRows(1, self::MAX_YEAR));
     }
 
     public function testBuildCashRowsReturnsEmptyWhenCashEndYearIsZero(): void
@@ -191,7 +193,7 @@ class TradeRosterPreviewCashRowBuilderTest extends TestCase
             'userCash1' => '500',
         ];
 
-        $this->assertSame([], $this->sut->buildCashRows(1));
+        $this->assertSame([], $this->sut->buildCashRows(1, self::MAX_YEAR));
     }
 
     public function testBuildCashRowsReturnsEmptyWhenAllCashAmountsAreZero(): void
@@ -206,7 +208,7 @@ class TradeRosterPreviewCashRowBuilderTest extends TestCase
             'partnerCash1' => '0',
         ];
 
-        $this->assertSame([], $this->sut->buildCashRows(1));
+        $this->assertSame([], $this->sut->buildCashRows(1, self::MAX_YEAR));
     }
 
     // -------------------------------------------------------------------------
@@ -225,7 +227,7 @@ class TradeRosterPreviewCashRowBuilderTest extends TestCase
             // partnerCash1 absent → 0, so no partner-cash row
         ];
 
-        $rows = $this->sut->buildCashRows(1);
+        $rows = $this->sut->buildCashRows(1, self::MAX_YEAR);
 
         $this->assertCount(1, $rows);
         $this->assertSame('| Cash to Boston', $rows[0]['name']);
@@ -244,7 +246,7 @@ class TradeRosterPreviewCashRowBuilderTest extends TestCase
             'partnerCash1' => '300',
         ];
 
-        $rows = $this->sut->buildCashRows(1);
+        $rows = $this->sut->buildCashRows(1, self::MAX_YEAR);
 
         $this->assertCount(1, $rows);
         $this->assertSame('| Cash from Boston', $rows[0]['name']);
@@ -263,7 +265,7 @@ class TradeRosterPreviewCashRowBuilderTest extends TestCase
             'partnerCash1' => '300',
         ];
 
-        $rows = $this->sut->buildCashRows(1);
+        $rows = $this->sut->buildCashRows(1, self::MAX_YEAR);
 
         $this->assertCount(2, $rows);
         // Cash to comes before Cash from
@@ -288,7 +290,7 @@ class TradeRosterPreviewCashRowBuilderTest extends TestCase
         ];
 
         // viewingTeamId=2 !== userTeamId=1 → viewing partner's team
-        $rows = $this->sut->buildCashRows(2);
+        $rows = $this->sut->buildCashRows(2, self::MAX_YEAR);
 
         $this->assertCount(2, $rows);
         // Partner's cash going to user's team (Miami)
@@ -314,11 +316,29 @@ class TradeRosterPreviewCashRowBuilderTest extends TestCase
             'userCash1' => '500',
         ];
 
-        $rows = $this->sut->buildCashRows(1);
+        $rows = $this->sut->buildCashRows(1, self::MAX_YEAR);
 
         $this->assertCount(1, $rows);
         $this->assertStringNotContainsString('<script>', $rows[0]['name']);
         $this->assertStringContainsString('| Cash to ', $rows[0]['name']);
+    }
+
+    // -------------------------------------------------------------------------
+    // buildCashRows() — horizon bound
+    // -------------------------------------------------------------------------
+
+    public function testBuildCashRowsRejectsOverHorizonEndYear(): void
+    {
+        $_GET = [
+            'userTeam'      => 'Miami',
+            'partnerTeam'   => 'Boston',
+            'userTeamId'    => '1',
+            'cashStartYear' => '1',
+            'cashEndYear'   => '999999',
+            'userCash1'     => '500',
+        ];
+
+        $this->assertSame([], $this->sut->buildCashRows(1, self::MAX_YEAR));
     }
 
     // -------------------------------------------------------------------------
@@ -331,9 +351,11 @@ class TradeRosterPreviewCashRowBuilderTest extends TestCase
         $mockValidator = $this->createMock(TradeRosterPreviewParamValidatorInterface::class);
         // validateStringParam is called for both 'userTeam' and 'partnerTeam' before the guard check
         $mockValidator->expects($this->atLeastOnce())->method('validateStringParam')->willReturn('');
+        // validateCashYearRange is destructured before the guard, so it must return a two-element tuple
+        $mockValidator->method('validateCashYearRange')->willReturn([0, 0]);
 
         $sut = new TradeRosterPreviewCashRowBuilder($mockValidator);
 
-        $this->assertSame([], $sut->buildCashRows(1));
+        $this->assertSame([], $sut->buildCashRows(1, self::MAX_YEAR));
     }
 }

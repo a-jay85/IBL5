@@ -14,6 +14,7 @@ use Player\Views\PlayerStatsCardView;
 use Player\Views\PlayerStatsFlipCardView;
 use Player\Views\PlayerViewFactory;
 use Player\Views\TeamColorHelper;
+use Http\HttpRequest;
 use Player\Contracts\PlayerPageServiceInterface;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Security\HtmlSanitizer;
@@ -31,6 +32,7 @@ class PlayerPageController
     private \mysqli $mysqliDb;
     private TeamIdentityRepositoryInterface $commonRepo;
     private PlayerPageServiceInterface $pageService;
+    private HttpRequest $request;
     /**
      * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
      */
@@ -40,12 +42,14 @@ class PlayerPageController
      * @param \mysqli $mysqliDb MySQLi database connection
      * @param TeamIdentityRepositoryInterface $commonRepo Common repository for shared queries
      * @param PlayerPageServiceInterface $pageService Service for player page business logic
+     * @param HttpRequest $request Immutable snapshot of this request's input arrays
      */
-    public function __construct(\mysqli $mysqliDb, TeamIdentityRepositoryInterface $commonRepo, PlayerPageServiceInterface $pageService, ?Season $season = null)
+    public function __construct(\mysqli $mysqliDb, TeamIdentityRepositoryInterface $commonRepo, PlayerPageServiceInterface $pageService, HttpRequest $request, ?Season $season = null)
     {
         $this->mysqliDb = $mysqliDb;
         $this->commonRepo = $commonRepo;
         $this->pageService = $pageService;
+        $this->request = $request;
         $this->season = $season;
     }
 
@@ -68,7 +72,7 @@ class PlayerPageController
         $html = '';
 
         // Render result banner from PRG redirect
-        $result = $_GET['result'] ?? null;
+        $result = $this->request->get('result');
         if (is_string($result)) {
             $banner = \UI\AlertRenderer::fromCode($result, [
                 'rookie_option_success' => ['class' => 'ibl-alert--success', 'message' => 'Rookie option has been exercised successfully. The contract update is reflected on the team page.'],

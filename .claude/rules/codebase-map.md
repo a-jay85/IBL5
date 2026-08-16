@@ -155,7 +155,7 @@ Negotiation -> BaseMysqliRepository BasketballStats League Player Repositories S
 NextSim -> BasketballStats LeagueSchedule Player Season Security Standings Team TeamSchedule UI
 OneOnOneGame -> BaseMysqliRepository Discord Security
 PageLayout -> Utilities
-Player -> BaseMysqliRepository BasketballStats League Repositories Season Security Team
+Player -> BaseMysqliRepository BasketballStats Http League Repositories Season Security Team
 PlayerDatabase -> BaseMysqliRepository Player Security UI Validation
 PlayerMovement -> Player UI
 PlrParser -> League Season

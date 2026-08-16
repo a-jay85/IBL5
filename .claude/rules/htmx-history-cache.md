@@ -65,3 +65,9 @@ a witness that the restore path was actually taken —
 `ibl5/tests/e2e/flows/voting-submission.spec.ts` sets a flag from an
 `htmx:historyRestore` listener installed via `page.addInitScript`, then polls it
 before asserting on the restored DOM.
+
+## Why this rule exists
+
+`ibl5/docs/decisions/0103-htmx-transient-dom-state-repair-on-history-restore.md` —
+the alternatives weighed (`beforeHistorySave`, a blanket re-enable, a mechanical
+gate) and why enforcement here is a rule doc plus review rather than a gate.

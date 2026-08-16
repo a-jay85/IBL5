@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-08-14
+last_verified: 2026-08-16
 ---
 
 # IBL5 Architecture Decision Records
@@ -37,6 +37,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0100](0100-actionlint-workflow-gate.md) | actionlint as the workflow-validation gate | Accepted | Pinned actionlint via `bin/lint-workflows` in the `gate`; its shellcheck pass over `run:` blocks is mandatory, with shell policy single-sourced from the ShellCheck job. |
 | [0101](0101-bun-only-lockfile-collapse.md) | bun-only lockfile for ibl5 | Accepted | Collapsed ibl5 to a single `bun.lock`; npm audit gate replaced by `bun audit` + weekly tracking issue. |
 | [0102](0102-pre-commit-gate-in-version-control.md) | Version-control the pre-commit gate body | Accepted | Moves the git pre-commit gate body out of the untracked common hooks dir into `bin/pre-commit-hook`, installed via a fail-closed shim. |
+| [0103](0103-htmx-transient-dom-state-repair-on-history-restore.md) | Repair transient htmx request-time DOM state on history restore | Accepted | htmx snapshots the DOM between `beforeRequest` and the swap, so pre-request mutations must be undone in `htmx:historyRestore` too, scoped to a `data-*` marker; enforced by rule doc + review, not a gate. |
 
 ## When an ADR is Required
 

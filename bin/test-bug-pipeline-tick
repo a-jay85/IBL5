@@ -265,6 +265,52 @@ else
     bpt_expect_eq "P5: PHP DEFAULT_CACHE_DIR = the driver default resolved under the deploy home" "$_drv_deploy_default" "$_php_default"
 fi
 
+# ── P6: the driver writes a liveness heartbeat at tick start ──────────────────
+# bin/bug-pipeline-check reads this file; without it launchctl can report 1828 clean
+# ticks while the driver never actually started. Epoch-only by contract — a formatted
+# timestamp here would re-import the host-local date -j skew the checker exists to detect.
+bpt_reset
+export BUG_PIPELINE_TICK_HEARTBEAT="$STUB/tick-heartbeat"
+rm -f "$BUG_PIPELINE_TICK_HEARTBEAT"
+bpt_file_absent "$BUG_PIPELINE_TICK_HEARTBEAT" "P6: no heartbeat before the tick"
+bpt_set_actionable '[]'
+_before="$(date '+%s')"
+bpt_run
+_after="$(date '+%s')"
+# P6a: file exists after the tick
+if [ -f "$BUG_PIPELINE_TICK_HEARTBEAT" ]; then bpt_ok "P6a: heartbeat file exists after tick"; else bpt_fail "P6a: heartbeat file absent after tick"; fi
+# P6b: content is a bare positive integer
+_hb="$(cat "$BUG_PIPELINE_TICK_HEARTBEAT" 2>/dev/null)"
+case "$_hb" in
+    ''|*[!0-9]*) bpt_fail "P6b: heartbeat is not a bare positive integer — got [$_hb]" ;;
+    *) if [ "$_hb" -gt 0 ]; then bpt_ok "P6b: heartbeat is a positive integer"; else bpt_fail "P6b: heartbeat is not positive — got [$_hb]"; fi ;;
+esac
+# P6c: the epoch is the tick's epoch, bounded by before/after timestamps
+if [ -n "$_hb" ] && [ "$_hb" -ge "$_before" ] && [ "$_hb" -le "$_after" ]; then
+    bpt_ok "P6c: heartbeat epoch bounded by tick window"
+else
+    bpt_fail "P6c: heartbeat epoch out of tick window — hb=$_hb before=$_before after=$_after"
+fi
+# P6d: exactly one line (pins the truncating > redirect; accidental >> would append)
+bpt_count "P6d: heartbeat is exactly one line" 1 "$BUG_PIPELINE_TICK_HEARTBEAT"
+# P6e: written even on an empty tick (bpt_set_actionable '[]' above)
+bpt_expect_eq "P6e: tick exits 0 on empty tick" 0 "$BPT_RC"
+
+# P6f/P6g/P6h: an unwritable heartbeat path must not break the tick
+# (root can write to mode-500 dirs — skip these assertions under root)
+if [ "$(id -u)" -ne 0 ]; then
+    bpt_reset
+    mkdir -p "$STUB/ro-dir" && chmod 500 "$STUB/ro-dir"
+    export BUG_PIPELINE_TICK_HEARTBEAT="$STUB/ro-dir/nested/heartbeat"
+    bpt_set_actionable '[]'
+    bpt_run
+    bpt_expect_eq "P6f: tick still exits 0 when the heartbeat path is unwritable" 0 "$BPT_RC"
+    bpt_file_absent "$STUB/ro-dir/nested/heartbeat" "P6g: no heartbeat file created under a read-only dir"
+    bpt_log_lacks "$STUB" tick.out "Permission denied" "P6h: no permission-denied noise in the tick log"
+else
+    bpt_ok "P6f-h: skipped (running as root)"
+fi
+
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"
 exit "$FAILED"

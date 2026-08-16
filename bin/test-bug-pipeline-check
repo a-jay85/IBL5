@@ -1,0 +1,609 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# bin/test-bug-pipeline-check — test harness for bin/bug-pipeline-check (16 cases)
+#
+# No set -e (constraint a). Verdict assertions use tail -n 1 (constraint b).
+# BUG_PIPELINE_HEARTBEAT_MAX_AGE=600 pinned per case (constraint c).
+# All heartbeat ages computed as $(( $(date '+%s') - AGE )) (constraint d).
+# No MariaDB, no real launchctl required (constraint e). bash 3.2 safe (constraint f).
+# Cleanup via trap EXIT (constraint g). Absolute path to checker (constraint h).
+
+set -u
+
+WORKTREE_ROOT="/Users/ajaynicolas/GitHub/IBL5-worktrees/bug-pipeline-liveness-check"
+CHECK_BIN="$WORKTREE_ROOT/bin/bug-pipeline-check"
+
+PASSED=0
+FAILED=0
+HEARTBEAT_FILE=""
+LAUNCHCTL_STUB=""
+DB_STUB=""
+CHECK_RC=0
+SCRATCH_DB=""
+MAIN_DB="iblhoops_ibl5"
+
+bpt_ok()   { echo "ok: $1";  PASSED=$(( PASSED + 1 )); }
+bpt_fail() { echo "FAIL: $1"; FAILED=$(( FAILED + 1 )); }
+bpt_expect_eq() {
+    if [ "$2" = "$3" ]; then bpt_ok "$1"
+    else bpt_fail "$1 — want [$2] got [$3]"
+    fi
+}
+
+# ── Stub setup ─────────────────────────────────────────────────────────────────
+STUB="$(mktemp -d)"
+export STUB
+mkdir -p "$STUB/bin"
+_cleanup_all() {
+    if [ -n "$SCRATCH_DB" ]; then
+        DB_NAME="$MAIN_DB" "$WORKTREE_ROOT/bin/db-query" \
+            "DROP DATABASE IF EXISTS \`$SCRATCH_DB\`" >/dev/null 2>&1 || true
+    fi
+    rm -rf "$STUB"
+}
+trap '_cleanup_all' EXIT
+
+# launchctl stub: reads list exit code and print output from per-case files
+cat > "$STUB/bin/launchctl" <<'SH'
+#!/usr/bin/env bash
+case "$1" in
+    list)  exit "$(cat "$STUB/launchctl-list-rc" 2>/dev/null || echo 0)" ;;
+    print) cat "$STUB/launchctl-print-out" 2>/dev/null || true; exit 0 ;;
+    *)     exit 1 ;;
+esac
+SH
+
+# db-query stub: logs SQL to sql.log; branches on SQL content
+# modes: db-unavailable (exit 1), db-unparseable (print nothing exit 0), default (table box)
+cat > "$STUB/bin/db-query" <<'SH'
+#!/usr/bin/env bash
+sql="$*"
+printf '%s\n' "$sql" >> "$STUB/sql.log"
+if [ -f "$STUB/db-unavailable" ]; then
+    echo "DB connection error" >&2
+    exit 1
+fi
+if [ -f "$STUB/db-unparseable" ]; then
+    exit 0
+fi
+case "$sql" in
+    *blocked*) cnt="$(cat "$STUB/db-count-blocked" 2>/dev/null || echo 0)" ;;
+    *hunting*) cnt="$(cat "$STUB/db-count-hunting" 2>/dev/null || echo 0)" ;;
+    *)         cnt="$(cat "$STUB/db-count-other"   2>/dev/null || echo 0)" ;;
+esac
+printf '| n |\n|---|\n| %s |\n' "$cnt"
+exit 0
+SH
+
+chmod +x "$STUB/bin/launchctl" "$STUB/bin/db-query"
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+# reset_case — clear per-case state; restore healthy defaults for all four seams
+reset_case() {
+    rm -f "$STUB/launchctl-list-rc" "$STUB/launchctl-print-out" \
+          "$STUB/db-unavailable" "$STUB/db-unparseable" \
+          "$STUB/db-count-blocked" "$STUB/db-count-hunting" "$STUB/db-count-other" \
+          "$STUB/sql.log" "$STUB/out.txt" "$STUB/err.txt" "$STUB/rc"
+    # healthy launchctl
+    printf '0\n' > "$STUB/launchctl-list-rc"
+    printf 'last exit code = 0\nruns = 1828\n' > "$STUB/launchctl-print-out"
+    # fresh heartbeat (30s ago)
+    HEARTBEAT_FILE="$STUB/heartbeat"
+    printf '%s\n' "$(( $(date '+%s') - 30 ))" > "$HEARTBEAT_FILE"
+    # db: all-zero counts
+    printf '0\n' > "$STUB/db-count-blocked"
+    printf '0\n' > "$STUB/db-count-hunting"
+    printf '0\n' > "$STUB/db-count-other"
+    # stub pointers
+    LAUNCHCTL_STUB="$STUB/bin/launchctl"
+    DB_STUB="$STUB/bin/db-query"
+    CHECK_RC=0
+}
+
+# run_check ["arg"] — invoke the checker; capture stdout/stderr; set CHECK_RC
+# Uses || _rc=$? so harness never aborts on non-zero checker exit (no set -e).
+run_check() {
+    local _rc=0
+    BUG_PIPELINE_CHECK_LAUNCHCTL_BIN="$LAUNCHCTL_STUB" \
+    BUG_PIPELINE_CHECK_DB_QUERY_BIN="$DB_STUB" \
+    BUG_PIPELINE_TICK_HEARTBEAT="$HEARTBEAT_FILE" \
+    BUG_PIPELINE_HEARTBEAT_MAX_AGE=600 \
+    "$CHECK_BIN" "$@" > "$STUB/out.txt" 2>"$STUB/err.txt" || _rc=$?
+    printf '%s\n' "$_rc" > "$STUB/rc"
+    CHECK_RC="$_rc"
+}
+
+# ── Case 1: Fully healthy ─────────────────────────────────────────────────────
+reset_case
+run_check
+bpt_expect_eq "1: verdict" "VERDICT: healthy" "$(tail -n 1 "$STUB/out.txt")"
+bpt_expect_eq "1: rc=0" "0" "$CHECK_RC"
+if grep -q '^SIGNAL:' "$STUB/out.txt" 2>/dev/null; then
+    bpt_fail "1: no SIGNAL lines expected in healthy output"
+else
+    bpt_ok "1: no SIGNAL lines in healthy output"
+fi
+
+# ── Case 2: launchctl binary absent ──────────────────────────────────────────
+reset_case
+LAUNCHCTL_STUB="/nonexistent/launchctl"
+run_check
+bpt_expect_eq "2: rc=2" "2" "$CHECK_RC"
+if grep -q 'SIGNAL: process:launchctl-unavailable' "$STUB/out.txt"; then
+    bpt_ok "2: SIGNAL process:launchctl-unavailable present"
+else
+    bpt_fail "2: SIGNAL process:launchctl-unavailable absent"
+fi
+_v2="$(tail -n 1 "$STUB/out.txt")"
+case "$_v2" in
+    VERDICT:\ unknown*) bpt_ok "2: verdict starts VERDICT: unknown" ;;
+    *) bpt_fail "2: verdict should start VERDICT: unknown — got [$_v2]" ;;
+esac
+
+# ── Case 3: Job unloaded ──────────────────────────────────────────────────────
+reset_case
+printf '1\n' > "$STUB/launchctl-list-rc"
+run_check
+bpt_expect_eq "3: rc=1" "1" "$CHECK_RC"
+if grep -q 'SIGNAL: process:unloaded' "$STUB/out.txt"; then
+    bpt_ok "3: SIGNAL process:unloaded present"
+else
+    bpt_fail "3: SIGNAL process:unloaded absent"
+fi
+if grep -q 'process:launchctl-unavailable' "$STUB/out.txt"; then
+    bpt_fail "3: process:launchctl-unavailable must be absent (not conflated with unloaded)"
+else
+    bpt_ok "3: process:launchctl-unavailable absent (unloaded not conflated)"
+fi
+
+# ── Case 4: Last exit code non-zero ──────────────────────────────────────────
+reset_case
+printf 'last exit code = 78\nruns = 1\n' > "$STUB/launchctl-print-out"
+run_check
+bpt_expect_eq "4: rc=1" "1" "$CHECK_RC"
+if grep -qE 'SIGNAL: process:last-exit-nonzero.*78' "$STUB/out.txt"; then
+    bpt_ok "4: SIGNAL process:last-exit-nonzero with 78 in detail"
+else
+    bpt_fail "4: SIGNAL process:last-exit-nonzero with 78 expected"
+fi
+
+# ── Case 5: Heartbeat missing ─────────────────────────────────────────────────
+reset_case
+HEARTBEAT_FILE="$STUB/no-such-heartbeat"
+run_check
+bpt_expect_eq "5: rc=1" "1" "$CHECK_RC"
+if grep -q 'SIGNAL: process:no-heartbeat' "$STUB/out.txt"; then
+    bpt_ok "5: SIGNAL process:no-heartbeat present"
+else
+    bpt_fail "5: SIGNAL process:no-heartbeat absent"
+fi
+if grep -q 'main checkout' "$STUB/out.txt"; then
+    bpt_ok "5: detail mentions main checkout"
+else
+    bpt_fail "5: detail should mention main checkout"
+fi
+
+# ── Case 6: Heartbeat stale ───────────────────────────────────────────────────
+reset_case
+printf '%s\n' "$(( $(date '+%s') - 4200 ))" > "$STUB/heartbeat"
+run_check
+bpt_expect_eq "6: rc=1" "1" "$CHECK_RC"
+if grep -q 'SIGNAL: process:heartbeat-stale' "$STUB/out.txt"; then
+    bpt_ok "6: SIGNAL process:heartbeat-stale present"
+else
+    bpt_fail "6: SIGNAL process:heartbeat-stale absent"
+fi
+
+# ── Case 7: Heartbeat boundary (599 / 600 / 601) — pins strict -gt ───────────
+# 7a: age 599 — not stale
+reset_case
+printf '%s\n' "$(( $(date '+%s') - 599 ))" > "$STUB/heartbeat"
+run_check
+if grep -q '^SIGNAL: process:heartbeat' "$STUB/out.txt" 2>/dev/null; then
+    bpt_fail "7a: age-599 should not trigger heartbeat signal"
+else
+    bpt_ok "7a: age-599 no heartbeat-stale signal"
+fi
+
+# 7b: age 600 exactly — not stale (checker uses strict -gt: 600 is NOT > 600)
+# Align to fresh second to avoid clock-boundary race: write heartbeat right after
+# the second ticks so the checker's own date '+%s' lands in the same second.
+reset_case
+_t0="$(date '+%s')"; while [ "$(date '+%s')" = "$_t0" ]; do :; done
+_now="$(date '+%s')"
+printf '%s\n' "$(( _now - 600 ))" > "$STUB/heartbeat"
+run_check
+if grep -q '^SIGNAL: process:heartbeat' "$STUB/out.txt" 2>/dev/null; then
+    bpt_fail "7b: age-600 should not trigger heartbeat signal (strict -gt)"
+else
+    bpt_ok "7b: age-600 no heartbeat-stale signal (strict -gt confirmed)"
+fi
+
+# 7c: age 601 — stale
+reset_case
+printf '%s\n' "$(( $(date '+%s') - 601 ))" > "$STUB/heartbeat"
+run_check
+if grep -q 'SIGNAL: process:heartbeat-stale' "$STUB/out.txt"; then
+    bpt_ok "7c: age-601 triggers heartbeat-stale"
+else
+    bpt_fail "7c: age-601 should trigger heartbeat-stale"
+fi
+
+# ── Case 8: Heartbeat unreadable ──────────────────────────────────────────────
+reset_case
+printf 'garbage\n' > "$STUB/heartbeat"
+run_check
+bpt_expect_eq "8: rc=2" "2" "$CHECK_RC"
+if grep -q 'SIGNAL: process:heartbeat-unreadable' "$STUB/out.txt"; then
+    bpt_ok "8: SIGNAL process:heartbeat-unreadable present"
+else
+    bpt_fail "8: SIGNAL process:heartbeat-unreadable absent"
+fi
+if grep -qiE 'Arithmetic syntax error|unbound variable' "$STUB/out.txt" "$STUB/err.txt" 2>/dev/null; then
+    bpt_fail "8: unexpected arithmetic/set-u error in output or stderr"
+else
+    bpt_ok "8: no arithmetic/set-u error text in output or stderr"
+fi
+
+# ── Case 9: Heartbeat in the future ──────────────────────────────────────────
+reset_case
+printf '%s\n' "$(( $(date '+%s') + 3600 ))" > "$STUB/heartbeat"
+run_check
+bpt_expect_eq "9: rc=1" "1" "$CHECK_RC"
+if grep -q 'SIGNAL: process:heartbeat-future' "$STUB/out.txt"; then
+    bpt_ok "9: SIGNAL process:heartbeat-future present"
+else
+    bpt_fail "9: SIGNAL process:heartbeat-future absent"
+fi
+
+# ── Case 10: DB unavailable (the silent-green guard) ─────────────────────────
+reset_case
+touch "$STUB/db-unavailable"
+run_check
+_v10="$(tail -n 1 "$STUB/out.txt")"
+bpt_expect_eq "10: rc=2" "2" "$CHECK_RC"
+if grep -q 'SIGNAL: stale:db-unavailable' "$STUB/out.txt"; then
+    bpt_ok "10: SIGNAL stale:db-unavailable present"
+else
+    bpt_fail "10: SIGNAL stale:db-unavailable absent"
+fi
+case "$_v10" in
+    VERDICT:\ unknown*) bpt_ok "10: verdict starts VERDICT: unknown" ;;
+    *) bpt_fail "10: verdict should start VERDICT: unknown — got [$_v10]" ;;
+esac
+if [ "$_v10" = "VERDICT: healthy" ]; then
+    bpt_fail "10: verdict must not be VERDICT: healthy"
+else
+    bpt_ok "10: verdict is not VERDICT: healthy"
+fi
+
+# ── Case 11: DB returns a count ───────────────────────────────────────────────
+reset_case
+printf '3\n' > "$STUB/db-count-blocked"
+run_check
+bpt_expect_eq "11: rc=1" "1" "$CHECK_RC"
+if grep -qE 'SIGNAL: stale:blocked-backoff-expired.*3' "$STUB/out.txt"; then
+    bpt_ok "11: SIGNAL stale:blocked-backoff-expired with 3 in detail"
+else
+    bpt_fail "11: SIGNAL stale:blocked-backoff-expired with 3 expected"
+fi
+
+# ── Case 12: DB output unparseable ───────────────────────────────────────────
+reset_case
+touch "$STUB/db-unparseable"
+run_check
+_v12="$(tail -n 1 "$STUB/out.txt")"
+bpt_expect_eq "12: rc=2" "2" "$CHECK_RC"
+if grep -q 'SIGNAL: stale:db-parse-failed' "$STUB/out.txt"; then
+    bpt_ok "12: SIGNAL stale:db-parse-failed present"
+else
+    bpt_fail "12: SIGNAL stale:db-parse-failed absent"
+fi
+if [ "$_v12" = "VERDICT: healthy" ]; then
+    bpt_fail "12: verdict must not be VERDICT: healthy"
+else
+    bpt_ok "12: verdict is not VERDICT: healthy"
+fi
+
+# ── Case 13: Mixed degraded + unknown (precedence) ───────────────────────────
+# launchctl unloaded (DEGRADED) + db unavailable (UNKNOWN) → exit 1 (degraded wins)
+reset_case
+printf '1\n' > "$STUB/launchctl-list-rc"
+touch "$STUB/db-unavailable"
+run_check
+_v13="$(tail -n 1 "$STUB/out.txt")"
+bpt_expect_eq "13: rc=1 (not 2)" "1" "$CHECK_RC"
+_starts_degraded=0
+case "$_v13" in VERDICT:\ degraded\ *) _starts_degraded=1 ;; esac
+if [ "$_starts_degraded" -eq 1 ] && echo "$_v13" | grep -q 'process:unloaded'; then
+    bpt_ok "13: verdict is VERDICT: degraded [...process:unloaded...]"
+else
+    bpt_fail "13: verdict should be VERDICT: degraded [...process:unloaded...] — got [$_v13]"
+fi
+if grep -qF 'UNKNOWN: [stale:db-unavailable]' "$STUB/out.txt"; then
+    bpt_ok "13: UNKNOWN: [stale:db-unavailable] line present above verdict"
+else
+    bpt_fail "13: UNKNOWN: [stale:db-unavailable] line expected"
+fi
+
+# ── Case 14: NEG — checker performs no writes ─────────────────────────────────
+# db stub logs every SQL call; assert all logged SQL is SELECT only
+reset_case
+run_check
+if [ -f "$STUB/sql.log" ]; then
+    # Anchor on statement position — avoids false match on column names like 'updated_at'
+    if grep -iE '^[[:space:]]*(insert|update|delete|alter|drop|truncate)[[:space:]]' \
+            "$STUB/sql.log" >/dev/null 2>&1; then
+        bpt_fail "14: non-SELECT SQL found in sql.log"
+    else
+        bpt_ok "14: sql.log contains only SELECT statements"
+    fi
+    _sql_count="$(grep -c 'SELECT' "$STUB/sql.log" 2>/dev/null || echo 0)"
+    bpt_expect_eq "14: sql.log has 3 SELECT calls" "3" "$_sql_count"
+else
+    bpt_fail "14: sql.log not found (db stub was not called)"
+fi
+
+# ── Case 15: NEG — static no-remediation / no-skew guards ────────────────────
+if grep -iE 'launchctl (load|unload|kickstart|bootout|start|stop)' "$CHECK_BIN" >/dev/null 2>&1; then
+    bpt_fail "15a: launchctl remediation command found in checker"
+else
+    bpt_ok "15a: no launchctl remediation command in checker"
+fi
+if grep -E '^[[:space:]]*mariadb ' "$CHECK_BIN" >/dev/null 2>&1; then
+    bpt_fail "15b: bare mariadb invocation found in checker"
+else
+    bpt_ok "15b: no bare mariadb invocation in checker"
+fi
+if grep -E 'date -j|date -d|epoch_of|future_ts' "$CHECK_BIN" >/dev/null 2>&1; then
+    bpt_fail "15c: non-epoch heartbeat comparison found in checker"
+else
+    bpt_ok "15c: no non-epoch heartbeat comparison in checker (epoch-only invariant)"
+fi
+
+# ── Case 16: Argument handling ────────────────────────────────────────────────
+reset_case
+run_check "--help"
+bpt_expect_eq "16a: --help rc=0" "0" "$CHECK_RC"
+if [ -s "$STUB/out.txt" ]; then
+    bpt_ok "16a: --help produces usage on stdout"
+else
+    bpt_fail "16a: --help should produce usage on stdout"
+fi
+if grep -q '^SIGNAL:' "$STUB/out.txt" 2>/dev/null; then
+    bpt_fail "16a: --help should have no SIGNAL lines"
+else
+    bpt_ok "16a: --help no SIGNAL lines"
+fi
+
+reset_case
+run_check "--bogus"
+bpt_expect_eq "16b: --bogus rc=64" "64" "$CHECK_RC"
+if [ -s "$STUB/err.txt" ]; then
+    bpt_ok "16b: --bogus produces usage on stderr"
+else
+    bpt_fail "16b: --bogus should produce usage on stderr"
+fi
+
+# ── Real-DB gate ──────────────────────────────────────────────────────────────
+REQUIRE_DB="${BUG_PIPELINE_CHECK_REQUIRE_DB:-0}"
+if ! DB_NAME="$MAIN_DB" "$WORKTREE_ROOT/bin/db-query" "SELECT 1" >/dev/null 2>&1; then
+    if [ "$REQUIRE_DB" = "1" ]; then
+        bpt_fail "real-DB cases REQUIRED but MariaDB is unreachable at 127.0.0.1:3306"
+        printf '\npassed %d / failed %d\n' "$PASSED" "$FAILED"
+        exit 1
+    fi
+    printf '\npassed %d / failed %d\n' "$PASSED" "$FAILED"
+    echo "skipping real-DB tests: MariaDB not available on 127.0.0.1:3306"
+    exit "$FAILED"
+fi
+
+# ── Real-DB scratch schema ─────────────────────────────────────────────────────
+SCRATCH_DB="ibl5_check_test_$$"
+DB_NAME="$MAIN_DB" "$WORKTREE_ROOT/bin/db-query" \
+    "CREATE DATABASE IF NOT EXISTS \`$SCRATCH_DB\`" >/dev/null 2>&1
+
+if ! DB_NAME="$SCRATCH_DB" "$WORKTREE_ROOT/bin/db-query" \
+        "$(cat "$WORKTREE_ROOT/ibl5/migrations/153_create_bug_pipeline_tables.sql")" >/dev/null 2>&1; then
+    bpt_fail "real-DB schema load: migration 153 failed"
+    printf '\npassed %d / failed %d\n' "$PASSED" "$FAILED"
+    exit 1
+fi
+if ! DB_NAME="$SCRATCH_DB" "$WORKTREE_ROOT/bin/db-query" \
+        "$(cat "$WORKTREE_ROOT/ibl5/migrations/158_create_bug_report_attachments.sql")" >/dev/null 2>&1; then
+    bpt_fail "real-DB schema load: migration 158 failed"
+    printf '\npassed %d / failed %d\n' "$PASSED" "$FAILED"
+    exit 1
+fi
+
+# ── Real-DB wrapper + liveness stubs ──────────────────────────────────────────
+# db-query-wrap: redirect every checker DB call to the scratch database
+cat > "$STUB/bin/db-query-wrap" << WRAPPER_EOF
+#!/bin/sh
+DB_NAME="$SCRATCH_DB" exec "$WORKTREE_ROOT/bin/db-query" "\$@"
+WRAPPER_EOF
+chmod +x "$STUB/bin/db-query-wrap"
+
+# launchctl-healthy: always reports healthy liveness so verdicts are DB-only
+cat > "$STUB/bin/launchctl-healthy" << 'LC_EOF'
+#!/bin/sh
+case "$1" in
+    list)  exit 0 ;;
+    print) printf 'last exit code = 0\nruns = 1\n' ;;
+    *)     exit 0 ;;
+esac
+LC_EOF
+chmod +x "$STUB/bin/launchctl-healthy"
+
+# fresh heartbeat for all real-DB cases
+REAL_DB_HB="$STUB/hb-realdb"
+date '+%s' > "$REAL_DB_HB"
+
+# ── Real-DB helpers ────────────────────────────────────────────────────────────
+_SEED_CTR=0
+
+# seed_row <status> <blocked_until_sql> <lease_expires_sql> <updated_at_sql>
+# blocked_until/lease_expires/updated_at are SQL expressions (NULL or NOW()-INTERVAL n UNIT)
+seed_row() {
+    _SEED_CTR=$(( _SEED_CTR + 1 ))
+    local status="$1" blocked_until="$2" lease_expires="$3" updated_at="$4"
+    local msg_id
+    msg_id=$(( $$ * 10000 + _SEED_CTR ))
+    local sql
+    sql="INSERT INTO ibl_bug_reports (discord_author_id, channel_id, original_message_id, original_text, status, blocked_until, lease_expires, updated_at) VALUES (1, 2, $msg_id, 'test text', '$status', $blocked_until, $lease_expires, $updated_at)"
+    DB_NAME="$SCRATCH_DB" "$WORKTREE_ROOT/bin/db-query" "$sql" >/dev/null 2>&1
+}
+
+truncate_table() {
+    DB_NAME="$SCRATCH_DB" "$WORKTREE_ROOT/bin/db-query" \
+        "DELETE FROM ibl_bug_reports" >/dev/null 2>&1
+}
+
+# run_real_check — invoke checker with scratch DB wrapper + healthy liveness stubs
+run_real_check() {
+    local _rc=0
+    BUG_PIPELINE_CHECK_LAUNCHCTL_BIN="$STUB/bin/launchctl-healthy" \
+    BUG_PIPELINE_CHECK_DB_QUERY_BIN="$STUB/bin/db-query-wrap" \
+    BUG_PIPELINE_TICK_HEARTBEAT="$REAL_DB_HB" \
+    BUG_PIPELINE_HEARTBEAT_MAX_AGE=600 \
+    "$CHECK_BIN" > "$STUB/out.txt" 2>"$STUB/err.txt" || _rc=$?
+    printf '%s\n' "$_rc" > "$STUB/rc"
+    CHECK_RC="$_rc"
+}
+
+# ── Case R1: blocked row past its backoff → stale:blocked-backoff-expired ─────
+truncate_table
+seed_row 'blocked' 'NOW() - INTERVAL 15 MINUTE' 'NULL' 'NOW()'
+run_real_check
+if grep -qE 'SIGNAL: stale:blocked-backoff-expired.*1' "$STUB/out.txt"; then
+    bpt_ok "R1: SIGNAL stale:blocked-backoff-expired with count 1"
+else
+    bpt_fail "R1: expected SIGNAL stale:blocked-backoff-expired with count 1 — got $(cat "$STUB/out.txt")"
+fi
+bpt_expect_eq "R1: rc=1" "1" "$CHECK_RC"
+
+# ── Case R2: blocked row with future blocked_until → healthy (neg) ─────────────
+truncate_table
+seed_row 'blocked' 'NOW() + INTERVAL 30 MINUTE' 'NULL' 'NOW()'
+run_real_check
+if grep -q 'SIGNAL: stale:blocked-backoff-expired' "$STUB/out.txt"; then
+    bpt_fail "R2: stale:blocked-backoff-expired must be absent for future blocked_until"
+else
+    bpt_ok "R2: stale:blocked-backoff-expired absent (future blocked_until)"
+fi
+bpt_expect_eq "R2: verdict healthy" "VERDICT: healthy" "$(tail -n 1 "$STUB/out.txt")"
+bpt_expect_eq "R2: rc=0" "0" "$CHECK_RC"
+
+# ── Case R3: blocked row, blocked_until only 5 min ago → healthy (neg) ─────────
+truncate_table
+seed_row 'blocked' 'NOW() - INTERVAL 5 MINUTE' 'NULL' 'NOW()'
+run_real_check
+if grep -q 'SIGNAL: stale:blocked-backoff-expired' "$STUB/out.txt"; then
+    bpt_fail "R3: stale:blocked-backoff-expired must be absent within 10-min threshold"
+else
+    bpt_ok "R3: stale:blocked-backoff-expired absent (5-min ago, threshold is 10)"
+fi
+bpt_expect_eq "R3: rc=0" "0" "$CHECK_RC"
+
+# ── Case R4: hunting row with stale lease → stale:hunting-stale-lease ──────────
+truncate_table
+seed_row 'hunting' 'NULL' 'NOW() - INTERVAL 35 MINUTE' 'NOW()'
+run_real_check
+if grep -q 'SIGNAL: stale:hunting-stale-lease' "$STUB/out.txt"; then
+    bpt_ok "R4: SIGNAL stale:hunting-stale-lease present"
+else
+    bpt_fail "R4: expected SIGNAL stale:hunting-stale-lease — got $(cat "$STUB/out.txt")"
+fi
+bpt_expect_eq "R4: rc=1" "1" "$CHECK_RC"
+
+# ── Case R5: hunting row with lease only 5 min expired → healthy (neg) ─────────
+truncate_table
+seed_row 'hunting' 'NULL' 'NOW() - INTERVAL 5 MINUTE' 'NOW()'
+run_real_check
+if grep -q 'SIGNAL: stale:hunting-stale-lease' "$STUB/out.txt"; then
+    bpt_fail "R5: stale:hunting-stale-lease must be absent within 30-min threshold"
+else
+    bpt_ok "R5: stale:hunting-stale-lease absent (5-min ago, threshold is 30)"
+fi
+bpt_expect_eq "R5: rc=0" "0" "$CHECK_RC"
+
+# ── Case R6: queued row stuck 3 hours → stale:rows-stuck ──────────────────────
+truncate_table
+seed_row 'queued' 'NULL' 'NULL' 'NOW() - INTERVAL 3 HOUR'
+run_real_check
+if grep -q 'SIGNAL: stale:rows-stuck' "$STUB/out.txt"; then
+    bpt_ok "R6: SIGNAL stale:rows-stuck present (queued 3h old, threshold 2h)"
+else
+    bpt_fail "R6: expected SIGNAL stale:rows-stuck — got $(cat "$STUB/out.txt")"
+fi
+bpt_expect_eq "R6: rc=1" "1" "$CHECK_RC"
+
+# ── Case R7: queued row only 1 hour old → healthy (neg) ────────────────────────
+truncate_table
+seed_row 'queued' 'NULL' 'NULL' 'NOW() - INTERVAL 1 HOUR'
+run_real_check
+if grep -q 'SIGNAL: stale:rows-stuck' "$STUB/out.txt"; then
+    bpt_fail "R7: stale:rows-stuck must be absent within 2-hour threshold"
+else
+    bpt_ok "R7: stale:rows-stuck absent (queued 1h old, threshold 2h)"
+fi
+bpt_expect_eq "R7: rc=0" "0" "$CHECK_RC"
+
+# ── Case R8: fixed row 30 days old → healthy (neg, terminal status) ─────────────
+truncate_table
+seed_row 'fixed' 'NULL' 'NULL' 'NOW() - INTERVAL 30 DAY'
+run_real_check
+if grep -q 'SIGNAL: stale:' "$STUB/out.txt"; then
+    bpt_fail "R8: no stale signal expected for terminal status 'fixed'"
+else
+    bpt_ok "R8: no stale signal for fixed row (terminal status exempt)"
+fi
+bpt_expect_eq "R8: rc=0" "0" "$CHECK_RC"
+
+# ── Case R9: pr_open row stuck 60 hours → stale:rows-stuck ────────────────────
+truncate_table
+seed_row 'pr_open' 'NULL' 'NULL' 'NOW() - INTERVAL 60 HOUR'
+run_real_check
+if grep -q 'SIGNAL: stale:rows-stuck' "$STUB/out.txt"; then
+    bpt_ok "R9: SIGNAL stale:rows-stuck present (pr_open 60h old, threshold 48h)"
+else
+    bpt_fail "R9: expected SIGNAL stale:rows-stuck — got $(cat "$STUB/out.txt")"
+fi
+bpt_expect_eq "R9: rc=1" "1" "$CHECK_RC"
+
+# ── Case R10: all-healthy mix — one fresh row per non-terminal status ──────────
+truncate_table
+seed_row 'queued'        'NULL'                       'NULL'                        'NOW()'
+seed_row 'hunting'       'NULL'                       'NOW() + INTERVAL 5 MINUTE'  'NOW()'
+seed_row 'blocked'       'NOW() + INTERVAL 1 HOUR'   'NULL'                        'NOW()'
+seed_row 'gathering'     'NULL'                       'NULL'                        'NOW()'
+seed_row 'awaiting_info' 'NULL'                       'NULL'                        'NOW()'
+seed_row 'pr_open'       'NULL'                       'NULL'                        'NOW()'
+seed_row 'planned'       'NULL'                       'NULL'                        'NOW()'
+seed_row 'awaiting_ajay' 'NULL'                       'NULL'                        'NOW()'
+run_real_check
+if grep -q 'SIGNAL: stale:' "$STUB/out.txt"; then
+    bpt_fail "R10: no stale signal expected for all-fresh rows — got $(grep 'SIGNAL: stale:' "$STUB/out.txt")"
+else
+    bpt_ok "R10: no stale signal for all-fresh non-terminal rows"
+fi
+bpt_expect_eq "R10: verdict healthy" "VERDICT: healthy" "$(tail -n 1 "$STUB/out.txt")"
+bpt_expect_eq "R10: rc=0" "0" "$CHECK_RC"
+
+# ── Case R11: checker performs no writes to the scratch DB ────────────────────
+truncate_table
+seed_row 'queued' 'NULL' 'NULL' 'NOW()'
+_r11_before="$(DB_NAME="$SCRATCH_DB" "$WORKTREE_ROOT/bin/db-query" \
+    "SELECT COUNT(*) AS n, IFNULL(MAX(updated_at),'-') AS m FROM ibl_bug_reports" 2>/dev/null)"
+run_real_check
+_r11_after="$(DB_NAME="$SCRATCH_DB" "$WORKTREE_ROOT/bin/db-query" \
+    "SELECT COUNT(*) AS n, IFNULL(MAX(updated_at),'-') AS m FROM ibl_bug_reports" 2>/dev/null)"
+bpt_expect_eq "R11: no writes — scratch DB snapshot unchanged" "$_r11_before" "$_r11_after"
+
+# ── Summary ───────────────────────────────────────────────────────────────────
+printf '\npassed %d / failed %d\n' "$PASSED" "$FAILED"
+if [ "$FAILED" -ne 0 ]; then
+    exit 1
+fi
+exit 0

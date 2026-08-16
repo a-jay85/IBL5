@@ -1,6 +1,6 @@
 ---
 description: Run the Discord bug/feature pipeline orchestrator as a Mac-local launchd LaunchAgent firing a poll-only bash driver every 180s via StartInterval — not a daemon, tmux, or persistent claude — with single-flight enforced by an atomic DB lease and no prod credentials in its environment.
-last_verified: 2026-07-06
+last_verified: 2026-08-09
 ---
 
 # ADR-0080: Mac-local launchd cron topology for the Discord bug/feature pipeline
@@ -81,3 +81,21 @@ cron on the trusted Mac, never in prod PHP.
 - `bin/bug-pipeline-cron-setup` and `bin/bug-pipeline-tick` are both new `bin/*` scripts ≥50 lines
   (the `bin/adr-check` trigger); this ADR covers the whole cron topology, so no per-script bypass is
   needed.
+- **Liveness heartbeat artifact.** `bin/bug-pipeline-tick` writes the epoch of each tick *start* to
+  `$HOME/.claude/logs/bug-pipeline-tick-heartbeat` as the first statement of `main()`, seamed by
+  `BUG_PIPELINE_TICK_HEARTBEAT`. `launchctl print` exposes `runs`, `state` and `last exit code` but
+  no timestamp, so this file is the only evidence of *when* the driver last started. It is written
+  before the `$CLAUDE_BIN` preflight can abort, which deliberately keeps "launchd fired" a distinct
+  fact from "the tick succeeded" (the latter is carried by `last exit code`). The value is a bare
+  integer epoch from `date '+%s'` — never a formatted timestamp — so the host-local `date -j`
+  formatting used elsewhere in the driver cannot leak into a recency comparison. Both the `mkdir`
+  and the write are `2>/dev/null || true`: a monitoring line must never be able to fail a tick.
+- **Ops health check.** `bin/bug-pipeline-check` is the read-only companion diagnostic for this
+  topology. It asserts two independent signals — process liveness (`launchctl` load state, last exit
+  code, heartbeat recency against a 600 s threshold ≈ 3.3× the 180 s `StartInterval`) and semantic
+  staleness (per-status `SELECT COUNT(*)` probes over `ibl_bug_reports` via `bin/db-query`) — and
+  exits 0 healthy / 1 degraded / 2 unprobeable with a greppable `VERDICT:` line. Both signals are
+  required: a clean `launchctl` record is compatible with a pipeline that ticks and does nothing, so
+  process liveness alone cannot establish health. It performs **no remediation** of any kind — no
+  service restart, no lease reset, no re-queue, no `blocked_until` edit — by design: detection and
+  alerting only, so a diagnostic run can never itself perturb the pipeline it is measuring.

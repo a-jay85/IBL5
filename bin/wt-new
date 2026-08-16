@@ -8,8 +8,13 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$REPO_ROOT/bin/lib/git-helpers.sh"
+# $REPO_ROOT is derived from $0, so invoking this script by its worktree-relative
+# path (bin/wt-new <slug> from inside a worktree — the form workflow-continuity.md
+# documents) points it at that worktree, not the main checkout. Every base-branch
+# git op and every symlink source below must target the main checkout instead.
+MAIN_CHECKOUT="$(resolve_canonical_root "$REPO_ROOT")"
 WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
-MAIN_IBL5="$REPO_ROOT/ibl5"
+MAIN_IBL5="$MAIN_CHECKOUT/ibl5"
 NAME=""
 BASE_BRANCH="master"
 
@@ -50,11 +55,11 @@ fi
 
 # Sync local $BASE_BRANCH with origin before branching — avoids forking from a stale tip.
 echo "Fetching origin/$BASE_BRANCH..."
-if git -C "$REPO_ROOT" fetch origin "$BASE_BRANCH" --quiet 2>/dev/null; then
-    BEHIND=$(git -C "$REPO_ROOT" rev-list --count "$BASE_BRANCH..origin/$BASE_BRANCH" 2>/dev/null || echo 0)
+if git -C "$MAIN_CHECKOUT" fetch origin "$BASE_BRANCH" --quiet 2>/dev/null; then
+    BEHIND=$(git -C "$MAIN_CHECKOUT" rev-list --count "$BASE_BRANCH..origin/$BASE_BRANCH" 2>/dev/null || echo 0)
     if [ "$BEHIND" -gt 0 ]; then
         echo "Fast-forwarding local $BASE_BRANCH ($BEHIND commit(s) behind origin)..."
-        git -C "$REPO_ROOT" merge --ff-only "origin/$BASE_BRANCH" --quiet
+        git -C "$MAIN_CHECKOUT" merge --ff-only "origin/$BASE_BRANCH" --quiet
     fi
 else
     echo "Warning: could not reach origin; creating worktree from local $BASE_BRANCH." >&2
@@ -62,7 +67,7 @@ fi
 
 # Create worktree + branch in one step
 echo "Creating worktree '$NAME' from $BASE_BRANCH..."
-git -C "$REPO_ROOT" worktree add "$WT_ROOT" -b "$NAME" "$BASE_BRANCH"
+git -C "$MAIN_CHECKOUT" worktree add "$WT_ROOT" -b "$NAME" "$BASE_BRANCH"
 
 # config.php: real copy, NOT a symlink. A symlink's absolute host target
 # (/Users/.../IBL5/ibl5/config.php) doesn't resolve inside the worktree's Docker

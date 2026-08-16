@@ -9,7 +9,8 @@
  * - Dropdown value decomposition for tab switching (split:key → display + split)
  * - Width constraint clearing before table content swaps
  * - Static file link interception to prevent hx-boost from breaking non-PHP links
- * - Submit button disable/enable during boosted form submissions
+ * - Submit button disable/enable during boosted form submissions, including
+ *   the reset on history restore (see .claude/rules/htmx-history-cache.md)
  */
 (function () {
     'use strict';
@@ -71,11 +72,7 @@
         if (!elt || elt.tagName !== 'FORM') return;
         var btns = elt.querySelectorAll('button[type="submit"], input[type="submit"]');
         for (var i = 0; i < btns.length; i++) {
-            btns[i].disabled = true;
-            if (btns[i].tagName === 'BUTTON') {
-                btns[i].dataset.originalText = btns[i].textContent;
-                btns[i].textContent = 'Submitting\u2026';
-            }
+            disableSubmitButton(btns[i]);
         }
     });
 
@@ -84,17 +81,52 @@
         if (!elt || elt.tagName !== 'FORM') return;
         var btns = elt.querySelectorAll('button[type="submit"], input[type="submit"]');
         for (var i = 0; i < btns.length; i++) {
-            btns[i].disabled = false;
-            if (btns[i].tagName === 'BUTTON' && btns[i].dataset.originalText) {
-                btns[i].textContent = btns[i].dataset.originalText;
-            }
+            restoreSubmitButton(btns[i]);
         }
     });
+
+    // data-original-text doubles as the marker for "this button was disabled by
+    // the handler above": a data-* attribute, so it survives DOM serialization.
+    // Only marked buttons are ever re-enabled, which keeps buttons that ship
+    // disabled from the server (e.g. #trade-submit-btn) disabled.
+    function disableSubmitButton(btn) {
+        btn.disabled = true;
+        if (btn.tagName === 'BUTTON') {
+            btn.dataset.originalText = btn.textContent;
+            btn.textContent = 'Submitting\u2026';
+        } else {
+            btn.dataset.originalText = btn.value;
+            btn.value = 'Submitting\u2026';
+        }
+    }
+
+    function restoreSubmitButton(btn) {
+        btn.disabled = false;
+        if (btn.dataset.originalText === undefined) return;
+        if (btn.tagName === 'BUTTON') {
+            btn.textContent = btn.dataset.originalText;
+        } else {
+            btn.value = btn.dataset.originalText;
+        }
+        delete btn.dataset.originalText;
+    }
 
     // Re-initialize JS features after HTMX restores a page from its
     // history cache (browser Back/Forward). htmx:afterSwap does NOT fire
     // on history restore — only htmx:historyRestore does.
     document.addEventListener('htmx:historyRestore', function () {
+        // htmx writes its history snapshot AFTER htmx:beforeRequest and BEFORE
+        // the swap, so the submit-button disable above is serialized into the
+        // cached copy while the htmx:afterRequest re-enable only ever reaches
+        // the live DOM. Without this reset, Back returns a ballot/form whose
+        // Submit button is permanently disabled and still reads "Submitting…".
+        var stuckBtns = document.querySelectorAll(
+            'button[data-original-text], input[data-original-text]'
+        );
+        for (var b = 0; b < stuckBtns.length; b++) {
+            restoreSubmitButton(stuckBtns[b]);
+        }
+
         if (window.sorttable) {
             // HTMX serializes the DOM (including data-sorttable attributes)
             // into its history cache, but JS event listeners are lost on

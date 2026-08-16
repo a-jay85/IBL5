@@ -1,6 +1,6 @@
 ---
-description: Index of tracked backlogs under docs/backlog/ — one row per LIVE backlog plus the archive pointer, and the canonical status taxonomy shared by all backlogs; and the archive / dated-pointer / supersession housekeeping conventions.
-last_verified: 2026-08-14
+description: Index of tracked backlogs under docs/backlog/ — one row per LIVE backlog, the standalone single-item files, and the archive pointer, plus the canonical status taxonomy shared by all backlogs and the archive / dated-pointer / supersession housekeeping conventions.
+last_verified: 2026-08-16
 ---
 
 # Backlog index
@@ -23,6 +23,17 @@ a `/plan`.
 Note: `token-spend-backlog.md` and `loop-engineering-backlog.md` include entries whose deliverable lives
 **outside the repo** (`$HOME/.claude/` settings/hooks/memory — marked ⌂ in those files). Those are exempt
 from the worktree rule and ship as direct harness edits, not PRs.
+
+## Standalone items
+
+A single finding whose design write-up is too long to sit as one entry inside an axis-organized
+backlog gets its own file here, named for the finding rather than `<x>-backlog.md`. Same frontmatter
+and same status taxonomy; no sibling archive (when it resolves, the file is deleted and the PR that
+resolves it is the record).
+
+| Item | Status |
+|------|--------|
+| [voting-csrf-single-use-post-redisplay.md](voting-csrf-single-use-post-redisplay.md) | ⬜ Open — ballot validation failure consumes the single-use CSRF token, so Back leads to a dead end; needs a `/plan` (security surface). |
 
 ## Status taxonomy
 

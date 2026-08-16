@@ -203,7 +203,7 @@ class VotingSubmissionService implements VotingSubmissionServiceInterface
             for ($i = 1; $i <= 4; $i++) {
                 $field = "{$prefix}{$i}";
                 if (str_contains($ballot[$field], $teamName)) {
-                    $errors[] = "Sorry, you cannot vote for your own player ({$court}: {$ballot[$field]}). Please go back, unselect that player, select a different player not on your team, and try again.";
+                    $errors[] = "Sorry, you cannot vote for your own player ({$court}: {$ballot[$field]}). Use the link below to return to the ballot, unselect that player, and select a different player not on your team.";
                 }
             }
         }
@@ -221,7 +221,7 @@ class VotingSubmissionService implements VotingSubmissionServiceInterface
             for ($i = 1; $i <= 4; $i++) {
                 $field = "{$prefix}{$i}";
                 if ($ballot[$field] === '') {
-                    $errors[] = "Sorry, you selected less than FOUR {$label} players. Please go back, select FOUR players, and try again.";
+                    $errors[] = "Sorry, you selected less than FOUR {$label} players. Use the link below to return to the ballot and select FOUR players.";
                     break; // One error per category is enough
                 }
             }
@@ -237,7 +237,7 @@ class VotingSubmissionService implements VotingSubmissionServiceInterface
         foreach (self::ASG_POSITIONS as $code => $pos) {
             $label = $pos['label'];
             if (isset($rawPostCategories[$code]) && count($rawPostCategories[$code]) > 4) {
-                $errors[] = "Sorry, you selected more than four {$label} players. Please go back, select FOUR players, and try again.";
+                $errors[] = "Sorry, you selected more than four {$label} players. Use the link below to return to the ballot and select FOUR players.";
             }
         }
     }

@@ -195,7 +195,7 @@ class PlayerDataMapperFieldMapTest extends TestCase
     public function testFillFromCurrentRowMapsNonStringOptionalFieldToNull(): void
     {
         $row = $this->buildFullCurrentRow();
-        $row['draftedby'] = 12345; // non-string → getOptionalStrippedValue returns null
+        $row['draftedby'] = null; // null → getOptionalStrippedValue returns null (is_string(null) is false)
 
         $player = $this->mapper->fillFromCurrentRow($row);
 

@@ -27,6 +27,7 @@ use Season\Season;
  * @covers \TeamSchedule\TeamScheduleRepository
  * @covers \TeamSchedule\TeamScheduleService
  * @covers \TeamSchedule\TeamScheduleView
+ * @phpstan-import-type ScheduleGameRow from \TeamSchedule\Contracts\TeamScheduleServiceInterface
  */
 #[AllowMockObjectsWithoutExpectations]
 class ScheduleWideUnitTest extends WideUnitTestCase
@@ -931,7 +932,7 @@ class ScheduleWideUnitTest extends WideUnitTestCase
      * Create a processed game row for view testing
      * Matches the structure returned by TeamScheduleService::getProcessedSchedule()
      *
-     * @return array<string, mixed>
+     * @return ScheduleGameRow
      */
     private function createProcessedGameRow(
         string $month,
@@ -946,10 +947,9 @@ class ScheduleWideUnitTest extends WideUnitTestCase
         string $winLossColor,
         string $highlight = ''
     ): array {
-        // Create mock Game object
-        $game = new \stdClass();
+        // Create stub Game object
+        $game = self::createStub(\LeagueSchedule\Game::class);
         $game->date = $date;
-        $game->dateObject = date_create($date);
         $game->visitorScore = $visitorScore;
         $game->homeScore = $homeScore;
         $game->boxScoreID = 12345;
@@ -957,8 +957,8 @@ class ScheduleWideUnitTest extends WideUnitTestCase
         $game->visitor_teamid = 5;
         $game->home_teamid = 10;
 
-        // Create mock opposing Team object
-        $opposingTeam = new \stdClass();
+        // Create stub opposing Team object
+        $opposingTeam = self::createStub(\Team\Team::class);
         $opposingTeam->teamid = 10;
         $opposingTeam->name = 'Boston';
         $opposingTeam->seasonRecord = '8-7';
@@ -975,6 +975,7 @@ class ScheduleWideUnitTest extends WideUnitTestCase
             'streak' => $streak,
             'winLossColor' => $winLossColor,
             'isUnplayed' => $isUnplayed,
+            'opponentTier' => '',
         ];
     }
 }

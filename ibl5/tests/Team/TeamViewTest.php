@@ -13,6 +13,10 @@ use Discord\Discord;
  * Tests for TeamView
  *
  * Validates HTML rendering from pre-computed page data
+ *
+ * @phpstan-import-type TeamPageData from \Team\Contracts\TeamServiceInterface
+ *
+ * @phpstan-type TeamPageDataOverrides array{teamid?: int, team?: \Team\Team, imagesPath?: string, yr?: ?string, display?: string, insertyear?: string, isActualTeam?: bool, tableOutput?: string, draftPicksTable?: string, currentSeasonCard?: string, awardsCard?: string, franchiseHistoryCard?: string, rafters?: string, userTeamName?: string, isOwnTeam?: bool, extensionResult?: ?string, extensionMsg?: ?string}
  */
 class TeamViewTest extends TestCase
 {
@@ -24,12 +28,12 @@ class TeamViewTest extends TestCase
     }
 
     /**
-     * @param array<string, mixed> $overrides
-     * @return array<string, mixed>
+     * @param TeamPageDataOverrides $overrides
+     * @return TeamPageData
      */
     private function createPageData(array $overrides = []): array
     {
-        $team = new \stdClass();
+        $team = self::createStub(\Team\Team::class);
         $team->name = 'Celtics';
         $team->color1 = 'FF0000';
         $team->color2 = '0000FF';
@@ -98,7 +102,7 @@ class TeamViewTest extends TestCase
 
     public function testRenderOmitsDraftPicksForNonTeam(): void
     {
-        $team = new \stdClass();
+        $team = self::createStub(\Team\Team::class);
         $team->name = 'Free Agents';
         $team->color1 = '000000';
         $team->color2 = 'FFFFFF';
@@ -125,7 +129,7 @@ class TeamViewTest extends TestCase
 
     public function testRenderOmitsCardsRowForNonTeam(): void
     {
-        $team = new \stdClass();
+        $team = self::createStub(\Team\Team::class);
         $team->name = 'Free Agents';
         $team->color1 = '000000';
         $team->color2 = 'FFFFFF';
@@ -185,7 +189,7 @@ class TeamViewTest extends TestCase
 
     public function testFreeAgentsNonActualTeamShowsTextHeadingOneAndNoBanner(): void
     {
-        $team = new \stdClass();
+        $team = self::createStub(\Team\Team::class);
         $team->name = 'Free Agents';
         $team->color1 = '000000';
         $team->color2 = 'FFFFFF';
@@ -264,7 +268,7 @@ class TeamViewTest extends TestCase
 
     public function testBannerDiscordLinksToUserProfileOnOtherTeam(): void
     {
-        $team = new \stdClass();
+        $team = self::createStub(\Team\Team::class);
         $team->name = 'Celtics';
         $team->color1 = 'FF0000';
         $team->color2 = '0000FF';

@@ -7,6 +7,9 @@ namespace Tests\Api\Transformer;
 use Api\Transformer\GameTransformer;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * @phpstan-import-type GameViewRow from \Api\Repository\ApiGameRepository
+ */
 class GameTransformerTest extends TestCase
 {
     private GameTransformer $transformer;
@@ -17,13 +20,7 @@ class GameTransformerTest extends TestCase
     }
 
     /**
-     * Kept as array<string, mixed> on purpose: testTransformHandlesNullScores and
-     * testTransformScheduledGameStatus deliberately set visitor_score/home_score to null
-     * (which GameViewRow types as int), so narrowing to GameViewRow would not remove those
-     * suppressions — it would only churn the baseline into per-edge entries. The argument.type
-     * mismatch on those degraded-row calls is a documented baseline defer, not a defect to fix.
-     *
-     * @return array<string, mixed>
+     * @return GameViewRow
      */
     private function makeGameRow(): array
     {
@@ -100,23 +97,23 @@ class GameTransformerTest extends TestCase
         $this->assertSame(142, $result['home']['score']);
     }
 
-    public function testTransformHandlesNullScores(): void
+    public function testTransformHandlesZeroScores(): void
     {
         $row = $this->makeGameRow();
-        $row['visitor_score'] = null;
-        $row['home_score'] = null;
+        $row['visitor_score'] = 0;
+        $row['home_score'] = 0;
         $result = $this->transformer->transform($row);
 
-        $this->assertNull($result['visitor']['score']);
-        $this->assertNull($result['home']['score']);
+        $this->assertSame(0, $result['visitor']['score']);
+        $this->assertSame(0, $result['home']['score']);
     }
 
     public function testTransformScheduledGameStatus(): void
     {
         $row = $this->makeGameRow();
         $row['game_status'] = 'scheduled';
-        $row['visitor_score'] = null;
-        $row['home_score'] = null;
+        $row['visitor_score'] = 0;
+        $row['home_score'] = 0;
         $result = $this->transformer->transform($row);
 
         $this->assertSame('scheduled', $result['status']);

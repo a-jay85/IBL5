@@ -8,6 +8,10 @@ use PHPUnit\Framework\TestCase;
 use DepthChartEntry\DepthChartEntryProcessor;
 use DepthChartEntry\DepthChartEntryView;
 
+/**
+ * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
+ * @phpstan-type PlayerRowOverrides array{pid?: int, name?: string, nickname?: string|null, age?: int|null, teamid?: int, teamname?: string|null, pos?: string, stamina?: int|null, exp?: int|null, bird?: int|null, cy?: int|null, cyt?: int|null, salary_yr1?: int|null, salary_yr2?: int|null, salary_yr3?: int|null, salary_yr4?: int|null, salary_yr5?: int|null, salary_yr6?: int|null, ordinal?: int|null, injured?: int|null, retired?: int|null, droptime?: int|null, stats_gs?: int|null, stats_gm?: int|null, stats_min?: int|null, stats_fgm?: int|null, stats_fga?: int|null, stats_ftm?: int|null, stats_fta?: int|null, stats_3gm?: int|null, stats_3ga?: int|null, stats_orb?: int|null, stats_drb?: int|null, stats_ast?: int|null, stats_stl?: int|null, stats_tvr?: int|null, stats_blk?: int|null, stats_pf?: int|null, sh_pts?: int|null, sh_reb?: int|null, sh_ast?: int|null, sh_stl?: int|null, sh_blk?: int|null, s_dd?: int|null, s_td?: int|null, sp_pts?: int|null, sp_reb?: int|null, sp_ast?: int|null, sp_stl?: int|null, sp_blk?: int|null, ch_pts?: int|null, ch_reb?: int|null, ch_ast?: int|null, ch_stl?: int|null, ch_blk?: int|null, c_dd?: int|null, c_td?: int|null, cp_pts?: int|null, cp_reb?: int|null, cp_ast?: int|null, cp_stl?: int|null, cp_blk?: int|null, car_gm?: int|null, car_min?: int|null, car_fgm?: int|null, car_fga?: int|null, car_ftm?: int|null, car_fta?: int|null, car_3gm?: int|null, car_3ga?: int|null, car_orb?: int|null, car_drb?: int|null, car_reb?: int|null, car_ast?: int|null, car_stl?: int|null, car_tvr?: int|null, car_blk?: int|null, car_pf?: int|null, r_fga?: int|null, r_fgp?: int|null, r_fta?: int|null, r_ftp?: int|null, r_3ga?: int|null, r_3gp?: int|null, r_orb?: int|null, r_drb?: int|null, r_ast?: int|null, r_stl?: int|null, r_tvr?: int|null, r_blk?: int|null, r_foul?: int|null, oo?: int|null, od?: int|null, r_drive_off?: int|null, dd?: int|null, po?: int|null, pd?: int|null, r_trans_off?: int|null, td?: int|null, clutch?: int|null, consistency?: int|null, talent?: int|null, skill?: int|null, intangibles?: int|null, loyalty?: int|null, playing_time?: int|null, winner?: int|null, tradition?: int|null, security?: int|null, draftround?: int|null, draftedby?: string|null, draftedbycurrentname?: string|null, draftyear?: int|null, draftpickno?: int|null, htft?: int|null, htin?: int|null, wt?: int|null, college?: string|null, dc_pg_depth?: int|null, dc_sg_depth?: int|null, dc_sf_depth?: int|null, dc_pf_depth?: int|null, dc_c_depth?: int|null, dc_can_play_in_game?: int|null, dc_minutes?: int|null, dc_of?: int|null, dc_df?: int|null, dc_oi?: int|null, dc_di?: int|null, dc_bh?: int|null}
+ */
 class DepthChartEntryProcessorTest extends TestCase
 {
     private DepthChartEntryProcessor $processor;
@@ -15,6 +19,149 @@ class DepthChartEntryProcessorTest extends TestCase
     protected function setUp(): void
     {
         $this->processor = new DepthChartEntryProcessor();
+    }
+
+    /**
+     * Build a complete PlayerRow for renderPlayerRow() tests.
+     * All nullable fields default to null; supply only the keys you care about.
+     *
+     * @param PlayerRowOverrides $overrides
+     * @return PlayerRow
+     */
+    private static function buildPlayerRow(array $overrides = []): array
+    {
+        return array_merge([
+            'pid' => 1,
+            'name' => 'Test Player',
+            'nickname' => null,
+            'age' => null,
+            'teamid' => 1,
+            'teamname' => null,
+            'pos' => 'PG',
+            'stamina' => null,
+            'exp' => null,
+            'bird' => null,
+            'cy' => null,
+            'cyt' => null,
+            'salary_yr1' => null,
+            'salary_yr2' => null,
+            'salary_yr3' => null,
+            'salary_yr4' => null,
+            'salary_yr5' => null,
+            'salary_yr6' => null,
+            'ordinal' => null,
+            'injured' => null,
+            'retired' => null,
+            'droptime' => null,
+            'stats_gs' => null,
+            'stats_gm' => null,
+            'stats_min' => null,
+            'stats_fgm' => null,
+            'stats_fga' => null,
+            'stats_ftm' => null,
+            'stats_fta' => null,
+            'stats_3gm' => null,
+            'stats_3ga' => null,
+            'stats_orb' => null,
+            'stats_drb' => null,
+            'stats_ast' => null,
+            'stats_stl' => null,
+            'stats_tvr' => null,
+            'stats_blk' => null,
+            'stats_pf' => null,
+            'sh_pts' => null,
+            'sh_reb' => null,
+            'sh_ast' => null,
+            'sh_stl' => null,
+            'sh_blk' => null,
+            's_dd' => null,
+            's_td' => null,
+            'sp_pts' => null,
+            'sp_reb' => null,
+            'sp_ast' => null,
+            'sp_stl' => null,
+            'sp_blk' => null,
+            'ch_pts' => null,
+            'ch_reb' => null,
+            'ch_ast' => null,
+            'ch_stl' => null,
+            'ch_blk' => null,
+            'c_dd' => null,
+            'c_td' => null,
+            'cp_pts' => null,
+            'cp_reb' => null,
+            'cp_ast' => null,
+            'cp_stl' => null,
+            'cp_blk' => null,
+            'car_gm' => null,
+            'car_min' => null,
+            'car_fgm' => null,
+            'car_fga' => null,
+            'car_ftm' => null,
+            'car_fta' => null,
+            'car_3gm' => null,
+            'car_3ga' => null,
+            'car_orb' => null,
+            'car_drb' => null,
+            'car_reb' => null,
+            'car_ast' => null,
+            'car_stl' => null,
+            'car_tvr' => null,
+            'car_blk' => null,
+            'car_pf' => null,
+            'r_fga' => null,
+            'r_fgp' => null,
+            'r_fta' => null,
+            'r_ftp' => null,
+            'r_3ga' => null,
+            'r_3gp' => null,
+            'r_orb' => null,
+            'r_drb' => null,
+            'r_ast' => null,
+            'r_stl' => null,
+            'r_tvr' => null,
+            'r_blk' => null,
+            'r_foul' => null,
+            'oo' => null,
+            'od' => null,
+            'r_drive_off' => null,
+            'dd' => null,
+            'po' => null,
+            'pd' => null,
+            'r_trans_off' => null,
+            'td' => null,
+            'clutch' => null,
+            'consistency' => null,
+            'talent' => null,
+            'skill' => null,
+            'intangibles' => null,
+            'loyalty' => null,
+            'playing_time' => null,
+            'winner' => null,
+            'tradition' => null,
+            'security' => null,
+            'draftround' => null,
+            'draftedby' => null,
+            'draftedbycurrentname' => null,
+            'draftyear' => null,
+            'draftpickno' => null,
+            'htft' => null,
+            'htin' => null,
+            'wt' => null,
+            'college' => null,
+            'dc_pg_depth' => null,
+            'dc_sg_depth' => null,
+            'dc_sf_depth' => null,
+            'dc_pf_depth' => null,
+            'dc_c_depth' => null,
+            'dc_can_play_in_game' => null,
+            'dc_minutes' => null,
+            'dc_of' => null,
+            'dc_df' => null,
+            'dc_oi' => null,
+            'dc_di' => null,
+            'dc_bh' => null,
+        ], $overrides);
     }
 
     public function testProcessesSubmissionCorrectly(): void
@@ -99,18 +246,19 @@ class DepthChartEntryProcessorTest extends TestCase
         $playerData = [
             [
                 'name' => 'Player One',
-                'pg' => '1',
-                'sg' => '0',
-                'sf' => '0',
-                'pf' => '0',
-                'c' => '0',
-                'canPlayInGame' => '1',
-                'min' => '30',
-                'of' => '0',
-                'df' => '0',
-                'oi' => '0',
-                'di' => '0',
-                'bh' => '0'
+                'pg' => 1,
+                'sg' => 0,
+                'sf' => 0,
+                'pf' => 0,
+                'c' => 0,
+                'canPlayInGame' => 1,
+                'min' => 30,
+                'of' => 0,
+                'df' => 0,
+                'oi' => 0,
+                'di' => 0,
+                'bh' => 0,
+                'injury' => 0,
             ]
         ];
 
@@ -220,7 +368,8 @@ class DepthChartEntryProcessorTest extends TestCase
                 'df' => 0,
                 'oi' => 0,
                 'di' => 0,
-                'bh' => 0
+                'bh' => 0,
+                'injury' => 0,
             ]
         ];
 
@@ -265,8 +414,7 @@ class DepthChartEntryProcessorTest extends TestCase
         $view = new DepthChartEntryView(self::createStub(\League\LeagueContext::class), new \DepthChartEntry\DepthChartEntryService());
 
         // Simulate a player record from the database with various depth values
-        $playerFromDb = [
-            'pid' => 1,
+        $playerFromDb = self::buildPlayerRow([
             'name' => 'Test Player',
             'pos' => 'PG',
             'injured' => 0,
@@ -282,8 +430,8 @@ class DepthChartEntryProcessorTest extends TestCase
             'dc_df' => 0,
             'dc_oi' => 0,
             'dc_di' => 0,
-            'dc_bh' => 0
-        ];
+            'dc_bh' => 0,
+        ]);
 
         ob_start();
         $view->renderPlayerRow($playerFromDb, 1);
@@ -356,7 +504,8 @@ class DepthChartEntryProcessorTest extends TestCase
                 'df' => 0,
                 'oi' => 0,
                 'di' => 0,
-                'bh' => 0
+                'bh' => 0,
+                'injury' => 0,
             ],
             [
                 'name' => 'Player 2',
@@ -371,7 +520,8 @@ class DepthChartEntryProcessorTest extends TestCase
                 'df' => 0,
                 'oi' => 0,
                 'di' => 0,
-                'bh' => 0
+                'bh' => 0,
+                'injury' => 0,
             ]
         ];
 
@@ -396,8 +546,7 @@ class DepthChartEntryProcessorTest extends TestCase
         $view = new DepthChartEntryView(self::createStub(\League\LeagueContext::class), new \DepthChartEntry\DepthChartEntryService());
 
         // Step 1: Player has these values in database
-        $dbPlayer = [
-            'pid' => 1,
+        $dbPlayer = self::buildPlayerRow([
             'name' => 'Round Trip Player',
             'pos' => 'SG',
             'injured' => 0,
@@ -413,8 +562,8 @@ class DepthChartEntryProcessorTest extends TestCase
             'dc_df' => 0,
             'dc_oi' => 0,
             'dc_di' => 0,
-            'dc_bh' => 0
-        ];
+            'dc_bh' => 0,
+        ]);
 
         // Step 2: Form displays these values (capture HTML)
         ob_start();
@@ -465,8 +614,7 @@ class DepthChartEntryProcessorTest extends TestCase
 
         // The key test: if we load the form again with the processed data as if it came from database,
         // it should show the same selected values
-        $dbPlayerAfterUpdate = [
-            'pid' => 1,
+        $dbPlayerAfterUpdate = self::buildPlayerRow([
             'name' => 'Round Trip Player',
             'pos' => 'SG',
             'injured' => 0,
@@ -482,8 +630,8 @@ class DepthChartEntryProcessorTest extends TestCase
             'dc_df' => 0,
             'dc_oi' => 0,
             'dc_di' => 0,
-            'dc_bh' => 0
-        ];
+            'dc_bh' => 0,
+        ]);
 
         ob_start();
         $view->renderPlayerRow($dbPlayerAfterUpdate, 1);
@@ -505,8 +653,7 @@ class DepthChartEntryProcessorTest extends TestCase
         $view = new DepthChartEntryView(self::createStub(\League\LeagueContext::class), new \DepthChartEntry\DepthChartEntryService());
 
         // Player with all zero position depths except C=1
-        $player = [
-            'pid' => 1,
+        $player = self::buildPlayerRow([
             'name' => 'Zero Settings Player',
             'pos' => 'C',
             'injured' => 0,
@@ -522,8 +669,8 @@ class DepthChartEntryProcessorTest extends TestCase
             'dc_df' => 0,
             'dc_oi' => 0,
             'dc_di' => 0,
-            'dc_bh' => 0
-        ];
+            'dc_bh' => 0,
+        ]);
 
         ob_start();
         $view->renderPlayerRow($player, 1);
@@ -568,6 +715,7 @@ class DepthChartEntryProcessorTest extends TestCase
                 'oi' => 0,
                 'di' => 0,
                 'bh' => 0,
+                'injury' => 0,
             ],
         ];
 

@@ -84,11 +84,11 @@ class DemandsBreakdownView
                 <tr><th>Factor</th><th>Value</th></tr>
             </thead>
             <tbody>
-                <tr><td>Wins</td><td><?= (int) $breakdown['teamFactors']['wins'] ?></td></tr>
-                <tr><td>Losses</td><td><?= (int) $breakdown['teamFactors']['losses'] ?></td></tr>
-                <tr><td>Tradition Wins</td><td><?= (int) $breakdown['teamFactors']['tradition_wins'] ?></td></tr>
-                <tr><td>Tradition Losses</td><td><?= (int) $breakdown['teamFactors']['tradition_losses'] ?></td></tr>
-                <tr><td>$ at Position</td><td><?= (int) $breakdown['teamFactors']['money_committed_at_position'] ?></td></tr>
+                <tr><td>Wins</td><td><?= (int) ($breakdown['teamFactors']['wins'] ?? 41) ?></td></tr>
+                <tr><td>Losses</td><td><?= (int) ($breakdown['teamFactors']['losses'] ?? 41) ?></td></tr>
+                <tr><td>Tradition Wins</td><td><?= (int) ($breakdown['teamFactors']['tradition_wins'] ?? 41) ?></td></tr>
+                <tr><td>Tradition Losses</td><td><?= (int) ($breakdown['teamFactors']['tradition_losses'] ?? 41) ?></td></tr>
+                <tr><td>$ at Position</td><td><?= (int) ($breakdown['teamFactors']['money_committed_at_position'] ?? 0) ?></td></tr>
             </tbody>
         </table>
     </div>

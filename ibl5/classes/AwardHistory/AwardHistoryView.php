@@ -109,7 +109,7 @@ class AwardHistoryView implements AwardHistoryViewInterface
     /**
      * @see AwardHistoryViewInterface::renderAwardRow()
      *
-     * @param array{year: int, award: string, name: string, pid?: int} $award
+     * @param array{year: int|string|null, award: string|null, name: string|null, pid?: int} $award
      */
     public function renderAwardRow(array $award, int $rowIndex): string
     {

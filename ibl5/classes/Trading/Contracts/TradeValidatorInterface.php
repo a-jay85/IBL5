@@ -40,7 +40,7 @@ interface TradeValidatorInterface
      * Calculates what each team's salary would be after the trade and
      * verifies neither exceeds the hard cap (League::HARD_CAP_MAX).
      *
-     * @param array{userCurrentSeasonCapTotal: int, partnerCurrentSeasonCapTotal: int, userCapSentToPartner: int, partnerCapSentToUser: int} $tradeData
+     * @param array{userCurrentSeasonCapTotal?: int, partnerCurrentSeasonCapTotal?: int, userCapSentToPartner?: int, partnerCapSentToUser?: int} $tradeData
      *        Pre-calculated cap data
      * @return array{valid: bool, errors: array<string>, userPostTradeCapTotal: int, partnerPostTradeCapTotal: int}
      *         Validation result:

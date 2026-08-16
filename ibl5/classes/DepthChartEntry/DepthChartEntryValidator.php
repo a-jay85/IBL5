@@ -7,7 +7,7 @@ namespace DepthChartEntry;
 use DepthChartEntry\Contracts\DepthChartEntryValidatorInterface;
 
 /**
- * @phpstan-import-type ProcessedSubmission from Contracts\DepthChartEntryProcessorInterface
+ * @phpstan-import-type ValidatorInput from Contracts\DepthChartEntryValidatorInterface
  * @phpstan-import-type ValidationError from Contracts\DepthChartEntryValidatorInterface
  *
  * @see DepthChartEntryValidatorInterface
@@ -19,7 +19,7 @@ class DepthChartEntryValidator implements DepthChartEntryValidatorInterface
     
     /**
      * @see DepthChartEntryValidatorInterface::validate()
-     * @param ProcessedSubmission $depthChartData
+     * @param ValidatorInput $depthChartData
      */
     public function validate(array $depthChartData, string $phase): bool
     {
@@ -74,7 +74,7 @@ class DepthChartEntryValidator implements DepthChartEntryValidatorInterface
     }
 
     /**
-     * @param ProcessedSubmission $depthChartData
+     * @param ValidatorInput $depthChartData
      */
     private function validatePositionDepth(array $depthChartData, int $minPerPosition): void
     {

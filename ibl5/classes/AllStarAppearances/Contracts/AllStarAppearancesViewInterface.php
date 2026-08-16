@@ -14,7 +14,7 @@ interface AllStarAppearancesViewInterface
     /**
      * Render the all-star appearances table.
      *
-     * @param array<int, array{name: string, appearances: int}> $appearances Array of player appearance data
+     * @param array<int, array{name: string, appearances: int, pid?: int}> $appearances Array of player appearance data
      * @return string HTML output for the all-star appearances table
      */
     public function render(array $appearances): string;

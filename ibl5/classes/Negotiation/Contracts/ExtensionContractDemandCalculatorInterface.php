@@ -12,7 +12,7 @@ use Player\Player;
  * Calculates contract demands based on player ratings and statistics
  * using market-based analysis to determine fair contract values.
  *
- * @phpstan-type TeamFactors array{wins: int, losses: int, tradition_wins: int, tradition_losses: int, money_committed_at_position: int}
+ * @phpstan-type TeamFactors array{wins?: int, losses?: int, tradition_wins?: int, tradition_losses?: int, money_committed_at_position?: int}
  * @phpstan-type DemandResult array{year1: float|int, year2: float|int, year3: float|int, year4: float|int, year5: float|int, year6: int, years: int, total: float|int, modifier: float}
  * @phpstan-type RatingBreakdown array{name: string, playerValue: int, marketMax: int, rawScore: int}
  * @phpstan-type ModifierBreakdown array{name: string, formula: string, inputs: string, result: float}

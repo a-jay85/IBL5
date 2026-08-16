@@ -581,6 +581,17 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 
 **Table evidence (2026-08-09):** Shipped: common `Api\Contracts\TransformerInterface` (7 uniform transformers) + flattened `Middleware/Contracts/`→`Api/Contracts/`. **Status:** partial 2026-06-26; residual = divergent-transformer interfaces (Boxscore/PlayerStats), responder interfaces (Csv/Json — disjoint shapes), `Response/Contracts/` flatten.
 
+### 2.39 TradeRosterPreviewCashRowBuilder — Unbounded Cash-Year Range From `$_GET`
+**Status:** ✅ Implemented (2026-08-16) — `validateCashYearRange(int $maxYear): array` added to `TradeRosterPreviewParamValidator` (+ interface); rejects a missing/non-digit/zero year, `cashEndYear > $maxYear`, and `cashStartYear > cashEndYear`, returning `[0, 0]` so `buildCashRows()` short-circuits to `[]`. `buildCashRows(int $viewingTeamId, int $maxCashYear)` now takes a required ceiling; `TradeRosterPreviewApiHandler::handle()` supplies `TradeRosterPreviewCashRowBuilder::CASH_YEAR_FORWARD_HORIZON` (= 6) directly — cashStartYear/cashEndYear are contract-year indices (1–6), not calendar years, mirroring `makeCashRow()`'s existing 1–6 column cap.
+**Location:** `ibl5/classes/Trading/TradeRosterPreviewCashRowBuilder.php` (`buildCashRows()`)
+**Problem:** `cashStartYear` and `cashEndYear` come directly from `$_GET` with no upper bound and no ordering check. `cashStartYear=1&cashEndYear=999999` drives an ~1M-iteration loop in `buildCashRows()` — a DoS vector on an authenticated endpoint.
+**Suggested direction:** Add an upper bound (e.g. current season + a reasonable forward horizon) and an ordering check (`cashStartYear ≤ cashEndYear`); ideally wire the validation into `TradeRosterPreviewParamValidator` (already extracted in trading-1-31-api-handler-extract).
+**Est. effort:** S
+**Risk if untouched:** Authenticated users can trigger arbitrary-length computation loops via crafted requests to the trade-roster-preview API endpoint.
+**Provenance:** Discovered 2026-07-27 during trading-1-31-api-handler-extract.
+
+**Table evidence (2026-08-16):** `cashStartYear=1&cashEndYear=999999` now yields zero cash rows instead of ~1M loop iterations; pinned by `testValidateCashYearRangeRejectsAttackInput` and `testBuildCashRowsRejectsOverHorizonEndYear`.
+
 ## Axis 3: Top-Level Legacy PHP Files
 
 ### 3.2 `DEMO_LOGIN_TOKEN` Hardcoded to `'demo'`

@@ -10,6 +10,7 @@ use Trading\Contracts\TradeAssetRepositoryInterface;
 use Trading\Contracts\TradeRosterPreviewCashRowBuilderInterface;
 use Trading\Contracts\TradeRosterPreviewParamValidatorInterface;
 use Trading\TradeRosterPreviewApiHandler;
+use Trading\TradeRosterPreviewCashRowBuilder;
 
 class TradeRosterPreviewApiHandlerTest extends TestCase
 {
@@ -412,7 +413,9 @@ class TradeRosterPreviewApiHandlerTest extends TestCase
 
         /** @var TradeRosterPreviewCashRowBuilderInterface&\PHPUnit\Framework\MockObject\MockObject $mockBuilder */
         $mockBuilder = $this->createMock(TradeRosterPreviewCashRowBuilderInterface::class);
-        $mockBuilder->expects($this->once())->method('buildCashRows')->with(1)->willReturn([]);
+        $mockBuilder->expects($this->once())->method('buildCashRows')
+            ->with(1, TradeRosterPreviewCashRowBuilder::CASH_YEAR_FORWARD_HORIZON)
+            ->willReturn([]);
 
         $handler = $this->buildHandler(cashRowBuilder: $mockBuilder);
 

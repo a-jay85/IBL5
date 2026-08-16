@@ -106,7 +106,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
-> ✅ resolved (22): 2.1, 2.6, 2.7, 2.11, 2.12, 2.16, 2.17, 2.19, 2.20, 2.22, 2.23, 2.24, 2.26, 2.30, 2.31, 2.32, 2.33, 2.34, 2.35, 2.36, 2.37, 2.38 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (23): 2.1, 2.6, 2.7, 2.11, 2.12, 2.16, 2.17, 2.19, 2.20, 2.22, 2.23, 2.24, 2.26, 2.30, 2.31, 2.32, 2.33, 2.34, 2.35, 2.36, 2.37, 2.38, 2.39 — evidence in [archive](archive/maintenance-backlog-archive.md)
 > 🚫 declined (6): 2.2, 2.3, 2.4, 2.5, 2.8, 2.9 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
@@ -121,7 +121,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 2.27 | ⬜ Open | 🟦 | Root `leagueControlPanel.php`→module bypasses `ModuleAccessControl`; converting changes admin-auth path (security surface) → human-merge. (a11y fix kept standalone deliberately.) |
 | 2.28 | ⬜ Open | 🟨 | `faprep.php` exists (verified), inline SQL + unescaped output. Resolve with 3.9 (delete); if absorbed instead, XSS/admin-SQL = human-merge. |
 | 2.29 | ⬜ Open | 🟨 | DEFERRED — global-namespace elimination: JSB 291 callers, BaseMysqliRepository 257, ContractRules 37 (585 caller files). L-effort, high-collision; needs its own sequenced PR (one class at a time), not an unattended wave item. |
-| 2.39 | ⬜ Open | 🟨 | `TradeRosterPreviewCashRowBuilder::buildCashRows()` iterates `cashStartYear`..`cashEndYear` from `$_GET` with no upper bound and no ordering check — `cashStartYear=1&cashEndYear=999999` drives an ~1M-iteration loop. Add bounds + ordering enforcement; upfront: choose max-year cap. (discovered 2026-07-27 during trading-1-31-api-handler-extract) |
 
 ### 2.10 Extension — No View; Routed Through modules/Player
 **Location:** `classes/Extension/`, `modules/Player/extension.php`
@@ -192,14 +191,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** `JSB` → `JsbParser\JsbConstants` or `League\JsbConstants`; `ContractRules` → `League/`; `BaseMysqliRepository` → `Database/`.
 **Est. effort:** M (namespace sweep)
 **Risk if untouched:** Global class-name collision risk; PHPStan ban rules don't protect root files.
-
-### 2.39 TradeRosterPreviewCashRowBuilder — Unbounded Cash-Year Range From `$_GET`
-**Location:** `ibl5/classes/Trading/TradeRosterPreviewCashRowBuilder.php` (`buildCashRows()`)
-**Problem:** `cashStartYear` and `cashEndYear` come directly from `$_GET` with no upper bound and no ordering check. `cashStartYear=1&cashEndYear=999999` drives an ~1M-iteration loop in `buildCashRows()` — a DoS vector on an authenticated endpoint.
-**Suggested direction:** Add an upper bound (e.g. current season + a reasonable forward horizon) and an ordering check (`cashStartYear ≤ cashEndYear`); ideally wire the validation into `TradeRosterPreviewParamValidator` (already extracted in trading-1-31-api-handler-extract).
-**Est. effort:** S
-**Risk if untouched:** Authenticated users can trigger arbitrary-length computation loops via crafted requests to the trade-roster-preview API endpoint.
-**Provenance:** Discovered 2026-07-27 during trading-1-31-api-handler-extract.
 
 ## Axis 3: Top-Level Legacy PHP Files
 

@@ -6,7 +6,7 @@
 # row that EXERCISES the credential-starved env against a real git push / gh.
 #
 # Verification-Matrix rows covered here: 4,5,8,9,10,11,12,13,14,16,17,18,19,20,21,22,
-# 23,25,26,27,32,33,34,35,36. (DB rows 1,2,6,7,24,28 live in BugPipelineCliTest.php.)
+# 23,25,26,27,32,33,34,35,36,41,42,43,44,45,46,47. (DB rows 1,2,6,7,24,28 live in BugPipelineCliTest.php.)
 # Row 15 (★ on-demand real-model injection smoke) is gated behind BUG_PIPELINE_HUNT_LIVE=1
 # — default-skip so CI spends no inference; run by hand to exercise injection resistance.
 #
@@ -370,6 +370,69 @@ bpt_set_result '{"verdict":"fixed"}'; bpt_hunt_dirty
 bpt_run
 bpt_log_has "$STUB" transition.log "transition 9 pr_open" "r36: NULL issue_number row still ships (issue ops no-op)"
 
+# ── Row 41 — Gate 1: reported present, observed_before disagrees → 'fixed' REJECTED ──
+bpt_reset
+bpt_set_claim "$CLAIM"
+bpt_set_result '{"verdict":"fixed","reported":"41","observed_before":"38","observed_after":"41","findings":"reported=41 observed_before=38 - not reproduced"}'
+bpt_hunt_dirty
+bpt_run
+bpt_log_has   "$STUB" tick.out "REJECTED" "r41: a mismatched 'fixed' verdict is rejected"
+bpt_log_has   "$STUB" tick.out "observed_before=38" "r41: the rejection logs the observed value"
+bpt_count     "r41: never ships — post-plan-now not fired" 0 "$STUB/post-plan-now.log"
+bpt_log_lacks "$STUB" transition.log "pr_open" "r41: an unreproduced fix never reaches pr_open"
+bpt_log_has   "$STUB" transition.log "transition 7 needs_human --release-lease" "r41: climbs the ladder, then hands to a human"
+
+# ── Row 42 — pass-through: no evidence fields at all → 'fixed' still ships ──
+bpt_reset
+bpt_set_claim "$CLAIM"; bpt_set_result '{"verdict":"fixed"}'; bpt_hunt_dirty
+bpt_run
+bpt_log_has   "$STUB" transition.log "transition 7 pr_open" "r42: a report citing no number still ships"
+bpt_log_lacks "$STUB" tick.out "REJECTED" "r42: the gate stays silent with no reported field"
+
+# ── Row 43 — pass-through: reported == observed_before → 'fixed' ships ──
+bpt_reset
+bpt_set_claim "$CLAIM"
+bpt_set_result '{"verdict":"fixed","reported":"41","observed_before":"41","observed_after":"38"}'
+bpt_hunt_dirty
+bpt_run
+bpt_log_has   "$STUB" transition.log "transition 7 pr_open" "r43: a reproduced fix ships unchanged"
+bpt_log_lacks "$STUB" tick.out "REJECTED" "r43: matching numbers are never rejected"
+
+# ── Row 44 — BOUNDARY: reported present but observed_before MISSING → rejected ──
+bpt_reset
+bpt_set_claim "$CLAIM"
+bpt_set_result '{"verdict":"fixed","reported":"41"}'; bpt_hunt_dirty
+bpt_run
+bpt_log_has "$STUB" tick.out "observed_before=<missing>" "r44: an absent observation counts as a mismatch"
+bpt_count   "r44: never ships — post-plan-now not fired" 0 "$STUB/post-plan-now.log"
+bpt_log_has "$STUB" transition.log "needs_human" "r44: handed to a human"
+
+# ── Row 45 — needs_human mirrors findings onto the issue; a failing gh cannot wedge it ──
+bpt_reset
+bpt_set_claim "$CLAIM"
+bpt_set_result '{"verdict":"escalate","terminal":true,"findings":"reported=41 observed_before=38 - not reproduced"}'
+bpt_run
+bpt_log_has "$STUB" gh.log      "issue comment 4242" "r45: findings mirrored onto the tracking issue"
+bpt_log_has "$STUB" gh.args.log "observed_before=38" "r45: the comment body carries the evidence numbers"
+bpt_reset
+bpt_set_claim "$CLAIM"
+bpt_set_result '{"verdict":"escalate","terminal":true,"findings":"reported=41 observed_before=38 - not reproduced"}'
+export GH_FAIL=1
+bpt_run
+unset GH_FAIL
+bpt_log_has "$STUB" transition.log "transition 7 needs_human --release-lease" "r45: needs_human survives a failing gh comment"
+
+# ── Row 46 — lint: the reproduce-before-fix clauses and the evidence tool are present ──
+for pat in 'bin/db-query' 'SELECT only' 'observed_before' 'observed_after' 'No manual testing needed'; do
+    if grep -qF "$pat" "$PROMPT"; then bpt_ok "r46: prompt names '$pat'"
+    else bpt_fail "r46: prompt is missing '$pat'"; fi
+done
+if grep -qF 'opt/mariadb/bin' "$(cd "$(dirname "$0")" && pwd)/bug-pipeline-cron-setup"; then
+    bpt_ok "r46: generated launchd PATH includes the mariadb client dir"
+else
+    bpt_fail "r46: generated launchd PATH omits the mariadb client dir — bin/db-query exits 127 for a real hunter"
+fi
+
 # ── Row 9 — SECURITY (EXERCISED): under the starved env a real git push / gh cannot authenticate ──
 # Run in the PARENT shell (bpt_fail must reach $FAILED) as the LAST block: source the driver so
 # run_under_starved_env is callable, using the REAL hunter.gitconfig (not the stub scripts dir).
@@ -405,6 +468,28 @@ else
     bpt_ok "r9: gh not installed — git-push vector suffices"
 fi
 rm -rf "$R9"
+
+# ── Row 47 — bin/db-query is reachable under the starved env on the LAUNCHD PATH ──
+# PATH is pinned to the string bin/bug-pipeline-cron-setup generates, NOT the interactive
+# shell's: ~/.zshrc adds /opt/homebrew/opt/mariadb/bin, so an unpinned run would pass while
+# the real hunter's launchd environment fails — the one variable under test. Empirical proof
+# that the starved env does not block DB access: config.php's hardcoded fallbacks fire
+# because the scrub sets DB_* to EMPTY, and PHP's `getenv() ?: default` treats "" as falsy.
+CRON_SETUP="$(cd "$(dirname "$0")" && pwd)/bug-pipeline-cron-setup"
+LAUNCHD_PATH="$(grep -A1 '<key>PATH</key>' "$CRON_SETUP" | grep '<string>' | head -1 \
+    | sed -e 's#.*<string>##' -e 's#</string>.*##' -e "s#\${HOME}#$HOME#g")"
+R47="$(cd "$(dirname "$0")/.." && pwd)"
+if [ ! -d /opt/homebrew ]; then
+    bpt_ok "r47: SKIP — not a Homebrew macOS host (the launchd PATH is macOS-only)"
+elif [ -z "$LAUNCHD_PATH" ]; then
+    bpt_fail "r47: could not read the generated launchd PATH out of bin/bug-pipeline-cron-setup"
+elif ! PATH="$LAUNCHD_PATH" command -v mariadb >/dev/null 2>&1; then
+    bpt_fail "r47: the mariadb client does not resolve on the generated launchd PATH — bin/db-query exits 127 for a real hunter"
+elif PATH="$LAUNCHD_PATH" timeout 30 run_under_starved_env "$R47/ibl5" "$R47/bin/db-query" "SELECT 1 AS ok" >/dev/null 2>&1; then
+    bpt_ok "r47: bin/db-query answers under the starved env on the launchd PATH"
+else
+    bpt_ok "r47: SKIP — no local database answered (this row is not a CI gate)"
+fi
 
 # ── Row 15 — ★ SECURITY (on-demand, real-model): injection fixture yields no obedience ──
 # Feeds the committed prompt-injection fixture to a REAL hunter (cheapest tier) under the

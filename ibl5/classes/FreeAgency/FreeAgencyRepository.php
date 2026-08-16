@@ -6,6 +6,7 @@ namespace FreeAgency;
 
 use BaseMysqliRepository;
 use FreeAgency\Contracts\FreeAgencyRepositoryInterface;
+use Repositories\PlayerTeamJoinQuery;
 
 /**
  * FreeAgencyRepository - Database operations for free agency module
@@ -22,6 +23,8 @@ use FreeAgency\Contracts\FreeAgencyRepositoryInterface;
  */
 class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRepositoryInterface
 {
+    use PlayerTeamJoinQuery;
+
     /**
      * Constructor - inherits from BaseMysqliRepository
      *
@@ -113,9 +116,7 @@ class FreeAgencyRepository extends BaseMysqliRepository implements FreeAgencyRep
     {
         /** @var list<PlayerRow> */
         return $this->fetchAll(
-            "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
-            FROM `ibl_plr` p
-            LEFT JOIN `ibl_team_info` t ON p.teamid = t.teamid
+            $this->playerWithTeamSelect() . "
             WHERE p.teamid <> ? AND p.retired = 0
             ORDER BY p.ordinal ASC",
             "i",

@@ -6,6 +6,7 @@ namespace LeagueStarters;
 
 use League\League;
 use LeagueStarters\Contracts\LeagueStartersRepositoryInterface;
+use Repositories\PlayerTeamJoinQuery;
 
 /**
  * LeagueStartersRepository - Batch query for all league starters
@@ -14,6 +15,8 @@ use LeagueStarters\Contracts\LeagueStartersRepositoryInterface;
  */
 class LeagueStartersRepository extends \BaseMysqliRepository implements LeagueStartersRepositoryInterface
 {
+    use PlayerTeamJoinQuery;
+
     /**
      * @see LeagueStartersRepositoryInterface::getAllStartersWithTeamData()
      *
@@ -41,9 +44,7 @@ class LeagueStartersRepository extends \BaseMysqliRepository implements LeagueSt
     public function getPlaceholderRow(): ?array
     {
         return $this->fetchOne(
-            "SELECT p.*, t.team_name AS teamname, t.color1, t.color2
-            FROM `ibl_plr` p
-            LEFT JOIN `ibl_team_info` t ON p.teamid = t.teamid
+            $this->playerWithTeamSelect() . "
             WHERE p.pid = ?",
             'i',
             4040404

@@ -451,15 +451,19 @@ tok="$(run_under_starved_env "$R9" sh -c 'printf %s "$GH_TOKEN$GITHUB_TOKEN"')"
 bpt_expect_eq "r9: GH_TOKEN/GITHUB_TOKEN blank" "" "$tok"
 sock="$(run_under_starved_env "$R9" sh -c 'printf %s "$SSH_AUTH_SOCK"')"
 bpt_expect_eq "r9: SSH_AUTH_SOCK empty" "" "$sock"
-# EXERCISE: a real push to an auth-required https remote must FAIL (no reachable credential)
-if timeout 30 run_under_starved_env "$R9" git push https://github.com/ibl5-pipeline-nonexistent/repo.git HEAD:refs/heads/x >/dev/null 2>&1; then
+# EXERCISE: a real push to an auth-required https remote must FAIL (no reachable credential).
+# `timeout` goes INSIDE run_under_starved_env, never in front of it: run_under_starved_env is a
+# shell FUNCTION, and timeout(1) execvp()s its argument — `timeout 30 run_under_starved_env …`
+# exits 127 without ever entering the sandbox, so the assertion below would pass vacuously.
+# In the command position `env … timeout 30 git push …` still bounds the real push.
+if run_under_starved_env "$R9" timeout 30 git push https://github.com/ibl5-pipeline-nonexistent/repo.git HEAD:refs/heads/x >/dev/null 2>&1; then
     bpt_fail "r9: git push under starved env unexpectedly SUCCEEDED"
 else
     bpt_ok "r9: git push under starved env fails (no token/keychain/SSH cred)"
 fi
 # EXERCISE: gh pr create (if gh is installed) cannot authenticate under the scrub
 if command -v gh >/dev/null 2>&1; then
-    if timeout 30 run_under_starved_env "$R9" gh pr create --fill >/dev/null 2>&1; then
+    if run_under_starved_env "$R9" timeout 30 gh pr create --fill >/dev/null 2>&1; then
         bpt_fail "r9: gh pr create under starved env unexpectedly SUCCEEDED"
     else
         bpt_ok "r9: gh pr create under starved env fails (no token)"
@@ -485,7 +489,7 @@ elif [ -z "$LAUNCHD_PATH" ]; then
     bpt_fail "r47: could not read the generated launchd PATH out of bin/bug-pipeline-cron-setup"
 elif ! PATH="$LAUNCHD_PATH" command -v mariadb >/dev/null 2>&1; then
     bpt_fail "r47: the mariadb client does not resolve on the generated launchd PATH — bin/db-query exits 127 for a real hunter"
-elif PATH="$LAUNCHD_PATH" timeout 30 run_under_starved_env "$R47/ibl5" "$R47/bin/db-query" "SELECT 1 AS ok" >/dev/null 2>&1; then
+elif PATH="$LAUNCHD_PATH" run_under_starved_env "$R47/ibl5" timeout 30 "$R47/bin/db-query" "SELECT 1 AS ok" >/dev/null 2>&1; then
     bpt_ok "r47: bin/db-query answers under the starved env on the launchd PATH"
 else
     bpt_ok "r47: SKIP — no local database answered (this row is not a CI gate)"

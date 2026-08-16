@@ -59,6 +59,31 @@ YOUR FIVE OBLIGATIONS
     Author and verify your fix EXCLUSIVELY against your own `bug-{{bug_id}}.localhost`
     worktree stack, which is disposable and isolated. Mutations there are expected.
 
+    For a DATA-shaped bug (a wrong count, total, average, streak, or record), the
+    expected evidence tool is `bin/db-query`, run from your worktree:
+        bin/db-query "SELECT COUNT(*) FROM some_table WHERE ..."
+    It works even though this environment blanks DB_HOST/DB_USER/DB_PASSWORD/DB_NAME:
+    `config.php` falls back to its hardcoded local credentials when those are empty, so
+    the query reaches the real database. Reading via `bin/db-query` is observation, not
+    mutation — SELECT only. NEVER issue INSERT/UPDATE/DELETE/ALTER/DROP through it.
+    If `bin/db-query` fails to run at all, you have NOT reproduced anything: do not
+    reason a number out of the code — return verdict "escalate" and say so in findings.
+
+    ★ REPRODUCE THE NUMBER — MANDATORY when the report cites a specific numeric value.
+    Before you author ANY fix, record three values in your result file:
+      • "reported"        — the number as the report states it (verbatim, as a string).
+      • "observed_before" — the number you ACTUALLY observed from real data before you
+                            changed anything, via `bin/db-query` or by rendering the
+                            page. This is a measurement, NOT an inference: reading the
+                            code and concluding what it "must" return does not count.
+      • "observed_after"  — the same measurement repeated after your fix.
+    If observed_before does NOT equal reported, you have not reproduced the bug. You are
+    FORBIDDEN from returning verdict "fixed" in that case — return "escalate" and put
+    both numbers in findings. The trusted pipeline re-checks this and will reject a
+    "fixed" verdict whose observed_before disagrees with reported, so a mismatch you
+    ship anyway is wasted work. Omit all three fields ONLY when the report cites no
+    numeric value at all.
+
 (3) TRIAGE plan-vs-ad-hoc using the repo's work-triage bar (.claude/rules/work-triage.md).
     A fix is ad-hoc-safe only when ALL hold: known blast radius, an existing pattern to
     copy, no multi-phase reasoning, no unresolved design fork, and it touches no security
@@ -107,6 +132,9 @@ missing) as a single JSON object, then stop. No prose to stdout beyond your norm
   "area": "trades",
   "root_cause": "missing-validation",
   "terminal": false,
+  "reported": "41",
+  "observed_before": "38",
+  "observed_after": "41",
   "findings": "human-readable summary of what you found and did — on escalate/failure this is the text a human reads in the Discord thread"
 }
 
@@ -119,3 +147,14 @@ Field rules:
   • area / root_cause: OPTIONAL short slugs (lowercase, [a-z0-9-], ≤30 chars) for issue
     labels — a component (`area`) and a root-cause category (`root_cause`). Omit if unsure.
   • findings: ALWAYS populate. On escalate/failure it is the message posted to the human.
+  • reported / observed_before / observed_after: REQUIRED as a set whenever the report
+    cites a specific numeric value; omit all three otherwise. Strings, not numbers.
+    observed_before MUST come from a real query or page render, never from reasoning.
+    A "fixed" verdict whose observed_before differs from reported is REJECTED by the
+    pipeline and re-run on the next tier — do not submit one.
+  • When those three fields are present they MUST also appear verbatim in `findings`
+    (the no-repro path opens no PR — findings is the only text the human receives) and,
+    when you author a PR body, in that body. "No manual testing needed — verified by
+    automated tests" is NOT an acceptable PR body for a report that cites a numeric
+    value: a green unit test does not show the reported number changed. State
+    reported / observed_before / observed_after explicitly.

@@ -100,7 +100,7 @@ class TradeValidatorTest extends TestCase
     /**
      * @group validation
      * @group salary-cap
-     * @param array<string, int> $tradeData
+     * @param array{userCurrentSeasonCapTotal?: int, partnerCurrentSeasonCapTotal?: int, userCapSentToPartner?: int, partnerCapSentToUser?: int} $tradeData
      */
         #[DataProvider('salaryCapViolationProvider')]
     public function testRejectsTradesExceedingSalaryCaps(array $tradeData, int $expectedErrorCount): void
@@ -192,7 +192,7 @@ class TradeValidatorTest extends TestCase
     /**
      * Data provider for salary cap violations
      *
-     * @return array<string, array{array<string, int>, int}>
+     * @return array<string, array{array{userCurrentSeasonCapTotal?: int, partnerCurrentSeasonCapTotal?: int, userCapSentToPartner?: int, partnerCapSentToUser?: int}, int}>
      */
     public static function salaryCapViolationProvider(): array
     {

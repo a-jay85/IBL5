@@ -279,7 +279,7 @@ class ExtensionValidatorTest extends TestCase
     /**
      * @group validation
      * @group raises
-     * @param array<string, int> $offer
+     * @param array{year1?: int, year2?: int, year3?: int, year4?: int, year5?: int, year6?: int} $offer
      */
         #[DataProvider('invalidRaiseProvider')]
     public function testRejectsIllegalRaises(array $offer, int $birdYears, int $expectedErrorYear): void
@@ -342,7 +342,7 @@ class ExtensionValidatorTest extends TestCase
     /**
      * @group validation
      * @group salary-decrease
-     * @param array<string, int> $offer
+     * @param array{year1?: int, year2?: int, year3?: int, year4?: int, year5?: int, year6?: int} $offer
      */
         #[DataProvider('salaryDecreaseProvider')]
     public function testRejectsSalaryDecreasesBetweenYears(array $offer, int $expectedErrorYear): void
@@ -380,7 +380,7 @@ class ExtensionValidatorTest extends TestCase
     /**
      * Data provider for invalid raises
      *
-     * @return array<string, array{array<string, int>, int, int}>
+     * @return array<string, array{array{year1?: int, year2?: int, year3?: int, year4?: int, year5?: int, year6?: int}, int, int}>
      */
     public static function invalidRaiseProvider(): array
     {
@@ -435,7 +435,7 @@ class ExtensionValidatorTest extends TestCase
     /**
      * Data provider for salary decreases
      *
-     * @return array<string, array{array<string, int>, int}>
+     * @return array<string, array{array{year1?: int, year2?: int, year3?: int, year4?: int, year5?: int, year6?: int}, int}>
      */
     public static function salaryDecreaseProvider(): array
     {

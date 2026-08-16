@@ -16,6 +16,8 @@ use Waivers\Contracts\WaiversValidatorInterface;
 /**
  * @see WaiversProcessorInterface
  * @phpstan-import-type PlayerRow from \Repositories\Contracts\PlayerLookupRepositoryInterface
+ *
+ * @phpstan-type WaiverContractSource array{cy?: ?int, cyt?: ?int, salary_yr1?: ?int, salary_yr2?: ?int, salary_yr3?: ?int, salary_yr4?: ?int, salary_yr5?: ?int, salary_yr6?: ?int, exp?: ?int, ...<string, mixed>}
  */
 class WaiversProcessor implements WaiversProcessorInterface
 {
@@ -127,7 +129,7 @@ class WaiversProcessor implements WaiversProcessorInterface
     /**
      * @see WaiversProcessorInterface::determineContractData()
      *
-     * @param PlayerRow $playerData
+     * @param WaiverContractSource $playerData
      * @return array{hasExistingContract: bool, salary: int}
      */
     public function determineContractData(array $playerData, Season $season): array

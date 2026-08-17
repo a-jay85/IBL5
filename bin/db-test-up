@@ -45,8 +45,8 @@ if [ -z "$WORKTREE_NAME" ]; then
         echo "  Re-run once it finishes, or check: ibl5/bin/db-sync-now --status" >&2
         exit 1
     fi
-    printf '%s\n' "$$" > "$DB_SYNC_LOCK_DIR/pid"
     trap 'rm -rf "$DB_SYNC_LOCK_DIR"' EXIT
+    printf '%s\n' "$$" > "$DB_SYNC_LOCK_DIR/pid"
 else
     WORKTREE_PATH="$WT_PARENT/$WORKTREE_NAME"
     if [ ! -d "$WORKTREE_PATH" ]; then

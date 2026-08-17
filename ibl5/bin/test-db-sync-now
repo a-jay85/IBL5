@@ -1,17 +1,18 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 #
-# bin/test-db-sync-now — harness for bin/db-sync-now and bin/db-sync-cron-setup.
+# ibl5/bin/test-db-sync-now — harness for ibl5/bin/db-sync-now and bin/db-sync-cron-setup.
 #
 # Stubs injected via env seams only — no PATH modification.
 #
-# Run: bin/test-db-sync-now  (exit 0 = all pass, 1 = failures)
+# Run: ibl5/bin/test-db-sync-now  (exit 0 = all pass, 1 = failures)
 
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 DRIVER="$SCRIPT_DIR/db-sync-now"
-CRON_SETUP="$SCRIPT_DIR/db-sync-cron-setup"
+CRON_SETUP="$REPO_ROOT/bin/db-sync-cron-setup"
 
 FAILED=0
 STUB=""

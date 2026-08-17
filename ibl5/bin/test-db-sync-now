@@ -441,7 +441,10 @@ if [ "$(uname)" = "Darwin" ] && [ -x "$CRON_SETUP" ]; then
     rm -f "$plist_out"
 
     # S-10: --install-schedule refuses when PROD_SSH_HOST unset
-    rc="$(PROD_SSH_HOST="" "$CRON_SETUP" --install-schedule > /dev/null 2>&1; echo $?)"
+    _s10_env="$(mktemp)"
+    printf 'PROD_SSH_HOST=\n' > "$_s10_env"
+    rc="$(DB_SYNC_CRON_ENV_FILE="$_s10_env" "$CRON_SETUP" --install-schedule > /dev/null 2>&1; echo $?)"
+    rm -f "$_s10_env"
     dsn_expect_eq "S-10: --install-schedule refuses without PROD_SSH_HOST" "1" "$rc"
 
     # S-11: --bogus exits 2

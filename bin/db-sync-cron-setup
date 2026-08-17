@@ -88,8 +88,9 @@ build_plist() {
 		     mariadb-client must resolve. ~/.local/bin is where the Claude Code native
 		     installer puts the claude binary (not needed here, but kept for parity with
 		     the sim-recap plist so the two PATH strings can be maintained together).
-		     HOME is expanded HERE, at generation time — launchd does NOT expand
-		     variables in EnvironmentVariables, so a literal \$HOME would be a dead path. -->
+		     HOME is expanded HERE at generation time (the path is baked in), because launchd
+		     does NOT expand shell variables in EnvironmentVariables; an unexpanded reference
+		     would be a dead path. -->
 		<key>PATH</key>
 		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${HOME}/.local/bin</string>
 	</dict>
@@ -110,7 +111,7 @@ case "$ACTION" in
     # Validate PROD_SSH_HOST is set in .env — db-sync-now --from-backup needs
     # it to reach the prod host. Without this guard a misconfigured plist silently
     # fails every night with no error until someone checks the log.
-    env_file="$MAIN_WT/.env"
+    env_file="${DB_SYNC_CRON_ENV_FILE:-$MAIN_WT/.env}"
     if [ ! -f "$env_file" ]; then
       echo "Error: .env not found at ${env_file}" >&2
       echo "       Set PROD_SSH_HOST there before running --install-schedule." >&2

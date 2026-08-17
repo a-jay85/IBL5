@@ -250,10 +250,8 @@ if ($csrfField === '') {
     <p><a href="<?= DRAFT_CLASS_PAGE_URL ?>">Upload another draft class</a></p>
 
 <?php elseif ($view === 'preview'): ?>
-    <p>
-        This will delete <?= $deleteCount ?> existing row<?= $deleteCount === 1 ? '' : 's' ?>
-        and insert <?= count($rows) ?> new one<?= count($rows) === 1 ? '' : 's' ?>.
-    </p>
+    <?php /* One source line so the rendered sentence has no interior newlines to match around. */ ?>
+    <p><?= HtmlSanitizer::e(sprintf('This will delete %d existing row%s and insert %d new one%s.', $deleteCount, $deleteCount === 1 ? '' : 's', count($rows), count($rows) === 1 ? '' : 's')) ?></p>
     <p>Nothing has been written yet. Check the rows below, then confirm.</p>
 
     <table class="skipped-table">

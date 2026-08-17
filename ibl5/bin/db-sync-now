@@ -110,8 +110,8 @@ cleanup() {
 # ── acquire_lock ──────────────────────────────────────────────────────────────
 acquire_lock() {
     if mkdir "$DB_SYNC_LOCK_DIR" 2>/dev/null; then
-        printf '%s\n' "$$" > "$DB_SYNC_LOCK_DIR/pid"
         trap 'cleanup' EXIT
+        printf '%s\n' "$$" > "$DB_SYNC_LOCK_DIR/pid"
         return 0
     fi
     # Lock exists — check if stale
@@ -128,16 +128,16 @@ acquire_lock() {
         log "stale lock (pid $existing_pid) — reaping"
         rm -rf "$DB_SYNC_LOCK_DIR"
         mkdir "$DB_SYNC_LOCK_DIR"
-        printf '%s\n' "$$" > "$DB_SYNC_LOCK_DIR/pid"
         trap 'cleanup' EXIT
+        printf '%s\n' "$$" > "$DB_SYNC_LOCK_DIR/pid"
         return 0
     fi
     if [ "$dir_age" -gt 7200 ]; then
         log "stale lock (older than 2h) — reaping"
         rm -rf "$DB_SYNC_LOCK_DIR"
         mkdir "$DB_SYNC_LOCK_DIR"
-        printf '%s\n' "$$" > "$DB_SYNC_LOCK_DIR/pid"
         trap 'cleanup' EXIT
+        printf '%s\n' "$$" > "$DB_SYNC_LOCK_DIR/pid"
         return 0
     fi
     log "skip: sync already running (pid ${existing_pid:-unknown})"

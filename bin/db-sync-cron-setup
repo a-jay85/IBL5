@@ -14,11 +14,11 @@
 # Install AFTER this lands on master — the launchd ProgramArguments[0] points at the
 # main checkout's ibl5/bin/db-sync-now, which must exist there.
 #
-# For --install-schedule, PROD_SSH_HOST must be set in ibl5/.env (example) — db-sync-now reads
+# For --install-schedule, PROD_SSH_HOST must be set in .env (repo root) — db-sync-now reads
 # it itself at runtime; we validate here so a misconfigured plist does not silently
 # fail every night).
 #
-# No DB credentials are embedded in the plist — ibl5/bin/db-sync-now reads ibl5/.env (example)
+# No DB credentials are embedded in the plist — ibl5/bin/db-sync-now reads .env (repo root)
 # itself. No API-key env var is needed — this script does not spawn claude.
 
 set -euo pipefail
@@ -107,12 +107,12 @@ case "$ACTION" in
     build_plist
     ;;
   install)
-    # Validate PROD_SSH_HOST is set in ibl5/.env (example) — db-sync-now --from-backup needs
+    # Validate PROD_SSH_HOST is set in .env — db-sync-now --from-backup needs
     # it to reach the prod host. Without this guard a misconfigured plist silently
     # fails every night with no error until someone checks the log.
-    env_file="$MAIN_WT/ibl5/.env"
+    env_file="$MAIN_WT/.env"
     if [ ! -f "$env_file" ]; then
-      echo "Error: ibl5/.env not found at ${env_file}" >&2
+      echo "Error: .env not found at ${env_file}" >&2
       echo "       Set PROD_SSH_HOST there before running --install-schedule." >&2
       exit 1
     fi

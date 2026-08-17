@@ -64,14 +64,15 @@ SIM_RECAP_OPS_ALERT_THREAD_ID="${SIM_RECAP_OPS_ALERT_THREAD_ID:-}"
 # rm -rf'd on EXIT) — suppressing a repeat across ticks needs a path that outlives
 # the run. Sits in the sim-recap dir sim-recap-cron-setup already creates (for its
 # logs/ subdir); ops_state_write mkdir -p's it anyway so neither depends on order.
-# HOME is defaulted, not bare: this is the only HOME reference in the file, we run
-# under `set -u`, and the plist's EnvironmentVariables does not set it — so a bare
-# $HOME would abort the tick at expansion time, on EVERY poll, if launchd ever
-# handed us an environment without it.
+# HOME is defaulted, not bare: both HOME references in this file use the defensive
+# ${HOME:-/tmp} pattern (SIM_RECAP_OPS_ALERT_STATE below and SIM_RECAP_DB_SYNC_LOG
+# further down). We run under `set -u`, and the plist's EnvironmentVariables does
+# not set it — so a bare $HOME would abort the tick at expansion time, on EVERY
+# poll, if launchd ever handed us an environment without it.
 SIM_RECAP_OPS_ALERT_STATE="${SIM_RECAP_OPS_ALERT_STATE:-${HOME:-/tmp}/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/sim-recap/ops-alert.json}"
 SIM_RECAP_LAUNCHCTL_BIN="${SIM_RECAP_LAUNCHCTL_BIN:-launchctl}"
 SIM_RECAP_DB_SYNC_BIN="${SIM_RECAP_DB_SYNC_BIN:-$REPO_ROOT/ibl5/bin/db-sync-now}"
-SIM_RECAP_DB_SYNC_LOG="${SIM_RECAP_DB_SYNC_LOG:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/sim-recap/logs/db-sync.log}"
+SIM_RECAP_DB_SYNC_LOG="${SIM_RECAP_DB_SYNC_LOG:-${HOME:-/tmp}/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/sim-recap/logs/db-sync.log}"
 DRY_RUN=0
 # SIM_RECAP_DB_PASSWORD is read from the environment ONLY (never defaulted, never
 # argv, never logged). require_password() enforces its presence on the live path.

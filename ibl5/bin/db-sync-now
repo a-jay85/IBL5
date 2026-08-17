@@ -121,7 +121,7 @@ acquire_lock() {
     local dir_age=0
     if [ -d "$DB_SYNC_LOCK_DIR" ]; then
         local dir_mtime
-        dir_mtime="$(stat -f %m "$DB_SYNC_LOCK_DIR" 2>/dev/null || stat -c %Y "$DB_SYNC_LOCK_DIR" 2>/dev/null || echo 0)"
+        dir_mtime="$(stat -c %Y "$DB_SYNC_LOCK_DIR" 2>/dev/null || stat -f %m "$DB_SYNC_LOCK_DIR" 2>/dev/null || echo 0)"
         dir_age=$(( $(date +%s) - dir_mtime ))
     fi
     if [ -n "$existing_pid" ] && ! kill -0 "$existing_pid" 2>/dev/null; then
@@ -244,7 +244,9 @@ from_backup_mode() {
     artifact_date="${artifact_name#ibl5-}"
     artifact_date="${artifact_date%.sql.gz}"
     local artifact_epoch=0
-    artifact_epoch="$(date -u -j -f '%Y-%m-%d %H:%M:%S' "$artifact_date 07:30:00" '+%s' 2>/dev/null || echo 0)"
+    artifact_epoch="$(date -u -j -f '%Y-%m-%d %H:%M:%S' "$artifact_date 07:30:00" '+%s' 2>/dev/null \
+        || TZ=UTC date -d "$artifact_date 07:30:00" '+%s' 2>/dev/null \
+        || echo 0)"
     if [ "$artifact_epoch" -gt 0 ]; then
         local marker_state marker_epoch
         marker_state="$(sed -n '1p' "$DB_SYNC_MARKER" 2>/dev/null || true)"
@@ -253,7 +255,7 @@ from_backup_mode() {
            [ -n "$marker_epoch" ] && \
            printf '%s' "$marker_epoch" | grep -qE '^[0-9]+$' && \
            [ "$marker_epoch" -gt "$artifact_epoch" ]; then
-            log "skip: local DB (synced $(date -r "$marker_epoch" '+%Y-%m-%dT%H:%M:%S' 2>/dev/null || echo 'unknown')) is fresher than $artifact_name"
+            log "skip: local DB (synced $(date -r "$marker_epoch" '+%Y-%m-%dT%H:%M:%S' 2>/dev/null || date -d "@$marker_epoch" '+%Y-%m-%dT%H:%M:%S' 2>/dev/null || echo 'unknown')) is fresher than $artifact_name"
             exit 0
         fi
     fi

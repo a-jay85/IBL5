@@ -10,6 +10,13 @@
 #   bin/plan-now --implement <prompt-file>  # ... but leave the plan on disk, unqueued
 #   bin/plan-now --queue <prompt-file>      # explicit form of the default
 #   bin/plan-now --model opus <prompt-file> # orchestrator model (default claude-sonnet-4-6)
+#   bin/plan-now --no-dm <prompt-file>      # ... and skip the finish DM
+# ---
+# EVERY terminal outcome DMs you through bin/discord-dm — icon, verdict, elapsed,
+# what to do next, the plan path and the log path — so learning that a run
+# finished never costs a `tail -f` again. That is the whole point of the DM: the
+# log is silent until the run exits (`claude -p` does not stream), and the case
+# you most need to hear about is the one that does NOT queue itself.
 #
 # THIS JOB queues the plan — not the model it runs. The queue call lives in the
 # runner, downstream of the identity check and the check-plan verdict below, so a
@@ -81,6 +88,7 @@ set -euo pipefail
 
 MODEL="claude-sonnet-4-6"
 DISPOSITION="queue"
+NOTIFY=1
 PROMPT_SRC=""
 
 while [ $# -gt 0 ]; do
@@ -88,6 +96,7 @@ while [ $# -gt 0 ]; do
         --queue)     DISPOSITION="queue"; shift ;;
         --implement) DISPOSITION="implement"; shift ;;
         --model)     MODEL="${2:?--model needs a value}"; shift 2 ;;
+        --no-dm)     NOTIFY=0; shift ;;
         -h|--help)
             sed -n '/^# Usage:/,/^#$/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         -*)
@@ -98,7 +107,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-[ -n "$PROMPT_SRC" ] || { echo "plan-now: usage: bin/plan-now [--queue|--implement] [--model M] <prompt-file>" >&2; exit 2; }
+[ -n "$PROMPT_SRC" ] || { echo "plan-now: usage: bin/plan-now [--queue|--implement] [--model M] [--no-dm] <prompt-file>" >&2; exit 2; }
 [ -s "$PROMPT_SRC" ] || { echo "plan-now: prompt file '$PROMPT_SRC' is missing or empty." >&2; exit 2; }
 
 grep -q '^/plan' "$PROMPT_SRC" \
@@ -202,11 +211,16 @@ CODA
     printf 'LABEL=%q\n'      "$LABEL"
     printf 'PLIST=%q\n'      "$PLIST"
     printf 'DISPOSITION=%q\n' "$DISPOSITION"
+    printf 'LOG=%q\n'         "$LOG"
+    printf 'NOTIFY=%q\n'      "$NOTIFY"
     printf 'CHECK_PLAN=%q\n' "$ROOT/bin/check-plan"
-    printf 'AUTOMOUSE_QUEUE=%q\n' "$ROOT/bin/automouse/queue"
-    # PLAN_NOW_CLAUDE lets a smoke test stub the model call and exercise the
-    # detection + check-plan half of the runner (same shape as bug-pipeline-tick's
-    # $CLAUDE_BIN). Unset in real use.
+    # PLAN_NOW_CLAUDE / PLAN_NOW_AUTOMOUSE_QUEUE / PLAN_NOW_DISCORD_DM let a smoke
+    # test stub the model call, the queue call and the DM, and so exercise the
+    # detection + check-plan + notify half of the runner (same shape as
+    # bug-pipeline-tick's $CLAUDE_BIN). All three are unset in real use — and the
+    # queue seam is what lets bin/test-plan-now reach the queued-vs-not fork at all.
+    printf 'AUTOMOUSE_QUEUE=%q\n' "${PLAN_NOW_AUTOMOUSE_QUEUE:-$ROOT/bin/automouse/queue}"
+    printf 'DISCORD_DM=%q\n' "${PLAN_NOW_DISCORD_DM:-$ROOT/bin/discord-dm}"
     printf 'CLAUDE_BIN=%q\n' "${PLAN_NOW_CLAUDE:-claude}"
     cat <<'RUNNER_EOF'
 # launchd runs with a minimal env — same PATH prelude bin/automouse/run uses.
@@ -215,6 +229,17 @@ cd "$ROOT" || exit 1
 
 before=$(ls "$PLANS_DIR"/*.md 2>/dev/null | sort)
 started=$(date +%s)
+
+# The finish DM's four fields. Every terminal branch of the verdict chain below
+# sets them; notify() at the tail sends them once. They are plain assignments
+# sitting beside the RESULT echoes rather than a helper wrapping those echoes,
+# because the echo strings are byte-exact fixtures in bin/test-plan-now (and the
+# unconfirmed verdict is two echoes, not one) — an assignment cannot break an
+# assertion the way a rewrapped echo can.
+DM_ICON=""      # ✅ ok · ⚠️ degraded · ❌ failed · ❓ unconfirmed
+DM_VERDICT=""   # the RESULT line, trimmed to what fits a phone notification
+DM_NEXT=""      # what happens next: queued, or waiting on you
+DM_PLAN=""      # the plan this run produced, when it is known
 
 # Draft recovery. A run whose plan-architect was backgrounded and cut off leaves
 # a complete draft in $PLANS_DIR/.drafts/ while printing no PLAN_FILE: line.
@@ -354,6 +379,9 @@ if [ "$rc" -ne 0 ]; then
     # check-plan can pass on a truncated plan. Never green here.
     [ "$rc" -eq 124 ] && echo "plan-now: the 5400s timeout killed it."
     echo "plan-now: RESULT failed — the run did not exit cleanly."
+    DM_ICON="❌"; DM_VERDICT="failed — the run did not exit cleanly"
+    DM_NEXT="NOT queued, needs you"
+    [ "$rc" -eq 124 ] && DM_VERDICT="failed — killed by the 5400s timeout"
     if [ -n "$plan" ]; then
         echo "plan-now: it had claimed $plan — treat that file as PARTIAL; a human must read it."
     fi
@@ -362,6 +390,7 @@ elif [ -n "$plan" ]; then
     echo "plan-now: new plan -> $plan"
     if "$CHECK_PLAN" "$plan"; then
         echo "plan-now: RESULT ok — plan written and check-plan PASSED."
+        DM_ICON="✅"; DM_VERDICT="ok — check-plan PASSED"; DM_PLAN="$plan"
         # The ONLY path to the queue. Everything above this line — a nonzero exit,
         # an unidentifiable plan, a FAILED check-plan — falls through to a human
         # instead, which is what makes queue-by-default tolerable (ADR-0096).
@@ -369,14 +398,20 @@ elif [ -n "$plan" ]; then
             if "$AUTOMOUSE_QUEUE" "$plan"; then
                 echo "plan-now: queued for automouse — it will implement this plan and open its PR."
                 echo "plan-now: to pull it back out: bin/automouse/queue remove $(basename "${plan%.md}")"
+                DM_NEXT="queued for automouse"
             else
                 echo "plan-now: WARNING — check-plan passed but automouse-queue failed; the plan is on disk, unqueued."
+                DM_ICON="⚠️"; DM_VERDICT="ok — check-plan PASSED, but automouse-queue FAILED"
+                DM_NEXT="NOT queued, needs you"
             fi
         else
             echo "plan-now: --implement — left on disk, NOT queued. A human reviews it first."
+            DM_NEXT="--implement — NOT queued, needs you"
         fi
     else
         echo "plan-now: RESULT degraded — plan written but check-plan FAILED (see above)."
+        DM_ICON="⚠️"; DM_VERDICT="degraded — check-plan FAILED"
+        DM_NEXT="NOT queued, needs you"; DM_PLAN="$plan"
         echo "plan-now: NOT queued. A human must fix $plan before it is queued or implemented."
     fi
 else
@@ -484,6 +519,8 @@ else
     if [ -n "$recovered" ]; then
         if "$CHECK_PLAN" "$recovered"; then
             echo "plan-now: RESULT degraded (recovered) — no PLAN_FILE: line, but this run's plan was identified and check-plan PASSED."
+            DM_ICON="⚠️"; DM_VERDICT="degraded (recovered) — check-plan PASSED"
+            DM_PLAN="$recovered"
             if [ -n "$recovery_source" ]; then
                 echo "plan-now: recovered from: $recovery_source"
             fi
@@ -495,14 +532,20 @@ else
                 if "$AUTOMOUSE_QUEUE" "$recovered"; then
                     echo "plan-now: queued for automouse (recovered plan) — it will implement this plan and open its PR."
                     echo "plan-now: to pull it back out: bin/automouse/queue remove $(basename "${recovered%.md}")"
+                    DM_NEXT="queued for automouse"
                 else
                     echo "plan-now: WARNING — check-plan passed but automouse-queue failed; the recovered plan is on disk, unqueued."
+                    DM_VERDICT="degraded (recovered) — check-plan PASSED, but automouse-queue FAILED"
+                    DM_NEXT="NOT queued, needs you"
                 fi
             else
                 echo "plan-now: --implement — recovered plan left on disk, NOT queued. A human reviews it first."
+                DM_NEXT="--implement — NOT queued, needs you"
             fi
         else
             echo "plan-now: RESULT degraded (recovery attempted) — identified $recovered but check-plan FAILED (see above)."
+            DM_ICON="⚠️"; DM_VERDICT="degraded (recovery attempted) — check-plan FAILED"
+            DM_NEXT="NOT queued, needs you"; DM_PLAN="$recovered"
             if [ -n "$recovery_source" ]; then
                 echo "plan-now: NOT queued. The draft is kept at $recovery_source. A human must fix $recovered."
             else
@@ -511,6 +554,8 @@ else
         fi
     else
         echo "plan-now: RESULT unconfirmed — the run printed no usable 'PLAN_FILE:' line,"
+        DM_ICON="❓"; DM_VERDICT="unconfirmed — no PLAN_FILE: line, plan not identified"
+        DM_NEXT="NOT queued, needs you"
         echo "plan-now: so its plan cannot be identified, check-plan was NOT run, and nothing was queued."
         if [ -n "$newfiles" ]; then
             guess=$(printf '%s\n' "$newfiles" | tr '\n' '\0' | xargs -0 ls -t 2>/dev/null | head -1)
@@ -521,6 +566,50 @@ else
         echo "plan-now: read the transcript above."
     fi
 fi
+
+# The whole reason this job exists in the background: tell the human it finished.
+# `claude -p` does not stream, so $LOG is empty until this point and there is no
+# earlier moment worth watching — which is what made `tail -f` the only way to
+# find out, and why every outcome notifies, not just the failures.
+#
+# BEFORE the teardown below, and that ordering is load-bearing: `launchctl bootout`
+# terminates this job, and discord-dm retries across a window longer than a pm2
+# restart (~5min15s). Sending after the bootout would race the send against its
+# own termination and lose exactly the messages that matter — the ones sent while
+# prod is bouncing.
+notify() {
+    [ "$NOTIFY" = 1 ] || return 0
+    if [ ! -x "$DISCORD_DM" ]; then
+        echo "plan-now: no executable discord-dm at $DISCORD_DM — not notifying."
+        return 0
+    fi
+    local title msg
+    if [ -n "$DM_PLAN" ]; then
+        title=$(basename "${DM_PLAN%.md}")
+    else
+        title=$(run_slug)
+    fi
+    [ -n "$title" ] || title="(unidentified)"
+
+    # A verdict this runner never set means someone added a seventh terminal
+    # branch and missed it. Say so in the DM rather than sending a blank line.
+    msg="${DM_ICON:-❓} plan-now: $title
+RESULT ${DM_VERDICT:-unknown — the runner set no verdict}
+${elapsed}s · ${DM_NEXT:-read the log}"
+    if [ -n "$DM_PLAN" ]; then
+        msg="$msg
+${DM_PLAN/#$HOME/~}"
+    fi
+    msg="$msg
+log: $LOG"
+
+    if ! printf '%s' "$msg" | "$DISCORD_DM" -; then
+        # discord-dm already spooled it and raised a macOS notification. The
+        # verdict is in $LOG regardless, so an undeliverable DM is never fatal.
+        echo "plan-now: DM UNDELIVERED (spooled by discord-dm) — the verdict above stands."
+    fi
+}
+notify
 
 rm -f "$PLIST"
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
@@ -576,6 +665,11 @@ else
     echo "  disposition: implement   (plan left on disk for a human to read; NOT queued)"
 fi
 echo "  supervised by launchd — survives closing Claude Code / the terminal"
+if [ "$NOTIFY" = 1 ]; then
+    echo "  notify: Discord DM on finish (every outcome) — no need to watch the log"
+else
+    echo "  notify: --no-dm — nothing will tell you when this finishes"
+fi
 echo "  log:    tail -f $LOG   (claude -p does not stream — this stays empty until it exits)"
 echo "  prompt: $PROMPT"
 echo "  label:  $LABEL   (self-removes when the run finishes)"

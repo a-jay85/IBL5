@@ -2,7 +2,7 @@
 name: plan-prompt
 description: "Draft a /plan prompt distilled from the current conversation — ground-truth pointers, already-measured evidence, scope, constraints, verification, and the Step-3 architect tier — then, unless the Step-1.5 size triage says the work clears the ad-hoc bar, fire it as a detached headless Sonnet 4.6 run via bin/plan-now. Use after a design discussion when the planning run should be offloaded off the expensive session."
 disable-model-invocation: true
-last_verified: 2026-08-10
+last_verified: 2026-08-17
 ---
 
 # Draft a `/plan` handoff prompt and fire it headless
@@ -238,7 +238,11 @@ step 3.
      that output is not in front of you, you have not fired it: say so plainly and
      fire it. A path you wrote instead of read is a fabricated one, and it reads
      exactly like a real report. Then don't poll the log — `claude -p` doesn't
-     stream, so it stays empty until the run exits.
+     stream, so it stays empty until the run exits. Say the run **DMs its verdict
+     on finish**, every outcome, queued or not (`bin/plan-now` → `bin/discord-dm`;
+     `--no-dm` opts out): that ping, not the log, is how the user learns it
+     finished, and it is the only thing that surfaces a plan left unqueued for
+     them to read.
    - which model should run it, and why (Step 4);
    - any judgment call you made for the user (scope picked, split chosen);
    - if a network failure kills the architect mid-run, **re-spawn the same tier**.

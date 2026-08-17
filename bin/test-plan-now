@@ -51,6 +51,45 @@ SHIM_EOF
 chmod +x "$SHIM/caffeinate"
 export PATH="$SHIM:$PATH"
 
+# ── The DM + queue stubs ─────────────────────────────────────────────────────
+# PLAN_NOW_DISCORD_DM and PLAN_NOW_AUTOMOUSE_QUEUE are seams in the same shape as
+# PLAN_NOW_CLAUDE. The queue one is not a convenience: the real bin/automouse/queue
+# writes to the LIVE queue, so without a stub every case here has to run
+# --implement and the queued-vs-not fork — the whole point of the finish DM — is
+# structurally unreachable.
+DM_LOG="$TMP/dm.txt"
+export DM_LOG
+# $DM_LOG holds only the case that just ran, so an assertion over it speaks for one
+# branch. $DM_ALL accumulates every message the suite ever composed — that is what a
+# claim about EVERY outcome (case 11) has to read, and it is never reset.
+DM_ALL="$TMP/dm-all.txt"
+export DM_ALL
+: > "$DM_ALL"
+DM_STUB="$TMP/discord-dm"
+cat > "$DM_STUB" <<'DM_EOF'
+#!/usr/bin/env bash
+# Captures the composed message, ignoring the `-` (stdin) argument the runner passes.
+tee -a "$DM_ALL" > "$DM_LOG"
+# $DM_FAIL emulates an undeliverable DM: the real discord-dm spools and exits 1.
+[ -n "${DM_FAIL:-}" ] && exit 1
+exit 0
+DM_EOF
+chmod +x "$DM_STUB"
+
+QUEUE_STUB="$TMP/automouse-queue"
+cat > "$QUEUE_STUB" <<'QUEUE_EOF'
+#!/usr/bin/env bash
+[ -n "${QUEUE_FAIL:-}" ] && { echo "automouse-queue (stub): refused $1" >&2; exit 1; }
+printf 'automouse-queue (stub): queued %s\n' "$1"
+QUEUE_EOF
+chmod +x "$QUEUE_STUB"
+
+# The message the runner composed for the case that just ran.
+dm() { cat "$DM_LOG" 2>/dev/null; }
+
+# Every message the suite has composed so far, across all cases.
+dm_all() { cat "$DM_ALL" 2>/dev/null; }
+
 # The prompt plan-now is handed. Only the leading /plan line matters to it.
 PROMPT="$TMP/prompt.md"
 printf '/plan a throwaway task for bin/test-plan-now\n' > "$PROMPT"
@@ -78,7 +117,16 @@ printf '/plan a throwaway task for bin/test-plan-now with no slug line\n' > "$NO
 STUB="$TMP/claude-stub"
 cat > "$STUB" <<'STUB_EOF'
 #!/usr/bin/env bash
-[ -n "${STUB_PLAN:-}" ] && [ -z "${STUB_NO_PLAN:-}" ] && printf '# stub plan\n' > "$STUB_PLAN"
+if [ -n "${STUB_PLAN:-}" ] && [ -z "${STUB_NO_PLAN:-}" ]; then
+    # $STUB_PLAN_SRC writes a plan that PASSES check-plan; the one-liner fails it.
+    # Both are needed — the notify cases below turn on which side of the gate the
+    # run lands, and every earlier case relies on the one-liner failing.
+    if [ -n "${STUB_PLAN_SRC:-}" ]; then
+        cat "$STUB_PLAN_SRC" > "$STUB_PLAN"
+    else
+        printf '# stub plan\n' > "$STUB_PLAN"
+    fi
+fi
 if [ -n "${STUB_DRAFT:-}" ]; then
     # The runner takes $started with whole-second granularity, and the recovery
     # gate is mtime > started. A real run takes minutes; this stub takes
@@ -102,20 +150,28 @@ if [ -n "${STUB_PLANFILE2:-}" ]; then
 fi
 printf 'Done — the plan is written and check-plan is clean.\n'
 [ -n "${STUB_TAIL:-}" ] && printf '%s\n' "$STUB_TAIL"
-exit 0
+# $STUB_RC emulates the crashed/timed-out run — rc 124 is the runner's 5400s kill.
+exit "${STUB_RC:-0}"
 STUB_EOF
 chmod +x "$STUB"
 
 # run_case <plan-file-the-stub-writes> <final-message-tail>  → transcript on stdout
+# $DISP overrides the disposition (default --implement, as every pre-DM case
+# assumed); $NODM adds --no-dm. Both are per-case env prefixes, not arguments,
+# so the existing call sites keep working unchanged.
 run_case() {
     local plan_path="$1" tail_line="$2"
     rm -f "$PLANS"/*.md
+    : > "$DM_LOG"
     local dry runner
     dry=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
-              "$PLAN_NOW" --implement "$PROMPT" 2>&1)
+              PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+              "$PLAN_NOW" "${DISP:---implement}" ${NODM:+--no-dm} "$PROMPT" 2>&1)
     runner=$(printf '%s\n' "$dry" | sed -n 's/^  runner: //p')
     [ -x "$runner" ] || { printf 'could not get a runner out of plan-now:\n%s\n' "$dry"; return 1; }
     STUB_PLAN="$plan_path" STUB_TAIL="$tail_line" STUB_NO_PLAN="${STUB_NO_PLAN:-}" \
+        STUB_PLAN_SRC="${STUB_PLAN_SRC:-}" STUB_RC="${STUB_RC:-0}" \
+        QUEUE_FAIL="${QUEUE_FAIL:-}" DM_FAIL="${DM_FAIL:-}" \
         bash "$runner" 2>&1
     rm -f "$runner"
 }
@@ -141,10 +197,12 @@ plans_reset() {
 run_case_recovery() {
     local src="$1" slug="$2" stale="${3:-}"
     plans_reset
+    : > "$DM_LOG"
     local dry runner draft=""
     [ -n "$src" ] && draft="$PLANS/.drafts/$slug.draft.md"
     dry=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
-              "$PLAN_NOW" --implement "$RECOVERY_PROMPT" 2>&1)
+              PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+              "$PLAN_NOW" "${DISP:---implement}" "$RECOVERY_PROMPT" 2>&1)
     runner=$(printf '%s\n' "$dry" | sed -n 's/^  runner: //p')
     [ -x "$runner" ] || { printf 'no runner:\n%s\n' "$dry"; return 1; }
     if [ -n "$draft" ] && [ "$stale" = stale ]; then
@@ -154,7 +212,7 @@ run_case_recovery() {
         STUB_NO_PLAN=1 STUB_TAIL="" bash "$runner" 2>&1
     else
         STUB_NO_PLAN=1 STUB_TAIL="" STUB_DRAFT="$draft" STUB_DRAFT_SRC="$src" \
-            bash "$runner" 2>&1
+            QUEUE_FAIL="${QUEUE_FAIL:-}" bash "$runner" 2>&1
     fi
     rm -f "$runner"
 }
@@ -166,9 +224,11 @@ run_case_recovery() {
 run_case_recovery_plan() {
     local prompt="$1" src1="$2" name1="$3" src2="${4:-}" name2="${5:-}"
     plans_reset
+    : > "$DM_LOG"
     local dry runner
     dry=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
-              "$PLAN_NOW" --implement "$prompt" 2>&1)
+              PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+              "$PLAN_NOW" "${DISP:---implement}" "$prompt" 2>&1)
     runner=$(printf '%s\n' "$dry" | sed -n 's/^  runner: //p')
     [ -x "$runner" ] || { printf 'no runner:\n%s\n' "$dry"; return 1; }
     STUB_NO_PLAN=1 STUB_TAIL="" \
@@ -388,6 +448,112 @@ out=$(run_case_recovery_plan "$RECOVERY_PROMPT" "$PARTIAL_DRAFT" demo-slug.md)
 want    "a failing adopted plan reports an attempt" "$out" "RESULT degraded (recovery attempted)"
 want    "a failing adopted plan is not queued"      "$out" "NOT queued"
 want_no "leg B claims no draft it never had"        "$out" "The draft is kept at"
+
+echo "── the finish DM: every terminal outcome pings, and says what to do next ──"
+
+# The reason this section exists: `claude -p` does not stream, so $LOG is empty
+# until the run exits and the only way to learn a plan-now run finished was to sit
+# on `tail -f`. Every branch of the verdict chain must therefore compose a message,
+# and the branch that needs a human most — the one that does NOT queue itself — is
+# the one that must say so.
+
+# 1. ok + --queue: check-plan passed and the job queued it. Nothing to do.
+out=$(DISP=--queue STUB_PLAN_SRC="$GOOD_PLAN" run_case "$P" "PLAN_FILE: $P")
+want "queued run reaches RESULT ok"      "$out" "RESULT ok"
+want "queued run DMs the ok icon"        "$(dm)" "✅ plan-now: demo-slug"
+want "queued run DMs the verdict"        "$(dm)" "RESULT ok — check-plan PASSED"
+want "queued run DMs the next action"    "$(dm)" "queued for automouse"
+want "queued run DMs the plan path"      "$(dm)" "$P"
+want "queued run DMs the log path"       "$(dm)" "log: /tmp/plan-now-"
+want "queued run DMs the elapsed time"   "$(dm)" "s · "
+
+# 2. ok + --implement: the case the user called out by name. It succeeded, and it
+#    is sitting there waiting for a human who has no way to know that.
+out=$(STUB_PLAN_SRC="$GOOD_PLAN" run_case "$P" "PLAN_FILE: $P")
+want "implement run still DMs on success" "$(dm)" "✅ plan-now: demo-slug"
+want "implement run says it needs you"    "$(dm)" "--implement — NOT queued, needs you"
+want_no "implement run never claims a queue" "$(dm)" "queued for automouse"
+
+# 3. ok, but the queue call itself failed — a green verdict with a red outcome.
+#    The icon must follow the OUTCOME, not the check-plan verdict.
+out=$(DISP=--queue QUEUE_FAIL=1 STUB_PLAN_SRC="$GOOD_PLAN" run_case "$P" "PLAN_FILE: $P")
+want "a failed queue call is still RESULT ok in the log" "$out" "RESULT ok"
+want "a failed queue call downgrades the DM icon"        "$(dm)" "⚠️ plan-now: demo-slug"
+want "a failed queue call names itself in the DM"        "$(dm)" "automouse-queue FAILED"
+want "a failed queue call says a human is needed"        "$(dm)" "NOT queued, needs you"
+
+# 4. check-plan FAILED — the stub's one-line plan, i.e. every earlier case here.
+out=$(run_case "$P" "PLAN_FILE: $P")
+want "a failed check-plan DMs the warning icon" "$(dm)" "⚠️ plan-now: demo-slug"
+want "a failed check-plan DMs its verdict"      "$(dm)" "RESULT degraded — check-plan FAILED"
+want "a failed check-plan says a human is needed" "$(dm)" "NOT queued, needs you"
+
+# 5. rc != 0. The plan is unidentified, so the DM falls back to the prompt slug —
+#    and $PROMPT carries none, which is the majority shape of real prompts.
+out=$(STUB_RC=1 run_case "$P" "PLAN_FILE: $P")
+want "a crashed run is still RESULT failed"  "$out" "RESULT failed"
+want "a crashed run DMs the failure icon"    "$(dm)" "❌ plan-now:"
+want "a crashed run DMs its verdict"         "$(dm)" "RESULT failed — the run did not exit cleanly"
+want "a slugless crashed run titles itself"  "$(dm)" "plan-now: (unidentified)"
+
+# 6. rc 124 is the 5400s timeout, and a DM that just says "failed" would send you
+#    to the log to find that out.
+out=$(STUB_RC=124 run_case "$P" "PLAN_FILE: $P")
+want "a timed-out run names the timeout in the DM" "$(dm)" "failed — killed by the 5400s timeout"
+
+# 7. unconfirmed — no marker, no recovery.
+out=$(run_case "$P" "")
+want "an unconfirmed run DMs the question icon" "$(dm)" "❓ plan-now:"
+want "an unconfirmed run DMs its verdict"       "$(dm)" "RESULT unconfirmed — no PLAN_FILE: line"
+
+# 8. Recovery: the DM must report the RECOVERED plan, not silence.
+out=$(run_case_recovery "$GOOD_DRAFT" demo-slug)
+want "a recovered run DMs the recovery verdict" "$(dm)" "RESULT degraded (recovered) — check-plan PASSED"
+want "a recovered run titles itself by the recovered plan" "$(dm)" "plan-now: demo-slug"
+want "a recovered run under --implement needs you" "$(dm)" "--implement — NOT queued, needs you"
+
+# 8b. Same, but queued. A recovered plan that passes check-plan is queued like any
+#     other, and the DM has to say so — "degraded" alone would read as needing a
+#     human when nothing is owed.
+out=$(DISP=--queue run_case_recovery "$GOOD_DRAFT" demo-slug)
+want "a recovered+queued run keeps the recovery verdict" "$(dm)" "RESULT degraded (recovered) — check-plan PASSED"
+want "a recovered+queued run says it queued"             "$(dm)" "queued for automouse"
+want_no "a recovered+queued run does not ask for you"    "$(dm)" "needs you"
+
+# 8c. Recovery that could not be salvaged: a promoted draft that still fails
+#     check-plan. Distinct from case 4 — the plan EXISTS and is named, so the DM
+#     must point at it rather than leave you hunting the log for a path.
+out=$(run_case_recovery "$PARTIAL_DRAFT" demo-slug)
+want "an attempted recovery DMs its own verdict" "$(dm)" \
+     "RESULT degraded (recovery attempted) — check-plan FAILED"
+want "an attempted recovery says a human is needed" "$(dm)" "NOT queued, needs you"
+want "an attempted recovery names the plan it promoted" "$(dm)" "demo-slug"
+
+# 8d. Recovered, queued, and the queue call failed — the recovery arm's copy of
+#     case 3. The verdict must carry BOTH failures, not just the recovery.
+out=$(DISP=--queue QUEUE_FAIL=1 run_case_recovery "$GOOD_DRAFT" demo-slug)
+want "a recovered run whose queue failed names the queue" "$(dm)" \
+     "degraded (recovered) — check-plan PASSED, but automouse-queue FAILED"
+want "a recovered run whose queue failed asks for you" "$(dm)" "NOT queued, needs you"
+
+# 9. --no-dm suppresses the send entirely, and nothing else changes.
+out=$(NODM=1 STUB_PLAN_SRC="$GOOD_PLAN" run_case "$P" "PLAN_FILE: $P")
+want    "--no-dm leaves the verdict alone" "$out" "RESULT ok"
+[ -s "$DM_LOG" ] && fail "--no-dm still sent a DM" || ok "--no-dm sends nothing"
+
+# 10. An undeliverable DM is never fatal — discord-dm spools it, and the verdict
+#     in the log is the record of last resort. Losing the run over a lost message
+#     would be strictly worse than the tail -f this replaces.
+out=$(DM_FAIL=1 STUB_PLAN_SRC="$GOOD_PLAN" run_case "$P" "PLAN_FILE: $P")
+want "an undeliverable DM is reported in the log" "$out" "DM UNDELIVERED"
+want "an undeliverable DM does not change the verdict" "$out" "RESULT ok"
+
+# 11. Every terminal branch sets a verdict. The fallback text exists so a seventh
+#     branch added later fails loudly instead of DMing a blank line — if it ever
+#     appears in a real run's DM, that is the bug it was put there to catch.
+# A want_no over an empty file passes vacuously, so prove the capture ran first.
+[ -s "$DM_ALL" ] || fail "the cumulative DM capture is empty — case 11 proves nothing"
+want_no "no case DMs the unset-verdict fallback" "$(dm_all)" "the runner set no verdict"
 
 echo "── the coda still tells the model where to put it ──"
 

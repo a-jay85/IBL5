@@ -58,22 +58,24 @@ Migrations are applied automatically during deployment via `ibl5/bin/migrate`. T
 
 ### Naming Convention for New Migrations
 
-Use timestamp-based filenames to avoid collisions:
+Use a sequential numbered prefix, taken from `bin/next-migration`:
 
 ```
-YYYYMMDD_HHMMSS_description.sql
+NNN_description.sql
 ```
 
-Example: `20260226_120000_add_league_season_table.sql`
+Example: `162_correct_game_of_that_day_comments.sql`
 
-Historical migrations use numbered prefixes (`001_*`, `002_*`) or descriptive names (`add_*`, `fix-*`). These are fully supported but timestamp-based names are preferred for new migrations.
+**Do not use timestamp-based filenames (`YYYYMMDD_HHMMSS_description.sql`) for new migrations.** The PHP runner (`ibl5/bin/migrate`) does apply them, but the CI runner (`ibl5/bin/run-migrations-ci`) selects files matching `^[0-9]{1,3}[a-z]?_` only, so a timestamp-named migration is skipped by every CI-built database — the schemas behind `tests.yml` and `e2e-tests.yml` simply lack it. A schema-changing one eventually surfaces as a `schema-parity-check` failure in `migration-safety.yml` (the bash path and the PHP path build different schemas); a data-only one diverges nothing and is never caught at all. The `migration-naming-check` job in the same workflow whitelists new `.sql` names to `NNN_description.sql`, so a timestamp (or any other shape) cannot land by accident.
+
+The same applies to bare descriptive names (`add_*`, `fix-*`) — `run-migrations-ci` skips those too. Every `.sql` file in this directory already carries a numbered prefix; the surviving descriptive names are `.php` data migrations, which the CI runner does not apply at all.
 
 ### Sort Order
 
 The runner executes migrations in this deterministic order:
 1. **Numbered** (`001_*` through `999_*`) — natural sort
 2. **Non-numbered** (`add_*`, `fix-*`, `create_*`, `migrate_*`) — alphabetical
-3. **Timestamp-based** (`20260226_*`) — natural sort
+3. **Timestamp-based** (`20260226_*`) — natural sort. Supported by the PHP runner, but **not** a naming option for new migrations — see the naming convention above.
 
 ### Numbering Gaps Are Intentional
 
@@ -86,9 +88,9 @@ These gaps are **expected and harmless**. A number is intentionally absent when 
 **Rules for new migrations:**
 
 - **Never reuse a gap number.** Do not "fill in" `019` or `111`. Filling a gap would place a brand-new migration *earlier* in natural-sort order than migrations that already ran in production, risking out-of-dependency-order execution on a fresh install.
-- **Always take the next number after the current maximum** — run `bin/next-migration`, which prints the next available prefix by inspecting the main checkout — or use a timestamp-based name (`YYYYMMDD_HHMMSS_description.sql`) as described above.
+- **Always take the next number after the current maximum** — run `bin/next-migration`, which prints the next available prefix by inspecting the main checkout. It considers numbered prefixes only, so an unmerged timestamp-named file in the tree cannot skew the number it hands out.
 
-A handful of historical migrations carry a letter suffix (`033b`, `037b`, `037c`, `044b`). These share a base number with their unsuffixed sibling and sort naturally **after** it; they are legacy artifacts, not a convention to extend — prefer the next sequential number or a timestamp for new work. CI enforces this: the `migration-naming-check` job in `.github/workflows/migration-safety.yml` rejects any new `.sql` file whose name carries a letter suffix.
+A handful of historical migrations carry a letter suffix (`033b`, `037b`, `037c`, `044b`). These share a base number with their unsuffixed sibling and sort naturally **after** it; they are legacy artifacts, not a convention to extend — prefer the next sequential number for new work. CI enforces this: the `migration-naming-check` job in `.github/workflows/migration-safety.yml` accepts only `NNN_description.sql` for newly added `.sql` files, so a letter suffix is rejected.
 
 ### CLI Usage
 

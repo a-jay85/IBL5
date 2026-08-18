@@ -60,12 +60,17 @@ jobs:
             exit 0
           fi
           url="${base}/${newest}/visual-review/index.html"
+          # 20 x 30s = 600s. The old 10 x 20s (200s) window was well under the measured p95 deploy
+          # wall-clock of 540s (ci-backlog 7.1 — the whole gh-pages tree re-uploads every deploy), so
+          # a run could fail the assert on pure CDN propagation lag while the deployment was already
+          # live: run 4061 (2026-08-18) had `deploy-pages` report success at 07:39:43 and still 404'd
+          # for the full 200s, then served 200 shortly after. Budget the assert against that p95.
           echo "Asserting HTTP 200 for ${url}"
-          for i in $(seq 1 10); do
+          for i in $(seq 1 20); do
             code=$(curl -s -o /dev/null -w '%{http_code}' "$url" || echo 000)
             echo "attempt ${i}: HTTP ${code}"
             [ "$code" = "200" ] && exit 0
-            sleep 20
+            [ "$i" -lt 20 ] && sleep 30
           done
           echo "::error::VR gallery did not serve HTTP 200 at ${url} after retries"
           exit 1

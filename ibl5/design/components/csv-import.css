@@ -79,11 +79,14 @@
 }
 
 /*
- * The picker form holds one control, so the shared form chrome framed a single
- * button in an otherwise empty panel. Bare and centered here; import-demands.php's
- * multi-control form keeps the panel. The id outranks `.csv-import form`.
+ * uploadDraftClass.php's own forms carry no panel: the picker holds one control, so
+ * the shared form chrome framed a single button in an otherwise empty panel, and the
+ * confirm form's two buttons read as page actions under the preview table rather than
+ * a framed group. Bare and centered here; import-demands.php's multi-control form
+ * keeps the panel. The ids outrank `.csv-import form`.
  */
-.csv-import form#draftClassForm {
+.csv-import form#draftClassForm,
+.csv-import form#draftClassConfirmForm {
     padding: 0;
     background: none;
     border: none;

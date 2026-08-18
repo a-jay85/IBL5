@@ -274,7 +274,7 @@ if ($csrfField === '') {
 <?php elseif ($view === 'preview'): ?>
     <?php /* One source line so the rendered sentence has no interior newlines to match around. */ ?>
     <p><?= HtmlSanitizer::e(sprintf('This will delete %d existing row%s and insert %d new one%s.', $deleteCount, $deleteCount === 1 ? '' : 's', count($rows), count($rows) === 1 ? '' : 's')) ?></p>
-    <p>Nothing has been written yet. Check the rows below, then confirm.</p>
+    <p>Nothing has been written yet. Check the rows below, then <b>scroll to the bottom of the page</b> to confirm.</p>
 
     <?php /* 27 columns never fit the page container, so the design system's scroll
              wrapper pair carries the table (css-architecture.md, table pattern 1). */ ?>
@@ -322,10 +322,10 @@ if ($csrfField === '') {
     })();
     </script>
 
-    <form method="post">
+    <form method="post" id="draftClassConfirmForm">
         <?= HtmlSanitizer::trusted($csrfField) ?>
         <?php /* Destructive: commit deletes every existing row before inserting. */ ?>
-        <button type="submit" name="action" value="commit" class="ibl-btn ibl-btn--danger">Commit Import</button>
+        <button type="submit" name="action" value="commit" class="ibl-btn ibl-btn--danger">Import</button>
         <a href="<?= DRAFT_CLASS_PAGE_URL ?>?action=cancel" class="ibl-btn ibl-btn--ghost">Cancel</a>
     </form>
 

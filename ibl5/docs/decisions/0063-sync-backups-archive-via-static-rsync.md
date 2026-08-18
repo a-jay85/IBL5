@@ -1,6 +1,6 @@
 ---
 description: Why the ibl5/backups archive syncs prod<->local via rsync over SSH, with a self-built static rsync uploaded to the rootless prod host.
-last_verified: 2026-06-18
+last_verified: 2026-08-18
 ---
 
 # ADR-0063: Sync the backups archive via a self-built static rsync

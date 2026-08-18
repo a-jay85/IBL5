@@ -1,6 +1,6 @@
 ---
 description: Why mutation testing (Infection) is scoped to classes/ only — scripts/, modules/, and root .php are intentionally out of scope.
-last_verified: 2026-06-18
+last_verified: 2026-08-18
 ---
 
 # ADR-0065: Mutation testing scoped to classes/ only

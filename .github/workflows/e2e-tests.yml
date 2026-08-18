@@ -314,6 +314,29 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # Debounce the rebase-prs fan-out: one master push updates every open PR, so N PRs each
+          # land a gh-pages push and each dispatches this workflow. A pages-deploy run that has NOT
+          # STARTED yet checks out gh-pages *after* this push landed, so it already serves this
+          # content — a second dispatch only adds a run that the `pages` concurrency group cancels
+          # (one pending slot per group). NEVER debounce on `in_progress`: that run may have checked
+          # out gh-pages before this push and would leave it unserved. Fails OPEN — an extra deploy
+          # is harmless, a missed one leaves the gallery dark.
+          #
+          # The filter is a DENYLIST (not `status == "queued"`) on purpose. GitHub has shipped several
+          # pre-execution statuses (queued/pending/waiting/requested) and a concurrency-blocked run has
+          # used more than one of them (observed 2026-08-18: two back-to-back dispatches cycled through
+          # `waiting`, `queued` AND `pending` across two polls a minute apart); an allowlist that
+          # misses the current spelling makes this a silent no-op that nothing would ever surface.
+          # Over-suppressing costs one push a wait for the next deploy — and since every deploy
+          # re-serves the WHOLE tree, that self-heals on the next PR. Under-suppressing just breaks
+          # the debounce, invisibly.
+          queued=$(gh api "repos/${{ github.repository }}/actions/workflows/pages-deploy.yml/runs?per_page=20" \
+            --jq '[.workflow_runs[] | select(.status != "completed" and .status != "in_progress")] | length' 2>/dev/null || echo "")
+          if [[ "$queued" =~ ^[0-9]+$ ]] && [ "$queued" -gt 0 ]; then
+            echo "${queued} pages-deploy run(s) already queued — one will publish this push. Skipping dispatch."
+            exit 0
+          fi
+
           # --ref pins the DEFAULT branch on purpose: workflow_run always ran the deploy job body
           # from the default branch, and a PR branch must not get its own pages:write/id-token:write
           # job onto the live site. The deploy job checks out `ref: gh-pages` for content, so this
@@ -894,4 +917,28 @@ jobs:
         if: steps.prune.outputs.pruned == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run pages-deploy.yml --ref "${{ github.event.repository.default_branch }}"
+        run: |
+          # Debounce the rebase-prs fan-out: one master push updates every open PR, so N PRs each
+          # land a gh-pages push and each dispatches this workflow. A pages-deploy run that has NOT
+          # STARTED yet checks out gh-pages *after* this push landed, so it already serves this
+          # content — a second dispatch only adds a run that the `pages` concurrency group cancels
+          # (one pending slot per group). NEVER debounce on `in_progress`: that run may have checked
+          # out gh-pages before this push and would leave it unserved. Fails OPEN — an extra deploy
+          # is harmless, a missed one leaves the gallery dark.
+          #
+          # The filter is a DENYLIST (not `status == "queued"`) on purpose. GitHub has shipped several
+          # pre-execution statuses (queued/pending/waiting/requested) and a concurrency-blocked run has
+          # used more than one of them (observed 2026-08-18: two back-to-back dispatches cycled through
+          # `waiting`, `queued` AND `pending` across two polls a minute apart); an allowlist that
+          # misses the current spelling makes this a silent no-op that nothing would ever surface.
+          # Over-suppressing costs one push a wait for the next deploy — and since every deploy
+          # re-serves the WHOLE tree, that self-heals on the next PR. Under-suppressing just breaks
+          # the debounce, invisibly.
+          queued=$(gh api "repos/${{ github.repository }}/actions/workflows/pages-deploy.yml/runs?per_page=20" \
+            --jq '[.workflow_runs[] | select(.status != "completed" and .status != "in_progress")] | length' 2>/dev/null || echo "")
+          if [[ "$queued" =~ ^[0-9]+$ ]] && [ "$queued" -gt 0 ]; then
+            echo "${queued} pages-deploy run(s) already queued — one will publish this push. Skipping dispatch."
+            exit 0
+          fi
+
+          gh workflow run pages-deploy.yml --ref "${{ github.event.repository.default_branch }}"

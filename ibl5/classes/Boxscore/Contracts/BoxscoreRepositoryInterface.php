@@ -51,7 +51,7 @@ interface BoxscoreRepositoryInterface
      * @param string $date Game date in Y-m-d format
      * @param int $visitor_teamid Visitor team ID
      * @param int $home_teamid Home team ID
-     * @param int $game_of_that_day Game number for that day (1 = first game, 2 = doubleheader)
+     * @param int $game_of_that_day 1-based index of the game within its date, league-wide
      * @return array<string, mixed>|null Row with quarter point columns, or null if not found
      */
     public function findTeamBoxscore(string $date, int $visitor_teamid, int $home_teamid, int $game_of_that_day): ?array;
@@ -62,7 +62,7 @@ interface BoxscoreRepositoryInterface
      * @param string $date Game date in Y-m-d format
      * @param int $visitor_teamid Visitor team ID
      * @param int $home_teamid Home team ID
-     * @param int $game_of_that_day Game number for that day
+     * @param int $game_of_that_day 1-based index of the game within its date, league-wide
      * @return int Number of affected rows
      */
     public function deleteTeamBoxscoresByGame(string $date, int $visitor_teamid, int $home_teamid, int $game_of_that_day): int;
@@ -153,7 +153,7 @@ interface BoxscoreRepositoryInterface
      * @param int $playerID Player ID
      * @param int $visitor_teamid Visitor team ID
      * @param int $home_teamid Home team ID
-     * @param int $game_of_that_day Game number for that date (1st, 2nd game)
+     * @param int $game_of_that_day 1-based index of the game within its date, league-wide
      * @param int $attendance Attendance at the game
      * @param int $capacity Arena capacity
      * @param int $visitor_wins Visitor team wins before this game

@@ -440,7 +440,7 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
 
         $displayable = $this->repo->findDisplayableGameRecaps(999091);
 
-        self::assertCount(2, $displayable, 'Doubleheader: both games must be returned');
+        self::assertCount(2, $displayable, 'Both indices on one date must be returned');
         self::assertSame(1, $displayable[0]['game_of_that_day']);
         self::assertSame(2, $displayable[1]['game_of_that_day']);
     }

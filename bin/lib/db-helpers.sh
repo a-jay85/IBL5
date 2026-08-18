@@ -28,6 +28,57 @@ db_exec_stdin_stream() {
     docker exec -i "$@" 2>&1 | grep -v '\[Warning\].*password' || true
 }
 
+# Resolve which database a checkout should talk to, from the checkout root alone.
+# Prints `main` for the main checkout (or anything not recognisably a linked
+# worktree), or the per-worktree container name `ibl5-db-<slug>`. Always exits 0:
+# an unrecognised layout resolves to `main`, i.e. today's behaviour, so a layout
+# surprise can never invent a bogus container name.
+#
+# Slug precedence is <root>/.wt-slug first, basename second. They are NOT always
+# equal: bin/wt-up:81 computes SLUG="${WORKTREE_NAME//\//-}" (a branch like
+# feature/x lands at .../feature/x, basename `x`, slug `feature-x`) and
+# bin/wt-up:92 overrides SLUG="pr-<N>" under --pr. The dotfile is what wt-up
+# actually named the container, so it wins whenever it exists and is non-empty.
+#
+# The git-helpers.sh source below is deliberately lazy and guarded by declare -F:
+# this library is sourced by ~a dozen scripts, and a top-of-file source would
+# inject six new function names into every one of them plus a hard load-order
+# dependency. Callers that already sourced git-helpers.sh pay nothing.
+#
+# Usage: target=$(db_resolve_target "/path/to/checkout/root")
+db_resolve_target() {
+    local checkout_root="$1" lib_dir slug
+    lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if ! declare -F is_main_checkout >/dev/null 2>&1; then
+        # shellcheck source=bin/lib/git-helpers.sh
+        . "$lib_dir/git-helpers.sh"
+    fi
+
+    if is_main_checkout "$checkout_root"; then
+        printf 'main\n'
+        return 0
+    fi
+
+    # Linked worktree: prefer .wt-slug, fall back to directory basename.
+    if [ -f "$checkout_root/.wt-slug" ]; then
+        slug="$(tr -d '[:space:]' < "$checkout_root/.wt-slug")"
+    fi
+    [ -z "${slug:-}" ] && slug="$(basename "$checkout_root")"
+    printf 'ibl5-db-%s\n' "$slug"
+}
+
+# True only when the named container exists AND is currently running. Absent and
+# stopped are both false — `docker inspect` alone exits 0 for a stopped container,
+# so reading .State.Running is what collapses both into one loud-fail branch: a
+# stopped worktree DB must fail loudly, not silently resolve to some other database.
+#
+# Usage: db_container_running <container-name>
+db_container_running() {
+    local state
+    state="$(docker inspect --format '{{.State.Running}}' "$1" 2>/dev/null)" || return 1
+    [ "$state" = "true" ]
+}
+
 # Pipeline filter: strips MariaDB password warnings from a stream.
 db_strip_warnings() {
     grep -v '\[Warning\].*password' || true

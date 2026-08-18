@@ -1,0 +1,205 @@
+#!/bin/bash
+# bin/test-db-query-routing — regression harness for ibl5/bin/db-query target routing.
+# Runs with no Docker, no MariaDB and no PHP: php/mariadb/docker are stubbed on PATH.
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+FAILED=0
+
+pass()     { echo "PASS: $1"; }
+failcase() { echo "FAIL: $1"; echo "      $2"; FAILED=1; }
+
+assert_match() {  # <label> <needle> <haystack>
+    case "$3" in *"$2"*) pass "$1" ;; *) failcase "$1" "expected to contain: $2 | got: $3" ;; esac
+}
+assert_absent() { # <label> <needle> <haystack>
+    case "$3" in *"$2"*) failcase "$1" "expected NOT to contain: $2 | got: $3" ;; *) pass "$1" ;; esac
+}
+assert_eq() {     # <label> <expected> <actual>
+    if [ "$2" = "$3" ]; then pass "$1"; else failcase "$1" "expected: [$2] got: [$3]"; fi
+}
+
+STUBBIN="$TMP/stubbin"
+mkdir -p "$STUBBIN"
+
+cat > "$STUBBIN/php" <<'STUB'
+#!/bin/bash
+# db-query calls: php -r "... include '<config>'; echo $dbuname;"
+case "$*" in
+    *dbuname*) echo "stubuser" ;;
+    *dbpass*)  echo "stubpass" ;;
+    *dbname*)  echo "stubdb" ;;
+    *)         : ;;
+esac
+STUB
+
+cat > "$STUBBIN/mariadb" <<'STUB'
+#!/bin/bash
+printf '%s\n' "$*" >> "$STUB_ARGV_LOG.mariadb"
+[ "${STUB_MARIADB_RC:-0}" -ne 0 ] && { echo "$STUB_MARIADB_STDERR" >&2; exit "$STUB_MARIADB_RC"; }
+printf '+-------+\n| c     |\n+-------+\n| 4242  |\n+-------+\n'
+STUB
+
+cat > "$STUBBIN/docker" <<'STUB'
+#!/bin/bash
+printf '%s\n' "$*" >> "$STUB_ARGV_LOG.docker"
+case "$1" in
+    inspect)
+        [ "${STUB_DOCKER_INSPECT_RC:-0}" -ne 0 ] && exit "${STUB_DOCKER_INSPECT_RC}"
+        printf '%s\n' "${STUB_DOCKER_RUNNING:-true}"
+        exit 0 ;;
+    exec)
+        [ "${STUB_DOCKER_EXEC_RC:-0}" -ne 0 ] && { echo "Error: No such container"; exit "${STUB_DOCKER_EXEC_RC}"; }
+        printf '+-------+\n| c     |\n+-------+\n| 4242  |\n+-------+\n' ;;
+    *) exit 0 ;;
+esac
+STUB
+
+chmod +x "$STUBBIN"/php "$STUBBIN"/mariadb "$STUBBIN"/docker
+export PATH="$STUBBIN:$PATH"
+export STUB_ARGV_LOG="$TMP/argv"
+
+# Fixture: a throwaway main checkout plus one linked worktree
+MAIN="$TMP/IBL5"
+WT_PARENT="$TMP/IBL5-worktrees"
+SLUG="fixture-wt"
+
+mkdir -p "$MAIN/ibl5/bin" "$MAIN/bin/lib" "$WT_PARENT"
+cp "$REPO_ROOT/ibl5/bin/db-query"       "$MAIN/ibl5/bin/db-query"
+cp "$REPO_ROOT/bin/lib/db-helpers.sh"   "$MAIN/bin/lib/db-helpers.sh"
+cp "$REPO_ROOT/bin/lib/git-helpers.sh"  "$MAIN/bin/lib/git-helpers.sh"
+chmod +x "$MAIN/ibl5/bin/db-query"
+ln -s ../ibl5/bin/db-query "$MAIN/bin/db-query"
+echo '<?php $dbuname="stubuser"; $dbpass="stubpass"; $dbname="stubdb";' > "$MAIN/ibl5/config.php"
+
+git -C "$MAIN" init -q -b master
+git -C "$MAIN" config user.email t@example.com
+git -C "$MAIN" config user.name  Test
+git -C "$MAIN" add -A
+git -C "$MAIN" commit -qm init
+git -C "$MAIN" worktree add -q -b "$SLUG" "$WT_PARENT/$SLUG" >/dev/null 2>&1
+WT="$WT_PARENT/$SLUG"
+echo "$SLUG" > "$WT/.wt-slug"
+
+run_dbq() {  # <cwd> <script-path> <sql> ; sets OUT / ERR / RC
+    rm -f "$STUB_ARGV_LOG".mariadb "$STUB_ARGV_LOG".docker
+    local cwd="$1" script="$2" sql="$3"
+    ERR="$TMP/err.$$"
+    OUT="$( cd "$cwd" && "$script" "$sql" 2>"$ERR" )"; RC=$?
+    ERR="$(cat "$TMP/err.$$")"
+}
+argv_mariadb() { cat "$STUB_ARGV_LOG".mariadb 2>/dev/null || true; }
+argv_docker()  { cat "$STUB_ARGV_LOG".docker  2>/dev/null || true; }
+
+# C1: Main checkout, $MAIN/bin/db-query (via symlink), cwd $MAIN
+run_dbq "$MAIN" "$MAIN/bin/db-query" "SELECT 1"
+assert_match  "C1 mariadb called with -h 127.0.0.1" "-h 127.0.0.1" "$(argv_mariadb)"
+assert_eq     "C1 docker not called" "" "$(argv_docker)"
+assert_eq     "C1 exit code 0" "0" "$RC"
+
+# C2: stdout only — extract the number
+run_dbq "$MAIN" "$MAIN/bin/db-query" "SELECT 1"
+actual_num="$(printf '%s\n' "$OUT" | grep -E '^\|' | tail -n 1 | tr -dc '0-9')"
+assert_eq "C2 stdout number" "4242" "$actual_num"
+
+# C3: The bug — worktree copy $WT/bin/db-query, cwd $WT
+# CHARACTERIZATION — Phase 3 inverts this; Phase 4 rewrites the block.
+run_dbq "$WT" "$WT/bin/db-query" "SELECT 1"
+assert_match  "C3 worktree still calls mariadb -h 127.0.0.1 (current bug)" "-h 127.0.0.1" "$(argv_mariadb)"
+assert_eq     "C3 docker not called (current bug)" "" "$(argv_docker)"
+
+# C4: Negative — no SQL argument at all
+rm -f "$STUB_ARGV_LOG".mariadb "$STUB_ARGV_LOG".docker
+OUT="$(cd "$MAIN" && "$MAIN/bin/db-query" 2>"$TMP/c4err")"; RC=$?
+ERR="$(cat "$TMP/c4err")"
+assert_eq     "C4 exit code 1" "1" "$RC"
+assert_match  "C4 usage on stderr" "Usage:" "$ERR"
+assert_eq     "C4 stdout empty" "" "$OUT"
+assert_eq     "C4 mariadb not called" "" "$(argv_mariadb)"
+
+# C5: Negative — config.php removed from a copy of the fixture
+MAIN_C5="$TMP/IBL5-noph"
+mkdir -p "$MAIN_C5/ibl5/bin"
+cp "$MAIN/ibl5/bin/db-query" "$MAIN_C5/ibl5/bin/db-query"
+rm -f "$STUB_ARGV_LOG".mariadb "$STUB_ARGV_LOG".docker
+OUT="$(cd "$MAIN_C5" && "$MAIN_C5/ibl5/bin/db-query" "SELECT 1" 2>"$TMP/c5err")"; RC=$?
+ERR="$(cat "$TMP/c5err")"
+assert_eq    "C5 exit code 1" "1" "$RC"
+assert_match "C5 config.php error on stderr" "config.php not found" "$ERR"
+assert_eq    "C5 stdout empty" "" "$OUT"
+
+# C6: Negative — client failure propagates
+export STUB_MARIADB_RC=1
+export STUB_MARIADB_STDERR='ERROR 1146 (42S02): unknown table'
+run_dbq "$MAIN" "$MAIN/bin/db-query" "SELECT 1"
+unset STUB_MARIADB_RC STUB_MARIADB_STDERR
+assert_eq    "C6 exit code 1" "1" "$RC"
+assert_match "C6 error on stderr" "ERROR 1146" "$ERR"
+assert_eq    "C6 stdout empty" "" "$OUT"
+
+# ── Library unit tests (Phase 2) ──────────────────────────────────────────────
+# shellcheck source=bin/lib/db-helpers.sh
+. "$MAIN/bin/lib/db-helpers.sh"
+
+# L1: main checkout resolves to 'main'
+result="$(db_resolve_target "$MAIN")"
+assert_eq "L1 main checkout" "main" "$result"
+
+# L2: linked worktree with .wt-slug=fixture-wt
+result="$(db_resolve_target "$WT")"
+assert_eq "L2 worktree slug from .wt-slug" "ibl5-db-fixture-wt" "$result"
+
+# L3: .wt-slug overrides basename (simulates --pr and feature/x divergences)
+echo "pr-99" > "$WT/.wt-slug"
+result="$(db_resolve_target "$WT")"
+assert_eq "L3 .wt-slug beats basename" "ibl5-db-pr-99" "$result"
+
+# L4: .wt-slug deleted — falls back to basename
+rm "$WT/.wt-slug"
+result="$(db_resolve_target "$WT")"
+assert_eq "L4 basename fallback" "ibl5-db-fixture-wt" "$result"
+
+# L5: .wt-slug containing only a newline — must not produce ibl5-db-
+printf '\n' > "$WT/.wt-slug"
+result="$(db_resolve_target "$WT")"
+assert_eq "L5 whitespace-only .wt-slug falls back to basename" "ibl5-db-fixture-wt" "$result"
+
+# L6: path that is not a git checkout at all — degrades to 'main'
+result="$(db_resolve_target "$TMP/nowhere")"
+assert_eq "L6 unknown layout degrades to main" "main" "$result"
+
+# L7: absent container (docker inspect fails) returns non-zero
+export STUB_DOCKER_INSPECT_RC=1
+if db_container_running ibl5-db-x; then
+    failcase "L7 absent container returns non-zero" "expected non-zero but got 0"
+else
+    pass "L7 absent container returns non-zero"
+fi
+unset STUB_DOCKER_INSPECT_RC
+
+# L8: stopped container (Running=false) returns non-zero
+export STUB_DOCKER_RUNNING=false
+if db_container_running ibl5-db-x; then
+    failcase "L8 stopped container returns non-zero" "expected non-zero but got 0"
+else
+    pass "L8 stopped container returns non-zero"
+fi
+unset STUB_DOCKER_RUNNING
+
+# L9: running container returns 0
+export STUB_DOCKER_RUNNING=true
+if db_container_running ibl5-db-x; then
+    pass "L9 running container returns 0"
+else
+    failcase "L9 running container returns 0" "expected 0 but got non-zero"
+fi
+unset STUB_DOCKER_RUNNING
+
+# Restore .wt-slug so Phase 4 cases start from a known fixture
+echo "$SLUG" > "$WT/.wt-slug"
+
+if [ "$FAILED" -ne 0 ]; then echo "SOME TESTS FAILED"; exit 1; fi
+echo "All db-query routing tests passed"

@@ -149,6 +149,18 @@ test.describe('uploadDraftClass.php', () => {
     await expect(page.getByText('Nothing has been written yet.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Commit Import' })).toBeVisible();
 
+    // Headers are the labels the league reads on the ratings table, not the
+    // SQL-safe DB column names (r_3ga, r_drive_off, r_trans_off).
+    await expect(
+      page.locator('.ibl-data-table thead th').allTextContents(),
+    ).resolves.toEqual([
+      'Player', 'Pos', 'Age', 'Team',
+      '2ga', '2g%', 'fta', 'ft%', '3ga', '3g%',
+      'orb', 'drb', 'ast', 'stl', 'tvr', 'blk',
+      'oo', 'do', 'po', 'to', 'od', 'dd', 'pd', 'td',
+      'Tal', 'Skl', 'Int',
+    ]);
+
     // Column-group separators (import-demands.css) mirror the ratings table's
     // grouping. Asserting the computed border, not just the class, is what proves
     // the rule survives: Ratings.php's own sep-r rules are scoped to .team-table,

@@ -347,8 +347,31 @@ class DraftClassCsvParserTest extends TestCase
 
         $this->assertNotEmpty($result['errors']);
         $this->assertStringContainsString('Line 1', $result['errors'][0]);
-        $this->assertStringContainsString('fga', $result['errors'][0]);
+        // The label the league reads ('2ga'), not the DB column name ('fga') — the
+        // commissioner matches the message against their export, not the schema.
+        $this->assertStringContainsString('2ga', $result['errors'][0]);
+        $this->assertStringNotContainsString('fga', $result['errors'][0]);
         $this->assertStringContainsString("'abc'", $result['errors'][0]);
+    }
+
+    public function testSqlSafeColumnNamesNeverReachAnErrorMessage(): void
+    {
+        // r_3ga / r_drive_off / r_trans_off exist only to dodge reserved words; a
+        // reader would not find them anywhere in their export.
+        $raw = $this->buildSemiRow([
+            'r_3ga' => 'x',
+            'r_drive_off' => 'y',
+            'r_trans_off' => 'z',
+        ]);
+
+        $result = $this->parser->parse($raw);
+
+        $this->assertNotEmpty($result['errors']);
+        $joined = implode("\n", $result['errors']);
+        $this->assertStringNotContainsString('r_', $joined);
+        $this->assertStringContainsString('3ga', $joined);
+        $this->assertStringContainsString('column do', $joined);
+        $this->assertStringContainsString('column to', $joined);
     }
 
     // -------------------------------------------------------------------------

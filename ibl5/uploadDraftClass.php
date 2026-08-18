@@ -244,7 +244,9 @@ if ($csrfField === '') {
     <link rel="stylesheet" href="design/components/import-demands.css?v=<?= HtmlSanitizer::e((string) (filemtime(__DIR__ . '/design/components/import-demands.css') ?: 0)) ?>">
 </head>
 <body>
-<div class="import-demands">
+<?php /* Preview drops the 700px prose measure so the 27-column table can use the
+         full viewport width; see import-demands.css .import-demands--preview. */ ?>
+<div class="import-demands<?= $view === 'preview' ? ' import-demands--preview' : '' ?>">
     <h1 class="ibl-title">Upload Draft Class</h1>
 
 <?php if ($errorMessage !== ''): ?>
@@ -276,14 +278,14 @@ if ($csrfField === '') {
 
     <?php /* 27 columns never fit the page container, so the design system's scroll
              wrapper pair carries the table (css-architecture.md, table pattern 1). */ ?>
-    <div class="table-scroll-wrapper"><div class="table-scroll-container">
+    <div class="table-scroll-wrapper" id="draftClassTableWrapper"><div class="table-scroll-container">
     <table class="ibl-data-table">
         <thead>
             <tr>
             <?php foreach (DRAFT_CLASS_COLUMNS as $column): ?>
                 <?php /* Header carries only the strong rules, as Ratings.php does. */ ?>
                 <?php $sep = DRAFT_CLASS_COLUMN_SEPARATORS[$column] ?? ''; ?>
-                <th<?= $sep === 'sep-r-team' ? ' class="sep-r-team"' : '' ?>><?= HtmlSanitizer::e($column) ?></th>
+                <th<?= $sep === 'sep-r-team' ? ' class="sep-r-team"' : '' ?>><?= HtmlSanitizer::e(DraftClassCsvParser::COLUMN_LABELS[$column] ?? $column) ?></th>
             <?php endforeach; ?>
             </tr>
         </thead>
@@ -299,6 +301,26 @@ if ($csrfField === '') {
         </tbody>
     </table>
     </div></div>
+
+    <?php /* The wrapper's right-edge scroll shadow is toggled by jslib/responsive-tables.js,
+             which this standalone page does not load — so without this it hangs there
+             advertising columns that are not off-screen. Same end test as that file's
+             updateScrollIndicator(), which also covers a table wide enough to scroll. */ ?>
+    <script>
+    (function () {
+        var wrapper = document.getElementById('draftClassTableWrapper');
+        var container = wrapper.querySelector('.table-scroll-container');
+
+        function updateScrollIndicator() {
+            var isAtEnd = container.scrollLeft + container.clientWidth >= container.scrollWidth - 5;
+            wrapper.classList.toggle('scrolled-end', isAtEnd);
+        }
+
+        container.addEventListener('scroll', updateScrollIndicator);
+        window.addEventListener('resize', updateScrollIndicator);
+        updateScrollIndicator();
+    })();
+    </script>
 
     <form method="post">
         <?= HtmlSanitizer::trusted($csrfField) ?>

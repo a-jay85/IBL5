@@ -41,6 +41,50 @@ final class DraftClassCsvParser
         27 => 'intangibles',
     ];
 
+    /**
+     * DB column → the label the league reads.
+     *
+     * The DB names are SQL-safe spellings (r_3ga, r_drive_off, r_trans_off) that no
+     * commissioner recognises; these are the headers the ratings table shows
+     * (classes/UI/Tables/Ratings.php), so an error message names a rating the reader
+     * can find in their export. Talent/skill/intangibles are absent from that table,
+     * so their labels come from the contracts table (classes/UI/Tables/Contracts.php).
+     *
+     * Public: uploadDraftClass.php renders its preview header from this same map, so
+     * the header and the error text can never drift apart.
+     *
+     * @var array<string, string>
+     */
+    public const COLUMN_LABELS = [
+        'name' => 'Player',
+        'pos' => 'Pos',
+        'age' => 'Age',
+        'team' => 'Team',
+        'fga' => '2ga',
+        'fgp' => '2g%',
+        'fta' => 'fta',
+        'ftp' => 'ft%',
+        'r_3ga' => '3ga',
+        'r_3gp' => '3g%',
+        'orb' => 'orb',
+        'drb' => 'drb',
+        'ast' => 'ast',
+        'stl' => 'stl',
+        'tvr' => 'tvr',
+        'blk' => 'blk',
+        'oo' => 'oo',
+        'r_drive_off' => 'do',
+        'po' => 'po',
+        'r_trans_off' => 'to',
+        'od' => 'od',
+        'dd' => 'dd',
+        'pd' => 'pd',
+        'td' => 'td',
+        'talent' => 'Tal',
+        'skill' => 'Skl',
+        'intangibles' => 'Int',
+    ];
+
     /** @var list<string> */
     private const VALID_POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C', 'G', 'F', 'GF'];
 
@@ -247,7 +291,7 @@ final class DraftClassCsvParser
         // Field 3: age (integer, no range constraint).
         $errors = array_merge($errors, $this->validateInteger(
             (string) ($row['age'] ?? ''),
-            'age',
+            self::COLUMN_LABELS['age'],
             $lineNumber,
             null,
             null
@@ -260,7 +304,7 @@ final class DraftClassCsvParser
             $column = self::COLUMNS[$fieldIndex];
             $errors = array_merge($errors, $this->validateInteger(
                 (string) ($row[$column] ?? ''),
-                $column,
+                self::COLUMN_LABELS[$column],
                 $lineNumber,
                 0,
                 255
@@ -272,7 +316,7 @@ final class DraftClassCsvParser
             $column = self::COLUMNS[$fieldIndex];
             $errors = array_merge($errors, $this->validateInteger(
                 (string) ($row[$column] ?? ''),
-                $column,
+                self::COLUMN_LABELS[$column],
                 $lineNumber,
                 null,
                 null
@@ -286,7 +330,7 @@ final class DraftClassCsvParser
      * Validate that a field value is a whole number and (when given) within range.
      *
      * @param string   $raw        Raw string value; will be trimmed here.
-     * @param string   $column     Column name for error messages.
+     * @param string   $label      Reader-facing column label for error messages (COLUMN_LABELS).
      * @param int      $lineNumber 1-based line number.
      * @param int|null $min        Minimum allowed value, or null for no lower bound.
      * @param int|null $max        Maximum allowed value, or null for no upper bound.
@@ -294,7 +338,7 @@ final class DraftClassCsvParser
      */
     private function validateInteger(
         string $raw,
-        string $column,
+        string $label,
         int $lineNumber,
         ?int $min,
         ?int $max
@@ -302,7 +346,7 @@ final class DraftClassCsvParser
         $value = trim($raw);
         if (preg_match('/^-?\d+$/', $value) !== 1) {
             return [
-                "Line {$lineNumber}: column {$column} should be a whole number "
+                "Line {$lineNumber}: column {$label} should be a whole number "
                 . "but contains '{$value}'.",
             ];
         }
@@ -311,7 +355,7 @@ final class DraftClassCsvParser
             $intValue = (int) $value;
             if ($intValue < $min || $intValue > $max) {
                 return [
-                    "Line {$lineNumber}: column {$column} is {$value}, which is "
+                    "Line {$lineNumber}: column {$label} is {$value}, which is "
                     . "outside the allowed range {$min}-{$max}.",
                 ];
             }

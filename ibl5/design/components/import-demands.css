@@ -137,6 +137,25 @@
 }
 
 /*
+ * Preview view: the 27-column table is the page's content, so the container drops
+ * its 700px prose measure and lets the design system's .table-scroll-wrapper
+ * (width: fit-content; max-width: 100%) size to the table — the whole table shows
+ * whenever the viewport can hold it, and only a genuinely wider table scrolls.
+ * Prose and the confirm form keep the 700px measure, centered over the table.
+ */
+.import-demands--preview {
+    max-width: none;
+}
+
+.import-demands--preview > p,
+.import-demands--preview > form,
+.import-demands--preview > .ibl-alert {
+    max-width: 700px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/*
  * Column-group separators for the draft-class preview table, matching the ratings
  * table (classes/UI/Tables/Ratings.php). Those rules live under .team-table and
  * tint the strong rule with --team-color-primary; a draft class spans every team,

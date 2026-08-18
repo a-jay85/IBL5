@@ -1,8 +1,7 @@
 ---
 name: plan-prompt
 description: "Draft a /plan prompt distilled from the current conversation — ground-truth pointers, already-measured evidence, scope, constraints, verification, and the Step-3 architect tier — then, unless the Step-1.5 size triage says the work clears the ad-hoc bar, fire it as a detached headless Sonnet 4.6 run via bin/plan-now. Use after a design discussion when the planning run should be offloaded off the expensive session."
-disable-model-invocation: true
-last_verified: 2026-08-17
+last_verified: 2026-08-18
 ---
 
 # Draft a `/plan` handoff prompt and fire it headless

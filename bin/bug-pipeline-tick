@@ -37,7 +37,7 @@ BUG_PIPELINE_APPROVER_ID="${BUG_PIPELINE_APPROVER_ID:-}"
 PLANS_DIR="${BUG_PIPELINE_PLANS_DIR:-$HOME/claude-plans}"
 IDLE_SECS="${BUG_PIPELINE_IDLE_SECS:-3600}"
 BACKOFF_SECS="${BUG_PIPELINE_BACKOFF_SECS:-1800}"
-CLASSIFY_MODEL="${BUG_PIPELINE_CLASSIFY_MODEL:-claude-haiku-4-5-20251001}"
+CLASSIFY_MODEL="${BUG_PIPELINE_CLASSIFY_MODEL:-claude-sonnet-4-6}"
 PLAN_MODEL="${BUG_PIPELINE_PLAN_MODEL:-claude-sonnet-4-6}"
 CLAUDE_TIMEOUT="${BUG_PIPELINE_CLAUDE_TIMEOUT:-120}"
 PLAN_TIMEOUT="${BUG_PIPELINE_PLAN_TIMEOUT:-1800}"
@@ -66,7 +66,7 @@ prune_attachment_cache() {
 
 # ── Hunter seams (#5b) — all default to production; tests override ─────────────
 HUNT_PROMPT_FILE="${BUG_PIPELINE_HUNT_PROMPT:-$SCRIPT_DIR/bug-pipeline-hunter-prompt}"
-HUNT_MODELS="${BUG_PIPELINE_HUNT_MODELS:-claude-haiku-4-5 claude-sonnet-4-6 claude-opus-5}"  # cheap→dear, Opus last
+HUNT_MODELS="${BUG_PIPELINE_HUNT_MODELS:-claude-sonnet-4-6 claude-opus-5}"  # cheap→dear, Opus last; no Haiku tier
 HUNTER_TIMEOUT_SECS="${BUG_PIPELINE_HUNTER_TIMEOUT:-1800}"
 HUNT_LOG="${BUG_PIPELINE_HUNT_LOG:-$HOME/.claude/logs/bug-pipeline-hunt.log}"
 # Liveness heartbeat: epoch of the last tick START (bin/bug-pipeline-check reads it).
@@ -188,7 +188,7 @@ park_blocked() { # id status
     cli transition "$1" "$2" --blocked-until="$until" >/dev/null 2>&1 || true
 }
 
-# ── The classifier Haiku call (locked-down: schema-constrained, tool-starved) ─
+# ── The classifier Sonnet call (locked-down: schema-constrained, tool-starved) ──
 CLASSIFY_SCHEMA='{"type":"object","additionalProperties":false,"required":["class"],"properties":{"class":{"enum":["bug","feature","not_a_thing"]},"bug_has_enough_info":{"type":"boolean"},"feature_is_regression":{"type":"boolean"},"clarifying_question":{"type":"string"},"issue_title":{"type":"string","maxLength":70},"severity":{"enum":["low","medium","high"]}}}'
 GATHER_SCHEMA='{"type":"object","additionalProperties":false,"required":["enough_info"],"properties":{"enough_info":{"type":"boolean"},"next_question":{"type":"string"},"scope_estimate":{"enum":["single_pr","multi_pr"]}}}'
 
@@ -861,7 +861,7 @@ render_hunter_prompt() { # claimed wt_appdir
     printf '%s' "$t"
 }
 
-# Climb the tiered ladder (Haiku→Sonnet→Opus, Opus last). Sets LADDER_STATE to one of
+# Climb the tiered ladder (Sonnet→Opus, Opus last). Sets LADDER_STATE to one of
 # fixed | escalate | blocked. A usage limit at ANY tier parks the whole hunt (blocked).
 LADDER_STATE="escalate"
 run_hunt_ladder() { # claimed hunt_id wt_appdir
@@ -885,8 +885,8 @@ run_hunt_ladder() { # claimed hunt_id wt_appdir
         verdict="$(printf '%s' "$result" | jq -r '.verdict // "escalate"' 2>/dev/null)"
         if [ "$verdict" = "fixed" ]; then rm -f "$rendered"; LADDER_STATE="fixed"; return 0; fi
         # terminal:true is the hunter's own "a retry by a stronger tier would be pointless"
-        # (bin/bug-pipeline-hunter-prompt § hunt-result schema). Climbing to sonnet then opus
-        # anyway spends 2 of 3 tiers — the dearest two — to re-derive the same answer.
+        # (bin/bug-pipeline-hunter-prompt § hunt-result schema). Climbing to opus
+        # anyway spends 1 of 2 tiers — the dearest — to re-derive the same answer.
         # Stop here; drive_hunt_row re-reads the same flag and routes to needs_human.
         if [ "$(printf '%s' "$result" | jq -r '.terminal // false' 2>/dev/null)" = "true" ]; then
             log "hunt $hunt_id: $model returned terminal — skipping remaining tiers"

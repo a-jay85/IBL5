@@ -103,9 +103,9 @@ run_mariadb() {
         mariadb -h 127.0.0.1 --skip-ssl -u "$DB_USER" -p"$DB_PASS" "$@"
         return $?
     fi
-    # db_exec_stdin merges the client's stderr into stdout (2>&1), which would
-    # otherwise leak diagnostics onto our stdout. Capture, then split by exit
-    # code: success is real output, failure is diagnostics.
+    # db_exec_stdin merges stderr into stdout (by design — its warning-strip
+    # pipeline uses 2>&1). Capture the merged stream, then re-route by exit
+    # code: success → our stdout (row output callers parse); failure → our stderr.
     local out rc=0
     out="$(db_exec_stdin "$DB_TARGET" mariadb --skip-ssl \
             -u "$DB_USER" -p"$DB_PASS" "$@" < /dev/null)" || rc=$?

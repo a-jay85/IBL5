@@ -67,10 +67,11 @@ db_resolve_target() {
     printf 'ibl5-db-%s\n' "$slug"
 }
 
-# True only when the named container exists AND is currently running. Absent and
-# stopped are both false — `docker inspect` alone exits 0 for a stopped container,
-# so reading .State.Running is what collapses both into one loud-fail branch: a
-# stopped worktree DB must fail loudly, not silently resolve to some other database.
+# True only when the named container exists AND is currently running. Both absent
+# and stopped are false, via distinct mechanisms: absent → `docker inspect` exits
+# non-zero → the `|| return 1` fires; stopped → inspect exits 0 but emits `false`
+# → the state check fails. A stopped worktree DB must fail loudly, not silently
+# resolve to some other database.
 #
 # Usage: db_container_running <container-name>
 db_container_running() {

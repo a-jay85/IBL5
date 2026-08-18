@@ -38,6 +38,22 @@ const DRAFT_CLASS_COLUMNS = [
     'talent', 'skill', 'intangibles',
 ];
 
+/**
+ * Right-hand column-group separators for the preview table, mirroring the ratings
+ * table's grouping (classes/UI/Tables/Ratings.php): identity | shooting | rebound
+ * and defence counts | offensive and defensive ratings | intangibles, with the
+ * light rule inside the shooting and offence groups.
+ */
+const DRAFT_CLASS_COLUMN_SEPARATORS = [
+    'team' => 'sep-r-team',
+    'fgp' => 'sep-r-weak',
+    'ftp' => 'sep-r-weak',
+    'r_3gp' => 'sep-r-team',
+    'blk' => 'sep-r-team',
+    'r_trans_off' => 'sep-r-weak',
+    'td' => 'sep-r-team',
+];
+
 /** Columns bound as strings; every other column is bound as an integer. */
 const DRAFT_CLASS_STRING_COLUMNS = ['name', 'pos', 'team'];
 
@@ -221,18 +237,22 @@ if ($csrfField === '') {
     <meta charset="utf-8">
     <title>Upload Draft Class</title>
     <link rel="stylesheet" href="themes/IBL/style/style.css">
-    <link rel="stylesheet" href="design/components/import-demands.css">
+<?php /* The stylesheet is served with no Cache-Control, so a browser that visited
+         import-demands.php (which links the same file) before the picker button
+         landed keeps the stale copy and renders the raw file input. The mtime
+         stamp retires that cached copy on the next edit. */ ?>
+    <link rel="stylesheet" href="design/components/import-demands.css?v=<?= HtmlSanitizer::e((string) (filemtime(__DIR__ . '/design/components/import-demands.css') ?: 0)) ?>">
 </head>
 <body>
 <div class="import-demands">
-    <h1>Upload Draft Class</h1>
+    <h1 class="ibl-title">Upload Draft Class</h1>
 
 <?php if ($errorMessage !== ''): ?>
-    <div class="alert alert-error"><?= HtmlSanitizer::e($errorMessage) ?></div>
+    <div class="ibl-alert ibl-alert--error"><?= HtmlSanitizer::e($errorMessage) ?></div>
 <?php endif; ?>
 
 <?php if ($errors !== []): ?>
-    <div class="alert alert-error">
+    <div class="ibl-alert ibl-alert--error">
         <strong>This file was not imported. Fix the following and upload it again:</strong>
         <ul>
         <?php foreach ($errors as $error): ?>
@@ -243,7 +263,7 @@ if ($csrfField === '') {
 <?php endif; ?>
 
 <?php if ($view === 'imported'): ?>
-    <div class="alert alert-success">
+    <div class="ibl-alert ibl-alert--success">
         Imported <?= $importedCount ?> player<?= $importedCount === 1 ? '' : 's' ?>.
     </div>
     <p><a href="modules.php?name=Draft">Go to the Draft module</a></p>
@@ -254,11 +274,16 @@ if ($csrfField === '') {
     <p><?= HtmlSanitizer::e(sprintf('This will delete %d existing row%s and insert %d new one%s.', $deleteCount, $deleteCount === 1 ? '' : 's', count($rows), count($rows) === 1 ? '' : 's')) ?></p>
     <p>Nothing has been written yet. Check the rows below, then confirm.</p>
 
-    <table class="skipped-table">
+    <?php /* 27 columns never fit the page container, so the design system's scroll
+             wrapper pair carries the table (css-architecture.md, table pattern 1). */ ?>
+    <div class="table-scroll-wrapper"><div class="table-scroll-container">
+    <table class="ibl-data-table">
         <thead>
             <tr>
             <?php foreach (DRAFT_CLASS_COLUMNS as $column): ?>
-                <th><?= HtmlSanitizer::e($column) ?></th>
+                <?php /* Header carries only the strong rules, as Ratings.php does. */ ?>
+                <?php $sep = DRAFT_CLASS_COLUMN_SEPARATORS[$column] ?? ''; ?>
+                <th<?= $sep === 'sep-r-team' ? ' class="sep-r-team"' : '' ?>><?= HtmlSanitizer::e($column) ?></th>
             <?php endforeach; ?>
             </tr>
         </thead>
@@ -266,29 +291,73 @@ if ($csrfField === '') {
         <?php foreach ($rows as $row): ?>
             <tr>
             <?php foreach (DRAFT_CLASS_COLUMNS as $column): ?>
-                <td><?= HtmlSanitizer::e((string) ($row[$column] ?? '')) ?></td>
+                <?php $sep = DRAFT_CLASS_COLUMN_SEPARATORS[$column] ?? ''; ?>
+                <td<?= $sep === '' ? '' : ' class="' . $sep . '"' ?>><?= HtmlSanitizer::e((string) ($row[$column] ?? '')) ?></td>
             <?php endforeach; ?>
             </tr>
         <?php endforeach; ?>
         </tbody>
     </table>
+    </div></div>
 
     <form method="post">
         <?= HtmlSanitizer::trusted($csrfField) ?>
-        <button type="submit" name="action" value="commit">Commit Import</button>
-        <a href="<?= DRAFT_CLASS_PAGE_URL ?>?action=cancel">Cancel</a>
+        <?php /* Destructive: commit deletes every existing row before inserting. */ ?>
+        <button type="submit" name="action" value="commit" class="ibl-btn ibl-btn--danger">Commit Import</button>
+        <a href="<?= DRAFT_CLASS_PAGE_URL ?>?action=cancel" class="ibl-btn ibl-btn--ghost">Cancel</a>
     </form>
 
 <?php else: ?>
     <p>Upload the draft-class export as a CSV. The importer reads the first 27 columns and replaces the entire draft class.</p>
     <p>Every existing row in <code>ibl_draft_class</code> is deleted and replaced. You will see a preview and a row count before anything is written.</p>
 
-    <form method="post" enctype="multipart/form-data">
+    <?php /* The file input wears .sr-only: its native control reads as a text box, not a
+             button, but it must stay focusable for keyboard users. The <label> is the
+             .ibl-btn the commissioner sees, and choosing a file submits the form — no
+             second click. `action` rides as a hidden input so the JS submit carries it
+             (a submit button's name/value would not). */ ?>
+    <form method="post" enctype="multipart/form-data" id="draftClassForm">
         <?= HtmlSanitizer::trusted($csrfField) ?>
-        <label for="draftClassFile">Select CSV file:</label>
-        <input type="file" name="draftClassFile" id="draftClassFile" accept=".csv" required>
-        <button type="submit" name="action" value="upload">Upload and Preview</button>
+        <input type="hidden" name="action" value="upload">
+        <input type="file" name="draftClassFile" id="draftClassFile" accept=".csv" class="sr-only" required>
+        <label for="draftClassFile" class="ibl-btn ibl-btn--primary" id="draftClassLabel">Click to choose .csv</label>
+        <noscript><button type="submit" class="ibl-btn ibl-btn--primary">Upload and Preview</button></noscript>
     </form>
+    <p class="ibl-alert ibl-alert--error" id="draftClassClientError" hidden>That is not a .csv file. Choose the draft-class export again.</p>
+
+    <script>
+    (function () {
+        var input = document.getElementById('draftClassFile');
+        var form = document.getElementById('draftClassForm');
+        var label = document.getElementById('draftClassLabel');
+        var clientError = document.getElementById('draftClassClientError');
+        var LABEL_IDLE = label.textContent;
+
+        // Back-button/bfcache restore hands back a form that still holds the last
+        // file. Re-picking the same file fires no `change` event, so clear it and
+        // restore the idle label — otherwise the button reads "Uploading…" forever.
+        window.addEventListener('pageshow', function () {
+            input.value = '';
+            label.textContent = LABEL_IDLE;
+        });
+
+        input.addEventListener('change', function () {
+            var file = input.files && input.files[0];
+            if (!file) {
+                return;
+            }
+            if (!/\.csv$/i.test(file.name)) {
+                // Only a filename check — the server still parses and validates every row.
+                clientError.hidden = false;
+                input.value = '';
+                return;
+            }
+            clientError.hidden = true;
+            label.textContent = 'Uploading ' + file.name + '…';
+            form.submit();
+        });
+    })();
+    </script>
 <?php endif; ?>
 </div>
 </body>

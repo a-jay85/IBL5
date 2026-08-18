@@ -36,12 +36,18 @@
     gap: var(--space-4, 1rem);
 }
 
-.import-demands form label {
+/*
+ * :not(.ibl-btn) yields to the design system. uploadDraftClass.php dresses its
+ * label and buttons as .ibl-btn; these bespoke rules outrank it on specificity,
+ * so they exclude it rather than fight it. import-demands.php's plain controls
+ * are unaffected.
+ */
+.import-demands form label:not(.ibl-btn) {
     font-weight: bold;
     white-space: nowrap;
 }
 
-.import-demands form button {
+.import-demands form button:not(.ibl-btn) {
     padding: var(--space-2, 0.5rem) var(--space-5, 1.25rem);
     background: var(--accent-500, #f97316);
     color: white;
@@ -52,8 +58,36 @@
     white-space: nowrap;
 }
 
-.import-demands form button:hover {
+.import-demands form button:not(.ibl-btn):hover {
     background: var(--accent-600, #ea580c);
+}
+
+/*
+ * File picker: the native <input type="file"> reads as a text box rather than a
+ * button, so uploadDraftClass.php hides it with the design system's .sr-only
+ * (kept focusable, not display:none) and styles its <label> as an .ibl-btn. The
+ * button carries the focus ring for the input it labels — the only part of that
+ * pattern the design system has no rule for.
+ *
+ * inset box-shadow, not outline: an outline's corner radius is the button's
+ * border-radius PLUS its outline-offset, so any positive offset draws a ring
+ * rounder than the button it is meant to trace. This traces the border edge
+ * exactly, at the button's own radius.
+ */
+.import-demands form input.sr-only:focus-visible + .ibl-btn {
+    box-shadow: inset 0 0 0 2px var(--accent-600, #ea580c);
+}
+
+/*
+ * The picker form holds one control, so the shared form chrome framed a single
+ * button in an otherwise empty panel. Bare and centered here; import-demands.php's
+ * multi-control form keeps the panel. The id outranks `.import-demands form`.
+ */
+.import-demands form#draftClassForm {
+    padding: 0;
+    background: none;
+    border: none;
+    justify-content: center;
 }
 
 .import-demands .results {
@@ -100,6 +134,26 @@
 
 .import-demands .skipped-table th {
     font-weight: bold;
+}
+
+/*
+ * Column-group separators for the draft-class preview table, matching the ratings
+ * table (classes/UI/Tables/Ratings.php). Those rules live under .team-table and
+ * tint the strong rule with --team-color-primary; a draft class spans every team,
+ * so there is no team to tint with. These re-state the same two-tier hierarchy in
+ * neutral gray: --gray-400 is where Ratings' color-mix(navy 30%, --gray-300) lands.
+ */
+.import-demands .ibl-data-table td.sep-r-team {
+    border-right: 2px solid var(--gray-400, #9ca3af);
+}
+
+/* Against the navy header gradient, as .team-table th.sep-r-team does. */
+.import-demands .ibl-data-table th.sep-r-team {
+    border-right: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.import-demands .ibl-data-table td.sep-r-weak {
+    border-right: 2px solid var(--gray-200, #e5e7eb);
 }
 
 } /* end @layer components */

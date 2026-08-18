@@ -126,14 +126,16 @@ test.describe('uploadDraftClass.php', () => {
     );
 
     await page.goto(PAGE);
+    // The picker label is the only visible control, and choosing a file submits
+    // the form — there is no second button to press.
+    await expect(page.getByText('Click to choose .csv')).toBeVisible();
     await page.locator('#draftClassFile').setInputFiles({
       name: '98rookies.csv',
       mimeType: 'text/csv',
       buffer: fixture,
     });
-    await page.getByRole('button', { name: 'Upload and Preview' }).click();
 
-    await expect(page.locator('.skipped-table tbody tr')).toHaveCount(67);
+    await expect(page.locator('.ibl-data-table tbody tr')).toHaveCount(67);
 
     // The insert count (67) is deterministic from the fixture. The delete count
     // is a live SELECT COUNT(*) over ibl_draft_class, which differs between the
@@ -147,7 +149,46 @@ test.describe('uploadDraftClass.php', () => {
     await expect(page.getByText('Nothing has been written yet.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Commit Import' })).toBeVisible();
 
+    // Column-group separators (import-demands.css) mirror the ratings table's
+    // grouping. Asserting the computed border, not just the class, is what proves
+    // the rule survives: Ratings.php's own sep-r rules are scoped to .team-table,
+    // so a class alone would render nothing here.
+    const strongBorder = page
+      .locator('.ibl-data-table tbody tr')
+      .first()
+      .locator('td.sep-r-team')
+      .first();
+    await expect(strongBorder).toHaveCSS('border-right-width', '2px');
+    // --gray-400: the strong rule has to stay visibly darker than the weak one,
+    // or the grouping it draws collapses into a single flat tier.
+    await expect(strongBorder).toHaveCSS('border-right-color', 'rgb(156, 163, 175)');
+    const weakBorder = page
+      .locator('.ibl-data-table tbody tr')
+      .first()
+      .locator('td.sep-r-weak')
+      .first();
+    await expect(weakBorder).toHaveCSS('border-right-width', '2px');
+    await expect(weakBorder).toHaveCSS('border-right-color', 'rgb(229, 231, 235)'); // --gray-200
+
     await assertNoPhpErrors(page, 'on the draft class preview');
+  });
+
+  test('choosing a non-.csv file is refused in the browser and never uploaded', async ({
+    page,
+  }) => {
+    await page.goto(PAGE);
+    await page.locator('#draftClassFile').setInputFiles({
+      name: '98rookies.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from(`${csvRow('Safe Prospect')}\n`),
+    });
+
+    await expect(page.getByText('That is not a .csv file.')).toBeVisible();
+    // No submit fired: the picker button is still what renders, and no preview exists.
+    await expect(page.getByText('Click to choose .csv')).toBeVisible();
+    await expect(page.locator('.ibl-data-table')).toHaveCount(0);
+
+    await assertNoPhpErrors(page, 'on the rejected-extension form');
   });
 
   // ── Escaping (matrix rows 25, 26) ─────────────────────────────────────────
@@ -169,9 +210,8 @@ test.describe('uploadDraftClass.php', () => {
         `${csvRow(XSS_PAYLOAD)}\n${csvRow('Safe Prospect')}\n`,
       ),
     });
-    await page.getByRole('button', { name: 'Upload and Preview' }).click();
 
-    const firstNameCell = page.locator('.skipped-table tbody tr').first().locator('td').first();
+    const firstNameCell = page.locator('.ibl-data-table tbody tr').first().locator('td').first();
     await expect(firstNameCell).toHaveText(XSS_PAYLOAD);
     // The payload must never have been parsed as markup.
     await expect(page.locator('img[onerror]')).toHaveCount(0);
@@ -199,14 +239,13 @@ test.describe('uploadDraftClass.php', () => {
         `${csvRow('Bad Position Guy', XSS_PAYLOAD)}\n${csvRow('Safe Prospect')}\n`,
       ),
     });
-    await page.getByRole('button', { name: 'Upload and Preview' }).click();
 
-    const firstError = page.locator('.alert-error li').first();
+    const firstError = page.locator('.ibl-alert--error li').first();
     await expect(firstError).toContainText(XSS_PAYLOAD);
     await expect(page.locator('img[onerror]')).toHaveCount(0);
     expect(dialogFired, 'an alert() dialog fired — the payload executed').toBe(false);
     // A rejected file is never parked, so the upload form is still what renders.
-    await expect(page.locator('.skipped-table')).toHaveCount(0);
+    await expect(page.locator('.ibl-data-table')).toHaveCount(0);
 
     await assertNoPhpErrors(page, 'on the escaped-error page');
   });

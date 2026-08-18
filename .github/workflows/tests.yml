@@ -538,9 +538,12 @@ jobs:
           set -e
           # Worktrees run a separate dockerized MariaDB per worktree. Calling the host
           # `mariadb` client with -h 127.0.0.1 bypasses worktree isolation and will read
-          # or mutate the wrong database. Only bin/db-query is allowed to do this: it
-          # deliberately targets the main stack's published 3306 and, on ERROR 1049,
-          # names the $dbname it used and where that name came from.
+          # or mutate the wrong database. Only bin/db-query is allowed to do this, and
+          # only on one branch: it routes by its own script location, so the host client
+          # runs solely for the main checkout's copy (or under DB_QUERY_TARGET=main).
+          # A worktree's copy goes through `docker exec ibl5-db-<slug>` and fails loudly
+          # if that container is not running. On ERROR 1049 it also names the $dbname it
+          # used and where that name came from. See .claude/rules/database-access.md.
           offenders=$(
             grep -rEn '^[[:space:]]*mariadb[[:space:]]+(-h[[:space:]]*127|-u[[:space:]]*root)' \
               bin/ ibl5/bin/ 2>/dev/null \
@@ -864,6 +867,8 @@ jobs:
         run: bin/test-automouse-disarm
       - name: bin/test-bun-audit-triage
         run: bin/test-bun-audit-triage
+      - name: bin/test-db-query-routing
+        run: bin/test-db-query-routing
 
   gate:
     name: Tests and Analysis

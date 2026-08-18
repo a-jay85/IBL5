@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-08-16
+last_verified: 2026-08-18
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -690,6 +690,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 ### 15.24 Pre-Existing Duplicate Player Box-Score Rows in 1993 / 1994 / 2002 / 2004
 **Location:** `ibl_box_scores` — seasons 1993, 1994, 2002, 2004
 **Problem:** Duplicate `(game_date, name)` pairs exist in four historical seasons: 1993 (29 pairs), 1994 (7), 2002 (1), 2004 (24) — 61 excess rows total. Signature is unlike the 2007 HEAT re-import (which is being fixed separately): no `ibl_schedule` overload on the affected days, no single-batch `created_at` cluster, and no month-shift pattern, so the cause is unknown. Inflates career/season totals for the affected players.
-**Suggested direction:** Investigate first — per-season, compare the dupe pairs against `ibl_box_scores_teams` to determine whether each is a true clone, a real doubleheader, or two distinct players sharing a `name`. Only then design the delete; the import-time duplicate guard shipping with the 2007 fix prevents recurrence but does not clean these.
+**Suggested direction:** Investigate first — per-season, compare the dupe pairs against `ibl_box_scores_teams` to determine whether each is a true clone, two genuinely distinct league games on that date (different `game_of_that_day`), or two distinct players sharing a `name`. Only then design the delete; the import-time duplicate guard shipping with the 2007 fix prevents recurrence but does not clean these.
 **Est. effort:** M
 **Risk if untouched:** 61 rows of silently wrong historical stats; any per-player aggregate over these seasons double-counts. A blind `(game_date, name)` dedupe would delete legitimate rows if any pair is two different players.

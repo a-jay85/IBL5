@@ -2,8 +2,7 @@
 allowed-tools: Bash(curl:*)
 name: update-cc
 description: Check the latest Claude Code release for anything actionable in our workflow
-disable-model-invocation: true
-last_verified: 2026-07-03
+last_verified: 2026-08-18
 ---
 
 Answer: **"Is there anything actionable for us in the latest version of Claude Code?"**

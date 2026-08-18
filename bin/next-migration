@@ -18,10 +18,17 @@ if is_main_checkout "$REPO_ROOT"; then
     exit 1
 fi
 
+# Only the numbered convention counts: a 1-3 digit prefix, optional legacy
+# letter suffix, then an underscore -- the same shape ibl5/bin/run-migrations-ci
+# applies. Filter first, then extract, so the letter suffix is dropped and a
+# stray timestamp-style name (20260818_120000_*.sql) cannot masquerade as a
+# 20-million-high maximum.
 get_max() {
     local dir="$1"
     if [ -d "$dir" ]; then
-        ls "$dir"/*.sql 2>/dev/null | sed 's/.*\///' | grep -oE '^[0-9]+' | sort -n | tail -1
+        ls "$dir"/*.sql 2>/dev/null | sed 's/.*\///' \
+            | grep -E '^[0-9]{1,3}[a-z]?_' \
+            | grep -oE '^[0-9]{1,3}' | sort -n | tail -1
     fi
 }
 

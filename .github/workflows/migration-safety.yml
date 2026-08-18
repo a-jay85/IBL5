@@ -279,15 +279,23 @@ jobs:
           fi
       - name: Check migration naming convention
         run: |
-          bad=$(git diff --diff-filter=A --name-only \
+          added=$(git diff --diff-filter=A --name-only \
             "${{ steps.base.outputs.sha }}" HEAD \
-            -- 'ibl5/migrations/*.sql' \
-            | grep -E '/[0-9]+[a-z][^/]*\.sql$' || true)
+            -- 'ibl5/migrations/*.sql')
+
+          # Whitelist, not a blacklist: ibl5/bin/run-migrations-ci selects files
+          # matching ^[0-9]{1,3}[a-z]?_ only, so ANY other shape — a letter suffix
+          # (033b_), a timestamp (20260818_120000_), a bare descriptive name — is
+          # skipped by every CI-built database while ibl5/bin/migrate still applies
+          # it in production. See ibl5/migrations/README.md.
+          bad=$(printf '%s\n' "$added" | grep -v '^$' \
+            | grep -vE '/[0-9]{1,3}_[^/]*\.sql$' || true)
           if [ -n "$bad" ]; then
-            printf 'FAIL: new letter-suffix migration names (legacy — use next number or timestamp):\n%s\n' "$bad"
+            printf 'FAIL: new migration files must use a plain 1-3 digit numbered prefix (NNN_description.sql) from bin/next-migration.\nLetter suffixes, timestamps and descriptive names are skipped by ibl5/bin/run-migrations-ci and never reach a CI-built database:\n%s\n' "$bad"
             exit 1
           fi
-          echo "OK: no new letter-suffix migrations"
+
+          echo "OK: all new migrations use the numbered convention"
 
   regen-schema-dump:
     name: Regenerate current-schema.sql

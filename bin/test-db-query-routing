@@ -93,6 +93,12 @@ run_dbq() {  # <cwd> <script-path> <sql> ; sets OUT / ERR / RC
 }
 argv_mariadb() { cat "$STUB_ARGV_LOG".mariadb 2>/dev/null || true; }
 argv_docker()  { cat "$STUB_ARGV_LOG".docker  2>/dev/null || true; }
+reset_stubs() {
+    unset STUB_DOCKER_RUNNING STUB_DOCKER_INSPECT_RC STUB_DOCKER_EXEC_RC \
+          STUB_MARIADB_RC STUB_MARIADB_STDERR DB_QUERY_TARGET
+}
+reset_stubs
+parsed_count() { printf '%s\n' "$1" | grep -E '^\|' | tail -n 1 | tr -dc '0-9'; }
 
 # C1: Main checkout, $MAIN/bin/db-query (via symlink), cwd $MAIN
 run_dbq "$MAIN" "$MAIN/bin/db-query" "SELECT 1"
@@ -105,11 +111,6 @@ run_dbq "$MAIN" "$MAIN/bin/db-query" "SELECT 1"
 actual_num="$(printf '%s\n' "$OUT" | grep -E '^\|' | tail -n 1 | tr -dc '0-9')"
 assert_eq "C2 stdout number" "4242" "$actual_num"
 
-# C3: The bug — worktree copy $WT/bin/db-query, cwd $WT
-# CHARACTERIZATION — Phase 3 inverts this; Phase 4 rewrites the block.
-run_dbq "$WT" "$WT/bin/db-query" "SELECT 1"
-assert_match  "C3 worktree still calls mariadb -h 127.0.0.1 (current bug)" "-h 127.0.0.1" "$(argv_mariadb)"
-assert_eq     "C3 docker not called (current bug)" "" "$(argv_docker)"
 
 # C4: Negative — no SQL argument at all
 rm -f "$STUB_ARGV_LOG".mariadb "$STUB_ARGV_LOG".docker
@@ -200,6 +201,144 @@ unset STUB_DOCKER_RUNNING
 
 # Restore .wt-slug so Phase 4 cases start from a known fixture
 echo "$SLUG" > "$WT/.wt-slug"
+
+# ── Routing cases (Phase 4) ──────────────────────────────────────────────────
+
+# R1: Worktree copy, cwd $WT, container running → docker route
+reset_stubs
+export STUB_DOCKER_RUNNING=true
+run_dbq "$WT" "$WT/ibl5/bin/db-query" "SELECT 1"
+assert_match  "R1 docker exec called with worktree container" "exec -i ibl5-db-fixture-wt mariadb" "$(argv_docker)"
+assert_eq     "R1 mariadb not called directly" "" "$(argv_mariadb)"
+assert_eq     "R1 exit code 0" "0" "$RC"
+
+# R2: Main copy, cwd $WT — routing keyed on script location, not cwd
+reset_stubs
+run_dbq "$WT" "$MAIN/ibl5/bin/db-query" "SELECT 1"
+assert_match  "R2 main copy calls mariadb -h 127.0.0.1 despite worktree cwd" "-h 127.0.0.1" "$(argv_mariadb)"
+assert_eq     "R2 docker not called" "" "$(argv_docker)"
+
+# R3: Worktree copy, cwd $MAIN — symmetric half of R2
+reset_stubs
+export STUB_DOCKER_RUNNING=true
+run_dbq "$MAIN" "$WT/ibl5/bin/db-query" "SELECT 1"
+assert_match  "R3 worktree copy routes to container despite main cwd" "ibl5-db-fixture-wt" "$(argv_docker)"
+assert_eq     "R3 mariadb not called" "" "$(argv_mariadb)"
+
+# R4: Banner on stderr, both routes
+reset_stubs
+export STUB_DOCKER_RUNNING=true
+run_dbq "$MAIN" "$MAIN/ibl5/bin/db-query" "SELECT 1"
+assert_match  "R4 main banner on stderr" "target = main stack (127.0.0.1:3306)" "$ERR"
+run_dbq "$WT" "$WT/ibl5/bin/db-query" "SELECT 1"
+assert_match  "R4 worktree banner on stderr" "target = container ibl5-db-fixture-wt" "$ERR"
+
+# R5: Stdout purity, container route
+reset_stubs
+export STUB_DOCKER_RUNNING=true
+run_dbq "$WT" "$WT/ibl5/bin/db-query" "SELECT 1"
+assert_eq     "R5 parsed_count from container route" "4242" "$(parsed_count "$OUT")"
+assert_absent "R5 banner not on stdout" "target =" "$OUT"
+assert_absent "R5 no Warning on stdout" "Warning" "$OUT"
+
+# R6: .wt-slug rewritten to pr-99 — slug flows into container name
+reset_stubs
+export STUB_DOCKER_RUNNING=true
+echo "pr-99" > "$WT/.wt-slug"
+run_dbq "$WT" "$WT/ibl5/bin/db-query" "SELECT 1"
+echo "$SLUG" > "$WT/.wt-slug"
+assert_match  "R6 pr-99 slug in container name" "ibl5-db-pr-99" "$(argv_docker)"
+
+# R7: Banner never on stdout, main route
+reset_stubs
+run_dbq "$MAIN" "$MAIN/ibl5/bin/db-query" "SELECT 1"
+assert_absent "R7 banner absent from stdout" "target =" "$OUT"
+assert_match  "R7 banner present on stderr" "target =" "$ERR"
+
+# ── Negative / failure-path cases (Phase 4) ──────────────────────────────────
+
+# N1: Worktree, container stopped → exit 3, loud stderr, no mariadb fallback
+reset_stubs
+export STUB_DOCKER_RUNNING=false
+run_dbq "$WT" "$WT/ibl5/bin/db-query" "SELECT 1"
+assert_eq     "N1 exit code 3" "3" "$RC"
+assert_match  "N1 container not running in stderr" "ibl5-db-fixture-wt' is not running" "$ERR"
+assert_match  "N1 wt-up hint in stderr" "bin/wt-up fixture-wt" "$ERR"
+assert_eq     "N1 stdout empty" "" "$OUT"
+assert_eq     "N1 mariadb not called" "" "$(argv_mariadb)"
+
+# N2: Worktree, docker inspect fails (absent/no daemon) → same loud fail as N1
+reset_stubs
+export STUB_DOCKER_INSPECT_RC=1
+run_dbq "$WT" "$WT/ibl5/bin/db-query" "SELECT 1"
+assert_eq     "N2 exit code 3" "3" "$RC"
+assert_match  "N2 container not running in stderr" "ibl5-db-fixture-wt' is not running" "$ERR"
+assert_match  "N2 wt-up hint in stderr" "bin/wt-up fixture-wt" "$ERR"
+assert_eq     "N2 stdout empty" "" "$OUT"
+assert_eq     "N2 mariadb not called" "" "$(argv_mariadb)"
+
+# N3: Worktree, running, docker exec fails → non-zero, error on stderr, stdout empty
+reset_stubs
+export STUB_DOCKER_RUNNING=true
+export STUB_DOCKER_EXEC_RC=1
+run_dbq "$WT" "$WT/ibl5/bin/db-query" "SELECT 1"
+if [ "$RC" -eq 0 ]; then
+    failcase "N3 exit code non-zero" "expected non-zero but got 0"
+else
+    pass "N3 exit code non-zero"
+fi
+assert_eq     "N3 stdout empty" "" "$OUT"
+assert_match  "N3 error on stderr" "No such container" "$ERR"
+
+# N4: Main checkout, typo'd DB_QUERY_TARGET → exit 2, no queries attempted
+reset_stubs
+export DB_QUERY_TARGET=mian
+run_dbq "$MAIN" "$MAIN/ibl5/bin/db-query" "SELECT 1"
+assert_eq     "N4 exit code 2" "2" "$RC"
+assert_match  "N4 invalid value in stderr" "is not a valid value" "$ERR"
+assert_match  "N4 accepted values in stderr" "Accepted:" "$ERR"
+assert_eq     "N4 stdout empty" "" "$OUT"
+assert_eq     "N4 mariadb not called" "" "$(argv_mariadb)"
+assert_eq     "N4 docker not called" "" "$(argv_docker)"
+
+# N5: Worktree, DB_QUERY_TARGET=main overrides script location → main route
+reset_stubs
+export DB_QUERY_TARGET=main
+run_dbq "$WT" "$WT/ibl5/bin/db-query" "SELECT 1"
+assert_match  "N5 forced-main calls mariadb -h 127.0.0.1" "-h 127.0.0.1" "$(argv_mariadb)"
+assert_eq     "N5 docker not called" "" "$(argv_docker)"
+assert_match  "N5 forced banner on stderr" "forced by DB_QUERY_TARGET=main" "$ERR"
+assert_eq     "N5 exit code 0" "0" "$RC"
+
+# N6: Worktree, DB_QUERY_TARGET=main, mariadb down → propagates mariadb error
+reset_stubs
+export DB_QUERY_TARGET=main
+export STUB_MARIADB_RC=1
+export STUB_MARIADB_STDERR="ERROR 2003 (HY000): Can't connect to server on '127.0.0.1'"
+run_dbq "$WT" "$WT/ibl5/bin/db-query" "SELECT 1"
+assert_eq     "N6 exit code 1" "1" "$RC"
+assert_match  "N6 mariadb error on stderr" "ERROR 2003" "$ERR"
+assert_eq     "N6 stdout empty" "" "$OUT"
+assert_eq     "N6 docker not called" "" "$(argv_docker)"
+
+# N7: Worktree, DB_QUERY_TARGET exported empty → routes to container (not an override)
+reset_stubs
+export STUB_DOCKER_RUNNING=true
+export DB_QUERY_TARGET=
+run_dbq "$WT" "$WT/ibl5/bin/db-query" "SELECT 1"
+_docker_out="$(argv_docker)"
+if [ -n "$_docker_out" ]; then pass "N7 empty DB_QUERY_TARGET routes to container"; else failcase "N7 empty DB_QUERY_TARGET routes to container" "expected docker called but argv_docker empty"; fi
+assert_eq     "N7 mariadb not called" "" "$(argv_mariadb)"
+
+# N8: db-helpers.sh missing from worktree checkout → degrades to main loudly
+reset_stubs
+mv "$WT/bin/lib/db-helpers.sh" "$TMP/db-helpers-n8.bak"
+run_dbq "$WT" "$WT/ibl5/bin/db-query" "SELECT 1"
+mv "$TMP/db-helpers-n8.bak" "$WT/bin/lib/db-helpers.sh"
+assert_eq     "N8 exit code 0" "0" "$RC"
+assert_match  "N8 mariadb -h 127.0.0.1 on degraded route" "-h 127.0.0.1" "$(argv_mariadb)"
+assert_match  "N8 degraded banner on stderr" "defaulting to the main stack" "$ERR"
+
 
 if [ "$FAILED" -ne 0 ]; then echo "SOME TESTS FAILED"; exit 1; fi
 echo "All db-query routing tests passed"

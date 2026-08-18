@@ -87,7 +87,6 @@ WITH playoff_games AS (
          + COALESCE(home_ot_points, 0)) AS h_total
     FROM `ibl_box_scores_teams`
     WHERE game_type = 2
-    GROUP BY game_date, visitor_teamid, home_teamid, game_of_that_day
 ),
 game_results AS (
     SELECT *,

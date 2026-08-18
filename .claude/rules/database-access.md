@@ -1,6 +1,6 @@
 ---
 description: Docker MariaDB connection details, query patterns, and schema verification rules.
-last_verified: 2026-07-27
+last_verified: 2026-08-18
 paths:
   - "**/*Repository.php"
   - "**/migrations/000_baseline_schema.sql"
@@ -59,7 +59,16 @@ mariadb -h 127.0.0.1 --skip-ssl -u root -proot iblhoops_ibl5
 
 **When to use `db-query`:** Use this script to explore the database schema, verify data after making changes, check record counts, and validate your work. This is the preferred method for Claude to query the local database since it's configured for auto-approval in the user's Claude Code settings.
 
-**Which database it hits:** the wrapper resolves its own symlink and always reads `ibl5/config.php` (never the repo-root `config.php`), then connects over `127.0.0.1:3306`. Both of those are fixed regardless of the directory you invoke it from — so it targets the **main** stack, using `ibl5/config.php`'s `$dbname`.
+**Which database it hits:** the wrapper resolves its own symlink and reads the `ibl5/config.php` **next to that resolved script** (never the repo-root `config.php`), then routes on the script's own location — not on your cwd:
+
+- **Main checkout's copy** → the main stack over `127.0.0.1:3306`, exactly as before.
+- **A worktree's copy** → that worktree's own container, `ibl5-db-<slug>`, via `docker exec`. Worktree DBs publish no host port, so this is the only way to reach them. The slug comes from `<worktree>/.wt-slug` (written by `bin/wt-up`), falling back to the worktree directory's basename.
+
+Because routing keys on the script's location, invoking the **main** checkout's `bin/db-query` by absolute path still hits the main stack no matter what directory you are standing in — that is what keeps `bin/bug-pipeline-check` (cron-invoked with an arbitrary working directory) reading the live main-stack `ibl_bug_reports`.
+
+It announces the resolved target on **stderr** on every run (`db-query: target = main stack (127.0.0.1:3306)` or `db-query: target = container ibl5-db-<slug>`). Nothing is added to stdout — callers that parse rows with `grep -E '^\|'` are unaffected.
+
+**There is no silent fallback.** If a worktree's DB container is missing or stopped, `db-query` exits **3** and names the container and the `bin/wt-up <slug>` that starts it, rather than answering from a different database. Set **`DB_QUERY_TARGET=main`** to force the main stack from anywhere; any other value is rejected with exit **2**. An unset or empty `DB_QUERY_TARGET` means "route normally".
 
 **On `ERROR 1049` (unknown database), `db-query` self-diagnoses.** It prints the resolved `$dbname`, the absolute `config.php` it was read from, whether `DB_NAME` was set in the environment, and the databases that do exist. On a host shell `DB_NAME` is normally **unset**, so the file's fallback *is* the value that gets used — the env line is there to tell you the exceptions (`php -r` inherits the shell's environment, so an exported `DB_NAME` overrides the fallback). Read that block instead of assuming the container is down. The diagnostic fires **only** for 1049 — an ordinary bad-table or syntax error still just prints MariaDB's message — and the script's exit status is still MariaDB's.
 

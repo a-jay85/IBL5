@@ -2,6 +2,14 @@
 # Wrapper script for querying the local Docker MariaDB database.
 # Usage: ibl5/bin/db-query "SELECT * FROM ibl_plr LIMIT 5"
 #
+# TARGET ROUTING: keyed on where this script physically lives, NOT on the cwd.
+# The main checkout's copy always reaches the main stack at 127.0.0.1:3306; a
+# worktree's copy reaches that worktree's own container (ibl5-db-<slug>) via
+# docker exec, because worktree DBs publish no host port. Set DB_QUERY_TARGET=main
+# to force the main stack from anywhere. There is no silent fallback: if a
+# worktree's container is not running, this exits 3 rather than answering from
+# some other database.
+#
 # NOTE: In interactive shells (terminal), bash expands `!` inside double quotes
 # (history expansion). If running manually, use <> instead of != in SQL,
 # or use single quotes: ./bin/db-query 'SELECT * FROM t WHERE col != ""'
@@ -21,6 +29,56 @@ done
 SCRIPT_DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
 CONFIG="$SCRIPT_DIR/../config.php"
 
+# --- target routing ---------------------------------------------------------
+# SCRIPT_DIR is <checkout>/ibl5/bin, so the checkout root is two levels up.
+# Keying on the script's own location (not $PWD) is deliberate: it keeps
+# bin/bug-pipeline-check — whose cron invokes the MAIN checkout by absolute path
+# with an arbitrary WorkingDirectory — pinned to the main stack no matter where
+# it is run from.
+CHECKOUT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+LIB_DIR="$CHECKOUT_ROOT/bin/lib"
+
+case "${DB_QUERY_TARGET:-}" in
+    "")   TARGET_FORCED=false ;;
+    main) TARGET_FORCED=true ;;
+    *)    echo "db-query: DB_QUERY_TARGET='$DB_QUERY_TARGET' is not a valid value." >&2
+          echo "          Accepted: 'main' (force the main stack), or unset/empty (route by script location)." >&2
+          exit 2 ;;
+esac
+
+TARGET_REASON=""
+if [ "$TARGET_FORCED" = true ]; then
+    DB_TARGET="main"
+    TARGET_REASON=" (forced by DB_QUERY_TARGET=main)"
+elif [ -r "$LIB_DIR/db-helpers.sh" ]; then
+    # shellcheck source=../../bin/lib/db-helpers.sh
+    . "$LIB_DIR/db-helpers.sh"
+    DB_TARGET="$(db_resolve_target "$CHECKOUT_ROOT")"
+else
+    DB_TARGET="main"
+    TARGET_REASON=" (bin/lib/db-helpers.sh not found — defaulting to the main stack)"
+fi
+
+if [ "$DB_TARGET" = "main" ]; then
+    echo "db-query: target = main stack (127.0.0.1:3306)$TARGET_REASON" >&2
+else
+    echo "db-query: target = container $DB_TARGET$TARGET_REASON" >&2
+fi
+
+if [ "$DB_TARGET" != "main" ] && ! db_container_running "$DB_TARGET"; then
+    WT_SLUG="${DB_TARGET#ibl5-db-}"
+    {
+        echo "db-query: worktree database container '$DB_TARGET' is not running."
+        echo "          This worktree routes to its OWN database — there is no fallback to the"
+        echo "          main stack, because answering from the wrong DB is worse than failing."
+        echo "          Start it : bin/wt-up $WT_SLUG"
+        echo "          Inspect  : docker ps -a --filter name=$DB_TARGET"
+        echo "          If you genuinely meant the main stack: DB_QUERY_TARGET=main $0 '<SQL>'"
+    } >&2
+    exit 3
+fi
+# --- end target routing -----------------------------------------------------
+
 if [ ! -f "$CONFIG" ]; then
     echo "Error: config.php not found at $CONFIG" >&2
     exit 1
@@ -35,14 +93,34 @@ DB_USER=$(php -r "error_reporting(0); include '$CONFIG'; echo \$dbuname;" 2>/dev
 DB_PASS=$(php -r "error_reporting(0); include '$CONFIG'; echo \$dbpass;" 2>/dev/null)
 DB_NAME=$(php -r "error_reporting(0); include '$CONFIG'; echo \$dbname;" 2>/dev/null)
 
+# Run one mariadb invocation against the resolved target. Contract: the client's
+# stdout reaches OUR stdout unchanged, everything else reaches OUR stderr. That
+# separation is load-bearing — bin/bug-pipeline-check parses this script's stdout
+# with `grep -E '^\|' | tail -n 1 | tr -dc '0-9'`, so a single stray diagnostic
+# line on stdout would corrupt a bug count rather than error.
+run_mariadb() {
+    if [ "$DB_TARGET" = "main" ]; then
+        mariadb -h 127.0.0.1 --skip-ssl -u "$DB_USER" -p"$DB_PASS" "$@"
+        return $?
+    fi
+    # db_exec_stdin merges stderr into stdout (by design — its warning-strip
+    # pipeline uses 2>&1). Capture the merged stream, then re-route by exit
+    # code: success → our stdout (row output callers parse); failure → our stderr.
+    local out rc=0
+    out="$(db_exec_stdin "$DB_TARGET" mariadb --skip-ssl \
+            -u "$DB_USER" -p"$DB_PASS" "$@" < /dev/null)" || rc=$?
+    if [ "$rc" -eq 0 ]; then
+        [ -n "$out" ] && printf '%s\n' "$out"
+    else
+        [ -n "$out" ] && printf '%s\n' "$out" >&2
+    fi
+    return "$rc"
+}
+
 STDERR_FILE=$(mktemp)
 trap 'rm -f "$STDERR_FILE"' EXIT
 
-mariadb -h 127.0.0.1 --skip-ssl \
-    -u "$DB_USER" -p"$DB_PASS" \
-    --table \
-    "$DB_NAME" \
-    -e "$1" 2>"$STDERR_FILE"
+run_mariadb --table "$DB_NAME" -e "$1" 2>"$STDERR_FILE"
 STATUS=$?
 
 cat "$STDERR_FILE" >&2
@@ -62,8 +140,7 @@ if [ "$STATUS" -ne 0 ] && grep -q "ERROR 1049" "$STDERR_FILE"; then
             echo "  DB_NAME in env      : unset — the config fallback above is load-bearing"
         fi
         echo "  databases present   :"
-        mariadb -h 127.0.0.1 --skip-ssl -u "$DB_USER" -p"$DB_PASS" \
-            -N -B -e "SHOW DATABASES" 2>/dev/null | sed 's/^/    /'
+        run_mariadb -N -B -e "SHOW DATABASES" 2>/dev/null | sed 's/^/    /'
         echo
         echo "Fix: correct \$dbname in $CONFIG, or export DB_NAME before running."
     } >&2

@@ -241,12 +241,12 @@ if ($csrfField === '') {
          import-demands.php (which links the same file) before the picker button
          landed keeps the stale copy and renders the raw file input. The mtime
          stamp retires that cached copy on the next edit. */ ?>
-    <link rel="stylesheet" href="design/components/import-demands.css?v=<?= HtmlSanitizer::e((string) (filemtime(__DIR__ . '/design/components/import-demands.css') ?: 0)) ?>">
+    <link rel="stylesheet" href="design/components/csv-import.css?v=<?= HtmlSanitizer::e((string) (filemtime(__DIR__ . '/design/components/csv-import.css') ?: 0)) ?>">
 </head>
 <body>
 <?php /* Preview drops the 700px prose measure so the 27-column table can use the
-         full viewport width; see import-demands.css .import-demands--preview. */ ?>
-<div class="import-demands<?= $view === 'preview' ? ' import-demands--preview' : '' ?>">
+         full viewport width; see csv-import.css .csv-import--preview. */ ?>
+<div class="csv-import<?= $view === 'preview' ? ' csv-import--preview' : '' ?>">
     <h1 class="ibl-title">Upload Draft Class</h1>
 
 <?php if ($errorMessage !== ''): ?>

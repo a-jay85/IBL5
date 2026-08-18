@@ -161,7 +161,7 @@ test.describe('uploadDraftClass.php', () => {
       'Tal', 'Skl', 'Int',
     ]);
 
-    // Column-group separators (import-demands.css) mirror the ratings table's
+    // Column-group separators (csv-import.css) mirror the ratings table's
     // grouping. Asserting the computed border, not just the class, is what proves
     // the rule survives: Ratings.php's own sep-r rules are scoped to .team-table,
     // so a class alone would render nothing here.

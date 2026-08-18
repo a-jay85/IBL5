@@ -1,31 +1,31 @@
 @layer components {
 
-.import-demands {
+.csv-import {
     max-width: 700px;
     margin: var(--space-8, 2rem) auto;
     font-family: Arial, Helvetica, sans-serif;
     padding: 0 var(--space-4, 1rem);
 }
 
-.import-demands h1 {
+.csv-import h1 {
     font-size: var(--text-2xl, 1.5rem);
     margin-bottom: var(--space-2, 0.5rem);
 }
 
-.import-demands p {
+.csv-import p {
     margin: var(--space-1, 0.25rem) 0;
     color: var(--gray-700, #374151);
     font-size: var(--text-sm, 0.875rem);
 }
 
-.import-demands code {
+.csv-import code {
     background: var(--gray-100, #f3f4f6);
     padding: 0.1rem 0.3rem;
     border-radius: var(--radius-sm, 0.25rem);
     font-size: var(--text-sm, 0.875rem);
 }
 
-.import-demands form {
+.csv-import form {
     margin: var(--space-6, 1.5rem) 0;
     padding: var(--space-4, 1rem);
     background: var(--gray-50, #f9fafb);
@@ -42,12 +42,12 @@
  * so they exclude it rather than fight it. import-demands.php's plain controls
  * are unaffected.
  */
-.import-demands form label:not(.ibl-btn) {
+.csv-import form label:not(.ibl-btn) {
     font-weight: bold;
     white-space: nowrap;
 }
 
-.import-demands form button:not(.ibl-btn) {
+.csv-import form button:not(.ibl-btn) {
     padding: var(--space-2, 0.5rem) var(--space-5, 1.25rem);
     background: var(--accent-500, #f97316);
     color: white;
@@ -58,7 +58,7 @@
     white-space: nowrap;
 }
 
-.import-demands form button:not(.ibl-btn):hover {
+.csv-import form button:not(.ibl-btn):hover {
     background: var(--accent-600, #ea580c);
 }
 
@@ -74,65 +74,65 @@
  * rounder than the button it is meant to trace. This traces the border edge
  * exactly, at the button's own radius.
  */
-.import-demands form input.sr-only:focus-visible + .ibl-btn {
+.csv-import form input.sr-only:focus-visible + .ibl-btn {
     box-shadow: inset 0 0 0 2px var(--accent-600, #ea580c);
 }
 
 /*
  * The picker form holds one control, so the shared form chrome framed a single
  * button in an otherwise empty panel. Bare and centered here; import-demands.php's
- * multi-control form keeps the panel. The id outranks `.import-demands form`.
+ * multi-control form keeps the panel. The id outranks `.csv-import form`.
  */
-.import-demands form#draftClassForm {
+.csv-import form#draftClassForm {
     padding: 0;
     background: none;
     border: none;
     justify-content: center;
 }
 
-.import-demands .results {
+.csv-import .results {
     margin-top: var(--space-4, 1rem);
 }
 
-.import-demands .alert {
+.csv-import .alert {
     padding: var(--space-3, 0.75rem) var(--space-4, 1rem);
     border-radius: var(--radius-sm, 0.25rem);
     margin-bottom: var(--space-3, 0.75rem);
 }
 
-.import-demands .alert-error {
+.csv-import .alert-error {
     background: var(--error-50, #fef2f2);
     border: 1px solid var(--error-200, #fecaca);
     color: var(--error-600, #dc2626);
 }
 
-.import-demands .alert-success {
+.csv-import .alert-success {
     background: var(--success-50, #f0fdf4);
     border: 1px solid var(--success-200, #bbf7d0);
     color: var(--success-600, #16a34a);
 }
 
-.import-demands .alert-warning {
+.csv-import .alert-warning {
     background: var(--warning-50, #fffbeb);
     border: 1px solid var(--warning-200, #fde68a);
     color: var(--warning-600, #d97706);
 }
 
-.import-demands .skipped-table {
+.csv-import .skipped-table {
     margin-top: var(--space-2, 0.5rem);
     border-collapse: collapse;
     width: 100%;
     font-size: var(--text-sm, 0.875rem);
 }
 
-.import-demands .skipped-table th,
-.import-demands .skipped-table td {
+.csv-import .skipped-table th,
+.csv-import .skipped-table td {
     text-align: left;
     padding: var(--space-1, 0.25rem) var(--space-2, 0.5rem);
     border-bottom: 1px solid var(--gray-200, #e5e7eb);
 }
 
-.import-demands .skipped-table th {
+.csv-import .skipped-table th {
     font-weight: bold;
 }
 
@@ -143,13 +143,13 @@
  * whenever the viewport can hold it, and only a genuinely wider table scrolls.
  * Prose and the confirm form keep the 700px measure, centered over the table.
  */
-.import-demands--preview {
+.csv-import--preview {
     max-width: none;
 }
 
-.import-demands--preview > p,
-.import-demands--preview > form,
-.import-demands--preview > .ibl-alert {
+.csv-import--preview > p,
+.csv-import--preview > form,
+.csv-import--preview > .ibl-alert {
     max-width: 700px;
     margin-left: auto;
     margin-right: auto;
@@ -162,16 +162,16 @@
  * so there is no team to tint with. These re-state the same two-tier hierarchy in
  * neutral gray: --gray-400 is where Ratings' color-mix(navy 30%, --gray-300) lands.
  */
-.import-demands .ibl-data-table td.sep-r-team {
+.csv-import .ibl-data-table td.sep-r-team {
     border-right: 2px solid var(--gray-400, #9ca3af);
 }
 
 /* Against the navy header gradient, as .team-table th.sep-r-team does. */
-.import-demands .ibl-data-table th.sep-r-team {
+.csv-import .ibl-data-table th.sep-r-team {
     border-right: 2px solid rgba(255, 255, 255, 0.3);
 }
 
-.import-demands .ibl-data-table td.sep-r-weak {
+.csv-import .ibl-data-table td.sep-r-weak {
     border-right: 2px solid var(--gray-200, #e5e7eb);
 }
 

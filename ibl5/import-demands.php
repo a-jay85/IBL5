@@ -211,10 +211,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['demands_csv'])) {
     <meta charset="utf-8">
     <title>Import Free Agent Demands</title>
     <link rel="stylesheet" href="themes/IBL/style/style.css">
-    <link rel="stylesheet" href="design/components/import-demands.css">
+    <link rel="stylesheet" href="design/components/csv-import.css">
 </head>
 <body>
-<div class="import-demands">
+<div class="csv-import">
     <h1>Import Free Agent Demands</h1>
     <p>Upload a CSV with columns: <code>name, dem1, dem2, dem3, dem4, dem5, dem6</code>.</p>
     <p>The <code>pid</code> column will be resolved automatically from the player name. The <code>ibl_demands</code> table will be truncated before import.</p>

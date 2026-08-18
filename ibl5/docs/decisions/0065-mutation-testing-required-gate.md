@@ -1,6 +1,6 @@
 ---
 description: The Infection per-PR diff job (`Infection PHP (per-PR diff)` / `mutation-pr`) becomes a required, green-skip-safe merge gate; the weekly full mutation run gains a Discord failure alert mirroring db-backup's notify job; the branch-protection activation is a post-merge admin API POST recorded here (not performed by this PR).
-last_verified: 2026-06-18
+last_verified: 2026-08-18
 ---
 
 # ADR-0065: Mutation Testing Becomes a Required Merge Gate
@@ -112,6 +112,10 @@ new one). After activation, on the **first `mutation-test`-labeled PR**, confirm
 runtime behavior the local plan cannot pre-verify against GitHub's required-check
 semantics. The `notify-mutation-failure` alert can be smoke-tested via a
 `workflow_dispatch` of the Mutation Testing workflow.
+
+## Addendum — `mutation-pr` guard re-added (PR #1136, 2026-06-19)
+
+Decision 1 removed `&& github.event.action != 'labeled'` from `mutation-pr` so the job always runs and always concludes. PR #1136 re-added the guard the following day: adding any label to a PR fires a `labeled` event, which was causing `mutation-pr` (and the full E2E suite) to re-run unnecessarily on label-only actions that carry no code change. The job now skips on `labeled` events; the `skipped` outcome on label-only events does not block merge because GitHub treats a skipped job as passing the required-check contract when the trigger is a label action with no associated diff. The `!= 'labeled'` guard is therefore the current intentional state.
 
 ## Lineage
 

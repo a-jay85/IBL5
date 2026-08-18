@@ -87,6 +87,11 @@ WITH playoff_games AS (
          + COALESCE(home_ot_points, 0)) AS h_total
     FROM `ibl_box_scores_teams`
     WHERE game_type = 2
+    -- LOAD-BEARING: ibl_box_scores_teams stores one row per TEAM side (two rows
+    -- per game; uq_game_team spans these four columns plus `name`). Without this
+    -- GROUP BY every series is counted twice — a 4-1 becomes 8-2. Same idiom in
+    -- migrations 123 and 124 and RefreshTeamSeasonRecordsStep. Do not remove.
+    GROUP BY game_date, visitor_teamid, home_teamid, game_of_that_day
 ),
 game_results AS (
     SELECT *,

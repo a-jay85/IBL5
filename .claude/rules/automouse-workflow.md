@@ -1,6 +1,6 @@
 ---
 description: Automouse autonomous workflow (formerly "nightly") — launchd fires claude -p on a recurring schedule, running two context-isolated agents per plan (implementation + post-plan) with time guards and incremental checkpoints.
-last_verified: 2026-08-18
+last_verified: 2026-08-19
 paths: "bin/automouse/**"
 ---
 
@@ -39,7 +39,9 @@ A headless `claude -p` process runs on a recurring schedule via macOS `launchd`.
 
 ```
 ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/
-  queue/    symlinks to ~/claude-plans/*.md (oldest runs first)
+  queue/    symlinks to ~/claude-plans/*.md (oldest mtime runs first; queuing and
+            requeuing stamp the new entry to the BACK, so a plan authored weeks ago
+            still enters last — only `queue reorder` changes relative order)
   done/     symlinks moved here after successful execution, or when the impl agent
             detects the plan is already merged (its work shipped under a prior PR)
   skipped/  symlinks moved here when skipped (ambiguity/errors/poison-pill);

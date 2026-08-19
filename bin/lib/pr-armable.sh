@@ -10,7 +10,7 @@
 #   (5) golden-snapshot touch      -> pr_golden_hold <files_json>
 #   (6) Depends-on merge-order     -> pr_dep_holds <body>
 #   (8) feat: floor                -> pr_feat_hold <title> <labels_json>
-#   (10) pipeline-authored floor   -> pr_pipeline_authored_hold <labels_json>
+#   (10) pipeline-authored floor   -> pr_pipeline_authored_hold <labels_json> [head_ref]
 #   (11) unresolved scored finding -> pr_unresolved_findings_hold <pr_number>
 #
 # Conditions (2) review>=80, (3) MISSING-tests, (4) Phase-5 local verify, (7)
@@ -114,19 +114,37 @@ pr_dep_holds() {
     done
 }
 
-# pr_pipeline_authored_hold <labels_json>
-#   Phase 6.5 condition (10), the pipeline-authored floor. Every PR the Discord
-#   bug/feature pipeline opens carries the `pipeline-authored` label, so it is
-#   NEVER auto-merged regardless of commit type (closes the hole where a `fix:`
-#   pipeline PR would auto-merge to prod). UNCONDITIONAL -- unlike pr_feat_hold
-#   there is NO override label; a pipeline PR ALWAYS holds for a human merge.
-#   Echoes `pipeline-authored` when the label is present, nothing otherwise.
-#   Pass the `.labels` array, e.g. `gh pr view N --json labels --jq '.labels'`.
+# pr_pipeline_authored_hold <labels_json> [head_ref]
+#   Phase 6.5 condition (10), the two-axis pipeline floor. Holds any PR opened by
+#   the Discord bug/feature pipeline from auto-merge, unconditionally. Two
+#   independent axes — either can hold:
+#
+#   Axis 1 (label): echoes `pipeline-authored` when the `.labels` array contains
+#     the `pipeline-authored` label. Pass the `.labels` array, e.g.
+#     `gh pr view N --json labels --jq '.labels'`.
+#
+#   Axis 2 (branch name): echoes `pipeline-branch` when head_ref is non-empty and
+#     matches `^bug-[0-9]+(-|$)`. This axis exists because the `pipeline-authored`
+#     label is applied by reconcile_pr_open_rows() in bin/bug-pipeline-tick on a
+#     LATER cron tick than ship_via_cron() which arms auto-merge — so at arming
+#     time the PR is unlabeled and label-alone cannot hold it. The branch name is
+#     deterministic (from bug_slug() in bin/bug-pipeline-tick: `bug-<id>-<desc>`
+#     or bare `bug-<id>`). The digit anchor (`[0-9]+`) is load-bearing: the human
+#     branch `bug-pipeline-reproduce-gate` must NOT be caught by this predicate.
+#
+#   UNCONDITIONAL: unlike pr_feat_hold there is NO override label; a pipeline PR
+#   ALWAYS holds for a human merge regardless of commit type.
+#   head_ref is optional — an absent/empty second arg behaves exactly as today
+#   (backward compatible; use ${2:-} to avoid an unbound-variable error).
 pr_pipeline_authored_hold() {
     local labels_json="$1"
+    local head_ref="${2:-}"
     if printf '%s' "$labels_json" \
         | jq -e 'any(.[]?; .name == "pipeline-authored")' >/dev/null 2>&1; then
         echo "pipeline-authored"
+    fi
+    if [ -n "$head_ref" ] && printf '%s' "$head_ref" | grep -qE '^bug-[0-9]+(-|$)'; then
+        echo "pipeline-branch"
     fi
 }
 

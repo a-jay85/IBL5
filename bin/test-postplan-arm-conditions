@@ -5,7 +5,7 @@
 # that must survive being run in their own shell — the Phase 6.5 auto-merge
 # conditions and the Phase 2.5 backlog trigger.
 # Phase 6.5 conditions call the shared predicate bin/lib/pr-armable.sh
-# (conditions (1) Manual-Testing, (5) golden, (6) Depends-on, (8) feat:, (10) pipeline-authored, (11) unresolved >= 80 findings), plus
+# (conditions (1) Manual-Testing, (5) golden, (6) Depends-on, (8) feat:, (10) pipeline-authored label OR bug-<id> branch name, (11) unresolved >= 80 findings), plus
 # condition (3), the Phase-5.0 conformance gate (no predicate; /tmp state only).
 #
 # Why this exists: those blocks live as separate ```bash blocks inside
@@ -398,9 +398,15 @@ expect_block "(8) fix: title -> NONE" NONE \
     "$(run_isolated "$B8" '{"title":"fix: bug","labels":[]}' '' '')"
 
 expect_block "(10) pipeline-authored label -> BLOCK" BLOCK \
-    "$(run_isolated "$B10" '{"labels":[{"name":"pipeline-authored"}]}' '' '')"
+    "$(run_isolated "$B10" '{"labels":[{"name":"pipeline-authored"}],"headRefName":"feature-x"}' '' '')"
 expect_block "(10) no pipeline label -> NONE" NONE \
-    "$(run_isolated "$B10" '{"labels":[]}' '' '')"
+    "$(run_isolated "$B10" '{"labels":[],"headRefName":"feature-x"}' '' '')"
+expect_block "(10) bug-<id> branch, no label -> BLOCK (label-timing fail-open guard)" BLOCK \
+    "$(run_isolated "$B10" '{"labels":[],"headRefName":"bug-2-odd-one-here"}' '' '')"
+expect_block "(10) bare bug-<id> branch -> BLOCK" BLOCK \
+    "$(run_isolated "$B10" '{"labels":[],"headRefName":"bug-7"}' '' '')"
+expect_block "(10) bug-pipeline-* human branch -> NONE (digit anchor)" NONE \
+    "$(run_isolated "$B10" '{"labels":[],"headRefName":"bug-pipeline-reproduce-gate"}' '' '')"
 
 # --- Phase 2.5 backlog trigger cases ---
 BL_HIT="$(mk_bl_dir hit ibl5/classes/Updater/StandingsUpdater.php)"

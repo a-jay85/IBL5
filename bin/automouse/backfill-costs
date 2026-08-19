@@ -1,0 +1,459 @@
+#!/usr/bin/env bash
+# Backfill historical automouse cost reports from transcript recomputation.
+#
+# The harness `result` event undercounts badly once a session compacts, so every
+# historical `*-costs.md` row is a floor, not a cost. This rewrites those rows in
+# place from `bin/lib/automouse-pricer` and writes the `logs/<date>.costs.jsonl`
+# sidecars the weekly aggregate reads.
+#
+# Historical `exit:` lines are NEVER rewritten: the log is the tamper-evident
+# record of what the harness reported, and the whole defect is that the two
+# disagree. The sidecar is the only new artifact placed next to a log.
+#
+# Usage: bin/automouse/backfill-costs [--dry-run] [--since YYYY-MM-DD] [--proj-dir DIR]
+#   --dry-run   print the unified diff that would be applied; write nothing at
+#               all, including no .bak files.
+#   --proj-dir  scan DIR instead of ~/.claude/projects for transcripts (tests).
+#
+# Write discipline: a `.bak` is written before any mutation and is NEVER
+# overwritten, so the first pre-backfill state stays recoverable across repeat
+# runs; every write lands via a temp file plus an atomic rename.
+#
+# Stdout contract — three machine-greppable lines, in both modes:
+#   join: <N> matched, <M> ambiguous, <K> missed
+#   agree: <A>/<B> uncompacted duration-matched rows within $0.01 of the harness figure
+#   no changes                       (bare, own line)   -- or --
+#   changed: <N> reports, <M> sidecars
+# Exit 0 for both verdicts; non-zero means the script itself failed.
+
+set -euo pipefail
+
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+NIGHTLY_DIR=${NIGHTLY_DIR:-"$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"}
+PRICER="$REPO_ROOT/bin/lib/automouse-pricer"
+
+DRY_RUN=0
+SINCE=""
+PROJ_DIR=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --dry-run) DRY_RUN=1; shift ;;
+        --since)   SINCE=${2:-}; shift 2 ;;
+        --since=*) SINCE=${1#--since=}; shift ;;
+        --proj-dir) PROJ_DIR=${2:-}; shift 2 ;;
+        --proj-dir=*) PROJ_DIR=${1#--proj-dir=}; shift ;;
+        -h|--help) sed -n '2,30p' "${BASH_SOURCE[0]}"; exit 0 ;;
+        *) printf 'unknown argument: %s\n' "$1" >&2; exit 2 ;;
+    esac
+done
+
+[ -x "$PRICER" ] || { printf 'missing pricer: %s\n' "$PRICER" >&2; exit 2; }
+
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
+
+# The index is the only expensive step; build it once and reuse it for every row.
+if [ -n "$PROJ_DIR" ]; then
+    "$PRICER" --index --proj-dir "$PROJ_DIR" > "$TMP/index.jsonl" 2>/dev/null || true
+else
+    "$PRICER" --index > "$TMP/index.jsonl" 2>/dev/null || true
+fi
+
+export NIGHTLY_DIR TMPDIR_X="$TMP" DRY_RUN SINCE
+python3 - <<'PYEOF'
+import datetime
+import difflib
+import glob
+import json
+import os
+import re
+import sys
+import tempfile
+
+NIGHTLY = os.environ["NIGHTLY_DIR"]
+TMP = os.environ["TMPDIR_X"]
+DRY = os.environ["DRY_RUN"] == "1"
+SINCE = os.environ.get("SINCE") or ""
+
+HEADER = ("| Plan | Phase | Model | Tier | Cost ($) | Surcharge est ($) | Peak Ctx (K) "
+          "| In | Out | Cache-read | CW-5m | CW-1h | Prov |")
+SEP = "|" + "---|" * 13
+NCOL = 13
+
+# Local wall-clock offset of the log timestamps (PDT = UTC-7).
+TZ_OFFSET_HOURS = 7
+# Endpoint tolerance for the wall-clock join, and the margin that makes a runner-up a tie.
+JOIN_TOL_S = 240.0
+TIE_MARGIN_S = 5.0
+
+TS_RE = re.compile(r"^\[(\d{2}):(\d{2}):(\d{2})\]\s*(.*)$")
+# `tool:` / `exit:` / `COMPACTION` lines carry ELAPSED seconds since the phase began;
+# every other bracketed line carries wall-clock time-of-day. This duality is the single
+# most error-prone part of the join -- see the module docstring in the plan's Phase 6.
+ELAPSED_RE = re.compile(r"\b(tool:|exit:|COMPACTION)")
+MODEL_RE = re.compile(r"^(\w+) model: (\S+) for (\S+)")
+EXIT_RE = re.compile(r"^(\S+)/(\w+) exit: (.*)$")
+TOOL_RE = re.compile(r"^(\S+)/(\w+) tool: ")
+HB_RE = re.compile(r"^(\S+) heartbeat: (\w+) alive")
+
+
+def norm(slug):
+    return slug[:-3] if slug.endswith(".md") else slug
+
+
+def iso(ts):
+    try:
+        return datetime.datetime.strptime(ts[:19], "%Y-%m-%dT%H:%M:%S").replace(
+            tzinfo=datetime.timezone.utc)
+    except (ValueError, TypeError):
+        return None
+
+
+def load_index():
+    sessions = []
+    path = os.path.join(TMP, "index.jsonl")
+    if not os.path.exists(path):
+        return sessions
+    for line in open(path, encoding="utf-8"):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            rec = json.loads(line)
+        except ValueError:
+            continue
+        rec["_first"] = iso(rec.get("first_ts"))
+        rec["_last"] = iso(rec.get("last_ts"))
+        if rec["_first"] is None or rec["_last"] is None:
+            continue
+        sessions.append(rec)
+    return sessions
+
+
+def log_paths(date):
+    for sub in ("logs", "logs.archive"):
+        p = os.path.join(NIGHTLY, sub, date + ".log")
+        if os.path.exists(p):
+            return p, os.path.join(NIGHTLY, sub)
+    return None, os.path.join(NIGHTLY, "logs")
+
+
+def parse_log(path, date):
+    """Recover each (plan, phase) window as {start, elapsed, logged_cost}.
+
+    Only `impl` gets an explicit `impl model:` wall-clock anchor; `postplan` has none.
+    So for every heartbeat at wall-clock W we bound the phase start: the nearest
+    same-phase elapsed reading BEFORE the heartbeat gives an upper bound (W - e_before)
+    and the nearest one AFTER gives a lower bound (W - e_after). Intersecting those
+    bounds over all heartbeats pins the start to within a second or two.
+    """
+    try:
+        day = datetime.datetime.strptime(date, "%Y-%m-%d").replace(
+            tzinfo=datetime.timezone.utc)
+    except ValueError:
+        return {}
+
+    events = []
+    prev_wall = None
+    day_roll = 0
+    try:
+        fh = open(path, encoding="utf-8", errors="replace")
+    except IOError:
+        return {}
+
+    with fh:
+        for raw in fh:
+            m = TS_RE.match(raw.rstrip("\n"))
+            if not m:
+                continue
+            secs = int(m.group(1)) * 3600 + int(m.group(2)) * 60 + int(m.group(3))
+            body = m.group(4)
+
+            if ELAPSED_RE.search(body):
+                tm = TOOL_RE.match(body)
+                if tm:
+                    events.append(("elapsed", (norm(tm.group(1)), tm.group(2)), secs, None))
+                    continue
+                em = EXIT_RE.match(body)
+                if em:
+                    cm = re.search(r"cost=\$([0-9.]+)", em.group(3))
+                    events.append(("exit", (norm(em.group(1)), em.group(2)), secs,
+                                   float(cm.group(1)) if cm else None))
+                continue
+
+            # A decreasing wall clock is a midnight roll, not a rewind.
+            if prev_wall is not None and secs < prev_wall:
+                day_roll += 1
+            prev_wall = secs
+            wall = day + datetime.timedelta(days=day_roll, seconds=secs,
+                                            hours=TZ_OFFSET_HOURS)
+
+            hm = HB_RE.match(body)
+            if hm:
+                events.append(("hb", (norm(hm.group(1)), hm.group(2)), wall, None))
+                continue
+            mm = MODEL_RE.match(body)
+            if mm:
+                events.append(("model", (norm(mm.group(3)), mm.group(1)), wall, None))
+
+    exact, lo, hi, exits = {}, {}, {}, {}
+    for i, (kind, key, val, extra) in enumerate(events):
+        if kind == "model":
+            exact.setdefault(key, val)
+        elif kind == "exit":
+            exits[key] = (val, extra)
+        elif kind == "hb":
+            before = after = None
+            for j in range(i - 1, -1, -1):
+                if events[j][0] in ("elapsed", "exit") and events[j][1] == key:
+                    before = events[j][2]
+                    break
+            for j in range(i + 1, len(events)):
+                if events[j][0] in ("elapsed", "exit") and events[j][1] == key:
+                    after = events[j][2]
+                    break
+            if after is not None:
+                v = val - datetime.timedelta(seconds=after)
+                if key not in lo or v > lo[key]:
+                    lo[key] = v
+            if before is not None:
+                v = val - datetime.timedelta(seconds=before)
+                if key not in hi or v < hi[key]:
+                    hi[key] = v
+
+    phases = {}
+    for key, (elapsed, cost) in exits.items():
+        start = exact.get(key)
+        if start is None:
+            l, h = lo.get(key), hi.get(key)
+            if l is not None and h is not None:
+                start = l + (h - l) / 2 if h > l else l
+            else:
+                start = l if l is not None else h
+        if start is None:
+            continue
+        phases[key] = {"start": start, "elapsed": elapsed, "logged_cost": cost}
+    return phases
+
+
+def join(window, sessions, claimed):
+    """Match a phase window to one session by BOTH endpoints.
+
+    Containment alone is far too loose: a 45-minute impl window swallows every short
+    session that happens to fall inside it. A phase spawns exactly one session, which
+    starts when the phase starts and ends when it ends, so score on |dstart| + |dend|
+    and require both within tolerance. Returns (session_or_None, status) where status
+    is 1 matched / 2 ambiguous / 0 missed.
+    """
+    start, end = window
+    scored = []
+    for s in sessions:
+        if s["session_id"] in claimed:
+            continue
+        d1 = abs((s["_first"] - start).total_seconds())
+        d2 = abs((s["_last"] - end).total_seconds())
+        if d1 <= JOIN_TOL_S and d2 <= JOIN_TOL_S:
+            scored.append((d1 + d2, s))
+    if not scored:
+        return None, 0
+    scored.sort(key=lambda x: x[0])
+    if len(scored) > 1 and scored[1][0] - scored[0][0] < TIE_MARGIN_S:
+        return None, 2
+    return scored[0][1], 1
+
+
+def row_cells(line):
+    if not line.startswith("|"):
+        return None
+    return [c.strip() for c in line.strip().strip("|").split("|")]
+
+
+def widen(cells):
+    """Map a historical row onto the 13-column layout.
+
+    Three shapes shipped over the archive's life: 3 columns (Plan, Phase, Cost),
+    5 (+ Model, Tier) and 6 (+ Peak Ctx). `Surcharge est ($)` was inserted at
+    index 5, so the 6-column form's Peak Ctx has to shift right one -- padding on
+    the right instead would render a context size as a dollar surcharge.
+    """
+    n = len(cells)
+    if n == 3:
+        cells = [cells[0], cells[1], "", "", cells[2]]
+    elif n == 6:
+        cells = cells[:5] + ["", cells[5]]
+    return (cells + [""] * NCOL)[:NCOL]
+
+
+def fmt_surcharge(rec):
+    if (rec.get("compactions_main", 0) + rec.get("compactions_sub", 0)) == 0:
+        return "—"
+    return "%.2f–%.2f" % (rec.get("surcharge_low", 0.0), rec.get("surcharge_high", 0.0))
+
+
+def provenance(rec, logged_cost, logdur):
+    if rec is None:
+        return "unknown"
+    tdur = (rec["_last"] - rec["_first"]).total_seconds()
+    comp = rec.get("compactions_main", 0) + rec.get("compactions_sub", 0)
+    if comp == 0 and logdur is not None and tdur > logdur * 1.05 + 30:
+        return "recomputed-anomalous"
+    if logged_cost is not None and rec["cost"] < logged_cost - 0.01:
+        return "recomputed-anomalous"
+    return "recomputed"
+
+
+sessions = load_index()
+claimed = set()
+matched = ambiguous = missed = 0
+agree_num = agree_den = 0
+changed_reports = changed_sidecars = 0
+anomalous = []
+
+reports = sorted(glob.glob(os.path.join(NIGHTLY, "reports", "*-costs.md")) +
+                 glob.glob(os.path.join(NIGHTLY, "reports.archive", "*-costs.md")))
+
+for report in reports:
+    date = os.path.basename(report)[: len("0000-00-00")]
+    if SINCE and date < SINCE:
+        continue
+    logpath, logdir = log_paths(date)
+    phases = parse_log(logpath, date) if logpath else {}
+
+    lines = open(report, encoding="utf-8").read().splitlines()
+    out_lines = []
+    sidecar = []
+    in_weekly = False
+    seen_header = False
+
+    for line in lines:
+        if line.startswith("## Weekly aggregate"):
+            in_weekly = True
+        cells = row_cells(line)
+
+        if not in_weekly and cells and cells[0] == "Plan":
+            seen_header = True
+            out_lines.append(HEADER)
+            continue
+
+        # Separators are matched on content, not width: the oldest reports carry a
+        # 3-cell rule that a width guard would leave stranded under a 13-column header.
+        if not in_weekly and seen_header and cells and set("".join(cells)) <= set("-| "):
+            out_lines.append(SEP)
+            continue
+
+        if not in_weekly and seen_header and cells and len(cells) >= 3:
+            cells = widen(cells)
+            plan, phase, model, tier = cells[0], cells[1], cells[2], cells[3]
+            info = phases.get((norm(plan), phase))
+            logged_cost = info["logged_cost"] if info else None
+            if logged_cost is None:
+                try:
+                    logged_cost = float(cells[4])
+                except (ValueError, IndexError):
+                    logged_cost = None
+            logdur = info["elapsed"] if info else None
+
+            rec, status = (None, 0)
+            if info:
+                rec, status = join(
+                    (info["start"],
+                     info["start"] + datetime.timedelta(seconds=info["elapsed"])),
+                    sessions, claimed)
+            if status == 1:
+                matched += 1
+                claimed.add(rec["session_id"])
+            elif status == 2:
+                ambiguous += 1
+                sys.stderr.write("ambiguous: %s %s/%s\n" % (date, plan, phase))
+            else:
+                missed += 1
+
+            prov = provenance(rec, logged_cost, logdur)
+            if rec is not None:
+                tdur = (rec["_last"] - rec["_first"]).total_seconds()
+                comp = rec.get("compactions_main", 0) + rec.get("compactions_sub", 0)
+                if comp == 0 and logdur is not None and not (tdur > logdur * 1.05 + 30):
+                    agree_den += 1
+                    if logged_cost is not None and abs(rec["cost"] - logged_cost) <= 0.01:
+                        agree_num += 1
+                if prov == "recomputed-anomalous":
+                    anomalous.append("%s %s/%s" % (date, plan, phase))
+                new = [plan, phase, model, tier, "%.4f" % rec["cost"], fmt_surcharge(rec),
+                       "%dK" % (rec["peak_ctx"] // 1000), str(rec["inp"]), str(rec["out"]),
+                       str(rec["cr"]), str(rec["w5"]), str(rec["w1"]), prov]
+                sidecar.append({
+                    "date": date, "plan": plan, "phase": phase, "model": model, "tier": tier,
+                    "session_id": rec["session_id"], "cost": rec["cost"],
+                    "surcharge_low": rec["surcharge_low"],
+                    "surcharge_high": rec["surcharge_high"],
+                    "inp": rec["inp"], "out": rec["out"], "cr": rec["cr"],
+                    "w5": rec["w5"], "w1": rec["w1"], "peak_ctx": rec["peak_ctx"],
+                    "compactions_main": rec["compactions_main"],
+                    "compactions_sub": rec["compactions_sub"], "provenance": prov,
+                    "price_asof": rec["price_asof"], "logged_cost": logged_cost,
+                })
+            else:
+                # Unjoined rows keep the harness figure and stay `unknown` forever: their
+                # transcripts have aged out, so re-running can never resurrect them.
+                pad = (cells + [""] * NCOL)[:NCOL]
+                pad[12] = "unknown"
+                new = pad
+            out_lines.append("| " + " | ".join(new) + " |")
+            continue
+
+        out_lines.append(line)
+
+    new_text = "\n".join(out_lines) + "\n"
+    old_text = "\n".join(lines) + "\n"
+
+    side_path = os.path.join(logdir, date + ".costs.jsonl")
+    side_text = "".join(json.dumps(r, sort_keys=True) + "\n" for r in sidecar)
+    side_old = ""
+    if os.path.exists(side_path):
+        side_old = open(side_path, encoding="utf-8").read()
+
+    report_differs = new_text != old_text
+    side_differs = bool(sidecar) and side_text != side_old
+
+    if DRY:
+        if report_differs:
+            sys.stdout.writelines(difflib.unified_diff(
+                old_text.splitlines(True), new_text.splitlines(True),
+                fromfile=report, tofile=report + " (backfilled)"))
+            changed_reports += 1
+        if side_differs:
+            changed_sidecars += 1
+        continue
+
+    if report_differs:
+        # Order is load-bearing: the .bak must exist before any in-place write, and an
+        # existing .bak is never overwritten -- it holds the true pre-backfill state.
+        bak = report + ".bak"
+        if not os.path.exists(bak):
+            with open(bak, "w", encoding="utf-8") as fh:
+                fh.write(old_text)
+        fd, tmpf = tempfile.mkstemp(dir=os.path.dirname(report))
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(new_text)
+        os.replace(tmpf, report)
+        changed_reports += 1
+
+    if side_differs:
+        if not os.path.isdir(logdir):
+            os.makedirs(logdir)
+        fd, tmpf = tempfile.mkstemp(dir=logdir)
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(side_text)
+        os.replace(tmpf, side_path)
+        changed_sidecars += 1
+
+print("join: %d matched, %d ambiguous, %d missed" % (matched, ambiguous, missed))
+print("agree: %d/%d uncompacted duration-matched rows within $0.01 of the harness figure"
+      % (agree_num, agree_den))
+if anomalous:
+    sys.stderr.write("anomalous rows:\n" + "\n".join("  " + a for a in anomalous) + "\n")
+if changed_reports == 0 and changed_sidecars == 0:
+    print("no changes")
+else:
+    print("changed: %d reports, %d sidecars" % (changed_reports, changed_sidecars))
+PYEOF

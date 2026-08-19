@@ -108,3 +108,9 @@ tools/postplan-harness/fixtures/scenarios/
 tools/postplan-harness/**/__pycache__/
 tools/postplan-harness/**/*.pyc
 tools/postplan-harness/.pytest_cache/
+
+# Committed test fixture: a trimmed automouse run log the cost backfill test joins against.
+!bin/fixtures/automouse-cost/nightly/logs/*.log
+
+# Byte-compiled pricer: `python3 -m py_compile bin/lib/automouse-pricer` drops this.
+bin/lib/__pycache__/

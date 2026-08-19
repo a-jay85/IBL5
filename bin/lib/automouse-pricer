@@ -1,0 +1,330 @@
+#!/usr/bin/env python3
+# <!-- no-adr: port of an existing evidence script into bin/lib/; no new architectural boundary -->
+"""Price a Claude Code session from its transcript(s).
+
+The harness `result` event undercounts: it sums only the top-level `usage` of the
+main transcript, so it misses (a) every entry in `usage.iterations[]`, and
+(b) every subagent transcript. This tool recomputes from the transcripts instead,
+which is why it must run *after* a phase exits — subagent transcripts are still
+being flushed when `result` fires.
+
+Usage:
+    automouse-pricer --session-id <SID> [--proj-dir <DIR>]   # one JSON object
+    automouse-pricer --index [--since YYYY-MM-DD]            # one JSON per line
+
+Exit 3 with {"error":"session-not-found"} or {"error":"session-ambiguous"}.
+"""
+
+import argparse
+import datetime
+import glob
+import json
+import os
+import sys
+
+# Prices in USD per 1M tokens, ordered (input, output, cache_read, write_5m, write_1h).
+# last_verified: 2026-08-18
+# price_expiry: 2026-08-31  # sonnet-5 intro pricing ends
+PRICE = {
+    "opus":     (5.00, 25.00, 0.50,  6.25, 10.00),
+    "sonnet":   (3.00, 15.00, 0.30,  3.75,  6.00),
+    "sonnet-5": (2.00, 10.00, 0.20,  2.50,  4.00),
+    "haiku":    (1.00,  5.00, 0.10,  1.25,  2.00),
+    "fable":   (10.00, 50.00, 1.00, 12.50, 20.00),
+}
+PRICE_ASOF = "2026-08-18"
+PRICE_EXPIRY = "2026-08-31"
+
+# Output tokens assumed for a compaction summary when the post-boundary record is absent.
+DEFAULT_SUMMARY_OUT = 8000
+
+PROJECTS_ROOT = os.path.expanduser("~/.claude/projects")
+
+
+def today():
+    """Today, honouring the AUTOMOUSE_PRICER_TODAY test hook. Malformed value ignored."""
+    raw = os.environ.get("AUTOMOUSE_PRICER_TODAY")
+    if raw:
+        try:
+            return datetime.date.fromisoformat(raw.strip())
+        except ValueError:
+            pass
+    return datetime.date.today()
+
+
+def price_stale():
+    return today() > datetime.date.fromisoformat(PRICE_EXPIRY)
+
+
+def warn_if_stale():
+    if price_stale():
+        sys.stderr.write(
+            "WARN: price table last_verified %s; sonnet-5 intro pricing expired %s "
+            "— re-verify bin/lib/automouse-pricer\n" % (PRICE_ASOF, PRICE_EXPIRY)
+        )
+
+
+def key(model):
+    """Normalise a model id to a PRICE key by longest-prefix match. None if unknown."""
+    if not model:
+        return None
+    m = str(model).lower()
+    for prefix in ("us.anthropic.", "anthropic."):
+        if m.startswith(prefix):
+            m = m[len(prefix):]
+    if m.startswith("claude-"):
+        m = m[len("claude-"):]
+    best = None
+    for k in PRICE:
+        if m.startswith(k) and (best is None or len(k) > len(best)):
+            best = k
+    return best
+
+
+class Acc(object):
+    """Running totals for one or more transcripts."""
+
+    def __init__(self):
+        self.cost = 0.0
+        self.inp = self.out = self.cr = self.w5 = self.w1 = 0
+        self.peak = 0
+        self.models = {}
+        self.unknown = set()
+        self.first_ts = None
+        self.last_ts = None
+
+
+def split_writes(u):
+    """Return (w5, w1) applying the remainder rule against the scalar field."""
+    cc = u.get("cache_creation") or {}
+    w5 = cc.get("ephemeral_5m_input_tokens")
+    w1 = cc.get("ephemeral_1h_input_tokens")
+    scalar = u.get("cache_creation_input_tokens") or 0
+    if w5 is None and w1 is None:
+        # Older transcripts carry only the scalar; it is 5m by convention.
+        return scalar, 0
+    w5 = w5 or 0
+    w1 = w1 or 0
+    if w5 + w1 < scalar:
+        w5 += scalar - (w5 + w1)
+    return w5, w1
+
+
+def tokens(u):
+    """Return (input, output, cache_read, w5, w1) for one usage part."""
+    w5, w1 = split_writes(u)
+    return (
+        u.get("input_tokens") or 0,
+        u.get("output_tokens") or 0,
+        u.get("cache_read_input_tokens") or 0,
+        w5,
+        w1,
+    )
+
+
+def price_part(u, default_model, acc):
+    """Price one usage part. Unknown models fall back to sonnet rates and are recorded."""
+    raw = u.get("model") or default_model
+    k = key(raw)
+    if k is None:
+        if raw:
+            acc.unknown.add(str(raw))
+        k = "sonnet"
+    i, o, cr, w5, w1 = tokens(u)
+    p = PRICE[k]
+    cost = (i * p[0] + o * p[1] + cr * p[2] + w5 * p[3] + w1 * p[4]) / 1e6
+    return cost, i, o, cr, w5, w1
+
+
+def parts_of(u):
+    """Iterations REPLACE the top-level usage for pricing; they never add to it."""
+    its = u.get("iterations")
+    return its if its else [u]
+
+
+def ctx_of(u):
+    """Context window occupancy implied by one usage part."""
+    w5, w1 = split_writes(u)
+    return (u.get("input_tokens") or 0) + (u.get("cache_read_input_tokens") or 0) + w5 + w1
+
+
+def scan(path, acc, is_main):
+    """Price one transcript into acc. Returns (compactions, surcharge_low, surcharge_high)."""
+    compactions = 0
+    s_low = s_high = 0.0
+    seen = set()
+    prev = None           # (ctx, model) of the last priced assistant record
+    pending = []          # boundaries still waiting for their post-boundary record
+
+    try:
+        fh = open(path, "r", encoding="utf-8", errors="replace")
+    except IOError:
+        return 0, 0.0, 0.0
+
+    with fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                rec = json.loads(line)
+            except ValueError:
+                continue
+
+            if rec.get("type") == "system" and rec.get("subtype") == "compact_boundary":
+                compactions += 1
+                if prev is not None:
+                    pending.append(prev)
+                continue
+
+            if rec.get("type") != "assistant":
+                continue
+            msg = rec.get("message") or {}
+            u = msg.get("usage")
+            if not u:
+                continue
+
+            mid = msg.get("id")
+            if mid:
+                if mid in seen:
+                    continue
+                seen.add(mid)
+
+            default_model = msg.get("model")
+            if default_model:
+                acc.models[default_model] = acc.models.get(default_model, 0) + 1
+
+            # A boundary is settled by the first priced record that follows it.
+            if pending:
+                out_tokens = u.get("output_tokens") or DEFAULT_SUMMARY_OUT
+                for pre_ctx, pre_model in pending:
+                    pk = key(pre_model) or "sonnet"
+                    p = PRICE[pk]
+                    s_low += pre_ctx * p[2] / 1e6
+                    s_high += (pre_ctx * p[0] + out_tokens * p[1]) / 1e6
+                pending = []
+
+            for part in parts_of(u):
+                c, i, o, cr, w5, w1 = price_part(part, default_model, acc)
+                acc.cost += c
+                acc.inp += i
+                acc.out += o
+                acc.cr += cr
+                acc.w5 += w5
+                acc.w1 += w1
+
+            # peak_ctx is a max over {top-level usage} U {each iteration} — never a sum.
+            for part in [u] + list(u.get("iterations") or []):
+                acc.peak = max(acc.peak, ctx_of(part))
+
+            prev = (ctx_of(u), default_model)
+
+            ts = rec.get("timestamp")
+            if ts and is_main:
+                if acc.first_ts is None or ts < acc.first_ts:
+                    acc.first_ts = ts
+                if acc.last_ts is None or ts > acc.last_ts:
+                    acc.last_ts = ts
+
+    # A boundary with no record after it still cost a summarization.
+    for pre_ctx, pre_model in pending:
+        pk = key(pre_model) or "sonnet"
+        p = PRICE[pk]
+        s_low += pre_ctx * p[2] / 1e6
+        s_high += (pre_ctx * p[0] + DEFAULT_SUMMARY_OUT * p[1]) / 1e6
+
+    return compactions, s_low, s_high
+
+
+def find_main(sid, proj_dir):
+    """Locate the main transcript for a session id. Returns a list of matches."""
+    if proj_dir:
+        direct = os.path.join(proj_dir, sid + ".jsonl")
+        if os.path.isfile(direct):
+            return [direct]
+        return sorted(glob.glob(os.path.join(proj_dir, "*", sid + ".jsonl")))
+    return sorted(glob.glob(os.path.join(PROJECTS_ROOT, "*", sid + ".jsonl")))
+
+
+def price_session(sid, main_path):
+    """Price a main transcript plus every subagent transcript beside it."""
+    proj = os.path.dirname(main_path)
+    acc = Acc()
+
+    comp_main, low, high = scan(main_path, acc, True)
+
+    comp_sub = 0
+    for sub in sorted(glob.glob(os.path.join(proj, sid, "subagents", "*.jsonl"))):
+        c, sl, sh = scan(sub, acc, False)
+        comp_sub += c
+        low += sl
+        high += sh
+
+    out = {
+        "session_id": sid,
+        "proj_dir": proj,
+        "cost": round(acc.cost, 4),
+        "inp": acc.inp,
+        "out": acc.out,
+        "cr": acc.cr,
+        "w5": acc.w5,
+        "w1": acc.w1,
+        "peak_ctx": acc.peak,
+        "compactions_main": comp_main,
+        "compactions_sub": comp_sub,
+        "surcharge_low": round(low, 4),
+        "surcharge_high": round(high, 4),
+        "models": acc.models,
+        "first_ts": acc.first_ts,
+        "last_ts": acc.last_ts,
+        "price_asof": PRICE_ASOF,
+        "price_stale": price_stale(),
+    }
+    if acc.unknown:
+        out["unknown_models"] = sorted(acc.unknown)
+    return out
+
+
+def cmd_session(args):
+    matches = find_main(args.session_id, args.proj_dir)
+    if not matches:
+        print(json.dumps({"error": "session-not-found", "session_id": args.session_id}))
+        return 3
+    if len(matches) > 1:
+        print(json.dumps({"error": "session-ambiguous", "session_id": args.session_id,
+                          "matches": matches}))
+        return 3
+    warn_if_stale()
+    print(json.dumps(price_session(args.session_id, matches[0])))
+    return 0
+
+
+def cmd_index(args):
+    warn_if_stale()
+    root = args.proj_dir or PROJECTS_ROOT
+    for path in sorted(glob.glob(os.path.join(root, "*", "*.jsonl"))):
+        sid = os.path.basename(path)[: -len(".jsonl")]
+        rec = price_session(sid, path)
+        if args.since and (rec["first_ts"] or "")[:10] < args.since:
+            continue
+        print(json.dumps(rec))
+    return 0
+
+
+def main():
+    ap = argparse.ArgumentParser(add_help=True)
+    ap.add_argument("--session-id")
+    ap.add_argument("--proj-dir")
+    ap.add_argument("--index", action="store_true")
+    ap.add_argument("--since")
+    args = ap.parse_args()
+
+    if args.index:
+        return cmd_index(args)
+    if args.session_id:
+        return cmd_session(args)
+    ap.error("one of --session-id or --index is required")
+
+
+if __name__ == "__main__":
+    sys.exit(main())

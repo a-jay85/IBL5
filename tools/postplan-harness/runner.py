@@ -120,9 +120,12 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         meta = gh.pr_meta() or {"number": pr, "title": copy["title"], "body": copy["summary_md"]}
 
         # ---- Phase 4: review + security (gated bounded calls) ---------
-        findings, gates = ReviewPhase(llm, gh).run(meta, cls, plan)
+        findings, gates, degraded_agents = ReviewPhase(llm, gh).run(meta, cls, plan)
         res.findings = findings
+        res.degraded_agents = degraded_agents
         log(f"phase4 gates={ {k: v for k, v in gates.items()} } surviving_findings={len(findings)}")
+        if degraded_agents:
+            log(f"phase4 DEGRADED: unparseable review output from {', '.join(degraded_agents)}")
 
         # ---- Phase 5 + 5.0: verify + conformance -----------------------
         tracks = verifier.run(cls)
@@ -179,6 +182,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             unresolved_conformance=unresolved, phase5_status=phase5,
             plan_auto_merge_false=plan.auto_merge_false, headless=headless,
             dep_state_lookup=lambda n: gh.pr_state(n),
+            degraded_agents=degraded_agents,
         )
         preview = evaluate(inputs)
         if not preview.holds:
@@ -198,6 +202,14 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         if decision.armed:
             gh.pr_merge_auto(pr)
 
+        if degraded_agents:
+            note = ("\n\n## Review Unavailable\n\n"
+                    "The compiled post-plan harness could not parse the reply from: "
+                    + ", ".join(degraded_agents)
+                    + ". Those checks did not run; auto-merge was not armed. "
+                      "Re-run the review or review this PR by hand before merging.\n")
+            gh.pr_edit_body(pr, (gh.pr_body() or body) + note)
+
         # ---- Phase 7/8: CI watch + confirm -----------------------------
         if mode == "replay":
             fx_ci = (fixture or {}).get("checks_outcome")
@@ -212,7 +224,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         res.final_pr_state = gh.pr_state() if (mode == "replay" or live) else "N/A"
         log(f"phase7 ci: exit={outcome.exit_code} failed={outcome.failed} ({outcome.evidence})")
 
-        res.terminal = (TerminalState.SHIPPED_ARMED if decision.armed
+        res.terminal = (TerminalState.DEGRADED if degraded_agents else
+                        TerminalState.SHIPPED_ARMED if decision.armed
                         else TerminalState.SHIPPED_HELD)
 
         # ---- Phase 9: retrospective (bounded) ---------------------------
@@ -247,9 +260,11 @@ def exit_code_for(res: RunResult) -> int:
     """Process exit code from a terminal RunResult.
     3 = rebase-conflict fail-closed sentinel: bin/post-plan-now MUST NOT escalate to
         the /post-plan skill session; a human resolves the stacked-branch rebase.
-    1 = any other typed failure.  0 = success / nothing-to-ship."""
+    1 = any other typed failure.  0 = success / nothing-to-ship / degraded (PR shipped + held)."""
     if res.terminal == TerminalState.FAILED and res.error_kind == "rebase-conflict":
         return 3
+    if res.terminal == TerminalState.DEGRADED:
+        return 0          # PR is open and held: nothing for the skill fallback to redo
     return 0 if res.terminal != TerminalState.FAILED else 1
 
 
@@ -351,7 +366,7 @@ def main() -> int:
         with open(args.canned) as fh:
             llm = FixtureLlm(ledger, json.load(fh))
     else:
-        llm = ClaudeCli(ledger)
+        llm = ClaudeCli(ledger, out_dir=args.out)
 
     res = run(fixture, args.out, llm, mode=args.mode, worktree=args.worktree,
               headless=not args.interactive, live=args.live, explicit_path=args.plan)

@@ -1,6 +1,6 @@
 ---
 description: Automouse autonomous workflow (formerly "nightly") — launchd fires claude -p on a recurring schedule, running two context-isolated agents per plan (implementation + post-plan) with time guards and incremental checkpoints.
-last_verified: 2026-08-14
+last_verified: 2026-08-18
 paths: "bin/automouse/**"
 ---
 
@@ -51,6 +51,22 @@ A headless `claude -p` process runs on a recurring schedule via macOS `launchd`.
   *.archive/  startup archival: logs/reports/done/skipped entries idle >7 days are
               moved here (logs.archive/, reports.archive/, …) at run launch
 ```
+
+### Cost accounting and the sidecar ledger
+
+Each phase's cost is recorded in two places: the markdown row in `reports/YYYY-MM-DD-costs.md` and a line-delimited JSON file `logs/YYYY-MM-DD.costs.jsonl` (the *sidecar ledger*). One JSON object per priced phase is written next to the log by `bin/automouse/run` going forward, and by `bin/automouse/backfill-costs` for history. The weekly aggregate in the costs report reads the sidecar rather than re-parsing the markdown rows, replacing the old fragile column-count heuristic.
+
+**Recomputed vs. harness cost.** The harness `result` event undercounts badly: it sums only the top-level `usage` of the main transcript, missing (a) every entry in `usage.iterations[]` and (b) every subagent transcript. `bin/lib/automouse-pricer` recomputes from the transcripts after the phase exits — subagent transcripts are still flushing when `result` fires. Concrete magnitude: for the 2026-08-18 `db-query-worktree-routing` impl phase, the harness reported $1.82 <!-- RETIRED-OK: superseded by recomputed $12.86 --> while recomputation gives $12.86.
+
+**Prov column.** Each cost row carries a `Prov` (provenance) value:
+
+| Value | Meaning |
+|-------|---------|
+| `recomputed` | Transcript recomputation succeeded and agrees with expectations. |
+| `recomputed-anomalous` | Recomputation succeeded but diverges from the harness figure in a way the mechanical check flags: recomputed cost falls more than $0.01 below the harness figure, or the joined transcript spans materially longer than the logged phase duration. |
+| `unknown` | No transcript could be joined to this row — the harness figure is left as-is (transcripts age out after ~30 days). |
+
+**Reported cost is a floor.** Compaction summarization is not recorded in any transcript record, so it is carried separately as a bounded interval in the "Surcharge est ($)" column: `low–high`, where low is the cache-read cost of the pre-boundary context and high is a full input re-read plus summary output. This interval is never folded into the cost column.
 
 ### Startup archival
 

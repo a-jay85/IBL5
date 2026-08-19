@@ -3,6 +3,7 @@ description: Read-on-demand detail for agent-tiering — the skip-vs-spawn heuri
 last_verified: 2026-08-26
 paths:
   - ".claude/skills/**/*.md"
+  - ".claude/agents/*.md"
 ---
 
 # Agent Tiering — Detail
@@ -60,11 +61,13 @@ verbose output" rationale; it is not a reason to push understanding-class work d
 changes (e.g. a coordinator that can surface its own filtered-out findings), not merely a
 higher per-task capability score.
 
-## Nested Sub-Agents — Available, Deliberately Unused
+## Nested Sub-Agents — One Carve-Out, Otherwise Unused
 
-Sub-agents can spawn sub-agents (5 deep), but we keep **flat fan-out**: the orchestrator session owns every fan-out and absorbs every agent's output. Do not nest in the recurring workflows (`/plan`, `/pr-review`, `/security-audit`, `/post-plan`, automouse). Why: our fan-out is narrow (1–4 agents/phase, not the wide verbose fan-out where nesting pays); the pipelines keep review/triage **in the orchestrator session** by design, whatever tier that session runs at (the review→score→filter step *is* triage — a coordinator would blind the orchestrator to the findings it filtered, and delegated judgment degrades — see `feedback_sonnet_proving_negatives`, `feedback_review_agent_full_diff`); and `/post-plan` is a single-context state machine whose Phase 3/5/6.5 gates read from main-session context, where nesting could only hide the filtered-out findings, not the survivor list the orchestrator still needs.
+Sub-agents can spawn sub-agents — `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH` is **3** in `~/.claude/settings.json`, not the 5 this rule claimed — but we keep **flat fan-out**: the orchestrator session owns every fan-out and absorbs every agent's output. Do not nest in `/pr-review`, `/security-audit`, `/post-plan`, or automouse. **One carve-out, in `/plan` only:** `plan-architect` and `plan-architect-xhigh` may spawn at most **one** `Explore` for a question that surfaces mid-design (`.claude/skills/plan/_architect-contract.md` § Mid-design exploration). That subtree terminates — `Explore` denies `Agent` — so it adds a depth, not a tree. Every other in-repo def (`plan-architect-sonnet`, `sonnet-4-6`, `automouse-delegate`) and `~/.claude/agents/Explore.md` denies `Agent` outright, which is what keeps the carve-out a carve-out rather than a general loosening. Budget: ≤1 `Explore` per architect invocation, on top of the `/plan` Step-2 cap of 2 — run-wide ceiling **3**. Why: our fan-out is narrow (1–4 agents/phase, not the wide verbose fan-out where nesting pays); the pipelines keep review/triage **in the orchestrator session** by design, whatever tier that session runs at (the review→score→filter step *is* triage — a coordinator would blind the orchestrator to the findings it filtered, and delegated judgment degrades — see `feedback_sonnet_proving_negatives`, `feedback_review_agent_full_diff`); and `/post-plan` is a single-context state machine whose Phase 3/5/6.5 gates read from main-session context, where nesting could only hide the filtered-out findings, not the survivor list the orchestrator still needs.
 
-**Tripwire to revisit:** a *measured* post-plan context-window problem, or a new workflow with genuinely wide fan-out and verbose per-agent intermediates.
+**Tripwire to revisit** (still live, for the surfaces above): a *measured* post-plan context-window problem, or a new workflow with genuinely wide fan-out and verbose per-agent intermediates.
+
+**The `/plan` carve-out did not come from the tripwire.** Neither condition fired. It was taken on an explicit user decision, on a different argument: the architect could *see* an unknown mid-design and had no way to close it, because Step-2's fan-out is spent before the architect starts. That is a capability gap, not a context-window measurement. Recorded this way on purpose — the tripwire's evidentiary bar is not retroactively claimed to have been met.
 
 > The bounded-checklist rationale for `/post-plan` Phase 6.5 condition (9) has moved to `agent-tiering-bounded-checklist.md`.
 
@@ -102,7 +105,7 @@ Tier the orchestrator by the judgment **it** retains:
 
 ## Explore Agent Tiering
 
-Tier per prompt — don't default all Explore agents to one tier. Explore itself is pinned to Sonnet 4.6 (see agent-tiering.md § Sonnet 4.6 pins); the choice below is Haiku-vs-Sonnet-4.6 for the Explore *task*.
+Two actors spawn Explore in a `/plan` run: the orchestrator at Step 2 (≤2) and the Opus `plan-architect` defs mid-design (≤1 each). Tier per prompt — don't default all Explore agents to one tier. Explore itself is pinned to Sonnet 4.6 (see agent-tiering.md § Sonnet 4.6 pins); the choice below is Haiku-vs-Sonnet-4.6 for the Explore *task*.
 
 | Tier | Model param | Use for Explore | Examples |
 |------|-------------|-----------------|---------|

@@ -22,6 +22,10 @@ set -u
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 PLAN_NOW="$ROOT/bin/plan-now"
+# Read the cap out of the script under test, so bumping RUN_TIMEOUT there cannot
+# leave this fixture asserting a retired number.
+RUN_TIMEOUT=$(sed -n 's/^RUN_TIMEOUT=\([0-9][0-9]*\)$/\1/p' "$PLAN_NOW" | head -1)
+[ -n "$RUN_TIMEOUT" ] || { echo "test-plan-now: could not read RUN_TIMEOUT from $PLAN_NOW" >&2; exit 1; }
 FAILS=0
 
 ok()   { printf '  ok   %s\n' "$1"; }
@@ -150,7 +154,7 @@ if [ -n "${STUB_PLANFILE2:-}" ]; then
 fi
 printf 'Done — the plan is written and check-plan is clean.\n'
 [ -n "${STUB_TAIL:-}" ] && printf '%s\n' "$STUB_TAIL"
-# $STUB_RC emulates the crashed/timed-out run — rc 124 is the runner's 5400s kill.
+# $STUB_RC emulates the crashed/timed-out run — rc 124 is the runner's timeout kill.
 exit "${STUB_RC:-0}"
 STUB_EOF
 chmod +x "$STUB"
@@ -496,10 +500,10 @@ want "a crashed run DMs the failure icon"    "$(dm)" "❌ plan-now:"
 want "a crashed run DMs its verdict"         "$(dm)" "RESULT failed — the run did not exit cleanly"
 want "a slugless crashed run titles itself"  "$(dm)" "plan-now: (unidentified)"
 
-# 6. rc 124 is the 5400s timeout, and a DM that just says "failed" would send you
-#    to the log to find that out.
+# 6. rc 124 is the $RUN_TIMEOUT kill, and a DM that just says "failed" would send
+#    you to the log to find that out.
 out=$(STUB_RC=124 run_case "$P" "PLAN_FILE: $P")
-want "a timed-out run names the timeout in the DM" "$(dm)" "failed — killed by the 5400s timeout"
+want "a timed-out run names the timeout in the DM" "$(dm)" "failed — killed by the ${RUN_TIMEOUT}s timeout"
 
 # 7. unconfirmed — no marker, no recovery.
 out=$(run_case "$P" "")

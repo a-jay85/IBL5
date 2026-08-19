@@ -86,6 +86,12 @@
 
 set -euo pipefail
 
+# The run's hard wall-clock cap, in seconds. ONE definition: the runner reads it
+# through the %q prelude below, and both rc==124 messages interpolate it, so the
+# number can never drift out of the text that reports it. History and the current
+# value's rationale live at the timeout call site.
+RUN_TIMEOUT=10800
+
 MODEL="claude-sonnet-4-6"
 DISPOSITION="queue"
 NOTIFY=1
@@ -207,6 +213,7 @@ CODA
     printf 'PLANS_DIR=%q\n'  "$PLANS_DIR"
     printf 'PROMPT=%q\n'     "$PROMPT"
     printf 'OUT=%q\n'        "$OUT"
+    printf 'RUN_TIMEOUT=%q\n' "$RUN_TIMEOUT"
     printf 'MODEL=%q\n'      "$MODEL"
     printf 'LABEL=%q\n'      "$LABEL"
     printf 'PLIST=%q\n'      "$PLIST"
@@ -324,8 +331,12 @@ promote_draft() {
 # the same autoCompactWindow setting an interactive session uses — rationale and
 # the tripwire for re-adding an explicit window in bin/automouse/run.
 # caffeinate -s keeps the Mac awake on AC for the run's duration.
-# 5400s: the first two real runs took 36 and 42 minutes, too close to the old
-# 3600s cap. claude -p does not stream, so $OUT stays empty until it exits — and with
+# $RUN_TIMEOUT (3h): the first two real runs took 36 and 42 minutes, too close to
+# the old 3600s cap; the 5400s that replaced it then killed a run at Step 5 finalize
+# on 2026-08-18 with every section already written, because an architect that drifts
+# past its own phase outline burns the budget re-deriving work. 3h is sized so the
+# cap catches a genuinely hung run, not a slow-but-progressing one.
+# claude -p does not stream, so $OUT stays empty until it exits — and with
 # the default --output-format text it then holds ONLY the final assistant message,
 # which is why the coda demands PLAN_FILE: on that message's last line (see header).
 # CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 disables the harness's background-task
@@ -335,10 +346,10 @@ promote_draft() {
 # on any run longer than the ceiling, so the orchestrator's turn ends with no
 # architect result and no PLAN_FILE: line while a complete draft sits in
 # $PLANS_DIR/.drafts/. 0 means wait indefinitely (the CLI says so itself);
-# timeout 5400 above remains the hard cap.
+# the $RUN_TIMEOUT above remains the hard cap.
 CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
     CLAUDE_HEADLESS=1 caffeinate -s \
-    timeout 5400 "$CLAUDE_BIN" -p "$(cat "$PROMPT")" \
+    timeout "$RUN_TIMEOUT" "$CLAUDE_BIN" -p "$(cat "$PROMPT")" \
     --dangerously-skip-permissions \
     --model "$MODEL" \
     --effort high \
@@ -377,11 +388,11 @@ echo "plan-now: claude exited $rc after ${elapsed}s"
 if [ "$rc" -ne 0 ]; then
     # A nonzero exit means any file this run wrote may be TRUNCATED mid-plan, and
     # check-plan can pass on a truncated plan. Never green here.
-    [ "$rc" -eq 124 ] && echo "plan-now: the 5400s timeout killed it."
+    [ "$rc" -eq 124 ] && echo "plan-now: the ${RUN_TIMEOUT}s timeout killed it."
     echo "plan-now: RESULT failed — the run did not exit cleanly."
     DM_ICON="❌"; DM_VERDICT="failed — the run did not exit cleanly"
     DM_NEXT="NOT queued, needs you"
-    [ "$rc" -eq 124 ] && DM_VERDICT="failed — killed by the 5400s timeout"
+    [ "$rc" -eq 124 ] && DM_VERDICT="failed — killed by the ${RUN_TIMEOUT}s timeout"
     if [ -n "$plan" ]; then
         echo "plan-now: it had claimed $plan — treat that file as PARTIAL; a human must read it."
     fi

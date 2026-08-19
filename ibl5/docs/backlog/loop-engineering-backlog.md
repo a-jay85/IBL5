@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-08-14
+last_verified: 2026-08-19
 ---
 
 # Loop-Engineering Backlog
@@ -269,6 +269,7 @@ not add backticks or markdown links to a row.
 | 2026-07-25 | #1654 | class: CLI entrypoint accepts an unknown flag silently instead of erroring | routed to: Rung 1 - PHPStan rule over argv option parsing, queued as L33 in this backlog, not yet built; interim Rung 3 backstop shipped in #1668 (section: Forced integration-verification trigger). A fourth occurrence forces the Rung 1 rule. | prior: #1354, #1496 |
 | 2026-08-10 | #1834 | class: app-generated file read by an updater is force-tracked via .gitignore negation, so deploy git-reset clobbers live data with stale committed content | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): updater/importer that reads a generated file from a repo-relative path must assert git ls-files exits nonzero for that path | prior: -- |
 | 2026-08-14 | #1880 | class: gate escape path conditioned on a git-range query silently blocks when the range is empty (first-branch-commit), with no null fallback | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan adding or modifying an escape path in a CI check gate that calls a git-range helper must test the empty-range (no-prior-commits-on-branch) scenario | prior: -- |
+| 2026-08-19 | #1925 | class: queue enqueue operation inherits mtime from the queued file rather than stamping the ordering key at insertion time, silently misordering entries with old authoring dates | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan adding or modifying an enqueue or requeue path in bin/automouse/queue must test back-of-queue placement with an ancient-mtime plan | prior: -- |
 ```
 
 ---

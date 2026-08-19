@@ -117,9 +117,7 @@ while IFS= read -r wt_path; do
     case "$reconcile" in
         ff|reset)
             merge_needed=false
-            git -C "$wt_path" merge-base --is-ancestor "origin/$branch" HEAD 2>/dev/null \
-                && tmp_head="$(git -C "$wt_path" rev-parse "origin/$branch")" \
-                || tmp_head="$(git -C "$wt_path" rev-parse "origin/$branch")"
+            tmp_head="$(git -C "$wt_path" rev-parse "origin/$branch")"
             # Would origin/master be an ancestor of origin/<branch> after reconcile?
             git -C "$wt_path" merge-base --is-ancestor origin/master "$tmp_head" 2>/dev/null \
                 || merge_needed=true

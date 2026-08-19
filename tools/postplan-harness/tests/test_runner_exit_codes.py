@@ -19,3 +19,9 @@ def test_success_and_nothing_to_ship_exit_0():
     assert runner.exit_code_for(_res(TerminalState.SHIPPED_ARMED)) == 0
     assert runner.exit_code_for(_res(TerminalState.SHIPPED_HELD)) == 0
     assert runner.exit_code_for(_res(TerminalState.NOTHING_TO_SHIP)) == 0
+
+def test_degraded_exits_zero():                 # no /post-plan skill fallback on a shipped+held PR
+    assert runner.exit_code_for(_res(TerminalState.DEGRADED)) == 0
+
+def test_degraded_does_not_shadow_rebase_sentinel():   # negative: ordering, not a duplicate
+    assert runner.exit_code_for(_res(TerminalState.FAILED, "rebase-conflict")) == 3

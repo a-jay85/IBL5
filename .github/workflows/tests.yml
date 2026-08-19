@@ -811,6 +811,8 @@ jobs:
         run: bin/test-wt-status
       - name: bin/test-wt-new-root
         run: bin/test-wt-new-root
+      - name: bin/test-wt-rebase
+        run: bin/test-wt-rebase
       - name: bin/test-check-plan
         run: bin/test-check-plan
       - name: bin/test-check-plan-staleness

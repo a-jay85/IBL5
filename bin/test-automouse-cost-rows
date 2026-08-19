@@ -314,6 +314,12 @@ assert_eq "$(awk -F'|' '/^\| legacy-six\.md \|/{gsub(/[ \t]/,"",$8); print $8; e
 assert_eq "$(awk -F'|' '/^\| legacy-six\.md \|/{gsub(/[ \t]/,"",$14); print $14; exit}' "$r6")" \
     "unknown" "unjoined legacy row is marked Prov=unknown"
 
+# 37. The legacy shapes are exactly where a re-widen would double-shift, so the
+#     second run has to be a no-op the same way the 13-column path is.
+NIGHTLY_DIR="$BF2" "$BACKFILL" --proj-dir "$FIXROOT" > "$TMPROOT/bf-legacy2.out"
+assert_eq "$(grep -c '^no changes$' "$TMPROOT/bf-legacy2.out")" "1" \
+    "re-running backfill over migrated legacy reports is a no-op"
+
 
 # ---------------------------------------------------------------------------
 # Stub-pricer sandbox — append_cost_row's plumbing (matrix rows 7-11).

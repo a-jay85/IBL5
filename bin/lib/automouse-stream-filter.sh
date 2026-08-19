@@ -45,9 +45,11 @@ while IFS= read -r line; do
                 printf '%s tool: %s (#%d, turn %d)\n' "$(line_prefix)" "$tool_name" "$TOOL_COUNT" "$TURN_COUNT"
             fi
             ctx=$(printf '%s' "$line" | jq -r '
-                ((.message.usage.input_tokens // 0)|tonumber) +
-                ((.message.usage.cache_read_input_tokens // 0)|tonumber) +
-                ((.message.usage.cache_creation_input_tokens // 0)|tonumber)
+                [ (.message.usage // {}) ] + ((.message.usage.iterations // []))
+                | map( ((.input_tokens // 0)|tonumber)
+                     + ((.cache_read_input_tokens // 0)|tonumber)
+                     + ((.cache_creation_input_tokens // 0)|tonumber) )
+                | max // 0
             ' 2>/dev/null) || ctx=0
             if [ -n "$ctx" ] && [ "$ctx" -gt "${PEAK_CTX:-0}" ] 2>/dev/null; then
                 PEAK_CTX=$ctx
@@ -97,9 +99,11 @@ while IFS= read -r line; do
             out_tokens=$(printf '%s' "$line" | jq -r '.usage.output_tokens // "?"' 2>/dev/null) || true
             cache_tokens=$(printf '%s' "$line" | jq -r '.usage.cache_read_input_tokens // "?"' 2>/dev/null) || true
             cache_write=$(printf '%s' "$line" | jq -r '.usage.cache_write_input_tokens // .usage.cache_creation_input_tokens // "?"' 2>/dev/null) || true
-            printf '%s exit: stop_reason=%s turns=%s tools=%d duration=%sms cost=$%s in=%s out=%s cache=%s cache_write=%s peak_ctx=%d\n' \
+            session_id=$(printf '%s' "$line" | jq -r '.session_id // "?"' 2>/dev/null) || true
+            printf '%s exit: stop_reason=%s turns=%s tools=%d duration=%sms cost=$%s in=%s out=%s cache=%s cache_write=%s peak_ctx=%d session_id=%s\n' \
                 "$(line_prefix)" "$stop_reason" "$num_turns" "$TOOL_COUNT" "$duration_ms" \
-                "$cost_usd" "$in_tokens" "$out_tokens" "$cache_tokens" "$cache_write" "${PEAK_CTX:-0}"
+                "$cost_usd" "$in_tokens" "$out_tokens" "$cache_tokens" "$cache_write" "${PEAK_CTX:-0}" \
+                "$session_id"
             # result is the final stream-json event — terminate claude and exit
             if [ -n "$CMDPID_FILE" ]; then
                 _target_pid=$(cat "$CMDPID_FILE" 2>/dev/null) || true

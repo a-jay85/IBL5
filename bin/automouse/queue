@@ -38,6 +38,61 @@ evict_dispositions() {
           "$DONE_DIR/$name" "$DONE_DIR/${name}.attempts" "$DONE_DIR/${name}.staleness" "$DONE_DIR/${name}.failure"
 }
 
+# --- Run-order stamping -----------------------------------------------------
+# lstat mtime (epoch) of $1 — never dereferences: GNU `stat` and BSD `stat` both
+# default to lstat, so a symlink reports its OWN mtime. GNU (-c %Y) first for
+# Linux CI, BSD (-f %m) fallback for the macOS automouse host.
+lstat_mtime() {
+    stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null
+}
+
+# Stamp a just-queued entry to the BACK of the run order.
+#
+# Run order is `ls -1tr "$QUEUE_DIR"/*.md` (oldest-first), and the glob hands
+# `ls` the symlinks as command-line OPERANDS, which BSD `ls` dereferences — so
+# on the macOS host the sort key is the readlink TARGET's mtime, while GNU `ls`
+# uses the symlink's own lstat mtime. Either way, an entry created by a bare
+# `ln -s` / `mv` inherits its queue position from whenever the plan file
+# happened to be authored. That is not "the back": `reorder` writes its ladder
+# into the PAST (now - N*60), so any plan authored before the last reorder
+# jumps to the FRONT and runs next. Stamp explicitly instead.
+#
+# Stamp = max(now, newest existing entry + 60s) — the +60 mirrors `reorder`'s
+# spacing so a same-second tie can never let `ls` fall back to filename order,
+# and the max() keeps us behind a ladder already stamped at or past now.
+# Both the symlink (GNU sort key) and its target (BSD sort key) are touched,
+# exactly as `reorder` does, so the two platforms agree.
+stamp_back_of_queue() {
+    local name=$1
+    local newest=0 f m t epoch stamp
+    for f in "$QUEUE_DIR"/*.md; do
+        # Unmatched glob (empty queue) fails both tests and is skipped.
+        { [ -L "$f" ] || [ -e "$f" ]; } || continue
+        # Explicit `if`, not `[ … ] && continue`: the latter yields a non-zero
+        # statement status on a NON-match, which `set -e` would treat as a fatal
+        # error and abort the stamp mid-scan.
+        if [ "$(basename "$f")" = "$name" ]; then continue; fi
+        m=$(lstat_mtime "$f") || m=""
+        if [ -n "$m" ] && [ "$m" -gt "$newest" ]; then newest=$m; fi
+        t=$(readlink "$f" 2>/dev/null) || t=""
+        if [ -n "$t" ] && [ -e "$t" ]; then
+            m=$(lstat_mtime "$t") || m=""
+            if [ -n "$m" ] && [ "$m" -gt "$newest" ]; then newest=$m; fi
+        fi
+    done
+
+    epoch=$(date +%s)
+    if [ "$(( newest + 60 ))" -gt "$epoch" ]; then epoch=$(( newest + 60 )); fi
+    # epoch -> touch stamp, portable: GNU (-d @epoch) first, BSD (-r epoch) fallback.
+    stamp=$(date -d "@$epoch" +%Y%m%d%H%M.%S 2>/dev/null || date -r "$epoch" +%Y%m%d%H%M.%S)
+
+    touch -h -t "$stamp" "$QUEUE_DIR/$name"
+    t=$(readlink "$QUEUE_DIR/$name" 2>/dev/null) || t=""
+    if [ -n "$t" ] && [ -e "$t" ]; then
+        touch -t "$stamp" "$t"
+    fi
+}
+
 show_queue() {
     echo "Automouse queue (next to run first):"
     printf "  %4s  %-44s %-8s %-6s  %s\n" "#" "PLAN" "MODEL" "MERGE" "TITLE"
@@ -111,6 +166,9 @@ if [ "$1" = "requeue" ]; then
         mv "$f" "$QUEUE_DIR/$name"
         rm -f "$QUEUE_DIR/${name}.attempts" "$QUEUE_DIR/${name}.failure"
         evict_dispositions "$name"
+        # `mv` carries the skipped/ mtime over; without this the requeued plan
+        # would re-enter at its authoring position, not the back.
+        stamp_back_of_queue "$name"
         count=$((count + 1))
         echo "  requeued: $name"
     done
@@ -256,6 +314,7 @@ fi
 evict_dispositions "$FILENAME"
 
 ln -s "$SOURCE" "$QUEUE_DIR/$FILENAME"
+stamp_back_of_queue "$FILENAME"
 echo "Queued: $FILENAME -> $(readlink "$QUEUE_DIR/$FILENAME")"
 echo ""
 show_queue

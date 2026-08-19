@@ -338,6 +338,93 @@ if [ "$a0" != "$a1" ] || [ "$b0" != "$b1" ] || [ "$c0" != "$c1" ]; then
 fi
 echo "ok: row14 — touch-nothing on rejection"
 
+# ===========================================================================
+# Back-of-queue stamping on ENQUEUE. A bare `ln -s`/`mv` leaves the new entry
+# sorting by the plan's AUTHORING mtime, and `reorder` writes its ladder into
+# the PAST — so a plan authored before the last reorder used to jump to the
+# FRONT and run next. Every row below deliberately gives the incoming plan an
+# ANCIENT target mtime; queuing a freshly-created plan would pass even with
+# the bug present.
+# ===========================================================================
+
+# lstat mtime of a queue entry itself (the GNU `ls` sort key). Neither GNU nor
+# BSD `stat` dereferences by default, so this reports the symlink's own mtime.
+link_mtime() {
+    stat -c %Y "$NDIR/queue/$1" 2>/dev/null || stat -f %m "$NDIR/queue/$1"
+}
+
+# ---------------------------------------------------------------------------
+# Row 17 — the reported bug: queue a plan whose target predates the existing
+# reorder ladder. It must land LAST, not first.
+# ---------------------------------------------------------------------------
+setup
+touch "$PDIR/plan-a.md" "$PDIR/plan-b.md" "$PDIR/plan-c.md"
+run_queue plan-a >/dev/null 2>&1; run_queue plan-b >/dev/null 2>&1; run_queue plan-c >/dev/null 2>&1
+run_queue reorder plan-a plan-b plan-c >/dev/null 2>&1   # ladder stamped into the past
+touch "$PDIR/plan-old.md"
+touch -t 202001010000.00 "$PDIR/plan-old.md"             # authored long before the ladder
+run_queue plan-old >/dev/null 2>&1
+assert_order "row17 stale-mtime plan lands at the back" \
+             "plan-a.md plan-b.md plan-c.md plan-old.md"
+echo "ok: row17 — enqueue of an old plan goes to the back (core bug)"
+
+# ---------------------------------------------------------------------------
+# Row 18 — platform-agnostic: BOTH sort keys (symlink lstat for GNU ls, target
+# stat for BSD ls) of the new entry are strictly newer than every incumbent.
+# Without both, the test passes on Linux CI while macOS keeps breaking.
+# ---------------------------------------------------------------------------
+setup
+touch "$PDIR/plan-a.md" "$PDIR/plan-b.md"
+run_queue plan-a >/dev/null 2>&1; run_queue plan-b >/dev/null 2>&1
+run_queue reorder plan-a plan-b >/dev/null 2>&1
+touch "$PDIR/plan-old.md"; touch -t 202001010000.00 "$PDIR/plan-old.md"
+run_queue plan-old >/dev/null 2>&1
+for incumbent in plan-a.md plan-b.md; do
+    if [ "$(link_mtime plan-old.md)" -le "$(link_mtime "$incumbent")" ]; then
+        echo "FAIL: row18 — new entry's symlink mtime not newer than $incumbent"
+        FAILED=1
+    fi
+    if [ "$(target_mtime plan-old.md)" -le "$(target_mtime "$incumbent")" ]; then
+        echo "FAIL: row18 — new entry's target mtime not newer than $incumbent"
+        FAILED=1
+    fi
+done
+echo "ok: row18 — both symlink and target sort keys stamped"
+
+# ---------------------------------------------------------------------------
+# Row 19 — `requeue` (mv out of skipped/) is the second enqueue path and must
+# stamp too; `mv` otherwise carries the old mtime straight across.
+# ---------------------------------------------------------------------------
+setup
+touch "$PDIR/plan-a.md" "$PDIR/plan-b.md"
+run_queue plan-a >/dev/null 2>&1; run_queue plan-b >/dev/null 2>&1
+run_queue reorder plan-a plan-b >/dev/null 2>&1
+touch "$PDIR/plan-old.md"; touch -t 202001010000.00 "$PDIR/plan-old.md"
+ln -s "$PDIR/plan-old.md" "$NDIR/skipped/plan-old.md"
+touch -h -t 202001010000.00 "$NDIR/skipped/plan-old.md"
+run_queue requeue >/dev/null 2>&1
+assert_order "row19 requeued plan lands at the back" "plan-a.md plan-b.md plan-old.md"
+echo "ok: row19 — requeue stamps to the back"
+
+# ---------------------------------------------------------------------------
+# Row 20 — two successive enqueues of equally-ancient plans keep INSERTION
+# order and stay >=60s apart (no same-second tie -> no filename tie-scramble;
+# 'y' before 'x' alphabetically would expose one).
+# ---------------------------------------------------------------------------
+setup
+touch "$PDIR/plan-a.md"
+run_queue plan-a >/dev/null 2>&1
+touch "$PDIR/plan-y.md" "$PDIR/plan-x.md"
+touch -t 202001010000.00 "$PDIR/plan-y.md" "$PDIR/plan-x.md"
+run_queue plan-y >/dev/null 2>&1
+run_queue plan-x >/dev/null 2>&1
+assert_order "row20 insertion order preserved" "plan-a.md plan-y.md plan-x.md"
+if [ "$(( $(target_mtime plan-x.md) - $(target_mtime plan-y.md) ))" -lt 60 ]; then
+    echo "FAIL: row20 — successive enqueues not >=60s apart"
+    FAILED=1
+fi
+echo "ok: row20 — successive enqueues stay spaced and ordered"
+
 # ---------------------------------------------------------------------------
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"

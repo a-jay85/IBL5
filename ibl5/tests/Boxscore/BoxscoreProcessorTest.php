@@ -9,6 +9,7 @@ use Boxscore\BoxscoreProcessor;
 use Boxscore\BoxscoreRepository;
 use Boxscore\Contracts\BoxscoreProcessorInterface;
 use Boxscore\Contracts\ProgressReporterInterface;
+use JsbParser\ScoFileParser;
 use PHPUnit\Framework\TestCase;
 use Season\Season;
 use Tests\WideUnit\Mocks\MockDatabase;
@@ -482,6 +483,88 @@ class BoxscoreProcessorTest extends TestCase
         $this->assertGreaterThan(0, $result['linesProcessed']);
     }
 
+    /**
+     * JSB writes the final record of a .sco without its 352-byte trailing padding, so the
+     * file ends 1,648 bytes past the last whole record. Bounding the parse loop on
+     * RECORD_SIZE silently dropped that game — for an end-of-season file, the
+     * championship-clinching one.
+     */
+    public function testProcessScoFileImportsUnpaddedTrailingRecord(): void
+    {
+        $mockDb = new MockDatabase();
+        $mockDb->setReturnTrue(true);
+        $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []);
+
+        $repository = new BoxscoreRepository($mockDb);
+        $seasonStub = self::createStub(Season::class);
+        $seasonStub->lastSimEndDate = '';
+
+        $trailingRecord = $this->buildGameRecord($this->buildGameInfoLine(3, 10), padToRecordSize: false);
+        $this->assertSame(ScoFileParser::GAME_PAYLOAD_SIZE, strlen($trailingRecord));
+
+        $scoFile = $this->buildScoFile([$trailingRecord]);
+        $processor = new BoxscoreProcessor($mockDb, $repository, $seasonStub);
+
+        $result = $processor->processScoFile($scoFile, 2026, 'Regular Season/Playoffs', skipSimDates: true);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame(1, $result['gamesInserted']);
+        $this->assertGreaterThan(0, $result['linesProcessed']);
+    }
+
+    /**
+     * The realistic shape: whole records followed by a short final one. Proves the offset
+     * arithmetic still advances by RECORD_SIZE for the padded records.
+     */
+    public function testProcessScoFileImportsBothPaddedAndUnpaddedTrailingRecords(): void
+    {
+        $mockDb = new MockDatabase();
+        $mockDb->setReturnTrue(true);
+        $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []);
+
+        $repository = new BoxscoreRepository($mockDb);
+        $seasonStub = self::createStub(Season::class);
+        $seasonStub->lastSimEndDate = '';
+
+        $scoFile = $this->buildScoFile([
+            $this->buildGameRecord($this->buildGameInfoLine(3, 10)),
+            $this->buildGameRecord($this->buildGameInfoLine(3, 11), padToRecordSize: false),
+        ]);
+        $processor = new BoxscoreProcessor($mockDb, $repository, $seasonStub);
+
+        $result = $processor->processScoFile($scoFile, 2026, 'Regular Season/Playoffs', skipSimDates: true);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame(2, $result['gamesInserted']);
+    }
+
+    /**
+     * A short trailing run of blank bytes is now long enough to enter the loop; it must
+     * still import nothing.
+     */
+    public function testProcessScoFileIgnoresBlankTrailingRemainder(): void
+    {
+        $mockDb = new MockDatabase();
+        $mockDb->setReturnTrue(true);
+        $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []);
+
+        $repository = new BoxscoreRepository($mockDb);
+        $seasonStub = self::createStub(Season::class);
+        $seasonStub->lastSimEndDate = '';
+
+        $scoFile = $this->buildScoFile([
+            $this->buildGameRecord($this->buildGameInfoLine(3, 10)),
+            str_repeat(' ', ScoFileParser::GAME_PAYLOAD_SIZE),
+        ]);
+        $processor = new BoxscoreProcessor($mockDb, $repository, $seasonStub);
+
+        $result = $processor->processScoFile($scoFile, 2026, 'Regular Season/Playoffs', skipSimDates: true);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame(1, $result['gamesInserted']);
+        $this->assertSame(0, $result['gamesUpdated']);
+    }
+
     public function testProcessScoFileSkipsMatchingGame(): void
     {
         $mockDb = new MockDatabase();
@@ -673,6 +756,18 @@ class BoxscoreProcessorTest extends TestCase
      */
     private function buildScoFileWithOneGame(string $gameInfoLine): string
     {
+        return $this->buildScoFile([$this->buildGameRecord($gameInfoLine)]);
+    }
+
+    /**
+     * Build a single game record.
+     *
+     * @param bool $padToRecordSize When false, the record stops at GAME_PAYLOAD_SIZE (1,648 bytes)
+     *                              with no trailing padding — exactly how JSB writes the final
+     *                              record of a .sco file.
+     */
+    private function buildGameRecord(string $gameInfoLine, bool $padToRecordSize = true): string
+    {
         // Build 30 player slots × 53 bytes each = 1590 bytes
         // Slot 0: visitor team total (name with pid=0)
         $teamTotalLine = str_pad('Visitor Total', 16) // name (16)
@@ -687,8 +782,8 @@ class BoxscoreProcessorTest extends TestCase
             . '32'                                     // minutes (2)
             . '0801500030201030402010102';              // stats (25)
         // Pad playerLine to exactly 53 chars
-        $playerLine = str_pad($playerLine, 53);
-        $teamTotalLine = str_pad($teamTotalLine, 53);
+        $playerLine = substr(str_pad($playerLine, ScoFileParser::PLAYER_SLOT_SIZE), 0, ScoFileParser::PLAYER_SLOT_SIZE);
+        $teamTotalLine = substr(str_pad($teamTotalLine, ScoFileParser::PLAYER_SLOT_SIZE), 0, ScoFileParser::PLAYER_SLOT_SIZE);
 
         // Slot 15: home team total
         $homeTeamTotal = str_pad('Home Total', 16)
@@ -696,7 +791,7 @@ class BoxscoreProcessorTest extends TestCase
             . '000000'
             . '00'
             . '3207003002020504050302010203';
-        $homeTeamTotal = str_pad($homeTeamTotal, 53);
+        $homeTeamTotal = substr(str_pad($homeTeamTotal, ScoFileParser::PLAYER_SLOT_SIZE), 0, ScoFileParser::PLAYER_SLOT_SIZE);
 
         // Slot 16: home player
         $homePlayer = str_pad('Home Player', 16)
@@ -704,10 +799,10 @@ class BoxscoreProcessorTest extends TestCase
             . '200002'
             . '28'
             . '0701200020201020301010102';
-        $homePlayer = str_pad($homePlayer, 53);
+        $homePlayer = substr(str_pad($homePlayer, ScoFileParser::PLAYER_SLOT_SIZE), 0, ScoFileParser::PLAYER_SLOT_SIZE);
 
         // Build 30 slots: fill unused slots with spaces
-        $emptySlot = str_repeat(' ', 53);
+        $emptySlot = str_repeat(' ', ScoFileParser::PLAYER_SLOT_SIZE);
         $gameData = $gameInfoLine; // 58 bytes
         // Slots 0-14 (visitor)
         $gameData .= $teamTotalLine;  // slot 0: team total
@@ -722,13 +817,23 @@ class BoxscoreProcessorTest extends TestCase
             $gameData .= $emptySlot;
         }
 
-        // Pad to exactly 2000 bytes
-        $gameData = str_pad($gameData, 2000);
+        if ($padToRecordSize) {
+            $gameData = str_pad($gameData, ScoFileParser::RECORD_SIZE);
+        }
 
-        // Write file: 1MB padding + game data
+        return $gameData;
+    }
+
+    /**
+     * Write a .sco file: the 1MB metadata header followed by the given game records.
+     *
+     * @param list<string> $records
+     */
+    private function buildScoFile(array $records): string
+    {
         $tmpFile = tempnam(sys_get_temp_dir(), 'sco_test_');
         $this->assertNotFalse($tmpFile);
-        file_put_contents($tmpFile, str_repeat("\0", 1000000) . $gameData);
+        file_put_contents($tmpFile, str_repeat("\0", ScoFileParser::HEADER_OFFSET_BYTES) . implode('', $records));
         $this->tempFiles[] = $tmpFile;
 
         return $tmpFile;

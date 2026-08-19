@@ -22,9 +22,12 @@
 #   3. HELD                   Manual-Testing real rows, golden touched, or a
 #                             belt-and-suspenders body hold marker
 #   4. BLOCKED-DEP            an unmerged Depends-on: predecessor
-#   5. FEAT-AWAITING-SIGNOFF  feat: title without the human-approved label
-#   6. UNCLEARED              no Manual-Testing section (fail-closed; never armed)
-#   7. ARMABLE                CLEARED + not dirty + all required checks green
+#   5. PIPELINE-HELD          bug-pipeline PR (pipeline-authored label OR a
+#                             `bug-<id>` branch name); UNCONDITIONAL — no label
+#                             clears it, so it is never armed
+#   6. FEAT-AWAITING-SIGNOFF  feat: title without the human-approved label
+#   7. UNCLEARED              no Manual-Testing section (fail-closed; never armed)
+#   8. ARMABLE                CLEARED + not dirty + all required checks green
 #
 # Exit codes: 0 = report generated; 1 = an attempted --arm merge failed;
 #             2 = usage error or gh not authenticated.
@@ -145,7 +148,7 @@ EXPECTED_RED_RE='expected[ -]?red|will be RED|Expected CI check.*RED'
 HELD_BODY_RE='auto_merge:[[:space:]]*false|auto_postplan:[[:space:]]*false|human reviewer|human authz|requires human review|do NOT auto-merge|DNM'
 
 PRS_JSON="$("$GH_CMD" pr list --state open --limit 200 \
-    --json number,title,body,labels,mergeStateStatus,headRefOid,files 2>/dev/null || echo '[]')"
+    --json number,title,body,labels,mergeStateStatus,headRefOid,headRefName,files 2>/dev/null || echo '[]')"
 
 PR_COUNT="$(echo "$PRS_JSON" | jq 'length')"
 
@@ -167,6 +170,7 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     sha="$(echo "$PR" | jq -r '.headRefOid')"
     labels="$(echo "$PR" | jq -c '.labels // []')"
     files="$(echo "$PR" | jq -c '.files // []')"
+    head_ref="$(echo "$PR" | jq -r '.headRefName // ""')"
 
     # --- live check-runs for this PR's head SHA (dedupe: latest run per name) ---
     CR_JSON="$($GH_API_CMD "repos/$SLUG/commits/$sha/check-runs?per_page=100" 2>/dev/null \
@@ -178,6 +182,9 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     clearance="$(pr_manual_testing_clearance "$body")"
     golden="$(pr_golden_hold "$files")"
     feat="$(pr_feat_hold "$title" "$labels")"
+    # `| tr` like deps/unresolved below: both axes can fire, and the predicate
+    # emits one reason per LINE — an untranslated newline splits the report row.
+    pipeline="$(pr_pipeline_authored_hold "$labels" "$head_ref" | tr '\n' ' ')"
     deps="$(pr_dep_holds "$body" | tr '\n' ' ')"
     unresolved="$(pr_unresolved_findings_hold "$num" | tr '\n' ' ')"
 
@@ -220,6 +227,12 @@ while [ "$i" -lt "$PR_COUNT" ]; do
         bucket="HELD"; action="human review"
     elif [ -n "$deps" ]; then
         bucket="BLOCKED-DEP"; action="wait for predecessor"
+    elif [ -n "$pipeline" ]; then
+        # Distinct from the feat: bucket on purpose. The pipeline floor is
+        # UNCONDITIONAL — no `human-approved` label clears it — so reusing
+        # FEAT-AWAITING-SIGNOFF's "human sign-off + label" action would send an
+        # operator down a dead end (label the PR, nothing arms).
+        bucket="PIPELINE-HELD"; action="human merge (never arms)"
     elif [ -n "$feat" ]; then
         bucket="FEAT-AWAITING-SIGNOFF"; action="human sign-off + label"
     elif [ "$clearance" = "UNKNOWN" ]; then
@@ -231,7 +244,7 @@ while [ "$i" -lt "$PR_COUNT" ]; do
         bucket="UNCLEARED"; action="human review (checks not green)"
     fi
 
-    signals="clearance=${clearance}; ${check_signals}held_body=$([ "$held_body" = 1 ] && echo yes || echo no); golden=$([ -n "$golden" ] && echo yes || echo no); deps=$([ -n "$deps" ] && echo "${deps% }" || echo none); feat=$([ -n "$feat" ] && echo yes || echo no); expected_red=$([ "$expected_red" = 1 ] && echo yes || echo no); unresolved=$([ -n "$unresolved" ] && echo "${unresolved% }" || echo none)"
+    signals="clearance=${clearance}; ${check_signals}held_body=$([ "$held_body" = 1 ] && echo yes || echo no); golden=$([ -n "$golden" ] && echo yes || echo no); deps=$([ -n "$deps" ] && echo "${deps% }" || echo none); feat=$([ -n "$feat" ] && echo yes || echo no); pipeline=$([ -n "$pipeline" ] && echo "${pipeline% }" || echo none); expected_red=$([ "$expected_red" = 1 ] && echo yes || echo no); unresolved=$([ -n "$unresolved" ] && echo "${unresolved% }" || echo none)"
 
     printf '%-7s  %-22s  %-26s  %s\n' "#$num" "$bucket" "$action" "$signals"
 

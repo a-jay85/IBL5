@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-08-15
+last_verified: 2026-08-19
 ---
 
 # Post-Plan Orchestrator
@@ -295,7 +295,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 7. Plan-time hold — the plan's line-1 `auto_merge: false` frontmatter is absent.
 8. Commit-type floor — the PR title is not a conventional-commit `feat:` (unless `human-approved`-labeled).
 9. PR-time safety verdict — the realized diff surfaces no reason to hold for a human.
-10. Pipeline-authored floor — the PR does NOT carry the `pipeline-authored` label.
+10. Pipeline-authored floor — the PR does NOT carry the `pipeline-authored` label AND the branch name does not match `^bug-[0-9]+(-|$)`. The branch-name axis is the label-timing guard: `reconcile_pr_open_rows()` in `bin/bug-pipeline-tick` applies the label on a later cron tick than `ship_via_cron()` which arms auto-merge, so at arming time the label may not yet exist. The digit anchor prevents catching human `bug-pipeline-*` branches.
 11. Unresolved scored finding — no unresolved GitHub review thread carries a `<!-- score: N -->` marker with N >= 80. Live-state counterpart to (2), which is run-local.
 
 **These conditions only ever HOLD, never RELEASE.** They are an AND-of-not-blocked set: every condition can *add* a block; none can clear another's. Conditions (7)–(9) are **additive brakes on top of** the deterministic floors (1)–(6), the pipeline-authored floor (10), and the independent `human-signoff` required GitHub check — they exist to catch what those miss, never to override them. post-plan **always runs and opens the PR**; these conditions decide only whether auto-merge *arms*. A held PR stays open for a human to merge.

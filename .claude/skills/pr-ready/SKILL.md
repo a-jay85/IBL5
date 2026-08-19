@@ -6,7 +6,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-08-15
+last_verified: 2026-08-19
 ---
 <!-- NO `model:` KEY — DELIBERATE, DO NOT ADD ONE.
      Runtime Phase 6 (plan-intent fidelity review) is Opus-column judgment:
@@ -290,11 +290,12 @@ Run `git show <MASTER_SHA>:.claude/skills/pr-ready/_plan-fidelity-review.md` —
    TITLE="$(gh pr view <N> --json title --jq .title)"
    LABELS="$(gh pr view <N> --json labels --jq '.labels')"
    FILES="$(gh pr view <N> --json files --jq '.files')"
+   HEADREF="$(gh pr view <N> --json headRefName --jq .headRefName)"
    pr_manual_testing_clearance "$BODY"
    pr_golden_hold "$FILES"
    pr_dep_holds "$BODY"
    pr_feat_hold "$TITLE" "$LABELS"
-   pr_pipeline_authored_hold "$LABELS"
+   pr_pipeline_authored_hold "$LABELS" "$HEADREF"
    pr_unresolved_findings_hold <N>
    ```
 

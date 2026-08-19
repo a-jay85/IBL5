@@ -15,9 +15,12 @@
 # (single-flight, top-level maybe_hunt pass) and serviced by the hunter — an
 # injection-exposed agent run in a credential-STARVED worktree sandbox that authors
 # + verifies a fix, then STOPS at a dirty worktree. Only the trusted cron fires
-# `bin/post-plan-now` to open a HELD PR (auto_merge:false + pipeline-authored →
-# human-signoff blocks merge). See ADR-0081 for the trust-split. The hunter itself
-# never pushes, never runs `gh`, never opens a PR.
+# `bin/post-plan-now` to open a HELD PR. The hold is the `bug-<id>` BRANCH NAME, not
+# the `pipeline-authored` label: reconcile_pr_open_rows() applies that label on a LATER
+# tick than this one, so at arming time the PR is still unlabeled. /post-plan Phase 6.5
+# and bin/pr-triage both call pr_pipeline_authored_hold() (bin/lib/pr-armable.sh), whose
+# branch-name axis fires unconditionally. See ADR-0081 for the trust-split. The hunter
+# itself never pushes, never runs `gh`, never opens a PR.
 
 set -u
 

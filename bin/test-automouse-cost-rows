@@ -32,6 +32,41 @@ assert_eq() {
     fi
 }
 
+# assert_near <actual> <expected> <tol> <label>
+assert_near() {
+    if awk -v a="$1" -v e="$2" -v t="$3" 'BEGIN{d=a-e; if(d<0)d=-d; exit !(d<=t)}'; then
+        printf '  ok   %s (%s)\n' "$4" "$1"
+    else
+        printf '  FAIL %s: got %s, expected %s +/- %s\n' "$4" "$1" "$2" "$3"
+        FAILED=1
+    fi
+}
+
+# assert_gt <actual> <threshold> <label> [why]
+assert_gt() {
+    if awk -v a="$1" -v t="$2" 'BEGIN{exit !(a>t)}'; then
+        printf '  ok   %s (%s > %s)\n' "$3" "$1" "$2"
+    else
+        printf '  FAIL %s: got %s, expected > %s%s\n' "$3" "$1" "$2" "${4:+ -- $4}"
+        FAILED=1
+    fi
+}
+
+# assert_ne <actual> <forbidden> <label>
+assert_ne() {
+    if [ "$1" != "$2" ]; then
+        printf '  ok   %s (%s != %s)\n' "$3" "$1" "$2"
+    else
+        printf '  FAIL %s: got %s, which must NOT equal %s\n' "$3" "$1" "$2"
+        FAILED=1
+    fi
+}
+
+# pj <json-file-or-"-"> <key> — pull one scalar out of a pricer JSON object.
+pj() {
+    python3 -c 'import json,sys; print(json.load(open(sys.argv[1]) if sys.argv[1]!="-" else sys.stdin)[sys.argv[2]])' "$1" "$2"
+}
+
 # Sandbox NIGHTLY_DIR so the real roll-up is never touched.
 TMPROOT=$(mktemp -d)
 trap 'rm -rf "$TMPROOT"' EXIT
@@ -78,5 +113,156 @@ assert_eq "$total" "7.5000" "weekly total sums all rows"
 # 5. Peak-ctx column is populated (guards the 5-col header regression).
 peaks=$(grep -c '| 10[123]K |' "$REPORT")
 assert_eq "$peaks" 3 "peak-ctx column carries all 3 peaks"
+
+# ---------------------------------------------------------------------------
+# Fixture suite — bin/lib/automouse-pricer and bin/automouse/backfill-costs.
+#
+# The harness `result` event undercounts: it sums only the top-level `usage` of
+# the MAIN transcript, missing every `usage.iterations[]` entry and every
+# subagent transcript. For the 2026-08-18 db-query-worktree-routing run it
+# reported $1.82 (impl) / $2.82 (postplan); recomputation gives $12.8633 /
+# $4.0134. The `cost > 5.0` / `cost > 3.0` assertions below exist so a
+# regression back to the harness figures fails LOUDLY rather than looking
+# plausible.
+# ---------------------------------------------------------------------------
+
+PRICER="$REPO_ROOT/bin/lib/automouse-pricer"
+BACKFILL="$REPO_ROOT/bin/automouse/backfill-costs"
+FIXROOT="$REPO_ROOT/bin/fixtures/automouse-cost"
+FIXPROJ="$FIXROOT/proj"
+IMPL_SID="bea65310-ff05-4604-aa22-d124759ac2e9"
+POST_SID="c0bf7a82-5244-4f64-bfe3-543e25dc8b3d"
+NCOL_EXPECTED=13
+
+printf '\n-- pricer: golden fixture --\n'
+
+"$PRICER" --session-id "$IMPL_SID" --proj-dir "$FIXPROJ" > "$TMPROOT/impl.json"
+"$PRICER" --session-id "$POST_SID" --proj-dir "$FIXPROJ" > "$TMPROOT/post.json"
+
+impl_cost=$(pj "$TMPROOT/impl.json" cost)
+post_cost=$(pj "$TMPROOT/post.json" cost)
+
+# 6/7. The golden figures, to the cent.
+assert_near "$impl_cost" 12.8633 0.01 "impl prices to \$12.8633"
+assert_near "$post_cost" 4.0134  0.01 "postplan prices to \$4.0134"
+
+# 8/9. Floor guards — these fail if the pricer regresses to the harness figures
+#      \$1.82392625 / \$2.81965335 (top-level main-transcript usage only).
+assert_gt "$impl_cost" 5.0 "impl is not the harness under-count" \
+    "harness reports \$1.82392625 — iterations and/or subagents were dropped"
+assert_gt "$post_cost" 3.0 "postplan is not the harness under-count" \
+    "harness reports \$2.81965335 — iterations and/or subagents were dropped"
+
+# 10. peak_ctx is carried through.
+assert_eq "$(pj "$TMPROOT/impl.json" peak_ctx)" 208262 "impl peak_ctx"
+
+printf '\n-- pricer: iterations REPLACE, not ADD (Error-A guard) --\n'
+
+# Two records. Record B's real spend lives entirely in usage.iterations[], on a
+# DIFFERENT model than the top-level, so the three candidate answers are far
+# apart and cannot be confused for rounding:
+#   A            = opus  1000 in / 1000 out   -> $0.0300
+#   B top-level  = opus  100000 in            -> $0.5000
+#   B iteration  = haiku 2000 in / 500 out    -> $0.0045
+# replace (correct) = 0.0345   top-level-only = 0.5300   sum = 0.5345
+ITDIR="$TMPROOT/itproj/proj"
+mkdir -p "$ITDIR"
+cat > "$ITDIR/iter-session.jsonl" <<'JSONL'
+{"type":"assistant","timestamp":"2026-08-18T00:00:01.000Z","message":{"id":"msg_a","model":"claude-opus-5","usage":{"input_tokens":1000,"output_tokens":1000,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}
+{"type":"assistant","timestamp":"2026-08-18T00:00:02.000Z","message":{"id":"msg_b","model":"claude-opus-5","usage":{"input_tokens":100000,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0,"iterations":[{"model":"claude-haiku-4-5-20251001","input_tokens":2000,"output_tokens":500,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}]}}}
+JSONL
+
+"$PRICER" --session-id iter-session --proj-dir "$ITDIR" > "$TMPROOT/iter.json"
+iter_cost=$(pj "$TMPROOT/iter.json" cost)
+
+# 11. Iterations are priced at all (not silently dropped).
+assert_near "$iter_cost" 0.0345 0.0001 "iterations are priced (replace semantics)"
+# 12. Not the top-level-only reading — that IS the Error-A regression.
+assert_ne "$iter_cost" 0.53 "iterations are not ignored in favour of top-level usage"
+# 13. And NOT the sum. If a future edit makes iteration handling additive, every
+#     multi-iteration record silently double-counts; this catches it.
+assert_ne "$iter_cost" 0.5345 "iterations REPLACE the top-level usage (not added to it)"
+
+# 14/15. peak_ctx is a MAX over {top-level} U {each iteration}, never a sum:
+#        max(1000, 100000, 2000) = 100000; the sum would be 103000.
+iter_peak=$(pj "$TMPROOT/iter.json" peak_ctx)
+assert_eq "$iter_peak" 100000 "peak_ctx is the max over usage parts"
+assert_ne "$iter_peak" 103000 "peak_ctx is not the sum of usage parts"
+
+printf '\n-- pricer: subagent transcripts are included (Error-B guard) --\n'
+
+# 16. Dropping subagents/ must cost the impl session exactly its subagent spend.
+mkdir -p "$TMPROOT/nosub"
+NOSUB="$TMPROOT/nosub/proj"
+cp -R "$FIXPROJ" "$NOSUB"
+rm -rf "${NOSUB:?}/$IMPL_SID/subagents"
+nosub_cost=$("$PRICER" --session-id "$IMPL_SID" --proj-dir "$NOSUB" | pj - cost)
+delta=$(awk -v a="$impl_cost" -v b="$nosub_cost" 'BEGIN{printf "%.4f", a-b}')
+assert_near "$delta" 2.1594 0.01 "subagent transcripts contribute \$2.1594"
+
+printf '\n-- pricer: dedup is by message.id --\n'
+
+# 17. A verbatim duplicate record must not be counted twice.
+DUPDIR="$TMPROOT/dupproj/proj"
+mkdir -p "$DUPDIR"
+cp "$ITDIR/iter-session.jsonl" "$DUPDIR/dup-session.jsonl"
+head -1 "$ITDIR/iter-session.jsonl" >> "$DUPDIR/dup-session.jsonl"
+dup_cost=$("$PRICER" --session-id dup-session --proj-dir "$DUPDIR" | pj - cost)
+assert_eq "$dup_cost" "$iter_cost" "duplicate message.id is not double-counted"
+
+printf '\n-- pricer: missing session degrades, it does not abort --\n'
+
+# 18/19. An unknown session id is a clean exit 3 plus a machine-readable error,
+#        so append_cost_row can fall back to the logged figure with Prov=unknown.
+miss_out=$("$PRICER" --session-id deadbeef --proj-dir "$FIXPROJ" 2>/dev/null) && miss_rc=0 || miss_rc=$?
+assert_eq "$miss_rc" 3 "missing session exits 3"
+assert_eq "$(printf '%s' "$miss_out" | grep -c 'session-not-found')" 1 \
+    "missing session reports session-not-found"
+
+printf '\n-- pricer: price staleness is loud --\n'
+
+# 20/21. Past price_expiry the pricer must WARN on stderr and flag price_stale,
+#        so a silently-wrong price table cannot survive a release cycle.
+stale_err=$(AUTOMOUSE_PRICER_TODAY=2026-09-01 "$PRICER" --session-id "$POST_SID" \
+    --proj-dir "$FIXPROJ" 2>&1 >"$TMPROOT/stale.json")
+assert_eq "$(printf '%s' "$stale_err" | grep -c '^WARN:')" 1 "stale price table warns on stderr"
+assert_eq "$(pj "$TMPROOT/stale.json" price_stale)" "True" "stale price table sets price_stale"
+
+printf '\n-- backfill: dry-run writes nothing; .bak is written once --\n'
+
+BF="$TMPROOT/bf"
+cp -R "$FIXROOT/nightly" "$BF"
+BF_REPORT="$BF/reports/2026-08-18-costs.md"
+BF_BAK="$BF_REPORT.bak"
+BF_SIDECAR="$BF/logs/2026-08-18.costs.jsonl"
+
+NIGHTLY_DIR="$BF" "$BACKFILL" --dry-run --proj-dir "$FIXROOT" > "$TMPROOT/bf-dry.out"
+
+# 22. The join must be unambiguous, or the rewritten costs are guesses.
+assert_eq "$(grep -c '^join: 2 matched, 0 ambiguous, 0 missed$' "$TMPROOT/bf-dry.out")" 1 \
+    "backfill joins both fixture phases unambiguously"
+# 23. --dry-run means NO writes at all, including no .bak.
+assert_eq "$([ -e "$BF_BAK" ] && echo yes || echo no)" "no" "--dry-run creates no .bak"
+
+NIGHTLY_DIR="$BF" "$BACKFILL" --proj-dir "$FIXROOT" > "$TMPROOT/bf-run1.out"
+
+# 24-27. The real run backs up, rewrites to the 13-column schema, drops a sidecar.
+assert_eq "$([ -e "$BF_BAK" ] && echo yes || echo no)" "yes" "real run writes a .bak"
+assert_eq "$([ -e "$BF_SIDECAR" ] && echo yes || echo no)" "yes" "real run writes the sidecar ledger"
+assert_eq "$(awk -F'|' '/^\| db-query-worktree-routing\.md \| impl /{print NF-2; exit}' "$BF_REPORT")" \
+    "$NCOL_EXPECTED" "rewritten row has $NCOL_EXPECTED columns"
+assert_eq "$(grep -c '| 12.8633 |' "$BF_REPORT")" 1 "rewritten impl row carries the recomputed cost"
+
+cp "$BF_REPORT" "$TMPROOT/bf-report.snap"
+cp "$BF_BAK" "$TMPROOT/bf-bak.snap"
+NIGHTLY_DIR="$BF" "$BACKFILL" --proj-dir "$FIXROOT" > "$TMPROOT/bf-run2.out"
+
+# 28-30. Idempotent: a second real run changes nothing and must NOT clobber the
+#        .bak, which is the only surviving copy of the pre-backfill state.
+assert_eq "$(grep -c '^no changes$' "$TMPROOT/bf-run2.out")" 1 "second backfill run reports no changes"
+assert_eq "$(cmp -s "$BF_REPORT" "$TMPROOT/bf-report.snap" && echo same || echo differs)" "same" \
+    "second backfill run leaves the report byte-identical"
+assert_eq "$(cmp -s "$BF_BAK" "$TMPROOT/bf-bak.snap" && echo same || echo differs)" "same" \
+    "second backfill run does not overwrite the .bak"
 
 exit "$FAILED"

@@ -10,9 +10,14 @@
 # record of what the harness reported, and the whole defect is that the two
 # disagree. The sidecar is the only new artifact placed next to a log.
 #
-# Usage: bin/automouse/backfill-costs [--dry-run] [--since YYYY-MM-DD]
+# Usage: bin/automouse/backfill-costs [--dry-run] [--since YYYY-MM-DD] [--proj-dir DIR]
 #   --dry-run   print the unified diff that would be applied; write nothing at
 #               all, including no .bak files.
+#   --proj-dir  scan DIR instead of ~/.claude/projects for transcripts (tests).
+#
+# Write discipline: a `.bak` is written before any mutation and is NEVER
+# overwritten, so the first pre-backfill state stays recoverable across repeat
+# runs; every write lands via a temp file plus an atomic rename.
 #
 # Stdout contract — three machine-greppable lines, in both modes:
 #   join: <N> matched, <M> ambiguous, <K> missed
@@ -29,12 +34,15 @@ PRICER="$REPO_ROOT/bin/lib/automouse-pricer"
 
 DRY_RUN=0
 SINCE=""
+PROJ_DIR=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --dry-run) DRY_RUN=1; shift ;;
         --since)   SINCE=${2:-}; shift 2 ;;
         --since=*) SINCE=${1#--since=}; shift ;;
-        -h|--help) sed -n '2,25p' "${BASH_SOURCE[0]}"; exit 0 ;;
+        --proj-dir) PROJ_DIR=${2:-}; shift 2 ;;
+        --proj-dir=*) PROJ_DIR=${1#--proj-dir=}; shift ;;
+        -h|--help) sed -n '2,30p' "${BASH_SOURCE[0]}"; exit 0 ;;
         *) printf 'unknown argument: %s\n' "$1" >&2; exit 2 ;;
     esac
 done
@@ -45,7 +53,11 @@ TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 
 # The index is the only expensive step; build it once and reuse it for every row.
-"$PRICER" --index > "$TMP/index.jsonl" 2>/dev/null || true
+if [ -n "$PROJ_DIR" ]; then
+    "$PRICER" --index --proj-dir "$PROJ_DIR" > "$TMP/index.jsonl" 2>/dev/null || true
+else
+    "$PRICER" --index > "$TMP/index.jsonl" 2>/dev/null || true
+fi
 
 export NIGHTLY_DIR TMPDIR_X="$TMP" DRY_RUN SINCE
 python3 - <<'PYEOF'

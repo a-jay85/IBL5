@@ -22,6 +22,14 @@ use JsbParser\Contracts\ScoFileParserInterface;
  *                    non-zero rows feed `ibl_box_scores`.
  * - bytes 1648..1999 — Trailing padding / unknown JSB sim data, ignored.
  *
+ * The **final** record in a .sco file is written without that trailing padding: JSB
+ * seeks to the record's slot and writes only the 1,648 meaningful bytes, so the file
+ * ends 352 bytes short of a whole record. Every real IBL .sco sampled (1993, 2002,
+ * 2006, 2007, 2008 end-of-season files) has `(filesize - 1000000) % 2000 === 1648`.
+ * Readers must therefore bound their loop on `GAME_PAYLOAD_SIZE`, not `RECORD_SIZE`,
+ * or they silently drop the last game played — which for an end-of-season file is the
+ * championship-clinching game.
+ *
  * @see /docs/JSB_FILE_FORMATS.md
  */
 class ScoFileParser implements ScoFileParserInterface
@@ -32,6 +40,12 @@ class ScoFileParser implements ScoFileParserInterface
     public const PLAYER_SLOT_COUNT = 30;
     public const VISITOR_SLOT_COUNT = 15;
     public const HEADER_OFFSET_BYTES = 1000000;
+
+    /**
+     * Meaningful bytes in a game record (1,648) — everything up to the trailing padding.
+     * The last record in a file is written at exactly this length; see the class docblock.
+     */
+    public const GAME_PAYLOAD_SIZE = self::GAME_INFO_SIZE + (self::PLAYER_SLOT_COUNT * self::PLAYER_SLOT_SIZE);
 
     /**
      * @see ScoFileParserInterface::extractGameInfo()

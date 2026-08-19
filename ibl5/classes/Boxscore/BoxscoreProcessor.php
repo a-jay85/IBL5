@@ -100,7 +100,12 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
         $linesProcessed = 0;
         $league = $this->leagueContext !== null ? $this->leagueContext->getCurrentLeague() : 'ibl';
 
-        while ($offset + ScoFileParser::RECORD_SIZE <= strlen($data)) {
+        $dataLength = strlen($data);
+
+        // Bound on GAME_PAYLOAD_SIZE, not RECORD_SIZE: JSB omits the 352-byte trailing
+        // padding on the last record it writes, so the final game is short. substr()
+        // returns the short remainder and all 30 player slots still resolve within it.
+        while ($offset + ScoFileParser::GAME_PAYLOAD_SIZE <= $dataLength) {
             $line = substr($data, $offset, ScoFileParser::RECORD_SIZE);
             $offset += ScoFileParser::RECORD_SIZE;
 

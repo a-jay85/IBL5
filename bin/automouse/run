@@ -605,26 +605,106 @@ model_tier() {
 # cross-phase variable dependency. See .claude/rules/automouse-workflow.md.
 append_cost_row() {
     local plan=$1 phase=$2 log_before=$3 model=${4:-?}
-    local cost report tier peak_raw peak_k
+    local logged_cost sid pricer_json provenance cost tier peak_raw peak_k
+    local inp out cr w5 w1 peak_ctx_raw compactions_main compactions_sub
+    local surcharge_low surcharge_high price_asof surcharge_cell report sidecar
+    # Sibling-relative, never $REPO: a worktree copy of `run` must price with its
+    # own checkout's pricer, not the main checkout's.
+    local root="${SELF_DIR:-}/.."
     tier=$(model_tier "$model")
     # `|| true` is load-bearing: under `set -euo pipefail` a killed phase emits no
-    # `cost=` line, so grep exits non-zero and this plain assignment would abort the
-    # whole automouse loop before the `cost="?"` fallback below. Swallow it and continue.
-    cost=$(tail -n +"$((log_before + 1))" "$LOG" | grep -oE 'cost=\$[0-9.]+' | tail -1 | sed 's/cost=\$//') || true
-    [ -n "$cost" ] || cost="?"
+    # `cost=` line, so grep exits non-zero and would abort the whole automouse loop.
+    # Store the harness figure as logged_cost; cost is overwritten by the pricer below.
+    logged_cost=$(tail -n +"$((log_before + 1))" "$LOG" | grep -oE 'cost=\$[0-9.]+' | tail -1 | sed 's/cost=\$//') || true
+    [ -n "$logged_cost" ] || logged_cost="?"
+    sid=$(tail -n +"$((log_before + 1))" "$LOG" | grep -oE 'session_id=[^ ]+' | tail -1 | sed 's/session_id=//') || true
     peak_raw=$(tail -n +"$((log_before + 1))" "$LOG" | grep -oE 'peak_ctx=[0-9]+' | tail -1 | sed 's/peak_ctx=//') || true
     peak_k=$(( ${peak_raw:-0} / 1000 ))
+    # Call pricer; || pricer_json="" prevents a non-zero pricer exit from aborting
+    # the automouse loop under set -euo pipefail — degrade to logged_cost, never abort.
+    pricer_json=""
+    if [ -n "${sid:-}" ]; then
+        pricer_json=$("$root/lib/automouse-pricer" --session-id "$sid" 2>/dev/null) || pricer_json=""
+    fi
+    # Parse pricer JSON; empty or unparseable → provenance=unknown, fall back to logged_cost.
+    if [ -n "$pricer_json" ] && printf '%s' "$pricer_json" | jq -e . >/dev/null 2>&1; then
+        IFS=$'\t' read -r cost surcharge_low surcharge_high inp out cr w5 w1 peak_ctx_raw \
+            compactions_main compactions_sub price_asof \
+            <<< "$(printf '%s' "$pricer_json" | jq -r '[.cost,.surcharge_low,.surcharge_high,.inp,.out,.cr,.w5,.w1,.peak_ctx,.compactions_main,.compactions_sub,(.price_asof // "")] | @tsv')" || true
+        provenance="recomputed"
+        peak_k=$(( ${peak_ctx_raw:-0} / 1000 ))
+    else
+        cost="$logged_cost"
+        surcharge_low="" surcharge_high="" inp="" out="" cr="" w5="" w1=""
+        peak_ctx_raw="${peak_raw:-0}" compactions_main="" compactions_sub="" price_asof=""
+        provenance="unknown"
+    fi
+    # Surcharge cell: en-dash-bounded interval when compactions > 0, else em-dash.
+    surcharge_cell="—"
+    if [ "$provenance" = "recomputed" ] && \
+            [ "$(( ${compactions_main:-0} + ${compactions_sub:-0} ))" -gt 0 ]; then
+        surcharge_cell=$(printf '%.2f\xe2\x80\x93%.2f' "$surcharge_low" "$surcharge_high") \
+            || surcharge_cell="—"
+    fi
     report="$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-costs.md"
     mkdir -p "$(dirname "$report")"
+    # Write sidecar: one JSON line per phase, all 20 keys unconditionally (null for missing).
+    sidecar="$NIGHTLY_DIR/logs/$(date +%Y-%m-%d).costs.jsonl"
+    mkdir -p "$(dirname "$sidecar")"
+    jq -n -c \
+        --arg  date             "$(date +%Y-%m-%d)" \
+        --arg  plan             "$plan" \
+        --arg  phase            "$phase" \
+        --arg  model            "$model" \
+        --arg  tier             "$tier" \
+        --arg  session_id       "${sid:-}" \
+        --arg  cost             "$cost" \
+        --arg  surcharge_low    "${surcharge_low:-}" \
+        --arg  surcharge_high   "${surcharge_high:-}" \
+        --arg  inp              "${inp:-}" \
+        --arg  out              "${out:-}" \
+        --arg  cr               "${cr:-}" \
+        --arg  w5               "${w5:-}" \
+        --arg  w1               "${w1:-}" \
+        --arg  peak_ctx         "${peak_ctx_raw:-0}" \
+        --arg  compactions_main "${compactions_main:-}" \
+        --arg  compactions_sub  "${compactions_sub:-}" \
+        --arg  provenance       "$provenance" \
+        --arg  price_asof       "${price_asof:-}" \
+        --arg  logged_cost      "$logged_cost" \
+        'def n: tonumber? // null; {date:$date,plan:$plan,phase:$phase,model:$model,tier:$tier,session_id:$session_id,cost:($cost|n),surcharge_low:($surcharge_low|n),surcharge_high:($surcharge_high|n),inp:($inp|n),out:($out|n),cr:($cr|n),w5:($w5|n),w1:($w1|n),peak_ctx:($peak_ctx|n),compactions_main:($compactions_main|n),compactions_sub:($compactions_sub|n),provenance:$provenance,price_asof:$price_asof,logged_cost:($logged_cost|n)}' \
+        >> "$sidecar"
+    # Create report with new 13-column header; or strip-then-migrate the old 6-column form.
     if [ ! -f "$report" ]; then
-        printf '# Automouse cost roll-up — %s\n\n| Plan | Phase | Model | Tier | Cost ($) | Peak Ctx (K) |\n|---|---|---|---|---|---|\n' \
+        printf '# Automouse cost roll-up — %s\n\n| Plan | Phase | Model | Tier | Cost ($) | Surcharge est ($) | Peak Ctx (K) | In | Out | Cache-read | CW-5m | CW-1h | Prov |\n|---|---|---|---|---|---|---|---|---|---|---|---|---|\n' \
             "$(date +%Y-%m-%d)" > "$report"
     fi
-    # Strip the weekly section BEFORE appending, so the row lands at the end of
-    # the per-phase table rather than below the section regenerate_weekly_section
-    # is about to delete — the bug that ate every row but the day's first.
+    # Strip the weekly section BEFORE migrating (weekly-section pipe rows must not be
+    # padded) and BEFORE appending — the bug that ate every row but the day's first.
     strip_weekly_section "$report"
-    printf '| %s | %s | %s | %s | %s | %dK |\n' "$plan" "$phase" "$model" "$tier" "$cost" "$peak_k" >> "$report"
+    if grep -qF '| Plan | Phase | Model | Tier | Cost ($) | Peak Ctx (K) |' "$report" 2>/dev/null; then
+        local tmp_mig
+        tmp_mig=$(mktemp)
+        awk '
+            /^\| Plan \| Phase \| Model \| Tier \| Cost \(\$\) \| Peak Ctx \(K\) \|/ { print "| Plan | Phase | Model | Tier | Cost ($) | Surcharge est ($) | Peak Ctx (K) | In | Out | Cache-read | CW-5m | CW-1h | Prov |"; next }
+            /^\|[-]+\|/ { print "|---|---|---|---|---|---|---|---|---|---|---|---|---|"; next }
+            /^\|/ {
+                nf = split($0, c, "|")
+                m = 0
+                for (i = 2; i <= nf - 1; i++) { m++; cell[m] = c[i] }
+                if (m >= 6) { for (j = m; j >= 6; j--) cell[j+1] = cell[j]; cell[6] = " "; m++ }
+                for (j = m + 1; j <= 13; j++) cell[j] = " "
+                line = ""
+                for (j = 1; j <= 13; j++) line = line "|" cell[j]
+                print line "|"
+                next
+            }
+            { print }
+        ' "$report" > "$tmp_mig" && mv "$tmp_mig" "$report"
+    fi
+    printf '| %s | %s | %s | %s | %s | %s | %dK | %s | %s | %s | %s | %s | %s |\n' \
+        "$plan" "$phase" "$model" "$tier" "$cost" "$surcharge_cell" "$peak_k" \
+        "${inp:-—}" "${out:-—}" "${cr:-—}" "${w5:-—}" "${w1:-—}" "$provenance" >> "$report"
     regenerate_weekly_section "$report"
 }
 
@@ -644,52 +724,117 @@ strip_weekly_section() {
 
 # Return the date N days ago in YYYY-MM-DD format. Works on both BSD (macOS,
 # date -v) and GNU (Linux/CI, date -d) date implementations.
-_date_ago() { date -v-"$1"d +%F 2>/dev/null || date -d "$1 days ago" +%F; }
+_date_ago() {
+    date -v-"$1"d +%F 2>/dev/null || date -d "$1 days ago" +%F
+}
 
 # Rebuild the trailing-7-days weekly aggregate at the bottom of today's costs
 # report. Idempotent: strips any prior "## Weekly aggregate" section (always the
-# last section) and rewrites it, so re-running per phase keeps it current and it
-# survives a mid-night run break. Cost-by-tier comes from the reports' Tier
-# column; token totals come from the logs' exit-line tags — each table from its
-# natural source. Every per-file read strips the weekly section first so a prior
-# day's weekly rows (which also start with a pipe) are never re-ingested.
+# last section) and rewrites it. Cost-by-tier comes from the sidecar ledger
+# (logs/YYYY-MM-DD.costs.jsonl); token totals come from the sidecar with fallback
+# to exit-line tags from the day's .log for days without a sidecar.
+# Three total cost lines are emitted: floor, floor+surcharge-est-low, floor+surcharge-est-high.
 regenerate_weekly_section() {
-    local report=$1 reports_dir logs_dir d f i
+    local report=$1 reports_dir logs_dir d f i lf
+    local all_sidecar cost_rows tok_rows tok_stream split_miss unpriced
+    local floor_raw low_raw high_raw floor_total low_total high_total
     reports_dir=$(dirname "$report")
     logs_dir="$NIGHTLY_DIR/logs"
     strip_weekly_section "$report"
+    all_sidecar=$(mktemp)
+    for i in 0 1 2 3 4 5 6; do
+        d=$(_date_ago "$i"); f="$logs_dir/$d.costs.jsonl"
+        if [ -f "$f" ]; then cat "$f" >> "$all_sidecar"; fi
+    done
+    floor_raw="0" low_raw="0" high_raw="0" unpriced=0
+    if [ -s "$all_sidecar" ]; then
+        unpriced=$(jq -s '[.[] | select(.provenance=="unknown")] | length' "$all_sidecar") || unpriced=0
+        IFS=$'\t' read -r floor_raw low_raw high_raw <<< "$(jq -r -s '
+            def n: (. // 0) | if type=="number" then . else 0 end;
+            {
+                f:  ([.[].cost          | n] | add // 0),
+                sl: ([.[].surcharge_low  | n] | add // 0),
+                sh: ([.[].surcharge_high | n] | add // 0)
+            } | [.f, (.f + .sl), (.f + .sh)] | @tsv
+        ' "$all_sidecar")" || true
+    fi
+    for i in 0 1 2 3 4 5 6; do
+        d=$(_date_ago "$i"); f="$logs_dir/$d.costs.jsonl"; lf="$logs_dir/$d.log"
+        if [ ! -f "$f" ] && [ -f "$lf" ]; then
+            fb=$(grep -hc 'exit:' "$lf" 2>/dev/null) || fb=0
+            unpriced=$(( unpriced + ${fb:-0} ))
+        fi
+    done
+    floor_total=$(printf '%.4f' "${floor_raw:-0}")
+    low_total=$(printf  '%.4f' "${low_raw:-0}")
+    high_total=$(printf '%.4f' "${high_raw:-0}")
+    cost_rows=$(
+        if [ -s "$all_sidecar" ]; then
+            jq -r -s '
+                def n: (. // 0) | if type=="number" then . else 0 end;
+                group_by(.tier) | .[] |
+                { t: .[0].tier, c: ([.[].cost | n] | add // 0) } |
+                [.t, .c] | @tsv
+            ' "$all_sidecar" | awk -F'\t' '{printf "| %s | %.4f |\n",$1,$2}'
+        fi
+    ) || cost_rows=""
+    tok_stream=$(mktemp)
+    {
+            if [ -s "$all_sidecar" ]; then
+                jq -r -s '
+                    def n: (. // 0) | if type=="number" then . else 0 end;
+                    .[] | [.phase, (.inp|n), (.out|n), (.cr|n), (.w5|n), (.w1|n), (.peak_ctx|n)] | @tsv
+                ' "$all_sidecar"
+            fi
+            for i in 0 1 2 3 4 5 6; do
+                d=$(_date_ago "$i"); f="$logs_dir/$d.costs.jsonl"
+                if [ ! -f "$f" ]; then
+                    lf="$logs_dir/$d.log"
+                    if [ -f "$lf" ]; then
+                        grep -h 'exit:' "$lf" 2>/dev/null | awk '
+                            { ph="?"; n=split($2,a,"/"); if(n>=2) ph=a[n]
+                              in_v=0;ou_v=0;cr_v=0;cw_v=0
+                              for(j=1;j<=NF;j++){if(split($j,kv,"=")==2){k=kv[1];v=kv[2]
+                                if(v~/^[0-9]+$/){
+                                  if(k=="in")in_v=v+0;else if(k=="out")ou_v=v+0;
+                                  else if(k=="cache")cr_v=v+0;else if(k=="cache_write")cw_v=v+0}}}
+                              print ph"\t"in_v"\t"ou_v"\t"cr_v"\t"cw_v"\t0\t0 }
+                        ' || true
+                    fi
+                fi
+            done
+    } > "$tok_stream"
+    tok_rows=$(awk -F'\t' '
+        { p=$1;inp[p]+=$2;out[p]+=$3;cr[p]+=$4;w5[p]+=$5;w1[p]+=$6;seen[p]=1
+          inpT+=$2;oT+=$3;crT+=$4;w5T+=$5;w1T+=$6 }
+        END {
+            for(p in seen) printf "| %s | %d | %d | %d | %d | %d |\n",p,inp[p],out[p],cr[p],w5[p],w1[p]
+            printf "| **Total** | %d | %d | %d | %d | %d |\n",inpT,oT,crT,w5T,w1T
+        }
+    ' "$tok_stream") || tok_rows=""
+    # Peak-ctx split-miss flagging (>150K) is retained from the pre-sidecar schema,
+    # now fed by the pricer's true peak ($7) rather than the truncated stream value
+    # that suppressed the flag on the run that most needed it.
+    split_miss=$(awk -F'\t' '
+        { p=$1; v=$7+0; if (v>pk[p]) pk[p]=v }
+        END { f=""; for (p in pk) if (pk[p]>150000) f=f " " p "(" int(pk[p]/1000) "K)"; print f }
+    ' "$tok_stream") || split_miss=""
+    rm -f "$tok_stream" "$all_sidecar"
     {
         printf '\n## Weekly aggregate (last 7 days)\n\n'
         printf '### Cost by tier ($)\n\n| Tier | Cost ($) |\n|---|---|\n'
-        for i in 0 1 2 3 4 5 6; do
-            d=$(_date_ago "$i"); f="$reports_dir/$d-costs.md"
-            [ -f "$f" ] && sed '/^## Weekly aggregate/,$d' "$f" || true
-        done | awk -F'|' '
-            { if (NF==7 || NF==8) {tier=$5; cost=$6}
-              else if (NF==5) {tier="(untracked)"; cost=$4}
-              else next
-              gsub(/^[ \t]+|[ \t]+$/,"",tier); gsub(/^[ \t]+|[ \t]+$/,"",cost)
-              if (cost ~ /^[0-9]+(\.[0-9]+)?$/) {c[tier]+=cost; tot+=cost} }
-            END { for (t in c) printf "| %s | %.4f |\n", t, c[t]
-                  printf "| **Total** | %.4f |\n", tot+0 }'
-        printf '\n### Tokens by phase\n\n| Phase | Input | Cache-write | Cache-read | Output |\n|---|---|---|---|---|\n'
-        for i in 0 1 2 3 4 5 6; do
-            d=$(_date_ago "$i"); f="$logs_dir/$d.log"
-            [ -f "$f" ] && grep -h 'exit:' "$f" || true
-        done | awk '
-            { phase="?"; n=split($2,a,"/"); if (n>=2) phase=a[n]
-              for (j=1;j<=NF;j++) { if (split($j,kv,"=")==2) { k=kv[1]; v=kv[2]; sub(/^[$]/,"",v)
-                if (v ~ /^[0-9]+$/) { if (k=="in") {inp[phase]+=v; inpT+=v}
-                  else if (k=="out") {o[phase]+=v; oT+=v}
-                  else if (k=="cache") {cr[phase]+=v; crT+=v}
-                  else if (k=="cache_write") {cw[phase]+=v; cwT+=v}
-                  else if (k=="peak_ctx") { v=v+0; if (v>pkmax[phase]) pkmax[phase]=v } } } }
-              seen[phase]=1 }
-            END { for (p in seen) printf "| %s | %d | %d | %d | %d |\n", p, inp[p], cw[p], cr[p], o[p]
-                  printf "| **Total** | %d | %d | %d | %d |\n", inpT, cwT, crT, oT
-                  flag=""
-                  for (p in pkmax) if (pkmax[p]>150000) flag=flag " " p "(" int(pkmax[p]/1000) "K)"
-                  if (flag!="") printf "\n> **Split-miss candidates (peak ctx >150K):**%s\n", flag }'
+        if [ -n "$cost_rows" ]; then printf '%s\n' "$cost_rows"; fi
+        printf '| **Total** (floor) | %s |\n' "$floor_total"
+        printf '| **Total** (floor + est low) | %s |\n' "$low_total"
+        printf '| **Total** (floor + est high) | %s |\n' "$high_total"
+        if [ "${unpriced:-0}" -gt 0 ]; then
+            printf '\n> **excludes %d unpriced rows**\n' "$unpriced"
+        fi
+        printf '\n### Tokens by phase\n\n| Phase | Input | Output | Cache-read | CW-5m | CW-1h |\n|---|---|---|---|---|---|\n'
+        if [ -n "$tok_rows" ]; then printf '%s\n' "$tok_rows"; fi
+        if [ -n "${split_miss// /}" ]; then
+            printf '\n> **Split-miss candidates (peak ctx >150K):**%s\n' "$split_miss"
+        fi
     } >> "$report"
 }
 

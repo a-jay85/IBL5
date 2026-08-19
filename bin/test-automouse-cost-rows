@@ -265,4 +265,162 @@ assert_eq "$(cmp -s "$BF_REPORT" "$TMPROOT/bf-report.snap" && echo same || echo 
 assert_eq "$(cmp -s "$BF_BAK" "$TMPROOT/bf-bak.snap" && echo same || echo differs)" "same" \
     "second backfill run does not overwrite the .bak"
 
+
+# ---------------------------------------------------------------------------
+# Stub-pricer sandbox — append_cost_row's plumbing (matrix rows 7-11).
+#
+# append_cost_row invokes "$SELF_DIR/../lib/automouse-pricer" with no --proj-dir,
+# so letting the REAL pricer run here would glob ~/.claude/projects and make the
+# test depend on the runner's home dir and on session ids that age out after
+# ~30 days. A stub on that same self-relative path exercises every consumer of
+# the pricer's JSON — parse, 13 columns, 20-key sidecar line, surcharge cell,
+# weekly aggregate — with zero ~/.claude dependency. The pricer's own numeric
+# correctness is pinned by the golden-constant assertions above.
+# ---------------------------------------------------------------------------
+
+echo
+echo "-- append_cost_row: recomputed path via a stub pricer --"
+
+S2=$(mktemp -d)
+mkdir -p "$S2/reports" "$S2/logs" "$S2/bin/automouse" "$S2/bin/lib"
+cat > "$S2/bin/lib/automouse-pricer" <<'STUBEOF'
+#!/usr/bin/env bash
+# Test stub: fixed JSON for session id "stub-good", exit 3 for anything else.
+case " $* " in
+  *" stub-good "*) ;;
+  *) echo '{"error":"session-not-found"}'; exit 3 ;;
+esac
+cat <<'JSONEOF'
+{"session_id":"stub-good","cost":9.1234,"surcharge_low":0.19,"surcharge_high":1.95,
+ "inp":111,"out":222,"cr":333,"w5":444,"w1":555,"peak_ctx":208262,
+ "compactions_main":2,"compactions_sub":1,"price_asof":"2026-08-18"}
+JSONEOF
+STUBEOF
+chmod +x "$S2/bin/lib/automouse-pricer"
+
+NIGHTLY_DIR="$S2"
+SELF_DIR="$S2/bin/automouse"
+LOG="$S2/logs/$(date +%F).log"
+: > "$LOG"
+S2_REPORT="$S2/reports/$(date +%F)-costs.md"
+S2_SIDECAR="$S2/logs/$(date +%F).costs.jsonl"
+
+for n in 1 2; do
+    before=$(wc -l < "$LOG")
+    printf '[00:0%d:00] good-%d.md/impl exit: cost=$1.8200 peak_ctx=99000 session_id=stub-good\n' \
+        "$n" "$n" >> "$LOG"
+    append_cost_row "good-$n.md" "impl" "$before" "claude-opus-4-1"
+done
+
+# Row 7 — the pricer's JSON reaches every column, and the recomputed figure
+# replaces the harness figure rather than sitting beside it.
+good_row=$(grep -m1 '^| good-1.md |' "$S2_REPORT")
+assert_eq "$(printf '%s' "$good_row" | awk -F'|' '{print NF-2}')" "$NCOL_EXPECTED" \
+    "recomputed row has 13 columns"
+assert_eq "$(printf '%s' "$good_row" | awk -F'|' '{gsub(/[ \t]/,"",$6); print $6}')" "9.1234" \
+    "cost column carries the recomputed figure, not the harness one"
+assert_eq "$(printf '%s' "$good_row" | awk -F'|' '{gsub(/[ \t]/,"",$8); print $8}')" "208K" \
+    "peak-ctx column carries the pricer peak, not the truncated stream peak"
+assert_eq "$(printf '%s' "$good_row" | awk -F'|' '{gsub(/[ \t]/,"",$14); print $14}')" "recomputed" \
+    "Prov column reads recomputed"
+assert_eq "$(printf '%s' "$good_row" | awk -F'|' '{gsub(/[ 	]/,"",$7); print $7}')" "0.19–1.95" \
+    "surcharge cell renders the en-dash bounded interval"
+
+# Row 8 — one well-formed sidecar line per phase, carrying the full 20-key schema.
+assert_eq "$(jq -s 'length' "$S2_SIDECAR")" "2" "sidecar gains exactly one line per phase"
+assert_eq "$(jq -s '.[0] | keys | length' "$S2_SIDECAR")" "20" "sidecar line carries all 20 keys"
+assert_eq "$(jq -r -s '.[0].provenance' "$S2_SIDECAR")" "recomputed" "sidecar records provenance"
+assert_eq "$(jq -r -s '.[0].cost' "$S2_SIDECAR")" "9.1234" "sidecar records the recomputed cost"
+
+# Row 11a — no unpriced rows means no exclusion note at all.
+assert_eq "$(grep -c 'unpriced rows' "$S2_REPORT")" "0" \
+    "all-priced week emits no exclusion note"
+
+echo
+echo "-- append_cost_row: a failing pricer degrades to unknown, it does not abort --"
+
+# Row 9 — the pricer exits 3 for an unrecognised session. Under `set -euo
+# pipefail` in the real driver that must not kill the run; the row still lands,
+# falling back to the harness figure and flagged as unpriced.
+before=$(wc -l < "$LOG")
+printf '[00:03:00] bad.md/impl exit: cost=$2.5000 peak_ctx=101000 session_id=stub-missing\n' >> "$LOG"
+append_cost_row "bad.md" "impl" "$before" "claude-opus-4-1"
+assert_eq "$?" "0" "append_cost_row returns 0 when the pricer fails"
+
+bad_row=$(grep -m1 '^| bad.md |' "$S2_REPORT")
+assert_eq "$(printf '%s' "$bad_row" | awk -F'|' '{gsub(/[ \t]/,"",$14); print $14}')" "unknown" \
+    "failed pricer yields Prov=unknown"
+assert_eq "$(printf '%s' "$bad_row" | awk -F'|' '{gsub(/[ \t]/,"",$6); print $6}')" "2.5000" \
+    "failed pricer falls back to the logged harness cost"
+assert_eq "$(printf '%s' "$bad_row" | awk -F'|' '{print NF-2}')" "$NCOL_EXPECTED" \
+    "unknown row still has 13 columns"
+
+echo
+echo "-- weekly aggregate: three totals, and unpriced rows are counted --"
+
+# Row 10 — floor / floor+low / floor+high are all emitted, and the floor is the
+# plain sum of the sidecar costs (9.1234 + 9.1234 + 2.5000).
+assert_eq "$(grep -c '^| \*\*Total\*\* (floor)' "$S2_REPORT")" "1" "floor total emitted"
+assert_eq "$(grep -c '^| \*\*Total\*\* (floor + est low)' "$S2_REPORT")" "1" "floor+low total emitted"
+assert_eq "$(grep -c '^| \*\*Total\*\* (floor + est high)' "$S2_REPORT")" "1" "floor+high total emitted"
+
+floor=$(awk -F'|' '/\*\*Total\*\* \(floor\)/ {gsub(/[ \t]/,"",$3); print $3; exit}' "$S2_REPORT")
+sidecar_sum=$(jq -s '[.[].cost] | add' "$S2_SIDECAR")
+assert_near "$floor" "$sidecar_sum" 0.0001 "floor total equals the sidecar cost sum"
+
+low=$(awk -F'|' '/\*\*Total\*\* \(floor \+ est low\)/ {gsub(/[ \t]/,"",$3); print $3; exit}' "$S2_REPORT")
+high=$(awk -F'|' '/\*\*Total\*\* \(floor \+ est high\)/ {gsub(/[ \t]/,"",$3); print $3; exit}' "$S2_REPORT")
+assert_gt "$low" "$floor" "floor+low exceeds floor" "the surcharge interval must widen the total"
+assert_gt "$high" "$low" "floor+high exceeds floor+low"
+
+# Row 11b — the one unknown row is counted and named.
+assert_eq "$(grep -c '> \*\*excludes 1 unpriced rows\*\*' "$S2_REPORT")" "1" \
+    "week with one unknown row reports excludes 1"
+
+# Split-miss flagging is retained (plan: dropping the column was the REJECTED
+# alternative) and is now fed by the pricer's 208262 peak. The truncated stream
+# value (99000) would have suppressed it — which is the bug this pins.
+assert_eq "$(grep -c 'Split-miss candidates (peak ctx >150K)' "$S2_REPORT")" "1" \
+    "split-miss block is retained and fires on the recomputed peak"
+assert_eq "$(grep -c 'impl(208K)' "$S2_REPORT")" "1" "split-miss names the phase and its true peak"
+
+echo
+echo "-- schema migration: the old 6-column report widens without shifting cells --"
+
+# The new schema INSERTS "Surcharge est ($)" at column 6, so an old row's peak
+# must slide from cell 6 to cell 7. Padding seven cells onto the END gets the
+# count right (13) and the semantics wrong: the peak lands under Surcharge.
+S3=$(mktemp -d)
+mkdir -p "$S3/reports" "$S3/logs"
+NIGHTLY_DIR="$S3"
+SELF_DIR="$S3/nonexistent"
+LOG="$S3/logs/$(date +%F).log"
+: > "$LOG"
+S3_REPORT="$S3/reports/$(date +%F)-costs.md"
+cat > "$S3_REPORT" <<OLDEOF
+# Automouse cost roll-up — $(date +%F)
+
+| Plan | Phase | Model | Tier | Cost (\$) | Peak Ctx (K) |
+|---|---|---|---|---|---|
+| old.md | impl | claude-opus-4-1 | opus | 1.2300 | 101K |
+OLDEOF
+
+before=$(wc -l < "$LOG")
+printf '[00:01:00] new.md/impl exit: cost=$4.0000 peak_ctx=120000\n' >> "$LOG"
+append_cost_row "new.md" "impl" "$before" "claude-opus-4-1"
+
+old_row=$(grep -m1 '^| old.md |' "$S3_REPORT")
+assert_eq "$(printf '%s' "$old_row" | awk -F'|' '{print NF-2}')" "$NCOL_EXPECTED" \
+    "migrated old row has 13 columns"
+assert_eq "$(printf '%s' "$old_row" | awk -F'|' '{gsub(/[ \t]/,"",$6); print $6}')" "1.2300" \
+    "migrated old row keeps its cost in the cost column"
+assert_eq "$(printf '%s' "$old_row" | awk -F'|' '{gsub(/[ \t]/,"",$7); print $7}')" "" \
+    "migrated old row leaves the inserted Surcharge cell empty"
+assert_eq "$(printf '%s' "$old_row" | awk -F'|' '{gsub(/[ \t]/,"",$8); print $8}')" "101K" \
+    "migrated old row's peak slides into Peak Ctx, not Surcharge"
+assert_eq "$(grep -c '^| Plan | Phase | Model | Tier | Cost (\$) | Surcharge est (\$) |' "$S3_REPORT")" "1" \
+    "header is rewritten to the 13-column schema exactly once"
+
+rm -rf "$S2" "$S3"
+
 exit "$FAILED"

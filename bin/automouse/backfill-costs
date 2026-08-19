@@ -268,6 +268,22 @@ def row_cells(line):
     return [c.strip() for c in line.strip().strip("|").split("|")]
 
 
+def widen(cells):
+    """Map a historical row onto the 13-column layout.
+
+    Three shapes shipped over the archive's life: 3 columns (Plan, Phase, Cost),
+    5 (+ Model, Tier) and 6 (+ Peak Ctx). `Surcharge est ($)` was inserted at
+    index 5, so the 6-column form's Peak Ctx has to shift right one -- padding on
+    the right instead would render a context size as a dollar surcharge.
+    """
+    n = len(cells)
+    if n == 3:
+        cells = [cells[0], cells[1], "", "", cells[2]]
+    elif n == 6:
+        cells = cells[:5] + ["", cells[5]]
+    return (cells + [""] * NCOL)[:NCOL]
+
+
 def fmt_surcharge(rec):
     if (rec.get("compactions_main", 0) + rec.get("compactions_sub", 0)) == 0:
         return "—"
@@ -319,11 +335,14 @@ for report in reports:
             out_lines.append(HEADER)
             continue
 
-        if not in_weekly and seen_header and cells and len(cells) >= 5:
-            if set("".join(cells)) <= set("-| "):
-                out_lines.append(SEP)
-                continue
+        # Separators are matched on content, not width: the oldest reports carry a
+        # 3-cell rule that a width guard would leave stranded under a 13-column header.
+        if not in_weekly and seen_header and cells and set("".join(cells)) <= set("-| "):
+            out_lines.append(SEP)
+            continue
 
+        if not in_weekly and seen_header and cells and len(cells) >= 3:
+            cells = widen(cells)
             plan, phase, model, tier = cells[0], cells[1], cells[2], cells[3]
             info = phases.get((norm(plan), phase))
             logged_cost = info["logged_cost"] if info else None

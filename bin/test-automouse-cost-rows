@@ -265,6 +265,55 @@ assert_eq "$(cmp -s "$BF_REPORT" "$TMPROOT/bf-report.snap" && echo same || echo 
 assert_eq "$(cmp -s "$BF_BAK" "$TMPROOT/bf-bak.snap" && echo same || echo differs)" "same" \
     "second backfill run does not overwrite the .bak"
 
+printf '\n-- backfill: legacy 3- and 6-column reports migrate without corruption --\n'
+
+# Three header shapes shipped over the archive's life: 3 columns (Plan, Phase,
+# Cost), 5 (+ Model, Tier) and 6 (+ Peak Ctx). Neither of these rows can join a
+# transcript, so both take the pad path -- which is exactly where a width guard
+# or a naive right-pad does its damage: the 3-column rule was left stranded under
+# a 13-column header, and the 6-column form's Peak Ctx landed in Surcharge est ($).
+BF2="$TMPROOT/bf2"
+mkdir -p "$BF2/reports" "$BF2/logs"
+cat > "$BF2/reports/2026-05-28-costs.md" <<'L3EOF'
+# Nightly cost roll-up — 2026-05-28
+
+| Plan | Phase | Cost ($) |
+|---|---|---|
+| legacy-three.md | impl | 10.3703 |
+L3EOF
+cat > "$BF2/reports/2026-07-04-costs.md" <<'L6EOF'
+# Nightly cost roll-up — 2026-07-04
+
+| Plan | Phase | Model | Tier | Cost ($) | Peak Ctx (K) |
+|---|---|---|---|---|---|
+| legacy-six.md | impl | claude-opus-5 | Opus | 5.9871 | 115K |
+L6EOF
+
+NIGHTLY_DIR="$BF2" "$BACKFILL" --proj-dir "$FIXROOT" > "$TMPROOT/bf-legacy.out"
+
+r3="$BF2/reports/2026-05-28-costs.md"
+r6="$BF2/reports/2026-07-04-costs.md"
+
+# 31-33. The 3-column form: header, rule and row all reach 13 columns, and the
+#        cost stays in the cost column rather than under Model.
+assert_eq "$(awk -F'|' '/^\|---/{print NF-2; exit}' "$r3")" "$NCOL_EXPECTED" \
+    "3-column report's separator rule widens to $NCOL_EXPECTED columns"
+assert_eq "$(awk -F'|' '/^\| legacy-three\.md \|/{print NF-2; exit}' "$r3")" "$NCOL_EXPECTED" \
+    "3-column report's data row widens to $NCOL_EXPECTED columns"
+assert_eq "$(awk -F'|' '/^\| legacy-three\.md \|/{gsub(/[ \t]/,"",$6); print $6; exit}' "$r3")" \
+    "10.3703" "3-column row keeps its cost in the cost column"
+
+# 34-35. The 6-column form: Peak Ctx shifts right past the inserted Surcharge
+#        cell instead of being rendered as a dollar figure.
+assert_eq "$(awk -F'|' '/^\| legacy-six\.md \|/{gsub(/[ \t]/,"",$7); print $7; exit}' "$r6")" "" \
+    "6-column row leaves the inserted Surcharge cell empty"
+assert_eq "$(awk -F'|' '/^\| legacy-six\.md \|/{gsub(/[ \t]/,"",$8); print $8; exit}' "$r6")" "115K" \
+    "6-column row's peak slides into Peak Ctx, not Surcharge"
+
+# 36. Unjoined rows are still marked unknown, not silently left blank.
+assert_eq "$(awk -F'|' '/^\| legacy-six\.md \|/{gsub(/[ \t]/,"",$14); print $14; exit}' "$r6")" \
+    "unknown" "unjoined legacy row is marked Prov=unknown"
+
 
 # ---------------------------------------------------------------------------
 # Stub-pricer sandbox — append_cost_row's plumbing (matrix rows 7-11).

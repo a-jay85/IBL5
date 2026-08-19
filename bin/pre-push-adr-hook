@@ -53,19 +53,19 @@ if ! git -C "$REPO_ROOT" rev-parse --verify origin/master >/dev/null 2>&1; then
     exit 0
 fi
 
-# Block pushes where the branch hasn't been rebased onto origin/master. No fetch here —
+# Block pushes where the branch does not contain origin/master. No fetch here —
 # keep push latency low; wt-new already syncs at creation time. If origin/master has
-# advanced since then, `git fetch origin master && git rebase origin/master` or
-# `bin/wt-rebase` brings the branch current.
+# advanced since then, `git fetch origin master && git merge origin/master` or
+# `bin/wt-rebase` (which merges despite its name) brings the branch current.
 CURRENT_BRANCH=$(git -C "$REPO_ROOT" symbolic-ref --short HEAD 2>/dev/null || true)
 if [ -n "$CURRENT_BRANCH" ] && [ "$CURRENT_BRANCH" != "master" ]; then
     if ! git -C "$REPO_ROOT" merge-base --is-ancestor origin/master HEAD 2>/dev/null; then
         cat >&2 <<'EOF'
 
-pre-push-adr-hook: branch is not rebased onto origin/master.
-Fetch and rebase before pushing:
-  git fetch origin master && git rebase origin/master
-  # or rebase all active worktrees at once: bin/wt-rebase
+pre-push-adr-hook: branch does not contain origin/master.
+Fetch and merge before pushing:
+  git fetch origin master && git merge origin/master
+  # or update all active worktrees at once: bin/wt-rebase (merges despite its name)
 EOF
         exit 1
     fi

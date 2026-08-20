@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+#
+# bin/watch-run — self-terminating watcher for a detached launchd run's log.
+#
+# Covers the three producers that fire a launchd one-shot and print a log path:
+# bin/post-plan-now, bin/plan-now, bin/docfix-run.
+#
+# WHY THIS EXISTS. Those logs are written by a headless `claude -p` session or by
+# the compiled post-plan harness, both of which buffer their output and flush it
+# at exit. A `tail -f <log> | grep -E "…"` armed on one is therefore silent for
+# the entire run — and silent FOREVER afterwards, because `tail -f` never exits.
+# "Finished cleanly" and "still working" look identical, so the watcher runs to
+# its timeout every time. (Observed repeatedly; the 2026-08-20 case ran 22m with
+# "No output available" on a job that had already merged its PR.)
+#
+# THE COMPLETION SIGNAL. Every one of those producers ends its launchd command
+# with `launchctl bootout gui/$(id -u)/<label>` — the job removes ITSELF on every
+# branch: success, typed failure, fail-closed sentinel, and hard crash. So
+# label-gone is the only terminator that is correct on all of them, and it needs
+# no cooperation from whatever wrote the log. That is what this script keys on
+# whenever --label is given.
+#
+# A `RESULT:` line is NOT a terminator when --label is present, only a signal to
+# surface. bin/post-plan-now's launchd job runs the compiled harness and then, on
+# a generic harness failure, escalates to a /post-plan skill session in the SAME
+# job writing the SAME log — so the harness's own `RESULT: … FAILED` lands while
+# a second engine is still working. Exiting on it would report a failure the job
+# is in the middle of recovering from. Without --label there is no other signal,
+# so `RESULT:` becomes the terminator there.
+#
+# Arm it from a Monitor (both flags are printed for you by the producer):
+#   bin/watch-run --log /tmp/post-plan-now-<slug>-<ts>.log \
+#                 --label com.ibl5.postplan-now-<slug>-<ts>
+#
+# Exit 0 — the run finished; its own verdict line is the last thing printed.
+# Exit 2 — --timeout elapsed with the job still alive (nothing is killed).
+# Exit 3 — usage error.
+
+set -uo pipefail
+
+LOG=""
+LABEL=""
+TIMEOUT=10800          # 3h — longer than any observed post-plan/plan run
+INTERVAL=5
+ALL=0
+
+# Lines worth surfacing as Monitor events. Deliberately broad on the FAILURE side:
+# a filter that matches only success is indistinguishable from a crash.
+# `RESULT` is unanchored so bin/plan-now's `RESULT ok|degraded|unconfirmed` verdict
+# is surfaced too, even though only `RESULT:` can ever terminate.
+SIGNAL='RESULT|^post-plan-now:|^plan-now:|^docfix-run:|PR #|pull/|ERROR|Error|error:|FAIL|Fail|failed|conflict|Traceback|terminal=|Killed|OOM|command not found|No such file'
+
+usage() {
+    sed -n '3,38p' "$0" | sed 's/^# \{0,1\}//'
+    exit 3
+}
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --log)      [ $# -ge 2 ] || usage; LOG="$2"; shift 2 ;;
+        --log=*)    LOG="${1#--log=}"; shift ;;
+        --label)    [ $# -ge 2 ] || usage; LABEL="$2"; shift 2 ;;
+        --label=*)  LABEL="${1#--label=}"; shift ;;
+        --timeout)  [ $# -ge 2 ] || usage; TIMEOUT="$2"; shift 2 ;;
+        --timeout=*) TIMEOUT="${1#--timeout=}"; shift ;;
+        --interval) [ $# -ge 2 ] || usage; INTERVAL="$2"; shift 2 ;;
+        --all)      ALL=1; shift ;;
+        -h|--help)  usage ;;
+        *)          echo "watch-run: unknown argument '$1'" >&2; usage ;;
+    esac
+done
+
+[ -n "$LOG" ] || { echo "watch-run: --log is required" >&2; usage; }
+
+# Lines [seen+1 .. EOF], filtered unless --all. `sed -n '<n>,$p'` also emits a
+# final line with no trailing newline, which `wc -l` does not count — so the
+# closing flush never drops a half-written verdict.
+SEEN=0
+flush() {
+    [ -f "$LOG" ] || return 0
+    local total
+    total=$(wc -l < "$LOG" | tr -d ' ')
+    [ "$total" -gt "$SEEN" ] || return 0
+    if [ "$ALL" = 1 ]; then
+        sed -n "$((SEEN + 1)),\$p" "$LOG"
+    else
+        sed -n "$((SEEN + 1)),\$p" "$LOG" | grep -E "$SIGNAL" || true
+    fi
+    SEEN=$total
+}
+
+label_alive() {
+    [ -n "$LABEL" ] || return 0                       # no label ⇒ never "gone"
+    launchctl list 2>/dev/null | grep -qF "$LABEL"
+}
+
+saw_result() {
+    [ -f "$LOG" ] && grep -qE '^ *RESULT:' "$LOG"
+}
+
+echo "watch-run: watching $LOG${LABEL:+ (label $LABEL)} — exits when the run finishes."
+
+START=$(date +%s)
+while :; do
+    flush
+
+    if [ -z "$LABEL" ] && saw_result; then
+        echo "watch-run: RESULT line seen — run complete."
+        exit 0
+    fi
+
+    if [ -n "$LABEL" ] && ! label_alive; then
+        # The job booted itself out. Give the filesystem a moment for the final
+        # flush, then print whatever is left — including lines the filter skips,
+        # so a crash with no recognisable signature is never silent.
+        sleep 3
+        flush
+        if saw_result; then
+            echo "watch-run: run complete (launchd label gone)."
+        elif [ -f "$LOG" ]; then
+            echo "watch-run: launchd label gone but the log has no RESULT line — tail follows:"
+            tail -n 8 "$LOG"
+        else
+            echo "watch-run: launchd label gone and $LOG was never created — the job died before it ran."
+        fi
+        exit 0
+    fi
+
+    if [ $(($(date +%s) - START)) -ge "$TIMEOUT" ]; then
+        echo "watch-run: TIMEOUT after ${TIMEOUT}s — the job is still running. Nothing was killed."
+        [ -f "$LOG" ] && tail -n 5 "$LOG"
+        exit 2
+    fi
+
+    sleep "$INTERVAL"
+done

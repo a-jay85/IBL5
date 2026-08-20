@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# One-time setup for the local worktree fast-forward sync cron (ADR-0104).
+#
+# Installs a Mac-local launchd LaunchAgent (com.ibl5.wt-sync) that fires
+# the poll-only bash driver bin/wt-sync-tick every 900s via StartInterval —
+# host-durable, poll-only, no-op when the operator is present.  The plist
+# Program/WorkingDirectory point at the durable MAIN checkout (never a
+# worktree, which gets torn down).
+#
+# INSTALL ONLY AFTER THIS LANDS ON master — the launchd Program points at
+# the main checkout's bin/wt-sync-tick, which must exist there.
+#
+# Usage:
+#   bin/wt-sync-cron-setup --print-schedule      # emit the plist to stdout (no side effect)
+#   bin/wt-sync-cron-setup --install-schedule    # install + load the LaunchAgent
+#   bin/wt-sync-cron-setup --uninstall-schedule  # unload + remove the LaunchAgent
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ACTION=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --install-schedule)   ACTION="install";   shift ;;
+    --uninstall-schedule) ACTION="uninstall"; shift ;;
+    --print-schedule)     ACTION="print";     shift ;;
+    -h|--help) awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"; exit 0 ;;
+    *) echo "Unknown option: $1" >&2; exit 1 ;;
+  esac
+done
+
+[ -n "$ACTION" ] || { echo "No action given. See --help." >&2; exit 1; }
+
+# ── Durable MAIN-checkout derivation ─────────────────────────────────────────
+# Program/WorkingDirectory MUST point at the main checkout, never this worktree
+# (a worktree gets torn down — the LaunchAgent would then point at a dead path).
+# The first `git worktree list` entry is the main working tree.
+MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / {print $2; exit}')"
+[ -n "$MAIN_WT" ] || MAIN_WT="$REPO_ROOT"   # fallback: not in a git tree
+
+PLIST_LABEL="com.ibl5.wt-sync"
+PLIST_PATH="$HOME/Library/LaunchAgents/${PLIST_LABEL}.plist"
+LOG_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/wt-sync"
+PROGRAM="$MAIN_WT/bin/wt-sync-tick"
+
+# Single source of truth for the plist — used by both --print-schedule and
+# --install-schedule, so the MAIN-checkout derivation is exercised by tests.
+build_plist() {
+  cat <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>${PLIST_LABEL}</string>
+	<key>Program</key>
+	<string>${PROGRAM}</string>
+	<!-- StartInterval: the correct launchd primitive for a 15-min poll.
+	     Do NOT "fix" this to a calendar-interval key — that is calendar-only. -->
+	<key>StartInterval</key>
+	<integer>900</integer>
+	<key>WorkingDirectory</key>
+	<string>${MAIN_WT}</string>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<!-- launchd agents start with a minimal PATH that omits Homebrew and
+		     ~/.local/bin (where the Claude Code native installer puts claude).
+		     git and ioreg must resolve. HOME interpolates HERE, at generation
+		     time — launchd does NOT expand variables in EnvironmentVariables,
+		     so a literal $HOME would bake in a dead path. -->
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${HOME}/.local/bin</string>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>${LOG_DIR}/launchd-stdout.log</string>
+	<key>StandardErrorPath</key>
+	<string>${LOG_DIR}/launchd-stderr.log</string>
+</dict>
+</plist>
+PLIST
+}
+
+case "$ACTION" in
+  print)
+    build_plist
+    ;;
+  install)
+    mkdir -p "$HOME/Library/LaunchAgents" "$LOG_DIR"
+    launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true  # idempotent
+    build_plist > "$PLIST_PATH"
+    launchctl bootstrap "gui/$(id -u)" "$PLIST_PATH"
+    echo "Installed ${PLIST_LABEL} (StartInterval 900s). Program: $PROGRAM"
+    ;;
+  uninstall)
+    launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true  # idempotent
+    rm -f "$PLIST_PATH"                                                   # idempotent
+    echo "Uninstalled ${PLIST_LABEL}."
+    ;;
+esac

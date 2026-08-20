@@ -1,0 +1,259 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/wt-sync-tick — poll-only fast-forward driver for local worktrees (ADR-0104).
+#
+# Fired every 900s by the launchd LaunchAgent installed by bin/wt-sync-cron-setup.
+# On an idle tick with nothing to sync it exits 0 having run ZERO git write
+# operations — the cost guard is the single most important property.
+#
+# NOT set -e: one worktree's failure must never abort the tick. Risky calls
+# are wrapped in `if` (mirrors bin/bug-pipeline-tick's discipline).
+#
+# NEVER pushes, never force-pushes, never calls gh, never rebases, never
+# resets --hard, never creates or deletes worktrees. Fast-forward only.
+# See ADR-0104 for the design rationale.
+#
+# Usage: bin/wt-sync-tick [--dry-run] [--force] [--help]
+#   --dry-run   Report what it would do; change nothing.
+#   --force     Bypass the HID-idle presence gate (for testing).
+#   --help      Print this header comment.
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=bin/lib/wt-guards.sh disable=SC1091
+source "$SCRIPT_DIR/lib/wt-guards.sh"
+# shellcheck source=bin/lib/git-helpers.sh disable=SC1091
+source "$SCRIPT_DIR/lib/git-helpers.sh"
+
+# ── Env seams (defaults = production; tests override) ─────────────────────────
+WT_SYNC_ENABLED="${WT_SYNC_ENABLED:-1}"
+WT_SYNC_IDLE_SECS="${WT_SYNC_IDLE_SECS:-600}"
+WT_SYNC_LOCK_DIR="${WT_SYNC_LOCK_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/wt-sync}"
+WT_SYNC_LOG="${WT_SYNC_LOG:-$WT_SYNC_LOCK_DIR/wt-sync.log}"
+# WT_SYNC_REPO_ROOT: override the git-derived repo root (tests set this to a
+# synthetic repo so real worktrees are never touched).
+# WT_SYNC_REPO_ROOT defaults to empty — actual derivation happens below, after
+# arg parsing, so the kill-switch can exit early without a git call.
+
+# ── Logging ───────────────────────────────────────────────────────────────────
+log() { printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*"; }
+
+# ── Arg parsing ───────────────────────────────────────────────────────────────
+DRY_RUN=false
+FORCE=false
+for arg in "$@"; do
+    case "$arg" in
+        --dry-run) DRY_RUN=true ;;
+        --force)   FORCE=true ;;
+        --help)
+            awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"
+            exit 0
+            ;;
+        -*) log "Unknown option: $arg" >&2; exit 1 ;;
+    esac
+done
+
+# ── Kill switch ───────────────────────────────────────────────────────────────
+if [ "$WT_SYNC_ENABLED" = "0" ]; then
+    log "WT_SYNC_ENABLED=0 — exiting"
+    exit 0
+fi
+
+# ── Presence gate (HID idle) ──────────────────────────────────────────────────
+# Read idle seconds from the HID system. VERIFIED working on Darwin 25.5 —
+# returns 0 while the operator types.
+# Fail-closed: empty or non-numeric → treat as operator present, never sync.
+if [ "$FORCE" = false ]; then
+    idle="$(ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print int($NF/1000000000); exit}' 2>/dev/null)"
+    case "$idle" in
+        ''|*[!0-9]*)
+            log "idle value unreadable ('${idle:-<empty>}') — treating as operator present (fail-closed)"
+            exit 0
+            ;;
+    esac
+    if [ "$idle" -lt "$WT_SYNC_IDLE_SECS" ]; then
+        log "operator present (idle ${idle}s < threshold ${WT_SYNC_IDLE_SECS}s) — exiting"
+        exit 0
+    fi
+    log "idle ${idle}s >= threshold ${WT_SYNC_IDLE_SECS}s — proceeding"
+fi
+
+# ── Single-flight lock ────────────────────────────────────────────────────────
+# Own namespace: wt-sync/ — must NOT collide with bug-pipeline's lock/ledger.
+mkdir -p "$WT_SYNC_LOCK_DIR" 2>/dev/null || true
+LOCK_FILE="$WT_SYNC_LOCK_DIR/wt-sync.lock"
+
+acquire_lock() {
+    if [ -f "$LOCK_FILE" ]; then
+        local existing_pid
+        existing_pid="$(cat "$LOCK_FILE" 2>/dev/null || true)"
+        # If PID is alive (including EPERM = other user's process), lock is held.
+        if [ -n "$existing_pid" ] && kill -0 "$existing_pid" 2>/dev/null; then
+            log "lock held by PID $existing_pid — another tick is running, exiting"
+            return 1
+        fi
+        # PID is dead (or unreadable) — stale lock; reclaim.
+        log "reclaiming stale lock (PID '${existing_pid:-<unreadable>}' is dead)"
+    fi
+    printf '%d\n' "$$" > "$LOCK_FILE" 2>/dev/null || {
+        log "could not write lock file $LOCK_FILE — aborting"
+        return 1
+    }
+    return 0
+}
+
+release_lock() {
+    rm -f "$LOCK_FILE" 2>/dev/null || true
+}
+
+if ! acquire_lock; then
+    exit 0
+fi
+trap release_lock EXIT
+
+# ── Repo / worktree setup ─────────────────────────────────────────────────────
+if [ -n "${WT_SYNC_REPO_ROOT:-}" ]; then
+    # Canonicalize (resolve symlinks) so the path matches what git worktree list
+    # returns — on macOS /var/folders is a symlink under /private, so mktemp-d
+    # paths diverge from git's internal realpath if not resolved here.
+    REPO_ROOT="$(cd "${WT_SYNC_REPO_ROOT}" 2>/dev/null && pwd -P || echo "${WT_SYNC_REPO_ROOT}")"
+else
+    REPO_ROOT="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
+fi
+WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
+
+# ── Counters — use $(( N + 1 )) not ((N++)) to stay safe under set -u ─────────
+SYNCED=0
+CURRENT=0
+DIRTY=0
+IN_USE=0
+AHEAD=0
+CANNOT_FF=0
+NO_REMOTE=0
+
+if [ "$DRY_RUN" = true ]; then
+    log "DRY RUN — no git write operations will be performed"
+fi
+
+# ── One fetch for the whole tick ──────────────────────────────────────────────
+log "Fetching origin..."
+if [ "$DRY_RUN" = false ]; then
+    git -C "$REPO_ROOT" fetch --prune origin --quiet 2>/dev/null || true
+fi
+
+# ── Per-worktree loop ─────────────────────────────────────────────────────────
+log "Scanning worktrees..."
+
+# Temporary file to collect STRAGGLER lines (avoids array-with-set-u portability issues).
+_straggler_tmp="$(mktemp)"
+trap 'rm -f "$_straggler_tmp" 2>/dev/null; release_lock' EXIT
+
+while IFS= read -r wt; do
+    # Skip the main checkout
+    [[ "$wt" == "$REPO_ROOT" ]] && continue
+
+    # Only enumerate worktrees under WT_PARENT (production) or legacy REPO_ROOT/worktrees
+    # (matches the same filter as bin/wt-rebase).
+    [[ "$wt" == "$WT_PARENT/"* ]] || [[ "$wt" == "$REPO_ROOT/worktrees/"* ]] || continue
+
+    wt_name="$(basename "$wt")"
+    branch="$(git -C "$wt" branch --show-current 2>/dev/null || true)"
+    [ -z "$branch" ] && continue
+    [ "$branch" = "master" ] && continue
+
+    # Skip if no origin/<branch> ref exists (local-only branch).
+    if ! git -C "$REPO_ROOT" rev-parse --verify "origin/$branch" >/dev/null 2>&1; then
+        log "  NO-REMOTE  $wt_name ($branch)"
+        NO_REMOTE=$(( NO_REMOTE + 1 ))
+        continue
+    fi
+
+    # Skip if worktree is actively in use (lsof CWD check from wt-guards.sh:46).
+    if is_worktree_in_use "$wt"; then
+        log "  IN-USE     $wt_name ($branch)"
+        IN_USE=$(( IN_USE + 1 ))
+        continue
+    fi
+
+    # Skip if worktree has uncommitted or staged changes.
+    if has_uncommitted_changes "$wt"; then
+        log "  DIRTY      $wt_name ($branch)"
+        DIRTY=$(( DIRTY + 1 ))
+        continue
+    fi
+
+    # Compute ahead/behind relative to origin/<branch>.
+    # "origin/$branch...HEAD" left=behind (origin commits not in HEAD),
+    #                          right=ahead (HEAD commits not in origin).
+    counts="$(git -C "$wt" rev-list --left-right --count "origin/$branch...HEAD" 2>/dev/null)" || true
+    if [ -z "$counts" ]; then
+        log "  NO-REMOTE  $wt_name ($branch) — rev-list failed"
+        NO_REMOTE=$(( NO_REMOTE + 1 ))
+        continue
+    fi
+    behind="${counts%%$'\t'*}"
+    ahead="${counts#*$'\t'}"
+    # Extra numeric guard (belt-and-suspenders).
+    case "$behind" in ''|*[!0-9]*) behind=0 ;; esac
+    case "$ahead"  in ''|*[!0-9]*) ahead=0  ;; esac
+
+    # AHEAD gate — NEVER touch a worktree with unpushed commits. Load-bearing.
+    if [ "$ahead" -gt 0 ]; then
+        log "  STRAGGLER  $wt_name ($branch) — ahead=$ahead behind=$behind (unpushed commits)"
+        AHEAD=$(( AHEAD + 1 ))
+        printf 'STRAGGLER branch=%s reason=ahead behind=%d ahead=%d\n' \
+            "$branch" "$behind" "$ahead" >> "$_straggler_tmp"
+        continue
+    fi
+
+    # Already current — nothing to do.
+    if [ "$behind" -eq 0 ]; then
+        log "  CURRENT    $wt_name ($branch)"
+        CURRENT=$(( CURRENT + 1 ))
+        continue
+    fi
+
+    # Fast-forward (behind > 0, ahead = 0).
+    if [ "$DRY_RUN" = true ]; then
+        log "  WOULD-FF   $wt_name ($branch) — behind=${behind}"
+        SYNCED=$(( SYNCED + 1 ))
+        continue
+    fi
+
+    if git -C "$wt" merge --ff-only "origin/$branch" --quiet 2>/dev/null; then
+        log "  SYNCED     $wt_name ($branch) — fast-forwarded ${behind} commit(s)"
+        SYNCED=$(( SYNCED + 1 ))
+    else
+        # Defensive: merge --ff-only failed despite behind>0, ahead=0.
+        # Can occur in a race where origin was force-pushed between the rev-list
+        # check and here, or if the working tree has an untracked file that
+        # conflicts with the incoming commit. Do NOT rebase or reset. Log it.
+        log "  STRAGGLER  $wt_name ($branch) — cannot fast-forward: behind=${behind}"
+        CANNOT_FF=$(( CANNOT_FF + 1 ))
+        printf 'STRAGGLER branch=%s reason=cannot-ff behind=%d ahead=%d\n' \
+            "$branch" "$behind" "$ahead" >> "$_straggler_tmp"
+    fi
+
+done < <(git -C "$REPO_ROOT" worktree list --porcelain | awk '/^worktree / { print substr($0, 10) }')
+
+# ── Summary (stdout) ─────────────────────────────────────────────────────────
+printf 'Done: %d synced, %d current, %d dirty, %d in-use, %d ahead, %d cannot-ff, %d no-remote.\n' \
+    "$SYNCED" "$CURRENT" "$DIRTY" "$IN_USE" "$AHEAD" "$CANNOT_FF" "$NO_REMOTE"
+
+# ── Structured log append ────────────────────────────────────────────────────
+# One tick-summary line + one STRAGGLER line per problem worktree.
+# STRAGGLER lines are the evidence base for deciding whether a smarter
+# conflict-resolution tool is worth building. Grep with: grep STRAGGLER wt-sync.log
+mkdir -p "$(dirname "$WT_SYNC_LOG")" 2>/dev/null || true
+{
+    printf '[%s] synced=%d current=%d dirty=%d in-use=%d ahead=%d cannot-ff=%d no-remote=%d\n' \
+        "$(date '+%Y-%m-%dT%H:%M:%S')" \
+        "$SYNCED" "$CURRENT" "$DIRTY" "$IN_USE" "$AHEAD" "$CANNOT_FF" "$NO_REMOTE"
+    if [ -s "$_straggler_tmp" ]; then
+        while IFS= read -r _sl; do
+            printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$_sl"
+        done < "$_straggler_tmp"
+    fi
+} >> "$WT_SYNC_LOG" 2>/dev/null || true

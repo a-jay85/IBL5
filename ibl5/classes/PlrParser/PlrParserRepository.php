@@ -190,7 +190,6 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
             `htin` = VALUES(`htin`),
             `wt` = VALUES(`wt`),
             `draftyear` = VALUES(`draftyear`),
-            `retired` = VALUES(`retired`),
             `r_foul` = VALUES(`r_foul`)";
 
         // Build types: ordinal(i) name(s) age(i) pid(i) teamid(i) peak(i) pos(s)

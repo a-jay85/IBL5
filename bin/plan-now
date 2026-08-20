@@ -681,7 +681,11 @@ if [ "$NOTIFY" = 1 ]; then
 else
     echo "  notify: --no-dm — nothing will tell you when this finishes"
 fi
-echo "  log:    tail -f $LOG   (claude -p does not stream — this stays empty until it exits)"
+echo "  watch:  $ROOT/bin/watch-run --log $LOG --label $LABEL"
+echo "          ^ arm THIS in a Monitor. Self-terminating. Never 'tail -f' the log:"
+echo "            claude -p does not stream, so the log stays empty until it exits and a"
+echo "            tail is silent for the whole run and then silent forever."
+echo "  log:    $LOG"
 echo "  prompt: $PROMPT"
 echo "  label:  $LABEL   (self-removes when the run finishes)"
 echo "  The log ends with a check-plan verdict on the produced plan, and its queue disposition."

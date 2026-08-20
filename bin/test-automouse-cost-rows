@@ -478,4 +478,52 @@ assert_eq "$(grep -c '^| Plan | Phase | Model | Tier | Cost (\$) | Surcharge est
 
 rm -rf "$S2" "$S3"
 
+echo
+echo "-- weekly aggregate: legacy logs without a sidecar still contribute tokens --"
+
+# A day older than the sidecar schema has a .log but no .costs.jsonl, so the
+# weekly token table falls back to parsing that log's `exit:` lines. That awk
+# program shipped with an unterminated string literal ("\t0\t0 } instead of
+# "\t0\t0" }), so awk aborted with "non-terminated string / giving up" on every
+# pre-sidecar day: the errors spewed to the terminal on each roll-up and every
+# legacy day contributed ZERO tokens to the table. Nothing else in this file
+# exercises the fallback, which is why it shipped. Assert both halves — no awk
+# diagnostics on stderr, and the numbers actually land.
+S4=$(mktemp -d)
+mkdir -p "$S4/reports" "$S4/logs"
+NIGHTLY_DIR="$S4"
+S4_REPORT="$S4/reports/$(date +%F)-costs.md"
+printf '# Automouse cost roll-up — %s\n\n' "$(date +%F)" > "$S4_REPORT"
+
+# Yesterday: a log, deliberately NO matching .costs.jsonl.
+YDAY=$(_date_ago 1)
+cat > "$S4/logs/$YDAY.log" <<LEGACYEOF
+[00:01:00] legacy-plan.md/impl exit: stop_reason=end_turn turns=40 tools=52 duration=900000ms cost=\$3.2100 in=140 out=9182 cache=1337900 cache_write=78708 peak_ctx=101000 session_id=abc
+[00:02:00] legacy-plan.md/postplan exit: stop_reason=end_turn turns=60 tools=71 duration=800000ms cost=\$2.1000 in=60 out=24052 cache=3170828 cache_write=144679 peak_ctx=99000 session_id=def
+LEGACYEOF
+
+regenerate_weekly_section "$S4_REPORT" 2> "$S4/regen.err"
+
+# The bug's loudest symptom: awk giving up on stderr.
+assert_eq "$(grep -ciE 'awk|non-terminated|giving up' "$S4/regen.err")" "0" \
+    "legacy-log fallback parses without awk diagnostics"
+
+# And the quiet symptom: the legacy day's tokens reaching the table.
+lg_impl=$(awk -F'|' '/^\| impl \|/{gsub(/[ \t]/,"",$0); print; exit}' "$S4_REPORT")
+assert_eq "$(printf '%s' "$lg_impl" | awk -F'|' '{print $3}')" "140" \
+    "legacy row's input tokens reach the table"
+assert_eq "$(printf '%s' "$lg_impl" | awk -F'|' '{print $4}')" "9182" \
+    "legacy row's output tokens reach the table"
+assert_eq "$(printf '%s' "$lg_impl" | awk -F'|' '{print $5}')" "1337900" \
+    "legacy row's cache-read tokens reach the table"
+assert_eq "$(printf '%s' "$lg_impl" | awk -F'|' '{print $6}')" "78708" \
+    "legacy row's cache-write tokens reach the table"
+
+# Both phases of the legacy day are kept distinct, not collapsed into one.
+assert_eq "$(grep -c '^| postplan |' "$S4_REPORT")" "1" \
+    "legacy log's second phase gets its own row"
+
+rm -rf "$S4"
+
+
 exit "$FAILED"

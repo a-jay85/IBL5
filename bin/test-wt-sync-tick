@@ -1,0 +1,404 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-wt-sync-tick — regression harness for bin/wt-sync-tick and
+# the --print-schedule path of bin/wt-sync-cron-setup.
+#
+# Fully self-contained: every git fixture is built under mktemp; stub
+# binaries on PATH replace ioreg (idle reader) and lsof (in-use check).
+# Never touches real worktrees.
+#
+# Run: bin/test-wt-sync-tick  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+TICK="$SCRIPT_DIR/wt-sync-tick"
+CRON_SETUP="$SCRIPT_DIR/wt-sync-cron-setup"
+TMP="$(mktemp -d)"
+trap 'chmod -R u+w "$TMP" 2>/dev/null; rm -rf "$TMP" 2>/dev/null' EXIT
+
+FAILED=0
+
+pass()     { echo "ok: $1"; }
+failcase() { echo "FAIL: $1"; FAILED=1; }
+
+# assert_match <name> <ERE> <haystack>
+assert_match() {
+    if printf '%s\n' "$3" | grep -qE "$2"; then
+        pass "$1"
+    else
+        failcase "$1 — expected to match: $2"
+        printf '%s\n' "$3" | sed 's/^/    /'
+    fi
+}
+
+# assert_absent <name> <ERE> <haystack>
+assert_absent() {
+    if printf '%s\n' "$3" | grep -qE "$2"; then
+        failcase "$1 — expected NOT to match: $2"
+        printf '%s\n' "$3" | sed 's/^/    /'
+    else
+        pass "$1"
+    fi
+}
+
+# assert_eq <name> <expected> <actual>
+assert_eq() {
+    if [ "$2" = "$3" ]; then
+        pass "$1"
+    else
+        failcase "$1 — expected '$2', got '$3'"
+    fi
+}
+
+# ── Stub binaries ─────────────────────────────────────────────────────────────
+# Place fake ioreg and lsof on PATH; each reads an env var for its output.
+# STUB_IOREG_LINE: what ioreg emits (default: idle 700s — above the 600s threshold).
+# STUB_LSOF_LINE: what lsof -d cwd emits (default: empty — no process in any wt).
+STUBBIN="$TMP/stubbin"
+mkdir -p "$STUBBIN"
+
+cat > "$STUBBIN/ioreg" <<'SH'
+#!/bin/sh
+echo "${STUB_IOREG_LINE:-HIDIdleTime = 700000000000}"
+SH
+chmod +x "$STUBBIN/ioreg"
+
+cat > "$STUBBIN/lsof" <<'SH'
+#!/bin/sh
+echo "${STUB_LSOF_LINE:-}"
+SH
+chmod +x "$STUBBIN/lsof"
+
+# ── run_tick <extra-env-assignments...> -- <args...> ─────────────────────────
+# Sets OUT (stdout+stderr combined) and ST (exit status).
+# Hardwires STUBBIN onto PATH, log+lock dirs under TMP, and clears the kill switch.
+_TICK_LOG="$TMP/default-run/wt-sync.log"
+_TICK_LOCKD="$TMP/default-run/lock"
+mkdir -p "$_TICK_LOCKD" "$(dirname "$_TICK_LOG")"
+
+run_tick() {
+    ST=0
+    OUT="$(PATH="$STUBBIN:$PATH" \
+           WT_SYNC_LOG="$_TICK_LOG" \
+           WT_SYNC_LOCK_DIR="$_TICK_LOCKD" \
+           WT_SYNC_ENABLED=1 \
+           "$TICK" "$@" 2>&1)" || ST=$?
+}
+
+# ── Synthetic git environment factory ────────────────────────────────────────
+# new_env — creates <TMP>/env.XXXX/{origin.git, main}; returns main path.
+new_env() {
+    local base
+    base="$(mktemp -d "$TMP/env.XXXXXX")"
+    git init -q --bare "$base/origin.git"
+    git clone -q "$base/origin.git" "$base/main" 2>/dev/null
+    git -C "$base/main" config user.email t@example.com
+    git -C "$base/main" config user.name tester
+    git -C "$base/main" config commit.gpgsign false
+    printf 'init\n' > "$base/main/README.md"
+    git -C "$base/main" add README.md
+    git -C "$base/main" commit -qm init
+    git -C "$base/main" branch -M master
+    git -C "$base/main" push -q -u origin master
+    # Resolve symlinks so the returned path matches what git worktree list
+    # --porcelain returns (on macOS /var/folders is a symlink under /private).
+    # Every path downstream (WT_SYNC_REPO_ROOT, stub lsof lines, worktree
+    # subdirs) must be canonical for the in-use grep to find a match.
+    (cd "$base/main" && pwd -P)
+}
+
+# add_worktree <main> <name> [ahead|behind|current|diverged]
+# Sets up a worktree branch in various states relative to origin.
+add_worktree() {
+    local main="$1" name="$2" state="${3:-current}"
+    local wt="$main/worktrees/$name"
+
+    git -C "$main" checkout -q -b "$name" master
+    case "$state" in
+        current)
+            # Commit, push, create worktree — local == origin.
+            printf '%s\n' "$name" > "$main/$name.txt"
+            git -C "$main" add "$name.txt"
+            git -C "$main" commit -qm "$name initial"
+            git -C "$main" push -q origin "$name"
+            git -C "$main" checkout -q master
+            git -C "$main" worktree add -q "$wt" "$name"
+            ;;
+        ahead)
+            # Commit to origin, create worktree, then add LOCAL commit not pushed.
+            printf '%s\n' "$name" > "$main/$name.txt"
+            git -C "$main" add "$name.txt"
+            git -C "$main" commit -qm "$name initial"
+            git -C "$main" push -q origin "$name"
+            git -C "$main" checkout -q master
+            git -C "$main" worktree add -q "$wt" "$name"
+            # Add an unpushed commit to the worktree
+            printf 'unpushed\n' > "$wt/unpushed.txt"
+            git -C "$wt" add unpushed.txt
+            git -C "$wt" -c user.email=t@example.com -c user.name=tester \
+                -c commit.gpgsign=false commit -qm "unpushed local commit"
+            ;;
+        behind)
+            # Commit, push, create worktree, then advance origin via a second clone.
+            printf '%s\n' "$name" > "$main/$name.txt"
+            git -C "$main" add "$name.txt"
+            git -C "$main" commit -qm "$name initial"
+            git -C "$main" push -q origin "$name"
+            git -C "$main" checkout -q master
+            git -C "$main" worktree add -q "$wt" "$name"
+            # Second clone advances origin
+            local orig_url; orig_url="$(git -C "$main" remote get-url origin)"
+            local clone2; clone2="$(mktemp -d "$TMP/clone2.XXXXXX")"
+            git clone -q "$orig_url" "$clone2" 2>/dev/null
+            git -C "$clone2" config user.email t@example.com
+            git -C "$clone2" config user.name tester
+            git -C "$clone2" config commit.gpgsign false
+            git -C "$clone2" checkout -q "$name"
+            printf 'origin-advance\n' > "$clone2/origin-advance.txt"
+            git -C "$clone2" add origin-advance.txt
+            git -C "$clone2" commit -qm "origin advance"
+            git -C "$clone2" push -q origin "$name"
+            # Fetch so REPO_ROOT knows about the new origin commit
+            git -C "$main" fetch -q origin
+            ;;
+        cannot-ff)
+            # Create branch, push, add worktree, then advance origin AND add an
+            # untracked file in the worktree that the origin commit would also add.
+            # has_uncommitted_changes misses untracked files, so the dirty gate
+            # passes — then merge --ff-only fails (working tree conflict).
+            printf '%s\n' "$name" > "$main/$name.txt"
+            git -C "$main" add "$name.txt"
+            git -C "$main" commit -qm "$name initial"
+            git -C "$main" push -q origin "$name"
+            git -C "$main" checkout -q master
+            git -C "$main" worktree add -q "$wt" "$name"
+            # Advance origin with a commit that adds 'would-conflict.txt'
+            local orig_url2; orig_url2="$(git -C "$main" remote get-url origin)"
+            local clone3; clone3="$(mktemp -d "$TMP/clone3.XXXXXX")"
+            git clone -q "$orig_url2" "$clone3" 2>/dev/null
+            git -C "$clone3" config user.email t@example.com
+            git -C "$clone3" config user.name tester
+            git -C "$clone3" config commit.gpgsign false
+            git -C "$clone3" checkout -q "$name"
+            printf 'from-origin\n' > "$clone3/would-conflict.txt"
+            git -C "$clone3" add would-conflict.txt
+            git -C "$clone3" commit -qm "origin adds would-conflict.txt"
+            git -C "$clone3" push -q origin "$name"
+            git -C "$main" fetch -q origin
+            # Place the conflicting file as UNTRACKED in the worktree
+            printf 'from-local\n' > "$wt/would-conflict.txt"
+            ;;
+    esac
+    echo "$wt"
+}
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+fresh_log() { local f="$TMP/$1/wt-sync.log"; mkdir -p "$TMP/$1/lock"; echo "$f"; }
+fresh_lockd() { echo "$TMP/$1/lock"; }
+
+run_with_repo() {
+    # run_with_repo <main> <log> <lockd> [extra-env=val ...] -- [args...]
+    local main="$1" log="$2" lockd="$3"; shift 3
+    local extra_env=()
+    while [ $# -gt 0 ] && [ "$1" != "--" ]; do
+        extra_env+=("$1"); shift
+    done
+    [ "${1:-}" = "--" ] && shift
+    ST=0
+    OUT="$(env PATH="$STUBBIN:$PATH" \
+               WT_SYNC_REPO_ROOT="$main" \
+               WT_SYNC_LOG="$log" \
+               WT_SYNC_LOCK_DIR="$lockd" \
+               WT_SYNC_ENABLED=1 \
+               "${extra_env[@]+"${extra_env[@]}"}" \
+               "$TICK" "$@" 2>&1)" || ST=$?
+}
+
+# ── Check 0: source-level safety grep ────────────────────────────────────────
+# A future edit breaking the non-destructive contract should fail here first.
+if grep -qE '\bgit\b.*(push|rebase|reset\s+--hard)' "$TICK"; then
+    failcase "source-level: wt-sync-tick contains git push / rebase / reset --hard"
+else
+    pass "source-level: no git push/rebase/reset --hard in wt-sync-tick"
+fi
+
+# ── Test 1: operator present → exit 0, nothing synced ────────────────────────
+MAIN1="$(new_env)"
+add_worktree "$MAIN1" "wt-present" behind >/dev/null
+LOG1="$(fresh_log t1)"; LOCKD1="$(fresh_lockd t1)"
+STUB_IOREG_LINE="HIDIdleTime = 50000000000"   # 50s — below 600s threshold
+OUT1="$(env PATH="$STUBBIN:$PATH" WT_SYNC_REPO_ROOT="$MAIN1" WT_SYNC_LOG="$LOG1" \
+           WT_SYNC_LOCK_DIR="$LOCKD1" WT_SYNC_ENABLED=1 STUB_IOREG_LINE="$STUB_IOREG_LINE" \
+           "$TICK" 2>&1)" || true
+unset STUB_IOREG_LINE
+assert_match "operator-present: exit message" "operator present" "$OUT1"
+# No log entry should have been written (tick exited before doing any work)
+assert_absent "operator-present: log has no synced= entry" "synced=" "$(cat "$LOG1" 2>/dev/null)"
+# Verify the worktree was NOT touched (HEAD still equals original, NOT origin)
+HEAD_AFTER="$(git -C "$MAIN1/worktrees/wt-present" rev-parse HEAD 2>/dev/null || echo '')"
+HEAD_ORIGIN="$(git -C "$MAIN1" rev-parse origin/wt-present 2>/dev/null || echo '')"
+if [ "$HEAD_AFTER" != "$HEAD_ORIGIN" ]; then
+    pass "operator-present: worktree not synced"
+else
+    failcase "operator-present: worktree was synced (should not have been)"
+fi
+
+# ── Test 2: non-numeric idle → treated as present, fail-closed ───────────────
+MAIN2="$(new_env)"
+add_worktree "$MAIN2" "wt-baddle" behind >/dev/null
+LOG2="$(fresh_log t2)"; LOCKD2="$(fresh_lockd t2)"
+OUT2="$(env PATH="$STUBBIN:$PATH" WT_SYNC_REPO_ROOT="$MAIN2" WT_SYNC_LOG="$LOG2" \
+           WT_SYNC_LOCK_DIR="$LOCKD2" WT_SYNC_ENABLED=1 \
+           STUB_IOREG_LINE="completely-unrelated-output" \
+           "$TICK" 2>&1)" || true
+assert_match "fail-closed: unreadable idle message" "unreadable|operator present|fail.closed" "$OUT2"
+assert_absent "fail-closed: log has no synced= entry" "synced=" "$(cat "$LOG2" 2>/dev/null)"
+
+# ── Test 3: --force bypasses the idle gate ────────────────────────────────────
+# Stub ioreg would return "operator present" (below threshold), but --force skips it.
+MAIN3="$(new_env)"
+add_worktree "$MAIN3" "wt-force" current >/dev/null
+LOG3="$(fresh_log t3)"; LOCKD3="$(fresh_lockd t3)"
+OUT3="$(env PATH="$STUBBIN:$PATH" WT_SYNC_REPO_ROOT="$MAIN3" WT_SYNC_LOG="$LOG3" \
+           WT_SYNC_LOCK_DIR="$LOCKD3" WT_SYNC_ENABLED=1 \
+           STUB_IOREG_LINE="HIDIdleTime = 10000000000" \
+           "$TICK" --force 2>&1)" || true
+# Should reach the scanning step (not exit at idle gate)
+assert_absent "force: does not emit 'operator present'" "operator present" "$OUT3"
+assert_match  "force: reaches scanning" "Scanning worktrees|CURRENT|SYNCED|Done:" "$OUT3"
+assert_match  "force: log written" "synced=" "$(cat "$LOG3" 2>/dev/null)"
+
+# ── Test 4: worktree AHEAD → skipped, STRAGGLER line written ─────────────────
+MAIN4="$(new_env)"
+add_worktree "$MAIN4" "wt-fwd" ahead >/dev/null
+LOG4="$(fresh_log t4)"; LOCKD4="$(fresh_lockd t4)"
+HEAD_BEFORE="$(git -C "$MAIN4/worktrees/wt-fwd" rev-parse HEAD)"
+run_with_repo "$MAIN4" "$LOG4" "$LOCKD4" -- --force
+HEAD_AFTER="$(git -C "$MAIN4/worktrees/wt-fwd" rev-parse HEAD)"
+assert_eq "ahead: HEAD not changed" "$HEAD_BEFORE" "$HEAD_AFTER"
+assert_match "ahead: STRAGGLER in log" "STRAGGLER.*wt-fwd|STRAGGLER.*reason=ahead" \
+    "$(cat "$LOG4" 2>/dev/null)"
+assert_match "ahead: counted in summary" "ahead=" "$(cat "$LOG4" 2>/dev/null)"
+
+# ── Test 5: dirty worktree → skipped, working tree byte-identical after ───────
+MAIN5="$(new_env)"
+add_worktree "$MAIN5" "wt-dirty" current >/dev/null
+# Dirty: stage a change
+printf 'dirty\n' >> "$MAIN5/worktrees/wt-dirty/README.md"
+git -C "$MAIN5/worktrees/wt-dirty" add README.md
+LOG5="$(fresh_log t5)"; LOCKD5="$(fresh_lockd t5)"
+CONTENT_BEFORE="$(cat "$MAIN5/worktrees/wt-dirty/README.md")"
+run_with_repo "$MAIN5" "$LOG5" "$LOCKD5" -- --force
+CONTENT_AFTER="$(cat "$MAIN5/worktrees/wt-dirty/README.md")"
+assert_eq "dirty: working tree unchanged" "$CONTENT_BEFORE" "$CONTENT_AFTER"
+assert_match "dirty: counted in summary" "dirty=1" "$(cat "$LOG5" 2>/dev/null)"
+
+# ── Test 6: worktree in use → skipped ────────────────────────────────────────
+MAIN6="$(new_env)"
+add_worktree "$MAIN6" "wt-inuse" current >/dev/null
+LOG6="$(fresh_log t6)"; LOCKD6="$(fresh_lockd t6)"
+WT6="$MAIN6/worktrees/wt-inuse"
+OUT6="$(env PATH="$STUBBIN:$PATH" WT_SYNC_REPO_ROOT="$MAIN6" WT_SYNC_LOG="$LOG6" \
+           WT_SYNC_LOCK_DIR="$LOCKD6" WT_SYNC_ENABLED=1 \
+           STUB_LSOF_LINE="lsof    999 user   3   DIR   $WT6" \
+           "$TICK" --force 2>&1)" || true
+assert_match "in-use: skipped message" "IN-USE|in-use" "$OUT6"
+assert_match "in-use: counted in summary" "in-use=1" "$(cat "$LOG6" 2>/dev/null)"
+
+# ── Test 7: fast-forwardable worktree → synced, HEAD equals origin ────────────
+MAIN7="$(new_env)"
+add_worktree "$MAIN7" "wt-ff" behind >/dev/null
+LOG7="$(fresh_log t7)"; LOCKD7="$(fresh_lockd t7)"
+HEAD_ORIGIN7="$(git -C "$MAIN7" rev-parse origin/wt-ff)"
+run_with_repo "$MAIN7" "$LOG7" "$LOCKD7" -- --force
+HEAD_AFTER7="$(git -C "$MAIN7/worktrees/wt-ff" rev-parse HEAD)"
+assert_eq "ff: HEAD equals origin/wt-ff" "$HEAD_ORIGIN7" "$HEAD_AFTER7"
+assert_match "ff: counted as synced" "synced=1" "$(cat "$LOG7" 2>/dev/null)"
+
+# ── Test 8: cannot fast-forward → not modified, STRAGGLER written ─────────────
+MAIN8="$(new_env)"
+add_worktree "$MAIN8" "wt-cantff" cannot-ff >/dev/null
+WT8="$MAIN8/worktrees/wt-cantff"
+LOG8="$(fresh_log t8)"; LOCKD8="$(fresh_lockd t8)"
+HEAD_BEFORE8="$(git -C "$WT8" rev-parse HEAD)"
+HEAD_ORIGIN8="$(git -C "$MAIN8" rev-parse origin/wt-cantff)"
+run_with_repo "$MAIN8" "$LOG8" "$LOCKD8" -- --force
+HEAD_AFTER8="$(git -C "$WT8" rev-parse HEAD)"
+# Merge should have FAILED, so HEAD stays at the pre-fetch commit
+assert_eq "cannot-ff: HEAD not advanced" "$HEAD_BEFORE8" "$HEAD_AFTER8"
+if [ "$HEAD_AFTER8" = "$HEAD_ORIGIN8" ]; then
+    failcase "cannot-ff: HEAD should NOT equal origin (merge should have failed)"
+else
+    pass "cannot-ff: HEAD is not at origin (merge correctly failed)"
+fi
+assert_match "cannot-ff: STRAGGLER in log" "STRAGGLER.*wt-cantff|STRAGGLER.*cannot-ff" \
+    "$(cat "$LOG8" 2>/dev/null)"
+assert_match "cannot-ff: counted in summary" "cannot-ff=1" "$(cat "$LOG8" 2>/dev/null)"
+
+# ── Test 9: --dry-run changes nothing ────────────────────────────────────────
+MAIN9="$(new_env)"
+add_worktree "$MAIN9" "wt-dry" behind >/dev/null
+WT9="$MAIN9/worktrees/wt-dry"
+LOG9="$(fresh_log t9)"; LOCKD9="$(fresh_lockd t9)"
+HEAD_BEFORE9="$(git -C "$WT9" rev-parse HEAD)"
+run_with_repo "$MAIN9" "$LOG9" "$LOCKD9" -- --force --dry-run
+HEAD_AFTER9="$(git -C "$WT9" rev-parse HEAD)"
+assert_eq "dry-run: HEAD not changed" "$HEAD_BEFORE9" "$HEAD_AFTER9"
+assert_match "dry-run: WOULD-FF in output" "WOULD-FF|dry" "$OUT"
+
+# ── Test 10: lock single-flight — second concurrent invocation exits ──────────
+MAIN10="$(new_env)"
+LOG10="$(fresh_log t10)"; LOCKD10="$(fresh_lockd t10)"
+LOCK10="$LOCKD10/wt-sync.lock"
+mkdir -p "$LOCKD10"
+# Seed lock with our own (alive) PID
+printf '%d\n' "$$" > "$LOCK10"
+OUT10="$(env PATH="$STUBBIN:$PATH" WT_SYNC_REPO_ROOT="$MAIN10" WT_SYNC_LOG="$LOG10" \
+            WT_SYNC_LOCK_DIR="$LOCKD10" WT_SYNC_ENABLED=1 \
+            "$TICK" --force 2>&1)" || true
+assert_match "lock-held: exit message" "lock held by PID|another tick" "$OUT10"
+assert_absent "lock-held: log has no synced= entry" "synced=" "$(cat "$LOG10" 2>/dev/null)"
+rm -f "$LOCK10"
+
+# Stale lock (dead PID) is reclaimed and tick proceeds.
+MAIN10B="$(new_env)"
+LOG10B="$(fresh_log t10b)"; LOCKD10B="$(fresh_lockd t10b)"
+LOCK10B="$LOCKD10B/wt-sync.lock"
+mkdir -p "$LOCKD10B"
+printf '99999999\n' > "$LOCK10B"    # PID that is almost certainly dead
+OUT10B="$(env PATH="$STUBBIN:$PATH" WT_SYNC_REPO_ROOT="$MAIN10B" WT_SYNC_LOG="$LOG10B" \
+             WT_SYNC_LOCK_DIR="$LOCKD10B" WT_SYNC_ENABLED=1 \
+             "$TICK" --force 2>&1)" || true
+assert_match "stale-lock: reclaim message" "reclaiming stale lock|stale" "$OUT10B"
+assert_match "stale-lock: log written (tick proceeded)" "synced=" "$(cat "$LOG10B" 2>/dev/null)"
+
+# ── Test 11: cron-setup --print-schedule → Program under MAIN checkout ────────
+PLIST_OUT="$("$CRON_SETUP" --print-schedule 2>&1)"
+MAIN_WT_EXPECTED="$(git worktree list --porcelain | awk '/^worktree / {print $2; exit}')"
+assert_match "cron-setup: plist emitted" "<key>Program</key>" "$PLIST_OUT"
+assert_match "cron-setup: Program is under main checkout" \
+    "${MAIN_WT_EXPECTED}/bin/wt-sync-tick" "$PLIST_OUT"
+# Must NOT point at a worktree path (worktrees are under IBL5-worktrees/)
+assert_absent "cron-setup: Program is NOT a worktree path" \
+    "IBL5-worktrees" "$PLIST_OUT"
+
+# ── Test 12: kill switch exits cleanly ───────────────────────────────────────
+MAIN12="$(new_env)"
+LOG12="$(fresh_log t12)"; LOCKD12="$(fresh_lockd t12)"
+OUT12="$(env PATH="$STUBBIN:$PATH" WT_SYNC_REPO_ROOT="$MAIN12" WT_SYNC_LOG="$LOG12" \
+            WT_SYNC_LOCK_DIR="$LOCKD12" WT_SYNC_ENABLED=0 \
+            "$TICK" --force 2>&1)" || true
+assert_match "kill-switch: exit message" "WT_SYNC_ENABLED=0|exiting" "$OUT12"
+assert_absent "kill-switch: log not written" "synced=" "$(cat "$LOG12" 2>/dev/null)"
+
+# ── Final report ──────────────────────────────────────────────────────────────
+echo ""
+if [ "$FAILED" -eq 0 ]; then
+    echo "All tests passed."
+    exit 0
+else
+    echo "${FAILED} test(s) FAILED."
+    exit 1
+fi

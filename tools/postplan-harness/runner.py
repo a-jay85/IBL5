@@ -22,6 +22,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
+import subprocess
 import sys
 import time
 
@@ -251,6 +253,70 @@ def exit_code_for(res: RunResult) -> int:
     return 0 if res.terminal != TerminalState.FAILED else 1
 
 
+def _pull_url_base(worktree: str | None) -> str:
+    """`https://github.com/<owner>/<repo>/pull` for this worktree's origin, or "".
+
+    Best-effort and never fatal: the verdict line degrades to a bare `PR #<n>`
+    when origin is missing or shaped unexpectedly."""
+    if not worktree:
+        return ""
+    try:
+        url = subprocess.run(["git", "-C", worktree, "remote", "get-url", "origin"],
+                             capture_output=True, text=True, timeout=10).stdout.strip()
+    except Exception:
+        return ""
+    if url.endswith(".git"):
+        url = url[:-4]
+    # scp-style (git@github.com:o/r), ssh:// (this repo's actual origin), git://, https://
+    m = re.match(r"^(?:git@github\.com:|(?:ssh|git|https)://(?:git@)?github\.com/)"
+                 r"([^/]+/[^/]+)$", url)
+    if not m:
+        return ""
+    return f"https://github.com/{m.group(1)}/pull"
+
+
+def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
+    """The one line a watcher greps for — printed FIRST, before the stats lines.
+
+    Every terminal branch produces one, and every branch names its outcome in the
+    words a `Monitor` filter actually looks for (RESULT / complete / FAILED /
+    ERROR / conflict / `PR #` / `pull/`). A happy-path-only verdict is the same
+    bug as no verdict: silence would still be indistinguishable from "running"."""
+    # A HarnessError detail can be multi-line (captured stderr). The verdict must
+    # stay ONE line — a watcher reads it with `head -1`, and each newline would
+    # otherwise become its own Monitor event.
+    def _flat(s: str, limit: int = 300) -> str:
+        s = " ".join((s or "").split())
+        return s[:limit] + "…" if len(s) > limit else s
+
+    pr = ""
+    if res.pr_number:
+        pr = f" PR #{res.pr_number}"
+        if pull_base:
+            pr += f" {pull_base}/{res.pr_number}"
+
+    if rc == 3:
+        return ("RESULT: post-plan BLOCKED — rebase conflict on a stacked branch, "
+                "human required; ERROR terminal=failed, no PR opened. "
+                "Resolve the rebase, then re-run bin/post-plan-now.")
+    if res.terminal == TerminalState.FAILED:
+        return (f"RESULT: post-plan FAILED — ERROR terminal=failed "
+                f"kind={res.error_kind or 'unknown'}: "
+                f"{_flat(res.error) or 'no detail'}{pr}")
+    if res.terminal == TerminalState.NOTHING_TO_SHIP:
+        return ("RESULT: post-plan complete — nothing to ship "
+                "(clean tree, empty diff vs master); no PR opened.")
+
+    armed = "armed" if (res.arm and res.arm.armed) else "HELD (human merges)"
+    tail = ""
+    if res.ci_outcome:
+        tail += f" ci={res.ci_outcome}"
+    if res.final_pr_state:
+        tail += f" pr-state={res.final_pr_state}"
+    return (f"RESULT: post-plan complete — terminal={res.terminal.value} "
+            f"auto-merge={armed}{pr}{tail} findings={len(res.findings)}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--mode", choices=["replay", "isolated"], default="replay")
@@ -290,12 +356,16 @@ def main() -> int:
     res = run(fixture, args.out, llm, mode=args.mode, worktree=args.worktree,
               headless=not args.interactive, live=args.live, explicit_path=args.plan)
     t = ledger.totals()
+    rc = exit_code_for(res)
+    # First line, so `head -1 <log>` is the whole verdict and bin/watch-run can
+    # terminate on it without waiting for the launchd label to disappear.
+    print(verdict_line(res, rc, _pull_url_base(args.worktree)))
     print(f"terminal={res.terminal.value} phase5={res.phase5} "
           f"armed={bool(res.arm and res.arm.armed)} findings={len(res.findings)}")
     print(f"llm: {t['llm_invocations']} calls, {t['gross_tokens']} gross tok, "
           f"{t['non_cached_tokens']} non-cached tok, ${t['cost_usd']}, {t['wall_seconds']}s")
     print(f"outputs: {args.out}/result.json, {args.out}/audit.log, {args.out}/actions.jsonl")
-    return exit_code_for(res)
+    return rc
 
 
 if __name__ == "__main__":

@@ -786,6 +786,10 @@ regenerate_weekly_section() {
                     .[] | [.phase, (.inp|n), (.out|n), (.cr|n), (.w5|n), (.w1|n), (.peak_ctx|n)] | @tsv
                 ' "$all_sidecar"
             fi
+            # Days predating the sidecar schema have only a raw log, so fall back to
+            # parsing its `exit:` lines. Peak-ctx (field 7) is deliberately hardcoded 0:
+            # those logs carry only the truncated stream peak that the split-miss comment
+            # below calls out as unreliable, so a legacy day never trips the flag.
             for i in 0 1 2 3 4 5 6; do
                 d=$(_date_ago "$i"); f="$logs_dir/$d.costs.jsonl"
                 if [ ! -f "$f" ]; then
@@ -798,7 +802,7 @@ regenerate_weekly_section() {
                                 if(v~/^[0-9]+$/){
                                   if(k=="in")in_v=v+0;else if(k=="out")ou_v=v+0;
                                   else if(k=="cache")cr_v=v+0;else if(k=="cache_write")cw_v=v+0}}}
-                              print ph"\t"in_v"\t"ou_v"\t"cr_v"\t"cw_v"\t0\t0 }
+                              print ph"\t"in_v"\t"ou_v"\t"cr_v"\t"cw_v"\t0\t0" }
                         ' || true
                     fi
                 fi

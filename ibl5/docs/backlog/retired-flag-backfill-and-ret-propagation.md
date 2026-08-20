@@ -1,6 +1,6 @@
 ---
 description: The `.plr` import zeroes `ibl_plr.retired` for any player still present in the file, and no import path ever writes `retired = 1`; PR #1926 stops the wipe but leaves 8 already-corrupted 2007 retirees unflagged and the write path unbuilt.
-last_verified: 2026-08-19
+last_verified: 2026-08-20
 ---
 
 # Retired Flag: Backfill + `.ret` → `ibl_plr` Propagation
@@ -100,5 +100,8 @@ its own data-entry or `.ret`-ingest gap and needs separate triage.
 
 ## Status
 
-⬜ **Open** — no plan yet. Needs a `/plan` (destructive-adjacent data migration + a new
-write path on an import). (discovered 2026-08-19 during #1926 review)
+◑ **Partial** — migration `163_backfill_2007_retired_flag.sql` backfills the 8
+mis-flagged 2007 retirees (shipped 2026-08-19). Remaining: build the `.ret` →
+`ibl_plr.retired` propagation write path (separate, stacked plan).
+
+**Status (2026-08-19):** Backfill migration shipped. Write-path propagation is the remaining open work.

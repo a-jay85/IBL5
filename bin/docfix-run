@@ -120,5 +120,7 @@ launchctl bootstrap "gui/$(id -u)" "$PLIST"
 
 echo "docfix-run: fired detached doc-fix run on '$SLUG' (issue #$ISSUE_NUM)."
 echo "  worklist: $SIG"
-echo "  log:      tail -f $LOG"
+echo "  watch:    $MAIN/bin/watch-run --log $LOG --label $LABEL"
+echo "            ^ arm THIS in a Monitor. Self-terminating. Never 'tail -f' the log."
+echo "  log:      $LOG"
 echo "  label:    $LABEL   (self-removes when the run finishes)"

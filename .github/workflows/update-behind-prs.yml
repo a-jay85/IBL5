@@ -1,4 +1,4 @@
-name: Update BEHIND Auto-Merge PRs
+name: Update BEHIND PRs
 
 on:
   schedule:
@@ -15,10 +15,10 @@ concurrency:
 
 jobs:
   update-behind:
-    name: Update armed PRs stuck BEHIND master
+    name: Update open PRs stuck BEHIND master
     runs-on: ubuntu-latest
     steps:
-      - name: Update BEHIND armed PRs
+      - name: Update BEHIND PRs
         env:
           GH_TOKEN: ${{ secrets.CI_PAT }}
           REPO: ${{ github.repository }}
@@ -28,10 +28,17 @@ jobs:
           OWNER="${REPO%/*}"
           NAME="${REPO#*/}"
 
-          # 1. Enumerate ALL open, armed (auto-merge enabled) PRs targeting master, with
-          #    their merge state and head SHA. Categorization happens in the loop below so
-          #    the step summary can report conflict / already-current counts too.
-          armed=$(gh api graphql -f owner="$OWNER" -f name="$NAME" -f query='
+          # 1. Enumerate ALL open, non-draft PRs targeting master, with their merge state
+          #    and head SHA. Categorization happens in the loop below so the step summary
+          #    can report conflict / already-current counts too.
+          #
+          #    Scope note: this used to select only PRs with auto-merge ARMED, whose job was
+          #    narrowly to unstick the merge queue (ADR-0081). It now covers every open
+          #    non-draft PR, so long-lived branches stay fresh against master continuously
+          #    instead of drifting until someone rebases by hand. Updating a branch is NOT
+          #    merging it: this workflow never arms auto-merge and never merges anything, so
+          #    the human review bottleneck is unchanged.
+          candidates=$(gh api graphql -f owner="$OWNER" -f name="$NAME" -f query='
             query($owner:String!, $name:String!) {
               repository(owner:$owner, name:$name) {
                 pullRequests(states:OPEN, baseRefName:"master", first:100) {
@@ -40,13 +47,13 @@ jobs:
                     headRefOid
                     mergeable
                     mergeStateStatus
-                    autoMergeRequest { enabledAt }
+                    isDraft
                   }
                 }
               }
             }' --jq '
               .data.repository.pullRequests.nodes[]
-              | select(.autoMergeRequest != null)
+              | select(.isDraft | not)
               | "\(.number) \(.headRefOid) \(.mergeStateStatus) \(.mergeable)"')
 
           updated=0
@@ -55,8 +62,8 @@ jobs:
           already_current=0
           still_unknown=0
 
-          if [ -z "$armed" ]; then
-            echo "No open PRs have auto-merge enabled."
+          if [ -z "$candidates" ]; then
+            echo "No open non-draft PRs targeting master."
           fi
 
           while IFS=' ' read -r number sha state mergeable; do
@@ -141,11 +148,11 @@ jobs:
               echo "::warning::update-branch failed for PR #$number"
             fi
             echo "::endgroup::"
-          done <<< "$armed"
+          done <<< "$candidates"
 
           # 4. Step summary counts.
           {
-            echo "## Update BEHIND Auto-Merge PRs"
+            echo "## Update BEHIND PRs"
             echo "- Updated: $updated"
             echo "- Skipped (CI running): $skipped_ci"
             echo "- Skipped (merge conflict): $skipped_conflict"

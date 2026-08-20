@@ -1,5 +1,5 @@
 ---
-description: The `.plr` import zeroes `ibl_plr.retired` for any player still present in the file, and no import path ever writes `retired = 1`; PR #1926 stops the wipe but leaves 8 already-corrupted 2007 retirees unflagged and the write path unbuilt.
+description: Three defects in the retired flag — the `.plr` import zeroes `ibl_plr.retired`, no import path ever writes `retired = 1`, and the `.ret` importer never reconciles REMOVALS so an un-retired player stays in `ibl_jsb_retired_players` forever; PR #1926 stops the wipe, migration 163 backfills the 8 corrupted 2007 retirees, migration 164 removes the one bogus row, and the write path is still unbuilt.
 last_verified: 2026-08-20
 ---
 
@@ -9,7 +9,7 @@ last_verified: 2026-08-20
 
 The career leaderboard's retired asterisk is driven solely by `ibl_plr.retired`
 (`ibl5/classes/CareerLeaderboards/CareerLeaderboardsService.php:27-28` — `$isRetired = $retired !== 0`).
-Two independent defects leave that column wrong:
+Three independent defects leave that column wrong:
 
 1. **The `.plr` import zeroes it.** `PlrParserRepository::upsertPlayer()` includes
    `` `retired` = VALUES(`retired`) `` in its `ON DUPLICATE KEY UPDATE` list
@@ -26,6 +26,14 @@ Two independent defects leave that column wrong:
    `INSERT INTO ibl_jsb_retired_players … ON DUPLICATE KEY UPDATE`. No code anywhere in
    the repo sets `ibl_plr.retired = 1` — the flag is maintained out-of-band by hand.
    Once #1926 stops the wipe, a newly retired player still never gets flagged.
+
+3. **The `.ret` import never reconciles removals.** A `.ret` file is a full **overwrite
+   snapshot**, not a cumulative log — each JSB retirement batch replaces the entire name
+   list. But `RetRepository` writes `INSERT … ON DUPLICATE KEY UPDATE` and issues **no
+   `DELETE`**, so `ibl_jsb_retired_players` is additive-only. A player JSB un-retires — or
+   a batch imported from a snapshot that was later superseded — stays in the table
+   permanently, with nothing in the codebase able to remove them. See
+   *Defect 3: the removal-reconciliation gap* below.
 
 ## Evidence (measured 2026-08-19 against the main stack)
 
@@ -52,6 +60,64 @@ in that import all have `retired = 0` and the 11 absent from it all have `retire
 is the `.plr` wipe and nothing else: Arvydas Sabonis (327), Gary Payton (2000), Jamal Murray (1250),
 Donta Smith (2750), Frank Johnson II (3301), Anthony Tolliver (3307), Troy Bell (5318),
 Danny Granger (5645).
+
+[CORRECTED 2026-08-20] **Danny Granger (5645) does not belong on that list** — he was never
+retired by JSB at all. His `ibl_jsb_retired_players` row came from a superseded snapshot and
+was removed by migration `164_remove_stale_granger_retirement.sql`, which also reset his
+`ibl_plr.retired` to 0. The other seven are genuine 2007 retirees and remain flagged. The
+row counts in the tables above are as measured on 2026-08-19 and are left unrevised.
+
+## Defect 3: the removal-reconciliation gap (traced 2026-08-20)
+
+The Danny Granger case is the worked example, and it is the reason defect 3 is not
+theoretical:
+
+- The archive `06-07_36_finals.zip` (example) contains an `IBL5.ret` with JSB internal
+  timestamp 2026-03-11 20:05 whose **first line** is `Danny Granger 5645`.
+- The next archive, `07-08_01_preseason.zip` (example), contains an `IBL5.ret` with JSB
+  timestamp 2026-03-11 23:12 — roughly three hours later — that is **byte-identical minus
+  that single line**. JSB retired and un-retired him the same night. He appears in no later
+  archive, and the live `.ret` on disk today does not name him.
+- `BackupArchiveLocator::findLatestArchive()`
+  (`ibl5/classes/BulkImport/BackupArchiveLocator.php`) selects the archive with the newest
+  mtime. On import day 2026-04-19 the stale finals zip was genuinely the newest file on
+  disk — the corrected preseason zip did not land until 2026-04-23. **The locator is not
+  the defect**; it read the only file that existed.
+- Because `RetRepository` has no `DELETE`, the later corrected seven-name import could not
+  undo the eight-name one. Row 137 became permanent, migration 163 propagated it into
+  `ibl_plr.retired = 1`, and Granger vanished from the Heat roster page. Reported as bug
+  pipeline report id 4.
+
+The load-bearing consequence: **clearing `ibl_plr.retired` alone would not have fixed
+this.** The propagation write path from defect 2, once built, would re-flag him off the
+stale row on the next import. Any propagation design must handle removals, or it will
+resurrect every stale row in the table the day it ships.
+
+### Related, NOT the same defect: Sabonis (327) and Payton (2000)
+
+Both carry `retired = 1` from migration 163 *and* a `teamID`, so migration 163 hid them
+from their team roster pages (Sabonis → Raptors, Payton → Kings) exactly as it hid Granger
+from the Heat. But **neither is a stale-snapshot case** — both are still named in the
+current `.ret` snapshot, so JSB does consider them retired. They are not reverted here and
+must not be reverted blind.
+
+Two criteria were floated while hunting report 4 and both are **retired as invalid** —
+recorded so they are not re-derived:
+
+- **"has an active multi-year contract (`cy=1`, `cyt>1`)" is not a signal.** 73 players are
+  `retired = 1` with a `teamID`, and 59 of those also have `cy > 0` and `salary_yr1 > 0`.
+  That is a normal, widespread state.
+- **"has 2008 `ibl_hist` activity" is not a signal on its own**, because some 2008 rows are
+  import-carryover duplicates. Sabonis's 2008 row is byte-identical to his 2007 row (Raptors,
+  76 G / 2818 min); Payton's likewise (82 G / 806 min in both). Four pids league-wide show
+  that duplicate pattern (327, 1245, 2000, 3877) out of 354 rows for 2008.
+
+The criterion that actually discriminated Granger is **row distinctness**: his 2008 row
+differs genuinely from his 2007 one (2007 Knicks 82 G / 2768 min → 2008 Heat 82 G / 2889 min).
+That plus the `.ret` snapshot trace is what made his case provable. Sabonis and Payton have
+neither, so they need their own triage — is the roster-page hiding correct behavior for a
+genuinely retired player who still holds a contract, or is the roster query the thing that
+should change?
 
 ## The design fork — why this needs a `/plan`
 
@@ -85,6 +151,17 @@ The plan has to settle:
 - **Propagation direction.** Should `RetImporter` set `ibl_plr.retired = 1` for records it
   ingests (additive, never clearing), or should retirement stay a manual act with the
   import merely reporting drift?
+- **Removal reconciliation.** A `.ret` snapshot is authoritative for its batch, so a name
+  dropped from a later snapshot is a signal, not noise. Does the importer diff the incoming
+  snapshot against the stored set and delete the difference? That collides head-on with the
+  never-clear invariant below and with the coverage finding above, because a naive
+  "delete everything not in this file" would empty the table on every import. A workable
+  shape is probably **per-`retirement_year` reconciliation** — only rows whose
+  `retirement_year` matches the batch being imported are candidates for removal — but that
+  needs verifying against how `retirement_year` is assigned (it comes from the bulk-import
+  entry's year, not from the file). Alternatively the importer reports the drift and a human
+  confirms. Until this is settled, stale rows must be removed by hand-written migration, as
+  `164_remove_stale_granger_retirement.sql` does.
 - **Never-clear invariant.** Whatever writes the flag must be additive-only, so a future
   import cannot repeat the wipe. Worth a regression test pinning `retired` across a
   re-import of an already-retired player.
@@ -101,7 +178,11 @@ its own data-entry or `.ret`-ingest gap and needs separate triage.
 ## Status
 
 ◑ **Partial** — migration `163_backfill_2007_retired_flag.sql` backfills the 8
-mis-flagged 2007 retirees (shipped 2026-08-19). Remaining: build the `.ret` →
-`ibl_plr.retired` propagation write path (separate, stacked plan).
+mis-flagged 2007 retirees (shipped 2026-08-19). Migration
+`164_remove_stale_granger_retirement.sql` removes the one bogus row that backfill inherited
+and resets that player's flag (2026-08-20). Remaining: build the `.ret` →
+`ibl_plr.retired` propagation write path, which now must also settle **removal
+reconciliation** (defect 3) — separate, stacked plan.
 
-**Status (2026-08-19):** Backfill migration shipped. Write-path propagation is the remaining open work.
+**Status (2026-08-20):** Backfills shipped (163, 164). Write-path propagation plus removal
+reconciliation is the remaining open work; Sabonis (327) needs separate triage.

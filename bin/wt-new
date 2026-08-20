@@ -6,8 +6,14 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-source "$REPO_ROOT/bin/lib/git-helpers.sh"
+SCRIPT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+source "$SCRIPT_ROOT/bin/lib/git-helpers.sh"
+# Always operate on the MAIN checkout, even when invoked through a worktree's own
+# copy of this script. REPO_ROOT drives the ff-only sync below, which targets the
+# CHECKED-OUT branch of whatever root it is given: from a worktree that is the
+# feature branch, not master, so the sync fast-forwards the wrong branch — and
+# fails outright ("Not possible to fast-forward") once that branch is squash-merged.
+REPO_ROOT="$(resolve_canonical_root "$SCRIPT_ROOT")"
 WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
 MAIN_IBL5="$REPO_ROOT/ibl5"
 NAME=""

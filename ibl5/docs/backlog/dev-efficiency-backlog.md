@@ -1,6 +1,6 @@
 ---
 description: Development-efficiency backlog — inner-loop speed (diff-scoped analysis, parallel tests), CI caching, dependency-bump batching, and worktree lifecycle automation, with per-entry status.
-last_verified: 2026-08-15
+last_verified: 2026-08-19
 ---
 
 # Development-Efficiency Backlog
@@ -38,7 +38,7 @@ last_verified: 2026-08-15
 | E9 | Meta-tooling growth bar | ✅ Implemented | — | S |
 | E10 | Schema baseline auto-regen | ✅ Implemented | — | M |
 | E11 | In-PR pre-baked image build | ✅ Implemented | — | M |
-| E12 | `bin/wt-new` fails with misleading error when invoked from inside a worktree | ⬜ Open | 🟨 | S |
+| E12 | `bin/wt-new` fails with misleading error when invoked from inside a worktree | ✅ Implemented | — | S |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -89,12 +89,7 @@ last_verified: 2026-08-15
 
 ➜ E11 In-PR pre-baked image build — ✅ Implemented (2026-07-09): see [archive](archive/dev-efficiency-backlog-archive.md).
 
-### E12 `bin/wt-new` fails with misleading error when invoked from inside a worktree
-**Location:** `bin/wt-new:9` (`REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"`) and `bin/wt-new:57` (`git -C "$REPO_ROOT" merge --ff-only "origin/$BASE_BRANCH"`).
-**Problem:** `bin/wt-new` computes `REPO_ROOT` from the script's own path and then runs `git -C "$REPO_ROOT" merge --ff-only "origin/$BASE_BRANCH"` to sync the base branch before branching. When the script is invoked by its worktree-relative path (e.g. `bin/wt-new foo` from `IBL5-worktrees/<slug>/`), `REPO_ROOT` resolves to that worktree rather than the main checkout. The `--ff-only` then targets the worktree's feature branch, which has diverged from `origin/master`, and the script aborts with `fatal: Not possible to fast-forward, aborting.` before creating anything. Observed 2026-07-29 running `bin/wt-new matrix-fence-strip` from the `critical-files-parser-unification` worktree. Failure is fail-safe (aborts, creates nothing) but the error message points at the fast-forward constraint and gives no hint that the real cause is the wrong `REPO_ROOT`. Note that `.claude/rules/workflow-continuity.md` documents the bare `bin/wt-new <slug>` form as the standard invocation — exactly the shape that fails from a worktree. Workaround: invoke the main checkout's copy by absolute path (`/Users/ajaynicolas/GitHub/IBL5/bin/wt-new <slug>`).
-**Suggested direction:** Resolve the base-branch sync against the repo's main worktree rather than `$REPO_ROOT`. Candidates: parse the first entry from `git worktree list --porcelain`; or use `git -C "$REPO_ROOT" rev-parse --git-common-dir` to locate the shared `.git/` and derive the main worktree path from it.
-**Risk if untouched:** Non-obvious failure every time a developer runs `bin/wt-new` from inside a worktree — a common pattern during multi-worktree sessions.
-**Status (2026-07-29):** ⬜ Open — 🟨 (core workflow script; needs smoke-testing from both main-checkout and worktree invocation paths). (discovered 2026-07-29 during matrix-fence-strip)
+➜ E12 `bin/wt-new` fails with misleading error when invoked from inside a worktree — ✅ Implemented (2026-08-19): see [archive](archive/dev-efficiency-backlog-archive.md).
 
 ---
 

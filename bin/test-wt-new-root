@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-wt-new-root — regression harness for bin/wt-new's repo-root resolution.
+#
+# Pins the defect: wt-new derived REPO_ROOT from its OWN script path, so invoking a
+# worktree's copy (`bin/wt-new <slug>` typed from inside a worktree) pointed the
+# ff-only master sync at that worktree's CHECKED-OUT branch instead of the main
+# checkout's master. Harmless while local master was current, but once the worktree's
+# branch had diverged — which every squash-merged branch does — the sync aborted with
+# "Not possible to fast-forward" and no worktree was created at all.
+#
+# Both cases run against a throwaway origin/main/worktree trio built under mktemp, so
+# nothing real is touched. The negative control re-points REPO_ROOT at the script path
+# and asserts the failure DOES reappear — without it, the positive case could pass for
+# reasons unrelated to the fix.
+#
+# Run: bin/test-wt-new-root  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+WTNEW="$SCRIPT_DIR/wt-new"
+TMP="$(mktemp -d)"
+trap 'chmod -R u+w "$TMP" 2>/dev/null; rm -rf "$TMP" 2>/dev/null' EXIT
+
+FAILED=0
+pass()     { echo "ok: $1"; }
+failcase() { echo "FAIL: $1"; FAILED=1; }
+
+# assert_absent <name> <regex> <haystack>
+assert_absent() {
+    if printf '%s' "$3" | grep -qE "$2"; then
+        failcase "$1 — expected NOT to match: $2"
+        printf '%s\n' "$3" | sed 's/^/    /'
+    else
+        pass "$1"
+    fi
+}
+
+# assert_match <name> <regex> <haystack>
+assert_match() {
+    if printf '%s' "$3" | grep -qE "$2"; then
+        pass "$1"
+    else
+        failcase "$1 — expected to match: $2"
+        printf '%s\n' "$3" | sed 's/^/    /'
+    fi
+}
+
+# assert_eq <name> <expected> <actual>
+assert_eq() {
+    if [ "$2" = "$3" ]; then pass "$1"; else failcase "$1 — expected '$2', got '$3'"; fi
+}
+
+git_q() { git -c user.email=t@t -c user.name=t -c init.defaultBranch=master "$@"; }
+
+# new_env — build <TMP>/env.XXXX/{origin.git,IBL5,IBL5-worktrees/feature}:
+#   • origin/master is ONE commit ahead of the main checkout's local master
+#   • the worktree's branch has its own commit, so it has DIVERGED from origin/master
+# Echoes the env base path. This is the exact shape the defect needed.
+new_env() {
+    local base
+    base="$(mktemp -d "$TMP/env.XXXXXX")"
+    git_q init -q --bare "$base/origin.git" >/dev/null 2>&1
+
+    # Seed C1 with a copy of the real scripts under test.
+    git_q clone -q "$base/origin.git" "$base/IBL5" >/dev/null 2>&1
+    mkdir -p "$base/IBL5/bin/lib" "$base/IBL5/ibl5"
+    cp "$WTNEW" "$base/IBL5/bin/wt-new"
+    cp "$SCRIPT_DIR"/lib/*.sh "$base/IBL5/bin/lib/" 2>/dev/null
+    chmod +x "$base/IBL5/bin/wt-new"
+    git_q -C "$base/IBL5" add -A >/dev/null 2>&1
+    git_q -C "$base/IBL5" commit -qm C1 >/dev/null 2>&1
+    git_q -C "$base/IBL5" push -q -u origin master >/dev/null 2>&1
+
+    # C2 lands on origin only — local master is now 1 behind, never fast-forwarded.
+    git_q clone -q "$base/origin.git" "$base/pusher" >/dev/null 2>&1
+    echo c2 > "$base/pusher/C2.txt"
+    git_q -C "$base/pusher" add -A >/dev/null 2>&1
+    git_q -C "$base/pusher" commit -qm C2 >/dev/null 2>&1
+    git_q -C "$base/pusher" push -q origin master >/dev/null 2>&1
+    git_q -C "$base/IBL5" fetch -q origin >/dev/null 2>&1
+
+    # A worktree whose branch carries its own commit → diverged from origin/master.
+    mkdir -p "$base/IBL5-worktrees"
+    git_q -C "$base/IBL5" worktree add -q "$base/IBL5-worktrees/feature" -b feature master >/dev/null 2>&1
+    echo f1 > "$base/IBL5-worktrees/feature/F1.txt"
+    git_q -C "$base/IBL5-worktrees/feature" add -A >/dev/null 2>&1
+    git_q -C "$base/IBL5-worktrees/feature" commit -qm F1 >/dev/null 2>&1
+
+    printf '%s\n' "$base"
+}
+
+sha() { git -C "$1" rev-parse "$2" 2>/dev/null; }
+
+echo "== case 1: wt-new invoked through a DIVERGED worktree's own copy"
+ENV1="$(new_env)"
+ORIGIN_TIP="$(sha "$ENV1/IBL5" origin/master)"
+FEATURE_TIP="$(sha "$ENV1/IBL5" feature)"
+
+# wt-new fails later in temp (no real ibl5/ tree to materialize) — irrelevant here.
+# The contract under test is the repo-root/sync behaviour, asserted on refs below.
+OUT1="$("$ENV1/IBL5-worktrees/feature/bin/wt-new" smoke 2>&1)"
+
+assert_absent "sync does not abort on the diverged branch" "Not possible to fast-forward" "$OUT1"
+assert_eq "main checkout's master fast-forwarded to origin/master" \
+    "$ORIGIN_TIP" "$(sha "$ENV1/IBL5" master)"
+assert_eq "the worktree's own branch is left untouched" \
+    "$FEATURE_TIP" "$(sha "$ENV1/IBL5" feature)"
+if [ -d "$ENV1/IBL5-worktrees/smoke" ]; then
+    pass "the requested worktree is actually created"
+else
+    failcase "the requested worktree is actually created — $ENV1/IBL5-worktrees/smoke missing"
+fi
+
+echo "== case 2: negative control — REPO_ROOT back on the script's own path"
+ENV2="$(new_env)"
+BEFORE_MASTER="$(sha "$ENV2/IBL5" master)"
+# Reintroduce the defect in the worktree's copy only.
+perl -0pi -e 's{^REPO_ROOT="\$\(resolve_canonical_root .*\)"$}{REPO_ROOT="\$SCRIPT_ROOT"}m' \
+    "$ENV2/IBL5-worktrees/feature/bin/wt-new"
+assert_match "control actually re-points REPO_ROOT" 'REPO_ROOT="\$SCRIPT_ROOT"' \
+    "$(cat "$ENV2/IBL5-worktrees/feature/bin/wt-new")"
+
+OUT2="$("$ENV2/IBL5-worktrees/feature/bin/wt-new" smoke 2>&1)"
+assert_match "defect reappears: sync aborts on the diverged branch" \
+    "Not possible to fast-forward" "$OUT2"
+assert_eq "and master is left stale" "$BEFORE_MASTER" "$(sha "$ENV2/IBL5" master)"
+if [ -d "$ENV2/IBL5-worktrees/smoke" ]; then
+    failcase "and no worktree is created — $ENV2/IBL5-worktrees/smoke exists"
+else
+    pass "and no worktree is created"
+fi
+
+echo "----"
+if [ "$FAILED" -eq 0 ]; then echo "ALL PASS"; else echo "FAILURES"; fi
+exit "$FAILED"

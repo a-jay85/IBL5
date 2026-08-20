@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed development-efficiency backlog entries, extracted from dev-efficiency-backlog.md.
-last_verified: 2026-08-15
+last_verified: 2026-08-19
 ---
 
 # Development-Efficiency Backlog — Archive
@@ -37,3 +37,9 @@ Read-only historical record of ✅ Implemented / 🚫 Declined entries. For OPEN
 **Suggested direction:** Build the Docker image in-PR for PRs touching the Dockerfile or composer deps (paths-filtered so normal PRs are unaffected).
 **Risk if untouched:** Dockerfile/dep changes are validated against a stale image; mismatch only surfaces post-merge.
 **Status (2026-07-09):** ✅ Implemented — PR #1386 (`in-pr-prebaked-image-build`): in-PR image build wired via paths-filter; normal PRs unaffected.
+
+### E12 `bin/wt-new` fails with misleading error when invoked from inside a worktree
+**Location:** `bin/wt-new` — `REPO_ROOT` derivation and `git merge --ff-only` sync.
+**Problem:** `bin/wt-new` computed `REPO_ROOT` from the script's own path. When invoked through a worktree copy (e.g. `bin/wt-new foo` from `IBL5-worktrees/<slug>/`), `REPO_ROOT` resolved to that worktree rather than the main checkout. The `--ff-only` then targeted the worktree's feature branch, which had diverged from `origin/master`, and the script aborted with `fatal: Not possible to fast-forward, aborting.` before creating anything. Observed 2026-07-29 running `bin/wt-new matrix-fence-strip` from the `critical-files-parser-unification` worktree. `.claude/rules/workflow-continuity.md` documents the bare `bin/wt-new <slug>` form as the standard invocation — exactly the shape that failed from a worktree. Workaround was: invoke the main checkout's copy by absolute path.
+**What shipped:** PR #1934 — `bin/wt-new` now calls `resolve_canonical_root "$SCRIPT_ROOT"` (from `bin/lib/git-helpers.sh`) to walk up to the canonical main checkout regardless of call site. `bin/test-wt-new-root` regression harness exercises both the positive case (worktree invocation, sync lands on master) and a negative control (defect re-introduced, failure re-appears); wired into CI.
+**Status (2026-08-19):** ✅ Implemented — shipped in #1934.

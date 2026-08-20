@@ -18,7 +18,7 @@ settings.local.json
 .claude/automouse/handoff/
 .nightly/
 
-# JSB native RE docs — in-place private git repo (ADR-0103).
+# JSB native RE docs — in-place private git repo (ADR-0105).
 # Guards every IBL5 clone against staging the 1.19 GB IBL5.log.
 # Mirrors (harmless duplicate of) .git/info/exclude line 20.
 jsb-native/

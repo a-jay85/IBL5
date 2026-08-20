@@ -3,7 +3,7 @@ description: jsb-native/ RE docs get their own private git repo, initialized in 
 last_verified: 2026-08-15
 ---
 
-# ADR-0103: `jsb-native/` is a private git repo, initialized in place
+# ADR-0105: `jsb-native/` is a private git repo, initialized in place
 
 **Status:** Accepted
 **Date:** 2026-07-29

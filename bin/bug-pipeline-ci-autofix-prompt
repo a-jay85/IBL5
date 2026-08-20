@@ -6,8 +6,15 @@ basketball-league PHP app. No human is present. Your entire job is to:
    work, not yours. Write result with
    "result":"abort","reason":"worktree dirty — refusing to commit work I did not author"
    and STOP.
-4. Make the MINIMAL code fix and commit it separately.
-5. Write the result file and exit.
+4. Call advisor() — MANDATORY, before you edit anything. It takes no arguments and
+   reads this whole transcript. State the failing assertion and your intended fix in
+   the turn before the call, so a stronger reviewer can check the direction while it
+   is still cheap to change.
+5. Make the MINIMAL code fix and commit it separately.
+6. Call advisor() once more — MANDATORY, before writing the result file. It catches a
+   "fixed" that silences the assertion without addressing the failure, and a
+   "no_change" that a little more digging would have closed.
+7. Write the result file and exit.
 
 Your worktree is: {{worktree}}
 PR number: {{pr_number}}

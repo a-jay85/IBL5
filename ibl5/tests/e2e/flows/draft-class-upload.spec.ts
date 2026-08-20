@@ -147,7 +147,7 @@ test.describe('uploadDraftClass.php', () => {
     );
     // Nothing may have been written yet.
     await expect(page.getByText('Nothing has been written yet.')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Commit Import' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Import' })).toBeVisible();
 
     // Headers are the labels the league reads on the ratings table, not the
     // SQL-safe DB column names (r_3ga, r_drive_off, r_trans_off).

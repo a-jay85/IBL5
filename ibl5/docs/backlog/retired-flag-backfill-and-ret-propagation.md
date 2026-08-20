@@ -115,9 +115,24 @@ recorded so they are not re-derived:
 The criterion that actually discriminated Granger is **row distinctness**: his 2008 row
 differs genuinely from his 2007 one (2007 Knicks 82 G / 2768 min → 2008 Heat 82 G / 2889 min).
 That plus the `.ret` snapshot trace is what made his case provable. Sabonis and Payton have
-neither, so they need their own triage — is the roster-page hiding correct behavior for a
-genuinely retired player who still holds a contract, or is the roster query the thing that
-should change?
+neither.
+
+**Resolved 2026-08-20 (league ruling): a retired-but-contracted player should NOT appear on a
+roster.** Retirement is the stronger fact; an unexpired contract on a retired player is a
+salary-book artifact, not roster membership. So the roster-page hiding is **correct behavior**,
+`retired = 1` alongside a live `teamID`/`cy` is a **legitimate state**, and the roster query is
+not the thing that should change. Sabonis (327) and Payton (2000) are therefore **closed — no
+fix, and no triage owed**: both are genuinely retired per the current `.ret` snapshot, so being
+hidden from the Raptors and Kings rosters is the correct outcome.
+
+Mechanism confirmed 2026-08-20 — the roster reads filter on `p.retired = 0`
+(`ibl5/classes/Team/TeamQueryRepository.php:115,148,181,200,218,238,257,275,293` and
+`ibl5/classes/Team/TeamRepository.php:323,342`), so migration 163's flag is indeed what hides
+them; the mechanism sentence opening this section is correct, not inherited guesswork.
+
+**This ruling does not reopen migration 164.** Granger was never retired by JSB at all, so his
+revert stands on the stale-snapshot trace and is independent of this decision. The ruling is
+*retired players stay hidden*; it says nothing about players who were never retired.
 
 ## The design fork — why this needs a `/plan`
 
@@ -165,6 +180,11 @@ The plan has to settle:
 - **Never-clear invariant.** Whatever writes the flag must be additive-only, so a future
   import cannot repeat the wipe. Worth a regression test pinning `retired` across a
   re-import of an already-retired player.
+- **Contracted retirees — settled, not a fork.** Per the 2026-08-20 ruling above, a retired
+  player with a live contract must stay off the roster, so propagation does **not** need to
+  special-case players who hold a `teamID`, `cy`, or salary. `retired = 1` next to an
+  unexpired contract is a valid end state, and the roster query stays as-is. The 73
+  `retired = 1` rows that carry a `teamID` need no cleanup.
 - **Ordering.** The backfill migration is only durable once #1926 is merged; before that,
   the next `.plr` import re-zeroes it.
 
@@ -185,4 +205,5 @@ and resets that player's flag (2026-08-20). Remaining: build the `.ret` →
 reconciliation** (defect 3) — separate, stacked plan.
 
 **Status (2026-08-20):** Backfills shipped (163, 164). Write-path propagation plus removal
-reconciliation is the remaining open work; Sabonis (327) needs separate triage.
+reconciliation is the remaining open work. Sabonis (327) and Payton (2000) are **closed** —
+the league ruling confirms retired-but-contracted players are correctly hidden from rosters.

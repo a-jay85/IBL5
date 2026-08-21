@@ -7,6 +7,7 @@ namespace FreeAgencyPreview;
 use FreeAgencyPreview\Contracts\FreeAgencyPreviewServiceInterface;
 use FreeAgencyPreview\Contracts\FreeAgencyPreviewViewInterface;
 use Player\PlayerImageHelper;
+use UI\TableStyles;
 use UI\TeamCellHelper;
 use Security\HtmlSanitizer;
 
@@ -56,34 +57,37 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
      */
     private function renderTableStart(): string
     {
-        return '<table class="sortable ibl-data-table sticky-table">
+        return '<table class="sortable ibl-data-table team-table sticky-table" style="' . TableStyles::inlineTeamVars('666666', 'ffffff') . '">
             <thead>
                 <tr>
                     <th class="sticky-col sticky-corner">Player</th>
                     <th>Team</th>
-                    <th class="fa-preview-pos-col">Pos</th>
+                    <th class="fa-preview-pos-col sep-r-team">Pos</th>
                     <th>Age</th>
                     <th>2ga</th>
                     <th>2g%</th>
                     <th>fta</th>
                     <th>ft%</th>
                     <th>3ga</th>
-                    <th>3g%</th>
+                    <th class="sep-r-team">3g%</th>
                     <th>orb</th>
                     <th>drb</th>
                     <th>ast</th>
                     <th>stl</th>
-                    <th>to</th>
+                    <th>tvr</th>
                     <th>blk</th>
-                    <th>foul</th>
-                    <th>o-o</th>
-                    <th>d-o</th>
-                    <th>p-o</th>
-                    <th>t-o</th>
-                    <th>o-d</th>
-                    <th>d-d</th>
-                    <th>p-d</th>
-                    <th>t-d</th>
+                    <th class="sep-r-team">foul</th>
+                    <th>oo</th>
+                    <th>do</th>
+                    <th>po</th>
+                    <th>to</th>
+                    <th>od</th>
+                    <th>dd</th>
+                    <th>pd</th>
+                    <th class="sep-r-team">td</th>
+                    <th>T</th>
+                    <th>S</th>
+                    <th class="sep-r-team">I</th>
                     <th>Loy</th>
                     <th>PFW</th>
                     <th>PT</th>
@@ -116,29 +120,32 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
             $output .= "<tr data-team-id=\"{$teamid}\">"
                 . $playerCell
                 . $teamCell
-                . "<td class=\"fa-preview-pos-col\">{$pos}</td>"
+                . "<td class=\"fa-preview-pos-col sep-r-team\">{$pos}</td>"
                 . "<td>{$age}</td>"
                 . "<td>{$player['r_fga']}</td>"
-                . "<td>{$player['r_fgp']}</td>"
+                . "<td class=\"sep-r-weak\">{$player['r_fgp']}</td>"
                 . "<td>{$player['r_fta']}</td>"
-                . "<td>{$player['r_ftp']}</td>"
+                . "<td class=\"sep-r-weak\">{$player['r_ftp']}</td>"
                 . "<td>{$player['r_3ga']}</td>"
-                . "<td>{$player['r_3gp']}</td>"
+                . "<td class=\"sep-r-team\">{$player['r_3gp']}</td>"
                 . "<td>{$player['r_orb']}</td>"
                 . "<td>{$player['r_drb']}</td>"
                 . "<td>{$player['r_ast']}</td>"
                 . "<td>{$player['r_stl']}</td>"
                 . "<td>{$player['r_tvr']}</td>"
                 . "<td>{$player['r_blk']}</td>"
-                . "<td>{$player['r_foul']}</td>"
+                . "<td class=\"sep-r-team\">{$player['r_foul']}</td>"
                 . "<td>{$player['oo']}</td>"
                 . "<td>{$player['r_drive_off']}</td>"
                 . "<td>{$player['po']}</td>"
-                . "<td>{$player['r_trans_off']}</td>"
+                . "<td class=\"sep-r-weak\">{$player['r_trans_off']}</td>"
                 . "<td>{$player['od']}</td>"
                 . "<td>{$player['dd']}</td>"
                 . "<td>{$player['pd']}</td>"
-                . "<td>{$player['td']}</td>"
+                . "<td class=\"sep-r-team\">{$player['td']}</td>"
+                . "<td>{$player['talent']}</td>"
+                . "<td>{$player['skill']}</td>"
+                . "<td class=\"sep-r-team\">{$player['intangibles']}</td>"
                 . "<td>{$player['loyalty']}</td>"
                 . "<td>{$player['winner']}</td>"
                 . "<td>{$player['playing_time']}</td>"

@@ -1,0 +1,269 @@
+#!/usr/bin/env bash
+# test-pr-ready-now — generation-slice tests for bin/pr-ready-now.
+#
+# Covers everything up to and including artifact generation: flag validation, the
+# open/non-draft selector, per-PR path uniqueness, plist shape, the env seams, and the
+# concurrency cap. It never bootstraps a launchd job and never touches a real PR, so it
+# runs identically on macOS and Linux CI — there is deliberately no platform skip.
+#
+# Driven entirely through bin/pr-ready-now's documented env seams plus a scratch HOME,
+# so no state outside the scratch dir is read or written.
+#
+# Usage: bin/test-pr-ready-now
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+DRIVER="$SCRIPT_DIR/pr-ready-now"
+[[ -x "$DRIVER" ]] || { echo "FAIL: $DRIVER missing or not executable" >&2; exit 1; }
+
+SCRATCH="$(mktemp -d)"
+trap 'rm -rf "$SCRATCH"' EXIT
+
+FAILED=0
+CASE_BASE=0
+fail() { echo "FAIL: $*" >&2; FAILED=$((FAILED + 1)); }
+begin_case() { CASE_BASE=$FAILED; }
+end_case() {  # $1 = case name; prints "<name> OK" only if the case added no failures
+    if [[ $FAILED -eq $CASE_BASE ]]; then echo "$1 OK"; else echo "$1 FAILED" >&2; fi
+}
+
+# --- fixtures ----------------------------------------------------------------------------
+mkdir -p "$SCRATCH/.local/bin" "$SCRATCH/.bun/bin"
+
+# Stub claude. /bin/true is not portable (macOS ships /usr/bin/true), so make our own.
+printf '#!/usr/bin/env bash\nexit 0\n' > "$SCRATCH/.local/bin/claude-stub"
+chmod +x "$SCRATCH/.local/bin/claude-stub"
+CLAUDE_STUB="$SCRATCH/.local/bin/claude-stub"
+
+cat > "$SCRATCH/two-open.json" <<'JSON'
+[
+  {"number": 1901, "title": "first",  "isDraft": false, "headRefName": "branch-one", "author": {"login": "a-jay85"}},
+  {"number": 1902, "title": "second", "isDraft": false, "headRefName": "branch-two", "author": {"login": "a-jay85"}}
+]
+JSON
+
+cat > "$SCRATCH/one-draft.json" <<'JSON'
+[
+  {"number": 1903, "title": "draft",     "isDraft": true,  "headRefName": "branch-draft", "author": {"login": "a-jay85"}},
+  {"number": 1904, "title": "not-draft", "isDraft": false, "headRefName": "branch-live",  "author": {"login": "a-jay85"}}
+]
+JSON
+
+# gh shim, installed where bin/pr-ready-now's PATH prelude will find it ahead of any
+# system gh on CI. Only `gh pr list` needs to work here; identity goes through the
+# PR_READY_NOW_GH_USER seam.
+cat > "$SCRATCH/.local/bin/gh" <<GH_EOF
+#!/usr/bin/env bash
+if [[ "\${1:-}" == "pr" && "\${2:-}" == "list" ]]; then
+    cat "$SCRATCH/two-open.json"
+    exit 0
+fi
+echo "gh shim: unexpected args: \$*" >&2
+exit 1
+GH_EOF
+chmod +x "$SCRATCH/.local/bin/gh"
+cp "$SCRATCH/.local/bin/gh" "$SCRATCH/.bun/bin/gh"
+
+# launchctl shim — makes the "already running" skip testable, and testable on Linux CI
+# where launchctl does not exist at all. `launchctl list` echoes whatever the current
+# case wrote to launchctl-list.txt; everything else is a no-op.
+#
+# The trailing filler is load-bearing, not padding. The bug case 9 guards is a SIGPIPE
+# under `set -o pipefail`, which only reproduces when the writer still has queued output
+# after the reader exits. Real `launchctl list` prints hundreds of lines; a three-line
+# shim would finish writing before grep -q exited and the buggy code would pass. The
+# filler follows the fixture labels so a match always leaves bytes unwritten, and it
+# exceeds the 64KB pipe buffer so the writer cannot dump-and-exit.
+: > "$SCRATCH/launchctl-list.txt"
+cat > "$SCRATCH/.local/bin/launchctl" <<LC_EOF
+#!/usr/bin/env bash
+if [[ "\${1:-}" == "list" && \$# -eq 1 ]]; then
+    cat "$SCRATCH/launchctl-list.txt"
+    i=0
+    while [[ \$i -lt 6000 ]]; do
+        printf -- '-\t0\tcom.apple.filler.service.number.%s\n' "\$i"
+        i=\$((i + 1))
+    done
+fi
+exit 0
+LC_EOF
+chmod +x "$SCRATCH/.local/bin/launchctl"
+
+set_live_labels() { printf '%s\n' "$@" > "$SCRATCH/launchctl-list.txt"; }
+clear_live_labels() { : > "$SCRATCH/launchctl-list.txt"; }
+
+# Run the driver in a sealed environment: scratch HOME (so plists land in the scratch
+# tree), stubbed claude, seamed gh identity, shim dir on PATH.
+run_driver() {
+    env HOME="$SCRATCH" \
+        PATH="$SCRATCH/.local/bin:$PATH" \
+        PR_READY_NOW_CLAUDE="$CLAUDE_STUB" \
+        PR_READY_NOW_GH_USER=a-jay85 \
+        "$DRIVER" "$@"
+}
+
+plist_count() {
+    local f n=0
+    for f in "$SCRATCH/Library/LaunchAgents"/com.ibl5.pr-ready-now-*.plist; do
+        if [[ -e "$f" ]]; then n=$((n + 1)); fi
+    done
+    printf '%s\n' "$n"
+}
+
+clean_slots() { rm -rf "$SCRATCH/Library/LaunchAgents"; }
+
+# --- case 1: --help ----------------------------------------------------------------------
+begin_case
+out="$(run_driver --help 2>&1)"; rc=$?
+[[ $rc -eq 0 ]]                 || fail "--help exited $rc, want 0"
+grep -q 'Usage:' <<< "$out"     || fail "--help output has no 'Usage:' line"
+grep -q -- '--jobs' <<< "$out"  || fail "--help output does not document --jobs"
+end_case help
+
+# --- case 2: flag validation -------------------------------------------------------------
+begin_case
+check_reject() {  # $1 = expected stderr substring, rest = argv
+    local want="$1"; shift
+    local e o r
+    e="$(mktemp)"
+    o="$(run_driver "$@" 2>"$e")"; r=$?
+    : "$o"
+    [[ $r -ne 0 ]] || fail "'$*' exited 0, want non-zero"
+    grep -q "$want" "$e" || fail "'$*' stderr lacks '$want' (got: $(tr '\n' ' ' < "$e"))"
+    rm -f "$e"
+}
+check_reject 'positive integer'  --jobs foo
+check_reject 'positive integer'  --jobs 0
+check_reject 'positive integers' --pr 0
+check_reject 'positive integers' --pr abc
+check_reject 'unknown flag'      --bogus
+check_reject 'requires a value'  --jobs
+end_case flag-validation
+
+# --- case 3: dry-run report, no --go -----------------------------------------------------
+begin_case
+clean_slots
+out="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" run_driver 2>&1)"; rc=$?
+[[ $rc -eq 0 ]]                    || fail "dry-run exited $rc, want 0 (out: $out)"
+grep -q '1901' <<< "$out"          || fail "dry-run report omits PR 1901"
+grep -q '1902' <<< "$out"          || fail "dry-run report omits PR 1902"
+grep -q 'branch-one' <<< "$out"    || fail "dry-run report omits branch-one"
+grep -q 'DRY RUN' <<< "$out"       || fail "dry-run report never says DRY RUN"
+[[ "$(plist_count)" -eq 0 ]]       || fail "dry-run wrote $(plist_count) plist(s), want 0"
+end_case dry-run-report
+
+# --- case 4: draft exclusion -------------------------------------------------------------
+begin_case
+clean_slots
+out="$(PR_READY_NOW_PR_JSON="$SCRATCH/one-draft.json" run_driver 2>&1)"; rc=$?
+[[ $rc -eq 0 ]]              || fail "draft-exclusion run exited $rc, want 0 (out: $out)"
+grep -q '1904' <<< "$out"    || fail "non-draft PR 1904 missing from report"
+grep -q '1903' <<< "$out"    && fail "draft PR 1903 leaked into the fire list"
+end_case draft-exclusion
+
+# --- case 5: per-PR path uniqueness (defect class B1 regression) -------------------------
+# Every generated path must be keyed to the PR number. A $$- or timestamp-derived name
+# would collide here, because both PRs are generated by the same process.
+begin_case
+clean_slots
+out="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" PR_READY_NOW_DRY_RUN=1 run_driver --go --jobs 3 2>&1)"; rc=$?
+[[ $rc -eq 0 ]]                || fail "--go dry-run exited $rc, want 0 (out: $out)"
+[[ "$(plist_count)" -eq 2 ]]   || fail "--go dry-run wrote $(plist_count) plist(s), want 2"
+
+P1="$SCRATCH/Library/LaunchAgents/com.ibl5.pr-ready-now-1901.plist"
+P2="$SCRATCH/Library/LaunchAgents/com.ibl5.pr-ready-now-1902.plist"
+if [[ -f "$P1" && -f "$P2" ]]; then
+    field() { grep -o "<key>$2</key><string>[^<]*</string>" "$1" | sed "s|<key>$2</key><string>||; s|</string>||"; }
+    for k in Label StandardOutPath; do
+        v1="$(field "$P1" "$k")"; v2="$(field "$P2" "$k")"
+        [[ -n "$v1" && -n "$v2" ]] || fail "$k empty in a plist (1901='$v1' 1902='$v2')"
+        [[ "$v1" != "$v2" ]]       || fail "$k collides across PRs: '$v1'"
+    done
+    r1="$(grep -o 'exec [^<]*' "$P1")"; r2="$(grep -o 'exec [^<]*' "$P2")"
+    [[ -n "$r1" && "$r1" != "$r2" ]] || fail "runner path collides across PRs: '$r1'"
+    grep -q 'pr-ready-now-runner-1901.sh' "$P1" || fail "PR 1901 runner path is not PR-keyed"
+else
+    fail "expected a plist for both 1901 and 1902"
+fi
+end_case path-uniqueness
+
+# --- case 6: plist shape -----------------------------------------------------------------
+begin_case
+if [[ -f "$P1" ]]; then
+    grep -q '<key>PATH</key>' "$P1"   || fail "plist has no PATH environment key"
+    grep -q '/opt/homebrew/bin' "$P1" || fail "plist PATH lacks /opt/homebrew/bin"
+    # Nothing may survive as a literal, unexpanded shell variable.
+    grep -qE '\$\{?HOME|\$\{?ROOT|\$\{?LABEL' "$P1" && fail "plist contains an unexpanded shell variable"
+    # An empty <string> means some value expanded to nothing at write time.
+    grep -q '<string></string>' "$P1" && fail "plist contains an empty <string>"
+    grep -q '<key>WorkingDirectory</key><string>/' "$P1" \
+        || fail "plist WorkingDirectory is not an absolute path"
+    # The runner must start in the MAIN checkout, never a worktree.
+    grep -q '<key>WorkingDirectory</key><string>[^<]*</string>' "$P1" \
+        || fail "plist has no WorkingDirectory key"
+else
+    fail "no plist to inspect for shape"
+fi
+end_case plist-shape
+
+# --- case 7: env seams -------------------------------------------------------------------
+begin_case
+clean_slots
+e="$(mktemp)"
+out="$(PR_READY_NOW_PR_JSON=/nonexistent/pr.json run_driver 2>"$e")"; rc=$?
+: "$out"
+[[ $rc -ne 0 ]]                  || fail "missing PR_READY_NOW_PR_JSON exited 0, want non-zero"
+grep -q 'not found' "$e"         || fail "missing-fixture error does not say 'not found'"
+rm -f "$e"
+
+# Unset: falls through to the gh shim on PATH.
+out="$(run_driver 2>&1)"; rc=$?
+[[ $rc -eq 0 ]]            || fail "gh-shim path exited $rc, want 0 (out: $out)"
+grep -q '1901' <<< "$out"  || fail "gh-shim path did not report PR 1901"
+end_case env-seam
+
+# --- case 8: concurrency cap -------------------------------------------------------------
+# --jobs 1 with two PRs: the first consumes the only slot, the second must block on it
+# rather than firing. Asserted on the emitted wait line, not on surviving plist count —
+# reap_stale is what would otherwise decide that question.
+begin_case
+clean_slots
+out="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" PR_READY_NOW_DRY_RUN=1 run_driver --go --jobs 1 2>&1)"; rc=$?
+[[ $rc -eq 0 ]]                        || fail "--jobs 1 run exited $rc, want 0 (out: $out)"
+grep -q 'waiting for slot' <<< "$out"  || fail "--jobs 1 never waited for a slot (cap not enforced)"
+[[ "$(plist_count)" -eq 1 ]]           || fail "--jobs 1 wrote $(plist_count) plist(s), want 1"
+end_case concurrency-cap
+
+# --- case 9: already-running skip ---------------------------------------------------------
+# Regression for a live-fire failure on 2026-08-21: the check was
+# `launchctl list | grep -q ...` under `set -o pipefail`. grep -q exits on the first
+# match, launchctl takes SIGPIPE, and the pipeline reports failure — so a PR whose
+# session was already running got fired a second time, booting out the first.
+begin_case
+clean_slots
+set_live_labels "40477	0	com.ibl5.pr-ready-now-1901"
+out="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" run_driver 2>&1)"; rc=$?
+[[ $rc -eq 0 ]]                            || fail "already-running run exited $rc, want 0 (out: $out)"
+grep -q 'already running' <<< "$out"       || fail "live PR 1901 was not skipped"
+grep -qE '1902 +branch-two +WOULD FIRE' <<< "$out" || fail "PR 1902 should still fire (out: $out)"
+end_case already-running-skip
+
+# --- case 10: label match is end-anchored -------------------------------------------------
+# A live job for PR 19011 must not suppress PR 1901.
+begin_case
+clean_slots
+set_live_labels "40477	0	com.ibl5.pr-ready-now-19011"
+out="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" run_driver 2>&1)"; rc=$?
+[[ $rc -eq 0 ]]                       || fail "anchor run exited $rc, want 0 (out: $out)"
+grep -q 'already running' <<< "$out"  && fail "PR 19011's label wrongly suppressed a different PR"
+grep -qE '1901 +branch-one +WOULD FIRE' <<< "$out" || fail "PR 1901 should fire (out: $out)"
+clear_live_labels
+end_case label-anchor
+
+# --- verdict -----------------------------------------------------------------------------
+if [[ $FAILED -ne 0 ]]; then
+    echo "test-pr-ready-now: FAILED ($FAILED assertion failure(s))" >&2
+    exit 1
+fi
+echo "test-pr-ready-now: all cases passed"

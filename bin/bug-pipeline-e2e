@@ -1,0 +1,203 @@
+#!/usr/bin/env bash
+# bin/bug-pipeline-e2e — default-SKIP E2E harness for the bug pipeline.
+# Set BUG_PIPELINE_E2E=1 to run. Drives real DB writes + a real tick.
+# Run bin/bug-pipeline-test-env first.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+usage() {
+    cat >&2 <<'EOF'
+Usage: BUG_PIPELINE_E2E=1 bin/bug-pipeline-e2e [--help]
+
+  (no flag)  run the full E2E suite (requires bin/bug-pipeline-test-env bring-up)
+  --help     print this and exit 0
+
+Distinct from BUG_BOT_E2E which gates the Discord smoke (Phase 8 / server.e2e.test.ts).
+EOF
+}
+
+# ── Step 5.1: Opt-in gate ────────────────────────────────────────────────────
+if [ "${BUG_PIPELINE_E2E:-}" != "1" ]; then
+    echo "SKIP: set BUG_PIPELINE_E2E=1 to run (drives real DB writes + a real tick)"
+    [ "${BUG_BOT_E2E:-}" = "1" ] && echo "note: BUG_BOT_E2E gates the Discord smoke (Phase 8), not this script"
+    exit 0
+fi
+
+# Flag parsing
+case "${1:-}" in
+    '')         ;;
+    -h|--help)  usage; exit 0 ;;
+    *)          echo "unknown option: $1" >&2; usage >&2; exit 2 ;;
+esac
+[ "$#" -le 1 ] || { echo "unexpected extra arguments" >&2; usage >&2; exit 2; }
+
+# ── Step 5.2: Source env block + production-contact guard ───────────────────
+ENV_FILE=/tmp/bug-pipeline-test-env.sh
+[ -f "$ENV_FILE" ] || { echo "missing $ENV_FILE — run bin/bug-pipeline-test-env first" >&2; exit 1; }
+# shellcheck disable=SC1090
+source "$ENV_FILE"
+
+fail() { echo "PRODUCTION-CONTACT GUARD: $1" >&2; exit 1; }
+[ "${DB_NAME:-}" = 'ibl5_bug_pipeline_test' ]        || fail "DB_NAME='${DB_NAME:-<unset>}'"
+[ "${BOT_BASE_URL:-}" = 'http://127.0.0.1:50002' ]   || fail "BOT_BASE_URL='${BOT_BASE_URL:-<unset>}'"
+case "${BOT_BASE_URL:-}" in *50001*) fail 'BOT_BASE_URL is the production bug-bot';; esac
+case "${BUG_PIPELINE_CODE_REPO:-}"  in a-jay85/*) fail 'code repo is real';;  esac
+case "${BUG_PIPELINE_ISSUE_REPO:-}" in a-jay85/*) fail 'issue repo is real';; esac
+case "${BUG_PIPELINE_PLANS_DIR:-}"  in "$HOME/claude-plans"|'') fail 'PLANS_DIR is the real plans dir';; esac
+[ "${BUG_PIPELINE_WT_BASE:-}" = '/tmp/bug-pipeline-test-worktrees' ] || fail "WT_BASE='${BUG_PIPELINE_WT_BASE:-<unset>}'"
+
+# ── Step 5.3: Verify stub wiring (prove, don't re-create) ───────────────────
+for v in CLAUDE_BIN GH_BIN BUG_PIPELINE_WT_NEW_BIN BUG_PIPELINE_POST_PLAN_NOW_BIN; do
+    p="$(eval printf '%s' "\${$v:-}")"
+    case "$p" in /tmp/bug-pipeline-test-stubs/bin/*) ;; *) fail "$v='$p' is not a stub";; esac
+    [ -x "$p" ] || fail "$v='$p' is not executable"
+done
+"$CLAUDE_BIN" | jq -e '.is_error == false and (.result|type) == "object"' >/dev/null \
+    || fail 'CLAUDE_BIN does not emit the {"is_error":false,"result":{...}} envelope'
+
+# ── E2E case helpers ─────────────────────────────────────────────────────────
+q() { docker exec ibl5-mariadb mariadb -u root -proot -N -B "$DB_NAME" -e "$1"; }
+RC=0
+expect() { [ "$2" = "$3" ] && echo "ok: $1" || { echo "FAIL: $1 — want [$2] got [$3]" >&2; RC=1; }; }
+
+# ── E2E cases (added by Phase 7 delegate) ───────────────────────────────────
+
+# ── Phase 6: Bug-path E2E ────────────────────────────────────────────────────
+# Fixtures (> 2^53 — always shell strings, never arithmetic)
+AUTHOR=1234567890123456789
+CHANNEL=1234567890123456790
+MESSAGE=1234567890123456791
+THREAD=1234567890123456792
+
+# Step 6.1 — Enqueue via the repository
+ID=$(cd "$REPO_ROOT/ibl5" && DB_NAME=ibl5_bug_pipeline_test php -r '
+require __DIR__."/scripts/bug-pipeline/_bootstrap.php";
+$r = new \BugPipeline\BugReportRepository($mysqli_db);
+echo $r->enqueueAuthorizedAndAdvance("1234567890123456789","1234567890123456790","1234567890123456791","text bug report"), "\n";
+')
+expect 'enqueued id is numeric' 1 "$(printf '%s' "$ID" | grep -cE '^[0-9]+$')"
+expect 'original_message_id stored exact' '1234567890123456791' \
+    "$(q "SELECT original_message_id FROM ibl_bug_reports WHERE id='$ID'")"
+
+# Step 6.2 — Classify into a bug
+(cd "$REPO_ROOT/ibl5" && DB_NAME=ibl5_bug_pipeline_test \
+    php scripts/bug-pipeline/transition.php "$ID" queued --class=bug --thread-id=1234567890123456792) >/dev/null
+expect 'status queued after classify' 'queued' \
+    "$(q "SELECT status FROM ibl_bug_reports WHERE id='$ID'")"
+expect 'class=bug' 'bug' \
+    "$(q "SELECT class FROM ibl_bug_reports WHERE id='$ID'")"
+expect 'thread_id string-equals snowflake' '1234567890123456792' \
+    "$(q "SELECT thread_id FROM ibl_bug_reports WHERE id='$ID'")"
+
+# Step 6.3 — One real tick claims it into `hunting`
+(source /tmp/bug-pipeline-test-env.sh && timeout 300 "$REPO_ROOT/bin/bug-pipeline-tick")
+expect 'status=hunting' 'hunting' \
+    "$(q "SELECT status FROM ibl_bug_reports WHERE id='$ID'")"
+expect 'lease_owner IS NOT NULL' '1' \
+    "$(q "SELECT IF(lease_owner IS NOT NULL, 1, 0) FROM ibl_bug_reports WHERE id='$ID'")"
+expect 'lease_expires IS NOT NULL' '1' \
+    "$(q "SELECT IF(lease_expires IS NOT NULL, 1, 0) FROM ibl_bug_reports WHERE id='$ID'")"
+expect 'lease_expires > NOW()' '1' \
+    "$(q "SELECT IF(lease_expires > NOW(), 1, 0) FROM ibl_bug_reports WHERE id='$ID'")"
+
+# Step 6.4 — Single-flight: a second claim gets nothing
+SECOND_OUT=$(DB_NAME=ibl5_bug_pipeline_test php "$REPO_ROOT/ibl5/scripts/bug-pipeline/claim-next.php" \
+    --owner=e2e-second-claimer 2>&1)
+expect 'second-claimer exit-0 empty output' '' "$SECOND_OUT"
+expect 'lease_owner not stolen by second claimer' '0' \
+    "$(q "SELECT IF(lease_owner='e2e-second-claimer', 1, 0) FROM ibl_bug_reports WHERE id='$ID'")"
+
+# Step 6.5 — Open the PR
+(cd "$REPO_ROOT/ibl5" && DB_NAME=ibl5_bug_pipeline_test \
+    php scripts/bug-pipeline/transition.php "$ID" pr_open --pr=42 --release-lease) >/dev/null
+expect 'status=pr_open' 'pr_open' \
+    "$(q "SELECT status FROM ibl_bug_reports WHERE id='$ID'")"
+expect 'pr_number=42' '42' \
+    "$(q "SELECT pr_number FROM ibl_bug_reports WHERE id='$ID'")"
+expect 'lease_owner IS NULL after release' '1' \
+    "$(q "SELECT IF(lease_owner IS NULL, 1, 0) FROM ibl_bug_reports WHERE id='$ID'")"
+expect 'lease_expires IS NULL after release' '1' \
+    "$(q "SELECT IF(lease_expires IS NULL, 1, 0) FROM ibl_bug_reports WHERE id='$ID'")"
+
+(cd "$REPO_ROOT/ibl5" && DB_NAME=ibl5_bug_pipeline_test \
+    php scripts/bug-pipeline/transition.php "$ID" pr_open --pr-number=42 2>/dev/null) \
+    && { echo 'FAIL: --pr-number= should exit 1' >&2; RC=1; } \
+    || echo 'ok: --pr-number= rejected'
+expect 'status still pr_open after rejected form' 'pr_open' \
+    "$(q "SELECT status FROM ibl_bug_reports WHERE id='$ID'")"
+
+# Step 6.6 — The row appears in the PR-open listing
+LIST_OUT=$(cd "$REPO_ROOT/ibl5" && DB_NAME=ibl5_bug_pipeline_test php scripts/bug-pipeline/list-pr-open.php)
+printf '%s' "$LIST_OUT" | grep -qF "$ID" \
+    && echo "ok: list-pr-open contains ID=$ID" \
+    || { echo "FAIL: list-pr-open missing ID=$ID" >&2; RC=1; }
+printf '%s' "$LIST_OUT" | grep -qF '42' \
+    && echo 'ok: list-pr-open contains pr_number=42' \
+    || { echo 'FAIL: list-pr-open missing 42' >&2; RC=1; }
+
+# Step 6.7 — Close it out
+(cd "$REPO_ROOT/ibl5" && DB_NAME=ibl5_bug_pipeline_test \
+    php scripts/bug-pipeline/transition.php "$ID" fixed) >/dev/null
+expect 'status=fixed' 'fixed' \
+    "$(q "SELECT status FROM ibl_bug_reports WHERE id='$ID'")"
+LIST_OUT2=$(cd "$REPO_ROOT/ibl5" && DB_NAME=ibl5_bug_pipeline_test php scripts/bug-pipeline/list-pr-open.php)
+expect 'list-pr-open empty after close' '[]' "$LIST_OUT2"
+
+# ── Phase 7: Feature-path E2E and snowflake fidelity ────────────────────────
+# Fixtures (fresh snowflakes, all > 2^53)
+AUTHOR2=1234567890123456793
+MESSAGE2=1234567890123456794
+THREAD2=1234567890123456795
+
+# Step 7.1 — Feature path: queued → gathering → awaiting_ajay
+ID2=$(cd "$REPO_ROOT/ibl5" && DB_NAME=ibl5_bug_pipeline_test php -r '
+require __DIR__."/scripts/bug-pipeline/_bootstrap.php";
+$r = new \BugPipeline\BugReportRepository($mysqli_db);
+echo $r->enqueueAuthorizedAndAdvance("1234567890123456793","1234567890123456790","1234567890123456794","text feature report"), "\n";
+')
+(cd "$REPO_ROOT/ibl5" && DB_NAME=ibl5_bug_pipeline_test \
+    php scripts/bug-pipeline/transition.php "$ID2" queued --class=feature --thread-id=1234567890123456795) >/dev/null
+expect 'ID2 class=feature' 'feature' \
+    "$(q "SELECT class FROM ibl_bug_reports WHERE id='$ID2'")"
+
+(cd "$REPO_ROOT/ibl5" && DB_NAME=ibl5_bug_pipeline_test \
+    php scripts/bug-pipeline/transition.php "$ID2" gathering) >/dev/null
+expect 'ID2 status=gathering' 'gathering' \
+    "$(q "SELECT status FROM ibl_bug_reports WHERE id='$ID2'")"
+
+(cd "$REPO_ROOT/ibl5" && DB_NAME=ibl5_bug_pipeline_test \
+    php scripts/bug-pipeline/transition.php "$ID2" awaiting_ajay --approval-message-id=1234567890123456789) >/dev/null
+expect 'ID2 status=awaiting_ajay' 'awaiting_ajay' \
+    "$(q "SELECT status FROM ibl_bug_reports WHERE id='$ID2'")"
+
+# Row 7.d — Phase 6 row must remain untouched
+expect 'Phase6 row untouched' 'fixed' \
+    "$(q "SELECT status FROM ibl_bug_reports WHERE id='$ID'")"
+
+# CLI boundary: invalid status must exit 1
+(cd "$REPO_ROOT/ibl5" && DB_NAME=ibl5_bug_pipeline_test \
+    php scripts/bug-pipeline/transition.php "$ID2" awaiting_ajay not_a_status 2>/dev/null) \
+    && { echo 'FAIL: invalid status should exit 1' >&2; RC=1; } \
+    || echo 'ok: invalid status rejected'
+
+# Step 7.2 — Snowflake fidelity
+GOT="$(q "SELECT approval_message_id FROM ibl_bug_reports WHERE id='$ID2'")"
+expect 'approval_message_id survives round-trip' '1234567890123456789' "$GOT"
+[ "$GOT" = '1234567890123456768' ] && { echo 'FAIL: snowflake was int-cast (2^53 precision loss)' >&2; RC=1; } || true
+
+expect 'ID thread_id exact' '1234567890123456792' \
+    "$(q "SELECT thread_id FROM ibl_bug_reports WHERE id='$ID'")"
+expect 'ID original_message_id exact' '1234567890123456791' \
+    "$(q "SELECT original_message_id FROM ibl_bug_reports WHERE id='$ID'")"
+expect 'ID2 thread_id exact' '1234567890123456795' \
+    "$(q "SELECT thread_id FROM ibl_bug_reports WHERE id='$ID2'")"
+expect 'ID2 original_message_id exact' '1234567890123456794' \
+    "$(q "SELECT original_message_id FROM ibl_bug_reports WHERE id='$ID2'")"
+
+# Step 7.3 — Option round-trip
+expect 'pr_number persisted from --pr=42' '42' \
+    "$(q "SELECT pr_number FROM ibl_bug_reports WHERE id='$ID'")"
+
+exit "$RC"

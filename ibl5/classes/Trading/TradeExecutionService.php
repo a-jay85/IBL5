@@ -108,9 +108,15 @@ class TradeExecutionService implements TradeExecutionServiceInterface
     {
         $parties = $this->deriveParties($offerId);
 
-        // Player cap basis: each player's vw_current_salary.current_salary, the
-        // SAME basis getTeamTotalSalary() sums, so post = current - sent + received
-        // stays internally consistent.
+        // Player cap basis: during phases that advance contract years
+        // (Playoffs/Draft/Free Agency) the current-season basis is
+        // vw_current_salary.next_year_salary, otherwise current_salary — the SAME
+        // basis the matching getTeam*Salary() call sums, so post = current - sent
+        // + received stays internally consistent, and the SAME predicate
+        // currentSeasonCashForLeg() uses. Both legs below MUST read this one local;
+        // evaluating the predicate twice is how the two legs drift onto different
+        // bases (the bug this fix closes).
+        $useNextYearBasis = $this->season->advancesContractYears();
         $capSent = array_fill_keys($parties, 0);
         $capReceived = array_fill_keys($parties, 0);
         $playersSent = array_fill_keys($parties, 0);
@@ -121,7 +127,10 @@ class TradeExecutionService implements TradeExecutionServiceInterface
             $to = $row['trade_to'];
 
             if ($row['itemtype'] === TradeItemType::Player->value) {
-                $salary = $this->salaryCapRepository->getPlayerCurrentSalary((int) $row['itemid']);
+                $pid = (int) $row['itemid'];
+                $salary = $useNextYearBasis
+                    ? $this->salaryCapRepository->getPlayerNextYearSalary($pid)
+                    : $this->salaryCapRepository->getPlayerCurrentSalary($pid);
                 $capSent[$from] += $salary;
                 $capReceived[$to] += $salary;
                 $playersSent[$from]++;
@@ -143,7 +152,9 @@ class TradeExecutionService implements TradeExecutionServiceInterface
         foreach ($parties as $party) {
             $capDeltas[] = [
                 'teamName' => $party,
-                'currentSeasonCapTotal' => $this->salaryCapRepository->getTeamTotalSalary($party),
+                'currentSeasonCapTotal' => $useNextYearBasis
+                    ? $this->salaryCapRepository->getTeamNextYearSalary($party)
+                    : $this->salaryCapRepository->getTeamTotalSalary($party),
                 'capSent' => $capSent[$party],
                 'capReceived' => $capReceived[$party],
             ];

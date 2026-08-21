@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-08-18
+last_verified: 2026-08-21
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -565,6 +565,8 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 13.7 | ◑ Partial | 🟩 | Waivers/Draft → ValidationResult (Strategy A); remainder is 13.7b. Done part green-green. |
 | 13.7b | ⬜ Open | 🟨 | Needs `ValidationError`/`ValidationResultWithContext` type design (Depth/Trade carry structured + cap-total payloads) before the sweep. |
 | 13.12 | ◑ Partial | 🟩 | Exact-match sites consolidated onto the `PlayerTeamJoinQuery` trait (TeamQuery ×8, FreeAgency, LeagueStarters). Six divergent sites remain in the surveyed repositories (INNER JOIN / wider column list), plus 7 player↔team joins outside the original survey. |
+| 13.14 | ⬜ Open | 🟨 | Phase-blind `getTeamTotalSalary()` in waiver-claim cap check — same defect class as the trade accept-path fix (PR heat-nuggets-hardcap). |
+| 13.15 | ⬜ Open | 🟨 | `PlayerContractCalculator::getCurrentSeasonSalary()` is a fourth cap basis keyed on raw `cy` with no phase shift. |
 
 ### 13.7 Validator Error-Accumulation Boilerplate Repeated
 **Status:** **Partially done (Strategy A, PR validator-accumulators-to-validationresult):** the two pure string-accumulator validators (`Waivers/WaiversValidator`, `Draft/DraftValidator`) now return `ValidationResult`; mutable `private array $errors` / `getErrors()` / `clearErrors()` removed. State-leakage risk eliminated for these two. Remainder re-filed as [[13.7b]].
@@ -589,6 +591,22 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Database view (`vw_players_with_team`) or `BaseMysqliRepository::fetchPlayersWithTeam()` helper. Document the preference in CLAUDE.md; fix opportunistically.
 **Est. effort:** L
 **Risk if untouched:** New `ibl_team_info` columns require touching 15+ queries.
+
+### 13.14 Waiver-Claim Cap Check Uses the Phase-Blind Salary Basis
+**Status:** Backlog
+**Location:** `Waivers/WaiversController.php:167`
+**Problem:** calls `SalaryCapRepository::getTeamTotalSalary()`, which sums `vw_current_salary.current_salary` regardless of phase. During Draft/Free Agency — exactly when waiver claims fire — the current-season basis is `next_year_salary`, so the check runs one contract year behind. Reproduction (the numbers that drove PR `heat-nuggets-hardcap`, prod snapshot 2026-08-21, phase `Draft`, `HARD_CAP_MAX` 7000): Heat read as **6861** on the phase-blind basis vs **5159** on the correct shifted basis — a 1702 overstatement, enough to false-reject a legal transaction (offer 12190's Heat post-trade total came out 7232 instead of 5556).
+**Suggested direction:** apply the same `Season::advancesContractYears()` gate this PR added to `TradeExecutionService::validateParties()`, selecting `getTeamNextYearSalary()`; keep the repository phase-ignorant.
+**Est. effort:** S
+**Risk if untouched:** legal waiver claims rejected as over-cap for the whole offseason, and (symmetrically) over-cap claims allowed where next-year salary is higher.
+
+### 13.15 `PlayerContractCalculator::getCurrentSeasonSalary()` Is a Fourth, Unshifted Cap Basis
+**Status:** Backlog
+**Location:** `Team/TeamCapCalculator.php:143` → `PlayerContractCalculator::getCurrentSeasonSalary()`
+**Problem:** computes the season salary from the raw `cy` column with no phase shift, giving a fourth basis alongside `vw_current_salary.current_salary`, `.next_year_salary`, and the cash `salary_yr1`/`salary_yr2` pair. It drives `canAddContractWithoutGoingOverHardCap()`, used by Free Agency and waivers, so during Draft/FA it reproduces 13.14's one-year lag through a different code path.
+**Suggested direction:** converge on one phase-aware accessor (extract the `advancesContractYears()` selection into a small `CurrentSeasonSalaryBasis` helper both trade and contract paths consume) rather than adding a fourth ad-hoc branch.
+**Est. effort:** M
+**Risk if untouched:** every new cap consumer picks whichever of the four bases it finds first; the same false-positive keeps recurring.
 
 ## Axis 14: Bootstrap / Dependency Injection
 

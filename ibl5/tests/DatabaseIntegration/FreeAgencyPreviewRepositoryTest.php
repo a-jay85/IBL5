@@ -53,6 +53,11 @@ class FreeAgencyPreviewRepositoryTest extends DatabaseTestCase
         self::assertArrayHasKey('oo', $first);
         self::assertArrayHasKey('r_drive_off', $first);
 
+        // TSI fields
+        self::assertArrayHasKey('talent', $first);
+        self::assertArrayHasKey('skill', $first);
+        self::assertArrayHasKey('intangibles', $first);
+
         // FA preference fields
         self::assertArrayHasKey('loyalty', $first);
         self::assertArrayHasKey('winner', $first);

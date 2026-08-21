@@ -59,6 +59,12 @@ class FreeAgencyPreviewViewTest extends TestCase
         $this->assertStringContainsString('Team', $html);
         $this->assertStringContainsString('Pos', $html);
         $this->assertStringContainsString('Age', $html);
+        $this->assertStringContainsString('<th>tvr</th>', $html);
+        $this->assertStringContainsString('<th>oo</th>', $html);
+        $this->assertStringContainsString('<th class="sep-r-team">td</th>', $html);
+        $this->assertStringContainsString('<th>T</th>', $html);
+        $this->assertStringContainsString('<th>S</th>', $html);
+        $this->assertStringContainsString('<th class="sep-r-team">I</th>', $html);
     }
 
     public function testRenderIncludesSortableClass(): void
@@ -78,11 +84,11 @@ class FreeAgencyPreviewViewTest extends TestCase
 
     /**
      * @param array<string, mixed> $overrides
-     * @return array{pid: int, teamid: int, name: string, teamname: string, team_city: string, color1: string, color2: string, pos: string, age: int, r_fga: int, r_fgp: int, r_fta: int, r_ftp: int, r_3ga: int, r_3gp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_tvr: int, r_foul: int, oo: int, r_drive_off: int, po: int, r_trans_off: int, od: int, dd: int, pd: int, td: int, loyalty: int, winner: int, playing_time: int, security: int, tradition: int}
+     * @return array{pid: int, teamid: int, name: string, teamname: string, team_city: string, color1: string, color2: string, pos: string, age: int, r_fga: int, r_fgp: int, r_fta: int, r_ftp: int, r_3ga: int, r_3gp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_tvr: int, r_foul: int, oo: int, r_drive_off: int, po: int, r_trans_off: int, od: int, dd: int, pd: int, td: int, talent: int, skill: int, intangibles: int, loyalty: int, winner: int, playing_time: int, security: int, tradition: int}
      */
     private static function createFreeAgent(array $overrides = []): array
     {
-        /** @var array{pid: int, teamid: int, name: string, teamname: string, team_city: string, color1: string, color2: string, pos: string, age: int, r_fga: int, r_fgp: int, r_fta: int, r_ftp: int, r_3ga: int, r_3gp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_tvr: int, r_foul: int, oo: int, r_drive_off: int, po: int, r_trans_off: int, od: int, dd: int, pd: int, td: int, loyalty: int, winner: int, playing_time: int, security: int, tradition: int} */
+        /** @var array{pid: int, teamid: int, name: string, teamname: string, team_city: string, color1: string, color2: string, pos: string, age: int, r_fga: int, r_fgp: int, r_fta: int, r_ftp: int, r_3ga: int, r_3gp: int, r_orb: int, r_drb: int, r_ast: int, r_stl: int, r_blk: int, r_tvr: int, r_foul: int, oo: int, r_drive_off: int, po: int, r_trans_off: int, od: int, dd: int, pd: int, td: int, talent: int, skill: int, intangibles: int, loyalty: int, winner: int, playing_time: int, security: int, tradition: int} */
         return array_merge([
             'pid' => 1,
             'teamid' => 1,
@@ -114,6 +120,9 @@ class FreeAgencyPreviewViewTest extends TestCase
             'dd' => 50,
             'pd' => 50,
             'td' => 50,
+            'talent' => 50,
+            'skill' => 50,
+            'intangibles' => 50,
             'loyalty' => 50,
             'winner' => 50,
             'playing_time' => 50,

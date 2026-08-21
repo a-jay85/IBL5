@@ -57,7 +57,7 @@ class FreeAgencyPreviewView implements FreeAgencyPreviewViewInterface
      */
     private function renderTableStart(): string
     {
-        return '<table class="sortable ibl-data-table team-table sticky-table" style="' . TableStyles::inlineTeamVars('666666', 'ffffff') . '">
+        return '<table class="sortable ibl-data-table team-table fa-table sticky-table" style="' . TableStyles::inlineTeamVars('666666', 'ffffff') . '">
             <thead>
                 <tr>
                     <th class="sticky-col sticky-corner">Player</th>

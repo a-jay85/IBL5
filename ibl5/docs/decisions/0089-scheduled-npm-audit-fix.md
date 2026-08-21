@@ -1,6 +1,6 @@
 ---
 description: A weekly CI_PAT-credentialed scheduled npm audit fix workflow keeps ibl5's pre-existing transitive vulns fixed so the audit-js gate stops false-failing unrelated dependabot PRs; adds an IBL6 npm dependabot entry.
-last_verified: 2026-08-13
+last_verified: 2026-08-21
 ---
 
 # ADR-0089: Scheduled npm audit fix to keep the audit-js gate green
@@ -43,7 +43,7 @@ The push uses `secrets.CI_PAT`, not the default `GITHUB_TOKEN`. A push made with
 `GITHUB_TOKEN` is silently ignored by GitHub's anti-recursion guard and does **not**
 trigger `pull_request` CI on the opened PR — so the generated PR's own `audit-js` gate
 would never run. CI_PAT makes the PR's CI fire naturally. Logic lives inline in the
-workflow (matching `.github/workflows/rebase-prs.yml`) rather than in a `bin/` script;
+workflow (following the established inline-logic pattern for push-token workflows) rather than in a `bin/` script;
 the workflow-level permission is `contents: read` because every write goes through CI_PAT.
 
 Separately, add an npm `/IBL6` weekly entry to `.github/dependabot.yml`, mirroring the
@@ -61,7 +61,7 @@ Scope narrowed to `ibl5/IBLbot` only. The `ibl5` entry is retired in favour of t
   waiting for the weekly cron.
 - **Trust surface:** the workflow wields `secrets.CI_PAT`, which can force-push the
   `chore/npm-audit-fix` branch and open PRs as the bot. This is the same credential and
-  posture already accepted for `rebase-prs.yml`; the scope is bounded to a single fixed
+  posture already accepted for push-token workflows; the scope is bounded to a single fixed
   branch and PR creation, and the first credentialed run is reviewed by a human.
 - **First-run verification is post-merge by construction:** a `schedule` /
   `workflow_dispatch` workflow only runs from the default branch, so the audit-fix loop,

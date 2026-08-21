@@ -65,6 +65,34 @@ GH_EOF
 chmod +x "$SCRATCH/.local/bin/gh"
 cp "$SCRATCH/.local/bin/gh" "$SCRATCH/.bun/bin/gh"
 
+# launchctl shim — makes the "already running" skip testable, and testable on Linux CI
+# where launchctl does not exist at all. `launchctl list` echoes whatever the current
+# case wrote to launchctl-list.txt; everything else is a no-op.
+#
+# The trailing filler is load-bearing, not padding. The bug case 9 guards is a SIGPIPE
+# under `set -o pipefail`, which only reproduces when the writer still has queued output
+# after the reader exits. Real `launchctl list` prints hundreds of lines; a three-line
+# shim would finish writing before grep -q exited and the buggy code would pass. The
+# filler follows the fixture labels so a match always leaves bytes unwritten, and it
+# exceeds the 64KB pipe buffer so the writer cannot dump-and-exit.
+: > "$SCRATCH/launchctl-list.txt"
+cat > "$SCRATCH/.local/bin/launchctl" <<LC_EOF
+#!/usr/bin/env bash
+if [[ "\${1:-}" == "list" && \$# -eq 1 ]]; then
+    cat "$SCRATCH/launchctl-list.txt"
+    i=0
+    while [[ \$i -lt 6000 ]]; do
+        printf -- '-\t0\tcom.apple.filler.service.number.%s\n' "\$i"
+        i=\$((i + 1))
+    done
+fi
+exit 0
+LC_EOF
+chmod +x "$SCRATCH/.local/bin/launchctl"
+
+set_live_labels() { printf '%s\n' "$@" > "$SCRATCH/launchctl-list.txt"; }
+clear_live_labels() { : > "$SCRATCH/launchctl-list.txt"; }
+
 # Run the driver in a sealed environment: scratch HOME (so plists land in the scratch
 # tree), stubbed claude, seamed gh identity, shim dir on PATH.
 run_driver() {
@@ -206,6 +234,32 @@ out="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" PR_READY_NOW_DRY_RUN=1 run_
 grep -q 'waiting for slot' <<< "$out"  || fail "--jobs 1 never waited for a slot (cap not enforced)"
 [[ "$(plist_count)" -eq 1 ]]           || fail "--jobs 1 wrote $(plist_count) plist(s), want 1"
 end_case concurrency-cap
+
+# --- case 9: already-running skip ---------------------------------------------------------
+# Regression for a live-fire failure on 2026-08-21: the check was
+# `launchctl list | grep -q ...` under `set -o pipefail`. grep -q exits on the first
+# match, launchctl takes SIGPIPE, and the pipeline reports failure — so a PR whose
+# session was already running got fired a second time, booting out the first.
+begin_case
+clean_slots
+set_live_labels "40477	0	com.ibl5.pr-ready-now-1901"
+out="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" run_driver 2>&1)"; rc=$?
+[[ $rc -eq 0 ]]                            || fail "already-running run exited $rc, want 0 (out: $out)"
+grep -q 'already running' <<< "$out"       || fail "live PR 1901 was not skipped"
+grep -qE '1902 +branch-two +WOULD FIRE' <<< "$out" || fail "PR 1902 should still fire (out: $out)"
+end_case already-running-skip
+
+# --- case 10: label match is end-anchored -------------------------------------------------
+# A live job for PR 19011 must not suppress PR 1901.
+begin_case
+clean_slots
+set_live_labels "40477	0	com.ibl5.pr-ready-now-19011"
+out="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" run_driver 2>&1)"; rc=$?
+[[ $rc -eq 0 ]]                       || fail "anchor run exited $rc, want 0 (out: $out)"
+grep -q 'already running' <<< "$out"  && fail "PR 19011's label wrongly suppressed a different PR"
+grep -qE '1901 +branch-one +WOULD FIRE' <<< "$out" || fail "PR 1901 should fire (out: $out)"
+clear_live_labels
+end_case label-anchor
 
 # --- verdict -----------------------------------------------------------------------------
 if [[ $FAILED -ne 0 ]]; then

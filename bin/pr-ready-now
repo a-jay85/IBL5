@@ -166,11 +166,17 @@ PR_LIST="$(select_prs)" || {
     exit 1
 }
 
+# Snapshot the live job table ONCE, into a variable. Never `launchctl list | grep -q`:
+# under `set -o pipefail`, grep -q exits on the first match, launchctl takes SIGPIPE, and
+# the pipeline reports failure even though the label WAS found — silently disabling the
+# already-running skip. `|| true` also covers Linux CI, which has no launchctl at all.
+LAUNCHCTL_LIST="$(launchctl list 2>/dev/null || true)"
+
 while read -r pr; do
     [[ -n "$pr" ]] || continue
     # Anchored at end-of-line: the label carries no suffix, so an unanchored match
     # would let a live PR 1892 job suppress a fire for PR 189.
-    if launchctl list 2>/dev/null | grep -qE "com\.ibl5\.pr-ready-now-${pr}$"; then
+    if grep -qE "com\.ibl5\.pr-ready-now-${pr}$" <<< "$LAUNCHCTL_LIST"; then
         SKIP_LINES+=("$pr|already running — skipped"); continue
     fi
     if [[ ${#EXPLICIT_PRS[@]} -gt 0 ]]; then

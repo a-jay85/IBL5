@@ -64,12 +64,16 @@ SIM_RECAP_OPS_ALERT_THREAD_ID="${SIM_RECAP_OPS_ALERT_THREAD_ID:-}"
 # rm -rf'd on EXIT) — suppressing a repeat across ticks needs a path that outlives
 # the run. Sits in the sim-recap dir sim-recap-cron-setup already creates (for its
 # logs/ subdir); ops_state_write mkdir -p's it anyway so neither depends on order.
-# HOME is defaulted, not bare: this is the only HOME reference in the file, we run
-# under `set -u`, and the plist's EnvironmentVariables does not set it — so a bare
-# $HOME would abort the tick at expansion time, on EVERY poll, if launchd ever
-# handed us an environment without it.
+# HOME is defaulted, not bare: both HOME references in this file use the defensive
+# ${HOME:-/tmp} pattern (SIM_RECAP_OPS_ALERT_STATE below and SIM_RECAP_DB_SYNC_LOG
+# further down). We run under `set -u`, and the plist's EnvironmentVariables does
+# not set it — so a bare $HOME would abort the tick at expansion time, on EVERY
+# poll, if launchd ever handed us an environment without it.
 SIM_RECAP_OPS_ALERT_STATE="${SIM_RECAP_OPS_ALERT_STATE:-${HOME:-/tmp}/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/sim-recap/ops-alert.json}"
 SIM_RECAP_LAUNCHCTL_BIN="${SIM_RECAP_LAUNCHCTL_BIN:-launchctl}"
+SIM_RECAP_DB_SYNC_BIN="${SIM_RECAP_DB_SYNC_BIN:-$REPO_ROOT/ibl5/bin/db-sync-now}"
+SIM_RECAP_DB_SYNC_LOG="${SIM_RECAP_DB_SYNC_LOG:-${HOME:-/tmp}/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/sim-recap/logs/db-sync.log}"
+DRY_RUN=0
 # SIM_RECAP_DB_PASSWORD is read from the environment ONLY (never defaulted, never
 # argv, never logged). require_password() enforces its presence on the live path.
 
@@ -387,6 +391,17 @@ generate() { # sim
     store_rc=$?
     if [ "$store_rc" -eq 0 ] && jq_ok "$store" '.ok == true'; then
         log "sim $sim: stored ($(printf '%s' "$store" | "$SIM_RECAP_JQ_BIN" -r '.games' 2>/dev/null) game recaps)"
+        # A stored sim means prod has data this local DB does not. Fire a refresh
+        # detached: ibl5/bin/db-sync-now takes minutes and this tick must return well
+        # inside launchd's 300s StartInterval. It self-guards (lock + 30-min
+        # throttle + container check), so firing per stored sim is safe and a
+        # sim-less tick never reaches this line.
+        if [ "$DRY_RUN" -eq 0 ] && [ -x "$SIM_RECAP_DB_SYNC_BIN" ]; then
+            log "sim $sim: triggering local DB sync (detached)"
+            mkdir -p "$(dirname "$SIM_RECAP_DB_SYNC_LOG")" 2>/dev/null || true
+            nohup "$SIM_RECAP_DB_SYNC_BIN" >> "$SIM_RECAP_DB_SYNC_LOG" 2>&1 &
+            disown 2>/dev/null || true
+        fi
         local avg_len
         avg_len="$("$SIM_RECAP_JQ_BIN" -r \
             '[.games[].recap_text | length] | if length == 0 then 0 else (add / length | floor) end' \
@@ -457,7 +472,7 @@ dry_run() {
 
 # ── main — flag parse, then the claim loop with the empty-tick invariant ──────
 main() {
-    local DRY_RUN=0
+    DRY_RUN=0
     DRY_SIM=""
     local arg
     for arg in "$@"; do

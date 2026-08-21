@@ -17,6 +17,16 @@ interface SalaryCapRepositoryInterface
      */
     public function getPlayerCurrentSalary(int $playerId): int;
 
+    /**
+     * Next-season salary for a single player (or cash-consideration row).
+     *
+     * Reads the `next_year_salary` basis from vw_current_salary, the SAME basis
+     * {@see self::getTeamNextYearSalary()} sums. Used by the accept-time cap check
+     * during phases where {@see \Season\Season::advancesContractYears()} is true,
+     * so it agrees with the offer-time/preview basis.
+     */
+    public function getPlayerNextYearSalary(int $playerId): int;
+
     public function getTeamNextYearSalary(string $teamName): int;
 
     public function getPositionSalaryCommitmentNextYear(string $teamName, string $position, int $excludePlayerID): int;

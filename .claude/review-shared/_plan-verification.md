@@ -1,6 +1,6 @@
 ---
 description: Requires plans to classify every verification step into the test-type taxonomy at plan-write time, preventing manual-testing items from deferring to post-plan cleanup, and grounds seed/DOM-dependent E2E assertions in real fixtures.
-last_verified: 2026-08-19
+last_verified: 2026-08-21
 ---
 
 # Plan Verification Matrix
@@ -181,6 +181,7 @@ The taxonomy above classifies *how* a thing is verified; this table names five s
 | adds or modifies an escape path in a CI check gate that calls a git-range helper (`git log base..HEAD` or similar) | asserts the **empty-range** case: when no commits exist in the range (first commit on branch), the gate passes or fails gracefully without the escape path becoming permanently unreachable |
 | adds or modifies an enqueue or requeue path in bin/automouse/queue | asserts that a plan file with an ancient mtime is placed AFTER all incumbents — ordering must be by insertion time, not by the plan file's authoring mtime; both symlink lstat mtime (GNU ls sort key) and target mtime (BSD ls sort key) must be strictly newer than the newest incumbent |
 | removes or modifies an importer or upsert path that was writing an incorrect value to a column (fixing ongoing data corruption) | asserts that either (a) a compensating backfill migration ships in the same PR and is verified post-impl, or (b) the plan's Scope section explicitly states that already-corrupted rows are out of scope and names a follow-up plan or ticket |
+| adds or modifies salary-comparison or cap-enforcement logic in a service | asserts **both** the in-season path (`Season::advancesContractYears()=false`, `current_salary` basis) and the offseason path (`advancesContractYears()=true`, `next_year_salary` basis): verify the salary-lookup column actually changes between paths and that the cap outcome (accept/reject) is correct on each |
 
 The header intentionally differs from the two tables above (`| Trigger pattern | Why PHPUnit is insufficient |`, `| Trigger | Example surface |`): those map a trigger to a rationale or an example, while this one mandates a **row shape**. Do not harmonize the headers.
 

@@ -184,7 +184,7 @@ SH
         exit 1
     fi
     # 2. Port 50002 must not be held by a foreign process.
-    if lsof -nP -iTCP:50002 -sTCP:LISTEN 2>/dev/null | grep -qv 'ibl-bug-bot-test'; then
+    if lsof -nP -iTCP:50002 -sTCP:LISTEN 2>/dev/null | awk 'NR>1' | grep -qv 'ibl-bug-bot-test'; then
         echo "port 50002 is already held by another process" >&2
         lsof -nP -iTCP:50002 -sTCP:LISTEN >&2 || true
         exit 1

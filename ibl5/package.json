@@ -52,7 +52,7 @@
   },
   "//pin": "@playwright/test is exact-pinned (no caret) so bin/playwright-image-tag derives the Playwright Docker image tag from THIS version at runtime — the image and the installed client cannot drift (ADR-0070). Dependabot bumps this; every CI surface follows automatically. The transitive playwright-core carried via @axe-core/playwright is left untouched — overriding it risks an incompatible axe-core/playwright-core pair, and it is separate from the runtime Playwright that executes tests.",
   "devDependencies": {
-    "@axe-core/playwright": "^4.12.1",
+    "@axe-core/playwright": "^4.13.0",
     "@lhci/cli": "^0.15.1",
     "@playwright/test": "1.62.1",
     "@tailwindcss/cli": "^4.3.3",

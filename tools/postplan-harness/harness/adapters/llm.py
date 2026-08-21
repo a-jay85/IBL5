@@ -49,11 +49,26 @@ def extract_json(text: str):
 class ClaudeCli:
     """Live adapter: claude -p, single turn, no tools, neutral cwd."""
 
-    def __init__(self, ledger: UsageLedger, workdir: str | None = None):
+    def __init__(self, ledger: UsageLedger, workdir: str | None = None,
+                 out_dir: str | None = None):
         self.ledger = ledger
         self.workdir = workdir or tempfile.mkdtemp(prefix="postplan-llm-")
+        self.out_dir = out_dir      # None => raw-attempt persistence disabled
 
-    def call(self, purpose: str, model: str, prompt: str, validate, max_retries: int = 1):
+    def _persist_raw(self, purpose: str, attempt: int, text: str) -> None:
+        """Best-effort raw-reply dump for post-mortem; never fails a run."""
+        if not self.out_dir:
+            return
+        try:
+            os.makedirs(self.out_dir, exist_ok=True)
+            path = os.path.join(self.out_dir, f"raw-{purpose}-attempt{attempt}.txt")
+            with open(path, "w") as fh:
+                fh.write(text)
+        except OSError:
+            pass
+
+    def call(self, purpose: str, model: str, prompt: str, validate,
+             max_retries: int = 1, normalizer=None):
         if len(prompt.encode()) > MAX_PROMPT_BYTES:
             prompt = prompt.encode()[:MAX_PROMPT_BYTES].decode(errors="ignore") + "\n[TRUNCATED]"
         model_id = MODEL_MAP.get(model, model)
@@ -87,8 +102,11 @@ class ClaudeCli:
             rec.duration_ms += envelope.get("duration_ms", 0) or 0
             rec.cost_usd += envelope.get("total_cost_usd", 0.0) or 0.0
             result_text = envelope.get("result", "") or ""
+            self._persist_raw(purpose, attempt, result_text)
             try:
                 data = extract_json(result_text)
+                if normalizer is not None:
+                    data = normalizer(data)
                 validate(data)
                 rec.retries = attempt
                 self.ledger.add(rec)
@@ -110,10 +128,13 @@ class FixtureLlm:
         self.ledger = ledger
         self.canned = canned
 
-    def call(self, purpose: str, model: str, prompt: str, validate, max_retries: int = 1):
+    def call(self, purpose: str, model: str, prompt: str, validate,
+             max_retries: int = 1, normalizer=None):
         if purpose not in self.canned:
             raise HarnessError("llm-fixture-missing", purpose)
         data = self.canned[purpose]
+        if normalizer is not None:
+            data = normalizer(data)
         validate(data)
         self.ledger.add(LlmCallRecord(purpose=purpose, model=f"fixture:{model}"))
         return data

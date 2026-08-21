@@ -8,8 +8,9 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import runner
-from harness.adapters.llm import FixtureLlm
-from harness.state import TerminalState, UsageLedger
+from harness.adapters.llm import FixtureLlm, extract_json
+from harness.state import HarnessError, TerminalState, UsageLedger
+from harness import schemas
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -90,6 +91,125 @@ def test_no_mutating_gh_commands_ever_executed():
     _, out = run_slug("backlog-l6-done")
     for a in _actions(out):
         assert set(a) >= {"ts", "action"}   # typed records, not shell strings
+
+
+
+def _fixture(**over):
+    fx = {
+        "slug": "synthetic-degrade",
+        "diff": "diff --git a/ibl5/x.php b/ibl5/x.php\n+<?php echo 1;\n",
+        "pr_number": 9999,
+        "pr_meta": {"number": 9999, "title": "fix: synthetic",
+                    "body": "## Manual Testing\n\nNo manual testing needed\n",
+                    "headRefOid": "deadbeef"},
+        "labels": [],
+        "final_state": "OPEN",
+        "checks_outcome": {"exit": 0, "failed": []},
+        "verify": {"phpunit": "OK (1 test)", "phpstan": "[OK] No errors"},
+        "plan_content": "# Synthetic plan\n\nBody with no matrix and no frontmatter.\n",
+    }
+    fx.update(over)
+    return fx
+
+
+class DegradingLlm(FixtureLlm):
+    """FixtureLlm that raises llm-invalid-output for one purpose, exactly as the live bug does."""
+    def __init__(self, ledger, canned, bad_purposes, kind="llm-invalid-output"):
+        super().__init__(ledger, canned)
+        self.bad, self.kind = set(bad_purposes), kind
+
+    def call(self, purpose, model, prompt, validate, max_retries=1, normalizer=None):
+        if purpose in self.bad:
+            raise HarnessError(self.kind, f"{purpose}: schema: findings must be a JSON array")
+        return super().call(purpose, model, prompt, validate, max_retries, normalizer)
+
+
+def test_envelope_unwrap_reaches_findings():
+    out = tempfile.mkdtemp()
+    canned = dict(CANNED)
+    canned["review-agent-a"] = {"findings": [{"path": "a.php", "line": 1, "body": "x"}]}
+    canned["score-findings"] = [{"n": 1, "score": 85}]   # finding survives (≥80 threshold)
+    llm = FixtureLlm(UsageLedger(), canned)
+    res = runner.run(_fixture(), out, llm, mode="replay")
+    assert res.terminal == TerminalState.SHIPPED_HELD   # surviving finding blocks arming
+    assert any(f.path == "a.php" for f in res.findings)
+
+
+def test_fenced_array_still_parses():
+    fenced = "```json\n[{\"path\": \"a.php\", \"line\": 1, \"body\": \"x\"}]\n```"
+    assert isinstance(extract_json(fenced), list)
+
+
+def test_prose_then_array_still_parses():
+    prose = "Findings:\n[{\"path\": \"a.php\", \"line\": 1, \"body\": \"x\"}]"
+    assert isinstance(extract_json(prose), list)
+
+
+def test_empty_reply_still_fails():
+    import pytest
+    with pytest.raises(ValueError, match="no parseable JSON in model reply"):
+        extract_json("")
+
+
+def test_prose_only_reply_still_fails():
+    import pytest
+    with pytest.raises(ValueError, match="no parseable JSON in model reply"):
+        extract_json("I found no issues.")
+
+
+def test_wrong_envelope_key_still_fails():
+    data = schemas.unwrap_findings_envelope({"not_findings": []})
+    try:
+        schemas.validate_findings(data)
+        assert False, "expected HarnessError"
+    except HarnessError as e:
+        assert e.kind == "schema" and "findings must be a JSON array" in str(e)
+
+
+def test_string_findings_value_still_fails():
+    data = schemas.unwrap_findings_envelope({"findings": "none"})
+    try:
+        schemas.validate_findings(data)
+        assert False, "expected HarnessError"
+    except HarnessError as e:
+        assert e.kind == "schema" and "findings must be a JSON array" in str(e)
+
+
+def test_degraded_run_holds_and_reports(tmp_path):
+    out = str(tmp_path / "out")
+    llm = DegradingLlm(UsageLedger(), CANNED, ["review-agent-a"])
+    res = runner.run(_fixture(), out, llm, mode="replay")
+    assert res.terminal == TerminalState.DEGRADED
+    assert res.degraded_agents == ["review-agent-a"]
+    assert res.arm is not None and not res.arm.armed
+    c9 = next(c for c in res.arm.conditions if c.number == 9)
+    assert c9.blocked and "review-agent-a" in c9.reason
+    assert runner.exit_code_for(res) == 0
+    acts = _actions(out)
+    assert not any(a["action"] == "pr_merge_auto" for a in acts)
+    assert any(a["action"] == "pr_edit_body" for a in acts)
+    assert any("Review Unavailable" in json.dumps(a) for a in acts)
+    assert any("review-agent-a" in json.dumps(a) for a in acts)
+    assert any(a["action"] in ("pr_create", "pr_comment") for a in acts)
+    from harness.armable import manual_testing_clearance
+    assert manual_testing_clearance(_fixture()["pr_meta"]["body"]
+                                    + "\n\n## Review Unavailable\n\nnote\n") == "CLEARED"
+
+
+def test_non_invalid_output_error_still_fails_run(tmp_path):
+    out = str(tmp_path / "out")
+    llm = DegradingLlm(UsageLedger(), CANNED, ["review-agent-a"], kind="llm-fixture-missing")
+    res = runner.run(_fixture(), out, llm, mode="replay")
+    assert res.terminal == TerminalState.FAILED
+
+
+def test_clean_run_still_arms(tmp_path):
+    out = str(tmp_path / "out")
+    llm = FixtureLlm(UsageLedger(), CANNED)
+    res = runner.run(_fixture(), out, llm, mode="replay")
+    assert res.terminal == TerminalState.SHIPPED_ARMED
+    acts = _actions(out)
+    assert any(a["action"] == "pr_merge_auto" for a in acts)
 
 
 def _actions(out):

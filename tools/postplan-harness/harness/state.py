@@ -17,6 +17,7 @@ class Phase5Status(str, Enum):
 class TerminalState(str, Enum):
     SHIPPED_ARMED = "shipped-armed"          # PR open/updated, auto-merge armed
     SHIPPED_HELD = "shipped-held"            # PR open, auto-merge deliberately NOT armed
+    DEGRADED = "degraded"                    # PR open+held; >=1 review agent unparseable
     NOTHING_TO_SHIP = "nothing-to-ship"      # clean tree, empty diff vs master
     FAILED = "failed"                        # typed failure aborted the run
 
@@ -194,6 +195,7 @@ class RunResult:
     retrospective: Optional[dict] = None
     error: Optional[str] = None
     error_kind: Optional[str] = None   # stable HarnessError.kind of a FAILED run (e.g. "rebase-conflict")
+    degraded_agents: list[str] = field(default_factory=list)  # purposes whose reply was unparseable
     ledger: Optional[UsageLedger] = None
     audit: list[str] = field(default_factory=list)
 

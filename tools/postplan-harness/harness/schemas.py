@@ -11,6 +11,18 @@ MANUAL_CATEGORIES = {"cli-executable", "phpunit", "api-test", "e2e",
 COMMIT_TYPES = {"feat", "fix", "refactor", "perf", "test", "docs", "build", "ci", "chore"}
 
 
+def unwrap_findings_envelope(data):
+    """Decoration layer: unwrap a {"findings": [...]} envelope; pass everything else through.
+
+    Tolerance lives here, never in validate_findings — a dict whose "findings" value is not a
+    list, or a dict with any other key, is returned unchanged so the strict validator still
+    rejects it. This is the only shape the layer knows how to unwrap.
+    """
+    if isinstance(data, dict) and isinstance(data.get("findings"), list):
+        return data["findings"]
+    return data
+
+
 def validate_findings(data) -> None:
     """[{path, line, body, agent?}] — code-review / security-audit output."""
     if not isinstance(data, list):

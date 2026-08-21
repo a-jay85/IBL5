@@ -80,6 +80,22 @@ assert_viol() {
     fi
 }
 
+# assert_draft <name> <expected-exit> <plan-body>
+# Same contract as assert(), but invokes the --draft path.
+assert_draft() {
+    name="$1"; want="$2"; body="$3"
+    f="$TMP/$name.md"
+    printf '%s\n' "$body" > "$f"
+    "$GUARD" --draft "$f" >/dev/null 2>&1
+    got=$?
+    if [ "$got" -ne "$want" ]; then
+        echo "FAIL: $name — expected exit $want, got $got"
+        FAILED=1
+    else
+        echo "ok: $name (exit $got)"
+    fi
+}
+
 # Gate 13 (impl_model <-> matrix consistency, assert block further below)
 # requires a deliberate `impl_model:` marker whenever the matrix has zero
 # Truly-manual rows (rule b). Every fixture in this file that predates gate 13
@@ -1812,6 +1828,66 @@ if "$GUARD" "$_f" 2>&1 | grep -qF 'must be written \|'; then
     echo "ok: [V]-pipe-message-confirmed"
 else
     echo "FAIL: [V] unescaped-pipe fixture must fire the pipe-escaping message"
+    FAILED=1
+fi
+
+# --- Gate D (draft phase drift) ---
+# Fixture bodies are built with printf heading-token arguments to avoid
+# literal level-2 Phase headings being counted if gate D is ever pointed at
+# this file. H feeds '##' as a printf %s argument; the body text is the
+# substituted output, never a raw `## Phase N` literal in this file.
+H='##'
+
+D_SCAF4=$(printf '%s PLAN OUTLINE (loop scaffold; dropped at Step 5):\n1. Phase 1: a\n2. Phase 2: b\n3. Phase 3: c\n4. Phase 4: d\n%s\n' '<!--' '-->')
+D_SCAF3=$(printf '%s PLAN OUTLINE (loop scaffold; dropped at Step 5):\n1. Phase 1: a\n2. Phase 2: b\n3. Phase 3: c\n%s\n' '<!--' '-->')
+D_SCAF3PLUS=$(printf '%s PLAN OUTLINE (loop scaffold; dropped at Step 5):\n1. Phase 1: a\n2. Phase 2: b\n3. Phase 3: c\n4. Verification Matrix\n5. Critical Files\n%s\n' '<!--' '-->')
+
+D_BODY3=$(printf '%s Phase 1: a\n\ntext\n\n%s Phase 2: b\n\ntext\n\n%s Phase 3: c\n\ntext\n' "$H" "$H" "$H")
+D_BODY4=$(printf '%s Phase 1: a\n\ntext\n\n%s Phase 2: b\n\ntext\n\n%s Phase 3: c\n\ntext\n\n%s Phase 4: d\n\ntext\n' "$H" "$H" "$H" "$H")
+D_BODY5=$(printf '%s Phase 1: a\n\ntext\n\n%s Phase 2: b\n\ntext\n\n%s Phase 3: c\n\ntext\n\n%s Phase 4: d\n\ntext\n\n%s Phase 5: e\n\ntext\n' "$H" "$H" "$H" "$H" "$H")
+D_BODY6=$(printf '%s Phase 1: a\n\ntext\n\n%s Phase 2: b\n\ntext\n\n%s Phase 3: c\n\ntext\n\n%s Phase 4: d\n\ntext\n\n%s Phase 5: e\n\ntext\n\n%s Phase 6: f\n\ntext\n' "$H" "$H" "$H" "$H" "$H" "$H")
+
+# 1. Over-complete: scaffold 4, body 6 → exit 1 with [D] and "over by 2"
+assert_draft "gateD-over-complete-violation" 1 "$(printf '%s\n%s' "$D_SCAF4" "$D_BODY6")"
+_f_d="$TMP/gateD-over-complete-violation.md"
+printf '%s\n%s\n' "$D_SCAF4" "$D_BODY6" > "$_f_d"
+_out_d=$("$GUARD" --draft "$_f_d" 2>&1)
+if printf '%s' "$_out_d" | grep -qF '[D]' && printf '%s' "$_out_d" | grep -q 'over by 2'; then
+    echo "ok: gateD-over-complete-violation-message"
+else
+    echo "FAIL: [D] violation message must contain '[D]' and 'over by 2'"
+    FAILED=1
+fi
+
+# 2. Exact match: scaffold 3, body 3 → exit 0
+assert_draft "gateD-exact-match-ok" 0 "$(printf '%s\n%s' "$D_SCAF3" "$D_BODY3")"
+
+# 3. Under-complete: scaffold 4, body 3 → exit 0 (run still in progress)
+assert_draft "gateD-under-complete-ok" 0 "$(printf '%s\n%s' "$D_SCAF4" "$D_BODY3")"
+
+# 4. No scaffold at all: body 5, no PLAN OUTLINE comment → exit 0 (pre-scaffold draft)
+assert_draft "gateD-no-scaffold-ok" 0 "$D_BODY5"
+
+# 5. Scaffold closing items not counted: scaffold 3 Phase items + 2 numbered
+# closing items, body 4 → exit 1. A counter that counts ALL numbered items
+# reads scaffold=5 and body=4 < 5 → wrongly passes; canonical counter reads
+# scaffold=3 and body=4 > 3 → correctly fails.
+assert_draft "gateD-scaffold-closing-items-not-counted" 1 "$(printf '%s\n%s' "$D_SCAF3PLUS" "$D_BODY4")"
+
+# Non-draft regression: an existing clean full plan must still exit 0 through
+# the unchanged (non-draft) path. Use the smallest valid complete fixture.
+assert "gateD-nondraft-regression" 0 "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | thing works | E2E | post-impl | `tests/X.spec.ts` |
+'
+
+# --draft with no path must exit 2.
+"$GUARD" --draft >/dev/null 2>&1; _got_2=$?
+if [ "$_got_2" -eq 2 ]; then
+    echo "ok: gateD-no-path-exits-2 (exit 2)"
+else
+    echo "FAIL: gateD-no-path-exits-2 — expected exit 2, got $_got_2"
     FAILED=1
 fi
 

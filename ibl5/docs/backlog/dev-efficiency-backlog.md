@@ -82,6 +82,12 @@ last_verified: 2026-09-06
 | E54 | PR #2084 Phase 6.5 — rebase silently dropped implementation commit; lost-work proof blind to pre-run loss | ⬜ Open | — | XS |
 | E55 | PR #2129 Phase 6.5 — PR body false E2E claim, omitted grep finding, vacuous VM selector; all fixed this pass | ⬜ Open | — | XS |
 | E56 | PR #2129 Phase 6.5 — SKILL.md size-band gate not updated after deliberate file growth; fixed this pass | ⬜ Open | — | XS |
+| E54 | Incomplete seam list in `bin/bug-pipeline-test-env` env block and `bin/bug-pipeline-e2e` guard causes production contact through unguarded tick seams | ✅ fixed this pass | — | S |
+| E55 | Hardcoded main-checkout path in `ibl5/IBLbot/ecosystem.bugbot-test.config.cjs` splits precondition check from PM2 artifact | ✅ fixed this pass | — | XS |
+| E56 | PR body carried stale ADR number (0108 vs 0111) and false no-manual-testing claim | ✅ fixed this pass | — | XS |
+| E57 | `REPLACE_WITH_` sentinel passes the non-empty approver-ID guard in `bin/bug-pipeline-test-env` | ✅ fixed this pass | — | XS |
+| E58 | No committed regression tests for guards in `bin/bug-pipeline-e2e` and `ecosystem.bugbot-test.config.cjs` fail-closed checks | ⬜ Open | — | S |
+| E59 | Unasked-for `last_verified` change with duplicate YAML key in `ibl5/docs/decisions/README.md` | ✅ fixed this pass | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -865,6 +871,11 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 ### E54 PR #2084 Phase 6.5 — rebase silently dropped implementation commit; lost-work proof blind to pre-run loss
 
 **class:** `rebase-dropped-commit` — an `--onto` rebase replay range that started above the branch's own commits, compounded by a lost-work proof that only compares pre-to-post within a single `/pr-ready` run and cannot detect a branch that arrives already emptied by a previous run's bad rebase.
+---
+
+### E54 Incomplete seam list in `bin/bug-pipeline-test-env` env block and `bin/bug-pipeline-e2e` guard causes production contact through unguarded tick seams
+
+**class:** a missing-seam class in a test-isolation env block and guard that allows production-defaulted tick seams to contact real infrastructure (real GitHub, real log files, real liveness heartbeat) when the env block is not fully sourced or the guard fails to detect them.
 
 **occurrence table:**
 
@@ -896,6 +907,26 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 - N4: a vacuous pytest selector in a Verification Matrix row (`-k prready`) that can never collect any test.
 
 All three fixed this pass: B1 and N3 via `gh pr edit`; N4 via the plan file VM.
+| 1 | `bin/bug-pipeline-test-env:150-152` + `bin/bug-pipeline-e2e:43-49` | yes — same class; guard lacked BUG_PIPELINE_DM_BIN, BUG_PIPELINE_TICK_HEARTBEAT, BUG_PIPELINE_CI_AUTOFIX_ENABLED, BUG_PIPELINE_CI_AUTOFIX_LEDGER, BUG_PIPELINE_CI_AUTOFIX_LOG, BUG_PIPELINE_CI_AUTOFIX_LOCK, BUG_PIPELINE_CI_AUTOFIX_WT_REPO | live | fixed this pass |
+
+**prevention_ladder:**
+
+- **rung 0 — already covered by an existing gate?** No. No gate validates the seam list completeness of the env block against the guard's seam list.
+- **rung 1 — extend an existing gate? Yes — landing rung.** `bin/bug-pipeline-e2e` guard extended this pass to fail closed on all 7 missing seams; discord-dm stub and expanded env block landed in `bin/bug-pipeline-test-env`.
+- **rung 2 — a rule doc?** A rule doc could note the requirement that every production-contacting seam in a test-environment script must appear in both the env block and the guard. Low ROI without a CI runner for this local script.
+- **rungs 3–5 — not warranted:** no CI runner for this local script.
+
+`prevention_ladder: rung 1 — guard now fails closed on all 7 missing seams; discord-dm stub and env block landed in bin/bug-pipeline-test-env`
+
+`artifact destination:` `bin/bug-pipeline-e2e` (guard section) — in-repo
+
+*(discovered 2026-09-05 during #1950)*
+
+---
+
+### E55 Hardcoded main-checkout path in `ibl5/IBLbot/ecosystem.bugbot-test.config.cjs` splits precondition check from PM2 artifact
+
+**class:** a hardcoded absolute path in a config file that splits the precondition check (worktree build) from the PM2 process start (main-checkout build), causing the guard to pass on the wrong artifact.
 
 **occurrence table:**
 
@@ -917,6 +948,26 @@ All three fixed this pass: B1 and N3 via `gh pr edit`; N4 via the plan file VM.
 ### E56 PR #2126 Phase 6.5 — stale entry-point counts in plan-preserved maintenance-backlog prose
 
 **class:** Plan-prescribed "preserve surrounding clauses" anchor instructions that treat count literals as invariants, when those counts were accurate at plan-write time but became stale relative to the PR's final diff scope (plan expanded from 4 to 9 entry points).
+| 1 | `ibl5/IBLbot/ecosystem.bugbot-test.config.cjs:5` — `const HERE = '/Users/ajaynicolas/GitHub/IBL5/ibl5/IBLbot'` | yes | live | fixed this pass (`__dirname` substituted) |
+
+**prevention_ladder:**
+
+- **rung 0 — already covered by an existing gate?** No. No gate checks for hardcoded absolute checkout paths in config files.
+- **rung 1 — cannot extend:** no existing gate owns this surface.
+- **rung 2 — a rule doc?** `.claude/rules/workflow-continuity.md` already cautions against editing the main checkout; the correct pattern (`__dirname`) is idiomatic Node.js and requires no new rule.
+- **rungs 3–5 — not warranted:** one-off config file; the fix (`__dirname`) is the correct and permanent pattern.
+
+`prevention_ladder: rung 2 — __dirname is the correct pattern; workflow-continuity.md covers the underlying constraint`
+
+`artifact destination:` `ibl5/IBLbot/ecosystem.bugbot-test.config.cjs` — in-repo
+
+*(discovered 2026-09-05 during #1950)*
+
+---
+
+### E56 PR body carried stale ADR number (0108 vs 0111) and false no-manual-testing claim
+
+**class:** a PR body accuracy failure where hand-authored prose was not re-checked after a mid-PR ADR renumber and after the plan's own opt-in/local-only testing constraints were written.
 
 **occurrence table:**
 
@@ -963,6 +1014,26 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 ### E61 PR #2129 Phase 6.5 — SKILL.md size-band gate not updated after deliberate file growth
 
 **class:** a test-maintenance omission — a size-band gate (`bin/test-pr-ready-now` case 25) not updated when the guarded file grew by deliberate plan work in the same PR.
+| 1 | PR #1950 body (scope prose + manual-testing section) — ADR-0108 reference was stale after renumber to ADR-0111; Manual Testing claimed no testing needed despite an opt-in Discord-provisioning step | yes — same class: body prose not reconciled after mid-PR renumber and after plan constraints written | live | fixed this pass (via `gh pr edit`) |
+
+**prevention_ladder:**
+
+- **rung 0 — already covered by an existing gate?** No. `bin/check-docs` does not read PR bodies. `.claude/rules/pr-body-negative-claim-recheck.md` covers the negative-claim half but not the ADR-renumber case.
+- **rung 1 — extend an existing gate?** No natural host for the ADR-number case.
+- **rung 2 — a rule doc? Landing rung.** The ADR-number case is distinct from the negative-claim case; a rule doc (`.claude/rules/pr-body-adr-renumber-recheck.md` (example)) could note that a mid-PR ADR renumber must trigger a body scope-prose re-read. The negative-claim half is already covered by `pr-body-negative-claim-recheck.md`.
+- **rungs 3–5 — not warranted:** prose accuracy is judgment-gated; no mechanical gate can verify free-form ADR citations.
+
+`prevention_ladder: rung 2 — file a rule doc for the ADR-renumber case; negative-claim case already covered by pr-body-negative-claim-recheck.md`
+
+`artifact destination:` n/a — PR body is a GitHub artifact, not a repo file; a rule doc would live at `.claude/rules/pr-body-adr-renumber-recheck.md` (example)
+
+*(discovered 2026-09-05 during #1950)*
+
+---
+
+### E57 `REPLACE_WITH_` sentinel passes the non-empty approver-ID guard in `bin/bug-pipeline-test-env`
+
+**class:** an unfilled template placeholder that satisfies a non-empty guard while remaining semantically unset, causing the test environment to start with a fake snowflake that will produce Discord API errors at runtime.
 
 **occurrence table:**
 
@@ -1040,3 +1111,66 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 `artifact destination: this entry`
 
 *(discovered 2026-09-06 during Phase 6 review of #2140)*
+| 1 | `bin/bug-pipeline-test-env` (APPROVER guard) — non-empty check passed by `REPLACE_WITH_<ID>` sentinel | yes | live | fixed this pass (`REPLACE_WITH_*` case check added) |
+
+**prevention_ladder:**
+
+- **rung 0 — already covered by an existing gate?** No. Non-empty guards do not check for template sentinel prefixes.
+- **rung 1 — extend an existing gate? Landing rung.** The guard itself is the correct extension point; `REPLACE_WITH_*` case check added this pass in `bin/bug-pipeline-test-env`.
+- **rungs 2–5 — not warranted:** a one-off guard with a direct fix; no broader pattern warrants a rule doc or CI gate for this surface.
+
+`prevention_ladder: rung 1 — REPLACE_WITH_* case check added to the approver-ID guard this pass`
+
+`artifact destination:` `bin/bug-pipeline-test-env` — in-repo
+
+*(discovered 2026-09-05 during #1950)*
+
+---
+
+### E58 No committed regression tests for guards in `bin/bug-pipeline-e2e` and `ecosystem.bugbot-test.config.cjs` fail-closed checks
+
+**class:** a test-coverage gap where one-shot CLI assertions serve as the only verification of guard behavior, allowing future edits to silently remove them (as happened to the lsof port guard between review and shipping).
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/bug-pipeline-e2e` guard section | yes | live | not fixed — filed |
+| 2 | `ibl5/IBLbot/ecosystem.bugbot-test.config.cjs` required-var check | yes | live | not fixed — filed |
+
+**prevention_ladder:**
+
+- **rung 0 — already covered by an existing gate?** No. No `bin/test-*` harness covers this surface.
+- **rung 1 — extend an existing gate?** Could extend a `bin/test-*` harness when one is added for this surface; no existing harness to extend today.
+- **rung 4 — a CI step?** Could run `bin/bug-pipeline-e2e --check` (example) in CI, but the script is SKIP-gated without a real environment; not practical.
+- **landing rung: rung 1** — extend an existing test harness when one is added for this surface; no gate warranted right now (no CI runner for this local script).
+
+`prevention_ladder: no gate warranted — landing rung 1 when a test harness is added for this surface; no CI runner today`
+
+`artifact destination:` n/a — no gate lands this pass
+
+*(discovered 2026-09-05 during #1950)*
+
+---
+
+### E59 Unasked-for `last_verified` change with duplicate YAML key in `ibl5/docs/decisions/README.md`
+
+**class:** a scope-creep edit to a gate-surface doc that was not requested by any plan phase, containing a duplicate frontmatter key that would break YAML parsers and regress the verified date.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/docs/decisions/README.md` frontmatter — `last_verified: 2026-09-04` followed by `last_verified: 2026-09-01` (duplicate key) | yes | live | fixed this pass (second key deleted; date bumped to 2026-09-05) |
+
+**prevention_ladder:**
+
+- **rung 0 — already covered by an existing gate?** Partially. `bin/check-docs` validates `last_verified` presence but not key uniqueness. A duplicate key would pass `bin/check-docs` today.
+- **rung 1 — extend an existing gate? Landing rung.** Extend `bin/check-docs` to detect duplicate YAML frontmatter keys (a YAML parse of the frontmatter block would catch this; the current check is line-level).
+- **rungs 2–5 — not warranted:** rung 1 is the natural landing rung given `bin/check-docs` already owns the frontmatter surface.
+
+`prevention_ladder: rung 1 — extend bin/check-docs to detect duplicate YAML frontmatter keys`
+
+`artifact destination:` `bin/check-docs` — in-repo, extend to detect duplicate YAML frontmatter keys
+
+*(discovered 2026-09-05 during #1950)*

@@ -1,0 +1,266 @@
+#!/usr/bin/env bash
+# bin/bug-pipeline-test-env — provision and tear down the bug-pipeline test environment.
+# See ibl5/docs/decisions/0111-bug-pipeline-test-isolation.md for the three-barrier design.
+#
+# Usage:
+#   bin/bug-pipeline-test-env           # bring up scratch DB + stubs + test bot
+#   bin/bug-pipeline-test-env --teardown
+#   bin/bug-pipeline-test-env --help
+#
+# After a successful bring-up: source /tmp/bug-pipeline-test-env.sh
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# ── Flag parsing ──────────────────────────────────────────────────────────────
+usage() {
+    cat >&2 <<'EOF'
+Usage: bin/bug-pipeline-test-env [--teardown | --help]
+
+  (no flag)    bring up: scratch DB, migrations, stubs, test bot
+  --teardown   tear down: stop bot, drop DB, remove /tmp artifacts
+  --help       print this and exit 0
+EOF
+}
+
+MODE=up
+case "${1:-}" in
+    '')           MODE=up ;;
+    --teardown)   MODE=down ;;
+    -h|--help)    usage; exit 0 ;;
+    *)            echo "unknown option: $1" >&2; usage >&2; exit 2 ;;
+esac
+[ "$#" -le 1 ] || { echo "unexpected extra arguments" >&2; usage >&2; exit 2; }
+
+# ── Isolation constants (literals — never env-overridable) ───────────────────
+SCRATCH_DB='ibl5_bug_pipeline_test'      # NEVER iblhoops_ibl5
+DB_CONTAINER='ibl5-mariadb'              # only host-published MariaDB (127.0.0.1:3306)
+BOT_URL='http://127.0.0.1:50002'         # 50001 is the production bug-bot
+ENV_FILE='/tmp/bug-pipeline-test-env.sh'
+STUB_BIN='/tmp/bug-pipeline-test-stubs/bin'
+WT_BASE='/tmp/bug-pipeline-test-worktrees'
+PLANS='/tmp/bug-pipeline-test-plans'
+IBLBOT="$REPO_ROOT/ibl5/IBLbot"
+
+# Fail closed before ANY write. A constant can still be broken by a bad edit.
+case "$SCRATCH_DB" in iblhoops_ibl5|ibl5_test|'') echo "refusing: unsafe DB name '$SCRATCH_DB'" >&2; exit 1;; esac
+case "$BOT_URL"    in *:50001*)                    echo "refusing: BOT_URL points at the production bug-bot" >&2; exit 1;; esac
+
+# ── Shared DB helper ─────────────────────────────────────────────────────────
+# shellcheck source=bin/lib/db-helpers.sh
+source "$REPO_ROOT/bin/lib/db-helpers.sh"
+
+# ── Bring-up ─────────────────────────────────────────────────────────────────
+if [ "$MODE" = "up" ]; then
+
+    # Step 2.2 — Read the approver snowflake from the untracked secrets file.
+    # BUG_PIPELINE_APPROVER_ID is a tick var, not a bot var — deliberately absent
+    # from the PM2 env block. Unset, empty, and unfilled placeholder are all rejected.
+    SECRETS="$IBLBOT/.env.bugbot.test"
+    [ -f "$SECRETS" ] || { echo "missing $SECRETS — copy .env.bugbot.test.example and fill it in" >&2; exit 1; }
+    APPROVER="$(grep -E '^BUG_PIPELINE_APPROVER_ID=' "$SECRETS" | tail -1 | cut -d= -f2- | tr -d '"'"'"' ')"
+    [ -n "${APPROVER:-}" ] || { echo "BUG_PIPELINE_APPROVER_ID unset or empty in $SECRETS" >&2; exit 1; }
+    case "${APPROVER}" in REPLACE_WITH_*) echo "BUG_PIPELINE_APPROVER_ID is still the template placeholder in $SECRETS" >&2; exit 1;; esac
+
+    # Step 2.3 — Create scratch DB and load migrations 153 + 158 via bin/db-migrate.
+    # db-migrate globs every *.sql in a dir, so we point it at a staging dir holding
+    # only these two — that gives us schema_migrations tracking + skip-if-applied.
+    db_exec "$DB_CONTAINER" mariadb -u root -proot -e \
+        "CREATE DATABASE IF NOT EXISTS \`$SCRATCH_DB\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
+    STAGE="$(mktemp -d)"; trap 'rm -rf "$STAGE"' EXIT
+    cp "$REPO_ROOT/ibl5/migrations/153_create_bug_pipeline_tables.sql" \
+       "$REPO_ROOT/ibl5/migrations/158_create_bug_report_attachments.sql" "$STAGE/"
+    "$REPO_ROOT/bin/db-migrate" "$DB_CONTAINER" "$STAGE" "$SCRATCH_DB"
+
+    # Step 2.4 — Write claude / gh / wt-new / post-plan-now stubs.
+    # Reuse the stub SHAPE from bin/lib/bug-pipeline-test-stubs.sh (:42-83, :111-112)
+    # but do NOT call bpt_setup — it also stubs php and curl, and this environment
+    # must run the real PHP CLI and make real loopback calls to the test bot.
+    mkdir -p "$WT_BASE" "$PLANS" "$STUB_BIN"
+
+    # claude — FULL envelope, not a bare result object (the envelope is what the tick parses).
+    cat > "$STUB_BIN/claude" <<'SH'
+#!/usr/bin/env bash
+echo "claude $*" >> /tmp/bug-pipeline-test-stubs/claude.log
+printf '%s\n' '{"type":"result","is_error":false,"result":{"status":"classified","class":"bug","confidence":0.9,"summary":"Test report"}}'
+SH
+
+    # gh — issue URL on `issue create`, bare PR number on `pr list`.
+    cat > "$STUB_BIN/gh" <<'SH'
+#!/usr/bin/env bash
+echo "gh $*" >> /tmp/bug-pipeline-test-stubs/gh.log
+case "$*" in
+  *"issue create"*) echo "https://github.com/${BUG_PIPELINE_ISSUE_REPO}/issues/1" ;;
+  *"pr list"*)      echo "999" ;;
+  *)                exit 0 ;;
+esac
+SH
+
+    # wt-new stub — absorbs worktree creation calls without creating anything.
+    cat > "$STUB_BIN/wt-new" <<'SH'
+#!/usr/bin/env bash
+echo "wt-new $*" >> /tmp/bug-pipeline-test-stubs/wt-new.log
+exit 0
+SH
+
+    # post-plan-now stub — absorbs ship pipeline calls without firing them.
+    cat > "$STUB_BIN/post-plan-now" <<'SH'
+#!/usr/bin/env bash
+echo "post-plan-now $*" >> /tmp/bug-pipeline-test-stubs/post-plan-now.log
+exit 0
+SH
+
+    # discord-dm — absorbs DM calls without sending to Discord.
+    cat > "$STUB_BIN/discord-dm" <<'SH'
+#!/usr/bin/env bash
+echo "discord-dm $*" >> /tmp/bug-pipeline-test-stubs/discord-dm.log
+exit 0
+SH
+
+    chmod +x "$STUB_BIN/claude" "$STUB_BIN/gh" "$STUB_BIN/wt-new" "$STUB_BIN/post-plan-now" \
+             "$STUB_BIN/discord-dm"
+
+    # Step 4.1 — Passthrough probes (written here, not wired into the env block;
+    # opt-in per-run via PHP_BIN= / CURL_BIN= for the isolation check in Step 4.2).
+    cat > "$STUB_BIN/php-probe" <<'SH'
+#!/usr/bin/env bash
+echo "DB_NAME=$DB_NAME" >> /tmp/bug-pipeline-test-stubs/env.log
+exec php "$@"
+SH
+
+    cat > "$STUB_BIN/curl-probe" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> /tmp/bug-pipeline-test-stubs/curl.log
+exec curl "$@"
+SH
+
+    chmod +x "$STUB_BIN/php-probe" "$STUB_BIN/curl-probe"
+
+    # Step 2.5 — Write the sourceable env block.
+    # Covers every production-defaulted seam in bin/bug-pipeline-tick:28-73 (original
+    # set) and lines 40, 84, 93-106 (CI-autofix + DM + heartbeat seams added later).
+    mkdir -p "$WT_BASE" "$PLANS"
+    cat > "$ENV_FILE" <<EOF
+export DB_HOST="127.0.0.1" DB_USER="root" DB_PASS="root" DB_NAME="${SCRATCH_DB}"
+export BOT_BASE_URL="${BOT_URL}"
+export CLAUDE_BIN="/tmp/bug-pipeline-test-stubs/bin/claude"
+export GH_BIN="/tmp/bug-pipeline-test-stubs/bin/gh"
+export BUG_PIPELINE_WT_NEW_BIN="/tmp/bug-pipeline-test-stubs/bin/wt-new"
+export BUG_PIPELINE_POST_PLAN_NOW_BIN="/tmp/bug-pipeline-test-stubs/bin/post-plan-now"
+export BUG_PIPELINE_DM_BIN="/tmp/bug-pipeline-test-stubs/bin/discord-dm"
+export BUG_PIPELINE_CODE_REPO="ibl-test/fake-code-repo"
+export BUG_PIPELINE_ISSUE_REPO="ibl-test/fake-issue-repo"
+export BUG_PIPELINE_WT_BASE="/tmp/bug-pipeline-test-worktrees"
+export BUG_PIPELINE_PLANS_DIR="/tmp/bug-pipeline-test-plans"
+export BUG_PIPELINE_SCRIPTS_DIR="${REPO_ROOT}/ibl5/scripts/bug-pipeline"
+export BUG_PIPELINE_ATTACHMENT_CACHE_DIR="/tmp/bug-pipeline-test-attachments"
+export BUG_PIPELINE_HUNT_LOG="/tmp/bug-pipeline-test-hunt.log"
+export BUG_PIPELINE_APPROVER_ID="${APPROVER}"
+export BUG_PIPELINE_TICK_HEARTBEAT="/tmp/bug-pipeline-test-tick-heartbeat"
+export BUG_PIPELINE_CI_AUTOFIX_ENABLED="0"
+export BUG_PIPELINE_CI_AUTOFIX_LEDGER="/tmp/bug-pipeline-test-ci-autofix-ledger.json"
+export BUG_PIPELINE_CI_AUTOFIX_LOG="/tmp/bug-pipeline-test-ci-autofix.log"
+export BUG_PIPELINE_CI_AUTOFIX_LOCK="/tmp/bug-pipeline-test-ci-autofix.lock"
+export BUG_PIPELINE_CI_AUTOFIX_WT_REPO="/tmp/bug-pipeline-test-worktrees"
+EOF
+
+    # Step 4.2 — Run one real tick under the sourced env block.
+    # The queue is empty right after bring-up, so an empty tick exits 0 having
+    # spawned ZERO claude processes (bin/bug-pipeline-tick:6-8 invariant).
+    rm -f /tmp/bug-pipeline-test-stubs/env.log \
+          /tmp/bug-pipeline-test-stubs/claude.log \
+          /tmp/bug-pipeline-test-stubs/curl.log
+    (   # shellcheck disable=SC1090
+        source "$ENV_FILE"
+        PHP_BIN="$STUB_BIN/php-probe" \
+        CURL_BIN="$STUB_BIN/curl-probe" \
+        timeout 60 "$REPO_ROOT/bin/bug-pipeline-tick"
+    )
+
+    # Step 4.3 — Prove the check has teeth: without the env block the tick resolves
+    # the production DB name. Use a non-executing probe so no DB connection is made.
+    # CI-autofix is disabled (BUG_PIPELINE_CI_AUTOFIX_ENABLED=0) so the pass does
+    # not make real GitHub calls. CODE_REPO and TICK_HEARTBEAT are also redirected
+    # so this probe never touches production seams (B1/B2 fix).
+    cat > /tmp/bpte-probe-only <<'SH'
+#!/usr/bin/env bash
+echo "DB_NAME=$DB_NAME" >> /tmp/bpte-control.log
+exit 0
+SH
+    chmod +x /tmp/bpte-probe-only
+    rm -f /tmp/bpte-control.log /tmp/bpte-control-heartbeat
+    (   unset DB_NAME
+        BUG_PIPELINE_CI_AUTOFIX_ENABLED=0 \
+        BUG_PIPELINE_CODE_REPO="ibl-test/fake-code-repo" \
+        BUG_PIPELINE_TICK_HEARTBEAT="/tmp/bpte-control-heartbeat" \
+        PHP_BIN=/tmp/bpte-probe-only \
+        timeout 60 "$REPO_ROOT/bin/bug-pipeline-tick"
+    ) || true
+
+    # Step 3.2 — Start the test bot.
+    # Two preconditions before pm2 start (each failure would present as a green bring-up):
+    # 1. The compiled entrypoint must exist.
+    if [ ! -f "$IBLBOT/dist/bug-bot/index.js" ]; then
+        echo "missing $IBLBOT/dist/bug-bot/index.js — build first:" >&2
+        echo "  (cd $IBLBOT && npm run build)" >&2
+        exit 1
+    fi
+    # Delete-then-start so the config file is always re-evaluated (not --update-env,
+    # which re-reads the process env and silently ignores a rotated token).
+    pm2 delete ibl-bug-bot-test >/dev/null 2>&1 || true
+    pm2 start "$IBLBOT/ecosystem.bugbot-test.config.cjs"
+
+    # Bounded liveness probe: wait up to 10 s for GET / → 'ok'.
+    BOT_UP=0
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        if curl -fsS "$BOT_URL/" 2>/dev/null | grep -q '^ok$'; then
+            BOT_UP=1; break
+        fi
+        if pm2 jlist 2>/dev/null | python3 -c "
+import sys,json
+apps=json.load(sys.stdin)
+for a in apps:
+    if a.get('name')=='ibl-bug-bot-test':
+        st=a.get('pm2_env',{}).get('status','')
+        rt=a.get('pm2_env',{}).get('restart_time',0)
+        if st=='errored' or rt>0: sys.exit(1)
+" 2>/dev/null; then
+            : # still starting
+        else
+            break  # errored
+        fi
+        sleep 1
+    done
+
+    if [ "$BOT_UP" != "1" ]; then
+        echo "test bot failed to come up on $BOT_URL" >&2
+        pm2 logs ibl-bug-bot-test --lines 50 >&2 || true
+        exit 1
+    fi
+
+    echo "Test environment is up."
+    echo ""
+    echo "Next step:  source $ENV_FILE"
+
+# ── Teardown ─────────────────────────────────────────────────────────────────
+elif [ "$MODE" = "down" ]; then
+
+    # Re-run the unsafe-name refusal before the drop.
+    case "$SCRATCH_DB" in iblhoops_ibl5|ibl5_test|'') echo "refusing to drop '$SCRATCH_DB'" >&2; exit 1;; esac
+
+    pm2 delete ibl-bug-bot-test >/dev/null 2>&1 || true
+    db_exec "$DB_CONTAINER" mariadb -u root -proot -e "DROP DATABASE IF EXISTS \`$SCRATCH_DB\`;"
+    rm -rf /tmp/bug-pipeline-test-worktrees /tmp/bug-pipeline-test-plans \
+           /tmp/bug-pipeline-test-stubs /tmp/bug-pipeline-test-attachments
+    rm -f  /tmp/bug-pipeline-test-env.sh /tmp/bug-pipeline-test-hunt.log \
+           /tmp/bpte-probe-only /tmp/bpte-control.log /tmp/bpte-control-heartbeat \
+           /tmp/bug-pipeline-test-tick-heartbeat \
+           /tmp/bug-pipeline-test-ci-autofix-ledger.json \
+           /tmp/bug-pipeline-test-ci-autofix.log \
+           /tmp/bug-pipeline-test-ci-autofix.lock
+    echo "Teardown complete."
+
+fi

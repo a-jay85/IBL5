@@ -37,6 +37,20 @@ class SalaryCapRepository extends \BaseMysqliRepository implements SalaryCapRepo
         return (int) ($result['current_salary'] ?? 0);
     }
 
+    public function getPlayerNextYearSalary(int $playerId): int
+    {
+        /** @var array{next_year_salary: int|null}|null $result */
+        $result = $this->fetchOne(
+            "SELECT next_year_salary
+            FROM vw_current_salary
+            WHERE pid = ?",
+            "i",
+            $playerId
+        );
+
+        return (int) ($result['next_year_salary'] ?? 0);
+    }
+
     public function getTeamNextYearSalary(string $teamName): int
     {
         /** @var array{total_salary: int|null}|null $result */

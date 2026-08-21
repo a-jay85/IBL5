@@ -1,7 +1,7 @@
 ---
 description: Common repository helpers and gotchas for IBL5 PHP code.
 paths: "**/*.php"
-last_verified: 2026-07-28
+last_verified: 2026-08-21
 ---
 
 # Core Coding Reference
@@ -36,6 +36,7 @@ $repo->getPlayerIDFromPlayerName(string $playerName): ?int
 ```php
 $repo->getTeamTotalSalary(string $teamName): int
 $repo->getPlayerCurrentSalary(int $playerId): int  // Single player's current-season salary from vw_current_salary
+$repo->getPlayerNextYearSalary(int $playerId): int  // Single player's next-season salary; use when Season::advancesContractYears()
 $repo->getTeamNextYearSalary(string $teamName): int
 $repo->getPositionSalaryCommitmentNextYear(string $teamName, string $position, int $excludePlayerID): int
 $repo->getTeamSalarySummary(string $teamName): array  // {current: int, nextYear: int}

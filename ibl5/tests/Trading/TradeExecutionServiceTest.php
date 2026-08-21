@@ -222,6 +222,64 @@ class TradeExecutionServiceTest extends TestCase
     }
 
     /**
+     * Characterization test: outside an offseason phase current_salary IS the correct
+     * accept-time basis for player legs, and the phase fix must not change it.
+     */
+    public function testPlayerLegUsesCurrentSalaryBasisOutsideOffseason(): void
+    {
+        $salaryCap = self::createMock(SalaryCapRepositoryInterface::class);
+        $salaryCap->expects(self::once())->method('getPlayerCurrentSalary')->with(4835)->willReturn(1063);
+        $salaryCap->expects(self::atLeastOnce())->method('getTeamTotalSalary')
+            ->willReturnMap([['Metros', 6861], ['Stars', 6926]]);
+        $salaryCap->expects(self::never())->method('getTeamNextYearSalary');
+        $deltas = $this->captureCapDeltasForPlayerLeg(false, $salaryCap, [$this->playerRow(4835, 'Metros', 'Stars')]);
+        $metros = $this->deltaFor($deltas, 'Metros');
+        self::assertSame(6861, $metros['currentSeasonCapTotal']);
+        self::assertSame(1063, $metros['capSent']);
+        self::assertSame(0, $metros['capReceived']);
+        self::assertSame(1063, $this->deltaFor($deltas, 'Stars')['capReceived']);
+    }
+
+    /**
+     * Run validateAndExecute over a single player leg and return the per-party cap
+     * deltas the service hands to the cap validator. cashRepo is left as the default
+     * null stub so getCashTransactionByOffer returns null and no cash leg fires.
+     *
+     * @param list<array<string, mixed>> $rows
+     * @return list<array<string, mixed>>
+     */
+    private function captureCapDeltasForPlayerLeg(bool $advancesContractYears, SalaryCapRepositoryInterface $salaryCap, array $rows, string $actingTeam = 'Metros'): array
+    {
+        $season = self::createStub(Season::class);
+        $season->method('advancesContractYears')->willReturn($advancesContractYears);
+
+        $captured = [];
+        $validator = self::createStub(TradeValidatorInterface::class);
+        $validator->method('validateSalaryCapsForParties')->willReturnCallback(
+            function (array $deltas) use (&$captured): array {
+                $captured = $deltas;
+                return ['valid' => true, 'errors' => [], 'parties' => []];
+            }
+        );
+        $validator->method('validateRosterLimitsForParties')->willReturn(['valid' => true, 'errors' => [], 'parties' => []]);
+
+        $processor = self::createStub(TradeProcessorInterface::class);
+        $processor->method('processTrade')->willReturn(['success' => true]);
+
+        $service = $this->buildService(
+            $rows,
+            processor: $processor,
+            validator: $validator,
+            salaryCap: $salaryCap,
+            season: $season,
+        );
+
+        $service->validateAndExecute(1, $actingTeam);
+
+        return $captured;
+    }
+
+    /**
      * Run validateAndExecute over a single Metros->Stars cash leg and return the
      * per-party cap deltas the service hands to the cap validator. The acting team
      * (Metros) is a party, so the IDOR gate passes and validateParties runs.

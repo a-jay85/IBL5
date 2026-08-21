@@ -13,7 +13,7 @@
         "phpstan/phpstan-phpunit": "^2.0",
         "phpstan/phpstan-strict-rules": "^2.0",
         "phpstan/phpstan-deprecation-rules": "^2.0",
-        "infection/infection": "^0.34.0",
+        "infection/infection": "^0.35.0",
         "brianium/paratest": "^7.23"
     },
     "scripts": {

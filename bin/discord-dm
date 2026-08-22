@@ -26,6 +26,11 @@
 #   --host <ssh-host>  ssh target (default: $DISCORD_DM_SSH_HOST, else iblhoops.net)
 #   --quiet            no per-attempt chatter on stderr (failures still print)
 #   --no-fallback      skip the macOS notification + spool on total failure
+#   --chunk            split an over-cap message into ordered messages instead of
+#                      truncating it. Opt-in: the short verdict pings sent by
+#                      bin/plan-now and bin/watch-automouse-plan want truncation,
+#                      and splitting one ping into three DMs would be worse.
+#                      With --chunk, exit 0 means EVERY chunk was delivered.
 #
 # Exit: 0 delivered · 1 undeliverable (spooled) · 2 usage/config error.
 
@@ -38,6 +43,9 @@ BOT_PORT="${DISCORD_DM_PORT:-50000}"
 ATTEMPTS=6
 QUIET=0
 FALLBACK=1
+CHUNK=0
+# Transport seam: tests point this at a stub. Production always uses the real ssh.
+SSH_BIN="${DISCORD_DM_SSH_BIN:-ssh}"
 SPOOL="${DISCORD_DM_SPOOL:-$HOME/.claude/discord-dm-spool.log}"
 ID_FILE="$HOME/.iblbot-dm-id"
 
@@ -54,7 +62,8 @@ while [ $# -gt 0 ]; do
         --host)        SSH_HOST="${2:-}"; shift 2 ;;
         --quiet)       QUIET=1; shift ;;
         --no-fallback) FALLBACK=0; shift ;;
-        -h|--help)     sed -n '2,31p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        --chunk)       CHUNK=1; shift ;;
+        -h|--help)     sed -n '2,36p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         -)             MSG=$(cat); shift ;;
         --)            shift; MSG="$*"; break ;;
         -*)            echo "discord-dm: unknown option $1" >&2; exit 2 ;;
@@ -79,16 +88,49 @@ fi
 
 say() { [ "$QUIET" = 1 ] || printf 'discord-dm: %s\n' "$1" >&2; }
 
-# Discord caps a message at 2000 chars; leave room for the truncation marker.
-if [ "${#MSG}" -gt 1900 ]; then
-    MSG="${MSG:0:1900}"$'\n…(truncated)'
-fi
+# Discord caps a message at 2000 chars. Two mutually exclusive strategies, kept as
+# separate branches on purpose: unifying them is how a no-flag caller would silently
+# pick up a "(1/1): " prefix or a changed spool format.
+#
+# The full, untruncated original — what gets spooled on failure, so a partially
+# delivered chunk run never leaves a partial message behind (§ decision 5).
+FULL_MSG="$MSG"
 
-# Snowflakes are 64-bit and MUST stay JSON strings end-to-end — jq --arg keeps
-# them strings; interpolating into a JSON literal would round-trip them through a
-# double and corrupt the low digits.
-PAYLOAD=$(jq -n --arg id "$TO" --arg msg "$MSG" \
-    '{content: {receivingUserDiscordID: $id, message: $msg}}') || exit 2
+# Split at <=CAP chars, preferring a line break over a mid-word cut. Mirrors
+# chunkMessage() in ibl5/IBLbot/src/bug-bot/server.ts so the DM and the Discord thread
+# break a long remedy at the same places. Populates the CHUNKS array.
+CAP=1900
+chunk_message() { # text
+    local text="$1" piece cut i total
+    CHUNKS=()
+    while [ "${#text}" -gt "$CAP" ]; do
+        piece="${text:0:$CAP}"
+        cut="${piece%$'\n'*}"                       # everything before the LAST newline
+        [ "$cut" = "$piece" ] && cut="${piece% *}"  # no newline? fall back to the last space
+        [ -n "$cut" ] || cut="$piece"               # no space either, or a leading break: hard cut
+        CHUNKS+=("$cut")
+        text="${text:${#cut}}"
+        text="${text#"${text%%[![:space:]]*}"}"     # drop the whitespace we split on
+    done
+    [ -n "$text" ] && CHUNKS+=("$text")
+    total=${#CHUNKS[@]}
+    [ "$total" -gt 1 ] || return 0
+    i=1
+    while [ "$i" -lt "$total" ]; do
+        CHUNKS[$i]="($(( i + 1 ))/$total): ${CHUNKS[$i]}"
+        i=$(( i + 1 ))
+    done
+}
+
+if [ "$CHUNK" = 1 ]; then
+    chunk_message "$MSG"
+else
+    # Unchanged default: leave room for the truncation marker and send one message.
+    if [ "${#MSG}" -gt 1900 ]; then
+        MSG="${MSG:0:1900}"$'\n…(truncated)'
+    fi
+    CHUNKS=("$MSG")
+fi
 
 # Remote leg. `-w` appends the status after the body so a failure is diagnosable
 # from the log alone; `-f` is deliberately absent (it hides the very status we
@@ -98,33 +140,67 @@ REMOTE_CMD="curl -s -m 20 -w '\nHTTP=%{http_code}' \
 -H 'Content-Type: application/json' -d @-; printf ' curl_rc=%s\n' \"\$?\""
 
 http=""
-n=1
-while [ "$n" -le "$ATTEMPTS" ]; do
-    out=$(printf '%s' "$PAYLOAD" | ssh -o BatchMode=yes -o ConnectTimeout=10 \
-        "$SSH_HOST" "$REMOTE_CMD" 2>&1)
-    ssh_rc=$?
-    http=$(printf '%s' "$out" | sed -n 's/.*HTTP=\([0-9][0-9]*\).*/\1/p' | tail -1)
-    curl_rc=$(printf '%s' "$out" | sed -n 's/.*curl_rc=\([0-9][0-9]*\).*/\1/p' | tail -1)
+LAST_ATTEMPTS=0
 
-    if [ "$http" = "200" ]; then
-        say "delivered on attempt $n (HTTP 200)"
-        exit 0
+# Deliver ONE message, retrying per the backoff schedule. 0 = delivered, 1 = not.
+# `http` and LAST_ATTEMPTS stay global so the spool line below can report the last
+# status seen; `n` is deliberately local, because with chunking the attempt counter
+# restarts per chunk.
+send_one() { # message
+    local msg="$1" payload out ssh_rc curl_rc n=1
+    # Snowflakes are 64-bit and MUST stay JSON strings end-to-end — jq --arg keeps
+    # them strings; interpolating into a JSON literal would round-trip them through a
+    # double and corrupt the low digits.
+    payload=$(jq -n --arg id "$TO" --arg msg "$msg" \
+        '{content: {receivingUserDiscordID: $id, message: $msg}}') || exit 2
+    while [ "$n" -le "$ATTEMPTS" ]; do
+        LAST_ATTEMPTS="$n"
+        out=$(printf '%s' "$payload" | "$SSH_BIN" -o BatchMode=yes -o ConnectTimeout=10 \
+            "$SSH_HOST" "$REMOTE_CMD" 2>&1)
+        ssh_rc=$?
+        http=$(printf '%s' "$out" | sed -n 's/.*HTTP=\([0-9][0-9]*\).*/\1/p' | tail -1)
+        curl_rc=$(printf '%s' "$out" | sed -n 's/.*curl_rc=\([0-9][0-9]*\).*/\1/p' | tail -1)
+
+        if [ "$http" = "200" ]; then
+            say "delivered on attempt $n (HTTP 200)"
+            return 0
+        fi
+
+        say "attempt $n/$ATTEMPTS failed — ssh_rc=$ssh_rc curl_rc=${curl_rc:-?} http=${http:-none}"
+        [ "$QUIET" = 1 ] || printf '  %s\n' "$(printf '%s' "$out" | tr '\n' ' ' | cut -c1-300)" >&2
+
+        # 4xx means the bot understood us and refused — a bad snowflake or an empty
+        # message. Retrying that just burns five minutes to reach the same answer.
+        case "${http:-}" in
+            4??) say "permanent failure (HTTP $http) — not retrying"; return 1 ;;
+        esac
+
+        if [ "$n" -lt "$ATTEMPTS" ]; then
+            sleep "${BACKOFF[$(( n - 1 ))]:-120}"
+        fi
+        n=$(( n + 1 ))
+    done
+    return 1
+}
+
+# All-or-nothing (§ decision 6 / 11c): the caller gates a public "a fix is on the way"
+# post on this exit code, so a half-delivered remedy MUST NOT report success. On the
+# first failed chunk we stop and fall through to the spool, which writes the whole
+# original message — never the surviving fragment.
+TOTAL=${#CHUNKS[@]}
+[ "$TOTAL" -gt 1 ] && say "message exceeds the cap — sending $TOTAL chunks"
+DELIVERED=1
+IDX=0
+for chunk in "${CHUNKS[@]}"; do
+    IDX=$(( IDX + 1 ))
+    if ! send_one "$chunk"; then
+        DELIVERED=0
+        [ "$TOTAL" -gt 1 ] && say "chunk $IDX/$TOTAL undeliverable — abandoning the rest"
+        break
     fi
-
-    say "attempt $n/$ATTEMPTS failed — ssh_rc=$ssh_rc curl_rc=${curl_rc:-?} http=${http:-none}"
-    [ "$QUIET" = 1 ] || printf '  %s\n' "$(printf '%s' "$out" | tr '\n' ' ' | cut -c1-300)" >&2
-
-    # 4xx means the bot understood us and refused — a bad snowflake or an empty
-    # message. Retrying that just burns five minutes to reach the same answer.
-    case "${http:-}" in
-        4??) say "permanent failure (HTTP $http) — not retrying"; break ;;
-    esac
-
-    if [ "$n" -lt "$ATTEMPTS" ]; then
-        sleep "${BACKOFF[$(( n - 1 ))]:-120}"
-    fi
-    n=$(( n + 1 ))
 done
+
+[ "$DELIVERED" = 1 ] && exit 0
 
 # Total failure. The message is the whole point of the call, so never let it
 # evaporate: put it somewhere durable and somewhere visible, and exit non-zero so
@@ -134,13 +210,13 @@ if [ "$FALLBACK" = 1 ]; then
     {
         printf '=== %s — UNDELIVERED (to=%s http=%s) ===\n' \
             "$(date '+%Y-%m-%d %H:%M:%S')" "$TO" "${http:-none}"
-        printf '%s\n\n' "$MSG"
+        printf '%s\n\n' "$FULL_MSG"
     } >> "$SPOOL"
     say "spooled to $SPOOL"
 
-    NOTE=$(printf '%s' "$MSG" | head -1 | cut -c1-180 | sed 's/[\\"]/ /g')
+    NOTE=$(printf '%s' "$FULL_MSG" | head -1 | cut -c1-180 | sed 's/[\\"]/ /g')
     osascript -e "display notification \"$NOTE\" with title \"Discord DM failed\" subtitle \"spooled — see the log\"" 2>/dev/null || true
 fi
 
-echo "discord-dm: UNDELIVERED after $(( n > ATTEMPTS ? ATTEMPTS : n )) attempt(s) — spooled to $SPOOL" >&2
+echo "discord-dm: UNDELIVERED after $LAST_ATTEMPTS attempt(s) — spooled to $SPOOL" >&2
 exit 1

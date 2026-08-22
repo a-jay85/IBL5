@@ -149,13 +149,83 @@ describe('/post-to-thread', () => {
     it('200 posted on success', async () => {
         const res = await invoke('/post-to-thread', { thread_id: 'T', message: 'hi' }, clientWithChannel(sendable));
         expect(res.statusCode).toBe(200);
-        expect(res.send).toHaveBeenCalledWith('posted');
+        expect(res.json).toHaveBeenCalledWith({ ok: true, chunks: 1 });
     });
 
     it('500 when send rejects', async () => {
         const bad = { isSendable: () => true, send: vi.fn().mockRejectedValue(new Error('x')) };
         const res = await invoke('/post-to-thread', { thread_id: 'T', message: 'hi' }, clientWithChannel(bad));
         expect(res.statusCode).toBe(500);
+    });
+
+    it('(a) under-cap: short message produces one chunk, verbatim, no prefix', async () => {
+        const ch = { isSendable: () => true, send: vi.fn().mockResolvedValue(undefined) };
+        const msg = 'Short message under cap';
+        const res = await invoke('/post-to-thread', { thread_id: 'T', message: msg }, clientWithChannel(ch));
+        expect(ch.send).toHaveBeenCalledTimes(1);
+        expect(ch.send).toHaveBeenCalledWith(msg);
+        expect(res.json).toHaveBeenCalledWith({ ok: true, chunks: 1 });
+    });
+
+    it('(b) over-cap: 5599-char fixture splits into multiple ordered chunks, content preserved whitespace-insensitively', async () => {
+        const ch = { isSendable: () => true, send: vi.fn().mockResolvedValue(undefined) };
+        // 56 lines of 99 chars joined by \n → 5599 chars; newlines land every 100 chars
+        // so lastIndexOf('\n', 1900) finds position 1899, well before the 1900 cap
+        const original = Array.from({ length: 56 }, () => 'x'.repeat(99)).join('\n');
+        const res = await invoke('/post-to-thread', { thread_id: 'T', message: original }, clientWithChannel(ch));
+        const calls = ch.send.mock.calls.map((c: unknown[]) => c[0] as string);
+        expect(calls.length).toBeGreaterThan(1);
+        // Ordering: each chunk after the first must carry the exact (N/total) counter
+        const parts = calls.map((c: string, i: number) => {
+            if (i === 0) return c;
+            const prefix = `(${i + 1}/${calls.length}): `;
+            expect(c.startsWith(prefix)).toBe(true);
+            return c.slice(prefix.length);
+        });
+        // Content preservation — whitespace-insensitive because trimStart eats the split separator
+        const joined = parts.join('');
+        expect(joined.replace(/\s+/g, '')).toBe(original.replace(/\s+/g, ''));
+        // No chunk may exceed Discord's 2000-char hard cap
+        for (const chunk of calls) {
+            expect(chunk.length).toBeLessThanOrEqual(2000);
+        }
+        expect(res.json).toHaveBeenCalledWith({ ok: true, chunks: calls.length });
+    });
+
+    it('(c) boundary: 1901-char fixture produces exactly 2 chunks, all content preserved, each within cap', async () => {
+        const ch = { isSendable: () => true, send: vi.fn().mockResolvedValue(undefined) };
+        // No whitespace → split falls back to CHUNK_MAX=1900; trimStart eats nothing
+        const original = 'a'.repeat(1901);
+        const res = await invoke('/post-to-thread', { thread_id: 'T', message: original }, clientWithChannel(ch));
+        const calls = ch.send.mock.calls.map((c: unknown[]) => c[0] as string);
+        expect(calls).toHaveLength(2);
+        const prefix2 = '(2/2): ';
+        expect(calls[1].startsWith(prefix2)).toBe(true);
+        const parts = [calls[0], calls[1].slice(prefix2.length)];
+        const joined = parts.join('');
+        expect(joined.replace(/\s+/g, '')).toBe(original.replace(/\s+/g, ''));
+        for (const chunk of calls) {
+            expect(chunk.length).toBeLessThanOrEqual(2000);
+        }
+        expect(res.json).toHaveBeenCalledWith({ ok: true, chunks: 2 });
+    });
+
+    it('(d) security: content-supplied "(N/M): " marker is passed verbatim; server counters use actual chunk total', async () => {
+        const ch = { isSendable: () => true, send: vi.fn().mockResolvedValue(undefined) };
+        // Over-cap so real server markers coexist with the content-supplied forged prefix;
+        // newline-rich so the cut lands at ~1806 (not at position 6 via space fallback)
+        const original = '(2/9): ' + Array.from({ length: 40 }, () => 'x'.repeat(99)).join('\n');
+        const res = await invoke('/post-to-thread', { thread_id: 'T', message: original }, clientWithChannel(ch));
+        const calls = ch.send.mock.calls.map((c: unknown[]) => c[0] as string);
+        expect(calls.length).toBeGreaterThan(1);
+        // Chunk 1: verbatim prefix of original — no server prefix prepended, no content stripped
+        expect(calls[0]).toBe(original.slice(0, calls[0].length));
+        // Server markers use actual chunk count (calls.length), NOT the content's forged "9"
+        expect(calls[1].startsWith(`(2/${calls.length}): `)).toBe(true);
+        if (calls.length > 2) {
+            expect(calls[2].startsWith(`(3/${calls.length}): `)).toBe(true);
+        }
+        expect(res.json).toHaveBeenCalledWith({ ok: true, chunks: calls.length });
     });
 });
 

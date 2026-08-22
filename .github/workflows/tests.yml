@@ -869,6 +869,8 @@ jobs:
         run: bin/test-automouse-disarm
       - name: bin/test-bun-audit-triage
         run: bin/test-bun-audit-triage
+      - name: bin/test-scrub-log-credentials
+        run: bin/test-scrub-log-credentials
       - name: bin/test-db-query-routing
         run: bin/test-db-query-routing
 

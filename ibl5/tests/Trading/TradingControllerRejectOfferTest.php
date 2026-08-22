@@ -12,6 +12,7 @@ use Trading\Contracts\TradingServiceInterface;
 use Trading\Contracts\TradeOfferRepositoryInterface;
 use Trading\Contracts\TradeOfferInterface;
 use Trading\Contracts\TradingViewInterface;
+use Trading\Contracts\TradeDecisionServiceInterface;
 use Trading\Contracts\TradeExecutionServiceInterface;
 use Auth\Contracts\AuthServiceInterface;
 use Trading\TradingController;
@@ -45,6 +46,7 @@ class TradingControllerRejectOfferTest extends TestCase
     private function buildController(
         ?TradeOfferRepositoryInterface $offerRepo = null,
         ?\Utilities\NukeCompat $nukeCompat = null,
+        ?TradeDecisionServiceInterface $decisionService = null,
     ): TradingController {
         return new TradingController(
             self::createStub(TradingServiceInterface::class),
@@ -56,6 +58,9 @@ class TradingControllerRejectOfferTest extends TestCase
             $this->mockDb,
             self::createStub(TradeExecutionServiceInterface::class),
             self::createStub(AuthServiceInterface::class),
+            null,
+            null,
+            $decisionService,
         );
     }
 
@@ -88,5 +93,51 @@ class TradingControllerRejectOfferTest extends TestCase
         $controller->rejectTradeOffer(null, ['offer' => '1', 'teamRejecting' => 'Stars', '_csrf_token' => $token]);
 
         $this->assertTrue($loginBoxCalled);
+    }
+
+    public function testRejectDelegatesToDecisionServiceWithSessionTeam(): void
+    {
+        $token = CsrfGuard::generateRawToken('trade_reject');
+        $_POST['_csrf_token'] = $token;
+
+        $authService = self::createStub(AuthServiceInterface::class);
+        $authService->method('getUsername')->willReturn('gm_metros');
+
+        $teamIdentityRepo = self::createStub(TeamIdentityRepositoryInterface::class);
+        $teamIdentityRepo->method('getTeamnameFromUsername')->willReturn('Metros');
+
+        $decisionService = self::createMock(TradeDecisionServiceInterface::class);
+        $decisionService->expects(self::once())
+            ->method('reject')
+            ->with(5, 'Metros', 'Attacker Team', 'Stars')
+            ->willThrowException(new \RuntimeException('delegation_verified'));
+
+        $nukeCompat = self::createStub(\Utilities\NukeCompat::class);
+        $nukeCompat->method('isUser')->willReturn(true);
+
+        $controller = new \Trading\TradingController(
+            self::createStub(TradingServiceInterface::class),
+            self::createStub(TradeOfferRepositoryInterface::class),
+            self::createStub(TradeOfferInterface::class),
+            self::createStub(TradingViewInterface::class),
+            $teamIdentityRepo,
+            $nukeCompat,
+            $this->mockDb,
+            self::createStub(TradeExecutionServiceInterface::class),
+            $authService,
+            null,
+            null,
+            $decisionService,
+        );
+
+        try {
+            $controller->rejectTradeOffer(
+                'gm_metros',
+                ['offer' => '5', 'teamRejecting' => 'Attacker Team', 'teamReceiving' => 'Stars', '_csrf_token' => $token]
+            );
+            self::fail('Expected delegation exception was not thrown');
+        } catch (\RuntimeException) {
+            // ->with() verified the session team reached the authz slot, not the attacker
+        }
     }
 }

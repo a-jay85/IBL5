@@ -1,0 +1,321 @@
+#!/usr/bin/env bash
+# pr-ready-now — fire one detached headless Claude session per open PR, each running /pr-ready <N>.
+#
+# Dry-run by default: prints the PRs it would process and exits. Nothing fires without --go.
+#
+# Usage:
+#   bin/pr-ready-now [--go] [--jobs N] [--pr N[,N...]] [--model M] [--dry-run] [--help]
+#
+#   --go          Actually fire. Without it the script only reports (default).
+#   --jobs N      Max concurrent sessions (default 3). Positive integer.
+#   --pr N[,N...] Explicit PR numbers; bypasses the open/non-draft selector.
+#   --model M     Model for the fired sessions (default: the Opus pin — see below).
+#   --dry-run     Explicit alias for the default. Useful in scripts that want intent stated.
+#   --help, -h    Print this usage and exit 0.
+#
+# Examples:
+#   bin/pr-ready-now                       # report what would run
+#   bin/pr-ready-now --go                  # fire all open non-draft PRs, 3 at a time
+#   bin/pr-ready-now --pr 1899,1900 --go   # fire exactly two
+#   bin/pr-ready-now --jobs 1 --go         # serialize
+#
+# WARNING: Never run with --go from inside a worktree. The launched sessions must start from
+# the main checkout so /pr-ready Phase 0 resolves the target PR's own worktree correctly.
+# This script pins the main checkout itself (see ROOT below) rather than trusting $PWD, so
+# invoking it from a worktree is survivable — but do not rely on that; run it from
+# /Users/ajaynicolas/GitHub/IBL5.
+#
+# Env seams (used by bin/test-pr-ready-now):
+#   PR_READY_NOW_CLAUDE     Override the claude binary (stub for tests). Unset = auto-detect.
+#   PR_READY_NOW_DRY_RUN=1  With --go: emit runner + plist per PR but skip launchctl bootstrap.
+#   PR_READY_NOW_PR_JSON    Read selector JSON from this file instead of shelling to gh.
+#   PR_READY_NOW_GH_USER    Use this GitHub login instead of calling `gh api user`. Lets the
+#                           tests run on CI, which has no gh auth. Never set it by hand.
+
+set -euo pipefail
+
+# --- PATH prelude ------------------------------------------------------------------------
+# A safety net for invocation from a restricted context (cron, a hook) that lacks the
+# usual tool dirs. Appended, not prepended: an interactive caller's own PATH — and the
+# test harness's shim dir — must still win. The runner emitted below prepends instead,
+# because launchd hands it a minimal PATH with no caller preference to respect.
+export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin"
+
+CLAUDE_BIN="${PR_READY_NOW_CLAUDE:-$(command -v claude || true)}"
+[[ -n "$CLAUDE_BIN" && -x "$CLAUDE_BIN" ]] || {
+    echo "ERROR: claude binary not found on PATH (set PR_READY_NOW_CLAUDE to override)" >&2
+    exit 1
+}
+
+# --- ROOT pin ----------------------------------------------------------------------------
+# Resolve the MAIN checkout, never the worktree we happen to be standing in.
+# --git-common-dir points at the main .git even from a linked worktree, where
+# --show-toplevel would return the worktree instead.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+GIT_COMMON="$(git -C "$SCRIPT_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+if [[ -z "$GIT_COMMON" ]]; then
+    # git < 2.31 has no --path-format; fall back to resolving the relative answer by hand.
+    GIT_COMMON="$(cd "$SCRIPT_DIR" && cd "$(git rev-parse --git-common-dir)" && pwd -P)"
+fi
+ROOT="$(dirname "$GIT_COMMON")"
+
+# .git is a DIRECTORY in the main checkout and a FILE in a linked worktree, so -d
+# structurally rejects a worktree even if the pin above somehow returned one.
+[[ -d "$ROOT/.git" ]] || {
+    echo "ERROR: cannot locate main checkout (ROOT=$ROOT)" >&2
+    exit 1
+}
+[[ -f "$ROOT/.claude/skills/pr-ready/SKILL.md" ]] || {
+    echo "ERROR: $ROOT does not look like the IBL5 checkout (no .claude/skills/pr-ready/SKILL.md)" >&2
+    exit 1
+}
+
+# --- defaults ----------------------------------------------------------------------------
+GO=0
+JOBS=3
+EXPLICIT_PRS=()
+MODEL="claude-opus-4-5"   # probed 2026-08-21: CLI accepts this id (see PR body, "MODEL ID ACCEPTED")
+EFFORT=high
+
+# --- flag parsing ------------------------------------------------------------------------
+usage() { sed -n '2,33p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --go)      GO=1; shift ;;
+        --dry-run) GO=0; shift ;;
+        --jobs)
+            [[ $# -ge 2 ]] || { echo "ERROR: --jobs requires a value" >&2; exit 1; }
+            [[ "$2" =~ ^[1-9][0-9]*$ ]] || { echo "ERROR: --jobs must be a positive integer, got: $2" >&2; exit 1; }
+            JOBS="$2"; shift 2 ;;
+        --pr)
+            [[ $# -ge 2 ]] || { echo "ERROR: --pr requires a value" >&2; exit 1; }
+            IFS=',' read -r -a _prs <<< "$2"
+            for _p in "${_prs[@]}"; do
+                [[ "$_p" =~ ^[1-9][0-9]*$ ]] || { echo "ERROR: --pr expects positive integers, got: $_p" >&2; exit 1; }
+                EXPLICIT_PRS+=("$_p")
+            done
+            shift 2 ;;
+        --model)
+            [[ $# -ge 2 ]] || { echo "ERROR: --model requires a value" >&2; exit 1; }
+            MODEL="$2"; shift 2 ;;
+        -h|--help) usage; exit 0 ;;
+        --) shift; break ;;
+        *) echo "ERROR: unknown flag: $1" >&2; usage >&2; exit 1 ;;
+    esac
+done
+[[ $# -eq 0 ]] || { echo "ERROR: unexpected positional argument: $1" >&2; exit 1; }
+
+# --- gh identity -------------------------------------------------------------------------
+# Resolved, never hardcoded: the local-part of the git email is NOT the GitHub login.
+GH_USER="${PR_READY_NOW_GH_USER:-$(gh api user --jq .login 2>/dev/null || true)}"
+[[ -n "$GH_USER" ]] || {
+    echo "ERROR: gh api user failed — is gh authenticated? (run: gh auth status)" >&2
+    exit 1
+}
+
+if [[ "$GO" -eq 0 ]]; then
+    echo "DRY RUN — nothing will fire. Re-run with --go to launch. (gh user: $GH_USER)"
+fi
+
+# --- selector ----------------------------------------------------------------------------
+pr_json() {
+    if [[ -n "${PR_READY_NOW_PR_JSON:-}" ]]; then
+        [[ -f "$PR_READY_NOW_PR_JSON" ]] || { echo "ERROR: PR_READY_NOW_PR_JSON not found: $PR_READY_NOW_PR_JSON" >&2; exit 1; }
+        cat "$PR_READY_NOW_PR_JSON"
+    else
+        gh pr list --state open --author "@me" --limit 100 \
+            --json number,title,isDraft,headRefName,author
+    fi
+}
+
+select_prs() {
+    if [[ ${#EXPLICIT_PRS[@]} -gt 0 ]]; then
+        printf '%s\n' "${EXPLICIT_PRS[@]}"
+        return
+    fi
+    pr_json | jq -r '.[] | select(.isDraft == false) | .number'
+}
+
+# Echoes the head branch on success. Return 2 = hard error (abort the run);
+# return 1 = skip just this PR.
+validate_explicit() {
+    local pr="$1" meta state draft author
+    meta="$(gh pr view "$pr" --json number,state,isDraft,headRefName,author 2>/dev/null)" || {
+        echo "ERROR: PR #$pr not found (gh pr view failed)" >&2; return 2; }
+    state="$(jq -r '.state' <<< "$meta")"
+    draft="$(jq -r '.isDraft' <<< "$meta")"
+    author="$(jq -r '.author.login' <<< "$meta")"
+    [[ "$state" == "OPEN" ]] || { echo "ERROR: PR #$pr is $state, not OPEN" >&2; return 2; }
+    [[ "$draft" == "false" ]] || { echo "ERROR: PR #$pr is a draft" >&2; return 2; }
+    [[ "$author" == "$GH_USER" ]] || { echo "SKIP PR #$pr — authored by $author, not $GH_USER (bot or other user)"; return 1; }
+    jq -r '.headRefName' <<< "$meta"
+}
+
+# --- fire list ---------------------------------------------------------------------------
+# FIRE_PRS and FIRE_BRANCHES are parallel indexed arrays, not one associative array:
+# macOS ships bash 3.2 at /bin/bash, which has no `declare -A`.
+FIRE_PRS=(); FIRE_BRANCHES=(); SKIP_LINES=()
+
+# Capture the selector into a variable rather than feeding the loop from < <(select_prs).
+# A failure inside a process substitution exits only that subshell, so an unreadable
+# fixture or a failing `gh pr list` would silently degrade to "no PRs selected" and a
+# clean exit 0. Capturing propagates the status.
+PR_LIST="$(select_prs)" || {
+    echo "ERROR: PR selection failed — see the error above." >&2
+    exit 1
+}
+
+# Snapshot the live job table ONCE, into a variable. Never `launchctl list | grep -q`:
+# under `set -o pipefail`, grep -q exits on the first match, launchctl takes SIGPIPE, and
+# the pipeline reports failure even though the label WAS found — silently disabling the
+# already-running skip. `|| true` also covers Linux CI, which has no launchctl at all.
+LAUNCHCTL_LIST="$(launchctl list 2>/dev/null || true)"
+
+while read -r pr; do
+    [[ -n "$pr" ]] || continue
+    # Anchored at end-of-line: the label carries no suffix, so an unanchored match
+    # would let a live PR 1892 job suppress a fire for PR 189.
+    if grep -qE "com\.ibl5\.pr-ready-now-${pr}$" <<< "$LAUNCHCTL_LIST"; then
+        SKIP_LINES+=("$pr|already running — skipped"); continue
+    fi
+    if [[ ${#EXPLICIT_PRS[@]} -gt 0 ]]; then
+        branch="$(validate_explicit "$pr")" || { rc=$?; [[ $rc -eq 2 ]] && exit 1; SKIP_LINES+=("$pr|bot- or other-authored — skipped"); continue; }
+    else
+        branch="$(pr_json | jq -r --arg n "$pr" '.[] | select(.number == ($n|tonumber)) | .headRefName')"
+    fi
+    FIRE_PRS+=("$pr"); FIRE_BRANCHES+=("$branch")
+done <<< "$PR_LIST"
+
+# --- report ------------------------------------------------------------------------------
+printf '%-6s %-34s %s\n' "PR" "BRANCH" "STATUS"
+printf '%-6s %-34s %s\n' "------" "----------------------------------" "------"
+# Guarded: under bash 3.2, ${!arr[@]} on an empty array trips `set -u`.
+if [[ ${#FIRE_PRS[@]} -gt 0 ]]; then
+    for i in "${!FIRE_PRS[@]}"; do printf '%-6s %-34s %s\n' "${FIRE_PRS[$i]}" "${FIRE_BRANCHES[$i]}" "WOULD FIRE"; done
+fi
+for s  in "${SKIP_LINES[@]:-}"; do [[ -n "$s"  ]] && printf '%-6s %-34s %s\n' "${s%%|*}" "-" "SKIP (${s#*|})"; done
+
+if [[ ${#FIRE_PRS[@]} -eq 0 ]]; then
+    echo "no PRs selected — nothing to do."
+    exit 0
+fi
+if [[ "$GO" -eq 0 ]]; then
+    echo "DRY RUN — would fire ${#FIRE_PRS[@]} session(s), ${JOBS} at a time. Re-run with --go to launch."
+    exit 0
+fi
+
+# --- fire --------------------------------------------------------------------------------
+# Every temp path is keyed to the PR number, never to $$ or a timestamp: those are
+# process-local and do not survive the launchd boundary (defect class B1, 33280f865).
+fire_pr() {
+    local PR="$1"
+    local LABEL="com.ibl5.pr-ready-now-${PR}"
+    local PLIST="$HOME/Library/LaunchAgents/${LABEL}.plist"
+    local RUNNER="/tmp/pr-ready-now-runner-${PR}.sh"
+    local LOG="/tmp/pr-ready-now-${PR}.log"
+    local PROMPT="/tmp/pr-ready-now-prompt-${PR}.md"
+    mkdir -p "$(dirname "$PLIST")"   # lets bin/test-pr-ready-now drive this on Linux CI
+
+    # BQ1 probed YES on 2026-08-21: disable-model-invocation gates the in-session Skill
+    # tool, not the user position, so `claude -p "/pr-ready N"` resolves the slash command.
+    printf '/pr-ready %s\n' "$PR" > "$PROMPT"
+
+    # Header is shell-quoted once via %q; the body is a quoted heredoc emitted verbatim,
+    # so nothing in it expands twice.
+    {   printf '#!/usr/bin/env bash\n'
+        printf 'ROOT=%q\n'       "$ROOT"
+        printf 'LABEL=%q\n'      "$LABEL"
+        printf 'PLIST=%q\n'      "$PLIST"
+        printf 'LOG=%q\n'        "$LOG"
+        printf 'PROMPT=%q\n'     "$PROMPT"
+        printf 'MODEL=%q\n'      "$MODEL"
+        printf 'EFFORT=%q\n'     "$EFFORT"
+        printf 'CLAUDE_BIN=%q\n' "$CLAUDE_BIN"
+        cat <<'RUNNER_EOF'
+export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
+cd "$ROOT" || exit 1
+CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 \
+    caffeinate -s timeout 5400 "$CLAUDE_BIN" -p "$(cat "$PROMPT")" \
+    --dangerously-skip-permissions \
+    --model "$MODEL" --effort "$EFFORT" \
+    --name "$LABEL" > "$LOG" 2>&1
+# Releasing the slot is the FIRST post-claude action: "plist present" == "job live"
+# is what the concurrency cap counts.
+rm -f "$PLIST"
+launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+RUNNER_EOF
+    } > "$RUNNER"
+    chmod +x "$RUNNER"
+
+    # Unquoted heredoc: ${LABEL}/${RUNNER}/${ROOT}/${LOG}/${HOME} expand at write time.
+    cat > "$PLIST" <<PLIST_EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>${LABEL}</string>
+  <key>ProgramArguments</key><array>
+    <string>/bin/bash</string><string>-lc</string><string>exec ${RUNNER}</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><false/>
+  <key>WorkingDirectory</key><string>${ROOT}</string>
+  <key>StandardOutPath</key><string>${LOG}</string>
+  <key>StandardErrorPath</key><string>${LOG}</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>/usr/local/bin:/opt/homebrew/bin:${HOME}/.bun/bin:${HOME}/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+</dict></plist>
+PLIST_EOF
+
+    if [[ -n "${PR_READY_NOW_DRY_RUN:-}" ]]; then
+        echo "DRY(plist) PR #${PR}: runner=${RUNNER} plist=${PLIST}"
+        return 0
+    fi
+    launchctl bootout "gui/$(id -u)/${LABEL}" 2>/dev/null || true
+    launchctl bootstrap "gui/$(id -u)" "$PLIST"
+    echo "Fired PR #${PR}: label=${LABEL}, log=${LOG}"
+}
+
+# --- concurrency cap ---------------------------------------------------------------------
+# The plist IS the slot token: the runner deletes it the moment claude returns.
+live_slots() {
+    local f n=0
+    for f in "$HOME/Library/LaunchAgents"/com.ibl5.pr-ready-now-*.plist; do
+        # A non-matching glob stays literal, so -e is what distinguishes zero from one.
+        if [[ -e "$f" ]]; then n=$((n + 1)); fi
+    done
+    printf '%s\n' "$n"
+}
+
+reap_stale() {   # plist on disk but no live label = the job died without self-cleaning
+    # Under the test seam nothing is ever bootstrapped, so every plist would look stale
+    # and the reaper would eat the very output the cap is counting.
+    [[ -n "${PR_READY_NOW_DRY_RUN:-}" ]] && return 0
+    local f label
+    for f in "$HOME/Library/LaunchAgents"/com.ibl5.pr-ready-now-*.plist; do
+        [[ -e "$f" ]] || continue
+        label="$(basename "$f" .plist)"
+        launchctl list "$label" >/dev/null 2>&1 || { rm -f "$f"; echo "reaped stale slot $label"; }
+    done
+}
+
+wait_for_slot() {
+    local waited=0
+    while [[ "$(live_slots)" -ge "$JOBS" ]]; do
+        echo "waiting for slot ($(live_slots)/$JOBS in flight)…"
+        reap_stale
+        [[ "$(live_slots)" -lt "$JOBS" ]] && break
+        if [[ -n "${PR_READY_NOW_DRY_RUN:-}" ]]; then
+            echo "cap reached under PR_READY_NOW_DRY_RUN — not sleeping; stopping here." >&2
+            exit 0
+        fi
+        sleep 5; waited=$((waited + 5))
+        if [[ $waited -ge 7200 ]]; then echo "ERROR: waited 2h for a slot; aborting" >&2; exit 1; fi
+    done
+}
+
+for PR in "${FIRE_PRS[@]}"; do
+    wait_for_slot
+    fire_pr "$PR"
+done

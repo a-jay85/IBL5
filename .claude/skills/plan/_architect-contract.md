@@ -1,6 +1,6 @@
 ---
 description: The plan-architect's full output contract, Read on demand from Step 3 of plan/SKILL.md — the MUST-produce list, the conditional-section catalogue, the agent-tiering labels to inject, and the delegation-packet format.
-last_verified: 2026-08-08
+last_verified: 2026-08-19
 ---
 
 The `plan-architect` Reads this file when Step 3 of `plan/SKILL.md` points to it, so this contract lands in the architect's own sub-context and never enters the orchestrator's. Mirrors the on-demand convention of the `.claude/review-shared/_*.md` reference files.
@@ -59,6 +59,18 @@ Conditionally — include a section **only when it applies**; never emit an empt
 ## Self-apply the Automouse Hold Challenge
 
 **Self-apply the Automouse Hold Challenge.** Before you classify any design decision `irreducible`, recommend a hold, or let a verification gap / reversible schema tightening default to a supervised verdict, ask yourself the question that breaks false holds in practice: *"What would I add to this plan to make it safe for automouse to merge unattended?"* If the honest answer is a buildable mechanical check — a lever-3 self-check (Verification-gap mechanization above), the Schema-safety guard, or the Security-surface mechanization assertion — **add that phase and its matrix rows** instead of leaning toward a hold. Carry a hold forward **only** when it is *intrinsic* (subjective UI/UX taste, an **irreducible** security surface — one that is not a dischargeable shape under Security-surface mechanization above, or is one but whose invariant cannot be machine-asserted — an irreversibly-destructive / design-data-blocked change, or a self-gating change to the merge-gate machinery itself) or you can state concretely *why no mechanical check is buildable*. Do **not** pressure an intrinsic hold into arming — that is a safety regression; just name its category. The orchestrator re-runs this challenge in Step 4.5, so do not leave it a reducible hold you could have dissolved.
+
+## Mid-design exploration
+
+`plan-architect` and `plan-architect-xhigh` have the `Agent` tool. `plan-architect-sonnet` does not, and must not be given it — a recipe-backed task by definition has no unresolved mid-design question, and the Sonnet architect is chosen precisely when the design is already known.
+
+**Why the grant exists.** Before it, an unknown that surfaced *during* design could not be explored at all: the orchestrator's Step-2 fan-out is spent before the architect starts, so the architect either guessed or the orchestrator had to have guessed the architect's needs in advance. Both produce plans with soft spots the architect could see but not close.
+
+**What it is not.** It is not a licence to delegate reading. A direct `Read`/`Grep` beats a ~3–5K-token spawn; an architect-side spawn must clear `.claude/rules/agent-tiering-detail.md` § Skip the Agent on its own merits, the same bar the orchestrator's Step-2 spawns clear.
+
+**Budget — per actor, not per run.** The `/plan` Step-2 cap (≤2 orchestrator agents; never 3) is unchanged. The architect gets **≤1 `Explore` spawn per architect invocation**, on top of it. Run-wide ceiling: **3** (2 orchestrator + 1 architect). A per-actor cap needs no shared counter and no cross-actor bookkeeping, and 1 rather than 2 keeps the ceiling one above today's rather than doubling it — the grant's justification is *a* question that surfaced mid-design, singular.
+
+**The bound is advisory.** Claude Code agent frontmatter offers `disallowedTools` (a denylist) and no positive allowlist, so "`Explore` only" cannot be expressed in the def. A `PreToolUse` hook on `Agent` sees only `tool_input.subagent_type` and `tool_input.model` — never the spawner's identity — so it cannot scope a rule to architect-initiated spawns. One component *is* mechanically enforced: `~/.claude/hooks/explore-model-gate.sh` pins any `Explore` spawn to `haiku`-or-omitted regardless of spawner. Everything else — `Explore` only, ≤1, foreground — rests on the def body and **is enforced by code review**. Treat a diff that widens it as a security-surface change.
 
 ## Agent-tiering guidance to inject
 

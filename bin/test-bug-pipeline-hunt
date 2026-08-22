@@ -475,6 +475,10 @@ export STUB_POST_THREAD_FAIL=1
 bpt_run
 bpt_log_has "$STUB" transition.log "transition 7 needs_human --release-lease" "r49: terminal transition fires despite post-to-thread failure"
 if [ -f "$STUB/dm.args.log" ]; then bpt_ok "r49: DM still sent despite post-to-thread failure"; else bpt_fail "r49: DM not sent when post-to-thread fails"; fi
+# Matrix row 22 — the whole point of Phase 10's --fail. Without it curl exits 0 on a 500 and
+# the `|| log ...` guard is unreachable dead code that silently swallows the failure. Asserting
+# the log line (not just "nothing crashed") is what distinguishes a live guard from a dead one.
+bpt_log_has "$STUB" tick.out "post-to-thread failed for 7 (continuing)" "r49: the failed post is logged, not swallowed"
 
 # ── Row 9 — SECURITY (EXERCISED): under the starved env a real git push / gh cannot authenticate ──
 # Run in the PARENT shell (bpt_fail must reach $FAILED) as the LAST block: source the driver so

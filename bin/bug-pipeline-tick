@@ -847,7 +847,7 @@ ci_autofix_giveup() {
 # are substituted by bash param-expansion (NEVER sed/eval) — the template wraps them
 # in <report>/<transcript> blocks and frames them strictly as data (prompt-injection defense).
 render_hunter_prompt() { # claimed wt_appdir
-    local claimed="$1" wt_appdir="$2" id class report thread_id transcript att t
+    local claimed="$1" wt_appdir="$2" id class report thread_id transcript att t host
     id="$(printf '%s' "$claimed" | jq -r '.id')"
     class="$(printf '%s' "$claimed" | jq -r '.class // "bug"')"
     report="$(printf '%s' "$claimed" | jq -r '.original_text // ""')"
@@ -858,6 +858,11 @@ render_hunter_prompt() { # claimed wt_appdir
     t="${t//\{\{bug_id\}\}/$id}"
     t="${t//\{\{class\}\}/$class}"
     t="${t//\{\{worktree\}\}/$wt_appdir}"
+    # Docker hostname = the worktree dir name (.claude/rules/worktree-hostname.md), derived from
+    # wt_appdir rather than reconstructed, so it always matches bug_slug()'s real output. Safe to
+    # interpolate: bug_slug() emits a strict [a-z0-9-] allowlist.
+    host="$(basename "$(dirname "$wt_appdir")")"
+    t="${t//\{\{hostname\}\}/$host}"
     t="${t//\{\{report\}\}/$report}"
     t="${t//\{\{transcript\}\}/$transcript}"
     t="${t//\{\{attachments_text\}\}/$att}"

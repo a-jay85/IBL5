@@ -37,6 +37,7 @@ GH_BIN="${GH_BIN:-gh}"
 BOT_BASE_URL="${BOT_BASE_URL:-http://127.0.0.1:50001}"
 BUG_PIPELINE_ISSUE_REPO="${BUG_PIPELINE_ISSUE_REPO:-a-jay85/ibl5-bugs}"
 BUG_PIPELINE_APPROVER_ID="${BUG_PIPELINE_APPROVER_ID:-}"
+DISCORD_DM_BIN="${BUG_PIPELINE_DM_BIN:-$SCRIPT_DIR/discord-dm}"
 PLANS_DIR="${BUG_PIPELINE_PLANS_DIR:-$HOME/claude-plans}"
 IDLE_SECS="${BUG_PIPELINE_IDLE_SECS:-3600}"
 BACKOFF_SECS="${BUG_PIPELINE_BACKOFF_SECS:-1800}"
@@ -51,6 +52,11 @@ GATHER_PROMPT_FILE="${BUG_PIPELINE_GATHER_PROMPT:-$SCRIPT_DIR/bug-pipeline-gathe
 # the /prMerged "Fixed!" precedent: GM text is never interpolated into a message the
 # bot echoes back to Discord — that is the injection surface this constant closes.
 DROP_REPLY_TEXT="Thanks for the note! I didn't read this as a bug report or a feature request, so I'm not queueing it up. If I got that wrong, edit your message and I'll take another look."
+
+# Posted in the bug's thread when a hunt escalates AND the human was genuinely reached AND a
+# concrete remedy exists (§ decision 6). A FIXED literal: no hunter text, no GM text — nothing
+# untrusted is echoed back into a public thread from this path.
+ESCALATION_FIX_ON_THE_WAY="A fix for this has been worked out and is with a human reviewer now — we'll post here when it ships."
 
 # Attachment byte cache — the bot (ibl5/IBLbot/src/bug-bot/attachments.ts) writes
 # downloaded attachment bytes here; this default MUST resolve to the same absolute
@@ -149,15 +155,47 @@ bot_create_thread() { # message_id name  -> echoes thread_id
         | jq -r '.thread_id // empty' 2>/dev/null
 }
 bot_post_to_thread() { # thread_id message
-    "$CURL_BIN" -s -X POST "$BOT_BASE_URL/post-to-thread" \
+    # The fail-on-HTTP-error flag below is what activates the `|| log "post-to-thread
+    # failed"` guard on every call site — without it curl exits 0 even on a 500 and the
+    # guard is dead code. Redirects are deliberately absent so a genuine failure's stderr
+    # reaches the tick log. NOT applied to bot_get_message: its fail-open contract
+    # ("answers 200 ALWAYS and degrades to {}") is deliberate.
+    "$CURL_BIN" -s --fail -X POST "$BOT_BASE_URL/post-to-thread" \
         -H 'Content-Type: application/json' \
-        -d "$(jq -nc --arg t "$1" --arg m "$2" '{thread_id:$t,message:$m}')" 2>/dev/null >/dev/null
+        -d "$(jq -nc --arg t "$1" --arg m "$2" '{thread_id:$t,message:$m}')"
 }
 bot_mention() { # thread_id discord_id message  -> echoes message_id
     "$CURL_BIN" -s -X POST "$BOT_BASE_URL/mention" \
         -H 'Content-Type: application/json' \
         -d "$(jq -nc --arg t "$1" --arg d "$2" --arg m "$3" '{thread_id:$t,discord_id:$d,message:$m}')" 2>/dev/null \
         | jq -r '.message_id // empty' 2>/dev/null
+}
+
+# Direct-DM the approver when a hunt escalates to needs_human (§ decisions 3/4/5).
+# SECURITY (decision 12): findings and remedy are UNTRUSTED, GM-derived text. They are printf
+# ARGUMENTS (never the format string), the body crosses to discord-dm on STDIN via its `-` form
+# (never argv, never eval, never unquoted), and discord-dm builds its payload with `jq -n --arg`.
+# The issue URL leads so discord-dm's truncation can never eat it — GitHub always holds the full
+# findings (§ decision 5). Returns discord-dm's exit code verbatim: 0 = delivered,
+# 1 = spooled only, 2 = usage/config error (e.g. no recipient resolvable).
+dm_escalation() { # hunt_id issue_number findings remedy
+    local hunt_id="$1" issue="${2:-}" findings="${3:-}" remedy="${4:-}" url body
+    local -a args=()
+    # Approver id may legitimately be empty — omit --to entirely and let discord-dm fall back to
+    # $DISCORD_DM_TO / ~/.iblbot-dm-id. Never pass --to "".
+    [ -n "$BUG_PIPELINE_APPROVER_ID" ] && args+=(--to "$BUG_PIPELINE_APPROVER_ID")
+    # 3 attempts, not the default 6: ~45s of worst-case backoff instead of ~315s, so a dead tunnel
+    # cannot stall a foreground tick (§ Architectural trade-offs). `-` MUST stay last.
+    args+=(--attempts 3 --quiet -)
+    if [ -n "$issue" ]; then
+        url="https://github.com/$BUG_PIPELINE_ISSUE_REPO/issues/$issue"
+    else
+        url="(no GitHub issue was created for this report)"
+    fi
+    body="$(printf '%s\n\n%s\n\nFindings:\n%s\n\nProposed remedy:\n%s\n' \
+        "Bug hunt $hunt_id escalated to needs_human." "$url" \
+        "${findings:-(none recorded)}" "${remedy:-(none proposed)}")"
+    printf '%s' "$body" | "$DISCORD_DM_BIN" "${args[@]}"
 }
 # /get-message answers 200 ALWAYS — {content, deleted} — so the tick never needs a
 # `curl -w '%{http_code}'` status channel across a $( ) subshell. Anything that isn't
@@ -947,7 +985,7 @@ ship_via_cron() { # claimed hunt_id wt_root wt_appdir
 # Give-up terminal (Phase 6): findings → thread, @A-Jay, release lease → needs_human.
 # Order: post context BEFORE the terminal transition so the thread carries findings.
 give_up_needs_human() { # claimed hunt_id wt_appdir [override_finding]
-    local claimed="$1" hunt_id="$2" wt_appdir="$3" override="${4:-}" findings thread_id issue
+    local claimed="$1" hunt_id="$2" wt_appdir="$3" override="${4:-}" findings thread_id issue remedy dm_ok
     if [ -n "$override" ]; then
         findings="$override"
     else
@@ -959,8 +997,24 @@ give_up_needs_human() { # claimed hunt_id wt_appdir [override_finding]
         bot_mention "$thread_id" "$BUG_PIPELINE_APPROVER_ID" "This bug needs a human — see the findings above." >/dev/null \
             || log "mention failed for $hunt_id (continuing)"
     fi
-    # Best-effort issue mirror (§3f): flag + assign; issue stays OPEN (a real unsolved bug).
     issue="$(printf '%s' "$claimed" | jq -r '.issue_number // empty')"
+    # Escalation DM (§ decisions 3-6). `.remedy // empty` makes an absent key, a JSON null and an
+    # empty string one branch, so a pre-remedy hunt result behaves exactly as before (§ 9).
+    remedy="$(jq -r '.remedy // empty' "$wt_appdir/.bug-pipeline/hunt-result.json" 2>/dev/null || true)"
+    # Capture the rc from the pipeline with `if`, NOT a later `$?` read — a `$?` after the wrong
+    # statement makes this gate always-true and turns decision 6 into a false promise.
+    if dm_escalation "$hunt_id" "$issue" "$findings" "$remedy"; then
+        dm_ok=1
+    else
+        dm_ok=0
+        log "escalation DM not delivered for $hunt_id (continuing)"
+    fi
+    # GM-facing follow-up: BOTH gates, or nothing (§ decision 6). Exit 1 = spooled, not read.
+    if [ "$dm_ok" = 1 ] && [ -n "$remedy" ] && [ -n "$thread_id" ]; then
+        bot_post_to_thread "$thread_id" "$ESCALATION_FIX_ON_THE_WAY" \
+            || log "escalation follow-up post failed for $hunt_id (continuing)"
+    fi
+    # Best-effort issue mirror (§3f): flag + assign; issue stays OPEN (a real unsolved bug).
     bpgh_add_label "$issue" needs-human
     bpgh_assign "$issue" a-jay85
     # Terminal + release the lease so no stale `hunting` row is left owned forever (Phase 1 flag).

@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/base';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { publicStorageState } from '../helpers/public-storage-state';
+import { assertColumnSorts } from '../helpers/sortable-table-page';
 
 // Free Agency Preview — public page.
 test.use({ storageState: publicStorageState() });
@@ -51,9 +52,12 @@ test.describe('Free Agency Preview flow', () => {
     expect(href).toContain('name=Player');
   });
 
-  test('table is sortable', async ({ page }) => {
-    const sortable = page.locator('.sortable');
-    await expect(sortable.first()).toBeVisible();
+  test('clicking a column header sorts the table', async ({ page }) => {
+    await assertColumnSorts(page, {
+      tableSelector: 'table.sortable',
+      columnIndex: 1,
+      minRows: 2,
+    });
   });
 
   test('no PHP errors', async ({ page }) => {

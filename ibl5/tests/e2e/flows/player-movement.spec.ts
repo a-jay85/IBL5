@@ -1,6 +1,7 @@
 import { test, expect } from '../fixtures/base';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { publicStorageState } from '../helpers/public-storage-state';
+import { assertColumnSorts } from '../helpers/sortable-table-page';
 
 // Player Movement — public page.
 test.use({ storageState: publicStorageState() });
@@ -49,9 +50,12 @@ test.describe('Player Movement flow', () => {
     expect(teamIds).toBeTruthy();
   });
 
-  test('table is sortable', async ({ page }) => {
-    const sortable = page.locator('.sortable');
-    await expect(sortable.first()).toBeVisible();
+  test('clicking a column header sorts the table', async ({ page }) => {
+    await assertColumnSorts(page, {
+      tableSelector: 'table.sortable',
+      columnIndex: 1,
+      minRows: 2,
+    });
   });
 
   test('no PHP errors', async ({ page }) => {

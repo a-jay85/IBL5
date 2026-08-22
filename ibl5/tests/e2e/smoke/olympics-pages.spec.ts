@@ -21,15 +21,25 @@ test.describe('Olympics page smoke tests', () => {
   test('team page loads in Olympics context', async ({ page }) => {
     await page.goto('modules.php?name=Team&op=team&teamid=1&league=olympics');
     await assertNoPhpErrors(page, 'on modules.php?name=Team&op=team&teamid=1&league=olympics');
-    const body = await page.locator('body').textContent();
-    expect(body?.length).toBeGreaterThan(100);
+    // teamid=1 in Olympics context must resolve against ibl_olympics_team_info.
+    // Seed (Eagles) vs wtdb (USA) disagree on team name — using structural invariant per §1.2 rule 3.
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+    await expect(page.locator('h2').filter({ hasText: 'Current Season' }).first()).toBeVisible();
   });
 
   test('player page loads in Olympics context', async ({ page }) => {
     await page.goto('modules.php?name=Player&pa=showpage&pid=1&league=olympics');
     await assertNoPhpErrors(page, 'on modules.php?name=Player&pa=showpage&pid=1&league=olympics');
-    const body = await page.locator('body').textContent();
-    expect(body?.length).toBeGreaterThan(100);
+    // pid=1 rendered in Olympics context — player page must render without crashing.
+    // Root cause (bug 6.24): PlayerPageController resolved the viewer's team via
+    // Team::initialize(), which LeagueContext rewrites onto ibl_olympics_team_info —
+    // a table with no 'Free Agents' row — so Team::load() threw RuntimeException and
+    // the page 500'd for every viewer. Fixed by skipping owner action buttons when the
+    // viewer's team is absent from the active league. Player overview renders
+    // .player-stats-card (game log), not .ibl-data-table (that class is used by
+    // standings/team pages, not player overview).
+    await expect(page.locator('.ibl-title').first()).toBeVisible();
+    await expect(page.locator('.player-stats-card').first()).toBeVisible();
   });
 });
 

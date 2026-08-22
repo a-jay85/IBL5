@@ -219,6 +219,41 @@ class LeagueControlPanelViewTest extends TestCase
         $this->assertStringNotContainsString('value="generate_awards"', $html);
     }
 
+    public function testPlayoffsShowsDraftClassUploadLink(): void
+    {
+        $html = $this->renderWithDefaults([
+            'panelData' => self::createPanelData(['phase' => 'Playoffs']),
+        ]);
+
+        $this->assertStringContainsString('/ibl5/uploadDraftClass.php', $html);
+        $this->assertStringContainsString('Draft Class CSV Uploader', $html);
+    }
+
+    public function testDraftShowsDraftClassUploadLink(): void
+    {
+        $html = $this->renderWithDefaults([
+            'panelData' => self::createPanelData(['phase' => 'Draft']),
+        ]);
+
+        $this->assertStringContainsString('/ibl5/uploadDraftClass.php', $html);
+        $this->assertStringContainsString('Draft Class CSV Uploader', $html);
+    }
+
+    public function testOtherPhasesDoNotShowDraftClassUploadLink(): void
+    {
+        foreach (['Preseason', 'HEAT', 'Regular Season', 'Free Agency'] as $phase) {
+            $html = $this->renderWithDefaults([
+                'panelData' => self::createPanelData(['phase' => $phase]),
+            ]);
+
+            $this->assertStringNotContainsString(
+                '/ibl5/uploadDraftClass.php',
+                $html,
+                "Draft class uploader link should be hidden for phase: $phase"
+            );
+        }
+    }
+
     public function testPlayoffsShowsFinalsMvpInputWhenNotSet(): void
     {
         $html = $this->renderWithDefaults([

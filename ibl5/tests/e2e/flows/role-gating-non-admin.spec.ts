@@ -49,6 +49,14 @@ test.describe('Admin entry-point scripts: non-admin gets 403', () => {
     expect(response?.status()).toBe(403);
   });
 
+  // The rest of uploadDraftClass.php (CSRF, preview, escaping) is covered by
+  // flows/draft-class-upload.spec.ts; the role gate lives here so this file
+  // stays the single home of the role-gating matrix.
+  test('uploadDraftClass.php returns 403', async ({ page }) => {
+    const response = await page.goto('uploadDraftClass.php');
+    expect(response?.status()).toBe(403);
+  });
+
   test('simSummaries.php returns 403', async ({ page }) => {
     const response = await page.goto('simSummaries.php');
     expect(response?.status()).toBe(403);

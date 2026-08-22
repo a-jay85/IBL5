@@ -271,6 +271,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <div class="lcp-control-row">
         <a href="/ibl5/import-demands.php">Free Agency Demands CSV Uploader</a>
     </div>
+    <?= HtmlSanitizer::trusted($this->renderDraftClassUploadLink()) ?>
     <?= HtmlSanitizer::trusted($this->renderDraftLinkSelect($panelData)) ?>
     <?= HtmlSanitizer::trusted($this->renderAwardsControls($panelData)) ?>
 <?php endif; ?>
@@ -294,6 +295,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <div class="updater-section__label">Draft Operations</div>
     <?= HtmlSanitizer::trusted($this->renderWaiversSelect($panelData)) ?>
     <?= HtmlSanitizer::trusted($this->renderAwardsControls($panelData)) ?>
+    <?= HtmlSanitizer::trusted($this->renderDraftClassUploadLink()) ?>
 </section>
         <?php
         return (string) ob_get_clean();
@@ -435,6 +437,15 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
 <?php endif; ?>
         <?php
         return (string) ob_get_clean();
+    }
+
+    /**
+     * Shared by the Playoffs and Draft sections — the draft class arrives before the
+     * draft, so the commissioner needs the uploader in both phases.
+     */
+    private function renderDraftClassUploadLink(): string
+    {
+        return '<div class="lcp-control-row"><a href="/ibl5/uploadDraftClass.php">Draft Class CSV Uploader</a></div>';
     }
 
     private function renderTriviaControls(): string

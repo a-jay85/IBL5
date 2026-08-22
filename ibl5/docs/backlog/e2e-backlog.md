@@ -203,18 +203,18 @@ value). For fake-POST tests (D7), assert the banner *after a real submit*, not a
 
 | # | Status | Auto | Pattern / location |
 |---|--------|------|--------------------|
-| E1 | ⬜ Open | 🟩 | `networkidle` — `depth-chart-entry-mobile.spec.ts:13,353,386,413` |
-| E2 | ⬜ Open | 🟩 | `networkidle` — `waivers-submission.spec.ts:67,133` |
-| E3 | ⬜ Open | 🟩 | `networkidle` — `one-on-one-game.spec.ts:67` |
-| E4 | ⬜ Open | 🟩 | `networkidle` — `sortable-tables.spec.ts:158,162` |
-| E5 | ⬜ Open | 🟩 | `networkidle` — `debug-toggle.spec.ts:36,107` |
-| E6 | ⬜ Open | 🟩 | `waitForTimeout(1000)` — `htmx.spec.ts:128` (after a swap already awaited) |
-| E7 | ⬜ Open | 🟩 | `waitForTimeout(800/500/500)` — `trading.spec.ts:431,567,575` (debounce/API-count) |
-| E8 | ⬜ Open | 🟩 | `waitForTimeout(100/200)` — `depth-chart-entry-mobile.spec.ts:229,430` |
-| E9 | ⬜ Open | 🟨 | racy submit `Promise.all([waitForNavigation, evaluate(form.submit)])` — `draft.spec.ts:147` (dies if HTMX intercepts) |
-| E10 | ⬜ Open | 🟩 | `waitForLoadState('domcontentloaded')` after HTMX form — `voting-submission.spec.ts:140`; tab-click pre-swap — `waivers.spec.ts` |
-| E11 | ⬜ Open | 🟩 | browser-history `goBack/goForward` — `draft-history`, `franchise-record-book`, `league-starters`, `team` (load-sensitive; keep, watch) |
-| E12 | ⬜ Open | 🟩 | sleep-in-retry `setTimeout(r,200)` loop — `ajax-api-endpoints.spec.ts fetchJson` |
+| E1 | ✅ Done | 🟩 | `networkidle` — `depth-chart-entry-mobile.spec.ts:13,353,386,413` |
+| E2 | ✅ Done | 🟩 | `networkidle` — `waivers-submission.spec.ts:67,133` |
+| E3 | ✅ Done | 🟩 | `networkidle` — `one-on-one-game.spec.ts:67` |
+| E4 | ✅ Done | 🟩 | `networkidle` — `sortable-tables.spec.ts:158,162` |
+| E5 | ✅ Done | 🟩 | `networkidle` — `debug-toggle.spec.ts:36,107` |
+| E6 | ✅ Done | 🟩 | `waitForTimeout(1000)` — `htmx.spec.ts:128` (after a swap already awaited) |
+| E7 | ✅ Done | 🟩 | `waitForTimeout(800/500/500)` — `trading.spec.ts:431,567,575` (debounce/API-count) |
+| E8 | ✅ Done | 🟩 | `waitForTimeout(100/200)` — `depth-chart-entry-mobile.spec.ts:229,430` |
+| E9 | ✅ Done | 🟨 | racy submit `Promise.all([waitForNavigation, evaluate(form.submit)])` — `draft.spec.ts:147` (dies if HTMX intercepts) |
+| E10 | ✅ Done | 🟩 | `waitForLoadState('domcontentloaded')` after HTMX form — `voting-submission.spec.ts:140`; tab-click pre-swap — `waivers.spec.ts` |
+| E11 | ✅ Done | 🟩 | browser-history `goBack/goForward` — `draft-history`, `franchise-record-book`, `league-starters`, `team` (load-sensitive; keep, watch) |
+| E12 | ✅ Done | 🟩 | sleep-in-retry `setTimeout(r,200)` loop — `ajax-api-endpoints.spec.ts fetchJson` |
 
 **Suggested direction (axis):** Replace `networkidle`/bare sleeps with web-first assertions or
 `waitForResponse`/`waitForFunction` on the actual condition; for PRG redirects use `'load'`; for HTMX history

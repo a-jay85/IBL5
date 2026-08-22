@@ -1,6 +1,6 @@
 ---
 description: Documentation organization and lifecycle rules.
-last_verified: 2026-06-22
+last_verified: 2026-08-22
 ---
 
 # IBL5 Documentation Standards

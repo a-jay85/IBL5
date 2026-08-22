@@ -47,12 +47,25 @@ jobs:
       iblbot: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.iblbot == 'true' }}
       jsdeps: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.jsdeps == 'true' }}
       workflows: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.workflows == 'true' }}
+      both: ${{ github.event_name == 'push' || github.event.pull_request.user.login == 'dependabot[bot]' || steps.filter.outputs.both == 'true' }}
     steps:
       - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         if: github.event_name == 'pull_request'
         with:
           filters: |
+            # `both:` is the producer/consumer coupling group: every path listed
+            # here triggers BOTH db-integration (PHP/DB side) and harness-tests
+            # (shell side), because the two sides share a wire contract that only
+            # breaks when one is changed without the other. Declare a new coupling
+            # by adding its paths here once — never by duplicating them into src:
+            # and shell:. Guarded by bin/test-path-filters.
+            both:
+              - 'bin/sim-recap-*'
+              - 'ibl5/scripts/simRecapQueue.php'
+              - 'ibl5/scripts/storeSimRecap.php'
+              - 'ibl5/scripts/simRecapContext.php'
+              - 'ibl5/classes/SimRecap/**'
             src:
               - '**.php'
               - 'ibl5/migrations/**.sql'
@@ -318,7 +331,7 @@ jobs:
   db-integration:
     name: Database Integration Tests
     needs: [changes]
-    if: needs.changes.outputs.src == 'true'
+    if: needs.changes.outputs.src == 'true' || needs.changes.outputs.both == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -777,7 +790,7 @@ jobs:
   harness-tests:
     name: Shell harness regression tests
     needs: [changes]
-    if: needs.changes.outputs.shell == 'true'
+    if: needs.changes.outputs.shell == 'true' || needs.changes.outputs.both == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # Each harness builds its own throwaway git repos under mktemp, so the
@@ -871,6 +884,8 @@ jobs:
         run: bin/test-bun-audit-triage
       - name: bin/test-db-query-routing
         run: bin/test-db-query-routing
+      - name: bin/test-path-filters
+        run: bin/test-path-filters
 
   gate:
     name: Tests and Analysis

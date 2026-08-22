@@ -112,6 +112,14 @@ pr_dep_holds() {
         st=$("$GH_CMD" pr view "$d" --json state 2>/dev/null | jq -r '.state // empty')
         [ "$st" != "MERGED" ] && echo "depends-on:#$d"
     done
+    # REQUIRED, same reason as pr_unresolved_findings_hold's: the `[ ... ] && echo`
+    # above is the LAST command in the `while` body, so a predecessor that IS merged
+    # makes the test false -> body rc 1 -> while rc 1 -> pipeline rc 1 -> function
+    # rc 1. bin/pr-triage captures this as `deps="$(pr_dep_holds ... | tr ...)"` under
+    # `set -euo pipefail`, so without this line the whole report ABORTS silently on
+    # the first PR whose Depends-on: predecessor has already merged — no stderr, a
+    # truncated table that looks complete. Observed live: 5 of 30 PRs reported.
+    return 0
 }
 
 # pr_pipeline_authored_hold <labels_json> [head_ref]
@@ -207,6 +215,8 @@ pr_unresolved_findings_hold() {
     ' 2>/dev/null) || { echo "unresolved-findings-api-error"; return 0; }
     [ -n "$findings" ] && printf '%s\n' "$findings"
     # REQUIRED: without it the clear path returns 1 and aborts bin/pr-triage
-    # (set -euo pipefail) on the first clear PR. All five predicates return 0 when clear.
+    # (set -euo pipefail) on the first clear PR. Every predicate in this file must
+    # return 0 on its clear path; pr_dep_holds violated that until 2026-08-22, so
+    # treat a trailing bare `[ ... ] && cmd` in any predicate here as a live bug.
     return 0
 }

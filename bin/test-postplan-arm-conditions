@@ -114,6 +114,58 @@ expect_block() { # name  BLOCK|NONE  output
     fi
 }
 
+# expect_rc0 <name> <predicate call> — assert a pr-armable.sh predicate exits 0 on
+# its CLEAR path (found nothing to hold).
+#
+# Why this is separate from the expect_block cases above: the Phase 6.5 blocks PIPE
+# the predicate (`pr_dep_holds ... | while read`), which DISCARDS its exit status —
+# so every one of those cases passes against a predicate that returns 1. bin/pr-triage
+# is the caller that cares: it CAPTURES the predicate (`deps="$(pr_dep_holds ...)"`)
+# under `set -euo pipefail`, where a nonzero rc aborts the whole cross-PR sweep
+# mid-loop. pr_dep_holds did exactly that from its introduction until 2026-08-22 (a
+# trailing bare `[ "$st" != "MERGED" ] && echo` as the last command in its `while`
+# body), silently hiding 25 of 30 open PRs behind a table that looked complete.
+# The defect CLASS is "predicate returns nonzero when clear", so assert it for all six.
+expect_rc0() { # name  predicate-call
+    local script="$BASE_TMP/rc0.sh" out
+    {
+        echo 'set -euo pipefail'
+        echo "source '$REPO_ROOT/bin/lib/pr-armable.sh'"
+        # Capture exactly as bin/pr-triage does — the shape that makes rc load-bearing.
+        echo "captured=\"\$($2 | tr '\\n' ' ')\""
+        echo 'printf "%s" "$captured"'
+    } > "$script"
+    if out="$(PATH="$SHIMD:$PATH" bash "$script" 2>&1)"; then
+        echo "ok: $1"
+    else
+        echo "FAIL: $1 — predicate exited nonzero on its clear path; captured under"
+        echo "      set -euo pipefail this ABORTS bin/pr-triage's sweep. output: '$out'"
+        FAILED=1
+    fi
+}
+
+# expect_mss <name> <mergeStateStatus> <block|arm> — exercise bin/pr-triage's
+# mss_blocks_merge allowlist. Extracted rather than sourced because bin/pr-triage is
+# an executable script, not a lib; the extraction is anchored on the function's own
+# `name() {` .. `}` lines, so a rename fails loudly here instead of silently passing.
+expect_mss() { # name  mss  block|arm
+    local fn script="$BASE_TMP/mss.sh" rc=0
+    fn="$(sed -n '/^mss_blocks_merge() {/,/^}/p' "$REPO_ROOT/bin/pr-triage")"
+    if [ -z "$fn" ]; then
+        echo "FAIL: $1 — mss_blocks_merge() not found in bin/pr-triage"
+        FAILED=1
+        return
+    fi
+    printf '%s\nmss_blocks_merge "%s"\n' "$fn" "$2" > "$script"
+    bash "$script" || rc=$?
+    if { [ "$3" = "block" ] && [ "$rc" -eq 0 ]; } || { [ "$3" = "arm" ] && [ "$rc" -ne 0 ]; }; then
+        echo "ok: $1"
+    else
+        echo "FAIL: $1 — mergeStateStatus=$2 expected to $3, but mss_blocks_merge returned $rc"
+        FAILED=1
+    fi
+}
+
 assert_self_contained() { # marker name
     local block; block="$(extract_block "$1")"
     if [ -z "$block" ]; then
@@ -388,6 +440,56 @@ expect_block "(6) unmerged Depends-on -> BLOCK" BLOCK \
     "$(run_isolated "$B6" '{"body":"x\nDepends-on: #1100"}' '' '')"
 expect_block "(6) merged Depends-on -> NONE" NONE \
     "$(run_isolated "$B6" '{"body":"x\nDepends-on: #1071"}' '' '')"
+
+# --- predicate exit-status invariant (the truncation bug) -------------------
+# The shim answers OPEN for #1100 and MERGED for every other number, so #1071 is
+# the merged predecessor that made pr_dep_holds return 1. `gh api graphql` is not
+# shimmed at all, so (11) takes its fail-closed api-error path — which must ALSO
+# return 0.
+expect_rc0 "rc0: pr_dep_holds, merged predecessor (the pr-triage truncation bug)" \
+    "pr_dep_holds \"\$(printf 'x\\nDepends-on: #1071')\""
+expect_rc0 "rc0: pr_dep_holds, unmerged predecessor" \
+    "pr_dep_holds \"\$(printf 'x\\nDepends-on: #1100')\""
+expect_rc0 "rc0: pr_dep_holds, no Depends-on marker" \
+    "pr_dep_holds 'a body with no markers'"
+expect_rc0 "rc0: pr_manual_testing_clearance, no section" \
+    "pr_manual_testing_clearance 'a body with no sections'"
+expect_rc0 "rc0: pr_golden_hold, golden untouched" \
+    "pr_golden_hold '[]'"
+expect_rc0 "rc0: pr_feat_hold, non-feat title" \
+    "pr_feat_hold 'fix: a bug' '[]'"
+expect_rc0 "rc0: pr_pipeline_authored_hold, neither axis fires" \
+    "pr_pipeline_authored_hold '[]' 'feature-x'"
+expect_rc0 "rc0: pr_unresolved_findings_hold, gh api unavailable (fail-closed path)" \
+    "pr_unresolved_findings_hold 1234"
+
+# --- bin/pr-triage merge-state allowlist ------------------------------------
+# BEHIND is the case that shipped wrong: master's protection is strict (branches
+# must be up to date), so a BEHIND PR's green checks ran on a SHA GitHub will not
+# merge. The old `mss != "DIRTY"` denylist armed it anyway. BLOCKED must stay
+# armable — it is the normal "waiting on a required check" state and 28 of 30 open
+# PRs sat in it on 2026-08-22, so blocking it would arm nothing, ever.
+expect_mss "mss: BEHIND blocks (stale-green, the #1956 bug)" BEHIND block
+expect_mss "mss: DRAFT blocks" DRAFT block
+expect_mss "mss: UNKNOWN blocks" UNKNOWN block
+expect_mss "mss: DIRTY blocks" DIRTY block
+expect_mss "mss: unrecognised enum value blocks (fail-closed)" WIDGET block
+expect_mss "mss: empty value blocks (fail-closed)" "" block
+expect_mss "mss: BLOCKED still arms (28/30 PRs live here)" BLOCKED arm
+expect_mss "mss: CLEAN still arms" CLEAN arm
+expect_mss "mss: UNSTABLE still arms (non-required checks only)" UNSTABLE arm
+expect_mss "mss: HAS_HOOKS still arms" HAS_HOOKS arm
+
+# The truncation guard itself: a mid-loop `set -e` abort exits BEFORE any check
+# placed after the loop, so only an EXIT trap can report it. Structural, because
+# reproducing an abort would require breaking a predicate on purpose.
+if grep -qF 'trap triage_exit_guard EXIT' "$REPO_ROOT/bin/pr-triage"; then
+    echo "ok: pr-triage installs the EXIT trap that reports a truncated sweep"
+else
+    echo "FAIL: pr-triage has no EXIT trap — a mid-loop abort reverts to reporting"
+    echo "      a partial table with an empty stderr (the 5-of-30 failure mode)"
+    FAILED=1
+fi
 
 # The fail-open this whole test exists to catch:
 expect_block "(8) feat: no label -> BLOCK (fail-open guard)" BLOCK \

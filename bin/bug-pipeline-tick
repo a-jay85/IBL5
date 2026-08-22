@@ -175,8 +175,8 @@ bot_mention() { # thread_id discord_id message  -> echoes message_id
 # SECURITY (decision 12): findings and remedy are UNTRUSTED, GM-derived text. They are printf
 # ARGUMENTS (never the format string), the body crosses to discord-dm on STDIN via its `-` form
 # (never argv, never eval, never unquoted), and discord-dm builds its payload with `jq -n --arg`.
-# The issue URL leads so discord-dm's truncation can never eat it — GitHub always holds the full
-# findings (§ decision 5). Returns discord-dm's exit code verbatim: 0 = delivered,
+# The issue URL leads so it lands in chunk 1 regardless of how long the body runs — GitHub always
+# holds the full findings (§ decision 5). Returns discord-dm's exit code verbatim: 0 = delivered,
 # 1 = spooled only, 2 = usage/config error (e.g. no recipient resolvable).
 dm_escalation() { # hunt_id issue_number findings remedy
     local hunt_id="$1" issue="${2:-}" findings="${3:-}" remedy="${4:-}" url body
@@ -184,9 +184,12 @@ dm_escalation() { # hunt_id issue_number findings remedy
     # Approver id may legitimately be empty — omit --to entirely and let discord-dm fall back to
     # $DISCORD_DM_TO / ~/.iblbot-dm-id. Never pass --to "".
     [ -n "$BUG_PIPELINE_APPROVER_ID" ] && args+=(--to "$BUG_PIPELINE_APPROVER_ID")
+    # --chunk: a bug-15-sized remedy is ~5600 chars, and without it discord-dm would truncate to
+    # ~1900 plus a marker — exactly the compression § decision 5 exists to forbid. With --chunk,
+    # exit 0 means EVERY chunk landed, which is what the follow-up gate below relies on.
     # 3 attempts, not the default 6: ~45s of worst-case backoff instead of ~315s, so a dead tunnel
     # cannot stall a foreground tick (§ Architectural trade-offs). `-` MUST stay last.
-    args+=(--attempts 3 --quiet -)
+    args+=(--chunk --attempts 3 --quiet -)
     if [ -n "$issue" ]; then
         url="https://github.com/$BUG_PIPELINE_ISSUE_REPO/issues/$issue"
     else

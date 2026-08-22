@@ -135,7 +135,7 @@ final class SimRecapPayload
             'game_date' => self::requireNonEmptyString($game, 'game_date', $index),
             'visitor_teamid' => self::requireInt($game, 'visitor_teamid', $index),
             'home_teamid' => self::requireInt($game, 'home_teamid', $index),
-            'game_of_that_day' => self::requireInt($game, 'game_of_that_day', $index),
+            'game_of_that_day' => self::requirePositiveInt($game, 'game_of_that_day', $index),
             'box_id' => $boxId,
             'sort_order' => self::requireInt($game, 'sort_order', $index),
             'recap_text' => self::requireNonEmptyString($game, 'recap_text', $index),
@@ -152,6 +152,25 @@ final class SimRecapPayload
         $value = $game[$key] ?? null;
         if (!is_int($value)) {
             throw new \InvalidArgumentException("games[{$index}].{$key} must be an int");
+        }
+
+        return $value;
+    }
+
+    /**
+     * A 1-based ordinal — `ibl_box_scores_teams.game_of_that_day` numbers a day's
+     * games from 1, so 0 is a malformed document, not a smaller value. Fail closed:
+     * storeSimRecap.php catches this and exits non-zero, and bin/sim-recap-tick
+     * parks the sim for retry rather than persisting a row the display query
+     * (SimSummaryRepository's COALESCE join on game_of_that_day) can never match.
+     *
+     * @param array<mixed> $game
+     */
+    private static function requirePositiveInt(array $game, string $key, int|string $index): int
+    {
+        $value = self::requireInt($game, $key, $index);
+        if ($value < 1) {
+            throw new \InvalidArgumentException("games[{$index}].{$key} must be >= 1");
         }
 
         return $value;

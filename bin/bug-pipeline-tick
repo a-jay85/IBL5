@@ -1039,7 +1039,9 @@ park_hunt_blocked() { # hunt_id
 # Derive the worktree/branch slug: bug-<id>-<kebab-from-original_text>.
 # Deterministic (pure function of the immutable row) so reclaim/resume/reconcile
 # all recompute the identical slug. SECURITY: original_text is UNTRUSTED GM text —
-# strict [a-z0-9-] allowlist output only; always a valid git ref / Docker hostname.
+# strict [a-z0-9-] allowlist output only; always a valid git ref and a valid hostname LABEL.
+# NOT itself a Docker hostname: Traefik routes on <slug>.localhost, so a consumer that needs a
+# reachable URL must append the suffix (see render_hunter_prompt) or every request 404s on DNS.
 bug_slug() { # id original_text
     local id="$1" desc
     desc="$(printf '%s' "$2" | LC_ALL=C tr '[:upper:]' '[:lower:]' | LC_ALL=C tr -cs 'a-z0-9' '-')"

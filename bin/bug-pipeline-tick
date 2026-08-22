@@ -868,7 +868,7 @@ render_hunter_prompt() { # claimed wt_appdir
 # fixed | escalate | blocked. A usage limit at ANY tier parks the whole hunt (blocked).
 LADDER_STATE="escalate"
 run_hunt_ladder() { # claimed hunt_id wt_appdir
-    local claimed="$1" hunt_id="$2" wt_appdir="$3" model run_name run_log result verdict rendered
+    local claimed="$1" hunt_id="$2" wt_appdir="$3" model run_name run_log result verdict rendered rep obs
     LADDER_STATE="escalate"
     rendered="$(mktemp)"; render_hunter_prompt "$claimed" "$wt_appdir" > "$rendered"
     for model in $HUNT_MODELS; do   # word-split intentional: fixed model-id list, no globs
@@ -886,7 +886,20 @@ run_hunt_ladder() { # claimed hunt_id wt_appdir
         rm -f "$run_log"
         result="$(cat "$wt_appdir/.bug-pipeline/hunt-result.json" 2>/dev/null || echo '{}')"
         verdict="$(printf '%s' "$result" | jq -r '.verdict // "escalate"' 2>/dev/null)"
-        if [ "$verdict" = "fixed" ]; then rm -f "$rendered"; LADDER_STATE="fixed"; return 0; fi
+        # Gate 1 (reproduce-before-fix): a hunter that filed evidence numbers must have
+        # OBSERVED the reported value. reported present + observed_before disagreeing =
+        # the symptom was never reproduced, so "fixed" is not a claim we can ship.
+        # Deliberately silent when .reported is absent: reports citing no number are
+        # unaffected, which keeps this additive.
+        if [ "$verdict" = "fixed" ]; then
+            rep="$(printf '%s' "$result" | jq -r '.reported // empty' 2>/dev/null)"
+            obs="$(printf '%s' "$result" | jq -r '.observed_before // empty' 2>/dev/null)"
+            if [ -n "$rep" ] && [ "$obs" != "$rep" ]; then
+                log "hunt $hunt_id ($model): 'fixed' REJECTED — reported=$rep observed_before=${obs:-<missing>} (not reproduced); escalating"
+            else
+                rm -f "$rendered"; LADDER_STATE="fixed"; return 0
+            fi
+        fi
         # terminal:true is the hunter's own "a retry by a stronger tier would be pointless"
         # (bin/bug-pipeline-hunter-prompt § hunt-result schema). Climbing to opus
         # anyway spends 1 of 2 tiers — the dearest — to re-derive the same answer.
@@ -957,6 +970,10 @@ give_up_needs_human() { # claimed hunt_id wt_appdir [override_finding]
     # Best-effort issue mirror (§3f): flag + assign; issue stays OPEN (a real unsolved bug).
     issue="$(printf '%s' "$claimed" | jq -r '.issue_number // empty')"
     bpgh_add_label "$issue" needs-human
+    # Mirror the findings (incl. reported/observed_before when the hunter filed them) onto
+    # the issue: the no-repro path opens no PR, so this comment is the only durable record
+    # a human gets outside the Discord thread. Best-effort by construction.
+    bpgh_comment "$issue" "$findings"
     bpgh_assign "$issue" a-jay85
     # Terminal + release the lease so no stale `hunting` row is left owned forever (Phase 1 flag).
     cli transition "$hunt_id" needs_human --release-lease >/dev/null

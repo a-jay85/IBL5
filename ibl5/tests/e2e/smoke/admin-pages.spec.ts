@@ -57,8 +57,11 @@ test.describe('Admin page smoke tests', () => {
     expect(status, 'Test user must have admin privileges — ensure roles_mask=1').not.toBe(403);
     await assertNoPhpErrors(page, 'on block.php');
 
-    // block.php is the Free Agency admin page — it should render without crashing
-    // Content depends on season phase, so just verify no access denial
-    expect(status).toBeLessThan(500);
+    // block.php is the Free Agency admin page. The <title> is emitted
+    // unconditionally (block.php:139), so it is stable across every season
+    // phase and regardless of whether free-agency day data exists — unlike the
+    // "You are viewing Day X results!" <h1>, which renders only when data exists.
+    expect(status, 'block.php must return 200 for an admin').toBe(200);
+    await expect(page).toHaveTitle(/Free Agent Processing/);
   });
 });

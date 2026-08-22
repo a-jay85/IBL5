@@ -75,8 +75,8 @@ function negotiate($playerID)
 
     PageLayout\PageLayout::header();
 
-    // Get user's team name using existing CommonRepository
-    $userTeamName = $commonRepository->getTeamnameFromUsername($authService->getUsername() ?? '');
+    // Get user's team name using existing CommonRepository; null means no team assigned.
+    $userTeamName = $commonRepository->getTeamnameFromUsername($authService->getUsername() ?? '') ?? '';
 
     $debugSession = new \Debug\DebugSession(
         $authService->getUsername() ?? '',

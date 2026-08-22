@@ -27,7 +27,10 @@ test.describe('allStarRename.php — admin success + error paths', () => {
     });
     expect(response.status()).toBe(200);
     const body = (await response.json()) as Record<string, unknown>;
-    expect(body.success).toBe(false);
+    expect(body).toMatchObject({
+      success: false,
+      error: expect.stringMatching(/Invalid team ID or name/i),
+    });
   });
 
   test('admin rename succeeds and DB read-back confirms new name', async ({

@@ -65,16 +65,19 @@ test.describe('Depth Chart submission', () => {
     // Find a pg (PG position depth) select with value "0" and change it to "2" (2nd)
     const pgSelects = page.locator('select[name^="pg"]');
     const count = await pgSelects.count();
+    let found = false;
 
     for (let i = 0; i < count; i++) {
       const val = await pgSelects.nth(i).inputValue();
       if (val === '0') {
         await pgSelects.nth(i).selectOption('2');
+        found = true;
         const newVal = await pgSelects.nth(i).inputValue();
         expect(newVal).toBe('2');
         break;
       }
     }
+    expect(found, 'CI seed must have at least one pg select with value "0" for this test').toBe(true);
   });
 
   test('submit redirects back to module URL with a fresh form and persisted change', async ({ page }) => {
@@ -360,6 +363,20 @@ test.describe('Depth Chart submission', () => {
     await expect(async () => {
       const val = await loadedId.first().inputValue();
       expect(val).not.toBe('0');
+    }).toPass({ timeout: 5000 });
+
+    // Verify at least one pg select was populated. populateForm() writes each
+    // player's own dc_PGDepth (jslib/saved-depth-charts.js:147), which is
+    // legitimately 0 for most of a roster — so assert across the whole pg column
+    // rather than .first(), which asserts a property the product never guarantees.
+    await expect(async () => {
+      const pgVals = await page
+        .locator('select[name^="pg"]')
+        .evaluateAll((els) => els.map((el) => (el as HTMLSelectElement).value));
+      expect(
+        pgVals.some((v) => v !== '0'),
+        'at least one pg select must be populated after loading saved DC',
+      ).toBe(true);
     }).toPass({ timeout: 5000 });
   });
 

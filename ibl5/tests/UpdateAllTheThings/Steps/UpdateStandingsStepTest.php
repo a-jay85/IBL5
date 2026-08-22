@@ -39,12 +39,10 @@ class UpdateStandingsStepTest extends TestCase
         $this->assertSame('Standings updated', $result->label);
     }
 
-    public function testExecuteCapturesOutputBufferLog(): void
+    public function testExecuteDrainsUpdaterBufferIntoCapturedLog(): void
     {
         $stubUpdater = self::createStub(StandingsUpdater::class);
-        $stubUpdater->method('update')->willReturnCallback(static function (): void {
-            echo '<p>Computing standings...</p>';
-        });
+        $stubUpdater->method('takeOutputBuffer')->willReturn('<p>Computing standings...</p>');
 
         $step = new UpdateStandingsStep($stubUpdater);
         $result = $step->execute();
@@ -52,5 +50,17 @@ class UpdateStandingsStepTest extends TestCase
         $this->assertTrue($result->success);
         $this->assertSame('<p>Computing standings...</p>', $result->capturedLog);
         $this->assertTrue($result->collapsibleLog);
+    }
+
+    public function testExecuteReturnsEmptyCapturedLogWhenBufferIsEmpty(): void
+    {
+        $stubUpdater = self::createStub(StandingsUpdater::class);
+        $stubUpdater->method('takeOutputBuffer')->willReturn('');
+
+        $step = new UpdateStandingsStep($stubUpdater);
+        $result = $step->execute();
+
+        $this->assertTrue($result->success);
+        $this->assertSame('', $result->capturedLog);
     }
 }

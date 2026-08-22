@@ -28,12 +28,15 @@ interface FreeAgencyProcessorInterface
      *                                        - playerID: Player ID being offered to
      *                                        - offerType: Exception type (0=custom, 1+=exception)
      *                                        - offeryear1-6: Custom offer amounts (if offerType=0)
-     * @param string $verifiedTeamName Offering team, derived from the authenticated session — never from POST
+     * @param ?string $verifiedTeamName Offering team, derived from the authenticated session — never from POST.
+     *                                  Null, empty, or the free-agent pseudo-team means the caller could not
+     *                                  establish an acting team; the method refuses with a verdict and performs
+     *                                  no mutation.
      *
      * @return array{success: bool, type: string, message: string, playerID: int}
      *         Result array for PRG redirect handling
      */
-    public function processOfferSubmission(array $postData, string $verifiedTeamName): array;
+    public function processOfferSubmission(array $postData, ?string $verifiedTeamName): array;
 
     /**
      * Delete contract offer(s) from this team to a player
@@ -41,10 +44,13 @@ interface FreeAgencyProcessorInterface
      * Removes any pending contract offer(s) from the specified team to the specified player.
      * Used when team wants to withdraw an offer.
      *
-     * @param string $teamName Team withdrawing the offer
+     * @param ?string $teamName Team withdrawing the offer, derived from the authenticated session — never from
+     *                          POST. Null, empty, or the free-agent pseudo-team means the caller could not
+     *                          establish an acting team; the method refuses with a verdict and performs no
+     *                          mutation.
      * @param int $playerID Player ID having offer withdrawn
      *
-     * @return array{success: bool} Result array for PRG redirect handling
+     * @return array{success: bool, error?: string} Result array for PRG redirect handling
      */
-    public function deleteOffers(string $teamName, int $playerID): array;
+    public function deleteOffers(?string $teamName, int $playerID): array;
 }

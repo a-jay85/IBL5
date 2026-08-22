@@ -16,8 +16,10 @@ use Tests\WideUnit\Mocks\MockDatabase;
  * Tests for FreeAgencyController
  *
  * Tests authentication gating and controller instantiation.
- * POST handler tests are covered by E2E tests since they rely on
- * static methods (CsrfGuard, HtmxHelper::redirect) that cannot be mocked.
+ * The POST handlers' redirect dispatch remains E2E/CLI-covered because it
+ * relies on static methods (CsrfGuard, HtmxHelper::redirect) that cannot be
+ * mocked, but the authz verdict — the security-critical "non-party refused +
+ * no mutation" property — is now unit-tested in FreeAgencyProcessorTest.
  */
 class FreeAgencyControllerTest extends TestCase
 {

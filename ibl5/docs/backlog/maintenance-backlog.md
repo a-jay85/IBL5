@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-09-03
+last_verified: 2026-09-04
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -25,7 +25,7 @@ Effort scale:
 - **M** — multi-step plan, 1-3 days, may touch several modules
 - **L** — refactor or platform shift, > 3 days, likely needs ADR
 
-**Status:** Complete — 15-axis audit, 312 findings (+2 post-audit follow-ups from the PR #1107 review, +1 from the #1066 reject-IDOR review → 315 tracked; +11 Axis-1 size seeds 1.21–1.31 from the hot-files comment→backlog migration 2026-07-24 → 326 tracked; +5 Axis-1 size seeds 1.32–1.36 from the ground-truth audit 2026-07-24 → 331 tracked; +1 Axis-2 robustness item 2.39 discovered 2026-07-27 during trading-1-31-api-handler-extract → 332 tracked; +1 Axis-15 data-integrity item 15.24 discovered 2026-08-04 during the PR #1771 review → 333 tracked; +1 Axis-6 coverage item 6.23 discovered 2026-08-08 during the PR #1670 review → 334 tracked; +1 Axis-8 correctness item 8.18 discovered 2026-08-09 during the PR #1683 review → 335 tracked; +1 Axis-6 robustness item 6.24 discovered 2026-08-10 during #1825 → 336 tracked; +1 Axis-6 coverage item 6.25 discovered 2026-09-01 during #1903 → 337 tracked; +1 Axis-9 process-observation item 9.28 discovered 2026-09-01 during #1903 → 338 tracked; +1 Axis-2 robustness item 2.40 discovered 2026-09-02 during #1807 → 339 tracked; +1 Axis-10 PHPStan-coverage item 10.27 discovered 2026-09-03 during #1807 → 340 tracked; +1 Axis-15 process-observation item 15.29 discovered 2026-09-03 during #1807 → 341 tracked).
+**Status:** Complete — 15-axis audit, 312 findings (+2 post-audit follow-ups from the PR #1107 review, +1 from the #1066 reject-IDOR review → 315 tracked; +11 Axis-1 size seeds 1.21–1.31 from the hot-files comment→backlog migration 2026-07-24 → 326 tracked; +5 Axis-1 size seeds 1.32–1.36 from the ground-truth audit 2026-07-24 → 331 tracked; +1 Axis-2 robustness item 2.39 discovered 2026-07-27 during trading-1-31-api-handler-extract → 332 tracked; +1 Axis-15 data-integrity item 15.24 discovered 2026-08-04 during the PR #1771 review → 333 tracked; +1 Axis-6 coverage item 6.23 discovered 2026-08-08 during the PR #1670 review → 334 tracked; +1 Axis-8 correctness item 8.18 discovered 2026-08-09 during the PR #1683 review → 335 tracked; +1 Axis-6 robustness item 6.24 discovered 2026-08-10 during #1825 → 336 tracked; +1 Axis-6 coverage item 6.25 discovered 2026-09-01 during #1903 → 337 tracked; +1 Axis-9 process-observation item 9.28 discovered 2026-09-01 during #1903 → 338 tracked; +1 Axis-2 robustness item 2.40 discovered 2026-09-02 during #1807 → 339 tracked; +1 Axis-10 PHPStan-coverage item 10.27 discovered 2026-09-03 during #1807 → 340 tracked; +1 Axis-15 process-observation item 15.29 discovered 2026-09-03 during #1807 → 341 tracked; +1 Axis-9 doc-drift item 9.29 discovered 2026-09-02 during #1961 → 342 tracked).
 
 ---
 
@@ -417,6 +417,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 |---|--------|-----------|-----------------|
 | 9.4b | ⬜ Open | 🟩 | Full endpoint-by-endpoint OpenAPI reference for API_GUIDE.md (deferred from 9.4). Docs-only. |
 | 9.26 | ⬜ Open | 🟨 | No CHANGELOG — upfront decision: ADRs-as-substitute (document) vs post-plan-fed CHANGELOG tooling. |
+| 9.29 | ⬜ Open | 🟩 | Stale migration-number cross-references in docblocks (165 instead of 174): 4 sites, all fixed this pass. Finding B (truly-manual Verification Matrix row 23): n/a — no gate warranted. (discovered 2026-09-02 during #1961) |
 
 
 ### 9.4b API_GUIDE — Full Endpoint-by-Endpoint OpenAPI Reference (Deferred from 9.4)
@@ -431,6 +432,24 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Decide: (a) STRATEGIC_PRIORITIES + ADRs as substitute (document explicitly), or (b) post-plan-fed CHANGELOG.
 **Est. effort:** S (decide) / M (tooling)
 **Risk if untouched:** "What changed recently?" queries waste tokens.
+
+### 9.29 Stale Migration-Number Cross-References in Docblocks (165 → 174) + Truly-Manual Verification Matrix Row
+**class:** a stale numeric label in migration header comments and code docblocks that references the wrong migration number (165 instead of 174), causing a reader to navigate to the unrelated `165_backfill_pre_2007_retired_flag.sql`
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/migrations/174_derive_conference_champions_from_playoffs.sql:1` | yes | yes | fixed this pass |
+| 2 | `ibl5/migrations/174_derive_conference_champions_from_playoffs.sql` NOTE paragraph | yes | yes | fixed this pass |
+| 3 | `ibl5/classes/Updater/StandingsUpdater.php` docblock | yes | yes | fixed this pass |
+| 4 | `ibl5/tests/DatabaseIntegration/ConferenceChampionsDerivationTest.php` docblock | yes | yes | fixed this pass |
+
+**prevention_ladder:** no gate warranted — migration-number cross-references in prose comments are human-authored; a gate parsing SQL headers against filesystem numbers would be fragile and is not worth the maintenance cost; zero prior occurrences in the rest of the codebase
+**artifact destination:** n/a — no gate
+**provenance:** (discovered 2026-09-02 during #1961)
+
+**Finding B — Truly-manual Verification Matrix row 23:**
+**class:** n/a — a Truly-manual verification row in the Verification Matrix is by definition deferred to human judgment; the auto_merge: false hold enforces that the league GM performs it before merge
+**prevention_ladder:** no gate warranted — the Truly-manual designation in the Verification Matrix already signals automated checking is impossible; auto_merge: false enforces the human hold
 
 ## Axis 10: PHPStan Rule Coverage Gaps
 

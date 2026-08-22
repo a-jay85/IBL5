@@ -32,14 +32,20 @@ use Standings\Contracts\StandingsRepositoryInterface;
  * @phpstan-import-type TeamMapping from StandingsRepositoryInterface
  */
 class StandingsUpdater {
-    /** @var array<string, string> */
+    /**
+     * Maps a **division** region to the team award upserted when that division is
+     * clinched. Conference regions are deliberately absent: a conference champion is
+     * the winner of playoff round 3 (the conference finals), not the team with the
+     * best regular-season conference record. Conference titles are derived in
+     * `vw_team_awards` (migration 174), so nothing is written here for them.
+     *
+     * @var array<string, string>
+     */
     public const REGION_AWARD_MAP = [
         'Atlantic' => 'Atlantic Division Champions',
         'Central'  => 'Central Division Champions',
         'Midwest'  => 'Midwest Division Champions',
         'Pacific'  => 'Pacific Division Champions',
-        'Eastern'  => 'Eastern Conference Champions',
-        'Western'  => 'Western Conference Champions',
     ];
 
     protected Season $season;

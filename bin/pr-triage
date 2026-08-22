@@ -17,17 +17,24 @@
 #
 # Bucket precedence (first match wins):
 #   1. DIRTY                  merge conflict (mergeStateStatus == DIRTY)
-#   2. BLOCKED-CHECK          a required Tests/E2E check is failing/pending/
+#   2. NOT-MERGEABLE          GitHub will not merge this head as-is —
+#                             mergeStateStatus is BEHIND / DRAFT / UNKNOWN (or an
+#                             unrecognised value). BEHIND is the load-bearing one:
+#                             master's protection is strict, so a behind PR's green
+#                             checks ran on a SHA GitHub will not merge — green but
+#                             NOT current, which must never arm
+#   3. BLOCKED-CHECK          a required Tests/E2E check is failing/pending/
 #                             cancelled/absent, or body declares an expected-red
-#   3. HELD                   Manual-Testing real rows, golden touched, or a
+#   4. HELD                   Manual-Testing real rows, golden touched, or a
 #                             belt-and-suspenders body hold marker
-#   4. BLOCKED-DEP            an unmerged Depends-on: predecessor
-#   5. PIPELINE-HELD          bug-pipeline PR (pipeline-authored label OR a
+#   5. BLOCKED-DEP            an unmerged Depends-on: predecessor
+#   6. PIPELINE-HELD          bug-pipeline PR (pipeline-authored label OR a
 #                             `bug-<id>` branch name); UNCONDITIONAL — no label
 #                             clears it, so it is never armed
-#   6. FEAT-AWAITING-SIGNOFF  feat: title without the human-approved label
-#   7. UNCLEARED              no Manual-Testing section (fail-closed; never armed)
-#   8. ARMABLE                CLEARED + not dirty + all required checks green
+#   7. FEAT-AWAITING-SIGNOFF  feat: title without the human-approved label
+#   8. UNCLEARED              no Manual-Testing section (fail-closed; never armed)
+#   9. ARMABLE                CLEARED + a mergeable merge-state + all required
+#                             checks green-and-current
 #
 # Exit codes: 0 = report generated; 1 = an attempted --arm merge failed;
 #             2 = usage error or gh not authenticated.
@@ -58,7 +65,9 @@ Environment (test seams):
 
 ARMABLE is fail-closed: a PR is armed only with a positive Manual-Testing
 clearance ("No manual testing needed"), all required checks green-and-current,
-and no DIRTY/HELD/dep/feat hold. A PR with no `## Manual Testing` section is
+no merge-state hold (DIRTY/BEHIND/DRAFT/UNKNOWN — BEHIND is what enforces
+"current", since master requires branches to be up to date), and no
+HELD/dep/feat hold. A PR with no `## Manual Testing` section is
 UNCLEARED and routed to a human. Reads one page (200 PRs / 100 check-runs).
 
 Exit codes: 0 = report generated; 1 = an attempted --arm merge failed;
@@ -155,8 +164,62 @@ PR_COUNT="$(echo "$PRS_JSON" | jq 'length')"
 printf '%-7s  %-22s  %-26s  %s\n' "PR#" "BUCKET" "NEXT-ACTION" "SIGNALS"
 printf '%-7s  %-22s  %-26s  %s\n' "-------" "----------------------" "--------------------------" "-------"
 
+# mss_blocks_merge <mergeStateStatus>  -> 0 (true) when GitHub will NOT merge this
+# head as-is, whatever the check-runs say.
+#
+# Written as an ALLOWLIST by inversion. GitHub's MergeStateStatus enum is closed
+# (BEHIND BLOCKED CLEAN DIRTY DRAFT HAS_HOOKS UNKNOWN UNSTABLE), so naming the four
+# that CAN legitimately arm and blocking everything else means an unrecognised or
+# empty value fails CLOSED instead of falling through to ARMABLE. The previous
+# `mss != "DIRTY"` denylist did the opposite: BEHIND, DRAFT and UNKNOWN all armed.
+#
+#   BLOCKED   — the normal "waiting on a required check/review" state; arming
+#               auto-merge on it is the entire point of this script, so it must
+#               stay armable (measured 2026-08-22: 28 of 30 open PRs were BLOCKED,
+#               so an allowlist of CLEAN alone would arm nothing, ever).
+#   UNSTABLE  — only NON-required checks are red; the required set is asserted
+#               separately by $armable_checks_green.
+#   HAS_HOOKS — clean, with repo pre-receive hooks.
+mss_blocks_merge() {
+    case "$1" in
+        CLEAN|BLOCKED|HAS_HOOKS|UNSTABLE) return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
+# mss_action <mergeStateStatus> -> the NEXT-ACTION text for a NOT-MERGEABLE row.
+mss_action() {
+    case "$1" in
+        BEHIND)  echo "update branch onto master" ;;
+        DRAFT)   echo "mark ready for review" ;;
+        UNKNOWN) echo "re-check (state unknown)" ;;
+        *)       echo "re-check merge state" ;;
+    esac
+}
+
 EXIT=0
 RERUN_HINTS=""
+ROWS=0
+SWEEPING=0
+
+# The truncation guard. A predicate or gh call that returns nonzero inside the
+# sweep aborts the whole script under `set -euo pipefail` — mid-loop, so a check
+# placed AFTER the loop would never run. Only an EXIT trap sees that abort. Without
+# it the failure is invisible: exit 1, empty stderr, and a partial table that reads
+# as a complete report (that is exactly how a merged Depends-on: predecessor hid 25
+# of 30 open PRs until 2026-08-22). Fails LOUD rather than silently under-reporting.
+triage_exit_guard() {
+    local rc=$?
+    if [ "$SWEEPING" = "1" ]; then
+        echo "ERROR: pr-triage ABORTED after $ROWS of $PR_COUNT open PRs (exit $rc)." >&2
+        echo "       Last PR attempted: #${num:-?}. A predicate or gh call returned" >&2
+        echo "       nonzero under set -euo pipefail. The table above is INCOMPLETE." >&2
+        [ "$rc" -eq 0 ] && rc=2
+    fi
+    exit "$rc"
+}
+trap triage_exit_guard EXIT
+SWEEPING=1
 
 i=0
 while [ "$i" -lt "$PR_COUNT" ]; do
@@ -217,6 +280,11 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     action=""
     if [ "$mss" = "DIRTY" ]; then
         bucket="DIRTY"; action="rebase onto master"
+    elif mss_blocks_merge "$mss"; then
+        # Ranked here, beside DIRTY, because it is the same fact: GitHub will not
+        # merge this head. The SIGNALS column still prints every required check's
+        # state, so nothing a lower bucket would have said is lost.
+        bucket="NOT-MERGEABLE"; action="$(mss_action "$mss")"
     elif [ "$blocked_check" = "1" ]; then
         bucket="BLOCKED-CHECK"; action="fix / re-run CI"
         if [ -n "$cancelled_ctx" ]; then
@@ -237,7 +305,7 @@ while [ "$i" -lt "$PR_COUNT" ]; do
         bucket="FEAT-AWAITING-SIGNOFF"; action="human sign-off + label"
     elif [ "$clearance" = "UNKNOWN" ]; then
         bucket="UNCLEARED"; action="human review (no clearance)"
-    elif [ "$clearance" = "CLEARED" ] && [ "$mss" != "DIRTY" ] && [ "$armable_checks_green" = "1" ]; then
+    elif [ "$clearance" = "CLEARED" ] && ! mss_blocks_merge "$mss" && [ "$armable_checks_green" = "1" ]; then
         bucket="ARMABLE"; action="arm auto-merge"
     else
         # Defensive: cleared but a check is not green yet (race) -> not armable.
@@ -246,7 +314,8 @@ while [ "$i" -lt "$PR_COUNT" ]; do
 
     signals="clearance=${clearance}; ${check_signals}held_body=$([ "$held_body" = 1 ] && echo yes || echo no); golden=$([ -n "$golden" ] && echo yes || echo no); deps=$([ -n "$deps" ] && echo "${deps% }" || echo none); feat=$([ -n "$feat" ] && echo yes || echo no); pipeline=$([ -n "$pipeline" ] && echo "${pipeline% }" || echo none); expected_red=$([ "$expected_red" = 1 ] && echo yes || echo no); unresolved=$([ -n "$unresolved" ] && echo "${unresolved% }" || echo none)"
 
-    printf '%-7s  %-22s  %-26s  %s\n' "#$num" "$bucket" "$action" "$signals"
+    printf '%-7s  %-22s  %-26s  %s\n' "#$num" "$bucket" "$action" "mss=${mss:-?}; $signals"
+    ROWS=$((ROWS + 1))
 
     # --- --arm side-effect: ONLY the ARMABLE bucket ---
     # No --delete-branch, deliberately: the repo already sets deleteBranchOnMerge,
@@ -264,6 +333,12 @@ while [ "$i" -lt "$PR_COUNT" ]; do
         fi
     fi
 done
+SWEEPING=0
+
+if [ "$ROWS" -ne "$PR_COUNT" ]; then
+    echo "ERROR: reported $ROWS of $PR_COUNT open PRs without aborting." >&2
+    EXIT=2
+fi
 
 if [ -n "$RERUN_HINTS" ]; then
     echo

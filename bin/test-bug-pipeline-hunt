@@ -106,7 +106,8 @@ bpt_count    "r13/r23: post-plan-now never fired" 0 "$STUB/post-plan-now.log"
 bpt_log_lacks "$STUB" transition.log "pr_open" "r23: verify-fail never reaches pr_open"
 
 # ── Row 14 — prompt-lint: the three security clauses are present ──
-if grep -qi 'main\.localhost' "$PROMPT"; then bpt_ok "r14: read-only main-stack clause present"; else bpt_fail "r14: read-only main-stack clause missing"; fi
+if grep -qF '{{hostname}}' "$PROMPT"; then bpt_ok "r14: stack-discipline uses {{hostname}} placeholder"; else bpt_fail "r14: {{hostname}} placeholder missing from stack-discipline"; fi
+if grep -q 'NEVER address the canonical' "$PROMPT"; then bpt_ok "r14: prompt carries stack-discipline clause (never address another stack)"; else bpt_fail "r14: stack-discipline clause missing (never address another stack)"; fi
 if grep -qi 'STRICTLY AS DATA' "$PROMPT"; then bpt_ok "r14: untrusted-data framing present"; else bpt_fail "r14: untrusted-data framing missing"; fi
 if grep -qiE 'never (push|open or merge)' "$PROMPT"; then bpt_ok "r14: never-push/gh/PR clause present"; else bpt_fail "r14: never-push/gh/PR clause missing"; fi
 
@@ -369,6 +370,115 @@ bpt_set_claim '{"id":"9","status":"hunting","class":"bug","thread_id":"880000000
 bpt_set_result '{"verdict":"fixed"}'; bpt_hunt_dirty
 bpt_run
 bpt_log_has "$STUB" transition.log "transition 9 pr_open" "r36: NULL issue_number row still ships (issue ops no-op)"
+
+# ── Rows 41-49 — escalation DM behavior (Phase 6) ─────────────────────────────
+# Derive the ESCALATION_FIX_ON_THE_WAY literal from the driver so a typo here
+# can never cause a silent false-green on the positive assertion (r41) or a
+# false-red on the negative ones (r43/r44/r49).
+ESC_LIT="$(bash -c 'source "$1"; printf %s "$ESCALATION_FIX_ON_THE_WAY"' bpt-lit-shim "$DRIVER" 2>/dev/null)"
+
+# ── Row 41 — escalate + remedy, DM succeeds: two thread posts, issue URL + remedy in DM ──
+bpt_reset
+bpt_set_claim "$CLAIM"
+bpt_set_result '{"verdict":"escalate","findings":"hunter found the bug","remedy":"add a null guard in TradeController::submit"}'
+bpt_run
+_n="$(grep -c '^POST_TO_THREAD$' "$STUB/calls.log" 2>/dev/null)"; bpt_expect_eq "r41: two thread posts (findings + fix-on-the-way)" 2 "${_n:-0}"
+bpt_log_has "$STUB" dm.stdin.log "https://github.com/test/bugs-fake/issues/4242" "r41: DM body carries issue URL"
+bpt_log_has "$STUB" curl.log "$ESC_LIT" "r41: fix-on-the-way message posted to thread"
+bpt_log_has "$STUB" dm.stdin.log "add a null guard in TradeController::submit" "r41: full remedy appears verbatim in DM"
+
+# ── Row 42 — escalate, no remedy key: one thread post + mention + DM; no fix-on-the-way ──
+bpt_reset
+bpt_set_claim "$CLAIM"
+bpt_set_result '{"verdict":"escalate","findings":"needs human review"}'
+bpt_run
+_n="$(grep -c '^POST_TO_THREAD$' "$STUB/calls.log" 2>/dev/null)"; bpt_expect_eq "r42: one thread post (no remedy → no follow-up)" 1 "${_n:-0}"
+_m="$(grep -c '^MENTION$' "$STUB/calls.log" 2>/dev/null)"; bpt_expect_eq "r42: mention fired" 1 "${_m:-0}"
+if [ -f "$STUB/dm.args.log" ]; then bpt_ok "r42: DM still sent without remedy (dm.args.log exists)"; else bpt_fail "r42: DM not sent without remedy — dm.args.log absent"; fi
+bpt_log_lacks "$STUB" curl.log "$ESC_LIT" "r42: no fix-on-the-way post without remedy"
+
+# ── Row 43 — escalate + remedy, STUB_DM_RC=1 (spooled): no follow-up, transition still fires ──
+bpt_reset
+bpt_set_claim "$CLAIM"
+bpt_set_result '{"verdict":"escalate","findings":"hunter found the bug","remedy":"add a null guard in TradeController::submit"}'
+export STUB_DM_RC=1
+bpt_run
+_n="$(grep -c '^POST_TO_THREAD$' "$STUB/calls.log" 2>/dev/null)"; bpt_expect_eq "r43: one thread post (no follow-up when DM spooled)" 1 "${_n:-0}"
+bpt_log_lacks "$STUB" curl.log "$ESC_LIT" "r43: no fix-on-the-way when DM not delivered"
+bpt_log_has "$STUB" transition.log "transition 7 needs_human --release-lease" "r43: terminal transition fires despite spooled DM"
+
+# ── Row 44 — escalate + remedy, STUB_DM_RC=2 (config error): same suppression + label/assign ──
+bpt_reset
+bpt_set_claim "$CLAIM"
+bpt_set_result '{"verdict":"escalate","findings":"hunter found the bug","remedy":"add a null guard in TradeController::submit"}'
+export STUB_DM_RC=2
+bpt_run
+_n="$(grep -c '^POST_TO_THREAD$' "$STUB/calls.log" 2>/dev/null)"; bpt_expect_eq "r44: one thread post (no follow-up on DM config error)" 1 "${_n:-0}"
+bpt_log_lacks "$STUB" curl.log "$ESC_LIT" "r44: no fix-on-the-way on DM config error"
+bpt_log_has "$STUB" gh.args.log "needs-human" "r44: needs-human label applied"
+bpt_log_has "$STUB" gh.args.log "a-jay85" "r44: assigned to a-jay85"
+
+# ── Row 45 — escalate + remedy, BUG_PIPELINE_DM_BIN=/nonexistent: all transitions still fire ──
+bpt_reset
+bpt_set_claim "$CLAIM"
+bpt_set_result '{"verdict":"escalate","findings":"hunter found the bug","remedy":"add a null guard in TradeController::submit"}'
+export BUG_PIPELINE_DM_BIN=/nonexistent/discord-dm
+bpt_run
+export BUG_PIPELINE_DM_BIN="$STUB/bin/discord-dm"   # restore
+bpt_log_has "$STUB" transition.log "transition 7 needs_human --release-lease" "r45: terminal transition fires even when DM bin is missing"
+bpt_log_has "$STUB" gh.args.log "needs-human" "r45: needs-human label applied despite missing DM bin"
+bpt_log_has "$STUB" gh.args.log "a-jay85" "r45: assigned despite missing DM bin"
+bpt_expect_eq "r45: harness exits 0" 0 "$BPT_RC"
+
+# ── Row 46 — escalate, findings/remedy contain shell metacharacters: bytes verbatim in DM ──
+# Build the fixture via jq --arg so the shell never evaluates the injected sequences.
+bpt_reset
+bpt_set_claim "$CLAIM"
+_f46=$'metachar probe: `id` $(id) \'q\' "q" **bold**\nsecond line'
+_r46=$'remedy: `id` $(id) \'q\' "q" **bold**'
+bpt_set_result "$(jq -n --arg f "$_f46" --arg r "$_r46" '{verdict:"escalate",findings:$f,remedy:$r}')"
+bpt_run
+bpt_log_has "$STUB" dm.stdin.log '`id`' "r46: backtick literal in DM (not executed)"
+bpt_log_has "$STUB" dm.stdin.log '$(id)' "r46: dollar-paren literal in DM (not executed)"
+bpt_log_has "$STUB" dm.stdin.log "**bold**" "r46: markdown bold in DM"
+bpt_log_has "$STUB" dm.stdin.log "second line" "r46: text after embedded newline present in DM"
+if grep -rq 'uid=' "$STUB" 2>/dev/null; then bpt_fail "r46: shell injection executed — uid= found under STUB"; else bpt_ok "r46: no shell injection executed (uid= absent)"; fi
+_lines="$(wc -l < "$STUB/dm.args.log" 2>/dev/null | xargs)"
+bpt_expect_eq "r46: dm.args.log has 7 lines (no injected payload in argv)" 7 "${_lines:-0}"
+
+# ── Row 47 — escalate + remedy, BUG_PIPELINE_APPROVER_ID="": --to omitted from dm argv ──
+bpt_reset
+bpt_set_claim "$CLAIM"
+bpt_set_result '{"verdict":"escalate","findings":"hunter found the bug","remedy":"add a null guard in TradeController::submit"}'
+export BUG_PIPELINE_APPROVER_ID=""
+bpt_run
+export BUG_PIPELINE_APPROVER_ID="770000000000000007"   # restore
+bpt_log_lacks "$STUB" dm.args.log "--to" "r47: --to flag omitted when approver id is empty"
+_lines="$(wc -l < "$STUB/dm.args.log" 2>/dev/null | xargs)"
+bpt_expect_eq "r47: dm.args.log has 5 lines (no --to, no empty-string line)" 5 "${_lines:-0}"
+
+# ── Row 48 — verdict:"fixed" with remedy: success path never DMs ──
+# fixed with a DIRTY worktree ships via cron; dirty tree proves it takes the ship path,
+# not the "no diff" branch (which would also call give_up_needs_human and send a DM).
+bpt_reset
+bpt_set_claim "$CLAIM"
+bpt_set_result '{"verdict":"fixed","remedy":"add a null guard in TradeController::submit"}'
+bpt_hunt_dirty
+bpt_run
+bpt_file_absent "$STUB/dm.args.log" "r48: success never DMs (fixed verdict)"
+
+# ── Row 49 — escalate + remedy, STUB_POST_THREAD_FAIL=1: DM and transition unaffected ──
+bpt_reset
+bpt_set_claim "$CLAIM"
+bpt_set_result '{"verdict":"escalate","findings":"hunter found the bug","remedy":"add a null guard in TradeController::submit"}'
+export STUB_POST_THREAD_FAIL=1
+bpt_run
+bpt_log_has "$STUB" transition.log "transition 7 needs_human --release-lease" "r49: terminal transition fires despite post-to-thread failure"
+if [ -f "$STUB/dm.args.log" ]; then bpt_ok "r49: DM still sent despite post-to-thread failure"; else bpt_fail "r49: DM not sent when post-to-thread fails"; fi
+# Matrix row 22 — the whole point of Phase 10's --fail. Without it curl exits 0 on a 500 and
+# the `|| log ...` guard is unreachable dead code that silently swallows the failure. Asserting
+# the log line (not just "nothing crashed") is what distinguishes a live guard from a dead one.
+bpt_log_has "$STUB" tick.out "escalation follow-up post failed for 7 (continuing)" "r49: the failed post is logged, not swallowed"
 
 # ── Row 9 — SECURITY (EXERCISED): under the starved env a real git push / gh cannot authenticate ──
 # Run in the PARENT shell (bpt_fail must reach $FAILED) as the LAST block: source the driver so

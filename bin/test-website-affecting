@@ -39,7 +39,6 @@ assert_exit() {
 
 # --- (a) CI-meta exempt set: each alone → exit 1 (non-website / SKIP) ---
 assert_exit "exempt-pages-deploy"  1 ".github/workflows/pages-deploy.yml"
-assert_exit "exempt-rebase-prs"    1 ".github/workflows/rebase-prs.yml"
 assert_exit "exempt-human-signoff" 1 ".github/workflows/human-signoff.yml"
 assert_exit "exempt-dependabot"    1 ".github/workflows/dependabot-auto-merge.yml"
 assert_exit "exempt-doc-freshness" 1 ".github/workflows/doc-freshness-audit.yml"

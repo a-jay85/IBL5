@@ -899,10 +899,13 @@ render_hunter_prompt() { # claimed wt_appdir
     t="${t//\{\{bug_id\}\}/$id}"
     t="${t//\{\{class\}\}/$class}"
     t="${t//\{\{worktree\}\}/$wt_appdir}"
-    # Docker hostname = the worktree dir name (.claude/rules/worktree-hostname.md), derived from
-    # wt_appdir rather than reconstructed, so it always matches bug_slug()'s real output. Safe to
-    # interpolate: bug_slug() emits a strict [a-z0-9-] allowlist.
-    host="$(basename "$(dirname "$wt_appdir")")"
+    # Docker hostname = the worktree dir name PLUS the .localhost suffix Traefik routes on
+    # (.claude/rules/worktree-hostname.md: "Docker hostname: <slug>.localhost"). Derived from
+    # wt_appdir rather than reconstructed, so the slug always matches bug_slug()'s real output.
+    # The suffix is not optional — the bare slug does not resolve, so every curl the hunter runs
+    # against it would fail before it ever reached the app. Safe to interpolate: bug_slug() emits
+    # a strict [a-z0-9-] allowlist.
+    host="$(basename "$(dirname "$wt_appdir")").localhost"
     t="${t//\{\{hostname\}\}/$host}"
     t="${t//\{\{report\}\}/$report}"
     t="${t//\{\{transcript\}\}/$transcript}"

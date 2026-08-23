@@ -28,6 +28,12 @@
 # frontmatter parse here (RAW value, not resolved) is the only way to keep that
 # distinction without changing plan-impl-model's contract for automouse-run.
 #
+# It now shares the accepted-value whitelist with plan-impl-model via
+# bin/lib/plan-model-tier, which classifies WITHOUT collapsing `absent` into
+# `opus-tier`. That is the whole reason the tier helper takes a raw string and
+# returns a tier rather than a model id: this gate needs the absent-vs-explicit
+# distinction that plan-impl-model is required to erase.
+#
 # Skips silently (exit 0, no output) when the plan carries no Verification
 # Matrix at all — that failure belongs to bin/check-plan gate 1, not this
 # script; a plan with no matrix has nothing for this gate to be consistent
@@ -75,8 +81,22 @@ RAW=$(awk '
   infm && /^impl_model:[[:space:]]*/ {sub(/^impl_model:[[:space:]]*/,""); gsub(/[[:space:]]/,""); print; exit}
 ' "$PLAN_FILE" 2>/dev/null)
 
-if [ "$MANUAL_COUNT" -ge 1 ] && [ "$RAW" = "sonnet" ]; then
-    echo "Truly-manual row forbids impl_model: sonnet — strip the marker or mechanize the row"
+LIB_DIR="$(cd "$(dirname "$0")" && pwd)"
+# Rejection message goes to STDOUT: gate [13] renders exactly one stdout line via
+# `viol "[13] ${GATE13_MSG}"`, so a stderr message would vanish from check-plan output.
+if TIER=$("$LIB_DIR/plan-model-tier" "$RAW"); then
+    :
+else
+    printf '%s\n' "$TIER"
+    exit 1
+fi
+
+# Keyed on the resolved TIER, not the literal string: `claude-sonnet-4-6` used to
+# slip past a `[ "$RAW" = "sonnet" ]` test and reach the runner unchallenged.
+# haiku-tier is covered for the same reason — a Truly-manual row under Haiku is a
+# strictly worse instance of the identical defect.
+if [ "$MANUAL_COUNT" -ge 1 ] && { [ "$TIER" = "sonnet-tier" ] || [ "$TIER" = "haiku-tier" ]; }; then
+    echo "Truly-manual row forbids impl_model: $RAW — strip the marker or mechanize the row"
     exit 1
 fi
 

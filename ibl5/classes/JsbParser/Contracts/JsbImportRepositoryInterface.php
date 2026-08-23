@@ -115,6 +115,13 @@ interface JsbImportRepositoryInterface
     public function upsertRetiredPlayer(array $record): int;
 
     /**
+     * Flag a player as retired in `ibl_plr`. Additive only: never writes 0.
+     *
+     * @return int Affected rows (1 = flag flipped, 0 = already retired)
+     */
+    public function markPlayerRetired(int $pid): int;
+
+    /**
      * Upsert a Hall of Fame inductee from .hof data.
      *
      * @param array{jsb_pid: int, player_name: string, pos: string, induction_year: int, pid: int|null} $record

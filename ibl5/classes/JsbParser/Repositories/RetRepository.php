@@ -32,4 +32,18 @@ class RetRepository extends \BaseMysqliRepository
             $record['pid']
         );
     }
+
+    /**
+     * Flag a player as retired in `ibl_plr`. Additive only: never writes 0.
+     *
+     * @return int Affected rows (1 = flag flipped, 0 = already retired)
+     */
+    public function markPlayerRetired(int $pid): int
+    {
+        return $this->execute(
+            "UPDATE `ibl_plr` SET `retired` = 1 WHERE `pid` = ? AND (`retired` IS NULL OR `retired` = 0)",
+            'i',
+            $pid
+        );
+    }
 }

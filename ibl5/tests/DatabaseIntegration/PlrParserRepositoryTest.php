@@ -70,6 +70,32 @@ class PlrParserRepositoryTest extends DatabaseTestCase
         self::assertSame(30, $row['age']);
     }
 
+    public function testUpsertPlayerDoesNotClobberRetiredFlag(): void
+    {
+        $this->repo->upsertPlayer($this->buildPlrData(200000101, 'Pin Retiree'));
+
+        $stmt = $this->db->prepare('SELECT retired FROM ibl_plr WHERE pid = ?');
+        self::assertNotFalse($stmt);
+        $pid = 200000101;
+        $stmt->bind_param('i', $pid);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        self::assertSame(0, $row['retired'], 'Fresh insert should have retired = 0');
+
+        $this->db->query("UPDATE ibl_plr SET retired = 1 WHERE pid = 200000101");
+
+        $this->repo->upsertPlayer($this->buildPlrData(200000101, 'Pin Retiree'));
+
+        $stmt2 = $this->db->prepare('SELECT retired FROM ibl_plr WHERE pid = ?');
+        self::assertNotFalse($stmt2);
+        $stmt2->bind_param('i', $pid);
+        $stmt2->execute();
+        $row2 = $stmt2->get_result()->fetch_assoc();
+        $stmt2->close();
+        self::assertSame(1, $row2['retired'], 'Re-upsert must not clobber retired = 1');
+    }
+
     // ── Data builders ───────────────────────────────────────────
 
     /**

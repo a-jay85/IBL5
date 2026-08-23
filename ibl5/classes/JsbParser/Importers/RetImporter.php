@@ -44,6 +44,14 @@ class RetImporter
             } catch (\RuntimeException $e) {
                 $result->addError('Retired player upsert failed for ' . $entry['player_name'] . ': ' . $e->getMessage());
             }
+
+            if ($pid !== null) {
+                try {
+                    $this->repository->markPlayerRetired($pid);
+                } catch (\RuntimeException $e) {
+                    $result->addError('Retired flag update failed for ' . $entry['player_name'] . ': ' . $e->getMessage());
+                }
+            }
         }
 
         return $result;

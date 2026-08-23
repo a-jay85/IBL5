@@ -106,6 +106,11 @@ class JsbImportRepository extends \BaseMysqliRepository implements JsbImportRepo
         return $this->ret->upsertRetiredPlayer($record);
     }
 
+    public function markPlayerRetired(int $pid): int
+    {
+        return $this->ret->markPlayerRetired($pid);
+    }
+
     public function upsertHofInductee(array $record): int
     {
         return $this->hof->upsertHofInductee($record);

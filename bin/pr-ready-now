@@ -74,7 +74,7 @@ ROOT="$(dirname "$GIT_COMMON")"
 GO=0
 JOBS=3
 EXPLICIT_PRS=()
-MODEL="claude-opus-4-5"   # probed 2026-08-21: CLI accepts this id (see PR body, "MODEL ID ACCEPTED")
+MODEL="claude-opus-5"   # current Opus generation, matching bin/bug-pipeline-tick and bin/lib/plan-impl-model
 EFFORT=high
 
 # --- flag parsing ------------------------------------------------------------------------

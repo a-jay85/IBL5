@@ -145,8 +145,9 @@ assert_present "row7 queued"        "$NDIR/queue/plan-g.md"
 echo "ok: row7 — real-symlink eviction + dangling guard"
 
 # ---------------------------------------------------------------------------
-# Row 8 — already-queued plan still errors (regression guard); skipped/ entry
-# must remain untouched (eviction must not fire before the already-queued check)
+# Row 8 — idempotent re-queue of the same plan (same target): exit 0,
+# "Already queued (no change)", and skipped/ entry left untouched (eviction
+# must not fire before the already-queued check).
 # ---------------------------------------------------------------------------
 setup
 touch "$PDIR/plan-h.md"
@@ -156,19 +157,179 @@ set +e
 out=$(run_queue plan-h 2>&1)
 exit_code=$?
 # Restore the top-level state (set -u only, never -e): a leaked `set -e` here
-# would silently abort rows 9-14 on any non-zero return instead of recording a
-# FAIL — which is exactly how the CI failure masqueraded as an early exit.
-if [ "$exit_code" -eq 0 ]; then
-    echo "FAIL: row8 — expected non-zero exit for already-queued plan, got 0"
+# would silently abort every row below on any non-zero return instead of
+# recording a FAIL — which is exactly how the CI failure masqueraded as an
+# early exit.
+set +e
+if [ "$exit_code" -ne 0 ]; then
+    echo "FAIL: row8 — expected exit 0 for same-target re-queue, got $exit_code"
     FAILED=1
 fi
-if ! echo "$out" | grep -q "already queued"; then
-    echo "FAIL: row8 — expected 'already queued' in output, got: $out"
+if ! echo "$out" | grep -q "Already queued (no change)"; then
+    echo "FAIL: row8 — expected 'Already queued (no change)' in output, got: $out"
     FAILED=1
 fi
 assert_present "row8 skipped untouched" "$NDIR/skipped/plan-h.md"
 assert_present "row8 queued untouched"  "$NDIR/queue/plan-h.md"
-echo "ok: row8 — already-queued errors, no partial eviction"
+echo "ok: row8 — same-target re-queue is idempotent (exit 0), skipped/ untouched"
+
+# ---------------------------------------------------------------------------
+# Row 8a — genuine conflict: same filename, different physical source → error,
+# queue entry unchanged.  Without the idempotent-check, a naïve `ln -s` would
+# crash with a raw "ln: File exists" message and leave the queue corrupted.
+# ---------------------------------------------------------------------------
+setup
+touch "$PDIR/plan-h.md"
+mkdir -p "$TMP/altplans"
+touch "$TMP/altplans/plan-h.md"
+ln -s "$PDIR/plan-h.md" "$NDIR/queue/plan-h.md"
+set +e
+out=$(NIGHTLY_DIR="$NDIR" PLANS_DIR="$TMP/altplans" "$SCRIPT" plan-h 2>&1)
+ec=$?
+set +e
+if [ "$ec" -eq 0 ]; then
+    echo "FAIL: row8a — expected non-zero exit for genuine conflict, got 0"
+    FAILED=1
+fi
+if ! echo "$out" | grep -q "queued:"; then
+    echo "FAIL: row8a — expected 'queued:' in error output, got: $out"
+    FAILED=1
+fi
+if ! echo "$out" | grep -q "new:"; then
+    echo "FAIL: row8a — expected 'new:' in error output, got: $out"
+    FAILED=1
+fi
+link_target=$(readlink "$NDIR/queue/plan-h.md")
+if [ "$link_target" != "$PDIR/plan-h.md" ]; then
+    echo "FAIL: row8a — readlink changed from original: $link_target"
+    FAILED=1
+fi
+echo "ok: row8a — genuine conflict exits 1 with clean error, queue unchanged"
+
+# ---------------------------------------------------------------------------
+# Row 8b — dangling symlink in queue/ gives a clean error, not a raw "ln: File
+# exists" crash.  Without the `[ -L "$f" ]` guard in the already-queued check,
+# `-e` alone is false for a dangling link, control falls through to `ln -s`,
+# and the shell prints a raw fatal error.  Here the dangling symlink points at
+# a path that differs from the real source, so it is a genuine conflict too.
+# ---------------------------------------------------------------------------
+setup
+touch "$PDIR/plan-h.md"
+ln -s "/nonexistent/plan-h.md" "$NDIR/queue/plan-h.md"   # dangling, different target
+set +e
+out=$(run_queue plan-h 2>&1)
+ec=$?
+set +e
+if [ "$ec" -eq 0 ]; then
+    echo "FAIL: row8b — expected non-zero exit for dangling+different path, got 0"
+    FAILED=1
+fi
+if echo "$out" | grep -qE '^ln:'; then
+    echo "FAIL: row8b — raw ln error leaked into output: $out"
+    FAILED=1
+fi
+if ! echo "$out" | grep -q "queued:"; then
+    echo "FAIL: row8b — expected 'queued:' in error output, got: $out"
+    FAILED=1
+fi
+echo "ok: row8b — dangling symlink gives clean error, no raw ln crash"
+
+# Helpers used by rows 8c, 8d, 10-14, and 17-20.  Defined here so they are
+# available to all callers regardless of which section they are in.
+
+# basenames of queue entries in ls -1tr (oldest-first = runs-first) order, space-joined
+queue_order() {
+    local out="" f
+    while IFS= read -r f; do out="$out $(basename "$f")"; done \
+        < <(ls -1tr "$NDIR/queue"/*.md 2>/dev/null)
+    echo "${out# }"
+}
+assert_order() {
+    local desc="$1" expected="$2" actual
+    actual="$(queue_order)"
+    if [ "$actual" != "$expected" ]; then
+        echo "FAIL: $desc — expected order [$expected], got [$actual]"
+        FAILED=1
+    fi
+}
+# epoch mtime of a queue entry's readlink target, portable: GNU (-c %Y) first
+# for Linux CI, BSD (-f %m) fallback for macOS (mirrors bin/wt-status).
+target_mtime() {
+    local t; t="$(readlink "$NDIR/queue/$1")"
+    stat -c %Y "$t" 2>/dev/null || stat -f %m "$t"
+}
+# lstat mtime of a queue entry itself (the GNU `ls` sort key). Neither GNU nor
+# BSD `stat` dereferences by default, so this reports the symlink's own mtime.
+link_mtime() {
+    stat -c %Y "$NDIR/queue/$1" 2>/dev/null || stat -f %m "$NDIR/queue/$1"
+}
+
+# ---------------------------------------------------------------------------
+# Row 8c — idempotent re-queue preserves run-order position and does not touch
+# the mtimes that `ls -1tr` sorts by.  If the re-queue mistakenly called
+# stamp_back_of_queue, the plan would jump to the back.
+# ---------------------------------------------------------------------------
+setup
+touch "$PDIR/plan-a.md" "$PDIR/plan-b.md" "$PDIR/plan-c.md"
+run_queue plan-a >/dev/null 2>&1
+run_queue plan-b >/dev/null 2>&1
+run_queue plan-c >/dev/null 2>&1
+lm_before=$(link_mtime plan-a.md)
+tm_before=$(target_mtime plan-a.md)
+set +e
+out=$(run_queue plan-a 2>&1)
+ec=$?
+set +e
+if [ "$ec" -ne 0 ]; then
+    echo "FAIL: row8c — expected exit 0 for idempotent re-queue, got $ec"
+    FAILED=1
+fi
+if ! echo "$out" | grep -q "Already queued (no change)"; then
+    echo "FAIL: row8c — expected 'Already queued (no change)' in output, got: $out"
+    FAILED=1
+fi
+assert_order "row8c order preserved after re-queue" "plan-a.md plan-b.md plan-c.md"
+lm_after=$(link_mtime plan-a.md)
+tm_after=$(target_mtime plan-a.md)
+if [ "$lm_after" != "$lm_before" ]; then
+    echo "FAIL: row8c — link mtime changed on idempotent re-queue: $lm_before -> $lm_after"
+    FAILED=1
+fi
+if [ "$tm_after" != "$tm_before" ]; then
+    echo "FAIL: row8c — target mtime changed on idempotent re-queue: $tm_before -> $tm_after"
+    FAILED=1
+fi
+echo "ok: row8c — idempotent re-queue preserves position and mtimes"
+
+# ---------------------------------------------------------------------------
+# Row 8d — a plan already queued with an ancient mtime that is re-queued via
+# the idempotent path stays in its ORIGINAL position (not stamped to the back).
+# If stamp_back_of_queue ran, the ancient plan would move to last.
+# ---------------------------------------------------------------------------
+setup
+touch "$PDIR/plan-a.md" "$PDIR/plan-b.md"
+touch "$PDIR/plan-old.md"; touch -t 202001010000.00 "$PDIR/plan-old.md"
+run_queue plan-a >/dev/null 2>&1
+run_queue plan-old >/dev/null 2>&1
+run_queue plan-b >/dev/null 2>&1
+# order: plan-a, plan-old, plan-b (plan-old was stamped to back of a,b,... no:
+# queue was a,old,b — each queued in insertion order with stamp_back_of_queue).
+# Re-queue plan-old (same target) → must stay in its current position, not jump.
+order_before="$(queue_order)"
+set +e
+out=$(run_queue plan-old 2>&1)
+ec=$?
+set +e
+if [ "$ec" -ne 0 ]; then
+    echo "FAIL: row8d — expected exit 0 for idempotent re-queue of ancient plan, got $ec"
+    FAILED=1
+fi
+order_after="$(queue_order)"
+if [ "$order_after" != "$order_before" ]; then
+    echo "FAIL: row8d — order changed on idempotent re-queue: [$order_before] -> [$order_after]"
+    FAILED=1
+fi
+echo "ok: row8d — idempotent re-queue of ancient-mtime plan keeps its position"
 
 # ---------------------------------------------------------------------------
 # Row 9 — .staleness sidecar evicted alongside symlink on (re)queue
@@ -235,28 +396,6 @@ echo "ok: row16 — queues a clean, correctly-marked plan"
 # bin/automouse/run claims the next plan.  GNU ls uses symlink lstat mtime;
 # BSD ls uses target stat mtime.  reorder touches both, so results agree.
 # ===========================================================================
-
-# basenames of queue entries in ls -1tr (oldest-first = runs-first) order, space-joined
-queue_order() {
-    local out="" f
-    while IFS= read -r f; do out="$out $(basename "$f")"; done \
-        < <(ls -1tr "$NDIR/queue"/*.md 2>/dev/null)
-    echo "${out# }"
-}
-assert_order() {
-    local desc="$1" expected="$2" actual
-    actual="$(queue_order)"
-    if [ "$actual" != "$expected" ]; then
-        echo "FAIL: $desc — expected order [$expected], got [$actual]"
-        FAILED=1
-    fi
-}
-# epoch mtime of a queue entry's readlink target, portable: GNU (-c %Y) first
-# for Linux CI, BSD (-f %m) fallback for macOS (mirrors bin/wt-status).
-target_mtime() {
-    local t; t="$(readlink "$NDIR/queue/$1")"
-    stat -c %Y "$t" 2>/dev/null || stat -f %m "$t"
-}
 
 # ---------------------------------------------------------------------------
 # Row 10 — happy path: reorder >=3 plans -> ls -1tr matches requested order
@@ -346,12 +485,6 @@ echo "ok: row14 — touch-nothing on rejection"
 # ANCIENT target mtime; queuing a freshly-created plan would pass even with
 # the bug present.
 # ===========================================================================
-
-# lstat mtime of a queue entry itself (the GNU `ls` sort key). Neither GNU nor
-# BSD `stat` dereferences by default, so this reports the symlink's own mtime.
-link_mtime() {
-    stat -c %Y "$NDIR/queue/$1" 2>/dev/null || stat -f %m "$NDIR/queue/$1"
-}
 
 # ---------------------------------------------------------------------------
 # Row 17 — the reported bug: queue a plan whose target predates the existing

@@ -5,10 +5,10 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
  * Admin viewer for the sim recap queue (`simSummaries.php`).
  *
  * Every count, order and string below is bound to the `ibl_sim_summaries`
- * block in `tests/e2e/fixtures/ci-seed.sql`, which seeds exactly four rows
- * (686 failed, 687 pending, 688 done, 689 done) after clearing the single
- * row migration 155 plants. Sim 999999 is deliberately left unseeded so the
- * "valid but absent" path has a stable fixture.
+ * block in `tests/e2e/fixtures/ci-seed.sql`, which seeds exactly five rows
+ * (686 failed, 687 pending, 688 done, 689 done, 690 done) after clearing the
+ * single row migration 155 plants. Sim 999999 is deliberately left unseeded so
+ * the "valid but absent" path has a stable fixture.
  */
 
 // Full assembled recap document for sim 689 (RecapDocument::postableText output) — the
@@ -45,7 +45,7 @@ The Stars held off a late Metros rally to steal a road win, 95-88.
 The Cannons are one to watch as the season reaches its final stretch.
 `;
 
-const SEEDED_ROW_COUNT = 4;
+const SEEDED_ROW_COUNT = 5;
 
 test.describe('Sim recap admin viewer', () => {
   test('index renders every seeded row', async ({ page }) => {
@@ -60,7 +60,7 @@ test.describe('Sim recap admin viewer', () => {
     await page.goto('simSummaries.php');
 
     const rows = page.locator('table.ibl-data-table tbody tr');
-    await expect(rows.first().locator('td').first()).toHaveText('689');
+    await expect(rows.first().locator('td').first()).toHaveText('690');
     await expect(rows.last().locator('td').first()).toHaveText('686');
     await assertNoPhpErrors(page);
   });
@@ -157,6 +157,23 @@ test.describe('Sim recap admin viewer', () => {
     await expect(page.locator('table.ibl-data-table tbody tr')).toHaveCount(SEEDED_ROW_COUNT);
     await assertNoPhpErrors(page);
   });
+
+  test('orphaned games surface as a warning on the recap page', async ({ page }) => {
+    await page.goto('simSummaries.php?sim=690');
+    await expect(page.locator('#recap-orphan-warning')).toBeVisible();
+    await expect(page.locator('#recap-orphan-warning')).toContainText('1 game');
+    await expect(page.locator('#recap-orphan-warning')).toContainText('2026-03-11');
+    await expect(page.locator('#recap-orphan-warning')).toContainText('5');
+    await expect(page.locator('#recap-orphan-warning')).toContainText('3');
+    await expect(page.locator('.recap-orphan')).toHaveCount(1);
+    await assertNoPhpErrors(page);
+  });
+
+  test('a fully-resolved sim renders no warning', async ({ page }) => {
+    await page.goto('simSummaries.php?sim=689');
+    await expect(page.locator('#recap-orphan-warning')).toHaveCount(0);
+    await assertNoPhpErrors(page);
+  });
 });
 
 test.describe('Sim recap plain-text export', () => {
@@ -196,5 +213,23 @@ test.describe('Sim recap plain-text export', () => {
     expect(response.status()).toBe(404);
     expect(response.headers()['content-type']).toMatch(/^text\/plain/);
     expect(await response.text()).toContain('No recap text available.');
+  });
+
+  test('bare-prose parts fall back to the stored monolith', async ({ request }) => {
+    const response = await request.get('simSummaries.php?sim=690&format=txt');
+    expect(response.status()).toBe(200);
+    expect(response.headers()['content-type']).toMatch(/^text\/plain/);
+    expect(response.headers()['content-disposition']).toContain('sim-690-recap.txt');
+    const body = await response.text();
+    expect(body).toContain('<@5>');
+    expect(body).toContain('<@12>');
+    expect(body).not.toContain('================================');
+  });
+
+  test('plain-text export reports the orphaned-game count in a header', async ({ request }) => {
+    const response690 = await request.get('simSummaries.php?sim=690&format=txt');
+    expect(response690.headers()['x-recap-orphaned-games']).toBe('1');
+    const response689 = await request.get('simSummaries.php?sim=689&format=txt');
+    expect(response689.headers()['x-recap-orphaned-games']).toBe('0');
   });
 });

@@ -73,7 +73,8 @@ INSERT INTO ibl_sim_summaries (sim, status, recap_text, intro_text, outro_text, 
   (686, 'failed',  NULL, NULL, NULL, NULL, 2, NULL, '2026-02-08 09:00:00'),
   (687, 'pending', NULL, NULL, NULL, NULL, 0, NULL, '2026-02-15 09:00:00'),
   (688, 'done',    'Sim 688 recap: a wire-to-wire blowout behind a 41-point night from the rookie.', NULL, NULL, '["blowout","rookie"]', 1, '2026-02-22 10:05:00', '2026-02-22 09:00:00'),
-  (689, 'done',    'Sim 689 recap: the Cannons erased a nine-point fourth-quarter deficit to win by three.', 'Another week of IBL action delivered drama from tip-off to the final buzzer.', 'The Cannons are one to watch as the season reaches its final stretch.', '["comeback"]', 1, '2026-03-01 10:05:00', '2026-03-01 09:00:00');
+  (689, 'done',    'Sim 689 recap: the Cannons erased a nine-point fourth-quarter deficit to win by three.', 'Another week of IBL action delivered drama from tip-off to the final buzzer.', 'The Cannons are one to watch as the season reaches its final stretch.', '["comeback"]', 1, '2026-03-01 10:05:00', '2026-03-01 09:00:00'),
+  (690, 'done',    'Sim 690 full monolith recap. Boston edged Charlotte behind <@5> and <@12> down the stretch.', 'Boston came out with intensity.', 'A gritty performance to cap the week.', NULL, 1, '2026-03-14 10:05:00', '2026-03-14 09:00:00');
 -- The per-game rows are inserted further down, after ibl_team_info: they carry
 -- FKs to ibl_team_info(teamid), so inserting them here aborts the whole seed.
 
@@ -113,15 +114,18 @@ INSERT INTO ibl_team_info (teamid, team_city, team_name, color1, color2, uuid) V
   (27, 'Utah',         'Jazz',         '002B5C', '00471B', 'b0000000-0000-0000-0000-000000000027'),
   (28, 'Oklahoma City','Thunder',      '007AC1', 'EF6100', 'b0000000-0000-0000-0000-000000000028');
 
--- Per-game recaps for sim 689 (see the sim-summaries block above). Deferred to
+-- Per-game recaps for sims 689 and 690 (see the sim-summaries block above). Deferred to
 -- here because ibl_sim_game_recaps FKs visitor_teamid/home_teamid to
--- ibl_team_info(teamid). Each natural key below has a matching pair of
+-- ibl_team_info(teamid). Each natural key for sim 689 below has a matching pair of
 -- ibl_box_scores_teams rows further down, so all three pass the admin viewer's
--- archived-box-score existence filter.
+-- archived-box-score existence filter. Sim 690 row A (2026-03-10) has a matching
+-- box score pair; row B (2026-03-11) has none and is intentionally orphaned.
 INSERT INTO ibl_sim_game_recaps (sim, season_year, game_date, visitor_teamid, home_teamid, game_of_that_day, box_id, sort_order, recap_text) VALUES
   (689, 2026, '2026-02-20', 1, 2, 1, NULL, 0, '**Metros 105 @ Stars 98**\n<@1> · <@2>\nThe Metros dominated from the opening tip, cruising to a 105-98 victory.'),
   (689, 2026, '2026-03-03', 1, 3, 1, NULL, 1, '**Metros 117 @ Cougars 108**\n<@1> · <@3>\nA balanced offensive attack lifted the Metros past the Cougars in a tightly contested game.'),
-  (689, 2026, '2026-03-05', 2, 1, 1, NULL, 2, '**Stars 95 @ Metros 88**\n<@2> · <@1>\nThe Stars held off a late Metros rally to steal a road win, 95-88.');
+  (689, 2026, '2026-03-05', 2, 1, 1, NULL, 2, '**Stars 95 @ Metros 88**\n<@2> · <@1>\nThe Stars held off a late Metros rally to steal a road win, 95-88.'),
+  (690, 2026, '2026-03-10', 5, 12, 0, NULL, 0, 'The visiting team came out strong and never gave the lead back.'),
+  (690, 2026, '2026-03-11', 5, 3, 0, NULL, 1, 'A grind-it-out road win in a game that never opened up.');
 
 -- ============================================================
 -- Standings (28 teams — FK to ibl_team_info)
@@ -498,6 +502,8 @@ INSERT INTO ibl_fa_offers (name, pid, team, teamid, offer1, offer2, offer3, offe
 -- All-Star Game team rows with default names (allStarRename test)
 -- visitor_teamid=50 (ALL_STAR_AWAY_TEAMID), home_teamid=51 (ALL_STAR_HOME_TEAMID)
 -- Names 'Team Away' / 'Team Home' make findAllStarGamesWithDefaultNames() return them.
+-- Sim 690 row A: visitor_teamid=5, home_teamid=12, game_of_that_day=NULL (COALESCE
+-- boundary — game recap stores gotd=0, box score NULL matches via COALESCE(NULL,0)=0).
 INSERT INTO ibl_box_scores_teams (game_date, visitor_teamid, home_teamid, game_of_that_day, name,
   game_2gm, game_2ga, game_ftm, game_fta, game_3gm, game_3ga,
   game_orb, game_drb, game_ast, game_stl, game_tov, game_blk, game_pf,
@@ -507,6 +513,12 @@ INSERT INTO ibl_box_scores_teams (game_date, visitor_teamid, home_teamid, game_o
    30, 60, 18, 22, 12, 28, 10, 28, 24, 8, 10, 5, 16,
    28, 26, 27, 24, 24, 25, 24, 25),
   ('2026-02-15', 50, 51, 1, 'Team Home',
+   28, 58, 20, 25, 10, 25, 9, 26, 22, 7, 12, 4, 17,
+   28, 26, 27, 24, 24, 25, 24, 25),
+  ('2026-03-10', 5, 12, NULL, 'Minutemen',
+   30, 60, 18, 22, 12, 28, 10, 28, 24, 8, 10, 5, 16,
+   28, 26, 27, 24, 24, 25, 24, 25),
+  ('2026-03-10', 5, 12, NULL, 'Royals',
    28, 58, 20, 25, 10, 25, 9, 26, 22, 7, 12, 4, 17,
    28, 26, 27, 24, 24, 25, 24, 25);
 

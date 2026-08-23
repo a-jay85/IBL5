@@ -395,6 +395,50 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
         self::assertSame(1, $displayable[0]['game_of_that_day'], 'The returned game is the one backed by a box score');
     }
 
+    public function testFindDisplayableGameRecapsIgnoresStoredBoxIdAndMatchesOnNaturalKey(): void
+    {
+        // box_id 42 is deliberately arbitrary: no ibl_box_scores_teams row has that id.
+        $games = [$this->gameRecap(sortOrder: 0, gameOfThatDay: 1, boxId: 42)];
+        $this->repo->markDone(999001, 'Intro.', 'Outro.', 'Recap.', $games, null);
+
+        $this->db->query(
+            "INSERT INTO `ibl_box_scores_teams` (`game_date`, `visitor_teamid`, `home_teamid`, `game_of_that_day`, `name`)" .
+            " VALUES ('2025-01-01', 1, 2, 1, 'Metros'), ('2025-01-01', 1, 2, 1, 'Stars')"
+        );
+
+        $displayable = $this->repo->findDisplayableGameRecaps(999001);
+
+        self::assertCount(1, $displayable, 'A stale stored box_id must not suppress a game whose natural key matches');
+        self::assertCount(1, $displayable, 'Two team-side rows must still yield exactly one recap — EXISTS, not JOIN');
+    }
+
+    public function testFindGameRecapsPartitionsIntoDisplayableAndNonDisplayableToday(): void
+    {
+        $games = [
+            $this->gameRecap(sortOrder: 0, gameOfThatDay: 0),
+            $this->gameRecap(sortOrder: 1, gameOfThatDay: 2),
+            $this->gameRecap(sortOrder: 2, gameOfThatDay: 3),
+            $this->gameRecap(sortOrder: 3, gameOfThatDay: 4),
+        ];
+        $this->repo->markDone(999020, 'Intro.', 'Outro.', 'Recap.', $games, null);
+
+        // gotd=0 backed by a box score with game_of_that_day=NULL (COALESCE boundary: COALESCE(NULL,0)=0).
+        // gotd=2 backed by a regular gotd=2 box score.
+        // gotd=3 and gotd=4 have no box score rows.
+        $this->db->query(
+            "INSERT INTO `ibl_box_scores_teams` (`game_date`, `visitor_teamid`, `home_teamid`, `game_of_that_day`, `name`)" .
+            " VALUES ('2025-01-01', 1, 2, NULL, 'Metros'), ('2025-01-01', 1, 2, NULL, 'Stars')," .
+            "        ('2025-01-01', 1, 2, 2, 'Metros2'), ('2025-01-01', 1, 2, 2, 'Stars2')"
+        );
+
+        $all         = $this->repo->findGameRecaps(999020);
+        $displayable = $this->repo->findDisplayableGameRecaps(999020);
+
+        self::assertCount(4, $all, 'findGameRecaps() must return all four stored rows');
+        self::assertCount(2, $displayable, 'Only the two box-score-backed rows must be displayable');
+        self::assertSame([0, 2], array_column($displayable, 'game_of_that_day'), 'Displayable rows must be gotd 0 and 2, in sort_order');
+    }
+
     public function testFindDisplayableGameRecapsReturnsEmptyArrayWhenNoBoxScoresExist(): void
     {
         // Store one game recap with no corresponding ibl_box_scores_teams row.
@@ -526,6 +570,211 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
 
         self::assertCount(1, $displayable);
         self::assertSame([1, 2], [$displayable[0]['visitor_teamid'], $displayable[0]['home_teamid']]);
+    }
+
+    // ── resolveBoxId tests ──────────────────────────────────────────────────────
+
+    public function testResolveBoxIdReturnsMinIdOfTheTwoTeamSideRows(): void
+    {
+        $this->db->query(
+            "INSERT INTO `ibl_box_scores_teams` (`game_date`, `visitor_teamid`, `home_teamid`, `game_of_that_day`, `name`)" .
+            " VALUES ('2025-01-01', 1, 2, 1, 'Metros'), ('2025-01-01', 1, 2, 1, 'Stars')"
+        );
+        $minResult = $this->db->query("SELECT MIN(`id`) AS `min_id` FROM `ibl_box_scores_teams` WHERE `game_date` = '2025-01-01' AND `visitor_teamid` = 1 AND `home_teamid` = 2 AND `game_of_that_day` = 1");
+        $minRow = $minResult ? $minResult->fetch_assoc() : null;
+        self::assertNotNull($minRow);
+        $minId = (int) ($minRow['min_id'] ?? 0);
+
+        $resolved = $this->repo->resolveBoxId('2025-01-01', 1, 2, 1);
+
+        self::assertSame($minId, $resolved, 'Must return the MIN id of the two per-team-side rows');
+        $count = $this->db->query("SELECT COUNT(*) AS cnt FROM `ibl_box_scores_teams` WHERE `game_date` = '2025-01-01' AND `visitor_teamid` = 1 AND `home_teamid` = 2 AND `game_of_that_day` = 1");
+        $cRow = $count ? $count->fetch_assoc() : null;
+        self::assertSame(2, (int) ($cRow['cnt'] ?? 0), 'Both rows must persist — MIN, not DELETE');
+    }
+
+    public function testResolveBoxIdReturnsNullWhenNoBoxScoreMatches(): void
+    {
+        $this->db->query(
+            "INSERT INTO `ibl_box_scores_teams` (`game_date`, `visitor_teamid`, `home_teamid`, `game_of_that_day`, `name`)" .
+            " VALUES ('2025-06-15', 1, 2, 1, 'Metros'), ('2025-06-15', 1, 2, 1, 'Stars')"
+        );
+
+        $resolved = $this->repo->resolveBoxId('2025-01-01', 1, 2, 1);
+
+        self::assertNull($resolved, 'No matching box score must return null, not 0 or false');
+    }
+
+    public function testResolveBoxIdMatchesABoxScoreRowWhoseGameOfThatDayIsNull(): void
+    {
+        $this->db->query(
+            "INSERT INTO `ibl_box_scores_teams` (`game_date`, `visitor_teamid`, `home_teamid`, `game_of_that_day`, `name`)" .
+            " VALUES ('2025-01-01', 1, 2, NULL, 'Metros'), ('2025-01-01', 1, 2, NULL, 'Stars')"
+        );
+
+        $resolved = $this->repo->resolveBoxId('2025-01-01', 1, 2, 0);
+
+        self::assertIsInt($resolved, 'A NULL-ordinal box score must match a request for ordinal 0');
+    }
+
+    public function testResolveBoxIdDoesNotMatchWhenOrdinalsDiffer(): void
+    {
+        $this->db->query(
+            "INSERT INTO `ibl_box_scores_teams` (`game_date`, `visitor_teamid`, `home_teamid`, `game_of_that_day`, `name`)" .
+            " VALUES ('2025-01-01', 1, 2, 1, 'Metros'), ('2025-01-01', 1, 2, 1, 'Stars')"
+        );
+
+        $resolved = $this->repo->resolveBoxId('2025-01-01', 1, 2, 0);
+
+        self::assertNull($resolved, 'Ordinal mismatch must return null');
+    }
+
+    public function testResolveBoxIdTreatsAQuoteBearingDateAsDataNotSql(): void
+    {
+        // Seed with a different date (2025-01-02) so the injection string's valid prefix
+        // (2025-01-01, truncated by MariaDB's DATE cast) does not match the real row.
+        $this->db->query(
+            "INSERT INTO `ibl_box_scores_teams` (`game_date`, `visitor_teamid`, `home_teamid`, `game_of_that_day`, `name`)" .
+            " VALUES ('2025-01-02', 1, 2, 1, 'Metros'), ('2025-01-02', 1, 2, 1, 'Stars')"
+        );
+
+        $resolved = $this->repo->resolveBoxId("2025-01-01' OR '1'='1", 1, 2, 1);
+
+        self::assertNull($resolved, 'A quote-bearing date must be bound as data, not as SQL — must not match the real row');
+    }
+
+    // ── findOrphanedGameRecaps tests ────────────────────────────────────────────
+
+    public function testFindDisplayableGameRecapsReturnsOneRowPerGameWhenBothTeamSidesExist(): void
+    {
+        $this->db->query(
+            "INSERT INTO `ibl_box_scores_teams` (`game_date`, `visitor_teamid`, `home_teamid`, `game_of_that_day`, `name`)" .
+            " VALUES ('2025-01-01', 1, 2, 1, 'Metros')"
+        );
+        $minId = (int) $this->db->insert_id;
+        $this->db->query(
+            "INSERT INTO `ibl_box_scores_teams` (`game_date`, `visitor_teamid`, `home_teamid`, `game_of_that_day`, `name`)" .
+            " VALUES ('2025-01-01', 1, 2, 1, 'Stars')"
+        );
+
+        $games = [$this->gameRecap(sortOrder: 0, gameOfThatDay: 1, boxId: $minId)];
+        $this->repo->markDone(999021, 'Intro.', 'Outro.', 'Recap.', $games, null);
+
+        $displayable = $this->repo->findDisplayableGameRecaps(999021);
+
+        self::assertCount(1, $displayable, 'Both union arms simultaneously true must still yield exactly one recap row');
+    }
+
+    public function testFindDisplayableGameRecapsStillMatchesOnNaturalKeyWhenStoredBoxIdIsStale(): void
+    {
+        $games = [$this->gameRecap(sortOrder: 0, gameOfThatDay: 1, boxId: 42)];
+        $this->repo->markDone(999022, 'Intro.', 'Outro.', 'Recap.', $games, null);
+
+        $this->db->query(
+            "INSERT INTO `ibl_box_scores_teams` (`game_date`, `visitor_teamid`, `home_teamid`, `game_of_that_day`, `name`)" .
+            " VALUES ('2025-01-01', 1, 2, 1, 'Metros'), ('2025-01-01', 1, 2, 1, 'Stars')"
+        );
+
+        $displayable = $this->repo->findDisplayableGameRecaps(999022);
+        $orphaned    = $this->repo->findOrphanedGameRecaps(999022);
+
+        self::assertCount(1, $displayable, 'Stale box_id backed by natural key must be displayable');
+        self::assertSame([], $orphaned, 'No game must appear as orphaned when its natural key matches');
+    }
+
+    public function testFindOrphanedGameRecapsReturnsGamesMatchingNeitherArm(): void
+    {
+        $games = [$this->gameRecap(sortOrder: 0, gameOfThatDay: 1, boxId: 42)];
+        $this->repo->markDone(999023, 'Intro.', 'Outro.', 'Recap.', $games, null);
+
+        $orphaned    = $this->repo->findOrphanedGameRecaps(999023);
+        $displayable = $this->repo->findDisplayableGameRecaps(999023);
+
+        self::assertCount(1, $orphaned, 'A game matching neither arm must appear in findOrphanedGameRecaps()');
+        self::assertSame('2025-01-01', $orphaned[0]['game_date']);
+        self::assertSame(1, $orphaned[0]['visitor_teamid']);
+        self::assertSame(2, $orphaned[0]['home_teamid']);
+        self::assertSame(1, $orphaned[0]['game_of_that_day']);
+        self::assertSame([], $displayable, 'An orphan must be absent from the displayable set');
+    }
+
+    public function testFindOrphanedGameRecapsTreatsLegacyNullBoxIdWithNoBoxScoreAsOrphan(): void
+    {
+        $games = [$this->gameRecap(sortOrder: 0, gameOfThatDay: 1, boxId: null)];
+        $this->repo->markDone(999024, 'Intro.', 'Outro.', 'Recap.', $games, null);
+
+        $orphaned    = $this->repo->findOrphanedGameRecaps(999024);
+        $displayable = $this->repo->findDisplayableGameRecaps(999024);
+
+        self::assertCount(1, $orphaned, 'Legacy null-boxId row with no matching box score must be orphaned');
+        self::assertSame([], $displayable);
+    }
+
+    public function testFindOrphanedGameRecapsExcludesLegacyNullBoxIdBackedByNaturalKey(): void
+    {
+        $games = [$this->gameRecap(sortOrder: 0, gameOfThatDay: 1, boxId: null)];
+        $this->repo->markDone(999025, 'Intro.', 'Outro.', 'Recap.', $games, null);
+
+        $this->db->query(
+            "INSERT INTO `ibl_box_scores_teams` (`game_date`, `visitor_teamid`, `home_teamid`, `game_of_that_day`, `name`)" .
+            " VALUES ('2025-01-01', 1, 2, 1, 'Metros'), ('2025-01-01', 1, 2, 1, 'Stars')"
+        );
+
+        $orphaned    = $this->repo->findOrphanedGameRecaps(999025);
+        $displayable = $this->repo->findDisplayableGameRecaps(999025);
+
+        self::assertSame([], $orphaned, 'Legacy null-boxId row backed by natural key must not be orphaned');
+        self::assertCount(1, $displayable);
+    }
+
+    public function testDisplayableAndOrphanedPartitionAllGameRecaps(): void
+    {
+        // Insert box scores for game 1 (real box_id) first to capture min id
+        $this->db->query(
+            "INSERT INTO `ibl_box_scores_teams` (`game_date`, `visitor_teamid`, `home_teamid`, `game_of_that_day`, `name`)" .
+            " VALUES ('2025-01-01', 1, 2, 1, 'Metros')"
+        );
+        $realId = (int) $this->db->insert_id;
+        // second side + box scores for gotd=2 (stale pointer backed) + gotd=4 (null backed)
+        $this->db->query(
+            "INSERT INTO `ibl_box_scores_teams` (`game_date`, `visitor_teamid`, `home_teamid`, `game_of_that_day`, `name`)" .
+            " VALUES ('2025-01-01', 1, 2, 1, 'Stars')," .
+            "        ('2025-01-01', 1, 2, 2, 'Metros'), ('2025-01-01', 1, 2, 2, 'Stars')," .
+            "        ('2025-01-01', 1, 2, 4, 'Metros'), ('2025-01-01', 1, 2, 4, 'Stars')"
+        );
+
+        $games = [
+            $this->gameRecap(sortOrder: 0, gameOfThatDay: 1, boxId: $realId), // displayable via PK arm
+            $this->gameRecap(sortOrder: 1, gameOfThatDay: 2, boxId: 42),      // displayable via natural key (stale pointer)
+            $this->gameRecap(sortOrder: 2, gameOfThatDay: 3, boxId: 42),      // orphan (stale pointer, no box score)
+            $this->gameRecap(sortOrder: 3, gameOfThatDay: 4, boxId: null),    // displayable via natural key (null pointer)
+            $this->gameRecap(sortOrder: 4, gameOfThatDay: 5, boxId: null),    // orphan (null pointer, no box score)
+        ];
+        $this->repo->markDone(999026, 'Intro.', 'Outro.', 'Recap.', $games, null);
+
+        $all         = $this->repo->findGameRecaps(999026);
+        $displayable = $this->repo->findDisplayableGameRecaps(999026);
+        $orphaned    = $this->repo->findOrphanedGameRecaps(999026);
+
+        self::assertSame(
+            count($all),
+            count($displayable) + count($orphaned),
+            'Displayable + orphaned must equal all game recaps'
+        );
+        self::assertSame(
+            [],
+            array_intersect(array_column($displayable, 'sort_order'), array_column($orphaned, 'sort_order')),
+            'The two sets must be disjoint'
+        );
+        self::assertCount(3, $displayable, 'Games 1, 2, 4 must be displayable');
+        self::assertCount(2, $orphaned, 'Games 3, 5 must be orphaned');
+    }
+
+    public function testFindOrphanedGameRecapsReturnsEmptyArrayForAnUnknownSim(): void
+    {
+        $orphaned = $this->repo->findOrphanedGameRecaps(999999);
+
+        self::assertSame([], $orphaned, 'A sim with no recap rows must return an empty array');
     }
 
     // ── validateGameRowsJoinToBoxScores tests ─────────────────────────────────

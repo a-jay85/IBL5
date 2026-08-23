@@ -13,6 +13,18 @@ namespace SimRecap;
  */
 class SimSummaryRepository extends \BaseMysqliRepository
 {
+    /** PK arm: gr.box_id points at a live ibl_box_scores_teams row. `bst.id = NULL` is never true, so this arm self-disables on legacy NULL rows — no IS NOT NULL guard is needed. */
+    private const BOX_MATCH_BY_ID = "EXISTS (SELECT 1 FROM `ibl_box_scores_teams` bst WHERE bst.`id` = gr.`box_id`)";
+
+    /** Natural-key arm: the pre-box_id fallback, kept so a stale pointer (boxscore reimport reassigns AUTO_INCREMENT ids) never suppresses a game whose box score still exists. */
+    private const BOX_MATCH_BY_NATURAL_KEY = "EXISTS ("
+        . "     SELECT 1 FROM `ibl_box_scores_teams` bst"
+        . "     WHERE bst.`game_date` = gr.`game_date`"
+        . "       AND bst.`visitor_teamid` = gr.`visitor_teamid`"
+        . "       AND bst.`home_teamid` = gr.`home_teamid`"
+        . "       AND COALESCE(bst.`game_of_that_day`, 0) = gr.`game_of_that_day`"
+        . " )";
+
     /**
      * Insert a pending row for $sim if none exists. Returns true when a row was
      * created, false when one already existed (idempotent by PK).
@@ -366,12 +378,10 @@ class SimSummaryRepository extends \BaseMysqliRepository
      * sorted by sort_order ascending — the admin viewer's display read.
      *
      * Distinct from findGameRecaps(), which is the unfiltered write-verification
-     * read. The INNER JOIN here is an existence filter: only games with an
-     * archived box-score record are displayed. Join partner is
-     * `ibl_box_scores_teams`, NOT `ibl_schedule` (shared-context decision 51 —
-     * `ibl_schedule` is churned on every sim upload and is an unreliable archive
-     * source). Returns an empty array when no per-game rows qualify; the View
-     * must handle that case.
+     * read. Join partner is `ibl_box_scores_teams`, NOT `ibl_schedule`
+     * (shared-context decision 51 — `ibl_schedule` is churned on every sim
+     * upload and is an unreliable archive source). Returns an empty array when
+     * no per-game rows qualify; the View must handle that case.
      *
      * @return list<array<string, mixed>>
      */
@@ -379,22 +389,62 @@ class SimSummaryRepository extends \BaseMysqliRepository
     {
         // EXISTS, not INNER JOIN: ibl_box_scores_teams stores one row per TEAM
         // side, so a join on the game's natural key matches twice and would
-        // render every per-game recap twice.
+        // render every per-game recap twice. The OR combines a PK pointer arm
+        // (fast, tolerant of NULL self-disabling) with the natural-key fallback
+        // (reimport-tolerant: AUTO_INCREMENT ids change on reimport, stale
+        // pointer stays matched via the natural key).
         $sql = "SELECT gr.`game_date`, gr.`visitor_teamid`, gr.`home_teamid`,"
-            . " gr.`game_of_that_day`, gr.`sort_order`, gr.`recap_text`"
+            . " gr.`game_of_that_day`, gr.`box_id`, gr.`sort_order`, gr.`recap_text`"
             . " FROM `ibl_sim_game_recaps` gr"
             . " WHERE gr.`sim` = ?"
-            . " AND EXISTS ("
-            . "     SELECT 1 FROM `ibl_box_scores_teams` bst"
-            . "     WHERE bst.`game_date` = gr.`game_date`"
-            . "       AND bst.`visitor_teamid` = gr.`visitor_teamid`"
-            . "       AND bst.`home_teamid` = gr.`home_teamid`"
-            . "       AND COALESCE(bst.`game_of_that_day`, 0) = gr.`game_of_that_day`"
-            . " )"
+            . " AND (" . self::BOX_MATCH_BY_ID . " OR " . self::BOX_MATCH_BY_NATURAL_KEY . ")"
             . " ORDER BY gr.`sort_order` ASC, gr.`id` ASC";
 
         /** @var list<array<string, mixed>> */
         return $this->fetchAll($sql, 'i', $sim);
+    }
+
+    /**
+     * Exact complement of findDisplayableGameRecaps() over the same sim: every row
+     * from findGameRecaps() appears in exactly one of the two. Callers render these
+     * as a warning; they are never rendered into the postable document.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function findOrphanedGameRecaps(int $sim): array
+    {
+        $sql = "SELECT gr.`game_date`, gr.`visitor_teamid`, gr.`home_teamid`,"
+            . " gr.`game_of_that_day`, gr.`box_id`, gr.`sort_order`"
+            . " FROM `ibl_sim_game_recaps` gr"
+            . " WHERE gr.`sim` = ?"
+            . " AND (NOT " . self::BOX_MATCH_BY_ID . " AND NOT " . self::BOX_MATCH_BY_NATURAL_KEY . ")"
+            . " ORDER BY gr.`sort_order` ASC, gr.`id` ASC";
+
+        /** @var list<array<string, mixed>> */
+        return $this->fetchAll($sql, 'i', $sim);
+    }
+
+    /**
+     * Resolve the ibl_box_scores_teams.id pointer for one game from its natural key.
+     * Returns MIN(id) of the two per-team-side rows, or null when no archived box
+     * score matches. Callers must persist null rather than reject the game — a missing
+     * box score is a warning at read time, never a reason to discard the sim recap.
+     *
+     * @return int|null ibl_box_scores_teams.id, or null when no archived box score matches
+     */
+    public function resolveBoxId(string $gameDate, int $visitorTeamid, int $homeTeamid, int $gameOfThatDay): ?int
+    {
+        $sql = "SELECT MIN(`id`) AS `box_id`"
+            . " FROM `ibl_box_scores_teams`"
+            . " WHERE `game_date` = ?"
+            . "   AND `visitor_teamid` = ?"
+            . "   AND `home_teamid` = ?"
+            . "   AND COALESCE(`game_of_that_day`, 0) = ?";
+
+        $row   = $this->fetchOne($sql, 'siii', $gameDate, $visitorTeamid, $homeTeamid, $gameOfThatDay);
+        $boxId = $row['box_id'] ?? null;
+
+        return is_numeric($boxId) ? (int) $boxId : null;
     }
 
     /**

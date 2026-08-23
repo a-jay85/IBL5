@@ -734,6 +734,55 @@ while IFS= read -r row; do
 done < "$MATRIX_FILE"
 
 # ---------------------------------------------------------------------------
+# Gate N: each Verification Matrix row's structural pipe count must match its
+# header. Covers ALL "What to verify" headers (canonical + phase-inline) since
+# $MATRIX_FILE only captures the first contiguous block.
+# Reuses the \|-aware sentinel technique from matrix_split(): gsub \| → \001
+# before splitting on |, so escaped pipes inside cell content are not counted.
+# ---------------------------------------------------------------------------
+_n_out=$(awk '
+    BEGIN {
+        ROW_ID = "^[[:space:]]*\\|[[:space:]]*[A-Za-z]?[A-Za-z]?[A-Za-z]?[0-9][0-9.a-zA-Z]*[[:space:]]*\\|"
+        total_rows = 0; total_blocks = 0
+    }
+    /\|[[:space:]]*[Ww]hat to verify[[:space:]]*\|/ {
+        in_matrix = 1; total_blocks++
+        s = $0; gsub(/\\\|/, "\001", s)
+        n = split(s, a, "|"); hdr_pipes = n - 1
+        next
+    }
+    in_matrix && /^[[:space:]]*\|/ {
+        s = $0; gsub(/\\\|/, "\001", s)
+        n = split(s, a, "|"); row_pipes = n - 1
+        if ($0 ~ ROW_ID) {
+            total_rows++
+            if (row_pipes != hdr_pipes)
+                print "MISMATCH:" NR ":" row_pipes ":" hdr_pipes ":" $0
+        }
+        next
+    }
+    in_matrix && !/^[[:space:]]*\|/ { in_matrix = 0 }
+    END { print "SUMMARY:" total_rows ":" total_blocks }
+' "$PLAN_FILE")
+_n_rows=0; _n_blocks=0
+while IFS= read -r _n_line; do
+    case "$_n_line" in
+    MISMATCH:*)
+        _n_nr=$(printf '%s' "$_n_line" | cut -d: -f2)
+        _n_rp=$(printf '%s' "$_n_line" | cut -d: -f3)
+        _n_hp=$(printf '%s' "$_n_line" | cut -d: -f4)
+        _n_row=$(printf '%s' "$_n_line" | cut -d: -f5-)
+        viol "[N] line ${_n_nr}: row has ${_n_rp} pipe-fields but header has ${_n_hp}: ${_n_row}"
+        ;;
+    SUMMARY:*)
+        _n_rows=$(printf '%s' "$_n_line" | cut -d: -f2)
+        _n_blocks=$(printf '%s' "$_n_line" | cut -d: -f3)
+        ;;
+    esac
+done <<< "$_n_out"
+printf '[N] checked %s row(s) across %s matrix block(s)\n' "$_n_rows" "$_n_blocks" >&2
+
+# ---------------------------------------------------------------------------
 # Gate C: Context budget — a marathon-sized plan predicts a dumb-zone run.
 # ---------------------------------------------------------------------------
 # Size proxies only (a script cannot estimate real context): total line count

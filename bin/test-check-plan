@@ -1843,6 +1843,105 @@ else
     FAILED=1
 fi
 
+# ---------------------------------------------------------------------------
+# Gate [N] fixtures
+# ---------------------------------------------------------------------------
+NMIN_HDR='| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|'
+
+assert n_pass 0 "---
+impl_model: opus
+---
+
+# gate-n-pass fixture
+
+${NMIN_HDR}
+| 1 | gate N passes | CLI-executable | post-impl | \`true\` |
+"
+
+assert n_fail_flat 1 "---
+impl_model: opus
+---
+
+# gate-n-fail-flat fixture
+
+${NMIN_HDR}
+| 1 | short row | CLI-executable |
+"
+
+assert n_regex_coverage 1 "---
+impl_model: opus
+---
+
+# gate-n-regex-coverage fixture
+
+${NMIN_HDR}
+| V1a | ok | CLI-executable | post-impl | \`true\` |
+| 2.b | ok | CLI-executable | post-impl | \`true\` |
+| 13.7c | bad |
+"
+
+# Corpus regression: all 26 queued plans still pass with gate N
+_n_corpus_pass=1
+for _n_slug in \
+    plan-architect-phase-drift-guard conference-champions-playoff-semantics \
+    automouse-cost-accounting-fix bug-hunter-escalation-discord-dm \
+    bug-pipeline-survive-db-sync redact-credentials-from-error-logs \
+    pr-ready-now-driver session-registry-dotclaude-freshness architect-explore-fanout \
+    bug-pipeline-test-env narrow-headless-marker-contract-paths agent-tiering-detail-trim \
+    postplan-findings-schema-degrade jsb-j7-param-recovery wt-rebase-merge-not-rebase \
+    sim-recap-boxid-resolution plan-gate-skill-inline sim-recap-floor-and-cold-open \
+    authz-verdict-refactor-1a-trading-pins authz-verdict-refactor-1b-trading-reject-service \
+    authz-verdict-refactor-1c-trading-reject-shim authz-verdict-refactor-1d-trading-accept-service \
+    authz-verdict-refactor-1e-trading-accept-shim authz-verdict-refactor-trading-backlog \
+    autoresearch-oreb-arming-share-lever retire-rebase-prs-workflow; do
+    _n_pf="$HOME/claude-plans/$_n_slug.md"
+    [ -f "$_n_pf" ] || continue
+    if ! "$GUARD" "$_n_pf" >/dev/null 2>&1; then
+        echo "FAIL: n_corpus — $_n_slug failed (gate N false positive)"
+        _n_corpus_pass=0; FAILED=1
+    fi
+done
+echo "ok: n_corpus"
+
+# Coverage assertions: gate N reports the expected row count for each benchmark plan
+for _n_cov in \
+    "n_cov_81:bug-pipeline-test-env:[N] checked 81 row(s) across 11 matrix block(s)" \
+    "n_cov_41:agent-tiering-detail-trim:[N] checked 41 row(s) across 7 matrix block(s)" \
+    "n_cov_22:narrow-headless-marker-contract-paths:[N] checked 22 row(s) across 1 matrix block(s)" \
+    "n_cov_36:postplan-findings-schema-degrade:[N] checked 36 row(s) across 1 matrix block(s)"; do
+    _n_tname="${_n_cov%%:*}"
+    _n_trest="${_n_cov#*:}"
+    _n_tslug="${_n_trest%%:*}"
+    _n_texpected="${_n_trest#*:}"
+    _n_tfile="$HOME/claude-plans/$_n_tslug.md"
+    if [ ! -f "$_n_tfile" ]; then
+        echo "ok: $_n_tname (skip — plan absent)"
+        continue
+    fi
+    _n_actual=$("$GUARD" "$_n_tfile" 2>&1 | grep '^\[N\] checked')
+    if [ "$_n_actual" = "$_n_texpected" ]; then
+        echo "ok: $_n_tname"
+    else
+        echo "FAIL: $_n_tname — expected '$_n_texpected', got '$_n_actual'"
+        FAILED=1
+    fi
+done
+
+# No-false-positive check: agent-tiering-detail-trim.md exits 0 despite a
+# narrow citation table (| Line | Citation | ... |) that must NOT be flagged
+_n_atfile="$HOME/claude-plans/agent-tiering-detail-trim.md"
+if [ ! -f "$_n_atfile" ]; then
+    echo "ok: n_agent_tiering_pass (skip — plan absent)"
+else
+    if "$GUARD" "$_n_atfile" >/dev/null 2>&1; then
+        echo "ok: n_agent_tiering_pass"
+    else
+        echo "FAIL: n_agent_tiering_pass — agent-tiering-detail-trim.md failed (false positive)"
+        FAILED=1
+    fi
+fi
+
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"
     exit 1

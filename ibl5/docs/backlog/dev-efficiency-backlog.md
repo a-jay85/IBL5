@@ -696,6 +696,8 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 | N3 | `BanRawSuperglobalsRule` suffix allowlist unchanged — plan Phase 6 §Correction forbids removing `Controller.php` | correct — intentional; `ControllerSuperglobalFreedomTest.php` is the scoped enforcement |
 | N4 | `codebase-map.md` regenerated as a side effect of other work | correct — expected artifact |
 | N5 | `Team/README.md` `last_verified: 2026-08-16` vs `maintenance-backlog.md` `2026-09-04` — cosmetic inconsistency | fixed this pass (bumped to 2026-09-04) |
+| E55 | PR #1967 Phase 6.5 — duplicate `last_verified:` in ADR index + stale body path reference (Findings 1+2); body note finding; all fixed this pass or filed | ⬜ Open | — | S |
+| E54 | PR #2064 Phase 6.5 — stale hand-written PR body claims contradicting the final diff and code; B1/B2/B3/N1 fixed this pass | ⬜ Open | — | XS |
 
 **prevention_ladder: no gate warranted** — all five are reviewer-confirmed correct behaviors, not defects; the existing `/pr-ready` Phase 6 review pipeline is the mechanism and it worked correctly here.
 
@@ -870,6 +872,17 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 ### E54 PR #2084 Phase 6.5 — rebase silently dropped implementation commit; lost-work proof blind to pre-run loss
 
 **class:** `rebase-dropped-commit` — an `--onto` rebase replay range that started above the branch's own commits, compounded by a lost-work proof that only compares pre-to-post within a single `/pr-ready` run and cannot detect a branch that arrives already emptied by a previous run's bad rebase.
+### E54 PR #2064 Phase 6.5 — stale hand-written PR body claims contradicting the final diff and code
+
+---
+
+### E55 PR #1967 Phase 6.5 — ADR index duplicate frontmatter key and stale body path reference
+
+**class (finding 1):** a duplicate YAML frontmatter mapping key (`last_verified:`) in a doc index that accumulates independent date bumps from concurrent auto-merged commits without deduplication, causing invalid YAML that strict parsers reject.
+
+**class (finding 2):** a hand-written PR body path reference to an ADR that was renumbered after the body was written, leaving the manual-test row pointing at a nonexistent file.
+
+**class (findings 3–6 / notes):** class: n/a — scope-prose "unchanged" wording (substance accurate; second clause discloses), unperformed pre-merge manual rows (by design), stale matrix acceptance-list items, cosmetic commit-subject and row-placement inconsistencies; none gatable.
 
 **occurrence table:**
 
@@ -1045,3 +1058,25 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 `artifact destination: this entry`
 
 *(discovered 2026-09-06 during Phase 6 review of #2140)*
+| 1 | `ibl5/docs/decisions/README.md:3-5` | yes (finding 1) | yes | fixed this pass |
+| 2 | PR #1967 body Row 60 | yes (finding 2) | yes | fixed this pass (gh pr edit by caller) |
+| 3 | matrix row 60 acceptance list (four named alternatives) | near-miss (finding 2) | yes | not fixed — filed (stale matrix row; ADR content correct) |
+| 4 | matrix rows 30, 55 stale commands | near-miss (finding 2) | yes | not fixed — filed |
+
+Scan for other files with duplicate `last_verified:` keys:
+
+```bash
+find ibl5/docs -name '*.md' -exec sh -c 'c=$(grep -c "^last_verified:" "$1" 2>/dev/null); [ "$c" -gt 1 ] && echo "$1: $c"' _ {} \;
+```
+
+Result: `ibl5/docs/decisions/README.md` is the only occurrence; fixed this pass.
+
+**prevention ladder:**
+- rung 0: `bin/check-docs` runs on every PR but accepts any number of `last_verified:` keys per file — not covered.
+- rung 1: extend `bin/check-docs` to reject more than one `^last_verified:` line in a single file's frontmatter. This catches the defect at the point of introduction rather than at review time. All four `meta-tooling-bar.md` extend-before-add conditions hold: the extension is 1–2 lines of `grep -c` logic, it lives where the rest of the frontmatter checks already live, it has a direct measurable surface (frontmatter parsing), and no separate tool is needed.
+- Landing rung: **rung 1** — extend `bin/check-docs`.
+- For finding 2 (stale body path): no gate warranted — PR body references are hand-written and ephemeral; an ADR renumber is a rare event; the existing Phase 6 6d(4) check is the review-time backstop and already caught it.
+
+**artifact destination:** `bin/check-docs` (in-repo script, path `bin/check-docs`).
+
+**provenance:** (discovered 2026-09-05 during #1967)

@@ -1,0 +1,180 @@
+name: Auto-promote to production
+
+# Fast-forwards `production` to master's HEAD once every check on that SHA is
+# green. The decision and the push both live in bin/promote-master-to-production,
+# which bin/test-promote-master-to-production exercises on every PR; this file is
+# only trigger wiring, the kill switch, and secret handling.
+#
+# KILL SWITCH: set the repo variable AUTO_PROMOTE_PAUSED=1 to stop all automatic
+# promotion (`gh variable set AUTO_PROMOTE_PAUSED --body 1`). Unset or any other
+# value means enabled. Resume with `gh variable delete AUTO_PROMOTE_PAUSED`.
+
+on:
+  workflow_run:
+    # ALL master-push workflows, path-filtered or not — see the plan's Phase 4a.
+    # The unfiltered two guarantee an event exists at all; the filtered eleven
+    # guarantee a LATE event, after the slow gates have finished.
+    workflows:
+      - gitleaks
+      - PR meta checks
+      - Tests and Analysis
+      - E2E Tests
+      - CodeQL
+      - Engine
+      - Migration Safety
+      - Deploy Rehearsal
+      - Python tests (post-plan harness)
+      - Cache Dependencies
+      - Lighthouse Baseline
+      - PR Fast-Canary
+      - Auto-Rebase PRs
+    types: [completed]
+
+# Deliberately NOT contents: write. The push authenticates with secrets.CI_PAT,
+# never with GITHUB_TOKEN, so withholding write means a regression that falls back
+# to the default token fails loudly instead of pushing a commit that would NOT
+# trigger main.yml (GITHUB_TOKEN pushes do not start downstream workflows — the
+# silent-failure bug this withholding makes impossible).
+permissions:
+  contents: read
+
+concurrency:
+  group: promote-to-production
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    # This name is load-bearing: it is the check-run name that lands on the very
+    # SHA being evaluated, and bin/merge-master-to-prod + the SKIP_CHECKS env below
+    # both list it verbatim. It must contain NO comma (SKIP_CHECKS is comma-split).
+    # bin/check-composite-contracts pins the pairing (plan Phase 5).
+    name: Promote master to production
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: >-
+      github.event.workflow_run.head_branch == 'master' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.event == 'push' &&
+      vars.AUTO_PROMOTE_PAUSED != '1'
+    steps:
+      - name: Assert CI_PAT is present
+        env:
+          CI_PAT: ${{ secrets.CI_PAT }}
+        run: |
+          set -euo pipefail
+          : "${CI_PAT:?CI_PAT is empty. Refusing to run: a fallback to GITHUB_TOKEN
+             would push production WITHOUT triggering main.yml, i.e. mark the site
+             deployed while nothing deployed.}"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: master
+          # bin/promote-master-to-production hard-fails on a shallow store, because
+          # `merge-base --is-ancestor` answers "no" for real ancestors when the
+          # history is grafted — which would silently turn every promotion into a
+          # not-ancestor rejection.
+          fetch-depth: 0
+          # Persist the PAT as the push credential. This is what makes the push
+          # both authorized (branch protection has enforce_admins: false) and
+          # capable of triggering main.yml.
+          token: ${{ secrets.CI_PAT }}
+
+      - name: Promote if green
+        id: promote
+        env:
+          # Never interpolate ${{ github.event.workflow_run.* }} directly into a
+          # run: body — an attacker-influenced field would be evaluated as shell.
+          # Every untrusted value crosses into the script through env only.
+          PROMOTE_SHA: ${{ github.event.workflow_run.head_sha }}
+          GH_TOKEN: ${{ secrets.CI_PAT }}
+          MIN_REQUIRED_CHECKS: '3'
+          MAX_WALKBACK: '0'
+          SKIP_CHECKS: Promote master to production,Auto-promotion paused
+        run: bin/promote-master-to-production "$PROMOTE_SHA" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Setup SSH
+        if: steps.promote.outputs.outcome == 'promoted' || failure()
+        uses: ./.github/actions/setup-ssh
+        with:
+          host: ${{ secrets.HOST }}
+          port: ${{ secrets.PORT }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Build Discord message
+        if: steps.promote.outputs.outcome == 'promoted' || failure()
+        env:
+          OUTCOME: ${{ steps.promote.outputs.outcome }}
+          PROMOTE_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          if [ "$OUTCOME" = "promoted" ]; then
+            {
+              printf 'Auto-promoted master to production: %s\n\n' "${PROMOTE_SHA:0:11}"
+              printf '%s\n\n' "$(git log -1 --format=%s "$PROMOTE_SHA")"
+              printf 'Deploy: %s\n' "$RUN_URL"
+            } > /tmp/discord-msg.txt
+          else
+            {
+              printf 'Auto-promotion FAILED (outcome=%s) for %s.\n\n' \
+                     "${OUTCOME:-hard-error}" "${PROMOTE_SHA:0:11}"
+              printf 'production was NOT modified. Nothing was force-pushed.\n'
+              printf 'Promote by hand with bin/merge-master-to-prod, or pause with\n'
+              printf 'gh variable set AUTO_PROMOTE_PAUSED --body 1\n\n%s\n' "$RUN_URL"
+            } > /tmp/discord-msg.txt
+          fi
+
+      - name: Send Discord DM
+        if: steps.promote.outputs.outcome == 'promoted' || failure()
+        uses: ./.github/actions/notify-discord
+        with:
+          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
+          port: ${{ secrets.PORT }}
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+
+  paused-notice:
+    # Second and last job in this workflow. Also listed verbatim in SKIP_CHECKS
+    # and in bin/merge-master-to-prod. No comma.
+    name: Auto-promotion paused
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Debounce: a master push fires ~13 workflow_run events, and a paused notice on
+    # each would send ~13 identical DMs. `PR meta checks` is unfiltered, so it runs
+    # exactly once per master push — making it the one event that fires this job.
+    if: >-
+      github.event.workflow_run.head_branch == 'master' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.name == 'PR meta checks' &&
+      vars.AUTO_PROMOTE_PAUSED == '1'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup SSH
+        uses: ./.github/actions/setup-ssh
+        with:
+          host: ${{ secrets.HOST }}
+          port: ${{ secrets.PORT }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Build Discord message
+        env:
+          PROMOTE_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          {
+            printf 'Auto-promotion is PAUSED (AUTO_PROMOTE_PAUSED=1).\n\n'
+            printf 'master %s was NOT promoted to production.\n\n' "${PROMOTE_SHA:0:11}"
+            printf 'Resume: gh variable delete AUTO_PROMOTE_PAUSED\n'
+            printf 'Ship by hand meanwhile: bin/merge-master-to-prod\n\n%s\n' "$RUN_URL"
+          } > /tmp/discord-msg.txt
+
+      - name: Send Discord DM
+        uses: ./.github/actions/notify-discord
+        with:
+          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
+          port: ${{ secrets.PORT }}
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}

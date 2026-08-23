@@ -472,4 +472,76 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
         $regular = $this->repo->findTeamBoxscore('2025-01-20', 3, 1, 1);
         self::assertNotNull($regular);
     }
+
+    // ── fetchScheduledGameIndex ────────────────────────────────────
+
+    public function testFetchScheduledGameIndexReturnsNestedTripleMap(): void
+    {
+        $this->insertScheduleRow(2025, '2025-01-15', 2, 100, 1, 90);
+
+        $index = $this->repo->fetchScheduledGameIndex(2025);
+
+        self::assertTrue(isset($index['2025-01-15'][2][1]));
+        self::assertSame(true, $index['2025-01-15'][2][1]);
+    }
+
+    public function testFetchScheduledGameIndexExcludesOtherSeasons(): void
+    {
+        $this->insertScheduleRow(2024, '2024-01-15', 2, 100, 1, 90);
+        $this->insertScheduleRow(2025, '2025-01-15', 3, 100, 1, 90);
+
+        $index = $this->repo->fetchScheduledGameIndex(2025);
+
+        // 2025 triple present
+        self::assertTrue(isset($index['2025-01-15'][3][1]));
+        // 2024 triple absent
+        self::assertFalse(isset($index['2024-01-15'][2][1]));
+    }
+
+    public function testFetchScheduledGameIndexIsEmptyForSeasonWithNoRows(): void
+    {
+        // ibl_schedule has no rows for season 1901; fail-open is correct behaviour.
+        $index = $this->repo->fetchScheduledGameIndex(1901);
+
+        self::assertSame([], $index);
+    }
+
+    // ── fetchBoxscoreGameOfThatDayIndex ───────────────────────────
+
+    public function testFetchBoxscoreGameOfThatDayIndexGroupsSiblingGamesUnderOneTriple(): void
+    {
+        // Two games sharing the same (date, visitor, home) triple but different gotd values.
+        // Use a month-3 date so season_year = 2025 (month < 10 → year stays).
+        $this->insertTeamBoxscoreRow('2025-03-05', 'Game1', 1, 2, 1);
+        $this->insertTeamBoxscoreRow('2025-03-05', 'Game2', 2, 2, 1);
+
+        $index = $this->repo->fetchBoxscoreGameOfThatDayIndex(2025);
+
+        self::assertSame([1, 2], $index['2025-03-05'][2][1]);
+    }
+
+    public function testFetchBoxscoreGameOfThatDayIndexSkipsNullTeamidRows(): void
+    {
+        // Non-null row at the same date — proves the predicate, not just an empty index.
+        // Use month-3 date so season_year = 2025.
+        $this->insertTeamBoxscoreRow('2025-03-10', 'NonNull', 1, 2, 1);
+
+        // Null-visitor row: omit visitor_teamid entirely so DEFAULT NULL is used.
+        // Passing PHP null via insertRow() would bind as '', failing the INT column.
+        $this->insertRow('ibl_box_scores_teams', [
+            'game_date'       => '2025-03-10',
+            'name'            => 'NullViz',
+            'game_of_that_day' => 2,
+            'home_teamid'     => 1,
+            // visitor_teamid intentionally omitted → DEFAULT NULL, bypasses FK check
+        ]);
+
+        $index = $this->repo->fetchBoxscoreGameOfThatDayIndex(2025);
+
+        // Non-null row IS in the index
+        self::assertTrue(isset($index['2025-03-10'][2][1]));
+        self::assertSame([1], $index['2025-03-10'][2][1]);
+        // Null row is excluded: (int)null = 0 would be key 0 if included
+        self::assertFalse(isset($index['2025-03-10'][0]));
+    }
 }

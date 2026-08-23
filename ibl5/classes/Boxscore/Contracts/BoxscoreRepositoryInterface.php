@@ -68,6 +68,30 @@ interface BoxscoreRepositoryInterface
     public function deleteTeamBoxscoresByGame(string $date, int $visitor_teamid, int $home_teamid, int $game_of_that_day): int;
 
     /**
+     * Build an in-memory membership index of all scheduled games for a season.
+     *
+     * Returns a nested map [game_date][visitor_teamid][home_teamid] => true
+     * backed by a single SELECT DISTINCT from `ibl_schedule` scoped to $seasonYear.
+     * Returns an empty array when no rows exist (seasons predating the schedule table).
+     *
+     * @param int $seasonYear The season_year value (e.g., 2008 for the 2007–08 season)
+     * @return array<string, array<int, array<int, true>>>
+     */
+    public function fetchScheduledGameIndex(int $seasonYear): array;
+
+    /**
+     * Build an in-memory index of existing boxscore game_of_that_day values per game triple.
+     *
+     * Returns a nested map [game_date][visitor_teamid][home_teamid] => list<int>
+     * of game_of_that_day values already recorded in `ibl_box_scores_teams`,
+     * excluding rows where visitor_teamid or home_teamid is NULL.
+     *
+     * @param int $seasonYear The season_year generated column value
+     * @return array<string, array<int, array<int, list<int>>>>
+     */
+    public function fetchBoxscoreGameOfThatDayIndex(int $seasonYear): array;
+
+    /**
      * Delete player boxscore records for a specific game
      *
      * @param string $date Game date in Y-m-d format

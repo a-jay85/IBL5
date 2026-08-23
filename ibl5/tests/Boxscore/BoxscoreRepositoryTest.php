@@ -269,4 +269,46 @@ class BoxscoreRepositoryTest extends TestCase
         self::assertStringContainsString('VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', $sql);
         self::assertStringContainsString('INSERT INTO `ibl_box_scores_teams`', $sql);
     }
+
+    public function testFetchScheduledGameIndexIsSeasonScopedAndParameterized(): void
+    {
+        // Set Olympics context so `ibl_schedule` is rewritten to ibl_olympics_schedule.
+        // This proves the SQL uses backtick-quoted table names (rewrite only fires for backticks).
+        // MockDatabase::getExecutedQueries() substitutes bound params before storing, so we
+        // assert the substituted value (2008) rather than the ? placeholder — MockDB limitation.
+        $context = new LeagueContext();
+        $context->setLeague(LeagueContext::LEAGUE_OLYMPICS);
+        BoxscoreRepository::setSharedLeagueContext($context);
+
+        $repo = new BoxscoreRepository($this->mockDb);
+        $repo->fetchScheduledGameIndex(2008);
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $this->assertCount(1, $queries);
+        $this->assertStringContainsString('ibl_olympics_schedule', $queries[0]);
+        $this->assertStringContainsString('season_year = 2008', $queries[0]);
+        $this->assertStringNotContainsString('2007', $queries[0]);
+    }
+
+    public function testFetchBoxscoreGameOfThatDayIndexExcludesNullTeamRows(): void
+    {
+        // IS NOT NULL predicates appear verbatim in the stored query (not bound params),
+        // so they are directly assertable despite the MockDB substitution limitation.
+        $this->repository->fetchBoxscoreGameOfThatDayIndex(2025);
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $this->assertCount(1, $queries);
+        $this->assertStringContainsString('visitor_teamid IS NOT NULL', $queries[0]);
+        $this->assertStringContainsString('home_teamid IS NOT NULL', $queries[0]);
+    }
+
+    public function testPreloadIndexesReturnEmptyArraysWhenNoRows(): void
+    {
+        // Default MockDatabase returns no rows; both methods must degrade gracefully.
+        $scheduleIndex = $this->repository->fetchScheduledGameIndex(2025);
+        $gotdIndex = $this->repository->fetchBoxscoreGameOfThatDayIndex(2025);
+
+        $this->assertSame([], $scheduleIndex);
+        $this->assertSame([], $gotdIndex);
+    }
 }

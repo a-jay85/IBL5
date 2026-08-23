@@ -132,6 +132,42 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
     }
 
     /**
+     * @see BoxscoreRepositoryInterface::fetchScheduledGameIndex()
+     */
+    public function fetchScheduledGameIndex(int $seasonYear): array
+    {
+        $rows = $this->fetchAll(
+            "SELECT DISTINCT game_date, visitor_teamid, home_teamid FROM `ibl_schedule` WHERE season_year = ?",
+            "i",
+            $seasonYear
+        );
+
+        $index = [];
+        foreach ($rows as $row) {
+            $index[(string)$row['game_date']][(int)$row['visitor_teamid']][(int)$row['home_teamid']] = true;
+        }
+        return $index;
+    }
+
+    /**
+     * @see BoxscoreRepositoryInterface::fetchBoxscoreGameOfThatDayIndex()
+     */
+    public function fetchBoxscoreGameOfThatDayIndex(int $seasonYear): array
+    {
+        $rows = $this->fetchAll(
+            "SELECT game_date, visitor_teamid, home_teamid, game_of_that_day FROM `ibl_box_scores_teams` WHERE season_year = ? AND visitor_teamid IS NOT NULL AND home_teamid IS NOT NULL",
+            "i",
+            $seasonYear
+        );
+
+        $index = [];
+        foreach ($rows as $row) {
+            $index[(string)$row['game_date']][(int)$row['visitor_teamid']][(int)$row['home_teamid']][] = (int)$row['game_of_that_day'];
+        }
+        return $index;
+    }
+
+    /**
      * @see BoxscoreRepositoryInterface::deletePlayerBoxscoresByGame()
      */
     public function deletePlayerBoxscoresByGame(string $date, int $visitor_teamid, int $home_teamid): int

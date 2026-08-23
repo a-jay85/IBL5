@@ -19,7 +19,7 @@ class BoxscoreView implements BoxscoreViewInterface
     /**
      * Render parse results log
      *
-     * @param array{success: bool, gamesInserted: int, gamesUpdated: int, gamesSkipped: int, linesProcessed: int, messages: list<string>, error?: string} $result
+     * @param array{success: bool, gamesInserted: int, gamesUpdated: int, gamesSkipped: int, linesProcessed: int, messages: list<string>, error?: string, gamesRejected?: int, rejectedGames?: list<RejectedGame>, sourceArchive?: string|null} $result
      * @return string HTML parse log
      */
     public function renderParseLog(array $result): string
@@ -35,6 +35,9 @@ class BoxscoreView implements BoxscoreViewInterface
             <span class="ibl-badge ibl-badge--success"><?= (int) $result['gamesInserted'] ?> Inserted</span>
             <span class="ibl-badge ibl-badge--info"><?= (int) $result['gamesUpdated'] ?> Updated</span>
             <span class="ibl-badge ibl-badge--warning"><?= (int) $result['gamesSkipped'] ?> Skipped</span>
+            <?php if (($result['gamesRejected'] ?? 0) > 0): ?>
+            <span class="ibl-badge ibl-badge--warning"><?= (int) $result['gamesRejected'] ?> Rejected</span>
+            <?php endif; ?>
             <span class="sco-summary__lines"><?= (int) $result['linesProcessed'] ?> lines processed</span>
         </div>
         <?php if ($result['messages'] !== []): ?>
@@ -42,6 +45,21 @@ class BoxscoreView implements BoxscoreViewInterface
             <?php foreach ($result['messages'] as $message): ?>
             <p class="sco-log__message"><?= HtmlSanitizer::safeHtmlOutput($message) ?></p>
             <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
+        <?php $rejectSummary = RejectSummary::fromRejects($result['rejectedGames'] ?? [], $result['sourceArchive'] ?? null); ?>
+        <?php if (!$rejectSummary->isEmpty()): ?>
+        <div class="ibl-alert ibl-alert--warning sco-rejects">
+          <strong>Rejected (not written):</strong>
+          <?= HtmlSanitizer::safeHtmlOutput($rejectSummary->headline()) ?>
+          <ul class="sco-rejects__list">
+            <?php foreach ($rejectSummary->triples() as $triple): ?>
+            <li class="sco-rejects__item"><?= HtmlSanitizer::safeHtmlOutput($triple) ?></li>
+            <?php endforeach; ?>
+          </ul>
+          <?php if ($rejectSummary->overflowCount() > 0): ?>
+          <p class="sco-rejects__overflow">... and <?= HtmlSanitizer::safeHtmlOutput((string) $rejectSummary->overflowCount()) ?> more.</p>
+          <?php endif; ?>
         </div>
         <?php endif; ?>
         <?php if (isset($result['error']) && $result['error'] !== ''): ?>

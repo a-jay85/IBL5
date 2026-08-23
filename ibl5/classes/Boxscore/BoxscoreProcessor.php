@@ -90,6 +90,8 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
                 'linesProcessed' => 0,
                 'messages' => $messages,
                 'error' => 'Data too short for .sco format',
+                'gamesRejected' => 0,
+                'rejectedGames' => [],
             ];
         }
 
@@ -99,6 +101,15 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
         $gamesSkipped = 0;
         $linesProcessed = 0;
         $league = $this->leagueContext !== null ? $this->leagueContext->getCurrentLeague() : 'ibl';
+
+        $gamesRejected = 0;
+        /** @var list<RejectedGame> $rejectedGames */
+        $rejectedGames = [];
+        $scheduleGuard = $this->makeScheduleGuard($operatingSeasonEndingYear);
+
+        if (!$scheduleGuard->isEnabled()) {
+            $messages[] = "Schedule guard disabled: ibl_schedule has no rows for season {$operatingSeasonEndingYear}; importing without membership validation.";
+        }
 
         $dataLength = strlen($data);
 
@@ -111,6 +122,15 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
 
             $gameInfoLine = ScoFileParser::extractGameInfo($line);
             $boxscoreGameInfo = Boxscore::withGameInfoLine($gameInfoLine, $operatingSeasonEndingYear, $operatingSeasonPhase, $league);
+
+            $rejection = $scheduleGuard->evaluate($boxscoreGameInfo);
+
+            if ($rejection !== null) {
+                $gamesRejected++;
+                $rejectedGames[] = $rejection;
+                $this->progressReporter->report($gamesInserted + $gamesUpdated + $gamesSkipped + $gamesRejected);
+                continue;
+            }
 
             $upsertAction = $this->processGameUpsert($boxscoreGameInfo);
 
@@ -130,12 +150,16 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
                 $linesProcessed += $gameLinesProcessed;
             }
 
-            $totalGames = $gamesInserted + $gamesUpdated + $gamesSkipped;
+            $totalGames = $gamesInserted + $gamesUpdated + $gamesSkipped + $gamesRejected;
             $this->progressReporter->report($totalGames);
         }
 
         $messages[] = "Number of .sco lines processed: {$linesProcessed}";
-        $messages[] = "Games inserted: {$gamesInserted} | Games updated: {$gamesUpdated} | Games skipped: {$gamesSkipped}";
+        $messages[] = "Games inserted: {$gamesInserted} | Games updated: {$gamesUpdated} | Games skipped: {$gamesSkipped} | Games rejected: {$gamesRejected}";
+
+        if ($gamesRejected > 0) {
+            $messages[] = "{$gamesRejected} game(s) rejected: not on the {$operatingSeasonEndingYear} schedule, or duplicate of an existing game at a different game_of_that_day.";
+        }
 
         if (!$skipSimDates) {
             $simDateMessages = $this->updateSimDates($operatingSeasonPhase);
@@ -149,6 +173,8 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
             'gamesSkipped' => $gamesSkipped,
             'linesProcessed' => $linesProcessed,
             'messages' => $messages,
+            'gamesRejected' => $gamesRejected,
+            'rejectedGames' => $rejectedGames,
         ];
     }
 
@@ -510,6 +536,14 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
         );
 
         return 'update';
+    }
+
+    /**
+     * Factory for the schedule-membership guard — overridable in tests.
+     */
+    protected function makeScheduleGuard(int $seasonEndingYear): ScheduleMembershipGuard
+    {
+        return ScheduleMembershipGuard::fromRepository($this->repository, $seasonEndingYear);
     }
 
     /**

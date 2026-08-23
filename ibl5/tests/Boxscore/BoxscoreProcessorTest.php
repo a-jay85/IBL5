@@ -9,6 +9,8 @@ use Boxscore\BoxscoreProcessor;
 use Boxscore\BoxscoreRepository;
 use Boxscore\Contracts\BoxscoreProcessorInterface;
 use Boxscore\Contracts\ProgressReporterInterface;
+use Boxscore\RejectedGame;
+use Boxscore\ScheduleMembershipGuard;
 use JsbParser\ScoFileParser;
 use PHPUnit\Framework\TestCase;
 use Season\Season;
@@ -19,6 +21,13 @@ use Tests\WideUnit\Mocks\MockDatabase;
  */
 class TestableBoxscoreProcessor extends BoxscoreProcessor
 {
+    public ?ScheduleMembershipGuard $guardOverride = null;
+
+    protected function makeScheduleGuard(int $seasonEndingYear): ScheduleMembershipGuard
+    {
+        return $this->guardOverride ?? parent::makeScheduleGuard($seasonEndingYear);
+    }
+
     public function exposedProcessGameUpsert(Boxscore $boxscoreGameInfo): string
     {
         return $this->processGameUpsert($boxscoreGameInfo);
@@ -693,6 +702,239 @@ class BoxscoreProcessorTest extends TestCase
         $this->assertSame(1, $result['gamesInserted']);
         $this->assertSame(0, $result['gamesSkipped']);
         $this->assertGreaterThan(0, $result['linesProcessed']);
+    }
+
+    /**
+     * The schedule-membership guard rejects games absent from ibl_schedule.
+     *
+     * The phantom-game incident (07-08_36_playoffs.zip) showed that processScoData
+     * was inserting games regardless of ibl_schedule membership. The guard added
+     * in Phase 4 flips this: an unscheduled triple is rejected and counted, but
+     * the run still returns success=true (never-abort contract).
+     *
+     * 2008-04-05 visitor=21 @ home=17 gotd=1: absent from ibl_schedule.
+     */
+    public function testProcessScoDataRejectsGameAbsentFromSchedule(): void
+    {
+        $mockDb = new MockDatabase();
+        $mockDb->setReturnTrue(true);
+        $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []);
+
+        $repository = new BoxscoreRepository($mockDb);
+        $seasonStub = self::createStub(Season::class);
+        $seasonStub->lastSimEndDate = '';
+
+        $scoFile = $this->buildScoFileWithGames([
+            $this->gameInfoLineForGame('2008-04-05', 1, 21, 17, 2008),
+        ]);
+        $data = file_get_contents($scoFile);
+        $this->assertNotFalse($data);
+
+        $processor = new TestableBoxscoreProcessor($mockDb, $repository, $seasonStub);
+        // Non-empty schedule that omits the 2008-04-05 21@17 triple
+        $processor->guardOverride = new ScheduleMembershipGuard(2008, ['2008-04-01' => [1 => [2 => true]]], []);
+        $result = $processor->processScoData($data, 2008, 'Regular Season/Playoffs', skipSimDates: true);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame(0, $result['gamesInserted']);
+        $this->assertSame(1, $result['gamesRejected']);
+        $this->assertCount(1, $result['rejectedGames']);
+        $this->assertSame(RejectedGame::REASON_NOT_IN_SCHEDULE, $result['rejectedGames'][0]->reason);
+    }
+
+    /**
+     * The whitelist in ScheduleMembershipGuard (teamids 40/41/50/51) ensures
+     * All-Star games from the main loop are still imported even with the guard active.
+     *
+     * 2008-02-03 visitor=50 @ home=51 gotd=1.
+     * The schedule index has no 50@51 entry — the exempt rule, not the fixture, is
+     * why these games pass through.
+     */
+    public function testProcessScoDataStillImportsAllStarTeamidsFromMainLoop(): void
+    {
+        $mockDb = new MockDatabase();
+        $mockDb->setReturnTrue(true);
+        $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []);
+
+        $repository = new BoxscoreRepository($mockDb);
+        $seasonStub = self::createStub(Season::class);
+        $seasonStub->lastSimEndDate = '';
+
+        $scoFile = $this->buildScoFileWithGames([
+            $this->gameInfoLineForGame('2008-02-03', 1, 50, 51, 2008),
+        ]);
+        $data = file_get_contents($scoFile);
+        $this->assertNotFalse($data);
+
+        $processor = new TestableBoxscoreProcessor($mockDb, $repository, $seasonStub);
+        // Non-empty schedule omitting 50@51 — the exempt rule, not a missing fixture, allows import
+        $processor->guardOverride = new ScheduleMembershipGuard(2008, ['2008-04-01' => [1 => [2 => true]]], []);
+        $result = $processor->processScoData($data, 2008, 'Regular Season/Playoffs', skipSimDates: true);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame(1, $result['gamesInserted']);
+        $this->assertSame(0, $result['gamesRejected']);
+    }
+
+    // --- Schedule guard tests (Phase 4) ---
+
+    /**
+     * The never-abort contract: valid and invalid games in a single run.
+     *
+     * Three records ordered: scheduled, unscheduled, scheduled.
+     * The third record proves the loop continued past the rejected second.
+     */
+    public function testProcessScoDataImportsValidGamesAndRejectsInvalidOnesInOneRun(): void
+    {
+        $mockDb = new MockDatabase();
+        $mockDb->setReturnTrue(true);
+        $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []);
+
+        $repository = new BoxscoreRepository($mockDb);
+        $seasonStub = self::createStub(Season::class);
+        $seasonStub->lastSimEndDate = '';
+
+        $scoFile = $this->buildScoFileWithGames([
+            $this->gameInfoLineForGame('2008-04-01', 1, 1, 2, 2008),  // scheduled
+            $this->gameInfoLineForGame('2008-04-05', 1, 21, 17, 2008), // NOT scheduled
+            $this->gameInfoLineForGame('2008-04-03', 1, 3, 4, 2008),   // scheduled
+        ]);
+        $data = file_get_contents($scoFile);
+        $this->assertNotFalse($data);
+
+        $processor = new TestableBoxscoreProcessor($mockDb, $repository, $seasonStub);
+        $processor->guardOverride = new ScheduleMembershipGuard(2008, [
+            '2008-04-01' => [1 => [2 => true]],
+            '2008-04-03' => [3 => [4 => true]],
+        ], []);
+        $result = $processor->processScoData($data, 2008, 'Regular Season/Playoffs', skipSimDates: true);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame(2, $result['gamesInserted']);
+        $this->assertSame(1, $result['gamesRejected']);
+        $this->assertCount(1, $result['rejectedGames']);
+        $this->assertArrayNotHasKey('error', $result);
+    }
+
+    public function testProcessScoDataRejectsDuplicateTripleAtDifferentGameOfThatDay(): void
+    {
+        $mockDb = new MockDatabase();
+        $mockDb->setReturnTrue(true);
+        $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []);
+
+        $repository = new BoxscoreRepository($mockDb);
+        $seasonStub = self::createStub(Season::class);
+        $seasonStub->lastSimEndDate = '';
+
+        // Triple is scheduled, but already stored at gotd=1; incoming game has gotd=4
+        $scoFile = $this->buildScoFileWithGames([
+            $this->gameInfoLineForGame('2008-04-01', 4, 1, 2, 2008),
+        ]);
+        $data = file_get_contents($scoFile);
+        $this->assertNotFalse($data);
+
+        $processor = new TestableBoxscoreProcessor($mockDb, $repository, $seasonStub);
+        $processor->guardOverride = new ScheduleMembershipGuard(
+            2008,
+            ['2008-04-01' => [1 => [2 => true]]],
+            ['2008-04-01' => [1 => [2 => [1]]]]  // already stored at gotd=1
+        );
+        $result = $processor->processScoData($data, 2008, 'Regular Season/Playoffs', skipSimDates: true);
+
+        $this->assertSame(1, $result['gamesRejected']);
+        $this->assertSame(RejectedGame::REASON_DUPLICATE_TRIPLE, $result['rejectedGames'][0]->reason);
+    }
+
+    /**
+     * Negative path: guard built from an empty schedule fails open.
+     *
+     * A season with no ibl_schedule rows must not have all games rejected.
+     */
+    public function testProcessScoDataFailsOpenAndWarnsWhenScheduleIsEmpty(): void
+    {
+        $mockDb = new MockDatabase();
+        $mockDb->setReturnTrue(true);
+        $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []);
+
+        $repository = new BoxscoreRepository($mockDb);
+        $seasonStub = self::createStub(Season::class);
+        $seasonStub->lastSimEndDate = '';
+
+        $scoFile = $this->buildScoFileWithGames([
+            $this->gameInfoLineForGame('2008-04-05', 1, 21, 17, 2008),
+        ]);
+        $data = file_get_contents($scoFile);
+        $this->assertNotFalse($data);
+
+        $processor = new TestableBoxscoreProcessor($mockDb, $repository, $seasonStub);
+        $processor->guardOverride = new ScheduleMembershipGuard(2008, [], []);  // empty — guard disabled
+        $result = $processor->processScoData($data, 2008, 'Regular Season/Playoffs', skipSimDates: true);
+
+        $this->assertSame(0, $result['gamesRejected']);
+        $this->assertSame(1, $result['gamesInserted']);
+
+        $found = false;
+        foreach ($result['messages'] as $message) {
+            if (preg_match('/Schedule guard disabled/i', $message) === 1) {
+                $found = true;
+                break;
+            }
+        }
+        $this->assertTrue($found, 'Expected a "Schedule guard disabled" warning message');
+    }
+
+    /**
+     * Boundary: the too-short early-return carries gamesRejected/rejectedGames keys.
+     *
+     * BoxscoreView must never dereference a missing key on the error path.
+     */
+    public function testProcessScoDataTooShortStillReturnsRejectKeys(): void
+    {
+        $mockDb = new MockDatabase();
+        $mockDb->setReturnTrue(true);
+
+        $repository = new BoxscoreRepository($mockDb);
+        $seasonStub = self::createStub(Season::class);
+        $seasonStub->lastSimEndDate = '';
+
+        $processor = new BoxscoreProcessor($mockDb, $repository, $seasonStub);
+        $result = $processor->processScoData('too short', 2026, 'Regular Season', skipSimDates: true);
+
+        $this->assertFalse($result['success']);
+        $this->assertSame(0, $result['gamesRejected']);
+        $this->assertSame([], $result['rejectedGames']);
+    }
+
+    /**
+     * A rejected game performs no SELECT, DELETE, or INSERT against ibl_box_scores.
+     */
+    public function testRejectedGameNeverTouchesTheDatabase(): void
+    {
+        $mockDb = new MockDatabase();
+        $mockDb->setReturnTrue(true);
+
+        $repository = new BoxscoreRepository($mockDb);
+        $seasonStub = self::createStub(Season::class);
+        $seasonStub->lastSimEndDate = '';
+
+        $scoFile = $this->buildScoFileWithGames([
+            $this->gameInfoLineForGame('2008-04-05', 1, 21, 17, 2008),
+        ]);
+        $data = file_get_contents($scoFile);
+        $this->assertNotFalse($data);
+
+        $processor = new TestableBoxscoreProcessor($mockDb, $repository, $seasonStub);
+        // Non-empty schedule that excludes this triple
+        $processor->guardOverride = new ScheduleMembershipGuard(2008, ['2008-04-01' => [1 => [2 => true]]], []);
+
+        $mockDb->clearQueries();
+        $processor->processScoData($data, 2008, 'Regular Season/Playoffs', skipSimDates: true);
+
+        $queries = $mockDb->getExecutedQueries();
+        $boxscoreInserts = array_filter($queries, static fn (string $q): bool => preg_match('/INSERT INTO.*ibl_box_scores/i', $q) === 1);
+        $boxscoreDeletes = array_filter($queries, static fn (string $q): bool => preg_match('/DELETE FROM.*ibl_box_scores/i', $q) === 1);
+        $this->assertCount(0, $boxscoreInserts, 'Rejected game must not INSERT to ibl_box_scores');
+        $this->assertCount(0, $boxscoreDeletes, 'Rejected game must not DELETE from ibl_box_scores');
     }
 
     // --- ProgressReporter seam tests ---

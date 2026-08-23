@@ -57,7 +57,7 @@ class JsbImportResult
     /**
      * Create a JsbImportResult from a BoxscoreProcessor::processScoFile() result array.
      *
-     * @param array{success: bool, gamesInserted: int, gamesUpdated: int, gamesSkipped: int, linesProcessed: int, messages: list<string>, error?: string} $scoResult
+     * @param array{success: bool, gamesInserted: int, gamesUpdated: int, gamesSkipped: int, linesProcessed: int, messages: list<string>, error?: string, gamesRejected?: int, rejectedGames?: list<\Boxscore\RejectedGame>} $scoResult
      */
     public static function fromScoResult(array $scoResult): self
     {

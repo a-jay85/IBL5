@@ -6,6 +6,7 @@ namespace Updater\Steps;
 
 use Boxscore\BoxscoreProcessor;
 use Boxscore\BoxscoreView;
+use Boxscore\RejectSummary;
 use Updater\Contracts\JsbSourceResolverInterface;
 use Updater\Contracts\PipelineStepInterface;
 use Updater\StepResult;
@@ -39,6 +40,28 @@ class ProcessBoxscoresStep implements PipelineStepInterface
         $scoResult = $this->processor->processScoData($data, 0, '');
         $inlineHtml = $this->view->renderParseLog($scoResult);
 
-        return StepResult::success($this->getLabel(), collapsibleLog: true, inlineHtml: $inlineHtml);
+        $rejectSummary = RejectSummary::fromRejects(
+            $scoResult['rejectedGames'] ?? [],
+            $scoResult['sourceArchive'] ?? null
+        );
+
+        $messages = $scoResult['messages'] ?? [];
+        if (!$rejectSummary->isEmpty()) {
+            $messages[] = $rejectSummary->headline();
+            foreach ($rejectSummary->triples() as $triple) {
+                $messages[] = '  rejected: ' . $triple;
+            }
+            if ($rejectSummary->overflowCount() > 0) {
+                $messages[] = sprintf('  ... and %d more.', $rejectSummary->overflowCount());
+            }
+        }
+
+        return StepResult::success(
+            $this->getLabel(),
+            collapsibleLog: true,
+            inlineHtml: $inlineHtml,
+            messages: $messages,
+            messageErrorCount: $rejectSummary->count,
+        );
     }
 }

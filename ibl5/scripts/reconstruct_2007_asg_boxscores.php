@@ -191,7 +191,7 @@ try {
 
         // Idempotency: clear any existing rows for this game key.
         $repository->deleteTeamBoxscoresByGame($g['date'], $g['visitor_teamid'], $g['home_teamid'], 1);
-        $repository->deletePlayerBoxscoresByGame($g['date'], $g['visitor_teamid'], $g['home_teamid']);
+        $repository->deletePlayerBoxscoresByGame($g['date'], $g['visitor_teamid'], $g['home_teamid'], 1);
 
         [$vq1, $vq2, $vq3, $vq4, $vot] = $g['visitor_q'];
         [$hq1, $hq2, $hq3, $hq4, $hot] = $g['home_q'];

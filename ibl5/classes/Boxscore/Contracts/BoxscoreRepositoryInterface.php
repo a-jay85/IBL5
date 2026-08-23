@@ -97,9 +97,10 @@ interface BoxscoreRepositoryInterface
      * @param string $date Game date in Y-m-d format
      * @param int $visitor_teamid Visitor team ID
      * @param int $home_teamid Home team ID
+     * @param int $game_of_that_day 1-based index of the game within its date, league-wide
      * @return int Number of affected rows
      */
-    public function deletePlayerBoxscoresByGame(string $date, int $visitor_teamid, int $home_teamid): int;
+    public function deletePlayerBoxscoresByGame(string $date, int $visitor_teamid, int $home_teamid, int $game_of_that_day): int;
 
     /**
      * Insert a team boxscore row.
@@ -122,9 +123,10 @@ interface BoxscoreRepositoryInterface
      * @param string $date Game date in Y-m-d format
      * @param int $visitor_teamid Visitor team ID
      * @param int $home_teamid Home team ID
+     * @param int $game_of_that_day 1-based index of the game within its date, league-wide
      * @return bool True if at least one player record has NULL teamid
      */
-    public function hasNullTeamIdPlayerBoxscores(string $date, int $visitor_teamid, int $home_teamid): bool;
+    public function hasNullTeamIdPlayerBoxscores(string $date, int $visitor_teamid, int $home_teamid, int $game_of_that_day): bool;
 
     /**
      * Find All-Star Game team names from existing boxscore records

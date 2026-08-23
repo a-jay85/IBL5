@@ -430,7 +430,7 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
                 $savedHomeName = $existingNames['homeName'];
 
                 $this->repository->deleteTeamBoxscoresByGame($gameDate, self::ALL_STAR_VISITOR_TID, self::ALL_STAR_HOME_TID, 1);
-                $this->repository->deletePlayerBoxscoresByGame($gameDate, self::ALL_STAR_VISITOR_TID, self::ALL_STAR_HOME_TID);
+                $this->repository->deletePlayerBoxscoresByGame($gameDate, self::ALL_STAR_VISITOR_TID, self::ALL_STAR_HOME_TID, 1);
 
                 $linesProcessed = $this->processGameLine($line, $boxscoreGameInfo, $savedAwayName, $savedHomeName);
                 if ($linesProcessed > 0) {
@@ -486,7 +486,8 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
             $hasNullTeamId = $this->repository->hasNullTeamIdPlayerBoxscores(
                 $boxscoreGameInfo->gameDate,
                 $boxscoreGameInfo->visitor_teamid,
-                $boxscoreGameInfo->home_teamid
+                $boxscoreGameInfo->home_teamid,
+                $boxscoreGameInfo->game_of_that_day
             );
 
             if (!$hasNullTeamId) {
@@ -504,7 +505,8 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
         $this->repository->deletePlayerBoxscoresByGame(
             $boxscoreGameInfo->gameDate,
             $boxscoreGameInfo->visitor_teamid,
-            $boxscoreGameInfo->home_teamid
+            $boxscoreGameInfo->home_teamid,
+            $boxscoreGameInfo->game_of_that_day
         );
 
         return 'update';

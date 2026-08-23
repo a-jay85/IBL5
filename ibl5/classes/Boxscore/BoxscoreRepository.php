@@ -144,7 +144,9 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
 
         $index = [];
         foreach ($rows as $row) {
-            $index[(string)$row['game_date']][(int)$row['visitor_teamid']][(int)$row['home_teamid']] = true;
+            $index[self::scalarToString($row['game_date'] ?? null)]
+                  [self::scalarToInt($row['visitor_teamid'] ?? null)]
+                  [self::scalarToInt($row['home_teamid'] ?? null)] = true;
         }
         return $index;
     }
@@ -162,7 +164,9 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
 
         $index = [];
         foreach ($rows as $row) {
-            $index[(string)$row['game_date']][(int)$row['visitor_teamid']][(int)$row['home_teamid']][] = (int)$row['game_of_that_day'];
+            $index[self::scalarToString($row['game_date'] ?? null)]
+                  [self::scalarToInt($row['visitor_teamid'] ?? null)]
+                  [self::scalarToInt($row['home_teamid'] ?? null)][] = self::scalarToInt($row['game_of_that_day'] ?? null);
         }
         return $index;
     }
@@ -170,32 +174,34 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
     /**
      * @see BoxscoreRepositoryInterface::deletePlayerBoxscoresByGame()
      */
-    public function deletePlayerBoxscoresByGame(string $date, int $visitor_teamid, int $home_teamid): int
+    public function deletePlayerBoxscoresByGame(string $date, int $visitor_teamid, int $home_teamid, int $game_of_that_day): int
     {
         return $this->execute(
             "DELETE FROM `ibl_box_scores`
-             WHERE game_date = ? AND visitor_teamid = ? AND home_teamid = ?",
-            "sii",
+             WHERE game_date = ? AND visitor_teamid = ? AND home_teamid = ? AND game_of_that_day = ?",
+            "siii",
             $date,
             $visitor_teamid,
-            $home_teamid
+            $home_teamid,
+            $game_of_that_day
         );
     }
 
     /**
      * @see BoxscoreRepositoryInterface::hasNullTeamIdPlayerBoxscores()
      */
-    public function hasNullTeamIdPlayerBoxscores(string $date, int $visitor_teamid, int $home_teamid): bool
+    public function hasNullTeamIdPlayerBoxscores(string $date, int $visitor_teamid, int $home_teamid, int $game_of_that_day): bool
     {
         /** @var array{cnt: int}|null $row */
         $row = $this->fetchOne(
             "SELECT COUNT(*) AS cnt FROM `ibl_box_scores`
-             WHERE game_date = ? AND visitor_teamid = ? AND home_teamid = ? AND pid <> 0 AND teamid IS NULL
+             WHERE game_date = ? AND visitor_teamid = ? AND home_teamid = ? AND game_of_that_day = ? AND pid <> 0 AND teamid IS NULL
              LIMIT 1",
-            "sii",
+            "siii",
             $date,
             $visitor_teamid,
-            $home_teamid
+            $home_teamid,
+            $game_of_that_day
         );
 
         return $row !== null && $row['cnt'] > 0;
@@ -431,5 +437,42 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
             $blocks,
             $personalFouls,
         );
+    }
+
+    /**
+     * Narrow a mixed fetchAll() column to int for use as an index key.
+     *
+     * The columns fed here are INT NOT NULL in the schema, so the fallback is
+     * defensive only; a non-numeric value yields 0, which simply never matches
+     * a real team id rather than producing a malformed key.
+     */
+    private static function scalarToInt(mixed $value): int
+    {
+        if (is_int($value)) {
+            return $value;
+        }
+        if (is_float($value)) {
+            return (int) $value;
+        }
+        if (is_string($value) && is_numeric($value)) {
+            return (int) $value;
+        }
+        return 0;
+    }
+
+    /**
+     * Narrow a mixed fetchAll() column to string for use as an index key.
+     *
+     * `game_date` is a DATE column, so the fallback is defensive only.
+     */
+    private static function scalarToString(mixed $value): string
+    {
+        if (is_string($value)) {
+            return $value;
+        }
+        if (is_int($value) || is_float($value)) {
+            return (string) $value;
+        }
+        return '';
     }
 }

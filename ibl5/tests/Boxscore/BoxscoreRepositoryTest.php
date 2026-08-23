@@ -311,4 +311,35 @@ class BoxscoreRepositoryTest extends TestCase
         $this->assertSame([], $scheduleIndex);
         $this->assertSame([], $gotdIndex);
     }
+
+    public function testDeletePlayerBoxscoresByGameBindsFourParameters(): void
+    {
+        // MockPreparedStatement substitutes bound values for ? before storing, so assert
+        // the interpolated value (7) rather than the ? placeholder — MockDB limitation.
+        // Use a distinctive gotd (7) so the assertion cannot match a coincidental literal.
+        $this->mockDb->setReturnTrue(true);
+
+        $this->repository->deletePlayerBoxscoresByGame('2025-01-01', 5, 3, 7);
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $this->assertCount(1, $queries);
+        $this->assertStringContainsString('DELETE FROM ibl_box_scores', $queries[0]);
+        $this->assertStringContainsString('game_of_that_day = 7', $queries[0]);
+    }
+
+    public function testHasNullTeamIdPlayerBoxscoresBindsFourParameters(): void
+    {
+        // Use a distinctive gotd (7) and assert both that the value is bound and that
+        // game_of_that_day appears before pid <> 0 (pinning WHERE predicate order).
+        $this->repository->hasNullTeamIdPlayerBoxscores('2025-01-01', 5, 3, 7);
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $this->assertCount(1, $queries);
+        $this->assertStringContainsString('game_of_that_day = 7', $queries[0]);
+        $gotdPos = strpos($queries[0], 'game_of_that_day = 7');
+        $pidPos  = strpos($queries[0], 'pid <> 0');
+        $this->assertNotFalse($gotdPos);
+        $this->assertNotFalse($pidPos);
+        $this->assertLessThan($pidPos, $gotdPos);
+    }
 }

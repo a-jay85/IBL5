@@ -1,0 +1,3275 @@
+# Instructions
+
+- Following Playwright test failed.
+- Explain why, be concise, respect Playwright best practices.
+- Provide a snippet of code with the fix, if possible.
+
+# Test info
+
+- Name: smoke/visual-regression.spec.ts >> Visual regression — public pages (full-page) >> team-off-def-stats-mobile
+- Location: tests/e2e/smoke/visual-regression.spec.ts:242:9
+
+# Error details
+
+```
+Error: expect(page).toHaveScreenshot(expected) failed
+
+  58871 pixels (ratio 0.03 of all image pixels) are different.
+
+  Snapshot: team-off-def-stats-mobile.png
+
+Call log:
+  - Expect "toHaveScreenshot(team-off-def-stats-mobile.png)" with timeout 10000ms
+    - verifying given screenshot expectation
+  - taking page screenshot
+    - disabled all CSS animations
+  - waiting for fonts to load...
+  - fonts loaded
+  - 58871 pixels (ratio 0.03 of all image pixels) are different.
+  - waiting 100ms before taking screenshot
+  - taking page screenshot
+    - disabled all CSS animations
+  - waiting for fonts to load...
+  - fonts loaded
+  - captured a stable screenshot
+  - 58871 pixels (ratio 0.03 of all image pixels) are different.
+
+```
+
+# Page snapshot
+
+```yaml
+- generic [active] [ref=f1e1]:
+  - navigation [ref=f1e2]:
+    - generic [ref=f1e6]:
+      - link "IBL Sim League" [ref=f1e7] [cursor=pointer]:
+        - /url: index.php
+        - generic [ref=f1e14]:
+          - generic [ref=f1e15]: IBL
+          - generic [ref=f1e16]: Sim League
+      - generic [ref=f1e17]:
+        - button "Switch to desktop view" [ref=f1e18]
+        - button "Toggle menu" [ref=f1e21]
+  - main [ref=f1e26]:
+    - generic [ref=f1e27]:
+      - heading "League-wide Statistics" [level=1] [ref=f1e28]
+      - heading "Team Offense Totals" [level=2] [ref=f1e29]
+      - region "Scrollable data table" [ref=f1e31]:
+        - table [ref=f1e32]:
+          - rowgroup [ref=f1e33]:
+            - row [ref=f1e34]:
+              - columnheader "Team" [ref=f1e35] [cursor=pointer]
+              - columnheader "Gm" [ref=f1e36] [cursor=pointer]
+              - columnheader "FGM" [ref=f1e37] [cursor=pointer]
+              - columnheader "FGA" [ref=f1e38] [cursor=pointer]
+              - columnheader "FTM" [ref=f1e39] [cursor=pointer]
+              - columnheader "FTA" [ref=f1e40] [cursor=pointer]
+              - columnheader "3GM" [ref=f1e41] [cursor=pointer]
+              - columnheader "3GA" [ref=f1e42] [cursor=pointer]
+              - columnheader "ORB" [ref=f1e43] [cursor=pointer]
+              - columnheader "REB" [ref=f1e44] [cursor=pointer]
+              - columnheader "AST" [ref=f1e45] [cursor=pointer]
+              - columnheader "STL" [ref=f1e46] [cursor=pointer]
+              - columnheader "TVR" [ref=f1e47] [cursor=pointer]
+              - columnheader "BLK" [ref=f1e48] [cursor=pointer]
+              - columnheader "PF" [ref=f1e49] [cursor=pointer]
+              - columnheader "PTS" [ref=f1e50] [cursor=pointer]
+          - rowgroup [ref=f1e51]:
+            - row [ref=f1e52]:
+              - cell [ref=f1e53]:
+                - link "Phoenixes" [ref=f1e54] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=14
+              - cell "0" [ref=f1e55]
+              - cell "0" [ref=f1e56]
+              - cell "0" [ref=f1e57]
+              - cell "0" [ref=f1e58]
+              - cell "0" [ref=f1e59]
+              - cell "0" [ref=f1e60]
+              - cell "0" [ref=f1e61]
+              - cell "0" [ref=f1e62]
+              - cell "0" [ref=f1e63]
+              - cell "0" [ref=f1e64]
+              - cell "0" [ref=f1e65]
+              - cell "0" [ref=f1e66]
+              - cell "0" [ref=f1e67]
+              - cell "0" [ref=f1e68]
+              - cell "0" [ref=f1e69]
+            - row [ref=f1e70]:
+              - cell [ref=f1e71]:
+                - link "Minutemen" [ref=f1e72] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=5
+              - cell "1" [ref=f1e73]
+              - cell "42" [ref=f1e74]
+              - cell "88" [ref=f1e75]
+              - cell "18" [ref=f1e76]
+              - cell "22" [ref=f1e77]
+              - cell "12" [ref=f1e78]
+              - cell "28" [ref=f1e79]
+              - cell "10" [ref=f1e80]
+              - cell "38" [ref=f1e81]
+              - cell "24" [ref=f1e82]
+              - cell "8" [ref=f1e83]
+              - cell "10" [ref=f1e84]
+              - cell "5" [ref=f1e85]
+              - cell "16" [ref=f1e86]
+              - cell "114" [ref=f1e87]
+            - row [ref=f1e88]:
+              - cell [ref=f1e89]:
+                - link "Royals" [ref=f1e90] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=12
+              - cell "1" [ref=f1e91]
+              - cell "38" [ref=f1e92]
+              - cell "83" [ref=f1e93]
+              - cell "20" [ref=f1e94]
+              - cell "25" [ref=f1e95]
+              - cell "10" [ref=f1e96]
+              - cell "25" [ref=f1e97]
+              - cell "9" [ref=f1e98]
+              - cell "35" [ref=f1e99]
+              - cell "22" [ref=f1e100]
+              - cell "7" [ref=f1e101]
+              - cell "12" [ref=f1e102]
+              - cell "4" [ref=f1e103]
+              - cell "17" [ref=f1e104]
+              - cell "106" [ref=f1e105]
+            - row [ref=f1e106]:
+              - cell [ref=f1e107]:
+                - link "Cougars" [ref=f1e108] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=3
+              - cell "1" [ref=f1e109]
+              - cell "34" [ref=f1e110]
+              - cell "75" [ref=f1e111]
+              - cell "16" [ref=f1e112]
+              - cell "21" [ref=f1e113]
+              - cell "7" [ref=f1e114]
+              - cell "19" [ref=f1e115]
+              - cell "8" [ref=f1e116]
+              - cell "34" [ref=f1e117]
+              - cell "20" [ref=f1e118]
+              - cell "5" [ref=f1e119]
+              - cell "14" [ref=f1e120]
+              - cell "2" [ref=f1e121]
+              - cell "19" [ref=f1e122]
+              - cell "91" [ref=f1e123]
+            - row [ref=f1e124]:
+              - cell [ref=f1e125]:
+                - link "Cavaliers" [ref=f1e126] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=22
+              - cell "0" [ref=f1e127]
+              - cell "0" [ref=f1e128]
+              - cell "0" [ref=f1e129]
+              - cell "0" [ref=f1e130]
+              - cell "0" [ref=f1e131]
+              - cell "0" [ref=f1e132]
+              - cell "0" [ref=f1e133]
+              - cell "0" [ref=f1e134]
+              - cell "0" [ref=f1e135]
+              - cell "0" [ref=f1e136]
+              - cell "0" [ref=f1e137]
+              - cell "0" [ref=f1e138]
+              - cell "0" [ref=f1e139]
+              - cell "0" [ref=f1e140]
+              - cell "0" [ref=f1e141]
+            - row [ref=f1e142]:
+              - cell [ref=f1e143]:
+                - link "Mavericks" [ref=f1e144] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=21
+              - cell "0" [ref=f1e145]
+              - cell "0" [ref=f1e146]
+              - cell "0" [ref=f1e147]
+              - cell "0" [ref=f1e148]
+              - cell "0" [ref=f1e149]
+              - cell "0" [ref=f1e150]
+              - cell "0" [ref=f1e151]
+              - cell "0" [ref=f1e152]
+              - cell "0" [ref=f1e153]
+              - cell "0" [ref=f1e154]
+              - cell "0" [ref=f1e155]
+              - cell "0" [ref=f1e156]
+              - cell "0" [ref=f1e157]
+              - cell "0" [ref=f1e158]
+              - cell "0" [ref=f1e159]
+            - row [ref=f1e160]:
+              - cell [ref=f1e161]:
+                - link "Nuggets" [ref=f1e162] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=19
+              - cell "0" [ref=f1e163]
+              - cell "0" [ref=f1e164]
+              - cell "0" [ref=f1e165]
+              - cell "0" [ref=f1e166]
+              - cell "0" [ref=f1e167]
+              - cell "0" [ref=f1e168]
+              - cell "0" [ref=f1e169]
+              - cell "0" [ref=f1e170]
+              - cell "0" [ref=f1e171]
+              - cell "0" [ref=f1e172]
+              - cell "0" [ref=f1e173]
+              - cell "0" [ref=f1e174]
+              - cell "0" [ref=f1e175]
+              - cell "0" [ref=f1e176]
+              - cell "0" [ref=f1e177]
+            - row [ref=f1e178]:
+              - cell [ref=f1e179]:
+                - link "Diesels" [ref=f1e180] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=4
+              - cell "0" [ref=f1e181]
+              - cell "0" [ref=f1e182]
+              - cell "0" [ref=f1e183]
+              - cell "0" [ref=f1e184]
+              - cell "0" [ref=f1e185]
+              - cell "0" [ref=f1e186]
+              - cell "0" [ref=f1e187]
+              - cell "0" [ref=f1e188]
+              - cell "0" [ref=f1e189]
+              - cell "0" [ref=f1e190]
+              - cell "0" [ref=f1e191]
+              - cell "0" [ref=f1e192]
+              - cell "0" [ref=f1e193]
+              - cell "0" [ref=f1e194]
+              - cell "0" [ref=f1e195]
+            - row [ref=f1e196]:
+              - cell [ref=f1e197]:
+                - link "Apollos" [ref=f1e198] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=13
+              - cell "0" [ref=f1e199]
+              - cell "0" [ref=f1e200]
+              - cell "0" [ref=f1e201]
+              - cell "0" [ref=f1e202]
+              - cell "0" [ref=f1e203]
+              - cell "0" [ref=f1e204]
+              - cell "0" [ref=f1e205]
+              - cell "0" [ref=f1e206]
+              - cell "0" [ref=f1e207]
+              - cell "0" [ref=f1e208]
+              - cell "0" [ref=f1e209]
+              - cell "0" [ref=f1e210]
+              - cell "0" [ref=f1e211]
+              - cell "0" [ref=f1e212]
+              - cell "0" [ref=f1e213]
+            - row [ref=f1e214]:
+              - cell [ref=f1e215]:
+                - link "Pacers" [ref=f1e216] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=26
+              - cell "0" [ref=f1e217]
+              - cell "0" [ref=f1e218]
+              - cell "0" [ref=f1e219]
+              - cell "0" [ref=f1e220]
+              - cell "0" [ref=f1e221]
+              - cell "0" [ref=f1e222]
+              - cell "0" [ref=f1e223]
+              - cell "0" [ref=f1e224]
+              - cell "0" [ref=f1e225]
+              - cell "0" [ref=f1e226]
+              - cell "0" [ref=f1e227]
+              - cell "0" [ref=f1e228]
+              - cell "0" [ref=f1e229]
+              - cell "0" [ref=f1e230]
+              - cell "0" [ref=f1e231]
+            - row [ref=f1e232]:
+              - cell [ref=f1e233]:
+                - link "Stars" [ref=f1e234] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=2
+              - cell "4" [ref=f1e235]
+              - cell "139" [ref=f1e236]
+              - cell "315" [ref=f1e237]
+              - cell "61" [ref=f1e238]
+              - cell "79" [ref=f1e239]
+              - cell "36" [ref=f1e240]
+              - cell "93" [ref=f1e241]
+              - cell "30" [ref=f1e242]
+              - cell "132" [ref=f1e243]
+              - cell "78" [ref=f1e244]
+              - cell "25" [ref=f1e245]
+              - cell "51" [ref=f1e246]
+              - cell "15" [ref=f1e247]
+              - cell "73" [ref=f1e248]
+              - cell "375" [ref=f1e249]
+            - row [ref=f1e250]:
+              - cell [ref=f1e251]:
+                - link "Blues" [ref=f1e252] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=15
+              - cell "0" [ref=f1e253]
+              - cell "0" [ref=f1e254]
+              - cell "0" [ref=f1e255]
+              - cell "0" [ref=f1e256]
+              - cell "0" [ref=f1e257]
+              - cell "0" [ref=f1e258]
+              - cell "0" [ref=f1e259]
+              - cell "0" [ref=f1e260]
+              - cell "0" [ref=f1e261]
+              - cell "0" [ref=f1e262]
+              - cell "0" [ref=f1e263]
+              - cell "0" [ref=f1e264]
+              - cell "0" [ref=f1e265]
+              - cell "0" [ref=f1e266]
+              - cell "0" [ref=f1e267]
+            - row [ref=f1e268]:
+              - cell [ref=f1e269]:
+                - link "Monarchs" [ref=f1e270] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=8
+              - cell "0" [ref=f1e271]
+              - cell "0" [ref=f1e272]
+              - cell "0" [ref=f1e273]
+              - cell "0" [ref=f1e274]
+              - cell "0" [ref=f1e275]
+              - cell "0" [ref=f1e276]
+              - cell "0" [ref=f1e277]
+              - cell "0" [ref=f1e278]
+              - cell "0" [ref=f1e279]
+              - cell "0" [ref=f1e280]
+              - cell "0" [ref=f1e281]
+              - cell "0" [ref=f1e282]
+              - cell "0" [ref=f1e283]
+              - cell "0" [ref=f1e284]
+              - cell "0" [ref=f1e285]
+            - row [ref=f1e286]:
+              - cell [ref=f1e287]:
+                - link "Bucks" [ref=f1e288] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=18
+              - cell "0" [ref=f1e289]
+              - cell "0" [ref=f1e290]
+              - cell "0" [ref=f1e291]
+              - cell "0" [ref=f1e292]
+              - cell "0" [ref=f1e293]
+              - cell "0" [ref=f1e294]
+              - cell "0" [ref=f1e295]
+              - cell "0" [ref=f1e296]
+              - cell "0" [ref=f1e297]
+              - cell "0" [ref=f1e298]
+              - cell "0" [ref=f1e299]
+              - cell "0" [ref=f1e300]
+              - cell "0" [ref=f1e301]
+              - cell "0" [ref=f1e302]
+              - cell "0" [ref=f1e303]
+            - row [ref=f1e304]:
+              - cell [ref=f1e305]:
+                - link "Blizzard" [ref=f1e306] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=16
+              - cell "0" [ref=f1e307]
+              - cell "0" [ref=f1e308]
+              - cell "0" [ref=f1e309]
+              - cell "0" [ref=f1e310]
+              - cell "0" [ref=f1e311]
+              - cell "0" [ref=f1e312]
+              - cell "0" [ref=f1e313]
+              - cell "0" [ref=f1e314]
+              - cell "0" [ref=f1e315]
+              - cell "0" [ref=f1e316]
+              - cell "0" [ref=f1e317]
+              - cell "0" [ref=f1e318]
+              - cell "0" [ref=f1e319]
+              - cell "0" [ref=f1e320]
+              - cell "0" [ref=f1e321]
+            - row [ref=f1e322]:
+              - cell [ref=f1e323]:
+                - link "Nets" [ref=f1e324] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=24
+              - cell "0" [ref=f1e325]
+              - cell "0" [ref=f1e326]
+              - cell "0" [ref=f1e327]
+              - cell "0" [ref=f1e328]
+              - cell "0" [ref=f1e329]
+              - cell "0" [ref=f1e330]
+              - cell "0" [ref=f1e331]
+              - cell "0" [ref=f1e332]
+              - cell "0" [ref=f1e333]
+              - cell "0" [ref=f1e334]
+              - cell "0" [ref=f1e335]
+              - cell "0" [ref=f1e336]
+              - cell "0" [ref=f1e337]
+              - cell "0" [ref=f1e338]
+              - cell "0" [ref=f1e339]
+            - row [ref=f1e340]:
+              - cell [ref=f1e341]:
+                - link "Metros" [ref=f1e342] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=1
+              - cell "5" [ref=f1e343]
+              - cell "188" [ref=f1e344]
+              - cell "396" [ref=f1e345]
+              - cell "86" [ref=f1e346]
+              - cell "107" [ref=f1e347]
+              - cell "49" [ref=f1e348]
+              - cell "120" [ref=f1e349]
+              - cell "47" [ref=f1e350]
+              - cell "185" [ref=f1e351]
+              - cell "108" [ref=f1e352]
+              - cell "37" [ref=f1e353]
+              - cell "56" [ref=f1e354]
+              - cell "23" [ref=f1e355]
+              - cell "83" [ref=f1e356]
+              - cell "511" [ref=f1e357]
+            - row [ref=f1e358]:
+              - cell [ref=f1e359]:
+                - link "Thunder" [ref=f1e360] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=28
+              - cell "0" [ref=f1e361]
+              - cell "0" [ref=f1e362]
+              - cell "0" [ref=f1e363]
+              - cell "0" [ref=f1e364]
+              - cell "0" [ref=f1e365]
+              - cell "0" [ref=f1e366]
+              - cell "0" [ref=f1e367]
+              - cell "0" [ref=f1e368]
+              - cell "0" [ref=f1e369]
+              - cell "0" [ref=f1e370]
+              - cell "0" [ref=f1e371]
+              - cell "0" [ref=f1e372]
+              - cell "0" [ref=f1e373]
+              - cell "0" [ref=f1e374]
+              - cell "0" [ref=f1e375]
+            - row [ref=f1e376]:
+              - cell [ref=f1e377]:
+                - link "Tropics" [ref=f1e378] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=7
+              - cell "0" [ref=f1e379]
+              - cell "0" [ref=f1e380]
+              - cell "0" [ref=f1e381]
+              - cell "0" [ref=f1e382]
+              - cell "0" [ref=f1e383]
+              - cell "0" [ref=f1e384]
+              - cell "0" [ref=f1e385]
+              - cell "0" [ref=f1e386]
+              - cell "0" [ref=f1e387]
+              - cell "0" [ref=f1e388]
+              - cell "0" [ref=f1e389]
+              - cell "0" [ref=f1e390]
+              - cell "0" [ref=f1e391]
+              - cell "0" [ref=f1e392]
+              - cell "0" [ref=f1e393]
+            - row [ref=f1e394]:
+              - cell [ref=f1e395]:
+                - link "Rage" [ref=f1e396] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=6
+              - cell "0" [ref=f1e397]
+              - cell "0" [ref=f1e398]
+              - cell "0" [ref=f1e399]
+              - cell "0" [ref=f1e400]
+              - cell "0" [ref=f1e401]
+              - cell "0" [ref=f1e402]
+              - cell "0" [ref=f1e403]
+              - cell "0" [ref=f1e404]
+              - cell "0" [ref=f1e405]
+              - cell "0" [ref=f1e406]
+              - cell "0" [ref=f1e407]
+              - cell "0" [ref=f1e408]
+              - cell "0" [ref=f1e409]
+              - cell "0" [ref=f1e410]
+              - cell "0" [ref=f1e411]
+            - row [ref=f1e412]:
+              - cell [ref=f1e413]:
+                - link "Flames" [ref=f1e414] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=9
+              - cell "0" [ref=f1e415]
+              - cell "0" [ref=f1e416]
+              - cell "0" [ref=f1e417]
+              - cell "0" [ref=f1e418]
+              - cell "0" [ref=f1e419]
+              - cell "0" [ref=f1e420]
+              - cell "0" [ref=f1e421]
+              - cell "0" [ref=f1e422]
+              - cell "0" [ref=f1e423]
+              - cell "0" [ref=f1e424]
+              - cell "0" [ref=f1e425]
+              - cell "0" [ref=f1e426]
+              - cell "0" [ref=f1e427]
+              - cell "0" [ref=f1e428]
+              - cell "0" [ref=f1e429]
+            - row [ref=f1e430]:
+              - cell [ref=f1e431]:
+                - link "Pioneers" [ref=f1e432] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=11
+              - cell "0" [ref=f1e433]
+              - cell "0" [ref=f1e434]
+              - cell "0" [ref=f1e435]
+              - cell "0" [ref=f1e436]
+              - cell "0" [ref=f1e437]
+              - cell "0" [ref=f1e438]
+              - cell "0" [ref=f1e439]
+              - cell "0" [ref=f1e440]
+              - cell "0" [ref=f1e441]
+              - cell "0" [ref=f1e442]
+              - cell "0" [ref=f1e443]
+              - cell "0" [ref=f1e444]
+              - cell "0" [ref=f1e445]
+              - cell "0" [ref=f1e446]
+              - cell "0" [ref=f1e447]
+            - row [ref=f1e448]:
+              - cell [ref=f1e449]:
+                - link "Pilots" [ref=f1e450] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=20
+              - cell "0" [ref=f1e451]
+              - cell "0" [ref=f1e452]
+              - cell "0" [ref=f1e453]
+              - cell "0" [ref=f1e454]
+              - cell "0" [ref=f1e455]
+              - cell "0" [ref=f1e456]
+              - cell "0" [ref=f1e457]
+              - cell "0" [ref=f1e458]
+              - cell "0" [ref=f1e459]
+              - cell "0" [ref=f1e460]
+              - cell "0" [ref=f1e461]
+              - cell "0" [ref=f1e462]
+              - cell "0" [ref=f1e463]
+              - cell "0" [ref=f1e464]
+              - cell "0" [ref=f1e465]
+            - row [ref=f1e466]:
+              - cell [ref=f1e467]:
+                - link "Spurs" [ref=f1e468] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=10
+              - cell "0" [ref=f1e469]
+              - cell "0" [ref=f1e470]
+              - cell "0" [ref=f1e471]
+              - cell "0" [ref=f1e472]
+              - cell "0" [ref=f1e473]
+              - cell "0" [ref=f1e474]
+              - cell "0" [ref=f1e475]
+              - cell "0" [ref=f1e476]
+              - cell "0" [ref=f1e477]
+              - cell "0" [ref=f1e478]
+              - cell "0" [ref=f1e479]
+              - cell "0" [ref=f1e480]
+              - cell "0" [ref=f1e481]
+              - cell "0" [ref=f1e482]
+              - cell "0" [ref=f1e483]
+            - row [ref=f1e484]:
+              - cell [ref=f1e485]:
+                - link "Supersonics" [ref=f1e486] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=23
+              - cell "0" [ref=f1e487]
+              - cell "0" [ref=f1e488]
+              - cell "0" [ref=f1e489]
+              - cell "0" [ref=f1e490]
+              - cell "0" [ref=f1e491]
+              - cell "0" [ref=f1e492]
+              - cell "0" [ref=f1e493]
+              - cell "0" [ref=f1e494]
+              - cell "0" [ref=f1e495]
+              - cell "0" [ref=f1e496]
+              - cell "0" [ref=f1e497]
+              - cell "0" [ref=f1e498]
+              - cell "0" [ref=f1e499]
+              - cell "0" [ref=f1e500]
+              - cell "0" [ref=f1e501]
+            - row [ref=f1e502]:
+              - cell [ref=f1e503]:
+                - link "Huskies" [ref=f1e504] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=17
+              - cell "0" [ref=f1e505]
+              - cell "0" [ref=f1e506]
+              - cell "0" [ref=f1e507]
+              - cell "0" [ref=f1e508]
+              - cell "0" [ref=f1e509]
+              - cell "0" [ref=f1e510]
+              - cell "0" [ref=f1e511]
+              - cell "0" [ref=f1e512]
+              - cell "0" [ref=f1e513]
+              - cell "0" [ref=f1e514]
+              - cell "0" [ref=f1e515]
+              - cell "0" [ref=f1e516]
+              - cell "0" [ref=f1e517]
+              - cell "0" [ref=f1e518]
+              - cell "0" [ref=f1e519]
+            - row [ref=f1e520]:
+              - cell [ref=f1e521]:
+                - link "Jazz" [ref=f1e522] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=27
+              - cell "0" [ref=f1e523]
+              - cell "0" [ref=f1e524]
+              - cell "0" [ref=f1e525]
+              - cell "0" [ref=f1e526]
+              - cell "0" [ref=f1e527]
+              - cell "0" [ref=f1e528]
+              - cell "0" [ref=f1e529]
+              - cell "0" [ref=f1e530]
+              - cell "0" [ref=f1e531]
+              - cell "0" [ref=f1e532]
+              - cell "0" [ref=f1e533]
+              - cell "0" [ref=f1e534]
+              - cell "0" [ref=f1e535]
+              - cell "0" [ref=f1e536]
+              - cell "0" [ref=f1e537]
+            - row [ref=f1e538]:
+              - cell [ref=f1e539]:
+                - link "Generals" [ref=f1e540] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=25
+              - cell "0" [ref=f1e541]
+              - cell "0" [ref=f1e542]
+              - cell "0" [ref=f1e543]
+              - cell "0" [ref=f1e544]
+              - cell "0" [ref=f1e545]
+              - cell "0" [ref=f1e546]
+              - cell "0" [ref=f1e547]
+              - cell "0" [ref=f1e548]
+              - cell "0" [ref=f1e549]
+              - cell "0" [ref=f1e550]
+              - cell "0" [ref=f1e551]
+              - cell "0" [ref=f1e552]
+              - cell "0" [ref=f1e553]
+              - cell "0" [ref=f1e554]
+              - cell "0" [ref=f1e555]
+          - rowgroup [ref=f1e556]:
+            - row [ref=f1e557]:
+              - cell [ref=f1e558]
+              - cell "12" [ref=f1e559]
+              - cell "441" [ref=f1e560]
+              - cell "957" [ref=f1e561]
+              - cell "201" [ref=f1e562]
+              - cell "254" [ref=f1e563]
+              - cell "114" [ref=f1e564]
+              - cell "285" [ref=f1e565]
+              - cell "104" [ref=f1e566]
+              - cell "424" [ref=f1e567]
+              - cell "252" [ref=f1e568]
+              - cell "82" [ref=f1e569]
+              - cell "143" [ref=f1e570]
+              - cell "49" [ref=f1e571]
+              - cell "208" [ref=f1e572]
+              - cell "1,197" [ref=f1e573]
+      - heading "Team Defense Totals" [level=2] [ref=f1e574]
+      - region "Scrollable data table" [ref=f1e576]:
+        - table [ref=f1e577]:
+          - rowgroup [ref=f1e578]:
+            - row [ref=f1e579]:
+              - columnheader "Team" [ref=f1e580] [cursor=pointer]
+              - columnheader "Gm" [ref=f1e581] [cursor=pointer]
+              - columnheader "FGM" [ref=f1e582] [cursor=pointer]
+              - columnheader "FGA" [ref=f1e583] [cursor=pointer]
+              - columnheader "FTM" [ref=f1e584] [cursor=pointer]
+              - columnheader "FTA" [ref=f1e585] [cursor=pointer]
+              - columnheader "3GM" [ref=f1e586] [cursor=pointer]
+              - columnheader "3GA" [ref=f1e587] [cursor=pointer]
+              - columnheader "ORB" [ref=f1e588] [cursor=pointer]
+              - columnheader "REB" [ref=f1e589] [cursor=pointer]
+              - columnheader "AST" [ref=f1e590] [cursor=pointer]
+              - columnheader "STL" [ref=f1e591] [cursor=pointer]
+              - columnheader "TVR" [ref=f1e592] [cursor=pointer]
+              - columnheader "BLK" [ref=f1e593] [cursor=pointer]
+              - columnheader "PF" [ref=f1e594] [cursor=pointer]
+              - columnheader "PTS" [ref=f1e595] [cursor=pointer]
+          - rowgroup [ref=f1e596]:
+            - row [ref=f1e597]:
+              - cell [ref=f1e598]:
+                - link "Phoenixes" [ref=f1e599] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=14
+              - cell "0" [ref=f1e600]
+              - cell "0" [ref=f1e601]
+              - cell "0" [ref=f1e602]
+              - cell "0" [ref=f1e603]
+              - cell "0" [ref=f1e604]
+              - cell "0" [ref=f1e605]
+              - cell "0" [ref=f1e606]
+              - cell "0" [ref=f1e607]
+              - cell "0" [ref=f1e608]
+              - cell "0" [ref=f1e609]
+              - cell "0" [ref=f1e610]
+              - cell "0" [ref=f1e611]
+              - cell "0" [ref=f1e612]
+              - cell "0" [ref=f1e613]
+              - cell "0" [ref=f1e614]
+            - row [ref=f1e615]:
+              - cell [ref=f1e616]:
+                - link "Minutemen" [ref=f1e617] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=5
+              - cell "0" [ref=f1e618]
+              - cell "0" [ref=f1e619]
+              - cell "0" [ref=f1e620]
+              - cell "0" [ref=f1e621]
+              - cell "0" [ref=f1e622]
+              - cell "0" [ref=f1e623]
+              - cell "0" [ref=f1e624]
+              - cell "0" [ref=f1e625]
+              - cell "0" [ref=f1e626]
+              - cell "0" [ref=f1e627]
+              - cell "0" [ref=f1e628]
+              - cell "0" [ref=f1e629]
+              - cell "0" [ref=f1e630]
+              - cell "0" [ref=f1e631]
+              - cell "0" [ref=f1e632]
+            - row [ref=f1e633]:
+              - cell [ref=f1e634]:
+                - link "Royals" [ref=f1e635] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=12
+              - cell "0" [ref=f1e636]
+              - cell "0" [ref=f1e637]
+              - cell "0" [ref=f1e638]
+              - cell "0" [ref=f1e639]
+              - cell "0" [ref=f1e640]
+              - cell "0" [ref=f1e641]
+              - cell "0" [ref=f1e642]
+              - cell "0" [ref=f1e643]
+              - cell "0" [ref=f1e644]
+              - cell "0" [ref=f1e645]
+              - cell "0" [ref=f1e646]
+              - cell "0" [ref=f1e647]
+              - cell "0" [ref=f1e648]
+              - cell "0" [ref=f1e649]
+              - cell "0" [ref=f1e650]
+            - row [ref=f1e651]:
+              - cell [ref=f1e652]:
+                - link "Cougars" [ref=f1e653] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=3
+              - cell "1" [ref=f1e654]
+              - cell "39" [ref=f1e655]
+              - cell "80" [ref=f1e656]
+              - cell "20" [ref=f1e657]
+              - cell "24" [ref=f1e658]
+              - cell "9" [ref=f1e659]
+              - cell "20" [ref=f1e660]
+              - cell "11" [ref=f1e661]
+              - cell "41" [ref=f1e662]
+              - cell "24" [ref=f1e663]
+              - cell "8" [ref=f1e664]
+              - cell "10" [ref=f1e665]
+              - cell "5" [ref=f1e666]
+              - cell "15" [ref=f1e667]
+              - cell "107" [ref=f1e668]
+            - row [ref=f1e669]:
+              - cell [ref=f1e670]:
+                - link "Cavaliers" [ref=f1e671] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=22
+              - cell "0" [ref=f1e672]
+              - cell "0" [ref=f1e673]
+              - cell "0" [ref=f1e674]
+              - cell "0" [ref=f1e675]
+              - cell "0" [ref=f1e676]
+              - cell "0" [ref=f1e677]
+              - cell "0" [ref=f1e678]
+              - cell "0" [ref=f1e679]
+              - cell "0" [ref=f1e680]
+              - cell "0" [ref=f1e681]
+              - cell "0" [ref=f1e682]
+              - cell "0" [ref=f1e683]
+              - cell "0" [ref=f1e684]
+              - cell "0" [ref=f1e685]
+              - cell "0" [ref=f1e686]
+            - row [ref=f1e687]:
+              - cell [ref=f1e688]:
+                - link "Mavericks" [ref=f1e689] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=21
+              - cell "0" [ref=f1e690]
+              - cell "0" [ref=f1e691]
+              - cell "0" [ref=f1e692]
+              - cell "0" [ref=f1e693]
+              - cell "0" [ref=f1e694]
+              - cell "0" [ref=f1e695]
+              - cell "0" [ref=f1e696]
+              - cell "0" [ref=f1e697]
+              - cell "0" [ref=f1e698]
+              - cell "0" [ref=f1e699]
+              - cell "0" [ref=f1e700]
+              - cell "0" [ref=f1e701]
+              - cell "0" [ref=f1e702]
+              - cell "0" [ref=f1e703]
+              - cell "0" [ref=f1e704]
+            - row [ref=f1e705]:
+              - cell [ref=f1e706]:
+                - link "Nuggets" [ref=f1e707] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=19
+              - cell "0" [ref=f1e708]
+              - cell "0" [ref=f1e709]
+              - cell "0" [ref=f1e710]
+              - cell "0" [ref=f1e711]
+              - cell "0" [ref=f1e712]
+              - cell "0" [ref=f1e713]
+              - cell "0" [ref=f1e714]
+              - cell "0" [ref=f1e715]
+              - cell "0" [ref=f1e716]
+              - cell "0" [ref=f1e717]
+              - cell "0" [ref=f1e718]
+              - cell "0" [ref=f1e719]
+              - cell "0" [ref=f1e720]
+              - cell "0" [ref=f1e721]
+              - cell "0" [ref=f1e722]
+            - row [ref=f1e723]:
+              - cell [ref=f1e724]:
+                - link "Diesels" [ref=f1e725] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=4
+              - cell "0" [ref=f1e726]
+              - cell "0" [ref=f1e727]
+              - cell "0" [ref=f1e728]
+              - cell "0" [ref=f1e729]
+              - cell "0" [ref=f1e730]
+              - cell "0" [ref=f1e731]
+              - cell "0" [ref=f1e732]
+              - cell "0" [ref=f1e733]
+              - cell "0" [ref=f1e734]
+              - cell "0" [ref=f1e735]
+              - cell "0" [ref=f1e736]
+              - cell "0" [ref=f1e737]
+              - cell "0" [ref=f1e738]
+              - cell "0" [ref=f1e739]
+              - cell "0" [ref=f1e740]
+            - row [ref=f1e741]:
+              - cell [ref=f1e742]:
+                - link "Apollos" [ref=f1e743] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=13
+              - cell "0" [ref=f1e744]
+              - cell "0" [ref=f1e745]
+              - cell "0" [ref=f1e746]
+              - cell "0" [ref=f1e747]
+              - cell "0" [ref=f1e748]
+              - cell "0" [ref=f1e749]
+              - cell "0" [ref=f1e750]
+              - cell "0" [ref=f1e751]
+              - cell "0" [ref=f1e752]
+              - cell "0" [ref=f1e753]
+              - cell "0" [ref=f1e754]
+              - cell "0" [ref=f1e755]
+              - cell "0" [ref=f1e756]
+              - cell "0" [ref=f1e757]
+              - cell "0" [ref=f1e758]
+            - row [ref=f1e759]:
+              - cell [ref=f1e760]:
+                - link "Pacers" [ref=f1e761] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=26
+              - cell "0" [ref=f1e762]
+              - cell "0" [ref=f1e763]
+              - cell "0" [ref=f1e764]
+              - cell "0" [ref=f1e765]
+              - cell "0" [ref=f1e766]
+              - cell "0" [ref=f1e767]
+              - cell "0" [ref=f1e768]
+              - cell "0" [ref=f1e769]
+              - cell "0" [ref=f1e770]
+              - cell "0" [ref=f1e771]
+              - cell "0" [ref=f1e772]
+              - cell "0" [ref=f1e773]
+              - cell "0" [ref=f1e774]
+              - cell "0" [ref=f1e775]
+              - cell "0" [ref=f1e776]
+            - row [ref=f1e777]:
+              - cell [ref=f1e778]:
+                - link "Stars" [ref=f1e779] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=2
+              - cell "4" [ref=f1e780]
+              - cell "149" [ref=f1e781]
+              - cell "316" [ref=f1e782]
+              - cell "66" [ref=f1e783]
+              - cell "83" [ref=f1e784]
+              - cell "40" [ref=f1e785]
+              - cell "100" [ref=f1e786]
+              - cell "36" [ref=f1e787]
+              - cell "144" [ref=f1e788]
+              - cell "84" [ref=f1e789]
+              - cell "29" [ref=f1e790]
+              - cell "46" [ref=f1e791]
+              - cell "18" [ref=f1e792]
+              - cell "68" [ref=f1e793]
+              - cell "404" [ref=f1e794]
+            - row [ref=f1e795]:
+              - cell [ref=f1e796]:
+                - link "Blues" [ref=f1e797] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=15
+              - cell "0" [ref=f1e798]
+              - cell "0" [ref=f1e799]
+              - cell "0" [ref=f1e800]
+              - cell "0" [ref=f1e801]
+              - cell "0" [ref=f1e802]
+              - cell "0" [ref=f1e803]
+              - cell "0" [ref=f1e804]
+              - cell "0" [ref=f1e805]
+              - cell "0" [ref=f1e806]
+              - cell "0" [ref=f1e807]
+              - cell "0" [ref=f1e808]
+              - cell "0" [ref=f1e809]
+              - cell "0" [ref=f1e810]
+              - cell "0" [ref=f1e811]
+              - cell "0" [ref=f1e812]
+            - row [ref=f1e813]:
+              - cell [ref=f1e814]:
+                - link "Monarchs" [ref=f1e815] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=8
+              - cell "0" [ref=f1e816]
+              - cell "0" [ref=f1e817]
+              - cell "0" [ref=f1e818]
+              - cell "0" [ref=f1e819]
+              - cell "0" [ref=f1e820]
+              - cell "0" [ref=f1e821]
+              - cell "0" [ref=f1e822]
+              - cell "0" [ref=f1e823]
+              - cell "0" [ref=f1e824]
+              - cell "0" [ref=f1e825]
+              - cell "0" [ref=f1e826]
+              - cell "0" [ref=f1e827]
+              - cell "0" [ref=f1e828]
+              - cell "0" [ref=f1e829]
+              - cell "0" [ref=f1e830]
+            - row [ref=f1e831]:
+              - cell [ref=f1e832]:
+                - link "Bucks" [ref=f1e833] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=18
+              - cell "0" [ref=f1e834]
+              - cell "0" [ref=f1e835]
+              - cell "0" [ref=f1e836]
+              - cell "0" [ref=f1e837]
+              - cell "0" [ref=f1e838]
+              - cell "0" [ref=f1e839]
+              - cell "0" [ref=f1e840]
+              - cell "0" [ref=f1e841]
+              - cell "0" [ref=f1e842]
+              - cell "0" [ref=f1e843]
+              - cell "0" [ref=f1e844]
+              - cell "0" [ref=f1e845]
+              - cell "0" [ref=f1e846]
+              - cell "0" [ref=f1e847]
+              - cell "0" [ref=f1e848]
+            - row [ref=f1e849]:
+              - cell [ref=f1e850]:
+                - link "Blizzard" [ref=f1e851] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=16
+              - cell "0" [ref=f1e852]
+              - cell "0" [ref=f1e853]
+              - cell "0" [ref=f1e854]
+              - cell "0" [ref=f1e855]
+              - cell "0" [ref=f1e856]
+              - cell "0" [ref=f1e857]
+              - cell "0" [ref=f1e858]
+              - cell "0" [ref=f1e859]
+              - cell "0" [ref=f1e860]
+              - cell "0" [ref=f1e861]
+              - cell "0" [ref=f1e862]
+              - cell "0" [ref=f1e863]
+              - cell "0" [ref=f1e864]
+              - cell "0" [ref=f1e865]
+              - cell "0" [ref=f1e866]
+            - row [ref=f1e867]:
+              - cell [ref=f1e868]:
+                - link "Nets" [ref=f1e869] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=24
+              - cell "0" [ref=f1e870]
+              - cell "0" [ref=f1e871]
+              - cell "0" [ref=f1e872]
+              - cell "0" [ref=f1e873]
+              - cell "0" [ref=f1e874]
+              - cell "0" [ref=f1e875]
+              - cell "0" [ref=f1e876]
+              - cell "0" [ref=f1e877]
+              - cell "0" [ref=f1e878]
+              - cell "0" [ref=f1e879]
+              - cell "0" [ref=f1e880]
+              - cell "0" [ref=f1e881]
+              - cell "0" [ref=f1e882]
+              - cell "0" [ref=f1e883]
+              - cell "0" [ref=f1e884]
+            - row [ref=f1e885]:
+              - cell [ref=f1e886]:
+                - link "Metros" [ref=f1e887] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=1
+              - cell "5" [ref=f1e888]
+              - cell "173" [ref=f1e889]
+              - cell "390" [ref=f1e890]
+              - cell "77" [ref=f1e891]
+              - cell "100" [ref=f1e892]
+              - cell "43" [ref=f1e893]
+              - cell "112" [ref=f1e894]
+              - cell "38" [ref=f1e895]
+              - cell "166" [ref=f1e896]
+              - cell "98" [ref=f1e897]
+              - cell "30" [ref=f1e898]
+              - cell "65" [ref=f1e899]
+              - cell "17" [ref=f1e900]
+              - cell "92" [ref=f1e901]
+              - cell "466" [ref=f1e902]
+            - row [ref=f1e903]:
+              - cell [ref=f1e904]:
+                - link "Thunder" [ref=f1e905] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=28
+              - cell "0" [ref=f1e906]
+              - cell "0" [ref=f1e907]
+              - cell "0" [ref=f1e908]
+              - cell "0" [ref=f1e909]
+              - cell "0" [ref=f1e910]
+              - cell "0" [ref=f1e911]
+              - cell "0" [ref=f1e912]
+              - cell "0" [ref=f1e913]
+              - cell "0" [ref=f1e914]
+              - cell "0" [ref=f1e915]
+              - cell "0" [ref=f1e916]
+              - cell "0" [ref=f1e917]
+              - cell "0" [ref=f1e918]
+              - cell "0" [ref=f1e919]
+              - cell "0" [ref=f1e920]
+            - row [ref=f1e921]:
+              - cell [ref=f1e922]:
+                - link "Tropics" [ref=f1e923] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=7
+              - cell "0" [ref=f1e924]
+              - cell "0" [ref=f1e925]
+              - cell "0" [ref=f1e926]
+              - cell "0" [ref=f1e927]
+              - cell "0" [ref=f1e928]
+              - cell "0" [ref=f1e929]
+              - cell "0" [ref=f1e930]
+              - cell "0" [ref=f1e931]
+              - cell "0" [ref=f1e932]
+              - cell "0" [ref=f1e933]
+              - cell "0" [ref=f1e934]
+              - cell "0" [ref=f1e935]
+              - cell "0" [ref=f1e936]
+              - cell "0" [ref=f1e937]
+              - cell "0" [ref=f1e938]
+            - row [ref=f1e939]:
+              - cell [ref=f1e940]:
+                - link "Rage" [ref=f1e941] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=6
+              - cell "0" [ref=f1e942]
+              - cell "0" [ref=f1e943]
+              - cell "0" [ref=f1e944]
+              - cell "0" [ref=f1e945]
+              - cell "0" [ref=f1e946]
+              - cell "0" [ref=f1e947]
+              - cell "0" [ref=f1e948]
+              - cell "0" [ref=f1e949]
+              - cell "0" [ref=f1e950]
+              - cell "0" [ref=f1e951]
+              - cell "0" [ref=f1e952]
+              - cell "0" [ref=f1e953]
+              - cell "0" [ref=f1e954]
+              - cell "0" [ref=f1e955]
+              - cell "0" [ref=f1e956]
+            - row [ref=f1e957]:
+              - cell [ref=f1e958]:
+                - link "Flames" [ref=f1e959] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=9
+              - cell "0" [ref=f1e960]
+              - cell "0" [ref=f1e961]
+              - cell "0" [ref=f1e962]
+              - cell "0" [ref=f1e963]
+              - cell "0" [ref=f1e964]
+              - cell "0" [ref=f1e965]
+              - cell "0" [ref=f1e966]
+              - cell "0" [ref=f1e967]
+              - cell "0" [ref=f1e968]
+              - cell "0" [ref=f1e969]
+              - cell "0" [ref=f1e970]
+              - cell "0" [ref=f1e971]
+              - cell "0" [ref=f1e972]
+              - cell "0" [ref=f1e973]
+              - cell "0" [ref=f1e974]
+            - row [ref=f1e975]:
+              - cell [ref=f1e976]:
+                - link "Pioneers" [ref=f1e977] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=11
+              - cell "0" [ref=f1e978]
+              - cell "0" [ref=f1e979]
+              - cell "0" [ref=f1e980]
+              - cell "0" [ref=f1e981]
+              - cell "0" [ref=f1e982]
+              - cell "0" [ref=f1e983]
+              - cell "0" [ref=f1e984]
+              - cell "0" [ref=f1e985]
+              - cell "0" [ref=f1e986]
+              - cell "0" [ref=f1e987]
+              - cell "0" [ref=f1e988]
+              - cell "0" [ref=f1e989]
+              - cell "0" [ref=f1e990]
+              - cell "0" [ref=f1e991]
+              - cell "0" [ref=f1e992]
+            - row [ref=f1e993]:
+              - cell [ref=f1e994]:
+                - link "Pilots" [ref=f1e995] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=20
+              - cell "0" [ref=f1e996]
+              - cell "0" [ref=f1e997]
+              - cell "0" [ref=f1e998]
+              - cell "0" [ref=f1e999]
+              - cell "0" [ref=f1e1000]
+              - cell "0" [ref=f1e1001]
+              - cell "0" [ref=f1e1002]
+              - cell "0" [ref=f1e1003]
+              - cell "0" [ref=f1e1004]
+              - cell "0" [ref=f1e1005]
+              - cell "0" [ref=f1e1006]
+              - cell "0" [ref=f1e1007]
+              - cell "0" [ref=f1e1008]
+              - cell "0" [ref=f1e1009]
+              - cell "0" [ref=f1e1010]
+            - row [ref=f1e1011]:
+              - cell [ref=f1e1012]:
+                - link "Spurs" [ref=f1e1013] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=10
+              - cell "0" [ref=f1e1014]
+              - cell "0" [ref=f1e1015]
+              - cell "0" [ref=f1e1016]
+              - cell "0" [ref=f1e1017]
+              - cell "0" [ref=f1e1018]
+              - cell "0" [ref=f1e1019]
+              - cell "0" [ref=f1e1020]
+              - cell "0" [ref=f1e1021]
+              - cell "0" [ref=f1e1022]
+              - cell "0" [ref=f1e1023]
+              - cell "0" [ref=f1e1024]
+              - cell "0" [ref=f1e1025]
+              - cell "0" [ref=f1e1026]
+              - cell "0" [ref=f1e1027]
+              - cell "0" [ref=f1e1028]
+            - row [ref=f1e1029]:
+              - cell [ref=f1e1030]:
+                - link "Supersonics" [ref=f1e1031] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=23
+              - cell "0" [ref=f1e1032]
+              - cell "0" [ref=f1e1033]
+              - cell "0" [ref=f1e1034]
+              - cell "0" [ref=f1e1035]
+              - cell "0" [ref=f1e1036]
+              - cell "0" [ref=f1e1037]
+              - cell "0" [ref=f1e1038]
+              - cell "0" [ref=f1e1039]
+              - cell "0" [ref=f1e1040]
+              - cell "0" [ref=f1e1041]
+              - cell "0" [ref=f1e1042]
+              - cell "0" [ref=f1e1043]
+              - cell "0" [ref=f1e1044]
+              - cell "0" [ref=f1e1045]
+              - cell "0" [ref=f1e1046]
+            - row [ref=f1e1047]:
+              - cell [ref=f1e1048]:
+                - link "Huskies" [ref=f1e1049] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=17
+              - cell "0" [ref=f1e1050]
+              - cell "0" [ref=f1e1051]
+              - cell "0" [ref=f1e1052]
+              - cell "0" [ref=f1e1053]
+              - cell "0" [ref=f1e1054]
+              - cell "0" [ref=f1e1055]
+              - cell "0" [ref=f1e1056]
+              - cell "0" [ref=f1e1057]
+              - cell "0" [ref=f1e1058]
+              - cell "0" [ref=f1e1059]
+              - cell "0" [ref=f1e1060]
+              - cell "0" [ref=f1e1061]
+              - cell "0" [ref=f1e1062]
+              - cell "0" [ref=f1e1063]
+              - cell "0" [ref=f1e1064]
+            - row [ref=f1e1065]:
+              - cell [ref=f1e1066]:
+                - link "Jazz" [ref=f1e1067] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=27
+              - cell "0" [ref=f1e1068]
+              - cell "0" [ref=f1e1069]
+              - cell "0" [ref=f1e1070]
+              - cell "0" [ref=f1e1071]
+              - cell "0" [ref=f1e1072]
+              - cell "0" [ref=f1e1073]
+              - cell "0" [ref=f1e1074]
+              - cell "0" [ref=f1e1075]
+              - cell "0" [ref=f1e1076]
+              - cell "0" [ref=f1e1077]
+              - cell "0" [ref=f1e1078]
+              - cell "0" [ref=f1e1079]
+              - cell "0" [ref=f1e1080]
+              - cell "0" [ref=f1e1081]
+              - cell "0" [ref=f1e1082]
+            - row [ref=f1e1083]:
+              - cell [ref=f1e1084]:
+                - link "Generals" [ref=f1e1085] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=25
+              - cell "0" [ref=f1e1086]
+              - cell "0" [ref=f1e1087]
+              - cell "0" [ref=f1e1088]
+              - cell "0" [ref=f1e1089]
+              - cell "0" [ref=f1e1090]
+              - cell "0" [ref=f1e1091]
+              - cell "0" [ref=f1e1092]
+              - cell "0" [ref=f1e1093]
+              - cell "0" [ref=f1e1094]
+              - cell "0" [ref=f1e1095]
+              - cell "0" [ref=f1e1096]
+              - cell "0" [ref=f1e1097]
+              - cell "0" [ref=f1e1098]
+              - cell "0" [ref=f1e1099]
+              - cell "0" [ref=f1e1100]
+          - rowgroup [ref=f1e1101]:
+            - row [ref=f1e1102]:
+              - cell [ref=f1e1103]
+              - cell "12" [ref=f1e1104]
+              - cell "441" [ref=f1e1105]
+              - cell "957" [ref=f1e1106]
+              - cell "201" [ref=f1e1107]
+              - cell "254" [ref=f1e1108]
+              - cell "114" [ref=f1e1109]
+              - cell "285" [ref=f1e1110]
+              - cell "104" [ref=f1e1111]
+              - cell "424" [ref=f1e1112]
+              - cell "252" [ref=f1e1113]
+              - cell "82" [ref=f1e1114]
+              - cell "143" [ref=f1e1115]
+              - cell "49" [ref=f1e1116]
+              - cell "208" [ref=f1e1117]
+              - cell "1,197" [ref=f1e1118]
+      - heading "Team Offense Averages" [level=2] [ref=f1e1119]
+      - region "Scrollable data table" [ref=f1e1121]:
+        - table [ref=f1e1122]:
+          - rowgroup [ref=f1e1123]:
+            - row [ref=f1e1124]:
+              - columnheader "Team" [ref=f1e1125] [cursor=pointer]
+              - columnheader "FGM" [ref=f1e1126] [cursor=pointer]
+              - columnheader "FGA" [ref=f1e1127] [cursor=pointer]
+              - columnheader "FGP" [ref=f1e1128] [cursor=pointer]
+              - columnheader "FTM" [ref=f1e1129] [cursor=pointer]
+              - columnheader "FTA" [ref=f1e1130] [cursor=pointer]
+              - columnheader "FTP" [ref=f1e1131] [cursor=pointer]
+              - columnheader "3GM" [ref=f1e1132] [cursor=pointer]
+              - columnheader "3GA" [ref=f1e1133] [cursor=pointer]
+              - columnheader "3GP" [ref=f1e1134] [cursor=pointer]
+              - columnheader "ORB" [ref=f1e1135] [cursor=pointer]
+              - columnheader "REB" [ref=f1e1136] [cursor=pointer]
+              - columnheader "AST" [ref=f1e1137] [cursor=pointer]
+              - columnheader "STL" [ref=f1e1138] [cursor=pointer]
+              - columnheader "TVR" [ref=f1e1139] [cursor=pointer]
+              - columnheader "BLK" [ref=f1e1140] [cursor=pointer]
+              - columnheader "PF" [ref=f1e1141] [cursor=pointer]
+              - columnheader "PTS" [ref=f1e1142] [cursor=pointer]
+          - rowgroup [ref=f1e1143]:
+            - row [ref=f1e1144]:
+              - cell [ref=f1e1145]:
+                - link "Phoenixes" [ref=f1e1146] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=14
+              - cell "0.0" [ref=f1e1147]
+              - cell "0.0" [ref=f1e1148]
+              - cell "0.000" [ref=f1e1149]
+              - cell "0.0" [ref=f1e1150]
+              - cell "0.0" [ref=f1e1151]
+              - cell "0.000" [ref=f1e1152]
+              - cell "0.0" [ref=f1e1153]
+              - cell "0.0" [ref=f1e1154]
+              - cell "0.000" [ref=f1e1155]
+              - cell "0.0" [ref=f1e1156]
+              - cell "0.0" [ref=f1e1157]
+              - cell "0.0" [ref=f1e1158]
+              - cell "0.0" [ref=f1e1159]
+              - cell "0.0" [ref=f1e1160]
+              - cell "0.0" [ref=f1e1161]
+              - cell "0.0" [ref=f1e1162]
+              - cell "0.0" [ref=f1e1163]
+            - row [ref=f1e1164]:
+              - cell [ref=f1e1165]:
+                - link "Minutemen" [ref=f1e1166] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=5
+              - cell "42.0" [ref=f1e1167]
+              - cell "88.0" [ref=f1e1168]
+              - cell "0.477" [ref=f1e1169]
+              - cell "18.0" [ref=f1e1170]
+              - cell "22.0" [ref=f1e1171]
+              - cell "0.818" [ref=f1e1172]
+              - cell "12.0" [ref=f1e1173]
+              - cell "28.0" [ref=f1e1174]
+              - cell "0.429" [ref=f1e1175]
+              - cell "10.0" [ref=f1e1176]
+              - cell "38.0" [ref=f1e1177]
+              - cell "24.0" [ref=f1e1178]
+              - cell "8.0" [ref=f1e1179]
+              - cell "10.0" [ref=f1e1180]
+              - cell "5.0" [ref=f1e1181]
+              - cell "16.0" [ref=f1e1182]
+              - cell "114.0" [ref=f1e1183]
+            - row [ref=f1e1184]:
+              - cell [ref=f1e1185]:
+                - link "Royals" [ref=f1e1186] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=12
+              - cell "38.0" [ref=f1e1187]
+              - cell "83.0" [ref=f1e1188]
+              - cell "0.458" [ref=f1e1189]
+              - cell "20.0" [ref=f1e1190]
+              - cell "25.0" [ref=f1e1191]
+              - cell "0.800" [ref=f1e1192]
+              - cell "10.0" [ref=f1e1193]
+              - cell "25.0" [ref=f1e1194]
+              - cell "0.400" [ref=f1e1195]
+              - cell "9.0" [ref=f1e1196]
+              - cell "35.0" [ref=f1e1197]
+              - cell "22.0" [ref=f1e1198]
+              - cell "7.0" [ref=f1e1199]
+              - cell "12.0" [ref=f1e1200]
+              - cell "4.0" [ref=f1e1201]
+              - cell "17.0" [ref=f1e1202]
+              - cell "106.0" [ref=f1e1203]
+            - row [ref=f1e1204]:
+              - cell [ref=f1e1205]:
+                - link "Cougars" [ref=f1e1206] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=3
+              - cell "34.0" [ref=f1e1207]
+              - cell "75.0" [ref=f1e1208]
+              - cell "0.453" [ref=f1e1209]
+              - cell "16.0" [ref=f1e1210]
+              - cell "21.0" [ref=f1e1211]
+              - cell "0.762" [ref=f1e1212]
+              - cell "7.0" [ref=f1e1213]
+              - cell "19.0" [ref=f1e1214]
+              - cell "0.368" [ref=f1e1215]
+              - cell "8.0" [ref=f1e1216]
+              - cell "34.0" [ref=f1e1217]
+              - cell "20.0" [ref=f1e1218]
+              - cell "5.0" [ref=f1e1219]
+              - cell "14.0" [ref=f1e1220]
+              - cell "2.0" [ref=f1e1221]
+              - cell "19.0" [ref=f1e1222]
+              - cell "91.0" [ref=f1e1223]
+            - row [ref=f1e1224]:
+              - cell [ref=f1e1225]:
+                - link "Cavaliers" [ref=f1e1226] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=22
+              - cell "0.0" [ref=f1e1227]
+              - cell "0.0" [ref=f1e1228]
+              - cell "0.000" [ref=f1e1229]
+              - cell "0.0" [ref=f1e1230]
+              - cell "0.0" [ref=f1e1231]
+              - cell "0.000" [ref=f1e1232]
+              - cell "0.0" [ref=f1e1233]
+              - cell "0.0" [ref=f1e1234]
+              - cell "0.000" [ref=f1e1235]
+              - cell "0.0" [ref=f1e1236]
+              - cell "0.0" [ref=f1e1237]
+              - cell "0.0" [ref=f1e1238]
+              - cell "0.0" [ref=f1e1239]
+              - cell "0.0" [ref=f1e1240]
+              - cell "0.0" [ref=f1e1241]
+              - cell "0.0" [ref=f1e1242]
+              - cell "0.0" [ref=f1e1243]
+            - row [ref=f1e1244]:
+              - cell [ref=f1e1245]:
+                - link "Mavericks" [ref=f1e1246] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=21
+              - cell "0.0" [ref=f1e1247]
+              - cell "0.0" [ref=f1e1248]
+              - cell "0.000" [ref=f1e1249]
+              - cell "0.0" [ref=f1e1250]
+              - cell "0.0" [ref=f1e1251]
+              - cell "0.000" [ref=f1e1252]
+              - cell "0.0" [ref=f1e1253]
+              - cell "0.0" [ref=f1e1254]
+              - cell "0.000" [ref=f1e1255]
+              - cell "0.0" [ref=f1e1256]
+              - cell "0.0" [ref=f1e1257]
+              - cell "0.0" [ref=f1e1258]
+              - cell "0.0" [ref=f1e1259]
+              - cell "0.0" [ref=f1e1260]
+              - cell "0.0" [ref=f1e1261]
+              - cell "0.0" [ref=f1e1262]
+              - cell "0.0" [ref=f1e1263]
+            - row [ref=f1e1264]:
+              - cell [ref=f1e1265]:
+                - link "Nuggets" [ref=f1e1266] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=19
+              - cell "0.0" [ref=f1e1267]
+              - cell "0.0" [ref=f1e1268]
+              - cell "0.000" [ref=f1e1269]
+              - cell "0.0" [ref=f1e1270]
+              - cell "0.0" [ref=f1e1271]
+              - cell "0.000" [ref=f1e1272]
+              - cell "0.0" [ref=f1e1273]
+              - cell "0.0" [ref=f1e1274]
+              - cell "0.000" [ref=f1e1275]
+              - cell "0.0" [ref=f1e1276]
+              - cell "0.0" [ref=f1e1277]
+              - cell "0.0" [ref=f1e1278]
+              - cell "0.0" [ref=f1e1279]
+              - cell "0.0" [ref=f1e1280]
+              - cell "0.0" [ref=f1e1281]
+              - cell "0.0" [ref=f1e1282]
+              - cell "0.0" [ref=f1e1283]
+            - row [ref=f1e1284]:
+              - cell [ref=f1e1285]:
+                - link "Diesels" [ref=f1e1286] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=4
+              - cell "0.0" [ref=f1e1287]
+              - cell "0.0" [ref=f1e1288]
+              - cell "0.000" [ref=f1e1289]
+              - cell "0.0" [ref=f1e1290]
+              - cell "0.0" [ref=f1e1291]
+              - cell "0.000" [ref=f1e1292]
+              - cell "0.0" [ref=f1e1293]
+              - cell "0.0" [ref=f1e1294]
+              - cell "0.000" [ref=f1e1295]
+              - cell "0.0" [ref=f1e1296]
+              - cell "0.0" [ref=f1e1297]
+              - cell "0.0" [ref=f1e1298]
+              - cell "0.0" [ref=f1e1299]
+              - cell "0.0" [ref=f1e1300]
+              - cell "0.0" [ref=f1e1301]
+              - cell "0.0" [ref=f1e1302]
+              - cell "0.0" [ref=f1e1303]
+            - row [ref=f1e1304]:
+              - cell [ref=f1e1305]:
+                - link "Apollos" [ref=f1e1306] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=13
+              - cell "0.0" [ref=f1e1307]
+              - cell "0.0" [ref=f1e1308]
+              - cell "0.000" [ref=f1e1309]
+              - cell "0.0" [ref=f1e1310]
+              - cell "0.0" [ref=f1e1311]
+              - cell "0.000" [ref=f1e1312]
+              - cell "0.0" [ref=f1e1313]
+              - cell "0.0" [ref=f1e1314]
+              - cell "0.000" [ref=f1e1315]
+              - cell "0.0" [ref=f1e1316]
+              - cell "0.0" [ref=f1e1317]
+              - cell "0.0" [ref=f1e1318]
+              - cell "0.0" [ref=f1e1319]
+              - cell "0.0" [ref=f1e1320]
+              - cell "0.0" [ref=f1e1321]
+              - cell "0.0" [ref=f1e1322]
+              - cell "0.0" [ref=f1e1323]
+            - row [ref=f1e1324]:
+              - cell [ref=f1e1325]:
+                - link "Pacers" [ref=f1e1326] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=26
+              - cell "0.0" [ref=f1e1327]
+              - cell "0.0" [ref=f1e1328]
+              - cell "0.000" [ref=f1e1329]
+              - cell "0.0" [ref=f1e1330]
+              - cell "0.0" [ref=f1e1331]
+              - cell "0.000" [ref=f1e1332]
+              - cell "0.0" [ref=f1e1333]
+              - cell "0.0" [ref=f1e1334]
+              - cell "0.000" [ref=f1e1335]
+              - cell "0.0" [ref=f1e1336]
+              - cell "0.0" [ref=f1e1337]
+              - cell "0.0" [ref=f1e1338]
+              - cell "0.0" [ref=f1e1339]
+              - cell "0.0" [ref=f1e1340]
+              - cell "0.0" [ref=f1e1341]
+              - cell "0.0" [ref=f1e1342]
+              - cell "0.0" [ref=f1e1343]
+            - row [ref=f1e1344]:
+              - cell [ref=f1e1345]:
+                - link "Stars" [ref=f1e1346] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=2
+              - cell "34.8" [ref=f1e1347]
+              - cell "78.8" [ref=f1e1348]
+              - cell "0.441" [ref=f1e1349]
+              - cell "15.3" [ref=f1e1350]
+              - cell "19.8" [ref=f1e1351]
+              - cell "0.772" [ref=f1e1352]
+              - cell "9.0" [ref=f1e1353]
+              - cell "23.3" [ref=f1e1354]
+              - cell "0.387" [ref=f1e1355]
+              - cell "7.5" [ref=f1e1356]
+              - cell "33.0" [ref=f1e1357]
+              - cell "19.5" [ref=f1e1358]
+              - cell "6.3" [ref=f1e1359]
+              - cell "12.8" [ref=f1e1360]
+              - cell "3.8" [ref=f1e1361]
+              - cell "18.3" [ref=f1e1362]
+              - cell "93.8" [ref=f1e1363]
+            - row [ref=f1e1364]:
+              - cell [ref=f1e1365]:
+                - link "Blues" [ref=f1e1366] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=15
+              - cell "0.0" [ref=f1e1367]
+              - cell "0.0" [ref=f1e1368]
+              - cell "0.000" [ref=f1e1369]
+              - cell "0.0" [ref=f1e1370]
+              - cell "0.0" [ref=f1e1371]
+              - cell "0.000" [ref=f1e1372]
+              - cell "0.0" [ref=f1e1373]
+              - cell "0.0" [ref=f1e1374]
+              - cell "0.000" [ref=f1e1375]
+              - cell "0.0" [ref=f1e1376]
+              - cell "0.0" [ref=f1e1377]
+              - cell "0.0" [ref=f1e1378]
+              - cell "0.0" [ref=f1e1379]
+              - cell "0.0" [ref=f1e1380]
+              - cell "0.0" [ref=f1e1381]
+              - cell "0.0" [ref=f1e1382]
+              - cell "0.0" [ref=f1e1383]
+            - row [ref=f1e1384]:
+              - cell [ref=f1e1385]:
+                - link "Monarchs" [ref=f1e1386] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=8
+              - cell "0.0" [ref=f1e1387]
+              - cell "0.0" [ref=f1e1388]
+              - cell "0.000" [ref=f1e1389]
+              - cell "0.0" [ref=f1e1390]
+              - cell "0.0" [ref=f1e1391]
+              - cell "0.000" [ref=f1e1392]
+              - cell "0.0" [ref=f1e1393]
+              - cell "0.0" [ref=f1e1394]
+              - cell "0.000" [ref=f1e1395]
+              - cell "0.0" [ref=f1e1396]
+              - cell "0.0" [ref=f1e1397]
+              - cell "0.0" [ref=f1e1398]
+              - cell "0.0" [ref=f1e1399]
+              - cell "0.0" [ref=f1e1400]
+              - cell "0.0" [ref=f1e1401]
+              - cell "0.0" [ref=f1e1402]
+              - cell "0.0" [ref=f1e1403]
+            - row [ref=f1e1404]:
+              - cell [ref=f1e1405]:
+                - link "Bucks" [ref=f1e1406] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=18
+              - cell "0.0" [ref=f1e1407]
+              - cell "0.0" [ref=f1e1408]
+              - cell "0.000" [ref=f1e1409]
+              - cell "0.0" [ref=f1e1410]
+              - cell "0.0" [ref=f1e1411]
+              - cell "0.000" [ref=f1e1412]
+              - cell "0.0" [ref=f1e1413]
+              - cell "0.0" [ref=f1e1414]
+              - cell "0.000" [ref=f1e1415]
+              - cell "0.0" [ref=f1e1416]
+              - cell "0.0" [ref=f1e1417]
+              - cell "0.0" [ref=f1e1418]
+              - cell "0.0" [ref=f1e1419]
+              - cell "0.0" [ref=f1e1420]
+              - cell "0.0" [ref=f1e1421]
+              - cell "0.0" [ref=f1e1422]
+              - cell "0.0" [ref=f1e1423]
+            - row [ref=f1e1424]:
+              - cell [ref=f1e1425]:
+                - link "Blizzard" [ref=f1e1426] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=16
+              - cell "0.0" [ref=f1e1427]
+              - cell "0.0" [ref=f1e1428]
+              - cell "0.000" [ref=f1e1429]
+              - cell "0.0" [ref=f1e1430]
+              - cell "0.0" [ref=f1e1431]
+              - cell "0.000" [ref=f1e1432]
+              - cell "0.0" [ref=f1e1433]
+              - cell "0.0" [ref=f1e1434]
+              - cell "0.000" [ref=f1e1435]
+              - cell "0.0" [ref=f1e1436]
+              - cell "0.0" [ref=f1e1437]
+              - cell "0.0" [ref=f1e1438]
+              - cell "0.0" [ref=f1e1439]
+              - cell "0.0" [ref=f1e1440]
+              - cell "0.0" [ref=f1e1441]
+              - cell "0.0" [ref=f1e1442]
+              - cell "0.0" [ref=f1e1443]
+            - row [ref=f1e1444]:
+              - cell [ref=f1e1445]:
+                - link "Nets" [ref=f1e1446] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=24
+              - cell "0.0" [ref=f1e1447]
+              - cell "0.0" [ref=f1e1448]
+              - cell "0.000" [ref=f1e1449]
+              - cell "0.0" [ref=f1e1450]
+              - cell "0.0" [ref=f1e1451]
+              - cell "0.000" [ref=f1e1452]
+              - cell "0.0" [ref=f1e1453]
+              - cell "0.0" [ref=f1e1454]
+              - cell "0.000" [ref=f1e1455]
+              - cell "0.0" [ref=f1e1456]
+              - cell "0.0" [ref=f1e1457]
+              - cell "0.0" [ref=f1e1458]
+              - cell "0.0" [ref=f1e1459]
+              - cell "0.0" [ref=f1e1460]
+              - cell "0.0" [ref=f1e1461]
+              - cell "0.0" [ref=f1e1462]
+              - cell "0.0" [ref=f1e1463]
+            - row [ref=f1e1464]:
+              - cell [ref=f1e1465]:
+                - link "Metros" [ref=f1e1466] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=1
+              - cell "37.6" [ref=f1e1467]
+              - cell "79.2" [ref=f1e1468]
+              - cell "0.475" [ref=f1e1469]
+              - cell "17.2" [ref=f1e1470]
+              - cell "21.4" [ref=f1e1471]
+              - cell "0.804" [ref=f1e1472]
+              - cell "9.8" [ref=f1e1473]
+              - cell "24.0" [ref=f1e1474]
+              - cell "0.408" [ref=f1e1475]
+              - cell "9.4" [ref=f1e1476]
+              - cell "37.0" [ref=f1e1477]
+              - cell "21.6" [ref=f1e1478]
+              - cell "7.4" [ref=f1e1479]
+              - cell "11.2" [ref=f1e1480]
+              - cell "4.6" [ref=f1e1481]
+              - cell "16.6" [ref=f1e1482]
+              - cell "102.2" [ref=f1e1483]
+            - row [ref=f1e1484]:
+              - cell [ref=f1e1485]:
+                - link "Thunder" [ref=f1e1486] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=28
+              - cell "0.0" [ref=f1e1487]
+              - cell "0.0" [ref=f1e1488]
+              - cell "0.000" [ref=f1e1489]
+              - cell "0.0" [ref=f1e1490]
+              - cell "0.0" [ref=f1e1491]
+              - cell "0.000" [ref=f1e1492]
+              - cell "0.0" [ref=f1e1493]
+              - cell "0.0" [ref=f1e1494]
+              - cell "0.000" [ref=f1e1495]
+              - cell "0.0" [ref=f1e1496]
+              - cell "0.0" [ref=f1e1497]
+              - cell "0.0" [ref=f1e1498]
+              - cell "0.0" [ref=f1e1499]
+              - cell "0.0" [ref=f1e1500]
+              - cell "0.0" [ref=f1e1501]
+              - cell "0.0" [ref=f1e1502]
+              - cell "0.0" [ref=f1e1503]
+            - row [ref=f1e1504]:
+              - cell [ref=f1e1505]:
+                - link "Tropics" [ref=f1e1506] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=7
+              - cell "0.0" [ref=f1e1507]
+              - cell "0.0" [ref=f1e1508]
+              - cell "0.000" [ref=f1e1509]
+              - cell "0.0" [ref=f1e1510]
+              - cell "0.0" [ref=f1e1511]
+              - cell "0.000" [ref=f1e1512]
+              - cell "0.0" [ref=f1e1513]
+              - cell "0.0" [ref=f1e1514]
+              - cell "0.000" [ref=f1e1515]
+              - cell "0.0" [ref=f1e1516]
+              - cell "0.0" [ref=f1e1517]
+              - cell "0.0" [ref=f1e1518]
+              - cell "0.0" [ref=f1e1519]
+              - cell "0.0" [ref=f1e1520]
+              - cell "0.0" [ref=f1e1521]
+              - cell "0.0" [ref=f1e1522]
+              - cell "0.0" [ref=f1e1523]
+            - row [ref=f1e1524]:
+              - cell [ref=f1e1525]:
+                - link "Rage" [ref=f1e1526] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=6
+              - cell "0.0" [ref=f1e1527]
+              - cell "0.0" [ref=f1e1528]
+              - cell "0.000" [ref=f1e1529]
+              - cell "0.0" [ref=f1e1530]
+              - cell "0.0" [ref=f1e1531]
+              - cell "0.000" [ref=f1e1532]
+              - cell "0.0" [ref=f1e1533]
+              - cell "0.0" [ref=f1e1534]
+              - cell "0.000" [ref=f1e1535]
+              - cell "0.0" [ref=f1e1536]
+              - cell "0.0" [ref=f1e1537]
+              - cell "0.0" [ref=f1e1538]
+              - cell "0.0" [ref=f1e1539]
+              - cell "0.0" [ref=f1e1540]
+              - cell "0.0" [ref=f1e1541]
+              - cell "0.0" [ref=f1e1542]
+              - cell "0.0" [ref=f1e1543]
+            - row [ref=f1e1544]:
+              - cell [ref=f1e1545]:
+                - link "Flames" [ref=f1e1546] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=9
+              - cell "0.0" [ref=f1e1547]
+              - cell "0.0" [ref=f1e1548]
+              - cell "0.000" [ref=f1e1549]
+              - cell "0.0" [ref=f1e1550]
+              - cell "0.0" [ref=f1e1551]
+              - cell "0.000" [ref=f1e1552]
+              - cell "0.0" [ref=f1e1553]
+              - cell "0.0" [ref=f1e1554]
+              - cell "0.000" [ref=f1e1555]
+              - cell "0.0" [ref=f1e1556]
+              - cell "0.0" [ref=f1e1557]
+              - cell "0.0" [ref=f1e1558]
+              - cell "0.0" [ref=f1e1559]
+              - cell "0.0" [ref=f1e1560]
+              - cell "0.0" [ref=f1e1561]
+              - cell "0.0" [ref=f1e1562]
+              - cell "0.0" [ref=f1e1563]
+            - row [ref=f1e1564]:
+              - cell [ref=f1e1565]:
+                - link "Pioneers" [ref=f1e1566] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=11
+              - cell "0.0" [ref=f1e1567]
+              - cell "0.0" [ref=f1e1568]
+              - cell "0.000" [ref=f1e1569]
+              - cell "0.0" [ref=f1e1570]
+              - cell "0.0" [ref=f1e1571]
+              - cell "0.000" [ref=f1e1572]
+              - cell "0.0" [ref=f1e1573]
+              - cell "0.0" [ref=f1e1574]
+              - cell "0.000" [ref=f1e1575]
+              - cell "0.0" [ref=f1e1576]
+              - cell "0.0" [ref=f1e1577]
+              - cell "0.0" [ref=f1e1578]
+              - cell "0.0" [ref=f1e1579]
+              - cell "0.0" [ref=f1e1580]
+              - cell "0.0" [ref=f1e1581]
+              - cell "0.0" [ref=f1e1582]
+              - cell "0.0" [ref=f1e1583]
+            - row [ref=f1e1584]:
+              - cell [ref=f1e1585]:
+                - link "Pilots" [ref=f1e1586] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=20
+              - cell "0.0" [ref=f1e1587]
+              - cell "0.0" [ref=f1e1588]
+              - cell "0.000" [ref=f1e1589]
+              - cell "0.0" [ref=f1e1590]
+              - cell "0.0" [ref=f1e1591]
+              - cell "0.000" [ref=f1e1592]
+              - cell "0.0" [ref=f1e1593]
+              - cell "0.0" [ref=f1e1594]
+              - cell "0.000" [ref=f1e1595]
+              - cell "0.0" [ref=f1e1596]
+              - cell "0.0" [ref=f1e1597]
+              - cell "0.0" [ref=f1e1598]
+              - cell "0.0" [ref=f1e1599]
+              - cell "0.0" [ref=f1e1600]
+              - cell "0.0" [ref=f1e1601]
+              - cell "0.0" [ref=f1e1602]
+              - cell "0.0" [ref=f1e1603]
+            - row [ref=f1e1604]:
+              - cell [ref=f1e1605]:
+                - link "Spurs" [ref=f1e1606] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=10
+              - cell "0.0" [ref=f1e1607]
+              - cell "0.0" [ref=f1e1608]
+              - cell "0.000" [ref=f1e1609]
+              - cell "0.0" [ref=f1e1610]
+              - cell "0.0" [ref=f1e1611]
+              - cell "0.000" [ref=f1e1612]
+              - cell "0.0" [ref=f1e1613]
+              - cell "0.0" [ref=f1e1614]
+              - cell "0.000" [ref=f1e1615]
+              - cell "0.0" [ref=f1e1616]
+              - cell "0.0" [ref=f1e1617]
+              - cell "0.0" [ref=f1e1618]
+              - cell "0.0" [ref=f1e1619]
+              - cell "0.0" [ref=f1e1620]
+              - cell "0.0" [ref=f1e1621]
+              - cell "0.0" [ref=f1e1622]
+              - cell "0.0" [ref=f1e1623]
+            - row [ref=f1e1624]:
+              - cell [ref=f1e1625]:
+                - link "Supersonics" [ref=f1e1626] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=23
+              - cell "0.0" [ref=f1e1627]
+              - cell "0.0" [ref=f1e1628]
+              - cell "0.000" [ref=f1e1629]
+              - cell "0.0" [ref=f1e1630]
+              - cell "0.0" [ref=f1e1631]
+              - cell "0.000" [ref=f1e1632]
+              - cell "0.0" [ref=f1e1633]
+              - cell "0.0" [ref=f1e1634]
+              - cell "0.000" [ref=f1e1635]
+              - cell "0.0" [ref=f1e1636]
+              - cell "0.0" [ref=f1e1637]
+              - cell "0.0" [ref=f1e1638]
+              - cell "0.0" [ref=f1e1639]
+              - cell "0.0" [ref=f1e1640]
+              - cell "0.0" [ref=f1e1641]
+              - cell "0.0" [ref=f1e1642]
+              - cell "0.0" [ref=f1e1643]
+            - row [ref=f1e1644]:
+              - cell [ref=f1e1645]:
+                - link "Huskies" [ref=f1e1646] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=17
+              - cell "0.0" [ref=f1e1647]
+              - cell "0.0" [ref=f1e1648]
+              - cell "0.000" [ref=f1e1649]
+              - cell "0.0" [ref=f1e1650]
+              - cell "0.0" [ref=f1e1651]
+              - cell "0.000" [ref=f1e1652]
+              - cell "0.0" [ref=f1e1653]
+              - cell "0.0" [ref=f1e1654]
+              - cell "0.000" [ref=f1e1655]
+              - cell "0.0" [ref=f1e1656]
+              - cell "0.0" [ref=f1e1657]
+              - cell "0.0" [ref=f1e1658]
+              - cell "0.0" [ref=f1e1659]
+              - cell "0.0" [ref=f1e1660]
+              - cell "0.0" [ref=f1e1661]
+              - cell "0.0" [ref=f1e1662]
+              - cell "0.0" [ref=f1e1663]
+            - row [ref=f1e1664]:
+              - cell [ref=f1e1665]:
+                - link "Jazz" [ref=f1e1666] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=27
+              - cell "0.0" [ref=f1e1667]
+              - cell "0.0" [ref=f1e1668]
+              - cell "0.000" [ref=f1e1669]
+              - cell "0.0" [ref=f1e1670]
+              - cell "0.0" [ref=f1e1671]
+              - cell "0.000" [ref=f1e1672]
+              - cell "0.0" [ref=f1e1673]
+              - cell "0.0" [ref=f1e1674]
+              - cell "0.000" [ref=f1e1675]
+              - cell "0.0" [ref=f1e1676]
+              - cell "0.0" [ref=f1e1677]
+              - cell "0.0" [ref=f1e1678]
+              - cell "0.0" [ref=f1e1679]
+              - cell "0.0" [ref=f1e1680]
+              - cell "0.0" [ref=f1e1681]
+              - cell "0.0" [ref=f1e1682]
+              - cell "0.0" [ref=f1e1683]
+            - row [ref=f1e1684]:
+              - cell [ref=f1e1685]:
+                - link "Generals" [ref=f1e1686] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=25
+              - cell "0.0" [ref=f1e1687]
+              - cell "0.0" [ref=f1e1688]
+              - cell "0.000" [ref=f1e1689]
+              - cell "0.0" [ref=f1e1690]
+              - cell "0.0" [ref=f1e1691]
+              - cell "0.000" [ref=f1e1692]
+              - cell "0.0" [ref=f1e1693]
+              - cell "0.0" [ref=f1e1694]
+              - cell "0.000" [ref=f1e1695]
+              - cell "0.0" [ref=f1e1696]
+              - cell "0.0" [ref=f1e1697]
+              - cell "0.0" [ref=f1e1698]
+              - cell "0.0" [ref=f1e1699]
+              - cell "0.0" [ref=f1e1700]
+              - cell "0.0" [ref=f1e1701]
+              - cell "0.0" [ref=f1e1702]
+              - cell "0.0" [ref=f1e1703]
+          - rowgroup [ref=f1e1704]:
+            - row [ref=f1e1705]:
+              - cell [ref=f1e1706]
+              - cell "36.8" [ref=f1e1707]
+              - cell "79.8" [ref=f1e1708]
+              - cell "0.461" [ref=f1e1709]
+              - cell "16.8" [ref=f1e1710]
+              - cell "21.2" [ref=f1e1711]
+              - cell "0.791" [ref=f1e1712]
+              - cell "9.5" [ref=f1e1713]
+              - cell "23.8" [ref=f1e1714]
+              - cell "0.400" [ref=f1e1715]
+              - cell "8.7" [ref=f1e1716]
+              - cell "35.3" [ref=f1e1717]
+              - cell "21.0" [ref=f1e1718]
+              - cell "6.8" [ref=f1e1719]
+              - cell "11.9" [ref=f1e1720]
+              - cell "4.1" [ref=f1e1721]
+              - cell "17.3" [ref=f1e1722]
+              - cell "99.8" [ref=f1e1723]
+      - heading "Team Defense Averages" [level=2] [ref=f1e1724]
+      - region "Scrollable data table" [ref=f1e1726]:
+        - table [ref=f1e1727]:
+          - rowgroup [ref=f1e1728]:
+            - row [ref=f1e1729]:
+              - columnheader "Team" [ref=f1e1730] [cursor=pointer]
+              - columnheader "FGM" [ref=f1e1731] [cursor=pointer]
+              - columnheader "FGA" [ref=f1e1732] [cursor=pointer]
+              - columnheader "FGP" [ref=f1e1733] [cursor=pointer]
+              - columnheader "FTM" [ref=f1e1734] [cursor=pointer]
+              - columnheader "FTA" [ref=f1e1735] [cursor=pointer]
+              - columnheader "FTP" [ref=f1e1736] [cursor=pointer]
+              - columnheader "3GM" [ref=f1e1737] [cursor=pointer]
+              - columnheader "3GA" [ref=f1e1738] [cursor=pointer]
+              - columnheader "3GP" [ref=f1e1739] [cursor=pointer]
+              - columnheader "ORB" [ref=f1e1740] [cursor=pointer]
+              - columnheader "REB" [ref=f1e1741] [cursor=pointer]
+              - columnheader "AST" [ref=f1e1742] [cursor=pointer]
+              - columnheader "STL" [ref=f1e1743] [cursor=pointer]
+              - columnheader "TVR" [ref=f1e1744] [cursor=pointer]
+              - columnheader "BLK" [ref=f1e1745] [cursor=pointer]
+              - columnheader "PF" [ref=f1e1746] [cursor=pointer]
+              - columnheader "PTS" [ref=f1e1747] [cursor=pointer]
+          - rowgroup [ref=f1e1748]:
+            - row [ref=f1e1749]:
+              - cell [ref=f1e1750]:
+                - link "Phoenixes" [ref=f1e1751] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=14
+              - cell "0.0" [ref=f1e1752]
+              - cell "0.0" [ref=f1e1753]
+              - cell "0.000" [ref=f1e1754]
+              - cell "0.0" [ref=f1e1755]
+              - cell "0.0" [ref=f1e1756]
+              - cell "0.000" [ref=f1e1757]
+              - cell "0.0" [ref=f1e1758]
+              - cell "0.0" [ref=f1e1759]
+              - cell "0.000" [ref=f1e1760]
+              - cell "0.0" [ref=f1e1761]
+              - cell "0.0" [ref=f1e1762]
+              - cell "0.0" [ref=f1e1763]
+              - cell "0.0" [ref=f1e1764]
+              - cell "0.0" [ref=f1e1765]
+              - cell "0.0" [ref=f1e1766]
+              - cell "0.0" [ref=f1e1767]
+              - cell "0.0" [ref=f1e1768]
+            - row [ref=f1e1769]:
+              - cell [ref=f1e1770]:
+                - link "Minutemen" [ref=f1e1771] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=5
+              - cell "0.0" [ref=f1e1772]
+              - cell "0.0" [ref=f1e1773]
+              - cell "0.000" [ref=f1e1774]
+              - cell "0.0" [ref=f1e1775]
+              - cell "0.0" [ref=f1e1776]
+              - cell "0.000" [ref=f1e1777]
+              - cell "0.0" [ref=f1e1778]
+              - cell "0.0" [ref=f1e1779]
+              - cell "0.000" [ref=f1e1780]
+              - cell "0.0" [ref=f1e1781]
+              - cell "0.0" [ref=f1e1782]
+              - cell "0.0" [ref=f1e1783]
+              - cell "0.0" [ref=f1e1784]
+              - cell "0.0" [ref=f1e1785]
+              - cell "0.0" [ref=f1e1786]
+              - cell "0.0" [ref=f1e1787]
+              - cell "0.0" [ref=f1e1788]
+            - row [ref=f1e1789]:
+              - cell [ref=f1e1790]:
+                - link "Royals" [ref=f1e1791] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=12
+              - cell "0.0" [ref=f1e1792]
+              - cell "0.0" [ref=f1e1793]
+              - cell "0.000" [ref=f1e1794]
+              - cell "0.0" [ref=f1e1795]
+              - cell "0.0" [ref=f1e1796]
+              - cell "0.000" [ref=f1e1797]
+              - cell "0.0" [ref=f1e1798]
+              - cell "0.0" [ref=f1e1799]
+              - cell "0.000" [ref=f1e1800]
+              - cell "0.0" [ref=f1e1801]
+              - cell "0.0" [ref=f1e1802]
+              - cell "0.0" [ref=f1e1803]
+              - cell "0.0" [ref=f1e1804]
+              - cell "0.0" [ref=f1e1805]
+              - cell "0.0" [ref=f1e1806]
+              - cell "0.0" [ref=f1e1807]
+              - cell "0.0" [ref=f1e1808]
+            - row [ref=f1e1809]:
+              - cell [ref=f1e1810]:
+                - link "Cougars" [ref=f1e1811] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=3
+              - cell "39.0" [ref=f1e1812]
+              - cell "80.0" [ref=f1e1813]
+              - cell "0.488" [ref=f1e1814]
+              - cell "20.0" [ref=f1e1815]
+              - cell "24.0" [ref=f1e1816]
+              - cell "0.833" [ref=f1e1817]
+              - cell "9.0" [ref=f1e1818]
+              - cell "20.0" [ref=f1e1819]
+              - cell "0.450" [ref=f1e1820]
+              - cell "11.0" [ref=f1e1821]
+              - cell "41.0" [ref=f1e1822]
+              - cell "24.0" [ref=f1e1823]
+              - cell "8.0" [ref=f1e1824]
+              - cell "10.0" [ref=f1e1825]
+              - cell "5.0" [ref=f1e1826]
+              - cell "15.0" [ref=f1e1827]
+              - cell "107.0" [ref=f1e1828]
+            - row [ref=f1e1829]:
+              - cell [ref=f1e1830]:
+                - link "Cavaliers" [ref=f1e1831] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=22
+              - cell "0.0" [ref=f1e1832]
+              - cell "0.0" [ref=f1e1833]
+              - cell "0.000" [ref=f1e1834]
+              - cell "0.0" [ref=f1e1835]
+              - cell "0.0" [ref=f1e1836]
+              - cell "0.000" [ref=f1e1837]
+              - cell "0.0" [ref=f1e1838]
+              - cell "0.0" [ref=f1e1839]
+              - cell "0.000" [ref=f1e1840]
+              - cell "0.0" [ref=f1e1841]
+              - cell "0.0" [ref=f1e1842]
+              - cell "0.0" [ref=f1e1843]
+              - cell "0.0" [ref=f1e1844]
+              - cell "0.0" [ref=f1e1845]
+              - cell "0.0" [ref=f1e1846]
+              - cell "0.0" [ref=f1e1847]
+              - cell "0.0" [ref=f1e1848]
+            - row [ref=f1e1849]:
+              - cell [ref=f1e1850]:
+                - link "Mavericks" [ref=f1e1851] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=21
+              - cell "0.0" [ref=f1e1852]
+              - cell "0.0" [ref=f1e1853]
+              - cell "0.000" [ref=f1e1854]
+              - cell "0.0" [ref=f1e1855]
+              - cell "0.0" [ref=f1e1856]
+              - cell "0.000" [ref=f1e1857]
+              - cell "0.0" [ref=f1e1858]
+              - cell "0.0" [ref=f1e1859]
+              - cell "0.000" [ref=f1e1860]
+              - cell "0.0" [ref=f1e1861]
+              - cell "0.0" [ref=f1e1862]
+              - cell "0.0" [ref=f1e1863]
+              - cell "0.0" [ref=f1e1864]
+              - cell "0.0" [ref=f1e1865]
+              - cell "0.0" [ref=f1e1866]
+              - cell "0.0" [ref=f1e1867]
+              - cell "0.0" [ref=f1e1868]
+            - row [ref=f1e1869]:
+              - cell [ref=f1e1870]:
+                - link "Nuggets" [ref=f1e1871] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=19
+              - cell "0.0" [ref=f1e1872]
+              - cell "0.0" [ref=f1e1873]
+              - cell "0.000" [ref=f1e1874]
+              - cell "0.0" [ref=f1e1875]
+              - cell "0.0" [ref=f1e1876]
+              - cell "0.000" [ref=f1e1877]
+              - cell "0.0" [ref=f1e1878]
+              - cell "0.0" [ref=f1e1879]
+              - cell "0.000" [ref=f1e1880]
+              - cell "0.0" [ref=f1e1881]
+              - cell "0.0" [ref=f1e1882]
+              - cell "0.0" [ref=f1e1883]
+              - cell "0.0" [ref=f1e1884]
+              - cell "0.0" [ref=f1e1885]
+              - cell "0.0" [ref=f1e1886]
+              - cell "0.0" [ref=f1e1887]
+              - cell "0.0" [ref=f1e1888]
+            - row [ref=f1e1889]:
+              - cell [ref=f1e1890]:
+                - link "Diesels" [ref=f1e1891] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=4
+              - cell "0.0" [ref=f1e1892]
+              - cell "0.0" [ref=f1e1893]
+              - cell "0.000" [ref=f1e1894]
+              - cell "0.0" [ref=f1e1895]
+              - cell "0.0" [ref=f1e1896]
+              - cell "0.000" [ref=f1e1897]
+              - cell "0.0" [ref=f1e1898]
+              - cell "0.0" [ref=f1e1899]
+              - cell "0.000" [ref=f1e1900]
+              - cell "0.0" [ref=f1e1901]
+              - cell "0.0" [ref=f1e1902]
+              - cell "0.0" [ref=f1e1903]
+              - cell "0.0" [ref=f1e1904]
+              - cell "0.0" [ref=f1e1905]
+              - cell "0.0" [ref=f1e1906]
+              - cell "0.0" [ref=f1e1907]
+              - cell "0.0" [ref=f1e1908]
+            - row [ref=f1e1909]:
+              - cell [ref=f1e1910]:
+                - link "Apollos" [ref=f1e1911] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=13
+              - cell "0.0" [ref=f1e1912]
+              - cell "0.0" [ref=f1e1913]
+              - cell "0.000" [ref=f1e1914]
+              - cell "0.0" [ref=f1e1915]
+              - cell "0.0" [ref=f1e1916]
+              - cell "0.000" [ref=f1e1917]
+              - cell "0.0" [ref=f1e1918]
+              - cell "0.0" [ref=f1e1919]
+              - cell "0.000" [ref=f1e1920]
+              - cell "0.0" [ref=f1e1921]
+              - cell "0.0" [ref=f1e1922]
+              - cell "0.0" [ref=f1e1923]
+              - cell "0.0" [ref=f1e1924]
+              - cell "0.0" [ref=f1e1925]
+              - cell "0.0" [ref=f1e1926]
+              - cell "0.0" [ref=f1e1927]
+              - cell "0.0" [ref=f1e1928]
+            - row [ref=f1e1929]:
+              - cell [ref=f1e1930]:
+                - link "Pacers" [ref=f1e1931] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=26
+              - cell "0.0" [ref=f1e1932]
+              - cell "0.0" [ref=f1e1933]
+              - cell "0.000" [ref=f1e1934]
+              - cell "0.0" [ref=f1e1935]
+              - cell "0.0" [ref=f1e1936]
+              - cell "0.000" [ref=f1e1937]
+              - cell "0.0" [ref=f1e1938]
+              - cell "0.0" [ref=f1e1939]
+              - cell "0.000" [ref=f1e1940]
+              - cell "0.0" [ref=f1e1941]
+              - cell "0.0" [ref=f1e1942]
+              - cell "0.0" [ref=f1e1943]
+              - cell "0.0" [ref=f1e1944]
+              - cell "0.0" [ref=f1e1945]
+              - cell "0.0" [ref=f1e1946]
+              - cell "0.0" [ref=f1e1947]
+              - cell "0.0" [ref=f1e1948]
+            - row [ref=f1e1949]:
+              - cell [ref=f1e1950]:
+                - link "Stars" [ref=f1e1951] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=2
+              - cell "37.3" [ref=f1e1952]
+              - cell "79.0" [ref=f1e1953]
+              - cell "0.472" [ref=f1e1954]
+              - cell "16.5" [ref=f1e1955]
+              - cell "20.8" [ref=f1e1956]
+              - cell "0.795" [ref=f1e1957]
+              - cell "10.0" [ref=f1e1958]
+              - cell "25.0" [ref=f1e1959]
+              - cell "0.400" [ref=f1e1960]
+              - cell "9.0" [ref=f1e1961]
+              - cell "36.0" [ref=f1e1962]
+              - cell "21.0" [ref=f1e1963]
+              - cell "7.3" [ref=f1e1964]
+              - cell "11.5" [ref=f1e1965]
+              - cell "4.5" [ref=f1e1966]
+              - cell "17.0" [ref=f1e1967]
+              - cell "101.0" [ref=f1e1968]
+            - row [ref=f1e1969]:
+              - cell [ref=f1e1970]:
+                - link "Blues" [ref=f1e1971] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=15
+              - cell "0.0" [ref=f1e1972]
+              - cell "0.0" [ref=f1e1973]
+              - cell "0.000" [ref=f1e1974]
+              - cell "0.0" [ref=f1e1975]
+              - cell "0.0" [ref=f1e1976]
+              - cell "0.000" [ref=f1e1977]
+              - cell "0.0" [ref=f1e1978]
+              - cell "0.0" [ref=f1e1979]
+              - cell "0.000" [ref=f1e1980]
+              - cell "0.0" [ref=f1e1981]
+              - cell "0.0" [ref=f1e1982]
+              - cell "0.0" [ref=f1e1983]
+              - cell "0.0" [ref=f1e1984]
+              - cell "0.0" [ref=f1e1985]
+              - cell "0.0" [ref=f1e1986]
+              - cell "0.0" [ref=f1e1987]
+              - cell "0.0" [ref=f1e1988]
+            - row [ref=f1e1989]:
+              - cell [ref=f1e1990]:
+                - link "Monarchs" [ref=f1e1991] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=8
+              - cell "0.0" [ref=f1e1992]
+              - cell "0.0" [ref=f1e1993]
+              - cell "0.000" [ref=f1e1994]
+              - cell "0.0" [ref=f1e1995]
+              - cell "0.0" [ref=f1e1996]
+              - cell "0.000" [ref=f1e1997]
+              - cell "0.0" [ref=f1e1998]
+              - cell "0.0" [ref=f1e1999]
+              - cell "0.000" [ref=f1e2000]
+              - cell "0.0" [ref=f1e2001]
+              - cell "0.0" [ref=f1e2002]
+              - cell "0.0" [ref=f1e2003]
+              - cell "0.0" [ref=f1e2004]
+              - cell "0.0" [ref=f1e2005]
+              - cell "0.0" [ref=f1e2006]
+              - cell "0.0" [ref=f1e2007]
+              - cell "0.0" [ref=f1e2008]
+            - row [ref=f1e2009]:
+              - cell [ref=f1e2010]:
+                - link "Bucks" [ref=f1e2011] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=18
+              - cell "0.0" [ref=f1e2012]
+              - cell "0.0" [ref=f1e2013]
+              - cell "0.000" [ref=f1e2014]
+              - cell "0.0" [ref=f1e2015]
+              - cell "0.0" [ref=f1e2016]
+              - cell "0.000" [ref=f1e2017]
+              - cell "0.0" [ref=f1e2018]
+              - cell "0.0" [ref=f1e2019]
+              - cell "0.000" [ref=f1e2020]
+              - cell "0.0" [ref=f1e2021]
+              - cell "0.0" [ref=f1e2022]
+              - cell "0.0" [ref=f1e2023]
+              - cell "0.0" [ref=f1e2024]
+              - cell "0.0" [ref=f1e2025]
+              - cell "0.0" [ref=f1e2026]
+              - cell "0.0" [ref=f1e2027]
+              - cell "0.0" [ref=f1e2028]
+            - row [ref=f1e2029]:
+              - cell [ref=f1e2030]:
+                - link "Blizzard" [ref=f1e2031] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=16
+              - cell "0.0" [ref=f1e2032]
+              - cell "0.0" [ref=f1e2033]
+              - cell "0.000" [ref=f1e2034]
+              - cell "0.0" [ref=f1e2035]
+              - cell "0.0" [ref=f1e2036]
+              - cell "0.000" [ref=f1e2037]
+              - cell "0.0" [ref=f1e2038]
+              - cell "0.0" [ref=f1e2039]
+              - cell "0.000" [ref=f1e2040]
+              - cell "0.0" [ref=f1e2041]
+              - cell "0.0" [ref=f1e2042]
+              - cell "0.0" [ref=f1e2043]
+              - cell "0.0" [ref=f1e2044]
+              - cell "0.0" [ref=f1e2045]
+              - cell "0.0" [ref=f1e2046]
+              - cell "0.0" [ref=f1e2047]
+              - cell "0.0" [ref=f1e2048]
+            - row [ref=f1e2049]:
+              - cell [ref=f1e2050]:
+                - link "Nets" [ref=f1e2051] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=24
+              - cell "0.0" [ref=f1e2052]
+              - cell "0.0" [ref=f1e2053]
+              - cell "0.000" [ref=f1e2054]
+              - cell "0.0" [ref=f1e2055]
+              - cell "0.0" [ref=f1e2056]
+              - cell "0.000" [ref=f1e2057]
+              - cell "0.0" [ref=f1e2058]
+              - cell "0.0" [ref=f1e2059]
+              - cell "0.000" [ref=f1e2060]
+              - cell "0.0" [ref=f1e2061]
+              - cell "0.0" [ref=f1e2062]
+              - cell "0.0" [ref=f1e2063]
+              - cell "0.0" [ref=f1e2064]
+              - cell "0.0" [ref=f1e2065]
+              - cell "0.0" [ref=f1e2066]
+              - cell "0.0" [ref=f1e2067]
+              - cell "0.0" [ref=f1e2068]
+            - row [ref=f1e2069]:
+              - cell [ref=f1e2070]:
+                - link "Metros" [ref=f1e2071] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=1
+              - cell "34.6" [ref=f1e2072]
+              - cell "78.0" [ref=f1e2073]
+              - cell "0.444" [ref=f1e2074]
+              - cell "15.4" [ref=f1e2075]
+              - cell "20.0" [ref=f1e2076]
+              - cell "0.770" [ref=f1e2077]
+              - cell "8.6" [ref=f1e2078]
+              - cell "22.4" [ref=f1e2079]
+              - cell "0.384" [ref=f1e2080]
+              - cell "7.6" [ref=f1e2081]
+              - cell "33.2" [ref=f1e2082]
+              - cell "19.6" [ref=f1e2083]
+              - cell "6.0" [ref=f1e2084]
+              - cell "13.0" [ref=f1e2085]
+              - cell "3.4" [ref=f1e2086]
+              - cell "18.4" [ref=f1e2087]
+              - cell "93.2" [ref=f1e2088]
+            - row [ref=f1e2089]:
+              - cell [ref=f1e2090]:
+                - link "Thunder" [ref=f1e2091] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=28
+              - cell "0.0" [ref=f1e2092]
+              - cell "0.0" [ref=f1e2093]
+              - cell "0.000" [ref=f1e2094]
+              - cell "0.0" [ref=f1e2095]
+              - cell "0.0" [ref=f1e2096]
+              - cell "0.000" [ref=f1e2097]
+              - cell "0.0" [ref=f1e2098]
+              - cell "0.0" [ref=f1e2099]
+              - cell "0.000" [ref=f1e2100]
+              - cell "0.0" [ref=f1e2101]
+              - cell "0.0" [ref=f1e2102]
+              - cell "0.0" [ref=f1e2103]
+              - cell "0.0" [ref=f1e2104]
+              - cell "0.0" [ref=f1e2105]
+              - cell "0.0" [ref=f1e2106]
+              - cell "0.0" [ref=f1e2107]
+              - cell "0.0" [ref=f1e2108]
+            - row [ref=f1e2109]:
+              - cell [ref=f1e2110]:
+                - link "Tropics" [ref=f1e2111] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=7
+              - cell "0.0" [ref=f1e2112]
+              - cell "0.0" [ref=f1e2113]
+              - cell "0.000" [ref=f1e2114]
+              - cell "0.0" [ref=f1e2115]
+              - cell "0.0" [ref=f1e2116]
+              - cell "0.000" [ref=f1e2117]
+              - cell "0.0" [ref=f1e2118]
+              - cell "0.0" [ref=f1e2119]
+              - cell "0.000" [ref=f1e2120]
+              - cell "0.0" [ref=f1e2121]
+              - cell "0.0" [ref=f1e2122]
+              - cell "0.0" [ref=f1e2123]
+              - cell "0.0" [ref=f1e2124]
+              - cell "0.0" [ref=f1e2125]
+              - cell "0.0" [ref=f1e2126]
+              - cell "0.0" [ref=f1e2127]
+              - cell "0.0" [ref=f1e2128]
+            - row [ref=f1e2129]:
+              - cell [ref=f1e2130]:
+                - link "Rage" [ref=f1e2131] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=6
+              - cell "0.0" [ref=f1e2132]
+              - cell "0.0" [ref=f1e2133]
+              - cell "0.000" [ref=f1e2134]
+              - cell "0.0" [ref=f1e2135]
+              - cell "0.0" [ref=f1e2136]
+              - cell "0.000" [ref=f1e2137]
+              - cell "0.0" [ref=f1e2138]
+              - cell "0.0" [ref=f1e2139]
+              - cell "0.000" [ref=f1e2140]
+              - cell "0.0" [ref=f1e2141]
+              - cell "0.0" [ref=f1e2142]
+              - cell "0.0" [ref=f1e2143]
+              - cell "0.0" [ref=f1e2144]
+              - cell "0.0" [ref=f1e2145]
+              - cell "0.0" [ref=f1e2146]
+              - cell "0.0" [ref=f1e2147]
+              - cell "0.0" [ref=f1e2148]
+            - row [ref=f1e2149]:
+              - cell [ref=f1e2150]:
+                - link "Flames" [ref=f1e2151] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=9
+              - cell "0.0" [ref=f1e2152]
+              - cell "0.0" [ref=f1e2153]
+              - cell "0.000" [ref=f1e2154]
+              - cell "0.0" [ref=f1e2155]
+              - cell "0.0" [ref=f1e2156]
+              - cell "0.000" [ref=f1e2157]
+              - cell "0.0" [ref=f1e2158]
+              - cell "0.0" [ref=f1e2159]
+              - cell "0.000" [ref=f1e2160]
+              - cell "0.0" [ref=f1e2161]
+              - cell "0.0" [ref=f1e2162]
+              - cell "0.0" [ref=f1e2163]
+              - cell "0.0" [ref=f1e2164]
+              - cell "0.0" [ref=f1e2165]
+              - cell "0.0" [ref=f1e2166]
+              - cell "0.0" [ref=f1e2167]
+              - cell "0.0" [ref=f1e2168]
+            - row [ref=f1e2169]:
+              - cell [ref=f1e2170]:
+                - link "Pioneers" [ref=f1e2171] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=11
+              - cell "0.0" [ref=f1e2172]
+              - cell "0.0" [ref=f1e2173]
+              - cell "0.000" [ref=f1e2174]
+              - cell "0.0" [ref=f1e2175]
+              - cell "0.0" [ref=f1e2176]
+              - cell "0.000" [ref=f1e2177]
+              - cell "0.0" [ref=f1e2178]
+              - cell "0.0" [ref=f1e2179]
+              - cell "0.000" [ref=f1e2180]
+              - cell "0.0" [ref=f1e2181]
+              - cell "0.0" [ref=f1e2182]
+              - cell "0.0" [ref=f1e2183]
+              - cell "0.0" [ref=f1e2184]
+              - cell "0.0" [ref=f1e2185]
+              - cell "0.0" [ref=f1e2186]
+              - cell "0.0" [ref=f1e2187]
+              - cell "0.0" [ref=f1e2188]
+            - row [ref=f1e2189]:
+              - cell [ref=f1e2190]:
+                - link "Pilots" [ref=f1e2191] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=20
+              - cell "0.0" [ref=f1e2192]
+              - cell "0.0" [ref=f1e2193]
+              - cell "0.000" [ref=f1e2194]
+              - cell "0.0" [ref=f1e2195]
+              - cell "0.0" [ref=f1e2196]
+              - cell "0.000" [ref=f1e2197]
+              - cell "0.0" [ref=f1e2198]
+              - cell "0.0" [ref=f1e2199]
+              - cell "0.000" [ref=f1e2200]
+              - cell "0.0" [ref=f1e2201]
+              - cell "0.0" [ref=f1e2202]
+              - cell "0.0" [ref=f1e2203]
+              - cell "0.0" [ref=f1e2204]
+              - cell "0.0" [ref=f1e2205]
+              - cell "0.0" [ref=f1e2206]
+              - cell "0.0" [ref=f1e2207]
+              - cell "0.0" [ref=f1e2208]
+            - row [ref=f1e2209]:
+              - cell [ref=f1e2210]:
+                - link "Spurs" [ref=f1e2211] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=10
+              - cell "0.0" [ref=f1e2212]
+              - cell "0.0" [ref=f1e2213]
+              - cell "0.000" [ref=f1e2214]
+              - cell "0.0" [ref=f1e2215]
+              - cell "0.0" [ref=f1e2216]
+              - cell "0.000" [ref=f1e2217]
+              - cell "0.0" [ref=f1e2218]
+              - cell "0.0" [ref=f1e2219]
+              - cell "0.000" [ref=f1e2220]
+              - cell "0.0" [ref=f1e2221]
+              - cell "0.0" [ref=f1e2222]
+              - cell "0.0" [ref=f1e2223]
+              - cell "0.0" [ref=f1e2224]
+              - cell "0.0" [ref=f1e2225]
+              - cell "0.0" [ref=f1e2226]
+              - cell "0.0" [ref=f1e2227]
+              - cell "0.0" [ref=f1e2228]
+            - row [ref=f1e2229]:
+              - cell [ref=f1e2230]:
+                - link "Supersonics" [ref=f1e2231] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=23
+              - cell "0.0" [ref=f1e2232]
+              - cell "0.0" [ref=f1e2233]
+              - cell "0.000" [ref=f1e2234]
+              - cell "0.0" [ref=f1e2235]
+              - cell "0.0" [ref=f1e2236]
+              - cell "0.000" [ref=f1e2237]
+              - cell "0.0" [ref=f1e2238]
+              - cell "0.0" [ref=f1e2239]
+              - cell "0.000" [ref=f1e2240]
+              - cell "0.0" [ref=f1e2241]
+              - cell "0.0" [ref=f1e2242]
+              - cell "0.0" [ref=f1e2243]
+              - cell "0.0" [ref=f1e2244]
+              - cell "0.0" [ref=f1e2245]
+              - cell "0.0" [ref=f1e2246]
+              - cell "0.0" [ref=f1e2247]
+              - cell "0.0" [ref=f1e2248]
+            - row [ref=f1e2249]:
+              - cell [ref=f1e2250]:
+                - link "Huskies" [ref=f1e2251] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=17
+              - cell "0.0" [ref=f1e2252]
+              - cell "0.0" [ref=f1e2253]
+              - cell "0.000" [ref=f1e2254]
+              - cell "0.0" [ref=f1e2255]
+              - cell "0.0" [ref=f1e2256]
+              - cell "0.000" [ref=f1e2257]
+              - cell "0.0" [ref=f1e2258]
+              - cell "0.0" [ref=f1e2259]
+              - cell "0.000" [ref=f1e2260]
+              - cell "0.0" [ref=f1e2261]
+              - cell "0.0" [ref=f1e2262]
+              - cell "0.0" [ref=f1e2263]
+              - cell "0.0" [ref=f1e2264]
+              - cell "0.0" [ref=f1e2265]
+              - cell "0.0" [ref=f1e2266]
+              - cell "0.0" [ref=f1e2267]
+              - cell "0.0" [ref=f1e2268]
+            - row [ref=f1e2269]:
+              - cell [ref=f1e2270]:
+                - link "Jazz" [ref=f1e2271] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=27
+              - cell "0.0" [ref=f1e2272]
+              - cell "0.0" [ref=f1e2273]
+              - cell "0.000" [ref=f1e2274]
+              - cell "0.0" [ref=f1e2275]
+              - cell "0.0" [ref=f1e2276]
+              - cell "0.000" [ref=f1e2277]
+              - cell "0.0" [ref=f1e2278]
+              - cell "0.0" [ref=f1e2279]
+              - cell "0.000" [ref=f1e2280]
+              - cell "0.0" [ref=f1e2281]
+              - cell "0.0" [ref=f1e2282]
+              - cell "0.0" [ref=f1e2283]
+              - cell "0.0" [ref=f1e2284]
+              - cell "0.0" [ref=f1e2285]
+              - cell "0.0" [ref=f1e2286]
+              - cell "0.0" [ref=f1e2287]
+              - cell "0.0" [ref=f1e2288]
+            - row [ref=f1e2289]:
+              - cell [ref=f1e2290]:
+                - link "Generals" [ref=f1e2291] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=25
+              - cell "0.0" [ref=f1e2292]
+              - cell "0.0" [ref=f1e2293]
+              - cell "0.000" [ref=f1e2294]
+              - cell "0.0" [ref=f1e2295]
+              - cell "0.0" [ref=f1e2296]
+              - cell "0.000" [ref=f1e2297]
+              - cell "0.0" [ref=f1e2298]
+              - cell "0.0" [ref=f1e2299]
+              - cell "0.000" [ref=f1e2300]
+              - cell "0.0" [ref=f1e2301]
+              - cell "0.0" [ref=f1e2302]
+              - cell "0.0" [ref=f1e2303]
+              - cell "0.0" [ref=f1e2304]
+              - cell "0.0" [ref=f1e2305]
+              - cell "0.0" [ref=f1e2306]
+              - cell "0.0" [ref=f1e2307]
+              - cell "0.0" [ref=f1e2308]
+          - rowgroup [ref=f1e2309]:
+            - row [ref=f1e2310]:
+              - cell [ref=f1e2311]
+              - cell "36.8" [ref=f1e2312]
+              - cell "79.8" [ref=f1e2313]
+              - cell "0.461" [ref=f1e2314]
+              - cell "16.8" [ref=f1e2315]
+              - cell "21.2" [ref=f1e2316]
+              - cell "0.791" [ref=f1e2317]
+              - cell "9.5" [ref=f1e2318]
+              - cell "23.8" [ref=f1e2319]
+              - cell "0.400" [ref=f1e2320]
+              - cell "8.7" [ref=f1e2321]
+              - cell "35.3" [ref=f1e2322]
+              - cell "21.0" [ref=f1e2323]
+              - cell "6.8" [ref=f1e2324]
+              - cell "11.9" [ref=f1e2325]
+              - cell "4.1" [ref=f1e2326]
+              - cell "17.3" [ref=f1e2327]
+              - cell "99.8" [ref=f1e2328]
+      - heading "Team Off/Def Average Differentials" [level=2] [ref=f1e2329]
+      - region "Scrollable data table" [ref=f1e2331]:
+        - table [ref=f1e2332]:
+          - rowgroup [ref=f1e2333]:
+            - row [ref=f1e2334]:
+              - columnheader "Team" [ref=f1e2335] [cursor=pointer]
+              - columnheader "FGM" [ref=f1e2336] [cursor=pointer]
+              - columnheader "FGA" [ref=f1e2337] [cursor=pointer]
+              - columnheader "FGP" [ref=f1e2338] [cursor=pointer]
+              - columnheader "FTM" [ref=f1e2339] [cursor=pointer]
+              - columnheader "FTA" [ref=f1e2340] [cursor=pointer]
+              - columnheader "FTP" [ref=f1e2341] [cursor=pointer]
+              - columnheader "3GM" [ref=f1e2342] [cursor=pointer]
+              - columnheader "3GA" [ref=f1e2343] [cursor=pointer]
+              - columnheader "3GP" [ref=f1e2344] [cursor=pointer]
+              - columnheader "ORB" [ref=f1e2345] [cursor=pointer]
+              - columnheader "REB" [ref=f1e2346] [cursor=pointer]
+              - columnheader "AST" [ref=f1e2347] [cursor=pointer]
+              - columnheader "STL" [ref=f1e2348] [cursor=pointer]
+              - columnheader "TVR" [ref=f1e2349] [cursor=pointer]
+              - columnheader "BLK" [ref=f1e2350] [cursor=pointer]
+              - columnheader "PF" [ref=f1e2351] [cursor=pointer]
+              - columnheader "PTS" [ref=f1e2352] [cursor=pointer]
+          - rowgroup [ref=f1e2353]:
+            - row [ref=f1e2354]:
+              - cell [ref=f1e2355]:
+                - link "Phoenixes" [ref=f1e2356] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=14
+              - cell "0.00" [ref=f1e2357]
+              - cell "0.00" [ref=f1e2358]
+              - cell "0.000" [ref=f1e2359]
+              - cell "0.00" [ref=f1e2360]
+              - cell "0.00" [ref=f1e2361]
+              - cell "0.000" [ref=f1e2362]
+              - cell "0.00" [ref=f1e2363]
+              - cell "0.00" [ref=f1e2364]
+              - cell "0.000" [ref=f1e2365]
+              - cell "0.00" [ref=f1e2366]
+              - cell "0.00" [ref=f1e2367]
+              - cell "0.00" [ref=f1e2368]
+              - cell "0.00" [ref=f1e2369]
+              - cell "0.00" [ref=f1e2370]
+              - cell "0.00" [ref=f1e2371]
+              - cell "0.00" [ref=f1e2372]
+              - cell "0.00" [ref=f1e2373]
+            - row [ref=f1e2374]:
+              - cell [ref=f1e2375]:
+                - link "Minutemen" [ref=f1e2376] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=5
+              - cell "42.00" [ref=f1e2377]
+              - cell "88.00" [ref=f1e2378]
+              - cell "0.477" [ref=f1e2379]
+              - cell "18.00" [ref=f1e2380]
+              - cell "22.00" [ref=f1e2381]
+              - cell "0.818" [ref=f1e2382]
+              - cell "12.00" [ref=f1e2383]
+              - cell "28.00" [ref=f1e2384]
+              - cell "0.429" [ref=f1e2385]
+              - cell "10.00" [ref=f1e2386]
+              - cell "38.00" [ref=f1e2387]
+              - cell "24.00" [ref=f1e2388]
+              - cell "8.00" [ref=f1e2389]
+              - cell "10.00" [ref=f1e2390]
+              - cell "5.00" [ref=f1e2391]
+              - cell "16.00" [ref=f1e2392]
+              - cell "114.00" [ref=f1e2393]
+            - row [ref=f1e2394]:
+              - cell [ref=f1e2395]:
+                - link "Royals" [ref=f1e2396] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=12
+              - cell "38.00" [ref=f1e2397]
+              - cell "83.00" [ref=f1e2398]
+              - cell "0.458" [ref=f1e2399]
+              - cell "20.00" [ref=f1e2400]
+              - cell "25.00" [ref=f1e2401]
+              - cell "0.800" [ref=f1e2402]
+              - cell "10.00" [ref=f1e2403]
+              - cell "25.00" [ref=f1e2404]
+              - cell "0.400" [ref=f1e2405]
+              - cell "9.00" [ref=f1e2406]
+              - cell "35.00" [ref=f1e2407]
+              - cell "22.00" [ref=f1e2408]
+              - cell "7.00" [ref=f1e2409]
+              - cell "12.00" [ref=f1e2410]
+              - cell "4.00" [ref=f1e2411]
+              - cell "17.00" [ref=f1e2412]
+              - cell "106.00" [ref=f1e2413]
+            - row [ref=f1e2414]:
+              - cell [ref=f1e2415]:
+                - link "Cougars" [ref=f1e2416] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=3
+              - cell "-5.00" [ref=f1e2417]
+              - cell "-5.00" [ref=f1e2418]
+              - cell "-0.034" [ref=f1e2419]
+              - cell "-4.00" [ref=f1e2420]
+              - cell "-3.00" [ref=f1e2421]
+              - cell "-0.071" [ref=f1e2422]
+              - cell "-2.00" [ref=f1e2423]
+              - cell "-1.00" [ref=f1e2424]
+              - cell "-0.082" [ref=f1e2425]
+              - cell "-3.00" [ref=f1e2426]
+              - cell "-7.00" [ref=f1e2427]
+              - cell "-4.00" [ref=f1e2428]
+              - cell "-3.00" [ref=f1e2429]
+              - cell "4.00" [ref=f1e2430]
+              - cell "-3.00" [ref=f1e2431]
+              - cell "4.00" [ref=f1e2432]
+              - cell "-16.00" [ref=f1e2433]
+            - row [ref=f1e2434]:
+              - cell [ref=f1e2435]:
+                - link "Cavaliers" [ref=f1e2436] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=22
+              - cell "0.00" [ref=f1e2437]
+              - cell "0.00" [ref=f1e2438]
+              - cell "0.000" [ref=f1e2439]
+              - cell "0.00" [ref=f1e2440]
+              - cell "0.00" [ref=f1e2441]
+              - cell "0.000" [ref=f1e2442]
+              - cell "0.00" [ref=f1e2443]
+              - cell "0.00" [ref=f1e2444]
+              - cell "0.000" [ref=f1e2445]
+              - cell "0.00" [ref=f1e2446]
+              - cell "0.00" [ref=f1e2447]
+              - cell "0.00" [ref=f1e2448]
+              - cell "0.00" [ref=f1e2449]
+              - cell "0.00" [ref=f1e2450]
+              - cell "0.00" [ref=f1e2451]
+              - cell "0.00" [ref=f1e2452]
+              - cell "0.00" [ref=f1e2453]
+            - row [ref=f1e2454]:
+              - cell [ref=f1e2455]:
+                - link "Mavericks" [ref=f1e2456] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=21
+              - cell "0.00" [ref=f1e2457]
+              - cell "0.00" [ref=f1e2458]
+              - cell "0.000" [ref=f1e2459]
+              - cell "0.00" [ref=f1e2460]
+              - cell "0.00" [ref=f1e2461]
+              - cell "0.000" [ref=f1e2462]
+              - cell "0.00" [ref=f1e2463]
+              - cell "0.00" [ref=f1e2464]
+              - cell "0.000" [ref=f1e2465]
+              - cell "0.00" [ref=f1e2466]
+              - cell "0.00" [ref=f1e2467]
+              - cell "0.00" [ref=f1e2468]
+              - cell "0.00" [ref=f1e2469]
+              - cell "0.00" [ref=f1e2470]
+              - cell "0.00" [ref=f1e2471]
+              - cell "0.00" [ref=f1e2472]
+              - cell "0.00" [ref=f1e2473]
+            - row [ref=f1e2474]:
+              - cell [ref=f1e2475]:
+                - link "Nuggets" [ref=f1e2476] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=19
+              - cell "0.00" [ref=f1e2477]
+              - cell "0.00" [ref=f1e2478]
+              - cell "0.000" [ref=f1e2479]
+              - cell "0.00" [ref=f1e2480]
+              - cell "0.00" [ref=f1e2481]
+              - cell "0.000" [ref=f1e2482]
+              - cell "0.00" [ref=f1e2483]
+              - cell "0.00" [ref=f1e2484]
+              - cell "0.000" [ref=f1e2485]
+              - cell "0.00" [ref=f1e2486]
+              - cell "0.00" [ref=f1e2487]
+              - cell "0.00" [ref=f1e2488]
+              - cell "0.00" [ref=f1e2489]
+              - cell "0.00" [ref=f1e2490]
+              - cell "0.00" [ref=f1e2491]
+              - cell "0.00" [ref=f1e2492]
+              - cell "0.00" [ref=f1e2493]
+            - row [ref=f1e2494]:
+              - cell [ref=f1e2495]:
+                - link "Diesels" [ref=f1e2496] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=4
+              - cell "0.00" [ref=f1e2497]
+              - cell "0.00" [ref=f1e2498]
+              - cell "0.000" [ref=f1e2499]
+              - cell "0.00" [ref=f1e2500]
+              - cell "0.00" [ref=f1e2501]
+              - cell "0.000" [ref=f1e2502]
+              - cell "0.00" [ref=f1e2503]
+              - cell "0.00" [ref=f1e2504]
+              - cell "0.000" [ref=f1e2505]
+              - cell "0.00" [ref=f1e2506]
+              - cell "0.00" [ref=f1e2507]
+              - cell "0.00" [ref=f1e2508]
+              - cell "0.00" [ref=f1e2509]
+              - cell "0.00" [ref=f1e2510]
+              - cell "0.00" [ref=f1e2511]
+              - cell "0.00" [ref=f1e2512]
+              - cell "0.00" [ref=f1e2513]
+            - row [ref=f1e2514]:
+              - cell [ref=f1e2515]:
+                - link "Apollos" [ref=f1e2516] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=13
+              - cell "0.00" [ref=f1e2517]
+              - cell "0.00" [ref=f1e2518]
+              - cell "0.000" [ref=f1e2519]
+              - cell "0.00" [ref=f1e2520]
+              - cell "0.00" [ref=f1e2521]
+              - cell "0.000" [ref=f1e2522]
+              - cell "0.00" [ref=f1e2523]
+              - cell "0.00" [ref=f1e2524]
+              - cell "0.000" [ref=f1e2525]
+              - cell "0.00" [ref=f1e2526]
+              - cell "0.00" [ref=f1e2527]
+              - cell "0.00" [ref=f1e2528]
+              - cell "0.00" [ref=f1e2529]
+              - cell "0.00" [ref=f1e2530]
+              - cell "0.00" [ref=f1e2531]
+              - cell "0.00" [ref=f1e2532]
+              - cell "0.00" [ref=f1e2533]
+            - row [ref=f1e2534]:
+              - cell [ref=f1e2535]:
+                - link "Pacers" [ref=f1e2536] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=26
+              - cell "0.00" [ref=f1e2537]
+              - cell "0.00" [ref=f1e2538]
+              - cell "0.000" [ref=f1e2539]
+              - cell "0.00" [ref=f1e2540]
+              - cell "0.00" [ref=f1e2541]
+              - cell "0.000" [ref=f1e2542]
+              - cell "0.00" [ref=f1e2543]
+              - cell "0.00" [ref=f1e2544]
+              - cell "0.000" [ref=f1e2545]
+              - cell "0.00" [ref=f1e2546]
+              - cell "0.00" [ref=f1e2547]
+              - cell "0.00" [ref=f1e2548]
+              - cell "0.00" [ref=f1e2549]
+              - cell "0.00" [ref=f1e2550]
+              - cell "0.00" [ref=f1e2551]
+              - cell "0.00" [ref=f1e2552]
+              - cell "0.00" [ref=f1e2553]
+            - row [ref=f1e2554]:
+              - cell [ref=f1e2555]:
+                - link "Stars" [ref=f1e2556] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=2
+              - cell "-2.50" [ref=f1e2557]
+              - cell "-0.25" [ref=f1e2558]
+              - cell "-0.030" [ref=f1e2559]
+              - cell "-1.25" [ref=f1e2560]
+              - cell "-1.00" [ref=f1e2561]
+              - cell "-0.023" [ref=f1e2562]
+              - cell "-1.00" [ref=f1e2563]
+              - cell "-1.75" [ref=f1e2564]
+              - cell "-0.013" [ref=f1e2565]
+              - cell "-1.50" [ref=f1e2566]
+              - cell "-3.00" [ref=f1e2567]
+              - cell "-1.50" [ref=f1e2568]
+              - cell "-1.00" [ref=f1e2569]
+              - cell "1.25" [ref=f1e2570]
+              - cell "-0.75" [ref=f1e2571]
+              - cell "1.25" [ref=f1e2572]
+              - cell "-7.25" [ref=f1e2573]
+            - row [ref=f1e2574]:
+              - cell [ref=f1e2575]:
+                - link "Blues" [ref=f1e2576] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=15
+              - cell "0.00" [ref=f1e2577]
+              - cell "0.00" [ref=f1e2578]
+              - cell "0.000" [ref=f1e2579]
+              - cell "0.00" [ref=f1e2580]
+              - cell "0.00" [ref=f1e2581]
+              - cell "0.000" [ref=f1e2582]
+              - cell "0.00" [ref=f1e2583]
+              - cell "0.00" [ref=f1e2584]
+              - cell "0.000" [ref=f1e2585]
+              - cell "0.00" [ref=f1e2586]
+              - cell "0.00" [ref=f1e2587]
+              - cell "0.00" [ref=f1e2588]
+              - cell "0.00" [ref=f1e2589]
+              - cell "0.00" [ref=f1e2590]
+              - cell "0.00" [ref=f1e2591]
+              - cell "0.00" [ref=f1e2592]
+              - cell "0.00" [ref=f1e2593]
+            - row [ref=f1e2594]:
+              - cell [ref=f1e2595]:
+                - link "Monarchs" [ref=f1e2596] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=8
+              - cell "0.00" [ref=f1e2597]
+              - cell "0.00" [ref=f1e2598]
+              - cell "0.000" [ref=f1e2599]
+              - cell "0.00" [ref=f1e2600]
+              - cell "0.00" [ref=f1e2601]
+              - cell "0.000" [ref=f1e2602]
+              - cell "0.00" [ref=f1e2603]
+              - cell "0.00" [ref=f1e2604]
+              - cell "0.000" [ref=f1e2605]
+              - cell "0.00" [ref=f1e2606]
+              - cell "0.00" [ref=f1e2607]
+              - cell "0.00" [ref=f1e2608]
+              - cell "0.00" [ref=f1e2609]
+              - cell "0.00" [ref=f1e2610]
+              - cell "0.00" [ref=f1e2611]
+              - cell "0.00" [ref=f1e2612]
+              - cell "0.00" [ref=f1e2613]
+            - row [ref=f1e2614]:
+              - cell [ref=f1e2615]:
+                - link "Bucks" [ref=f1e2616] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=18
+              - cell "0.00" [ref=f1e2617]
+              - cell "0.00" [ref=f1e2618]
+              - cell "0.000" [ref=f1e2619]
+              - cell "0.00" [ref=f1e2620]
+              - cell "0.00" [ref=f1e2621]
+              - cell "0.000" [ref=f1e2622]
+              - cell "0.00" [ref=f1e2623]
+              - cell "0.00" [ref=f1e2624]
+              - cell "0.000" [ref=f1e2625]
+              - cell "0.00" [ref=f1e2626]
+              - cell "0.00" [ref=f1e2627]
+              - cell "0.00" [ref=f1e2628]
+              - cell "0.00" [ref=f1e2629]
+              - cell "0.00" [ref=f1e2630]
+              - cell "0.00" [ref=f1e2631]
+              - cell "0.00" [ref=f1e2632]
+              - cell "0.00" [ref=f1e2633]
+            - row [ref=f1e2634]:
+              - cell [ref=f1e2635]:
+                - link "Blizzard" [ref=f1e2636] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=16
+              - cell "0.00" [ref=f1e2637]
+              - cell "0.00" [ref=f1e2638]
+              - cell "0.000" [ref=f1e2639]
+              - cell "0.00" [ref=f1e2640]
+              - cell "0.00" [ref=f1e2641]
+              - cell "0.000" [ref=f1e2642]
+              - cell "0.00" [ref=f1e2643]
+              - cell "0.00" [ref=f1e2644]
+              - cell "0.000" [ref=f1e2645]
+              - cell "0.00" [ref=f1e2646]
+              - cell "0.00" [ref=f1e2647]
+              - cell "0.00" [ref=f1e2648]
+              - cell "0.00" [ref=f1e2649]
+              - cell "0.00" [ref=f1e2650]
+              - cell "0.00" [ref=f1e2651]
+              - cell "0.00" [ref=f1e2652]
+              - cell "0.00" [ref=f1e2653]
+            - row [ref=f1e2654]:
+              - cell [ref=f1e2655]:
+                - link "Nets" [ref=f1e2656] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=24
+              - cell "0.00" [ref=f1e2657]
+              - cell "0.00" [ref=f1e2658]
+              - cell "0.000" [ref=f1e2659]
+              - cell "0.00" [ref=f1e2660]
+              - cell "0.00" [ref=f1e2661]
+              - cell "0.000" [ref=f1e2662]
+              - cell "0.00" [ref=f1e2663]
+              - cell "0.00" [ref=f1e2664]
+              - cell "0.000" [ref=f1e2665]
+              - cell "0.00" [ref=f1e2666]
+              - cell "0.00" [ref=f1e2667]
+              - cell "0.00" [ref=f1e2668]
+              - cell "0.00" [ref=f1e2669]
+              - cell "0.00" [ref=f1e2670]
+              - cell "0.00" [ref=f1e2671]
+              - cell "0.00" [ref=f1e2672]
+              - cell "0.00" [ref=f1e2673]
+            - row [ref=f1e2674]:
+              - cell [ref=f1e2675]:
+                - link "Metros" [ref=f1e2676] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=1
+              - cell "3.00" [ref=f1e2677]
+              - cell "1.20" [ref=f1e2678]
+              - cell "0.031" [ref=f1e2679]
+              - cell "1.80" [ref=f1e2680]
+              - cell "1.40" [ref=f1e2681]
+              - cell "0.034" [ref=f1e2682]
+              - cell "1.20" [ref=f1e2683]
+              - cell "1.60" [ref=f1e2684]
+              - cell "0.024" [ref=f1e2685]
+              - cell "1.80" [ref=f1e2686]
+              - cell "3.80" [ref=f1e2687]
+              - cell "2.00" [ref=f1e2688]
+              - cell "1.40" [ref=f1e2689]
+              - cell "-1.80" [ref=f1e2690]
+              - cell "1.20" [ref=f1e2691]
+              - cell "-1.80" [ref=f1e2692]
+              - cell "9.00" [ref=f1e2693]
+            - row [ref=f1e2694]:
+              - cell [ref=f1e2695]:
+                - link "Thunder" [ref=f1e2696] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=28
+              - cell "0.00" [ref=f1e2697]
+              - cell "0.00" [ref=f1e2698]
+              - cell "0.000" [ref=f1e2699]
+              - cell "0.00" [ref=f1e2700]
+              - cell "0.00" [ref=f1e2701]
+              - cell "0.000" [ref=f1e2702]
+              - cell "0.00" [ref=f1e2703]
+              - cell "0.00" [ref=f1e2704]
+              - cell "0.000" [ref=f1e2705]
+              - cell "0.00" [ref=f1e2706]
+              - cell "0.00" [ref=f1e2707]
+              - cell "0.00" [ref=f1e2708]
+              - cell "0.00" [ref=f1e2709]
+              - cell "0.00" [ref=f1e2710]
+              - cell "0.00" [ref=f1e2711]
+              - cell "0.00" [ref=f1e2712]
+              - cell "0.00" [ref=f1e2713]
+            - row [ref=f1e2714]:
+              - cell [ref=f1e2715]:
+                - link "Tropics" [ref=f1e2716] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=7
+              - cell "0.00" [ref=f1e2717]
+              - cell "0.00" [ref=f1e2718]
+              - cell "0.000" [ref=f1e2719]
+              - cell "0.00" [ref=f1e2720]
+              - cell "0.00" [ref=f1e2721]
+              - cell "0.000" [ref=f1e2722]
+              - cell "0.00" [ref=f1e2723]
+              - cell "0.00" [ref=f1e2724]
+              - cell "0.000" [ref=f1e2725]
+              - cell "0.00" [ref=f1e2726]
+              - cell "0.00" [ref=f1e2727]
+              - cell "0.00" [ref=f1e2728]
+              - cell "0.00" [ref=f1e2729]
+              - cell "0.00" [ref=f1e2730]
+              - cell "0.00" [ref=f1e2731]
+              - cell "0.00" [ref=f1e2732]
+              - cell "0.00" [ref=f1e2733]
+            - row [ref=f1e2734]:
+              - cell [ref=f1e2735]:
+                - link "Rage" [ref=f1e2736] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=6
+              - cell "0.00" [ref=f1e2737]
+              - cell "0.00" [ref=f1e2738]
+              - cell "0.000" [ref=f1e2739]
+              - cell "0.00" [ref=f1e2740]
+              - cell "0.00" [ref=f1e2741]
+              - cell "0.000" [ref=f1e2742]
+              - cell "0.00" [ref=f1e2743]
+              - cell "0.00" [ref=f1e2744]
+              - cell "0.000" [ref=f1e2745]
+              - cell "0.00" [ref=f1e2746]
+              - cell "0.00" [ref=f1e2747]
+              - cell "0.00" [ref=f1e2748]
+              - cell "0.00" [ref=f1e2749]
+              - cell "0.00" [ref=f1e2750]
+              - cell "0.00" [ref=f1e2751]
+              - cell "0.00" [ref=f1e2752]
+              - cell "0.00" [ref=f1e2753]
+            - row [ref=f1e2754]:
+              - cell [ref=f1e2755]:
+                - link "Flames" [ref=f1e2756] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=9
+              - cell "0.00" [ref=f1e2757]
+              - cell "0.00" [ref=f1e2758]
+              - cell "0.000" [ref=f1e2759]
+              - cell "0.00" [ref=f1e2760]
+              - cell "0.00" [ref=f1e2761]
+              - cell "0.000" [ref=f1e2762]
+              - cell "0.00" [ref=f1e2763]
+              - cell "0.00" [ref=f1e2764]
+              - cell "0.000" [ref=f1e2765]
+              - cell "0.00" [ref=f1e2766]
+              - cell "0.00" [ref=f1e2767]
+              - cell "0.00" [ref=f1e2768]
+              - cell "0.00" [ref=f1e2769]
+              - cell "0.00" [ref=f1e2770]
+              - cell "0.00" [ref=f1e2771]
+              - cell "0.00" [ref=f1e2772]
+              - cell "0.00" [ref=f1e2773]
+            - row [ref=f1e2774]:
+              - cell [ref=f1e2775]:
+                - link "Pioneers" [ref=f1e2776] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=11
+              - cell "0.00" [ref=f1e2777]
+              - cell "0.00" [ref=f1e2778]
+              - cell "0.000" [ref=f1e2779]
+              - cell "0.00" [ref=f1e2780]
+              - cell "0.00" [ref=f1e2781]
+              - cell "0.000" [ref=f1e2782]
+              - cell "0.00" [ref=f1e2783]
+              - cell "0.00" [ref=f1e2784]
+              - cell "0.000" [ref=f1e2785]
+              - cell "0.00" [ref=f1e2786]
+              - cell "0.00" [ref=f1e2787]
+              - cell "0.00" [ref=f1e2788]
+              - cell "0.00" [ref=f1e2789]
+              - cell "0.00" [ref=f1e2790]
+              - cell "0.00" [ref=f1e2791]
+              - cell "0.00" [ref=f1e2792]
+              - cell "0.00" [ref=f1e2793]
+            - row [ref=f1e2794]:
+              - cell [ref=f1e2795]:
+                - link "Pilots" [ref=f1e2796] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=20
+              - cell "0.00" [ref=f1e2797]
+              - cell "0.00" [ref=f1e2798]
+              - cell "0.000" [ref=f1e2799]
+              - cell "0.00" [ref=f1e2800]
+              - cell "0.00" [ref=f1e2801]
+              - cell "0.000" [ref=f1e2802]
+              - cell "0.00" [ref=f1e2803]
+              - cell "0.00" [ref=f1e2804]
+              - cell "0.000" [ref=f1e2805]
+              - cell "0.00" [ref=f1e2806]
+              - cell "0.00" [ref=f1e2807]
+              - cell "0.00" [ref=f1e2808]
+              - cell "0.00" [ref=f1e2809]
+              - cell "0.00" [ref=f1e2810]
+              - cell "0.00" [ref=f1e2811]
+              - cell "0.00" [ref=f1e2812]
+              - cell "0.00" [ref=f1e2813]
+            - row [ref=f1e2814]:
+              - cell [ref=f1e2815]:
+                - link "Spurs" [ref=f1e2816] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=10
+              - cell "0.00" [ref=f1e2817]
+              - cell "0.00" [ref=f1e2818]
+              - cell "0.000" [ref=f1e2819]
+              - cell "0.00" [ref=f1e2820]
+              - cell "0.00" [ref=f1e2821]
+              - cell "0.000" [ref=f1e2822]
+              - cell "0.00" [ref=f1e2823]
+              - cell "0.00" [ref=f1e2824]
+              - cell "0.000" [ref=f1e2825]
+              - cell "0.00" [ref=f1e2826]
+              - cell "0.00" [ref=f1e2827]
+              - cell "0.00" [ref=f1e2828]
+              - cell "0.00" [ref=f1e2829]
+              - cell "0.00" [ref=f1e2830]
+              - cell "0.00" [ref=f1e2831]
+              - cell "0.00" [ref=f1e2832]
+              - cell "0.00" [ref=f1e2833]
+            - row [ref=f1e2834]:
+              - cell [ref=f1e2835]:
+                - link "Supersonics" [ref=f1e2836] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=23
+              - cell "0.00" [ref=f1e2837]
+              - cell "0.00" [ref=f1e2838]
+              - cell "0.000" [ref=f1e2839]
+              - cell "0.00" [ref=f1e2840]
+              - cell "0.00" [ref=f1e2841]
+              - cell "0.000" [ref=f1e2842]
+              - cell "0.00" [ref=f1e2843]
+              - cell "0.00" [ref=f1e2844]
+              - cell "0.000" [ref=f1e2845]
+              - cell "0.00" [ref=f1e2846]
+              - cell "0.00" [ref=f1e2847]
+              - cell "0.00" [ref=f1e2848]
+              - cell "0.00" [ref=f1e2849]
+              - cell "0.00" [ref=f1e2850]
+              - cell "0.00" [ref=f1e2851]
+              - cell "0.00" [ref=f1e2852]
+              - cell "0.00" [ref=f1e2853]
+            - row [ref=f1e2854]:
+              - cell [ref=f1e2855]:
+                - link "Huskies" [ref=f1e2856] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=17
+              - cell "0.00" [ref=f1e2857]
+              - cell "0.00" [ref=f1e2858]
+              - cell "0.000" [ref=f1e2859]
+              - cell "0.00" [ref=f1e2860]
+              - cell "0.00" [ref=f1e2861]
+              - cell "0.000" [ref=f1e2862]
+              - cell "0.00" [ref=f1e2863]
+              - cell "0.00" [ref=f1e2864]
+              - cell "0.000" [ref=f1e2865]
+              - cell "0.00" [ref=f1e2866]
+              - cell "0.00" [ref=f1e2867]
+              - cell "0.00" [ref=f1e2868]
+              - cell "0.00" [ref=f1e2869]
+              - cell "0.00" [ref=f1e2870]
+              - cell "0.00" [ref=f1e2871]
+              - cell "0.00" [ref=f1e2872]
+              - cell "0.00" [ref=f1e2873]
+            - row [ref=f1e2874]:
+              - cell [ref=f1e2875]:
+                - link "Jazz" [ref=f1e2876] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=27
+              - cell "0.00" [ref=f1e2877]
+              - cell "0.00" [ref=f1e2878]
+              - cell "0.000" [ref=f1e2879]
+              - cell "0.00" [ref=f1e2880]
+              - cell "0.00" [ref=f1e2881]
+              - cell "0.000" [ref=f1e2882]
+              - cell "0.00" [ref=f1e2883]
+              - cell "0.00" [ref=f1e2884]
+              - cell "0.000" [ref=f1e2885]
+              - cell "0.00" [ref=f1e2886]
+              - cell "0.00" [ref=f1e2887]
+              - cell "0.00" [ref=f1e2888]
+              - cell "0.00" [ref=f1e2889]
+              - cell "0.00" [ref=f1e2890]
+              - cell "0.00" [ref=f1e2891]
+              - cell "0.00" [ref=f1e2892]
+              - cell "0.00" [ref=f1e2893]
+            - row [ref=f1e2894]:
+              - cell [ref=f1e2895]:
+                - link "Generals" [ref=f1e2896] [cursor=pointer]:
+                  - /url: modules.php?name=Team&op=team&teamid=25
+              - cell "0.00" [ref=f1e2897]
+              - cell "0.00" [ref=f1e2898]
+              - cell "0.000" [ref=f1e2899]
+              - cell "0.00" [ref=f1e2900]
+              - cell "0.00" [ref=f1e2901]
+              - cell "0.000" [ref=f1e2902]
+              - cell "0.00" [ref=f1e2903]
+              - cell "0.00" [ref=f1e2904]
+              - cell "0.000" [ref=f1e2905]
+              - cell "0.00" [ref=f1e2906]
+              - cell "0.00" [ref=f1e2907]
+              - cell "0.00" [ref=f1e2908]
+              - cell "0.00" [ref=f1e2909]
+              - cell "0.00" [ref=f1e2910]
+              - cell "0.00" [ref=f1e2911]
+              - cell "0.00" [ref=f1e2912]
+              - cell "0.00" [ref=f1e2913]
+```
+
+# Test source
+
+```ts
+  83  |       // eslint-disable-next-line playwright/no-wait-for-timeout -- deliberate settle: let a transiently-failing render advance before retrying
+  84  |       await page.waitForTimeout(STABLE_SETTLE_MS);
+  85  |       continue;
+  86  |     }
+  87  |     if (prev && consecutiveDiffRatio(prev, shot) <= STABLE_MAX_DIFF_RATIO) {
+  88  |       mkdirSync(dirname(path), { recursive: true });
+  89  |       writeFileSync(path, shot);
+  90  |       return;
+  91  |     }
+  92  |     prev = shot;
+  93  |     // eslint-disable-next-line playwright/no-wait-for-timeout -- deliberate settle: let the render advance (fonts/images/height) before the next sample
+  94  |     await page.waitForTimeout(STABLE_SETTLE_MS);
+  95  |   }
+  96  |   if (prev) {
+  97  |     mkdirSync(dirname(path), { recursive: true });
+  98  |     writeFileSync(path, prev);
+  99  |   }
+  100 | }
+  101 | 
+  102 | async function captureSnapshot(
+  103 |   page: Page,
+  104 |   row: VrRow,
+  105 |   state: StateVariant,
+  106 |   viewport: Viewport,
+  107 |   tab?: HtmxTab,
+  108 | ): Promise<void> {
+  109 |   if (viewport === 'mobile') {
+  110 |     await page.setViewportSize({ width: 375, height: 812 });
+  111 |   }
+  112 | 
+  113 |   const filename = snapshotFilename(row, state, viewport, tab);
+  114 |   const title = filename.replace(/\.png$/, '');
+  115 |   const anchor = page.locator(row.anchor).first();
+  116 | 
+  117 |   // Re-establish the same visual state after a (re)load: settle the network,
+  118 |   // wait for the anchor, and re-trigger the HTMX tab swap if any. Runs after
+  119 |   // both the initial navigation and the render-B reload.
+  120 |   async function settle(): Promise<void> {
+  121 |     await page.waitForLoadState('networkidle');
+  122 |     await anchor.waitFor({ state: 'visible' });
+  123 |     if (tab) {
+  124 |       await page.locator(tab.trigger).first().click();
+  125 |       await page.locator(tab.swapTarget).first().waitFor({ state: 'visible' });
+  126 |       await page.waitForLoadState('networkidle');
+  127 |     }
+  128 |   }
+  129 | 
+  130 |   await gotoWithRetry(page, row.url);
+  131 |   await assertNoPhpErrors(page, `on ${row.url}`);
+  132 |   await settle();
+  133 | 
+  134 |   // What to screenshot, and whether it's a full-page capture (page only).
+  135 |   const fullPage = !tab?.swapTarget && !row.elementScreenshot;
+  136 |   const captureTarget: Locator | Page = tab?.swapTarget
+  137 |     ? page.locator(tab.swapTarget).first()
+  138 |     : row.elementScreenshot
+  139 |       ? anchor
+  140 |       : page;
+  141 | 
+  142 |   // Capture options for the raw PR renders. Deliberately EXCLUDE
+  143 |   // maxDiffPixelRatio — that governs the toHaveScreenshot() gate below, not a
+  144 |   // raw render capture.
+  145 |   const captureOpts = {
+  146 |     animations: 'disabled' as const,
+  147 |     mask: buildMasks(page, row.extraMask),
+  148 |     ...(fullPage ? { fullPage: true } : {}),
+  149 |   };
+  150 | 
+  151 |   // Render A — the PR's actual render of this cell. captureStable retries a
+  152 |   // thrown capture and re-samples until settled; if every attempt throws it
+  153 |   // writes no .a.png and the gallery builder triages the cell as infra.
+  154 |   await captureStable(page, captureTarget, `${ACTUALS_DIR}/${title}.a.png`, captureOpts);
+  155 | 
+  156 |   // Render B — an independent second render after a full reload, used to demote
+  157 |   // self-disagreeing (flaky) cells out of the change gallery.
+  158 |   try {
+  159 |     await page.reload({ waitUntil: 'load' });
+  160 |     await settle();
+  161 |     await captureStable(page, captureTarget, `${ACTUALS_DIR}/${title}.b.png`, captureOpts);
+  162 |   } catch {
+  163 |     // A missing .b.png skips the self-stability check (gallery handles null B).
+  164 |   }
+  165 | 
+  166 |   // The pass/fail gate stays LAST and unchanged — this is what the
+  167 |   // `update-baselines` regen workflow signs off and what the green/red check
+  168 |   // reflects. The gallery above is independent of this assertion's outcome.
+  169 |   const screenshotOpts = {
+  170 |     animations: 'disabled' as const,
+  171 |     mask: buildMasks(page, row.extraMask),
+  172 |     ...(row.extraMaxDiffPixelRatio !== undefined
+  173 |       ? { maxDiffPixelRatio: row.extraMaxDiffPixelRatio }
+  174 |       : {}),
+  175 |   };
+  176 | 
+  177 |   if (tab?.swapTarget) {
+  178 |     const target = page.locator(tab.swapTarget).first();
+  179 |     await expect(target).toHaveScreenshot(filename, screenshotOpts);
+  180 |   } else if (row.elementScreenshot) {
+  181 |     await expect(anchor).toHaveScreenshot(filename, screenshotOpts);
+  182 |   } else {
+> 183 |     await expect(page).toHaveScreenshot(filename, {
+      |                        ^ Error: expect(page).toHaveScreenshot(expected) failed
+  184 |       fullPage: true,
+  185 |       ...screenshotOpts,
+  186 |     });
+  187 |   }
+  188 | }
+  189 | 
+  190 | function rowsByAuth(auth: AuthMode): VrRow[] {
+  191 |   return VR_MANIFEST.filter((r) => r.auth === auth);
+  192 | }
+  193 | 
+  194 | function expandRow(row: VrRow): Array<{
+  195 |   state: StateVariant;
+  196 |   viewport: Viewport;
+  197 |   tab?: HtmxTab;
+  198 |   testName: string;
+  199 | }> {
+  200 |   const states = row.states ?? [DEFAULT_STATE];
+  201 |   const viewports = row.viewports ?? ['desktop'];
+  202 |   const tabs: Array<HtmxTab | undefined> = [undefined, ...(row.htmxTabs ?? [])];
+  203 |   const cells: Array<{
+  204 |     state: StateVariant;
+  205 |     viewport: Viewport;
+  206 |     tab?: HtmxTab;
+  207 |     testName: string;
+  208 |   }> = [];
+  209 | 
+  210 |   for (const state of states) {
+  211 |     for (const viewport of viewports) {
+  212 |       for (const tab of tabs) {
+  213 |         const filename = snapshotFilename(row, state, viewport, tab);
+  214 |         cells.push({
+  215 |           state,
+  216 |           viewport,
+  217 |           tab: tab ?? undefined,
+  218 |           testName: filename.replace(/\.png$/, ''),
+  219 |         });
+  220 |       }
+  221 |     }
+  222 |   }
+  223 |   return cells;
+  224 | }
+  225 | 
+  226 | function registerTests(
+  227 |   testFn: typeof publicTest,
+  228 |   auth: AuthMode,
+  229 |   label: string,
+  230 |   beforeEachHook?: (fixtures: { appState: (s: Record<string, string>) => Promise<void> }) => Promise<void>,
+  231 | ): void {
+  232 |   testFn.describe(`Visual regression — ${label}`, () => {
+  233 |     if (beforeEachHook) {
+  234 |       testFn.beforeEach(async ({ appState }) => {
+  235 |         await beforeEachHook({ appState });
+  236 |       });
+  237 |     }
+  238 | 
+  239 |     for (const row of rowsByAuth(auth)) {
+  240 |       const cells = expandRow(row);
+  241 |       for (const cell of cells) {
+  242 |         testFn(cell.testName, async ({ appState, page }) => {
+  243 |           if (cell.state.appState && Object.keys(cell.state.appState).length > 0) {
+  244 |             await appState(cell.state.appState);
+  245 |           }
+  246 |           if (row.notes) {
+  247 |             console.log(`[visual-regression] ${row.name}: ${row.notes}`);
+  248 |           }
+  249 |           await captureSnapshot(page, row, cell.state, cell.viewport, cell.tab);
+  250 |         });
+  251 |       }
+  252 |     }
+  253 |   });
+  254 | }
+  255 | 
+  256 | // ============================================================
+  257 | // Public visual regression — no authentication required
+  258 | // ============================================================
+  259 | 
+  260 | registerTests(publicTest, 'public', 'public pages (full-page)', async ({ appState }) => {
+  261 |   await appState({ 'Trivia Mode': 'Off' });
+  262 | });
+  263 | 
+  264 | // ============================================================
+  265 | // Authenticated visual regression — requires test user
+  266 | // ============================================================
+  267 | 
+  268 | registerTests(authTest, 'auth', 'authenticated pages (full-page)');
+  269 | 
+  270 | // ============================================================
+  271 | // Non-admin visual regression — roles_mask=0, no franchise
+  272 | // ============================================================
+  273 | 
+  274 | registerTests(authRegularTest, 'auth-regular', 'non-admin authenticated pages');
+  275 | 
+```

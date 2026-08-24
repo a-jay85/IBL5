@@ -6,7 +6,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-08-19
+last_verified: 2026-08-24
 ---
 <!-- NO `model:` KEY — DELIBERATE, DO NOT ADD ONE.
      Runtime Phase 6 (plan-intent fidelity review) is Opus-column judgment:
@@ -203,7 +203,19 @@ Run `git show <MASTER_SHA>:.claude/skills/pr-ready/_rebase-and-conflicts.md` —
 
    `TREE DIVERGED` is expected **only** when Phase 3 resolved a real conflict; in that case name each diverging path in the Phase 6 verdict. Any other divergence — including a guard trip, which means the comparison never happened — stops the run.
 
-3. `git push --force-with-lease` — never a bare `--force`. The lease is what catches a concurrent push into the same branch.
+3. **Push with an explicit refspec and an explicit lease ref — three numbered steps, four Bash calls (3c reads twice).** A bare `--force-with-lease` publishes nothing on a worktree branch with no upstream (measured 2026-08-24 against a local bare repo: `fatal: The current branch <b> has no upstream branch`, remote ref unchanged; the exit status is `push.default`-dependent, so never treat "no recognised error" as "pushed"), so the lease value must be supplied by hand. `$(…)` is unavailable here and values do not survive between Bash calls, so read each SHA off the printed output and type it as a literal into the next call.
+
+   **3a — read the remote's current value for THIS branch:** `git ls-remote origin <branch>`
+
+   Read the 40-char SHA from the printed line. **Do not use `git ls-remote origin HEAD`** — that returns origin's default-branch (master) tip, not this branch's, and the lease would never match. If the output is **empty** the branch has no remote ref yet; use `0000000000000000000000000000000000000000`, which is git's value for "this ref must not exist".
+
+   **3b — push:** `git push -u --force-with-lease=<branch>:<remote-sha-from-3a> origin <branch>:<branch>`
+
+   Never a bare `--force`. The lease catches a concurrent push into the same branch: if someone pushed between 3a and 3b, git rejects with `stale info` — stop and re-run Phase 3; never re-read and retry with a fresh lease.
+
+   **3c — verify the remote actually moved (two reads, one step):** `git ls-remote origin <branch>`, then `git rev-parse HEAD`.
+
+   If the two SHAs differ, print `PUSH FAILED` and stop — do not continue to Phase 5. "No error printed" is not evidence of a push.
 
 4. **`mergeable=UNKNOWN` handling — bounded, and never with a foreground `sleep`.** GitHub computes mergeability asynchronously, so the first read right after a push is usually `UNKNOWN`. Read once:
 

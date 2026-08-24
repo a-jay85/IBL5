@@ -4,7 +4,7 @@
 # Dry-run by default: prints the PRs it would process and exits. Nothing fires without --go.
 #
 # Usage:
-#   bin/pr-ready-now [--go] [--jobs N] [--pr N[,N...]] [--model M] [--dry-run] [--help]
+#   bin/pr-ready-now [--go] [--jobs N] [--pr N[,N...]] [--pr-attack FILE] [--top-n N] [--model M] [--dry-run] [--wait] [--help]
 #
 #   --go          Actually fire. Without it the script only reports (default).
 #   --jobs N      Max concurrent sessions (default 3). Positive integer.
@@ -12,12 +12,24 @@
 #   --model M     Model for the fired sessions (default: the Opus pin — see below).
 #   --dry-run     Explicit alias for the default. Useful in scripts that want intent stated.
 #   --help, -h    Print this usage and exit 0.
+#   --pr-attack FILE  Read ranked PR list from a /pr-attack output file; selects top --top-n.
+#   --top-n N         How many top-ranked PRs to select (default 5). Positive integer.
+#   --wait        After all sessions are fired, poll until every launchd plist is gone
+#                 (all sessions finished). For use inside a detached wrapper only —
+#                 never from an interactive main-thread session (foreground poll loop is
+#                 a spend bug; see .claude/rules/work-triage.md). Times out at 7200s.
+#                 Known limitation L34 (loop-engineering-backlog.md): reap_stale() may
+#                 clear a plist whose claude process is still running, causing --wait to
+#                 break before all sessions have truly finished.
 #
 # Examples:
 #   bin/pr-ready-now                       # report what would run
 #   bin/pr-ready-now --go                  # fire all open non-draft PRs, 3 at a time
 #   bin/pr-ready-now --pr 1899,1900 --go   # fire exactly two
 #   bin/pr-ready-now --jobs 1 --go         # serialize
+#   bin/pr-ready-now --pr-attack ~/pr-attack.md --go         # fire top 5 from rank file
+#   bin/pr-ready-now --pr-attack ~/pr-attack.md --top-n 3 --go  # fire top 3
+#   bin/pr-ready-now --pr-attack ~/pr-attack.md --go --wait      # fire, then wait for all to finish
 #
 # WARNING: Never run with --go from inside a worktree. The launched sessions must start from
 # the main checkout so /pr-ready Phase 0 resolves the target PR's own worktree correctly.
@@ -31,6 +43,23 @@
 #   PR_READY_NOW_PR_JSON    Read selector JSON from this file instead of shelling to gh.
 #   PR_READY_NOW_GH_USER    Use this GitHub login instead of calling `gh api user`. Lets the
 #                           tests run on CI, which has no gh auth. Never set it by hand.
+#   PR_READY_NOW_MASTER_SHA Override the master SHA for the staleness gate. Unset or
+#                           empty = auto-detect via git rev-parse --short origin/master.
+#   PR_READY_NOW_WTL        Read the worktree listing from this file instead of shelling
+#                           to git worktree list. Unset or empty = auto-detect.
+#
+# Report output (written under --go only):
+#   $HOME/pr-firstpass-YYYY-MM-DD.md — one Markdown row per PR (fired or skipped),
+#   a Findings section (diffs from FINDING[...] markers in PR logs), and a Security notes section.
+#   Same-day re-runs overwrite. The report path is printed as the last stdout line.
+#   Without --wait the sessions are still running when the report is written, so most
+#   status rows will read NOT READY (no log) — expected, not a defect.
+#
+# Findings marker contract (producer: /pr-ready, consumer: Phase 7):
+#   FINDING[<class>]: <one-line text>
+#   where <class> is one of: loop, ci, e2e, dev, a11y, a11y-contrast, maintenance,
+#   security. /pr-ready does not emit these yet; the Findings section will be empty
+#   on a real run until it does.
 
 set -euo pipefail
 
@@ -58,6 +87,7 @@ if [[ -z "$GIT_COMMON" ]]; then
     GIT_COMMON="$(cd "$SCRIPT_DIR" && cd "$(git rev-parse --git-common-dir)" && pwd -P)"
 fi
 ROOT="$(dirname "$GIT_COMMON")"
+BACKLOG_DIR="$ROOT/ibl5/docs/backlog"
 
 # .git is a DIRECTORY in the main checkout and a FILE in a linked worktree, so -d
 # structurally rejects a worktree even if the pin above somehow returned one.
@@ -76,9 +106,15 @@ JOBS=3
 EXPLICIT_PRS=()
 MODEL="claude-opus-5"   # current Opus generation, matching bin/bug-pipeline-tick and bin/lib/plan-impl-model
 EFFORT=high
+PR_ATTACK_FILE=""
+TOP_N=5
+WAIT=0
+# Single ceiling for BOTH bounded poll loops (wait_for_slot and the --wait block).
+# Two independent literals would drift; one constant cannot.
+CEILING_SECS=7200
 
 # --- flag parsing ------------------------------------------------------------------------
-usage() { sed -n '2,33p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,63p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -88,6 +124,11 @@ while [[ $# -gt 0 ]]; do
             [[ $# -ge 2 ]] || { echo "ERROR: --jobs requires a value" >&2; exit 1; }
             [[ "$2" =~ ^[1-9][0-9]*$ ]] || { echo "ERROR: --jobs must be a positive integer, got: $2" >&2; exit 1; }
             JOBS="$2"; shift 2 ;;
+        --pr-attack) [[ -n "${2:-}" ]] || { echo "ERROR: --pr-attack requires a value" >&2; exit 2; }
+             PR_ATTACK_FILE="$2"; shift 2 ;;
+        --top-n)     [[ "${2:-}" =~ ^[1-9][0-9]*$ ]] || { echo "ERROR: --top-n must be a positive integer, got: ${2:-}" >&2; exit 2; }
+             TOP_N="$2"; shift 2 ;;
+        --wait)    WAIT=1; shift ;;
         --pr)
             [[ $# -ge 2 ]] || { echo "ERROR: --pr requires a value" >&2; exit 1; }
             IFS=',' read -r -a _prs <<< "$2"
@@ -105,6 +146,335 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 [[ $# -eq 0 ]] || { echo "ERROR: unexpected positional argument: $1" >&2; exit 1; }
+
+# --pr-attack and --pr are mutually exclusive: one picks from a ranked file, the other
+# hard-pins numbers. Letting one silently win is the failure mode a first-pass loop cannot afford.
+if [[ -n "$PR_ATTACK_FILE" && ${#EXPLICIT_PRS[@]} -gt 0 ]]; then
+    echo "ERROR: --pr-attack and --pr are mutually exclusive" >&2; exit 2
+fi
+
+# --- attack_sha: extract master SHA from a /pr-attack output file -----------------------
+# The Base: header has one of two forms:
+#   Base: `master` @ abc1234 · ...
+#   Base: `master` @ abc1234567890 · ...
+# The backticks around `master` may be present or absent; tolerate both.
+attack_sha() { grep -m1 '^Base:' "$1" | sed -E 's/.*@[[:space:]]*`?([0-9a-f]{7,40})`?.*/\1/'; }
+
+# --- parallel arrays (declared early so write_report can be called from the STALE path) --
+# FIRE_PRS, FIRE_BRANCHES, and FIRE_PRE are parallel indexed arrays, not one associative
+# array: macOS ships bash 3.2 at /bin/bash, which has no `declare -A`.
+# Declared here (above the staleness gate) so write_report sees naturally-empty arrays on
+# the STALE path and produces a zero-row report. The population loop below fills them.
+FIRE_PRS=(); FIRE_BRANCHES=(); FIRE_PRE=(); SKIP_LINES=()
+
+# _REPORT_MASTER_SHA is set inside the staleness gate (when --pr-attack is used) and
+# auto-resolved lazily inside write_report for runs without --pr-attack.
+_REPORT_MASTER_SHA=""
+
+# --- Phase 7: findings collection and diff generation ------------------------------------
+# Route a FINDING class to the absolute path of its backlog file.
+# Empty string = security class (emitted to notes section, no diff).
+_p7_dest() {
+    local cls="$1"
+    case "$cls" in
+        loop|autonomy|automouse) printf '%s/loop-engineering-backlog.md' "$BACKLOG_DIR" ;;
+        ci)                      printf '%s/ci-backlog.md' "$BACKLOG_DIR" ;;
+        e2e)                     printf '%s/e2e-backlog.md' "$BACKLOG_DIR" ;;
+        dev)                     printf '%s/dev-efficiency-backlog.md' "$BACKLOG_DIR" ;;
+        a11y)                    printf '%s/a11y-backlog.md' "$BACKLOG_DIR" ;;
+        a11y-contrast)           printf '%s/a11y-contrast-backlog.md' "$BACKLOG_DIR" ;;
+        maintenance)             printf '%s/maintenance-backlog.md' "$BACKLOG_DIR" ;;
+        security)                printf '' ;;
+        *)                       printf '%s/dev-efficiency-backlog.md' "$BACKLOG_DIR" ;;
+    esac
+}
+
+# Strip markup that would make a generated backlog entry trip check-docs.
+# loop-engineering-backlog.md states the rule in its own prose: a row naming a
+# path that does not exist yet must carry BARE paths, because the dead-reference
+# check does not strip fenced or backticked spans. Finding text comes from a
+# /pr-ready log -- arbitrary prose that may contain backticked paths -- so
+# backticks and markdown-link syntax are removed before the text is emitted.
+# Pipes are escaped so a finding cannot break the table row it lands in.
+_p7_sanitize() {
+    printf '%s' "$1" | sed -e 's/\[\([^]]*\)\](\([^)]*\))/\1/g' -e 's/`//g' -e 's/|/\\|/g'
+}
+
+# Returns 0 if a backlog file uses the standard two-insertion format:
+# has | ALPHANUMID | table rows AND ### ALPHANUMID body sections.
+_p7_is_standard() {
+    local f="$1"
+    [[ -f "$f" ]] || return 1
+    grep -qE '^\| [A-Za-z]+[0-9]+[[:space:]]*\|' "$f" || return 1
+    grep -qE '^### [A-Za-z]+[0-9]+ ' "$f"
+}
+
+# Generate the modified content of a standard-format backlog file (to stdout).
+# Inserts all entries from the spec file in one awk pass.
+# Spec format: one \001-delimited line per entry: placeholder\001title\001pr-num\001today
+_p7_gen_modified() {
+    local orig="$1" spec="$2"
+    awk -v spec="$spec" '
+    { lines[NR] = $0 }
+    END {
+        entry_n = 0
+        while ((getline line < spec) > 0) {
+            entry_n++
+            split(line, f, "\001")
+            entry_title[entry_n] = f[2]
+            entry_pr[entry_n] = f[3]
+            entry_today[entry_n] = f[4]
+        }
+        if (entry_n == 0) { for (i = 1; i <= NR; i++) print lines[i]; exit }
+        last_table_row = 0; body_term_row = 0; in_body = 0; last_id_line = ""
+        for (i = 1; i <= NR; i++) {
+            line = lines[i]
+            if (match(line, /^\| [A-Za-z]+[0-9]+[[:space:]]*\|/)) {
+                id_field = substr(line, RSTART+2, RLENGTH-4)
+                gsub(/[[:space:]]/, "", id_field)
+                if (id_field ~ /^[A-Za-z]+[0-9]+$/) { last_table_row = i; last_id_line = id_field }
+            }
+            if (match(line, /^### [A-Za-z]+[0-9]+[[:space:]]/)) { in_body = 1 }
+            if (line == "---" && in_body) { body_term_row = i; in_body = 0 }
+        }
+        if (last_table_row == 0) { for (i = 1; i <= NR; i++) print lines[i]; exit }
+        id_prefix = last_id_line; sub(/[0-9]+$/, "", id_prefix)
+        id_num = last_id_line; sub(/^[A-Za-z]+/, "", id_num); id_num = id_num + 0
+        for (e = 1; e <= entry_n; e++) { id_num++; entry_id[e] = id_prefix id_num }
+        for (i = 1; i <= NR; i++) {
+            if (body_term_row > 0 && i == body_term_row) {
+                for (e = 1; e <= entry_n; e++) {
+                    tag = "*(discovered " entry_today[e] " during pr-firstpass-loop-" entry_today[e] " for PR #" entry_pr[e] ")*"
+                    printf "### %s %s\n%s\n**Problem:** %s\n**Suggested direction:** (see PR #%s log)\n**Status (%s):** \342\254\234 Open \342\200\224 \360\237\237\246.\n\n", \
+                        entry_id[e], entry_title[e], tag, entry_title[e], entry_pr[e], entry_today[e]
+                }
+            }
+            print lines[i]
+            if (i == last_table_row) {
+                for (e = 1; e <= entry_n; e++) {
+                    printf "| %s | %s | \342\254\234 Open | \360\237\237\246 | S |\n", entry_id[e], entry_title[e]
+                }
+            }
+        }
+    }
+    ' "$orig"
+}
+
+# Generate the modified content of a NON-standard backlog file (to stdout).
+# The five other backlog files each use a different schema (axis-numbered
+# ### N.M, rule-name-keyed, letter-ID table-only, per-page tables), so there is
+# no ID to allocate and no anchor to insert at. Rather than guessing a scheme
+# the driver does not understand -- or emitting no diff at all -- append a
+# clearly-labelled section at end-of-file. It always applies cleanly, touches no
+# existing anchor, names the correct file in the diff header, and survives
+# bin/backlog-open (it is not a resolved row). A human relocates it into the
+# right axis when applying.
+_p7_gen_appended() {
+    local orig="$1" spec="$2" today="$3"
+    cat "$orig"
+    printf '\n## Proposed entries (pr-firstpass %s)\n\n' "$today"
+    printf 'Auto-drafted from PR-loop findings. Unnumbered on purpose: this file does\n'
+    printf 'not use the table-row + `### ID` body schema, so a human assigns the ID and\n'
+    printf 'moves each entry into the correct section when applying.\n\n'
+    local _t _p _d
+    while IFS=$'\001' read -r _ _t _p _d; do
+        printf -- '- %s *(discovered %s during pr-firstpass-loop-%s for PR #%s)*\n' \
+            "$_t" "$_d" "$_d" "$_p"
+    done < "$spec"
+    printf '\n'
+}
+
+# derive_status <log-path>
+# Returns the status string for a single PR log: READY, NOT READY, NOT READY (no log),
+# or MASTER-MOVING-TOO-FAST.
+derive_status() {
+    local log="$1"
+    # Missing log: session may still be running (e.g. --go without --wait).
+    if [[ ! -f "$log" ]]; then
+        printf 'NOT READY (no log)'
+        return
+    fi
+    # Check MASTER-MOVING-TOO-FAST before STOP:, since an exhausted-rebase log may
+    # also carry a STOP: line.
+    if grep -qF 'master is moving faster than this branch can rebase' "$log"; then
+        printf 'MASTER-MOVING-TOO-FAST'
+        return
+    fi
+    # STOP: and PUSH FAILED are hard-stop markers; match them as line prefixes to avoid
+    # false-positives from quoted instruction text. (Phase 8 tests this predicate; do not
+    # weaken the anchor.)
+    if grep -qE '^[[:space:]>*_`-]*STOP:' "$log" || grep -qF 'PUSH FAILED' "$log"; then
+        printf 'NOT READY'
+        return
+    fi
+    # Check NOT READY before READY: "NOT READY" contains "READY".
+    if grep -qE '^[[:space:]>*_`-]*NOT READY' "$log"; then
+        printf 'NOT READY'
+        return
+    fi
+    if grep -qE '^[[:space:]>*_`-]*READY' "$log"; then
+        printf 'READY'
+        return
+    fi
+    printf 'NOT READY'
+}
+
+# write_report <attack-src> <master-sha> <fired-n> <skip-n>
+# Builds the Markdown report from the global FIRE_PRS/SKIP_LINES arrays, writes it to
+# $HOME/pr-firstpass-YYYY-MM-DD.md (overwrites on same-day re-run), and prints the path
+# to stdout as the last line (headless-marker-contract: last stdout line = report path).
+# master-sha may be empty; if so, auto-resolved here to avoid a git call on dry-run paths.
+# attack-src should be "—" when --pr-attack is not in use.
+write_report() {
+    local attack_src="$1" master_sha="$2" fired_n="$3" skip_n="$4"
+    local rdate rpath i s _sp _sr _sb _spre _smsg pr br pre st log
+    local today _p7_dir pi prn cls txt dest fname
+    local _p7_has _p7_f _p7_dp _p7_rl _p7_mod _p7_dr _p7_df _p7_txt _p7_prn _p7_fd _p7_sf
+    if [[ -z "$master_sha" ]]; then
+        master_sha="${PR_READY_NOW_MASTER_SHA:-$(git -C "$ROOT" rev-parse --short origin/master 2>/dev/null || echo unknown)}"
+    fi
+    rdate="$(date +%F)"
+    today="$rdate"
+    rpath="${HOME}/pr-firstpass-${rdate}.md"
+
+    # Phase 7: scan PR logs for FINDING[<class>]: <text> markers.
+    # Results are routed to per-dest spec files (standard-format destinations) or
+    # security.txt in a scratch temp dir — all cleaned up after the report is written.
+    _p7_dir="$(mktemp -d)"
+    if [[ ${#FIRE_PRS[@]} -gt 0 ]]; then
+        for pi in "${!FIRE_PRS[@]}"; do
+            prn="${FIRE_PRS[$pi]}"
+            log="/tmp/pr-ready-now-${prn}.log"
+            [[ -f "$log" ]] || continue
+            while IFS= read -r line; do
+                if [[ "$line" =~ FINDING\[([A-Za-z0-9_-]+)\]:[[:space:]]*(.+) ]]; then
+                    cls="${BASH_REMATCH[1]}"
+                    txt="$(_p7_sanitize "${BASH_REMATCH[2]}")"
+                    dest="$(_p7_dest "$cls")"
+                    if [[ -z "$dest" ]]; then
+                        printf '%s (PR #%s)\n' "$txt" "$prn" >> "$_p7_dir/security.txt"
+                    else
+                        fname="$(basename "$dest")"
+                        printf 'X\001%s\001%s\001%s\n' "$txt" "$prn" "$today" >> "$_p7_dir/$fname.spec"
+                    fi
+                fi
+            done < "$log"
+        done
+    fi
+
+    {
+        printf '# PR first pass — %s\n\n' "$rdate"
+        printf 'Source: pr-attack: %s, master @ %s, fired %s, skipped %s\n\n' \
+            "$attack_src" "$master_sha" "$fired_n" "$skip_n"
+        printf '| PR | Branch | Pre-flight | Status | Log |\n'
+        printf '|---|---|---|---|---|\n'
+        if [[ ${#FIRE_PRS[@]} -gt 0 ]]; then
+            for i in "${!FIRE_PRS[@]}"; do
+                pr="${FIRE_PRS[$i]}"
+                br="${FIRE_BRANCHES[$i]}"
+                pre="${FIRE_PRE[$i]}"
+                log="/tmp/pr-ready-now-${pr}.log"
+                st="$(derive_status "$log")"
+                printf '| %s | %s | %s | %s | %s |\n' "$pr" "$br" "$pre" "$st" "$log"
+            done
+        fi
+        for s in "${SKIP_LINES[@]:-}"; do
+            [[ -n "$s" ]] || continue
+            _sp="${s%%|*}"; _sr="${s#*|}"
+            _sb="${_sr%%|*}"; _sr="${_sr#*|}"
+            _spre="${_sr%%|*}"; _smsg="${_sr#*|}"
+            printf '| %s | %s | %s | SKIPPED (%s) | — |\n' "$_sp" "$_sb" "$_spre" "$_smsg"
+        done
+
+        printf '\n## Findings\n\n'
+        _p7_has=0
+        # Standard-format destinations: emit git apply -able diffs.
+        for _p7_f in loop-engineering-backlog.md dev-efficiency-backlog.md; do
+            [[ -f "$_p7_dir/$_p7_f.spec" ]] || continue
+            _p7_dp="$BACKLOG_DIR/$_p7_f"
+            _p7_rl="ibl5/docs/backlog/$_p7_f"
+            _p7_mod="$_p7_dir/$_p7_f.modified"
+            # If the schema ever drifts, fall back rather than emitting no diff:
+            # every routed class must still produce an appliable diff.
+            if _p7_is_standard "$_p7_dp"; then
+                _p7_gen_modified "$_p7_dp" "$_p7_dir/$_p7_f.spec" > "$_p7_mod"
+            else
+                _p7_gen_appended "$_p7_dp" "$_p7_dir/$_p7_f.spec" "$today" > "$_p7_mod"
+            fi
+            _p7_dr="$(diff -u "$_p7_dp" "$_p7_mod" || true)"
+            [[ -n "$_p7_dr" ]] || continue
+            _p7_df="$(printf '%s\n' "$_p7_dr" | awk \
+                -v o="--- a/$_p7_rl" -v n="+++ b/$_p7_rl" \
+                'NR==1{print o;next}NR==2{print n;next}{print}')"
+            printf '### Diff for `%s`\n\n```diff\n%s\n```\n\n' "$_p7_f" "$_p7_df"
+            _p7_has=1
+        done
+        # Non-standard destinations: same diff contract, format-agnostic insertion.
+        for _p7_f in ci-backlog.md e2e-backlog.md a11y-backlog.md a11y-contrast-backlog.md maintenance-backlog.md; do
+            [[ -f "$_p7_dir/$_p7_f.spec" ]] || continue
+            _p7_dp="$BACKLOG_DIR/$_p7_f"
+            [[ -f "$_p7_dp" ]] || continue
+            _p7_rl="ibl5/docs/backlog/$_p7_f"
+            _p7_mod="$_p7_dir/$_p7_f.modified"
+            _p7_gen_appended "$_p7_dp" "$_p7_dir/$_p7_f.spec" "$today" > "$_p7_mod"
+            _p7_dr="$(diff -u "$_p7_dp" "$_p7_mod" || true)"
+            [[ -n "$_p7_dr" ]] || continue
+            _p7_df="$(printf '%s\n' "$_p7_dr" | awk \
+                -v o="--- a/$_p7_rl" -v n="+++ b/$_p7_rl" \
+                'NR==1{print o; next} NR==2{print n; next} {print}')"
+            printf '### Diff for `%s`\n\n```diff\n%s\n```\n\n' "$_p7_f" "$_p7_df"
+            _p7_has=1
+        done
+        if [[ $_p7_has -eq 0 ]]; then
+            if [[ ${#FIRE_PRS[@]} -eq 0 ]]; then
+                printf '*(no PRs were fired — findings cannot be collected)*\n\n'
+            else
+                printf '*(no FINDING[...] markers detected in PR logs)*\n\n'
+            fi
+        else
+            printf 'After applying the diffs above, run: `bin/check-docs --since=origin/master --fix-dates`\n\n'
+        fi
+
+        printf '## Security notes\n'
+        if [[ -f "$_p7_dir/security.txt" ]]; then
+            printf '\n'
+            while IFS= read -r _p7_sf; do
+                printf -- '- %s\n' "$_p7_sf"
+            done < "$_p7_dir/security.txt"
+        fi
+    } > "$rpath"
+
+    rm -rf "$_p7_dir"
+    printf '%s\n' "$rpath"
+}
+
+# --- staleness gate ----------------------------------------------------------------------
+# Runs OUTSIDE select_prs() so its exit 1 genuinely terminates the script and no plist
+# is ever written. Must be called before PR_LIST="$(select_prs)".
+if [[ -n "$PR_ATTACK_FILE" ]]; then
+    [[ -f "$PR_ATTACK_FILE" ]] || {
+        echo "ERROR: --pr-attack file not found: $PR_ATTACK_FILE" >&2
+        exit 1
+    }
+    _old_sha="$(attack_sha "$PR_ATTACK_FILE" || true)"
+    # A missing or unparseable Base: header must fail LOUDLY. Without this, the command
+    # substitution above fails under set -e and the script exits 1 with no message at all.
+    [[ "$_old_sha" =~ ^[0-9a-f]{7,40}$ ]] || {
+        echo "ERROR: --pr-attack file has no parseable 'Base: \`master\` @ <sha>' header: $PR_ATTACK_FILE" >&2
+        exit 1
+    }
+    _cur_sha="${PR_READY_NOW_MASTER_SHA:-$(git -C "$ROOT" rev-parse --short origin/master 2>/dev/null || echo unknown)}"
+    _REPORT_MASTER_SHA="$_cur_sha"
+    # Compare on the shorter of the two lengths so a 7-vs-8-char abbreviation is not a false STALE.
+    _min="${#_old_sha}"; [[ "${#_cur_sha}" -lt "$_min" ]] && _min="${#_cur_sha}"
+    if [[ "${_old_sha:0:$_min}" != "${_cur_sha:0:$_min}" ]]; then
+        if [[ "$GO" -eq 1 ]]; then
+            write_report "$PR_ATTACK_FILE" "$_cur_sha (stale — attack pinned $_old_sha)" 0 0
+        fi
+        echo "STALE: /pr-attack file is from master@${_old_sha}, current is ${_cur_sha}. Re-run /pr-attack first." >&2
+        exit 1
+    fi
+fi
 
 # --- gh identity -------------------------------------------------------------------------
 # Resolved, never hardcoded: the local-part of the git email is NOT the GitHub login.
@@ -130,10 +500,39 @@ pr_json() {
 }
 
 select_prs() {
+    # --- pr-attack branch: pick top N from a ranked /pr-attack output file ---
+    if [[ -n "$PR_ATTACK_FILE" ]]; then
+        local f="$PR_ATTACK_FILE"
+        # Extract excluded PR numbers from the ## Excluded section only.
+        # awk section-scopes so a "- #NNNN" elsewhere in the file is not treated as excluded.
+        local excluded
+        excluded="$(awk '/^## /{inx=($0 ~ /^## Excluded/)} inx && /^- #[0-9]+/{sub(/^- #/,""); print $1}' "$f" || true)"
+        # Extract ranked PR numbers from table rows (table format: | rank | #NNNN | ...).
+        # Capture to a variable before piping to head so pipefail does not fire on SIGPIPE.
+        local ranked
+        ranked="$(grep -E '^\|[[:space:]]*[0-9]+[[:space:]]*\|[[:space:]]*#[0-9]+' "$f" \
+            | sed -E 's/^\|[^|]*\|[[:space:]]*#([0-9]+).*/\1/' || true)"
+        if [[ -z "$ranked" ]]; then
+            echo "ERROR: --pr-attack file has no orderable PRs: $f" >&2
+            exit 1
+        fi
+        # Filter excluded entries. Use grep -vxF for exact-line matching (no prefix collisions).
+        local selected
+        if [[ -n "$excluded" ]]; then
+            selected="$(echo "$ranked" | grep -vxF -f <(echo "$excluded") || true)"
+        else
+            selected="$ranked"
+        fi
+        # Take top N. Use awk instead of head -n so no SIGPIPE under set -o pipefail.
+        echo "$selected" | awk -v n="$TOP_N" 'NR<=n'
+        return
+    fi
+    # --- explicit --pr branch ---
     if [[ ${#EXPLICIT_PRS[@]} -gt 0 ]]; then
         printf '%s\n' "${EXPLICIT_PRS[@]}"
         return
     fi
+    # --- default: open non-draft PRs from gh ---
     pr_json | jq -r '.[] | select(.isDraft == false) | .number'
 }
 
@@ -153,9 +552,9 @@ validate_explicit() {
 }
 
 # --- fire list ---------------------------------------------------------------------------
-# FIRE_PRS and FIRE_BRANCHES are parallel indexed arrays, not one associative array:
-# macOS ships bash 3.2 at /bin/bash, which has no `declare -A`.
-FIRE_PRS=(); FIRE_BRANCHES=(); SKIP_LINES=()
+# FIRE_PRS, FIRE_BRANCHES, and FIRE_PRE are parallel indexed arrays, not one associative
+# array: macOS ships bash 3.2 at /bin/bash, which has no `declare -A`.
+# (Declared above the staleness gate so write_report can be called from the STALE path.)
 
 # Capture the selector into a variable rather than feeding the loop from < <(select_prs).
 # A failure inside a process substitution exits only that subshell, so an unreadable
@@ -172,32 +571,72 @@ PR_LIST="$(select_prs)" || {
 # already-running skip. `|| true` also covers Linux CI, which has no launchctl at all.
 LAUNCHCTL_LIST="$(launchctl list 2>/dev/null || true)"
 
+# Snapshot the worktree list ONCE, outside the per-PR loop (invariant across the run).
+# PR_READY_NOW_WTL: when set to a non-empty path, read the listing from that file (test
+# seam); when unset or empty, shell to git worktree list. The :- form ensures an
+# empty value falls back to git rather than pointing at an empty listing that would
+# silently skip every PR (the single-dash form would honour the empty value as-is).
+_WTL="${PR_READY_NOW_WTL:-}"
+if [[ -z "$_WTL" ]]; then
+    _WTL="/tmp/pr-ready-now-wtl.txt"
+    git -C "$ROOT" worktree list > "$_WTL"
+else
+    [[ -f "$_WTL" ]] || { echo "ERROR: PR_READY_NOW_WTL not found: $_WTL" >&2; exit 1; }
+fi
+
 while read -r pr; do
     [[ -n "$pr" ]] || continue
     # Anchored at end-of-line: the label carries no suffix, so an unanchored match
     # would let a live PR 1892 job suppress a fire for PR 189.
     if grep -qE "com\.ibl5\.pr-ready-now-${pr}$" <<< "$LAUNCHCTL_LIST"; then
-        SKIP_LINES+=("$pr|already running — skipped"); continue
+        SKIP_LINES+=("$pr|-|—|already running — skipped"); continue
     fi
     if [[ ${#EXPLICIT_PRS[@]} -gt 0 ]]; then
-        branch="$(validate_explicit "$pr")" || { rc=$?; [[ $rc -eq 2 ]] && exit 1; SKIP_LINES+=("$pr|bot- or other-authored — skipped"); continue; }
+        branch="$(validate_explicit "$pr")" || { rc=$?; [[ $rc -eq 2 ]] && exit 1; SKIP_LINES+=("$pr|-|—|bot- or other-authored — skipped"); continue; }
     else
         branch="$(pr_json | jq -r --arg n "$pr" '.[] | select(.number == ($n|tonumber)) | .headRefName')"
     fi
-    FIRE_PRS+=("$pr"); FIRE_BRANCHES+=("$branch")
+    # Pre-flight: worktree + plan check.
+    # grep -F is required: without it, [$branch] is treated as a character class.
+    # The [branch] form (not path) matches git worktree list's "path  sha [branch]" output.
+    w=""; p=""
+    if grep -qF "[$branch]" "$_WTL"; then w=WT; fi
+    if [[ -f "$HOME/claude-plans/$branch.md" ]]; then p=PLAN; fi
+    if   [[ -n "$w" && -n "$p" ]]; then pre="WT+PLAN"
+    elif [[ -n "$w" ]];            then pre="WT"
+    elif [[ -n "$p" ]];            then pre="PLAN"
+    else                                pre="—"
+    fi
+    if [[ -z "$w" ]]; then
+        SKIP_LINES+=("$pr|$branch|$pre|no worktree"); continue
+    fi
+    FIRE_PRS+=("$pr"); FIRE_BRANCHES+=("$branch"); FIRE_PRE+=("$pre")
 done <<< "$PR_LIST"
 
 # --- report ------------------------------------------------------------------------------
-printf '%-6s %-34s %s\n' "PR" "BRANCH" "STATUS"
-printf '%-6s %-34s %s\n' "------" "----------------------------------" "------"
+# printf pads %-Ns by BYTES, but the "—" placeholder is 3 bytes wide for 1 display column,
+# so a bare %-9s leaves that row 2 columns short and the STATUS column zig-zags. Pad the
+# PRE field by DISPLAY width instead. Header and separator are ASCII, so they are exempt.
+pre_col() { local v="$1" w; w=${#v}; [[ "$v" == "—" ]] && w=1; printf '%s%*s' "$v" $((9 - w)) ''; }
+printf '%-6s %-34s %-9s %s\n' "PR" "BRANCH" "PRE" "STATUS"
+printf '%-6s %-34s %-9s %s\n' "------" "----------------------------------" "---------" "------"
 # Guarded: under bash 3.2, ${!arr[@]} on an empty array trips `set -u`.
 if [[ ${#FIRE_PRS[@]} -gt 0 ]]; then
-    for i in "${!FIRE_PRS[@]}"; do printf '%-6s %-34s %s\n' "${FIRE_PRS[$i]}" "${FIRE_BRANCHES[$i]}" "WOULD FIRE"; done
+    for i in "${!FIRE_PRS[@]}"; do printf '%-6s %-34s %s %s\n' "${FIRE_PRS[$i]}" "${FIRE_BRANCHES[$i]}" "$(pre_col "${FIRE_PRE[$i]}")" "WOULD FIRE"; done
 fi
-for s  in "${SKIP_LINES[@]:-}"; do [[ -n "$s"  ]] && printf '%-6s %-34s %s\n' "${s%%|*}" "-" "SKIP (${s#*|})"; done
+for s in "${SKIP_LINES[@]:-}"; do
+    [[ -n "$s" ]] || continue
+    _sp="${s%%|*}"; _sr="${s#*|}"
+    _sb="${_sr%%|*}"; _sr="${_sr#*|}"
+    _spre="${_sr%%|*}"; _smsg="${_sr#*|}"
+    printf '%-6s %-34s %s %s\n' "$_sp" "$_sb" "$(pre_col "$_spre")" "SKIP ($_smsg)"
+done
 
 if [[ ${#FIRE_PRS[@]} -eq 0 ]]; then
     echo "no PRs selected — nothing to do."
+    if [[ "$GO" -eq 1 ]]; then
+        write_report "${PR_ATTACK_FILE:-—}" "$_REPORT_MASTER_SHA" 0 "${#SKIP_LINES[@]}"
+    fi
     exit 0
 fi
 if [[ "$GO" -eq 0 ]]; then
@@ -311,7 +750,7 @@ wait_for_slot() {
             exit 0
         fi
         sleep 5; waited=$((waited + 5))
-        if [[ $waited -ge 7200 ]]; then echo "ERROR: waited 2h for a slot; aborting" >&2; exit 1; fi
+        if [[ $waited -ge $CEILING_SECS ]]; then echo "ERROR: waited 2h for a slot; aborting" >&2; exit 1; fi
     done
 }
 
@@ -319,3 +758,32 @@ for PR in "${FIRE_PRS[@]}"; do
     wait_for_slot
     fire_pr "$PR"
 done
+
+# --- wait for completion -----------------------------------------------------------------
+# Active only when --wait and --go are both set. Polls live_slots() (plist count) until all
+# sessions finish. Under PR_READY_NOW_DRY_RUN=1 the block is skipped entirely: fire_pr
+# leaves plists on disk under dry-run, and sleeping on them would hang indefinitely.
+if [[ "$WAIT" -eq 1 && "$GO" -eq 1 ]]; then
+    if [[ -z "${PR_READY_NOW_DRY_RUN:-}" ]]; then
+        _wait_elapsed=0
+        while :; do
+            reap_stale
+            n="$(live_slots)"
+            [ "$n" -eq 0 ] && break
+            echo "waiting for $n session(s) to finish…"
+            sleep 20
+            _wait_elapsed=$((_wait_elapsed + 20))
+            if [[ $_wait_elapsed -ge $CEILING_SECS ]]; then
+                echo "TIMED OUT waiting for $n session(s); leaving them running." >&2
+                exit 1
+            fi
+        done
+    fi
+fi
+
+# --- phase 6: report ---------------------------------------------------------------------
+# Written after the wait block. Without --wait the sessions are still running here, so
+# most status rows will read NOT READY (no log) — expected (see header comment).
+if [[ "$GO" -eq 1 ]]; then
+    write_report "${PR_ATTACK_FILE:-—}" "$_REPORT_MASTER_SHA" "${#FIRE_PRS[@]}" "${#SKIP_LINES[@]}"
+fi

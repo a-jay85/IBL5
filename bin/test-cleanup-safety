@@ -518,6 +518,49 @@ assert_absent "stash-untracked-component-not-dropped" 'WOULD drop' "$out"
 # (6c) zero stashes -> no Stashes: header, no error.
 assert_absent "stash-zero-no-header" 'Stashes:' "$(run_cleanup "$(new_env)")"
 
+# ----------------------------------------------------------------------------
+# (7) Docker built-image drift guard.
+#
+# cleanup's Docker block names built images explicitly ("$project-php" etc.) and
+# matches them with a hardcoded alternation. When docker/worktree-compose.yml
+# gained a fourth built service (tailwind), both lists went stale and 175 images
+# (~570MB each) piled up unreaped. This asserts the lists stay in sync with the
+# compose file, so the next added service fails here instead of leaking disk.
+#
+# Static-only: no docker daemon, no stub — CI has no docker, and the earlier
+# cases never reach the Docker block because `command -v docker` fails there.
+# ----------------------------------------------------------------------------
+COMPOSE="$SCRIPT_DIR/../docker/worktree-compose.yml"
+if [ ! -f "$COMPOSE" ]; then
+    failcase "docker-drift-compose-missing — no file at $COMPOSE"
+else
+    # Services carrying a `build:` key are the ones compose builds an image for.
+    built_services="$(awk '
+        /^services:/            { s = 1; next }
+        s && /^[a-zA-Z]/        { s = 0 }
+        s && /^  [a-zA-Z0-9_-]+:/ { svc = $1; sub(/:$/, "", svc) }
+        s && /^    build:/      { print svc }
+    ' "$COMPOSE")"
+
+    if [ -z "$built_services" ]; then
+        failcase "docker-drift-no-built-services — awk parsed zero build: services (parser broke?)"
+    fi
+
+    # Pass 1's explicit list, e.g.  for img in "$project-php" "$project-tailwind"; do
+    img_list="$(grep -E 'for img in .*\$project-' "$CLEANUP" || true)"
+    # Pass 2's alternation, e.g.  | grep -E '^ibl5-.+-(php|browsersync|tailwind)$'
+    img_regex="$(grep -E "grep -E '\^ibl5-\.\+-\(" "$CLEANUP" || true)"
+
+    assert_match "docker-drift-pass1-list-exists" 'for img in' "$img_list"
+    assert_match "docker-drift-pass2-regex-exists" 'ibl5' "$img_regex"
+
+    while IFS= read -r svc; do
+        [ -z "$svc" ] && continue
+        assert_match "docker-drift-pass1-covers-$svc" "\\\$project-$svc" "$img_list"
+        assert_match "docker-drift-pass2-covers-$svc" "[(|]$svc[|)]"    "$img_regex"
+    done <<< "$built_services"
+fi
+
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"
     exit 1

@@ -577,8 +577,10 @@ if [ "$ALL" = true ]; then
                 if [ -n "$networks" ]; then
                     echo "$networks" | xargs docker network rm 2>/dev/null || true
                 fi
-                # Remove built images (php, browsersync)
-                for img in "$project-php" "$project-browsersync"; do
+                # Remove built images — one per service carrying a `build:` key
+                # in docker/worktree-compose.yml. Keep this list in sync with
+                # that file; bin/test-cleanup-safety asserts it (drift guard).
+                for img in "$project-php" "$project-browsersync" "$project-tailwind"; do
                     if docker image inspect "$img" &>/dev/null; then
                         docker rmi "$img" 2>/dev/null || true
                     fi
@@ -595,8 +597,8 @@ if [ "$ALL" = true ]; then
         # ~318MB for browsersync — they add up fast).
         while IFS= read -r img; do
             [ -z "$img" ] && continue
-            # Extract slug: ibl5-<slug>-(php|browsersync) -> <slug>
-            slug=$(echo "$img" | sed -E 's/^ibl5-(.+)-(php|browsersync)$/\1/')
+            # Extract slug: ibl5-<slug>-(php|browsersync|tailwind) -> <slug>
+            slug=$(echo "$img" | sed -E 's/^ibl5-(.+)-(php|browsersync|tailwind)$/\1/')
             [ "$slug" = "$img" ] && continue
             # Skip if slug belongs to an active worktree
             if echo "$active_slugs" | tr ' ' '\n' | grep -qx "$slug" 2>/dev/null; then
@@ -610,7 +612,7 @@ if [ "$ALL" = true ]; then
             fi
             CLEANED=$((CLEANED + 1))
         done < <(docker images --format '{{.Repository}}' \
-            | grep -E '^ibl5-.+-(php|browsersync)$' \
+            | grep -E '^ibl5-.+-(php|browsersync|tailwind)$' \
             | sort -u)
 
         # Third pass: sweep orphaned volumes (pattern: ibl5-<slug>_<suffix>).
@@ -634,6 +636,62 @@ if [ "$ALL" = true ]; then
         done < <(docker volume ls --format '{{.Name}}' \
             | grep -E '^ibl5-.+_.+$' \
             | sort -u)
+
+        # Fourth pass: sweep stranded ANONYMOUS volumes.
+        #
+        # Why the first three passes can't reach these: the tailwind service in
+        # docker/worktree-compose.yml mounts an anonymous volume for
+        # node_modules. Anonymous volumes get a random 64-hex name (so pass 3's
+        # ibl5-<slug>_<suffix> pattern never matches) and carry no
+        # com.docker.compose.project label (so pass 1's label filter never
+        # matches). Pass 1 also removes containers before volumes, which strands
+        # them by construction — running this pass last mops up what pass 1 just
+        # orphaned, so no inspect-before-rm dance is needed.
+        #
+        # Why this is safe:
+        #   - dangling=true means NO container references the volume. A stopped
+        #     or even merely `created` container still counts as a reference, so
+        #     a live or paused stack (IBL5 or otherwise) is never touched.
+        #     Verified empirically 2026-08-24.
+        #   - label=com.docker.volume.anonymous excludes every NAMED volume.
+        #     The DB volume is declared `db-data:` (named) in
+        #     docker/worktree-compose.yml, so this pass structurally cannot
+        #     delete a database. The only anonymous volume we create is
+        #     node_modules, which is regenerable.
+        #   - This filter is strictly narrower than `docker volume prune`.
+        #
+        # Note: the filter is not IBL5-scoped — an anonymous volume carries no
+        # project label to scope on. Any unreferenced anonymous volume from any
+        # project is swept.
+        while IFS= read -r vol; do
+            [ -z "$vol" ] && continue
+            if [ "$DRY_RUN" = true ]; then
+                echo "  WOULD remove stranded anonymous volume: $vol"
+            else
+                echo "  Removing stranded anonymous volume: $vol"
+                docker volume rm "$vol" 2>/dev/null || true
+            fi
+            CLEANED=$((CLEANED + 1))
+        done < <(docker volume ls -q \
+            --filter dangling=true \
+            --filter label=com.docker.volume.anonymous)
+
+        # Fifth pass: reclaim unused build cache. Deliberately NOT `-a`:
+        # plain `prune` drops only cache not referenced by an existing image,
+        # leaving warm layers so the next bin/wt-up stays fast. `-a` would
+        # nuke everything and make the next worktree build slow from scratch.
+        #
+        # The dry-run branch deliberately does NOT report the reclaimable size:
+        # `docker system df` walks every image layer and routinely takes minutes
+        # on a large local daemon, and bin/test-cleanup-safety runs cleanup in
+        # dry-run once per case. Run `docker system df` by hand if you want the
+        # number.
+        if [ "$DRY_RUN" = true ]; then
+            echo "  WOULD prune unused build cache"
+        else
+            echo "  Pruning unused build cache..."
+            docker builder prune -f >/dev/null 2>&1 || true
+        fi
     fi
 
     # Surface stashes (informational; DROP only with --drop-merged-stashes AND

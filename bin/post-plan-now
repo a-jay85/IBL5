@@ -159,8 +159,12 @@ fi
 # the same autoCompactWindow setting an interactive session uses — rationale and
 # the tripwire for re-adding an explicit window in bin/automouse/run.
 # CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 stops the harness terminating a
-# long-running backgrounded sub-agent mid-run (see bin/plan-now for the full
-# rationale). Applies to the /post-plan skill fallback only.
+# long-running backgrounded sub-AGENT mid-run (see bin/plan-now for the full
+# rationale). Applies to the /post-plan skill fallback only. It does NOT extend to a
+# backgrounded Bash shell: the sweep's other trigger ignores the ceiling and kills
+# `local_bash` tasks once nothing awaitable is left, which is why /post-plan Phase 5
+# mandates an in-turn BashOutput drain barrier and bash-guard.sh check 17 denies
+# `run_in_background: true` under CLAUDE_HEADLESS.
 #
 # The command line is assembled as PLAIN shell text first — literal `&&`, and
 # whatever `<`/`>`/`&` the prompt happens to carry — then XML-escaped exactly once

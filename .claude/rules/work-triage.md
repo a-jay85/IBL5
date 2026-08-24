@@ -1,6 +1,6 @@
 ---
-description: Triage every non-trivial unit of work as ad-hoc vs /plan before starting; ad-hoc bar, ad-hoc safety mirror, Sonnet execution-routing (trigger stays resident, reasoning in work-triage-detail.md), hard trigger (≥5 files), and calibration.
-last_verified: 2026-08-10
+description: Triage every non-trivial unit of work as ad-hoc vs /plan before starting; ad-hoc bar, ad-hoc safety mirror, Sonnet execution-routing, hard trigger (≥5 files), /plan-verdict routing (bin/plan-now, never inline), and calibration.
+last_verified: 2026-08-21
 ---
 
 # Work Triage Rule
@@ -23,7 +23,7 @@ If any are open, it wants a `/plan`.
 
 ## Ad-hoc safety mirror
 
-Even when the bar says ad-hoc, run a quick safety check — the surfaces `/plan` Step 4 gate 14 holds the merge for, plus the `plan-architect-xhigh` escalation surface. If the change touches any of:
+Even when the bar says ad-hoc, run a quick safety check. If the change touches any of:
 - a **security surface** (SQL, POST/form endpoint, auth/authz-gated route, user-facing output rendering),
 - a **destructive or schema-tightening migration**,
 - **new or redesigned user-visible UI/UX**,
@@ -49,7 +49,11 @@ Stay inline (Opus edits directly) only when: the edits are genuinely **entangled
 
 **The numeric rule: the fifth distinct repo file you edit on the main thread within one user turn is the handoff point.** Four files is a change; five is a sweep. Route the remainder to one `subagent_type: "sonnet-4-6"` sub-agent (omit `model`) before making that fifth edit — don't wait to be stopped.
 
-Enforced by `~/.claude/hooks/plan-gate-edit.sh` **§ Check 1**, which **denies** the Edit/Write — the gate cannot be read past, and its deny message carries the routing instruction and the escape hatch. The same hook also denies *Reads* under an unrelated check (the cross-worktree straddle gate); only Check 1 is the sweep trigger. Gate properties, escape hatch, and self-test: `work-triage-detail.md` § Hard trigger.
+Enforced by `~/.claude/hooks/plan-gate-edit.sh` **§ Check 1**, which **denies** the Edit/Write — the gate cannot be read past, and its deny message carries the routing instruction and the escape hatch. Gate properties and self-test: `work-triage-detail.md` § Hard trigger.
+
+## Execution routing: a `/plan` verdict routes to `bin/plan-now`, never inline
+
+Never execute a `/plan` verdict as inline `Skill(plan)` — it burns the whole orchestrator through every `/plan` phase. Route via `/plan-prompt` → `bin/plan-now` (detached Sonnet 4.6); `~/.claude/hooks/plan-gate-skill.sh` denies it. Exemptions and escape hatch: `work-triage-detail.md` § `/plan` verdict routing.
 
 ## Execution routing: repeat-polling is a spend bug
 

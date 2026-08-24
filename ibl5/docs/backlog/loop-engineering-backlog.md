@@ -96,7 +96,7 @@ last_verified: 2026-08-24
 **Status (2026-07-07):** ⬜ Open — 🟦.
 
 ### L6 Auto-update-branch unsticker
-**Location:** `.github/workflows/update-behind-prs.yml` — scheduled every 15 min; calls the GitHub `update-branch` API for armed auto-merge PRs stuck BEHIND master. ADR-0081 records the CI_PAT token strategy, merge-vs-rebase decision, and loop-safety design.
+**Location:** `.github/workflows/update-behind-prs.yml` — scheduled every 15 min; calls the GitHub `update-branch` API for every open non-draft PR stuck BEHIND master (scope widened from armed-only by #1936), debounced on an hour of master quiet. ADR-0081 records the CI_PAT token strategy, merge-vs-rebase decision, loop-safety design, and the debounce amendment.
 **Status (2026-07-10):** ✅ Implemented — merged PR #1390.
 
 ➜ L7 Queue-add shift-left preflight — ✅ Implemented (2026-06-27): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).

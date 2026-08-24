@@ -2,7 +2,7 @@ name: Update BEHIND PRs
 
 on:
   schedule:
-    - cron: '*/15 * * * *'   # every 15 min — worst-case unstick latency for an armed BEHIND PR
+    - cron: '*/15 * * * *'   # every 15 min — ticks are cheap; the debounce below decides which act
   workflow_dispatch:          # manual trigger for on-demand runs + the dispatch smoke test
 
 permissions:
@@ -22,11 +22,57 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.CI_PAT }}
           REPO: ${{ github.repository }}
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
 
           OWNER="${REPO%/*}"
           NAME="${REPO#*/}"
+
+          # 0. Debounce on master quiet time.
+          #
+          #    A master merge is what puts every open PR BEHIND, and updating a PR pushes a
+          #    merge commit that fans out the full ~11-workflow CI matrix. With the all-open-PRs
+          #    scope (#1936) the first tick after any merge therefore updates ~30 PRs at once —
+          #    one merge becomes ~300 CI runs, and a merge-heavy afternoon becomes several such
+          #    storms. Nothing about that is load-bearing: BEHIND is not urgent, because this
+          #    workflow never merges and never arms auto-merge.
+          #
+          #    So wait until master has been quiet for DEBOUNCE_SECONDS before acting. A burst
+          #    of merges coalesces into a single update pass once the burst ends, instead of one
+          #    pass per merge. Cost: on a day where master moves more often than the window,
+          #    PRs go un-updated until the run rate drops — acceptable, since a stale-but-clean
+          #    PR blocks nothing.
+          #
+          #    workflow_dispatch bypasses the wait, so on-demand unsticking and the dispatch
+          #    smoke test still work immediately.
+          DEBOUNCE_SECONDS=3600
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "Manual dispatch — bypassing the master-quiet debounce."
+          else
+            master_date=$(gh api "repos/$REPO/commits/master" --jq '.commit.committer.date' || true)
+
+            if [ -z "$master_date" ]; then
+              # Fail open: a transient API error must not silently park PR updates forever.
+              # Proceeding costs a storm at worst; skipping on every tick would be invisible.
+              echo "::warning::Could not read master's last commit date — proceeding without debounce."
+            else
+              master_epoch=$(date -u -d "$master_date" +%s)
+              quiet_for=$(( $(date -u +%s) - master_epoch ))
+
+              if [ "$quiet_for" -lt "$DEBOUNCE_SECONDS" ]; then
+                echo "master last moved ${quiet_for}s ago (< ${DEBOUNCE_SECONDS}s) — debouncing."
+                {
+                  echo "## Update BEHIND PRs"
+                  echo "- Skipped: master moved ${quiet_for}s ago, within the ${DEBOUNCE_SECONDS}s debounce window."
+                } >> "$GITHUB_STEP_SUMMARY"
+                exit 0
+              fi
+
+              echo "master quiet for ${quiet_for}s (>= ${DEBOUNCE_SECONDS}s) — proceeding."
+            fi
+          fi
 
           # 1. Enumerate ALL open, non-draft PRs targeting master, with their merge state
           #    and head SHA. Categorization happens in the loop below so the step summary

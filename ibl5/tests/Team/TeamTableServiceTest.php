@@ -342,4 +342,128 @@ class TeamTableServiceTest extends TestCase
         $service = new TeamTableService($this->mockDb, $repository);
         $service->getRosterAndStarters(5);
     }
+
+    // ============================================
+    // Phase 1 characterization — expiring players & the starter set
+    // ============================================
+
+    /**
+     * Executable form of the Phase 1.2 decision: an expiring-contract player who is
+     * not the depth-chart starter must not acquire a star when the offseason roster
+     * query is widened to include him.
+     *
+     * Scope note — the plan's 1.2 prose describes starters as coming from a separate
+     * starters table. That is not how this codebase works: extractStartersData() is
+     * *roster-derived*, reading the `*_depth` columns carried on each roster row. The
+     * exclusion is therefore a property of the depth values, not of the roster filter
+     * — which the companion test below proves, and which is why getTableOutput()
+     * narrows the row set it feeds to extractStartersData() when $markExpiringRows is
+     * on (the narrowing-filter contingency the plan pre-authorised in 1.2).
+     */
+    public function testExtractStartersDataIgnoresExpiringRosterRows(): void
+    {
+        $roster = [
+            ['pid' => 501, 'name' => 'Contracted Starter', 'teamid' => 7, 'cy' => 1, 'cyt' => 3, 'pg_depth' => 1, 'sg_depth' => 0, 'sf_depth' => 0, 'pf_depth' => 0, 'c_depth' => 0],
+            ['pid' => 502, 'name' => 'Expiring Bench', 'teamid' => 7, 'cy' => 3, 'cyt' => 3, 'pg_depth' => 2, 'sg_depth' => 0, 'sf_depth' => 0, 'pf_depth' => 0, 'c_depth' => 0],
+        ];
+
+        $starters = $this->service->extractStartersData($roster);
+
+        $pids = [];
+        foreach ($starters as $data) {
+            if ($data['pid'] !== null) {
+                $pids[] = $data['pid'];
+            }
+        }
+
+        $this->assertContains(501, $pids, 'The contracted depth-1 player is the starter');
+        $this->assertNotContains(502, $pids, 'The expiring player must not acquire a star');
+    }
+
+    /**
+     * Negative/boundary companion to the test above. Seeding the *expiring* player at
+     * depth 1 must return his pid. Without this, the assertion above would pass for
+     * the wrong reason (any always-empty starter set satisfies "does not contain"),
+     * and it is what makes the roster-derived derivation fail loudly.
+     */
+    public function testExtractStartersDataReturnsExpiringPidWhenSeededAsStarter(): void
+    {
+        $roster = [
+            ['pid' => 502, 'name' => 'Expiring Starter', 'teamid' => 7, 'cy' => 3, 'cyt' => 3, 'pg_depth' => 1, 'sg_depth' => 0, 'sf_depth' => 0, 'pf_depth' => 0, 'c_depth' => 0],
+        ];
+
+        $starters = $this->service->extractStartersData($roster);
+
+        $this->assertSame(502, $starters['PG']['pid']);
+        $this->assertSame('Expiring Starter', $starters['PG']['name']);
+    }
+
+    /**
+     * Phase 1.4 characterization: getRosterAndStarters() — the entry point used by
+     * the Trading preview (TradeRosterPreviewApiHandler:98) and the Depth Chart
+     * (DepthChartEntryController:222) — must keep routing to getFreeAgencyRoster()
+     * during the offseason, i.e. to the query that carries `AND cyt != cy`, and must
+     * pass its rows through untouched.
+     *
+     * The SQL-level exclusion itself is pinned by the DatabaseIntegration test
+     * TeamRepositoryTest::testGetFreeAgencyRosterExcludesExpiringContracts(); this
+     * unit test pins the *routing*, which is the part this PR could regress.
+     */
+    public function testGetRosterAndStartersExcludesExpiringPlayers(): void
+    {
+        $season = self::createStub(Season::class);
+        $season->method('isOffseasonPhase')->willReturn(true);
+
+        // Exactly the rows getFreeAgencyRoster()'s `AND cyt != cy` filter returns.
+        $filtered = [
+            ['pid' => 601, 'name' => 'Contracted Guy', 'teamid' => 7, 'cy' => 1, 'cyt' => 3, 'pg_depth' => 1, 'sg_depth' => 0, 'sf_depth' => 0, 'pf_depth' => 0, 'c_depth' => 0],
+        ];
+
+        $repository = $this->createMock(\Team\Contracts\TeamRepositoryInterface::class);
+        $repository->expects($this->once())->method('getFreeAgencyRoster')->with(7)->willReturn($filtered);
+        $repository->expects($this->never())->method('getRosterUnderContract');
+
+        $service = new TeamTableService($this->mockDb, $repository, $season);
+        $out = $service->getRosterAndStarters(7);
+
+        $names = array_column($out['roster'], 'name');
+        $this->assertSame(['Contracted Guy'], $names);
+        $this->assertNotContains('Expiring Guy', $names);
+        $this->assertSame([601], $out['starterPids']);
+    }
+
+    /**
+     * Boundary guard against an over-broad filter: a player in a later contract year
+     * who is NOT expiring (cy 3 of 4) must still reach the Trading/Depth Chart roster.
+     */
+    public function testGetRosterAndStartersIncludesMidContractPlayer(): void
+    {
+        $season = self::createStub(Season::class);
+        $season->method('isOffseasonPhase')->willReturn(true);
+
+        $filtered = [
+            ['pid' => 603, 'name' => 'Mid Contract Guy', 'teamid' => 7, 'cy' => 3, 'cyt' => 4, 'pg_depth' => 0, 'sg_depth' => 0, 'sf_depth' => 0, 'pf_depth' => 0, 'c_depth' => 0],
+        ];
+
+        $repository = $this->createMock(\Team\Contracts\TeamRepositoryInterface::class);
+        $repository->expects($this->once())->method('getFreeAgencyRoster')->with(7)->willReturn($filtered);
+        $repository->expects($this->never())->method('getRosterUnderContract');
+
+        $service = new TeamTableService($this->mockDb, $repository, $season);
+        $out = $service->getRosterAndStarters(7);
+
+        $this->assertContains('Mid Contract Guy', array_column($out['roster'], 'name'));
+    }
+
+    /**
+     * getRosterAndStarters() is deliberately frozen at one parameter — the shared
+     * consumers call it positionally and this PR must not thread anything through it.
+     */
+    public function testGetRosterAndStartersSignatureUnchanged(): void
+    {
+        $method = new \ReflectionMethod(TeamTableService::class, 'getRosterAndStarters');
+
+        $this->assertSame(1, $method->getNumberOfParameters());
+        $this->assertSame('teamid', $method->getParameters()[0]->getName());
+    }
 }

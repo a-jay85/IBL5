@@ -411,6 +411,24 @@ class TeamRepositoryTest extends DatabaseTestCase
 
     // ── getFreeAgencyRoster ────────────────────────────────────
 
+    /**
+     * SCOPE NOTE (see plan: team-page-expiring-players-faded).
+     *
+     * The `cyt != cy` exclusion pinned here is deliberately retained. As of the
+     * expiring-players-faded change the Team page no longer uses this query --
+     * TeamTableService::getTableOutput() calls getRosterUnderContract() in every
+     * current-season phase so expiring players stay visible and render faded.
+     *
+     * getFreeAgencyRoster() is still the roster source for
+     * TeamTableService::getRosterAndStarters(), and therefore for both
+     * Trading\TradeRosterPreviewApiHandler and
+     * DepthChartEntry\DepthChartEntryController. Those two consumers must NOT
+     * show expiring players. Removing this filter or this test changes their
+     * rendered output.
+     *
+     * The widened counterpart is covered by
+     * testGetRosterUnderContractIncludesExpiringContracts() below.
+     */
     public function testGetFreeAgencyRosterExcludesExpiringContracts(): void
     {
         // Non-expiring: cy=1, cyt=3 (cy != cyt → included)
@@ -423,6 +441,47 @@ class TeamRepositoryTest extends DatabaseTestCase
         $names = array_column($result, 'name');
         self::assertContains('FA Roster Keep', $names);
         self::assertNotContains('FA Roster Expire', $names);
+    }
+
+    // ── getRosterUnderContract ─────────────────────────────────
+
+    /**
+     * The widened counterpart of the exclusion above. getRosterUnderContract() is
+     * getFreeAgencyRoster() without the `cyt != cy` filter, which is exactly why the
+     * Team page can now use one source in every current-season phase and render the
+     * expiring players faded instead of dropping them.
+     */
+    public function testGetRosterUnderContractIncludesExpiringContracts(): void
+    {
+        // Non-expiring: cy=1, cyt=3 (cy != cyt)
+        $this->insertTestPlayer(200100011, 'UC Roster Keep', ['teamid' => 1, 'cy' => 1, 'cyt' => 3]);
+        // Expiring: cy=3, cyt=3 (cy == cyt) — excluded by getFreeAgencyRoster(), kept here
+        $this->insertTestPlayer(200100012, 'UC Roster Expire', ['teamid' => 1, 'cy' => 3, 'cyt' => 3]);
+
+        $result = $this->repo->getRosterUnderContract(1);
+
+        $names = array_column($result, 'name');
+        self::assertContains('UC Roster Keep', $names);
+        self::assertContains('UC Roster Expire', $names);
+    }
+
+    /**
+     * Boundary: widening for expiring contracts must not also widen for retired
+     * players. A retired player has no business on any roster view.
+     */
+    public function testGetRosterUnderContractStillExcludesRetiredPlayers(): void
+    {
+        $this->insertTestPlayer(200100013, 'UC Active Guy', ['teamid' => 1, 'retired' => 0]);
+        $this->insertTestPlayer(200100014, 'UC Retired Guy', ['teamid' => 1, 'retired' => 1]);
+        // Retired AND expiring — the intersection must stay excluded.
+        $this->insertTestPlayer(200100015, 'UC Retired Expire', ['teamid' => 1, 'retired' => 1, 'cy' => 3, 'cyt' => 3]);
+
+        $result = $this->repo->getRosterUnderContract(1);
+
+        $names = array_column($result, 'name');
+        self::assertContains('UC Active Guy', $names);
+        self::assertNotContains('UC Retired Guy', $names);
+        self::assertNotContains('UC Retired Expire', $names);
     }
 
     // ── getEntireLeagueRoster ───────────────────────────────────

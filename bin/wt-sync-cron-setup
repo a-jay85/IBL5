@@ -67,11 +67,15 @@ build_plist() {
 	<dict>
 		<!-- launchd agents start with a minimal PATH that omits Homebrew and
 		     ~/.local/bin (where the Claude Code native installer puts claude).
-		     git and ioreg must resolve. HOME interpolates HERE, at generation
-		     time — launchd does NOT expand variables in EnvironmentVariables,
-		     so a literal $HOME would bake in a dead path. -->
+		     Every binary the tick shells out to must resolve here: git, lsof,
+		     and ioreg — ioreg lives in /usr/sbin, which an earlier revision of
+		     this list omitted, silently fail-closing every tick. bin/test-wt-sync-tick
+		     asserts this PATH resolves all three; add the dir, don't drop a tool.
+		     HOME interpolates HERE, at generation time — launchd does NOT expand
+		     variables in EnvironmentVariables, so a literal $HOME would bake in
+		     a dead path. -->
 		<key>PATH</key>
-		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${HOME}/.local/bin</string>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${HOME}/.local/bin</string>
 	</dict>
 	<key>StandardOutPath</key>
 	<string>${LOG_DIR}/launchd-stdout.log</string>

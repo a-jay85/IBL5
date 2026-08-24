@@ -32,6 +32,11 @@ WT_SYNC_ENABLED="${WT_SYNC_ENABLED:-1}"
 WT_SYNC_IDLE_SECS="${WT_SYNC_IDLE_SECS:-600}"
 WT_SYNC_LOCK_DIR="${WT_SYNC_LOCK_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/wt-sync}"
 WT_SYNC_LOG="${WT_SYNC_LOG:-$WT_SYNC_LOCK_DIR/wt-sync.log}"
+# WT_SYNC_IOREG: absolute path to the idle reader. Absolute on purpose — the
+# launchd agent runs with a curated PATH, and when that PATH omitted /usr/sbin
+# (where ioreg lives) a bare `ioreg` resolved to nothing and the presence gate
+# fail-closed on EVERY tick, silently, for days. Tests override this to a stub.
+WT_SYNC_IOREG="${WT_SYNC_IOREG:-/usr/sbin/ioreg}"
 # WT_SYNC_REPO_ROOT: override the git-derived repo root (tests set this to a
 # synthetic repo so real worktrees are never touched).
 # WT_SYNC_REPO_ROOT defaults to empty — actual derivation happens below, after
@@ -62,11 +67,20 @@ if [ "$WT_SYNC_ENABLED" = "0" ]; then
 fi
 
 # ── Presence gate (HID idle) ──────────────────────────────────────────────────
-# Read idle seconds from the HID system. VERIFIED working on Darwin 25.5 —
-# returns 0 while the operator types.
-# Fail-closed: empty or non-numeric → treat as operator present, never sync.
+# Read idle seconds from the HID system (macOS-only; ADR-0106).
+# Verified interactively on Darwin 25.5 — returns 0 while the operator types.
+# That is NOT evidence the launchd agent can reach the binary: the tool worked
+# in a login shell for days while every cron tick died on `command not found`.
+# Deployment reachability is asserted by bin/test-wt-sync-tick Test 13.
+# Fail-closed: missing binary, empty, or non-numeric → operator present, never sync.
 if [ "$FORCE" = false ]; then
-    idle="$(ioreg -c IOHIDSystem | awk '/HIDIdleTime/ {print int($NF/1000000000); exit}' 2>/dev/null)"
+    # Distinct from the "unreadable value" case below: a missing binary is a
+    # deployment bug (bad PATH, moved tool), not a transient HID read failure.
+    if [ ! -x "$WT_SYNC_IOREG" ]; then
+        log "idle reader missing or not executable ('$WT_SYNC_IOREG') — treating as operator present (fail-closed)"
+        exit 0
+    fi
+    idle="$("$WT_SYNC_IOREG" -c IOHIDSystem | awk '/HIDIdleTime/ {print int($NF/1000000000); exit}' 2>/dev/null)"
     case "$idle" in
         ''|*[!0-9]*)
             log "idle value unreadable ('${idle:-<empty>}') — treating as operator present (fail-closed)"

@@ -18,7 +18,9 @@ DRIVER="$SCRIPT_DIR/pr-ready-now"
 [[ -x "$DRIVER" ]] || { echo "FAIL: $DRIVER missing or not executable" >&2; exit 1; }
 
 SCRATCH="$(mktemp -d)"
-trap 'rm -rf "$SCRATCH"' EXIT
+TMP_LOGS=()
+_cleanup() { rm -rf "$SCRATCH"; [[ ${#TMP_LOGS[@]} -gt 0 ]] && rm -f "${TMP_LOGS[@]}"; }
+trap _cleanup EXIT
 
 FAILED=0
 CASE_BASE=0
@@ -35,6 +37,19 @@ mkdir -p "$SCRATCH/.local/bin" "$SCRATCH/.bun/bin"
 printf '#!/usr/bin/env bash\nexit 0\n' > "$SCRATCH/.local/bin/claude-stub"
 chmod +x "$SCRATCH/.local/bin/claude-stub"
 CLAUDE_STUB="$SCRATCH/.local/bin/claude-stub"
+
+# Worktree listing fixture. The driver's pre-flight check greps this for "[<branch>]";
+# without it the check falls back to the REAL `git worktree list`, where none of the
+# fixture branches exist, and every fixture PR would skip as "no worktree".
+# Format mirrors `git worktree list`: <path>  <sha> [<branch>]. Note the branch name is
+# NOT the last path segment -- that is exactly what the -qF "[$b]" form exists to handle.
+WTL_FIXTURE="$SCRATCH/wtl.txt"
+cat > "$WTL_FIXTURE" <<EOF
+/Users/x/GitHub/IBL5                                  1111111 [master]
+/Users/x/GitHub/IBL5-worktrees/first-slug/ibl5        2222222 [branch-one]
+/Users/x/GitHub/IBL5-worktrees/second-slug/ibl5       3333333 [branch-two]
+/Users/x/GitHub/IBL5-worktrees/live-slug/ibl5         4444444 [branch-live]
+EOF
 
 cat > "$SCRATCH/two-open.json" <<'JSON'
 [
@@ -86,6 +101,9 @@ if [[ "\${1:-}" == "list" && \$# -eq 1 ]]; then
         i=\$((i + 1))
     done
 fi
+if [[ "\${1:-}" == "list" && \$# -eq 2 ]]; then
+    grep -qF "\${2}" "$SCRATCH/launchctl-list.txt" 2>/dev/null && exit 0 || exit 1
+fi
 exit 0
 LC_EOF
 chmod +x "$SCRATCH/.local/bin/launchctl"
@@ -100,6 +118,7 @@ run_driver() {
         PATH="$SCRATCH/.local/bin:$PATH" \
         PR_READY_NOW_CLAUDE="$CLAUDE_STUB" \
         PR_READY_NOW_GH_USER=a-jay85 \
+        PR_READY_NOW_WTL="${PR_READY_NOW_WTL-$WTL_FIXTURE}" \
         "$DRIVER" "$@"
 }
 
@@ -111,7 +130,9 @@ plist_count() {
     printf '%s\n' "$n"
 }
 
-clean_slots() { rm -rf "$SCRATCH/Library/LaunchAgents"; }
+clean_slots() { rm -rf "$SCRATCH/Library/LaunchAgents"; clear_live_labels; }
+
+field() { grep -o "<key>$2</key><string>[^<]*</string>" "$1" | sed "s|<key>$2</key><string>||; s|</string>||"; }
 
 # --- case 1: --help ----------------------------------------------------------------------
 begin_case
@@ -174,7 +195,6 @@ out="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" PR_READY_NOW_DRY_RUN=1 run_
 P1="$SCRATCH/Library/LaunchAgents/com.ibl5.pr-ready-now-1901.plist"
 P2="$SCRATCH/Library/LaunchAgents/com.ibl5.pr-ready-now-1902.plist"
 if [[ -f "$P1" && -f "$P2" ]]; then
-    field() { grep -o "<key>$2</key><string>[^<]*</string>" "$1" | sed "s|<key>$2</key><string>||; s|</string>||"; }
     for k in Label StandardOutPath; do
         v1="$(field "$P1" "$k")"; v2="$(field "$P2" "$k")"
         [[ -n "$v1" && -n "$v2" ]] || fail "$k empty in a plist (1901='$v1' 1902='$v2')"
@@ -246,7 +266,7 @@ set_live_labels "40477	0	com.ibl5.pr-ready-now-1901"
 out="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" run_driver 2>&1)"; rc=$?
 [[ $rc -eq 0 ]]                            || fail "already-running run exited $rc, want 0 (out: $out)"
 grep -q 'already running' <<< "$out"       || fail "live PR 1901 was not skipped"
-grep -qE '1902 +branch-two +WOULD FIRE' <<< "$out" || fail "PR 1902 should still fire (out: $out)"
+grep -qE '1902 +branch-two +WT +WOULD FIRE' <<< "$out" || fail "PR 1902 should still fire with PRE=WT (out: $out)"
 end_case already-running-skip
 
 # --- case 10: label match is end-anchored -------------------------------------------------
@@ -257,9 +277,700 @@ set_live_labels "40477	0	com.ibl5.pr-ready-now-19011"
 out="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" run_driver 2>&1)"; rc=$?
 [[ $rc -eq 0 ]]                       || fail "anchor run exited $rc, want 0 (out: $out)"
 grep -q 'already running' <<< "$out"  && fail "PR 19011's label wrongly suppressed a different PR"
-grep -qE '1901 +branch-one +WOULD FIRE' <<< "$out" || fail "PR 1901 should fire (out: $out)"
+grep -qE '1901 +branch-one +WT +WOULD FIRE' <<< "$out" || fail "PR 1901 should fire with PRE=WT (out: $out)"
 clear_live_labels
 end_case label-anchor
+
+# --- Phase 8 fixture setup ---------------------------------------------------------------
+# Shared fixtures for cases 11-30.
+
+ATTACK_SHA="abc1234"   # 7 valid hex digits — matched against the attack-fresh.md Base: line
+
+# Extended WTL: covers attack-path branches (branch-r1..r8, branch-s1..s3), preflight
+# combos (wt-and-plan, wt-only), report-status branches (branch-ready, branch-notready,
+# branch-mmtf, branch-nolog), and grep-form branches (foo, foo-bar).
+WTL8="$SCRATCH/wtl8.txt"
+cat > "$WTL8" <<EOF
+/Users/x/IBL5                                 0000abc [master]
+/Users/x/IBL5-worktrees/r1/ibl5              1111111 [branch-r1]
+/Users/x/IBL5-worktrees/r2/ibl5              2222222 [branch-r2]
+/Users/x/IBL5-worktrees/r3/ibl5              3333333 [branch-r3]
+/Users/x/IBL5-worktrees/r4/ibl5              4444444 [branch-r4]
+/Users/x/IBL5-worktrees/r5/ibl5              5555555 [branch-r5]
+/Users/x/IBL5-worktrees/r6/ibl5              6666666 [branch-r6]
+/Users/x/IBL5-worktrees/r7/ibl5              7777777 [branch-r7]
+/Users/x/IBL5-worktrees/r8/ibl5              8888888 [branch-r8]
+/Users/x/IBL5-worktrees/s1/ibl5              aaaaaaa [branch-s1]
+/Users/x/IBL5-worktrees/s2/ibl5              bbbbbbb [branch-s2]
+/Users/x/IBL5-worktrees/s3/ibl5              ccccccc [branch-s3]
+/Users/x/IBL5-worktrees/wt-and-plan/ibl5     ddddddd [wt-and-plan]
+/Users/x/IBL5-worktrees/wt-only/ibl5         eeeeeee [wt-only]
+/Users/x/IBL5-worktrees/ready/ibl5           fffffff [branch-ready]
+/Users/x/IBL5-worktrees/notready/ibl5        1234567 [branch-notready]
+/Users/x/IBL5-worktrees/mmtf/ibl5            2345678 [branch-mmtf]
+/Users/x/IBL5-worktrees/nolog/ibl5           3456789 [branch-nolog]
+/Users/x/IBL5-worktrees/foo/ibl5             4567890 [foo]
+/Users/x/IBL5-worktrees/foo-bar/ibl5         5678901 [foo-bar]
+EOF
+
+# attack-fresh.md: 8 ranked PRs (1910-1917), 1 excluded (1912), sha=ATTACK_SHA.
+cat > "$SCRATCH/attack-fresh.md" <<EOF
+# /pr-attack output fixture
+
+Base: \`master\` @ ${ATTACK_SHA} · 8 open · 8 orderable · 1 excluded
+
+| rank | PR | title |
+|------|----|----|
+| 1 | #1910 | r1 |
+| 2 | #1911 | r2 |
+| 3 | #1912 | r3 |
+| 4 | #1913 | r4 |
+| 5 | #1914 | r5 |
+| 6 | #1915 | r6 |
+| 7 | #1916 | r7 |
+| 8 | #1917 | r8 |
+
+## Excluded
+- #1912
+EOF
+
+# attack-stale.md: same structure but sha=aaaaaaa (mismatches ATTACK_SHA → STALE).
+cat > "$SCRATCH/attack-stale.md" <<EOF
+# /pr-attack output fixture
+
+Base: \`master\` @ aaaaaaa · 8 open · 8 orderable · 1 excluded
+
+| rank | PR | title |
+|------|----|----|
+| 1 | #1910 | r1 |
+| 2 | #1911 | r2 |
+| 3 | #1912 | r3 |
+
+## Excluded
+- #1912
+EOF
+
+# attack-empty.md: valid Base: sha but no ranked table rows → select_prs errors out.
+cat > "$SCRATCH/attack-empty.md" <<EOF
+# /pr-attack output fixture
+
+Base: \`master\` @ ${ATTACK_SHA} · 0 open · 0 orderable · 0 excluded
+
+## Excluded
+(none)
+EOF
+
+# attack-short.md: 3 ranked PRs (1920-1922), no excluded, sha=ATTACK_SHA.
+cat > "$SCRATCH/attack-short.md" <<EOF
+# /pr-attack output fixture
+
+Base: \`master\` @ ${ATTACK_SHA} · 3 open · 3 orderable · 0 excluded
+
+| rank | PR | title |
+|------|----|----|
+| 1 | #1920 | s1 |
+| 2 | #1921 | s2 |
+| 3 | #1922 | s3 |
+
+## Excluded
+(none)
+EOF
+
+# JSON for the 1910-1922 PR universe (used so the fire loop can resolve headRefName
+# for each PR number when --pr-attack is in effect).
+cat > "$SCRATCH/attack-8prs.json" <<'JSON'
+[
+  {"number": 1910, "title": "r1",      "isDraft": false, "headRefName": "branch-r1", "author": {"login": "a-jay85"}},
+  {"number": 1911, "title": "r2",      "isDraft": false, "headRefName": "branch-r2", "author": {"login": "a-jay85"}},
+  {"number": 1912, "title": "r3-excl", "isDraft": false, "headRefName": "branch-r3", "author": {"login": "a-jay85"}},
+  {"number": 1913, "title": "r4",      "isDraft": false, "headRefName": "branch-r4", "author": {"login": "a-jay85"}},
+  {"number": 1914, "title": "r5",      "isDraft": false, "headRefName": "branch-r5", "author": {"login": "a-jay85"}},
+  {"number": 1915, "title": "r6",      "isDraft": false, "headRefName": "branch-r6", "author": {"login": "a-jay85"}},
+  {"number": 1916, "title": "r7",      "isDraft": false, "headRefName": "branch-r7", "author": {"login": "a-jay85"}},
+  {"number": 1917, "title": "r8",      "isDraft": false, "headRefName": "branch-r8", "author": {"login": "a-jay85"}},
+  {"number": 1920, "title": "s1",      "isDraft": false, "headRefName": "branch-s1", "author": {"login": "a-jay85"}},
+  {"number": 1921, "title": "s2",      "isDraft": false, "headRefName": "branch-s2", "author": {"login": "a-jay85"}},
+  {"number": 1922, "title": "s3",      "isDraft": false, "headRefName": "branch-s3", "author": {"login": "a-jay85"}}
+]
+JSON
+
+# four-combo.json: 4 PRs for the preflight-matrix case.
+cat > "$SCRATCH/four-combo.json" <<'JSON'
+[
+  {"number": 2001, "title": "wt-and-plan", "isDraft": false, "headRefName": "wt-and-plan", "author": {"login": "a-jay85"}},
+  {"number": 2002, "title": "wt-only",     "isDraft": false, "headRefName": "wt-only",     "author": {"login": "a-jay85"}},
+  {"number": 2003, "title": "plan-only",   "isDraft": false, "headRefName": "plan-only",   "author": {"login": "a-jay85"}},
+  {"number": 2004, "title": "neither",     "isDraft": false, "headRefName": "neither",     "author": {"login": "a-jay85"}}
+]
+JSON
+
+# four-fire.json: 4 PRs all with worktrees in WTL8, for report-statuses.
+cat > "$SCRATCH/four-fire.json" <<'JSON'
+[
+  {"number": 3001, "title": "ready",    "isDraft": false, "headRefName": "branch-ready",    "author": {"login": "a-jay85"}},
+  {"number": 3002, "title": "notready", "isDraft": false, "headRefName": "branch-notready", "author": {"login": "a-jay85"}},
+  {"number": 3003, "title": "mmtf",     "isDraft": false, "headRefName": "branch-mmtf",     "author": {"login": "a-jay85"}},
+  {"number": 3004, "title": "nolog",    "isDraft": false, "headRefName": "branch-nolog",    "author": {"login": "a-jay85"}}
+]
+JSON
+
+# foo-prs.json: 2 PRs with branches "foo" and "foo-bar" for the preflight-grep-form case.
+cat > "$SCRATCH/foo-prs.json" <<'JSON'
+[
+  {"number": 2011, "title": "foo",     "isDraft": false, "headRefName": "foo",     "author": {"login": "a-jay85"}},
+  {"number": 2012, "title": "foo-bar", "isDraft": false, "headRefName": "foo-bar", "author": {"login": "a-jay85"}}
+]
+JSON
+
+# Minimal WTLs for preflight-grep-form: one contains only [foo], the other only [foo-bar].
+cat > "$SCRATCH/foo-only.txt" <<EOF
+/Users/x/IBL5                          abc0001 [master]
+/Users/x/IBL5-worktrees/foo/ibl5       abc0002 [foo]
+EOF
+cat > "$SCRATCH/foo-bar-only.txt" <<EOF
+/Users/x/IBL5                            abc0001 [master]
+/Users/x/IBL5-worktrees/foo-bar/ibl5    abc0003 [foo-bar]
+EOF
+
+# claude-plans dir: HOME=$SCRATCH in run_driver → driver looks for $SCRATCH/claude-plans/$branch.md.
+mkdir -p "$SCRATCH/claude-plans"
+touch "$SCRATCH/claude-plans/wt-and-plan.md"
+touch "$SCRATCH/claude-plans/plan-only.md"
+
+# --- case 11: attack-selection -----------------------------------------------------------
+# select_prs() from a /pr-attack file: top-5 after exclusion. Excluded PR 1912 absent.
+# PRs beyond the top-5 cut (1916, 1917) absent.
+begin_case
+clean_slots
+out="$(PR_READY_NOW_MASTER_SHA="$ATTACK_SHA" \
+       PR_READY_NOW_WTL="$WTL8" \
+       PR_READY_NOW_PR_JSON="$SCRATCH/attack-8prs.json" \
+       run_driver --pr-attack "$SCRATCH/attack-fresh.md" --top-n 5 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "attack-selection: exit $rc (out: $out)"
+for pr in 1910 1911 1913 1914 1915; do
+    grep -q "$pr" <<< "$out" || fail "attack-selection: PR $pr missing (out: $out)"
+done
+grep -q '1912' <<< "$out" && fail "attack-selection: excluded PR 1912 appeared in output"
+grep -q '1916' <<< "$out" && fail "attack-selection: beyond-top PR 1916 appeared in output"
+grep -q '1917' <<< "$out" && fail "attack-selection: beyond-top PR 1917 appeared in output"
+end_case attack-selection
+
+# --- case 12: attack-excluded ------------------------------------------------------------
+# Excluded PR 1912 never appears, even when --top-n 99 would otherwise include it.
+begin_case
+clean_slots
+out="$(PR_READY_NOW_MASTER_SHA="$ATTACK_SHA" \
+       PR_READY_NOW_WTL="$WTL8" \
+       PR_READY_NOW_PR_JSON="$SCRATCH/attack-8prs.json" \
+       run_driver --pr-attack "$SCRATCH/attack-fresh.md" --top-n 99 2>&1)"
+grep -q '1912' <<< "$out" && fail "attack-excluded: PR 1912 appeared with --top-n 99 (out: $out)"
+end_case attack-excluded
+
+# --- case 13: attack-staleness -----------------------------------------------------------
+# Fresh fixture + matching SHA → exit 0.
+# Stale fixture (sha=aaaaaaa, ATTACK_SHA=abc1234) → STALE message + exit 1.
+begin_case
+clean_slots
+PR_READY_NOW_MASTER_SHA="$ATTACK_SHA" \
+    PR_READY_NOW_WTL="$WTL8" \
+    PR_READY_NOW_PR_JSON="$SCRATCH/attack-8prs.json" \
+    run_driver --pr-attack "$SCRATCH/attack-fresh.md" --top-n 1 >/dev/null 2>&1
+fresh_rc=$?
+[[ $fresh_rc -eq 0 ]] || fail "attack-staleness: fresh arm exited $fresh_rc, want 0"
+stale_err="$(PR_READY_NOW_MASTER_SHA="$ATTACK_SHA" \
+    run_driver --pr-attack "$SCRATCH/attack-stale.md" 2>&1)"; stale_rc=$?
+[[ $stale_rc -ne 0 ]] || fail "attack-staleness: stale arm exited 0, want non-zero"
+grep -qi 'STALE' <<< "$stale_err" || fail "attack-staleness: stale arm lacks STALE keyword (out: $stale_err)"
+end_case attack-staleness
+
+# --- case 14: attack-empty-table ---------------------------------------------------------
+# A /pr-attack file with a valid Base: but no ranked rows triggers an error exit.
+# No plists must be created.
+begin_case
+clean_slots
+err="$(PR_READY_NOW_MASTER_SHA="$ATTACK_SHA" \
+    run_driver --pr-attack "$SCRATCH/attack-empty.md" 2>&1)"; rc=$?
+[[ $rc -ne 0 ]] || fail "attack-empty-table: exited 0, want non-zero"
+grep -qi 'no orderable' <<< "$err" || fail "attack-empty-table: error lacks 'no orderable' (out: $err)"
+[[ "$(plist_count)" -eq 0 ]] || fail "attack-empty-table: $(plist_count) plist(s) written, want 0"
+end_case attack-empty-table
+
+# --- case 15: top-n-bounds ---------------------------------------------------------------
+# --top-n 99 on a 3-row file selects all 3; --top-n 2 selects exactly 2;
+# --top-n 0 and --top-n abc are rejected before any selection runs.
+begin_case
+clean_slots
+out99="$(PR_READY_NOW_MASTER_SHA="$ATTACK_SHA" \
+         PR_READY_NOW_WTL="$WTL8" \
+         PR_READY_NOW_PR_JSON="$SCRATCH/attack-8prs.json" \
+         run_driver --pr-attack "$SCRATCH/attack-short.md" --top-n 99 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "top-n-bounds: top-n 99 exited $rc"
+fire99="$(grep -c 'WOULD FIRE' <<< "$out99" || echo 0)"
+[[ $fire99 -eq 3 ]] || fail "top-n-bounds: top-n 99 on 3 rows → $fire99 WOULD FIRE lines, want 3"
+out2="$(PR_READY_NOW_MASTER_SHA="$ATTACK_SHA" \
+        PR_READY_NOW_WTL="$WTL8" \
+        PR_READY_NOW_PR_JSON="$SCRATCH/attack-8prs.json" \
+        run_driver --pr-attack "$SCRATCH/attack-short.md" --top-n 2 2>&1)"
+fire2="$(grep -c 'WOULD FIRE' <<< "$out2" || echo 0)"
+[[ $fire2 -eq 2 ]] || fail "top-n-bounds: top-n 2 on 3 rows → $fire2 WOULD FIRE lines, want 2"
+e0="$(run_driver --pr-attack "$SCRATCH/attack-fresh.md" --top-n 0 2>&1)"; rc0=$?
+[[ $rc0 -ne 0 ]] || fail "top-n-bounds: --top-n 0 exited 0, want non-zero"
+grep -q 'positive integer' <<< "$e0" || fail "top-n-bounds: --top-n 0 lacks 'positive integer' (out: $e0)"
+eabc="$(run_driver --pr-attack "$SCRATCH/attack-fresh.md" --top-n abc 2>&1)"; rcabc=$?
+[[ $rcabc -ne 0 ]] || fail "top-n-bounds: --top-n abc exited 0, want non-zero"
+end_case top-n-bounds
+
+# --- case 16: pr-attack-vs-pr-exclusive --------------------------------------------------
+# --pr-attack and --pr are mutually exclusive; combining them errors immediately.
+begin_case
+err="$(run_driver --pr-attack "$SCRATCH/attack-fresh.md" --pr 1910 2>&1)"; rc=$?
+[[ $rc -ne 0 ]] || fail "pr-attack-vs-pr-exclusive: combined flags exited 0, want non-zero"
+grep -qi 'mutually exclusive' <<< "$err" || \
+    fail "pr-attack-vs-pr-exclusive: error lacks 'mutually exclusive' (out: $err)"
+end_case pr-attack-vs-pr-exclusive
+
+# --- case 17: preflight-matrix -----------------------------------------------------------
+# All four worktree+plan combinations produce the expected PRE and status columns:
+#   wt-and-plan (2001) → WT+PLAN  WOULD FIRE
+#   wt-only     (2002) → WT       WOULD FIRE
+#   plan-only   (2003) → PLAN     SKIP (no worktree)
+#   neither     (2004) → —        SKIP (no worktree)
+begin_case
+clean_slots
+out="$(PR_READY_NOW_PR_JSON="$SCRATCH/four-combo.json" \
+       PR_READY_NOW_WTL="$WTL8" \
+       run_driver 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "preflight-matrix: exit $rc (out: $out)"
+grep -qE '2001.*WT\+PLAN.*WOULD FIRE' <<< "$out" || \
+    fail "preflight-matrix: 2001 not WT+PLAN WOULD FIRE (out: $out)"
+grep -qE '2002.*WOULD FIRE' <<< "$out" || \
+    fail "preflight-matrix: 2002 not WOULD FIRE (out: $out)"
+grep -qE '2003.*PLAN.*SKIP' <<< "$out" || \
+    fail "preflight-matrix: 2003 not PLAN SKIP (out: $out)"
+grep -qE '2004.*SKIP' <<< "$out" || \
+    fail "preflight-matrix: 2004 not SKIP (out: $out)"
+# Neither 2003 nor 2004 should appear as WOULD FIRE.
+grep -qE '2003.*WOULD FIRE' <<< "$out" && fail "preflight-matrix: 2003 appeared as WOULD FIRE"
+grep -qE '2004.*WOULD FIRE' <<< "$out" && fail "preflight-matrix: 2004 appeared as WOULD FIRE"
+end_case preflight-matrix
+
+# --- case 18: preflight-grep-form --------------------------------------------------------
+# The pre-flight grep uses -qF "[$branch]" (literal). With only [foo] in the WTL,
+# branch "foo-bar" must get SKIP; with only [foo-bar], branch "foo" must get SKIP.
+# A grep without -F would treat "[foo]" as a character class and spuriously match.
+begin_case
+clean_slots
+# WTL has only [foo]: foo→FIRE, foo-bar→SKIP (no worktree)
+out_fo="$(PR_READY_NOW_PR_JSON="$SCRATCH/foo-prs.json" \
+          PR_READY_NOW_WTL="$SCRATCH/foo-only.txt" \
+          run_driver 2>&1)"
+grep -qE '2011.*WOULD FIRE' <<< "$out_fo" || \
+    fail "preflight-grep-form: foo-only WTL: PR 2011 (foo) should WOULD FIRE (out: $out_fo)"
+grep -qE '2012.*SKIP' <<< "$out_fo" || \
+    fail "preflight-grep-form: foo-only WTL: PR 2012 (foo-bar) should SKIP (out: $out_fo)"
+# WTL has only [foo-bar]: foo→SKIP, foo-bar→FIRE
+out_fb="$(PR_READY_NOW_PR_JSON="$SCRATCH/foo-prs.json" \
+          PR_READY_NOW_WTL="$SCRATCH/foo-bar-only.txt" \
+          run_driver 2>&1)"
+grep -qE '2012.*WOULD FIRE' <<< "$out_fb" || \
+    fail "preflight-grep-form: foo-bar-only WTL: PR 2012 (foo-bar) should WOULD FIRE (out: $out_fb)"
+grep -qE '2011.*SKIP' <<< "$out_fb" || \
+    fail "preflight-grep-form: foo-bar-only WTL: PR 2011 (foo) should SKIP (out: $out_fb)"
+end_case preflight-grep-form
+
+# --- case 19: wait-dry-run-inert ---------------------------------------------------------
+# PR_READY_NOW_DRY_RUN=1 skips the real wait block even with --wait --go:
+# no "waiting for" line, fast exit.
+begin_case
+clean_slots
+out="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" \
+       PR_READY_NOW_DRY_RUN=1 \
+       run_driver --go --wait 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "wait-dry-run-inert: exit $rc (out: $out)"
+grep -q 'waiting for' <<< "$out" && fail "wait-dry-run-inert: 'waiting for' printed under DRY_RUN"
+end_case wait-dry-run-inert
+
+# --- case 20: wait-drains ----------------------------------------------------------------
+# Sub-case A (fast): empty label list → reap_stale reaps all plists in the first
+# iteration → live_slots=0 → break without printing "waiting for".
+# Sub-case B (~20s): a plist for a PR that is NOT a selection candidate, whose label IS
+# live, survives the first reap → "waiting for 1 session(s)…" printed → a background job
+# clears the label list → the second iteration reaps it → live_slots hits 0 → exit 0.
+#
+# Sub-case B needs the wait block to be REACHED, and line 635 exits 0 before it whenever
+# FIRE_PRS is empty. So the candidate PRs must actually fire — which is safe here because
+# `launchctl bootstrap` resolves to the shim on PATH, never to real launchd. The held-open
+# slot therefore has to belong to a label outside the candidate set (9999): a live label on
+# 1901/1902 would suppress them as already-running and empty FIRE_PRS again.
+begin_case
+# Sub-case A — zero live slots at entry breaks immediately, without printing.
+clean_slots
+clear_live_labels
+out_a="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" \
+         run_driver --go --wait 2>&1)"; rc_a=$?
+[[ $rc_a -eq 0 ]] || fail "wait-drains/A: exit $rc_a (out: $out_a)"
+grep -q 'waiting for' <<< "$out_a" && fail "wait-drains/A: printed 'waiting for' with empty label list"
+
+# Sub-case B — the block must actually wait, then drain to zero.
+clean_slots
+mkdir -p "$SCRATCH/Library/LaunchAgents"
+: > "$SCRATCH/Library/LaunchAgents/com.ibl5.pr-ready-now-9999.plist"
+set_live_labels "40477	0	com.ibl5.pr-ready-now-9999"
+( sleep 3; : > "$SCRATCH/launchctl-list.txt" ) &
+_wd_bg=$!
+out_b="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" \
+         run_driver --go --wait 2>&1)"; rc_b=$?
+wait "$_wd_bg" 2>/dev/null
+[[ $rc_b -eq 0 ]] || fail "wait-drains/B: exit $rc_b (out: $out_b)"
+grep -qE 'waiting for [0-9]+ session' <<< "$out_b" \
+    || fail "wait-drains/B: never printed a 'waiting for N session(s)' line — the wait block did not wait (out: $out_b)"
+[[ "$(plist_count)" -eq 0 ]] || fail "wait-drains/B: drained to $(plist_count) plists, want 0"
+clear_live_labels
+clean_slots
+end_case wait-drains
+
+# --- case 21: report-statuses ------------------------------------------------------------
+# Pre-created logs produce all four derive_status() return values in the written report.
+begin_case
+clean_slots
+_rdate="$(date +%F)"
+rm -f /tmp/pr-ready-now-300{1,2,3,4}.log
+TMP_LOGS+=("/tmp/pr-ready-now-3001.log" "/tmp/pr-ready-now-3002.log" "/tmp/pr-ready-now-3003.log")
+printf 'READY\n' > /tmp/pr-ready-now-3001.log
+printf 'NOT READY — please fix the issues above.\n' > /tmp/pr-ready-now-3002.log
+printf 'master is moving faster than this branch can rebase\n' > /tmp/pr-ready-now-3003.log
+# No log for 3004 → NOT READY (no log)
+out="$(PR_READY_NOW_PR_JSON="$SCRATCH/four-fire.json" \
+       PR_READY_NOW_WTL="$WTL8" \
+       PR_READY_NOW_DRY_RUN=1 \
+       run_driver --go --jobs 4 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "report-statuses: exit $rc (out: $out)"
+rp="$SCRATCH/pr-firstpass-${_rdate}.md"
+[[ -f "$rp" ]] || fail "report-statuses: report not found at $rp"
+grep -qF '| READY |' "$rp" || fail "report-statuses: READY status missing from report"
+grep -qF '| NOT READY |' "$rp" || fail "report-statuses: NOT READY status missing from report"
+grep -qF '| MASTER-MOVING-TOO-FAST |' "$rp" || fail "report-statuses: MMTF status missing from report"
+grep -qF '| NOT READY (no log) |' "$rp" || fail "report-statuses: NOT READY (no log) status missing"
+end_case report-statuses
+
+# --- case 22: report-skip-reason ---------------------------------------------------------
+# SKIPped PRs appear in the report table with "SKIPPED (<reason>)" and "—" in the Log column.
+begin_case
+clean_slots
+_rdate="$(date +%F)"
+out="$(PR_READY_NOW_PR_JSON="$SCRATCH/four-combo.json" \
+       PR_READY_NOW_WTL="$WTL8" \
+       PR_READY_NOW_DRY_RUN=1 \
+       run_driver --go 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "report-skip-reason: exit $rc (out: $out)"
+rp="$SCRATCH/pr-firstpass-${_rdate}.md"
+[[ -f "$rp" ]] || fail "report-skip-reason: report not found at $rp"
+grep -qF 'SKIPPED (no worktree)' "$rp" || \
+    fail "report-skip-reason: 'SKIPPED (no worktree)' not in report (head: $(head -20 "$rp"))"
+end_case report-skip-reason
+
+# --- case 23: report-no-mutation ---------------------------------------------------------
+# The driver must never make mutating gh calls (merge, approve, worktree remove, etc.).
+# The strict shim exits 1 on any non-list gh call, so exit 0 + correct plist count
+# proves no mutation occurred.
+begin_case
+clean_slots
+out="$(PR_READY_NOW_DRY_RUN=1 run_driver --go 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "report-no-mutation: exit $rc — strict shim may have caught a mutating gh call"
+[[ "$(plist_count)" -eq 2 ]] || fail "report-no-mutation: plist_count=$(plist_count), want 2"
+end_case report-no-mutation
+
+# --- case 24: backlog-routing ------------------------------------------------------------
+# FINDING[loop], [ci], [e2e], [dev], [a11y], [maintenance] each route to a distinct
+# backlog file and produce a non-empty diff section in the report.
+begin_case
+clean_slots
+_rdate="$(date +%F)"
+rm -f /tmp/pr-ready-now-1901.log /tmp/pr-ready-now-1902.log
+TMP_LOGS+=("/tmp/pr-ready-now-1901.log")
+printf '%s\n' \
+    'FINDING[loop]: Loop engineering issue discovered in PR' \
+    'FINDING[ci]: CI configuration gap discovered in PR' \
+    'FINDING[e2e]: E2E coverage gap discovered in PR' \
+    'FINDING[dev]: Dev efficiency issue discovered in PR' \
+    'FINDING[a11y]: Accessibility issue discovered in PR' \
+    'FINDING[maintenance]: Maintenance debt discovered in PR' \
+    > /tmp/pr-ready-now-1901.log
+out="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" \
+       PR_READY_NOW_DRY_RUN=1 \
+       run_driver --go 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "backlog-routing: exit $rc (out: $out)"
+rp="$SCRATCH/pr-firstpass-${_rdate}.md"
+[[ -f "$rp" ]] || fail "backlog-routing: report not found at $rp"
+diff_count="$(grep -c '### Diff for' "$rp" 2>/dev/null)"; diff_count="${diff_count:-0}"
+[[ "${diff_count:-0}" -eq 6 ]] || fail "backlog-routing: expected 6 diff sections, got $diff_count (report: $(cat "$rp"))"
+rm -f /tmp/pr-ready-now-1901.log
+end_case backlog-routing
+
+# --- case 25: backlog-catchall -----------------------------------------------------------
+# FINDING[foobar] (unrecognised class) routes via the catch-all to dev-efficiency-backlog.md.
+begin_case
+clean_slots
+_rdate="$(date +%F)"
+rm -f /tmp/pr-ready-now-1901.log
+TMP_LOGS+=("/tmp/pr-ready-now-1901.log")
+printf 'FINDING[foobar]: Unrecognised class routes to catch-all\n' > /tmp/pr-ready-now-1901.log
+out="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" \
+       PR_READY_NOW_DRY_RUN=1 \
+       run_driver --go 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "backlog-catchall: exit $rc (out: $out)"
+rp="$SCRATCH/pr-firstpass-${_rdate}.md"
+[[ -f "$rp" ]] || fail "backlog-catchall: report not found at $rp"
+grep -qF '### Diff for `dev-efficiency-backlog.md`' "$rp" || \
+    fail "backlog-catchall: dev-efficiency-backlog.md diff section missing (report: $(cat "$rp"))"
+diff_count="$(grep -c '### Diff for' "$rp" 2>/dev/null)"; diff_count="${diff_count:-0}"
+[[ "${diff_count:-0}" -eq 1 ]] || fail "backlog-catchall: expected 1 diff section, got $diff_count"
+rm -f /tmp/pr-ready-now-1901.log
+end_case backlog-catchall
+
+# --- case 26: backlog-security-note ------------------------------------------------------
+# FINDING[security] writes to security.txt (no diff) and appears under ## Security notes.
+begin_case
+clean_slots
+_rdate="$(date +%F)"
+rm -f /tmp/pr-ready-now-1901.log
+TMP_LOGS+=("/tmp/pr-ready-now-1901.log")
+printf 'FINDING[security]: A security issue was found in this PR\n' > /tmp/pr-ready-now-1901.log
+out="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" \
+       PR_READY_NOW_DRY_RUN=1 \
+       run_driver --go 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "backlog-security-note: exit $rc (out: $out)"
+rp="$SCRATCH/pr-firstpass-${_rdate}.md"
+[[ -f "$rp" ]] || fail "backlog-security-note: report not found at $rp"
+grep -qF '## Security notes' "$rp" || fail "backlog-security-note: no '## Security notes' section"
+grep -qF 'A security issue was found in this PR (PR #1901)' "$rp" || \
+    fail "backlog-security-note: security finding not in security notes section"
+grep -qF '### Diff for' "$rp" && fail "backlog-security-note: unexpected diff section for security finding"
+rm -f /tmp/pr-ready-now-1901.log
+end_case backlog-security-note
+
+# --- case 27: usage-not-truncated --------------------------------------------------------
+# --help output documents all three Phase 8 flags (--pr-attack, --top-n, --wait).
+begin_case
+out="$(run_driver --help 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "usage-not-truncated: --help exited $rc, want 0"
+grep -q -- '--pr-attack' <<< "$out" || fail "usage-not-truncated: --help omits --pr-attack"
+grep -q -- '--top-n' <<< "$out" || fail "usage-not-truncated: --help omits --top-n"
+grep -q -- '--wait' <<< "$out" || fail "usage-not-truncated: --help omits --wait"
+end_case usage-not-truncated
+
+# --- case 28: seam-master-sha-unset-vs-empty ---------------------------------------------
+# Both unset and empty PR_READY_NOW_MASTER_SHA trigger the git rev-parse fallback.
+# The real master SHA differs from the fixture abc1234, so the staleness gate fires on both.
+begin_case
+# Unset arm: run_driver does not set PR_READY_NOW_MASTER_SHA → driver uses git → STALE.
+err_unset="$(env -u PR_READY_NOW_MASTER_SHA \
+    env HOME="$SCRATCH" PATH="$SCRATCH/.local/bin:$PATH" \
+        PR_READY_NOW_CLAUDE="$CLAUDE_STUB" \
+        PR_READY_NOW_GH_USER=a-jay85 \
+        "$DRIVER" --pr-attack "$SCRATCH/attack-fresh.md" 2>&1)"; rc_unset=$?
+[[ $rc_unset -ne 0 ]] || fail "seam-master-sha-unset-vs-empty: unset arm exited 0, want STALE exit"
+grep -qi 'STALE' <<< "$err_unset" || \
+    fail "seam-master-sha-unset-vs-empty: unset arm lacks STALE keyword (out: $err_unset)"
+# Empty arm: same fallback via :- operator.
+err_empty="$(PR_READY_NOW_MASTER_SHA="" \
+    run_driver --pr-attack "$SCRATCH/attack-fresh.md" 2>&1)"; rc_empty=$?
+[[ $rc_empty -ne 0 ]] || fail "seam-master-sha-unset-vs-empty: empty arm exited 0, want STALE exit"
+grep -qi 'STALE' <<< "$err_empty" || \
+    fail "seam-master-sha-unset-vs-empty: empty arm lacks STALE keyword (out: $err_empty)"
+end_case seam-master-sha-unset-vs-empty
+
+# --- case 29: seam-wtl-unset-vs-empty ---------------------------------------------------
+# Unset PR_READY_NOW_WTL → run_driver's single-dash expansion uses WTL_FIXTURE → WOULD FIRE.
+# Empty PR_READY_NOW_WTL="" → driver's :- expansion falls through to git worktree list
+# (no fixture branches in the real tree) → all PRs SKIP; no crash.
+begin_case
+clean_slots
+# Unset arm: PR_READY_NOW_WTL not set in harness → run_driver expansion uses WTL_FIXTURE.
+out_unset="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" run_driver 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "seam-wtl-unset-vs-empty: unset arm exit $rc"
+grep -q 'WOULD FIRE' <<< "$out_unset" || \
+    fail "seam-wtl-unset-vs-empty: unset arm has no WOULD FIRE (WTL_FIXTURE not used)"
+# Empty arm: empty string → driver falls back to git worktree list (no fixture branches → all skip).
+out_empty="$(PR_READY_NOW_WTL="" PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" run_driver 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "seam-wtl-unset-vs-empty: empty arm crashed (exit $rc)"
+grep -q 'WOULD FIRE' <<< "$out_empty" && \
+    fail "seam-wtl-unset-vs-empty: empty arm shows WOULD FIRE (git WTL should skip all)"
+end_case seam-wtl-unset-vs-empty
+
+# --- case 30: plist-shape-under-attack-selection -----------------------------------------
+# When a PR is selected via --pr-attack, fire_pr writes the same plist structure as
+# the default path. field() verifies Label and StandardOutPath are PR-number-keyed.
+begin_case
+clean_slots
+PR_READY_NOW_MASTER_SHA="$ATTACK_SHA" \
+    PR_READY_NOW_WTL="$WTL8" \
+    PR_READY_NOW_PR_JSON="$SCRATCH/attack-8prs.json" \
+    PR_READY_NOW_DRY_RUN=1 \
+    run_driver --go --pr-attack "$SCRATCH/attack-fresh.md" --top-n 1 >/dev/null 2>&1
+rc=$?
+[[ $rc -eq 0 ]] || fail "plist-shape-under-attack-selection: driver exited $rc"
+P1910="$SCRATCH/Library/LaunchAgents/com.ibl5.pr-ready-now-1910.plist"
+[[ -f "$P1910" ]] || fail "plist-shape-under-attack-selection: plist for PR 1910 not created"
+v="$(field "$P1910" "Label")"
+[[ "$v" == "com.ibl5.pr-ready-now-1910" ]] || \
+    fail "plist-shape-under-attack-selection: Label '$v' != com.ibl5.pr-ready-now-1910"
+v="$(field "$P1910" "StandardOutPath")"
+[[ "$v" == "/tmp/pr-ready-now-1910.log" ]] || \
+    fail "plist-shape-under-attack-selection: StandardOutPath '$v' != /tmp/pr-ready-now-1910.log"
+grep -qE '\$\{?HOME|\$\{?ROOT|\$\{?LABEL' "$P1910" && \
+    fail "plist-shape-under-attack-selection: plist contains unexpanded shell variable"
+end_case plist-shape-under-attack-selection
+
+# --- Phase 9: push-form proof against a local bare origin ---------------------------------
+# The Phase 2 fix replaces /pr-ready step 3's bare `--force-with-lease` with an explicit
+# refspec plus an explicit lease ref. These cases prove, against a real bare repo, that the
+# OLD form publishes nothing on a branch with no upstream (the silent-failure bug), that the
+# NEW form publishes, and that the lease still rejects a concurrent third-party push.
+# Cases 1, 3 and 5 are Phase 2's NEGATIVE and BOUNDARY requirements: they assert that
+# something must NOT happen. Never relax them into positive-only checks.
+
+GITFIX="$SCRATCH/gitfix"
+ORIGIN="$GITFIX/origin.git"
+W="$GITFIX/work"
+W2="$GITFIX/work2"
+ZERO="0000000000000000000000000000000000000000"
+
+# Isolated git: no signing, deterministic identity, fixed initial branch name -- so the
+# developer's ~/.gitconfig cannot change the outcome, on macOS or on Linux CI.
+g() { git -c user.name=t -c user.email=t@example.com -c commit.gpgsign=false \
+          -c init.defaultBranch=master -c protocol.file.allow=always "$@"; }
+
+remote_sha() { g -C "$W" ls-remote origin "$1" 2>/dev/null | awk '{print $1}'; }
+commit_on()  { echo "$2" > "$1/f-$2.txt"; g -C "$1" add -A >/dev/null 2>&1; \
+               g -C "$1" commit -q -m "$2" >/dev/null 2>&1; }
+
+mkdir -p "$GITFIX"
+g init --bare -q "$ORIGIN"
+g clone -q "$ORIGIN" "$W" >/dev/null 2>&1
+commit_on "$W" seed
+g -C "$W" push -q origin HEAD:refs/heads/master >/dev/null 2>&1
+g clone -q "$ORIGIN" "$W2" >/dev/null 2>&1
+
+# --- case 11: the OLD bare form publishes nothing with no upstream ------------------------
+# `bin/wt-new` creates branches WITHOUT -u, so @{upstream} is unset -- the only state in
+# which the bug reproduces. Exit status is deliberately NOT asserted: it is push.default-
+# dependent, which is precisely why "no error printed" was never evidence of a push.
+begin_case
+g -C "$W" checkout -q master
+g -C "$W" checkout -q -b feat-old
+commit_on "$W" old1
+before="$(remote_sha feat-old)"
+old_out="$(g -C "$W" push --force-with-lease 2>&1)"; old_rc=$?
+after="$(remote_sha feat-old)"
+[[ -z "$before" ]] || fail "feat-old should start with no remote ref, got '$before'"
+[[ "$after" == "$before" ]] || fail "bare --force-with-lease PUBLISHED (remote '$before' -> '$after') -- the Phase 2 premise is wrong"
+echo "  observed: bare --force-with-lease exit=$old_rc msg=$(head -1 <<< "$old_out")"
+end_case push-old-form-does-not-publish
+
+# --- case 12: the NEW explicit form publishes (3a -> 3b -> 3c) ----------------------------
+begin_case
+g -C "$W" checkout -q master
+g -C "$W" checkout -q -b feat-new
+commit_on "$W" new1
+g -C "$W" push -q origin feat-new:refs/heads/feat-new >/dev/null 2>&1
+commit_on "$W" new2
+lease="$(remote_sha feat-new)"                                     # 3a
+[[ ${#lease} -eq 40 ]] || fail "3a should read a 40-char SHA, got '$lease'"
+new_out="$(g -C "$W" push -u --force-with-lease="feat-new:$lease" origin feat-new:feat-new 2>&1)"; new_rc=$?
+[[ $new_rc -eq 0 ]] || fail "new form exited $new_rc, want 0 (out: $new_out)"   # 3b
+head_sha="$(g -C "$W" rev-parse HEAD)"                             # 3c
+[[ "$(remote_sha feat-new)" == "$head_sha" ]] || fail "3c: remote '$(remote_sha feat-new)' != HEAD '$head_sha'"
+end_case push-new-form-publishes
+
+# --- case 13: the lease STILL rejects a concurrent third-party push -----------------------
+# The whole point of --force-with-lease. If this case ever passes trivially, the explicit
+# lease has been reduced to a plain --force.
+begin_case
+g -C "$W" checkout -q master
+g -C "$W" checkout -q -b feat-lease
+commit_on "$W" lease1
+g -C "$W" push -q origin feat-lease:refs/heads/feat-lease >/dev/null 2>&1
+stale_lease="$(remote_sha feat-lease)"                             # 3a, captured early
+g -C "$W2" fetch -q origin >/dev/null 2>&1                         # third party moves the ref
+g -C "$W2" checkout -q -B feat-lease origin/feat-lease >/dev/null 2>&1
+commit_on "$W2" third
+g -C "$W2" push -q origin feat-lease:refs/heads/feat-lease >/dev/null 2>&1
+third_sha="$(g -C "$W2" rev-parse HEAD)"
+[[ "$(remote_sha feat-lease)" == "$third_sha" ]] || fail "fixture: third-party push did not land"
+commit_on "$W" lease2
+sl_out="$(g -C "$W" push -u --force-with-lease="feat-lease:$stale_lease" origin feat-lease:feat-lease 2>&1)"; sl_rc=$?
+[[ $sl_rc -ne 0 ]] || fail "stale lease was ACCEPTED -- a concurrent push would have been clobbered"
+grep -q 'stale info' <<< "$sl_out" || fail "rejection message lacks 'stale info' (out: $sl_out)"
+[[ "$(remote_sha feat-lease)" == "$third_sha" ]] || fail "third party's commit was overwritten despite the lease"
+end_case push-lease-still-rejects
+
+# --- case 14: the all-zeros lease CREATES a ref that does not exist -----------------------
+# 3a prints nothing when the branch has no remote ref; the doc says use 40 zeros.
+begin_case
+g -C "$W" checkout -q master
+g -C "$W" checkout -q -b feat-zero
+commit_on "$W" zero1
+[[ -z "$(remote_sha feat-zero)" ]] || fail "fixture: feat-zero already has a remote ref"
+z_out="$(g -C "$W" push -u --force-with-lease="feat-zero:$ZERO" origin feat-zero:feat-zero 2>&1)"; z_rc=$?
+[[ $z_rc -eq 0 ]] || fail "zero-lease create exited $z_rc, want 0 (out: $z_out)"
+[[ "$(remote_sha feat-zero)" == "$(g -C "$W" rev-parse HEAD)" ]] || fail "zero-lease did not create the remote ref"
+end_case push-zero-lease-creates
+
+# --- case 15: the all-zeros lease is NOT a force wildcard ---------------------------------
+# Boundary case. If zeros were treated as "don't care", a copy-pasted 3b from an earlier
+# branch would silently clobber an existing ref. A new local commit is required first, or
+# git short-circuits with "Everything up-to-date" and never evaluates the lease.
+begin_case
+commit_on "$W" zero2
+existing="$(remote_sha feat-zero)"
+[[ ${#existing} -eq 40 ]] || fail "fixture: feat-zero should now have a remote ref"
+zw_out="$(g -C "$W" push --force-with-lease="feat-zero:$ZERO" origin feat-zero:feat-zero 2>&1)"; zw_rc=$?
+[[ $zw_rc -ne 0 ]] || fail "all-zeros lease ACCEPTED against an existing ref -- it is behaving as a wildcard"
+[[ "$(remote_sha feat-zero)" == "$existing" ]] || fail "existing ref moved under an all-zeros lease"
+end_case push-zero-lease-not-a-wildcard
+
+# --- case 16: /pr-ready SKILL.md still carries the fixed push form ------------------------
+# Line-level greps, so the assertions survive reflowing of the prose.
+#
+# DEVIATION from the plan text (surfaced in the PR body): the plan asked for ZERO
+# occurrences of `ls-remote origin HEAD` and ZERO `--force-with-lease` not followed by `=`.
+# The plan's own Phase 2 prose deliberately contains both, as PROHIBITIONS ("Do not use
+# `git ls-remote origin HEAD`", "A bare `--force-with-lease` publishes nothing"). Asserting
+# zero would forbid the skill from ever documenting the anti-pattern it exists to prevent.
+# The assertion is narrowed instead: a bare occurrence is allowed only on a line that
+# negates it, and a POSITIVE arm pins the 3b line to the fixed form.
+begin_case
+SKILL="$SCRIPT_DIR/../.claude/skills/pr-ready/SKILL.md"
+if [[ ! -f "$SKILL" ]]; then
+    fail "pr-ready SKILL.md not found at $SKILL"
+else
+    # (a) every bare --force-with-lease sits on a negating line
+    while IFS= read -r line; do
+        grep -qE '(bare|Do not|Never|never)' <<< "$line" \
+            || fail "bare --force-with-lease on a non-negating line: $line"
+    done < <(grep -- '--force-with-lease' "$SKILL" | grep -v -- '--force-with-lease=')
+    # (b) `ls-remote origin HEAD` only on a "Do not use" line
+    while IFS= read -r line; do
+        grep -q 'Do not use' <<< "$line" \
+            || fail "'ls-remote origin HEAD' on a non-prohibiting line: $line"
+    done < <(grep -F 'ls-remote origin HEAD' "$SKILL")
+    # (c) POSITIVE arm: 3b names the explicit lease form
+    step3b="$(grep -F '3b — push' "$SKILL")"
+    [[ -n "$step3b" ]] || fail "SKILL.md has no '3b -- push' step line"
+    grep -q -- '--force-with-lease=<branch>:' <<< "$step3b" \
+        || fail "the 3b step line does not carry --force-with-lease=<branch>: (fix reverted?)"
+    grep -q -- 'origin <branch>:<branch>' <<< "$step3b" \
+        || fail "the 3b step line lost its explicit refspec"
+    # (d) the fail-closed verify word survives
+    [[ "$(grep -c 'PUSH FAILED' "$SKILL")" -ge 1 ]] || fail "SKILL.md lost the PUSH FAILED stop word"
+    # (e) the doc was re-verified after the fix
+    grep -q '^last_verified: 2026-08-19$' "$SKILL" && fail "last_verified still the pre-fix 2026-08-19"
+    # (f) unrelated prose was not collaterally rewritten
+    grep -qF 'master is moving faster than this branch can rebase' "$SKILL" \
+        || fail "the Phase 4 loop-bound message was lost"
+fi
+end_case pr-ready-doc-shape
 
 # --- verdict -----------------------------------------------------------------------------
 if [[ $FAILED -ne 0 ]]; then

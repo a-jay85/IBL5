@@ -1,8 +1,9 @@
 ---
-description: Read-on-demand detail for work-triage — NO auto-attach trigger (its only `paths:` entry is out-of-repo and never matches); Read it when work-triage.md cites it. Covers measurement context for the inline-Opus leak, ADR-0067 gateway framing, hard-trigger gate properties (sub-agent exemption, per-turn scoping, escape hatch, self-test), the cross-worktree straddle gate's four-rung remedy ladder, inline-vs-delegated criteria, safety-mirror backstop, and repeat-polling spend rationale.
-last_verified: 2026-08-14
+description: Read-on-demand detail for work-triage — NO auto-attach trigger (its `paths:` entries are all out-of-repo and never match); Read it when work-triage.md cites it. Covers measurement context for the inline-Opus leak, ADR-0067 gateway framing, hard-trigger gate properties (sub-agent exemption, per-turn scoping, escape hatch, self-test), the cross-worktree straddle gate's four-rung remedy ladder, inline-vs-delegated criteria, safety-mirror backstop, repeat-polling spend rationale, and /plan-verdict routing gate properties and escape hatch.
+last_verified: 2026-08-24
 paths:
   - "~/.claude/hooks/plan-gate-edit.sh"
+  - "~/.claude/hooks/plan-gate-skill.sh"
 ---
 
 # Work Triage — Detail
@@ -71,6 +72,8 @@ Observed 2026-07-27: a watcher for detached headless `/plan` runs (`bin/plan-now
 
 **What counts as a gate removal/weakening** (the resident bullet carries the trigger; these are the examples): deleting, relaxing, or disabling an enforcement mechanism — a hook deny, a `bin/check-plan` gate condition, a `plan-gate-edit` check, a `/post-plan` Phase 6.5 arming condition. **Bootstrap hazard** means the change rewrites the arming, escalation, or auto-merge rules that govern its own merge. Same trigger as `/plan` Step 3's `plan-architect-xhigh` escalation — full clause in `.claude/skills/plan/SKILL.md` Step 3 check 1.
 
+**Why these five bullets.** The trigger list mirrors the surfaces `/plan` Step 4 gate 14 (the auto-merge hold criterion) holds the merge for — a subjective/`Truly-manual` row, a touched security surface, a destructive or schema-tightening migration, new or redesigned user-visible UI/UX — plus the `plan-architect-xhigh` escalation surface. A change that would be held at merge is routed into `/plan` at the start instead, where the defense and its verification get designed rather than retrofitted.
+
 Whatever still ships ad-hoc is caught at PR time by `/post-plan` Phase 6.5 condition (9) — but designing it in the plan beats relying on the backstop. The safety-mirror trigger list in `work-triage.md` routes security work into `/plan` *before* the backstop exists; losing it strands the backstop as the only protection.
 
 ## Inline vs. delegated
@@ -80,3 +83,22 @@ Stay inline (Opus edits directly) only when:
 - the chunk is **trivial** — a one-or-two-edit change where the sub-agent's fixed spawn cost (~17–23K tokens [CORRECTED 2026-08-14: was "~3–5K"; measured p50 spawn context is 17–23K], `agent-tiering-detail.md` § Skip the Agent) exceeds the work being moved.
 
 Either way the routing decision is **stated, not silent** — one line, like the triage verdict. The user should see which way it went and be able to override in the moment.
+
+## /plan verdict routing
+
+Why prose alone fails and a hook is required: on 2026-07-28, with `work-triage.md` fully resident, a `/plan` verdict on the `bin/wt-rebase` task was executed as an inline `Skill(plan)` call on Opus. It burned the orchestrator through all of Step 3 (one `plan-architect` spawn + section append) before being killed. A warning you can read past is not a control.
+
+### Gate properties — plan skill
+
+`~/.claude/hooks/plan-gate-skill.sh` is a PreToolUse hook on the `Skill` tool. Key properties:
+
+- **Denies unconditionally** (not Opus-specific — `/plan-prompt` → `bin/plan-now` is the better path on ANY interactive model).
+- **Exact skill-name match** — only `plan` is denied. Every other skill, including `post-plan`, `plan-prompt`, and namespaced names like `commit-commands:commit`, passes through untouched.
+- **Main thread only** — sub-agent calls (`agent_id` present) pass through; the delegate you spawn is never blocked.
+- **Headless sessions exempt** — when `CLAUDE_HEADLESS=1` is set in the environment, the hook allows the call. `bin/plan-now` sets this env var before its detached `claude -p` invocation; `plan-gate-commit.sh` and `output-guard.sh` both branch on it in production, confirming it reaches hook child processes. This exemption is what keeps `bin/plan-now` and automouse working.
+- **Fails open** on malformed or unrecognised payload — a missing field never blocks a Skill call.
+- **Escape hatch:** `touch /tmp/claude-plan-inline-override-<session_id>` (session-scoped). Legitimate when the session has already paid the context cost or the plan is too entangled with live state to hand off. **Say out loud that you're overriding and why, in the same turn** — using it silently defeats the gate.
+
+The deny message must not tell you to call `/plan-prompt` as a skill: `.claude/skills/plan-prompt/SKILL.md` sets `disable-model-invocation: true`, so a model cannot invoke it. The actionable routes are asking the user to type `/plan-prompt`, or running `bin/plan-now <prompt-file>` directly.
+
+Self-test: `bash ~/.claude/hooks/test-plan-gate-skill.sh`

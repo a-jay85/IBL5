@@ -161,8 +161,51 @@ PRS_JSON="$("$GH_CMD" pr list --state open --limit 200 \
 
 PR_COUNT="$(echo "$PRS_JSON" | jq 'length')"
 
-printf '%-7s  %-22s  %-26s  %s\n' "PR#" "BUCKET" "NEXT-ACTION" "SIGNALS"
-printf '%-7s  %-22s  %-26s  %s\n' "-------" "----------------------" "--------------------------" "-------"
+# --- report column layout ----------------------------------------------------
+# Every column is fixed-width and separated by exactly TWO spaces, and no value
+# contains a double space. So a consumer splits a row with `awk -F"  +"` and gets
+# one field per column even when a value overflows its width -- overflow costs
+# alignment, never parseability. (The old single free-form SIGNALS column forced
+# consumers to anchor on `clearance=` instead.)
+#
+# Widths are >= the longest value each CLOSED enum can emit, so nothing overflows
+# in practice: BUCKET <= 21 ("FEAT-AWAITING-SIGNOFF"), NEXT-ACTION <= 31
+# ("human review (checks not green)"), MSS <= 9 ("HAS_HOOKS"), CLEARANCE <= 7
+# ("CLEARED"), a check state <= 9 ("cancelled"). HOLDS is last and unbounded.
+W_PR=7; W_BUCKET=22; W_ACTION=32; W_MSS=9; W_CLEAR=9; W_CHECK=9
+
+# ctx_header <required-check-context> -> its short column header. REQUIRED comes
+# from the live branch-protection API, so an unrecognised context must still get
+# a header: the fallback uppercases, strips non-alphanumerics, and truncates.
+ctx_header() {
+    case "$1" in
+        "Tests and Analysis") echo "TESTS" ;;
+        "E2E Tests")          echo "E2E" ;;
+        "human-signoff")      echo "SIGNOFF" ;;
+        *) printf '%s' "$1" | tr '[:lower:]' '[:upper:]' \
+             | tr -cd 'A-Z0-9-' | cut -c1-"$W_CHECK" ;;
+    esac
+}
+
+# dashes <n> -> n '-' characters (one separator-row cell).
+dashes() { printf '%*s' "$1" '' | tr ' ' '-'; }
+
+CHECK_HDRS=()
+CHECK_RULES=()
+CHECK_FMT=""
+for ctx in "${REQUIRED[@]}"; do
+    CHECK_HDRS+=("$(ctx_header "$ctx")")
+    CHECK_RULES+=("$(dashes "$W_CHECK")")
+    CHECK_FMT="${CHECK_FMT}%-${W_CHECK}s  "
+done
+ROW_FMT="%-${W_PR}s  %-${W_BUCKET}s  %-${W_ACTION}s  %-${W_MSS}s  %-${W_CLEAR}s  ${CHECK_FMT}%s\n"
+
+# shellcheck disable=SC2059  # ROW_FMT is built above from constants, never from input
+printf "$ROW_FMT" "PR#" "BUCKET" "NEXT-ACTION" "MSS" "CLEARANCE" \
+    "${CHECK_HDRS[@]}" "HOLDS"
+# shellcheck disable=SC2059
+printf "$ROW_FMT" "$(dashes "$W_PR")" "$(dashes "$W_BUCKET")" "$(dashes "$W_ACTION")" \
+    "$(dashes "$W_MSS")" "$(dashes "$W_CLEAR")" "${CHECK_RULES[@]}" "-----"
 
 # mss_blocks_merge <mergeStateStatus>  -> 0 (true) when GitHub will NOT merge this
 # head as-is, whatever the check-runs say.
@@ -251,13 +294,13 @@ while [ "$i" -lt "$PR_COUNT" ]; do
     deps="$(pr_dep_holds "$body" | tr '\n' ' ')"
     unresolved="$(pr_unresolved_findings_hold "$num" | tr '\n' ' ')"
 
-    check_signals=""
+    check_states=()
     blocked_check=0
     cancelled_ctx=""
     armable_checks_green=1
     for ctx in "${REQUIRED[@]}"; do
         st="$(state_of "$LATEST" "$ctx")"
-        check_signals="${check_signals}${ctx}=${st}; "
+        check_states+=("$st")
         [ "$st" != "green" ] && armable_checks_green=0
         if is_blocked_check_ctx "$ctx" && [ "$st" != "green" ]; then
             blocked_check=1
@@ -282,7 +325,7 @@ while [ "$i" -lt "$PR_COUNT" ]; do
         bucket="DIRTY"; action="rebase onto master"
     elif mss_blocks_merge "$mss"; then
         # Ranked here, beside DIRTY, because it is the same fact: GitHub will not
-        # merge this head. The SIGNALS column still prints every required check's
+        # merge this head. The per-check columns still print every required check's
         # state, so nothing a lower bucket would have said is lost.
         bucket="NOT-MERGEABLE"; action="$(mss_action "$mss")"
     elif [ "$blocked_check" = "1" ]; then
@@ -312,9 +355,25 @@ while [ "$i" -lt "$PR_COUNT" ]; do
         bucket="UNCLEARED"; action="human review (checks not green)"
     fi
 
-    signals="clearance=${clearance}; ${check_signals}held_body=$([ "$held_body" = 1 ] && echo yes || echo no); golden=$([ -n "$golden" ] && echo yes || echo no); deps=$([ -n "$deps" ] && echo "${deps% }" || echo none); feat=$([ -n "$feat" ] && echo yes || echo no); pipeline=$([ -n "$pipeline" ] && echo "${pipeline% }" || echo none); expected_red=$([ "$expected_red" = 1 ] && echo yes || echo no); unresolved=$([ -n "$unresolved" ] && echo "${unresolved% }" || echo none)"
+    # HOLDS lists only the signals that actually FIRED, in bucket-precedence order,
+    # so a clean PR reads as a single "-" instead of eight `=no` pairs. Each token is
+    # the predicate's own vocabulary (`golden-changed`, `depends-on:#N`,
+    # `unresolved-finding:N`, ...), so it stays self-describing and greppable. The
+    # deps/pipeline/unresolved values already carry a trailing space from their `tr`.
+    holds=""
+    if [ "$held_body" = "1" ];    then holds="${holds}body-hold "; fi
+    if [ -n "$golden" ];          then holds="${holds}${golden} "; fi
+    if [ -n "$deps" ];            then holds="${holds}${deps}"; fi
+    if [ -n "$feat" ];            then holds="${holds}${feat} "; fi
+    if [ -n "$pipeline" ];        then holds="${holds}${pipeline}"; fi
+    if [ "$expected_red" = "1" ]; then holds="${holds}expected-red "; fi
+    if [ -n "$unresolved" ];      then holds="${holds}${unresolved}"; fi
+    holds="${holds% }"
+    if [ -z "$holds" ]; then holds="-"; fi
 
-    printf '%-7s  %-22s  %-26s  %s\n' "#$num" "$bucket" "$action" "mss=${mss:-?}; $signals"
+    # shellcheck disable=SC2059
+    printf "$ROW_FMT" "#$num" "$bucket" "$action" "${mss:-?}" "$clearance" \
+        "${check_states[@]}" "$holds"
     ROWS=$((ROWS + 1))
 
     # --- --arm side-effect: ONLY the ARMABLE bucket ---

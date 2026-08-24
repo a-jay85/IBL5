@@ -3,7 +3,7 @@ name: pr-attack
 description: Compute an optimal merge order for all open PRs — ordered table, excluded set, and hand-resolution forecast — printed to chat and written to a dated file under the home directory.
 disable-model-invocation: true
 model: claude-sonnet-4-6
-last_verified: 2026-08-11
+last_verified: 2026-08-24
 allowed-tools: Bash(bin/pr-triage), Bash(bin/pr-overlap:*), Bash(gh pr list:*),
   Bash(gh pr view:*), Bash(gh pr diff:*), Bash(git rev-parse:*), Bash(date:*),
   Bash(mktemp:*), Bash(awk:*), Bash(sort:*), Bash(grep:*), Write
@@ -40,27 +40,41 @@ bin/pr-triage > "$WORK/triage.txt"
 ```
 
 Its stdout is a fixed-width report, one line per open PR:
-`PR#  BUCKET  NEXT-ACTION  SIGNALS`. **Parse it by anchoring on `clearance=`,
-not by column offsets** — `NEXT-ACTION` is printed with `%-26s`, which does not
-truncate, so a long action shifts every later column:
+
+```
+PR#  BUCKET  NEXT-ACTION  MSS  CLEARANCE  <one column per required check>  HOLDS
+```
+
+**Parse it with `-F'  +'`, not by column offsets.** Every column is padded to a
+fixed width and separated by exactly TWO spaces, and no value contains a double
+space — so a two-or-more-space field separator gives one field per column even
+when a long value overflows its width. Column offsets do not, because the widths
+do not truncate.
+
+The number of check columns is **not fixed** — `bin/pr-triage` reads the required
+contexts from the live branch-protection API. Only the check block is variable, so
+never index past it: `HOLDS` is read as `$NF`, not as a fixed number. The four
+columns *before* the check block are fixed in count, and none of them can ever be
+empty (`state_of` and `pr_manual_testing_clearance` are total over closed enums;
+`MSS` is `${mss:-?}`), so no field collapses into the separator — `CLEARANCE` is
+therefore stably `$5`.
 
 ```bash
-awk '/^#[0-9]+/ {
-       pr = $1; bucket = $2
-       sig = substr($0, index($0, "clearance="))
-       printf "%s\t%s\t%s\n", pr, bucket, sig
+awk -F'  +' '/^#[0-9]+/ {
+       printf "%s\t%s\t%s\t%s\n", $1, $2, $5, $NF
      }' "$WORK/triage.txt" > "$WORK/triage.tsv"
 ```
 
-`SIGNALS` is a `;`-separated `key=value` list. The keys this skill reads are
-`clearance=` (`CLEARED` | `HELD` | `UNKNOWN`), `feat=` (`yes` | `no`), `deps=`
-(`none`, or one or more `depends-on:#N` tokens), and the three remaining
-hold signals the `Needs you?` table consumes — `held_body=` (`yes` | `no`),
-`golden=` (`yes` | `no`), and `unresolved=` (`none`, or one or more finding
-tokens). The awk above already captures all of them: `clearance=` is emitted
-first, so anchoring on it carries the whole `key=value` tail into field 3.
+That leaves `$WORK/triage.tsv` with four fields: **PR#**, **BUCKET**,
+**CLEARANCE** (`CLEARED` | `HELD` | `UNKNOWN`), and **HOLDS**.
 
-`deps=` is the authoritative declared-dependency signal: it comes from
+`HOLDS` is a space-separated list of only the hold tokens that actually fired, or
+a lone `-` when none did. The tokens this skill reads are `body-hold`,
+`golden-changed`, `feat-awaiting-signoff`, `depends-on:#N` (one per declared
+predecessor), and `unresolved-finding:SCORE`. Match them with `index()` /
+`~ /token/`, not by position — the order is fixed but the set is not.
+
+`depends-on:#N` is the authoritative declared-dependency signal: it comes from
 `pr_dep_holds()` in `bin/lib/pr-armable.sh`, which reads only **anchored**
 `Depends-on: #N` lines and ignores inline prose mentions. Never re-scrape PR
 bodies for dependencies here.
@@ -103,9 +117,9 @@ wins**:
 
 | Condition | `Needs you?` |
 |---|---|
-| bucket `HELD`, or **any** hold signal — `clearance=HELD`, `held_body=yes`, `golden=yes`, `unresolved` ≠ `none` | `manual test` |
-| bucket `FEAT-AWAITING-SIGNOFF`, or `feat=yes` | `sign feat:` |
-| bucket `UNCLEARED`, or `clearance=UNKNOWN` | `manual test` |
+| bucket `HELD`, or **any** hold signal — `CLEARANCE` = `HELD`, or `HOLDS` contains `body-hold`, `golden-changed`, or `unresolved-finding:` | `manual test` |
+| bucket `FEAT-AWAITING-SIGNOFF`, or `HOLDS` contains `feat-awaiting-signoff` | `sign feat:` |
+| bucket `UNCLEARED`, or `CLEARANCE` = `UNKNOWN` | `manual test` |
 | otherwise | `—` |
 
 **Read the signals, not just the bucket.** `bin/pr-triage` assigns buckets
@@ -113,9 +127,9 @@ wins**:
 `HELD` — a PR with a live hold plus a red check buckets `BLOCKED-CHECK` and its
 hold never reaches the bucket name. That is why row 1 enumerates the raw signals:
 they are exactly the four disjuncts of the `HELD` branch in `bin/pr-triage`
-(`clearance=HELD` OR `golden` OR `held_body` OR `unresolved`). Rows 2 and 3 read
-`feat=` and `clearance=` directly for the same reason — `BLOCKED-DEP` outranks
-both of their buckets. **If a fifth disjunct is ever added to that branch, add it
+(`clearance` = `HELD` OR `golden-changed` OR `body-hold` OR `unresolved-finding:`).
+Rows 2 and 3 read `feat-awaiting-signoff` and `CLEARANCE` directly for the same
+reason — `BLOCKED-DEP` outranks both of their buckets. **If a fifth disjunct is ever added to that branch, add it
 here too**; `bin/pr-triage`'s `HELD` branch is the source of truth, this table
 mirrors it.
 
@@ -133,7 +147,7 @@ diffs for files that are actually shared.
 
 **2a — file lists, one call, no diff download.** `$WORK/prs.json` already carries
 `files` for every open PR (the same `gh pr list --json … files` shape
-`bin/pr-triage:147` uses), so no per-PR call is needed:
+`bin/pr-triage:160` uses), so no per-PR call is needed:
 
 ```bash
 gh pr list --state open --limit 200 --json number,files \
@@ -194,7 +208,7 @@ are MUST constraints**; the third changes effort, never order.
 
 | Type | Source | Meaning | MUST? |
 |---|---|---|---|
-| `declared` | the `deps=` signal from Step 1 (anchored `Depends-on: #N`, read by `pr_dep_holds()` in `bin/lib/pr-armable.sh`) | the author stated #N must land first | **yes** |
+| `declared` | the `depends-on:#N` tokens in Step 1's `HOLDS` field (anchored `Depends-on: #N`, read by `pr_dep_holds()` in `bin/lib/pr-armable.sh`) | the author stated #N must land first | **yes** |
 | `gate` | the heuristic + judgment pass below | PR A adds or tightens a CI check that PR B's diff would violate, so the wrong order either red-lights B or manufactures false confidence in it | **yes**, once judgment confirms |
 | `conflict-cost` | `HAND-RESOLUTION` lines from `bin/pr-overlap` | the two PRs edit the same lines; whoever goes second rebases by hand | **no** — advisory only |
 
@@ -204,8 +218,9 @@ Step 4 is what minimises it.
 
 ### 3a — declared
 
-For each orderable PR, split its `deps=` value. `deps=none` means no declared
-edge. Each `depends-on:#N` token is an edge `#N → this PR`.
+For each orderable PR, scan its `HOLDS` field for `depends-on:#N` tokens. No such
+token (in particular a bare `-`) means no declared edge. Each `depends-on:#N`
+token is an edge `#N → this PR`.
 
 Two things to resolve before ordering:
 

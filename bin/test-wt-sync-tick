@@ -54,6 +54,8 @@ assert_eq() {
 
 # ── Stub binaries ─────────────────────────────────────────────────────────────
 # Place fake ioreg and lsof on PATH; each reads an env var for its output.
+# ioreg additionally reaches the tick via the WT_SYNC_IOREG seam (the tick calls
+# it by absolute path so a launchd PATH gap can never silently disable the gate).
 # STUB_IOREG_LINE: what ioreg emits (default: idle 700s — above the 600s threshold).
 # STUB_LSOF_LINE: what lsof -d cwd emits (default: empty — no process in any wt).
 STUBBIN="$TMP/stubbin"
@@ -81,6 +83,7 @@ mkdir -p "$_TICK_LOCKD" "$(dirname "$_TICK_LOG")"
 run_tick() {
     ST=0
     OUT="$(PATH="$STUBBIN:$PATH" \
+           WT_SYNC_IOREG="$STUBBIN/ioreg" \
            WT_SYNC_LOG="$_TICK_LOG" \
            WT_SYNC_LOCK_DIR="$_TICK_LOCKD" \
            WT_SYNC_ENABLED=1 \
@@ -207,7 +210,7 @@ run_with_repo() {
     done
     [ "${1:-}" = "--" ] && shift
     ST=0
-    OUT="$(env PATH="$STUBBIN:$PATH" \
+    OUT="$(env PATH="$STUBBIN:$PATH" WT_SYNC_IOREG="$STUBBIN/ioreg" \
                WT_SYNC_REPO_ROOT="$main" \
                WT_SYNC_LOG="$log" \
                WT_SYNC_LOCK_DIR="$lockd" \
@@ -229,7 +232,7 @@ MAIN1="$(new_env)"
 add_worktree "$MAIN1" "wt-present" behind >/dev/null
 LOG1="$(fresh_log t1)"; LOCKD1="$(fresh_lockd t1)"
 STUB_IOREG_LINE="HIDIdleTime = 50000000000"   # 50s — below 600s threshold
-OUT1="$(env PATH="$STUBBIN:$PATH" WT_SYNC_REPO_ROOT="$MAIN1" WT_SYNC_LOG="$LOG1" \
+OUT1="$(env PATH="$STUBBIN:$PATH" WT_SYNC_IOREG="$STUBBIN/ioreg" WT_SYNC_REPO_ROOT="$MAIN1" WT_SYNC_LOG="$LOG1" \
            WT_SYNC_LOCK_DIR="$LOCKD1" WT_SYNC_ENABLED=1 STUB_IOREG_LINE="$STUB_IOREG_LINE" \
            "$TICK" 2>&1)" || true
 unset STUB_IOREG_LINE
@@ -249,7 +252,7 @@ fi
 MAIN2="$(new_env)"
 add_worktree "$MAIN2" "wt-baddle" behind >/dev/null
 LOG2="$(fresh_log t2)"; LOCKD2="$(fresh_lockd t2)"
-OUT2="$(env PATH="$STUBBIN:$PATH" WT_SYNC_REPO_ROOT="$MAIN2" WT_SYNC_LOG="$LOG2" \
+OUT2="$(env PATH="$STUBBIN:$PATH" WT_SYNC_IOREG="$STUBBIN/ioreg" WT_SYNC_REPO_ROOT="$MAIN2" WT_SYNC_LOG="$LOG2" \
            WT_SYNC_LOCK_DIR="$LOCKD2" WT_SYNC_ENABLED=1 \
            STUB_IOREG_LINE="completely-unrelated-output" \
            "$TICK" 2>&1)" || true
@@ -261,7 +264,7 @@ assert_absent "fail-closed: log has no synced= entry" "synced=" "$(cat "$LOG2" 2
 MAIN3="$(new_env)"
 add_worktree "$MAIN3" "wt-force" current >/dev/null
 LOG3="$(fresh_log t3)"; LOCKD3="$(fresh_lockd t3)"
-OUT3="$(env PATH="$STUBBIN:$PATH" WT_SYNC_REPO_ROOT="$MAIN3" WT_SYNC_LOG="$LOG3" \
+OUT3="$(env PATH="$STUBBIN:$PATH" WT_SYNC_IOREG="$STUBBIN/ioreg" WT_SYNC_REPO_ROOT="$MAIN3" WT_SYNC_LOG="$LOG3" \
            WT_SYNC_LOCK_DIR="$LOCKD3" WT_SYNC_ENABLED=1 \
            STUB_IOREG_LINE="HIDIdleTime = 10000000000" \
            "$TICK" --force 2>&1)" || true
@@ -300,7 +303,7 @@ MAIN6="$(new_env)"
 add_worktree "$MAIN6" "wt-inuse" current >/dev/null
 LOG6="$(fresh_log t6)"; LOCKD6="$(fresh_lockd t6)"
 WT6="$MAIN6/worktrees/wt-inuse"
-OUT6="$(env PATH="$STUBBIN:$PATH" WT_SYNC_REPO_ROOT="$MAIN6" WT_SYNC_LOG="$LOG6" \
+OUT6="$(env PATH="$STUBBIN:$PATH" WT_SYNC_IOREG="$STUBBIN/ioreg" WT_SYNC_REPO_ROOT="$MAIN6" WT_SYNC_LOG="$LOG6" \
            WT_SYNC_LOCK_DIR="$LOCKD6" WT_SYNC_ENABLED=1 \
            STUB_LSOF_LINE="lsof    999 user   3   DIR   $WT6" \
            "$TICK" --force 2>&1)" || true
@@ -355,7 +358,7 @@ LOCK10="$LOCKD10/wt-sync.lock"
 mkdir -p "$LOCKD10"
 # Seed lock with our own (alive) PID
 printf '%d\n' "$$" > "$LOCK10"
-OUT10="$(env PATH="$STUBBIN:$PATH" WT_SYNC_REPO_ROOT="$MAIN10" WT_SYNC_LOG="$LOG10" \
+OUT10="$(env PATH="$STUBBIN:$PATH" WT_SYNC_IOREG="$STUBBIN/ioreg" WT_SYNC_REPO_ROOT="$MAIN10" WT_SYNC_LOG="$LOG10" \
             WT_SYNC_LOCK_DIR="$LOCKD10" WT_SYNC_ENABLED=1 \
             "$TICK" --force 2>&1)" || true
 assert_match "lock-held: exit message" "lock held by PID|another tick" "$OUT10"
@@ -368,7 +371,7 @@ LOG10B="$(fresh_log t10b)"; LOCKD10B="$(fresh_lockd t10b)"
 LOCK10B="$LOCKD10B/wt-sync.lock"
 mkdir -p "$LOCKD10B"
 printf '99999999\n' > "$LOCK10B"    # PID that is almost certainly dead
-OUT10B="$(env PATH="$STUBBIN:$PATH" WT_SYNC_REPO_ROOT="$MAIN10B" WT_SYNC_LOG="$LOG10B" \
+OUT10B="$(env PATH="$STUBBIN:$PATH" WT_SYNC_IOREG="$STUBBIN/ioreg" WT_SYNC_REPO_ROOT="$MAIN10B" WT_SYNC_LOG="$LOG10B" \
              WT_SYNC_LOCK_DIR="$LOCKD10B" WT_SYNC_ENABLED=1 \
              "$TICK" --force 2>&1)" || true
 assert_match "stale-lock: reclaim message" "reclaiming stale lock|stale" "$OUT10B"
@@ -387,11 +390,65 @@ assert_absent "cron-setup: Program is NOT a worktree path" \
 # ── Test 12: kill switch exits cleanly ───────────────────────────────────────
 MAIN12="$(new_env)"
 LOG12="$(fresh_log t12)"; LOCKD12="$(fresh_lockd t12)"
-OUT12="$(env PATH="$STUBBIN:$PATH" WT_SYNC_REPO_ROOT="$MAIN12" WT_SYNC_LOG="$LOG12" \
+OUT12="$(env PATH="$STUBBIN:$PATH" WT_SYNC_IOREG="$STUBBIN/ioreg" WT_SYNC_REPO_ROOT="$MAIN12" WT_SYNC_LOG="$LOG12" \
             WT_SYNC_LOCK_DIR="$LOCKD12" WT_SYNC_ENABLED=0 \
             "$TICK" --force 2>&1)" || true
 assert_match "kill-switch: exit message" "WT_SYNC_ENABLED=0|exiting" "$OUT12"
 assert_absent "kill-switch: log not written" "synced=" "$(cat "$LOG12" 2>/dev/null)"
+
+# ── Test 13: plist PATH resolves EVERY binary the tick shells out to ─────────
+# The regression this guards: the generated PATH omitted /usr/sbin, so `ioreg`
+# resolved to nothing under launchd, the presence gate fail-closed on every
+# tick, and wt-sync never synced a single worktree. A missing tool is invisible
+# at runtime (fail-closed by design), so it must be caught here instead.
+PLIST_PATH_VAL="$("$CRON_SETUP" --print-schedule 2>/dev/null \
+    | awk '/<key>PATH<\/key>/ { getline; gsub(/^[[:space:]]*<string>|<\/string>[[:space:]]*$/, ""); print; exit }')"
+if [ -z "$PLIST_PATH_VAL" ]; then
+    failcase "plist-path: could not extract PATH from --print-schedule"
+else
+    pass "plist-path: extracted PATH from plist"
+    for _bin in git lsof ioreg; do
+        if PATH="$PLIST_PATH_VAL" command -v "$_bin" >/dev/null 2>&1; then
+            pass "plist-path: '$_bin' resolves under the launchd PATH"
+        else
+            failcase "plist-path: '$_bin' does NOT resolve under the launchd PATH ($PLIST_PATH_VAL)"
+        fi
+    done
+fi
+# The seam default must itself be an existing executable on this machine.
+_IOREG_DEFAULT="$(awk -F'"' '/^WT_SYNC_IOREG=/ { print $0; exit }' "$TICK" | sed 's/.*:-//; s/}.*//')"
+if [ -x "$_IOREG_DEFAULT" ]; then
+    pass "plist-path: WT_SYNC_IOREG default ($_IOREG_DEFAULT) is executable"
+else
+    failcase "plist-path: WT_SYNC_IOREG default ('$_IOREG_DEFAULT') is not an executable"
+fi
+
+# ── Test 14: idle reader missing → distinct fail-closed message, nothing synced ─
+# Must NOT be silently indistinguishable from a bad HID reading — a missing
+# binary is a deployment bug and has to be greppable in the launchd log.
+MAIN14="$(new_env)"
+add_worktree "$MAIN14" "wt-noioreg" behind >/dev/null
+LOG14="$(fresh_log t14)"; LOCKD14="$(fresh_lockd t14)"
+OUT14="$(env PATH="$STUBBIN:$PATH" WT_SYNC_IOREG="$TMP/definitely-not-here/ioreg" \
+            WT_SYNC_REPO_ROOT="$MAIN14" WT_SYNC_LOG="$LOG14" \
+            WT_SYNC_LOCK_DIR="$LOCKD14" WT_SYNC_ENABLED=1 \
+            "$TICK" 2>&1)" || true
+assert_match  "missing-ioreg: distinct message" "idle reader missing or not executable" "$OUT14"
+assert_absent "missing-ioreg: log has no synced= entry" "synced=" "$(cat "$LOG14" 2>/dev/null)"
+HEAD14="$(git -C "$MAIN14/worktrees/wt-noioreg" rev-parse HEAD 2>/dev/null || echo '')"
+ORIG14="$(git -C "$MAIN14" rev-parse origin/wt-noioreg 2>/dev/null || echo 'x')"
+if [ "$HEAD14" != "$ORIG14" ]; then
+    pass "missing-ioreg: worktree not synced"
+else
+    failcase "missing-ioreg: worktree was synced (should not have been)"
+fi
+
+# ── Test 15: source-level — ioreg is invoked via the seam, never bare ────────
+if grep -qE '^[^#]*[^/"]\bioreg -c' "$TICK"; then
+    failcase "source-level: wt-sync-tick calls bare 'ioreg' (PATH-dependent)"
+else
+    pass "source-level: ioreg invoked via \$WT_SYNC_IOREG, not a bare PATH lookup"
+fi
 
 # ── Final report ──────────────────────────────────────────────────────────────
 echo ""

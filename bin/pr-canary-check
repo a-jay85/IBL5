@@ -157,7 +157,7 @@ render_body() {
     if [[ -n "$run_link" ]]; then
         printf '[Run log](%s)\n\n' "$run_link"
     fi
-    printf '> **Advisory only — does not block merge.** The merge queue runs the authoritative full suite.\n\n'
+    printf '> **Advisory only — does not block merge.** The required PR checks (`Tests and Analysis`, `E2E Tests`) run the authoritative full suite.\n\n'
     printf '%s\n' "$STICKY_MARKER"
 }
 

@@ -11,7 +11,7 @@ paths:
   - "bin/vr-changed-coverage"
   - "bin/vr-build-gallery"
   - "bin/vr-review-comment"
-last_verified: 2026-08-18
+last_verified: 2026-08-21
 ---
 
 # Visual-review PRs
@@ -53,8 +53,8 @@ They are skipped only during baseline regen (the `update-baselines` label).
    make the guard a silent no-op nothing would surface, whereas over-suppressing just makes one push
    wait for the next deploy, which re-serves the whole tree anyway. The debounce never fires on an
    `in_progress` run (that one may have checked out `gh-pages` first) and fails **open** — an API
-   error dispatches anyway. This is what stops a `rebase-prs.yml` fan-out (one master push → every
-   open PR resynced → N gh-pages pushes) from producing N deploys, most of which the `pages`
+   error dispatches anyway. This is what stops a push fan-out (one master push → multiple open-PR
+   updates → N gh-pages pushes) from producing N deploys, most of which the `pages`
    concurrency group would just cancel; the fan-out collapses to roughly **two** deploys (one
    in-flight plus one pending), not one. Because every open PR's VR job pushes to the same `gh-pages` ref, concurrent runs
    collide on the ref lock; the deploy is spelled out as **one attempt plus two retries** (the

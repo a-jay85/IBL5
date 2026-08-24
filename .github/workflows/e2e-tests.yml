@@ -314,7 +314,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Debounce the rebase-prs fan-out: one master push updates every open PR, so N PRs each
+          # Debounce the push fan-out: one master push can trigger multiple open-PR CI runs, so N PRs each
           # land a gh-pages push and each dispatches this workflow. A pages-deploy run that has NOT
           # STARTED yet checks out gh-pages *after* this push landed, so it already serves this
           # content — a second dispatch only adds a run that the `pages` concurrency group cancels
@@ -918,7 +918,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Debounce the rebase-prs fan-out: one master push updates every open PR, so N PRs each
+          # Debounce the push fan-out: one master push can trigger multiple open-PR CI runs, so N PRs each
           # land a gh-pages push and each dispatches this workflow. A pages-deploy run that has NOT
           # STARTED yet checks out gh-pages *after* this push landed, so it already serves this
           # content — a second dispatch only adds a run that the `pages` concurrency group cancels

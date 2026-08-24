@@ -1,6 +1,6 @@
 ---
 description: Post-refactoring roadmap and priority queue.
-last_verified: 2026-07-24
+last_verified: 2026-08-21
 ---
 
 # Strategic Development Priorities for IBL5
@@ -16,7 +16,7 @@ IBL5 has completed its full-stack modernization from a PHP-Nuke monolith to an i
 - **Security stack**: CSP + HSTS + X-Frame-Options headers, CSRF on all forms, `HtmlSanitizer::e()` on all output, prepared statements everywhere
 - **HTMX frontend**: boosted navigation (SPA-like), tab switching via `hx-get`, partial-page loading, form boost
 - **Test pyramid**: PHPUnit (unit + integration + module entry point), Playwright E2E (functional + visual regression), Infection mutation testing at 100% MSI
-- **CI/CD**: PHPUnit + PHPStan + Playwright + Lighthouse + CodeQL + migration safety + mutation testing + production smoke tests + auto-rebase
+- **CI/CD**: PHPUnit + PHPStan + Playwright + Lighthouse + CodeQL + migration safety + mutation testing + production smoke tests
 - **Docker dev environment**: multi-worktree with Traefik routing, isolated DBs, automated migration runner
 
 ### Quality Gates (enforced by CI)

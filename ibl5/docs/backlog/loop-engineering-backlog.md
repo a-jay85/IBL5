@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-08-23
+last_verified: 2026-08-24
 ---
 
 # Loop-Engineering Backlog
@@ -61,6 +61,7 @@ last_verified: 2026-08-23
 | L32 | Concurrent `bin/wt-new` on the shared main checkout can lose a queued plan to a `skipped/` disposition | ⬜ Open | 🟥 | S |
 | L33 | CLI entrypoints accept unknown flags silently; no static rule enforces argv option allowlisting | ⬜ Open | 🟦 | S |
 | L34 | `bin/pr-ready-now` has no working stop path; `launchctl bootout` orphans the session and corrupts slot accounting | ⬜ Open | 🟦 | S |
+| L35 | automouse: cap-timeout kill (exit 143) misclassified as genuine plan failure, burns attempt | ⬜ Open | 🟥 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -254,6 +255,15 @@ last_verified: 2026-08-23
 **Risk if untouched:** There is no safe way to abort a fired run — an operator who thinks they stopped one has in fact left it free to rebase and force-push a real branch, and the slot cap that is supposed to bound concurrency silently over-issues afterwards. The stale-scratch facet is the quieter one: it makes a *future* `/pr-ready` run compare against the wrong baseline while every guard reports green.
 **Closes gap:** abort-path correctness — every fire-path row in #1948 passes; nothing exercises the stop path.
 **Status (2026-08-23):** ⬜ Open — 🟦 (loop-machinery default is human-merge; design is resolved and the failure is reproducible).
+
+### L35 automouse: cap-timeout kill (exit 143) misclassified as genuine plan failure, burns attempt
+*(discovered 2026-08-23 during pr-firstpass-loop)*
+**Location:** `bin/automouse/run` — `MAX_IMPL_SECS=3600` (line 462), macOS timeout shim (lines 371–413) that SIGTERMs the child at the cap, and `should_impl_env_stop()` (line 902) which decides whether a failed impl refunds the attempt (environmental) or burns it (genuine failure).
+**Problem:** A SIGTERM from the cap fires exit code 143 (128+15). `should_impl_env_stop()` env-stops only on: a limit/auth string matched by `phase_env_error()`, a watchdog `STALL-KILL` marker matched by `phase_stalled()`, or a sub-minute "fast" exit. A cap-timeout SIGTERM matches none of those, writes no handoff file, and leaves the plan in `queue/` — so it falls through as a "Genuine impl failure" and increments the attempt counter. A plan too large to complete in one hour burns all 3 attempts and is poison-pilled into `skipped/`, even though each attempt committed real progress. Observed 2026-08-23: attempt 1 ran 19:03:54–20:03:55 (3601 s); attempt 2 ran 20:45:40–21:45:40 (3600 s); both logged `claude exited code=143 (impl phase)` then `Genuine impl failure ... (attempt N/3)`. Log: `~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/logs/2026-08-23.log`.
+**Suggested direction:** Teach the impl-failure path to recognise a cap-timeout — e.g. record the phase's elapsed seconds and treat "elapsed >= MAX_IMPL_SECS and exit code 143" as a distinct outcome that refunds the attempt (or at minimum does not count it toward the poison-pill), so out-of-time is not conflated with broken. `should_impl_env_stop()` is locked by `bin/test-automouse-env-breaker`; any change must extend that test.
+**Risk if untouched:** Every plan that routinely exceeds MAX_IMPL_SECS is eventually poison-pilled into `skipped/` rather than retried with a smaller scope or re-queued.
+**Note:** `bin/automouse/run` is a ship-pipeline surface; route through `/plan`, not ad-hoc.
+**Status (2026-08-24):** ⬜ Open — 🟥 (ship-pipeline surface; loop-machinery changes should default to `auto_merge: false`).
 
 ---
 

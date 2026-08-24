@@ -1,6 +1,6 @@
 ---
 description: Cross-PR auto-merge triage via a shared, fail-closed armability predicate sourced by both /post-plan Phase 6.5 and bin/pr-triage.
-last_verified: 2026-06-24
+last_verified: 2026-08-24
 ---
 
 # ADR-0069: Shared fail-closed armability predicate + cross-PR auto-arm

@@ -1,6 +1,6 @@
 ---
 description: Classify each failing visual-review cell as NEW (no committed baseline) vs CHANGED (a real pixel regression) using git ls-files on the tracked index, and render NEW views in a distinct section of the sticky PR comment.
-last_verified: 2026-06-24
+last_verified: 2026-08-24
 ---
 
 # ADR-0069: NEW vs CHANGED classification in the visual-review PR comment

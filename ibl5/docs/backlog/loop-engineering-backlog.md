@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-08-21
+last_verified: 2026-08-23
 ---
 
 # Loop-Engineering Backlog
@@ -60,6 +60,7 @@ last_verified: 2026-08-21
 | L31 | One shared daily log per calendar day: concurrent runners cross-read each other's cost, stall-kill, and env-stop signals | ⬜ Open | 🟥 | M |
 | L32 | Concurrent `bin/wt-new` on the shared main checkout can lose a queued plan to a `skipped/` disposition | ⬜ Open | 🟥 | S |
 | L33 | CLI entrypoints accept unknown flags silently; no static rule enforces argv option allowlisting | ⬜ Open | 🟦 | S |
+| L34 | `bin/pr-ready-now` has no working stop path; `launchctl bootout` orphans the session and corrupts slot accounting | ⬜ Open | 🟦 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -242,6 +243,17 @@ last_verified: 2026-08-21
 **Risk if untouched:** A fourth occurrence, and the existing unhardened entrypoints stay unswept — the backstop above never looks at them.
 **Status (2026-08-09):** ⬜ Open — 🟦.
 **Provenance (2026-08-09):** Surfaced by the `## Class registry` seed row for this class, which routed it to Rung 1 and recorded it as queued; nothing was in fact queued. This entry is that queue.
+
+
+### L34 `bin/pr-ready-now` has no working stop path; `launchctl bootout` orphans the session and corrupts slot accounting
+*(discovered 2026-08-23 during #1948, by the row-22 live-fire smoke test against PR #1899)*
+**Location:** `bin/pr-ready-now` — the emitted runner body (`/tmp/pr-ready-now-runner-<N>.sh`), whose trailing `rm -f "$PLIST"` is the only thing that releases a slot, plus `live_slots()` / `reap_stale()` / `wait_for_slot()`, which count `~/Library/LaunchAgents/com.ibl5.pr-ready-now-*.plist` as the slot token. Secondary surface: the PR-keyed scratch files the `/pr-ready` skill writes (`/tmp/pr-ready-*-<N>.*`), which are deliberately not `$$`-keyed so they survive the launchd boundary.
+**Problem:** Three coupled facts, all observed in one run, not inferred. (1) **`launchctl bootout` does not stop a fired session.** It kills only the runner shell; `timeout` / `caffeinate` / `claude` are reparented to PID 1 and keep going — the observed run completed its Phase 4.3 force-push to `origin` *after* bootout returned, and needed an explicit `kill -TERM` on the reparented PIDs to actually die. (2) **An aborted job leaks its slot.** The runner's `rm -f "$PLIST"` sits after the `claude` invocation, so killing the runner skips it and the plist stays on disk. (3) **`reap_stale()` then makes it worse, not better.** It deletes a plist whose launchd label is gone — which is exactly the aborted-job state — so it frees a slot whose `claude` is still alive; `live_slots()` under-counts and a re-fire can race a live session on the same PR. Separately, the aborted run leaves its `/tmp/pr-ready-*-<N>.*` scratch behind, so a later `/pr-ready <N>` reads a **stale pre-rebase baseline** as its own lost-work comparison — present-but-wrong, which the skill's fail-closed guards do not catch because they only catch missing.
+**Interim workaround (2026-08-23):** `launchctl bootout "gui/$(id -u)/com.ibl5.pr-ready-now-<N>"`, then `rm -f ~/Library/LaunchAgents/com.ibl5.pr-ready-now-<N>.plist`, then `pkill -TERM -f 'name com.ibl5.pr-ready-now-<N>'`, then `rm -f /tmp/pr-ready-*-<N>.*`. Verified to leave no orphan process and no leftover plist. Documented in #1948's body; not wired into the script.
+**Suggested direction:** Give the driver a real stop verb (`--stop <N>` / `--stop-all`) that boots the label out, TERMs the reparented descendants, removes the plist, and clears the PR-keyed scratch — so the release path is the same code whether the run completes or is aborted. Move slot release out of the runner's happy path (a `trap`, or make `reap_stale` verify no live `claude` carries `--name <label>` before reclaiming the slot) so an abort cannot leak or double-issue a slot. `bin/test-plan-now`'s stub pattern (`PLAN_NOW_CLAUDE` shim, no real launchd job) is the closest existing test host to copy.
+**Risk if untouched:** There is no safe way to abort a fired run — an operator who thinks they stopped one has in fact left it free to rebase and force-push a real branch, and the slot cap that is supposed to bound concurrency silently over-issues afterwards. The stale-scratch facet is the quieter one: it makes a *future* `/pr-ready` run compare against the wrong baseline while every guard reports green.
+**Closes gap:** abort-path correctness — every fire-path row in #1948 passes; nothing exercises the stop path.
+**Status (2026-08-23):** ⬜ Open — 🟦 (loop-machinery default is human-merge; design is resolved and the failure is reproducible).
 
 ---
 

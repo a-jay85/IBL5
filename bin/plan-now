@@ -347,6 +347,11 @@ promote_draft() {
 # architect result and no PLAN_FILE: line while a complete draft sits in
 # $PLANS_DIR/.drafts/. 0 means wait indefinitely (the CLI says so itself);
 # the $RUN_TIMEOUT above remains the hard cap.
+# Scope limit: this covers background AGENTS only. The sweep's second, ceiling-independent
+# trigger fires when nothing `local_agent`/`local_workflow` is left, so a `run_in_background`
+# BASH shell is killed after a 5s grace regardless of this value — which is why the coda
+# above forbids backgrounding outright and ~/.claude/hooks/bash-guard.sh check 17 denies it
+# under CLAUDE_HEADLESS.
 CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
     CLAUDE_HEADLESS=1 caffeinate -s \
     timeout "$RUN_TIMEOUT" "$CLAUDE_BIN" -p "$(cat "$PROMPT")" \

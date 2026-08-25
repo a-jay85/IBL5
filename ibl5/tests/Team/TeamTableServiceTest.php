@@ -466,4 +466,239 @@ class TeamTableServiceTest extends TestCase
         $this->assertSame(1, $method->getNumberOfParameters());
         $this->assertSame('teamid', $method->getParameters()[0]->getName());
     }
+
+    // ============================================
+    // Phase 3 tests — markExpiringRows flag, interface parity, roster routing
+    // ============================================
+
+    /**
+     * Build a minimal team row that satisfies Team::fill() so that
+     * Team::initialize($this->db, $teamid) succeeds with the MockDatabase.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildMockTeamRow(int $teamid): array
+    {
+        return [
+            'teamid'       => $teamid,
+            'team_city'    => 'Test City',
+            'team_name'    => 'Test Team',
+            'color1'       => 'FF0000',
+            'color2'       => '0000FF',
+            'arena'        => 'Test Arena',
+            'capacity'     => 10000,
+            'owner_name'   => 'Test Owner',
+            'owner_email'  => 'owner@test.com',
+            'discord_id'   => null,
+            'league_record' => null,
+        ];
+    }
+
+    /**
+     * Build a full player roster row with all fields expected by PlayerDataMapper,
+     * so that getTableOutput() can render without triggering "undefined array key" warnings.
+     *
+     * @param array<string, mixed> $overrides Fields to override on the base row
+     * @return array<string, mixed>
+     */
+    private function buildFullRosterRow(array $overrides = []): array
+    {
+        $base = [
+            // Basic
+            'pid' => 1, 'ordinal' => 1, 'name' => 'Player', 'age' => 25,
+            'teamid' => 5, 'pos' => 'PG',
+            // Ratings
+            'r_fga' => 10, 'r_fgp' => 45, 'r_fta' => 5, 'r_ftp' => 80,
+            'r_3ga' => 3, 'r_3gp' => 35, 'r_orb' => 2, 'r_drb' => 4,
+            'r_ast' => 6, 'r_stl' => 1, 'r_tvr' => 2, 'r_blk' => 0,
+            'r_foul' => 2, 'oo' => 70, 'od' => 65, 'r_drive_off' => 68,
+            'dd' => 62, 'po' => 55, 'pd' => 50, 'r_trans_off' => 72,
+            'td' => 70, 'clutch' => 65, 'consistency' => 70,
+            'talent' => 70, 'skill' => 65, 'intangibles' => 60,
+            // Free agency
+            'loyalty' => 50, 'playing_time' => 50, 'winner' => 50,
+            'tradition' => 50, 'security' => 50,
+            // Contract
+            'exp' => 3, 'bird' => 3, 'cy' => 1, 'cyt' => 3,
+            'salary_yr1' => 1000000, 'salary_yr2' => 1000000,
+            'salary_yr3' => 1000000, 'salary_yr4' => 0,
+            'salary_yr5' => 0, 'salary_yr6' => 0,
+            // Draft
+            'draftyear' => 2020, 'draftround' => 1, 'draftpickno' => 5,
+            // Physical
+            'htft' => 6, 'htin' => 3, 'wt' => 200,
+            // Status
+            'injured' => 0, 'retired' => 0, 'droptime' => null,
+            // Depth
+            'pg_depth' => 0, 'sg_depth' => 0, 'sf_depth' => 0,
+            'pf_depth' => 0, 'c_depth' => 0,
+        ];
+        return array_merge($base, $overrides);
+    }
+
+    /**
+     * Interface parity: renderTableForDisplay() on the interface and implementation
+     * must have the same parameter count (8) and the 8th parameter must be named
+     * markExpiringRows with a default of false.
+     */
+    public function testRenderTableForDisplayMatchesInterfaceSignature(): void
+    {
+        $implMethod = new \ReflectionMethod(TeamTableService::class, 'renderTableForDisplay');
+        $ifaceMethod = new \ReflectionMethod(\Team\Contracts\TeamTableServiceInterface::class, 'renderTableForDisplay');
+
+        $this->assertSame(8, $implMethod->getNumberOfParameters(), 'Implementation must have 8 parameters');
+        $this->assertSame(8, $ifaceMethod->getNumberOfParameters(), 'Interface must have 8 parameters');
+
+        $param = $implMethod->getParameters()[7];
+        $this->assertSame('markExpiringRows', $param->getName());
+        $this->assertTrue($param->isDefaultValueAvailable());
+        $this->assertFalse($param->getDefaultValue());
+    }
+
+    /**
+     * Phase 3.1: getTableOutput() during an offseason must call getRosterUnderContract()
+     * for a real team (not getFreeAgencyRoster()), proving the widening.
+     */
+    public function testGetTableOutputUsesUnderContractRosterDuringOffseason(): void
+    {
+        $this->mockDb->onQuery('ibl_team_info', [$this->buildMockTeamRow(5)]);
+
+        $season = self::createStub(Season::class);
+        $season->method('isOffseasonPhase')->willReturn(true);
+
+        $repository = $this->createMock(\Team\Contracts\TeamRepositoryInterface::class);
+        $repository->expects($this->once())->method('getRosterUnderContract')->with(5)->willReturn([]);
+        $repository->expects($this->never())->method('getFreeAgencyRoster');
+        $repository->method('getTeam')->willReturn(['color1' => '000000', 'color2' => 'FFFFFF']);
+
+        $service = new TeamTableService($this->mockDb, $repository, $season);
+        $service->getTableOutput(5, null, 'ratings');
+    }
+
+    /**
+     * Negative/boundary: during Regular Season (isOffseasonPhase() false), the flag
+     * must not fire — no player-fa-expiring-row class in the output.
+     */
+    public function testMarkExpiringRowsIsFalseDuringRegularSeason(): void
+    {
+        $this->mockDb->onQuery('ibl_team_info', [$this->buildMockTeamRow(5)]);
+
+        $season = self::createStub(Season::class);
+        $season->method('isOffseasonPhase')->willReturn(false);
+        $season->phase = 'Regular Season';
+        $season->lastSimEndDate = '2025-01-01';
+
+        $repository = $this->createStub(\Team\Contracts\TeamRepositoryInterface::class);
+        $repository->method('getRosterUnderContract')->willReturn([]);
+        $repository->method('getTeam')->willReturn(['color1' => '000000', 'color2' => 'FFFFFF']);
+
+        $service = new TeamTableService($this->mockDb, $repository, $season);
+        $html = $service->getTableOutput(5, null, 'ratings');
+
+        $this->assertStringNotContainsString('player-fa-expiring-row', $html);
+    }
+
+    /**
+     * Negative/boundary: getTableOutput(0, ...) — the Free Agents pool —
+     * must NOT emit player-fa-expiring-row even during an offseason.
+     */
+    public function testMarkExpiringRowsIsFalseForFreeAgentPoolDuringOffseason(): void
+    {
+        $this->mockDb->onQuery('ibl_team_info', [$this->buildMockTeamRow(0)]);
+
+        $season = self::createStub(Season::class);
+        $season->method('isOffseasonPhase')->willReturn(true);
+        $season->phase = 'Free Agency';
+        $season->lastSimEndDate = '2025-01-01';
+
+        $repository = $this->createStub(\Team\Contracts\TeamRepositoryInterface::class);
+        $repository->method('getFreeAgents')->willReturn([]);
+        $repository->method('getTeam')->willReturn(['color1' => '000000', 'color2' => 'FFFFFF']);
+
+        $service = new TeamTableService($this->mockDb, $repository, $season);
+        $html = $service->getTableOutput(0, null, 'ratings');
+
+        $this->assertStringNotContainsString('player-fa-expiring-row', $html);
+    }
+
+    /**
+     * Negative/boundary: getTableOutput(-1, ...) — entire league roster —
+     * must NOT emit player-fa-expiring-row even during an offseason.
+     */
+    public function testMarkExpiringRowsIsFalseForEntireLeagueRosterDuringOffseason(): void
+    {
+        $this->mockDb->onQuery('ibl_team_info', [$this->buildMockTeamRow(-1)]);
+
+        $season = self::createStub(Season::class);
+        $season->method('isOffseasonPhase')->willReturn(true);
+        $season->phase = 'Free Agency';
+        $season->lastSimEndDate = '2025-01-01';
+
+        $repository = $this->createStub(\Team\Contracts\TeamRepositoryInterface::class);
+        $repository->method('getEntireLeagueRoster')->willReturn([]);
+        $repository->method('getTeam')->willReturn(['color1' => '000000', 'color2' => 'FFFFFF']);
+
+        $service = new TeamTableService($this->mockDb, $repository, $season);
+        $html = $service->getTableOutput(-1, null, 'ratings');
+
+        $this->assertStringNotContainsString('player-fa-expiring-row', $html);
+    }
+
+    /**
+     * Negative/boundary: a historical view (yr !== '') must use getHistoricalRoster()
+     * and must NOT emit player-fa-expiring-row (historical pages show past state).
+     */
+    public function testMarkExpiringRowsIsFalseForHistoricalRosterDuringOffseason(): void
+    {
+        $this->mockDb->onQuery('ibl_team_info', [$this->buildMockTeamRow(5)]);
+
+        $season = self::createStub(Season::class);
+        $season->method('isOffseasonPhase')->willReturn(true);
+        $season->phase = 'Free Agency';
+        $season->lastSimEndDate = '2025-01-01';
+
+        $repository = $this->createMock(\Team\Contracts\TeamRepositoryInterface::class);
+        $repository->expects($this->once())->method('getHistoricalRoster')->with(5, '2029')->willReturn([]);
+        $repository->expects($this->never())->method('getRosterUnderContract');
+        $repository->method('getTeam')->willReturn(['color1' => '000000', 'color2' => 'FFFFFF']);
+
+        $service = new TeamTableService($this->mockDb, $repository, $season);
+        $html = $service->getTableOutput(5, '2029', 'ratings');
+
+        $this->assertStringNotContainsString('player-fa-expiring-row', $html);
+    }
+
+    /**
+     * Sort order guard: the expiring-rows path must not reorder the roster.
+     * Players must appear in the order the repository returns them.
+     */
+    public function testExpiringPlayersKeepNormalSortOrder(): void
+    {
+        $this->mockDb->onQuery('ibl_team_info', [$this->buildMockTeamRow(5)]);
+
+        $season = self::createStub(Season::class);
+        $season->method('isOffseasonPhase')->willReturn(true);
+        $season->phase = 'Free Agency';
+        $season->lastSimEndDate = '2025-01-01';
+
+        // Roster rows: expiring first, then under-contract. Order must be preserved.
+        $roster = [
+            $this->buildFullRosterRow(['pid' => 10, 'name' => 'Alpha Expiring', 'cy' => 3, 'cyt' => 3, 'pg_depth' => 2]),
+            $this->buildFullRosterRow(['pid' => 11, 'name' => 'Beta Contracted', 'cy' => 1, 'cyt' => 3, 'pg_depth' => 1]),
+        ];
+
+        $repository = $this->createStub(\Team\Contracts\TeamRepositoryInterface::class);
+        $repository->method('getRosterUnderContract')->willReturn($roster);
+        $repository->method('getTeam')->willReturn(['color1' => '000000', 'color2' => 'FFFFFF']);
+
+        $service = new TeamTableService($this->mockDb, $repository, $season);
+        $html = $service->getTableOutput(5, null, 'ratings');
+
+        // Alpha must appear before Beta in the HTML
+        $posAlpha = strpos($html, 'Alpha Expiring');
+        $posBeta  = strpos($html, 'Beta Contracted');
+        $this->assertNotFalse($posAlpha, 'Alpha Expiring must be in output');
+        $this->assertNotFalse($posBeta, 'Beta Contracted must be in output');
+        $this->assertLessThan((int) $posBeta, (int) $posAlpha, 'Alpha must appear before Beta (sort order preserved)');
+    }
 }

@@ -87,6 +87,9 @@ jobs:
               # bin/test-human-signoff-classifier guards the classifier lib that
               # human-signoff.yml sources, so a workflow-only edit must run it too.
               - '.github/workflows/human-signoff.yml'
+              # /pr-ready's runtime blocks are committed scripts, and bin/test-pr-ready-now
+              # case 16 asserts on SKILL.md, so both must trigger shellcheck + harness-tests.
+              - '.claude/skills/pr-ready/**'
             ibl5ts:
               # Everything the ibl5 TS unit suite executes or imports
               # (tests/ts-unit/ specs cover the pure VR-review helpers and
@@ -430,14 +433,14 @@ jobs:
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install -y shellcheck
 
-      - name: Run shellcheck on bin/**
+      - name: Run shellcheck on bin/** and skill scripts
         run: |
           set -e
           # Find shell scripts: files with .sh extension OR bash/sh shebang
           mapfile -t scripts < <(
             {
-              find bin ibl5/bin -type f -name '*.sh' 2>/dev/null || true
-              find bin ibl5/bin -type f -not -name '*.sh' 2>/dev/null \
+              find bin ibl5/bin .claude/skills/pr-ready/scripts -type f -name '*.sh' 2>/dev/null || true
+              find bin ibl5/bin .claude/skills/pr-ready/scripts -type f -not -name '*.sh' 2>/dev/null \
                 | while read -r f; do
                     head -c 40 "$f" 2>/dev/null | grep -qE '^#!(/usr)?/bin/(ba)?sh' && echo "$f"
                   done

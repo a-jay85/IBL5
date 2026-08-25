@@ -291,75 +291,17 @@ Runs on **every** run, before Phase 6 reads the body — including runs where Ph
 
 This refresh is **unconditional and unclassified**. It always runs, always reports its outcome to Phase 7, and is never itself a Phase 6 finding: a stale generated block is a thing this skill fixes, not a thing it reports. Only the `AMBIGUOUS` outcome — duplicate or out-of-order markers, body deliberately left untouched — is a finding, and 6d.4 owns it.
 
-This step needs command substitution, which a Bash tool call may not carry after `EnterWorktree`, so it ships as a script file: `Write` the block below to `/tmp/pr-ready-filesblock-<N>.sh`, then run `bash /tmp/pr-ready-filesblock-<N>.sh`. The Bash tool call is that bare `bash` line and nothing else. The script uses no process substitution — `bin/test-pr-ready-now` case 17 asserts the sentinel-delimited region below contains zero occurrences.
+This step needs command substitution, which a Bash tool call may not carry after `EnterWorktree`, so it ships as a committed script — `.claude/skills/pr-ready/scripts/files-changed.sh`, materialised from the pin and run in one call:
 
 ```bash
-cd /Users/ajaynicolas/GitHub/IBL5-worktrees/<slug> || exit 1
-# --- files-changed rewriter: begin ---
-BEG='<!-- files-changed:begin -->'
-END='<!-- files-changed:end -->'
-IN=/tmp/pr-ready-body-in-<N>.md
-OUT=/tmp/pr-ready-body-out-<N>.md
-BLK=/tmp/pr-ready-fc-block-<N>.md
-NEWB=/tmp/pr-ready-fc-new-<N>.txt
-NEWS=/tmp/pr-ready-fc-newsort-<N>.txt
-OLDB=/tmp/pr-ready-fc-old-<N>.txt
-
-git fetch origin --quiet || exit 1
-gh pr view <N> --json body --jq .body | sed 's/\r$//' > "$IN" || exit 1
-
-git diff --name-status origin/master...HEAD \
-  | awk -F'\t' 'NF > 1 { printf "- `%s` `%s`\n", $1, $NF }' > "$NEWB"
-{ printf '%s\n' "$BEG"; cat "$NEWB"; printf '%s\n' "$END"; } > "$BLK"
-LC_ALL=C sort "$NEWB" > "$NEWS"
-
-nb=$(grep -cFx "$BEG" "$IN"); ne=$(grep -cFx "$END" "$IN")
-lb=$(grep -nFx "$BEG" "$IN" | head -1 | cut -d: -f1); lb=${lb:-0}
-le=$(grep -nFx "$END" "$IN" | head -1 | cut -d: -f1); le=${le:-0}
-paired=0
-if [ "$nb" -eq 1 ] && [ "$ne" -eq 1 ] && [ "$le" -gt "$lb" ]; then paired=1; fi
-
-if [ "$nb" -gt 1 ] || [ "$ne" -gt 1 ] || { [ "$nb" -eq 1 ] && [ "$ne" -eq 1 ] && [ "$paired" -eq 0 ]; }; then
-  echo "FILES-CHANGED: AMBIGUOUS (nb=$nb ne=$ne lb=$lb le=$le) - body left untouched"
-  exit 0
-fi
-
-: > "$OLDB"
-if [ "$paired" -eq 1 ]; then
-  if [ "$le" -gt "$((lb + 1))" ]; then sed -n "$((lb + 1)),$((le - 1))p" "$IN" | LC_ALL=C sort > "$OLDB"; fi
-  : > "$OUT"
-  if [ "$lb" -gt 1 ]; then head -n "$((lb - 1))" "$IN" >> "$OUT"; fi
-  cat "$BLK" >> "$OUT"
-  tail -n "+$((le + 1))" "$IN" >> "$OUT"
-  MODE=REPLACED
-else
-  cp "$IN" "$OUT"
-  printf '\n' >> "$OUT"
-  cat "$BLK" >> "$OUT"
-  MODE=APPENDED
-fi
-
-add=$(comm -13 "$OLDB" "$NEWS" | wc -l | tr -d ' ')
-del=$(comm -23 "$OLDB" "$NEWS" | wc -l | tr -d ' ')
-tot=$(wc -l < "$NEWB" | tr -d ' ')
-
-if cmp -s "$IN" "$OUT"; then echo "FILES-CHANGED: UNCHANGED ($tot files; +0 -0)"; exit 0; fi
-
-gh pr edit <N> --body-file "$OUT" || { echo "FILES-CHANGED: EDIT FAILED"; exit 1; }
-echo "FILES-CHANGED: $MODE ($tot files; +$add -$del)"
-# --- files-changed rewriter: end ---
+git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/files-changed.sh > /tmp/pr-ready-filesblock-<N>.sh && test -s /tmp/pr-ready-filesblock-<N>.sh && bash /tmp/pr-ready-filesblock-<N>.sh <N>
 ```
+
+The Bash tool call is that one line and nothing else. If the `test -s` trips, re-run the whole command — never `bash` a leftover `/tmp` copy. The script takes the PR number only: it runs in the **current** worktree, because every Phase 0 path leaves cwd inside the target, and it prints a `STOP:` line rather than proceeding if cwd is not inside a git work tree. It uses no process substitution — `bin/test-pr-ready-now` case 17 asserts the committed script contains zero occurrences.
 
 Record the printed `FILES-CHANGED:` line **verbatim, as a literal**, for the Phase 7 verdict — a value captured in one Bash call does not survive to the next.
 
-Six properties are load-bearing and must not be "simplified" away:
-
-- **`grep -cFx` / `grep -nFx`, never `-F` alone.** The markers get quoted inside PR bodies that discuss this skill — including this PR's own. Exact-line matching is what stops an inline mention from being read as a marker.
-- **`sed 's/\r$//'` on the fetched body.** A body carrying CRLF makes `-Fx` miss both markers, which silently routes a marked-up body onto the append path and **duplicates** the block — the one outcome `/post-plan`'s recipe forbids. Accepted side effect: on such a body the whole thing is rewritten with LF endings. That is benign — GitHub normalises line endings on render — and it only happens to a body that already had CRLF.
-- **The `AMBIGUOUS` arm writes nothing.** With duplicate or out-of-order markers there is no safe splice: the `head`/`tail` splice on a reversed pair would swallow the body tail. Fail closed and let 6d.4 report it.
-- **`$NF`, not `$2`, in the awk.** `git diff --name-status` emits `R100<TAB>old<TAB>new` for renames; `$1` is the status and `$NF` is the surviving path.
-- **The block is emitted in native `git diff --name-status` order — never `sort`ed.** `/post-plan`'s recipe (`.claude/skills/post-plan/SKILL.md`, § *Files-changed block*) writes one bullet per file straight from `git diff --name-status`, i.e. git's own path order. Sorting the *bullet lines* sorts on the **status letter first** (`` - `A` `z` `` ahead of `` - `M` `a` ``), so the same file set yields a byte-different block. `cmp -s` would then differ on an already-current body and fire a body write on **every** run, printing `REPLACED (n files; +0 -0)` — a body rewrite per invocation, on an artifact a human is reading. `$BLK` is therefore built from the unsorted `$NEWB`; the sorted `$NEWS`/`$OLDB` pair exists **only** to feed `comm` for the `+add -del` counts, and uses `LC_ALL=C sort` so both sides collate identically regardless of the runner's locale.
-- **`head` is guarded by `[ "$lb" -gt 1 ]`.** When the body *starts* with the begin marker, `lb` is 1 and `head -n 0` on BSD/macOS `head` exits 1 with `illegal line count -- 0` (confirmed on this platform) instead of emitting nothing the way GNU `head` does. Unguarded, that aborts the splice and leaves `$OUT` truncated. The `: > "$OUT"` seed plus the guard makes the empty-prefix case write nothing and carry on.
+Six properties inside that script are load-bearing and must not be "simplified" away: `grep -cFx`/`grep -nFx` over bare `-F`; the `sed 's/\r$//'` CRLF strip; the write-nothing `AMBIGUOUS` arm; `$NF` over `$2` in the awk; the deliberately **unsorted** block order; and the `[ "$lb" -gt 1 ]` guard around BSD `head`. Each carries its measured rationale as a comment at its own site in the script — read them before editing it. `bin/test-pr-ready-now` case 17 pins all six against ten body fixtures.
 
 **Phase 6 — plan-intent fidelity review.**
 

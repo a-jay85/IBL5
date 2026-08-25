@@ -29,9 +29,10 @@ class Ratings implements RatingsInterface
      * @param string $moduleName Module name for styling variations
      * @param list<int> $starterPids Starter player IDs
      * @param string $ariaLabel Optional aria-label for the table scroll region (empty = no attribute)
+     * @param bool $markExpiringRows When true, rows whose player has an expiring contract get the player-fa-expiring-row class (Team page during Draft/Free Agency only)
      * @return string HTML table
      */
-    public static function render($db, $data, $team, string $yr, $season, string $moduleName = "", array $starterPids = [], string $ariaLabel = ''): string
+    public static function render($db, $data, $team, string $yr, $season, string $moduleName = "", array $starterPids = [], string $ariaLabel = '', bool $markExpiringRows = false): string
     {
         $players = PlayerRowTransformer::resolvePlayers($db, $data, $yr);
 
@@ -74,7 +75,7 @@ class Ratings implements RatingsInterface
     </thead>
     <tbody>
 <?php foreach ($players as $player): ?>
-        <tr<?php if ($moduleName === "LeagueStarters"): ?> data-team-id="<?= $player->getTeamid() ?? 0 ?>"<?php endif; ?>>
+        <tr<?= ($markExpiringRows && $player->getNameStatusClass() === 'player-expiring') ? ' class="player-fa-expiring-row"' : '' ?><?php if ($moduleName === "LeagueStarters"): ?> data-team-id="<?= $player->getTeamid() ?? 0 ?>"<?php endif; ?>>
 <?php if ($moduleName === "LeagueStarters"):
     echo TeamCellHelper::renderTeamCellOrFreeAgent($player->getTeamid() ?? 0, $player->getTeamName() ?? '', $player->getTeamColor1() ?? 'FFFFFF', $player->getTeamColor2() ?? '000000');
 endif; ?>

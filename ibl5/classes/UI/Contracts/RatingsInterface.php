@@ -20,7 +20,8 @@ interface RatingsInterface
      * @param string $moduleName Module name for styling variations
      * @param list<int> $starterPids Starter player IDs
      * @param string $ariaLabel Optional aria-label for the table scroll region (empty = no attribute)
+     * @param bool $markExpiringRows When true, rows whose player has an expiring contract get the player-fa-expiring-row class (Team page during Draft/Free Agency only)
      * @return string HTML table
      */
-    public static function render($db, $data, $team, string $yr, $season, string $moduleName = "", array $starterPids = [], string $ariaLabel = ''): string;
+    public static function render($db, $data, $team, string $yr, $season, string $moduleName = "", array $starterPids = [], string $ariaLabel = '', bool $markExpiringRows = false): string;
 }

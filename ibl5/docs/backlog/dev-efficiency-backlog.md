@@ -44,7 +44,7 @@ last_verified: 2026-08-25
 | E15 | `/pr-ready` Phase 2 delegation packet tells rebase delegate to push — blocked by sub-agent gate | ⬜ Open | 🟩 | S |
 | E16 | `bin/watch-run` declares a run finished on its first poll, before launchd registers the label | ⬜ Open | 🟩 | S |
 | E17 | Skill prose carries fixed-count words (`either`, `the two`) that go stale when the enumerated set grows | ⬜ Open | 🟩 | S |
-| E18 | `/pr-ready` Phase 6.5 commits new files but never regenerates the PR body `files-changed` block | ⬜ Open | 🟩 | S |
+| E18 | `/pr-ready` Phase 6.5 commits new files but never regenerates the PR body `files-changed` block | ✅ Implemented | — | S |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).

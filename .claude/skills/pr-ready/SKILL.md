@@ -285,6 +285,24 @@ gh pr view <N> --json mergeStateStatus --jq .mergeStateStatus   # BEHIND => must
 
 If `BEHIND`, re-pin — run `git rev-parse origin/master` bare again and record the new printed SHA as `<MASTER_SHA>`, replacing the Phase 1.3 literal — then loop back to Phase 2 with a fresh delegate on the new pin. **Bound the loop at 3 iterations**; on the fourth, stop and report `master is moving faster than this branch can rebase — merge manually or retry when master quiets`. An unbounded loop is the failure mode a strict-protection repo with a busy master produces.
 
+**Phase 5.9 — refresh the machine-generated files-changed block.**
+
+Runs on **every** run, before Phase 6 reads the body — including runs where Phase 5 was skipped. The block's format and splice rules are `/post-plan`'s, not this skill's: `.claude/skills/post-plan/SKILL.md` § *Files-changed block* — build it from `git diff --name-status origin/master...HEAD`, delimit it exactly by `<!-- files-changed:begin -->` / `<!-- files-changed:end -->`, one `` - `<status>` `<path>` `` bullet per file; regenerate and **replace what sits between the two markers** rather than appending a second copy; if only one marker is present, append a fresh block and leave the orphan alone. Do not re-derive that format here.
+
+This refresh is **unconditional and unclassified**. It always runs, always reports its outcome to Phase 7, and is never itself a Phase 6 finding: a stale generated block is a thing this skill fixes, not a thing it reports. Only the `AMBIGUOUS` outcome — duplicate or out-of-order markers, body deliberately left untouched — is a finding, and 6d.4 owns it.
+
+This step needs command substitution, which a Bash tool call may not carry after `EnterWorktree`, so it ships as a committed script — `.claude/skills/pr-ready/scripts/files-changed.sh`, materialised from the pin and run in one call:
+
+```bash
+git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/files-changed.sh > /tmp/pr-ready-filesblock-<N>.sh && test -s /tmp/pr-ready-filesblock-<N>.sh && bash /tmp/pr-ready-filesblock-<N>.sh <N>
+```
+
+The Bash tool call is that one line and nothing else. If the `test -s` trips, re-run the whole command — never `bash` a leftover `/tmp` copy. The script takes the PR number only: it runs in the **current** worktree, because every Phase 0 path leaves cwd inside the target, and it prints a `STOP:` line rather than proceeding if cwd is not inside a git work tree. It uses no process substitution — `bin/test-pr-ready-now` case 17 asserts the committed script contains zero occurrences.
+
+Record the printed `FILES-CHANGED:` line **verbatim, as a literal**, for the Phase 7 verdict — a value captured in one Bash call does not survive to the next.
+
+Six properties inside that script are load-bearing and must not be "simplified" away: `grep -cFx`/`grep -nFx` over bare `-F`; the `sed 's/\r$//'` CRLF strip; the write-nothing `AMBIGUOUS` arm; `$NF` over `$2` in the awk; the deliberately **unsorted** block order; and the `[ "$lb" -gt 1 ]` guard around BSD `head`. Each carries its measured rationale as a comment at its own site in the script — read them before editing it. `bin/test-pr-ready-now` case 17 pins all six against ten body fixtures.
+
 **Phase 6 — plan-intent fidelity review.**
 
 Run `git show <MASTER_SHA>:.claude/skills/pr-ready/_plan-fidelity-review.md` — same pin, same reason as the Phase 2 include (`git show` invariant above) — and perform the printed review **yourself**. By this phase the rebase has landed, so a path read would *usually* work; it is loaded from the pin anyway, so that the procedure applied never depends on how far behind master the branch started, and never silently reads an older copy of itself off the branch. This phase is NEVER delegated — `.claude/rules/agent-tiering.md`: "Never delegate understanding." Spawning any sub-agent for this phase is a defect.
@@ -298,6 +316,7 @@ Every Phase 6 finding gets fixed and its prevention filed, in this PR's existing
 2. **Prove the tree carried nothing else — before the first remediation edit.** `git status --porcelain`. If it prints anything, print `STOP: worktree dirty before remediation` followed by that output, and stop. Phase 0.3 may have entered a worktree that is a peer's active workspace; the `git add -A` in step 4 would sweep their uncommitted work into this commit and step 5 would force-push it. A clean tree here is the normal case — Phase 4.3 step 3c already proved remote == HEAD. Run this once, here at Phase 6.5 entry; from step 3 onward the tree is dirty by design, so never repeat it.
 
 3. **Remediate every finding.** For each Phase 6 finding — **notes as well as blocking**, across all six 6d classes — follow `_remediation.md` in **`Mode: in-PR`**. State that mode line out loud before its step 1; the procedure refuses to run without a declared mode. In-PR mode overrides `/fix-and-prevent`'s § Calibration "Out of scope" carve-outs: a finding too small to name a defect class still gets an entry, with `class: n/a — <reason>`. Never zero entries.
+"Never zero entries" binds the findings Phase 6 actually emitted — it does not manufacture one. A Phase 5.9 outcome of `REPLACED`, `APPENDED` or `UNCHANGED` is a routine refresh, not a finding: it produces no remediation entry, no backlog row, and no `last_verified:` bump. Only `AMBIGUOUS` reaches this phase, as the 6d.4 finding it is, and that one does get an entry.
 
    - **Worktree:** this PR's existing one. Never `bin/wt-new`, never a second worktree, never a teardown.
    - **Backlog:** append the table row and the prose entry to the LIVE backlog file `_remediation.md` step 3 selects, and bump that file's `last_verified:`. Bump no other file's, and do not run the rest of the `/backlog-housekeep` chain. Consolidate findings sharing a surface into one entry.
@@ -382,6 +401,6 @@ Then proceed to Phase 7, which posts the single verdict comment covering both th
    fi
    ```
 
-   Comment body sections, in order: **rebase result** (the master SHA used, conflicts resolved), **CI result**, **plan-fidelity verdict**, **remediation** (what Phase 6.5 fixed, each backlog item filed with its file and ID, anything left `not fixed — filed`, and the post-remediation CI result), **hold predicates**, and one explicit **READY / NOT READY** line — the last reflecting the state *after* remediation, not the Phase 6 findings. If any include was loaded by the declared fallback rather than from the pin, say so here — one `include-source:` line — so the verdict states which revision of its own procedure it followed.
+   Comment body sections, in order: **rebase result** (the master SHA used, conflicts resolved), **CI result**, **files-changed refresh** (the Phase 5.9 `FILES-CHANGED:` line verbatim — `REPLACED` / `APPENDED` / `UNCHANGED` / `AMBIGUOUS`, with its file count and `+added -removed` delta; on `AMBIGUOUS`, state that the body was left untouched and that the markers need repair), **plan-fidelity verdict**, **remediation** (what Phase 6.5 fixed, each backlog item filed with its file and ID, anything left `not fixed — filed`, and the post-remediation CI result), **hold predicates**, and one explicit **READY / NOT READY** line — the last reflecting the state *after* remediation, not the Phase 6 findings. If any include was loaded by the declared fallback rather than from the pin, say so here — one `include-source:` line — so the verdict states which revision of its own procedure it followed. The files-changed block reflects the diff as of Phase 5.9. If Phase 6.5 pushed remediation commits after it, say so on the refresh line — the block is one commit behind by design, and the next `/post-plan` body write regenerates it. Never open a second body edit to catch it up.
 
 3. **STOP — hard terminator.** The run ends at the posted-or-updated comment. No merge. No auto-merge arming. No `/backlog-housekeep` chain beyond the row and `last_verified` bump Phase 6.5 already filed. No `/post-plan` chain. No worktree teardown. No second comment. The user reviews every PR deliberately.

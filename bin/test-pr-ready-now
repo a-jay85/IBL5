@@ -972,6 +972,231 @@ else
 fi
 end_case pr-ready-doc-shape
 
+# --- case 17: Phase 5.9 files-changed rewriter -------------------------------------------
+begin_case
+# The rewriter is a COMMITTED script, not an inline SKILL.md block (PR #1982's pattern),
+# so this case exercises the same bytes /pr-ready runs. It takes the PR number as $1;
+# every runner below passes 9999, which is what makes the /tmp paths concrete.
+RWSRC="$SCRIPT_DIR/../.claude/skills/pr-ready/scripts/files-changed.sh"
+RW=/tmp/tprn-rewriter.sh
+cp "$RWSRC" "$RW"
+
+# (a) fail-closed source guard
+[[ -s "$RW" ]] || fail "scripts/files-changed.sh missing, empty, or moved"
+grep -qF 'files-changed:begin' "$RW" || fail "scripts/files-changed.sh lost the block markers"
+
+# (b) doc-shape assertions on the committed script
+[[ "$(grep -c '<(' "$RW")" -eq 0 ]] \
+    || fail "rewriter must have 0 process substitutions"
+grep -qF 'grep -cFx' "$RW" || fail "rewriter missing grep -cFx"
+grep -qF 'grep -nFx' "$RW" || fail "rewriter missing grep -nFx"
+grep -qF "sed 's/\r\$//'" "$RW" || fail "rewriter missing CRLF normalisation"
+grep -qF 'AMBIGUOUS' "$RW"   || fail "rewriter missing AMBIGUOUS arm"
+[[ "$(grep -c 'gh pr edit' "$RW")" -eq 1 ]] \
+    || fail "rewriter must have exactly 1 'gh pr edit'"
+grep -qF '$NF' "$RW" || fail "rewriter missing \$NF (rename-safe awk)"
+
+# (b2) call-site seam. Externalising the block (PR #1982's pattern) split doc from runtime:
+# every runner below invokes $RW directly with a hardcoded 9999, so a SKILL.md call line that
+# lost its `<N>` argument would pass this case and STOP on the arg guard in every real run.
+# This pins the seam the split opened — the one line Phase 5.9 tells the model to run.
+_SK="$SCRIPT_DIR/../.claude/skills/pr-ready/SKILL.md"
+_CALL=$(grep -F 'pr-ready-filesblock-<N>.sh' "$_SK" | grep -F 'git show' || true)
+[[ -n "$_CALL" ]] || fail "SKILL.md Phase 5.9 lost its git-show call line for the rewriter"
+grep -qF '.claude/skills/pr-ready/scripts/files-changed.sh' <<< "$_CALL" \
+    || fail "SKILL.md call line does not materialise scripts/files-changed.sh"
+grep -qF 'test -s /tmp/pr-ready-filesblock-<N>.sh' <<< "$_CALL" \
+    || fail "SKILL.md call line lost its 'test -s' non-empty guard"
+grep -qE 'bash /tmp/pr-ready-filesblock-<N>\.sh <N>[[:space:]]*$' <<< "$_CALL" \
+    || fail "SKILL.md call line must end 'bash /tmp/pr-ready-filesblock-<N>.sh <N>' (arg guard STOPs without it)"
+
+# (c) fixture git repo: origin/master has .claude/x; feat-rewriter adds bin/y + modifies .claude/x
+_FIX=$(mktemp -d)
+_REMOTE="$_FIX/remote.git"
+_LOCAL="$_FIX/local"
+g init --bare --quiet "$_REMOTE"
+g clone --quiet "$_REMOTE" "$_LOCAL" 2>/dev/null
+mkdir -p "$_LOCAL/.claude" "$_LOCAL/bin"
+printf 'initial\n' > "$_LOCAL/.claude/x"
+g -C "$_LOCAL" add .
+g -C "$_LOCAL" commit --quiet -m "init"
+g -C "$_LOCAL" push --quiet origin master
+g -C "$_LOCAL" checkout --quiet -b feat-rewriter
+printf 'modified\n' > "$_LOCAL/.claude/x"
+printf 'new\n' > "$_LOCAL/bin/y"
+g -C "$_LOCAL" add .
+g -C "$_LOCAL" commit --quiet -m "feat"
+g -C "$_LOCAL" push --quiet origin feat-rewriter
+
+_BEG='<!-- files-changed:begin -->'
+_END='<!-- files-changed:end -->'
+
+# mk_runner: prepend gh() stub to $RW and write runner to $2.sh
+mk_runner() {  # $1 = body fixture file, $2 = capture path
+    { printf 'gh() { case "$2" in\n'
+      printf '  view) cat %q ;;\n' "$1"
+      printf '  edit) cp "${@: -1}" %q; echo EDIT >> %q ;;\n' "$2" "$2.log"
+      printf 'esac; }\n'
+      cat "$RW"
+    } > "$2.sh"
+}
+
+# --- fixture 1: stale bullets → REPLACED (prose preserved above and below) ---
+_F1B=/tmp/tprn-f1.md
+printf '%s\n%s\n%s\n%s\n%s\n' \
+    'Prose above.' "$_BEG" '- `A` `old/file`' "$_END" 'Prose below.' > "$_F1B"
+_F1=/tmp/tprn-f1
+mk_runner "$_F1B" "$_F1"
+_f1_out=$(cd "$_LOCAL" && bash "$_F1.sh" 9999 2>&1)
+grep -qF 'FILES-CHANGED: REPLACED (2 files; +2 -1)' <<< "$_f1_out" \
+    || fail "fixture 1: expected REPLACED (2 files; +2 -1), got: $_f1_out"
+[[ -f "$_F1.log" ]] || fail "fixture 1: gh edit was not called"
+[[ "$(grep -cFx "$_BEG" "$_F1")" -eq 1 ]] || fail "fixture 1: begin-marker count != 1"
+[[ "$(grep -cFx "$_END" "$_F1")" -eq 1 ]] || fail "fixture 1: end-marker count != 1"
+grep -qF 'Prose above.'       "$_F1" || fail "fixture 1: prose above lost"
+grep -qF 'Prose below.'       "$_F1" || fail "fixture 1: prose below lost"
+grep -qF -- '- `M` `.claude/x`' "$_F1" || fail "fixture 1: modified file missing"
+grep -qF -- '- `A` `bin/y`'     "$_F1" || fail "fixture 1: added file missing"
+
+# --- fixture 2: current block in native git order → UNCHANGED (anti-sort fixture) ---
+# native order: M .claude/x before A bin/y (.claude < bin by path in ASCII)
+_F2B=/tmp/tprn-f2.md
+printf '%s\n%s\n%s\n%s\n' "$_BEG" '- `M` `.claude/x`' '- `A` `bin/y`' "$_END" > "$_F2B"
+_F2=/tmp/tprn-f2
+mk_runner "$_F2B" "$_F2"
+_f2_out=$(cd "$_LOCAL" && bash "$_F2.sh" 9999 2>&1)
+grep -qF 'FILES-CHANGED: UNCHANGED (2 files; +0 -0)' <<< "$_f2_out" \
+    || fail "fixture 2: expected UNCHANGED (2 files; +0 -0), got: $_f2_out"
+[[ ! -f "$_F2.log" ]] || fail "fixture 2: gh edit was called on an already-current block"
+
+# sanity: sorted order (A bin/y first) forces a rewrite — confirms fixture 2 discriminates
+_F2SB=/tmp/tprn-f2s.md
+printf '%s\n%s\n%s\n%s\n' "$_BEG" '- `A` `bin/y`' '- `M` `.claude/x`' "$_END" > "$_F2SB"
+_F2S=/tmp/tprn-f2s
+mk_runner "$_F2SB" "$_F2S"
+_f2s_out=$(cd "$_LOCAL" && bash "$_F2S.sh" 9999 2>&1)
+grep -qF 'FILES-CHANGED: REPLACED (2 files; +0 -0)' <<< "$_f2s_out" \
+    || fail "fixture 2 sanity (sorted→native): expected REPLACED (2 files; +0 -0), got: $_f2s_out"
+
+# --- fixture 3: no markers → APPENDED ---
+_F3B=/tmp/tprn-f3.md
+printf 'Prose only, no markers.\n' > "$_F3B"
+_F3=/tmp/tprn-f3
+mk_runner "$_F3B" "$_F3"
+_f3_out=$(cd "$_LOCAL" && bash "$_F3.sh" 9999 2>&1)
+grep -qF 'FILES-CHANGED: APPENDED (2 files; +2 -0)' <<< "$_f3_out" \
+    || fail "fixture 3: expected APPENDED (2 files; +2 -0), got: $_f3_out"
+[[ -f "$_F3.log" ]] || fail "fixture 3: gh edit was not called"
+[[ "$(grep -cFx "$_BEG" "$_F3")" -eq 1 ]] || fail "fixture 3: begin-marker count != 1"
+[[ "$(grep -cFx "$_END" "$_F3")" -eq 1 ]] || fail "fixture 3: end-marker count != 1"
+grep -qF 'Prose only, no markers.' "$_F3" || fail "fixture 3: original prose lost"
+
+# --- fixture 4: orphan begin marker → APPENDED (begin count 2, end count 1, orphan intact) ---
+_F4B=/tmp/tprn-f4.md
+printf '%s\n%s\n%s\n' 'Some prose.' "$_BEG" 'More prose.' > "$_F4B"
+_F4=/tmp/tprn-f4
+mk_runner "$_F4B" "$_F4"
+_f4_out=$(cd "$_LOCAL" && bash "$_F4.sh" 9999 2>&1)
+grep -qF 'FILES-CHANGED: APPENDED' <<< "$_f4_out" \
+    || fail "fixture 4: expected APPENDED, got: $_f4_out"
+[[ -f "$_F4.log" ]] || fail "fixture 4: gh edit was not called"
+[[ "$(grep -cFx "$_BEG" "$_F4")" -eq 2 ]] \
+    || fail "fixture 4: begin-marker count should be 2 (orphan + new)"
+[[ "$(grep -cFx "$_END" "$_F4")" -eq 1 ]] || fail "fixture 4: end-marker count should be 1"
+grep -qF 'Some prose.' "$_F4" || fail "fixture 4: original prose lost"
+
+# --- fixture 5: duplicate marker pairs → AMBIGUOUS, edit log absent ---
+# Layout for nb=2 ne=2 lb=1 le=2: empty first block, then second block with bullet
+_F5B=/tmp/tprn-f5.md
+printf '%s\n%s\n%s\n%s\n%s\n' "$_BEG" "$_END" "$_BEG" '- `A` `old/file`' "$_END" > "$_F5B"
+_F5=/tmp/tprn-f5
+mk_runner "$_F5B" "$_F5"
+_f5_out=$(cd "$_LOCAL" && bash "$_F5.sh" 9999 2>&1)
+grep -qF 'FILES-CHANGED: AMBIGUOUS' <<< "$_f5_out" \
+    || fail "fixture 5: expected AMBIGUOUS, got: $_f5_out"
+[[ ! -f "$_F5.log" ]] || fail "fixture 5: gh edit was called (body should be left untouched)"
+
+# --- fixture 6: end before begin → AMBIGUOUS, edit log absent ---
+# lb=4, le=2 → le < lb → paired=0 → AMBIGUOUS
+_F6B=/tmp/tprn-f6.md
+printf '%s\n%s\n%s\n%s\n' 'Prose line 1.' "$_END" '- `A` `old/file`' "$_BEG" > "$_F6B"
+_F6=/tmp/tprn-f6
+mk_runner "$_F6B" "$_F6"
+_f6_out=$(cd "$_LOCAL" && bash "$_F6.sh" 9999 2>&1)
+grep -qF 'FILES-CHANGED: AMBIGUOUS' <<< "$_f6_out" \
+    || fail "fixture 6: expected AMBIGUOUS, got: $_f6_out"
+[[ ! -f "$_F6.log" ]] || fail "fixture 6: gh edit was called (body should be left untouched)"
+
+# --- fixture 7: CRLF body with markers → REPLACED, begin-marker count exactly 1 ---
+_F7B=/tmp/tprn-f7.md
+printf 'Prose above.\r\n%s\r\n- `A` `old/file`\r\n%s\r\nProse below.\r\n' \
+    "$_BEG" "$_END" > "$_F7B"
+_F7=/tmp/tprn-f7
+mk_runner "$_F7B" "$_F7"
+_f7_out=$(cd "$_LOCAL" && bash "$_F7.sh" 9999 2>&1)
+grep -qF 'FILES-CHANGED: REPLACED (2 files; +2 -1)' <<< "$_f7_out" \
+    || fail "fixture 7: expected REPLACED (2 files; +2 -1), got: $_f7_out"
+[[ -f "$_F7.log" ]] || fail "fixture 7: gh edit was not called"
+[[ "$(grep -cFx "$_BEG" "$_F7")" -eq 1 ]] \
+    || fail "fixture 7: begin-marker duplicated — CRLF normalisation not working"
+
+# (c2) self-mutant: replace sed CRLF strip with cat — must produce 2 begin markers
+sed "s|sed 's/.r\$//'|cat|" "$RW" > /tmp/tprn-rewriter-mutant.sh
+_F7M=/tmp/tprn-f7-mutant
+{ printf 'gh() { case "$2" in\n'
+  printf '  view) cat %q ;;\n' "$_F7B"
+  printf '  edit) cp "${@: -1}" %q; echo EDIT >> %q ;;\n' "$_F7M" "$_F7M.log"
+  printf 'esac; }\n'
+  cat /tmp/tprn-rewriter-mutant.sh
+} > "$_F7M.sh"
+(cd "$_LOCAL" && bash "$_F7M.sh" 9999 2>/dev/null) >/dev/null
+[[ "$(grep -cF "$_BEG" "$_F7M")" -eq 2 ]] \
+    || fail "self-mutant: expected 2 begin markers after CRLF-strip removal, got $(grep -cF "$_BEG" "$_F7M" 2>/dev/null || echo 0)"
+
+# --- fixture 8: rename in diff → REPLACED with R100 bullet naming the new path ---
+g -C "$_LOCAL" checkout --quiet master
+g -C "$_LOCAL" checkout --quiet -b feat-rename
+g -C "$_LOCAL" mv .claude/x .claude/x-new
+g -C "$_LOCAL" commit --quiet -m "rename"
+g -C "$_LOCAL" push --quiet origin feat-rename
+_F8B=/tmp/tprn-f8.md
+printf '%s\n%s\n%s\n%s\n%s\n' \
+    'Prose above.' "$_BEG" '- `M` `.claude/x`' "$_END" 'Prose below.' > "$_F8B"
+_F8=/tmp/tprn-f8
+mk_runner "$_F8B" "$_F8"
+_f8_out=$(cd "$_LOCAL" && bash "$_F8.sh" 9999 2>&1)
+grep -qF 'FILES-CHANGED: REPLACED' <<< "$_f8_out" \
+    || fail "fixture 8: expected REPLACED, got: $_f8_out"
+[[ -f "$_F8.log" ]] || fail "fixture 8: gh edit was not called"
+grep -qF '`.claude/x-new`'  "$_F8" || fail "fixture 8: renamed-to path missing"
+grep -qFx -- '- `M` `.claude/x`' "$_F8" && fail "fixture 8: old path still appears as M bullet"
+g -C "$_LOCAL" checkout --quiet feat-rewriter
+
+# --- fixture 9: begin marker on line 1 (lb==1 edge; guards head -n 0 on BSD head) ---
+_F9B=/tmp/tprn-f9.md
+printf '%s\n%s\n%s\n%s\n' "$_BEG" '- `A` `old/file`' "$_END" 'Trailing prose.' > "$_F9B"
+_F9=/tmp/tprn-f9
+mk_runner "$_F9B" "$_F9"
+_f9_out=$(cd "$_LOCAL" && bash "$_F9.sh" 9999 2>&1)
+grep -qF 'FILES-CHANGED: REPLACED (2 files; +2 -1)' <<< "$_f9_out" \
+    || fail "fixture 9: expected REPLACED (2 files; +2 -1), got: $_f9_out"
+[[ -f "$_F9.log" ]] || fail "fixture 9: gh edit was not called"
+head -1 "$_F9" | grep -qFx "$_BEG" || fail "fixture 9: begin marker not on line 1 of output"
+grep -qF 'Trailing prose.' "$_F9" || fail "fixture 9: trailing prose lost"
+
+# --- fixture 10: end marker on last line (le==last-line edge; guards tail past EOF) ---
+_F10B=/tmp/tprn-f10.md
+printf '%s\n%s\n%s\n%s' 'Prose above.' "$_BEG" '- `A` `old/file`' "$_END" > "$_F10B"
+_F10=/tmp/tprn-f10
+mk_runner "$_F10B" "$_F10"
+_f10_out=$(cd "$_LOCAL" && bash "$_F10.sh" 9999 2>&1)
+grep -qF 'FILES-CHANGED: REPLACED (2 files; +2 -1)' <<< "$_f10_out" \
+    || fail "fixture 10: expected REPLACED (2 files; +2 -1), got: $_f10_out"
+[[ -f "$_F10.log" ]] || fail "fixture 10: gh edit was not called"
+tail -1 "$_F10" | grep -qFx "$_END" || fail "fixture 10: end marker not on last line of output"
+
+end_case pr-ready-files-changed-rewriter
+
 # --- verdict -----------------------------------------------------------------------------
 if [[ $FAILED -ne 0 ]]; then
     echo "test-pr-ready-now: FAILED ($FAILED assertion failure(s))" >&2

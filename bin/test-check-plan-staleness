@@ -7,7 +7,8 @@
 # tokens that live at ibl5/bin/, ellipsis (`ibl5/...`) meta-notation, ADR numeric
 # placeholders (`docs/decisions/00NN-…`), and to-be-created/non-dependency paths
 # carried by a same-line cue (create / new file / Write / **NEW** / (new) / Reject(ed) /
-# fixture / scaffold / throwaway / scratch / post-impl). This test pins each
+# fixture / scaffold / throwaway / scratch / post-impl / an absence assertion such as
+# "does not exist" or "never existed"). This test pins each
 # relaxation AND the load-bearing negative: a missing path on a cue-LESS line
 # must still flag stale. Without the negatives, a relaxed guard could silently
 # stop catching real poison-pill plans.
@@ -171,6 +172,33 @@ assert "bq-prose-still-scanned" 1 $'> **Path correction:** the brief says `ibl5/
 # there. Same-line creation cue (a) and a non-dependency heading (c):
 assert "bq-cue-still-works"  0 $'> Create `ibl5/classes/QuotedNewThing.php` for the callout.'
 assert "bq-under-oos-exempt" 0 $'## Out of Scope\n> The `bin/future-quoted-thing` lands in a later PR.'
+
+# --- Absence assertions (regression for the 2026-08-24 skip) -----------------
+# A plan that states in prose that a path DOES NOT EXIST is asserting absence,
+# not declaring a dependency. Safe to exempt because this cue is only ever
+# consulted for paths already missing from disk, so the assertion matches
+# reality. Before this, the FP was unrecoverable: self-heal requeues only when
+# the guard passes, and a path the plan says will never exist never resolves.
+
+# The exact real-world FP shape: backticked path + bold "does not exist".
+assert "does-not-exist-cue" 0 'The carve-out goes in `SKILL.md`, not a remediation include: `.claude/skills/pr-ready/_remediation.md` **does not exist** in that directory.'
+
+# Bold emphasis INSIDE the phrase (`does **not** exist`) must match too — a
+# plain-substring cue would miss it, which is how the **NEW** marker already
+# needed its own alternation.
+assert "does-bold-not-exist-cue" 0 'The helper `bin/phantom-absent-helper` does **not** exist on master.'
+
+# Contraction and plural forms of the same assertion.
+assert "doesnt-exist-cue" 0 $'The file `ibl5/classes/NoSuchAbsentThing.php` doesn\'t exist in this checkout.'
+assert "do-not-exist-cue"  0 'Neither `bin/phantom-one` nor `bin/phantom-two` do not exist yet under that name.'
+
+# Past-tense absence: the brief named a path that was never real.
+assert "never-existed-cue" 0 'The brief cites `bin/never-was-a-real-script`, which never existed.'
+
+# Load-bearing negative: the cue is the full "do(es) not exist" phrase, not a
+# bare "not". A vanished dependency on a line that merely contains "does not"
+# followed by some OTHER verb must still flag stale (exit 1).
+assert "does-not-other-verb-not-cue" 1 'Modify `ibl5/classes/DeletedButNotCoveredXyz.php`; the suite does not cover it.'
 
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"

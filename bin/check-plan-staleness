@@ -240,8 +240,22 @@ while IFS= read -r token; do
     # a genuinely stale Y. `post-impl` is the verification-matrix timing column
     # for new artifacts; `pre-impl` rows reference existing files (which resolve
     # on disk and never reach here).
+    #
+    # ABSENCE ASSERTIONS ("does not exist" / "never existed") are cues for the
+    # same reason, and are strictly safe: this branch only ever runs for a path
+    # ALREADY absent from disk, so a plan asserting that path's absence holds an
+    # assumption that MATCHES reality — the opposite of the drift the guard
+    # exists to catch. (The inverse — a plan claiming absence for a path that
+    # DOES exist — resolves on disk and never reaches here, so no verdict is
+    # lost.) FP that motivated this: pr-ready-autorefresh-files-block cited
+    # `.claude/skills/pr-ready/_remediation.md` (example) in prose stating it does not
+    # exist; because the path never would exist, self-heal could never recover
+    # the plan and it was stuck in skipped/ permanently. The `**` alternations
+    # below absorb bold emphasis around the negation (`does **not** exist`).
+    # Known limit, shared with every cue above: a cue exempts EVERY token on its
+    # line, not just the one it describes — no new hole class.
     if grep -F -- "$token" "$SCAN_FILE" \
-        | grep -qE '([Cc]reate|[Nn]ew file|[Aa]dd(s|ing)? (a )?new|[Ii]ntroduce|[Ss]caffold|[Ww]rite|\*\*[Nn][Ee][Ww]\*\*|\([Nn][Ee][Ww]\)|[-—] *NEW\b|\b[Mm]ov(e|ed|es|ing)\b|\b[Rr]ename(d|s|ing)?\b|\b[Rr]elocat(e|ed|es|ing)\b|→|[Rr]eject(ed)?|[Ff]ixture|throwaway|scratch|post-impl)'; then
+        | grep -qE '([Cc]reate|[Nn]ew file|[Aa]dd(s|ing)? (a )?new|[Ii]ntroduce|[Ss]caffold|[Ww]rite|\*\*[Nn][Ee][Ww]\*\*|\([Nn][Ee][Ww]\)|[-—] *NEW\b|\b[Mm]ov(e|ed|es|ing)\b|\b[Rr]ename(d|s|ing)?\b|\b[Rr]elocat(e|ed|es|ing)\b|→|[Rr]eject(ed)?|[Ff]ixture|throwaway|scratch|post-impl|\b[Dd]o(es)?(n.t| (\*\*)?not(\*\*)?) exist|[Nn]ever existed)'; then
         continue
     fi
 

@@ -1,6 +1,6 @@
 ---
 description: Rationale for removing the 9998/9999 preseason sentinel year and using real season years instead, with a cleanup pipeline step for the Preseason→Regular Season transition.
-last_verified: 2026-06-25
+last_verified: 2026-08-25
 ---
 
 # ADR-0011: Remove Preseason Sentinel Year (9998/9999)
@@ -29,7 +29,7 @@ The update pipeline (`updateAllTheThings.php`) shares a single `Season` object a
 
 4. **Add `'sch'` to `ExtractFromBackupStep::EXTENSIONS`** so the schedule file is extracted from backup archives.
 
-5. **One-time migration** (`121_remove_preseason_sentinel_data.sql`) purges any existing year-9999 data.
+5. **One-time migration** (`122_remove_preseason_sentinel_data.sql`) purges any existing year-9999 data.
 
 ## Consequences
 
@@ -40,5 +40,5 @@ The update pipeline (`updateAllTheThings.php`) shares a single `Season` object a
 
 ## Enforcement
 
-- Destructive migration (`121`) triggers this ADR requirement.
+- Destructive migration (`122`) triggers this ADR requirement.
 - New pipeline step (`CleanupPreseasonDataStep`) is covered by unit tests.

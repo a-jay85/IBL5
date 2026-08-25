@@ -1205,6 +1205,20 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # EVERY delegate is a background task, so any packet slower than the ceiling
         # was unwinnable. 0 = wait indefinitely; `timeout "$REMAINING_SECS"` and the
         # heartbeat watcher (STALL_KILL_SECS) remain the real bounds.
+        #
+        # WHAT THIS DOES NOT COVER. The harness sweep has TWO independent triggers, and
+        # the ceiling is only one of them. Decompiled from 2.1.241, the sweep fires when
+        # the main thread is idle and EITHER the ceiling is exceeded OR nothing awaitable
+        # remains — and "awaitable" is `local_agent`/`local_workflow` only:
+        #   I2e(e){ if(e.type==="local_agent") return !cR(e); return e.type==="local_workflow" }
+        # A shell started with `run_in_background: true` is `local_bash`, so it is NEVER
+        # awaited no matter what this variable is set to; after a 5000ms grace the harness
+        # logs `print wind-down: killing background shell <id>` and exits. Setting the
+        # ceiling to 0 makes background AGENTS safe and does nothing at all for background
+        # BASH. The 2026-08-24 team-page-expiring-players-faded impl lost three verification
+        # gates and its handoff to exactly this path. The guard is upstream, not here:
+        # bin/automouse/prompt-impl forbids backgrounded Bash, and ~/.claude/hooks/bash-guard.sh
+        # check 17 denies `run_in_background: true` whenever CLAUDE_HEADLESS is set.
         CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
         NIGHTLY_CMDPID_FILE="$CMDPID_FILE" \
         timeout "$REMAINING_SECS" \
@@ -1314,7 +1328,9 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # review/E2E sub-agents, which are asynchronous too. The skill's own "drain
         # every background shell before ending your turn" rule is unchanged and still
         # the primary contract; this only stops the harness from severing an agent
-        # that is legitimately still working.
+        # that is legitimately still working. It does NOT protect a backgrounded Bash
+        # shell — see the impl-phase comment above for why the ceiling cannot; that is
+        # what the skill's drain barrier and bash-guard.sh check 17 are for.
         CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
         NIGHTLY_CMDPID_FILE="$CMDPID_FILE" \
         timeout "$REMAINING_SECS" \

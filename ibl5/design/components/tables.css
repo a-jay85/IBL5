@@ -209,6 +209,36 @@
     background-color: var(--accent-200);
 }
 
+/* Expiring-contract row (Team page, Draft / Free Agency) — faded to mirror the
+   Trading module's outgoing-player treatment: "this player may not be on this
+   roster next season". Uses the same :nth-child pair as .highlight/.totals-row
+   above to outrank striping without !important. Values duplicated from
+   components/trade-roster-preview.css tr.trade-outgoing-row by design — see the
+   plan's Architectural trade-offs (c). */
+.ibl-data-table tbody tr.player-fa-expiring-row:nth-child(odd),
+.ibl-data-table tbody tr.player-fa-expiring-row:nth-child(even) {
+    background-color: var(--gray-100);
+    color: var(--gray-400);
+}
+
+.ibl-data-table tbody tr.player-fa-expiring-row:nth-child(odd):hover,
+.ibl-data-table tbody tr.player-fa-expiring-row:nth-child(even):hover {
+    background-color: var(--gray-200);
+}
+
+.ibl-data-table tbody tr.player-fa-expiring-row td {
+    color: var(--gray-400);
+}
+
+.ibl-data-table tbody tr.player-fa-expiring-row a {
+    color: var(--gray-400);
+}
+
+.ibl-data-table tbody tr.player-fa-expiring-row img {
+    filter: grayscale(100%);
+    opacity: 0.45;
+}
+
 /* Table footer summary rows (team totals, cap totals, etc.) */
 .ibl-data-table tfoot tr {
     background-color: var(--accent-100);
@@ -404,6 +434,17 @@
     /* Drafted row sticky backgrounds - consolidated */
     .responsive-table tbody tr.drafted td[class*="sticky-col"] {
         background-color: var(--gray-100);
+    }
+
+    /* Expiring-contract row sticky backgrounds — keeps the frozen Player cell
+       in step with the faded row instead of retaining its stripe colour. */
+    .responsive-table tbody tr.player-fa-expiring-row td[class*="sticky-col"] {
+        background-color: var(--gray-100);
+        color: var(--gray-400);
+    }
+
+    .responsive-table tbody tr.player-fa-expiring-row:hover td[class*="sticky-col"] {
+        background-color: var(--gray-200);
     }
 
     /* User team highlight sticky backgrounds */

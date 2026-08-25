@@ -40,9 +40,10 @@ interface TeamTableServiceInterface
      * @param Season $season Season object
      * @param list<int> $starterPids Player IDs of starters for highlighting
      * @param ?string $split Split stats key when display is 'split'
+     * @param bool $markExpiringRows When true, expiring-contract rows receive the player-fa-expiring-row class. Default false keeps every shared consumer byte-identical.
      * @return string Table HTML
      */
-    public function renderTableForDisplay(string $display, array $result, Team $team, ?string $yr, Season $season, array $starterPids = [], ?string $split = null): string;
+    public function renderTableForDisplay(string $display, array $result, Team $team, ?string $yr, Season $season, array $starterPids = [], ?string $split = null, bool $markExpiringRows = false): string;
 
     /**
      * Build the optgroup structure for the dropdown view selector

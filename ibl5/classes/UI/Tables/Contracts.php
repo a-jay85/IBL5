@@ -29,9 +29,10 @@ class Contracts implements ContractsTableInterface
      * @param list<int> $starterPids Starter player IDs
      * @param list<int> $excludeFromCapPids PIDs to exclude from cap total sums (e.g. outgoing trade players)
      * @param bool $showActionLinks When false, Rookie Option / Contract Extension eligibility markers still render but are not clickable links (used when previewing another GM's roster in the Trading module)
+     * @param bool $markExpiringRows When true, rows whose player has an expiring contract get the player-fa-expiring-row class (Team page during Draft/Free Agency only)
      * @return string HTML table
      */
-    public static function render(\mysqli $db, iterable $result, Team $team, Season $season, array $starterPids = [], array $excludeFromCapPids = [], bool $showActionLinks = true): string
+    public static function render(\mysqli $db, iterable $result, Team $team, Season $season, array $starterPids = [], array $excludeFromCapPids = [], bool $showActionLinks = true, bool $markExpiringRows = false): string
     {
         $isFreeAgency = $season->isOffseasonPhase();
         // Contract extensions are only actionable during in-season phases. During
@@ -151,7 +152,7 @@ class Contracts implements ContractsTableInterface
         $renderHintAsLink = $showActionLinks && $isExtensionActionablePhase;
     }
 ?>
-        <tr<?= $row['isCashRow'] ? ' data-cash-row' : '' ?>>
+        <tr<?= $row['isCashRow'] ? ' data-cash-row' : '' ?><?= (!$row['isCashRow'] && $markExpiringRows && $player->getNameStatusClass() === 'player-expiring') ? ' class="player-fa-expiring-row"' : '' ?>>
             <td><?= HtmlSanitizer::e($player->getPosition() ?? '') ?></td>
             <?= PlayerImageHelper::renderPlayerCell((int)$player->getPlayerID(), $player->getDecoratedName() ?? '', $starterPids, $player->getNameStatusClass()) ?>
             <td><?= (int)$player->getAge() ?></td>

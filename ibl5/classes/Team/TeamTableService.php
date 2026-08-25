@@ -49,12 +49,20 @@ class TeamTableService implements TeamTableServiceInterface
         } else {
             if ($yr !== null && $yr !== '') {
                 $result = $this->repository->getHistoricalRoster($teamid, $yr);
-            } elseif ($isFreeAgency) {
-                $result = $this->repository->getFreeAgencyRoster($teamid);
             } else {
+                // During Draft / Free Agency the Team page deliberately keeps
+                // expiring-contract players in the roster so they can render
+                // faded (see $markExpiringRows below). getRosterUnderContract()
+                // is getFreeAgencyRoster() without the `cyt != cy` filter, so
+                // one source now serves both phases.
                 $result = $this->repository->getRosterUnderContract($teamid);
             }
         }
+
+        // Fade expiring players only where the widening actually applies:
+        // a real team (not the FA pool or the league roster) in the current
+        // season (not a historical view), during Draft or Free Agency.
+        $markExpiringRows = $isFreeAgency && $teamid > 0 && ($yr === null || $yr === '');
 
         $insertyear = ($yr !== null && $yr !== '') ? "&yr=$yr" : "";
         $baseUrl = "modules.php?name=Team&op=team&teamid=$teamid" . $insertyear;
@@ -67,7 +75,18 @@ class TeamTableService implements TeamTableServiceInterface
         /** @var list<int> $starterPids */
         $starterPids = [];
         if ($teamid > 0 && ($yr === null || $yr === '')) {
-            $starters = $this->extractStartersData($result);
+            // extractStartersData() derives starters from the *_depth columns on the
+            // roster rows themselves, not from a starters table. Widening the roster
+            // above would therefore let an expiring player surface as a starter during
+            // the offseason. Narrow the rows back to the pre-widening set (cy != cyt)
+            // exactly where the widening applied, so $starterPids stays byte-identical.
+            $starterSource = $markExpiringRows
+                ? array_values(array_filter(
+                    $result,
+                    static fn (array $row): bool => self::rowInt($row['cy'] ?? 0) !== self::rowInt($row['cyt'] ?? 0)
+                ))
+                : $result;
+            $starters = $this->extractStartersData($starterSource);
             foreach ($starters as $data) {
                 if ($data['pid'] !== null) {
                     $starterPids[] = $data['pid'];
@@ -75,7 +94,7 @@ class TeamTableService implements TeamTableServiceInterface
             }
         }
 
-        $tableHtml = $this->renderTableForDisplay($display, $result, $team, $yr, $season, $starterPids, $split);
+        $tableHtml = $this->renderTableForDisplay($display, $result, $team, $yr, $season, $starterPids, $split, $markExpiringRows);
 
         // HTMX API URL for tab/dropdown switching
         $apiUrl = 'modules.php?name=Team&op=api&teamid=' . $teamid . $insertyear;
@@ -106,6 +125,15 @@ class TeamTableService implements TeamTableServiceInterface
 
         $switcher = new TableViewSwitcher($tabDefinitions, $display, $baseUrl, $teamColor1, $teamColor2, $apiUrl);
         return $switcher->wrap($tableHtml);
+    }
+
+    /**
+     * Normalise a raw roster-row column to int, mirroring extractStartersData()'s
+     * handling of columns that arrive as either native ints or numeric strings.
+     */
+    private static function rowInt(mixed $value): int
+    {
+        return is_int($value) ? $value : (is_string($value) ? (int) $value : 0);
     }
 
     /**
@@ -177,8 +205,9 @@ class TeamTableService implements TeamTableServiceInterface
      *
      * @param list<PlayerRow>|list<array<string, mixed>> $result
      * @param list<int> $starterPids
+     * @param bool $markExpiringRows When true, expiring-contract rows receive the player-fa-expiring-row class. Default false keeps every shared consumer byte-identical.
      */
-    public function renderTableForDisplay(string $display, array $result, Team $team, ?string $yr, Season $season, array $starterPids = [], ?string $split = null): string
+    public function renderTableForDisplay(string $display, array $result, Team $team, ?string $yr, Season $season, array $starterPids = [], ?string $split = null, bool $markExpiringRows = false): string
     {
         $yrStr = $yr ?? '';
         switch ($display) {
@@ -198,11 +227,11 @@ class TeamTableService implements TeamTableServiceInterface
                 foreach ($cashRows as $cashRow) {
                     $result[] = self::cashConsiderationToRosterRow($cashRow);
                 }
-                return \UI\Tables\Contracts::render($this->db, $result, $team, $season, $starterPids);
+                return \UI\Tables\Contracts::render($this->db, $result, $team, $season, $starterPids, [], true, $markExpiringRows);
             case 'split':
                 return $this->renderSplitStats($team, $season, $split ?? 'home', $starterPids);
             default:
-                return \UI\Tables\Ratings::render($this->db, $result, $team, $yrStr, $season, '', $starterPids);
+                return \UI\Tables\Ratings::render($this->db, $result, $team, $yrStr, $season, '', $starterPids, '', $markExpiringRows);
         }
     }
 

@@ -31,12 +31,12 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
 - **Every glob is quoted** — `--include="*.md"`, never `--include=*.md`.
 - **The run STOPS at the verdict, with one amendment.** After Phase 6 and before Phase 7, the new Phase 6.5 (remediation) is permitted: fix the reported findings, file prevention backlog items, commit, and push — then Phase 7 updates the same sticky comment. What remains unconditionally forbidden: merge, auto-merge arming, the full `/backlog-housekeep` chain beyond appending a backlog row and bumping its `last_verified`, any `/post-plan` chain, worktree teardown, and a second new comment.
 - **After `EnterWorktree`, no Bash command may contain `$(…)` or `<(…)`.** The worktree-isolated session refuses command and process substitution outright — "too complex to verify that it stays inside the worktree"; the refusal's "…without the redirect" wording is canned and misleading. Pipelines, redirects, conditionals and `;`-separated statements all run fine: substitution is the only trigger. On the 0.3 `ALREADY-IN-TARGET` path no `EnterWorktree` call is ever made, so — *unless the session was already isolated when `/pr-ready` was invoked* — substitution would in fact work everywhere. That caveat is why the exception is worthless: you cannot tell from inside which regime you are in without probing. The later phases are written substitution-free regardless, so the same text runs unchanged on all three paths. Do not "simplify" them back on the strength of that. **Phase 0 is NOT exempt.** The gate keys on the *session* being `EnterWorktree`-tracked, not on the cwd being a worktree — a session launched directly in a worktree is unrestricted (probed: `X=$(echo hi); echo "subst-ok $X"` printed `subst-ok hi` from a worktree cwd), but a session that called `EnterWorktree` **before** `/pr-ready` was invoked is already isolated at 0.3. Phase 0 therefore has to run under both regimes, and the 0.3 guard block is written in the script-file shape for exactly that reason. It is also **re-run** after step 4's `EnterWorktree`, which is isolated by definition — so `Write` the guard file once at 0.3, *before* any `EnterWorktree`, then `bash` it up to three times; no `Write` ever needs to land post-isolation. **Exempt:** any command passed to `Monitor`, which is not gated (probed: `Monitor(command: 'X=$(echo hi); echo "$X"')` emits `hi`, so the Phase 4.5 watcher loop runs as written). Everywhere else, use one of two shapes:
-  - **Multi-command blocks** — `Write` the block to `/tmp/pr-ready-<step>-<N>.sh`, then run `bash /tmp/pr-ready-<step>-<N>.sh` as one plain command. Key the filename to the PR number, never `$$`.
+  - **Multi-command blocks** — they live as committed scripts under `.claude/skills/pr-ready/scripts/` (example) and run in one call: `git show <MASTER_SHA>:<path> > /tmp/<file>.sh && test -s /tmp/<file>.sh && bash /tmp/<file>.sh <args>`. Key the filename to the PR number, never `$$`. If the `test -s` trips, re-run the whole command — never `bash` a leftover `/tmp` copy. The one exception is the Phase 0.3 guard, which runs before the Phase 1.3 pin exists and so stays an inline `Write`.
   - **Single-value captures** (the master pin, `STRICT`, the branch name) — run the bare command so it **prints** the value, then hold that value as a **literal** in the run notes and substitute it into every later command.
 - **A value captured in one Bash call does not survive to the next — hold it as a literal, not a shell variable.** Every Bash call is a fresh shell, so `MASTER_SHA=$(git rev-parse origin/master)` in one call is *empty* in the next, and `git rev-list --count "$MASTER_SHA"..HEAD` then degrades to `git rev-list --count ..HEAD`, which exits 0 printing `0` — a silent wrong answer that skips the Phase 2c squash gate for every PR. `<MASTER_SHA>` in a later block therefore means **substitute the recorded literal here**. That form also fails *closed*: forget to substitute and git rejects the literal `<MASTER_SHA>` as a bad rev, where `"$MASTER_SHA"` would have failed open. The same rule is why every `/tmp` path in this skill is keyed to `<N>` rather than `$$`.
 - **Every repo file this skill reads after Phase 0 comes from `git show <MASTER_SHA>:<path>` — never a bare repo-relative `Read`.** That covers all three progressive-disclosure includes and the linear-history rule the Phase 2 include names. The reason is structural, not stylistic: on the ordinary path the harness loads this `SKILL.md` from the **main checkout** and Phase 0.4 then `EnterWorktree`s into the *target PR's* worktree — and that tree is by definition behind master, so the skill's own files are simply **absent** there until the branch rebases, which is Phase 2, the phase whose instructions live in the missing file. (On the 0.3 `ALREADY-IN-TARGET` path the loaded `SKILL.md` is the target worktree's own copy, so skill discovery *did* resolve inside a worktree — the rule holds unchanged there, because that tree is exactly the one whose includes may be missing. On the 0.3b `WRONG-WORKTREE` path the loaded copy came from a *third* tree — the one the session started in, which has nothing to do with the PR — while the includes still come from `<MASTER_SHA>`; that is documentation, not a new case, because the rule already forbids reading any include by repo-relative path.) The main-checkout path is not a fallback: reading it from a worktree-entered session is **denied** by the cross-worktree straddle gate in `~/.claude/hooks/plan-gate-edit.sh`. `git show` against the Phase 1.3 pin sidesteps both horns — same shared object store, no gate crossed, no `$(…)` needed, and the include is guaranteed to be the revision that matches the `SKILL.md` the harness loaded. Measured before this was fixed: `_rebase-and-conflicts.md` existed in **1 of 34** worktrees on this machine — the skill's own.
   - **Exactly one fallback for the orchestrator's three progressive-disclosure includes — `_rebase-and-conflicts.md` (Phase 2), `_plan-fidelity-review.md` (Phase 6), and `_remediation.md` (Phase 6.5) — and it must be declared.** (The Phase 2 delegation packet carries its own separate fallback for the rule file it names — declared in the delegate's report line 1, per `_rebase-and-conflicts.md`. That one is not covered by, and does not violate, this clause.) `git show` fails with `fatal: invalid object name` or `path … does not exist` when the pinned master predates this skill — which, once merged, happens only when you are dogfooding `/pr-ready` on its own still-open PR. In that case, and only when the file is genuinely present in the current worktree, `Read` it by path and record `include-source: worktree (pin predates skill)` in the verdict. If neither source yields the file, print `STOP: cannot load <file> from <MASTER_SHA> or from the worktree` and stop. Never reach for the main-checkout path — that is the gated horn, and a denial there is not a signal to retry.
-- **`STOP:` lines are hard stops for the model, not just for the shell.** Five runtime blocks below print a `STOP:` line: the Phase 0 argument gate (0.1), the Phase 0 worktree guard (0.3, on an unresolvable head branch or a missing `bin/lib/git-helpers.sh`), the Phase 0 exit-recovery check (0.3b, when the post-`ExitWorktree` re-run does not print `MAIN-CHECKOUT`), the Phase 0 worktree-entry step (0.4, on a missing worktree or a post-`EnterWorktree` re-run that does not print `ALREADY-IN-TARGET`), and the Phase 1 plan check (1.1). The include-fallback clause above prints a sixth, from whichever phase was loading an include. Where such a block runs `exit 1`, that `exit` terminates **only that Bash invocation** — it does not terminate the skill, because a skill's blocks are run by the model. The contract is therefore: **on a non-zero rc, or on printing a `STOP:` line, stop the run and make no further tool call.** None of the five relies on shell exit status to halt anything but the shell, so in all five the printed line *is* the gate. Only 0.3's own two failure arms gate via `exit 1`; 0.1 and 1.1 have no shell block at all. **0.3b and 0.4 gate on the printed word, never on the rc** — both re-run the *same* guard script, and its remaining arms all exit 0, so a re-printed `WRONG-WORKTREE` (or a `MAIN-CHECKOUT` where `ALREADY-IN-TARGET` was required) is a passing shell carrying a failing verdict. 0.4's `git worktree list` likewise only captures data, so its rc carries no signal either. The `gh pr view` whose failure that rc used to mask now lives in 0.3, behind an explicit empty-`SLUG` check that does exit non-zero.
+- **`STOP:` lines are hard stops for the model, not just for the shell.** Five runtime blocks below print a `STOP:` line: the Phase 0 argument gate (0.1), the Phase 0 worktree guard (0.3, on an unresolvable head branch or a missing `bin/lib/git-helpers.sh`), the Phase 0 exit-recovery check (0.3b, when the post-`ExitWorktree` re-run does not print `MAIN-CHECKOUT`), the Phase 0 worktree-entry step (0.4, on a missing worktree or a post-`EnterWorktree` re-run that does not print `ALREADY-IN-TARGET`), and the Phase 1 plan check (1.1). The include-fallback clause above prints a sixth, from whichever phase was loading an include. Where such a block runs `exit 1`, that `exit` terminates **only that Bash invocation** — it does not terminate the skill, because a skill's blocks are run by the model. The contract is therefore: **on a non-zero rc, or on printing a `STOP:` line, stop the run and make no further tool call.** None of the five relies on shell exit status to halt anything but the shell, so in all five the printed line *is* the gate. Only 0.3's own two failure arms gate via `exit 1`; 0.1 and 1.1 have no shell block at all. **0.3b and 0.4 gate on the printed word, never on the rc** — both re-run the *same* guard script, and its remaining arms all exit 0, so a re-printed `WRONG-WORKTREE` (or a `MAIN-CHECKOUT` where `ALREADY-IN-TARGET` was required) is a passing shell carrying a failing verdict. 0.4's `git worktree list` likewise only captures data, so its rc carries no signal either. The `gh pr view` whose failure that rc used to mask now lives in 0.3, behind an explicit empty-`SLUG` check that does exit non-zero. The externalized scripts print their own `STOP:` lines on a missing argument, a missing worktree, or an unreadable input, and the same contract applies — stop the run and make no further tool call.
 
 ## Runtime phases
 
@@ -152,18 +152,7 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
 
    Record the printed value as `<STRICT>` in the run notes. On a 403/404 (a token without admin read), record `<STRICT>` as `true` and say so in the verdict. Failing closed costs one extra divergence check; failing open ships a stale-base merge.
 
-5. **Prior-Phase-4B probe.** Look for the review heading in **both** the issue comments and the review bodies — findings are posted as a review body with inline threads, not only as issue comments. Multi-command, so per the invariants it runs via the script-file shape: `Write` this to `/tmp/pr-ready-4bprobe-<N>.sh`, then run `bash /tmp/pr-ready-4bprobe-<N>.sh`.
-
-   ```bash
-   gh api "repos/{owner}/{repo}/issues/<N>/comments" --paginate \
-     --jq '.[] | select((.body // "") | test("(?m)^#{1,6} +Code review\\b")) | "comment\t\(.id)\t\(.user.login)\t\(.created_at)"'
-   gh api "repos/{owner}/{repo}/pulls/<N>/reviews" --paginate \
-     --jq '.[] | select((.body // "") | test("(?m)^#{1,6} +Code review\\b")) | "review\t\(.id)\t\(.user.login)\t\(.submitted_at)"'
-   ```
-
-   (**The `(?m)` is load-bearing — never reduce it to a bare `^`.** In jq's Oniguruma engine a bare `^` anchors to **string start only**, not to each line start; `(?m)` is what makes it line-anchored. Dropping it breaks the probe on the shape every review actually has — the helper wraps its output in `<details><summary>…`, so the heading is never at offset 0. Measured 2026-08-14 on jq 1.7.1 against a `<details>`-wrapped body: bare `^…` ⇒ `false`, `(?m)^…` ⇒ `true`, engine-agnostic `(^|\n)…` ⇒ `true`. This failure is the **mirror image** of the false-positive risk flagged at the end of this step: it makes `PHASE_4B_RAN` falsely *false*, so Phase 6 reports "never reviewed" for a PR that was reviewed, and re-recommends `/pr-review` needlessly. Do not "correct" `(?m)` to `(?s)` either — `(?s)` is dot-matches-newline, a different flag, verified the same day.)
-
-   **Match the heading at any level (`#{1,6}`), never a fixed one.** The helper that posts it — `post_review_summary` / `post_review_findings` in `bin/lib/post-review-findings.sh` — emits `### Code review` in its source today, yet **every** review comment actually on a PR right now carries `## Code review`, and GitHub renders both identically so nothing looks wrong. Measured 2026-08-14 across PRs #1790, #1872 and #1876: an h3-pinned probe matched **zero** of the six genuine review comments those PRs carry between them. So the level-pinned form was not "occasionally stale" — it made `PHASE_4B_RAN` structurally false for every PR, which reads as "this PR was never reviewed" and sends the verdict's headline recommendation the wrong way. This is why the probe is a command rather than an instruction to eyeball the output: a heading is prose, and prose gets matched by whatever regex the reader assumes.
+5. **Prior-Phase-4B probe.** Look for the review heading in **both** the issue comments and the review bodies — findings are posted as a review body with inline threads, not only as issue comments. `git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/4b-probe.sh > /tmp/pr-ready-4bprobe-<N>.sh && test -s /tmp/pr-ready-4bprobe-<N>.sh && bash /tmp/pr-ready-4bprobe-<N>.sh <N>`. The probe prints `PROBE-COMPLETE` as its last line; no output before it means no prior review, and no `PROBE-COMPLETE` at all means the probe never ran.
 
    Record `PHASE_4B_RAN` (any line printed ⇒ true) **and the earliest timestamp printed**, which runtime Phase 6 reports. This is a **probe, not a gate**: the value is reported in Phase 6 and never used to skip work.
 
@@ -179,27 +168,7 @@ Run `git show <MASTER_SHA>:.claude/skills/pr-ready/_rebase-and-conflicts.md` —
 
 2. **Lost-work proof, two signals.** `git cherry -v origin/<branch> HEAD` is the weak signal: after a squash **every** replayed commit shows `+` by design, so `git cherry` alone cannot carry the proof. The authoritative check is content equivalence of the tree diff captured before and after the rebase (the Phase 2 include wrote `/tmp/pr-ready-diff-pre-<N>.patch`, keyed to the PR number — **never `$$`**, which differs between that call's shell and this one's).
 
-   The block below is multi-command, so per the invariants it runs via the script-file shape: `Write` it to `/tmp/pr-ready-lostwork-<N>.sh`, then run `bash /tmp/pr-ready-lostwork-<N>.sh`.
-
-   ```bash
-   set -o pipefail   # without this, the `||` guards below catch `sort`'s status, not `git apply`'s
-   PRE=/tmp/pr-ready-diff-pre-<N>.patch
-   POST=/tmp/pr-ready-diff-post-<N>.patch
-   git diff origin/master...HEAD > "$POST" || { echo "TREE DIVERGED — could not capture the post-rebase diff"; exit 1; }
-   for f in "$PRE" "$POST"; do
-     [ -s "$f" ] || { echo "TREE DIVERGED — $f is missing or empty; nothing was compared"; exit 1; }
-   done
-   git apply --numstat "$PRE"  | sort > /tmp/pr-ready-numstat-pre-<N>.txt  || { echo "TREE DIVERGED — git apply --numstat failed on $PRE"; exit 1; }
-   git apply --numstat "$POST" | sort > /tmp/pr-ready-numstat-post-<N>.txt || { echo "TREE DIVERGED — git apply --numstat failed on $POST"; exit 1; }
-   [ -s /tmp/pr-ready-numstat-pre-<N>.txt ] || { echo "TREE DIVERGED — numstat of $PRE is empty"; exit 1; }
-   if diff /tmp/pr-ready-numstat-pre-<N>.txt /tmp/pr-ready-numstat-post-<N>.txt; then
-     echo "TREE-EQUIVALENT"
-   else
-     echo "TREE DIVERGED — inspect before pushing"
-   fi
-   ```
-
-   **The guards are the point: this proof must fail closed.** The naked `diff <(…) <(…) && echo "TREE-EQUIVALENT"` form it replaces printed the *proceed* word when it had compared nothing — `git apply --numstat` on a missing patch exits 128 writing only to stderr, `sort` of empty input is empty, and `diff` of two empty streams exits 0. So a `/tmp` clean, a re-invocation, or a silently failed Phase 2a capture all produced `TREE-EQUIVALENT`, and Phase 4.3 pushed on it. Every failure path above emits the stop word instead.
+   `git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/lostwork.sh > /tmp/pr-ready-lostwork-<N>.sh && test -s /tmp/pr-ready-lostwork-<N>.sh && bash /tmp/pr-ready-lostwork-<N>.sh <N>`. The proof still fails closed — every path prints `TREE-EQUIVALENT` or `TREE DIVERGED — …`, and `test -s` stops a failed materialize reading as silence.
 
    `TREE DIVERGED` is expected **only** when Phase 3 resolved a real conflict; in that case name each diverging path in the Phase 6 verdict. Any other divergence — including a guard trip, which means the comparison never happened — stops the run.
 
@@ -325,13 +294,7 @@ Every Phase 6 finding gets fixed and its prevention filed, in this PR's existing
 
 4. **Commit — exactly one.** Step 2 already proved the tree carried nothing but this phase's own edits.
 
-   Substitutions, so this is a script file: `Write` to `/tmp/pr-ready-commit-<N>.sh`, then run `bash /tmp/pr-ready-commit-<N>.sh`.
-
-   ```bash
-   cd /Users/ajaynicolas/GitHub/IBL5-worktrees/<slug> || exit 1
-   git add -A
-   git commit -m "chore: pr-ready remediation for PR #<N>"
-   ```
+   `git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/commit.sh > /tmp/pr-ready-commit-<N>.sh && test -s /tmp/pr-ready-commit-<N>.sh && bash /tmp/pr-ready-commit-<N>.sh <N> <slug>`
 
    `chore:` is correct per `.claude/rules/commit-conventions.md` — a fidelity remediation plus a backlog row is invisible to a league GM. Classify by what the diff is; never retitle to route around a hold.
 
@@ -359,23 +322,7 @@ Then proceed to Phase 7, which posts the single verdict comment covering both th
 
 1. **Run the shared hold predicates.** `bin/lib/pr-armable.sh` is **sourced, not executed** — it carries no `set -euo pipefail` at file scope by design. Reuse its six predicates rather than re-deriving any hold logic:
 
-   Substitutions again, so this is a script file: `Write` it to `/tmp/pr-ready-holds-<N>.sh`, then run `bash /tmp/pr-ready-holds-<N>.sh`. Sourcing and the six calls have to land in **one** invocation anyway — the predicates are shell functions, and a `source` in one Bash call is gone by the next.
-
-   ```bash
-   cd /Users/ajaynicolas/GitHub/IBL5-worktrees/<slug> || exit 1
-   source bin/lib/pr-armable.sh
-   BODY="$(gh pr view <N> --json body --jq .body)"
-   TITLE="$(gh pr view <N> --json title --jq .title)"
-   LABELS="$(gh pr view <N> --json labels --jq '.labels')"
-   FILES="$(gh pr view <N> --json files --jq '.files')"
-   HEADREF="$(gh pr view <N> --json headRefName --jq .headRefName)"
-   pr_manual_testing_clearance "$BODY"
-   pr_golden_hold "$FILES"
-   pr_dep_holds "$BODY"
-   pr_feat_hold "$TITLE" "$LABELS"
-   pr_pipeline_authored_hold "$LABELS" "$HEADREF"
-   pr_unresolved_findings_hold <N>
-   ```
+   `git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/holds.sh > /tmp/pr-ready-holds-<N>.sh && test -s /tmp/pr-ready-holds-<N>.sh && bash /tmp/pr-ready-holds-<N>.sh <N> <slug>`. The script is that single invocation, and prints exactly six labelled lines — fewer means a predicate aborted, itself a finding.
 
    Report each predicate's result as one line in the verdict. These are **advisory inputs to the human's merge decision** — `/pr-ready` never arms auto-merge and never merges.
 
@@ -387,19 +334,7 @@ Then proceed to Phase 7, which posts the single verdict comment covering both th
 
    There is no helper in `bin/lib/` for this, so use the find-and-update-else-create shape from `bin/pr-canary-check` (see its `STICKY_MARKER` constant and the `post_sticky()` below it — grep the symbols rather than trusting a line number, which drifts).
 
-   The post itself substitutes, so it is a script file too: `Write` it to `/tmp/pr-ready-post-<N>.sh`, then run `bash /tmp/pr-ready-post-<N>.sh`.
-
-   ```bash
-   cd /Users/ajaynicolas/GitHub/IBL5-worktrees/<slug> || exit 1
-   id=$(gh api "repos/{owner}/{repo}/issues/<N>/comments" --paginate \
-     --jq '.[] | select(.body | contains("<!-- pr-ready-verdict -->")) | .id' | head -1)
-   if [ -n "$id" ]; then
-     gh api --method PATCH "repos/{owner}/{repo}/issues/comments/$id" \
-       -F body=@/tmp/pr-ready-verdict-<N>.md --jq .html_url
-   else
-     gh pr comment <N> --body-file /tmp/pr-ready-verdict-<N>.md
-   fi
-   ```
+   `git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/post-verdict.sh > /tmp/pr-ready-post-<N>.sh && test -s /tmp/pr-ready-post-<N>.sh && bash /tmp/pr-ready-post-<N>.sh <N> <slug>`
 
    Comment body sections, in order: **rebase result** (the master SHA used, conflicts resolved), **CI result**, **files-changed refresh** (the Phase 5.9 `FILES-CHANGED:` line verbatim — `REPLACED` / `APPENDED` / `UNCHANGED` / `AMBIGUOUS`, with its file count and `+added -removed` delta; on `AMBIGUOUS`, state that the body was left untouched and that the markers need repair), **plan-fidelity verdict**, **remediation** (what Phase 6.5 fixed, each backlog item filed with its file and ID, anything left `not fixed — filed`, and the post-remediation CI result), **hold predicates**, and one explicit **READY / NOT READY** line — the last reflecting the state *after* remediation, not the Phase 6 findings. If any include was loaded by the declared fallback rather than from the pin, say so here — one `include-source:` line — so the verdict states which revision of its own procedure it followed. The files-changed block reflects the diff as of Phase 5.9. If Phase 6.5 pushed remediation commits after it, say so on the refresh line — the block is one commit behind by design, and the next `/post-plan` body write regenerates it. Never open a second body edit to catch it up.
 

@@ -285,6 +285,82 @@ gh pr view <N> --json mergeStateStatus --jq .mergeStateStatus   # BEHIND => must
 
 If `BEHIND`, re-pin — run `git rev-parse origin/master` bare again and record the new printed SHA as `<MASTER_SHA>`, replacing the Phase 1.3 literal — then loop back to Phase 2 with a fresh delegate on the new pin. **Bound the loop at 3 iterations**; on the fourth, stop and report `master is moving faster than this branch can rebase — merge manually or retry when master quiets`. An unbounded loop is the failure mode a strict-protection repo with a busy master produces.
 
+**Phase 5.9 — refresh the machine-generated files-changed block.**
+
+Runs on **every** run, before Phase 6 reads the body — including runs where Phase 5 was skipped. The block's format and splice rules are `/post-plan`'s, not this skill's: `.claude/skills/post-plan/SKILL.md` § *Files-changed block* — build it from `git diff --name-status origin/master...HEAD`, delimit it exactly by `<!-- files-changed:begin -->` / `<!-- files-changed:end -->`, one `` - `<status>` `<path>` `` bullet per file; regenerate and **replace what sits between the two markers** rather than appending a second copy; if only one marker is present, append a fresh block and leave the orphan alone. Do not re-derive that format here.
+
+This refresh is **unconditional and unclassified**. It always runs, always reports its outcome to Phase 7, and is never itself a Phase 6 finding: a stale generated block is a thing this skill fixes, not a thing it reports. Only the `AMBIGUOUS` outcome — duplicate or out-of-order markers, body deliberately left untouched — is a finding, and 6d.4 owns it.
+
+This step needs command substitution, which a Bash tool call may not carry after `EnterWorktree`, so it ships as a script file: `Write` the block below to `/tmp/pr-ready-filesblock-<N>.sh`, then run `bash /tmp/pr-ready-filesblock-<N>.sh`. The Bash tool call is that bare `bash` line and nothing else. The script uses no process substitution — `bin/test-pr-ready-now` case 17 asserts the sentinel-delimited region below contains zero occurrences.
+
+```bash
+cd /Users/ajaynicolas/GitHub/IBL5-worktrees/<slug> || exit 1
+# --- files-changed rewriter: begin ---
+BEG='<!-- files-changed:begin -->'
+END='<!-- files-changed:end -->'
+IN=/tmp/pr-ready-body-in-<N>.md
+OUT=/tmp/pr-ready-body-out-<N>.md
+BLK=/tmp/pr-ready-fc-block-<N>.md
+NEWB=/tmp/pr-ready-fc-new-<N>.txt
+NEWS=/tmp/pr-ready-fc-newsort-<N>.txt
+OLDB=/tmp/pr-ready-fc-old-<N>.txt
+
+git fetch origin --quiet || exit 1
+gh pr view <N> --json body --jq .body | sed 's/\r$//' > "$IN" || exit 1
+
+git diff --name-status origin/master...HEAD \
+  | awk -F'\t' 'NF > 1 { printf "- `%s` `%s`\n", $1, $NF }' > "$NEWB"
+{ printf '%s\n' "$BEG"; cat "$NEWB"; printf '%s\n' "$END"; } > "$BLK"
+LC_ALL=C sort "$NEWB" > "$NEWS"
+
+nb=$(grep -cFx "$BEG" "$IN"); ne=$(grep -cFx "$END" "$IN")
+lb=$(grep -nFx "$BEG" "$IN" | head -1 | cut -d: -f1); lb=${lb:-0}
+le=$(grep -nFx "$END" "$IN" | head -1 | cut -d: -f1); le=${le:-0}
+paired=0
+if [ "$nb" -eq 1 ] && [ "$ne" -eq 1 ] && [ "$le" -gt "$lb" ]; then paired=1; fi
+
+if [ "$nb" -gt 1 ] || [ "$ne" -gt 1 ] || { [ "$nb" -eq 1 ] && [ "$ne" -eq 1 ] && [ "$paired" -eq 0 ]; }; then
+  echo "FILES-CHANGED: AMBIGUOUS (nb=$nb ne=$ne lb=$lb le=$le) - body left untouched"
+  exit 0
+fi
+
+: > "$OLDB"
+if [ "$paired" -eq 1 ]; then
+  if [ "$le" -gt "$((lb + 1))" ]; then sed -n "$((lb + 1)),$((le - 1))p" "$IN" | LC_ALL=C sort > "$OLDB"; fi
+  : > "$OUT"
+  if [ "$lb" -gt 1 ]; then head -n "$((lb - 1))" "$IN" >> "$OUT"; fi
+  cat "$BLK" >> "$OUT"
+  tail -n "+$((le + 1))" "$IN" >> "$OUT"
+  MODE=REPLACED
+else
+  cp "$IN" "$OUT"
+  printf '\n' >> "$OUT"
+  cat "$BLK" >> "$OUT"
+  MODE=APPENDED
+fi
+
+add=$(comm -13 "$OLDB" "$NEWS" | wc -l | tr -d ' ')
+del=$(comm -23 "$OLDB" "$NEWS" | wc -l | tr -d ' ')
+tot=$(wc -l < "$NEWB" | tr -d ' ')
+
+if cmp -s "$IN" "$OUT"; then echo "FILES-CHANGED: UNCHANGED ($tot files; +0 -0)"; exit 0; fi
+
+gh pr edit <N> --body-file "$OUT" || { echo "FILES-CHANGED: EDIT FAILED"; exit 1; }
+echo "FILES-CHANGED: $MODE ($tot files; +$add -$del)"
+# --- files-changed rewriter: end ---
+```
+
+Record the printed `FILES-CHANGED:` line **verbatim, as a literal**, for the Phase 7 verdict — a value captured in one Bash call does not survive to the next.
+
+Six properties are load-bearing and must not be "simplified" away:
+
+- **`grep -cFx` / `grep -nFx`, never `-F` alone.** The markers get quoted inside PR bodies that discuss this skill — including this PR's own. Exact-line matching is what stops an inline mention from being read as a marker.
+- **`sed 's/\r$//'` on the fetched body.** A body carrying CRLF makes `-Fx` miss both markers, which silently routes a marked-up body onto the append path and **duplicates** the block — the one outcome `/post-plan`'s recipe forbids. Accepted side effect: on such a body the whole thing is rewritten with LF endings. That is benign — GitHub normalises line endings on render — and it only happens to a body that already had CRLF.
+- **The `AMBIGUOUS` arm writes nothing.** With duplicate or out-of-order markers there is no safe splice: the `head`/`tail` splice on a reversed pair would swallow the body tail. Fail closed and let 6d.4 report it.
+- **`$NF`, not `$2`, in the awk.** `git diff --name-status` emits `R100<TAB>old<TAB>new` for renames; `$1` is the status and `$NF` is the surviving path.
+- **The block is emitted in native `git diff --name-status` order — never `sort`ed.** `/post-plan`'s recipe (`.claude/skills/post-plan/SKILL.md`, § *Files-changed block*) writes one bullet per file straight from `git diff --name-status`, i.e. git's own path order. Sorting the *bullet lines* sorts on the **status letter first** (`` - `A` `z` `` ahead of `` - `M` `a` ``), so the same file set yields a byte-different block. `cmp -s` would then differ on an already-current body and fire a body write on **every** run, printing `REPLACED (n files; +0 -0)` — a body rewrite per invocation, on an artifact a human is reading. `$BLK` is therefore built from the unsorted `$NEWB`; the sorted `$NEWS`/`$OLDB` pair exists **only** to feed `comm` for the `+add -del` counts, and uses `LC_ALL=C sort` so both sides collate identically regardless of the runner's locale.
+- **`head` is guarded by `[ "$lb" -gt 1 ]`.** When the body *starts* with the begin marker, `lb` is 1 and `head -n 0` on BSD/macOS `head` exits 1 with `illegal line count -- 0` (confirmed on this platform) instead of emitting nothing the way GNU `head` does. Unguarded, that aborts the splice and leaves `$OUT` truncated. The `: > "$OUT"` seed plus the guard makes the empty-prefix case write nothing and carry on.
+
 **Phase 6 — plan-intent fidelity review.**
 
 Run `git show <MASTER_SHA>:.claude/skills/pr-ready/_plan-fidelity-review.md` — same pin, same reason as the Phase 2 include (`git show` invariant above) — and perform the printed review **yourself**. By this phase the rebase has landed, so a path read would *usually* work; it is loaded from the pin anyway, so that the procedure applied never depends on how far behind master the branch started, and never silently reads an older copy of itself off the branch. This phase is NEVER delegated — `.claude/rules/agent-tiering.md`: "Never delegate understanding." Spawning any sub-agent for this phase is a defect.
@@ -298,6 +374,7 @@ Every Phase 6 finding gets fixed and its prevention filed, in this PR's existing
 2. **Prove the tree carried nothing else — before the first remediation edit.** `git status --porcelain`. If it prints anything, print `STOP: worktree dirty before remediation` followed by that output, and stop. Phase 0.3 may have entered a worktree that is a peer's active workspace; the `git add -A` in step 4 would sweep their uncommitted work into this commit and step 5 would force-push it. A clean tree here is the normal case — Phase 4.3 step 3c already proved remote == HEAD. Run this once, here at Phase 6.5 entry; from step 3 onward the tree is dirty by design, so never repeat it.
 
 3. **Remediate every finding.** For each Phase 6 finding — **notes as well as blocking**, across all six 6d classes — follow `_remediation.md` in **`Mode: in-PR`**. State that mode line out loud before its step 1; the procedure refuses to run without a declared mode. In-PR mode overrides `/fix-and-prevent`'s § Calibration "Out of scope" carve-outs: a finding too small to name a defect class still gets an entry, with `class: n/a — <reason>`. Never zero entries.
+"Never zero entries" binds the findings Phase 6 actually emitted — it does not manufacture one. A Phase 5.9 outcome of `REPLACED`, `APPENDED` or `UNCHANGED` is a routine refresh, not a finding: it produces no remediation entry, no backlog row, and no `last_verified:` bump. Only `AMBIGUOUS` reaches this phase, as the 6d.4 finding it is, and that one does get an entry.
 
    - **Worktree:** this PR's existing one. Never `bin/wt-new`, never a second worktree, never a teardown.
    - **Backlog:** append the table row and the prose entry to the LIVE backlog file `_remediation.md` step 3 selects, and bump that file's `last_verified:`. Bump no other file's, and do not run the rest of the `/backlog-housekeep` chain. Consolidate findings sharing a surface into one entry.
@@ -382,6 +459,6 @@ Then proceed to Phase 7, which posts the single verdict comment covering both th
    fi
    ```
 
-   Comment body sections, in order: **rebase result** (the master SHA used, conflicts resolved), **CI result**, **plan-fidelity verdict**, **remediation** (what Phase 6.5 fixed, each backlog item filed with its file and ID, anything left `not fixed — filed`, and the post-remediation CI result), **hold predicates**, and one explicit **READY / NOT READY** line — the last reflecting the state *after* remediation, not the Phase 6 findings. If any include was loaded by the declared fallback rather than from the pin, say so here — one `include-source:` line — so the verdict states which revision of its own procedure it followed.
+   Comment body sections, in order: **rebase result** (the master SHA used, conflicts resolved), **CI result**, **files-changed refresh** (the Phase 5.9 `FILES-CHANGED:` line verbatim — `REPLACED` / `APPENDED` / `UNCHANGED` / `AMBIGUOUS`, with its file count and `+added -removed` delta; on `AMBIGUOUS`, state that the body was left untouched and that the markers need repair), **plan-fidelity verdict**, **remediation** (what Phase 6.5 fixed, each backlog item filed with its file and ID, anything left `not fixed — filed`, and the post-remediation CI result), **hold predicates**, and one explicit **READY / NOT READY** line — the last reflecting the state *after* remediation, not the Phase 6 findings. If any include was loaded by the declared fallback rather than from the pin, say so here — one `include-source:` line — so the verdict states which revision of its own procedure it followed. The files-changed block reflects the diff as of Phase 5.9. If Phase 6.5 pushed remediation commits after it, say so on the refresh line — the block is one commit behind by design, and the next `/post-plan` body write regenerates it. Never open a second body edit to catch it up.
 
 3. **STOP — hard terminator.** The run ends at the posted-or-updated comment. No merge. No auto-merge arming. No `/backlog-housekeep` chain beyond the row and `last_verified` bump Phase 6.5 already filed. No `/post-plan` chain. No worktree teardown. No second comment. The user reviews every PR deliberately.

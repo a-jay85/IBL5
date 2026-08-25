@@ -87,6 +87,10 @@ jobs:
               # bin/test-human-signoff-classifier guards the classifier lib that
               # human-signoff.yml sources, so a workflow-only edit must run it too.
               - '.github/workflows/human-signoff.yml'
+              # bin/test-pr-ready-now cases 16 and 17 read SKILL.md's push form,
+              # its Phase 5.9 files-changed rewriter, and the fidelity-review
+              # criteria, so a pr-ready-skill-only edit must run the harness job too.
+              - '.claude/skills/pr-ready/**'
             ibl5ts:
               # Everything the ibl5 TS unit suite executes or imports
               # (tests/ts-unit/ specs cover the pure VR-review helpers and

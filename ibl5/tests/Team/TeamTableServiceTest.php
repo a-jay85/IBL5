@@ -588,7 +588,7 @@ class TeamTableServiceTest extends TestCase
         $season->phase = 'Regular Season';
         $season->lastSimEndDate = '2025-01-01';
 
-        $repository = $this->createStub(\Team\Contracts\TeamRepositoryInterface::class);
+        $repository = self::createStub(\Team\Contracts\TeamRepositoryInterface::class);
         $repository->method('getRosterUnderContract')->willReturn([]);
         $repository->method('getTeam')->willReturn(['color1' => '000000', 'color2' => 'FFFFFF']);
 
@@ -611,7 +611,7 @@ class TeamTableServiceTest extends TestCase
         $season->phase = 'Free Agency';
         $season->lastSimEndDate = '2025-01-01';
 
-        $repository = $this->createStub(\Team\Contracts\TeamRepositoryInterface::class);
+        $repository = self::createStub(\Team\Contracts\TeamRepositoryInterface::class);
         $repository->method('getFreeAgents')->willReturn([]);
         $repository->method('getTeam')->willReturn(['color1' => '000000', 'color2' => 'FFFFFF']);
 
@@ -634,7 +634,7 @@ class TeamTableServiceTest extends TestCase
         $season->phase = 'Free Agency';
         $season->lastSimEndDate = '2025-01-01';
 
-        $repository = $this->createStub(\Team\Contracts\TeamRepositoryInterface::class);
+        $repository = self::createStub(\Team\Contracts\TeamRepositoryInterface::class);
         $repository->method('getEntireLeagueRoster')->willReturn([]);
         $repository->method('getTeam')->willReturn(['color1' => '000000', 'color2' => 'FFFFFF']);
 
@@ -687,7 +687,7 @@ class TeamTableServiceTest extends TestCase
             $this->buildFullRosterRow(['pid' => 11, 'name' => 'Beta Contracted', 'cy' => 1, 'cyt' => 3, 'pg_depth' => 1]),
         ];
 
-        $repository = $this->createStub(\Team\Contracts\TeamRepositoryInterface::class);
+        $repository = self::createStub(\Team\Contracts\TeamRepositoryInterface::class);
         $repository->method('getRosterUnderContract')->willReturn($roster);
         $repository->method('getTeam')->willReturn(['color1' => '000000', 'color2' => 'FFFFFF']);
 
@@ -699,6 +699,6 @@ class TeamTableServiceTest extends TestCase
         $posBeta  = strpos($html, 'Beta Contracted');
         $this->assertNotFalse($posAlpha, 'Alpha Expiring must be in output');
         $this->assertNotFalse($posBeta, 'Beta Contracted must be in output');
-        $this->assertLessThan((int) $posBeta, (int) $posAlpha, 'Alpha must appear before Beta (sort order preserved)');
+        $this->assertLessThan($posBeta, $posAlpha, 'Alpha must appear before Beta (sort order preserved)');
     }
 }

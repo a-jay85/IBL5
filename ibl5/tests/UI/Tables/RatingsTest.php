@@ -228,12 +228,12 @@ class RatingsTest extends TestCase
         // The only <tr> inside <tbody> must not carry any class= attribute
         $tbodyStart = strpos($html, '<tbody>');
         $this->assertNotFalse($tbodyStart, '<tbody> must exist in output');
-        $tbodyFragment = substr($html, (int) $tbodyStart);
+        $tbodyFragment = substr($html, $tbodyStart);
         $trPos = strpos($tbodyFragment, '<tr');
         $this->assertNotFalse($trPos, '<tr> must exist inside <tbody>');
-        $trEnd = strpos($tbodyFragment, '>', (int) $trPos);
+        $trEnd = strpos($tbodyFragment, '>', $trPos);
         $this->assertNotFalse($trEnd, '<tr> opening tag must be closed');
-        $trTag = substr($tbodyFragment, (int) $trPos, (int) $trEnd - (int) $trPos + 1);
+        $trTag = substr($tbodyFragment, $trPos, $trEnd - $trPos + 1);
         $this->assertStringNotContainsString('class=', $trTag, '<tr> must carry no class= attribute when flag is false');
     }
 

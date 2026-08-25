@@ -88,7 +88,7 @@ class ContractsTest extends TestCase
      */
     private function createMockTeam(): \Team\Team
     {
-        $team = $this->createStub(\Team\Team::class);
+        $team = self::createStub(\Team\Team::class);
         $team->color1 = 'FF0000';
         $team->color2 = '0000FF';
         $team->teamid = 1;
@@ -106,7 +106,7 @@ class ContractsTest extends TestCase
      */
     private function createMockSeason(): \Season\Season
     {
-        $season = $this->createStub(\Season\Season::class);
+        $season = self::createStub(\Season\Season::class);
         $season->phase = 'Regular Season';
         $season->endingYear = 2025;
         $season->method('isOffseasonPhase')->willReturn(false);
@@ -120,7 +120,7 @@ class ContractsTest extends TestCase
      */
     public function testRenderMarksExpiringContractRowWhenFlagEnabled(): void
     {
-        $db = $this->createStub(\mysqli::class);
+        $db = self::createStub(\mysqli::class);
         $team = $this->createMockTeam();
         $season = $this->createMockSeason();
 
@@ -137,7 +137,7 @@ class ContractsTest extends TestCase
      */
     public function testRenderDoesNotMarkContractRowWhenFlagDisabled(): void
     {
-        $db = $this->createStub(\mysqli::class);
+        $db = self::createStub(\mysqli::class);
         $team = $this->createMockTeam();
         $season = $this->createMockSeason();
 
@@ -154,7 +154,7 @@ class ContractsTest extends TestCase
      */
     public function testRenderDoesNotMarkPlayerWithYearsRemaining(): void
     {
-        $db = $this->createStub(\mysqli::class);
+        $db = self::createStub(\mysqli::class);
         $team = $this->createMockTeam();
         $season = $this->createMockSeason();
 
@@ -175,7 +175,7 @@ class ContractsTest extends TestCase
      */
     public function testRenderNeverMarksCashConsiderationRow(): void
     {
-        $db = $this->createStub(\mysqli::class);
+        $db = self::createStub(\mysqli::class);
         $team = $this->createMockTeam();
         $season = $this->createMockSeason();
 
@@ -210,7 +210,7 @@ class ContractsTest extends TestCase
      */
     public function testRenderNeverMarksCapTotalsRow(): void
     {
-        $db = $this->createStub(\mysqli::class);
+        $db = self::createStub(\mysqli::class);
         $team = $this->createMockTeam();
         $season = $this->createMockSeason();
 
@@ -244,7 +244,7 @@ class ContractsTest extends TestCase
      */
     public function testExtensionEligibilityMarkerUnchangedByMarkExpiringRows(): void
     {
-        $db = $this->createStub(\mysqli::class);
+        $db = self::createStub(\mysqli::class);
         $team = $this->createMockTeam();
 
         // cy=1, cyt=3, salary_yr2=0 → canRenegotiateContract() returns true (next-year

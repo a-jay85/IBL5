@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for agent-tiering — the skip-vs-spawn heuristic, flat-fan-out (nested sub-agent) rationale, boundary keys on task type, orchestrator context economics (delegate-don't-dismiss, split-don't-self-clear), the measured evidence behind the offload-`/plan`-by-default rule, and per-tier prompt style. Fable approval gate moved to `agent-tiering-fable-gate.md`; bounded-checklist diff-triage rationale moved to `agent-tiering-bounded-checklist.md`. Loads only when editing workflow orchestration defs.
-last_verified: 2026-08-14
+last_verified: 2026-08-26
 paths:
   - ".claude/skills/**/*.md"
 ---
@@ -15,6 +15,25 @@ and prompt style — pulled out of the always-loaded budget.
 ## Skip the Agent — Direct Tool Calls
 
 Each sub-agent costs ~17–23K tokens (system prompt + rules + memory, loaded before its prompt) [CORRECTED 2026-08-14: was "~3–5K"; measured p50 spawn context is 17–23K], and its output re-loads in Opus's context every later turn.
+
+**Measured 2026-08-25** — 139 Opus main sessions, 1,580.7 Mtok total:
+
+| Quantity | Value |
+|---|---|
+| Delegatable tool results | 8,292 calls / 4.73 Mtok |
+| p50 result | 194 tokens |
+| p75 / p90 | 565 / 1,272 tokens |
+| p95 result | 2,039 tokens (~8 KB on disk) |
+| p99 result | 5,389 tokens |
+| Calls ≥ 2,000 tokens | 5.2% of calls / **43.6% of total residue** |
+| Sub-agent spawn cost | 17–23K tokens (p50 spawn context) |
+| Sessions with zero spawns | 87 / 139 = 63% |
+
+**This gives the "~50 lines" threshold below a measured basis.** ~50 lines of output lands right around the measured p50 of 194 tokens — roughly 90× cheaper than the 17–23K a spawn costs before it does any work. The figure stands exactly as written; it was an estimate and is now an estimate the data agrees with.
+
+**The fat-tail batching rule *is* "minimize invocation count," applied to the tail.** `agent-tiering.md` § Fat-tail delegation says 2+ fat calls in one turn go into ONE `sonnet-4-6` spawn. That is not a competing directive: it names *which* calls are worth a spawn at all (the 5.2% carrying 43.6% of the residue) and then says to cover them with a single invocation. "Spawn for the tail" and "spawn as few times as possible" are the same instruction read from two ends.
+
+**Read this as headroom, not as savings.** Break-even for this corpus is roughly 353 spawns; the same 139 sessions produced 135. We sit about 2.5× *below* break-even, so the finding is **unused delegation headroom** — room to route more of the fat tail through a sub-agent — not a token saving already banked and not cost pressure to relieve.
 
 **Run directly (no agent) when ALL hold:** single command/tool call · output under ~50 lines · nothing else to run in parallel · output won't persist across turns.
 

@@ -46,6 +46,7 @@ last_verified: 2026-08-26
 | E17 | Skill prose carries fixed-count words (`either`, `the two`) that go stale when the enumerated set grows | ✅ Implemented | — | S |
 | E18 | `/pr-ready` Phase 6.5 commits new files but never regenerates the PR body `files-changed` block | ✅ Implemented | — | S |
 | E19 | `/pr-ready` materialize-from-pin sites declare no fallback, so a pin that predates the script loops forever | ✅ Implemented | — | S |
+| E20 | Ship-pipeline coverage assertions (PR-body Manual Testing block, Phase 4B review) are emitted against a narrower slice than the PR's cumulative diff | ⬜ Open | 🟦 | M |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -188,3 +189,40 @@ Landing rung is **1**, so rungs 3–5 are never reached and the four `.claude/ru
 **Related.** [E18](#e18-pr-ready-phase-65-commits-new-files-but-never-regenerates-the-pr-bodys-files-changed-block) is also a `/pr-ready` self-inflicted gap, but it concerns a **stale generated artifact**; E19 concerns a **missing recovery arm** — different failure mode, different trigger, same host file.
 
 *(discovered 2026-08-25 during #1982)*
+
+### E20 Ship-pipeline coverage assertions are emitted against a narrower slice than the PR's cumulative diff
+
+`class:` a ship-pipeline step that emits a **coverage assertion** — a PR-body `## Manual Testing` claim, a Phase 4B structured-review verdict — scoped to something narrower than the PR's cumulative diff, so the assertion reads as endorsing lines it never examined.
+
+Surfaced by `/pr-ready` running on PR #1964 (a docs-only J7 RE correction). Two independent instances of the same shape landed on one PR:
+
+1. The body's `## Manual Testing` block reads *"No manual testing needed — all changes are covered by automated tests."* The diff is one markdown backlog file; **no** automated test covers it, and the governing plan's own § *Automouse Hold Justification* names three properties that need subjective human confirmation and states "Human eyes required before merge." The boilerplate asserts a coverage source that does not exist for this diff class.
+2. The Phase 4B review (comment `5384312129`, 2026-08-23T04:58:43Z, head `205e851f5`) posted *"No issues found… a one-line date stamp added to the J29 backlog entry."* That description is the **incremental commit** `c0effc44a..205e851f5` — 1 changed line. The PR's cumulative diff at that same head is **12 changed lines**; the other 11 (the J29 table rewrite, the J7 `[CORRECTED]` append, the `RETIRED-OK` marker, the Next-RE rewrite, the `last_verified` bump) were never structurally reviewed. The verdict is worded as if it covered the PR.
+
+Both are silent: the assertion is well-formed, the gate is green, and nothing in the artifact records which slice it actually read. A reader of either one over-trusts it by exactly the amount of diff it skipped.
+
+**Occurrences**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #1964 body, `## Manual Testing` block | yes — asserts automated coverage that does not exist for a docs-only diff | yes | fixed this pass (body rewritten to the plan's three human-confirmation properties) |
+| 2 | PR #1964 comment `5384312129` (Phase 4B verdict) | yes — verdict scoped to the last commit, worded as covering the PR | yes | not fixed — filed; `/pr-review 1964` recommended before merge |
+| 3 | `.claude/skills/post-plan/SKILL.md` — the body generator that emits the `## Manual Testing` default | yes — the producer of occurrence 1; picks the boilerplate without consulting the plan's hold justification | yes | not fixed — filed (the gate belongs here, not on #1964) |
+| 4 | `.claude/skills/pr-ready/_plan-fidelity-review.md:6c(a)` | no — already *requires* bounding 4B's coverage; it is the check that caught occurrence 2 | yes | not fixed — correct as written |
+
+`prevention_ladder:`
+
+- **rung 0 — already covered by an existing gate?** Partially, and only downstream: `/pr-ready` 6c(a) bounds 4B coverage and 6d.4 catches a body claim the diff contradicts. Neither fires until a human invokes `/pr-ready`, which is optional — both instances here sat green for three days first.
+- **rung 1 — extend an existing gate? LANDS HERE.** Two one-surface extensions, both on producers that already own the artifact: (a) `/post-plan`'s body generator picks `## Manual Testing` boilerplate from the plan it already reads — when that plan carries an `Automouse Hold Justification` naming human-confirmation properties, emit those as unchecked boxes instead of the "no manual testing needed" default; (b) the Phase 4B runner already computes the diff it reviews — have it print the base ref and changed-line count in its verdict block, so scope is legible without recomputation. Neither adds a mechanism.
+- **rung 2 — a rule doc under `.claude/rules/`?** Insufficient. Both artifacts are emitted by automated skills mid-run; a documented norm has no reader at the moment it is violated (same reasoning as [E18](#e18-pr-ready-phase-65-commits-new-files-but-never-regenerates-the-pr-bodys-files-changed-block) and [E19](#e19-pr-ready-materialize-from-pin-sites-declare-no-fallback-so-a-pin-that-predates-the-script-loops-forever)).
+- **rung 3 — a PHPStan rule?** N/A — no PHP on this surface.
+- **rung 4 — a CI gate?** Rejected for (a): a gate would have to decide whether a diff "needs" manual testing, which is the subjective judgment the plan's hold justification already records — cheaper to read it than to re-derive it. Worth reconsidering for (b) only if rung 1 proves insufficient.
+- **rung 5 — a new hook?** Rejected. Neither failure reaches a tool call the hook layer can intercept.
+
+Landing rung is **1**, so rungs 3–5 are never reached and the four `.claude/rules/meta-tooling-bar.md` extend-before-add conditions do not apply.
+
+`artifact destination:` `.claude/skills/post-plan/SKILL.md` (the `## Manual Testing` body-generation step) and the Phase 4B review runner's verdict block. Both in-repo.
+
+**Related.** [E18](#e18-pr-ready-phase-65-commits-new-files-but-never-regenerates-the-pr-bodys-files-changed-block) also concerns a PR body that stops matching its diff, but there the artifact is *machine-generated and stale*; here it is *hand-shaped and over-broad from the start* — the body was never right, rather than having drifted.
+
+*(discovered 2026-08-26 during #1964)*

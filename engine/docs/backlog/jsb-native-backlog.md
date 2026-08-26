@@ -1,6 +1,6 @@
 ---
 description: JSB native-engine backlog — the count-axis cut-over blocker chain, static RE pins, faithful ports, and validation gates, each tagged with the model tier that owns its load-bearing reasoning (Fable-gated items marked).
-last_verified: 2026-08-22
+last_verified: 2026-08-26
 ---
 
 # JSB Native-Engine Backlog
@@ -604,7 +604,7 @@ everything after it) — re-grep on the quoted anchor text, do not seek by numbe
 34-line proof-type sweep, plus the structural decision** (leave the reference outside git, or bring a
 scanned copy in-tree so `bin/check-docs` can fire on it).
 
-**Confirmed drift sites** — all ✅ CORRECTED 2026-07-29 (each re-read that day; line numbers as of *before* those edits):
+**Confirmed drift sites** — every row dated 2026-07-29 is ✅ CORRECTED (each re-read that day; line numbers as of *before* those edits). Rows added later carry their own status in the *Overturned by* cell — do not read the 2026-07-29 blanket stamp as covering them:
 
 | Site | Stale claim | Overturned by |
 |---|---|---|
@@ -616,6 +616,7 @@ scanned copy in-tree so `bin/check-docs` can fire on it).
 | `:1450-1457` | the pre-2026-07-09 bucket table (delta `0x68`, `+0xDA8??`/`TBD`/`+0xDF0`, "expected 3P rate `+0xD70`") printed **unmarked above** the pinned table | `:1463-1468` (delta `0x60`; `+0xD90`/`+0xDB0`/`+0xDE0`/`+0xDF8`) |
 | `:415`, `:1472` | "JSB turnovers are therefore overwhelmingly **steal-driven**" | J29 + J30: the ~0.1% independent-TO figure that conclusion rests on is falsified by the corpus at ~50× |
 | `:1384` vs `:1420` | two unqualified `param_7` tokens 35 lines apart naming **different functions'** parameters (`FUN_004e1ba0`'s play_type vs `FUN_004e45a0`'s inert flag) | not a wrong claim — a live misreading trap |
+| `:466` | the § *Misreading trap* callout still routes the reader to "§ Steal Probability (steal side, **blocked on `param`**)" | J7 RE 2026-07-29 (`re-artifacts/jsb-J7-steal-probability-RE-20260729.md`): `param = leagueSTL48 × 5.0` is valued and § Steal Probability now carries a `✅ VERIFIED 2026-07-29` stamp, so the reference self-contradicts. **⬜ NOT corrected** — surfaced 2026-08-26 during #1964, which is a worktree PR and cannot reach a git-excluded file (this entry's own structural finding) |
 
 **The larger sweep, which is the actual work.** `grep -nE 'dead\b|never read|vestigial|dead-zero|always 0|≡ 0'` returns **34 lines**. Two of those dead-zero pins have already been overturned by
 one method fix each (J6's esp-store blindspot; the 2026-07-23 Ghidra `double`-argument misread). Each

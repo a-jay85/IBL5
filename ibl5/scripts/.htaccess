@@ -40,3 +40,7 @@
 <Files "plrDropUnsignedFreeAgentsToWaivers.php">
     Require all denied
 </Files>
+
+<Files "list-retirement-candidates.php">
+    Require all denied
+</Files>

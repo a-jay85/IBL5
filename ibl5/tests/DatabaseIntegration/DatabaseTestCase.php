@@ -208,7 +208,12 @@ abstract class DatabaseTestCase extends TestCase
      * Insert a test player into ibl_plr with sensible defaults.
      * Uses high PIDs (200000000+) to avoid conflicts with production data.
      *
-     * @param array<string, int|string|float> $overrides Column overrides
+     * A `null` override omits that column from the INSERT entirely, so the
+     * column takes its schema default. For nullable columns like `retired`
+     * (`tinyint(1) DEFAULT NULL`) that yields a genuine SQL NULL, which
+     * insertRow() cannot produce — it binds null as an empty string.
+     *
+     * @param array<string, int|string|float|null> $overrides Column overrides
      */
     protected function insertTestPlayer(int $pid, string $name, array $overrides = []): void
     {
@@ -231,7 +236,12 @@ abstract class DatabaseTestCase extends TestCase
             'uuid' => sprintf('test-%09d-0000-000000000001', $pid),
         ];
 
-        $this->insertRow('ibl_plr', array_merge($defaults, $overrides));
+        $row = array_filter(
+            array_merge($defaults, $overrides),
+            static fn ($value): bool => $value !== null
+        );
+
+        $this->insertRow('ibl_plr', $row);
     }
 
     /**

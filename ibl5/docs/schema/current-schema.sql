@@ -3490,6 +3490,25 @@ CREATE TABLE `password_reset_tokens` (
   PRIMARY KEY (`email`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `schedule_guard_rejects`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `schedule_guard_rejects` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `rejected_at` datetime NOT NULL DEFAULT current_timestamp() COMMENT 'When the import run recorded this reject.',
+  `season_year` smallint(5) unsigned NOT NULL COMMENT 'Operating season the guard was scoped to — matches ibl_schedule.season_year.',
+  `game_date` date NOT NULL COMMENT 'Decoded game date from the .sco record.',
+  `visitor_teamid` int(11) NOT NULL COMMENT 'Decoded visitor team id.',
+  `home_teamid` int(11) NOT NULL COMMENT 'Decoded home team id.',
+  `game_of_that_day` int(11) NOT NULL DEFAULT 0 COMMENT '1-based league-wide ordinal within the date, as decoded (NOT a per-matchup counter).',
+  `reason` varchar(32) NOT NULL COMMENT 'ScheduleMembershipGuard reason constant, e.g. not-in-schedule / duplicate-triple.',
+  `stored_game_of_that_day` varchar(64) NOT NULL DEFAULT '' COMMENT 'Comma-joined ordinals already stored for this triple; populated for duplicate-triple only.',
+  `source_archive` varchar(255) NOT NULL DEFAULT '' COMMENT 'Basename of the archive or .sco the run read, from JsbSourceResolver::describeLastSource().',
+  PRIMARY KEY (`id`),
+  KEY `idx_season_rejected` (`season_year`,`rejected_at`) COMMENT 'The listing query: most recent rejects for a season.',
+  KEY `idx_triple` (`game_date`,`visitor_teamid`,`home_teamid`) COMMENT 'Forensic lookup: was this specific game ever blocked?'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `vw_career_totals`;
 /*!50001 DROP VIEW IF EXISTS `vw_career_totals`*/;
 SET @saved_cs_client     = @@character_set_client;

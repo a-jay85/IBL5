@@ -778,6 +778,26 @@ fire_pr() {
     local PROMPT="/tmp/pr-ready-now-prompt-${PR}.md"
     mkdir -p "$(dirname "$PLIST")"   # lets bin/test-pr-ready-now drive this on Linux CI
 
+    # A --stop that was itself interrupted can leave this PR's /pr-ready scratch behind, and a
+    # stale pr-ready-diff-pre-<N>.patch would be read as THIS run's baseline. Clear it — but
+    # only when the label is provably dead, so we can never delete a live run's working state.
+    # The glob is deliberately broad (a new /pr-ready scratch name is covered automatically);
+    # the driver's OWN three paths are excluded by name, because $PROMPT and $RUNNER are written
+    # just below and $LOG is read by the report phase — bin/test-pr-ready-now cases 21, 22 and 26
+    # pre-plant /tmp/pr-ready-now-<PR>.log for a PR they then fire.
+    # $LOG.aborted is deliberately NOT excluded: the previous abort's forensics are superseded
+    # the moment this PR is re-fired, and that is what bounds /tmp growth.
+    local _stale
+    if ! _label_alive "$LABEL"; then
+        for _stale in /tmp/pr-ready-*-"${PR}".*; do
+            [[ -e "$_stale" ]] || continue
+            case "$_stale" in
+                "$LOG"|"$PROMPT"|"$RUNNER") continue ;;
+            esac
+            rm -f "$_stale"
+        done
+    fi
+
     # BQ1 probed YES on 2026-08-21: disable-model-invocation gates the in-session Skill
     # tool, not the user position, so `claude -p "/pr-ready N"` resolves the slash command.
     printf '/pr-ready %s\n' "$PR" > "$PROMPT"

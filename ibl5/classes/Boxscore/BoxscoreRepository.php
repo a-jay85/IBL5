@@ -462,6 +462,7 @@ class BoxscoreRepository extends \BaseMysqliRepository implements BoxscoreReposi
         // an operator would read 1236 phantom games where 618 exist. The uniqueness key
         // is (game_date, visitor_teamid, home_teamid, game_of_that_day); the two team
         // names are aggregated into the single `name` field the finding detail renders.
+        // @phpstan-ignore ibl.orderByMissingTiebreaker (GROUP_CONCAT's ORDER BY is misidentified as the outer sort; outer ORDER BY is game_date+game_of_that_day, which is unique within the GROUP BY set)
         $sql = "SELECT b.game_date, b.visitor_teamid, b.home_teamid, b.game_of_that_day,
        GROUP_CONCAT(b.name ORDER BY b.name SEPARATOR ', ') AS name
 FROM `ibl_box_scores_teams` b

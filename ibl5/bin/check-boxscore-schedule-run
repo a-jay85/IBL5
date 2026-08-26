@@ -1,0 +1,326 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+if (php_sapi_name() !== 'cli') {
+    http_response_code(403);
+    exit('This script must be run from the command line.');
+}
+
+$documentRoot = dirname(__DIR__, 2);
+$_SERVER['DOCUMENT_ROOT'] = $documentRoot;
+require $documentRoot . '/ibl5/vendor/autoload.php';
+
+// Fallback PSR-4 loader rooted at the container's /ibl5/classes path.
+// When this script is invoked via `docker exec php ...` on macOS, Docker
+// Desktop's VirtioFS exposes bind-mount source paths through realpath(),
+// so composer's generated autoloader computes $baseDir from the included
+// autoload_psr4.php's __DIR__ — which resolves to a host path
+// (e.g. /Users/<me>/.../ibl5) that doesn't exist inside the container —
+// and every PSR-4 lookup fails with "Class not found". This fallback
+// avoids that trap because $_SERVER['DOCUMENT_ROOT'] is computed from the
+// top-level script's __DIR__, which PHP does not realpath-resolve on
+// direct invocation, so it stays /var/www/html. Registered after
+// composer's loader, so it only fires on the misses, leaving normal
+// host-side execution unchanged.
+spl_autoload_register(static function (string $class) use ($documentRoot): void {
+    $path = $documentRoot . '/ibl5/classes/' . str_replace('\\', '/', $class) . '.php';
+    if (is_file($path)) {
+        require_once $path;
+    }
+});
+
+include $documentRoot . '/ibl5/config.php';
+
+// Direct mysqli connection — the legacy db/db.php bootstrap instantiates
+// \Database\MySQL, which hits the same broken-autoload path described above
+// before this script's fallback loader gets a chance to run. Bypass it and
+// talk to MariaDB through mysqli directly, using credentials from config.php.
+/** @var string $dbhost */
+/** @var string $dbuname */
+/** @var string $dbpass */
+/** @var string $dbname */
+$mysqli_db = new \mysqli();
+$mysqli_db->options(MYSQLI_OPT_INT_AND_FLOAT_NATIVE, 1);
+if (!$mysqli_db->real_connect($dbhost, $dbuname, $dbpass, $dbname)) {
+    fwrite(STDERR, "Failed to connect to MariaDB ({$mysqli_db->connect_errno}): {$mysqli_db->connect_error}\n");
+    exit(2);
+}
+$mysqli_db->set_charset('utf8mb4');
+
+// ── Arg parsing ───────────────────────────────────────────────────────────────
+
+$season      = null;
+$replayPath  = null;
+$phase       = null;
+$jsonMode    = false;
+$rejectsMode = false;
+$rejectsCount = 20;
+
+/** @var list<string> $argv */
+$args = array_slice($argv, 1);
+foreach ($args as $arg) {
+    if (str_starts_with($arg, '--season=')) {
+        $val = substr($arg, strlen('--season='));
+        if (!ctype_digit($val) || strlen($val) !== 4) {
+            fwrite(STDERR, "Error: --season must be a 4-digit year, got: {$val}\n");
+            exit(2);
+        }
+        $season = (int) $val;
+    } elseif (str_starts_with($arg, '--replay=')) {
+        $replayPath = substr($arg, strlen('--replay='));
+    } elseif (str_starts_with($arg, '--phase=')) {
+        $phase = substr($arg, strlen('--phase='));
+    } elseif ($arg === '--json') {
+        $jsonMode = true;
+    } elseif ($arg === '--rejects') {
+        $rejectsMode = true;
+    } elseif (str_starts_with($arg, '--rejects=')) {
+        $rejectsMode = true;
+        $val = substr($arg, strlen('--rejects='));
+        if (!ctype_digit($val)) {
+            fwrite(STDERR, "Error: --rejects value must be a positive integer, got: {$val}\n");
+            exit(2);
+        }
+        $rejectsCount = (int) $val;
+    } else {
+        fwrite(STDERR, "Unknown flag: {$arg}\n");
+        exit(2);
+    }
+}
+
+// ── Season resolution ─────────────────────────────────────────────────────────
+
+if ($season === null) {
+    $seasonObj   = new \Season\Season($mysqli_db);
+    $season      = $seasonObj->endingYear;
+}
+
+// ── Rejects mode ──────────────────────────────────────────────────────────────
+
+if ($rejectsMode) {
+    $stmt = $mysqli_db->prepare(
+        'SELECT rejected_at, game_date, visitor_teamid, home_teamid, game_of_that_day, reason, source_archive'
+        . ' FROM schedule_guard_rejects'
+        . ' WHERE season_year = ?'
+        . ' ORDER BY rejected_at DESC, id DESC'
+        . ' LIMIT ?'
+    );
+    if ($stmt === false) {
+        fwrite(STDERR, "Failed to prepare rejects query: {$mysqli_db->error}\n");
+        exit(2);
+    }
+    $stmt->bind_param('ii', $season, $rejectsCount);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result === false) {
+        fwrite(STDERR, "Failed to retrieve rejects result: {$stmt->error}\n");
+        exit(2);
+    }
+    /** @var list<array{rejected_at: string, game_date: string, visitor_teamid: int, home_teamid: int, game_of_that_day: int, reason: string, source_archive: string}> $rows */
+    $rows = $result->fetch_all(MYSQLI_ASSOC);
+    $stmt->close();
+
+    if ($jsonMode) {
+        $rejectsJson = [];
+        foreach ($rows as $row) {
+            $rejectsJson[] = [
+                'rejected_at'   => $row['rejected_at'],
+                'game_date'     => $row['game_date'],
+                'visitor_at_home' => "{$row['visitor_teamid']}@{$row['home_teamid']}",
+                'gotd'          => $row['game_of_that_day'],
+                'reason'        => $row['reason'],
+                'source_archive' => $row['source_archive'],
+            ];
+        }
+        echo json_encode([
+            'mode'    => 'rejects',
+            'season'  => $season,
+            'count'   => count($rows),
+            'rejects' => $rejectsJson,
+        ], JSON_THROW_ON_ERROR) . "\n";
+    } else {
+        if ($rows === []) {
+            echo "No rejects recorded for season {$season}.\n";
+        } else {
+            foreach ($rows as $row) {
+                $matchup = "{$row['visitor_teamid']}@{$row['home_teamid']}";
+                echo "{$row['rejected_at']} | {$row['game_date']} | {$matchup} | gotd {$row['game_of_that_day']} | {$row['reason']} | {$row['source_archive']}\n";
+            }
+        }
+    }
+
+    exit(0);
+}
+
+// ── Replay mode ───────────────────────────────────────────────────────────────
+
+if ($replayPath !== null) {
+    if (str_ends_with(strtolower($replayPath), '.sco')) {
+        $scoData = file_get_contents($replayPath);
+        if ($scoData === false) {
+            fwrite(STDERR, "Could not read .sco file: {$replayPath}\n");
+            exit(2);
+        }
+    } else {
+        $extractor = new \BulkImport\ArchiveExtractor();
+        $scoData   = $extractor->extractToString($replayPath, 'IBL5.sco');
+        if ($scoData === false) {
+            fwrite(STDERR, "Could not read IBL5.sco from {$replayPath} — extract it and pass the .sco directly\n");
+            exit(2);
+        }
+    }
+
+    $resolvedPhase = $phase ?? '';
+
+    $repo  = new \Boxscore\BoxscoreRepository($mysqli_db);
+    $guard = \Boxscore\ScheduleMembershipGuard::fromRepository($repo, $season);
+
+    $accepted = 0;
+    $rejected = 0;
+    $padding  = 0;
+    /** @var array<string, int> $rejectionsByReason */
+    $rejectionsByReason = [];
+    $dataLength         = strlen($scoData);
+
+    $offset = \JsbParser\ScoFileParser::HEADER_OFFSET_BYTES;
+    while ($offset + \JsbParser\ScoFileParser::GAME_PAYLOAD_SIZE <= $dataLength) {
+        $line         = substr($scoData, $offset, \JsbParser\ScoFileParser::RECORD_SIZE);
+        $offset      += \JsbParser\ScoFileParser::RECORD_SIZE;
+        $gameInfoLine = \JsbParser\ScoFileParser::extractGameInfo($line);
+        $boxscore     = \Boxscore\Boxscore::withGameInfoLine($gameInfoLine, $season, $resolvedPhase, 'ibl');
+
+        // JSB zero-fills every .sco to a fixed record count, so a 566-game playoff
+        // archive is 5591 records. Padding decodes to a team hosting ITSELF — measured
+        // as the single triple 2008-10-01|1|1, 5025 times in 07-08_36_playoffs.zip and
+        // 3361 times in 07-08_08_heat.zip. No real game has visitor == home.
+        //
+        // BoxscoreProcessor never counts these: it only increments a game counter when
+        // processGameLine() returns > 0, and padding has no non-empty player name, so it
+        // returns 0. This loop mirrors the processor's byte walk but has no such filter,
+        // so without this skip `total` and `accepted` report thousands of phantom games
+        // and the real accept/reject split is unreadable. Counted separately rather than
+        // silently dropped, so the record total still reconciles against the file size.
+        if ($boxscore->visitor_teamid === $boxscore->home_teamid) {
+            $padding++;
+            continue;
+        }
+
+        $rejection    = $guard->evaluate($boxscore);
+        if ($rejection === null) {
+            $accepted++;
+        } else {
+            $rejected++;
+            $reason                      = $rejection->reason;
+            $rejectionsByReason[$reason] = ($rejectionsByReason[$reason] ?? 0) + 1;
+        }
+    }
+
+    $total       = $accepted + $rejected;
+    $archiveName = basename($replayPath);
+    $phaseLabel  = $resolvedPhase !== '' ? $resolvedPhase : '(default)';
+
+    if ($jsonMode) {
+        $rejectionsJson = [];
+        foreach ($rejectionsByReason as $r => $count) {
+            $rejectionsJson[] = ['reason' => $r, 'count' => $count];
+        }
+        echo json_encode([
+            'mode'                 => 'replay',
+            'file'                 => $archiveName,
+            'season'               => $season,
+            'phase'                => $phaseLabel,
+            'total'                => $total,
+            'accepted'             => $accepted,
+            'rejected'             => $rejected,
+            'padding_skipped'      => $padding,
+            'rejections_by_reason' => $rejectionsJson,
+        ], JSON_THROW_ON_ERROR) . "\n";
+    } else {
+        echo "Replay of {$archiveName} against season {$season} ({$phaseLabel})\n";
+        echo "  {$total} games in file ({$padding} zero-fill padding records skipped)\n";
+        echo "  {$accepted} accepted\n";
+        if ($rejected > 0) {
+            $reasonSummary = [];
+            foreach ($rejectionsByReason as $r => $count) {
+                $reasonSummary[] = "{$r} {$count}";
+            }
+            echo "  {$rejected} rejected — " . implode(', ', $reasonSummary) . "\n";
+        } else {
+            echo "  0 rejected\n";
+        }
+    }
+
+    exit(0);
+}
+
+// ── Audit mode ────────────────────────────────────────────────────────────────
+
+$repo   = new \Boxscore\BoxscoreRepository($mysqli_db);
+$audit  = new \Boxscore\ScheduleReconciliationAudit($repo);
+$report = $audit->run($season);
+
+if ($jsonMode) {
+    $errorsJson = [];
+    foreach ($report->errors() as $f) {
+        $errorsJson[] = [
+            'kind'           => $f->kind,
+            'game_date'      => $f->gameDate,
+            'visitor_teamid' => $f->visitorTeamId,
+            'home_teamid'    => $f->homeTeamId,
+            'detail'         => $f->detail,
+        ];
+    }
+    $warningsJson = [];
+    foreach ($report->warnings() as $f) {
+        $warningsJson[] = [
+            'kind'           => $f->kind,
+            'game_date'      => $f->gameDate,
+            'visitor_teamid' => $f->visitorTeamId,
+            'home_teamid'    => $f->homeTeamId,
+            'detail'         => $f->detail,
+        ];
+    }
+    echo json_encode([
+        'season'    => $report->seasonYear,
+        'scheduled' => $report->scheduledGames,
+        'errors'    => $errorsJson,
+        'warnings'  => $warningsJson,
+        'exit_code' => $report->exitCode(),
+    ], JSON_THROW_ON_ERROR) . "\n";
+} else {
+    echo $report->summaryLine() . "\n";
+
+    $errors = $report->errors();
+    if (count($errors) > 0) {
+        echo "\nERRORS (" . count($errors) . ")\n";
+        $shown = 0;
+        foreach ($errors as $f) {
+            if ($shown >= 50) {
+                $remaining = count($errors) - $shown;
+                echo "  ... and {$remaining} more\n";
+                break;
+            }
+            echo "  " . $f->describe() . "\n";
+            $shown++;
+        }
+    }
+
+    $warnings = $report->warnings();
+    if (count($warnings) > 0) {
+        echo "\nWARNINGS (" . count($warnings) . ")\n";
+        $shown = 0;
+        foreach ($warnings as $f) {
+            if ($shown >= 50) {
+                $remaining = count($warnings) - $shown;
+                echo "  ... and {$remaining} more\n";
+                break;
+            }
+            echo "  " . $f->describe() . "\n";
+            $shown++;
+        }
+    }
+}
+
+exit($report->exitCode());

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Updater\Contracts;
 
+use Updater\SourceProvenance;
+
 /**
  * Resolves JSB file contents from the best available source.
  *
@@ -19,4 +21,11 @@ interface JsbSourceResolverInterface
      * @return string|null Raw file bytes, or null if unavailable from any source
      */
     public function getContents(string $extension): ?string;
+
+    /**
+     * Provenance of the most recent successful getContents() call.
+     *
+     * @return SourceProvenance|null Null before any successful read.
+     */
+    public function describeLastSource(): ?SourceProvenance;
 }

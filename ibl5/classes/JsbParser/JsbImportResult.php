@@ -13,6 +13,7 @@ class JsbImportResult
     public int $updated = 0;
     public int $skipped = 0;
     public int $errors = 0;
+    public int $rejected = 0;
 
     /** @var list<string> */
     public array $messages = [];
@@ -30,6 +31,11 @@ class JsbImportResult
     public function addSkipped(int $count = 1): void
     {
         $this->skipped += $count;
+    }
+
+    public function addRejected(int $count = 1): void
+    {
+        $this->rejected += $count;
     }
 
     public function addError(string $message): void
@@ -57,7 +63,7 @@ class JsbImportResult
     /**
      * Create a JsbImportResult from a BoxscoreProcessor::processScoFile() result array.
      *
-     * @param array{success: bool, gamesInserted: int, gamesUpdated: int, gamesSkipped: int, linesProcessed: int, messages: list<string>, error?: string, gamesRejected?: int, rejectedGames?: list<\Boxscore\RejectedGame>} $scoResult
+     * @param array{success: bool, gamesInserted: int, gamesUpdated: int, gamesSkipped: int, linesProcessed: int, messages: list<string>, error?: string, gamesRejected?: int, rejectedGames?: list<\Boxscore\RejectedGame>, operatingSeasonEndingYear?: int, operatingSeasonPhase?: string, outOfWindowGames?: int, rejectsRecorded?: int, scheduleGuardEnabled?: bool, sourceArchive?: string|null} $scoResult
      */
     public static function fromScoResult(array $scoResult): self
     {
@@ -65,6 +71,11 @@ class JsbImportResult
         $result->inserted = $scoResult['gamesInserted'];
         $result->updated = $scoResult['gamesUpdated'];
         $result->skipped = $scoResult['gamesSkipped'];
+        $result->rejected = $scoResult['gamesRejected'] ?? 0;
+        if ($result->rejected > 0) {
+            $season = isset($scoResult['operatingSeasonEndingYear']) ? ' (season ' . $scoResult['operatingSeasonEndingYear'] . ')' : '';
+            $result->addMessage($result->rejected . ' game(s) rejected by the schedule guard' . $season);
+        }
         if (isset($scoResult['error'])) {
             $result->addError($scoResult['error']);
         }
@@ -82,6 +93,7 @@ class JsbImportResult
         $this->inserted += $other->inserted;
         $this->updated += $other->updated;
         $this->skipped += $other->skipped;
+        $this->rejected += $other->rejected;
         $this->errors += $other->errors;
         $this->messages = array_merge($this->messages, $other->messages);
     }
@@ -100,6 +112,9 @@ class JsbImportResult
         }
         if ($this->skipped > 0) {
             $parts[] = $this->skipped . ' skipped';
+        }
+        if ($this->rejected > 0) {
+            $parts[] = $this->rejected . ' rejected';
         }
         if ($this->errors > 0) {
             $parts[] = $this->errors . ' errors';

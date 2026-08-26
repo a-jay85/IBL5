@@ -19,7 +19,7 @@ class BoxscoreView implements BoxscoreViewInterface
     /**
      * Render parse results log
      *
-     * @param array{success: bool, gamesInserted: int, gamesUpdated: int, gamesSkipped: int, linesProcessed: int, messages: list<string>, error?: string, gamesRejected?: int, rejectedGames?: list<RejectedGame>, sourceArchive?: string|null} $result
+     * @param array{success: bool, gamesInserted: int, gamesUpdated: int, gamesSkipped: int, linesProcessed: int, messages: list<string>, error?: string, gamesRejected?: int, rejectedGames?: list<RejectedGame>, sourceArchive?: string|null, operatingSeasonEndingYear?: int, operatingSeasonPhase?: string, outOfWindowGames?: int, rejectsRecorded?: int, scheduleGuardEnabled?: bool} $result
      * @return string HTML parse log
      */
     public function renderParseLog(array $result): string

@@ -74,6 +74,27 @@ final class ScheduleMembershipGuard
     }
 
     /**
+     * The [minDate, maxDate] ISO date range spanned by the loaded schedule index.
+     *
+     * Derived by folding the already-preloaded schedule keys — no new query.
+     * Returns null when the schedule index is empty (same fail-open condition
+     * as isEnabled()), so callers can skip the window check entirely on seasons
+     * whose schedule was never imported.
+     *
+     * @return array{0: string, 1: string}|null [minDate, maxDate], null when the index is empty
+     */
+    public function scheduleDateWindow(): ?array
+    {
+        if ($this->scheduledGameIndex === []) {
+            return null;
+        }
+
+        $dates = array_keys($this->scheduledGameIndex);
+
+        return [min($dates), max($dates)];
+    }
+
+    /**
      * Evaluate a decoded boxscore game against the schedule and duplicate-triple rules.
      *
      * Returns null (accepted) or a RejectedGame (rejected). Never throws.

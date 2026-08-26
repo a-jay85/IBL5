@@ -1,0 +1,94 @@
+#!/bin/bash
+# Restores the rows migration 168 deleted, from the *_phantom_backup tables.
+#
+# Usage: bin/rollback-phantom-repair [--help]
+#
+# Operator tool, not a migration. This is the undo button for the season-2008
+# phantom-boxscore repair: run it by hand after deciding the repair was wrong.
+# It is never applied automatically and must never be pointed at production by
+# an agent — restoring 636494 rows is a human decision.
+#
+# Runs the PHP entry point inside the php container (ibl5-php for the main checkout,
+# ibl5-php-<slug> for a worktree), mirroring bin/check-boxscore-schedule.
+#
+# Environment overrides (for testing):
+#   PHANTOM_ROLLBACK_PHP_CONTAINER  Override the derived PHP container name.
+#
+# Exit codes: 0 = restored (or already restored), 1 = aborted with nothing written,
+#             2 = usage error, 3 = environment unavailable (php container not running).
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=bin/lib/db-helpers.sh disable=SC1091
+source "$REPO_ROOT/bin/lib/db-helpers.sh"
+# shellcheck source=bin/lib/git-helpers.sh disable=SC1091
+source "$REPO_ROOT/bin/lib/git-helpers.sh"
+
+usage() {
+    cat <<'EOF'
+Usage: bin/rollback-phantom-repair [--help]
+
+Restores every row migration 168 deleted, reading them back out of the three
+*_phantom_backup tables migration 167 created.
+
+Aborts without writing when the backups are empty, when a backup table is
+missing, or when the restore does not land exactly on the pre-repair baseline.
+Idempotent: a second run restores nothing rather than double-inserting, and the
+backup tables are never emptied.
+
+Exit codes: 0 = restored (or already restored), 1 = aborted with nothing written,
+            2 = usage error, 3 = environment unavailable (php container not running).
+EOF
+}
+
+for arg in "$@"; do
+    case "$arg" in
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        *)
+            usage >&2
+            echo "Unknown flag: $arg" >&2
+            exit 2
+            ;;
+    esac
+done
+
+# ── Container resolution ──────────────────────────────────────────────────────
+
+if [ -n "${PHANTOM_ROLLBACK_PHP_CONTAINER:-}" ]; then
+    PHP_CONTAINER="$PHANTOM_ROLLBACK_PHP_CONTAINER"
+else
+    SLUG_FILE="$REPO_ROOT/.wt-slug"
+    if [ -f "$SLUG_FILE" ]; then
+        SLUG=$(cat "$SLUG_FILE")
+        PHP_CONTAINER="ibl5-php-$SLUG"
+    elif is_main_checkout "$REPO_ROOT"; then
+        PHP_CONTAINER="ibl5-php"
+    else
+        SLUG=$(basename "$REPO_ROOT")
+        PHP_CONTAINER="ibl5-php-$SLUG"
+    fi
+fi
+
+# ── Container liveness check ──────────────────────────────────────────────────
+
+if ! db_container_running "$PHP_CONTAINER"; then
+    echo "Error: PHP container '$PHP_CONTAINER' is not running." >&2
+    SLUG_FILE="$REPO_ROOT/.wt-slug"
+    if [ -f "$SLUG_FILE" ] && [ -s "$SLUG_FILE" ]; then
+        echo "  Start it with: bin/wt-up $(cat "$SLUG_FILE")" >&2
+    else
+        echo "  Start it with: bin/dev-up" >&2
+    fi
+    exit 3
+fi
+
+# ── Execute inside the container ──────────────────────────────────────────────
+
+rc=0
+docker exec -w /var/www/html/ibl5 "$PHP_CONTAINER" \
+    php bin/rollback-phantom-repair-run || rc=$?
+exit "$rc"

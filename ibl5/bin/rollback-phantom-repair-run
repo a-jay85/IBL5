@@ -1,0 +1,260 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * Operator rollback for the season-2008 phantom-boxscore repair (migrations 167/168).
+ *
+ * Re-inserts every row migration 168 deleted, reading them back out of the three
+ * *_phantom_backup tables migration 167 created. This is the undo button for a repair
+ * that turned out to be wrong - it is NOT a numbered migration and is never applied
+ * automatically. Run it by hand, from a human shell, after deciding to revert.
+ *
+ * Deliberately not a migration: migrations are forward-only and MigrationRunner would
+ * happily "apply" this once and never again, which is the opposite of what an undo
+ * button needs. Deliberately not agent-runnable against production either - restoring
+ * 636494 rows is not something to trigger from an automated loop.
+ *
+ * The restore is idempotent. Each INSERT is guarded by NOT EXISTS on the live row's
+ * `id`, so running it twice restores nothing the second time rather than double-inserting
+ * (INSERT IGNORE would also avoid duplicate-key errors, but it would silently swallow a
+ * genuine constraint failure too, and here a swallowed failure means a half-restored
+ * table). Backup rows are never deleted after a successful restore, so the backups stay
+ * the source of record and a third run is still a clean no-op.
+ *
+ * Usage: bin/rollback-phantom-repair
+ *
+ * Exit codes: 0 = restored (or already restored), 1 = aborted, nothing written.
+ */
+
+if (PHP_SAPI !== 'cli') {
+    echo "This script must be run from the command line.\n";
+    exit(1);
+}
+
+require_once __DIR__ . '/../vendor/autoload.php';
+
+// Worktree fix: vendor/ symlinks to the main repo, so PSR-4 resolves classes/ there;
+// register the local classes/ dir first so this worktree's code is the code that runs.
+// No-op in the main checkout and in production, where the two paths coincide.
+$localClassesDir = realpath(__DIR__ . '/../classes');
+if ($localClassesDir !== false) {
+    spl_autoload_register(static function (string $class) use ($localClassesDir): void {
+        $path = $localClassesDir . '/' . str_replace('\\', '/', $class) . '.php';
+        if (file_exists($path)) {
+            require_once $path;
+        }
+    }, true, true);
+}
+
+include __DIR__ . '/../config.php';
+include __DIR__ . '/../db/db.php';
+
+/** @var mysqli $mysqli_db */
+
+/**
+ * Row counts the three live tables carried BEFORE migration 168 ran (plan Phase 1
+ * baseline, measured on the prod-shaped snapshot). A successful rollback has to land
+ * exactly on these; anything else means the backups are incomplete or the live tables
+ * drifted after the repair, and restoring on top of drift would corrupt them further.
+ */
+const BASELINE_TEAM_ROWS = 54220;
+const BASELINE_PLAYER_ROWS = 636494;
+const BASELINE_RECAP_ROWS = 373;
+
+function countRows(mysqli $db, string $table): int
+{
+    // Table names here are compile-time literals from the call sites below, never input.
+    $result = $db->query('SELECT COUNT(*) AS n FROM `' . $table . '`');
+    if (!$result instanceof mysqli_result) {
+        throw new RuntimeException('Failed to count rows in ' . $table);
+    }
+    $row = $result->fetch_assoc();
+    $result->free();
+
+    return is_array($row) && is_numeric($row['n']) ? (int) $row['n'] : 0;
+}
+
+function tableExists(mysqli $db, string $table): bool
+{
+    $stmt = $db->prepare(
+        'SELECT COUNT(*) AS n FROM information_schema.TABLES '
+        . 'WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?'
+    );
+    if ($stmt === false) {
+        throw new RuntimeException('Failed to prepare table-existence probe: ' . $db->error);
+    }
+    $stmt->bind_param('s', $table);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $row = $result instanceof mysqli_result ? $result->fetch_assoc() : null;
+    $stmt->close();
+
+    return is_array($row) && is_numeric($row['n']) && (int) $row['n'] > 0;
+}
+
+function runStatement(mysqli $db, string $sql, string $label): int
+{
+    if ($db->query($sql) === false) {
+        throw new RuntimeException($label . ' failed: ' . $db->error);
+    }
+
+    return (int) $db->affected_rows;
+}
+
+// ── Restore statements ──────────────────────────────────────────────────────
+//
+// Explicit column lists, mirroring migration 167's backup fill: game_type, season_year
+// and the calc_* columns are STORED GENERATED on both live boxscore tables and cannot
+// be written by an INSERT (ERROR 3105). MariaDB recomputes them from the restored
+// game_date / stat columns, which is why the round-trip is exact.
+//
+// `id` IS restored - the backup tables were created with CREATE TABLE ... LIKE, so they
+// carry the original surrogate keys, and preserving them is what makes NOT EXISTS a
+// sound idempotency guard.
+
+$restoreTeams = <<<'SQL'
+INSERT INTO `ibl_box_scores_teams` (
+    `id`, `game_date`, `name`, `game_of_that_day`, `visitor_teamid`, `home_teamid`,
+    `attendance`, `capacity`, `visitor_wins`, `visitor_losses`, `home_wins`, `home_losses`,
+    `visitor_q1_points`, `visitor_q2_points`, `visitor_q3_points`, `visitor_q4_points`, `visitor_ot_points`,
+    `home_q1_points`, `home_q2_points`, `home_q3_points`, `home_q4_points`, `home_ot_points`,
+    `game_min`, `game_2gm`, `game_2ga`, `game_ftm`, `game_fta`, `game_3gm`, `game_3ga`,
+    `game_orb`, `game_drb`, `game_ast`, `game_stl`, `game_tov`, `game_blk`, `game_pf`,
+    `created_at`, `updated_at`)
+SELECT b.`id`, b.`game_date`, b.`name`, b.`game_of_that_day`, b.`visitor_teamid`, b.`home_teamid`,
+    b.`attendance`, b.`capacity`, b.`visitor_wins`, b.`visitor_losses`, b.`home_wins`, b.`home_losses`,
+    b.`visitor_q1_points`, b.`visitor_q2_points`, b.`visitor_q3_points`, b.`visitor_q4_points`, b.`visitor_ot_points`,
+    b.`home_q1_points`, b.`home_q2_points`, b.`home_q3_points`, b.`home_q4_points`, b.`home_ot_points`,
+    b.`game_min`, b.`game_2gm`, b.`game_2ga`, b.`game_ftm`, b.`game_fta`, b.`game_3gm`, b.`game_3ga`,
+    b.`game_orb`, b.`game_drb`, b.`game_ast`, b.`game_stl`, b.`game_tov`, b.`game_blk`, b.`game_pf`,
+    b.`created_at`, b.`updated_at`
+FROM `ibl_box_scores_teams_phantom_backup` b
+WHERE NOT EXISTS (SELECT 1 FROM `ibl_box_scores_teams` l WHERE l.`id` = b.`id`)
+SQL;
+
+$restorePlayers = <<<'SQL'
+INSERT INTO `ibl_box_scores` (
+    `id`, `game_date`, `name`, `pos`, `pid`, `visitor_teamid`, `home_teamid`,
+    `game_min`, `game_2gm`, `game_2ga`, `game_ftm`, `game_fta`, `game_3gm`, `game_3ga`,
+    `game_orb`, `game_drb`, `game_ast`, `game_stl`, `game_tov`, `game_blk`, `game_pf`,
+    `created_at`, `updated_at`, `uuid`, `game_of_that_day`, `attendance`, `capacity`,
+    `visitor_wins`, `visitor_losses`, `home_wins`, `home_losses`, `teamid`)
+SELECT b.`id`, b.`game_date`, b.`name`, b.`pos`, b.`pid`, b.`visitor_teamid`, b.`home_teamid`,
+    b.`game_min`, b.`game_2gm`, b.`game_2ga`, b.`game_ftm`, b.`game_fta`, b.`game_3gm`, b.`game_3ga`,
+    b.`game_orb`, b.`game_drb`, b.`game_ast`, b.`game_stl`, b.`game_tov`, b.`game_blk`, b.`game_pf`,
+    b.`created_at`, b.`updated_at`, b.`uuid`, b.`game_of_that_day`, b.`attendance`, b.`capacity`,
+    b.`visitor_wins`, b.`visitor_losses`, b.`home_wins`, b.`home_losses`, b.`teamid`
+FROM `ibl_box_scores_phantom_backup` b
+WHERE NOT EXISTS (SELECT 1 FROM `ibl_box_scores` l WHERE l.`id` = b.`id`)
+SQL;
+
+// ibl_sim_game_recaps has no generated columns - season_year is a real column there -
+// so every column round-trips verbatim.
+$restoreRecaps = <<<'SQL'
+INSERT INTO `ibl_sim_game_recaps` (
+    `id`, `sim`, `season_year`, `game_date`, `visitor_teamid`, `home_teamid`,
+    `game_of_that_day`, `box_id`, `sort_order`, `recap_text`, `created_at`)
+SELECT b.`id`, b.`sim`, b.`season_year`, b.`game_date`, b.`visitor_teamid`, b.`home_teamid`,
+    b.`game_of_that_day`, b.`box_id`, b.`sort_order`, b.`recap_text`, b.`created_at`
+FROM `ibl_sim_game_recaps_phantom_backup` b
+WHERE NOT EXISTS (SELECT 1 FROM `ibl_sim_game_recaps` l WHERE l.`id` = b.`id`)
+SQL;
+
+// ── Preflight ───────────────────────────────────────────────────────────────
+
+/** @var mysqli $mysqli_db */
+echo "=== Rollback: season-2008 phantom boxscore repair ===\n\n";
+
+$backupTables = [
+    'ibl_box_scores_teams_phantom_backup',
+    'ibl_box_scores_phantom_backup',
+    'ibl_sim_game_recaps_phantom_backup',
+];
+
+try {
+    foreach ($backupTables as $backupTable) {
+        if (!tableExists($mysqli_db, $backupTable)) {
+            // Abort rather than skip: a missing recap backup means migration 167 never ran
+            // here (or was dropped), so a "partial" restore would leave the boxscore tables
+            // at their pre-repair size with 20 recaps still missing - a state neither the
+            // repair nor the rollback can recognise afterwards.
+            fwrite(STDERR, "Backup table {$backupTable} does not exist - refusing to roll back partially.\n");
+            fwrite(STDERR, "Apply migration 167 (and 168) before attempting a rollback.\n");
+            exit(1);
+        }
+    }
+
+    $backupTeams = countRows($mysqli_db, 'ibl_box_scores_teams_phantom_backup');
+    $backupPlayers = countRows($mysqli_db, 'ibl_box_scores_phantom_backup');
+    $backupRecaps = countRows($mysqli_db, 'ibl_sim_game_recaps_phantom_backup');
+
+    printf("  backup team rows     %d\n", $backupTeams);
+    printf("  backup player rows   %d\n", $backupPlayers);
+    printf("  backup recap rows    %d\n\n", $backupRecaps);
+
+    if ($backupTeams === 0 && $backupPlayers === 0 && $backupRecaps === 0) {
+        fwrite(STDERR, "no backup rows - nothing to roll back\n");
+        exit(1);
+    }
+
+    $beforeTeams = countRows($mysqli_db, 'ibl_box_scores_teams');
+    $beforePlayers = countRows($mysqli_db, 'ibl_box_scores');
+    $beforeRecaps = countRows($mysqli_db, 'ibl_sim_game_recaps');
+} catch (Throwable $e) {
+    fwrite(STDERR, "Rollback preflight failed: " . $e->getMessage() . "\n");
+    exit(1);
+}
+
+// ── Restore ─────────────────────────────────────────────────────────────────
+
+$mysqli_db->begin_transaction();
+
+try {
+    $teamsRestored = runStatement($mysqli_db, $restoreTeams, 'Team-row restore');
+    $playersRestored = runStatement($mysqli_db, $restorePlayers, 'Player-row restore');
+    $recapsRestored = runStatement($mysqli_db, $restoreRecaps, 'Recap restore');
+
+    $afterTeams = countRows($mysqli_db, 'ibl_box_scores_teams');
+    $afterPlayers = countRows($mysqli_db, 'ibl_box_scores');
+    $afterRecaps = countRows($mysqli_db, 'ibl_sim_game_recaps');
+
+    $mismatches = [];
+    if ($afterTeams !== BASELINE_TEAM_ROWS) {
+        $mismatches[] = sprintf('ibl_box_scores_teams: expected %d, got %d', BASELINE_TEAM_ROWS, $afterTeams);
+    }
+    if ($afterPlayers !== BASELINE_PLAYER_ROWS) {
+        $mismatches[] = sprintf('ibl_box_scores: expected %d, got %d', BASELINE_PLAYER_ROWS, $afterPlayers);
+    }
+    if ($afterRecaps !== BASELINE_RECAP_ROWS) {
+        $mismatches[] = sprintf('ibl_sim_game_recaps: expected %d, got %d', BASELINE_RECAP_ROWS, $afterRecaps);
+    }
+
+    if ($mismatches !== []) {
+        $mysqli_db->rollback();
+        fwrite(STDERR, "Restore did not reproduce the pre-repair baseline - rolled back, nothing written:\n");
+        foreach ($mismatches as $mismatch) {
+            fwrite(STDERR, '  ' . $mismatch . "\n");
+        }
+        exit(1);
+    }
+
+    $mysqli_db->commit();
+} catch (Throwable $e) {
+    $mysqli_db->rollback();
+    fwrite(STDERR, "Rollback failed - transaction reverted, nothing written: " . $e->getMessage() . "\n");
+    exit(1);
+}
+
+printf("  ibl_box_scores_teams     %d -> %d  (+%d)\n", $beforeTeams, $afterTeams, $teamsRestored);
+printf("  ibl_box_scores           %d -> %d  (+%d)\n", $beforePlayers, $afterPlayers, $playersRestored);
+printf("  ibl_sim_game_recaps      %d -> %d  (+%d)\n\n", $beforeRecaps, $afterRecaps, $recapsRestored);
+
+if ($teamsRestored === 0 && $playersRestored === 0 && $recapsRestored === 0) {
+    echo "Already at the pre-repair baseline - nothing needed restoring.\n";
+} else {
+    echo "Restored to the pre-repair baseline. Backup tables were left intact.\n";
+}
+
+exit(0);

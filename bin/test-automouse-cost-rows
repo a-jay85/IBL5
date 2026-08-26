@@ -153,8 +153,12 @@ assert_gt "$impl_cost" 5.0 "impl is not the harness under-count" \
 assert_gt "$post_cost" 3.0 "postplan is not the harness under-count" \
     "harness reports \$2.81965335 — iterations and/or subagents were dropped"
 
-# 10. peak_ctx is carried through.
-assert_eq "$(pj "$TMPROOT/impl.json" peak_ctx)" 208262 "impl peak_ctx"
+# 10. peak_ctx is the MAIN transcript's true peak, not the summed top-level usage
+#     and not a sub-agent's occupancy. 208262 was the pre-fix sum; 102614 is the
+#     sub-agent peak this session's shared accumulator used to leak in.
+assert_eq "$(pj "$TMPROOT/impl.json" peak_ctx)" 116570 "impl peak_ctx (main-only, true peak)"
+assert_ne "$(pj "$TMPROOT/impl.json" peak_ctx)" 208262 "impl peak_ctx is not the summed top-level"
+assert_ne "$(pj "$TMPROOT/impl.json" peak_ctx)" 102614 "impl peak_ctx does not leak the sub-agent peak"
 
 printf '\n-- pricer: iterations REPLACE, not ADD (Error-A guard) --\n'
 
@@ -183,11 +187,34 @@ assert_ne "$iter_cost" 0.53 "iterations are not ignored in favour of top-level u
 #     multi-iteration record silently double-counts; this catches it.
 assert_ne "$iter_cost" 0.5345 "iterations REPLACE the top-level usage (not added to it)"
 
-# 14/15. peak_ctx is a MAX over {top-level} U {each iteration}, never a sum:
-#        max(1000, 100000, 2000) = 100000; the sum would be 103000.
+# 14/15/16. peak_ctx is the MAX over ITERATIONS ONLY, not incl. the top-level sum:
+#           iteration ctx = 2000; the wrong summed top level would be 100000;
+#           the wrong sum-of-all-parts would be 103000.
 iter_peak=$(pj "$TMPROOT/iter.json" peak_ctx)
-assert_eq "$iter_peak" 100000 "peak_ctx is the max over usage parts"
+assert_eq "$iter_peak" 2000 "peak_ctx is the max over ITERATIONS, not incl. the top level"
+assert_ne "$iter_peak" 100000 "peak_ctx does not fall back to the summed top-level usage"
 assert_ne "$iter_peak" 103000 "peak_ctx is not the sum of usage parts"
+
+# Advisor fixture — discriminates four wrong implementations with one number.
+# Record 1: iterations with mixed types; four candidate peak answers are far apart.
+#   top-level ctx = 4+120000+1705 = 121709  (the old "sum" reading)
+#   iter 1 (type:message)        ctx = 25+60000+0    = 60025
+#   iter 2 (type:advisor_message) ctx = 61684+0+0    = 61684  (excluded)
+#   iter 3 (type:message)        ctx = 5+60000+1385  = 61390  <-- correct peak
+# Record 2: no iterations[] at all, ctx = 900 (verifies the else fallback, does not clobber).
+cat > "$ITDIR/adv11111-1111-1111-1111-111111111111.jsonl" <<'JSONL'
+{"type":"assistant","timestamp":"2026-08-26T00:00:01.000Z","message":{"id":"msg_adv1","model":"claude-opus-5","usage":{"input_tokens":4,"output_tokens":0,"cache_read_input_tokens":120000,"cache_creation_input_tokens":1705,"iterations":[{"type":"message","model":"claude-sonnet-5","input_tokens":25,"output_tokens":0,"cache_read_input_tokens":60000,"cache_creation_input_tokens":0},{"type":"advisor_message","model":"claude-opus-5","input_tokens":61684,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0},{"type":"message","model":"claude-sonnet-5","input_tokens":5,"output_tokens":0,"cache_read_input_tokens":60000,"cache_creation_input_tokens":1385}]}}}
+{"type":"assistant","timestamp":"2026-08-26T00:00:02.000Z","message":{"id":"msg_adv2","model":"claude-opus-5","usage":{"input_tokens":900,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}
+JSONL
+
+"$PRICER" --session-id adv11111-1111-1111-1111-111111111111 --proj-dir "$ITDIR" > "$TMPROOT/adv.json"
+adv_peak=$(pj "$TMPROOT/adv.json" peak_ctx)
+assert_eq "$adv_peak" 61390 "advisor iterations are excluded from the peak"
+assert_ne "$adv_peak" 121709 "peak_ctx is not the summed top-level usage"
+assert_ne "$adv_peak" 61684 "peak_ctx does not count the advisor_message iteration"
+assert_ne "$adv_peak" 60025 "peak_ctx is the max of the non-advisor iterations, not the first"
+# Records with no iterations[] still contribute via ctx_of(u).
+assert_ne "$adv_peak" 900 "the no-iterations record did not clobber the peak"
 
 printf '\n-- pricer: subagent transcripts are included (Error-B guard) --\n'
 

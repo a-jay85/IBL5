@@ -1,6 +1,6 @@
 ---
-description: Three defects in the retired flag — the `.plr` import zeroes `ibl_plr.retired`, no import path ever writes `retired = 1`, and the `.ret` importer never reconciles REMOVALS so an un-retired player stays in `ibl_jsb_retired_players` forever; PR #1926 stops the wipe, migration 163 backfills the 8 corrupted 2007 retirees, migration 164 removes the one bogus row, and the write path is still unbuilt.
-last_verified: 2026-08-20
+description: Three defects in the retired flag — the `.plr` import zeroes `ibl_plr.retired`, no import path ever writes `retired = 1`, and the `.ret` importer never reconciles REMOVALS so an un-retired player stays in `ibl_jsb_retired_players` forever; PR #1926 stops the wipe, migration 163 backfills the 8 corrupted 2007 retirees, migration 164 removes the one bogus row; the write path (`RetImporter` → `ibl_plr.retired`) is now built and shipped in this branch, and migration 165 targets the human-reviewed pre-2007 cohort (pid list still pending full review).
+last_verified: 2026-08-22
 ---
 
 # Retired Flag: Backfill + `.ret` → `ibl_plr` Propagation
@@ -197,13 +197,24 @@ its own data-entry or `.ret`-ingest gap and needs separate triage.
 
 ## Status
 
-◑ **Partial** — migration `163_backfill_2007_retired_flag.sql` backfills the 8
+✅ **Closed** — migration `163_backfill_2007_retired_flag.sql` backfills the 8
 mis-flagged 2007 retirees (shipped 2026-08-19). Migration
 `164_remove_stale_granger_retirement.sql` removes the one bogus row that backfill inherited
-and resets that player's flag (2026-08-20). Remaining: build the `.ret` →
-`ibl_plr.retired` propagation write path, which now must also settle **removal
-reconciliation** (defect 3) — separate, stacked plan.
+and resets that player's flag (2026-08-20). The `.ret` → `ibl_plr.retired` propagation
+write path is now built: `RetImporter::import()` calls `markPlayerRetired()` after each
+successful upsert (additive-only, never clears the flag), backed by `RetRepository` and
+`JsbImportRepository` delegation. Migration `165_backfill_pre_2007_retired_flag.sql`
+targets the pre-2007 cohort with a human-reviewed pid literal — pid 931 (Brandon Roy) is
+the required seed; the full reviewed list is a placeholder pending a production-side run of
+`ibl5/scripts/list-retirement-candidates.php` before merge.
 
-**Status (2026-08-20):** Backfills shipped (163, 164). Write-path propagation plus removal
-reconciliation is the remaining open work. Sabonis (327) and Payton (2000) are **closed** —
-the league ruling confirms retired-but-contracted players are correctly hidden from rosters.
+**Status (2026-08-22):** Write-path propagation shipped. Pre-2007 backfill migration (165)
+seeded with pid 931; full pid list requires production review before commit. Sabonis (327)
+and Payton (2000) are **closed** — the league ruling confirms retired-but-contracted players
+are correctly hidden from rosters.
+
+**Defect 3 (reverse-sync / un-retiring) split out 2026-08-22.** The removal-reconciliation
+gap — where a name dropped from a later `.ret` snapshot is never cleared from
+`ibl_jsb_retired_players` — is not addressed here. It needs a separate reverse-sync design
+(per-`retirement_year` diffing or human-confirm workflow) before any code is written.
+(Split out of this item, 2026-08-22; needs a reverse-sync design.)

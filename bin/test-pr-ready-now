@@ -1197,6 +1197,131 @@ tail -1 "$_F10" | grep -qFx "$_END" || fail "fixture 10: end marker not on last 
 
 end_case pr-ready-files-changed-rewriter
 
+# --- case 18: E14 the CI watcher is a committed script armed in the background ------------
+# The watcher no longer runs under `Monitor` at all: Monitor turns every stdout line into a
+# conversation message, and ~46 checks landing in waves woke the orchestrator a dozen-odd
+# times per run. scripts/watch-ci.sh polls silently and prints one verdict block, so the
+# skill arms it with `Bash(run_in_background: true)` and is woken exactly once. These
+# assertions are the anti-drift guard: a re-added `Monitor(`/`command:` block, or a pasted
+# copy of the loop, fails here. Unconditional counts (case 17's shape) so a regression
+# fails loudly rather than skipping. The `**Exempt:**` check is E14's original assertion,
+# kept because that clause is what told a reader Monitor was safe to arm here.
+begin_case
+SKILL="$SCRIPT_DIR/../.claude/skills/pr-ready/SKILL.md"
+[[ -s "$SKILL" ]] || fail "e14: pr-ready SKILL.md missing or empty at $SKILL"
+
+[[ "$(grep -cF '**Exempt:**' "$SKILL")" -eq 0 ]] \
+    || fail "e14: SKILL.md still carries an **Exempt:** clause (E14 regression)"
+# no Monitor arming block, and no `command:` key, may exist anywhere in the skill
+[[ "$(grep -c 'command:' "$SKILL")" -eq 0 ]] \
+    || fail "e14: SKILL.md has a 'command:' line — a Monitor arm was re-added (E14 regression)"
+[[ "$(grep -cF 'Monitor(' "$SKILL")" -eq 0 ]] \
+    || fail "e14: SKILL.md arms a Monitor( — the CI watcher must run via Bash run_in_background"
+# the watcher is materialised once from the pin, and armed twice (Phase 4.5 + Phase 6.5)
+[[ "$(grep -cF 'scripts/watch-ci.sh > /tmp/pr-ready-ciwatch-<N>.sh' "$SKILL")" -eq 1 ]] \
+    || fail "e14: expected exactly 1 watch-ci.sh materialise line in SKILL.md"
+[[ "$(grep -cF 'bash /tmp/pr-ready-ciwatch-<N>.sh <N> <HEAD_SHA>' "$SKILL")" -eq 2 ]] \
+    || fail "e14: expected 2 'bash /tmp/pr-ready-ciwatch-<N>.sh <N> <HEAD_SHA>' arm lines (Phase 4.5 + 6.5)"
+grep -qF 'run_in_background: true' "$SKILL" \
+    || fail "e14: SKILL.md no longer says run_in_background: true — the single-wake shape was lost"
+# the polling logic must live ONLY in the script; a pasted copy is the drift this guards
+[[ "$(grep -c 'gh pr checks <N>' "$SKILL")" -eq 0 ]] \
+    || fail "e14: a copy of the watcher loop was pasted back into SKILL.md (drift)"
+end_case e14-ci-watcher-single-wake
+
+# --- case 19: E15 rebase delegate is never told to push ----------------------------------
+# The delegate packet runs under ~/.claude/hooks/plan-gate-commit.sh, which denies `git push`
+# for sub-agents. Any positive push instruction in the packet is an instant hard-fail.
+begin_case
+REBASE="$SCRIPT_DIR/../.claude/skills/pr-ready/_rebase-and-conflicts.md"
+[[ -s "$REBASE" ]] || fail "e15: _rebase-and-conflicts.md missing or empty at $REBASE"
+
+grep -qiE '(NOT|may not|must not) run.*git push' "$REBASE" \
+    || fail "e15: delegate hard limits do not prohibit 'git push' (E15 regression)"
+[[ "$(grep 'git push' "$REBASE" | grep -cviE '\b(NOT|never|may not|must not|cannot|do not)\b')" -eq 0 ]] \
+    || fail "e15: positive 'git push' instruction in the delegate packet (E15 regression)"
+end_case e15-delegate-no-push
+
+# --- case 20: scripts/watch-ci.sh — one wake, and every terminal path is loud -------------
+# Driven through a PATH gh shim plus the script's two documented test seams
+# (WATCH_CI_INTERVAL / WATCH_CI_GRACE), so no arm here touches the network or sleeps 30s.
+begin_case
+WCI="$SCRIPT_DIR/../.claude/skills/pr-ready/scripts/watch-ci.sh"
+[[ -s "$WCI" ]] || fail "watch-ci: script missing or empty at $WCI"
+[[ -x "$WCI" ]] || fail "watch-ci: script is not executable"
+
+CIW="$SCRATCH/ciwatch"
+mkdir -p "$CIW/bin"
+# gh shim: `pr view` and `pr checks` each cat the fixture the current arm wrote.
+cat > "$CIW/bin/gh" <<GH2_EOF
+#!/usr/bin/env bash
+if [[ "\${1:-}" == "pr" && "\${2:-}" == "view" ]];   then cat "$CIW/view.json";   exit 0; fi
+if [[ "\${1:-}" == "pr" && "\${2:-}" == "checks" ]]; then cat "$CIW/checks.json"; exit 0; fi
+echo "gh shim: unexpected args: \$*" >&2
+exit 1
+GH2_EOF
+chmod +x "$CIW/bin/gh"
+
+SHA_NEW=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+SHA_OLD=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+
+# $1 = headRefOid the API reports, $2 = mergeStateStatus, $3 = checks JSON, $4.. = script args.
+wci_out=""; wci_rc=0
+run_wci() {
+    printf '{"headRefOid":"%s","mergeStateStatus":"%s"}\n' "$1" "$2" > "$CIW/view.json"
+    printf '%s\n' "$3" > "$CIW/checks.json"
+    shift 3
+    wci_out="$(env PATH="$CIW/bin:$PATH" WATCH_CI_INTERVAL=0 WATCH_CI_GRACE=2 bash "$WCI" "$@" 2>&1)"
+    wci_rc=$?
+}
+
+ALL_GREEN='[{"name":"a","bucket":"pass"},{"name":"b","bucket":"skipping"}]'
+ONE_RED='[{"name":"a","bucket":"pass"},{"name":"b","bucket":"fail"},{"name":"c","bucket":"cancel"}]'
+PENDING='[{"name":"a","bucket":"pass"},{"name":"b","bucket":"pending"}]'
+
+# (a) all settled, none red
+run_wci "$SHA_NEW" CLEAN "$ALL_GREEN" 1234 "$SHA_NEW"
+[[ $wci_rc -eq 0 ]] || fail "watch-ci (a): expected exit 0, got $wci_rc — $wci_out"
+grep -qF 'CI COMPLETE' <<< "$wci_out" || fail "watch-ci (a): no CI COMPLETE line — $wci_out"
+grep -qF 'CLEAN' <<< "$wci_out" || fail "watch-ci (a): verdict does not carry mergeStateStatus"
+
+# (b) red checks — EVERY non-pass/skipping bucket is named. This is what buys the single
+# wake: Phase 6.5 fixes all of them in one pass instead of one CI round trip per failure.
+run_wci "$SHA_NEW" CLEAN "$ONE_RED" 1234 "$SHA_NEW"
+[[ $wci_rc -eq 1 ]] || fail "watch-ci (b): expected exit 1, got $wci_rc — $wci_out"
+grep -qF 'CI FAILED' <<< "$wci_out" || fail "watch-ci (b): no CI FAILED line — $wci_out"
+grep -qF 'b: fail'   <<< "$wci_out" || fail "watch-ci (b): failing check not named"
+grep -qF 'c: cancel' <<< "$wci_out" || fail "watch-ci (b): cancelled check not named (fail-fast leak?)"
+grep -qF 'a: pass'   <<< "$wci_out" && fail "watch-ci (b): a green check was listed as red"
+
+# (c) DIRTY beats the checks predicate
+run_wci "$SHA_NEW" DIRTY "$ALL_GREEN" 1234 "$SHA_NEW"
+[[ $wci_rc -eq 2 ]] || fail "watch-ci (c): expected exit 2 on DIRTY, got $wci_rc — $wci_out"
+grep -qF 'MERGE CONFLICT' <<< "$wci_out" || fail "watch-ci (c): no MERGE CONFLICT line"
+
+# (d) THE #1830 REGRESSION. The API still serves the pre-push head, whose checks are all
+# settled and green. Without the `seen` gate this returns a false CI COMPLETE for a head
+# whose CI was never watched at all. It must report STALE instead.
+run_wci "$SHA_OLD" CLEAN "$ALL_GREEN" 1234 "$SHA_NEW"
+[[ $wci_rc -eq 3 ]] || fail "watch-ci (d): expected exit 3 (STALE), got $wci_rc — the seen gate is gone"
+grep -qF 'STALE' <<< "$wci_out" || fail "watch-ci (d): no STALE line — $wci_out"
+grep -qF 'CI COMPLETE' <<< "$wci_out" && fail "watch-ci (d): FALSE CI COMPLETE on the pre-push head (#1830)"
+
+# (e) timeout with the head seen and a check still pending
+run_wci "$SHA_NEW" CLEAN "$PENDING" 1234 "$SHA_NEW" 1
+[[ $wci_rc -eq 4 ]] || fail "watch-ci (e): expected exit 4 (CI TIMEOUT), got $wci_rc — $wci_out"
+grep -qF 'CI TIMEOUT'  <<< "$wci_out" || fail "watch-ci (e): no CI TIMEOUT line — $wci_out"
+grep -qF 'pending: b'  <<< "$wci_out" || fail "watch-ci (e): timeout verdict does not name the pending check"
+
+# (f) usage errors are loud, never a silent exit 0
+run_wci "$SHA_NEW" CLEAN "$ALL_GREEN"
+[[ $wci_rc -eq 5 ]] || fail "watch-ci (f): expected exit 5 with no args, got $wci_rc"
+grep -qF 'STOP:' <<< "$wci_out" || fail "watch-ci (f): no STOP: line on missing args"
+run_wci "$SHA_NEW" CLEAN "$ALL_GREEN" 1234
+[[ $wci_rc -eq 5 ]] || fail "watch-ci (f): expected exit 5 with no SHA, got $wci_rc"
+[[ -n "$wci_out" ]] || fail "watch-ci (f): a terminal path printed nothing — silence is not success"
+end_case watch-ci-single-wake
+
 # --- verdict -----------------------------------------------------------------------------
 if [[ $FAILED -ne 0 ]]; then
     echo "test-pr-ready-now: FAILED ($FAILED assertion failure(s))" >&2

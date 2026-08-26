@@ -1,6 +1,6 @@
 ---
 description: Index of tracked backlogs under docs/backlog/ — one row per LIVE backlog, the standalone single-item files, and the archive pointer, plus the canonical status taxonomy shared by all backlogs and the archive / dated-pointer / supersession housekeeping conventions.
-last_verified: 2026-08-20
+last_verified: 2026-08-25
 ---
 
 # Backlog index
@@ -35,7 +35,7 @@ resolves it is the record).
 |------|--------|
 | [voting-csrf-single-use-post-redisplay.md](voting-csrf-single-use-post-redisplay.md) | ⬜ Open — ballot validation failure consumes the single-use CSRF token, so Back leads to a dead end; needs a `/plan` (security surface). |
 | [draft-selection-pick-ownership.md](draft-selection-pick-ownership.md) | ⬜ Open — draft submission path has no pick-slot ownership check; a GM can submit their team name with an arbitrary round/pick owned by another team; needs a `/plan` (security surface). |
-| [retired-flag-backfill-and-ret-propagation.md](retired-flag-backfill-and-ret-propagation.md) | ◑ Partial — 8-pid backfill migration shipped (2026-08-19); `.ret` → `ibl_plr` write-path propagation pending. |
+| [retired-flag-backfill-and-ret-propagation.md](retired-flag-backfill-and-ret-propagation.md) | ✅ Closed — `.ret` → `ibl_plr.retired` propagation shipped (#1969); migration 165 backfills pre-2007 cohort (pid 931 seeded; full list pending human review before merge). Defect 3 (reverse-sync) split out 2026-08-22. |
 
 ## Status taxonomy
 

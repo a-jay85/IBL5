@@ -25,7 +25,7 @@ Tier every sub-agent (and every agent a plan spawns) by the reasoning the task a
 
 ## `/plan` orchestrator model
 
-Single backlog item → **Sonnet** orchestrator; multiple items → **Opus**. Default: offload via **`/plan-prompt`** → `bin/plan-now` (detached Sonnet run). Stay inline only when the user must weigh in mid-run. Mechanics and evidence: `agent-tiering-detail.md` § `/plan` orchestrator model.
+Single backlog item → **Sonnet** orchestrator; multiple items → **Opus**. The `plan-architect` is Step-3-tiered (xhigh → sonnet → opus) **regardless of orchestrator**. Default: offload via **`/plan-prompt`** → `bin/plan-now` (detached Sonnet run). Stay inline only when the user must weigh in mid-run. Mechanics and evidence: `agent-tiering-detail.md` § `/plan` orchestrator model.
 
 ## Sonnet 4.6 pins
 

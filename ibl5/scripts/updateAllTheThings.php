@@ -146,8 +146,8 @@ try {
     $plrRepo = new PlrParser\PlrParserRepository($mysqli_db, $leagueContext);
     $plrService = new PlrParser\PlrParserService($plrRepo, $season);
 
-    $boxscoreProcessor = new Boxscore\BoxscoreProcessor($mysqli_db, null, $season, $leagueContext);
     $boxscoreRepo = new Boxscore\BoxscoreRepository($mysqli_db, $leagueContext);
+    $boxscoreProcessor = new Boxscore\BoxscoreProcessor($mysqli_db, $boxscoreRepo, $season, $leagueContext);
     $boxscoreView = new Boxscore\BoxscoreView();
 
     $savedDcRepo = new SavedDepthChart\SavedDepthChartRepository($mysqli_db, $leagueContext);

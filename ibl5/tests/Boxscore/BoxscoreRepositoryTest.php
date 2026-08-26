@@ -269,4 +269,77 @@ class BoxscoreRepositoryTest extends TestCase
         self::assertStringContainsString('VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', $sql);
         self::assertStringContainsString('INSERT INTO `ibl_box_scores_teams`', $sql);
     }
+
+    public function testFetchScheduledGameIndexIsSeasonScopedAndParameterized(): void
+    {
+        // Set Olympics context so `ibl_schedule` is rewritten to ibl_olympics_schedule.
+        // This proves the SQL uses backtick-quoted table names (rewrite only fires for backticks).
+        // MockDatabase::getExecutedQueries() substitutes bound params before storing, so we
+        // assert the substituted value (2008) rather than the ? placeholder — MockDB limitation.
+        $context = new LeagueContext();
+        $context->setLeague(LeagueContext::LEAGUE_OLYMPICS);
+        BoxscoreRepository::setSharedLeagueContext($context);
+
+        $repo = new BoxscoreRepository($this->mockDb);
+        $repo->fetchScheduledGameIndex(2008);
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $this->assertCount(1, $queries);
+        $this->assertStringContainsString('ibl_olympics_schedule', $queries[0]);
+        $this->assertStringContainsString('season_year = 2008', $queries[0]);
+        $this->assertStringNotContainsString('2007', $queries[0]);
+    }
+
+    public function testFetchBoxscoreGameOfThatDayIndexExcludesNullTeamRows(): void
+    {
+        // IS NOT NULL predicates appear verbatim in the stored query (not bound params),
+        // so they are directly assertable despite the MockDB substitution limitation.
+        $this->repository->fetchBoxscoreGameOfThatDayIndex(2025);
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $this->assertCount(1, $queries);
+        $this->assertStringContainsString('visitor_teamid IS NOT NULL', $queries[0]);
+        $this->assertStringContainsString('home_teamid IS NOT NULL', $queries[0]);
+    }
+
+    public function testPreloadIndexesReturnEmptyArraysWhenNoRows(): void
+    {
+        // Default MockDatabase returns no rows; both methods must degrade gracefully.
+        $scheduleIndex = $this->repository->fetchScheduledGameIndex(2025);
+        $gotdIndex = $this->repository->fetchBoxscoreGameOfThatDayIndex(2025);
+
+        $this->assertSame([], $scheduleIndex);
+        $this->assertSame([], $gotdIndex);
+    }
+
+    public function testDeletePlayerBoxscoresByGameBindsFourParameters(): void
+    {
+        // MockPreparedStatement substitutes bound values for ? before storing, so assert
+        // the interpolated value (7) rather than the ? placeholder — MockDB limitation.
+        // Use a distinctive gotd (7) so the assertion cannot match a coincidental literal.
+        $this->mockDb->setReturnTrue(true);
+
+        $this->repository->deletePlayerBoxscoresByGame('2025-01-01', 5, 3, 7);
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $this->assertCount(1, $queries);
+        $this->assertStringContainsString('DELETE FROM ibl_box_scores', $queries[0]);
+        $this->assertStringContainsString('game_of_that_day = 7', $queries[0]);
+    }
+
+    public function testHasNullTeamIdPlayerBoxscoresBindsFourParameters(): void
+    {
+        // Use a distinctive gotd (7) and assert both that the value is bound and that
+        // game_of_that_day appears before pid <> 0 (pinning WHERE predicate order).
+        $this->repository->hasNullTeamIdPlayerBoxscores('2025-01-01', 5, 3, 7);
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $this->assertCount(1, $queries);
+        $this->assertStringContainsString('game_of_that_day = 7', $queries[0]);
+        $gotdPos = strpos($queries[0], 'game_of_that_day = 7');
+        $pidPos  = strpos($queries[0], 'pid <> 0');
+        $this->assertNotFalse($gotdPos);
+        $this->assertNotFalse($pidPos);
+        $this->assertLessThan($pidPos, $gotdPos);
+    }
 }

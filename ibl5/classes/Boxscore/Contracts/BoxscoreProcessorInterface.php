@@ -24,7 +24,9 @@ interface BoxscoreProcessorInterface
      * @param int $seasonEndingYear Season ending year (0 to use current season)
      * @param string $seasonPhase Season phase (empty to use current phase)
      * @param bool $skipSimDates When true, skip updating ibl_sim_dates (use for historical imports)
-     * @return array{success: bool, gamesInserted: int, gamesUpdated: int, gamesSkipped: int, linesProcessed: int, messages: list<string>, error?: string}
+     * @param string|null $sourceArchive Human-readable provenance of the bytes (archive or file name).
+     *                                   Recorded with rejects; never used for control flow.
+     * @return array{success: bool, gamesInserted: int, gamesUpdated: int, gamesSkipped: int, linesProcessed: int, messages: list<string>, error?: string, gamesRejected?: int, rejectedGames?: list<\Boxscore\RejectedGame>, operatingSeasonEndingYear?: int, operatingSeasonPhase?: string, outOfWindowGames?: int, rejectsRecorded: int, scheduleGuardEnabled: bool, sourceArchive: string|null}
      *         Result:
      *         - 'success': bool - Whether processing completed without errors
      *         - 'gamesInserted': int - Number of new games inserted
@@ -33,8 +35,16 @@ interface BoxscoreProcessorInterface
      *         - 'linesProcessed': int - Total number of .sco lines processed
      *         - 'messages': list<string> - Log messages from processing
      *         - 'error': string - Error message if success is false
+     *         - 'gamesRejected': int - Number of games rejected by the schedule membership guard
+     *         - 'rejectedGames': list<RejectedGame> - Details of each rejected game
+     *         - 'operatingSeasonEndingYear': int - Season ending year determined during processing
+     *         - 'operatingSeasonPhase': string - Season phase determined during processing
+     *         - 'outOfWindowGames': int - Games whose date falls outside the schedule window
+     *         - 'rejectsRecorded': int - Number of rejected games written to the audit table
+     *         - 'scheduleGuardEnabled': bool - Whether the schedule membership guard was active
+     *         - 'sourceArchive': string|null - Archive or file name that provided the data
      */
-    public function processScoFile(string $filePath, int $seasonEndingYear, string $seasonPhase, bool $skipSimDates = false): array;
+    public function processScoFile(string $filePath, int $seasonEndingYear, string $seasonPhase, bool $skipSimDates = false, ?string $sourceArchive = null): array;
 
     /**
      * Process .sco data from a string and insert/update boxscore records
@@ -45,9 +55,11 @@ interface BoxscoreProcessorInterface
      * @param int $seasonEndingYear Season ending year (0 to use current season)
      * @param string $seasonPhase Season phase (empty to use current phase)
      * @param bool $skipSimDates When true, skip updating ibl_sim_dates
-     * @return array{success: bool, gamesInserted: int, gamesUpdated: int, gamesSkipped: int, linesProcessed: int, messages: list<string>, error?: string}
+     * @param string|null $sourceArchive Human-readable provenance of the bytes (archive or file name).
+     *                                   Recorded with rejects; never used for control flow.
+     * @return array{success: bool, gamesInserted: int, gamesUpdated: int, gamesSkipped: int, linesProcessed: int, messages: list<string>, error?: string, gamesRejected?: int, rejectedGames?: list<\Boxscore\RejectedGame>, operatingSeasonEndingYear?: int, operatingSeasonPhase?: string, outOfWindowGames?: int, rejectsRecorded: int, scheduleGuardEnabled: bool, sourceArchive: string|null}
      */
-    public function processScoData(string $data, int $seasonEndingYear, string $seasonPhase, bool $skipSimDates = false): array;
+    public function processScoData(string $data, int $seasonEndingYear, string $seasonPhase, bool $skipSimDates = false, ?string $sourceArchive = null): array;
 
     /**
      * Process All-Star Weekend games from the first 4000 bytes of a .sco file

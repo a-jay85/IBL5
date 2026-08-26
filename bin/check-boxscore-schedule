@@ -1,0 +1,161 @@
+#!/bin/bash
+# Reconciles ibl_box_scores_teams against ibl_schedule for one season.
+#
+# Usage: bin/check-boxscore-schedule [--season=YYYY] [--replay=<path>] [--phase=<phase>] [--json] [--help]
+#
+# Runs the PHP entry point inside the php container (ibl5-php for the main checkout,
+# ibl5-php-<slug> for a worktree). The repo tree is bind-mounted at /var/www/html;
+# --replay paths must therefore be inside the checkout.
+#
+# Environment overrides (for testing):
+#   BOXSCORE_SCHEDULE_PHP_CONTAINER  Override the derived PHP container name.
+#
+# Exit codes: 0 = clean (warnings allowed), 1 = errors found, 2 = usage error,
+#             3 = environment unavailable (php container not running).
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# shellcheck source=bin/lib/db-helpers.sh disable=SC1091
+source "$REPO_ROOT/bin/lib/db-helpers.sh"
+# shellcheck source=bin/lib/git-helpers.sh disable=SC1091
+source "$REPO_ROOT/bin/lib/git-helpers.sh"
+
+# ── Arg parsing (before any container check) ──────────────────────────────────
+
+REPLAY_ARG=""
+PASS_THROUGH_ARGS=()
+
+usage() {
+    cat <<'EOF'
+Usage: bin/check-boxscore-schedule [--season=YYYY] [--replay=<path>] [--phase=<phase>] [--rejects[=N]] [--json] [--help]
+
+Reconciles ibl_box_scores_teams against ibl_schedule for one season.
+
+Modes:
+  (default)          Audit the database for the season.
+  --replay=<path>    Dry-run a .sco file or backup archive through the schedule
+                     guard and report what WOULD be rejected. Writes nothing.
+  --rejects[=N]      List the N most recent guard rejects for --season (default 20)
+                     and exit 0. Diagnostic; never changes the exit code.
+
+Options:
+  --season=YYYY      Season ending year. Defaults to the current operating season.
+  --phase=<phase>    Season phase for --replay date decoding (default: operating phase).
+  --json             Emit machine-readable JSON instead of text.
+  --help, -h         Show this message.
+
+Exit codes: 0 = clean (warnings allowed), 1 = errors found, 2 = usage error,
+            3 = environment unavailable (php container not running).
+EOF
+}
+
+for arg in "$@"; do
+    case "$arg" in
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --season=*)
+            PASS_THROUGH_ARGS+=("$arg")
+            ;;
+        --replay=*)
+            REPLAY_ARG="${arg#--replay=}"
+            ;;
+        --phase=*)
+            PASS_THROUGH_ARGS+=("$arg")
+            ;;
+        --json)
+            PASS_THROUGH_ARGS+=("$arg")
+            ;;
+        --rejects)
+            PASS_THROUGH_ARGS+=("$arg")
+            ;;
+        --rejects=*)
+            REJECTS_VAL="${arg#--rejects=}"
+            if [[ ! "$REJECTS_VAL" =~ ^[0-9]+$ ]]; then
+                echo "Error: --rejects value must be a positive integer, got: ${REJECTS_VAL}" >&2
+                usage >&2
+                exit 2
+            fi
+            PASS_THROUGH_ARGS+=("$arg")
+            ;;
+        *)
+            usage >&2
+            echo "Unknown flag: $arg" >&2
+            exit 2
+            ;;
+    esac
+done
+
+# ── Replay path validation ────────────────────────────────────────────────────
+
+if [ -n "$REPLAY_ARG" ]; then
+    # Absolutize without requiring file existence (macOS lacks realpath -m)
+    if [[ "$REPLAY_ARG" != /* ]]; then
+        REPLAY_ARG="$PWD/$REPLAY_ARG"
+    fi
+
+    # The host path has to be rewritten to its in-container equivalent: the
+    # container has no /Users tree, it sees this checkout's ibl5/ at
+    # /var/www/html/ibl5. Two distinct host trees land under that prefix:
+    #
+    #   1. This checkout's own ibl5/.
+    #   2. The MAIN checkout's ibl5/backups/, which every worktree stack
+    #      bind-mounts over its (empty) ibl5/backups — 150 MB sim archives are
+    #      never duplicated per worktree, so the main checkout is the only
+    #      on-disk source of record for a --replay archive.
+    #
+    # Accepting (2) is what makes --replay usable from a worktree at all.
+    MAIN_ROOT="$(resolve_canonical_root "$REPO_ROOT")"
+    CONTAINER_REPLAY=""
+    if [[ "$REPLAY_ARG" == "$REPO_ROOT/ibl5/"* ]]; then
+        CONTAINER_REPLAY="/var/www/html/ibl5/${REPLAY_ARG#"$REPO_ROOT"/ibl5/}"
+    elif [[ "$REPLAY_ARG" == "$MAIN_ROOT/ibl5/backups/"* ]]; then
+        CONTAINER_REPLAY="/var/www/html/ibl5/backups/${REPLAY_ARG#"$MAIN_ROOT"/ibl5/backups/}"
+    else
+        echo "Error: --replay path must be inside the repo checkout." >&2
+        echo "       Resolved: $REPLAY_ARG" >&2
+        echo "       The container bind-mount only covers the repo tree (plus the main" >&2
+        echo "       checkout's ibl5/backups); paths outside it are inaccessible." >&2
+        exit 2
+    fi
+    PASS_THROUGH_ARGS+=("--replay=$CONTAINER_REPLAY")
+fi
+
+# ── Container resolution ──────────────────────────────────────────────────────
+
+if [ -n "${BOXSCORE_SCHEDULE_PHP_CONTAINER:-}" ]; then
+    PHP_CONTAINER="$BOXSCORE_SCHEDULE_PHP_CONTAINER"
+else
+    SLUG_FILE="$REPO_ROOT/.wt-slug"
+    if [ -f "$SLUG_FILE" ]; then
+        SLUG=$(cat "$SLUG_FILE")
+        PHP_CONTAINER="ibl5-php-$SLUG"
+    elif is_main_checkout "$REPO_ROOT"; then
+        PHP_CONTAINER="ibl5-php"
+    else
+        SLUG=$(basename "$REPO_ROOT")
+        PHP_CONTAINER="ibl5-php-$SLUG"
+    fi
+fi
+
+# ── Container liveness check ──────────────────────────────────────────────────
+
+if ! db_container_running "$PHP_CONTAINER"; then
+    echo "Error: PHP container '$PHP_CONTAINER' is not running." >&2
+    SLUG_FILE="$REPO_ROOT/.wt-slug"
+    if [ -f "$SLUG_FILE" ] && [ -s "$SLUG_FILE" ]; then
+        echo "  Start it with: bin/wt-up $(cat "$SLUG_FILE")" >&2
+    else
+        echo "  Start it with: bin/dev-up" >&2
+    fi
+    exit 3
+fi
+
+# ── Execute inside the container ──────────────────────────────────────────────
+
+rc=0
+docker exec -w /var/www/html/ibl5 "$PHP_CONTAINER" \
+    php bin/check-boxscore-schedule-run "${PASS_THROUGH_ARGS[@]+"${PASS_THROUGH_ARGS[@]}"}" || rc=$?
+exit "$rc"

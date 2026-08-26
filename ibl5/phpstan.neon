@@ -10,6 +10,7 @@ parameters:
         - themes
         - phpstan-rules
         - bin/check-baseline-drift
+        - bin/check-boxscore-schedule-run
         - bin/check-coverage
         - bin/check-coverage-regression
         - bin/check-seed-id-uniqueness

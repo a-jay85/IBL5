@@ -14,7 +14,7 @@ interface BoxscoreViewInterface
     /**
      * Render parse results log
      *
-     * @param array{success: bool, gamesInserted: int, gamesUpdated: int, gamesSkipped: int, linesProcessed: int, messages: list<string>, error?: string} $result
+     * @param array{success: bool, gamesInserted: int, gamesUpdated: int, gamesSkipped: int, linesProcessed: int, messages: list<string>, error?: string, gamesRejected?: int, rejectedGames?: list<\Boxscore\RejectedGame>, sourceArchive?: string|null, operatingSeasonEndingYear?: int, operatingSeasonPhase?: string, outOfWindowGames?: int, rejectsRecorded?: int} $result
      * @return string HTML parse log
      */
     public function renderParseLog(array $result): string;

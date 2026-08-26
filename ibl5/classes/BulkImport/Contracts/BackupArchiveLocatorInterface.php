@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace BulkImport\Contracts;
 
+use BulkImport\ArchiveSelection;
+
 /**
  * Locates and validates backup archives in season directories.
  */
@@ -16,6 +18,18 @@ interface BackupArchiveLocatorInterface
      * @return string|null Full path to the archive, or null if none found
      */
     public function findLatestArchive(string $seasonBackupDir): ?string;
+
+    /**
+     * Rank a season backup directory and report the full selection outcome.
+     *
+     * Encapsulates the mtime + tie-break ranking, provenance parsing, predecessor
+     * lookup, and warning generation. findLatestArchive() delegates here.
+     *
+     * @param string $seasonBackupDir Full path to the season backup directory
+     * @return ArchiveSelection|null Selection outcome, or null only from PHPUnit stubs.
+     *                               Production implementations always return an ArchiveSelection.
+     */
+    public function describeSelection(string $seasonBackupDir): ?ArchiveSelection;
 
     /**
      * Check if an archive follows the standardized naming convention.

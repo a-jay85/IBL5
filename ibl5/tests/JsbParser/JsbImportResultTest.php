@@ -195,4 +195,84 @@ class JsbImportResultTest extends TestCase
         $this->assertSame('Parsing .sco file...', $result->messages[0]);
         $this->assertSame('Games inserted: 1', $result->messages[1]);
     }
+
+    public function testFromScoResultCopiesRejectedCount(): void
+    {
+        $scoResult = [
+            'success' => true,
+            'gamesInserted' => 0,
+            'gamesUpdated' => 0,
+            'gamesSkipped' => 0,
+            'linesProcessed' => 565,
+            'messages' => [],
+            'gamesRejected' => 565,
+        ];
+
+        $result = JsbImportResult::fromScoResult($scoResult);
+
+        $this->assertSame(565, $result->rejected);
+    }
+
+    public function testFromScoResultWithoutRejectedKeyDefaultsToZero(): void
+    {
+        // Pre-Phase-4 shaped array: no gamesRejected key — must not throw.
+        $scoResult = [
+            'success' => true,
+            'gamesInserted' => 3,
+            'gamesUpdated' => 2,
+            'gamesSkipped' => 1,
+            'linesProcessed' => 100,
+            'messages' => [],
+        ];
+
+        $result = JsbImportResult::fromScoResult($scoResult);
+
+        $this->assertSame(0, $result->rejected);
+    }
+
+    public function testMergeAccumulatesRejectedCounts(): void
+    {
+        $a = new JsbImportResult();
+        $a->addRejected(3);
+
+        $b = new JsbImportResult();
+        $b->addRejected(4);
+
+        $a->merge($b);
+
+        $this->assertSame(7, $a->rejected);
+    }
+
+    public function testSummaryIncludesRejectedOnlyWhenNonZero(): void
+    {
+        // Half 1: with rejects, summary() contains 'rejected'.
+        $withRejects = new JsbImportResult();
+        $withRejects->addRejected(5);
+
+        $this->assertStringContainsString('rejected', $withRejects->summary());
+
+        // Half 2: with zero rejects and no other activity, returns exactly 'No changes'.
+        $noActivity = new JsbImportResult();
+
+        $this->assertSame('No changes', $noActivity->summary());
+    }
+
+    public function testRejectsDoNotIncrementErrorCount(): void
+    {
+        // A result carrying rejects but no 'error' key must leave errors === 0.
+        $scoResult = [
+            'success' => true,
+            'gamesInserted' => 0,
+            'gamesUpdated' => 0,
+            'gamesSkipped' => 0,
+            'linesProcessed' => 10,
+            'messages' => [],
+            'gamesRejected' => 10,
+        ];
+
+        $result = JsbImportResult::fromScoResult($scoResult);
+
+        $this->assertSame(0, $result->errors);
+        $this->assertSame(10, $result->rejected);
+    }
 }

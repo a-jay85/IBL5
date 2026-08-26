@@ -26,6 +26,9 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
     private const UNPLAYED_BOX_ID = 100000;
 
+    /** Season phase whose schedule rows exist ONLY in Schedule.htm. */
+    private const PLAYOFF_PHASE = 'Playoffs';
+
     /** @var array<int, string> Calendar month number to name for date string construction */
     private const MONTH_NAMES = [
         1 => 'January',
@@ -151,7 +154,13 @@ class ScheduleUpdater extends \BaseMysqliRepository {
      * JSB's Schedule.htm HTML export. This parses both played games (with
      * scores) and upcoming/unplayed games (no scores yet).
      *
+     * During the Playoffs phase an unreadable Schedule.htm is fatal: the postseason
+     * rows have no other source, so continuing would commit a playoff-less schedule.
+     *
      * @return string Log of inserted playoff games
+     *
+     * @throws \RuntimeException When Schedule.htm cannot be read, or contains only stale
+     *                             rows from another season, during the Playoffs phase
      */
     private function insertPlayoffGamesFromScheduleHtm(): string
     {
@@ -168,11 +177,37 @@ class ScheduleUpdater extends \BaseMysqliRepository {
                 'season_ending_year' => $this->season->endingYear,
             ]);
 
+            // Playoff rows exist ONLY in this file. During the Playoffs phase a missing
+            // export means update() would commit a schedule with no postseason games,
+            // and ScheduleMembershipGuard then rejects every real playoff boxscore as
+            // "not in ibl_schedule". Throw so the enclosing transaction rolls back and
+            // the previous schedule — playoff rows included — survives intact.
+            if ($this->season->phase === self::PLAYOFF_PHASE) {
+                throw new \RuntimeException(
+                    "Schedule.htm not found at {$scheduleHtmPath} — refusing to rebuild `ibl_schedule` during the Playoffs phase without playoff games. Export Schedule.htm from JSB and re-run."
+                );
+            }
+
             return "Schedule.htm not found at {$scheduleHtmPath} — skipping playoff games<br>";
         }
 
         $html = file_get_contents($scheduleHtmPath);
         if ($html === false) {
+            $this->channelLogger->warning('ScheduleUpdater could not read Schedule.htm — no playoff games imported', [
+                'path' => $scheduleHtmPath,
+                'reason' => 'unreadable',
+                'league' => $leagueDir,
+                'season_phase' => $this->season->phase,
+                'season_ending_year' => $this->season->endingYear,
+            ]);
+
+            // Same rollback rationale as the missing-file branch above.
+            if ($this->season->phase === self::PLAYOFF_PHASE) {
+                throw new \RuntimeException(
+                    "Failed to read Schedule.htm at {$scheduleHtmPath} — refusing to rebuild `ibl_schedule` during the Playoffs phase without playoff games."
+                );
+            }
+
             return "Failed to read Schedule.htm — skipping playoff games<br>";
         }
 
@@ -180,6 +215,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
         $log = '';
         $skippedCount = 0;
+        $insertedCount = 0;
         /** @var array<int|string, true> $skippedYears */
         $skippedYears = [];
 
@@ -239,6 +275,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
                 $game['home_score'],
                 $uuid
             );
+            $insertedCount++;
             $log .= "Inserted playoff game: {$game['visitor']} @ {$game['home']} on {$fullDate['date']}<br>";
         }
 
@@ -252,6 +289,20 @@ class ScheduleUpdater extends \BaseMysqliRepository {
                 'file_years' => array_keys($skippedYears),
                 'season_ending_year' => $this->season->endingYear,
             ]);
+
+            // A stale export is as destructive as a missing one: every row belongs to
+            // another season, so the rebuild would commit a playoff-less schedule and
+            // ScheduleMembershipGuard would reject every real playoff boxscore.
+            // Requiring skippedCount > 0 keeps this off the legitimate zero-row case —
+            // early in the Playoffs phase JSB has not seeded the bracket yet, so an
+            // export with no playoff rows at all is expected and must not be fatal.
+            if ($this->season->phase === self::PLAYOFF_PHASE && $insertedCount === 0) {
+                throw new \RuntimeException(
+                    "Schedule.htm at {$scheduleHtmPath} contains only stale playoff rows from year(s) {$years}"
+                    . " — refusing to rebuild `ibl_schedule` during the Playoffs phase without playoff games"
+                    . " for {$this->season->endingYear}. Export a current Schedule.htm from JSB and re-run."
+                );
+            }
         }
 
         return $log;

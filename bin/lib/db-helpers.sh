@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Shared database helper functions for Docker MariaDB interactions.
 # Source this from scripts that exec commands in DB containers.
 #

@@ -14,6 +14,12 @@
 #     start of every stream-json session — must NOT produce a COMPACTION line
 #   - regression: tool: and exit: lines still emit (the new arm didn't break them)
 #
+# It also pins the closing-text fix: the log's last human-readable line must be the
+# run's LAST assistant message, not the `result` event's `.result` field. `.result`
+# is snapshotted at the run's first end_turn, so on any run that yields to a
+# background Agent it holds a stale "waiting for the review agents" line and makes a
+# completed run look truncated.
+#
 # Run: bin/test-automouse-stream-filter  (exit 0 = all pass, 1 = a case failed)
 
 set -u
@@ -108,6 +114,40 @@ OUT=$(run_filter '{"type":"assistant","message":{"content":[{"type":"tool_use","
 ')
 assert_contains "c7a-noPhase-bare-slug" "$OUT" "test-plan tool: Bash"
 assert_not_contains "c7b-noPhase-no-slash" "$OUT" "test-plan/"
+
+# A `result` event carrying the stale first-end_turn snapshot in `.result`.
+RESULT_LINE_STALE='{"type":"result","subtype":"success","result":"Review agents running. Waiting for their results.","stop_reason":"end_turn","num_turns":1,"duration_ms":1000,"total_cost_usd":0.01,"usage":{"input_tokens":1,"output_tokens":1}}'
+
+# c8 — the closing line is the last assistant message; the stale `.result` snapshot
+# is dropped. This is the bug that made completed post-plan runs read as if they had
+# exited before their review agents returned.
+OUT=$(run_filter '{"type":"assistant","message":{"content":[{"type":"text","text":"Review agents running. Waiting for their results."}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"Post-plan complete. PR is open, CI green."}]}}
+'"$RESULT_LINE_STALE"'
+')
+assert_contains "c8a-prints-final-assistant-text" "$OUT" "Post-plan complete. PR is open, CI green."
+assert_not_contains "c8b-drops-stale-result-snapshot" "$OUT" "Waiting for their results."
+
+# c9 (fallback) — a run with no assistant text still prints `.result`
+OUT=$(run_filter "$RESULT_LINE_STALE"'
+')
+assert_contains "c9-falls-back-to-result-field" "$OUT" "Review agents running."
+
+# c10 (negative) — a trailing `thinking` block is never the closing text, and
+# thinking content is never logged at all
+OUT=$(run_filter '{"type":"assistant","message":{"content":[{"type":"text","text":"Real final answer."}]}}
+{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"internal musing"}]}}
+'"$RESULT_LINE_STALE"'
+')
+assert_contains "c10a-thinking-does-not-clobber" "$OUT" "Real final answer."
+assert_not_contains "c10b-thinking-never-logged" "$OUT" "internal musing"
+
+# c11 (negative) — a whitespace-only text block does not clobber the real message
+OUT=$(run_filter '{"type":"assistant","message":{"content":[{"type":"text","text":"Real final answer."}]}}
+{"type":"assistant","message":{"content":[{"type":"text","text":"   "}]}}
+'"$RESULT_LINE_STALE"'
+')
+assert_contains "c11-whitespace-does-not-clobber" "$OUT" "Real final answer."
 
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"

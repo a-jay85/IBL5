@@ -10,6 +10,16 @@ TOOL_COUNT=0
 PEAK_CTX=0
 TURN_COUNT=1
 START_EPOCH=$(date +%s)
+# Last non-empty assistant *text* block seen on the stream. The `result` event's
+# `.result` field is a snapshot the harness takes when the main loop FIRST yields,
+# so for any run that hands off to a background `Agent` (every /post-plan run with
+# parallel review agents) that snapshot is the "waiting for the review agents" line
+# rather than the run's real closing message. Assistant text is otherwise never
+# logged, so that stale line became the log's last human-readable output and made
+# fully-completed runs look like they had exited before their agents returned.
+# Track the real final message ourselves and print that instead. Sub-agent messages
+# never reach the parent stream, so this only ever holds the main loop's own text.
+LAST_TEXT=""
 
 # Line prefix: the elapsed timestamp, plus the active plan slug when one was
 # passed. Concurrent runners interleave into per-day logs, so the slug column
@@ -44,6 +54,15 @@ while IFS= read -r line; do
                 TOOL_COUNT=$(( TOOL_COUNT + 1 ))
                 printf '%s tool: %s (#%d, turn %d)\n' "$(line_prefix)" "$tool_name" "$TOOL_COUNT" "$TURN_COUNT"
             fi
+            # Text blocks only — `thinking` blocks are not the run's answer, and a
+            # whitespace-only block must not clobber a real preceding message.
+            msg_text=$(printf '%s' "$line" | jq -r '
+                [ .message.content[]? | select(.type=="text") | .text ]
+                | join("\n")
+            ' 2>/dev/null) || msg_text=""
+            case "$msg_text" in
+                *[![:space:]]*) LAST_TEXT="$msg_text" ;;
+            esac
             ctx=$(printf '%s' "$line" | jq -r '
                 [ (.message.usage // {}) ] + ((.message.usage.iterations // []))
                 | map( ((.input_tokens // 0)|tonumber)
@@ -88,7 +107,9 @@ while IFS= read -r line; do
             ;;
         result)
             result_text=$(printf '%s' "$line" | jq -r '.result // empty' 2>/dev/null) || true
-            if [ -n "$result_text" ]; then
+            if [ -n "$LAST_TEXT" ]; then
+                printf '%s\n' "$LAST_TEXT"
+            elif [ -n "$result_text" ]; then
                 printf '%s\n' "$result_text"
             fi
             stop_reason=$(printf '%s' "$line" | jq -r '.stop_reason // "unknown"' 2>/dev/null) || true

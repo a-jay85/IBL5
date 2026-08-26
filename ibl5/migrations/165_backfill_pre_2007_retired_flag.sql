@@ -15,7 +15,7 @@ UPDATE ibl_plr
    SET retired = 1
  WHERE pid IN (
     931  -- Brandon Roy: required; a manual production fix was blocked
-    -- Scope is deliberately this one pid. The remaining 237 reviewed candidates
+    -- Scope is deliberately this one pid. The remaining 233 reviewed candidates
     -- are NOT folded in here: cohort membership is a human judgment that was
     -- not settled in time for this PR, and the runner keys `migrations` on
     -- filename, so editing 165 after it applies would be silently inert.

@@ -283,7 +283,7 @@ last_verified: 2026-08-25
 | 2 | `.claude/skills/post-plan/SKILL.md:121` (the generator itself) | yes | yes | not fixed — filed (ship-pipeline surface; wants a `/plan`) |
 | 3 | `.claude/skills/post-plan/SKILL.md:276` — fallback clause says "automated tests", type-agnostic | near-miss | yes | not fixed — correct as written; names no specific type |
 | 4 | `.claude/skills/plan/SKILL.md:288` | near-miss | yes | not fixed — this is the documented warning, not an occurrence |
-| 5 | `.claude/skills/pr-ready/SKILL.md` — Invariants § "**Exempt:** any command passed to `Monitor`, which is not gated" | yes | yes | not fixed — filed (measured false 2026-08-25: the inline watcher was refused with "too complex to verify that it stays inside the worktree"; it had to be written to a `/tmp` script and run as `bash /tmp/...`) |
+| 5 | `.claude/skills/pr-ready/SKILL.md` — Invariants § "**Exempt:** any command passed to `Monitor`, which is not gated" | yes | yes | **already fixed on master** — independently found and shipped the same day as [E14](dev-efficiency-backlog.md) via #1991, which deleted the clause. Measured false here first (2026-08-25: the inline watcher was refused with "too complex to verify that it stays inside the worktree" and had to be written to a `/tmp` script), then confirmed resolved on rebase. Retained as evidence the class generalises beyond the `post-plan` generator. |
 
 **prevention ladder:**
 - rung 0 — already covered? No. `bin/lib/pr-armable.sh` prefix-matches the sentinel and never reads the tail clause; `bin/check-docs` does not read PR bodies at all.
@@ -295,7 +295,7 @@ last_verified: 2026-08-25
 
 Rung 1 does not require the `.claude/rules/meta-tooling-bar.md` extend-before-add conditions (those bind rungs 3–5), and it *is* the extend-before-add outcome those conditions push toward.
 
-**artifact destination:** `bin/lib/pr-armable.sh` (in-repo, appears in the PR diff), locked by `ibl5/tests/Cli/PrArmableLibCliTest.php`. A companion one-line correction to the template at `.claude/skills/post-plan/SKILL.md:121` ships with it. Occurrence 5 is a prose-only correction to `.claude/skills/pr-ready/SKILL.md` (delete the `Monitor` exemption clause; the skill's later phases are already written substitution-free, so nothing else changes) — no gate lands for it, because the invariant it contradicts is already the safe default.
+**artifact destination:** `bin/lib/pr-armable.sh` (in-repo, appears in the PR diff), locked by `ibl5/tests/Cli/PrArmableLibCliTest.php`. A companion one-line correction to the template at `.claude/skills/post-plan/SKILL.md:121` ships with it. Occurrence 5 needs no artifact — #1991 already deleted the clause (dev-efficiency E14, ✅ Implemented 2026-08-25). Two independent discoveries of the same class on the same day is itself the argument for rung 1: prose asserting an environment fact is not self-checking, so it drifts silently until something trips over it.
 
 **Suggested direction:** Change the `.claude/skills/post-plan/SKILL.md:121` template to a type-agnostic clause ("all changes are covered by automated tests", matching line 276), and extend `pr_manual_testing_clearance` to fail closed when the tail clause names a test type with no corresponding file in the PR's changed-file list.
 

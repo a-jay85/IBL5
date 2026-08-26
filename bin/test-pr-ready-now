@@ -38,6 +38,13 @@ printf '#!/usr/bin/env bash\nexit 0\n' > "$SCRATCH/.local/bin/claude-stub"
 chmod +x "$SCRATCH/.local/bin/claude-stub"
 CLAUDE_STUB="$SCRATCH/.local/bin/claude-stub"
 
+# Long-lived process fixture. The reap cases need a process that carries a launchd label in
+# its argv and outlives the driver's poll tick. It must be a REAL script: `bash -c 'sleep N'`
+# exec-optimizes into sleep itself, which drops the trailing argv and makes the label vanish.
+printf '#!/usr/bin/env bash\nsleep "${SLEEP_SECS:-12}"\n' > "$SCRATCH/.local/bin/pr-ready-now-sleeper"
+chmod +x "$SCRATCH/.local/bin/pr-ready-now-sleeper"
+SLEEPER="$SCRATCH/.local/bin/pr-ready-now-sleeper"
+
 # Worktree listing fixture. The driver's pre-flight check greps this for "[<branch>]";
 # without it the check falls back to the REAL `git worktree list`, where none of the
 # fixture branches exist, and every fixture PR would skip as "no worktree".
@@ -757,6 +764,10 @@ out="$(run_driver --help 2>&1)"; rc=$?
 grep -q -- '--pr-attack' <<< "$out" || fail "usage-not-truncated: --help omits --pr-attack"
 grep -q -- '--top-n' <<< "$out" || fail "usage-not-truncated: --help omits --top-n"
 grep -q -- '--wait' <<< "$out" || fail "usage-not-truncated: --help omits --wait"
+# --stop-all is the last-added header line, so it is the truncation canary. --stop is matched
+# with the trailing ` N` because a bare `--stop` would also be satisfied by `--stop-all`.
+grep -q -- '--stop N' <<< "$out" || fail "usage-not-truncated: --help omits --stop"
+grep -q -- '--stop-all' <<< "$out" || fail "usage-not-truncated: --help omits --stop-all"
 end_case usage-not-truncated
 
 # --- case 28: seam-master-sha-unset-vs-empty ---------------------------------------------
@@ -821,6 +832,177 @@ v="$(field "$P1910" "StandardOutPath")"
 grep -qE '\$\{?HOME|\$\{?ROOT|\$\{?LABEL' "$P1910" && \
     fail "plist-shape-under-attack-selection: plist contains unexpanded shell variable"
 end_case plist-shape-under-attack-selection
+
+# (case 31 was the L34 characterization: it asserted the buggy reaper freeing a live slot.
+#  Deleted with the fix — case 32 is its inverse and is the permanent regression guard.)
+
+# --- case 32: reap-respects-live-process -------------------------------------------------
+# 32a: a plist whose process is ALIVE survives the first reap → the wait block actually waits.
+# 32b: once that process exits, the next iteration DOES reap it → live_slots reaches 0.
+# The 12s stub straddles the wait block's `sleep 20`: iteration 1 (t≈0) preserves, iteration 2
+# (t≈20) reaps. A longer stub would loop to CEILING_SECS=7200 and hang the harness.
+begin_case
+clean_slots
+mkdir -p "$SCRATCH/Library/LaunchAgents"
+: > "$SCRATCH/Library/LaunchAgents/com.ibl5.pr-ready-now-9001.plist"
+clear_live_labels
+( SLEEP_SECS=12 "$SLEEPER" --name com.ibl5.pr-ready-now-9001 >/dev/null 2>&1 & )
+sleep 0.5
+pgrep -f "name com.ibl5.pr-ready-now-9001$" >/dev/null 2>&1 \
+    || fail "reap-respects-live-process: sleeper fixture never started"
+out="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" run_driver --go --wait 2>&1)"; rc=$?
+pkill -f "name com.ibl5.pr-ready-now-9001$" 2>/dev/null || true
+[[ $rc -eq 0 ]] || fail "reap-respects-live-process: exit $rc (out: $out)"
+grep -qE 'waiting for [0-9]+ session' <<< "$out" \
+    || fail "32a: reaped a slot whose process was alive — L34 has regressed (out: $out)"
+grep -qF 'reaped stale slot com.ibl5.pr-ready-now-9001' <<< "$out" \
+    || fail "32b: never reaped the slot after its process exited (out: $out)"
+[[ "$(plist_count)" -eq 0 ]] || fail "32b: drained to $(plist_count) plists, want 0"
+clean_slots
+end_case reap-respects-live-process
+
+# --- case 32c: reap-fails-closed-on-broken-pgrep -----------------------------------------
+# A pgrep that ERRORS (exit 2 — how procps rejects a BSD-only flag) must read as ALIVE.
+# Reading an error as "dead" is exactly how a portability slip would silently restore L34.
+# Because failing closed means the wait block never drains, the driver is bounded and killed
+# rather than waited on; the assertion is on the surviving plist, not on the exit code.
+begin_case
+clean_slots
+mkdir -p "$SCRATCH/Library/LaunchAgents"
+: > "$SCRATCH/Library/LaunchAgents/com.ibl5.pr-ready-now-9001.plist"
+clear_live_labels
+printf '#!/usr/bin/env bash\necho "pgrep: invalid option" >&2\nexit 2\n' > "$SCRATCH/.local/bin/pgrep"
+chmod +x "$SCRATCH/.local/bin/pgrep"
+PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" run_driver --go --wait >/dev/null 2>&1 &
+_p=$!
+sleep 25
+kill "$_p" 2>/dev/null || true
+wait "$_p" 2>/dev/null || true
+rm -f "$SCRATCH/.local/bin/pgrep"
+[[ -e "$SCRATCH/Library/LaunchAgents/com.ibl5.pr-ready-now-9001.plist" ]] \
+    || fail "32c: reaped a slot on a pgrep ERROR exit — the probe is not failing closed"
+clean_slots
+end_case reap-fails-closed-on-broken-pgrep
+
+# --- case 33: stop-flag-validation -------------------------------------------------------
+# Every malformed or mode-conflicting invocation exits nonzero AND says why. A stop verb that
+# exits 0 having done nothing is the worst outcome: the operator believes the run is dead.
+begin_case
+while IFS= read -r bad; do
+    [[ -n "$bad" ]] || continue
+    # shellcheck disable=SC2086  # word splitting is the mechanism under test
+    out="$(run_driver $bad 2>&1)"; rc=$?
+    [[ $rc -ne 0 ]] || fail "stop-flag-validation: '$bad' exited 0, want nonzero (out: $out)"
+    grep -q 'ERROR' <<< "$out" || fail "stop-flag-validation: '$bad' printed no ERROR (out: $out)"
+done <<'BADFORMS'
+--stop
+--stop 0
+--stop abc
+--stop 1901 --go
+--stop 1901 --dry-run
+--stop 1901 --wait
+--stop 1901 --pr 1902
+--stop 1901 --stop-all
+--stop-all --stop 1901
+BADFORMS
+# `--stop ""` parses cleanly — the empty list has to be caught by the post-loop check, not the
+# per-element regex, or the run exits 0 having stopped nothing.
+out="$(run_driver --stop "" 2>&1)"; rc=$?
+[[ $rc -ne 0 ]] || fail "stop-flag-validation: '--stop \"\"' exited 0, want nonzero (out: $out)"
+grep -q 'ERROR' <<< "$out" || fail "stop-flag-validation: '--stop \"\"' printed no ERROR (out: $out)"
+end_case stop-flag-validation
+
+# Cases 34-36 use PR numbers 9002/19002/9003, chosen far above the live PR range (~1900),
+# because /tmp is NOT scoped by the harness's scratch HOME. A fixture number that collided
+# with a real in-flight PR would let the suite delete a real run's state.
+
+# --- case 34: stop-e2e -------------------------------------------------------------------
+# The whole point of L34: --stop must kill the process, release the slot exactly once, clear
+# the scratch, and preserve the log.
+begin_case
+clean_slots
+mkdir -p "$SCRATCH/Library/LaunchAgents"
+: > "$SCRATCH/Library/LaunchAgents/com.ibl5.pr-ready-now-9002.plist"
+printf 'stale baseline\n' > /tmp/pr-ready-diff-pre-9002.patch
+printf 'partial run\n'    > /tmp/pr-ready-now-9002.log
+TMP_LOGS+=("/tmp/pr-ready-diff-pre-9002.patch" "/tmp/pr-ready-now-9002.log" "/tmp/pr-ready-now-9002.log.aborted")
+( SLEEP_SECS=120 "$SLEEPER" --name com.ibl5.pr-ready-now-9002 >/dev/null 2>&1 & )
+sleep 0.5
+pgrep -f "name com.ibl5.pr-ready-now-9002$" >/dev/null 2>&1 \
+    || fail "stop-e2e: sleeper fixture never started — the case proves nothing"
+out="$(run_driver --stop 9002 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "stop-e2e: exit $rc (out: $out)"
+pgrep -f "name com.ibl5.pr-ready-now-9002$" >/dev/null 2>&1 \
+    && fail "stop-e2e: the process survived --stop (out: $out)"
+[[ ! -e "$SCRATCH/Library/LaunchAgents/com.ibl5.pr-ready-now-9002.plist" ]] \
+    || fail "stop-e2e: plist not removed — the slot was never released"
+[[ "$(plist_count)" -eq 0 ]] || fail "stop-e2e: live_slots sees $(plist_count), want 0"
+[[ ! -e /tmp/pr-ready-diff-pre-9002.patch ]] || fail "stop-e2e: /pr-ready scratch not cleared"
+[[ -e /tmp/pr-ready-now-9002.log.aborted ]] || fail "stop-e2e: log not preserved as .aborted"
+[[ ! -e /tmp/pr-ready-now-9002.log ]] || fail "stop-e2e: original log left in place"
+pkill -f "name com.ibl5.pr-ready-now-9002$" 2>/dev/null || true
+clean_slots
+# fire_pr pre-clear: stale scratch for a DEAD label is cleared; a LIVE label's is preserved.
+printf 'stale\n' > /tmp/pr-ready-diff-pre-1901.patch
+printf 'stale\n' > /tmp/pr-ready-diff-pre-11901.patch
+TMP_LOGS+=("/tmp/pr-ready-diff-pre-1901.patch" "/tmp/pr-ready-diff-pre-11901.patch")
+clean_slots
+out="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" PR_READY_NOW_DRY_RUN=1 run_driver --go 2>&1)"
+[[ ! -e /tmp/pr-ready-diff-pre-1901.patch ]] || fail "stop-e2e/pre-clear: stale scratch survived a fire"
+[[ -e /tmp/pr-ready-diff-pre-11901.patch ]] || fail "stop-e2e/pre-clear: glob is not PR-anchored — it ate 11901"
+( SLEEP_SECS=30 "$SLEEPER" --name com.ibl5.pr-ready-now-1902 >/dev/null 2>&1 & )
+sleep 0.5
+printf 'live\n' > /tmp/pr-ready-diff-pre-1902.patch
+TMP_LOGS+=("/tmp/pr-ready-diff-pre-1902.patch")
+out="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" PR_READY_NOW_DRY_RUN=1 run_driver --go 2>&1)"
+pkill -f "name com.ibl5.pr-ready-now-1902$" 2>/dev/null || true
+[[ -e /tmp/pr-ready-diff-pre-1902.patch ]] \
+    || fail "stop-e2e/pre-clear: deleted the scratch of a LIVE run"
+clean_slots
+end_case stop-e2e
+
+# --- case 35: stop-label-anchor ----------------------------------------------------------
+# --stop 9002 must NOT touch a live session for PR 19002. Unanchored `pgrep -f "name ...9002"`
+# matches 19002 on BOTH BSD and procps (measured) — on the kill path that is a SIGKILL against
+# the wrong run mid-publish. Never relax this into a positive-only check.
+begin_case
+clean_slots
+mkdir -p "$SCRATCH/Library/LaunchAgents"
+: > "$SCRATCH/Library/LaunchAgents/com.ibl5.pr-ready-now-19002.plist"
+( SLEEP_SECS=60 "$SLEEPER" --name com.ibl5.pr-ready-now-19002 >/dev/null 2>&1 & )
+sleep 0.5
+out="$(run_driver --stop 9002 2>&1)"; rc=$?
+pgrep -f "name com.ibl5.pr-ready-now-19002$" >/dev/null 2>&1 \
+    || fail "stop-label-anchor: --stop 9002 killed the live PR 19002 session (rc=$rc, out: $out)"
+[[ -e "$SCRATCH/Library/LaunchAgents/com.ibl5.pr-ready-now-19002.plist" ]] \
+    || fail "stop-label-anchor: --stop 9002 released PR 19002's slot"
+pkill -f "name com.ibl5.pr-ready-now-19002$" 2>/dev/null || true
+clean_slots
+end_case stop-label-anchor
+
+# --- case 36: stop-fails-closed ----------------------------------------------------------
+# If something survives KILL, --stop must exit nonzero and LEAVE the slot held. Releasing a
+# slot we cannot prove is free is the L34 corruption in a new costume.
+# Costs ~7s (2s grace + the 5s settle bound); that bound exists so this path terminates.
+begin_case
+clean_slots
+mkdir -p "$SCRATCH/Library/LaunchAgents"
+: > "$SCRATCH/Library/LaunchAgents/com.ibl5.pr-ready-now-9003.plist"
+printf 'scratch\n' > /tmp/pr-ready-diff-pre-9003.patch
+TMP_LOGS+=("/tmp/pr-ready-diff-pre-9003.patch")
+printf '#!/usr/bin/env bash\nexit 0\n' > "$SCRATCH/.local/bin/pgrep"   # "always alive"
+chmod +x "$SCRATCH/.local/bin/pgrep"
+out="$(run_driver --stop 9003 2>&1)"; rc=$?
+rm -f "$SCRATCH/.local/bin/pgrep"
+[[ $rc -ne 0 ]] || fail "stop-fails-closed: exited 0 with the process still alive (out: $out)"
+grep -q 'slot left occupied' <<< "$out" || fail "stop-fails-closed: no fail-closed message (out: $out)"
+[[ -e "$SCRATCH/Library/LaunchAgents/com.ibl5.pr-ready-now-9003.plist" ]] \
+    || fail "stop-fails-closed: released the slot without proving the process died"
+[[ -e /tmp/pr-ready-diff-pre-9003.patch ]] \
+    || fail "stop-fails-closed: cleared scratch for a run that may still be writing to it"
+clean_slots
+end_case stop-fails-closed
+
 
 # --- Phase 9: push-form proof against a local bare origin ---------------------------------
 # The Phase 2 fix replaces /pr-ready step 3's bare `--force-with-lease` with an explicit

@@ -4,7 +4,7 @@
 # Dry-run by default: prints the PRs it would process and exits. Nothing fires without --go.
 #
 # Usage:
-#   bin/pr-ready-now [--go] [--jobs N] [--pr N[,N...]] [--pr-attack FILE] [--top-n N] [--model M] [--dry-run] [--wait] [--help]
+#   bin/pr-ready-now [--go] [--jobs N] [--pr N[,N...]] [--pr-attack FILE] [--top-n N] [--model M] [--dry-run] [--wait] [--stop N[,N...]] [--stop-all] [--help]
 #
 #   --go          Actually fire. Without it the script only reports (default).
 #   --jobs N      Max concurrent sessions (default 3). Positive integer.
@@ -18,9 +18,13 @@
 #                 (all sessions finished). For use inside a detached wrapper only —
 #                 never from an interactive main-thread session (foreground poll loop is
 #                 a spend bug; see .claude/rules/work-triage.md). Times out at 7200s.
-#                 Known limitation L34 (loop-engineering-backlog.md): reap_stale() may
-#                 clear a plist whose claude process is still running, causing --wait to
-#                 break before all sessions have truly finished.
+#                 A slot is released only when its label is gone AND no process carries it,
+#                 so a run aborted without --stop holds its slot until the ceiling.
+#   --stop N[,N...]   Abort the fired session(s) for these PRs: bootout the launchd label,
+#                     TERM then KILL anything carrying --name <label>, release the slot
+#                     (remove the plist) and clear the PR's /tmp scratch. Exits nonzero and
+#                     LEAVES the slot held if a process survives KILL.
+#   --stop-all        Apply --stop to every PR currently holding a slot.
 #
 # Examples:
 #   bin/pr-ready-now                       # report what would run
@@ -71,10 +75,6 @@ set -euo pipefail
 export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin"
 
 CLAUDE_BIN="${PR_READY_NOW_CLAUDE:-$(command -v claude || true)}"
-[[ -n "$CLAUDE_BIN" && -x "$CLAUDE_BIN" ]] || {
-    echo "ERROR: claude binary not found on PATH (set PR_READY_NOW_CLAUDE to override)" >&2
-    exit 1
-}
 
 # --- ROOT pin ----------------------------------------------------------------------------
 # Resolve the MAIN checkout, never the worktree we happen to be standing in.
@@ -109,17 +109,20 @@ EFFORT=high
 PR_ATTACK_FILE=""
 TOP_N=5
 WAIT=0
+MODE=fire          # fire | stop | stop-all
+STOP_PRS=()
+SAW_DRY_RUN=0      # --dry-run only sets GO=0, which is indistinguishable from the default
 # Single ceiling for BOTH bounded poll loops (wait_for_slot and the --wait block).
 # Two independent literals would drift; one constant cannot.
 CEILING_SECS=7200
 
 # --- flag parsing ------------------------------------------------------------------------
-usage() { sed -n '2,63p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,67p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --go)      GO=1; shift ;;
-        --dry-run) GO=0; shift ;;
+        --dry-run) GO=0; SAW_DRY_RUN=1; shift ;;
         --jobs)
             [[ $# -ge 2 ]] || { echo "ERROR: --jobs requires a value" >&2; exit 1; }
             [[ "$2" =~ ^[1-9][0-9]*$ ]] || { echo "ERROR: --jobs must be a positive integer, got: $2" >&2; exit 1; }
@@ -140,6 +143,18 @@ while [[ $# -gt 0 ]]; do
         --model)
             [[ $# -ge 2 ]] || { echo "ERROR: --model requires a value" >&2; exit 1; }
             MODEL="$2"; shift 2 ;;
+        --stop)
+            [[ "$MODE" != "stop-all" ]] || { echo "ERROR: --stop and --stop-all are mutually exclusive" >&2; exit 2; }
+            [[ $# -ge 2 ]] || { echo "ERROR: --stop requires a value" >&2; exit 2; }
+            IFS=',' read -r -a _sprs <<< "$2"
+            for _s in ${_sprs[@]+"${_sprs[@]}"}; do
+                [[ "$_s" =~ ^[1-9][0-9]*$ ]] || { echo "ERROR: --stop expects positive integers, got: $_s" >&2; exit 2; }
+                STOP_PRS+=("$_s")
+            done
+            MODE=stop; shift 2 ;;
+        --stop-all)
+            [[ "$MODE" == "fire" ]] || { echo "ERROR: --stop and --stop-all are mutually exclusive" >&2; exit 2; }
+            MODE=stop-all; shift ;;
         -h|--help) usage; exit 0 ;;
         --) shift; break ;;
         *) echo "ERROR: unknown flag: $1" >&2; usage >&2; exit 1 ;;
@@ -152,6 +167,113 @@ done
 if [[ -n "$PR_ATTACK_FILE" && ${#EXPLICIT_PRS[@]} -gt 0 ]]; then
     echo "ERROR: --pr-attack and --pr are mutually exclusive" >&2; exit 2
 fi
+
+# The stop verbs are a distinct mode, not a modifier: combining them with a firing flag is
+# always a mistake, and silently ignoring one of the two is how a "stop" turns into a fire.
+if [[ "$MODE" != "fire" ]]; then
+    [[ "$GO" -eq 0 && "$SAW_DRY_RUN" -eq 0 ]] \
+        || { echo "ERROR: --stop/--stop-all cannot be combined with --go or --dry-run" >&2; exit 2; }
+    [[ -z "$PR_ATTACK_FILE" && ${#EXPLICIT_PRS[@]} -eq 0 && "$WAIT" -eq 0 ]] \
+        || { echo "ERROR: --stop/--stop-all cannot be combined with --pr, --pr-attack or --wait" >&2; exit 2; }
+    # `--stop ""` parses cleanly and would otherwise reach the dispatch with an empty list,
+    # exiting 0 having stopped nothing — the operator believes the run is dead when it is not.
+    [[ "$MODE" != "stop" || ${#STOP_PRS[@]} -gt 0 ]] \
+        || { echo "ERROR: --stop expects positive integers, got an empty list" >&2; exit 2; }
+fi
+
+# Liveness probe for a launchd label. Returns 0 = alive OR undecidable, 1 = provably dead.
+# Fail closed by construction: only pgrep's "no match" (exit 1) proves death. A missing pgrep,
+# or an error exit (procps rejects BSD-only flags with exit 2), reads as ALIVE — so a slot is
+# never freed, and a live session is never killed, on the strength of a broken probe.
+# The pattern is END-ANCHORED: `name com.ibl5.pr-ready-now-1901` unanchored also matches PR
+# 19011. `--name <label>` is the final argv element of caffeinate, timeout and claude alike.
+_label_alive() {
+    local label="$1" rc=0
+    command -v pgrep >/dev/null 2>&1 || return 0
+    if pgrep -f "name ${label}$" >/dev/null 2>&1; then
+        return 0
+    else
+        rc=$?      # must be read here: in a condition context set -e is suppressed
+    fi
+    [[ $rc -eq 1 ]] && return 1
+    return 0
+}
+
+# --- stop path (L34) ---------------------------------------------------------------------
+# `launchctl bootout` unloads the label but does NOT kill the reparented caffeinate → timeout
+# → claude chain, so bootout alone leaves the run burning tokens while the plist (the slot
+# token) disappears. Kill by label, verify death, THEN release the slot — in that order.
+stop_one_pr() {
+    local PR="$1"
+    local LABEL="com.ibl5.pr-ready-now-${PR}"
+    local PLIST="$HOME/Library/LaunchAgents/${LABEL}.plist"
+    local LOG="/tmp/pr-ready-now-${PR}.log"
+    # End-anchored: `name ...-1901` (unanchored) also matches a LIVE session for PR 19011,
+    # and on the kill path that means SIGKILLing the wrong run mid-publish.
+    local PAT="name ${LABEL}$"
+    local waited=0 keep=""
+
+    launchctl bootout "gui/$(id -u)/${LABEL}" 2>/dev/null || true
+    pkill -TERM -f "$PAT" 2>/dev/null || true
+    sleep 2                                    # grace: let claude flush its log and exit
+    pkill -KILL -f "$PAT" 2>/dev/null || true
+
+    # Fail closed: the slot is released ONLY once nothing carries the label. If something
+    # survives KILL we would rather over-count slots than hand a slot to a second session.
+    while _label_alive "$LABEL"; do
+        if [[ $waited -ge 5 ]]; then
+            echo "ERROR: PR #${PR}: a process still carries ${LABEL} after SIGKILL;" >&2
+            echo "       slot left occupied (${PLIST}); investigate before re-firing." >&2
+            return 1
+        fi
+        sleep 1; waited=$((waited + 1))
+    done
+
+    # Preserve the log for forensics under a name the NEXT fire's pre-clear will collect.
+    # It must be moved out of the glob's reach first: /tmp/pr-ready-now-<N>.log.aborted also
+    # matches /tmp/pr-ready-*-<N>.*, so a mv-then-rm would delete what it just preserved.
+    if [[ -f "$LOG" ]]; then
+        keep="$(mktemp /tmp/prn-keep.XXXXXX)"
+        mv -f "$LOG" "$keep"
+    fi
+    rm -f "$PLIST"                             # release the slot — exactly once
+    rm -f /tmp/pr-ready-*-"${PR}".*            # clear this PR's /pr-ready scratch
+    if [[ -n "$keep" ]]; then
+        mv -f "$keep" "${LOG}.aborted"
+    fi
+    echo "stopped PR #${PR}: process killed, slot released, scratch cleared"
+    return 0
+}
+
+stop_all() {
+    local f label pr rc=0 found=0
+    for f in "$HOME/Library/LaunchAgents"/com.ibl5.pr-ready-now-*.plist; do
+        [[ -e "$f" ]] || continue              # unmatched globs stay literal
+        found=1
+        label="$(basename "$f" .plist)"
+        pr="${label##*-}"
+        stop_one_pr "$pr" || rc=1              # aggregate: one stuck PR must not mask the rest
+    done
+    [[ "$found" -eq 1 ]] || echo "no pr-ready-now slots held; nothing to stop"
+    return "$rc"
+}
+
+if [[ "$MODE" != "fire" ]]; then
+    _stop_rc=0
+    if [[ "$MODE" == "stop-all" ]]; then
+        stop_all || _stop_rc=$?
+    else
+        for _p in "${STOP_PRS[@]}"; do stop_one_pr "$_p" || _stop_rc=1; done
+    fi
+    exit "$_stop_rc"
+fi
+
+# Checked HERE, not at assignment time: the stop verbs are an emergency abort and must keep
+# working on a machine where the claude binary has moved. Only the firing path needs it.
+[[ -n "$CLAUDE_BIN" && -x "$CLAUDE_BIN" ]] || {
+    echo "ERROR: claude binary not found on PATH (set PR_READY_NOW_CLAUDE to override)" >&2
+    exit 1
+}
 
 # --- attack_sha: extract master SHA from a /pr-attack output file -----------------------
 # The Base: header has one of two forms:
@@ -656,6 +778,26 @@ fire_pr() {
     local PROMPT="/tmp/pr-ready-now-prompt-${PR}.md"
     mkdir -p "$(dirname "$PLIST")"   # lets bin/test-pr-ready-now drive this on Linux CI
 
+    # A --stop that was itself interrupted can leave this PR's /pr-ready scratch behind, and a
+    # stale pr-ready-diff-pre-<N>.patch would be read as THIS run's baseline. Clear it — but
+    # only when the label is provably dead, so we can never delete a live run's working state.
+    # The glob is deliberately broad (a new /pr-ready scratch name is covered automatically);
+    # the driver's OWN three paths are excluded by name, because $PROMPT and $RUNNER are written
+    # just below and $LOG is read by the report phase — bin/test-pr-ready-now cases 21, 22 and 26
+    # pre-plant /tmp/pr-ready-now-<PR>.log for a PR they then fire.
+    # $LOG.aborted is deliberately NOT excluded: the previous abort's forensics are superseded
+    # the moment this PR is re-fired, and that is what bounds /tmp growth.
+    local _stale
+    if ! _label_alive "$LABEL"; then
+        for _stale in /tmp/pr-ready-*-"${PR}".*; do
+            [[ -e "$_stale" ]] || continue
+            case "$_stale" in
+                "$LOG"|"$PROMPT"|"$RUNNER") continue ;;
+            esac
+            rm -f "$_stale"
+        done
+    fi
+
     # BQ1 probed YES on 2026-08-21: disable-model-invocation gates the in-session Skill
     # tool, not the user position, so `claude -p "/pr-ready N"` resolves the slash command.
     printf '/pr-ready %s\n' "$PR" > "$PROMPT"
@@ -718,6 +860,10 @@ PLIST_EOF
 
 # --- concurrency cap ---------------------------------------------------------------------
 # The plist IS the slot token: the runner deletes it the moment claude returns.
+
+# _label_alive() (the liveness probe reap_stale and stop_one_pr share) is defined ABOVE the
+# stop dispatch: bash defines functions as it executes, so a definition down here would not
+# exist yet when the --stop path runs.
 live_slots() {
     local f n=0
     for f in "$HOME/Library/LaunchAgents"/com.ibl5.pr-ready-now-*.plist; do
@@ -727,7 +873,7 @@ live_slots() {
     printf '%s\n' "$n"
 }
 
-reap_stale() {   # plist on disk but no live label = the job died without self-cleaning
+reap_stale() {   # plist on disk, no live label AND no live process = the job really died
     # Under the test seam nothing is ever bootstrapped, so every plist would look stale
     # and the reaper would eat the very output the cap is counting.
     [[ -n "${PR_READY_NOW_DRY_RUN:-}" ]] && return 0
@@ -735,9 +881,12 @@ reap_stale() {   # plist on disk but no live label = the job died without self-c
     for f in "$HOME/Library/LaunchAgents"/com.ibl5.pr-ready-now-*.plist; do
         [[ -e "$f" ]] || continue
         label="$(basename "$f" .plist)"
-        launchctl list "$label" >/dev/null 2>&1 || { rm -f "$f"; echo "reaped stale slot $label"; }
+        launchctl list "$label" >/dev/null 2>&1 && continue   # label still live → keep the slot
+        _label_alive "$label" && continue                     # L34: claude still running → keep it
+        rm -f "$f"; echo "reaped stale slot $label"
     done
-}
+    return 0                                                  # a trailing failed test must not
+}                                                             # propagate out under set -e
 
 wait_for_slot() {
     local waited=0

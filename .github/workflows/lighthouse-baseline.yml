@@ -13,6 +13,12 @@ on:
       - 'Dockerfile'
       - 'docker-compose*.yml'
       - 'ibl5/.lighthouserc.json'
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Regenerate even if a fresh baseline already exists'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -21,9 +27,73 @@ concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false
 
+# The baseline audit is ~18 minutes of runner time (56 URLs x ~17s, collected
+# serially by lhci), and the paths filter above fires it on nearly every master
+# push — roughly twice a day. Neither consumer needs that cadence: the weekly
+# audit accepts a baseline up to 7 days old (lighthouse-audit.yml, "Check
+# baseline freshness"), and the PR comment (lighthouse.yml) only wants "recent
+# master", which is already a moving target between merges. So gate the audit on
+# artifact age and skip it when a fresh one exists, returning the runner time to
+# a contended pool. FRESH_HOURS is far tighter than either consumer requires, so
+# it collapses same-day merge bursts without letting the baseline drift.
+# Skipping makes this workflow's newest successful run artifact-less, so both
+# consumers set `search_artifacts: true` on their download step to walk back to
+# the newest run that actually published the manifest. Removing the gate is safe;
+# removing those flags without removing the gate silently drops the baseline.
+env:
+  FRESH_HOURS: 12
+
 jobs:
+  # Fail-open by design: if the artifact API is unreachable, returns nothing, or
+  # the latest baseline has expired, `stale` is true and the audit runs. A
+  # missing baseline is the expensive failure (lighthouse-audit.yml falls back to
+  # a full self-run; the PR comment silently drops its delta column), so every
+  # uncertain path must resolve toward regenerating.
+  freshness:
+    name: Check baseline freshness
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read   # required to list workflow artifacts
+    outputs:
+      stale: ${{ steps.check.outputs.stale }}
+    steps:
+      - name: Check age of latest baseline artifact
+        id: check
+        run: |
+          if [ "${{ inputs.force }}" = "true" ]; then
+            echo "Forced regeneration requested."
+            echo "stale=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          CREATED_AT=$(gh api \
+            "repos/${{ github.repository }}/actions/artifacts?name=lighthouse-baseline-manifest&per_page=100" \
+            --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at) | last | .created_at // empty' \
+            2>/dev/null || true)
+
+          if [ -z "$CREATED_AT" ]; then
+            echo "No unexpired baseline artifact found — regenerating."
+            echo "stale=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          AGE_HOURS=$(( ($(date -u +%s) - $(date -u -d "$CREATED_AT" +%s)) / 3600 ))
+          if [ "$AGE_HOURS" -lt "$FRESH_HOURS" ]; then
+            echo "Latest baseline is ${AGE_HOURS}h old (< ${FRESH_HOURS}h) — skipping audit."
+            echo "stale=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Latest baseline is ${AGE_HOURS}h old (>= ${FRESH_HOURS}h) — regenerating."
+            echo "stale=true" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   baseline:
     name: Generate baseline
+    needs: [freshness]
+    if: needs.freshness.outputs.stale == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:

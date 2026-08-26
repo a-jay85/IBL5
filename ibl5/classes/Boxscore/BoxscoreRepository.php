@@ -607,7 +607,7 @@ ORDER BY b.game_date";
                 $archive = $sourceArchive ?? '';
                 foreach ($toRecord as $reject) {
                     $this->execute(
-                        'INSERT INTO schedule_guard_rejects'
+                        'INSERT INTO `schedule_guard_rejects`'
                         . ' (season_year, game_date, visitor_teamid, home_teamid, game_of_that_day, reason, stored_game_of_that_day, source_archive)'
                         . ' VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
                         'isiiisss',

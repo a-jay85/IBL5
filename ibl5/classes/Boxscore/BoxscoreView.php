@@ -36,7 +36,7 @@ class BoxscoreView implements BoxscoreViewInterface
             <span class="ibl-badge ibl-badge--info"><?= (int) $result['gamesUpdated'] ?> Updated</span>
             <span class="ibl-badge ibl-badge--warning"><?= (int) $result['gamesSkipped'] ?> Skipped</span>
             <?php if (($result['gamesRejected'] ?? 0) > 0): ?>
-            <span class="ibl-badge ibl-badge--warning"><?= (int) $result['gamesRejected'] ?> Rejected</span>
+            <span class="ibl-badge ibl-badge--error"><?= (int) $result['gamesRejected'] ?> Rejected</span>
             <?php endif; ?>
             <span class="sco-summary__lines"><?= (int) $result['linesProcessed'] ?> lines processed</span>
         </div>

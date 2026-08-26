@@ -38,6 +38,13 @@ printf '#!/usr/bin/env bash\nexit 0\n' > "$SCRATCH/.local/bin/claude-stub"
 chmod +x "$SCRATCH/.local/bin/claude-stub"
 CLAUDE_STUB="$SCRATCH/.local/bin/claude-stub"
 
+# Long-lived process fixture. The reap cases need a process that carries a launchd label in
+# its argv and outlives the driver's poll tick. It must be a REAL script: `bash -c 'sleep N'`
+# exec-optimizes into sleep itself, which drops the trailing argv and makes the label vanish.
+printf '#!/usr/bin/env bash\nsleep "${SLEEP_SECS:-12}"\n' > "$SCRATCH/.local/bin/pr-ready-now-sleeper"
+chmod +x "$SCRATCH/.local/bin/pr-ready-now-sleeper"
+SLEEPER="$SCRATCH/.local/bin/pr-ready-now-sleeper"
+
 # Worktree listing fixture. The driver's pre-flight check greps this for "[<branch>]";
 # without it the check falls back to the REAL `git worktree list`, where none of the
 # fixture branches exist, and every fixture PR would skip as "no worktree".
@@ -821,6 +828,30 @@ v="$(field "$P1910" "StandardOutPath")"
 grep -qE '\$\{?HOME|\$\{?ROOT|\$\{?LABEL' "$P1910" && \
     fail "plist-shape-under-attack-selection: plist contains unexpanded shell variable"
 end_case plist-shape-under-attack-selection
+
+# --- case 31 (TRANSIENT — deleted in Phase 2): reap-frees-live-slot ----------------------
+# Characterization of L34: reap_stale() deletes a plist whose claude is STILL RUNNING.
+# Asserts the BUG, so it is green on unfixed code. Phase 2 deletes it and replaces it with
+# case 32, which asserts the fix.
+begin_case
+clean_slots
+mkdir -p "$SCRATCH/Library/LaunchAgents"
+: > "$SCRATCH/Library/LaunchAgents/com.ibl5.pr-ready-now-9001.plist"
+clear_live_labels     # launchctl list fails for the label → today's code calls it "stale"
+( SLEEP_SECS=30 "$SLEEPER" --name com.ibl5.pr-ready-now-9001 >/dev/null 2>&1 & )
+sleep 0.5
+pgrep -f "name com.ibl5.pr-ready-now-9001$" >/dev/null 2>&1 \
+    || fail "reap-frees-live-slot: sleeper fixture never started — the case proves nothing"
+out="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" run_driver --go --wait 2>&1)"; rc=$?
+pkill -f "name com.ibl5.pr-ready-now-9001$" 2>/dev/null || true
+[[ $rc -eq 0 ]] || fail "reap-frees-live-slot: exit $rc (out: $out)"
+[[ "$(plist_count)" -eq 0 ]] \
+    || fail "reap-frees-live-slot: expected the buggy reaper to free every slot, got $(plist_count)"
+grep -q 'waiting for' <<< "$out" \
+    && fail "reap-frees-live-slot: waited — the live process was already being respected"
+clean_slots
+end_case reap-frees-live-slot
+
 
 # --- Phase 9: push-form proof against a local bare origin ---------------------------------
 # The Phase 2 fix replaces /pr-ready step 3's bare `--force-with-lease` with an explicit

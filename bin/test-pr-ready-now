@@ -829,28 +829,56 @@ grep -qE '\$\{?HOME|\$\{?ROOT|\$\{?LABEL' "$P1910" && \
     fail "plist-shape-under-attack-selection: plist contains unexpanded shell variable"
 end_case plist-shape-under-attack-selection
 
-# --- case 31 (TRANSIENT — deleted in Phase 2): reap-frees-live-slot ----------------------
-# Characterization of L34: reap_stale() deletes a plist whose claude is STILL RUNNING.
-# Asserts the BUG, so it is green on unfixed code. Phase 2 deletes it and replaces it with
-# case 32, which asserts the fix.
+# (case 31 was the L34 characterization: it asserted the buggy reaper freeing a live slot.
+#  Deleted with the fix — case 32 is its inverse and is the permanent regression guard.)
+
+# --- case 32: reap-respects-live-process -------------------------------------------------
+# 32a: a plist whose process is ALIVE survives the first reap → the wait block actually waits.
+# 32b: once that process exits, the next iteration DOES reap it → live_slots reaches 0.
+# The 12s stub straddles the wait block's `sleep 20`: iteration 1 (t≈0) preserves, iteration 2
+# (t≈20) reaps. A longer stub would loop to CEILING_SECS=7200 and hang the harness.
 begin_case
 clean_slots
 mkdir -p "$SCRATCH/Library/LaunchAgents"
 : > "$SCRATCH/Library/LaunchAgents/com.ibl5.pr-ready-now-9001.plist"
-clear_live_labels     # launchctl list fails for the label → today's code calls it "stale"
-( SLEEP_SECS=30 "$SLEEPER" --name com.ibl5.pr-ready-now-9001 >/dev/null 2>&1 & )
+clear_live_labels
+( SLEEP_SECS=12 "$SLEEPER" --name com.ibl5.pr-ready-now-9001 >/dev/null 2>&1 & )
 sleep 0.5
 pgrep -f "name com.ibl5.pr-ready-now-9001$" >/dev/null 2>&1 \
-    || fail "reap-frees-live-slot: sleeper fixture never started — the case proves nothing"
+    || fail "reap-respects-live-process: sleeper fixture never started"
 out="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" run_driver --go --wait 2>&1)"; rc=$?
 pkill -f "name com.ibl5.pr-ready-now-9001$" 2>/dev/null || true
-[[ $rc -eq 0 ]] || fail "reap-frees-live-slot: exit $rc (out: $out)"
-[[ "$(plist_count)" -eq 0 ]] \
-    || fail "reap-frees-live-slot: expected the buggy reaper to free every slot, got $(plist_count)"
-grep -q 'waiting for' <<< "$out" \
-    && fail "reap-frees-live-slot: waited — the live process was already being respected"
+[[ $rc -eq 0 ]] || fail "reap-respects-live-process: exit $rc (out: $out)"
+grep -qE 'waiting for [0-9]+ session' <<< "$out" \
+    || fail "32a: reaped a slot whose process was alive — L34 has regressed (out: $out)"
+grep -qF 'reaped stale slot com.ibl5.pr-ready-now-9001' <<< "$out" \
+    || fail "32b: never reaped the slot after its process exited (out: $out)"
+[[ "$(plist_count)" -eq 0 ]] || fail "32b: drained to $(plist_count) plists, want 0"
 clean_slots
-end_case reap-frees-live-slot
+end_case reap-respects-live-process
+
+# --- case 32c: reap-fails-closed-on-broken-pgrep -----------------------------------------
+# A pgrep that ERRORS (exit 2 — how procps rejects a BSD-only flag) must read as ALIVE.
+# Reading an error as "dead" is exactly how a portability slip would silently restore L34.
+# Because failing closed means the wait block never drains, the driver is bounded and killed
+# rather than waited on; the assertion is on the surviving plist, not on the exit code.
+begin_case
+clean_slots
+mkdir -p "$SCRATCH/Library/LaunchAgents"
+: > "$SCRATCH/Library/LaunchAgents/com.ibl5.pr-ready-now-9001.plist"
+clear_live_labels
+printf '#!/usr/bin/env bash\necho "pgrep: invalid option" >&2\nexit 2\n' > "$SCRATCH/.local/bin/pgrep"
+chmod +x "$SCRATCH/.local/bin/pgrep"
+PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" run_driver --go --wait >/dev/null 2>&1 &
+_p=$!
+sleep 25
+kill "$_p" 2>/dev/null || true
+wait "$_p" 2>/dev/null || true
+rm -f "$SCRATCH/.local/bin/pgrep"
+[[ -e "$SCRATCH/Library/LaunchAgents/com.ibl5.pr-ready-now-9001.plist" ]] \
+    || fail "32c: reaped a slot on a pgrep ERROR exit — the probe is not failing closed"
+clean_slots
+end_case reap-fails-closed-on-broken-pgrep
 
 
 # --- Phase 9: push-form proof against a local bare origin ---------------------------------

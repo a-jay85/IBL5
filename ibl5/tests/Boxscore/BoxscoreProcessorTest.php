@@ -210,20 +210,52 @@ class BoxscoreProcessorTest extends TestCase
      * 2-char visitor, 2-char home, 5-char attendance, 5-char capacity,
      * then W/L and quarter scores to fill 58 chars total.
      */
-    private function buildGameInfoLine(int $monthOffset = 0, int $dayOffset = 14): string
+    private function buildGameInfoLine(int $monthOffset = 0, int $dayOffset = 14, int $gameOfDay = 0, int $visitorIndex = 0, int $homeIndex = 1): string
     {
         // Month offset (0=Oct), day offset (0=day 1), game#=0, visitor=0, home=1
-        $line = sprintf('%02d', $monthOffset)  // month offset from Oct
-              . sprintf('%02d', $dayOffset)     // day offset (0-indexed)
-              . '00'                            // game of that day
-              . '00'                            // visitor team (0-indexed → teamid 1)
-              . '01'                            // home team (0-indexed → teamid 2)
-              . '18000'                         // attendance
-              . '20000'                         // capacity
-              . '1005'                          // visitor wins/losses
-              . '0510'                          // home wins/losses
-              . '025030028027000'               // visitor quarter scores (5x3 chars)
-              . '022031025030000';              // home quarter scores (5x3 chars)
+        $line = sprintf('%02d', $monthOffset)   // month offset from Oct
+              . sprintf('%02d', $dayOffset)      // day offset (0-indexed)
+              . sprintf('%02d', $gameOfDay)      // game of that day (0-indexed)
+              . sprintf('%02d', $visitorIndex)   // visitor team (0-indexed → teamid = index+1)
+              . sprintf('%02d', $homeIndex)      // home team (0-indexed → teamid = index+1)
+              . '18000'                          // attendance
+              . '20000'                          // capacity
+              . '1005'                           // visitor wins/losses
+              . '0510'                           // home wins/losses
+              . '025030028027000'                // visitor quarter scores (5x3 chars)
+              . '022031025030000';               // home quarter scores (5x3 chars)
+
+        return $line;
+    }
+
+    /**
+     * Build a game-info line from a concrete calendar date and teamid triple.
+     *
+     * Computes the month/day/gotd/team offsets from the given values and
+     * self-checks the round-trip via Boxscore::withGameInfoLine to catch any
+     * formula mistake at test-authoring time.
+     *
+     * monthOffset formula: ((month - 10) + 12) % 12
+     *   Oct=0, Nov=1, Dec=2, Jan=3, Feb=4, Mar=5, Apr=6, May=7, Jun=8
+     */
+    private function gameInfoLineForGame(
+        string $isoDate,
+        int $gameOfThatDay,
+        int $visitorTeamid,
+        int $homeTeamid,
+        int $seasonEndingYear,
+    ): string {
+        $monthOffset  = (((int) substr($isoDate, 5, 2)) - 10 + 12) % 12;
+        $dayOffset    = ((int) substr($isoDate, 8, 2)) - 1;
+        $gameOfDay    = $gameOfThatDay - 1;
+        $visitorIndex = $visitorTeamid - 1;
+        $homeIndex    = $homeTeamid - 1;
+
+        $line = $this->buildGameInfoLine($monthOffset, $dayOffset, $gameOfDay, $visitorIndex, $homeIndex);
+
+        // Self-check: round-trip must recover the original date.
+        $probe = Boxscore::withGameInfoLine($line, $seasonEndingYear, 'Regular Season/Playoffs', 'ibl');
+        self::assertSame($isoDate, $probe->gameDate, 'gameInfoLineForGame offset arithmetic is wrong');
 
         return $line;
     }
@@ -1260,9 +1292,17 @@ class BoxscoreProcessorTest extends TestCase
      * The game contains 2 team total rows (playerID=0) and 2 player rows.
      * This is enough to exercise the insert/skip/update code paths.
      */
+    /** @param string[] $gameInfoLines */
+    private function buildScoFileWithGames(array $gameInfoLines): string
+    {
+        $records = array_map(fn (string $line): string => $this->buildGameRecord($line), $gameInfoLines);
+
+        return $this->buildScoFile($records);
+    }
+
     private function buildScoFileWithOneGame(string $gameInfoLine): string
     {
-        return $this->buildScoFile([$this->buildGameRecord($gameInfoLine)]);
+        return $this->buildScoFileWithGames([$gameInfoLine]);
     }
 
     /**

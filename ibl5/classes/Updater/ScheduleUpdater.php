@@ -26,6 +26,9 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
     private const UNPLAYED_BOX_ID = 100000;
 
+    /** Season phase whose schedule rows exist ONLY in Schedule.htm. */
+    private const PLAYOFF_PHASE = 'Playoffs';
+
     /** @var array<int, string> Calendar month number to name for date string construction */
     private const MONTH_NAMES = [
         1 => 'January',
@@ -151,7 +154,12 @@ class ScheduleUpdater extends \BaseMysqliRepository {
      * JSB's Schedule.htm HTML export. This parses both played games (with
      * scores) and upcoming/unplayed games (no scores yet).
      *
+     * During the Playoffs phase an unreadable Schedule.htm is fatal: the postseason
+     * rows have no other source, so continuing would commit a playoff-less schedule.
+     *
      * @return string Log of inserted playoff games
+     *
+     * @throws \RuntimeException When Schedule.htm cannot be read during the Playoffs phase
      */
     private function insertPlayoffGamesFromScheduleHtm(): string
     {
@@ -168,11 +176,37 @@ class ScheduleUpdater extends \BaseMysqliRepository {
                 'season_ending_year' => $this->season->endingYear,
             ]);
 
+            // Playoff rows exist ONLY in this file. During the Playoffs phase a missing
+            // export means update() would commit a schedule with no postseason games,
+            // and ScheduleMembershipGuard then rejects every real playoff boxscore as
+            // "not in ibl_schedule". Throw so the enclosing transaction rolls back and
+            // the previous schedule — playoff rows included — survives intact.
+            if ($this->season->phase === self::PLAYOFF_PHASE) {
+                throw new \RuntimeException(
+                    "Schedule.htm not found at {$scheduleHtmPath} — refusing to rebuild `ibl_schedule` during the Playoffs phase without playoff games. Export Schedule.htm from JSB and re-run."
+                );
+            }
+
             return "Schedule.htm not found at {$scheduleHtmPath} — skipping playoff games<br>";
         }
 
         $html = file_get_contents($scheduleHtmPath);
         if ($html === false) {
+            $this->channelLogger->warning('ScheduleUpdater could not read Schedule.htm — no playoff games imported', [
+                'path' => $scheduleHtmPath,
+                'reason' => 'unreadable',
+                'league' => $leagueDir,
+                'season_phase' => $this->season->phase,
+                'season_ending_year' => $this->season->endingYear,
+            ]);
+
+            // Same rollback rationale as the missing-file branch above.
+            if ($this->season->phase === self::PLAYOFF_PHASE) {
+                throw new \RuntimeException(
+                    "Failed to read Schedule.htm at {$scheduleHtmPath} — refusing to rebuild `ibl_schedule` during the Playoffs phase without playoff games."
+                );
+            }
+
             return "Failed to read Schedule.htm — skipping playoff games<br>";
         }
 

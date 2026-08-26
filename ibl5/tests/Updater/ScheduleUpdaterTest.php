@@ -181,13 +181,27 @@ class ScheduleUpdaterTest extends TestCase
      * @param list<array{team_name: string, teamid: int}> $teams
      * @param list<array{date_slot: int, game_index: int, visitor: int, home: int, visitor_score: int, home_score: int}> $games
      */
-    private function createUpdaterForFullRun(array $teams, array $games): TestableScheduleUpdater
-    {
+    private function createUpdaterForFullRun(
+        array $teams,
+        array $games,
+        string $phase = 'Regular Season',
+        ?string $basePath = null,
+    ): TestableScheduleUpdater {
         $this->mockDb->setMockData($teams);
         $resolver = self::createStub(JsbSourceResolverInterface::class);
         $resolver->method('getContents')->willReturn($this->buildSchBytes($games));
 
-        return $this->createUpdater(sourceResolver: $resolver);
+        return $this->createUpdater(phase: $phase, sourceResolver: $resolver, basePath: $basePath);
+    }
+
+    /** Create an empty temp root so ibl/<league>/Schedule.htm is guaranteed absent. */
+    private function makeRootWithoutScheduleHtm(string $prefix): string
+    {
+        $root = sys_get_temp_dir() . '/' . uniqid($prefix, true);
+        mkdir($root, 0777, true);
+        $this->tempDirs[] = $root;
+
+        return $root;
     }
 
     public function testUpdateWrapsRebuildInCommittedTransaction(): void
@@ -410,13 +424,15 @@ class ScheduleUpdaterTest extends TestCase
         $this->assertStringContainsString('unparseable', $log);
     }
 
+    /**
+     * Outside the Playoffs phase a missing Schedule.htm costs nothing — there are no
+     * postseason rows to lose — so the import degrades gracefully instead of throwing.
+     */
     public function testMissingScheduleHtmReturnsGracefulMessageAndInsertsNothing(): void
     {
-        $root = sys_get_temp_dir() . '/' . uniqid('sch_missing_', true);
-        mkdir($root, 0777, true);
-        $this->tempDirs[] = $root;
+        $root = $this->makeRootWithoutScheduleHtm('sch_missing_');
 
-        $updater = $this->createUpdater('Playoffs', 2025, false, null, $root);
+        $updater = $this->createUpdater('Regular Season', 2025, false, null, $root);
         $this->mockDb->clearQueries();
 
         $log = $updater->exposedInsertPlayoffGamesFromScheduleHtm();
@@ -435,9 +451,7 @@ class ScheduleUpdaterTest extends TestCase
      */
     public function testMissingScheduleHtmLogsWarning(): void
     {
-        $root = sys_get_temp_dir() . '/' . uniqid('sch_missing_log_', true);
-        mkdir($root, 0777, true);
-        $this->tempDirs[] = $root;
+        $root = $this->makeRootWithoutScheduleHtm('sch_missing_log_');
 
         $logger = $this->createMock(\Psr\Log\LoggerInterface::class);
         $logger->expects($this->once())
@@ -448,14 +462,71 @@ class ScheduleUpdaterTest extends TestCase
                     return ($context['path'] ?? null) === $root . '/ibl/IBL/Schedule.htm'
                         && ($context['reason'] ?? null) === 'missing'
                         && ($context['league'] ?? null) === 'IBL'
-                        && ($context['season_phase'] ?? null) === 'Playoffs'
+                        && ($context['season_phase'] ?? null) === 'Regular Season'
                         && ($context['season_ending_year'] ?? null) === 2025;
                 }),
             );
 
-        $updater = $this->createUpdater('Playoffs', 2025, false, null, $root, $logger);
+        $updater = $this->createUpdater('Regular Season', 2025, false, null, $root, $logger);
 
         $updater->exposedInsertPlayoffGamesFromScheduleHtm();
+    }
+
+    /**
+     * Playoff rows exist ONLY in Schedule.htm, so during the Playoffs phase a missing
+     * export must be fatal rather than a warning: update() would otherwise commit a
+     * schedule with no postseason games and ScheduleMembershipGuard would then reject
+     * every real playoff boxscore as "not in ibl_schedule".
+     */
+    public function testMissingScheduleHtmThrowsDuringPlayoffs(): void
+    {
+        $root = $this->makeRootWithoutScheduleHtm('sch_missing_playoffs_');
+
+        $updater = $this->createUpdater('Playoffs', 2025, false, null, $root);
+
+        try {
+            $updater->exposedInsertPlayoffGamesFromScheduleHtm();
+            self::fail('a missing Schedule.htm during Playoffs must throw');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('Schedule.htm not found at', $e->getMessage());
+            $this->assertStringContainsString('Playoffs phase', $e->getMessage());
+        }
+    }
+
+    /**
+     * The throw must reach update()'s transaction so the DELETE is rolled back and the
+     * previous schedule — playoff rows included — survives a missing export.
+     */
+    public function testUpdateRollsBackWhenScheduleHtmIsMissingDuringPlayoffs(): void
+    {
+        $root = $this->makeRootWithoutScheduleHtm('sch_missing_rollback_');
+
+        $updater = $this->createUpdaterForFullRun(
+            [
+                ['team_name' => 'Alpha', 'teamid' => 1],
+                ['team_name' => 'Beta', 'teamid' => 2],
+            ],
+            [
+                ['date_slot' => 103, 'game_index' => 0, 'visitor' => 1, 'home' => 2, 'visitor_score' => 100, 'home_score' => 95],
+            ],
+            'Playoffs',
+            $root,
+        );
+
+        ob_start();
+        try {
+            $updater->update();
+            $threw = false;
+        } catch (\RuntimeException) {
+            $threw = true;
+        } finally {
+            ob_end_clean();
+        }
+
+        $log = $this->mockDb->getOperationLog();
+        $this->assertTrue($threw, 'update() must rethrow when Schedule.htm is missing during Playoffs');
+        $this->assertContains('ROLLBACK', $log, 'the DELETE must be rolled back');
+        $this->assertNotContains('COMMIT', $log, 'a schedule with no playoff rows must not commit');
     }
 }
 

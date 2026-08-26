@@ -16,9 +16,9 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-# shellcheck source=bin/lib/db-helpers.sh
+# shellcheck source=bin/lib/db-helpers.sh disable=SC1091
 source "$REPO_ROOT/bin/lib/db-helpers.sh"
-# shellcheck source=bin/lib/git-helpers.sh
+# shellcheck source=bin/lib/git-helpers.sh disable=SC1091
 source "$REPO_ROOT/bin/lib/git-helpers.sh"
 
 # ── Arg parsing (before any container check) ──────────────────────────────────

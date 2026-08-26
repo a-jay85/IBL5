@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Shared git-layout helpers.
 # Source this file from scripts that need canonical repo root resolution.
 #

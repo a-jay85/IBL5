@@ -31,7 +31,7 @@ Each sub-agent costs ~17–23K tokens (system prompt + rules + memory, loaded be
 
 **This gives the "~50 lines" threshold below a measured basis.** ~50 lines of output lands right around the measured p50 of 194 tokens — roughly 90× cheaper than the 17–23K a spawn costs before it does any work. The figure stands exactly as written; it was an estimate and is now an estimate the data agrees with.
 
-**The fat-tail batching rule *is* "minimize invocation count," applied to the tail.** `agent-tiering.md` § Fat-tail delegation says 2+ fat calls in one turn go into ONE `sonnet-4-6` spawn. That is not a competing directive: it names *which* calls are worth a spawn at all (the 5.2% carrying 43.6% of the residue) and then says to cover them with a single invocation. "Spawn for the tail" and "spawn as few times as possible" are the same instruction read from two ends.
+**The fat-tail batching rule *is* "minimize invocation count," applied to the tail.** `agent-tiering.md` § Fat-tail delegation lets two fat calls per turn through and denies the 3rd, routing it and the rest into ONE `sonnet-4-6` spawn. That is not a competing directive: it names *which* calls are worth a spawn at all (the 5.2% carrying 43.6% of the residue) and then says to cover them with a single invocation. "Spawn for the tail" and "spawn as few times as possible" are the same instruction read from two ends.
 
 **Read this as headroom, not as savings.** Break-even for this corpus is roughly 353 spawns; the same 139 sessions produced 135. We sit about 2.5× *below* break-even, so the finding is **unused delegation headroom** — room to route more of the fat tail through a sub-agent — not a token saving already banked and not cost pressure to relieve.
 

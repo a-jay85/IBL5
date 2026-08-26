@@ -1,6 +1,6 @@
 ---
 description: Which tier to pick for each sub-agent, plus the Sonnet 4.6 def-pins.
-last_verified: 2026-08-17
+last_verified: 2026-08-26
 ---
 
 # Agent Tiering
@@ -14,16 +14,18 @@ Tier every sub-agent (and every agent a plan spawns) by the reasoning the task a
 | **Haiku** | `model: "haiku"` | Command output, grep-and-format, mechanical lookups — answerable by running commands and reporting, without judging relevance. |
 | **Sonnet** | `subagent_type: "sonnet-4-6"`, omit `model` — see § Sonnet 4.6 pins | Synthesis: "is this finding relevant?", cross-file traces, semantic compliance checks, rename sweeps needing call-site judgment, review agents, backlog housekeeping, manual-test classification. Never pass `model: "sonnet"` — the alias now resolves to Sonnet 5. |
 | **Opus** | self (no delegation) | Novel reasoning, FK ordering, rule authoring, ADR writing, ambiguous test failures, final code review, open-ended diff-triage (Phase 6.5 bounded checklist: `agent-tiering-bounded-checklist.md`). Never delegate understanding. |
-| **Opus (delegated)** | `subagent_type: "plan-architect"` | Implementation **planning** only, via `/plan` Step 3 — three defs by ONE ordered precedence (mirrors Step 3): **`plan-architect-xhigh`** (`effort: xhigh`) FIRST for security surfaces, trust boundaries, destructive migrations, or a ship-pipeline **gate removal/weakening or bootstrap hazard** (`.claude/skills`, `.claude/rules`, `~/.claude/hooks`) — deleting, relaxing, or disabling an enforcement mechanism; *not* additive gates, decision-procedure-preserving prose, or mechanism/plumbing (full clause: `/plan` Step 3 check 1); else **`plan-architect-sonnet`** (`model: claude-sonnet-4-6`) for recipe-backed tasks; else the default **`plan-architect`** (`model: opus` + `effort: high`). Do **not** pass an inline `model` override — each def owns it. |
+| **Opus (delegated)** | `subagent_type: "plan-architect"` | Implementation **planning** only, via `/plan` Step 3 — three defs by ONE ordered precedence: **`plan-architect-xhigh`** (gate-removal, security, destructive — full trigger: `/plan` Step 3 check 1); **`plan-architect-sonnet`** (recipe-backed); **`plan-architect`** (Opus, default). Do **not** pass inline `model`. |
 | **Fable** | `model: "fable"` | Rung above Opus (~2× cost). Default to Opus; **never spawn Fable without prompting the user first**. Full gate: `agent-tiering-fable-gate.md`. |
 
 > **The boundary keys on task *type* (judgment vs. mechanical), not raw model capability** — a stronger Sonnet moves nothing across the line. Why: `agent-tiering-detail.md`.
 
+## Fat-tail delegation
+
+**Only the fat tail of tool results is worth a spawn.** A call is **fat** when it is a `Read` ≥ 8 KB, or a Bash command in: bare `cat`, `git log` with no bound, `find` with no limit, a full Playwright run. **Two fat calls per turn pass; the 3rd is denied** — batch it and the rest into ONE `Agent(subagent_type: "sonnet-4-6")` (omit `model`). Enforced by **Check F** in `~/.claude/hooks/output-guard.sh`; fails open; touch the override path from the deny message for a one-off. Evidence and reconciliation: `agent-tiering-detail.md` § Skip the Agent.
+
 ## `/plan` orchestrator model
 
-The `/plan` session model is a separate call from the rows above. Tier the orchestrator by the judgment it retains — single backlog item → **Sonnet**, multiple items in one pass → **Opus** (cross-item decomposition + dependency ordering). The `plan-architect` is Step-3-tiered (xhigh → sonnet → opus) regardless of orchestrator.
-
-**Default: don't run `/plan` inline from an Opus session — offload it.** Once the design thinking is done, run **`/plan-prompt`** (`.claude/skills/plan-prompt/SKILL.md`), which fires it via `bin/plan-now` as a **detached headless Sonnet 4.6 `/plan` session**. Sonnet orchestrates; the tier directive keeps the *design* on Opus. Stay inline only when the fork genuinely needs the human in the loop mid-run (`/plan` Step 3.5) and you can't pre-resolve it. Mechanics and evidence: `agent-tiering-detail.md` § `/plan` orchestrator model.
+Single backlog item → **Sonnet** orchestrator; multiple items → **Opus**. Default: offload via **`/plan-prompt`** → `bin/plan-now` (detached Sonnet run). Stay inline only when the user must weigh in mid-run. Mechanics and evidence: `agent-tiering-detail.md` § `/plan` orchestrator model.
 
 ## Sonnet 4.6 pins
 

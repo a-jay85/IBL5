@@ -62,21 +62,31 @@ class ProcessBoxscoresStep implements PipelineStepInterface
         $guardDisabled = ($scoResult['scheduleGuardEnabled'] ?? true) === false
             && ($scoResult['linesProcessed'] ?? 0) > 0;
 
-        $messages = $scoResult['messages'] ?? [];
+        // Only operator signals that the "Parse Results" card does NOT already show.
+        // The processor's own $scoResult['messages'], the reject headline/triples and
+        // the reject count are all rendered inside that card, so repeating them here
+        // was pure duplication.
+        /** @var list<string> $messages */
+        $messages = [];
         if ($guardDisabled) {
-            array_unshift($messages, self::GUARD_DISABLED_NOTICE);
+            $messages[] = self::GUARD_DISABLED_NOTICE;
         }
 
         $messages = [...$messages, ...$this->buildProvenanceWarnings($provenance, $scoResult)];
         $messages = [...$messages, ...$this->buildRejectMessages($rejectSummary)];
         $messages = [...$messages, ...$this->dispatchNotifications($rejectSummary, $guardDisabled)];
 
+        // The reject headline is the one top-level fact an operator must not have to
+        // expand a <details> to see; renderStepComplete prints $detail inline.
+        $detail = $rejectSummary->isEmpty() ? '' : $rejectSummary->headline();
+
         return StepResult::success(
             $this->getLabel(),
+            $detail,
             collapsibleLog: true,
             inlineHtml: $inlineHtml,
             messages: $messages,
-            messageErrorCount: $rejectSummary->count,
+            messageErrorCount: 0,
         );
     }
 
@@ -124,7 +134,12 @@ class ProcessBoxscoresStep implements PipelineStepInterface
     }
 
     /**
-     * Build reject detail lines for the operator message list.
+     * Build reject lines the "Parse Results" card cannot show.
+     *
+     * The card builds its own RejectSummary without $rejectsRecorded, so the audit
+     * note ("rejects were not written to the audit table") has no other surface.
+     * The headline / per-game triples / overflow line ARE on the card — emitting
+     * them here too was the duplication this method used to create.
      *
      * @return list<string>
      */
@@ -134,24 +149,9 @@ class ProcessBoxscoresStep implements PipelineStepInterface
             return [];
         }
 
-        /** @var list<string> $lines */
-        $lines = [];
-        $lines[] = $rejectSummary->headline();
-
-        foreach ($rejectSummary->triples() as $triple) {
-            $lines[] = '  rejected: ' . $triple;
-        }
-
-        if ($rejectSummary->overflowCount() > 0) {
-            $lines[] = sprintf('  ... and %d more.', $rejectSummary->overflowCount());
-        }
-
         $auditNote = $rejectSummary->auditNote();
-        if ($auditNote !== '') {
-            $lines[] = $auditNote;
-        }
 
-        return $lines;
+        return $auditNote !== '' ? [$auditNote] : [];
     }
 
     /**

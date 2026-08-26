@@ -97,19 +97,18 @@ class ProcessBoxscoresStepTest extends TestCase
         $step = new ProcessBoxscoresStep($processor, $view, $resolver);
         $result = $step->execute();
 
-        self::assertSame(2, $result->messageErrorCount);
+        // Reject headline / per-game triples / count all live on the "Parse Results"
+        // card now; the step must not duplicate them into the operator message list.
+        self::assertSame(0, $result->messageErrorCount);
 
-        $headline = null;
-        $rejectedLines = [];
         foreach ($result->messages as $msg) {
-            if (str_starts_with($msg, '2 game(s) rejected')) {
-                $headline = $msg;
-            } elseif (str_starts_with($msg, '  rejected:')) {
-                $rejectedLines[] = $msg;
-            }
+            self::assertStringStartsNotWith('2 game(s) rejected', $msg);
+            self::assertStringStartsNotWith('  rejected:', $msg);
         }
-        self::assertNotNull($headline);
-        self::assertCount(2, $rejectedLines);
+
+        // ...but the headline must stay visible at the step line, without expanding
+        // the collapsible log.
+        self::assertStringStartsWith('2 game(s) rejected', $result->detail);
     }
 
     public function testStillSucceedsWhenGamesAreRejected(): void
@@ -297,7 +296,7 @@ class ProcessBoxscoresStepTest extends TestCase
         $result = $step->execute();
 
         self::assertTrue($result->success, 'A Discord failure must not fail the step');
-        self::assertSame(2, $result->messageErrorCount, 'messageErrorCount must equal the reject count, not count Discord failures');
+        self::assertSame(0, $result->messageErrorCount, 'Reject count is shown on the Parse Results card, not counted here');
 
         $hasFailureMessage = false;
         foreach ($result->messages as $msg) {

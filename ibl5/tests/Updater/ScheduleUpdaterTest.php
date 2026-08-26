@@ -376,6 +376,10 @@ class ScheduleUpdaterTest extends TestCase
     // Phase 3: Guard tests — written post-impl (after Phase 2 guard is added)
     // -------------------------------------------------------------------------
 
+    /**
+     * Skip mechanics are phase-independent; asserted outside Playoffs because during
+     * Playoffs an all-stale export is fatal (see testStaleScheduleHtmThrowsDuringPlayoffs).
+     */
     public function testPlayoffRowsFromAPriorSeasonAreSkipped(): void
     {
         $html = $this->playoffHtml(2007, [
@@ -384,7 +388,7 @@ class ScheduleUpdaterTest extends TestCase
         ]);
         $basePath = $this->makeScheduleHtm($html);
 
-        $updater = $this->createUpdater('Playoffs', 2008, false, null, $basePath);
+        $updater = $this->createUpdater('Regular Season', 2008, false, null, $basePath);
         $updater->setTeamNameToIdMap(['Metros' => 1, 'Stars' => 2]);
         $this->mockDb->clearQueries();
 
@@ -408,7 +412,7 @@ class ScheduleUpdaterTest extends TestCase
             . "</table>";
         $basePath = $this->makeScheduleHtm($html);
 
-        $updater = $this->createUpdater('Playoffs', 2025, false, null, $basePath);
+        $updater = $this->createUpdater('Regular Season', 2025, false, null, $basePath);
         $updater->setTeamNameToIdMap(['Metros' => 1, 'Stars' => 2]);
         $this->mockDb->clearQueries();
 
@@ -527,6 +531,141 @@ class ScheduleUpdaterTest extends TestCase
         $this->assertTrue($threw, 'update() must rethrow when Schedule.htm is missing during Playoffs');
         $this->assertContains('ROLLBACK', $log, 'the DELETE must be rolled back');
         $this->assertNotContains('COMMIT', $log, 'a schedule with no playoff rows must not commit');
+    }
+
+    /**
+     * A stale export is as destructive as a missing one — every row belongs to another
+     * season, so the rebuild would commit a playoff-less schedule and the boxscore guard
+     * would reject the whole postseason. Must be fatal during Playoffs.
+     */
+    public function testStaleScheduleHtmThrowsDuringPlayoffs(): void
+    {
+        $html = $this->playoffHtml(2007, [
+            ['visitor' => 'Metros', 'home' => 'Stars', 'played' => true, 'box_id' => 6001],
+            ['visitor' => 'Stars', 'home' => 'Metros', 'played' => false],
+        ]);
+        $basePath = $this->makeScheduleHtm($html);
+
+        $updater = $this->createUpdater('Playoffs', 2008, false, null, $basePath);
+        $updater->setTeamNameToIdMap(['Metros' => 1, 'Stars' => 2]);
+
+        try {
+            $updater->exposedInsertPlayoffGamesFromScheduleHtm();
+            self::fail('an all-stale Schedule.htm during Playoffs must throw');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('only stale playoff rows', $e->getMessage());
+            $this->assertStringContainsString('2007', $e->getMessage(), 'message must name the file year');
+            $this->assertStringContainsString('2008', $e->getMessage(), 'message must name the current ending year');
+        }
+    }
+
+    /**
+     * Same fatal treatment when the year label cannot be parsed at all — an unreadable
+     * label is not evidence the rows belong to the current season.
+     */
+    public function testUnparseableYearOnlyScheduleHtmThrowsDuringPlayoffs(): void
+    {
+        $html = "<table>\n<tr><th>Post 1 07</th></tr>\n"
+            . "<tr><td><a href=\"t1.htm\">Metros</a></td><td></td>"
+            . "<td><a href=\"t2.htm\">Stars</a></td><td></td></tr>\n"
+            . "</table>";
+        $basePath = $this->makeScheduleHtm($html);
+
+        $updater = $this->createUpdater('Playoffs', 2025, false, null, $basePath);
+        $updater->setTeamNameToIdMap(['Metros' => 1, 'Stars' => 2]);
+
+        try {
+            $updater->exposedInsertPlayoffGamesFromScheduleHtm();
+            self::fail('an unparseable-year-only Schedule.htm during Playoffs must throw');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('only stale playoff rows', $e->getMessage());
+        }
+    }
+
+    /**
+     * The stale throw must reach update()'s transaction so the DELETE is rolled back.
+     */
+    public function testUpdateRollsBackWhenScheduleHtmIsStaleDuringPlayoffs(): void
+    {
+        $stale = $this->playoffHtml(2007, [
+            ['visitor' => 'Alpha', 'home' => 'Beta', 'played' => false],
+        ]);
+        $basePath = $this->makeScheduleHtm($stale);
+
+        $updater = $this->createUpdaterForFullRun(
+            [
+                ['team_name' => 'Alpha', 'teamid' => 1],
+                ['team_name' => 'Beta', 'teamid' => 2],
+            ],
+            [
+                ['date_slot' => 103, 'game_index' => 0, 'visitor' => 1, 'home' => 2, 'visitor_score' => 100, 'home_score' => 95],
+            ],
+            'Playoffs',
+            $basePath,
+        );
+
+        ob_start();
+        try {
+            $updater->update();
+            $threw = false;
+        } catch (\RuntimeException) {
+            $threw = true;
+        } finally {
+            ob_end_clean();
+        }
+
+        $log = $this->mockDb->getOperationLog();
+        $this->assertTrue($threw, 'update() must rethrow when Schedule.htm is stale during Playoffs');
+        $this->assertContains('ROLLBACK', $log, 'the DELETE must be rolled back');
+        $this->assertNotContains('COMMIT', $log, 'a schedule with no playoff rows must not commit');
+    }
+
+    /**
+     * An export carrying BOTH current and stale rows still imports the current ones.
+     * Nothing is lost, so warn rather than abort.
+     */
+    public function testMixedCurrentAndStaleScheduleHtmImportsCurrentRowsDuringPlayoffs(): void
+    {
+        $current = $this->playoffHtml(2008, [
+            ['visitor' => 'Metros', 'home' => 'Stars', 'played' => true, 'box_id' => 6001],
+        ]);
+        $stale = $this->playoffHtml(2007, [
+            ['visitor' => 'Stars', 'home' => 'Metros', 'played' => false],
+        ]);
+        $basePath = $this->makeScheduleHtm($current . "\n" . $stale);
+
+        $updater = $this->createUpdater('Playoffs', 2008, false, null, $basePath);
+        $updater->setTeamNameToIdMap(['Metros' => 1, 'Stars' => 2]);
+        $this->mockDb->clearQueries();
+
+        $log = $updater->exposedInsertPlayoffGamesFromScheduleHtm();
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $inserts = array_filter($queries, static fn (string $q): bool => str_contains($q, 'INSERT INTO ibl_schedule'));
+
+        $this->assertCount(1, $inserts, 'the current-season row must still be inserted');
+        $this->assertStringContainsString('Skipped 1', $log, 'the stale row must still be reported');
+    }
+
+    /**
+     * Early in the Playoffs phase JSB has not seeded the bracket, so an export with no
+     * playoff rows at all is expected. Nothing is lost, so it must not be fatal.
+     */
+    public function testEmptyPlayoffScheduleHtmDoesNotThrowDuringPlayoffs(): void
+    {
+        $basePath = $this->makeScheduleHtm("<table>\n</table>");
+
+        $updater = $this->createUpdater('Playoffs', 2025, false, null, $basePath);
+        $updater->setTeamNameToIdMap(['Metros' => 1, 'Stars' => 2]);
+        $this->mockDb->clearQueries();
+
+        $log = $updater->exposedInsertPlayoffGamesFromScheduleHtm();
+
+        $queries = $this->mockDb->getExecutedQueries();
+        $inserts = array_filter($queries, static fn (string $q): bool => str_contains($q, 'INSERT INTO ibl_schedule'));
+
+        $this->assertCount(0, $inserts, 'an empty bracket inserts nothing');
+        $this->assertStringNotContainsString('Skipped', $log, 'no rows means nothing was skipped');
     }
 }
 

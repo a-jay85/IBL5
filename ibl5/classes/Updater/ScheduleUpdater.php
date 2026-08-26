@@ -159,7 +159,8 @@ class ScheduleUpdater extends \BaseMysqliRepository {
      *
      * @return string Log of inserted playoff games
      *
-     * @throws \RuntimeException When Schedule.htm cannot be read during the Playoffs phase
+     * @throws \RuntimeException When Schedule.htm cannot be read, or contains only stale
+     *                             rows from another season, during the Playoffs phase
      */
     private function insertPlayoffGamesFromScheduleHtm(): string
     {
@@ -214,6 +215,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
 
         $log = '';
         $skippedCount = 0;
+        $insertedCount = 0;
         /** @var array<int|string, true> $skippedYears */
         $skippedYears = [];
 
@@ -273,6 +275,7 @@ class ScheduleUpdater extends \BaseMysqliRepository {
                 $game['home_score'],
                 $uuid
             );
+            $insertedCount++;
             $log .= "Inserted playoff game: {$game['visitor']} @ {$game['home']} on {$fullDate['date']}<br>";
         }
 
@@ -286,6 +289,20 @@ class ScheduleUpdater extends \BaseMysqliRepository {
                 'file_years' => array_keys($skippedYears),
                 'season_ending_year' => $this->season->endingYear,
             ]);
+
+            // A stale export is as destructive as a missing one: every row belongs to
+            // another season, so the rebuild would commit a playoff-less schedule and
+            // ScheduleMembershipGuard would reject every real playoff boxscore.
+            // Requiring skippedCount > 0 keeps this off the legitimate zero-row case —
+            // early in the Playoffs phase JSB has not seeded the bracket yet, so an
+            // export with no playoff rows at all is expected and must not be fatal.
+            if ($this->season->phase === self::PLAYOFF_PHASE && $insertedCount === 0) {
+                throw new \RuntimeException(
+                    "Schedule.htm at {$scheduleHtmPath} contains only stale playoff rows from year(s) {$years}"
+                    . " — refusing to rebuild `ibl_schedule` during the Playoffs phase without playoff games"
+                    . " for {$this->season->endingYear}. Export a current Schedule.htm from JSB and re-run."
+                );
+            }
         }
 
         return $log;

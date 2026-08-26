@@ -764,6 +764,10 @@ out="$(run_driver --help 2>&1)"; rc=$?
 grep -q -- '--pr-attack' <<< "$out" || fail "usage-not-truncated: --help omits --pr-attack"
 grep -q -- '--top-n' <<< "$out" || fail "usage-not-truncated: --help omits --top-n"
 grep -q -- '--wait' <<< "$out" || fail "usage-not-truncated: --help omits --wait"
+# --stop-all is the last-added header line, so it is the truncation canary. --stop is matched
+# with the trailing ` N` because a bare `--stop` would also be satisfied by `--stop-all`.
+grep -q -- '--stop N' <<< "$out" || fail "usage-not-truncated: --help omits --stop"
+grep -q -- '--stop-all' <<< "$out" || fail "usage-not-truncated: --help omits --stop-all"
 end_case usage-not-truncated
 
 # --- case 28: seam-master-sha-unset-vs-empty ---------------------------------------------
@@ -879,6 +883,34 @@ rm -f "$SCRATCH/.local/bin/pgrep"
     || fail "32c: reaped a slot on a pgrep ERROR exit — the probe is not failing closed"
 clean_slots
 end_case reap-fails-closed-on-broken-pgrep
+
+# --- case 33: stop-flag-validation -------------------------------------------------------
+# Every malformed or mode-conflicting invocation exits nonzero AND says why. A stop verb that
+# exits 0 having done nothing is the worst outcome: the operator believes the run is dead.
+begin_case
+while IFS= read -r bad; do
+    [[ -n "$bad" ]] || continue
+    # shellcheck disable=SC2086  # word splitting is the mechanism under test
+    out="$(run_driver $bad 2>&1)"; rc=$?
+    [[ $rc -ne 0 ]] || fail "stop-flag-validation: '$bad' exited 0, want nonzero (out: $out)"
+    grep -q 'ERROR' <<< "$out" || fail "stop-flag-validation: '$bad' printed no ERROR (out: $out)"
+done <<'BADFORMS'
+--stop
+--stop 0
+--stop abc
+--stop 1901 --go
+--stop 1901 --dry-run
+--stop 1901 --wait
+--stop 1901 --pr 1902
+--stop 1901 --stop-all
+--stop-all --stop 1901
+BADFORMS
+# `--stop ""` parses cleanly — the empty list has to be caught by the post-loop check, not the
+# per-element regex, or the run exits 0 having stopped nothing.
+out="$(run_driver --stop "" 2>&1)"; rc=$?
+[[ $rc -ne 0 ]] || fail "stop-flag-validation: '--stop \"\"' exited 0, want nonzero (out: $out)"
+grep -q 'ERROR' <<< "$out" || fail "stop-flag-validation: '--stop \"\"' printed no ERROR (out: $out)"
+end_case stop-flag-validation
 
 
 # --- Phase 9: push-form proof against a local bare origin ---------------------------------

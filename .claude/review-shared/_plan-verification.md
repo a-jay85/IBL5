@@ -120,6 +120,7 @@ These patterns **require** at least one E2E row in the verification matrix, even
 | New HTML route (module `index.php`) | The route may render, redirect, or error — only a browser visit confirms which |
 | New `<details>`, modal, toggle, or expandable section | Expand/collapse, visibility toggling, and content rendering are DOM interactions |
 | New indicator or status element that changes with state | Visual state feedback (dots, badges, labels) must be verified in-browser across both states |
+| Plan adds or modifies `htmx:beforeRequest` / `htmx:afterRequest` handlers that mutate DOM state (element disabled/enabled, text changed) | These mutations are serialized into the htmx history cache between the before-request event and the swap; browser Back restores the request-time snapshot, making the mutation permanent unless a `historyRestore` handler repairs it — only a real browser navigation catches this (see `.claude/rules/htmx-history-cache.md`) |
 
 When a plan introduces any of these patterns, the planner must add a corresponding E2E row — one row per distinct user-visible state. For example, a toggle that shows/hides UI needs two E2E rows: one verifying the ON state, one verifying OFF.
 

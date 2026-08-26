@@ -94,6 +94,12 @@ jobs:
           name: lighthouse-baseline-manifest
           path: ibl5/baseline/
           if_no_artifact_found: warn
+          # The baseline workflow now skips its expensive job when a fresh baseline
+          # already exists (lighthouse-baseline.yml, FRESH_HOURS), so its newest
+          # successful run often carries no artifact. Without this, the action would
+          # pick that run and find nothing; search_artifacts walks back to the newest
+          # run that actually published the manifest.
+          search_artifacts: true
 
       - name: Generate PR comment
         id: comment

@@ -6,7 +6,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-08-25
+last_verified: 2026-08-26
 ---
 <!-- NO `model:` KEY — DELIBERATE, DO NOT ADD ONE.
      Runtime Phase 6 (plan-intent fidelity review) is Opus-column judgment:
@@ -30,7 +30,7 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
 - **Flat fan-out only.** A delegate may not spawn a delegate.
 - **Every glob is quoted** — `--include="*.md"`, never `--include=*.md`.
 - **The run STOPS at the verdict, with one amendment.** After Phase 6 and before Phase 7, the new Phase 6.5 (remediation) is permitted: fix the reported findings, file prevention backlog items, commit, and push — then Phase 7 updates the same sticky comment. What remains unconditionally forbidden: merge, auto-merge arming, the full `/backlog-housekeep` chain beyond appending a backlog row and bumping its `last_verified`, any `/post-plan` chain, worktree teardown, and a second new comment.
-- **After `EnterWorktree`, no Bash command may contain `$(…)` or `<(…)`.** The worktree-isolated session refuses command and process substitution outright — "too complex to verify that it stays inside the worktree"; the refusal's "…without the redirect" wording is canned and misleading. Pipelines, redirects, conditionals and `;`-separated statements all run fine: substitution is the only trigger. On the 0.3 `ALREADY-IN-TARGET` path no `EnterWorktree` call is ever made, so — *unless the session was already isolated when `/pr-ready` was invoked* — substitution would in fact work everywhere. That caveat is why the exception is worthless: you cannot tell from inside which regime you are in without probing. The later phases are written substitution-free regardless, so the same text runs unchanged on all three paths. Do not "simplify" them back on the strength of that. **Phase 0 is NOT exempt.** The gate keys on the *session* being `EnterWorktree`-tracked, not on the cwd being a worktree — a session launched directly in a worktree is unrestricted (probed: `X=$(echo hi); echo "subst-ok $X"` printed `subst-ok hi` from a worktree cwd), but a session that called `EnterWorktree` **before** `/pr-ready` was invoked is already isolated at 0.3. Phase 0 therefore has to run under both regimes, and the 0.3 guard block is written in the script-file shape for exactly that reason. It is also **re-run** after step 4's `EnterWorktree`, which is isolated by definition — so `Write` the guard file once at 0.3, *before* any `EnterWorktree`, then `bash` it up to three times; no `Write` ever needs to land post-isolation. **Exempt:** any command passed to `Monitor`, which is not gated (probed: `Monitor(command: 'X=$(echo hi); echo "$X"')` emits `hi`, so the Phase 4.5 watcher loop runs as written). Everywhere else, use one of two shapes:
+- **After `EnterWorktree`, no Bash command may contain `$(…)` or `<(…)`.** The worktree-isolated session refuses command and process substitution outright — "too complex to verify that it stays inside the worktree"; the refusal's "…without the redirect" wording is canned and misleading. Pipelines, redirects, conditionals and `;`-separated statements all run fine: substitution is the only trigger. On the 0.3 `ALREADY-IN-TARGET` path no `EnterWorktree` call is ever made, so — *unless the session was already isolated when `/pr-ready` was invoked* — substitution would in fact work everywhere. That caveat is why the exception is worthless: you cannot tell from inside which regime you are in without probing. The later phases are written substitution-free regardless, so the same text runs unchanged on all three paths. Do not "simplify" them back on the strength of that. **Phase 0 is NOT exempt.** The gate keys on the *session* being `EnterWorktree`-tracked, not on the cwd being a worktree — a session launched directly in a worktree is unrestricted (probed: `X=$(echo hi); echo "subst-ok $X"` printed `subst-ok hi` from a worktree cwd), but a session that called `EnterWorktree` **before** `/pr-ready` was invoked is already isolated at 0.3. Phase 0 therefore has to run under both regimes, and the 0.3 guard block is written in the script-file shape for exactly that reason. It is also **re-run** after step 4's `EnterWorktree`, which is isolated by definition — so `Write` the guard file once at 0.3, *before* any `EnterWorktree`, then `bash` it up to three times; no `Write` ever needs to land post-isolation. Everywhere else, use one of two shapes:
   - **Multi-command blocks** — they live as committed scripts under `.claude/skills/pr-ready/scripts/` (example) and run in one call: `git show <MASTER_SHA>:<path> > /tmp/<file>.sh && test -s /tmp/<file>.sh && bash /tmp/<file>.sh <args>`. Key the filename to the PR number, never `$$`. If the `test -s` trips, re-run the whole command — never `bash` a leftover `/tmp` copy. The one exception is the Phase 0.3 guard, which runs before the Phase 1.3 pin exists and so stays an inline `Write`.
     - **Declared fallback, identical in shape to the include-fallback clause below.** **If it trips a second time the pin genuinely predates the script, and the declared fallback below applies to `scripts/` exactly as it does to the three includes**: run the worktree copy directly — `bash .claude/skills/pr-ready/scripts/<name>.sh <args>` (example) — and record `include-source: worktree (pin predates skill)` in the verdict; if the worktree has no copy either, print `STOP: cannot load <name>.sh from <MASTER_SHA> or from the worktree` and stop. Without that arm a genuinely missing path and a torn write are indistinguishable, and “re-run the whole command” is a deterministic infinite loop on the dogfooding case — the case this very skill hits on its own PR.
   - **Single-value captures** (the master pin, `STRICT`, the branch name) — run the bare command so it **prints** the value, then hold that value as a **literal** in the run notes and substitute it into every later command.
@@ -199,22 +199,16 @@ Run `git show <MASTER_SHA>:.claude/skills/pr-ready/_rebase-and-conflicts.md` —
 
 5. **CI watcher — exactly one, keyed to the head SHA.** If a watcher from an earlier iteration is live, kill it first with `TaskStop(task_id: "<the id recorded when it was armed>")`. **Record the id `Monitor` returns in the run notes at arm time** — `TaskStop` has no "stop all" form, so an unrecorded id is an orphaned watcher. **Never** poll with `sleep N; gh pr checks` on the main thread: that re-reads the full orchestrator context on every call, the spend bug `.claude/rules/work-triage.md` names.
 
-   Arm one `Monitor` with `description`, `persistent`, and `timeout_ms` all set (all three are required):
+   First, run `git rev-parse HEAD` bare and record the printed SHA as `<HEAD_SHA>` in the run notes (single-value capture — it does not survive to the next Bash call).
 
-   ```
-   Monitor(
-     description: "CI checks for PR <N> @ <HEAD_SHA>",
-     persistent: false,
-     timeout_ms: 3600000,
-     command: <the bash loop below>
-   )
-   ```
+   `Write` the following to `/tmp/pr-ready-ciwatch-<N>.sh`, with `<N>` and `<HEAD_SHA>` substituted before writing. The filename is PR-keyed, not `$`-keyed — the same reason every other `/tmp` path in this skill uses `<N>`:
 
    ```bash
-   HEAD_SHA="$(git rev-parse HEAD)"; prev=""; prev_ms=""; seen=""; grace=10
+   HEAD_SHA="<HEAD_SHA>"
+   prev=""; prev_ms=""; seen=""; grace=10
    while true; do
-     v="$(gh pr view <N> --json headRefOid,mergeStateStatus 2>/dev/null || echo '{}')"
-     live="$(jq -r '.headRefOid // ""' <<<"$v")"
+     v=$(gh pr view <N> --json headRefOid,mergeStateStatus 2>/dev/null || echo '{}')
+     live=$(jq -r '.headRefOid // ""' <<<"$v")
      [ "$live" = "$HEAD_SHA" ] && seen=1
      if [ -z "$seen" ]; then
        grace=$((grace - 1))
@@ -226,18 +220,29 @@ Run `git show <MASTER_SHA>:.claude/skills/pr-ready/_rebase-and-conflicts.md` —
      if [ -n "$live" ] && [ "$live" != "$HEAD_SHA" ]; then
        echo "STALE: head moved $HEAD_SHA -> $live; this watcher is obsolete"; break
      fi
-     ms="$(jq -r '.mergeStateStatus // ""' <<<"$v")"
+     ms=$(jq -r '.mergeStateStatus // ""' <<<"$v")
      if [ -n "$ms" ] && [ "$ms" != "$prev_ms" ]; then echo "mergeStateStatus: $ms"; prev_ms="$ms"; fi
      if [ "$ms" = "DIRTY" ]; then
        echo "MERGE CONFLICT: mergeStateStatus=DIRTY; stop and re-run Phases 2-3"; break
      fi
-     s="$(gh pr checks <N> --json name,bucket 2>/dev/null || echo '[]')"
-     cur="$(jq -r '.[] | select(.bucket!="pending") | "\(.name): \(.bucket)"' <<<"$s" | sort)"
+     s=$(gh pr checks <N> --json name,bucket 2>/dev/null || echo '[]')
+     cur=$(jq -r '.[] | select(.bucket!="pending") | "\(.name): \(.bucket)"' <<<"$s" | sort)
      comm -13 <(printf '%s\n' "$prev") <(printf '%s\n' "$cur")
      prev="$cur"
      jq -e 'length > 0 and all(.[]; .bucket!="pending")' <<<"$s" >/dev/null && { echo "CI COMPLETE"; break; }
      sleep 30
    done
+   ```
+
+   Then arm one `Monitor` with `description`, `persistent`, and `timeout_ms` all set (all three are required):
+
+   ```
+   Monitor(
+     description: "CI checks for PR <N> @ <HEAD_SHA>",
+     persistent: false,
+     timeout_ms: 3600000,
+     command: "bash /tmp/pr-ready-ciwatch-<N>.sh"
+   )
    ```
 
    The emitted line is `"\(.name): \(.bucket)"` and **not** a success-only filter because **silence is not success**. A filter matching only `pass` stays mute through `fail`, `cancel`, `skipping`, and `action_required`, and mute is indistinguishable from "still running". The `mergeStateStatus` line is emitted on **change**, which is what resolves step 4's `UNKNOWN` without a wait — the first poll prints the real value, and `DIRTY` breaks out on that same poll rather than after CI finishes.
@@ -307,7 +312,18 @@ Every Phase 6 finding gets fixed and its prevention filed, in this PR's existing
 
    On `stale info` someone pushed concurrently: stop and report it in the Phase 7 verdict. Never re-read and retry with a fresh lease.
 
-6. **Re-watch CI on the new head — exactly one watcher.** If the Phase 4.5 watcher is still live, `TaskStop(task_id: "<the id recorded when it was armed>")` first. Then arm **one** `Monitor` on the new head SHA using the Phase 4.5 step 5 watcher loop, with `description`, `persistent: false`, and `timeout_ms: 3600000` all set. **Re-read that loop from Phase 4.5; do not restate it here** — it is the only process-substitution expression in the runtime phases, and duplicating it would break the process-substitution count this file is checked on. Record the new `Monitor` id in the run notes; `TaskStop` has no "stop all" form.
+6. **Re-watch CI on the new head — exactly one watcher.** If the Phase 4.5 watcher is still live, `TaskStop(task_id: "<the id recorded when it was armed>")` first. Run `git rev-parse HEAD` bare and record the new `<HEAD_SHA>` literal. Re-`Write` `/tmp/pr-ready-ciwatch-<N>.sh` with the same script body from Phase 4.5 step 5 but with `<HEAD_SHA>` updated to the new literal — the old script's baked-in SHA no longer matches the new push and the `seen` gate would never fire. Then arm one `Monitor`:
+
+   ```
+   Monitor(
+     description: "CI checks for PR <N> @ <HEAD_SHA>",
+     persistent: false,
+     timeout_ms: 3600000,
+     command: "bash /tmp/pr-ready-ciwatch-<N>.sh"
+   )
+   ```
+
+   Record the new `Monitor` id in the run notes; `TaskStop` has no "stop all" form.
 
 7. **One bounded staleness check, then stop.** After `CI COMPLETE`, and only when `<STRICT>` is `true`, read once:
 

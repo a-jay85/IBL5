@@ -1197,6 +1197,39 @@ tail -1 "$_F10" | grep -qFx "$_END" || fail "fixture 10: end marker not on last 
 
 end_case pr-ready-files-changed-rewriter
 
+# --- case 18: E14 Monitor commands are substitution-free ---------------------------------
+# After E14, every SKILL.md `command:` line is the Write-to-tmp runner, and the stale
+# `**Exempt:**` clause that told the reader Monitor was ungated is gone. Assertions are
+# unconditional counts (case 17's shape) so a regression fails loudly rather than skipping.
+begin_case
+SKILL="$SCRIPT_DIR/../.claude/skills/pr-ready/SKILL.md"
+[[ -s "$SKILL" ]] || fail "e14: pr-ready SKILL.md missing or empty at $SKILL"
+
+[[ "$(grep -cF '**Exempt:**' "$SKILL")" -eq 0 ]] \
+    || fail "e14: SKILL.md still carries an **Exempt:** clause (E14 regression)"
+# every `command:` line must be substitution-free
+[[ "$(grep 'command:' "$SKILL" | grep -c '\$(\|<(')" -eq 0 ]] \
+    || fail "e14: a Monitor command: line contains \$( or <( (E14 regression)"
+# ...and must be the Write-to-tmp runner, armed in both Phase 4.5 and Phase 6.5
+[[ "$(grep -cF 'command: "bash /tmp/pr-ready-ciwatch-<N>.sh"' "$SKILL")" -eq 2 ]] \
+    || fail "e14: expected 2 'command: \"bash /tmp/pr-ready-ciwatch-<N>.sh\"' lines (Phase 4.5 + 6.5)"
+[[ "$(grep -c 'command:' "$SKILL")" -eq 2 ]] \
+    || fail "e14: unexpected extra command: line in SKILL.md — widen or narrow this assertion"
+end_case e14-monitor-subst-free
+
+# --- case 19: E15 rebase delegate is never told to push ----------------------------------
+# The delegate packet runs under ~/.claude/hooks/plan-gate-commit.sh, which denies `git push`
+# for sub-agents. Any positive push instruction in the packet is an instant hard-fail.
+begin_case
+REBASE="$SCRIPT_DIR/../.claude/skills/pr-ready/_rebase-and-conflicts.md"
+[[ -s "$REBASE" ]] || fail "e15: _rebase-and-conflicts.md missing or empty at $REBASE"
+
+grep -qiE '(NOT|may not|must not) run.*git push' "$REBASE" \
+    || fail "e15: delegate hard limits do not prohibit 'git push' (E15 regression)"
+[[ "$(grep 'git push' "$REBASE" | grep -cviE '\b(NOT|never|may not|must not|cannot|do not)\b')" -eq 0 ]] \
+    || fail "e15: positive 'git push' instruction in the delegate packet (E15 regression)"
+end_case e15-delegate-no-push
+
 # --- verdict -----------------------------------------------------------------------------
 if [[ $FAILED -ne 0 ]]; then
     echo "test-pr-ready-now: FAILED ($FAILED assertion failure(s))" >&2

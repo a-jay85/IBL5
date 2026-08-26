@@ -165,7 +165,7 @@ Run `git show <MASTER_SHA>:.claude/skills/pr-ready/_rebase-and-conflicts.md` —
 
 **Phase 4 — prove nothing was lost, push, watch CI.**
 
-1. **Load the deferred watcher tools here, not in Phase 0:** `ToolSearch("select:Monitor,TaskStop")`. Deferring keeps `Monitor`'s long schema out of context for the phases that never use it.
+1. **Load the deferred watcher tool here, not in Phase 0:** `ToolSearch("select:TaskStop")`. Deferring keeps its schema out of context for the phases that never use it. `Monitor` is deliberately **not** loaded — step 5 explains why this skill never arms a CI watcher under it.
 
 2. **Lost-work proof, two signals.** `git cherry -v origin/<branch> HEAD` is the weak signal: after a squash **every** replayed commit shows `+` by design, so `git cherry` alone cannot carry the proof. The authoritative check is content equivalence of the tree diff captured before and after the rebase (the Phase 2 include wrote `/tmp/pr-ready-diff-pre-<N>.patch`, keyed to the PR number — **never `$$`**, which differs between that call's shell and this one's).
 
@@ -195,59 +195,27 @@ Run `git show <MASTER_SHA>:.claude/skills/pr-ready/_rebase-and-conflicts.md` —
 
    If the answer is anything other than `UNKNOWN`, act on it now — in particular `mergeStateStatus=DIRTY` means the rebase did not actually clear the conflict, so stop and re-run Phases 2–3 rather than pushing on. If it **is** `UNKNOWN`, **do not wait here**: proceed to step 5, whose watcher polls `mergeStateStatus` on every iteration and breaks immediately on `DIRTY`. That is the resolution path — the watcher is the wait, and a conflict surfaces on its first poll rather than after CI finishes. Do not re-read here, and do not loop.
 
-   **Never insert a foreground `sleep` to bridge the gap.** The harness refuses one (`Blocked: sleep 30 … To wait for a condition, use Monitor with an until-loop … Do not chain shorter sleeps to work around this block`), so a `sleep`-based wait does not merely cost time — it hard-fails the call and stalls the run.
+   **Never insert a foreground `sleep` to bridge the gap.** The harness refuses one (`Blocked: sleep 30 … To wait for a condition, use Monitor with an until-loop … Do not chain shorter sleeps to work around this block`), so a `sleep`-based wait does not merely cost time — it hard-fails the call and stalls the run. That message's suggested `Monitor` is **not** the remedy here; step 5's background `Bash` watcher is, for the reason step 5 gives.
 
-5. **CI watcher — exactly one, keyed to the head SHA.** If a watcher from an earlier iteration is live, kill it first with `TaskStop(task_id: "<the id recorded when it was armed>")`. **Record the id `Monitor` returns in the run notes at arm time** — `TaskStop` has no "stop all" form, so an unrecorded id is an orphaned watcher. **Never** poll with `sleep N; gh pr checks` on the main thread: that re-reads the full orchestrator context on every call, the spend bug `.claude/rules/work-triage.md` names.
+5. **CI watcher — exactly one, keyed to the head SHA, and it wakes you exactly once.** If a watcher from an earlier iteration is live, kill it first with `TaskStop(task_id: "<the id recorded when it was armed>")`. **Record the id the background `Bash` call returns in the run notes at arm time** — `TaskStop` has no "stop all" form, so an unrecorded id is an orphaned watcher. **Never** poll with `sleep N; gh pr checks` on the main thread: that re-reads the full orchestrator context on every call, the spend bug `.claude/rules/work-triage.md` names.
 
-   First, run `git rev-parse HEAD` bare and record the printed SHA as `<HEAD_SHA>` in the run notes (single-value capture — it does not survive to the next Bash call).
+   **Never arm this under `Monitor`, and never inline the loop.** `Monitor`'s contract is *every stdout line is a conversation message*; this repo's PRs carry ~46 checks that land in waves across a ~10-minute run, so a per-check emitter woke the orchestrator a dozen-odd times and re-sent the whole `/pr-ready` context on each wake — the watching cost more than the work. `scripts/watch-ci.sh` polls in **silence** and prints one verdict block on exit, so `Bash` with `run_in_background: true` wakes you exactly **once**. Do not "improve" it back into a progress feed.
 
-   `Write` the following to `/tmp/pr-ready-ciwatch-<N>.sh`, with `<N>` and `<HEAD_SHA>` substituted before writing. The filename is PR-keyed, not `$`-keyed — the same reason every other `/tmp` path in this skill uses `<N>`:
+   First, run `git rev-parse HEAD` bare and record the printed SHA as `<HEAD_SHA>` in the run notes (single-value capture — it does not survive to the next Bash call). Then materialize the watcher in the foreground, so a failed materialize is loud rather than an exit code on a background task. The filename is PR-keyed, not `$`-keyed — the same reason every other `/tmp` path in this skill uses `<N>`:
 
    ```bash
-   HEAD_SHA="<HEAD_SHA>"
-   prev=""; prev_ms=""; seen=""; grace=10
-   while true; do
-     v=$(gh pr view <N> --json headRefOid,mergeStateStatus 2>/dev/null || echo '{}')
-     live=$(jq -r '.headRefOid // ""' <<<"$v")
-     [ "$live" = "$HEAD_SHA" ] && seen=1
-     if [ -z "$seen" ]; then
-       grace=$((grace - 1))
-       if [ "$grace" -le 0 ]; then
-         echo "STALE: head never reached $HEAD_SHA (last seen ${live:-none}); this watcher is obsolete"; break
-       fi
-       sleep 30; continue
-     fi
-     if [ -n "$live" ] && [ "$live" != "$HEAD_SHA" ]; then
-       echo "STALE: head moved $HEAD_SHA -> $live; this watcher is obsolete"; break
-     fi
-     ms=$(jq -r '.mergeStateStatus // ""' <<<"$v")
-     if [ -n "$ms" ] && [ "$ms" != "$prev_ms" ]; then echo "mergeStateStatus: $ms"; prev_ms="$ms"; fi
-     if [ "$ms" = "DIRTY" ]; then
-       echo "MERGE CONFLICT: mergeStateStatus=DIRTY; stop and re-run Phases 2-3"; break
-     fi
-     s=$(gh pr checks <N> --json name,bucket 2>/dev/null || echo '[]')
-     cur=$(jq -r '.[] | select(.bucket!="pending") | "\(.name): \(.bucket)"' <<<"$s" | sort)
-     comm -13 <(printf '%s\n' "$prev") <(printf '%s\n' "$cur")
-     prev="$cur"
-     jq -e 'length > 0 and all(.[]; .bucket!="pending")' <<<"$s" >/dev/null && { echo "CI COMPLETE"; break; }
-     sleep 30
-   done
+   git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/watch-ci.sh > /tmp/pr-ready-ciwatch-<N>.sh && test -s /tmp/pr-ready-ciwatch-<N>.sh && echo MATERIALIZED
    ```
 
-   Then arm one `Monitor` with `description`, `persistent`, and `timeout_ms` all set (all three are required):
+   Then arm it with **one** `Bash` call, `run_in_background: true`, and **no `timeout`** — `Bash`'s foreground `timeout` caps at 600000ms (10 min), under a normal CI run, while `run_in_background` has no cap and the script bounds itself at 3600s:
 
-   ```
-   Monitor(
-     description: "CI checks for PR <N> @ <HEAD_SHA>",
-     persistent: false,
-     timeout_ms: 3600000,
-     command: "bash /tmp/pr-ready-ciwatch-<N>.sh"
-   )
+   ```bash
+   bash /tmp/pr-ready-ciwatch-<N>.sh <N> <HEAD_SHA>
    ```
 
-   The emitted line is `"\(.name): \(.bucket)"` and **not** a success-only filter because **silence is not success**. A filter matching only `pass` stays mute through `fail`, `cancel`, `skipping`, and `action_required`, and mute is indistinguishable from "still running". The `mergeStateStatus` line is emitted on **change**, which is what resolves step 4's `UNKNOWN` without a wait — the first poll prints the real value, and `DIRTY` breaks out on that same poll rather than after CI finishes.
+   The verdict block's first word is one of six, each with its own exit code: `CI COMPLETE` (0), `CI FAILED` (1 — one indented line per check that did not end `pass` or `skipping`), `MERGE CONFLICT` (2 — `mergeStateStatus=DIRTY`, so stop and re-run Phases 2–3), `STALE` (3 — the head moved, so this watcher is obsolete), `CI TIMEOUT` (4), `STOP` (5 — a usage error). **Silence is not success**, so no path exits quietly and no verdict is a success-only filter: naming *every* red check is what makes one wake enough to drive Phase 6.5 remediation instead of one round trip per failure. Every verdict also carries the last `mergeStateStatus` the script read, which is what resolves step 4's `UNKNOWN` without a second main-thread read.
 
-   **The `seen` gate is what makes the rest of the loop trustworthy — do not remove it.** This watcher is armed immediately after the Phase 4.3 push, and GitHub's API serves the **previous** head for a window of seconds afterwards. Without the gate that window produces two failures, and the second is the dangerous one: the stale-SHA break false-fires and kills a watcher that is not actually obsolete; and, worse, `gh pr checks` returns the *old* head's already-finished buckets, so `all(.[]; .bucket!="pending")` is true on iteration one and the loop prints a **false `CI COMPLETE`** — the run then proceeds to a verdict having never watched the current head's CI at all. Observed live while dogfooding this skill on its own PR (#1830). So: until `live` has matched `HEAD_SHA` at least once, evaluate **nothing** — not the stale break, not `mergeStateStatus`, not the checks predicate. `grace` bounds that silence at 10 polls (~5 min) so a genuinely superseded push still reports `STALE` promptly instead of idling to the `timeout_ms`.
+   The script's own header carries the rest — why it does not fail fast, and why the `seen` grace gate (the false `CI COMPLETE` on the pre-push head, observed on PR #1830) must not be removed. **The script is the only copy of that logic**; do not paste a reference loop back into this file, or the two drift and the reader follows the stale one.
 
 **Phase 5 — strict re-check loop.**
 
@@ -312,18 +280,13 @@ Every Phase 6 finding gets fixed and its prevention filed, in this PR's existing
 
    On `stale info` someone pushed concurrently: stop and report it in the Phase 7 verdict. Never re-read and retry with a fresh lease.
 
-6. **Re-watch CI on the new head — exactly one watcher.** If the Phase 4.5 watcher is still live, `TaskStop(task_id: "<the id recorded when it was armed>")` first. Run `git rev-parse HEAD` bare and record the new `<HEAD_SHA>` literal. Re-`Write` `/tmp/pr-ready-ciwatch-<N>.sh` with the same script body from Phase 4.5 step 5 but with `<HEAD_SHA>` updated to the new literal — the old script's baked-in SHA no longer matches the new push and the `seen` gate would never fire. Then arm one `Monitor`:
+6. **Re-watch CI on the new head — exactly one watcher.** If the Phase 4.5 watcher is still live, `TaskStop(task_id: "<the id recorded when it was armed>")` first. Run `git rev-parse HEAD` bare and record the new `<HEAD_SHA>` literal. `/tmp/pr-ready-ciwatch-<N>.sh` is already materialized from Phase 4.5 and takes the SHA as an **argument**, so it does not need rewriting — just re-arm it on the new literal with one `Bash` call, `run_in_background: true`, no `timeout`:
 
-   ```
-   Monitor(
-     description: "CI checks for PR <N> @ <HEAD_SHA>",
-     persistent: false,
-     timeout_ms: 3600000,
-     command: "bash /tmp/pr-ready-ciwatch-<N>.sh"
-   )
+   ```bash
+   bash /tmp/pr-ready-ciwatch-<N>.sh <N> <HEAD_SHA>
    ```
 
-   Record the new `Monitor` id in the run notes; `TaskStop` has no "stop all" form.
+   Passing the stale Phase 4.5 SHA here is the failure to avoid: the `seen` gate would never fire and the run would idle to `CI TIMEOUT`. Record the new background task id in the run notes — `TaskStop` has no "stop all" form. Verdict words and exit codes are the Phase 4.5 step 5 list, unchanged.
 
 7. **One bounded staleness check, then stop.** After `CI COMPLETE`, and only when `<STRICT>` is `true`, read once:
 

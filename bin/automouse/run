@@ -426,15 +426,20 @@ export CLAUDE_HEADLESS=1
 # IS the interactive window — currently the `autoCompactWindow` pin in
 # ~/.claude/settings.json — and tracks it by construction. An explicit export
 # was two numbers to keep in sync and drifted: it sat at 200000 with a comment
-# claiming the pin was 120K, when the pin had moved to 140000.
+# claiming the pin was 120K, when the pin had already moved on.
 #
 # Tripwire before you re-add one. Inheriting is the smaller window: headless
 # sessions carry ~44K of fixed context (system prompt + rules + memory +
 # compaction summary) and compaction fires at ~73% of the window, so working
-# room is ~58K at a 140K window versus ~102K at 200K. The 2026-08-10 run that
-# was aborted by hand had already reached peak_ctx=72063 during reconnaissance
-# — 21 tools in, before a single edit — i.e. most of the way to the ~102K
-# trigger point with the whole implementation still ahead of it. If impl runs
+# room is (0.73 * pin) - 44K. Read the live pin — never hardcode it here, that
+# is exactly what drifted last time:
+#     jq .autoCompactWindow ~/.claude/settings.json
+# At the 200000 an explicit export would set, working room is ~102K. The
+# 2026-08-10 run that was aborted by hand had already reached peak_ctx=72063
+# during reconnaissance — 21 tools in, before a single edit — i.e. most of the
+# way to that ~102K trigger point with the whole implementation still ahead of
+# it. (That 72063 predates the peak_ctx fix, so it is a summed figure and reads
+# high against post-fix rows.) If impl runs
 # start showing repeated compactions (2026-07-07, at a window around 120K: 5
 # compactions in 19 min, 21% of the 5h budget, zero edits made), the fix is to
 # export a larger window again — 200000 keeps peak context at/below the ~200K

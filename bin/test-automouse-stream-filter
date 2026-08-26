@@ -149,6 +149,23 @@ OUT=$(run_filter '{"type":"assistant","message":{"content":[{"type":"text","text
 ')
 assert_contains "c11-whitespace-does-not-clobber" "$OUT" "Real final answer."
 
+# c12 — peak_ctx uses the max of non-advisor iterations (Phase 3c fixture shape)
+# Record has: top-level ctx=121709 (sum), iter1 type:message ctx=60025,
+# iter2 type:advisor_message ctx=61684 (excluded), iter3 type:message ctx=61390.
+# Correct peak = 61390; wrong answers: 121709 (summed top), 61684 (advisor).
+OUT=$(run_filter '{"type":"assistant","message":{"usage":{"input_tokens":4,"output_tokens":0,"cache_read_input_tokens":120000,"cache_creation_input_tokens":1705,"iterations":[{"type":"message","input_tokens":25,"output_tokens":0,"cache_read_input_tokens":60000,"cache_creation_input_tokens":0},{"type":"advisor_message","input_tokens":61684,"output_tokens":0,"cache_read_input_tokens":0,"cache_creation_input_tokens":0},{"type":"message","input_tokens":5,"output_tokens":0,"cache_read_input_tokens":60000,"cache_creation_input_tokens":1385}]}}}
+'"$RESULT_LINE"'
+')
+assert_contains "peak_ctx takes the max of non-advisor iterations" "$OUT" "peak_ctx=61390"
+assert_not_contains "peak_ctx is not the summed top-level usage" "$OUT" "peak_ctx=121709"
+assert_not_contains "peak_ctx excludes the advisor_message iteration" "$OUT" "peak_ctx=61684"
+
+# c13 — an event with no usage at all degrades to peak_ctx=0, not a crash
+OUT=$(run_filter '{"type":"assistant","message":{"content":[{"type":"text","text":"done"}]}}
+'"$RESULT_LINE"'
+')
+assert_contains "no-usage event degrades to zero" "$OUT" "peak_ctx=0"
+
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"
     exit 1

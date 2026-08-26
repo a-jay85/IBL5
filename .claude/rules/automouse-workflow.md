@@ -1,6 +1,6 @@
 ---
 description: Automouse autonomous workflow (formerly "nightly") — launchd fires claude -p on a recurring schedule, running two context-isolated agents per plan (implementation + post-plan) with time guards and incremental checkpoints.
-last_verified: 2026-08-19
+last_verified: 2026-08-26
 paths: "bin/automouse/**"
 ---
 
@@ -67,6 +67,8 @@ Each phase's cost is recorded in two places: the markdown row in `reports/YYYY-M
 | `recomputed` | Transcript recomputation succeeded and agrees with expectations. |
 | `recomputed-anomalous` | Recomputation succeeded but diverges from the harness figure in a way the mechanical check flags: recomputed cost falls more than $0.01 below the harness figure, or the joined transcript spans materially longer than the logged phase duration. |
 | `unknown` | No transcript could be joined to this row — the harness figure is left as-is (transcripts age out after ~30 days). |
+
+**`peak_ctx` semantics.** `peak_ctx` is the maximum context occupancy of the **main** transcript only, taken over `usage.iterations[]` when present (the top-level `usage` on such a record is their sum across iterations, not any single occupancy) and excluding `advisor_message` iterations (which run against a separate inference window). Sub-agent occupancy is excluded because a sub-agent runs in its own context window. Rows written before 2026-08-26 carry the older summed figure and read high compared to post-fix rows.
 
 **Reported cost is a floor.** Compaction summarization is not recorded in any transcript record, so it is carried separately as a bounded interval in the "Surcharge est ($)" column: `low–high`, where low is the cache-read cost of the pre-boundary context and high is a full input re-read plus summary output. This interval is never folded into the cost column.
 

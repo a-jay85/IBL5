@@ -90,6 +90,9 @@ jobs:
               # /pr-ready's runtime blocks are committed scripts, and bin/test-pr-ready-now
               # case 16 asserts on SKILL.md, so both must trigger shellcheck + harness-tests.
               - '.claude/skills/pr-ready/**'
+              # Agent defs are asserted by bin/test-pr-ready-now's static case (the /pr-ready
+              # Phase 6 reviewer def), so an agent-def-only PR must run harness-tests too.
+              - '.claude/agents/**'
             ibl5ts:
               # Everything the ibl5 TS unit suite executes or imports
               # (tests/ts-unit/ specs cover the pure VR-review helpers and

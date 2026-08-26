@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-08-24
+last_verified: 2026-08-25
 ---
 
 # Loop-Engineering Backlog
@@ -62,6 +62,7 @@ last_verified: 2026-08-24
 | L33 | CLI entrypoints accept unknown flags silently; no static rule enforces argv option allowlisting | ⬜ Open | 🟦 | S |
 | L34 | `bin/pr-ready-now` has no working stop path; `launchctl bootout` orphans the session and corrupts slot accounting | ⬜ Open | 🟦 | S |
 | L35 | automouse: cap-timeout kill (exit 143) misclassified as genuine plan failure, burns attempt | ⬜ Open | 🟥 | S |
+| L36 | `/post-plan` Phase 3 writes a hardcoded "covered by unit and E2E tests" clause into the PR body without checking the diff contains those test types | ⬜ Open | 🟥 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -264,6 +265,44 @@ last_verified: 2026-08-24
 **Risk if untouched:** Every plan that routinely exceeds MAX_IMPL_SECS is eventually poison-pilled into `skipped/` rather than retried with a smaller scope or re-queued.
 **Note:** `bin/automouse/run` is a ship-pipeline surface; route through `/plan`, not ad-hoc.
 **Status (2026-08-24):** ⬜ Open — 🟥 (ship-pipeline surface; loop-machinery changes should default to `auto_merge: false`).
+
+### L36 `/post-plan` Phase 3 writes a hardcoded "covered by unit and E2E tests" clause into the PR body without checking the diff contains those test types
+*(discovered 2026-08-25 during #1969)*
+
+**class:** a PR-body generator emits a fixed prose clause naming specific test types as evidence of coverage, without asserting the diff actually contains a test of those types — so the sentence is false whenever the plan's matrix simply had zero `Truly-manual` rows.
+
+**Location:** `.claude/skills/post-plan/SKILL.md` line 121 — "If the matrix has zero truly-manual rows (or the plan says 'All verification is automated'), write: `No manual testing needed — all changes are covered by unit and E2E tests.`"
+
+**Problem:** The clause is a template constant, not a claim derived from the diff. PR #1969 added PHPUnit unit and `DatabaseIntegration` tests and **no** Playwright E2E spec, yet the body asserted E2E coverage. The failing half is only the tail clause: the `No manual testing needed` prefix is a load-bearing machine sentinel that `bin/lib/pr-armable.sh:59` prefix-matches (`^[[:space:]]*No manual testing needed`) to clear auto-merge condition (1), so the sentinel itself must survive any fix. `.claude/skills/plan/SKILL.md:288` already names this exact sentence as a known plan-side failure mode ("Silence is not coverage"), but names it only as a *plan matrix* defect — nothing checks the generated PR body against the realized diff.
+
+**Occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #1969 body § Manual Testing (generated from `.claude/skills/post-plan/SKILL.md:121`) | yes | yes | fixed this pass (body prose corrected in-PR) |
+| 2 | `.claude/skills/post-plan/SKILL.md:121` (the generator itself) | yes | yes | not fixed — filed (ship-pipeline surface; wants a `/plan`) |
+| 3 | `.claude/skills/post-plan/SKILL.md:276` — fallback clause says "automated tests", type-agnostic | near-miss | yes | not fixed — correct as written; names no specific type |
+| 4 | `.claude/skills/plan/SKILL.md:288` | near-miss | yes | not fixed — this is the documented warning, not an occurrence |
+
+**prevention ladder:**
+- rung 0 — already covered? No. `bin/lib/pr-armable.sh` prefix-matches the sentinel and never reads the tail clause; `bin/check-docs` does not read PR bodies at all.
+- rung 1 — extend an existing gate? **Yes — this is the landing rung.** `bin/lib/pr-armable.sh` already parses the `## Manual Testing` section and already owns the Manual-Testing clearance predicate; extending `pr_manual_testing_clearance` (or adding a sibling predicate beside it) to reject a tail clause naming a test type absent from the PR's changed-file list reuses the existing parse and the existing `ibl5/tests/Cli/PrArmableLibCliTest.php` harness.
+- rung 2 — a rule doc? Insufficient alone: `.claude/skills/plan/SKILL.md:288` already *is* prose guidance against this exact sentence and it did not prevent the occurrence.
+- rung 3 — a PHPStan rule? N/A — the artifact is a GitHub PR body, not PHP.
+- rung 4 — a CI gate? Overkill given rung 1 lands it, and a CI job cannot see the body on a `pull_request` event without an extra API call.
+- rung 5 — a new hook? Overkill; rung 1 is strictly cheaper.
+
+Rung 1 does not require the `.claude/rules/meta-tooling-bar.md` extend-before-add conditions (those bind rungs 3–5), and it *is* the extend-before-add outcome those conditions push toward.
+
+**artifact destination:** `bin/lib/pr-armable.sh` (in-repo, appears in the PR diff), locked by `ibl5/tests/Cli/PrArmableLibCliTest.php`. A companion one-line correction to the template at `.claude/skills/post-plan/SKILL.md:121` ships with it.
+
+**Suggested direction:** Change the `.claude/skills/post-plan/SKILL.md:121` template to a type-agnostic clause ("all changes are covered by automated tests", matching line 276), and extend `pr_manual_testing_clearance` to fail closed when the tail clause names a test type with no corresponding file in the PR's changed-file list.
+
+**Risk if untouched:** Every plan whose matrix has zero `Truly-manual` rows ships a PR body asserting E2E coverage it may not have. A reviewer who trusts the sentence skips exactly the verification the plan deferred, and the false claim is the *positive clearance signal* auto-merge arming reads — so the sentence that is wrong is also the one that unblocks the merge.
+
+**Note:** `.claude/skills/post-plan/SKILL.md` and `bin/lib/pr-armable.sh` are ship-pipeline surfaces; route through `/plan`, not ad-hoc.
+
+**Status (2026-08-25):** ⬜ Open — 🟥 (ship-pipeline surface; touches the auto-merge clearance predicate).
 
 ---
 

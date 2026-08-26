@@ -63,12 +63,20 @@ while IFS= read -r line; do
             case "$msg_text" in
                 *[![:space:]]*) LAST_TEXT="$msg_text" ;;
             esac
+            # Mirror bin/lib/automouse-pricer's peak rule exactly — the two must agree
+            # because run's `provenance=unknown` fallback reads THIS number into the
+            # same report column. iterations[] REPLACE the top-level usage (which is
+            # their sum); advisor_message iterations ran against a separate window.
             ctx=$(printf '%s' "$line" | jq -r '
-                [ (.message.usage // {}) ] + ((.message.usage.iterations // []))
-                | map( ((.input_tokens // 0)|tonumber)
-                     + ((.cache_read_input_tokens // 0)|tonumber)
-                     + ((.cache_creation_input_tokens // 0)|tonumber) )
-                | max // 0
+                def occ: ((.input_tokens // 0)|tonumber)
+                       + ((.cache_read_input_tokens // 0)|tonumber)
+                       + ((.cache_creation_input_tokens // 0)|tonumber);
+                (.message.usage // {}) as $u
+                | ($u.iterations // []) as $its
+                | ([ $its[] | select(.type != "advisor_message") ]) as $cand
+                | if   ($cand | length) > 0 then [ $cand[] | occ ] | max
+                  elif ($its  | length) > 0 then [ $its[]  | occ ] | max
+                  else ($u | occ) end
             ' 2>/dev/null) || ctx=0
             if [ -n "$ctx" ] && [ "$ctx" -gt "${PEAK_CTX:-0}" ] 2>/dev/null; then
                 PEAK_CTX=$ctx

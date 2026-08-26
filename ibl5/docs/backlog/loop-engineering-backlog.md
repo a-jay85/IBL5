@@ -269,7 +269,7 @@ last_verified: 2026-08-25
 ### L36 `/post-plan` Phase 3 writes a hardcoded "covered by unit and E2E tests" clause into the PR body without checking the diff contains those test types
 *(discovered 2026-08-25 during #1969)*
 
-**class:** a PR-body generator emits a fixed prose clause naming specific test types as evidence of coverage, without asserting the diff actually contains a test of those types — so the sentence is false whenever the plan's matrix simply had zero `Truly-manual` rows.
+**class:** a skill or generator asserts a fact about its own environment — test coverage present, a tool exempt from a gate — as a template constant or a hand-written invariant, with nothing checking that the assertion is still true. Two live instances found this pass: a PR-body clause naming test types the diff does not contain, and a skill invariant declaring `Monitor` exempt from the worktree command-substitution gate when it is not.
 
 **Location:** `.claude/skills/post-plan/SKILL.md` line 121 — "If the matrix has zero truly-manual rows (or the plan says 'All verification is automated'), write: `No manual testing needed — all changes are covered by unit and E2E tests.`"
 
@@ -283,6 +283,7 @@ last_verified: 2026-08-25
 | 2 | `.claude/skills/post-plan/SKILL.md:121` (the generator itself) | yes | yes | not fixed — filed (ship-pipeline surface; wants a `/plan`) |
 | 3 | `.claude/skills/post-plan/SKILL.md:276` — fallback clause says "automated tests", type-agnostic | near-miss | yes | not fixed — correct as written; names no specific type |
 | 4 | `.claude/skills/plan/SKILL.md:288` | near-miss | yes | not fixed — this is the documented warning, not an occurrence |
+| 5 | `.claude/skills/pr-ready/SKILL.md` — Invariants § "**Exempt:** any command passed to `Monitor`, which is not gated" | yes | yes | not fixed — filed (measured false 2026-08-25: the inline watcher was refused with "too complex to verify that it stays inside the worktree"; it had to be written to a `/tmp` script and run as `bash /tmp/...`) |
 
 **prevention ladder:**
 - rung 0 — already covered? No. `bin/lib/pr-armable.sh` prefix-matches the sentinel and never reads the tail clause; `bin/check-docs` does not read PR bodies at all.
@@ -294,7 +295,7 @@ last_verified: 2026-08-25
 
 Rung 1 does not require the `.claude/rules/meta-tooling-bar.md` extend-before-add conditions (those bind rungs 3–5), and it *is* the extend-before-add outcome those conditions push toward.
 
-**artifact destination:** `bin/lib/pr-armable.sh` (in-repo, appears in the PR diff), locked by `ibl5/tests/Cli/PrArmableLibCliTest.php`. A companion one-line correction to the template at `.claude/skills/post-plan/SKILL.md:121` ships with it.
+**artifact destination:** `bin/lib/pr-armable.sh` (in-repo, appears in the PR diff), locked by `ibl5/tests/Cli/PrArmableLibCliTest.php`. A companion one-line correction to the template at `.claude/skills/post-plan/SKILL.md:121` ships with it. Occurrence 5 is a prose-only correction to `.claude/skills/pr-ready/SKILL.md` (delete the `Monitor` exemption clause; the skill's later phases are already written substitution-free, so nothing else changes) — no gate lands for it, because the invariant it contradicts is already the safe default.
 
 **Suggested direction:** Change the `.claude/skills/post-plan/SKILL.md:121` template to a type-agnostic clause ("all changes are covered by automated tests", matching line 276), and extend `pr_manual_testing_clearance` to fail closed when the tail clause names a test type with no corresponding file in the PR's changed-file list.
 

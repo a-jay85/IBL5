@@ -1584,6 +1584,17 @@ out="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" PR_READY_NOW_DRY_RUN=1 run_
 test -s "$R"    || fail "21f: --model dry-run emitted no runner at $R"
 grep -qx 'MODEL=claude-opus-5' "$R" \
   || fail "21f: --model claude-opus-5 did not override the default — the revert lever is broken"
+# 21g: the verdict path is cleared BEFORE the spawn. Ordering is the whole property — an
+# rm -f sitting after the Agent( call would still leave step 2's `test -s` satisfiable by a
+# prior run's file for the same PR, which is the stale-verdict hole this closes. Both line
+# numbers are captured so a missing clause and a misordered one fail with distinct messages.
+_sk="$SCRIPT_DIR/../.claude/skills/pr-ready/SKILL.md"
+_rm_ln=$(grep -nF 'rm -f /tmp/pr-ready-phase6-verdict' "$_sk" | head -1 | cut -d: -f1)
+_spawn_ln=$(grep -nF 'subagent_type: "pr-ready-phase6"' "$_sk" | head -1 | cut -d: -f1)
+[[ -n "$_rm_ln" ]] \
+  || fail "21g: SKILL.md never clears the verdict path — step 2's test -s can pass on a stale file"
+[[ -n "$_spawn_ln" && -n "$_rm_ln" && "$_rm_ln" -lt "$_spawn_ln" ]] \
+  || fail "21g: verdict rm -f (line ${_rm_ln:-none}) does not precede the spawn (line ${_spawn_ln:-none})"
 end_case phase6-opus-delegate-static
 
 # --- verdict -----------------------------------------------------------------------------

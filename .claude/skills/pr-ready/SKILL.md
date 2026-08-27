@@ -7,7 +7,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-08-26
+last_verified: 2026-08-27
 ---
 <!-- `model: claude-sonnet-4-6` IS DELIBERATE — DO NOT REMOVE IT, and never write
      `model: sonnet` (that alias resolves to Sonnet 5). User-authorized 2026-08-26,
@@ -260,7 +260,14 @@ This phase does not run on the orchestrator. It runs **once** in the pinned Opus
 the Phase 2 include uses (`git show` invariant above) and applies its own declared
 fallback. User-authorized 2026-08-26; the Invariants block records the same change.
 
-1. **Spawn exactly one reviewer.** `model` is deliberately ABSENT from the call site —
+1. **Clear the stale verdict, then spawn exactly one reviewer.** First, one Bash call.
+   The verdict path is PR-keyed and nothing else ever removes it, so a prior `/pr-ready`
+   run on this same PR leaves its file behind — and step 2's `test -s` cannot tell that
+   file apart from this run's. Clearing it is what makes that read fail-closed:
+
+     rm -f /tmp/pr-ready-phase6-verdict-<N>.md
+
+   Then spawn. `model` is deliberately ABSENT from the call site —
    the def owns its own Opus pin (`.claude/rules/agent-tiering.md` § Sonnet 4.6 pins:
    the def-based pin wins only when `model` is omitted). Never pass `model: "sonnet"`.
 

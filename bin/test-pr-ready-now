@@ -1854,6 +1854,33 @@ if [[ "$_sz" -lt 32224 || "$_sz" -gt 34224 ]]; then
 fi
 end_case pr-ready-skill-size-band
 
+# --- case 27: E22/E23 prevention prose pins -----------------------------------------------
+# Pins the load-bearing phrases added by this PR's prevention work so a prose gutting is
+# caught immediately rather than discovered in a future /pr-ready Phase 6 review.
+begin_case
+# 27a: E22 Class B — pre-commit scope-reconciliation step. Removing the numstat command
+# from _phase65-remediation.md step 4 makes this fail.
+grep -qF 'git diff --numstat HEAD' "$SCRIPT_DIR/../.claude/skills/pr-ready/_phase65-remediation.md" \
+  || fail "27a: _phase65-remediation.md lost 'git diff --numstat HEAD' — E22 Class B prevention removed"
+# 27b: E22 Class B — body correction command. Removing the gh pr edit line from step 4
+# makes this fail.
+grep -qF 'gh pr edit' "$SCRIPT_DIR/../.claude/skills/pr-ready/_phase65-remediation.md" \
+  || fail "27b: _phase65-remediation.md lost 'gh pr edit' — E22 Class B prevention removed"
+# 27c: E23 — named-constant-volume check (sub-clause 4a). Removing the 4a sub-clause from
+# _plan-fidelity-review.md makes this fail.
+grep -qF 'inheriting its blocking verdict' "$SCRIPT_DIR/../.claude/skills/pr-ready/_plan-fidelity-review.md" \
+  || fail "27c: _plan-fidelity-review.md lost 'inheriting its blocking verdict' — E23 4a sub-clause removed"
+# 27d: E23 — EXPECTED constant array check. Removing the named-constant prose from 4a
+# makes this fail.
+grep -qF '`EXPECTED` constant array' "$SCRIPT_DIR/../.claude/skills/pr-ready/_plan-fidelity-review.md" \
+  || fail "27d: _plan-fidelity-review.md lost '\`EXPECTED\` constant array' — E23 4a sub-clause removed"
+# 27e: coupling pin — "all six 6d checks" in 6a and "all six 6d classes" in
+# _phase65-remediation.md forbid a 7th 6d class item; changing this count breaks both
+# coupling statements and makes this fail.
+grep -qF 'all six 6d checks' "$SCRIPT_DIR/../.claude/skills/pr-ready/_plan-fidelity-review.md" \
+  || fail "27e: _plan-fidelity-review.md lost 'all six 6d checks' — coupling that forbids a 7th 6d class item removed"
+end_case e22-e23-prevention-prose-pins
+
 # --- verdict -----------------------------------------------------------------------------
 if [[ $FAILED -ne 0 ]]; then
     echo "test-pr-ready-now: FAILED ($FAILED assertion failure(s))" >&2

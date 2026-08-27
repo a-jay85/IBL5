@@ -1,6 +1,6 @@
 ---
 description: /pr-ready runtime Phase 6.5 — fix every Phase 6 finding in-PR, commit, re-push, re-arm CI. Loaded by SKILL.md via git show at Phase 6.5.
-last_verified: 2026-08-26
+last_verified: 2026-08-27
 ---
 
 # /pr-ready runtime Phase 6.5 — in-PR remediation
@@ -9,15 +9,15 @@ Purpose: the full Phase 6.5 procedure, lifted out of `SKILL.md` so it is residen
 
 Read at runtime via `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase65-remediation.md`.
 
-`<MASTER_SHA>`, `<N>`, and `<HEAD_SHA>` below are **literals to substitute** with the values pinned in Phase 1.3 — a value captured in one Bash call does not survive into the next.
+`<MASTER_SHA>` and `<N>` below are **literals to substitute** with the values pinned in Phase 1.3 — a value captured in one Bash call does not survive into the next. `<HEAD_SHA>` is **not** a Phase 1.3 pin: step 6 captures it fresh after this phase's own push. Never carry one in from an earlier phase.
 
 **Phase 6.5 — Remediation.**
 
 Every Phase 6 finding gets fixed and its prevention filed, in this PR's existing worktree. This is the one amendment to the stop-at-verdict invariant; everything that invariant still forbids stays forbidden.
 
-1. **Load the shared procedure.** `git show <MASTER_SHA>:.claude/skills/fix-and-prevent/_remediation.md` — same pin, same reason as the Phase 2 and Phase 6 includes (`git show` invariant above). Declared fallback, per the include-fallback clause: if `git show` fails and the file is genuinely present in this worktree, `Read` it by path and record `include-source: worktree (pin predates skill)` in the verdict. If neither source yields it, print `STOP: cannot load _remediation.md from <MASTER_SHA> or from the worktree` and stop.
+1. **Load the shared procedure.** `git show <MASTER_SHA>:.claude/skills/fix-and-prevent/_remediation.md` — same pin, same reason as the Phase 2 and Phase 6 includes (the `git show` include invariant in `SKILL.md`). Declared fallback, per the include-fallback clause: if `git show` fails and the file is genuinely present in this worktree, `Read` it by path and record `include-source: worktree (pin predates skill)` in the verdict. If neither source yields it, print `STOP: cannot load _remediation.md from <MASTER_SHA> or from the worktree` and stop.
 
-2. **Prove the tree carried nothing else — before the first remediation edit.** `git status --porcelain`. If it prints anything, print `STOP: worktree dirty before remediation` followed by that output, and stop. Phase 0.3 may have entered a worktree that is a peer's active workspace; the `git add -A` in step 4 would sweep their uncommitted work into this commit and step 5 would force-push it. A clean tree here is the normal case — Phase 4.3 step 3c already proved remote == HEAD. Run this once, here at Phase 6.5 entry; from step 3 onward the tree is dirty by design, so never repeat it.
+2. **Prove the tree carried nothing else — before the first remediation edit.** `git status --porcelain`. If it prints anything, print `STOP: worktree dirty before remediation` followed by that output, and stop. Phase 0.3 may have entered a worktree that is a peer's active workspace; the `git add -A` in step 4 would sweep their uncommitted work into this commit and step 5 would force-push it. A clean tree here is the normal case — Phase 4.3's `scripts/push.sh` already verified that origin holds this HEAD. Run this once, here at Phase 6.5 entry; from step 3 onward the tree is dirty by design, so never repeat it.
 
 3. **Remediate every finding.** For each Phase 6 finding — **notes as well as blocking**, across all six 6d classes — follow `_remediation.md` in **`Mode: in-PR`**. State that mode line out loud before its step 1; the procedure refuses to run without a declared mode. In-PR mode overrides `/fix-and-prevent`'s § Calibration "Out of scope" carve-outs: a finding too small to name a defect class still gets an entry, with `class: n/a — <reason>`. Never zero entries.
 "Never zero entries" binds the findings Phase 6 actually emitted — it does not manufacture one. A Phase 5.9 outcome of `REPLACED`, `APPENDED` or `UNCHANGED` is a routine refresh, not a finding: it produces no remediation entry, no backlog row, and no `last_verified:` bump. Only `AMBIGUOUS` reaches this phase, as the 6d.4 finding it is, and that one does get an entry.

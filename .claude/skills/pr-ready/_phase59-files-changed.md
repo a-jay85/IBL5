@@ -1,6 +1,6 @@
 ---
 description: /pr-ready runtime Phase 5.9 — refresh the PR body's files-changed block before review. Loaded by SKILL.md via git show at Phase 5.9.
-last_verified: 2026-08-26
+last_verified: 2026-08-27
 ---
 
 # /pr-ready runtime Phase 5.9 — refresh the files-changed block
@@ -9,7 +9,7 @@ Purpose: the full Phase 5.9 procedure, lifted out of `SKILL.md` so it is residen
 
 Read at runtime via `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase59-files-changed.md`.
 
-`<MASTER_SHA>`, `<N>`, and `<HEAD_SHA>` below are **literals to substitute** with the values pinned in Phase 1.3 — a value captured in one Bash call does not survive into the next.
+`<MASTER_SHA>` and `<N>` below are **literals to substitute** with the values pinned in Phase 1.3 — a value captured in one Bash call does not survive into the next.
 
 **Phase 5.9 — refresh the machine-generated files-changed block.**
 

@@ -1,6 +1,6 @@
 ---
 description: /pr-ready runtime Phase 7 — arm-hold evaluation, sticky verdict comment, hard terminator. Loaded by SKILL.md via git show at Phase 7.
-last_verified: 2026-08-26
+last_verified: 2026-08-27
 ---
 
 # /pr-ready runtime Phase 7 — holds, sticky verdict, terminator
@@ -9,7 +9,7 @@ Purpose: the full Phase 7 procedure, lifted out of `SKILL.md` so it is resident 
 
 Read at runtime via `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase7-verdict.md`.
 
-`<MASTER_SHA>`, `<N>`, and `<HEAD_SHA>` below are **literals to substitute** with the values pinned in Phase 1.3 — a value captured in one Bash call does not survive into the next.
+`<MASTER_SHA>` and `<N>` below are **literals to substitute** with the values pinned in Phase 1.3 — a value captured in one Bash call does not survive into the next.
 
 **Phase 7 — verdict and stop.**
 

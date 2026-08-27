@@ -1,6 +1,6 @@
 ---
 description: /pr-ready runtime Phase 4 — lost-work proof, push, PR state, and the CI watcher arm. Loaded by SKILL.md via git show at Phase 4.
-last_verified: 2026-08-26
+last_verified: 2026-08-27
 ---
 
 # /pr-ready runtime Phase 4 — push, PR state, and the CI watcher
@@ -9,7 +9,7 @@ Purpose: the full Phase 4 procedure, lifted out of `SKILL.md` so it is resident 
 
 Read at runtime via `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase4-push-and-ci.md`.
 
-`<MASTER_SHA>`, `<N>`, and `<HEAD_SHA>` below are **literals to substitute** with the values pinned in Phase 1.3 — a value captured in one Bash call does not survive into the next.
+`<MASTER_SHA>` and `<N>` below are **literals to substitute** with the values pinned in Phase 1.3 — a value captured in one Bash call does not survive into the next. `<HEAD_SHA>` is **not** a Phase 1.3 pin: it is captured fresh at the step that names it, and re-captured after every push. Never carry one in from an earlier phase.
 
 **Phase 4 — prove nothing was lost, push, watch CI.**
 

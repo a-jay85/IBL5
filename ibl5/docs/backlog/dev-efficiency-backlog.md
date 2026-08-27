@@ -297,3 +297,23 @@ Class B:
 `artifact destination:` Class A → `.claude/skills/plan/_architect-contract.md` (in-repo). Class B → `.claude/skills/pr-ready/SKILL.md` Phase 6.5 step 4 (in-repo). Neither built this pass.
 
 *(discovered 2026-08-26 during #2000)*
+
+### E23 PR Body Deletion Volumes Diverged from Code's `EXPECTED` Constants, Undetected Until /pr-ready Phase 6
+
+Body summary text was authored pre-implementation and hand-updated during coding, allowing four separate factual errors: (4a) player-row volume understated ~23× (627 vs 14502); (4b) backup table suffix wrong (`_bak` vs `_backup`); (4c) claimed rollback test coverage that doesn't exist; (4d) claimed full unit+E2E coverage while the same PR dropped the coverage baseline 0.85 pp.
+
+**Occurrences**
+
+| # | File:line | Class | Live? | Status |
+|---|-----------|-------|-------|--------|
+| 1 | PR #2001 body Summary — "627 player rows" vs code's 14502; `_bak` vs `_backup`; "and rollback" in test claim; "No manual testing needed — all changes are covered by unit and E2E tests" | A | yes | fixed this pass (body corrected via `gh pr edit`) |
+
+`prevention_ladder:`
+
+- **rung 0 — already covered?** No. Nothing checks that PR body deletion volumes match the code's `EXPECTED` constants at review time.
+- **rung 1 — extend an existing gate? LANDS HERE.** Extend the `/pr-ready` Phase 6 `_plan-fidelity-review.md` 6d checklist with a class item: "for any PR whose diff introduces a class with a named `EXPECTED` constant array (or equivalent named-constant deletion count), confirm the PR body Summary names volumes consistent with those constants." This is a reviewer prompt, not a mechanical gate — body prose cannot be auto-parsed for intent, but a named reviewer check prevents it from being silently skipped.
+- **rungs 2–5** — N/A.
+
+`artifact destination:` `.claude/skills/pr-ready/_plan-fidelity-review.md` — new 6d class item. Not built this pass.
+
+*(discovered 2026-08-27 during #2001)*

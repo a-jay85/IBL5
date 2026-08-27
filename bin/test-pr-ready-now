@@ -1511,6 +1511,8 @@ grep -qx 'model: claude-sonnet-4-6' "$SCRIPT_DIR/../.claude/skills/pr-ready/SKIL
   || fail "21a: SKILL.md missing model: claude-sonnet-4-6"
 grep -qE '^model: *"?sonnet"?' "$SCRIPT_DIR/../.claude/skills/pr-ready/SKILL.md" \
   && fail "21a: SKILL.md has banned sonnet alias"
+grep -qF 'DO NOT ADD ONE' "$SCRIPT_DIR/../.claude/skills/pr-ready/SKILL.md" \
+  && fail "21a: superseded NO-model: gate comment is still in SKILL.md"
 # 21b: reviewer def exists, is Opus-pinned, cannot nest a delegate
 test -f "$SCRIPT_DIR/../.claude/agents/pr-ready-phase6.md" \
   || fail "21b: pr-ready-phase6.md missing"
@@ -1557,6 +1559,8 @@ grep -qF 'This review runs on the orchestrator' "$SCRIPT_DIR/../.claude/skills/p
   && fail "21e: old 6a text still present (orchestrator form)"
 grep -qF 'pinned Opus 5 def' "$SCRIPT_DIR/../.claude/skills/pr-ready/_plan-fidelity-review.md" \
   || fail "21e: new 6a text missing"
+grep -qF 'Spawning any sub-agent for this phase is a defect' "$SCRIPT_DIR/../.claude/skills/pr-ready/SKILL.md" \
+  && fail "21e: superseded never-delegate clause still in SKILL.md"
 # 21f: driver default and revert lever — behavioral, over the EMITTED runner.
 # The static `grep -q -- '--model claude-opus-5'` this replaces matched comment prose only
 # (bin/pr-ready-now lines 14 and 112), so it kept passing with the entire --model parsing arm

@@ -1,6 +1,6 @@
 ---
 description: Development-efficiency backlog — inner-loop speed (diff-scoped analysis, parallel tests), CI caching, dependency-bump batching, and worktree lifecycle automation, with per-entry status.
-last_verified: 2026-08-26
+last_verified: 2026-08-27
 ---
 
 # Development-Efficiency Backlog
@@ -47,6 +47,8 @@ last_verified: 2026-08-26
 | E18 | `/pr-ready` Phase 6.5 commits new files but never regenerates the PR body `files-changed` block | ✅ Implemented | — | S |
 | E19 | `/pr-ready` materialize-from-pin sites declare no fallback, so a pin that predates the script loops forever | ✅ Implemented | — | S |
 | E20 | Ship-pipeline coverage assertions (PR-body Manual Testing block, Phase 4B review) are emitted against a narrower slice than the PR's cumulative diff | ⬜ Open | 🟦 | M |
+| E21 | Test assertions land as static source greps that pass while the behavior they name is absent | ⬜ Open | 🟩 | S |
+| E22 | Plan-declared negatives and PR body Scope dropped during Phase 6.5 remediation | ⬜ Open | 🟨 | S |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -226,3 +228,72 @@ Landing rung is **1**, so rungs 3–5 are never reached and the four `.claude/ru
 **Related.** [E18](#e18-pr-ready-phase-65-commits-new-files-but-never-regenerates-the-pr-bodys-files-changed-block) also concerns a PR body that stops matching its diff, but there the artifact is *machine-generated and stale*; here it is *hand-shaped and over-broad from the start* — the body was never right, rather than having drifted.
 
 *(discovered 2026-08-26 during #1964)*
+
+### E21 Test assertions land as static source greps that pass while the behavior they name is absent
+
+`class:` a verification phase specifies a **behavioral** assertion (run the thing, inspect what it emitted) and the implementation lands a **static source grep** instead. The grep matches text that can be present while the behavior is absent — comment prose, or a key line that could never structurally carry the token being banned — so the assertion is green from birth and stays green through the exact regression it was written to catch. It is worse than no test: the coverage matrix records the row as backed.
+
+Surfaced by `/pr-ready` running on PR #2000 — the `/pr-ready` Sonnet-orchestrator PR, dogfooding on itself. The plan (`~/claude-plans/pr-ready-sonnet-orchestrator.md` Phase 8) wrote case 21f as a two-arm dry-run over the runner file `bin/pr-ready-now` emits; the implementation substituted two `grep` calls against `bin/pr-ready-now`'s own source. One of those two matched **comment prose only** — `--model claude-opus-5` appears at `bin/pr-ready-now:14` and `:112` as documentation — so the PR's named rollback lever, the single thing that makes the Opus→Sonnet orchestrator switch reversible, could be deleted outright with the harness still passing. Confirmed by mutation on 2026-08-26: gutting the `--model` parse arm at `bin/pr-ready-now:151` left the old assertion green and makes the replacement fail with `21f: --model claude-opus-5 did not override the default — the revert lever is broken`.
+
+Two lesser instances of the same class shipped alongside it, both vacuous by construction rather than by accident of matching prose.
+
+**Occurrences**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/test-pr-ready-now` case 21f — `grep -q '--model claude-opus-5' bin/pr-ready-now` | yes — matches comment prose; the revert lever had no test | yes | fixed this pass (replaced with a two-arm `PR_READY_NOW_DRY_RUN=1` run asserting `MODEL=` in the emitted runner; mutation-verified) |
+| 2 | `bin/test-pr-ready-now` case 21c — `grep -F 'subagent_type: "pr-ready-phase6"' \| grep -qE 'model:'` | yes — vacuous by construction: the only matching line *is* the `subagent_type:` key, which can never also be a `model:` key | yes | fixed this pass (assertion now spans the whole `Agent( ... )` block via `awk`, and fails when the block is missing) |
+| 3 | `bin/test-pr-ready-now` case 21d — grep scoped to the single `test -s /tmp/pr-ready-phase6-verdict` line | yes — the fail-closed read spans several lines; the continuation arms were unasserted | yes | fixed this pass (widened to every line naming the verdict path, plus a `>= 3` line floor) |
+| 4 | `bin/test-pr-ready-now` case 21 name — landed as `sonnet-orchestrator-static`, plan declared `phase6-opus-delegate-static` | no — naming drift, not vacuity; but it breaks the plan's Phase 8 acceptance grep on harness output | yes | fixed this pass (renamed; stray `begin_case` argument dropped — `begin_case()` ignores it) |
+| 5 | PR #2000 body `## Scope` — omits the `bin/pr-ready-now` default + `--model` lever, the additive `.claude/agents/**` paths-filter widening, and the new harness case; asserts the tier guarantee unconditionally | no — a body claim narrower than the diff; this is [E20](#e20-ship-pipeline-coverage-assertions-are-emitted-against-a-narrower-slice-than-the-prs-cumulative-diff)'s class, on a new PR | yes | fixed this pass (Scope rewritten; the `files-changed` block left untouched) |
+| 6 | PR #2000 commit subject `feat: … (phases 1-4)` — stale and wrong type | no — cosmetic only; squash-merge lands the PR **title**, which is already `chore: …` with no phase suffix | no | not fixed — correct as-is; amending would cost a second force-push for text `master` never sees |
+| 7 | `bin/test-pr-ready-now` case 36 `stop-fails-closed` | no — a pre-existing flake, unrelated to this PR (it failed once then passed twice on an unchanged tree, and runs 500 lines above the edits) | yes | not fixed — out of scope for #2000; belongs to [E4](#e4-flake-quarantine-ledger) (flake-quarantine ledger) |
+
+`prevention_ladder:`
+
+- **rung 0 — already covered by an existing gate?** Only by a human-invoked one. `/pr-ready` Phase 6 (6d.2 plan-fidelity) is what caught all three, and it is optional — nothing fires at implementation time, when the substitution is made, or at PR time. The harness itself cannot detect it: a vacuous assertion is a *passing* assertion.
+- **rung 1 — extend an existing gate? LANDS HERE.** One doc-surface extension on a producer that already owns the artifact: `.claude/skills/plan/_architect-contract.md`'s verification-phase contract already requires each phase to state its acceptance check. Extend it so that when a phase asserts a **named behavior or lever**, the phase must also state **the mutation that assertion is required to catch** ("delete the `--model` arm ⇒ 21f fails"). That single line makes the substitution visible at three separate moments — the implementer cannot swap in a text grep without leaving the stated mutation unmet, the Phase 6 reviewer gets a stated predicate instead of having to re-derive intent, and anyone editing the case later has the teeth written down. No new mechanism, no new script.
+- **rung 2 — a rule doc under `.claude/rules/`?** Insufficient alone, and it would sit in the wrong place: the norm has to be read at the moment a verification phase is *authored*, which is inside the architect contract, not in an always-loaded rule. It would also add resident-context weight for a norm that fires on one narrow authoring surface.
+- **rung 3 — a PHPStan rule?** N/A — no PHP on this surface.
+- **rung 4 — a CI gate?** Rejected. Deciding whether a given `grep` is a legitimate static assertion or a stand-in for a behavioral one is the judgment the plan already records; a gate would have to re-derive it and would false-positive on the many static greps that are correct (case 21a, 21b, 21e and the retained 21f default check are all properly static — they assert *source text* because source text is the property).
+- **rung 5 — a new hook?** Rejected. The substitution happens inside a file edit that the hook layer cannot distinguish from any other test edit.
+
+Landing rung is **1**, so rungs 3–5 are never reached and the four `.claude/rules/meta-tooling-bar.md` extend-before-add conditions do not apply.
+
+`artifact destination:` `.claude/skills/plan/_architect-contract.md`, the verification-phase contract section. In-repo. Not built this pass — the occurrences above are fixed, the prevention is the open work this entry tracks.
+
+**Related.** [E20](#e20-ship-pipeline-coverage-assertions-are-emitted-against-a-narrower-slice-than-the-prs-cumulative-diff) is the sibling: there an artifact *claims* coverage it does not have, here a test *records* coverage it does not have. Both are silent, well-formed, and green.
+
+*(discovered 2026-08-26 during #2000)*
+
+---
+
+### E22 Plan-declared negatives and PR body Scope dropped during Phase 6.5 remediation
+
+**Class A** (finding 2): a test case rewrite during Phase 6.5 remediation that silently drops plan-declared negative assertions from the harness, leaving the asserted regressions unpinned.
+
+**Class B** (finding 4): a PR body Scope section whose file count and diff-stat numbers are not updated after Phase 6.5 remediation adds files and expands test cases beyond plan estimates.
+
+**Occurrences**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/test-pr-ready-now` case 21 — `grep -qF 'DO NOT ADD ONE'` and `grep -qF 'Spawning any sub-agent for this phase is a defect'` assertions dropped during E21 harness rewrite | class A | yes | fixed this pass (re-added both assertions) |
+| 2 | `PR #2000 body ## Scope` — "Six files change" vs. 7-file diff; `+38 -0` vs. actual `+82 -0`; `ibl5/docs/backlog/dev-efficiency-backlog.md` unmentioned | class B (same as E20) | yes | fixed this pass (body updated: count, stat, backlog file named) |
+
+`prevention_ladder:`
+
+Class A:
+- **rung 0 — already covered?** No. Nothing at implementation time checks that plan-declared negatives survive a harness rewrite.
+- **rung 1 — extend an existing gate? LANDS HERE.** Extend `.claude/skills/plan/_architect-contract.md` to require that each verification phase listing a negative assertion also name the mutation it must catch ("delete the `--model` arm ⇒ assertion fails"). An implementer cannot substitute a vacuous text grep without the mutation target going visibly missing; a Phase 6 reviewer gets a stated predicate instead of re-deriving intent from plan prose.
+- **rung 2 — a rule doc?** Insufficient alone: the norm must fire at authoring time, inside the architect contract.
+- **rungs 3–5** — N/A.
+
+Class B:
+- **rung 0 — already covered?** E20 tracks the same class; no mechanical gate exists.
+- **rung 1 — extend an existing gate? LANDS HERE.** Extend the `/pr-ready` SKILL.md Phase 6.5 commit step to include a micro-check: before committing, confirm that any explicit file counts and diff stats in the PR body Scope prose match the post-remediation `git diff --numstat`.
+- **rungs 2–5** — ruled out.
+
+`artifact destination:` Class A → `.claude/skills/plan/_architect-contract.md` (in-repo). Class B → `.claude/skills/pr-ready/SKILL.md` Phase 6.5 step 4 (in-repo). Neither built this pass.
+
+*(discovered 2026-08-26 during #2000)*

@@ -2,7 +2,7 @@
 
 Purpose: the criteria and verdict shape for the semantic judgment this skill exists to produce — does the implementation do what the plan *intended*, not merely what its tests assert?
 
-**6a. This review runs on the orchestrator. It is NEVER delegated.** Do not spawn an agent for it. Do not delegate any part of it. Do not summarise the diff via a sub-agent and review the summary. `.claude/rules/agent-tiering.md` reserves this class for the Opus column — "Never delegate understanding" — and the cost of delegating is not the delegate's raw capability but that the orchestrator loses the findings the delegate filtered out. Spawning a sub-agent for any part of this phase is a defect in the run.
+**6a. This review runs in the pinned Opus 5 def, spawned exactly once by the `/pr-ready` SKILL.md Phase 6 stub. It never runs on the orchestrator, and it never spawns a delegate of its own.** User-authorized 2026-08-26, superseding the previous "runs on the orchestrator / NEVER delegated" form. `.claude/rules/agent-tiering.md` reserves this class for the Opus column — "Never delegate understanding" — and what that clause protects is the *tier the judgment runs at*, not the *session it runs in*: the real cost of a bad delegation is that the caller only ever sees what the delegate filtered out. So the boundary is drawn where nothing is filtered — the reviewer gets every 6b input, performs all six 6d checks itself, and hands back a full written verdict rather than a summary. Delegating *part* of the review, summarising the diff through a second agent and reviewing the summary, or re-spawning the reviewer per finding are each still a defect in the run. Flat fan-out: the def disallows `Agent` outright.
 
 **6b. Inputs.** Gather all five before judging anything:
 

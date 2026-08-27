@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-08-21
+last_verified: 2026-08-27
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -711,3 +711,10 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Investigate first — per-season, compare the dupe pairs against `ibl_box_scores_teams` to determine whether each is a true clone, two genuinely distinct league games on that date (different `game_of_that_day`), or two distinct players sharing a `name`. Only then design the delete; the import-time duplicate guard shipping with the 2007 fix prevents recurrence but does not clean these.
 **Est. effort:** M
 **Risk if untouched:** 61 rows of silently wrong historical stats; any per-player aggregate over these seasons double-counts. A blind `(game_date, name)` dedupe would delete legitimate rows if any pair is two different players.
+
+### 15.25 `PhantomBoxscoreRepair::EXPECTED` Production Constants Are Untestable in CI
+**Location:** `ibl5/classes/Boxscore/PhantomBoxscoreRepair.php` (`EXPECTED`), `ibl5/tests/DatabaseIntegration/PhantomBoxscoreRepairTest.php` (`FIXTURE_EXPECTED`, `$expectedOverride`)
+**Problem:** The CI `DatabaseIntegration` harness DB has zero `ibl_box_scores` rows by construction (`db-seed.sql` contains no boxscore inserts), so production-count assertions for `EXPECTED = ['orphan_games'=>618,'orphan_team_rows'=>1236,'duplicate_triple_games'=>3,'duplicate_team_rows'=>6,'player_rows'=>14502,'recap_rows'=>20]` cannot pass in CI. Tests use a fourth constructor parameter `$expectedOverride` with synthetic fixture counts instead, making `EXPECTED` dead weight from a verification standpoint — mutating `EXPECTED['player_rows']` to any other value breaks no CI test. The correct duplicate-keeper `game_of_that_day` values (1, 2, 6 for the three real 2008 triples) are similarly unverifiable. Consequence: the CI coverage job's exclusion of `#[Group('database')]` tests caused the coverage baseline to drop 0.85 pp (86.8 → 85.95) in the same PR, affirmative evidence of the gap. Production figures were verified only by the migration dry-run against the prod-shaped snapshot.
+**Suggested direction:** Either (i) expand `db-seed.sql` with minimal boxscore fixtures sufficient to exercise the production-constant paths, remove the `$expectedOverride` escape hatch, and restore the coverage baseline floor; or (ii) formalize the `$expectedOverride` pattern as an explicit contract for data-repair classes and require that the migration dry-run output be attached to the PR so the human signing the hold has primary evidence of the production constants.
+**Est. effort:** M (option i) / S (option ii)
+**Risk if untouched:** Any future edit to `EXPECTED` or the selection predicates in `PhantomBoxscoreRepair` cannot be caught by CI; the only safety net is the dry-run step a deployer might skip.

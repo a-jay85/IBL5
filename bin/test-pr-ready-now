@@ -1640,6 +1640,7 @@ end_case phase6-opus-delegate-static
 begin_case
 _root="$SCRIPT_DIR/.."
 _paths=$(grep -ohE 'git show <MASTER_SHA>:[^ `]+' "$PRD/SKILL.md" "$PRD"/_*.md \
+             "$_root/.claude/agents/pr-ready-phase6.md" \
          | sed 's|^git show <MASTER_SHA>:||' | sort -u)
 [[ -n "$_paths" ]] || fail "no 'git show <MASTER_SHA>:<path>' includes found -- did the loader idiom change?"
 while IFS= read -r _p; do

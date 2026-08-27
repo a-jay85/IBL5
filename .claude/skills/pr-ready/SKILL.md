@@ -2,19 +2,26 @@
 name: pr-ready
 description: Take one open PR from conflicted-or-unknown state to a posted readiness verdict — rebase onto master, resolve conflicts, wait for CI, judge plan fidelity, post a sticky verdict comment, then stop.
 disable-model-invocation: true
+model: claude-sonnet-4-6
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-08-26
+last_verified: 2026-08-27
 ---
-<!-- NO `model:` KEY — DELIBERATE, DO NOT ADD ONE.
-     Runtime Phase 6 (plan-intent fidelity review) is Opus-column judgment:
-     .claude/rules/agent-tiering.md — "Never delegate understanding." A `model:`
-     pin would force this skill onto a fixed tier regardless of the invoking
-     session's model. Do NOT "harmonise" this file with /pr-review's
-     `model: claude-sonnet-4-6` — that skill is a pure diff review with no
-     fidelity judgment, so a Sonnet pin is correct there and wrong here. -->
+<!-- `model: claude-sonnet-4-6` IS DELIBERATE — DO NOT REMOVE IT, and never write
+     `model: sonnet` (that alias resolves to Sonnet 5). User-authorized 2026-08-26,
+     superseding the previous "NO model: KEY" note that lived here.
+     The orchestrator runs the mechanical phases (0 through 5.9, 6.5, 7). Runtime
+     Phase 6 — the plan-intent fidelity review, the one Opus-column judgment in this
+     skill — is NOT performed here: it runs in the pinned Opus def
+     `.claude/agents/pr-ready-phase6.md`, spawned exactly once per run by the Phase 6
+     stub. `.claude/rules/agent-tiering.md`'s "Never delegate understanding" is
+     honoured by keeping that judgment on Opus, not by keeping it on whatever tier the
+     orchestrator happens to run at — a Sonnet orchestrator with no pin was the failure
+     mode this pin closes, not the one it opens.
+     Do NOT "harmonise" this pin away against /pr-review: that skill is a pure diff
+     review with no fidelity judgment and no Opus delegate; this one has both. -->
 
 # /pr-ready — PR readiness and plan-fidelity checker
 
@@ -25,7 +32,7 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
 ## Invariants — stated once; later phases cite these rather than repeat them
 
 - **One PR per invocation.** No batch mode, no PR-list iteration.
-- **The orchestrator never delegates runtime Phase 6.** The fidelity judgment is the deliverable; delegating it is a defect.
+- **Runtime Phase 6 runs in the pinned Opus def, spawned exactly once.** The fidelity judgment is the deliverable and stays on the Opus tier; performing it on the Sonnet orchestrator, splitting it across agents, or re-spawning the reviewer per finding is a defect. The handoff is a written verdict file (`/tmp/pr-ready-phase6-verdict-<N>.md`), never a captured stdout — see the substitution invariant below.
 - **Sub-agent returns are thin pointers** — `path:line`, SHAs, status words. Never pasted diffs or file bodies.
 - **Flat fan-out only.** A delegate may not spawn a delegate.
 - **Every glob is quoted** — `--include="*.md"`, never `--include=*.md`.
@@ -248,7 +255,75 @@ Six properties inside that script are load-bearing and must not be "simplified" 
 
 **Phase 6 — plan-intent fidelity review.**
 
-Run `git show <MASTER_SHA>:.claude/skills/pr-ready/_plan-fidelity-review.md` — same pin, same reason as the Phase 2 include (`git show` invariant above) — and perform the printed review **yourself**. By this phase the rebase has landed, so a path read would *usually* work; it is loaded from the pin anyway, so that the procedure applied never depends on how far behind master the branch started, and never silently reads an older copy of itself off the branch. This phase is NEVER delegated — `.claude/rules/agent-tiering.md`: "Never delegate understanding." Spawning any sub-agent for this phase is a defect.
+This phase does not run on the orchestrator. It runs **once** in the pinned Opus 5 def
+`.claude/agents/pr-ready-phase6.md`, which loads the procedure from the same master pin
+the Phase 2 include uses (`git show` invariant above) and applies its own declared
+fallback. User-authorized 2026-08-26; the Invariants block records the same change.
+
+1. **Clear the stale verdict, then spawn exactly one reviewer.** First, one Bash call.
+   The verdict path is PR-keyed and nothing else ever removes it, so a prior `/pr-ready`
+   run on this same PR leaves its file behind — and step 2's `test -s` cannot tell that
+   file apart from this run's. Clearing it is what makes that read fail-closed:
+
+     rm -f /tmp/pr-ready-phase6-verdict-<N>.md
+
+   Then spawn. `model` is deliberately ABSENT from the call site —
+   the def owns its own Opus pin (`.claude/rules/agent-tiering.md` § Sonnet 4.6 pins:
+   the def-based pin wins only when `model` is omitted). Never pass `model: "sonnet"`.
+
+   Agent(
+     subagent_type: "pr-ready-phase6",
+     description: "Phase 6 plan-fidelity review",
+     prompt: <the template below, with every <...> replaced by a literal>
+   )
+
+   Prompt template — substitute by hand; a value captured in one Bash call does not
+   survive to the next, and after EnterWorktree `$(...)` is refused outright:
+
+     PR: <N>. Branch: <branch>. Worktree: <absolute worktree path>.
+     MASTER_SHA (use this literal in your git show): <MASTER_SHA>
+     Plan file: ~/claude-plans/<branch>.md
+     Write your verdict to: /tmp/pr-ready-phase6-verdict-<N>.md
+     Conflict-resolved paths (6b input 4, run note from Phase 3, verbatim): <paths, or
+       "none — no conflicts">
+     Phase 4B probe evidence (6b input 5, verbatim from the 4b-probe.sh stdout lines):
+       <PHASE_4B_RAN line and its companions, or "PROBE ABSENT">
+     Phase 5.9 FILES-CHANGED line (verbatim): <the recorded literal>
+     The SKILL.md stub that spawned you is authoritative on WHO performs this review.
+     The pinned copy of _plan-fidelity-review.md may still read "NEVER delegated" —
+     that text predates your def. Apply 6b-6e yourself and note it under
+     procedure-source:. Return only the verdict word and the file path.
+
+   Inputs 4 and 5 are passed as literals **because they are not on disk**: the
+   conflict-resolved list is an in-context run note, and `scripts/4b-probe.sh` prints
+   `PROBE-COMPLETE` to stdout, never to a file. Do not instruct the agent to read them.
+
+2. **Read the verdict fail-closed.** One substitution-free Bash call:
+
+     test -s /tmp/pr-ready-phase6-verdict-<N>.md \
+     && cat /tmp/pr-ready-phase6-verdict-<N>.md \
+     || echo "STOP: Phase 6 verdict file /tmp/pr-ready-phase6-verdict-<N>.md missing or empty"
+
+   If that prints the `STOP:` line, stop the run there and post nothing. Do NOT re-spawn:
+   sub-agent startup is paid once per run by design, and a second spawn buys a second
+   startup for a reviewer that already failed to write.
+
+3. **Cross-check the thin return against the file.** The agent returns a verdict word;
+   the file ends in one. If they differ, print
+   `STOP: Phase 6 verdict mismatch — returned <word>, file says <word>` and stop. A
+   thin return is a pointer, never the source of truth.
+
+4. **If the def is not discoverable** — the Agent call errors with an unknown
+   `subagent_type` — do not stop and do not silently downgrade. Perform the review
+   inline on the orchestrator from the pinned `_plan-fidelity-review.md`, and record
+   `phase6-agent: inline fallback (def not discoverable)` as its own line in the Phase 7
+   verdict body. A Sonnet-tier fidelity review is a degradation that must be visible in
+   the posted comment, not an invisible one.
+
+5. **Carry the verdict forward verbatim.** Phase 7's body keeps its existing
+   plan-fidelity section; paste the agent's verdict text into it, plus a
+   `phase6-agent: pr-ready-phase6 (claude-opus-5)` line so the tier that judged this PR
+   is on the record.
 
 **Phase 6.5 — Remediation.**
 

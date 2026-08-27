@@ -1504,6 +1504,99 @@ run_wci "$SHA_NEW" CLEAN "$ALL_GREEN" 1234
 [[ -n "$wci_out" ]] || fail "watch-ci (f): a terminal path printed nothing — silence is not success"
 end_case watch-ci-single-wake
 
+# --- case 21: static assertions for the Sonnet-orchestrator + pinned-Opus-reviewer PR ---
+begin_case
+# 21a: orchestrator pinned to claude-sonnet-4-6; banned sonnet alias absent
+grep -qx 'model: claude-sonnet-4-6' "$SCRIPT_DIR/../.claude/skills/pr-ready/SKILL.md" \
+  || fail "21a: SKILL.md missing model: claude-sonnet-4-6"
+grep -qE '^model: *"?sonnet"?' "$SCRIPT_DIR/../.claude/skills/pr-ready/SKILL.md" \
+  && fail "21a: SKILL.md has banned sonnet alias"
+grep -qF 'DO NOT ADD ONE' "$SCRIPT_DIR/../.claude/skills/pr-ready/SKILL.md" \
+  && fail "21a: superseded NO-model: gate comment is still in SKILL.md"
+# 21b: reviewer def exists, is Opus-pinned, cannot nest a delegate
+test -f "$SCRIPT_DIR/../.claude/agents/pr-ready-phase6.md" \
+  || fail "21b: pr-ready-phase6.md missing"
+grep -qx 'model: claude-opus-5' "$SCRIPT_DIR/../.claude/agents/pr-ready-phase6.md" \
+  || fail "21b: pr-ready-phase6.md not pinned to claude-opus-5"
+grep -q '^disallowedTools:.*Agent' "$SCRIPT_DIR/../.claude/agents/pr-ready-phase6.md" \
+  || fail "21b: pr-ready-phase6.md does not disallow Agent"
+# 21c: Phase 6 spawn site carries no model: override — asserted over the whole
+# Agent( ... ) block, not over the lines that happen to name the def. A line-scoped grep
+# is vacuous by construction here: the only line matching subagent_type: "pr-ready-phase6"
+# IS the subagent_type key, and one key line can never also be a model: key line. The
+# realistic regression is a bare `model: "sonnet",` added as its own line inside the block,
+# which contains no 'pr-ready-phase6' and so was invisible to the old form.
+blk="$(awk '
+    /^[[:space:]]*Agent\(/                  { inblk=1; buf="" }
+    inblk                                   { buf = buf $0 "\n" }
+    inblk && /^[[:space:]]*\)[[:space:]]*$/ {
+        if (buf ~ /subagent_type: "pr-ready-phase6"/) printf "%s", buf
+        inblk = 0
+    }
+' "$SCRIPT_DIR/../.claude/skills/pr-ready/SKILL.md")"
+# Empty window => the spawn block was deleted or reshaped. Fail loudly rather than let the
+# absence of a block silently satisfy the "no model: override" assertion below.
+[[ -n "$blk" ]] \
+  || fail "21c: no Agent( ... ) block spawning pr-ready-phase6 found in SKILL.md"
+grep -qE 'model:' <<< "$blk" \
+  && fail "21c: spawn site has a model: override (def pin must win)"
+: # 21c passes when no line in the spawn block matches model:
+# 21d: verdict handoff uses no $( or <( — survives EnterWorktree isolation.
+# Scoped to EVERY line naming the verdict path, not only the `test -s` line: the fail-closed
+# read spans several lines, so the narrower form left the `&&`/`||` arms unasserted and a
+# later $(cat ...) added there would have sailed through.
+_vd=$(grep -cF 'pr-ready-phase6-verdict' "$SCRIPT_DIR/../.claude/skills/pr-ready/SKILL.md")
+[[ "$_vd" -ge 3 ]] \
+  || fail "21d: verdict-read block shrank to $_vd line(s) naming the verdict path, want >= 3"
+grep -F 'pr-ready-phase6-verdict' "$SCRIPT_DIR/../.claude/skills/pr-ready/SKILL.md" \
+  | grep -qE '\$\(|<\(' \
+  && fail "21d: fail-closed read contains command substitution"
+: # 21d passes when no match
+# 21e: section 6a rewritten; old form gone
+grep -qF 'It is NEVER delegated' "$SCRIPT_DIR/../.claude/skills/pr-ready/_plan-fidelity-review.md" \
+  && fail "21e: old 6a text still present"
+grep -qF 'This review runs on the orchestrator' "$SCRIPT_DIR/../.claude/skills/pr-ready/_plan-fidelity-review.md" \
+  && fail "21e: old 6a text still present (orchestrator form)"
+grep -qF 'pinned Opus 5 def' "$SCRIPT_DIR/../.claude/skills/pr-ready/_plan-fidelity-review.md" \
+  || fail "21e: new 6a text missing"
+grep -qF 'Spawning any sub-agent for this phase is a defect' "$SCRIPT_DIR/../.claude/skills/pr-ready/SKILL.md" \
+  && fail "21e: superseded never-delegate clause still in SKILL.md"
+# 21f: driver default and revert lever — behavioral, over the EMITTED runner.
+# The static `grep -q -- '--model claude-opus-5'` this replaces matched comment prose only
+# (bin/pr-ready-now lines 14 and 112), so it kept passing with the entire --model parsing arm
+# deleted — the plan's own named rollback lever had no test at all. The `grep -qx` on the
+# assignment is KEPT: it is what gives the mutation check teeth on the default's source text.
+# `rm -f "$R"` before each arm is load-bearing — case 5 fires the same PR under the default
+# model, and fire_pr's stale-clearing glob excludes $RUNNER by name, so a leftover runner
+# would satisfy arm 1 even if this case's own driver run never reached emit_runner.
+grep -qx 'MODEL="claude-sonnet-4-6"' "$SCRIPT_DIR/pr-ready-now" \
+  || fail "21f: bin/pr-ready-now default is not claude-sonnet-4-6"
+R="/tmp/pr-ready-now-runner-1901.sh"
+clean_slots; rm -f "$R"
+out="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" PR_READY_NOW_DRY_RUN=1 run_driver --go --jobs 3 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "21f: default dry-run exited $rc, want 0 (out: $out)"
+test -s "$R"    || fail "21f: default dry-run emitted no runner at $R"
+grep -qx 'MODEL=claude-sonnet-4-6' "$R" \
+  || fail "21f: default runner MODEL is not claude-sonnet-4-6"
+clean_slots; rm -f "$R"
+out="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" PR_READY_NOW_DRY_RUN=1 run_driver --go --jobs 3 --model claude-opus-5 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "21f: --model dry-run exited $rc, want 0 (out: $out)"
+test -s "$R"    || fail "21f: --model dry-run emitted no runner at $R"
+grep -qx 'MODEL=claude-opus-5' "$R" \
+  || fail "21f: --model claude-opus-5 did not override the default — the revert lever is broken"
+# 21g: the verdict path is cleared BEFORE the spawn. Ordering is the whole property — an
+# rm -f sitting after the Agent( call would still leave step 2's `test -s` satisfiable by a
+# prior run's file for the same PR, which is the stale-verdict hole this closes. Both line
+# numbers are captured so a missing clause and a misordered one fail with distinct messages.
+_sk="$SCRIPT_DIR/../.claude/skills/pr-ready/SKILL.md"
+_rm_ln=$(grep -nF 'rm -f /tmp/pr-ready-phase6-verdict' "$_sk" | head -1 | cut -d: -f1)
+_spawn_ln=$(grep -nF 'subagent_type: "pr-ready-phase6"' "$_sk" | head -1 | cut -d: -f1)
+[[ -n "$_rm_ln" ]] \
+  || fail "21g: SKILL.md never clears the verdict path — step 2's test -s can pass on a stale file"
+[[ -n "$_spawn_ln" && -n "$_rm_ln" && "$_rm_ln" -lt "$_spawn_ln" ]] \
+  || fail "21g: verdict rm -f (line ${_rm_ln:-none}) does not precede the spawn (line ${_spawn_ln:-none})"
+end_case phase6-opus-delegate-static
+
 # --- verdict -----------------------------------------------------------------------------
 if [[ $FAILED -ne 0 ]]; then
     echo "test-pr-ready-now: FAILED ($FAILED assertion failure(s))" >&2

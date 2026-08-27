@@ -338,6 +338,34 @@ assert "gateH-no-hold-armed" 0 '---
 impl_model: sonnet
 ---'"$M"
 
+# Gate H (a): the crammed one-line form must flag (exit 1). This is the whole
+# point of the sub-check — WITHOUT it the fixture below is silently read as
+# "auto_merge absent" (= true) and every downstream consumer arms the merge.
+assert "gateHa-crammed-frontmatter" 1 '---
+impl_model: sonnet, auto_merge: false
+---'"$M"'
+## Automouse Hold Justification
+
+Intrinsic: touched security surface.
+'
+
+# Gate H (a): reversed key order is the same defect, must flag (exit 1).
+assert "gateHa-crammed-reversed" 1 '---
+auto_merge: false, impl_model: sonnet
+---'"$M"'
+## Automouse Hold Justification
+
+Intrinsic: touched security surface.
+'
+
+# Gate H (a) FP-guard: a `description:` line that name-drops auto_merge in prose
+# AFTER a comma must NOT flag (exit 0) — the check is anchored at line start on
+# the key itself. Real corpus plans do this (jsb-faithful-foul-pair.md).
+assert "gateHa-prose-mentions-not-crammed" 0 '---
+description: "gates passed mechanically, auto_merge: true stands"
+impl_model: sonnet
+---'"$M"
+
 # Gate H FP-guard: a plan that merely DOCUMENTS the `auto_merge: false` syntax in
 # its body (not in line-1 frontmatter) must NOT flag (exit 0).
 assert "gateH-body-mentions-syntax-only" 0 "$FM$M"'

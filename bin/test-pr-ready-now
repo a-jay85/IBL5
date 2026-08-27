@@ -1676,13 +1676,13 @@ for _c in _phase4-push-and-ci.md _phase59-files-changed.md _phase65-remediation.
     grep -qF "STOP: cannot load $_c from <MASTER_SHA> or from the worktree" "$_SKILL" \
         || fail "the $_c stub has no inline fail-closed STOP line -- a failed load would silently skip the phase"
 done
-# The two PRE-EXISTING stubs use the other sanctioned shape: they point at the single
-# declared fallback in the invariants instead of carrying an inline STOP. Assert that shape
-# too, so a future edit cannot quietly delete either form of the guard.
-for _c in _rebase-and-conflicts.md _plan-fidelity-review.md; do
-    grep -qF "git show <MASTER_SHA>:.claude/skills/pr-ready/$_c" "$_SKILL" \
-        || fail "SKILL.md has no git-show stub for $_c"
-done
+# The one PRE-EXISTING orchestrator-side stub uses the sanctioned fallback shape: it points
+# at the single declared fallback in the invariants rather than carrying an inline STOP.
+# _plan-fidelity-review.md is NO LONGER loaded by SKILL.md directly: Phase 6 now spawns the
+# pr-ready-phase6 agent def, which loads _plan-fidelity-review.md on its own. Only
+# _rebase-and-conflicts.md is loaded by the orchestrator via git show.
+grep -qF "git show <MASTER_SHA>:.claude/skills/pr-ready/_rebase-and-conflicts.md" "$_SKILL" \
+    || fail "SKILL.md has no git-show stub for _rebase-and-conflicts.md"
 grep -qF 'STOP: cannot load <file> from <MASTER_SHA> or from the worktree' "$_SKILL" \
     || fail "the include-fallback invariant lost its declared STOP line"
 # The enumeration must not drift behind the number of includes -- a stale count leaves
@@ -1843,11 +1843,13 @@ end_case pr-ready-push-fail-closed
 # SKILL.md is resident in context on EVERY turn of a /pr-ready run, so its size is a cost
 # invariant, not a style preference. The band is 2000 B wide -- deliberately NARROWER than
 # the smallest relocatable phase (Phase 5.9, 2671 B) -- so re-inlining any phase trips it.
-# Measured at implementation: 29021 B (Step 3.5).
+# Measured at implementation: 33224 B (Step 3.5 post Phase-6-delegate rewrite; the plan
+# predicted 29021 B but a separate merged PR added the Phase 6 Opus-delegate block (+4203 B)
+# before this PR rebased onto master).
 begin_case
 _sz=$(wc -c < "$PRD/SKILL.md" | tr -d ' ')
-if [[ "$_sz" -lt 28021 || "$_sz" -gt 30021 ]]; then
-    fail "SKILL.md is $_sz B, outside the [28021, 30021] resident-bytes band -- a phase was re-inlined, a relocation was reverted, or the file grew unreviewed"
+if [[ "$_sz" -lt 32224 || "$_sz" -gt 34224 ]]; then
+    fail "SKILL.md is $_sz B, outside the [32224, 34224] resident-bytes band -- a phase was re-inlined, a relocation was reverted, or the file grew unreviewed"
 fi
 end_case pr-ready-skill-size-band
 

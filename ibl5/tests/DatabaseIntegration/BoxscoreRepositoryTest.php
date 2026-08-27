@@ -114,9 +114,123 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
             1, 30, 7, 14, 3, 4, 1, 5, 1, 4, 5, 1, 2, 1, 3
         );
 
-        $deleted = $this->repo->deletePlayerBoxscoresByGame('2025-03-01', 2, 1);
+        $deleted = $this->repo->deletePlayerBoxscoresByGame('2025-03-01', 2, 1, 1);
 
         self::assertGreaterThan(0, $deleted);
+    }
+
+    /**
+     * deletePlayerBoxscoresByGame filters on all four columns including game_of_that_day.
+     * With two rows at the same (date, visitor, home) but gotd=1 and gotd=2,
+     * calling with gotd=1 deletes exactly one row and leaves the gotd=2 row.
+     */
+    #[\PHPUnit\Framework\Attributes\Group('database')]
+    public function testDeletePlayerBoxscoresByGameDeletesOnlyTheMatchingGameOfThatDay(): void
+    {
+        // Two players needed — ibl_box_scores.pid has a FK to ibl_plr.pid.
+        $this->insertTestPlayer(200010050, 'BS GotdDel1', ['teamid' => 2]);
+        $this->insertTestPlayer(200010051, 'BS GotdDel2', ['teamid' => 2]);
+
+        // gotd=1 (default) for player 50, gotd=2 for player 51 — same (date, visitor, home) triple.
+        $this->insertPlayerBoxscoreRow('2025-03-05', 200010050, 'BS GotdDel1', 'PG', 2, 1, 2);
+        $this->insertPlayerBoxscoreRow('2025-03-05', 200010051, 'BS GotdDel2', 'SG', 2, 1, 2, overrides: ['game_of_that_day' => 2]);
+
+        $deleted = $this->repo->deletePlayerBoxscoresByGame('2025-03-05', 2, 1, 1);
+        self::assertSame(1, $deleted);
+
+        $date = '2025-03-05';
+        $visitorTid = 2;
+        $homeTid = 1;
+        $gotd = 2;
+        $stmt = $this->db->prepare(
+            'SELECT game_of_that_day FROM ibl_box_scores WHERE game_date = ? AND visitor_teamid = ? AND home_teamid = ? AND game_of_that_day = ?'
+        );
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('siii', $date, $visitorTid, $homeTid, $gotd);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        self::assertSame(2, (int) $row['game_of_that_day']);
+    }
+
+    /**
+     * Boundary: deletePlayerBoxscoresByGame returns 0 when no row matches the given game_of_that_day.
+     */
+    #[\PHPUnit\Framework\Attributes\Group('database')]
+    public function testDeletePlayerBoxscoresByGameReturnsZeroForUnknownGameOfThatDay(): void
+    {
+        $this->insertTestPlayer(200010054, 'BS GotdBound', ['teamid' => 2]);
+        $this->insertPlayerBoxscoreRow('2025-03-07', 200010054, 'BS GotdBound', 'PG', 2, 1, 2);
+
+        $deleted = $this->repo->deletePlayerBoxscoresByGame('2025-03-07', 2, 1, 9);
+        self::assertSame(0, $deleted);
+
+        $date = '2025-03-07';
+        $visitorTid = 2;
+        $homeTid = 1;
+        $gotd = 1;
+        $stmt = $this->db->prepare(
+            'SELECT COUNT(*) AS cnt FROM ibl_box_scores WHERE game_date = ? AND visitor_teamid = ? AND home_teamid = ? AND game_of_that_day = ?'
+        );
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('siii', $date, $visitorTid, $homeTid, $gotd);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+        self::assertSame(1, (int) $row['cnt']);
+    }
+
+    /**
+     * hasNullTeamIdPlayerBoxscores is scoped to game_of_that_day.
+     * With gotd=1 clean and gotd=2 corrupt (NULL teamid), calling with gotd=1
+     * returns false, and calling with gotd=2 returns true.
+     */
+    #[\PHPUnit\Framework\Attributes\Group('database')]
+    public function testHasNullTeamIdPlayerBoxscoresIsScopedToGameOfThatDay(): void
+    {
+        $this->insertTestPlayer(200010052, 'BS GotdLeak1', ['teamid' => 2]);
+        $this->insertTestPlayer(200010053, 'BS GotdLeak2', ['teamid' => 1]);
+
+        // Clean row at gotd=1 — teamid is set.
+        $this->insertPlayerBoxscoreRow('2025-03-06', 200010052, 'BS GotdLeak1', 'PG', 2, 1, 2);
+
+        // Corrupt row at gotd=2 — teamid is NULL, pid != 0 (required by hasNullTeamId's WHERE clause).
+        $this->insertRow('ibl_box_scores', [
+            'game_date'       => '2025-03-06',
+            'name'            => 'BS GotdLeak2',
+            'pos'             => 'SF',
+            'pid'             => 200010053,
+            'visitor_teamid'  => 2,
+            'home_teamid'     => 1,
+            // teamid intentionally omitted — will be NULL
+            'game_min'        => 25,
+            'game_2gm'        => 3,
+            'game_2ga'        => 8,
+            'game_ftm'        => 2,
+            'game_fta'        => 4,
+            'game_3gm'        => 1,
+            'game_3ga'        => 3,
+            'game_orb'        => 1,
+            'game_drb'        => 4,
+            'game_ast'        => 3,
+            'game_stl'        => 1,
+            'game_tov'        => 1,
+            'game_blk'        => 0,
+            'game_pf'         => 2,
+            'game_of_that_day' => 2,
+            'attendance'      => 10000,
+            'capacity'        => 15000,
+            'visitor_wins'    => 20,
+            'visitor_losses'  => 10,
+            'home_wins'       => 25,
+            'home_losses'     => 5,
+            'uuid'            => 'bs-gotdleak-' . bin2hex(random_bytes(6)),
+        ]);
+
+        // gotd=1 is clean — must return false
+        self::assertFalse($this->repo->hasNullTeamIdPlayerBoxscores('2025-03-06', 2, 1, 1));
+        // gotd=2 is corrupt — must return true
+        self::assertTrue($this->repo->hasNullTeamIdPlayerBoxscores('2025-03-06', 2, 1, 2));
     }
 
     public function testDeletePreseasonBoxScoresRemovesOnlyPreseason(): void
@@ -287,7 +401,7 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
             '2025-04-01', 200010030, 'BS NullTid', 'PG', 2, 1, 1
         );
 
-        $result = $this->repo->hasNullTeamIdPlayerBoxscores('2025-04-01', 2, 1);
+        $result = $this->repo->hasNullTeamIdPlayerBoxscores('2025-04-01', 2, 1, 1);
 
         self::assertFalse($result);
     }
@@ -330,14 +444,14 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
             'uuid' => 'bs-nulltid-' . bin2hex(random_bytes(6)),
         ]);
 
-        $result = $this->repo->hasNullTeamIdPlayerBoxscores('2025-04-02', 2, 1);
+        $result = $this->repo->hasNullTeamIdPlayerBoxscores('2025-04-02', 2, 1, 1);
 
         self::assertTrue($result);
     }
 
     public function testHasNullTeamIdReturnsFalseForNoMatchingGames(): void
     {
-        $result = $this->repo->hasNullTeamIdPlayerBoxscores('2099-01-01', 999, 998);
+        $result = $this->repo->hasNullTeamIdPlayerBoxscores('2099-01-01', 999, 998, 1);
 
         self::assertFalse($result);
     }
@@ -471,5 +585,77 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
 
         $regular = $this->repo->findTeamBoxscore('2025-01-20', 3, 1, 1);
         self::assertNotNull($regular);
+    }
+
+    // ── fetchScheduledGameIndex ────────────────────────────────────
+
+    public function testFetchScheduledGameIndexReturnsNestedTripleMap(): void
+    {
+        $this->insertScheduleRow(2025, '2025-01-15', 2, 100, 1, 90);
+
+        $index = $this->repo->fetchScheduledGameIndex(2025);
+
+        self::assertTrue(isset($index['2025-01-15'][2][1]));
+        self::assertTrue($index['2025-01-15'][2][1]);
+    }
+
+    public function testFetchScheduledGameIndexExcludesOtherSeasons(): void
+    {
+        $this->insertScheduleRow(2024, '2024-01-15', 2, 100, 1, 90);
+        $this->insertScheduleRow(2025, '2025-01-15', 3, 100, 1, 90);
+
+        $index = $this->repo->fetchScheduledGameIndex(2025);
+
+        // 2025 triple present
+        self::assertTrue(isset($index['2025-01-15'][3][1]));
+        // 2024 triple absent
+        self::assertFalse(isset($index['2024-01-15'][2][1]));
+    }
+
+    public function testFetchScheduledGameIndexIsEmptyForSeasonWithNoRows(): void
+    {
+        // ibl_schedule has no rows for season 1901; fail-open is correct behaviour.
+        $index = $this->repo->fetchScheduledGameIndex(1901);
+
+        self::assertSame([], $index);
+    }
+
+    // ── fetchBoxscoreGameOfThatDayIndex ───────────────────────────
+
+    public function testFetchBoxscoreGameOfThatDayIndexGroupsSiblingGamesUnderOneTriple(): void
+    {
+        // Two games sharing the same (date, visitor, home) triple but different gotd values.
+        // Use a month-3 date so season_year = 2025 (month < 10 → year stays).
+        $this->insertTeamBoxscoreRow('2025-03-05', 'Game1', 1, 2, 1);
+        $this->insertTeamBoxscoreRow('2025-03-05', 'Game2', 2, 2, 1);
+
+        $index = $this->repo->fetchBoxscoreGameOfThatDayIndex(2025);
+
+        self::assertSame([1, 2], $index['2025-03-05'][2][1]);
+    }
+
+    public function testFetchBoxscoreGameOfThatDayIndexSkipsNullTeamidRows(): void
+    {
+        // Non-null row at the same date — proves the predicate, not just an empty index.
+        // Use month-3 date so season_year = 2025.
+        $this->insertTeamBoxscoreRow('2025-03-10', 'NonNull', 1, 2, 1);
+
+        // Null-visitor row: omit visitor_teamid entirely so DEFAULT NULL is used.
+        // Passing PHP null via insertRow() would bind as '', failing the INT column.
+        $this->insertRow('ibl_box_scores_teams', [
+            'game_date'       => '2025-03-10',
+            'name'            => 'NullViz',
+            'game_of_that_day' => 2,
+            'home_teamid'     => 1,
+            // visitor_teamid intentionally omitted → DEFAULT NULL, bypasses FK check
+        ]);
+
+        $index = $this->repo->fetchBoxscoreGameOfThatDayIndex(2025);
+
+        // Non-null row IS in the index
+        self::assertTrue(isset($index['2025-03-10'][2][1]));
+        self::assertSame([1], $index['2025-03-10'][2][1]);
+        // Null row is excluded: (int)null = 0 would be key 0 if included
+        self::assertFalse(isset($index['2025-03-10'][0]));
     }
 }

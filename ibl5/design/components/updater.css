@@ -238,17 +238,6 @@ body:has(> .updater) {
     margin: 0.125em 0;
 }
 
-/* --- Error variant --- */
-
-.updater-details__summary--errors {
-    color: var(--error-500);
-    font-weight: 600;
-}
-
-.updater-details--errors {
-    margin-top: var(--space-1);
-}
-
 .updater-details__content .text-error {
     color: var(--error-500);
 }

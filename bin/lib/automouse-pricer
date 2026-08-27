@@ -213,9 +213,32 @@ def scan(path, acc, is_main):
                 acc.w5 += w5
                 acc.w1 += w1
 
-            # peak_ctx is a max over {top-level usage} U {each iteration} — never a sum.
-            for part in [u] + list(u.get("iterations") or []):
-                acc.peak = max(acc.peak, ctx_of(part))
+            # True context occupancy for this turn.
+            #
+            # When an assistant record carries usage.iterations[], the TOP-LEVEL usage is
+            # the SUM across those iterations, not the occupancy of any one of them — the
+            # same fact parts_of() already encodes for pricing. Maxing over [u] + iterations
+            # therefore always picked the sum and inflated the peak (bea65310 read 208262
+            # against a true 116570). Take the max over the iterations alone.
+            #
+            # advisor_message iterations are dropped: an advisor sub-call is a separate
+            # inference against a separate window, so its occupancy never sat in this
+            # session's window. It is still PRICED — parts_of() is deliberately untouched.
+            # Absence of "type" means a normal iteration, so test != rather than ==.
+            #
+            # Sub-agents run in their own windows too, so only the main transcript feeds
+            # peak_ctx; a sub-agent's peak is recoverable by pricing its session directly.
+            its = u.get("iterations") or []
+            cand = [p for p in its if p.get("type") != "advisor_message"]
+            if cand:
+                turn_ctx = max(ctx_of(p) for p in cand)
+            elif its:
+                # Every iteration was an advisor call — still never the summed top level.
+                turn_ctx = max(ctx_of(p) for p in its)
+            else:
+                turn_ctx = ctx_of(u)
+            if is_main:
+                acc.peak = max(acc.peak, turn_ctx)
 
             prev = (ctx_of(u), default_model)
 

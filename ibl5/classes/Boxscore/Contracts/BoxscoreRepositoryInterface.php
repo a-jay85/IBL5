@@ -68,14 +68,39 @@ interface BoxscoreRepositoryInterface
     public function deleteTeamBoxscoresByGame(string $date, int $visitor_teamid, int $home_teamid, int $game_of_that_day): int;
 
     /**
+     * Build an in-memory membership index of all scheduled games for a season.
+     *
+     * Returns a nested map [game_date][visitor_teamid][home_teamid] => true
+     * backed by a single SELECT DISTINCT from `ibl_schedule` scoped to $seasonYear.
+     * Returns an empty array when no rows exist (seasons predating the schedule table).
+     *
+     * @param int $seasonYear The season_year value (e.g., 2008 for the 2007–08 season)
+     * @return array<string, array<int, array<int, true>>>
+     */
+    public function fetchScheduledGameIndex(int $seasonYear): array;
+
+    /**
+     * Build an in-memory index of existing boxscore game_of_that_day values per game triple.
+     *
+     * Returns a nested map [game_date][visitor_teamid][home_teamid] => list<int>
+     * of game_of_that_day values already recorded in `ibl_box_scores_teams`,
+     * excluding rows where visitor_teamid or home_teamid is NULL.
+     *
+     * @param int $seasonYear The season_year generated column value
+     * @return array<string, array<int, array<int, list<int>>>>
+     */
+    public function fetchBoxscoreGameOfThatDayIndex(int $seasonYear): array;
+
+    /**
      * Delete player boxscore records for a specific game
      *
      * @param string $date Game date in Y-m-d format
      * @param int $visitor_teamid Visitor team ID
      * @param int $home_teamid Home team ID
+     * @param int $game_of_that_day 1-based index of the game within its date, league-wide
      * @return int Number of affected rows
      */
-    public function deletePlayerBoxscoresByGame(string $date, int $visitor_teamid, int $home_teamid): int;
+    public function deletePlayerBoxscoresByGame(string $date, int $visitor_teamid, int $home_teamid, int $game_of_that_day): int;
 
     /**
      * Insert a team boxscore row.
@@ -98,9 +123,10 @@ interface BoxscoreRepositoryInterface
      * @param string $date Game date in Y-m-d format
      * @param int $visitor_teamid Visitor team ID
      * @param int $home_teamid Home team ID
+     * @param int $game_of_that_day 1-based index of the game within its date, league-wide
      * @return bool True if at least one player record has NULL teamid
      */
-    public function hasNullTeamIdPlayerBoxscores(string $date, int $visitor_teamid, int $home_teamid): bool;
+    public function hasNullTeamIdPlayerBoxscores(string $date, int $visitor_teamid, int $home_teamid, int $game_of_that_day): bool;
 
     /**
      * Find All-Star Game team names from existing boxscore records
@@ -142,6 +168,41 @@ interface BoxscoreRepositoryInterface
      * @return int Number of affected rows
      */
     public function renameAllStarTeam(int $recordId, string $newName): int;
+
+    /**
+     * Boxscore games with no matching ibl_schedule row for the season.
+     *
+     * Applies ScheduleMembershipGuard exemptions: off-schedule months and
+     * All-Star/Rising-Stars pseudo-team IDs are excluded so they are never
+     * reported as orphans.
+     *
+     * @param int $seasonYear The season_year generated-column value (e.g. 2008)
+     * @return list<array{game_date: string, visitor_teamid: int, home_teamid: int, game_of_that_day: int, name: string}>
+     */
+    public function findOrphanBoxscoreGames(int $seasonYear): array;
+
+    /**
+     * Played schedule rows with no boxscore rows at all.
+     *
+     * Rows where visitor_score = 0 AND home_score = 0 are excluded — those are
+     * scheduled-but-unplayed (series ended early) and are benign by design.
+     *
+     * @param int $seasonYear The season_year stored column value (e.g. 2008)
+     * @return list<array{game_date: string, visitor_teamid: int, home_teamid: int, visitor_score: int, home_score: int}>
+     */
+    public function findScheduledGamesWithoutBoxscores(int $seasonYear): array;
+
+    /**
+     * Triples recorded at more than one game_of_that_day within the season.
+     *
+     * These are invisible to the orphan query because the legitimate half of the
+     * pair matches the schedule. The detail names both gotd values without asserting
+     * which is the phantom.
+     *
+     * @param int $seasonYear The season_year generated-column value (e.g. 2008)
+     * @return list<array{game_date: string, visitor_teamid: int, home_teamid: int, occurrences: int, gotds: string}>
+     */
+    public function findDuplicateTripleGames(int $seasonYear): array;
 
     /**
      * Insert a player boxscore row

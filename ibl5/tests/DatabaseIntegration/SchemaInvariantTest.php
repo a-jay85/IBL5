@@ -184,6 +184,8 @@ class SchemaInvariantTest extends DatabaseTestCase
         'ibl_rcb_season_records.teamid' => 'record-book aggregate; denormalized, rebuilt on demand',
         'ibl_saved_depth_charts.teamid' => 'user-saved depth-chart snapshot; decoupled from team lifecycle',
         'ibl_saved_depth_chart_players.pid' => 'user-saved depth-chart snapshot; decoupled from roster lifecycle',
+        'schedule_guard_rejects.visitor_teamid' => 'audit log; no ibl_ prefix deliberately — decoupled from team lifecycle',
+        'schedule_guard_rejects.home_teamid' => 'audit log; no ibl_ prefix deliberately — decoupled from team lifecycle',
     ];
 
     /**

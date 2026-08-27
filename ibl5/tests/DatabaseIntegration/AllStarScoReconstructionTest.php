@@ -138,9 +138,9 @@ class AllStarScoReconstructionTest extends DatabaseTestCase
     private function setUpGameState(): void
     {
         $this->repo->deleteTeamBoxscoresByGame(self::RSG_DATE, self::RSG_VISITOR_TID, self::RSG_HOME_TID, 1);
-        $this->repo->deletePlayerBoxscoresByGame(self::RSG_DATE, self::RSG_VISITOR_TID, self::RSG_HOME_TID);
+        $this->repo->deletePlayerBoxscoresByGame(self::RSG_DATE, self::RSG_VISITOR_TID, self::RSG_HOME_TID, 1);
         $this->repo->deleteTeamBoxscoresByGame(self::ASG_DATE, self::ASG_VISITOR_TID, self::ASG_HOME_TID, 1);
-        $this->repo->deletePlayerBoxscoresByGame(self::ASG_DATE, self::ASG_VISITOR_TID, self::ASG_HOME_TID);
+        $this->repo->deletePlayerBoxscoresByGame(self::ASG_DATE, self::ASG_VISITOR_TID, self::ASG_HOME_TID, 1);
 
         // Seed ibl_plr rows for every PID that will be inserted into ibl_box_scores.
         // The fk_boxscore_player FK requires these to exist before any boxscore insert.

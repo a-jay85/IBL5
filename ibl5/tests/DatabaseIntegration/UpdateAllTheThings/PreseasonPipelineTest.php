@@ -55,6 +55,9 @@ class PreseasonPipelineTest extends PipelineIntegrationTestCase
         $season = $this->buildSeason('Playoffs', 2026);
 
         $schPath = $this->buildSchFile([]);
+        $this->buildScheduleHtm(2026, [
+            ['visitor' => 'Metros', 'home' => 'Stars'],
+        ]);
         $this->buildPlrFile([
             ['pid' => 200001, 'name' => 'Playoff Player A', 'teamid' => 1, 'ordinal' => 1],
             ['pid' => 200002, 'name' => 'Playoff Player B', 'teamid' => 2, 'ordinal' => 2],

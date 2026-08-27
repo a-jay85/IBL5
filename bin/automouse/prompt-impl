@@ -22,7 +22,55 @@ fi
 
 If the plan file does not exist in the queue, write an error report to $NIGHTLY_DIR/reports/YYYY-MM-DD-error-unknown.md and STOP.
 
-Read the plan file content. If it is a symlink, follow it to read the original content.
+If it is a symlink, resolve it first so the reads below hit the real file:
+
+```bash
+PLAN_PATH="$(readlink -f "$PLAN_PATH" 2>/dev/null || echo "$PLAN_PATH")"
+```
+
+**Do NOT read the whole plan file.** Plans routinely exceed 300KB (~80K tokens) — more
+than half the autoCompactWindow — and reading one end to end compacts you before you
+make a single edit. Read it in two moves instead.
+
+**Move 1 — index the sections. Run this and keep the output:**
+
+```bash
+wc -l "$PLAN_PATH"
+grep -n '^## ' "$PLAN_PATH"
+```
+
+That gives you every section title with its start line. A section runs from its own line
+number to one less than the next section's line number (the last section runs to `wc -l`).
+
+**Move 2 — read only what you need, one `sed` range at a time:**
+
+```bash
+sed -n '1,22p' "$PLAN_PATH"            # frontmatter + title + any context-budget marker
+sed -n 'START,ENDp' "$PLAN_PATH"       # ONE section, using line numbers from the index
+```
+
+Read these up front, because they govern the whole run:
+
+- lines 1 to the first `## ` (frontmatter, title, context-budget marker)
+- `## Approach` and any `## Design Decisions` section
+- `## Verification Matrix` and `## Required Test Methods` (if present)
+- `## Critical Files`
+- `## Sequencing` and `## Scope guard` (if present)
+
+Then, in Step 6, read **one phase section at a time**: `sed -n` that phase's range, do
+the work, commit, and only then `sed -n` the next phase's range. Never read two phase
+bodies into context at once, and never re-read a phase you have already finished.
+
+Skip entirely unless a phase explicitly tells you to read it: `## Out of Scope`,
+`## Architectural trade-offs`, `## Automouse Hold Justification`, `## PR Checklist`,
+evidence tables, and correction logs. They are written for the human reviewing the PR.
+
+Worked example — on a 4,022-line plan, the governing sections above total ~22KB (~5.7K
+tokens) and the largest single phase is ~53KB (~13K tokens), so the peak is ~19K tokens
+against ~81K for reading the file whole.
+
+If `grep -n '^## '` returns nothing, the plan has no `## ` sections; only then fall back
+to reading the file whole, and note it in your handoff.
 
 ## Step 1.5: Prior Failure Report (escalated final retry only)
 

@@ -231,6 +231,36 @@ abstract class PipelineIntegrationTestCase extends DatabaseTestCase
         return $path;
     }
 
+    /**
+     * Write a fixture ibl/IBL/Schedule.htm holding playoff rows for the given year.
+     *
+     * Playoff schedule rows have no other source, so during the Playoffs phase
+     * ScheduleUpdater treats a missing or wholly-stale file as fatal. Pipeline tests
+     * running that phase must seed one.
+     *
+     * @param list<array{visitor: string, home: string}> $games
+     */
+    protected function buildScheduleHtm(int $year, array $games): string
+    {
+        $html = "<table>\n<tr><th>Post 1 {$year}</th></tr>\n";
+        foreach ($games as $game) {
+            $html .= "<tr>"
+                . "<td><a href=\"team1.htm\">{$game['visitor']}</a></td><td></td>"
+                . "<td><a href=\"team2.htm\">{$game['home']}</a></td><td></td>"
+                . "</tr>\n";
+        }
+        $html .= "</table>";
+
+        $dir = $this->tempDir . '/ibl/IBL';
+        if (!is_dir($dir)) {
+            mkdir($dir, 0777, true);
+        }
+        $path = $dir . '/Schedule.htm';
+        file_put_contents($path, $html);
+
+        return $path;
+    }
+
     protected function buildScoFile(): string
     {
         $path = $this->tempDir . '/IBL5.sco';
@@ -277,7 +307,9 @@ abstract class PipelineIntegrationTestCase extends DatabaseTestCase
                 return null;
             },
         );
-        $scheduleUpdater = new \Updater\ScheduleUpdater($this->db, $season, null, $schResolver);
+        // basePath points at the temp dir so ScheduleUpdater reads the fixture
+        // ibl/IBL/Schedule.htm written by buildScheduleHtm() instead of the repo tree.
+        $scheduleUpdater = new \Updater\ScheduleUpdater($this->db, $season, null, $schResolver, $this->tempDir);
         $standingsRepo = new \Standings\StandingsRepository($this->db);
         $standingsUpdater = new \Updater\StandingsUpdater($standingsRepo, $season);
         $powerRankingsUpdater = new \Updater\PowerRankingsUpdater($this->db, $season);

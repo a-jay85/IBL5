@@ -91,7 +91,15 @@ flush() {
 
 label_alive() {
     [ -n "$LABEL" ] || return 0                       # no label ⇒ never "gone"
-    launchctl list 2>/dev/null | grep -qF "$LABEL"
+    # NOT `launchctl list | grep -qF`. This script runs under `set -o pipefail`
+    # (above), and `grep -q` exits the instant it matches, closing the pipe.
+    # `launchctl list` is still writing (~560 lines on a normal Mac), so it dies
+    # of SIGPIPE and the PIPELINE reports 141 — non-zero — even though the label
+    # WAS found. label_alive() then returned false on its very first call, so
+    # every `watch-run --label` invocation exited immediately with "launchd label
+    # gone but the log has no RESULT line", seconds after a run it was supposed
+    # to watch for hours. `grep -c` reads to EOF, so the writer never sees SIGPIPE.
+    [ "$(launchctl list 2>/dev/null | grep -cF "$LABEL")" -gt 0 ]
 }
 
 saw_result() {

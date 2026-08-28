@@ -1268,6 +1268,13 @@ while true; do
         IMPL_PROMPT="$(cat "$SELF_DIR/prompt-impl")
 
 PLAN_FILE=$PLAN_NAME"
+        # `cat` does not expand shell syntax, so the template's budget slot is a
+        # literal {{IMPL_BUDGET_MINUTES}} token substituted here. Keep the token
+        # spelled identically on both sides — bin/test-automouse-impl-cap-timeout
+        # pins that pairing, because a one-sided rename would silently ship the
+        # raw placeholder to the agent.
+        IMPL_BUDGET_MIN=$(( REMAINING_SECS / 60 ))
+        IMPL_PROMPT="${IMPL_PROMPT//\{\{IMPL_BUDGET_MINUTES\}\}/$IMPL_BUDGET_MIN}"
         if should_feed_failure_report "$BASE_MODEL" "$IMPL_MODEL" "$FAILURE_FILE"; then
             IMPL_PROMPT="$IMPL_PROMPT
 PRIOR_FAILURE_REPORT=$FAILURE_FILE"

@@ -60,6 +60,18 @@ class MaintenanceRepositoryTest extends TestCase
         $this->assertSame(50, $result[0]['wins']);
     }
 
+    public function testGetTeamRecentCompleteSeasonsUsesBoundedGameCountBand(): void
+    {
+        $this->mockDb->setMockData([]);
+
+        $this->repository->getTeamRecentCompleteSeasons('Boston');
+
+        $queries = $this->mockDb->getExecutedQueries();
+        // The band must stay capped: phantom-boxscore bugs inflate a season to
+        // 119-127 games, and an unbounded predicate would admit that corruption.
+        $this->assertStringContainsString('wins + losses BETWEEN 81 AND 83', $queries[0]);
+    }
+
     public function testGetTeamRecentCompleteSeasonsUsesLimit(): void
     {
         $this->mockDb->setMockData([]);

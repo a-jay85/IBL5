@@ -48,7 +48,10 @@ last_verified: 2026-08-27
 | E19 | `/pr-ready` materialize-from-pin sites declare no fallback, so a pin that predates the script loops forever | ✅ Implemented | — | S |
 | E20 | Ship-pipeline coverage assertions (PR-body Manual Testing block, Phase 4B review) are emitted against a narrower slice than the PR's cumulative diff | ⬜ Open | 🟦 | M |
 | E21 | Test assertions land as static source greps that pass while the behavior they name is absent | ⬜ Open | 🟩 | S |
-| E22 | Plan-declared negatives and PR body Scope dropped during Phase 6.5 remediation | ⬜ Open | 🟨 | S |
+| E22 | Plan-declared negatives and PR body Scope dropped during Phase 6.5 remediation | ✅ Implemented | — | S |
+| E23 | PR body deletion volumes diverged from code's `EXPECTED` constants | ✅ Implemented | — | S |
+| E24 | `/post-plan` Phase 4B can hand-write its review comment, bypassing `post_review_summary` | ⬜ Open | 🟨 | S |
+| E25 | `/pr-review` migration-exclusion `awk` filter is a no-op, silently ingests full migration diffs | ⬜ Open | 🟨 | S |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -268,32 +271,61 @@ Landing rung is **1**, so rungs 3–5 are never reached and the four `.claude/ru
 
 ---
 
-### E22 Plan-declared negatives and PR body Scope dropped during Phase 6.5 remediation
+➜ E22 Plan-declared negatives and PR body Scope dropped during Phase 6.5 remediation — ✅ Implemented (2026-08-27): see [archive](archive/dev-efficiency-backlog-archive.md).
 
-**Class A** (finding 2): a test case rewrite during Phase 6.5 remediation that silently drops plan-declared negative assertions from the harness, leaving the asserted regressions unpinned.
+➜ E23 PR body deletion volumes diverged from code's `EXPECTED` constants — ✅ Implemented (2026-08-27): see [archive](archive/dev-efficiency-backlog-archive.md).
 
-**Class B** (finding 4): a PR body Scope section whose file count and diff-stat numbers are not updated after Phase 6.5 remediation adds files and expands test cases beyond plan estimates.
+### E24 `/post-plan` Phase 4B can hand-write its review comment, bypassing `post_review_summary` and making the review undetectable
+
+Phase 4B's posting step is prose-only: it *tells* the run to call `post_review_findings` / `post_review_summary` but nothing enforces it. A run that instead composes the comment freehand still performs a real review — the findings are genuine — but the artifact lands outside the helper's envelope, with three downstream consequences: (i) the `/pr-ready` `PHASE_4B_RAN` probe (`4b-probe.sh`, regex `^#{1,6} +Code review`) misses it and recommends a redundant `/pr-review`; (ii) findings are prose-summarized instead of posted as inline threads carrying `<!-- score: N -->`, so `list_open_review_findings` / `resolve_review_finding` cannot disposition them and `unresolved-findings-hold` is blind to them; (iii) the helper's `<details>` envelope and footer are absent. The failure is silent in both directions — the run reports success, and the probe reports "never ran."
+
+The fix belongs at the **emitter**, not the probe. Loosening the probe regex to match freehand prose makes a false `true` more likely, and `.claude/skills/pr-ready/SKILL.md` explicitly names a false `true` as the worse failure mode. The defect is that Phase 4B is permitted to write the comment by hand at all.
 
 **Occurrences**
 
-| # | File:line | Same class? | Live? | Status |
-|---|-----------|-------------|-------|--------|
-| 1 | `bin/test-pr-ready-now` case 21 — `grep -qF 'DO NOT ADD ONE'` and `grep -qF 'Spawning any sub-agent for this phase is a defect'` assertions dropped during E21 harness rewrite | class A | yes | fixed this pass (re-added both assertions) |
-| 2 | `PR #2000 body ## Scope` — "Six files change" vs. 7-file diff; `+38 -0` vs. actual `+82 -0`; `ibl5/docs/backlog/dev-efficiency-backlog.md` unmentioned | class B (same as E20) | yes | fixed this pass (body updated: count, stat, backlog file named) |
+| # | File:line | Class | Live? | Status |
+|---|-----------|-------|-------|--------|
+| 1 | `.claude/skills/post-plan/_phase-4-review-audit.md:101-102` — mandates `post_review_findings` / `post_review_summary` in prose; unenforced | A | yes | not fixed this pass |
+| 2 | PR #2001 `## Code Review Summary` + `## Security Audit Summary` comments — real Phase 4B output, written freehand (no `<details>`, no `### Code review`, no `PRF_FOOTER`), invisible to the 4B probe; its one finding (`FILL_TEAM_BACKUP` docblock, scored 25) never became a dispositionable thread | A | yes | not fixed this pass |
 
 `prevention_ladder:`
 
-Class A:
-- **rung 0 — already covered?** No. Nothing at implementation time checks that plan-declared negatives survive a harness rewrite.
-- **rung 1 — extend an existing gate? LANDS HERE.** Extend `.claude/skills/plan/_architect-contract.md` to require that each verification phase listing a negative assertion also name the mutation it must catch ("delete the `--model` arm ⇒ assertion fails"). An implementer cannot substitute a vacuous text grep without the mutation target going visibly missing; a Phase 6 reviewer gets a stated predicate instead of re-deriving intent from plan prose.
-- **rung 2 — a rule doc?** Insufficient alone: the norm must fire at authoring time, inside the architect contract.
-- **rungs 3–5** — N/A.
+- **rung 0 — already covered?** No. `bin/lib/post-review-findings.sh` is the sanctioned path but is not the *only* reachable path; no gate checks that the comment Phase 4B produced came through it.
+- **rung 1 — extend an existing gate? LANDS HERE.** Rewrite `.claude/skills/post-plan/_phase-4-review-audit.md` §4B/§4D posting steps from descriptive prose into a single verbatim copy-paste command block (source the helper, write the findings file, call the helper) with an explicit "do not compose this comment by hand — the envelope is machine-parsed downstream" note naming the 4B probe as the consumer. Same treatment for the Security audit arm, which has the identical shape.
+- **rung 2 — a rule doc?** Insufficient alone: the norm has to fire at the exact step that emits the comment, not as ambient guidance.
+- **rung 3 — a mechanical gate?** Possible follow-on: have Phase 4B re-read its own comment after posting and assert the `PRF_FOOTER` string is present, failing the phase if not. Cheap, but only worth building if rung 1 proves insufficient.
+- **rungs 4–5** — N/A. Explicitly ruled out: relaxing the `4b-probe.sh` regex, which trades a detectable false negative for an invisible false positive.
 
-Class B:
-- **rung 0 — already covered?** E20 tracks the same class; no mechanical gate exists.
-- **rung 1 — extend an existing gate? LANDS HERE.** Extend the `/pr-ready` SKILL.md Phase 6.5 commit step to include a micro-check: before committing, confirm that any explicit file counts and diff stats in the PR body Scope prose match the post-remediation `git diff --numstat`.
-- **rungs 2–5** — ruled out.
+`artifact destination:` `.claude/skills/post-plan/_phase-4-review-audit.md` (in-repo). Not built this pass.
 
-`artifact destination:` Class A → `.claude/skills/plan/_architect-contract.md` (in-repo). Class B → `.claude/skills/pr-ready/SKILL.md` Phase 6.5 step 4 (in-repo). Neither built this pass.
+*(discovered 2026-08-27 during #2001)*
 
-*(discovered 2026-08-26 during #2000)*
+### E25 `/pr-review` Step 2c's migration-exclusion `awk` filter is a no-op, so every review silently ingests full migration diffs
+
+`.claude/skills/pr-review/SKILL.md:37` filters migrations out of the diff before the 100 KB size branch:
+
+```
+awk '/^diff --git.*migrations\//{skip=1} /^diff --git/{skip=0} skip==0{print}'
+```
+
+Both patterns match the same line. A `diff --git a/ibl5/migrations/167_….sql …` header sets `skip=1` in rule 1, then rule 2 — which matches *every* `^diff --git` line, including that one — immediately resets it to `0`. `skip` is therefore never `1` at print time and the filter passes the input through unchanged. Verified empirically on PR #2001: the "filtered" diff still contained both migration file headers (`167_create_phantom_repair_backup_tables.sql`, `168_delete_phantom_season2008_boxscores.php`).
+
+Consequence is size control, not correctness — reviews get *more* context than intended, and the `DIFF_SIZE > 100000` per-file-API fallback trips earlier than designed. On a migration-heavy PR this can push a review onto the fallback path (or, past that, into the test-file-exclusion path) for no real reason. The correct form guards rule 2 with `!/migrations\//`, or uses an explicit else.
+
+**Occurrences**
+
+| # | File:line | Class | Live? | Status |
+|---|-----------|-------|-------|--------|
+| 1 | `.claude/skills/pr-review/SKILL.md:37` — Step 2c filter; sole copy in the repo (grepped `.claude/`, `bin/`) | A | yes | not fixed this pass |
+
+`prevention_ladder:`
+
+- **rung 0 — already covered?** No. Skill-body shell snippets are prose to every existing gate; nothing executes or lints them.
+- **rung 1 — extend an existing gate?** No natural host. `bin/check-docs` resolves path *references* in doc bodies, not shell semantics, and teaching it to evaluate embedded snippets is far outside its responsibility.
+- **rung 2 — a rule doc?** No — this is a one-line logic bug, not a norm.
+- **rung 3 — fix in place. LANDS HERE.** Correct the `awk` to `/^diff --git/ && !/migrations\//{skip=0}` (or an explicit if/else), and re-verify by grepping the produced diff for `^diff --git.*migrations/` — expecting zero hits. A one-line change with a one-command check; no new tooling, per the extend-before-add bar in `.claude/rules/meta-tooling-bar.md`.
+- **rungs 4–5** — N/A.
+
+`artifact destination:` `.claude/skills/pr-review/SKILL.md` Step 2c (in-repo). Not built this pass.
+
+*(discovered 2026-08-27 during #2001)*

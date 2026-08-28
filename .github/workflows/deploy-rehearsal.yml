@@ -5,6 +5,9 @@ on:
     branches: [master]
     paths:
       - 'ibl5/migrations/**.sql'
+      - 'ibl5/migrations/**.php'
+      - 'ibl5/classes/Boxscore/PhantomBoxscoreRepair.php'
+      - 'ibl5/bin/rollback-phantom-repair-run'
       - 'ibl5/composer.json'
       - 'ibl5/composer.lock'
       - 'ibl5/bin/migrate'
@@ -17,6 +20,9 @@ on:
     branches: [master]
     paths:
       - 'ibl5/migrations/**.sql'
+      - 'ibl5/migrations/**.php'
+      - 'ibl5/classes/Boxscore/PhantomBoxscoreRepair.php'
+      - 'ibl5/bin/rollback-phantom-repair-run'
       - 'ibl5/composer.json'
       - 'ibl5/composer.lock'
       - 'ibl5/bin/migrate'

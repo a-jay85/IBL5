@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed development-efficiency backlog entries, extracted from dev-efficiency-backlog.md.
-last_verified: 2026-08-25
+last_verified: 2026-08-27
 ---
 
 # Development-Efficiency Backlog — Archive
@@ -90,3 +90,57 @@ Read-only historical record of ✅ Implemented / 🚫 Declined entries. For OPEN
 **Related:** E14 and E15 are the two prior instances of the broader pattern — `/pr-ready` SKILL.md prose drifting from the runtime it describes. E17 differs in kind (both of those are behaviourally wrong instructions that fail at runtime; this one is prose that stays true but under-specifies), so it is filed separately rather than consolidated.
 
 **Status (2026-08-25):** ✅ Implemented — the single occurrence was fixed in PR #1981 (`either` → `any`); no gate was warranted (prevention_ladder: no gate warranted); watch-item closed by owner decision on 2026-08-25. *(discovered 2026-08-25 during #1981)*
+
+### E22 Plan-declared negatives and PR body Scope dropped during Phase 6.5 remediation
+
+**Class A** (finding 2): a test case rewrite during Phase 6.5 remediation that silently drops plan-declared negative assertions from the harness, leaving the asserted regressions unpinned.
+
+**Class B** (finding 4): a PR body Scope section whose file count and diff-stat numbers are not updated after Phase 6.5 remediation adds files and expands test cases beyond plan estimates.
+
+**Occurrences**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/test-pr-ready-now` case 21 — `grep -qF 'DO NOT ADD ONE'` and `grep -qF 'Spawning any sub-agent for this phase is a defect'` assertions dropped during E21 harness rewrite | class A | yes | fixed this pass (re-added both assertions) |
+| 2 | `PR #2000 body ## Scope` — "Six files change" vs. 7-file diff; `+38 -0` vs. actual `+82 -0`; `ibl5/docs/backlog/dev-efficiency-backlog.md` unmentioned | class B (same as E20) | yes | fixed this pass (body updated: count, stat, backlog file named) |
+
+`prevention_ladder:`
+
+Class A:
+- **rung 0 — already covered?** No. Nothing at implementation time checks that plan-declared negatives survive a harness rewrite.
+- **rung 1 — extend an existing gate? LANDS HERE.** Extend `.claude/skills/plan/_architect-contract.md` to require that each verification phase listing a negative assertion also name the mutation it must catch ("delete the `--model` arm ⇒ assertion fails"). An implementer cannot substitute a vacuous text grep without the mutation target going visibly missing; a Phase 6 reviewer gets a stated predicate instead of re-deriving intent from plan prose.
+- **rung 2 — a rule doc?** Insufficient alone: the norm must fire at authoring time, inside the architect contract.
+- **rungs 3–5** — N/A.
+
+Class B:
+- **rung 0 — already covered?** E20 tracks the same class; no mechanical gate exists.
+- **rung 1 — extend an existing gate? LANDS HERE.** Extend the `/pr-ready` SKILL.md Phase 6.5 commit step to include a micro-check: before committing, confirm that any explicit file counts and diff stats in the PR body Scope prose match the post-remediation `git diff --numstat`.
+- **rungs 2–5** — ruled out.
+
+`artifact destination:` Class A → `.claude/skills/plan/_architect-contract.md` (in-repo). Class B → `.claude/skills/pr-ready/_phase65-remediation.md` step 4 (in-repo); the original Class B address (`SKILL.md` Phase 6.5) was stale because Phase 6.5 was extracted out of `SKILL.md`. Both built this pass.
+
+**Status (2026-08-27):** ✅ Implemented — Class A landed in `_architect-contract.md`'s negative-path bullet as a "name the mutation it catches" requirement; Class B landed as a pre-commit `git diff --numstat HEAD` vs. PR-body-Scope reconciliation in `_phase65-remediation.md` step 4.
+
+*(discovered 2026-08-26 during #2000)*
+
+### E23 PR Body Deletion Volumes Diverged from Code's `EXPECTED` Constants, Undetected Until /pr-ready Phase 6
+
+Body summary text was authored pre-implementation and hand-updated during coding, allowing four separate factual errors: (4a) player-row volume understated ~23× (627 vs 14502); (4b) backup table suffix wrong (`_bak` vs `_backup`); (4c) claimed rollback test coverage that doesn't exist; (4d) claimed full unit+E2E coverage while the same PR dropped the coverage baseline 0.85 pp.
+
+**Occurrences**
+
+| # | File:line | Class | Live? | Status |
+|---|-----------|-------|-------|--------|
+| 1 | PR #2001 body Summary — "627 player rows" vs code's 14502; `_bak` vs `_backup`; "and rollback" in test claim; "No manual testing needed — all changes are covered by unit and E2E tests" | A | yes | fixed this pass (body corrected via `gh pr edit`) |
+
+`prevention_ladder:`
+
+- **rung 0 — already covered?** No. Nothing checks that PR body deletion volumes match the code's `EXPECTED` constants at review time.
+- **rung 1 — extend an existing gate? LANDS HERE.** Extend the `/pr-ready` Phase 6 `_plan-fidelity-review.md` 6d checklist with a class item: "for any PR whose diff introduces a class with a named `EXPECTED` constant array (or equivalent named-constant deletion count), confirm the PR body Summary names volumes consistent with those constants." This is a reviewer prompt, not a mechanical gate — body prose cannot be auto-parsed for intent, but a named reviewer check prevents it from being silently skipped.
+- **rungs 2–5** — N/A.
+
+`artifact destination:` `.claude/skills/pr-ready/_plan-fidelity-review.md` 6d.4 sub-clause **4a** (in-repo); implemented as a sub-clause rather than a new class item because `_phase65-remediation.md` says "across all six 6d classes" and `_plan-fidelity-review.md` 6a says "performs all six 6d checks itself" — a 7th class item would falsify both. Built this pass.
+
+**Status (2026-08-27):** ✅ Implemented — landed as `_plan-fidelity-review.md` 6d.4 sub-clause 4a, "Named-constant volumes."
+
+*(discovered 2026-08-27 during #2001)*

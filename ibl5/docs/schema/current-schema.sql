@@ -428,6 +428,72 @@ CREATE TABLE `ibl_box_scores_engine_shadow_teams` (
   KEY `idx_shadow_teams_game` (`game_date`,`visitor_teamid`,`home_teamid`,`game_of_that_day`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `ibl_box_scores_phantom_backup`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ibl_box_scores_phantom_backup` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `game_date` date NOT NULL COMMENT 'Game date',
+  `name` varchar(16) DEFAULT '' COMMENT 'Player name (denormalized snapshot)',
+  `pos` enum('PG','SG','SF','PF','C','G','F','GF','') DEFAULT '' COMMENT 'Player position at game time',
+  `pid` int(11) DEFAULT NULL COMMENT 'FK to ibl_plr.pid',
+  `visitor_teamid` int(11) DEFAULT NULL COMMENT 'Visiting team ID (FK to ibl_team_info)',
+  `home_teamid` int(11) DEFAULT NULL COMMENT 'Home team ID (FK to ibl_team_info)',
+  `game_min` tinyint(3) unsigned DEFAULT NULL COMMENT 'Minutes played',
+  `game_2gm` tinyint(3) unsigned DEFAULT NULL COMMENT 'Two-point field goals made',
+  `game_2ga` tinyint(3) unsigned DEFAULT NULL COMMENT 'Two-point field goals attempted',
+  `game_ftm` tinyint(3) unsigned DEFAULT NULL COMMENT 'Free throws made',
+  `game_fta` tinyint(3) unsigned DEFAULT NULL COMMENT 'Free throws attempted',
+  `game_3gm` tinyint(3) unsigned DEFAULT NULL COMMENT 'Three pointers made',
+  `game_3ga` tinyint(3) unsigned DEFAULT NULL COMMENT 'Three pointers attempted',
+  `game_orb` tinyint(3) unsigned DEFAULT NULL COMMENT 'Offensive rebounds',
+  `game_drb` tinyint(3) unsigned DEFAULT NULL COMMENT 'Defensive rebounds',
+  `game_ast` tinyint(3) unsigned DEFAULT NULL COMMENT 'Assists',
+  `game_stl` tinyint(3) unsigned DEFAULT NULL COMMENT 'Steals',
+  `game_tov` tinyint(3) unsigned DEFAULT NULL COMMENT 'Turnovers',
+  `game_blk` tinyint(3) unsigned DEFAULT NULL COMMENT 'Blocks',
+  `game_pf` tinyint(3) unsigned DEFAULT NULL COMMENT 'Personal fouls',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `uuid` char(36) NOT NULL DEFAULT uuid(),
+  `game_of_that_day` tinyint(3) unsigned DEFAULT NULL COMMENT '1-based index of this game within its date across the whole league (NOT a doubleheader / per-matchup counter)',
+  `attendance` int(11) DEFAULT NULL COMMENT 'Attendance at the game',
+  `capacity` int(11) DEFAULT NULL COMMENT 'Arena capacity',
+  `visitor_wins` smallint(5) unsigned DEFAULT NULL COMMENT 'Visitor team wins before this game',
+  `visitor_losses` smallint(5) unsigned DEFAULT NULL COMMENT 'Visitor team losses before this game',
+  `home_wins` smallint(5) unsigned DEFAULT NULL COMMENT 'Home team wins before this game',
+  `home_losses` smallint(5) unsigned DEFAULT NULL COMMENT 'Home team losses before this game',
+  `teamid` int(11) DEFAULT NULL COMMENT 'Player''s team ID (visitor or home)',
+  `game_type` tinyint(3) unsigned DEFAULT NULL,
+  `season_year` smallint(5) unsigned DEFAULT NULL,
+  `calc_points` smallint(5) unsigned DEFAULT NULL,
+  `calc_rebounds` tinyint(3) unsigned DEFAULT NULL,
+  `calc_fg_made` tinyint(3) unsigned DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uuid` (`uuid`),
+  UNIQUE KEY `idx_uuid` (`uuid`),
+  UNIQUE KEY `uq_game_player` (`game_date`,`pid`,`visitor_teamid`,`home_teamid`,`game_of_that_day`,`teamid`),
+  KEY `idx_date` (`game_date`),
+  KEY `idx_visitor_tid` (`visitor_teamid`),
+  KEY `idx_home_tid` (`home_teamid`),
+  KEY `idx_date_pid` (`game_date`,`pid`),
+  KEY `idx_date_home_visitor` (`game_date`,`home_teamid`,`visitor_teamid`),
+  KEY `idx_team_id` (`teamid`),
+  KEY `idx_gt_points` (`game_type`,`calc_points`),
+  KEY `idx_gt_rebounds` (`game_type`,`calc_rebounds`),
+  KEY `idx_gt_fg_made` (`game_type`,`calc_fg_made`),
+  KEY `idx_gt_ast` (`game_type`,`game_ast`),
+  KEY `idx_gt_stl` (`game_type`,`game_stl`),
+  KEY `idx_gt_blk` (`game_type`,`game_blk`),
+  KEY `idx_gt_tov` (`game_type`,`game_tov`),
+  KEY `idx_gt_ftm` (`game_type`,`game_ftm`),
+  KEY `idx_gt_3gm` (`game_type`,`game_3gm`),
+  KEY `idx_gt_pid` (`game_type`,`pid`),
+  KEY `idx_gt_pid_season` (`game_type`,`pid`,`season_year`),
+  KEY `idx_pid_date` (`pid`,`game_date`),
+  CONSTRAINT `chk_box_minutes` CHECK (`game_min` is null or `game_min` >= 0 and `game_min` <= 70)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_box_scores_teams`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -495,6 +561,73 @@ CREATE TABLE `ibl_box_scores_teams` (
   KEY `idx_date_visitor_home_gotd` (`game_date`,`visitor_teamid`,`home_teamid`,`game_of_that_day`),
   CONSTRAINT `fk_boxscoreteam_home` FOREIGN KEY (`home_teamid`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE,
   CONSTRAINT `fk_boxscoreteam_visitor` FOREIGN KEY (`visitor_teamid`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `ibl_box_scores_teams_phantom_backup`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ibl_box_scores_teams_phantom_backup` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `game_date` date NOT NULL COMMENT 'Game date',
+  `name` varchar(16) NOT NULL DEFAULT '' COMMENT 'Denormalized team label snapshot (e.g. Team Home/Team Away); no FK by design',
+  `game_of_that_day` int(11) DEFAULT NULL COMMENT '1-based index of this game within its date across the whole league (NOT a doubleheader / per-matchup counter)',
+  `visitor_teamid` int(11) DEFAULT NULL COMMENT 'Visiting team ID (FK to ibl_team_info)',
+  `home_teamid` int(11) DEFAULT NULL COMMENT 'Home team ID (FK to ibl_team_info)',
+  `attendance` int(11) DEFAULT NULL COMMENT 'Game attendance',
+  `capacity` int(11) DEFAULT NULL COMMENT 'Arena capacity',
+  `visitor_wins` int(11) DEFAULT NULL COMMENT 'Visitor record wins before game',
+  `visitor_losses` int(11) DEFAULT NULL COMMENT 'Visitor record losses before game',
+  `home_wins` int(11) DEFAULT NULL COMMENT 'Home record wins before game',
+  `home_losses` int(11) DEFAULT NULL COMMENT 'Home record losses before game',
+  `visitor_q1_points` int(11) DEFAULT NULL COMMENT 'Visitor Q1 points',
+  `visitor_q2_points` int(11) DEFAULT NULL COMMENT 'Visitor Q2 points',
+  `visitor_q3_points` int(11) DEFAULT NULL COMMENT 'Visitor Q3 points',
+  `visitor_q4_points` int(11) DEFAULT NULL COMMENT 'Visitor Q4 points',
+  `visitor_ot_points` int(11) DEFAULT NULL COMMENT 'Visitor overtime points',
+  `home_q1_points` int(11) DEFAULT NULL COMMENT 'Home Q1 points',
+  `home_q2_points` int(11) DEFAULT NULL COMMENT 'Home Q2 points',
+  `home_q3_points` int(11) DEFAULT NULL COMMENT 'Home Q3 points',
+  `home_q4_points` int(11) DEFAULT NULL COMMENT 'Home Q4 points',
+  `home_ot_points` int(11) DEFAULT NULL COMMENT 'Home overtime points',
+  `game_min` int(11) DEFAULT NULL COMMENT 'Total game minutes',
+  `game_2gm` int(11) DEFAULT NULL COMMENT 'Two-point field goals made',
+  `game_2ga` int(11) DEFAULT NULL COMMENT 'Two-point field goals attempted',
+  `game_ftm` int(11) DEFAULT NULL COMMENT 'Free throws made',
+  `game_fta` int(11) DEFAULT NULL COMMENT 'Free throws attempted',
+  `game_3gm` int(11) DEFAULT NULL COMMENT 'Three pointers made',
+  `game_3ga` int(11) DEFAULT NULL COMMENT 'Three pointers attempted',
+  `game_orb` int(11) DEFAULT NULL COMMENT 'Offensive rebounds',
+  `game_drb` int(11) DEFAULT NULL COMMENT 'Defensive rebounds',
+  `game_ast` int(11) DEFAULT NULL COMMENT 'Assists',
+  `game_stl` int(11) DEFAULT NULL COMMENT 'Steals',
+  `game_tov` int(11) DEFAULT NULL COMMENT 'Turnovers',
+  `game_blk` int(11) DEFAULT NULL COMMENT 'Blocks',
+  `game_pf` int(11) DEFAULT NULL COMMENT 'Personal fouls',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `game_type` tinyint(3) unsigned DEFAULT NULL,
+  `season_year` smallint(5) unsigned DEFAULT NULL,
+  `calc_points` smallint(5) unsigned DEFAULT NULL,
+  `calc_rebounds` smallint(5) unsigned DEFAULT NULL,
+  `calc_fg_made` smallint(5) unsigned DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_game_team` (`game_date`,`visitor_teamid`,`home_teamid`,`game_of_that_day`,`name`),
+  KEY `idx_date` (`game_date`),
+  KEY `idx_visitor_team` (`visitor_teamid`),
+  KEY `idx_home_team` (`home_teamid`),
+  KEY `idx_name` (`name`),
+  KEY `idx_gt_points` (`game_type`,`calc_points`),
+  KEY `idx_gt_rebounds` (`game_type`,`calc_rebounds`),
+  KEY `idx_gt_fg_made` (`game_type`,`calc_fg_made`),
+  KEY `idx_gt_ast` (`game_type`,`game_ast`),
+  KEY `idx_gt_stl` (`game_type`,`game_stl`),
+  KEY `idx_gt_blk` (`game_type`,`game_blk`),
+  KEY `idx_gt_tov` (`game_type`,`game_tov`),
+  KEY `idx_gt_ftm` (`game_type`,`game_ftm`),
+  KEY `idx_gt_3gm` (`game_type`,`game_3gm`),
+  KEY `idx_gt_date_teams` (`game_type`,`game_date`,`visitor_teamid`,`home_teamid`),
+  KEY `idx_gt_name_season` (`game_type`,`name`,`season_year`),
+  KEY `idx_date_visitor_home_gotd` (`game_date`,`visitor_teamid`,`home_teamid`,`game_of_that_day`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_bug_pipeline_state`;
@@ -2931,6 +3064,29 @@ CREATE TABLE `ibl_sim_game_recaps` (
   CONSTRAINT `fk_sgr_home` FOREIGN KEY (`home_teamid`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE,
   CONSTRAINT `fk_sgr_sim` FOREIGN KEY (`sim`) REFERENCES `ibl_sim_summaries` (`sim`) ON DELETE CASCADE,
   CONSTRAINT `fk_sgr_visitor` FOREIGN KEY (`visitor_teamid`) REFERENCES `ibl_team_info` (`teamid`) ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `ibl_sim_game_recaps_phantom_backup`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ibl_sim_game_recaps_phantom_backup` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT COMMENT 'Surrogate PK.',
+  `sim` int(10) unsigned NOT NULL COMMENT 'FK to ibl_sim_summaries.sim (the envelope).',
+  `season_year` smallint(5) unsigned NOT NULL COMMENT 'Season year — first component of the natural game key.',
+  `game_date` date NOT NULL COMMENT 'Game date — natural-key component.',
+  `visitor_teamid` int(11) NOT NULL COMMENT 'Visitor team id — natural-key component.',
+  `home_teamid` int(11) NOT NULL COMMENT 'Home team id — natural-key component.',
+  `game_of_that_day` int(11) NOT NULL DEFAULT 0 COMMENT '1-based index of this game within its date across the whole league (NOT a per-matchup counter); NULL->0 normalised (matches ibl_box_scores_teams)',
+  `box_id` int(11) DEFAULT NULL COMMENT 'Convenience pointer to the box score when known; NULL when unresolved.',
+  `sort_order` smallint(5) unsigned NOT NULL COMMENT 'Presentation order within the sim.',
+  `recap_text` mediumtext NOT NULL COMMENT 'The per-game recap prose.',
+  `created_at` datetime NOT NULL DEFAULT current_timestamp() COMMENT 'Row creation timestamp.',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_game` (`season_year`,`game_date`,`visitor_teamid`,`home_teamid`,`game_of_that_day`) COMMENT 'One recap per game — the natural game key.',
+  KEY `idx_sim` (`sim`,`sort_order`) COMMENT 'Ordered read-back of a sim''s game recaps.',
+  KEY `idx_game` (`game_date`,`visitor_teamid`,`home_teamid`) COMMENT 'Join to ibl_box_scores_teams by natural key.',
+  KEY `fk_sgr_visitor` (`visitor_teamid`),
+  KEY `fk_sgr_home` (`home_teamid`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_sim_summaries`;

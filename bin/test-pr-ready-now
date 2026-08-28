@@ -1112,6 +1112,23 @@ zw_out="$(g -C "$W" push --force-with-lease="feat-zero:$ZERO" origin feat-zero:f
 [[ "$(remote_sha feat-zero)" == "$existing" ]] || fail "existing ref moved under an all-zeros lease"
 end_case push-zero-lease-not-a-wildcard
 
+# --- shared: the /pr-ready doc surface is SKILL.md + its git-show-loaded companions -------
+# Phase text lives partly in companion files, so an assertion that greps SKILL.md alone
+# would silently stop covering a relocated phase — passing forever on an empty match set.
+# Cases 16-18 grep the UNION instead, so relocating a phase can never weaken an assertion.
+# The _*.md glob is deliberate: a future companion joins the covered surface automatically.
+begin_case
+PRD="$SCRIPT_DIR/../.claude/skills/pr-ready"
+UNION="$SCRATCH/pr-ready-union.md"
+for _c in _rebase-and-conflicts.md _plan-fidelity-review.md _phase4-push-and-ci.md \
+          _phase59-files-changed.md _phase65-remediation.md _phase7-verdict.md; do
+    [[ -s "$PRD/$_c" ]] || fail "pr-ready companion missing or empty: $_c"
+done
+[[ -f "$PRD/SKILL.md" ]] || fail "pr-ready SKILL.md not found at $PRD/SKILL.md"
+cat "$PRD/SKILL.md" "$PRD"/_*.md > "$UNION" 2>/dev/null
+[[ -s "$UNION" ]] || fail "could not build the pr-ready doc union at $UNION"
+end_case pr-ready-doc-union-built
+
 # --- case 16: /pr-ready SKILL.md still carries the fixed push form ------------------------
 # Line-level greps, so the assertions survive reflowing of the prose.
 #
@@ -1121,7 +1138,7 @@ end_case push-zero-lease-not-a-wildcard
 # `git ls-remote origin HEAD`", "A bare `--force-with-lease` publishes nothing"). Asserting
 # zero would forbid the skill from ever documenting the anti-pattern it exists to prevent.
 # The assertion is narrowed instead: a bare occurrence is allowed only on a line that
-# negates it, and a POSITIVE arm pins the 3b line to the fixed form.
+# negates it, and a POSITIVE arm pins scripts/push.sh to the fixed form.
 begin_case
 SKILL="$SCRIPT_DIR/../.claude/skills/pr-ready/SKILL.md"
 if [[ ! -f "$SKILL" ]]; then
@@ -1131,26 +1148,43 @@ else
     while IFS= read -r line; do
         grep -qE '(bare|Do not|Never|never)' <<< "$line" \
             || fail "bare --force-with-lease on a non-negating line: $line"
-    done < <(grep -- '--force-with-lease' "$SKILL" | grep -v -- '--force-with-lease=')
+    done < <(grep -- '--force-with-lease' "$UNION" | grep -v -- '--force-with-lease=')
     # (b) `ls-remote origin HEAD` only on a "Do not use" line
     while IFS= read -r line; do
         grep -q 'Do not use' <<< "$line" \
             || fail "'ls-remote origin HEAD' on a non-prohibiting line: $line"
-    done < <(grep -F 'ls-remote origin HEAD' "$SKILL")
-    # (c) POSITIVE arm: 3b names the explicit lease form
-    step3b="$(grep -F '3b — push' "$SKILL")"
-    [[ -n "$step3b" ]] || fail "SKILL.md has no '3b -- push' step line"
-    grep -q -- '--force-with-lease=<branch>:' <<< "$step3b" \
-        || fail "the 3b step line does not carry --force-with-lease=<branch>: (fix reverted?)"
-    grep -q -- 'origin <branch>:<branch>' <<< "$step3b" \
-        || fail "the 3b step line lost its explicit refspec"
+    done < <(grep -F 'ls-remote origin HEAD' "$UNION")
+    # (c) POSITIVE arm: the committed push script carries the fixed form.
+    # The old 3b prose line is gone -- Phase 4.3 now calls scripts/push.sh, so the
+    # explicit-refspec + explicit-lease property is asserted where it now lives.
+    PUSHSH="$PRD/scripts/push.sh"
+    if [[ ! -x "$PUSHSH" ]]; then
+        fail "scripts/push.sh missing or not executable at $PUSHSH"
+    else
+        # Comments must not satisfy these: push.sh's own header quotes both forms, so a
+        # whole-file grep stays green even after the real push line loses them.
+        _pushcode=$(grep -v '^[[:space:]]*#' "$PUSHSH")
+        grep -qF -- '--force-with-lease="$BRANCH:$LEASE"' <<< "$_pushcode" \
+            || fail "push.sh lost the explicit lease form --force-with-lease=\"\$BRANCH:\$LEASE\" (fix reverted?)"
+        grep -qF -- 'origin "$BRANCH:refs/heads/$BRANCH"' <<< "$_pushcode" \
+            || fail "push.sh lost its explicit refspec origin \"\$BRANCH:refs/heads/\$BRANCH\""
+    fi
     # (d) the fail-closed verify word survives
-    [[ "$(grep -c 'PUSH FAILED' "$SKILL")" -ge 1 ]] || fail "SKILL.md lost the PUSH FAILED stop word"
+    [[ "$(grep -c 'PUSH FAILED' "$UNION")" -ge 1 ]] || fail "SKILL.md lost the PUSH FAILED stop word"
     # (e) the doc was re-verified after the fix
     grep -q '^last_verified: 2026-08-19$' "$SKILL" && fail "last_verified still the pre-fix 2026-08-19"
     # (f) unrelated prose was not collaterally rewritten
     grep -qF 'master is moving faster than this branch can rebase' "$SKILL" \
         || fail "the Phase 4 loop-bound message was lost"
+    # (g) POSITIVE arm: BOTH push sites materialise the script and invoke it exactly once.
+    # 2, not 1: Phase 4.3 and Phase 6.5 step 5 each carry a full materialise-and-run line,
+    # so re-materialising is a cheap no-op that removes an ordering dependency between them.
+    [[ "$(grep -c 'scripts/push.sh > /tmp/pr-ready-push-<N>.sh' "$UNION")" -eq 2 ]] \
+        || fail "expected exactly 2 push.sh materialise lines (Phase 4.3 and Phase 6.5 step 5) -- a push site was missed or duplicated"
+    [[ "$(grep -c 'bash /tmp/pr-ready-push-<N>.sh <N>' "$UNION")" -eq 2 ]] \
+        || fail "expected exactly 2 'bash /tmp/pr-ready-push-<N>.sh <N>' invocations across the doc union"
+    [[ "$(grep -c 'test -s /tmp/pr-ready-push-<N>.sh' "$UNION")" -eq 2 ]] \
+        || fail "a push call line lost its 'test -s' non-empty guard -- an empty materialise would run as a no-op"
 fi
 end_case pr-ready-doc-shape
 
@@ -1182,15 +1216,17 @@ grep -qF '$NF' "$RW" || fail "rewriter missing \$NF (rename-safe awk)"
 # every runner below invokes $RW directly with a hardcoded 9999, so a SKILL.md call line that
 # lost its `<N>` argument would pass this case and STOP on the arg guard in every real run.
 # This pins the seam the split opened — the one line Phase 5.9 tells the model to run.
-_SK="$SCRIPT_DIR/../.claude/skills/pr-ready/SKILL.md"
+# Phase 5.9's call line now lives in _phase59-files-changed.md, so this seam is
+# asserted against the SKILL.md + companions union rather than SKILL.md alone.
+_SK="$UNION"
 _CALL=$(grep -F 'pr-ready-filesblock-<N>.sh' "$_SK" | grep -F 'git show' || true)
-[[ -n "$_CALL" ]] || fail "SKILL.md Phase 5.9 lost its git-show call line for the rewriter"
+[[ -n "$_CALL" ]] || fail "Phase 5.9 lost its git-show call line for the rewriter"
 grep -qF '.claude/skills/pr-ready/scripts/files-changed.sh' <<< "$_CALL" \
-    || fail "SKILL.md call line does not materialise scripts/files-changed.sh"
+    || fail "Phase 5.9 call line does not materialise scripts/files-changed.sh"
 grep -qF 'test -s /tmp/pr-ready-filesblock-<N>.sh' <<< "$_CALL" \
-    || fail "SKILL.md call line lost its 'test -s' non-empty guard"
+    || fail "Phase 5.9 call line lost its 'test -s' non-empty guard"
 grep -qE 'bash /tmp/pr-ready-filesblock-<N>\.sh <N>[[:space:]]*$' <<< "$_CALL" \
-    || fail "SKILL.md call line must end 'bash /tmp/pr-ready-filesblock-<N>.sh <N>' (arg guard STOPs without it)"
+    || fail "Phase 5.9 call line must end 'bash /tmp/pr-ready-filesblock-<N>.sh <N>' (arg guard STOPs without it)"
 
 # (c) fixture git repo: origin/master has .claude/x; feat-rewriter adds bin/y + modifies .claude/x
 _FIX=$(mktemp -d)
@@ -1389,25 +1425,24 @@ end_case pr-ready-files-changed-rewriter
 # fails loudly rather than skipping. The `**Exempt:**` check is E14's original assertion,
 # kept because that clause is what told a reader Monitor was safe to arm here.
 begin_case
-SKILL="$SCRIPT_DIR/../.claude/skills/pr-ready/SKILL.md"
-[[ -s "$SKILL" ]] || fail "e14: pr-ready SKILL.md missing or empty at $SKILL"
+[[ -s "$UNION" ]] || fail "e14: pr-ready doc union missing or empty at $UNION"
 
-[[ "$(grep -cF '**Exempt:**' "$SKILL")" -eq 0 ]] \
+[[ "$(grep -cF '**Exempt:**' "$UNION")" -eq 0 ]] \
     || fail "e14: SKILL.md still carries an **Exempt:** clause (E14 regression)"
 # no Monitor arming block, and no `command:` key, may exist anywhere in the skill
-[[ "$(grep -c 'command:' "$SKILL")" -eq 0 ]] \
+[[ "$(grep -c 'command:' "$UNION")" -eq 0 ]] \
     || fail "e14: SKILL.md has a 'command:' line — a Monitor arm was re-added (E14 regression)"
-[[ "$(grep -cF 'Monitor(' "$SKILL")" -eq 0 ]] \
+[[ "$(grep -cF 'Monitor(' "$UNION")" -eq 0 ]] \
     || fail "e14: SKILL.md arms a Monitor( — the CI watcher must run via Bash run_in_background"
 # the watcher is materialised once from the pin, and armed twice (Phase 4.5 + Phase 6.5)
-[[ "$(grep -cF 'scripts/watch-ci.sh > /tmp/pr-ready-ciwatch-<N>.sh' "$SKILL")" -eq 1 ]] \
+[[ "$(grep -cF 'scripts/watch-ci.sh > /tmp/pr-ready-ciwatch-<N>.sh' "$UNION")" -eq 1 ]] \
     || fail "e14: expected exactly 1 watch-ci.sh materialise line in SKILL.md"
-[[ "$(grep -cF 'bash /tmp/pr-ready-ciwatch-<N>.sh <N> <HEAD_SHA>' "$SKILL")" -eq 2 ]] \
+[[ "$(grep -cF 'bash /tmp/pr-ready-ciwatch-<N>.sh <N> <HEAD_SHA>' "$UNION")" -eq 2 ]] \
     || fail "e14: expected 2 'bash /tmp/pr-ready-ciwatch-<N>.sh <N> <HEAD_SHA>' arm lines (Phase 4.5 + 6.5)"
-grep -qF 'run_in_background: true' "$SKILL" \
+grep -qF 'run_in_background: true' "$UNION" \
     || fail "e14: SKILL.md no longer says run_in_background: true — the single-wake shape was lost"
 # the polling logic must live ONLY in the script; a pasted copy is the drift this guards
-[[ "$(grep -c 'gh pr checks <N>' "$SKILL")" -eq 0 ]] \
+[[ "$(grep -c 'gh pr checks <N>' "$UNION")" -eq 0 ]] \
     || fail "e14: a copy of the watcher loop was pasted back into SKILL.md (drift)"
 end_case e14-ci-watcher-single-wake
 
@@ -1596,6 +1631,255 @@ _spawn_ln=$(grep -nF 'subagent_type: "pr-ready-phase6"' "$_sk" | head -1 | cut -
 [[ -n "$_spawn_ln" && -n "$_rm_ln" && "$_rm_ln" -lt "$_spawn_ln" ]] \
   || fail "21g: verdict rm -f (line ${_rm_ln:-none}) does not precede the spawn (line ${_spawn_ln:-none})"
 end_case phase6-opus-delegate-static
+
+# --- case 26: every git-show include path resolves ----------------------------------------
+# The runtime loader is `git show <MASTER_SHA>:<path>`. A stub naming a path that does not
+# exist STOPs the run: fail-closed, but a dead stop on every future /pr-ready. Resolve
+# against the WORKING TREE, not a master SHA -- the companions are not in any master SHA
+# until this PR merges, so a `git show` based check here would fail for the wrong reason.
+begin_case
+_root="$SCRIPT_DIR/.."
+_paths=$(grep -ohE 'git show <MASTER_SHA>:[^ `]+' "$PRD/SKILL.md" "$PRD"/_*.md \
+             "$_root/.claude/agents/pr-ready-phase6.md" \
+         | sed 's|^git show <MASTER_SHA>:||' | sort -u)
+[[ -n "$_paths" ]] || fail "no 'git show <MASTER_SHA>:<path>' includes found -- did the loader idiom change?"
+while IFS= read -r _p; do
+    [[ -z "$_p" ]] && continue
+    case "$_p" in *"<"*) continue ;; esac   # the invariants quote a literal <path> placeholder
+    [[ -f "$_root/$_p" ]] || fail "include path does not resolve to a file: $_p"
+done <<< "$_paths"
+end_case pr-ready-include-paths-resolve
+
+# --- case 22: new pr-ready companions carry doc-freshness frontmatter --------------------
+# bin/check-docs' IN_SCOPE_GLOBS covers .claude/skills/*/SKILL.md but NOT _*.md, so nothing
+# else in the repo enforces this. The two PRE-EXISTING companions predate the convention and
+# are deliberately excluded rather than retrofitted in an unrelated PR.
+begin_case
+for _c in _phase4-push-and-ci.md _phase59-files-changed.md _phase65-remediation.md _phase7-verdict.md; do
+    head -1 "$PRD/$_c" | grep -qx -- '---' \
+        || fail "$_c does not open with a YAML frontmatter fence"
+    head -5 "$PRD/$_c" | grep -q '^description: ' \
+        || fail "$_c is missing a 'description:' frontmatter key"
+    head -5 "$PRD/$_c" | grep -qE '^last_verified: [0-9]{4}-[0-9]{2}-[0-9]{2}$' \
+        || fail "$_c is missing a well-formed 'last_verified: YYYY-MM-DD' key"
+done
+end_case pr-ready-companion-frontmatter
+
+# --- case 23: relocated phases fail CLOSED -----------------------------------------------
+# A stub whose `git show` fails must STOP the run, never silently skip the phase. A skipped
+# Phase 7 means no verdict is ever posted; a skipped Phase 4 means nothing is ever pushed.
+# Neither leaves a trace, so this is asserted statically or not at all.
+begin_case
+_SKILL="$PRD/SKILL.md"
+for _c in _phase4-push-and-ci.md _phase59-files-changed.md _phase65-remediation.md _phase7-verdict.md; do
+    grep -qF "git show <MASTER_SHA>:.claude/skills/pr-ready/$_c" "$_SKILL" \
+        || fail "SKILL.md has no git-show stub for $_c"
+    grep -qF "STOP: cannot load $_c from <MASTER_SHA> or from the worktree" "$_SKILL" \
+        || fail "the $_c stub has no inline fail-closed STOP line -- a failed load would silently skip the phase"
+done
+# The one PRE-EXISTING orchestrator-side stub uses the sanctioned fallback shape: it points
+# at the single declared fallback in the invariants rather than carrying an inline STOP.
+# _plan-fidelity-review.md is NO LONGER loaded by SKILL.md directly: Phase 6 now spawns the
+# pr-ready-phase6 agent def, which loads _plan-fidelity-review.md on its own. Only
+# _rebase-and-conflicts.md is loaded by the orchestrator via git show.
+grep -qF "git show <MASTER_SHA>:.claude/skills/pr-ready/_rebase-and-conflicts.md" "$_SKILL" \
+    || fail "SKILL.md has no git-show stub for _rebase-and-conflicts.md"
+grep -qF 'STOP: cannot load <file> from <MASTER_SHA> or from the worktree' "$_SKILL" \
+    || fail "the include-fallback invariant lost its declared STOP line"
+# The enumeration must not drift behind the number of includes -- a stale count leaves
+# includes outside the single declared fallback, which is a fail-OPEN hole. Two distinct
+# assertions: the first pins line 38's phrasing, the second pins line 39's.
+grep -qF 'all seven progressive-disclosure includes' "$_SKILL" \
+    || fail "the git-show invariant no longer says 'all seven progressive-disclosure includes'"
+grep -qF "orchestrator's seven progressive-disclosure includes" "$_SKILL" \
+    || fail "the include-fallback clause no longer enumerates seven includes"
+# Constraint 5: the model: key is claude-sonnet-4-6 (user-authorized 2026-08-26, superseding
+# the prior "NO model: KEY" note). Case 21a also asserts this; the two are complementary.
+grep -qx 'model: claude-sonnet-4-6' "$_SKILL" \
+    || fail "SKILL.md lost its model: claude-sonnet-4-6 key -- it is deliberate, do not remove it"
+grep -qF 'DO NOT REMOVE IT' "$_SKILL" \
+    || fail "the deliberate model: key comment was removed or reworded -- constraint 5 marker lost"
+end_case pr-ready-stub-fail-closed
+
+# --- case 24: push.sh fails CLOSED --------------------------------------------------------
+# The bug: a lease-only push with no explicit refspec, on a no-upstream worktree branch,
+# publishes NOTHING and its rc is push.default-dependent. push.sh must (1) publish anyway
+# via an explicit refspec, (2) still honour the lease, and (3) never report success unless
+# origin actually holds HEAD. Arm (d) is the one that matters: a rejected push must be loud.
+begin_case
+PUSHSH="$PRD/scripts/push.sh"
+if [[ ! -x "$PUSHSH" ]]; then
+    fail "scripts/push.sh missing or not executable at $PUSHSH"
+else
+    PFIX="$SCRATCH/pushfix"; PORIGIN="$PFIX/origin.git"; PW="$PFIX/work"; PW2="$PFIX/work2"
+    mkdir -p "$PFIX"
+    g init -q --bare "$PORIGIN"
+    g init -q "$PW"
+    commit_on "$PW" one
+    g -C "$PW" remote add origin "file://$PORIGIN"
+    g -C "$PW" branch -M feat-x          # branch with NO upstream: the live worktree shape
+
+    # (a) publishes on a no-upstream branch (the whole point), and verifies against origin
+    out=$(cd "$PW" && bash "$PUSHSH" 9999 2>&1); rc=$?
+    [[ $rc -eq 0 ]] || fail "push.sh rc=$rc on a clean no-upstream publish, expected 0: $out"
+    grep -q '^PUSHED PR #9999 ' <<< "$out" || fail "push.sh did not print the PUSHED verdict: $out"
+    grep -q 'moved: yes' <<< "$out" || fail "push.sh should report moved: yes when it creates the ref"
+    _hs=$(g -C "$PW" rev-parse HEAD)
+    [[ "$(g -C "$PW" ls-remote origin refs/heads/feat-x | awk '{print $1}')" == "$_hs" ]] \
+        || fail "push.sh reported PUSHED but origin/feat-x does not hold HEAD"
+
+    # (b) idempotent re-run: the ref does NOT move, and the verdict is still PUSHED.
+    # This is why `after == HEAD` is authoritative and `moved` is only reported.
+    out=$(cd "$PW" && bash "$PUSHSH" 9999 2>&1); rc=$?
+    [[ $rc -eq 0 ]] || fail "push.sh rc=$rc on an idempotent re-run, expected 0: $out"
+    grep -q '^PUSHED PR #9999 ' <<< "$out" \
+        || fail "push.sh false-failed an up-to-date re-run -- 'moved' must not be the authoritative gate: $out"
+    grep -q 'moved: no' <<< "$out" || fail "push.sh should report moved: no on an up-to-date re-run"
+
+    # (c) stale lease: a concurrent third-party publish is REJECTED, never clobbered
+    g clone -q "file://$PORIGIN" "$PW2"
+    g -C "$PW2" checkout -q feat-x
+    commit_on "$PW2" concurrent
+    g -C "$PW2" push -q origin feat-x
+    _third=$(g -C "$PW2" rev-parse HEAD)
+    commit_on "$PW" mine
+    out=$(cd "$PW" && bash "$PUSHSH" 9999 2>&1); rc=$?
+    [[ $rc -eq 2 ]] || fail "push.sh rc=$rc on a stale lease, expected 2: $out"
+    grep -q '^STALE LEASE' <<< "$out" || fail "push.sh did not print the STALE LEASE verdict: $out"
+    grep -q '^PUSHED' <<< "$out" && fail "push.sh reported PUSHED on a stale lease -- FAIL-OPEN"
+    [[ "$(g -C "$PW" ls-remote origin refs/heads/feat-x | awk '{print $1}')" == "$_third" ]] \
+        || fail "push.sh CLOBBERED a concurrent update despite the lease"
+
+    # (d) THE fail-closed arm: the remote REJECTS the update. A pre-receive hook exiting 1
+    # lets the lease read succeed and only the update fail -- exactly the silent-failure shape.
+    DFIX="$SCRATCH/pushdeny"; DORIGIN="$DFIX/origin.git"; DW="$DFIX/work"
+    mkdir -p "$DFIX"
+    g init -q --bare "$DORIGIN"
+    printf '#!/bin/sh\nexit 1\n' > "$DORIGIN/hooks/pre-receive"
+    chmod 755 "$DORIGIN/hooks/pre-receive"
+    g init -q "$DW"
+    commit_on "$DW" d1
+    g -C "$DW" remote add origin "file://$DORIGIN"
+    g -C "$DW" branch -M feat-deny
+    out=$(cd "$DW" && bash "$PUSHSH" 9999 2>&1); rc=$?
+    [[ $rc -ne 0 ]] || fail "push.sh exited 0 against a rejecting remote -- FAIL-OPEN: $out"
+    grep -q 'PUSH FAILED' <<< "$out" || fail "push.sh did not print PUSH FAILED on a rejected update: $out"
+    grep -q '^PUSHED' <<< "$out" && fail "push.sh reported PUSHED on a rejected update -- FAIL-OPEN"
+    [[ -z "$(g -C "$DW" ls-remote origin refs/heads/feat-deny | awk '{print $1}')" ]] \
+        || fail "fixture bug: the pre-receive deny hook did not actually block the update"
+
+    # (g) rc 0 but origin does NOT hold HEAD. A post-receive hook rewinds the ref after the
+    # update lands: git reports success (post-receive's status is ignored) while origin ends
+    # up elsewhere. This is the arm that makes `after == HEAD` authoritative rather than rc --
+    # arms (a)-(d) alone cannot tell the two gates apart, since a rejected push already sets
+    # rc != 0. Mutate the gate to `[ "$RC" -eq 0 ]` and only this arm goes red.
+    RFIX="$SCRATCH/pushrewind"; RORIGIN="$RFIX/origin.git"; RW="$RFIX/work"
+    mkdir -p "$RFIX"
+    g init -q --bare "$RORIGIN"
+    printf '#!/bin/sh\ngit update-ref refs/heads/feat-rw "$(git rev-parse refs/heads/feat-rw^ 2>/dev/null || echo %s)" 2>/dev/null\nexit 0\n' \
+        0000000000000000000000000000000000000000 > "$RORIGIN/hooks/post-receive"
+    chmod 755 "$RORIGIN/hooks/post-receive"
+    g init -q "$RW"
+    commit_on "$RW" r1
+    commit_on "$RW" r2
+    g -C "$RW" remote add origin "file://$RORIGIN"
+    g -C "$RW" branch -M feat-rw
+    _rhead=$(g -C "$RW" rev-parse HEAD)
+    out=$(cd "$RW" && bash "$PUSHSH" 9999 2>&1); rc=$?
+    grep -q 'push rc: 0' <<< "$out" \
+        || fail "fixture bug: the post-receive rewind should leave push rc 0 (out: $out)"
+    [[ "$(g -C "$RW" ls-remote origin refs/heads/feat-rw | awk '{print $1}')" != "$_rhead" ]] \
+        || fail "fixture bug: the post-receive hook did not rewind refs/heads/feat-rw"
+    [[ $rc -ne 0 ]] || fail "push.sh exited 0 when origin does not hold HEAD -- rc is not the gate: $out"
+    grep -q '^PUSHED' <<< "$out" \
+        && fail "push.sh reported PUSHED on an rc-0 push that origin did not keep -- FAIL-OPEN"
+    grep -q 'PUSH FAILED' <<< "$out" \
+        || fail "push.sh did not print PUSH FAILED when origin does not hold HEAD: $out"
+
+    # (f) origin holds the branch but we have NEVER fetched it: there is no lease to hold.
+    # Unreachable from arms (a)-(d), and it is exactly where a naive fresh-read lease
+    # silently degrades into --force.
+    NFIX="$SCRATCH/pushnofetch"; NW="$NFIX/work"
+    mkdir -p "$NFIX"
+    g init -q "$NW"
+    commit_on "$NW" nofetch
+    g -C "$NW" remote add origin "file://$PORIGIN"
+    g -C "$NW" branch -M feat-x
+    out=$(cd "$NW" && bash "$PUSHSH" 9999 2>&1); rc=$?
+    [[ $rc -eq 2 ]] || fail "push.sh rc=$rc with origin ahead and no tracking ref, expected 2: $out"
+    grep -q '^STALE LEASE' <<< "$out" || fail "push.sh did not fail closed on an unfetched branch: $out"
+    grep -q '^PUSHED' <<< "$out" && fail "push.sh reported PUSHED with no lease to hold -- FAIL-OPEN"
+    [[ "$(g -C "$NW" ls-remote origin refs/heads/feat-x | awk '{print $1}')" == "$_third" ]] \
+        || fail "push.sh CLOBBERED origin/feat-x when it held no lease"
+
+    # (e) the four STOP guards
+    out=$(cd "$PW" && bash "$PUSHSH" 2>&1); rc=$?
+    [[ $rc -ne 0 ]] || fail "push.sh exited 0 with no PR-number argument"
+    grep -q '^STOP: arg1' <<< "$out" || fail "push.sh missing-arg guard did not STOP: $out"
+
+    NOGIT=$(mktemp -d)
+    if git -C "$NOGIT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        fail "fixture problem: mktemp -d ($NOGIT) is inside a git work tree; the non-repo guard cannot be exercised"
+    else
+        out=$(cd "$NOGIT" && bash "$PUSHSH" 9999 2>&1); rc=$?
+        [[ $rc -ne 0 ]] || fail "push.sh exited 0 outside a git work tree"
+        grep -q '^STOP: not inside a git work tree' <<< "$out" || fail "push.sh non-repo guard did not STOP: $out"
+    fi
+    rm -rf "$NOGIT"
+
+    g -C "$PW" checkout -q --detach
+    out=$(cd "$PW" && bash "$PUSHSH" 9999 2>&1); rc=$?
+    [[ $rc -ne 0 ]] || fail "push.sh exited 0 on a detached HEAD"
+    grep -q '^STOP: detached HEAD' <<< "$out" || fail "push.sh detached-HEAD guard did not STOP: $out"
+    g -C "$PW" checkout -q feat-x
+
+    g -C "$DW" branch -M master
+    out=$(cd "$DW" && bash "$PUSHSH" 9999 2>&1); rc=$?
+    [[ $rc -ne 0 ]] || fail "push.sh exited 0 on branch master"
+    grep -q "^STOP: refusing to push 'master'" <<< "$out" || fail "push.sh master guard did not STOP: $out"
+fi
+end_case pr-ready-push-fail-closed
+
+# --- case 25: SKILL.md stays inside its resident-bytes band ------------------------------
+# SKILL.md is resident in context on EVERY turn of a /pr-ready run, so its size is a cost
+# invariant, not a style preference. The band is 2000 B wide -- deliberately NARROWER than
+# the smallest relocatable phase (Phase 5.9, 2671 B) -- so re-inlining any phase trips it.
+# Measured at implementation: 33224 B (Step 3.5 post Phase-6-delegate rewrite; the plan
+# predicted 29021 B but a separate merged PR added the Phase 6 Opus-delegate block (+4203 B)
+# before this PR rebased onto master).
+begin_case
+_sz=$(wc -c < "$PRD/SKILL.md" | tr -d ' ')
+if [[ "$_sz" -lt 32224 || "$_sz" -gt 34224 ]]; then
+    fail "SKILL.md is $_sz B, outside the [32224, 34224] resident-bytes band -- a phase was re-inlined, a relocation was reverted, or the file grew unreviewed"
+fi
+end_case pr-ready-skill-size-band
+
+# --- case 27: E22/E23 prevention prose pins -----------------------------------------------
+# Pins the load-bearing phrases added by this PR's prevention work so a prose gutting is
+# caught immediately rather than discovered in a future /pr-ready Phase 6 review.
+begin_case
+# 27a: E22 Class B — pre-commit scope-reconciliation step. Removing the numstat command
+# from _phase65-remediation.md step 4 makes this fail.
+grep -qF 'git diff --numstat HEAD' "$SCRIPT_DIR/../.claude/skills/pr-ready/_phase65-remediation.md" \
+  || fail "27a: _phase65-remediation.md lost 'git diff --numstat HEAD' — E22 Class B prevention removed"
+# 27b: E22 Class B — body correction command. Removing the gh pr edit line from step 4
+# makes this fail.
+grep -qF 'gh pr edit' "$SCRIPT_DIR/../.claude/skills/pr-ready/_phase65-remediation.md" \
+  || fail "27b: _phase65-remediation.md lost 'gh pr edit' — E22 Class B prevention removed"
+# 27c: E23 — named-constant-volume check (sub-clause 4a). Removing the 4a sub-clause from
+# _plan-fidelity-review.md makes this fail.
+grep -qF 'inheriting its blocking verdict' "$SCRIPT_DIR/../.claude/skills/pr-ready/_plan-fidelity-review.md" \
+  || fail "27c: _plan-fidelity-review.md lost 'inheriting its blocking verdict' — E23 4a sub-clause removed"
+# 27d: E23 — EXPECTED constant array check. Removing the named-constant prose from 4a
+# makes this fail.
+grep -qF '`EXPECTED` constant array' "$SCRIPT_DIR/../.claude/skills/pr-ready/_plan-fidelity-review.md" \
+  || fail "27d: _plan-fidelity-review.md lost '\`EXPECTED\` constant array' — E23 4a sub-clause removed"
+# 27e: coupling pin — "all six 6d checks" in 6a and "all six 6d classes" in
+# _phase65-remediation.md forbid a 7th 6d class item; changing this count breaks both
+# coupling statements and makes this fail.
+grep -qF 'all six 6d checks' "$SCRIPT_DIR/../.claude/skills/pr-ready/_plan-fidelity-review.md" \
+  || fail "27e: _plan-fidelity-review.md lost 'all six 6d checks' — coupling that forbids a 7th 6d class item removed"
+end_case e22-e23-prevention-prose-pins
 
 # --- verdict -----------------------------------------------------------------------------
 if [[ $FAILED -ne 0 ]]; then

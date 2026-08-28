@@ -466,6 +466,13 @@ FAILURE_TAIL_LINES=200
 FAILURE_TAIL_BYTES=20000
 MAX_IMPL_SECS=3600   # per-phase cap: impl gets at most 1h
 MAX_PP_SECS=3600     # per-phase cap: post-plan gets at most 1h
+# Wall-clock cap-timeout classifier (see impl_cap_timeout below). The tolerance
+# absorbs process startup/teardown skew around `timeout`; it must stay SMALL —
+# a large value would forgive ordinary failures, which is exactly the
+# blanket-forgive this breaker must not become.
+CAP_TIMEOUT_TOLERANCE_SECS=30
+CAP_REFUND_LIMIT=2   # max wall-clock refunds per plan; the 3rd cap-timeout burns
+                     # a real attempt so MAX_ATTEMPTS still retires a hopeless plan
 LOCK_TTL_SECS=9000   # max a single plan legitimately holds its claim lock
                      # (impl 1h + postplan 1h + overhead); a lock older than this
                      # whose owner PID is gone is presumed crashed and stolen.
@@ -533,6 +540,7 @@ fi
 
 WATCHER_PID=""
 CURRENT_LOCK=""   # claim-lock dir held for the plan this runner is processing
+CAP_DEFERRED=" "  # space-wrapped basenames cap-refunded this run; claim_next_plan skips them
 cleanup_watcher() {
     if [ -n "$WATCHER_PID" ]; then
         kill "$WATCHER_PID" 2>/dev/null || true
@@ -851,6 +859,14 @@ regenerate_weekly_section() {
 # phase is cut short by an environmental failure (usage/rate limit, auth error,
 # transient) rather than a genuine plan failure — the plan should retry cleanly
 # next run, not march toward the poison-pill skip threshold.
+# Give back the attempt consumed by an environmental failure.
+#
+# Deliberately does NOT remove "$CAP_REFUND_FILE". This function is called FROM
+# the cap-timeout refund path, so clearing the counter here would reset the
+# bound on every refund and make cap-timeout refunds UNLIMITED — the exact
+# inverse of CAP_REFUND_LIMIT. The counter is evicted only where a plan's whole
+# retry state resets: poison-pill eviction, impl success/disposition, the
+# end-of-session orphan sweep, and bin/automouse/queue.
 refund_attempt() {
     local current
     current=$(cat "$ATTEMPT_FILE" 2>/dev/null || echo 0)
@@ -909,6 +925,55 @@ should_impl_env_stop() {
     [ "$handoff" -eq 1 ] && return 1     # handoff written → impl succeeded
     [ "$in_queue" -eq 0 ] && return 1    # plan left queue/ → deliberate disposition, not environmental
     [ "$env_err" -eq 1 ] || [ "$stalled" -eq 1 ] || [ "$fast" -eq 1 ]
+}
+
+# Was this phase killed by the per-phase wall clock (the `timeout` cap)?
+#
+# Narrow by construction. The exit status alone proves nothing: 143 is ALSO the
+# ordinary SUCCESS exit here, because bin/lib/automouse-stream-filter.sh
+# kill -TERMs claude on the final `result` event — a clean 6-minute impl exits
+# 143 too. The DURATION test is what discriminates. Both statuses are accepted:
+# 124 is GNU timeout's own exit code, and 143 is what this pipeline actually
+# observes (the harness traps SIGTERM, emits a graceful `result`, and the stream
+# filter then TERMs the recorded pid, masking timeout's 124).
+impl_cap_timeout() {
+    local status=$1 dur=$2 budget=$3
+    [ "$status" -eq 143 ] || [ "$status" -eq 124 ] || return 1
+    [ "$dur" -ge $(( budget - CAP_TIMEOUT_TOLERANCE_SECS )) ]
+}
+
+# Does this cap-timeout earn an attempt refund?
+#
+# Same boolean shape as should_impl_env_stop(): handoff=1 means the impl
+# actually SUCCEEDED at the wall (post-plan must run — nothing to refund), and
+# in_queue=0 means the agent deliberately disposed of the plan at the wall.
+# Refunds are bounded by CAP_REFUND_LIMIT so a plan that times out forever still
+# reaches the MAX_ATTEMPTS poison pill.
+should_refund_cap_timeout() {
+    local handoff=$1 in_queue=$2 cap_timeout=$3 granted=$4 limit=$5
+    [ "$cap_timeout" -eq 1 ] || return 1
+    [ "$handoff" -eq 1 ] && return 1
+    [ "$in_queue" -eq 0 ] && return 1
+    [ "$granted" -lt "$limit" ]
+}
+
+# Read the cap-refund counter, sanitizing anything that is not a non-negative
+# integer to 0. Fails CLOSED is wrong here and fails OPEN is worse, so it fails
+# to 0 = "no refunds granted yet", the value a fresh plan has; a truncated or
+# hand-edited sidecar therefore costs at most the normal 2-refund budget.
+cap_refunds_granted() {
+    local file=$1 raw
+    raw=$(cat "$file" 2>/dev/null || echo 0)
+    case "$raw" in
+        ''|*[!0-9]*) echo 0 ;;
+        *)           echo "$raw" ;;
+    esac
+}
+
+# Persist the incremented cap-refund count (single-line overwrite, never append).
+record_cap_refund() {
+    local file=$1 granted=$2
+    echo $(( granted + 1 )) > "$file"
 }
 
 # Write a one-line report when the run STOPS on an environmental failure. The
@@ -1004,6 +1069,10 @@ claim_next_plan() {
         [ -n "$plan" ] || continue
         plan_name=$(basename "$plan")
         [ -n "${SINGLE_PLAN:-}" ] && [ "$plan_name" != "$SINGLE_PLAN" ] && continue
+        # Cap-refunded earlier in THIS run → deliberately deferred to a future
+        # run. Skip before locking, so a sibling runner stays free to take it and
+        # this runner falls through to the next-oldest plan.
+        case "$CAP_DEFERRED" in *" $plan_name "*) continue ;; esac
         lock="$QUEUE_DIR/${plan_name}.lock"
         # Fast path: unlocked plan — claim atomically.
         if mkdir "$lock" 2>/dev/null; then
@@ -1107,6 +1176,8 @@ while true; do
     if [ -z "$NEXT_PLAN" ]; then
         if [ -n "${SINGLE_PLAN:-}" ]; then
             echo "Plan ${SINGLE_PLAN%.md} is being processed by another runner — nothing to do." >> "$LOG"
+        elif [ "$CAP_DEFERRED" != " " ]; then
+            echo "No claimable plan left. Cap-refunded and deferred to the next run:${CAP_DEFERRED% } — stopping." >> "$LOG"
         else
             echo "All queued plans are claimed by a concurrent runner — nothing to do." >> "$LOG"
         fi
@@ -1119,6 +1190,7 @@ while true; do
     # Per-plan retry counter — skip poison pills
     ATTEMPT_FILE="$QUEUE_DIR/${PLAN_NAME}.attempts"
     FAILURE_FILE="$QUEUE_DIR/${PLAN_NAME}.failure"   # capped tail of the last genuine impl failure (ADR-0085); lifecycle-tied to ATTEMPT_FILE
+    CAP_REFUND_FILE="$QUEUE_DIR/${PLAN_NAME}.cap-refunds"   # wall-clock refunds granted to this plan; lifecycle-tied to ATTEMPT_FILE, NOT reset by refund_attempt
     ATTEMPTS=0
     if [ -f "$ATTEMPT_FILE" ]; then
         ATTEMPTS=$(cat "$ATTEMPT_FILE")
@@ -1127,7 +1199,7 @@ while true; do
         echo "Plan $PLAN_NAME failed $ATTEMPTS times — moving to skipped/." >> "$LOG"
         mkdir -p "$NIGHTLY_DIR/skipped"
         mv "$NEXT_PLAN" "$NIGHTLY_DIR/skipped/"
-        rm -f "$ATTEMPT_FILE" "$FAILURE_FILE"
+        rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE"
         REPORTS_DIR="$NIGHTLY_DIR/reports"
         mkdir -p "$REPORTS_DIR"
         SLUG=$(basename "$PLAN_NAME" .md)
@@ -1268,6 +1340,9 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # falls through to continue the loop. A slow no-signature failure that left
         # the plan in queue/ falls through as a genuine plan failure, keeping its
         # incremented attempt → eventual poison-pill skip (unchanged).
+        # EXCEPTION, handled just below: a slow failure that was the wall-clock
+        # cap itself is refunded by the bounded cap-timeout breaker, up to
+        # CAP_REFUND_LIMIT times per plan.
         IMPL_HANDOFF=0;  [ -f "$HANDOFF_FILE" ] && IMPL_HANDOFF=1
         IMPL_IN_QUEUE=0; [ -e "$NEXT_PLAN" ]   && IMPL_IN_QUEUE=1
         IMPL_ENV_ERR=0;  phase_env_error "$IMPL_LOG_BEFORE" && IMPL_ENV_ERR=1
@@ -1286,15 +1361,42 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             break
         fi
 
+        # Wall-clock cap breaker (BOUNDED). timeout(1) hard-kills the impl at
+        # REMAINING_SECS; that is environmental in exactly the way a STALL-KILL
+        # is — the agent was cut off mid-work, not defeated by the plan — so the
+        # attempt is refunded. Two deliberate differences from the breaker above:
+        # it does NOT break the loop (a cap-timeout means THIS PLAN was big, not
+        # that the environment is degraded, so the next plan is still worth
+        # running), and it is CAPPED, because a plan that always exhausts the
+        # wall must still retire.
+        IMPL_CAP_TIMEOUT=0
+        IMPL_CAP_REFUNDED=0
+        impl_cap_timeout "$IMPL_STATUS" "$IMPL_DUR" "$REMAINING_SECS" && IMPL_CAP_TIMEOUT=1
+        CAP_REFUNDS=$(cap_refunds_granted "$CAP_REFUND_FILE")
+        if should_refund_cap_timeout "$IMPL_HANDOFF" "$IMPL_IN_QUEUE" "$IMPL_CAP_TIMEOUT" "$CAP_REFUNDS" "$CAP_REFUND_LIMIT"; then
+            CAP_REASON="impl hard-killed at the ${REMAINING_SECS}s wall-clock cap (exit $IMPL_STATUS after ${IMPL_DUR}s)"
+            echo "CAP-TIMEOUT REFUNDED ($(( CAP_REFUNDS + 1 ))/$CAP_REFUND_LIMIT) — $CAP_REASON. Attempt refunded; continuing to the next plan." >> "$LOG"
+            record_cap_refund "$CAP_REFUND_FILE" "$CAP_REFUNDS"
+            refund_attempt
+            IMPL_CAP_REFUNDED=1
+            # Defer for the REST OF THIS RUN (see claim_next_plan): the plan is
+            # still the oldest entry in queue/, so without this the next iteration
+            # would immediately re-claim it and grind the whole night on one plan.
+            CAP_DEFERRED="$CAP_DEFERRED$PLAN_NAME "
+        elif [ "$IMPL_CAP_TIMEOUT" -eq 1 ] && [ "$IMPL_HANDOFF" -eq 0 ] && [ "$IMPL_IN_QUEUE" -eq 1 ]; then
+            echo "CAP-TIMEOUT BURNED — impl hard-killed at the ${REMAINING_SECS}s wall-clock cap (exit $IMPL_STATUS after ${IMPL_DUR}s); refund budget ${CAP_REFUNDS}/${CAP_REFUND_LIMIT} exhausted, this counts as a genuine attempt." >> "$LOG"
+        fi
+
         # Handoff created → impl succeeded, reset attempt counter
         if [ -f "$HANDOFF_FILE" ]; then
             echo "Handoff file created — impl succeeded." >> "$LOG"
-            rm -f "$ATTEMPT_FILE" "$FAILURE_FILE"
+            rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE"
         elif [ ! -e "$NEXT_PLAN" ]; then
             echo "Impl made a deliberate disposition (plan left queue/, e.g. already-merged → done/ or a stale-plan skip) — not an environmental failure, continuing." >> "$LOG"
-        else
+        elif [ "$IMPL_CAP_REFUNDED" -eq 0 ]; then
             # Genuine (non-environmental) failure: handoff absent, plan STILL in
-            # queue/, and the env-stop guard did NOT fire (it breaks above). The
+            # queue/, the env-stop guard did NOT fire (it breaks above), and the
+            # cap-timeout breaker did NOT refund (it sets IMPL_CAP_REFUNDED=1). The
             # incremented attempt stays in place (→ eventual poison-pill, unchanged).
             # Persist the capped failure report so the NEXT attempt — escalated to
             # Opus on the final retry (ADR-0085) — has this attempt's context.
@@ -1389,7 +1491,7 @@ PLAN_FILE=$PLAN_NAME" \
 
     # If the plan moved out of queue/ (to done/ or skipped/), clean up its attempt file and failure report
     if [ ! -e "$NEXT_PLAN" ]; then
-        rm -f "$ATTEMPT_FILE" "$FAILURE_FILE"
+        rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE"
     fi
 
     # Release this plan's claim — done with it for this iteration. A genuine
@@ -1421,6 +1523,16 @@ for ff in "$QUEUE_DIR"/*.failure; do
     PLAN_FOR_FAILURE="${ff%.failure}"
     if [ ! -e "$PLAN_FOR_FAILURE" ]; then
         rm -f "$ff"
+    fi
+done
+
+# Clean up any leftover cap-refund counters for plans that completed (mirrors
+# the .attempts sweep above — .cap-refunds shares the .attempts lifecycle)
+for cf in "$QUEUE_DIR"/*.cap-refunds; do
+    [ -e "$cf" ] || continue
+    PLAN_FOR_CAP="${cf%.cap-refunds}"
+    if [ ! -e "$PLAN_FOR_CAP" ]; then
+        rm -f "$cf"
     fi
 done
 

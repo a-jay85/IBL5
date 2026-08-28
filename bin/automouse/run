@@ -289,6 +289,7 @@ PLIST_EOF
     next_fire=""
     if hhmm=$(daily_fire_hhmm "$daily"); then
         # $hhmm is "<hour> <minute>" — unquoted on purpose so it splits in two.
+        # shellcheck disable=SC2086
         next_fire=$(next_daily_epoch $hhmm "$rearm_epoch" 2>/dev/null || true)
     fi
 
@@ -317,6 +318,7 @@ if [ "${1:-}" = "disarm-tonight" ] || [ "${1:-}" = "disarm-until" ]; then
             exit 1
         fi
         # $DAILY_HHMM is "<hour> <minute>" — unquoted on purpose so it splits.
+        # shellcheck disable=SC2086
         DISARM_FIRE=$(next_daily_epoch $DAILY_HHMM "$NOW")
         # Re-arm an hour after the run we're skipping would have started, so the
         # bootstrap can't land inside that interval. launchd does not fire a
@@ -1108,6 +1110,7 @@ cd "$REPO"
 
 # Prevent macOS from sleeping while we run (released automatically on exit)
 caffeinate -s -w $$ &
+# shellcheck disable=SC2034  # captured for reference; caffeinate exits automatically
 CAFFEINATE_PID=$!
 
 START=$(date +%s)

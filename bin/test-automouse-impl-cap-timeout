@@ -217,12 +217,15 @@ fi
 # oldest queued entry, and a cap-refunded plan is still queued and still oldest,
 # so the next iteration would re-claim it, cap out again, and spend the whole
 # night on one hopeless plan.
+# shellcheck disable=SC2034  # used by claim_next_plan() via source
 LOCK_TTL_SECS=9000
+# shellcheck disable=SC2034
 LOG=/dev/null
 
 # assert_claim <name> <deferred> <expect-basename or ''> <expect-rc>
 assert_claim() {
     name="$1"; deferred="$2"; want="$3"; want_rc="$4"
+    # shellcheck disable=SC2034  # used by claim_next_plan() via source
     CAP_DEFERRED="$deferred"
     claim_out="$(claim_next_plan 2>/dev/null)" && claim_rc=0 || claim_rc=1
     claim_got=""
@@ -299,6 +302,7 @@ fi
 # blanket "every line carries all three" is unsatisfiable against s4 and could
 # never go green. (bin/test-automouse-escalation separately pins that every such
 # line carries "$FAILURE_FILE"; not duplicated here.)
+# shellcheck disable=SC2016  # intentional: searching source code for literal $-strings
 s3_bad=$(grep -F 'rm -f "$ATTEMPT_FILE"' "$RUNNER" | grep -vF '"$CAP_REFUND_FILE"' || true)
 s3_n=$(printf '%s' "$s3_bad" | grep -c . || true)
 if [ "$s3_n" -eq 1 ]; then
@@ -324,6 +328,7 @@ else
 fi
 
 # s5: the end-of-session orphan sweep, mirroring the .attempts/.failure sweeps.
+# shellcheck disable=SC2016  # intentional: searching source code for literal $-string
 if grep -qF '"$QUEUE_DIR"/*.cap-refunds' "$RUNNER"; then
     echo "ok: s5-sweep-exists"
 else

@@ -28,14 +28,14 @@ DONE_DIR="$NIGHTLY_DIR/done"
 
 mkdir -p "$QUEUE_DIR"
 
-# Evict any stale same-basename disposition symlink (and its .attempts counter)
+# Evict any stale same-basename disposition symlink (and its sidecar counters)
 # from skipped/ and done/ before (re)queuing. queue/ is the cut vertex: a plan
 # can land in two disposition folders only if a stale sibling survives queue
 # entry. rm -f is a no-op when nothing is there.
 evict_dispositions() {
     local name=$1
-    rm -f "$SKIPPED_DIR/$name" "$SKIPPED_DIR/${name}.attempts" "$SKIPPED_DIR/${name}.staleness" "$SKIPPED_DIR/${name}.failure" \
-          "$DONE_DIR/$name" "$DONE_DIR/${name}.attempts" "$DONE_DIR/${name}.staleness" "$DONE_DIR/${name}.failure"
+    rm -f "$SKIPPED_DIR/$name" "$SKIPPED_DIR/${name}.attempts" "$SKIPPED_DIR/${name}.staleness" "$SKIPPED_DIR/${name}.failure" "$SKIPPED_DIR/${name}.cap-refunds" \
+          "$DONE_DIR/$name" "$DONE_DIR/${name}.attempts" "$DONE_DIR/${name}.staleness" "$DONE_DIR/${name}.failure" "$DONE_DIR/${name}.cap-refunds"
 }
 
 # --- Run-order stamping -----------------------------------------------------
@@ -144,7 +144,7 @@ if [ "$1" = "remove" ] || [ "$1" = "rm" ]; then
         show_queue >&2
         exit 1
     fi
-    rm -f "$QUEUE_DIR/$TARGET" "$QUEUE_DIR/${TARGET}.attempts" "$QUEUE_DIR/${TARGET}.failure"
+    rm -f "$QUEUE_DIR/$TARGET" "$QUEUE_DIR/${TARGET}.attempts" "$QUEUE_DIR/${TARGET}.failure" "$QUEUE_DIR/${TARGET}.cap-refunds"
     echo "Removed from queue: $TARGET (original plan in $PLANS_DIR is untouched)"
     echo ""
     show_queue
@@ -164,7 +164,7 @@ if [ "$1" = "requeue" ]; then
             continue
         fi
         mv "$f" "$QUEUE_DIR/$name"
-        rm -f "$QUEUE_DIR/${name}.attempts" "$QUEUE_DIR/${name}.failure"
+        rm -f "$QUEUE_DIR/${name}.attempts" "$QUEUE_DIR/${name}.failure" "$QUEUE_DIR/${name}.cap-refunds"
         evict_dispositions "$name"
         # `mv` carries the skipped/ mtime over; without this the requeued plan
         # would re-enter at its authoring position, not the back.

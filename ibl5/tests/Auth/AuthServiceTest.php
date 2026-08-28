@@ -317,6 +317,42 @@ class AuthServiceTest extends TestCase
         self::assertFalse($this->authService->isAdmin());
     }
 
+    public function testStartSessionClearsStaleRolesCache(): void
+    {
+        // A session that cached roles_mask before an admin grant.
+        $_SESSION['auth_user_id'] = 1;
+        $_SESSION['auth_username'] = 'testuser';
+        $_SESSION['auth_roles'] = 0;
+
+        $startSession = new \ReflectionMethod(AuthService::class, 'startSession');
+        $startSession->invoke($this->authService, 1, 'testuser');
+
+        self::assertArrayNotHasKey(
+            'auth_roles',
+            $_SESSION,
+            'startSession() must drop the cached roles mask so a re-login re-reads auth_users'
+        );
+    }
+
+    public function testReLoginPicksUpAnAdminGrantMadeAfterTheRolesWereCached(): void
+    {
+        $stubRepo = static::createStub(AuthRepositoryInterface::class);
+        $stubRepo->method('findUserRolesByUsername')->willReturn(['roles_mask' => Role::ADMIN]);
+        $service = new AuthService($stubRepo);
+
+        // Session cached "not an admin" before the grant was made.
+        $_SESSION['auth_user_id'] = 1;
+        $_SESSION['auth_username'] = 'testuser';
+        $_SESSION['auth_roles'] = 0;
+        self::assertFalse($service->isAdmin(), 'the stale cache denies before re-login');
+
+        // Signing in again must re-read the mask from the database.
+        $startSession = new \ReflectionMethod(AuthService::class, 'startSession');
+        $startSession->invoke($service, 1, 'testuser');
+
+        self::assertTrue($service->isAdmin(), 'a fresh login must see the granted ADMIN bit');
+    }
+
     // --- DI seam tests (rows #6–#9) ---
 
     private static function buildSqlitePdo(): \PDO

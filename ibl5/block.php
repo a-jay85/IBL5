@@ -19,17 +19,28 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/mainfile.php';
 
-global $mysqli_db;
+global $mysqli_db, $authService;
 
 use FreeAgency\FreeAgencyAdminProcessor;
 use FreeAgency\FreeAgencyAdminRepository;
 use Security\CsrfGuard;
 use Security\HtmlSanitizer;
 
-// Admin authentication check
+// Admin authentication check. Distinguish "not signed in" from "signed in but
+// not an admin" — one message for both makes a session problem read as a
+// permissions problem.
 if (!is_admin()) {
     header('HTTP/1.1 403 Forbidden');
-    echo '<h1>403 Forbidden</h1><p>Admin access required.</p>';
+
+    if (!$authService->isAuthenticated()) {
+        echo '<h1>403 Forbidden</h1><p>You are not signed in. '
+            . '<a href="modules.php?name=YourAccount">Sign in</a> and try again.</p>';
+        exit;
+    }
+
+    echo '<h1>403 Forbidden</h1><p>Admin access required. If you should have admin '
+        . 'access, <a href="modules.php?name=YourAccount&amp;op=logout">sign out</a>, '
+        . 'sign back in, and try again.</p>';
     exit;
 }
 

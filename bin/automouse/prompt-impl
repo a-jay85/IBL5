@@ -4,6 +4,12 @@ The outer bash loop in bin/automouse/run fires two claude -p invocations per pla
 
 Do NOT invoke /post-plan, /simplify, /commit, /code-review, or /security-audit. Your job ends after writing the handoff file.
 
+## Your Time Budget — HARD WALL
+
+You have **{{IMPL_BUDGET_MINUTES}} minutes** of wall-clock time for this phase. The outer loop runs you under `timeout`, so at that mark your process is SIGTERM'd mid-sentence — no cleanup turn, no chance to write anything afterward. An unfinished phase that left a handoff is recoverable; one that left nothing is not.
+
+So: commit a checkpoint after each phase of the plan rather than batching, and treat roughly 90% of the budget as your real deadline. If you reach that point with work outstanding, STOP implementing and write the handoff file describing what landed, what did not, and the exact next step. Budget for asynchronous `Agent` delegates too — they can block you for tens of minutes while emitting nothing.
+
 ## Step 1: Read the Assigned Plan
 
 NIGHTLY_DIR is: $HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse

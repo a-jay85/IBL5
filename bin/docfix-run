@@ -46,8 +46,15 @@ if [ -n "$(git -C "$MAIN" branch --list 'docs-stale-refresh-*')" ]; then
     echo "docfix-run: a docs-stale-refresh-* branch already exists — skipping (no stacking)."
     exit 0
 fi
-if gh pr list --state open --json headRefName --jq '.[].headRefName' 2>/dev/null \
-     | grep -q '^docs-stale-refresh-'; then
+# `grep -c`, not `grep -q`: this script runs under `set -euo pipefail`, and
+# `grep -q` exits on first match, closing the pipe under the still-writing
+# producer. The producer then dies of SIGPIPE and pipefail reports 141 — so a
+# FOUND branch reads as NOT-FOUND and the dedupe silently stops deduping. Bites
+# once the producer's output exceeds the pipe buffer; latent here today (few open
+# PRs), load-bearing as the PR count grows. Same defect fixed in bin/watch-run's
+# label_alive(); guarded by bin/test-sigpipe-grep-q-guard.
+if [ "$(gh pr list --state open --json headRefName --jq '.[].headRefName' 2>/dev/null \
+     | grep -c '^docs-stale-refresh-')" -gt 0 ]; then
     echo "docfix-run: an open docs-stale-refresh-* PR is pending human merge — skipping."
     exit 0
 fi

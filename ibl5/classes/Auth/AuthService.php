@@ -287,6 +287,12 @@ class AuthService implements AuthServiceInterface
         $_SESSION[self::SESSION_USER_ID] = $userId;
         $_SESSION[self::SESSION_USERNAME] = $username;
 
+        // Drop the cached roles mask. hasRole() caches it for the life of the
+        // session (180 days — SessionBootstrap::SESSION_LIFETIME), so a mask
+        // read before an admin grant would otherwise deny the user for months
+        // even after signing in again. A fresh login must re-read auth_users.
+        unset($_SESSION['auth_roles']);
+
         // Clear cached user info so it gets re-fetched
         $this->cachedUserInfo = null;
     }

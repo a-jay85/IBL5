@@ -1,6 +1,6 @@
 ---
 description: Development standards, priorities, and workflow for IBL5.
-last_verified: 2026-06-28
+last_verified: 2026-08-28
 ---
 
 # Development Guide

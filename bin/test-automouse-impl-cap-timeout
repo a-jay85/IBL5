@@ -1,0 +1,350 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-automouse-impl-cap-timeout — regression test for the WALL-CLOCK
+# cap-timeout breaker in bin/automouse/run (impl_cap_timeout,
+# should_refund_cap_timeout, cap_refunds_granted, record_cap_refund) and for the
+# run-scoped deferral skip in claim_next_plan.
+#
+# The defect this locks: `timeout "$REMAINING_SECS"` hard-kills the impl phase at
+# the per-phase wall. That is environmental in exactly the way a watchdog
+# STALL-KILL is — the agent was cut off mid-work, not defeated by the plan — yet
+# it used to fall through to the genuine-failure arm and burn one of three
+# attempts (27 occurrences in ~10 days of production logs). The cap-timeout is
+# now refunded, BOUNDED to CAP_REFUND_LIMIT refunds per plan.
+#
+# The load-bearing safety property: exit 143 is ALSO the ordinary SUCCESS exit
+# code here, because bin/lib/automouse-stream-filter.sh kill -TERMs claude on the
+# final `result` event. A status-only classifier would therefore refund
+# successful impls. All the discriminating power lives in the DURATION test plus
+# the handoff / in-queue guards — cases t5, t6, r5 and r6 below.
+#
+# The second load-bearing property: the refund does NOT break the loop, so a
+# refunded plan is still the oldest entry in queue/ and would be re-claimed on
+# the very next iteration. CAP_DEFERRED (a run-scoped shell variable) is what
+# stops that from grinding the whole night on one plan — cases d1-d4.
+#
+# Predicates are EXTRACTED from bin/automouse/run rather than copied, so the test
+# can never drift from the implementation. Each is self-contained (reads only its
+# positional args, or documented globals the harness sets), so eval'ing the
+# definition is safe and does not run the runner's top-level loop.
+#
+# Run: bin/test-automouse-impl-cap-timeout  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+RUNNER="$SCRIPT_DIR/automouse/run"
+PROMPT="$SCRIPT_DIR/automouse/prompt-impl"
+QUEUE_SCRIPT="$SCRIPT_DIR/automouse/queue"
+FAILED=0
+
+for f in "$RUNNER" "$PROMPT" "$QUEUE_SCRIPT"; do
+    if [ ! -f "$f" ]; then
+        echo "FAIL: cannot find $f"
+        exit 1
+    fi
+done
+
+# --- Extract each predicate from the runner -------------------------------
+# Same awk idiom as bin/test-automouse-env-breaker: from the definition line to
+# the first line that is a lone `}` at column 0.
+extract_fn() {
+    awk -v fn="$1" '
+        $0 ~ "^" fn "\\(\\) \\{" { capture = 1 }
+        capture { print }
+        capture && /^\}/ { exit }
+    ' "$RUNNER"
+}
+
+for fn in impl_cap_timeout should_refund_cap_timeout cap_refunds_granted record_cap_refund claim_next_plan; do
+    FN_SRC="$(extract_fn "$fn")"
+    if [ -z "$FN_SRC" ]; then
+        echo "FAIL: could not extract $fn from $RUNNER"
+        FAILED=1
+    else
+        eval "$FN_SRC"
+    fi
+done
+
+# --- Extract the two constants BY VALUE, not by copy -----------------------
+CAP_TIMEOUT_TOLERANCE_SECS=""
+CAP_REFUND_LIMIT=""
+eval "$(grep -m1 '^CAP_TIMEOUT_TOLERANCE_SECS=' "$RUNNER" | sed 's/#.*//')"
+eval "$(grep -m1 '^CAP_REFUND_LIMIT=' "$RUNNER" | sed 's/#.*//')"
+
+# ---------------------------------------------------------------------------
+# impl_cap_timeout <status> <dur> <budget> — was this exit the wall-clock cap?
+# ---------------------------------------------------------------------------
+# assert_cap <name> <status> <dur> <budget> <expect: cap|not-cap>
+assert_cap() {
+    name="$1"; st="$2"; dur="$3"; budget="$4"; want="$5"
+    if impl_cap_timeout "$st" "$dur" "$budget" 2>/dev/null; then
+        got="cap"
+    else
+        got="not-cap"
+    fi
+    if [ "$got" != "$want" ]; then
+        echo "FAIL: $name — expected '$want', got '$got' (status=$st dur=$dur budget=$budget)"
+        FAILED=1
+    else
+        echo "ok: $name ($got)"
+    fi
+}
+
+# --- Positive: the cap really fired ---
+assert_cap "t1-143-at-wall"                143 3600 3600 cap
+assert_cap "t2-124-at-wall"                124 3600 3600 cap
+assert_cap "t3-overshoot"                  143 3605 3600 cap
+assert_cap "t4-boundary-exactly-tolerance" 143 3570 3600 cap
+
+# --- THE safety negatives: 143 is also the ordinary success exit code ---
+assert_cap "t5-boundary-one-below"         143 3569 3600 not-cap
+assert_cap "t6-short-143-normal-success"   143  600 3600 not-cap
+
+# --- Non-cap terminations at the wall still burn a real attempt ---
+assert_cap "t7-generic-failure-at-wall"      1 3600 3600 not-cap
+assert_cap "t8-clean-exit-at-wall"           0 3600 3600 not-cap
+
+# ---------------------------------------------------------------------------
+# should_refund_cap_timeout <handoff> <in_queue> <cap> <granted> <limit>
+# ---------------------------------------------------------------------------
+# assert_refund <name> <h> <q> <cap> <granted> <limit> <expect: refund|burn>
+assert_refund() {
+    name="$1"; h="$2"; q="$3"; c="$4"; g="$5"; l="$6"; want="$7"
+    if should_refund_cap_timeout "$h" "$q" "$c" "$g" "$l" 2>/dev/null; then
+        got="refund"
+    else
+        got="burn"
+    fi
+    if [ "$got" != "$want" ]; then
+        echo "FAIL: $name — expected '$want', got '$got' (h=$h q=$q cap=$c granted=$g limit=$l)"
+        FAILED=1
+    else
+        echo "ok: $name ($got)"
+    fi
+}
+
+assert_refund "r1-first-refund"      0 1 1 0 2 refund
+assert_refund "r2-second-refund"     0 1 1 1 2 refund
+assert_refund "r3-third-burns"       0 1 1 2 2 burn
+assert_refund "r4-over-bound-burns"  0 1 1 3 2 burn
+# r5/r6 keep 143's ambiguity safe: a successful long impl, and a deliberate
+# disposition made at the wall, must never be refunded.
+assert_refund "r5-handoff-written"   1 1 1 0 2 burn
+assert_refund "r6-left-queue"        0 0 1 0 2 burn
+assert_refund "r7-not-a-cap-timeout" 0 1 0 0 2 burn
+
+# ---------------------------------------------------------------------------
+# cap_refunds_granted <file> — reads the counter, sanitizing garbage to 0
+# ---------------------------------------------------------------------------
+TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$TMP_DIR"' EXIT
+
+# assert_granted <name> <expect> <file>
+assert_granted() {
+    name="$1"; want="$2"; file="$3"
+    got="$(cap_refunds_granted "$file" 2>/dev/null)"
+    if [ "$got" != "$want" ]; then
+        echo "FAIL: $name — expected '$want', got '$got'"
+        FAILED=1
+    else
+        echo "ok: $name ($got)"
+    fi
+}
+
+assert_granted "g1-missing-file" 0 "$TMP_DIR/nope.cap-refunds"
+printf '1\n'      > "$TMP_DIR/g2"; assert_granted "g2-normal"       1 "$TMP_DIR/g2"
+printf 'banana\n' > "$TMP_DIR/g3"; assert_granted "g3-non-numeric"  0 "$TMP_DIR/g3"
+: > "$TMP_DIR/g4";                 assert_granted "g4-empty"        0 "$TMP_DIR/g4"
+printf -- '-3\n'  > "$TMP_DIR/g5"; assert_granted "g5-negative"     0 "$TMP_DIR/g5"
+
+# ---------------------------------------------------------------------------
+# record_cap_refund <file> <granted> — writes granted+1, overwrite not append
+# ---------------------------------------------------------------------------
+printf '1\n' > "$TMP_DIR/k1"
+record_cap_refund "$TMP_DIR/k1" 1 2>/dev/null
+k1_got="$(cat "$TMP_DIR/k1" 2>/dev/null || echo '<unwritten>')"
+if [ "$k1_got" = "2" ]; then
+    echo "ok: k1-writes-increment (2)"
+else
+    echo "FAIL: k1-writes-increment — expected '2', got '$k1_got'"
+    FAILED=1
+fi
+
+# A `>>` typo would corrupt every later read, and cap_refunds_granted would then
+# sanitize the multi-line garbage to 0 — silently making refunds unbounded.
+printf '0\n' > "$TMP_DIR/k2"
+record_cap_refund "$TMP_DIR/k2" 0 2>/dev/null
+record_cap_refund "$TMP_DIR/k2" 4 2>/dev/null
+k2_lines="$(wc -l < "$TMP_DIR/k2" 2>/dev/null | tr -d ' ')"
+k2_got="$(cat "$TMP_DIR/k2" 2>/dev/null || echo '<unwritten>')"
+if [ "$k2_lines" = "1" ] && [ "$k2_got" = "5" ]; then
+    echo "ok: k2-overwrites-not-appends (1 line, '5')"
+else
+    echo "FAIL: k2-overwrites-not-appends — expected 1 line containing '5', got $k2_lines line(s) containing '$k2_got'"
+    FAILED=1
+fi
+
+# ---------------------------------------------------------------------------
+# Constants — pin the user-decided bound and catch a tolerance typo
+# ---------------------------------------------------------------------------
+if [ "$CAP_REFUND_LIMIT" = "2" ]; then
+    echo "ok: c1-refund-limit-is-two"
+else
+    echo "FAIL: c1-refund-limit-is-two — expected CAP_REFUND_LIMIT=2, got '$CAP_REFUND_LIMIT'"
+    FAILED=1
+fi
+
+# A fat-fingered 3000 would classify EVERY impl as a cap-timeout — the blanket
+# forgive this breaker must never become. Nothing else in the repo catches it.
+tol_ok=0
+case "$CAP_TIMEOUT_TOLERANCE_SECS" in
+    ''|*[!0-9]*|0*) tol_ok=0 ;;
+    *)              [ "$CAP_TIMEOUT_TOLERANCE_SECS" -le 120 ] && tol_ok=1 ;;
+esac
+if [ "$tol_ok" -eq 1 ]; then
+    echo "ok: c2-tolerance-sane ($CAP_TIMEOUT_TOLERANCE_SECS)"
+else
+    echo "FAIL: c2-tolerance-sane — expected a positive integer <= 120, got '$CAP_TIMEOUT_TOLERANCE_SECS'"
+    FAILED=1
+fi
+
+# ---------------------------------------------------------------------------
+# claim_next_plan deferral skip — the starvation guard (functional, not grep)
+# ---------------------------------------------------------------------------
+# Without this skip the refund is a REGRESSION: claim_next_plan returns the
+# oldest queued entry, and a cap-refunded plan is still queued and still oldest,
+# so the next iteration would re-claim it, cap out again, and spend the whole
+# night on one hopeless plan.
+LOCK_TTL_SECS=9000
+LOG=/dev/null
+
+# assert_claim <name> <deferred> <expect-basename or ''> <expect-rc>
+assert_claim() {
+    name="$1"; deferred="$2"; want="$3"; want_rc="$4"
+    CAP_DEFERRED="$deferred"
+    claim_out="$(claim_next_plan 2>/dev/null)" && claim_rc=0 || claim_rc=1
+    claim_got=""
+    [ -n "$claim_out" ] && claim_got="$(basename "$claim_out")"
+    if [ "$claim_got" != "$want" ] || [ "$claim_rc" != "$want_rc" ]; then
+        echo "FAIL: $name — expected '${want:-<nothing>}' rc=$want_rc, got '${claim_got:-<nothing>}' rc=$claim_rc (CAP_DEFERRED='$deferred')"
+        FAILED=1
+        return 1
+    fi
+    echo "ok: $name (${claim_got:-<nothing>}, rc=$claim_rc)"
+    return 0
+}
+
+QUEUE_DIR="$TMP_DIR/queue"
+mkdir -p "$QUEUE_DIR"
+: > "$QUEUE_DIR/alpha.md"
+: > "$QUEUE_DIR/beta.md"
+touch -t 202001010000 "$QUEUE_DIR/alpha.md"   # alpha is strictly the older/oldest
+touch -t 202001020000 "$QUEUE_DIR/beta.md"
+
+assert_claim "d1-no-deferral-picks-oldest" " " "alpha.md" 0
+rm -rf "${QUEUE_DIR:?}"/*.lock
+
+assert_claim "d2-deferred-skips-to-next" " alpha.md " "beta.md" 0
+# This assertion MUST run here, before the between-case lock cleanup below — it
+# is the only check on the deferral `case` sitting ABOVE `mkdir "$lock"`. A
+# deferred plan must stay claimable by a concurrent sibling runner, with its lock
+# dir neither created nor mtime-refreshed. Moving the `case` below the mkdir
+# would still pass d1-d4 and fail only here.
+if [ ! -d "$QUEUE_DIR/alpha.md.lock" ]; then
+    echo "ok: d2-deferred-plan-left-unlocked"
+else
+    echo "FAIL: d2-deferred-plan-left-unlocked — alpha.md.lock was created for a deferred plan (the skip must run BEFORE mkdir)"
+    FAILED=1
+fi
+rm -rf "${QUEUE_DIR:?}"/*.lock
+
+# The degenerate case: the run ends cleanly instead of grinding — exactly the
+# behavior of the rejected `break` design, so the deferral is never worse.
+assert_claim "d3-all-deferred-returns-empty" " alpha.md beta.md " "" 1
+rm -rf "${QUEUE_DIR:?}"/*.lock
+
+# Negative path on the space-wrapping: with an unwrapped membership test,
+# `foo.md` would match inside `not-foo.md` and a queued plan would be skipped
+# forever.
+QUEUE_DIR="$TMP_DIR/queue2"
+mkdir -p "$QUEUE_DIR"
+: > "$QUEUE_DIR/foo.md"
+assert_claim "d4-substring-safety" " not-foo.md " "foo.md" 0
+rm -rf "${QUEUE_DIR:?}"/*.lock
+
+# ---------------------------------------------------------------------------
+# Static guards — same style as bin/test-automouse-escalation's parity block
+# ---------------------------------------------------------------------------
+
+# s1+s2: the placeholder and its substitution must be renamed together, or the
+# budget injection silently ships the raw token to the agent.
+if grep -qF '{{IMPL_BUDGET_MINUTES}}' "$PROMPT"; then
+    echo "ok: s1-placeholder-present"
+else
+    echo "FAIL: s1-placeholder-present — {{IMPL_BUDGET_MINUTES}} missing from $PROMPT"
+    FAILED=1
+fi
+
+if grep -qF 'IMPL_BUDGET_MINUTES' "$RUNNER"; then
+    echo "ok: s2-substitution-present"
+else
+    echo "FAIL: s2-substitution-present — no IMPL_BUDGET_MINUTES substitution in $RUNNER"
+    FAILED=1
+fi
+
+# s3: of the ATTEMPT_FILE eviction lines, EXACTLY ONE may omit CAP_REFUND_FILE —
+# refund_attempt()'s, whose omission is the load-bearing exclusion s4 pins. A
+# blanket "every line carries all three" is unsatisfiable against s4 and could
+# never go green. (bin/test-automouse-escalation separately pins that every such
+# line carries "$FAILURE_FILE"; not duplicated here.)
+s3_bad=$(grep -F 'rm -f "$ATTEMPT_FILE"' "$RUNNER" | grep -vF '"$CAP_REFUND_FILE"' || true)
+s3_n=$(printf '%s' "$s3_bad" | grep -c . || true)
+if [ "$s3_n" -eq 1 ]; then
+    echo "ok: s3-eviction-parity (1 permitted omission)"
+else
+    echo "FAIL: s3-eviction-parity — expected exactly 1 ATTEMPT_FILE eviction without CAP_REFUND_FILE (refund_attempt's), got $s3_n:"
+    echo "$s3_bad"
+    FAILED=1
+fi
+
+# s4: THE unbounded-refund landmine. refund_attempt() is called FROM the
+# cap-refund path, so clearing the counter there would reset the bound on every
+# refund and make cap-timeout refunds unlimited.
+S4_SRC="$(extract_fn refund_attempt)"
+if [ -z "$S4_SRC" ]; then
+    echo "FAIL: s4-refund-attempt-excludes-counter — could not extract refund_attempt from $RUNNER"
+    FAILED=1
+elif printf '%s\n' "$S4_SRC" | grep -qF 'CAP_REFUND_FILE'; then
+    echo "FAIL: s4-refund-attempt-excludes-counter — refund_attempt() touches CAP_REFUND_FILE, which makes cap refunds UNBOUNDED"
+    FAILED=1
+else
+    echo "ok: s4-refund-attempt-excludes-counter"
+fi
+
+# s5: the end-of-session orphan sweep, mirroring the .attempts/.failure sweeps.
+if grep -qF '"$QUEUE_DIR"/*.cap-refunds' "$RUNNER"; then
+    echo "ok: s5-sweep-exists"
+else
+    echo "FAIL: s5-sweep-exists — missing end-of-session .cap-refunds orphan sweep in $RUNNER"
+    FAILED=1
+fi
+
+# s6: bin/automouse/queue evicts .cap-refunds everywhere it evicts .attempts, or
+# a requeued plan silently inherits an exhausted refund budget.
+s6_bad=$(grep -F 'rm -f' "$QUEUE_SCRIPT" | grep -F '.attempts' | grep -vF '.cap-refunds' || true)
+if [ -z "$s6_bad" ]; then
+    echo "ok: s6-queue-parity"
+else
+    echo "FAIL: s6-queue-parity — found .attempts removal without .cap-refunds in $QUEUE_SCRIPT:"
+    echo "$s6_bad"
+    FAILED=1
+fi
+
+if [ "$FAILED" -ne 0 ]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

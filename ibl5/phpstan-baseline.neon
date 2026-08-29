@@ -55,6 +55,12 @@ parameters:
 			path: bin/rebuild-record-holders-cache
 
 		-
+			rawMessage: Variable $argv might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: bin/refresh-team-season-records
+
+		-
 			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
 			identifier: ibl.directTime
 			count: 1

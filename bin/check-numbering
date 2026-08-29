@@ -1,0 +1,282 @@
+#!/bin/bash
+#
+# bin/check-numbering — fail a PR that introduces a duplicate ADR or migration number.
+#
+# ADR and migration numbers are allocated by scanning the filesystem. Two branches
+# that each allocate before the other merges can claim the same number, and git
+# merges both files cleanly: no conflict, no CI failure, nothing to notice. This
+# gate is the PR-time backstop for that (bin/next-adr / bin/next-migration prevent
+# it at allocation time).
+#
+# Three checks:
+#   1. Duplicate within the diff   — two added files sharing one key.
+#   2. Collision with the base     — an added file whose key already exists on base.
+#   3. Duplicate ADR index rows    — the failure mode `merge=union` on
+#                                    ibl5/docs/decisions/README.md can produce
+#                                    silently (rebase-clean, same row twice).
+#
+# The COLLISION KEY keeps the letter suffix: `044b` is a deliberate "amendment to
+# migration 044" convention, NOT a collision with `044`. The allocators separately
+# strip the suffix when computing the next free number. Keying on the stripped
+# number would report five duplicate migration keys instead of two and fail on
+# master today.
+#
+# This gate compares against the BASE TREE ONLY. It deliberately does not call
+# scan_origin_refs / scan_worktrees (bin/lib/git-helpers.sh) — those are
+# allocator-only. A CI runner has no sibling worktrees, and letting the verdict
+# depend on other people's in-flight branches would make a green run turn red with
+# no change to the PR. Allocation is advisory and should be maximally informed; a
+# gate must be deterministic.
+#
+# There is no bypass marker. A duplicate number is never intentional: it is
+# mechanically detected and mechanically fixable by rerunning the allocator, so
+# there is nothing for a human to justify.
+#
+# Exit codes: 0 = pass, 1 = collision found, 2 = usage error.
+
+set -euo pipefail
+
+ADR_DIR="ibl5/docs/decisions"
+MIGRATION_DIR="ibl5/migrations"
+ADR_INDEX="$ADR_DIR/README.md"
+
+# Duplicate numbers that predate this gate. Renumbering them is not an option:
+# ~289 citations across ADRs, rules, docs and PR bodies reference these by number.
+# The gate exempts them from the --all whole-tree audit ONLY — checks 1 and 2
+# ignore these lists, so a PR adding a *third* 0062-*.md or 046_*.sql still fails.
+# The grandfather list forgives history; it never licenses a new collision.
+ADR_GRANDFATHER="
+0032
+0062
+0065
+0069
+0079
+0081
+0085
+"
+MIGRATION_GRANDFATHER="
+007
+046
+"
+
+usage() {
+    cat <<'EOF'
+Usage: bin/check-numbering [--staged|--since=<sha>|--all] [--help|-h]
+
+Fail when a change introduces a duplicate ADR or migration number.
+
+Modes:
+  --staged        Scan staged changes (git diff --cached). Default.
+  --since=<sha>   Scan changes since <sha> (git diff <sha>...HEAD). CI mode.
+  --all           Audit the whole tree at HEAD. Grandfather list applies.
+  --help, -h      Print this usage and exit 0.
+EOF
+}
+
+MODE="staged"
+SINCE_SHA=""
+
+for arg in "$@"; do
+    case "$arg" in
+        --staged)
+            MODE="staged"
+            ;;
+        --all)
+            MODE="all"
+            ;;
+        --since=*)
+            MODE="since"
+            SINCE_SHA="${arg#--since=}"
+            if [ -z "$SINCE_SHA" ]; then
+                echo "--since= requires a sha" >&2
+                usage >&2
+                exit 2
+            fi
+            ;;
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        -*)
+            echo "unknown flag: $arg" >&2
+            usage >&2
+            exit 2
+            ;;
+        *)
+            echo "unknown argument: $arg" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+done
+
+cd "$(git rev-parse --show-toplevel)"
+
+# Collision key for a repo-relative path, or nothing when the path is not a
+# numbered artifact. ADRs key on the 4-digit prefix; migrations on NNN plus an
+# optional letter suffix. The 0000 template is never a number.
+key_for() {
+    local path="$1" base
+    base="${path##*/}"
+    case "$path" in
+        "$ADR_DIR"/*)
+            case "$base" in
+                0000-*) return 0 ;;
+            esac
+            printf '%s\n' "$base" | grep -oE '^[0-9]{4}' || true
+            ;;
+        "$MIGRATION_DIR"/*)
+            printf '%s\n' "$base" | grep -oE '^[0-9]{1,3}[a-z]?_' | sed 's/_$//' || true
+            ;;
+    esac
+    return 0
+}
+
+# Only files directly inside the two numbered directories are candidates.
+is_numbered_path() {
+    case "$1" in
+        "$ADR_DIR"/*/*|"$MIGRATION_DIR"/*/*) return 1 ;;
+        "$ADR_DIR"/*|"$MIGRATION_DIR"/*)     return 0 ;;
+        *)                                    return 1 ;;
+    esac
+}
+
+is_grandfathered() {
+    local key="$1" kind="$2" list
+    case "$kind" in
+        adr)       list="$ADR_GRANDFATHER" ;;
+        migration) list="$MIGRATION_GRANDFATHER" ;;
+        *)         return 1 ;;
+    esac
+    printf '%s\n' "$list" | grep -qx -- "$key"
+}
+
+kind_for() {
+    case "$1" in
+        "$ADR_DIR"/*)       echo adr ;;
+        "$MIGRATION_DIR"/*) echo migration ;;
+    esac
+}
+
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+FINDINGS="$WORK/findings"
+: > "$FINDINGS"
+
+# ---------------------------------------------------------------------------
+# Collect the paths in scope, and the base tree to compare them against.
+# ---------------------------------------------------------------------------
+ADDED="$WORK/added"
+: > "$ADDED"
+BASE=""
+
+case "$MODE" in
+    staged)
+        BASE="HEAD"
+        git diff --cached --name-only --diff-filter=AR -- "$ADR_DIR" "$MIGRATION_DIR" > "$ADDED" || true
+        ;;
+    since)
+        BASE="$SINCE_SHA"
+        git diff --name-only --diff-filter=AR "$SINCE_SHA...HEAD" -- "$ADR_DIR" "$MIGRATION_DIR" > "$ADDED" || true
+        ;;
+    all)
+        BASE=""
+        git ls-tree --name-only HEAD "$ADR_DIR/" "$MIGRATION_DIR/" > "$ADDED" || true
+        ;;
+esac
+
+# ---------------------------------------------------------------------------
+# Check 1 — duplicate within the diff (or within the tree, in --all mode).
+# In --all mode the grandfather lists suppress historical duplicates.
+# ---------------------------------------------------------------------------
+PAIRS="$WORK/pairs"
+: > "$PAIRS"
+while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    is_numbered_path "$path" || continue
+    k="$(key_for "$path")"
+    [ -n "$k" ] || continue
+    printf '%s\t%s\t%s\n' "$(kind_for "$path")" "$k" "$path" >> "$PAIRS"
+done < "$ADDED"
+
+if [ -s "$PAIRS" ]; then
+    while IFS=$'\t' read -r kind k; do
+        [ -n "$k" ] || continue
+        if [ "$MODE" = "all" ] && is_grandfathered "$k" "$kind"; then
+            continue
+        fi
+        files="$(awk -F'\t' -v kk="$k" -v knd="$kind" '$1==knd && $2==kk {print $3}' "$PAIRS" | paste -sd', ' -)"
+        printf '%s: %s\n' "$k" "$files" >> "$FINDINGS"
+    done < <(cut -f1,2 "$PAIRS" | sort | uniq -d)
+fi
+
+# ---------------------------------------------------------------------------
+# Check 2 — collision with the base tree. Skipped in --all mode (there is no
+# base: the whole tree IS the subject). Never consults other branches.
+# ---------------------------------------------------------------------------
+if [ "$MODE" != "all" ] && [ -s "$ADDED" ]; then
+    BASE_FILES="$WORK/base"
+    git ls-tree --name-only "$BASE" "$ADR_DIR/" "$MIGRATION_DIR/" > "$BASE_FILES" 2>/dev/null || : > "$BASE_FILES"
+    while IFS= read -r path; do
+        [ -n "$path" ] || continue
+        is_numbered_path "$path" || continue
+        k="$(key_for "$path")"
+        [ -n "$k" ] || continue
+        kind="$(kind_for "$path")"
+        while IFS= read -r existing; do
+            [ -n "$existing" ] || continue
+            [ "$existing" = "$path" ] && continue
+            is_numbered_path "$existing" || continue
+            [ "$(kind_for "$existing")" = "$kind" ] || continue
+            [ "$(key_for "$existing")" = "$k" ] || continue
+            printf '%s: %s, %s (already on base)\n' "$k" "$path" "$existing" >> "$FINDINGS"
+        done < "$BASE_FILES"
+    done < "$ADDED"
+fi
+
+# ---------------------------------------------------------------------------
+# Check 3 — duplicate rows in the ADR index table. This is what converts the
+# merge=union corruption (rebase-clean, but the same row present twice) from a
+# silent failure into a loud one. Runs in --all mode, and whenever the index
+# appears in the diff.
+# ---------------------------------------------------------------------------
+INDEX_IN_SCOPE=0
+if [ "$MODE" = "all" ]; then
+    INDEX_IN_SCOPE=1
+else
+    case "$MODE" in
+        staged) CHANGED="$(git diff --cached --name-only -- "$ADR_INDEX" || true)" ;;
+        since)  CHANGED="$(git diff --name-only "$SINCE_SHA...HEAD" -- "$ADR_INDEX" || true)" ;;
+        *)      CHANGED="" ;;
+    esac
+    [ -n "$CHANGED" ] && INDEX_IN_SCOPE=1
+fi
+
+if [ "$INDEX_IN_SCOPE" = "1" ] && [ -f "$ADR_INDEX" ]; then
+    DUP_ROWS="$(grep -oE '^\| \[[0-9]{4}\]\(' "$ADR_INDEX" \
+        | grep -oE '[0-9]{4}' | sort | uniq -d || true)"
+    if [ -n "$DUP_ROWS" ]; then
+        while IFS= read -r n; do
+            [ -n "$n" ] || continue
+            printf '%s: duplicated row in %s\n' "$n" "$ADR_INDEX" >> "$FINDINGS"
+        done <<< "$DUP_ROWS"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Verdict
+# ---------------------------------------------------------------------------
+if [ -s "$FINDINGS" ]; then
+    {
+        echo ""
+        echo "Numbering collision:"
+        sort -u "$FINDINGS" | sed 's/^/  /'
+        echo ""
+        echo "Run 'bin/next-adr <slug>' or 'bin/next-migration' from your worktree to get"
+        echo "a free number, then 'git mv' the file. Do not renumber any existing file."
+    } >&2
+    exit 1
+fi
+
+echo "No duplicate ADR or migration numbers detected."
+exit 0

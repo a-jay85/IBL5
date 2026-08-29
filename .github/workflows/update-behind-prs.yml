@@ -1,25 +1,53 @@
 name: Update BEHIND PRs
 
 on:
+  push:
+    branches: [master]
+    # A master merge is the exact moment every open PR goes BEHIND, and push events are NOT
+    # subject to the schedule-event delay that has been dropping this repo's crons by 6-12h
+    # (measured 2026-08-27/28 across all 11 scheduled workflows; repo Actions volume was at
+    # its LOWEST on those two days — 950/1054 runs vs 2907 on 08-24 when crons were on time —
+    # so our own load is not the cause. The delay is GitHub-side and unreachable from here).
+    # Push is therefore the only trigger this workflow can actually rely on.
+    #
+    # The push pass is deliberately scoped to auto-merge-ARMED PRs only (see step 1). The
+    # retired rebase-prs.yml (#1949) push-triggered ALL open PRs and was removed precisely
+    # because one merge set off a rebase storm across the whole PR set. Armed-only prevents
+    # a recurrence: ~3 armed PRs x ~11 workflows = ~33 CI runs per merge, versus ~330 for
+    # the full open-PR set.
+    paths-ignore:
+      - '**.md'                      # all markdown docs (covers .claude/rules, ibl5/docs, README, ADRs)
+      - '.claude/**'                 # agent rules/skills/commands/memory — never affects app build/test
+      - '.github/ISSUE_TEMPLATE/**'
+      - '.github/PULL_REQUEST_TEMPLATE.md'
+      - '.github/CODEOWNERS'
+      - 'LICENSE'
+      - '**/LICENSE'
+      - '.gitignore'
+      - '**/.gitignore'
+      - '.gitattributes'
   schedule:
-    # Every 15 min, but deliberately OFF the quarter-hour. Do NOT "tidy" this back
-    # to '*/15 * * * *' — the odd minutes are load-bearing.
+    # Best-effort ONLY. GitHub drops and delays these (see the push block above), so nothing
+    # latency-sensitive may depend on them. Their job is the freshness sweep over the full
+    # open-PR set, which the push trigger deliberately does not cover.
     #
-    # GitHub drops scheduled events under load, and names the top of the hour as the
-    # worst window: "The schedule event can be delayed during periods of high loads of
-    # GitHub Actions workflow runs. High load times include the start of every hour. If
-    # the load is sufficiently high enough, some queued jobs may be dropped. ... To
-    # decrease the chance of delay, schedule your workflow to run at a different time
-    # of the hour."
+    # Deliberately OFF the quarter-hour. Do NOT "tidy" this back to '*/15 * * * *' — the odd
+    # minutes are load-bearing. GitHub names the top of the hour as the worst window:
+    # "The schedule event can be delayed during periods of high loads of GitHub Actions
+    # workflow runs. High load times include the start of every hour. If the load is
+    # sufficiently high enough, some queued jobs may be dropped. ... To decrease the chance
+    # of delay, schedule your workflow to run at a different time of the hour."
     #   https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows
-    #
-    # This repo is a heavy Actions user (~790 runs/24h, ~12k/7d as of 2026-08-28), so it
-    # is squarely in the population that gets dropped: '*/15' — which fires on :00 —
-    # produced ONE run in the 12h window 05:22Z–17:31Z on 2026-08-28 instead of ~48,
-    # leaving three green dependabot PRs stuck BEHIND with nothing to unstick them.
-    #
-    # Ticks are cheap; the debounce below decides which ones actually act.
     - cron: '7,22,37,52 * * * *'
+    # Daily overnight full sweep at a fixed, known local time. 11:30 UTC is 04:30 PDT AND
+    # 03:30 PST — the same instant in both, because GitHub cron is UTC-only and never
+    # observes DST, so this one entry covers the whole year with no seasonal edit.
+    #
+    # Honest scope: this is an ADDITIONAL draw on the same unreliable schedule lottery as the
+    # line above, not a guarantee — if the 15-min ticks are being dropped, this one can be
+    # dropped too. It is a backstop for the overnight quiet hours, NOT the fix. The fix is
+    # the push trigger.
+    - cron: '30 11 * * *'
   workflow_dispatch:          # manual trigger for on-demand runs + the dispatch smoke test
 
 permissions:
@@ -34,6 +62,7 @@ jobs:
   update-behind:
     name: Update open PRs stuck BEHIND master
     runs-on: ubuntu-latest
+    timeout-minutes: 60   # a push pass waits on in-flight CI (see step 2); bound it hard
     steps:
       - name: Update BEHIND PRs
         env:
@@ -64,9 +93,19 @@ jobs:
           #    workflow_dispatch bypasses the wait, so on-demand unsticking and the dispatch
           #    smoke test still work immediately.
           DEBOUNCE_SECONDS=3600
+          PUSH_COALESCE_SECONDS=300
 
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             echo "Manual dispatch — bypassing the master-quiet debounce."
+          elif [ "$EVENT_NAME" = "push" ]; then
+            # A push means master moved ~0s ago, so the master-quiet debounce would skip
+            # EVERY push run — it must be bypassed here or the trigger is a silent no-op.
+            # Storm control for pushes is different and twofold: the armed-only scope in
+            # step 1, and this short wait. During the wait a second merge starts a new run
+            # and `concurrency: cancel-in-progress` kills this one, so a burst of
+            # back-to-back merges coalesces into one update pass at the end of the burst.
+            echo "Push to master — coalescing for ${PUSH_COALESCE_SECONDS}s before acting."
+            sleep "$PUSH_COALESCE_SECONDS"
           else
             master_date=$(gh api "repos/$REPO/commits/master" --jq '.commit.committer.date' || true)
 
@@ -91,16 +130,46 @@ jobs:
             fi
           fi
 
-          # 1. Enumerate ALL open, non-draft PRs targeting master, with their merge state
-          #    and head SHA. Categorization happens in the loop below so the step summary
-          #    can report conflict / already-current counts too.
+          # 1. Enumerate the open, non-draft PRs targeting master that THIS pass should
+          #    consider, with their merge state and head SHA. Categorization happens in the
+          #    loop below so the step summary can report conflict / already-current counts.
           #
-          #    Scope note: this used to select only PRs with auto-merge ARMED, whose job was
-          #    narrowly to unstick the merge queue (ADR-0081). It now covers every open
-          #    non-draft PR, so long-lived branches stay fresh against master continuously
-          #    instead of drifting until someone rebases by hand. Updating a branch is NOT
-          #    merging it: this workflow never arms auto-merge and never merges anything, so
-          #    the human review bottleneck is unchanged.
+          #    Scope is event-dependent, and the split is load-bearing:
+          #
+          #    - push -> auto-merge-ARMED PRs only. These are the PRs where BEHIND actually
+          #      blocks something: they are approved and ready, waiting on nothing but
+          #      freshness (dependabot bumps especially). Restricting the per-merge pass to
+          #      them is what keeps the push trigger from re-creating the rebase-prs.yml
+          #      storm that got that workflow retired (#1949).
+          #    - schedule / workflow_dispatch -> ALL open non-draft PRs (#1936), so long-lived
+          #      branches stay fresh against master instead of drifting until someone rebases
+          #      by hand. This is the expensive pass (~30 PRs, ~330 CI runs), so it stays on
+          #      the infrequent triggers.
+          #
+          #    Updating a branch is NOT merging it: this workflow never arms auto-merge and
+          #    never merges anything, so the human review bottleneck is unchanged (ADR-0081).
+          #    Retry budgets are event-dependent for the same reason. Every timing constant
+          #    below was originally calibrated for a SCHEDULED tick, where master last moved
+          #    at least an hour ago, GitHub has long since settled mergeability, and a PR
+          #    skipped this tick is simply retried on the next one. A push pass has neither
+          #    property: it fires while GitHub is still recomputing mergeability for the whole
+          #    open-PR set and while the runner pool is busy with the merge that just landed,
+          #    AND it has no next tick — the run after a push is the next master merge. A
+          #    single skip there is therefore not a deferral, it is a silent permanent miss
+          #    for the exact PRs this trigger exists to unstick. So the push path waits longer
+          #    at both gates instead of skipping once.
+          if [ "$EVENT_NAME" = "push" ]; then
+            SCOPE_FILTER='| select(.autoMergeRequest != null)'
+            UNKNOWN_ATTEMPTS=20   # x 3s  = up to 60s for GitHub to settle mergeStateStatus
+            CI_WAIT_ATTEMPTS=10   # x 60s = up to 10min for a PR's in-flight CI to finish
+            echo "Scope: auto-merge-armed PRs only (push event)."
+          else
+            SCOPE_FILTER=''
+            UNKNOWN_ATTEMPTS=5    # a dropped/slow scheduled tick is retried by the next tick
+            CI_WAIT_ATTEMPTS=0    # ...so a scheduled pass skips rather than waits
+            echo "Scope: all open non-draft PRs ($EVENT_NAME event)."
+          fi
+
           candidates=$(gh api graphql -f owner="$OWNER" -f name="$NAME" -f query='
             query($owner:String!, $name:String!) {
               repository(owner:$owner, name:$name) {
@@ -111,13 +180,15 @@ jobs:
                     mergeable
                     mergeStateStatus
                     isDraft
+                    autoMergeRequest { enabledAt }
                   }
                 }
               }
-            }' --jq '
+            }' --jq "
               .data.repository.pullRequests.nodes[]
               | select(.isDraft | not)
-              | "\(.number) \(.headRefOid) \(.mergeStateStatus) \(.mergeable)"')
+              $SCOPE_FILTER
+              | \"\\(.number) \\(.headRefOid) \\(.mergeStateStatus) \\(.mergeable)\"")
 
           updated=0
           skipped_ci=0
@@ -126,7 +197,7 @@ jobs:
           still_unknown=0
 
           if [ -z "$candidates" ]; then
-            echo "No open non-draft PRs targeting master."
+            echo "No PRs in scope for this $EVENT_NAME pass."
           fi
 
           while IFS=' ' read -r number sha state mergeable; do
@@ -139,7 +210,7 @@ jobs:
             # mid-compute — the defect that left armed PRs (dependabot bumps especially)
             # stuck BEHIND across ticks, because every cold tick re-drew UNKNOWN.
             attempt=0
-            while [ "$state" = "UNKNOWN" ] && [ "$attempt" -lt 5 ]; do
+            while [ "$state" = "UNKNOWN" ] && [ "$attempt" -lt "$UNKNOWN_ATTEMPTS" ]; do
               attempt=$((attempt + 1))
               sleep 3
               resolved=$(gh api graphql -f owner="$OWNER" -f name="$NAME" -F number="$number" -f query='
@@ -188,15 +259,37 @@ jobs:
               continue
             fi
 
-            # 2. Loop safety (step-level): skip if any check run on the head commit is still
-            #    running, so we never re-update the branch while CI from a prior update is live.
-            #    REST check-runs statuses are lowercase: queued / in_progress / completed.
+            # 2. Loop safety (step-level): never re-update a branch while CI from a prior
+            #    update is live. REST check-runs statuses are lowercase: queued / in_progress
+            #    / completed.
+            #
+            #    On a SCHEDULED pass (CI_WAIT_ATTEMPTS=0) this skips immediately — the next
+            #    tick retries. On a PUSH pass it POLLS instead, because there is no next tick
+            #    and because a push fires precisely when the runner pool is busiest, so a
+            #    single check here would skip the armed PRs on essentially every push and
+            #    still report success. Same shape as the UNKNOWN retry loop above.
             running=$(gh api "repos/$REPO/commits/$sha/check-runs" \
               --jq '[.check_runs[] | select(.status=="in_progress" or .status=="queued")] | length' \
               || echo 0)
 
+            ci_attempt=0
+            while [ "${running:-0}" -gt 0 ] && [ "$ci_attempt" -lt "$CI_WAIT_ATTEMPTS" ]; do
+              ci_attempt=$((ci_attempt + 1))
+              echo "CI in progress ($running run(s)) — waiting 60s (attempt $ci_attempt/$CI_WAIT_ATTEMPTS)"
+              sleep 60
+              running=$(gh api "repos/$REPO/commits/$sha/check-runs" \
+                --jq '[.check_runs[] | select(.status=="in_progress" or .status=="queued")] | length' \
+                || echo 0)
+            done
+
             if [ "${running:-0}" -gt 0 ]; then
-              echo "CI in progress ($running check run(s) queued/in_progress) — skipping"
+              # On push this is a permanent miss until master next moves, so make it loud
+              # rather than a quiet summary line.
+              if [ "$EVENT_NAME" = "push" ]; then
+                echo "::warning::PR #$number still had $running CI run(s) in flight after ${CI_WAIT_ATTEMPTS}min of waiting — left BEHIND until the next master merge or scheduled sweep."
+              else
+                echo "CI in progress ($running check run(s) queued/in_progress) — skipping"
+              fi
               skipped_ci=$((skipped_ci + 1))
               echo "::endgroup::"
               continue

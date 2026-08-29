@@ -36,7 +36,7 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
      *
      * No game-count predicate is applied. The 81..83 band that previously lived
      * here was removed when the ibl_team_win_loss view's dedup key was fixed in
-     * ADR-XXXX: phantom boxscores no longer inflate game counts past 82, and the
+     * ADR-0109: phantom boxscores no longer inflate game counts past 82, and the
      * 2004 anomaly rows (Aces 83 / Jazz 83 / Heat 81 / Suns 81) were remediated
      * at source. In-progress-season detection (year === currentSeasonYear AND
      * games < 82) and anomaly validation (games !== 82 → abort) are done by

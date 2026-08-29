@@ -1,6 +1,6 @@
 ---
 description: E2E (Playwright + api-e2e) test-quality backlog — refactoring, perf, weak/tautological assertions, tests that don't prove functionality, and flake-prone patterns, with per-entry status + automouse-readiness. Each open entry is a candidate for a /plan.
-last_verified: 2026-08-08
+last_verified: 2026-08-29
 ---
 
 # E2E Test-Quality Backlog
@@ -185,6 +185,7 @@ Green tests that don't guard the behavior they're named for. **Fix first.** D1/D
 | D13 | ⬜ | 🟩 | `next-sim.spec.ts` opponent colors | asserts `style` contains `--team-color-primary`, not that it resolves to data. Borderline. |
 | D14 | ⬜ | 🟩 | `cross-module-navigation.spec.ts` chain | `if(playerCount>0){…}` silent-passes (no-silent-pass rule); also subsumed by two prior chain tests. |
 | D15 | ⬜ | 🟨 | `role-gating-non-admin.spec.ts` Block F | self-labelled exploratory; 4 no-team-user tests assert only HTTP 200 + no PHP error. |
+| D16 | ⬜ | 🟨 | `depth-chart-entry-mobile.spec.ts` save-flow: positive success assertion (`.ibl-alert--success`) removed due to session-shared flash race; only non-error gate remains (discovered #1805) |
 
 **Suggested direction (axis):** Replace "accept-either-outcome" with "require the success signal **and** read
 back the mutated state" (DB read-back via test-state where available, or re-navigate and assert the changed
@@ -194,8 +195,31 @@ value). For fake-POST tests (D7), assert the banner *after a real submit*, not a
 ### D clusters for planning
 
 - **D-cluster-1 — submission tests that accept a failed mutation as success** *(plan this first)*: **D1, D2, D7** (all ✓verified) — uniform fix: require the success redirect/banner *after a real submit*, then read back the mutation. Tightest, highest-confidence, one coherent worktree.
-- **D-cluster-2 — submission tests with no read-back of mutated state:** D3, D4, D5, D6, D8, D9. (D6 folded in here — same "no read-back" planning shape as D3/D4/D5/D8/D9, even though its accept-info-as-success symptom resembles cluster-1; cluster-1 is already ✓verified/done, so D6 groups with the still-open cluster.)
+- **D-cluster-2 — submission tests with no read-back of mutated state:** D3, D4, D5, D6, D8, D9, D16. (D6 folded in here — same "no read-back" planning shape as D3/D4/D5/D8/D9, even though its accept-info-as-success symptom resembles cluster-1; cluster-1 is already ✓verified/done, so D6 groups with the still-open cluster. D16 added 2026-08-29.)
 - **D-cluster-3 — smoke/gating tests that don't prove the gate:** D10, D11, D12, D14, D15 (+ C17 as a sibling).
+
+### D16 DCE mobile save-flow: positive assertion replaced with non-error gate
+
+**Location:** `ibl5/tests/e2e/flows/depth-chart-entry-mobile.spec.ts` (~L411–431, the `submit` helper)
+**Problem:** The positive save assertion (`.ibl-alert--success` with text `/depth chart saved/i`) was removed during the Axis E flake sweep (PR #1805) because the flash key `_ibl_depth_chart_flash` is session-shared and races parallel E2E workers (same documented race as `depth-chart-entry-submission.spec.ts` L14–29). Replacement asserts `.dc-mobile-cards` visible + `.ibl-alert--error` absent. Neither proves the depth chart actually persisted — `.dc-mobile-cards` is visible before the save, and a silent server-side failure that suppresses the error banner would pass.
+**Suggested direction:** Add a positive non-flash assertion immune to the session race: navigate away and back, then assert the saved depth chart ordering appears in the mobile cards.
+**Est. effort:** S
+**Risk if untouched:** A silent save failure (error suppressed server-side or misrouted) would not be caught.
+**Status:** ⬜ Open
+
+**class:** an E2E submission test that accepts non-error as success, with no read-back of the mutated state, because the original positive assertion was session-race prone.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/tests/e2e/flows/depth-chart-entry-mobile.spec.ts:411–431` | yes | yes | not fixed — filed |
+
+**prevention_ladder:** no gate warranted — the defect class (positive assertion removed under flash-session-race pressure) is too context-specific to gate mechanically; a code-review check on assertion strength would be the right rung but is already a PR-review responsibility.
+
+**artifact_destination:** n/a — no gate
+
+**provenance:** (discovered 2026-08-29 during #1805)
 
 ---
 
@@ -216,10 +240,8 @@ value). For fake-POST tests (D7), assert the banner *after a real submit*, not a
 | E11 | ✅ Done | 🟩 | browser-history `goBack/goForward` — `draft-history`, `franchise-record-book`, `league-starters`, `team` (load-sensitive; keep, watch) |
 | E12 | ✅ Done | 🟩 | sleep-in-retry `setTimeout(r,200)` loop — `ajax-api-endpoints.spec.ts fetchJson` |
 
-**Suggested direction (axis):** Replace `networkidle`/bare sleeps with web-first assertions or
-`waitForResponse`/`waitForFunction` on the actual condition; for PRG redirects use `'load'`; for HTMX history
-use the swap/`waitForURL` signal. E9 needs the real submit signal (waitForResponse on the POST).
-**Est. effort:** S each, M as a sweep. **Risk if untouched:** intermittent CI failures under parallel load.
+**Suggested direction (axis):** All E1–E12 items complete (PR #1805). E9's final implementation uses `evaluate(form.submit())` + auto-retrying `toContainText` DOM assertion rather than `waitForResponse` — `form.submit()` triggers full-page navigation, making `page.content()` race the navigate; the DOM assertion survives the navigation. E9 STOP GUARD: not triggered — PHP validation confirmed working.
+**Est. effort:** complete. **Risk if untouched:** n/a.
 
 > **Audited & excluded (not findings):** `smoke/visual-regression.spec.ts:42,49` uses `networkidle` too, but
 > there it's the correct pre-screenshot settle and the file runs under `playwright.visual.config.ts` (excluded

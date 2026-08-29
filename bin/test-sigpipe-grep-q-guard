@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-sigpipe-grep-q-guard — regression test for the `pipefail` + `grep -q`
+# SIGPIPE defect.
+#
+# THE DEFECT. Under `set -o pipefail` a pipeline reports the last non-zero exit of
+# ANY stage. `grep -q` exits the instant it matches and closes its stdin. If the
+# producer is still writing at that moment it dies of SIGPIPE (exit 141), so the
+# PIPELINE reports 141 — non-zero — even though grep FOUND the match. Every
+# `producer | grep -q` used as a boolean under pipefail therefore reads
+# FOUND as NOT-FOUND, but only once the producer's output outgrows the pipe
+# buffer (~16-64KB). Below that the producer's write completes into the buffer,
+# it exits 0, and the bug hides.
+#
+# WHERE IT BIT. bin/watch-run's label_alive() ran
+#   launchctl list 2>/dev/null | grep -qF "$LABEL"
+# `launchctl list` emits ~560 lines (~28KB) — over the buffer. So label_alive()
+# returned false on its FIRST call for a label that was demonstrably alive, and
+# every `watch-run --label` invocation exited within seconds of arming, printing
+# "launchd label gone but the log has no RESULT line". Runs it was meant to watch
+# for hours reported complete immediately. Found 2026-08-28 while watching a
+# post-plan run that was still running.
+#
+# WHY THIS TEST IS SHAPED LIKE THIS. `launchctl` is macOS-only and CI is Ubuntu,
+# so the live reproduction is not portable. Instead:
+#   - Cases 1-2 prove the MECHANISM with a portable producer, so the rationale
+#     above stays falsifiable rather than becoming folklore.
+#   - Cases 3-4 statically assert the two fixed call sites have not regressed.
+#
+# Run: bin/test-sigpipe-grep-q-guard   (exit 0 = all pass, 1 = a case failed)
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+FAILED=0
+
+pass() { echo "ok: $1"; }
+fail() { echo "FAIL: $1 — $2"; FAILED=1; }
+
+# Both static cases below strip comments first: the fixes themselves carry
+# explanatory comments that quote the broken `| grep -qF` form, so a naive grep
+# over the raw file would read the very comment that documents the fix.
+strip_comments() { sed 's/#.*//'; }
+
+# The probe below uses `seq 1 100000` (~580KB) as the producer — comfortably over
+# any pipe buffer — and matches its FIRST line, so grep -q exits with most of the
+# output still unwritten. That is the exact shape of the real defect.
+
+# --- 1. mechanism: `| grep -q` under pipefail reports non-zero on a FOUND match -
+# If this case ever starts passing as 0, the shell's SIGPIPE/pipefail interaction
+# changed and the comments in watch-run/docfix-run should be revisited.
+rc=0
+bash -c 'set -uo pipefail; seq 1 100000 | grep -qx 1' || rc=$?
+if [ "$rc" -ne 0 ]; then
+    pass "mechanism: pipefail + grep -q returns non-zero ($rc) despite a match"
+else
+    fail "mechanism: pipefail + grep -q returned 0" \
+         "the SIGPIPE interaction this guard exists for no longer reproduces"
+fi
+
+# --- 2. the fix: `| grep -c` reads to EOF, so the producer never sees SIGPIPE ---
+rc=0
+bash -c 'set -uo pipefail; [ "$(seq 1 100000 | grep -cx 1)" -gt 0 ]' || rc=$?
+if [ "$rc" -eq 0 ]; then
+    pass "fix: pipefail + grep -c correctly reports the match (exit 0)"
+else
+    fail "fix: pipefail + grep -c returned $rc" "the sanctioned replacement is broken"
+fi
+
+# --- 3. bin/watch-run's label_alive() must USE the grep -c form ----------------
+# Asserted positively, and with an anchor guard: "the bug is absent" would also
+# report green if the function were renamed away, which is the same silent-pass
+# shape as the defect itself.
+WATCH_RUN="$SCRIPT_DIR/watch-run"
+body="$(awk '/^label_alive\(\) *\{/{f=1} f{print} f&&/^\}/{exit}' "$WATCH_RUN" 2>/dev/null | strip_comments)"
+if [ ! -f "$WATCH_RUN" ]; then
+    fail "watch-run present" "$WATCH_RUN not found"
+elif [ -z "$body" ]; then
+    fail "watch-run label_alive() anchor found" \
+         "label_alive() was renamed or removed — this guard is no longer checking anything"
+elif printf '%s\n' "$body" | grep -qE '\| *grep -[a-zA-Z]*c'; then
+    pass "watch-run label_alive() uses the grep -c form"
+else
+    fail "watch-run label_alive() does not use grep -c" \
+         "reintroduces the SIGPIPE defect — use [ \"\$(... | grep -cF ...)\" -gt 0 ]"
+fi
+
+# --- 4. bin/docfix-run's open-PR dedupe must USE the grep -c form --------------
+# Only the `gh pr list` dedupe pipeline is in scope; the other grep -q uses in
+# that file take small builtin-produced input and cannot fill a pipe buffer.
+DOCFIX="$SCRIPT_DIR/docfix-run"
+window="$(grep -A3 'gh pr list --state open --json headRefName' "$DOCFIX" 2>/dev/null | strip_comments)"
+if [ ! -f "$DOCFIX" ]; then
+    fail "docfix-run present" "$DOCFIX not found"
+elif [ -z "$window" ]; then
+    fail "docfix-run dedupe anchor found" \
+         "the 'gh pr list --state open --json headRefName' pipeline moved or was reworded — this guard is no longer checking anything"
+elif printf '%s\n' "$window" | grep -qE '\| *grep -[a-zA-Z]*c'; then
+    pass "docfix-run open-PR dedupe uses the grep -c form"
+else
+    fail "docfix-run open-PR dedupe does not use grep -c" \
+         "reintroduces the SIGPIPE defect — use [ \"\$(... | grep -c ...)\" -gt 0 ]"
+fi
+
+if [ "$FAILED" -eq 0 ]; then
+    echo "all cases passed"
+else
+    echo "one or more cases FAILED"
+fi
+exit "$FAILED"

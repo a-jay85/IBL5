@@ -551,15 +551,21 @@ ORDER BY s.game_date, s.id";
             $values[] = $gameType;
         }
 
-        $where = $predicates === [] ? '' : 'WHERE ' . implode(' AND ', $predicates) . "\n";
+        $whereClause = $predicates === [] ? '' : 'WHERE ' . implode(' AND ', $predicates);
 
-        $sql = "SELECT b.game_date, b.visitor_teamid, b.home_teamid,
+        // IDENTIFIER (already-validated): $whereClause is built only from the two
+        // hardcoded fragments above; every value is bound.
+        $sql = sprintf(
+            "SELECT b.game_date, b.visitor_teamid, b.home_teamid,
        COUNT(DISTINCT b.game_of_that_day) AS occurrences,
        GROUP_CONCAT(DISTINCT b.game_of_that_day ORDER BY b.game_of_that_day) AS gotds
 FROM `ibl_box_scores_teams` b
-{$where}GROUP BY b.game_date, b.visitor_teamid, b.home_teamid
+%s
+GROUP BY b.game_date, b.visitor_teamid, b.home_teamid
 HAVING occurrences > 1
-ORDER BY b.game_date";
+ORDER BY b.game_date",
+            $whereClause,
+        );
 
         // fetchAll() forwards to bind_param() only when the type string is
         // non-empty; calling bind_param('') is a fatal, so the unscoped call

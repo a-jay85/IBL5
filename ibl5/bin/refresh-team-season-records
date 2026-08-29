@@ -1,0 +1,56 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+if (php_sapi_name() !== 'cli') {
+    http_response_code(403);
+    exit('This script must be run from the command line.');
+}
+
+set_time_limit(0);
+
+$docRoot = dirname(__DIR__, 2);
+$_SERVER['DOCUMENT_ROOT'] = $docRoot;
+$serverName = in_array('--production', $argv, true) ? 'iblhoops.net' : 'localhost';
+$_SERVER['SERVER_NAME'] = $serverName;
+require $docRoot . '/ibl5/vendor/autoload.php';
+include $docRoot . '/ibl5/config.php';
+include $docRoot . '/ibl5/db/db.php';
+
+\Discord\Discord::init($serverName);
+
+/** @var \mysqli $mysqli_db */
+
+/**
+ * Rebuild the materialized ibl_team_season_records table from
+ * ibl_box_scores_teams, without running the full updateAllTheThings
+ * pipeline. Used when box score data is corrected out-of-band (e.g. a
+ * phantom-row repair) and the table needs to catch up before the next
+ * league update. Run ibl5/bin/purge-page-cache afterwards.
+ */
+try {
+    $step = new \Updater\Steps\RefreshTeamSeasonRecordsStep($mysqli_db);
+    $result = $step->execute();
+} catch (\Throwable $e) {
+    try {
+        \Discord\Discord::sendDM('283183467804491776', 'refresh-team-season-records failed: ' . $e->getMessage());
+    } catch (\Throwable) {
+        // DM delivery failed; fall through to stderr
+    }
+    fwrite(STDERR, 'refresh-team-season-records failed: ' . $e->getMessage() . "\n");
+    exit(1);
+}
+
+// RefreshTeamSeasonRecordsStep reports failure via StepResult, not an exception.
+if (!$result->success) {
+    try {
+        \Discord\Discord::sendDM('283183467804491776', 'refresh-team-season-records failed: ' . $result->errorMessage);
+    } catch (\Throwable) {
+        // DM delivery failed; fall through to stderr
+    }
+    fwrite(STDERR, 'refresh-team-season-records failed: ' . $result->errorMessage . "\n");
+    exit(1);
+}
+
+echo $result->label . ': ' . $result->detail . "\n";

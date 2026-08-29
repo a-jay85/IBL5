@@ -1,6 +1,6 @@
 ---
 description: The visual-review comment classifies a failed VR cell as a genuine pixel diff only when it carries a *-diff.png screenshot attachment; failed cells with no triplet are labeled navigation/render failures with a re-run remedy, never "changed pixels / apply update-baselines".
-last_verified: 2026-06-29
+last_verified: 2026-08-29
 ---
 
 # ADR-0073: Distinguish infra/render failures from pixel diffs in the visual-review comment

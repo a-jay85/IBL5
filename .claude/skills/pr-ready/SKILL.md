@@ -7,7 +7,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-08-27
+last_verified: 2026-08-29
 ---
 <!-- `model: claude-sonnet-4-6` IS DELIBERATE — DO NOT REMOVE IT, and never write
      `model: sonnet` (that alias resolves to Sonnet 5). User-authorized 2026-08-26,
@@ -172,7 +172,7 @@ Run `git show <MASTER_SHA>:.claude/skills/pr-ready/_rebase-and-conflicts.md` —
 
 **Phase 4 — prove nothing was lost, push, watch CI.**
 
-Run `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase4-push-and-ci.md` — the Phase 1.3 literal substituted — and follow the printed file end-to-end before continuing. **Do not reach for it by path first**: per the `git show` invariant above, the worktree you are now in almost certainly does not contain it, and the main-checkout copy is behind the straddle gate. On a `git show` failure take the single declared fallback in that invariant — nothing else. If neither source yields the file, print `STOP: cannot load _phase4-push-and-ci.md from <MASTER_SHA> or from the worktree` and stop. **Never push, and never arm the CI watcher, from memory.** It holds the `TaskStop` schema fetch, the lost-work proof, the push, the `mergeable=UNKNOWN` handling, and the single-wake CI watcher arm.
+Run `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase4-push-and-ci.md` — the Phase 1.3 literal substituted — and follow the printed file end-to-end before continuing. **Do not reach for it by path first**: per the `git show` invariant above, the worktree you are now in almost certainly does not contain it, and the main-checkout copy is behind the straddle gate. On a `git show` failure take the single declared fallback in that invariant — nothing else. If neither source yields the file, print `STOP: cannot load _phase4-push-and-ci.md from <MASTER_SHA> or from the worktree` and stop. **Never push, and never arm the CI watcher, from memory.** It holds the lost-work proof, the push, the `mergeable=UNKNOWN` handling, and the `Agent`-delegate CI watcher — the one watcher shape that survives a headless run.
 
 **Phase 5 — strict re-check loop.**
 

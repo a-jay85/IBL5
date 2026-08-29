@@ -45,13 +45,13 @@ Every Phase 6 finding gets fixed and its prevention filed, in this PR's existing
 
    Verdict words are the Phase 4.3 list, unchanged. `PUSHED PR #<N> <sha>` — proceed to step 6. `STALE LEASE` — someone pushed concurrently; git rejected with `stale info` and nothing was clobbered. Stop and report it in the Phase 7 verdict; never re-read and retry with a fresh lease. `PUSH FAILED` — origin does not hold this HEAD; stop. "No error printed" is not evidence of a push.
 
-6. **Re-watch CI on the new head — exactly one watcher.** If the Phase 4.5 watcher is still live, `TaskStop(task_id: "<the id recorded when it was armed>")` first. Run `git rev-parse HEAD` bare and record the new `<HEAD_SHA>` literal. `/tmp/pr-ready-ciwatch-<N>.sh` is already materialized from Phase 4.5 and takes the SHA as an **argument**, so it does not need rewriting — just re-arm it on the new literal with one `Bash` call, `run_in_background: true`, no `timeout`:
+6. **Re-watch CI on the new head — exactly one delegate.** The Phase 4.5 delegate has already returned (that is what re-invoked you), so there is nothing to stop. Run `git rev-parse HEAD` bare and record the new `<HEAD_SHA>` literal. `/tmp/pr-ready-ciwatch-<N>.sh` is already materialized from Phase 4.5 and takes the SHA as an **argument**, so it does not need rewriting — just spawn a second delegate on the new literal, using the **identical shape and packet** as Phase 4.5 step 5 (`Agent`, `model: "haiku"`, foreground `timeout: 600000`, up to 6 windows), whose command line is:
 
    ```bash
-   bash /tmp/pr-ready-ciwatch-<N>.sh <N> <HEAD_SHA>
+   bash /tmp/pr-ready-ciwatch-<N>.sh <N> <HEAD_SHA> 540
    ```
 
-   Passing the stale Phase 4.5 SHA here is the failure to avoid: the `seen` gate would never fire and the run would idle to `CI TIMEOUT`. Record the new background task id in the run notes — `TaskStop` has no "stop all" form. Verdict words and exit codes are the Phase 4.5 step 5 list, unchanged.
+   Then end your turn. **Never** re-arm this with `Bash(run_in_background: true)`, and never with a bare foreground `Bash` call: Phase 4.5 step 5 explains why both are killed or truncated under headless `claude -p`, and this step is where a fixed run most often relapses. Passing the stale Phase 4.5 SHA here is the other failure to avoid: the `seen` gate would never fire and the run would idle to `CI TIMEOUT`. Verdict words and exit codes are the Phase 4.5 step 5 list, unchanged.
 
 7. **One bounded staleness check, then stop.** After `CI COMPLETE`, and only when `<STRICT>` is `true`, read once:
 

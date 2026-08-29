@@ -1,4 +1,4 @@
--- Migration 165 — backfill ibl_sim_game_recaps.box_id from the natural game key.
+-- Migration 169 — backfill ibl_sim_game_recaps.box_id from the natural game key.
 --
 -- Migration 156 added box_id as a nullable convenience pointer but nothing ever
 -- wrote it: every historical row is NULL. Ingest now resolves it (see
@@ -28,3 +28,7 @@ UPDATE `ibl_sim_game_recaps` gr
           AND bst.`home_teamid`    = gr.`home_teamid`
           AND COALESCE(bst.`game_of_that_day`, 0) = gr.`game_of_that_day`
    );
+
+-- Rollback: this migration is lossless — box_id was NULL for every historical row
+-- before it ran, so the inverse is safe. To undo:
+-- UPDATE `ibl_sim_game_recaps` SET `box_id` = NULL;

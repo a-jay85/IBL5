@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-08-27
+last_verified: 2026-08-29
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -718,3 +718,10 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Either (i) expand `db-seed.sql` with minimal boxscore fixtures sufficient to exercise the production-constant paths, remove the `$expectedOverride` escape hatch, and restore the coverage baseline floor; or (ii) formalize the `$expectedOverride` pattern as an explicit contract for data-repair classes and require that the migration dry-run output be attached to the PR so the human signing the hold has primary evidence of the production constants.
 **Est. effort:** M (option i) / S (option ii)
 **Risk if untouched:** Any future edit to `EXPECTED` or the selection predicates in `PhantomBoxscoreRepair` cannot be caught by CI; the only safety net is the dry-run step a deployer might skip.
+
+### 15.26 Retired `validateGameRowsJoinToBoxScores` Fail-Closed Guard — Orphan Warning Coverage
+**Location:** `ibl5/scripts/storeSimRecap.php`, `ibl5/classes/SimRecap/SimSummaryRepository.php`, `ibl5/tests/DatabaseIntegration/SimRecap/StoreSimRecapCliTest.php`
+**Problem:** PR #1963 retired the fail-closed ingest guard (`validateGameRowsJoinToBoxScores`) that blocked writes when any game row had no matching box score. The guard was replaced by warn-only orphan detection (`findOrphanedGameRecaps()` + Discord warning). The three CLI tests that pinned the guard's behaviour (`testUnmatchedGameRowsExitNonZeroWithoutWriting`, `testWrongGameOfThatDayIsRejectedEvenThoughTheGameExists`, `testValidationFailureCannotReachTheDiscordPost`) were deleted with it; no replacement tests cover the warn-only path under unjoinable payloads.
+**Suggested direction:** Add a `DatabaseIntegration` test asserting that `storeSimRecap` succeeds and emits a Discord warning when given a payload whose game rows have no matching box score, verifying the warn-only contract explicitly.
+**Est. effort:** S
+**Risk if untouched:** The orphan-warning path has no automated coverage; a future regression to silent success (no warning) would not be caught by CI.

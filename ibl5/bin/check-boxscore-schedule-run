@@ -55,6 +55,7 @@ $season      = null;
 $replayPath  = null;
 $phase       = null;
 $jsonMode    = false;
+$duplicatesOnly = false;
 $rejectsMode = false;
 $rejectsCount = 20;
 
@@ -74,6 +75,8 @@ foreach ($args as $arg) {
         $phase = substr($arg, strlen('--phase='));
     } elseif ($arg === '--json') {
         $jsonMode = true;
+    } elseif ($arg === '--duplicates-only') {
+        $duplicatesOnly = true;
     } elseif ($arg === '--rejects') {
         $rejectsMode = true;
     } elseif (str_starts_with($arg, '--rejects=')) {
@@ -88,6 +91,38 @@ foreach ($args as $arg) {
         fwrite(STDERR, "Unknown flag: {$arg}\n");
         exit(2);
     }
+}
+
+// ── Duplicates-only mode ──────────────────────────────────────────────────────
+
+// Bypasses ScheduleReconciliationAudit::run(), whose run(int $seasonYear)
+// signature cannot express "all seasons". With --season omitted the null
+// propagates straight into the repository's all-seasons predicate, so no season
+// resolution runs. Only the duplicate invariant is queried here: orphan and
+// missing-boxscore findings can never raise this path's exit code.
+if ($duplicatesOnly) {
+    $dupRepo = new \Boxscore\BoxscoreRepository($mysqli_db);
+    $dupRows = $dupRepo->findDuplicateTripleGames($season, 1);
+
+    $scope = $season === null ? 'all seasons' : "season {$season}";
+    foreach ($dupRows as $dupRow) {
+        printf(
+            "DUPLICATE %s: visitor %d @ home %d recorded at %d game_of_that_day values (%s)\n",
+            $dupRow['game_date'],
+            $dupRow['visitor_teamid'],
+            $dupRow['home_teamid'],
+            $dupRow['occurrences'],
+            $dupRow['gotds'],
+        );
+    }
+
+    if ($dupRows === []) {
+        printf("No duplicate regular-season boxscores found (%s).\n", $scope);
+        exit(0);
+    }
+
+    printf("%d duplicate regular-season matchup(s) found (%s).\n", count($dupRows), $scope);
+    exit(1);
 }
 
 // ── Season resolution ─────────────────────────────────────────────────────────

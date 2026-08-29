@@ -1,7 +1,7 @@
 #!/bin/bash
 # Reconciles ibl_box_scores_teams against ibl_schedule for one season.
 #
-# Usage: bin/check-boxscore-schedule [--season=YYYY] [--replay=<path>] [--phase=<phase>] [--json] [--help]
+# Usage: bin/check-boxscore-schedule [--season=YYYY] [--replay=<path>] [--phase=<phase>] [--duplicates-only] [--json] [--help]
 #
 # Runs the PHP entry point inside the php container (ibl5-php for the main checkout,
 # ibl5-php-<slug> for a worktree). The repo tree is bind-mounted at /var/www/html;
@@ -28,7 +28,7 @@ PASS_THROUGH_ARGS=()
 
 usage() {
     cat <<'EOF'
-Usage: bin/check-boxscore-schedule [--season=YYYY] [--replay=<path>] [--phase=<phase>] [--rejects[=N]] [--json] [--help]
+Usage: bin/check-boxscore-schedule [--season=YYYY] [--replay=<path>] [--phase=<phase>] [--rejects[=N]] [--duplicates-only] [--json] [--help]
 
 Reconciles ibl_box_scores_teams against ibl_schedule for one season.
 
@@ -42,6 +42,9 @@ Modes:
 Options:
   --season=YYYY      Season ending year. Defaults to the current operating season.
   --phase=<phase>    Season phase for --replay date decoding (default: operating phase).
+  --duplicates-only  Report only duplicate regular-season matchups, across every
+                     season unless --season is given. Exits 1 on a duplicate,
+                     0 otherwise; orphan and missing findings are not queried.
   --json             Emit machine-readable JSON instead of text.
   --help, -h         Show this message.
 
@@ -66,6 +69,9 @@ for arg in "$@"; do
             PASS_THROUGH_ARGS+=("$arg")
             ;;
         --json)
+            PASS_THROUGH_ARGS+=("$arg")
+            ;;
+        --duplicates-only)
             PASS_THROUGH_ARGS+=("$arg")
             ;;
         --rejects)

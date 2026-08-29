@@ -166,6 +166,14 @@ jobs:
       - name: php bin/validate-schema (mirrors main.yml; pre-flight gate)
         run: php ibl5/bin/validate-schema
 
+      # Runs against the untouched prod clone — the smoke fixtures below inject
+      # rows, so the assertion has to see the database before they land.
+      # ibl_box_scores_teams is sampled to the two most recent seasons here, so
+      # this host's claim is "no duplicate in the two most recent seasons at
+      # merge time"; the all-seasons guarantee belongs to db-backup.yml.
+      - name: Assert no duplicate regular-season boxscores in the prod clone
+        run: php ibl5/bin/check-boxscore-schedule-run --duplicates-only
+
       - name: Seed rehearsal database with smoke fixtures
         run: mysql -h 127.0.0.1 -u root -proot iblhoops_ibl5 < ibl5/tests/DatabaseIntegration/Fixtures/db-seed.sql
 

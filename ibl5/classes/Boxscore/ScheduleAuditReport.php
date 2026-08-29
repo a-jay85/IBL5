@@ -55,6 +55,32 @@ final class ScheduleAuditReport
     }
 
     /**
+     * Findings of kind KIND_DUPLICATE_TRIPLE only.
+     *
+     * The duplicate invariant has its own CI hosts, which must fail on a
+     * duplicate and stay green on orphan or missing-boxscore findings.
+     *
+     * @return list<AuditFinding>
+     */
+    public function duplicateFindings(): array
+    {
+        return array_values(
+            array_filter($this->findings, static fn (AuditFinding $f): bool => $f->kind === AuditFinding::KIND_DUPLICATE_TRIPLE)
+        );
+    }
+
+    /**
+     * Returns 1 when there is at least one duplicate-triple finding, 0 otherwise.
+     *
+     * Deliberately narrower than exitCode(): orphan findings are errors there but
+     * are not this invariant's concern.
+     */
+    public function duplicateExitCode(): int
+    {
+        return $this->duplicateFindings() === [] ? 0 : 1;
+    }
+
+    /**
      * Returns a one-line summary for terminal output.
      *
      * Example: "Season 2008: 1250 scheduled, 1249 with boxscores — 621 error(s), 1 warning(s)"

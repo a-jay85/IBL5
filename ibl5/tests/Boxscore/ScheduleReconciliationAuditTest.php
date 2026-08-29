@@ -191,6 +191,35 @@ final class ScheduleReconciliationAuditTest extends TestCase
     }
 
     /**
+     * The duplicate invariant's CI hosts key on duplicateExitCode(), which must
+     * ignore the orphan and missing-boxscore directions entirely.
+     */
+    public function testDuplicatesOnlyExitCodeIsZeroWhenOnlyOrphanAndMissingFindingsExist(): void
+    {
+        $report = $this->makeAudit(
+            scheduleIndex: $this->oneGameSchedule(),
+            orphans: [$this->makeOrphanRow()],
+            missing: [$this->makeMissingRow()],
+        );
+
+        self::assertSame([], $report->duplicateFindings());
+        self::assertSame(0, $report->duplicateExitCode());
+        // The full audit still fails on the orphan — only the narrow gate is green.
+        self::assertSame(1, $report->exitCode());
+    }
+
+    public function testDuplicateExitCodeIsOneWhenADuplicateIsPresent(): void
+    {
+        $report = $this->makeAudit(
+            scheduleIndex: $this->oneGameSchedule(),
+            duplicates: [$this->makeDuplicateRow()],
+        );
+
+        self::assertCount(1, $report->duplicateFindings());
+        self::assertSame(1, $report->duplicateExitCode());
+    }
+
+    /**
      * Fail-open regression: the empty-schedule guard covers the orphan direction
      * only. The duplicate-triple invariant reads ibl_box_scores_teams against
      * itself, so it must still be reported for a season that has no schedule rows.

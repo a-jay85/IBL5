@@ -19,14 +19,19 @@ if is_main_checkout "$REPO_ROOT"; then
 fi
 
 # Only the numbered convention counts: a 1-3 digit prefix, optional legacy
-# letter suffix, then an underscore -- the same shape ibl5/bin/run-migrations-ci
-# applies. Filter first, then extract, so the letter suffix is dropped and a
-# stray timestamp-style name (20260818_120000_*.sql) cannot masquerade as a
-# 20-million-high maximum.
+# letter suffix, then an underscore. Filter first, then extract, so the letter
+# suffix is dropped and a stray timestamp-style name (20260818_120000_*.sql)
+# cannot masquerade as a 20-million-high maximum.
+#
+# Scans EVERY extension, not just .sql. ibl5/bin/run-migrations-ci globs *.sql
+# because it only *applies* SQL, but the migration NUMBER namespace is shared by
+# .php data migrations and .md notes too (168_delete_phantom_season2008_boxscores.php,
+# 007_enable_native_types.md). A .sql-only scan hands out a number that is
+# already taken -- on 168 it returned 167, so the next allocation collided.
 get_max() {
     local dir="$1"
     if [ -d "$dir" ]; then
-        ls "$dir"/*.sql 2>/dev/null | sed 's/.*\///' \
+        printf '%s\n' "$dir"/* | sed 's|.*/||' \
             | grep -E '^[0-9]{1,3}[a-z]?_' \
             | grep -oE '^[0-9]{1,3}' | sort -n | tail -1
     fi

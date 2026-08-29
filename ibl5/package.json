@@ -56,12 +56,12 @@
     "@lhci/cli": "^0.15.1",
     "@playwright/test": "1.62.1",
     "@tailwindcss/cli": "^4.3.3",
-    "eslint": "^10.8.1",
+    "eslint": "^10.9.1",
     "eslint-plugin-playwright": "^2.11.0",
     "pixelmatch": "^7.2.0",
     "pngjs": "^7.0.0",
     "tailwindcss": "^4.3.3",
-    "typescript-eslint": "^8.66.0",
-    "vitest": "^4.1.10"
+    "typescript-eslint": "^8.68.0",
+    "vitest": "^4.1.11"
   }
 }

@@ -1,6 +1,6 @@
 ---
 description: Rationale for forcing all CI checks on Dependabot PRs and enabling squash auto-merge.
-last_verified: 2026-07-02
+last_verified: 2026-08-29
 ---
 
 # ADR-0017: Dependabot Full CI and Auto-Merge
@@ -16,6 +16,8 @@ Dependabot PRs that bumped frontend dependencies (tailwindcss, @tailwindcss/cli)
 
 Force all CI workflows to run on Dependabot PRs by adding `github.event.pull_request.user.login == 'dependabot[bot]'` to the changes-job output expressions. Workflows that used trigger-level `paths:` (eslint, lighthouse, codeql) were converted to the dorny/paths-filter `changes` job pattern so the Dependabot override could be applied at job level. A new `dependabot-auto-merge.yml` workflow enables `gh pr merge --auto --squash` on Dependabot PRs, taking effect once all required status checks pass.
 
+**Amended 2026-08-29 (arming token).** The workflow armed auto-merge with the built-in `GITHUB_TOKEN`. GitHub attributes an auto-merge to whoever armed it, and its anti-recursion guard fires **no** workflow runs for a push made under `GITHUB_TOKEN` — so every dependabot auto-merge landed on master silently. That was harmless until ADR-0081's push trigger shipped, at which point it became load-bearing: that trigger's whole job is to unstick auto-merge-armed PRs on the master merge that puts them BEHIND, and the dependabot cascade — one armed PR merging knocks the remaining armed PRs BEHIND — is exactly the case it never saw. Measured 2026-08-29: PR #2010 merged as `app/github-actions` at 07:08:46Z and produced zero workflow runs, where ~11 fan out on a normal master push, leaving #2008 and #2011 stuck BEHIND; PR #2019, merged the same morning by a real user, did fire the push pass. The arming token is therefore now **`CI_PAT`** — the same secret, and the same guard, that `update-behind-prs.yml` already works around for its `update-branch` call. This weakens no gate: `--auto` still merges only once every required status check passes, and the human-signoff hold is unaffected.
+
 ## Alternatives Considered
 
 - **Add lock files to every workflow's paths filter** — would run tests on file-match but miss future dependency ecosystems. Rejected because it doesn't generalize.
@@ -28,6 +30,8 @@ Force all CI workflows to run on Dependabot PRs by adding `github.event.pull_req
 - Positive: passing Dependabot PRs merge automatically without human intervention.
 - Negative: CI minute usage increases for Dependabot PRs that previously skipped most workflows.
 - Negative: workflows that previously used trigger-level `paths:` now always start (to run the `changes` job), adding ~10s overhead per non-matching PR.
+- Positive (2026-08-29): a dependabot auto-merge now emits a real push event, so ADR-0081's push trigger fires and immediately unsticks the remaining armed PRs the merge put BEHIND.
+- Neutral (2026-08-29): merges are now attributed to the `CI_PAT` user rather than `github-actions[bot]`. Branch protection applies identically to both.
 
 ## References
 
@@ -37,3 +41,5 @@ Force all CI workflows to run on Dependabot PRs by adding `github.event.pull_req
 - `.github/workflows/eslint.yml`
 - `.github/workflows/lighthouse.yml`
 - `.github/workflows/codeql.yml`
+- `.github/workflows/update-behind-prs.yml` — the push-triggered consumer this arming token feeds.
+- `ibl5/docs/decisions/0081-scheduled-branch-update-for-armed-behind-prs.md` — the anti-recursion guard, documented there first.

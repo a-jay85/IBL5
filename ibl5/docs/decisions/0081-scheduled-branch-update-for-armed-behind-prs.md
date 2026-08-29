@@ -1,6 +1,6 @@
 ---
 description: A GitHub Actions workflow that finds open PRs stuck BEHIND master and refreshes them via the update-branch API using CI_PAT. Triggered on push to master (auto-merge-armed PRs only, coalesced) and on a best-effort schedule (all open non-draft PRs, debounced on an hour of master quiet), guarded by concurrency-cancel plus a per-PR check-run gate, so PRs stay current without manual intervention and without a CI storm per merge.
-last_verified: 2026-08-28
+last_verified: 2026-08-29
 ---
 
 # ADR-0081: Scheduled branch-update for armed PRs stuck BEHIND master
@@ -32,6 +32,8 @@ That re-opens the storm this ADR's 2026-08-24 amendment closed, since a push can
 
 A second daily cron (`30 11 * * *`) was added as an overnight full-sweep backstop: 11:30 UTC is 04:30 PDT and 03:30 PST — the same instant in both, because GitHub cron is UTC-only and never observes DST, so one entry covers the year. It is an additional draw on the same unreliable schedule lottery, not a guarantee, and is documented in the workflow as a backstop rather than a fix.
 
+**Follow-up 2026-08-29 (auto-merge attribution).** The push trigger is only as good as the push events master actually emits, and on the day it shipped it did not cover the highest-frequency case in this repo. `dependabot-auto-merge.yml` armed auto-merge with the built-in `GITHUB_TOKEN`; GitHub attributes an auto-merge to whoever armed it, so those merges landed on master under `GITHUB_TOKEN` and its anti-recursion guard fired no workflows at all. Measured the same morning this amendment shipped: #2019, merged by a real user, fired the push pass and unstuck all three armed PRs — then #2010 auto-merged at 07:08:46Z as `app/github-actions`, put #2008 and #2011 straight back BEHIND, and produced zero runs. `paths-ignore` was ruled out: #2010 changed `package.json` and `package-lock.json`. Fixed by arming with `CI_PAT` (ADR-0017, amended 2026-08-29). The hazard's shape outlives the fix — any future automation that writes to master under `GITHUB_TOKEN` silently re-opens this hole, inside runs that all report success.
+
 ## Alternatives Considered
 
 - **Extend the eager-rebase workflow with a `schedule`/`workflow_dispatch` trigger instead of a new file** — rejected: it uses a different update strategy (rebase + force-push, which rewrites commits) and a different scope (all open PRs, not just armed ones). For armed auto-merge PRs, `update-branch`'s merge commit is safer — it preserves the original commits and the auto-merge arming survives the update. Keeping the two workflows separate keeps each strategy focused and its concurrency group independent.
@@ -40,7 +42,7 @@ A second daily cron (`30 11 * * *`) was added as an overnight full-sweep backsto
 
 ## Consequences
 
-- Positive: PRs left BEHIND auto-unstick with no human intervention — armed PRs on the master merge that put them BEHIND (push trigger), and the rest within an hour of master going quiet (scheduled sweep). No end-to-end latency figure is claimed for the push path yet: a push run coalesces for 300s and then waits on any in-flight CI for up to 10 minutes per PR, so the real number depends on runner-pool contention and has to be measured from actual runs rather than inferred from the constants. Doc-only master merges are excluded from the push trigger by `paths-ignore`, but are still covered by the scheduled sweep, which was this ADR's original motivation.
+- Positive: PRs left BEHIND auto-unstick with no human intervention — armed PRs on the master merge that put them BEHIND (push trigger, provided that merge emitted a push event — see the 2026-08-29 follow-up), and the rest within an hour of master going quiet (scheduled sweep). No end-to-end latency figure is claimed for the push path yet: a push run coalesces for 300s and then waits on any in-flight CI for up to 10 minutes per PR, so the real number depends on runner-pool contention and has to be measured from actual runs rather than inferred from the constants. Doc-only master merges are excluded from the push trigger by `paths-ignore`, but are still covered by the scheduled sweep, which was this ADR's original motivation.
 - Positive: The merge-commit update strategy preserves original commits and keeps auto-merge armed across the refresh.
 - Positive: Loop safety guarantees the same branch is never re-updated while its CI is live, so the job cannot thrash a PR.
 - Neutral: The human-signoff hold is unaffected — refreshing a `feat:` PR's branch does not merge it while the `human-approved` label is absent; the required human-signoff check still gates the merge.

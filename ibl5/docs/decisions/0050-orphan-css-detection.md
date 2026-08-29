@@ -1,6 +1,6 @@
 ---
 description: Advisory tool and CI workflow for detecting orphan CSS class candidates in ibl5/design/
-last_verified: 2026-06-29
+last_verified: 2026-08-29
 ---
 
 # ADR-0050: Orphan CSS Detection

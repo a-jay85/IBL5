@@ -1,6 +1,6 @@
 ---
 description: ADR for bin/refactor-flag CI gate that blocks refactor PRs without test coverage.
-last_verified: 2026-06-29
+last_verified: 2026-08-29
 ---
 
 # ADR-0021: Refactor PR Flag

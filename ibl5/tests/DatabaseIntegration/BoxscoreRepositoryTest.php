@@ -658,4 +658,63 @@ class BoxscoreRepositoryTest extends DatabaseTestCase
         // Null row is excluded: (int)null = 0 would be key 0 if included
         self::assertFalse(isset($index['2025-03-10'][0]));
     }
+
+    // ── findDuplicateTripleGames ──────────────────────────────────
+
+    /**
+     * @param list<array{game_date: string, visitor_teamid: int, home_teamid: int, occurrences: int, gotds: string}> $rows
+     */
+    private static function hasTripleOn(array $rows, string $date): bool
+    {
+        foreach ($rows as $row) {
+            if ($row['game_date'] === $date) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function testDuplicateInvariantIgnoresPlayoffDuplicatesWhenScopedToRegularSeason(): void
+    {
+        // Month 6 → game_type = 2 (playoffs), where a matchup legitimately repeats
+        // on one date. Month 3 → game_type = 1, where it never should.
+        $this->insertTeamBoxscoreRow('2097-06-05', 'Playoff1', 1, 2, 1);
+        $this->insertTeamBoxscoreRow('2097-06-05', 'Playoff2', 5, 2, 1);
+        $this->insertTeamBoxscoreRow('2097-03-05', 'Regular1', 1, 2, 1);
+        $this->insertTeamBoxscoreRow('2097-03-05', 'Regular2', 5, 2, 1);
+
+        $rows = $this->repo->findDuplicateTripleGames(2097, 1);
+
+        self::assertTrue(self::hasTripleOn($rows, '2097-03-05'));
+        self::assertFalse(self::hasTripleOn($rows, '2097-06-05'));
+    }
+
+    public function testFindDuplicateTripleGamesWithoutGameTypeKeepsExistingUnscopedBehavior(): void
+    {
+        // Same seed, no $gameType: the playoff pair is reported too — the pre-existing
+        // behaviour both remaining single-argument callers still rely on.
+        $this->insertTeamBoxscoreRow('2097-06-05', 'Playoff1', 1, 2, 1);
+        $this->insertTeamBoxscoreRow('2097-06-05', 'Playoff2', 5, 2, 1);
+
+        $rows = $this->repo->findDuplicateTripleGames(2097);
+
+        self::assertTrue(self::hasTripleOn($rows, '2097-06-05'));
+    }
+
+    public function testFindDuplicateTripleGamesNullSeasonYearFindsAllSeasonsIncludingNonCurrent(): void
+    {
+        // Two different seasons; a null $seasonYear drops the season predicate and
+        // must surface both. Scoped to game_type = 1 so the assertion is about the
+        // season axis alone.
+        $this->insertTeamBoxscoreRow('2096-03-05', 'SeasonA1', 1, 2, 1);
+        $this->insertTeamBoxscoreRow('2096-03-05', 'SeasonA2', 5, 2, 1);
+        $this->insertTeamBoxscoreRow('2097-03-05', 'SeasonB1', 1, 2, 1);
+        $this->insertTeamBoxscoreRow('2097-03-05', 'SeasonB2', 5, 2, 1);
+
+        $rows = $this->repo->findDuplicateTripleGames(null, 1);
+
+        self::assertTrue(self::hasTripleOn($rows, '2096-03-05'));
+        self::assertTrue(self::hasTripleOn($rows, '2097-03-05'));
+    }
 }

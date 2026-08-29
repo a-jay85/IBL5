@@ -49,7 +49,7 @@ final class ScheduleReconciliationAuditTest extends TestCase
 
             public function fetchScheduledGameIndex(int $seasonYear): array { return $this->scheduleIndex; }
             public function findOrphanBoxscoreGames(int $seasonYear): array { return $this->orphans; }
-            public function findDuplicateTripleGames(int $seasonYear): array { return $this->duplicates; }
+            public function findDuplicateTripleGames(?int $seasonYear = null, ?int $gameType = null): array { return $this->duplicates; }
             public function findScheduledGamesWithoutBoxscores(int $seasonYear): array { return $this->missing; }
 
             // Unused methods — throw to catch accidental calls
@@ -188,6 +188,30 @@ final class ScheduleReconciliationAuditTest extends TestCase
         // Detail must name both gotd values
         self::assertStringContainsString('1', $report->errors()[0]->detail);
         self::assertStringContainsString('4', $report->errors()[0]->detail);
+    }
+
+    /**
+     * Fail-open regression: the empty-schedule guard covers the orphan direction
+     * only. The duplicate-triple invariant reads ibl_box_scores_teams against
+     * itself, so it must still be reported for a season that has no schedule rows.
+     */
+    public function testDuplicateFindingIsReportedWhenSeasonHasNoScheduleRows(): void
+    {
+        $report = $this->makeAudit(
+            scheduleIndex: [],
+            orphans: [$this->makeOrphanRow()],
+            duplicates: [$this->makeDuplicateRow(gotds: '1,4')],
+        );
+
+        // Orphans stay suppressed by the fail-open guard...
+        self::assertCount(0, array_filter(
+            $report->findings,
+            static fn (AuditFinding $f): bool => $f->kind === AuditFinding::KIND_ORPHAN,
+        ));
+        // ...but the raw-table duplicate invariant still fires.
+        self::assertCount(1, $report->errors());
+        self::assertSame(AuditFinding::KIND_DUPLICATE_TRIPLE, $report->errors()[0]->kind);
+        self::assertSame(1, $report->exitCode());
     }
 
     /**

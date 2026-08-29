@@ -17,8 +17,10 @@ use Boxscore\Contracts\BoxscoreRepositoryInterface;
  * The audit has NO write path. It reads and reports only.
  *
  * Fail-open: when a season has zero schedule rows (was never imported), the orphan
- * direction is skipped entirely rather than flagging every boxscore as corruption.
- * This mirrors ScheduleMembershipGuard::isEnabled() from Phase 3.
+ * direction only is skipped, rather than flagging every boxscore as corruption.
+ * This mirrors ScheduleMembershipGuard::isEnabled() from Phase 3. The guard covers
+ * the orphan direction alone — the duplicate-triple check is a raw-table invariant
+ * that never reads ibl_schedule, so it runs unconditionally.
  */
 final class ScheduleReconciliationAudit
 {
@@ -67,22 +69,26 @@ final class ScheduleReconciliationAudit
                     )
                 );
             }
+        }
 
-            // Duplicate-triple direction: same (date, visitor, home) at >1 gotd (error).
-            foreach ($this->repository->findDuplicateTripleGames($seasonYear) as $row) {
-                $findings[] = new AuditFinding(
-                    AuditFinding::KIND_DUPLICATE_TRIPLE,
-                    AuditFinding::SEVERITY_ERROR,
-                    (string) $row['game_date'],
-                    (int) $row['visitor_teamid'],
-                    (int) $row['home_teamid'],
-                    sprintf(
-                        'recorded at %d different game_of_that_day values (%s) — one is likely a phantom import',
-                        (int) $row['occurrences'],
-                        (string) $row['gotds']
-                    )
-                );
-            }
+        // Duplicate-triple direction: same (date, visitor, home) at >1 gotd (error).
+        // This is a raw-table invariant — it compares ibl_box_scores_teams against
+        // itself and never consults ibl_schedule, so the fail-open guard above must
+        // not gate it. Scoped to game_type = 1 so playoff and HEAT games, which
+        // legitimately repeat a matchup on one date, are not flagged.
+        foreach ($this->repository->findDuplicateTripleGames($seasonYear, 1) as $row) {
+            $findings[] = new AuditFinding(
+                AuditFinding::KIND_DUPLICATE_TRIPLE,
+                AuditFinding::SEVERITY_ERROR,
+                (string) $row['game_date'],
+                (int) $row['visitor_teamid'],
+                (int) $row['home_teamid'],
+                sprintf(
+                    'recorded at %d different game_of_that_day values (%s) — one is likely a phantom import',
+                    (int) $row['occurrences'],
+                    (string) $row['gotds']
+                )
+            );
         }
 
         // Missing direction: scheduled and played games with no boxscore (warning).

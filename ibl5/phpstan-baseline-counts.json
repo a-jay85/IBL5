@@ -44,7 +44,7 @@
         "varTag.misplaced": 2,
         "varTag.nativeType": 1,
         "varTag.type": 1,
-        "variable.undefined": 30
+        "variable.undefined": 31
     },
     "phpstan-tests-baseline.neon": {
         "argument.type": 73,

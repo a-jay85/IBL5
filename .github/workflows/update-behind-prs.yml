@@ -2,7 +2,24 @@ name: Update BEHIND PRs
 
 on:
   schedule:
-    - cron: '*/15 * * * *'   # every 15 min — ticks are cheap; the debounce below decides which act
+    # Every 15 min, but deliberately OFF the quarter-hour. Do NOT "tidy" this back
+    # to '*/15 * * * *' — the odd minutes are load-bearing.
+    #
+    # GitHub drops scheduled events under load, and names the top of the hour as the
+    # worst window: "The schedule event can be delayed during periods of high loads of
+    # GitHub Actions workflow runs. High load times include the start of every hour. If
+    # the load is sufficiently high enough, some queued jobs may be dropped. ... To
+    # decrease the chance of delay, schedule your workflow to run at a different time
+    # of the hour."
+    #   https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows
+    #
+    # This repo is a heavy Actions user (~790 runs/24h, ~12k/7d as of 2026-08-28), so it
+    # is squarely in the population that gets dropped: '*/15' — which fires on :00 —
+    # produced ONE run in the 12h window 05:22Z–17:31Z on 2026-08-28 instead of ~48,
+    # leaving three green dependabot PRs stuck BEHIND with nothing to unstick them.
+    #
+    # Ticks are cheap; the debounce below decides which ones actually act.
+    - cron: '7,22,37,52 * * * *'
   workflow_dispatch:          # manual trigger for on-demand runs + the dispatch smoke test
 
 permissions:

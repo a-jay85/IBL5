@@ -19,6 +19,7 @@ parameters:
         - bin/migrate-seed
         - bin/purge-page-cache
         - bin/rebuild-record-holders-cache
+        - bin/refresh-team-season-records
         - bin/rollback-phantom-repair-run
         - bin/validate-schema
         - bin/warm-cache

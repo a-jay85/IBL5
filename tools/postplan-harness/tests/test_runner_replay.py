@@ -196,6 +196,39 @@ def test_degraded_run_holds_and_reports(tmp_path):
                                     + "\n\n## Review Unavailable\n\nnote\n") == "CLEARED"
 
 
+def test_degraded_rerun_skips_duplicate_section(tmp_path):
+    """Re-run on a PR whose body already has ## Review Unavailable must not append a second one.
+
+    This test does NOT rely on RecordingGh._body_override resetting between
+    instantiations — which is exactly what masked the bug. Instead, the section
+    is pre-loaded into the fixture's pr_meta.body so that a fresh RecordingGh
+    (with _body_override=None) returns it from pr_body(), exactly as LiveGh
+    would on a genuine re-run.
+    """
+    out = str(tmp_path / "out")
+    pre_tagged_body = (
+        "## Manual Testing\n\nNo manual testing needed\n"
+        "\n\n## Review Unavailable\n\n"
+        "The compiled post-plan harness could not parse the reply from: "
+        "review-agent-a. Those checks did not run; auto-merge was not armed. "
+        "Re-run the review or review this PR by hand before merging.\n"
+    )
+    fx = _fixture(pr_meta={"number": 9999, "title": "fix: synthetic",
+                           "body": pre_tagged_body, "headRefOid": "deadbeef"})
+    llm = DegradingLlm(UsageLedger(), CANNED, ["review-agent-a"])
+    res = runner.run(fx, out, llm, mode="replay")
+    assert res.terminal == TerminalState.DEGRADED
+    acts = _actions(out)
+    edit_acts = [a for a in acts if a["action"] == "pr_edit_body"]
+    assert edit_acts, "expected at least one pr_edit_body action"
+    final_body = edit_acts[-1]["body"]
+    count = final_body.count("## Review Unavailable")
+    assert count == 1, (
+        f"## Review Unavailable duplicated on re-run: found {count} occurrences "
+        f"(idempotency guard missing or ineffective)"
+    )
+
+
 def test_non_invalid_output_error_still_fails_run(tmp_path):
     out = str(tmp_path / "out")
     llm = DegradingLlm(UsageLedger(), CANNED, ["review-agent-a"], kind="llm-fixture-missing")

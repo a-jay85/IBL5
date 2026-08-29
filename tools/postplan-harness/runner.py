@@ -259,12 +259,14 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             gh.pr_merge_auto(pr)
 
         if degraded_agents:
-            note = ("\n\n## Review Unavailable\n\n"
-                    "The compiled post-plan harness could not parse the reply from: "
-                    + ", ".join(degraded_agents)
-                    + ". Those checks did not run; auto-merge was not armed. "
-                      "Re-run the review or review this PR by hand before merging.\n")
-            gh.pr_edit_body(pr, (gh.pr_body() or body) + note)
+            current = gh.pr_body() or body
+            if "## Review Unavailable" not in current:
+                note = ("\n\n## Review Unavailable\n\n"
+                        "The compiled post-plan harness could not parse the reply from: "
+                        + ", ".join(degraded_agents)
+                        + ". Those checks did not run; auto-merge was not armed. "
+                          "Re-run the review or review this PR by hand before merging.\n")
+                gh.pr_edit_body(pr, current + note)
 
         # ---- Phase 7/8: CI watch + confirm -----------------------------
         if mode == "replay":

@@ -34,18 +34,44 @@ class MaintenanceRepositoryTest extends DatabaseTestCase
         self::assertIsString($teams[0]['team_name']);
     }
 
-    // ── getTeamRecentCompleteSeasons ─────────────────────────────
+    // ── getTeamSeasonRecords ─────────────────────────────────────
 
-    public function testGetTeamRecentCompleteSeasonsReturnsArray(): void
+    public function testGetTeamSeasonRecordsReturnsArray(): void
     {
         // View ibl_team_win_loss is derived from ibl_box_scores_teams — may be
         // empty in CI (needs 82-game seasons). Verify structure, not specific data.
-        $seasons = $this->repo->getTeamRecentCompleteSeasons('Metros');
+        $seasons = $this->repo->getTeamSeasonRecords('Metros', 9999);
 
         self::assertIsArray($seasons);
         if ($seasons !== []) {
+            self::assertArrayHasKey('year', $seasons[0]);
             self::assertArrayHasKey('wins', $seasons[0]);
             self::assertArrayHasKey('losses', $seasons[0]);
+        }
+    }
+
+    public function testGetTeamSeasonRecordsExcludesSeasonsAfterTheGivenYear(): void
+    {
+        // Fetch all available rows to derive a year pivot from live data.
+        $all = $this->repo->getTeamSeasonRecords('Metros', 9999, 100);
+
+        self::assertIsArray($all);
+
+        // Verify DESC ordering regardless of whether data exists.
+        $years = array_column($all, 'year');
+        $sorted = $years;
+        rsort($sorted);
+        self::assertSame($sorted, $years, 'Seasons must be ordered by year DESC');
+
+        if ($all !== []) {
+            // Exclude the newest year and assert none of those rows appear in the result.
+            $newest = $all[0]['year'];
+            $excluded = $this->repo->getTeamSeasonRecords('Metros', $newest - 1, 100);
+
+            foreach ($excluded as $row) {
+                self::assertLessThanOrEqual($newest - 1, $row['year']);
+            }
+            self::assertNotContains($newest, array_column($excluded, 'year'));
         }
     }
 

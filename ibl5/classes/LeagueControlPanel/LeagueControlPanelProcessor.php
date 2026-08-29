@@ -420,21 +420,62 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
             return ['success' => false, 'message' => 'Tradition update is unavailable: maintenance repository not configured.'];
         }
 
-        $updated = 0;
+        $yearSetting = $this->repository->getSetting('Current Season Ending Year');
+        if ($yearSetting === null) {
+            return ['success' => false, 'message' => 'Tradition update aborted: Current Season Ending Year setting not found.'];
+        }
+        $year = (int) $yearSetting;
+
+        // Phase 1: gather and validate — collect anomalies before writing anything.
+        $anomalies = [];
+        $skipped = [];
+        /** @var array<string, array<int, array{year: int, wins: int, losses: int}>> $teamSeasons */
+        $teamSeasons = [];
+
         $teams = $this->maintenanceRepository->getAllTeams();
         foreach ($teams as $team) {
             $teamName = $team['team_name'];
-            $seasons = $this->maintenanceRepository->getTeamRecentCompleteSeasons($teamName, 5);
-            $seasonCount = count($seasons);
-            if ($seasonCount === 0) {
-                continue; // teams with 0 complete seasons are SKIPPED (preserve boundary behavior)
+            $rows = $this->maintenanceRepository->getTeamSeasonRecords($teamName, $year, 5);
+
+            // Drop an in-progress current season: newest row is the current year
+            // but has fewer than 82 games played.
+            if ($rows !== [] && $rows[0]['year'] === $year && ($rows[0]['wins'] + $rows[0]['losses']) < 82) {
+                array_shift($rows);
             }
 
+            $rows = array_slice($rows, 0, 5);
+
+            if ($rows === []) {
+                $skipped[] = $teamName;
+                continue;
+            }
+
+            foreach ($rows as $row) {
+                $games = $row['wins'] + $row['losses'];
+                if ($games !== 82) {
+                    $anomalies[] = "{$teamName} {$row['year']}: {$games} games";
+                }
+            }
+
+            $teamSeasons[$teamName] = $rows;
+        }
+
+        if ($anomalies !== []) {
+            return [
+                'success' => false,
+                'message' => 'Tradition update aborted — unexpected game counts in ' . count($anomalies) . ' season(s): ' . implode('; ', $anomalies) . '. No tradition factors were changed; fix the boxscore data and re-run.',
+            ];
+        }
+
+        // Phase 2: write — only reached when every season validated cleanly.
+        $updated = 0;
+        foreach ($teamSeasons as $teamName => $seasons) {
+            $seasonCount = count($seasons);
             $totalWins = 0;
             $totalLosses = 0;
             foreach ($seasons as $season) {
-                $totalWins += (int) $season['wins'];
-                $totalLosses += (int) $season['losses'];
+                $totalWins += $season['wins'];
+                $totalLosses += $season['losses'];
             }
 
             $avgWins = (int) round($totalWins / $seasonCount);
@@ -443,6 +484,11 @@ class LeagueControlPanelProcessor implements LeagueControlPanelProcessorInterfac
             $updated++;
         }
 
-        return ['success' => true, 'message' => 'Free agency tradition factors updated for ' . $updated . ' team(s).'];
+        $message = 'Free agency tradition factors updated for ' . $updated . ' team(s).';
+        if ($skipped !== []) {
+            $message .= ' Skipped (no completed seasons): ' . implode(', ', $skipped);
+        }
+
+        return ['success' => true, 'message' => $message];
     }
 }

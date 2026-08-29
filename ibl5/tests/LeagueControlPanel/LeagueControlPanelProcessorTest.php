@@ -621,10 +621,10 @@ class LeagueControlPanelProcessorTest extends TestCase
     {
         $maintenanceMock = $this->createMock(MaintenanceRepositoryInterface::class);
         $maintenanceMock->method('getAllTeams')->willReturn([['team_name' => 'Miami']]);
-        $maintenanceMock->method('getTeamRecentCompleteSeasons')->willReturn([
-            ['wins' => 50, 'losses' => 32],
-            ['wins' => 41, 'losses' => 41],
-            ['wins' => 45, 'losses' => 37],
+        $maintenanceMock->method('getTeamSeasonRecords')->willReturn([
+            ['year' => 2023, 'wins' => 50, 'losses' => 32],
+            ['year' => 2022, 'wins' => 41, 'losses' => 41],
+            ['year' => 2021, 'wins' => 45, 'losses' => 37],
         ]);
         // avg wins 45.33 -> 45, avg losses 36.67 -> 37
         $maintenanceMock->expects($this->once())
@@ -632,6 +632,7 @@ class LeagueControlPanelProcessorTest extends TestCase
             ->with('Miami', 45, 37);
 
         $stub = self::createStub(LeagueControlPanelRepositoryInterface::class);
+        $stub->method('getSetting')->willReturn('2024');
         $awardStub = self::createStub(AwardGenerationServiceInterface::class);
         $processor = new LeagueControlPanelProcessor($stub, $awardStub, LeagueContext::LEAGUE_IBL, $maintenanceMock);
 
@@ -645,10 +646,11 @@ class LeagueControlPanelProcessorTest extends TestCase
     {
         $maintenanceMock = $this->createMock(MaintenanceRepositoryInterface::class);
         $maintenanceMock->method('getAllTeams')->willReturn([['team_name' => 'Miami']]);
-        $maintenanceMock->method('getTeamRecentCompleteSeasons')->willReturn([]);
+        $maintenanceMock->method('getTeamSeasonRecords')->willReturn([]);
         $maintenanceMock->expects($this->never())->method('updateTeamTradition');
 
         $stub = self::createStub(LeagueControlPanelRepositoryInterface::class);
+        $stub->method('getSetting')->willReturn('2024');
         $awardStub = self::createStub(AwardGenerationServiceInterface::class);
         $processor = new LeagueControlPanelProcessor($stub, $awardStub, LeagueContext::LEAGUE_IBL, $maintenanceMock);
 
@@ -656,6 +658,69 @@ class LeagueControlPanelProcessorTest extends TestCase
 
         $this->assertTrue($result['success']);
         $this->assertStringContainsString('0 team', $result['message']);
+    }
+
+    public function testUpdateTraditionAbortsAndWritesNothingWhenASeasonHasWrongGameCount(): void
+    {
+        $maintenanceMock = $this->createMock(MaintenanceRepositoryInterface::class);
+        $maintenanceMock->method('getAllTeams')->willReturn([['team_name' => 'Miami']]);
+        $maintenanceMock->method('getTeamSeasonRecords')->willReturn([
+            ['year' => 2023, 'wins' => 82, 'losses' => 37],  // 119 games — phantom-boxscore anomaly
+            ['year' => 2022, 'wins' => 50, 'losses' => 32],
+        ]);
+        $maintenanceMock->expects($this->never())->method('updateTeamTradition');
+
+        $stub = self::createStub(LeagueControlPanelRepositoryInterface::class);
+        $stub->method('getSetting')->willReturn('2024');
+        $awardStub = self::createStub(AwardGenerationServiceInterface::class);
+        $processor = new LeagueControlPanelProcessor($stub, $awardStub, LeagueContext::LEAGUE_IBL, $maintenanceMock);
+
+        $result = $processor->dispatch('update_tradition', []);
+
+        $this->assertFalse($result['success']);
+    }
+
+    public function testUpdateTraditionNamesOffendingTeamAndYearInFailureMessage(): void
+    {
+        $maintenanceMock = self::createStub(MaintenanceRepositoryInterface::class);
+        $maintenanceMock->method('getAllTeams')->willReturn([['team_name' => 'Miami']]);
+        $maintenanceMock->method('getTeamSeasonRecords')->willReturn([
+            ['year' => 2023, 'wins' => 82, 'losses' => 37],  // 119 games
+        ]);
+
+        $stub = self::createStub(LeagueControlPanelRepositoryInterface::class);
+        $stub->method('getSetting')->willReturn('2024');
+        $awardStub = self::createStub(AwardGenerationServiceInterface::class);
+        $processor = new LeagueControlPanelProcessor($stub, $awardStub, LeagueContext::LEAGUE_IBL, $maintenanceMock);
+
+        $result = $processor->dispatch('update_tradition', []);
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('Miami', $result['message']);
+        $this->assertStringContainsString('2023', $result['message']);
+    }
+
+    public function testUpdateTraditionSucceedsAndNamesSkippedTeamsWithNoHistory(): void
+    {
+        $maintenanceMock = self::createStub(MaintenanceRepositoryInterface::class);
+        $maintenanceMock->method('getAllTeams')->willReturn([
+            ['team_name' => 'Miami'],
+            ['team_name' => 'Boston'],
+        ]);
+        $maintenanceMock->method('getTeamSeasonRecords')->willReturnMap([
+            ['Miami', 2024, 5, []],
+            ['Boston', 2024, 5, [['year' => 2023, 'wins' => 50, 'losses' => 32]]],
+        ]);
+
+        $stub = self::createStub(LeagueControlPanelRepositoryInterface::class);
+        $stub->method('getSetting')->willReturn('2024');
+        $awardStub = self::createStub(AwardGenerationServiceInterface::class);
+        $processor = new LeagueControlPanelProcessor($stub, $awardStub, LeagueContext::LEAGUE_IBL, $maintenanceMock);
+
+        $result = $processor->dispatch('update_tradition', []);
+
+        $this->assertTrue($result['success']);
+        $this->assertStringContainsString('Miami', $result['message']);
     }
 
     public function testUpdateTraditionWithoutMaintenanceRepositoryReturnsFailure(): void

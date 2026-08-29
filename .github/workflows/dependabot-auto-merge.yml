@@ -20,5 +20,15 @@ jobs:
     steps:
       - name: Enable auto-merge
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # CI_PAT, not GITHUB_TOKEN. GitHub attributes the eventual auto-merge to whoever
+          # ARMED it, and its anti-recursion guard fires NO workflow runs for a push made
+          # under the built-in GITHUB_TOKEN. Arming with GITHUB_TOKEN therefore made every
+          # dependabot auto-merge land on master silently, suppressing update-behind-prs.yml's
+          # push trigger on the exact cascade that trigger exists for: one armed PR merging
+          # knocks the remaining armed PRs BEHIND, with nothing left to unstick them but the
+          # unreliable schedule. Measured 2026-08-29 — PR #2010 merged as app/github-actions
+          # at 07:08:46Z and zero workflows ran, where ~11 fan out on a normal master push;
+          # PR #2019, merged the same morning by a real user, did fire the push pass.
+          # Same guard, same fix as update-behind-prs.yml's update-branch call (ADR-0081).
+          GH_TOKEN: ${{ secrets.CI_PAT }}
         run: gh pr merge "${{ github.event.pull_request.number }}" --auto --squash --repo "${{ github.repository }}"

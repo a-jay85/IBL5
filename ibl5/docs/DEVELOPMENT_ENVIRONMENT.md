@@ -1,6 +1,6 @@
 ---
 description: Docker setup, dependency management, testing commands, and database connection details.
-last_verified: 2026-06-29
+last_verified: 2026-08-29
 ---
 
 # IBL5 Development Environment Setup

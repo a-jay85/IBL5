@@ -111,9 +111,18 @@ class PlayerPageController
 
         // Action buttons
         $userTeamName = $this->commonRepo->getTeamnameFromUsername($username) ?? League::FREE_AGENTS_TEAM_NAME;
-        $userTeam = Team::initialize($this->mysqliDb, $userTeamName);
-
-        $actionButtons = $this->renderActionButtons($pageService, $player, $playerID, $userTeam, $season);
+        try {
+            $userTeam = Team::initialize($this->mysqliDb, $userTeamName);
+        } catch (\RuntimeException) {
+            // The viewer's team may not exist in the active league context: Olympics
+            // rewrites ibl_team_info -> ibl_olympics_team_info, which has no
+            // 'Free Agents' row and none of the IBL franchises. Owner actions are
+            // meaningless there, so render none rather than crashing the page.
+            $userTeam = null;
+        }
+        $actionButtons = $userTeam === null
+            ? ''
+            : $this->renderActionButtons($pageService, $player, $playerID, $userTeam, $season);
         if ($actionButtons !== '') {
             $html .= '<tr><td colspan="2"><div class="player-action-buttons">' . $actionButtons . '</div></td></tr>';
         }

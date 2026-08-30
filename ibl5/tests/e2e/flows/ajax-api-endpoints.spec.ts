@@ -27,8 +27,7 @@ async function fetchJson(
       }
       return { status: lastStatus, body, contentType: lastContentType };
     }
-    // Got HTML instead of JSON — brief pause before retry
-    await new Promise((r) => setTimeout(r, 200));
+    // Got HTML instead of JSON — retry immediately
   }
 
   return { status: lastStatus, body: null, contentType: lastContentType };

@@ -63,8 +63,10 @@ test.describe('One-on-One Game flow', () => {
     // Submit the form
     await page.getByRole('button', { name: /begin/i }).click();
 
-    // Wait for results page — verify error message disappears or results appear
-    await page.waitForLoadState('networkidle');
+    await expect(page.locator('body')).toContainText(
+      /(Score|Winner|won|pts|Final|Game ID|Quarter)/i,
+      { timeout: 10000 },
+    );
     const body = await page.locator('body').textContent();
     // Results should contain score or game info (not just the form)
     const hasResults =

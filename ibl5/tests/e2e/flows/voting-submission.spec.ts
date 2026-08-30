@@ -188,7 +188,7 @@ test.describe('ASG Voting: validation errors', () => {
     });
 
     await submitBtn.first().click();
-    await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('body')).toContainText('less than FOUR', { timeout: 10000 });
 
     await assertNoPhpErrors(page, 'after ASG validation error');
   });

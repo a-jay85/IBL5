@@ -86,7 +86,7 @@ test.describe('Waivers: view switcher tabs', () => {
     const totalTab = page.locator('.ibl-tab').filter({ hasText: /total/i });
     await expect(totalTab.first(), 'Waivers must render the "Total" tab').toBeVisible();
     await totalTab.first().click();
-    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+    await expect(page.locator('.ibl-data-table thead').first()).toContainText('fgm');
   });
 
   test('no PHP errors after tab switch', async ({ page }) => {

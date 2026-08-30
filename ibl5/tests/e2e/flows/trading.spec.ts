@@ -428,7 +428,10 @@ test.describe('Trade offer form: roster preview interactions', () => {
     }
 
     // Wait for debounce (300ms) + fetch to complete
-    await page.waitForTimeout(800);
+    await page.waitForResponse(
+      resp => resp.url().includes('op=roster-preview-api'),
+      { timeout: 5000 },
+    );
 
     // Should have fewer requests than checkboxes checked (debounce coalesces)
     expect(requestCount).toBeLessThan(count);
@@ -563,8 +566,13 @@ test.describe('Trade review page: offer cards and preview', () => {
     const previewBtn = page.locator('[data-preview-offer]').first();
 
     // First click — should fire API request
-    await previewBtn.click();
-    await page.waitForTimeout(500);
+    await Promise.all([
+      page.waitForResponse(
+        resp => resp.url().includes('op=roster-preview-api'),
+        { timeout: 5000 },
+      ),
+      previewBtn.click(),
+    ]);
     expect(apiRequestCount).toBeGreaterThanOrEqual(1);
 
     const firstCount = apiRequestCount;
@@ -572,7 +580,6 @@ test.describe('Trade review page: offer cards and preview', () => {
     // Hide then show again — should NOT fire new request (already initialized)
     await previewBtn.click(); // Hide
     await previewBtn.click(); // Show again
-    await page.waitForTimeout(500);
     expect(apiRequestCount).toBe(firstCount);
   });
 

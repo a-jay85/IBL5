@@ -127,7 +127,7 @@ ROOT=$(git rev-parse --show-toplevel 2>/dev/null) \
 PLANS_DIR="${PLAN_NOW_PLANS_DIR:-$HOME/claude-plans}"
 mkdir -p "$PLANS_DIR"
 
-TS=$(date +%Y%m%d-%H%M%S)
+TS=$(date +%Y%m%d-%H%M%S)-$$
 LABEL="com.ibl5.plan-now-$TS"
 LOG="/tmp/plan-now-$TS.log"
 PROMPT="/tmp/plan-now-$TS.prompt"
@@ -142,6 +142,10 @@ PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 
 # Own a private copy: the caller's mktemp block may be cleaned up long before
 # launchd gets around to running the job.
+if [ -e "$PROMPT" ]; then
+    echo "plan-now: artifact path already exists — label collision would occur ($PROMPT). Aborting." >&2
+    exit 1
+fi
 cp "$PROMPT_SRC" "$PROMPT"
 
 # The headless coda. It lives HERE, not in the skill's drafted block, so every

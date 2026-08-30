@@ -52,6 +52,7 @@ last_verified: 2026-08-30
 | E23 | PR body deletion volumes diverged from code's `EXPECTED` constants | ✅ Implemented | — | S |
 | E24 | `/post-plan` Phase 4B can hand-write its review comment, bypassing `post_review_summary` | ⬜ Open | 🟨 | S |
 | E25 | `/pr-review` migration-exclusion `awk` filter is a no-op, silently ingests full migration diffs | ⬜ Open | 🟨 | S |
+| E26 | `bin/plan-now` second-resolution timestamp caused label collision on back-to-back invocations | ✅ Implemented | — | S |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -324,3 +325,21 @@ Consequence is size control, not correctness — reviews get *more* context than
 `artifact destination:` `.claude/skills/pr-review/SKILL.md` Step 2c (in-repo). Not built this pass.
 
 *(discovered 2026-08-27 during #2001)*
+
+### E26 `bin/plan-now` timestamp collision on back-to-back invocations
+
+`bin/plan-now:130` derived all artifact paths and the launchd label from `TS=$(date +%Y%m%d-%H%M%S)` — second-resolution only. Two invocations within the same wall-clock second produced identical `$LABEL`, `$LOG`, `$PROMPT`, `$RUNNER`, and `$OUT` paths. The second invocation's `launchctl bootout … || true` silently unregistered the first job, and the first invocation's runner script was overwritten before launchd executed it. `bin/post-plan-now:123` carried the same pattern.
+
+**Fix:** Changed `TS=$(date +%Y%m%d-%H%M%S)` to `TS=$(date +%Y%m%d-%H%M%S)-$$` (PID suffix) in both scripts. Added a backstop guard in `bin/plan-now` that exits nonzero if `$PROMPT` already exists at write time. Extended `bin/test-plan-now` with a collision case.
+
+`prevention_ladder:`
+
+- **rung 0 — already covered?** No.
+- **rung 1 — extend an existing gate?** Extended `bin/test-plan-now` (already wired to CI at `.github/workflows/tests.yml:876-877`). No new harness.
+- **rung 2 — a rule doc?** N/A — a one-liner code fix plus a runtime backstop guard.
+- **rung 3 — fix in place. LANDS HERE.**
+- **rungs 4–5** — N/A.
+
+`artifact destination:` `bin/plan-now:130`, `bin/post-plan-now:123` (in-repo). **Status:** ✅ Implemented.
+
+*(discovered 2026-08-30, fixed in PR plan-now-label-collision)*

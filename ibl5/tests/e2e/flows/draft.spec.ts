@@ -137,19 +137,18 @@ test.describe('Draft selection: submission', () => {
     const form = page.locator('form[name="draft_form"]');
     await expect(form).toBeVisible();
 
-    // Submit via JS to bypass client-side validation
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: 'domcontentloaded' }),
-      page.evaluate(() => {
-        const f = document.querySelector(
-          'form[name="draft_form"]',
-        ) as HTMLFormElement;
-        if (f) f.submit();
-      }),
-    ]);
-
-    const html = await page.content();
-    expect(html).toMatch(/didn.t select|select a player|oops/i);
+    // Submit via JS to bypass client-side validation; web-first assertion
+    // waits through the navigation so page.content() race is eliminated.
+    await page.evaluate(() => {
+      const f = document.querySelector(
+        'form[name="draft_form"]',
+      ) as HTMLFormElement;
+      if (f) f.submit();
+    });
+    await expect(page.locator('body')).toContainText(
+      /didn.t select|select a player|oops/i,
+      { timeout: 10000 },
+    );
   });
 });
 

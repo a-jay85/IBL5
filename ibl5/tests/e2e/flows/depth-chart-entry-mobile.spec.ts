@@ -12,7 +12,7 @@ test.describe('Depth Chart Entry: mobile card view', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('modules.php?name=DepthChartEntry');
-    await page.waitForLoadState('networkidle');
+    await expect(page.locator('.dc-mobile-cards').first()).toBeVisible();
   });
 
   test('no PHP errors at mobile viewport', async ({ page }) => {
@@ -228,7 +228,7 @@ test.describe('Depth Chart Entry: mobile card view', () => {
 
     // Scroll down
     await page.evaluate(() => window.scrollTo(0, 1000));
-    await page.waitForTimeout(100);
+    await page.waitForFunction(() => window.scrollY >= 990);
 
     const navBox = await nav.boundingBox();
     expect(navBox).not.toBeNull();
@@ -352,7 +352,7 @@ test.describe('DCE mobile: saved depth chart loading', () => {
 
   test('loading a saved depth chart updates mobile card selects', async ({ page }) => {
     await page.goto('modules.php?name=DepthChartEntry');
-    await page.waitForLoadState('networkidle');
+    await expect(page.locator('#saved-dc-select option').nth(1)).toBeAttached();
 
     const dropdown = page.locator('#saved-dc-select');
     await expect(dropdown).toBeVisible();
@@ -411,15 +411,21 @@ isolatedTest.describe('DCE mobile: form submission', () => {
     await expect(submitBtn).toBeVisible();
     await submitBtn.click();
 
-    // Require the success signal — PRG back to the module base with the saved
-    // banner. A validation/server rejection no longer passes as success.
+    // PRG back to the module base URL (op=submit is absent after a clean redirect).
+    // The global flash_success is deliberately NOT asserted — all authenticated
+    // workers share one PHPSESSID and any parallel render consumes it, exactly as
+    // documented in depth-chart-entry-submission.spec.ts. Instead we assert the
+    // durable signals: mobile form reloads + no module-scoped validation error.
     await page.waitForURL(
       /modules\.php\?name=DepthChartEntry(?!.*op=submit)/,
       { timeout: 15_000 },
     );
-    await expect(
-      page.locator('.ibl-alert--success', { hasText: /depth chart saved/i }),
-    ).toBeVisible({ timeout: 15000 });
+    // Mobile cards re-appearing proves the DC form reloaded (not an error page).
+    await expect(page.locator('.dc-mobile-cards')).toBeVisible({ timeout: 10000 });
+    // Module-scoped error flash (_ibl_depth_chart_flash) is safe from the
+    // parallel-worker race; its presence means server-side validation rejected
+    // the live config — a real failure we must catch.
+    await expect(page.locator('.ibl-alert--error')).not.toBeVisible();
     await assertNoPhpErrors(page, 'after mobile depth chart submission');
   });
 
@@ -433,7 +439,6 @@ test.describe('DCE mobile: resize sync', () => {
     // Start at mobile
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto('modules.php?name=DepthChartEntry');
-    await page.waitForLoadState('networkidle');
 
     // Change the first card's PG (pg) depth by tapping the stepper down
     // arrow. The underlying <select> is display:none on mobile, so we
@@ -450,7 +455,6 @@ test.describe('DCE mobile: resize sync', () => {
 
     // Switch to desktop
     await page.setViewportSize({ width: 1280, height: 900 });
-    await page.waitForTimeout(200); // debounce
 
     // Desktop table should now show the changed value
     const desktopSelect = page.locator('.depth-chart-table select[name^="pg"]').first();

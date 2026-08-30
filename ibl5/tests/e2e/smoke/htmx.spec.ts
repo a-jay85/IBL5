@@ -124,14 +124,6 @@ test.describe('HTMX hx-boost navigation', () => {
     // Wait for HTMX to swap content — the search renders results inline,
     // so wait for the results content to appear in site-content
     await expect(page.locator('#site-content').first()).toBeVisible({ timeout: 10000 });
-    // Wait for search results or "no results" message to render
-    await page.waitForTimeout(1000);
-
-    // Verify the nav marker persists (nav was NOT re-rendered = no full page reload)
-    const marker = await page.evaluate(() => {
-      const navEl = document.querySelector('nav.fixed');
-      return navEl?.getAttribute('data-htmx-marker');
-    });
-    expect(marker).toBe('1');
+    await expect(page.locator('nav.fixed').first()).toHaveAttribute('data-htmx-marker', '1');
   });
 });

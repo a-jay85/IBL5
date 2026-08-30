@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed/declined maintenance-audit findings, extracted from maintenance-backlog.md.
-last_verified: 2026-08-16
+last_verified: 2026-08-30
 ---
 
 # Maintenance-Cost Reduction Backlog — Archive
@@ -2561,3 +2561,11 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Status:** Completed (maintenance-28, migration 137) — disambiguated as a GM **username**, comment set to `GM username (ref ibl_team_info.gm_username; no enforced FK)`. Deliberately NOT shrunk from `varchar(50)`: historical usernames cannot be proven ≤25 (CI seed has zero rows so the length audit is uninformative, and `ibl_gm_tenures.gm_username` is `varchar(50)`), so a blind shrink risks truncating production history. No enforced FK because `gm_username` is not unique. A future shrink can land once a production-data length audit confirms the max.
 
 **Table evidence (2026-07-25):** gm_history.name disambiguated (#137).
+
+### 6.24 Olympics player page does not render (surfaced by the #1825 assertion tightening)
+**Location:** `ibl5/classes/Player/PlayerPageController.php` (`renderPage()`, action-buttons block); reproduced by `ibl5/tests/e2e/smoke/olympics-pages.spec.ts` (`player page loads in Olympics context`)
+**Problem:** `modules.php?name=Player&pa=showpage&pid=1&league=olympics` does not render the player overview. The old assertion on that test was `expect(body?.length).toBeGreaterThan(100)`, which passes on the error page, so the failure was invisible. #1825 replaces it with scoped `.ibl-title` / `.player-stats-card` assertions that red correctly. Two contributing causes were identified while triaging: (a) `ibl_olympics_plr` had no row for `pid=1` in the CI seed — fixed in #1825, which is fixture-only; and (b) `renderPage()` resolves the *viewer's* team with an unguarded `Team::initialize($this->mysqliDb, $userTeamName)`, and `League\LeagueContext::TABLE_MAP` rewrites `ibl_team_info` → `ibl_olympics_team_info`, a table holding none of the IBL franchises and no `Free Agents` row, so `Team::load()` throws `RuntimeException: Team not found`. Measured locally (worktree `e2e-axis-c-weak-assertions`, PageCache bypassed via `_e2e=1`): with the `ibl_olympics_plr` row present but no PHP fix the response is HTTP 200 / 89836 bytes **truncated at the opening `<div id="site-content">`** with no `.ibl-title`; with the PHP fix it is HTTP 200 / 114206 bytes rendering `.ibl-title` = `Test Player` and `.player-stats-card`. So (a) is only what gives the assertion a name to match — (b) is the failure, and it fires for every viewer on every Olympics player page regardless of stats data. (opcache ruled out: `validate_timestamps=On`, `revalidate_freq=0`.) Cause (b) is production PHP and is **out of scope for #1825 by its plan** (plan §"When a tightened assertion reds", rule 4: "This PR changes no PHP by design; a production fix belongs in its own change with its own review").
+**Suggested direction:** Treat a viewer team that is absent from the active league context as "no owner actions" rather than a fatal — catch the `RuntimeException` from the viewer-team lookup only, and skip `renderActionButtons()` when the team cannot be resolved. Owner actions are meaningless in an Olympics context. The IBL path must be unchanged.
+**Est. effort:** S
+**Risk if untouched:** Olympics player pages stay broken for every viewer, and #1825 cannot go green until the fix lands.
+**Status:** Completed (#2028) — `renderPage()` now catches the `RuntimeException` from the viewer-team lookup and renders no owner-action buttons when the viewer's team is absent from the active league context; the IBL path is unchanged. The tightened assertion in `ibl5/tests/e2e/smoke/olympics-pages.spec.ts` (`player page loads in Olympics context`, shipped in #1825) is the regression pin, and goes green with #2028 in the base. (discovered 2026-08-10 during #1825)

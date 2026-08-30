@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-08-29
+last_verified: 2026-08-30
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -316,7 +316,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):** Adding tests is inherently green-green (no production change) → every open coverage gap is 🟩 auto-mergeable. If writing a test surfaces a real bug, the *fix* becomes its own finding with its own classification. (Exceptions: **6.21** and **6.23** are 🟨, not 🟩 — in each the target code is unreachable from PHPUnit, so no test is writable until a production seam is decided: a teamless-fixture / non-`exit()` refactor for 6.21, a SAPI-independent hashing seam for 6.23.)
 
-> ✅ resolved (17): 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 6.15, 6.16, 6.17, 6.18, 6.20 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (18): 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 6.15, 6.16, 6.17, 6.18, 6.20, 6.24 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
@@ -326,7 +326,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 6.21 | ⬜ Open | 🟨 | Row-12 (Free-Agents/teamless session) `processrookieoption` ownership-rejection path untested: PHPUnit entry-point test impossible (handler `exit()`s), E2E auth fixture always has a session team. Needs a teamless-fixture / non-`exit()` refactor decision before it's writable → 🟨. From PR #1107 Phase 5.0 note. |
 | 6.22 | ⬜ Open | 🟨 | **Pattern behind 6.20/6.21.** Authz/IDOR gates inline in controllers end in `HtmxHelper::redirect()→exit()`, so the security-critical "non-party refused + no mutation" property is E2E-only (forced the D-05 reject test, #1066). `Trading\TradeExecutionService` (accept path, #1066) proves the fix: a gate returning a *verdict* is unit-testable exit-free (`testValidateAndExecuteRejectsNonPartyWithoutExecuting`). Convert the inline gates (Waivers, FreeAgency, Trade API accept/decline, Trading reject) to verdict + thin redirect-shim → security logic becomes unit-testable; unblocks 6.21. 🟨: production refactor on a security surface; needs a verdict-shape decision. From the #1066 reject-IDOR review. |
 | 6.23 | ⬜ Open | 🟨 | **Same family as 6.22, different guard.** `RequestEventLoggingBootstrap::boot()` returns at line 35 when `\PHP_SAPI === 'cli'`, and PHPUnit is always CLI (DB group included), so the `hash('sha256', session_id())` derivation at lines 66–70 is unreachable from any PHPUnit test — the file's three existing tests are all `expectNotToPerformAssertions()` for exactly this reason. A regression storing the **raw** session id would break zero tests. Extract the derivation to a pure static (or inject the SAPI) so the PII boundary is unit-pinnable. 🟨: production change on a PII boundary; needs a seam decision. (discovered 2026-08-08 during #1670) |
-| 6.24 | ⬜ Open | 🟦 | **Production bug surfaced by a tightened E2E assertion (#1825).** The `smoke/olympics-pages.spec.ts` player-page test reds against `?league=olympics&pid=1`; the old `body.length > 100` tautology hid it. The production PHP fix is deliberately **not** in #1825 (that plan forbids PHP changes) — it ships in its own PR with its own review. 🟦: production-path change, needs human review. (discovered 2026-08-10 during #1825) |
 
 ### 6.13 Player Module — Large + Subthreshold (69 prod / 31 test files, ~0.45 ratio)
 **Location:** `ibl5/classes/Player`
@@ -375,14 +374,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Est. effort:** S
 **Risk if untouched:** The `session_id` column is documented and reviewed as a non-replayable digest. If the derivation regresses to the raw token, every CI gate stays green and the failure is only visible by inspecting production rows — a PII exposure with no automated detector.
 **Status:** ⬜ Open — raised from the #1670 review (the plan listed the bootstrap test as `[modify]`; the item was not implementable as specified). 🟨 conditional: a production change on a PII boundary, gated on the seam decision above.
-
-### 6.24 Olympics player page does not render (surfaced by the #1825 assertion tightening)
-**Location:** `ibl5/classes/Player/PlayerPageController.php` (`renderPage()`, action-buttons block); reproduced by `ibl5/tests/e2e/smoke/olympics-pages.spec.ts` (`player page loads in Olympics context`)
-**Problem:** `modules.php?name=Player&pa=showpage&pid=1&league=olympics` does not render the player overview. The old assertion on that test was `expect(body?.length).toBeGreaterThan(100)`, which passes on the error page, so the failure was invisible. #1825 replaces it with scoped `.ibl-title` / `.player-stats-card` assertions that red correctly. Two contributing causes were identified while triaging: (a) `ibl_olympics_plr` had no row for `pid=1` in the CI seed — fixed in #1825, which is fixture-only; and (b) `renderPage()` resolves the *viewer's* team with an unguarded `Team::initialize($this->mysqliDb, $userTeamName)`, and `League\LeagueContext::TABLE_MAP` rewrites `ibl_team_info` → `ibl_olympics_team_info`, a table holding none of the IBL franchises and no `Free Agents` row, so `Team::load()` throws `RuntimeException: Team not found`. Measured locally (worktree `e2e-axis-c-weak-assertions`, PageCache bypassed via `_e2e=1`): with the `ibl_olympics_plr` row present but no PHP fix the response is HTTP 200 / 89836 bytes **truncated at the opening `<div id="site-content">`** with no `.ibl-title`; with the PHP fix it is HTTP 200 / 114206 bytes rendering `.ibl-title` = `Test Player` and `.player-stats-card`. So (a) is only what gives the assertion a name to match — (b) is the failure, and it fires for every viewer on every Olympics player page regardless of stats data. (opcache ruled out: `validate_timestamps=On`, `revalidate_freq=0`.) Cause (b) is production PHP and is **out of scope for #1825 by its plan** (plan §"When a tightened assertion reds", rule 4: "This PR changes no PHP by design; a production fix belongs in its own change with its own review").
-**Suggested direction:** Treat a viewer team that is absent from the active league context as "no owner actions" rather than a fatal — catch the `RuntimeException` from the viewer-team lookup only, and skip `renderActionButtons()` when the team cannot be resolved. Owner actions are meaningless in an Olympics context. The IBL path must be unchanged.
-**Est. effort:** S
-**Risk if untouched:** Olympics player pages stay broken for every viewer, and #1825 cannot go green until the fix lands.
-**Status:** ⬜ Open — production fix split out of #1825 into its own PR. 🟦: production-path change on a rendering path, needs human review. (discovered 2026-08-10 during #1825)
 
 ---
 

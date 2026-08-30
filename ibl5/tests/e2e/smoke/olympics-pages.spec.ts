@@ -36,12 +36,9 @@ test.describe('Olympics page smoke tests', () => {
     // Player overview renders .player-stats-card (the game-log wrapper), not
     // .ibl-data-table (that class belongs to standings/team pages).
     //
-    // KNOWN RED (maintenance-backlog 6.24): this currently fails because
-    // PlayerPageController::renderPage() resolves the viewer's team with an unguarded
-    // Team::initialize(), and LeagueContext rewrites ibl_team_info ->
-    // ibl_olympics_team_info, which has no 'Free Agents' row — Team::load() throws.
-    // The production fix is deliberately out of scope here (plan: this PR changes no
-    // PHP) and ships in its own PR. Do NOT relax this assertion to make CI green.
+    // Regression pin for maintenance-backlog 6.24 (fixed in #2028):
+    // PlayerPageController::renderPage() must not fatal when the viewer's team is
+    // absent from the Olympics context. Do NOT relax this assertion.
     await expect(page.locator('.ibl-title').first()).toHaveText('Test Player');
     await expect(page.locator('.player-stats-card').first()).toBeVisible();
   });

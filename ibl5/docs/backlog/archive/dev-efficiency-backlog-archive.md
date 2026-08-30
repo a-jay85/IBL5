@@ -154,3 +154,21 @@ Body summary text was authored pre-implementation and hand-updated during coding
 **Status (2026-08-19):** ⬜ Open — 🟩 (no design fork; found while fixing E12 and deliberately left out of that PR's scope).
 
 **Status (2026-08-30):** ✅ Implemented — `bin/wt-new` now detects whether `$BASE_BRANCH` is checked out in the main checkout; if not, uses `fetch origin "$BASE_BRANCH:$BASE_BRANCH"` to fast-forward the local ref directly. `bin/test-wt-new-root` extended with Case 3 regression pin. Shipped in #2033.
+
+### E26 `bin/plan-now` timestamp collision on back-to-back invocations
+
+`bin/plan-now:130` derived all artifact paths and the launchd label from `TS=$(date +%Y%m%d-%H%M%S)` — second-resolution only. Two invocations within the same wall-clock second produced identical `$LABEL`, `$LOG`, `$PROMPT`, `$RUNNER`, and `$OUT` paths. The second invocation's `launchctl bootout … || true` silently unregistered the first job, and the first invocation's runner script was overwritten before launchd executed it. `bin/post-plan-now:123` carried the same pattern.
+
+**Fix:** Changed `TS=$(date +%Y%m%d-%H%M%S)` to `TS=$(date +%Y%m%d-%H%M%S)-$$` (PID suffix) in both scripts. Added a backstop guard in `bin/plan-now` that exits nonzero if `$PROMPT` already exists at write time. Extended `bin/test-plan-now` with a collision case.
+
+`prevention_ladder:`
+
+- **rung 0 — already covered?** No.
+- **rung 1 — extend an existing gate?** Extended `bin/test-plan-now` (already wired to CI at `.github/workflows/tests.yml:876-877`). No new harness.
+- **rung 2 — a rule doc?** N/A — a one-liner code fix plus a runtime backstop guard.
+- **rung 3 — fix in place. LANDS HERE.**
+- **rungs 4–5** — N/A.
+
+`artifact destination:` `bin/plan-now:130`, `bin/post-plan-now:123` (in-repo). **Status:** ✅ Implemented.
+
+*(discovered 2026-08-30, fixed in #2034)*

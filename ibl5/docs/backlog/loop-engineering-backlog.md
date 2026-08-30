@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-08-29
+last_verified: 2026-08-30
 ---
 
 # Loop-Engineering Backlog
@@ -209,6 +209,8 @@ last_verified: 2026-08-29
 **Suggested direction:** Make the run ID collision-proof rather than merely unlikely — append the shell PID (`$$`) or a monotonic suffix, or probe and increment until the label is free and the four paths are unclaimed. Prefer a check that fails loudly over one that silently reuses. Extend `bin/test-plan-now` (which already stubs the model call through `PLAN_NOW_CLAUDE` / `PLAN_NOW_PLANS_DIR` and spawns no launchd job) with a regression that two same-second invocations yield two distinct IDs and two surviving prompt files.
 **Risk if untouched:** Any batch fire — a multi-plan blast, an intake loop, a retry burst — silently drops all but one run while reporting every one as launched. The loss is invisible until someone counts jobs in `launchctl list`, and the discarded runs leave no artifact to recover from.
 **Status (2026-08-08):** ⬜ Open — 🟦 (automouse-safe, human-merge per this doc's loop-machinery default; the design is resolved and `bin/test-plan-now` already exists to pin it).
+
+**Superseded by:** #2034 — PID suffix (`-$$`) appended to `$TS` in both `bin/plan-now` and `bin/post-plan-now`; backstop guard added in `bin/plan-now`; `bin/test-plan-now` extended with collision regression. Collision class resolved.
 
 > **L30–L32 share an origin** *(discovered 2026-08-08 while checking whether two automouse agents can run simultaneously without interfering)*. The finding that prompted them: **plan-level work isolation is sound, shared bookkeeping is not.** The atomic-`mkdir` claim lock in `bin/automouse/run` `claim_next_plan()` guarantees exactly-once execution, and `bin/test-automouse-concurrency` verifies it end to end (run 2026-08-08 — all four assertions pass: every plan executed once, phases genuinely overlapped across two runner PIDs, queue fully drained, no leftover `.lock`/`.attempts`). The TTL-steal branch cannot misfire on a healthy sibling either: `LOCK_TTL_SECS=9000` against hard per-phase caps `MAX_IMPL_SECS=3600` + `MAX_PP_SECS=3600` leaves ~30 min of slack, and the lock is claimed once per plan. What that test asserts nothing about — and what L30–L32 cover — is every piece of state the runners *share*: the per-day cost report, the per-day log, and the main checkout.
 

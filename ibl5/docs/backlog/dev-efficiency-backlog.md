@@ -52,6 +52,7 @@ last_verified: 2026-08-30
 | E23 | PR body deletion volumes diverged from code's `EXPECTED` constants | ✅ Implemented | — | S |
 | E24 | `/post-plan` Phase 4B can hand-write its review comment, bypassing `post_review_summary` | ⬜ Open | 🟨 | S |
 | E25 | `/pr-review` migration-exclusion `awk` filter is a no-op, silently ingests full migration diffs | ⬜ Open | 🟨 | S |
+| E26 | `bin/plan-now` second-resolution timestamp caused label collision on back-to-back invocations | ✅ Implemented | — | S |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -324,3 +325,5 @@ Consequence is size control, not correctness — reviews get *more* context than
 `artifact destination:` `.claude/skills/pr-review/SKILL.md` Step 2c (in-repo). Not built this pass.
 
 *(discovered 2026-08-27 during #2001)*
+
+➜ E26 `bin/plan-now` timestamp collision on back-to-back invocations — ✅ Implemented (2026-08-30): see [archive](archive/dev-efficiency-backlog-archive.md).

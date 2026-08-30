@@ -559,6 +559,25 @@ want "an undeliverable DM does not change the verdict" "$out" "RESULT ok"
 [ -s "$DM_ALL" ] || fail "the cumulative DM capture is empty — case 11 proves nothing"
 want_no "no case DMs the unset-verdict fallback" "$(dm_all)" "the runner set no verdict"
 
+echo "── two back-to-back invocations get unique artifact paths ──"
+
+dry1=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
+          PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+          "$PLAN_NOW" --implement "$PROMPT" 2>&1)
+rm -f "$(printf '%s\n' "$dry1" | sed -n 's/^  plist:  //p')"
+prompt1=$(printf '%s\n' "$dry1" | sed -n 's/^  prompt: //p')
+
+dry2=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \
+          PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+          "$PLAN_NOW" --implement "$PROMPT" 2>&1)
+rm -f "$(printf '%s\n' "$dry2" | sed -n 's/^  plist:  //p')"
+prompt2=$(printf '%s\n' "$dry2" | sed -n 's/^  prompt: //p')
+
+[ -n "$prompt1" ] || fail "first DRY_RUN produced no prompt: line — extraction failed"
+[ -n "$prompt2" ] || fail "second DRY_RUN produced no prompt: line — extraction failed"
+[ "$prompt1" != "$prompt2" ] \
+    || fail "both DRY_RUN invocations produced identical prompt paths — TS collision: $prompt1"
+
 echo "── the coda still tells the model where to put it ──"
 
 dry=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \

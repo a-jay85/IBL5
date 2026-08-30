@@ -102,7 +102,7 @@ asserters, console-error watcher auto-wired into the base fixture, cookie-based 
 | B11 | ✅ | — | `player` stat-view loop re-covers 7 individual PHP-only tests. ✓done |
 | B12 | ✅ | — | `draft` "visible without scrolling" subsumed by "after scrolling". ✓done |
 | B13 | ✅ | — | `draft-history` probe runs in 5 tests → beforeAll once; + merge HTMX double-call tests. ✓done (HTMX URL assertion removals applied; probe beforeAll consolidation deferred — plan defect: `page` fixture is test-scoped and invalid in `beforeAll`) |
-| B14 | ⬜ Open | 🟩 | `draft-history` `navigateToDraftYearWithData` still runs 5× per suite; probe requires `page` fixture which is test-scoped. Alternative: `workerScope` fixture or module-level `let dataYear` populated by `beforeAll` using a headless HTTP GET or seed-data lookup. (discovered 2026-08-08 during #1811) |
+| B14 | ✅ Implemented | 🟩 | `draft-history` `navigateToDraftYearWithData` still runs 5× per suite; probe requires `page` fixture which is test-scoped. Alternative: `workerScope` fixture or module-level `let dataYear` populated by `beforeAll` using a headless HTTP GET or seed-data lookup. (discovered 2026-08-08 during #1811) **Status:** `let dataYear` + `test.beforeAll({ request })` HTTP probe; `navigateToDraftYearWithData` deleted. |
 
 **B1–B4 — missing `beforeEach` (each test re-`goto`s the same URL):**
 `award-history.spec.ts` (8 tests → save 7 loads), `navigation.spec.ts` desktop describe (6 → save 5; mobile

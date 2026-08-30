@@ -115,3 +115,37 @@ materialize_worktree_config() {
         return 1
     fi
 }
+
+# Print the basename of every entry under <repo-relative-dir> as it exists on each
+# remote-tracking ref under refs/remotes/origin/. Used by the number allocators so
+# a number claimed on a pushed-but-unmerged branch is never handed out twice.
+#
+# STRICTLY OFFLINE. for-each-ref and ls-tree read objects already in .git; neither
+# contacts the network. Never add fetch/ls-remote here — an allocator that needs
+# the network becomes an allocator that fails on a plane. refs/remotes lives in the
+# git common dir, so this returns the same set from a linked worktree as from the
+# main checkout. Degrades open: no origin remote, or a ref with no such directory,
+# yields nothing rather than an error.
+scan_origin_refs() {
+    local dir_path="${1%/}" repo="${2:-.}" ref
+    while IFS= read -r ref; do
+        git -C "$repo" ls-tree --name-only "$ref" "$dir_path/" 2>/dev/null
+    done < <(git -C "$repo" for-each-ref --format='%(refname)' refs/remotes/origin/ 2>/dev/null) \
+        | sed 's|.*/||'
+    return 0
+}
+
+# Print the basename of every entry under <repo-relative-dir> in each registered
+# worktree of this repo, including the main checkout. Reads the working tree on
+# disk (not a ref), so it sees a number allocated in a sibling worktree that has
+# not been committed yet. awk strips the "worktree " prefix without splitting on
+# whitespace, so worktree paths containing spaces survive. Degrades open.
+scan_worktrees() {
+    local rel_path="${1%/}" repo="${2:-.}" wt
+    while IFS= read -r wt; do
+        [ -d "$wt/$rel_path" ] || continue
+        ls -1 "$wt/$rel_path" 2>/dev/null
+    done < <(git -C "$repo" worktree list --porcelain 2>/dev/null \
+        | awk '/^worktree /{sub(/^worktree /, ""); print}')
+    return 0
+}

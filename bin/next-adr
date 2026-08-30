@@ -39,30 +39,41 @@ if is_main_checkout "$REPO_ROOT"; then
     exit 1
 fi
 
-get_max() {
-    local dir="$1"
-    if [ ! -d "$dir" ]; then
-        return 0
-    fi
-    # List NNNN-*.md files, extract numeric prefix, skip 0000 (template), find max.
-    # `|| true` absorbs the empty-pipeline case under `set -o pipefail`.
+# Max ADR number from a stream of BASENAMES on stdin. Split out of get_max so the
+# same grammar (NNNN- prefix, 0000 template excluded) applies to names read off a
+# directory, off a remote-tracking ref, and out of a sibling worktree.
+# `|| true` absorbs the empty-pipeline case under `set -o pipefail`.
+max_from_names() {
     (
-        ls "$dir"/[0-9][0-9][0-9][0-9]-*.md 2>/dev/null \
-            | sed 's/.*\///' \
-            | grep -oE '^[0-9]+' \
+        grep -oE '^[0-9]{4}-' \
+            | tr -d '-' \
             | grep -v '^0000$' \
             | sort -n \
             | tail -1
     ) || true
 }
 
+get_max() {
+    local dir="$1"
+    if [ ! -d "$dir" ]; then
+        return 0
+    fi
+    (ls "$dir"/[0-9][0-9][0-9][0-9]-*.md 2>/dev/null | sed 's/.*\///' | max_from_names) || true
+}
+
 MAX_WT=$(get_max "$WORKTREE_DIR")
 MAX_CANON=$(get_max "$CANONICAL_DIR")
+# Numbers claimed on a pushed-but-unmerged branch, and in a sibling worktree that
+# has not committed yet. Both scans are strictly local (see lib/git-helpers.sh).
+MAX_ORIGIN=$(scan_origin_refs ibl5/docs/decisions "$REPO_ROOT" | max_from_names)
+MAX_WTS=$(scan_worktrees ibl5/docs/decisions "$REPO_ROOT" | max_from_names)
 
 MAX="${MAX_WT:-0}"
-if [ -n "$MAX_CANON" ] && [ "$MAX_CANON" -gt "$MAX" ] 2>/dev/null; then
-    MAX=$MAX_CANON
-fi
+for CANDIDATE in "$MAX_CANON" "$MAX_ORIGIN" "$MAX_WTS"; do
+    if [ -n "$CANDIDATE" ] && [ "$((10#$CANDIDATE))" -gt "$((10#$MAX))" ]; then
+        MAX=$CANDIDATE
+    fi
+done
 
 NEXT=$((10#$MAX + 1))
 PADDED=$(printf "%04d" "$NEXT")

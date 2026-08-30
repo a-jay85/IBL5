@@ -53,6 +53,14 @@ jobs:
               - 'bin/*'
               - 'ibl5/migrations/**.sql'
               - 'ibl5/composer.json'
+            numbering:
+              # Deliberately NOT steps.filter.outputs.adr: that filter has no
+              # ibl5/docs/decisions/** entry and its migrations entry is .sql-
+              # suffixed, so it would silently skip the two most common collision
+              # shapes (an ADR-only PR, and a .php/.md migration).
+              - 'ibl5/docs/decisions/**'
+              - 'ibl5/migrations/**'
+              - '.gitattributes'
             refactor:
               - 'ibl5/classes/**'
               - 'ibl5/tests/**'
@@ -119,6 +127,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: bin/adr-check --pr
+
+      - name: Run bin/check-numbering
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.numbering == 'true' }}
+        run: bin/check-numbering --since=${{ github.event.pull_request.base.sha }}
 
       - name: Run bin/refactor-flag
         if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.refactor == 'true' }}

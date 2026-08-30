@@ -28,8 +28,13 @@ test.describe('Homepage flow', () => {
     expect(href).toContain('News');
   });
 
-  test('main content area renders', async ({ page }) => {
-    await expect(page.locator('#site-content').first()).toBeVisible();
+  test('main content area renders homepage news', async ({ page }) => {
+    const main = page.locator('#site-content').first();
+    await expect(main.locator('article').first()).toBeVisible();
+    // Seed/wtdb disagree on story titles — using structural invariant per §1.2 rule 3
+    await expect(main.locator('article a[href*="sid="]').first()).not.toBeEmpty();
+    // A stray chrome-only render would put zero articles inside the content area.
+    expect(await main.locator('article').count()).toBeGreaterThanOrEqual(1);
   });
 
   test('no PHP errors on homepage', async ({ page }) => {

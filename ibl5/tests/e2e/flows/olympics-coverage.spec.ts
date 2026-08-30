@@ -15,10 +15,15 @@ test.describe('Olympics module coverage', () => {
 
     // Standings table should have team-related headers
     const headers = await tables.first().locator('th').allTextContents();
-    const joined = headers.join(' ');
-    const hasTeamColumn = /team|country|nation/i.test(joined);
-    const hasRecordColumn = /w|l|win|loss|pct|record/i.test(joined);
-    expect(hasTeamColumn || hasRecordColumn).toBe(true);
+    const headerTokens = headers.map((t) => t.trim().toLowerCase());
+    // Olympics standings must carry BOTH the team/country column and the record columns.
+    // [rendered] TH labels: ['Rank', 'Team', 'W-L', 'Win%', 'Home', 'Away', 'Games Left']
+    expect(headerTokens).toContain('team');
+    expect(headerTokens).toContain('w-l');
+    expect(headerTokens).toContain('win%');
+    // Negative path: IBL conference labels must not leak into the Olympics render.
+    expect(headerTokens).not.toContain('eastern conference');
+    expect(headerTokens).not.toContain('western conference');
   });
 
   test('IBL-only modules show gating message in olympics context', async ({ appState, page }) => {

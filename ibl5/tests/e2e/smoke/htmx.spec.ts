@@ -67,9 +67,12 @@ test.describe('HTMX hx-boost navigation', () => {
     const nav = page.locator('nav.fixed').first();
     await expect(nav).toBeVisible();
 
-    // Should have full HTML structure
-    const html = await page.locator('html').count();
-    expect(html).toBe(1);
+    // A full-page response starts with the doctype and carries the site chrome;
+    // an HTMX partial would return only the #site-content fragment.
+    const raw = await (await page.request.get('modules.php?name=Standings')).text();
+    expect(raw.trimStart().slice(0, 15).toLowerCase()).toContain('<!doctype html');
+    expect(raw).toContain('<nav');
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
   });
 
   test('browser back/forward works after HTMX navigation', async ({ page }) => {

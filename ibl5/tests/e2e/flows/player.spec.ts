@@ -86,9 +86,10 @@ test.describe('Player page flow — nav pill navigation', () => {
     // Find the stats table via column headers (th elements with stat names)
     const allHeaders = page.locator('th');
     const headerTexts = await allHeaders.allTextContents();
-    const joined = headerTexts.join(' ').toLowerCase();
-    // Key basketball stat columns (lowercase in player tables)
-    expect(joined).toContain('g');
+    const headerTokens = headerTexts.map((t) => t.trim().toLowerCase());
+    const joined = headerTokens.join(' ');
+    // 'g' (games) is a single-char header — match the cell exactly, not as a substring.
+    expect(headerTokens).toContain('g');
     expect(joined).toContain('min');
     expect(joined).toContain('pts');
   });

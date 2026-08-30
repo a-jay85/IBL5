@@ -262,7 +262,7 @@ class BoxscoreImportCharacterizationTest extends TestCase
     {
         $db = new MockDatabase();
         $db->setReturnTrue(true);
-        $db->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []);
+        $db->onQuery('(?s)SELECT.*ibl_box_scores_teams.*LIMIT 1', []);
 
         $seasonStub = self::createStub(Season::class);
         $repository = new BoxscoreRepository($db);
@@ -275,6 +275,8 @@ class BoxscoreImportCharacterizationTest extends TestCase
         $processor->processScoData($data, 2026, 'Regular Season/Playoffs', skipSimDates: true);
 
         $this->assertSame([
+            "SELECT ibl_schedule WHERE season_year = 2026",
+            "SELECT ibl_box_scores_teams WHERE season_year = 2026 AND visitor_teamid IS NOT NULL AND home_teamid IS NOT NULL",
             "SELECT ibl_box_scores_teams WHERE game_date = '2026-10-15' AND visitor_teamid = 1 AND home_teamid = 2 AND game_of_that_day = 1 LIMIT 1",
             "INSERT ibl_box_scores_teams VALUES( ('2026-10-15','Visitor Total',1,1,2,18000,20000,10,5,5,10,25,30,28,27,0,22,31,25,30,0,35,80,4,0,30,20,60,50,60,30,20,10,20))",
             "INSERT ibl_box_scores_teams VALUES( ('2026-10-15','3Test Player',1,1,2,18000,20000,10,5,5,10,25,30,28,27,0,22,31,25,30,0,20,801,50,0,30,20,10,30,40,20,10,10,2))",
@@ -287,7 +289,7 @@ class BoxscoreImportCharacterizationTest extends TestCase
     {
         $db = new MockDatabase();
         $db->setReturnTrue(true);
-        $db->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []);
+        $db->onQuery('(?s)SELECT.*ibl_box_scores_teams.*LIMIT 1', []);
 
         $seasonStub = self::createStub(Season::class);
         $repository = new BoxscoreRepository($db);
@@ -306,8 +308,9 @@ class BoxscoreImportCharacterizationTest extends TestCase
         $this->assertSame(4, $result['linesProcessed']);
         $this->assertSame([
             'Parsing .sco file for the 2025-2026 Regular Season/Playoffs...',
+            'Schedule guard disabled: ibl_schedule has no rows for season 2026; importing without membership validation.',
             'Number of .sco lines processed: 4',
-            'Games inserted: 1 | Games updated: 0 | Games skipped: 0',
+            'Games inserted: 1 | Games updated: 0 | Games skipped: 0 | Games rejected: 0',
         ], $result['messages']);
     }
 
@@ -316,7 +319,7 @@ class BoxscoreImportCharacterizationTest extends TestCase
         $db = new MockDatabase();
         $db->setReturnTrue(true);
         $db->onQuery('COUNT\(\*\) AS cnt', [['cnt' => 0]]);
-        $db->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', [[
+        $db->onQuery('(?s)SELECT.*ibl_box_scores_teams.*LIMIT 1', [[
             'visitor_q1_points' => 25, 'visitor_q2_points' => 30, 'visitor_q3_points' => 28,
             'visitor_q4_points' => 27, 'visitor_ot_points' => 0,
             'home_q1_points' => 22, 'home_q2_points' => 31, 'home_q3_points' => 25,
@@ -346,7 +349,7 @@ class BoxscoreImportCharacterizationTest extends TestCase
     {
         $db = new MockDatabase();
         $db->setReturnTrue(true);
-        $db->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []);
+        $db->onQuery('(?s)SELECT.*ibl_box_scores_teams.*LIMIT 1', []);
 
         $seasonStub = self::createStub(Season::class);
         $repository = new BoxscoreRepository($db);
@@ -433,7 +436,7 @@ class BoxscoreImportCharacterizationTest extends TestCase
             "SELECT ibl_box_scores_teams WHERE game_date = '2026-02-03' AND visitor_teamid = 50 AND home_teamid = 51 ORDER BY id ASC LIMIT 2",
             "SELECT ibl_box_scores_teams WHERE game_date = '2026-02-03' AND visitor_teamid = 50 AND home_teamid = 51 AND game_of_that_day = 1 LIMIT 1",
             "DELETE ibl_box_scores_teams WHERE game_date = '2026-02-03' AND visitor_teamid = 50 AND home_teamid = 51 AND game_of_that_day = 1",
-            "DELETE ibl_box_scores WHERE game_date = '2026-02-03' AND visitor_teamid = 50 AND home_teamid = 51",
+            "DELETE ibl_box_scores WHERE game_date = '2026-02-03' AND visitor_teamid = 50 AND home_teamid = 51 AND game_of_that_day = 1",
             "INSERT ibl_box_scores_teams VALUES( ('2026-02-03','East',1,50,51,18000,20000,10,5,5,10,25,30,28,27,0,22,31,25,30,0,35,80,4,0,30,20,60,50,60,30,20,10,20))",
             "INSERT ibl_box_scores_teams VALUES( ('2026-02-03','West',1,50,51,18000,20000,10,5,5,10,25,30,28,27,0,22,31,25,30,0,20,801,50,0,30,20,10,30,40,20,10,10,2))",
             "INSERT ibl_box_scores_teams VALUES( ('2026-02-03','West',1,50,51,18000,20000,10,5,5,10,25,30,28,27,0,22,31,25,30,0,3,207,0,30,2,2,5,4,5,3,2,1,2))",

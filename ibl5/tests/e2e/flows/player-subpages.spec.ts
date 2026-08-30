@@ -73,12 +73,11 @@ test.describe('Player rookie option sub-page', () => {
     await page.goto('modules.php?name=Player&pa=rookieoption&pid=1');
     await assertNoPhpErrors(page, 'on Player rookie option page');
 
-    // Should show either the form or an ineligibility alert
-    const alert = page.locator('.ibl-alert--error');
-    const form = page.locator('form');
-    const hasAlert = (await alert.count()) > 0;
-    const hasForm = (await form.count()) > 0;
-    expect(hasAlert || hasForm).toBe(true);
+    // pid=1 is ineligible: the alert must render AND no rookie-option form may.
+    await expect(page.locator('.ibl-alert--error')).toBeVisible();
+    await expect(
+      page.locator('input[name="rookieOptionValue"], form[action*="processrookieoption"]'),
+    ).toHaveCount(0);
   });
 
   test('error message explains why option is unavailable', async ({

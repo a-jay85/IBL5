@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-08-27
+last_verified: 2026-08-30
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -25,7 +25,7 @@ Effort scale:
 - **M** — multi-step plan, 1-3 days, may touch several modules
 - **L** — refactor or platform shift, > 3 days, likely needs ADR
 
-**Status:** Complete — 15-axis audit, 312 findings (+2 post-audit follow-ups from the PR #1107 review, +1 from the #1066 reject-IDOR review → 315 tracked; +11 Axis-1 size seeds 1.21–1.31 from the hot-files comment→backlog migration 2026-07-24 → 326 tracked; +5 Axis-1 size seeds 1.32–1.36 from the ground-truth audit 2026-07-24 → 331 tracked; +1 Axis-2 robustness item 2.39 discovered 2026-07-27 during trading-1-31-api-handler-extract → 332 tracked; +1 Axis-15 data-integrity item 15.24 discovered 2026-08-04 during the PR #1771 review → 333 tracked; +1 Axis-6 coverage item 6.23 discovered 2026-08-08 during the PR #1670 review → 334 tracked; +1 Axis-8 correctness item 8.18 discovered 2026-08-09 during the PR #1683 review → 335 tracked).
+**Status:** Complete — 15-axis audit, 312 findings (+2 post-audit follow-ups from the PR #1107 review, +1 from the #1066 reject-IDOR review → 315 tracked; +11 Axis-1 size seeds 1.21–1.31 from the hot-files comment→backlog migration 2026-07-24 → 326 tracked; +5 Axis-1 size seeds 1.32–1.36 from the ground-truth audit 2026-07-24 → 331 tracked; +1 Axis-2 robustness item 2.39 discovered 2026-07-27 during trading-1-31-api-handler-extract → 332 tracked; +1 Axis-15 data-integrity item 15.24 discovered 2026-08-04 during the PR #1771 review → 333 tracked; +1 Axis-6 coverage item 6.23 discovered 2026-08-08 during the PR #1670 review → 334 tracked; +1 Axis-8 correctness item 8.18 discovered 2026-08-09 during the PR #1683 review → 335 tracked; +1 Axis-6 robustness item 6.24 discovered 2026-08-10 during #1825 → 336 tracked).
 
 ---
 
@@ -316,7 +316,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):** Adding tests is inherently green-green (no production change) → every open coverage gap is 🟩 auto-mergeable. If writing a test surfaces a real bug, the *fix* becomes its own finding with its own classification. (Exceptions: **6.21** and **6.23** are 🟨, not 🟩 — in each the target code is unreachable from PHPUnit, so no test is writable until a production seam is decided: a teamless-fixture / non-`exit()` refactor for 6.21, a SAPI-independent hashing seam for 6.23.)
 
-> ✅ resolved (17): 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 6.15, 6.16, 6.17, 6.18, 6.20 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (18): 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 6.15, 6.16, 6.17, 6.18, 6.20, 6.24 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
@@ -718,3 +718,10 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Either (i) expand `db-seed.sql` with minimal boxscore fixtures sufficient to exercise the production-constant paths, remove the `$expectedOverride` escape hatch, and restore the coverage baseline floor; or (ii) formalize the `$expectedOverride` pattern as an explicit contract for data-repair classes and require that the migration dry-run output be attached to the PR so the human signing the hold has primary evidence of the production constants.
 **Est. effort:** M (option i) / S (option ii)
 **Risk if untouched:** Any future edit to `EXPECTED` or the selection predicates in `PhantomBoxscoreRepair` cannot be caught by CI; the only safety net is the dry-run step a deployer might skip.
+
+### 15.26 Retired `validateGameRowsJoinToBoxScores` Fail-Closed Guard — Orphan Warning Coverage
+**Location:** `ibl5/scripts/storeSimRecap.php`, `ibl5/classes/SimRecap/SimSummaryRepository.php`, `ibl5/tests/DatabaseIntegration/SimRecap/StoreSimRecapCliTest.php`
+**Problem:** PR #1963 retired the fail-closed ingest guard (`validateGameRowsJoinToBoxScores`) that blocked writes when any game row had no matching box score. The guard was replaced by warn-only orphan detection (`findOrphanedGameRecaps()` + Discord warning). The three CLI tests that pinned the guard's behaviour (`testUnmatchedGameRowsExitNonZeroWithoutWriting`, `testWrongGameOfThatDayIsRejectedEvenThoughTheGameExists`, `testValidationFailureCannotReachTheDiscordPost`) were deleted with it; no replacement tests cover the warn-only path under unjoinable payloads.
+**Suggested direction:** Add a `DatabaseIntegration` test asserting that `storeSimRecap` succeeds and emits a Discord warning when given a payload whose game rows have no matching box score, verifying the warn-only contract explicitly.
+**Est. effort:** S
+**Risk if untouched:** The orphan-warning path has no automated coverage; a future regression to silent success (no warning) would not be caught by CI.

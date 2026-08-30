@@ -63,19 +63,15 @@ test.describe('One-on-One Game flow', () => {
     // Submit the form
     await page.getByRole('button', { name: /begin/i }).click();
 
-    // Wait for results page — verify error message disappears or results appear
-    await page.waitForLoadState('networkidle');
-    const body = await page.locator('body').textContent();
-    // Results should contain score or game info (not just the form)
-    const hasResults =
-      body?.includes('Score') ||
-      body?.includes('Winner') ||
-      body?.includes('won') ||
-      body?.includes('pts') ||
-      body?.includes('Final') ||
-      body?.includes('Game ID') ||
-      body?.includes('Quarter');
-    expect(hasResults).toBe(true);
+    // Axis E: no networkidle — the web-first assertion below auto-waits for the
+    // results render. Axis C: assert the seed-grounded discriminator, not a loose
+    // any-of-seven-words body scan.
+    // renderGameResult() appends <strong>GAME ID: N</strong> to the card body.
+    // (renderGameReplay uses .text-center strong — different template.)
+    await expect(page.locator('.ibl-card__body')).toContainText(/GAME ID:/i, {
+      timeout: 10000,
+    });
+    // The module renders form + results on the same page; form intentionally stays.
     await assertNoPhpErrors(page, 'on OneOnOneGame results page');
   });
 

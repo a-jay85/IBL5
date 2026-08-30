@@ -305,87 +305,118 @@ final class StoreSimRecapCliTest extends DatabaseTestCase
         );
     }
 
-    // ── Validation guard tests ─────────────────────────────────────────────────
+    // ── box_id resolution tests ─────────────────────────────────────────────────
 
-    /**
-     * A payload whose game_date has no matching ibl_box_scores_teams row must be
-     * rejected before anything is written. Exit non-zero, stderr carries the
-     * validation failure, and the DB is untouched.
-     */
-    public function testUnmatchedGameRowsExitNonZeroWithoutWriting(): void
+    public function testIngestResolvesBoxIdFromTheNaturalKey(): void
     {
         $this->repo->queuePendingIfAbsent(self::SIM);
 
-        // 2025-01-02 has no seeded box-score row — validation must reject it.
-        $payloadBadDate = '{"intro_text":"Intro text.","outro_text":"Outro text.",'
-            . '"recap_text":"This is the recap text.","themes":["comeback"],'
-            . '"games":[{"season_year":2025,"game_date":"2025-01-02","visitor_teamid":1,'
-            . '"home_teamid":2,"game_of_that_day":1,"box_id":null,"sort_order":0,'
-            . '"recap_text":"Game recap text."}]}';
-
-        $result = $this->runScript(['--sim=' . self::SIM], $payloadBadDate);
-
-        self::assertNotSame(0, $result['exit_code'], 'exit must be non-zero when no box score matches');
-        self::assertStringContainsString(
-            'payload rejected',
-            $result['stderr'],
-            'stderr must contain "payload rejected"'
+        // setUp() seeded two team-side rows for 2025-01-01 / 1 / 2 / gotd=1. Capture the MIN id.
+        $minResult = $this->db->query(
+            "SELECT MIN(`id`) AS `box_id` FROM `ibl_box_scores_teams`"
+            . " WHERE `game_date` = '2025-01-01' AND `visitor_teamid` = 1"
+            . " AND `home_teamid` = 2 AND `game_of_that_day` = 1"
         );
-        self::assertStringContainsString(
-            'do not match an archived box score',
-            $result['stderr'],
-            'stderr must contain the validation failure message'
-        );
-        self::assertSame('', trim($result['stdout']), 'stdout must be empty — no {"ok":true} line');
-        self::assertCount(0, $this->repo->findGameRecaps(self::SIM), 'no game recap rows must be written');
+        $minRow = $minResult ? $minResult->fetch_assoc() : null;
+        self::assertNotNull($minRow);
+        $expectedBoxId = (int) ($minRow['box_id'] ?? 0);
+        self::assertGreaterThan(0, $expectedBoxId, 'setUp must have seeded at least one box-score row');
 
-        $summary = $this->repo->find(self::SIM);
-        self::assertTrue(
-            $summary === null || $summary['status'] !== 'done',
-            'ibl_sim_summaries row must be absent or not done'
-        );
+        $result = $this->runScript(['--sim=' . self::SIM], self::VALID_PAYLOAD);
+
+        self::assertSame(0, $result['exit_code'], 'exit must be 0 when ingest succeeds');
+        $recaps = $this->repo->findGameRecaps(self::SIM);
+        self::assertCount(1, $recaps);
+        self::assertSame($expectedBoxId, $recaps[0]['box_id'], 'Stored box_id must equal the MIN id of the two per-team-side rows');
     }
 
-    /**
-     * A payload that matches the date and teams of a real box score but carries the
-     * wrong game_of_that_day index must be rejected even though the game exists.
-     */
-    public function testWrongGameOfThatDayIsRejectedEvenThoughTheGameExists(): void
+    public function testIngestStoresNullBoxIdWhenNoBoxScoreMatches(): void
     {
         $this->repo->queuePendingIfAbsent(self::SIM);
 
-        // Date 2025-01-01, teams 1 vs 2 match the seeded box score, but gotd=3 does not.
-        $payloadWrongGotd = '{"intro_text":"Intro text.","outro_text":"Outro text.",'
+        // game_of_that_day=2 has no seeded box-score row (setUp seeds only gotd=1),
+        // so resolveBoxId() must return null and ingest must still succeed.
+        $payloadGotd2 = '{"intro_text":"Intro text.","outro_text":"Outro text.",'
             . '"recap_text":"This is the recap text.","themes":["comeback"],'
             . '"games":[{"season_year":2025,"game_date":"2025-01-01","visitor_teamid":1,'
-            . '"home_teamid":2,"game_of_that_day":3,"box_id":null,"sort_order":0,'
+            . '"home_teamid":2,"game_of_that_day":2,"box_id":null,"sort_order":0,'
             . '"recap_text":"Game recap text."}]}';
 
-        $result = $this->runScript(['--sim=' . self::SIM], $payloadWrongGotd);
+        $result = $this->runScript(['--sim=' . self::SIM], $payloadGotd2);
 
-        self::assertNotSame(0, $result['exit_code'], 'exit must be non-zero when game_of_that_day is wrong');
-        self::assertCount(0, $this->repo->findGameRecaps(self::SIM), 'no game recap rows must be written for wrong gotd');
+        self::assertSame(0, $result['exit_code'], 'exit must be 0 — a missing box score is a warning, not a rejection');
+        $summary = $this->repo->find(self::SIM);
+        self::assertNotNull($summary);
+        self::assertSame('done', $summary['status']);
+        $recaps = $this->repo->findGameRecaps(self::SIM);
+        self::assertCount(1, $recaps);
+        self::assertNull($recaps[0]['box_id'], 'box_id must be strictly null when no box score matches — not 0');
     }
 
-    /**
-     * Structural guard: validateGameRowsJoinToBoxScores must execute before markDone
-     * and before the Discord post, so a rejected payload can never reach either.
-     * This is a source-inspection test — no child process, no DB state.
-     */
-    public function testValidationFailureCannotReachTheDiscordPost(): void
+    public function testIngestIgnoresAnAgentSuppliedBoxIdAndReDerivesIt(): void
     {
-        $source = file_get_contents(dirname(__DIR__, 3) . '/scripts/storeSimRecap.php');
-        self::assertIsString($source);
+        $this->repo->queuePendingIfAbsent(self::SIM);
 
-        $validate = strpos($source, 'validateGameRowsJoinToBoxScores');
-        $markDone = strpos($source, '$repo->markDone(');
-        $discord  = strpos($source, 'Discord::postToChannel');
+        $minResult = $this->db->query(
+            "SELECT MIN(`id`) AS `box_id` FROM `ibl_box_scores_teams`"
+            . " WHERE `game_date` = '2025-01-01' AND `visitor_teamid` = 1"
+            . " AND `home_teamid` = 2 AND `game_of_that_day` = 1"
+        );
+        $minRow = $minResult ? $minResult->fetch_assoc() : null;
+        $expectedBoxId = (int) (($minRow ?? [])['box_id'] ?? 0);
 
-        self::assertIsInt($validate, 'The validator must be wired into the store script');
-        self::assertIsInt($markDone);
-        self::assertIsInt($discord);
-        self::assertLessThan($markDone, $validate, 'Validation must run before the write');
-        self::assertLessThan($discord, $markDone, 'The Discord post must stay downstream of the write');
+        $payloadWithBoxId = str_replace('"box_id":null', '"box_id":999999', self::VALID_PAYLOAD);
+        $result = $this->runScript(['--sim=' . self::SIM], $payloadWithBoxId);
+
+        self::assertSame(0, $result['exit_code']);
+        $recaps = $this->repo->findGameRecaps(self::SIM);
+        self::assertCount(1, $recaps);
+        self::assertSame($expectedBoxId, $recaps[0]['box_id'], 'Agent-supplied box_id must be discarded; stored value must be the re-derived MIN id');
+        self::assertNotSame(999999, $recaps[0]['box_id'], 'The hallucinated box_id must never reach the DB');
+    }
+
+    public function testIngestStoresEveryGameEvenWhenOnlySomeResolve(): void
+    {
+        $this->repo->queuePendingIfAbsent(self::SIM);
+
+        // setUp() seeded box scores for gotd=1; gotd=2 has none.
+        $twoGamePayload = '{"intro_text":"Intro text.","outro_text":"Outro text.","recap_text":"Recap.","themes":["comeback"],'
+            . '"games":['
+            . '{"season_year":2025,"game_date":"2025-01-01","visitor_teamid":1,"home_teamid":2,"game_of_that_day":1,"box_id":null,"sort_order":0,"recap_text":"Game 1 recap."},'
+            . '{"season_year":2025,"game_date":"2025-01-01","visitor_teamid":1,"home_teamid":2,"game_of_that_day":2,"box_id":null,"sort_order":1,"recap_text":"Game 2 recap."}'
+            . ']}';
+
+        $result = $this->runScript(['--sim=' . self::SIM], $twoGamePayload);
+
+        self::assertSame(0, $result['exit_code'], 'exit must be 0 — unresolvable games must not abort the transaction');
+        $recaps = $this->repo->findGameRecaps(self::SIM);
+        self::assertCount(2, $recaps, 'Both games must be stored even though only one resolves');
+        $byGotd = array_column($recaps, null, 'game_of_that_day');
+        self::assertIsInt($byGotd[1]['box_id'], 'gotd=1 must have a resolved box_id');
+        self::assertNull($byGotd[2]['box_id'], 'gotd=2 must have null box_id when no box score exists');
+    }
+
+    public function testIngestDoesNotTreatAQuoteBearingGameDateAsSql(): void
+    {
+        $this->repo->queuePendingIfAbsent(self::SIM);
+
+        $countBefore = (int) ($this->db->query("SELECT COUNT(*) AS `cnt` FROM `ibl_box_scores_teams`")?->fetch_assoc()['cnt'] ?? 0);
+
+        $maliciousPayload = '{"intro_text":"Intro text.","outro_text":"Outro text.","recap_text":"Recap.","themes":["comeback"],'
+            . '"games":[{"season_year":2025,"game_date":"2025-01-01\' OR \'1\'=\'1","visitor_teamid":1,"home_teamid":2,"game_of_that_day":1,"box_id":null,"sort_order":0,"recap_text":"Game recap."}]}';
+
+        $result = $this->runScript(['--sim=' . self::SIM], $maliciousPayload);
+
+        $countAfter = (int) ($this->db->query("SELECT COUNT(*) AS `cnt` FROM `ibl_box_scores_teams`")?->fetch_assoc()['cnt'] ?? 0);
+        self::assertSame($countBefore, $countAfter, 'ibl_box_scores_teams row count must be unchanged');
+
+        if ($result['exit_code'] === 0) {
+            $recaps = $this->repo->findGameRecaps(self::SIM);
+            if ($recaps !== []) {
+                self::assertNull($recaps[0]['box_id'], 'A quote-bearing date must never yield a stored box_id pointing at a real row');
+            }
+        }
+        // Non-zero exit is also acceptable — DATE column coercion may reject the malformed date.
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────────

@@ -21,15 +21,26 @@ test.describe('Olympics page smoke tests', () => {
   test('team page loads in Olympics context', async ({ page }) => {
     await page.goto('modules.php?name=Team&op=team&teamid=1&league=olympics');
     await assertNoPhpErrors(page, 'on modules.php?name=Team&op=team&teamid=1&league=olympics');
-    const body = await page.locator('body').textContent();
-    expect(body?.length).toBeGreaterThan(100);
+    // teamid=1 in Olympics context must resolve against ibl_olympics_team_info.
+    // Seed (Eagles) vs wtdb (USA) disagree on team name — using structural invariant per §1.2 rule 3.
+    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+    await expect(page.locator('h2').filter({ hasText: 'Current Season' }).first()).toBeVisible();
   });
 
   test('player page loads in Olympics context', async ({ page }) => {
     await page.goto('modules.php?name=Player&pa=showpage&pid=1&league=olympics');
     await assertNoPhpErrors(page, 'on modules.php?name=Player&pa=showpage&pid=1&league=olympics');
-    const body = await page.locator('body').textContent();
-    expect(body?.length).toBeGreaterThan(100);
+    // pid=1 must resolve against ibl_olympics_plr and render the player overview.
+    // The seeded name is the discriminator: a page-title-exists check passes on nearly
+    // every page, so assert the ci-seed literal 'Test Player' inside the scoped title.
+    // Player overview renders .player-stats-card (the game-log wrapper), not
+    // .ibl-data-table (that class belongs to standings/team pages).
+    //
+    // Regression pin for maintenance-backlog 6.24 (fixed in #2028):
+    // PlayerPageController::renderPage() must not fatal when the viewer's team is
+    // absent from the Olympics context. Do NOT relax this assertion.
+    await expect(page.locator('.ibl-title').first()).toHaveText('Test Player');
+    await expect(page.locator('.player-stats-card').first()).toBeVisible();
   });
 });
 

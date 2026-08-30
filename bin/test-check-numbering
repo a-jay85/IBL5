@@ -1,0 +1,345 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# test-check-numbering — behavioural harness for bin/check-numbering, the widened
+# allocators (bin/next-adr, bin/next-migration) and the merge=union attribute on
+# the ADR index.
+#
+# Each case builds a throwaway git repo under a temp dir, seeds a fixture, runs
+# the real script from a copy inside that repo, and asserts on the exit code.
+# The bin/ copies are deliberately left UNTRACKED so they never show up in
+# `git diff` / `git ls-tree` and pollute the very numbering the gate inspects.
+#
+# Run: bin/test-check-numbering  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BASE_TMP="$(mktemp -d)"
+trap 'rm -rf "$BASE_TMP"' EXIT
+
+FAILED=0
+REPO=""
+REPO_WT=""
+OUT="$BASE_TMP/out"
+
+expect() { # name want got
+    if [ "$3" -eq "$2" ]; then
+        echo "ok: $1 (exit $3)"
+    else
+        echo "FAIL: $1 — expected exit $2, got $3"
+        sed 's/^/      | /' "$OUT" 2>/dev/null | head -20
+        FAILED=1
+    fi
+}
+
+expect_out() { # name pattern
+    if grep -qE "$2" "$OUT"; then
+        echo "ok: $1"
+    else
+        echo "FAIL: $1 — output did not match /$2/"
+        sed 's/^/      | /' "$OUT" 2>/dev/null | head -20
+        FAILED=1
+    fi
+}
+
+expect_eq() { # name want got
+    if [ "$3" = "$2" ]; then
+        echo "ok: $1 ($3)"
+    else
+        echo "FAIL: $1 — expected '$2', got '$3'"
+        FAILED=1
+    fi
+}
+
+new_repo() {
+    REPO="$(mktemp -d "$BASE_TMP/repo.XXXXXX")"
+    REPO_WT="$REPO.wt"
+    mkdir -p "$REPO/bin/lib"
+    cp "$SCRIPT_DIR/check-numbering"    "$REPO/bin/check-numbering"
+    cp "$SCRIPT_DIR/next-adr"           "$REPO/bin/next-adr"
+    cp "$SCRIPT_DIR/next-migration"     "$REPO/bin/next-migration"
+    cp "$SCRIPT_DIR/lib/git-helpers.sh" "$REPO/bin/lib/git-helpers.sh"
+    chmod +x "$REPO/bin/check-numbering" "$REPO/bin/next-adr" "$REPO/bin/next-migration"
+    git -C "$REPO" init -q
+    git -C "$REPO" config user.email test@example.com
+    git -C "$REPO" config user.name "test"
+    git -C "$REPO" config commit.gpgsign false
+    # The 'apply' rebase backend is patch-based and ignores merge drivers
+    # entirely; the union-merge cases need the merge backend regardless of the
+    # invoking user's global config.
+    git -C "$REPO" config rebase.backend merge
+    mkdir -p "$REPO/ibl5/docs/decisions" "$REPO/ibl5/migrations"
+    echo base > "$REPO/README.md"
+    git -C "$REPO" add README.md
+    git -C "$REPO" commit -qm base
+}
+
+# seed <relpath>...  — create a placeholder file inside the throwaway repo.
+seed() {
+    local f
+    for f in "$@"; do
+        mkdir -p "$REPO/$(dirname "$f")"
+        echo "placeholder for $f" > "$REPO/$f"
+    done
+}
+
+# index <number>...  — write the ADR index with one table row per number, in
+# exactly the shape bin/check-numbering's Check 3 regex matches.
+index() {
+    local n
+    {
+        echo "# Architecture Decision Records"
+        echo
+        echo "## Index"
+        echo
+        echo "| ADR | Title | Status | Why it matters |"
+        echo "| --- | --- | --- | --- |"
+        for n in "$@"; do
+            echo "| [$n]($n-placeholder.md) | Placeholder $n | Accepted | Because. |"
+        done
+    } > "$REPO/ibl5/docs/decisions/README.md"
+}
+
+gadd()    { git -C "$REPO" add -- "$@"; }
+gcommit() { git -C "$REPO" commit -qm "$1"; }
+origin_master() { git -C "$REPO" update-ref refs/remotes/origin/master "$(git -C "$REPO" rev-parse HEAD)"; }
+
+# run_gate <args...> — always with cwd inside the repo: check-numbering does
+# `cd "$(git rev-parse --show-toplevel)"`, which follows cwd, not $0.
+run_gate() {
+    ( cd "$REPO" && ./bin/check-numbering "$@" ) > "$OUT" 2>&1
+    return $?
+}
+
+# probe_worktree — add a linked worktree with the untracked bin/ copies, because
+# both allocators refuse to run from a main checkout.
+probe_worktree() {
+    git -C "$REPO" worktree add -q "$REPO_WT" -b probe
+    mkdir -p "$REPO_WT/bin/lib"
+    cp "$SCRIPT_DIR/next-adr"           "$REPO_WT/bin/next-adr"
+    cp "$SCRIPT_DIR/next-migration"     "$REPO_WT/bin/next-migration"
+    cp "$SCRIPT_DIR/lib/git-helpers.sh" "$REPO_WT/bin/lib/git-helpers.sh"
+    chmod +x "$REPO_WT/bin/next-adr" "$REPO_WT/bin/next-migration"
+}
+
+echo "== bin/check-numbering =="
+
+# 1. Two ADRs sharing a number inside one staged diff.
+new_repo
+index 0001
+gadd ibl5/docs/decisions/README.md; gcommit index
+seed ibl5/docs/decisions/0400-alpha.md ibl5/docs/decisions/0400-beta.md
+gadd ibl5/docs/decisions/0400-alpha.md ibl5/docs/decisions/0400-beta.md
+run_gate; expect "dup-adr-in-diff" 1 $?
+expect_out "dup-adr-in-diff names both files" '0400-alpha\.md.*0400-beta\.md|0400-beta\.md.*0400-alpha\.md'
+
+# 2. Two migrations sharing a number inside one staged diff.
+new_repo
+seed ibl5/migrations/400_a.sql ibl5/migrations/400_b.sql
+gadd ibl5/migrations/400_a.sql ibl5/migrations/400_b.sql
+run_gate; expect "dup-migration-in-diff" 1 $?
+
+# 3. An added ADR whose number already exists on the base tree.
+new_repo
+seed ibl5/docs/decisions/0400-alpha.md
+gadd ibl5/docs/decisions/0400-alpha.md; gcommit base-adr; origin_master
+seed ibl5/docs/decisions/0400-beta.md
+gadd ibl5/docs/decisions/0400-beta.md; gcommit branch-adr
+run_gate --since=refs/remotes/origin/master; expect "adr-collides-with-base" 1 $?
+expect_out "adr-collides-with-base says already on base" 'already on base'
+
+# 4. Same for migrations.
+new_repo
+seed ibl5/migrations/400_a.sql
+gadd ibl5/migrations/400_a.sql; gcommit base-mig; origin_master
+seed ibl5/migrations/400_b.sql
+gadd ibl5/migrations/400_b.sql; gcommit branch-mig
+run_gate --since=refs/remotes/origin/master; expect "migration-collides-with-base" 1 $?
+
+# 5. Collision across file extensions (.php on base, .sql on the branch).
+new_repo
+seed ibl5/migrations/400_a.php
+gadd ibl5/migrations/400_a.php; gcommit base-php; origin_master
+seed ibl5/migrations/400_b.sql
+gadd ibl5/migrations/400_b.sql; gcommit branch-sql
+run_gate --since=refs/remotes/origin/master; expect "cross-extension-collision" 1 $?
+
+# 6. The happy path: one genuinely new number.
+new_repo
+seed ibl5/docs/decisions/0400-alpha.md
+gadd ibl5/docs/decisions/0400-alpha.md; gcommit base-adr; origin_master
+seed ibl5/docs/decisions/0401-beta.md
+gadd ibl5/docs/decisions/0401-beta.md; gcommit branch-adr
+run_gate --since=refs/remotes/origin/master; expect "single-new-adr-passes" 0 $?
+
+# 7. A letter suffix is a distinct number, not a duplicate: 045b != 045.
+new_repo
+seed ibl5/migrations/045_a.sql
+gadd ibl5/migrations/045_a.sql; gcommit base-mig; origin_master
+seed ibl5/migrations/045b_b.sql
+gadd ibl5/migrations/045b_b.sql; gcommit branch-mig
+run_gate --since=refs/remotes/origin/master; expect "letter-suffix-not-a-duplicate" 0 $?
+
+# 8. 0000-template.md carries no number and never collides.
+new_repo
+seed ibl5/docs/decisions/0000-template.md
+gadd ibl5/docs/decisions/0000-template.md; gcommit base-template; origin_master
+seed ibl5/docs/decisions/0400-x.md
+gadd ibl5/docs/decisions/0400-x.md; gcommit branch-adr
+run_gate --since=refs/remotes/origin/master; expect "template-excluded" 0 $?
+
+# 9. A duplicated row in the ADR index, with no duplicated file.
+new_repo
+seed ibl5/docs/decisions/0400-a.md
+index 0400 0400
+gadd ibl5/docs/decisions/0400-a.md ibl5/docs/decisions/README.md; gcommit dup-row
+run_gate --all; expect "dup-index-row" 1 $?
+expect_out "dup-index-row names the row" '0400: duplicated row'
+
+# 10. A clean index passes.
+new_repo
+seed ibl5/docs/decisions/0400-a.md ibl5/docs/decisions/0401-b.md
+index 0400 0401
+gadd ibl5/docs/decisions/0400-a.md ibl5/docs/decisions/0401-b.md ibl5/docs/decisions/README.md
+gcommit clean-rows
+run_gate --all; expect "clean-index-rows" 0 $?
+
+echo "== merge=union on the ADR index =="
+
+# 11. Two branches appending different index rows rebase without a conflict.
+new_repo
+printf 'ibl5/docs/decisions/README.md merge=union\n' > "$REPO/.gitattributes"
+index 0400 0401
+gadd .gitattributes ibl5/docs/decisions/README.md; gcommit base-index
+BASE_SHA="$(git -C "$REPO" rev-parse HEAD)"
+git -C "$REPO" checkout -q -b branch-a
+echo '| [0402](0402-a.md) | Placeholder 0402 | Accepted | Because. |' >> "$REPO/ibl5/docs/decisions/README.md"
+gadd ibl5/docs/decisions/README.md; gcommit append-a
+git -C "$REPO" checkout -q -b branch-b "$BASE_SHA"
+echo '| [0403](0403-b.md) | Placeholder 0403 | Accepted | Because. |' >> "$REPO/ibl5/docs/decisions/README.md"
+gadd ibl5/docs/decisions/README.md; gcommit append-b
+( cd "$REPO" && git rebase branch-a ) > "$OUT" 2>&1
+expect "union-merge-concurrent-appends rebases clean" 0 $?
+CONFLICTS="$(grep -c '<<<<<<<' "$REPO/ibl5/docs/decisions/README.md" || true)"
+expect_eq "union-merge leaves no conflict markers" "0" "$CONFLICTS"
+ROWS="$(grep -cE '^\| \[04(00|01|02|03)\]\(' "$REPO/ibl5/docs/decisions/README.md" || true)"
+expect_eq "union-merge keeps all four rows" "4" "$ROWS"
+
+# 11b. Control: the identical sequence without .gitattributes must conflict, so
+#      the case above is proving the attribute and not a git default.
+new_repo
+index 0400 0401
+gadd ibl5/docs/decisions/README.md; gcommit base-index
+BASE_SHA="$(git -C "$REPO" rev-parse HEAD)"
+git -C "$REPO" checkout -q -b branch-a
+echo '| [0402](0402-a.md) | Placeholder 0402 | Accepted | Because. |' >> "$REPO/ibl5/docs/decisions/README.md"
+gadd ibl5/docs/decisions/README.md; gcommit append-a
+git -C "$REPO" checkout -q -b branch-b "$BASE_SHA"
+echo '| [0403](0403-b.md) | Placeholder 0403 | Accepted | Because. |' >> "$REPO/ibl5/docs/decisions/README.md"
+gadd ibl5/docs/decisions/README.md; gcommit append-b
+( cd "$REPO" && git rebase branch-a ) > "$OUT" 2>&1
+RC=$?
+( cd "$REPO" && git rebase --abort >/dev/null 2>&1 ) || true
+if [ "$RC" -ne 0 ]; then
+    echo "ok: no-gitattributes-control conflicts (exit $RC)"
+else
+    echo "FAIL: no-gitattributes-control — expected a rebase conflict, got exit 0"
+    FAILED=1
+fi
+
+# 12. Union merge can duplicate a row when one side edits instead of appending;
+#     bin/check-numbering is the backstop that catches it.
+new_repo
+printf 'ibl5/docs/decisions/README.md merge=union\n' > "$REPO/.gitattributes"
+seed ibl5/docs/decisions/0400-a.md ibl5/docs/decisions/0401-b.md
+index 0400 0401
+gadd .gitattributes ibl5/docs/decisions/README.md ibl5/docs/decisions/0400-a.md ibl5/docs/decisions/0401-b.md
+gcommit base-index
+BASE_SHA="$(git -C "$REPO" rev-parse HEAD)"
+git -C "$REPO" checkout -q -b branch-s
+sed -i.bak 's/| \[0401\](0401-placeholder.md) | Placeholder 0401 | Accepted |/| [0401](0401-placeholder.md) | Placeholder 0401 | Superseded |/' \
+    "$REPO/ibl5/docs/decisions/README.md"
+rm -f "$REPO/ibl5/docs/decisions/README.md.bak"
+gadd ibl5/docs/decisions/README.md; gcommit supersede-0401
+git -C "$REPO" checkout -q -b branch-b2 "$BASE_SHA"
+echo '| [0402](0402-c.md) | Placeholder 0402 | Accepted | Because. |' >> "$REPO/ibl5/docs/decisions/README.md"
+seed ibl5/docs/decisions/0402-c.md
+gadd ibl5/docs/decisions/README.md ibl5/docs/decisions/0402-c.md; gcommit append-0402
+( cd "$REPO" && git rebase branch-s ) > "$OUT" 2>&1
+expect "union-merge-corruption rebases clean" 0 $?
+run_gate --all; expect "union-merge-corruption-is-caught" 1 $?
+expect_out "union-merge-corruption names a duplicated row" 'duplicated row'
+
+echo "== allocators =="
+
+# 13. bin/next-adr sees a number that exists only on an origin ref.
+new_repo
+seed ibl5/docs/decisions/0000-template.md ibl5/docs/decisions/0400-a.md
+gadd ibl5/docs/decisions/0000-template.md ibl5/docs/decisions/0400-a.md; gcommit base-adr
+git -C "$REPO" checkout -q -b other
+seed ibl5/docs/decisions/0401-b.md
+gadd ibl5/docs/decisions/0401-b.md; gcommit other-adr
+git -C "$REPO" update-ref refs/remotes/origin/other "$(git -C "$REPO" rev-parse HEAD)"
+git -C "$REPO" checkout -q -
+probe_worktree
+ALLOC="$( ( cd "$REPO_WT" && ./bin/next-adr some-new-slug ) 2>"$OUT" )"
+expect_eq "allocator-sees-origin-ref" "0402-some-new-slug.md" "$(basename "${ALLOC:-none}")"
+
+# 14. The same allocation with every network door nailed shut, under a timeout:
+#     if the allocator ever reached out, this hangs or fails.
+git -C "$REPO_WT" checkout -q -- . 2>/dev/null || true
+rm -f "$REPO_WT/ibl5/docs/decisions/0402-some-new-slug.md"
+ALLOC_OFFLINE="$(
+    ( cd "$REPO_WT" \
+        && GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND=/bin/false GIT_ASKPASS=/bin/false \
+           timeout 20 ./bin/next-adr some-new-slug ) 2>"$OUT"
+)"
+expect_eq "allocator-is-offline" "0402-some-new-slug.md" "$(basename "${ALLOC_OFFLINE:-none}")"
+git -C "$REPO" update-ref -d refs/remotes/origin/other
+
+# 15. bin/next-migration's number parser: a letter-suffixed migration counts,
+#     a timestamp-prefixed file does not.
+new_repo
+seed ibl5/migrations/001_first.sql
+gadd ibl5/migrations/001_first.sql; gcommit base-mig
+probe_worktree
+seed_wt() { local f; for f in "$@"; do mkdir -p "$REPO_WT/$(dirname "$f")"; echo x > "$REPO_WT/$f"; done; }
+seed_wt ibl5/migrations/037c_x.sql ibl5/migrations/20260818_120000_y.sql
+NEXT_MIG="$( ( cd "$REPO_WT" && ./bin/next-migration ) 2>"$OUT" )"
+expect_eq "next-migration skips timestamp names, honours letter suffix" "038" "${NEXT_MIG:-none}"
+
+echo "== CI wiring =="
+
+# 16. The paths-filter that gates bin/check-numbering must cover both numbered
+#     directories with an extension-agnostic glob. Grep-based on purpose: this
+#     runs in CI and must not depend on a YAML library being installed.
+WORKFLOW="$SCRIPT_DIR/../.github/workflows/pr-meta-checks.yml"
+FILTER_BLOCK="$(awk '
+    /^ *numbering: *$/ { f = 1; next }
+    f && /^ *[a-zA-Z_-]+: *$/ { f = 0 }
+    f { print }
+' "$WORKFLOW")"
+for GLOB in "ibl5/docs/decisions/\*\*" "ibl5/migrations/\*\*"; do
+    if printf '%s\n' "$FILTER_BLOCK" | grep -qF "$(printf '%s' "$GLOB" | tr -d '\\')"; then
+        echo "ok: numbering filter covers $(printf '%s' "$GLOB" | tr -d '\\')"
+    else
+        echo "FAIL: numbering filter is missing $(printf '%s' "$GLOB" | tr -d '\\')"
+        FAILED=1
+    fi
+done
+if grep -q "steps.filter.outputs.numbering == 'true'" "$WORKFLOW" \
+    && grep -q 'run: bin/check-numbering --since=' "$WORKFLOW"; then
+    echo "ok: check-numbering step is wired to the numbering filter"
+else
+    echo "FAIL: check-numbering step is not wired to the numbering filter"
+    FAILED=1
+fi
+
+echo
+if [ "$FAILED" -ne 0 ]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

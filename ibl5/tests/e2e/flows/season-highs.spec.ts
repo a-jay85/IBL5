@@ -37,7 +37,9 @@ test.describe('Season Highs flow', () => {
     const table = page.locator('.stat-table, .ibl-data-table').first();
     await expect(table).toBeVisible();
     const headerText = await table.locator('thead').textContent();
-    expect(headerText!.length).toBeGreaterThan(0);
+    // [rendered] SeasonHighs first table thead: 'POINTS'. PHP-emitted static label — env-independent.
+    expect(headerText).toContain('POINTS');
+    expect(await table.locator('thead th').count()).toBeGreaterThanOrEqual(1);
   });
 
   test('player links navigate to valid player pages', async ({ page }) => {

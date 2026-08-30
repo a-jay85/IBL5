@@ -1,3 +1,8 @@
 ibl5/migrations/*.sql linguist-generated=true
 docker/entrypoint.sh text eol=lf
 bin/* text eol=lf
+
+# ADR index rows are append-only; union merge keeps both sides of a concurrent
+# append instead of raising a rebase conflict. Duplicate rows that union can
+# produce from a non-append edit are caught by bin/check-numbering.
+ibl5/docs/decisions/README.md merge=union

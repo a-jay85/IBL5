@@ -831,6 +831,8 @@ jobs:
         run: bin/test-backlog-open
       - name: bin/test-adr-check
         run: bin/test-adr-check
+      - name: bin/test-check-numbering
+        run: bin/test-check-numbering
       - name: bin/test-postplan-arm-conditions
         run: bin/test-postplan-arm-conditions
       - name: bin/test-docfix-run

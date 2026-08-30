@@ -28,28 +28,45 @@ fi
 # .php data migrations and .md notes too (168_delete_phantom_season2008_boxscores.php,
 # 007_enable_native_types.md). A .sql-only scan hands out a number that is
 # already taken -- on 168 it returned 167, so the next allocation collided.
+# Max migration number from a stream of BASENAMES on stdin. Split out of get_max
+# so the same grammar applies to names read off a directory, off a remote-tracking
+# ref, and out of a sibling worktree. The extension is NOT part of the filter: the
+# numbered namespace spans .sql, .php and .md. The `^[0-9]{1,3}[a-z]?_` filter runs
+# FIRST so a stray timestamp-style name (20260818_120000_*.sql) cannot masquerade
+# as a 20-million-high maximum, then the numeric prefix is extracted with the
+# legacy letter suffix dropped.
+max_from_names() {
+    grep -E '^[0-9]{1,3}[a-z]?_' \
+        | grep -oE '^[0-9]{1,3}' | sort -n | tail -1
+}
+
 get_max() {
     local dir="$1"
     if [ -d "$dir" ]; then
-        printf '%s\n' "$dir"/* | sed 's|.*/||' \
-            | grep -E '^[0-9]{1,3}[a-z]?_' \
-            | grep -oE '^[0-9]{1,3}' | sort -n | tail -1
+        printf '%s\n' "$dir"/* | sed 's|.*/||' | max_from_names
     fi
 }
 
 MAX_MAIN=$(get_max "$MAIN_DIR")
 MAX_CANONICAL=$(get_max "$CANONICAL_DIR")
+# Numbers claimed on a pushed-but-unmerged branch, and in a sibling worktree.
+# Both scans are strictly local (see lib/git-helpers.sh).
+MAX_ORIGIN=$(scan_origin_refs ibl5/migrations "$REPO_ROOT" | max_from_names)
+MAX_WTS=$(scan_worktrees ibl5/migrations "$REPO_ROOT" | max_from_names)
 
-# Use the higher of the two
-if [ -z "$MAX_MAIN" ] && [ -z "$MAX_CANONICAL" ]; then
+# Use the highest seen anywhere
+if [ -z "$MAX_MAIN" ] && [ -z "$MAX_CANONICAL" ] \
+    && [ -z "$MAX_ORIGIN" ] && [ -z "$MAX_WTS" ]; then
     echo "No migrations found" >&2
     exit 1
 fi
 
-MAX=$MAX_MAIN
-if [ -n "$MAX_CANONICAL" ] && [ "$MAX_CANONICAL" -gt "${MAX:-0}" ] 2>/dev/null; then
-    MAX=$MAX_CANONICAL
-fi
+MAX=${MAX_MAIN:-0}
+for CANDIDATE in "$MAX_CANONICAL" "$MAX_ORIGIN" "$MAX_WTS"; do
+    if [ -n "$CANDIDATE" ] && [ "$((10#$CANDIDATE))" -gt "$((10#$MAX))" ]; then
+        MAX=$CANDIDATE
+    fi
+done
 
 NEXT=$((10#$MAX + 1))
 PADDED=$(printf "%03d" "$NEXT")

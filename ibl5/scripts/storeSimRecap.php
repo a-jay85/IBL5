@@ -88,18 +88,22 @@ try {
     fail('malformed payload: ' . $e->getMessage());
 }
 
-// ── Validate against the archive (fail closed BEFORE anything is written) ─────
-// Structural validity is not enough. Sim 725's payload parsed cleanly and stored
-// 49 rows, but every row carried game_of_that_day = 1, so the display filter
-// matched one game per date and 42 recaps became unreachable. A payload whose
-// games cannot render must never become a row. Nothing below this point runs on
-// failure: fail() is `never`, the write is downstream, and the Discord post is
-// downstream of the write — so an aborted store posts nothing.
 $repo = new \SimRecap\SimSummaryRepository($mysqli_db);
-try {
-    $repo->validateGameRowsJoinToBoxScores($payload->getGames());
-} catch (\Throwable $e) {
-    fail('payload rejected: ' . $e->getMessage());
+
+// ── Resolve each game's box_id from its natural key ───────────────────────────
+// The payload's own `box_id` is agent-supplied and is IGNORED: it is overwritten
+// unconditionally, so a hallucinated or stale pointer can never reach the DB.
+// A game whose key matches no archived box score resolves to NULL and is STILL
+// stored — a missing box score is a warning at read time, never a rejected sim.
+$games = [];
+foreach ($payload->getGames() as $game) {
+    $game['box_id'] = $repo->resolveBoxId(
+        $game['game_date'],
+        $game['visitor_teamid'],
+        $game['home_teamid'],
+        $game['game_of_that_day']
+    );
+    $games[] = $game;
 }
 
 // ── Write, then confirm ───────────────────────────────────────────────────────
@@ -108,7 +112,7 @@ $repo->markDone(
     $payload->getIntroText(),
     $payload->getOutroText(),
     $payload->getRecapText(),
-    $payload->getGames(),
+    $games,
     $payload->getThemesJson()
 );
 $row = $repo->find($sim);
@@ -134,5 +138,5 @@ $viewerUrl = $host === ''
 \Discord\Discord::postToChannel('#admin-chat', "Sim {$sim} recap is ready for review: {$viewerUrl}");
 
 // ── Success output ────────────────────────────────────────────────────────────
-echo json_encode(['ok' => true, 'sim' => $sim, 'games' => count($payload->getGames()), 'url' => $viewerUrl]), "\n";
+echo json_encode(['ok' => true, 'sim' => $sim, 'games' => count($games), 'url' => $viewerUrl]), "\n";
 exit(0);

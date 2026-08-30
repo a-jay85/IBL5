@@ -1,6 +1,6 @@
 ---
 description: The visual-review gallery is built from rows whose PR render differs from master's committed baseline (read via git show <base.sha>:<snapshot>), not from Playwright cells that failed pixel comparison; this makes the gallery immune to a baseline regen into the PR branch and lets it publish on pass OR fail.
-last_verified: 2026-06-30
+last_verified: 2026-08-30
 ---
 
 # ADR-0074: Change-driven visual-review gallery (render-diff, not comparison-failure)

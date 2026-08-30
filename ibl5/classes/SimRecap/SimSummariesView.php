@@ -22,13 +22,14 @@ use Security\HtmlSanitizer;
 class SimSummariesView
 {
     /**
-     * @param list<array<string, mixed>> $rows         From SimSummaryRepository::listAll()
-     * @param array<string, mixed>|null  $recap        From SimSummaryRepository::find(), or null
-     * @param list<array<string, mixed>> $gameRecaps   From SimSummaryRepository::findDisplayableGameRecaps(), sorted by sort_order
-     * @param string|null                $error        'malformed' | 'notfound' | null
-     * @param int|null                   $requestedSim The validated sim behind a 'notfound' notice
+     * @param list<array<string, mixed>> $rows          From SimSummaryRepository::listAll()
+     * @param array<string, mixed>|null  $recap         From SimSummaryRepository::find(), or null
+     * @param list<array<string, mixed>> $gameRecaps    From SimSummaryRepository::findDisplayableGameRecaps(), sorted by sort_order
+     * @param string|null                $error         'malformed' | 'notfound' | null
+     * @param int|null                   $requestedSim  The validated sim behind a 'notfound' notice
+     * @param list<array<string, mixed>> $orphanedGames From SimSummaryRepository::findOrphanedGameRecaps()
      */
-    public function render(array $rows, ?array $recap, array $gameRecaps, ?string $error, ?int $requestedSim = null): string
+    public function render(array $rows, ?array $recap, array $gameRecaps, ?string $error, ?int $requestedSim = null, array $orphanedGames = []): string
     {
         ob_start();
         ?>
@@ -87,6 +88,22 @@ class SimSummariesView
         <h2 class="ibl-title">Sim <?= HtmlSanitizer::e($recap['sim'] ?? '') ?></h2>
         <p>Status: <?= HtmlSanitizer::e($recap['status'] ?? '') ?> · Attempts: <?= HtmlSanitizer::e($recap['attempts'] ?? '') ?> · Generated: <?= HtmlSanitizer::e($recap['generated_at'] ?? '—') ?></p>
         <p id="recap-themes">Themes: <?= HtmlSanitizer::e($this->themeSummary($recap)) ?></p>
+<?php if ($orphanedGames !== []): ?>
+        <div id="recap-orphan-warning" class="ibl-card bg-yellow-50 border border-yellow-400 text-yellow-900">
+            <p><strong>Warning:</strong> <?= HtmlSanitizer::e(count($orphanedGames)) ?> <?= HtmlSanitizer::e(count($orphanedGames) === 1 ? 'game' : 'games') ?> in this sim recap could not be matched to a box score and <?= HtmlSanitizer::e(count($orphanedGames) === 1 ? 'is' : 'are') ?> omitted from the postable document. Unresolvable keys:</p>
+            <ul>
+<?php foreach ($orphanedGames as $orphan): ?>
+<?php
+            $oDate = $orphan['game_date'] ?? null;
+            $oVid  = $orphan['visitor_teamid'] ?? null;
+            $oHid  = $orphan['home_teamid'] ?? null;
+            $oGotd = $orphan['game_of_that_day'] ?? null;
+?>
+            <li class="recap-orphan"><?= HtmlSanitizer::e(is_string($oDate) ? $oDate : '') ?> · team <?= HtmlSanitizer::e(is_scalar($oVid) ? (string) $oVid : '') ?> at team <?= HtmlSanitizer::e(is_scalar($oHid) ? (string) $oHid : '') ?> · game <?= HtmlSanitizer::e(is_scalar($oGotd) ? (string) $oGotd : '') ?> of that day</li>
+<?php endforeach; ?>
+            </ul>
+        </div>
+<?php endif; ?>
 <?php $body = $recap['recap_text'] ?? null; ?>
 <?php if (!is_string($body)): ?>
         <p id="recap-missing">No recap text stored yet — status: <?= HtmlSanitizer::e($recap['status'] ?? '') ?>.</p>

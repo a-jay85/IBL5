@@ -67,10 +67,12 @@ if ($wantsTxt) {
         is_string($outroText) ? $outroText : null,
         (string) $row['recap_text']
     );
+    $orphanCount = count($repo->findOrphanedGameRecaps($sim));
 
     header('Content-Type: text/plain; charset=utf-8');
     header('Content-Disposition: attachment; filename="sim-' . $sim . '-recap.txt"');
     header('X-Content-Type-Options: nosniff');
+    header('X-Recap-Orphaned-Games: ' . $orphanCount);
     echo $document;
     exit;
 }
@@ -79,9 +81,11 @@ $rows = $repo->listAll();
 
 // Per-game recaps only accompany a stored envelope body; a pending/failed row
 // renders its status message instead of a game list (plan Phase 3b).
-$gameRecaps = [];
+$gameRecaps    = [];
+$orphanedGames = [];
 if ($sim !== null && $row !== null && $row['recap_text'] !== null) {
-    $gameRecaps = $repo->findDisplayableGameRecaps($sim);
+    $gameRecaps    = $repo->findDisplayableGameRecaps($sim);
+    $orphanedGames = $repo->findOrphanedGameRecaps($sim);
 }
 
 if ($simError === 'malformed') {
@@ -91,4 +95,4 @@ if ($simError === 'malformed') {
 }
 
 // $sim is passed so the 'notfound' notice can name the sim it could not find.
-echo (new \SimRecap\SimSummariesView())->render($rows, $row, $gameRecaps, $simError, $sim);
+echo (new \SimRecap\SimSummariesView())->render($rows, $row, $gameRecaps, $simError, $sim, $orphanedGames);

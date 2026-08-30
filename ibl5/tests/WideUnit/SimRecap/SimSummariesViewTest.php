@@ -349,4 +349,65 @@ final class SimSummariesViewTest extends TestCase
         // The short teaser is not the textarea content.
         self::assertNotSame('Short teaser.', $body);
     }
+
+    public function testRendersOrphanWarningWhenGamesAreUnmatched(): void
+    {
+        $orphan1 = ['game_date' => '2026-03-11', 'visitor_teamid' => 5, 'home_teamid' => 3, 'game_of_that_day' => 0, 'sort_order' => 1, 'box_id' => null];
+        $orphan2 = ['game_date' => '2026-03-12', 'visitor_teamid' => 7, 'home_teamid' => 9, 'game_of_that_day' => 1, 'sort_order' => 2, 'box_id' => null];
+        $html = $this->view->render([], $this->recapRow('Body.'), [], null, null, [$orphan1, $orphan2]);
+
+        self::assertStringContainsString('id="recap-orphan-warning"', $html);
+        self::assertStringContainsString('2 games', $html);
+        self::assertSame(2, substr_count($html, 'class="recap-orphan"'));
+        self::assertStringContainsString('2026-03-11', $html);
+        self::assertStringContainsString('2026-03-12', $html);
+        self::assertStringContainsString('team 5', $html);
+        self::assertStringContainsString('team 3', $html);
+    }
+
+    public function testDoesNotRenderOrphanWarningWhenNoGamesAreOrphaned(): void
+    {
+        $htmlEmpty = $this->view->render([], $this->recapRow('Body.'), [], null, null, []);
+        self::assertStringNotContainsString('recap-orphan-warning', $htmlEmpty);
+
+        $htmlFiveArgs = $this->view->render([], $this->recapRow('Body.'), [], null, null);
+        self::assertStringNotContainsString('recap-orphan-warning', $htmlFiveArgs);
+    }
+
+    public function testEscapesOrphanKeyValues(): void
+    {
+        $orphan = [
+            'game_date'        => '<script>alert(1)</script>',
+            'visitor_teamid'   => '"><img src=x onerror=alert(1)>',
+            'home_teamid'      => 2,
+            'game_of_that_day' => 0,
+            'sort_order'       => 0,
+            'box_id'           => null,
+        ];
+        $html = $this->view->render([], $this->recapRow('Body.'), [], null, null, [$orphan]);
+
+        self::assertStringContainsString('&lt;script&gt;', $html, 'game_date script tag must be escaped');
+        self::assertStringNotContainsString('<script>alert(1)</script>', $html);
+        self::assertStringContainsString('&quot;&gt;&lt;img', $html, 'visitor_teamid breakout payload must be escaped');
+        self::assertStringNotContainsString('onerror=alert(1)>', $html);
+    }
+
+    public function testRendersSingularCopyForASingleOrphan(): void
+    {
+        $orphan = ['game_date' => '2026-03-11', 'visitor_teamid' => 5, 'home_teamid' => 3, 'game_of_that_day' => 0, 'sort_order' => 0, 'box_id' => null];
+        $html = $this->view->render([], $this->recapRow('Body.'), [], null, null, [$orphan]);
+
+        self::assertStringContainsString('1 game', $html, 'Single orphan must render "1 game"');
+        self::assertStringNotContainsString('1 games', $html, 'Must not render "1 games"');
+        self::assertStringContainsString('is omitted', $html, 'Single orphan must render "is omitted"');
+        self::assertStringNotContainsString('are omitted', $html);
+    }
+
+    public function testToleratesAnOrphanRowWithMissingKeyColumns(): void
+    {
+        $orphan = ['visitor_teamid' => 5, 'home_teamid' => null, 'game_of_that_day' => 0, 'sort_order' => 0, 'box_id' => null];
+        $html = $this->view->render([], $this->recapRow('Body.'), [], null, null, [$orphan]);
+
+        self::assertStringContainsString('class="recap-orphan"', $html, 'The orphan list item must still render');
+    }
 }

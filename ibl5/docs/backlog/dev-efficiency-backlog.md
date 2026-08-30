@@ -104,7 +104,7 @@ last_verified: 2026-08-30
 
 ➜ E12 `bin/wt-new` fails with misleading error when invoked from inside a worktree — ✅ Implemented (2026-08-19): see [archive](archive/dev-efficiency-backlog-archive.md).
 
-➜ E13 `bin/wt-new --base <branch>` fast-forwards the wrong branch — ✅ Implemented (2026-08-30): `bin/wt-new` now detects whether `$BASE_BRANCH` is checked out in the main checkout; if not, uses `fetch origin "$BASE_BRANCH:$BASE_BRANCH"` to fast-forward the local ref directly. `bin/test-wt-new-root` extended with Case 3 regression pin. Shipped in PR `wt-new-base-branch-sync`.
+➜ E13 `bin/wt-new --base <branch>` fast-forwards the wrong branch — ✅ Implemented (2026-08-30): see [archive](archive/dev-efficiency-backlog-archive.md).
 
 ➜ E14 `/pr-ready` Monitor exemption in invariants is stale — ✅ Implemented (2026-08-25): see [archive](archive/dev-efficiency-backlog-archive.md).
 

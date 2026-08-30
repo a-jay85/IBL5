@@ -644,4 +644,187 @@ class BoxscoreImportCharacterizationTest extends TestCase
             'INSERT ibl_box_scores_teams VALUES( (\'2026-02-02\',\'Sophomores\',1,40,41,18000,20000,10,5,5,10,25,30,28,27,0,22,31,25,30,0,0,0,0,0,0,0,0,0,0,0,0,0,0))',
         ], $this->opDigest($db));
     }
+    // ── Phase 3: ScheduleMembershipGuard pins ──────────────────────────────
+
+    /**
+     * Inject an ibl_schedule index into the mock DB so the guard is ENABLED.
+     *
+     * The guard sources its schedule through the real BoxscoreRepository, so the
+     * only injection seam available to this file (which may drive nothing but the
+     * four public entry points) is the DB itself. The pattern is deliberately
+     * anchored on SELECT DISTINCT ... ibl_schedule so it stays disjoint from the
+     * ibl_box_scores_teams registrations the import pins use.
+     *
+     * @param list<array{game_date: string, visitor_teamid: int, home_teamid: int}> $rows
+     */
+    private function injectScheduleIndex(MockDatabase $db, array $rows): void
+    {
+        $db->onQuery('(?s)SELECT DISTINCT.*ibl_schedule', $rows);
+    }
+
+    public function testUnscheduledGameIsRejectedWithZeroDatabaseWrites(): void
+    {
+        $db = new MockDatabase();
+        $db->setReturnTrue(true);
+        $db->onQuery('(?s)SELECT.*ibl_box_scores_teams.*LIMIT 1', []);
+        // Schedule holds a DIFFERENT matchup on the same date, so the imported
+        // game (visitor 1 vs home 2) is genuinely absent from the schedule.
+        // November, not the default October: guard Rule 3 exempts months 8/9/10
+        // (Olympics, Preseason, HEAT), so an October date fails the guard open.
+        // The date is 2025-11-15, not 2026-11-15: fillGameInfo() resolves months
+        // after October to the season's STARTING year. Same date as the imported
+        // game, different matchup — so the reject is proven on the full triple,
+        // not on a date the schedule simply never mentions.
+        $this->injectScheduleIndex($db, [
+            ['game_date' => '2025-11-15', 'visitor_teamid' => 5, 'home_teamid' => 6],
+        ]);
+
+        $seasonStub = self::createStub(Season::class);
+        $repository = new BoxscoreRepository($db);
+        $processor = new BoxscoreProcessor($db, $repository, $seasonStub);
+
+        $scoFile = $this->buildScoFileWithOneGame($this->buildGameInfoLine(1, 14));
+        $data = file_get_contents($scoFile);
+        $this->assertIsString($data);
+
+        $result = $processor->processScoData($data, 2026, 'Regular Season/Playoffs', skipSimDates: true);
+
+        // Negative half: without this, a season-year mismatch would fail the guard
+        // open and turn this pin into a silently-passing accept pin.
+        $this->assertTrue($result['scheduleGuardEnabled']);
+        $this->assertSame(1, $result['gamesRejected']);
+        $this->assertSame(0, $result['gamesInserted']);
+        $this->assertSame(0, $result['gamesUpdated']);
+        $this->assertCount(1, $result['rejectedGames']);
+
+        // Zero boxscore writes — this is the pin that would have caught the 621
+        // phantom rows. The schedule_guard_rejects audit INSERT is the guard's own
+        // bookkeeping and is asserted separately below.
+        $boxscoreMutations = array_values(array_filter(
+            $this->opDigest($db),
+            static fn (string $entry): bool
+                => (bool) preg_match('/^(INSERT|UPDATE|DELETE) ibl_box_scores/', $entry)
+        ));
+        $this->assertSame([], $boxscoreMutations);
+
+        $this->assertContains(
+            '1 game(s) rejected: not on the 2026 schedule, or duplicate of an existing game at a different game_of_that_day.',
+            $result['messages']
+        );
+    }
+
+    public function testScheduledGamePassesGuardAndImportsNormally(): void
+    {
+        $db = new MockDatabase();
+        $db->setReturnTrue(true);
+        $db->onQuery('(?s)SELECT.*ibl_box_scores_teams.*LIMIT 1', []);
+        // Inject the exact triple that the game fixture encodes.
+        // buildGameInfoLine(1, 14) → monthOffset=1 (+10=11) which is > 10, so fillGameInfo
+        // uses seasonStartingYear (2026-1=2025), giving gameDate='2025-11-15'.
+        // visitor_teamid = 0-indexed 00 + 1 = 1; home_teamid = 0-indexed 01 + 1 = 2.
+        // The guard is enabled (non-empty index) and the game IS in the schedule → passes.
+        $this->injectScheduleIndex($db, [
+            ['game_date' => '2025-11-15', 'visitor_teamid' => 1, 'home_teamid' => 2],
+        ]);
+
+        $seasonStub = self::createStub(Season::class);
+        $repository = new BoxscoreRepository($db);
+        $processor = new BoxscoreProcessor($db, $repository, $seasonStub);
+
+        // buildGameInfoLine(1, 14) → November, so the guard is active (not an off-schedule month).
+        $scoFile = $this->buildScoFileWithOneGame($this->buildGameInfoLine(1, 14));
+        $data = file_get_contents($scoFile);
+        $this->assertIsString($data);
+
+        $result = $processor->processScoData($data, 2026, 'Regular Season/Playoffs', skipSimDates: true);
+
+        // Negative half: guard must be enabled; without this, a month-8/9/10 date would
+        // fail open and make this pin silently agree with a disabled-guard accept.
+        $this->assertTrue($result['scheduleGuardEnabled']);
+        $this->assertSame(0, $result['gamesRejected']);
+        $this->assertSame(1, $result['gamesInserted']);
+
+        // Full mutation sequence pinned — proves the guard does not over-reject.
+        // Same shape as testRegularSeasonImportPinsMutationSequence; date differs only
+        // ('2025-11-15' here vs '2026-10-15' there, because November month-offset triggers
+        // seasonStartingYear in Boxscore::fillGameInfo while October does not).
+        $this->assertSame([
+            "SELECT ibl_schedule WHERE season_year = 2026",
+            "SELECT ibl_box_scores_teams WHERE season_year = 2026 AND visitor_teamid IS NOT NULL AND home_teamid IS NOT NULL",
+            "SELECT ibl_box_scores_teams WHERE game_date = '2025-11-15' AND visitor_teamid = 1 AND home_teamid = 2 AND game_of_that_day = 1 LIMIT 1",
+            "INSERT ibl_box_scores_teams VALUES( ('2025-11-15','Visitor Total',1,1,2,18000,20000,10,5,5,10,25,30,28,27,0,22,31,25,30,0,35,80,4,0,30,20,60,50,60,30,20,10,20))",
+            "INSERT ibl_box_scores_teams VALUES( ('2025-11-15','3Test Player',1,1,2,18000,20000,10,5,5,10,25,30,28,27,0,22,31,25,30,0,20,801,50,0,30,20,10,30,40,20,10,10,2))",
+            "INSERT ibl_box_scores_teams VALUES( ('2025-11-15','Home Total',1,1,2,18000,20000,10,5,5,10,25,30,28,27,0,22,31,25,30,0,3,207,0,30,2,2,5,4,5,3,2,1,2))",
+            "INSERT ibl_box_scores_teams VALUES( ('2025-11-15','03Home Player',1,1,2,18000,20000,10,5,5,10,25,30,28,27,0,22,31,25,30,0,28,70,12,0,2,2,1,2,3,1,1,1,2))",
+        ], $this->opDigest($db));
+    }
+
+    public function testEmptyScheduleIndexFailsOpenAndImportsWithWarning(): void
+    {
+        $db = new MockDatabase();
+        $db->setReturnTrue(true);
+        $db->onQuery('(?s)SELECT.*ibl_box_scores_teams.*LIMIT 1', []);
+        // Explicitly empty schedule → guard fails open (Rule 1).
+        $this->injectScheduleIndex($db, []);
+
+        $seasonStub = self::createStub(Season::class);
+        $repository = new BoxscoreRepository($db);
+        $processor = new BoxscoreProcessor($db, $repository, $seasonStub);
+
+        $scoFile = $this->buildScoFileWithOneGame($this->buildGameInfoLine());
+        $data = file_get_contents($scoFile);
+        $this->assertIsString($data);
+
+        $result = $processor->processScoData($data, 2026, 'Regular Season/Playoffs', skipSimDates: true);
+
+        $this->assertFalse($result['scheduleGuardEnabled']);
+        $this->assertSame(0, $result['gamesRejected']);
+        $this->assertSame(1, $result['gamesInserted']);
+
+        // At least one message must start with 'Schedule guard disabled:'
+        $disabledMessages = array_values(array_filter(
+            $result['messages'],
+            static fn (string $m): bool => str_starts_with($m, 'Schedule guard disabled:')
+        ));
+        $this->assertNotEmpty($disabledMessages, 'Expected a "Schedule guard disabled:" message');
+    }
+
+    public function testSourceArchiveThreadsThroughAllPublicEntryPoints(): void
+    {
+        $db = new MockDatabase();
+        $db->setReturnTrue(true);
+
+        $seasonStub = self::createStub(Season::class);
+        $repository = new BoxscoreRepository($db);
+        $processor = new BoxscoreProcessor($db, $repository, $seasonStub);
+
+        $phase = 'Regular Season/Playoffs';
+
+        // A too-short string triggers the early-return path in processScoData before
+        // any DB I/O — no mock data required.
+        $shortData = 'too short';
+        $shortFile = $this->writeTempScoFile($shortData);
+
+        // 1. processScoData — sourceArchive omitted → null
+        $result = $processor->processScoData($shortData, 2026, $phase);
+        $this->assertNull($result['sourceArchive']);
+
+        // 2. processScoData — explicit 'x.zip' → 'x.zip'
+        $result = $processor->processScoData($shortData, 2026, $phase, false, 'x.zip');
+        $this->assertSame('x.zip', $result['sourceArchive']);
+
+        // 3. processScoFile — sourceArchive omitted → basename($path)
+        //    processScoFile reads the file (short → early return in processScoData)
+        //    and sets sourceArchive = basename($filePath) when the parameter is null.
+        $result = $processor->processScoFile($shortFile, 2026, $phase);
+        $this->assertSame(basename($shortFile), $result['sourceArchive']);
+
+        // 4. processScoFile — explicit 'x.zip' wins over basename
+        $result = $processor->processScoFile($shortFile, 2026, $phase, false, 'x.zip');
+        $this->assertSame('x.zip', $result['sourceArchive']);
+
+        // 5. Short-data early return explicitly — sourceArchive is preserved on both exit paths.
+        $result = $processor->processScoData(str_repeat('x', 100), 2026, $phase, false, 'early.zip');
+        $this->assertSame('early.zip', $result['sourceArchive']);
+    }
 }

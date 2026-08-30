@@ -6,7 +6,7 @@ name: pr-review
 description: Token-efficient code review for pull requests
 disable-model-invocation: true
 model: claude-sonnet-4-6
-last_verified: 2026-08-14
+last_verified: 2026-08-29
 ---
 
 Provide a code review for the given pull request. This command optimizes token usage by fetching the diff once and distributing only what each agent needs.
@@ -85,12 +85,7 @@ Apply the **Code review** threshold from `_review-rubric.md` (currently `< 80` d
 
 ## Step 6: Re-check eligibility
 
-Run this command directly (no agent needed):
-```bash
-gh pr view --json state --jq '.state'
-```
-
-If the result is not `"OPEN"`, do not post a comment. Tell the user the PR is no longer open.
+**Read** `.claude/review-shared/_posting-procedure.md` — it carries this step's eligibility re-check plus the dispositioning and link-format rules cited below. Bind `$PR_NUMBER` from Step 2a before running anything from it. Follow its **Re-check eligibility** section now.
 
 ## Step 7: Post findings
 
@@ -127,15 +122,7 @@ post_review_summary "$PR_NUMBER" "Code review" \
 
 ### Dispositioning open threads:
 
-A finding posted as an inline thread stays open until something replies *in-thread* and resolves it. Never use `gh pr comment` to announce that a finding is fixed or to close a thread — a top-level comment cannot associate with a review thread. To disposition a finding:
-
-```bash
-source "$(git rev-parse --show-toplevel)/bin/lib/post-review-findings.sh"
-list_open_review_findings "$PR_NUMBER"                      # TSV: COMMENT_ID, score, path:line, excerpt
-resolve_review_finding "$PR_NUMBER" <COMMENT_ID> "Fixed in <sha> — <what changed>"
-```
-
-The same call applies when declining a finding — the body says why, and the thread still closes. A finding is dispositioned when it is fixed *or* explicitly declined; silence is not a disposition.
+See `.claude/review-shared/_posting-procedure.md` § Dispositioning open threads (read in Step 6).
 
 ### Notes:
 - Do not check build signal or attempt to build or typecheck the app. These will run separately.
@@ -154,7 +141,5 @@ https://github.com/a-jay85/IBL5/blob/FULL_SHA/path/to/file.php#L13-L17
 (The heading `### Code review`, the found-N summary line, and the footer are emitted by the helper — do NOT include them in individual finding bodies.)
 
 ### Link format rules:
-- Must use the full git SHA (from Step 2a's `headRefOid`)
-- Format: `https://github.com/a-jay85/IBL5/blob/{FULL_SHA}/path/to/file#L{start}-L{end}`
-- Provide at least 1 line of context before and after the line you are commenting about
-- Do NOT use `$(git rev-parse HEAD)` or any bash interpolation in the body string — expand the SHA beforehand
+
+See `.claude/review-shared/_posting-procedure.md` § Link format rules (read in Step 6).

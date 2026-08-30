@@ -120,7 +120,7 @@ fi
 [ -f "$PLAN_FILE" ] \
     || echo "post-plan-now: warn — no plan at $PLAN_FILE; /post-plan will run plan-blind. Pass --plan <abs-path> to name one explicitly." >&2
 
-TS=$(date +%Y%m%d-%H%M%S)
+TS=$(date +%Y%m%d-%H%M%S)-$$
 LOG="/tmp/post-plan-now-$SLUG-$TS.log"
 LABEL="com.ibl5.postplan-now-$SLUG-$TS"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"

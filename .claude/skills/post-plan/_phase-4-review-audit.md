@@ -105,6 +105,8 @@ The helper provides two public functions:
 - Issues survived filter → build findings JSON (`body` = `**[SEVERITY]** Type in \`Class::method()\` — description` + full-SHA range link, `score`); call `post_review_findings "$PR" "$FULL_SHA" "Security audit" <file>`. Severity: CRITICAL (SQLi/CMDi), HIGH (missing auth/open redirect), MEDIUM (CSRF/missing auth on non-critical endpoints), LOW (best practice).
 - No issues → call `post_review_summary "$PR" "Security audit" "No security issues found. <brief evidence per category> (XSS and input validation are enforced by PHPStan custom rules.)"`.
 
+> Canonical source for the two blocks below: `.claude/review-shared/_posting-procedure.md` (§ Dispositioning open threads, § Link format rules). They are restated here under this phase's own variable names (`$PR`, `$FULL_SHA` from 4A) so the commands are runnable as written — change one and change the other.
+
 **Dispositioning open threads:** a finding posted as an inline thread stays open until something replies *in-thread* and resolves it. Never announce a fixed finding with `gh pr comment` to close a thread — a top-level comment cannot associate with a review thread. Use `list_open_review_findings` to find the COMMENT_ID, then `resolve_review_finding` to reply in-thread and mark the thread resolved. The same call applies when declining a finding — the body says why, and the thread still closes. A finding is dispositioned when it is fixed *or* explicitly declined; silence is not a disposition.
 
 ```bash

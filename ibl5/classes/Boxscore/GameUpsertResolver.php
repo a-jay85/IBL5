@@ -40,7 +40,8 @@ class GameUpsertResolver
             $hasNullTeamId = $this->repository->hasNullTeamIdPlayerBoxscores(
                 $boxscoreGameInfo->gameDate,
                 $boxscoreGameInfo->visitor_teamid,
-                $boxscoreGameInfo->home_teamid
+                $boxscoreGameInfo->home_teamid,
+                $boxscoreGameInfo->game_of_that_day
             );
 
             if (!$hasNullTeamId) {
@@ -58,7 +59,8 @@ class GameUpsertResolver
         $this->repository->deletePlayerBoxscoresByGame(
             $boxscoreGameInfo->gameDate,
             $boxscoreGameInfo->visitor_teamid,
-            $boxscoreGameInfo->home_teamid
+            $boxscoreGameInfo->home_teamid,
+            $boxscoreGameInfo->game_of_that_day
         );
 
         return 'update';

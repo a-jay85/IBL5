@@ -72,7 +72,7 @@ class AllStarGameProcessor implements GameTypeProcessorInterface
                 $savedHomeName = $existingNames['homeName'];
 
                 $this->repository->deleteTeamBoxscoresByGame($gameDate, self::ALL_STAR_VISITOR_TID, self::ALL_STAR_HOME_TID, 1);
-                $this->repository->deletePlayerBoxscoresByGame($gameDate, self::ALL_STAR_VISITOR_TID, self::ALL_STAR_HOME_TID);
+                $this->repository->deletePlayerBoxscoresByGame($gameDate, self::ALL_STAR_VISITOR_TID, self::ALL_STAR_HOME_TID, 1);
 
                 $linesProcessed = $this->writer->write($line, $boxscoreGameInfo, $savedAwayName, $savedHomeName);
 

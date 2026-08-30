@@ -122,7 +122,7 @@ post_review_summary "$PR_NUMBER" "Code review" \
 
 ### Dispositioning open threads:
 
-See `.claude/review-shared/_posting-procedure.md` § Dispositioning open threads (read in Step 6).
+See `.claude/review-shared/_posting-procedure.md` § Dispositioning open threads (read in Step 6) — use `list_open_review_findings` for the COMMENT_ID, then `resolve_review_finding` to reply in-thread and resolve. Never `gh pr comment`.
 
 ### Notes:
 - Do not check build signal or attempt to build or typecheck the app. These will run separately.

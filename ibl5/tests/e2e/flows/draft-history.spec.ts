@@ -27,27 +27,31 @@ async function getFirstDraftYear(page: Page): Promise<string> {
   return '';
 }
 
-/**
- * Navigate to a draft year that has data (player picks).
- * Tries each year from the dropdown until a draft table appears.
- */
-async function navigateToDraftYearWithData(page: Page): Promise<boolean> {
-  const options = page.locator('#draft-year-select option');
-  const optionCount = await options.count();
-  for (let i = 0; i < optionCount; i++) {
-    const val = await options.nth(i).getAttribute('value');
-    if (val && /^\d{4}$/.test(val)) {
-      await page.goto(`modules.php?name=DraftHistory&year=${val}`);
-      const table = page.locator('.draft-history-table');
-      if ((await table.count()) > 0) { // e2e-hygiene-allow: helper probes years until data found, returns boolean to caller
-        return true;
-      }
-    }
-  }
-  return false;
-}
 
 test.describe('Draft History flow', () => {
+  let dataYear: string = '';
+
+  test.beforeAll(async ({ request }) => {
+    const res = await request.get('modules.php?name=DraftHistory');
+    const html = await res.text();
+    const optionPattern = /<option[^>]+value="(\d{4})"[^>]*>/g;
+    let match;
+    while ((match = optionPattern.exec(html)) !== null) {
+      const year = match[1];
+      const yearRes = await request.get(`modules.php?name=DraftHistory&year=${year}`);
+      const yearHtml = await yearRes.text();
+      if (yearHtml.includes('draft-history-table')) {
+        dataYear = year;
+        break;
+      }
+    }
+    if (!dataYear) {
+      throw new Error(
+        'draft-history beforeAll: no draft year with data found — check ci-seed.sql'
+      );
+    }
+  });
+
   test.beforeEach(async ({ page }) => {
     await page.goto('modules.php?name=DraftHistory');
   });
@@ -74,8 +78,7 @@ test.describe('Draft History flow', () => {
   });
 
   test('selecting a year with data shows draft picks table', async ({ page }) => {
-    const found = await navigateToDraftYearWithData(page);
-    expect(found).toBe(true);
+    await page.goto(`modules.php?name=DraftHistory&year=${dataYear}`);
     await assertNoPhpErrors(page, 'on DraftHistory with data');
 
     const table = page.locator('.draft-history-table');
@@ -85,16 +88,14 @@ test.describe('Draft History flow', () => {
   });
 
   test('draft table has responsive-table class', async ({ page }) => {
-    const found = await navigateToDraftYearWithData(page);
-    expect(found).toBe(true);
+    await page.goto(`modules.php?name=DraftHistory&year=${dataYear}`);
 
     const table = page.locator('.draft-history-table.responsive-table');
     await expect(table.first()).toBeVisible();
   });
 
   test('draft picks table has expected column headers', async ({ page }) => {
-    const found = await navigateToDraftYearWithData(page);
-    expect(found).toBe(true);
+    await page.goto(`modules.php?name=DraftHistory&year=${dataYear}`);
 
     const table = page.locator('.draft-history-table').first();
     const headerText = await table.locator('thead').textContent();
@@ -111,8 +112,7 @@ test.describe('Draft History flow', () => {
   });
 
   test('player links exist in draft table', async ({ page }) => {
-    const found = await navigateToDraftYearWithData(page);
-    expect(found).toBe(true);
+    await page.goto(`modules.php?name=DraftHistory&year=${dataYear}`);
 
     const playerLinks = page.locator('.draft-history-table a[href*="pid="]');
     await expect(playerLinks.first()).toBeVisible();
@@ -122,8 +122,7 @@ test.describe('Draft History flow', () => {
   });
 
   test('player link navigates to player page', async ({ page }) => {
-    const found = await navigateToDraftYearWithData(page);
-    expect(found).toBe(true);
+    await page.goto(`modules.php?name=DraftHistory&year=${dataYear}`);
 
     const playerLink = page.locator('.draft-history-table a[href*="pid="]').first();
     const href = await playerLink.getAttribute('href');

@@ -92,6 +92,57 @@ new_env() {
     printf '%s\n' "$base"
 }
 
+# new_env_base_branch — build <TMP>/env.XXXX/{origin.git,IBL5,IBL5-worktrees}:
+#   • master in main checkout and on origin is at M2 (checked out, synced)
+#   • feature-a exists locally at F1; origin/feature-a is at F2 (1 ahead)
+#   • master and origin/feature-a have DIVERGED (M2 is not in feature-a history)
+#     → merge --ff-only origin/feature-a from master would abort; fetch must be used
+#   • IBL5-worktrees/ sibling dir exists (wt-new will create slug-b inside it)
+# Echoes the env base path. Invoked from the main checkout, not a worktree.
+new_env_base_branch() {
+    local base
+    base="$(mktemp -d "$TMP/env.XXXXXX")"
+    git_q init -q --bare "$base/origin.git" >/dev/null 2>&1
+
+    # M1: seed origin with scripts under test.
+    git_q clone -q "$base/origin.git" "$base/IBL5" >/dev/null 2>&1
+    mkdir -p "$base/IBL5/bin/lib" "$base/IBL5/ibl5"
+    cp "$WTNEW" "$base/IBL5/bin/wt-new"
+    cp "$SCRIPT_DIR"/lib/*.sh "$base/IBL5/bin/lib/" 2>/dev/null
+    chmod +x "$base/IBL5/bin/wt-new"
+    git_q -C "$base/IBL5" add -A >/dev/null 2>&1
+    git_q -C "$base/IBL5" commit -qm M1 >/dev/null 2>&1
+    git_q -C "$base/IBL5" push -q -u origin master >/dev/null 2>&1
+
+    # feature-a: branch from M1, commit F1, push to origin (both local and remote at F1).
+    git_q -C "$base/IBL5" checkout -qb feature-a >/dev/null 2>&1
+    echo f1 > "$base/IBL5/F1.txt"
+    git_q -C "$base/IBL5" add -A >/dev/null 2>&1
+    git_q -C "$base/IBL5" commit -qm F1 >/dev/null 2>&1
+    git_q -C "$base/IBL5" push -q -u origin feature-a >/dev/null 2>&1
+
+    # M2 on master: diverges master from feature-a; push so origin/master is current too.
+    git_q -C "$base/IBL5" checkout -q master >/dev/null 2>&1
+    echo m2 > "$base/IBL5/M2.txt"
+    git_q -C "$base/IBL5" add -A >/dev/null 2>&1
+    git_q -C "$base/IBL5" commit -qm M2 >/dev/null 2>&1
+    git_q -C "$base/IBL5" push -q origin master >/dev/null 2>&1
+
+    # F2 on origin/feature-a only — local feature-a stays at F1 (1 behind).
+    git_q clone -q "$base/origin.git" "$base/pusher-f" >/dev/null 2>&1
+    git_q -C "$base/pusher-f" checkout -q feature-a >/dev/null 2>&1
+    echo f2 > "$base/pusher-f/F2.txt"
+    git_q -C "$base/pusher-f" add -A >/dev/null 2>&1
+    git_q -C "$base/pusher-f" commit -qm F2 >/dev/null 2>&1
+    git_q -C "$base/pusher-f" push -q origin feature-a >/dev/null 2>&1
+    git_q -C "$base/IBL5" fetch -q origin >/dev/null 2>&1
+
+    # Worktrees sibling dir must exist; wt-new will create the slug-b subdir.
+    mkdir -p "$base/IBL5-worktrees"
+
+    printf '%s\n' "$base"
+}
+
 sha() { git -C "$1" rev-parse "$2" 2>/dev/null; }
 
 echo "== case 1: wt-new invoked through a DIVERGED worktree's own copy"
@@ -125,13 +176,37 @@ assert_match "control actually re-points REPO_ROOT" 'REPO_ROOT="\$SCRIPT_ROOT"' 
 
 OUT2="$("$ENV2/IBL5-worktrees/feature/bin/wt-new" smoke 2>&1)"
 assert_match "defect reappears: sync aborts on the diverged branch" \
-    "Not possible to fast-forward" "$OUT2"
+    "Not possible to fast-forward|refusing to fetch" "$OUT2"
 assert_eq "and master is left stale" "$BEFORE_MASTER" "$(sha "$ENV2/IBL5" master)"
 if [ -d "$ENV2/IBL5-worktrees/smoke" ]; then
     failcase "and no worktree is created — $ENV2/IBL5-worktrees/smoke exists"
 else
     pass "and no worktree is created"
 fi
+
+echo "== case 3: wt-new --base <non-checked-out-branch> from main checkout"
+ENV3="$(new_env_base_branch)"
+MASTER_TIP3="$(sha "$ENV3/IBL5" master)"
+FEATURE_A_ORIGIN_TIP="$(sha "$ENV3/IBL5" origin/feature-a)"
+
+# Invoke wt-new from the MAIN checkout, not a worktree — the fix under test.
+# wt-new fails later materializing config / symlinks (no real ibl5 tree); irrelevant.
+# Contract: feature-a fast-forwarded, master untouched, no ff-only abort.
+OUT3="$("$ENV3/IBL5/bin/wt-new" slug-b --base feature-a 2>&1)"
+
+assert_absent "no fast-forward abort on base branch" "Not possible to fast-forward" "$OUT3"
+assert_eq "feature-a fast-forwarded to origin/feature-a" \
+    "$FEATURE_A_ORIGIN_TIP" "$(sha "$ENV3/IBL5" feature-a)"
+assert_eq "master is left at M2 (unchanged)" \
+    "$MASTER_TIP3" "$(sha "$ENV3/IBL5" master)"
+
+echo "== case 3b: unknown flag is rejected loudly"
+# The --base flag parsing path is modified; assert the guard for unknown flags still fires.
+# Reuse ENV3's IBL5 copy — no env state needed, just exit-code + message shape.
+OUT3B="$("$ENV3/IBL5/bin/wt-new" slug-c --bogus-flag 2>&1)" && RC3B=$? || RC3B=$?
+assert_match "unknown flag prints usage to stderr" "Unknown option" "$OUT3B"
+if [ "$RC3B" -ne 0 ]; then pass "unknown flag exits non-zero"; else
+    failcase "unknown flag exits non-zero — expected non-zero, got 0"; fi
 
 echo "----"
 if [ "$FAILED" -eq 0 ]; then echo "ALL PASS"; else echo "FAILURES"; fi

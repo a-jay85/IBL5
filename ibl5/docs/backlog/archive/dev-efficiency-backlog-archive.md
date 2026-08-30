@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed development-efficiency backlog entries, extracted from dev-efficiency-backlog.md.
-last_verified: 2026-08-27
+last_verified: 2026-08-30
 ---
 
 # Development-Efficiency Backlog — Archive
@@ -144,3 +144,13 @@ Body summary text was authored pre-implementation and hand-updated during coding
 **Status (2026-08-27):** ✅ Implemented — landed as `_plan-fidelity-review.md` 6d.4 sub-clause 4a, "Named-constant volumes."
 
 *(discovered 2026-08-27 during #2001)*
+
+### E13 `bin/wt-new --base <branch>` fast-forwards the wrong branch
+
+**Location:** `bin/wt-new` — the pre-branch sync block (`git fetch` → `rev-list --count` → `merge --ff-only`).
+**Problem:** The staleness check is computed on `$BASE_BRANCH` (`rev-list --count "$BASE_BRANCH..origin/$BASE_BRANCH"`), but the merge that acts on it is a plain `git -C "$REPO_ROOT" merge --ff-only "origin/$BASE_BRANCH"` — which merges into whatever branch the main checkout has *checked out*, i.e. `master`. So `bin/wt-new <slug> --base <other-branch>` — the documented stacked-PR path — leaves local `<other-branch>` stale (the worktree forks from a stale tip, exactly what the sync exists to prevent) and drags `master` toward `origin/<other-branch>` instead, or aborts with `Not possible to fast-forward` once the two have diverged. Silent today only because a stacked base is usually already current, so `BEHIND=0` skips the merge entirely.
+**Suggested direction:** Update the base branch without checking it out — `git -C "$REPO_ROOT" fetch origin "$BASE_BRANCH:$BASE_BRANCH"` (which is ff-only by default for non-current branches), falling back to the existing `merge --ff-only` only when `$BASE_BRANCH` *is* the checked-out branch. Extend `bin/test-wt-new-root` with a `--base` case; its temp-repo harness already builds a stale-local/diverged fixture.
+**Risk if untouched:** Stacked PRs silently branch from a stale parent, and a diverged base turns `wt-new` into a hard failure that also mutates `master` on the way there.
+**Status (2026-08-19):** ⬜ Open — 🟩 (no design fork; found while fixing E12 and deliberately left out of that PR's scope).
+
+**Status (2026-08-30):** ✅ Implemented — `bin/wt-new` now detects whether `$BASE_BRANCH` is checked out in the main checkout; if not, uses `fetch origin "$BASE_BRANCH:$BASE_BRANCH"` to fast-forward the local ref directly. `bin/test-wt-new-root` extended with Case 3 regression pin. Shipped in #2033.

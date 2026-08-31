@@ -221,6 +221,53 @@ function memoryDirForRepo(string $repoRoot): ?string
 }
 
 /** @return list<string> */
+/**
+ * Drop repo-relative paths that git considers ignored (gitignored local files are
+ * on-disk but never committed, so they must not participate in freshness tracking).
+ * Fail-open: any git error returns $files unchanged — never silently lose coverage.
+ * Memory files outside $root pass through unchanged.
+ *
+ * @param  list<string> $files Absolute paths (may include memory files outside $root).
+ * @return list<string>
+ */
+function filterGitignored(array $files, string $root): array
+{
+    if (empty($files)) {
+        return $files;
+    }
+    $prefix   = $root . '/';
+    $repoFiles = array_filter($files, static fn(string $f) => str_starts_with($f, $prefix));
+    if (empty($repoFiles)) {
+        return $files;
+    }
+    $relPaths = array_map(static fn(string $f) => substr($f, strlen($prefix)), $repoFiles);
+    $proc = proc_open(
+        ['git', '-C', $root, 'check-ignore', '--stdin'],
+        [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+        $pipes
+    );
+    if (!is_resource($proc)) {
+        return $files;
+    }
+    fwrite($pipes[0], implode("\n", $relPaths));
+    fclose($pipes[0]);
+    $raw = stream_get_contents($pipes[1]);
+    fclose($pipes[1]);
+    fclose($pipes[2]);
+    proc_close($proc);
+    if ($raw === false || trim($raw) === '') {
+        return $files;
+    }
+    $ignored = array_flip(array_filter(array_map('trim', explode("\n", $raw))));
+    if (empty($ignored)) {
+        return $files;
+    }
+    return array_values(array_filter(
+        $files,
+        static fn(string $f) => !isset($ignored[str_starts_with($f, $prefix) ? substr($f, strlen($prefix)) : $f])
+    ));
+}
+
 function collectFiles(string $root, bool $includeMemory): array
 {
     $files = [];
@@ -254,7 +301,7 @@ function collectFiles(string $root, bool $includeMemory): array
         }
         return true;
     });
-    return array_values($filtered);
+    return filterGitignored(array_values($filtered), $root);
 }
 
 /** @return array<string, string>|null */

@@ -1,5 +1,5 @@
 -- Backup tables for the 2004 Suns-Heat boxscore restore (migration 171).
--- Created empty and additively; filled and verified by 171 before any UPDATE runs.
+-- Created empty and additively; filled and verified by 171 before any DELETE runs.
 -- These tables are dedicated to the 2004 season restore and are NOT the 2008 rollback
 -- source used by bin/rollback-phantom-repair. See ibl_box_scores_teams_phantom_backup
 -- and ibl_box_scores_phantom_backup (migration 167) for those.

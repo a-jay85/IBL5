@@ -54,6 +54,7 @@ last_verified: 2026-08-31
 | E25 | `/pr-review` migration-exclusion `awk` filter is a no-op, silently ingests full migration diffs | ⬜ Open | 🟨 | S |
 | E26 | `bin/plan-now` second-resolution timestamp caused label collision on back-to-back invocations | ✅ Implemented | — | S |
 | E27 | `filterGitignored()` in `bin/check-docs`: orphaned docblock, unchecked proc exit, non-NUL-delimited check-ignore paths | ⬜ Open | 🟨 | S |
+| E28 | PR body hand-authored migration numbers not updated after a forced renumber | ⬜ Open | — | S |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -360,3 +361,24 @@ Three defects in the `filterGitignored()` function added to `bin/check-docs` by 
 - 3b/3c: a new PHPStan custom rule (no directory exists yet; will live under `ibl5/phpstan/` (example) when created) plus fix in `bin/check-docs:filterGitignored()` (not built this pass)
 
 **provenance:** (discovered 2026-08-31 during #2046)
+
+### E28 PR body hand-authored migration numbers not updated after a forced renumber
+
+**class:** a hand-authored PR body prose claim that becomes stale when a forced migration renumber is applied to code and comments but not to the body's summary bullets and manual-testing rows.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `#2022` PR body — "**169** (DDL)" / "**170** (PHP)" / "After CI deploys migration **170**" contradicted the shipped 170/171 pair | yes | fixed this pass | fixed this pass |
+| 2 | Other PRs with migration pairs (generic) | near-miss — only arises on a forced renumber mid-implementation | N/A | not fixed — filed |
+
+**prevention_ladder:**
+- rung 0 — already covered by an existing gate? **LANDS HERE.** `/pr-ready` Phase 6 check 4 ("PR body vs. diff") is designed to catch exactly this mismatch — it fired correctly on PR #2022 and blocked the verdict until the body was corrected. No additional gate is warranted.
+- rungs 1–5 — N/A given rung 0 coverage.
+
+`prevention_ladder: no gate warranted — /pr-ready Phase 6 check 4 (PR body vs. diff mismatch) is the existing detection gate; it fired and caught this correctly; building a duplicate gate adds noise without coverage.`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-08-31 during #2022)*

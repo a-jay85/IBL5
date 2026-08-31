@@ -51,7 +51,6 @@ include __DIR__ . '/../db/db.php';
 
 $flagDryRun = in_array('--dry-run', $argv ?? [], true);
 $envDryRun = getenv('DRY_RUN') === '1';
-$dryRun = $flagDryRun || $envDryRun;
 
 if ($envDryRun) {
     fwrite(STDERR, "DRY_RUN=1 was set in the environment - refusing to report success.\n");

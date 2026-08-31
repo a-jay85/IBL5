@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-08-30
+last_verified: 2026-08-31
 ---
 
 # Loop-Engineering Backlog
@@ -65,6 +65,7 @@ last_verified: 2026-08-30
 | L36 | `/post-plan` Phase 3 writes a hardcoded "covered by unit and E2E tests" clause into the PR body without checking the diff contains those test types | ⬜ Open | 🟥 | S |
 | L37 | PR body declares only the plan's named files; changes the plan never named ship undeclared, so a reviewer cannot separate intended scope from drift | ⬜ Open | 🟦 | S |
 | L38 | Headless CI watcher killed: `local_bash` not awaited by wind-down sweep — phantom success under `claude -p` | ✅ Shipped #2026 | 🟦 | S |
+| L39 | Autonomous PR body omits plan-deliverable moot-at-branch-cut explanation and asserts unchecked test coverage | ⬜ Open | 🟥 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -343,6 +344,42 @@ Rung 1 does not require the `meta-tooling-bar.md` extend-before-add conditions (
 **Note:** `.claude/skills/post-plan/` and `bin/lib/pr-armable.sh` are ship-pipeline surfaces; route through `/plan`, not ad-hoc. Ship with L36.
 
 **Status (2026-08-26):** ⬜ Open — 🟦 (ship-pipeline surface, but additive: the check only reports, it removes no existing assertion).
+
+### L39 Autonomous PR body omits plan-deliverable moot-at-branch-cut explanation and asserts unchecked test coverage
+
+*(discovered 2026-08-31 during #2046)*
+
+**class (finding 1):** an autonomous PR body does not explain why the plan's sole deliverable is absent from the diff when that deliverable was already completed by a prior PR before the branch was cut, leaving a reader with an unexplained plan-to-diff gap.
+
+**class (finding 4):** a PR-body Manual Testing section asserts automated test coverage when the diff adds no test and no pre-existing test covers the new behavior — an additional occurrence of [L36](#l36-post-plan-phase-3-writes-a-hardcoded-covered-by-unit-and-e2e-tests-clause-into-the-pr-body-without-checking-the-diff-contains-those-test-types)'s class.
+
+**Location (finding 1):** PR #2046 body § Summary — no mention of issue #2035, ADR-0074, or the prior refresh (#2036). The autonomous run's plan records the deliverable but nothing in the pipeline checks whether the deliverable was already done before the branch was cut.
+
+**Location (finding 4):** PR #2046 body § Manual Testing — "No manual testing needed — verified by automated tests." `git diff --name-only` against `ibl5/tests` returns nothing; `PHPUnit Tests` is `SKIPPED` in CI. Occurrence 2 of L36's class; prior occurrence was PR #1969.
+
+**Finding 1 fix (this PR):** Added an explanatory bullet to PR body Summary noting that ADR-0074 was already refreshed by #2036 before branch cut.
+
+**Finding 4 fix (this PR):** Rewrote Manual Testing from "verified by automated tests" to a truthful manual-verification statement. The "No manual testing needed" sentinel prefix was preserved for `bin/lib/pr-armable.sh:59`.
+
+**Occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #2046 body § Summary — plan deliverable absent from diff with no explanation | finding 1 | yes | fixed this pass (explanatory bullet added) |
+| 2 | PR #2046 body § Manual Testing — "verified by automated tests" with no test in diff | finding 4 (L36 class) | yes | fixed this pass (section rewritten) |
+| 3 | .claude/skills/post-plan/SKILL.md:121 — template generator for the "verified by automated tests" clause | finding 4 source | yes | not fixed — filed as L36 (open) |
+| 4 | /post-plan pipeline — no step checks whether the plan's deliverable was already done before branch cut | finding 1 source | yes | not fixed — filed here as L39 |
+
+**prevention ladder (finding 1):**
+- rung 0 — already covered? No. `/post-plan` Phase 5.0 checks declared-artifact → diff; no step checks whether a plan-named deliverable is absent from the diff without a declared descope or pre-emption reason.
+- rung 1 — extend an existing gate? Yes — this is the landing rung. L37 proposes extending `/post-plan` Phase 5.0 to check diff → declared. Finding 1 wants the symmetric check: any plan-declared deliverable with no diff footprint must carry a body prose explanation. Ships with L36 and L37 (same surface, same test harness, complementary directions).
+- rungs 2–5 — N/A; rung 1 is the landing rung.
+
+**prevention ladder (finding 4):** Already covered by L36's ladder (rung 1: extend `bin/lib/pr-armable.sh`). This is occurrence 2; per the class registry anti-recurrence lever, recurrence confirms L36 should move up the burn-down queue.
+
+**artifact destination:** .claude/skills/post-plan/_phase-5-final-verification.md and bin/lib/pr-armable.sh (in-repo). Ships with L36 and L37.
+
+**provenance:** (discovered 2026-08-31 during #2046)
 
 ---
 

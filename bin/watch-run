@@ -32,9 +32,20 @@
 #   bin/watch-run --log /tmp/post-plan-now-<slug>-<ts>.log \
 #                 --label com.ibl5.postplan-now-<slug>-<ts>
 #
+# THE STARTUP RACE. launchd registers the job a moment AFTER the producer prints
+# this command, so a watcher armed immediately sees `launchctl list` WITHOUT the
+# label and used to report "run complete" seconds into a run that had not started
+# (observed 2026-08-24: a post-plan run declared finished at ~14s, still alive and
+# working for another ~2.5 minutes). Label-absence is therefore terminal only once
+# the label has been SEEN alive at least once. A job that never registers at all is
+# bounded by --startup-grace <seconds> (default 60), after which the watcher gives
+# up with exit 4 rather than waiting out --timeout.
+#
 # Exit 0 — the run finished; its own verdict line is the last thing printed.
 # Exit 2 — --timeout elapsed with the job still alive (nothing is killed).
 # Exit 3 — usage error.
+# Exit 4 — --startup-grace elapsed and the launchd label was never seen alive:
+#          the job never registered. Nothing was killed.
 
 set -uo pipefail
 
@@ -42,6 +53,7 @@ LOG=""
 LABEL=""
 TIMEOUT=10800          # 3h — longer than any observed post-plan/plan run
 INTERVAL=5
+STARTUP_GRACE=60       # give launchd this long to register --label before giving up
 ALL=0
 
 # Lines worth surfacing as Monitor events. Deliberately broad on the FAILURE side:
@@ -51,7 +63,10 @@ ALL=0
 SIGNAL='RESULT|^post-plan-now:|^plan-now:|^docfix-run:|PR #|pull/|ERROR|Error|error:|FAIL|Fail|failed|conflict|Traceback|terminal=|Killed|OOM|command not found|No such file'
 
 usage() {
-    sed -n '3,38p' "$0" | sed 's/^# \{0,1\}//'
+    # Prints the header docblock, lines 3..(last leading `#` line). Derived, not a
+    # hard-coded range: the previous `sed -n '3,38p'` silently truncated --help the
+    # moment the docblock grew. bin/test-watch-run case D pins this.
+    awk 'NR>=3 && /^#/ { sub(/^# ?/, ""); print; next } NR>=3 { exit }' "$0"
     exit 3
 }
 
@@ -64,6 +79,9 @@ while [ $# -gt 0 ]; do
         --timeout)  [ $# -ge 2 ] || usage; TIMEOUT="$2"; shift 2 ;;
         --timeout=*) TIMEOUT="${1#--timeout=}"; shift ;;
         --interval) [ $# -ge 2 ] || usage; INTERVAL="$2"; shift 2 ;;
+        --interval=*) INTERVAL="${1#--interval=}"; shift ;;
+        --startup-grace) [ $# -ge 2 ] || usage; STARTUP_GRACE="$2"; shift 2 ;;
+        --startup-grace=*) STARTUP_GRACE="${1#--startup-grace=}"; shift ;;
         --all)      ALL=1; shift ;;
         -h|--help)  usage ;;
         *)          echo "watch-run: unknown argument '$1'" >&2; usage ;;
@@ -108,6 +126,7 @@ saw_result() {
 
 echo "watch-run: watching $LOG${LABEL:+ (label $LABEL)} — exits when the run finishes."
 
+SEEN_ALIVE=0
 START=$(date +%s)
 while :; do
     flush
@@ -117,21 +136,38 @@ while :; do
         exit 0
     fi
 
-    if [ -n "$LABEL" ] && ! label_alive; then
-        # The job booted itself out. Give the filesystem a moment for the final
-        # flush, then print whatever is left — including lines the filter skips,
-        # so a crash with no recognisable signature is never silent.
-        sleep 3
-        flush
-        if saw_result; then
-            echo "watch-run: run complete (launchd label gone)."
-        elif [ -f "$LOG" ]; then
-            echo "watch-run: launchd label gone but the log has no RESULT line — tail follows:"
-            tail -n 8 "$LOG"
+    if [ -n "$LABEL" ]; then
+        # label_alive is called EXACTLY ONCE per iteration. bin/test-watch-run's
+        # stub counts launchctl invocations to prove the latch held on poll 1, so a
+        # second call here (e.g. `if label_alive; …` followed by `if ! label_alive`)
+        # doubles the count and fails that assertion for an unrelated-looking reason.
+        if label_alive; then
+            SEEN_ALIVE=1
+        elif [ "$SEEN_ALIVE" = 0 ]; then
+            # Absent and never yet seen ⇒ NOT REGISTERED YET, not finished. Keep
+            # polling until the label shows up or the startup grace runs out.
+            if [ $(($(date +%s) - START)) -ge "$STARTUP_GRACE" ]; then
+                echo "watch-run: launchd label $LABEL was never seen alive within ${STARTUP_GRACE}s — the job never registered. Nothing was killed." >&2
+                [ -f "$LOG" ] && tail -n 5 "$LOG"
+                exit 4
+            fi
         else
-            echo "watch-run: launchd label gone and $LOG was never created — the job died before it ran."
+            # Seen alive before, gone now: the job booted itself out. Give the
+            # filesystem a moment for the final flush, then print whatever is left —
+            # including lines the filter skips, so a crash with no recognisable
+            # signature is never silent.
+            sleep 3
+            flush
+            if saw_result; then
+                echo "watch-run: run complete (launchd label gone)."
+            elif [ -f "$LOG" ]; then
+                echo "watch-run: launchd label gone but the log has no RESULT line — tail follows:"
+                tail -n 8 "$LOG"
+            else
+                echo "watch-run: launchd label gone and $LOG was never created — the job died before it ran."
+            fi
+            exit 0
         fi
-        exit 0
     fi
 
     if [ $(($(date +%s) - START)) -ge "$TIMEOUT" ]; then

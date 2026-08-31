@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed development-efficiency backlog entries, extracted from dev-efficiency-backlog.md.
-last_verified: 2026-08-30
+last_verified: 2026-08-31
 ---
 
 # Development-Efficiency Backlog — Archive
@@ -172,3 +172,10 @@ Body summary text was authored pre-implementation and hand-updated during coding
 `artifact destination:` `bin/plan-now:130`, `bin/post-plan-now:123` (in-repo). **Status:** ✅ Implemented.
 
 *(discovered 2026-08-30, fixed in #2034)*
+
+### E16 `bin/watch-run` declares a run finished on its first poll, before launchd registers the label
+**Location:** `bin/watch-run` — the `label_alive()` check at the top of the poll loop, which runs before any startup grace period.
+**Problem:** `bin/post-plan-now` prints its watch command and returns before launchd has finished registering the job, so a watcher armed immediately after sees `launchctl list` without the label and reports "launchd label gone but the log has no RESULT line" within seconds of a run starting. The `sleep 3` retry that follows only re-checks the log for a `RESULT:` line — and the harness flushes its log at exit by design, so the log is empty for the whole run. Observed 2026-08-24: a `bin/post-plan-now` run on `plan-gate-skill-inline` was reported finished after ~14s; the job was in fact alive (PID 26804) and ran another ~2.5 minutes to a successful `terminal=shipped-held`. This is the readiness-predicate failure mode described in `.claude/rules/work-triage-detail.md` § The readiness predicate — a confident verdict on an unstarted run, indistinguishable from a real completion.
+**Suggested direction:** Do not treat label-absence as terminal until the label has been seen alive at least once, or until a bounded startup grace (a few poll intervals) has elapsed. Alternatively require label-absence on two consecutive polls before exiting, so a transient `launchctl` gap cannot terminate the watch.
+**Risk if untouched:** Every caller that arms the watch command `bin/post-plan-now` prints — the documented usage — can get a false "finished" on a run that just started, and act on a verdict that does not exist yet.
+**Status (2026-08-31):** ✅ Implemented — seen-alive latch plus `--startup-grace` (default 60s, exit 4) in `bin/watch-run`, guarded by `bin/test-watch-run` (NEW) in the `harness-tests` CI job.

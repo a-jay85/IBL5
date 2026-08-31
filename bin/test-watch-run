@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-watch-run — regression harness for the bin/watch-run startup-latch
+# bug. On the very first poll (before launchd registers the job) the absence of
+# the label is treated as "job done" — the script exits 0 immediately. Phase 2
+# adds a SEEN_ALIVE latch and a --startup-grace flag; these cases are RED now
+# and must turn GREEN after Phase 2.
+#
+# Run: bin/test-watch-run  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+FAILED=0
+
+pass() { echo "ok: $*"; }
+fail() { echo "FAIL: $*"; FAILED=1; }
+
+setup() {                       # setup <response tokens…>
+    rm -rf "$TMP/stub" "$TMP/state"
+    mkdir -p "$TMP/stub" "$TMP/state"
+    printf '%s\n' "$@" > "$TMP/state/responses"
+    echo 0 > "$TMP/state/calls"
+    printf 'RESULT: ok\n' > "$TMP/run.log"
+    cat > "$TMP/stub/launchctl" <<'STUB'
+#!/usr/bin/env bash
+# Stateful `launchctl` stub. Accepts and ignores the real subcommand (`list`).
+# Nth call reads the Nth line of $STUB_RESPONSES (last line repeats past EOF).
+n=$(( $(cat "$STUB_CALLS") + 1 ))
+echo "$n" > "$STUB_CALLS"
+total=$(wc -l < "$STUB_RESPONSES" | tr -d ' ')
+idx=$n
+[ "$idx" -gt "$total" ] && idx=$total
+verdict=$(sed -n "${idx}p" "$STUB_RESPONSES")
+echo "PID	Status	Label"
+i=0
+while [ "$i" -lt 20 ]; do echo "-	0	com.apple.filler.$i"; i=$((i + 1)); done
+[ "$verdict" = alive ] && echo "26804	0	$STUB_LABEL"
+exit 0
+STUB
+    chmod +x "$TMP/stub/launchctl"
+}
+
+LABEL="com.ibl5.test-watch-run"
+run_watch() {                   # run_watch <extra watch-run args…>; sets OUT, RC, CALLS
+    OUT="$(PATH="$TMP/stub:$PATH" \
+           STUB_RESPONSES="$TMP/state/responses" \
+           STUB_CALLS="$TMP/state/calls" \
+           STUB_LABEL="$LABEL" \
+           "$SCRIPT_DIR/watch-run" --log "$TMP/run.log" --label "$LABEL" \
+           --interval 1 --timeout 20 "$@" 2>&1)"
+    RC=$?
+    CALLS=$(cat "$TMP/state/calls")
+}
+
+# ---------------------------------------------------------------------------
+# A. startup latch (RED) — poll 1 sees absent (before registration);
+#    polls 2-3 see alive; poll 4 sees gone for real.
+#    The mutation catcher is CALLS >= 2: the current code exits after 1 call.
+# ---------------------------------------------------------------------------
+setup gone alive alive gone
+run_watch
+[ "$RC" -eq 0 ] \
+    && pass "A: RC is 0" \
+    || fail "A: RC is 0 (got $RC)"
+echo "$OUT" | grep -q "run complete (launchd label gone)" \
+    && pass "A: output contains 'run complete (launchd label gone)'" \
+    || fail "A: output missing 'run complete (launchd label gone)'"
+[ "$CALLS" -ge 2 ] \
+    && pass "A: CALLS >= 2" \
+    || fail "A: CALLS >= 2 (got $CALLS)"
+
+# ---------------------------------------------------------------------------
+# B. startup grace, negative path (RED) — label never appears within the
+#    grace window; watch-run must exit 4 with a "never seen alive within"
+#    message. Current watch-run does not recognise --startup-grace → exits 3.
+# ---------------------------------------------------------------------------
+setup gone
+run_watch --startup-grace 3
+[ "$RC" -eq 4 ] \
+    && pass "B: RC is 4" \
+    || fail "B: RC is 4 (got $RC)"
+echo "$OUT" | grep -q "never seen alive within" \
+    && pass "B: output contains 'never seen alive within'" \
+    || fail "B: output missing 'never seen alive within'"
+
+# ---------------------------------------------------------------------------
+# C. happy path, no regression (GREEN) — label alive on poll 1, gone on
+#    poll 2; must pass now and stay passing after Phase 2.
+# ---------------------------------------------------------------------------
+setup alive gone
+run_watch
+[ "$RC" -eq 0 ] \
+    && pass "C: RC is 0" \
+    || fail "C: RC is 0 (got $RC)"
+echo "$OUT" | grep -q "run complete (launchd label gone)" \
+    && pass "C: output contains 'run complete (launchd label gone)'" \
+    || fail "C: output missing 'run complete (launchd label gone)'"
+[ "$CALLS" -eq 2 ] \
+    && pass "C: CALLS is 2" \
+    || fail "C: CALLS is 2 (got $CALLS)"
+
+# ---------------------------------------------------------------------------
+# D. usage() header range (RED) — --startup-grace and Exit 4 must appear in
+#    the help output after Phase 2 extends the docblock.
+# ---------------------------------------------------------------------------
+OUT="$("$SCRIPT_DIR/watch-run" --help 2>&1)"
+RC=$?
+[ "$RC" -eq 3 ] \
+    && pass "D: RC is 3" \
+    || fail "D: RC is 3 (got $RC)"
+echo "$OUT" | grep -q -- "--startup-grace" \
+    && pass "D: output contains '--startup-grace'" \
+    || fail "D: output missing '--startup-grace'"
+echo "$OUT" | grep -q "Exit 4" \
+    && pass "D: output contains 'Exit 4'" \
+    || fail "D: output missing 'Exit 4'"
+
+exit "$FAILED"

@@ -135,21 +135,22 @@ class DepthChartEntryRepositoryTest extends TestCase
         $this->assertTrue($result);
     }
 
-    public function testUpdatePlayerDepthChartHandlesStringNumbers(): void
+    public function testUpdatePlayerDepthChartWithIntegerValues(): void
     {
-        // Test that the method properly converts string numbers to integers
-        // (mysqli bind_param "i" coerces string inputs). Strings are intentional;
-        // the array{...: int} shape mismatch is a documented baseline defer, not a
-        // defect to "fix" by changing these to ints (that would gut the test).
         $playerName = 'Test Player';
         $depthChartValues = [
-            'pg' => '1',  // String instead of int
-            'sg' => '0',
-            'sf' => '2',
-            'pf' => '0',
-            'c' => '0',
-            'canPlayInGame' => '1',
-            'min' => '30',
+            'pg' => 1,
+            'sg' => 0,
+            'sf' => 2,
+            'pf' => 0,
+            'c' => 0,
+            'canPlayInGame' => 1,
+            'min' => 30,
+            'of' => 0,
+            'df' => 0,
+            'oi' => 0,
+            'di' => 0,
+            'bh' => 0,
         ];
 
         $this->mockDb->setAffectedRows(1);

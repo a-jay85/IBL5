@@ -62,7 +62,7 @@ last_verified: 2026-09-05
 | L33 | CLI entrypoints accept unknown flags silently; no static rule enforces argv option allowlisting | ⬜ Open | 🟦 | S |
 | L34 | `bin/pr-ready-now` has no working stop path; `launchctl bootout` orphans the session and corrupts slot accounting | ✅ Implemented | — | S |
 | L35 | automouse: cap-timeout kill (exit 143) misclassified as genuine plan failure, burns attempt | ⬜ Open | 🟥 | S |
-| L36 | `/post-plan` Phase 3 writes a hardcoded "covered by unit and E2E tests" clause into the PR body without checking the diff contains those test types | ⬜ Open | 🟥 | S |
+| L36 | `/post-plan` Phase 3 writes a hardcoded "covered by unit and E2E tests" clause into the PR body without checking the diff contains those test types | ✅ Implemented | — | S |
 | L37 | PR body declares only the plan's named files; changes the plan never named ship undeclared, so a reviewer cannot separate intended scope from drift | ⬜ Open | 🟦 | S |
 | L38 | Headless CI watcher killed: `local_bash` not awaited by wind-down sweep — phantom success under `claude -p` | ✅ Shipped #2026 | 🟦 | S |
 | L39 | Autonomous PR body omits plan-deliverable moot-at-branch-cut explanation and asserts unchecked test coverage | ⬜ Open | 🟥 | S |
@@ -275,44 +275,7 @@ last_verified: 2026-09-05
 **Note:** `bin/automouse/run` is a ship-pipeline surface; route through `/plan`, not ad-hoc.
 **Status (2026-08-24):** ⬜ Open — 🟥 (ship-pipeline surface; loop-machinery changes should default to `auto_merge: false`).
 
-### L36 `/post-plan` Phase 3 writes a hardcoded "covered by unit and E2E tests" clause into the PR body without checking the diff contains those test types
-*(discovered 2026-08-25 during #1969)*
-
-**class:** a skill or generator asserts a fact about its own environment — test coverage present, a tool exempt from a gate — as a template constant or a hand-written invariant, with nothing checking that the assertion is still true. Two live instances found this pass: a PR-body clause naming test types the diff does not contain, and a skill invariant declaring `Monitor` exempt from the worktree command-substitution gate when it is not.
-
-**Location:** `.claude/skills/post-plan/SKILL.md` line 121 — "If the matrix has zero truly-manual rows (or the plan says 'All verification is automated'), write: `No manual testing needed — all changes are covered by unit and E2E tests.`"
-
-**Problem:** The clause is a template constant, not a claim derived from the diff. PR #1969 added PHPUnit unit and `DatabaseIntegration` tests and **no** Playwright E2E spec, yet the body asserted E2E coverage. The failing half is only the tail clause: the `No manual testing needed` prefix is a load-bearing machine sentinel that `bin/lib/pr-armable.sh:59` prefix-matches (`^[[:space:]]*No manual testing needed`) to clear auto-merge condition (1), so the sentinel itself must survive any fix. `.claude/skills/plan/SKILL.md:288` already names this exact sentence as a known plan-side failure mode ("Silence is not coverage"), but names it only as a *plan matrix* defect — nothing checks the generated PR body against the realized diff.
-
-**Occurrence table:**
-
-| # | File:line | Same class? | Live? | Status |
-|---|-----------|-------------|-------|--------|
-| 1 | PR #1969 body § Manual Testing (generated from `.claude/skills/post-plan/SKILL.md:121`) | yes | yes | fixed this pass (body prose corrected in-PR) |
-| 2 | `.claude/skills/post-plan/SKILL.md:121` (the generator itself) | yes | yes | not fixed — filed (ship-pipeline surface; wants a `/plan`) |
-| 3 | `.claude/skills/post-plan/SKILL.md:276` — fallback clause says "automated tests", type-agnostic | near-miss | yes | not fixed — correct as written; names no specific type |
-| 4 | `.claude/skills/plan/SKILL.md:288` | near-miss | yes | not fixed — this is the documented warning, not an occurrence |
-| 5 | `.claude/skills/pr-ready/SKILL.md` — Invariants § "**Exempt:** any command passed to `Monitor`, which is not gated" | yes | yes | **already fixed on master** — independently found and shipped the same day as [E14](dev-efficiency-backlog.md) via #1991, which deleted the clause. Measured false here first (2026-08-25: the inline watcher was refused with "too complex to verify that it stays inside the worktree" and had to be written to a `/tmp` script), then confirmed resolved on rebase. Retained as evidence the class generalises beyond the `post-plan` generator. |
-
-**prevention ladder:**
-- rung 0 — already covered? No. `bin/lib/pr-armable.sh` prefix-matches the sentinel and never reads the tail clause; `bin/check-docs` does not read PR bodies at all.
-- rung 1 — extend an existing gate? **Yes — this is the landing rung.** `bin/lib/pr-armable.sh` already parses the `## Manual Testing` section and already owns the Manual-Testing clearance predicate; extending `pr_manual_testing_clearance` (or adding a sibling predicate beside it) to reject a tail clause naming a test type absent from the PR's changed-file list reuses the existing parse and the existing `ibl5/tests/Cli/PrArmableLibCliTest.php` harness.
-- rung 2 — a rule doc? Insufficient alone: `.claude/skills/plan/SKILL.md:288` already *is* prose guidance against this exact sentence and it did not prevent the occurrence.
-- rung 3 — a PHPStan rule? N/A — the artifact is a GitHub PR body, not PHP.
-- rung 4 — a CI gate? Overkill given rung 1 lands it, and a CI job cannot see the body on a `pull_request` event without an extra API call.
-- rung 5 — a new hook? Overkill; rung 1 is strictly cheaper.
-
-Rung 1 does not require the `.claude/rules/meta-tooling-bar.md` extend-before-add conditions (those bind rungs 3–5), and it *is* the extend-before-add outcome those conditions push toward.
-
-**artifact destination:** `bin/lib/pr-armable.sh` (in-repo, appears in the PR diff), locked by `ibl5/tests/Cli/PrArmableLibCliTest.php`. A companion one-line correction to the template at `.claude/skills/post-plan/SKILL.md:121` ships with it. Occurrence 5 needs no artifact — #1991 already deleted the clause (dev-efficiency E14, ✅ Implemented 2026-08-25). Two independent discoveries of the same class on the same day is itself the argument for rung 1: prose asserting an environment fact is not self-checking, so it drifts silently until something trips over it.
-
-**Suggested direction:** Change the `.claude/skills/post-plan/SKILL.md:121` template to a type-agnostic clause ("all changes are covered by automated tests", matching line 276), and extend `pr_manual_testing_clearance` to fail closed when the tail clause names a test type with no corresponding file in the PR's changed-file list.
-
-**Risk if untouched:** Every plan whose matrix has zero `Truly-manual` rows ships a PR body asserting E2E coverage it may not have. A reviewer who trusts the sentence skips exactly the verification the plan deferred, and the false claim is the *positive clearance signal* auto-merge arming reads — so the sentence that is wrong is also the one that unblocks the merge.
-
-**Note:** `.claude/skills/post-plan/SKILL.md` and `bin/lib/pr-armable.sh` are ship-pipeline surfaces; route through `/plan`, not ad-hoc.
-
-**Status (2026-08-25):** ⬜ Open — 🟥 (ship-pipeline surface; touches the auto-merge clearance predicate).
+➜ L36 `/post-plan` Phase 3 hardcoded "covered by unit and E2E tests" — ✅ Implemented (2026-08-31): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ### L37 PR body declares only the plan's named files; changes the plan never named ship undeclared
 
@@ -470,6 +433,7 @@ not add backticks or markdown links to a row.
 | 2026-08-26 | #1996 | class: SQL table names in BaseMysqliRepository subclasses inserted without backtick quoting, silently bypassing the rewriteTableNames() invariant that all repository SQL be rewrite-eligible | routed to: Rung 1 - PHPStan rule over SQL string literals in BaseMysqliRepository subclasses, asserting all bare table-name identifiers are backtick-quoted in INSERT/UPDATE/DELETE statements | prior: -- |
 | 2026-08-27 | #2002 | class: Phase 6 conflict-audit runtime dependency (/tmp/pr-ready-diff-pre-<N>.patch) deletable by bin/pr-ready-now:246 (rm -f /tmp/pr-ready-*-"${PR}".*), leaving the audit unable to verify conflict resolution without a reconstruction workaround | routed to: Rung 3 - forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan modifying the /pr-ready skill's tmp-file cleanup in bin/pr-ready-now must verify the Phase 6 conflict-audit path (/tmp/pr-ready-diff-pre-<N>.patch) is excluded from the cleanup glob | prior: -- |
 | 2026-08-29 | #2023 | class: an unconditional detection check in an audit class is nested inside a fail-open guard conditioned on data availability, causing the check to silently skip when the guard condition is false instead of running independently | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan adding or modifying a detection check in an audit class that has a fail-open guard must verify the check fires even when the guard-controlling condition is false (e.g., ScheduleReconciliationAudit with empty schedule index) | prior: -- |
+| 2026-08-31 | #2043 | class: a skill or generator asserts a fact about its own output environment as a template constant — test types present, a tool exempt from a gate — with nothing checking the assertion holds after the diff that generates the output changes | routed to: Rung 2 - extended pr_manual_testing_clearance() in bin/lib/pr-armable.sh to fail closed when the PR body's tail clause names a test type absent from the changed-file list | prior: -- |
 | 2026-09-01 | #2054 | class: a two-phase CLI tool that collects human judgment for a set of items does not short-circuit when the set is empty, forcing an unnecessary second invocation and opening a failure window in the inter-invocation gap | routed to: Rung 4 - rule doc in .claude/rules/ stating that two-invocation CLI scripts must implement the trivial bypass when invocation 1 produces an empty judgment set | prior: -- |
 | 2026-09-04 | #2087 | class: Shell script wrapper that cd's to its module root before invoking Python invalidates caller-provided relative path arguments, silently breaking callers that pass repo-relative paths | routed to: Rung 4 - .claude/rules/shell-wrapper-path-resolution.md | prior: -- |
 | 2026-09-04 | #2092 | class: a plan-level portability claim for a shell script uses find -regex with \{n\} interval notation, verified only on macOS BSD find (where BRE supports \{n\}), not on Ubuntu GNU find (which uses emacs regex type by default and does not treat \{n\} as an interval) — the regex silently matches nothing in CI, causing the script to find no directories and skip its entire body without error | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan introducing a find -regex pattern claiming cross-platform portability between macOS and Ubuntu must carry a CI-run verification row demonstrating the regex matches on the Ubuntu runner, OR must use bash-level character-class and length filtering instead of find interval expressions | prior: -- |

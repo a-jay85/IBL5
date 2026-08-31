@@ -48,7 +48,8 @@ last_verified: 2026-09-06
 | L19 | Weekly product-analytics review | ⬜ Open | 🟦 | M |
 | L20 | post-plan body-rewrite clobbers `Depends-on:`, bypassing arm condition (6) | ✅ Implemented (2026-09-06) | — | M |
 | L21 | Phase 5.0 parsers fail-open on an unclosed code fence (conformance check covers nothing) | ⬜ Open | 🟥 | S |
-| L22 | Sweep queue-vs-review disposition gates across other skills/scripts | ⬜ Open | 🟦 | S |
+| L22 | Sweep queue-vs-review disposition gates across other skills/scripts | ✅ Implemented | — | S |
+| L51 | Archive closure Status line can assert full sweep completion while named candidate sites lack documented dispositions, creating a permanently false record | ⬜ Open | 🟥 | S |
 | L23 | sim-recap degraded path emits no Discord signal; qctx() failure ships roster-blind with CI green | 📋 Planned | 🟦 | S |
 | L24 | Phase 5.0 conformance is path-level only; planned method names absent from diff pass undetected | ✅ Implemented | — | S |
 | L25 | CI-wiring gap: matrix CLI-executable rows may live in jobs the PR's own path filters never trigger | ✅ Implemented | — | S |
@@ -178,11 +179,7 @@ last_verified: 2026-09-06
 **Status (2026-07-29):** ⬜ Open — 🟥 (ship-pipeline invariant; loop-machinery changes should default to `auto_merge: false`). (discovered 2026-07-29 during matrix-fence-strip; documented in `parse_matrix` docstring on that branch)
 
 ### L22 Sweep queue-vs-review disposition gates across other skills/scripts
-**Location:** `.claude/skills/` — every other skill or script carrying `--queue` vs `--implement` (or equivalent queue-vs-human-review) disposition guidance. `.claude/skills/plan-prompt/SKILL.md` Step 5 item 2 is already converted (this entry's originating PR). Candidates to enumerate: `.claude/skills/plan/SKILL.md` (Step 4 gate 14 and its `auto_merge` guidance), `.claude/skills/post-plan/SKILL.md` (the Phase 6.5 arm conditions), and `bin/plan-now`'s disposition coda. **Peer conflict:** `.claude/skills/plan/SKILL.md` was owned by branch `plan-frontmatter-scaffold-strip` during the originating PR's implementation window, so the sweep is deferred until that branch merges.
-**Problem:** The blast-radius predicate now governing `/plan-prompt`'s gate — reach for `--implement` if and only if the work triggers `plan-architect-xhigh` — applies equally to every other queue-vs-review gate in the pipeline. Those gates still key on subjective self-assessment (novelty, felt scope, drafting-session confidence), which is unfalsifiable and fires hardest exactly when the deciding session has the least information. Left alone, each gate re-accretes its own carve-outs on its next edit and the pipeline ends up holding several mutually inconsistent answers to one question.
-**Suggested direction:** Once `plan-frontmatter-scaffold-strip` has merged, enumerate every disposition gate under `.claude/skills/` and `bin/`, apply the same three-trigger predicate (security surface or trust boundary; destructive or schema-tightening migration; `.claude/skills` ship-pipeline invariant — authoritative in `.claude/rules/agent-tiering.md` § Tiers), and ship it as one `chore:` PR. **Explicit non-target:** `.claude/rules/work-triage.md` § Ad-hoc safety mirror is deliberately out of scope — it answers a different question (should this work be planned at all, where a UI/UX or subjective-judgment surface is a legitimate trigger), not whether a human reads the plan before it implements. Do not fold it in.
-**Risk if untouched:** The predicate lives in one skill while its peers keep subjective carve-outs, so the queue-vs-review decision stays inconsistent across the pipeline and each gate drifts independently.
-**Status (2026-07-30):** ⬜ Open — 🟦 (the design is already resolved by the originating PR, so the sweep itself is mechanical; human-merge per this doc's burn-down default for loop-machinery changes). (discovered 2026-07-30 during plan-prompt-blast-radius-disposition)
+➜ L22 Sweep queue-vs-review disposition gates across other skills/scripts — ✅ Implemented (2026-08-31): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ➜ L23 sim-recap degraded path emits no Discord signal; qctx() failure ships roster-blind with CI green — ✅ Implemented (2026-08-14): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
@@ -471,6 +468,7 @@ not add backticks or markdown links to a row.
 | 2026-08-31 | #2039 | class: an awk filter in a skill file uses a reset pattern that fires after the set pattern on the same diff-header line, making the exclusion a no-op and silently passing all lines through | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan adding or modifying an awk filter in a skill or bin/ file must carry a CLI-executable smoke test that verifies the negative path (excluded content absent from output) and the positive path (non-excluded content present) | prior: -- |
 | 2026-09-01 | #2054 | class: a two-phase CLI tool that collects human judgment for a set of items does not short-circuit when the set is empty, forcing an unnecessary second invocation and opening a failure window in the inter-invocation gap | routed to: Rung 4 - rule doc in .claude/rules/ stating that two-invocation CLI scripts must implement the trivial bypass when invocation 1 produces an empty judgment set | prior: -- |
 | 2026-09-04 | #2087 | class: Shell script wrapper that cd's to its module root before invoking Python invalidates caller-provided relative path arguments, silently breaking callers that pass repo-relative paths | routed to: Rung 4 - .claude/rules/shell-wrapper-path-resolution.md | prior: -- |
+| 2026-08-31 | #2040 | class: a backlog entry archived in the live file receives a table-row status flip but its section-body Status: line is left at the old open status — the two representations diverge until a follow-up fix commit corrects the section body | routed to: Rung 3 - forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan that archives a backlog entry (moves section body to archive/) must carry a verification step confirming the archived entry's Status: line is updated to ✅ Implemented | prior: -- |
 | 2026-09-04 | #2092 | class: a plan-level portability claim for a shell script uses find -regex with \{n\} interval notation, verified only on macOS BSD find (where BRE supports \{n\}), not on Ubuntu GNU find (which uses emacs regex type by default and does not treat \{n\} as an interval) — the regex silently matches nothing in CI, causing the script to find no directories and skip its entire body without error | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan introducing a find -regex pattern claiming cross-platform portability between macOS and Ubuntu must carry a CI-run verification row demonstrating the regex matches on the Ubuntu runner, OR must use bash-level character-class and length filtering instead of find interval expressions | prior: -- |
 | 2026-09-05 | #2117 | class: proc_open subprocess contract violations (unchecked proc_close exit, undrained stderr, NUL-unsafe delimiter) shipped undetected when a plan adds or modifies a proc_open call site without requiring subprocess contract verification | routed to: Rung 1 (partial, shipped in #2117) - BanProcOpenUncheckedExitRule in ibl5/phpstan-rules/ enforces checked proc_close exit; broader contract (stderr drain, NUL-delimiter correctness) routed to Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger) | prior: -- |
 | 2026-09-05 | #2121 | class: new always-loaded rule doc committed to wrong directory tree during implementation — bin/check-rules-byte-budget scans only the correct $RULES_DIR, so the misplaced file passes the gate silently until manually relocated | routed to: Rung 4 - note in .claude/rules/doc-freshness.md clarifying always-loaded .claude/rules/*.md files must be created at the exact repo-root path, not inside any subdirectory (e.g. not ibl5/.claude/rules/) | prior: -- |
@@ -750,6 +748,17 @@ Landing rung: **no gate warranted** — neither occurrence exists in the tree af
 **provenance:** (discovered 2026-09-05 during #2108)
 
 **Status (2026-09-05):** ✅ moot — harness retired this PR.
+### L51 Archive closure Status line can assert full sweep completion while named candidate sites lack documented dispositions
+
+*(discovered 2026-09-05 via PR #2040 Phase 6 plan-intent fidelity review)*
+
+**Location:** Any `loop-engineering-backlog-archive.md` entry whose body enumerates candidate sites for a multi-site sweep.
+
+**Problem:** A Status line stamped ✅ Implemented after converting one site — while the body still names other sites as candidates requiring assessment — produces a permanently false closure. The archive is read-only after merge; a false closure there is uncorrectable without a follow-up PR.
+
+**Suggested direction:** When archiving a multi-site sweep entry, the Status line must name every site listed in the body and state its disposition (converted, assessed/out-of-scope, or waived with reason). Add a check to `.claude/skills/fix-and-prevent/_remediation.md` step 4 noting this requirement before "Bump that file's `last_verified`".
+
+**provenance:** (discovered 2026-09-05; PR #2040 L22 Status line claimed full sweep when gate-14, post-plan/SKILL.md, and bin/plan-now candidate dispositions were undocumented; corrected in same PR)
 
 ---
 

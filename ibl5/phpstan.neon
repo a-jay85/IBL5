@@ -209,3 +209,7 @@ services:
         class: PHPStanRules\BanProcOpenUncheckedExitRule
         tags:
             - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanUnknownCliOptionRule
+        tags:
+            - phpstan.rules.rule

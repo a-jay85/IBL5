@@ -60,7 +60,7 @@ class NewsController implements NewsControllerInterface
             $home_msg = "";
         } else {
             $topicText = $newsService->getTopicText($new_topic);
-            OpenTable();
+            echo '<div class="ibl-card">';
             if ($topicText === null) {
                 echo "<center><font class=\"title\">$sitename</font><br><br>" . _NOINFO4TOPIC . "<br><br>[ <a href=\"modules.php?name=News\">" . _GOTONEWSINDEX . "</a> | <a href=\"modules.php?name=Topics\">" . _SELECTNEWTOPIC . "</a> ]</center>";
             } else {
@@ -74,7 +74,7 @@ class NewsController implements NewsControllerInterface
                     . "</form>"
                     . "[ <a href=\"index.php\">" . _GOTOHOME . "</a> | <a href=\"modules.php?name=Topics\">" . _SELECTNEWTOPIC . "</a> ]</center>";
             }
-            CloseTable();
+            echo '</div>';
             echo "<br>";
         }
 

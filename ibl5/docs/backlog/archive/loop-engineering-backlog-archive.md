@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed autonomous-loop engineering entries, extracted from loop-engineering-backlog.md.
-last_verified: 2026-08-25
+last_verified: 2026-08-31
 ---
 
 # Autonomous-Loop Engineering Backlog — Archive
@@ -132,3 +132,12 @@ Read-only historical record of ✅ Implemented entries. For OPEN items see ../lo
 **Risk if untouched:** There is no safe way to abort a fired run — an operator who thinks they stopped one has in fact left it free to rebase and force-push a real branch, and the slot cap that is supposed to bound concurrency silently over-issues afterwards. The stale-scratch facet is the quieter one: it makes a *future* `/pr-ready` run compare against the wrong baseline while every guard reports green.
 **Closes gap:** abort-path correctness — every fire-path row in #1948 passes; nothing exercises the stop path.
 **Status (2026-08-25):** ✅ Implemented — `bin/pr-ready-now` gained `--stop N[,N...]` / `--stop-all`: bootout → TERM → KILL by end-anchored `--name <label>`, a fail-closed liveness probe that releases the slot only once nothing carries the label, and a PR-anchored clear of `/tmp/pr-ready-*-<N>.*` (also run pre-fire, for provably-dead labels only). `reap_stale()` no longer frees a slot whose `claude` is still alive. Locked by `bin/test-pr-ready-now` cases 32/32c/33/34/35/36. The interim workaround above is superseded by `--stop <N>` — kept for the record only.
+
+### L33 CLI entrypoints accept unknown flags silently; no static rule enforces argv option allowlisting
+**Location:** `ibl5/phpstan-rules/` — no rule inspects `$argv` / `getopt()` option parsing (verified 2026-08-09: zero rule files mention either). The one hardened entrypoint is `ibl5/scripts/bug-pipeline/transition.php`, allowlisted by hand in PR #1654.
+**Problem (was):** A CLI entrypoint that ignores an unrecognized option runs with the caller's intent silently dropped — a typo'd or renamed flag produces a successful-looking run that did something else. It has now recurred three times (#1354, #1496, #1654), each fixed one entrypoint at a time, which is the signature of a class that needs a mechanical check rather than another point fix.
+**Suggested direction (was):** A PHPStan rule over argv/`getopt()` option parsing in CLI entrypoints, asserting that an unrecognized option is rejected rather than ignored. Extend the existing `ibl5/phpstan-rules/` set — this is Rung 1 on the `/post-plan` Phase 9 ladder, and the class registry routes it there.
+**Interim backstop (2026-08-08):** PR #1668 added a forced integration-verification trigger — a plan that adds a CLI flag or flag-parsing branch must carry a row asserting the rejected form fails loudly (`.claude/review-shared/_plan-verification.md` § Forced integration-verification trigger). That is plan-time, so it catches *new* flags only; it does not sweep the entrypoints that already exist.
+**Risk if untouched (was):** A fourth occurrence, and the existing unhardened entrypoints stay unswept — the backstop above never looks at them.
+**Provenance (2026-08-09):** Surfaced by the `## Class registry` seed row for this class, which routed it to Rung 1 and recorded it as queued; nothing was in fact queued. This entry is that queue.
+**Status (2026-08-30):** ✅ Implemented — `BanUnknownCliOptionRule` added in `ibl5/phpstan-rules/`; 2 existing callers baselined as temporary. Rule fires on all `getopt()` calls; developers suppress with `@phpstan-ignore ibl.unknownCliOption` after implementing the guard.

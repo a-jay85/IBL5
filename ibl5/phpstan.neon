@@ -205,3 +205,7 @@ services:
         class: PHPStanRules\BanDirectTimeCallsRule
         tags:
             - phpstan.rules.rule
+    -
+        class: PHPStanRules\BanUnknownCliOptionRule
+        tags:
+            - phpstan.rules.rule

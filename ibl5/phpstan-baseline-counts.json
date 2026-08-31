@@ -27,6 +27,7 @@
         "ibl.orderByMissingTiebreaker": 84,
         "ibl.sqlStringConcatenation": 33,
         "ibl.trustedVariable": 17,
+        "ibl.unknownCliOption": 2,
         "identical.alwaysFalse": 1,
         "if.condNotBoolean": 3,
         "method.nonObject": 19,

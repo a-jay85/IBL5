@@ -7,13 +7,6 @@ namespace Tests\DepthChartEntry;
 use PHPUnit\Framework\TestCase;
 use DepthChartEntry\DepthChartEntryValidator;
 
-/**
- * All fixtures deliberately omit the `playerData` key — the validator's structural/count
- * rules (activePlayers, pos_1–pos_5, hasStarterAtMultiplePositions) are tested independently
- * of player roster data. The array{} shape mismatch for the missing key is a documented
- * baseline defer, not a defect to fix by populating playerData (that would couple these
- * structural tests to player-data logic they are not testing).
- */
 class DepthChartEntryValidatorTest extends TestCase
 {
     private DepthChartEntryValidator $validator;
@@ -26,6 +19,7 @@ class DepthChartEntryValidatorTest extends TestCase
     public function testValidatesSuccessfullyWithValidRegularSeasonData(): void
     {
         $depthChartData = [
+            'playerData' => [],
             'activePlayers' => 12,
             'pos_1' => 3,
             'pos_2' => 3,
@@ -35,16 +29,17 @@ class DepthChartEntryValidatorTest extends TestCase
             'hasStarterAtMultiplePositions' => false,
             'nameOfProblemStarter' => ''
         ];
-        
+
         $result = $this->validator->validate($depthChartData, 'Regular Season');
-        
+
         $this->assertTrue($result);
         $this->assertEmpty($this->validator->getErrors());
     }
-    
+
     public function testValidatesSuccessfullyWithValidPlayoffsData(): void
     {
         $depthChartData = [
+            'playerData' => [],
             'activePlayers' => 10,
             'pos_1' => 2,
             'pos_2' => 2,
@@ -54,16 +49,17 @@ class DepthChartEntryValidatorTest extends TestCase
             'hasStarterAtMultiplePositions' => false,
             'nameOfProblemStarter' => ''
         ];
-        
+
         $result = $this->validator->validate($depthChartData, 'Playoffs');
-        
+
         $this->assertTrue($result);
         $this->assertEmpty($this->validator->getErrors());
     }
-    
+
     public function testFailsValidationWithTooFewActivePlayers(): void
     {
         $depthChartData = [
+            'playerData' => [],
             'activePlayers' => 10,
             'pos_1' => 3,
             'pos_2' => 3,
@@ -73,17 +69,18 @@ class DepthChartEntryValidatorTest extends TestCase
             'hasStarterAtMultiplePositions' => false,
             'nameOfProblemStarter' => ''
         ];
-        
+
         $result = $this->validator->validate($depthChartData, 'Regular Season');
-        
+
         $this->assertFalse($result);
         $this->assertNotEmpty($this->validator->getErrors());
         $this->assertSame('active_players_min', $this->validator->getErrors()[0]['type']);
     }
-    
+
     public function testFailsValidationWithTooManyActivePlayers(): void
     {
         $depthChartData = [
+            'playerData' => [],
             'activePlayers' => 13,
             'pos_1' => 3,
             'pos_2' => 3,
@@ -93,17 +90,18 @@ class DepthChartEntryValidatorTest extends TestCase
             'hasStarterAtMultiplePositions' => false,
             'nameOfProblemStarter' => ''
         ];
-        
+
         $result = $this->validator->validate($depthChartData, 'Regular Season');
-        
+
         $this->assertFalse($result);
         $this->assertNotEmpty($this->validator->getErrors());
         $this->assertSame('active_players_max', $this->validator->getErrors()[0]['type']);
     }
-    
+
     public function testReturnsFormattedErrorMessages(): void
     {
         $depthChartData = [
+            'playerData' => [],
             'activePlayers' => 10,
             'pos_1' => 3,
             'pos_2' => 3,
@@ -113,17 +111,18 @@ class DepthChartEntryValidatorTest extends TestCase
             'hasStarterAtMultiplePositions' => false,
             'nameOfProblemStarter' => ''
         ];
-        
+
         $this->validator->validate($depthChartData, 'Regular Season');
         $errorHtml = $this->validator->getErrorMessagesHtml();
-        
+
         $this->assertStringContainsString('text-red-500', $errorHtml);
         $this->assertStringContainsString('at least 12 active players', $errorHtml);
     }
-    
+
     public function testValidatesActivePlayerCountPositionDepthAndMultiStarter(): void
     {
         $depthChartData = [
+            'playerData' => [],
             'activePlayers' => 8,  // Too few for Regular Season (min 12)
             'pos_1' => 1,         // Too few PG (need 3)
             'pos_2' => 1,         // Too few SG (need 3)
@@ -145,10 +144,11 @@ class DepthChartEntryValidatorTest extends TestCase
         $this->assertSame('position_depth', $errors[2]['type']);
         $this->assertSame('multiple_starting_positions', $errors[3]['type']);
     }
-    
+
     public function testEdgeCaseExactlyAtMinimumRequirements(): void
     {
         $depthChartData = [
+            'playerData' => [],
             'activePlayers' => 12,  // Exactly minimum
             'pos_1' => 3,  // Exactly minimum
             'pos_2' => 3,
@@ -158,16 +158,17 @@ class DepthChartEntryValidatorTest extends TestCase
             'hasStarterAtMultiplePositions' => false,
             'nameOfProblemStarter' => ''
         ];
-        
+
         $result = $this->validator->validate($depthChartData, 'Regular Season');
-        
+
         $this->assertTrue($result);
         $this->assertEmpty($this->validator->getErrors());
     }
-    
+
     public function testEdgeCaseExactlyAtMaximumActivePlayers(): void
     {
         $depthChartData = [
+            'playerData' => [],
             'activePlayers' => 12,  // Exactly maximum
             'pos_1' => 3,
             'pos_2' => 3,
@@ -177,16 +178,17 @@ class DepthChartEntryValidatorTest extends TestCase
             'hasStarterAtMultiplePositions' => false,
             'nameOfProblemStarter' => ''
         ];
-        
+
         $result = $this->validator->validate($depthChartData, 'Regular Season');
-        
+
         $this->assertTrue($result);
         $this->assertEmpty($this->validator->getErrors());
     }
-    
+
     public function testPlayoffsAllowsFewerActivePlayers(): void
     {
         $depthChartData = [
+            'playerData' => [],
             'activePlayers' => 11,  // Valid for playoffs
             'pos_1' => 2,
             'pos_2' => 2,
@@ -196,16 +198,17 @@ class DepthChartEntryValidatorTest extends TestCase
             'hasStarterAtMultiplePositions' => false,
             'nameOfProblemStarter' => ''
         ];
-        
+
         $result = $this->validator->validate($depthChartData, 'Playoffs');
-        
+
         $this->assertTrue($result);
         $this->assertEmpty($this->validator->getErrors());
     }
-    
+
     public function testFailsValidationWithInsufficientPositionDepth(): void
     {
         $depthChartData = [
+            'playerData' => [],
             'activePlayers' => 12,
             'pos_1' => 3,
             'pos_2' => 3,
@@ -228,6 +231,7 @@ class DepthChartEntryValidatorTest extends TestCase
     public function testFailsValidationWithMultipleStartingPositions(): void
     {
         $depthChartData = [
+            'playerData' => [],
             'activePlayers' => 12,
             'pos_1' => 3,
             'pos_2' => 3,

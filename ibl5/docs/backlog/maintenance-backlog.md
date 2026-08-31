@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-08-30
+last_verified: 2026-08-31
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -287,13 +287,11 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20 against current `phpstan-baseline.neon` / `phpstan-tests-baseline.neon`):**
 
-> ✅ resolved (19): 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 5.10, 5.11, 5.12, 5.13, 5.14, 5.16, 5.17, 5.18, 5.20, 5.21 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (20): 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 5.10, 5.11, 5.12, 5.13, 5.14, 5.16, 5.17, 5.18, 5.19, 5.20, 5.21 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 5.15 | ◑ Partial | 🟨 | `argument.type` 161→**73** in tests baseline (verified); phantom cascades cleared, real remainder persists (#1100 burns 2). Each fix must **not** weaken the assert (`feedback_agent_argument_type_weakening`) → careful, error-prone. |
-| 5.19 | ◑ Partial | 🟨 | DepthChartEntry tests **87→16** baseline entries (verified); bulk cleared by 5.1/5.14. Remaining 16 = careful test-type fixes (as 5.15). |
-
 ### 5.15 161 `argument.type` in Tests — Mostly Phantom Cascades
 **Location:** Extension (41), FreeAgency (23), WideUnit (22), Injuries (18), UpdateAllTheThings (16), DepthChartEntry (9)
 **Problem:** `MockDatabase` not seen as `mysqli` subtype → injected `MockDatabase` violates constructor parameter type.
@@ -301,14 +299,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Est. effort:** S (consequence)
 **Risk if untouched:** Real argument-type bugs marked as suppressed noise.
 **Status:** Partial (verified 2026-06-20) — `argument.type` in tests baseline down 161→73 (phantom cascades cleared by 5.1/5.14; #1100 burns down 2). Real remainder persists.
-
-### 5.19 DepthChartEntry Tests — 87 Errors Across 5 Files (Canonical Module!)
-**Location:** `ibl5/tests/DepthChartEntry/`
-**Problem:** CLAUDE.md cites DepthChartEntry as canonical-refactored; its tests carry 87 baseline errors.
-**Suggested direction:** Fix DepthChartEntry first as the mock-infrastructure proof-of-concept.
-**Est. effort:** M (pilot)
-**Risk if untouched:** Canonical example has degraded analysis — undermines its use as a template.
-**Status:** Partial (verified 2026-06-20) — DepthChartEntry test baseline entries down 87→16 (bulk cleared by the 5.1/5.14 mock fixes); remaining 16 are careful test-type fixes.
 
 ## Axis 6: Test Coverage Gaps
 

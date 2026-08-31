@@ -246,7 +246,7 @@ last_verified: 2026-09-02
 **Status (2026-08-08):** ⬜ Open — 🟥 (touches impl-disposition classification; reproduce before designing).
 
 ### L33 CLI entrypoints accept unknown flags silently; no static rule enforces argv option allowlisting
-➜ L33 CLI entrypoints accept unknown flags silently — ✅ Implemented (2026-08-30): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
+➜ L33 CLI entrypoints accept unknown flags silently — ✅ Implemented (2026-08-30): PR #2042. see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 
 ### L34 `bin/pr-ready-now` has no working stop path; `launchctl bootout` orphans the session and corrupts slot accounting

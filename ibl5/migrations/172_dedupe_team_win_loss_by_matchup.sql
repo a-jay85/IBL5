@@ -1,4 +1,4 @@
--- Migration 171 — key `ibl_team_win_loss` on the matchup triple, not the quadruple.
+-- Migration 172 — key `ibl_team_win_loss` on the matchup triple, not the quadruple.
 --
 -- Migration 121 defined this view's `unique_games` CTE with a four-column dedup key
 -- (game_date, visitor_teamid, home_teamid, game_of_that_day). `game_of_that_day` is a

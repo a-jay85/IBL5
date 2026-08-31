@@ -18,7 +18,7 @@ Meanwhile the duplicate check that should have caught it — `KIND_DUPLICATE_TRI
 
 ## Decision
 
-**1. The view's dedup key is the matchup triple.** Migration 171 redefines `ibl_team_win_loss` to canonicalize on `(game_date, visitor_teamid, home_teamid)`, selecting `min(game_of_that_day)` as the canonical row — "first recorded wins". This is the in-repo house pattern; `vw_schedule_upcoming` in migration 121 canonicalizes identically. Choosing a row *deterministically* is load-bearing rather than cosmetic: duplicate rows can disagree on the score, and an arbitrary-row `GROUP BY` selection would make **which team is credited with the win** nondeterministic across query plans.
+**1. The view's dedup key is the matchup triple.** Migration 172 redefines `ibl_team_win_loss` to canonicalize on `(game_date, visitor_teamid, home_teamid)`, selecting `min(game_of_that_day)` as the canonical row — "first recorded wins". This is the in-repo house pattern; `vw_schedule_upcoming` in migration 121 canonicalizes identically. Choosing a row *deterministically* is load-bearing rather than cosmetic: duplicate rows can disagree on the score, and an arbitrary-row `GROUP BY` selection would make **which team is credited with the win** nondeterministic across query plans.
 
 **2. A duplicate is therefore invisible in the view, by design.** Collapsing the pair is the correct reporting behaviour — a league page should show 82 games — but it also means the view can never be the place a duplicate is *detected*. The two properties are in tension only if one surface is asked to do both jobs.
 
@@ -45,7 +45,7 @@ Meanwhile the duplicate check that should have caught it — `KIND_DUPLICATE_TRI
 
 ## References
 
-- `ibl5/migrations/171_dedupe_team_win_loss_by_matchup.sql` — the view redefinition.
+- `ibl5/migrations/172_dedupe_team_win_loss_by_matchup.sql` — the view redefinition.
 - `ibl5/migrations/121_snake_case_boxscore_and_schedule_columns.sql` — the original four-column key, and `vw_schedule_upcoming`'s `min(game_of_that_day)` prior art.
 - `ibl5/classes/Boxscore/ScheduleReconciliationAudit.php` — the unconditional, `game_type = 1`-scoped duplicate loop.
 - `ibl5/classes/Boxscore/BoxscoreRepository.php` — `findDuplicateTripleGames(?int $seasonYear, ?int $gameType)`.

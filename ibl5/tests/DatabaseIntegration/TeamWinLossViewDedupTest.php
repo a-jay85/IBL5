@@ -7,7 +7,7 @@ namespace Tests\DatabaseIntegration;
 use PHPUnit\Framework\Attributes\Group;
 
 /**
- * Verifies that migration 171 (canonical_games CTE) collapses duplicate
+ * Verifies that migration 172 (canonical_games CTE) collapses duplicate
  * boxscore rows for the same matchup into exactly one game, while still
  * counting genuinely distinct matchups on the same date as separate games.
  */
@@ -18,9 +18,9 @@ class TeamWinLossViewDedupTest extends DatabaseTestCase
      * The real 2004 corruption shape: the same matchup appears twice in
      * ibl_box_scores_teams under two different game_of_that_day ordinals.
      *
-     * Before migration 171 the four-column dedup key treated each ordinal as a
+     * Before migration 172 the four-column dedup key treated each ordinal as a
      * separate game, making teams appear to have played 83 games in an 82-game
-     * season.  After migration 171 the canonical_games CTE groups by the matchup
+     * season.  After migration 172 the canonical_games CTE groups by the matchup
      * triple (date, visitor_teamid, home_teamid) and keeps only the row with the
      * lowest game_of_that_day, so wins + losses must equal 1 for both teams.
      */

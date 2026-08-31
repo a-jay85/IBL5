@@ -220,7 +220,6 @@ function memoryDirForRepo(string $repoRoot): ?string
     return $home . '/.claude/projects/' . $slug . '/memory';
 }
 
-/** @return list<string> */
 /**
  * Drop repo-relative paths that git considers ignored (gitignored local files are
  * on-disk but never committed, so they must not participate in freshness tracking).
@@ -268,6 +267,7 @@ function filterGitignored(array $files, string $root): array
     ));
 }
 
+/** @return list<string> */
 function collectFiles(string $root, bool $includeMemory): array
 {
     $files = [];

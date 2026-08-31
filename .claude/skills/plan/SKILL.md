@@ -427,7 +427,7 @@ A plan is **queue-safe** the moment `bin/check-plan` (Step 5) exits 0 — that g
 For every plan that passed `bin/check-plan` in Step 5, decide its disposition by this precedence (the default is **queue**):
 
 1. **Explicit token in `$ARGUMENTS`** wins outright: `--implement` (or "implement now") → do NOT queue; leave the plan on disk and report it ready to implement. `--queue` → queue.
-2. **Else, clear session intent to implement now** (the user said they will implement it in this session, or implementation is already underway) → do NOT queue.
+2. **Else, the work trips a `plan-architect-xhigh` trigger** (a security surface or trust boundary; a destructive or schema-tightening migration; or a `.claude/skills` ship-pipeline invariant — see `.claude/rules/agent-tiering.md` § Tiers) → do NOT queue.
 3. **Else, default: auto-queue.** Run `bin/automouse/queue <slug>` for the plan.
 
 When the work was split into multiple PRs (Step 2.5), queue **every** queue-safe unit, running `bin/automouse/queue <slug>` once per plan in dependency order (the order they must merge). A plan that did not pass `bin/check-plan` is never queued — fix it first.

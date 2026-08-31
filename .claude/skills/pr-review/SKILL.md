@@ -34,8 +34,12 @@ gh pr diff --name-only
 
 ### 2c. Get the filtered diff and measure its size
 ```bash
-DIFF=$(gh pr diff | awk '/^diff --git.*migrations\//{skip=1} /^diff --git/{skip=0} skip==0{print}')
-DIFF_SIZE=$(echo "$DIFF" | wc -c)
+DIFF=$(gh pr diff)
+# DIFF_FOR_SIZE excludes migration files from the byte count only — $DIFF stays unfiltered
+# so the reviewer sees the full diff; large migrations are excluded from the size measure
+# to prevent them from blowing the diff-chunking threshold.
+DIFF_FOR_SIZE=$(echo "$DIFF" | awk '/^diff --git/{if(/migrations\//){skip=1}else{skip=0}} skip==0{print}')
+DIFF_SIZE=$(echo "$DIFF_FOR_SIZE" | wc -c)
 echo "Diff size: $DIFF_SIZE bytes"
 echo "$DIFF"
 ```

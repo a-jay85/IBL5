@@ -51,7 +51,7 @@ last_verified: 2026-09-05
 | E22 | Plan-declared negatives and PR body Scope dropped during Phase 6.5 remediation | ✅ Implemented | — | S |
 | E23 | PR body deletion volumes diverged from code's `EXPECTED` constants | ✅ Implemented | — | S |
 | E24 | `/post-plan` Phase 4B can hand-write its review comment, bypassing `post_review_summary` | ✅ Implemented | 🟨 | S |
-| E25 | `/pr-review` migration-exclusion `awk` filter is a no-op, silently ingests full migration diffs | ⬜ Open | 🟨 | S |
+| E25 | `/pr-review` migration-exclusion `awk` filter is a no-op, silently ingests full migration diffs | ✅ Implemented | — | S |
 | E26 | `bin/plan-now` second-resolution timestamp caused label collision on back-to-back invocations | ✅ Implemented | — | S |
 | E27 | `filterGitignored()` in `bin/check-docs`: orphaned docblock, unchecked proc exit, non-NUL-delimited check-ignore paths | ⬜ Open | 🟨 | S |
 | E28 | PR body hand-authored migration numbers not updated after a forced renumber | ⬜ Open | — | S |
@@ -303,7 +303,9 @@ Consequence is size control, not correctness — reviews get *more* context than
 - **rung 3 — fix in place. LANDS HERE.** Correct the `awk` to `/^diff --git/ && !/migrations\//{skip=0}` (or an explicit if/else), and re-verify by grepping the produced diff for `^diff --git.*migrations/` — expecting zero hits. A one-line change with a one-command check; no new tooling, per the extend-before-add bar in `.claude/rules/meta-tooling-bar.md`.
 - **rungs 4–5** — N/A.
 
-`artifact destination:` `.claude/skills/pr-review/SKILL.md` Step 2c (in-repo). Not built this pass.
+`artifact destination:` `.claude/skills/pr-review/SKILL.md` Step 2c (in-repo).
+
+**Status:** Fixed in PR `pr-review-migration-awk-fix` — corrected awk to `if(/migrations\//){skip=1}else{skip=0}` form; introduced `DIFF_FOR_SIZE` for size-only measurement; `$DIFF` left unfiltered for review content.
 
 *(discovered 2026-08-27 during #2001)*
 

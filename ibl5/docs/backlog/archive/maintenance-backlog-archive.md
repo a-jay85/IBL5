@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed/declined maintenance-audit findings, extracted from maintenance-backlog.md.
-last_verified: 2026-08-30
+last_verified: 2026-08-31
 ---
 
 # Maintenance-Cost Reduction Backlog — Archive
@@ -1042,6 +1042,15 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Status:** Completed (2026-06-25) — `Database\MySQL` deleted. The "no remaining app consumers" claim was incorrect; the actual consumers were `modules/News/index.php`, `modules/News/categories.php`, and `classes/Bootstrap/LegacyFunctions.php::blocks()`, all migrated to `$mysqli_db` prepared statements. `db/db.php` instantiation removed and its connection-health check reworked to probe `$mysqli_db->connect_errno`.
 
 **Table evidence (2026-07-25):** Deprecated `Database\MySQL` removed: 3 consumers (News/index.php, News/categories.php, blocks()) migrated to `$mysqli_db` prepared statements; class file + db.php instantiation deleted; db.php health check reworked to `$mysqli_db->connect_errno`. The earlier "no app consumers" note was wrong — there were 3, now migrated.
+### 5.19 DepthChartEntry Tests — 87 Errors Across 5 Files (Canonical Module!)
+**Location:** `ibl5/tests/DepthChartEntry/`
+**Problem:** CLAUDE.md cites DepthChartEntry as canonical-refactored; its tests carry 87 baseline errors.
+**Suggested direction:** Fix DepthChartEntry first as the mock-infrastructure proof-of-concept.
+**Est. effort:** M (pilot)
+**Risk if untouched:** Canonical example has degraded analysis — undermines its use as a template.
+**Status:** Completed (2026-08-31) — DepthChartEntry test baseline entries cleared 87→16→0. Bulk cleared by 5.1/5.14 mock fixes. Remaining 16 required real type fixes in 3 test files (ValidatorTest, RepositoryTest, ProcessorTest).
+
+**Table evidence (2026-08-31):** DepthChartEntry tests **87→16→0** baseline entries; `phpstan-tests-baseline.neon` DepthChartEntry entries = 0; `composer run analyse:tests` clean.
 ### 5.20 152 `missingType.iterableValue` — Untyped Arrays as Primary Test-Debt Vector
 **Location:** WideUnit (46 — on `MockDatabase`), Trading (21), Team (11), RookieOption (9), SeriesRecords (9), Negotiation (4)
 **Problem:** Bare `array` return types prevent shape verification.

@@ -887,6 +887,8 @@ jobs:
         run: bin/test-bun-audit-triage
       - name: bin/test-db-query-routing
         run: bin/test-db-query-routing
+      - name: bin/test-watch-run
+        run: bin/test-watch-run
 
   gate:
     name: Tests and Analysis

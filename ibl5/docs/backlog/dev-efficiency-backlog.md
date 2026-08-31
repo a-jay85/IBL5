@@ -1,6 +1,6 @@
 ---
 description: Development-efficiency backlog — inner-loop speed (diff-scoped analysis, parallel tests), CI caching, dependency-bump batching, and worktree lifecycle automation, with per-entry status.
-last_verified: 2026-08-30
+last_verified: 2026-08-31
 ---
 
 # Development-Efficiency Backlog
@@ -42,7 +42,7 @@ last_verified: 2026-08-30
 | E13 | `bin/wt-new --base <branch>` fast-forwards the wrong branch | ✅ Implemented | — | S |
 | E14 | `/pr-ready` Monitor exemption in invariants is stale — watcher loop is actually refused | ✅ Implemented | — | S |
 | E15 | `/pr-ready` Phase 2 delegation packet tells rebase delegate to push — blocked by sub-agent gate | ✅ Implemented | — | S |
-| E16 | `bin/watch-run` declares a run finished on its first poll, before launchd registers the label | ⬜ Open | 🟩 | S |
+| E16 | `bin/watch-run` declares a run finished on its first poll, before launchd registers the label | ✅ Implemented | — | S |
 | E17 | Skill prose carries fixed-count words (`either`, `the two`) that go stale when the enumerated set grows | ✅ Implemented | — | S |
 | E18 | `/pr-ready` Phase 6.5 commits new files but never regenerates the PR body `files-changed` block | ✅ Implemented | — | S |
 | E19 | `/pr-ready` materialize-from-pin sites declare no fallback, so a pin that predates the script loops forever | ✅ Implemented | — | S |
@@ -111,12 +111,7 @@ last_verified: 2026-08-30
 
 ➜ E15 `/pr-ready` Phase 2 delegation packet tells rebase delegate to push — ✅ Implemented (2026-08-25): see [archive](archive/dev-efficiency-backlog-archive.md).
 
-### E16 `bin/watch-run` declares a run finished on its first poll, before launchd registers the label
-**Location:** `bin/watch-run` — the `label_alive()` check at the top of the poll loop, which runs before any startup grace period.
-**Problem:** `bin/post-plan-now` prints its watch command and returns before launchd has finished registering the job, so a watcher armed immediately after sees `launchctl list` without the label and reports "launchd label gone but the log has no RESULT line" within seconds of a run starting. The `sleep 3` retry that follows only re-checks the log for a `RESULT:` line — and the harness flushes its log at exit by design, so the log is empty for the whole run. Observed 2026-08-24: a `bin/post-plan-now` run on `plan-gate-skill-inline` was reported finished after ~14s; the job was in fact alive (PID 26804) and ran another ~2.5 minutes to a successful `terminal=shipped-held`. This is the readiness-predicate failure mode described in `.claude/rules/work-triage-detail.md` § The readiness predicate — a confident verdict on an unstarted run, indistinguishable from a real completion.
-**Suggested direction:** Do not treat label-absence as terminal until the label has been seen alive at least once, or until a bounded startup grace (a few poll intervals) has elapsed. Alternatively require label-absence on two consecutive polls before exiting, so a transient `launchctl` gap cannot terminate the watch.
-**Risk if untouched:** Every caller that arms the watch command `bin/post-plan-now` prints — the documented usage — can get a false "finished" on a run that just started, and act on a verdict that does not exist yet.
-**Status (2026-08-24):** ⬜ Open — 🟩 (no design fork; add a seen-alive latch or a startup grace to one loop).
+➜ E16 `bin/watch-run` declares a run finished on its first poll, before launchd registers the label — ✅ Implemented (2026-08-31): see [archive](archive/dev-efficiency-backlog-archive.md).
 
 
 ➜ E17 Skill prose carries fixed-count words that go stale when the enumerated set grows — ✅ Implemented (2026-08-25): see [archive](archive/dev-efficiency-backlog-archive.md).

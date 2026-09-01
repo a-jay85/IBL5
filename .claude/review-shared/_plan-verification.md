@@ -1,6 +1,6 @@
 ---
 description: Requires plans to classify every verification step into the test-type taxonomy at plan-write time, preventing manual-testing items from deferring to post-plan cleanup, and grounds seed/DOM-dependent E2E assertions in real fixtures.
-last_verified: 2026-08-23
+last_verified: 2026-08-29
 ---
 
 # Plan Verification Matrix
@@ -185,6 +185,7 @@ The taxonomy above classifies *how* a thing is verified; this table names five s
 | adds or modifies salary-comparison or cap-enforcement logic in a service | asserts **both** the in-season path (`Season::advancesContractYears()=false`, `current_salary` basis) and the offseason path (`advancesContractYears()=true`, `next_year_salary` basis): verify the salary-lookup column actually changes between paths and that the cap outcome (accept/reject) is correct on each |
 | relaxes a fail-closed guard on a store or import path (changes an error or rejection into a warning or no-op) | asserts that either (a) the compensating resolution path that prevents orphaned rows ships in the same PR and is verified post-impl, or (b) the plan's Scope section explicitly states that orphan accumulation is accepted and names a follow-up plan to address it |
 | adds or modifies an importer that writes records to a secondary/audit table (e.g., a junction or tracking table alongside a primary entity table) | carries an integration test that reads the canonical flag column in the primary table after a complete import cycle — checking the secondary table alone does not prove the flag propagated; the primary column must be verified to have changed |
+| adds or modifies a detection check in an audit class that has a fail-open guard conditioned on data availability (e.g., `$isEnabled = $dataIndex !== []`) | asserts the check fires even when the guard-controlling condition is false — a check nested inside a fail-open guard silently skips when data is unavailable, which must be verified to not affect unconditional detection paths |
 
 The header intentionally differs from the two tables above (`| Trigger pattern | Why PHPUnit is insufficient |`, `| Trigger | Example surface |`): those map a trigger to a rationale or an example, while this one mandates a **row shape**. Do not harmonize the headers.
 

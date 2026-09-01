@@ -32,33 +32,33 @@ class MaintenanceRepository extends \BaseMysqliRepository implements Maintenance
     }
 
     /**
-     * @see MaintenanceRepositoryInterface::getTeamRecentCompleteSeasons()
+     * @see MaintenanceRepositoryInterface::getTeamSeasonRecords()
      *
-     * A "complete" season is 82 games, but the 81..83 band deliberately admits
-     * the four known season-2004 anomalies in `ibl_team_win_loss` (Aces 83,
-     * Jazz 83 — one re-simmed game double-counted by the view's dedup key;
-     * Heat 81, Suns 81 — one scheduled game that was never simmed and is
-     * unrecoverable). A scan of seasons 1998-2008 found those four rows and
-     * nothing else outside 82, so the band admits exactly them. Without it the
-     * four teams silently slid their 5-season window back to 2003 while the
-     * other 24 used 2004, making tradition factors mutually inconsistent.
+     * No game-count predicate is applied. The 81..83 band that previously lived
+     * here was removed when the ibl_team_win_loss view's dedup key was fixed in
+     * ADR-0109: phantom boxscores no longer inflate game counts past 82, and the
+     * 2004 anomaly rows (Aces 83 / Jazz 83 / Heat 81 / Suns 81) were remediated
+     * at source. In-progress-season detection (year === currentSeasonYear AND
+     * games < 82) and anomaly validation (games !== 82 → abort) are done by
+     * LeagueControlPanelProcessor, not here.
      *
-     * KEEP THE UPPER BOUND. Phantom-boxscore bugs inflate a season to 119-127
-     * games; an unbounded predicate would let that corruption into the average.
+     * Fetches $limit + 1 rows so the processor can drop one in-progress season
+     * and still have a full window of $limit complete seasons.
      *
-     * @return array<int, array{wins: int, losses: int}>
+     * @return array<int, array{year: int, wins: int, losses: int}>
      */
-    public function getTeamRecentCompleteSeasons(string $teamName, int $limit = 5): array
+    public function getTeamSeasonRecords(string $teamName, int $currentSeasonYear, int $limit = 5): array
     {
-        /** @var array<int, array{wins: int, losses: int}> */
+        /** @var array<int, array{year: int, wins: int, losses: int}> */
         return $this->fetchAll(
-            "SELECT wins, losses FROM `ibl_team_win_loss`
-             WHERE currentname = ? AND (wins + losses BETWEEN 81 AND 83)
+            "SELECT year, wins, losses FROM `ibl_team_win_loss`
+             WHERE currentname = ? AND year <= ?
              ORDER BY year DESC
              LIMIT ?",
-            "si",
+            "sii",
             $teamName,
-            $limit
+            $currentSeasonYear,
+            $limit + 1
         );
     }
 

@@ -59,6 +59,14 @@ jobs:
       # Backup host is overridable via dispatch input for failure testing.
       BACKUP_HOST: ${{ github.event.inputs.ssh_host_override || secrets.HOST }}
       REMOTE_DATABASE: iblhoops_ibl5
+      # config.php.example reads these four via getenv(); the duplicate-invariant
+      # step below needs them to reach the ephemeral MariaDB holding the restored
+      # dump. DB_NAME repeats REMOTE_DATABASE's literal because YAML cannot
+      # self-reference within one env: map.
+      DB_HOST: 127.0.0.1
+      DB_USER: root
+      DB_PASS: root
+      DB_NAME: iblhoops_ibl5
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -155,6 +163,15 @@ jobs:
           fi
           echo "Restore verification passed."
 
+      # After the restore, so a PHP-setup failure can never cost a backup. The
+      # restored dump is complete and unsampled, so this all-seasons scan is the
+      # host that actually catches the next duplicate, within 24 hours.
+      - name: Setup PHP environment
+        uses: ./.github/actions/setup-php-env
+
+      - name: Assert no duplicate regular-season boxscores in the restored dump
+        run: php ibl5/bin/check-boxscore-schedule-run --duplicates-only
+
   notify-backup-failure:
     name: Notify Backup Failure
     runs-on: ubuntu-latest
@@ -176,7 +193,7 @@ jobs:
       - name: Build Discord message
         run: |
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          MSG=$(printf 'Production DB backup FAILED (%s trigger).\n\nNo verified dump was produced for today. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
+          MSG=$(printf 'Production DB backup job FAILED (%s trigger).\n\nThe dump, its restore verification, or the boxscore duplicate invariant did not pass. Check the run: %s' "${{ github.event_name }}" "$RUN_URL")
           printf '%s' "$MSG" > /tmp/discord-msg.txt
 
       - name: Send Discord DM

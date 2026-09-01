@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-08-29
+last_verified: 2026-08-31
 ---
 
 # IBL5 Architecture Decision Records
@@ -40,6 +40,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0103](0103-htmx-transient-dom-state-repair-on-history-restore.md) | Repair transient htmx request-time DOM state on history restore | Accepted | htmx snapshots the DOM between `beforeRequest` and the swap, so pre-request mutations must be undone in `htmx:historyRestore` too, scoped to a `data-*` marker; enforced by rule doc + review, not a gate. |
 | [0106](0106-local-worktree-sync-fast-forward.md) | Local worktree sync via fast-forward only | Accepted | `bin/wt-sync-tick` fast-forwards idle local worktrees to their `origin/<branch>` counterparts (900 s launchd poll, HID-idle gate, ahead-of-origin skip, straggler log as evidence base). |
 | [0108](0108-boxscore-schedule-reconciliation-severity.md) | Asymmetric severity for boxscore/schedule reconciliation | Accepted | Orphan boxscores and duplicate `(date, visitor, home)` triples are errors (exit 1); played schedule rows without boxscores are warnings (exit 0), because a missing boxscore is the normal mid-sim state and a strict check would be muted within a week. |
+| [0109](0109-team-win-loss-dedup-key-and-raw-table-duplicate-invariant.md) | Matchup-triple dedup key for `ibl_team_win_loss`, and a raw-table duplicate invariant | Accepted | The view keys on `(date, visitor, home)` with `min(game_of_that_day)` as the canonical row, so a duplicate boxscore is invisible there by design; detection therefore lives on `ibl_box_scores_teams`, runs unconditionally, and is scoped to `game_type = 1`. Narrows ADR-0108's fail-open guard to the orphan direction only. |
 | [0110](0110-numbering-collision-prevention.md) | ADR and migration numbering collision prevention | Accepted | Allocators fold in `refs/remotes/origin/*` and sibling worktrees (offline); `merge=union` on this index stops concurrent-append rebase conflicts; `bin/check-numbering` fails a PR introducing a duplicate number or a duplicated index row. Nine legacy duplicates are grandfathered in `--all` only. |
 
 ## When an ADR is Required

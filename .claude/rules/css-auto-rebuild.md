@@ -1,7 +1,7 @@
 ---
 description: Tailwind CSS is auto-rebuilt by the ibl5-tailwind container (on save) and by git hooks (after rebase/checkout/merge); manual builds are a last resort.
 paths: "**/*.css"
-last_verified: 2026-07-02
+last_verified: 2026-09-01
 ---
 
 # CSS Auto-Rebuild (Tailwind)

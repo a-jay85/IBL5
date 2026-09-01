@@ -1,6 +1,6 @@
 ---
 description: Git hooks (post-checkout/post-merge/post-rewrite) auto-heal stale compiled Tailwind CSS after bulk working-tree rewrites the watcher container misses.
-last_verified: 2026-07-02
+last_verified: 2026-09-01
 ---
 
 # ADR-0075: CSS auto-heal via git hooks

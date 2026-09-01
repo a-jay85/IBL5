@@ -1,6 +1,6 @@
 ---
 description: Brand-new VR views (gallery.newCells) are published inline at the top of the PR body — not only inside the sticky visual-review comment — via a marker-delimited, offset-0, idempotent managed block spliced in with `gh pr edit --body-file`, after a bounded readiness poll against the first new-screen image URL.
-last_verified: 2026-07-02
+last_verified: 2026-09-01
 ---
 
 # ADR-0076: Publish first-render screenshots of new VR views in the PR body

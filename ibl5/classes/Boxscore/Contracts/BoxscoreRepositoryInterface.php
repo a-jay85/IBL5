@@ -199,10 +199,15 @@ interface BoxscoreRepositoryInterface
      * pair matches the schedule. The detail names both gotd values without asserting
      * which is the phantom.
      *
-     * @param int $seasonYear The season_year generated-column value (e.g. 2008)
+     * Both filters are optional. Passing null for either axis drops that
+     * predicate, so `findDuplicateTripleGames()` scans every season and every
+     * game type.
+     *
+     * @param int|null $seasonYear The season_year generated-column value (e.g. 2008), or null for all seasons
+     * @param int|null $gameType The game_type generated-column value (1 = regular season), or null for all game types
      * @return list<array{game_date: string, visitor_teamid: int, home_teamid: int, occurrences: int, gotds: string}>
      */
-    public function findDuplicateTripleGames(int $seasonYear): array;
+    public function findDuplicateTripleGames(?int $seasonYear = null, ?int $gameType = null): array;
 
     /**
      * Insert a player boxscore row

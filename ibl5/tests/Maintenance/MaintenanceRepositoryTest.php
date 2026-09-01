@@ -46,40 +46,65 @@ class MaintenanceRepositoryTest extends TestCase
         $this->assertStringContainsString('teamid BETWEEN 1 AND', $queries[0]);
     }
 
-    public function testGetTeamRecentCompleteSeasonsReturnsSeasons(): void
+    public function testGetTeamSeasonRecordsReturnsSeasons(): void
     {
         $this->mockDb->setMockData([
-            ['wins' => 50, 'losses' => 32],
-            ['wins' => 45, 'losses' => 37],
+            ['year' => 2023, 'wins' => 50, 'losses' => 32],
+            ['year' => 2022, 'wins' => 45, 'losses' => 37],
         ]);
 
-        $result = $this->repository->getTeamRecentCompleteSeasons('Boston');
+        $result = $this->repository->getTeamSeasonRecords('Boston', 2024);
 
         $this->assertIsArray($result);
         $this->assertCount(2, $result);
         $this->assertSame(50, $result[0]['wins']);
+        $this->assertSame(2023, $result[0]['year']);
     }
 
-    public function testGetTeamRecentCompleteSeasonsUsesBoundedGameCountBand(): void
+    public function testGetTeamSeasonRecordsUsesLimit(): void
     {
         $this->mockDb->setMockData([]);
 
-        $this->repository->getTeamRecentCompleteSeasons('Boston');
-
-        $queries = $this->mockDb->getExecutedQueries();
-        // The band must stay capped: phantom-boxscore bugs inflate a season to
-        // 119-127 games, and an unbounded predicate would admit that corruption.
-        $this->assertStringContainsString('wins + losses BETWEEN 81 AND 83', $queries[0]);
-    }
-
-    public function testGetTeamRecentCompleteSeasonsUsesLimit(): void
-    {
-        $this->mockDb->setMockData([]);
-
-        $this->repository->getTeamRecentCompleteSeasons('Boston', 3);
+        $this->repository->getTeamSeasonRecords('Boston', 2024, 3);
 
         $queries = $this->mockDb->getExecutedQueries();
         $this->assertStringContainsString('LIMIT', $queries[0]);
+    }
+
+    public function testGetTeamSeasonRecordsExcludesInProgressCurrentSeason(): void
+    {
+        // The repository applies NO game-count predicate — it returns an in-progress
+        // season row unfiltered. Exclusion of in-progress seasons is the processor's job.
+        $this->mockDb->setMockData([
+            ['year' => 2024, 'wins' => 30, 'losses' => 10],  // in-progress: only 40 games
+            ['year' => 2023, 'wins' => 50, 'losses' => 32],
+        ]);
+
+        $result = $this->repository->getTeamSeasonRecords('Boston', 2024);
+
+        // Both rows must be returned — the repo does not filter by game count.
+        $this->assertCount(2, $result);
+        $this->assertSame(2024, $result[0]['year']);
+        $this->assertSame(30, $result[0]['wins']);
+
+        // Verify no game-count band exists in the emitted SQL.
+        $queries = $this->mockDb->getExecutedQueries();
+        $this->assertStringNotContainsString('BETWEEN', $queries[0]);
+    }
+
+    public function testGetTeamSeasonRecordsReturnsAnomalousSeasonsInsteadOfHidingThem(): void
+    {
+        // Rows with game counts outside 82 must be returned, not silently skipped.
+        // The processor is responsible for detecting and aborting on anomalies.
+        $this->mockDb->setMockData([
+            ['year' => 2023, 'wins' => 82, 'losses' => 37],  // 119 games — a phantom-boxscore anomaly
+            ['year' => 2022, 'wins' => 50, 'losses' => 32],
+        ]);
+
+        $result = $this->repository->getTeamSeasonRecords('Boston', 2024);
+
+        $this->assertCount(2, $result);
+        $this->assertSame(119, $result[0]['wins'] + $result[0]['losses']);
     }
 
     public function testUpdateTeamTraditionExecutesUpdate(): void

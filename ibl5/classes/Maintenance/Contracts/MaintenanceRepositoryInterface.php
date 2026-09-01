@@ -19,13 +19,19 @@ interface MaintenanceRepositoryInterface
     public function getAllTeams(): array;
 
     /**
-     * Get recent complete seasons for a team
+     * Get recent season records for a team up to and including the given year
+     *
+     * Returns rows where year <= $currentSeasonYear, ordered by year descending,
+     * fetching $limit + 1 rows so the caller can drop one in-progress season and
+     * still have a full window. No game-count predicate is applied — in-progress
+     * detection and anomaly validation are the caller's responsibility.
      *
      * @param string $teamName Team name
-     * @param int $limit Number of seasons to retrieve
-     * @return array<int, array{wins: int, losses: int}> Array of season records with 'wins' and 'losses'
+     * @param int $currentSeasonYear Upper bound for year (inclusive)
+     * @param int $limit Number of complete seasons needed (repository fetches $limit + 1)
+     * @return array<int, array{year: int, wins: int, losses: int}> Array of season records
      */
-    public function getTeamRecentCompleteSeasons(string $teamName, int $limit = 5): array;
+    public function getTeamSeasonRecords(string $teamName, int $currentSeasonYear, int $limit = 5): array;
 
     /**
      * Update team tradition values

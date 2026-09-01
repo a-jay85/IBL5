@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-08-31
+last_verified: 2026-09-01
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -715,3 +715,10 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Add a `DatabaseIntegration` test asserting that `storeSimRecap` succeeds and emits a Discord warning when given a payload whose game rows have no matching box score, verifying the warn-only contract explicitly.
 **Est. effort:** S
 **Risk if untouched:** The orphan-warning path has no automated coverage; a future regression to silent success (no warning) would not be caught by CI.
+
+### 15.27 `updateTradition()` in-progress-season exclusion branch lacked a covering test
+**Location:** `ibl5/classes/LeagueControlPanel/LeagueControlPanelProcessor.php` (`updateTradition`), `ibl5/tests/LeagueControlPanel/LeagueControlPanelProcessorTest.php`
+**Problem:** The `array_shift` branch that drops the current in-progress season (when `$rows[0]['year'] === $year` and `wins + losses < 82`) was never entered by any existing test — all tests stubbed `getSetting → '2024'` but supplied rows with years 2023/2022/2021, so the `year === $year` condition was always false. Mutation testing did not catch this because the mutated conditional (`!== $year`) still failed the existing assertions identically.
+**Status:** Fixed this pass (PR #2023) — added `testUpdateTraditionExcludesInProgressCurrentSeasonBeforeAveraging` which supplies a 2024 row with 40 games and verifies the averages are computed from the two completed seasons only.
+**Suggested direction:** When adding a conditional exclusion to a method with existing tests, verify the new branch is exercised by at least one test path before committing.
+**Est. effort:** XS (already fixed)

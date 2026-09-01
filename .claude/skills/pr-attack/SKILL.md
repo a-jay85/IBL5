@@ -16,7 +16,10 @@ human hand-resolution is coming. Target: under ~2 minutes end to end.
 **This skill is strictly read-only.** It never merges, never arms auto-merge,
 never edits a PR, never pushes a branch, and never runs `bin/pr-triage --arm`.
 Its only write is one dated markdown file in the home directory. It shrinks no
-human review: it orders the queue the maintainer already reviews by hand.
+human review: it orders the queue the maintainer already reviews by hand, and it
+never recommends batching reviews or arming anything. The guarantee is now
+enforced by `bin/pr-attack` refusing `--arm` outright and by the skill's
+`allowed-tools` granting only the two ordering invocations.
 
 Take no arguments. Re-run it after every merge — the order is only valid against
 the current tip.
@@ -81,9 +84,9 @@ bin/pr-attack --work <WORK> --gate-edges /dev/null
 
 ## Exit codes
 
-| Code | Meaning |
-|------|---------|
-| 0 | ok |
-| 1 | usage / refused argument (including `--arm`) |
-| 2 | gate candidates present and no `--gate-edge`/`--gate-edges` supplied |
-| 3 | `$WORK` is stale (tip moved); re-run `--gate-candidates` |
+| Code | Meaning | Action |
+|------|---------|--------|
+| 0 | ok | — |
+| 1 | usage / refused argument (including `--arm`) | Read the error message |
+| 2 | gate candidates present and no `--gate-edge`/`--gate-edges` supplied | Answer the gate nominations (Step 3b), then re-run with `--gate-edge` or `--gate-edges` |
+| 3 | `$WORK` is stale (tip moved) | Re-run `--gate-candidates` — `master` has moved |

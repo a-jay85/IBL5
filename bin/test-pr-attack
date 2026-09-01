@@ -117,19 +117,18 @@ STUB
 chmod +x "$TMP/stubs/pr-overlap"
 
 # ============================================================
-# gh stub: pr list -> $GH_PR_LIST_FIXTURE; pr diff -> empty
+# gh stub: pr list -> $GH_PR_LIST_FIXTURE; pr diff -> $DIFF_FIXTURE if set
 # ============================================================
 cat > "$TMP/stubs/gh" <<'STUB'
 #!/usr/bin/env bash
 set -euo pipefail
 : "${GH_PR_LIST_FIXTURE:?GH_PR_LIST_FIXTURE not set}"
 # gh pr list ... -> emit fixture
-# gh pr diff N  -> emit nothing (no diff needed for most tests)
+# gh pr diff N  -> emit DIFF_FIXTURE content if set, otherwise emit nothing
 if [ "${1:-}" = "pr" ] && [ "${2:-}" = "list" ]; then
     cat "$GH_PR_LIST_FIXTURE"
 elif [ "${1:-}" = "pr" ] && [ "${2:-}" = "diff" ]; then
-    # emit empty diff; caller does || true
-    :
+    if [ -n "${DIFF_FIXTURE:-}" ]; then cat "$DIFF_FIXTURE"; fi
 else
     echo "gh stub: unhandled: $*" >&2
     exit 1
@@ -240,8 +239,7 @@ run_attack --gate-candidates --bogus
 assert_status "gate-candidates unrecognized arg exits 1" 1 "$ST"
 
 # ============================================================
-# Case 6/7: --gate-candidates valid run → WORK= line
-# (also covers exclude-draft and exclude-dirty in invocation 1)
+# --gate-candidates valid run → WORK= line
 # ============================================================
 TRIAGE_FIXTURE="$TRIAGE_FIXTURE_BASIC" \
 GH_PR_LIST_FIXTURE="$PRS_JSON_BASIC" \
@@ -432,118 +430,278 @@ assert_match  "5 acyclic #30 still ordered" '#30' "$OUT"
 assert_match  "5 acyclic #40 still ordered" '#40' "$OUT"
 
 # ============================================================
-# Case 6: exclude-draft (via invocation 2 pre-populated excluded.tsv)
+# Case 6: exclude-draft — invocation 1 partitions draft PRs
 # ============================================================
-W6="$(make_work_dir 6)"
-populate_work "$W6" "$REAL_TIP" \
-    "$(printf '#10')" \
-    "$(printf '#20\tdraft\n')" \
-    "" "" "" \
-    "$(printf '#10\t—\t0')" \
-    "" \
-    "$(cat "$PRS_JSON_INV2")"
+_TRIAGE_6="$TMP/triage-6.txt"
+cat > "$_TRIAGE_6" <<'EOF'
+#10  CLEAN  Fix something  https://github.com/x/y/pull/10  CLEARED  —
+#30  CLEAN  Draft PR       https://github.com/x/y/pull/30  CLEARED  —
+EOF
 
-run_attack --work "$W6" --gate-edges /dev/null
-assert_status "6 exclude-draft exits 0" 0 "$ST"
-assert_match  "6 draft PR shows DRAFT reason" 'DRAFT' "$OUT"
-assert_absent "6 draft PR not in ordered table rows" '^\| [0-9]+ \| #20' "$OUT"
+_PRS_6="$TMP/prs-6.json"
+cat > "$_PRS_6" <<'EOF'
+[
+  {"number":10,"isDraft":false,"mergeStateStatus":"CLEAN","headRefName":"fix-10","url":"https://github.com/x/y/pull/10","files":[{"path":"app/foo.php"}],"reviewDecision":"APPROVED"},
+  {"number":30,"isDraft":true,"mergeStateStatus":"CLEAN","headRefName":"draft-30","url":"https://github.com/x/y/pull/30","files":[{"path":"app/baz.php"}],"reviewDecision":"APPROVED"}
+]
+EOF
 
-# ============================================================
-# Case 7: exclude-dirty
-# ============================================================
-W7="$(make_work_dir 7)"
-populate_work "$W7" "$REAL_TIP" \
-    "$(printf '#10')" \
-    "$(printf '#20\tconflicted\n')" \
-    "" "" "" \
-    "$(printf '#10\t—\t0')" \
-    "" \
-    "$(cat "$PRS_JSON_INV2")"
+TRIAGE_FIXTURE="$_TRIAGE_6" GH_PR_LIST_FIXTURE="$_PRS_6" OVERLAP_EXIT=0 \
+    run_attack --gate-candidates
+assert_status "6 exclude-draft gate-candidates exits 0" 0 "$ST"
 
-run_attack --work "$W7" --gate-edges /dev/null
-assert_status "7 exclude-dirty exits 0" 0 "$ST"
-assert_match  "7 dirty PR shows DIRTY reason" 'DIRTY \(merge conflict' "$OUT"
-assert_absent "7 dirty PR not in ordered table rows" '^\| [0-9]+ \| #20' "$OUT"
-
-# ============================================================
-# Case 8: blocked-by-excluded
-# ============================================================
-W8="$(make_work_dir 8)"
-populate_work "$W8" "$REAL_TIP" \
-    "$(printf '#10')" \
-    "$(printf '#10\tconflicted\n#20\tblocked by excluded #10\n')" \
-    "" "" "" \
-    "$(printf '#20\t—\t0')" \
-    "" \
-    "$(cat "$PRS_JSON_INV2")"
-
-# orderable is empty (#10 and #20 both excluded), need at least one orderable
-# Actually in this test: #10 is dirty, #20 blocked. So orderable is empty.
-# Adjust: add #30 as orderable
-printf '#30\n' > "$W8/orderable.txt"
-printf '#10\tconflicted\n#20\tblocked by excluded #10\n' > "$W8/excluded.tsv"
-printf '#10\t—\t0\n#20\t—\t0\n#30\t—\t0\n' > "$W8/needsyou.tsv"
-
-run_attack --work "$W8" --gate-edges /dev/null
-assert_status "8 blocked-by-excluded exits 0" 0 "$ST"
-assert_match  "8 #20 excluded with blocked reason" 'blocked by excluded #10' "$OUT"
-assert_absent "8 #20 not in ordered table" '^\| [0-9]+ \| #20' "$OUT"
+WORK6=""
+while IFS= read -r _line; do
+    case "$_line" in WORK=*) WORK6="${_line#WORK=}" ;; esac
+done < <(printf '%s\n' "$OUT")
+if [ -z "$WORK6" ]; then
+    failcase "6 could not extract WORK dir"
+else
+    if grep -qE $'^#30\tdraft' "$WORK6/excluded.tsv" 2>/dev/null; then
+        pass "6 exclude-draft: #30 in excluded.tsv with draft reason"
+    else
+        failcase "6 exclude-draft: expected #30 draft in excluded.tsv"
+    fi
+    run_attack --work "$WORK6" --gate-edges /dev/null
+    assert_status "6 exclude-draft inv2 exits 0" 0 "$ST"
+    assert_match  "6 draft PR shows DRAFT reason" 'DRAFT' "$OUT"
+    assert_absent "6 draft PR not in ordered table" '^\| [0-9]+ \| #30' "$OUT"
+fi
 
 # ============================================================
-# Case 9: depends-non-open
+# Case 7: exclude-dirty — invocation 1 partitions DIRTY PRs
 # ============================================================
-W9="$(make_work_dir 9)"
-populate_work "$W9" "$REAL_TIP" \
-    "$(printf '#30')" \
-    "$(printf '#20\tdepends on non-open #99\n')" \
-    "" "" "" \
-    "$(printf '#20\t—\t0\n#30\t—\t0')" \
-    "" \
-    "$(cat "$PRS_JSON_INV2")"
+_TRIAGE_7="$TMP/triage-7.txt"
+cat > "$_TRIAGE_7" <<'EOF'
+#10  CLEAN  Clean PR  https://github.com/x/y/pull/10  CLEARED  —
+#20  DIRTY  Dirty PR  https://github.com/x/y/pull/20  CLEARED  —
+EOF
 
-run_attack --work "$W9" --gate-edges /dev/null
-assert_status "9 depends-non-open exits 0" 0 "$ST"
-assert_match  "9 #20 excluded with non-open reason" 'depends on non-open #99' "$OUT"
-assert_absent "9 #20 not in ordered table" '^\| [0-9]+ \| #20' "$OUT"
+_PRS_7="$TMP/prs-7.json"
+cat > "$_PRS_7" <<'EOF'
+[
+  {"number":10,"isDraft":false,"mergeStateStatus":"CLEAN","headRefName":"fix-10","url":"https://github.com/x/y/pull/10","files":[{"path":"app/foo.php"}],"reviewDecision":"APPROVED"},
+  {"number":20,"isDraft":false,"mergeStateStatus":"DIRTY","headRefName":"dirty-20","url":"https://github.com/x/y/pull/20","files":[{"path":"app/bar.php"}],"reviewDecision":"APPROVED"}
+]
+EOF
+
+TRIAGE_FIXTURE="$_TRIAGE_7" GH_PR_LIST_FIXTURE="$_PRS_7" OVERLAP_EXIT=0 \
+    run_attack --gate-candidates
+assert_status "7 exclude-dirty gate-candidates exits 0" 0 "$ST"
+
+WORK7=""
+while IFS= read -r _line; do
+    case "$_line" in WORK=*) WORK7="${_line#WORK=}" ;; esac
+done < <(printf '%s\n' "$OUT")
+if [ -z "$WORK7" ]; then
+    failcase "7 could not extract WORK dir"
+else
+    if grep -qE $'^#20\tconflicted' "$WORK7/excluded.tsv" 2>/dev/null; then
+        pass "7 exclude-dirty: #20 in excluded.tsv with conflicted reason"
+    else
+        failcase "7 exclude-dirty: expected #20 conflicted in excluded.tsv"
+    fi
+    run_attack --work "$WORK7" --gate-edges /dev/null
+    assert_status "7 exclude-dirty inv2 exits 0" 0 "$ST"
+    assert_match  "7 dirty PR shows DIRTY reason" 'DIRTY \(merge conflict' "$OUT"
+    assert_absent "7 dirty PR not in ordered table" '^\| [0-9]+ \| #20' "$OUT"
+fi
 
 # ============================================================
-# Case 10: overlap-exit-2 → UNKNOWN, never CLEAN
+# Case 8: blocked-by-excluded — fixpoint excludes depend-on-dirty PR
 # ============================================================
-W10="$(make_work_dir 10)"
-# overlap.tsv with UNKNOWN rows (as would result from overlap exit 2)
-populate_work "$W10" "$REAL_TIP" \
-    "$(printf '#10\n#20')" \
-    "" \
-    "$(printf '#10\t#20\tconflict-cost\n')" \
-    "$(printf '#10\t#20\tapp/shared.php\tUNKNOWN\texit 2\n')" \
-    "$(printf '#10\t2\n#20\t2')" \
-    "$(printf '#10\t—\t0\n#20\t—\t0')" \
-    "" \
-    "$(cat "$PRS_JSON_INV2")"
+_TRIAGE_8="$TMP/triage-8.txt"
+cat > "$_TRIAGE_8" <<'EOF'
+#10  DIRTY  Dirty PR    https://github.com/x/y/pull/10  CLEARED  —
+#20  CLEAN  Depends PR  https://github.com/x/y/pull/20  CLEARED  depends-on:#10
+#30  CLEAN  Other PR    https://github.com/x/y/pull/30  CLEARED  —
+EOF
 
-run_attack --work "$W10" --gate-edges /dev/null
-assert_status "10 overlap-exit-2 exits 0" 0 "$ST"
-assert_match  "10 UNKNOWN appears in output" 'UNKNOWN|unavailable' "$OUT"
-assert_absent "10 CLEAN never appears for that pair" 'CLEAN' "$OUT"
+_PRS_8="$TMP/prs-8.json"
+cat > "$_PRS_8" <<'EOF'
+[
+  {"number":10,"isDraft":false,"mergeStateStatus":"DIRTY","headRefName":"dirty-10","url":"https://github.com/x/y/pull/10","files":[{"path":"app/foo.php"}],"reviewDecision":"APPROVED"},
+  {"number":20,"isDraft":false,"mergeStateStatus":"CLEAN","headRefName":"depends-20","url":"https://github.com/x/y/pull/20","files":[{"path":"app/bar.php"}],"reviewDecision":"APPROVED"},
+  {"number":30,"isDraft":false,"mergeStateStatus":"CLEAN","headRefName":"other-30","url":"https://github.com/x/y/pull/30","files":[{"path":"app/baz.php"}],"reviewDecision":"APPROVED"}
+]
+EOF
+
+TRIAGE_FIXTURE="$_TRIAGE_8" GH_PR_LIST_FIXTURE="$_PRS_8" OVERLAP_EXIT=0 \
+    run_attack --gate-candidates
+assert_status "8 blocked-by-excluded gate-candidates exits 0" 0 "$ST"
+
+WORK8=""
+while IFS= read -r _line; do
+    case "$_line" in WORK=*) WORK8="${_line#WORK=}" ;; esac
+done < <(printf '%s\n' "$OUT")
+if [ -z "$WORK8" ]; then
+    failcase "8 could not extract WORK dir"
+else
+    if grep -qF 'blocked by excluded #10' "$WORK8/excluded.tsv" 2>/dev/null; then
+        pass "8 blocked-by-excluded: #20 in excluded.tsv with blocked reason"
+    else
+        failcase "8 blocked-by-excluded: expected #20 blocked by excluded #10 in excluded.tsv"
+    fi
+    run_attack --work "$WORK8" --gate-edges /dev/null
+    assert_status "8 blocked-by-excluded inv2 exits 0" 0 "$ST"
+    assert_match  "8 #20 excluded with blocked reason" 'blocked by excluded #10' "$OUT"
+    assert_absent "8 #20 not in ordered table" '^\| [0-9]+ \| #20' "$OUT"
+fi
 
 # ============================================================
-# Case 11: overlap-exit-3 → UNKNOWN, never CLEAN
+# Case 9: depends-non-open — PR depending on a non-open PR is excluded
 # ============================================================
-W11="$(make_work_dir 11)"
-populate_work "$W11" "$REAL_TIP" \
-    "$(printf '#10\n#20')" \
-    "" \
-    "$(printf '#10\t#20\tconflict-cost\n')" \
-    "$(printf '#10\t#20\tapp/shared.php\tUNKNOWN\texit 3\n')" \
-    "$(printf '#10\t2\n#20\t2')" \
-    "$(printf '#10\t—\t0\n#20\t—\t0')" \
-    "" \
-    "$(cat "$PRS_JSON_INV2")"
+_TRIAGE_9="$TMP/triage-9.txt"
+cat > "$_TRIAGE_9" <<'EOF'
+#20  CLEAN  Depends PR  https://github.com/x/y/pull/20  CLEARED  depends-on:#99
+#30  CLEAN  Other PR    https://github.com/x/y/pull/30  CLEARED  —
+EOF
 
-run_attack --work "$W11" --gate-edges /dev/null
-assert_status "11 overlap-exit-3 exits 0" 0 "$ST"
-assert_match  "11 UNKNOWN appears in output" 'UNKNOWN|unavailable' "$OUT"
-assert_absent "11 CLEAN never appears for exit-3 pair" 'CLEAN' "$OUT"
+_PRS_9="$TMP/prs-9.json"
+cat > "$_PRS_9" <<'EOF'
+[
+  {"number":20,"isDraft":false,"mergeStateStatus":"CLEAN","headRefName":"depends-20","url":"https://github.com/x/y/pull/20","files":[{"path":"app/bar.php"}],"reviewDecision":"APPROVED"},
+  {"number":30,"isDraft":false,"mergeStateStatus":"CLEAN","headRefName":"other-30","url":"https://github.com/x/y/pull/30","files":[{"path":"app/baz.php"}],"reviewDecision":"APPROVED"}
+]
+EOF
+
+TRIAGE_FIXTURE="$_TRIAGE_9" GH_PR_LIST_FIXTURE="$_PRS_9" OVERLAP_EXIT=0 \
+    run_attack --gate-candidates
+assert_status "9 depends-non-open gate-candidates exits 0" 0 "$ST"
+
+WORK9=""
+while IFS= read -r _line; do
+    case "$_line" in WORK=*) WORK9="${_line#WORK=}" ;; esac
+done < <(printf '%s\n' "$OUT")
+if [ -z "$WORK9" ]; then
+    failcase "9 could not extract WORK dir"
+else
+    if grep -qF 'depends on non-open #99' "$WORK9/excluded.tsv" 2>/dev/null; then
+        pass "9 depends-non-open: #20 in excluded.tsv with non-open reason"
+    else
+        failcase "9 depends-non-open: expected #20 depends on non-open #99 in excluded.tsv"
+    fi
+    run_attack --work "$WORK9" --gate-edges /dev/null
+    assert_status "9 depends-non-open inv2 exits 0" 0 "$ST"
+    assert_match  "9 #20 excluded with non-open reason" 'depends on non-open #99' "$OUT"
+    assert_absent "9 #20 not in ordered table" '^\| [0-9]+ \| #20' "$OUT"
+fi
+
+# Minimal diff fixture for cases 10/11 — non-empty diffs so pr-overlap is called
+DIFF_FIXTURE_FILE="$TMP/diff-fixture.txt"
+cat > "$DIFF_FIXTURE_FILE" <<'EOF'
+diff --git a/app/shared.php b/app/shared.php
+--- a/app/shared.php
++++ b/app/shared.php
+@@ -1,3 +1,3 @@
+ foo
+-bar
++baz
+EOF
+
+_TRIAGE_10_11="$TMP/triage-10-11.txt"
+cat > "$_TRIAGE_10_11" <<'EOF'
+#10  CLEAN  PR ten    https://github.com/x/y/pull/10  CLEARED  —
+#20  CLEAN  PR twenty https://github.com/x/y/pull/20  CLEARED  —
+EOF
+
+_PRS_10_11="$TMP/prs-10-11.json"
+cat > "$_PRS_10_11" <<'EOF'
+[
+  {"number":10,"isDraft":false,"mergeStateStatus":"CLEAN","headRefName":"pr-10","url":"https://github.com/x/y/pull/10","files":[{"path":"app/shared.php"}],"reviewDecision":"APPROVED"},
+  {"number":20,"isDraft":false,"mergeStateStatus":"CLEAN","headRefName":"pr-20","url":"https://github.com/x/y/pull/20","files":[{"path":"app/shared.php"}],"reviewDecision":"APPROVED"}
+]
+EOF
+
+# ============================================================
+# Case 10: overlap-exit-2 — pr-overlap called (non-empty diffs) and exits 2
+# ============================================================
+TRIAGE_FIXTURE="$_TRIAGE_10_11" GH_PR_LIST_FIXTURE="$_PRS_10_11" \
+    OVERLAP_EXIT=2 DIFF_FIXTURE="$DIFF_FIXTURE_FILE" \
+    run_attack --gate-candidates
+assert_status "10 overlap-exit-2 gate-candidates exits 0" 0 "$ST"
+
+WORK10=""
+while IFS= read -r _line; do
+    case "$_line" in WORK=*) WORK10="${_line#WORK=}" ;; esac
+done < <(printf '%s\n' "$OUT")
+if [ -z "$WORK10" ]; then
+    failcase "10 could not extract WORK dir"
+else
+    if grep -qE $'\tUNKNOWN\texit 2$' "$WORK10/overlap.tsv" 2>/dev/null; then
+        pass "10 overlap-exit-2: UNKNOWN exit 2 in overlap.tsv"
+    else
+        failcase "10 overlap-exit-2: expected UNKNOWN exit 2 in overlap.tsv"
+    fi
+    run_attack --work "$WORK10" --gate-edges /dev/null
+    assert_status "10 overlap-exit-2 inv2 exits 0" 0 "$ST"
+    assert_match  "10 UNKNOWN appears in output" 'UNKNOWN|unavailable' "$OUT"
+    assert_absent "10 CLEAN never appears for that pair" 'CLEAN' "$OUT"
+fi
+
+# ============================================================
+# Case 11: overlap-exit-3 — pr-overlap called (non-empty diffs) and exits 3
+# ============================================================
+TRIAGE_FIXTURE="$_TRIAGE_10_11" GH_PR_LIST_FIXTURE="$_PRS_10_11" \
+    OVERLAP_EXIT=3 DIFF_FIXTURE="$DIFF_FIXTURE_FILE" \
+    run_attack --gate-candidates
+assert_status "11 overlap-exit-3 gate-candidates exits 0" 0 "$ST"
+
+WORK11=""
+while IFS= read -r _line; do
+    case "$_line" in WORK=*) WORK11="${_line#WORK=}" ;; esac
+done < <(printf '%s\n' "$OUT")
+if [ -z "$WORK11" ]; then
+    failcase "11 could not extract WORK dir"
+else
+    if grep -qE $'\tUNKNOWN\texit 3$' "$WORK11/overlap.tsv" 2>/dev/null; then
+        pass "11 overlap-exit-3: UNKNOWN exit 3 in overlap.tsv"
+    else
+        failcase "11 overlap-exit-3: expected UNKNOWN exit 3 in overlap.tsv"
+    fi
+    run_attack --work "$WORK11" --gate-edges /dev/null
+    assert_status "11 overlap-exit-3 inv2 exits 0" 0 "$ST"
+    assert_match  "11 UNKNOWN appears in output" 'UNKNOWN|unavailable' "$OUT"
+    assert_absent "11 CLEAN never appears for exit-3 pair" 'CLEAN' "$OUT"
+fi
+
+# ============================================================
+# Case F3: gate-nominee gets diff fetched even without a contended file partner
+# ============================================================
+_TRIAGE_F3="$TMP/triage-f3.txt"
+cat > "$_TRIAGE_F3" <<'EOF'
+#10  CLEAN  Gate PR  https://github.com/x/y/pull/10  CLEARED  —
+EOF
+
+_PRS_F3="$TMP/prs-f3.json"
+cat > "$_PRS_F3" <<'EOF'
+[
+  {"number":10,"isDraft":false,"mergeStateStatus":"CLEAN","headRefName":"gate-10","url":"https://github.com/x/y/pull/10","files":[{"path":".github/workflows/tests.yml"}],"reviewDecision":"APPROVED"}
+]
+EOF
+
+TRIAGE_FIXTURE="$_TRIAGE_F3" GH_PR_LIST_FIXTURE="$_PRS_F3" OVERLAP_EXIT=0 \
+    run_attack --gate-candidates
+assert_status "F3 gate-nominee gate-candidates exits 0" 0 "$ST"
+
+WORK_F3=""
+while IFS= read -r _line; do
+    case "$_line" in WORK=*) WORK_F3="${_line#WORK=}" ;; esac
+done < <(printf '%s\n' "$OUT")
+if [ -z "$WORK_F3" ]; then
+    failcase "F3 could not extract WORK dir"
+else
+    if grep -qF '#10' "$WORK_F3/gate-candidates.tsv" 2>/dev/null; then
+        pass "F3 gate-nominee: #10 in gate-candidates.tsv"
+    else
+        failcase "F3 gate-nominee: expected #10 in gate-candidates.tsv"
+    fi
+    if [ -e "$WORK_F3/diff-10.txt" ]; then
+        pass "F3 gate-nominee: diff-10.txt fetched even without contended partner"
+    else
+        failcase "F3 gate-nominee: diff-10.txt absent — F3 fix not applied"
+    fi
+fi
 
 # ============================================================
 # Case 12: gate-edge-changes-order

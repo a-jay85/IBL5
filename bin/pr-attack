@@ -221,22 +221,40 @@ gate_candidates() {
     awk -F'\t' 'NR == FNR { ok[$1] = 1; next } ok[$1]' \
         "$WORK/orderable.txt" "$WORK/pr-files.tsv" > "$WORK/orderable-files.tsv"
 
-    # Step 2c: need-diff.txt — orderable PRs on contended files
+    # Step 3b: gate-candidates.tsv — orderable PRs touching gate-sensitive paths
+    : > "$WORK/gate-candidates.tsv"
+    while IFS=$'\t' read -r pr filepath; do
+        if ! grep -qFx "$pr" "$WORK/orderable.txt" 2>/dev/null; then continue; fi
+        if _is_gate_sensitive "$filepath"; then
+            printf '%s\t%s\n' "$pr" "$filepath" >> "$WORK/gate-candidates.tsv"
+        fi
+    done < "$WORK/pr-files.tsv"
+    sort -u "$WORK/gate-candidates.tsv" > "$WORK/gate-candidates.tsv.tmp"
+    mv "$WORK/gate-candidates.tsv.tmp" "$WORK/gate-candidates.tsv"
+
+    # Step 2c: need-diff.txt — orderable PRs on contended files OR gate nominees
     : > "$WORK/need-diff.txt"
     if [ -s "$WORK/contended.tsv" ]; then
         awk -F'\t' '{ n = split($2, a, " "); for (i = 1; i <= n; i++) print a[i] }' \
             "$WORK/contended.tsv" | sort -u | grep -Fx -f "$WORK/orderable.txt" \
-            > "$WORK/need-diff.txt" || true
-        while IFS= read -r pr; do
-            "$GH_CMD" pr diff "${pr#\#}" > "$WORK/diff-${pr#\#}.txt" 2>/dev/null || true
-        done < "$WORK/need-diff.txt"
+            >> "$WORK/need-diff.txt" || true
     fi
+    # Gate nominees always get diffs fetched (even when they share no contended file)
+    if [ -s "$WORK/gate-candidates.tsv" ]; then
+        cut -f1 "$WORK/gate-candidates.tsv" | sort -u | grep -Fx -f "$WORK/orderable.txt" \
+            >> "$WORK/need-diff.txt" || true
+    fi
+    sort -u "$WORK/need-diff.txt" > "$WORK/need-diff.txt.tmp"
+    mv "$WORK/need-diff.txt.tmp" "$WORK/need-diff.txt"
+    while IFS= read -r pr; do
+        "$GH_CMD" pr diff "${pr#\#}" > "$WORK/diff-${pr#\#}.txt" 2>/dev/null || true
+    done < "$WORK/need-diff.txt"
 
     # Step 3c: conflict-cost edges + hub degree via bin/pr-overlap
     : > "$WORK/overlap.tsv"     # #A<TAB>#B<TAB>path<TAB>kind<TAB>detail
     : > "$WORK/hubcounts-raw.txt"
 
-    if [ -s "$WORK/need-diff.txt" ]; then
+    if [ -s "$WORK/contended.tsv" ]; then
         # Unique orderable pairs sharing at least one contended file (lower #N first)
         awk -F'\t' '{
             n = split($2, a, " ")
@@ -317,17 +335,6 @@ gate_candidates() {
         : > "$WORK/hubdeg.tsv"
     fi
 
-    # Step 3b: gate-candidates.tsv — orderable PRs touching gate-sensitive paths
-    : > "$WORK/gate-candidates.tsv"
-    while IFS=$'\t' read -r pr filepath; do
-        if ! grep -qFx "$pr" "$WORK/orderable.txt" 2>/dev/null; then continue; fi
-        if _is_gate_sensitive "$filepath"; then
-            printf '%s\t%s\n' "$pr" "$filepath" >> "$WORK/gate-candidates.tsv"
-        fi
-    done < "$WORK/pr-files.tsv"
-    sort -u "$WORK/gate-candidates.tsv" > "$WORK/gate-candidates.tsv.tmp"
-    mv "$WORK/gate-candidates.tsv.tmp" "$WORK/gate-candidates.tsv"
-
     # Emit stdout: nominees → orderable non-nominees → WORK=
     if [ -s "$WORK/gate-candidates.tsv" ]; then
         echo "## Gate candidates (need judgment before invocation 2)"
@@ -342,7 +349,7 @@ gate_candidates() {
             if [ -s "$diff_file" ]; then
                 echo "Diff: $diff_file"
             else
-                echo "Diff: fetch with: ${GH_CMD} pr diff ${pr#\#}"
+                echo "Diff: UNAVAILABLE for #${pr#\#} — re-run --gate-candidates"
             fi
             echo ""
         done

@@ -55,6 +55,7 @@ last_verified: 2026-09-01
 | E26 | `bin/plan-now` second-resolution timestamp caused label collision on back-to-back invocations | ✅ Implemented | — | S |
 | E27 | `filterGitignored()` in `bin/check-docs`: orphaned docblock, unchecked proc exit, non-NUL-delimited check-ignore paths | ⬜ Open | 🟨 | S |
 | E28 | PR body hand-authored migration numbers not updated after a forced renumber | ⬜ Open | — | S |
+| E29 | Shell-harness cases pre-populate `$WORK` instead of driving invocation 1 | ✅ Implemented | — | S |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -383,3 +384,26 @@ Three defects in the `filterGitignored()` function added to `bin/check-docs` by 
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-08-31 during #2022)*
+
+### E29 Shell-harness cases pre-populate `$WORK` instead of driving invocation 1
+
+**class:** test cases for a two-invocation script that pre-populate the intermediate `$WORK` directory and only call invocation 2, letting all invocation-1 logic (isDraft partition, DIRTY bucket awk, `depends-on` fixpoint, `bin/pr-overlap` call) escape test coverage. Compounded in this pass by a SKILL.md prose deletion that silently dropped a guardrail clause on the same edit that widened a permission grant.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/test-pr-attack` cases 6–11 — all drove `--work` on a hand-crafted `$WORK`, never `--gate-candidates` | yes | fixed this pass | fixed this pass |
+| 2 | `bin/pr-attack` gate-candidate diff path — gate nominees wrote `gate-candidates.tsv` after the diff-fetch loop, so nominees without contended files never had diffs fetched | yes | fixed this pass | fixed this pass |
+| 3 | `.claude/skills/pr-attack/SKILL.md` read-only paragraph — `and it never recommends batching reviews or arming anything` clause deleted; enforcement sentence absent | yes | fixed this pass | fixed this pass |
+
+`prevention_ladder:`
+
+- **rung 0 — already covered by an existing gate?** No gate checks that harness cases for multi-invocation scripts exercise invocation 1 rather than pre-populating its output state.
+- **rung 1 — extend an existing gate?** No existing gate owns this surface.
+- **rung 2 — a rule doc? Yes — landing rung.** A `.claude/rules/` doc noting that test cases for multi-invocation scripts must call the first invocation rather than pre-populating its output; same doc notes that SKILL.md prose edits must be diffed against the prior version to catch silent deletions. Meta-tooling-bar extend-before-add: no host to extend ✓, distinct trigger ✓, earns its upkeep ✓, no cheaper alternative ✓. Rule not authored this pass.
+- **rungs 3–5** — N/A. No mechanical check would detect the pre-population pattern without semantic understanding of what `$WORK` contains and how it is populated.
+
+`artifact destination:` a new `.claude/rules/` doc on test-case design for multi-invocation scripts (not created this pass).
+
+*(discovered 2026-09-01 during #2050)*

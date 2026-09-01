@@ -1,0 +1,636 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/pr-attack — compute an optimal merge order for all open PRs.
+# Mechanizes the deterministic steps of .claude/skills/pr-attack/SKILL.md.
+# STRICTLY READ-ONLY against GitHub and git: it never merges, never arms
+# auto-merge, never edits or opens a PR, never pushes, and never invokes
+# bin/pr-triage --arm. Its only write is a dated markdown file under $HOME.
+# Two invocations, because gate judgment is an INPUT to the sort:
+#   1. bin/pr-attack --gate-candidates          -> nominations + $WORK dir
+#   2. bin/pr-attack --work <dir> [--gate-edge '#A>#B'...] -> ordered document
+# Exit codes: 0 = ok; 1 = usage / refused argument; 2 = unjudged gate
+# candidates and no --gate-edge/--gate-edges; 3 = stale $WORK (tip moved).
+set -euo pipefail
+export LC_ALL=C
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PR_TRIAGE_CMD="${PR_TRIAGE_CMD:-$SCRIPT_DIR/pr-triage}"
+PR_OVERLAP_CMD="${PR_OVERLAP_CMD:-$SCRIPT_DIR/pr-overlap}"
+GH_CMD="${GH_CMD:-gh}"
+
+# --arm refusal — checked before any mode dispatch; cannot be bypassed by argument order
+for _check_arg in "$@"; do
+    if [ "$_check_arg" = "--arm" ]; then
+        echo "bin/pr-attack: --arm is not a flag this script accepts." >&2
+        echo "This script is strictly read-only: it never merges, arms auto-merge," >&2
+        echo "edits a PR, pushes, or invokes bin/pr-triage --arm." >&2
+        exit 1
+    fi
+done
+unset _check_arg
+
+# ============================================================
+# Argument parsing
+# ============================================================
+GATE_CANDIDATES=0
+WORK=""
+GATE_EDGES_FILE=""
+GATE_EDGE_ARGS=()
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --gate-candidates) GATE_CANDIDATES=1; shift ;;
+        --work)
+            [ $# -lt 2 ] && { echo "bin/pr-attack: --work requires an argument" >&2; exit 1; }
+            WORK="$2"; shift 2 ;;
+        --gate-edge)
+            [ $# -lt 2 ] && { echo "bin/pr-attack: --gate-edge requires an argument" >&2; exit 1; }
+            GATE_EDGE_ARGS+=("$2"); shift 2 ;;
+        --gate-edges)
+            [ $# -lt 2 ] && { echo "bin/pr-attack: --gate-edges requires an argument" >&2; exit 1; }
+            GATE_EDGES_FILE="$2"; shift 2 ;;
+        --help|-h)
+            cat <<'EOF'
+Usage: bin/pr-attack --gate-candidates
+       bin/pr-attack --work <dir> [--gate-edge '#A>#B' ...] [--gate-edges <file>]
+
+Invocation 1 (--gate-candidates): fetch triage + PR metadata, emit gate
+  nominees, write $WORK dir. WORK=<dir> is the last line of stdout.
+Invocation 2 (--work <dir>): ingest gate-edge judgments, Kahn sort, emit
+  the ordered plan to stdout and $HOME/IBL5-pr-attack-<date>.md.
+
+--gate-edges /dev/null  judged-empty case; succeeds with no gate edges.
+
+Exit codes:
+  0  ok
+  1  usage / refused argument
+  2  unjudged gate candidates and no --gate-edge/--gate-edges supplied
+  3  stale $WORK (tip moved); re-run --gate-candidates
+EOF
+            exit 0 ;;
+        *) echo "bin/pr-attack: unrecognized argument: $1" >&2; exit 1 ;;
+    esac
+done
+
+if [ "$GATE_CANDIDATES" -eq 1 ] && [ -n "$WORK" ]; then
+    echo "bin/pr-attack: --gate-candidates and --work are mutually exclusive" >&2; exit 1
+fi
+if [ "$GATE_CANDIDATES" -eq 0 ] && [ -z "$WORK" ]; then
+    echo "bin/pr-attack: one of --gate-candidates or --work is required" >&2; exit 1
+fi
+if [ "$GATE_CANDIDATES" -eq 1 ] && { [ "${#GATE_EDGE_ARGS[@]}" -gt 0 ] || [ -n "$GATE_EDGES_FILE" ]; }; then
+    echo "bin/pr-attack: --gate-edge/--gate-edges are only valid with --work" >&2; exit 1
+fi
+
+# ============================================================
+# Helper: sort #N values by their numeric part
+# ============================================================
+_pr_num_sort() {
+    awk -F'\t' '{
+        pr=$1; n=pr; sub(/^#/, "", n)
+        print n+0 "\t" $0
+    }' | sort -n | cut -f2-
+}
+
+# ============================================================
+# Helper: check if a file path is gate-sensitive
+# ============================================================
+_is_gate_sensitive() {
+    case "$1" in
+        .github/workflows/*|bin/check-*|bin/adr-check|bin/generate-codebase-map|bin/lib/pr-armable.sh)
+            return 0 ;;
+    esac
+    return 1
+}
+
+# ============================================================
+# Invocation 1: --gate-candidates
+# ============================================================
+gate_candidates() {
+    WORK="$(mktemp -d "${TMPDIR:-/tmp}/pr-attack.XXXXXX")"
+
+    # Steps 0–1: fetch and parse
+    "$PR_TRIAGE_CMD" > "$WORK/triage.txt"
+    awk -F'  +' '/^#[0-9]+/ { printf "%s\t%s\t%s\t%s\n", $1, $2, $5, $NF }' \
+        "$WORK/triage.txt" > "$WORK/triage.tsv"
+    "$GH_CMD" pr list --state open --limit 200 \
+        --json number,title,isDraft,mergeStateStatus,headRefName,url,files \
+        > "$WORK/prs.json"
+    git rev-parse origin/master > "$WORK/tip"
+    date +%Y-%m-%d > "$WORK/date"
+
+    # All open PR numbers (numerically sorted)
+    jq -r '.[] | "#" + (.number|tostring)' "$WORK/prs.json" | _pr_num_sort > "$WORK/all-prs.txt"
+
+    # Draft PRs
+    jq -r '.[] | select(.isDraft == true) | "#" + (.number|tostring)' "$WORK/prs.json" \
+        | _pr_num_sort > "$WORK/draft-prs.txt"
+
+    # DIRTY PRs (bucket == DIRTY in triage.tsv)
+    awk -F'\t' '$2 == "DIRTY" { print $1 }' "$WORK/triage.tsv" \
+        | _pr_num_sort > "$WORK/dirty-prs.txt"
+
+    # excluded.tsv: draft wins over DIRTY
+    {
+        sed 's/$/\tdraft/' "$WORK/draft-prs.txt"
+        comm -23 "$WORK/dirty-prs.txt" "$WORK/draft-prs.txt" \
+            | awk '{ print $1 "\tconflicted" }'
+    } | sort -u > "$WORK/excluded.tsv"
+
+    # orderable.txt: all-prs minus excluded
+    comm -23 "$WORK/all-prs.txt" \
+        <(cut -f1 "$WORK/excluded.tsv" | _pr_num_sort) \
+        > "$WORK/orderable.txt"
+
+    # Needs you? — first-match classification; triage.tsv: $1=#N $2=BUCKET $3=CLEARANCE $4=HOLDS
+    awk -F'\t' 'BEGIN{OFS="\t"} {
+        pr=$1; bucket=$2; clearance=$3; holds=$4
+        if (bucket=="HELD" || clearance=="HELD" || \
+            holds ~ /body-hold/ || holds ~ /golden-changed/ || holds ~ /unresolved-finding:/) {
+            print pr, "manual test", 2
+        } else if (bucket=="FEAT-AWAITING-SIGNOFF" || holds ~ /feat-awaiting-signoff/) {
+            print pr, "sign feat:", 1
+        } else if (bucket=="UNCLEARED" || clearance=="UNKNOWN") {
+            print pr, "manual test", 2
+        } else {
+            print pr, "—", 0
+        }
+    }' "$WORK/triage.tsv" > "$WORK/needsyou.tsv"
+
+    # Step 2a: pr-files.tsv (#N<TAB>filepath) — from cached prs.json
+    jq -r '.[] | . as $p | $p.files[].path | "#\($p.number)\t\(.)"' \
+        "$WORK/prs.json" | sort > "$WORK/pr-files.tsv"
+
+    # orderable-files.tsv: pr-files.tsv filtered to orderable PRs
+    awk -F'\t' 'NR == FNR { ok[$1] = 1; next } ok[$1]' \
+        "$WORK/orderable.txt" "$WORK/pr-files.tsv" > "$WORK/orderable-files.tsv"
+
+    # Step 2b: contended.tsv (filepath<TAB>space-sep-#N, 2+ orderable PRs)
+    awk -F'\t' '{ prs[$2] = prs[$2] " " $1; n[$2]++ }
+                END { for (f in n) if (n[f] > 1) printf "%s\t%s\n", f, substr(prs[f], 2) }' \
+        "$WORK/orderable-files.tsv" | sort > "$WORK/contended.tsv"
+
+    # Step 3a: declared edges — extract depends-on tokens, then propagate exclusions
+    awk -F'\t' '{
+        pr=$1; holds=$4
+        n = split(holds, tok, " ")
+        for (i=1; i<=n; i++) {
+            if (tok[i] ~ /^depends-on:#/) {
+                dep = tok[i]; sub(/^depends-on:/, "", dep)
+                print pr "\t" dep
+            }
+        }
+    }' "$WORK/triage.tsv" > "$WORK/raw-deps.tsv"
+
+    : > "$WORK/edges.tsv"   # from<TAB>to<TAB>type
+
+    # Fixpoint: propagate exclusions from declared dependencies
+    local changed=1
+    while [ "$changed" -eq 1 ]; do
+        changed=0
+        while IFS=$'\t' read -r pr dep; do
+            # Skip if $pr already excluded
+            if grep -qFx "$pr" <(cut -f1 "$WORK/excluded.tsv") 2>/dev/null; then continue; fi
+            if grep -qFx "$dep" "$WORK/orderable.txt" 2>/dev/null; then
+                : # orderable predecessor — edge written after fixpoint
+            elif grep -qFx "$dep" <(cut -f1 "$WORK/excluded.tsv") 2>/dev/null; then
+                printf '%s\tblocked by excluded %s\n' "$pr" "$dep" >> "$WORK/excluded.tsv"
+                changed=1
+            elif ! grep -qFx "$dep" "$WORK/all-prs.txt" 2>/dev/null; then
+                printf '%s\tdepends on non-open %s\n' "$pr" "$dep" >> "$WORK/excluded.tsv"
+                changed=1
+            fi
+        done < "$WORK/raw-deps.tsv"
+        sort -u "$WORK/excluded.tsv" > "$WORK/excluded.tsv.tmp"
+        mv "$WORK/excluded.tsv.tmp" "$WORK/excluded.tsv"
+        comm -23 "$WORK/all-prs.txt" \
+            <(cut -f1 "$WORK/excluded.tsv" | _pr_num_sort) \
+            > "$WORK/orderable.txt"
+    done
+
+    # Write declared edges for remaining orderable PRs
+    while IFS=$'\t' read -r pr dep; do
+        if grep -qFx "$pr" <(cut -f1 "$WORK/excluded.tsv") 2>/dev/null; then continue; fi
+        if grep -qFx "$dep" "$WORK/orderable.txt" 2>/dev/null; then
+            printf '%s\t%s\tdeclared\n' "$dep" "$pr" >> "$WORK/edges.tsv"
+        fi
+    done < "$WORK/raw-deps.tsv"
+
+    # Rebuild orderable-files.tsv after 3a exclusions
+    awk -F'\t' 'NR == FNR { ok[$1] = 1; next } ok[$1]' \
+        "$WORK/orderable.txt" "$WORK/pr-files.tsv" > "$WORK/orderable-files.tsv"
+
+    # Step 3b: gate-candidates.tsv — orderable PRs touching gate-sensitive paths
+    : > "$WORK/gate-candidates.tsv"
+    while IFS=$'\t' read -r pr filepath; do
+        if ! grep -qFx "$pr" "$WORK/orderable.txt" 2>/dev/null; then continue; fi
+        if _is_gate_sensitive "$filepath"; then
+            printf '%s\t%s\n' "$pr" "$filepath" >> "$WORK/gate-candidates.tsv"
+        fi
+    done < "$WORK/pr-files.tsv"
+    sort -u "$WORK/gate-candidates.tsv" > "$WORK/gate-candidates.tsv.tmp"
+    mv "$WORK/gate-candidates.tsv.tmp" "$WORK/gate-candidates.tsv"
+
+    # Step 2c: need-diff.txt — orderable PRs on contended files OR gate nominees
+    : > "$WORK/need-diff.txt"
+    if [ -s "$WORK/contended.tsv" ]; then
+        awk -F'\t' '{ n = split($2, a, " "); for (i = 1; i <= n; i++) print a[i] }' \
+            "$WORK/contended.tsv" | sort -u | grep -Fx -f "$WORK/orderable.txt" \
+            >> "$WORK/need-diff.txt" || true
+    fi
+    # Gate nominees always get diffs fetched (even when they share no contended file)
+    if [ -s "$WORK/gate-candidates.tsv" ]; then
+        cut -f1 "$WORK/gate-candidates.tsv" | sort -u | grep -Fx -f "$WORK/orderable.txt" \
+            >> "$WORK/need-diff.txt" || true
+    fi
+    sort -u "$WORK/need-diff.txt" > "$WORK/need-diff.txt.tmp"
+    mv "$WORK/need-diff.txt.tmp" "$WORK/need-diff.txt"
+    while IFS= read -r pr; do
+        "$GH_CMD" pr diff "${pr#\#}" > "$WORK/diff-${pr#\#}.txt" 2>/dev/null || true
+    done < "$WORK/need-diff.txt"
+
+    # Step 3c: conflict-cost edges + hub degree via bin/pr-overlap
+    : > "$WORK/overlap.tsv"     # #A<TAB>#B<TAB>path<TAB>kind<TAB>detail
+    : > "$WORK/hubcounts-raw.txt"
+
+    if [ -s "$WORK/contended.tsv" ]; then
+        # Unique orderable pairs sharing at least one contended file (lower #N first)
+        awk -F'\t' '{
+            n = split($2, a, " ")
+            for (i=1; i<=n-1; i++) for (j=i+1; j<=n; j++) {
+                pa=a[i]; pb=a[j]
+                na=pa; sub(/^#/,"",na); nb=pb; sub(/^#/,"",nb)
+                if (na+0 < nb+0) print pa "\t" pb
+                else print pb "\t" pa
+            }
+        }' "$WORK/contended.tsv" | sort -u > "$WORK/pairs.tsv"
+
+        while IFS=$'\t' read -r pa pb; do
+            # Skip if either PR became excluded after 3a
+            if ! grep -qFx "$pa" "$WORK/orderable.txt" 2>/dev/null; then continue; fi
+            if ! grep -qFx "$pb" "$WORK/orderable.txt" 2>/dev/null; then continue; fi
+
+            a="${pa#\#}"; b="${pb#\#}"
+            da="$WORK/diff-$a.txt"; db="$WORK/diff-$b.txt"
+
+            if [ ! -s "$da" ] || [ ! -s "$db" ]; then
+                # Shared files for this pair (from contended.tsv)
+                while IFS= read -r cfile; do
+                    printf '%s\t%s\t%s\tUNKNOWN\texit 2\n' "$pa" "$pb" "$cfile" >> "$WORK/overlap.tsv"
+                done < <(awk -F'\t' -v a="$pa" -v b="$pb" '{
+                    n=split($2,prlist," "); fa=0; fb=0
+                    for(i=1;i<=n;i++){if(prlist[i]==a)fa=1; if(prlist[i]==b)fb=1}
+                    if(fa && fb) print $1
+                }' "$WORK/contended.tsv")
+                printf '%s\n%s\n' "$pa" "$pb" >> "$WORK/hubcounts-raw.txt"
+                printf '%s\t%s\tconflict-cost\n' "$pa" "$pb" >> "$WORK/edges.tsv"
+                continue
+            fi
+
+            rc=0
+            out="$("$PR_OVERLAP_CMD" "$da" "$db" "$pa" "$pb" 2>&1)" || rc=$?
+            if [ "$rc" -ne 0 ]; then
+                while IFS= read -r cfile; do
+                    printf '%s\t%s\t%s\tUNKNOWN\texit %s\n' "$pa" "$pb" "$cfile" "$rc" >> "$WORK/overlap.tsv"
+                done < <(awk -F'\t' -v a="$pa" -v b="$pb" '{
+                    n=split($2,prlist," "); fa=0; fb=0
+                    for(i=1;i<=n;i++){if(prlist[i]==a)fa=1; if(prlist[i]==b)fb=1}
+                    if(fa && fb) print $1
+                }' "$WORK/contended.tsv")
+                printf '%s\n%s\n' "$pa" "$pb" >> "$WORK/hubcounts-raw.txt"
+                printf '%s\t%s\tconflict-cost\n' "$pa" "$pb" >> "$WORK/edges.tsv"
+            else
+                local found_collision=0
+                while IFS= read -r line; do
+                    case "$line" in
+                        HAND-RESOLUTION\ *)
+                            rest="${line#HAND-RESOLUTION }"
+                            fpath="${rest%% (*}"
+                            fpath="${fpath% }"
+                            detail="${rest#"$fpath "}"
+                            printf '%s\t%s\t%s\tHAND-RESOLUTION\t%s\n' \
+                                "$pa" "$pb" "$fpath" "$detail" >> "$WORK/overlap.tsv"
+                            found_collision=1
+                            ;;
+                        CLEAN\ *)
+                            fpath="${line#CLEAN }"
+                            printf '%s\t%s\t%s\tCLEAN\t\n' "$pa" "$pb" "$fpath" >> "$WORK/overlap.tsv"
+                            ;;
+                    esac
+                done <<< "$out"
+                if [ "$found_collision" -eq 1 ]; then
+                    printf '%s\n%s\n' "$pa" "$pb" >> "$WORK/hubcounts-raw.txt"
+                    printf '%s\t%s\tconflict-cost\n' "$pa" "$pb" >> "$WORK/edges.tsv"
+                fi
+            fi
+        done < "$WORK/pairs.tsv"
+    fi
+
+    # hubdeg.tsv: #N<TAB>count (from accumulator)
+    if [ -s "$WORK/hubcounts-raw.txt" ]; then
+        sort "$WORK/hubcounts-raw.txt" | uniq -c \
+            | awk '{ print $2 "\t" $1 }' > "$WORK/hubdeg.tsv"
+    else
+        : > "$WORK/hubdeg.tsv"
+    fi
+
+    # Emit stdout: nominees → orderable non-nominees → WORK=
+    if [ -s "$WORK/gate-candidates.tsv" ]; then
+        echo "## Gate candidates (need judgment before invocation 2)"
+        echo ""
+        cut -f1 "$WORK/gate-candidates.tsv" | sort -u | while IFS= read -r pr; do
+            slug=$(jq -r --arg n "${pr#\#}" \
+                '.[] | select(.number==($n|tonumber)) | .headRefName' "$WORK/prs.json")
+            echo "### $pr $slug"
+            echo "Gate-sensitive paths:"
+            grep "^${pr}	" "$WORK/gate-candidates.tsv" | cut -f2 | sed 's/^/  /'
+            diff_file="$WORK/diff-${pr#\#}.txt"
+            if [ -s "$diff_file" ]; then
+                echo "Diff: $diff_file"
+            else
+                echo "Diff: UNAVAILABLE for #${pr#\#} — re-run --gate-candidates"
+            fi
+            echo ""
+        done
+    fi
+
+    echo "## Orderable PRs (non-nominees)"
+    while IFS= read -r pr; do
+        if cut -f1 "$WORK/gate-candidates.tsv" | grep -qFx "$pr" 2>/dev/null; then continue; fi
+        slug=$(jq -r --arg n "${pr#\#}" \
+            '.[] | select(.number==($n|tonumber)) | .headRefName' "$WORK/prs.json")
+        echo "  $pr $slug"
+    done < "$WORK/orderable.txt"
+
+    echo ""
+    echo "WORK=$WORK"
+}
+
+# ============================================================
+# Helper: validate and ingest one gate-edge spec into edges.tsv
+# ============================================================
+_ingest_gate_edge() {
+    local spec="$1"
+    # Strip leading/trailing whitespace
+    spec="${spec#"${spec%%[![:space:]]*}"}"
+    spec="${spec%"${spec##*[![:space:]]}"}"
+    # Skip blank lines and comments
+    [ -z "$spec" ] && return 0
+    case "$spec" in \#[[:space:]]*|\#) return 0 ;; esac
+
+    if ! printf '%s\n' "$spec" | grep -qE '^#[0-9]+>#[0-9]+$'; then
+        echo "bin/pr-attack: invalid --gate-edge spec '$spec' (expected #A>#B)" >&2
+        exit 1
+    fi
+    local from="${spec%%>*}"
+    local to="${spec##*>}"
+    if ! grep -qFx "$from" "$WORK/orderable.txt" 2>/dev/null; then
+        echo "bin/pr-attack: gate-edge $spec: $from is not in the orderable set" >&2
+        exit 1
+    fi
+    if ! grep -qFx "$to" "$WORK/orderable.txt" 2>/dev/null; then
+        echo "bin/pr-attack: gate-edge $spec: $to is not in the orderable set" >&2
+        exit 1
+    fi
+    printf '%s\t%s\tgate\n' "$from" "$to" >> "$WORK/edges.tsv"
+}
+
+# ============================================================
+# Invocation 2: --work → emit_order
+# ============================================================
+emit_order() {
+    [ ! -d "$WORK" ] && { echo "bin/pr-attack: $WORK does not exist" >&2; exit 1; }
+
+    # Guard 1: tip staleness
+    local recorded_tip current_tip
+    recorded_tip="$(cat "$WORK/tip")"
+    current_tip="$(git rev-parse origin/master)"
+    if [ "$recorded_tip" != "$current_tip" ]; then
+        local rs="${recorded_tip:0:8}" cs="${current_tip:0:8}"
+        echo "bin/pr-attack: $WORK is stale (recorded ${rs}, origin/master is now ${cs}). Re-run --gate-candidates." >&2
+        exit 3
+    fi
+
+    # Guard 2: unjudged gate candidates
+    if [ -s "$WORK/gate-candidates.tsv" ]; then
+        if [ "${#GATE_EDGE_ARGS[@]}" -eq 0 ] && [ -z "$GATE_EDGES_FILE" ]; then
+            echo "bin/pr-attack: gate candidates present but no --gate-edge/--gate-edges supplied." >&2
+            echo "Nominated PRs:" >&2
+            cut -f1 "$WORK/gate-candidates.tsv" | sort -u >&2
+            echo "Supply --gate-edge '#A>#B' or --gate-edges /dev/null (judged empty)." >&2
+            exit 2
+        fi
+    fi
+
+    # Ingest gate edges
+    if [ "${#GATE_EDGE_ARGS[@]}" -gt 0 ]; then
+        for spec in "${GATE_EDGE_ARGS[@]}"; do
+            _ingest_gate_edge "$spec"
+        done
+    fi
+    if [ -n "$GATE_EDGES_FILE" ]; then
+        while IFS= read -r line || [ -n "$line" ]; do
+            _ingest_gate_edge "$line"
+        done < "$GATE_EDGES_FILE"
+    fi
+
+    # Deduplicate edges
+    sort -u "$WORK/edges.tsv" > "$WORK/edges.tsv.tmp"
+    mv "$WORK/edges.tsv.tmp" "$WORK/edges.tsv"
+
+    # ---- Kahn's algorithm ----
+    local kdir
+    kdir="$(mktemp -d "$WORK/kahn.XXXXXX")"
+
+    # Must-edges only (declared + gate)
+    grep -E $'\t(declared|gate)$' "$WORK/edges.tsv" > "$kdir/must-edges.tsv" 2>/dev/null || true
+
+    cp "$WORK/orderable.txt" "$kdir/remaining.txt"
+    local pos=0
+    local emitted_order=()
+    : > "$WORK/order.tsv"   # pos<TAB>#N<TAB>slug<TAB>constraint<TAB>needs_label
+
+    while [ -s "$kdir/remaining.txt" ]; do
+        # Active must-edges: both endpoints still in remaining
+        if [ -s "$kdir/must-edges.tsv" ]; then
+            awk -F'\t' 'NR==FNR{r[$1]=1; next} r[$1] && r[$2]' \
+                "$kdir/remaining.txt" "$kdir/must-edges.tsv" \
+                > "$kdir/active.tsv" 2>/dev/null || true
+        else
+            : > "$kdir/active.tsv"
+        fi
+
+        # Nodes with at least one active incoming edge
+        cut -f2 "$kdir/active.tsv" | sort > "$kdir/has-incoming.txt"
+
+        # Ready = remaining minus has-incoming
+        comm -23 <(sort "$kdir/remaining.txt") "$kdir/has-incoming.txt" > "$kdir/ready.txt"
+
+        if ! [ -s "$kdir/ready.txt" ]; then
+            # Cycle: all remaining nodes are in or downstream of one
+            while IFS= read -r pr; do
+                printf '%s\tdependency cycle\n' "$pr" >> "$WORK/excluded.tsv"
+            done < "$kdir/remaining.txt"
+            : > "$kdir/remaining.txt"
+            break
+        fi
+
+        # Pick winner: sort by hub-last, Needs-you? rank, ascending PR#
+        while IFS= read -r pr; do
+            local prnum="${pr#\#}"
+            local hub rank
+            hub=$(grep -m1 "^${pr}	" "$WORK/hubdeg.tsv" 2>/dev/null | cut -f2 || true)
+            [ -z "$hub" ] && hub=0
+            rank=$(grep -m1 "^${pr}	" "$WORK/needsyou.tsv" 2>/dev/null | cut -f3 || true)
+            [ -z "$rank" ] && rank=0
+            printf '%s\t%s\t%s\t%s\n' "$hub" "$rank" "$prnum" "$pr"
+        done < "$kdir/ready.txt" \
+            | sort -t$'\t' -k1,1n -k2,2n -k3,3n \
+            > "$kdir/ready-sorted.txt"
+        head -1 "$kdir/ready-sorted.txt" > "$kdir/winner.txt"
+
+        local winner prnum slug constraint needs_label
+        winner=$(cut -f4 "$kdir/winner.txt")
+        prnum="${winner#\#}"
+        slug=$(jq -r --arg n "$prnum" \
+            '.[] | select(.number==($n|tonumber)) | .headRefName' "$WORK/prs.json")
+        needs_label=$(grep -m1 "^${winner}	" "$WORK/needsyou.tsv" 2>/dev/null | cut -f2 || true)
+        [ -z "$needs_label" ] && needs_label="—"
+        pos=$((pos + 1))
+
+        # Constraint: MUST incoming edge first, then conflict-cost from already-emitted
+        constraint="—"
+        local must_incoming
+        must_incoming=$(grep -E "	${winner}	(declared|gate)$" "$WORK/edges.tsv" 2>/dev/null \
+            | head -1 || true)
+        if [ -n "$must_incoming" ]; then
+            local mfrom mtype
+            mfrom=$(printf '%s\n' "$must_incoming" | cut -f1)
+            mtype=$(printf '%s\n' "$must_incoming" | cut -f3)
+            constraint="${mtype}: after ${mfrom} (MUST)"
+        else
+            local prev
+            for prev in "${emitted_order[@]:-}"; do
+                [ -z "$prev" ] && continue
+                # Check if this pair has HAND-RESOLUTION or UNKNOWN in overlap.tsv
+                if grep -qE "^(${prev}	${winner}|${winner}	${prev})	[^	]+	(HAND-RESOLUTION|UNKNOWN)	" \
+                        "$WORK/overlap.tsv" 2>/dev/null; then
+                    constraint="conflict-cost: rebase over ${prev}"
+                    break
+                fi
+            done
+        fi
+
+        printf '%s\t%s\t%s\t%s\t%s\n' \
+            "$pos" "$winner" "$slug" "$constraint" "$needs_label" >> "$WORK/order.tsv"
+        emitted_order+=("$winner")
+
+        # Remove winner from remaining
+        awk -v w="$winner" '$0 != w' "$kdir/remaining.txt" > "$kdir/remaining.tmp"
+        mv "$kdir/remaining.tmp" "$kdir/remaining.txt"
+    done
+
+    rm -rf "$kdir"
+
+    # Build and emit document
+    local tmp_doc
+    tmp_doc="$(mktemp)"
+    _build_doc > "$tmp_doc"
+    cat "$tmp_doc"
+
+    local REPO_ROOT OUT
+    REPO_ROOT="$(git rev-parse --show-toplevel)"
+    OUT="$HOME/IBL5-pr-attack-$(cat "$WORK/date").md"
+    case "$OUT" in
+        "$HOME"/*) ;;
+        *) echo "bin/pr-attack: refusing to write outside \$HOME: $OUT" >&2; rm -f "$tmp_doc"; exit 1 ;;
+    esac
+    case "$OUT" in
+        "$REPO_ROOT"/*) echo "bin/pr-attack: refusing to write inside the repo: $OUT" >&2; rm -f "$tmp_doc"; exit 1 ;;
+    esac
+    cp "$tmp_doc" "$OUT"
+    rm -f "$tmp_doc"
+}
+
+# ============================================================
+# Build the markdown document (reads $WORK, writes to stdout)
+# ============================================================
+_build_doc() {
+    local date_str short_sha n_open n_ordered n_excluded
+    date_str="$(cat "$WORK/date")"
+    short_sha="$(git rev-parse --short origin/master)"
+    n_open="$(jq 'length' "$WORK/prs.json")"
+    n_ordered="$(wc -l < "$WORK/order.tsv" | tr -d ' ')"
+    n_excluded="$(wc -l < "$WORK/excluded.tsv" | tr -d ' ')"
+
+    printf '# Plan of attack — %s\n\n' "$date_str"
+    # shellcheck disable=SC2016
+    printf 'Base: `master` @ %s · %s open · %s orderable · %s excluded\n\n' \
+        "$short_sha" "$n_open" "$n_ordered" "$n_excluded"
+
+    # Ordered table
+    printf '| # | PR | Constraint | Needs you? |\n'
+    printf '|---|----|-----------:|:----------:|\n'
+    while IFS=$'\t' read -r pos pr slug constraint needs; do
+        printf '| %s | %s %s | %s | %s |\n' "$pos" "$pr" "$slug" "$constraint" "$needs"
+    done < "$WORK/order.tsv"
+    printf '\n'
+
+    # ## Excluded (ascending PR#; omit section if empty)
+    if [ -s "$WORK/excluded.tsv" ]; then
+        printf '## Excluded\n'
+        while IFS=$'\t' read -r pr reason; do
+            slug=$(jq -r --arg n "${pr#\#}" \
+                '.[] | select(.number==($n|tonumber)) | .headRefName // ""' "$WORK/prs.json")
+            case "$reason" in
+                conflicted)
+                    printf -- '- %s %s — DIRTY (merge conflict; rebase before it can be ordered)\n' "$pr" "$slug" ;;
+                draft)
+                    printf -- '- %s %s — DRAFT\n' "$pr" "$slug" ;;
+                "dependency cycle")
+                    printf -- '- %s %s — dependency cycle\n' "$pr" "$slug" ;;
+                *)
+                    printf -- '- %s %s — %s\n' "$pr" "$slug" "$reason" ;;
+            esac
+        done < <(awk -F'\t' '{n=$1; sub(/^#/,"",n); print n+0 "\t" $0}' "$WORK/excluded.tsv" \
+                 | sort -n | cut -f2-)
+        printf '\n'
+    fi
+
+    # ## Hand-resolutions needed (omit section entirely if no HAND-RESOLUTION/UNKNOWN rows)
+    if grep -qE $'\t(HAND-RESOLUTION|UNKNOWN)\t' "$WORK/overlap.tsv" 2>/dev/null; then
+        printf '## Hand-resolutions needed\n'
+        while IFS=$'\t' read -r pa pb fpath kind detail; do
+            case "$kind" in
+                HAND-RESOLUTION)
+                    # shellcheck disable=SC2016
+                    printf -- '- %s vs %s on `%s` — %s\n' "$pa" "$pb" "$fpath" "$detail" ;;
+                UNKNOWN)
+                    local rc="${detail#exit }"
+                    # shellcheck disable=SC2016
+                    printf -- '- %s vs %s on `%s` — overlap analysis unavailable (bin/pr-overlap exit %s) — inspect by hand\n' \
+                        "$pa" "$pb" "$fpath" "$rc" ;;
+            esac
+        done < <(grep -E $'\t(HAND-RESOLUTION|UNKNOWN)\t' "$WORK/overlap.tsv")
+        printf '\n'
+    fi
+
+    # ## Rebase — once, at the bottom
+    printf '## Rebase (run per PR, after the one above it merges)\n'
+    printf '```bash\n'
+    printf 'cd /Users/ajaynicolas/GitHub/IBL5-worktrees/<slug> \\\n'
+    printf '  && git fetch origin \\\n'
+    printf '  && git rebase origin/master \\\n'
+    printf '  && git push --force-with-lease\n'
+    printf '```\n'
+}
+
+# ============================================================
+# Main dispatch
+# ============================================================
+if [ "$GATE_CANDIDATES" -eq 1 ]; then
+    gate_candidates
+else
+    emit_order
+fi

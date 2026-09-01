@@ -3,7 +3,9 @@ name: pr-attack
 description: Compute an optimal merge order for all open PRs — ordered table, excluded set, and hand-resolution forecast — printed to chat and written to a dated file under the home directory.
 disable-model-invocation: true
 model: claude-sonnet-4-6
-last_verified: 2026-08-24
+context: fork
+agent: sonnet-4-6
+last_verified: 2026-09-01
 allowed-tools: Bash(bin/pr-triage), Bash(bin/pr-overlap:*), Bash(gh pr list:*),
   Bash(gh pr view:*), Bash(gh pr diff:*), Bash(git rev-parse:*), Bash(date:*),
   Bash(mktemp:*), Bash(awk:*), Bash(sort:*), Bash(grep:*), Write
@@ -303,9 +305,14 @@ your attention arriving sooner.
 
 ## Step 5: Emit the plan of attack — twice
 
-Assemble the markdown **once**, then (a) print it to chat verbatim and (b) write
-the identical text to a dated file. Target 20–40 lines total; no per-PR prose
-paragraphs.
+Assemble the markdown **once**, then (a) write it to a dated file and (b) return
+that identical text verbatim as your final message. Target 20–40 lines total; no
+per-PR prose paragraphs.
+
+This skill runs forked (`context: fork`), so your final message **is** the delivered
+document — the maintainer sees nothing else from the run. Return the complete
+markdown, start to finish. Never substitute a summary, a status line, or a pointer
+to the file you wrote.
 
 ```markdown
 # Plan of attack — <YYYY-MM-DD>

@@ -1,0 +1,713 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-pr-attack — regression harness for bin/pr-attack.
+# Fully offline: synthetic triage output, synthetic gh JSON and synthetic
+# unified diffs, all written under mktemp. No gh, no network.
+# Wired into the "Shell harness regression tests" job in .github/workflows/tests.yml.
+# Run: bin/test-pr-attack  (exit 0 = all pass, 1 = a case failed)
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ATTACK="$SCRIPT_DIR/pr-attack"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP" 2>/dev/null' EXIT
+
+FAILED=0
+
+pass()     { echo "ok: $1"; }
+failcase() { echo "FAIL: $1"; FAILED=1; }
+
+# assert_match <name> <ERE> <output>
+assert_match() {
+    if printf '%s\n' "$3" | grep -qE "$2"; then
+        pass "$1"
+    else
+        failcase "$1 - expected to match: $2"
+        printf '%s\n' "$3" | sed 's/^/    /'
+    fi
+}
+
+# assert_absent <name> <ERE> <output>
+assert_absent() {
+    if printf '%s\n' "$3" | grep -qE "$2"; then
+        failcase "$1 - expected NOT to match: $2"
+        printf '%s\n' "$3" | sed 's/^/    /'
+    else
+        pass "$1"
+    fi
+}
+
+# assert_status <name> <expected> <actual>
+assert_status() {
+    if [ "$3" = "$2" ]; then pass "$1"; else failcase "$1 - expected exit $2, got $3"; fi
+}
+
+# run_attack [args...] -> sets OUT (stdout+stderr merged) and ST (exit status)
+run_attack() {
+    ST=0
+    OUT="$(HOME="$TMP/home" PR_TRIAGE_CMD="$TMP/stubs/pr-triage" \
+           PR_OVERLAP_CMD="$TMP/stubs/pr-overlap" \
+           GH_CMD="$TMP/stubs/gh" \
+           GIT_MASTER_SHA="$REAL_TIP" \
+           PATH="$TMP/stubs:$PATH" \
+           "$ATTACK" "$@" 2>&1)" || ST=$?
+}
+
+if [ ! -x "$ATTACK" ]; then
+    echo "FAIL: $ATTACK is missing or not executable" >&2
+    exit 1
+fi
+
+# ============================================================
+# Set up stubs dir and fake HOME
+# ============================================================
+mkdir -p "$TMP/stubs" "$TMP/home"
+
+# Fixed fake SHA representing "current master tip" (no git network call needed)
+REAL_TIP="ccccccccddddddddeeeeeeeeffffffff11111111"
+FAKE_SHA="aaaaaaaabbbbbbbb0000000000000000000000000"
+
+# ============================================================
+# git stub: intercepts rev-parse origin/master calls; passes
+# everything else to the real git binary. Required because CI
+# shallow clones do not fetch origin/master.
+# ============================================================
+REAL_GIT="$(command -v git)"
+cat > "$TMP/stubs/git" <<STUB
+#!/usr/bin/env bash
+# Intercept rev-parse origin/master to return the fixed fake tip SHA.
+if [ "\${1:-}" = "rev-parse" ] && [ "\${*: -1}" = "origin/master" ]; then
+    if printf '%s ' "\$@" | grep -qF ' --short '; then
+        printf '%s\n' "\${GIT_MASTER_SHA:0:7}"
+    else
+        printf '%s\n' "\${GIT_MASTER_SHA}"
+    fi
+else
+    exec "$REAL_GIT" "\$@"
+fi
+STUB
+chmod +x "$TMP/stubs/git"
+
+# ============================================================
+# pr-triage stub: emits $TRIAGE_FIXTURE file content
+# ============================================================
+cat > "$TMP/stubs/pr-triage" <<'STUB'
+#!/usr/bin/env bash
+set -euo pipefail
+: "${TRIAGE_FIXTURE:?TRIAGE_FIXTURE not set}"
+cat "$TRIAGE_FIXTURE"
+STUB
+chmod +x "$TMP/stubs/pr-triage"
+
+# ============================================================
+# pr-overlap stub: exits with $OVERLAP_EXIT (default 0)
+# emits $OVERLAP_STDOUT if set
+# ============================================================
+cat > "$TMP/stubs/pr-overlap" <<'STUB'
+#!/usr/bin/env bash
+set -euo pipefail
+: "${OVERLAP_EXIT:=0}"
+if [ -n "${OVERLAP_STDOUT:-}" ]; then
+    cat "$OVERLAP_STDOUT"
+fi
+exit "$OVERLAP_EXIT"
+STUB
+chmod +x "$TMP/stubs/pr-overlap"
+
+# ============================================================
+# gh stub: pr list -> $GH_PR_LIST_FIXTURE; pr diff -> empty
+# ============================================================
+cat > "$TMP/stubs/gh" <<'STUB'
+#!/usr/bin/env bash
+set -euo pipefail
+: "${GH_PR_LIST_FIXTURE:?GH_PR_LIST_FIXTURE not set}"
+# gh pr list ... -> emit fixture
+# gh pr diff N  -> emit nothing (no diff needed for most tests)
+if [ "${1:-}" = "pr" ] && [ "${2:-}" = "list" ]; then
+    cat "$GH_PR_LIST_FIXTURE"
+elif [ "${1:-}" = "pr" ] && [ "${2:-}" = "diff" ]; then
+    # emit empty diff; caller does || true
+    :
+else
+    echo "gh stub: unhandled: $*" >&2
+    exit 1
+fi
+STUB
+chmod +x "$TMP/stubs/gh"
+
+# ============================================================
+# Fixture helpers
+# ============================================================
+
+# write_triage_fixture <path> <lines...>
+# Minimal bin/pr-triage output format: columns separated by 2+ spaces
+# Fields: #N  BUCKET  TITLE  URL  CLEARANCE  HOLDS
+# shellcheck disable=SC2329
+write_simple_triage() {
+    local f="$1"; shift
+    printf '%s\n' "$@" > "$f"
+}
+
+# write_prs_json <path> <json-array>
+# shellcheck disable=SC2329
+write_prs_json() {
+    printf '%s\n' "$2" > "$1"
+}
+
+# make_work_dir <subdir> returns path
+make_work_dir() {
+    local w="$TMP/work-$1"
+    mkdir -p "$w"
+    echo "$w"
+}
+
+# ============================================================
+# Helper: populate a minimal $WORK dir for invocation-2 tests
+# ============================================================
+# populate_work <dir> <tip> <orderable_prs_newline_sep> <excluded_tsv> <edges_tsv>
+#               <overlap_tsv> <hubdeg_tsv> <needsyou_tsv> <gate_candidates_tsv> <prs_json>
+populate_work() {
+    local w="$1" tip="$2" orderable="$3" excl="$4" edges="$5"
+    local overlap="$6" hubdeg="$7" needsyou="$8" gcand="$9" prsjson="${10}"
+    echo "$tip" > "$w/tip"
+    printf '2099-01-01\n' > "$w/date"
+    printf '%s\n' "$orderable" > "$w/orderable.txt"
+    printf '%s' "$excl" > "$w/excluded.tsv"
+    printf '%s' "$edges" > "$w/edges.tsv"
+    printf '%s' "$overlap" > "$w/overlap.tsv"
+    printf '%s' "$hubdeg" > "$w/hubdeg.tsv"
+    printf '%s' "$needsyou" > "$w/needsyou.tsv"
+    printf '%s' "$gcand" > "$w/gate-candidates.tsv"
+    printf '%s\n' "$prsjson" > "$w/prs.json"
+    # order.tsv is produced by emit_order; start empty
+    : > "$w/order.tsv"
+}
+
+# ============================================================
+# Case 17: arm-refused
+# ============================================================
+ST=0
+OUT="$(HOME="$TMP/home" "$ATTACK" --arm 2>&1)" || ST=$?
+assert_status "17 arm-refused exits non-zero" 1 "$ST"
+assert_match  "17 arm-refused message" 'not a flag' "$OUT"
+
+# Also: --gate-candidates --arm
+ST=0
+OUT="$(HOME="$TMP/home" "$ATTACK" --gate-candidates --arm 2>&1)" || ST=$?
+assert_status "17b arm-refused with --gate-candidates" 1 "$ST"
+
+# ============================================================
+# Case 18: unknown-flag
+# ============================================================
+ST=0
+OUT="$(HOME="$TMP/home" "$ATTACK" --bogus 2>&1)" || ST=$?
+assert_status "18 unknown-flag exits non-zero" 1 "$ST"
+assert_match  "18 unknown-flag message" 'unrecognized argument' "$OUT"
+
+# ============================================================
+# Set up common fixtures for gate-candidates invocation
+# ============================================================
+
+# Minimal triage: #10 orderable, #20 DIRTY, #30 draft (sorted)
+TRIAGE_FIXTURE_BASIC="$TMP/triage-basic.txt"
+cat > "$TRIAGE_FIXTURE_BASIC" <<'EOF'
+#10  CLEAN  Fix something  https://github.com/x/y/pull/10  CLEARED  —
+#20  DIRTY  Dirty PR       https://github.com/x/y/pull/20  CLEARED  —
+#30  CLEAN  Draft PR       https://github.com/x/y/pull/30  CLEARED  —
+EOF
+
+PRS_JSON_BASIC="$TMP/prs-basic.json"
+cat > "$PRS_JSON_BASIC" <<'EOF'
+[
+  {"number":10,"title":"Fix something","isDraft":false,"mergeStateStatus":"CLEAN","headRefName":"fix-something","url":"https://github.com/x/y/pull/10","files":[{"path":"app/foo.php"}]},
+  {"number":20,"title":"Dirty PR","isDraft":false,"mergeStateStatus":"DIRTY","headRefName":"dirty-pr","url":"https://github.com/x/y/pull/20","files":[{"path":"app/bar.php"}]},
+  {"number":30,"title":"Draft PR","isDraft":true,"mergeStateStatus":"CLEAN","headRefName":"draft-pr","url":"https://github.com/x/y/pull/30","files":[{"path":"app/baz.php"}]}
+]
+EOF
+
+# ============================================================
+# Case: --gate-candidates --work is mutually exclusive
+# ============================================================
+run_attack --gate-candidates --work /tmp/nonexistent
+assert_status "gate-candidates/work mutually exclusive exits 1" 1 "$ST"
+
+# ============================================================
+# Case: unrecognized arg with --gate-candidates context
+# ============================================================
+run_attack --gate-candidates --bogus
+assert_status "gate-candidates unrecognized arg exits 1" 1 "$ST"
+
+# ============================================================
+# Case 6/7: --gate-candidates valid run → WORK= line
+# (also covers exclude-draft and exclude-dirty in invocation 1)
+# ============================================================
+TRIAGE_FIXTURE="$TRIAGE_FIXTURE_BASIC" \
+GH_PR_LIST_FIXTURE="$PRS_JSON_BASIC" \
+OVERLAP_EXIT=0 \
+    run_attack --gate-candidates
+assert_status "gate-candidates valid run exits 0" 0 "$ST"
+assert_match  "gate-candidates emits WORK= line" '^WORK=' "$OUT"
+
+# ============================================================
+# Now build $WORK dirs for invocation-2 tests
+# ============================================================
+
+# --- Common prs.json for most inv-2 tests (PRs #10,#20,#30,#40,#50) ---
+PRS_JSON_INV2="$TMP/prs-inv2.json"
+cat > "$PRS_JSON_INV2" <<'EOF'
+[
+  {"number":10,"title":"PR Ten","isDraft":false,"mergeStateStatus":"CLEAN","headRefName":"pr-ten","url":"https://github.com/x/y/pull/10","files":[{"path":"app/a.php"}]},
+  {"number":20,"title":"PR Twenty","isDraft":false,"mergeStateStatus":"CLEAN","headRefName":"pr-twenty","url":"https://github.com/x/y/pull/20","files":[{"path":"app/b.php"}]},
+  {"number":30,"title":"PR Thirty","isDraft":false,"mergeStateStatus":"CLEAN","headRefName":"pr-thirty","url":"https://github.com/x/y/pull/30","files":[{"path":"app/c.php"}]},
+  {"number":40,"title":"PR Forty","isDraft":false,"mergeStateStatus":"CLEAN","headRefName":"pr-forty","url":"https://github.com/x/y/pull/40","files":[{"path":"app/d.php"}]},
+  {"number":50,"title":"PR Fifty","isDraft":false,"mergeStateStatus":"CLEAN","headRefName":"pr-fifty","url":"https://github.com/x/y/pull/50","files":[{"path":"app/e.php"}]}
+]
+EOF
+
+# ============================================================
+# Case 19: stale-tip
+# ============================================================
+W19="$(make_work_dir 19)"
+populate_work "$W19" "$FAKE_SHA" \
+    "$(printf '#10\n#20')" \
+    "" "" "" "" \
+    "$(printf '#10\t—\t0\n#20\t—\t0')" \
+    "" \
+    "$(cat "$PRS_JSON_INV2")"
+
+run_attack --work "$W19" --gate-edges /dev/null
+assert_status "19 stale-tip exits 3" 3 "$ST"
+assert_match  "19 stale-tip message names re-run" 'gate-candidates' "$OUT"
+
+# ============================================================
+# Case 13: unjudged-fails-loud
+# ============================================================
+W13="$(make_work_dir 13)"
+populate_work "$W13" "$REAL_TIP" \
+    "$(printf '#10\n#20')" \
+    "" "" "" "" \
+    "$(printf '#10\t—\t0\n#20\t—\t0')" \
+    "$(printf '#10\t.github/workflows/tests.yml')" \
+    "$(cat "$PRS_JSON_INV2")"
+
+run_attack --work "$W13"
+assert_status "13 unjudged-fails-loud exits 2" 2 "$ST"
+
+# ============================================================
+# Case 14: judged-empty-succeeds
+# ============================================================
+W14="$(make_work_dir 14)"
+populate_work "$W14" "$REAL_TIP" \
+    "$(printf '#10\n#20')" \
+    "" "" "" "" \
+    "$(printf '#10\t—\t0\n#20\t—\t0')" \
+    "$(printf '#10\t.github/workflows/tests.yml')" \
+    "$(cat "$PRS_JSON_INV2")"
+
+run_attack --work "$W14" --gate-edges /dev/null
+assert_status "14 judged-empty-succeeds exits 0" 0 "$ST"
+assert_match  "14 judged-empty produces document" '^# Plan of attack' "$OUT"
+assert_match  "14 document has Rebase section" '^## Rebase' "$OUT"
+
+# Verify exactly 1 Rebase section (grep -c returns a count)
+REBASE_COUNT="$(printf '%s\n' "$OUT" | grep -c '^## Rebase' || true)"
+if [ "$REBASE_COUNT" = "1" ]; then pass "14 exactly one Rebase section"; else failcase "14 expected 1 Rebase section, got $REBASE_COUNT"; fi
+
+# ============================================================
+# Case 1: tiebreak-hub-last
+# Two PRs: #10 hub-degree=2, #20 hub-degree=0; both rank=0 (—)
+# Lower hub should come FIRST → #20 before #10
+# ============================================================
+W1="$(make_work_dir 1)"
+populate_work "$W1" "$REAL_TIP" \
+    "$(printf '#10\n#20')" \
+    "" "" \
+    "" \
+    "$(printf '#10\t2\n#20\t0')" \
+    "$(printf '#10\t—\t0\n#20\t—\t0')" \
+    "" \
+    "$(cat "$PRS_JSON_INV2")"
+
+run_attack --work "$W1" --gate-edges /dev/null
+assert_status "1 tiebreak-hub-last exits 0" 0 "$ST"
+# #20 (hub=0) must appear before #10 (hub=2)
+POS20="$(printf '%s\n' "$OUT" | grep -n '#20' | head -1 | cut -d: -f1 || echo 9999)"
+POS10="$(printf '%s\n' "$OUT" | grep -n '#10' | head -1 | cut -d: -f1 || echo 9999)"
+if [ "$POS20" -lt "$POS10" ]; then pass "1 tiebreak-hub-last #20 before #10"; else failcase "1 tiebreak-hub-last: expected #20 before #10 (pos $POS20 vs $POS10)"; fi
+
+# ============================================================
+# Case 2: tiebreak-needsyou-rank
+# Two PRs both hub=0; #10 rank=2 (manual test), #20 rank=0 (—)
+# → #20 (rank 0) before #10 (rank 2)
+# ============================================================
+W2="$(make_work_dir 2)"
+populate_work "$W2" "$REAL_TIP" \
+    "$(printf '#10\n#20')" \
+    "" "" "" "" \
+    "$(printf '#10\tmanual test\t2\n#20\t—\t0')" \
+    "" \
+    "$(cat "$PRS_JSON_INV2")"
+
+run_attack --work "$W2" --gate-edges /dev/null
+assert_status "2 tiebreak-needsyou-rank exits 0" 0 "$ST"
+POS20="$(printf '%s\n' "$OUT" | grep -n '#20' | head -1 | cut -d: -f1 || echo 9999)"
+POS10="$(printf '%s\n' "$OUT" | grep -n '#10' | head -1 | cut -d: -f1 || echo 9999)"
+if [ "$POS20" -lt "$POS10" ]; then pass "2 tiebreak-needsyou-rank #20(rank0) before #10(rank2)"; else failcase "2 tiebreak-needsyou-rank: expected #20 before #10 (pos $POS20 vs $POS10)"; fi
+
+# ============================================================
+# Case 3: tiebreak-pr-number
+# Two PRs equal hub=0 rank=0; lower number first
+# ============================================================
+W3="$(make_work_dir 3)"
+populate_work "$W3" "$REAL_TIP" \
+    "$(printf '#10\n#20')" \
+    "" "" "" "" \
+    "$(printf '#10\t—\t0\n#20\t—\t0')" \
+    "" \
+    "$(cat "$PRS_JSON_INV2")"
+
+run_attack --work "$W3" --gate-edges /dev/null
+assert_status "3 tiebreak-pr-number exits 0" 0 "$ST"
+POS10="$(printf '%s\n' "$OUT" | grep -n '#10' | head -1 | cut -d: -f1 || echo 9999)"
+POS20="$(printf '%s\n' "$OUT" | grep -n '#20' | head -1 | cut -d: -f1 || echo 9999)"
+if [ "$POS10" -lt "$POS20" ]; then pass "3 tiebreak-pr-number #10 before #20"; else failcase "3 tiebreak-pr-number: expected #10 before #20 (pos $POS10 vs $POS20)"; fi
+
+# ============================================================
+# Case 4: tiebreak-precedence
+# #10 hub=2 rank=0 (—), #20 hub=0 rank=2 (manual test)
+# hub-last key dominates: #20 (hub=0) still wins despite rank=2
+# ============================================================
+W4="$(make_work_dir 4)"
+populate_work "$W4" "$REAL_TIP" \
+    "$(printf '#10\n#20')" \
+    "" "" "" \
+    "$(printf '#10\t2\n#20\t0')" \
+    "$(printf '#10\t—\t0\n#20\tmanual test\t2')" \
+    "" \
+    "$(cat "$PRS_JSON_INV2")"
+
+run_attack --work "$W4" --gate-edges /dev/null
+assert_status "4 tiebreak-precedence exits 0" 0 "$ST"
+POS20="$(printf '%s\n' "$OUT" | grep -n '#20' | head -1 | cut -d: -f1 || echo 9999)"
+POS10="$(printf '%s\n' "$OUT" | grep -n '#10' | head -1 | cut -d: -f1 || echo 9999)"
+if [ "$POS20" -lt "$POS10" ]; then pass "4 tiebreak-precedence hub-last key dominates needs-you rank"; else failcase "4 tiebreak-precedence: expected #20(hub=0) before #10(hub=2) (pos $POS20 vs $POS10)"; fi
+
+# ============================================================
+# Case 5: cycle-detected
+# #10>#20 and #20>#10 (cycle), plus #30 and #40 (acyclic)
+# Cycle members → excluded with "dependency cycle"
+# Acyclic PRs still ordered
+# ============================================================
+W5="$(make_work_dir 5)"
+populate_work "$W5" "$REAL_TIP" \
+    "$(printf '#10\n#20\n#30\n#40')" \
+    "" \
+    "$(printf '#10\t#20\tdeclared\n#20\t#10\tdeclared')" \
+    "" "" \
+    "$(printf '#10\t—\t0\n#20\t—\t0\n#30\t—\t0\n#40\t—\t0')" \
+    "" \
+    "$(cat "$PRS_JSON_INV2")"
+
+# expand prs.json to include #40
+cat > "$TMP/prs-5.json" <<'EOF'
+[
+  {"number":10,"title":"PR Ten","isDraft":false,"mergeStateStatus":"CLEAN","headRefName":"pr-ten","url":"https://github.com/x/y/pull/10","files":[{"path":"app/a.php"}]},
+  {"number":20,"title":"PR Twenty","isDraft":false,"mergeStateStatus":"CLEAN","headRefName":"pr-twenty","url":"https://github.com/x/y/pull/20","files":[{"path":"app/b.php"}]},
+  {"number":30,"title":"PR Thirty","isDraft":false,"mergeStateStatus":"CLEAN","headRefName":"pr-thirty","url":"https://github.com/x/y/pull/30","files":[{"path":"app/c.php"}]},
+  {"number":40,"title":"PR Forty","isDraft":false,"mergeStateStatus":"CLEAN","headRefName":"pr-forty","url":"https://github.com/x/y/pull/40","files":[{"path":"app/d.php"}]}
+]
+EOF
+printf '%s\n' "$(cat "$TMP/prs-5.json")" > "$W5/prs.json"
+
+run_attack --work "$W5" --gate-edges /dev/null
+assert_status "5 cycle-detected exits 0" 0 "$ST"
+assert_match  "5 cycle members appear in Excluded" 'dependency cycle' "$OUT"
+# Both #10 and #20 should be excluded
+assert_match  "5 #10 in Excluded" '#10.*dependency cycle' "$OUT"
+assert_match  "5 #20 in Excluded" '#20.*dependency cycle' "$OUT"
+# Acyclic PRs #30 and #40 appear in the ordered table
+assert_match  "5 acyclic #30 still ordered" '#30' "$OUT"
+assert_match  "5 acyclic #40 still ordered" '#40' "$OUT"
+
+# ============================================================
+# Case 6: exclude-draft (via invocation 2 pre-populated excluded.tsv)
+# ============================================================
+W6="$(make_work_dir 6)"
+populate_work "$W6" "$REAL_TIP" \
+    "$(printf '#10')" \
+    "$(printf '#20\tdraft\n')" \
+    "" "" "" \
+    "$(printf '#10\t—\t0')" \
+    "" \
+    "$(cat "$PRS_JSON_INV2")"
+
+run_attack --work "$W6" --gate-edges /dev/null
+assert_status "6 exclude-draft exits 0" 0 "$ST"
+assert_match  "6 draft PR shows DRAFT reason" 'DRAFT' "$OUT"
+assert_absent "6 draft PR not in ordered table rows" '^\| [0-9]+ \| #20' "$OUT"
+
+# ============================================================
+# Case 7: exclude-dirty
+# ============================================================
+W7="$(make_work_dir 7)"
+populate_work "$W7" "$REAL_TIP" \
+    "$(printf '#10')" \
+    "$(printf '#20\tconflicted\n')" \
+    "" "" "" \
+    "$(printf '#10\t—\t0')" \
+    "" \
+    "$(cat "$PRS_JSON_INV2")"
+
+run_attack --work "$W7" --gate-edges /dev/null
+assert_status "7 exclude-dirty exits 0" 0 "$ST"
+assert_match  "7 dirty PR shows DIRTY reason" 'DIRTY \(merge conflict' "$OUT"
+assert_absent "7 dirty PR not in ordered table rows" '^\| [0-9]+ \| #20' "$OUT"
+
+# ============================================================
+# Case 8: blocked-by-excluded
+# ============================================================
+W8="$(make_work_dir 8)"
+populate_work "$W8" "$REAL_TIP" \
+    "$(printf '#10')" \
+    "$(printf '#10\tconflicted\n#20\tblocked by excluded #10\n')" \
+    "" "" "" \
+    "$(printf '#20\t—\t0')" \
+    "" \
+    "$(cat "$PRS_JSON_INV2")"
+
+# orderable is empty (#10 and #20 both excluded), need at least one orderable
+# Actually in this test: #10 is dirty, #20 blocked. So orderable is empty.
+# Adjust: add #30 as orderable
+printf '#30\n' > "$W8/orderable.txt"
+printf '#10\tconflicted\n#20\tblocked by excluded #10\n' > "$W8/excluded.tsv"
+printf '#10\t—\t0\n#20\t—\t0\n#30\t—\t0\n' > "$W8/needsyou.tsv"
+
+run_attack --work "$W8" --gate-edges /dev/null
+assert_status "8 blocked-by-excluded exits 0" 0 "$ST"
+assert_match  "8 #20 excluded with blocked reason" 'blocked by excluded #10' "$OUT"
+assert_absent "8 #20 not in ordered table" '^\| [0-9]+ \| #20' "$OUT"
+
+# ============================================================
+# Case 9: depends-non-open
+# ============================================================
+W9="$(make_work_dir 9)"
+populate_work "$W9" "$REAL_TIP" \
+    "$(printf '#30')" \
+    "$(printf '#20\tdepends on non-open #99\n')" \
+    "" "" "" \
+    "$(printf '#20\t—\t0\n#30\t—\t0')" \
+    "" \
+    "$(cat "$PRS_JSON_INV2")"
+
+run_attack --work "$W9" --gate-edges /dev/null
+assert_status "9 depends-non-open exits 0" 0 "$ST"
+assert_match  "9 #20 excluded with non-open reason" 'depends on non-open #99' "$OUT"
+assert_absent "9 #20 not in ordered table" '^\| [0-9]+ \| #20' "$OUT"
+
+# ============================================================
+# Case 10: overlap-exit-2 → UNKNOWN, never CLEAN
+# ============================================================
+W10="$(make_work_dir 10)"
+# overlap.tsv with UNKNOWN rows (as would result from overlap exit 2)
+populate_work "$W10" "$REAL_TIP" \
+    "$(printf '#10\n#20')" \
+    "" \
+    "$(printf '#10\t#20\tconflict-cost\n')" \
+    "$(printf '#10\t#20\tapp/shared.php\tUNKNOWN\texit 2\n')" \
+    "$(printf '#10\t2\n#20\t2')" \
+    "$(printf '#10\t—\t0\n#20\t—\t0')" \
+    "" \
+    "$(cat "$PRS_JSON_INV2")"
+
+run_attack --work "$W10" --gate-edges /dev/null
+assert_status "10 overlap-exit-2 exits 0" 0 "$ST"
+assert_match  "10 UNKNOWN appears in output" 'UNKNOWN|unavailable' "$OUT"
+assert_absent "10 CLEAN never appears for that pair" 'CLEAN' "$OUT"
+
+# ============================================================
+# Case 11: overlap-exit-3 → UNKNOWN, never CLEAN
+# ============================================================
+W11="$(make_work_dir 11)"
+populate_work "$W11" "$REAL_TIP" \
+    "$(printf '#10\n#20')" \
+    "" \
+    "$(printf '#10\t#20\tconflict-cost\n')" \
+    "$(printf '#10\t#20\tapp/shared.php\tUNKNOWN\texit 3\n')" \
+    "$(printf '#10\t2\n#20\t2')" \
+    "$(printf '#10\t—\t0\n#20\t—\t0')" \
+    "" \
+    "$(cat "$PRS_JSON_INV2")"
+
+run_attack --work "$W11" --gate-edges /dev/null
+assert_status "11 overlap-exit-3 exits 0" 0 "$ST"
+assert_match  "11 UNKNOWN appears in output" 'UNKNOWN|unavailable' "$OUT"
+assert_absent "11 CLEAN never appears for exit-3 pair" 'CLEAN' "$OUT"
+
+# ============================================================
+# Case 12: gate-edge-changes-order
+# Without gate edge: #10 before #20 (lower number, equal rank/hub)
+# With gate edge #20>#10 (20 must come before 10): #20 before #10
+# ============================================================
+W12="$(make_work_dir 12)"
+populate_work "$W12" "$REAL_TIP" \
+    "$(printf '#10\n#20')" \
+    "" "" "" "" \
+    "$(printf '#10\t—\t0\n#20\t—\t0')" \
+    "" \
+    "$(cat "$PRS_JSON_INV2")"
+
+# Without gate edge → #10 before #20
+cp -r "$W12" "$TMP/work-12a"
+run_attack --work "$TMP/work-12a" --gate-edges /dev/null
+OUT_NO_GATE="$OUT"
+# Re-populate work-12 for gated run (edges.tsv gets appended during emit_order)
+cp -r "$W12" "$TMP/work-12b"
+run_attack --work "$TMP/work-12b" --gate-edge '#20>#10'
+OUT_WITH_GATE="$OUT"
+
+POS10_NO="$(printf '%s\n' "$OUT_NO_GATE" | grep -n '#10' | head -1 | cut -d: -f1 || echo 9999)"
+POS20_NO="$(printf '%s\n' "$OUT_NO_GATE" | grep -n '#20' | head -1 | cut -d: -f1 || echo 9999)"
+POS10_G="$(printf '%s\n' "$OUT_WITH_GATE" | grep -n '#10' | head -1 | cut -d: -f1 || echo 9999)"
+POS20_G="$(printf '%s\n' "$OUT_WITH_GATE" | grep -n '#20' | head -1 | cut -d: -f1 || echo 9999)"
+
+if [ "$POS10_NO" -lt "$POS20_NO" ]; then pass "12 without gate: #10 before #20"; else failcase "12 without gate: expected #10 before #20 (pos $POS10_NO vs $POS20_NO)"; fi
+if [ "$POS20_G" -lt "$POS10_G" ]; then pass "12 with gate #20>#10: #20 before #10"; else failcase "12 with gate: expected #20 before #10 (pos $POS20_G vs $POS10_G)"; fi
+if [ "$POS10_NO" -lt "$POS20_NO" ] && [ "$POS20_G" -lt "$POS10_G" ]; then pass "12 gate-edge-changes-order"; else failcase "12 gate-edge-changes-order: orders did not differ"; fi
+
+# ============================================================
+# Case 15: no-overlap-omits-section
+# ============================================================
+W15="$(make_work_dir 15)"
+populate_work "$W15" "$REAL_TIP" \
+    "$(printf '#10\n#20')" \
+    "" "" "" "" \
+    "$(printf '#10\t—\t0\n#20\t—\t0')" \
+    "" \
+    "$(cat "$PRS_JSON_INV2")"
+
+run_attack --work "$W15" --gate-edges /dev/null
+assert_status "15 no-overlap exits 0" 0 "$ST"
+assert_absent "15 no Hand-resolutions section" '## Hand-resolutions needed' "$OUT"
+
+# ============================================================
+# Case 16: deterministic — same WORK run twice produces identical output
+# ============================================================
+W16="$(make_work_dir 16)"
+populate_work "$W16" "$REAL_TIP" \
+    "$(printf '#10\n#20\n#30')" \
+    "$(printf '#40\tdraft\n')" \
+    "" "" "" \
+    "$(printf '#10\t—\t0\n#20\t—\t0\n#30\t—\t0\n#40\t—\t0')" \
+    "" \
+    "$(cat "$PRS_JSON_INV2")"
+
+# run 1
+cp -r "$W16" "$TMP/work-16a"
+run_attack --work "$TMP/work-16a" --gate-edges /dev/null
+OUT1="$OUT"
+# run 2 (fresh copy)
+cp -r "$W16" "$TMP/work-16b"
+run_attack --work "$TMP/work-16b" --gate-edges /dev/null
+OUT2="$OUT"
+
+if [ "$OUT1" = "$OUT2" ]; then
+    pass "16 deterministic - identical output on two runs"
+else
+    failcase "16 deterministic - outputs differ"
+    diff <(printf '%s\n' "$OUT1") <(printf '%s\n' "$OUT2") | sed 's/^/    /' || true
+fi
+
+# ============================================================
+# Case 20: write-path-outside-repo
+# ============================================================
+W20="$(make_work_dir 20)"
+populate_work "$W20" "$REAL_TIP" \
+    "$(printf '#10')" \
+    "" "" "" "" \
+    "$(printf '#10\t—\t0')" \
+    "" \
+    "$(cat "$PRS_JSON_INV2")"
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+mkdir -p "$TMP/home"
+run_attack --work "$W20" --gate-edges /dev/null
+assert_status "20 write-path exits 0" 0 "$ST"
+
+# File should exist under $TMP/home
+WRITTEN_FILE="$(find "$TMP/home" -maxdepth 1 -name 'IBL5-pr-attack-*.md' 2>/dev/null | head -1 || true)"
+if [ -n "$WRITTEN_FILE" ]; then
+    pass "20 written file exists under HOME"
+    case "$WRITTEN_FILE" in
+        "$TMP/home"/*) pass "20 written file is under TMP/home (not real HOME)" ;;
+        *) failcase "20 written file is not under TMP/home: $WRITTEN_FILE" ;;
+    esac
+    case "$WRITTEN_FILE" in
+        "$REPO_ROOT"/*) failcase "20 written file must not be inside repo: $WRITTEN_FILE" ;;
+        *) pass "20 written file is outside repo root" ;;
+    esac
+else
+    failcase "20 no IBL5-pr-attack-*.md found under TMP/home"
+fi
+
+# ============================================================
+# Case 21: output-fidelity
+# conflict-cost-only PR: constraint cell is — (never MUST)
+# declared edge PR: constraint carries (MUST)
+# exactly 1 Rebase section
+# ============================================================
+W21="$(make_work_dir 21)"
+# #10>#20 as conflict-cost (advisory), #30>#40 as declared (MUST)
+populate_work "$W21" "$REAL_TIP" \
+    "$(printf '#10\n#20\n#30\n#40')" \
+    "" \
+    "$(printf '#10\t#20\tconflict-cost\n#30\t#40\tdeclared\n')" \
+    "$(printf '#10\t#20\tapp/shared.php\tHAND-RESOLUTION\t(#10 @@ -1,3 vs #20 @@ -2,3)\n')" \
+    "$(printf '#10\t2\n#20\t2')" \
+    "$(printf '#10\t—\t0\n#20\t—\t0\n#30\t—\t0\n#40\t—\t0')" \
+    "" \
+    "$(cat "$TMP/prs-5.json")"
+
+run_attack --work "$W21" --gate-edges /dev/null
+assert_status "21 output-fidelity exits 0" 0 "$ST"
+
+# conflict-cost PR should NOT have (MUST) in its constraint cell
+# Find the row for #20 (the conflict-cost follower)
+ROW20="$(printf '%s\n' "$OUT" | grep '#20' | grep '^|' | head -1 || true)"
+if [ -n "$ROW20" ]; then
+    if printf '%s\n' "$ROW20" | grep -qF '(MUST)'; then
+        failcase "21 conflict-cost PR #20 must not have (MUST) in constraint"
+    else
+        pass "21 conflict-cost PR #20 has no (MUST)"
+    fi
+else
+    # #20 might be positioned later; check full output
+    if printf '%s\n' "$OUT" | grep -qE '#20.*\(MUST\)'; then
+        failcase "21 conflict-cost constraint must not contain (MUST)"
+    else
+        pass "21 conflict-cost PR constraint has no (MUST)"
+    fi
+fi
+
+# declared edge PR #40 should have (MUST)
+if printf '%s\n' "$OUT" | grep '#40' | grep '^|' | grep -q '(MUST)'; then
+    pass "21 declared edge PR #40 has (MUST)"
+else
+    failcase "21 declared edge PR #40 should have (MUST) in constraint"
+    printf '%s\n' "$OUT" | grep '#40' | sed 's/^/    /'
+fi
+
+# Exactly 1 Rebase section
+RC21="$(printf '%s\n' "$OUT" | grep -c '^## Rebase' || true)"
+if [ "$RC21" = "1" ]; then pass "21 exactly one Rebase section"; else failcase "21 expected 1 Rebase section, got $RC21"; fi
+
+# ============================================================
+# Verdict
+# ============================================================
+if [ "$FAILED" -eq 0 ]; then
+    echo "All bin/pr-attack cases passed."
+    exit 0
+fi
+echo "bin/test-pr-attack: one or more cases failed (see FAIL lines above)." >&2
+exit 1

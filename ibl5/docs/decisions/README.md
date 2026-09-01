@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-08-31
+last_verified: 2026-09-01
 ---
 
 # IBL5 Architecture Decision Records
@@ -42,6 +42,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0108](0108-boxscore-schedule-reconciliation-severity.md) | Asymmetric severity for boxscore/schedule reconciliation | Accepted | Orphan boxscores and duplicate `(date, visitor, home)` triples are errors (exit 1); played schedule rows without boxscores are warnings (exit 0), because a missing boxscore is the normal mid-sim state and a strict check would be muted within a week. |
 | [0109](0109-team-win-loss-dedup-key-and-raw-table-duplicate-invariant.md) | Matchup-triple dedup key for `ibl_team_win_loss`, and a raw-table duplicate invariant | Accepted | The view keys on `(date, visitor, home)` with `min(game_of_that_day)` as the canonical row, so a duplicate boxscore is invisible there by design; detection therefore lives on `ibl_box_scores_teams`, runs unconditionally, and is scoped to `game_type = 1`. Narrows ADR-0108's fail-open guard to the orphan direction only. |
 | [0110](0110-numbering-collision-prevention.md) | ADR and migration numbering collision prevention | Accepted | Allocators fold in `refs/remotes/origin/*` and sibling worktrees (offline); `merge=union` on this index stops concurrent-append rebase conflicts; `bin/check-numbering` fails a PR introducing a duplicate number or a duplicated index row. Nine legacy duplicates are grandfathered in `--all` only. |
+| [0113](0113-pr-attack-gate-judgment-as-sort-input.md) | Gate judgment is a sort input, not a post-hoc annotation | Accepted | `bin/pr-attack` uses a two-invocation design: `--gate-candidates` identifies nominees and halts; `--work --gate-edge` injects human-supplied judgments as `gate`-type MUST edges before running Kahn's sort. Exit 2 if candidates are present and no judgment is supplied; `--gate-edges /dev/null` is the judged-empty case. |
 
 ## When an ADR is Required
 

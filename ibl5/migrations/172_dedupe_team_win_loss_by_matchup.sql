@@ -14,6 +14,13 @@
 -- score, and an arbitrary-row GROUP BY selection would make *which team is credited
 -- with the win* nondeterministic.
 --
+-- The join back onto `canonical_games` uses `<=>` (NULL-safe equality), not `=`, because
+-- `game_of_that_day` is NULLable. With plain `=`, a matchup whose rows all carry a NULL
+-- ordinal yields `min(...) = NULL`, the equality is never true, and the game is dropped
+-- from the view entirely -- silently costing both teams a game rather than deduping one.
+-- Production currently holds no NULL ordinals, but the E2E seed does, and the column
+-- permits them; `<=>` matches NULL to NULL and makes the drop impossible.
+--
 -- The inner `group by` on the triple is still required: `ibl_box_scores_teams` holds
 -- two rows per game (one per team) carrying identical game-level quarter columns, and
 -- that GROUP BY collapses the pair -- exactly as migration 121 did.
@@ -43,7 +50,7 @@ unique_games as (
     on `c`.`game_date` = `b`.`game_date`
    and `c`.`visitor_teamid` = `b`.`visitor_teamid`
    and `c`.`home_teamid` = `b`.`home_teamid`
-   and `c`.`game_of_that_day` = `b`.`game_of_that_day`
+   and `c`.`game_of_that_day` <=> `b`.`game_of_that_day`
   where `b`.`game_type` = 1
   group by `b`.`game_date`,`b`.`visitor_teamid`,`b`.`home_teamid`
 ),

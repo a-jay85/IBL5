@@ -122,4 +122,58 @@ class TeamWinLossViewDedupTest extends DatabaseTestCase
 
         $stmt->close();
     }
+
+    /**
+     * A matchup whose rows carry a NULL `game_of_that_day` must still count as a
+     * game for both teams.
+     *
+     * `game_of_that_day` is NULLable.  The view's `canonical_games` CTE keeps
+     * `min(game_of_that_day)`, which is NULL for such a matchup, and the join back
+     * onto the raw table must therefore use `<=>` (NULL-safe equality).  With a
+     * plain `=` the comparison is never true, the join drops the game entirely,
+     * and both teams silently lose a game from their record.
+     */
+    public function testTeamWinLossViewKeepsMatchupWithNullGameOfThatDay(): void
+    {
+        // Stars (2) @ Metros (1), inserted at ordinal 1 then nulled — `insertRow`
+        // binds PHP null as an empty string, which an INT column coerces to 0, so
+        // the NULL has to be written with a follow-up UPDATE.
+        $this->insertTeamBoxscoreRow('2099-01-17', 'Metros', 1, 2, 1);
+        $this->insertTeamBoxscoreRow('2099-01-17', 'Stars',  1, 2, 1);
+
+        $updated = $this->db->query(
+            "UPDATE `ibl_box_scores_teams` SET `game_of_that_day` = NULL WHERE `game_date` = '2099-01-17'"
+        );
+        self::assertNotFalse($updated, 'Failed to null game_of_that_day: ' . $this->db->error);
+        self::assertSame(2, $this->db->affected_rows, 'Expected both 2099-01-17 rows to be nulled.');
+
+        $stmt = $this->db->prepare(
+            'SELECT wins, losses FROM ibl_team_win_loss WHERE year = ? AND currentname = ?'
+        );
+        self::assertNotFalse($stmt, 'Failed to prepare ibl_team_win_loss query: ' . $this->db->error);
+
+        $year = 2099;
+
+        foreach (['Metros', 'Stars'] as $name) {
+            $stmt->bind_param('is', $year, $name);
+            $stmt->execute();
+            $row = $stmt->get_result()->fetch_assoc();
+            self::assertNotNull(
+                $row,
+                sprintf('No ibl_team_win_loss row for %s in 2099; the NULL-ordinal game was dropped by the view.', $name),
+            );
+            self::assertSame(
+                1,
+                $row['wins'] + $row['losses'],
+                sprintf(
+                    '%s should have exactly 1 game (wins=%d, losses=%d); a NULL game_of_that_day must not drop the game.',
+                    $name,
+                    $row['wins'],
+                    $row['losses'],
+                ),
+            );
+        }
+
+        $stmt->close();
+    }
 }

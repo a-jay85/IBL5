@@ -733,6 +733,30 @@ class LeagueControlPanelProcessorTest extends TestCase
         $this->assertStringContainsString('maintenance repository not configured', $result['message']);
     }
 
+    public function testUpdateTraditionExcludesInProgressCurrentSeasonBeforeAveraging(): void
+    {
+        $maintenanceMock = $this->createMock(MaintenanceRepositoryInterface::class);
+        $maintenanceMock->method('getAllTeams')->willReturn([['team_name' => 'Miami']]);
+        $maintenanceMock->method('getTeamSeasonRecords')->willReturn([
+            ['year' => 2024, 'wins' => 30, 'losses' => 10],  // in-progress (40 games < 82), dropped by array_shift
+            ['year' => 2023, 'wins' => 50, 'losses' => 32],
+            ['year' => 2022, 'wins' => 40, 'losses' => 42],
+        ]);
+        // in-progress 2024 row excluded; avg of 2023+2022: wins=(50+40)/2=45, losses=(32+42)/2=37
+        $maintenanceMock->expects($this->once())
+            ->method('updateTeamTradition')
+            ->with('Miami', 45, 37);
+
+        $stub = self::createStub(LeagueControlPanelRepositoryInterface::class);
+        $stub->method('getSetting')->willReturn('2024');
+        $awardStub = self::createStub(AwardGenerationServiceInterface::class);
+        $processor = new LeagueControlPanelProcessor($stub, $awardStub, LeagueContext::LEAGUE_IBL, $maintenanceMock);
+
+        $result = $processor->dispatch('update_tradition', []);
+
+        $this->assertTrue($result['success']);
+    }
+
     // --- simRecapPollerNotice ---
 
     public function testSimRecapPollerNoticeReturnsNullForPlayoffs(): void

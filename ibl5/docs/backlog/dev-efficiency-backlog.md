@@ -1,6 +1,6 @@
 ---
 description: Development-efficiency backlog — inner-loop speed (diff-scoped analysis, parallel tests), CI caching, dependency-bump batching, and worktree lifecycle automation, with per-entry status.
-last_verified: 2026-08-31
+last_verified: 2026-09-01
 ---
 
 # Development-Efficiency Backlog
@@ -207,6 +207,7 @@ Both are silent: the assertion is well-formed, the gate is green, and nothing in
 | 2 | PR #1964 comment `5384312129` (Phase 4B verdict) | yes — verdict scoped to the last commit, worded as covering the PR | yes | not fixed — filed; `/pr-review 1964` recommended before merge |
 | 3 | `.claude/skills/post-plan/SKILL.md` — the body generator that emits the `## Manual Testing` default | yes — the producer of occurrence 1; picks the boilerplate without consulting the plan's hold justification | yes | not fixed — filed (the gate belongs here, not on #1964) |
 | 4 | `.claude/skills/pr-ready/_plan-fidelity-review.md:6c(a)` | no — already *requires* bounding 4B's coverage; it is the check that caught occurrence 2 | yes | not fixed — correct as written |
+| 5 | PR #2023 body, `## Manual Testing` block — "all changes are covered by unit and E2E tests" | yes — asserts E2E test coverage; the diff contains only unit and database-integration tests, no E2E | yes | fixed this pass (body rewritten to "unit and database-integration tests, plus two CI hosts running the duplicate invariant") |
 
 `prevention_ladder:`
 

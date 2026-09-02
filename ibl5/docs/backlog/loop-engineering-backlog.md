@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-09-01
+last_verified: 2026-09-02
 ---
 
 # Loop-Engineering Backlog
@@ -66,6 +66,7 @@ last_verified: 2026-09-01
 | L37 | PR body declares only the plan's named files; changes the plan never named ship undeclared, so a reviewer cannot separate intended scope from drift | ⬜ Open | 🟦 | S |
 | L38 | Headless CI watcher killed: `local_bash` not awaited by wind-down sweep — phantom success under `claude -p` | ✅ Shipped #2026 | 🟦 | S |
 | L39 | Autonomous PR body omits plan-deliverable moot-at-branch-cut explanation and asserts unchecked test coverage | ⬜ Open | 🟥 | S |
+| L40 | Compiled post-plan harness crashes on any PR containing a binary file (`git diff` decoded as strict UTF-8) | ⬜ Open | 🟥 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -380,6 +381,24 @@ Rung 1 does not require the `meta-tooling-bar.md` extend-before-add conditions (
 **artifact destination:** .claude/skills/post-plan/_phase-5-final-verification.md and bin/lib/pr-armable.sh (in-repo). Ships with L36 and L37.
 
 **provenance:** (discovered 2026-08-31 during #2046)
+
+---
+
+### L40 Compiled post-plan harness crashes on any PR containing a binary file (`git diff` decoded as strict UTF-8)
+
+*(discovered 2026-09-01 while shipping #2056, whose diff contained the binary artifact `ibl5/data/finals2008-g4.rec`)*
+
+**Location:** `tools/postplan-harness/harness/adapters/gitad.py:18` — `_run()` calls `subprocess.run([...], capture_output=True, text=True)` with no `errors=` argument. The crash surfaces at `gitad.py:42` (`diff_vs_base`), which shells out to `git diff <merge-base>`. Same unguarded `text=True` at six other call sites: `gitad.py:85`, `gitad.py:88`, `ciwatch.py:71`, `llm.py:68`, `ghad.py:116`, `verify.py:42`. (`llm.py:58` is the only place in the harness that passes `errors=` at all.) Regression-test host: `tools/postplan-harness/tests/test_gitad_live.py`.
+
+**Problem:** `text=True` decodes the child's stdout as strict UTF-8. `git diff` emits raw bytes for a binary file, so any diff touching one raises `UnicodeDecodeError` and kills the compiled harness *before any phase runs*. Observed 2026-09-01 at 18:19: `UnicodeDecodeError: 'utf-8' codec can't decode byte 0x9e in position 23462: invalid start byte`, traceback `gitad.py:42 diff_vs_base` → `gitad.py:17 _run`. This is not a corner case — it fires on **every** PR whose diff contains a binary file, which is the entire boxscore-restore class of work (`.rec` artifacts) plus any image, font, or fixture blob.
+
+The failure is quiet because the two-engine design absorbs it: the harness exits non-zero, `should_fallback()` returns true for any rc except 0 and 3, and `bin/post-plan-now` silently hands off to the slower Sonnet `/post-plan` skill. Work still completes, so nothing alarms — but the run costs ~40 min instead of a few, and the fallback agent reasons without the harness's guardrails. In #2056 it invented a `@codeCoverageIgnore` annotation with zero precedent anywhere in the repo, which did not clear the coverage gate anyway (83.98% → 84.24%, minimum 84.46%); the fix had to be reverted by hand and replaced with the repo's actual precedent (lowering `coverage-baseline.json`, as in #2001 and #2022).
+
+**Suggested direction:** Add `errors="replace"` to `_run()` in `gitad.py` — mojibake in a diff string the harness only pattern-matches over is strictly better than a crash. Then sweep the other six `text=True` sites for the same guard, since `git log`, `gh` output, and CI logs can all carry non-UTF-8 bytes. Regression test in `tests/test_gitad_live.py`: create a temp repo, commit a file containing byte `0x9e`, and assert `diff_vs_base()` returns a string rather than raising.
+
+**Risk if untouched:** Every binary-touching PR silently loses the fast, guardrailed engine and falls through to an unconstrained agent — the expensive path, taken invisibly, with lower-quality output. Because the fallback usually *succeeds*, there is no signal that the primary engine has been dead for that whole class of PR.
+
+**Status (2026-09-01):** ⬜ Open — 🟥 (self-contained fix in a dev-tooling adapter; no user-facing surface, no gate weakened).
 
 ---
 

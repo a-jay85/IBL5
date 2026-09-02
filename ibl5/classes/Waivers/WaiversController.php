@@ -26,11 +26,9 @@ class WaiversController implements WaiversControllerInterface
     public const WAIVER_POOL_MOVES_CATEGORY_ID = 1;
 
     private WaiversServiceInterface $service;
-    private WaiversProcessorInterface $processor;
     private \Waivers\Contracts\WaiversSubmissionServiceInterface $submissionService;
     private WaiversViewInterface $view;
     private \Repositories\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepo;
-    private \Repositories\Contracts\SalaryCapRepositoryInterface $salaryCapRepo;
     private \Utilities\NukeCompat $nukeCompat;
     private \mysqli $db;
     private AuthServiceInterface $authService;
@@ -58,19 +56,15 @@ class WaiversController implements WaiversControllerInterface
         ?\Waivers\Contracts\WaiversSubmissionServiceInterface $submissionService = null
     ) {
         $this->service = $service;
-        $this->processor = $processor;
         $this->view = $view;
         $this->teamIdentityRepo = $teamIdentityRepo;
-        $this->salaryCapRepo = $salaryCapRepo;
         $this->nukeCompat = $nukeCompat;
         $this->db = $db;
         $this->authService = $authService;
         $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
         $this->season = $season;
-        // Built last, after $this->processor and $this->salaryCapRepo are assigned, so the
-        // fallback construction reads populated properties — no assignment-order null risk.
         $this->submissionService = $submissionService
-            ?? new \Waivers\WaiversSubmissionService($this->processor, $this->salaryCapRepo);
+            ?? new \Waivers\WaiversSubmissionService($processor, $salaryCapRepo);
     }
 
     /**

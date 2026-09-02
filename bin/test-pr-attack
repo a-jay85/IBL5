@@ -249,6 +249,43 @@ assert_status "gate-candidates valid run exits 0" 0 "$ST"
 assert_match  "gate-candidates emits WORK= line" '^WORK=' "$OUT"
 
 # ============================================================
+# needsyou classification: NOT-MERGEABLE (BEHIND) is not "—"
+# ============================================================
+TRIAGE_FIXTURE_NM="$TMP/triage-notmergeable.txt"
+cat > "$TRIAGE_FIXTURE_NM" <<'EOF'
+#10  CLEAN          Fix something              https://github.com/x/y/pull/10  CLEARED  —
+#40  NOT-MERGEABLE  update branch onto master  https://github.com/x/y/pull/40  CLEARED  —
+#50  NOT-MERGEABLE  update branch onto master  https://github.com/x/y/pull/50  CLEARED  body-hold
+EOF
+
+PRS_JSON_NM="$TMP/prs-notmergeable.json"
+cat > "$PRS_JSON_NM" <<'EOF'
+[
+  {"number":10,"title":"Fix something","isDraft":false,"mergeStateStatus":"CLEAN","headRefName":"fix-something","url":"https://github.com/x/y/pull/10","files":[{"path":"app/foo.php"}]},
+  {"number":40,"title":"Behind PR","isDraft":false,"mergeStateStatus":"BEHIND","headRefName":"behind-pr","url":"https://github.com/x/y/pull/40","files":[{"path":"app/bar.php"}]},
+  {"number":50,"title":"Behind held PR","isDraft":false,"mergeStateStatus":"BEHIND","headRefName":"behind-held-pr","url":"https://github.com/x/y/pull/50","files":[{"path":"app/baz.php"}]}
+]
+EOF
+
+TRIAGE_FIXTURE="$TRIAGE_FIXTURE_NM" \
+GH_PR_LIST_FIXTURE="$PRS_JSON_NM" \
+OVERLAP_EXIT=0 \
+    run_attack --gate-candidates
+assert_status "needsyou NOT-MERGEABLE run exits 0" 0 "$ST"
+
+W_NM="$(printf '%s\n' "$OUT" | sed -n 's/^WORK=//p' | head -1)"
+NY_NM="$(cat "$W_NM/needsyou.tsv" 2>/dev/null || true)"
+
+# #40: plain BEHIND -> "update branch onto master", rank 1 (not "—"/0)
+assert_match "needsyou #40 BEHIND labelled update-branch" \
+    $'^#40\tupdate branch onto master\t1$' "$NY_NM"
+# #50: BEHIND but also body-hold -> the costlier human action still wins
+assert_match "needsyou #50 BEHIND+hold keeps manual test" \
+    $'^#50\tmanual test\t2$' "$NY_NM"
+# #10: unchanged control
+assert_match "needsyou #10 clean still —" $'^#10\t—\t0$' "$NY_NM"
+
+# ============================================================
 # Now build $WORK dirs for invocation-2 tests
 # ============================================================
 

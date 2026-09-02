@@ -153,6 +153,12 @@ gate_candidates() {
             print pr, "sign feat:", 1
         } else if (bucket=="UNCLEARED" || clearance=="UNKNOWN") {
             print pr, "manual test", 2
+        } else if (bucket=="NOT-MERGEABLE") {
+            # BEHIND/DRAFT/UNKNOWN merge state — GitHub will not merge it as-is, so
+            # it is NOT "—". Ranked last so a NOT-MERGEABLE PR that also carries a
+            # hold still reports the costlier human action above; rank 1 (peer of
+            # "sign feat:") because updating the branch is one mechanical step.
+            print pr, "update branch onto master", 1
         } else {
             print pr, "—", 0
         }

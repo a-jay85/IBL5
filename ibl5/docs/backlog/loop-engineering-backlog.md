@@ -68,6 +68,7 @@ last_verified: 2026-09-02
 | L39 | Autonomous PR body omits plan-deliverable moot-at-branch-cut explanation and asserts unchecked test coverage | ⬜ Open | 🟥 | S |
 | L40 | Compiled post-plan harness crashes on any PR containing a binary file (`git diff` decoded as strict UTF-8) | ⬜ Open | 🟥 | S |
 | L41 | Plan Verification Matrix rows can ship unrealised — nothing checks a plan's declared assertions against the tests actually delivered | ⬜ Open | 🟥 | S |
+| L42 | Autonomous-loop PR ships stale line citations, undeclared plan substitution, unmentioned diff file, and duplicate backlog ID | ⬜ Open | 🟦 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -477,6 +478,34 @@ not add backticks or markdown links to a row.
 ```
 
 ---
+
+
+---
+
+### L42 Autonomous-loop PR ships stale line citations, undeclared plan substitution, unmentioned diff file, and duplicate backlog ID
+
+*(discovered 2026-09-01 during #1966)*
+
+**class:** an autonomous-loop run authors or squash-rebases a PR body containing hand-written line citations, plan-substitution declarations, and a scope file list — none of which are re-validated after the commit history changes; and a sequential backlog ID is assigned without checking the preceding entry for duplication.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #1966 body — `bin/plan-now:449` (should be `:453`) and `bin/plan-now:583` (should be `:587`) post-rebase | yes | yes | fixed this pass (via `gh pr edit`) |
+| 2 | PR #1966 body — plan-item 5 substituted but PR body carries no substitution declaration | yes | yes | fixed this pass (via `gh pr edit`) |
+| 3 | PR #1966 body — `ibl5/docs/backlog/loop-engineering-backlog.md` modified in diff but absent from Scope section | yes | yes | fixed this pass (via `gh pr edit`) |
+| 4 | `ibl5/docs/backlog/loop-engineering-backlog.md` — second `L39` entry created without checking that `L39` already existed | yes | fixed this pass | fixed this pass |
+
+`prevention_ladder:`
+
+- **rung 0 — already covered by an existing gate?** No gate re-validates hand-authored PR body line citations against post-rebase line numbers, and no gate checks sequential backlog ID uniqueness.
+- **rung 1 — extend an existing gate?** **Yes — landing rung for the duplicate ID.** `bin/check-docs` already parses backlog tables; extending it to assert that each ID appears exactly once in its file's table is structurally the right host. Backlog-entry authoring (`_remediation.md`) should also instruct the author to grep for the proposed ID before writing. The PR-body citation gap is a harder problem (line numbers drift after rebase) and warrants a separate tracking note.
+- **rung 2 — a rule doc?** Augment `ibl5/docs/backlog/loop-engineering-backlog.md`'s authoring notes (or a shared backlog-authoring companion) to include "grep for the ID first" before assigning.
+- **rungs 3–5** — N/A. Line-number citations in free-form PR prose cannot be mechanically validated without reparsing the referenced file at the PR's HEAD.
+
+`artifact destination:` `bin/check-docs` unique-ID extension (in-repo; ship-pipeline surface — wants a `/plan`). Authoring note: wherever `_remediation.md` instructs backlog-entry creation.
+
 
 ## Burn-down process
 

@@ -15,7 +15,6 @@
 #   planning artifact on disk (queue, plans dir, done, or skipped), plan-now declines
 #   before spending a model run and exits 3. --implement always bypasses the gate.
 #   Exit codes: 0 ok, 1 internal error, 2 bad flag or missing file, 3 declined by gate.
-#
 # ---
 # EVERY terminal outcome DMs you through bin/discord-dm — icon, verdict, elapsed,
 # what to do next, the plan path and the log path — so learning that a run

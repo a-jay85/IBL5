@@ -773,6 +773,7 @@ PRE_OUT5=$(PLAN_NOW_DUP_CHECK="$DUP_WARN" PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DI
     "$PLAN_NOW" --queue "$RECOVERY_PROMPT" 2>&1) || PRE_RC5=$?
 [ "$PRE_RC5" = 0 ] && ok "non-3 exit: warning printed, proceeds" || fail "non-3 exit: warning printed, proceeds (got $PRE_RC5)"
 want "non-3 exit: runner is written" "$PRE_OUT5" "runner:"
+want "non-3 exit: warning names the proceed decision" "$PRE_OUT5" "proceeding"
 preflight_cleanup "$PRE_OUT5"
 ndir_reset
 

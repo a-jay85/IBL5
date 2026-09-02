@@ -5,7 +5,7 @@ disable-model-invocation: true
 model: claude-sonnet-4-6
 context: fork
 agent: sonnet-4-6
-last_verified: 2026-09-01
+last_verified: 2026-09-02
 allowed-tools: Bash(bin/pr-attack --gate-candidates), Bash(bin/pr-attack --work:*), Read
 ---
 
@@ -32,8 +32,13 @@ bin/pr-attack --gate-candidates
 
 Fetches triage output and PR metadata, partitions PRs into orderable and excluded,
 identifies gate-sensitive nominees (Step 3b below), fetches diffs for contended
-files, and prints a summary ending with `WORK=<tmpdir>`. Save that path; it is the
+files, and prints a summary containing `WORK=<tmpdir>`. Save that path; it is the
 input to invocation 2.
+
+**Stop condition — check this first.** If there are no gate nominees there is
+nothing for you to judge, so invocation 1 falls through and prints the ordered
+plan itself. **If the output contains `# Plan of attack`, you are done — do NOT
+run invocation 2.** Report the plan and stop.
 
 ## Step 3b — Gate judgment (human step)
 
@@ -76,7 +81,9 @@ Ingests the gate-edge judgments from Step 3b, runs Kahn's topological sort (with
 hub-last, Needs-you? rank, and ascending-PR# tie-breaks), and emits the ordered
 plan to stdout and to `$HOME/IBL5-pr-attack-<date>.md`.
 
-If there are no gate nominees, supply `--gate-edges /dev/null` (judged-empty case):
+If there are no gate nominees this normally happens automatically (see the stop
+condition above), so you should not reach here. The explicit judged-empty form is
+still valid for a pre-existing `$WORK` dir:
 
 ```bash
 bin/pr-attack --work <WORK> --gate-edges /dev/null
@@ -89,4 +96,4 @@ bin/pr-attack --work <WORK> --gate-edges /dev/null
 | 0 | ok | — |
 | 1 | usage / refused argument (including `--arm`) | Read the error message |
 | 2 | gate candidates present and no `--gate-edge`/`--gate-edges` supplied | Answer the gate nominations (Step 3b), then re-run with `--gate-edge` or `--gate-edges` |
-| 3 | `$WORK` is stale (tip moved) | Re-run `--gate-candidates` — `master` has moved |
+| 3 | `$WORK` is stale (tip moved) | Re-run `--gate-candidates` — `master` has moved. Reachable from invocation 1 too, via the fall-through |

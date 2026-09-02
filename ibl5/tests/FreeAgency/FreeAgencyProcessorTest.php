@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\FreeAgency;
 
+use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use FreeAgency\FreeAgencyProcessor;
 use FreeAgency\Contracts\FreeAgencyCapCalculatorFactoryInterface;
@@ -13,6 +14,7 @@ use FreeAgency\Contracts\FreeAgencyMarketDemandCalculatorInterface;
 use FreeAgency\Contracts\FreeAgencyRepositoryInterface;
 use Player\Player;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
+use Season\Season;
 use Team\Team;
 use Tests\WideUnit\Mocks\MockDatabase;
 use Tests\WideUnit\Mocks\MockPreparedStatement;
@@ -614,8 +616,194 @@ class FreeAgencyProcessorTest extends TestCase
     }
 
     // ================================================================
+    // AUTHZ VERDICT — characterization of the AUTHORIZED path (Phase 2)
+    // These pin the authorized half so a later over-broad gate cannot pass
+    // silently. Both pass before and after the Phase 2 gate is added.
+    // ================================================================
+
+    public function testProcessOfferSubmissionLoadsPlayerForAuthorizedTeam(): void
+    {
+        $this->mockDb->setMockData([$this->getCompletePlayerData()]);
+
+        $player = Player::withPlayerID($this->mockDb, 1);
+        $team = Team::initialize($this->mockDb, 'Test Team');
+
+        $loaderMock = $this->createMock(FreeAgencyEntityLoaderInterface::class);
+        $loaderMock->expects($this->once())->method('loadPlayer')->with(7)->willReturn($player);
+        $loaderMock->method('loadTeam')->willReturn($team);
+
+        /** @var FreeAgencyCapCalculatorInterface&\PHPUnit\Framework\MockObject\Stub $calcStub */
+        $calcStub = self::createStub(FreeAgencyCapCalculatorInterface::class);
+        $calcStub->method('calculateTeamCapMetrics')->willReturn([
+            'totalSalaries' => [0 => 0],
+            'softCapSpace'  => [0 => 5000],
+            'hardCapSpace'  => [0 => 7000],
+            'rosterSpots'   => [0 => 15],
+        ]);
+        /** @var FreeAgencyCapCalculatorFactoryInterface&\PHPUnit\Framework\MockObject\Stub $factoryStub */
+        $factoryStub = self::createStub(FreeAgencyCapCalculatorFactoryInterface::class);
+        $factoryStub->method('forTeam')->willReturn($calcStub);
+
+        $processor = new FreeAgencyProcessor(
+            $this->mockDb,
+            self::createStub(TeamIdentityRepositoryInterface::class),
+            new StubDemandCalculator(),
+            new CapturingRepository(),
+            entityLoader: $loaderMock,
+            capCalculatorFactory: $factoryStub,
+        );
+
+        // An authorized (real) team must reach the entity loader — the gate is not over-broad.
+        $processor->processOfferSubmission(
+            ['playerID' => 7, 'offeryear1' => 500, 'offerType' => 0],
+            'Chicago Bulls'
+        );
+    }
+
+    public function testDeleteOffersDeletesForAuthorizedTeam(): void
+    {
+        $repoMock = $this->createMock(FreeAgencyRepositoryInterface::class);
+        $repoMock->expects($this->once())->method('deleteOffer');
+
+        $commonRepo = self::createStub(TeamIdentityRepositoryInterface::class);
+        $commonRepo->method('getTidFromTeamname')->willReturn(5);
+
+        $processor = new FreeAgencyProcessor(
+            $this->mockDb,
+            $commonRepo,
+            repository: $repoMock,
+        );
+
+        $result = $processor->deleteOffers('Chicago Bulls', 42);
+
+        $this->assertTrue($result['success']);
+    }
+
+    // ================================================================
+    // AUTHZ VERDICT — refused AND no mutation (Phase 4)
+    // The gate is the first statement of each public method; each test
+    // asserts never() on the mutation method AND on the read that would
+    // otherwise follow, so removing the gate turns the test red.
+    // ================================================================
+
+    public function testProcessOfferSubmissionRefusesNullTeamWithoutSavingOffer(): void
+    {
+        [$processor, $repository, $entityLoader, $commonRepo] = $this->buildProcessorWithMocks();
+        $repository->expects($this->never())->method('saveOffer');
+        $entityLoader->expects($this->never())->method('loadPlayer');
+        $commonRepo->expects($this->never())->method('getTidFromTeamname');
+
+        $result = $processor->processOfferSubmission(['playerID' => 42, 'offeryear1' => 5000000], null);
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('unauthorized', $result['type']);
+        $this->assertSame(0, $result['playerID']);
+    }
+
+    public function testProcessOfferSubmissionRefusesFreeAgentsPseudoTeamWithoutSavingOffer(): void
+    {
+        [$processor, $repository, $entityLoader, $commonRepo] = $this->buildProcessorWithMocks();
+        $repository->expects($this->never())->method('saveOffer');
+        $entityLoader->expects($this->never())->method('loadPlayer');
+        $commonRepo->expects($this->never())->method('getTidFromTeamname');
+
+        // Reference the constant, never a literal: renaming the pseudo-team must not un-gate this path.
+        $result = $processor->processOfferSubmission(
+            ['playerID' => 42, 'offeryear1' => 5000000],
+            \League\League::FREE_AGENTS_TEAM_NAME
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('unauthorized', $result['type']);
+        $this->assertSame(0, $result['playerID']);
+    }
+
+    public function testProcessOfferSubmissionRefusesEmptyTeamWithoutSavingOffer(): void
+    {
+        [$processor, $repository, $entityLoader, $commonRepo] = $this->buildProcessorWithMocks();
+        $repository->expects($this->never())->method('saveOffer');
+        $entityLoader->expects($this->never())->method('loadPlayer');
+        $commonRepo->expects($this->never())->method('getTidFromTeamname');
+
+        $result = $processor->processOfferSubmission(['playerID' => 42, 'offeryear1' => 5000000], '');
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('unauthorized', $result['type']);
+        $this->assertSame(0, $result['playerID']);
+    }
+
+    public function testProcessOfferSubmissionIgnoresTeamNameSuppliedInPostData(): void
+    {
+        [$processor, $repository, $entityLoader, $commonRepo] = $this->buildProcessorWithMocks();
+        $repository->expects($this->never())->method('saveOffer');
+        $entityLoader->expects($this->never())->method('loadPlayer');
+        $commonRepo->expects($this->never())->method('getTidFromTeamname');
+
+        // IDOR D-07: a spoofed team in the request body must not rescue a request whose
+        // session-derived acting team is absent.
+        $result = $processor->processOfferSubmission(
+            ['playerID' => 42, 'teamName' => 'Chicago Bulls', 'team' => 'Chicago Bulls'],
+            null
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertSame('unauthorized', $result['type']);
+    }
+
+    public function testDeleteOffersRefusesNullTeamWithoutDeleting(): void
+    {
+        [$processor, $repository, $entityLoader, $commonRepo] = $this->buildProcessorWithMocks();
+        $repository->expects($this->never())->method('deleteOffer');
+        $commonRepo->expects($this->never())->method('getTidFromTeamname');
+        $entityLoader->expects($this->never())->method('loadPlayer');
+
+        $result = $processor->deleteOffers(null, 42);
+
+        $this->assertFalse($result['success']);
+        $this->assertIsString($result['error']);
+        $this->assertNotSame('', $result['error']);
+    }
+
+    public function testDeleteOffersRefusesFreeAgentsPseudoTeamWithoutDeleting(): void
+    {
+        [$processor, $repository, $entityLoader, $commonRepo] = $this->buildProcessorWithMocks();
+        $repository->expects($this->never())->method('deleteOffer');
+        $commonRepo->expects($this->never())->method('getTidFromTeamname');
+        $entityLoader->expects($this->never())->method('loadPlayer');
+
+        $result = $processor->deleteOffers(\League\League::FREE_AGENTS_TEAM_NAME, 42);
+
+        $this->assertFalse($result['success']);
+        $this->assertIsString($result['error']);
+        $this->assertNotSame('', $result['error']);
+    }
+
+    // ================================================================
     // HELPERS
     // ================================================================
+
+    /**
+     * @return array{0: FreeAgencyProcessor, 1: FreeAgencyRepositoryInterface&MockObject, 2: FreeAgencyEntityLoaderInterface&MockObject, 3: TeamIdentityRepositoryInterface&MockObject}
+     */
+    private function buildProcessorWithMocks(): array
+    {
+        $repository = $this->createMock(FreeAgencyRepositoryInterface::class);
+        $entityLoader = $this->createMock(FreeAgencyEntityLoaderInterface::class);
+        $commonRepo = $this->createMock(TeamIdentityRepositoryInterface::class);
+
+        $processor = new FreeAgencyProcessor(
+            $this->mockDb,
+            $commonRepo,
+            self::createStub(FreeAgencyMarketDemandCalculatorInterface::class),
+            $repository,
+            self::createStub(\Psr\Log\LoggerInterface::class),
+            self::createStub(Season::class),
+            $entityLoader,
+            self::createStub(FreeAgencyCapCalculatorFactoryInterface::class),
+        );
+
+        return [$processor, $repository, $entityLoader, $commonRepo];
+    }
 
     /**
      * @return array<string, mixed>

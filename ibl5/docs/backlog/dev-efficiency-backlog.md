@@ -1,6 +1,6 @@
 ---
 description: Development-efficiency backlog — inner-loop speed (diff-scoped analysis, parallel tests), CI caching, dependency-bump batching, and worktree lifecycle automation, with per-entry status.
-last_verified: 2026-09-01
+last_verified: 2026-09-02
 ---
 
 # Development-Efficiency Backlog
@@ -59,6 +59,7 @@ last_verified: 2026-09-01
 | E30 | `bin/pr-ready-now` already-running skip only sees its own launchd jobs, so an interactive `/pr-ready` is invisible and both runs share PR-keyed `/tmp` scratch | ⬜ Open | 🟨 | S |
 | E31 | `bin/plan-now` help span truncated by bare `#`; test assertions miss declared secondary-behaviour tokens | ⬜ Open | 🟦 | S |
 | E32 | Phase 6 review notes on PR #1861 — minor plan-vs-implementation drifts and in-flight artifacts on a long-lived branch, all non-blocking | ⬜ Open | — | S |
+| E33 | Phase 6 review notes on PR #1815 — F1/F2 blocking (body inaccuracy, backlog 6.24 collision); F3–F7 notes (reflection test, coercion guards, smoke narrative, last_verified); F1/F2/F5 remediated in Phase 6.5 | ⬜ Open | — | S |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -479,3 +480,30 @@ Not a defect in the anchoring or the SIGPIPE handling: the `$`-anchor (guarding 
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-01 during #1861)*
+
+### E33 Phase 6 review notes on PR #1815 (authz verdict extraction)
+
+**class:** n/a — F1 and F2 were blocking; F3–F7 were notes. F1, F2, and F5 remediated in Phase 6.5; F3, F4, F6, F7 addressed in PR body notes.
+
+**occurrence table:**
+
+| # | Finding | Blocking? | Status |
+|---|---------|-----------|--------|
+| F1 | PR body credited FreeAgencyController DI injection as new; it pre-existed on master (maint 14.6 batch 2) — plan Step 3.1 was skipped as the plan directs | yes | fixed Phase 6.5 — body updated |
+| F2 | Backlog residual numbered 6.24; that ID was already taken by the Olympics player-page bug (PR #1825) — renumbered to 6.25 | yes | fixed Phase 6.5 — three sites in maintenance-backlog.md, one in archive |
+| F3 | Phase 5 reflection characterization test (`testProcessWaiverSubmissionRefusesNullTeamWithoutProcessing`) was not written — plan marks it transient (write pre-extraction, delete at Step 5.3); semantic preservation covered by WaiversSubmissionServiceTest rows 10–16 | no | not fixed — not a defect; body clarified |
+| F4 | `WaiversSubmissionService::submit()` adds `is_string`/`is_numeric` coercion guards beyond "moved verbatim" — a net-tightening deviation | no | not fixed — net-tighter; body notes the deviation |
+| F5 | WaiversController ctor fallback used `$this->processor, $this->salaryCapRepo` instead of local params; exposed dead property declarations | yes | fixed Phase 6.5 — switched to params, removed dead props |
+| F6 | Smoke B (Action=trade pre-filter) and Smoke C (unauthenticated POST) observations stated more confidently than warranted; B was not runnable end-to-end over HTTP, C short-circuited at isUser() | no | not fixed — not a defect; body notes revised |
+| F7 | Phase 9 Step 9.4 last_verified sub-step skipped — master's values already post-date the commit date (2026-08-09) | no | not fixed — intentional; body notes skip |
+
+**prevention_ladder:**
+
+- **rung 0 — already covered by an existing gate?** No. `/pr-ready` Phase 6 catches these after the fact.
+- **rung 1 — extend an existing gate?** No existing gate checks plan Step 3.1 skip documentation or backlog item number collision.
+- **rung 2 — a rule doc? Partially applicable.** (a) When a plan step is documented as "may already be done — READ THE FILE FIRST," the PR body should say "skipped as plan directs" rather than crediting the work as new. (b) Before assigning a residual backlog item number, confirm the number is free on master. These are author-discipline items, not automatable gates.
+- **rungs 3–5** — N/A.
+
+`artifact destination: n/a — author discipline, no gate`
+
+*(discovered 2026-09-01 during #1815)*

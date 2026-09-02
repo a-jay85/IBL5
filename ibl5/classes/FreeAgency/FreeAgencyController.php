@@ -129,9 +129,6 @@ class FreeAgencyController
 
         $username = $this->authService->getUsername() ?? '';
         $verifiedTeamName = $this->commonRepository->getTeamnameFromUsername($username);
-        if ($verifiedTeamName === null || $verifiedTeamName === '' || $verifiedTeamName === \League\League::FREE_AGENTS_TEAM_NAME) {
-            \Utilities\HtmxHelper::redirect('modules.php?name=FreeAgency&result=error');
-        }
 
         try {
             /** @var array<string, mixed> $postData */
@@ -151,6 +148,8 @@ class FreeAgencyController
         if ($result['success']) {
             EventLogger::setAction('free_agent_offer_submitted');
             \Utilities\HtmxHelper::redirect('modules.php?name=FreeAgency&result=offer_success');
+        } elseif ($result['type'] === 'unauthorized') {
+            \Utilities\HtmxHelper::redirect('modules.php?name=FreeAgency&result=error');
         } elseif ($result['type'] === 'already_signed') {
             \Utilities\HtmxHelper::redirect('modules.php?name=FreeAgency&result=already_signed');
         } else {
@@ -192,19 +191,20 @@ class FreeAgencyController
 
         $username = $this->authService->getUsername() ?? '';
         $verifiedTeamName = $this->commonRepository->getTeamnameFromUsername($username);
-        if ($verifiedTeamName === null || $verifiedTeamName === '' || $verifiedTeamName === \League\League::FREE_AGENTS_TEAM_NAME) {
-            \Utilities\HtmxHelper::redirect('modules.php?name=FreeAgency&result=error');
-        }
 
         try {
             $playerID = isset($_POST['playerID']) && is_numeric($_POST['playerID']) ? (int) $_POST['playerID'] : 0;
-            $this->processor->deleteOffers($verifiedTeamName, $playerID);
+            $result = $this->processor->deleteOffers($verifiedTeamName, $playerID);
         } catch (\Throwable $e) {
             $this->logger->error('fa_delete_error', [
                 'error' => $e->getMessage(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
             ]);
+            \Utilities\HtmxHelper::redirect('modules.php?name=FreeAgency&result=error');
+        }
+
+        if ($result['success'] !== true) {
             \Utilities\HtmxHelper::redirect('modules.php?name=FreeAgency&result=error');
         }
 

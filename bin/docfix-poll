@@ -174,6 +174,127 @@ orphaned_refresh_branch() {   # echoes the first branch with no PR at all; empty
     done < <(git_remote_refresh_branches)
 }
 
+# Age of a local branch in seconds, keyed on the reflog CREATION timestamp.
+# THREE traps, all of which produce a plausible-looking wrong number:
+#   1. git for-each-ref --format='%(creatordate:unix)' — a zero-commit branch points
+#      at master's commit, so this returns MASTER's date, not the branch's age.
+#   2. git log -g --format='%ct' — %ct is the COMMIT timestamp of the entry's commit,
+#      not the reflog event timestamp. For a branch cut from an old commit it can be
+#      years off.
+#   3. head -1 — that is the NEWEST reflog entry. Creation is the OLDEST: tail -1.
+# `git reflog show --date=unix` puts the event epoch in the @{...} field, e.g.
+#   cbe4e1152 docs-stale-refresh-20260802@{1785687929}: branch: Created from master
+branch_age_seconds() {   # $1 = branch name; echoes seconds; empty when unknown
+    local epoch
+    epoch="$(git -C "$MAIN" reflog show --date=unix "refs/heads/$1" 2>/dev/null \
+             | tail -1 | sed -n 's/.*@{\([0-9][0-9]*\)}.*/\1/p')"
+    [ -n "$epoch" ] || return 0
+    echo $(( $(date -u +%s) - epoch ))
+}
+
+# Salvage a wedged docs-stale-refresh-* branch that died with uncommitted edits.
+# Disposition (user-decided): commit → push to docs-stale-salvage-YYYYMMDD (not
+# refresh-* so orphaned_refresh_branch never sees it) → cleanup original.
+# If push fails: leave branch in place, return 1 (do not destroy the work).
+# If the worktree is clean: reap directly. If there is no worktree: delete the ref.
+# Echoes one line describing the outcome; caller uses it for --health-report detail.
+#
+# TRAP: the uncommitted edits live in the branch's WORKTREE, NOT in $MAIN. $MAIN sits
+# on master and is normally clean, so `git -C "$MAIN" status --porcelain` reports
+# "clean" for EVERY wedged branch and sends a dirty branch down the direct-reap arm,
+# destroying exactly the work this function exists to preserve. Derive the worktree
+# path from git; never assume the IBL5-worktrees/<slug> layout, and never let an empty
+# derivation degrade into `git -C ""` (which silently means "cwd").
+salvage_wedged_branch() {   # $1 = branch name
+    local branch="$1"
+    # Declared then assigned: `local x="$(cmd)"` is SC2155, and CI shellchecks bin/**
+    # at --severity=warning as a REQUIRED check (.github/workflows/tests.yml:430).
+    local salvage_branch
+    salvage_branch="docs-stale-salvage-$(date +%Y%m%d)"
+    local wt changed files
+    wt="$(git -C "$MAIN" worktree list --porcelain \
+          | awk -v b="refs/heads/$branch" '/^worktree /{p=$2} $0=="branch "b{print p; exit}')"
+
+    if [ -z "$wt" ] || [ ! -d "$wt" ]; then
+        # No worktree ⇒ nothing uncommitted can exist, and named-mode bin/cleanup
+        # cannot run (bin/cleanup:695-704 → exit 1). Delete the ref directly, or the
+        # branch deadlocks docfix-run's no-stacking guard forever. git refuses this
+        # for a worktree-held branch, so it cannot reach a live run.
+        if git -C "$MAIN" branch -D "$branch" >/dev/null 2>&1; then
+            echo "Wedged branch '$branch' had no worktree; deleted the ref directly."
+            return 0
+        fi
+        echo "Could not delete wedged branch '$branch' (no worktree) — leaving." >&2
+        return 1
+    fi
+
+    changed="$(git -C "$wt" status --porcelain 2>/dev/null)"
+    if [ -z "$changed" ]; then
+        # Clean worktree — no uncommitted work to preserve, reap directly.
+        if "$MAIN/bin/cleanup" "$branch" >/dev/null 2>&1; then
+            echo "Wedged branch '$branch' was clean; reaped directly."
+            return 0
+        fi
+        echo "Could not reap clean wedged branch '$branch' — leaving." >&2
+        return 1
+    fi
+
+    # $NF, not $2: a rename line is `R  old -> new`, and $NF is the surviving path.
+    files="$(git -C "$wt" status --porcelain | awk '{print $NF}' | paste -sd, -)"
+    # Commit the uncommitted edits, clearly marked as unverified salvage.
+    # Explicit `if !` on each step: a bare failing command under `set -e` would exit
+    # the whole poll rather than return from this function.
+    if ! git -C "$wt" add -A 2>/dev/null \
+       || ! git -C "$wt" commit -q \
+            -m "[SALVAGE: unverified] Uncommitted edits from died docfix run on $branch" \
+            -m "Files: $files" \
+            -m "These last_verified bumps were written by a run that died before committing." \
+            -m "The run's verification may be incomplete. Review before merging." 2>/dev/null; then
+        echo "COMMIT FAILED: could not commit salvage for '$branch' — leaving it in place. Files: $files" >&2
+        return 1
+    fi
+    # Push to the salvage branch (not refresh-*, cannot become fire-forever residue).
+    if git -C "$wt" push origin "HEAD:refs/heads/$salvage_branch" >/dev/null 2>&1; then
+        "$MAIN/bin/cleanup" "$branch" >/dev/null 2>&1 \
+            || echo "docfix-poll: salvage pushed but could not cleanup '$branch' — leaving." >&2
+        echo "Salvaged uncommitted edits from '$branch' to '$salvage_branch' (files: $files). Review before merging. No PR was opened."
+        return 0
+    fi
+    echo "PUSH FAILED: could not push salvage branch '$salvage_branch' — leaving '$branch' in place to avoid data loss. Files: $files" >&2
+    # Undo the salvage commit to restore the worktree to its pre-commit state.
+    git -C "$wt" reset --soft HEAD~1 2>/dev/null || true
+    return 1
+}
+
+# Detects a local docs-stale-refresh-* branch with no origin ref, no PR, and age
+# past the 4h threshold. Returns (echoes) the branch name if found, empty if none.
+# This is the case orphaned_refresh_branch() cannot see (origin-only check).
+# IMPORTANT: declined PRs also leave local branches but WITH an origin ref (bin/cleanup
+# only reads origin/<branch>; GitHub delete_branch_on_merge covers MERGED; CLOSED
+# has no auto-delete). A local branch WITH an origin ref → orphaned_refresh_branch()
+# domain. Only local-only (no origin ref) → this function's domain.
+wedged_local_refresh_branch() {   # echoes branch name or empty; always exits 0
+    local b age_s on_origin pr_count
+    while IFS= read -r b; do
+        [ -n "$b" ] || continue
+        # A loaded docfix-run job means the run is alive, not wedged — never alert.
+        launchctl list 2>/dev/null | grep -q "com\.ibl5\.docfix-run-$b-" && continue
+        # ASYMMETRY, deliberate (Design decision 8): an UNKNOWN age (expired reflog)
+        # counts as wedged HERE, because this arm only sends a DM. The reaper treats the
+        # same unknown as "leave alone". Alerting fails open; destroying fails closed.
+        age_s="$(branch_age_seconds "$b")"
+        [ -z "$age_s" ] || [ "$age_s" -gt 14400 ] || continue
+        on_origin="$(git -C "$MAIN" ls-remote --heads origin "refs/heads/$b" 2>/dev/null)"
+        [ -z "$on_origin" ] || continue
+        # Any PR at all (open, merged, or closed) means this is not a pre-push wedge.
+        # FAIL CLOSED on API failure: `|| echo 1` makes an unreachable API look like
+        # "a PR exists", so a network blip yields no alert rather than a false one.
+        pr_count="$(gh pr list --state all --head "$b" --json number --jq 'length' 2>/dev/null || echo 1)"
+        [ "${pr_count:-1}" -eq 0 ] || continue
+        printf '%s' "$b"; return
+    done < <(git -C "$MAIN" branch --list 'docs-stale-refresh-*' --format='%(refname:short)')
+}
+
 # Epoch at which the CURRENT stale set was first filed. NOT the issue's createdAt:
 # the audit keeps ONE long-lived `stale-docs` issue (workflow :77-103 — created only
 # when none is open, EDITED when the signature changes, closed only at count 0), so
@@ -195,7 +316,7 @@ issue_episode_epoch() {   # $1 = issue number
 # a report, not a gate, mirroring `check-docs --staleness-report`. The audit
 # workflow appends them to $GITHUB_OUTPUT verbatim.
 health_report() {
-    local alert=false kind="" detail="" report count pr_json pr_num red orphan age_h episode
+    local alert=false kind="" detail="" report count pr_json pr_num red orphan wedged age_h episode
     report="$(mktemp)"; trap 'rm -f "$report"' RETURN
     "$MAIN/bin/check-docs" --staleness-report > "$report" \
         || { printf 'alert=false\nkind=\ndetail=\n'; return 0; }
@@ -227,6 +348,9 @@ health_report() {
         elif orphan="$(orphaned_refresh_branch)"; [ -n "$orphan" ]; then
             alert=true; kind="died"
             detail="Refresh branch ${orphan} is on origin with no PR — the doc-fix run died mid-flight. Log: ls -t /tmp/docfix-run-*.log | head -1"
+        elif wedged="$(wedged_local_refresh_branch)"; [ -n "$wedged" ]; then
+            alert=true; kind="wedged"
+            detail="Local branch ${wedged} has no origin ref and no in-flight launchd run — the doc-fix run died before pushing. Next poll will salvage it automatically."
         else
             # gh dying inside issue_episode_epoch yields empty output, and an empty
             # arithmetic operand is a syntax error that kills the function. Fall back
@@ -289,16 +413,63 @@ SIG="$(jq -r '.[].path' "$REPORT" | sort -u | paste -sd, -)"
 # stays: it is waiting on the user's review, which is the designed steady state.
 while IFS= read -r branch; do
     [ -n "$branch" ] || continue
-    state="$(gh pr view "$branch" --json state -q .state 2>/dev/null || true)"
+    # Defect 6: launchctl interlock — if a docfix-run launchd job is still loaded,
+    # cleanup would kill a live run. Skip until the job self-removes on completion.
+    if launchctl list 2>/dev/null | grep -q "com\.ibl5\.docfix-run-$branch-"; then
+        echo "docfix-poll: leaving '$branch' — docfix-run job still loaded (in flight)."
+        continue
+    fi
+
+    # Defect 5: fail-closed probe. gh pr list exits non-zero when the API is
+    # unreachable (empty stdout + exit 1), unlike `gh pr view ... || true` (always
+    # exits 0). jq classifies by liveness priority: OPEN > MERGED > CLOSED, so a
+    # branch with both an OPEN and a MERGED PR is treated as still-open (not safe
+    # to reap), and a branch with no PRs is classified as NONE.
+    if ! state="$(gh pr list --head "$branch" --state all --json state --jq \
+           '[.[].state] as $s | if ($s|length)==0 then "NONE"
+            elif ($s|index("OPEN")) then "OPEN"
+            elif ($s|index("MERGED")) then "MERGED" else "CLOSED" end' \
+           2>/dev/null)"; then
+        echo "docfix-poll: gh API unreachable — leaving '$branch' untouched (fail closed)." >&2
+        continue
+    fi
+
     case "$state" in
         MERGED|CLOSED)
-            # Named mode needs the worktree DIRECTORY (bin/cleanup:695-704 → exit 1
-            # without it). post-plan leaves it in place, so that's the happy path;
-            # tolerate a nonzero exit and let the nightly alert report a real stall.
             "$MAIN/bin/cleanup" "$branch" \
                 && echo "docfix-poll: reaped '$branch' (PR $state)." \
                 || echo "docfix-poll: could not reap '$branch' — leaving it." >&2 ;;
-        *)  echo "docfix-poll: leaving '$branch' (PR state: ${state:-none})." ;;
+        OPEN)
+            echo "docfix-poll: leaving '$branch' (open PR, awaiting human review)." ;;
+        NONE)
+            # No PR at all. Distinguish a WEDGED branch (local-only, past the age
+            # threshold) from a run that is genuinely in flight and has not pushed yet.
+            # Do NOT relax docfix-run's no-stacking guard — fix on the reaper side.
+            #
+            # NOTE: no `local` here. This loop is at TOP-LEVEL script scope
+            # (health_report() closes above it), and `local` outside a function is a
+            # hard bash error — under `set -euo pipefail` it aborts the entire poll on
+            # every run. Verified: `bash -c 'set -e; local x=1'` →
+            # "local: can only be used in a function".
+            age_s="$(branch_age_seconds "$branch")"
+            on_origin="$(git -C "$MAIN" ls-remote --heads origin "refs/heads/$branch" 2>/dev/null)"
+            if [ -n "$on_origin" ]; then on_origin_msg="yes"; else on_origin_msg="no"; fi
+            if [ -z "$age_s" ]; then
+                # Age UNKNOWN (reflog expired — git gc prunes at 90 days). Do not guess
+                # and do NOT fail open toward reaping: leave the branch and let the
+                # `wedged` health arm (Phase 3) surface it for a human.
+                echo "docfix-poll: leaving '$branch' — reflog age unavailable; see --health-report." >&2
+            elif [ "$age_s" -gt 14400 ] && [ -z "$on_origin" ]; then
+                # Local-only, no PR, older than 4h — wedged, not in flight. Runs start
+                # at 09:17 EDT and finish in <60 min; the inter-poll gap is ~24h, so 4h
+                # is safely above the in-flight window and safely below the gap.
+                echo "docfix-poll: wedged branch '$branch' detected (age ${age_s}s, no origin ref, no PR). Salvaging."
+                salvage_wedged_branch "$branch" \
+                    || echo "docfix-poll: salvage failed for '$branch' — left in place." >&2
+            else
+                echo "docfix-poll: leaving '$branch' (no PR, age ${age_s}s, origin ref: $on_origin_msg)."
+            fi
+            ;;
     esac
 done < <(git -C "$MAIN" branch --list 'docs-stale-refresh-*' --format='%(refname:short)')
 

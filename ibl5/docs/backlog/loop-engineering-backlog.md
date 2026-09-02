@@ -70,6 +70,7 @@ last_verified: 2026-09-02
 | L41 | Plan Verification Matrix rows can ship unrealised — nothing checks a plan's declared assertions against the tests actually delivered | ⬜ Open | 🟥 | S |
 | L42 | Autonomous-loop PR ships stale line citations, undeclared plan substitution, unmentioned diff file, and duplicate backlog ID | ⬜ Open | 🟦 | S |
 | L43 | Autonomous-loop doc-fix PR body contains stale claims and inconsistent ADR authoring format after post-review commit | ⬜ Open | 🟦 | S |
+| L44 | Upstream overlap silently drops a plan phase; Phase 2a pre-rebase artifact captures post-rebase state, making the drop undetectable | ✅ fixed this pass | 🟦 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -533,6 +534,34 @@ not add backticks or markdown links to a row.
 `artifact destination:` `.claude/rules/pr-body-claims.md` (example) — or an addendum to `.claude/rules/auto-commit.md`. Ships in a repo worktree as a normal PR.
 
 `provenance:` (discovered 2026-09-02 during #2059)
+
+### L44 Upstream overlap silently drops a plan phase; Phase 2a pre-rebase artifact captures post-rebase state, making the drop undetectable
+
+*(discovered 2026-09-02 during #1789)*
+
+**class:** A git rebase that silently drops a plan-phase's implementation (via upstream overlap) leaves the branch with stale test assertions for the dropped code, and the Phase 2a pre-rebase artifact captures post-rebase state if a prior rebase already ran, making the drop undetectable.
+
+**Occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/docfix-run` (dropped `bin/docfix-run:38-42` guard, superseded by PR #1861) + `bin/test-docfix-run` case 23 (stale assertion for 'API unreachable') | yes | yes | fixed this pass (test assertion corrected; PR body and ADR corrected) |
+
+**prevention_ladder:**
+
+- rung 0 — not covered by existing gate. No gate detects when a plan-phase's implementation is absent from the branch due to upstream overlap, and no gate checks whether the Phase 2a pre-rebase artifact predates the branch's latest reflog entry.
+- rung 1 — extend Phase 2a to check whether `/tmp/pr-ready-diff-pre-<N>.patch` predates the branch's latest reflog entry; if so, recapture. This is the landing rung. Cheaper rungs are insufficient because the timing check is mechanical and can be automated.
+- rung 2 — a rule doc noting that Phase 2a artifacts should be re-captured after any rebase. Insufficient alone: the artifact timestamp issue is not visible to the author.
+
+Landing rung: 1 (extend Phase 2a capture to detect and correct post-rebase stale artifacts).
+
+**artifact destination:** `.claude/skills/pr-ready/scripts/` (Phase 2a capture logic, in-repo)
+
+**provenance:** (discovered 2026-09-02 during #1789)
+
+**Status (2026-09-02):** ✅ fixed this pass (test assertion fixed; PR body and ADR corrected) — 🟦.
+
+---
 
 ## Burn-down process
 

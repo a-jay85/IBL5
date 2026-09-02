@@ -898,5 +898,15 @@ VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
   && ok "(47) veronly: missing plan file is rc 2, not a grant" \
   || bad "(47) veronly: missing plan file"
 
+# --- Case 48: static — prompt still carries the append-only + disclosure clauses
+# These are prose constraints inside $PROMPT, not code, so nothing else fails when a
+# future edit drops them. Assert them the way Case 6/8 assert workflow invariants.
+{ grep -qF 'DECISION RECORDS ARE APPEND-ONLY' "$REAL_DOCFIX" \
+    && grep -qF 'NEVER SWAP A FIGURE WITHOUT RE-READING ITS SENTENCE' "$REAL_DOCFIX" \
+    && grep -qF '## Addendum' "$REAL_DOCFIX" \
+    && grep -qF '## Content rewritten' "$REAL_DOCFIX"; } \
+  && ok "(48) prompt: ADR append-only + figure-resubstitution + content-rewrite disclosure clauses present" \
+  || bad "(48) prompt: an append-only/disclosure clause was dropped from \$PROMPT"
+
 if [ "$FAILED" -eq 0 ]; then echo "All docfix-run checks passed."; else echo "Some docfix-run checks FAILED."; fi
 exit "$FAILED"

@@ -114,10 +114,30 @@ final class Season2008Finals4Restore
     }
 
     /**
+     * Distinct player IDs referenced by the recovered payload.
+     *
+     * Test-only seam. ibl_box_scores.pid carries an FK onto ibl_plr and these are live
+     * production IDs, so a seeded integration database must create them before the
+     * insert path can be exercised at all. Production never needs this — the players
+     * are already there.
+     *
+     * @return list<int>
+     */
+    public static function payloadPlayerIds(): array
+    {
+        $ids = [];
+        foreach (self::PLAYER_ROWS as $row) {
+            $ids[] = $row[3];
+        }
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
      * Development helper — run once to derive TEAM_ROWS and PLAYER_ROWS.
      * Never called at deploy time.
      *
-     * @return array{team_rows: list<list<scalar>>, player_rows: list<list<scalar>>}
+     * @return array{team_rows: list<list<scalar>>, player_rows: list<list<scalar>>, game_of_that_day: int}
      */
     public static function generateFromRec(string $recPath, \mysqli $db): array
     {
@@ -129,11 +149,15 @@ final class Season2008Finals4Restore
         $gameInfoLine = \JsbParser\ScoFileParser::extractGameInfo($data);
         $boxscore = Boxscore::withGameInfoLine($gameInfoLine, 2008, 'Playoffs');
 
-        /** @var list<\Player\Stats\PlayerStats> $slots */
         $slots = [];
         for ($i = 0; $i < 30; $i++) {
             $slotLine = \JsbParser\ScoFileParser::extractPlayerSlot($data, $i);
-            $slots[$i] = \Player\Stats\PlayerStats::withBoxscoreInfoLine($db, $slotLine);
+            // withBoxscoreInfoLine() is declared to return PlayerStatsInterface, which hides
+            // the concrete class's typed public properties. Annotate the assignment, exactly
+            // as BoxscoreProcessor::processPlayerSlots() does.
+            /** @var \Player\Stats\PlayerStats $slot */
+            $slot = \Player\Stats\PlayerStats::withBoxscoreInfoLine($db, $slotLine);
+            $slots[$i] = $slot;
         }
 
         $teamRows = [];
@@ -287,7 +311,20 @@ final class Season2008Finals4Restore
         $row = $result->fetch_row();
         $stmt->close();
 
-        return (int) ($row[0] ?? 0);
+        return self::toInt($row[0] ?? 0);
+    }
+
+    /**
+     * Narrow one numeric mysqli column value to int.
+     *
+     * fetch_row()/fetch_all(MYSQLI_NUM) type every column as mixed, and
+     * mysqli_stmt::$affected_rows is int|string, so a bare (int) cast is a cast of a
+     * non-int type rather than a narrowing. Every call site here reads COUNT(*), SUM(),
+     * an INT column, or a row count — a non-numeric value means the query changed shape.
+     */
+    private static function toInt(mixed $value): int
+    {
+        return is_numeric($value) ? (int) $value : 0;
     }
 
     private function count2008TeamRows(): int
@@ -306,7 +343,7 @@ final class Season2008Finals4Restore
         $row = $result->fetch_row();
         $stmt->close();
 
-        return (int) ($row[0] ?? 0);
+        return self::toInt($row[0] ?? 0);
     }
 
     private function count2008PlayerRows(): int
@@ -325,7 +362,7 @@ final class Season2008Finals4Restore
         $row = $result->fetch_row();
         $stmt->close();
 
-        return (int) ($row[0] ?? 0);
+        return self::toInt($row[0] ?? 0);
     }
 
     // --------------------------------------------------------------- writes
@@ -354,7 +391,7 @@ final class Season2008Finals4Restore
             ];
 
             $this->bindAndExecute($stmt, 'ss' . str_repeat('i', 32), $values);
-            $inserted += $stmt->affected_rows;
+            $inserted += self::toInt($stmt->affected_rows);
         }
         $stmt->close();
 
@@ -386,7 +423,7 @@ final class Season2008Finals4Restore
             ];
 
             $this->bindAndExecute($stmt, 'ssss' . str_repeat('i', 25), $values);
-            $inserted += $stmt->affected_rows;
+            $inserted += self::toInt($stmt->affected_rows);
         }
         $stmt->close();
 
@@ -419,7 +456,7 @@ final class Season2008Finals4Restore
         $scores = [];
         $rows = $result->fetch_all(MYSQLI_NUM);
         foreach ($rows as $row) {
-            $scores[(int) ($row[0] ?? 0)] = (int) ($row[1] ?? 0);
+            $scores[self::toInt($row[0] ?? 0)] = self::toInt($row[1] ?? 0);
         }
         $stmt->close();
 

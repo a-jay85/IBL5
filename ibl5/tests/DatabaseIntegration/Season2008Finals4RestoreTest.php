@@ -28,6 +28,27 @@ final class Season2008Finals4RestoreTest extends DatabaseTestCase
     private const EXPECTED_PLAYER_ROWS = 24;
 
     /**
+     * A season-2008 date that is NOT the game being restored.
+     *
+     * Season2008Finals4Restore's State 2 guard refuses to proceed when the box score
+     * tables hold no `2008-%` rows at all — the production database has 1642/19177 of
+     * them, the seeded test database has none. Sentinel rows at this date make the
+     * season look present without colliding with the target coordinate, which
+     * alreadyInsertedCount() matches on game_date + visitor/home + ordinal.
+     */
+    private const DECOY_DATE = '2008-01-02';
+
+    /**
+     * ibl_plr rows this class created to satisfy ibl_box_scores' pid foreign key.
+     *
+     * runRestore() commits, so these survive tearDown()'s rollback and would otherwise
+     * leak into every later test class in the same suite run.
+     *
+     * @var list<int>
+     */
+    private static array $seededPids = [];
+
+    /**
      * Removes the rows this class knowingly commits to the shared test database.
      *
      * runRestore() calls begin_transaction() internally (MariaDB: implicitly commits T1),
@@ -39,10 +60,10 @@ final class Season2008Finals4RestoreTest extends DatabaseTestCase
      */
     public static function tearDownAfterClass(): void
     {
-        $host = $_ENV['DB_HOST'] ?? '127.0.0.1';
-        $user = $_ENV['DB_USER'] ?? 'ibl';
-        $pass = $_ENV['DB_PASS'] ?? '';
-        $name = $_ENV['DB_NAME'] ?? 'ibl5_test';
+        $host = self::envOr('DB_HOST', '127.0.0.1');
+        $user = self::envOr('DB_USER', 'ibl');
+        $pass = self::envOr('DB_PASS', '');
+        $name = self::envOr('DB_NAME', 'ibl5_test');
 
         $db = new \mysqli();
         $db->options(MYSQLI_OPT_INT_AND_FLOAT_NATIVE, 1);
@@ -64,11 +85,43 @@ final class Season2008Finals4RestoreTest extends DatabaseTestCase
                AND visitor_teamid = " . Season2008Finals4Restore::VISITOR_TEAMID . "
                AND home_teamid = " . Season2008Finals4Restore::HOME_TEAMID
         );
+        $db->query(
+            "DELETE FROM `" . Season2008Finals4Restore::TEAM_TABLE . "`
+             WHERE game_date = '" . self::DECOY_DATE . "'"
+        );
+        $db->query(
+            "DELETE FROM `" . Season2008Finals4Restore::PLAYER_TABLE . "`
+             WHERE game_date = '" . self::DECOY_DATE . "'"
+        );
+        if (self::$seededPids !== []) {
+            $db->query('DELETE FROM ibl_plr WHERE pid IN (' . implode(',', self::$seededPids) . ')');
+            self::$seededPids = [];
+        }
         $db->close();
 
         parent::tearDownAfterClass();
     }
 
+    /**
+     * Read an environment variable, falling back when it is unset or empty.
+     *
+     * getenv(), not $_ENV: docker-compose injects these as real environment variables
+     * and the container's variables_order leaves $_ENV unpopulated, so $_ENV would
+     * silently fall back to 127.0.0.1 and refuse the connection.
+     * DatabaseTestCase::requireEnv() reads them the same way; this is a static mirror
+     * of it because requireEnv() is a private instance method and this class needs the
+     * values from the static tearDownAfterClass().
+     */
+    private static function envOr(string $name, string $fallback): string
+    {
+        $value = getenv($name);
+
+        return ($value === false || $value === '') ? $fallback : $value;
+    }
+
+    /**
+     * @param array{team_rows_2008: int, player_rows_2008: int}|null $expectedOverride
+     */
     private function makeRestore(?array $expectedOverride = null): Season2008Finals4Restore
     {
         return new Season2008Finals4Restore($this->db, $expectedOverride);
@@ -89,6 +142,68 @@ final class Season2008Finals4RestoreTest extends DatabaseTestCase
                AND visitor_teamid = " . Season2008Finals4Restore::VISITOR_TEAMID . "
                AND home_teamid = " . Season2008Finals4Restore::HOME_TEAMID
         );
+    }
+
+    /**
+     * Put sentinel `2008-%` rows in both box score tables.
+     *
+     * Without them count2008TeamRows() is 0 and runRestore() stops at State 2
+     * ("season absent") before it ever reaches the insert path.
+     */
+    private function seed2008Fingerprint(): void
+    {
+        foreach ([Season2008Finals4Restore::TEAM_TABLE, Season2008Finals4Restore::PLAYER_TABLE] as $table) {
+            // Delete first so repeated calls within one suite run stay at exactly one
+            // sentinel row per table — runRestore() commits, so these survive tearDown().
+            $this->db->query("DELETE FROM `" . $table . "` WHERE game_date = '" . self::DECOY_DATE . "'");
+            $this->db->query("INSERT INTO `" . $table . "` (game_date) VALUES ('" . self::DECOY_DATE . "')");
+        }
+    }
+
+    /**
+     * Create the ibl_plr rows the payload's FK needs, remembering which ones we made.
+     *
+     * Only genuinely missing IDs are inserted, so tearDownAfterClass() never deletes a
+     * player the seed fixture owns.
+     */
+    private function seedPayloadPlayers(): void
+    {
+        foreach (Season2008Finals4Restore::payloadPlayerIds() as $pid) {
+            if (in_array($pid, self::$seededPids, true)) {
+                continue;
+            }
+            if ($this->scalarQuery('SELECT COUNT(*) FROM ibl_plr WHERE pid = ' . $pid) > 0) {
+                continue;
+            }
+            $this->db->query('INSERT INTO ibl_plr (pid) VALUES (' . $pid . ')');
+            self::$seededPids[] = $pid;
+        }
+    }
+
+    private function count2008Rows(string $table): int
+    {
+        return $this->scalarQuery("SELECT COUNT(*) FROM `" . $table . "` WHERE game_date LIKE '2008-%'");
+    }
+
+    /**
+     * Clean the target coordinate, seed the season, and return a restore whose
+     * fingerprint matches what the test database actually holds right now.
+     *
+     * The production EXPECTED counts (1642/19177) describe the live database, so a
+     * seeded test database can never match them; the constructor's override seam
+     * exists for exactly this. Counts are measured after seeding, so the fingerprint
+     * guard passes and State 3 is what the test exercises.
+     */
+    private function arrangeProceedState(): Season2008Finals4Restore
+    {
+        $this->cleanInsertedCoordinate();
+        $this->seedPayloadPlayers();
+        $this->seed2008Fingerprint();
+
+        return $this->makeRestore([
+            'team_rows_2008'   => $this->count2008Rows(Season2008Finals4Restore::TEAM_TABLE),
+            'player_rows_2008' => $this->count2008Rows(Season2008Finals4Restore::PLAYER_TABLE),
+        ]);
     }
 
     private function scalarQuery(string $sql): int
@@ -124,9 +239,7 @@ final class Season2008Finals4RestoreTest extends DatabaseTestCase
 
     public function testRunRestore_insertsTeamRows_whenProceed(): void
     {
-        $this->cleanInsertedCoordinate();
-
-        $result = $this->makeRestore()->runRestore(false);
+        $result = $this->arrangeProceedState()->runRestore(false);
 
         self::assertSame('inserted', $result['status']);
         self::assertSame(self::EXPECTED_TEAM_ROWS, $this->teamRowCount());
@@ -134,9 +247,7 @@ final class Season2008Finals4RestoreTest extends DatabaseTestCase
 
     public function testRunRestore_insertsPlayerRows_whenProceed(): void
     {
-        $this->cleanInsertedCoordinate();
-
-        $result = $this->makeRestore()->runRestore(false);
+        $result = $this->arrangeProceedState()->runRestore(false);
 
         self::assertSame('inserted', $result['status']);
         self::assertSame(self::EXPECTED_PLAYER_ROWS, $this->playerRowCount());
@@ -144,9 +255,7 @@ final class Season2008Finals4RestoreTest extends DatabaseTestCase
 
     public function testRunRestore_scoreSumsMatchExpected(): void
     {
-        $this->cleanInsertedCoordinate();
-
-        $this->makeRestore()->runRestore(false);
+        $this->arrangeProceedState()->runRestore(false);
 
         $visitorScore = $this->scalarQuery(
             "SELECT SUM(calc_points) FROM `" . Season2008Finals4Restore::PLAYER_TABLE . "`
@@ -169,10 +278,10 @@ final class Season2008Finals4RestoreTest extends DatabaseTestCase
 
     public function testRunRestore_isNoop_whenAlreadyInserted(): void
     {
-        $this->cleanInsertedCoordinate();
-        $this->makeRestore()->runRestore(false);
+        $this->arrangeProceedState()->runRestore(false);
 
-        // Second call: rows already exist → noop
+        // Second call: rows already exist → State 1 noop, reached before the
+        // fingerprint guard, so a plain instance is enough here.
         $result = $this->makeRestore()->runRestore(false);
 
         self::assertSame('noop', $result['status']);
@@ -184,6 +293,9 @@ final class Season2008Finals4RestoreTest extends DatabaseTestCase
     public function testRunRestore_isNoop_whenFingerprintMismatch(): void
     {
         $this->cleanInsertedCoordinate();
+        // Seed the season too, otherwise State 2 ("season absent") noops first and this
+        // test would pass without the fingerprint guard ever being consulted.
+        $this->seed2008Fingerprint();
 
         // Fingerprint seam: override with wrong expected counts
         $override = ['team_rows_2008' => 99999, 'player_rows_2008' => 99999];
@@ -196,14 +308,14 @@ final class Season2008Finals4RestoreTest extends DatabaseTestCase
 
     public function testDryRun_insertsNothing_exits0(): void
     {
-        $this->cleanInsertedCoordinate();
+        $restore = $this->arrangeProceedState();
 
         // Snapshot ibl_playoff_series_results before dry run
         $seriesBefore = $this->scalarQuery(
             'SELECT COUNT(*) FROM ibl_playoff_series_results WHERE year = 2008 AND round = 4'
         );
 
-        $result = $this->makeRestore()->runRestore(true);
+        $result = $restore->runRestore(true);
 
         self::assertSame('inserted', $result['status'], 'dry run should still report inserted');
         self::assertTrue($result['dryRun']);

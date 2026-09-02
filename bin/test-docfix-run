@@ -556,7 +556,7 @@ run_dm_compose() {
 
 # --- Helper: build_veronly_repo ---------------------------------------------
 # Creates a throwaway git repo seeded with:
-#   master branch: docs/x.md (last_verified: 2026-01-01), one commit
+#   master branch: ibl5/docs/x.md (last_verified: 2026-01-01), one commit
 #   feature branch: docs-stale-refresh-veronly-test (no extra commits)
 #   plan file: $SB2/home/claude-plans/docs-stale-refresh-veronly-test.md
 #              seeded with auto_merge:false + hold section
@@ -574,9 +574,9 @@ build_veronly_repo() {
     git -C "$R" config user.email "test@example.com"
     git -C "$R" config user.name "Test"
     git -C "$R" config commit.gpgsign false
-    mkdir -p "$R/docs"
-    printf 'last_verified: 2026-01-01\n' > "$R/docs/x.md"
-    git -C "$R" add docs/x.md
+    mkdir -p "$R/ibl5/docs"
+    printf 'last_verified: 2026-01-01\n' > "$R/ibl5/docs/x.md"
+    git -C "$R" add ibl5/docs/x.md
     git -C "$R" commit -m "initial" >/dev/null 2>&1
     git -C "$R" checkout -b "$SLUG" >/dev/null 2>&1
     printf '%s\n' '---' 'auto_merge: false' '---' '' '# Stale-docs auto-refresh' \
@@ -588,14 +588,14 @@ build_veronly_repo() {
 VR_SLUG="docs-stale-refresh-veronly-test"
 
 # --- Helper: veronly_reseed_base --------------------------------------------
-# Rewrites docs/x.md on master with the given lines and re-points the feature
+# Rewrites ibl5/docs/x.md on master with the given lines and re-points the feature
 # branch at the new tip, so merge-base..worktree still sees ONLY the case's own
 # edit. For cases whose fixture needs a multi-line base file.
 # Use: veronly_reseed_base "$R" 'line1' 'line2' ...
 veronly_reseed_base() {
     local R="$1"; shift
     git -C "$R" checkout -q master
-    printf '%s\n' "$@" > "$R/docs/x.md"
+    printf '%s\n' "$@" > "$R/ibl5/docs/x.md"
     git -C "$R" commit -qam "reseed base" >/dev/null 2>&1
     git -C "$R" branch -f "$VR_SLUG" master
     git -C "$R" checkout -q "$VR_SLUG"
@@ -607,7 +607,7 @@ veronly_reseed_base() {
 SB2="$(build_veronly_repo)"
 R="$SB2/repo"
 PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
-printf 'last_verified: 2026-08-13\n' > "$R/docs/x.md"
+printf 'last_verified: 2026-08-13\n' > "$R/ibl5/docs/x.md"
 ( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
     "$REAL_VERONLY" "$VR_SLUG" >/dev/null 2>&1 ) && VRC=0 || VRC=$?
 { [ "$VRC" -eq 0 ] \
@@ -620,7 +620,7 @@ printf 'last_verified: 2026-08-13\n' > "$R/docs/x.md"
 SB2="$(build_veronly_repo)"
 R="$SB2/repo"
 PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
-printf 'last_verified: 2026-08-13\nextra prose\n' > "$R/docs/x.md"
+printf 'last_verified: 2026-08-13\nextra prose\n' > "$R/ibl5/docs/x.md"
 ( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
     "$REAL_VERONLY" "$VR_SLUG" >/dev/null 2>&1 ) && VRC=0 || VRC=$?
 { [ "$VRC" -eq 1 ] \
@@ -633,9 +633,9 @@ printf 'last_verified: 2026-08-13\nextra prose\n' > "$R/docs/x.md"
 SB2="$(build_veronly_repo)"
 R="$SB2/repo"
 PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
-printf 'last_verified: 2026-08-13\n' > "$R/docs/x.md"
-printf 'new doc\n' > "$R/docs/new.md"
-git -C "$R" add docs/new.md
+printf 'last_verified: 2026-08-13\n' > "$R/ibl5/docs/x.md"
+printf 'new doc\n' > "$R/ibl5/docs/new.md"
+git -C "$R" add ibl5/docs/new.md
 ( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
     "$REAL_VERONLY" "$VR_SLUG" >/dev/null 2>&1 ) && VRC=0 || VRC=$?
 { [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V"; } \
@@ -646,8 +646,8 @@ git -C "$R" add docs/new.md
 SB2="$(build_veronly_repo)"
 R="$SB2/repo"
 PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
-printf 'last_verified: 2026-08-13\n' > "$R/docs/x.md"
-printf 'untracked\n' > "$R/docs/untracked.md"
+printf 'last_verified: 2026-08-13\n' > "$R/ibl5/docs/x.md"
+printf 'untracked\n' > "$R/ibl5/docs/untracked.md"
 ( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
     "$REAL_VERONLY" "$VR_SLUG" >/dev/null 2>&1 ) && VRC=0 || VRC=$?
 { [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V"; } \
@@ -658,7 +658,7 @@ printf 'untracked\n' > "$R/docs/untracked.md"
 SB2="$(build_veronly_repo)"
 R="$SB2/repo"
 PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
-printf 'last_verified: 2025-12-31\n' > "$R/docs/x.md"
+printf 'last_verified: 2025-12-31\n' > "$R/ibl5/docs/x.md"
 ( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
     "$REAL_VERONLY" "$VR_SLUG" >/dev/null 2>&1 ) && VRC=0 || VRC=$?
 { [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V"; } \
@@ -816,8 +816,8 @@ SHIM_GH_CALLS="$CALLS40" run_dm_compose "$SB" '12; rm -rf /' "$OUTF40" && DRC=0 
 SB2="$(build_veronly_repo)"
 R="$SB2/repo"
 PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
-git -C "$R" mv docs/x.md docs/y.md
-printf 'last_verified: 2026-08-13\n' > "$R/docs/y.md"
+git -C "$R" mv ibl5/docs/x.md ibl5/docs/y.md
+printf 'last_verified: 2026-08-13\n' > "$R/ibl5/docs/y.md"
 VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
     "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
 { [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
@@ -829,7 +829,7 @@ VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
 SB2="$(build_veronly_repo)"
 R="$SB2/repo"
 PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
-git -C "$R" rm -q docs/x.md
+git -C "$R" rm -q ibl5/docs/x.md
 VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
     "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
 { [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
@@ -843,7 +843,7 @@ SB2="$(build_veronly_repo)"
 R="$SB2/repo"
 PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
 veronly_reseed_base "$R" 'last_verified: 2026-01-01' 'body'
-printf '%s\n' 'body' 'last_verified: 2026-01-01' > "$R/docs/x.md"
+printf '%s\n' 'body' 'last_verified: 2026-01-01' > "$R/ibl5/docs/x.md"
 VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
     "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
 { [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
@@ -855,7 +855,7 @@ VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
 SB2="$(build_veronly_repo)"
 R="$SB2/repo"
 PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
-printf 'last_verified: 2026-8-9\n' > "$R/docs/x.md"
+printf 'last_verified: 2026-8-9\n' > "$R/ibl5/docs/x.md"
 VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
     "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
 { [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
@@ -870,34 +870,36 @@ R="$SB2/repo"
 PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
 veronly_reseed_base "$R" 'last_verified: 2026-01-01' '' 'example:' 'last_verified: 2026-01-01'
 printf '%s\n' 'last_verified: 2026-08-13' '' 'example:' 'last_verified: 2026-08-13' \
-    > "$R/docs/x.md"
+    > "$R/ibl5/docs/x.md"
 VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
     "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
 { [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
-    && printf '%s' "$VOUT" | grep -qF 'expected exactly 1 date-change pair'; } \
+    && printf '%s' "$VOUT" | grep -qF 'more than 1 last_verified pair'; } \
   && ok "(45) veronly: two date pairs in one file hold (rc 1)" \
   || bad "(45) veronly: two date pairs"
 
-# Case 46: a removed markdown --- delimiter renders as "----", which has no
-# space in the 4th position and so must NOT be swallowed by the "--- " header
-# skip. Guards the load-bearing trailing space in the predicate's case pattern.
+# Case 46: the base has '---' / last_verified / '---' (3 lines); the new file
+# has only the advanced date (1 line).  The hunk is 3 removed / 1 added, so
+# pair_hunk() fires "unpaired change lines".  This discriminating power depends
+# on the trailing space in "--- " — dropping it would let the --- delimiters be
+# skipped as header lines, leaving a 1/1 pair that would PASS instead of HOLD.
 SB2="$(build_veronly_repo)"
 R="$SB2/repo"
 PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
 veronly_reseed_base "$R" '---' 'last_verified: 2026-01-01' '---'
-printf '%s\n' 'last_verified: 2026-08-13' > "$R/docs/x.md"
+printf '%s\n' 'last_verified: 2026-08-13' > "$R/ibl5/docs/x.md"
 VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
     "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
 { [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
-    && printf '%s' "$VOUT" | grep -qF 'non-date change line'; } \
-  && ok "(46) veronly: removed --- delimiter holds (rc 1, not a header line)" \
+    && printf '%s' "$VOUT" | grep -qF 'unpaired change lines'; } \
+  && ok "(46) veronly: removed --- delimiter holds (rc 1, unpaired hunk)" \
   || bad "(46) veronly: removed --- delimiter"
 
 # Case 47: valid date bump but the plan file is gone → rc 2, no silent grant
 SB2="$(build_veronly_repo)"
 R="$SB2/repo"
 PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
-printf 'last_verified: 2026-08-13\n' > "$R/docs/x.md"
+printf 'last_verified: 2026-08-13\n' > "$R/ibl5/docs/x.md"
 rm -f "$PLAN_V"
 VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
     "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
@@ -963,6 +965,282 @@ RC23=$?
     && grep -qF '## Content rewritten' "$REAL_DOCFIX"; } \
   && ok "(48) prompt: ADR append-only + figure-resubstitution + content-rewrite disclosure clauses present" \
   || bad "(48) prompt: an append-only/disclosure clause was dropped from \$PROMPT"
+
+# --- Cases 49-64: bin/docfix-check-veronly numeric-pass + boundary cases ------
+
+# Helper: seed a file in master, re-point the feature branch, check it out.
+# veronly_add_master "$R" "rel/path" "line1" "line2" ...
+veronly_add_master() {
+    local R="$1" RELPATH="$2"; shift 2
+    git -C "$R" checkout -q master
+    mkdir -p "$R/$(dirname "$RELPATH")"
+    printf '%s\n' "$@" > "$R/$RELPATH"
+    git -C "$R" add "$RELPATH"
+    git -C "$R" commit -qm "add $RELPATH" >/dev/null 2>&1
+    git -C "$R" branch -f "$VR_SLUG" master
+    git -C "$R" checkout -q "$VR_SLUG"
+}
+
+# Case 49: date-only bump in ibl5/docs/decisions/0002.md (PR #2059 shape) → PASS
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_add_master "$R" "ibl5/docs/decisions/0002.md" "last_verified: 2026-01-01"
+printf 'last_verified: 2026-09-02\n' > "$R/ibl5/docs/decisions/0002.md"
+VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 0 ] \
+    && grep -q '^auto_merge: true$' "$PLAN_V" \
+    && ! grep -q '## Automouse Hold Justification' "$PLAN_V"; } \
+  && ok "(49) veronly: date-only bump in decisions/0002.md arms the plan (rc 0, PR #2059 shape)" \
+  || bad "(49) veronly: PR #2059 shape date-only bump"
+
+# Case 50: date bump + 1R/3A prose expansion (0026 shape) → HOLD unpaired
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_reseed_base "$R" 'last_verified: 2026-01-01' 'one prose line'
+printf '%s\n' 'last_verified: 2026-09-02' 'prose line a' 'prose line b' 'prose line c' \
+    > "$R/ibl5/docs/x.md"
+VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
+    && printf '%s' "$VOUT" | grep -qF 'unpaired change lines'; } \
+  && ok "(50) veronly: date + 1R/3A prose expansion holds (rc 1, 0026 shape)" \
+  || bad "(50) veronly: 0026 shape (date + prose expansion)"
+
+# Case 51: date bump + pure 10-line addendum insertion (0034 shape) → HOLD unpaired.
+# 8 body lines separate the date hunk from the insertion hunk (>6 lines needed to
+# prevent context overlap with -U3 default).
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_reseed_base "$R" 'last_verified: 2026-01-01' 'b1' 'b2' 'b3' 'b4' 'b5' 'b6' 'b7' 'b8'
+printf '%s\n' 'last_verified: 2026-09-02' 'b1' 'b2' 'b3' 'b4' 'b5' 'b6' 'b7' 'b8' \
+    '## Addendum' 'a1' 'a2' 'a3' 'a4' 'a5' 'a6' 'a7' 'a8' 'a9' 'a10' \
+    > "$R/ibl5/docs/x.md"
+VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
+    && printf '%s' "$VOUT" | grep -qF 'unpaired change lines'; } \
+  && ok "(51) veronly: date + pure 10-line addendum insertion holds (rc 1, 0034 shape)" \
+  || bad "(51) veronly: 0034 shape (date + 10-line addendum insertion)"
+
+# Case 52: date bump + pure 8-line addendum insertion (0077 shape) → HOLD unpaired
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_reseed_base "$R" 'last_verified: 2026-01-01' 'b1' 'b2' 'b3' 'b4' 'b5' 'b6' 'b7' 'b8'
+printf '%s\n' 'last_verified: 2026-09-02' 'b1' 'b2' 'b3' 'b4' 'b5' 'b6' 'b7' 'b8' \
+    '## Addendum' 'a1' 'a2' 'a3' 'a4' 'a5' 'a6' 'a7' 'a8' \
+    > "$R/ibl5/docs/x.md"
+VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
+    && printf '%s' "$VOUT" | grep -qF 'unpaired change lines'; } \
+  && ok "(52) veronly: date + pure 8-line addendum insertion holds (rc 1, 0077 shape)" \
+  || bad "(52) veronly: 0077 shape (date + 8-line addendum insertion)"
+
+# Case 53: all six 0002/0026/0034/0068/0077/0078 shapes in one branch → HOLD.
+# 0002 alone would PASS; 0026/0034/0068/0077/0078 each hold; fail-closed fires
+# on the first HOLD file encountered.
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+git -C "$R" checkout -q master
+mkdir -p "$R/ibl5/docs/decisions"
+printf '%s\n' 'last_verified: 2026-01-01' > "$R/ibl5/docs/decisions/0002.md"
+printf '%s\n' 'last_verified: 2026-01-01' 'old prose' > "$R/ibl5/docs/decisions/0026.md"
+printf '%s\n' 'last_verified: 2026-01-01' \
+    'b1' 'b2' 'b3' 'b4' 'b5' 'b6' 'b7' 'b8' > "$R/ibl5/docs/decisions/0034.md"
+printf '%s\n' 'last_verified: 2026-01-01' 'old prose' > "$R/ibl5/docs/decisions/0068.md"
+printf '%s\n' 'last_verified: 2026-01-01' \
+    'b1' 'b2' 'b3' 'b4' 'b5' 'b6' 'b7' 'b8' > "$R/ibl5/docs/decisions/0077.md"
+printf '%s\n' 'last_verified: 2026-01-01' 'old prose' > "$R/ibl5/docs/decisions/0078.md"
+git -C "$R" add ibl5/docs/decisions/
+git -C "$R" commit -qm "add six shapes" >/dev/null 2>&1
+git -C "$R" branch -f "$VR_SLUG" master
+git -C "$R" checkout -q "$VR_SLUG"
+printf '%s\n' 'last_verified: 2026-09-02' > "$R/ibl5/docs/decisions/0002.md"
+printf '%s\n' 'last_verified: 2026-09-02' 'new prose a' 'new prose b' 'new prose c' \
+    > "$R/ibl5/docs/decisions/0026.md"
+printf '%s\n' 'last_verified: 2026-09-02' \
+    'b1' 'b2' 'b3' 'b4' 'b5' 'b6' 'b7' 'b8' \
+    '## Addendum' 'a1' 'a2' 'a3' 'a4' 'a5' 'a6' 'a7' 'a8' 'a9' 'a10' \
+    > "$R/ibl5/docs/decisions/0034.md"
+printf '%s\n' 'last_verified: 2026-09-02' 'new prose d' 'new prose e' \
+    > "$R/ibl5/docs/decisions/0068.md"
+printf '%s\n' 'last_verified: 2026-09-02' \
+    'b1' 'b2' 'b3' 'b4' 'b5' 'b6' 'b7' 'b8' \
+    '## Addendum' 'a1' 'a2' 'a3' 'a4' 'a5' 'a6' 'a7' 'a8' \
+    > "$R/ibl5/docs/decisions/0077.md"
+printf '%s\n' 'last_verified: 2026-09-02' 'new prose f' 'new prose g' \
+    > "$R/ibl5/docs/decisions/0078.md"
+VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V"; } \
+  && ok "(53) veronly: all six PR shapes in one branch holds (rc 1, fail-closed)" \
+  || bad "(53) veronly: all six shapes in one branch"
+
+# Case 54: gitleaks @v2→@v3 numeric edit + advancing date in decisions/0034x.md → PASS
+SB2_54="$(build_veronly_repo)"
+R54="$SB2_54/repo"
+PLAN_V54="$SB2_54/home/claude-plans/$VR_SLUG.md"
+veronly_add_master "$R54" "ibl5/docs/decisions/0034x.md" \
+    "last_verified: 2026-01-01" \
+    "uses: gitleaks/gitleaks-action@v2"
+printf '%s\n' 'last_verified: 2026-09-02' 'uses: gitleaks/gitleaks-action@v3' \
+    > "$R54/ibl5/docs/decisions/0034x.md"
+VOUT="$( cd "$R54" && HOME="$SB2_54/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 0 ] \
+    && grep -q '^auto_merge: true$' "$PLAN_V54" \
+    && ! grep -q '## Automouse Hold Justification' "$PLAN_V54"; } \
+  && ok "(54) veronly: gitleaks @v2→@v3 + advancing date arms the plan (rc 0)" \
+  || bad "(54) veronly: numeric @v2→@v3 + date should PASS"
+
+# Case 55: 147→17 call-sites numeric edit + advancing date → PASS
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_reseed_base "$R" 'last_verified: 2026-01-01' '147 call sites across 16 files'
+printf '%s\n' 'last_verified: 2026-09-02' '17 call sites across 16 files' \
+    > "$R/ibl5/docs/x.md"
+VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 0 ] \
+    && grep -q '^auto_merge: true$' "$PLAN_V" \
+    && ! grep -q '## Automouse Hold Justification' "$PLAN_V"; } \
+  && ok "(55) veronly: 147→17 call-sites numeric edit + advancing date arms the plan (rc 0)" \
+  || bad "(55) veronly: call-site count numeric edit + date should PASS"
+
+# Case 56: same call-site numeric edit, no date change → HOLD numeric without date
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_reseed_base "$R" 'last_verified: 2026-01-01' '147 call sites across 16 files'
+printf '%s\n' 'last_verified: 2026-01-01' '17 call sites across 16 files' \
+    > "$R/ibl5/docs/x.md"
+VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
+    && printf '%s' "$VOUT" | grep -qF 'numeric change without a last_verified bump'; } \
+  && ok "(56) veronly: numeric edit without date change holds (rc 1)" \
+  || bad "(56) veronly: numeric edit without date should HOLD"
+
+# Case 57: same call-site numeric edit, date present but equal → HOLD not advancing
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_reseed_base "$R" 'last_verified: 2026-01-01' '147 call sites across 16 files'
+printf '%s\n' 'last_verified: 2026-01-01' '17 call sites across 16 files' \
+    > "$R/ibl5/docs/x.md"
+VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
+    && printf '%s' "$VOUT" | grep -qF 'numeric change without a last_verified bump'; } \
+  && ok "(57) veronly: numeric edit with equal date holds (rc 1)" \
+  || bad "(57) veronly: numeric edit with equal date should HOLD"
+
+# Case 58: M change to .github/workflows/gitleaks.yml (@v2→@v3) → HOLD, path outside ibl5/docs/
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+git -C "$R" checkout -q master
+mkdir -p "$R/.github/workflows"
+printf '%s\n' 'uses: gitleaks/gitleaks-action@v2' > "$R/.github/workflows/gitleaks.yml"
+git -C "$R" add .github/workflows/gitleaks.yml
+git -C "$R" commit -qm "add gitleaks workflow" >/dev/null 2>&1
+git -C "$R" branch -f "$VR_SLUG" master
+git -C "$R" checkout -q "$VR_SLUG"
+printf '%s\n' 'uses: gitleaks/gitleaks-action@v3' > "$R/.github/workflows/gitleaks.yml"
+VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
+    && printf '%s' "$VOUT" | grep -qF 'path outside ibl5/docs/' \
+    && printf '%s' "$VOUT" | grep -qF '.github/workflows/gitleaks.yml'; } \
+  && ok "(58) veronly: M change outside ibl5/docs/ holds (rc 1, path guard fires)" \
+  || bad "(58) veronly: path outside ibl5/docs/ should HOLD"
+
+# Case 59: 2R/1A hunk (two removed, one added) → HOLD unpaired change lines
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_reseed_base "$R" 'last_verified: 2026-01-01' 'line a' 'line b'
+printf '%s\n' 'last_verified: 2026-09-02' 'line c' > "$R/ibl5/docs/x.md"
+VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
+    && printf '%s' "$VOUT" | grep -qF 'unpaired change lines'; } \
+  && ok "(59) veronly: 2R/1A hunk holds (rc 1, unpaired change lines)" \
+  || bad "(59) veronly: 2R/1A hunk should HOLD"
+
+# Case 60: 0R/1A pure insertion alongside an advancing date → HOLD unpaired.
+# The insertion is far enough from the date to be in a separate 0/1 hunk.
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_reseed_base "$R" 'last_verified: 2026-01-01' 'b1' 'b2' 'b3' 'b4' 'b5' 'b6' 'b7' 'b8'
+printf '%s\n' 'last_verified: 2026-09-02' 'b1' 'b2' 'b3' 'b4' 'b5' 'b6' 'b7' 'b8' \
+    'new line' > "$R/ibl5/docs/x.md"
+VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
+    && printf '%s' "$VOUT" | grep -qF 'unpaired change lines'; } \
+  && ok "(60) veronly: 0R/1A pure insertion alongside advancing date holds (rc 1)" \
+  || bad "(60) veronly: 0R/1A insertion should HOLD"
+
+# Case 61: word-only edit (no digits) + advancing date → HOLD non-numeric change line
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_reseed_base "$R" 'last_verified: 2026-01-01' 'the cache is warm'
+printf '%s\n' 'last_verified: 2026-09-02' 'the cache is cold' > "$R/ibl5/docs/x.md"
+VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
+    && printf '%s' "$VOUT" | grep -qF 'non-numeric change line'; } \
+  && ok "(61) veronly: word-only edit holds (rc 1, non-numeric change line)" \
+  || bad "(61) veronly: word-only edit should HOLD"
+
+# Case 62: line moved within the file (identical text, no digit changed) → HOLD no numeric difference
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_reseed_base "$R" 'last_verified: 2026-01-01' 'b1' 'b2' 'b3' 'b4' 'b5' 'b6' 'b7' 'b8' 'moved line'
+printf '%s\n' 'moved line' 'last_verified: 2026-09-02' 'b1' 'b2' 'b3' 'b4' 'b5' 'b6' 'b7' 'b8' \
+    > "$R/ibl5/docs/x.md"
+VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
+    && ( printf '%s' "$VOUT" | grep -qF 'change line with no numeric difference' \
+      || printf '%s' "$VOUT" | grep -qF 'unpaired change lines' ); } \
+  && ok "(62) veronly: moved line holds (rc 1, no numeric difference or unpaired)" \
+  || bad "(62) veronly: moved line should HOLD"
+
+# Case 63: change line whose text already contains __NUM__ → HOLD mask placeholder
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+veronly_reseed_base "$R" 'last_verified: 2026-01-01' 'count: __NUM__ items'
+printf '%s\n' 'last_verified: 2026-09-02' 'count: __NUM__ things' > "$R/ibl5/docs/x.md"
+VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 1 ] && grep -q '^auto_merge: false$' "$PLAN_V" \
+    && printf '%s' "$VOUT" | grep -qF 'mask placeholder'; } \
+  && ok "(63) veronly: __NUM__ literal in change line holds (rc 1, mask placeholder)" \
+  || bad "(63) veronly: __NUM__ literal in change line should HOLD"
+
+# Case 64: case 54's PASSing repo re-run → rc 0, plan byte-identical (idempotent)
+BEFORE64="$(cat "$PLAN_V54")"
+VOUT="$( cd "$R54" && HOME="$SB2_54/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" 2>&1 )" && VRC=0 || VRC=$?
+AFTER64="$(cat "$PLAN_V54")"
+{ [ "$VRC" -eq 0 ] \
+    && [ "$BEFORE64" = "$AFTER64" ] \
+    && grep -q '^auto_merge: true$' "$PLAN_V54"; } \
+  && ok "(64) veronly: re-run on armed plan is rc 0 and plan is byte-identical (idempotent)" \
+  || bad "(64) veronly: idempotency re-run"
 
 if [ "$FAILED" -eq 0 ]; then echo "All docfix-run checks passed."; else echo "Some docfix-run checks FAILED."; fi
 exit "$FAILED"

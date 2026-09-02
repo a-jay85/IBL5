@@ -1,6 +1,6 @@
 ---
 description: Development-efficiency backlog — inner-loop speed (diff-scoped analysis, parallel tests), CI caching, dependency-bump batching, and worktree lifecycle automation, with per-entry status.
-last_verified: 2026-09-02
+last_verified: 2026-09-01
 ---
 
 # Development-Efficiency Backlog
@@ -58,6 +58,7 @@ last_verified: 2026-09-02
 | E29 | Shell-harness cases pre-populate `$WORK` instead of driving invocation 1 | ✅ Implemented | — | S |
 | E30 | `bin/pr-ready-now` already-running skip only sees its own launchd jobs, so an interactive `/pr-ready` is invisible and both runs share PR-keyed `/tmp` scratch | ⬜ Open | 🟨 | S |
 | E31 | `bin/plan-now` help span truncated by bare `#`; test assertions miss declared secondary-behaviour tokens | ⬜ Open | 🟦 | S |
+| E32 | Phase 6 review notes on PR #1861 — minor plan-vs-implementation drifts and in-flight artifacts on a long-lived branch, all non-blocking | ⬜ Open | — | S |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -376,6 +377,7 @@ Three defects in the `filterGitignored()` function added to `bin/check-docs` by 
 |---|-----------|-------------|-------|--------|
 | 1 | `#2022` PR body — "**169** (DDL)" / "**170** (PHP)" / "After CI deploys migration **170**" contradicted the shipped 170/171 pair | yes | fixed this pass | fixed this pass |
 | 2 | Other PRs with migration pairs (generic) | near-miss — only arises on a forced renumber mid-implementation | N/A | not fixed — filed |
+| 3 | `#1861` PR body — "Add ADR-0102" contradicted actual ADR-0104 (renumber from 0100 while PR sat open 19 days) | yes | fixed this pass | fixed this pass |
 
 **prevention_ladder:**
 - rung 0 — already covered by an existing gate? **LANDS HERE.** `/pr-ready` Phase 6 check 4 ("PR body vs. diff") is designed to catch exactly this mismatch — it fired correctly on PR #2022 and blocked the verdict until the body was corrected. No additional gate is warranted.
@@ -453,3 +455,27 @@ Not a defect in the anchoring or the SIGPIPE handling: the `$`-anchor (guarding 
 - **rungs 3–5** — N/A. Mechanical detection of missing assertions requires understanding which tokens a row declares — outside the scope of a linter without semantic knowledge of the plan's matrix.
 
 `artifact destination:` a new `.claude/rules/` doc on help-span terminator hygiene and secondary-assertion completeness (not created this pass).
+
+### E32 Phase 6 review notes on PR #1861 (long-lived branch drift)
+
+**class:** n/a — minor plan-vs-implementation drifts, scope-creep-adjacent changes, and in-flight operational artifacts surfaced as notes by `/pr-ready` Phase 6 on a 19-day, 23-rebase branch; none reached a blocking clause; documented here because Mode: in-PR requires an entry for every Phase 6 finding.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | Note 2.1: ADR numbered 0104 not plan's 0100 — plan-permitted (`bin/next-adr` decides) | n/a | no — plan-resolved | not fixed — not a defect |
+| 2 | Note 2.2: `last_verified` dates set to 2026-08-15 not plan's 2026-08-13 — master already ahead, correct | n/a | no — correct behavior | not fixed — not a defect |
+| 3 | Note 2.3: README index row appended after 0113 not 0099 — cosmetic ordering gap, `bin/check-numbering` does not enforce order | n/a | yes — cosmetic | not fixed — cosmetic |
+| 4 | Note 2.4: plist-grep realised via pre-existing case 20 (stricter than plan's source grep) | n/a | no — better route | not fixed — better route |
+| 5 | Note 3.1: `bin/test-sigpipe-grep-q-guard` rewrite not in plan — necessary consequence of Phase 4 dedupe, net stricter | n/a | no — correct | not fixed — not a defect |
+| 6 | Note 3.2: `bin/lib/README.md` index row added — correct convention follow | n/a | no — correct | not fixed — not a defect |
+| 7 | Note 3.3: HEAD remediation commit (`933899189`) — Phase 6.5 union-merge artifact cleanup | n/a | no — already done | fixed this pass |
+| 8 | Note 5.1: `Truly-manual` row 40 not performed — intentional; needs post-merge prod dispatch per plan | n/a | no — intentional | not fixed — intentional |
+| 9 | Note 6.1: earlier rebase union-merge artifacts (duplicate 0103 row + stale `last_verified`) | n/a | no — already remediated | fixed this pass |
+
+**prevention_ladder:** no gate warranted — `/pr-ready` Phase 6 already surfaces these; they are expected review notes for a long-lived branch with 23+ force-pushes; no per-note gate would catch future occurrences reliably without high false-positive cost.
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-01 during #1861)*

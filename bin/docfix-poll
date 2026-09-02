@@ -251,6 +251,33 @@ fi
 # --- The poll -----------------------------------------------------------------
 cd "$MAIN"
 
+# --- Lingering-unarmed-PR DM --------------------------------------------------
+# Send a once-per-PR DM for any open docfix PR that is not yet armed for
+# auto-merge. An armed PR self-ships; a DM there would be noise.  We do this
+# BEFORE the staleness check so it fires even on nights with no new stale docs,
+# which are exactly the nights a lingering PR is most likely the only thing
+# outstanding.  Fail-quiet on gh errors: a missed notification retries tomorrow.
+if ! DM_PRS="$(gh pr list --state open --json number,headRefName,autoMergeRequest \
+     --jq '.[] | select(.headRefName | startswith("docs-stale-refresh-"))
+                | select(.autoMergeRequest == null) | .number' 2>/dev/null)"; then
+    DM_PRS=""   # fail-quiet, like every guard in this script
+fi
+
+DM_MARKER_DIR="${LOG_DIR%/logs}/dm-sent"
+mkdir -p "$DM_MARKER_DIR"
+
+for PR_NUM in $DM_PRS; do
+    if [ -e "$DM_MARKER_DIR/pr-$PR_NUM" ]; then
+        continue
+    fi
+    if gh workflow run docs-refreshed-notify.yml -f pr_number="$PR_NUM" 2>/dev/null; then
+        : > "$DM_MARKER_DIR/pr-$PR_NUM"
+        echo "docfix-poll: DM dispatched for lingering unarmed PR #$PR_NUM."
+    else
+        echo "docfix-poll: DM dispatch failed for PR #$PR_NUM — will retry next poll." >&2
+    fi
+done
+
 REPORT="$(mktemp)"
 trap 'rm -f "$REPORT"' EXIT
 "$MAIN/bin/check-docs" --staleness-report > "$REPORT"

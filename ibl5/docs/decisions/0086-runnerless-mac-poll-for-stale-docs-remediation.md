@@ -1,6 +1,6 @@
 ---
 description: Replace ADR-0079's self-hosted macOS runner with a launchd-scheduled Mac poll — the repo is public, so a runner label is addressable by any workflow including a fork's; the Mac pulls work from GitHub instead of GitHub pushing work onto the Mac.
-last_verified: 2026-07-15
+last_verified: 2026-08-15
 ---
 
 # ADR-0086: Runnerless Mac poll for stale-docs remediation
@@ -10,6 +10,7 @@ last_verified: 2026-07-15
 **Supersedes:** ADR-0079 *Autonomous stale-docs remediation via a self-hosted macOS runner*
 (`0079-stale-docs-auto-remediation.md`) — transport only; its human-merge posture is carried forward
 deliberately.
+**Narrowed by:** [ADR-0104](0104-verification-only-doc-refresh-auto-merge.md) — decision 2's human-merge posture still governs, except for verification-only `last_verified:` diffs proven by `bin/docfix-check-veronly`.
 
 > **Numbering note.** The number 0079 is **duplicated on master**: this ADR supersedes
 > `0079-stale-docs-auto-remediation.md` (2026-07-04), **not** `0079-sha-pin-github-actions.md`

@@ -1,6 +1,6 @@
 ---
 description: Rationale for adding a gitleaks secret-scanning CI gate, scrubbing a rotated DB password, and hardening the demo-login token to fail closed.
-last_verified: 2026-07-03
+last_verified: 2026-09-02
 ---
 
 # ADR-0034: Secret-Scanning Gate
@@ -14,7 +14,7 @@ A holistic audit found the production DB password (already rotated by the mainta
 
 ## Decision
 
-1. **Secrets must never be committed.** A `gitleaks` workflow (`.github/workflows/gitleaks.yml`, `gitleaks/gitleaks-action@v2`) runs on every `pull_request` (diff range) and on `push` to `master` (full history via `fetch-depth: 0`). Branch protection should require the `gitleaks` check. False positives are suppressed only via explicit, commented entries in `.gitleaks.toml` at the repo root.
+1. **Secrets must never be committed.** A `gitleaks` workflow (`.github/workflows/gitleaks.yml`, `gitleaks/gitleaks-action@v3`) runs on every `pull_request` (diff range) and on `push` to `master` (full history via `fetch-depth: 0`). Branch protection should require the `gitleaks` check. False positives are suppressed only via explicit, commented entries in `.gitleaks.toml` at the repo root.
 
 2. **Rotation is the remediation for any leak — never `.gitignore`.** When the gate fires, the credential is rotated and scrubbed from HEAD. Git-history rewrite is out of scope (disruptive; rotation already mitigates), so the already-leaked-and-rotated literal is allowlisted in `.gitleaks.toml` rather than purged from history.
 

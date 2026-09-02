@@ -1,6 +1,6 @@
 ---
 description: ADR for advisory 500-LOC hot-file threshold rule and bin/check-hot-files script
-last_verified: 2026-07-03
+last_verified: 2026-09-02
 ---
 
 # ADR-0026: Hot-File Threshold Rule
@@ -20,7 +20,9 @@ A codebase audit (2026-05-14) found 23 files in `ibl5/classes/` exceeding 500 li
 
 ## Threshold Rationale
 
-500 LOC is approximately one-third the size of the largest hotspot (RecordHoldersRepository at 995 LOC) and well above typical Service/View sizes (200–400 LOC). The > 100 LOC growth trigger avoids noise from minor additions while catching significant expansion.
+500 LOC was picked in May 2026 against the codebase as it stood then: the largest hotspot was `RecordHoldersRepository` at 995 LOC, while typical Service/View classes landed at 200–400 LOC. 500 sits roughly midway between the two — high enough that a healthy class never trips it, low enough to catch the god-class tail well before it doubles. The > 100 LOC growth trigger avoids noise from minor additions while catching significant expansion.
+
+The threshold has not moved since; the numbers behind it have. `RecordHoldersRepository` was subsequently extracted into the collaborators now in `classes/RecordHolders/` and is down to 195 LOC, and as of 2026-09-02 the largest hotspot is `BoxscoreRepository` at 678 LOC. The original figures are kept here as the historical basis for the number, not as a live description of the codebase — see Review Trigger below.
 
 ## Alternatives Considered
 

@@ -137,7 +137,6 @@ final class Season2008Finals4Restore
      * Development helper — run once to derive TEAM_ROWS and PLAYER_ROWS.
      * Never called at deploy time.
      *
-     * @codeCoverageIgnore
      * @return array{team_rows: list<list<scalar>>, player_rows: list<list<scalar>>, game_of_that_day: int}
      */
     public static function generateFromRec(string $recPath, \mysqli $db): array

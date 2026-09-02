@@ -7,7 +7,7 @@
 #   bin/pr-ready-now [--go] [--jobs N] [--pr N[,N...]] [--pr-attack FILE] [--top-n N] [--model M] [--dry-run] [--wait] [--stop N[,N...]] [--stop-all] [--help]
 #
 #   --go          Actually fire. Without it the script only reports (default).
-#   --jobs N      Max concurrent sessions (default 3). Positive integer.
+#   --jobs N      Max concurrent sessions (default 5). Positive integer.
 #   --pr N[,N...] Explicit PR numbers; bypasses the open/non-draft selector.
 #   --model M     Model for the fired sessions (default: claude-sonnet-4-6 — see below).
 #                 Opus judgment lives in the Phase 6 agent def, not in this default;
@@ -30,7 +30,7 @@
 #
 # Examples:
 #   bin/pr-ready-now                       # report what would run
-#   bin/pr-ready-now --go                  # fire all open non-draft PRs, 3 at a time
+#   bin/pr-ready-now --go                  # fire all open non-draft PRs, 5 at a time
 #   bin/pr-ready-now --pr 1899,1900 --go   # fire exactly two
 #   bin/pr-ready-now --jobs 1 --go         # serialize
 #   bin/pr-ready-now --pr-attack ~/pr-attack.md --go         # fire top 5 from rank file
@@ -104,7 +104,7 @@ BACKLOG_DIR="$ROOT/ibl5/docs/backlog"
 
 # --- defaults ----------------------------------------------------------------------------
 GO=0
-JOBS=3
+JOBS=5
 EXPLICIT_PRS=()
 # Orchestrator tier for /pr-ready's mechanical phases. No longer corresponds to
 # bin/bug-pipeline-tick or bin/lib/plan-impl-model: this driver's Opus judgment is pinned

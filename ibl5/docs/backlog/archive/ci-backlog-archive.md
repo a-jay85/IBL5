@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed/declined CI workflow simplification entries, extracted from ci-backlog.md.
-last_verified: 2026-08-08
+last_verified: 2026-09-02
 ---
 
 # CI Workflow Simplification Backlog — Archive
@@ -69,4 +69,4 @@ Read-only historical record of ✅ Implemented / 🚫 Declined findings. For OPE
 **Risk if untouched:** `game_of_that_day = 0` silently drops recap rows; the test suite treats this as expected, so future regressions in this path pass CI green.
 **Closes gap:** #8 from `$HOME/claude-plans/sim-recap-testing-gaps-breakdown.md`
 **Tracked here** by PR #1753 audit origin, not by theme (no existing backlog covers payload-validation gaps).
-**Status (2026-08-08):** ✅ Implemented — PR #1800 (`game-of-that-day-validation-floor`): `requirePositiveInt()` helper added to `SimRecapPayload`; applied to `game_of_that_day`; 18 PHPUnit tests (rejection, error message, per-element index, boundary, over-rejection); design fork (fail-closed vs. warn) resolved fail-closed at DTO boundary; `SimSummaryRepository.php:392` left unchanged (fork B resolved by fork A). (#1800)
+**Status (2026-08-08):** ✅ Implemented — PR #1800 (`game-of-that-day-validation-floor`): `requirePositiveInt()` helper added to `SimRecapPayload`; applied to `game_of_that_day`; 7 PHPUnit test methods (9 cases: rejection, error message, per-element index, boundary, over-rejection, int-type-before-range delegation order); design fork (fail-closed vs. warn) resolved fail-closed at DTO boundary; `SimSummaryRepository.php:392` left unchanged (fork B resolved by fork A). (#1800)

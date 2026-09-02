@@ -61,6 +61,7 @@ last_verified: 2026-09-02
 | E32 | Phase 6 review notes on PR #1861 — minor plan-vs-implementation drifts and in-flight artifacts on a long-lived branch, all non-blocking | ⬜ Open | — | S |
 | E33 | Phase 6 review notes on PR #1815 — F1/F2 blocking (body inaccuracy, backlog 6.24 collision); F3–F7 notes (reflection test, coercion guards, smoke narrative, last_verified); F1/F2/F5 remediated in Phase 6.5 | ⬜ Open | — | S |
 | E34 | Auto-generated `codebase-map.md` row added in #1903 — mechanical output of `bin/generate-codebase-map`, no defect | 🚫 Declined | — | XS |
+| E35 | Phase 6 review notes on PR #1800 — PR body test count conflated Verification Matrix row count (18) with PHPUnit method count (7 methods / 9 cases); same wrong number replicated into archive entry; both fixed in Phase 6.5 | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -524,3 +525,27 @@ Not a defect in the anchoring or the SIGPIPE handling: the `$`-anchor (guarding 
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-01 during #1903)*
+
+### E35 Phase 6 review notes on PR #1800 (game-of-that-day validation floor)
+
+**class:** a hand-written test count in the PR body that conflates the Verification Matrix row count with the PHPUnit method count, replicated permanently into an in-repo archive entry.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/docs/backlog/archive/ci-backlog-archive.md:72` — "18 PHPUnit tests" | yes | yes | fixed this pass — corrected to "7 PHPUnit test methods (9 cases)" |
+| 2 | PR #1800 body bullet — "18 new PHPUnit test cases" | yes | yes | fixed this pass — corrected to "7 new PHPUnit test methods (9 cases)" |
+
+**prevention_ladder:**
+
+- **rung 0 — already covered by an existing gate?** No. `/pr-ready` Phase 6 catches this class after the fact.
+- **rung 1 — extend an existing gate?** No existing gate checks hand-written test counts in PR bodies.
+- **rung 2 — a rule doc?** A reminder in `.claude/rules/commit-conventions.md` could note "use method count, not Verification Matrix row count" — but this is author discipline, not automatable.
+- **rungs 3–5** — N/A. A PHPStan rule, CI gate, or hook cannot read a PR body or verify a claim inside it.
+
+`prevention_ladder: no gate warranted — the Verification Matrix already records the correct method count ("the SimRecapPayloadTest count is 16 (9+3+4)"); the wrong figure requires ignoring the plan's own count. Author discipline; no mechanical gate is cheaper than re-reading the plan.`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-02 during #1800)*

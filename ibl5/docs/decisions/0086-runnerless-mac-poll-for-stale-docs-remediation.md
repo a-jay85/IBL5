@@ -1,6 +1,6 @@
 ---
 description: Replace ADR-0079's self-hosted macOS runner with a launchd-scheduled Mac poll — the repo is public, so a runner label is addressable by any workflow including a fork's; the Mac pulls work from GitHub instead of GitHub pushing work onto the Mac.
-last_verified: 2026-08-15
+last_verified: 2026-09-02
 ---
 
 # ADR-0086: Runnerless Mac poll for stale-docs remediation
@@ -177,8 +177,12 @@ data loss. The reaper runs before the nightly `docfix-run` fire, so a recovered 
 **Fail-closed API probes (defects 5a/5b)** — both `bin/docfix-poll:265` and `bin/docfix-run:38-42`
 previously used `gh pr view … 2>/dev/null || true` or piped to `grep -q`, discarding `gh`'s exit status.
 An unreachable `api.github.com` was read as "no PR" — confirmed cause of the 2026-08-07 non-reap and a
-potential double-stack hazard in `bin/docfix-run`. Both sites now capture the `gh pr list` output into a
-variable and check its exit status; non-zero → skip with a logged "fail closed" message.
+potential double-stack hazard in `bin/docfix-run`.
+
+The two sites were repaired independently:
+
+- **`bin/docfix-poll` (defect 5a)** — fixed in this PR. The open-PR query now captures `gh pr list` output into a variable and checks its exit status; non-zero → skip with a logged "fail closed" message.
+- **`bin/docfix-run` (defect 5b)** — fixed upstream in PR #1861 (commit `c4d73e567`, merged 2026-09-01), before this branch was cut. That guard lives at `bin/docfix-run:50-55` and blocks the run only when `gh pr list` fails; it additionally narrows the check to PRs with `autoMergeRequest == null` (unarmed PRs only) — a narrower predicate than the "any open `docs-stale-refresh-*` PR" this plan originally described. The fail-closed-on-API-failure property is fully satisfied; the broader predicate was superseded upstream and was not re-implemented here.
 
 Additionally, `bin/docfix-poll`'s reap loop now classifies PR state by **liveness priority**
 (OPEN > MERGED > CLOSED) over a `--state all` query rather than `gh pr view`, so a branch carrying

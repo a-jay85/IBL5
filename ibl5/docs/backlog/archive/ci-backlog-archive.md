@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed/declined CI workflow simplification entries, extracted from ci-backlog.md.
-last_verified: 2026-08-08
+last_verified: 2026-09-02
 ---
 
 # CI Workflow Simplification Backlog — Archive
@@ -60,3 +60,13 @@ Read-only historical record of ✅ Implemented / 🚫 Declined findings. For OPE
 **Risk if untouched:** Any syntax or class-reference error in `ibl5/scripts/*.php` is invisible to CI. It surfaces only as a prod degradation (the exact bug class PR #1753 fixed).
 **Closes gap:** #1 (static-analysis half) from `$HOME/claude-plans/sim-recap-testing-gaps-breakdown.md`
 **Status (2026-08-05):** ✅ Implemented — PR #1759 (`phpstan-scripts-dir-coverage`): `scripts` dir added to `ibl5/phpstan.neon` `paths:`; phpstan baseline generated; ADR-0092→0093 docblock fix included.
+
+### 6.3 `SimRecapPayload` accepts `game_of_that_day < 1`; `SimSummaryRepository` silently drops those rows
+*(discovered 2026-07-31 during #1753)*
+**Location:** `ibl5/classes/SimRecap/SimRecapPayload.php` (`requireInt` with no lower bound on `game_of_that_day`); `ibl5/classes/SimRecap/SimSummaryRepository.php` (`COALESCE(bst.game_of_that_day, 0) = gr.game_of_that_day` silently drops rows where `game_of_that_day = 0`).
+**Problem:** The new `…MismatchDropped` test (PR #1753) pins the silent drop as *expected behavior*. The correct fix is an ingest-time lower-bound check so that `game_of_that_day < 1` is rejected at `SimRecapPayload::fromJson()`. An open design fork must be resolved first: **fail-closed vs. warn**, and what to do when box scores land *after* the recap.
+**Suggested direction:** Resolve the fail-closed-vs-warn fork (lean fail-closed with a structured error); add a `requireInt` lower bound; revisit `testFindDisplayableGameRecapsMismatchDropped` to test the rejection, not the silent drop. This item is the plan's own deferred "ingest-time reconciliation of `game_of_that_day`" Out-of-Scope item.
+**Risk if untouched:** `game_of_that_day = 0` silently drops recap rows; the test suite treats this as expected, so future regressions in this path pass CI green.
+**Closes gap:** #8 from `$HOME/claude-plans/sim-recap-testing-gaps-breakdown.md`
+**Tracked here** by PR #1753 audit origin, not by theme (no existing backlog covers payload-validation gaps).
+**Status (2026-08-08):** ✅ Implemented — PR #1800 (`game-of-that-day-validation-floor`): `requirePositiveInt()` helper added to `SimRecapPayload`; applied to `game_of_that_day`; 7 PHPUnit test methods (9 cases: rejection, error message, per-element index, boundary, over-rejection, int-type-before-range delegation order); design fork (fail-closed vs. warn) resolved fail-closed at DTO boundary; `SimSummaryRepository.php:392` left unchanged (fork B resolved by fork A). (#1800)

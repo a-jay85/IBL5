@@ -491,8 +491,9 @@ final class SimSummaryRepositoryTest extends DatabaseTestCase
 
     public function testFindDisplayableGameRecapsMismatchDropped(): void
     {
-        // A recap with game_of_that_day=0 (the old wrong value) must be dropped
-        // when the box score has game_of_that_day=1.
+        // Since payload validation now rejects game_of_that_day < 1 (B2), this scenario
+        // cannot arise via SimRecapPayload::fromJson(). This test pins the DB-level behavior:
+        // a recap stored with gotd=0 is correctly dropped by the display query.
         $game = $this->gameRecap(sortOrder: 0, gameOfThatDay: 0);
         $this->repo->markDone(999092, 'Intro.', 'Outro.', 'Recap.', [$game], null);
 

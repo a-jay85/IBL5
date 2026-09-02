@@ -64,15 +64,15 @@ final class Season2008Finals4Restore
      * [uuid, pos, name, pid, teamid, min, 2gm, 2ga, ftm, fta, 3gm, 3ga,
      *  orb, drb, ast, stl, tov, blk, pf]
      *
-     * uuid is '' — the column has DEFAULT (UUID()) so it auto-populates.
-     * name is pre-truncated to varchar(16). Non-ASCII bytes stored as-is
-     * (Windows-1252), matching what the live parser writes from .sco files.
+     * uuid placeholder is '' in the constant; insertPlayerRows() generates a real UUID4
+     * per row so the UNIQUE constraint is satisfied.
+     * name is pre-truncated to varchar(16), matching what the live parser writes.
      */
     private const PLAYER_ROWS = [
         // Knicks (visitor, teamid=3) — slots 0-11 (slots 12-13 empty/DNP)
         ['', 'PG', 'Immanuel Quickle',    4852,  3, 38,  6, 10,  2,  2,  4,  6,  0,  2,  5,  2,  4,  0,  1],
         ['', 'PG', 'Becky Hammon',        5648,  3, 13,  2,  3,  2,  2,  3,  5,  0,  1,  1,  0,  1,  1,  0],
-        ['', 'SG', "Dra\x9een Dalipagic", 5265,  3, 29,  6, 13,  0,  0,  1,  4,  2,  1,  2,  1,  2,  0,  3],
+        ['', 'SG', 'Drazen Dalipagic',   5265,  3, 29,  6, 13,  0,  0,  1,  4,  2,  1,  2,  1,  2,  0,  3],
         ['', 'SG', 'Tyreke Evans',        3855,  3, 37,  9, 19,  5,  6,  2,  4,  3,  3, 17,  1,  8,  0,  1],
         ['', 'SF', 'Curt Hennig',         5934,  3, 18,  4,  8,  0,  0,  0,  2,  1,  2,  1,  2,  1,  0,  5],
         ['', 'PF', 'Brandon Clarke',      6329,  3,  9,  1,  2,  0,  0,  0,  0,  0,  0,  1,  0,  0,  1,  2],
@@ -370,8 +370,10 @@ final class Season2008Finals4Restore
         }
 
         foreach (self::PLAYER_ROWS as $player) {
-            [$uuid, $pos, $name, $pid, $teamid, $min, $twoGm, $twoGa, $ftm, $fta,
+            [, $pos, $name, $pid, $teamid, $min, $twoGm, $twoGa, $ftm, $fta,
                 $threeGm, $threeGa, $orb, $drb, $ast, $stl, $tov, $blk, $pf] = $player;
+
+            $uuid = $this->generateUuid4();
 
             $values = [
                 self::GAME_DATE, $uuid, $name, $pos, $pid,
@@ -438,6 +440,18 @@ final class Season2008Finals4Restore
     }
 
     // ------------------------------------------------------------- plumbing
+
+    private function generateUuid4(): string
+    {
+        return sprintf(
+            '%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+            mt_rand(0, 0xffff), mt_rand(0, 0xffff),
+            mt_rand(0, 0xffff),
+            mt_rand(0, 0x0fff) | 0x4000,
+            mt_rand(0, 0x3fff) | 0x8000,
+            mt_rand(0, 0xffff), mt_rand(0, 0xffff), mt_rand(0, 0xffff)
+        );
+    }
 
     /**
      * bind_param() takes values by reference — a row from a class constant cannot

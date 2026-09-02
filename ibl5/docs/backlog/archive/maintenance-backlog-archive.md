@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed/declined maintenance-audit findings, extracted from maintenance-backlog.md.
-last_verified: 2026-08-31
+last_verified: 2026-09-01
 ---
 
 # Maintenance-Cost Reduction Backlog — Archive
@@ -2589,3 +2589,11 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Est. effort:** S
 **Risk if untouched:** Olympics player pages stay broken for every viewer, and #1825 cannot go green until the fix lands.
 **Status:** Completed (#2028) — `renderPage()` now catches the `RuntimeException` from the viewer-team lookup and renders no owner-action buttons when the viewer's team is absent from the active league context; the IBL path is unchanged. The tightened assertion in `ibl5/tests/e2e/smoke/olympics-pages.spec.ts` (`player page loads in Olympics context`, shipped in #1825) is the regression pin, and goes green with #2028 in the base. (discovered 2026-08-10 during #1825)
+
+### 9.28 Expected/Better-Than-Spec Outcomes in PR #1903 (F3 + F11)
+**Location:** `ibl5/uploadDraftClass.php` (PRG redirect), ship-pipeline (human-signoff hold)
+**Problem:** Phase 6 review noted two findings that looked like spec deviations but were actually improvements or expected behavior. F3: PRG carries `?imported=67` (the actual count) not `?imported=1`; plan spec said "?imported=1" but the actual import processes the full file. F11: row 27 (human-signoff hold) unchecked, expected when `auto_merge: false`.
+**Suggested direction:** No action — F3 deliberate improvement; F11 hold mechanism working as designed.
+**prevention_ladder:** no gate warranted — plan-vs-spec gaps of this type not automatable.
+**provenance:** (discovered 2026-09-01 during #1903)
+**Status:** 🚫 Declined — no action warranted.

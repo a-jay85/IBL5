@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-09-01
+last_verified: 2026-09-02
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -25,7 +25,7 @@ Effort scale:
 - **M** — multi-step plan, 1-3 days, may touch several modules
 - **L** — refactor or platform shift, > 3 days, likely needs ADR
 
-**Status:** Complete — 15-axis audit, 312 findings (+2 post-audit follow-ups from the PR #1107 review, +1 from the #1066 reject-IDOR review → 315 tracked; +11 Axis-1 size seeds 1.21–1.31 from the hot-files comment→backlog migration 2026-07-24 → 326 tracked; +5 Axis-1 size seeds 1.32–1.36 from the ground-truth audit 2026-07-24 → 331 tracked; +1 Axis-2 robustness item 2.39 discovered 2026-07-27 during trading-1-31-api-handler-extract → 332 tracked; +1 Axis-15 data-integrity item 15.24 discovered 2026-08-04 during the PR #1771 review → 333 tracked; +1 Axis-6 coverage item 6.23 discovered 2026-08-08 during the PR #1670 review → 334 tracked; +1 Axis-8 correctness item 8.18 discovered 2026-08-09 during the PR #1683 review → 335 tracked; +1 Axis-6 robustness item 6.24 discovered 2026-08-10 during #1825 → 336 tracked).
+**Status:** Complete — 15-axis audit, 312 findings (+2 post-audit follow-ups from the PR #1107 review, +1 from the #1066 reject-IDOR review → 315 tracked; +11 Axis-1 size seeds 1.21–1.31 from the hot-files comment→backlog migration 2026-07-24 → 326 tracked; +5 Axis-1 size seeds 1.32–1.36 from the ground-truth audit 2026-07-24 → 331 tracked; +1 Axis-2 robustness item 2.39 discovered 2026-07-27 during trading-1-31-api-handler-extract → 332 tracked; +1 Axis-15 data-integrity item 15.24 discovered 2026-08-04 during the PR #1771 review → 333 tracked; +1 Axis-6 coverage item 6.23 discovered 2026-08-08 during the PR #1670 review → 334 tracked; +1 Axis-8 correctness item 8.18 discovered 2026-08-09 during the PR #1683 review → 335 tracked; +1 Axis-6 robustness item 6.24 discovered 2026-08-10 during #1825 → 336 tracked; +1 Axis-6 coverage item 6.25 discovered 2026-09-01 during #1903 → 337 tracked; +1 Axis-9 process-observation item 9.28 discovered 2026-09-01 during #1903 → 338 tracked).
 
 ---
 
@@ -302,7 +302,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 ## Axis 6: Test Coverage Gaps
 
-**Summary:** 6 zero-test modules; 6 thin-test modules (>5 files, <3 tests); 4 large modules below 0.5 ratio; +2 post-audit E2E-coverage follow-ups (6.20, 6.21) from the PR #1107 review; +1 (6.23) from the #1670 ibl_events-enrichment review; +1 (6.25) carrying the Trading-reject residual split out of 6.22 when it resolved.
+**Summary:** 6 zero-test modules; 6 thin-test modules (>5 files, <3 tests); 4 large modules below 0.5 ratio; +2 post-audit E2E-coverage follow-ups (6.20, 6.21) from the PR #1107 review; +1 (6.23) from the #1670 ibl_events-enrichment review; +1 (6.25) carrying the Trading-reject residual split out of 6.22 when it resolved; +1 (6.26) from the #1903 draft-class-csv-uploader review.
 
 **Automouse audit (verified 2026-06-20):** Adding tests is inherently green-green (no production change) → every open coverage gap is 🟩 auto-mergeable. If writing a test surfaces a real bug, the *fix* becomes its own finding with its own classification. (Exceptions: **6.21** and **6.23** are 🟨, not 🟩 — in each the target code is unreachable from PHPUnit, so no test is writable until a production seam is decided: a teamless-fixture / non-`exit()` refactor for 6.21, a SAPI-independent hashing seam for 6.23.)
 
@@ -316,6 +316,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 6.21 | ⬜ Open | 🟨 | Row-12 (Free-Agents/teamless session) `processrookieoption` ownership-rejection path untested: PHPUnit entry-point test impossible (handler `exit()`s), E2E auth fixture always has a session team. Needs a teamless-fixture / non-`exit()` refactor decision before it's writable → 🟨. From PR #1107 Phase 5.0 note. |
 | 6.23 | ⬜ Open | 🟨 | **Same family as 6.22, different guard.** `RequestEventLoggingBootstrap::boot()` returns at line 35 when `\PHP_SAPI === 'cli'`, and PHPUnit is always CLI (DB group included), so the `hash('sha256', session_id())` derivation at lines 66–70 is unreachable from any PHPUnit test — the file's three existing tests are all `expectNotToPerformAssertions()` for exactly this reason. A regression storing the **raw** session id would break zero tests. Extract the derivation to a pure static (or inject the SAPI) so the PII boundary is unit-pinnable. 🟨: production change on a PII boundary; needs a seam decision. (discovered 2026-08-08 during #1670) |
 | 6.25 | ⬜ Open | 🟨 | **Residual of 6.22.** The verdict + thin-redirect-shim conversion landed for Waivers, FreeAgency, and the Trade API accept/decline controllers; `Trading\TradingController`'s reject path still gates inline and still ends in `HtmxHelper::redirect()→exit()`, so its "non-party refused + no mutation" property remains E2E-only. Apply the same pattern: move the authz decision into a verdict-returning method on the service that owns the mutation, leave the controller a shim. Verdict shape is now settled (`array{success: bool, error?: string}`), so the design fork 6.22 carried is closed. 🟨: production refactor on a security surface. Split out of 6.22 when it resolved. |
+| 6.26 | ⬜ Open | 🟩 | Plan-scope drift in #1903: `import-demands.php` + `csv-import.css` modified beyond plan's read-only scope; E2E `.csv-import` class assertion added this pass (F1 fixed). Secondary observation-only notes: `uploadDraftClass.php` JS picker (F2), preview chrome (F4), PR body omission (F8), matrix row 23 file mismatch (F9) — no gate warranted. (discovered 2026-09-01 during #1903) |
 
 ### 6.13 Player Module — Large + Subthreshold (69 prod / 31 test files, ~0.45 ratio)
 **Location:** `ibl5/classes/Player`
@@ -356,6 +357,15 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Est. effort:** S
 **Risk if untouched:** The `session_id` column is documented and reviewed as a non-replayable digest. If the derivation regresses to the raw token, every CI gate stays green and the failure is only visible by inspecting production rows — a PII exposure with no automated detector.
 **Status:** ⬜ Open — raised from the #1670 review (the plan listed the bootstrap test as `[modify]`; the item was not implementable as specified). 🟨 conditional: a production change on a PII boundary, gated on the seam decision above.
+
+### 6.26 Plan-Scope Drift: `import-demands.php` and `csv-import.css` Modified Beyond Declared Scope
+**Location:** `ibl5/import-demands.php`, `ibl5/design/components/csv-import.css` (renamed from `ibl5/design/components/import-demands.css` (example)) — PR #1903
+**Problem:** The Phase 6 plan-fidelity review found that the diff modified `import-demands.php` (updated stylesheet link and class names) and renamed `import-demands.css` → `csv-import.css`, both files marked "read-only reference" in the plan. No regression coverage existed before this pass to prove `import-demands.php` still renders correctly with the renamed stylesheet (F1). Secondary observation-only notes: `uploadDraftClass.php` uses a JS auto-submit picker rather than a plain `<button>` (F2, satisfies plan goal via `<noscript>` fallback); preview chrome includes extra elements and a scroll-indicator with one guarded null dereference (F4, inside the preview branch only, not a live crash); PR body Scope prose omits the CSS-rename half of the diff (F8, cleared by orchestrator body update); Verification Matrix row 23 names the wrong spec file for the 403 role-gating test (F9, documentation only).
+**Suggested direction:** F1 fixed this pass — E2E assertion added to `ibl5/tests/e2e/flows/import-demands-submission.spec.ts` verifying `.csv-import` class presence after page load. F2/F4/F8/F9 are observation notes requiring no corrective action.
+**Est. effort:** XS (F1 already fixed this pass)
+**Risk if untouched:** (F1 now covered by E2E pin) Secondary observations carry no live risk; the JS picker degrades gracefully via `<noscript>` fallback.
+**prevention_ladder:** no gate warranted — the plan's "read-only reference" designation is the human-readable fence; enforcement would require a hook that reads the plan text, which is not feasible.
+**provenance:** (discovered 2026-09-01 during #1903)
 
 ---
 
@@ -418,11 +428,13 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Automouse audit (verified 2026-06-20):** All open items here are docs-only → 🟩 auto-mergeable (a docs PR never trips the `feat:` human-signoff hold), except 9.26 which needs one upfront decision.
 
 > ✅ resolved (26): 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 9.9, 9.10, 9.11, 9.12, 9.13, 9.14, 9.15, 9.16, 9.17, 9.18, 9.19, 9.20, 9.21, 9.22, 9.23, 9.24, 9.25, 9.27 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> 🚫 declined (1): 9.28 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 9.4b | ⬜ Open | 🟩 | Full endpoint-by-endpoint OpenAPI reference for API_GUIDE.md (deferred from 9.4). Docs-only. |
 | 9.26 | ⬜ Open | 🟨 | No CHANGELOG — upfront decision: ADRs-as-substitute (document) vs post-plan-fed CHANGELOG tooling. |
+
 
 ### 9.4b API_GUIDE — Full Endpoint-by-Endpoint OpenAPI Reference (Deferred from 9.4)
 **Location:** `ibl5/docs/API_GUIDE.md`

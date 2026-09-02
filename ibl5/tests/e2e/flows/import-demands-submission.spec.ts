@@ -17,6 +17,7 @@ test.describe('import-demands.php — admin upload flow', () => {
     await expect(
       page.getByRole('button', { name: /import demands/i }),
     ).toBeVisible();
+    await expect(page.locator('.csv-import')).toBeAttached();
   });
 
   test('uploading a 2-row CSV truncates and reloads ibl_demands', async ({

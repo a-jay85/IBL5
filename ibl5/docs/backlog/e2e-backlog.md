@@ -1,6 +1,6 @@
 ---
 description: E2E (Playwright + api-e2e) test-quality backlog — refactoring, perf, weak/tautological assertions, tests that don't prove functionality, and flake-prone patterns, with per-entry status + automouse-readiness. Each open entry is a candidate for a /plan.
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # E2E Test-Quality Backlog
@@ -190,6 +190,7 @@ Green tests that don't guard the behavior they're named for. **Fix first.** D1/D
 | D15 | ⬜ | 🟨 | `role-gating-non-admin.spec.ts` Block F | self-labelled exploratory; 4 no-team-user tests assert only HTTP 200 + no PHP error. |
 | D16 | ⬜ | 🟨 | `depth-chart-entry-mobile.spec.ts` save-flow: positive success assertion (`.ibl-alert--success`) removed due to session-shared flash race; only non-error gate remains (discovered #1805) |
 
+
 **Suggested direction (axis):** Replace "accept-either-outcome" with "require the success signal **and** read
 back the mutated state" (DB read-back via test-state where available, or re-navigate and assert the changed
 value). For fake-POST tests (D7), assert the banner *after a real submit*, not after a query-param navigation.
@@ -223,6 +224,8 @@ value). For fake-POST tests (D7), assert the banner *after a real submit*, not a
 **artifact_destination:** n/a — no gate
 
 **provenance:** (discovered 2026-08-29 during #1805)
+
+➜ D17 PR #1903 extra coverage + intentional assertion relaxation (F6 + F7 + F10) — 🚫 Declined (2026-09-01): see [archive](archive/e2e-backlog-archive.md).
 
 ---
 

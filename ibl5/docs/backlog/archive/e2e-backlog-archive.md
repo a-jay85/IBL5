@@ -82,3 +82,25 @@ Read-only historical record of ✅ Implemented / 🚫 Declined findings. For OPE
 **Est. effort:** S per item.
 **Risk if untouched:** Tests give false green; broken features pass CI undetected.
 **Status (2026-08-08):** ✅ Implemented — each weak assertion replaced with a seed-grounded or element-scoped assertion, every one verified to fail when fed a wrong value. C17 remains ⬜ Open (out of scope). Bug finding: C7 player page (`smoke/olympics-pages.spec.ts:31`) — the tightened assertion red-flagged a real production bug: `PlayerPageController::renderPage()` resolved the viewer's team with an unguarded `Team::initialize()`, and `League\LeagueContext` rewrites `ibl_team_info` → `ibl_olympics_team_info`, which has no `Free Agents` row, so `Team::load()` threw and the page never rendered (the missing `ibl_olympics_plr` seed row, fixed here, was only what gives the assertion a name to match). Tracked as maintenance-backlog 6.24 and fixed in #2028; the assertion was kept failing, never relaxed, and goes green with #2028 in the base. Implementation notes: (1) C12 shipped the shared `assertColumnSorts` helper WITHOUT the exact-descending-sequence line `expect(after).toEqual([...before].sort().reverse())` — `sorttable.js` uses a diacritic-insensitive comparator that diverges from JS `.sort()`'s UTF-16 order on non-ASCII names (e.g. "Dariuš Lavrinovich"), producing false reds; the retained state assertions (`aria-sort`, `sorttable_sorted_reverse`, `#sorttable_sortrevind`) plus `after !== before` still discriminate; V36 is retired for that reason, not left unimplemented. (2) The plan's V40 completeness greps over-catch: the bare-return grep also matches the DON'T-12-compliant 401 branches at `api-e2e/api.test.ts` L45/L275, and the `if (ct.includes` grep matches three pre-existing, uncatalogued query-param-auth JSON guards at L423/438/450 — same Axis-C class, now tracked as C19 in e2e-backlog.md; both are documented knowns, not surviving escapes. (#1825)
+
+### D17 PR #1903 Extra Coverage and Intentional Assertion Relaxation (F6 + F7 + F10)
+
+**Location:** `ibl5/tests/e2e/flows/role-gating-non-admin.spec.ts` (F6), `ibl5/tests/DraftClassImport/DraftClassCsvParserTest.php` (F7), `ibl5/tests/e2e/flows/draft-class-upload.spec.ts` (F10)
+
+**class:** an E2E test assertion relaxed from the plan's stated value, or test rows added without a corresponding plan matrix entry.
+
+**occurrence table:**
+
+| # | File | Same class? | Live? | Status |
+|---|------|-------------|-------|--------|
+| 1 | `ibl5/tests/e2e/flows/role-gating-non-admin.spec.ts` — 8 extra lines for `uploadDraftClass.php returns 403` (F6) | yes — extra test row without plan matrix entry | yes | not fixed — note only |
+| 2 | `ibl5/tests/DraftClassImport/DraftClassCsvParserTest.php` — extra method `testSqlSafeColumnNamesNeverReachAnErrorMessage` (F7) | yes — extra test beyond plan's 19 required methods | yes | not fixed — note only |
+| 3 | `ibl5/tests/e2e/flows/draft-class-upload.spec.ts` — row 24 delete-count relaxed to `\d+` rather than plan's "6 deletions" (F10) | yes — assertion relaxed from plan's stated value | yes | not fixed — intentional; live `SELECT COUNT(*)` differs CI vs dev DB |
+
+**prevention_ladder:** no gate warranted — plan-vs-spec gaps in E2E coverage levels require human judgment; no machine gate can enforce "add coverage but not too much coverage".
+
+**artifact_destination:** n/a — no gate
+
+**provenance:** (discovered 2026-09-01 during #1903)
+
+**Status:** 🚫 Declined — F6/F7 are additive coverage; F10's relaxation is intentional and the 67-import count is still pinned.

@@ -1,6 +1,6 @@
 ---
 description: Development-efficiency backlog — inner-loop speed (diff-scoped analysis, parallel tests), CI caching, dependency-bump batching, and worktree lifecycle automation, with per-entry status.
-last_verified: 2026-09-01
+last_verified: 2026-09-02
 ---
 
 # Development-Efficiency Backlog
@@ -56,6 +56,7 @@ last_verified: 2026-09-01
 | E27 | `filterGitignored()` in `bin/check-docs`: orphaned docblock, unchecked proc exit, non-NUL-delimited check-ignore paths | ⬜ Open | 🟨 | S |
 | E28 | PR body hand-authored migration numbers not updated after a forced renumber | ⬜ Open | — | S |
 | E29 | Shell-harness cases pre-populate `$WORK` instead of driving invocation 1 | ✅ Implemented | — | S |
+| E30 | `bin/pr-ready-now` already-running skip only sees its own launchd jobs, so an interactive `/pr-ready` is invisible and both runs share PR-keyed `/tmp` scratch | ⬜ Open | 🟨 | S |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -407,3 +408,27 @@ Three defects in the `filterGitignored()` function added to `bin/check-docs` by 
 `artifact destination:` a new `.claude/rules/` doc on test-case design for multi-invocation scripts (not created this pass).
 
 *(discovered 2026-09-01 during #2050)*
+
+### E30 `bin/pr-ready-now` already-running skip only sees its own launchd jobs, so an interactive `/pr-ready` is invisible
+
+**class:** a concurrency guard whose liveness probe covers only the launcher's own spawn mechanism, while the guarded resource is keyed by a launcher-independent identifier. `bin/pr-ready-now:717-720` decides "already running" solely by matching `com.ibl5.pr-ready-now-<pr>` against a one-shot `launchctl list` snapshot, so a `/pr-ready` started interactively in another Claude session carries no launchd label and is never detected. The two runs then collide on shared state: `.claude/skills/pr-ready/SKILL.md:41` mandates scratch filenames keyed to the PR number and explicitly forbids `$$`, and `bin/pr-ready-now:246` (`--stop`) confirms the convention with `rm -f /tmp/pr-ready-*-"${PR}".*`. Two concurrent runs on one PR therefore overwrite each other's mid-phase scratch, and both push to the same branch.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/pr-ready-now:717-720` — `grep -qE "com\.ibl5\.pr-ready-now-${pr}$" <<< "$LAUNCHCTL_LIST"` is the whole liveness test | yes | yes — observed 2026-09-01: a peer session held an interactive `/pr-ready` on #1966 (PR-keyed `/tmp` scratch being written), and `bin/pr-ready-now` dry-run still listed #1966 as `WOULD FIRE` | not fixed — filed |
+| 2 | `bin/pr-ready-now:246` (`--stop`) — `rm -f /tmp/pr-ready-*-"${PR}".*` deletes by PR number, so `--stop` on a launchd job also wipes an unrelated interactive run's scratch | yes | yes — same root cause (PR-keyed state, launcher-scoped control) | not fixed — filed |
+
+Not a defect in the anchoring or the SIGPIPE handling: the `$`-anchor (guarding 1892-vs-189) and the snapshot-into-a-variable pattern are both correct and deliberately commented. The gap is scope of the probe, not its mechanics.
+
+**prevention_ladder:**
+
+- **rung 0 — already covered by an existing gate?** No. The launchd-label check is the only concurrency guard, and it is exactly the one that misses.
+- **rung 1 — extend an existing gate? Yes — landing rung.** Give `/pr-ready` a PR-keyed lock the skill itself takes at Phase 0 (a `/tmp/pr-ready-lock-<pr>` carrying the owning PID), and extend the existing skip in `bin/pr-ready-now:717-720` to consult it alongside the launchd snapshot. Same fail-closed shape already used by `_label_alive()`: a stale lock whose PID is dead must not block a fire, so only a confirmed-live PID skips. `--stop` (line 246) should likewise refuse to delete scratch it does not own. Meta-tooling-bar extend-before-add does not apply — this extends `bin/pr-ready-now`, adds no new gate, hook, or workflow.
+- **rung 2 — a rule doc?** Insufficient alone. The colliding party is a headless batch that no human is watching; a documented norm cannot be honoured by a launchd job.
+- **rungs 3–5** — N/A once rung 1 lands.
+
+`artifact destination:` `bin/pr-ready-now` (skip predicate + `--stop` ownership check), `.claude/skills/pr-ready/SKILL.md` (Phase 0 lock acquisition + release), and a case in `bin/test-pr-ready-now` that seeds a live-PID lock and asserts the PR is skipped.
+
+*(discovered 2026-09-01 while assessing en-masse `/pr-ready` readiness; not tied to a single PR)*

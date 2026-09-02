@@ -8,6 +8,7 @@
 # bin/pr-triage --arm. Its only write is a dated markdown file under $HOME.
 # Two invocations, because gate judgment is an INPUT to the sort:
 #   1. bin/pr-attack --gate-candidates          -> nominations + $WORK dir
+#      (no nominations => falls through to 2 automatically)
 #   2. bin/pr-attack --work <dir> [--gate-edge '#A>#B'...] -> ordered document
 # Exit codes: 0 = ok; 1 = usage / refused argument; 2 = unjudged gate
 # candidates and no --gate-edge/--gate-edges; 3 = stale $WORK (tip moved).
@@ -56,7 +57,9 @@ Usage: bin/pr-attack --gate-candidates
        bin/pr-attack --work <dir> [--gate-edge '#A>#B' ...] [--gate-edges <file>]
 
 Invocation 1 (--gate-candidates): fetch triage + PR metadata, emit gate
-  nominees, write $WORK dir. WORK=<dir> is the last line of stdout.
+  nominees, write $WORK dir. WORK=<dir> appears in stdout.
+  If there are NO gate nominees there is nothing to judge, so it falls
+  through to invocation 2 automatically and prints the ordered plan.
 Invocation 2 (--work <dir>): ingest gate-edge judgments, Kahn sort, emit
   the ordered plan to stdout and $HOME/IBL5-pr-attack-<date>.md.
 
@@ -66,7 +69,8 @@ Exit codes:
   0  ok
   1  usage / refused argument
   2  unjudged gate candidates and no --gate-edge/--gate-edges supplied
-  3  stale $WORK (tip moved); re-run --gate-candidates
+  3  stale $WORK (tip moved); re-run --gate-candidates. Reachable from
+     --gate-candidates too, via the fall-through.
 EOF
             exit 0 ;;
         *) echo "bin/pr-attack: unrecognized argument: $1" >&2; exit 1 ;;
@@ -153,6 +157,12 @@ gate_candidates() {
             print pr, "sign feat:", 1
         } else if (bucket=="UNCLEARED" || clearance=="UNKNOWN") {
             print pr, "manual test", 2
+        } else if (bucket=="NOT-MERGEABLE") {
+            # BEHIND/DRAFT/UNKNOWN merge state — GitHub will not merge it as-is, so
+            # it is NOT "—". Ranked last so a NOT-MERGEABLE PR that also carries a
+            # hold still reports the costlier human action above; rank 1 (peer of
+            # "sign feat:") because updating the branch is one mechanical step.
+            print pr, "update branch onto master", 1
         } else {
             print pr, "—", 0
         }
@@ -631,6 +641,15 @@ _build_doc() {
 # ============================================================
 if [ "$GATE_CANDIDATES" -eq 1 ]; then
     gate_candidates
+    # Fall-through: with no gate candidates there is nothing for a human to
+    # judge, so invocation 2 would demand no input. Emit the plan directly
+    # rather than forcing a round-trip (which also opens an exit-3 window).
+    if [ ! -s "$WORK/gate-candidates.tsv" ]; then
+        echo ""
+        echo "No gate candidates to judge — continuing to the ordered plan."
+        echo ""
+        emit_order
+    fi
 else
     emit_order
 fi

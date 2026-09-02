@@ -255,7 +255,7 @@ while IFS= read -r token; do
     # Known limit, shared with every cue above: a cue exempts EVERY token on its
     # line, not just the one it describes — no new hole class.
     if grep -F -- "$token" "$SCAN_FILE" \
-        | grep -qE '([Cc]reate|[Nn]ew file|[Aa]dd(s|ing)? (a )?new|[Ii]ntroduce|[Ss]caffold|[Ww]rite|\*\*[Nn][Ee][Ww]\*\*|\([Nn][Ee][Ww]\)|[-—] *NEW\b|\b[Mm]ov(e|ed|es|ing)\b|\b[Rr]ename(d|s|ing)?\b|\b[Rr]elocat(e|ed|es|ing)\b|→|[Rr]eject(ed)?|[Ff]ixture|throwaway|scratch|post-impl|\b[Dd]o(es)?(n.t| (\*\*)?not(\*\*)?) exist|[Nn]ever existed)'; then
+        | grep -qE '([Cc]reate|[Nn]ew file|[Aa]dd(s|ing)? (a )?new|[Ii]ntroduce|[Ss]caffold|[Ww]rite|\*\*[Nn][Ee][Ww]\*\*|\([Nn][Ee][Ww]\)|\(NEW |[-—] *NEW\b|\b[Mm]ov(e|ed|es|ing)\b|\b[Rr]ename(d|s|ing)?\b|\b[Rr]elocat(e|ed|es|ing)\b|→|[Rr]eject(ed)?|[Ff]ixture|throwaway|scratch|post-impl|\b[Dd]o(es)?(n.t| (\*\*)?not(\*\*)?) exist|[Nn]ever existed)'; then
         continue
     fi
 

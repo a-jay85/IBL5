@@ -67,6 +67,8 @@ last_verified: 2026-09-02
 | L38 | Headless CI watcher killed: `local_bash` not awaited by wind-down sweep — phantom success under `claude -p` | ✅ Shipped #2026 | 🟦 | S |
 | L39 | Autonomous PR body omits plan-deliverable moot-at-branch-cut explanation and asserts unchecked test coverage | ⬜ Open | 🟥 | S |
 | L40 | Compiled post-plan harness crashes on any PR containing a binary file (`git diff` decoded as strict UTF-8) | ⬜ Open | 🟥 | S |
+| L41 | Plan Verification Matrix rows can ship unrealised — nothing checks a plan's declared assertions against the tests actually delivered | ⬜ Open | 🟥 | S |
+| L42 | Autonomous-loop PR ships stale line citations, undeclared plan substitution, unmentioned diff file, and duplicate backlog ID | ⬜ Open | 🟦 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -383,6 +385,43 @@ Rung 1 does not require the `meta-tooling-bar.md` extend-before-add conditions (
 **provenance:** (discovered 2026-08-31 during #2046)
 
 ---
+### L41 Plan Verification Matrix rows can ship unrealised — nothing checks a plan's declared assertions against the tests actually delivered
+*(discovered 2026-08-25 during #1966)*
+
+**class:** a plan declares a per-row verification assertion in its Verification Matrix, the implementation delivers the *file* that row names but not the *assertion*, and no gate compares the two — so the plan reads as fully verified while a named assertion has zero footprint in the diff.
+
+**Location:** `.claude/skills/post-plan/SKILL.md` Phase 5.0 (declared-artifact conformance). It confirms every artifact the plan declared exists in the diff; it never reads the Verification Matrix's per-row assertion text.
+
+**Problem:** `~/claude-plans/plan-now-dup-guard.md` declared 19 CLI-executable matrix rows. Rows 10 and 12 named assertions that the delivered `bin/test-plan-now` did not contain — row 10 ("a custom `PLAN_NOW_DUP_CHECK` seam that exits 3 declines, and its marker reaches both stdout and the DM log") had no case at all, and row 12 ("benign re-queue emits no `automouse-queue FAILED` at **either** call site") was implemented for the normal path only, because `run_case_recovery` never forwarded `QUEUE_ALREADY` to the second call site at `bin/plan-now:583`. Both rows named `bin/test-plan-now`, which *is* in the diff, so Phase 5.0's artifact check passed on both. The suite was green throughout: a matrix row with no case cannot fail. This is the mirror image of [L36](#l36-post-plan-phase-3-writes-a-hardcoded-covered-by-unit-and-e2e-tests-clause-into-the-pr-body-without-checking-the-diff-contains-those-test-types) — there a *generated* coverage claim outran the diff; here a *hand-declared* one did.
+
+**Occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/test-plan-now` — Matrix row 10, live seam exits 3 | yes | yes | fixed this pass (pre-flight case 11b added) |
+| 2 | `bin/test-plan-now:242` — Matrix row 12, call site #2 (`bin/plan-now:583`) | yes | yes | fixed this pass (`run_case_recovery` forwards `QUEUE_ALREADY`; case 13b added) |
+| 3 | `bin/test-plan-now` case 13 — the plan's `want_no … "automouse-queue FAILED"` assertion omitted | yes | yes | fixed this pass |
+| 4 | `~/claude-plans/plan-now-dup-guard.md` Phase 6 item 5 (a genuinely new ancient-mtime plan lands last, both sort keys strictly newer) | near-miss | yes | not fixed — goal already met by pre-existing `bin/test-automouse-queue` rows 17/18, which still run; the substituted row 8d is additive |
+| 5 | `.claude/skills/post-plan/SKILL.md` Phase 5.0 (the gate itself) | yes | yes | not fixed — filed; ship-pipeline surface, wants a `/plan` |
+
+**prevention ladder:**
+- rung 0 — already covered? No. Phase 5.0 checks declared **artifacts**, not declared **assertions**; `bin/check-plan` validates the plan's own shape *before* implementation and never sees the diff.
+- rung 1 — extend an existing gate? **Yes — this is the landing rung.** Phase 5.0 already locates the plan and parses its declared-artifact list. Extending it to enumerate the Verification Matrix rows and require, per row, either a matching assertion string in the diff or an explicit waiver line in the PR body reuses that existing parse and the existing plan-lookup path.
+- rung 2 — a rule doc? Insufficient alone: `.claude/skills/plan/SKILL.md` already carries the "silence is not coverage" warning and this still shipped.
+- rung 3 — a PHPStan rule? N/A — the artifacts are Markdown and Bash.
+- rung 4 — a CI gate? Structurally ruled out: plans live at `~/claude-plans/<branch>.md`, **outside** the repo (ADR-0046 / `workflow-continuity.md`), so a CI runner cannot read the plan being conformed against. The check has to run where the plan is readable — the `/post-plan` session.
+- rung 5 — a new hook? Overkill, and it fails the first `.claude/rules/meta-tooling-bar.md` condition: there **is** a host to extend (Phase 5.0), so add-new is not warranted.
+
+**artifact destination:** `.claude/skills/post-plan/SKILL.md` Phase 5.0 (in-repo; appears in the PR diff). Not out-of-repo.
+
+**Suggested direction:** In Phase 5.0, after the artifact check, walk the Verification Matrix row by row and emit a `MATRIX-ROW UNREALISED: <row> — <assertion>` line for any row whose named assertion has no footprint in the diff. Report, do not block: some rows are legitimately satisfied by a pre-existing test (occurrence 4 above), so the output belongs in the PR body as a reviewer checklist rather than as a hard gate.
+
+**Risk if untouched:** A plan's matrix is the artifact reviewers trust when deciding a PR is verified. A row that was never implemented is indistinguishable from one that passes — both are silent — so the plan's own count of verification rows overstates the real coverage, and the specific assertion the planner thought worth naming is the one nobody runs.
+
+**Status (2026-08-25):** ⬜ Open — 🟥 (ship-pipeline surface: `.claude/skills/post-plan/SKILL.md`).
+
+---
+
 
 ### L40 Compiled post-plan harness crashes on any PR containing a binary file (`git diff` decoded as strict UTF-8)
 
@@ -439,6 +478,34 @@ not add backticks or markdown links to a row.
 ```
 
 ---
+
+
+---
+
+### L42 Autonomous-loop PR ships stale line citations, undeclared plan substitution, unmentioned diff file, and duplicate backlog ID
+
+*(discovered 2026-09-01 during #1966)*
+
+**class:** an autonomous-loop run authors or squash-rebases a PR body containing hand-written line citations, plan-substitution declarations, and a scope file list — none of which are re-validated after the commit history changes; and a sequential backlog ID is assigned without checking the preceding entry for duplication.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #1966 body — `bin/plan-now:449` (should be `:453`) and `bin/plan-now:583` (should be `:587`) post-rebase | yes | yes | fixed this pass (via `gh pr edit`) |
+| 2 | PR #1966 body — plan-item 5 substituted but PR body carries no substitution declaration | yes | yes | fixed this pass (via `gh pr edit`) |
+| 3 | PR #1966 body — `ibl5/docs/backlog/loop-engineering-backlog.md` modified in diff but absent from Scope section | yes | yes | fixed this pass (via `gh pr edit`) |
+| 4 | `ibl5/docs/backlog/loop-engineering-backlog.md` — second `L39` entry created without checking that `L39` already existed | yes | fixed this pass | fixed this pass |
+
+`prevention_ladder:`
+
+- **rung 0 — already covered by an existing gate?** No gate re-validates hand-authored PR body line citations against post-rebase line numbers, and no gate checks sequential backlog ID uniqueness.
+- **rung 1 — extend an existing gate?** **Yes — landing rung for the duplicate ID.** `bin/check-docs` already parses backlog tables; extending it to assert that each ID appears exactly once in its file's table is structurally the right host. Backlog-entry authoring (`_remediation.md`) should also instruct the author to grep for the proposed ID before writing. The PR-body citation gap is a harder problem (line numbers drift after rebase) and warrants a separate tracking note.
+- **rung 2 — a rule doc?** Augment `ibl5/docs/backlog/loop-engineering-backlog.md`'s authoring notes (or a shared backlog-authoring companion) to include "grep for the ID first" before assigning.
+- **rungs 3–5** — N/A. Line-number citations in free-form PR prose cannot be mechanically validated without reparsing the referenced file at the PR's HEAD.
+
+`artifact destination:` `bin/check-docs` unique-ID extension (in-repo; ship-pipeline surface — wants a `/plan`). Authoring note: wherever `_remediation.md` instructs backlog-entry creation.
+
 
 ## Burn-down process
 

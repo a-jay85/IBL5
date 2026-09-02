@@ -39,6 +39,16 @@ trap 'rm -rf "$TMP"' EXIT
 PLANS="$TMP/plans"
 mkdir -p "$PLANS"
 
+# Isolate the harness from the live automouse tree — the dup gate reads
+# $NIGHTLY_DIR, which without this would default to ~/.claude/…/automouse and
+# could trigger false-positive blocks or leave artifacts in the real queue.
+# Exporting both dirs ensures plan-dup-check (invoked by plan-now as a
+# subprocess) also uses the test trees rather than the defaults.
+NDIR="$TMP/automouse"
+mkdir -p "$NDIR/queue" "$NDIR/done" "$NDIR/skipped"
+export NIGHTLY_DIR="$NDIR"
+export PLANS_DIR="$PLANS"
+
 # `caffeinate` is macOS-only and the runner wraps the model call in it. Unshimmed,
 # this test cannot run on Linux CI: command-not-found → rc != 0 → every
 # identification case falls into the RESULT-failed branch and the marker contract
@@ -84,6 +94,7 @@ QUEUE_STUB="$TMP/automouse-queue"
 cat > "$QUEUE_STUB" <<'QUEUE_EOF'
 #!/usr/bin/env bash
 [ -n "${QUEUE_FAIL:-}" ] && { echo "automouse-queue (stub): refused $1" >&2; exit 1; }
+[ -n "${QUEUE_ALREADY:-}" ] && { printf 'Already queued (no change): %s\n' "$(basename "$1")"; exit 0; }
 printf 'automouse-queue (stub): queued %s\n' "$1"
 QUEUE_EOF
 chmod +x "$QUEUE_STUB"
@@ -175,7 +186,7 @@ run_case() {
     [ -x "$runner" ] || { printf 'could not get a runner out of plan-now:\n%s\n' "$dry"; return 1; }
     STUB_PLAN="$plan_path" STUB_TAIL="$tail_line" STUB_NO_PLAN="${STUB_NO_PLAN:-}" \
         STUB_PLAN_SRC="${STUB_PLAN_SRC:-}" STUB_RC="${STUB_RC:-0}" \
-        QUEUE_FAIL="${QUEUE_FAIL:-}" DM_FAIL="${DM_FAIL:-}" \
+        QUEUE_FAIL="${QUEUE_FAIL:-}" QUEUE_ALREADY="${QUEUE_ALREADY:-}" DM_FAIL="${DM_FAIL:-}" \
         bash "$runner" 2>&1
     rm -f "$runner"
 }
@@ -193,6 +204,18 @@ plans_reset() {
            exit 1 ;;
     esac
     rm -f "$PLANS"/*.md; rm -rf "$PLANS/.drafts"; mkdir -p "$PLANS/.drafts"
+}
+
+# Wipe only the automouse disposition dirs — not queue (which the pre-flight
+# cases explicitly populate to simulate existing artifacts). Guards against the
+# same path-safety hazard as plans_reset.
+ndir_reset() {
+    case "$NDIR" in
+        "$TMP"/*) ;;
+        *) echo "test-plan-now: refusing to wipe \$NDIR='$NDIR' — not under \$TMP" >&2
+           exit 1 ;;
+    esac
+    rm -f "$NDIR/queue"/*.md "$NDIR/done"/*.md "$NDIR/skipped"/*.md
 }
 
 # run_case_recovery <draft-src-or-empty> <draft-slug> [stale] → transcript
@@ -216,9 +239,32 @@ run_case_recovery() {
         STUB_NO_PLAN=1 STUB_TAIL="" bash "$runner" 2>&1
     else
         STUB_NO_PLAN=1 STUB_TAIL="" STUB_DRAFT="$draft" STUB_DRAFT_SRC="$src" \
-            QUEUE_FAIL="${QUEUE_FAIL:-}" bash "$runner" 2>&1
+            QUEUE_FAIL="${QUEUE_FAIL:-}" QUEUE_ALREADY="${QUEUE_ALREADY:-}" bash "$runner" 2>&1
     fi
     rm -f "$runner"
+}
+
+# Remove any plist/runner that PLAN_NOW_DRY_RUN=1 wrote but the test did not
+# execute (e.g., the dup gate declined before the runner was launched). Without
+# this, declined pre-flight cases leave RunAtLoad plists in ~/Library/LaunchAgents
+# pointing at deleted /tmp runners. $1 is the captured stdout from plan-now.
+preflight_cleanup() {
+    rm -f "$(printf '%s\n' "$1" | sed -n 's/^  plist:  //p')" \
+          "$(printf '%s\n' "$1" | sed -n 's/^  runner: //p')"
+}
+
+# run_preflight <prompt-file> [--queue|--implement] [--no-dm]
+# Fires plan-now under DRY_RUN=1 with the dup-gate seam active and captures
+# exit code (PRE_RC) + stdout+stderr (PRE_OUT). Does NOT reset NDIR — case
+# bodies carry explicit touch/ndir_reset calls so the artifact state is clear.
+run_preflight() {
+    local f="$1"; shift
+    : > "$DM_LOG"
+    PRE_RC=0
+    PRE_OUT=$(PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" PLAN_NOW_DRY_RUN=1 \
+        PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+        "$PLAN_NOW" "$@" "$f" 2>&1) || PRE_RC=$?
+    preflight_cleanup "$PRE_OUT"
 }
 
 # run_case_recovery_plan <prompt> <src1> <name1> [<src2> <name2>] → transcript
@@ -577,6 +623,181 @@ prompt2=$(printf '%s\n' "$dry2" | sed -n 's/^  prompt: //p')
 [ -n "$prompt2" ] || fail "second DRY_RUN produced no prompt: line — extraction failed"
 [ "$prompt1" != "$prompt2" ] \
     || fail "both DRY_RUN invocations produced identical prompt paths — TS collision: $prompt1"
+
+echo "── pre-flight duplicate gate ──"
+
+# Start from a clean slate.  The DM section may have left plan files in $PLANS
+# (e.g., STUB_PLAN_SRC cases write to $P = $PLANS/demo-slug.md).  With
+# PLANS_DIR exported, plan-dup-check now checks $PLANS as well as $NDIR, so
+# any leftover file there would cause false-positive declines in cases below.
+ndir_reset
+rm -f "$PLANS"/*.md
+
+# Pre-flight cases share two prompts:
+#   $RECOVERY_PROMPT  — slug = "demo-slug" (triggers the gate on any artifact match)
+#   $NOSLUG_PROMPT    — no slug line (gate always passes; this is the COMMON shape)
+# PRE_RC / PRE_OUT are set by run_preflight; the artifact that plan-now writes
+# under DRY_RUN=1 is cleaned up by run_preflight via preflight_cleanup.
+
+# 1. Incident replay: a queue artifact already exists → gate declines (exit 3),
+#    output names the artifact path and the recovery command.
+touch "$NDIR/queue/demo-slug.md"
+run_preflight "$RECOVERY_PROMPT" --queue
+[ "$PRE_RC" = 3 ] && ok "incident replay: exits 3" || fail "incident replay: exits 3 (got $PRE_RC)"
+want "incident replay: output names queue path"      "$PRE_OUT" "$NDIR/queue/demo-slug.md"
+want "incident replay: output names recovery command" "$PRE_OUT" "bin/automouse/queue remove demo-slug"
+want_no "incident replay: runner not written on decline" "$PRE_OUT" "runner:"
+
+# 2. No false positive — empty NDIR, no matching plan file → gate passes → plan-now
+#    proceeds and writes a runner.
+ndir_reset
+run_preflight "$RECOVERY_PROMPT" --queue
+[ "$PRE_RC" = 0 ] && ok "no false positive: exits 0" || fail "no false positive: exits 0 (got $PRE_RC)"
+want "no false positive: runner is written" "$PRE_OUT" "runner:"
+
+# 3. No slug in prompt → gate is skipped even when artifacts exist → proceeds.
+touch "$NDIR/queue/demo-slug.md"
+run_preflight "$NOSLUG_PROMPT" --queue
+[ "$PRE_RC" = 0 ] && ok "no-slug: exits 0 (no false positive)" || fail "no-slug: exits 0 (got $PRE_RC)"
+want "no-slug: runner is written" "$PRE_OUT" "runner:"
+
+# 4. --implement disposition → gate is skipped entirely → proceeds (artifact irrelevant).
+run_preflight "$RECOVERY_PROMPT" --implement
+[ "$PRE_RC" = 0 ] && ok "--implement: gate skipped, exits 0" || fail "--implement: gate skipped (got $PRE_RC)"
+want "--implement: runner is written" "$PRE_OUT" "runner:"
+ndir_reset
+
+# 5. Plans-file signal: a matching .md already in $PLANS → gate declines (exit 3).
+touch "$PLANS/demo-slug.md"
+run_preflight "$RECOVERY_PROMPT" --queue
+[ "$PRE_RC" = 3 ] && ok "plans-file signal: exits 3" || fail "plans-file signal: exits 3 (got $PRE_RC)"
+want "plans-file signal: names the plan path" "$PRE_OUT" "$PLANS/demo-slug.md"
+rm -f "$PLANS/demo-slug.md"
+
+# 6. done/ signal: an already-implemented artifact → gate declines.
+touch "$NDIR/done/demo-slug.md"
+run_preflight "$RECOVERY_PROMPT" --queue
+[ "$PRE_RC" = 3 ] && ok "done/ signal: exits 3" || fail "done/ signal: exits 3 (got $PRE_RC)"
+want "done/ signal: names the done path" "$PRE_OUT" "$NDIR/done/demo-slug.md"
+ndir_reset
+
+# 7. skipped/ signal: a previously-skipped artifact → gate declines.
+touch "$NDIR/skipped/demo-slug.md"
+run_preflight "$RECOVERY_PROMPT" --queue
+[ "$PRE_RC" = 3 ] && ok "skipped/ signal: exits 3" || fail "skipped/ signal: exits 3 (got $PRE_RC)"
+want "skipped/ signal: names the skipped path" "$PRE_OUT" "$NDIR/skipped/demo-slug.md"
+ndir_reset
+
+# 8. --no-dm suppresses the DM but still declines (exit 3); positive branch
+#    confirms the DM IS sent without --no-dm.
+touch "$NDIR/queue/demo-slug.md"
+DM_BEFORE=$(wc -l < "$DM_ALL")
+run_preflight "$RECOVERY_PROMPT" --queue --no-dm
+[ "$PRE_RC" = 3 ] && ok "--no-dm: still declines (exit 3)" || fail "--no-dm: still declines (exit 3) (got $PRE_RC)"
+DM_AFTER=$(wc -l < "$DM_ALL")
+[ "$DM_AFTER" = "$DM_BEFORE" ] && ok "--no-dm: DM stub got no new line" || fail "--no-dm: DM stub got no new line"
+run_preflight "$RECOVERY_PROMPT" --queue
+want "--dm: DM contains queue artifact path" "$(dm_all)" "$NDIR/queue/demo-slug.md"
+ndir_reset
+
+# 9. PLAN_NOW_DUP_CHECK unset → plan-now falls back to the real repo script.
+#    The real script reads $NIGHTLY_DIR (exported) and $PLANS_DIR (exported), so
+#    it uses the test trees and declines exactly as the stub would.
+touch "$NDIR/queue/demo-slug.md"
+PRE_RC2=0
+PRE_OUT2=$(unset PLAN_NOW_DUP_CHECK; PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" \
+    PLAN_NOW_DRY_RUN=1 PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+    "$PLAN_NOW" --queue "$RECOVERY_PROMPT" 2>&1) || PRE_RC2=$?
+[ "$PRE_RC2" = 3 ] && ok "DUP_CHECK unset: repo script declines" || fail "DUP_CHECK unset: repo script declines (got $PRE_RC2)"
+want "DUP_CHECK unset: repo script names queue path" "$PRE_OUT2" "$NDIR/queue/demo-slug.md"
+preflight_cleanup "$PRE_OUT2"
+ndir_reset
+
+# 10. PLAN_NOW_DUP_CHECK set to empty → same as unset; $() falls back to repo script.
+touch "$NDIR/queue/demo-slug.md"
+PRE_RC3=0
+PRE_OUT3=$(PLAN_NOW_DUP_CHECK='' PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" \
+    PLAN_NOW_DRY_RUN=1 PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+    "$PLAN_NOW" --queue "$RECOVERY_PROMPT" 2>&1) || PRE_RC3=$?
+[ "$PRE_RC3" = 3 ] && ok "DUP_CHECK empty: repo script declines" || fail "DUP_CHECK empty: repo script declines (got $PRE_RC3)"
+want "DUP_CHECK empty: repo script names queue path" "$PRE_OUT3" "$NDIR/queue/demo-slug.md"
+preflight_cleanup "$PRE_OUT3"
+ndir_reset
+
+# 11. Broken seam (DUP_CHECK not executable) → gate is skipped, plan-now proceeds.
+#     A stale/misconfigured path should never block a plan run.
+DUP_STUB="$TMP/broken-dup-check"
+printf '#!/usr/bin/env bash\nexit 3\n' > "$DUP_STUB"
+# Deliberately NOT chmod +x — non-executable, so plan-now's `[ -x ... ]` skips it.
+touch "$NDIR/queue/demo-slug.md"
+PRE_RC4=0
+PRE_OUT4=$(PLAN_NOW_DUP_CHECK="$DUP_STUB" PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" \
+    PLAN_NOW_DRY_RUN=1 PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+    "$PLAN_NOW" --queue "$RECOVERY_PROMPT" 2>&1) || PRE_RC4=$?
+[ "$PRE_RC4" = 0 ] && ok "broken seam: gate skipped, exits 0" || fail "broken seam: gate skipped (got $PRE_RC4)"
+want "broken seam: runner is written" "$PRE_OUT4" "runner:"
+preflight_cleanup "$PRE_OUT4"
+ndir_reset
+
+# 11b. Live seam that declines — the mirror of case 11. An EXECUTABLE stub that
+#      prints a marker and exits 3 must be honoured end to end: plan-now exits 3,
+#      echoes the stub's own output, and forwards it into the DM. Case 11 covers
+#      the skip path and case 12 the proceed path; without this one nothing proves
+#      a custom PLAN_NOW_DUP_CHECK can decline at all.
+DUP_LIVE="$TMP/live-dup-check"
+printf '#!/usr/bin/env bash\necho "SEAM-MARKER-11B: duplicate"\nexit 3\n' > "$DUP_LIVE"
+chmod +x "$DUP_LIVE"
+: > "$DM_LOG"
+PRE_RC6=0
+PRE_OUT6=$(PLAN_NOW_DUP_CHECK="$DUP_LIVE" PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" \
+    PLAN_NOW_DRY_RUN=1 PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+    "$PLAN_NOW" --queue "$RECOVERY_PROMPT" 2>&1) || PRE_RC6=$?
+[ "$PRE_RC6" = 3 ] && ok "live seam: declines with exit 3" || fail "live seam: declines with exit 3 (got $PRE_RC6)"
+want "live seam: the stub's marker reaches stdout" "$PRE_OUT6" "SEAM-MARKER-11B"
+want "live seam: the decline line is printed"      "$PRE_OUT6" "declined before spending a model run"
+want "live seam: the marker reaches the DM"        "$(dm)" "SEAM-MARKER-11B"
+want "live seam: the DM says DECLINED"             "$(dm)" "plan-now DECLINED"
+want_no "live seam: no runner is ever written"     "$PRE_OUT6" "runner:"
+preflight_cleanup "$PRE_OUT6"
+ndir_reset
+
+# 12. Non-3 exit from DUP_CHECK (e.g. exit 2 = usage error) → plan-now prints a
+#     warning and proceeds; a usage error in the gate should not block a plan run.
+DUP_WARN="$TMP/warn-dup-check"
+printf '#!/usr/bin/env bash\necho "dup-check: bad args" >&2; exit 2\n' > "$DUP_WARN"
+chmod +x "$DUP_WARN"
+touch "$NDIR/queue/demo-slug.md"
+PRE_RC5=0
+PRE_OUT5=$(PLAN_NOW_DUP_CHECK="$DUP_WARN" PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" \
+    PLAN_NOW_DRY_RUN=1 PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+    "$PLAN_NOW" --queue "$RECOVERY_PROMPT" 2>&1) || PRE_RC5=$?
+[ "$PRE_RC5" = 0 ] && ok "non-3 exit: warning printed, proceeds" || fail "non-3 exit: warning printed, proceeds (got $PRE_RC5)"
+want "non-3 exit: runner is written" "$PRE_OUT5" "runner:"
+want "non-3 exit: warning names the proceed decision" "$PRE_OUT5" "proceeding"
+preflight_cleanup "$PRE_OUT5"
+ndir_reset
+
+# 13. Benign re-queue at call site #1, the normal verdict path — the queue stub
+#     returns "Already queued (no change)" (QUEUE_ALREADY=1). The run should
+#     succeed (exit 0), carry the idempotent message, and — the whole point of
+#     the change — never reach the `automouse-queue FAILED` else-branch.
+out=$(DISP=--queue STUB_PLAN_SRC="$GOOD_PLAN" QUEUE_ALREADY=1 run_case "$P" "PLAN_FILE: $P")
+want "benign re-queue: exit 0 with idempotent message" "$out" "Already queued (no change)"
+want "benign re-queue: verdict is ok" "$out" "RESULT ok"
+want "benign re-queue: still reports a queue" "$(dm)" "queued for automouse"
+want_no "benign re-queue: no false failure in the log" "$out" "automouse-queue FAILED"
+want_no "benign re-queue: no false failure in the DM"  "$(dm)" "automouse-queue FAILED"
+
+# 13b. The same benign re-queue at call site #2, the recovery path. It has its
+#      own queue call, its own else-branch and its own verdict string, so case 13
+#      says nothing about it — without this the recovery arm could still emit the
+#      false "automouse-queue FAILED".
+out=$(DISP=--queue QUEUE_ALREADY=1 run_case_recovery "$GOOD_DRAFT" demo-slug)
+want "benign re-queue (recovery): idempotent message survives" "$out" "Already queued (no change)"
+want "benign re-queue (recovery): keeps the recovery verdict" "$(dm)" \
+     "RESULT degraded (recovered) — check-plan PASSED"
+want "benign re-queue (recovery): says it queued" "$(dm)" "queued for automouse"
+want_no "benign re-queue (recovery): no false failure verdict" "$(dm)" "automouse-queue FAILED"
 
 echo "── the coda still tells the model where to put it ──"
 

@@ -287,8 +287,20 @@ fi
 
 FILENAME=$(basename "$SOURCE")
 
-if [ -e "$QUEUE_DIR/$FILENAME" ]; then
-    echo "Error: $FILENAME is already queued." >&2
+if [ -e "$QUEUE_DIR/$FILENAME" ] || [ -L "$QUEUE_DIR/$FILENAME" ]; then
+    EXISTING=$(readlink "$QUEUE_DIR/$FILENAME" 2>/dev/null || true)
+    EXISTING_PHYS=""
+    if [ -n "$EXISTING" ] && [ -e "$EXISTING" ]; then
+        EXISTING_PHYS=$( (cd "$(dirname "$EXISTING")" && printf '%s/%s' "$(pwd)" "$(basename "$EXISTING")") 2>/dev/null || true )
+    fi
+    if [ "$EXISTING" = "$SOURCE" ] || [ "$EXISTING_PHYS" = "$SOURCE" ]; then
+        echo "Already queued (no change): $FILENAME"
+        show_queue
+        exit 0
+    fi
+    echo "Error: $FILENAME is already queued, pointing at a different plan:" >&2
+    echo "  queued: ${EXISTING:-<not a symlink, or dangling>}" >&2
+    echo "  new:    $SOURCE" >&2
     exit 1
 fi
 

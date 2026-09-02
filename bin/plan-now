@@ -11,6 +11,10 @@
 #   bin/plan-now --queue <prompt-file>      # explicit form of the default
 #   bin/plan-now --model opus <prompt-file> # orchestrator model (default claude-sonnet-4-6)
 #   bin/plan-now --no-dm <prompt-file>      # ... and skip the finish DM
+#   Pre-flight duplicate gate (--queue only): if the prompt's branch slug already has a
+#   planning artifact on disk (queue, plans dir, done, or skipped), plan-now declines
+#   before spending a model run and exits 3. --implement always bypasses the gate.
+#   Exit codes: 0 ok, 1 internal error, 2 bad flag or missing file, 3 declined by gate.
 # ---
 # EVERY terminal outcome DMs you through bin/discord-dm — icon, verdict, elapsed,
 # what to do next, the plan path and the log path — so learning that a run
@@ -126,6 +130,30 @@ ROOT=$(git rev-parse --show-toplevel 2>/dev/null) \
 # (workflow-continuity.md), same shape as bug-pipeline-tick's BUG_PIPELINE_PLANS_DIR.
 PLANS_DIR="${PLAN_NOW_PLANS_DIR:-$HOME/claude-plans}"
 mkdir -p "$PLANS_DIR"
+
+# --- pre-flight duplicate gate (--queue only; --implement always proceeds) ---
+if [ "$DISPOSITION" = "queue" ] && [ -n "$PROMPT_SRC" ] && [ -f "$PROMPT_SRC" ]; then
+    DUP_CHECK="${PLAN_NOW_DUP_CHECK:-$ROOT/bin/plan-dup-check}"
+    if [ -x "$DUP_CHECK" ]; then
+        DUP_RC=0
+        DUP_OUT=$(PLANS_DIR="$PLANS_DIR" "$DUP_CHECK" "$PROMPT_SRC" 2>&1) || DUP_RC=$?
+        if [ "$DUP_RC" = 3 ]; then
+            echo "$DUP_OUT"
+            echo "plan-now: declined before spending a model run (exit 3)."
+            if [ "$NOTIFY" = 1 ]; then
+                DISCORD_DM="${PLAN_NOW_DISCORD_DM:-$ROOT/bin/discord-dm}"
+                if [ -x "$DISCORD_DM" ]; then
+                    printf '%s\n%s\n' "**plan-now DECLINED — duplicate**" "$DUP_OUT" \
+                        | "$DISCORD_DM" - || true
+                fi
+            fi
+            exit 3
+        elif [ "$DUP_RC" != 0 ]; then
+            echo "plan-now: dup-check exited $DUP_RC (not a decline) — proceeding." >&2
+            [ -z "$DUP_OUT" ] || echo "$DUP_OUT" >&2
+        fi
+    fi
+fi
 
 TS=$(date +%Y%m%d-%H%M%S)-$$
 LABEL="com.ibl5.plan-now-$TS"

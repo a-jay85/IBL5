@@ -14,11 +14,21 @@ A holistic audit found the production DB password (already rotated by the mainta
 
 ## Decision
 
-1. **Secrets must never be committed.** A `gitleaks` workflow (`.github/workflows/gitleaks.yml`, `gitleaks/gitleaks-action@v3`) runs on every `pull_request` (diff range) and on `push` to `master` (full history via `fetch-depth: 0`). Branch protection should require the `gitleaks` check. False positives are suppressed only via explicit, commented entries in `.gitleaks.toml` at the repo root.
+1. **Secrets must never be committed.** A `gitleaks` workflow (`.github/workflows/gitleaks.yml`, `gitleaks/gitleaks-action@v2`) runs on every `pull_request` (diff range) and on `push` to `master` (full history via `fetch-depth: 0`). Branch protection should require the `gitleaks` check. False positives are suppressed only via explicit, commented entries in `.gitleaks.toml` at the repo root.
 
 2. **Rotation is the remediation for any leak — never `.gitignore`.** When the gate fires, the credential is rotated and scrubbed from HEAD. Git-history rewrite is out of scope (disruptive; rotation already mitigates), so the already-leaked-and-rotated literal is allowlisted in `.gitleaks.toml` rather than purged from history.
 
 3. **`config.php` stays untracked, and demo login fails closed.** `Auth\DemoLoginGate` resolves the expected token from the `DEMO_LOGIN_TOKEN` env var first, falling back to the constant. Demo login is disabled (HTTP 403, no session) whenever the resolved token is empty or equals the weak `'demo'` literal — even if a stale `config.php` still defines it. A wrong-but-well-formed token keeps the endpoint's prior 404 obscurity.
+
+## Addendum — action version (2026-09-02)
+
+The Decision above records `gitleaks/gitleaks-action@v2`, which is what was adopted on
+2026-05-28. The workflow has since been upgraded to v3 and is now pinned by digest
+(`gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0` in
+`.github/workflows/gitleaks.yml`). The decision itself — that a gitleaks gate runs on every PR
+and on pushes to `master`, with suppressions only via commented `.gitleaks.toml` entries — is
+unchanged; only the action major version moved. The v2 reference is left in place deliberately
+as the historical record of what was decided.
 
 ## Alternatives Considered
 

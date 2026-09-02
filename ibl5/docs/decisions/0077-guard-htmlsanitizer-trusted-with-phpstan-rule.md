@@ -24,10 +24,18 @@ XSS guarantee just broke (maintenance-backlog finding 10.10).
 Add `RequireTrustedAnnotationRule`, firing identifier `ibl.trustedVariable`, when the first
 argument to `HtmlSanitizer::trusted()` / `Security\HtmlSanitizer::trusted()` is not a
 string/numeric literal, an `(int)`/`(float)`/`(bool)` cast, or a `$this->...()` method call.
-Existing firing sites (17 call sites across 16 files) are captured in
+Existing firing sites (147 call sites across 16 files) are captured in
 `ibl5/phpstan-baseline.neon` with zero code churn. A genuinely-safe new site is acknowledged
 with a native `// @phpstan-ignore ibl.trustedVariable` comment plus a justifying note, not a
 bespoke marker.
+
+## Addendum — baseline size (2026-09-02)
+
+The 147-call-sites-across-16-files figure in the Decision is the baseline as captured on
+2026-07-03, when this ADR was written, and is left as the historical snapshot. The baseline has
+shrunk since as call sites were refactored to safe forms: as of 2026-09-02 `ibl5/phpstan-baseline.neon`
+holds 134 `ibl.trustedVariable` sites across 17 files. The count is expected to keep drifting
+downward and is not a figure this ADR undertakes to track.
 
 ## Alternatives Considered
 

@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+# plan-dup-check — pre-flight duplicate detector for bin/plan-now.
+#
+# Reads a /plan prompt file, derives the candidate branch slug from its
+# "## Sequencing" section, and reports whether a planning artifact for that
+# slug already exists on disk. Detection only: no DM, no writes, no deletes.
+#
+# Usage: plan-dup-check <prompt-file>
+#   exit 0 — no duplicate signal (or no slug derivable); caller should proceed
+#   exit 2 — usage error
+#   exit 3 — duplicate found; the decline message is on stdout
+set -euo pipefail
+
+PROMPT="${1:-}"
+if [ -z "$PROMPT" ] || [ ! -f "$PROMPT" ]; then
+    echo "plan-dup-check: usage: plan-dup-check <prompt-file>" >&2
+    exit 2
+fi
+
+: "${NIGHTLY_DIR:=$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse}"
+: "${PLANS_DIR:=$HOME/claude-plans}"
+
+# Kept deliberately identical to run_slug() in the generated runner heredoc
+# inside bin/plan-now (search: "run_slug()"). If one changes, change both.
+# shellcheck disable=SC2016  # backticks in single-quote patterns are literal, not expansions
+SLUG=$(grep -ioE 'branch slug[^`]{0,24}`[^`]+`' "$PROMPT" 2>/dev/null | head -1 \
+    | grep -oE '`[^`]+`' | head -1 | tr -d '`' || true)
+
+# No slug derivable -> never block. A false positive here is the expensive one.
+[ -n "$SLUG" ] || exit 0
+
+decline() {  # $1=label $2=artifact path $3=recovery command
+    printf 'plan-now declined: a planning artifact for "%s" already exists.\n' "$SLUG"
+    printf '  %s: %s\n' "$1" "$2"
+    printf '  Recovery: %s\n' "$3"
+}
+
+exists() { [ -e "$1" ] || [ -L "$1" ]; }   # -L so a dangling symlink still counts
+
+if exists "$NIGHTLY_DIR/queue/$SLUG.md"; then
+    decline "Queued for automouse" "$NIGHTLY_DIR/queue/$SLUG.md" \
+        "bin/automouse/queue remove $SLUG"
+    exit 3
+fi
+if exists "$PLANS_DIR/$SLUG.md"; then
+    decline "Plan file on disk" "$PLANS_DIR/$SLUG.md" \
+        "rm $PLANS_DIR/$SLUG.md   # or queue the existing plan: bin/automouse/queue $PLANS_DIR/$SLUG.md"
+    exit 3
+fi
+if exists "$NIGHTLY_DIR/done/$SLUG.md"; then
+    decline "Already implemented" "$NIGHTLY_DIR/done/$SLUG.md" \
+        "rm $NIGHTLY_DIR/done/$SLUG.md   # then re-run plan-now"
+    exit 3
+fi
+if exists "$NIGHTLY_DIR/skipped/$SLUG.md"; then
+    decline "Previously skipped" "$NIGHTLY_DIR/skipped/$SLUG.md" \
+        "rm $NIGHTLY_DIR/skipped/$SLUG.md   # then re-run plan-now"
+    exit 3
+fi
+
+exit 0

@@ -57,6 +57,10 @@ last_verified: 2026-09-02
 | E28 | PR body hand-authored migration numbers not updated after a forced renumber | ⬜ Open | — | S |
 | E29 | Shell-harness cases pre-populate `$WORK` instead of driving invocation 1 | ✅ Implemented | — | S |
 | E30 | `bin/pr-ready-now` already-running skip only sees its own launchd jobs, so an interactive `/pr-ready` is invisible and both runs share PR-keyed `/tmp` scratch | ⬜ Open | 🟨 | S |
+| E31 | `bin/plan-now` help span truncated by bare `#`; test assertions miss declared secondary-behaviour tokens | ⬜ Open | 🟦 | S |
+| E32 | Phase 6 review notes on PR #1861 — minor plan-vs-implementation drifts and in-flight artifacts on a long-lived branch, all non-blocking | ⬜ Open | — | S |
+| E33 | Phase 6 review notes on PR #1815 — F1/F2 blocking (body inaccuracy, backlog 6.24 collision); F3–F7 notes (reflection test, coercion guards, smoke narrative, last_verified); F1/F2/F5 remediated in Phase 6.5 | ⬜ Open | — | S |
+| E34 | Auto-generated `codebase-map.md` row added in #1903 — mechanical output of `bin/generate-codebase-map`, no defect | 🚫 Declined | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -375,6 +379,7 @@ Three defects in the `filterGitignored()` function added to `bin/check-docs` by 
 |---|-----------|-------------|-------|--------|
 | 1 | `#2022` PR body — "**169** (DDL)" / "**170** (PHP)" / "After CI deploys migration **170**" contradicted the shipped 170/171 pair | yes | fixed this pass | fixed this pass |
 | 2 | Other PRs with migration pairs (generic) | near-miss — only arises on a forced renumber mid-implementation | N/A | not fixed — filed |
+| 3 | `#1861` PR body — "Add ADR-0102" contradicted actual ADR-0104 (renumber from 0100 while PR sat open 19 days) | yes | fixed this pass | fixed this pass |
 
 **prevention_ladder:**
 - rung 0 — already covered by an existing gate? **LANDS HERE.** `/pr-ready` Phase 6 check 4 ("PR body vs. diff") is designed to catch exactly this mismatch — it fired correctly on PR #2022 and blocked the verdict until the body was corrected. No additional gate is warranted.
@@ -413,6 +418,14 @@ Three defects in the `filterGitignored()` function added to `bin/check-docs` by 
 
 **class:** a concurrency guard whose liveness probe covers only the launcher's own spawn mechanism, while the guarded resource is keyed by a launcher-independent identifier. `bin/pr-ready-now:717-720` decides "already running" solely by matching `com.ibl5.pr-ready-now-<pr>` against a one-shot `launchctl list` snapshot, so a `/pr-ready` started interactively in another Claude session carries no launchd label and is never detected. The two runs then collide on shared state: `.claude/skills/pr-ready/SKILL.md:41` mandates scratch filenames keyed to the PR number and explicitly forbids `$$`, and `bin/pr-ready-now:246` (`--stop`) confirms the convention with `rm -f /tmp/pr-ready-*-"${PR}".*`. Two concurrent runs on one PR therefore overwrite each other's mid-phase scratch, and both push to the same branch.
 
+---
+
+### E31 `bin/plan-now` help span truncated by bare `#`; test assertions miss declared secondary-behaviour tokens
+
+*(discovered 2026-09-01 during #1966)*
+
+**class:** a bin/ help-block edit inserts a bare `#` that silently terminates the `sed -n '/^# Usage:/,/^#$/p'` span, dropping a documented operator section from `--help`; or a verification-matrix row is implemented positive-only, omitting an asserted secondary stderr token — in both cases a reviewer sees the declared behaviour and the test suite does not contradict it, so the gap ships.
+
 **occurrence table:**
 
 | # | File:line | Same class? | Live? | Status |
@@ -432,3 +445,82 @@ Not a defect in the anchoring or the SIGPIPE handling: the `$`-anchor (guarding 
 `artifact destination:` `bin/pr-ready-now` (skip predicate + `--stop` ownership check), `.claude/skills/pr-ready/SKILL.md` (Phase 0 lock acquisition + release), and a case in `bin/test-pr-ready-now` that seeds a live-PID lock and asserts the PR is skipped.
 
 *(discovered 2026-09-01 while assessing en-masse `/pr-ready` readiness; not tied to a single PR)*
+| 1 | `bin/plan-now:18` — bare `#` terminated the help span, dropping the 6-line DM-contract paragraph | yes | fixed this pass | fixed this pass |
+| 2 | `bin/test-plan-now` — verification-matrix row declared secondary assertion `proceeding` in non-3-exit warning case; no `want` called it | yes | fixed this pass | fixed this pass |
+| 3 | `bin/test-plan-now` — verification-matrix row 2 (secondary assertion text for non-3 path) missing positive assertion for `--proceed-on-non-gate-exit` activation token | yes | fixed this pass | fixed this pass |
+
+`prevention_ladder:`
+
+- **rung 0 — already covered by an existing gate?** No gate checks that verification-matrix rows assert every named secondary token, or that a help-comment block contains no bare `#` terminators.
+- **rung 1 — extend an existing gate?** No existing gate owns this surface.
+- **rung 2 — a rule doc? Yes — landing rung.** A `.claude/rules/` note that: (a) help-block comment spans must not contain a bare `#` line (terminator hazard); (b) verification-matrix rows that declare a secondary stderr or stdout token must have a matching `want` assertion in the harness for that token specifically. Meta-tooling-bar: no host to extend ✓, distinct trigger ✓, earns its upkeep ✓, no cheaper alternative ✓. Rule not authored this pass.
+- **rungs 3–5** — N/A. Mechanical detection of missing assertions requires understanding which tokens a row declares — outside the scope of a linter without semantic knowledge of the plan's matrix.
+
+`artifact destination:` a new `.claude/rules/` doc on help-span terminator hygiene and secondary-assertion completeness (not created this pass).
+
+### E32 Phase 6 review notes on PR #1861 (long-lived branch drift)
+
+**class:** n/a — minor plan-vs-implementation drifts, scope-creep-adjacent changes, and in-flight operational artifacts surfaced as notes by `/pr-ready` Phase 6 on a 19-day, 23-rebase branch; none reached a blocking clause; documented here because Mode: in-PR requires an entry for every Phase 6 finding.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | Note 2.1: ADR numbered 0104 not plan's 0100 — plan-permitted (`bin/next-adr` decides) | n/a | no — plan-resolved | not fixed — not a defect |
+| 2 | Note 2.2: `last_verified` dates set to 2026-08-15 not plan's 2026-08-13 — master already ahead, correct | n/a | no — correct behavior | not fixed — not a defect |
+| 3 | Note 2.3: README index row appended after 0113 not 0099 — cosmetic ordering gap, `bin/check-numbering` does not enforce order | n/a | yes — cosmetic | not fixed — cosmetic |
+| 4 | Note 2.4: plist-grep realised via pre-existing case 20 (stricter than plan's source grep) | n/a | no — better route | not fixed — better route |
+| 5 | Note 3.1: `bin/test-sigpipe-grep-q-guard` rewrite not in plan — necessary consequence of Phase 4 dedupe, net stricter | n/a | no — correct | not fixed — not a defect |
+| 6 | Note 3.2: `bin/lib/README.md` index row added — correct convention follow | n/a | no — correct | not fixed — not a defect |
+| 7 | Note 3.3: HEAD remediation commit (`933899189`) — Phase 6.5 union-merge artifact cleanup | n/a | no — already done | fixed this pass |
+| 8 | Note 5.1: `Truly-manual` row 40 not performed — intentional; needs post-merge prod dispatch per plan | n/a | no — intentional | not fixed — intentional |
+| 9 | Note 6.1: earlier rebase union-merge artifacts (duplicate 0103 row + stale `last_verified`) | n/a | no — already remediated | fixed this pass |
+
+**prevention_ladder:** no gate warranted — `/pr-ready` Phase 6 already surfaces these; they are expected review notes for a long-lived branch with 23+ force-pushes; no per-note gate would catch future occurrences reliably without high false-positive cost.
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-01 during #1861)*
+
+### E33 Phase 6 review notes on PR #1815 (authz verdict extraction)
+
+**class:** n/a — F1 and F2 were blocking; F3–F7 were notes. F1, F2, and F5 remediated in Phase 6.5; F3, F4, F6, F7 addressed in PR body notes.
+
+**occurrence table:**
+
+| # | Finding | Blocking? | Status |
+|---|---------|-----------|--------|
+| F1 | PR body credited FreeAgencyController DI injection as new; it pre-existed on master (maint 14.6 batch 2) — plan Step 3.1 was skipped as the plan directs | yes | fixed Phase 6.5 — body updated |
+| F2 | Backlog residual numbered 6.24; that ID was already taken by the Olympics player-page bug (PR #1825) — renumbered to 6.25 | yes | fixed Phase 6.5 — three sites in maintenance-backlog.md, one in archive |
+| F3 | Phase 5 reflection characterization test (`testProcessWaiverSubmissionRefusesNullTeamWithoutProcessing`) was not written — plan marks it transient (write pre-extraction, delete at Step 5.3); semantic preservation covered by WaiversSubmissionServiceTest rows 10–16 | no | not fixed — not a defect; body clarified |
+| F4 | `WaiversSubmissionService::submit()` adds `is_string`/`is_numeric` coercion guards beyond "moved verbatim" — a net-tightening deviation | no | not fixed — net-tighter; body notes the deviation |
+| F5 | WaiversController ctor fallback used `$this->processor, $this->salaryCapRepo` instead of local params; exposed dead property declarations | yes | fixed Phase 6.5 — switched to params, removed dead props |
+| F6 | Smoke B (Action=trade pre-filter) and Smoke C (unauthenticated POST) observations stated more confidently than warranted; B was not runnable end-to-end over HTTP, C short-circuited at isUser() | no | not fixed — not a defect; body notes revised |
+| F7 | Phase 9 Step 9.4 last_verified sub-step skipped — master's values already post-date the commit date (2026-08-09) | no | not fixed — intentional; body notes skip |
+
+**prevention_ladder:**
+
+- **rung 0 — already covered by an existing gate?** No. `/pr-ready` Phase 6 catches these after the fact.
+- **rung 1 — extend an existing gate?** No existing gate checks plan Step 3.1 skip documentation or backlog item number collision.
+- **rung 2 — a rule doc? Partially applicable.** (a) When a plan step is documented as "may already be done — READ THE FILE FIRST," the PR body should say "skipped as plan directs" rather than crediting the work as new. (b) Before assigning a residual backlog item number, confirm the number is free on master. These are author-discipline items, not automatable gates.
+- **rungs 3–5** — N/A.
+
+`artifact destination: n/a — author discipline, no gate`
+
+*(discovered 2026-09-01 during #1815)*
+
+### E34 Auto-Generated `codebase-map.md` Row — No Defect (PR #1903 F5)
+
+**class:** n/a — `.claude/rules/codebase-map.md` is auto-generated by `bin/generate-codebase-map`; the added row (`| DraftClassImport | 1 | - | | |`) is mechanical output of the generation script; no enforcement mechanism changed.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `.claude/rules/codebase-map.md` — one new row for `DraftClassImport` | n/a — auto-generated | no — not a defect | not fixed — not a defect |
+
+**prevention_ladder:** no gate warranted — auto-generated file; already governed by `bin/generate-codebase-map`.
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-01 during #1903)*

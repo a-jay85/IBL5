@@ -41,26 +41,25 @@ MAIN="${IBL5_MAIN:-/Users/ajaynicolas/GitHub/IBL5}"
 cd "$MAIN"
 source "$MAIN/bin/lib/git-helpers.sh"   # worktrees_parent_dir
 
-# --- 3. Dedupe: never stack duplicate doc-fix runs ----------------------------
-if [ -n "$(git -C "$MAIN" branch --list 'docs-stale-refresh-*')" ]; then
-    echo "docfix-run: a docs-stale-refresh-* branch already exists — skipping (no stacking)."
+# --- 3. Today's slug + dedupe: never stack duplicate doc-fix runs -------------
+SLUG="docs-stale-refresh-$(date +%Y%m%d)"
+if [ -n "$(git -C "$MAIN" branch --list "$SLUG")" ]; then
+    echo "docfix-run: branch $SLUG already exists — today's run already fired; skipping."
     exit 0
 fi
-# `grep -c`, not `grep -q`: this script runs under `set -euo pipefail`, and
-# `grep -q` exits on first match, closing the pipe under the still-writing
-# producer. The producer then dies of SIGPIPE and pipefail reports 141 — so a
-# FOUND branch reads as NOT-FOUND and the dedupe silently stops deduping. Bites
-# once the producer's output exceeds the pipe buffer; latent here today (few open
-# PRs), load-bearing as the PR count grows. Same defect fixed in bin/watch-run's
-# label_alive(); guarded by bin/test-sigpipe-grep-q-guard.
-if [ "$(gh pr list --state open --json headRefName --jq '.[].headRefName' 2>/dev/null \
-     | grep -c '^docs-stale-refresh-')" -gt 0 ]; then
-    echo "docfix-run: an open docs-stale-refresh-* PR is pending human merge — skipping."
+if ! PR_UNARMED="$(gh pr list --state open --json headRefName,autoMergeRequest \
+     --jq '.[] | select(.headRefName | startswith("docs-stale-refresh-"))
+                | select(.autoMergeRequest == null) | .headRefName' 2>/dev/null)"; then
+    echo "docfix-run: could not query open PRs (gh failed) — skipping this cycle (fail-closed)."
+    exit 0
+fi
+if [ -n "$PR_UNARMED" ]; then
+    echo "docfix-run: unarmed open PR(s) pending human merge — skipping:"
+    printf '  %s\n' $PR_UNARMED
     exit 0
 fi
 
 # --- 4. Create the worktree (base = master) -----------------------------------
-SLUG="docs-stale-refresh-$(date +%Y%m%d)"
 bin/wt-new "$SLUG"                                   # cwd is $MAIN (step 2)
 WT_ROOT="$(worktrees_parent_dir "$MAIN")/$SLUG"
 
@@ -91,7 +90,7 @@ LABEL="com.ibl5.docfix-run-$SLUG-$TS"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 TODAY="$(date -u +%Y-%m-%d)"
 
-PROMPT="You are fixing doc findings with NO human present — never ask questions or wait for input; make the safe choice and continue. The findings are the nightly Doc Freshness Audit set for issue #$ISSUE_NUM. Work ONLY on these paths (comma-separated): $SIG. First run \`bin/check-docs --staleness-report\` and split its JSON with jq into entries whose \`reason\` is \`stale\` and entries whose \`reason\` is \`dead-glob\`; that command is the authoritative finding list, and the body of issue #$ISSUE_NUM shows the same two tables for reference. For each \`stale\` entry: re-verify its content against the current reality of the codebase, correct drifted content, and bump its \`last_verified\` to today ($TODAY). For each \`dead-glob\` entry: the named file declares a \`paths:\` frontmatter glob matching no tracked file, so that rule can never load — PREFER correcting the glob so it matches the tracked files it was meant to cover, and delete the \`paths:\` entry only when no correction is identifiable. IF you delete a glob you MUST disclose it: add one line per deletion to the commit message body AND to the PR body under a heading reading \`## Dead globs deleted\`, in exactly this form: \`Dead glob deleted: in FILE_PATH, removed paths: entry GLOB — REASON\`, substituting the real repo-relative path, the exact glob text, and one clause saying why no correction was possible, so the maintainer can review the deletion without opening the diff. Never delete a whole file, and never remove a \`paths:\` key that still carries a working glob. Then run \`bin/check-docs --fix-dates --since=master\` to bump any in-scope doc you changed but did not hand-bump, and re-run \`bin/check-docs --staleness-report\` to confirm every finding you were given is gone. Do NOT touch any doc outside the list above. Commit with a message whose body contains the line \`Closes #$ISSUE_NUM\`. Then fire \`bin/post-plan-now\` (NOT --auto) to open the PR; the PR body MUST include \`Closes #$ISSUE_NUM\` so merging it closes the stale-docs issue."
+PROMPT="You are fixing doc findings with NO human present — never ask questions or wait for input; make the safe choice and continue. The findings are the nightly Doc Freshness Audit set for issue #$ISSUE_NUM. Work ONLY on these paths (comma-separated): $SIG. First run \`bin/check-docs --staleness-report\` and split its JSON with jq into entries whose \`reason\` is \`stale\` and entries whose \`reason\` is \`dead-glob\`; that command is the authoritative finding list, and the body of issue #$ISSUE_NUM shows the same two tables for reference. For each \`stale\` entry: re-verify its content against the current reality of the codebase, correct drifted content, and bump its \`last_verified\` to today ($TODAY). For each \`dead-glob\` entry: the named file declares a \`paths:\` frontmatter glob matching no tracked file, so that rule can never load — PREFER correcting the glob so it matches the tracked files it was meant to cover, and delete the \`paths:\` entry only when no correction is identifiable. IF you delete a glob you MUST disclose it: add one line per deletion to the commit message body AND to the PR body under a heading reading \`## Dead globs deleted\`, in exactly this form: \`Dead glob deleted: in FILE_PATH, removed paths: entry GLOB — REASON\`, substituting the real repo-relative path, the exact glob text, and one clause saying why no correction was possible, so the maintainer can review the deletion without opening the diff. Never delete a whole file, and never remove a \`paths:\` key that still carries a working glob. Then run \`bin/check-docs --fix-dates --since=master\` to bump any in-scope doc you changed but did not hand-bump, and re-run \`bin/check-docs --staleness-report\` to confirm every finding you were given is gone. Do NOT touch any doc outside the list above. Commit with a message whose body contains the line \`Closes #$ISSUE_NUM\`. Then run \`bin/docfix-check-veronly $SLUG\` from the worktree root: it inspects the realized diff and arms the plan for this run for auto-merge only when every changed line is a strictly-advancing \`last_verified:\` date on an already-tracked file. A \`HOLD\` verdict is a normal, expected outcome — it means the refresh changed real content and a human should read it. Never edit the plan file yourself and never re-run the helper to try to turn a HOLD into a PASS. Then fire \`bin/post-plan-now\` (NOT --auto) to open the PR; the PR body MUST include \`Closes #$ISSUE_NUM\` so merging it closes the stale-docs issue."
 # Shell-quote first (far-side bash), then XML-escape (launchd's plist parser). Order
 # matters: shq's output is what has to survive into the <string> element intact.
 PROMPT_ARG=$(xml_escape "$(shq "$PROMPT")")

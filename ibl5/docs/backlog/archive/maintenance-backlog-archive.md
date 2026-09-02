@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed/declined maintenance-audit findings, extracted from maintenance-backlog.md.
-last_verified: 2026-08-31
+last_verified: 2026-09-01
 ---
 
 # Maintenance-Cost Reduction Backlog — Archive
@@ -1230,6 +1230,17 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 
 
 **Table evidence (2026-07-25):** Anon rookie-option lockdown E2E (`draft-rookie-anon-lockdown.spec.ts`) asserts `toContain('YourAccount')` — emitted by nav chrome on every anon page, so a regressed `is_user()` gate still passes. Strengthen to `maxRedirects:0` + redirect/`Location` assert. Test-only, green-green. From PR #1107 review.
+
+### 6.22 Inline controller authz gates force E2E-only coverage (the pattern behind 6.20/6.21)
+**Location:** `ibl5/classes/Waivers/WaiversController.php`, `ibl5/classes/FreeAgency/FreeAgencyController.php`, `ibl5/classes/Api/Controller/TradeAcceptController.php`, `ibl5/classes/Api/Controller/TradeDeclineController.php`, `ibl5/classes/Trading/TradingController.php` (reject path, added in #1066)
+**Problem:** The dominant authz convention gates inline in the controller method, and every branch ends in `HtmxHelper::redirect() → exit()`. `exit()` terminates the process before any PHPUnit assertion past the gate runs, so the security-critical "a non-party is refused AND no mutation occurs" property cannot be unit-tested — it is provable only via E2E (slower, and on the pre-baked PHP image rebuilt on master push only). This is the root cause of 6.20 and 6.21, and forced the D-05 reject-IDOR coverage (#1066) to be E2E-only. The accept path (the `Trading\TradeExecutionService` orchestrator introduced in #1066) demonstrates the alternative: its gate returns a verdict array instead of redirecting, so `TradeExecutionServiceTest::testValidateAndExecuteRejectsNonPartyWithoutExecuting` asserts the refusal + non-execution exit-free in PHPUnit.
+**Suggested direction:** Extract each inline authz *decision* into a service/policy method returning a verdict (bool or result array); leave the controller a thin `verdict → redirect` shim. The security logic becomes unit-testable; only the trivial shim stays E2E. Mirrors the accept-path pattern and retires the E2E reliance for these gates (and unblocks 6.21's teamless-rejection test).
+**Est. effort:** M
+**Risk if untouched:** Security-critical authz gates rest on untested invariants (`redirect()` keeps `exit()`ing; the destructive call stays after the gate). A future edit can silently restore unauthorized access with nothing red in unit CI — the only guard is an E2E on a slower cadence.
+**Status:** ✅ Implemented — verdict + thin-redirect-shim conversion landed for Waivers and FreeAgency (#1815); Trade API accept/decline were already converted to `$responder->error(403)` + `return`. `FreeAgencyProcessor::processOfferSubmission()`/`::deleteOffers()` now accept `?string` and refuse with a verdict; the Waivers verdict moved to a new `Waivers\WaiversSubmissionService::submit()`. Both refusals are unit-tested for "refused AND no mutation" via `expects($this->never())` on the write methods, mirroring `TradeExecutionServiceTest::testValidateAndExecuteRejectsNonPartyWithoutExecuting`. Residual: `Trading\TradingController`'s reject path is not converted — split out as open item **6.25**.
+
+**Table evidence (2026-08-09):** **Pattern behind 6.20/6.21.** Authz/IDOR gates inline in controllers end in `HtmxHelper::redirect()→exit()`, so the security-critical "non-party refused + no mutation" property is E2E-only (forced the D-05 reject test, #1066). `Trading\TradeExecutionService` (accept path, #1066) proves the fix: a gate returning a *verdict* is unit-testable exit-free (`testValidateAndExecuteRejectsNonPartyWithoutExecuting`). Convert the inline gates (Waivers, FreeAgency, Trade API accept/decline, Trading reject) to verdict + thin redirect-shim → security logic becomes unit-testable; unblocks 6.21. 🟨: production refactor on a security surface; needs a verdict-shape decision. From the #1066 reject-IDOR review.
+
 ## Axis 7: Repository Contract Gaps / Shared Abstractions
 
 ### 7.1 `CommonMysqliRepository` Has No Interface
@@ -2578,3 +2589,11 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Est. effort:** S
 **Risk if untouched:** Olympics player pages stay broken for every viewer, and #1825 cannot go green until the fix lands.
 **Status:** Completed (#2028) — `renderPage()` now catches the `RuntimeException` from the viewer-team lookup and renders no owner-action buttons when the viewer's team is absent from the active league context; the IBL path is unchanged. The tightened assertion in `ibl5/tests/e2e/smoke/olympics-pages.spec.ts` (`player page loads in Olympics context`, shipped in #1825) is the regression pin, and goes green with #2028 in the base. (discovered 2026-08-10 during #1825)
+
+### 9.28 Expected/Better-Than-Spec Outcomes in PR #1903 (F3 + F11)
+**Location:** `ibl5/uploadDraftClass.php` (PRG redirect), ship-pipeline (human-signoff hold)
+**Problem:** Phase 6 review noted two findings that looked like spec deviations but were actually improvements or expected behavior. F3: PRG carries `?imported=67` (the actual count) not `?imported=1`; plan spec said "?imported=1" but the actual import processes the full file. F11: row 27 (human-signoff hold) unchecked, expected when `auto_merge: false`.
+**Suggested direction:** No action — F3 deliberate improvement; F11 hold mechanism working as designed.
+**prevention_ladder:** no gate warranted — plan-vs-spec gaps of this type not automatable.
+**provenance:** (discovered 2026-09-01 during #1903)
+**Status:** 🚫 Declined — no action warranted.

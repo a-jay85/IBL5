@@ -85,9 +85,15 @@ else
          "reintroduces the SIGPIPE defect — use [ \"\$(... | grep -cF ...)\" -gt 0 ]"
 fi
 
-# --- 4. bin/docfix-run's open-PR dedupe must USE the grep -c form --------------
+# --- 4. bin/docfix-run's open-PR dedupe must USE a SIGPIPE-safe form -----------
 # Only the `gh pr list` dedupe pipeline is in scope; the other grep -q uses in
 # that file take small builtin-produced input and cannot fill a pipe buffer.
+# Two shapes are sanctioned, both of which drain the producer to EOF:
+#   a) [ "$(gh pr list ... | grep -c ...)" -gt 0 ]
+#   b) VAR="$(gh pr list ... --jq '...')" — command substitution, no pipe at
+#      all, and it preserves the producer's exit status, so it is strictly
+#      safer than (a) and is what the --jq-side filtering form uses.
+# Piping this producer into `grep -q` is the defect and is rejected either way.
 DOCFIX="$SCRIPT_DIR/docfix-run"
 window="$(grep -A3 'gh pr list --state open --json headRefName' "$DOCFIX" 2>/dev/null | strip_comments)"
 if [ ! -f "$DOCFIX" ]; then
@@ -95,11 +101,16 @@ if [ ! -f "$DOCFIX" ]; then
 elif [ -z "$window" ]; then
     fail "docfix-run dedupe anchor found" \
          "the 'gh pr list --state open --json headRefName' pipeline moved or was reworded — this guard is no longer checking anything"
+elif printf '%s\n' "$window" | grep -qE '\| *grep -[a-zA-Z]*q'; then
+    fail "docfix-run open-PR dedupe pipes into grep -q" \
+         "reintroduces the SIGPIPE defect — use [ \"\$(... | grep -c ...)\" -gt 0 ] or capture into a variable"
 elif printf '%s\n' "$window" | grep -qE '\| *grep -[a-zA-Z]*c'; then
     pass "docfix-run open-PR dedupe uses the grep -c form"
+elif printf '%s\n' "$window" | grep -qE '= *"?\$\(gh pr list'; then
+    pass "docfix-run open-PR dedupe captures gh output into a variable (no pipe)"
 else
-    fail "docfix-run open-PR dedupe does not use grep -c" \
-         "reintroduces the SIGPIPE defect — use [ \"\$(... | grep -c ...)\" -gt 0 ]"
+    fail "docfix-run open-PR dedupe uses no sanctioned SIGPIPE-safe form" \
+         "use [ \"\$(... | grep -c ...)\" -gt 0 ] or capture the output into a variable"
 fi
 
 if [ "$FAILED" -eq 0 ]; then

@@ -404,7 +404,24 @@ isolatedTest.describe('DCE mobile: form submission', () => {
       page.locator('.dc-mobile-cards select[name^="pg"]').first(),
     ).toBeEnabled();
 
-    // Submit the live (valid) config via the mobile footer button.
+    // Mutate one position via the stepper so the read-back asserts a CHANGED value,
+    // not the seed data that was already in the DB (a no-mutation submit would make
+    // selectsBefore === selectsAfter vacuously true whether or not the save ran).
+    const entryUrl = page.url();
+    const firstCard = page.locator('.dc-card').first();
+    const firstField = firstCard.locator('.dc-card__field').first();
+    const firstSelect = firstField.locator('select');
+    const valueBeforeMutation = await firstSelect.inputValue();
+    await firstField.locator('.dc-card__stepper-arrow--down').click();
+    // Stepper must have changed the value — if the down-arrow was already at the
+    // bottom it wraps; an unchanged value here means the stepper UI is broken.
+    await expect(firstSelect).not.toHaveValue(valueBeforeMutation);
+
+    // Capture after mutation: this is the state the save must persist.
+    const selectsBefore = await page.locator('.dc-mobile-cards select').evaluateAll(
+      els => els.map(el => (el as HTMLSelectElement).value),
+    );
+    // Submit the mutated config via the mobile footer button.
     const submitBtn = page.locator(
       '.dc-mobile-cards__footer .depth-chart-submit-btn',
     );
@@ -427,6 +444,15 @@ isolatedTest.describe('DCE mobile: form submission', () => {
     // the live config — a real failure we must catch.
     await expect(page.locator('.ibl-alert--error')).not.toBeVisible();
     await assertNoPhpErrors(page, 'after mobile depth chart submission');
+    // Read-back: navigate away and back to prove the mutated depth chart was
+    // persisted to the DB, not merely that the form reloaded without an error.
+    await page.goto('modules.php?name=Standings');
+    await page.goto(entryUrl);
+    await expect(page.locator('.dc-mobile-cards')).toBeVisible({ timeout: 10000 });
+    const selectsAfter = await page.locator('.dc-mobile-cards select').evaluateAll(
+      els => els.map(el => (el as HTMLSelectElement).value),
+    );
+    expect(selectsAfter).toEqual(selectsBefore);
   });
 
   isolatedTest.afterAll(async ({ request }) => {

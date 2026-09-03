@@ -171,7 +171,7 @@ class ErrorHandlerRegistrarTest extends TestCase
         return new ErrorHandlerRegistrar($logger, null, static fn (): ?array => $error);
     }
 
-    private const SYNTHETIC_SECRET = 'SYNTH-Pa55word-DO-NOT-MATCH-REAL';
+    private const SYNTHETIC_SECRET = 'SYNTH_Pa55word';
 
     /** Mirrors AuthService::loginWithUsername($username, $password, $ttl) frame shape. */
     private function throwFromAuthLikeFrame(string $username, string $password, int $ttl): void

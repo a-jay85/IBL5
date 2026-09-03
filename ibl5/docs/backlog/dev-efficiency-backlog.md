@@ -65,6 +65,8 @@ last_verified: 2026-09-02
 | E37 | Phase 6 review notes on PR #2045 — plan under-specified assertion discriminator and archive step; PR body Scope omitted mutation context; "No manual testing" claim tensioned with hold; check 5 outstanding hold (n/a); PR body fixed in Phase 6.5 | ⬜ Open | — | XS |
 | E38 | `/pr-ready` lost-work guard blind to prior-run destructive rebase | ⬜ Open | 🟨 | S |
 | E39 | Phase 6 review notes on PR #1824 (StandingsUpdater echo→logger) — B1 wrong seam name + scope count in body; N3 scope creep unbundled; N4 stale plan literal; N5 manual backlog row not retired in plan; N7 wrong method name in body; B1+N7 remediated this pass | ⬜ Open | — | S |
+| E40 | `bin/scrub-log-credentials` prod path: unquoted outer heredoc mangles remote jq filter escapes (F1) + local per-file hit report silently discarded (F4) — both fixed Phase 6.5 #1920; case 8 harness guards regression | ⬜ Open | — | S |
+| E41 | `ErrorHandlerRegistrarTest` + `bin/test-scrub-log-credentials`: SYNTHETIC_SECRET 32 chars truncated to 15 in `getTraceAsString()` causes vacuous assertion (F2) + closure assertion replaced with unconditional pass (F3) — both fixed Phase 6.5 #1920 | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -660,3 +662,55 @@ Not a defect in the anchoring or the SIGPIPE handling: the `$`-anchor (guarding 
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-02 during #1824 Phase 6 review)*
+
+### E40 Phase 6 review notes on PR #1920 (scrub-log-credentials remote filter + stdout)
+
+**class:** implementation defects in `bin/scrub-log-credentials` — unquoted outer heredoc collapses jq regex escapes in the remote path (F1), and per-file hit report output silently discarded in local mode (F4)
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/scrub-log-credentials:231–272` (F1: outer heredoc collapses `\\` → `\`, corrupting jq regex; remote path silently no-ops) | yes | yes | fixed this pass |
+| 2 | `bin/scrub-log-credentials:156–158` (F4: `result_text` captures report + HITS line, but only HITS extracted; file:line report discarded) | yes | yes | fixed this pass |
+
+**prevention_ladder:**
+
+- **rung 0 — already covered?** No. `bin/test-scrub-log-credentials` only exercised `run_local()`; the remote path and its embedded jq filter had no test coverage.
+- **rung 1 — extend existing gate?** Case 8 added to `bin/test-scrub-log-credentials` (shipped this PR) guards remote invocation pattern and filter content against drift. F4 output is implicitly covered by case 1 dry-run hit-count assertions.
+- **rung 2 — a rule doc?** No rule doc warranted — too specific.
+- **rung 3 — PHPStan?** Not applicable (bash).
+- **rung 4 — CI gate?** `bin/test-scrub-log-credentials` is wired to CI; case 8 guards future regression.
+- **landing rung:** rung 1 — case 8 harness shipped with the fix.
+
+`prevention_ladder: rung 1 — case 8 in bin/test-scrub-log-credentials guards remote jq filter content and invocation pattern; F4 output fix covered by existing case 1 assertions`
+
+`artifact destination: bin/test-scrub-log-credentials case 8 (shipped this PR)`
+
+*(discovered 2026-09-02 during #1920)*
+
+### E41 Phase 6 review notes on PR #1920 (SYNTHETIC_SECRET length + closure assertion)
+
+**class:** verification-quality defects — SYNTHETIC_SECRET constant too long for `getTraceAsString()` 15-char truncation (F2) causes tests to pass vacuously; closure-frame assertion replaced with unconditional pass (F3)
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/tests/Bootstrap/ErrorHandlerRegistrarTest.php:174` (F2: SYNTHETIC_SECRET 32 chars; `getTraceAsString()` truncates args to 15 chars — assertion checks for string never present in output) | yes | yes | fixed this pass |
+| 2 | `bin/test-scrub-log-credentials:138–140` (F3: closure not-wholesale-redacted assertion replaced with `ok "..."` unconditional pass) | yes | yes | fixed this pass |
+
+**prevention_ladder:**
+
+- **rung 0 — already covered?** No. PHPUnit and the harness ran green, masking both defects.
+- **rung 1 — extend existing gate?** F2 fix shortens SYNTHETIC_SECRET to 14 chars (fits verbatim in `getTraceAsString()` output) — tests now genuinely fail on a regression. F3 fix restores the real predicate.
+- **rung 2 — a rule doc?** No rule doc warranted — the PHP 15-char truncation behavior is documented in the test comment.
+- **rung 3 — PHPStan?** PHPStan cannot detect vacuous string-absence assertions of this form.
+- **rung 4 — CI gate?** No gate warranted — both fixes are direct test-quality improvements requiring human judgment.
+- **landing rung:** rung 1 — direct fixes applied this pass; no additional gate.
+
+`prevention_ladder: rung 1 — SYNTHETIC_SECRET shortened to fit getTraceAsString() truncation; closure assertion restored as real predicate; no further gate warranted`
+
+`artifact destination: n/a — no new gate`
+
+*(discovered 2026-09-02 during #1920)*

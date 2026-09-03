@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # Loop-Engineering Backlog
@@ -71,6 +71,7 @@ last_verified: 2026-09-02
 | L42 | Autonomous-loop PR ships stale line citations, undeclared plan substitution, unmentioned diff file, and duplicate backlog ID | ⬜ Open | 🟦 | S |
 | L43 | Autonomous-loop doc-fix PR body contains stale claims and inconsistent ADR authoring format after post-review commit | ⬜ Open | 🟦 | S |
 | L44 | Upstream overlap silently drops a plan phase; Phase 2a pre-rebase artifact captures post-rebase state, making the drop undetectable | ✅ fixed this pass | 🟦 | S |
+| L45 | `/pr-ready` Phase 2 squashes load-bearing commit boundaries when `auto_merge: false`; PR body SHAs go stale after force-push | ⬜ Open | 🟥 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -560,6 +561,41 @@ Landing rung: 1 (extend Phase 2a capture to detect and correct post-rebase stale
 **provenance:** (discovered 2026-09-02 during #1789)
 
 **Status (2026-09-02):** ✅ fixed this pass (test assertion fixed; PR body and ADR corrected) — 🟦.
+
+---
+
+### L45 `/pr-ready` Phase 2 squashes load-bearing commit boundaries when `auto_merge: false`; PR body SHAs go stale after force-push
+
+**class (Check 2 + Check 4):** A `/pr-ready` Phase 2 rebase delegate that applies a generic squash-is-cosmetic rule to a plan whose `auto_merge: false` flag signals a load-bearing commit boundary, silently voiding the merge gate (V-2c/V-4a/V-7a) and leaving PR body SHA citations pointing at pre-squash history that is no longer reachable from the pushed head.
+
+**Check 3 — class: n/a:** three plan-undeclared docs (`codebase-map.md`, backlog archive, maintenance backlog) landed in the commit stack; informational finding, surfaced by Phase 5.9 files-changed comparison; no additional gate warranted beyond the existing Phase 5.9 diff.
+
+**Check 5 — class: n/a:** the plan's V-4c/V-4d verification matrix contained a literal count that became stale after master advanced past the plan's authoring point; correctness of plan literals is the plan author's responsibility; no harness gate can distinguish intentional from accidental staleness in a plan literal.
+
+**Occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `.claude/skills/pr-ready/_rebase-and-conflicts.md` — Phase 2 delegate squash rule fires unconditionally regardless of `auto_merge` plan flag | yes (Check 2) | yes | fixed this pass (restored pre-squash stack; 11 commits rebased `--onto` new master; V-2c/V-4a verified) |
+| 2 | PR body of #1797 — SHA citations pointed at `5bd71bc12` / `14b363829`, both unreachable from pushed head | yes (Check 4) | yes | fixed this pass (updated 3 SHA citations to `acbfff148a` / `09ee61e054`) |
+
+**prevention_ladder:**
+
+- rung 0 — not covered by an existing gate.
+- rung 1 — extend `_rebase-and-conflicts.md` Phase 2 delegate to read `auto_merge:` from the plan file before squashing; if `false`, preserve individual commits. This is the landing rung for Check 2. Check 4 is self-corrected by Phase 6.5 PR body reconciliation (already implemented); no new rung needed.
+- rung 2 — a rule doc noting that `auto_merge: false` signals a load-bearing commit boundary; Phase 2 must not squash. Insufficient alone: rule docs are not loaded during Sonnet delegation.
+- rung 3 — not applicable (PHPStan cannot gate plan-file parsing).
+- rung 4 — not applicable (CI cannot verify delegate behavior mid-run).
+- rung 5 — not warranted (a push hook cannot recover a squash already committed).
+
+Landing rung: 1 for Check 2 (extend `_rebase-and-conflicts.md`); rung 0 for Check 4 (Phase 6.5 already handles it). Check 3 and Check 5: `prevention_ladder: no gate warranted`.
+
+**artifact destination:**
+- Check 2: `.claude/skills/pr-ready/_rebase-and-conflicts.md` (in-repo)
+- Check 4: `.claude/skills/pr-ready/SKILL.md` Phase 6.5 (already present; no new artifact)
+- Check 3/5: `n/a — no gate`
+
+**provenance:** (discovered 2026-09-02 during #1797)
 
 ---
 

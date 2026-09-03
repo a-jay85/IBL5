@@ -417,7 +417,10 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 |---|--------|-----------|-----------------|
 | 9.4b | ⬜ Open | 🟩 | Full endpoint-by-endpoint OpenAPI reference for API_GUIDE.md (deferred from 9.4). Docs-only. |
 | 9.26 | ⬜ Open | 🟨 | No CHANGELOG — upfront decision: ADRs-as-substitute (document) vs post-plan-fed CHANGELOG tooling. |
-| 9.29 | ⬜ Open | 🟩 | Stale migration-number cross-references in docblocks (165 instead of 174): 4 sites, all fixed this pass. Finding B (truly-manual Verification Matrix row 23): n/a — no gate warranted. (discovered 2026-09-02 during #1961) |
+| 9.29 | ⬜ Open | 🟩 | Stale migration-number cross-references in docblocks (165 instead of 174): 6 sites; 4 fixed 2026-08-22, 2 fixed 2026-09-03. Finding B (truly-manual Verification Matrix row 23): n/a — no gate warranted. (discovered 2026-09-02 during #1961) |
+| 9.30 | ⬜ Open | 🟩 | Migration backup-table suffix (_165) fossilized from intermediate renaming — header comment corrected this pass. No gate warranted. (discovered 2026-09-03 during #1961) |
+| 9.31 | ⬜ Open | 🟩 | PR body manual-test row naming a pre-existing UI mislabel as the actual label — PR #1961 body row 23 corrected this pass via gh pr edit. No gate warranted. (discovered 2026-09-03 during #1961) |
+| 9.32 | ⬜ Open | 🟩 | Unperformed Truly-manual verification row — PR #1961 row 23; protected by auto_merge: false hold. No gate warranted. (discovered 2026-09-03 during #1961) |
 
 
 ### 9.4b API_GUIDE — Full Endpoint-by-Endpoint OpenAPI Reference (Deferred from 9.4)
@@ -438,18 +441,41 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 | # | File:line | Same class? | Live? | Status |
 |---|-----------|-------------|-------|--------|
-| 1 | `ibl5/migrations/174_derive_conference_champions_from_playoffs.sql:1` | yes | yes | fixed this pass |
-| 2 | `ibl5/migrations/174_derive_conference_champions_from_playoffs.sql` NOTE paragraph | yes | yes | fixed this pass |
-| 3 | `ibl5/classes/Updater/StandingsUpdater.php` docblock | yes | yes | fixed this pass |
-| 4 | `ibl5/tests/DatabaseIntegration/ConferenceChampionsDerivationTest.php` docblock | yes | yes | fixed this pass |
+| 1 | `ibl5/migrations/174_derive_conference_champions_from_playoffs.sql:1` | yes | yes | fixed 2026-08-22 |
+| 2 | `ibl5/migrations/174_derive_conference_champions_from_playoffs.sql` NOTE paragraph | yes | yes | fixed 2026-08-22 |
+| 3 | `ibl5/classes/Updater/StandingsUpdater.php` docblock | yes | yes | fixed 2026-08-22 |
+| 4 | `ibl5/tests/DatabaseIntegration/ConferenceChampionsDerivationTest.php` docblock (class header, line 22) | yes | yes | fixed 2026-08-22 |
+| 5 | `ibl5/tests/DatabaseIntegration/ConferenceChampionsDerivationTest.php` line 22 | yes | yes | fixed this pass |
+| 6 | `ibl5/tests/DatabaseIntegration/ConferenceChampionsDerivationTest.php` line 162 | yes | yes | fixed this pass |
 
-**prevention_ladder:** no gate warranted — migration-number cross-references in prose comments are human-authored; a gate parsing SQL headers against filesystem numbers would be fragile and is not worth the maintenance cost; zero prior occurrences in the rest of the codebase
+**prevention_ladder:** no gate warranted — migration-number cross-references in prose comments are human-authored; a gate parsing SQL headers against filesystem numbers would be fragile and is not worth the maintenance cost; 2 occurrences were missed in the initial pass (same file, ConferenceChampionsDerivationTest.php lines 22 and 162), corrected 2026-09-03
 **artifact destination:** n/a — no gate
 **provenance:** (discovered 2026-09-02 during #1961)
 
 **Finding B — Truly-manual Verification Matrix row 23:**
 **class:** n/a — a Truly-manual verification row in the Verification Matrix is by definition deferred to human judgment; the auto_merge: false hold enforces that the league GM performs it before merge
 **prevention_ladder:** no gate warranted — the Truly-manual designation in the Verification Matrix already signals automated checking is impossible; auto_merge: false enforces the human hold
+
+### 9.30 Migration Backup-Table Suffix Fossilized From Intermediate Renaming
+**class:** a migration backup-table suffix fossilized from an intermediate renaming that maps to an unrelated existing migration
+**occurrence:** the one corrected site (migration 174 header comment — `ibl5/migrations/174_derive_conference_champions_from_playoffs.sql` lines 8–10)
+**prevention_ladder:** no gate warranted — one-off artifact of development-time renaming; self-consistent across create/insert/reversal SQL; header comment now states provenance accurately
+**artifact destination:** n/a — no gate
+**provenance:** (discovered 2026-09-03 during #1961)
+
+### 9.31 Wrong UI Label Named in PR Body Manual-Test Row
+**class:** n/a — a PR body instruction naming a pre-existing UI mislabel as if it were the actual label, in an unticked manual-test row; the mislabel is intentionally out of scope for this PR
+**occurrence:** PR #1961 body row 23 (fixed this pass via gh pr edit)
+**prevention_ladder:** no gate warranted — the mislabel will be corrected in a future PR; this was a copy from the plan which correctly documented the discrepancy in its own bug-17 paragraph
+**artifact destination:** n/a — no gate
+**provenance:** (discovered 2026-09-03 during #1961)
+
+### 9.32 Unperformed Truly-Manual Verification Row
+**class:** n/a — an unperformed Truly-manual verification row; protected by the auto_merge: false human-signoff hold declared in the plan's Automouse Hold Justification
+**occurrence:** PR #1961 row 23 (no code fix; held by auto_merge: false)
+**prevention_ladder:** no gate warranted — covered by existing human-signoff hold
+**artifact destination:** n/a — no gate
+**provenance:** (discovered 2026-09-03 during #1961)
 
 ## Axis 10: PHPStan Rule Coverage Gaps
 

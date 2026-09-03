@@ -6,8 +6,9 @@
 -- migrations 163 through 173 before this file (none touch ibl_team_awards,
 -- vw_team_awards, vw_franchise_summary, vw_playoff_series_results, ibl_league_config
 -- or ibl_franchise_seasons), so this migration is 174. The backup table retains its
--- _165 suffix from the plan's original numbering; that suffix is arbitrary and
--- self-consistent with the reversal SQL.
+-- _165 suffix as a fossil of an intermediate renumbering (163 → 165 → 170 → 173 → 174);
+-- it does not correspond to migration 165 (165_backfill_pre_2007_retired_flag.sql) and
+-- is arbitrary — the suffix is self-consistent across create/insert/reversal SQL.
 --
 -- Root cause: StandingsUpdater::checkClinched() upserted an
 -- 'Eastern/Western Conference Champions' row into ibl_team_awards the moment a team

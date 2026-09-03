@@ -19,7 +19,7 @@ use Team\TeamRepository;
  * Synthetic year 2099 (and 2098 where a second season is needed) ensures no
  * real-data row in ibl_playoff_series_results or ibl_league_config can collide.
  *
- * IMPORTANT: This class does NOT replay migration 165. DDL in MariaDB implicitly
+ * IMPORTANT: This class does NOT replay migration 174. DDL in MariaDB implicitly
  * commits, which would destroy DatabaseTestCase's rollback() isolation for every
  * later test in the run. The vw_team_awards view is assumed live from bin/db-test-up.
  */
@@ -159,7 +159,7 @@ final class ConferenceChampionsDerivationTest extends DatabaseTestCase
      * Reader-layer test for the Phase 5 FranchiseRecordRepository UNION branch.
      *
      * Without that UNION branch getMostTitlesByType('Conference') returns an
-     * empty list for the test DB (no stored conference rows after migration 165
+     * empty list for the test DB (no stored conference rows after migration 174
      * deleted them). With it, the derived 2099 titles flow through and both
      * synthetic teams appear with count = 1.
      */

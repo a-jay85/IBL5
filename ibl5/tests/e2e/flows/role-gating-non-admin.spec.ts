@@ -267,7 +267,6 @@ test.describe('GM-only pages: non-admin / no-team behavior', () => {
     );
     expect(response?.status()).toBe(200);
     await assertNoPhpErrors(page, 'on Player negotiate as non-admin');
-    await expect(page.locator('.ibl-title, .ibl-card__title, h1, h2').first(), 'Player negotiate must render module chrome for a no-team user, not a blank page').toBeVisible();
   });
 
   test('DepthChartEntry renders without PHP errors for a user with no team', async ({

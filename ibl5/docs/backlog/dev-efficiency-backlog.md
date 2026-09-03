@@ -1,6 +1,6 @@
 ---
 description: Development-efficiency backlog — inner-loop speed (diff-scoped analysis, parallel tests), CI caching, dependency-bump batching, and worktree lifecycle automation, with per-entry status.
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # Development-Efficiency Backlog
@@ -549,3 +549,29 @@ Not a defect in the anchoring or the SIGPIPE handling: the `$`-anchor (guarding 
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-02 during #1800)*
+
+### E36 Phase 6 review notes on PR #1965 (check-plan row-width gate)
+
+**class:** dead variable masking and fence-blindness gaps in `bin/check-plan`/`bin/test-check-plan` that cause test verdicts or gate results to misfire in edge cases
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/test-check-plan:~1877` | yes | yes | fixed this pass |
+| 2 | `bin/check-plan:~740-773` (gate N awk, no fence stripping) | near-miss | yes | not fixed — filed |
+
+**prevention_ladder:**
+
+- **rung 0 — already covered by an existing gate?** No existing gate covers dead variables in test scripts or fence-blindness in plan checkers.
+- **rung 1 — extend an existing gate?** Could extend check-plan to strip fences before the N awk, but adds complexity.
+- **rung 2 — a rule doc?** No rule doc warranted — too specific.
+- **rung 3 — PHPStan?** PHPStan doesn't cover bash scripts.
+- **rung 4 — CI gate?** CI gate could run a fence-probe fixture in `bin/test-check-plan` for rung 1; for dead variables, shellcheck CI could catch them.
+- **landing rung:** no gate warranted — the dead-variable fix is applied this pass; the fence-blindness is a documented design tradeoff with zero current false positives, and adding a fixture for it would encode a behavioral contract before the human reviewer has decided whether to fix it.
+
+`prevention_ladder: no gate warranted — Note 2 fixed in-PR; Note 1 is a design tradeoff with zero live false positives, documented for human-reviewer consideration`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-02 during #1965)*

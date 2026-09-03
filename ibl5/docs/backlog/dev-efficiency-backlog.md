@@ -1,6 +1,6 @@
 ---
 description: Development-efficiency backlog — inner-loop speed (diff-scoped analysis, parallel tests), CI caching, dependency-bump batching, and worktree lifecycle automation, with per-entry status.
-last_verified: 2026-09-03
+last_verified: 2026-09-02
 ---
 
 # Development-Efficiency Backlog
@@ -62,6 +62,8 @@ last_verified: 2026-09-03
 | E33 | Phase 6 review notes on PR #1815 — F1/F2 blocking (body inaccuracy, backlog 6.24 collision); F3–F7 notes (reflection test, coercion guards, smoke narrative, last_verified); F1/F2/F5 remediated in Phase 6.5 | ⬜ Open | — | S |
 | E34 | Auto-generated `codebase-map.md` row added in #1903 — mechanical output of `bin/generate-codebase-map`, no defect | 🚫 Declined | — | XS |
 | E35 | Phase 6 review notes on PR #1800 — PR body test count conflated Verification Matrix row count (18) with PHPUnit method count (7 methods / 9 cases); same wrong number replicated into archive entry; both fixed in Phase 6.5 | ⬜ Open | — | XS |
+| E37 | Phase 6 review notes on PR #2045 — plan under-specified assertion discriminator and archive step; PR body Scope omitted mutation context; "No manual testing" claim tensioned with hold; check 5 outstanding hold (n/a); PR body fixed in Phase 6.5 | ⬜ Open | — | XS |
+| E38 | `/pr-ready` lost-work guard blind to prior-run destructive rebase | ⬜ Open | 🟨 | S |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -575,3 +577,57 @@ Not a defect in the anchoring or the SIGPIPE handling: the `$`-anchor (guarding 
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-02 during #1965)*
+
+### E37 Phase 6 review notes on PR #2045 (E2E DCE mobile save-flow)
+
+**class:** a plan spec for an E2E test change that (a) omits the behavioral step (deliberate depth-slot mutation via the mobile stepper) that makes the read-back assertion discriminating — making the plan's prescribed recipe vacuous — and (b) omits the mandatory archive step for a backlog-status-glyph flip, causing unplanned scope that `bin/check-docs` would block if the implementation had followed the plan literally.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `~/claude-plans/e2e-d16-dce-mobile-save-readback.md` Phase 1 — plan recipe prescribes `allInputValues()` capture before submit with no prior mutation; the assertion would be vacuous without a prior state change | yes | no — plan file only; implementation diverged by a better route | not fixed — not a defect in the shipped code; body updated to name the mutation |
+| 2 | `~/claude-plans/e2e-d16-dce-mobile-save-readback.md` Phase 2 — plan recipe specifies only the glyph flip, omitting the mandatory archive move that `bin/check-docs` enforces | yes | no — plan file only; implementation included the archive step | not fixed — not a defect in the shipped code; noted for future plan templates |
+
+**prevention_ladder:**
+
+- **rung 0 — already covered by an existing gate?** Partially: `bin/check-docs` enforces the archive step at commit time (the implementation was correct), but no gate checks whether the *plan* named it.
+- **rung 1 — extend an existing gate?** No existing gate reads plan files or validates that a read-back assertion is discriminating.
+- **rung 2 — a rule doc?** A note in `.claude/rules/` (or the plan-authoring guidance in `_architect-contract.md`) could say: "for E2E read-back plans, the plan must include the mutation that makes the assertion discriminating, not just the capture-and-assert shape." And: "a backlog-flip plan must scope the archive move explicitly." Both are author-discipline items.
+- **rungs 3–5** — N/A. A PHPStan rule, CI gate, or hook cannot evaluate whether a prescribed test recipe is discriminating without running the test.
+
+`prevention_ladder: no gate warranted — (a) the assertion-discriminator gap is an author-judgment item; no mechanical gate can verify a prescribed assertion is discriminating without executing the test; (b) the archive step gap is already enforced at commit time by bin/check-docs; the plan was under-specified but the implementation was correct.`
+
+`artifact destination: n/a — no gate`
+
+**check 4(i) remediation (PR body Scope):** PR body updated via `gh pr edit` to add: "The test first mutates one depth slot via the mobile stepper, captures the resulting select values, submits, then navigates…" — the causal claim "proving persisted" now holds on its stated evidence.
+
+**check 4(ii) remediation (Manual Testing):** PR body "No manual testing needed — all changes are covered by unit and E2E tests" updated to: "No interactive manual testing needed — E2E covers the save flow. However, a human must confirm two consecutive green CI runs before merging (see Notes)." — no longer contradicts the Notes hold.
+
+**check 5 (Verification Matrix row 2 outstanding):** `class: n/a — no defect; row 2 (second consecutive green CI run) is the expected hold state, gated by human-signoff and the plan's explicit Automouse Hold Justification.`
+
+*(discovered 2026-09-02 during #2045)*
+
+### E38 /pr-ready lost-work guard blind to prior-run destructive rebase
+
+`class:` a `/pr-ready` Phase 2a pre-image capture that occurs inside the current run, making the lost-work guard invisible to a destructive rebase performed by an earlier run on the same branch.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `.claude/skills/pr-ready/SKILL.md` Phase 2a | yes | yes | not fixed — filed |
+
+**prevention_ladder:**
+
+- rung 0 — not already covered by an existing gate
+- rung 1 — could extend the existing lost-work guard to also compare against a persisted pre-image from the previous run (e.g. stored as `/tmp/pr-ready-preimage-<N>-<branch>.patch` keyed to PR+branch across runs)
+- rung 2 — a rule doc under `.claude/rules/` would not prevent a code path from executing; not applicable
+- rung 3 — PHPStan rule not applicable (skill/shell code)
+- rung 4 — a CI gate not applicable (harness-side behavior)
+- rung 5 — hook not applicable
+- **Landing: rung 1** — extend the guard to compare the current pre-image against a persistent cross-run patch file; OR add a check that verifies the plan's Critical Files list is represented in the pre-rebase diff (a planned file absent from pre means the pre was already post-loss). Either check is a code change to `scripts/lostwork.sh` or Phase 2a of `SKILL.md`.
+
+`artifact destination:` `.claude/skills/pr-ready/scripts/lostwork.sh` (in-repo; lands in a PR diff)
+
+`provenance:` (discovered 2026-09-02 during #2045)

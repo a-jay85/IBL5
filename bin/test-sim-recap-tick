@@ -143,7 +143,7 @@ if [ ! -f "$STUB/agent-fails" ]; then
             '{"intro_text":"intro","outro_text":"outro","recap_text":"recap",' \
             '"themes":["theme1"],' \
             '"games":[{"season_year":2008,"game_date":"2026-07-23",' \
-            '"visitor_teamid":1,"home_teamid":2,"game_of_that_day":0,' \
+            '"visitor_teamid":1,"home_teamid":2,"game_of_that_day":1,' \
             '"box_id":null,"sort_order":1,"recap_text":"game recap"}]}' \
             | tr -d '\n' > payload.json
     fi
@@ -582,7 +582,7 @@ printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
 {
     printf '%s' '{"intro_text":"intro","outro_text":"outro","recap_text":"recap","themes":["t"],'
     printf '%s' '"games":[{"season_year":2008,"game_date":"2026-07-23","visitor_teamid":1,'
-    printf '%s' '"home_teamid":2,"game_of_that_day":0,"box_id":null,"sort_order":1,"recap_text":"'
+    printf '%s' '"home_teamid":2,"game_of_that_day":1,"box_id":null,"sort_order":1,"recap_text":"'
     printf '%280s' | tr ' ' 'x'
     printf '%s' '"}]}'
 } > "$STUB/resp.payload"
@@ -599,7 +599,7 @@ printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
 {
     printf '%s' '{"intro_text":"intro","outro_text":"outro","recap_text":"recap","themes":["t"],'
     printf '%s' '"games":[{"season_year":2008,"game_date":"2026-07-23","visitor_teamid":1,'
-    printf '%s' '"home_teamid":2,"game_of_that_day":0,"box_id":null,"sort_order":1,"recap_text":"'
+    printf '%s' '"home_teamid":2,"game_of_that_day":1,"box_id":null,"sort_order":1,"recap_text":"'
     printf '%570s' | tr ' ' 'x'
     printf '%s' '"}]}'
 } > "$STUB/resp.payload"

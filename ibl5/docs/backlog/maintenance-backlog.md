@@ -61,12 +61,11 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
-> ✅ resolved (33): 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.19, 1.20, 1.21, 1.22, 1.23, 1.24, 1.26, 1.27, 1.28, 1.29, 1.30, 1.31, 1.32, 1.34, 1.35, 1.36 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (34): 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.19, 1.20, 1.21, 1.22, 1.23, 1.24, 1.25, 1.26, 1.27, 1.28, 1.29, 1.30, 1.31, 1.32, 1.34, 1.35, 1.36 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 1.18 | ◑ Partial | 🟩 | StandingsUpdater. `82`→`League::REGULAR_SEASON_GAMES` DONE (refactor PR). echo→logger + `$log` removal DEFERRED: behavior-changing — echoes feed the rendered pipeline `capturedLog` (UpdateStandingsStep→UpdaterController); `$log` feeds admin-rendered `DebugOutput::display`. Needs a non-`refactor:` PR. |
-| 1.25 | ⬜ Open | 🟨 | BoxscoreProcessor 559 LOC — mutating .sco import pipeline; regular/all-star/rising-stars game processors in one class. Extract per-game-type processors; import-fidelity-critical → characterization pins first. Size finding only; the Processor→Service *rename* is separately declined at 2.5. |
 | 1.33 | ⬜ Open | 🟩 | Player 671 LOC — typed-getter accumulation. Extract per-domain typed-getter groups (contract, stats, identity); green-green. |
 
 > **Note:** `BaseMysqliRepository.php` (602 LOC) is the 18th hot file but is tracked under **2.29** (global-namespace elimination sweep) and is not seeded as a standalone god-class item here.
@@ -86,13 +85,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Est. effort:** S
 **Risk if untouched:** Bug fixes applied twice; optional param is an invisible branching point.
 
-### 1.25 BoxscoreProcessor — Multi-Game-Type Import Pipeline (559 LOC)
-**Location:** `ibl5/classes/Boxscore/BoxscoreProcessor.php` (559 lines)
-**Problem:** One class parses and upserts regular, all-star, and rising-stars game lines from `.sco` files (`processGameLine`, `processAllStarGame`, `processRisingStarsGame`, `processGameUpsert`, `updateSimDates`) — a size/god-class concern.
-**Suggested direction:** Extract per-game-type processors behind a common interface; keep `BoxscoreProcessor` as the file-level dispatcher.
-**Est. effort:** M
-**Risk if untouched:** Import-fidelity-critical mutating pipeline — needs characterization pins before refactor (🟨). This is a **size** finding only; the separate Processor→Service *rename* was deliberately declined at 2.5 (mutating pipeline ⇒ `Processor` is the correct house name) and is not reopened here.
-**Provenance:** Seeded 2026-07-24 — hot-files comment→backlog migration.
 
 ### 1.33 Player — Typed-Getter Accumulation (671 LOC)
 **Location:** `ibl5/classes/Player/Player.php` (671 lines)

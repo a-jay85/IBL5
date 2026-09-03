@@ -101,9 +101,12 @@ jobs:
         run: |
           NUM=$(gh issue list --label stale-docs --state open --json number --jq '.[0].number // empty')
           PREV_SIG=""
+          PREV_SINCE=""
           if [ -n "$NUM" ]; then
             PREV_SIG=$(gh issue view "$NUM" --json body --jq '.body' \
               | tr -d '\r' | sed -n 's/.*<!-- stale-set: \(.*\) -->.*/\1/p')
+            PREV_SINCE=$(gh issue view "$NUM" --json body --jq '.body' \
+              | tr -d '\r' | sed -n 's/.*<!-- stale-since: \(.*\) -->.*/\1/p')
           fi
 
           if [ "$COUNT" -eq 0 ]; then
@@ -123,6 +126,12 @@ jobs:
             echo "Stale set unchanged; leaving issue #$NUM as-is."
             echo "notify=false" >> "$GITHUB_OUTPUT"
           else
+            # Defect 3: preserve the episode start; only restore if this issue existed
+            # before (PREV_SINCE non-empty). A brand-new issue body already has the
+            # correct stale-since written by the "Build issue body" step above.
+            if [ -n "$PREV_SINCE" ]; then
+              sed -i "s|<!-- stale-since: .* -->|<!-- stale-since: $PREV_SINCE -->|" /tmp/issue-body.md
+            fi
             gh issue edit "$NUM" \
               --title "Doc issues: $STALE_COUNT stale, $GLOB_COUNT dead globs" \
               --body-file /tmp/issue-body.md

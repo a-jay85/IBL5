@@ -122,6 +122,7 @@ case "$*" in
     fi
     ;;
   *reply-to-message*)    [ "${STUB_REPLY_FAIL:-0}" = 1 ] && exit 7; echo '{}' ;;
+  *post-to-thread*)      [ -n "${STUB_POST_THREAD_FAIL:-}" ] && exit 1; echo '{}' ;;
   *mention*)             echo '{"message_id":"'"${STUB_MESSAGE_ID:-1420098765432109876}"'"}' ;;
   *get-thread-messages*) cat "$STUB/transcript.json" 2>/dev/null || echo '{"messages":[]}' ;;
   *)                     echo '{}' ;;
@@ -238,6 +239,16 @@ echo "POST_PLAN_NOW $*" >> "$STUB/calls.log"
 exit 0
 SH
 
+    # discord-dm stub: log argv one arg per line and stdin; exit with STUB_DM_RC.
+    # Does NOT write to calls.log — dm.args.log / dm.stdin.log are the two seams.
+    cat > "$STUB/bin/discord-dm" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$@" >> "$STUB/dm.args.log"
+cat >> "$STUB/dm.stdin.log"
+printf '%s\n' '---END---' >> "$STUB/dm.stdin.log"
+exit "${STUB_DM_RC:-0}"
+SH
+
     chmod +x "$STUB"/bin/* "$STUB"/scripts/*.php
 
     export STUB
@@ -245,6 +256,7 @@ SH
     export CLAUDE_BIN="$STUB/bin/claude"
     export CURL_BIN="$STUB/bin/curl"
     export GH_BIN="$STUB/bin/gh"
+    export BUG_PIPELINE_DM_BIN="$STUB/bin/discord-dm"
     export BUG_PIPELINE_SCRIPTS_DIR="$STUB/scripts"
     export BUG_PIPELINE_PLANS_DIR="$STUB/plans"
     export BUG_PIPELINE_ISSUE_REPO="test/bugs-fake"
@@ -297,7 +309,8 @@ bpt_reset() {
     printf '[]' > "$STUB/actionable.json"
     unset GH_FAIL STUB_THREAD_ID STUB_MESSAGE_ID STUB_ISSUE_NUMBER WT_NEW_FAIL STUB_CREATE_THREAD_FAIL \
           CLAIM_NEXT_RC LIST_ACTIVE_RC \
-          STUB_MERGE_STATE STUB_MERGEABLE STUB_PR_VIEW_FAIL
+          STUB_MERGE_STATE STUB_MERGEABLE STUB_PR_VIEW_FAIL \
+          STUB_DM_RC STUB_POST_THREAD_FAIL
 }
 
 bpt_set_actionable()  { printf '%s' "$1" > "$STUB/actionable.json"; }

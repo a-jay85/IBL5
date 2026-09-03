@@ -1,0 +1,327 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-discord-dm — harness for bin/discord-dm Phase-11 chunking contract.
+#
+# Verification rows 27-29 from the Phase 11 matrix:
+#   27. A 5619-char fixture sent with --chunk arrives complete and in order.
+#   28. Without --chunk, the same fixture produces exactly one truncated message.
+#   29. A partial multi-chunk delivery exits non-zero; spool holds the full original.
+# Plus an edge case: an under-cap message with --chunk produces one unmodified message.
+#
+# Row 28's verification that bin/plan-now and bin/watch-automouse-plan callers are
+# unaffected is done by running bin/test-plan-now separately (not inlined here, so
+# a test-plan-now regression does not misreport as a test-discord-dm failure).
+#
+# Run: bin/test-discord-dm  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+ROOT=$(cd "$(dirname "$0")/.." && pwd)
+DM="$ROOT/bin/discord-dm"
+
+FAILS=0
+ok()   { printf '  ok   %s\n' "$1"; }
+fail() { printf '  FAIL %s\n' "$1"; FAILS=$(( FAILS + 1 )); }
+
+# A full template rather than -t <prefix>: GNU mktemp rejects a -t argument
+# with too few X's, so the BSD spelling would fail on the Linux CI runner.
+TMP=$(mktemp -d "${TMPDIR:-/tmp}/test-discord-dm.XXXXXX")
+trap 'rm -rf "$TMP"' EXIT
+
+# Shim osascript so the T29 fallback path does not fire a macOS notification
+# banner on every local run. Matches the caffeinate shim in bin/test-plan-now.
+SHIM="$TMP/bin"
+mkdir -p "$SHIM"
+cat > "$SHIM/osascript" <<'SHIM_EOF'
+#!/usr/bin/env bash
+exit 0
+SHIM_EOF
+chmod +x "$SHIM/osascript"
+export PATH="$SHIM:$PATH"
+
+FAKE_TO="123456789012345678"
+CAP="$TMP/cap.txt"
+SPOOL="$TMP/spool.log"
+FIXTURE="$TMP/big.txt"
+
+# ── Stubs ─────────────────────────────────────────────────────────────────────
+# Transport seam: discord-dm invokes "$SSH_BIN" -o ... "$SSH_HOST" "$REMOTE_CMD"
+# with the JSON payload on stdin. The stub records the payload to $DM_CAPTURE
+# (env var set by the harness) and prints the HTTP status line that discord-dm
+# greps for from the combined ssh output.
+
+# ssh-ok: records each incoming JSON payload, always answers HTTP 200.
+SSH_OK="$TMP/ssh-ok"
+cat > "$SSH_OK" <<'STUB_EOF'
+#!/bin/bash
+cat >> "$DM_CAPTURE"
+printf '\n---MSGEND---\n' >> "$DM_CAPTURE"
+printf '\nHTTP=200 curl_rc=0\n'
+STUB_EOF
+chmod +x "$SSH_OK"
+
+# ssh-fail2: succeeds on chunk 1 (first ---MSGEND--- in the file), returns
+# HTTP 400 (permanent failure, forces no retry) from chunk 2 onward.
+# Uses the accumulated ---MSGEND--- count as the delivery-attempt counter.
+SSH_FAIL2="$TMP/ssh-fail2"
+cat > "$SSH_FAIL2" <<'STUB_EOF'
+#!/bin/bash
+cat >> "$DM_CAPTURE"
+printf '\n---MSGEND---\n' >> "$DM_CAPTURE"
+n=$(grep -c -- '---MSGEND---' "$DM_CAPTURE")
+if [ "$n" -ge 2 ]; then
+    printf '\nHTTP=400 curl_rc=0\n'
+else
+    printf '\nHTTP=200 curl_rc=0\n'
+fi
+STUB_EOF
+chmod +x "$SSH_FAIL2"
+
+# ── Fixture ───────────────────────────────────────────────────────────────────
+# 5619-char fixture with realistic multi-line structure, matching the smoke test
+# in /tmp/dmtest/run.sh. Generates output until at least 5619 bytes have been
+# produced, then truncates. head -c is POSIX since 2017 and works on macOS and
+# Linux. The subshell may receive SIGPIPE once head exits; that is expected.
+{
+    i=0
+    n=0
+    while [ "$n" -lt 5700 ]; do
+        line="step $i: change the thing in the file and then verify the behaviour flips"
+        printf '%s\n' "$line"
+        n=$(( n + ${#line} + 1 ))
+        i=$(( i + 1 ))
+    done
+} 2>/dev/null | head -c 5619 > "$FIXTURE"
+
+fixture_len=$(wc -c < "$FIXTURE" | tr -d ' ')
+if [ "$fixture_len" != "5619" ]; then
+    printf 'test-discord-dm: fixture is %s chars, expected 5619\n' "$fixture_len" >&2
+    exit 1
+fi
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+# read_cap <capfile>: populates global array MSGS and scalar N_MSGS.
+# Splits on ---MSGEND--- delimiters, writes each JSON block to a numbered temp
+# file, then extracts .content.message via jq.
+read_cap() {
+    local cap="$1" blkdir
+    MSGS=()
+    N_MSGS=0
+    blkdir=$(mktemp -d "${TMP}/blk.XXXXXX")
+    awk -v out="$blkdir" '
+    BEGIN { idx=0; buf="" }
+    /^---MSGEND---$/ {
+        if (buf != "") {
+            print buf > (out "/" idx)
+            close(out "/" idx)
+            idx++
+        }
+        buf = ""; next
+    }
+    { buf = (buf == "") ? $0 : buf "\n" $0 }
+    END {
+        if (buf != "") {
+            print buf > (out "/" idx)
+        }
+    }' "$cap"
+
+    local i=0
+    while [ -f "$blkdir/$i" ]; do
+        MSGS+=("$(jq -r '.content.message' "$blkdir/$i")")
+        i=$(( i + 1 ))
+    done
+    N_MSGS="$i"
+}
+
+# ── T27: --chunk delivers the fixture complete and in order ───────────────────
+printf '\n── T27: --chunk complete + in order ──\n'
+: > "$CAP"
+DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" \
+    "$DM" --to "$FAKE_TO" --attempts 1 --quiet --chunk - < "$FIXTURE"
+t27_exit=$?
+if [ "$t27_exit" = 0 ]; then
+    ok "T27: exit 0"
+else
+    fail "T27: exit $t27_exit (expected 0)"
+fi
+
+read_cap "$CAP"
+
+if [ "$N_MSGS" -gt 1 ]; then
+    ok "T27: multiple chunks sent ($N_MSGS)"
+else
+    fail "T27: expected multiple chunks, got $N_MSGS"
+fi
+
+# No truncation marker in any chunk.
+found_trunc=0
+i=0
+while [ "$i" -lt "$N_MSGS" ]; do
+    case "${MSGS[$i]}" in
+        *'(truncated)'*) found_trunc=1 ;;
+    esac
+    i=$(( i + 1 ))
+done
+if [ "$found_trunc" = 0 ]; then
+    ok "T27: no truncation marker in any chunk"
+else
+    fail "T27: found truncation marker in a chunk"
+fi
+
+# Chunk ordering: chunk i (0-indexed, i>0) must start with "(i+1/total): ".
+order_ok=1
+i=1
+while [ "$i" -lt "$N_MSGS" ]; do
+    expected="($(( i + 1 ))/$N_MSGS): "
+    case "${MSGS[$i]}" in
+        "$expected"*) ;;
+        *) order_ok=0 ;;
+    esac
+    i=$(( i + 1 ))
+done
+if [ "$order_ok" = 1 ]; then
+    ok "T27: chunk ordering correct (2/$N_MSGS … $N_MSGS/$N_MSGS)"
+else
+    fail "T27: chunk ordering wrong"
+fi
+
+# No single chunk exceeds Discord's 2000-char cap.
+cap_ok=1
+i=0
+while [ "$i" -lt "$N_MSGS" ]; do
+    if [ "${#MSGS[$i]}" -gt 2000 ]; then
+        cap_ok=0
+    fi
+    i=$(( i + 1 ))
+done
+if [ "$cap_ok" = 1 ]; then
+    ok "T27: all chunks <= 2000 chars"
+else
+    fail "T27: a chunk exceeds 2000 chars"
+fi
+
+# Content matches input whitespace-insensitively. Reassemble by stripping the
+# (N/M): prefix from chunks 2+. The splitter consumes the whitespace it breaks
+# on, so byte-exact equality after reassembly does not hold; whitespace-
+# insensitive comparison (strip all whitespace from both sides) is the correct
+# criterion. Anchor the strip to line 1 of each chunk so a body line that
+# resembles a prefix is not eaten.
+reassembled="${MSGS[0]}"
+i=1
+while [ "$i" -lt "$N_MSGS" ]; do
+    stripped=$(printf '%s' "${MSGS[$i]}" | sed '1s/^([0-9][0-9]*\/[0-9][0-9]*): //')
+    reassembled="${reassembled}${stripped}"
+    i=$(( i + 1 ))
+done
+orig_compact=$(tr -d '[:space:]' < "$FIXTURE")
+reassembled_compact=$(printf '%s' "$reassembled" | tr -d '[:space:]')
+if [ "$orig_compact" = "$reassembled_compact" ]; then
+    ok "T27: reassembled content matches input (whitespace-insensitive)"
+else
+    fail "T27: content mismatch after reassembly"
+fi
+
+# ── T28: no --chunk still produces exactly one truncated message ──────────────
+printf '\n── T28: no --chunk still truncates ──\n'
+: > "$CAP"
+DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" \
+    "$DM" --to "$FAKE_TO" --attempts 1 --quiet - < "$FIXTURE"
+t28_exit=$?
+if [ "$t28_exit" = 0 ]; then
+    ok "T28: exit 0"
+else
+    fail "T28: exit $t28_exit (expected 0)"
+fi
+
+read_cap "$CAP"
+
+if [ "$N_MSGS" = 1 ]; then
+    ok "T28: exactly one message sent"
+else
+    fail "T28: expected 1 message, got $N_MSGS"
+fi
+
+case "${MSGS[0]}" in
+    *'(truncated)'*) ok "T28: truncation marker present" ;;
+    *)               fail "T28: missing truncation marker" ;;
+esac
+
+# ── T29: partial delivery exits non-zero, spools the full original ────────────
+printf '\n── T29: partial delivery → non-zero exit + full spool ──\n'
+: > "$CAP"
+: > "$SPOOL"
+DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_FAIL2" DISCORD_DM_SPOOL="$SPOOL" \
+    "$DM" --to "$FAKE_TO" --attempts 1 --quiet --chunk - < "$FIXTURE"
+t29_exit=$?
+if [ "$t29_exit" -ne 0 ]; then
+    ok "T29: exit non-zero ($t29_exit)"
+else
+    fail "T29: exit was 0 (expected non-zero)"
+fi
+
+# ssh-fail2 delivers chunk 1 (HTTP 200) then hard-fails chunk 2 (HTTP 400,
+# permanent). Exactly 2 payloads must be in the capture — one success + one
+# refused — pinning the "stop immediately" half of the all-or-nothing contract.
+read_cap "$CAP"
+if [ "$N_MSGS" = 2 ]; then
+    ok "T29: exactly 2 payloads captured (deliver-then-stop)"
+else
+    fail "T29: expected 2 payloads in cap (deliver-then-stop), got $N_MSGS"
+fi
+
+# Spool holds the full original message (whitespace-insensitive to tolerate
+# the timestamp header line discord-dm prepends to the spool entry).
+orig_compact=$(tr -d '[:space:]' < "$FIXTURE")
+spool_compact=$(tr -d '[:space:]' < "$SPOOL")
+case "$spool_compact" in
+    *"$orig_compact"*) ok "T29: spool holds full original message" ;;
+    *)                 fail "T29: spool does not contain full original" ;;
+esac
+
+# Spool must not contain a chunk prefix — the spool holds FULL_MSG, which is
+# the pre-chunked original, never a partially assembled fragment.
+if grep -qF '(2/' "$SPOOL"; then
+    fail "T29: spool contains (2/ chunk prefix"
+else
+    ok "T29: spool has no chunk prefix"
+fi
+
+# ── Edge: under-cap message with --chunk → one message, byte-identical ────────
+printf '\n── Edge: under-cap + --chunk → single message, no prefix ──\n'
+: > "$CAP"
+# printf has no trailing newline. jq captures the message exactly as given;
+# $() strips any trailing newline from jq's output — both sides of the
+# byte-identity comparison lose no content.
+printf 'short and sweet' | \
+    DM_CAPTURE="$CAP" DISCORD_DM_SSH_BIN="$SSH_OK" DISCORD_DM_SPOOL="$SPOOL" \
+    "$DM" --to "$FAKE_TO" --attempts 1 --quiet --chunk -
+edge_exit=$?
+if [ "$edge_exit" = 0 ]; then
+    ok "edge: exit 0"
+else
+    fail "edge: exit $edge_exit (expected 0)"
+fi
+
+read_cap "$CAP"
+
+if [ "$N_MSGS" = 1 ]; then
+    ok "edge: exactly one message"
+else
+    fail "edge: expected 1 message, got $N_MSGS"
+fi
+
+if [ "${MSGS[0]}" = "short and sweet" ]; then
+    ok "edge: message byte-identical to input"
+else
+    fail "edge: message differs — got '${MSGS[0]}'"
+fi
+
+# ── Summary ───────────────────────────────────────────────────────────────────
+printf '\n'
+if [ "$FAILS" -eq 0 ]; then
+    echo "test-discord-dm: all cases passed"
+else
+    printf 'test-discord-dm: %d case(s) FAILED\n' "$FAILS"
+fi
+exit $(( FAILS > 0 ? 1 : 0 ))

@@ -238,7 +238,7 @@ test.describe('GM-only pages: non-admin / no-team behavior', () => {
     const response = await page.goto('modules.php?name=Trading');
     expect(response?.status()).toBe(200);
     await assertNoPhpErrors(page, 'on Trading as non-admin');
-    await expect(page.locator('.ibl-title, .ibl-card__title, h1, h2').first()).toBeVisible();
+    await expect(page.locator('.ibl-title, .ibl-card__title, h1, h2').first(), 'Trading must render module chrome for a no-team user, not a blank page').toBeVisible();
   });
 
   test('FreeAgency negotiate renders without PHP errors for a user with no team', async ({
@@ -251,7 +251,7 @@ test.describe('GM-only pages: non-admin / no-team behavior', () => {
     );
     expect(response?.status()).toBe(200);
     await assertNoPhpErrors(page, 'on FreeAgency negotiate as non-admin');
-    await expect(page.locator('.ibl-title, .ibl-card__title, h1, h2').first()).toBeVisible();
+    await expect(page.locator('.ibl-title, .ibl-card__title, h1, h2').first(), 'FreeAgency negotiate must render module chrome for a no-team user, not a blank page').toBeVisible();
   });
 
   test('Player negotiate renders without PHP errors for a user with no team', async ({
@@ -267,7 +267,7 @@ test.describe('GM-only pages: non-admin / no-team behavior', () => {
     );
     expect(response?.status()).toBe(200);
     await assertNoPhpErrors(page, 'on Player negotiate as non-admin');
-    await expect(page.locator('.ibl-title, .ibl-card__title, h1, h2').first()).toBeVisible();
+    await expect(page.locator('.ibl-title, .ibl-card__title, h1, h2').first(), 'Player negotiate must render module chrome for a no-team user, not a blank page').toBeVisible();
   });
 
   test('DepthChartEntry renders without PHP errors for a user with no team', async ({
@@ -276,7 +276,7 @@ test.describe('GM-only pages: non-admin / no-team behavior', () => {
     const response = await page.goto('modules.php?name=DepthChartEntry');
     expect(response?.status()).toBe(200);
     await assertNoPhpErrors(page, 'on DepthChartEntry as non-admin');
-    await expect(page.locator('.ibl-title, .ibl-card__title, h1, h2').first()).toBeVisible();
+    await expect(page.locator('.ibl-title, .ibl-card__title, h1, h2').first(), 'DepthChartEntry must render module chrome for a no-team user, not a blank page').toBeVisible();
   });
 });
 

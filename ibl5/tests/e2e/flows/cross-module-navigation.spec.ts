@@ -51,7 +51,7 @@ test.describe('Cross-module navigation', () => {
     await assertNoPhpErrors(page, 'on Season Leaderboards');
 
     const playerLink = page.locator('a[href*="name=Player"][href*="pid="]').first();
-    await expect(playerLink).toBeVisible();
+    await expect(playerLink, 'CI seed gives teamid 1 a roster (ci-seed.sql, ibl_plr)').toBeVisible();
 
     const href = await playerLink.getAttribute('href');
     expect(href).toBeTruthy();

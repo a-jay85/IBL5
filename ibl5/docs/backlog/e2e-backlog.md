@@ -257,6 +257,7 @@ value). For fake-POST tests (D7), assert the banner *after a real submit*, not a
 | E10 | ✅ Done | 🟩 | `waitForLoadState('domcontentloaded')` after HTMX form — `voting-submission.spec.ts:140`; tab-click pre-swap — `waivers.spec.ts` |
 | E11 | ✅ Done | 🟩 | browser-history `goBack/goForward` — `draft-history`, `franchise-record-book`, `league-starters`, `team` (load-sensitive; keep, watch) |
 | E12 | ✅ Done | 🟩 | sleep-in-retry `setTimeout(r,200)` loop — `ajax-api-endpoints.spec.ts fetchJson` |
+| E13 | ⬜ Open | 🟩 | Plan-specified diagnostic strings and DOM observation evidence omitted during E2E assertion implementation. Messages fixed inline (PR #1807). DOM dumps for D15's four no-team pages not captured — needs a Playwright run against the worktree stack with `IBL_TEST_USER_REGULAR` credentials. (discovered 2026-09-02 during #1807) |
 
 **Suggested direction (axis):** All E1–E12 items complete (PR #1805). E9's final implementation uses `evaluate(form.submit())` + auto-retrying `toContainText` DOM assertion rather than `waitForResponse` — `form.submit()` triggers full-page navigation, making `page.content()` race the navigate; the DOM assertion survives the navigation. E9 STOP GUARD: not triggered — PHP validation confirmed working.
 **Est. effort:** complete. **Risk if untouched:** n/a.
@@ -265,6 +266,27 @@ value). For fake-POST tests (D7), assert the banner *after a real submit*, not a
 > there it's the correct pre-screenshot settle and the file runs under `playwright.visual.config.ts` (excluded
 > from the chromium project). `console-error-watcher.spec.ts:31,51` 50ms sleeps are meta-test (no deterministic
 > state). `engine-shadow-spawn-on-update` poll loop is an out-of-band process with a double `test.skip`.
+
+### E13 Missing diagnostic artifacts in E2E assertions — messages and DOM evidence
+**class:** a plan-specified diagnostic string (message arg to a Playwright `expect()` assertion) or DOM observation dump omitted silently during implementation, leaving assertion failures reporting only "expected visible" with no pointer to which CI seed table, session, or rendered shape to check.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `tests/e2e/flows/cross-module-navigation.spec.ts:54` | yes | yes | fixed this pass — message `'CI seed gives teamid 1 a roster (ci-seed.sql, ibl_plr)'` added |
+| 2 | `tests/e2e/flows/role-gating-non-admin.spec.ts:241,254,270,279` | yes | yes | fixed this pass — four plan-specified diagnostic messages added |
+| 3 | PR #1807 body — four D15 DOM dumps for no-team pages (Trading, FreeAgency negotiate, Player negotiate, DepthChartEntry) | yes | not fixed | not fixed — filed; requires a Playwright session with `IBL_TEST_USER_REGULAR` against the worktree stack |
+
+**prevention ladder:**
+- rung 0 — no existing gate enforces plan-specified message args in Playwright assertions.
+- rung 1 — no existing gate to extend covers this pattern.
+- rung 2 — a `.claude/rules/` note on "plan-specified diagnostic messages must ship with the assertion" would help but cannot automate the catch.
+- rung 3 — PHPStan does not cover TypeScript. A TypeScript ESLint rule could flag bare `expect(locator).toBeVisible()` calls with no message arg, but the signal-to-noise ratio is poor (not all assertions need messages) and the rung-3–5 `meta-tooling-bar.md` extend-before-add conditions do not hold.
+- rungs 4–5 — same objection; a CI gate on bare `toBeVisible()` calls would over-fire.
+- **Landing: no gate warranted** — the diagnostic message requirement is plan-authorship discipline, not a mechanically detectable structural property. The right enforcement is a plan checklist item at assertion-writing time, not a runtime gate.
+**artifact destination:** n/a — no gate
+**provenance:** (discovered 2026-09-02 during #1807)
 
 ---
 

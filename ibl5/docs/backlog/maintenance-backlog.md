@@ -25,7 +25,7 @@ Effort scale:
 - **M** — multi-step plan, 1-3 days, may touch several modules
 - **L** — refactor or platform shift, > 3 days, likely needs ADR
 
-**Status:** Complete — 15-axis audit, 312 findings (+2 post-audit follow-ups from the PR #1107 review, +1 from the #1066 reject-IDOR review → 315 tracked; +11 Axis-1 size seeds 1.21–1.31 from the hot-files comment→backlog migration 2026-07-24 → 326 tracked; +5 Axis-1 size seeds 1.32–1.36 from the ground-truth audit 2026-07-24 → 331 tracked; +1 Axis-2 robustness item 2.39 discovered 2026-07-27 during trading-1-31-api-handler-extract → 332 tracked; +1 Axis-15 data-integrity item 15.24 discovered 2026-08-04 during the PR #1771 review → 333 tracked; +1 Axis-6 coverage item 6.23 discovered 2026-08-08 during the PR #1670 review → 334 tracked; +1 Axis-8 correctness item 8.18 discovered 2026-08-09 during the PR #1683 review → 335 tracked; +1 Axis-6 robustness item 6.24 discovered 2026-08-10 during #1825 → 336 tracked; +1 Axis-6 coverage item 6.25 discovered 2026-09-01 during #1903 → 337 tracked; +1 Axis-9 process-observation item 9.28 discovered 2026-09-01 during #1903 → 338 tracked).
+**Status:** Complete — 15-axis audit, 312 findings (+2 post-audit follow-ups from the PR #1107 review, +1 from the #1066 reject-IDOR review → 315 tracked; +11 Axis-1 size seeds 1.21–1.31 from the hot-files comment→backlog migration 2026-07-24 → 326 tracked; +5 Axis-1 size seeds 1.32–1.36 from the ground-truth audit 2026-07-24 → 331 tracked; +1 Axis-2 robustness item 2.39 discovered 2026-07-27 during trading-1-31-api-handler-extract → 332 tracked; +1 Axis-15 data-integrity item 15.24 discovered 2026-08-04 during the PR #1771 review → 333 tracked; +1 Axis-6 coverage item 6.23 discovered 2026-08-08 during the PR #1670 review → 334 tracked; +1 Axis-8 correctness item 8.18 discovered 2026-08-09 during the PR #1683 review → 335 tracked; +1 Axis-6 robustness item 6.24 discovered 2026-08-10 during #1825 → 336 tracked; +1 Axis-6 coverage item 6.25 discovered 2026-09-01 during #1903 → 337 tracked; +1 Axis-9 process-observation item 9.28 discovered 2026-09-01 during #1903 → 338 tracked; +1 Axis-2 robustness item 2.40 discovered 2026-09-02 during #1807 → 339 tracked).
 
 ---
 
@@ -105,6 +105,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 2.28 | ⬜ Open | 🟨 | `faprep.php` exists (verified), inline SQL + unescaped output. Resolve with 3.9 (delete); if absorbed instead, XSS/admin-SQL = human-merge. |
 | 2.29 | ⬜ Open | 🟨 | DEFERRED — global-namespace elimination: JSB 291 callers, BaseMysqliRepository 257, ContractRules 37 (585 caller files). L-effort, high-collision; needs its own sequenced PR (one class at a time), not an unattended wave item. |
 | 2.39 | ⬜ Open | 🟨 | `TradeRosterPreviewCashRowBuilder::buildCashRows()` iterates `cashStartYear`..`cashEndYear` from `$_GET` with no upper bound and no ordering check — `cashStartYear=1&cashEndYear=999999` drives an ~1M-iteration loop. Add bounds + ordering enforcement; upfront: choose max-year cap. (discovered 2026-07-27 during trading-1-31-api-handler-extract) |
+| 2.40 | ⬜ Open | 🟨 | `modules/Player/index.php:79,114` (+ 3 candidates in Player/extension.php, DepthChartEntry, LeagueStarters) pass `getTeamnameFromUsername()`'s `?string` return into a `string` sink under `strict_types=1` — no-team users get a `TypeError`. Reverted from PR #1807 per plan STOP guard; needs a full sweep + PHPStan gate. (discovered 2026-09-02 during #1807) |
 
 ### 2.10 Extension — No View; Routed Through modules/Player
 **Location:** `classes/Extension/`, `modules/Player/extension.php`
@@ -183,6 +184,27 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Est. effort:** S
 **Risk if untouched:** Authenticated users can trigger arbitrary-length computation loops via crafted requests to the trade-roster-preview API endpoint.
 **Provenance:** Discovered 2026-07-27 during trading-1-31-api-handler-extract.
+
+### 2.40 Player `negotiate()` — `getTeamnameFromUsername()` nullable return into `string` sink under `strict_types=1`
+**class:** a PHP module function that passes `getTeamnameFromUsername()`'s nullable `?string` return directly into a `string`-typed parameter under `strict_types=1`, causing a runtime `TypeError` for users with no team assignment.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `modules/Player/index.php:79` | yes | yes | not fixed — reverted; surfaced in PR body per plan STOP guard |
+| 2 | `modules/Player/index.php:114` | yes | yes (candidate) | not fixed — filed |
+| 3 | `modules/Player/extension.php:22` | yes (candidate) | unverified | not fixed — filed |
+| 4 | `modules/DepthChartEntry/index.php:68,124` | yes (candidate) | unverified | not fixed — filed |
+| 5 | `modules/LeagueStarters/index.php:57` | yes (candidate) | unverified | not fixed — filed |
+
+**prevention ladder:**
+- rung 0 — no existing gate covers nullable-to-typed-string sinks; `composer run analyse` did not flag `index.php:79` before the PR's drive-by fix, suggesting the pattern escapes the current PHPStan config.
+- rung 1 — PHPStan strictness in `ibl5/phpstan.neon` may be raiseable to detect `?string → string` mismatches without a new rule.
+- rung 2 — a `.claude/rules/` note on `getTeamnameFromUsername()`'s nullable contract would help reviewers but cannot automate the catch.
+- rung 3 — PHPStan at sufficiently high strictness catches `?string → string` parameter mismatch; check `ibl5/phpstan-baseline.neon` for a suppression of this class and remove it. **Landing rung: 3** — rungs 0–2 are insufficient; PHPStan's gap is the root cause, and closing it with the existing tooling is the cheapest automated defense. Rungs 4–5 (`meta-tooling-bar.md` extend-before-add conditions: `(i)` checking for an existing gate — rung 0 applies; `(ii)` extending before adding — rung 1/3 extend the existing PHPStan run; `(iii)` the gate fires on the triggering class — PHPStan finds `?string → string`; `(iv)` cost proportionate — a config bump costs zero new tooling) all hold.
+**artifact destination:** `ibl5/phpstan-baseline.neon` (remove suppression if present) and/or `ibl5/phpstan.neon` (raise level). In-repo; present in the PR diff when fixed. Not out-of-repo.
+**provenance:** (discovered 2026-09-02 during #1807)
 
 ## Axis 3: Top-Level Legacy PHP Files
 

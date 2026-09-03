@@ -1,6 +1,6 @@
 ---
 description: Rationale for adding a gitleaks secret-scanning CI gate, scrubbing a rotated DB password, and hardening the demo-login token to fail closed.
-last_verified: 2026-07-03
+last_verified: 2026-09-02
 ---
 
 # ADR-0034: Secret-Scanning Gate
@@ -19,6 +19,16 @@ A holistic audit found the production DB password (already rotated by the mainta
 2. **Rotation is the remediation for any leak — never `.gitignore`.** When the gate fires, the credential is rotated and scrubbed from HEAD. Git-history rewrite is out of scope (disruptive; rotation already mitigates), so the already-leaked-and-rotated literal is allowlisted in `.gitleaks.toml` rather than purged from history.
 
 3. **`config.php` stays untracked, and demo login fails closed.** `Auth\DemoLoginGate` resolves the expected token from the `DEMO_LOGIN_TOKEN` env var first, falling back to the constant. Demo login is disabled (HTTP 403, no session) whenever the resolved token is empty or equals the weak `'demo'` literal — even if a stale `config.php` still defines it. A wrong-but-well-formed token keeps the endpoint's prior 404 obscurity.
+
+## Addendum — action version (2026-09-02)
+
+The Decision above records `gitleaks/gitleaks-action@v2`, which is what was adopted on
+2026-05-28. The workflow has since been upgraded to v3 and is now pinned by digest
+(`gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0` in
+`.github/workflows/gitleaks.yml`). The decision itself — that a gitleaks gate runs on every PR
+and on pushes to `master`, with suppressions only via commented `.gitleaks.toml` entries — is
+unchanged; only the action major version moved. The v2 reference is left in place deliberately
+as the historical record of what was decided.
 
 ## Alternatives Considered
 

@@ -98,7 +98,15 @@ case "$1 $2" in
       esac ;;
   "pr list")
       case "$args" in
-        *"--state all"*)    printf '%s' "${SHIM_PR_FOR_BRANCH:-0}" ;;
+        *"--state all"*)
+            # Two callers use --state all with different --json fields:
+            # reap loop uses --json state (wants post-jq: MERGED/CLOSED/OPEN/NONE),
+            # health checks use --json number (want post-jq: count integer).
+            # Distinguish them so both callers get the right post-jq value.
+            case "$args" in
+              *"--json state"*) printf '%s' "${SHIM_PR_STATE:-NONE}" ;;
+              *)                printf '%s' "${SHIM_PR_FOR_BRANCH:-0}" ;;
+            esac ;;
         *"--state closed"*) printf '%s' "${SHIM_PR_CLOSED:-[]}" ;;
         *"number,headRefName,autoMergeRequest"*) printf '%s' "${SHIM_PR_DM:-}" ;;
         *autoMergeRequest*)                      printf '%s' "${SHIM_PR_UNARMED:-}" ;;
@@ -897,6 +905,64 @@ VOUT="$( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
     && printf '%s' "$VOUT" | grep -qF 'plan file not found'; } \
   && ok "(47) veronly: missing plan file is rc 2, not a grant" \
   || bad "(47) veronly: missing plan file"
+
+# --- Cases 20a-23 (plan matrix #13-16): prompt-safety + fail-closed guard --------
+
+# Case 20a (plan #13): injection chars in SIG — not executed, written literally to plist.
+# shq() single-quotes the prompt, so $() spans are never evaluated by the plist shell.
+SB="$(build_sandbox)"
+SIG13='ibl5/docs/foo.md,$(touch /tmp/pr13-pwned-backtick)'
+run_docfix "$SB" "" "" "13p" "$SIG13" >/dev/null
+P_INJ="$(plist_of "$SB")"
+{ [ ! -f /tmp/pr13-pwned-backtick ] \
+    && [ -n "$P_INJ" ] \
+    && grep -qF '$(touch /tmp/pr13-pwned-backtick)' "$P_INJ"; } \
+  && ok "(20a/plan13) injection chars in SIG written literally to plist, not executed" \
+  || bad "(20a/plan13) prompt injection guard"
+
+# Case 20b (plan #14): malicious $SIG — not executed during plist construction.
+# $SIG is substituted into PROMPT as a literal; no second expansion occurs in bash.
+SB="$(build_sandbox)"
+SIG14='ibl5/docs/foo.md $(touch /tmp/pr14-pwned-sig)'
+run_docfix "$SB" "" "" "14p" "$SIG14" >/dev/null
+{ [ ! -f /tmp/pr14-pwned-sig ]; } \
+  && ok "(20b/plan14) malicious SIG not executed during plist construction" \
+  || bad "(20b/plan14) malicious SIG executed"
+
+# Case 22 (plan #15): XML metacharacters in SIG — plist still parses.
+# xml_escape() converts & → &amp; and < → &lt; so the plist XML stays well-formed.
+SB="$(build_sandbox)"
+SIG15='ibl5/docs/foo.md &amp; <tag>'
+run_docfix "$SB" "" "" "15p" "$SIG15" >/dev/null
+PLIST22="$(plist_of "$SB")"
+# plutil is macOS-only; use python3 xml.etree (available on macOS + Linux CI) as a
+# portable plist/XML validator so the test passes on ubuntu-latest runners.
+{ [ -n "$PLIST22" ] && python3 -c "import xml.etree.ElementTree as ET; ET.parse('$PLIST22')" >/dev/null 2>&1; } \
+  && ok "(22/plan15) SIG with & and < yields a python3-ET-parse-clean plist" \
+  || bad "(22/plan15) XML metacharacters broke plist"
+
+# Case 23: gh API failure → fail-closed guard (upstream guard from PR #1861, bin/docfix-run:50-55).
+# That guard emits "could not query open PRs (gh failed) — skipping this cycle (fail-closed)."
+# run_docfix suppresses output; call docfix-run directly to capture stderr.
+SB="$(build_sandbox)"
+OUT23="$(SHIM_GH_FAIL=1 IBL5_MAIN="$SB" HOME="$SB/home" PATH="$SB/shim:$PATH" \
+    "$REAL_DOCFIX" "16p" "a.md" 2>&1)"
+RC23=$?
+{ [ "$RC23" -eq 0 ] \
+    && [ -z "$(plist_of "$SB")" ] \
+    && printf '%s' "$OUT23" | grep -q 'could not query open PRs'; } \
+  && ok "(23) gh API failure → exit 0, no plist, upstream #1861 fail-closed guard fires" \
+  || bad "(23) upstream #1861 fail-closed open-PR guard did not fire as expected"
+
+# --- Case 48: static — prompt still carries the append-only + disclosure clauses
+# These are prose constraints inside $PROMPT, not code, so nothing else fails when a
+# future edit drops them. Assert them the way Case 6/8 assert workflow invariants.
+{ grep -qF 'DECISION RECORDS ARE APPEND-ONLY' "$REAL_DOCFIX" \
+    && grep -qF 'NEVER SWAP A FIGURE WITHOUT RE-READING ITS SENTENCE' "$REAL_DOCFIX" \
+    && grep -qF '## Addendum' "$REAL_DOCFIX" \
+    && grep -qF '## Content rewritten' "$REAL_DOCFIX"; } \
+  && ok "(48) prompt: ADR append-only + figure-resubstitution + content-rewrite disclosure clauses present" \
+  || bad "(48) prompt: an append-only/disclosure clause was dropped from \$PROMPT"
 
 if [ "$FAILED" -eq 0 ]; then echo "All docfix-run checks passed."; else echo "Some docfix-run checks FAILED."; fi
 exit "$FAILED"

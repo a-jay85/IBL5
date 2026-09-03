@@ -28,6 +28,25 @@ function isUnknownMessage(error: unknown): boolean {
         && (error as { code?: unknown }).code === 10008;
 }
 
+// Splits text at ≤CHUNK_MAX chars, preferring line breaks over mid-word cuts.
+// Each chunk after the first is prefixed with "(N/M): " so a reader knows more follows.
+const CHUNK_MAX = 1900;
+export function chunkMessage(text: string): string[] {
+  if (text.length <= CHUNK_MAX) return [text];
+  const chunks: string[] = [];
+  let remaining = text;
+  while (remaining.length > CHUNK_MAX) {
+    let cut = remaining.lastIndexOf('\n', CHUNK_MAX);
+    if (cut <= 0) cut = remaining.lastIndexOf(' ', CHUNK_MAX);
+    if (cut <= 0) cut = CHUNK_MAX;
+    chunks.push(remaining.slice(0, cut));
+    remaining = remaining.slice(cut).trimStart();
+  }
+  if (remaining.length > 0) chunks.push(remaining);
+  const total = chunks.length;
+  return chunks.map((c, i) => (i === 0 ? c : `(${i + 1}/${total}): ${c}`));
+}
+
 export function startBugBotServer(client: Client): void {
     const app = express();
     app.use(express.json());
@@ -98,8 +117,9 @@ export function startBugBotServer(client: Client): void {
                 res.status(500).send('Thread is not sendable');
                 return;
             }
-            await channel.send(message);
-            res.send('posted');
+            const chunks = chunkMessage(message);
+            for (const chunk of chunks) { await channel.send(chunk); }
+            res.json({ ok: true, chunks: chunks.length });
         } catch (error) {
             console.error('/post-to-thread failed:', error);
             res.status(500).send('Failed to post to thread');

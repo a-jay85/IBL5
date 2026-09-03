@@ -1,6 +1,6 @@
 ---
 description: Development-efficiency backlog — inner-loop speed (diff-scoped analysis, parallel tests), CI caching, dependency-bump batching, and worktree lifecycle automation, with per-entry status.
-last_verified: 2026-09-02
+last_verified: 2026-09-03
 ---
 
 # Development-Efficiency Backlog
@@ -61,6 +61,7 @@ last_verified: 2026-09-02
 | E32 | Phase 6 review notes on PR #1861 — minor plan-vs-implementation drifts and in-flight artifacts on a long-lived branch, all non-blocking | ⬜ Open | — | S |
 | E33 | Phase 6 review notes on PR #1815 — F1/F2 blocking (body inaccuracy, backlog 6.24 collision); F3–F7 notes (reflection test, coercion guards, smoke narrative, last_verified); F1/F2/F5 remediated in Phase 6.5 | ⬜ Open | — | S |
 | E34 | Auto-generated `codebase-map.md` row added in #1903 — mechanical output of `bin/generate-codebase-map`, no defect | 🚫 Declined | — | XS |
+| E35 | Phase 6 review notes on PR #1800 — PR body test count conflated Verification Matrix row count (18) with PHPUnit method count (7 methods / 9 cases); same wrong number replicated into archive entry; both fixed in Phase 6.5 | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -524,3 +525,53 @@ Not a defect in the anchoring or the SIGPIPE handling: the `$`-anchor (guarding 
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-01 during #1903)*
+
+### E35 Phase 6 review notes on PR #1800 (game-of-that-day validation floor)
+
+**class:** a hand-written test count in the PR body that conflates the Verification Matrix row count with the PHPUnit method count, replicated permanently into an in-repo archive entry.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/docs/backlog/archive/ci-backlog-archive.md:72` — "18 PHPUnit tests" | yes | yes | fixed this pass — corrected to "7 PHPUnit test methods (9 cases)" |
+| 2 | PR #1800 body bullet — "18 new PHPUnit test cases" | yes | yes | fixed this pass — corrected to "7 new PHPUnit test methods (9 cases)" |
+
+**prevention_ladder:**
+
+- **rung 0 — already covered by an existing gate?** No. `/pr-ready` Phase 6 catches this class after the fact.
+- **rung 1 — extend an existing gate?** No existing gate checks hand-written test counts in PR bodies.
+- **rung 2 — a rule doc?** A reminder in `.claude/rules/commit-conventions.md` could note "use method count, not Verification Matrix row count" — but this is author discipline, not automatable.
+- **rungs 3–5** — N/A. A PHPStan rule, CI gate, or hook cannot read a PR body or verify a claim inside it.
+
+`prevention_ladder: no gate warranted — the Verification Matrix already records the correct method count ("the SimRecapPayloadTest count is 16 (9+3+4)"); the wrong figure requires ignoring the plan's own count. Author discipline; no mechanical gate is cheaper than re-reading the plan.`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-02 during #1800)*
+
+### E36 Phase 6 review notes on PR #1965 (check-plan row-width gate)
+
+**class:** dead variable masking and fence-blindness gaps in `bin/check-plan`/`bin/test-check-plan` that cause test verdicts or gate results to misfire in edge cases
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/test-check-plan:~1877` | yes | yes | fixed this pass |
+| 2 | `bin/check-plan:~740-773` (gate N awk, no fence stripping) | near-miss | yes | not fixed — filed |
+
+**prevention_ladder:**
+
+- **rung 0 — already covered by an existing gate?** No existing gate covers dead variables in test scripts or fence-blindness in plan checkers.
+- **rung 1 — extend an existing gate?** Could extend check-plan to strip fences before the N awk, but adds complexity.
+- **rung 2 — a rule doc?** No rule doc warranted — too specific.
+- **rung 3 — PHPStan?** PHPStan doesn't cover bash scripts.
+- **rung 4 — CI gate?** CI gate could run a fence-probe fixture in `bin/test-check-plan` for rung 1; for dead variables, shellcheck CI could catch them.
+- **landing rung:** no gate warranted — the dead-variable fix is applied this pass; the fence-blindness is a documented design tradeoff with zero current false positives, and adding a fixture for it would encode a behavioral contract before the human reviewer has decided whether to fix it.
+
+`prevention_ladder: no gate warranted — Note 2 fixed in-PR; Note 1 is a design tradeoff with zero live false positives, documented for human-reviewer consideration`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-02 during #1965)*

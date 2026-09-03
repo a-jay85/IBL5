@@ -605,6 +605,7 @@ test.describe('Trade submission: accept and reject', () => {
     expect(await acceptableCard.count(), 'CI seed must provide offers with Accept button').toBeGreaterThan(0);
 
     const acceptBtn = acceptableCard.first().locator('.ibl-btn--success');
+    const acceptedOfferId = await acceptableCard.first().locator('[data-preview-offer]').getAttribute('data-preview-offer');
 
     await submitFormAndAssertEffect(page, {
       submit: async () => {
@@ -618,7 +619,12 @@ test.describe('Trade submission: accept and reject', () => {
         await assertNoPhpErrors(page, 'after accept');
       },
       readBack: async () => {
-        expect(page.url()).toContain('result=trade_accepted');
+        await gotoWithRetry(page, 'modules.php?name=Trading&op=reviewtrade');
+        // The accepted card should no longer be present in the review list
+        const acceptedCard = page.locator('.trade-offer-card').filter({
+          has: page.locator(`[data-preview-offer="${acceptedOfferId}"]`),
+        });
+        await expect(acceptedCard, 'accepted offer card must be gone after trade is processed').toHaveCount(0);
       },
     });
 

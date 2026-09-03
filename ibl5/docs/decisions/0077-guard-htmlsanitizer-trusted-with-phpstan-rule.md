@@ -1,6 +1,6 @@
 ---
 description: PHPStan rule guarding the HtmlSanitizer::trusted() XSS escape hatch; native @phpstan-ignore as the acknowledgment mechanism.
-last_verified: 2026-07-03
+last_verified: 2026-09-02
 ---
 
 # ADR-0077: Guard `HtmlSanitizer::trusted()` with `RequireTrustedAnnotationRule` (PHPStan)
@@ -28,6 +28,14 @@ Existing firing sites (147 call sites across 16 files) are captured in
 `ibl5/phpstan-baseline.neon` with zero code churn. A genuinely-safe new site is acknowledged
 with a native `// @phpstan-ignore ibl.trustedVariable` comment plus a justifying note, not a
 bespoke marker.
+
+## Addendum — baseline size (2026-09-02)
+
+The 147-call-sites-across-16-files figure in the Decision is the baseline as captured on
+2026-07-03, when this ADR was written, and is left as the historical snapshot. The baseline has
+shrunk since as call sites were refactored to safe forms: as of 2026-09-02 `ibl5/phpstan-baseline.neon`
+holds 134 `ibl.trustedVariable` sites across 17 files. The count is expected to keep drifting
+downward and is not a figure this ADR undertakes to track.
 
 ## Alternatives Considered
 

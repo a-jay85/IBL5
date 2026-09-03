@@ -65,16 +65,19 @@ test.describe('Depth Chart submission', () => {
     // Find a pg (PG position depth) select with value "0" and change it to "2" (2nd)
     const pgSelects = page.locator('select[name^="pg"]');
     const count = await pgSelects.count();
+    let found = false;
 
     for (let i = 0; i < count; i++) {
       const val = await pgSelects.nth(i).inputValue();
       if (val === '0') {
         await pgSelects.nth(i).selectOption('2');
+        found = true;
         const newVal = await pgSelects.nth(i).inputValue();
         expect(newVal).toBe('2');
         break;
       }
     }
+    expect(found, 'CI seed must have at least one pg select with value "0" for this test').toBe(true);
   });
 
   test('submit redirects back to module URL with a fresh form and persisted change', async ({ page }) => {
@@ -351,6 +354,12 @@ test.describe('Depth Chart submission', () => {
     // Ensure first pg select is ready before loading a saved config
     await expect(page.locator('select[name^="pg"]').first()).toBeEnabled();
 
+    // Capture pre-load pg values — serial suite state means they may already be non-zero
+    // from earlier tests; asserting change rather than non-zero is load-bearing (D4 fix)
+    const prePgVals = await page
+      .locator('select[name^="pg"]')
+      .evaluateAll((els) => els.map((el) => (el as HTMLSelectElement).value));
+
     // Select the second option (first saved config)
     await dropdown.selectOption({ index: 1 });
 
@@ -360,6 +369,18 @@ test.describe('Depth Chart submission', () => {
     await expect(async () => {
       const val = await loadedId.first().inputValue();
       expect(val).not.toBe('0');
+    }).toPass({ timeout: 5000 });
+
+    // Verify at least one pg select changed after loading the saved DC — asserting
+    // non-zero is vacuous in a serial suite where earlier tests persist non-zero values.
+    await expect(async () => {
+      const pgVals = await page
+        .locator('select[name^="pg"]')
+        .evaluateAll((els) => els.map((el) => (el as HTMLSelectElement).value));
+      expect(
+        pgVals.some((v, i) => v !== prePgVals[i]),
+        'at least one pg select must change value after loading saved DC',
+      ).toBe(true);
     }).toPass({ timeout: 5000 });
   });
 

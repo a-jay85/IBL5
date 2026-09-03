@@ -258,6 +258,7 @@ value). For fake-POST tests (D7), assert the banner *after a real submit*, not a
 | E11 | ✅ Done | 🟩 | browser-history `goBack/goForward` — `draft-history`, `franchise-record-book`, `league-starters`, `team` (load-sensitive; keep, watch) |
 | E12 | ✅ Done | 🟩 | sleep-in-retry `setTimeout(r,200)` loop — `ajax-api-endpoints.spec.ts fetchJson` |
 | E13 | ⬜ Open | 🟩 | Plan-specified diagnostic strings and DOM observation evidence omitted during E2E assertion implementation. Messages fixed inline (PR #1807). DOM dumps for D15's four no-team pages not captured — needs a Playwright run against the worktree stack with `IBL_TEST_USER_REGULAR` credentials. (discovered 2026-09-02 during #1807) |
+| E14 | ⬜ Open | 🟥 | Autofix bot (`IBL5 Bug Hunter (sandbox)`, commit `ede59f41d`) silently removed the D15 Player-negotiate `.ibl-alert--error` assertion without declaring a scope change, leaving permissive-form coverage on a route with assertable production behavior. (discovered 2026-09-03 during #1807) |
 
 **Suggested direction (axis):** All E1–E12 items complete (PR #1805). E9's final implementation uses `evaluate(form.submit())` + auto-retrying `toContainText` DOM assertion rather than `waitForResponse` — `form.submit()` triggers full-page navigation, making `page.content()` race the navigate; the DOM assertion survives the navigation. E9 STOP GUARD: not triggered — PHP validation confirmed working.
 **Est. effort:** complete. **Risk if untouched:** n/a.
@@ -287,6 +288,26 @@ value). For fake-POST tests (D7), assert the banner *after a real submit*, not a
 - **Landing: no gate warranted** — the diagnostic message requirement is plan-authorship discipline, not a mechanically detectable structural property. The right enforcement is a plan checklist item at assertion-writing time, not a runtime gate.
 **artifact destination:** n/a — no gate
 **provenance:** (discovered 2026-09-02 during #1807)
+
+### E14 Autofix bot silently removed D15 Player-negotiate assertion without declaring scope change
+
+**class:** An automated-bot commit that deletes an `expect(` line from an E2E test file without an accompanying issue comment or structured scope justification, silently leaving permissive-form coverage on a route where a concrete production signal (`.ibl-alert--error`) is assertable.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/tests/e2e/flows/role-gating-non-admin.spec.ts` (Block F, Player-negotiate) | yes | yes | not fixed — filed |
+
+**prevention ladder:**
+- rung 0 — no existing gate checks whether a bot commit deletes `expect(` lines in E2E test files.
+- rung 1 — extending `bin/check-e2e-hygiene` to flag assertion deletions by bot actors is structurally infeasible (commit metadata is not available at check-time in the E2E hygiene script).
+- rung 2 — a CODEOWNERS entry or branch-protection rule requiring human review when a bot deletes assertion lines from test files is the right structural rung; alternatively, restrict the bot's write scope to exclude deletions in `tests/e2e/`.
+- **Landing: rung 2 or CI bot-scope restriction** — require human co-author review when a bot commit removes `expect(` lines from E2E test files, or configure the bot's repository permissions to exclude E2E assertion deletions.
+- rungs 3–5 — PHPStan/TypeScript linters cannot detect bot-actor commit provenance.
+
+**artifact destination:** CODEOWNERS update or CI bot-scope restriction
+**provenance:** (discovered 2026-09-03 during #1807)
 
 ---
 

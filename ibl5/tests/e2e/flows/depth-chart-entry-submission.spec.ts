@@ -354,6 +354,12 @@ test.describe('Depth Chart submission', () => {
     // Ensure first pg select is ready before loading a saved config
     await expect(page.locator('select[name^="pg"]').first()).toBeEnabled();
 
+    // Capture pre-load pg values — serial suite state means they may already be non-zero
+    // from earlier tests; asserting change rather than non-zero is load-bearing (D4 fix)
+    const prePgVals = await page
+      .locator('select[name^="pg"]')
+      .evaluateAll((els) => els.map((el) => (el as HTMLSelectElement).value));
+
     // Select the second option (first saved config)
     await dropdown.selectOption({ index: 1 });
 
@@ -365,17 +371,15 @@ test.describe('Depth Chart submission', () => {
       expect(val).not.toBe('0');
     }).toPass({ timeout: 5000 });
 
-    // Verify at least one pg select was populated. populateForm() writes each
-    // player's own dc_PGDepth (jslib/saved-depth-charts.js:147), which is
-    // legitimately 0 for most of a roster — so assert across the whole pg column
-    // rather than .first(), which asserts a property the product never guarantees.
+    // Verify at least one pg select changed after loading the saved DC — asserting
+    // non-zero is vacuous in a serial suite where earlier tests persist non-zero values.
     await expect(async () => {
       const pgVals = await page
         .locator('select[name^="pg"]')
         .evaluateAll((els) => els.map((el) => (el as HTMLSelectElement).value));
       expect(
-        pgVals.some((v) => v !== '0'),
-        'at least one pg select must be populated after loading saved DC',
+        pgVals.some((v, i) => v !== prePgVals[i]),
+        'at least one pg select must change value after loading saved DC',
       ).toBe(true);
     }).toPass({ timeout: 5000 });
   });

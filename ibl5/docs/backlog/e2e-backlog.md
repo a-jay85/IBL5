@@ -176,11 +176,11 @@ Green tests that don't guard the behavior they're named for. **Fix first.** D1/D
 | D1 | ✅ | — | `trading-submission.spec.ts:316,408` | `expect(offer_sent \|\| error=)` — a cap/validation error redirect passes. ✓verified — Blocks 2 & 4 now require `result=offer_sent` + `collectNewOfferIds` read-back; Block 4 uses a cap-safe (max-user / min-partner salary) selection. ✓done |
 | D2 | ✅ | — | `depth-chart-entry-mobile.spec.ts:402` | `hasSuccess \|\| hasValidation` (regex incl. `position`) — server rejection passes. ✓verified — submission describe now uses the `auth-isolated` (tid=8) fixture, submits the seeded valid live config, requires the success banner (verified against the live stack), and cleans up via `resetSavedDcNames`. ✓done |
 | D3 | ✅ | — | `depth-chart-entry-submission.spec.ts` "change a position depth" | Added `found` flag + `expect(found).toBe(true)` after loop — seed-guard against silent pass. ✓done |
-| D4 | ✅ | — | `depth-chart-entry-submission.spec.ts` "loading saved DC" | Added `toPass` assertion that first pg select is non-zero after AJAX load. ✓done |
+| D4 | ✅ | — | `depth-chart-entry-submission.spec.ts` "loading saved DC" | Added change-detect assertion: captures pre-load pg values, asserts at least one changes after AJAX load (Phase 6.5 fix, #1806). ✓done |
 | D5 | ✅ | — | `free-agency-submission.spec.ts` "amend offer" | Added `readBack` re-navigation asserting `offeryear1` persisted as `'250'`. ✓done |
 | D6 | ✅ | — | `contract-extension-submission.spec.ts` block 1 | readBack now branches on `location` — accepted → `.ibl-alert--success`, rejected → `.ibl-alert--info`. ✓done |
 | D7 | ✅ | — | `waivers-submission.spec.ts:83` | "success banner" navigates straight to `&result=player_added`, never POSTs. ✓verified (real POST covered separately → redundant-weak). ✓done — deleted the redundant add + waive query-param banner tests; the real-POST add/waive tests already assert `.ibl-alert--success`. |
-| D8 | ✅ | — | `trading-submission.spec.ts` accept-offer readBack | Replaced tautological URL re-assert with card-consumed check (Accept button count = 0). ✓done |
+| D8 | ✅ | — | `trading-submission.spec.ts` accept-offer readBack | Replaced tautological URL re-assert with card-gone-by-offer-id check (`data-preview-offer`). ✓done |
 | D9 | ✅ | — | `all-star-rename-submission.spec.ts` & `projected-draft-order-submission.spec.ts` 405/0 | D9a: `toMatchObject` with error regex; D9b: `body.error` regex assertion added. ✓done |
 | D10 | ⬜ | 🟨 | `admin-pages.spec.ts` block.php | `status not 403 / <500` → 404/blank passes; no content assertion. |
 | D11 | ⬜ | 🟨 | `olympics-coverage.spec.ts` test 2 | titled "shows gating message" but only `assertNoPhpErrors`; `olympics-module-gating` already asserts the message → strengthen or drop. |
@@ -189,6 +189,7 @@ Green tests that don't guard the behavior they're named for. **Fix first.** D1/D
 | D14 | ⬜ | 🟩 | `cross-module-navigation.spec.ts` chain | `if(playerCount>0){…}` silent-passes (no-silent-pass rule); also subsumed by two prior chain tests. |
 | D15 | ⬜ | 🟨 | `role-gating-non-admin.spec.ts` Block F | self-labelled exploratory; 4 no-team-user tests assert only HTTP 200 + no PHP error. |
 | D16 | ⬜ | 🟨 | `depth-chart-entry-mobile.spec.ts` save-flow: positive success assertion (`.ibl-alert--success`) removed due to session-shared flash race; only non-error gate remains (discovered #1805) |
+| D18 | ⬜ | 🟩 | `.claude/rules/playwright-tests.md` | Serial-suite pre-capture invariant: AJAX assertions must capture pre-action state and assert change, not absolute values. Prevention rule from #1806 vacuous-D4-assertion discovery. |
 
 
 **Suggested direction (axis):** Replace "accept-either-outcome" with "require the success signal **and** read
@@ -226,6 +227,37 @@ value). For fake-POST tests (D7), assert the banner *after a real submit*, not a
 **provenance:** (discovered 2026-08-29 during #1805)
 
 ➜ D17 PR #1903 extra coverage + intentional assertion relaxation (F6 + F7 + F10) — 🚫 Declined (2026-09-01): see [archive](archive/e2e-backlog-archive.md).
+
+### D18 Serial-suite pre-capture invariant rule doc
+
+**Location:** `.claude/rules/playwright-tests.md` (Serial mode section)
+
+**class (F1):** A serial-test E2E assertion that passes vacuously before the AJAX action runs, because it checks an absolute property (non-zero pg select value) already true from prior test state — so total AJAX failure passes silently.
+**class (F2):** A PR body that falsely described a deliberately-failing test when all CI checks were green, and a backlog row description that did not match the shipped assertion. Both corrected in Phase 6.5 remediation (#1806).
+**class (F3/F4):** Notes — D8 shipped a stricter form than the plan (card-gone-by-offer-id beats count=0); two unplanned lines were mechanically required. No defect.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/tests/e2e/flows/depth-chart-entry-submission.spec.ts:368–380` | yes (F1) | yes | fixed this pass |
+| 2 | PR #1806 body `Bug Discovery (D4)` section | yes (F2) | yes | fixed this pass |
+| 3 | `ibl5/docs/backlog/e2e-backlog.md` D4/D8 row descriptions | yes (F2) | yes | fixed this pass |
+
+**prevention_ladder (F1):**
+- rung 0: not already gated — `bin/check-e2e-hygiene` bans silent-pass patterns but cannot detect pre-state vacuity.
+- rung 1: extending `bin/check-e2e-hygiene` to flag `evaluateAll + .some()` without a pre-capture reference is viable but brittle (the pattern is legitimate without serial context).
+- rung 2: a note in `.claude/rules/playwright-tests.md` § Serial mode — state the invariant: assertions on AJAX-updated DOM in a serial suite must capture pre-action state and assert change, not absolute values that may be satisfied before the action.
+- **Landing: rung 2** — a targeted rule-doc note costs one sentence and catches this class at PR-review time.
+- rung 3: PHPStan not applicable (TypeScript).
+- rung 4/5: no CI gate can detect vacuous-before-action patterns without running the action with a no-op stub.
+
+**prevention_ladder (F2):** no gate warranted — PR body vs. diff accuracy is a one-off process failure; `/pr-ready` Phase 6 is the structural gate and it caught it.
+
+**artifact_destination (F1):** `.claude/rules/playwright-tests.md` — add one sentence to the "Serial mode" paragraph.
+**artifact_destination (F2):** n/a — no gate.
+
+**provenance:** (discovered 2026-09-02 during #1806)
 
 ---
 

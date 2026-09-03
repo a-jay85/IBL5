@@ -1902,7 +1902,7 @@ for _n_slug in \
         _n_corpus_pass=0; FAILED=1
     fi
 done
-echo "ok: n_corpus"
+[ "$_n_corpus_pass" -eq 1 ] && echo "ok: n_corpus"
 
 # Coverage assertions: gate N reports the expected row count for each benchmark plan
 for _n_cov in \

@@ -1,9 +1,9 @@
 ---
 description: Introduces ibl5/bin/db-sync-now (lock, throttle, marker, --from-backup), a detached sim-hook in bin/sim-recap-tick, a main-stack guard in bin/db-test-up, and a bin/db-sync-cron-setup nightly launchd agent — keeping the local developer DB within one sim or one night of prod.
-last_verified: 2026-08-16
+last_verified: 2026-09-02
 ---
 
-# ADR-0104: Local DB snapshot freshness
+# ADR-0114: Local DB snapshot freshness
 
 **Status:** Accepted
 **Date:** 2026-08-16

@@ -66,11 +66,22 @@ test.describe('Free Agency -- submit and manage offers', () => {
     const yr1Input = form.locator('input[name="offeryear1"]');
     const currentValue = await yr1Input.inputValue();
     expect(currentValue).toBe('200');
-    // Change offer amount
+    // Change offer amount and verify DB persistence
     await yr1Input.fill('250');
-    await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
-    await page.waitForURL(/result=offer_success/);
-    await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
+    await submitFormAndAssertEffect(page, {
+      submit: async () => {
+        await page.getByRole('button', { name: /Offer.*Free Agent Contract/i }).click();
+        await page.waitForURL(/result=offer_success/);
+      },
+      expectSameSpot: async () => {
+        await expect(page.locator('.ibl-alert--success', { hasText: /offer.*saved/i })).toBeVisible();
+      },
+      readBack: async () => {
+        await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
+        const readForm = offerForm(page);
+        await expect(readForm.locator('input[name="offeryear1"]')).toHaveValue('250');
+      },
+    });
   });
 
   test('delete existing offer', async ({ page }) => {

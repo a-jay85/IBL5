@@ -51,6 +51,8 @@ class StandingsUpdaterRegressionGuardTest extends TestCase
 
     public function testUpdateStandingsStepSourceHasNoObStart(): void
     {
-        $this->assertStringNotContainsString('ob_start', $this->readSource('Steps/UpdateStandingsStep.php'));
+        $source = $this->readSource('Steps/UpdateStandingsStep.php');
+        $this->assertStringNotContainsString('ob_start', $source, 'UpdateStandingsStep must drain StandingsUpdater::takeOutputBuffer(); re-adding ob_start re-couples the step to echo.');
+        $this->assertStringNotContainsString('ob_get_clean', $source, 'UpdateStandingsStep must drain StandingsUpdater::takeOutputBuffer(); re-adding ob_get_clean re-couples the step to echo.');
     }
 }

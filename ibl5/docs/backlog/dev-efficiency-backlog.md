@@ -64,6 +64,7 @@ last_verified: 2026-09-02
 | E35 | Phase 6 review notes on PR #1800 — PR body test count conflated Verification Matrix row count (18) with PHPUnit method count (7 methods / 9 cases); same wrong number replicated into archive entry; both fixed in Phase 6.5 | ⬜ Open | — | XS |
 | E37 | Phase 6 review notes on PR #2045 — plan under-specified assertion discriminator and archive step; PR body Scope omitted mutation context; "No manual testing" claim tensioned with hold; check 5 outstanding hold (n/a); PR body fixed in Phase 6.5 | ⬜ Open | — | XS |
 | E38 | `/pr-ready` lost-work guard blind to prior-run destructive rebase | ⬜ Open | 🟨 | S |
+| E39 | Phase 6 review notes on PR #1824 (StandingsUpdater echo→logger) — B1 wrong seam name + scope count in body; N3 scope creep unbundled; N4 stale plan literal; N5 manual backlog row not retired in plan; N7 wrong method name in body; B1+N7 remediated this pass | ⬜ Open | — | S |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -631,3 +632,31 @@ Not a defect in the anchoring or the SIGPIPE handling: the `$`-anchor (guarding 
 `artifact destination:` `.claude/skills/pr-ready/scripts/lostwork.sh` (in-repo; lands in a PR diff)
 
 `provenance:` (discovered 2026-09-02 during #2045)
+### E39 Phase 6 review notes on PR #1824 (StandingsUpdater echo→logger migration)
+
+**class:** PR body / plan accuracy drift — wrong method name, wrong scope count, undocumented scope creep, stale plan literal, and a manual backlog row not retired in the plan
+
+**occurrence table:**
+
+| # | Finding | Live? | Status |
+|---|---------|-------|--------|
+| B1 | Body used `outputBuffer()` instead of `takeOutputBuffer()`; scope said "removes two $log accumulators" not three; `OlympicsFlatStandingsUpdater` subclass not named in Scope | yes | fixed this pass (gh pr edit) |
+| N3 | `CheckDocsCliTest.php` rewrite in the diff but not in the plan; unbundled scope creep | yes | noted in PR body (transparency note added) |
+| N4 | Plan said "drain both updaters' buffers" but only one updater is injected per step | yes | corrected in PR body |
+| N5 | Plan's backlog row 1.18 not marked done in plan after retire | yes | informational — plan already shipped |
+| N7 | `$this->outputBuffer[] = ...` literal in body did not match actual `appendOutput()` call | yes | fixed this pass (gh pr edit) |
+
+**prevention_ladder:**
+
+- **rung 0 — already covered?** No existing gate validates that PR body method names match the actual implementation.
+- **rung 1 — extend an existing gate?** `bin/check-plan` could cross-reference body method names against the diff, but false-positive risk is high.
+- **rung 2 — a rule doc?** Could add a prose reminder in the Phase 6.5 remediation procedure to diff body method/class names against `git diff HEAD~1` before posting.
+- **rung 3 — PHPStan?** Not applicable to body prose.
+- **rung 4 — CI gate?** No practical CI gate for prose accuracy.
+- **landing rung:** no gate warranted — body-prose accuracy is a judgment review; Phase 6 Opus fidelity review is the correct catch surface and fired correctly here.
+
+`prevention_ladder: no gate warranted — Phase 6 Opus review is the correct catch surface; B1+N7 fixed in-PR`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-02 during #1824 Phase 6 review)*

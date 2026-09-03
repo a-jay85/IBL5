@@ -387,6 +387,12 @@ abstract class PipelineIntegrationTestCase extends DatabaseTestCase
             }
         }
 
+        $standingsResult = $this->findResultByLabel($results, 'Standings updated');
+        if ($standingsResult !== null) {
+            self::assertNotEmpty($standingsResult->capturedLog, 'Standings capturedLog empty — UpdateStandingsStep::takeOutputBuffer() wiring broken.');
+            self::assertStringContainsString('The standings table has been updated', $standingsResult->capturedLog, 'Standings capturedLog missing expected closing message.');
+        }
+
         return $results;
     }
 

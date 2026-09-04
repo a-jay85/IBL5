@@ -38,6 +38,7 @@ test.describe('Olympics module coverage', () => {
 // `if (!$isModuleAccessible && !is_admin())`, so the admin fixture bypasses
 // ModuleAccessControl entirely and would never see the gating message.
 nonAdminTest.describe('Olympics module coverage — non-admin gating', () => {
+  // e2e-hygiene-allow: CI-config env gating — auth-regular.setup.ts also skips when IBL_TEST_USER_REGULAR is unset, so regular.json is absent or stale and these assertions would run against an unauthenticated session
   nonAdminTest.skip(
     !process.env.IBL_TEST_USER_REGULAR || !process.env.IBL_TEST_PASS_REGULAR,
     'IBL_TEST_USER_REGULAR / IBL_TEST_PASS_REGULAR not set — regular.json is not freshly authenticated',

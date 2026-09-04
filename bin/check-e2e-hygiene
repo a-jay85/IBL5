@@ -233,7 +233,7 @@ run_pattern blocking "catch-false" \
   '\.catch\(\(\)\s*=>\s*(false|null)\)'
 
 run_pattern blocking "test-skip" \
-  '^\s*test\.skip\('
+  '^\s*[A-Za-z_$][A-Za-z0-9_$]*\.skip\('
 
 run_pattern blocking "test-only" \
   '(^|[^a-zA-Z0-9_.])(test|describe)(\.[a-zA-Z]+)?\.only\('

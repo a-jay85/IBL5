@@ -14,6 +14,7 @@ setup('authenticate regular (non-admin) user', async ({ page, request }) => {
   // setup project still publishes user.json and the admin suite stays green
   // for local devs who haven't opted into the role-gating tests. Specs that
   // import fixtures/auth-regular will fail loudly when regular.json is absent.
+  // e2e-hygiene-allow: CI-config env gating — without IBL_TEST_USER_REGULAR the setup project has no credentials to authenticate with, and specs importing fixtures/auth-regular fail loudly when regular.json is absent
   setup.skip(!username || !password, 'IBL_TEST_USER_REGULAR / IBL_TEST_PASS_REGULAR not set');
 
   const throttleResp = await request.delete('test-state.php?action=clear-throttle');

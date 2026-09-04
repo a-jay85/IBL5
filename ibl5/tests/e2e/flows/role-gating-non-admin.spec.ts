@@ -268,7 +268,7 @@ test.describe('GM-only pages: non-admin / no-team behavior', () => {
     expect(response?.status()).toBe(200);
     await assertNoPhpErrors(page, 'on Player negotiate as non-admin');
     await expect(
-      page.locator('.ibl-alert--error'),
+      page.locator('.ibl-alert--error').first(),
       'Player negotiate must show the no-team error message for a user with no team assignment',
     ).toBeVisible();
   });

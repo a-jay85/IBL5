@@ -542,6 +542,39 @@ else
     fail "structural: condition (11) block missing or does not reference pr-armable.sh in first 4 lines"
 fi
 
+# ── structural case 25: every emitter surface forbids hand-writing the comment ──
+# Backlog E24: Phase 4B's posting step used to mandate the helper in prose only, so a
+# run could compose the comment freehand. The review still happened, but the artifact
+# landed outside the helper's envelope and became invisible to 4b-probe.sh (PHASE_4B_RAN
+# false-negative), to resolve_review_finding, and to unresolved-findings-hold. Observed
+# on PRs #1956 and #2001. The prohibition is prose, so assert it statically — deleting
+# it must fail CI rather than silently reopening the hole.
+for f in \
+    "$REPO_ROOT/.claude/skills/post-plan/_phase-4-review-audit.md" \
+    "$REPO_ROOT/.claude/review-shared/_posting-procedure.md"
+do
+    name="$(basename "$f")"
+    if grep -qi 'compose .* by hand' "$f" 2>/dev/null \
+        && grep -q '4b-probe\.sh' "$f" 2>/dev/null; then
+        ok "case25: $name forbids hand-written review comments and names the 4B probe"
+    else
+        fail "case25: $name lost the never-hand-write prohibition or the 4b-probe.sh consumer reference — a freehand review comment becomes undetectable again (E24)"
+    fi
+done
+
+# The two other emitters inherit the prohibition only by reading the shared file.
+for f in \
+    "$REPO_ROOT/.claude/skills/pr-review/SKILL.md" \
+    "$REPO_ROOT/.claude/skills/security-audit/SKILL.md"
+do
+    name="$(basename "$f")"
+    if grep -q '_posting-procedure\.md' "$f" 2>/dev/null; then
+        ok "case25: $name still reads _posting-procedure.md"
+    else
+        fail "case25: $name no longer reads _posting-procedure.md — it stops inheriting the never-hand-write prohibition"
+    fi
+done
+
 # ── summary ───────────────────────────────────────────────────────────────────
 if [ "$FAILED" -eq 0 ]; then
     echo "All post-review-findings checks passed."

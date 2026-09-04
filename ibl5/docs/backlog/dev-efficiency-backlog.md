@@ -68,6 +68,7 @@ last_verified: 2026-09-04
 | E40 | `bin/scrub-log-credentials` prod path: unquoted outer heredoc mangles remote jq filter escapes (F1) + local per-file hit report silently discarded (F4) — both fixed Phase 6.5 #1920; case 8 harness guards regression | ⬜ Open | — | S |
 | E41 | `ErrorHandlerRegistrarTest` + `bin/test-scrub-log-credentials`: SYNTHETIC_SECRET 32 chars truncated to 15 in `getTraceAsString()` causes vacuous assertion (F2) + closure assertion replaced with unconditional pass (F3) — both fixed Phase 6.5 #1920 | ⬜ Open | — | XS |
 | E42 | Phase 6 review notes on PR #1968 — plan-accuracy divergences (N1–N4); all non-blocking; no gate warranted | ⬜ Open | — | XS |
+| E43 | `bin/check-plan` PR6 gates: migration literals [A], line-number anchors [L], docker liveness [E], shellcheck CI-class [I], PHP coverage advisory [J], plus gate [V] `/path/to` + `main.localhost` extensions | ⬜ Open | 🟩 | S |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -704,3 +705,23 @@ Not a defect in the anchoring or the SIGPIPE handling: the `$`-anchor (guarding 
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-04 during #1968)*
+
+### E43 `bin/check-plan` PR6 gates: five new gates and two gate [V] extensions
+
+**class: gate addition** — Adds five new gates and two extensions to `bin/check-plan` to prevent recurring plan-vs-implementation divergences that caused Phase 6 remediation commits:
+
+- **[A] Migration-number literal** (hard-fail): plans must not name specific migration numbers; use `run bin/next-migration at impl time` escape phrase.
+- **[L] Line-number anchor** (warn-only, location-cell scope): location cells referencing `line N` create fragile anchors that break when code shifts.
+- **[E] Docker liveness precondition** (warn-only): plans that exercise Docker/`bin/db-query` should include a liveness check row.
+- **[I] Shellcheck CI-class flags** (hard-fail): VM rows invoking `shellcheck` must use `--severity=warning --shell=bash` to match CI.
+- **[J] PHP coverage advisory** (warn-only): plans that introduce a new `ibl5/classes/*.php` file should include an Infection/mutation/coverage row.
+- **[V] ext `/path/to`**: CLI-executable rows with a `/path/to` placeholder are caught by the existing `_bad` chain.
+- **[V] ext `main.localhost`**: any VM row referencing `main.localhost` is a hard-fail (worktree plans must derive the hostname at runtime).
+
+**prevention_ladder: gates added** — PR #2082 (check-plan-pr6-gates branch).
+
+`artifact destination: bin/check-plan, bin/test-check-plan`
+
+`last_verified: 2026-09-04`
+
+*(discovered 2026-09-04 from pattern analysis of Phase 6 remediation commits)*

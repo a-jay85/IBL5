@@ -11,9 +11,11 @@ ids="$(gh api "repos/{owner}/{repo}/issues/$1/comments" --paginate \
   --jq '.[] | select((.body // "") | contains("<!-- pr-ready-verdict -->")) | .id')" \
   || { echo "STOP: could not list comments for PR #$1 — not posting; a duplicate verdict is worse than none"; exit 1; }
 id="$(printf '%s\n' "$ids" | head -1)"
+URL_FILE="/tmp/pr-ready-commenturl-$1.txt"
+rm -f "$URL_FILE"
 if [ -n "$id" ]; then
   gh api --method PATCH "repos/{owner}/{repo}/issues/comments/$id" \
-    -F body=@"$BODY_FILE" --jq .html_url
+    -F body=@"$BODY_FILE" --jq .html_url | tee "$URL_FILE"
 else
-  gh pr comment "$1" --body-file "$BODY_FILE"
+  gh pr comment "$1" --body-file "$BODY_FILE" | tee "$URL_FILE"
 fi

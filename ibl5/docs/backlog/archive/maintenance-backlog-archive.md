@@ -1224,6 +1224,11 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Status:** Implemented (2026-06-27) — added TeamScheduleService opponent-lookup/opponent-text, SOS-tier (populated vs empty rankings), and next-sim-highlight tests in tests/TeamSchedule/. Repository correctness owned by gated tests/DatabaseIntegration/TeamScheduleRepositoryTest.php; no playoff-bracket unit exists on master (View-only month relabel).
 
 **Table evidence (2026-07-25):** TeamSchedule thin; additive.
+### 6.14 Updater Module — Large + Subthreshold (37 files, 9 tests)
+**Table evidence (2026-08-30):** Axis-1 partial (2026-08-08): 4 raw-mysqli step classes added (RefreshIblHistStep, RefreshPlayoffSeriesResultsStep, RefreshTeamSeasonRecordsStep, ResetExtensionAttemptsStep) in tests/UpdateAllTheThings/Steps/. Remaining: 11 step classes (pure-delegator, interface-injected, OlympicsFlatStandingsUpdater, UpdaterView, JsbSourceResolver) + ProcessAllStarGamesStep (deferred — W1-12 sequencing). AutoSeedOlympicsTeamInfoStep already has behavioral coverage (4 tests on `master`) — the plan's audit was stale.
+
+**Status (2026-08-30):** ✅ Implemented — All 20 `Updater\Steps` classes now have behavioral test coverage. Intermediate PRs (Axis-1 through maint-6-14-updater-coverage) progressively covered the pure-delegator steps (UpdatePowerRankingsStep, UpdateScheduleStep, UpdateStandingsStep), interface-injected steps (ParsePlayerFileStep, ExtendDepthChartsStep, ImportLeagueConfigStep, SnapshotPlrStep, EndOfSeasonImportStep), non-Step updater classes (OlympicsFlatStandingsUpdater, UpdaterView, JsbSourceResolver), and ProcessAllStarGamesStep. Final gap — CleanupPreseasonDataStep and QueueSimSummaryStep — closed by this PR (2026-08-30).
+
 ### 6.15 Voting Module — Subthreshold (17 files, 4 tests)
 **Location:** `ibl5/classes/Voting`
 **Problem:** Ballot/submission/results services and renderer with 4 tests.

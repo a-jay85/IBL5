@@ -4,7 +4,7 @@ description: "Plan an implementation task: enforces a verification matrix, direc
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
-last_verified: 2026-08-23
+last_verified: 2026-09-04
 ---
 
 # /plan — Implementation Planning with Verification Matrix
@@ -352,11 +352,11 @@ If a plan file already exists at that path, create a new one with a numeric suff
 **Pre-finalize drift check — run FIRST, before you read or rewrite the draft.** The scaffold comment is still in the file at this instant and is about to be dropped; this is the last moment gate `[D]` can compare against it.
 
 ```
-DRAFT="$HOME/claude-plans/.drafts/$(git rev-parse --abbrev-ref HEAD).draft.md"
+DRAFT="$HOME/claude-plans/.drafts/<slug>.draft.md"
 bin/check-plan --draft "$DRAFT"
 ```
 
-Exit 0 → continue below. Exit non-zero with a gate `[D]` drift violation (body phase count exceeds the scaffold's) → the architect appended a phase the outline never declared. Delete the excess phase sections, then re-run:
+Exit 0 → continue below. Exit 1 (gate `[D]` drift violation — body phase count exceeds the scaffold's) → the architect appended a phase the outline never declared; delete the excess phase sections, then re-run below. Exit 2 → path error: `$DRAFT` was not found or `--draft` was not passed; stop, verify `<slug>` is the slug you derived at the top of this step, and confirm the draft exists before retrying.
 
 ```
 SCAF=$(awk '/<!-- PLAN OUTLINE/,/-->/' "$DRAFT" \

@@ -275,7 +275,7 @@ warn() { printf '%s\n' "$1" >> "$WARN_FILE"; }
 # body that grew PAST the scaffold means it re-emitted work already written
 # under a new title. Over-complete is the failure. Under-complete (body <
 # scaffold) is a run still in progress or cut short — never flagged. No
-# scaffold at all (a pre-scaffold draft, 40 of 60 in the historical corpus) is
+# scaffold at all (a pre-scaffold draft, ~43 of 81 in the historical corpus) is
 # skipped outright.
 # ---------------------------------------------------------------------------
 if [ "$DRAFT_MODE" = 1 ]; then

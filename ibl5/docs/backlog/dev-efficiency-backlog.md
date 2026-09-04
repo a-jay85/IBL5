@@ -47,7 +47,7 @@ last_verified: 2026-09-04
 | E18 | `/pr-ready` Phase 6.5 commits new files but never regenerates the PR body `files-changed` block | ✅ Implemented | — | S |
 | E19 | `/pr-ready` materialize-from-pin sites declare no fallback, so a pin that predates the script loops forever | ✅ Implemented | — | S |
 | E20 | Ship-pipeline coverage assertions (PR-body Manual Testing block, Phase 4B review) are emitted against a narrower slice than the PR's cumulative diff | ⬜ Open | 🟦 | M |
-| E21 | Test assertions land as static source greps that pass while the behavior they name is absent | ⬜ Open | 🟩 | S |
+| E21 | Test assertions land as static source greps that pass while the behavior they name is absent | ✅ Implemented | — | S |
 | E22 | Plan-declared negatives and PR body Scope dropped during Phase 6.5 remediation | ✅ Implemented | — | S |
 | E23 | PR body deletion volumes diverged from code's `EXPECTED` constants | ✅ Implemented | — | S |
 | E24 | `/post-plan` Phase 4B can hand-write its review comment, bypassing `post_review_summary` | ✅ Implemented | 🟨 | S |

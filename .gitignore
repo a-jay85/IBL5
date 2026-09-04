@@ -114,3 +114,6 @@ tools/postplan-harness/.pytest_cache/
 
 # Byte-compiled pricer: `python3 -m py_compile bin/lib/automouse-pricer` drops this.
 bin/lib/__pycache__/
+
+# PR body template written by automouse impl — used by post-plan to open PR; not a repo artifact
+pr-body.md

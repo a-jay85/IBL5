@@ -289,25 +289,15 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):** Adding tests is inherently green-green (no production change) → every open coverage gap is 🟩 auto-mergeable. If writing a test surfaces a real bug, the *fix* becomes its own finding with its own classification. (Exceptions: **6.21** and **6.23** are 🟨, not 🟩 — in each the target code is unreachable from PHPUnit, so no test is writable until a production seam is decided: a teamless-fixture / non-`exit()` refactor for 6.21, a SAPI-independent hashing seam for 6.23.)
 
-> ✅ resolved (19): 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 6.15, 6.16, 6.17, 6.18, 6.20, 6.22, 6.24 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (21): 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 6.13, 6.15, 6.16, 6.17, 6.18, 6.20, 6.22, 6.24, 6.26 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 6.13 | ◑ Partial | 🟩 | Player (69 prod / 48 test files); additive (L — chunked; 3 of 3 done). |
 | 6.14 | ◑ Partial | 🟩 | Axis-1 partial (2026-08-08): 4 raw-mysqli step classes added (RefreshIblHistStep, RefreshPlayoffSeriesResultsStep, RefreshTeamSeasonRecordsStep, ResetExtensionAttemptsStep) in tests/UpdateAllTheThings/Steps/. Remaining: 11 step classes (pure-delegator, interface-injected, OlympicsFlatStandingsUpdater, UpdaterView, JsbSourceResolver) + ProcessAllStarGamesStep (deferred — W1-12 sequencing). AutoSeedOlympicsTeamInfoStep already has behavioral coverage (4 tests on `master`) — the plan's audit was stale. |
 | 6.19 | ◑ Partial | 🟩 | AllStarAppearances + GMContactList repo unit tests added. Season entity predicates blocked by `Season\Season`→mock alias (QueryRepo plumbing covered). `Shared` N/A (deleted 2.23). |
 | 6.21 | ⬜ Open | 🟨 | Row-12 (Free-Agents/teamless session) `processrookieoption` ownership-rejection path untested: PHPUnit entry-point test impossible (handler `exit()`s), E2E auth fixture always has a session team. Needs a teamless-fixture / non-`exit()` refactor decision before it's writable → 🟨. From PR #1107 Phase 5.0 note. |
 | 6.23 | ⬜ Open | 🟨 | **Same family as 6.22, different guard.** `RequestEventLoggingBootstrap::boot()` returns at line 35 when `\PHP_SAPI === 'cli'`, and PHPUnit is always CLI (DB group included), so the `hash('sha256', session_id())` derivation at lines 66–70 is unreachable from any PHPUnit test — the file's three existing tests are all `expectNotToPerformAssertions()` for exactly this reason. A regression storing the **raw** session id would break zero tests. Extract the derivation to a pure static (or inject the SAPI) so the PII boundary is unit-pinnable. 🟨: production change on a PII boundary; needs a seam decision. (discovered 2026-08-08 during #1670) |
 | 6.25 | ⬜ Open | 🟨 | **Residual of 6.22.** The verdict + thin-redirect-shim conversion landed for Waivers, FreeAgency, and the Trade API accept/decline controllers; `Trading\TradingController`'s reject path still gates inline and still ends in `HtmxHelper::redirect()→exit()`, so its "non-party refused + no mutation" property remains E2E-only. Apply the same pattern: move the authz decision into a verdict-returning method on the service that owns the mutation, leave the controller a shim. Verdict shape is now settled (`array{success: bool, error?: string}`), so the design fork 6.22 carried is closed. 🟨: production refactor on a security surface. Split out of 6.22 when it resolved. |
-| 6.26 | ⬜ Open | 🟩 | Plan-scope drift in #1903: `import-demands.php` + `csv-import.css` modified beyond plan's read-only scope; E2E `.csv-import` class assertion added this pass (F1 fixed). Secondary observation-only notes: `uploadDraftClass.php` JS picker (F2), preview chrome (F4), PR body omission (F8), matrix row 23 file mismatch (F9) — no gate warranted. (discovered 2026-09-01 during #1903) |
-
-### 6.13 Player Module — Large + Subthreshold (69 prod / 31 test files, ~0.45 ratio)
-**Location:** `ibl5/classes/Player`
-**Problem:** Largest module; coverage ~0.45 (69 prod / 31 test files). PlayerPageService, PlayerContractValidator, PlayerStats underrepresented.
-**Suggested direction:** Page-type routing, contract rules, stats aggregation, image-helper edge cases.
-**Est. effort:** L
-**Risk if untouched:** Profile regressions cascade; contract validation bypass.
-**Status:** ◑ Partial (this PR, 2026-06-27). Added negative-path/boundary coverage on the named critical classes — `PlayerContractValidator` (offseason renegotiation advance; non-draft-pick and already-set option-year rejections), `PlayerImageHelper` (`renderPhoto`/`renderLargePlayerCell` escaping; `renderThumbnail` invalid-id placeholder), `PlayerStats` (empty boxscore line; missing historical columns) — in `ibl5/tests/Player/PlayerContractValidatorTest.php`, `ibl5/tests/Player/PlayerImageHelperTest.php`, `ibl5/tests/Player/PlayerStatsTest.php`. `PlayerPageService`/`PlayerPageType` page-type routing already covered (`ibl5/tests/Player/PlayerPageServiceTest.php`, `ibl5/tests/Player/PlayerPageTypeTest.php`). **Chunk 1 (this PR, 2026-07-26):** `Player/Stats/Views/` covered — `PlayerRatingsAndSalaryView`, `PlayerRegularSeasonAveragesView`, `PlayerRegularSeasonTotalsView`, `PlayerSimStatsView` now have snapshot + branch tests in `ibl5/tests/Player/Stats/Views/`, sharing new fixtures in `RegularSeasonViewFixtures.php`. `PlayerSeasonTableConfig`/`PlayerSeasonTableMode` need no separate tests — they are already mutation-covered through `PlayerSeasonTableRendererTest.php`. Scoped Infection residual is recorded in the PR body: the surviving mutants are the provably-equivalent `$gm > 0` -> `$gm >= 0` boundary on the fifteen per-game columns of `PlayerRegularSeasonAveragesView` (`StatsFormatter::formatPerGameAverage($x, 0)` returns the same `"0.0"` the else-branch emits) plus mutants on the `fgpct`/`ftpct`/`tpct` values that view never renders. **Chunk 2 (#1816, 2026-08-08):** All ten untested files in `ibl5/classes/Player/Views/` now have snapshot + branch tests in `ibl5/tests/Player/Views/`. Six infection.json5 excludes removed; scoped MSI result recorded in PR body. **Chunk 3 (#1817, 2026-08-09):** `PlayerRepository` database-integration coverage (`getPlayerNews` happy-path with `nuke_stories` rows; exclusion negative-path) and `PlayerPageController` full routing (`email_failed` banner, unknown-code → no banner, invalid-pageView default fallback for active + retired player) added. All three chunks complete.
 
 ### 6.14 Updater Module — Large + Subthreshold (37 files, 9 tests)
 **Location:** `ibl5/classes/Updater`
@@ -340,15 +330,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Est. effort:** S
 **Risk if untouched:** The `session_id` column is documented and reviewed as a non-replayable digest. If the derivation regresses to the raw token, every CI gate stays green and the failure is only visible by inspecting production rows — a PII exposure with no automated detector.
 **Status:** ⬜ Open — raised from the #1670 review (the plan listed the bootstrap test as `[modify]`; the item was not implementable as specified). 🟨 conditional: a production change on a PII boundary, gated on the seam decision above.
-
-### 6.26 Plan-Scope Drift: `import-demands.php` and `csv-import.css` Modified Beyond Declared Scope
-**Location:** `ibl5/import-demands.php`, `ibl5/design/components/csv-import.css` (renamed from `ibl5/design/components/import-demands.css` (example)) — PR #1903
-**Problem:** The Phase 6 plan-fidelity review found that the diff modified `import-demands.php` (updated stylesheet link and class names) and renamed `import-demands.css` → `csv-import.css`, both files marked "read-only reference" in the plan. No regression coverage existed before this pass to prove `import-demands.php` still renders correctly with the renamed stylesheet (F1). Secondary observation-only notes: `uploadDraftClass.php` uses a JS auto-submit picker rather than a plain `<button>` (F2, satisfies plan goal via `<noscript>` fallback); preview chrome includes extra elements and a scroll-indicator with one guarded null dereference (F4, inside the preview branch only, not a live crash); PR body Scope prose omits the CSS-rename half of the diff (F8, cleared by orchestrator body update); Verification Matrix row 23 names the wrong spec file for the 403 role-gating test (F9, documentation only).
-**Suggested direction:** F1 fixed this pass — E2E assertion added to `ibl5/tests/e2e/flows/import-demands-submission.spec.ts` verifying `.csv-import` class presence after page load. F2/F4/F8/F9 are observation notes requiring no corrective action.
-**Est. effort:** XS (F1 already fixed this pass)
-**Risk if untouched:** (F1 now covered by E2E pin) Secondary observations carry no live risk; the JS picker degrades gracefully via `<noscript>` fallback.
-**prevention_ladder:** no gate warranted — the plan's "read-only reference" designation is the human-readable fence; enforcement would require a hook that reads the plan text, which is not feasible.
-**provenance:** (discovered 2026-09-01 during #1903)
 
 ---
 
@@ -588,24 +569,15 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
-> ✅ resolved (9): 13.1, 13.2, 13.3, 13.5, 13.6, 13.8, 13.9, 13.11, 13.13 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (10): 13.1, 13.2, 13.3, 13.5, 13.6, 13.7, 13.8, 13.9, 13.11, 13.13 — evidence in [archive](archive/maintenance-backlog-archive.md)
 > 🚫 declined (2): 13.4, 13.10 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 13.7 | ◑ Partial | 🟩 | Waivers/Draft → ValidationResult (Strategy A); remainder is 13.7b. Done part green-green. |
 | 13.7b | ⬜ Open | 🟨 | Needs `ValidationError`/`ValidationResultWithContext` type design (Depth/Trade carry structured + cap-total payloads) before the sweep. |
 | 13.12 | ◑ Partial | 🟩 | Exact-match sites consolidated onto the `PlayerTeamJoinQuery` trait (TeamQuery ×8, FreeAgency, LeagueStarters). Six divergent sites remain in the surveyed repositories (INNER JOIN / wider column list), plus 7 player↔team joins outside the original survey. |
 | 13.14 | ⬜ Open | 🟨 | Phase-blind `getTeamTotalSalary()` in waiver-claim cap check — same defect class as the trade accept-path fix (PR heat-nuggets-hardcap). |
 | 13.15 | ⬜ Open | 🟨 | `PlayerContractCalculator::getCurrentSeasonSalary()` is a fourth cap basis keyed on raw `cy` with no phase shift. |
-
-### 13.7 Validator Error-Accumulation Boilerplate Repeated
-**Status:** **Partially done (Strategy A, PR validator-accumulators-to-validationresult):** the two pure string-accumulator validators (`Waivers/WaiversValidator`, `Draft/DraftValidator`) now return `ValidationResult`; mutable `private array $errors` / `getErrors()` / `clearErrors()` removed. State-leakage risk eliminated for these two. Remainder re-filed as [[13.7b]].
-**Location:** `Waivers/WaiversValidator.php`, `Draft/DraftValidator.php`, `DepthChartEntry/DepthChartEntryValidator.php`
-**Problem:** All three define `private array $errors = []; getErrors(); clearErrors();`. `TradeValidator` and `FreeAgencyOfferValidator` use a different return shape — two incompatible patterns.
-**Suggested direction:** `AbstractAccumulatingValidator` base or `ValidatorErrorBag` value object; enforce "clearErrors before validate" centrally.
-**Est. effort:** S
-**Risk if untouched:** New validators copy without the convention; state leakage between calls.
 
 ### 13.7b Structured and Dict-Family Validators — Design Decision Needed
 **Status:** Backlog

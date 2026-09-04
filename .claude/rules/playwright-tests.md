@@ -1,7 +1,7 @@
 ---
 description: Playwright E2E testing rules, Docker requirements, and actionability pitfalls.
 paths: ibl5/tests/e2e/**/*.ts
-last_verified: 2026-09-03
+last_verified: 2026-09-04
 ---
 
 # Playwright E2E Testing Rules
@@ -130,7 +130,7 @@ Tests depending on app state (season phase, trading open, trivia mode…) **set 
 
 **Allowlisted settings:** `Current Season Phase`, `Current Season Ending Year`, `Allow Trades`, `Allow Waiver Moves`, `Show Draft Link`, `Trivia Mode`, `ASG Voting`, `EOY Voting`, `Free Agency Notifications`. Always include `'Current Season Ending Year': '2026'` when tests depend on CI seed data.
 
-**Serial mode:** Prefer splitting a spec into read-only (`smoke/`/`flows/`) and submission (`flows/*-submission.spec.ts`) files over file-level `test.describe.configure({ mode: 'serial' })`. Use serial only within one `describe` where tests genuinely share state. Canonical: `voting.spec.ts` / `voting-submission.spec.ts`.
+**Serial mode:** Prefer splitting a spec into read-only (`smoke/`/`flows/`) and submission (`flows/*-submission.spec.ts`) files over file-level `test.describe.configure({ mode: 'serial' })`. Use serial only within one `describe` where tests genuinely share state. Canonical: `voting.spec.ts` / `voting-submission.spec.ts`. When asserting AJAX-updated DOM values inside a serial suite, capture the pre-action value first and assert the *change*, not an absolute value — earlier specs in a serial suite mutate shared state, so an absolute expectation is order-dependent and will flake.
 
 ## DO
 

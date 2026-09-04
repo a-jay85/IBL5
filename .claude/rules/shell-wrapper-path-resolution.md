@@ -29,3 +29,7 @@ exec python3 -m my.module "$@"
 ```
 
 **Why this matters:** relative-path arguments that work from the repo root will silently fail (or hit a different file) when the wrapper cd's first. The error is non-obvious because the script exits with a module-level FileNotFoundError, not a "wrong directory" message.
+
+## Why
+
+See `ibl5/docs/decisions/0118-shell-wrapper-path-resolution-via-pythonpath.md` for the rung ladder that rejected static analysis, a `bin/check-*` gate, and a forced verification row before landing on this authoring norm.

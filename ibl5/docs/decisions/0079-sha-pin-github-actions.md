@@ -1,6 +1,6 @@
 ---
 description: Pin every external GitHub Actions ref across all workflows and composite actions to a full 40-char commit SHA (with a trailing # vX comment) via pinact, enforced by a pinact --check drift-guard wired into the gate aggregator; local ./ composite refs are exempt.
-last_verified: 2026-07-05
+last_verified: 2026-09-04
 ---
 
 # ADR-0079: SHA-pin all external GitHub Actions, enforced by a drift-guard

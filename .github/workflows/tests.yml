@@ -261,9 +261,67 @@ jobs:
       working-directory: ibl5
       run: bun install --frozen-lockfile
 
+    # `bun audit` POSTs to npm's advisory API, so an npm outage used to turn this
+    # REQUIRED check red on a PR that changed nothing about dependencies (run
+    # 33823695245: `POST .../security/advisories/bulk - 503` after a 5-minute
+    # hang, no retry, no continue-on-error).
+    #
+    # The fix is NOT `|| true` — that is fine for the advisory-only
+    # bun-audit-issue.yml, but here it would silently retire a blocking gate.
+    # Instead: retry, and tell an outage apart from a real finding by the SHAPE
+    # of the output rather than by bun's exit code, which is 1 for both.
+    # Verified against bun 1.3.6 with a local registry forced to 503: bun writes
+    # NOTHING to stdout and prints `error: audit request failed (status 503)`,
+    # whereas any audit that actually COMPLETED — clean or dirty — writes a JSON
+    # object (`{}` when clean). So "valid, non-empty JSON on stdout" is the only
+    # sound success predicate, and bin/bun-audit-triage turns that JSON into the
+    # pass/fail verdict. That script is already the consumer in
+    # bun-audit-issue.yml and is covered by bin/test-bun-audit-triage, so this
+    # reuses a tested severity filter instead of re-deriving one; it also names
+    # the offending packages in the log, which `--audit-level=high` never did.
+    #
+    # Net effect: an npm blip is a warning, a real high/critical advisory still
+    # fails the job.
     - name: Audit JS dependencies (bun)
-      working-directory: ibl5
-      run: bun audit --audit-level=high
+      env:
+        AUDIT_JSON: ${{ runner.temp }}/bun-audit.json
+        AUDIT_ERR: ${{ runner.temp }}/bun-audit.err
+        AUDIT_ATTEMPTS: '3'
+        # Bounds the observed 5-minute hang. Worst case is 3 x 180s plus 45s of
+        # backoff, comfortably inside the job's 30-minute timeout.
+        AUDIT_TIMEOUT_SECS: '180'
+      run: |
+        got_json=false
+        for attempt in $(seq 1 "$AUDIT_ATTEMPTS"); do
+          (cd ibl5 && timeout "$AUDIT_TIMEOUT_SECS" bun audit --json) \
+            > "$AUDIT_JSON" 2> "$AUDIT_ERR" || true
+
+          if [ -s "$AUDIT_JSON" ] && jq -e . "$AUDIT_JSON" > /dev/null 2>&1; then
+            got_json=true
+            break
+          fi
+
+          echo "bun audit produced no usable JSON (attempt ${attempt}/${AUDIT_ATTEMPTS}) — npm's advisory API is likely unavailable:"
+          sed -n '1,20p' "$AUDIT_ERR"
+          if [ "$attempt" -lt "$AUDIT_ATTEMPTS" ]; then
+            sleep $((attempt * 15))
+          fi
+        done
+
+        if [ "$got_json" != true ]; then
+          echo "::warning::bun audit could not reach npm's advisory API after ${AUDIT_ATTEMPTS} attempts, so this PR's dependencies were NOT audited. Failing the check on an npm outage would block unrelated PRs; the weekly bun-audit-issue.yml run re-audits the tree."
+          exit 0
+        fi
+
+        set +e
+        bin/bun-audit-triage --level=high "$AUDIT_JSON"
+        triage_exit=$?
+        set -e
+        case "$triage_exit" in
+          0) echo "bun audit: no high or critical advisories." ;;
+          1) echo "::error::bun audit found high or critical advisories (listed above)."; exit 1 ;;
+          *) echo "::error::bin/bun-audit-triage could not parse the audit JSON."; exit 1 ;;
+        esac
 
   ibl5-ts-unit:
     name: IBL5 TS Unit Tests
@@ -891,6 +949,8 @@ jobs:
         run: bin/test-automouse-disarm
       - name: bin/test-bun-audit-triage
         run: bin/test-bun-audit-triage
+      - name: bin/test-scrub-log-credentials
+        run: bin/test-scrub-log-credentials
       - name: bin/test-db-query-routing
         run: bin/test-db-query-routing
       - name: bin/test-watch-run

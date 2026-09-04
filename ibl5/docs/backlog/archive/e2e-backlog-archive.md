@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed/declined E2E test-quality backlog entries, extracted from e2e-backlog.md.
-last_verified: 2026-08-30
+last_verified: 2026-09-02
 ---
 
 # E2E Test-Quality Backlog — Archive
@@ -82,6 +82,33 @@ Read-only historical record of ✅ Implemented / 🚫 Declined findings. For OPE
 **Est. effort:** S per item.
 **Risk if untouched:** Tests give false green; broken features pass CI undetected.
 **Status (2026-08-08):** ✅ Implemented — each weak assertion replaced with a seed-grounded or element-scoped assertion, every one verified to fail when fed a wrong value. C17 remains ⬜ Open (out of scope). Bug finding: C7 player page (`smoke/olympics-pages.spec.ts:31`) — the tightened assertion red-flagged a real production bug: `PlayerPageController::renderPage()` resolved the viewer's team with an unguarded `Team::initialize()`, and `League\LeagueContext` rewrites `ibl_team_info` → `ibl_olympics_team_info`, which has no `Free Agents` row, so `Team::load()` threw and the page never rendered (the missing `ibl_olympics_plr` seed row, fixed here, was only what gives the assertion a name to match). Tracked as maintenance-backlog 6.24 and fixed in #2028; the assertion was kept failing, never relaxed, and goes green with #2028 in the base. Implementation notes: (1) C12 shipped the shared `assertColumnSorts` helper WITHOUT the exact-descending-sequence line `expect(after).toEqual([...before].sort().reverse())` — `sorttable.js` uses a diacritic-insensitive comparator that diverges from JS `.sort()`'s UTF-16 order on non-ASCII names (e.g. "Dariuš Lavrinovich"), producing false reds; the retained state assertions (`aria-sort`, `sorttable_sorted_reverse`, `#sorttable_sortrevind`) plus `after !== before` still discriminate; V36 is retired for that reason, not left unimplemented. (2) The plan's V40 completeness greps over-catch: the bare-return grep also matches the DON'T-12-compliant 401 branches at `api-e2e/api.test.ts` L45/L275, and the `if (ct.includes` grep matches three pre-existing, uncatalogued query-param-auth JSON guards at L423/438/450 — same Axis-C class, now tracked as C19 in e2e-backlog.md; both are documented knowns, not surviving escapes. (#1825)
+
+---
+
+### D16 DCE mobile save-flow: positive assertion replaced with non-error gate
+
+**Location:** `ibl5/tests/e2e/flows/depth-chart-entry-mobile.spec.ts` (~L411–431, the `submit` helper)
+**Problem:** The positive save assertion (`.ibl-alert--success` with text `/depth chart saved/i`) was removed during the Axis E flake sweep (PR #1805) because the flash key `_ibl_depth_chart_flash` is session-shared and races parallel E2E workers (same documented race as `depth-chart-entry-submission.spec.ts` L14–29). Replacement asserts `.dc-mobile-cards` visible + `.ibl-alert--error` absent. Neither proves the depth chart actually persisted — `.dc-mobile-cards` is visible before the save, and a silent server-side failure that suppresses the error banner would pass.
+**Suggested direction:** Add a positive non-flash assertion immune to the session race: navigate away and back, then assert the saved depth chart ordering appears in the mobile cards.
+**Est. effort:** S
+**Risk if untouched:** A silent save failure (error suppressed server-side or misrouted) would not be caught.
+**Status (2026-08-31):** ✅ Implemented — navigate-away read-back assertion added; selects captured before submit, verified equal after navigate-to-Standings-and-back. (#2045)
+
+**class:** an E2E submission test that accepts non-error as success, with no read-back of the mutated state, because the original positive assertion was session-race prone.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/tests/e2e/flows/depth-chart-entry-mobile.spec.ts:411–431` | yes | yes | fixed — #2045 |
+
+**prevention_ladder:** no gate warranted — the defect class (positive assertion removed under flash-session-race pressure) is too context-specific to gate mechanically; a code-review check on assertion strength would be the right rung but is already a PR-review responsibility.
+
+**artifact_destination:** n/a — no gate
+
+**provenance:** (discovered 2026-08-29 during #1805)
+
+---
 
 ### D17 PR #1903 Extra Coverage and Intentional Assertion Relaxation (F6 + F7 + F10)
 

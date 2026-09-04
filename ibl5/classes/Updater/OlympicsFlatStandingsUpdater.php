@@ -8,9 +8,9 @@ class OlympicsFlatStandingsUpdater extends StandingsUpdater
 {
     public function update(): void
     {
-        echo "<p>Updating the Olympics standings database table...<p>";
+        $this->appendOutput("<p>Updating the Olympics standings database table...<p>");
         $this->computeAndInsertStandings();
-        echo "<p>The Olympics standings table has been updated.<p>";
+        $this->appendOutput("<p>The Olympics standings table has been updated.<p>");
     }
 
     protected function computeAndInsertAll(array $standings, array $teamMap): void
@@ -19,8 +19,6 @@ class OlympicsFlatStandingsUpdater extends StandingsUpdater
         $startDate = $this->season->beginningYear . "-{$month}-01";
         $endDate = $this->season->endingYear . "-05-30";
         $scheduledCounts = $this->repository->fetchScheduledGameCountsPerTeam($startDate, $endDate);
-
-        $log = '';
 
         foreach ($standings as $team) {
             $totalGames = $team['wins'] + $team['losses'];
@@ -60,10 +58,6 @@ class OlympicsFlatStandingsUpdater extends StandingsUpdater
                 'awayWins' => $team['away_wins'],
                 'awayLosses' => $team['away_losses'],
             ]);
-
-            $log .= "Inserted standings for team: {$team['teamName']}<br>";
         }
-
-        \UI\DebugOutput::display($log, 'Computed Olympics Standings');
     }
 }

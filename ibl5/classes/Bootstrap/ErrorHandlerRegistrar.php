@@ -68,10 +68,39 @@ final class ErrorHandlerRegistrar
             'message' => $e->getMessage(),
             'file' => $e->getFile(),
             'line' => $e->getLine(),
-            'trace' => $e->getTraceAsString(),
+            'trace' => $this->buildArgFreeTrace($e),
         ]);
 
         ($this->renderer)(500);
+    }
+
+    /**
+     * Build a stack-trace string from structured frames without ever reading the
+     * `args` key, so call arguments (passwords, tokens) can never be serialized.
+     *
+     * This is the primary defense and holds regardless of `zend.exception_ignore_args`.
+     * Do NOT replace this with `getTraceAsString()` or with a downstream log processor:
+     * once the trace is a formatted string the arguments are already leaked.
+     */
+    private function buildArgFreeTrace(\Throwable $e): string
+    {
+        $lines = [];
+
+        foreach ($e->getTrace() as $i => $frame) {
+            $callable = isset($frame['class'])
+                ? $frame['class'] . ($frame['type'] ?? '::') . ($frame['function'] ?? '{closure}')
+                : ($frame['function'] ?? '{closure}');
+
+            $location = isset($frame['file'])
+                ? $frame['file'] . ':' . ($frame['line'] ?? 0)
+                : '[internal function]';
+
+            $lines[] = sprintf('#%d %s() at %s', $i, $callable, $location);
+        }
+
+        $lines[] = sprintf('#%d {main}', count($lines));
+
+        return implode("\n", $lines);
     }
 
     /**

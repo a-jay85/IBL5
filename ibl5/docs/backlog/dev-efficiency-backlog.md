@@ -1,6 +1,6 @@
 ---
 description: Development-efficiency backlog — inner-loop speed (diff-scoped analysis, parallel tests), CI caching, dependency-bump batching, and worktree lifecycle automation, with per-entry status.
-last_verified: 2026-09-03
+last_verified: 2026-09-02
 ---
 
 # Development-Efficiency Backlog
@@ -62,6 +62,11 @@ last_verified: 2026-09-03
 | E33 | Phase 6 review notes on PR #1815 — F1/F2 blocking (body inaccuracy, backlog 6.24 collision); F3–F7 notes (reflection test, coercion guards, smoke narrative, last_verified); F1/F2/F5 remediated in Phase 6.5 | ⬜ Open | — | S |
 | E34 | Auto-generated `codebase-map.md` row added in #1903 — mechanical output of `bin/generate-codebase-map`, no defect | 🚫 Declined | — | XS |
 | E35 | Phase 6 review notes on PR #1800 — PR body test count conflated Verification Matrix row count (18) with PHPUnit method count (7 methods / 9 cases); same wrong number replicated into archive entry; both fixed in Phase 6.5 | ⬜ Open | — | XS |
+| E37 | Phase 6 review notes on PR #2045 — plan under-specified assertion discriminator and archive step; PR body Scope omitted mutation context; "No manual testing" claim tensioned with hold; check 5 outstanding hold (n/a); PR body fixed in Phase 6.5 | ⬜ Open | — | XS |
+| E38 | `/pr-ready` lost-work guard blind to prior-run destructive rebase | ⬜ Open | 🟨 | S |
+| E39 | Phase 6 review notes on PR #1824 (StandingsUpdater echo→logger) — B1 wrong seam name + scope count in body; N3 scope creep unbundled; N4 stale plan literal; N5 manual backlog row not retired in plan; N7 wrong method name in body; B1+N7 remediated this pass | ⬜ Open | — | S |
+| E40 | `bin/scrub-log-credentials` prod path: unquoted outer heredoc mangles remote jq filter escapes (F1) + local per-file hit report silently discarded (F4) — both fixed Phase 6.5 #1920; case 8 harness guards regression | ⬜ Open | — | S |
+| E41 | `ErrorHandlerRegistrarTest` + `bin/test-scrub-log-credentials`: SYNTHETIC_SECRET 32 chars truncated to 15 in `getTraceAsString()` causes vacuous assertion (F2) + closure assertion replaced with unconditional pass (F3) — both fixed Phase 6.5 #1920 | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -575,3 +580,137 @@ Not a defect in the anchoring or the SIGPIPE handling: the `$`-anchor (guarding 
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-02 during #1965)*
+
+### E37 Phase 6 review notes on PR #2045 (E2E DCE mobile save-flow)
+
+**class:** a plan spec for an E2E test change that (a) omits the behavioral step (deliberate depth-slot mutation via the mobile stepper) that makes the read-back assertion discriminating — making the plan's prescribed recipe vacuous — and (b) omits the mandatory archive step for a backlog-status-glyph flip, causing unplanned scope that `bin/check-docs` would block if the implementation had followed the plan literally.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `~/claude-plans/e2e-d16-dce-mobile-save-readback.md` Phase 1 — plan recipe prescribes `allInputValues()` capture before submit with no prior mutation; the assertion would be vacuous without a prior state change | yes | no — plan file only; implementation diverged by a better route | not fixed — not a defect in the shipped code; body updated to name the mutation |
+| 2 | `~/claude-plans/e2e-d16-dce-mobile-save-readback.md` Phase 2 — plan recipe specifies only the glyph flip, omitting the mandatory archive move that `bin/check-docs` enforces | yes | no — plan file only; implementation included the archive step | not fixed — not a defect in the shipped code; noted for future plan templates |
+
+**prevention_ladder:**
+
+- **rung 0 — already covered by an existing gate?** Partially: `bin/check-docs` enforces the archive step at commit time (the implementation was correct), but no gate checks whether the *plan* named it.
+- **rung 1 — extend an existing gate?** No existing gate reads plan files or validates that a read-back assertion is discriminating.
+- **rung 2 — a rule doc?** A note in `.claude/rules/` (or the plan-authoring guidance in `_architect-contract.md`) could say: "for E2E read-back plans, the plan must include the mutation that makes the assertion discriminating, not just the capture-and-assert shape." And: "a backlog-flip plan must scope the archive move explicitly." Both are author-discipline items.
+- **rungs 3–5** — N/A. A PHPStan rule, CI gate, or hook cannot evaluate whether a prescribed test recipe is discriminating without running the test.
+
+`prevention_ladder: no gate warranted — (a) the assertion-discriminator gap is an author-judgment item; no mechanical gate can verify a prescribed assertion is discriminating without executing the test; (b) the archive step gap is already enforced at commit time by bin/check-docs; the plan was under-specified but the implementation was correct.`
+
+`artifact destination: n/a — no gate`
+
+**check 4(i) remediation (PR body Scope):** PR body updated via `gh pr edit` to add: "The test first mutates one depth slot via the mobile stepper, captures the resulting select values, submits, then navigates…" — the causal claim "proving persisted" now holds on its stated evidence.
+
+**check 4(ii) remediation (Manual Testing):** PR body "No manual testing needed — all changes are covered by unit and E2E tests" updated to: "No interactive manual testing needed — E2E covers the save flow. However, a human must confirm two consecutive green CI runs before merging (see Notes)." — no longer contradicts the Notes hold.
+
+**check 5 (Verification Matrix row 2 outstanding):** `class: n/a — no defect; row 2 (second consecutive green CI run) is the expected hold state, gated by human-signoff and the plan's explicit Automouse Hold Justification.`
+
+*(discovered 2026-09-02 during #2045)*
+
+### E38 /pr-ready lost-work guard blind to prior-run destructive rebase
+
+`class:` a `/pr-ready` Phase 2a pre-image capture that occurs inside the current run, making the lost-work guard invisible to a destructive rebase performed by an earlier run on the same branch.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `.claude/skills/pr-ready/SKILL.md` Phase 2a | yes | yes | not fixed — filed |
+
+**prevention_ladder:**
+
+- rung 0 — not already covered by an existing gate
+- rung 1 — could extend the existing lost-work guard to also compare against a persisted pre-image from the previous run (e.g. stored as `/tmp/pr-ready-preimage-<N>-<branch>.patch` keyed to PR+branch across runs)
+- rung 2 — a rule doc under `.claude/rules/` would not prevent a code path from executing; not applicable
+- rung 3 — PHPStan rule not applicable (skill/shell code)
+- rung 4 — a CI gate not applicable (harness-side behavior)
+- rung 5 — hook not applicable
+- **Landing: rung 1** — extend the guard to compare the current pre-image against a persistent cross-run patch file; OR add a check that verifies the plan's Critical Files list is represented in the pre-rebase diff (a planned file absent from pre means the pre was already post-loss). Either check is a code change to `scripts/lostwork.sh` or Phase 2a of `SKILL.md`.
+
+`artifact destination:` `.claude/skills/pr-ready/scripts/lostwork.sh` (in-repo; lands in a PR diff)
+
+`provenance:` (discovered 2026-09-02 during #2045)
+### E39 Phase 6 review notes on PR #1824 (StandingsUpdater echo→logger migration)
+
+**class:** PR body / plan accuracy drift — wrong method name, wrong scope count, undocumented scope creep, stale plan literal, and a manual backlog row not retired in the plan
+
+**occurrence table:**
+
+| # | Finding | Live? | Status |
+|---|---------|-------|--------|
+| B1 | Body used `outputBuffer()` instead of `takeOutputBuffer()`; scope said "removes two $log accumulators" not three; `OlympicsFlatStandingsUpdater` subclass not named in Scope | yes | fixed this pass (gh pr edit) |
+| N3 | `CheckDocsCliTest.php` rewrite in the diff but not in the plan; unbundled scope creep | yes | noted in PR body (transparency note added) |
+| N4 | Plan said "drain both updaters' buffers" but only one updater is injected per step | yes | corrected in PR body |
+| N5 | Plan's backlog row 1.18 not marked done in plan after retire | yes | informational — plan already shipped |
+| N7 | `$this->outputBuffer[] = ...` literal in body did not match actual `appendOutput()` call | yes | fixed this pass (gh pr edit) |
+
+**prevention_ladder:**
+
+- **rung 0 — already covered?** No existing gate validates that PR body method names match the actual implementation.
+- **rung 1 — extend an existing gate?** `bin/check-plan` could cross-reference body method names against the diff, but false-positive risk is high.
+- **rung 2 — a rule doc?** Could add a prose reminder in the Phase 6.5 remediation procedure to diff body method/class names against `git diff HEAD~1` before posting.
+- **rung 3 — PHPStan?** Not applicable to body prose.
+- **rung 4 — CI gate?** No practical CI gate for prose accuracy.
+- **landing rung:** no gate warranted — body-prose accuracy is a judgment review; Phase 6 Opus fidelity review is the correct catch surface and fired correctly here.
+
+`prevention_ladder: no gate warranted — Phase 6 Opus review is the correct catch surface; B1+N7 fixed in-PR`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-02 during #1824 Phase 6 review)*
+
+### E40 Phase 6 review notes on PR #1920 (scrub-log-credentials remote filter + stdout)
+
+**class:** implementation defects in `bin/scrub-log-credentials` — unquoted outer heredoc collapses jq regex escapes in the remote path (F1), and per-file hit report output silently discarded in local mode (F4)
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/scrub-log-credentials:231–272` (F1: outer heredoc collapses `\\` → `\`, corrupting jq regex; remote path silently no-ops) | yes | yes | fixed this pass |
+| 2 | `bin/scrub-log-credentials:156–158` (F4: `result_text` captures report + HITS line, but only HITS extracted; file:line report discarded) | yes | yes | fixed this pass |
+
+**prevention_ladder:**
+
+- **rung 0 — already covered?** No. `bin/test-scrub-log-credentials` only exercised `run_local()`; the remote path and its embedded jq filter had no test coverage.
+- **rung 1 — extend existing gate?** Case 8 added to `bin/test-scrub-log-credentials` (shipped this PR) guards remote invocation pattern and filter content against drift. F4 output is implicitly covered by case 1 dry-run hit-count assertions.
+- **rung 2 — a rule doc?** No rule doc warranted — too specific.
+- **rung 3 — PHPStan?** Not applicable (bash).
+- **rung 4 — CI gate?** `bin/test-scrub-log-credentials` is wired to CI; case 8 guards future regression.
+- **landing rung:** rung 1 — case 8 harness shipped with the fix.
+
+`prevention_ladder: rung 1 — case 8 in bin/test-scrub-log-credentials guards remote jq filter content and invocation pattern; F4 output fix covered by existing case 1 assertions`
+
+`artifact destination: bin/test-scrub-log-credentials case 8 (shipped this PR)`
+
+*(discovered 2026-09-02 during #1920)*
+
+### E41 Phase 6 review notes on PR #1920 (SYNTHETIC_SECRET length + closure assertion)
+
+**class:** verification-quality defects — SYNTHETIC_SECRET constant too long for `getTraceAsString()` 15-char truncation (F2) causes tests to pass vacuously; closure-frame assertion replaced with unconditional pass (F3)
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/tests/Bootstrap/ErrorHandlerRegistrarTest.php:174` (F2: SYNTHETIC_SECRET 32 chars; `getTraceAsString()` truncates args to 15 chars — assertion checks for string never present in output) | yes | yes | fixed this pass |
+| 2 | `bin/test-scrub-log-credentials:138–140` (F3: closure not-wholesale-redacted assertion replaced with `ok "..."` unconditional pass) | yes | yes | fixed this pass |
+
+**prevention_ladder:**
+
+- **rung 0 — already covered?** No. PHPUnit and the harness ran green, masking both defects.
+- **rung 1 — extend existing gate?** F2 fix shortens SYNTHETIC_SECRET to 14 chars (fits verbatim in `getTraceAsString()` output) — tests now genuinely fail on a regression. F3 fix restores the real predicate.
+- **rung 2 — a rule doc?** No rule doc warranted — the PHP 15-char truncation behavior is documented in the test comment.
+- **rung 3 — PHPStan?** PHPStan cannot detect vacuous string-absence assertions of this form.
+- **rung 4 — CI gate?** No gate warranted — both fixes are direct test-quality improvements requiring human judgment.
+- **landing rung:** rung 1 — direct fixes applied this pass; no additional gate.
+
+`prevention_ladder: rung 1 — SYNTHETIC_SECRET shortened to fit getTraceAsString() truncation; closure assertion restored as real predicate; no further gate warranted`
+
+`artifact destination: n/a — no new gate`
+
+*(discovered 2026-09-02 during #1920)*

@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed/declined maintenance-audit findings, extracted from maintenance-backlog.md.
-last_verified: 2026-09-03
+last_verified: 2026-09-04
 ---
 
 # Maintenance-Cost Reduction Backlog — Archive
@@ -2639,3 +2639,35 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **prevention_ladder:** no gate warranted — plan-vs-spec gaps of this type not automatable.
 **provenance:** (discovered 2026-09-01 during #1903)
 **Status:** 🚫 Declined — no action warranted.
+
+### 6.13 Player Module — Large + Subthreshold (69 prod / 31 test files, ~0.45 ratio)
+**Location:** `ibl5/classes/Player`
+**Problem:** Largest module; coverage ~0.45 (69 prod / 31 test files). PlayerPageService, PlayerContractValidator, PlayerStats underrepresented.
+**Suggested direction:** Page-type routing, contract rules, stats aggregation, image-helper edge cases.
+**Est. effort:** L
+**Risk if untouched:** Profile regressions cascade; contract validation bypass.
+**Status:** ✅ Implemented (2026-08-09) — Added negative-path/boundary coverage on the named critical classes — `PlayerContractValidator` (offseason renegotiation advance; non-draft-pick and already-set option-year rejections), `PlayerImageHelper` (`renderPhoto`/`renderLargePlayerCell` escaping; `renderThumbnail` invalid-id placeholder), `PlayerStats` (empty boxscore line; missing historical columns) — in `ibl5/tests/Player/PlayerContractValidatorTest.php`, `ibl5/tests/Player/PlayerImageHelperTest.php`, `ibl5/tests/Player/PlayerStatsTest.php`. `PlayerPageService`/`PlayerPageType` page-type routing already covered (`ibl5/tests/Player/PlayerPageServiceTest.php`, `ibl5/tests/Player/PlayerPageTypeTest.php`). **Chunk 1 (2026-07-26):** `Player/Stats/Views/` covered — `PlayerRatingsAndSalaryView`, `PlayerRegularSeasonAveragesView`, `PlayerRegularSeasonTotalsView`, `PlayerSimStatsView` now have snapshot + branch tests in `ibl5/tests/Player/Stats/Views/`, sharing new fixtures in `RegularSeasonViewFixtures.php`. `PlayerSeasonTableConfig`/`PlayerSeasonTableMode` need no separate tests — they are already mutation-covered through `PlayerSeasonTableRendererTest.php`. Scoped Infection residual is recorded in the PR body: the surviving mutants are the provably-equivalent `$gm > 0` -> `$gm >= 0` boundary on the fifteen per-game columns of `PlayerRegularSeasonAveragesView` (`StatsFormatter::formatPerGameAverage($x, 0)` returns the same `"0.0"` the else-branch emits) plus mutants on the `fgpct`/`ftpct`/`tpct` values that view never renders. **Chunk 2 (#1816, 2026-08-08):** All ten untested files in `ibl5/classes/Player/Views/` now have snapshot + branch tests in `ibl5/tests/Player/Views/`. Six infection.json5 excludes removed; scoped MSI result recorded in PR body. **Chunk 3 (#1817, 2026-08-09):** `PlayerRepository` database-integration coverage (`getPlayerNews` happy-path with `nuke_stories` rows; exclusion negative-path) and `PlayerPageController` full routing (`email_failed` banner, unknown-code → no banner, invalid-pageView default fallback for active + retired player) added. All three chunks complete.
+
+**Table evidence (2026-08-09):** Player (69 prod / 48 test files); additive (L — chunked; 3 of 3 done).
+
+### 6.26 Plan-Scope Drift: `import-demands.php` and `csv-import.css` Modified Beyond Declared Scope
+**Location:** `ibl5/import-demands.php`, `ibl5/design/components/csv-import.css` (renamed from `ibl5/design/components/import-demands.css` (example)) — PR #1903
+**Problem:** The Phase 6 plan-fidelity review found that the diff modified `import-demands.php` (updated stylesheet link and class names) and renamed `import-demands.css` → `csv-import.css`, both files marked "read-only reference" in the plan. No regression coverage existed before this pass to prove `import-demands.php` still renders correctly with the renamed stylesheet (F1). Secondary observation-only notes: `uploadDraftClass.php` uses a JS auto-submit picker rather than a plain `<button>` (F2, satisfies plan goal via `<noscript>` fallback); preview chrome includes extra elements and a scroll-indicator with one guarded null dereference (F4, inside the preview branch only, not a live crash); PR body Scope prose omits the CSS-rename half of the diff (F8, cleared by orchestrator body update); Verification Matrix row 23 names the wrong spec file for the 403 role-gating test (F9, documentation only).
+**Suggested direction:** F1 fixed this pass — E2E assertion added to `ibl5/tests/e2e/flows/import-demands-submission.spec.ts` verifying `.csv-import` class presence after page load. F2/F4/F8/F9 are observation notes requiring no corrective action.
+**Est. effort:** XS (F1 already fixed this pass)
+**Risk if untouched:** (F1 now covered by E2E pin) Secondary observations carry no live risk; the JS picker degrades gracefully via `<noscript>` fallback.
+**prevention_ladder:** no gate warranted — the plan's "read-only reference" designation is the human-readable fence; enforcement would require a hook that reads the plan text, which is not feasible.
+**provenance:** (discovered 2026-09-01 during #1903)
+**Status:** ✅ Implemented (2026-09-01) — F1 fixed in PR #1903 (E2E assertion on `.csv-import` class added to `ibl5/tests/e2e/flows/import-demands-submission.spec.ts`); F2/F4/F8/F9 are observation notes, no gate warranted.
+
+**Table evidence (2026-09-01):** Plan-scope drift in #1903: F1 (E2E pin) fixed; F2/F4/F8/F9 observation notes only — no gate warranted.
+
+### 13.7 Validator Error-Accumulation Boilerplate Repeated
+**Location:** `Waivers/WaiversValidator.php`, `Draft/DraftValidator.php`, `DepthChartEntry/DepthChartEntryValidator.php`
+**Problem:** All three define `private array $errors = []; getErrors(); clearErrors();`. `TradeValidator` and `FreeAgencyOfferValidator` use a different return shape — two incompatible patterns.
+**Suggested direction:** `AbstractAccumulatingValidator` base or `ValidatorErrorBag` value object; enforce "clearErrors before validate" centrally.
+**Est. effort:** S
+**Risk if untouched:** New validators copy without the convention; state leakage between calls.
+**Status:** ✅ Implemented (Strategy A, PR #1007 validator-accumulators-to-validationresult, 2026-06-08) — the two pure string-accumulator validators (`Waivers/WaiversValidator`, `Draft/DraftValidator`) now return `ValidationResult`; mutable `private array $errors` / `getErrors()` / `clearErrors()` removed. State-leakage risk eliminated for these two. Remainder (structured/dict-family validators) re-filed as 13.7b (open).
+
+**Table evidence (2026-06-08):** Waivers/Draft → ValidationResult (Strategy A); remainder is 13.7b. Done part green-green.

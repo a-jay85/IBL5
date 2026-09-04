@@ -17,8 +17,8 @@ class CleanupPreseasonDataStepTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->stubBoxscoreRepo = $this->createStub(BoxscoreRepository::class);
-        $this->stubSeason = $this->createStub(Season::class);
+        $this->stubBoxscoreRepo = self::createStub(BoxscoreRepository::class);
+        $this->stubSeason = self::createStub(Season::class);
         $this->stubSeason->phase = 'HEAT';
         $this->stubSeason->beginningYear = 2026;
         $this->stubSeason->endingYear = 2027;
@@ -40,7 +40,7 @@ class CleanupPreseasonDataStepTest extends TestCase
 
     public function testSkipsWhenPhaseIsNotHeat(): void
     {
-        $seasonStub = $this->createStub(Season::class);
+        $seasonStub = self::createStub(Season::class);
         $seasonStub->phase = 'REGULAR_SEASON';
         $seasonStub->beginningYear = 2026;
         $seasonStub->endingYear = 2027;

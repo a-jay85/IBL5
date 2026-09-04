@@ -16,8 +16,8 @@ class QueueSimSummaryStepTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->stubSummaries = $this->createStub(SimSummaryRepository::class);
-        $this->stubSeasonQuery = $this->createStub(SeasonQueryRepository::class);
+        $this->stubSummaries = self::createStub(SimSummaryRepository::class);
+        $this->stubSeasonQuery = self::createStub(SeasonQueryRepository::class);
         $this->stubSeasonQuery->method('getSeasonPhase')->willReturn('Regular Season');
         $this->stubSeasonQuery->method('getLastSimDatesArray')->willReturn(['sim' => 5]);
     }
@@ -37,7 +37,7 @@ class QueueSimSummaryStepTest extends TestCase
 
     public function testSkipsWhenPhaseIsDisabledForRecaps(): void
     {
-        $stubQuery = $this->createStub(SeasonQueryRepository::class);
+        $stubQuery = self::createStub(SeasonQueryRepository::class);
         $stubQuery->method('getSeasonPhase')->willReturn('HEAT');
 
         $result = $this->buildStep(seasonQuery: $stubQuery)->execute();
@@ -47,7 +47,7 @@ class QueueSimSummaryStepTest extends TestCase
 
     public function testSkipsWhenNoSimDatesRecorded(): void
     {
-        $stubQuery = $this->createStub(SeasonQueryRepository::class);
+        $stubQuery = self::createStub(SeasonQueryRepository::class);
         $stubQuery->method('getSeasonPhase')->willReturn('Regular Season');
         $stubQuery->method('getLastSimDatesArray')->willReturn(['sim' => 0]);
 
@@ -58,7 +58,7 @@ class QueueSimSummaryStepTest extends TestCase
 
     public function testQueuesSimWhenAbsentFromSummaryTable(): void
     {
-        $stubSummaries = $this->createStub(SimSummaryRepository::class);
+        $stubSummaries = self::createStub(SimSummaryRepository::class);
         $stubSummaries->method('queuePendingIfAbsent')->willReturn(true);
 
         $result = $this->buildStep(summaries: $stubSummaries)->execute();
@@ -70,7 +70,7 @@ class QueueSimSummaryStepTest extends TestCase
 
     public function testReturnsSuccessWhenSimAlreadyHasSummaryRow(): void
     {
-        $stubSummaries = $this->createStub(SimSummaryRepository::class);
+        $stubSummaries = self::createStub(SimSummaryRepository::class);
         $stubSummaries->method('queuePendingIfAbsent')->willReturn(false);
         $stubSummaries->method('listAll')->willReturn([['status' => 'done', 'sim' => 3]]);
 

@@ -602,6 +602,98 @@ assert "gate13-manual-explicit-opus-ok" 0 '---
 impl_model: opus
 ---'"$M_MANUAL"
 
+# (g) Full-id claude-sonnet-4-6 with a Truly-manual row is forbidden (exit 1) —
+# regression pin for the closed hole: previously the full-id form slipped past a
+# literal `[ "$RAW" = "sonnet" ]` guard and ran as an opus-tier fallback.
+_f="$TMP/gate13-sonnet46-manual.md"
+printf '%s\n' '---
+impl_model: claude-sonnet-4-6
+---'"$M_MANUAL" > "$_f"
+"$GUARD" "$_f" >/dev/null 2>&1; _ec=$?
+if [ "$_ec" -eq 0 ]; then
+    echo "FAIL: gate13-sonnet46-manual — expected nonzero exit, got 0"; FAILED=1
+else
+    echo "ok: gate13-sonnet46-manual (exit $_ec)"
+fi
+if "$GUARD" "$_f" 2>&1 | grep -qF 'Truly-manual row forbids impl_model: claude-sonnet-4-6'; then
+    echo "ok: gate13-sonnet46-manual (substring confirmed)"
+else
+    echo "FAIL: gate13-sonnet46-manual — expected 'Truly-manual row forbids impl_model: claude-sonnet-4-6'"; FAILED=1
+fi
+
+# (h) Full-id claude-haiku-4-5 with a Truly-manual row is forbidden (exit 1).
+_f="$TMP/gate13-haiku45-manual.md"
+printf '%s\n' '---
+impl_model: claude-haiku-4-5
+---'"$M_MANUAL" > "$_f"
+"$GUARD" "$_f" >/dev/null 2>&1; _ec=$?
+if [ "$_ec" -eq 0 ]; then
+    echo "FAIL: gate13-haiku45-manual — expected nonzero exit, got 0"; FAILED=1
+else
+    echo "ok: gate13-haiku45-manual (exit $_ec)"
+fi
+if "$GUARD" "$_f" 2>&1 | grep -qF 'Truly-manual row forbids impl_model: claude-haiku-4-5'; then
+    echo "ok: gate13-haiku45-manual (substring confirmed)"
+else
+    echo "FAIL: gate13-haiku45-manual — expected 'Truly-manual row forbids impl_model: claude-haiku-4-5'"; FAILED=1
+fi
+
+# (i) Full-id claude-opus-5 with a Truly-manual row passes (exit 0) — mirrors (f).
+assert "gate13-opus5-manual-ok" 0 '---
+impl_model: claude-opus-5
+---'"$M_MANUAL"
+
+# (j) Unknown model values are rejected by the whitelist before the manual-row
+# check; the rejection message must be present in the output (exit 1).
+_f="$TMP/gate13-unknown-gpt4.md"
+printf '%s\n' '---
+impl_model: gpt-4
+---'"$M" > "$_f"
+"$GUARD" "$_f" >/dev/null 2>&1; _ec=$?
+if [ "$_ec" -eq 0 ]; then
+    echo "FAIL: gate13-unknown-gpt4 — expected nonzero exit, got 0"; FAILED=1
+else
+    echo "ok: gate13-unknown-gpt4 (exit $_ec)"
+fi
+if "$GUARD" "$_f" 2>&1 | grep -qF 'is not a recognized model'; then
+    echo "ok: gate13-unknown-gpt4 (substring confirmed)"
+else
+    echo "FAIL: gate13-unknown-gpt4 — expected 'is not a recognized model'"; FAILED=1
+fi
+
+_f="$TMP/gate13-fable.md"
+printf '%s\n' '---
+impl_model: fable
+---'"$M" > "$_f"
+"$GUARD" "$_f" >/dev/null 2>&1; _ec=$?
+if [ "$_ec" -eq 0 ]; then
+    echo "FAIL: gate13-fable — expected nonzero exit, got 0"; FAILED=1
+else
+    echo "ok: gate13-fable (exit $_ec)"
+fi
+if "$GUARD" "$_f" 2>&1 | grep -qF '.claude/rules/agent-tiering.md'; then
+    echo "ok: gate13-fable (substring confirmed)"
+else
+    echo "FAIL: gate13-fable — expected '.claude/rules/agent-tiering.md' in output"; FAILED=1
+fi
+
+# (k) Absence distinction regression pins — both messages must still fire verbatim,
+# proving `absent` was not collapsed into `opus-tier` by the full-id refactor.
+_f="$TMP/gate13-absent-manual.md"
+printf '%s\n' "$M_MANUAL" > "$_f"
+if "$GUARD" "$_f" 2>&1 | grep -qF 'Truly-manual row requires an explicit impl_model'; then
+    echo "ok: gate13-absent-manual-msg (substring confirmed)"
+else
+    echo "FAIL: gate13-absent-manual-msg — expected 'Truly-manual row requires an explicit impl_model'"; FAILED=1
+fi
+_f="$TMP/gate13-absent-clean.md"
+printf '%s\n' "$M" > "$_f"
+if "$GUARD" "$_f" 2>&1 | grep -qF 'model must be a deliberate choice'; then
+    echo "ok: gate13-absent-clean-msg (substring confirmed)"
+else
+    echo "FAIL: gate13-absent-clean-msg — expected 'model must be a deliberate choice'"; FAILED=1
+fi
+
 # ---------------------------------------------------------------------------
 # Gate T: below-run-model tier labels must bind to a packet or an inline marker.
 # ---------------------------------------------------------------------------
@@ -741,6 +833,41 @@ git mv a b
 - **Report back:** one line
 ````
 '
+
+# Gate [T] full-id alias equivalence: each full model id must produce the same
+# exit code — and the same [T] violation presence — as its bare-alias twin under
+# an identical plan body (bare **Tier:** Haiku, no packet, no inline marker).
+# Under opus/sonnet, Haiku is below-run-model (both exit 1 with [T]).
+# Under haiku, Haiku is at-run-model (both exit 0, no [T]).
+# The haiku pair is the discriminating case: a full-id that silently fell through
+# to opus-tier would rank Haiku as below-model and flip exit 0 → exit 1.
+_gT_body='
+## Phase 1
+- **Tier:** Haiku
+
+Do the mechanical thing.
+'
+for _gT_pair in "opus:claude-opus-5" "sonnet:claude-sonnet-4-6" "haiku:claude-haiku-4-5"; do
+    _gT_bare="${_gT_pair%%:*}"; _gT_full="${_gT_pair##*:}"
+    _fb="$TMP/gateT-alias-${_gT_bare}.md"
+    _ff="$TMP/gateT-alias-${_gT_full}.md"
+    printf '%s\n' "---
+impl_model: $_gT_bare
+---$M$_gT_body" > "$_fb"
+    printf '%s\n' "---
+impl_model: $_gT_full
+---$M$_gT_body" > "$_ff"
+    _ob=$("$GUARD" "$_fb" 2>&1); _ecb=$?
+    _of=$("$GUARD" "$_ff" 2>&1); _ecf=$?
+    _tb=no; printf '%s\n' "$_ob" | grep -qF '[T]' && _tb=yes
+    _tf=no; printf '%s\n' "$_of" | grep -qF '[T]' && _tf=yes
+    if [ "$_ecb" -eq "$_ecf" ] && [ "$_tb" = "$_tf" ]; then
+        echo "ok: gateT-alias-$_gT_full-matches-$_gT_bare (exit $_ecf T=$_tf)"
+    else
+        echo "FAIL: gateT-alias-$_gT_full exit $_ecf/T=$_tf != $_gT_bare exit $_ecb/T=$_tb"
+        FAILED=1
+    fi
+done
 
 # ---------------------------------------------------------------------------
 # Gate S: Sonnet-recipe completeness (impl_model: sonnet only).

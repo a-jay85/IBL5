@@ -1218,6 +1218,34 @@ while true; do
         continue
     fi
 
+    # Resolve + validate the plan's impl_model BEFORE the attempt counter moves:
+    #   1. A bad value cannot self-correct on retry, so it must not burn an attempt.
+    #   2. `set -euo pipefail` (:13) makes a bare `VAR=$(...)` a runner-wide abort.
+    #   3. The `continue` below makes it structurally impossible for a bad value to
+    #      reach bin/lib/automouse-escalate-model, whose final-attempt
+    #      `!= claude-opus-5` branch would silently escalate an empty BASE_MODEL.
+    # On success stderr is empty (capture = model id); on failure stdout is empty
+    # (capture = the one-line rejection message).
+    if BASE_MODEL=$(bin/lib/plan-impl-model "$NEXT_PLAN" 2>&1); then
+        :
+    else
+        echo "Plan $PLAN_NAME declares an unusable impl_model — $BASE_MODEL — moving to skipped/." >> "$LOG"
+        mkdir -p "$NIGHTLY_DIR/skipped"
+        mv "$NEXT_PLAN" "$NIGHTLY_DIR/skipped/"
+        rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE"
+        REPORTS_DIR="$NIGHTLY_DIR/reports"
+        mkdir -p "$REPORTS_DIR"
+        SLUG=$(basename "$PLAN_NAME" .md)
+        {
+            printf 'Plan "%s" skipped: unusable `impl_model:` frontmatter. Needs human review.\n\n' "$SLUG"
+            printf '%s\n\n' "$BASE_MODEL"
+            printf 'Fix the line-1 frontmatter to one of: opus, sonnet, haiku, claude-opus-5, claude-sonnet-4-6, claude-haiku-4-5 — then `bin/automouse/queue add %s`.\n' "$SLUG"
+        } > "$REPORTS_DIR/$(date +%Y-%m-%d)-skipped-$SLUG.md"
+        rm -rf "$CURRENT_LOCK" 2>/dev/null || true
+        CURRENT_LOCK=""
+        continue
+    fi
+
     # Increment attempt counter
     echo $(( ATTEMPTS + 1 )) > "$ATTEMPT_FILE"
 
@@ -1249,13 +1277,13 @@ while true; do
 
         IMPL_STATUS=0
         IMPL_START=$(date +%s)
-        # Per-plan model selection: a plan may declare `impl_model:` in its
-        # first frontmatter block; absent/unknown → Opus default.
+        # Per-plan model selection: $BASE_MODEL was resolved AND validated above,
+        # before the attempt counter moved. Do not re-resolve here — a second call
+        # site would reintroduce the unguarded `set -e` abort this phase removed.
         # Both invocations pass `--effort high` explicitly to pin reasoning
         # depth regardless of the user's interactive `/effort` setting (which
         # writes ~/.claude/settings.json effortLevel). Do not remove as
         # "redundant with the default" — the pin is the point.
-        BASE_MODEL=$(bin/lib/plan-impl-model "$NEXT_PLAN")
         # Escalate a non-Opus plan to Opus on its FINAL attempt only (ADR-0085).
         # $ATTEMPTS is the PRE-increment read (:621-624); the attempt now running
         # is $(( ATTEMPTS + 1 )), which the helper compares against MAX_ATTEMPTS.

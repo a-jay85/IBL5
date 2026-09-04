@@ -18,8 +18,8 @@ queue ◄──── queue-reorder-ui (browser drag-reorder UI, writes queue or
 
 | Script | Role |
 |--------|------|
-| `run` | Outer loop. Drains the queue, fires two `claude -p` invocations per plan (implementation, then post-plan review), manages logs/heartbeat, and schedules one-shot launchd runs (`run schedule "…"`) or temporary disarms with automatic re-enabling (`run disarm-tonight`, `run disarm-until "YYYY-MM-DD HH:MM [TZ]"`). Holds the `SELF` absolute-path pin used to generate one-shot plists (ADR-0092). |
-| `queue` | Add/remove/list/requeue/reorder plans in the nightly queue. Enforces the `impl_model` ↔ Verification-Matrix consistency backstop via `../lib/plan-model-consistency`. |
+| `run` | Outer loop. Drains the queue, fires two `claude -p` invocations per plan (implementation, then post-plan review), manages logs/heartbeat, and schedules one-shot launchd runs (`run schedule "…"`) or temporary disarms with automatic re-enabling (`run disarm-tonight`, `run disarm-until "YYYY-MM-DD HH:MM [TZ]"`). Holds the `SELF` absolute-path pin used to generate one-shot plists (ADR-0092). Validates each plan's `impl_model` **before** incrementing the attempt counter, disposing an unusable one to `skipped/` with a report so a typo never burns a retry. |
+| `queue` | Add/remove/list/requeue/reorder plans in the nightly queue. Enforces the `impl_model` ↔ Verification-Matrix consistency backstop via `../lib/plan-model-consistency`. The listing's MODEL column is wide enough to render full model ids (`claude-sonnet-4-6`) unclipped. |
 | `queue-reorder-ui` | Local browser UI to drag-reorder the queue; shells out to `queue reorder` and `../lib/automouse-reorder-router.php`. |
 | `self-heal` | Top-of-run recovery. Requeues plans skipped by the staleness gate that now pass `../check-plan-staleness` (only those carrying a `.md.staleness` sidecar marker). |
 | `prompt-impl` | The implementation-phase prompt text fed to `claude -p`. |

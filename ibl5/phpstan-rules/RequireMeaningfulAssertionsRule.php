@@ -12,12 +12,12 @@ use PhpParser\Node\Identifier;
 use PhpParser\Node\Scalar\Int_ as IntLiteral;
 use PhpParser\Node\Scalar\String_;
 use PhpParser\Node\Stmt\Catch_;
-use PhpParser\Node\Stmt\ClassMethod;
 use PhpParser\Node\Stmt\Expression;
 use PhpParser\Node\Stmt\Nop;
 use PhpParser\Node\Stmt\TryCatch;
 use PhpParser\NodeFinder;
 use PHPStan\Analyser\Scope;
+use PHPStan\Node\InClassMethodNode;
 use PHPStan\Rules\Rule;
 use PHPStan\Rules\RuleErrorBuilder;
 use PHPStan\Type\VerbosityLevel;
@@ -35,7 +35,7 @@ use PHPStan\Type\VerbosityLevel;
  *
  * Only applies to files under tests/ whose class methods start with `test`.
  *
- * @implements Rule<ClassMethod>
+ * @implements Rule<InClassMethodNode>
  */
 final class RequireMeaningfulAssertionsRule implements Rule
 {
@@ -65,15 +65,21 @@ final class RequireMeaningfulAssertionsRule implements Rule
 
     public function getNodeType(): string
     {
-        return ClassMethod::class;
+        return InClassMethodNode::class;
     }
 
     /**
-     * @param ClassMethod $node
+     * @param InClassMethodNode $node
      * @return list<\PHPStan\Rules\IdentifierRuleError>
      */
     public function processNode(Node $node, Scope $scope): array
     {
+        // Keyed on the virtual InClassMethodNode, not ClassMethod: PHPStan hands a
+        // ClassMethod rule the *class* scope, where parameters are unresolved
+        // (`mixed`), so the assertNotNull type check below could never fire.
+        // InClassMethodNode carries the in-method scope; the raw AST node the other
+        // sub-checks walk is reached via getOriginalNode().
+        $method = $node->getOriginalNode();
         $file = $scope->getFile();
 
         // Only enforce in tests/ directory
@@ -82,27 +88,27 @@ final class RequireMeaningfulAssertionsRule implements Rule
         }
 
         // Only test* methods
-        if (!str_starts_with($node->name->name, 'test')) {
+        if (!str_starts_with($method->name->name, 'test')) {
             return [];
         }
 
         $errors = [];
 
         // Sub-check 1: empty test body
-        if ($node->stmts === null || count($node->stmts) === 0) {
+        if ($method->stmts === null || count($method->stmts) === 0) {
             $errors[] = RuleErrorBuilder::message(
-                'Test method `' . $node->name->name . '()` has an empty body. '
+                'Test method `' . $method->name->name . '()` has an empty body. '
                 . 'Add meaningful assertions or delete the test.'
             )
                 ->identifier('ibl.meaninglessAssertion')
-                ->line($node->getStartLine())
+                ->line($method->getStartLine())
                 ->build();
             return $errors;
         }
 
         // Sub-check 2: trivial assertions inside the method
         $nodeFinder = new NodeFinder();
-        $methodCalls = $nodeFinder->findInstanceOf($node->stmts, MethodCall::class);
+        $methodCalls = $nodeFinder->findInstanceOf($method->stmts, MethodCall::class);
 
         foreach ($methodCalls as $call) {
             if (!$call instanceof MethodCall) {
@@ -171,7 +177,7 @@ final class RequireMeaningfulAssertionsRule implements Rule
 
         // Sub-check 4: empty catch block for a broad type. Swallows every failure the
         // system under test can produce, so the test passes even when it fatals.
-        foreach ($nodeFinder->findInstanceOf($node->stmts, TryCatch::class) as $tryCatch) {
+        foreach ($nodeFinder->findInstanceOf($method->stmts, TryCatch::class) as $tryCatch) {
             if (!$tryCatch instanceof TryCatch) {
                 continue;
             }
@@ -184,7 +190,7 @@ final class RequireMeaningfulAssertionsRule implements Rule
                     continue;
                 }
                 $errors[] = RuleErrorBuilder::message(
-                    'Empty `catch (' . $broadType . ')` in test method `' . $node->name->name . '()` '
+                    'Empty `catch (' . $broadType . ')` in test method `' . $method->name->name . '()` '
                     . 'swallows every failure the code under test can produce — including a fatal on '
                     . 'its first line — so the test cannot fail. Narrow the caught type to the specific '
                     . 'exception the test expects, use `expectException()`, or assert on post-state '

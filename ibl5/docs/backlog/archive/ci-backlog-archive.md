@@ -78,3 +78,49 @@ Read-only historical record of ✅ Implemented / 🚫 Declined findings. For OPE
 **Suggested direction:** Replace the merge-queue clause with the real authority — the required PR checks. One-line string change; no test asserts on the string (`grep -rn "authoritative full suite" bin/ .github/` returns the source line only), so the edit is behaviour-preserving for every caller.
 **Risk if untouched:** Every canary comment on every PR repeats a false statement about the repo's own merge pipeline, which is exactly the premise that cost three plans and a merged-then-reverted PR (#1254 -> #1268) the last time it went unchallenged.
 **Status (2026-08-24):** ✅ Implemented — fix shipped in PR #1949 (`retire-rebase-prs-workflow`): merge-queue clause replaced with real authority (required PR checks `Tests and Analysis`, `E2E Tests`, plus the `human-signoff` gate); `STRATEGIC_PRIORITIES.md` stale-premise correction included. Merged 2026-08-24.
+
+### 9.1 scp trailing-slash causes `dist/` to nest inside existing remote `dist/`
+*(discovered 2026-09-01 during #2044)*
+**Location:** `.github/workflows/main.yml` "Deploy IBLbot dist to server" step (fixed this pass).
+**Problem:** A trailing slash on the scp source path (`dist/`) combined with a target that names an existing remote directory (`…:www/ibl5/IBLbot/dist/`) causes scp to place the source contents *inside* the already-existing directory — silently deploying into a nested `dist/dist/` rather than replacing `dist/`. Stale code stays live.
+**Occurrence scan:** `grep -n 'scp' .github/workflows/main.yml` at the time of the audit returned two lines:
+- Line 90: CSS deploy — targets a full file path (not a directory); not affected.
+- Line 125 (now fixed): IBLbot `dist/` — was the live occurrence.
+**Fix applied:** Removed trailing slash from source (`dist/` → `dist`); changed target from `…:www/ibl5/IBLbot/dist/` to `…:www/ibl5/IBLbot/` so scp places `dist` inside it correctly.
+**Prevention ladder:**
+- Rung 0: no existing gate covers scp path semantics.
+- Rung 1: no existing gate to extend.
+- Rung 2 (warranted): a `scp-trailing-slash` rule doc under `.claude/rules/` warning that a trailing slash on the scp source copies *contents into* the target rather than placing the named directory — cheap, plan-reviewable, zero gate overhead.
+- Rungs 3-5: not warranted (meta-tooling-bar conditions don't hold for a naming-convention rule).
+**Landing rung:** 2. **Artifact owed:** `scp-trailing-slash.md` written in `.claude/rules/`.
+**Status (2026-09-04):** ✅ Implemented — `scp-trailing-slash.md` rule doc written in `.claude/rules/`. (#2095)
+
+### 9.2 PR body `## Manual Testing` falsely claimed test coverage
+*(discovered 2026-09-01 during #2044)*
+**Location:** PR #2044 body `## Manual Testing` section (corrected this pass); also `## Summary` "before any SSH or scp step executes" (corrected to "before the IBLbot scp and deploy steps execute").
+**Problem:** Hand-authored PR body text that contradicted the diff — claiming "all changes are covered by unit and E2E tests" when the change is static/structural (no unit or E2E tests exist for it), and overstating blast-radius isolation (6 SSH steps run before `Build IBLbot`, so a build failure does not precede *all* SSH steps).
+**Occurrence scan:** PR body claims are ephemeral; scan not applicable — checked the one PR in scope.
+**Prevention ladder:**
+- Rung 0: no existing gate.
+- Rung 1: no existing gate to extend.
+- Rung 2 (warranted): a `pr-body-test-claim` rule doc under `.claude/rules/` specifying that `## Manual Testing` must match the plan's Verification Matrix typing — if the matrix has no test rows, the body must say "verification is static" rather than "covered by tests".
+- Rungs 3-5: not warranted.
+**Landing rung:** 2. **Artifact owed:** `pr-body-test-claim.md` written in `.claude/rules/`.
+**Status (2026-09-04):** ✅ Implemented — `pr-body-test-claim.md` rule doc written in `.claude/rules/`. (#2095)
+
+### 9.3 No Node toolchain pin before `Build IBLbot` on CI runner
+*(discovered 2026-09-01 during #2044)*
+**Location:** `.github/workflows/main.yml` "Build IBLbot" step (`npm ci --include=dev && npm run build`); no preceding `actions/setup-node` step.
+**Problem:** The IBLbot build runs `npm ci` + `npm run build` against whatever Node version `ubuntu-latest` currently ships, coupling the build to runner-image drift. A silent Node major upgrade on the runner could break the tsc build (or, worse, silently succeed against a semantically incompatible version).
+**Occurrence scan:** `grep -n 'npm ci\|npm run build' .github/workflows/main.yml` returns:
+- Line 120: `npm ci --include=dev` — in `Build IBLbot` step; no toolchain pin.
+- Line 121: `npm run build` — same step.
+- Line 136: `npm ci --omit=dev` — in the SSH step on the droplet; the droplet's Node version is pinned externally (not a CI-runner concern).
+The `Build IBLbot` step (lines 120-121) is the only CI-runner npm build without a toolchain pin.
+**Prevention ladder:**
+- Rung 0: no existing gate.
+- Rung 1: no existing gate to extend (actionlint runs in `bin/lint-workflows` but has no built-in rule for missing `setup-node` before `npm`).
+- Rung 2 (warranted minimum): a `ci-node-toolchain-pin` rule doc under `.claude/rules/` specifying that any `npm ci` / `npm run` step on a CI runner must be preceded by `actions/setup-node` with a pinned Node version.
+- Rungs 3-5: an actionlint custom rule could qualify as rung 4 if meta-tooling-bar conditions hold on the next review; defer until the rung-2 rule is in place and a recurring breach is observed.
+**Landing rung:** 2. **Artifact owed:** a `ci-node-toolchain-pin` rule doc in `.claude/rules/` (not yet written).
+**Status (2026-09-04):** ✅ Implemented — `actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0` step inserted immediately before `Build IBLbot` in `.github/workflows/main.yml`; prevention rule doc created at `.claude/rules/ci-node-toolchain-pin.md`. (ci-9-3-node-toolchain-pin)

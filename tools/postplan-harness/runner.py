@@ -29,23 +29,64 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from harness import ciwatch, conformance, llm_calls, schemas
+from harness import ciwatch, conformance, llm_calls, manual_rows, schemas
 from harness.armable import ArmInputs, evaluate, manual_testing_clearance
 from harness.classify import (classify, files_from_diff, modified_files_from_diff,
-                              render_files_changed, upsert_files_changed)
+                              render_files_changed, strip_manual_testing_section,
+                              upsert_files_changed)
 from harness.planfile import locate_plan
 from harness.review import ReviewPhase
 from harness.state import (HarnessError, RunResult, TerminalState, UsageLedger)
 from harness.adapters.ghad import LiveGh, RecordingGh
 from harness.adapters.gitad import LiveGit, ReplayGit
 from harness.adapters.llm import ClaudeCli, FixtureLlm
+from harness.adapters.probe import FixtureProbe, LiveProbe
 from harness.adapters.verify import LiveVerify, ReplayVerify, aggregate
+
+
+def _recheck_manual_rows(llm, probe, plan, cls, log, res) -> list:
+    """Phase 6 attempt-then-demote: may drop a truly-manual row only when a
+    concrete probe ran and returned (True, _). Any exception keeps all rows.
+    Logs one line per row and appends each demotion to res.manual_demotions."""
+    try:
+        items = llm.call(
+            "manual-recheck", "sonnet",
+            llm_calls.manual_recheck_prompt(plan.truly_manual_rows, cls),
+            schemas.validate_manual_recheck,
+        )
+    except Exception as exc:  # noqa: BLE001
+        log(f"phase6 recheck: LLM call failed ({exc}) — keeping all rows held")
+        return list(plan.truly_manual_rows)
+
+    by_n = {item["n"]: item for item in items}
+    surviving = []
+    for row in plan.truly_manual_rows:
+        n = int(row.number)
+        item = by_n.get(n)
+        if item is None or item.get("hold"):
+            log(f"phase6 recheck: row {n} held (hold=true or absent)")
+            surviving.append(row)
+            continue
+        argv = item.get("probe")
+        if not isinstance(argv, list) or not argv:
+            log(f"phase6 recheck: row {n} held (invalid probe)")
+            surviving.append(row)
+            continue
+        ok, detail = probe.run(argv)
+        if ok:
+            log(f"phase6 recheck: row {n} demoted via {argv}")
+            res.manual_demotions.append({"row": n, "argv": argv, "exit_ok": True})
+        else:
+            log(f"phase6 recheck: row {n} held via {argv} ({detail[:80]})")
+            surviving.append(row)
+    return surviving
 
 
 def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         worktree: str | None = None, headless: bool = True,
         plans_dir: str | None = None, live: bool = False,
-        explicit_path: str | None = None) -> RunResult:
+        explicit_path: str | None = None,
+        probe=None) -> RunResult:
     os.makedirs(out_dir, exist_ok=True)
     ledger = llm.ledger
     audit: list[str] = []
@@ -57,6 +98,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         assert fixture is not None
         git, gh = ReplayGit(fixture), RecordingGh(out_dir, fixture)
         verifier = ReplayVerify(fixture)
+        if probe is None:
+            probe = FixtureProbe(fixture)
         slug = fixture.get("slug", "unknown")
         plan = locate_plan(slug, content_override=fixture.get("plan_content") or None)
     else:
@@ -65,6 +108,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         slug = git.branch()
         gh = LiveGh(out_dir, worktree, slug) if live else RecordingGh(out_dir)
         verifier = LiveVerify(worktree)
+        if probe is None:
+            probe = LiveProbe(repo_root=worktree)
         plan = locate_plan(slug, plans_dir=plans_dir, explicit_path=explicit_path)
 
     res = RunResult(terminal=TerminalState.FAILED, slug=slug, plan=plan,
@@ -98,6 +143,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         copy = llm.call("pr-copy", "haiku",
                         llm_calls.pr_copy_prompt(slug, cls, plan, plan_excerpt),
                         schemas.validate_pr_copy)
+        summary, stripped = strip_manual_testing_section(copy["summary_md"])
+        if stripped:
+            copy["summary_md"] = summary
+            log("phase2: stripped model-authored Manual Testing section from PR copy")
         sha = git.commit_all(f"{copy['title']}\n\n{copy['summary_md']}")
         if live:
             git.rebase_onto()      # pre-push policy: branch must sit on origin/master
@@ -120,9 +169,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         meta = gh.pr_meta() or {"number": pr, "title": copy["title"], "body": copy["summary_md"]}
 
         # ---- Phase 4: review + security (gated bounded calls) ---------
-        findings, gates = ReviewPhase(llm, gh).run(meta, cls, plan)
+        findings, gates, scored = ReviewPhase(llm, gh).run(meta, cls, plan)
         res.findings = findings
-        log(f"phase4 gates={ {k: v for k, v in gates.items()} } surviving_findings={len(findings)}")
+        res.scored_findings = scored
+        log(f"phase4 gates={ {k: v for k, v in gates.items()} } findings: raw={len(scored)} surviving={len(findings)} scores={[s['score'] for s in scored]}")
 
         # ---- Phase 5 + 5.0: verify + conformance -----------------------
         tracks = verifier.run(cls)
@@ -145,10 +195,16 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 clearance = "CLEARED"
                 log("phase6: plan matrix fully automated — sentinel appended (CLEARED)")
             elif plan.found:
-                body += ("\n\n## Manual Testing\n\n"
-                         + "\n".join(f"- [ ] {r}" for r in plan.truly_manual_rows) + "\n")
-                clearance = "HELD"
-                log(f"phase6: {len(plan.truly_manual_rows)} truly-manual plan rows — HELD")
+                surviving_rows = _recheck_manual_rows(llm, probe, plan, cls, log, res)
+                if not surviving_rows:
+                    body += "\n\n## Manual Testing\n\nNo manual testing needed — verified by automated tests.\n"
+                    clearance = "CLEARED"
+                    log(f"phase6: all {len(plan.truly_manual_rows)} truly-manual rows demoted — CLEARED")
+                else:
+                    body += ("\n\n## Manual Testing\n\n"
+                             + manual_rows.render_rows(surviving_rows) + "\n")
+                    clearance = "HELD"
+                    log(f"phase6: {len(surviving_rows)} truly-manual plan rows — HELD")
             else:
                 # plan-blind: bounded classification decides whether human judgment is needed
                 items = llm.call("manual-classify", "haiku",

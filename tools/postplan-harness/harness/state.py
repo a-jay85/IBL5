@@ -5,7 +5,10 @@ import json
 import time
 from dataclasses import dataclass, field, asdict
 from enum import Enum
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    from .manual_rows import ManualRow
 
 
 class Phase5Status(str, Enum):
@@ -95,7 +98,7 @@ class PlanInfo:
     planned_test_paths: list[str] = field(default_factory=list)
     critical_files: list[tuple] = field(default_factory=list)  # (path, annotation, exempt)
     required_test_methods: list[str] = field(default_factory=list)
-    truly_manual_rows: list[str] = field(default_factory=list)
+    truly_manual_rows: list[ManualRow] = field(default_factory=list)
     security_section: str = ""
     reuse_section: str = ""
     variant_selection: Optional[str] = None            # "highest" when multi-variant selection ran
@@ -195,6 +198,8 @@ class RunResult:
     error: Optional[str] = None
     error_kind: Optional[str] = None   # stable HarnessError.kind of a FAILED run (e.g. "rebase-conflict")
     ledger: Optional[UsageLedger] = None
+    scored_findings: list[dict] = field(default_factory=list)
+    manual_demotions: list[dict] = field(default_factory=list)
     audit: list[str] = field(default_factory=list)
 
     def to_json(self) -> str:

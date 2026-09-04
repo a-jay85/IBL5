@@ -32,3 +32,9 @@ def test_pr_copy_prompt_without_retro_row_omits_retro_block():
     prompt = pr_copy_prompt("some-slug", _cls(""), PlanInfo(), "")
     assert _REAL_REGISTRY_ROW not in prompt
     assert "## Why this PR exists" not in prompt
+
+
+def test_pr_copy_prompt_contains_manual_testing_prohibition():
+    prompt = pr_copy_prompt("some-slug", _cls(""), PlanInfo(), "")
+    assert '## Manual Testing' in prompt
+    assert "corrupts the arming gate" in prompt

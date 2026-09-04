@@ -284,6 +284,33 @@ def classify(files: list[str], diff_text: str, modified_files: list[str] | None 
     return c
 
 
+_MANUAL_HEADING_RE = re.compile(r"^#{2,6}\s*Manual\s+Testing\b", re.I | re.M)
+_NEXT_HEADING_RE = re.compile(r"^#{1,6}\s", re.M)
+
+
+def strip_manual_testing_section(body: str) -> tuple[str, bool]:
+    """Remove a `## Manual Testing` section from a PR body.
+
+    Scans for a heading matching `^#{2,6}\\s*Manual\\s+Testing\\b` and drops
+    from that heading up to (not including) the next heading or EOF.
+    Returns `(new_body, stripped)`. Fence-blind and unconditional — a fenced
+    example of the heading is not a case worth preserving.
+    """
+    m = _MANUAL_HEADING_RE.search(body)
+    if not m:
+        return body, False
+    start = m.start()
+    # find the next heading after this one
+    rest = body[m.end():]
+    next_m = _NEXT_HEADING_RE.search(rest)
+    if next_m:
+        end = m.end() + next_m.start()
+    else:
+        end = len(body)
+    new_body = body[:start] + body[end:]
+    return new_body, True
+
+
 def slice_spec_diffs(filtered_diff: str, e2e_spec_modules: list[str]) -> tuple[str, str]:
     """Agent D pre-slice: (spec portion, production portion) of the diff."""
     spec_lines: list[str] = []

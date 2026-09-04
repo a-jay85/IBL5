@@ -189,9 +189,9 @@ Entries 9.1–9.3 are defects and gaps surfaced by the 2026-09-01 audit of PR #2
 | 9.2 | PR body `## Manual Testing` falsely claimed test coverage | ✅ Implemented | 🟩 | S |
 | 9.3 | No Node toolchain pin before `Build IBLbot` on CI runner | ⬜ Open | 🟩 | S |
 
-➜ 9.1 scp trailing-slash causes `dist/` to nest inside existing remote `dist/` — ✅ Implemented (2026-09-04): see [archive](archive/ci-backlog-archive.md).
+➜ 9.1 scp trailing-slash causes `dist/` to nest inside existing remote `dist/` — ✅ Implemented (2026-09-04, #2095): see [archive](archive/ci-backlog-archive.md).
 
-➜ 9.2 PR body `## Manual Testing` falsely claimed test coverage — ✅ Implemented (2026-09-04): see [archive](archive/ci-backlog-archive.md).
+➜ 9.2 PR body `## Manual Testing` falsely claimed test coverage — ✅ Implemented (2026-09-04, #2095): see [archive](archive/ci-backlog-archive.md).
 
 ### 9.3 No Node toolchain pin before `Build IBLbot` on CI runner
 *(discovered 2026-09-01 during #2044)*

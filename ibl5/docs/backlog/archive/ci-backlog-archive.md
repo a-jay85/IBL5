@@ -93,7 +93,7 @@ Read-only historical record of ✅ Implemented / 🚫 Declined findings. For OPE
 - Rung 2 (warranted): a `scp-trailing-slash` rule doc under `.claude/rules/` warning that a trailing slash on the scp source copies *contents into* the target rather than placing the named directory — cheap, plan-reviewable, zero gate overhead.
 - Rungs 3-5: not warranted (meta-tooling-bar conditions don't hold for a naming-convention rule).
 **Landing rung:** 2. **Artifact owed:** `scp-trailing-slash.md` written in `.claude/rules/`.
-**Status (2026-09-04):** ✅ Implemented — `scp-trailing-slash.md` rule doc written in `.claude/rules/`.
+**Status (2026-09-04):** ✅ Implemented — `scp-trailing-slash.md` rule doc written in `.claude/rules/`. (#2095)
 
 ### 9.2 PR body `## Manual Testing` falsely claimed test coverage
 *(discovered 2026-09-01 during #2044)*
@@ -106,4 +106,4 @@ Read-only historical record of ✅ Implemented / 🚫 Declined findings. For OPE
 - Rung 2 (warranted): a `pr-body-test-claim` rule doc under `.claude/rules/` specifying that `## Manual Testing` must match the plan's Verification Matrix typing — if the matrix has no test rows, the body must say "verification is static" rather than "covered by tests".
 - Rungs 3-5: not warranted.
 **Landing rung:** 2. **Artifact owed:** `pr-body-test-claim.md` written in `.claude/rules/`.
-**Status (2026-09-04):** ✅ Implemented — `pr-body-test-claim.md` rule doc written in `.claude/rules/`.
+**Status (2026-09-04):** ✅ Implemented — `pr-body-test-claim.md` rule doc written in `.claude/rules/`. (#2095)

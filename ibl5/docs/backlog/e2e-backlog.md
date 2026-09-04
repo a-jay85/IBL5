@@ -208,7 +208,7 @@ value). For fake-POST tests (D7), assert the banner *after a real submit*, not a
 
 ➜ D17 PR #1903 extra coverage + intentional assertion relaxation (F6 + F7 + F10) — 🚫 Declined (2026-09-01): see [archive](archive/e2e-backlog-archive.md).
 
-➜ D18 Serial-suite pre-capture invariant rule doc — ✅ Implemented (2026-09-04): see [archive](archive/e2e-backlog-archive.md).
+➜ D18 Serial-suite pre-capture invariant rule doc — ✅ Implemented (2026-09-04, #2095): see [archive](archive/e2e-backlog-archive.md).
 
 ---
 

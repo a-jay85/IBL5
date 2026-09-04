@@ -165,4 +165,4 @@ Read-only historical record of ✅ Implemented / 🚫 Declined findings. For OPE
 
 **provenance:** (discovered 2026-09-02 during #1806)
 
-**Status (2026-09-04):** ✅ Implemented — D18 sentence inserted into `.claude/rules/playwright-tests.md` Serial mode section.
+**Status (2026-09-04):** ✅ Implemented — D18 sentence inserted into `.claude/rules/playwright-tests.md` Serial mode section. (#2095)

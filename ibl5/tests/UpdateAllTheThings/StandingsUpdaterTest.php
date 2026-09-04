@@ -592,7 +592,7 @@ class StandingsUpdaterTest extends TestCase
         $this->assertNotEmpty($awardQueries, 'Expected at least one ibl_team_awards upsert query');
     }
 
-    public function testClinchConferenceUpsertsTeamAward(): void
+    public function testClinchConferenceDoesNotUpsertTeamAward(): void
     {
         $this->mockDb->setReturnTrue(true);
         $clinchData = [
@@ -615,14 +615,24 @@ class StandingsUpdaterTest extends TestCase
         }));
 
         $conferenceAwardFound = false;
+        $divisionAwardFound = false;
         foreach ($awardQueries as $q) {
             if (stripos($q, 'Conference Champions') !== false) {
                 $conferenceAwardFound = true;
-                break;
+            }
+            if (stripos($q, 'Division Champions') !== false) {
+                $divisionAwardFound = true;
             }
         }
 
-        $this->assertTrue($conferenceAwardFound, 'Expected a Conference Champions award upsert');
+        $this->assertFalse(
+            $conferenceAwardFound,
+            'Conference champions are derived from playoff round 3, not written at regular-season clinch'
+        );
+        $this->assertTrue(
+            $divisionAwardFound,
+            'Division champions are still upserted at regular-season clinch'
+        );
     }
 
     public function testOlympicsSkipsTeamAwardUpsert(): void
@@ -664,15 +674,26 @@ class StandingsUpdaterTest extends TestCase
         $this->assertEmpty($awardQueries, 'Olympics context should not upsert team awards');
     }
 
-    public function testRegionAwardMapCoversAllSixRegions(): void
+    public function testRegionAwardMapCoversOnlyDivisionRegions(): void
     {
         $constant = StandingsUpdater::REGION_AWARD_MAP;
-        $this->assertCount(6, $constant);
+        $this->assertCount(4, $constant);
 
-        $expectedRegions = ['Atlantic', 'Central', 'Midwest', 'Pacific', 'Eastern', 'Western'];
+        $expectedRegions = ['Atlantic', 'Central', 'Midwest', 'Pacific'];
         foreach ($expectedRegions as $region) {
             $this->assertArrayHasKey($region, $constant, "REGION_AWARD_MAP missing region: {$region}");
         }
+
+        $this->assertArrayNotHasKey(
+            'Eastern',
+            $constant,
+            'Eastern Conference Champions is derived from playoff round 3, not clinch'
+        );
+        $this->assertArrayNotHasKey(
+            'Western',
+            $constant,
+            'Western Conference Champions is derived from playoff round 3, not clinch'
+        );
     }
 
     public function testConstructorAcceptsOptionalIsOlympicsFlag(): void

@@ -70,7 +70,7 @@ class TradingControllerRejectOfferTest extends TestCase
 
     public function testUnauthenticatedRejectShowsLoginAndDoesNotDelete(): void
     {
-        // Pass CSRF so execution reaches the auth gate (CSRF failure would exit first).
+        // The auth gate fires before CSRF; this token is set only to keep the harness identical to the submit-path pin.
         $token = CsrfGuard::generateRawToken('trade_reject');
         $_POST['_csrf_token'] = $token;
 

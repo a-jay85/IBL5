@@ -83,7 +83,7 @@ test.describe('Forged CSRF token is rejected', () => {
     const location = response.headers()['location'] ?? '';
     expect(location).toContain('name=Trading');
     expect(location).toContain('Invalid');
-    // Reaching this result would mean the offer lookup ran before the CSRF gate.
+    // Corroborating sanity pin: the positive 'Invalid' assertion above is the primary ordering evidence; this confirms the offer lookup never ran.
     expect(location).not.toContain('result=already_processed');
     expect(location).not.toContain('result=trade_rejected');
   });

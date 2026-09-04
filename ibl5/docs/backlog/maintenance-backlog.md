@@ -664,6 +664,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 15.24 | ⬜ Open | 🟦 | Pre-existing duplicate rows in `ibl_box_scores`: 1993 (29), 1994 (7), 2002 (1), 2004 (24) — 61 excess by `(game_date, name)`. Distinct signature from the 2007 HEAT re-import (no schedule overload, no `created_at` batch, no month shift); cause unknown. Destructive delete → human-merge. (discovered 2026-08-04 during the PR #1771 review) |
 
 | 15.29 | ⬜ Open | 🟩 | Production PHP changes (`Player/index.php` null guards, `LeagueStarters/index.php` free-agent fallback) entered a test-scoped PR without a plan phase, structured code review, or scope justification; six PR-body claims were contradicted by the actual diff. Adding a files-changed reconciliation gate is additive → auto-mergeable. (discovered 2026-09-03 during #1807) |
+| 15.31 | 🔵 filed | ✗ | Plan-authored inaccuracies in test code and frontmatter discovered during PR review — see prose |
 
 ### 15.1 `tid` / `teamid` / `team_id` — Three Spellings Survive ADR-0009
 **Location:** `ibl_box_scores` (`visitorTID`, `homeTID`, `teamID`), `ibl_box_scores_teams` (`visitorTeamID`, `homeTeamID`), `ibl_rcb_*` (`team_id`), `ibl_league_config` (`team_id`)
@@ -745,3 +746,25 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Est. effort:** S
 **Risk if untouched:** Production behavior changes enter the codebase without a plan phase, dedicated code review, or verification matrix row, and the PR body can misrepresent the diff scope without a gate catching the contradiction.
 **provenance:** (discovered 2026-09-03 during #1807; Findings 3 and 4 combined)
+
+### 15.31 Plan-authored inaccuracies propagated into test code and plan frontmatter
+
+class: plan-authored prose about control-flow ordering that misidentifies the gate sequence (F1), and a plan frontmatter/prose contradiction on auto_merge value (F4) — both transcribed faithfully from the plan and both invisible to CI.
+
+occurrence table:
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/tests/Trading/TradingControllerRejectOfferTest.php:73` | yes (F1 — false comment) | was live; fixed this pass | fixed this pass |
+| 2 | `~/claude-plans/authz-verdict-refactor-1a-trading-pins.md` — `auto_merge` field | yes (F4 — frontmatter vs. prose contradiction) | yes (plan file; unfixable inline) | not fixed — filed |
+
+prevention_ladder:
+- rung 0: no existing gate catches plan-level prose inaccuracies or frontmatter contradictions.
+- rung 1: no existing gate to extend.
+- rung 2: a rule doc could advise plan authors to verify comment accuracy against the production source before implementation. Low ROI for a rare class.
+- rung 3–5: no PHPStan rule or CI check can validate prose accuracy in plan files.
+- landing rung: no gate warranted — these are one-off plan authoring imprecisions; the Phase 7 verdict documents the correct auto_merge behavior (false), and the code comment was fixed in-pass.
+
+artifact_destination: n/a — no gate
+
+provenance: (discovered 2026-09-04 during #1956)

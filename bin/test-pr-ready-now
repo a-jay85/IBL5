@@ -658,6 +658,50 @@ grep -qF '| READY |' "$rp" || fail "report-statuses: READY status missing from r
 grep -qF '| NOT READY |' "$rp" || fail "report-statuses: NOT READY status missing from report"
 grep -qF '| MASTER-MOVING-TOO-FAST |' "$rp" || fail "report-statuses: MMTF status missing from report"
 grep -qF '| NOT READY (no log) |' "$rp" || fail "report-statuses: NOT READY (no log) status missing"
+# 5.4: derive_status regression arm -- HOOK REJECTED logs must classify correctly.
+# Three logs each beginning with HOOK REJECTED; the trailing marker drives the status.
+cat > "$SCRATCH/hookrej-fire.json" <<'JSON'
+[
+  {"number": 3005, "title": "hookrej-ready",    "isDraft": false, "headRefName": "branch-hookrej-ready",    "author": {"login": "a-jay85"}},
+  {"number": 3006, "title": "hookrej-pfailed",  "isDraft": false, "headRefName": "branch-hookrej-pfailed",  "author": {"login": "a-jay85"}},
+  {"number": 3007, "title": "hookrej-notready", "isDraft": false, "headRefName": "branch-hookrej-notready", "author": {"login": "a-jay85"}}
+]
+JSON
+cat > "$SCRATCH/hookrej-wtl.txt" <<EOF
+/Users/x/IBL5                                              0000abc [master]
+/Users/x/IBL5-worktrees/hookrej-ready/ibl5    aaaaaab [branch-hookrej-ready]
+/Users/x/IBL5-worktrees/hookrej-pfailed/ibl5  aaaaaac [branch-hookrej-pfailed]
+/Users/x/IBL5-worktrees/hookrej-notready/ibl5 aaaaaad [branch-hookrej-notready]
+EOF
+rm -f /tmp/pr-ready-now-300{5,6,7}.log
+TMP_LOGS+=("/tmp/pr-ready-now-3005.log" "/tmp/pr-ready-now-3006.log" "/tmp/pr-ready-now-3007.log")
+# 3005: recovered run -- HOOK REJECTED then PUSHED then READY → derive_status must return READY
+printf 'HOOK REJECTED — pre-push-adr-hook refused this push: the branch is not rebased onto origin/master.\nPUSHED PR #7 abc123 (moved: yes, push rc: 0)\nREADY\n' \
+    > /tmp/pr-ready-now-3005.log
+# 3006: terminal run -- HOOK REJECTED then PUSH FAILED then NOT READY → NOT READY
+printf 'HOOK REJECTED — pre-push-adr-hook refused this push: the branch is not rebased onto origin/master.\nPUSH FAILED — the pre-push rebase gate rejected this push again after one bounded recovery attempt.\nNOT READY\n' \
+    > /tmp/pr-ready-now-3006.log
+# 3007: hook-only rejection, no recovery -- HOOK REJECTED then NOT READY → NOT READY
+printf 'HOOK REJECTED — pre-push-adr-hook refused this push: the branch is not rebased onto origin/master.\nNOT READY\n' \
+    > /tmp/pr-ready-now-3007.log
+clean_slots  # clear the 4 plist slots from the first run; otherwise the cap fires immediately
+out2="$(PR_READY_NOW_PR_JSON="$SCRATCH/hookrej-fire.json" \
+        PR_READY_NOW_WTL="$SCRATCH/hookrej-wtl.txt" \
+        PR_READY_NOW_DRY_RUN=1 \
+        run_driver --go --jobs 3 2>&1)"; rc2=$?
+[[ $rc2 -eq 0 ]] || fail "report-statuses hookrej: exit $rc2 (out: $out2)"
+rp2="$SCRATCH/pr-firstpass-${_rdate}.md"
+[[ -f "$rp2" ]] || fail "report-statuses hookrej: report not found at $rp2"
+# Assertions scoped to each PR's own row to prevent vacuous passes.
+grep '3005' "$rp2" | grep -qF '| READY |' \
+    || fail "PR 3005 HOOK REJECTED+PUSHED+READY log: derive_status returned wrong status (expected READY)"
+grep '3006' "$rp2" | grep -qF '| NOT READY |' \
+    || fail "PR 3006 HOOK REJECTED+PUSH FAILED+NOT READY log: derive_status returned wrong status (expected NOT READY)"
+grep '3007' "$rp2" | grep -qF '| NOT READY |' \
+    || fail "PR 3007 HOOK REJECTED+NOT READY log: derive_status returned wrong status (expected NOT READY)"
+# Source-level negative: HOOK REJECTED must never appear as a hard-stop marker in pr-ready-now.
+grep -qF 'HOOK REJECTED' "$SCRIPT_DIR/pr-ready-now" \
+    && fail "HOOK REJECTED was added to bin/pr-ready-now -- it is deliberately not a hard-stop marker"
 end_case report-statuses
 
 # --- case 22: report-skip-reason ---------------------------------------------------------
@@ -1177,6 +1221,9 @@ else
     grep -qF 'master is moving faster than this branch can rebase' "$SKILL" \
         || fail "the Phase 4 loop-bound message was lost"
     # (g) POSITIVE arm: BOTH push sites materialise the script and invoke it exactly once.
+    # Still 2 after the HOOK REJECTED recovery landed: the recovery re-runs the SAME step-3
+    # invocation rather than pasting a third copy, and _phase65 defers to _phase4 by reference.
+    # A 3 here means someone duplicated the recipe -- fix the doc, not this number.
     # 2, not 1: Phase 4.3 and Phase 6.5 step 5 each carry a full materialise-and-run line,
     # so re-materialising is a cheap no-op that removes an ordering dependency between them.
     [[ "$(grep -c 'scripts/push.sh > /tmp/pr-ready-push-<N>.sh' "$UNION")" -eq 2 ]] \
@@ -1185,6 +1232,31 @@ else
         || fail "expected exactly 2 'bash /tmp/pr-ready-push-<N>.sh <N>' invocations across the doc union"
     [[ "$(grep -c 'test -s /tmp/pr-ready-push-<N>.sh' "$UNION")" -eq 2 ]] \
         || fail "a push call line lost its 'test -s' non-empty guard -- an empty materialise would run as a no-op"
+    # (16d) HOOK REJECTED recovery static shape assertions.
+    SKILL65="$PRD/_phase65-remediation.md"
+    [[ "$(grep -cF 'bounded hook-rebase recovery' "$UNION")" -eq 2 ]] \
+        || fail "recovery is defined twice or referenced nowhere -- the two phase docs have drifted"
+    [[ "$(grep -cF 'HOOK REJECTED' "$UNION")" -ge 2 ]] \
+        || fail "a phase doc lost the HOOK REJECTED verdict word"
+    grep -qF 'git fetch origin master' "$UNION" \
+        || fail "recovery lost its scoped fetch refspec"
+    # DEVIATION from plan: plan used \$UNION but SKILL.md legitimately contains 'git fetch origin'
+    # on its own line for Phase 3's CI re-check loop (not the HOOK REJECTED recovery path).
+    # Scoped to the recovery-path doc only to avoid a false positive.
+    grep -qE 'git fetch origin[[:space:]]*$' "$PRD/_phase4-push-and-ci.md" \
+        && fail "bare 'git fetch origin' on the recovery path -- this degrades --force-with-lease into --force"
+    grep -qF 'git rebase --abort' "$UNION" \
+        || fail "recovery lost its conflict abort"
+    grep -qF 'rc namespaces are per-script' "$UNION" \
+        || fail "lost the push.sh-vs-watch-ci.sh rc 3 note"
+    grep -qF 'Do NOT loop back into Phases 2–3' "$SKILL65" \
+        || fail "the Phase 6.5 no-loop-back invariant was deleted, not scoped"
+    grep -qF 'do **not** write the words' "$UNION" \
+        || fail "lost the recovered-run narration clause that keeps derive_status from misreading a success"
+    [[ "$(grep -c 'HOOK REJECTED' "$PUSHSH")" -ge 2 ]] \
+        || fail "push.sh header verdict list or the new arm is missing HOOK REJECTED"
+    grep -qF 'branch is not rebased onto origin/master' "$SCRIPT_DIR/pre-push-adr-hook" \
+        || fail "the hook was reworded -- push.sh's discriminator no longer matches and recovery is silently dead"
 fi
 end_case pr-ready-doc-shape
 
@@ -1864,6 +1936,122 @@ else
     grep -q "^STOP: refusing to push 'master'" <<< "$out" || fail "push.sh master guard did not STOP: $out"
 fi
 end_case pr-ready-push-fail-closed
+
+# --- case push-hook-rejected: push.sh HOOK REJECTED arms ---------------------------------
+# Six arms cover the full decision tree of the pre-push-adr-hook rebase gate: positive
+# rejection (HOOK REJECTED rc 3), recovery (rebase → re-push PUSHED), conflict abort,
+# ADR-gate terminal failure (PUSH FAILED rc 1), passthru guard (the MOVED=no guard), and
+# never-pushed boundary. The mk_hookfix fixture ordering is load-bearing: the branch must
+# reach origin FIRST or BEFORE is empty, MOVED=yes, and the guard path is silently wrong.
+begin_case push-hook-rejected
+PUSHSH="$PRD/scripts/push.sh"
+if [[ ! -x "$PUSHSH" ]]; then
+    fail "push-hook-rejected: scripts/push.sh missing or not executable at $PUSHSH"
+else
+HFROOT="$SCRATCH/hookrej"; mkdir -p "$HFROOT"
+HOOKSRC="$SCRIPT_DIR/pre-push-adr-hook"
+
+# $1 fixture name, $2 hook to install, $3 = "conflict" to make the rebase conflict,
+# "nopush" to skip pushing feat-hook to origin (arm f boundary).
+# Ordering is load-bearing: the branch must reach origin BEFORE the hook is installed,
+# or BEFORE is empty, MOVED=yes, and every arm silently tests a different path.
+mk_hookfix() {
+  local d="$HFROOT/$1" o="$HFROOT/$1/origin.git" w="$HFROOT/$1/work"
+  mkdir -p "$d"; g init -q --bare "$o"; g init -q "$w"
+  echo base > "$w/shared.txt"; commit_on "$w" m1
+  g -C "$w" remote add origin "file://$o"; g -C "$w" push -q -u origin master
+  g -C "$w" checkout -q -b feat-hook; commit_on "$w" b1
+  [ "${3:-}" != nopush ] && g -C "$w" push -q -u origin feat-hook  # branch on origin FIRST
+  g clone -q "file://$o" "$d/side"
+  [ "${3:-}" = conflict ] && echo master-side > "$d/side/shared.txt"
+  commit_on "$d/side" m2
+  g -C "$d/side" push -q origin master
+  g -C "$w" fetch -q origin master             # advance ONLY origin/master
+  # stub adr-check at both plausible REPO_ROOT derivations so the hook's second gate
+  # passes; the hook resolves REPO_ROOT by walking up from its own location (.git/hooks/),
+  # which yields the work dir ($w), so bin/adr-check there is the live path.
+  mkdir -p "$w/bin" "$w/.git/bin"
+  for p in "$w/bin/adr-check" "$w/.git/bin/adr-check"; do
+    printf '#!/bin/sh\nexit 0\n' > "$p"; chmod 755 "$p"
+  done
+  install -m 755 "$2" "$w/.git/hooks/pre-push"
+  [ "${3:-}" = conflict ] && echo branch-side > "$w/shared.txt"
+  commit_on "$w" b2                            # the commit that gets rejected
+  printf '%s' "$w"
+}
+refsha() { g -C "$1" ls-remote origin refs/heads/feat-hook 2>/dev/null | awk '{print $1}'; }
+
+# (a) Positive -- rejection is HOOK REJECTED, rc 3, remote unmoved.
+W=$(mk_hookfix a "$HOOKSRC"); B4=$(refsha "$W")
+[[ -n "$B4" ]] || fail "push-hook-rejected (a): fixture bug: branch absent from origin, BEFORE would be empty"
+out=$(cd "$W" && bash "$PUSHSH" 9999 2>&1); rc=$?
+[[ $rc -eq 3 ]] || fail "push-hook-rejected (a): hook rejection did not exit 3 (got $rc): $out"
+grep -q 'HOOK REJECTED' <<< "$out" || fail "push-hook-rejected (a): no HOOK REJECTED verdict: $out"
+grep -q 'PUSH FAILED' <<< "$out" && fail "push-hook-rejected (a): hook rejection still reported PUSH FAILED"
+grep -q '^PUSHED' <<< "$out" && fail "push-hook-rejected (a): FAIL-OPEN: PUSHED reported on a rejected push"
+[[ "$(refsha "$W")" == "$B4" ]] || fail "push-hook-rejected (a): remote ref moved on a hook rejection"
+
+# (b) Recovery -- fetch + clean rebase + one re-push lands.
+# Also proves the stubbed adr-check landed at the right path: if not, the second gate
+# fires and this arm goes red rather than passing vacuously.
+W=$(mk_hookfix b "$HOOKSRC")
+(cd "$W" && bash "$PUSHSH" 9999 >/dev/null 2>&1) || true
+g -C "$W" fetch -q origin master
+g -C "$W" rebase -q origin/master || fail "push-hook-rejected (b): fixture bug: this rebase must be clean"
+NEW=$(g -C "$W" rev-parse HEAD)
+out=$(cd "$W" && bash "$PUSHSH" 9999 2>&1); rc=$?
+[[ $rc -eq 0 ]] || fail "push-hook-rejected (b): recovery re-push failed (rc=$rc): $out"
+grep -q '^PUSHED' <<< "$out" || fail "push-hook-rejected (b): recovery re-push printed no PUSHED verdict: $out"
+[[ "$(refsha "$W")" == "$NEW" ]] || fail "push-hook-rejected (b): origin does not hold the rebased HEAD"
+
+# (c) Negative, conflict -- rebase genuinely conflicts, --abort restores, remote unmoved.
+W=$(mk_hookfix c "$HOOKSRC" conflict); B4=$(refsha "$W"); PRE=$(g -C "$W" rev-parse HEAD)
+out=$(cd "$W" && bash "$PUSHSH" 9999 2>&1); rc=$?
+[[ $rc -eq 3 ]] || fail "push-hook-rejected (c): conflict fixture: first push should be HOOK REJECTED rc 3 (got $rc)"
+g -C "$W" fetch -q origin master
+g -C "$W" rebase -q origin/master && fail "push-hook-rejected (c): conflict fixture did not conflict -- arm proves nothing"
+g -C "$W" rebase --abort
+[[ "$(g -C "$W" rev-parse HEAD)" == "$PRE" ]] || fail "push-hook-rejected (c): --abort did not restore HEAD"
+[[ -z "$(g -C "$W" status --porcelain)" ]] || fail "push-hook-rejected (c): --abort left the tree dirty"
+[[ "$(refsha "$W")" == "$B4" ]] || fail "push-hook-rejected (c): remote moved during a conflicting recovery"
+
+# (d) Negative, ADR gate -- a missing ADR after a clean rebase must stay terminal (rc 1).
+# Mutation caught: discriminating on the bare pre-push-adr-hook token instead of the rebase sentence.
+W=$(mk_hookfix d "$HOOKSRC")
+g -C "$W" fetch -q origin master
+g -C "$W" rebase -q origin/master || fail "push-hook-rejected (d): fixture bug: rebase must be clean here"
+for p in "$W/bin/adr-check" "$W/.git/bin/adr-check"; do printf '#!/bin/sh\nexit 1\n' > "$p"; done
+out=$(cd "$W" && bash "$PUSHSH" 9999 2>&1); rc=$?
+[[ $rc -eq 1 ]] || fail "push-hook-rejected (d): ADR-gate rejection did not exit 1 (got $rc): $out"
+grep -q 'PUSH FAILED' <<< "$out" || fail "push-hook-rejected (d): ADR-gate rejection lost its PUSH FAILED verdict: $out"
+grep -q 'a decision-trigger surface is being pushed without an ADR' <<< "$out" \
+  || fail "push-hook-rejected (d): arm did not reach the ADR gate -- rc 1 came from somewhere else: $out"
+grep -q 'HOOK REJECTED' <<< "$out" && fail "push-hook-rejected (d): ADR-gate rejection misclassified as HOOK REJECTED -- a rebase cannot supply a missing ADR"
+
+# (e) Negative, ref moved -- the MOVED=no guard (the mutation catcher).
+# A passthru hook that emits the rebase sentence but exits 0 lets the push land.
+# Without the MOVED=no guard, push.sh would misclassify a successful push as HOOK REJECTED.
+W=$(mk_hookfix e "$HOOKSRC")
+printf '#!/bin/sh\necho "pre-push-adr-hook: branch is not rebased onto origin/master." >&2\nexit 0\n' \
+  > "$W/.git/hooks/pre-push"; chmod 755 "$W/.git/hooks/pre-push"
+H=$(g -C "$W" rev-parse HEAD)
+out=$(cd "$W" && bash "$PUSHSH" 9999 2>&1); rc=$?
+[[ $rc -eq 0 ]] || fail "push-hook-rejected (e): guard arm: push should have succeeded (rc=$rc): $out"
+grep -q '^PUSHED' <<< "$out" || fail "push-hook-rejected (e): guard arm: no PUSHED verdict: $out"
+grep -q 'HOOK REJECTED' <<< "$out" && fail "push-hook-rejected (e): FAIL-OPEN: HOOK REJECTED on a push that LANDED -- unmoved-ref guard missing"
+[[ "$(refsha "$W")" == "$H" ]] || fail "push-hook-rejected (e): guard arm: origin does not hold HEAD"
+
+# (f) Boundary -- never-pushed branch (nopush mode): BEFORE="", AFTER="(absent)", MOVED=yes.
+# The MOVED=no guard does not fire; falls through to PUSH FAILED. rc 1, no HOOK REJECTED.
+# Mutation caught: adding an absent-ref disjunct to the guard.
+W=$(mk_hookfix f "$HOOKSRC" nopush)
+out=$(cd "$W" && bash "$PUSHSH" 9999 2>&1); rc=$?
+[[ $rc -eq 1 ]] || fail "push-hook-rejected (f): never-pushed branch did not exit 1 (got $rc): $out"
+grep -q 'PUSH FAILED' <<< "$out" || fail "push-hook-rejected (f): never-pushed branch lost its PUSH FAILED verdict: $out"
+grep -q 'HOOK REJECTED' <<< "$out" && fail "push-hook-rejected (f): FAIL-OPEN: HOOK REJECTED on a never-pushed branch"
+
+fi
+end_case push-hook-rejected
 
 # --- case 25: SKILL.md stays inside its resident-bytes band ------------------------------
 # SKILL.md is resident in context on EVERY turn of a /pr-ready run, so its size is a cost

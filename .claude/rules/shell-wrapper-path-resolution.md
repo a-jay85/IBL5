@@ -21,8 +21,18 @@ exec python3 -m my.module "$@"
 If the subcommand truly must run from a specific directory, resolve each positional argument to an absolute path **before** the `cd`:
 
 ```sh
-for i in "$@"; do
-    case "$i" in /*) :;; *) set -- "$@" "$(realpath -- "$i")"; shift;; esac
+# Rotate the positional list exactly once: each pass appends the resolved
+# form of $1 to the end, then shifts it off the front.  Appending without a
+# matching shift (or shifting only in one `case` branch) reorders and drops
+# arguments once absolute and relative paths are mixed.
+n=$#
+while [ "$n" -gt 0 ]; do
+    case "$1" in
+        /*) set -- "$@" "$1" ;;
+        *)  set -- "$@" "$(realpath -- "$1")" ;;
+    esac
+    shift
+    n=$((n - 1))
 done
 cd "$ROOT/tools/my-module"
 exec python3 -m my.module "$@"

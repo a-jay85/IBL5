@@ -1,6 +1,6 @@
 ---
 description: CI/GitHub-Actions workflow simplification backlog — duplicated setup/notify boilerplate, job consolidation, and verified-not-redundant workflows, with per-entry status + automouse-readiness.
-last_verified: 2026-09-01
+last_verified: 2026-09-04
 ---
 
 # CI Workflow Simplification Backlog
@@ -173,15 +173,9 @@ Entries 6.1 and 6.2 are CI/coverage gaps surfaced by the 2026-07-31 audit of PR 
 
 | # | Title | Status | Automouse | Effort |
 |---|-------|--------|-----------|-------:|
-| 8.1 | `pr-canary-check` sticky comment cites a non-existent merge queue | 📋 Planned | 🟩 | S |
+| 8.1 | `pr-canary-check` sticky comment cites a non-existent merge queue | ✅ Implemented | 🟩 | S |
 
-### 8.1 `pr-canary-check` sticky comment cites a non-existent merge queue
-*(discovered 2026-08-23 during #1949)*
-**Location:** `bin/pr-canary-check` — the sticky-comment body builder, footer line (helper for `.github/workflows/pr-canary.yml`).
-**Problem:** The advisory footer read "The merge queue runs the authoritative full suite." This repo has no merge queue and can never have one: GitHub's native merge queue requires organization ownership, and `a-jay85/IBL5` is a User-owned repo on the free personal tier (`mergeQueue: null` on a live GraphQL query; already recorded at ADR-0081:22). The sentence names a mechanism that does not exist, so a reader trusting it looks for an authoritative suite that never runs — the authority actually lives in the required PR checks (`Tests and Analysis`, `E2E Tests`) plus the `human-signoff` gate. Same class of stale premise as the `ibl5/docs/STRATEGIC_PRIORITIES.md` line corrected in this PR.
-**Suggested direction:** Replace the merge-queue clause with the real authority — the required PR checks. One-line string change; no test asserts on the string (`grep -rn "authoritative full suite" bin/ .github/` returns the source line only), so the edit is behaviour-preserving for every caller.
-**Risk if untouched:** Every canary comment on every PR repeats a false statement about the repo's own merge pipeline, which is exactly the premise that cost three plans and a merged-then-reverted PR (#1254 -> #1268) the last time it went unchallenged.
-**Status (2026-08-23):** 📋 Planned — fix ships in PR #1949 (`retire-rebase-prs-workflow`) alongside the `STRATEGIC_PRIORITIES.md` correction. 🟩.
+➜ 8.1 — ✅ Implemented (2026-08-24): see [archive](archive/ci-backlog-archive.md).
 
 ---
 

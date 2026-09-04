@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Trading;
 
+use EventLog\EventLogger;
 use Psr\Log\LoggerInterface;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
-use Trading\Contracts\TradeDecisionServiceInterface;
 use Trading\Contracts\TradeExecutionServiceInterface;
 use Trading\Contracts\TradeOfferRepositoryInterface;
 
@@ -56,6 +56,8 @@ class TradeDecisionService implements Contracts\TradeDecisionServiceInterface
             // Silently fail if Discord notification fails
             // The trade rejection itself has already succeeded
         }
+
+        EventLogger::setAction('trade_offer_rejected');
 
         return ['success' => true, 'redirect' => '/ibl5/modules.php?name=Trading&op=reviewtrade&result=trade_rejected'];
     }

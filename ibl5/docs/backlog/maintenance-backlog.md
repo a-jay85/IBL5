@@ -665,6 +665,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 | 15.29 | ⬜ Open | 🟩 | Production PHP changes (`Player/index.php` null guards, `LeagueStarters/index.php` free-agent fallback) entered a test-scoped PR without a plan phase, structured code review, or scope justification; six PR-body claims were contradicted by the actual diff. Adding a files-changed reconciliation gate is additive → auto-mergeable. (discovered 2026-09-03 during #1807) |
 | 15.31 | ⬜ Open | — | Plan-authored inaccuracies in test code and frontmatter discovered during PR review — see prose |
+| 15.32 | ⬜ Open | 🟩 | `TradeDecisionService::reject()` omitted `EventLogger::setAction('trade_offer_rejected')` when transcribing the controller success path, silently dropping `ibl_events` rows when unit 1c swaps in. Code fixed in PR #1957; unit test gap filed — static call requires EventLogger injection refactor to pin. (discovered 2026-09-04 during #1957) |
 
 ### 15.1 `tid` / `teamid` / `team_id` — Three Spellings Survive ADR-0009
 **Location:** `ibl_box_scores` (`visitorTID`, `homeTID`, `teamID`), `ibl_box_scores_teams` (`visitorTeamID`, `homeTeamID`), `ibl_rcb_*` (`team_id`), `ibl_league_config` (`team_id`)
@@ -768,3 +769,23 @@ prevention_ladder:
 artifact_destination: n/a — no gate
 
 provenance: (discovered 2026-09-04 during #1956)
+### 15.32 EventLogger Side Effect Omitted from Service Transcription — Unit Test Gap
+
+**Location:** `ibl5/classes/Trading/TradeDecisionService.php` (`reject()`), `ibl5/tests/Trading/TradeDecisionServiceTest.php`
+**class:** A service transcribing a controller success path omits a static analytics side-effect call (`EventLogger::setAction`) that the controller makes at the same position, silently dropping `ibl_events` rows when the controller shim swaps in; and the static call cannot be unit-pinned without injecting `EventLogger` as a mockable dependency.
+**Occurrences:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/classes/Trading/TradeDecisionService.php:60` | yes | yes | fixed this pass (PR #1957) — `EventLogger::setAction('trade_offer_rejected')` added; unit test gap filed |
+| 2 | `ibl5/classes/Trading/TradeDecisionService.php` `accept()`, unit 1d | yes | not yet written | not fixed — filed (unit 1d plan must add the call; same gap applies) |
+
+**Prevention ladder:**
+- rung 0: No existing gate covers "service transcription omits EventLogger::setAction."
+- rung 1: No existing gate to extend — controllers call it directly and are exercised via module integration tests, not unit tests.
+- rung 2: A `.claude/rules/` doc reminding authors that transcribing a controller success path must preserve every `EventLogger::setAction` call. Sufficient for the prose-guidance gap and does not require tooling.
+- rungs 3–5: A PHPStan rule, CI grep, or hook could not reliably detect the omission pattern without high false-positive rate. Skip.
+- **Landing rung: 2.** A rule doc is the minimum viable prevention.
+
+**artifact destination:** `.claude/rules/trading-transcription.md` (example) (new file, in-repo).
+**provenance:** (discovered 2026-09-04 during #1957)

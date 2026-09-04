@@ -80,16 +80,15 @@ class TradeDecisionServiceTest extends TestCase
         $offerRepo->expects(self::never())->method('deleteTradeOffer');
 
         $executionService = self::createMock(TradeExecutionServiceInterface::class);
-        $executionService->method('assertActingTeamIsParty')->willReturn(false);
         $executionService->expects(self::once())
             ->method('assertActingTeamIsParty')
-            ->with(1, 'Outsider Team');
+            ->with(1, 'Outsider Team')
+            ->willReturn(false);
 
         $service = $this->buildService(offerRepo: $offerRepo, executionService: $executionService);
         $verdict = $service->reject(1, 'Outsider Team', 'Metros', 'Stars');
 
         self::assertFalse($verdict['success']);
-        $offerRepo->expects(self::never())->method('deleteTradeOffer');
     }
 
     public function testRejectShortCircuitsOnAlreadyProcessedOffer(): void

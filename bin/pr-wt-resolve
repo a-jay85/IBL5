@@ -1,0 +1,43 @@
+#!/bin/bash
+# Resolve a PR number or branch name to that branch's git worktree path.
+# Prints exactly one absolute path on stdout; errors go to stderr.
+# Used by the /pr-wt skill, which feeds the path to EnterWorktree.
+# Usage: bin/pr-wt-resolve <pr-number|branch-name>
+
+set -euo pipefail
+
+arg="${1:-}"
+if [ -z "$arg" ]; then
+    echo "Usage: bin/pr-wt-resolve <pr-number|branch-name>" >&2
+    exit 2
+fi
+
+branch="$arg"
+if [[ "$arg" =~ ^[0-9]+$ ]]; then
+    branch="$(gh pr view "$arg" --json headRefName -q .headRefName 2>/dev/null || true)"
+    if [ -z "$branch" ]; then
+        echo "pr-wt-resolve: no PR #$arg found (or gh is not authenticated)." >&2
+        exit 1
+    fi
+fi
+
+# Match on the porcelain branch field — bin/wt-new truncates worktree directory
+# names, so the directory slug and the branch name can diverge.
+path="$(git worktree list --porcelain | awk -v b="refs/heads/$branch" '
+    /^worktree / { p = substr($0, 10) }
+    /^branch /   { if (substr($0, 8) == b) { print p; exit } }
+')"
+
+# Fallback: a detached-HEAD worktree has no branch line, so match its directory name.
+if [ -z "$path" ]; then
+    path="$(git worktree list --porcelain | awk -v b="$branch" '
+        /^worktree / { p = substr($0, 10); if (p ~ ("/" b "$")) { print p; exit } }
+    ')"
+fi
+
+if [ -z "$path" ]; then
+    echo "pr-wt-resolve: branch '$branch' has no worktree. Create one with: bin/wt-new $branch" >&2
+    exit 1
+fi
+
+echo "$path"

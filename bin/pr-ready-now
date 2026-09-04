@@ -4,7 +4,7 @@
 # Dry-run by default: prints the PRs it would process and exits. Nothing fires without --go.
 #
 # Usage:
-#   bin/pr-ready-now [--go] [--jobs N] [--pr N[,N...]] [--pr-attack FILE] [--top-n N] [--model M] [--dry-run] [--wait] [--stop N[,N...]] [--stop-all] [--help]
+#   bin/pr-ready-now [--go] [--jobs N] [--pr N[,N...]] [--pr-attack FILE] [--top-n N] [--model M] [--dry-run] [--wait] [--no-dm] [--stop N[,N...]] [--stop-all] [--help]
 #
 #   --go          Actually fire. Without it the script only reports (default).
 #   --jobs N      Max concurrent sessions (default 5). Positive integer.
@@ -27,6 +27,8 @@
 #                     (remove the plist) and clear the PR's /tmp scratch. Exits nonzero and
 #                     LEAVES the slot held if a process survives KILL.
 #   --stop-all        Apply --stop to every PR currently holding a slot.
+#   --no-dm       Skip the Discord DM this script sends when each fired session ends.
+#                 The /tmp log is written either way; the DM is additive, never a replacement.
 #
 # Examples:
 #   bin/pr-ready-now                       # report what would run
@@ -53,6 +55,8 @@
 #                           empty = auto-detect via git rev-parse --short origin/master.
 #   PR_READY_NOW_WTL        Read the worktree listing from this file instead of shelling
 #                           to git worktree list. Unset or empty = auto-detect.
+#   PR_READY_NOW_DISCORD_DM Override the notifier binary (a recorder stub for tests).
+#                           Unset or empty = $ROOT/bin/discord-dm.
 #
 # Report output (written under --go only):
 #   $HOME/pr-firstpass-YYYY-MM-DD.md — one Markdown row per PR (fired or skipped),
@@ -65,7 +69,7 @@
 #   FINDING[<class>]: <one-line text>
 #   where <class> is one of: loop, ci, e2e, dev, a11y, a11y-contrast, maintenance,
 #   security. /pr-ready does not emit these yet; the Findings section will be empty
-#   on a real run until it does.
+# on a real run until it does.
 
 set -euo pipefail
 
@@ -115,6 +119,7 @@ EFFORT=high
 PR_ATTACK_FILE=""
 TOP_N=5
 WAIT=0
+NOTIFY=1
 MODE=fire          # fire | stop | stop-all
 STOP_PRS=()
 SAW_DRY_RUN=0      # --dry-run only sets GO=0, which is indistinguishable from the default
@@ -123,7 +128,7 @@ SAW_DRY_RUN=0      # --dry-run only sets GO=0, which is indistinguishable from t
 CEILING_SECS=7200
 
 # --- flag parsing ------------------------------------------------------------------------
-usage() { sed -n '2,69p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,72p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -138,6 +143,7 @@ while [[ $# -gt 0 ]]; do
         --top-n)     [[ "${2:-}" =~ ^[1-9][0-9]*$ ]] || { echo "ERROR: --top-n must be a positive integer, got: ${2:-}" >&2; exit 2; }
              TOP_N="$2"; shift 2 ;;
         --wait)    WAIT=1; shift ;;
+        --no-dm)   NOTIFY=0; shift ;;
         --pr)
             [[ $# -ge 2 ]] || { echo "ERROR: --pr requires a value" >&2; exit 1; }
             IFS=',' read -r -a _prs <<< "$2"
@@ -819,17 +825,103 @@ fire_pr() {
         printf 'MODEL=%q\n'      "$MODEL"
         printf 'EFFORT=%q\n'     "$EFFORT"
         printf 'CLAUDE_BIN=%q\n' "$CLAUDE_BIN"
+        printf 'PR=%q\n'         "$PR"
+        printf 'NOTIFY=%q\n'     "$NOTIFY"
+        printf 'MARKER=%q\n'     "/tmp/pr-ready-marker-${PR}.txt"
+        printf 'DISCORD_DM=%q\n' "${PR_READY_NOW_DISCORD_DM:-$ROOT/bin/discord-dm}"
         cat <<'RUNNER_EOF'
 export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
 cd "$ROOT" || exit 1
+STARTED=$(date +%s)
+RC=0
 CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 \
     caffeinate -s timeout 5400 "$CLAUDE_BIN" -p "$(cat "$PROMPT")" \
     --dangerously-skip-permissions \
     --model "$MODEL" --effort "$EFFORT" \
-    --name "$LABEL" > "$LOG" 2>&1
+    --name "$LABEL" > "$LOG" 2>&1 || RC=$?
+ELAPSED=$(( $(date +%s) - STARTED ))
+notify() {
+    [ "$NOTIFY" = 1 ] || return 0
+    if [ ! -x "$DISCORD_DM" ]; then
+        echo "pr-ready-now: no executable discord-dm at $DISCORD_DM — not notifying."
+        return 0
+    fi
+    local DM_ICON="" DM_VERDICT="" DM_NEXT="" msg
+    local marker_line=""
+    if [ -f "$MARKER" ]; then
+        marker_line=$(grep -m1 'PR-READY-VERDICT-MARKER-V1|' "$MARKER" \
+            | sed 's/^[^P]*\(PR-READY-VERDICT-MARKER-V1|\)/\1/' \
+            | sed 's/[`* ]*$//')
+    fi
+    if [ -z "$marker_line" ] && [ -f "$LOG" ]; then
+        marker_line=$(grep -m1 'PR-READY-VERDICT-MARKER-V1|' "$LOG" \
+            | sed 's/^[^P]*\(PR-READY-VERDICT-MARKER-V1|\)/\1/' \
+            | sed 's/[`* ]*$//')
+    fi
+    local marker_pr=""
+    marker_pr=$(printf '%s' "$marker_line" | grep -o 'pr=[^|]*' | cut -d= -f2)
+    if [ "$marker_pr" != "$PR" ]; then
+        marker_line=""
+    fi
+    if [ -n "$marker_line" ]; then
+        local v=""
+        v=$(printf '%s' "$marker_line" | grep -o 'verdict=[^|]*' | cut -d= -f2)
+        local url=""
+        url=$(printf '%s' "$marker_line" | grep -o 'url=[^|]*' | cut -d= -f2)
+        local holds=""
+        holds=$(printf '%s' "$marker_line" | grep -o 'holds=[^|]*' | sed 's/holds=//')
+        case "$v" in
+            READY)           DM_ICON="✅"; DM_VERDICT="READY";           DM_NEXT="merge when you're ready" ;;
+            READY-WITH-NOTES) DM_ICON="⚠️"; DM_VERDICT="READY WITH NOTES"; DM_NEXT="$holds" ;;
+            NOT-READY)       DM_ICON="❌"; DM_VERDICT="NOT READY";        DM_NEXT="read the verdict comment" ;;
+            *)               DM_ICON="❓"; DM_VERDICT="unconfirmed — no verdict marker"; DM_NEXT="read the log" ;;
+        esac
+        msg="${DM_ICON} pr-ready-now: PR #${PR}
+RESULT ${DM_VERDICT}
+${ELAPSED}s · ${DM_NEXT}"
+        if [ -n "$url" ] && [ "$url" != "-" ]; then
+            msg="$msg
+$url"
+        fi
+    elif [ "$RC" = 124 ]; then
+        DM_ICON="⏱"; DM_VERDICT="TIMED OUT after 5400s"; DM_NEXT="re-fire, or read the log"
+        msg="${DM_ICON} pr-ready-now: PR #${PR}
+RESULT ${DM_VERDICT}
+${ELAPSED}s · ${DM_NEXT}"
+    elif [ "$RC" != 0 ]; then
+        DM_ICON="💥"; DM_VERDICT="runner exited rc=${RC}"; DM_NEXT="read the log"
+        msg="${DM_ICON} pr-ready-now: PR #${PR}
+RESULT ${DM_VERDICT}
+${ELAPSED}s · ${DM_NEXT}"
+    else
+        local stop_line=""
+        stop_line=$(grep -m1 '^[[:space:]>*_`-]*STOP:' "$LOG" 2>/dev/null || true)
+        if [ -n "$stop_line" ]; then
+            DM_ICON="🛑"; DM_VERDICT="STOPPED"
+            DM_NEXT=$(printf '%s' "$stop_line" | cut -c1-200)
+            msg="${DM_ICON} pr-ready-now: PR #${PR}
+RESULT ${DM_VERDICT}
+${ELAPSED}s · ${DM_NEXT}"
+        else
+            DM_ICON="❓"; DM_VERDICT="unconfirmed — no verdict marker"; DM_NEXT="read the log"
+            msg="${DM_ICON} pr-ready-now: PR #${PR}
+RESULT ${DM_VERDICT}
+${ELAPSED}s · ${DM_NEXT}"
+        fi
+    fi
+    msg="$msg
+log: $LOG"
+    if ! printf '%s' "$msg" | "$DISCORD_DM" -; then
+        echo "pr-ready-now: DM UNDELIVERED (spooled by discord-dm) — the verdict above stands."
+    fi
+}
 # Releasing the slot is the FIRST post-claude action: "plist present" == "job live"
 # is what the concurrency cap counts.
 rm -f "$PLIST"
+# THEN notify, and only THEN bootout. The bootout command terminates this job, and
+# discord-dm retries across a window longer than a pm2 restart; sending after the
+# bootout races the send against its own termination. The slot is already free.
+notify
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 RUNNER_EOF
     } > "$RUNNER"

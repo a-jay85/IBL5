@@ -45,6 +45,31 @@ Every Phase 6 finding gets fixed and its prevention filed, in this PR's existing
 
    Verdict words are the Phase 4.3 list, unchanged. `PUSHED PR #<N> <sha>` — proceed to step 6. `STALE LEASE` — someone pushed concurrently; git rejected with `stale info` and nothing was clobbered. Stop and report it in the Phase 7 verdict; never re-read and retry with a fresh lease. `PUSH FAILED` — origin does not hold this HEAD; stop. "No error printed" is not evidence of a push.
 
+   That list now **includes `HOOK REJECTED` (rc 3), which applies here and is imported
+   deliberately, not by accident:**
+
+   - **Recover by reference, not by copy.** On `HOOK REJECTED`, run the **bounded hook-rebase recovery**
+     defined at step 3 of `.claude/skills/pr-ready/_phase4-push-and-ci.md`: one scoped fetch of
+     `origin/master`, one rebase onto it, one re-push of the step 5 command. That block is the only
+     copy of the recipe — do not restate its commands here.
+   - **Clean-only, and here it is load-bearing.** If the rebase reports **any** conflict, run
+     `git rebase --abort` and treat this run as `PUSH FAILED`. Phase 6 has already completed a
+     line-by-line fidelity review of this exact diff. A **clean** rebase is patch-preserving —
+     every branch commit's diff is byte-identical afterwards, so that review still describes
+     exactly what ships. A **conflict-resolving** rebase is not: it introduces content nobody
+     reviewed, at the one point in the run where re-review will not happen. Never resolve a
+     conflict here.
+   - **One attempt.** A second `HOOK REJECTED` is terminal, exactly as in Phase 4.3.
+   - **The tree is already clean.** Step 2 STOPs on a dirty tree and step 4 has committed, so the
+     rebase provably runs against a clean worktree — it cannot fail for uncommitted changes.
+   - **This is a single inline step inside step 5, not a loop back into Phases 2–3.** See step 7's
+     invariant, which governs a different situation and is unchanged.
+
+   Phase 6.5 is where this defect was observed, and it has the widest staleness window in the
+   skill: steps 1–5 contain no fetch and no rebase before their push, yet by the time step 5 runs
+   the session has spent Phase 4.5 waiting on CI and Phase 6 performing a fidelity review, so
+   `origin/master` has had that whole span to move.
+
 6. **Re-watch CI on the new head — exactly one delegate.** The Phase 4.5 delegate has already returned (that is what re-invoked you), so there is nothing to stop. Run `git rev-parse HEAD` bare and record the new `<HEAD_SHA>` literal.
 
    **Re-materialize the watcher first — never `bash` a leftover `/tmp` copy** (the materialize invariant in `SKILL.md`). The watcher takes the SHA as an **argument**, so re-running the materialize changes nothing on the ordinary path; what it buys is the failure path. A failed Phase 4.5 `git show` leaves a **0-byte** file at that path; `bash` on an empty file exits **0** printing nothing; the packet reads a no-output run as a killed window and re-runs it, so all 6 windows burn in seconds, no verdict ever returns, and the run is timeout-killed with no verdict comment (PR #2077, 2026-09-04). Re-run the Phase 4.5 step 5 materialize **verbatim** — including the `.part` staging, which is what stops a failure from replacing a good copy with an empty one — and require `MATERIALIZED` to print. If it does not, stop and report the failed materialize in the Phase 7 verdict.
@@ -64,6 +89,14 @@ Every Phase 6 finding gets fixed and its prevention filed, in this PR's existing
    ```
 
    If `BEHIND`, state it in the Phase 7 verdict and stop. **Do NOT loop back into Phases 2–3.** Phase 5's 3-iteration rebase loop is a pre-Phase-6 invariant; this is a separate, deliberately single-shot check. Re-rebasing here would invalidate the fidelity review Phase 6 has already performed on a diff that no longer exists.
+
+   **Scope of this invariant.** It governs the post-push `BEHIND` observation only — a push that
+   already landed. It does **not** govern the step 5 `HOOK REJECTED` recovery, which fires on a
+   push that never landed, runs one clean-only rebase inline, and aborts to terminal on any
+   conflict. The two are disjoint: step 7 is reached only when step 5 pushed. The hazard this
+   invariant names — reviewing a diff that no longer exists — is a property of a
+   *conflict-resolving* rebase; a clean rebase replays each commit with its patch unchanged, which
+   is why the step 5 recovery is bounded to clean-only rather than exempted from this rule.
 
 Then proceed to Phase 7, which posts the single verdict comment covering both the findings and this remediation.
 

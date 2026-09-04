@@ -6,8 +6,16 @@
 # Reads a positionally-constrained `impl_model:` field from the plan's FIRST
 # YAML frontmatter block (anchored to line 1) and echoes the model id that
 # bin/automouse/run passes to `claude -p --model`. The body is never scanned, so
-# a plan that merely *documents* the syntax cannot self-select a model. Any
-# missing, unknown, or `opus` value falls through to the safe Opus default.
+# a plan that merely *documents* the syntax cannot self-select a model.
+#
+# Accepted values are whitelisted by bin/lib/plan-model-tier: `opus`, `sonnet`,
+# `haiku` and their full ids `claude-opus-5`, `claude-sonnet-4-6`,
+# `claude-haiku-4-5`. An ABSENT marker still resolves to the Opus default (the
+# ~103 marker-less corpus plans depend on it, as does check-plan gate [T]).
+# Anything else is REJECTED: one line on stderr, exit 1, nothing on stdout.
+#
+# Contract: exit 0 -> stdout is one model id, stderr empty;
+#           exit 1 -> stdout empty, stderr is exactly one line.
 #
 # Usage: bin/lib/plan-impl-model <plan-file>   # echoes exactly one model id
 
@@ -24,8 +32,20 @@ RAW=$(awk '
   infm && /^impl_model:[[:space:]]*/ {sub(/^impl_model:[[:space:]]*/,""); gsub(/[[:space:]]/,""); print; exit}
 ' "$PLAN_FILE" 2>/dev/null)
 
-case "$RAW" in
-  sonnet) echo "claude-sonnet-4-6" ;;
-  haiku)  echo "claude-haiku-4-5"  ;;
-  *)      echo "claude-opus-5"   ;;   # opus, empty, garbled, or unknown → safe default
+LIB_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# `if VAR=$(...)` (not a bare assignment) so a rejection is handled, not inherited.
+# On rejection plan-model-tier puts its one line on STDOUT; this script's stdout is
+# reserved for a model id, so re-emit it on STDERR and exit nonzero.
+if TIER=$("$LIB_DIR/plan-model-tier" "$RAW"); then
+    :
+else
+    printf '%s\n' "$TIER" >&2
+    exit 1
+fi
+
+case "$TIER" in
+  absent|opus-tier) echo "claude-opus-5"     ;;
+  sonnet-tier)      echo "claude-sonnet-4-6" ;;
+  haiku-tier)       echo "claude-haiku-4-5"  ;;
 esac

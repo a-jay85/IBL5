@@ -4,7 +4,7 @@ description: "Plan an implementation task: enforces a verification matrix, direc
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
-last_verified: 2026-08-10
+last_verified: 2026-08-23
 ---
 
 # /plan — Implementation Planning with Verification Matrix
@@ -376,7 +376,7 @@ impl_model: sonnet
 ---
 ```
 
-The implementation then runs at Sonnet (cheaper, verified-equivalent quality on uniformly-mechanical plans — parsed by `bin/lib/plan-impl-model`). For any plan carrying a `Truly-manual` or subjective row, declare an explicit `impl_model: opus` instead, with a one-line reason in the plan body. Only the first frontmatter block is parsed, so documenting this syntax inside a plan body never mis-selects a model. Failure modes are bounded: a garbled marker → the runtime resolver (`bin/lib/plan-impl-model`) falls back to Opus (safe), and gate `[13]` catches absence before the plan ships; a wrongly-applied `sonnet` marker → the plan's objective matrix goes red under Sonnet → caught by CI / post-plan.
+The implementation then runs at Sonnet (cheaper, verified-equivalent quality on uniformly-mechanical plans — parsed by `bin/lib/plan-impl-model`). For any plan carrying a `Truly-manual` or subjective row, declare an explicit `impl_model: opus` instead, with a one-line reason in the plan body. The full model ids `claude-opus-5`, `claude-sonnet-4-6` and `claude-haiku-4-5` are equally accepted alongside the bare `opus`/`sonnet`/`haiku` aliases. Only the first frontmatter block is parsed, so documenting this syntax inside a plan body never mis-selects a model. Failure modes are bounded: a garbled marker → gate `[13]` rejects it at plan time, and if one somehow reaches the runner the resolver exits nonzero and the plan is disposed to `skipped/` rather than guessed at, and gate `[13]` catches absence before the plan ships; a wrongly-applied `sonnet` marker → the plan's objective matrix goes red under Sonnet → caught by CI / post-plan.
 
 ### Holding auto-merge (optional)
 

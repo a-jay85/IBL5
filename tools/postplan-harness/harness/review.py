@@ -192,7 +192,8 @@ class ReviewPhase:
             "security": cls.has_php,
         }
 
-    def run(self, meta: dict, cls: Classification, plan: PlanInfo) -> tuple[list[Finding], dict]:
+    def run(self, meta: dict, cls: Classification,
+            plan: PlanInfo) -> tuple[list[Finding], dict, list[dict]]:
         gates = self.gates(cls)
         findings: list[Finding] = []
 
@@ -225,6 +226,10 @@ class ReviewPhase:
         surviving = [f for f in findings
                      if (f.score or 0) >= (SEC_THRESHOLD if f.source == "security-audit"
                                            else CODE_THRESHOLD)]
+        scored = [{"source": f.source, "agent": f.agent, "path": f.path,
+                   "line": f.line, "score": f.score,
+                   "body_head": (f.body or "")[:160]}
+                  for f in findings]
 
         pr = meta.get("number") or 0
         sha = meta.get("headRefOid") or meta.get("sha") or ""
@@ -242,4 +247,4 @@ class ReviewPhase:
                     pr, "Security audit",
                     "No security issues found. (XSS and input validation are enforced "
                     "by PHPStan custom rules.)")
-        return surviving, gates
+        return surviving, gates, scored

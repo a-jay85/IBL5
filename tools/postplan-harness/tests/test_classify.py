@@ -11,6 +11,7 @@ from harness.classify import (classify, files_from_diff, filter_diff,
                                FILES_CHANGED_BEGIN, FILES_CHANGED_END,
                                name_status_from_diff, render_files_changed,
                                retro_registry_row_from_diff,
+                               strip_manual_testing_section,
                                upsert_files_changed)
 
 SYN_DIFF = """diff --git a/ibl5/foo.php b/ibl5/foo.php
@@ -382,3 +383,40 @@ def test_retro_registry_row_negative_non_registry_table_row():
 
 def test_retro_registry_row_empty_diff():
     assert retro_registry_row_from_diff("") == ""
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 - D3: strip_manual_testing_section
+# ---------------------------------------------------------------------------
+
+def test_strip_manual_testing_section_strips_section():
+    body = (
+        "## Summary\n\nSome changes.\n\n"
+        "## Manual Testing\n\n- [ ] Eyeball the layout.\n\n"
+        "## Other Section\n\nStill here.\n"
+    )
+    new_body, stripped = strip_manual_testing_section(body)
+    assert stripped is True
+    assert "## Manual Testing" not in new_body
+    assert "Eyeball the layout" not in new_body
+    assert "## Summary" in new_body
+    assert "## Other Section" in new_body
+
+
+def test_strip_manual_testing_section_absent_returns_byte_identical():
+    body = "## Summary\n\nNo manual section here.\n\n## Foo\n\nBar.\n"
+    new_body, stripped = strip_manual_testing_section(body)
+    assert stripped is False
+    assert new_body == body
+
+
+def test_strip_manual_testing_subsection_strips_only_up_to_next_heading():
+    body = (
+        "## Summary\n\nIntro.\n\n"
+        "### Manual Testing\n\nsome steps\n\n"
+        "## Summary\n\nConclusion.\n"
+    )
+    new_body, stripped = strip_manual_testing_section(body)
+    assert stripped is True
+    assert "some steps" not in new_body
+    assert "Conclusion" in new_body

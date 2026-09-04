@@ -46,6 +46,31 @@ def validate_manual_classification(data) -> None:
             raise HarnessError("schema", f"item[{i}].category {s['category']!r} not in {MANUAL_CATEGORIES}")
 
 
+def validate_manual_recheck(data) -> None:
+    """[{n, hold: true} | {n, probe: [str, ...]}] — Phase 6 re-check output."""
+    if not isinstance(data, list):
+        raise HarnessError("schema", "manual recheck must be a JSON array")
+    for i, item in enumerate(data):
+        if not isinstance(item, dict) or "n" not in item:
+            raise HarnessError("schema", f"recheck[{i}] must be a dict with 'n'")
+        if not isinstance(item["n"], int):
+            raise HarnessError("schema", f"recheck[{i}].n must be int")
+        has_hold = "hold" in item
+        has_probe = "probe" in item
+        if has_hold and has_probe:
+            raise HarnessError("schema", f"recheck[{i}] must have hold OR probe, not both")
+        if not has_hold and not has_probe:
+            raise HarnessError("schema", f"recheck[{i}] must have hold or probe")
+        if has_hold and item["hold"] is not True:
+            raise HarnessError("schema", f"recheck[{i}].hold must be true")
+        if has_probe:
+            probe = item["probe"]
+            if not isinstance(probe, list) or not probe:
+                raise HarnessError("schema", f"recheck[{i}].probe must be a non-empty list")
+            if not all(isinstance(s, str) for s in probe):
+                raise HarnessError("schema", f"recheck[{i}].probe elements must be strings")
+
+
 def validate_pr_copy(data) -> None:
     """{type, title, summary_md} — commit/PR copy generation."""
     if not isinstance(data, dict):

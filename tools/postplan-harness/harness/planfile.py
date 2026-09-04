@@ -11,6 +11,7 @@ import os
 import re
 import sys
 
+from . import manual_rows
 from .state import PlanInfo
 
 # Paren-scoped canonical exempt marker. MUST stay behaviorally identical to
@@ -63,11 +64,32 @@ def _section(content: str, heading_re: str) -> str:
     return (m.group(2).strip() if m else "")
 
 
-def parse_matrix(content: str) -> tuple[list[str], list[str]]:
+def _is_test_path(tok: str) -> bool:
+    """True when `tok` looks like a file path rather than a shell command token.
+
+    Three observed phantom shapes this rejects:
+      - `npm test && npm run build` (shell metacharacter &)
+      - `pytest -q tools/... ; echo ok` (shell metacharacter ; and leading flag -)
+      - `$TEST_CMD tests/foo` (shell variable $)
+    """
+    if not tok or tok != tok.strip() or re.search(r"\s", tok):
+        return False
+    if re.search(r"[&|;><$\\]", tok):
+        return False
+    if tok[0] in ("-", "'", '"', "$"):
+        return False
+    if "/" not in tok:
+        return False
+    return True
+
+
+def parse_matrix(content: str) -> tuple[list[str], list[manual_rows.ManualRow]]:
     """Returns (planned_test_paths, truly_manual_rows) from the Verification Matrix.
 
     Planned tests: rows whose Test type is PHPUnit / API-test / E2E / Visual-regression;
     path taken from the row's backticked file token.
+    Truly-manual rows are returned as ManualRow objects (typed, with noise columns
+    stripped) rather than raw pipe-delimited strings.
 
     Fenced code blocks are skipped (_strip_fenced, defined below — same width-aware
     machine parse_critical_files uses). A plan that *documents* the matrix format —
@@ -89,17 +111,17 @@ def parse_matrix(content: str) -> tuple[list[str], list[str]]:
     backlog, not fixed here.
     """
     planned: list[str] = []
-    manual: list[str] = []
+    manual: list[manual_rows.ManualRow] = []
     for line in _strip_fenced(content):
         if not line.strip().startswith("|"):
             continue
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
         row = " | ".join(cells)
         if re.search(r"truly.?manual", row, re.I):
-            manual.append(row)
+            manual.append(manual_rows.row_from_cells(cells, len(manual) + 1))
         if re.search(r"\b(PHPUnit|API.?test|E2E|Visual.?regression)\b", row, re.I):
             m = re.search(r"`([^`]*(?:test|spec|Test)[^`]*)`", row)
-            if m and "/" in m.group(1):
+            if m and _is_test_path(m.group(1)):
                 p = m.group(1)
                 if p not in planned:
                     planned.append(p)

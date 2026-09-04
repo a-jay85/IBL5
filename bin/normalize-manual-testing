@@ -1,0 +1,8 @@
+#!/bin/sh
+# Single entry point for the prose /post-plan skill to render manual-testing checkboxes.
+# The Python harness calls harness.manual_rows.render_rows in-process; both execute the
+# same module, so there is no second implementation to drift.
+set -eu
+
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT/tools/postplan-harness" && exec python3 -m harness.manual_rows "$@"

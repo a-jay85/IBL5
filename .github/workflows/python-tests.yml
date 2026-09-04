@@ -10,12 +10,14 @@ on:
       - 'tools/postplan-harness/**'
       - '.github/workflows/python-tests.yml'
       - 'bin/post-plan-now'
+      - 'bin/normalize-manual-testing'
   push:
     branches: [master]
     paths:
       - 'tools/postplan-harness/**'
       - '.github/workflows/python-tests.yml'
       - 'bin/post-plan-now'
+      - 'bin/normalize-manual-testing'
 
 permissions:
   contents: read

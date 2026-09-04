@@ -1,10 +1,13 @@
 import os
 import sys
 
+import pytest
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from harness.armable import (ArmInputs, dep_numbers, evaluate, feat_hold,
+from harness.armable import (ArmInputs, SENTINEL_RE, dep_numbers, evaluate, feat_hold,
                              manual_testing_clearance)
+from harness.manual_rows import ManualRow, _assert_no_sentinel, render_rows
 from harness.state import Classification, Finding
 
 BODY_CLEARED = "## Summary\nx\n\n## Manual Testing\n\nNo manual testing needed — covered.\n"
@@ -85,3 +88,16 @@ def test_findings_below_80_do_not_block():
 def test_phase5_skipped_does_not_block():
     assert evaluate(inputs(phase5_status="skipped")).armed
     assert evaluate(inputs(phase5_status=None)).armed
+
+
+def test_render_rows_never_emits_sentinel():
+    row = ManualRow(number="1", text="No manual testing needed - looks fine",
+                    raw="1 | No manual testing needed - looks fine | Truly-manual | post-impl | none")
+    rendered = render_rows([row])
+    assert not SENTINEL_RE.match(rendered)
+    assert manual_testing_clearance("## Manual Testing\n\n" + rendered + "\n") == "HELD"
+
+
+def test_assert_no_sentinel_has_teeth():
+    with pytest.raises(ValueError, match="sentinel"):
+        _assert_no_sentinel("No manual testing needed\n")

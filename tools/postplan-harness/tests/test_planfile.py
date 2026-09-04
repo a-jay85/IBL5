@@ -49,7 +49,7 @@ def test_frontmatter_gate():
 def test_matrix_and_critical_files():
     planned, manual = parse_matrix(PLAN)
     assert planned == ["ibl5/tests/Unit/EventLoggerTest.php", "ibl5/tests/e2e/admin/events.spec.ts"]
-    assert len(manual) == 1 and "eyeball" in manual[0]
+    assert len(manual) == 1 and "eyeball" in manual[0].raw
     cf = parse_critical_files(PLAN)
     assert cf[0][0] == "ibl5/classes/EventLogger.php" and not cf[0][2]
     assert cf[1][0] == "ibl5/schema.sql" and cf[1][2]  # "(read-only reference)" -> exempt
@@ -79,7 +79,7 @@ def test_matrix_ignores_fenced_rows():
     assert planned == parse_matrix(PLAN)[0]
     assert len(manual) == len(parse_matrix(PLAN)[1])
     assert "tests/X.php" not in planned
-    assert not any("eyeball it" in row for row in manual)
+    assert not any("eyeball it" in row.raw for row in manual)
 
 
 def test_matrix_fence_width_awareness():
@@ -707,3 +707,46 @@ def test_conformance_empty_diff_body_is_noop():
     items = conformance.check(plan, [])
     method_items = [i for i in items if i.startswith("MISSING-METHOD:")]
     assert method_items == []
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 - D5: shell-command token rejection in parse_matrix
+# ---------------------------------------------------------------------------
+
+def _plan_with_phpunit(test_expr: str) -> str:
+    """Minimal plan with a PHPUnit matrix row using `test_expr` as the backtick token."""
+    return (
+        "## Verification Matrix\n\n"
+        "| Behavior | Test type | Test |\n"
+        "|---|---|---|\n"
+        f"| saves row | PHPUnit | `{test_expr}` |\n"
+    )
+
+
+@pytest.mark.parametrize("token,reason", [
+    ("npm test && npm run build", "shell metacharacter &"),
+    ("pytest -q x/y.py; echo", "shell metacharacter ;"),
+    ("bin/x > out/test.log", "shell metacharacter >"),
+    ("-k test_foo", "leading dash flag"),
+    ('"tests/a.py"', "leading double-quote"),
+    ("$CMD tests/a.py", "leading dollar sign"),
+    ("run tests/a.py", "whitespace in token"),
+])
+def test_shell_token_rejected(token, reason):
+    """Each shell-shaped token yields planned == [] (Phase 5 D5 guard)."""
+    planned, _ = parse_matrix(_plan_with_phpunit(token))
+    assert planned == [], f"Expected empty planned for {reason!r}: got {planned!r}"
+
+
+def test_real_path_lands_in_planned():
+    """Positive control: real repo paths with slashes and no shell chars still land in planned."""
+    plan = (
+        "## Verification Matrix\n\n"
+        "| Behavior | Test type | Test |\n"
+        "|---|---|---|\n"
+        "| spec runs | E2E | `ibl5/tests/e2e/admin/events.spec.ts` |\n"
+        "| unit runs | PHPUnit | `tools/postplan-harness/tests/test_planfile.py` |\n"
+    )
+    planned, _ = parse_matrix(plan)
+    assert "ibl5/tests/e2e/admin/events.spec.ts" in planned
+    assert "tools/postplan-harness/tests/test_planfile.py" in planned

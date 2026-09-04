@@ -43,6 +43,9 @@ def pr_copy_prompt(slug: str, cls: Classification, plan: PlanInfo, plan_excerpt:
         + retro_block
         + (f"\nPLAN EXCERPT (intent):\n{plan_excerpt[:4000]}\n" if plan.found else "")
         + "\nDIFF:\n" + cls.filtered_diff[:60000]
+        + '\n\nNEVER write a "## Manual Testing" heading or any manual-testing checklist '
+        'inside summary_md. The runner owns that section and appends it after you; '
+        'duplicating it corrupts the arming gate.'
         + '\n\nReturn ONLY JSON: {"type": "chore", "title": "chore(scope): ...", '
         '"summary_md": "## Summary\\n- ..."}. Title <= 72 chars, starts with its type.'
     )
@@ -87,6 +90,34 @@ def manual_classify_prompt(body_section: str, cls: Classification) -> str:
         f"MANUAL TESTING SECTION:\n{body_section[:8000]}\n\n"
         'Return ONLY JSON: [{"step": "<verbatim step>", "category": "...", '
         '"rationale": "<one line>"}]. Empty section -> [].'
+    )
+
+
+def manual_recheck_prompt(rows: list, cls: "Classification") -> str:
+    """Phase 6 re-check — ask the model whether each truly-manual row can be
+    verified by a concrete command, or must remain held for a human reviewer.
+
+    The model may reply with either ``{"n": N, "hold": true}`` (subjective, keep
+    the row in the checklist) or ``{"n": N, "probe": ["bin/test-x", "arg"]}`` (an
+    argv list, never a shell string).  Argv[0] must match the allowlist.
+    """
+    numbered = "\n".join(f"{r.number}. {r.text}" for r in rows)
+    return (
+        "Classify each manual-testing row as either held-for-human or runnable by "
+        "a concrete check command.\n\n"
+        "A row is held when it requires subjective human judgment (visual appearance, "
+        "UI correctness, 'does this look right'). A row is runnable only when a "
+        "real command that already exists in the repo can verify it — not a command "
+        "you invent.\n\n"
+        "When a row is runnable, provide the argv as a JSON list. The first element "
+        "must match the allowlist: `pytest`, `grep`, or `bin/(check|test)-<name>` — "
+        "no interpreters (bash, python3, sh, env, node), no absolute paths, no `..`, "
+        "no flags starting with -c/-e/--eval/--exec/-p/--plugin, and at most 8 "
+        "elements. When in doubt, return hold.\n\n"
+        f"CLASSIFICATION:\n{cls.summary()}\n\n"
+        f"ROWS:\n{numbered}\n\n"
+        'Return ONLY JSON: [{"n": 1, "hold": true}, {"n": 2, "probe": ["bin/test-x"]}].'
+        " One entry per row, in order."
     )
 
 

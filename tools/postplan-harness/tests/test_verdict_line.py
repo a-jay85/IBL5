@@ -166,3 +166,52 @@ def test_pull_url_base_none_returns_empty():
 
 def test_pull_url_base_nonexistent_path_returns_empty():
     assert runner._pull_url_base("/nonexistent-path-xyz-abc") == ""
+
+
+# ---------------------------------------------------------------------------
+# Phase 7: scored_findings logged independently from surviving findings
+# ---------------------------------------------------------------------------
+
+def test_scored_findings_stored_and_surviving_differs():
+    """RunResult holds all scored findings; findings holds only those above threshold.
+
+    Simulate a review that produced 3 raw findings (scores 95, 60, 40) where only
+    the 95-scorer survives the CODE_THRESHOLD=80 gate. scored_findings should
+    expose all 3 for the log; findings/verdict_line should report 1.
+    """
+    import json
+    from harness.state import Finding
+    raw = [
+        Finding(source="code-review", agent="A", path="ibl5/a.php", line=1, body="high", score=95),
+        Finding(source="code-review", agent="A", path="ibl5/b.php", line=2, body="mid", score=60),
+        Finding(source="code-review", agent="A", path="ibl5/c.php", line=3, body="low", score=40),
+    ]
+    surviving = [f for f in raw if (f.score or 0) >= 80]
+    scored = [{"source": f.source, "agent": f.agent, "path": f.path,
+               "line": f.line, "score": f.score, "body_head": (f.body or "")[:160]}
+              for f in raw]
+
+    r = _res(TerminalState.SHIPPED_ARMED, pr_number=99, arm=_arm(True))
+    r.findings = surviving
+    r.scored_findings = scored
+
+    assert len(r.scored_findings) == 3
+    assert [s["score"] for s in r.scored_findings] == [95, 60, 40]
+    assert len(r.findings) == 1
+
+    # to_json must serialise scored_findings; raw count must not appear in verdict
+    blob = json.loads(r.to_json())
+    assert len(blob["scored_findings"]) == 3
+    assert [s["score"] for s in blob["scored_findings"]] == [95, 60, 40]
+
+    line = runner.verdict_line(r, 0, "https://github.com/o/r/pull")
+    assert "findings=1" in line
+
+
+def test_scored_findings_empty_when_no_findings():
+    """A run with zero findings must serialise scored_findings as [] with no key error."""
+    import json
+    r = _res(TerminalState.SHIPPED_ARMED, pr_number=1, arm=_arm(True))
+    # findings and scored_findings left at defaults (empty lists)
+    blob = json.loads(r.to_json())
+    assert blob["scored_findings"] == []

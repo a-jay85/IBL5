@@ -187,28 +187,13 @@ Entries 9.1–9.3 are defects and gaps surfaced by the 2026-09-01 audit of PR #2
 |---|-------|--------|-----------|-------:|
 | 9.1 | scp trailing-slash causes `dist/` to nest inside existing remote `dist/` | ✅ Implemented | 🟩 | S |
 | 9.2 | PR body `## Manual Testing` falsely claimed test coverage | ✅ Implemented | 🟩 | S |
-| 9.3 | No Node toolchain pin before `Build IBLbot` on CI runner | ⬜ Open | 🟩 | S |
+| 9.3 | No Node toolchain pin before `Build IBLbot` on CI runner | ✅ Implemented | 🟩 | S |
 
 ➜ 9.1 scp trailing-slash causes `dist/` to nest inside existing remote `dist/` — ✅ Implemented (2026-09-04, #2095): see [archive](archive/ci-backlog-archive.md).
 
 ➜ 9.2 PR body `## Manual Testing` falsely claimed test coverage — ✅ Implemented (2026-09-04, #2095): see [archive](archive/ci-backlog-archive.md).
 
-### 9.3 No Node toolchain pin before `Build IBLbot` on CI runner
-*(discovered 2026-09-01 during #2044)*
-**Location:** `.github/workflows/main.yml` "Build IBLbot" step (`npm ci --include=dev && npm run build`); no preceding `actions/setup-node` step.
-**Problem:** The IBLbot build runs `npm ci` + `npm run build` against whatever Node version `ubuntu-latest` currently ships, coupling the build to runner-image drift. A silent Node major upgrade on the runner could break the tsc build (or, worse, silently succeed against a semantically incompatible version).
-**Occurrence scan:** `grep -n 'npm ci\|npm run build' .github/workflows/main.yml` returns:
-- Line 120: `npm ci --include=dev` — in `Build IBLbot` step; no toolchain pin.
-- Line 121: `npm run build` — same step.
-- Line 136: `npm ci --omit=dev` — in the SSH step on the droplet; the droplet's Node version is pinned externally (not a CI-runner concern).
-The `Build IBLbot` step (lines 120-121) is the only CI-runner npm build without a toolchain pin.
-**Prevention ladder:**
-- Rung 0: no existing gate.
-- Rung 1: no existing gate to extend (actionlint runs in `bin/lint-workflows` but has no built-in rule for missing `setup-node` before `npm`).
-- Rung 2 (warranted minimum): a `ci-node-toolchain-pin` rule doc under `.claude/rules/` specifying that any `npm ci` / `npm run` step on a CI runner must be preceded by `actions/setup-node` with a pinned Node version.
-- Rungs 3-5: an actionlint custom rule could qualify as rung 4 if meta-tooling-bar conditions hold on the next review; defer until the rung-2 rule is in place and a recurring breach is observed.
-**Landing rung:** 2. **Artifact owed:** a `ci-node-toolchain-pin` rule doc in `.claude/rules/` (not yet written).
-**Status (2026-09-01):** ⬜ Open — no fix yet; rule doc not yet written. 🟩.
+➜ 9.3 No Node toolchain pin before `Build IBLbot` on CI runner — ✅ Implemented (2026-09-04): see [archive](archive/ci-backlog-archive.md).
 
 ---
 

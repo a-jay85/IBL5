@@ -272,13 +272,13 @@ This step references the existing `.github/workflows/tests.yml` workflow.
 # Gate 8: a new migration with NO `DROP` in the plan text must NOT flag (exit 0) —
 # conservative migration scoping.
 assert "gate8-migration-no-drop" 0 "$FM$M"'
-Phase 1 — Create `ibl5/migrations/099_x.sql` to add a nullable column.
+Phase 1 — Create `ibl5/migrations/add_column.sql` to add a nullable column.
 '
 
 # Gate 8: a new migration whose plan text mentions `DROP TABLE`, no resolution,
 # must flag (exit 1) — destructive-migration trigger.
 assert "gate8-migration-drop-no-adr" 1 "$FM$M"'
-Phase 1 — Create `ibl5/migrations/099_x.sql`.
+Phase 1 — Create `ibl5/migrations/add_column.sql`.
 The migration runs DROP TABLE foo to remove the legacy store.
 '
 
@@ -2008,16 +2008,20 @@ ${NMIN_HDR}
 | 13.7c | bad |
 "
 
-# Corpus regression: all 26 queued plans still pass with gate N
+# Corpus regression: all 20 queued plans still pass with gate N
+# Plans removed because they trigger new gates added in this PR (all true positives):
+# conference-champions-playoff-semantics, bug-pipeline-survive-db-sync,
+# bug-pipeline-test-env, sim-recap-boxid-resolution (gate [A]: migration literals);
+# bug-hunter-escalation-discord-dm (gate [V]: main.localhost);
+# pr-ready-now-driver, bug-pipeline-survive-db-sync (gate [I]: shellcheck flags).
 _n_corpus_pass=1
 for _n_slug in \
-    plan-architect-phase-drift-guard conference-champions-playoff-semantics \
-    automouse-cost-accounting-fix bug-hunter-escalation-discord-dm \
-    bug-pipeline-survive-db-sync redact-credentials-from-error-logs \
-    pr-ready-now-driver session-registry-dotclaude-freshness architect-explore-fanout \
-    bug-pipeline-test-env narrow-headless-marker-contract-paths agent-tiering-detail-trim \
+    plan-architect-phase-drift-guard \
+    automouse-cost-accounting-fix redact-credentials-from-error-logs \
+    session-registry-dotclaude-freshness architect-explore-fanout \
+    narrow-headless-marker-contract-paths agent-tiering-detail-trim \
     postplan-findings-schema-degrade jsb-j7-param-recovery wt-rebase-merge-not-rebase \
-    sim-recap-boxid-resolution plan-gate-skill-inline sim-recap-floor-and-cold-open \
+    plan-gate-skill-inline sim-recap-floor-and-cold-open \
     authz-verdict-refactor-1a-trading-pins authz-verdict-refactor-1b-trading-reject-service \
     authz-verdict-refactor-1c-trading-reject-shim authz-verdict-refactor-1d-trading-accept-service \
     authz-verdict-refactor-1e-trading-accept-shim authz-verdict-refactor-trading-backlog \
@@ -2068,6 +2072,237 @@ else
         FAILED=1
     fi
 fi
+
+# ---------------------------------------------------------------------------
+# Gate [A] — migration-number literal
+# ---------------------------------------------------------------------------
+
+assert_viol gate-A-literal-fires 1 '[A]' "$FM
+
+## Phase 1
+
+Plan calls for migration 171_dedup_key.sql to be applied first.
+
+$CF_MATRIX"
+
+assert_viol gate-A-escape-phrase-clears 0 '[A]' "$FM
+sonnet-recipe: gate-A escape-phrase fixture; anchor signal not under test.
+
+## Phase 1
+
+run bin/next-migration at impl time to get the number.
+
+$CF_MATRIX"
+
+assert_viol gate-A-fenced-clean 0 '[A]' "$FM
+sonnet-recipe: gate-A fence-aware fixture; anchor signal not under test.
+
+## Phase 1
+
+\`\`\`sql
+-- migration 171_dedup_key.sql
+INSERT INTO ibl_dedup VALUES (1);
+\`\`\`
+
+$CF_MATRIX"
+
+# ---------------------------------------------------------------------------
+# Gate [V] extensions — main.localhost and /path/to
+# ---------------------------------------------------------------------------
+
+# Gate [V] — main.localhost in any VM row (row must be in the VM block)
+assert_viol gate-V-main-localhost 1 '[V]' "$FM
+sonnet-recipe: gate-V main.localhost fixture; anchor not under test.
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | DB is accessible | CLI-executable | post-impl | curl http://main.localhost/ibl5/api/health |
+"
+
+# Gate [V] — /path/to placeholder in CLI-executable location cell (row in VM)
+assert_viol gate-V-path-to 1 '[V]' "$FM
+sonnet-recipe: gate-V path-to fixture; anchor not under test.
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | script runs | CLI-executable | post-impl | cd /path/to/worktree && php -v |
+"
+
+# Clean: derived hostname form does not trip the gate
+assert_viol gate-V-derived-hostname-clean 0 '[V]' "$FM
+sonnet-recipe: gate-V derived-hostname fixture; anchor not under test.
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | DB is accessible | CLI-executable | post-impl | curl http://check-plan-pr6-gates.localhost/ibl5/api/health |
+"
+
+# Escape phrase silences the main.localhost gate for plans that document it
+assert_viol gate-V-main-localhost-escape-clears 0 '[V]' "$FM
+documents main.localhost gate — this plan tests the gate itself.
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | DB is accessible | CLI-executable | post-impl | curl http://main.localhost/ibl5/api/health |
+"
+
+# ---------------------------------------------------------------------------
+# Gate [L] — line-number anchor in location cell (warn-only: exit 0, [L] in advisory)
+# Fixtures write full contiguous VM blocks (no empty lines between rows) so
+# all rows land in MATRIX_FILE and the gate sees them.
+# ---------------------------------------------------------------------------
+
+# Bare line number in location cell fires advisory [L] — exit 0 (warn-only).
+# Uses assert (exit-code only) + a companion inline grep to confirm advisory.
+_l_body="$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | thing works | E2E | post-impl | \`tests/X.spec.ts\` |
+| 2 | ID present | CLI-executable | post-impl | grep -n 'id: iblbot' .github/workflows/main.yml -- line 108 |"
+assert "gate-L-bare-line-number" 0 "$_l_body"
+_l_f=$(mktemp)
+printf '%s\n' "$_l_body" > "$_l_f"
+if ! "$GUARD" "$_l_f" 2>&1 | grep -q '\[L\]'; then
+    echo "FAIL: gate-L-bare-line-number — expected [L] advisory in output, got none"
+    FAILED=1
+else
+    echo "ok: gate-L-bare-line-number advisory confirmed"
+fi
+rm -f "$_l_f"
+
+# Tilde-approximate form is clean (excluded by pattern) — [L] must NOT appear.
+assert_viol gate-L-tilde-approx-clean 0 '[L]' "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | thing works | E2E | post-impl | \`tests/X.spec.ts\` |
+| 2 | section present | CLI-executable | post-impl | grep 'id: lint' .github/workflows/tests.yml -- ~line 483 |"
+
+# Range form is clean (excluded by pattern) — [L] must NOT appear.
+assert_viol gate-L-range-clean 0 '[L]' "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | thing works | E2E | post-impl | \`tests/X.spec.ts\` |
+| 2 | coverage span | CLI-executable | post-impl | bin/check-coverage tests/fixtures/plan.md -- line 62-75 |"
+
+# ---------------------------------------------------------------------------
+# Gate [E] — docker liveness precondition (warn-only: exit 0, [E] in advisory)
+# Rows appended directly inside the VM block (contiguous, no empty lines) so
+# they land in MATRIX_FILE.
+# ---------------------------------------------------------------------------
+
+# Docker/db-query row without a liveness row fires advisory [E] — exit 0.
+_e_body="$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | thing works | E2E | post-impl | \`tests/X.spec.ts\` |
+| 2 | data present | CLI-executable | post-impl | bin/db-query 'SELECT 1' |"
+assert "gate-E-docker-no-liveness" 0 "$_e_body"
+_e_f=$(mktemp)
+printf '%s\n' "$_e_body" > "$_e_f"
+if ! "$GUARD" "$_e_f" 2>&1 | grep -q '\[E\]'; then
+    echo "FAIL: gate-E-docker-no-liveness — expected [E] advisory in output, got none"
+    FAILED=1
+else
+    echo "ok: gate-E-docker-no-liveness advisory confirmed"
+fi
+rm -f "$_e_f"
+
+# Liveness row present — gate is silent ([E] must NOT appear).
+assert_viol gate-E-liveness-present-clean 0 '[E]' "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | stack up | CLI-executable | pre-impl | docker ps --filter name=ibl5-db |
+| 2 | data present | CLI-executable | post-impl | bin/db-query 'SELECT 1' |"
+
+# No docker rows at all — gate is silent ([E] must NOT appear).
+assert_viol gate-E-no-docker-clean 0 '[E]' "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | thing works | E2E | post-impl | \`tests/X.spec.ts\` |"
+
+# ---------------------------------------------------------------------------
+# Gate [I] — shellcheck CI-flag requirement (hard-fail)
+# Contiguous VM blocks; shellcheck rows reference actual CI-wired scripts only
+# in want=1 fixtures (gate [G] also fires but [I] tag is still present).
+# Clean fixtures (want=0) use shellcheck with full flags or no shellcheck at all.
+# ---------------------------------------------------------------------------
+
+# Bare shellcheck (no flags) — fires [I] (exit 1).
+assert_viol gate-I-bare-shellcheck 1 '[I]' "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | thing works | E2E | post-impl | \`tests/X.spec.ts\` |
+| 2 | lint clean | CLI-executable | post-impl | shellcheck bin/foo |"
+
+# --severity=warning only, missing --shell=bash — fires [I] (exit 1).
+assert_viol gate-I-severity-only 1 '[I]' "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | thing works | E2E | post-impl | \`tests/X.spec.ts\` |
+| 2 | lint clean | CLI-executable | post-impl | shellcheck --severity=warning bin/foo |"
+
+# Both flags present — gate is silent ([I] must NOT appear, exit 0).
+assert_viol gate-I-full-flags-clean 0 '[I]' "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | thing works | E2E | post-impl | \`tests/X.spec.ts\` |
+| 2 | lint clean | CLI-executable | post-impl | shellcheck --severity=warning --shell=bash bin/foo |"
+
+# No shellcheck row at all — gate is silent ([I] must NOT appear, exit 0).
+assert_viol gate-I-no-shellcheck-row-clean 0 '[I]' "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | thing works | E2E | post-impl | \`tests/X.spec.ts\` |"
+
+# ---------------------------------------------------------------------------
+# Gate [J] — coverage advisory for new PHP class (warn-only)
+# ---------------------------------------------------------------------------
+
+# New PHP class without coverage row fires advisory [J] — exit 0 (warn-only).
+# Uses assert (exit-code only) + companion inline grep to confirm advisory.
+_j_body="$FM_OPUS
+
+## Phase 1
+
+Create a new ibl5/classes/Foo/BarService.php implementing the baz interface.
+$CF_MATRIX"
+assert "gate-J-new-class-no-coverage" 0 "$_j_body"
+_j_f=$(mktemp)
+printf '%s\n' "$_j_body" > "$_j_f"
+if ! "$GUARD" "$_j_f" 2>&1 | grep -q '\[J\]'; then
+    echo "FAIL: gate-J-new-class-no-coverage — expected [J] advisory in output, got none"
+    FAILED=1
+else
+    echo "ok: gate-J-new-class-no-coverage advisory confirmed"
+fi
+rm -f "$_j_f"
+
+# Infection row present in VM — gate is silent ([J] must NOT appear).
+assert_viol gate-J-new-class-with-infection-clean 0 '[J]' "$FM_OPUS
+
+## Phase 1
+
+Create a new ibl5/classes/Foo/BarService.php implementing the baz interface.
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | mutation score | Infection | post-impl | bin/infection-run ibl5/classes/Foo/BarService.php |"
+
+# No creation verb — gate is silent ([J] must NOT appear).
+assert_viol gate-J-no-new-class-clean 0 '[J]' "$FM_OPUS
+
+## Phase 1
+
+Modify ibl5/classes/Foo/BarService.php to add a method.
+$CF_MATRIX"
 
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"

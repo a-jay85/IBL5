@@ -68,6 +68,8 @@ last_verified: 2026-09-04
 | E40 | `bin/scrub-log-credentials` prod path: unquoted outer heredoc mangles remote jq filter escapes (F1) + local per-file hit report silently discarded (F4) — both fixed Phase 6.5 #1920; case 8 harness guards regression | ⬜ Open | — | S |
 | E41 | `ErrorHandlerRegistrarTest` + `bin/test-scrub-log-credentials`: SYNTHETIC_SECRET 32 chars truncated to 15 in `getTraceAsString()` causes vacuous assertion (F2) + closure assertion replaced with unconditional pass (F3) — both fixed Phase 6.5 #1920 | ⬜ Open | — | XS |
 | E42 | Phase 6 review notes on PR #1968 — plan-accuracy divergences (N1–N4); all non-blocking; no gate warranted | ⬜ Open | — | XS |
+| E43 | `bin/check-plan` PR6 gates: migration literals [A], line-number anchors [L], docker liveness [E], shellcheck CI-class [I], PHP coverage advisory [J], plus gate [V] `/path/to` + `main.localhost` extensions | ⬜ Open | 🟩 | S |
+| E44 | Phase 6 review findings on PR #2082 — gate [V] main.localhost bootstrap defect (blocking), body count mismatch, vacuous range fixture, stale corpus count, nonexistent `bin/db-wait` (example) reference, wrong baseline claim; all fixed in Phase 6.5 | ⬜ Open | 🟩 | S |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -704,3 +706,49 @@ Not a defect in the anchoring or the SIGPIPE handling: the `$`-anchor (guarding 
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-04 during #1968)*
+
+### E43 `bin/check-plan` PR6 gates: five new gates and two gate [V] extensions
+
+**class: gate addition** — Adds five new gates and two extensions to `bin/check-plan` to prevent recurring plan-vs-implementation divergences that caused Phase 6 remediation commits:
+
+- **[A] Migration-number literal** (hard-fail): plans must not name specific migration numbers; use `run bin/next-migration at impl time` escape phrase.
+- **[L] Line-number anchor** (warn-only, location-cell scope): location cells referencing `line N` create fragile anchors that break when code shifts.
+- **[E] Docker liveness precondition** (warn-only): plans that exercise Docker/`bin/db-query` should include a liveness check row.
+- **[I] Shellcheck CI-class flags** (hard-fail): VM rows invoking `shellcheck` must use `--severity=warning --shell=bash` to match CI.
+- **[J] PHP coverage advisory** (warn-only): plans that introduce a new `ibl5/classes/*.php` file should include an Infection/mutation/coverage row.
+- **[V] ext `/path/to`**: CLI-executable rows with a `/path/to` placeholder are caught by the existing `_bad` chain.
+- **[V] ext `main.localhost`**: any VM row referencing `main.localhost` is a hard-fail (worktree plans must derive the hostname at runtime).
+
+**prevention_ladder: gates added** — PR #2082 (check-plan-pr6-gates branch).
+
+`artifact destination: bin/check-plan, bin/test-check-plan`
+
+`last_verified: 2026-09-04`
+
+*(discovered 2026-09-04 from pattern analysis of Phase 6 remediation commits)*
+
+### E44 Phase 6 review findings on PR #2082 — gate [V] bootstrap defect and five accuracy notes
+
+**class: gate bootstrap defect** — a `bin/check-plan` gate implementation that matches the full matrix row string (including the prose "What to verify" cell) rather than just the location cell, with no escape phrase, causing a plan that documents or tests the gate to hard-fail the very gate it is proposing — a self-referential bootstrap failure. Five additional accuracy findings (body count, vacuous fixture, stale comment, nonexistent script reference, wrong baseline claim) also remediated in Phase 6.5.
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/check-plan:316` — gate [V] full-row main.localhost match, no escape | yes | yes | fixed this pass |
+| 2 | PR body — "15 fixtures" contradicted by diff (19 actual) | near-miss | yes | fixed this pass |
+| 3 | `bin/test-check-plan:2182` — gate-L-range-clean fixture used plural form, vacuous | near-miss | yes | fixed this pass |
+| 4 | `bin/test-check-plan:2011` — corpus count "26" stale after trim to 20 | near-miss | yes | fixed this pass |
+| 5 | `bin/check-plan:1203,1208` — nonexistent `bin/db-wait` (example) in [E] liveness regex and warn string | near-miss | yes | fixed this pass |
+| 6 | plan VM row 7 — pre-flight claim "exits 0" wrong at time of writing | near-miss | yes | fixed this pass (plan file) |
+
+**prevention_ladder:**
+- rung 0: No existing gate covered the escape-phrase gap in gate [V].
+- rung 1: Extended gate [V]'s main.localhost arm with an escape phrase `documents main.localhost gate` (same pattern as gate [A]'s `run bin/next-migration at impl time` escape). **Landing rung: 1** — escape phrase added in Phase 6.5 of this PR.
+- rungs 2–5: Not warranted for this class; the fix is a one-line guard in the same gate implementation.
+
+For the accuracy findings (2–6): prevention is the existing `/pr-ready` Phase 6 review pipeline, which caught all five. No new gate warranted — the mechanism works.
+
+`artifact destination: bin/check-plan` (escape phrase guard), `bin/test-check-plan` (escape fixture + range fixture fix)
+
+`last_verified: 2026-09-04`
+
+*(discovered 2026-09-04 during Phase 6 review of #2082)**

@@ -308,9 +308,17 @@ awk '
 MHDR_PIPES=$(grep -m1 -iE '\|[[:space:]]*What to verify[[:space:]]*\|' "$PLAN_FILE" \
     | tr -cd '|' | wc -c | tr -d ' ')
 [ -n "$MHDR_PIPES" ] || MHDR_PIPES=0
+_v_mainhost_esc=0; grep -qF 'documents main.localhost gate' "$PLAN_FILE" && _v_mainhost_esc=1
 
 while IFS= read -r row; do
     low="$(printf '%s' "$row" | tr '[:upper:]' '[:lower:]')"
+    # Gate [V] ext: main.localhost in any VM row is a hard error in a worktree plan.
+    # worktree-hostname.md: "Never use main.localhost when working in a worktree."
+    # Escape: include the phrase "documents main.localhost gate" anywhere in the
+    # plan (for plans that describe or test this gate, e.g. this PR's own plan).
+    if [ "$_v_mainhost_esc" -eq 0 ] && printf '%s' "$row" | grep -qiF 'main.localhost'; then
+        viol "[V] VM row references 'main.localhost' — worktree plans must use the derived hostname (\$(basename \"\$(git rev-parse --show-toplevel)\").localhost), never the main-checkout hostname; see .claude/rules/worktree-hostname.md"
+    fi
     # Gate 3: a Truly-manual row using an automatable verb is mislabeled.
     if printf '%s' "$low" | grep -qE 'truly[- ]manual'; then
         if printf '%s' "$low" | grep -qE 'verify|check that|confirm|ensure'; then
@@ -344,6 +352,8 @@ while IFS= read -r row; do
             _bad="bare SQL — wrap it in bin/db-query"
         elif printf '%s' "$MC_LOC" | grep -qiE '^(same[[:space:]]|re-run)'; then
             _bad="prose referring to another row, not a command"
+        elif printf '%s' "$MC_LOC" | grep -qE '(^|[[:space:]])/path/to[/[:space:]]'; then
+            _bad="a /path/to placeholder — bind the real path with \$(git rev-parse --show-toplevel) or a \$VAR that has a stated default"
         fi
         if [ -n "$_bad" ]; then
             viol "[V] CLI-executable row (row ${MC_NUM:-?}) has a non-runnable location cell: \"${MC_LOC}\" — ${_bad}. It must be a single shell command. Not accepted: 'Phase N' pointers, '...' ellipsis, '<placeholder>' tokens, bare file paths, bare SQL. Valid examples: bin/check-docs / grep -c 'FunctionName' ibl5/classes/Foo.php / python3 -c \"import sys; sys.exit(0)\""
@@ -1120,6 +1130,125 @@ if [ "$GATEP_MARKER" -eq 0 ] && [ -s "$GATEP_MATRIX" ]; then
         fi
         viol "[P] ${gatep_token} is declared as a deliverable but no verification-matrix row exercises it - build a pre-prod exercise path (run it on the worktree Docker stack, in CI, or via the deploy-rehearsal job) and add the matrix row; see /plan Step 4 gate 16"
     done < <(gatep_declared_tokens)
+fi
+
+# ---------------------------------------------------------------------------
+# Gate [A]: Migration-number literal detector (hard-fail).
+# ---------------------------------------------------------------------------
+# A plan that names a specific migration number (e.g. "migration 171",
+# "171_dedup_key.sql") will break when the actual assigned number differs.
+# Migration numbers are not known at planning time — they are assigned by
+# bin/next-migration at implementation time.
+# Escape: include the phrase "run bin/next-migration at impl time" anywhere
+# in the plan (mirrors no-adr: / context-budget: pattern).
+# Fence-aware: skips lines inside ```...``` and ````...```` blocks.
+if ! grep -qF 'run bin/next-migration at impl time' "$PLAN_FILE"; then
+    _a_hits=$(awk '
+        function fence_ticks(s,   t) {
+            if (match(s, /^[ \t]*`+/)) {
+                t = substr(s, RSTART, RLENGTH); gsub(/[^`]/, "", t); return length(t)
+            }
+            return 0
+        }
+        BEGIN { infence=0; fence_len=0; count=0 }
+        {
+            nt = fence_ticks($0)
+            if (infence) {
+                if (nt >= fence_len && $0 ~ /^[ \t]*`+[ \t]*$/) { infence=0; fence_len=0 }
+                next
+            }
+            if (nt >= 3) { infence=1; fence_len=nt; next }
+            if (/migration[_ -]*[0-9]{3,}|[0-9]{3,}[_-][a-zA-Z][A-Za-z0-9_-]*\.sql/) count++
+        }
+        END { print count+0 }
+    ' "$PLAN_FILE")
+    if [ "${_a_hits:-0}" -gt 0 ]; then
+        viol "[A] plan names ${_a_hits} migration-number literal(s) outside fences — migration numbers are assigned at impl time and conflict when parallel branches claim the same number; use bin/next-migration at impl time, or add the phrase 'run bin/next-migration at impl time' anywhere in the plan to acknowledge this"
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Gate [L]: Line-number anchor in VM location column (warn-only).
+# ---------------------------------------------------------------------------
+# A "line N" reference in the location cell names a line that shifts when
+# surrounding code changes, creating a fragile anchor. Use a code snippet
+# or function/method name instead.
+# Scope: location cell ($MC_LOC) only — full-row scan has >20% FP rate.
+# Implementation: uses matrix_split() to handle escaped-pipe rows correctly.
+# Excludes: tilde-prefixed approximations (~line N), ranges (line N-M /
+# lines N-M), and rows already annotated (one-shot) or (wired in this PR).
+while IFS= read -r row; do
+    if ! matrix_split "$row"; then continue; fi
+    case "$MC_LOC" in *'(one-shot)'*|*'(wired in this PR)'*) continue ;; esac
+    # Strip tilde-approximate forms and ranges before testing.
+    _l_probe=$(printf '%s' "$MC_LOC" \
+        | sed -E 's/~[[:space:]]*lines?[[:space:]]+[0-9]+-?[0-9]*//gi' \
+        | sed -E 's/lines?[[:space:]]+[0-9]+-[0-9]+//gi')
+    if printf '%s' "$_l_probe" | grep -qiE '\bline[[:space:]]+[0-9]+'; then
+        warn "[L] VM row ${MC_NUM:-?} location cell references a line number — line numbers shift when the file changes; use a code snippet anchor, function name, or grep pattern instead: \"${MC_LOC}\""
+    fi
+done < "$MATRIX_FILE"
+
+# ---------------------------------------------------------------------------
+# Gate [E]: Docker liveness precondition (warn-only).
+# ---------------------------------------------------------------------------
+# A plan that exercises Docker or bin/db-query in its VM should include a
+# liveness check row (e.g. docker ps, docker compose ps, docker compose inspect) so
+# a dead container is diagnosed as infrastructure failure, not a test failure.
+# Warn-only: 0% of sampled docker-row plans already carry a liveness row
+# (well under the 50% threshold for hard-fail).
+# Scope: $MATRIX_FILE (first contiguous VM block only).
+_e_docker=0; _e_liveness=0
+while IFS= read -r row; do
+    if printf '%s' "$row" | grep -qE 'docker|bin/db-query'; then
+        _e_docker=1
+    fi
+    if printf '%s' "$row" | grep -qiE 'docker[[:space:]]+(ps|compose|inspect|stats)|bin/wt-[a-z]+'; then
+        _e_liveness=1
+    fi
+done < "$MATRIX_FILE"
+if [ "$_e_docker" -eq 1 ] && [ "$_e_liveness" -eq 0 ]; then
+    warn "[E] plan exercises Docker or bin/db-query but no liveness check row found — add a row with e.g. 'docker ps --filter name=ibl5-db-...' before the first docker-dependent assertion"
+fi
+
+# ---------------------------------------------------------------------------
+# Gate [I]: Shellcheck CI-class flag requirement (hard-fail).
+# ---------------------------------------------------------------------------
+# The CI shellcheck job always runs with --severity=warning --shell=bash
+# (.github/workflows/tests.yml, id: shellcheck). A VM row invoking shellcheck
+# without both flags is weaker than CI and can produce a false green.
+# Fires only when a shellcheck row exists — silent otherwise.
+while IFS= read -r row; do
+    if ! matrix_split "$row"; then continue; fi
+    if printf '%s' "$MC_LOC" | grep -qE '\bshellcheck\b'; then
+        _i_sev=0; _i_sh=0
+        printf '%s' "$MC_LOC" | grep -qF -- '--severity=warning' && _i_sev=1
+        printf '%s' "$MC_LOC" | grep -qF -- '--shell=bash'       && _i_sh=1
+        if [ "$_i_sev" -eq 0 ] || [ "$_i_sh" -eq 0 ]; then
+            viol "[I] VM row ${MC_NUM:-?} runs shellcheck without CI-class flags — CI always uses '--severity=warning --shell=bash'; weaker invocations can produce false greens: \"${MC_LOC}\""
+        fi
+    fi
+done < "$MATRIX_FILE"
+
+# ---------------------------------------------------------------------------
+# Gate [J]: Coverage advisory for new PHP classes (warn-only).
+# ---------------------------------------------------------------------------
+# A plan that introduces a new ibl5/classes/*.php file should include at
+# least one Infection/mutation or coverage VM row, so the new code's
+# mutation resistance is considered. Infection is label-gated (mutation-test)
+# so this is advisory only — it never blocks the plan.
+_j_new_class=0
+if grep -qiE '([Cc]reate|[Nn]ew file|[Aa]dd(s|ing)? (a )?new|[Ii]ntroduce|[Ss]caffold)' "$PLAN_FILE" \
+   && grep -qE 'ibl5/classes/[^ ]+\.php' "$PLAN_FILE"; then
+    # Confirm at least one token matches BOTH creation context and PHP class path
+    # (same conjunction technique as gate 8's ADR filter).
+    _j_new_class=$(grep -iE '([Cc]reate|[Nn]ew file|[Aa]dd(s|ing)? (a )?new|[Ii]ntroduce|[Ss]caffold)' "$PLAN_FILE" \
+        | grep -cE 'ibl5/classes/[^ ]+\.php' || true)
+fi
+if [ "${_j_new_class:-0}" -gt 0 ]; then
+    if ! grep -qiE 'infection|mutation|coverage' "$MATRIX_FILE"; then
+        warn "[J] plan introduces a new ibl5/classes/*.php file but the VM has no Infection/mutation/coverage row — consider adding one (Infection is label-gated; suppress with a comment if deliberately omitted)"
+    fi
 fi
 
 # ---------------------------------------------------------------------------

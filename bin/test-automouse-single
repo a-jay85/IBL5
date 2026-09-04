@@ -200,6 +200,26 @@ grep -qi "already queued" "$ROOT/run.out" \
     && { echo "FAIL: case5 leaked an 'already queued' error"; FAILED=1; }
 
 # ===========================================================================
+# Case 6 — unusable impl_model is disposed WITHOUT burning an attempt (Phase 4)
+# ===========================================================================
+echo "--- case 6: unusable impl_model disposed, no attempt burned ---"
+reset_state
+printf -- '---\nimpl_model: claude-sonnet-4.6\n---\n\n# plan-badmodel\n' > "$PDIR/plan-badmodel.md"
+ln -s "$PDIR/plan-badmodel.md" "$NDIR/queue/plan-badmodel.md"
+set +e
+PLANS_DIR="$PDIR" "$RUNNER" plan plan-badmodel > "$ROOT/run.out" 2>&1; rc=$?
+set -e
+[ "$rc" -eq 0 ] || { echo "FAIL: case6 runner aborted (rc=$rc) instead of skipping"; FAILED=1; }
+assert_present "case6 disposed to skipped/"     "$NDIR/skipped/plan-badmodel.md"
+assert_absent  "case6 left queue"               "$NDIR/queue/plan-badmodel.md"
+assert_absent  "case6 no attempts sidecar"      "$NDIR/queue/plan-badmodel.md.attempts"
+assert_absent  "case6 no handoff (claude never ran)" "$NDIR/handoff/plan-badmodel.md.json"
+assert_absent  "case6 not completed"            "$NDIR/done/plan-badmodel.md"
+assert_present "case6 skipped report written"   "$NDIR/reports/$(date +%Y-%m-%d)-skipped-plan-badmodel.md"
+grep -qF 'is not a recognized model' "$NDIR/reports/$(date +%Y-%m-%d)-skipped-plan-badmodel.md" \
+    || { echo "FAIL: case6 report lacks the rejection reason"; FAILED=1; }
+
+# ===========================================================================
 echo ""
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"

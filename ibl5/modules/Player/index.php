@@ -75,8 +75,17 @@ function negotiate($playerID)
 
     PageLayout\PageLayout::header();
 
-    // Get user's team name using existing CommonRepository
+    // Get user's team name using existing CommonRepository. Returns null for a
+    // logged-in user with no `ibl_team_info` row (a registered non-GM); passing that
+    // into processNegotiation()'s `string $userTeamName` is a TypeError under
+    // strict_types, so bail with the same error shape rookieoption() uses.
     $userTeamName = $commonRepository->getTeamnameFromUsername($authService->getUsername() ?? '');
+    if ($userTeamName === null) {
+        echo '<div class="ibl-alert ibl-alert--error">' . \Security\HtmlSanitizer::safeHtmlOutput('You do not have a team assigned.') . '</div>';
+        echo '<a href="javascript:history.back()" class="ibl-btn ibl-btn--primary" style="margin-top: 0.5rem; display: inline-block;">Go Back</a>';
+        PageLayout\PageLayout::footer();
+        return;
+    }
 
     $debugSession = new \Debug\DebugSession(
         $authService->getUsername() ?? '',
@@ -110,8 +119,16 @@ function rookieoption($pid)
 
     PageLayout\PageLayout::header();
 
-    // Get user's team name
+    // Get user's team name. Returns null for a logged-in user with no `ibl_team_info`
+    // row (a registered non-GM); validatePlayerOwnership() declares `string
+    // $userTeamName`, so null is a TypeError under strict_types.
     $userTeamName = $commonRepository->getTeamnameFromUsername($authService->getUsername() ?? '');
+    if ($userTeamName === null) {
+        echo '<div class="ibl-alert ibl-alert--error">' . \Security\HtmlSanitizer::safeHtmlOutput('You do not have a team assigned.') . '</div>';
+        echo '<a href="javascript:history.back()" class="ibl-btn ibl-btn--primary" style="margin-top: 0.5rem; display: inline-block;">Go Back</a>';
+        PageLayout\PageLayout::footer();
+        return;
+    }
 
     // Validate player ownership
     $ownershipValidation = $validator->validatePlayerOwnership($player, $userTeamName);

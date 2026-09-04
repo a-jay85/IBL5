@@ -24,7 +24,10 @@ BASE="${1:?Usage: automouse-escalate-model <base_model> <current_attempt> <max_a
 CUR="${2:?Usage: automouse-escalate-model <base_model> <current_attempt> <max_attempts>}"
 MAX="${3:?Usage: automouse-escalate-model <base_model> <current_attempt> <max_attempts>}"
 
-# Escalation target — MUST equal the default bin/lib/plan-impl-model emits.
+# Escalation target — MUST equal what bin/lib/plan-impl-model emits for an absent
+# or `opus` marker. There is no longer an unknown-value default: a rejected value
+# exits nonzero in plan-impl-model and bin/automouse/run disposes the plan before
+# reaching this helper, so BASE is always one of the three whitelisted model ids.
 OPUS="claude-opus-5"
 
 # Non-numeric attempt or max → do NOT escalate (preserve the declared tier).

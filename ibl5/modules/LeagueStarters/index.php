@@ -54,7 +54,11 @@ if (isset($_REQUEST['display']) && is_string($_REQUEST['display'])
 PageLayout\PageLayout::header();
 
 $username = $authService->getUsername() ?? '';
-$userTeamName = $commonRepository->getTeamnameFromUsername($username);
+// getTeamnameFromUsername() returns null for a logged-in user with no `ibl_team_info`
+// row (a registered non-GM). Team::initialize() takes int|string|array, so null is a
+// TypeError under strict_types. Fall back to the same value a logged-out visitor
+// already gets, keeping this read-only page rendering for everyone.
+$userTeamName = $commonRepository->getTeamnameFromUsername($username) ?? \League\League::FREE_AGENTS_TEAM_NAME;
 $userTeam = \Team\Team::initialize($mysqli_db, $userTeamName);
 
 echo $view->render($mysqli_db, $season, $startersByPosition, $userTeam, $display);

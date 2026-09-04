@@ -1,6 +1,6 @@
 ---
 description: Index of shared library files sourced by bin/ scripts.
-last_verified: 2026-08-18
+last_verified: 2026-08-23
 ---
 
 # bin/lib — Shared Library Files
@@ -18,8 +18,9 @@ Sourced (not executed directly) by scripts in `bin/` and `bin/automouse/`. Each 
 | `docfix-dm.sh` | Compose the docs-refreshed Discord DM for a docfix PR; holds the numeric-input, OPEN-state, and `docs-stale-refresh-` head-ref guards lifted out of `docs-refreshed-notify.yml` so they are exercisable by `bin/test-docfix-run` |
 | `git-helpers.sh` | Shared git-layout helpers: canonical repo root resolution and related utilities |
 | `human-signoff-classifier.sh` | Single source of truth for the feature-PR human sign-off classifier (ADR-0062), sourced by both the workflow and its regression harness |
-| `plan-impl-model` | Resolve the automouse impl-agent model for a given plan file |
-| `plan-model-consistency` | Shared `impl_model` ↔ Verification-Matrix consistency check, sourced by `bin/check-plan` (gate M) and `bin/test-automouse-impl-model` |
+| `plan-model-tier` | Validate a raw `impl_model:` value against the accepted whitelist and classify it (`absent`/`opus-tier`/`sonnet-tier`/`haiku-tier`); shared by `plan-impl-model` and `plan-model-consistency` |
+| `plan-impl-model` | Resolve the automouse impl-agent model for a given plan file; rejects any value outside the `plan-model-tier` whitelist (exit 1, one line on stderr) instead of defaulting to Opus |
+| `plan-model-consistency` | Shared `impl_model` ↔ Verification-Matrix consistency check, invoked by `bin/check-plan` gate `[13]` and by the `bin/automouse/queue` add-time backstop |
 | `post-review-findings.sh` | Convert a JSON findings array into resolvable inline GitHub review threads or a fallback issue comment; sourced by `/post-plan` Phase 4D, `/pr-review`, and `/security-audit` |
 | `pr-armable.sh` | Shared auto-merge "live hold" predicate for `/post-plan` Phase 6.5 arming conditions; sourced by `bin/pr-triage` and `/post-plan` |
 | `sim-recap-exemplar.txt` | Exemplar sim-recap text used as a style reference by the sim-recap prompt |

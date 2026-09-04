@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/lib/plan-model-tier — validate a raw `impl_model:` value and classify it.
+# Single source of truth for the accepted whitelist, shared by plan-impl-model
+# (tier -> model id) and plan-model-consistency (tier -> gate verdict).
+# Takes the RAW STRING, not a path: both callers already own the line-1 anchoring.
+#
+# exit 0 -> stdout is one tier token: absent | opus-tier | sonnet-tier | haiku-tier
+# exit 1 -> stdout is exactly ONE line: the rejection message
+# exit 2 -> usage error (no argument). An EMPTY argument is legal and means `absent`.
+#
+# Usage: bin/lib/plan-model-tier <raw-impl-model-value>
+
+set -u
+
+if [ "$#" -lt 1 ]; then
+    echo "Usage: plan-model-tier <raw-impl-model-value>" >&2
+    exit 2
+fi
+
+case "$1" in
+  "")                       echo "absent"      ;;
+  opus|claude-opus-5)       echo "opus-tier"   ;;
+  sonnet|claude-sonnet-4-6) echo "sonnet-tier" ;;
+  haiku|claude-haiku-4-5)   echo "haiku-tier"  ;;
+  fable|claude-fable-*|claude-fable)
+      echo "impl_model: $1 is not selectable — Fable is never spawned without asking the user first (see .claude/rules/agent-tiering.md § Fable)"
+      exit 1 ;;
+  *)
+      echo "impl_model: $1 is not a recognized model — use one of: opus, sonnet, haiku, claude-opus-5, claude-sonnet-4-6, claude-haiku-4-5"
+      exit 1 ;;
+esac

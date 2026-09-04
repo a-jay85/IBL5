@@ -775,3 +775,42 @@ For the accuracy findings (2–6): prevention is the existing `/pr-ready` Phase 
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-04 during #1924)*
+
+### E46 PR body "What is NOT in this PR" written before all plan phases complete
+
+**class: scope-claim staleness** — a PR body "What is NOT in this PR" residual entry that asserts an absence which the same PR's diff contradicts: a plan deliverable (scoped enforcement test) ships in a remediation commit during the same PR cycle, but the body is not updated to reflect it, leaving the PR claiming the conversion "is not yet self-enforcing" when `ControllerSuperglobalFreedomTest.php` is already in the diff.
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #2077 body — "What is NOT in this PR" residual #2 claimed "conversion is not yet self-enforcing" after `ControllerSuperglobalFreedomTest.php` landed in the remediation commit | yes | no | fixed this pass |
+
+**prevention_ladder:**
+- rung 0: No existing gate checks "What is NOT" claims against the actual diff.
+- rung 1: Add a `.claude/rules/` doc reminding authors to re-read every "What is NOT in this PR" bullet when a remediation commit adds a plan deliverable — the negative claim may have been overtaken. **Landing rung: 1** — a rule doc is the cheapest enforcement and matches the risk level (rare, easy to spot in review).
+- rungs 2–5: Not warranted; the Phase 6 review pipeline already catches this class when it fires.
+
+`artifact destination: .claude/rules/` (doc addition — not yet filed; proposed prevention)
+
+`last_verified: 2026-09-04`
+
+*(discovered 2026-09-04 during Phase 6 review of #2077)*
+
+### E47 Phase 6 review notes on PR #2077 — five confirmatory observations
+
+**class: n/a** — five reviewer observations confirmed as correct behaviors, not defects. No gate warranted; the Phase 6 pipeline surfaced them as expected for human confirmation.
+
+| # | Observation | Verdict |
+|---|-------------|---------|
+| N1 | `Waivers/WaiversController.php` still has 6 superglobal reads — deliberately descoped per plan | correct — backlog 14.8 corrected to `◑ Partial` |
+| N2 | Archive-doc skip: `DepthChartEntryApiHandler.php` touched but not archived — plan never scoped it | correct — out of scope |
+| N3 | `BanRawSuperglobalsRule` suffix allowlist unchanged — plan Phase 6 §Correction forbids removing `Controller.php` | correct — intentional; `ControllerSuperglobalFreedomTest.php` is the scoped enforcement |
+| N4 | `codebase-map.md` regenerated as a side effect of other work | correct — expected artifact |
+| N5 | `Team/README.md` `last_verified: 2026-08-16` vs `maintenance-backlog.md` `2026-09-04` — cosmetic inconsistency | fixed this pass (bumped to 2026-09-04) |
+
+**prevention_ladder: no gate warranted** — all five are reviewer-confirmed correct behaviors, not defects; the existing `/pr-ready` Phase 6 review pipeline is the mechanism and it worked correctly here.
+
+`artifact destination: n/a — no gate`
+
+`last_verified: 2026-09-04`
+
+*(discovered 2026-09-04 during Phase 6 review of #2077)*

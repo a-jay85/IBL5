@@ -1,6 +1,6 @@
 ---
 description: Team page — roster, stats, history, and accomplishments — following Controller/Service/View/Repository pattern with multiple stat display modes.
-last_verified: 2026-08-16
+last_verified: 2026-09-04
 ---
 
 # Team Module

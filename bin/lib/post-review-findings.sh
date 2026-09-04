@@ -71,8 +71,19 @@ prf_diff_right_lines() {
 post_review_findings() {
     local pr="$1" head_sha="$2" title="$3" findings_file="$4"
     local tmp; tmp="$(mktemp -d)"
+    # `trap ... RETURN` is bash-only.  This file is SOURCED, and /pr-review
+    # sources it from a zsh shell, where RETURN is not a signal: the trap
+    # command errors ("undefined signal: RETURN") and the temp dir leaks.  zsh
+    # scopes an in-function EXIT trap to that function, which is the same
+    # cleanup semantics bash gets from RETURN — so branch on the shell.
+    # Keep this inline at each call site: factoring it into a helper would scope
+    # the trap to the helper, firing it the moment the helper returns.
     # shellcheck disable=SC2064
-    trap "rm -rf '$tmp'" RETURN
+    if [ -n "${ZSH_VERSION:-}" ]; then
+        trap "rm -rf '$tmp'" EXIT
+    else
+        trap "rm -rf '$tmp'" RETURN
+    fi
 
     local count
     count=$(jq 'length' "$findings_file")
@@ -139,8 +150,13 @@ ${PRF_FOOTER}"
 post_review_summary() {
     local pr="$1" title="$2" body="$3"
     local tmp; tmp="$(mktemp -d)"
+    # Shell-branched cleanup — see post_review_findings for why RETURN alone leaks.
     # shellcheck disable=SC2064
-    trap "rm -rf '$tmp'" RETURN
+    if [ -n "${ZSH_VERSION:-}" ]; then
+        trap "rm -rf '$tmp'" EXIT
+    else
+        trap "rm -rf '$tmp'" RETURN
+    fi
 
     local out="$tmp/summary.txt"
     printf '<details><summary>✅ %s — no issues found</summary>\n\n### %s\n\n%s\n\n%s\n\n</details>\n' \

@@ -16,6 +16,7 @@
 #   • resolve_review_finding replies in-thread AND resolves the owning thread
 #   • resolve_review_finding refuses an unknown / malformed comment id
 #   • all 3 callers document the disposition step (structural)
+#   • sourcing under zsh installs a working cleanup trap and leaks no temp dir
 #
 # Run: bin/test-post-review-findings  (exit 0 = all pass, 1 = some failed)
 
@@ -574,6 +575,69 @@ do
         fail "case25: $name no longer reads _posting-procedure.md — it stops inheriting the never-hand-write prohibition"
     fi
 done
+
+# ── case 26: no temp-dir leak under zsh ───────────────────────────────────────
+# `trap ... RETURN` is bash-only. /pr-review sources this lib from a zsh shell,
+# where the trap command errors ("undefined signal: RETURN") and every call
+# leaks its mktemp -d. Observed live on PR #2089's review run. The rest of this
+# harness runs under bash, so the bug was structurally invisible to it — this
+# case is the only one that exercises the other sourcing shell.
+if command -v zsh >/dev/null 2>&1; then
+    ZT="$BASE_TMP/zshcase"
+    mkdir -p "$ZT/tmpdir" "$ZT/bin"
+
+    # macOS `mktemp -d` ignores TMPDIR, so the leak cannot be observed by
+    # sandboxing the temp root. Shim mktemp instead: it forces the dir into
+    # $ZT/tmpdir AND records the path, so the assertion below is exact rather
+    # than a scan of a shared temp root that other processes also write to.
+    # Resolve the real binary FIRST: `command mktemp` inside the shim would not
+    # bypass PATH lookup and would re-find the shim, recursing forever.
+    REAL_MKTEMP="$(command -v mktemp)"
+    cat > "$ZT/bin/mktemp" <<MKTEMP
+#!/usr/bin/env bash
+d="\$("$REAL_MKTEMP" -d "$ZT/tmpdir/tmp.XXXXXXXX")"
+printf '%s\\n' "\$d" >> "$ZT/created.txt"
+printf '%s\\n' "\$d"
+MKTEMP
+    chmod +x "$ZT/bin/mktemp"
+
+    ZERR="$ZT/stderr.txt"
+    : > "$ZT/created.txt"
+    # -f skips rc files, so the exported PATH survives (a plain `zsh -c` would
+    # let a user's ~/.zshenv reset it and the mktemp shim would never be found).
+    PATH="$ZT/bin:$PATH" GH_CMD="$SHIMD/gh" COMMENT_OUT="$ZT/comment.out" \
+        zsh -f -c "source '$LIB'; post_review_summary 1 'Code review' 'No issues found.'" \
+        >/dev/null 2>"$ZERR"
+
+    if grep -qi 'undefined signal' "$ZERR"; then
+        fail "case26: post_review_summary emits '$(tr -d '\n' < "$ZERR")' under zsh — the RETURN trap never installs and the temp dir leaks"
+    else
+        ok "case26: post_review_summary installs its cleanup trap cleanly under zsh"
+    fi
+
+    CREATED=$(wc -l < "$ZT/created.txt" | tr -d ' ')
+    if [ "$CREATED" -eq 0 ]; then
+        fail "case26: mktemp shim never fired — the leak assertion below would be vacuous"
+    else
+        LEAKED=0
+        while IFS= read -r d; do
+            [ -n "$d" ] && [ -e "$d" ] && LEAKED=$((LEAKED + 1))
+        done < "$ZT/created.txt"
+        if [ "$LEAKED" -eq 0 ]; then
+            ok "case26: post_review_summary removed all $CREATED temp dir(s) it created under zsh"
+        else
+            fail "case26: post_review_summary leaked $LEAKED of $CREATED temp dir(s) under zsh"
+        fi
+    fi
+
+    if grep -q 'no issues found' "$ZT/comment.out" 2>/dev/null; then
+        ok "case26: post_review_summary still posts its comment under zsh"
+    else
+        fail "case26: post_review_summary produced no comment under zsh"
+    fi
+else
+    ok "case26: zsh not installed — skipped"
+fi
 
 # ── summary ───────────────────────────────────────────────────────────────────
 if [ "$FAILED" -eq 0 ]; then

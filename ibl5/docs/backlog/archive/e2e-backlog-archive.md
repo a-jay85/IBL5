@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed/declined E2E test-quality backlog entries, extracted from e2e-backlog.md.
-last_verified: 2026-09-02
+last_verified: 2026-09-04
 ---
 
 # E2E Test-Quality Backlog — Archive
@@ -131,3 +131,38 @@ Read-only historical record of ✅ Implemented / 🚫 Declined findings. For OPE
 **provenance:** (discovered 2026-09-01 during #1903)
 
 **Status:** 🚫 Declined — F6/F7 are additive coverage; F10's relaxation is intentional and the 67-import count is still pinned.
+
+---
+
+### D18 Serial-suite pre-capture invariant rule doc
+
+**Location:** `.claude/rules/playwright-tests.md` (Serial mode section)
+
+**class (F1):** A serial-test E2E assertion that passes vacuously before the AJAX action runs, because it checks an absolute property (non-zero pg select value) already true from prior test state — so total AJAX failure passes silently.
+**class (F2):** A PR body that falsely described a deliberately-failing test when all CI checks were green, and a backlog row description that did not match the shipped assertion. Both corrected in Phase 6.5 remediation (#1806).
+**class (F3/F4):** Notes — D8 shipped a stricter form than the plan (card-gone-by-offer-id beats count=0); two unplanned lines were mechanically required. No defect.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/tests/e2e/flows/depth-chart-entry-submission.spec.ts:368–380` | yes (F1) | yes | fixed this pass |
+| 2 | PR #1806 body `Bug Discovery (D4)` section | yes (F2) | yes | fixed this pass |
+| 3 | `ibl5/docs/backlog/e2e-backlog.md` D4/D8 row descriptions | yes (F2) | yes | fixed this pass |
+
+**prevention_ladder (F1):**
+- rung 0: not already gated — `bin/check-e2e-hygiene` bans silent-pass patterns but cannot detect pre-state vacuity.
+- rung 1: extending `bin/check-e2e-hygiene` to flag `evaluateAll + .some()` without a pre-capture reference is viable but brittle (the pattern is legitimate without serial context).
+- rung 2: a note in `.claude/rules/playwright-tests.md` § Serial mode — state the invariant: assertions on AJAX-updated DOM in a serial suite must capture pre-action state and assert change, not absolute values that may be satisfied before the action.
+- **Landing: rung 2** — a targeted rule-doc note costs one sentence and catches this class at PR-review time.
+- rung 3: PHPStan not applicable (TypeScript).
+- rung 4/5: no CI gate can detect vacuous-before-action patterns without running the action with a no-op stub.
+
+**prevention_ladder (F2):** no gate warranted — PR body vs. diff accuracy is a one-off process failure; `/pr-ready` Phase 6 is the structural gate and it caught it.
+
+**artifact_destination (F1):** `.claude/rules/playwright-tests.md` — sentence added to the "Serial mode" paragraph.
+**artifact_destination (F2):** n/a — no gate.
+
+**provenance:** (discovered 2026-09-02 during #1806)
+
+**Status (2026-09-04):** ✅ Implemented — D18 sentence inserted into `.claude/rules/playwright-tests.md` Serial mode section.

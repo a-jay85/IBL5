@@ -2008,7 +2008,7 @@ ${NMIN_HDR}
 | 13.7c | bad |
 "
 
-# Corpus regression: all 26 queued plans still pass with gate N
+# Corpus regression: all 20 queued plans still pass with gate N
 # Plans removed because they trigger new gates added in this PR (all true positives):
 # conference-champions-playoff-semantics, bug-pipeline-survive-db-sync,
 # bug-pipeline-test-env, sim-recap-boxid-resolution (gate [A]: migration literals);
@@ -2143,6 +2143,17 @@ sonnet-recipe: gate-V derived-hostname fixture; anchor not under test.
 | 1 | DB is accessible | CLI-executable | post-impl | curl http://check-plan-pr6-gates.localhost/ibl5/api/health |
 "
 
+# Escape phrase silences the main.localhost gate for plans that document it
+assert_viol gate-V-main-localhost-escape-clears 0 '[V]' "$FM
+documents main.localhost gate — this plan tests the gate itself.
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | DB is accessible | CLI-executable | post-impl | curl http://main.localhost/ibl5/api/health |
+"
+
 # ---------------------------------------------------------------------------
 # Gate [L] — line-number anchor in location cell (warn-only: exit 0, [L] in advisory)
 # Fixtures write full contiguous VM blocks (no empty lines between rows) so
@@ -2179,7 +2190,7 @@ assert_viol gate-L-range-clean 0 '[L]' "$FM_OPUS
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---|---|---|---|
 | 1 | thing works | E2E | post-impl | \`tests/X.spec.ts\` |
-| 2 | coverage span | CLI-executable | post-impl | bin/check-coverage tests/fixtures/plan.md -- lines 62-75 |"
+| 2 | coverage span | CLI-executable | post-impl | bin/check-coverage tests/fixtures/plan.md -- line 62-75 |"
 
 # ---------------------------------------------------------------------------
 # Gate [E] — docker liveness precondition (warn-only: exit 0, [E] in advisory)

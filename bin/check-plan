@@ -308,12 +308,15 @@ awk '
 MHDR_PIPES=$(grep -m1 -iE '\|[[:space:]]*What to verify[[:space:]]*\|' "$PLAN_FILE" \
     | tr -cd '|' | wc -c | tr -d ' ')
 [ -n "$MHDR_PIPES" ] || MHDR_PIPES=0
+_v_mainhost_esc=0; grep -qF 'documents main.localhost gate' "$PLAN_FILE" && _v_mainhost_esc=1
 
 while IFS= read -r row; do
     low="$(printf '%s' "$row" | tr '[:upper:]' '[:lower:]')"
     # Gate [V] ext: main.localhost in any VM row is a hard error in a worktree plan.
     # worktree-hostname.md: "Never use main.localhost when working in a worktree."
-    if printf '%s' "$row" | grep -qiF 'main.localhost'; then
+    # Escape: include the phrase "documents main.localhost gate" anywhere in the
+    # plan (for plans that describe or test this gate, e.g. this PR's own plan).
+    if [ "$_v_mainhost_esc" -eq 0 ] && printf '%s' "$row" | grep -qiF 'main.localhost'; then
         viol "[V] VM row references 'main.localhost' — worktree plans must use the derived hostname (\$(basename \"\$(git rev-parse --show-toplevel)\").localhost), never the main-checkout hostname; see .claude/rules/worktree-hostname.md"
     fi
     # Gate 3: a Truly-manual row using an automatable verb is mislabeled.
@@ -1200,12 +1203,12 @@ while IFS= read -r row; do
     if printf '%s' "$row" | grep -qE 'docker|bin/db-query'; then
         _e_docker=1
     fi
-    if printf '%s' "$row" | grep -qiE 'docker[[:space:]]+(ps|compose|inspect|stats)|bin/(db-wait|wt-[a-z]+)'; then
+    if printf '%s' "$row" | grep -qiE 'docker[[:space:]]+(ps|compose|inspect|stats)|bin/wt-[a-z]+'; then
         _e_liveness=1
     fi
 done < "$MATRIX_FILE"
 if [ "$_e_docker" -eq 1 ] && [ "$_e_liveness" -eq 0 ]; then
-    warn "[E] plan exercises Docker or bin/db-query but no liveness check row found — add a row with e.g. 'docker ps --filter name=ibl5-db-...' or 'bin/db-wait' before the first docker-dependent assertion"
+    warn "[E] plan exercises Docker or bin/db-query but no liveness check row found — add a row with e.g. 'docker ps --filter name=ibl5-db-...' before the first docker-dependent assertion"
 fi
 
 # ---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed/declined maintenance-audit findings, extracted from maintenance-backlog.md.
-last_verified: 2026-09-01
+last_verified: 2026-09-03
 ---
 
 # Maintenance-Cost Reduction Backlog — Archive
@@ -597,6 +597,31 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 ### 2.32
 
 **Table evidence (2026-08-09):** Shipped: common `Api\Contracts\TransformerInterface` (7 uniform transformers) + flattened `Middleware/Contracts/`→`Api/Contracts/`. **Status:** partial 2026-06-26; residual = divergent-transformer interfaces (Boxscore/PlayerStats), responder interfaces (Csv/Json — disjoint shapes), `Response/Contracts/` flatten.
+
+### 2.40 Player `negotiate()` / `rookieoption()` + `LeagueStarters` — `getTeamnameFromUsername()` nullable return into `string` sink under `strict_types=1`
+**Status:** ✅ Implemented (2026-09-03) — three live sites fixed on branch e2e-d-cluster-3-gating (#1807); two false positives identified and documented. Prevention rung deferred to 10.27.
+**class:** a PHP module function that passes `getTeamnameFromUsername()`'s nullable `?string` return directly into a `string`-typed parameter under `strict_types=1`, causing a blank page (HTTP 200, no main content) for logged-in users with no team assignment (~90% of registered users: 259 of 287 `auth_users` rows have no matching `ibl_team_info.gm_username`).
+
+**occurrence table (as resolved 2026-09-03):**
+
+| # | File:line | Live? | Resolution |
+|---|-----------|-------|------------|
+| 1 | `modules/Player/index.php:79` (`negotiate`) | yes | Fixed: null guard added before `NegotiationService::processNegotiation()` — renders "You do not have a team assigned." with Go Back link |
+| 2 | `modules/Player/index.php:114` (`rookieoption`) | yes | Fixed: null guard added before `RookieOptionValidator::validatePlayerOwnership()` — same error UI |
+| 3 | `modules/Player/extension.php:22` | false positive | Guarded at line 23: `=== null \|\| === '' \|\| === FREE_AGENTS_TEAM_NAME` → redirect |
+| 4 | `modules/DepthChartEntry/index.php:68,124` | false positive | Guarded at lines 69 and 125: same triple check → `renderInlineSubmitError()` + return / 403 JSON |
+| 5 | `modules/LeagueStarters/index.php:57` | yes | Fixed: `?? \League\League::FREE_AGENTS_TEAM_NAME` fallback; logged-in non-GM now behaves identically to a logged-out visitor on this read-only page |
+
+**prevention ladder:**
+- rung 0 (root cause) — `ibl5/modules/` is absent from the `paths:` list of every PHPStan config: `phpstan.neon` covers `classes`, `themes`, `phpstan-rules`, a hand-listed set of `bin/` scripts, and `scripts`; `phpstan-tests.neon` covers `tests` only. `ibl5/bin/analyse-diff`'s file classifier has an explicit `*) : ;;` arm that silently drops any changed file under `modules/` rather than routing it to either config. That is why `Player/index.php:79` was never flagged despite PHPStan already running at `level: max`.
+- rung 1 — `ibl5/phpstan.neon` is already at `level: max`; the strictness dial has no headroom.
+- rung 2 — `ibl5/phpstan-baseline.neon` contains no suppression for this class. The only `getTeamnameFromUsername` baseline entry (line 1112) is the opposite direction — `mixed given` into the `?string` parameter — not a `?string → string` return-side sink.
+- rung 3 (deferred) — add `modules/` to `phpstan.neon`'s `paths:` and wire a `modules/*` arm in `ibl5/bin/analyse-diff`'s classifier. Measured as-is cost: 549 errors. Tracked as **10.27**; needs a `/plan` on its own branch off master.
+**Landing rung: 3 (deferred — prevention not landed; see 10.27).**
+**artifact destination:** `ibl5/phpstan.neon` (`paths:` addition) + `ibl5/bin/analyse-diff` (classifier arm). Deferred to 10.27.
+**provenance:** (discovered 2026-09-02 during #1807)
+
+**Table evidence (2026-09-03)** — the Axis 2 table cell as it read at archiving time, preserved verbatim: `modules/Player/index.php:79,114` (+ 3 candidates in Player/extension.php, DepthChartEntry, LeagueStarters) pass `getTeamnameFromUsername()`'s `?string` return into a `string` sink under `strict_types=1` — no-team users get a `TypeError`. Reverted from PR #1807 per plan STOP guard; needs a full sweep + PHPStan gate. (discovered 2026-09-02 during #1807) [CORRECTED 2026-09-03: two of the three "candidates" were already guarded (see occurrence table above), and the observed symptom is **not** a `TypeError` reaching the client — it is HTTP 200 with a blank main content area (header + footer render, body empty, nothing logged). Reproduced on branch e2e-d-cluster-3-gating by unassigning the auto-login user's `gm_username`: 2389 chars of visible text before the fix on all three URLs, 14936 after on LeagueStarters.]
 
 ## Axis 3: Top-Level Legacy PHP Files
 

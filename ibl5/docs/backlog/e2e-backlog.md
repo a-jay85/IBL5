@@ -154,14 +154,13 @@ were softened after direct re-check (C6 partially a false positive, C16 lower-co
 | C14 | ✅ | 🟩 | `homepage.spec.ts` main | `#site-content` on every page. |
 | C15 | ✅ | 🟩 | `contract-list.spec.ts` wrapper | asserts `.ibl-data-table` (already asserted), not the wrapper. |
 | C16 | ✅ | 🟩 | `flows/olympics-coverage.spec.ts:20` | header-scoped `/w\|l\|.../i` — weak single-char, lower confidence. |
-| C17 | ⬜ | 🟨 | `api-e2e/api.test.ts assertGetRoute` | **High impact:** silently passes on 401 → 30+ tests skip body validation. May be masking a CI-key/config issue → triage. |
+| C17 | ✅ | — | `api-e2e/api.test.ts assertGetRoute` | **High impact:** silently passes on 401 → 30+ tests skip body validation. May be masking a CI-key/config issue → triage. ✓verified — 401 early-return removed; 14 validateBody callbacks now execute. ✓done |
 | C18 | ✅ | 🟩 | `api-e2e/api.test.ts` CSV | bare `return` L373/395/396 + true-only guard L415 (DON'T rules 12/14). |
 | C19 | ⬜ | 🟨 | `api-e2e/api.test.ts` L423/438/450 | Three pre-existing `if (ct.includes` query-param-auth JSON guards — same Axis-C class (sibling debt; like C17). (discovered 2026-08-10 during #1825) |
 
 **Suggested direction (axis):** Replace each with an assertion tied to feature-specific content (a known seed
-value, a specific column/class, a real sort effect). C17 needs investigation first — confirm the CI API key
-is present and the 401 branch is dead, then remove the silent skip.
-**Est. effort:** S per item (C17 = S+investigation). **Risk if untouched:** these tests give false green.
+value, a specific column/class, a real sort effect). C17 resolved — 401 early-return removed from assertGetRoute; 14 validateBody callbacks now execute.
+**Est. effort:** S per item. **Risk if untouched:** these tests give false green.
 
 ➜ C1–C16, C18 weak/tautological assertions — ✅ Implemented (2026-08-08): see [archive](archive/e2e-backlog-archive.md).
 
@@ -182,12 +181,12 @@ Green tests that don't guard the behavior they're named for. **Fix first.** D1/D
 | D7 | ✅ | — | `waivers-submission.spec.ts:83` | "success banner" navigates straight to `&result=player_added`, never POSTs. ✓verified (real POST covered separately → redundant-weak). ✓done — deleted the redundant add + waive query-param banner tests; the real-POST add/waive tests already assert `.ibl-alert--success`. |
 | D8 | ✅ | — | `trading-submission.spec.ts` accept-offer readBack | Replaced tautological URL re-assert with card-gone-by-offer-id check (`data-preview-offer`). ✓done |
 | D9 | ✅ | — | `all-star-rename-submission.spec.ts` & `projected-draft-order-submission.spec.ts` 405/0 | D9a: `toMatchObject` with error regex; D9b: `body.error` regex assertion added. ✓done |
-| D10 | ⬜ | 🟨 | `admin-pages.spec.ts` block.php | `status not 403 / <500` → 404/blank passes; no content assertion. |
-| D11 | ⬜ | 🟨 | `olympics-coverage.spec.ts` test 2 | titled "shows gating message" but only `assertNoPhpErrors`; `olympics-module-gating` already asserts the message → strengthen or drop. |
-| D12 | ⬜ | 🟨 | `ajax-api-endpoints.spec.ts` all-modes / fallback | `html.length>0` (or only content-type) → error page passes; first test in each block does `toContain('<table')`. |
-| D13 | ⬜ | 🟩 | `next-sim.spec.ts` opponent colors | asserts `style` contains `--team-color-primary`, not that it resolves to data. Borderline. |
-| D14 | ⬜ | 🟩 | `cross-module-navigation.spec.ts` chain | `if(playerCount>0){…}` silent-passes (no-silent-pass rule); also subsumed by two prior chain tests. |
-| D15 | ⬜ | 🟨 | `role-gating-non-admin.spec.ts` Block F | self-labelled exploratory; 4 no-team-user tests assert only HTTP 200 + no PHP error. |
+| D10 | ✅ | — | `admin-pages.spec.ts` block.php | `status not 403 / <500` → 404/blank passes; no content assertion. ✓verified — block.php returns 200 + "Free Agent Processing" title; assertion tightened. ✓done |
+| D11 | ✅ | — | `olympics-coverage.spec.ts` test 2 | titled "shows gating message" but only `assertNoPhpErrors`; `olympics-module-gating` already asserts the message → strengthen or drop. ✓verified — gating must be asserted as a **non-admin**: `modules.php:91` is `if (!$isModuleAccessible && !is_admin())`, so the admin fixture bypasses `ModuleAccessControl` by design and an admin seeing FranchiseHistory in olympics context is not a bug. Re-asserted via `fixtures/auth-regular`; green in CI. ✓done |
+| D12 | ✅ | — | `ajax-api-endpoints.spec.ts` all-modes / fallback | `html.length>0` (or only content-type) → error page passes; first test in each block does `toContain('<table')`. ✓verified — 5 table assertion sites added; all green. ✓done |
+| D13 | ✅ | — | `next-sim.spec.ts` opponent colors | asserts `style` contains `--team-color-primary`, not that it resolves to data. Borderline. ✓verified — hex-color regex verified green against live stack. ✓done |
+| D14 | ✅ | — | `cross-module-navigation.spec.ts` chain | `if(playerCount>0){…}` silent-passes (no-silent-pass rule); also subsumed by two prior chain tests. ✓verified — hard count assertion replaces silent if-block; green. ✓done |
+| D15 | ◑ | 🟨 | `role-gating-non-admin.spec.ts` Block F | self-labelled exploratory; 4 no-team-user tests assert only HTTP 200 + no PHP error. ✓content assertions added and green in CI (`e2e-tests.yml` supplies `IBL_TEST_USER_REGULAR`/`IBL_TEST_PASS_REGULAR` with fallbacks, so the pre-existing skip gate is false there). Left ◑ because the selector had to stay `.ibl-title, .ibl-card__title, h1, h2` — narrowing to `.ibl-title` alone failed CI, so these pages still lack a single canonical title hook. |
 | D16 | ✅ | 🟨 | `depth-chart-entry-mobile.spec.ts` save-flow: positive success assertion (`.ibl-alert--success`) removed due to session-shared flash race; only non-error gate remains (discovered #1805) |
 | D18 | ⬜ | 🟩 | `.claude/rules/playwright-tests.md` | Serial-suite pre-capture invariant: AJAX assertions must capture pre-action state and assert change, not absolute values. Prevention rule from #1806 vacuous-D4-assertion discovery. |
 
@@ -201,7 +200,7 @@ value). For fake-POST tests (D7), assert the banner *after a real submit*, not a
 
 - **D-cluster-1 — submission tests that accept a failed mutation as success** *(plan this first)*: **D1, D2, D7** (all ✓verified) — uniform fix: require the success redirect/banner *after a real submit*, then read back the mutation. Tightest, highest-confidence, one coherent worktree.
 - **D-cluster-2 — submission tests with no read-back of mutated state:** D3, D4, D5, D6, D8, D9, ~~D16~~ (✅ #2045). (D6 folded in here — same "no read-back" planning shape as D3/D4/D5/D8/D9, even though its accept-info-as-success symptom resembles cluster-1; cluster-1 is already ✓verified/done, so D6 groups with the still-open cluster. D16 added 2026-08-29; implemented 2026-08-31.)
-- **D-cluster-3 — smoke/gating tests that don't prove the gate:** D10, D11, D12, D14, D15 (+ C17 as a sibling).
+- **D-cluster-3 — smoke/gating tests that don't prove the gate:** D10, D11, D12, D14, D15 (+ C17 as a sibling). ✓done — shipped in this PR (D13 folded in; D15 left ◑ pending a canonical page-title hook). The cluster's one real bug was in `Player/index.php`: `getTeamnameFromUsername()` returns null for a user with no team, which raised a `TypeError` under `strict_types=1` — surfaced by D15's Player-negotiate test and fixed in-PR.
 
 ### D16 DCE mobile save-flow: positive assertion replaced with non-error gate
 
@@ -258,6 +257,8 @@ value). For fake-POST tests (D7), assert the banner *after a real submit*, not a
 | E10 | ✅ Done | 🟩 | `waitForLoadState('domcontentloaded')` after HTMX form — `voting-submission.spec.ts:140`; tab-click pre-swap — `waivers.spec.ts` |
 | E11 | ✅ Done | 🟩 | browser-history `goBack/goForward` — `draft-history`, `franchise-record-book`, `league-starters`, `team` (load-sensitive; keep, watch) |
 | E12 | ✅ Done | 🟩 | sleep-in-retry `setTimeout(r,200)` loop — `ajax-api-endpoints.spec.ts fetchJson` |
+| E13 | ⬜ Open | 🟩 | Plan-specified diagnostic strings and DOM observation evidence omitted during E2E assertion implementation. Messages fixed inline (PR #1807). DOM dumps for D15's four no-team pages not captured — needs a Playwright run against the worktree stack with `IBL_TEST_USER_REGULAR` credentials. (discovered 2026-09-02 during #1807) |
+| E14 | ⬜ Open | 🟥 | Autofix bot (`IBL5 Bug Hunter (sandbox)`, commit `ede59f41d`) silently removed the D15 Player-negotiate `.ibl-alert--error` assertion without declaring a scope change, leaving permissive-form coverage on a route with assertable production behavior. (discovered 2026-09-03 during #1807) |
 
 **Suggested direction (axis):** All E1–E12 items complete (PR #1805). E9's final implementation uses `evaluate(form.submit())` + auto-retrying `toContainText` DOM assertion rather than `waitForResponse` — `form.submit()` triggers full-page navigation, making `page.content()` race the navigate; the DOM assertion survives the navigation. E9 STOP GUARD: not triggered — PHP validation confirmed working.
 **Est. effort:** complete. **Risk if untouched:** n/a.
@@ -266,6 +267,47 @@ value). For fake-POST tests (D7), assert the banner *after a real submit*, not a
 > there it's the correct pre-screenshot settle and the file runs under `playwright.visual.config.ts` (excluded
 > from the chromium project). `console-error-watcher.spec.ts:31,51` 50ms sleeps are meta-test (no deterministic
 > state). `engine-shadow-spawn-on-update` poll loop is an out-of-band process with a double `test.skip`.
+
+### E13 Missing diagnostic artifacts in E2E assertions — messages and DOM evidence
+**class:** a plan-specified diagnostic string (message arg to a Playwright `expect()` assertion) or DOM observation dump omitted silently during implementation, leaving assertion failures reporting only "expected visible" with no pointer to which CI seed table, session, or rendered shape to check.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `tests/e2e/flows/cross-module-navigation.spec.ts:54` | yes | yes | fixed this pass — message `'CI seed gives teamid 1 a roster (ci-seed.sql, ibl_plr)'` added |
+| 2 | `tests/e2e/flows/role-gating-non-admin.spec.ts:241,254,270,279` | yes | yes | fixed this pass — four plan-specified diagnostic messages added |
+| 3 | PR #1807 body — four D15 DOM dumps for no-team pages (Trading, FreeAgency negotiate, Player negotiate, DepthChartEntry) | yes | not fixed | not fixed — filed; requires a Playwright session with `IBL_TEST_USER_REGULAR` against the worktree stack |
+
+**prevention ladder:**
+- rung 0 — no existing gate enforces plan-specified message args in Playwright assertions.
+- rung 1 — no existing gate to extend covers this pattern.
+- rung 2 — a `.claude/rules/` note on "plan-specified diagnostic messages must ship with the assertion" would help but cannot automate the catch.
+- rung 3 — PHPStan does not cover TypeScript. A TypeScript ESLint rule could flag bare `expect(locator).toBeVisible()` calls with no message arg, but the signal-to-noise ratio is poor (not all assertions need messages) and the rung-3–5 `meta-tooling-bar.md` extend-before-add conditions do not hold.
+- rungs 4–5 — same objection; a CI gate on bare `toBeVisible()` calls would over-fire.
+- **Landing: no gate warranted** — the diagnostic message requirement is plan-authorship discipline, not a mechanically detectable structural property. The right enforcement is a plan checklist item at assertion-writing time, not a runtime gate.
+**artifact destination:** n/a — no gate
+**provenance:** (discovered 2026-09-02 during #1807)
+
+### E14 Autofix bot silently removed D15 Player-negotiate assertion without declaring scope change
+
+**class:** An automated-bot commit that deletes an `expect(` line from an E2E test file without an accompanying issue comment or structured scope justification, silently leaving permissive-form coverage on a route where a concrete production signal (`.ibl-alert--error`) is assertable.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/tests/e2e/flows/role-gating-non-admin.spec.ts` (Block F, Player-negotiate) | yes | yes | not fixed — filed |
+
+**prevention ladder:**
+- rung 0 — no existing gate checks whether a bot commit deletes `expect(` lines in E2E test files.
+- rung 1 — extending `bin/check-e2e-hygiene` to flag assertion deletions by bot actors is structurally infeasible (commit metadata is not available at check-time in the E2E hygiene script).
+- rung 2 — a CODEOWNERS entry or branch-protection rule requiring human review when a bot deletes assertion lines from test files is the right structural rung; alternatively, restrict the bot's write scope to exclude deletions in `tests/e2e/`.
+- **Landing: rung 2 or CI bot-scope restriction** — require human co-author review when a bot commit removes `expect(` lines from E2E test files, or configure the bot's repository permissions to exclude E2E assertion deletions.
+- rungs 3–5 — PHPStan/TypeScript linters cannot detect bot-actor commit provenance.
+
+**artifact destination:** CODEOWNERS update or CI bot-scope restriction
+**provenance:** (discovered 2026-09-03 during #1807)
 
 ---
 
@@ -279,7 +321,7 @@ value). For fake-POST tests (D7), assert the banner *after a real submit*, not a
 - All 11 `test.skip` are env/ownership-gated, not dead tests.
 
 ## Recommended order
-1. **D-cluster-1 (D1/D2/D7) + C17** — green tests not guarding their feature; cheapest correctness win. *(first plan)*
+1. **D-cluster-1 (D1/D2/D7) + C17 ✅** — green tests not guarding their feature; cheapest correctness win. *(first plan)* ✓done
 2. **D-cluster-2** — add the missing read-back / error-code assertion.
 3. **A1, A2, A3** — clear DRY wins, low risk.
 4. **Axis E** `networkidle`/`waitForTimeout` sweep (especially `depth-chart-entry-mobile`).

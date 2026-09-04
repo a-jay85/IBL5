@@ -25,7 +25,7 @@ Effort scale:
 - **M** — multi-step plan, 1-3 days, may touch several modules
 - **L** — refactor or platform shift, > 3 days, likely needs ADR
 
-**Status:** Complete — 15-axis audit, 312 findings (+2 post-audit follow-ups from the PR #1107 review, +1 from the #1066 reject-IDOR review → 315 tracked; +11 Axis-1 size seeds 1.21–1.31 from the hot-files comment→backlog migration 2026-07-24 → 326 tracked; +5 Axis-1 size seeds 1.32–1.36 from the ground-truth audit 2026-07-24 → 331 tracked; +1 Axis-2 robustness item 2.39 discovered 2026-07-27 during trading-1-31-api-handler-extract → 332 tracked; +1 Axis-15 data-integrity item 15.24 discovered 2026-08-04 during the PR #1771 review → 333 tracked; +1 Axis-6 coverage item 6.23 discovered 2026-08-08 during the PR #1670 review → 334 tracked; +1 Axis-8 correctness item 8.18 discovered 2026-08-09 during the PR #1683 review → 335 tracked; +1 Axis-6 robustness item 6.24 discovered 2026-08-10 during #1825 → 336 tracked; +1 Axis-6 coverage item 6.25 discovered 2026-09-01 during #1903 → 337 tracked; +1 Axis-9 process-observation item 9.28 discovered 2026-09-01 during #1903 → 338 tracked).
+**Status:** Complete — 15-axis audit, 312 findings (+2 post-audit follow-ups from the PR #1107 review, +1 from the #1066 reject-IDOR review → 315 tracked; +11 Axis-1 size seeds 1.21–1.31 from the hot-files comment→backlog migration 2026-07-24 → 326 tracked; +5 Axis-1 size seeds 1.32–1.36 from the ground-truth audit 2026-07-24 → 331 tracked; +1 Axis-2 robustness item 2.39 discovered 2026-07-27 during trading-1-31-api-handler-extract → 332 tracked; +1 Axis-15 data-integrity item 15.24 discovered 2026-08-04 during the PR #1771 review → 333 tracked; +1 Axis-6 coverage item 6.23 discovered 2026-08-08 during the PR #1670 review → 334 tracked; +1 Axis-8 correctness item 8.18 discovered 2026-08-09 during the PR #1683 review → 335 tracked; +1 Axis-6 robustness item 6.24 discovered 2026-08-10 during #1825 → 336 tracked; +1 Axis-6 coverage item 6.25 discovered 2026-09-01 during #1903 → 337 tracked; +1 Axis-9 process-observation item 9.28 discovered 2026-09-01 during #1903 → 338 tracked; +1 Axis-2 robustness item 2.40 discovered 2026-09-02 during #1807 → 339 tracked; +1 Axis-10 PHPStan-coverage item 10.27 discovered 2026-09-03 during #1807 → 340 tracked; +1 Axis-15 process-observation item 15.29 discovered 2026-09-03 during #1807 → 341 tracked).
 
 ---
 
@@ -89,7 +89,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
-> ✅ resolved (22): 2.1, 2.6, 2.7, 2.11, 2.12, 2.16, 2.17, 2.19, 2.20, 2.22, 2.23, 2.24, 2.26, 2.30, 2.31, 2.32, 2.33, 2.34, 2.35, 2.36, 2.37, 2.38 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (23): 2.1, 2.6, 2.7, 2.11, 2.12, 2.16, 2.17, 2.19, 2.20, 2.22, 2.23, 2.24, 2.26, 2.30, 2.31, 2.32, 2.33, 2.34, 2.35, 2.36, 2.37, 2.38, 2.40 — evidence in [archive](archive/maintenance-backlog-archive.md)
 > 🚫 declined (6): 2.2, 2.3, 2.4, 2.5, 2.8, 2.9 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
@@ -441,6 +441,15 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 10.26 | ⬜ Open | 🟥 | `BanSqlStringConcatenationRule` flags the identifier-concatenation sites introduced by the sqlInterp burndown (PR #1203) — 100 occurrences across 33 file entries baselined (2026-07-24). Convert `in_array`-guarded identifier sites to `match()`/constant-array lookup so PHPStan types them as constant-string (rule-inert), clearing the concat baseline. |
+| 10.27 | ⬜ Open | 🟨 | `ibl5/modules/` is absent from every PHPStan config's `paths:` and from `ibl5/bin/analyse-diff`'s classifier (explicit `*) : ;;` arm silently drops all `modules/` diffs). Measured cost to add as-is: 549 errors (`argument.type` 290, `ibl.bannedNukeGlobal` 65, `cast.int` 31, `method.nonObject` 30, `variable.undefined` 29). Needs a `/plan` on its own branch; upfront decision: baseline-and-burn vs. fix-first. See 2.40 for root-cause context. (discovered 2026-09-03 during #1807) |
+
+### 10.27 `ibl5/modules/` Absent from PHPStan Analysis Paths
+**Location:** `ibl5/phpstan.neon` (`paths:`), `ibl5/bin/analyse-diff` (classifier)
+**Problem:** `phpstan.neon` covers `classes`, `themes`, `phpstan-rules`, hand-listed `bin/` scripts, and `scripts` — but not `modules/`. `phpstan-tests.neon` covers `tests` only. `ibl5/bin/analyse-diff`'s file classifier has an explicit `*) : ;;` arm that silently drops any changed file under `modules/` rather than routing it to either config. The practical effect: type errors in module entrypoints (e.g. `?string → string` sinks, global variables passed into typed parameters) are invisible to CI — discovered when `Player/index.php:79` was fixed in #1807 without any PHPStan signal. PHPStan already runs at `level: max`; the gap is the missing path, not the strictness dial.
+**Suggested direction:** Add `modules/` to `phpstan.neon`'s `paths:` and wire a `modules/*` arm in `ibl5/bin/analyse-diff`'s classifier. Measured as-is cost: 549 errors (top identifiers: `argument.type` 290, `ibl.bannedNukeGlobal` 65, `cast.int` 31, `method.nonObject` 30, `variable.undefined` 29); a baseline-and-burn or fix-first approach needs upfront decision. 🟨: upfront decision gates implementation.
+**Est. effort:** L
+**Risk if untouched:** Module entrypoint type errors (nullability sinks, untyped globals into typed parameters) remain invisible to CI and PHPStan's PR-diff check indefinitely.
+**provenance:** (discovered 2026-09-03 during #1807; root cause of 2.40)
 
 ## Axis 11: CSS, Themes, Design System
 
@@ -646,6 +655,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 15.17 | ⬜ Open | 🟨 | olympics_career int(11)→smallint/mediumint. Reversible narrowing → arm via the `/plan` schema-safety guard (apply-time fail-closed + DatabaseIntegration test); else 🟦. |
 | 15.24 | ⬜ Open | 🟦 | Pre-existing duplicate rows in `ibl_box_scores`: 1993 (29), 1994 (7), 2002 (1), 2004 (24) — 61 excess by `(game_date, name)`. Distinct signature from the 2007 HEAT re-import (no schedule overload, no `created_at` batch, no month shift); cause unknown. Destructive delete → human-merge. (discovered 2026-08-04 during the PR #1771 review) |
 | 15.28 | ⬜ Open | 🟩 | `bin/check-boxscore-schedule`'s missing-game and orphan detectors are never run automatically — both automated call sites pass `--duplicates-only`. A played 2008 Finals game sat unimported for two weeks until a GM reported it. Wiring the full audit into an existing nightly is additive → auto-mergeable. (discovered 2026-09-01 while backfilling that game) |
+| 15.29 | ⬜ Open | 🟩 | Production PHP changes (`Player/index.php` null guards, `LeagueStarters/index.php` free-agent fallback) entered a test-scoped PR without a plan phase, structured code review, or scope justification; six PR-body claims were contradicted by the actual diff. Adding a files-changed reconciliation gate is additive → auto-mergeable. (discovered 2026-09-03 during #1807) |
 
 ### 15.1 `tid` / `teamid` / `team_id` — Three Spellings Survive ADR-0009
 **Location:** `ibl_box_scores` (`visitorTID`, `homeTID`, `teamID`), `ibl_box_scores_teams` (`visitorTeamID`, `homeTeamID`), `ibl_rcb_*` (`team_id`), `ibl_league_config` (`team_id`)
@@ -726,3 +736,11 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Status:** Fixed this pass (PR #1824) — added `capturedLog` non-empty assertion plus expected closing-message substring to `runPipeline()`, and added `ob_get_clean` assertion alongside the existing `ob_start` assertion.
 **Suggested direction:** When a migration introduces a new seam (buffer drain, output capture interface), ensure the pipeline integration test asserts data flows through the seam end-to-end in at least one real call path. The regression guard should assert both sides of every paired construct (`ob_start`/`ob_get_clean`, etc.).
 **Est. effort:** XS (already fixed)
+### 15.30 Production Module Drift Into Test-Scoped PR — Undeclared Scope Expansion
+
+**Location:** `ibl5/modules/Player/index.php`, `ibl5/modules/LeagueStarters/index.php` — PR #1807
+**Problem:** `Player/index.php` (null guards for `negotiate()` and `rookieoption()`) and `LeagueStarters/index.php` (free-agent fallback) entered a PR scoped to test-only assertion tightening (D-cluster-3) without a plan phase, structured code review of the production surface, or a verification matrix row covering the changed production paths. Six PR-body claims were contradicted by the actual diff as a result: the body asserted the diff was assertion-only and introduced no new production behavior — both false. Findings 3 and 4 from the PR #1807 Phase 6 plan-fidelity review are combined here (same root cause: undeclared scope expansion).
+**Suggested direction:** Phase 5.9 (files-changed reconciliation) in `/post-plan` or the PR template should require explicit scope-expansion justification when production modules appear in the diff of a plan scoped to test/doc changes. A files-changed gate checking for `modules/` edits in a test-only plan branch would surface these automatically at PR-creation time.
+**Est. effort:** S
+**Risk if untouched:** Production behavior changes enter the codebase without a plan phase, dedicated code review, or verification matrix row, and the PR body can misrepresent the diff scope without a gate catching the contradiction.
+**provenance:** (discovered 2026-09-03 during #1807; Findings 3 and 4 combined)

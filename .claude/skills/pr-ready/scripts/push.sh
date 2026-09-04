@@ -10,7 +10,8 @@ set -euo pipefail
 #   2. EXPLICIT lease ref      -> --force-with-lease="$BRANCH:$LEASE", derived below from
 #                                 refs/remotes/origin/<branch>, never a fresh ls-remote
 #   3. VERIFY against origin   -> re-read the ref after the push; rc is never trusted
-# Every exit path prints one verdict word: PUSHED, STALE LEASE, PUSH FAILED, or STOP.
+# Every exit path prints one verdict word: PUSHED, STALE LEASE, HOOK REJECTED, PUSH FAILED, or STOP.
+#   rc 0 PUSHED · 2 STALE LEASE · 3 HOOK REJECTED (recoverable — see _phase4-push-and-ci.md step 3) · 1 PUSH FAILED / STOP
 # Silence is not success.
 [ -z "${1:-}" ] && { echo "STOP: arg1 (PR number) required — was the site rewritten with the literal?"; exit 1; }
 PR="$1"
@@ -68,6 +69,19 @@ case "$OUT" in
     echo "moved: $MOVED"
     echo "Re-read the remote and re-run push.sh. Do NOT drop the lease."
     exit 2
+    ;;
+  *"pre-push-adr-hook: branch is not rebased onto origin/master"*)
+    # Client-side pre-push hook refused the update. Recoverable ONLY when the remote is
+    # provably unchanged: nothing was pushed, nothing was clobbered, and origin/$BRANCH is
+    # known -- the STALE LEASE neighbourhood, not the PUSH FAILED one. If the remote moved,
+    # it is not in the state we reasoned about, so fall through to the catch-all below.
+    if [ "$MOVED" = no ]; then
+      echo "HOOK REJECTED — pre-push-adr-hook refused this push: the branch is not rebased onto origin/master."
+      echo "origin/$BRANCH is unchanged at $AFTER; nothing was pushed and nothing was clobbered."
+      echo "Recover with ONE bounded attempt: git fetch origin master && git rebase origin/master, then re-run push.sh."
+      echo "If that rebase reports a conflict: git rebase --abort — and treat this as terminal."
+      exit 3
+    fi
     ;;
 esac
 

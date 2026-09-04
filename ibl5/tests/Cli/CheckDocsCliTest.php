@@ -104,16 +104,17 @@ final class CheckDocsCliTest extends TestCase
         if (!is_dir($dir)) {
             return;
         }
-        $items = new \RecursiveIteratorIterator(
-            new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS),
-            \RecursiveIteratorIterator::CHILD_FIRST
-        );
+        // Snapshot each directory listing before deleting from it: unlinking while a
+        // RecursiveDirectoryIterator still holds the readdir stream open can skip
+        // entries on Linux/ext4, leaving $dir non-empty when rmdir() runs.
+        /** @var list<string> $items */
+        $items = scandir($dir);
         foreach ($items as $item) {
-            if ($item->isDir()) {
-                rmdir($item->getPathname());
-            } else {
-                unlink($item->getPathname());
+            if ($item === '.' || $item === '..') {
+                continue;
             }
+            $path = $dir . '/' . $item;
+            is_dir($path) ? $this->removeDir($path) : unlink($path);
         }
         rmdir($dir);
     }

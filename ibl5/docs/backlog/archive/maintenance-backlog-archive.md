@@ -312,6 +312,17 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 
 **Table evidence (2026-08-08):** StandingsRepository 726 LOC — per-category standings query methods. Extract per-category query collaborators; green-green DB pin. Shares `classes/Standings/` with 1.35 — plan as ONE chunk.
 
+### 1.33 Player — Typed-Getter Accumulation (671 LOC)
+**Location:** `ibl5/classes/Player/Player.php` (671 lines)
+**Problem:** Domain entity accumulates typed getters across contract, stats, and identity domains in a single class. Finding 1.10 (mutable props) is resolved; the residual is pure size from typed-getter bulk.
+**Suggested direction:** Extract per-domain typed-getter groups (contract, stats, identity) into focused value-object collaborators; keep `Player` as the root entity.
+**Est. effort:** M
+**Risk if untouched:** Every new player attribute inflates one file; getter search spans the entire class.
+**Provenance:** Seeded 2026-07-24 — ground-truth audit hot-file scan.
+**Status:** Implemented — `Player.php` 671 → 279; the 66 pure field getters moved to the `PlayerIdentityGetters`, `PlayerContractGetters` and `PlayerRatingsGetters` traits (created in `ibl5/classes/Player/`). All 73 public signatures preserved — no change to any of the 138 caller files or to `PlayerInterface`. Collaborator-backed and repository-backed methods stayed in `Player.php`. Trait mechanism recorded in ADR-0119. Pinned by `PlayerPublicApiSurfaceTest`. Green-green.
+
+**Table evidence (2026-09-04):** Player 671 LOC — typed-getter accumulation. Extract per-domain typed-getter groups (contract, stats, identity); green-green.
+
 ### 1.34 SavedDepthChartService — Data Assembly + Slot-Conflict Resolution (626 LOC)
 **Location:** `ibl5/classes/SavedDepthChart/SavedDepthChartService.php` (626 lines)
 **Problem:** One service assembles depth-chart page data and resolves slot conflicts, mixing orchestration with conflict-resolution logic.

@@ -53,7 +53,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 🟨 Conditional | needs one mechanical-scope add, one upfront decision, or a collision-PR to merge first |
 | 🟥 Not automouse-safe | 12.11 — `git filter-repo` history rewrite (irreversible, coordinated) |
 
-**Highest-leverage 🟩 auto-mergeable clusters** (no human needed): the open god-class extractions (1.3/1.9/1.11/1.13/1.17/1.20, 7.14/7.15, 1.33–1.36), the entire Axis-6 coverage backlog (bar 6.21, now 🟨), the Axis-9 docs items, and the PHPStan-baseline burndowns (10.12/10.13/10.19/10.21).
+**Highest-leverage 🟩 auto-mergeable clusters** (no human needed): the open god-class extractions (1.3/1.9/1.11/1.13/1.17/1.20, 7.14/7.15, 1.34–1.36), the entire Axis-6 coverage backlog (bar 6.21, now 🟨), the Axis-9 docs items, and the PHPStan-baseline burndowns (10.12/10.13/10.19/10.21).
 
 ---
 
@@ -61,12 +61,10 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
-> ✅ resolved (35): 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.18, 1.19, 1.20, 1.21, 1.22, 1.23, 1.24, 1.25, 1.26, 1.27, 1.28, 1.29, 1.30, 1.31, 1.32, 1.34, 1.35, 1.36 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (36): 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.18, 1.19, 1.20, 1.21, 1.22, 1.23, 1.24, 1.25, 1.26, 1.27, 1.28, 1.29, 1.30, 1.31, 1.32, 1.33, 1.34, 1.35, 1.36 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 1.33 | ⬜ Open | 🟩 | Player 671 LOC — typed-getter accumulation. Extract per-domain typed-getter groups (contract, stats, identity); green-green. |
-
 > **Note:** `BaseMysqliRepository.php` (602 LOC) is the 18th hot file but is tracked under **2.29** (global-namespace elimination sweep) and is not seeded as a standalone god-class item here.
 
 ### 1.19 PlrParserService — Duplicate Pass-1 Logic
@@ -76,14 +74,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Est. effort:** S
 **Risk if untouched:** Bug fixes applied twice; optional param is an invisible branching point.
 
-
-### 1.33 Player — Typed-Getter Accumulation (671 LOC)
-**Location:** `ibl5/classes/Player/Player.php` (671 lines)
-**Problem:** Domain entity accumulates typed getters across contract, stats, and identity domains in a single class. Finding 1.10 (mutable props) is resolved; the residual is pure size from typed-getter bulk.
-**Suggested direction:** Extract per-domain typed-getter groups (contract, stats, identity) into focused value-object collaborators; keep `Player` as the root entity.
-**Est. effort:** M
-**Risk if untouched:** Every new player attribute inflates one file; getter search spans the entire class.
-**Provenance:** Seeded 2026-07-24 — ground-truth audit hot-file scan.
 
 ## Axis 2: Module Structure Inconsistency
 

@@ -86,24 +86,97 @@ Otherwise launch a **single Haiku agent**, pass it the issues list plus the **Sc
 
 **Re-check PR state:** `gh pr view --json state --jq '.state'` — skip posting if not `OPEN`.
 
-**Post results for code review and security audit** using the shared posting helper. Source it mirroring the pr-armable.sh idiom used by the Phase 6.5 condition blocks:
+**Post results for code review and security audit** using the shared posting helper.
+
+> **Never compose these comments by hand.** `gh pr comment` with a freehand body is not an
+> alternative spelling of the calls below — the envelope the helper emits (`### Code review` /
+> `### Security audit` heading, `<details>` wrapper, `<!-- score: N -->` markers, `PRF_FOOTER`)
+> is **machine-parsed downstream** by three consumers:
+> `.claude/skills/pr-ready/scripts/4b-probe.sh` (matches `^#{1,6} +Code review` to set
+> `PHASE_4B_RAN`), `list_open_review_findings` / `resolve_review_finding` (read the score marker
+> and the inline threads to disposition findings), and the `unresolved-findings-hold` gate.
+> A hand-written comment performs a real review whose artifact is invisible to all three:
+> `/pr-ready` reports "structured code review never ran" and recommends a redundant `/pr-review`,
+> and the findings can never be dispositioned. This failed silently on PRs #1956 and #2001.
+> If a call below does not fit the situation, stop and say so — do not improvise a comment.
+
+Source the helper, mirroring the pr-armable.sh idiom used by the Phase 6.5 condition blocks:
 
 ```bash
 source "$(git rev-parse --show-toplevel)/bin/lib/post-review-findings.sh"
 ```
 
-The helper provides two public functions:
+**Code review — run exactly one of these two blocks.** Issues survived the filter:
 
-- `post_review_findings PR_NUMBER HEAD_SHA REVIEW_TITLE FINDINGS_FILE` — splits findings into on-diff (→ batch resolvable inline review threads) and out-of-diff (→ single fallback `gh pr comment`). Nothing is dropped. The `<!-- score: N -->` marker is appended automatically; the heading envelope and footer are emitted by the helper — do NOT re-add them.
-- `post_review_summary PR_NUMBER REVIEW_TITLE BODY` — for the no-issues path; posts a single `gh pr comment` with the heading, evidence body, and footer.
+```bash
+# One object per surviving issue. path = repo-relative file (matches `+++ b/<path>`);
+# line = single anchor line on the new-file (RIGHT) side; body = <description>
+# (CLAUDE.md says "<rule>") followed by the full-SHA range link; score = Haiku score.
+# Do NOT add the heading or footer — the helper emits both.
+cat > /tmp/post-plan-cr-findings-$PPID.json <<'JSON'
+[ { "path": "ibl5/classes/Example.php", "line": 17,
+    "body": "<description> (CLAUDE.md says \"<rule>\")\n\n<full-SHA range link>",
+    "score": 85 } ]
+JSON
+post_review_findings "$PR" "$FULL_SHA" "Code review" "/tmp/post-plan-cr-findings-$PPID.json"
+```
 
-**For code review:**
-- Issues survived filter → build a JSON findings array (one object per issue: `path` = repo-relative file, `line` = single anchor line on new-file side, `body` = `<description> (CLAUDE.md says "<rule>")` + full-SHA range link, `score` = Haiku score) to a temp file; call `post_review_findings "$PR" "$FULL_SHA" "Code review" <file>`.
-- No issues → call `post_review_summary "$PR" "Code review" "No issues found. <1-2 sentence evidence summary>"`.
+No issues survived the filter:
 
-**For security audit:**
-- Issues survived filter → build findings JSON (`body` = `**[SEVERITY]** Type in \`Class::method()\` — description` + full-SHA range link, `score`); call `post_review_findings "$PR" "$FULL_SHA" "Security audit" <file>`. Severity: CRITICAL (SQLi/CMDi), HIGH (missing auth/open redirect), MEDIUM (CSRF/missing auth on non-critical endpoints), LOW (best practice).
-- No issues → call `post_review_summary "$PR" "Security audit" "No security issues found. <brief evidence per category> (XSS and input validation are enforced by PHPStan custom rules.)"`.
+```bash
+post_review_summary "$PR" "Code review" "No issues found. <1-2 sentence evidence summary>"
+```
+
+**Security audit — run exactly one of these two blocks.** Issues survived the filter (severity:
+CRITICAL = SQLi/CMDi, HIGH = missing auth/open redirect, MEDIUM = CSRF/missing auth on
+non-critical endpoints, LOW = best practice):
+
+```bash
+cat > /tmp/post-plan-sa-findings-$PPID.json <<'JSON'
+[ { "path": "ibl5/classes/Example.php", "line": 17,
+    "body": "**[SEVERITY]** Type in `Class::method()` — description\n\n<full-SHA range link>",
+    "score": 85 } ]
+JSON
+post_review_findings "$PR" "$FULL_SHA" "Security audit" "/tmp/post-plan-sa-findings-$PPID.json"
+```
+
+No issues survived the filter:
+
+```bash
+post_review_summary "$PR" "Security audit" "No security issues found. <brief evidence per category> (XSS and input validation are enforced by PHPStan custom rules.)"
+```
+
+`post_review_findings` splits findings into on-diff (→ batch resolvable inline review threads) and
+out-of-diff (→ single fallback `gh pr comment`); nothing is dropped, and an empty array is a no-op.
+
+**Confirm the envelope landed.** A freehand comment fails silently in both directions, so measure
+the count for that title **before and after** each call and require a strict increase. An absolute
+count is not enough — a PR that already carries a `### Code review` comment (a prior `/pr-review`,
+a Phase-5 strict-loop re-entry into Phase 4) reads as passing even when this run posted nothing.
+
+```bash
+# prf_envelope_count TITLE — comments + reviews whose body carries the helper's heading.
+prf_envelope_count() {
+    local t="$1" ep n=0 x
+    for ep in "issues/$PR/comments" "pulls/$PR/reviews"; do
+        x=$("$GH_CMD" api "repos/{owner}/{repo}/$ep" --paginate \
+            --jq "[.[] | select((.body // \"\") | test(\"(?m)^#{1,6} +${t}\\\\b\"))] | length" \
+            | awk '{s+=$1} END {print s+0}')   # --paginate emits one count per page
+        n=$((n + x))
+    done
+    printf '%s\n' "$n"
+}
+
+before=$(prf_envelope_count "Code review")
+# ... run exactly one of the two Code review blocks above ...
+[ "$(prf_envelope_count "Code review")" -gt "$before" ] \
+    || echo "ENVELOPE MISSING: Code review — re-post through the helper"
+```
+
+Repeat with `"Security audit"` around the security-audit call. Skip the check for a
+`post_review_findings` call whose findings array was empty — that is a documented no-op and posts
+nothing. On `ENVELOPE MISSING`, re-post through the helper rather than leaving the artifact
+undetectable; do not paper over it with a freehand comment.
 
 > Canonical source for the two blocks below: `.claude/review-shared/_posting-procedure.md` (§ Dispositioning open threads, § Link format rules). They are restated here under this phase's own variable names (`$PR`, `$FULL_SHA` from 4A) so the commands are runnable as written — change one and change the other.
 

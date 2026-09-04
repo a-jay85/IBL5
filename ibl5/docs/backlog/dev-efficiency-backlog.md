@@ -50,7 +50,7 @@ last_verified: 2026-09-04
 | E21 | Test assertions land as static source greps that pass while the behavior they name is absent | ⬜ Open | 🟩 | S |
 | E22 | Plan-declared negatives and PR body Scope dropped during Phase 6.5 remediation | ✅ Implemented | — | S |
 | E23 | PR body deletion volumes diverged from code's `EXPECTED` constants | ✅ Implemented | — | S |
-| E24 | `/post-plan` Phase 4B can hand-write its review comment, bypassing `post_review_summary` | ⬜ Open | 🟨 | S |
+| E24 | `/post-plan` Phase 4B can hand-write its review comment, bypassing `post_review_summary` | ✅ Implemented | 🟨 | S |
 | E25 | `/pr-review` migration-exclusion `awk` filter is a no-op, silently ingests full migration diffs | ⬜ Open | 🟨 | S |
 | E26 | `bin/plan-now` second-resolution timestamp caused label collision on back-to-back invocations | ✅ Implemented | — | S |
 | E27 | `filterGitignored()` in `bin/check-docs`: orphaned docblock, unchecked proc exit, non-NUL-delimited check-ignore paths | ⬜ Open | 🟨 | S |
@@ -292,20 +292,21 @@ The fix belongs at the **emitter**, not the probe. Loosening the probe regex to 
 
 | # | File:line | Class | Live? | Status |
 |---|-----------|-------|-------|--------|
-| 1 | `.claude/skills/post-plan/_phase-4-review-audit.md:101-102` — mandates `post_review_findings` / `post_review_summary` in prose; unenforced | A | yes | not fixed this pass |
-| 2 | PR #2001 `## Code Review Summary` + `## Security Audit Summary` comments — real Phase 4B output, written freehand (no `<details>`, no `### Code review`, no `PRF_FOOTER`), invisible to the 4B probe; its one finding (`FILL_TEAM_BACKUP` docblock, scored 25) never became a dispositionable thread | A | yes | not fixed this pass |
+| 1 | `.claude/skills/post-plan/_phase-4-review-audit.md:101-102` — mandates `post_review_findings` / `post_review_summary` in prose; unenforced | A | yes | ✅ fixed |
+| 2 | PR #2001 `## Code Review Summary` + `## Security Audit Summary` comments — real Phase 4B output, written freehand (no `<details>`, no `### Code review`, no `PRF_FOOTER`), invisible to the 4B probe; its one finding (`FILL_TEAM_BACKUP` docblock, scored 25) never became a dispositionable thread | A | yes | ✅ prevented (artifact not retro-fixed) |
+| 3 | PR #1956 `## Phase 4D — Code Review Summary` comment (2026-08-22, five days before this entry was opened) — four review agents ran and produced two informational findings (A1, D1); freehand envelope, so the 4B probe returned empty and the 2026-09-04 `/pr-ready` verdict asserted "Phase 4B structured code review: NOT RAN … run `/pr-review 1956` before merge" on a PR that had been reviewed. Neither finding became a dispositionable thread | A | yes | ✅ prevented (artifact not retro-fixed — #1956's `/pr-ready` verdict still reads "NOT RAN") |
 
 `prevention_ladder:`
 
 - **rung 0 — already covered?** No. `bin/lib/post-review-findings.sh` is the sanctioned path but is not the *only* reachable path; no gate checks that the comment Phase 4B produced came through it.
-- **rung 1 — extend an existing gate? LANDS HERE.** Rewrite `.claude/skills/post-plan/_phase-4-review-audit.md` §4B/§4D posting steps from descriptive prose into a single verbatim copy-paste command block (source the helper, write the findings file, call the helper) with an explicit "do not compose this comment by hand — the envelope is machine-parsed downstream" note naming the 4B probe as the consumer. Same treatment for the Security audit arm, which has the identical shape.
-- **rung 2 — a rule doc?** Insufficient alone: the norm has to fire at the exact step that emits the comment, not as ambient guidance.
-- **rung 3 — a mechanical gate?** Possible follow-on: have Phase 4B re-read its own comment after posting and assert the `PRF_FOOTER` string is present, failing the phase if not. Cheap, but only worth building if rung 1 proves insufficient.
+- **rung 1 — extend an existing gate? LANDED HERE.** Rewrote `.claude/skills/post-plan/_phase-4-review-audit.md` §4D posting steps from descriptive prose into four verbatim copy-paste command blocks (code review × {findings, no-issues}, security audit × {findings, no-issues}), fronted by a "never compose these comments by hand" callout naming all three downstream consumers of the envelope (the 4B probe, `list_open_review_findings` / `resolve_review_finding`, `unresolved-findings-hold`) and both observed occurrences.
+- **rung 2 — a rule doc?** Insufficient alone: the norm has to fire at the exact step that emits the comment, not as ambient guidance. Instead the same prohibition was added as a § to `.claude/review-shared/_posting-procedure.md`, the canonical shared source both `/pr-review` Step 6 and `/security-audit` Step 6 already Read — so the two other emitters of the same envelope inherit it at their own posting step, not ambiently.
+- **rung 3 — a mechanical gate?** Landed as a self-check rather than a gate: §4D now closes with a `prf_envelope_count TITLE` helper snippet and requires a **strict increase** across each `post_review_*` call, with instruction to re-post through the helper if the count does not move. Before/after rather than an absolute count, because a PR that already carries a `### Code review` comment (a prior `/pr-review`, a Phase-5 strict-loop re-entry into Phase 4) reads as passing under an absolute threshold even when this run posted nothing — the population the check most needs to cover. A hard failing gate stays available as a follow-on if this proves insufficient.
 - **rungs 4–5** — N/A. Explicitly ruled out: relaxing the `4b-probe.sh` regex, which trades a detectable false negative for an invisible false positive.
 
-`artifact destination:` `.claude/skills/post-plan/_phase-4-review-audit.md` (in-repo). Not built this pass.
+`artifact destination:` `.claude/skills/post-plan/_phase-4-review-audit.md` + `.claude/review-shared/_posting-procedure.md` (in-repo). Built 2026-09-04.
 
-*(discovered 2026-08-27 during #2001)*
+*(discovered 2026-08-27 during #2001; occurrence 3 found 2026-09-04 while diagnosing #1956's `/pr-ready` verdict)*
 
 ### E25 `/pr-review` Step 2c's migration-exclusion `awk` filter is a no-op, so every review silently ingests full migration diffs
 

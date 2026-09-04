@@ -319,7 +319,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Est. effort:** M
 **Risk if untouched:** Every new player attribute inflates one file; getter search spans the entire class.
 **Provenance:** Seeded 2026-07-24 — ground-truth audit hot-file scan.
-**Status:** Implemented — `Player.php` 671 → 279; the 66 pure field getters moved to the `PlayerIdentityGetters`, `PlayerContractGetters` and `PlayerRatingsGetters` traits (created in `ibl5/classes/Player/`). All 73 public signatures preserved — no change to any of the 138 caller files or to `PlayerInterface`. Collaborator-backed and repository-backed methods stayed in `Player.php`. Trait mechanism recorded in ADR-0119. Pinned by `PlayerPublicApiSurfaceTest`. Green-green.
+**Status:** Implemented (#2097, 2026-09-04) — `Player.php` 671 → 279; the 66 pure field getters moved to the `PlayerIdentityGetters`, `PlayerContractGetters` and `PlayerRatingsGetters` traits (created in `ibl5/classes/Player/`). All 73 public signatures preserved — no change to any of the 138 caller files or to `PlayerInterface`. Collaborator-backed and repository-backed methods stayed in `Player.php`. Trait mechanism recorded in ADR-0119. Pinned by `PlayerPublicApiSurfaceTest`. Green-green.
 
 **Table evidence (2026-09-04):** Player 671 LOC — typed-getter accumulation. Extract per-domain typed-getter groups (contract, stats, identity); green-green.
 

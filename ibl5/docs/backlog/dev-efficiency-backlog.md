@@ -1,6 +1,6 @@
 ---
 description: Development-efficiency backlog — inner-loop speed (diff-scoped analysis, parallel tests), CI caching, dependency-bump batching, and worktree lifecycle automation, with per-entry status.
-last_verified: 2026-09-02
+last_verified: 2026-09-04
 ---
 
 # Development-Efficiency Backlog
@@ -67,6 +67,7 @@ last_verified: 2026-09-02
 | E39 | Phase 6 review notes on PR #1824 (StandingsUpdater echo→logger) — B1 wrong seam name + scope count in body; N3 scope creep unbundled; N4 stale plan literal; N5 manual backlog row not retired in plan; N7 wrong method name in body; B1+N7 remediated this pass | ⬜ Open | — | S |
 | E40 | `bin/scrub-log-credentials` prod path: unquoted outer heredoc mangles remote jq filter escapes (F1) + local per-file hit report silently discarded (F4) — both fixed Phase 6.5 #1920; case 8 harness guards regression | ⬜ Open | — | S |
 | E41 | `ErrorHandlerRegistrarTest` + `bin/test-scrub-log-credentials`: SYNTHETIC_SECRET 32 chars truncated to 15 in `getTraceAsString()` causes vacuous assertion (F2) + closure assertion replaced with unconditional pass (F3) — both fixed Phase 6.5 #1920 | ⬜ Open | — | XS |
+| E42 | Phase 6 review notes on PR #1968 — plan-accuracy divergences (N1–N4); all non-blocking; no gate warranted | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -689,6 +690,8 @@ Not a defect in the anchoring or the SIGPIPE handling: the `$`-anchor (guarding 
 
 *(discovered 2026-09-02 during #1920)*
 
+---
+
 ### E41 Phase 6 review notes on PR #1920 (SYNTHETIC_SECRET length + closure assertion)
 
 **class:** verification-quality defects — SYNTHETIC_SECRET constant too long for `getTraceAsString()` 15-char truncation (F2) causes tests to pass vacuously; closure-frame assertion replaced with unconditional pass (F3)
@@ -714,3 +717,24 @@ Not a defect in the anchoring or the SIGPIPE handling: the `$`-anchor (guarding 
 `artifact destination: n/a — no new gate`
 
 *(discovered 2026-09-02 during #1920)*
+
+---
+
+### E42 Phase 6 review notes on PR #1968 — plan-accuracy divergences (N1–N4); all non-blocking; no gate warranted
+
+**class: n/a** — Four plan-accuracy divergences surfaced by `/pr-ready` Phase 6 on PR #1968; all instances are non-blocking (implementation correct in every case); no gate warranted on any.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| N1 | `~/claude-plans/impl-model-accept-full-ids.md` Phase 8e literal spec vs. `.claude/rules/agent-tiering.md:22` — implementation compressed the six-literal enumeration to a pointer; the route is better than specified (avoids a second drift surface for the whitelist) | route deviation, non-blocking | no | not fixed — filed |
+| N2 | `bin/automouse/run:1235` — `rm -f "$CAP_REFUND_FILE"` added beyond plan Phase 4 fence; safe by symmetry with sibling poison-pill block at `:1205` and exercised by `bin/test-automouse-single` case 6 | safe scope addition, non-blocking | no | not fixed — filed |
+| N3 | `.claude/rules/agent-tiering.md` `last_verified` bump dropped by rebase; master advanced past the branch's bump; `bin/check-docs` green | doc-bump dropped by rebase, non-blocking | no | not fixed — filed |
+| N4 | `~/claude-plans/impl-model-accept-full-ids.md` matrix row 15: `bin/automouse/queue list` is not a valid subcommand; correct command is bare `bin/automouse/queue`; property holds when re-run correctly | wrong command in plan verification matrix, non-blocking | no | not fixed — filed |
+
+**prevention_ladder: no gate warranted** — all four divergences are plan-author responsibility; runtime gates cannot distinguish intentional route deviation from accidental staleness in plan text; N2 is a correct addition; N3 is self-healed by master; N4 is a plan-text typo discovered post-implementation with the property verified.
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-04 during #1968)*

@@ -35,8 +35,7 @@ class CleanupPreseasonDataStepTest extends TestCase
 
     public function testGetLabelReturnsExpectedLabel(): void
     {
-        $stub = $this->createStub(\mysqli::class);
-        $this->assertSame('Preseason data cleaned', $this->buildStep($stub)->getLabel());
+        $this->assertSame('Preseason data cleaned', $this->buildStep(new MockDatabase())->getLabel());
     }
 
     public function testSkipsWhenPhaseIsNotHeat(): void
@@ -46,7 +45,7 @@ class CleanupPreseasonDataStepTest extends TestCase
         $seasonStub->beginningYear = 2026;
         $seasonStub->endingYear = 2027;
 
-        $result = $this->buildStep($this->createStub(\mysqli::class), season: $seasonStub)->execute();
+        $result = $this->buildStep(new MockDatabase(), season: $seasonStub)->execute();
 
         $this->assertSame('Not HEAT phase', $result->detail);
     }

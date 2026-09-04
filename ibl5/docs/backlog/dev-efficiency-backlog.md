@@ -71,6 +71,7 @@ last_verified: 2026-09-04
 | E43 | `bin/check-plan` PR6 gates: migration literals [A], line-number anchors [L], docker liveness [E], shellcheck CI-class [I], PHP coverage advisory [J], plus gate [V] `/path/to` + `main.localhost` extensions | ⬜ Open | 🟩 | S |
 | E44 | Phase 6 review findings on PR #2082 — gate [V] main.localhost bootstrap defect (blocking), body count mismatch, vacuous range fixture, stale corpus count, nonexistent `bin/db-wait` (example) reference, wrong baseline claim; all fixed in Phase 6.5 | ⬜ Open | 🟩 | S |
 | E45 | Phase 6 review notes on PR #1924 — stale Scope forward-reference and false Manual Testing claim; PR-body-only fixes; no gate warranted | ⬜ Open | — | XS |
+| E46 | Documentation gaps in bin/pr-cycle toolchain — missing seam declarations and overstated harness assertions | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -814,3 +815,29 @@ For the accuracy findings (2–6): prevention is the existing `/pr-ready` Phase 
 `last_verified: 2026-09-04`
 
 *(discovered 2026-09-04 during Phase 6 review of #2077)*
+
+### E48 Phase 6 review notes on PR #2081 — documentation gaps in bin/pr-cycle toolchain (missing seam declarations and overstated harness assertions)
+
+**class:** undeclared env seams and overstated assertion prose in a bin/ script toolchain that causes plan-fidelity gaps and misleading harness failure messages
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/pr-cycle:27` (env seams header) — `PR_CYCLE_TS` and `PR_CYCLE_LOG` are live env seams missing from the `# Env seams (used by bin/test-pr-cycle):` block the plan required | yes | yes | fixed this pass |
+| 2 | `bin/test-pr-cycle` (row 22 failure message) — prose and failure message say "execs with --worker" but predicate is `grep -qF -- '--worker'`, which never checks for exec | yes | yes | fixed this pass |
+| 3 | `bin/pr-cycle:171` (guard (b) skipped for `--worker`) — better route than plan §1.6 literal; the literal would fail every --go run; no code action needed | yes | yes | not fixed — better route (no code action) |
+
+**prevention_ladder:**
+
+- **rung 0 — already covered?** No existing gate catches missing seam declarations or overstated harness failure messages.
+- **rung 1 — extend existing gate?** Could extend `~/.claude/hooks/plan-gate-edit.sh`, but plan validation is not automated; too narrow.
+- **rung 2 — a rule doc?** A `.claude/rules/` doc noting that plan §1.1 seam-header requirement should be verified at review time — but `/pr-ready` Phase 6 is already the catch mechanism; no new rule warranted.
+- **rung 3–5 — not warranted** for a documentation-accuracy issue in shell scripts.
+- **landing rung:** no gate warranted — plan-fidelity review (Phase 6) is already the catch mechanism; the class is too narrow and high-cost for a static gate.
+
+`prevention_ladder: no gate warranted — plan-fidelity review (Phase 6) is already the catch mechanism; the class is too narrow and high-cost for a static gate`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-04 during #2081)*

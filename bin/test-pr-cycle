@@ -1,0 +1,795 @@
+#!/usr/bin/env bash
+# test-pr-cycle — behaviour tests for bin/pr-cycle.
+#
+# Covers selection, readying, arming, merge confirmation, ledgering, the caps and stops,
+# the dry-run default, artifact generation, and the static guards over the driver's own
+# source. Nothing here bootstraps a launchd job, touches a real PR, or writes outside the
+# scratch dir, so it runs identically on macOS and Linux CI — there is deliberately no
+# platform skip.
+#
+# Driven entirely through bin/pr-cycle's documented PR_CYCLE_* env seams plus a scratch
+# HOME and a scratch git repo standing in for the main checkout.
+#
+# Usage: bin/test-pr-cycle
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+DRIVER="$SCRIPT_DIR/pr-cycle"
+[[ -x "$DRIVER" ]] || { echo "FAIL: $DRIVER missing or not executable" >&2; exit 1; }
+
+SCRATCH="$(mktemp -d)"
+_cleanup() { rm -rf "$SCRATCH"; }
+trap _cleanup EXIT
+
+FAILED=0
+CASE_BASE=0
+fail() { echo "FAIL: $*" >&2; FAILED=$((FAILED + 1)); }
+begin_case() { CASE_BASE=$FAILED; }
+end_case() {  # $1 = case name; prints "<name> OK" only if the case added no failures
+    if [[ $FAILED -eq $CASE_BASE ]]; then echo "$1 OK"; else echo "$1 FAILED" >&2; fi
+}
+
+BIN="$SCRATCH/.local/bin"
+mkdir -p "$BIN"
+
+# --- the scratch main checkout ------------------------------------------------------------
+# A real git repo, because the driver's guard asks git for the toplevel and then requires
+# .git to be a DIRECTORY. Resolve the path through git itself: on macOS mktemp hands back
+# /var/..., a symlink to /private/var, and a literal string compare would spuriously fail.
+REPO="$SCRATCH/repo"
+mkdir -p "$REPO"
+git -C "$REPO" init -q 2>/dev/null
+git -C "$REPO" config user.email t@t.invalid
+git -C "$REPO" config user.name t
+: > "$REPO/seed"
+git -C "$REPO" add -A >/dev/null 2>&1
+git -C "$REPO" commit -qm seed >/dev/null 2>&1
+MAIN="$(cd "$REPO" && git rev-parse --show-toplevel)"
+
+# A linked worktree of that repo: same tooling, but .git is a FILE. Used to prove the
+# guard rejects a worktree even when its path is handed in as the expected checkout.
+WT="$SCRATCH/wt"
+git -C "$REPO" worktree add -q -b wtbranch "$WT" >/dev/null 2>&1
+WT_TOP="$(cd "$WT" && git rev-parse --show-toplevel 2>/dev/null)"
+
+# --- recording shims -----------------------------------------------------------------------
+# Each shim appends its argv to <name>.argv (one line per call) and replays canned output.
+# Per-call overrides live in <name>-out-<N> / <name>-rc-<N> where N is the 1-based call
+# index; the unsuffixed files are the fallback.
+mkshim() {  # $1 = shim name
+    cat > "$BIN/$1" <<SHIM_EOF
+#!/usr/bin/env bash
+S="$SCRATCH"
+printf '%s\n' "\$(printf '%s' "\$*" | tr '\\n' ' ')" >> "\$S/$1.argv"
+N=\$(wc -l < "\$S/$1.argv" | tr -d ' ')
+[[ -f "\$S/$1-hook-\$N" ]] && . "\$S/$1-hook-\$N"
+[[ -f "\$S/$1-hook" ]] && . "\$S/$1-hook"
+if [[ -f "\$S/$1-out-\$N" ]]; then cat "\$S/$1-out-\$N"
+elif [[ -f "\$S/$1-out" ]]; then cat "\$S/$1-out"; fi
+if [[ -f "\$S/$1-err-\$N" ]]; then cat "\$S/$1-err-\$N" >&2
+elif [[ -f "\$S/$1-err" ]]; then cat "\$S/$1-err" >&2; fi
+if [[ -f "\$S/$1-rc-\$N" ]]; then exit "\$(cat "\$S/$1-rc-\$N")"
+elif [[ -f "\$S/$1-rc" ]]; then exit "\$(cat "\$S/$1-rc")"; fi
+exit 0
+SHIM_EOF
+    chmod +x "$BIN/$1"
+}
+mkshim attack
+mkshim ready
+mkshim triage
+mkshim dm
+
+# gh shim. `pr view N --json state --jq .state` replays state-N (default OPEN);
+# `pr view N --json title,url,comments` replays view-N.json (default an empty object).
+cat > "$BIN/gh" <<GH_EOF
+#!/usr/bin/env bash
+S="$SCRATCH"
+printf '%s\n' "\$*" >> "\$S/gh.argv"
+num=""
+for a in "\$@"; do case "\$a" in [0-9]*) num="\$a"; break ;; esac; done
+case "\$*" in
+    *"--json state"*)
+        if [[ -f "\$S/state-\$num" ]]; then cat "\$S/state-\$num"; else echo OPEN; fi ;;
+    *"--json title,url,comments"*)
+        if [[ -f "\$S/view-\$num.json" ]]; then cat "\$S/view-\$num.json"; else echo '{}'; fi ;;
+esac
+exit 0
+GH_EOF
+chmod +x "$BIN/gh"
+
+# launchctl shim — makes the "already live" guard testable, and testable on Linux CI where
+# launchctl does not exist at all. `launchctl list` echoes whatever the current case wrote
+# to launchctl-list.txt; everything else is a recorded no-op.
+#
+# The 6000-line filler is load-bearing, not padding. The bug the guard exists to prevent is
+# a SIGPIPE under `set -o pipefail`: it only reproduces when the writer still has queued
+# output after the reader exits. Real `launchctl list` prints hundreds of lines; a three-line
+# shim would finish writing before grep -q exited and the buggy form would pass anyway. The
+# filler follows the fixture labels and exceeds the 64KB pipe buffer, so a match always
+# leaves bytes unwritten.
+: > "$SCRATCH/launchctl-list.txt"
+cat > "$BIN/launchctl" <<LC_EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$SCRATCH/launchctl.argv"
+if [[ "\${1:-}" == "list" && \$# -eq 1 ]]; then
+    cat "$SCRATCH/launchctl-list.txt"
+    i=0
+    while [[ \$i -lt 6000 ]]; do
+        printf -- '-\t0\tcom.apple.filler.service.number.%s\n' "\$i"
+        i=\$((i + 1))
+    done
+fi
+exit 0
+LC_EOF
+chmod +x "$BIN/launchctl"
+
+set_live_labels() { printf '%s\n' "$@" > "$SCRATCH/launchctl-list.txt"; }
+clear_live_labels() { : > "$SCRATCH/launchctl-list.txt"; }
+
+# --- fixtures ------------------------------------------------------------------------------
+# A three-PR plan of attack, in the shape bin/pr-attack emits. The dashed separator row is
+# included deliberately: it must never be collected as an orderable PR.
+ATTACK_3PR='# Plan of attack
+
+| # | PR | Constraint | Needs you? |
+|---|----|-----------|------------|
+| 1 | #101 first-slug | none | no |
+| 2 | #102 second-slug | none | yes |
+| 3 | #103 third-slug | none | no |
+'
+
+ATTACK_1PR='# Plan of attack
+
+| # | PR | Constraint | Needs you? |
+|---|----|-----------|------------|
+| 1 | #101 first-slug | none | no |
+'
+
+triage_report() {  # $@ = "PR BUCKET ACTION" triples, one per argument
+    printf '%-8s %-18s %-24s\n' "PR#" "BUCKET" "NEXT-ACTION"
+    printf -- '-------- ------------------ ------------------------\n'
+    local t
+    for t in "$@"; do
+        # shellcheck disable=SC2086
+        set -- $t
+        printf '%-8s %-18s %-24s\n' "#$1" "$2" "$3"
+    done
+}
+
+digest_comment() {  # $1 = extra body text appended after the standard digest block
+    cat <<'DIG_EOF'
+<!-- pr-ready-verdict -->
+Verdict: green.
+
+### Merge digest
+- **What changed:** the driver landed
+- **Why:** because the loop was manual
+- **Watch:** the ledger
+- **Touches:** bin/pr-cycle
+- **Machine-authored fixes:** none
+DIG_EOF
+}
+
+view_json() {  # $1 = PR number, $2 = comment body (may be empty for the no-comments case)
+    if [[ -z "${2:-}" ]]; then
+        printf '{"title":"t%s","url":"https://x/%s","comments":[]}' "$1" "$1"
+    else
+        printf '{"title":"t%s","url":"https://x/%s","comments":[{"body":%s}]}' \
+            "$1" "$1" "$(printf '%s' "$2" | jq -Rs .)"
+    fi
+}
+
+reset_state() {
+    rm -f "$SCRATCH"/*.argv "$SCRATCH"/attack-* "$SCRATCH"/ready-* "$SCRATCH"/triage-* \
+          "$SCRATCH"/dm-* "$SCRATCH"/state-* "$SCRATCH"/view-*.json
+    rm -f "$SCRATCH/IBL5-merge-digest.md" "$SCRATCH/.ibl5-pr-cycle.stop"
+    rm -rf /tmp/pr-cycle-testfix* 2>/dev/null
+    rm -f /tmp/pr-cycle-testfix*.sh /tmp/pr-cycle-testfix*.log 2>/dev/null
+    rm -f "$SCRATCH/Library/LaunchAgents"/com.ibl5.pr-cycle-*.plist 2>/dev/null
+    clear_live_labels
+    : > "$SCRATCH/attack.argv"; : > "$SCRATCH/ready.argv"
+    : > "$SCRATCH/triage.argv"; : > "$SCRATCH/dm.argv"
+    : > "$SCRATCH/gh.argv";     : > "$SCRATCH/launchctl.argv"
+}
+
+# Run the driver in a sealed environment. $1 = cwd, rest = argv.
+OUT=""; ERR=""; RC=0
+run_in() {
+    local cwd="$1"; shift
+    ERR="$SCRATCH/last.err"
+    OUT="$(cd "$cwd" && env HOME="$SCRATCH" PATH="$BIN:$PATH" \
+        PR_CYCLE_ATTACK_CMD="$BIN/attack" \
+        PR_CYCLE_TRIAGE_CMD="$BIN/triage" \
+        PR_CYCLE_READY_CMD="$BIN/ready" \
+        PR_CYCLE_DM_CMD="$BIN/dm" \
+        PR_CYCLE_GH_CMD="$BIN/gh" \
+        PR_CYCLE_MAIN_CHECKOUT="${MAIN_OVERRIDE-$MAIN}" \
+        PR_CYCLE_POLL_INTERVAL="${IVAL:-0}" \
+        PR_CYCLE_POLL_CEILING="${CEIL:-0}" \
+        PR_CYCLE_LEDGER="${LEDGER-$SCRATCH/IBL5-merge-digest.md}" \
+        PR_CYCLE_STOP_FILE="$SCRATCH/.ibl5-pr-cycle.stop" \
+        PR_CYCLE_NOW="2026-01-01T00:00:00Z" \
+        PR_CYCLE_TS="${TSPIN:-testfix}" \
+        "$DRIVER" "$@" 2>"$ERR")"
+    RC=$?
+    return 0
+}
+run() { run_in "$REPO" "$@"; }
+
+calls() { wc -l < "$SCRATCH/$1.argv" | tr -d ' '; }
+ledger() { cat "$SCRATCH/IBL5-merge-digest.md" 2>/dev/null; }
+rows() { grep -c '^- \[ \] #' "$SCRATCH/IBL5-merge-digest.md" 2>/dev/null || echo 0; }
+
+# ==========================================================================================
+# 1 — flag validation
+# ==========================================================================================
+begin_case
+reset_state
+run --help
+[[ $RC -eq 0 ]] || fail "--help exit $RC"
+for f in -- --go --dry-run --stop --no-dm --max-merges --help; do
+    [[ "$f" == "--" ]] && continue
+    grep -qF -- "$f" <<< "$OUT" || fail "--help omits $f"
+done
+for bad in "--nope" "--max-merges 0" "--max-merges -1" "--max-merges abc" "--max-merges" "--go --stop"; do
+    # shellcheck disable=SC2086
+    run $bad
+    [[ $RC -eq 2 ]] || fail "'$bad' exit $RC, want 2"
+done
+end_case "case 1 flag validation"
+
+# ==========================================================================================
+# 2 — main-checkout-only guard
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+run_in "$SCRATCH" --go
+[[ $RC -eq 1 ]] || fail "outside any repo: exit $RC, want 1"
+run_in "$SCRATCH"
+[[ $RC -eq 1 ]] || fail "outside any repo (dry): exit $RC, want 1"
+
+MAIN_OVERRIDE="$SCRATCH/somewhere-else" run_in "$REPO" --go
+[[ $RC -eq 1 ]] || fail "toplevel mismatch: exit $RC, want 1"
+
+if [[ -n "$WT_TOP" ]]; then
+    MAIN_OVERRIDE="$WT_TOP" run_in "$WT" --go
+    [[ $RC -eq 1 ]] || fail "worktree .git file accepted: exit $RC, want 1"
+    grep -qF 'main checkout' "$ERR" || fail "worktree rejection lacks explanation"
+else
+    fail "worktree fixture missing"
+fi
+unset MAIN_OVERRIDE
+end_case "case 2 main-checkout guard"
+
+# ==========================================================================================
+# 3 — live-session guard (SIGPIPE regression)
+# ==========================================================================================
+begin_case
+reset_state
+set_live_labels "-	0	com.ibl5.pr-ready-now-20260101-000000"
+run --go
+[[ $RC -eq 1 ]] || fail "live pr-ready-now label: exit $RC, want 1"
+set_live_labels "-	0	com.ibl5.pr-cycle-20260101-000000"
+run --go
+[[ $RC -eq 1 ]] || fail "live pr-cycle label: exit $RC, want 1"
+# --worker is the running session itself: the liveness guard must NOT fire against its own
+# label. Without the WORKER=0 guard the worker exits 1 immediately, making every --go fail.
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+run --worker
+[[ $RC -eq 0 ]] || fail "--worker with own live label: exit $RC, want 0 (liveness guard must not block the worker)"
+clear_live_labels
+run --help
+[[ $RC -eq 0 ]] || fail "no live label should not block"
+end_case "case 3 live-session guard"
+
+# ==========================================================================================
+# 4 — --stop
+# ==========================================================================================
+begin_case
+reset_state
+echo 3 > "$SCRATCH/ready-rc"
+run --stop
+[[ $RC -eq 3 ]] || fail "--stop should propagate the ready exit status, got $RC"
+[[ -e "$SCRATCH/.ibl5-pr-cycle.stop" ]] || fail "--stop left no stop file after a failing --stop-all"
+grep -qx -- '--stop-all' "$SCRATCH/ready.argv" || fail "--stop did not call the ready tool with --stop-all"
+end_case "case 4 stop"
+
+# ==========================================================================================
+# 5 / 8 — serial selection order and the ready argv
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
+    > "$SCRATCH/triage-out"
+run --worker
+[[ $RC -eq 0 ]] || fail "drained run exit $RC, want 0"
+[[ "$(calls ready)" == "3" ]] || fail "want 3 ready calls, got $(calls ready)"
+[[ "$(sed -n '1p' "$SCRATCH/ready.argv")" == "--pr 101 --jobs 1 --go --wait" ]] \
+    || fail "ready argv 1: $(sed -n '1p' "$SCRATCH/ready.argv")"
+[[ "$(sed -n '2p' "$SCRATCH/ready.argv")" == "--pr 102 --jobs 1 --go --wait" ]] \
+    || fail "ready argv 2: $(sed -n '2p' "$SCRATCH/ready.argv")"
+[[ "$(sed -n '3p' "$SCRATCH/ready.argv")" == "--pr 103 --jobs 1 --go --wait" ]] \
+    || fail "ready argv 3: $(sed -n '3p' "$SCRATCH/ready.argv")"
+[[ "$(rows)" == "0" ]] || fail "non-armable run wrote $(rows) ledger rows, want 0"
+grep -qF 'queue drained' <<< "$OUT" || fail "drained run did not report draining"
+end_case "case 5/8 serial order and ready argv"
+
+# ==========================================================================================
+# 6 — gate nominees force a second, exactly-shaped pr-attack call
+# ==========================================================================================
+begin_case
+reset_state
+cat > "$SCRATCH/attack-out-1" <<'NOM_EOF'
+### #999 dangling-gate
+WORK=decoy-must-be-ignored
+Nominated for a gate edge; unjudged.
+WORK=abc123
+NOM_EOF
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out-2"
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
+    > "$SCRATCH/triage-out"
+run --worker
+[[ "$(sed -n '1p' "$SCRATCH/attack.argv")" == "--gate-candidates" ]] \
+    || fail "first attack call: $(sed -n '1p' "$SCRATCH/attack.argv")"
+[[ "$(sed -n '2p' "$SCRATCH/attack.argv")" == "--work abc123 --gate-edges /dev/null" ]] \
+    || fail "second attack call: $(sed -n '2p' "$SCRATCH/attack.argv")"
+grep -qF '#999' <<< "$OUT" || fail "gate nominee was not reported as excluded"
+[[ "$(calls ready)" == "3" ]] || fail "want 3 ready calls after nominee exclusion, got $(calls ready)"
+end_case "case 6 gate nominees"
+
+# ==========================================================================================
+# 7 — pr-attack failure handling
+# ==========================================================================================
+begin_case
+reset_state
+echo 1 > "$SCRATCH/attack-rc"
+run --worker
+[[ $RC -eq 1 ]] || fail "attack exit 1 should halt with 1, got $RC"
+[[ "$(calls ready)" == "0" ]] || fail "attack exit 1 still readied"
+[[ "$(calls triage)" == "0" ]] || fail "attack exit 1 still armed"
+
+reset_state
+cat > "$SCRATCH/attack-out" <<'NOM_EOF'
+### #999 dangling-gate
+WORK=abc123
+NOM_EOF
+echo 3 > "$SCRATCH/attack-rc-2"
+echo 3 > "$SCRATCH/attack-rc-4"
+run --worker
+[[ $RC -eq 1 ]] || fail "two stale WORKs should halt with 1, got $RC"
+[[ "$(calls attack)" == "4" ]] || fail "want 4 attack calls (retried once), got $(calls attack)"
+grep -qF 'stale' <<< "$OUT" || fail "stale retry was not reported"
+end_case "case 7 attack failures"
+
+# ==========================================================================================
+# 9 — a --wait timeout halts before arming
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+echo 'TIMED OUT waiting for 1 session(s) after 7200s; leaving them running' > "$SCRATCH/ready-err"
+echo 0 > "$SCRATCH/ready-rc"
+run --worker
+[[ $RC -eq 1 ]] || fail "timeout should halt with 1, got $RC"
+[[ "$(calls ready)" == "1" ]] || fail "timeout should stop after one ready, got $(calls ready)"
+[[ "$(calls triage)" == "0" ]] || fail "timeout still armed"
+end_case "case 9 wait timeout"
+
+# ==========================================================================================
+# 10 — a stop file created during readying blocks the arm in that same iteration
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+echo ': > "$S/.ibl5-pr-cycle.stop"' > "$SCRATCH/ready-hook"
+run --worker
+[[ $RC -eq 0 ]] || fail "a stop is an intended termination, want 0, got $RC"
+[[ "$(calls ready)" == "1" ]] || fail "want 1 ready before the stop, got $(calls ready)"
+[[ "$(calls triage)" == "0" ]] || fail "arm ran despite the stop file"
+end_case "case 10 stop during readying"
+
+# ==========================================================================================
+# 11 — non-ARMABLE and absent buckets skip polling; the separator is never an armed PR
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"   # 102 and 103 absent entirely
+echo MERGED > "$SCRATCH/state-101"
+run --worker
+[[ $RC -eq 0 ]] || fail "non-armable run exit $RC, want 0"
+[[ "$(calls ready)" == "3" ]] || fail "run stopped early: $(calls ready) ready calls"
+[[ "$(calls gh)" == "0" ]] || fail "polled despite no ARMABLE row: $(calls gh) gh calls"
+[[ "$(rows)" == "0" ]] || fail "wrote $(rows) rows without an ARMABLE row"
+grep -qF 'absent' <<< "$OUT" || fail "a PR missing from the report was not reported as absent"
+end_case "case 11 non-armable and absent"
+
+# ==========================================================================================
+# 12 — triage exit codes
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+echo 2 > "$SCRATCH/triage-rc"
+run --worker
+[[ $RC -eq 1 ]] || fail "triage exit 2 should halt with 1, got $RC"
+[[ "$(calls ready)" == "1" ]] || fail "triage exit 2 did not halt the loop"
+
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE auto-merge armed" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
+    > "$SCRATCH/triage-out"
+echo 1 > "$SCRATCH/triage-rc"
+echo MERGED > "$SCRATCH/state-101"
+printf '%s' "$(view_json 101 "$(digest_comment)")" > "$SCRATCH/view-101.json"
+run --worker
+[[ $RC -eq 0 ]] || fail "triage exit 1 should continue, got $RC"
+[[ "$(rows)" == "1" ]] || fail "triage exit 1 lost the merge row: $(rows)"
+end_case "case 12 triage exit codes"
+
+# ==========================================================================================
+# 13 — a confirmed merge appends exactly one six-line row, byte-identical
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE auto-merge armed" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
+    > "$SCRATCH/triage-out"
+echo MERGED > "$SCRATCH/state-101"
+printf '%s' "$(view_json 101 "$(digest_comment)")" > "$SCRATCH/view-101.json"
+run --worker
+[[ $RC -eq 0 ]] || fail "merge run exit $RC, want 0"
+[[ "$(rows)" == "1" ]] || fail "want 1 ledger row, got $(rows)"
+cat > "$SCRATCH/expected-row" <<'EXP_EOF'
+- [ ] #101 t101 — merged 2026-01-01T00:00:00Z — https://x/101
+  **What changed:** the driver landed
+  **Why:** because the loop was manual
+  **Watch:** the ledger
+  **Touches:** bin/pr-cycle
+  **Machine-authored fixes:** none
+EXP_EOF
+ledger | grep -n '' >/dev/null
+ledger | tail -n 6 > "$SCRATCH/actual-row"
+diff -u "$SCRATCH/expected-row" "$SCRATCH/actual-row" >/dev/null \
+    || { fail "ledger row is not byte-identical"; diff -u "$SCRATCH/expected-row" "$SCRATCH/actual-row" >&2; }
+grep -qF 'merged 1' <<< "$OUT" || fail "run summary did not report 1 merge"
+end_case "case 13 ledger row"
+
+# ==========================================================================================
+# 14 — OPEN to the ceiling and CLOSED both write no row; ceiling 0 polls exactly once
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+IVAL=30 CEIL=0 run --worker    # a second poll would sleep 30s; the run must not
+[[ $RC -eq 0 ]] || fail "ceiling hit should not halt, got $RC"
+[[ "$(rows)" == "0" ]] || fail "unconfirmed merge wrote $(rows) rows"
+# 2 gh state calls: one poll, then one reconcile check. A retry loop would show more.
+[[ "$(calls gh)" == "2" ]] || fail "want exactly 1 poll + 1 reconcile, got $(calls gh) gh calls"
+grep -qF 'not confirmed' <<< "$OUT" || fail "ceiling hit was not reported"
+unset IVAL CEIL
+
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
+    > "$SCRATCH/triage-out"
+echo CLOSED > "$SCRATCH/state-101"
+run --worker
+[[ $RC -eq 0 ]] || fail "CLOSED should not halt, got $RC"
+[[ "$(rows)" == "0" ]] || fail "CLOSED wrote $(rows) rows"
+[[ "$(calls ready)" == "3" ]] || fail "CLOSED stopped the run early"
+end_case "case 14 unconfirmed merges"
+
+# ==========================================================================================
+# 15 — degraded digests still produce a row
+# ==========================================================================================
+begin_case
+for variant in nodigest nocomments partial; do
+    reset_state
+    printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+    triage_report "101 ARMABLE armed" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
+        > "$SCRATCH/triage-out"
+    echo MERGED > "$SCRATCH/state-101"
+    case "$variant" in
+        nodigest)   printf '%s' "$(view_json 101 '<!-- pr-ready-verdict -->
+Verdict: green. No digest block here.')" > "$SCRATCH/view-101.json" ;;
+        nocomments) printf '%s' "$(view_json 101 '')" > "$SCRATCH/view-101.json" ;;
+        partial)    printf '%s' "$(view_json 101 '<!-- pr-ready-verdict -->
+
+### Merge digest
+- **What changed:** partial
+- **Why:** partial
+- **Watch:** partial
+- **Touches:** partial')" > "$SCRATCH/view-101.json" ;;
+    esac
+    run --worker
+    [[ "$(rows)" == "1" ]] || fail "$variant: want 1 row, got $(rows)"
+    case "$variant" in
+        nodigest|nocomments)
+            ledger | grep -qF 'digest: unavailable' || fail "$variant: want 'digest: unavailable'" ;;
+        partial)
+            ledger | grep -qF '**Machine-authored fixes:** (missing)' \
+                || fail "partial: missing label not rendered as (missing)"
+            ledger | grep -qF '**Touches:** partial' || fail "partial: present label lost" ;;
+    esac
+done
+end_case "case 15 degraded digests"
+
+# ==========================================================================================
+# 16 / 17 — cap semantics
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" "102 ARMABLE armed" "103 NEEDS-WORK rebase" \
+    > "$SCRATCH/triage-out"
+echo MERGED > "$SCRATCH/state-101"
+echo MERGED > "$SCRATCH/state-102"
+printf '%s' "$(view_json 101 "$(digest_comment)")" > "$SCRATCH/view-101.json"
+printf '%s' "$(view_json 102 "$(digest_comment)")" > "$SCRATCH/view-102.json"
+run --worker --max-merges 1
+[[ $RC -eq 0 ]] || fail "cap run exit $RC, want 0"
+# The cap stops further WORK; it never suppresses a row for an already-confirmed merge.
+[[ "$(rows)" == "2" ]] || fail "cap 1 with two confirmed merges: want 2 rows, got $(rows)"
+[[ "$(calls ready)" == "1" ]] || fail "cap 1: want 1 ready call, got $(calls ready)"
+ledger | grep -qF '#102' || fail "a PR merged without being readied was not ledgered"
+grep -qF 'merge cap' <<< "$OUT" || fail "cap termination not reported"
+
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+# One PR becomes ARMABLE per iteration, so the cap has to survive two full rounds.
+triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out-1"
+triage_report "102 ARMABLE armed" > "$SCRATCH/triage-out-2"
+triage_report "103 ARMABLE armed" > "$SCRATCH/triage-out"
+echo MERGED > "$SCRATCH/state-101"
+echo MERGED > "$SCRATCH/state-102"
+echo MERGED > "$SCRATCH/state-103"
+for p in 101 102 103; do printf '%s' "$(view_json "$p" "$(digest_comment)")" > "$SCRATCH/view-$p.json"; done
+run --worker --max-merges 2
+[[ "$(calls ready)" == "2" ]] || fail "cap 2: want 2 ready calls, got $(calls ready)"
+[[ "$(rows)" == "2" ]] || fail "cap 2: want 2 ledger rows, got $(rows)"
+end_case "case 16/17 cap semantics"
+
+# ==========================================================================================
+# 18 — a stop between iterations halts before the next selection
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
+    > "$SCRATCH/triage-out"
+echo ': > "$S/.ibl5-pr-cycle.stop"' > "$SCRATCH/triage-hook-1"
+run --worker
+[[ $RC -eq 0 ]] || fail "stop between iterations exit $RC, want 0"
+[[ "$(calls ready)" == "1" ]] || fail "want 1 ready before the stop, got $(calls ready)"
+grep -qF 'stopped by' "$SCRATCH/dm.argv" || fail "the DM did not name the stop"
+end_case "case 18 stop between iterations"
+
+# ==========================================================================================
+# 19 — the end-of-run DM
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
+    > "$SCRATCH/triage-out"
+run --worker
+[[ "$(calls dm)" == "1" ]] || fail "want exactly 1 DM, got $(calls dm)"
+grep -qF 'merged 0' "$SCRATCH/dm.argv" || fail "DM lacks the merged count"
+grep -qF 'left for human 3' "$SCRATCH/dm.argv" || fail "DM lacks the left-for-human count"
+
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
+    > "$SCRATCH/triage-out"
+run --worker --no-dm
+[[ "$(calls dm)" == "0" ]] || fail "--no-dm still sent $(calls dm) DMs"
+
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
+    > "$SCRATCH/triage-out"
+echo MERGED > "$SCRATCH/state-101"
+printf '%s' "$(view_json 101 "$(digest_comment)")" > "$SCRATCH/view-101.json"
+echo 1 > "$SCRATCH/dm-rc"
+run --worker
+[[ $RC -eq 0 ]] || fail "a failed DM changed the run exit status to $RC"
+[[ "$(rows)" == "1" ]] || fail "a failed DM cost a ledger row"
+end_case "case 19 end-of-run DM"
+
+# ==========================================================================================
+# 20 — the dry-run default fires nothing
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+run
+[[ $RC -eq 0 ]] || fail "dry run exit $RC, want 0"
+BARE="$OUT"
+grep -qF -- '--go' "$SCRATCH/ready.argv" && fail "dry run passed --go to the ready tool"
+grep -qF -- '--arm' "$SCRATCH/triage.argv" && fail "dry run armed"
+grep -qF 'bootstrap' "$SCRATCH/launchctl.argv" && fail "dry run bootstrapped a job"
+[[ ! -e "$SCRATCH/IBL5-merge-digest.md" ]] || fail "dry run created the ledger"
+grep -qF 'next PR: #101' <<< "$BARE" || fail "dry run did not name the next PR"
+
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+run --dry-run
+[[ "$OUT" == "$BARE" ]] || fail "--dry-run output differs from the bare form"
+end_case "case 20 dry-run default"
+
+# ==========================================================================================
+# 21 / 22 / 23 — artifact generation under --go
+# ==========================================================================================
+begin_case
+reset_state
+TSPIN="testfix1"
+PLIST="$SCRATCH/Library/LaunchAgents/com.ibl5.pr-cycle-$TSPIN.plist"
+RUNNER="/tmp/pr-cycle-$TSPIN.sh"
+rm -f "$RUNNER" "/tmp/pr-cycle-$TSPIN.log" "$PLIST"
+PR_CYCLE_DRY_LAUNCH=1 TSPIN="$TSPIN" run --go
+[[ $RC -eq 0 ]] || fail "--go (dry launch) exit $RC, want 0"
+[[ -f "$PLIST" ]] || fail "no plist at $PLIST"
+grep -qF "<string>com.ibl5.pr-cycle-$TSPIN</string>" "$PLIST" || fail "plist Label wrong"
+grep -qF '<key>KeepAlive</key><false/>' "$PLIST" || fail "plist KeepAlive is not false"
+[[ "$(grep -c "<string>/tmp/pr-cycle-$TSPIN.log</string>" "$PLIST")" == "2" ]] \
+    || fail "plist stdout/stderr paths do not both point at the printed log"
+grep -qF '/usr/bin' "$PLIST" || fail "plist PATH lacks /usr/bin"
+grep -qF '${' "$PLIST" && fail "plist has an unexpanded \${...} sequence"
+grep -qF '<string></string>' "$PLIST" && fail "plist has an empty <string></string> value"
+grep -qF "log=/tmp/pr-cycle-$TSPIN.log" <<< "$OUT" || fail "--go did not print the log path"
+
+[[ -x "$RUNNER" ]] || fail "runner not executable"
+bash -n "$RUNNER" || fail "runner does not parse"
+grep -qF -- '--worker' "$RUNNER" || fail "runner does not carry --worker"
+grep -qF "NO_DM=''" "$RUNNER" || fail "runner NO_DM not empty by default"
+
+rm -f "$RUNNER" "$PLIST"
+PR_CYCLE_DRY_LAUNCH=1 TSPIN="$TSPIN" run --go --no-dm
+grep -qF "NO_DM=1" "$RUNNER" || fail "--no-dm did not reach the runner"
+
+# 23a — artifact collision refuses without writing a plist
+rm -f "$PLIST"
+PR_CYCLE_DRY_LAUNCH=1 TSPIN="$TSPIN" run --go
+[[ $RC -eq 1 ]] || fail "runner collision: exit $RC, want 1"
+[[ ! -e "$PLIST" ]] || fail "runner collision still wrote a plist"
+
+# 23b — a pre-existing stop file refuses
+rm -f "$RUNNER" "$PLIST"
+: > "$SCRATCH/.ibl5-pr-cycle.stop"
+PR_CYCLE_DRY_LAUNCH=1 TSPIN="$TSPIN" run --go
+[[ $RC -eq 1 ]] || fail "stop file present: exit $RC, want 1"
+[[ -e "$SCRATCH/.ibl5-pr-cycle.stop" ]] || fail "the driver removed the stop file"
+rm -f "$SCRATCH/.ibl5-pr-cycle.stop" "$RUNNER" "$PLIST" "/tmp/pr-cycle-$TSPIN.log"
+unset TSPIN
+end_case "case 21/22/23 artifacts"
+
+# ==========================================================================================
+# 24 — an empty seam behaves exactly like an unset one
+# ==========================================================================================
+begin_case
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
+    > "$SCRATCH/triage-out"
+echo MERGED > "$SCRATCH/state-101"
+printf '%s' "$(view_json 101 "$(digest_comment)")" > "$SCRATCH/view-101.json"
+LEDGER="" run --worker      # empty PR_CYCLE_LEDGER must fall back to $HOME/IBL5-merge-digest.md
+[[ "$(rows)" == "1" ]] || fail "empty PR_CYCLE_LEDGER did not fall back to the HOME default"
+
+reset_state
+MAIN_OVERRIDE="" run --worker   # empty checkout seam falls back to the real hardcoded path
+[[ $RC -eq 1 ]] || fail "empty PR_CYCLE_MAIN_CHECKOUT did not fall back to the pinned default"
+unset MAIN_OVERRIDE LEDGER
+end_case "case 24 empty seams"
+
+# ==========================================================================================
+# 25 / 26 — static guards over the driver source, and their vacuity check
+# ==========================================================================================
+# Each guard is a function over a FILE, so it can be run against the real driver (expect
+# pass) and against deliberately mutated copies (expect fail). A guard that cannot fail is
+# not a guard.
+noncomment() { grep -vE '^[[:space:]]*#' "$1"; }
+
+g_no_merge() {
+    ! grep -qE 'gh[[:space:]]+pr[[:space:]]+merge|pr[[:space:]]+merge[[:space:]]+--' "$1" \
+        && ! grep -qE 'merge[^\n]*--auto' "$1"
+}
+g_no_armable_lib() { ! grep -q 'pr-armable' "$1"; }
+g_triage_pin() {
+    grep -qF 'PR_CYCLE_TRIAGE_CMD="${PR_CYCLE_TRIAGE_CMD:-$ROOT/bin/pr-triage}"' "$1"
+}
+g_one_arm() {
+    local n line
+    n="$(noncomment "$1" | grep -c -- '--arm')"
+    [[ "$n" == "1" ]] || return 1
+    # Strip the leading indent and everything from the first redirection onward: the real
+    # call site ends in `> ... 2> ...`, and that is not part of the argv being asserted.
+    line="$(noncomment "$1" | grep -- '--arm' \
+        | sed 's/^[[:space:]]*//; s/[[:space:]]*[0-9]*>.*$//; s/[[:space:]]*$//')"
+    [[ "$line" == '"$PR_CYCLE_TRIAGE_CMD" --arm' ]]
+}
+g_no_bucket_cond() {
+    ! noncomment "$1" | grep -qE 'FEAT-AWAITING-SIGNOFF|PIPELINE-HELD|UNCLEARED|[^-A-Z]HELD[^-A-Z]'
+}
+g_sleep_in_poll() {
+    local start end bad
+    start="$(grep -n '^_poll_merge()' "$1" | cut -d: -f1)"
+    end="$(grep -n '^_digest_labels()' "$1" | cut -d: -f1)"
+    [[ -n "$start" && -n "$end" ]] || return 1
+    bad="$(grep -nE '(^|[^A-Za-z_])sleep[[:space:]]' "$1" | cut -d: -f1 \
+        | awk -v s="$start" -v e="$end" '$1 < s || $1 > e')"
+    [[ -z "$bad" ]]
+}
+g_cmd_prefix() {
+    ! noncomment "$1" | grep -E '^[A-Z_]+_CMD=' | grep -qv '^PR_CYCLE_'
+}
+
+begin_case
+for g in g_no_merge g_no_armable_lib g_triage_pin g_one_arm g_no_bucket_cond \
+         g_sleep_in_poll g_cmd_prefix; do
+    "$g" "$DRIVER" || fail "static guard $g fails against the real bin/pr-cycle"
+done
+# Guard 7 — both new files are executable and parse.
+for f in "$DRIVER" "$SCRIPT_DIR/test-pr-cycle"; do
+    [[ -x "$f" ]] || fail "$f is not executable"
+    bash -n "$f" 2>/dev/null || fail "$f does not parse under bash -n"
+done
+end_case "case 25 static guards"
+
+begin_case
+mutant() { cp "$DRIVER" "$SCRATCH/mutant"; }
+mutant; echo 'gh pr merge 101 --squash --auto' >> "$SCRATCH/mutant"
+g_no_merge "$SCRATCH/mutant" && fail "vacuous: g_no_merge passed a driver that merges"
+mutant; echo '"$PR_CYCLE_GH_CMD" pr  merge  101  --auto' >> "$SCRATCH/mutant"
+g_no_merge "$SCRATCH/mutant" && fail "vacuous: g_no_merge passed a seamed merge with --auto"
+mutant; echo '. "$ROOT/bin/lib/pr-armable.sh"' >> "$SCRATCH/mutant"
+g_no_armable_lib "$SCRATCH/mutant" && fail "vacuous: g_no_armable_lib passed an armable-lib source"
+mutant; sed -i.bak 's/^PR_CYCLE_TRIAGE_CMD=.*/PR_CYCLE_TRIAGE_CMD="$ROOT\/bin\/other"/' "$SCRATCH/mutant"
+g_triage_pin "$SCRATCH/mutant" && fail "vacuous: g_triage_pin passed a repointed triage seam"
+mutant; sed -i.bak '/"\$PR_CYCLE_TRIAGE_CMD" --arm /d' "$SCRATCH/mutant"
+g_one_arm "$SCRATCH/mutant" && fail "vacuous: g_one_arm passed a driver with no arm call"
+mutant; sed -i.bak 's/" --arm >/" --arm --force >/' "$SCRATCH/mutant"
+g_one_arm "$SCRATCH/mutant" && fail "vacuous: g_one_arm passed an arm call with an extra flag"
+mutant; echo 'if [ "$BUCKET" = "FEAT-AWAITING-SIGNOFF" ]; then :; fi' >> "$SCRATCH/mutant"
+g_no_bucket_cond "$SCRATCH/mutant" && fail "vacuous: g_no_bucket_cond passed a sign-off conditional"
+mutant; echo 'sleep 5' >> "$SCRATCH/mutant"
+g_sleep_in_poll "$SCRATCH/mutant" && fail "vacuous: g_sleep_in_poll passed a sleep outside _poll_merge"
+mutant; echo 'TRIAGE_CMD="${TRIAGE_CMD:-x}"' >> "$SCRATCH/mutant"
+g_cmd_prefix "$SCRATCH/mutant" && fail "vacuous: g_cmd_prefix passed an unprefixed *_CMD seam"
+end_case "case 26 guards are not vacuous"
+
+# ==========================================================================================
+# 29 — CI actually runs this harness
+# ==========================================================================================
+begin_case
+WF="$SCRIPT_DIR/../.github/workflows/tests.yml"
+if [[ -f "$WF" ]]; then
+    [[ "$(grep -c 'run: bin/test-pr-cycle' "$WF")" == "1" ]] \
+        || fail "tests.yml does not run bin/test-pr-cycle exactly once"
+    A="$(grep -n 'run: bin/test-pr-ready-now' "$WF" | head -1 | cut -d: -f1)"
+    B="$(grep -n 'run: bin/test-pr-cycle' "$WF" | head -1 | cut -d: -f1)"
+    C="$(grep -n 'run: bin/test-check-phpunit-hygiene' "$WF" | head -1 | cut -d: -f1)"
+    [[ -n "$A" && -n "$B" && -n "$C" && "$A" -lt "$B" && "$B" -lt "$C" ]] \
+        || fail "bin/test-pr-cycle is not wired between pr-ready-now and phpunit-hygiene"
+else
+    fail "workflow file not found at $WF"
+fi
+end_case "case 29 CI wiring"
+
+# --- summary --------------------------------------------------------------------------------
+if [[ $FAILED -eq 0 ]]; then
+    echo "test-pr-cycle: ALL PASS"
+    exit 0
+fi
+echo "test-pr-cycle: $FAILED failure(s)" >&2
+exit 1

@@ -23,7 +23,7 @@ use Season\Season;
  */
 class Player implements PlayerInterface
 {
-    use PlayerRatingsGetters;
+    use PlayerIdentityGetters, PlayerRatingsGetters;
 
     /** @var \mysqli Database connection */
     protected \mysqli $db;
@@ -128,48 +128,6 @@ class Player implements PlayerInterface
 
     // --- Typed getters delegating to PlayerData ---
 
-    /** @see PlayerInterface::getPlayerID() */
-    public function getPlayerID(): ?int
-    {
-        return $this->playerData?->playerID;
-    }
-
-    /** @see PlayerInterface::getPlrRow() */
-    public function getPlrRow(): ?array
-    {
-        return $this->playerData?->plr;
-    }
-
-    /** @see PlayerInterface::getOrdinal() */
-    public function getOrdinal(): ?int
-    {
-        return $this->playerData?->ordinal;
-    }
-
-    /** @see PlayerInterface::getName() */
-    public function getName(): ?string
-    {
-        return $this->playerData?->name;
-    }
-
-    /** @see PlayerInterface::getNickname() */
-    public function getNickname(): ?string
-    {
-        return $this->playerData?->nickname;
-    }
-
-    /** @see PlayerInterface::getAge() */
-    public function getAge(): ?int
-    {
-        return $this->playerData?->age;
-    }
-
-    /** @see PlayerInterface::getHistoricalYear() */
-    public function getHistoricalYear(): ?int
-    {
-        return $this->playerData?->historicalYear;
-    }
-
     /** @see PlayerInterface::getTeamid() */
     public function getTeamid(): ?int
     {
@@ -192,12 +150,6 @@ class Player implements PlayerInterface
     public function getTeamColor2(): ?string
     {
         return $this->playerData?->teamColor2;
-    }
-
-    /** @see PlayerInterface::getPosition() */
-    public function getPosition(): ?string
-    {
-        return $this->playerData?->position;
     }
 
     /** @see PlayerInterface::getFreeAgencyLoyalty() */
@@ -228,12 +180,6 @@ class Player implements PlayerInterface
     public function getFreeAgencySecurity(): ?int
     {
         return $this->playerData?->freeAgencySecurity;
-    }
-
-    /** @see PlayerInterface::getYearsOfExperience() */
-    public function getYearsOfExperience(): ?int
-    {
-        return $this->playerData?->yearsOfExperience;
     }
 
     /** @see PlayerInterface::getBirdYears() */
@@ -294,72 +240,6 @@ class Player implements PlayerInterface
     public function getSalaryJSB(): ?int
     {
         return $this->playerData?->salaryJSB;
-    }
-
-    /** @see PlayerInterface::getDraftYear() */
-    public function getDraftYear(): ?int
-    {
-        return $this->playerData?->draftYear;
-    }
-
-    /** @see PlayerInterface::getDraftRound() */
-    public function getDraftRound(): ?int
-    {
-        return $this->playerData?->draftRound;
-    }
-
-    /** @see PlayerInterface::getDraftPickNumber() */
-    public function getDraftPickNumber(): ?int
-    {
-        return $this->playerData?->draftPickNumber;
-    }
-
-    /** @see PlayerInterface::getDraftTeamOriginalName() */
-    public function getDraftTeamOriginalName(): ?string
-    {
-        return $this->playerData?->draftTeamOriginalName;
-    }
-
-    /** @see PlayerInterface::getDraftTeamCurrentName() */
-    public function getDraftTeamCurrentName(): ?string
-    {
-        return $this->playerData?->draftTeamCurrentName;
-    }
-
-    /** @see PlayerInterface::getCollegeName() */
-    public function getCollegeName(): ?string
-    {
-        return $this->playerData?->collegeName;
-    }
-
-    /** @see PlayerInterface::getDaysRemainingForInjury() */
-    public function getDaysRemainingForInjury(): ?int
-    {
-        return $this->playerData?->daysRemainingForInjury;
-    }
-
-    /** @see PlayerInterface::getHeightFeet() */
-    public function getHeightFeet(): ?int
-    {
-        return $this->playerData?->heightFeet;
-    }
-
-    /** @see PlayerInterface::getHeightInches() */
-    public function getHeightInches(): ?int
-    {
-        return $this->playerData?->heightInches;
-    }
-
-    /** @see PlayerInterface::getWeightPounds() */
-    public function getWeightPounds(): ?int
-    {
-        return $this->playerData?->weightPounds;
-    }
-
-    /** @see PlayerInterface::getIsRetired() */
-    public function getIsRetired(): ?int
-    {
-        return $this->playerData?->isRetired;
     }
 
     /** @see PlayerInterface::getTimeDroppedOnWaivers() */

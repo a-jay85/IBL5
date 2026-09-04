@@ -853,6 +853,11 @@ notify() {
             | sed 's/^[^P]*\(PR-READY-VERDICT-MARKER-V1|\)/\1/' \
             | sed 's/[`* ]*$//')
     fi
+    if [ -z "$marker_line" ] && [ -f "$LOG" ]; then
+        marker_line=$(grep -m1 'PR-READY-VERDICT-MARKER-V1|' "$LOG" \
+            | sed 's/^[^P]*\(PR-READY-VERDICT-MARKER-V1|\)/\1/' \
+            | sed 's/[`* ]*$//')
+    fi
     local marker_pr=""
     marker_pr=$(printf '%s' "$marker_line" | grep -o 'pr=[^|]*' | cut -d= -f2)
     if [ "$marker_pr" != "$PR" ]; then

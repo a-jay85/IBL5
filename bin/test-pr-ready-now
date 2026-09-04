@@ -2440,6 +2440,7 @@ end_case push-failed-still-hard-stops
 begin_case
 for _f in "$_PRD"/_phase*.md; do
     _enter_line="$(grep -n 'EnterWorktree' "$_f" | head -1 | cut -d: -f1)"
+    [[ -n "$_enter_line" ]] || continue
     _range_end="${_enter_line:-$}"
     _hits="$(sed -n "1,${_range_end}p" "$_f" \
         | awk '/^```/{b=!b;next}!b' \
@@ -2473,9 +2474,12 @@ end_case phase3-marker-step-pin
 
 # --- case 38: phase3-terminator-shasum ---------------------------------------------------
 begin_case
-sed -n '34p' "$_PRD/_phase7-verdict.md" \
-    | shasum | grep -q '13fdd17a712ce7e779e2cf054ce04b120ee2f84c' \
-    || fail "phase3-terminator-shasum: line 34 of _phase7-verdict.md changed — update the pin if intentional"
+_term_line38="$(grep -n '^3\. \*\*STOP — hard terminator' "$_PRD/_phase7-verdict.md" | head -1 | cut -d: -f1)"
+[[ -n "$_term_line38" ]] \
+    || fail "phase3-terminator-shasum: could not locate STOP hard terminator in _phase7-verdict.md"
+sed -n "${_term_line38}p" "$_PRD/_phase7-verdict.md" \
+    | shasum | grep -q '08ea1c2d9451c2431c03c7aea8ad6a63d7c53a9f' \
+    || fail "phase3-terminator-shasum: STOP hard terminator content changed — update the pin if intentional"
 end_case phase3-terminator-shasum
 
 # --- verdict -----------------------------------------------------------------------------

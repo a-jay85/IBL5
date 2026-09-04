@@ -23,7 +23,7 @@ Read at runtime via `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase7-verdi
 
    `<!-- pr-ready-verdict -->`
 
-   **First write the composed comment body to `/tmp/pr-ready-verdict-<N>.md` with the `Write` tool.** The path is keyed to the PR number for the same reason Phase 2a's is: a tmpfile assigned in one Bash call is gone by the next one, so the post below would send an empty `--body-file`. Compose the body in full, write it, then run the post.
+   **First write the composed comment body to `/tmp/pr-ready-verdict-<N>.md` with the `Write` tool.** The path is keyed to the PR number for the same reason Phase 2a's is: a `tmpfile=$(mktemp)` assigned in one Bash call is gone by the next one, so the post below would send an empty `--body-file`. Compose the body in full, write it, then run the post.
 
    **Before composing, materialise the digest lines.** The Phase 6 agent wrote them into
    `/tmp/pr-ready-phase6-verdict-<N>.md` under a trailing `## DIGEST` section; `digest.sh`

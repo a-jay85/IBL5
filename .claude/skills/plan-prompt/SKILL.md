@@ -1,7 +1,7 @@
 ---
 name: plan-prompt
 description: "Draft a /plan prompt distilled from the current conversation — ground-truth pointers, already-measured evidence, scope, constraints, verification, and the Step-3 architect tier — then, unless the Step-1.5 size triage says the work clears the ad-hoc bar, fire it as a detached headless Sonnet 4.6 run via bin/plan-now. Use after a design discussion when the planning run should be offloaded off the expensive session."
-last_verified: 2026-08-18
+last_verified: 2026-09-03
 ---
 
 # Draft a `/plan` handoff prompt and fire it headless
@@ -70,9 +70,25 @@ offload; offloading is why you invoked this skill.
 ## Step 2 — Split by PR before composing
 
 **One plan = one PR** (`.claude/skills/plan/SKILL.md`). If the work spans multiple
-PRs, emit **one prompt block per PR**, in dependency order, each naming its base
-branch. Do not hand Sonnet a bundle and expect Step 2.5 to untangle it — you already
-know the split; encode it.
+PRs, emit **one prompt block per PR**. Do not hand Sonnet a bundle and expect Step 2.5
+to untangle it — you already know the split; encode it.
+
+**Every block bases on `master`. De-stacking is the default, not the exception.**
+Step 5 fires every block you emit, in one invocation, so a block whose base branch does
+not exist yet is unfireable — and an unfireable block is a to-do handed to the user.
+Before writing `--base <sibling>` into any block's Sequencing section, run this
+discriminator:
+
+| What you see | A dependency? | What to do |
+|---|---|---|
+| Two blocks edit the **same file** | **No** — that is a rebase | Base both on `master`. In each block name the *region* it touches, say a sibling is in flight on that file, anchor every edit on surrounding **text, never a line number** (the sibling shifts them), and say plainly: do not re-implement the sibling's work, do not depend on it, do not name its branch. |
+| Block N wants to **reuse a pattern** block N-1 introduces | **No** | Block N-1 is itself copying that pattern from somewhere. Point block N at *that* source on `master` with a `path:line` pointer, so it never needs the sibling. |
+| Block N's code **calls a symbol** block N-1 creates, with no `master`-side equivalent | **Yes** — and the split is wrong | Do not emit two blocks. Re-cut the boundary so each half stands alone on `master`, or fold both into one block. |
+
+The first two rows are the common case; the third is rare. The observed failure was
+reading a shared-file overlap as a dependency and holding block 2 for a human to fire
+later. "Dependency order" is not a licence to stack — a genuine dependency means the
+split is not finished.
 
 ## Step 3 — Compose each block
 
@@ -183,7 +199,7 @@ artifact *feels* like the work landed, and a fire gets reported that never happe
 The block goes to a file and to `bin/plan-now`; the conversation gets the report in
 step 3.
 
-1. Write block 1 to a temp file and copy it to the clipboard:
+1. Write each block to its own temp file:
 
    ```bash
    f=$(mktemp -t plan-prompt); : > "$f"   # write the block into "$f" first
@@ -191,10 +207,13 @@ step 3.
    ```
 
    Use `mktemp`, not a fixed `/tmp` name — several sessions run this repo at once.
-   With multiple blocks, copy block 1 and say which one is on the clipboard.
    Keep the `pbcopy` even though step 2 fires the run: if the fire fails, the block
    is still on the clipboard and you have degraded to the old manual paste, not lost
    the draft.
+   With multiple blocks the clipboard holds only one, and nothing is special about
+   block 1 — step 2 consumes the temp files, not the clipboard. So the clipboard
+   belongs to whichever block **failed** to fire: copy that one after step 2, and say
+   which it is. If every block fired, the clipboard is irrelevant.
 2. Fire it — the file from step 1 is the argument:
 
    ```bash
@@ -226,8 +245,30 @@ step 3.
    Because the plan will be *executed*, not skimmed: Step 4.5's fork pre-resolution and
    the Step-3 tier directive are what stand between this block and a wrong PR.
 
-   With multiple blocks, fire **only block 1**. Later blocks are stacked PRs whose base
-   branch does not exist yet — write them out, and say they fire after block 1's PR.
+   **With multiple blocks, fire every one of them in this same invocation** — one
+   `bin/plan-now` call per block, back to back. Step 2 already guaranteed every block
+   bases on `master`, so none of them waits on a branch that does not exist:
+
+   ```bash
+   for f in "$f1" "$f2" "$f3"; do bin/plan-now --implement "$f"; done
+   ```
+
+   No spacing between the calls is needed. Each `bin/plan-now` is its own process and
+   its launchd label carries that process's PID, so same-second fires cannot collide
+   (fixed 2026-08-30 — `TS=$(date +%Y%m%d-%H%M%S)-$$` in `bin/plan-now`). Any older
+   advice to `sleep` between fires is stale. Then confirm the count — one live label
+   per block, and report the log path each call printed:
+
+   ```bash
+   launchctl list | grep -c 'com\.ibl5\.plan-now-'
+   ```
+
+   **Never end a multi-block draft with something for the user to do later.** "Write
+   block 2 out and fire it once block 1's PR merges" is a to-do handed to a human, and
+   a to-do is a thing to forget — this is a standing user constraint, not a preference.
+   Every block you emit is fired now, or it is not emitted at all. If a block truly
+   cannot fire yet, that is Step 2's third row: the split was wrong, so go re-cut it
+   instead of deferring it.
 
    Skip the fire (draft only) when the user asked for the prompt itself, or when
    Step 4.5 left a fork you could not resolve. Say which happened — and only in the

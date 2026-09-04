@@ -137,6 +137,26 @@ final class FranchiseRecordRepository extends \BaseMysqliRepository
 
                 UNION ALL
 
+                SELECT ranked.year, ranked.name, ranked.award
+                FROM (
+                    SELECT
+                        psr.year AS year,
+                        psr.winner AS name,
+                        CONCAT(lc.conference, ' Conference Champions') AS award,
+                        COUNT(*) OVER (PARTITION BY psr.year, lc.conference) AS series_in_conf
+                    FROM vw_playoff_series_results psr
+                    LEFT JOIN `ibl_franchise_seasons` fs
+                        ON fs.franchise_id = psr.winner_tid AND fs.season_ending_year = psr.year
+                    JOIN `ibl_league_config` lc
+                        ON lc.season_ending_year = psr.year
+                       AND lc.team_name = COALESCE(fs.team_name, psr.winner)
+                    WHERE psr.round = 3
+                      AND psr.winner_games >= NULLIF(CAST(SUBSTRING_INDEX(lc.playoff_round3_format, ' ', 1) AS UNSIGNED), 0)
+                ) ranked
+                WHERE ranked.series_in_conf = 1
+
+                UNION ALL
+
                 SELECT year, name, award
                 FROM `vw_heat_champions`
             ) all_awards

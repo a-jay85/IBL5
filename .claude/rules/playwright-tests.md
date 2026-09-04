@@ -1,7 +1,7 @@
 ---
 description: Playwright E2E testing rules, Docker requirements, and actionability pitfalls.
 paths: ibl5/tests/e2e/**/*.ts
-last_verified: 2026-07-27
+last_verified: 2026-09-03
 ---
 
 # Playwright E2E Testing Rules
@@ -160,7 +160,7 @@ Tests depending on app state (season phase, trading open, trivia mode…) **set 
 
 ## Mandatory: No Skips, No Silent Passes
 
-DON'Ts 10–14 (the most common anti-patterns) are mechanically enforced by `bin/check-e2e-hygiene` (CI: the `e2e-hygiene` check in `.github/workflows/pr-meta-checks.yml`, consolidated from the former `e2e-hygiene.yml`). Exceptions go in `.e2e-hygiene-skip-allowlist` (file-level) or inline `// e2e-hygiene-allow: <reason >= 20 chars>`. Banned forms:
+DON'Ts 10–14 (the most common anti-patterns) are mechanically enforced by `bin/check-e2e-hygiene` (CI: the `e2e-hygiene` check in `.github/workflows/pr-meta-checks.yml`, consolidated from the former `e2e-hygiene.yml`). Exceptions go in `.e2e-hygiene-skip-allowlist` (file-level) or inline `// e2e-hygiene-allow: <reason >= 20 chars>`. The skip ban matches any aliased test object (e.g. `nonAdminTest.skip(`, `setup.skip(`), not just the literal `test.skip(`, so renaming the import is not an escape hatch. Banned forms:
 
 ```typescript
 if (count === 0) { test.skip(true, 'No data'); return; }      // BANNED — hides failures

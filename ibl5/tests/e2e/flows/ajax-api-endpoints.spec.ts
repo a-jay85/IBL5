@@ -61,6 +61,10 @@ function describeTabApi(cfg: TabApiSuite): void {
         expect(response.status(), `${cfg.modeMsgPrefix}${mode} should return 200`).toBe(200);
         const html = await response.text();
         expect(html.length, `${cfg.modeMsgPrefix}${mode} should return non-empty html`).toBeGreaterThan(0);
+        expect(
+          html,
+          `${cfg.modeMsgPrefix}${mode} should render a real table, not an error page`,
+        ).toContain('<table');
       }
     });
 
@@ -259,6 +263,9 @@ test.describe('DraftHistory API', () => {
     expect(response.status()).toBe(200);
     const html = await response.text();
     expect(html.length).toBeGreaterThan(0);
+    expect(html, 'out-of-range year should still render a draft table, not an error page').toContain(
+      '<table',
+    );
   });
 
   test('response includes HX-Push-Url header', async ({ request }) => {
@@ -298,6 +305,9 @@ test.describe('FranchiseRecordBook API', () => {
     expect(response.status()).toBe(200);
     const html = await response.text();
     expect(html.length).toBeGreaterThan(0);
+    expect(html, 'team-specific view should render the record-book page, not an error').toContain(
+      'ibl-title',
+    );
   });
 
   test('invalid teamid falls back to league-wide', async ({ request }) => {

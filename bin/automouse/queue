@@ -95,7 +95,7 @@ stamp_back_of_queue() {
 
 show_queue() {
     echo "Automouse queue (next to run first):"
-    printf "  %4s  %-44s %-8s %-6s  %s\n" "#" "PLAN" "MODEL" "MERGE" "TITLE"
+    printf "  %4s  %-44s %-17s %-6s  %s\n" "#" "PLAN" "MODEL" "MERGE" "TITLE"
     local found=0
     local i=1
     while IFS= read -r f; do
@@ -114,7 +114,7 @@ show_queue() {
         fi
         impl_model=${impl_model:-opus}
         auto_merge=${auto_merge:-true}
-        printf "  %4d. %-44s %-8s %-6s  %s\n" "$i" "$name" "$impl_model" "$auto_merge" "$title"
+        printf "  %4d. %-44s %-17s %-6s  %s\n" "$i" "$name" "$impl_model" "$auto_merge" "$title"
         i=$((i + 1))
     done < <(ls -1tr "$QUEUE_DIR"/*.md 2>/dev/null)
     if [ "$found" -eq 0 ]; then

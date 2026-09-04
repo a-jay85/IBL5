@@ -19,6 +19,8 @@ Tier every sub-agent (and every agent a plan spawns) by the reasoning the task a
 
 > **The boundary keys on task *type* (judgment vs. mechanical), not raw model capability** — a stronger Sonnet moves nothing across the line. Why: `agent-tiering-detail.md`.
 
+**Plan `impl_model:` is a different namespace** — these values do not carry over; six literals only: `.claude/rules/automouse-workflow.md`.
+
 ## Fat-tail delegation
 
 **Only the fat tail of tool results is worth a spawn.** A call is **fat** when it is a `Read` ≥ 8 KB, or a Bash command in: bare `cat`, `git log` with no bound, `find` with no limit, a full Playwright run. **Two fat calls per turn pass; the 3rd is denied** — batch it and the rest into ONE `Agent(subagent_type: "sonnet-4-6")` (omit `model`). Enforced by **Check F** in `~/.claude/hooks/output-guard.sh`; fails open; touch the override path from the deny message for a one-off. Evidence and reconciliation: `agent-tiering-detail.md` § Skip the Agent.

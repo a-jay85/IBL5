@@ -20,6 +20,7 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HELPER="$SCRIPT_DIR/lib/plan-impl-model"
+TIER_HELPER="$SCRIPT_DIR/lib/plan-model-tier"
 TMP="$(mktemp -d)"
 trap 'rm -f "$TMP"/*.md 2>/dev/null; rmdir "$TMP" 2>/dev/null' EXIT
 
@@ -36,6 +37,34 @@ assert() {
         FAILED=1
     else
         echo "ok: $name ($got)"
+    fi
+}
+
+# assert_reject <name> <body> <expected-stderr-substring>
+assert_reject() {
+    name="$1"; body="$2"; want_sub="$3"
+    f="$TMP/$name.md"
+    printf '%s\n' "$body" > "$f"
+    out=$("$HELPER" "$f" 2>/dev/null); rc=$?
+    err=$("$HELPER" "$f" 2>&1 >/dev/null)
+    if [ "$rc" -eq 0 ]; then echo "FAIL: $name — expected nonzero exit, got 0"; FAILED=1; return; fi
+    if [ -n "$out" ]; then echo "FAIL: $name — stdout must be empty on rejection, got: $out"; FAILED=1; fi
+    case "$err" in *"$want_sub"*) ;; *) echo "FAIL: $name — stderr missing '$want_sub', got: $err"; FAILED=1 ;; esac
+    if [ "$rc" -ne 0 ] && [ -z "$out" ]; then
+        case "$err" in *"$want_sub"*) echo "ok: $name (rejected, stderr contains '$want_sub')" ;; esac
+    fi
+}
+
+# assert_tier <raw-value> <expected-tier>
+assert_tier() {
+    val="$1"; want_tier="$2"
+    got=$("$TIER_HELPER" "$val" 2>/dev/null); rc=$?
+    if [ $rc -ne 0 ]; then echo "FAIL: tier($val) — expected exit 0, got $rc"; FAILED=1; return; fi
+    if [ "$got" != "$want_tier" ]; then
+        echo "FAIL: tier($val) — expected '$want_tier', got '$got'"
+        FAILED=1
+    else
+        echo "ok: tier($val) ($got)"
     fi
 }
 
@@ -76,6 +105,64 @@ assert "c5-whitespace" "claude-sonnet-4-6" '---
 impl_model:   sonnet
 ---
 # Plan'
+
+# c6 — full opus id accepted and resolves to claude-opus-5
+assert "c6-full-opus" "claude-opus-5" '---
+impl_model: claude-opus-5
+---'
+
+# c7 — full sonnet id accepted and resolves to claude-sonnet-4-6
+assert "c7-full-sonnet" "claude-sonnet-4-6" '---
+impl_model: claude-sonnet-4-6
+---'
+
+# c8 — full haiku id accepted and resolves to claude-haiku-4-5
+assert "c8-full-haiku" "claude-haiku-4-5" '---
+impl_model: claude-haiku-4-5
+---'
+
+# r1 — dotted form (claude-sonnet-4.6) is rejected
+assert_reject "r1-dotted" '---
+impl_model: claude-sonnet-4.6
+---' "is not a recognized model"
+
+# r2 — capitalized alias is rejected
+assert_reject "r2-capitalized" '---
+impl_model: Sonnet
+---' "is not a recognized model"
+
+# r3 — foreign model id is rejected
+assert_reject "r3-foreign" '---
+impl_model: gpt-4
+---' "is not a recognized model"
+
+# r4 — fable alias is rejected with the agent-tiering reference
+assert_reject "r4-fable-alias" '---
+impl_model: fable
+---' ".claude/rules/agent-tiering.md"
+
+# r5 — fable full id is rejected with the agent-tiering reference
+assert_reject "r5-fable-full" '---
+impl_model: claude-fable-5
+---' ".claude/rules/agent-tiering.md"
+
+# tier tests — directly pin the classifier contract independent of the resolver
+assert_tier ""               "absent"
+assert_tier "opus"           "opus-tier"
+assert_tier "claude-opus-5"  "opus-tier"
+assert_tier "sonnet"         "sonnet-tier"
+assert_tier "claude-sonnet-4-6" "sonnet-tier"
+assert_tier "haiku"          "haiku-tier"
+assert_tier "claude-haiku-4-5"  "haiku-tier"
+
+# tier no-arg — plan-model-tier with no argument must exit 2 (usage error)
+"$TIER_HELPER" 2>/dev/null; tier_no_arg_rc=$?
+if [ $tier_no_arg_rc -ne 2 ]; then
+    echo "FAIL: tier(no-arg) — expected exit 2, got $tier_no_arg_rc"
+    FAILED=1
+else
+    echo "ok: tier(no-arg) (exit $tier_no_arg_rc)"
+fi
 
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"

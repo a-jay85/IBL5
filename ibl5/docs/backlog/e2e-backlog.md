@@ -1,6 +1,6 @@
 ---
 description: E2E (Playwright + api-e2e) test-quality backlog — refactoring, perf, weak/tautological assertions, tests that don't prove functionality, and flake-prone patterns, with per-entry status + automouse-readiness. Each open entry is a candidate for a /plan.
-last_verified: 2026-09-04
+last_verified: 2026-09-05
 ---
 
 # E2E Test-Quality Backlog
@@ -156,7 +156,7 @@ were softened after direct re-check (C6 partially a false positive, C16 lower-co
 | C16 | ✅ | 🟩 | `flows/olympics-coverage.spec.ts:20` | header-scoped `/w\|l\|.../i` — weak single-char, lower confidence. |
 | C17 | ✅ | — | `api-e2e/api.test.ts assertGetRoute` | **High impact:** silently passes on 401 → 30+ tests skip body validation. May be masking a CI-key/config issue → triage. ✓verified — 401 early-return removed; 14 validateBody callbacks now execute. ✓done |
 | C18 | ✅ | 🟩 | `api-e2e/api.test.ts` CSV | bare `return` L373/395/396 + true-only guard L415 (DON'T rules 12/14). |
-| C19 | ⬜ | 🟨 | `api-e2e/api.test.ts` L423/438/450 | Three pre-existing `if (ct.includes` query-param-auth JSON guards — same Axis-C class (sibling debt; like C17). (discovered 2026-08-10 during #1825) |
+| C19 | ✅ | 🟨 | `api-e2e/api.test.ts` L423/438/450 | Three pre-existing `if (ct.includes` query-param-auth JSON guards — same Axis-C class (sibling debt; like C17). (discovered 2026-08-10 during #1825) ✓verified — three if-guard wrappers removed; all three query-param-auth ct assertions now execute unconditionally (branch api-e2e-c19-unguard-validatebody). ✓done |
 
 **Suggested direction (axis):** Replace each with an assertion tied to feature-specific content (a known seed
 value, a specific column/class, a real sort effect). C17 resolved — 401 early-return removed from assertGetRoute; 14 validateBody callbacks now execute.

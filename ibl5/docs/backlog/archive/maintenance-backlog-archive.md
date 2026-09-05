@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed/declined maintenance-audit findings, extracted from maintenance-backlog.md.
-last_verified: 2026-09-04
+last_verified: 2026-09-05
 ---
 
 # Maintenance-Cost Reduction Backlog — Archive
@@ -1637,6 +1637,15 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Status (2026-07-26):** ✅ Done — API_GUIDE.md correctly framed as architectural overview with controller inventory (`last_verified: 2026-07-24`); full endpoint-by-endpoint reference deferred. See 9.4b (still open in the live backlog).
 
 **Table evidence (2026-08-09):** API_GUIDE.md correctly framed (last_verified 2026-07-24); full endpoint reference deferred to 9.4b.
+### 9.4b API_GUIDE — Full Endpoint-by-Endpoint OpenAPI Reference (Deferred from 9.4)
+**Location:** `ibl5/docs/API_GUIDE.md`
+**Problem:** Architectural overview was correct; no per-endpoint request/response reference existed.
+**Suggested direction:** Author a per-controller endpoint reference; consider OpenAPI/Swagger generation from annotations.
+**Est. effort:** M
+**Risk if untouched:** Agents generating API calls had no authoritative source for request parameters, response shapes, or error codes.
+**Status:** ✅ Implemented (PR #<PR>, 2026-09-05) — full `## Endpoint Reference` section added covering all 27 routes (17 GET + 10 POST); conventions, request parameters, response shapes, and error codes documented per endpoint. Route inventory also corrected from 25/24 to 27/26 (finding 9.34).
+
+**Table evidence (2026-09-05):** API_GUIDE.md endpoint reference section present; `last_verified: 2026-09-05`.
 ### 9.5 `ibl5/docs/README.md` Lists API_GUIDE as "(planned)"
 **Location:** `ibl5/docs/README.md` line 23
 **Problem:** Index contradicts the 17-controller API reality.

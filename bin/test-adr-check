@@ -12,10 +12,10 @@
 #
 # Each case builds a temp git repo with a fake origin/master ref (no real remote
 # needed: `git update-ref refs/remotes/origin/master <base>`). The repo's bin/
-# gets UNTRACKED copies of adr-check + pre-push-adr-hook so REPO_ROOT resolves to
-# the temp repo — untracked, so they never appear in `git diff` and can't become
-# triggers themselves. The trigger file (bin/foo) is the only thing committed into
-# bin/, so the diff sees exactly one added bin/ script.
+# gets UNTRACKED copies of adr-check + pre-push-adr-hook + bin/lib/branch-base.sh
+# so REPO_ROOT resolves to the temp repo — untracked, so they never appear in
+# `git diff` and can't become triggers themselves. The trigger file (bin/foo) is
+# the only thing committed into bin/, so the diff sees exactly one added bin/ script.
 #
 # Run: bin/test-adr-check  (exit 0 = all pass, 1 = a case failed)
 
@@ -41,9 +41,10 @@ expect() { # name want got
 # (optionally) a fake origin/master ref. Sets $REPO.
 new_repo() {
     REPO="$(mktemp -d "$BASE_TMP/repo.XXXXXX")"
-    mkdir -p "$REPO/bin"
+    mkdir -p "$REPO/bin/lib"
     cp "$SCRIPT_DIR/adr-check" "$REPO/bin/adr-check"
     cp "$SCRIPT_DIR/pre-push-adr-hook" "$REPO/bin/pre-push-adr-hook"
+    cp "$SCRIPT_DIR/lib/branch-base.sh" "$REPO/bin/lib/branch-base.sh"
     chmod +x "$REPO/bin/adr-check" "$REPO/bin/pre-push-adr-hook"
     git -C "$REPO" init -q
     git -C "$REPO" config user.email test@example.com

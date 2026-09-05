@@ -172,6 +172,31 @@ jobs:
       - name: Assert no duplicate regular-season boxscores in the restored dump
         run: php ibl5/bin/check-boxscore-schedule-run --duplicates-only
 
+      - name: Run full boxscore/schedule audit (warn-only)
+        id: boxscore-full-audit
+        if: ${{ !cancelled() }}
+        run: |
+          set +e
+          php ibl5/bin/check-boxscore-schedule-run
+          AUDIT_RC=$?
+          echo "audit_rc=$AUDIT_RC" >> "$GITHUB_OUTPUT"
+
+      - name: Build full-audit Discord message
+        if: ${{ !cancelled() && steps.boxscore-full-audit.outputs.audit_rc != '0' && steps.boxscore-full-audit.outputs.audit_rc != '' }}
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          printf 'Boxscore/schedule full audit found issues in the nightly prod-DB snapshot.\n\nThis is a monitoring alert, not a job failure. Triage the findings as data debt in a separate unit of work.\n\nRun: %s' "$RUN_URL" > /tmp/discord-msg.txt
+
+      - name: Notify full-audit findings via Discord
+        if: ${{ !cancelled() && steps.boxscore-full-audit.outputs.audit_rc != '0' && steps.boxscore-full-audit.outputs.audit_rc != '' }}
+        continue-on-error: true
+        uses: ./.github/actions/notify-discord
+        with:
+          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
+          port: ${{ secrets.PORT }}
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+
   notify-backup-failure:
     name: Notify Backup Failure
     runs-on: ubuntu-latest

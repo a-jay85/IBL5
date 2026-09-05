@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Team;
 
 use Auth\Contracts\AuthServiceInterface;
+use Http\HttpRequest;
 use League\League;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Team\Contracts\TeamControllerInterface;
@@ -23,14 +24,16 @@ class TeamController implements TeamControllerInterface
     private TeamViewInterface $view;
     private TeamIdentityRepositoryInterface $commonRepo;
     private AuthServiceInterface $authService;
+    private HttpRequest $request;
 
-    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepo, AuthServiceInterface $authService, TeamServiceInterface $service, TeamViewInterface $view)
+    public function __construct(\mysqli $db, TeamIdentityRepositoryInterface $commonRepo, AuthServiceInterface $authService, TeamServiceInterface $service, TeamViewInterface $view, HttpRequest $request)
     {
         $this->db = $db;
         $this->service = $service;
         $this->view = $view;
         $this->commonRepo = $commonRepo;
         $this->authService = $authService;
+        $this->request = $request;
     }
 
     /**
@@ -54,9 +57,9 @@ class TeamController implements TeamControllerInterface
     {
         // Validate and sanitize year parameter
         $yr = null;
-        if (isset($_REQUEST['yr']) && is_string($_REQUEST['yr']) && $_REQUEST['yr'] !== '') {
+        $rawYr = $this->request->request('yr');
+        if (is_string($rawYr) && $rawYr !== '') {
             // Year should be a 4-digit year or a season range like "2024-25"
-            $rawYr = $_REQUEST['yr'];
             if (preg_match('/^\d{4}(-\d{2})?$/', $rawYr) === 1) {
                 $yr = $rawYr;
             }
@@ -65,8 +68,8 @@ class TeamController implements TeamControllerInterface
 
         // Validate display parameter against whitelist
         $display = 'ratings';
-        if (isset($_REQUEST['display']) && is_string($_REQUEST['display'])) {
-            $rawDisplay = $_REQUEST['display'];
+        $rawDisplay = $this->request->request('display');
+        if (is_string($rawDisplay)) {
             if (in_array($rawDisplay, self::VALID_DISPLAY_MODES, true)) {
                 $display = $rawDisplay;
             }
@@ -75,9 +78,9 @@ class TeamController implements TeamControllerInterface
 
         // Validate split parameter when display=split
         $split = null;
-        if ($display === 'split' && isset($_REQUEST['split']) && is_string($_REQUEST['split'])) {
+        $rawSplit = $this->request->request('split');
+        if ($display === 'split' && is_string($rawSplit)) {
             $splitRepo = new SplitStatsRepository($this->db);
-            $rawSplit = $_REQUEST['split'];
             if (in_array($rawSplit, $splitRepo->getValidSplitKeys(), true)) {
                 $split = $rawSplit;
             } else {
@@ -101,8 +104,10 @@ class TeamController implements TeamControllerInterface
 
         try {
             $pageData = $this->service->getTeamPageData($teamid, $yr, $display, $userTeamName, $split);
-            $pageData['extensionResult'] = isset($_GET['result']) && is_string($_GET['result']) ? $_GET['result'] : null;
-            $pageData['extensionMsg'] = isset($_GET['msg']) && is_string($_GET['msg']) ? $_GET['msg'] : null;
+            $rawResult = $this->request->get('result');
+            $pageData['extensionResult'] = is_string($rawResult) ? $rawResult : null;
+            $rawMsg = $this->request->get('msg');
+            $pageData['extensionMsg'] = is_string($rawMsg) ? $rawMsg : null;
         } catch (\RuntimeException $e) {
             $responder->html('<div class="ibl-alert ibl-alert--error">Team not found.</div>');
             \PageLayout\PageLayout::footer();

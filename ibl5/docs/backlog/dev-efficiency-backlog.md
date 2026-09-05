@@ -68,6 +68,10 @@ last_verified: 2026-09-04
 | E40 | `bin/scrub-log-credentials` prod path: unquoted outer heredoc mangles remote jq filter escapes (F1) + local per-file hit report silently discarded (F4) — both fixed Phase 6.5 #1920; case 8 harness guards regression | ⬜ Open | — | S |
 | E41 | `ErrorHandlerRegistrarTest` + `bin/test-scrub-log-credentials`: SYNTHETIC_SECRET 32 chars truncated to 15 in `getTraceAsString()` causes vacuous assertion (F2) + closure assertion replaced with unconditional pass (F3) — both fixed Phase 6.5 #1920 | ⬜ Open | — | XS |
 | E42 | Phase 6 review notes on PR #1968 — plan-accuracy divergences (N1–N4); all non-blocking; no gate warranted | ⬜ Open | — | XS |
+| E43 | `bin/check-plan` PR6 gates: migration literals [A], line-number anchors [L], docker liveness [E], shellcheck CI-class [I], PHP coverage advisory [J], plus gate [V] `/path/to` + `main.localhost` extensions | ⬜ Open | 🟩 | S |
+| E44 | Phase 6 review findings on PR #2082 — gate [V] main.localhost bootstrap defect (blocking), body count mismatch, vacuous range fixture, stale corpus count, nonexistent `bin/db-wait` (example) reference, wrong baseline claim; all fixed in Phase 6.5 | ⬜ Open | 🟩 | S |
+| E45 | Phase 6 review notes on PR #1924 — stale Scope forward-reference and false Manual Testing claim; PR-body-only fixes; no gate warranted | ⬜ Open | — | XS |
+| E46 | Documentation gaps in bin/pr-cycle toolchain — missing seam declarations and overstated harness assertions | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -704,3 +708,136 @@ Not a defect in the anchoring or the SIGPIPE handling: the `$`-anchor (guarding 
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-04 during #1968)*
+
+### E43 `bin/check-plan` PR6 gates: five new gates and two gate [V] extensions
+
+**class: gate addition** — Adds five new gates and two extensions to `bin/check-plan` to prevent recurring plan-vs-implementation divergences that caused Phase 6 remediation commits:
+
+- **[A] Migration-number literal** (hard-fail): plans must not name specific migration numbers; use `run bin/next-migration at impl time` escape phrase.
+- **[L] Line-number anchor** (warn-only, location-cell scope): location cells referencing `line N` create fragile anchors that break when code shifts.
+- **[E] Docker liveness precondition** (warn-only): plans that exercise Docker/`bin/db-query` should include a liveness check row.
+- **[I] Shellcheck CI-class flags** (hard-fail): VM rows invoking `shellcheck` must use `--severity=warning --shell=bash` to match CI.
+- **[J] PHP coverage advisory** (warn-only): plans that introduce a new `ibl5/classes/*.php` file should include an Infection/mutation/coverage row.
+- **[V] ext `/path/to`**: CLI-executable rows with a `/path/to` placeholder are caught by the existing `_bad` chain.
+- **[V] ext `main.localhost`**: any VM row referencing `main.localhost` is a hard-fail (worktree plans must derive the hostname at runtime).
+
+**prevention_ladder: gates added** — PR #2082 (check-plan-pr6-gates branch).
+
+`artifact destination: bin/check-plan, bin/test-check-plan`
+
+`last_verified: 2026-09-04`
+
+*(discovered 2026-09-04 from pattern analysis of Phase 6 remediation commits)*
+
+### E44 Phase 6 review findings on PR #2082 — gate [V] bootstrap defect and five accuracy notes
+
+**class: gate bootstrap defect** — a `bin/check-plan` gate implementation that matches the full matrix row string (including the prose "What to verify" cell) rather than just the location cell, with no escape phrase, causing a plan that documents or tests the gate to hard-fail the very gate it is proposing — a self-referential bootstrap failure. Five additional accuracy findings (body count, vacuous fixture, stale comment, nonexistent script reference, wrong baseline claim) also remediated in Phase 6.5.
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/check-plan:316` — gate [V] full-row main.localhost match, no escape | yes | yes | fixed this pass |
+| 2 | PR body — "15 fixtures" contradicted by diff (19 actual) | near-miss | yes | fixed this pass |
+| 3 | `bin/test-check-plan:2182` — gate-L-range-clean fixture used plural form, vacuous | near-miss | yes | fixed this pass |
+| 4 | `bin/test-check-plan:2011` — corpus count "26" stale after trim to 20 | near-miss | yes | fixed this pass |
+| 5 | `bin/check-plan:1203,1208` — nonexistent `bin/db-wait` (example) in [E] liveness regex and warn string | near-miss | yes | fixed this pass |
+| 6 | plan VM row 7 — pre-flight claim "exits 0" wrong at time of writing | near-miss | yes | fixed this pass (plan file) |
+
+**prevention_ladder:**
+- rung 0: No existing gate covered the escape-phrase gap in gate [V].
+- rung 1: Extended gate [V]'s main.localhost arm with an escape phrase `documents main.localhost gate` (same pattern as gate [A]'s `run bin/next-migration at impl time` escape). **Landing rung: 1** — escape phrase added in Phase 6.5 of this PR.
+- rungs 2–5: Not warranted for this class; the fix is a one-line guard in the same gate implementation.
+
+For the accuracy findings (2–6): prevention is the existing `/pr-ready` Phase 6 review pipeline, which caught all five. No new gate warranted — the mechanism works.
+
+`artifact destination: bin/check-plan` (escape phrase guard), `bin/test-check-plan` (escape fixture + range fixture fix)
+
+`last_verified: 2026-09-04`
+
+*(discovered 2026-09-04 during Phase 6 review of #2082)*
+
+### E45 Phase 6 review notes on PR #1924 (architect-explore-fanout) — stale Scope forward-reference and false test claim; PR-body-only fixes
+
+**class:** PR body prose carries a forward-reference to phases already landed on master ("not yet in this diff — see MISSING-FILE note below") and a false Manual Testing claim ("all changes are covered by unit and E2E tests") for a docs-only `.claude/` change with no PHP code. Both are scope-accuracy defects in the PR body, not implementation defects.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #1924 body Scope — "not yet in this diff — see MISSING-FILE note below"; Phases 2 (`sonnet-4-6.md`) and 6 (`agent-tiering.md`) had already landed on master at `beb9874` | yes | fixed this pass (gh pr edit) |
+| 2 | PR #1924 body Manual Testing — "all changes are covered by unit and E2E tests"; no PHP code changed; no executable Verification Matrix rows | yes | fixed this pass (gh pr edit); replaced with CLI-executable verification claim and Phase 7.1 behavioral probe disposition |
+
+**prevention_ladder:**
+
+- **rung 0 — already covered?** Yes — `/pr-ready` Phase 6 check 1 (undeclared scope gap) and check 4 (PR body vs. diff accuracy) are the existing detection gate; both fired correctly and blocked the verdict until this pass.
+- **rungs 1–5** — N/A given rung 0 coverage.
+
+`prevention_ladder: no gate warranted — /pr-ready Phase 6 checks 1 and 4 are the correct catch surface and fired correctly`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-04 during #1924)*
+
+### E46 PR body "What is NOT in this PR" written before all plan phases complete
+
+**class: scope-claim staleness** — a PR body "What is NOT in this PR" residual entry that asserts an absence which the same PR's diff contradicts: a plan deliverable (scoped enforcement test) ships in a remediation commit during the same PR cycle, but the body is not updated to reflect it, leaving the PR claiming the conversion "is not yet self-enforcing" when `ControllerSuperglobalFreedomTest.php` is already in the diff.
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #2077 body — "What is NOT in this PR" residual #2 claimed "conversion is not yet self-enforcing" after `ControllerSuperglobalFreedomTest.php` landed in the remediation commit | yes | no | fixed this pass |
+
+**prevention_ladder:**
+- rung 0: No existing gate checks "What is NOT" claims against the actual diff.
+- rung 1: Add a `.claude/rules/` doc reminding authors to re-read every "What is NOT in this PR" bullet when a remediation commit adds a plan deliverable — the negative claim may have been overtaken. **Landing rung: 1** — a rule doc is the cheapest enforcement and matches the risk level (rare, easy to spot in review).
+- rungs 2–5: Not warranted; the Phase 6 review pipeline already catches this class when it fires.
+
+`artifact destination: .claude/rules/` (doc addition — not yet filed; proposed prevention)
+
+`last_verified: 2026-09-04`
+
+*(discovered 2026-09-04 during Phase 6 review of #2077)*
+
+### E47 Phase 6 review notes on PR #2077 — five confirmatory observations
+
+**class: n/a** — five reviewer observations confirmed as correct behaviors, not defects. No gate warranted; the Phase 6 pipeline surfaced them as expected for human confirmation.
+
+| # | Observation | Verdict |
+|---|-------------|---------|
+| N1 | `Waivers/WaiversController.php` still has 6 superglobal reads — deliberately descoped per plan | correct — backlog 14.8 corrected to `◑ Partial` |
+| N2 | Archive-doc skip: `DepthChartEntryApiHandler.php` touched but not archived — plan never scoped it | correct — out of scope |
+| N3 | `BanRawSuperglobalsRule` suffix allowlist unchanged — plan Phase 6 §Correction forbids removing `Controller.php` | correct — intentional; `ControllerSuperglobalFreedomTest.php` is the scoped enforcement |
+| N4 | `codebase-map.md` regenerated as a side effect of other work | correct — expected artifact |
+| N5 | `Team/README.md` `last_verified: 2026-08-16` vs `maintenance-backlog.md` `2026-09-04` — cosmetic inconsistency | fixed this pass (bumped to 2026-09-04) |
+
+**prevention_ladder: no gate warranted** — all five are reviewer-confirmed correct behaviors, not defects; the existing `/pr-ready` Phase 6 review pipeline is the mechanism and it worked correctly here.
+
+`artifact destination: n/a — no gate`
+
+`last_verified: 2026-09-04`
+
+*(discovered 2026-09-04 during Phase 6 review of #2077)*
+
+### E48 Phase 6 review notes on PR #2081 — documentation gaps in bin/pr-cycle toolchain (missing seam declarations and overstated harness assertions)
+
+**class:** undeclared env seams and overstated assertion prose in a bin/ script toolchain that causes plan-fidelity gaps and misleading harness failure messages
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/pr-cycle:27` (env seams header) — `PR_CYCLE_TS` and `PR_CYCLE_LOG` are live env seams missing from the `# Env seams (used by bin/test-pr-cycle):` block the plan required | yes | yes | fixed this pass |
+| 2 | `bin/test-pr-cycle` (row 22 failure message) — prose and failure message say "execs with --worker" but predicate is `grep -qF -- '--worker'`, which never checks for exec | yes | yes | fixed this pass |
+| 3 | `bin/pr-cycle:171` (guard (b) skipped for `--worker`) — better route than plan §1.6 literal; the literal would fail every --go run; no code action needed | yes | yes | not fixed — better route (no code action) |
+
+**prevention_ladder:**
+
+- **rung 0 — already covered?** No existing gate catches missing seam declarations or overstated harness failure messages.
+- **rung 1 — extend existing gate?** Could extend `~/.claude/hooks/plan-gate-edit.sh`, but plan validation is not automated; too narrow.
+- **rung 2 — a rule doc?** A `.claude/rules/` doc noting that plan §1.1 seam-header requirement should be verified at review time — but `/pr-ready` Phase 6 is already the catch mechanism; no new rule warranted.
+- **rung 3–5 — not warranted** for a documentation-accuracy issue in shell scripts.
+- **landing rung:** no gate warranted — plan-fidelity review (Phase 6) is already the catch mechanism; the class is too narrow and high-cost for a static gate.
+
+`prevention_ladder: no gate warranted — plan-fidelity review (Phase 6) is already the catch mechanism; the class is too narrow and high-cost for a static gate`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-04 during #2081)*

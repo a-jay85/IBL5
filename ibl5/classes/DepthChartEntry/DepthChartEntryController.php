@@ -9,6 +9,7 @@ use DepthChartEntry\Contracts\DepthChartEntryRepositoryInterface;
 use DepthChartEntry\Contracts\DepthChartEntryServiceInterface;
 use DepthChartEntry\Contracts\DepthChartEntrySubmissionHandlerInterface;
 use DepthChartEntry\Contracts\DepthChartEntryViewInterface;
+use Http\HttpRequest;
 use NextSim\NextSimService;
 use NextSim\NextSimView;
 use SavedDepthChart\SavedDepthChartService;
@@ -33,6 +34,7 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
     private TeamTableServiceInterface $teamTableService;
     private DepthChartEntryServiceInterface $service;
     private DepthChartEntrySubmissionHandlerInterface $submissionHandler;
+    private HttpRequest $request;
     /**
      * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
      */
@@ -46,9 +48,11 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
         DepthChartEntryViewInterface $view,
         TeamTableServiceInterface $teamTableService,
         DepthChartEntrySubmissionHandlerInterface $submissionHandler,
+        HttpRequest $request,
         ?Season $season = null
     ) {
         $this->db = $db;
+        $this->request = $request;
         $this->season = $season;
         $this->repository = $repository;
         $this->service = $service;
@@ -89,15 +93,16 @@ class DepthChartEntryController implements DepthChartEntryControllerInterface
     public function displayForm(string $username): void
     {
         $display = 'ratings';
-        if (isset($_REQUEST['display']) && is_string($_REQUEST['display'])) {
-            $display = $_REQUEST['display'];
+        $rawDisplay = $this->request->request('display');
+        if (is_string($rawDisplay)) {
+            $display = $rawDisplay;
         }
 
         // Validate split parameter when display=split
         $split = null;
-        if ($display === 'split' && isset($_REQUEST['split']) && is_string($_REQUEST['split'])) {
+        $rawSplit = $this->request->request('split');
+        if ($display === 'split' && is_string($rawSplit)) {
             $splitRepo = new \Team\SplitStatsRepository($this->db);
-            $rawSplit = $_REQUEST['split'];
             if (in_array($rawSplit, $splitRepo->getValidSplitKeys(), true)) {
                 $split = $rawSplit;
             } else {

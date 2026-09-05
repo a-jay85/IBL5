@@ -1906,6 +1906,194 @@ grep -qF 'all six 6d checks' "$SCRIPT_DIR/../.claude/skills/pr-ready/_plan-fidel
   || fail "27e: _plan-fidelity-review.md lost 'all six 6d checks' — coupling that forbids a 7th 6d class item removed"
 end_case e22-e23-prevention-prose-pins
 
+# --- case 28 (pr-ready skill block): merge-digest extraction + body shape ---
+# Tests the digest.sh script (Phase 4) and the prose contracts in the four edited files.
+# Four arms:
+#   28a: a well-formed DIGEST section extracts verbatim (5 lines, correct labels, exact body)
+#   28b: missing DIGEST section degrades to 5 placeholders (all "unavailable —", rc=0)
+#   28c: 3-line DIGEST degrades wholly — no partial mix of real and placeholder
+#   28d–f: label drift, absent/empty file, missing argument
+#   28g: assembled-body ordering — ### Merge digest sits between fidelity and remediation,
+#        <!-- pr-ready-verdict --> is the last line
+#   28h–k: prose pins for the four edited files (DIGEST contract, labels, last_verified)
+# The placeholder uses an em dash (U+2014) — not a hyphen. A hyphen here fails 28b.
+begin_case pr-ready-merge-digest-shape
+
+D="$PRD/scripts/digest.sh"
+DG="$SCRATCH/digest"; mkdir -p "$DG"
+
+[[ -x "$D" ]] || fail "28: $D missing or not executable — Phase 4 chmod +x skipped"
+bash -n "$D" 2>/dev/null || fail "28: digest.sh is not valid bash"
+
+LABELS=( '**What changed:**' '**Why:**' '**Watch:**' '**Touches:**' '**Machine-authored fixes:**' )
+
+# --- 28a: well-formed digest extracts verbatim ---
+FIX="$DG/a.md"
+cat > "$FIX" <<'FIX_A'
+Plan fidelity: the diff matches the plan.
+
+PASS
+
+## DIGEST
+**What changed:** Added a five-line merge digest to the pr-ready sticky comment.
+**Why:** Prose and one new script; no runtime behavior on the PR itself changes.
+**Watch:** .claude/skills/pr-ready/** and bin/test-pr-ready-now.
+**Touches:** none.
+**Machine-authored fixes:** Digest text is model-authored and unverified against the diff.
+FIX_A
+out=$(bash "$D" "$FIX" 2>&1); rc=$?
+[[ $rc -eq 0 ]] || fail "28a: rc=$rc (expected 0)"
+[[ $(printf '%s\n' "$out" | wc -l | tr -d ' ') -eq 5 ]] || fail "28a: expected 5 lines, got $(printf '%s\n' "$out" | wc -l | tr -d ' ')"
+for i in 0 1 2 3 4; do
+  line=$(printf '%s\n' "$out" | sed -n "$((i+1))p")
+  [[ "$line" == "${LABELS[$i]}"* ]] || fail "28a: line $((i+1)) does not start with ${LABELS[$i]}"
+done
+grep -qF 'Added a five-line merge digest' <<<"$out" || fail "28a: body text not preserved verbatim"
+grep -qF 'unavailable' <<<"$out" && fail "28a: placeholder emitted for a valid digest"
+grep -qxF 'PASS' <<<"$out" && fail "28a: verdict word leaked into digest output"
+
+# --- 28b: no DIGEST section → 5 unavailable lines ---
+FIX="$DG/b.md"
+cat > "$FIX" <<'FIX_B'
+Plan fidelity: the diff matches the plan.
+
+PASS
+FIX_B
+out=$(bash "$D" "$FIX" 2>&1); rc=$?
+[[ $rc -eq 0 ]] || fail "28b: rc=$rc (expected 0)"
+[[ $(printf '%s\n' "$out" | wc -l | tr -d ' ') -eq 5 ]] || fail "28b: expected 5 lines, got $(printf '%s\n' "$out" | wc -l | tr -d ' ')"
+for i in 0 1 2 3 4; do
+  line=$(printf '%s\n' "$out" | sed -n "$((i+1))p")
+  [[ "$line" == "${LABELS[$i]} unavailable"* ]] || fail "28b: line $((i+1)) not a placeholder: $line"
+done
+grep -qF 'Plan fidelity' <<<"$out" && fail "28b: file content leaked into degrade output"
+
+# --- 28c: 3-line DIGEST degrades wholly (not partially) ---
+FIX="$DG/c.md"
+cat > "$FIX" <<'FIX_C'
+PASS
+
+## DIGEST
+
+**What changed:** Something.
+**Why:** Reasons.
+**Watch:** Small.
+FIX_C
+out=$(bash "$D" "$FIX" 2>&1); rc=$?
+[[ $rc -eq 0 ]] || fail "28c: rc=$rc (expected 0)"
+[[ $(printf '%s\n' "$out" | wc -l | tr -d ' ') -eq 5 ]] || fail "28c: expected 5 lines, got $(printf '%s\n' "$out" | wc -l | tr -d ' ')"
+for i in 0 1 2 3 4; do
+  line=$(printf '%s\n' "$out" | sed -n "$((i+1))p")
+  [[ "$line" == "${LABELS[$i]} unavailable"* ]] || fail "28c: line $((i+1)) not a placeholder: $line"
+done
+grep -qF 'Something.' <<<"$out" && fail "28c: partial digest emitted — first 3 lines kept real text, last 2 placeholdered"
+
+# --- 28d: label drift → all 5 unavailable ---
+FIX="$DG/d.md"
+cat > "$FIX" <<'FIX_D'
+PASS
+
+## DIGEST
+**What changed:** Something.
+**Why this is safe:** Drift.
+**Watch:** nothing specific.
+**Touches:** bin/.
+**Machine-authored fixes:** none.
+FIX_D
+out=$(bash "$D" "$FIX" 2>&1); rc=$?
+[[ $rc -eq 0 ]] || fail "28d: rc=$rc (expected 0)"
+[[ $(printf '%s\n' "$out" | wc -l | tr -d ' ') -eq 5 ]] || fail "28d: expected 5 lines"
+for i in 0 1 2 3 4; do
+  line=$(printf '%s\n' "$out" | sed -n "$((i+1))p")
+  [[ "$line" == "${LABELS[$i]} unavailable"* ]] || fail "28d: line $((i+1)) not a placeholder: $line"
+done
+
+# --- 28e: absent and empty file ---
+out=$(bash "$D" "$DG/nope.md" 2>&1); rc=$?
+[[ $rc -eq 0 ]] || fail "28e: absent file rc=$rc (expected 0)"
+[[ $(printf '%s\n' "$out" | wc -l | tr -d ' ') -eq 5 ]] || fail "28e: absent file expected 5 lines"
+for i in 0 1 2 3 4; do
+  line=$(printf '%s\n' "$out" | sed -n "$((i+1))p")
+  [[ "$line" == "${LABELS[$i]} unavailable"* ]] || fail "28e: absent: line $((i+1)) not a placeholder"
+done
+: > "$DG/empty.md"
+out=$(bash "$D" "$DG/empty.md" 2>&1); rc=$?
+[[ $rc -eq 0 ]] || fail "28e: empty file rc=$rc (expected 0)"
+[[ $(printf '%s\n' "$out" | wc -l | tr -d ' ') -eq 5 ]] || fail "28e: empty file expected 5 lines"
+for i in 0 1 2 3 4; do
+  line=$(printf '%s\n' "$out" | sed -n "$((i+1))p")
+  [[ "$line" == "${LABELS[$i]} unavailable"* ]] || fail "28e: empty: line $((i+1)) not a placeholder"
+done
+
+# --- 28f: missing argument → STOP + exit 1 ---
+out=$(bash "$D" 2>&1); rc=$?
+[[ $rc -eq 1 ]] || fail "28f: missing arg rc=$rc (expected 1)"
+grep -qF 'STOP:' <<<"$out" || fail "28f: missing arg: expected STOP: in output"
+
+# --- 28g: assembled-body ordering ---
+BODY="$DG/body.md"
+{ printf '### Plan fidelity\nPASS\n\n### Merge digest\n%s\n\n### Remediation\nnone\n\n<!-- pr-ready-verdict -->\n' "$out2"; } > "$BODY"
+# Use fixture A output for the digest lines
+out_a=$(bash "$D" "$DG/a.md" 2>&1)
+{ printf '### Plan fidelity\nPASS\n\n### Merge digest\n%s\n\n### Remediation\nnone\n\n<!-- pr-ready-verdict -->\n' "$out_a"; } > "$BODY"
+n_fid=$(grep -n '^### Plan fidelity' "$BODY" | head -1 | cut -d: -f1)
+n_dig=$(grep -n '^### Merge digest' "$BODY" | head -1 | cut -d: -f1)
+n_rem=$(grep -n '^### Remediation' "$BODY" | head -1 | cut -d: -f1)
+[[ $n_fid -lt $n_dig ]] || fail "28g: ### Plan fidelity must precede ### Merge digest"
+[[ $n_dig -lt $n_rem ]] || fail "28g: ### Merge digest must precede ### Remediation"
+n_dig_count=$(grep -c '^### Merge digest' "$BODY" || true)
+[[ $n_dig_count -eq 1 ]] || fail "28g: expected exactly 1 ### Merge digest, got $n_dig_count"
+[[ "$(tail -1 "$BODY")" == '<!-- pr-ready-verdict -->' ]] || fail "28g: <!-- pr-ready-verdict --> must be last line"
+[[ $(grep -c '^<!-- pr-ready-verdict -->$' "$BODY" || true) -eq 1 ]] || fail "28g: expected exactly 1 marker"
+
+# --- 28h: .claude/agents/pr-ready-phase6.md prose pins ---
+f="$PRD/../../agents/pr-ready-phase6.md"
+grep -qF '## DIGEST' "$f" || fail "28h: ## DIGEST missing from pr-ready-phase6.md"
+grep -qF '**What changed:**' "$f" || fail "28h: **What changed:** missing from pr-ready-phase6.md"
+grep -qF '**Why:**' "$f" || fail "28h: **Why:** missing from pr-ready-phase6.md"
+grep -qF '**Watch:**' "$f" || fail "28h: **Watch:** missing from pr-ready-phase6.md"
+grep -qF '**Touches:**' "$f" || fail "28h: **Touches:** missing from pr-ready-phase6.md"
+grep -qF '**Machine-authored fixes:**' "$f" || fail "28h: **Machine-authored fixes:** missing from pr-ready-phase6.md"
+grep -qF 'and nothing after it' "$f" || fail "28h: 'and nothing after it' missing from pr-ready-phase6.md"
+grep -qE '^last_verified: 2026-09-04$' "$f" || fail "28h: last_verified not bumped to 2026-09-04 in pr-ready-phase6.md"
+
+# --- 28i: _plan-fidelity-review.md prose pins ---
+f="$PRD/_plan-fidelity-review.md"
+grep -qF '## DIGEST' "$f" || fail "28i: ## DIGEST missing from _plan-fidelity-review.md"
+grep -qF 'descriptive, never a verdict' "$f" || fail "28i: 'descriptive, never a verdict' missing from _plan-fidelity-review.md"
+
+# --- 28j: _phase7-verdict.md prose pins ---
+f="$PRD/_phase7-verdict.md"
+grep -qF 'scripts/digest.sh' "$f" || fail "28j: digest.sh materialise line missing from _phase7-verdict.md"
+n_merge=$(grep -c '### Merge digest' "$f" || true)
+[[ $n_merge -eq 2 ]] || fail "28j: expected exactly 2 '### Merge digest' in _phase7-verdict.md, got $n_merge"
+grep -qF '**What changed:**' "$f" || fail "28j: **What changed:** missing from _phase7-verdict.md"
+grep -qF '**Why:**' "$f" || fail "28j: **Why:** missing from _phase7-verdict.md"
+grep -qF '**Watch:**' "$f" || fail "28j: **Watch:** missing from _phase7-verdict.md"
+grep -qF '**Touches:**' "$f" || fail "28j: **Touches:** missing from _phase7-verdict.md"
+grep -qF '**Machine-authored fixes:**' "$f" || fail "28j: **Machine-authored fixes:** missing from _phase7-verdict.md"
+grep -qF 'a stable-shaped degraded block is' "$f" || fail "28j: degraded-block clause missing from _phase7-verdict.md"
+
+# --- 28k: SKILL.md prose pins ---
+f="$PRD/SKILL.md"
+grep -qF '## DIGEST' "$f" || fail "28k: ## DIGEST missing from SKILL.md"
+grep -qF 'scripts/digest.sh' "$f" || fail "28k: scripts/digest.sh missing from SKILL.md"
+n_skill_merge=$(grep -c '### Merge digest' "$f" || true)
+[[ $n_skill_merge -eq 2 ]] || fail "28k: expected exactly 2 '### Merge digest' in SKILL.md, got $n_skill_merge"
+grep -qE '^last_verified: 2026-09-04$' "$f" || fail "28k: last_verified not bumped in SKILL.md"
+n_ends_in_one=$(grep -c 'the file ends in one' "$f" || true)
+[[ $n_ends_in_one -eq 0 ]] || fail "28k: 'the file ends in one' still present in SKILL.md — stale claim not removed"
+
+# --- 28l: trailing space on ## DIGEST heading is normalised, not degraded ---
+FIX="$DG/l.md"
+printf 'READY\n## DIGEST \n**What changed:** trailing-space fix\n**Why:** grep and awk agree\n**Watch:** nothing specific\n**Touches:** digest.sh\n**Machine-authored fixes:** none\n' > "$FIX"
+out=$(bash "$D" "$FIX" 2>&1); rc=$?
+[[ $rc -eq 0 ]] || fail "28l: rc=$rc (expected 0) — trailing-space heading degraded"
+[[ $(printf '%s\n' "$out" | wc -l | tr -d ' ') -eq 5 ]] || fail "28l: expected 5 lines, got $(printf '%s\n' "$out" | wc -l | tr -d ' ')"
+grep -qF 'unavailable' <<<"$out" && fail "28l: trailing-space heading produced unavailable placeholder: $out" || true
+
+end_case pr-ready-merge-digest-shape
+
 # --- verdict -----------------------------------------------------------------------------
 if [[ $FAILED -ne 0 ]]; then
     echo "test-pr-ready-now: FAILED ($FAILED assertion failure(s))" >&2

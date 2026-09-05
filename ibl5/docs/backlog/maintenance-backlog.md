@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-09-04
+last_verified: 2026-09-05
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -53,7 +53,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 🟨 Conditional | needs one mechanical-scope add, one upfront decision, or a collision-PR to merge first |
 | 🟥 Not automouse-safe | 12.11 — `git filter-repo` history rewrite (irreversible, coordinated) |
 
-**Highest-leverage 🟩 auto-mergeable clusters** (no human needed): the open god-class extractions (1.3/1.9/1.11/1.13/1.17/1.20, 7.14/7.15, 1.33–1.36), the entire Axis-6 coverage backlog (bar 6.21, now 🟨), the Axis-9 docs items, and the PHPStan-baseline burndowns (10.12/10.13/10.19/10.21).
+**Highest-leverage 🟩 auto-mergeable clusters** (no human needed): the open god-class extractions (1.3/1.9/1.11/1.13/1.17/1.20, 7.14/7.15, 1.34–1.36), the entire Axis-6 coverage backlog (bar 6.21, now 🟨), the Axis-9 docs items, and the PHPStan-baseline burndowns (10.12/10.13/10.19/10.21).
 
 ---
 
@@ -61,12 +61,10 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
-> ✅ resolved (35): 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.18, 1.19, 1.20, 1.21, 1.22, 1.23, 1.24, 1.25, 1.26, 1.27, 1.28, 1.29, 1.30, 1.31, 1.32, 1.34, 1.35, 1.36 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (36): 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10, 1.11, 1.12, 1.13, 1.14, 1.15, 1.16, 1.17, 1.18, 1.19, 1.20, 1.21, 1.22, 1.23, 1.24, 1.25, 1.26, 1.27, 1.28, 1.29, 1.30, 1.31, 1.32, 1.33, 1.34, 1.35, 1.36 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 1.33 | ⬜ Open | 🟩 | Player 671 LOC — typed-getter accumulation. Extract per-domain typed-getter groups (contract, stats, identity); green-green. |
-
 > **Note:** `BaseMysqliRepository.php` (602 LOC) is the 18th hot file but is tracked under **2.29** (global-namespace elimination sweep) and is not seeded as a standalone god-class item here.
 
 ### 1.19 PlrParserService — Duplicate Pass-1 Logic
@@ -76,14 +74,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Est. effort:** S
 **Risk if untouched:** Bug fixes applied twice; optional param is an invisible branching point.
 
-
-### 1.33 Player — Typed-Getter Accumulation (671 LOC)
-**Location:** `ibl5/classes/Player/Player.php` (671 lines)
-**Problem:** Domain entity accumulates typed getters across contract, stats, and identity domains in a single class. Finding 1.10 (mutable props) is resolved; the residual is pure size from typed-getter bulk.
-**Suggested direction:** Extract per-domain typed-getter groups (contract, stats, identity) into focused value-object collaborators; keep `Player` as the root entity.
-**Est. effort:** M
-**Risk if untouched:** Every new player attribute inflates one file; getter search spans the entire class.
-**Provenance:** Seeded 2026-07-24 — ground-truth audit hot-file scan.
 
 ## Axis 2: Module Structure Inconsistency
 
@@ -289,31 +279,14 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):** Adding tests is inherently green-green (no production change) → every open coverage gap is 🟩 auto-mergeable. If writing a test surfaces a real bug, the *fix* becomes its own finding with its own classification. (Exceptions: **6.21** and **6.23** are 🟨, not 🟩 — in each the target code is unreachable from PHPUnit, so no test is writable until a production seam is decided: a teamless-fixture / non-`exit()` refactor for 6.21, a SAPI-independent hashing seam for 6.23.)
 
-> ✅ resolved (21): 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 6.13, 6.15, 6.16, 6.17, 6.18, 6.20, 6.22, 6.24, 6.26 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (23): 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 6.13, 6.14, 6.15, 6.16, 6.17, 6.18, 6.19, 6.20, 6.22, 6.24, 6.26 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 6.14 | ◑ Partial | 🟩 | Axis-1 partial (2026-08-08): 4 raw-mysqli step classes added (RefreshIblHistStep, RefreshPlayoffSeriesResultsStep, RefreshTeamSeasonRecordsStep, ResetExtensionAttemptsStep) in tests/UpdateAllTheThings/Steps/. Remaining: 11 step classes (pure-delegator, interface-injected, OlympicsFlatStandingsUpdater, UpdaterView, JsbSourceResolver) + ProcessAllStarGamesStep (deferred — W1-12 sequencing). AutoSeedOlympicsTeamInfoStep already has behavioral coverage (4 tests on `master`) — the plan's audit was stale. |
-| 6.19 | ◑ Partial | 🟩 | AllStarAppearances + GMContactList repo unit tests added. Season entity predicates blocked by `Season\Season`→mock alias (QueryRepo plumbing covered). `Shared` N/A (deleted 2.23). |
 | 6.21 | ⬜ Open | 🟨 | Row-12 (Free-Agents/teamless session) `processrookieoption` ownership-rejection path untested: PHPUnit entry-point test impossible (handler `exit()`s), E2E auth fixture always has a session team. Needs a teamless-fixture / non-`exit()` refactor decision before it's writable → 🟨. From PR #1107 Phase 5.0 note. |
 | 6.23 | ⬜ Open | 🟨 | **Same family as 6.22, different guard.** `RequestEventLoggingBootstrap::boot()` returns at line 35 when `\PHP_SAPI === 'cli'`, and PHPUnit is always CLI (DB group included), so the `hash('sha256', session_id())` derivation at lines 66–70 is unreachable from any PHPUnit test — the file's three existing tests are all `expectNotToPerformAssertions()` for exactly this reason. A regression storing the **raw** session id would break zero tests. Extract the derivation to a pure static (or inject the SAPI) so the PII boundary is unit-pinnable. 🟨: production change on a PII boundary; needs a seam decision. (discovered 2026-08-08 during #1670) |
 | 6.25 | ⬜ Open | 🟨 | **Residual of 6.22.** The verdict + thin-redirect-shim conversion landed for Waivers, FreeAgency, and the Trade API accept/decline controllers; `Trading\TradingController`'s reject path still gates inline and still ends in `HtmxHelper::redirect()→exit()`, so its "non-party refused + no mutation" property remains E2E-only. Apply the same pattern: move the authz decision into a verdict-returning method on the service that owns the mutation, leave the controller a shim. Verdict shape is now settled (`array{success: bool, error?: string}`), so the design fork 6.22 carried is closed. 🟨: production refactor on a security surface. Split out of 6.22 when it resolved. |
-
-### 6.14 Updater Module — Large + Subthreshold (37 files, 9 tests)
-**Location:** `ibl5/classes/Updater`
-**Problem:** Core step classes (Standings/Schedule/PowerRankings/RecordParser) lightly tested.
-**Suggested direction:** Per-step W-L aggregation, date ordering, format parsing.
-**Est. effort:** L
-**Risk if untouched:** Nightly automation corrupts standings/schedules/stats silently.
-**Status:** ◑ Partial (this PR, 2026-06-27). Added `ibl5/tests/Updater/StandingsUpdaterTest.php` (league/home/away/conference/division W-L aggregation, plus unknown-team-skip, empty-config, and zero-games boundaries) and `ibl5/tests/Updater/PowerRankingsUpdaterTest.php` (ranking formula + div-by-zero guard); extended `ibl5/tests/Updater/RecordParserTest.php` with empty/non-numeric/leading-dash boundaries. `ScheduleUpdater` already covered (`ibl5/tests/Updater/ScheduleUpdaterTest.php`). Added `ibl5/tests/Updater/ProcessBoxscoresStepTest.php`, `ibl5/tests/Updater/GenerateSeasonAwardsStepTest.php`, `ibl5/tests/Updater/ParseJsbFilesStepTest.php` (2026-07-24). **Axis-1 partial (2026-08-08, PR #1798):** Added execute/transaction/query-table tests for 4 raw-mysqli step classes in tests/UpdateAllTheThings/Steps/: RefreshIblHistStep, RefreshPlayoffSeriesResultsStep, RefreshTeamSeasonRecordsStep, ResetExtensionAttemptsStep (transaction wrapping + execute success + query-table assertions). **Residual:** 11 remaining classes (pure-delegator: UpdatePowerRankingsStep/UpdateScheduleStep/UpdateStandingsStep; interface-injected: ParsePlayerFileStep/ExtendDepthChartsStep/ImportLeagueConfigStep/SnapshotPlrStep/EndOfSeasonImportStep; OlympicsFlatStandingsUpdater/UpdaterView/JsbSourceResolver). AutoSeedOlympicsTeamInfoStep is **not** residual — `tests/UpdateAllTheThings/Steps/AutoSeedOlympicsTeamInfoStepTest.php` already carries 4 behavioral tests on `master`, covering all three scenarios the plan's Phase 6 specified; the plan's coverage audit was stale on that class. + ProcessAllStarGamesStep deferred (W1-12 BoxscoreProcessor sequencing — see plan tests-updater-steps-6-14).
-
-### 6.19 Small Modules With Single-Test Coverage
-**Location:** `AllStarAppearances` (4/1), `GMContactList` (4/1), `Season` (3/1), `Shared` (3/1)
-**Problem:** Minimal coverage on aggregation, dedup, phase transitions, shared-data constraints.
-**Suggested direction:** Targeted single-class tests.
-**Est. effort:** S each
-**Risk if untouched:** AS appearances double-counted; duplicate GMs; season state inconsistencies; shared data leaks.
-**Status:** ◑ Partial (2026-06-26) — added AllStarAppearancesRepositoryTest and GMContactListRepositoryTest (return-shape + empty negative). Season: phase plumbing covered by SeasonQueryRepositoryTest (getSeasonPhase, calculatePhaseSimNumber); the Season-entity phase predicates (isFreeAgencyPhase, areTradesAllowed, areWaiversAllowed, advancesContractYears) are structurally untestable because classes/Bootstrap/TestAliasesBootstrap.php:22 aliases Season\Season → the mock — left as-is (removing the alias is a cross-suite infra change, out of scope). Shared: N/A (deleted, backlog 2.23). Residual (DatabaseIntegration-only): AS-appearance aggregation / GM dedup correctness.
+| 6.27 | ⬜ Open | 🟩 | Plan-prescribed test phase (`ControllerSuperglobalFreedomTest.php`) shipped in remediation pass rather than in original PR; descope was declared under wrong artifact (allowlist ratchet). `Phase 6 plan-fidelity review` is the detection gate. |
 
 ### 6.21 Rookie-option Free-Agents/teamless ownership gate is untested
 **Location:** `ibl5/modules/Player/index.php` (`processrookieoption()` ownership gate); planned `tests/Module/EntryPoints/PlayerRookieOptionEntryPointTest.php`
@@ -330,6 +303,21 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Est. effort:** S
 **Risk if untouched:** The `session_id` column is documented and reviewed as a non-replayable digest. If the derivation regresses to the raw token, every CI gate stays green and the failure is only visible by inspecting production rows — a PII exposure with no automated detector.
 **Status:** ⬜ Open — raised from the #1670 review (the plan listed the bootstrap test as `[modify]`; the item was not implementable as specified). 🟨 conditional: a production change on a PII boundary, gated on the seam decision above.
+
+### 6.27 Plan-prescribed test class omitted from PR diff with descope misdeclared
+
+**class:** a plan-prescribed test class (`ControllerSuperglobalFreedomTest.php`) absent from the PR diff, with the omission declared under a different artifact (the allowlist ratchet) rather than the missing test file.
+
+**occurrences:**
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/tests/Http/ControllerSuperglobalFreedomTest.php` | yes | fixed | fixed this pass |
+
+**prevention_ladder:** no gate warranted — `/pr-ready` Phase 6 plan-fidelity review IS the detection gate and caught this; adding a second layer for one observed instance is not warranted.
+
+**artifact destination:** n/a — no gate
+
+**provenance:** (discovered 2026-09-04 during #2077)
 
 ---
 
@@ -402,6 +390,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 9.30 | ⬜ Open | 🟩 | Migration backup-table suffix (_165) fossilized from intermediate renaming — header comment corrected this pass. No gate warranted. (discovered 2026-09-03 during #1961) |
 | 9.31 | ⬜ Open | 🟩 | PR body manual-test row naming a pre-existing UI mislabel as the actual label — PR #1961 body row 23 corrected this pass via gh pr edit. No gate warranted. (discovered 2026-09-03 during #1961) |
 | 9.32 | ⬜ Open | 🟩 | Unperformed Truly-manual verification row — PR #1961 row 23; protected by auto_merge: false hold. No gate warranted. (discovered 2026-09-03 during #1961) |
+| 9.33 | ⬜ Open | 🟩 | Backlog Status prose named a controller as converted when its source still reads superglobals (14.8 and 14.12 Status blocks); creating an intra-doc contradiction with the Evidence cell. |
 
 
 ### 9.4b API_GUIDE — Full Endpoint-by-Endpoint OpenAPI Reference (Deferred from 9.4)
@@ -457,6 +446,22 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **prevention_ladder:** no gate warranted — covered by existing human-signoff hold
 **artifact destination:** n/a — no gate
 **provenance:** (discovered 2026-09-03 during #1961)
+
+### 9.33 Backlog Status sentence names controller as converted when source still reads superglobals
+
+**class:** a backlog Status sentence naming a controller as converted when its source file still reads superglobals directly, creating an intra-doc contradiction between the Evidence cell and the Status prose.
+
+**occurrences:**
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/docs/backlog/maintenance-backlog.md:14.8 Status` | yes | yes | fixed this pass |
+| 2 | `ibl5/docs/backlog/maintenance-backlog.md:14.12 Status` | yes | yes | fixed this pass |
+
+**prevention_ladder:** no gate warranted — `/pr-ready` Phase 6 plan-fidelity review covers 6d.4 (body vs. reality); the equivalent check for backlog Status prose is already performed inline during review. Adding a CI gate that parses status claims against file contents would require custom static analysis beyond the established bar.
+
+**artifact destination:** n/a — no gate
+
+**provenance:** (discovered 2026-09-04 during #2077)
 
 ## Axis 10: PHPStan Rule Coverage Gaps
 
@@ -621,9 +626,9 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 14.5 | ⬜ Open | 🟨 | Module index.php → front-controller composition root (42 modules). Very large; routing/auth-sensitive → decompose + sequence (some modules touch mutations). |
-| 14.8 | ⬜ Open | 🟩 | Introduce `HttpRequest` VO wrapping superglobals; green-green abstraction. |
+| 14.8 | ◑ Partial | 🟩 | `Http\HttpRequest` VO shipped and wired into 4 controllers (Player, Team, DepthChartEntry, FreeAgency) + their module entry points; residual: `Waivers/WaiversController.php` (6 superglobal reads) and the `BanRawSuperglobalsRule` `_REQUEST` ratchet. |
 | 14.10 | ◑ Partial | 🟨 | Container accessor registered (PR1); side-effect removal deferred to PR3 (boosted-HTMX cookie-population hazard) → careful sequencing. |
-| 14.12 | ◑ Partial | 🟩 | Wholesale `$_REQUEST`→`$GLOBALS` gone; modules still read `$op/$pid` from `$_REQUEST` → Request object is the residual (folds into 14.8). |
+| 14.12 | ◑ Partial | 🟩 | `HttpRequest` VO shipped (14.8) and wired into 4 module entry points; residual: `ComparePlayers`, `Draft`, `ProjectedDraftOrder`, `Voting`, `ApiKeys` `index.php` still read `$op` from `$_REQUEST` directly. |
 
 ### 14.5 Module `index.php` Files Are the Real Composition Root (42 of 47)
 **Location:** `ibl5/modules/*/index.php`
@@ -633,11 +638,12 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Risk if untouched:** New collaborators added module-by-module (42x); shared services instantiated N times per request.
 
 ### 14.8 Controllers Directly Read `$_GET`/`$_POST`/`$_REQUEST`
-**Location:** `Waivers/WaiversController.php:87-154`, `FreeAgency/FreeAgencyController.php:111-166`, `DepthChartEntry/DepthChartEntryController.php`, `Team/TeamController.php`, `Player/PlayerPageController.php`
+**Location:** `Waivers/WaiversController.php:87-154` (residual), `FreeAgency/FreeAgencyController.php`, `DepthChartEntry/DepthChartEntryController.php`, `Team/TeamController.php`, `Player/PlayerPageController.php` (all four converted)
 **Problem:** No `Request` abstraction; controllers can't be invoked with synthetic input.
 **Suggested direction:** Thin `HttpRequest` value object wrapping `$_GET`/`$_POST`/`$_SERVER`; composition root creates from superglobals.
-**Est. effort:** M
+**Est. effort:** M (residual: S)
 **Risk if untouched:** PRG/HTMX redirect logic untestable; superglobals must be polluted in tests.
+**Status:** ◑ Partial (2026-09-04) — `ibl5/classes/Http/HttpRequest.php` landed and four of the five named controllers convert cleanly; `tests/Http/ControllerSuperglobalFreedomTest.php` now guards the converted set automatically. **Residual:** `WaiversController.php` still holds 6 superglobal reads. **Note:** `Controller.php` must **stay** on the `_REQUEST` suffix allowlist in `BanRawSuperglobalsRule` — removing it would break unrelated controllers (plan Phase 6 §Correction). To close the item: convert Waivers and land a matching guard for it.
 
 ### 14.10 `PageLayout::header()` Has Side Effect Controllers Depend On
 **Location:** `PageLayout/PageLayout.php:16` (`cookiedecode($user)`); `FreeAgency/FreeAgencyController.php:55` comment "Must come first"
@@ -653,7 +659,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Replace with explicit `Request` object; module entry points read named parameters by key.
 **Est. effort:** L
 **Risk if untouched:** Name collisions silently overwrite globals; PHPStan needs per-site `@var` annotations.
-**Status:** Partially completed (verified 2026-05-29 audit) — the wholesale `$_REQUEST`→`$GLOBALS` copy is gone; `ConfigBootstrap` now allowlists only `newlang`/`redirect` (see [[3.6]]). Modules still read `$op`/`$pid`/`$action` directly from `$_REQUEST` — a `Request` object remains the longer-term fix.
+**Status:** Partially completed (verified 2026-05-29 audit) — the wholesale `$_REQUEST`→`$GLOBALS` copy is gone; `ConfigBootstrap` now allowlists only `newlang`/`redirect` (see [[3.6]]). Modules still read `$op`/`$pid`/`$action` directly from `$_REQUEST` — a `Request` object remains the longer-term fix. A `Http\HttpRequest` value object shipped (item 14.8) and is now the boundary for the FreeAgency, DepthChartEntry, Team and Player entry points (four); residual: `WaiversController`/`modules/Waivers/index.php` still read superglobals directly, plus ComparePlayers, Draft, ProjectedDraftOrder, Voting, ApiKeys `index.php` still read `$op` from `$_REQUEST`.
 
 ---
 
@@ -661,7 +667,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):** Most FK/type/idempotency work is done (maintenance-27/28/41–44). Open items are mostly **column renames / destructive schema** → 🟦 human-merge (gate-14c + rename-sweep blast radius); a *reversible* type-narrowing (15.17) can arm 🟨 via the `/plan` schema-safety guard; doc items are 🟩.
 
-> ✅ resolved (18): 15.2, 15.4, 15.5, 15.8, 15.9, 15.10, 15.11, 15.12, 15.13, 15.14, 15.15, 15.16, 15.18, 15.19, 15.20, 15.21, 15.22, 15.23 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (19): 15.2, 15.4, 15.5, 15.8, 15.9, 15.10, 15.11, 15.12, 15.13, 15.14, 15.15, 15.16, 15.18, 15.19, 15.20, 15.21, 15.22, 15.23, 15.28 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
@@ -671,7 +677,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 15.7 | ◑ Partial | 🟦 | `name`→`setting_key` done (#143); `value`→`setting_value` deferred (reserved-word rename + sweep → human-merge). |
 | 15.17 | ⬜ Open | 🟨 | olympics_career int(11)→smallint/mediumint. Reversible narrowing → arm via the `/plan` schema-safety guard (apply-time fail-closed + DatabaseIntegration test); else 🟦. |
 | 15.24 | ⬜ Open | 🟦 | Pre-existing duplicate rows in `ibl_box_scores`: 1993 (29), 1994 (7), 2002 (1), 2004 (24) — 61 excess by `(game_date, name)`. Distinct signature from the 2007 HEAT re-import (no schedule overload, no `created_at` batch, no month shift); cause unknown. Destructive delete → human-merge. (discovered 2026-08-04 during the PR #1771 review) |
-| 15.28 | ⬜ Open | 🟩 | `bin/check-boxscore-schedule`'s missing-game and orphan detectors are never run automatically — both automated call sites pass `--duplicates-only`. A played 2008 Finals game sat unimported for two weeks until a GM reported it. Wiring the full audit into an existing nightly is additive → auto-mergeable. (discovered 2026-09-01 while backfilling that game) |
+
 | 15.29 | ⬜ Open | 🟩 | Production PHP changes (`Player/index.php` null guards, `LeagueStarters/index.php` free-agent fallback) entered a test-scoped PR without a plan phase, structured code review, or scope justification; six PR-body claims were contradicted by the actual diff. Adding a files-changed reconciliation gate is additive → auto-mergeable. (discovered 2026-09-03 during #1807) |
 
 ### 15.1 `tid` / `teamid` / `team_id` — Three Spellings Survive ADR-0009
@@ -737,13 +743,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Status:** Fixed this pass (PR #2023) — added `testUpdateTraditionExcludesInProgressCurrentSeasonBeforeAveraging` which supplies a 2024 row with 40 games and verifies the averages are computed from the two completed seasons only.
 **Suggested direction:** When adding a conditional exclusion to a method with existing tests, verify the new branch is exercised by at least one test path before committing.
 **Est. effort:** XS (already fixed)
-
-### 15.28 Boxscore Schedule Audit — the Missing-Game Detector Is Never Actually Run
-**Location:** `.github/workflows/db-backup.yml:173`, `.github/workflows/deploy-rehearsal.yml:175`, `bin/check-boxscore-schedule`, `ibl5/bin/check-boxscore-schedule-run`
-**Problem:** `check-boxscore-schedule` reconciles `ibl_box_scores_teams` against `ibl_schedule` in both directions — orphan boxscores (no schedule row) *and* played schedule rows with no boxscore. Only the first direction is ever exercised automatically: the two automated call sites both invoke `check-boxscore-schedule-run --duplicates-only`, and that mode explicitly "reports only duplicate regular-season matchups; orphan and missing findings are not queried." Nothing on any schedule computes the missing-game finding, so it surfaces only when a human happens to run the bare command. Concrete cost: the `boxscore-schedule-guard` plan recorded `2008-06-25 3@19 (134-147)` as the season's single played-but-unimported game and classified it "row 9 (warning only)"; no follow-up was filed anywhere, and the gap was next observed two weeks later as a GM bug report that the Clippers' 2008 Finals series rendered 3-0 instead of 4-0. The root-cause code defect had already been fixed (PR #1918, the `RECORD_SIZE` → `GAME_PAYLOAD_SIZE` loop bound) and deployed; only the data was left behind, which is exactly the class this detector exists to catch.
-**Suggested direction:** Run the full audit (drop `--duplicates-only`) on a schedule against a prod-shaped snapshot, and route a non-clean verdict somewhere a human reads — the existing nightly docfix/audit + Discord-DM plumbing is the cheap host, so this should extend a job rather than add one (`meta-tooling-bar.md`). Decide deliberately whether a missing-game finding should be exit-1 (blocking) or warn-and-notify; warn-and-notify is the safer default given historical seasons carry known unexplained gaps (see 15.24). Note this is the *detection* sibling of 15.26, which covers the missing test for `storeSimRecap`'s warn-only orphan path — same blind spot, different surface.
-**Est. effort:** S
-**Risk if untouched:** A played game that fails to import is invisible to automation. Detection latency is however long it takes a GM to notice a wrong series score or standings row — two weeks in the observed case — and every derived surface is silently wrong meanwhile, including the materialized `ibl_playoff_series_results` and anything summing `ibl_box_scores`.
 
 ### 15.29 Missing Test Coverage for the `takeOutputBuffer` Seam — StandingsUpdater Migration
 **Location:** `ibl5/tests/DatabaseIntegration/UpdateAllTheThings/PipelineIntegrationTestCase.php`; `ibl5/tests/UpdateAllTheThings/StandingsUpdaterRegressionGuardTest.php`

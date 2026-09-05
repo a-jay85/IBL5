@@ -7,7 +7,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-08-29
+last_verified: 2026-09-04
 ---
 <!-- `model: claude-sonnet-4-6` IS DELIBERATE — DO NOT REMOVE IT, and never write
      `model: sonnet` (that alias resolves to Sonnet 5). User-authorized 2026-08-26,
@@ -245,7 +245,9 @@ fallback. User-authorized 2026-08-26; the Invariants block records the same chan
    startup for a reviewer that already failed to write.
 
 3. **Cross-check the thin return against the file.** The agent returns a verdict word;
-   the file ends in one. If they differ, print
+   the file carries one as its last bare prose line, now followed by a trailing
+   `## DIGEST` section (five bold-labelled lines). Compare the WORD, not the file's
+   last line. If they differ, print
    `STOP: Phase 6 verdict mismatch — returned <word>, file says <word>` and stop. A
    thin return is a pointer, never the source of truth.
 
@@ -260,6 +262,9 @@ fallback. User-authorized 2026-08-26; the Invariants block records the same chan
    plan-fidelity section; paste the agent's verdict text into it, plus a
    `phase6-agent: pr-ready-phase6 (claude-opus-5)` line so the tier that judged this PR
    is on the record.
+   Do **not** paste the `## DIGEST` section into that verdict text: Phase 7 extracts it
+   with `.claude/skills/pr-ready/scripts/digest.sh` and posts it as its own
+   `### Merge digest` block.
 
 **Phase 6.5 — Remediation.**
 
@@ -267,4 +272,4 @@ Run `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase65-remediation.md` — 
 
 **Phase 7 — verdict and stop.**
 
-Run `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase7-verdict.md` — the Phase 1.3 literal substituted — and follow the printed file end-to-end before continuing. **Do not reach for it by path first**: per the `git show` invariant above, the worktree you are now in almost certainly does not contain it, and the main-checkout copy is behind the straddle gate. On a `git show` failure take the single declared fallback in that invariant — nothing else. If neither source yields the file, print `STOP: cannot load _phase7-verdict.md from <MASTER_SHA> or from the worktree` and stop. **This phase is mandatory and always runs** — reaching it is never conditional on Phase 6.5. It holds the arm-hold evaluation, the sticky verdict comment, and the hard terminator.
+Run `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase7-verdict.md` — the Phase 1.3 literal substituted — and follow the printed file end-to-end before continuing. **Do not reach for it by path first**: per the `git show` invariant above, the worktree you are now in almost certainly does not contain it, and the main-checkout copy is behind the straddle gate. On a `git show` failure take the single declared fallback in that invariant — nothing else. If neither source yields the file, print `STOP: cannot load _phase7-verdict.md from <MASTER_SHA> or from the worktree` and stop. **This phase is mandatory and always runs** — reaching it is never conditional on Phase 6.5. It holds the arm-hold evaluation, the sticky verdict comment, and the hard terminator. The comment body now carries a `### Merge digest` block — the five digest lines, after the plan-fidelity verdict section and before the remediation section.

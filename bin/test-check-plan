@@ -80,6 +80,22 @@ assert_viol() {
     fi
 }
 
+# assert_draft <name> <expected-exit> <plan-body>
+# Same contract as assert(), but invokes the --draft path.
+assert_draft() {
+    name="$1"; want="$2"; body="$3"
+    f="$TMP/$name.md"
+    printf '%s\n' "$body" > "$f"
+    "$GUARD" --draft "$f" >/dev/null 2>&1
+    got=$?
+    if [ "$got" -ne "$want" ]; then
+        echo "FAIL: $name — expected exit $want, got $got"
+        FAILED=1
+    else
+        echo "ok: $name (exit $got)"
+    fi
+}
+
 # Gate 13 (impl_model <-> matrix consistency, assert block further below)
 # requires a deliberate `impl_model:` marker whenever the matrix has zero
 # Truly-manual rows (rule b). Every fixture in this file that predates gate 13
@@ -272,13 +288,13 @@ This step references the existing `.github/workflows/tests.yml` workflow.
 # Gate 8: a new migration with NO `DROP` in the plan text must NOT flag (exit 0) —
 # conservative migration scoping.
 assert "gate8-migration-no-drop" 0 "$FM$M"'
-Phase 1 — Create `ibl5/migrations/099_x.sql` to add a nullable column.
+Phase 1 — Create `ibl5/migrations/add_column.sql` to add a nullable column.
 '
 
 # Gate 8: a new migration whose plan text mentions `DROP TABLE`, no resolution,
 # must flag (exit 1) — destructive-migration trigger.
 assert "gate8-migration-drop-no-adr" 1 "$FM$M"'
-Phase 1 — Create `ibl5/migrations/099_x.sql`.
+Phase 1 — Create `ibl5/migrations/add_column.sql`.
 The migration runs DROP TABLE foo to remove the legacy store.
 '
 
@@ -2008,16 +2024,20 @@ ${NMIN_HDR}
 | 13.7c | bad |
 "
 
-# Corpus regression: all 26 queued plans still pass with gate N
+# Corpus regression: all 20 queued plans still pass with gate N
+# Plans removed because they trigger new gates added in this PR (all true positives):
+# conference-champions-playoff-semantics, bug-pipeline-survive-db-sync,
+# bug-pipeline-test-env, sim-recap-boxid-resolution (gate [A]: migration literals);
+# bug-hunter-escalation-discord-dm (gate [V]: main.localhost);
+# pr-ready-now-driver, bug-pipeline-survive-db-sync (gate [I]: shellcheck flags).
 _n_corpus_pass=1
 for _n_slug in \
-    plan-architect-phase-drift-guard conference-champions-playoff-semantics \
-    automouse-cost-accounting-fix bug-hunter-escalation-discord-dm \
-    bug-pipeline-survive-db-sync redact-credentials-from-error-logs \
-    pr-ready-now-driver session-registry-dotclaude-freshness architect-explore-fanout \
-    bug-pipeline-test-env narrow-headless-marker-contract-paths agent-tiering-detail-trim \
+    plan-architect-phase-drift-guard \
+    automouse-cost-accounting-fix redact-credentials-from-error-logs \
+    session-registry-dotclaude-freshness architect-explore-fanout \
+    narrow-headless-marker-contract-paths agent-tiering-detail-trim \
     postplan-findings-schema-degrade jsb-j7-param-recovery wt-rebase-merge-not-rebase \
-    sim-recap-boxid-resolution plan-gate-skill-inline sim-recap-floor-and-cold-open \
+    plan-gate-skill-inline sim-recap-floor-and-cold-open \
     authz-verdict-refactor-1a-trading-pins authz-verdict-refactor-1b-trading-reject-service \
     authz-verdict-refactor-1c-trading-reject-shim authz-verdict-refactor-1d-trading-accept-service \
     authz-verdict-refactor-1e-trading-accept-shim authz-verdict-refactor-trading-backlog \
@@ -2067,6 +2087,317 @@ else
         echo "FAIL: n_agent_tiering_pass — agent-tiering-detail-trim.md failed (false positive)"
         FAILED=1
     fi
+fi
+
+# ---------------------------------------------------------------------------
+# Gate [A] — migration-number literal
+# ---------------------------------------------------------------------------
+
+assert_viol gate-A-literal-fires 1 '[A]' "$FM
+
+## Phase 1
+
+Plan calls for migration 171_dedup_key.sql to be applied first.
+
+$CF_MATRIX"
+
+assert_viol gate-A-escape-phrase-clears 0 '[A]' "$FM
+sonnet-recipe: gate-A escape-phrase fixture; anchor signal not under test.
+
+## Phase 1
+
+run bin/next-migration at impl time to get the number.
+
+$CF_MATRIX"
+
+assert_viol gate-A-fenced-clean 0 '[A]' "$FM
+sonnet-recipe: gate-A fence-aware fixture; anchor signal not under test.
+
+## Phase 1
+
+\`\`\`sql
+-- migration 171_dedup_key.sql
+INSERT INTO ibl_dedup VALUES (1);
+\`\`\`
+
+$CF_MATRIX"
+
+# ---------------------------------------------------------------------------
+# Gate [V] extensions — main.localhost and /path/to
+# ---------------------------------------------------------------------------
+
+# Gate [V] — main.localhost in any VM row (row must be in the VM block)
+assert_viol gate-V-main-localhost 1 '[V]' "$FM
+sonnet-recipe: gate-V main.localhost fixture; anchor not under test.
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | DB is accessible | CLI-executable | post-impl | curl http://main.localhost/ibl5/api/health |
+"
+
+# Gate [V] — /path/to placeholder in CLI-executable location cell (row in VM)
+assert_viol gate-V-path-to 1 '[V]' "$FM
+sonnet-recipe: gate-V path-to fixture; anchor not under test.
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | script runs | CLI-executable | post-impl | cd /path/to/worktree && php -v |
+"
+
+# Clean: derived hostname form does not trip the gate
+assert_viol gate-V-derived-hostname-clean 0 '[V]' "$FM
+sonnet-recipe: gate-V derived-hostname fixture; anchor not under test.
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | DB is accessible | CLI-executable | post-impl | curl http://check-plan-pr6-gates.localhost/ibl5/api/health |
+"
+
+# Escape phrase silences the main.localhost gate for plans that document it
+assert_viol gate-V-main-localhost-escape-clears 0 '[V]' "$FM
+documents main.localhost gate — this plan tests the gate itself.
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | DB is accessible | CLI-executable | post-impl | curl http://main.localhost/ibl5/api/health |
+"
+
+# ---------------------------------------------------------------------------
+# Gate [L] — line-number anchor in location cell (warn-only: exit 0, [L] in advisory)
+# Fixtures write full contiguous VM blocks (no empty lines between rows) so
+# all rows land in MATRIX_FILE and the gate sees them.
+# ---------------------------------------------------------------------------
+
+# Bare line number in location cell fires advisory [L] — exit 0 (warn-only).
+# Uses assert (exit-code only) + a companion inline grep to confirm advisory.
+_l_body="$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | thing works | E2E | post-impl | \`tests/X.spec.ts\` |
+| 2 | ID present | CLI-executable | post-impl | grep -n 'id: iblbot' .github/workflows/main.yml -- line 108 |"
+assert "gate-L-bare-line-number" 0 "$_l_body"
+_l_f=$(mktemp)
+printf '%s\n' "$_l_body" > "$_l_f"
+if ! "$GUARD" "$_l_f" 2>&1 | grep -q '\[L\]'; then
+    echo "FAIL: gate-L-bare-line-number — expected [L] advisory in output, got none"
+    FAILED=1
+else
+    echo "ok: gate-L-bare-line-number advisory confirmed"
+fi
+rm -f "$_l_f"
+
+# Tilde-approximate form is clean (excluded by pattern) — [L] must NOT appear.
+assert_viol gate-L-tilde-approx-clean 0 '[L]' "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | thing works | E2E | post-impl | \`tests/X.spec.ts\` |
+| 2 | section present | CLI-executable | post-impl | grep 'id: lint' .github/workflows/tests.yml -- ~line 483 |"
+
+# Range form is clean (excluded by pattern) — [L] must NOT appear.
+assert_viol gate-L-range-clean 0 '[L]' "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | thing works | E2E | post-impl | \`tests/X.spec.ts\` |
+| 2 | coverage span | CLI-executable | post-impl | bin/check-coverage tests/fixtures/plan.md -- line 62-75 |"
+
+# ---------------------------------------------------------------------------
+# Gate [E] — docker liveness precondition (warn-only: exit 0, [E] in advisory)
+# Rows appended directly inside the VM block (contiguous, no empty lines) so
+# they land in MATRIX_FILE.
+# ---------------------------------------------------------------------------
+
+# Docker/db-query row without a liveness row fires advisory [E] — exit 0.
+_e_body="$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | thing works | E2E | post-impl | \`tests/X.spec.ts\` |
+| 2 | data present | CLI-executable | post-impl | bin/db-query 'SELECT 1' |"
+assert "gate-E-docker-no-liveness" 0 "$_e_body"
+_e_f=$(mktemp)
+printf '%s\n' "$_e_body" > "$_e_f"
+if ! "$GUARD" "$_e_f" 2>&1 | grep -q '\[E\]'; then
+    echo "FAIL: gate-E-docker-no-liveness — expected [E] advisory in output, got none"
+    FAILED=1
+else
+    echo "ok: gate-E-docker-no-liveness advisory confirmed"
+fi
+rm -f "$_e_f"
+
+# Liveness row present — gate is silent ([E] must NOT appear).
+assert_viol gate-E-liveness-present-clean 0 '[E]' "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | stack up | CLI-executable | pre-impl | docker ps --filter name=ibl5-db |
+| 2 | data present | CLI-executable | post-impl | bin/db-query 'SELECT 1' |"
+
+# No docker rows at all — gate is silent ([E] must NOT appear).
+assert_viol gate-E-no-docker-clean 0 '[E]' "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | thing works | E2E | post-impl | \`tests/X.spec.ts\` |"
+
+# ---------------------------------------------------------------------------
+# Gate [I] — shellcheck CI-flag requirement (hard-fail)
+# Contiguous VM blocks; shellcheck rows reference actual CI-wired scripts only
+# in want=1 fixtures (gate [G] also fires but [I] tag is still present).
+# Clean fixtures (want=0) use shellcheck with full flags or no shellcheck at all.
+# ---------------------------------------------------------------------------
+
+# Bare shellcheck (no flags) — fires [I] (exit 1).
+assert_viol gate-I-bare-shellcheck 1 '[I]' "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | thing works | E2E | post-impl | \`tests/X.spec.ts\` |
+| 2 | lint clean | CLI-executable | post-impl | shellcheck bin/foo |"
+
+# --severity=warning only, missing --shell=bash — fires [I] (exit 1).
+assert_viol gate-I-severity-only 1 '[I]' "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | thing works | E2E | post-impl | \`tests/X.spec.ts\` |
+| 2 | lint clean | CLI-executable | post-impl | shellcheck --severity=warning bin/foo |"
+
+# Both flags present — gate is silent ([I] must NOT appear, exit 0).
+assert_viol gate-I-full-flags-clean 0 '[I]' "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | thing works | E2E | post-impl | \`tests/X.spec.ts\` |
+| 2 | lint clean | CLI-executable | post-impl | shellcheck --severity=warning --shell=bash bin/foo |"
+
+# No shellcheck row at all — gate is silent ([I] must NOT appear, exit 0).
+assert_viol gate-I-no-shellcheck-row-clean 0 '[I]' "$FM_OPUS
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | thing works | E2E | post-impl | \`tests/X.spec.ts\` |"
+
+# ---------------------------------------------------------------------------
+# Gate [J] — coverage advisory for new PHP class (warn-only)
+# ---------------------------------------------------------------------------
+
+# New PHP class without coverage row fires advisory [J] — exit 0 (warn-only).
+# Uses assert (exit-code only) + companion inline grep to confirm advisory.
+_j_body="$FM_OPUS
+
+## Phase 1
+
+Create a new ibl5/classes/Foo/BarService.php implementing the baz interface.
+$CF_MATRIX"
+assert "gate-J-new-class-no-coverage" 0 "$_j_body"
+_j_f=$(mktemp)
+printf '%s\n' "$_j_body" > "$_j_f"
+if ! "$GUARD" "$_j_f" 2>&1 | grep -q '\[J\]'; then
+    echo "FAIL: gate-J-new-class-no-coverage — expected [J] advisory in output, got none"
+    FAILED=1
+else
+    echo "ok: gate-J-new-class-no-coverage advisory confirmed"
+fi
+rm -f "$_j_f"
+
+# Infection row present in VM — gate is silent ([J] must NOT appear).
+assert_viol gate-J-new-class-with-infection-clean 0 '[J]' "$FM_OPUS
+
+## Phase 1
+
+Create a new ibl5/classes/Foo/BarService.php implementing the baz interface.
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | mutation score | Infection | post-impl | bin/infection-run ibl5/classes/Foo/BarService.php |"
+
+# No creation verb — gate is silent ([J] must NOT appear).
+assert_viol gate-J-no-new-class-clean 0 '[J]' "$FM_OPUS
+
+## Phase 1
+
+Modify ibl5/classes/Foo/BarService.php to add a method.
+$CF_MATRIX"
+# --- Gate D (draft phase drift) ---
+# Fixture bodies are built with printf heading-token arguments to avoid
+# literal level-2 Phase headings being counted if gate D is ever pointed at
+# this file. H feeds '##' as a printf %s argument; the body text is the
+# substituted output, never a raw `## Phase N` literal in this file.
+H='##'
+
+D_SCAF4=$(printf '%s PLAN OUTLINE (loop scaffold; dropped at Step 5):\n1. Phase 1: a\n2. Phase 2: b\n3. Phase 3: c\n4. Phase 4: d\n%s\n' '<!--' '-->')
+D_SCAF3=$(printf '%s PLAN OUTLINE (loop scaffold; dropped at Step 5):\n1. Phase 1: a\n2. Phase 2: b\n3. Phase 3: c\n%s\n' '<!--' '-->')
+D_SCAF3PLUS=$(printf '%s PLAN OUTLINE (loop scaffold; dropped at Step 5):\n1. Phase 1: a\n2. Phase 2: b\n3. Phase 3: c\n4. Verification Matrix\n5. Critical Files\n%s\n' '<!--' '-->')
+
+D_BODY3=$(printf '%s Phase 1: a\n\ntext\n\n%s Phase 2: b\n\ntext\n\n%s Phase 3: c\n\ntext\n' "$H" "$H" "$H")
+D_BODY4=$(printf '%s Phase 1: a\n\ntext\n\n%s Phase 2: b\n\ntext\n\n%s Phase 3: c\n\ntext\n\n%s Phase 4: d\n\ntext\n' "$H" "$H" "$H" "$H")
+D_BODY5=$(printf '%s Phase 1: a\n\ntext\n\n%s Phase 2: b\n\ntext\n\n%s Phase 3: c\n\ntext\n\n%s Phase 4: d\n\ntext\n\n%s Phase 5: e\n\ntext\n' "$H" "$H" "$H" "$H" "$H")
+D_BODY6=$(printf '%s Phase 1: a\n\ntext\n\n%s Phase 2: b\n\ntext\n\n%s Phase 3: c\n\ntext\n\n%s Phase 4: d\n\ntext\n\n%s Phase 5: e\n\ntext\n\n%s Phase 6: f\n\ntext\n' "$H" "$H" "$H" "$H" "$H" "$H")
+
+# 1. Over-complete: scaffold 4, body 6 → exit 1 with [D] and "over by 2"
+assert_draft "gateD-over-complete-violation" 1 "$(printf '%s\n%s' "$D_SCAF4" "$D_BODY6")"
+_f_d="$TMP/gateD-over-complete-violation.md"
+printf '%s\n%s\n' "$D_SCAF4" "$D_BODY6" > "$_f_d"
+_out_d=$("$GUARD" --draft "$_f_d" 2>&1)
+if printf '%s' "$_out_d" | grep -qF '[D]' && printf '%s' "$_out_d" | grep -q 'over by 2'; then
+    echo "ok: gateD-over-complete-violation-message"
+else
+    echo "FAIL: [D] violation message must contain '[D]' and 'over by 2'"
+    FAILED=1
+fi
+
+# 2. Exact match: scaffold 3, body 3 → exit 0
+assert_draft "gateD-exact-match-ok" 0 "$(printf '%s\n%s' "$D_SCAF3" "$D_BODY3")"
+
+# 3. Under-complete: scaffold 4, body 3 → exit 0 (run still in progress)
+assert_draft "gateD-under-complete-ok" 0 "$(printf '%s\n%s' "$D_SCAF4" "$D_BODY3")"
+
+# 4. No scaffold at all: body 5, no PLAN OUTLINE comment → exit 0 (pre-scaffold draft)
+assert_draft "gateD-no-scaffold-ok" 0 "$D_BODY5"
+
+# 5. Scaffold closing items not counted: scaffold 3 Phase items + 2 numbered
+# closing items, body 4 → exit 1. A counter that counts ALL numbered items
+# reads scaffold=5 and body=4 < 5 → wrongly passes; canonical counter reads
+# scaffold=3 and body=4 > 3 → correctly fails.
+assert_draft "gateD-scaffold-closing-items-not-counted" 1 "$(printf '%s\n%s' "$D_SCAF3PLUS" "$D_BODY4")"
+
+# Non-draft regression: an existing clean full plan must still exit 0 through
+# the unchanged (non-draft) path. Use the smallest valid complete fixture.
+assert "gateD-nondraft-regression" 0 "$FM"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | thing works | E2E | post-impl | `tests/X.spec.ts` |
+'
+
+# --draft with no path must exit 2.
+"$GUARD" --draft >/dev/null 2>&1; _got_2=$?
+if [ "$_got_2" -eq 2 ]; then
+    echo "ok: gateD-no-path-exits-2 (exit 2)"
+else
+    echo "FAIL: gateD-no-path-exits-2 — expected exit 2, got $_got_2"
+    FAILED=1
+fi
+
+# regex_canon_divergence — the three call sites must stay byte-identical.
+# Canon lives in bin/check-plan gate [D]; SKILL.md and _architect-contract.md
+# restate it. Any divergence (notably \s for [[:space:]]) fails here.
+SCAF_RE='^[[:space:]]*[0-9]+\.[[:space:]]+(Phase|Step)[[:space:]]*[0-9]'
+BODY_RE='^##[[:space:]]+(Phase|Step)[[:space:]]*[0-9]'
+_canon_failed=0
+for _f in bin/check-plan .claude/skills/plan/SKILL.md \
+         .claude/skills/plan/_architect-contract.md; do
+  grep -qF "$SCAF_RE" "$_f" || { echo "FAIL: scaffold regex missing/divergent in $_f"; FAILED=1; _canon_failed=1; }
+  grep -qF "$BODY_RE" "$_f" || { echo "FAIL: body regex missing/divergent in $_f"; FAILED=1; _canon_failed=1; }
+done
+if grep -nE '\\s' bin/check-plan .claude/skills/plan/SKILL.md \
+    .claude/skills/plan/_architect-contract.md 2>/dev/null | grep -qE '\(Phase\|Step\)'; then
+  echo "FAIL: non-POSIX \\s found in canon expression"
+  FAILED=1
+  _canon_failed=1
+fi
+if [ "$_canon_failed" -eq 0 ]; then
+  echo "ok: regex_canon_divergence"
 fi
 
 if [ "$FAILED" -ne 0 ]; then

@@ -312,6 +312,17 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 
 **Table evidence (2026-08-08):** StandingsRepository 726 LOC — per-category standings query methods. Extract per-category query collaborators; green-green DB pin. Shares `classes/Standings/` with 1.35 — plan as ONE chunk.
 
+### 1.33 Player — Typed-Getter Accumulation (671 LOC)
+**Location:** `ibl5/classes/Player/Player.php` (671 lines)
+**Problem:** Domain entity accumulates typed getters across contract, stats, and identity domains in a single class. Finding 1.10 (mutable props) is resolved; the residual is pure size from typed-getter bulk.
+**Suggested direction:** Extract per-domain typed-getter groups (contract, stats, identity) into focused value-object collaborators; keep `Player` as the root entity.
+**Est. effort:** M
+**Risk if untouched:** Every new player attribute inflates one file; getter search spans the entire class.
+**Provenance:** Seeded 2026-07-24 — ground-truth audit hot-file scan.
+**Status:** Implemented (#2097, 2026-09-04) — `Player.php` 671 → 279; the 66 pure field getters moved to the `PlayerIdentityGetters`, `PlayerContractGetters` and `PlayerRatingsGetters` traits (created in `ibl5/classes/Player/`). All 73 public signatures preserved — no change to any of the 138 caller files or to `PlayerInterface`. Collaborator-backed and repository-backed methods stayed in `Player.php`. Trait mechanism recorded in ADR-0119. Pinned by `PlayerPublicApiSurfaceTest`. Green-green.
+
+**Table evidence (2026-09-04):** Player 671 LOC — typed-getter accumulation. Extract per-domain typed-getter groups (contract, stats, identity); green-green.
+
 ### 1.34 SavedDepthChartService — Data Assembly + Slot-Conflict Resolution (626 LOC)
 **Location:** `ibl5/classes/SavedDepthChart/SavedDepthChartService.php` (626 lines)
 **Problem:** One service assembles depth-chart page data and resolves slot conflicts, mixing orchestration with conflict-resolution logic.
@@ -1224,6 +1235,11 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Status:** Implemented (2026-06-27) — added TeamScheduleService opponent-lookup/opponent-text, SOS-tier (populated vs empty rankings), and next-sim-highlight tests in tests/TeamSchedule/. Repository correctness owned by gated tests/DatabaseIntegration/TeamScheduleRepositoryTest.php; no playoff-bracket unit exists on master (View-only month relabel).
 
 **Table evidence (2026-07-25):** TeamSchedule thin; additive.
+### 6.14 Updater Module — Large + Subthreshold (37 files, 9 tests)
+**Table evidence (2026-08-30):** Axis-1 partial (2026-08-08): 4 raw-mysqli step classes added (RefreshIblHistStep, RefreshPlayoffSeriesResultsStep, RefreshTeamSeasonRecordsStep, ResetExtensionAttemptsStep) in tests/UpdateAllTheThings/Steps/. Remaining: 11 step classes (pure-delegator, interface-injected, OlympicsFlatStandingsUpdater, UpdaterView, JsbSourceResolver) + ProcessAllStarGamesStep (deferred — W1-12 sequencing). AutoSeedOlympicsTeamInfoStep already has behavioral coverage (4 tests on `master`) — the plan's audit was stale.
+
+**Status (2026-08-30):** ✅ Implemented — All 20 `Updater\Steps` classes now have behavioral test coverage. Intermediate PRs (Axis-1 through maint-6-14-updater-coverage) progressively covered the pure-delegator steps (UpdatePowerRankingsStep, UpdateScheduleStep, UpdateStandingsStep), interface-injected steps (ParsePlayerFileStep, ExtendDepthChartsStep, ImportLeagueConfigStep, SnapshotPlrStep, EndOfSeasonImportStep), non-Step updater classes (OlympicsFlatStandingsUpdater, UpdaterView, JsbSourceResolver), and ProcessAllStarGamesStep. Final gap — CleanupPreseasonDataStep and QueueSimSummaryStep — closed by this PR (2026-08-30).
+
 ### 6.15 Voting Module — Subthreshold (17 files, 4 tests)
 **Location:** `ibl5/classes/Voting`
 **Problem:** Ballot/submission/results services and renderer with 4 tests.
@@ -1261,6 +1277,16 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 **Status:** ✅ Done (2026-08-15) — All DB-integration residuals resolved: TransactionHistory ORDER BY correctness covered by testGetTransactionsOrdersNewestFirst (#1885); SavedDepthChart write-path covered by testGetSavedDepthChartByIdReturnsRow; win-loss aggregation covered by testGetWinLossRecord* tests.
 
 **Table evidence (2026-08-15):** Unit tests added: DraftPickLocator repo, LeagueSchedule Game, TransactionHistory repo, CapSpace repo. NextSim/SavedDepthChart/DepthChartEntry verified covered. Residual: SQL aggregation/ordering + SDC write-path are DB-integration-only. Residual closed: testGetTransactionsOrdersNewestFirst added (PR #1885); SDC write-path covered by testGetSavedDepthChartByIdReturnsRow; aggregation covered by testGetWinLossRecord* tests.
+
+### 6.19 Small Modules With Single-Test Coverage
+**Location:** `AllStarAppearances` (4/1), `GMContactList` (4/1), `Season` (3/1), `Shared` (3/1)
+**Problem:** Minimal coverage on aggregation, dedup, phase transitions, shared-data constraints.
+**Suggested direction:** Targeted single-class tests.
+**Est. effort:** S each
+**Risk if untouched:** AS appearances double-counted; duplicate GMs; season state inconsistencies; shared data leaks.
+**Status:** ✅ Done (2026-09-04) — DatabaseIntegration residual closed. AS-appearance aggregation was already covered by the 10 seeded-row tests in `ibl5/tests/DatabaseIntegration/AllStarAppearancesRepositoryTest.php`. GM dedup correctness now covered end-to-end by `testExcludesTeamsOutsideRealFranchiseRange` (seeds an out-of-range `teamid` and proves it is filtered) and `testTwoDistinctInRangeTeamsAreNotCollapsed` (proves the returned `teamid` multiset is duplicate-free) in `ibl5/tests/DatabaseIntegration/GMContactListRepositoryTest.php`. Season-entity phase predicates remain structurally untestable (the `TestAliasesBootstrap` mock alias) and `Shared` is N/A (deleted, backlog 2.23) — both are non-goals, not residuals.
+
+**Table evidence (2026-09-04):** AllStarAppearances + GMContactList repo unit tests added. Season entity predicates blocked by `Season\Season`→mock alias (QueryRepo plumbing covered). `Shared` N/A (deleted 2.23).
 
 ### 6.20 Anonymous rookie-option lockdown E2E assertion is non-discriminating
 **Location:** `tests/e2e/security/draft-rookie-anon-lockdown.spec.ts` (under `ibl5/`; added by PR #1107, not yet on `master`)
@@ -2671,3 +2697,11 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Status:** ✅ Implemented (Strategy A, PR #1007 validator-accumulators-to-validationresult, 2026-06-08) — the two pure string-accumulator validators (`Waivers/WaiversValidator`, `Draft/DraftValidator`) now return `ValidationResult`; mutable `private array $errors` / `getErrors()` / `clearErrors()` removed. State-leakage risk eliminated for these two. Remainder (structured/dict-family validators) re-filed as 13.7b (open).
 
 **Table evidence (2026-06-08):** Waivers/Draft → ValidationResult (Strategy A); remainder is 13.7b. Done part green-green.
+
+### 15.28 Boxscore Schedule Audit — the Missing-Game Detector Is Never Actually Run
+**Location:** `.github/workflows/db-backup.yml:173`, `.github/workflows/deploy-rehearsal.yml:175`, `bin/check-boxscore-schedule`, `ibl5/bin/check-boxscore-schedule-run`
+**Problem:** `check-boxscore-schedule` reconciles `ibl_box_scores_teams` against `ibl_schedule` in both directions — orphan boxscores (no schedule row) *and* played schedule rows with no boxscore. Only the first direction is ever exercised automatically: the two automated call sites both invoke `check-boxscore-schedule-run --duplicates-only`, and that mode explicitly "reports only duplicate regular-season matchups; orphan and missing findings are not queried." Nothing on any schedule computes the missing-game finding, so it surfaces only when a human happens to run the bare command. Concrete cost: the `boxscore-schedule-guard` plan recorded `2008-06-25 3@19 (134-147)` as the season's single played-but-unimported game and classified it "row 9 (warning only)"; no follow-up was filed anywhere, and the gap was next observed two weeks later as a GM bug report that the Clippers' 2008 Finals series rendered 3-0 instead of 4-0. The root-cause code defect had already been fixed (PR #1918, the `RECORD_SIZE` → `GAME_PAYLOAD_SIZE` loop bound) and deployed; only the data was left behind, which is exactly the class this detector exists to catch.
+**Suggested direction:** Run the full audit (drop `--duplicates-only`) on a schedule against a prod-shaped snapshot, and route a non-clean verdict somewhere a human reads — the existing nightly docfix/audit + Discord-DM plumbing is the cheap host, so this should extend a job rather than add one (`meta-tooling-bar.md`). Decide deliberately whether a missing-game finding should be exit-1 (blocking) or warn-and-notify; warn-and-notify is the safer default given historical seasons carry known unexplained gaps (see 15.24). Note this is the *detection* sibling of 15.26, which covers the missing test for `storeSimRecap`'s warn-only orphan path — same blind spot, different surface.
+**Est. effort:** S
+**Risk if untouched:** A played game that fails to import is invisible to automation. Detection latency is however long it takes a GM to notice a wrong series score or standings row — two weeks in the observed case — and every derived surface is silently wrong meanwhile, including the materialized `ibl_playoff_series_results` and anything summing `ibl_box_scores`.
+**Status:** ✅ Implemented (PR #2100, 2026-09-04) — added a non-fatal full-audit step to the `backup` job in `.github/workflows/db-backup.yml` that runs `check-boxscore-schedule-run` without `--duplicates-only`, guarded by `if: ${{ !cancelled() }}` so it runs even on nights the duplicate check fails. A conditional Discord DM fires via the existing `notify-discord` composite action when `audit_rc != 0`. Both existing `--duplicates-only` call sites are byte-identical. First run is expected to report findings (historical data debt, including the confirmed 2008 gap) — this is the detector working for the first time, not a new regression.

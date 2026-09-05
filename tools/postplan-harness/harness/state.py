@@ -66,7 +66,13 @@ class Classification:
     non_code_only: bool = False
     has_modified: bool = False
     has_comments_in_diff: bool = False
+    has_shell: bool = False
+    has_workflow: bool = False
+    has_skill_prose: bool = False
+    count_shell: int = 0
+    count_workflow: int = 0
     lines_php_changed: int = 0
+    lines_shell_changed: int = 0
     e2e_spec_modules: list[str] = field(default_factory=list)
     has_e2e_prod_overlap: bool = False
     filtered_diff: str = ""          # migrations/lockfiles/snapshots stripped
@@ -82,7 +88,10 @@ class Classification:
             f"HAS_COMMENTS_IN_DIFF={self.has_comments_in_diff} LINES_PHP_CHANGED={self.lines_php_changed}\n"
             f"HAS_E2E_SPECS={self.has_e2e_specs} HAS_E2E_PROD_OVERLAP={self.has_e2e_prod_overlap}\n"
             f"HAS_GO={self.has_go} GO_TOUCHED={self.go_touched} ENGINE_ONLY={self.engine_only} "
-            f"GOLDEN_CHANGED={self.golden_changed} COUNT_GO={self.count_go}"
+            f"GOLDEN_CHANGED={self.golden_changed} COUNT_GO={self.count_go}\n"
+            f"HAS_SHELL={self.has_shell} HAS_WORKFLOW={self.has_workflow} "
+            f"HAS_SKILL_PROSE={self.has_skill_prose} COUNT_SHELL={self.count_shell} "
+            f"COUNT_WORKFLOW={self.count_workflow} LINES_SHELL_CHANGED={self.lines_shell_changed}"
         )
 
 

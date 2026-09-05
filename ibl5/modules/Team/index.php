@@ -23,7 +23,7 @@ $commonRepo = new \Repositories\TeamIdentityRepository($mysqli_db);
 $teamRepository = new Team\TeamRepository($mysqli_db);
 $service = new Team\TeamService($mysqli_db, $teamRepository, $leagueContext);
 $view = new Team\TeamView();
-$controller = new Team\TeamController($mysqli_db, $commonRepo, $authService, $service, $view);
+$controller = new Team\TeamController($mysqli_db, $commonRepo, $authService, $service, $view, \Http\HttpRequest::fromGlobals());
 
 switch ($op) {
     case "team":

@@ -1,6 +1,6 @@
 ---
 description: /pr-ready runtime Phase 6.5 — fix every Phase 6 finding in-PR, commit, re-push, re-arm CI. Loaded by SKILL.md via git show at Phase 6.5.
-last_verified: 2026-08-27
+last_verified: 2026-09-04
 ---
 
 # /pr-ready runtime Phase 6.5 — in-PR remediation
@@ -45,10 +45,14 @@ Every Phase 6 finding gets fixed and its prevention filed, in this PR's existing
 
    Verdict words are the Phase 4.3 list, unchanged. `PUSHED PR #<N> <sha>` — proceed to step 6. `STALE LEASE` — someone pushed concurrently; git rejected with `stale info` and nothing was clobbered. Stop and report it in the Phase 7 verdict; never re-read and retry with a fresh lease. `PUSH FAILED` — origin does not hold this HEAD; stop. "No error printed" is not evidence of a push.
 
-6. **Re-watch CI on the new head — exactly one delegate.** The Phase 4.5 delegate has already returned (that is what re-invoked you), so there is nothing to stop. Run `git rev-parse HEAD` bare and record the new `<HEAD_SHA>` literal. `/tmp/pr-ready-ciwatch-<N>.sh` is already materialized from Phase 4.5 and takes the SHA as an **argument**, so it does not need rewriting — just spawn a second delegate on the new literal, using the **identical shape and packet** as Phase 4.5 step 5 (`Agent`, `model: "haiku"`, foreground `timeout: 600000`, up to 6 windows), whose command line is:
+6. **Re-watch CI on the new head — exactly one delegate.** The Phase 4.5 delegate has already returned (that is what re-invoked you), so there is nothing to stop. Run `git rev-parse HEAD` bare and record the new `<HEAD_SHA>` literal.
+
+   **Re-materialize the watcher first — never `bash` a leftover `/tmp` copy** (the materialize invariant in `SKILL.md`). The watcher takes the SHA as an **argument**, so re-running the materialize changes nothing on the ordinary path; what it buys is the failure path. A failed Phase 4.5 `git show` leaves a **0-byte** file at that path; `bash` on an empty file exits **0** printing nothing; the packet reads a no-output run as a killed window and re-runs it, so all 6 windows burn in seconds, no verdict ever returns, and the run is timeout-killed with no verdict comment (PR #2077, 2026-09-04). Re-run the Phase 4.5 step 5 materialize **verbatim** — including the `.part` staging, which is what stops a failure from replacing a good copy with an empty one — and require `MATERIALIZED` to print. If it does not, stop and report the failed materialize in the Phase 7 verdict.
+
+   Then spawn a second delegate on the new literal, using the **identical shape and packet** as Phase 4.5 step 5 (`Agent`, `model: "haiku"`, foreground `timeout: 600000`, up to 6 windows), whose command line is:
 
    ```bash
-   bash /tmp/pr-ready-ciwatch-<N>.sh <N> <HEAD_SHA> 540
+   if test -s /tmp/pr-ready-ciwatch-<N>.sh; then bash /tmp/pr-ready-ciwatch-<N>.sh <N> <HEAD_SHA> 540; else echo "STOP: watcher /tmp/pr-ready-ciwatch-<N>.sh is missing or empty"; fi
    ```
 
    Then end your turn. **Never** re-arm this with `Bash(run_in_background: true)`, and never with a bare foreground `Bash` call: Phase 4.5 step 5 explains why both are killed or truncated under headless `claude -p`, and this step is where a fixed run most often relapses. Passing the stale Phase 4.5 SHA here is the other failure to avoid: the `seen` gate would never fire and the run would idle to `CI TIMEOUT`. Verdict words and exit codes are the Phase 4.5 step 5 list, unchanged.

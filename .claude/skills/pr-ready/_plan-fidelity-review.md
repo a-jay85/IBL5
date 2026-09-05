@@ -37,3 +37,19 @@ Purpose: the criteria and verdict shape for the semantic judgment this skill exi
 - **`NOT READY`** — at least one finding matched a blocking clause in 6d; each one must name the clause it matched and the concrete next action.
 
 A green CI plus a green Phase 5.0 conformance run is **not** sufficient for `READY` on its own — that combination is exactly the state this skill exists to look past.
+
+**6e(b). Merge digest — always emitted, after the verdict word.** Whatever the verdict, the
+verdict file ends with a `## DIGEST` section: the heading, then exactly five lines, each opening
+with its bold label, in this order — `**What changed:**`, `**Why:**`, `**Watch:**`,
+`**Touches:**`, `**Machine-authored fixes:**`. The full shape, the plain-language rule, and the
+never-omit-a-label rule are specified in `.claude/agents/pr-ready-phase6.md` § Output contract
+item 3; that item is authoritative and this clause must not restate it differently. Three points
+that belong here, with the verdict criteria:
+
+- The digest is **descriptive, never a verdict**. A `NOT READY` PR still gets a factual digest.
+  It does not repeat, soften, or contradict the terminal word; blockers stay in the 6d findings.
+- `**Why:**` is taken from 6b input 1 (the plan file) or input 3 (the PR body), never inferred
+  from the code. If those two disagree, that disagreement is a 6d check 4 finding and must be
+  reported there as well as noted in one clause here.
+- The digest is written **from the read you already performed**. It is not a second pass, and
+  6a's one-spawn-per-run boundary forbids delegating it.

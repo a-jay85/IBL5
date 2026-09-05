@@ -260,4 +260,36 @@ class TradeRosterPreviewParamValidatorTest extends TestCase
         $_GET = ['myCash' => '0'];
         $this->assertSame(0, $this->validator->validateCashAmount('myCash'));
     }
+
+    // ── validateCashYearRange ───────────────────────────────────────────────
+
+    public function testValidateCashYearRangeRejectsAttackInput(): void
+    {
+        $_GET = ['cashStartYear' => '1', 'cashEndYear' => '999999'];
+        $this->assertSame([0, 0], $this->validator->validateCashYearRange(2031));
+    }
+
+    public function testValidateCashYearRangeAcceptsValidRange(): void
+    {
+        $_GET = ['cashStartYear' => '1', 'cashEndYear' => '3'];
+        $this->assertSame([1, 3], $this->validator->validateCashYearRange(6));
+    }
+
+    public function testValidateCashYearRangeRejectsInvertedRange(): void
+    {
+        $_GET = ['cashStartYear' => '5', 'cashEndYear' => '2'];
+        $this->assertSame([0, 0], $this->validator->validateCashYearRange(6));
+    }
+
+    public function testValidateCashYearRangeRejectsBoundaryOverMax(): void
+    {
+        $_GET = ['cashStartYear' => '1', 'cashEndYear' => '7'];
+        $this->assertSame([0, 0], $this->validator->validateCashYearRange(6));
+    }
+
+    public function testValidateCashYearRangeAcceptsBoundaryAtMax(): void
+    {
+        $_GET = ['cashStartYear' => '6', 'cashEndYear' => '6'];
+        $this->assertSame([6, 6], $this->validator->validateCashYearRange(6));
+    }
 }

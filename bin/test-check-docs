@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Test harness for bin/check-docs checkSkillDraftPlaceholder().
+# Follows bin/test-check-plan style.
+#
+# Each fixture is a minimal git repo so bin/check-docs can locate the root.
+# Assertions check for the specific FAIL label in output, not bare exit code,
+# because a sparse fixture may trip unrelated checks.
+
+PASS=0
+FAIL=0
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REAL_SCRIPT="$SCRIPT_DIR/check-docs"
+
+label_present() {   echo "$1" | grep -qF 'skill DRAFT= command-substitution'; }
+label_absent()  { ! echo "$1" | grep -qF 'skill DRAFT= command-substitution'; }
+
+pass() { echo "PASS: $1"; ((PASS++)) || true; }
+fail() { echo "FAIL: $1"; ((FAIL++)) || true; }
+
+make_repo() {
+    local repo
+    repo=$(mktemp -d)
+    git -C "$repo" init -q
+    # Copy check-docs into the temp repo's bin/ so __DIR__ resolves to the temp repo root.
+    mkdir -p "$repo/bin"
+    cp "$REAL_SCRIPT" "$repo/bin/check-docs"
+    echo "$repo"
+}
+
+make_skill_md() {   # make_skill_md <repo> <content>
+    local repo="$1" content="$2"
+    mkdir -p "$repo/.claude/skills/foo"
+    printf '%s' "$content" > "$repo/.claude/skills/foo/SKILL.md"
+}
+
+# Valid frontmatter prefix so frontmatter checks don't interfere
+FM=$'---\ndescription: Test fixture\nlast_verified: 2026-09-04\n---\n'
+
+# ── Test 1: positive — DRAFT=$(...) inside fenced block → label present ──────
+
+REPO=$(make_repo)
+make_skill_md "$REPO" "${FM}"'# Foo
+
+```bash
+DRAFT=$(git rev-parse HEAD)
+echo "$DRAFT"
+```
+'
+OUT=$(cd "$REPO" && bin/check-docs --no-staleness 2>&1) || true
+rm -rf "$REPO"
+if label_present "$OUT"; then
+    pass "positive: DRAFT=\$(...) in fenced block triggers violation"
+else
+    fail "positive: DRAFT=\$(...) in fenced block should trigger violation"
+    echo "  output: $OUT"
+fi
+
+# ── Test 2: negative — DRAFT=<slug> in fenced block → label absent ───────────
+
+REPO=$(make_repo)
+make_skill_md "$REPO" "${FM}"'# Foo
+
+```bash
+DRAFT="$HOME/claude-plans/.drafts/<slug>.draft.md"
+echo "$DRAFT"
+```
+'
+OUT=$(cd "$REPO" && bin/check-docs --no-staleness 2>&1) || true
+rm -rf "$REPO"
+if label_absent "$OUT"; then
+    pass "negative: DRAFT=<slug> in fenced block is clean"
+else
+    fail "negative: DRAFT=<slug> in fenced block should not trigger violation"
+    echo "  output: $OUT"
+fi
+
+# ── Test 3: prose-scope — DRAFT=$(...) in prose (not fenced) → label absent ──
+
+REPO=$(make_repo)
+make_skill_md "$REPO" "${FM}"'# Foo
+
+Run: DRAFT=$(git rev-parse HEAD)
+
+No fenced block here.
+'
+OUT=$(cd "$REPO" && bin/check-docs --no-staleness 2>&1) || true
+rm -rf "$REPO"
+if label_absent "$OUT"; then
+    pass "prose-scope: DRAFT=\$(...) in prose is not flagged"
+else
+    fail "prose-scope: DRAFT=\$(...) in prose should not be flagged"
+    echo "  output: $OUT"
+fi
+
+# ── Test 4: non-skill — DRAFT=$(...) in non-SKILL.md file → label absent ─────
+
+REPO=$(make_repo)
+mkdir -p "$REPO/docs"
+printf '%s' "${FM}"'# Other
+
+```bash
+DRAFT=$(git rev-parse HEAD)
+```
+' > "$REPO/docs/OTHER.md"
+OUT=$(cd "$REPO" && bin/check-docs --no-staleness 2>&1) || true
+rm -rf "$REPO"
+if label_absent "$OUT"; then
+    pass "non-skill: DRAFT=\$(...) in non-SKILL.md is not flagged"
+else
+    fail "non-skill: DRAFT=\$(...) in non-SKILL.md should not be flagged"
+    echo "  output: $OUT"
+fi
+
+# ── Results ───────────────────────────────────────────────────────────────────
+
+echo ""
+echo "PASS: $PASS, FAIL: $FAIL"
+[[ "$FAIL" -eq 0 ]]

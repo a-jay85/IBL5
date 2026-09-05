@@ -1,5 +1,5 @@
 ---
-description: /pr-ready runtime Phase 4 — lost-work proof, push, PR state, and the CI watcher arm. Loaded by SKILL.md via git show at Phase 4.
+description: /pr-ready runtime Phase 4 — lost-work proof, push, bounded retry ladder, PR state, and the CI watcher arm. Loaded by SKILL.md via git show at Phase 4.
 last_verified: 2026-09-04
 ---
 
@@ -27,7 +27,21 @@ Read at runtime via `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase4-push-
    git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/push.sh > /tmp/pr-ready-push-<N>.sh && test -s /tmp/pr-ready-push-<N>.sh && bash /tmp/pr-ready-push-<N>.sh <N>
    ```
 
-   Verdict words. `PUSHED PR #<N> <sha>` (rc 0) — origin holds this HEAD; proceed. `STALE LEASE` (rc 2) — origin holds something this worktree has never seen (someone pushed into the branch, or it was never fetched here); git rejected with `stale info`, or the script refused for want of a lease, and **nothing was clobbered**. Stop and re-run Phase 3; never drop the lease, never retry with `--force`. `PUSH FAILED` (rc 1) — origin does **not** hold this HEAD. Print it and stop; do not continue to Phase 5. **"No error printed" is not evidence of a push.** Any `STOP:` line — stop the run and make no further tool call.
+   Verdict words. `PUSHED PR #<N> <sha>` (rc 0) — origin holds this HEAD; proceed. `STALE LEASE` (rc 2) — origin holds something this worktree has never seen (someone pushed into the branch, or it was never fetched here); git rejected with `stale info`, or the script refused for want of a lease, and **nothing was clobbered**. Take step 3a's retry ladder; never drop the lease, never retry with `--force`. `PUSH FAILED` (rc 1) — origin does **not** hold this HEAD. Print it and stop; do not continue to Phase 5. **"No error printed" is not evidence of a push.** Any `STOP:` line — stop the run and make no further tool call.
+
+3a. **Retry ladder — bounded at three push attempts, then a loud stop.** Keep a literal `<PUSH-ATTEMPTS>` in the run notes, starting at 1 for the step-3 push you just ran; like `<MASTER_SHA>` it is model-held, because a shell variable does not survive to the next Bash call.
+
+   Three verdicts enter this ladder: step 3's `STALE LEASE` (rc 2), step 4's `mergeStateStatus=DIRTY`, and step 5's `MERGE CONFLICT` (rc 2). All three mean the same thing — origin moved under us and the branch must be rebuilt on the new master — so they share one budget.
+
+   If `<PUSH-ATTEMPTS>` is already **3**, stop. Print, as its own line and verbatim:
+
+   `STOP: push retry budget exhausted after 3 rebase attempts — master is moving faster than this branch can rebase — merge manually or retry when master quiets`
+
+   Otherwise: re-pin master (`git rev-parse origin/master` bare, record the new SHA as `<MASTER_SHA>`, replacing the Phase 1.3 literal), re-run the Phase 2-3 include end-to-end on the new pin, re-run step 2's lost-work proof, then re-run step 3's push. Increment `<PUSH-ATTEMPTS>` by one and read the new verdict through this same ladder.
+
+   Re-running Phase 3 is what makes the retry legitimate: its `git fetch origin` updates `refs/remotes/origin/<branch>`, so `scripts/push.sh` derives a *current* lease from what we now genuinely know origin holds. Never shortcut this by re-reading the remote yourself, never pass `--force`, and never edit `scripts/push.sh` — a lease derived any other way is a plain force-push wearing a lease's name.
+
+   The Phase 2 include overwrites `/tmp/pr-ready-diff-pre-<N>.patch` on each pass, and that is correct: pass *n* proves its own rebase lost nothing, and the chain of per-pass proofs composes into the whole. Do not add a guard to preserve the first capture.
 
    **Do not use `git ls-remote origin HEAD`** — that returns origin's default-branch (master) tip, not this branch's, and the lease would never match. The script reads `refs/heads/<branch>` fully qualified for exactly that reason.
 
@@ -37,7 +51,7 @@ Read at runtime via `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase4-push-
    gh pr view <N> --json mergeable,mergeStateStatus,state
    ```
 
-   If the answer is anything other than `UNKNOWN`, act on it now — in particular `mergeStateStatus=DIRTY` means the rebase did not actually clear the conflict, so stop and re-run Phases 2–3 rather than pushing on. If it **is** `UNKNOWN`, **do not wait here**: proceed to step 5, whose watcher polls `mergeStateStatus` on every iteration and breaks immediately on `DIRTY`. That is the resolution path — the watcher is the wait, and a conflict surfaces on its first poll rather than after CI finishes. Do not re-read here, and do not loop.
+   If the answer is anything other than `UNKNOWN`, act on it now — in particular `mergeStateStatus=DIRTY` means the rebase did not actually clear the conflict, so take step 3a's retry ladder rather than pushing on. If it **is** `UNKNOWN`, **do not wait here**: proceed to step 5, whose watcher polls `mergeStateStatus` on every iteration and breaks immediately on `DIRTY`. That is the resolution path — the watcher is the wait, and a conflict surfaces on its first poll rather than after CI finishes. Do not re-read here, and do not loop.
 
    **Never insert a foreground `sleep` to bridge the gap.** The harness refuses one (`Blocked: sleep 30 … To wait for a condition, use Monitor with an until-loop … Do not chain shorter sleeps to work around this block`), so a `sleep`-based wait does not merely cost time — it hard-fails the call and stalls the run. That message's suggested `Monitor` is **not** the remedy here; step 5's `Agent`-delegate watcher is, for the reason step 5 gives.
 
@@ -79,6 +93,6 @@ Read at runtime via `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase4-push-
 
    The 540s window is deliberately under the 600000ms `Bash` cap, so the delegate never meets the auto-background message at all. Read its report exactly as if the script had printed it here.
 
-   The verdict block's first word is one of six, each with its own exit code: `CI COMPLETE` (0), `CI FAILED` (1 — one indented line per check that did not end `pass` or `skipping`), `MERGE CONFLICT` (2 — `mergeStateStatus=DIRTY`, so stop and re-run Phases 2–3), `STALE` (3 — the head moved, so this watcher is obsolete), `CI TIMEOUT` (4 — only after all 6 windows), `STOP` (5 — a usage error). **Silence is not success**, so no path exits quietly and no verdict is a success-only filter: naming *every* red check is what makes one wake enough to drive Phase 6.5 remediation instead of one round trip per failure. Every verdict also carries the last `mergeStateStatus` the script read, which is what resolves step 4's `UNKNOWN` without a second main-thread read.
+   The verdict block's first word is one of six, each with its own exit code: `CI COMPLETE` (0), `CI FAILED` (1 — one indented line per check that did not end `pass` or `skipping`), `MERGE CONFLICT` (2 — `mergeStateStatus=DIRTY`, so take step 3a's retry ladder), `STALE` (3 — the head moved, so this watcher is obsolete), `CI TIMEOUT` (4 — only after all 6 windows), `STOP` (5 — a usage error). **Silence is not success**, so no path exits quietly and no verdict is a success-only filter: naming *every* red check is what makes one wake enough to drive Phase 6.5 remediation instead of one round trip per failure. Every verdict also carries the last `mergeStateStatus` the script read, which is what resolves step 4's `UNKNOWN` without a second main-thread read.
 
    The script's own header carries the rest — why it does not fail fast, and why the `seen` grace gate (the false `CI COMPLETE` on the pre-push head, observed on PR #1830) must not be removed. **The script is the only copy of that logic**; do not paste a reference loop back into this file, or the two drift and the reader follows the stale one.

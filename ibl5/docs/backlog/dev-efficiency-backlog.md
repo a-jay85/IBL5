@@ -76,6 +76,7 @@ last_verified: 2026-09-05
 | E51 | PR #2092 Phase 6.5 — notes Findings 2–4: find-regex deviation already filed, benign out-of-plan changes, body claim fixed by E50; class n/a for all | ⬜ Open | — | XS |
 | E52 | PR #2064 Phase 6.5 — stale hand-written PR body claims contradicting the final diff and code; all fixed this pass | ⬜ Open | — | XS |
 | E53 | PR #1897 Phase 6.5 — plan-text staleness and meta-text accuracy notes (stale plan literals, vestigial test arg, Manual Testing boilerplate, post-plan retrospective scope count); class n/a or no gate warranted for all | ⬜ Open | — | XS |
+| E54 | /pr-ready Phase 6.5 remediation — PR #2091: dual-channel transport omission, test pin drift, over-broad scan | ⬜ Open | — | S |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -912,3 +913,35 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-05 during Phase 6 review of #1897)*
+---
+
+### E54 /pr-ready Phase 6.5 remediation — PR #2091: dual-channel transport omission, test pin drift, over-broad scan
+
+**class:** a missing log-fallback channel in `notify()` (file primary, log silently absent); a line-number pin in a test that breaks when the target gains new paragraphs; an over-broad `EnterWorktree` scan that flags prose files with no EnterWorktree; and PR body accuracy divergences — all surfaced by `/pr-ready` Phase 6 review.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/pr-ready-now:851` — `notify()` reads only `$MARKER` file; no fallback to `$LOG` | yes (2A) | was live | fixed this pass |
+| 2 | `bin/test-pr-ready-now:2287` — case 38 pinned line 34 by shasum instead of content-based grep | yes (2B) | was live | fixed this pass |
+| 3 | `bin/test-pr-ready-now:2252` — case 35 scanned whole file when no `EnterWorktree` present | yes (3A) | was live | fixed this pass |
+| 4 | `.claude/skills/pr-ready/_phase7-verdict.md:26` — `$(mktemp)` prose deleted to satisfy over-broad case 35 | yes (3A) | was live | fixed this pass |
+| 5 | `bin/test-pr-ready-now:2195` — Phase 6 finding 2C (case 31) was a false positive; test correctly asserts NOT READY for marker-only log | false positive | n/a | not fixed — false positive; test correct as-is |
+| 6 | `bin/pr-ready-now:68` — line de-indented (3B note) | no — trivial scope | was live | not fixed — non-blocking note |
+| 7 | runner teardown comment reworded (3C note) | no — trivial scope | was live | not fixed — non-blocking note |
+| 8 | PR body said "12 DM dispatch cases" (4A) | no — body accuracy | was live | fixed this pass (gh pr edit) |
+| 9 | PR title `feat:` should be `chore:` (4B) | no — title type error | was live | fixed this pass (gh pr edit) |
+| 10 | PR body "No manual testing needed" despite row 36 requirement (4D) | no — body accuracy | was live | fixed this pass (gh pr edit + live DM send rc=0 2026-09-04) |
+
+**prevention_ladder:**
+- rung 0: `/pr-ready` Phase 6 review catches these — it is the existing gate. The findings surfaced exactly as intended.
+- rung 1: no extension warranted; the gate worked.
+- rungs 2–5: no rule doc, PHPStan, CI gate, or hook can catch test-pin drift or prose deletion by over-broad test — these require human code review.
+- **landing rung: rung 0 — existing gate (Phase 6 review) is sufficient; no additional gate warranted.**
+
+`prevention_ladder: rung 0 — existing /pr-ready Phase 6 review caught all findings; no additional gate warranted`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-04 during #2091)*

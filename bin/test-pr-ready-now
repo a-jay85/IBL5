@@ -768,6 +768,10 @@ grep -q -- '--wait' <<< "$out" || fail "usage-not-truncated: --help omits --wait
 # with the trailing ` N` because a bare `--stop` would also be satisfied by `--stop-all`.
 grep -q -- '--stop N' <<< "$out" || fail "usage-not-truncated: --help omits --stop"
 grep -q -- '--stop-all' <<< "$out" || fail "usage-not-truncated: --help omits --stop-all"
+grep -q -- '--no-dm' <<< "$out" || fail "usage-not-truncated: --help omits --no-dm"
+_help_tail="$(run_driver --help 2>&1 | tail -1)"
+[[ "$_help_tail" == "on a real run until it does." ]] \
+    || fail "usage-not-truncated: --help tail-1='$_help_tail', want 'on a real run until it does.'"
 end_case usage-not-truncated
 
 # --- case 28: seam-master-sha-unset-vs-empty ---------------------------------------------
@@ -1002,6 +1006,236 @@ grep -q 'slot left occupied' <<< "$out" || fail "stop-fails-closed: no fail-clos
     || fail "stop-fails-closed: cleared scratch for a run that may still be writing to it"
 clean_slots
 end_case stop-fails-closed
+
+# === DM-dispatch cases (driver slice, 37–48) =============================================
+# Shared setup: PR 9901 with headRefName=branch-live (already in WTL_FIXTURE at line 58),
+# a DM-capture stub, a caffeinate shim (strips -s + timeout SECS; execs the remainder),
+# and derive_status sourced from the driver for the cross-slice guards in cases 44 and 47.
+_DM_PR=9901
+_DM_JSON="$SCRATCH/dm-9901.json"
+cat > "$_DM_JSON" <<'DMJSON'
+[{"number": 9901, "title": "dm-test", "isDraft": false, "headRefName": "branch-live", "author": {"login": "a-jay85"}}]
+DMJSON
+
+_DM_CAPTURE="/tmp/pr-ready-test-dm-${_DM_PR}.txt"
+_DM_STUB="$SCRATCH/.local/bin/pr-ready-dm-capture"
+printf '#!/usr/bin/env bash\ncat >> "%s"\n' "$_DM_CAPTURE" > "$_DM_STUB"
+chmod +x "$_DM_STUB"
+
+# Shim: strip -s, then the 'timeout SECS' pair, then exec the remainder.  Avoids any
+# dependency on a system timeout binary when the runner is executed manually in tests.
+cat > "$SCRATCH/.local/bin/caffeinate" <<'CAFF'
+#!/usr/bin/env bash
+[ "${1:-}" = "-s" ] && shift
+if [ "${1:-}" = "timeout" ]; then shift; shift; fi
+exec "$@"
+CAFF
+chmod +x "$SCRATCH/.local/bin/caffeinate"
+
+_DM_RUNNER="/tmp/pr-ready-now-runner-${_DM_PR}.sh"
+_DM_LOG="/tmp/pr-ready-now-${_DM_PR}.log"
+_DM_MARKER="/tmp/pr-ready-marker-${_DM_PR}.txt"
+TMP_LOGS+=("$_DM_CAPTURE" "$_DM_LOG" "$_DM_MARKER" "$_DM_RUNNER"
+           "/tmp/pr-ready-now-prompt-${_DM_PR}.md"
+           "/tmp/pr-ready-commenturl-${_DM_PR}.txt")
+
+# run_driver bakes PR_READY_NOW_CLAUDE="$CLAUDE_STUB" unconditionally via env; DM cases
+# need their own stubs, so they bypass run_driver and call the driver directly.
+run_dm_driver() {
+    env HOME="$SCRATCH" \
+        PATH="$SCRATCH/.local/bin:$PATH" \
+        PR_READY_NOW_GH_USER=a-jay85 \
+        PR_READY_NOW_WTL="$WTL_FIXTURE" \
+        "$DRIVER" "$@"
+}
+
+# Source derive_status from the driver for cross-slice guards in cases 44 and 47.
+eval "$(sed -n '/^derive_status()/,/^}/p' "$DRIVER")"
+
+# --- case 37: dm-fires-on-marker ----------------------------------------------------------
+begin_case
+clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+_cs37="$SCRATCH/.local/bin/dm-cs-37"
+cat > "$_cs37" <<'STUB'
+#!/usr/bin/env bash
+printf 'READY\n'
+printf 'https://github.com/x/y/pull/9901#issuecomment-1\n' > /tmp/pr-ready-commenturl-9901.txt
+_line="PR-READY-VERDICT-MARKER-V1|pr=9901|verdict=READY|url=https://github.com/x/y/pull/9901#issuecomment-1|holds=none"
+printf '%s\n' "$_line" | tee /tmp/pr-ready-marker-9901.txt
+STUB
+chmod +x "$_cs37"
+PR_READY_NOW_PR_JSON="$_DM_JSON" PR_READY_NOW_DRY_RUN=1 \
+    PR_READY_NOW_DISCORD_DM="$_DM_STUB" PR_READY_NOW_CLAUDE="$_cs37" \
+    run_dm_driver --go >/dev/null 2>&1
+HOME="$SCRATCH" bash "$_DM_RUNNER" >/dev/null 2>&1 || true
+[[ -f "$_DM_CAPTURE" ]] \
+    || fail "dm-fires-on-marker: capture file not created — DM was not sent"
+_dm37_count="$(grep -c 'pr-ready-now: PR #9901' "$_DM_CAPTURE" 2>/dev/null || echo 0)"
+[[ "$_dm37_count" -eq 1 ]] \
+    || fail "dm-fires-on-marker: expected 1 DM header, got $_dm37_count"
+grep -q 'RESULT READY' "$_DM_CAPTURE" \
+    || fail "dm-fires-on-marker: DM missing 'RESULT READY'"
+grep -q 'https://github.com' "$_DM_CAPTURE" \
+    || fail "dm-fires-on-marker: DM missing comment URL"
+end_case dm-fires-on-marker
+
+# --- case 38: dm-fires-on-stop-line -------------------------------------------------------
+begin_case
+clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+_cs38="$SCRATCH/.local/bin/dm-cs-38"
+printf '#!/usr/bin/env bash\nprintf "STOP: xyzzy-test-stop-reason\n"\n' > "$_cs38"
+chmod +x "$_cs38"
+PR_READY_NOW_PR_JSON="$_DM_JSON" PR_READY_NOW_DRY_RUN=1 \
+    PR_READY_NOW_DISCORD_DM="$_DM_STUB" PR_READY_NOW_CLAUDE="$_cs38" \
+    run_dm_driver --go >/dev/null 2>&1
+HOME="$SCRATCH" bash "$_DM_RUNNER" >/dev/null 2>&1 || true
+[[ -f "$_DM_CAPTURE" ]] \
+    || fail "dm-fires-on-stop-line: no DM sent"
+grep -q 'RESULT STOPPED' "$_DM_CAPTURE" \
+    || fail "dm-fires-on-stop-line: DM not classified as STOPPED"
+grep -q 'xyzzy-test-stop-reason' "$_DM_CAPTURE" \
+    || fail "dm-fires-on-stop-line: DM missing first STOP: line text"
+end_case dm-fires-on-stop-line
+
+# --- case 39: dm-fires-on-timeout ---------------------------------------------------------
+begin_case
+clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+_cs39="$SCRATCH/.local/bin/dm-cs-39"
+printf '#!/usr/bin/env bash\nexit 124\n' > "$_cs39"
+chmod +x "$_cs39"
+PR_READY_NOW_PR_JSON="$_DM_JSON" PR_READY_NOW_DRY_RUN=1 \
+    PR_READY_NOW_DISCORD_DM="$_DM_STUB" PR_READY_NOW_CLAUDE="$_cs39" \
+    run_dm_driver --go >/dev/null 2>&1
+HOME="$SCRATCH" bash "$_DM_RUNNER" >/dev/null 2>&1 || true
+[[ -f "$_DM_CAPTURE" ]] \
+    || fail "dm-fires-on-timeout: no DM sent"
+grep -q 'TIMED OUT' "$_DM_CAPTURE" \
+    || fail "dm-fires-on-timeout: DM not classified as timeout"
+end_case dm-fires-on-timeout
+
+# --- case 40: dm-fires-on-nonzero-exit ---------------------------------------------------
+begin_case
+clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+_cs40="$SCRATCH/.local/bin/dm-cs-40"
+printf '#!/usr/bin/env bash\nexit 1\n' > "$_cs40"
+chmod +x "$_cs40"
+PR_READY_NOW_PR_JSON="$_DM_JSON" PR_READY_NOW_DRY_RUN=1 \
+    PR_READY_NOW_DISCORD_DM="$_DM_STUB" PR_READY_NOW_CLAUDE="$_cs40" \
+    run_dm_driver --go >/dev/null 2>&1
+HOME="$SCRATCH" bash "$_DM_RUNNER" >/dev/null 2>&1 || true
+[[ -f "$_DM_CAPTURE" ]] \
+    || fail "dm-fires-on-nonzero-exit: no DM sent"
+grep -q 'runner exited rc=1' "$_DM_CAPTURE" \
+    || fail "dm-fires-on-nonzero-exit: DM missing crash classification"
+end_case dm-fires-on-nonzero-exit
+
+# --- case 41: dm-undeliverable-is-not-fatal -----------------------------------------------
+begin_case
+clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+_dm41_stub="$SCRATCH/.local/bin/dm-41-undeliverable"
+printf '#!/usr/bin/env bash\ncat > /dev/null\nexit 1\n' > "$_dm41_stub"
+chmod +x "$_dm41_stub"
+PR_READY_NOW_PR_JSON="$_DM_JSON" PR_READY_NOW_DRY_RUN=1 \
+    PR_READY_NOW_DISCORD_DM="$_dm41_stub" PR_READY_NOW_CLAUDE="$CLAUDE_STUB" \
+    run_dm_driver --go >/dev/null 2>&1
+_out41="$(HOME="$SCRATCH" bash "$_DM_RUNNER" 2>&1 || true)"
+[[ ! -e "$SCRATCH/Library/LaunchAgents/com.ibl5.pr-ready-now-${_DM_PR}.plist" ]] \
+    || fail "dm-undeliverable-is-not-fatal: plist not removed after undeliverable DM"
+grep -q 'DM UNDELIVERED' <<< "$_out41" \
+    || fail "dm-undeliverable-is-not-fatal: missing spool message in runner output"
+end_case dm-undeliverable-is-not-fatal
+
+# --- case 42: dm-missing-binary-degrades --------------------------------------------------
+begin_case
+clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+# Sub-case a: non-existent path.
+PR_READY_NOW_PR_JSON="$_DM_JSON" PR_READY_NOW_DRY_RUN=1 \
+    PR_READY_NOW_DISCORD_DM="$SCRATCH/.local/bin/no-such-dm" PR_READY_NOW_CLAUDE="$CLAUDE_STUB" \
+    run_dm_driver --go >/dev/null 2>&1
+_out42a="$(HOME="$SCRATCH" bash "$_DM_RUNNER" 2>&1 || true)"
+grep -q 'no executable discord-dm' <<< "$_out42a" \
+    || fail "dm-missing-binary-degrades: non-existent path missing degrade message"
+# Sub-case b: existing but non-executable.
+rm -f "$_DM_LOG" "$_DM_MARKER"
+_dm42b="$SCRATCH/.local/bin/dm-42b-nonexec"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$_dm42b"
+PR_READY_NOW_PR_JSON="$_DM_JSON" PR_READY_NOW_DRY_RUN=1 \
+    PR_READY_NOW_DISCORD_DM="$_dm42b" PR_READY_NOW_CLAUDE="$CLAUDE_STUB" \
+    run_dm_driver --go >/dev/null 2>&1
+chmod -x "$_dm42b"
+_out42b="$(HOME="$SCRATCH" bash "$_DM_RUNNER" 2>&1 || true)"
+grep -q 'no executable discord-dm' <<< "$_out42b" \
+    || fail "dm-missing-binary-degrades: non-executable path missing degrade message"
+end_case dm-missing-binary-degrades
+
+# --- case 43: dm-suppressed-by-no-dm -------------------------------------------------------
+begin_case
+clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+PR_READY_NOW_PR_JSON="$_DM_JSON" PR_READY_NOW_DRY_RUN=1 \
+    PR_READY_NOW_DISCORD_DM="$_DM_STUB" PR_READY_NOW_CLAUDE="$CLAUDE_STUB" \
+    run_dm_driver --go --no-dm >/dev/null 2>&1
+HOME="$SCRATCH" bash "$_DM_RUNNER" >/dev/null 2>&1 || true
+[[ ! -f "$_DM_CAPTURE" ]] \
+    || fail "dm-suppressed-by-no-dm: DM was sent despite --no-dm"
+end_case dm-suppressed-by-no-dm
+
+# --- case 44: dm-does-not-pollute-status --------------------------------------------------
+begin_case
+clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+_cs44="$SCRATCH/.local/bin/dm-cs-44"
+cat > "$_cs44" <<'STUB'
+#!/usr/bin/env bash
+printf 'READY\n'
+printf 'PR-READY-VERDICT-MARKER-V1|pr=9901|verdict=READY|url=-|holds=none\n' \
+    | tee /tmp/pr-ready-marker-9901.txt
+STUB
+chmod +x "$_cs44"
+PR_READY_NOW_PR_JSON="$_DM_JSON" PR_READY_NOW_DRY_RUN=1 \
+    PR_READY_NOW_DISCORD_DM="$_DM_STUB" PR_READY_NOW_CLAUDE="$_cs44" \
+    run_dm_driver --go >/dev/null 2>&1
+HOME="$SCRATCH" bash "$_DM_RUNNER" >/dev/null 2>&1 || true
+_st44="$(derive_status "$_DM_LOG")"
+[[ "$_st44" == "READY" ]] \
+    || fail "dm-does-not-pollute-status: derive_status='$_st44', want 'READY' — notify() modified the log"
+end_case dm-does-not-pollute-status
+
+# --- case 46: dm-unknown-flag-rejected ----------------------------------------------------
+begin_case
+check_reject 'unknown flag' --no-dms
+end_case dm-unknown-flag-rejected
+
+# --- case 47: dm-marker-absent-rc0-no-stop ------------------------------------------------
+begin_case
+clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+_cs47="$SCRATCH/.local/bin/dm-cs-47"
+printf '#!/usr/bin/env bash\nprintf "run completed without verdict\n"\n' > "$_cs47"
+chmod +x "$_cs47"
+PR_READY_NOW_PR_JSON="$_DM_JSON" PR_READY_NOW_DRY_RUN=1 \
+    PR_READY_NOW_DISCORD_DM="$_DM_STUB" PR_READY_NOW_CLAUDE="$_cs47" \
+    run_dm_driver --go >/dev/null 2>&1
+HOME="$SCRATCH" bash "$_DM_RUNNER" >/dev/null 2>&1 || true
+[[ -f "$_DM_CAPTURE" ]] \
+    || fail "dm-marker-absent-rc0-no-stop: no DM sent"
+grep -q 'unconfirmed — no verdict marker' "$_DM_CAPTURE" \
+    || fail "dm-marker-absent-rc0-no-stop: DM not classified as unconfirmed"
+end_case dm-marker-absent-rc0-no-stop
+
+# --- case 48: dm-teardown-order-static ---------------------------------------------------
+begin_case
+clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER"
+PR_READY_NOW_PR_JSON="$_DM_JSON" PR_READY_NOW_DRY_RUN=1 \
+    PR_READY_NOW_DISCORD_DM="$_DM_STUB" PR_READY_NOW_CLAUDE="$CLAUDE_STUB" \
+    run_dm_driver --go >/dev/null 2>&1
+_rm_line="$(grep -Fn 'rm -f "$PLIST"' "$_DM_RUNNER" | head -1 | cut -d: -f1)"
+_notify_line="$(grep -n '^notify$' "$_DM_RUNNER" | head -1 | cut -d: -f1)"
+_bootout_line="$(grep -Fn 'launchctl bootout' "$_DM_RUNNER" | head -1 | cut -d: -f1)"
+[[ -n "$_rm_line" && -n "$_notify_line" && -n "$_bootout_line" ]] \
+    || fail "dm-teardown-order-static: runner missing rm/notify/bootout (rm=$_rm_line notify=$_notify_line bootout=$_bootout_line)"
+[[ "$_rm_line" -lt "$_notify_line" ]] \
+    || fail "dm-teardown-order-static: rm-plist (line $_rm_line) must precede notify (line $_notify_line)"
+[[ "$_notify_line" -lt "$_bootout_line" ]] \
+    || fail "dm-teardown-order-static: notify (line $_notify_line) must precede bootout (line $_bootout_line)"
+end_case dm-teardown-order-static
 
 
 # --- Phase 9: push-form proof against a local bare origin ---------------------------------
@@ -2093,6 +2327,160 @@ out=$(bash "$D" "$FIX" 2>&1); rc=$?
 grep -qF 'unavailable' <<<"$out" && fail "28l: trailing-space heading produced unavailable placeholder: $out" || true
 
 end_case pr-ready-merge-digest-shape
+# === Marker-parse and prose-pin cases (skill slice, 28–38) ===============================
+_PRD="$SCRIPT_DIR/../.claude/skills/pr-ready"
+_VMARK="$_PRD/scripts/verdict-marker.sh"
+_VM_PR=8801
+TMP_LOGS+=("/tmp/pr-ready-marker-${_VM_PR}.txt"
+           "/tmp/pr-ready-commenturl-${_VM_PR}.txt"
+           "/tmp/pr-ready-holdsout-${_VM_PR}.txt")
+
+# --- case 28: verdict-marker-emits-single-line -------------------------------------------
+begin_case
+rm -f "/tmp/pr-ready-commenturl-${_VM_PR}.txt" "/tmp/pr-ready-holdsout-${_VM_PR}.txt"
+_vm28_out="$(bash "$_VMARK" "$_VM_PR" READY 2>&1)"
+_vm28_lines="$(printf '%s\n' "$_vm28_out" | wc -l | tr -d ' ')"
+[[ "$_vm28_lines" -eq 1 ]] \
+    || fail "verdict-marker-emits-single-line: got $_vm28_lines lines, want 1"
+printf '%s\n' "$_vm28_out" | grep -q '^PR-READY-VERDICT-MARKER-V1|' \
+    || fail "verdict-marker-emits-single-line: missing sentinel prefix"
+grep -q 'verdict=' <<< "$_vm28_out" \
+    || fail "verdict-marker-emits-single-line: missing verdict="
+grep -q 'pr=' <<< "$_vm28_out" \
+    || fail "verdict-marker-emits-single-line: missing pr="
+grep -q 'url=' <<< "$_vm28_out" \
+    || fail "verdict-marker-emits-single-line: missing url="
+grep -q 'holds=' <<< "$_vm28_out" \
+    || fail "verdict-marker-emits-single-line: missing holds="
+[[ -s "/tmp/pr-ready-marker-${_VM_PR}.txt" ]] \
+    || fail "verdict-marker-emits-single-line: marker file not created or empty"
+end_case verdict-marker-emits-single-line
+
+# --- case 29: verdict-marker-holds-are-space-free -----------------------------------------
+begin_case
+rm -f "/tmp/pr-ready-commenturl-${_VM_PR}.txt"
+printf 'check one: some multi word reason\ncheck two: another reason here\n' \
+    > "/tmp/pr-ready-holdsout-${_VM_PR}.txt"
+_vm29_out="$(bash "$_VMARK" "$_VM_PR" NOT-READY 2>&1)"
+_post29="$(printf '%s' "$_vm29_out" | sed 's/^PR-READY-VERDICT-MARKER-V1|//')"
+grep -q '[[:space:]]' <<< "$_post29" \
+    && fail "verdict-marker-holds-are-space-free: space/tab found after sentinel: '$_post29'" || true
+end_case verdict-marker-holds-are-space-free
+
+# --- case 30: verdict-marker-all-clear-does-not-abort ------------------------------------
+begin_case
+rm -f "/tmp/pr-ready-commenturl-${_VM_PR}.txt"
+printf 'hold1: (clear)\nhold2: (clear)\nhold3: (clear)\n' \
+    > "/tmp/pr-ready-holdsout-${_VM_PR}.txt"
+_vm30_out="$(bash "$_VMARK" "$_VM_PR" READY 2>&1)"; _vm30_rc=$?
+[[ $_vm30_rc -eq 0 ]] \
+    || fail "verdict-marker-all-clear-does-not-abort: script exited $_vm30_rc, want 0"
+grep -q 'holds=none' <<< "$_vm30_out" \
+    || fail "verdict-marker-all-clear-does-not-abort: holds not 'none' (got: $_vm30_out)"
+end_case verdict-marker-all-clear-does-not-abort
+
+# --- case 31: verdict-marker-line-not-misclassified ---------------------------------------
+# Cross-slice guard: the marker line starts with 'P', which must NOT match
+# derive_status's READY pattern (^[[:space:]>*_`-]*READY). If someone widens the
+# sentinel prefix to start with "READY|...", this case fails immediately.
+begin_case
+_log31="/tmp/pr-ready-test-marker-classify-$$.log"
+TMP_LOGS+=("$_log31")
+printf 'PR-READY-VERDICT-MARKER-V1|pr=%s|verdict=READY|url=-|holds=none\n' \
+    "$_VM_PR" > "$_log31"
+_st31="$(derive_status "$_log31")"
+[[ "$_st31" == "NOT READY" ]] \
+    || fail "verdict-marker-line-not-misclassified: derive_status='$_st31' on marker-only log, want 'NOT READY' — sentinel leaked into READY pattern"
+end_case verdict-marker-line-not-misclassified
+
+# --- case 32: post-verdict-tees-comment-url -----------------------------------------------
+begin_case
+_PVSH="$_PRD/scripts/post-verdict.sh"
+grep -qF 'rm -f "$URL_FILE"' "$_PVSH" \
+    || fail "post-verdict-tees-comment-url: missing rm -f URL_FILE"
+_tee_count="$(grep -cF '| tee "$URL_FILE"' "$_PVSH" || true)"
+[[ "$_tee_count" -ge 2 ]] \
+    || fail "post-verdict-tees-comment-url: expected >=2 tee lines, got $_tee_count"
+_rm_lno="$(grep -nF 'rm -f "$URL_FILE"' "$_PVSH" | head -1 | cut -d: -f1)"
+_tee_lno="$(grep -nF '| tee "$URL_FILE"' "$_PVSH" | head -1 | cut -d: -f1)"
+[[ "$_rm_lno" -lt "$_tee_lno" ]] \
+    || fail "post-verdict-tees-comment-url: rm -f (line $_rm_lno) must precede first tee (line $_tee_lno)"
+end_case post-verdict-tees-comment-url
+
+# --- case 33: phase4-retry-ladder-pinned -------------------------------------------------
+begin_case
+_P4="$_PRD/_phase4-push-and-ci.md"
+grep -q 'step 3a' "$_P4" \
+    || fail "phase4-retry-ladder-pinned: 'step 3a' heading missing"
+grep -q 'bounded at three push attempts' "$_P4" \
+    || fail "phase4-retry-ladder-pinned: retry cap annotation missing"
+grep -qF 'push retry budget exhausted after 3 rebase attempts — master is moving faster than this branch can rebase' "$_P4" \
+    || fail "phase4-retry-ladder-pinned: cap-hit STOP: line missing or changed"
+grep -qF 'stop and re-run Phases 2' "$_P4" \
+    && fail "phase4-retry-ladder-pinned: old deferral 'stop and re-run Phases 2...' still present" || true
+grep -qF 'Stop and re-run Phase 3' "$_P4" \
+    && fail "phase4-retry-ladder-pinned: old deferral 'Stop and re-run Phase 3' still present" || true
+# Cross-slice: the cap-hit STOP: line must classify as MASTER-MOVING-TOO-FAST.
+_log33="/tmp/pr-ready-test-caplog-$$.txt"
+TMP_LOGS+=("$_log33")
+printf 'STOP: push retry budget exhausted after 3 rebase attempts — master is moving faster than this branch can rebase — merge manually or retry when master quiets\n' \
+    > "$_log33"
+_capst="$(derive_status "$_log33")"
+[[ "$_capst" == "MASTER-MOVING-TOO-FAST" ]] \
+    || fail "phase4-retry-ladder-pinned: cap-hit STOP: classified as '$_capst', want 'MASTER-MOVING-TOO-FAST'"
+end_case phase4-retry-ladder-pinned
+
+# --- case 34: push-failed-still-hard-stops -----------------------------------------------
+begin_case
+grep -qF 'Print it and stop; do not continue to Phase 5.' "$_PRD/_phase4-push-and-ci.md" \
+    || fail "push-failed-still-hard-stops: 'Print it and stop; do not continue to Phase 5.' missing"
+end_case push-failed-still-hard-stops
+
+# --- case 35: no-command-substitution-after-worktree -------------------------------------
+begin_case
+for _f in "$_PRD"/_phase*.md; do
+    _enter_line="$(grep -n 'EnterWorktree' "$_f" | head -1 | cut -d: -f1)"
+    [[ -n "$_enter_line" ]] || continue
+    _range_end="${_enter_line:-$}"
+    _hits="$(sed -n "1,${_range_end}p" "$_f" \
+        | awk '/^```/{b=!b;next}!b' \
+        | grep -Ec '\$\(|<\(')" || true
+    [[ "$_hits" -eq 0 ]] \
+        || fail "no-command-substitution-after-worktree: $(basename "$_f") has $_hits command-substitution(s) in prose before EnterWorktree"
+done
+end_case no-command-substitution-after-worktree
+
+# --- case 36: phase3-holds-tee-pin -------------------------------------------------------
+begin_case
+_P7="$_PRD/_phase7-verdict.md"
+grep -qF '| tee /tmp/pr-ready-holdsout-' "$_P7" \
+    || fail "phase3-holds-tee-pin: holds.sh invocation missing tee to /tmp/pr-ready-holdsout-"
+grep -qF 'prints exactly six labelled lines' "$_P7" \
+    || fail "phase3-holds-tee-pin: 'prints exactly six labelled lines' constraint removed"
+end_case phase3-holds-tee-pin
+
+# --- case 37: phase3-marker-step-pin -------------------------------------------------------
+begin_case
+_step2_start="$(grep -n '2\. \*\*Post the sticky verdict' "$_P7" | head -1 | cut -d: -f1)"
+_stop_line37="$(grep -n '3\. \*\*STOP' "$_P7" | head -1 | cut -d: -f1)"
+[[ -n "$_step2_start" && -n "$_stop_line37" ]] \
+    || fail "phase3-marker-step-pin: could not locate step 2 heading or STOP terminator in _phase7"
+_marker_in_step2="$(sed -n "${_step2_start},${_stop_line37}p" "$_P7" | grep -c 'verdict-marker.sh' || true)"
+[[ "$_marker_in_step2" -ge 1 ]] \
+    || fail "phase3-marker-step-pin: verdict-marker.sh not found between step 2 and STOP terminator"
+grep -qF 'Your final message must end with that line' "$_P7" \
+    || fail "phase3-marker-step-pin: 'Your final message must end with that line' instruction removed"
+end_case phase3-marker-step-pin
+
+# --- case 38: phase3-terminator-shasum ---------------------------------------------------
+begin_case
+_term_line38="$(grep -n '^3\. \*\*STOP — hard terminator' "$_PRD/_phase7-verdict.md" | head -1 | cut -d: -f1)"
+[[ -n "$_term_line38" ]] \
+    || fail "phase3-terminator-shasum: could not locate STOP hard terminator in _phase7-verdict.md"
+sed -n "${_term_line38}p" "$_PRD/_phase7-verdict.md" \
+    | shasum | grep -q '08ea1c2d9451c2431c03c7aea8ad6a63d7c53a9f' \
+    || fail "phase3-terminator-shasum: STOP hard terminator content changed — update the pin if intentional"
+end_case phase3-terminator-shasum
 
 # --- verdict -----------------------------------------------------------------------------
 if [[ $FAILED -ne 0 ]]; then

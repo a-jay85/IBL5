@@ -74,6 +74,8 @@ last_verified: 2026-09-05
 | E46 | PR body "What is NOT in this PR" written before all plan phases complete | ✅ Implemented | — | XS |
 | E50 | PR #2092 Phase 6.5 — `--dry-run` counter increment in live-only branch; no harness case for dry-run count (Findings 1+5); both fixed this pass | ⬜ Open | — | XS |
 | E51 | PR #2092 Phase 6.5 — notes Findings 2–4: find-regex deviation already filed, benign out-of-plan changes, body claim fixed by E50; class n/a for all | ⬜ Open | — | XS |
+| E52 | PR #1967 Phase 6.5 — duplicate `last_verified:` in ADR index + stale body path reference (Findings 1+2); body note finding; all fixed this pass or filed | ⬜ Open | — | S |
+| E53 | PR #2064 Phase 6.5 — stale hand-written PR body claims contradicting the final diff and code; B1/B2/B3/N1 fixed this pass | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -857,7 +859,7 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 
 ---
 
-### E52 PR #2064 Phase 6.5 — stale hand-written PR body claims contradicting the final diff and code
+### E53 PR #2064 Phase 6.5 — stale hand-written PR body claims contradicting the final diff and code
 
 **class:** a stale hand-written PR body claim in the ship-pipeline surface (Scope prose or Manual Testing section) that contradicts the final implementation, code, or test counts — specifically: a guard described as hunk-scoped when the code is file-scoped (B1); case range stated as 48–63 when the diff adds 49–64 (B2); and a Manual Testing claim citing E2E tests when the change is bash tooling with no E2E component (B3); plus an omission of a changed file from the Scope prose (N1).
 
@@ -882,3 +884,40 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-05 during Phase 6 review of #2064)*
+
+---
+
+### E52 PR #1967 Phase 6.5 — ADR index duplicate frontmatter key and stale body path reference
+
+**class (finding 1):** a duplicate YAML frontmatter mapping key (`last_verified:`) in a doc index that accumulates independent date bumps from concurrent auto-merged commits without deduplication, causing invalid YAML that strict parsers reject.
+
+**class (finding 2):** a hand-written PR body path reference to an ADR that was renumbered after the body was written, leaving the manual-test row pointing at a nonexistent file.
+
+**class (findings 3–6 / notes):** class: n/a — scope-prose "unchanged" wording (substance accurate; second clause discloses), unperformed pre-merge manual rows (by design), stale matrix acceptance-list items, cosmetic commit-subject and row-placement inconsistencies; none gatable.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/docs/decisions/README.md:3-5` | yes (finding 1) | yes | fixed this pass |
+| 2 | PR #1967 body Row 60 | yes (finding 2) | yes | fixed this pass (gh pr edit by caller) |
+| 3 | matrix row 60 acceptance list (four named alternatives) | near-miss (finding 2) | yes | not fixed — filed (stale matrix row; ADR content correct) |
+| 4 | matrix rows 30, 55 stale commands | near-miss (finding 2) | yes | not fixed — filed |
+
+Scan for other files with duplicate `last_verified:` keys:
+
+```bash
+find ibl5/docs -name '*.md' -exec sh -c 'c=$(grep -c "^last_verified:" "$1" 2>/dev/null); [ "$c" -gt 1 ] && echo "$1: $c"' _ {} \;
+```
+
+Result: `ibl5/docs/decisions/README.md` is the only occurrence; fixed this pass.
+
+**prevention ladder:**
+- rung 0: `bin/check-docs` runs on every PR but accepts any number of `last_verified:` keys per file — not covered.
+- rung 1: extend `bin/check-docs` to reject more than one `^last_verified:` line in a single file's frontmatter. This catches the defect at the point of introduction rather than at review time. All four `meta-tooling-bar.md` extend-before-add conditions hold: the extension is 1–2 lines of `grep -c` logic, it lives where the rest of the frontmatter checks already live, it has a direct measurable surface (frontmatter parsing), and no separate tool is needed.
+- Landing rung: **rung 1** — extend `bin/check-docs`.
+- For finding 2 (stale body path): no gate warranted — PR body references are hand-written and ephemeral; an ADR renumber is a rare event; the existing Phase 6 6d(4) check is the review-time backstop and already caught it.
+
+**artifact destination:** `bin/check-docs` (in-repo script, path `bin/check-docs`).
+
+**provenance:** (discovered 2026-09-05 during #1967)

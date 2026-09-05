@@ -390,7 +390,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 9.31 | ⬜ Open | 🟩 | PR body manual-test row naming a pre-existing UI mislabel as the actual label — PR #1961 body row 23 corrected this pass via gh pr edit. No gate warranted. (discovered 2026-09-03 during #1961) |
 | 9.32 | ⬜ Open | 🟩 | Unperformed Truly-manual verification row — PR #1961 row 23; protected by auto_merge: false hold. No gate warranted. (discovered 2026-09-03 during #1961) |
 | 9.33 | ⬜ Open | 🟩 | Backlog Status prose named a controller as converted when its source still reads superglobals (14.8 and 14.12 Status blocks); creating an intra-doc contradiction with the Evidence cell. |
-| 9.34 | ⬜ Open | 🟩 | API_GUIDE.md route inventory drifted from Router.php (25/24 documented vs 27/26 actual; two POST routes undocumented) — corrected this pass. No gate warranted. (discovered 2026-09-05 during #<PR>) |
+| 9.34 | ⬜ Open | 🟩 | API_GUIDE.md route inventory drifted from Router.php (25/24 documented vs 27/26 actual; two POST routes undocumented) — corrected this pass. No gate warranted. (discovered 2026-09-05 during #2110) |
 
 
 ### 9.26 No CHANGELOG Exists

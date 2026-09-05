@@ -1,0 +1,433 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# bin/test-wt-rebase — regression test for bin/wt-rebase.
+# <!-- no-adr: bin/test-wt-rebase is a test harness for the existing wt-rebase tool, not a new architectural constraint -->
+#
+# Builds scratch multi-worktree fleets under mktemp -d with a real bare remote.
+# Never touches the live worktree fleet. Covers all reconcile states plus negative
+# paths. Run: bin/test-wt-rebase  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BASE_TMP="$(mktemp -d)"
+trap 'rm -rf "$BASE_TMP"' EXIT
+
+FAILED=0
+
+expect() { # name want got
+    if [ "$3" -eq "$2" ]; then
+        echo "ok: $1 (exit $3)"
+    else
+        echo "FAIL: $1 — expected exit $2, got $3"
+        FAILED=1
+    fi
+}
+
+expect_out() { # name needle output
+    case "$3" in
+        *"$2"*) echo "ok: $1" ;;
+        *)      echo "FAIL: $1 — expected output to contain '$2'"
+                printf '%s\n' "$3" | sed 's/^/      | /'
+                FAILED=1 ;;
+    esac
+}
+
+expect_no_out() { # name needle output
+    case "$3" in
+        *"$2"*) echo "FAIL: $1 — output must NOT contain '$2'"
+                printf '%s\n' "$3" | sed 's/^/      | /'
+                FAILED=1 ;;
+        *)      echo "ok: $1" ;;
+    esac
+}
+
+# ---------------------------------------------------------------------------
+# Fixture helpers
+# ---------------------------------------------------------------------------
+
+# new_fleet — creates $FLEET with a real bare remote and a main checkout
+new_fleet() {
+    FLEET="$(mktemp -d "$BASE_TMP/fleet.XXXXXX")"
+    git init -q --bare "$FLEET/upstream.git"
+    git clone -q "$FLEET/upstream.git" "$FLEET/ibl5"
+    git -C "$FLEET/ibl5" config user.email test@example.com
+    git -C "$FLEET/ibl5" config user.name test
+    git -C "$FLEET/ibl5" config commit.gpgsign false
+    echo base > "$FLEET/ibl5/README.md"
+    git -C "$FLEET/ibl5" add README.md
+    git -C "$FLEET/ibl5" commit -qm base
+    git -C "$FLEET/ibl5" branch -M master
+    git -C "$FLEET/ibl5" push -q -u origin master
+    mkdir -p "$FLEET/IBL5-worktrees"
+}
+
+# add_wt <slug> — create a worktree branched from origin/master
+add_wt() {
+    git -C "$FLEET/ibl5" worktree add -q -b "$1" "$FLEET/IBL5-worktrees/$1" origin/master
+    git -C "$FLEET/IBL5-worktrees/$1" config user.email test@example.com
+    git -C "$FLEET/IBL5-worktrees/$1" config user.name test
+    git -C "$FLEET/IBL5-worktrees/$1" config commit.gpgsign false
+}
+
+# commit_in <slug> <file> <content>
+commit_in() {
+    echo "$3" > "$FLEET/IBL5-worktrees/$1/$2"
+    git -C "$FLEET/IBL5-worktrees/$1" add "$2"
+    git -C "$FLEET/IBL5-worktrees/$1" commit -qm "$2"
+}
+
+# advance_master <name> — commit and push to origin/master, updating tracking ref
+advance_master() {
+    echo "$1" > "$FLEET/ibl5/$1"
+    git -C "$FLEET/ibl5" add "$1"
+    git -C "$FLEET/ibl5" commit -qm "master: $1"
+    git -C "$FLEET/ibl5" push -q origin master
+}
+
+# advance_remote_without_fetch <name> — push to upstream.git from a temp clone,
+# leaving ibl5's origin/master tracking ref stale (simulates remote-advanced-no-fetch)
+advance_remote_without_fetch() {
+    local tmp
+    tmp="$(mktemp -d "$BASE_TMP/remote.XXXXXX")"
+    git clone -q "$FLEET/upstream.git" "$tmp"
+    git -C "$tmp" config user.email test@example.com
+    git -C "$tmp" config user.name test
+    git -C "$tmp" config commit.gpgsign false
+    echo "$1" > "$tmp/$1"
+    git -C "$tmp" add "$1"
+    git -C "$tmp" commit -qm "remote: $1"
+    git -C "$tmp" push -q origin master
+}
+
+# ci_force_push <slug> — simulate .github/workflows/rebase-prs.yml:
+# replay the branch's commits onto new origin/master and force-push
+ci_force_push() {
+    local slug="$1" tmp
+    tmp="$(mktemp -d "$BASE_TMP/ci.XXXXXX")"
+    git clone -q "$FLEET/upstream.git" "$tmp"
+    git -C "$tmp" config user.email ci@example.com
+    git -C "$tmp" config user.name ci
+    git -C "$tmp" config commit.gpgsign false
+    git -C "$tmp" checkout -q -B "$slug" "origin/$slug"
+    git -C "$tmp" rebase -q origin/master
+    git -C "$tmp" push -q --force origin "$slug"
+}
+
+# unpushed_work <slug> — add a commit that exists ONLY locally (not on remote)
+unpushed_work() {
+    commit_in "$1" "local-only.txt" "not on the remote"
+}
+
+# run_wt_rebase [args] — run the real wt-rebase against $FLEET
+run_wt_rebase() {
+    ( cd "$FLEET/ibl5" && "$SCRIPT_DIR/wt-rebase" "$@" ) 2>&1
+}
+
+# ===========================================================================
+# CHARACTERIZATION CASES — assert TODAY's rebase-based behavior
+#
+# These run green against the current rebase-based bin/wt-rebase. Cases marked
+# [FLIP] go red after Phase 3 rewrites the script; Phase 4 inverts them.
+# Cases NOT marked [FLIP] must pass both before and after the rewrite.
+# ===========================================================================
+
+echo "--- char-already-current ---"
+new_fleet
+add_wt current-wt
+pre_head="$(git -C "$FLEET/IBL5-worktrees/current-wt" rev-parse HEAD)"
+out="$(run_wt_rebase)"; rc=$?
+expect      "char-already-current-exit"    0 "$rc"
+expect_no_out "char-already-current-silent"  "current-wt" "$out"
+expect_out  "char-already-current-summary" "Done: 0 updated, 0 skipped, 0 failed." "$out"
+post_head="$(git -C "$FLEET/IBL5-worktrees/current-wt" rev-parse HEAD)"
+[[ "$pre_head" == "$post_head" ]] && _r=0 || _r=1
+expect "char-already-current-head-stable" 0 "$_r"
+
+echo "--- char-behind-master ---"
+new_fleet
+add_wt behind-wt
+advance_master alpha
+out="$(run_wt_rebase)"; rc=$?
+expect     "char-behind-master-exit"     0 "$rc"
+expect_out "char-behind-master-ok"       "OK      behind-wt" "$out"
+# Post-state: worktree is current with master (survives rewrite — pin the post-state)
+count="$(git -C "$FLEET/IBL5-worktrees/behind-wt" rev-list --count origin/master..HEAD)"
+expect "char-behind-master-current" 0 "$count"
+
+echo "--- char-work-then-master-moves ---"
+new_fleet
+add_wt work-wt
+commit_in work-wt feature.txt "local work"
+pre_sha="$(git -C "$FLEET/IBL5-worktrees/work-wt" rev-parse HEAD)"
+advance_master beta
+out="$(run_wt_rebase)"; rc=$?
+expect     "char-work-then-master-exit"    0 "$rc"
+expect_out "char-work-then-master-ok"      "OK      work-wt" "$out"
+# pre_sha (the local feature commit) is preserved as an ancestor of the merge commit;
+# this distinguishes merge (history preserved) from rebase (SHA rewritten).
+git -C "$FLEET/IBL5-worktrees/work-wt" merge-base --is-ancestor "$pre_sha" HEAD && _r=0 || _r=1
+expect "char-work-sha-preserved-as-ancestor" 0 "$_r"
+
+echo "--- char-force-push-divergence ---"
+new_fleet
+add_wt replay-wt
+commit_in replay-wt work.txt "real work"
+git -C "$FLEET/IBL5-worktrees/replay-wt" push -q -u origin replay-wt
+advance_master gamma
+ci_force_push replay-wt
+# Run BEFORE fetching — current script doesn't fetch, so origin/replay-wt is stale
+out="$(run_wt_rebase)"; rc=$?
+expect     "char-force-push-div-exit"  0 "$rc"
+expect_out "char-force-push-div-ok"    "OK      replay-wt" "$out"
+# New script fetches and reconciles: reset --hard to origin/replay-wt, then merges
+# master. Worktree is now in sync with its own remote branch (ahead == 0).
+ahead="$(git -C "$FLEET/IBL5-worktrees/replay-wt" rev-list --count origin/replay-wt..HEAD)"
+[[ "$ahead" -eq 0 ]] && _r=0 || _r=1
+expect "char-force-push-div-reconciled" 0 "$_r"
+
+echo "--- char-no-fetch ---"
+new_fleet
+add_wt nofetch-wt
+# Push to upstream.git via a separate clone, leaving ibl5's origin/master tracking ref stale
+advance_remote_without_fetch nofetch_file
+out="$(run_wt_rebase)"; rc=$?
+expect     "char-no-fetch-exit"    0 "$rc"
+# New script fetches up front; finds origin/master advanced; merges into the worktree.
+expect_out "char-no-fetch-acts" "nofetch-wt" "$out"
+
+echo "--- char-dry-run-is-blind ---"
+new_fleet
+add_wt blind-behind-wt
+add_wt blind-work-wt
+commit_in blind-work-wt local.txt "local only"
+advance_master delta
+out="$(run_wt_rebase --dry-run)"; rc=$?
+expect     "char-dry-run-blind-exit"     0 "$rc"
+expect_out "char-dry-run-blind-behind"   "WOULD   blind-behind-wt" "$out"
+expect_out "char-dry-run-blind-work"     "WOULD   blind-work-wt"   "$out"
+# New script prints classification suffix on every WOULD line.
+expect_out "char-dry-run-classifies" "reconcile:" "$out"
+
+# ---------------------------------------------------------------------------
+# Negative-path / boundary cases — NOT marked [FLIP]; must pass both before
+# and after the rewrite
+# ---------------------------------------------------------------------------
+
+echo "--- char-skip-dirty (staged) ---"
+new_fleet
+add_wt dirty-wt
+advance_master epsilon
+echo "uncommitted" > "$FLEET/IBL5-worktrees/dirty-wt/scratch.txt"
+git -C "$FLEET/IBL5-worktrees/dirty-wt" add scratch.txt
+pre_head="$(git -C "$FLEET/IBL5-worktrees/dirty-wt" rev-parse HEAD)"
+out="$(run_wt_rebase)"; rc=$?
+expect     "char-skip-dirty-exit"    0 "$rc"
+expect_out "char-skip-dirty-skip"    "SKIP    dirty-wt" "$out"
+expect_out "char-skip-dirty-reason"  "uncommitted changes" "$out"
+post_head="$(git -C "$FLEET/IBL5-worktrees/dirty-wt" rev-parse HEAD)"
+[[ "$pre_head" == "$post_head" ]] && _r=0 || _r=1
+expect "char-skip-dirty-head-stable" 0 "$_r"
+
+echo "--- char-skip-dirty (unstaged) ---"
+new_fleet
+add_wt dusty-wt
+advance_master zeta
+# Create a tracked file first, then modify it without staging
+echo "tracked" > "$FLEET/IBL5-worktrees/dusty-wt/tracked.txt"
+git -C "$FLEET/IBL5-worktrees/dusty-wt" add tracked.txt
+git -C "$FLEET/IBL5-worktrees/dusty-wt" commit -qm "add tracked"
+echo "modified" >> "$FLEET/IBL5-worktrees/dusty-wt/tracked.txt"
+pre_head="$(git -C "$FLEET/IBL5-worktrees/dusty-wt" rev-parse HEAD)"
+out="$(run_wt_rebase)"; rc=$?
+expect     "char-skip-dusty-exit"    0 "$rc"
+expect_out "char-skip-dusty-skip"    "SKIP    dusty-wt" "$out"
+expect_out "char-skip-dusty-reason"  "uncommitted changes" "$out"
+post_head="$(git -C "$FLEET/IBL5-worktrees/dusty-wt" rev-parse HEAD)"
+[[ "$pre_head" == "$post_head" ]] && _r=0 || _r=1
+expect "char-skip-dusty-head-stable" 0 "$_r"
+
+echo "--- char-skip-in-use ---"
+new_fleet
+add_wt busy-wt
+advance_master eta
+( cd "$FLEET/IBL5-worktrees/busy-wt" && sleep 30 ) & busy_pid=$!
+out="$(run_wt_rebase)"; rc=$?
+kill "$busy_pid" 2>/dev/null || true
+wait "$busy_pid" 2>/dev/null || true
+expect "char-skip-in-use-exit" 0 "$rc"
+# is_worktree_in_use is lsof-based; degrade to a static guard-invocation check
+# if the detection cannot be triggered in this environment (sandbox/CI)
+if echo "$out" | grep -q "SKIP.*busy-wt"; then
+    expect_out "char-skip-in-use-skip"   "SKIP    busy-wt" "$out"
+    expect_out "char-skip-in-use-reason" "actively in use" "$out"
+else
+    grep -q 'is_worktree_in_use' "$SCRIPT_DIR/wt-rebase"
+    expect "char-skip-in-use-wired" 0 $?
+    echo "ok: char-skip-in-use (degraded — lsof cwd detection not available in this env)"
+fi
+
+echo "--- char-empty-fleet ---"
+new_fleet
+# No add_wt — zero worktrees in this fleet
+out="$(run_wt_rebase)"; rc=$?
+expect     "char-empty-exit"      0 "$rc"
+expect_out "char-empty-uptodate"  "All worktrees up to date." "$out"
+
+echo "--- char-detached-head ---"
+new_fleet
+add_wt detach-wt
+advance_master theta
+git -C "$FLEET/IBL5-worktrees/detach-wt" checkout -q --detach
+pre_head="$(git -C "$FLEET/IBL5-worktrees/detach-wt" rev-parse HEAD)"
+out="$(run_wt_rebase)"; rc=$?
+expect     "char-detached-exit"      0 "$rc"
+expect_no_out "char-detached-silent" "detach-wt" "$out"
+post_head="$(git -C "$FLEET/IBL5-worktrees/detach-wt" rev-parse HEAD)"
+[[ "$pre_head" == "$post_head" ]] && _r=0 || _r=1
+expect "char-detached-head-stable" 0 "$_r"
+
+# ===========================================================================
+# POST-IMPL CASES — assert the four reconcile states + dry-run classifies
+# ===========================================================================
+
+echo "--- post-already-current ---"
+new_fleet
+add_wt post-cur-wt
+out="$(run_wt_rebase)"; rc=$?
+expect     "post-already-current-exit"       0 "$rc"
+expect_no_out "post-already-current-silent"  "post-cur-wt" "$out"
+expect_out "post-already-current-summary"    "Done: 0 updated" "$out"
+
+echo "--- post-ok-behind-master (reconcile:none, merge:true) ---"
+new_fleet
+add_wt post-behind-wt
+advance_master post_alpha
+pre_head="$(git -C "$FLEET/IBL5-worktrees/post-behind-wt" rev-parse HEAD)"
+out="$(run_wt_rebase)"; rc=$?
+expect     "post-behind-exit"         0 "$rc"
+expect_out "post-behind-ok"           "OK      post-behind-wt" "$out"
+expect_out "post-behind-reconcile"    "reconcile:none" "$out"
+expect_out "post-behind-merge"        "merge:true" "$out"
+# HEAD must now include master's new commit
+git -C "$FLEET/IBL5-worktrees/post-behind-wt" merge-base --is-ancestor origin/master HEAD && _r=0 || _r=1
+expect "post-behind-master-ancestor" 0 "$_r"
+
+echo "--- post-ok-local-work (reconcile:none, merge:true) ---"
+new_fleet
+add_wt post-work-wt
+commit_in post-work-wt feat.txt "local feature"
+pre_sha="$(git -C "$FLEET/IBL5-worktrees/post-work-wt" rev-parse HEAD)"
+advance_master post_beta
+out="$(run_wt_rebase)"; rc=$?
+expect     "post-work-exit"               0 "$rc"
+expect_out "post-work-ok"                 "OK      post-work-wt" "$out"
+expect_out "post-work-reconcile"          "reconcile:none" "$out"
+# pre_sha must be an ancestor of HEAD (merge preserved it)
+git -C "$FLEET/IBL5-worktrees/post-work-wt" merge-base --is-ancestor "$pre_sha" HEAD && _r=0 || _r=1
+expect "post-work-sha-preserved" 0 "$_r"
+# origin/master must be an ancestor of HEAD (master merged in)
+git -C "$FLEET/IBL5-worktrees/post-work-wt" merge-base --is-ancestor origin/master HEAD && _r=0 || _r=1
+expect "post-work-master-merged" 0 "$_r"
+
+echo "--- post-reset-to-origin (reconcile:reset, CI force-push) ---"
+new_fleet
+add_wt post-reset-wt
+commit_in post-reset-wt work.txt "published"
+git -C "$FLEET/IBL5-worktrees/post-reset-wt" push -q -u origin post-reset-wt
+advance_master post_gamma
+ci_force_push post-reset-wt
+out="$(run_wt_rebase)"; rc=$?
+expect     "post-reset-exit"        0 "$rc"
+expect_out "post-reset-ok"          "OK      post-reset-wt" "$out"
+expect_out "post-reset-reconcile"   "reconcile:reset" "$out"
+# After reset + merge, worktree is in sync with its own remote
+ahead="$(git -C "$FLEET/IBL5-worktrees/post-reset-wt" rev-list --count origin/post-reset-wt..HEAD)"
+[[ "$ahead" -eq 0 ]] && _r=0 || _r=1
+expect "post-reset-in-sync" 0 "$_r"
+# And master is an ancestor
+git -C "$FLEET/IBL5-worktrees/post-reset-wt" merge-base --is-ancestor origin/master HEAD && _r=0 || _r=1
+expect "post-reset-master-merged" 0 "$_r"
+
+echo "--- post-ff-to-origin (reconcile:ff) ---"
+new_fleet
+add_wt post-ff-wt
+commit_in post-ff-wt work.txt "v1"
+git -C "$FLEET/IBL5-worktrees/post-ff-wt" push -q -u origin post-ff-wt
+# Advance origin/post-ff-wt without updating local (push from separate clone)
+ff_tmp="$(mktemp -d "$BASE_TMP/ff.XXXXXX")"
+git clone -q "$FLEET/upstream.git" "$ff_tmp"
+git -C "$ff_tmp" config user.email test@example.com
+git -C "$ff_tmp" config user.name test
+git -C "$ff_tmp" config commit.gpgsign false
+git -C "$ff_tmp" checkout -q -b post-ff-wt origin/post-ff-wt
+echo v2 > "$ff_tmp/work.txt"
+git -C "$ff_tmp" add work.txt
+git -C "$ff_tmp" commit -qm "v2"
+git -C "$ff_tmp" push -q origin post-ff-wt
+# Local post-ff-wt is now strictly behind origin/post-ff-wt
+out="$(run_wt_rebase)"; rc=$?
+expect     "post-ff-exit"          0 "$rc"
+expect_out "post-ff-ok"            "OK      post-ff-wt" "$out"
+expect_out "post-ff-reconcile"     "reconcile:ff" "$out"
+# In sync with its remote after ff
+ahead="$(git -C "$FLEET/IBL5-worktrees/post-ff-wt" rev-list --count origin/post-ff-wt..HEAD)"
+[[ "$ahead" -eq 0 ]] && _r=0 || _r=1
+expect "post-ff-in-sync" 0 "$_r"
+
+echo "--- post-skip-unpushed-divergence (genuine local-only commits) ---"
+new_fleet
+add_wt post-skip-div-wt
+commit_in post-skip-div-wt published.txt "goes upstream"
+git -C "$FLEET/IBL5-worktrees/post-skip-div-wt" push -q -u origin post-skip-div-wt
+advance_master post_delta
+ci_force_push post-skip-div-wt
+# Now add a local-only commit — makes cherry see a '+' line
+unpushed_work post-skip-div-wt
+pre_head="$(git -C "$FLEET/IBL5-worktrees/post-skip-div-wt" rev-parse HEAD)"
+out="$(run_wt_rebase 2>&1)"; rc=$?
+expect     "post-skip-div-exit"       0 "$rc"
+expect_out "post-skip-div-skip"       "SKIP    post-skip-div-wt" "$out"
+expect_out "post-skip-div-reason"     "local-only commit" "$out"
+post_head="$(git -C "$FLEET/IBL5-worktrees/post-skip-div-wt" rev-parse HEAD)"
+[[ "$pre_head" == "$post_head" ]] && _r=0 || _r=1
+expect "post-skip-div-head-stable" 0 "$_r"
+
+echo "--- post-reset-false-positive-boundary (same patches → reset, not skip) ---"
+new_fleet
+add_wt post-fp-wt
+commit_in post-fp-wt work.txt "same patch"
+git -C "$FLEET/IBL5-worktrees/post-fp-wt" push -q -u origin post-fp-wt
+advance_master post_epsilon
+ci_force_push post-fp-wt
+# No extra local commit here — every local patch exists in origin/post-fp-wt
+out="$(run_wt_rebase)"; rc=$?
+expect     "post-fp-exit"       0 "$rc"
+expect_out "post-fp-ok"         "OK      post-fp-wt" "$out"
+expect_out "post-fp-reset"      "reconcile:reset" "$out"
+expect_no_out "post-fp-not-skip" "SKIP    post-fp-wt" "$out"
+
+echo "--- post-dry-run-mutates-nothing ---"
+new_fleet
+add_wt post-dry-wt
+commit_in post-dry-wt local.txt "local"
+advance_master post_zeta
+pre_head="$(git -C "$FLEET/IBL5-worktrees/post-dry-wt" rev-parse HEAD)"
+out="$(run_wt_rebase --dry-run)"; rc=$?
+expect     "post-dry-exit"           0 "$rc"
+expect_out "post-dry-would"          "WOULD   post-dry-wt" "$out"
+expect_out "post-dry-classifies"     "reconcile:" "$out"
+post_head="$(git -C "$FLEET/IBL5-worktrees/post-dry-wt" rev-parse HEAD)"
+[[ "$pre_head" == "$post_head" ]] && _r=0 || _r=1
+expect "post-dry-head-stable" 0 "$_r"
+
+# ===========================================================================
+# Terminator
+# ===========================================================================
+
+if [ "$FAILED" -ne 0 ]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

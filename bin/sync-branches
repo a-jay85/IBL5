@@ -10,7 +10,7 @@ set -e
 #   - Hard reset to origin (non-current branches via branch -f)
 #   - Current branch via reset --hard
 #   - Worktree branches synced from within the worktree (skipped if in active use)
-#   - After sync, rebases all worktree branches onto origin/master
+#   - After sync, merges origin/master into all active worktree branches
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 source "$REPO_ROOT/bin/lib/wt-guards.sh"
@@ -102,7 +102,7 @@ done < <(git for-each-ref --format='%(refname:short)' refs/heads/)
 echo ""
 echo "Done: $SYNCED reset, $SKIPPED skipped."
 
-# Rebase worktree branches onto updated origin/master
+# Merge updated origin/master into worktree branches
 if [ -x "$REPO_ROOT/bin/wt-rebase" ]; then
     echo ""
     "$REPO_ROOT/bin/wt-rebase"

@@ -19,6 +19,8 @@ def repo():
                        env={**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
                             "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"})
     subprocess.run(["git", "init", "-b", "master", d], check=True, capture_output=True)
+    subprocess.run(["git", "-C", d, "config", "user.email", "t@t"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", d, "config", "user.name", "t"], check=True, capture_output=True)
     open(os.path.join(d, "a.txt"), "w").write("base\n")
     sh("add", "-A"); sh("commit", "-m", "base")
     return d

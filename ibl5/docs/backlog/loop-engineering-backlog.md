@@ -79,6 +79,8 @@ last_verified: 2026-09-06
 | L50 | `bin/pr-cycle` logs gate nominees as "excluded this run" but then orders and readies them (`--gate-edges /dev/null` re-admits every nominee) | ⬜ Open | 🟦 | S |
 | L51 | Plan Phase 5 dry-run count propagated to archive only, not PR body; reviewer blast-radius instruction stale by ~23% | ⬜ Open | 🟦 | S |
 | L52 | Test harness case comment over-claims assertion scope; adjacent cases leave `run_block` exit codes unchecked | ✅ fixed this pass | — | S |
+| L51 | `/pr-ready` rebase silently merges `merge=union` files; the Phase 3 conflict list never names them, and `bin/check-numbering` does not catch two ADR index rows that share the same number but carry differing descriptions | ⬜ Open | 🟥 | S |
+| L52 | Hand-authored PR body `## Manual Testing` asserts "unit and E2E tests" without verifying the diff contains PHPUnit tests or Playwright specs; same class as L36, different surface (hand-authored body vs. `/post-plan` template) | ⬜ Open | 🟥 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -722,6 +724,9 @@ The static-guard case in `bin/test-pr-cycle` should pin whichever wording lands,
 *(discovered 2026-09-05 during #2108)*
 
 **class:** A plan Phase 5 stated deliverable — recording the dry-run-measured blast-radius count in the PR body — propagated to the archive entry but not the PR body, leaving a reviewer-facing instruction citing the planning-time estimate (~772) rather than the measured figure (~626), a ~23% overstatement.
+### L51 `/pr-ready` rebase silently merges `merge=union` files; Phase 3 list never names them; `bin/check-numbering` misses same-number rows with differing descriptions
+
+**class:** A `merge=union` file that receives additive rows from both rebase sides; the Phase 3 conflict list never enumerates it (it never conflicted, so it never surfaced for human review), and `bin/check-numbering` Check 3 does not fire when two rows share the same `[NNNN]` ADR hyperlink but carry differing description text — because the check matches on row identity, not on the extracted number.
 
 **occurrence table:**
 
@@ -750,6 +755,23 @@ Landing rung: **2** — add a sentence to the plan template's Phase 5 dry-run se
 *(discovered 2026-09-05 during #2108)*
 
 **class:** A test harness case comment asserts a behavioral property ("1 tracked removed") that the case's assertions do not verify; adjacent cases also capture `run_block` exit codes into a variable but do not assert them, so a non-zero exit silently masks the real cause.
+| 1 | `ibl5/docs/decisions/README.md` — ADR-0104 row duplicated during rebase of #2111; older shorter description resurrected over master's current text | yes | fixed this pass | fixed this pass |
+
+**prevention ladder:**
+- rung 0 — `bin/check-numbering` Check 3 fires on a duplicate *number* in the shape it recognises, but not on two rows that share `[0104]` with different descriptions; partial coverage, not this class.
+- rung 1 — Extend `bin/check-numbering` Check 3 to additionally fail when two rows in the ADR index table share the same `| [NNNN]` leading pattern, regardless of trailing description text. Direct prevention: the duplicate 0104 row would have tripped it.
+- rung 2 — A rule doc requiring Phase 3 to also enumerate every rebased path whose `.gitattributes` driver is `union`. Cheaper, but post-hoc: the row is already silently merged and unchecked by the time the list is written.
+- Landing: **rung 1** — extend `bin/check-numbering`. Directly prevents the defect class without requiring the human to remember to scan `.gitattributes` during rebase. All four meta-tooling-bar extend-before-add conditions hold: host already exists (`bin/check-numbering`), trigger is the same CI step, surface is live and recurring (every rebase of an ADR-adding branch), no cheaper alternative closes the class.
+
+**artifact destination:** `bin/check-numbering` (in-repo; lands in PR diff).
+
+**provenance:** (discovered 2026-09-05 during #2111)
+
+---
+
+### L52 Hand-authored PR body `## Manual Testing` asserts "unit and E2E tests" without verifying the diff contains those test types
+
+**class:** A hand-authored PR body section that copies a generic coverage claim ("covered by unit and E2E tests") without checking whether the diff actually contains PHPUnit tests or Playwright specs — same defect class as L36 (`/post-plan` Phase 3 hardcoded claim), different surface: here the claim is written by a human, not generated from a template.
 
 **occurrence table:**
 
@@ -771,6 +793,15 @@ Landing rung: **no gate warranted** — neither occurrence exists in the tree af
 **provenance:** (discovered 2026-09-05 during #2108)
 
 **Status (2026-09-05):** ✅ moot — harness retired this PR.
+| 1 | PR #2111 `## Manual Testing` body section — "covered by unit and E2E tests"; diff contains zero PHPUnit tests or Playwright specs; 23 new cases live in `bin/test-adr-check` shell harness | yes | fixed this pass | fixed this pass |
+
+**prevention ladder:**
+- rung 0 — `/pr-ready` Phase 6 check 4 already catches this class and routes it to Phase 6.5 for correction. The catch-and-fix path is operative. Covered.
+- Landing: **no gate warranted** — already caught by `/pr-ready` Phase 6 check 4; the Phase 6.5 fix path is the gate. Adding a separate authoring-time gate would duplicate coverage already in place.
+
+**artifact destination:** n/a — no gate.
+
+**provenance:** (discovered 2026-09-05 during #2111)
 
 ---
 

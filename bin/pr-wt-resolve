@@ -2,6 +2,8 @@
 # Resolve a PR number or branch name to that branch's git worktree path.
 # Prints exactly one absolute path on stdout; errors go to stderr.
 # Used by the /pr-wt skill, which feeds the path to EnterWorktree.
+# Exits 3 when the calling session is itself inside a linked worktree — /pr-wt cannot
+# switch out of one, so resolving a path would be pointless.
 # Usage: bin/pr-wt-resolve <pr-number|branch-name>
 
 set -euo pipefail
@@ -10,6 +12,21 @@ arg="${1:-}"
 if [ -z "$arg" ]; then
     echo "Usage: bin/pr-wt-resolve <pr-number|branch-name>" >&2
     exit 2
+fi
+
+# /pr-wt step 1 is an unconditional ExitWorktree. If the session is STILL inside a
+# linked worktree when we run, that exit no-oped: this session was LAUNCHED in a
+# worktree rather than entering one, so it can never move — EnterWorktree gates on
+# cwd being a linked worktree and rejects the main working tree outright. Fail here
+# rather than burn a `gh pr view` on a switch that cannot land. Measured, not
+# inferred from the transcript or from matching an EnterWorktree error string.
+_git_dir="$(git rev-parse --path-format=absolute --git-dir 2>/dev/null || true)"
+_common_dir="$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+if [ -n "$_git_dir" ] && [ -n "$_common_dir" ] && [ "$_git_dir" != "$_common_dir" ]; then
+    echo "pr-wt-resolve: session is still inside the worktree $(git rev-parse --show-toplevel)." >&2
+    echo "  EnterWorktree cannot switch out of a linked worktree, and ExitWorktree only acts on a" >&2
+    echo "  worktree this session entered. Relaunch a session from $(dirname "$_common_dir"), then retry." >&2
+    exit 3
 fi
 
 branch="$arg"

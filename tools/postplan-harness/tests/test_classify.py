@@ -11,6 +11,7 @@ from harness.classify import (classify, files_from_diff, filter_diff,
                                FILES_CHANGED_BEGIN, FILES_CHANGED_END,
                                name_status_from_diff, render_files_changed,
                                retro_registry_row_from_diff,
+                               slice_agent_e_diff,
                                strip_manual_testing_section,
                                upsert_files_changed)
 
@@ -55,6 +56,89 @@ def test_files_and_flags():
     assert cls.has_e2e_specs and cls.e2e_spec_modules == []
     assert cls.has_modified and cls.has_comments_in_diff
     assert not cls.docs_only and not cls.non_code_only
+
+
+SHELL_DIFF = """diff --git a/bin/my-script b/bin/my-script
+index 111..222 100755
+--- a/bin/my-script
++++ b/bin/my-script
+@@ -1,3 +1,6 @@
++echo "added line one"
++echo "added line two"
++echo "added line three"
+diff --git a/.github/workflows/main.yml b/.github/workflows/main.yml
+new file mode 100644
+--- /dev/null
++++ b/.github/workflows/main.yml
+@@ -0,0 +1,2 @@
++on: push
++jobs: {}
+"""
+
+
+def test_shell_and_workflow_flags():
+    files = files_from_diff(SHELL_DIFF)
+    cls = classify(files, SHELL_DIFF, modified_files=["bin/my-script"])
+    assert cls.has_shell is True
+    assert cls.has_workflow is True
+    assert cls.count_shell == 1
+    assert cls.count_workflow == 1
+    assert cls.lines_shell_changed == 3
+    assert cls.has_php is False
+    assert cls.non_code_only is False
+    sliced = slice_agent_e_diff(cls.filtered_diff)
+    assert "bin/my-script" in sliced
+    assert ".github/workflows/main.yml" in sliced
+
+
+SKILL_PROSE_DIFF = """diff --git a/.claude/skills/post-plan/SKILL.md b/.claude/skills/post-plan/SKILL.md
+index 111..222 100644
+--- a/.claude/skills/post-plan/SKILL.md
++++ b/.claude/skills/post-plan/SKILL.md
+@@ -1,1 +1,2 @@
++## Updated section
+"""
+
+
+def test_skill_prose_flag_preserves_non_code_only():
+    files = files_from_diff(SKILL_PROSE_DIFF)
+    cls = classify(files, SKILL_PROSE_DIFF, modified_files=[".claude/skills/post-plan/SKILL.md"])
+    assert cls.has_skill_prose is True
+    assert cls.non_code_only is True
+    assert cls.docs_only is True
+    assert cls.has_shell is False
+    assert cls.has_workflow is False
+
+
+SHELL_NEGATIVE_DIFF = """diff --git a/ibl5/foo.shtml b/ibl5/foo.shtml
+index 111..222 100644
+--- a/ibl5/foo.shtml
++++ b/ibl5/foo.shtml
+@@ -1,1 +1,2 @@
++<p>updated</p>
+diff --git a/bin/lib/router.php b/bin/lib/router.php
+index 333..444 100644
+--- a/bin/lib/router.php
++++ b/bin/lib/router.php
+@@ -1,1 +1,2 @@
++<?php return true;
+diff --git a/bin/lib/README.md b/bin/lib/README.md
+index 555..666 100644
+--- a/bin/lib/README.md
++++ b/bin/lib/README.md
+@@ -1,1 +1,2 @@
++Updated docs.
+"""
+
+
+def test_shell_negative_excludes_lookalikes():
+    files = files_from_diff(SHELL_NEGATIVE_DIFF)
+    cls = classify(files, SHELL_NEGATIVE_DIFF, modified_files=files)
+    assert cls.has_shell is False
+    assert cls.has_workflow is False
+    assert cls.has_skill_prose is False
+    assert cls.count_shell == 0
+    assert slice_agent_e_diff(cls.filtered_diff) == ""
 
 
 def test_filter_strips_migrations_and_locks():

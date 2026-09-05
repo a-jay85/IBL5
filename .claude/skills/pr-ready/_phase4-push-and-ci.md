@@ -1,6 +1,6 @@
 ---
 description: /pr-ready runtime Phase 4 — lost-work proof, push, PR state, and the CI watcher arm. Loaded by SKILL.md via git show at Phase 4.
-last_verified: 2026-08-27
+last_verified: 2026-09-04
 ---
 
 # /pr-ready runtime Phase 4 — push, PR state, and the CI watcher
@@ -50,8 +50,10 @@ Read at runtime via `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase4-push-
    First, run `git rev-parse HEAD` bare and record the printed SHA as `<HEAD_SHA>` in the run notes (single-value capture — it does not survive to the next Bash call). Then materialize the watcher in the foreground, so a failed materialize is loud rather than an exit code on a background task. The filename is PR-keyed, not `$`-keyed — the same reason every other `/tmp` path in this skill uses `<N>`:
 
    ```bash
-   git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/watch-ci.sh > /tmp/pr-ready-ciwatch-<N>.sh && test -s /tmp/pr-ready-ciwatch-<N>.sh && echo MATERIALIZED
+   git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/watch-ci.sh > /tmp/pr-ready-ciwatch-<N>.sh.part && test -s /tmp/pr-ready-ciwatch-<N>.sh.part && mv /tmp/pr-ready-ciwatch-<N>.sh.part /tmp/pr-ready-ciwatch-<N>.sh && echo MATERIALIZED
    ```
+
+   **The `.part` staging is load-bearing, and `MATERIALIZED` is a required output.** `>` truncates its target *before* `git show` runs, so materializing straight onto the real path leaves a **0-byte** `/tmp/pr-ready-ciwatch-<N>.sh` behind whenever the `git show` fails. `test -s` correctly stops this `&&` chain — but the empty file survives in `/tmp`, and `bash` on an empty file exits **0** printing nothing. The delegate packet below reads a no-output run as a killed window and re-runs it, so an empty watcher burns all 6 windows in seconds, returns no verdict, and the orchestrator idles until `timeout 5400` kills it with no verdict comment posted (PR #2077, 2026-09-04). Staging through `.part` means a failed `git show` leaves the real path exactly as it was — absent, or the previous good copy — and never a silent 0-byte trap. If `MATERIALIZED` does not print, **stop**: do not spawn the delegate; report the failed materialize in the Phase 7 verdict.
 
    Then spawn **one** delegate and end your turn. Haiku tier: it runs a command and repeats its output, with no relevance judgment to make (`.claude/rules/agent-tiering.md`). Pass `model: "haiku"` and omit `subagent_type`:
 
@@ -64,7 +66,7 @@ Read at runtime via `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase4-push-
    > Run this command in the FOREGROUND with `timeout: 600000`. Never pass `run_in_background` — it is denied here and its results are discarded.
    >
    > ```bash
-   > bash /tmp/pr-ready-ciwatch-<N>.sh <N> <HEAD_SHA> 540
+   > if test -s /tmp/pr-ready-ciwatch-<N>.sh; then bash /tmp/pr-ready-ciwatch-<N>.sh <N> <HEAD_SHA> 540; else echo "STOP: watcher /tmp/pr-ready-ciwatch-<N>.sh is missing or empty"; fi
    > ```
    >
    > It polls in silence for up to 540s, then prints one verdict block whose first word is `CI COMPLETE`, `CI FAILED`, `MERGE CONFLICT`, `STALE`, `CI TIMEOUT`, or `STOP`.

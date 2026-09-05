@@ -10,8 +10,15 @@ import { test as authTest } from './auth';
  * `page`), the cookie is always set — even for tests that only
  * destructure `{ page }`.
  *
- * No other spec touches tid=8, so the roster is immune to parallel
- * mutations from trading/extension/waiver specs.
+ * tid=8 is isolated from the trading/extension/waiver specs, which act on
+ * the logged-in user's Metros. It is NOT, however, a single-writer roster:
+ * every spec importing this fixture writes tid=8, and several write the same
+ * depth-chart rows (depth-chart-entry-submission, depth-chart-entry-mobile,
+ * depth-chart-saved-dc-api). `test.describe.configure({ mode: 'serial' })` is
+ * file-scoped and does not order them against each other, so a spec that
+ * writes a tid=8 row AND reads it back must run in the `mutators` project
+ * (--workers=1, dedicated DB) — see the mutators comment block in
+ * playwright.config.ts.
  */
 export const test = authTest.extend({
   context: async ({ context }, use) => {

@@ -74,6 +74,7 @@ last_verified: 2026-09-04
 | L45 | `/pr-ready` Phase 2 squashes load-bearing commit boundaries when `auto_merge: false`; PR body SHAs go stale after force-push | ⬜ Open | 🟥 | S |
 | L46 | Queued matrix-less plan with non-canonical `impl_model:` alias slips all pre-queue gates; runner disposes on first nightly run | ⬜ Open | 🟦 | S |
 | L47 | `/pr-ready` folds a recoverable pre-push-hook rebase rejection into the terminal `PUSH FAILED` verdict, stranding the Phase 6.5 remediation commit locally | ⬜ Open | 🟥 | M |
+| L48 | Planning pipeline prose coverage gap: code-block path expressions in `SKILL.md` are invisible to `bin/check-docs`, so they can diverge from `bin/plan-now`'s runtime slug derivation silently | ⬜ Open | 🟦 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -663,6 +664,31 @@ Landing rung: **1** (extend `scripts/push.sh`'s verdict vocabulary plus its two 
 **artifact destination:** `.claude/skills/pr-ready/scripts/push.sh`, `.claude/skills/pr-ready/_phase4-push-and-ci.md`, `.claude/skills/pr-ready/_phase65-remediation.md`, `bin/pr-ready-now`, `bin/test-pr-ready-now` — all in-repo; nothing out-of-repo, so the whole change appears in the PR diff.
 
 **provenance:** (discovered 2026-09-04 during #1956)
+
+---
+
+### L48 Planning pipeline prose coverage gap: code-block path expressions in `SKILL.md` are invisible to `bin/check-docs`, so they can diverge from `bin/plan-now`'s runtime slug derivation silently
+
+**class:** Any shell code block inside `.claude/skills/plan/SKILL.md` that constructs a file path is invisible to `bin/check-docs`'s dead-reference checker, because the check operates on prose tokens matching `bin/<name>` / `ibl5/<path>` / `.claude/<path>` patterns — not on dynamic expressions inside fenced blocks. A path expression that silently produces the wrong value causes the gate to read a nonexistent file and exit 0 without firing.
+
+**Immediate instance fixed in PR #1946:** `SKILL.md` Step 5 pre-finalize drift check derived the draft path via `$(git rev-parse --abbrev-ref HEAD)`. On the dominant `bin/plan-now` path the branch is `master`, so the check silently read `$HOME/claude-plans/.drafts/master.draft.md` (nonexistent), exiting 0 as "no scaffold found" and never detecting drift. Fixed by substituting the `<slug>` placeholder already established earlier in Step 5.
+
+**Prevention gap.** `bin/check-docs` explicitly skips paths containing shell variable syntax (`$FOO/bar`). Dynamic expressions inside code fences are not covered. A PR that changes a path expression in a SKILL.md code block passes all CI gates while quietly introducing a runtime divergence.
+
+**prevention_ladder:**
+
+- rung 0 — no existing gate covers this surface.
+- rung 1 — extend `bin/check-docs` (or add a narrow `bin/check-plan-skill-paths` (example)) to grep fenced blocks in `SKILL.md` for `DRAFT=` assignments and assert the path uses the `<slug>` placeholder, not a `$(git rev-parse ...)` expression. Structural grep, no behavioral execution required. Effort: S.
+- rung 2 — a rule doc under `.claude/rules/`: useful but not enforcement.
+- rung 3 — PHPStan: not applicable (shell/markdown).
+- rung 4 — a CI gate extension: `bin/test-check-plan` already covers the path-not-found case (`gateD-no-path-exits-2`); a wrong-but-present path cannot be caught without knowing the expected slug — rung 1 is the natural landing.
+- rung 5 — a new hook: not warranted per `meta-tooling-bar.md` (no distinct trigger; a `bin/check-docs` extension is the natural host).
+
+Landing rung: **1** (extend `bin/check-docs` or add a narrow lint for `DRAFT=` expressions in SKILL.md fenced blocks).
+
+**artifact destination:** `bin/check-docs` or a new `bin/check-plan-skill-paths` (example) (in-repo)
+
+**provenance:** (discovered 2026-09-04 during PR #1946 plan-intent review)
 
 ---
 

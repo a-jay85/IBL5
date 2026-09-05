@@ -442,18 +442,36 @@ jobs:
     - name: Setup PHP environment
       uses: ./.github/actions/setup-php-env
 
-    # Key prefix bumped to v2 to evict caches written before config.php existed in this
-    # job. PHPStan's result cache does not invalidate a requireOnce.fileNotFound entry
-    # when the missing file later appears, so a restored v1 cache replays stale errors.
+    # Key prefix bumped to v3 to evict v2 caches poisoned by the baseline gap below.
+    # (v2 itself evicted caches written before config.php existed in this job: PHPStan's
+    # result cache does not invalidate a requireOnce.fileNotFound entry when the missing
+    # file later appears, so a restored v1 cache replays stale errors.)
+    #
+    # The baseline hash sits in the key PREFIX, ahead of the config hash, because both
+    # baselines are `includes:` of the phpstan configs — a baseline change alters which
+    # errors are suppressed, so a cache written under a different baseline replays
+    # errors the new baseline no longer expects (ignore.unmatched + the error itself).
+    # Putting it only in the exact key would not help: `restore-keys` would still fall
+    # back across a baseline change. Scoping restore-keys to the baseline hash keeps the
+    # partial-restore speedup within one baseline generation and blocks it across
+    # generations, which is exactly when the nightly `[auto]` baseline commit lands.
+    #
+    # Verified locally: appending an unmatched entry to phpstan-baseline.neon does NOT
+    # invalidate PHPStan's own result cache (run stayed warm at ~1.2s vs ~43s cold) and
+    # the run failed with `ignore.unmatched (non-ignorable)` — the exact CI failure shape.
+    #
+    # Accepted cost: the first run after each nightly `[auto]` baseline commit gets a
+    # fully cold cache (~40s each for analyse and analyse:tests) on master and on every
+    # open PR. That is the price of not replaying a poisoned cache.
     - name: Cache PHPStan result cache
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           ibl5/tmp
           ibl5/tmp-tests
-        key: phpstan-v2-${{ hashFiles('ibl5/phpstan.neon', 'ibl5/phpstan-tests.neon', 'ibl5/phpstan-rules/**') }}
+        key: phpstan-v3-${{ hashFiles('ibl5/phpstan-baseline.neon', 'ibl5/phpstan-tests-baseline.neon') }}-${{ hashFiles('ibl5/phpstan.neon', 'ibl5/phpstan-tests.neon', 'ibl5/phpstan-rules/**') }}
         restore-keys: |
-          phpstan-v2-
+          phpstan-v3-${{ hashFiles('ibl5/phpstan-baseline.neon', 'ibl5/phpstan-tests-baseline.neon') }}-
 
     - name: Run PHPStan
       working-directory: ibl5
@@ -863,6 +881,8 @@ jobs:
         run: bin/test-pr-attack
       - name: bin/test-pr-ready-now
         run: bin/test-pr-ready-now
+      - name: bin/test-pr-cycle
+        run: bin/test-pr-cycle
       - name: bin/test-check-phpunit-hygiene
         run: bin/test-check-phpunit-hygiene
       - name: bin/test-test

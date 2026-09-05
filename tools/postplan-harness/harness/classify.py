@@ -29,6 +29,18 @@ _COMMENT_ADDED = re.compile(r"^\+\s*(//|#|/\*|\*)")
 _MODULE_REF = re.compile(r"(modules\.php\?name=[A-Za-z][A-Za-z0-9_]*|modules/[A-Za-z][A-Za-z0-9_]*/)")
 _RETRO_ROW_RE = re.compile(r"^\|\s*\d{4}-\d{2}-\d{2}\b.*class:.*routed to:")
 
+# Agent E surface (mirrors _phase-3-classify-diff.md exactly)
+_SHELL_INC = re.compile(r"(^|/)bin/|\.sh$")
+_SHELL_EXC = re.compile(r"\.(php|md|json|py|ts|tsx|css|sql|ya?ml|lock|txt|neon)$")
+_WORKFLOW = re.compile(r"^\.github/workflows/.*\.ya?ml$")
+_SKILL_PROSE = re.compile(r"^\.claude/.*\.md$")
+
+def is_shell_path(p: str) -> bool:
+    return bool(_SHELL_INC.search(p)) and not _SHELL_EXC.search(p)
+
+def is_agent_e_path(p: str) -> bool:
+    return is_shell_path(p) or bool(_WORKFLOW.match(p)) or bool(_SKILL_PROSE.match(p))
+
 
 def files_from_diff(diff_text: str) -> list[str]:
     """Changed-file list from unified diff headers (b-side path)."""
@@ -226,6 +238,8 @@ def classify(files: list[str], diff_text: str, modified_files: list[str] | None 
     c.count_go = _count(files, _GO)
     c.count_ibl5 = _count(files, _IBL5)
     c.go_touched_count = _count(files, _ENGINE)
+    c.count_shell = sum(1 for f in files if is_shell_path(f))
+    c.count_workflow = _count(files, _WORKFLOW)
 
     c.has_php = c.count_php > 0
     c.has_css = c.count_css > 0
@@ -236,6 +250,9 @@ def classify(files: list[str], diff_text: str, modified_files: list[str] | None 
     c.go_touched = c.go_touched_count > 0
     c.engine_only = c.go_touched and c.count_php == 0 and c.count_ibl5 == 0
     c.golden_changed = GOLDEN_PATH in files
+    c.has_shell = c.count_shell > 0
+    c.has_workflow = c.count_workflow > 0
+    c.has_skill_prose = any(_SKILL_PROSE.match(f) for f in files)
 
     t = c.count_total
     c.docs_only = t > 0 and c.count_md == t
@@ -263,6 +280,15 @@ def classify(files: list[str], diff_text: str, modified_files: list[str] | None 
         elif in_php and line.startswith("+") and not line.startswith("++"):
             php_added += 1
     c.lines_php_changed = php_added
+
+    shell_added = 0
+    keep = False
+    for line in c.filtered_diff.splitlines():
+        if line.startswith("diff --git"):
+            keep = is_shell_path(line.split()[-1][2:])
+        elif keep and line.startswith("+") and not line.startswith("++"):
+            shell_added += 1
+    c.lines_shell_changed = shell_added
 
     # E2E spec module extraction + prod overlap
     if c.count_e2e_specs > 0:
@@ -328,3 +354,15 @@ def slice_spec_diffs(filtered_diff: str, e2e_spec_modules: list[str]) -> tuple[s
         if keep_prod:
             prod_lines.append(line)
     return "".join(spec_lines), "".join(prod_lines)
+
+
+def slice_agent_e_diff(filtered_diff: str) -> str:
+    """Agent E pre-slice: shell + workflow + .claude prose sections only."""
+    out: list[str] = []
+    keep = False
+    for line in filtered_diff.splitlines(keepends=True):
+        if line.startswith("diff --git"):
+            keep = is_agent_e_path(line.split()[-1][2:])
+        if keep:
+            out.append(line)
+    return "".join(out)

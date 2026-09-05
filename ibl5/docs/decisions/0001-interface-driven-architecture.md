@@ -1,6 +1,6 @@
 ---
 description: Why every module in ibl5/classes/ uses interface-driven Repository/Service/View split with Contracts/ subdirs.
-last_verified: 2026-08-11
+last_verified: 2026-09-04
 ---
 
 # ADR-0001: Interface-driven Repository/Service/View architecture
@@ -24,7 +24,7 @@ Controllers, Processors, and Validators are added as additional sibling classes 
 
 ## Alternatives Considered
 
-- **Trait-based composition** — mix repository/service/view traits into one class per module. Rejected: traits cannot be mocked in PHPUnit, so every test would hit the real database; and a class with three traits has three responsibilities hiding inside one name, defeating the whole clarity goal.
+- **Trait-based composition** — mix repository/service/view traits into one class per module. Rejected: traits cannot be mocked in PHPUnit, so every test would hit the real database; and a class with three traits has three responsibilities hiding inside one name, defeating the whole clarity goal. Narrowed by ADR-0119 — a single-consumer trait carrying only one entity's own pure field reads is a file split, not composition, and is permitted.
 - **Factory pattern without interfaces** — a module-level factory builds repository and service instances. Rejected: factories become god objects that know how every class is assembled, and without interfaces the factories still can't be mocked effectively.
 - **Monolithic modules with layered directory structure** — keep procedural code but organize files by layer. Rejected: no compile-time enforcement of layering; regressions always drift inward because nothing mechanical blocks them.
 - **Hexagonal / ports-and-adapters** — full hexagonal architecture with ports between every seam. Rejected: too much ceremony for a single-app codebase with no microservice boundaries; 3 roles is the right granularity for IBL5's scale.

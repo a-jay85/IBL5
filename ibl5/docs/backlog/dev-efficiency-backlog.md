@@ -753,7 +753,7 @@ For the accuracy findings (2–6): prevention is the existing `/pr-ready` Phase 
 
 `last_verified: 2026-09-04`
 
-*(discovered 2026-09-04 during Phase 6 review of #2082)**
+*(discovered 2026-09-04 during Phase 6 review of #2082)*
 
 ### E45 Phase 6 review notes on PR #1924 (architect-explore-fanout) — stale Scope forward-reference and false test claim; PR-body-only fixes
 

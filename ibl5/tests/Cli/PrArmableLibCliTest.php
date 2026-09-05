@@ -79,17 +79,18 @@ final class PrArmableLibCliTest extends TestCase
 
     public function testClearanceE2eClaimedWithNoSpecFileIsHeld(): void
     {
-        // E2E named in tail clause; no *.spec.ts in changed files → fail closed (HELD).
+        // E2E named in tail clause; unit test present but no *.spec.ts → HELD (AND semantics).
+        // With OR semantics the unit match would clear despite the missing spec file.
         $body = "## Manual Testing\nNo manual testing needed — all changes are covered by unit and E2E tests.";
-        $changedFiles = "ibl5/src/Foo.php\nibl5/src/Bar.php";
+        $changedFiles = "ibl5/tests/Cli/FooTest.php\nibl5/src/Foo.php";
         self::assertSame('HELD', $this->runFn('pr_manual_testing_clearance', [$body, $changedFiles])['output']);
     }
 
     public function testClearanceE2eClaimedWithSpecFileIsCleared(): void
     {
-        // E2E named in tail clause; *.spec.ts present in changed files → CLEARED.
+        // Both types named; both matching files present → CLEARED (AND semantics: all types satisfied).
         $body = "## Manual Testing\nNo manual testing needed — all changes are covered by unit and E2E tests.";
-        $changedFiles = "ibl5/tests/e2e/foo.spec.ts\nibl5/src/Foo.php";
+        $changedFiles = "ibl5/tests/e2e/foo.spec.ts\nibl5/tests/Cli/FooTest.php";
         self::assertSame('CLEARED', $this->runFn('pr_manual_testing_clearance', [$body, $changedFiles])['output']);
     }
 

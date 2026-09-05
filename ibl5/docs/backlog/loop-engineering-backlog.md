@@ -77,6 +77,7 @@ last_verified: 2026-09-05
 | L48 | Planning pipeline prose coverage gap: code-block path expressions in `SKILL.md` are invisible to `bin/check-docs`, so they can diverge from `bin/plan-now`'s runtime slug derivation silently | ✅ Implemented (2026-09-04) | 🟦 | S |
 | L49 | `/pr-ready` Phase 6.5 files backlog rows with non-canonical status glyphs and automouse values, making them invisible to open-work filters | ⬜ Open | 🟥 | S |
 | L50 | `bin/pr-cycle` logs gate nominees as "excluded this run" but then orders and readies them (`--gate-edges /dev/null` re-admits every nominee) | ⬜ Open | 🟦 | S |
+| L51 | `pr_manual_testing_clearance` callers in the ship pipeline pass only one argument; the keyword–file AND gate never fires at runtime | ⬜ Open | 🟦 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -680,6 +681,35 @@ Landing rung: **2** — add an explicit note to `.claude/skills/fix-and-prevent/
 The static-guard case in `bin/test-pr-cycle` should pin whichever wording lands, so the two cannot drift again.
 
 **provenance:** (discovered 2026-09-05 during the first live `bin/pr-cycle --go` run, right after #2081 merged)
+
+---
+
+### L51 `pr_manual_testing_clearance` callers pass only one argument; the keyword–file AND gate never fires at runtime
+
+**class:** A gate predicate in `bin/lib/pr-armable.sh` extended with a second `changed_files` parameter and AND-semantics keyword enforcement, where every production caller in the ship pipeline still passes only the body argument, so the keyword–file gate is structurally unreachable at runtime.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/lib/pr-armable.sh` — OR-semantics accumulation in `pr_manual_testing_clearance` | yes | was live; fixed this pass (PR #2043) | fixed this pass |
+| 2 | `.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md` — all `pr_manual_testing_clearance` call sites pass only `$BODY` | yes | live | not fixed — filed |
+| 3 | `.claude/skills/pr-ready/scripts/holds.sh:37` — `run_predicate "manual-testing-clearance" pr_manual_testing_clearance "$BODY"` passes only one arg | yes | live | not fixed — filed |
+
+**prevention_ladder:**
+
+- rung 0 — no existing gate checks argument arity of sourced-shell-function calls.
+- rung 1 — `bin/check-docs` or a dedicated `bin/test-pr-armable-wiring` (example) could grep each caller site and assert it passes two arguments; extend-before-add bar favors extending an existing test script if one already covers these callers. Effort: S.
+- rung 2 — adding a note to `_phase-6.5-arm-auto-merge.md` naming the required second argument is cheaper but prose-only, so insufficient on its own for a headless caller that cannot read rules mid-run.
+- rung 3 — not applicable (shell surface; PHPStan does not parse shell scripts).
+- rung 4 — a CI gate that greps caller sites for the single-arg pattern after the function signature changes. Possible; rung 1 is the natural form for this repo.
+- rung 5 — not warranted per `meta-tooling-bar.md`; rung 1 is the correct host.
+
+Landing rung: **1** — extend the existing `ibl5/tests/Cli/PrArmableLibCliTest.php` or a shell-level wiring test to assert that each caller in `_phase-6.5-arm-auto-merge.md` and `scripts/holds.sh` passes the `changed_files` argument.
+
+**artifact destination:** `ibl5/tests/Cli/PrArmableLibCliTest.php` (in-repo, extends existing test class) or a new `bin/test-pr-armable-wiring` (example) (in-repo shell test).
+
+**provenance:** (discovered 2026-09-05 during #2043)
 
 ---
 

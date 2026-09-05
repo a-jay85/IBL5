@@ -41,14 +41,16 @@ REPO_SLUG="${REPO_SLUG:-a-jay85/IBL5}"
 #                `No manual testing needed` (case-insensitive). This is the
 #                positive "post-plan evaluated and cleared this" signal.
 #     HELD     — a `## Manual Testing` section exists but is NOT the sentinel
-#                (it carries real manual rows) -> a human must review.
+#                (it carries real manual rows) -> a human must review. Also HELD
+#                when the sentinel names an explicit type whose matching file is
+#                absent from <changed_files> (AND semantics, see tail-clause).
 #     UNKNOWN  — there is NO `## Manual Testing` section at all (a hand-made PR,
 #                or one post-plan never processed) -> NOT auto-armable.
 #   The sentinel prefix `No manual testing needed` covers both the template-
 #   generated suffix ("...automated tests") and any historical PR that used the
 #   old wording ("...unit and E2E tests"); the tail-clause check (second param)
-#   fires only when <changed_files> is non-empty and the suffix names an explicit
-#   test type — type-agnostic wording ("automated tests") always clears.
+#   uses AND semantics: each named type must have a matching file; any absent
+#   type holds. Type-agnostic wording ("automated tests") always clears.
 pr_manual_testing_clearance() {
     local body="$1"
     local changed_files="${2:-}"
@@ -75,31 +77,27 @@ pr_manual_testing_clearance() {
     tail=$(printf '%s' "$sentinel_line" \
         | sed 's/^[[:space:]]*[Nn]o manual testing needed[[:space:]]*[—–-]*[[:space:]]*//')
     # Keyword → required changed-file pattern table (case-insensitive, \b word boundary).
-    # OR semantics: if any named type has a matching file → CLEARED; if keywords are
-    # found but none has a matching file → HELD.
-    local any_keyword=0 any_match=0
+    # AND semantics: each named type must have a matching file; any absent type holds.
+    local held=0
     if printf '%s' "$tail" | grep -qiE '\b(e2e|playwright)\b'; then
-        any_keyword=1
-        if printf '%s\n' "$changed_files" \
+        if ! printf '%s\n' "$changed_files" \
                 | grep -qE '^ibl5/tests/e2e/.*\.spec\.ts$'; then
-            any_match=1
+            held=1
         fi
     fi
     if printf '%s' "$tail" | grep -qiE '\b(unit|phpunit)\b'; then
-        any_keyword=1
-        if printf '%s\n' "$changed_files" \
+        if ! printf '%s\n' "$changed_files" \
                 | grep -qE '^ibl5/tests/.*Test\.php$'; then
-            any_match=1
+            held=1
         fi
     fi
     if printf '%s' "$tail" | grep -qiE '\bintegration\b'; then
-        any_keyword=1
-        if printf '%s\n' "$changed_files" \
+        if ! printf '%s\n' "$changed_files" \
                 | grep -qE '^ibl5/tests/DatabaseIntegration/'; then
-            any_match=1
+            held=1
         fi
     fi
-    if [ "$any_keyword" -eq 1 ] && [ "$any_match" -eq 0 ]; then
+    if [ "$held" -eq 1 ]; then
         echo "HELD"
     else
         echo "CLEARED"

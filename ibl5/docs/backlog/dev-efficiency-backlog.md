@@ -53,7 +53,7 @@ last_verified: 2026-09-05
 | E24 | `/post-plan` Phase 4B can hand-write its review comment, bypassing `post_review_summary` | ✅ Implemented | 🟨 | S |
 | E25 | `/pr-review` migration-exclusion `awk` filter is a no-op, silently ingests full migration diffs | ⬜ Open | 🟨 | S |
 | E26 | `bin/plan-now` second-resolution timestamp caused label collision on back-to-back invocations | ✅ Implemented | — | S |
-| E27 | `filterGitignored()` in `bin/check-docs`: orphaned docblock, unchecked proc exit, non-NUL-delimited check-ignore paths | ⬜ Open | 🟨 | S |
+| E27 | `filterGitignored()` in `bin/check-docs`: orphaned docblock, unchecked proc exit, non-NUL-delimited check-ignore paths | ✅ Implemented | — | S |
 | E28 | PR body hand-authored migration numbers not updated after a forced renumber | ⬜ Open | — | S |
 | E29 | Shell-harness cases pre-populate `$WORK` instead of driving invocation 1 | ✅ Implemented | — | S |
 | E30 | `bin/pr-ready-now` already-running skip only sees its own launchd jobs, so an interactive `/pr-ready` is invisible and both runs share PR-keyed `/tmp` scratch | ⬜ Open | 🟨 | S |
@@ -309,42 +309,7 @@ Consequence is size control, not correctness — reviews get *more* context than
 
 ➜ E26 `bin/plan-now` timestamp collision on back-to-back invocations — ✅ Implemented (2026-08-30): see [archive](archive/dev-efficiency-backlog-archive.md).
 
-### E27 `filterGitignored()` in `bin/check-docs`: orphaned docblock, unchecked proc exit, non-NUL-delimited check-ignore paths
-
-*(discovered 2026-08-31 during #2046)*
-
-Three defects in the `filterGitignored()` function added to `bin/check-docs` by PR #2046, surfaced by the `/pr-ready` Phase 6 fidelity review.
-
-**class (3a — fixed this pass):** an insertion point side-effect in a PHP function sequence orphans the immediately-preceding docblock and strips the following function's `@return` type narrowing, silently widening its declared return type.
-
-**class (3b — filed):** a `proc_open()`-based subprocess call does not inspect `proc_close()`'s exit status, and does not drain stderr before stdout; a partial git failure can emit matched paths on stdout that are applied as authoritative.
-
-**class (3c — filed):** `git check-ignore --stdin` is invoked without `-z`, so git C-quotes paths containing non-ASCII or special characters; the quoted token fails the `isset($ignored[$rel])` lookup and such files are not filtered. Fails in the safe direction but makes the filter silently unreliable for non-ASCII paths.
-
-**Occurrence table:**
-
-| # | File:line | Same class? | Live? | Status |
-|---|-----------|-------------|-------|--------|
-| 1 | bin/check-docs:223 — orphaned `/** @return list<string> */` before `filterGitignored()` strips `collectFiles()`'s return annotation | 3a | yes | fixed this pass (orphaned block deleted, annotation restored above `collectFiles()`) |
-| 2 | bin/check-docs:257 — `proc_close($proc)` exit status discarded; stderr not drained before stdout | 3b | yes | not fixed — filed |
-| 3 | bin/check-docs:245 — `git check-ignore --stdin` without `-z`; C-quoted paths fail isset lookup | 3c | yes | not fixed — filed |
-
-**prevention ladder:**
-
-*For 3a (docblock orphaning):*
-- rung 0 — already covered? PHPStan enforces typed returns on the annotated function but cannot detect an orphaned preceding block.
-- rung 2 — a rule doc? **Yes — landing rung.** A prose addition to the PHP coding norms rule noting "when inserting a function, verify the preceding block's attached function has not changed" is cheap-to-check and the right level for a cosmetic invariant PHPStan cannot catch. Meta-tooling-bar extend-before-add conditions apply to rungs 3–5 only.
-
-*For 3b and 3c (proc_open robustness):*
-- rung 0 — already covered? No gate checks `proc_open` idioms in PHP scripts.
-- rung 1 — extend existing gate? No existing gate owns this surface.
-- rung 3 — PHPStan rule? **Yes — landing rung.** A custom PHPStan rule asserting that any `proc_open` call inspects `proc_close()` return value would catch 3b. Meta-tooling-bar conditions: no host to extend, distinct trigger (proc_open-without-exit-check), earns its upkeep, no cheaper alternative — all four hold. 3c ships as a companion fix to 3b (same function, same tool call).
-
-**artifact destination:**
-- 3a: a `.claude/rules/` doc (PHP coding norms; not created this pass)
-- 3b/3c: a new PHPStan custom rule (no directory exists yet; will live under `ibl5/phpstan/` (example) when created) plus fix in `bin/check-docs:filterGitignored()` (not built this pass)
-
-**provenance:** (discovered 2026-08-31 during #2046)
+➜ E27 `filterGitignored()` in `bin/check-docs`: unchecked proc exit, non-NUL-delimited check-ignore paths — ✅ Implemented (2026-09-04): see [archive](archive/dev-efficiency-backlog-archive.md).
 
 ### E28 PR body hand-authored migration numbers not updated after a forced renumber
 

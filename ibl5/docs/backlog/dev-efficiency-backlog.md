@@ -70,6 +70,7 @@ last_verified: 2026-09-04
 | E42 | Phase 6 review notes on PR #1968 — plan-accuracy divergences (N1–N4); all non-blocking; no gate warranted | ⬜ Open | — | XS |
 | E43 | `bin/check-plan` PR6 gates: migration literals [A], line-number anchors [L], docker liveness [E], shellcheck CI-class [I], PHP coverage advisory [J], plus gate [V] `/path/to` + `main.localhost` extensions | ⬜ Open | 🟩 | S |
 | E44 | Phase 6 review findings on PR #2082 — gate [V] main.localhost bootstrap defect (blocking), body count mismatch, vacuous range fixture, stale corpus count, nonexistent `bin/db-wait` (example) reference, wrong baseline claim; all fixed in Phase 6.5 | ⬜ Open | 🟩 | S |
+| E45 | Phase 6 review notes on PR #1924 — stale Scope forward-reference and false Manual Testing claim; PR-body-only fixes; no gate warranted | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -752,3 +753,25 @@ For the accuracy findings (2–6): prevention is the existing `/pr-ready` Phase 
 `last_verified: 2026-09-04`
 
 *(discovered 2026-09-04 during Phase 6 review of #2082)**
+
+### E45 Phase 6 review notes on PR #1924 (architect-explore-fanout) — stale Scope forward-reference and false test claim; PR-body-only fixes
+
+**class:** PR body prose carries a forward-reference to phases already landed on master ("not yet in this diff — see MISSING-FILE note below") and a false Manual Testing claim ("all changes are covered by unit and E2E tests") for a docs-only `.claude/` change with no PHP code. Both are scope-accuracy defects in the PR body, not implementation defects.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #1924 body Scope — "not yet in this diff — see MISSING-FILE note below"; Phases 2 (`sonnet-4-6.md`) and 6 (`agent-tiering.md`) had already landed on master at `beb9874` | yes | fixed this pass (gh pr edit) |
+| 2 | PR #1924 body Manual Testing — "all changes are covered by unit and E2E tests"; no PHP code changed; no executable Verification Matrix rows | yes | fixed this pass (gh pr edit); replaced with CLI-executable verification claim and Phase 7.1 behavioral probe disposition |
+
+**prevention_ladder:**
+
+- **rung 0 — already covered?** Yes — `/pr-ready` Phase 6 check 1 (undeclared scope gap) and check 4 (PR body vs. diff accuracy) are the existing detection gate; both fired correctly and blocked the verdict until this pass.
+- **rungs 1–5** — N/A given rung 0 coverage.
+
+`prevention_ladder: no gate warranted — /pr-ready Phase 6 checks 1 and 4 are the correct catch surface and fired correctly`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-04 during #1924)*

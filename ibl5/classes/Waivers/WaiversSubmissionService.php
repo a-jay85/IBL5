@@ -48,7 +48,11 @@ class WaiversSubmissionService implements WaiversSubmissionServiceInterface
             return ['success' => false, 'error' => 'Invalid submission data.'];
         }
 
-        $totalSalary = $this->salaryCapRepo->getTeamTotalSalary($teamName);
+        // Backlog 13.14 — during phases that advance the contract year (Playoffs, Draft,
+        // Free Agency) the live cap basis is next_year_salary, not current_salary.
+        $totalSalary = $this->season->advancesContractYears()
+            ? $this->salaryCapRepo->getTeamNextYearSalary($teamName)
+            : $this->salaryCapRepo->getTeamTotalSalary($teamName);
 
         if ($action === 'waive') {
             return $this->processor->processDrop($playerID, $teamName, $rosterSlots, $totalSalary);

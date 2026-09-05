@@ -192,7 +192,7 @@ class WaiversSubmissionServiceTest extends TestCase
     {
         $processor = $this->createMock(WaiversProcessorInterface::class);
         $salaryCapRepo = $this->createMock(SalaryCapRepositoryInterface::class);
-        $season = $this->createStub(Season::class);
+        $season = self::createStub(Season::class);
         $season->method('advancesContractYears')->willReturn($advancesContractYears);
         $service = new WaiversSubmissionService($processor, $salaryCapRepo, $season);
 

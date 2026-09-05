@@ -843,3 +843,31 @@ For the accuracy findings (2–6): prevention is the existing `/pr-ready` Phase 
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-04 during #2081)*
+
+### E49 Phase 6 review notes on PR #1957 — plan-authoring gaps (body claim vs. remediation commit, verbatim omission, auto_merge contradiction, auto-generated scope)
+
+**class:** plan-authoring imprecisions requiring in-PR remediation — PR body claim contradicted by a remediation commit, a verbatim transcription omitting a side-effect call, a plan prose/frontmatter auto_merge contradiction, and a scope note about auto-generated file changes
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #1957 body (Manual Testing section) — claimed "all changes are covered by unit tests" but remediation commit `0efe66858` added `EventLogger::setAction('trade_offer_rejected')` which is not unit-pinned | yes | yes | fixed this pass — body updated to name the exception |
+| 2 | `~/claude-plans/authz-verdict-refactor-1b-trading-reject-service.md` (verbatim `reject()` body) — `EventLogger::setAction('trade_offer_rejected')` omitted from plan's transcription of the controller success path | yes | yes | not fixed — plan is a historical artifact; remediation commit `0efe66858` added the call; maintenance-backlog 15.32 filed |
+| 3 | `~/claude-plans/authz-verdict-refactor-1b-trading-reject-service.md` (frontmatter vs. prose) — `auto_merge: false` in frontmatter contradicted by "armed (auto_merge: true)" in plan prose | yes | yes | not fixed — plan is a historical artifact; Phase 7 verdict documents correct behavior |
+| 4 | `.claude/rules/codebase-map.md` — auto-generated file changed in diff but not declared in plan scope; Phase 6 reviewer noted as scope creep | yes | yes | no action needed — auto-generated, not plan-authored |
+
+**prevention_ladder:**
+- **rung 0 — already covered?** No existing gate catches PR body contradictions against remediation commits or plan verbatim omissions.
+- **rung 1 — extend existing gate?** Not feasible — plan files are freeform prose; no parser exists.
+- **rung 2 — a rule doc?** A `.claude/rules/` doc reminding authors that the PR body Manual Testing claim must be reconciled against every remediation commit, and that verbatim transcriptions must be verified against the production source (see maintenance-backlog 15.32 artifact). Low ROI.
+- **rungs 3–5 — not warranted** for plan-prose accuracy.
+- **landing rung:** no gate warranted — `/pr-ready` Phase 6 is already the catch mechanism; three of four findings are plan-authoring imprecisions; the fourth is a reviewer calibration note, not a defect.
+
+`prevention_ladder: no gate warranted — /pr-ready Phase 6 is the catch mechanism`
+
+`artifact destination: n/a — no gate`
+
+`last_verified: 2026-09-04`
+
+*(discovered 2026-09-04 during Phase 6 review of #1957)*

@@ -45,7 +45,7 @@ class TradeDecisionServiceTest extends TestCase
         self::assertSame('/ibl5/modules.php?name=Trading&op=reviewtrade&result=reject_error', $verdict['redirect']);
     }
 
-    public function testRejectRefusesEmptyActingTeamAndDeletesNothing(): void
+    public function testRejectRefusesEmptyActingTeam(): void
     {
         $offerRepo = self::createMock(TradeOfferRepositoryInterface::class);
         $offerRepo->method('getTradesByOfferId')->willReturn([['tradeofferid' => 1, 'trade_from' => 'Metros', 'trade_to' => 'Stars']]);

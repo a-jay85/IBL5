@@ -789,3 +789,22 @@ provenance: (discovered 2026-09-04 during #1956)
 
 **artifact destination:** `.claude/rules/trading-transcription.md` (example) (new file, in-repo).
 **provenance:** (discovered 2026-09-04 during #1957)
+### 15.33 Test Method Name Drift — Plan's Required Test Methods List Diverges from Branch
+
+**Location:** `ibl5/tests/Trading/TradeDecisionServiceTest.php` (method name)
+**class:** A plan's Required Test Methods list names a method that differs from the method actually committed in the branch, causing plan-fidelity review to flag a missing test that is present under a different name.
+**Occurrences:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/tests/Trading/TradeDecisionServiceTest.php:48` — `testRejectRefusesEmptyActingTeamAndDeletesNothing` in branch vs. `testRejectRefusesEmptyActingTeam` in plan's Required Test Methods list | yes | yes | fixed this pass (PR #1957) — method renamed to match plan |
+
+**Prevention ladder:**
+- rung 0: No existing gate checks test method names against a plan's Required Test Methods list.
+- rung 1: No existing gate to extend — plan files are not parsed by CI.
+- rung 2: A reminder in a `.claude/rules/` doc advising plan authors to verify test method names match the plan before committing. Low ROI for a rare class.
+- rungs 3–5: A CI check parsing plan Required Test Methods and validating against the test file is feasible but high-cost for an infrequent drift class.
+- **landing rung: no gate warranted** — the drift is caught by `/pr-ready` Phase 6 plan-fidelity review; the fix is a rename; the class does not recur frequently enough to justify a CI gate.
+
+**artifact destination:** n/a — no gate
+**provenance:** (discovered 2026-09-04 during #1957)

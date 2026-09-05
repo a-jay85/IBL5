@@ -1,6 +1,10 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
 last_verified: 2026-09-04
+last_verified: 2026-09-01
+last_verified: 2026-08-31
+last_verified: 2026-08-17
+last_verified: 2026-09-02
 ---
 
 # IBL5 Architecture Decision Records
@@ -46,6 +50,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0104](0104-verification-only-doc-refresh-auto-merge.md) | Verification-only doc refreshes may self-ship | Accepted | A docfix PR is released to auto-merge only when `bin/docfix-check-veronly` proves every changed file under `ibl5/docs/` carries only a strictly-advancing `last_verified:` date bump and, optionally, same-line numeric corrections; the release is a frontmatter flip in the seeded plan, not a merge-gate special case, and Phase 6.5's (9) safety verdict and (11) finding floor still gate the arm. |
 | [0118](0118-shell-wrapper-path-resolution-via-pythonpath.md) | Shell wrapper path resolution via `PYTHONPATH`, not `cd` | Accepted | A shell wrapper invoking a Python module exports `PYTHONPATH` and keeps the caller cwd, so caller-supplied relative paths keep resolving; a required `cd` must be preceded by absolutising every positional argument. Rung-4 authoring norm, not a mechanical gate. |
 | [0119](0119-entity-field-accessor-trait-split.md) | Entity field-accessor trait splits are not trait composition | Accepted | Narrows ADR-0001: a single-consumer trait carrying only one entity's own pure field reads is a file split, not composition. First applied to `Player`'s 66 field getters. |
+| [0114](0114-local-db-snapshot-freshness.md) | Local DB snapshot freshness | Accepted | Adds `ibl5/bin/db-sync-now` (lock, throttle, marker, `--from-backup`), a detached sim-hook in `bin/sim-recap-tick`, a main-stack guard in `bin/db-test-up`, and `bin/db-sync-cron-setup` for a nightly launchd restore. |
 
 ## When an ADR is Required
 

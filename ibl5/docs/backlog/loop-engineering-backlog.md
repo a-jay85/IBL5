@@ -77,6 +77,7 @@ last_verified: 2026-09-04
 | L48 | Planning pipeline prose coverage gap: code-block path expressions in `SKILL.md` are invisible to `bin/check-docs`, so they can diverge from `bin/plan-now`'s runtime slug derivation silently | ⬜ Open | 🟦 | S |
 | L49 | PR body `## Manual Testing` rotting step-ordinal + false coverage-type claim contradicts diff | ✅ fixed this pass | 🟦 | XS |
 | L50 | Three Phase 6 review notes from PR #1801: plan supersession (F3), undeclared scope (F4), stale comment (F5) | ✅ fixed this pass | 🟦 | XS |
+| L51 | Phase 6 notes from PR #1801 (second /pr-ready pass): missing Changes bullet (F4, fixed), carry-forward notes F1/F2/F5 | ✅ fixed this pass | 🟦 | XS |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -757,6 +758,34 @@ Landing rung: 1 (extend Phase 6.5 step 4) + rung 2 as supplemental documentation
 **provenance:** (discovered 2026-09-04 during #1801)
 
 **Status (2026-09-04):** ✅ fixed this pass — F3/F4 require no action; F5 stale parenthetical removed from `bin/test-path-filters:7` — 🟦.
+
+---
+
+### L51 Phase 6 notes from PR #1801 (second /pr-ready pass): missing Changes bullet (F4, fixed), carry-forward notes F1/F2/F5
+
+**class (F4):** a PR body `### Changes` bullet list that omits a file added by a prior Phase 6.5 remediation pass, because the PR body's bullet list is drafted at plan time and Phase 6.5 adds files after the fact.
+
+**class (F1, F2, F5) — n/a:** notes from this pass requiring no code fix — plan recipe superseded by master (F1), undeclared scope for loop-engineering-backlog.md added by the prior remediation pass (F2), shellcheck default severity differing from CI job enforcement (F5).
+
+**Occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #1801 — F4: `ibl5/docs/backlog/loop-engineering-backlog.md` +61 lines missing from `### Changes` bullets | yes | yes | fixed this pass |
+| 2 | PR #1801 — F1: plan recipe for ci-backlog.md Axis 6 superseded by master | n/a (forced by master state) | n/a | not fixed — no action needed |
+| 3 | PR #1801 — F2: loop-engineering-backlog.md undeclared scope from prior remediation pass | n/a (docs-only, additive) | n/a | not fixed — no action needed |
+| 4 | PR #1801 — F5: plan specifies bare `shellcheck` (emits SC2015 info); CI runs `--severity=warning` (suppresses info) | n/a (cosmetic; CI green) | n/a | not fixed — no action needed |
+| 5 | Prior pass — L50 F4: same class (undeclared scope in PR body) | yes | yes | not fixed — filed in L50 |
+
+**prevention_ladder (F4):** Phase 6.5 step 4 already requires reconciling body numeric stats against `git diff --numstat HEAD`; the gap is that the step does not also require a bullet-per-changed-file check. No new gate warranted — rung 2 (extend `.claude/skills/pr-ready/_phase65-remediation.md` step 4 to require bullet-list completeness) is sufficient and can be addressed in a future `/plan`.
+
+**prevention_ladder (F1, F2, F5):** no gate warranted — same reasoning as L50 for each.
+
+**artifact destination:** n/a — no gate.
+
+**provenance:** (discovered 2026-09-04 during #1801)
+
+**Status (2026-09-04):** ✅ fixed this pass — F4 missing bullet added via `gh pr edit`; F1/F2/F5 require no action — 🟦.
 
 ## Burn-down process
 

@@ -64,6 +64,15 @@
 # Whole-word DECIDE/TBD and the "subject to …" phrases ARE FP-free, so they stay.
 #
 # Plus a NEW conservative check the gates describe but never enforced:
+#   D  Draft phase drift        — `--draft` only; compares body `^## Phase|Step N`
+#                              headings against `Phase N`/`Step N` items inside the
+#                              `PLAN OUTLINE` scaffold comment; flags over-complete
+#                              only (body > scaffold); skips when the scaffold is
+#                              absent (SCAF=0). Draft mode runs this gate alone
+#                              because a draft has no frontmatter, so the
+#                              frontmatter-anchored gates — 13, [H], [T], [S] —
+#                              would all fire spuriously; draft mode exits 0/1 on
+#                              gate D alone.
 #   B  Security-surface discharge — a plan carrying '## Security-Surface Discharge'
 #                              (outside fences) must name **Invariant:**,
 #                              **Asserted by:** <path>Test.php, and **Not covered:**,
@@ -180,6 +189,7 @@
 #
 # Exit codes: 0 = clean, 1 = one or more violations (printed, prefixed by gate),
 #             2 = usage error / plan file missing.
+#             --draft exits 0/1 on gate D alone (phase-count drift).
 #
 # Bash 3.2 / macOS compatible: no mapfile, no declare -A; temp files collect
 # state. `shell=bash` keeps shellcheck's SC3xxx (sh-dialect) warnings quiet on
@@ -195,12 +205,22 @@ set -u
 export LC_ALL=C
 
 usage() {
-    echo "Usage: bin/check-plan [--print-critical-files] <plan-file>" >&2
+    echo "Usage: bin/check-plan [--print-critical-files] [--draft] <plan-file>" >&2
 }
 
 CF_PRINT_ONLY=0
 if [ "${1:-}" = "--print-critical-files" ]; then
     CF_PRINT_ONLY=1
+    shift
+fi
+
+# --draft: run ONLY gate [D] (phase-count drift) against an in-progress
+# sectioned-delivery draft, then exit. A draft has no line-1 YAML frontmatter
+# (its line 1 is the plan title), so the frontmatter-anchored gates — 13, [H],
+# [T], [S] — would all fire spuriously; draft mode never reaches them.
+DRAFT_MODE=0
+if [ "${1:-}" = "--draft" ]; then
+    DRAFT_MODE=1
     shift
 fi
 
@@ -248,6 +268,33 @@ trap 'rm -f "$VIOL_FILE" "$WARN_FILE" "$MATRIX_FILE" "$SEEN_FILE" "$GATE8_SEEN" 
 
 viol() { printf '%s\n' "$1" >> "$VIOL_FILE"; }
 warn() { printf '%s\n' "$1" >> "$WARN_FILE"; }
+
+# ---------------------------------------------------------------------------
+# Gate D: draft phase-count drift (--draft only, and the ONLY gate draft mode
+# runs). A sectioned-delivery architect commits to its turn-1 phase count; a
+# body that grew PAST the scaffold means it re-emitted work already written
+# under a new title. Over-complete is the failure. Under-complete (body <
+# scaffold) is a run still in progress or cut short — never flagged. No
+# scaffold at all (a pre-scaffold draft, ~43 of 81 in the historical corpus) is
+# skipped outright.
+# ---------------------------------------------------------------------------
+if [ "$DRAFT_MODE" = 1 ]; then
+    D_SCAF=$(awk '/<!-- PLAN OUTLINE/,/-->/' "$PLAN_FILE" \
+        | grep -cE '^[[:space:]]*[0-9]+\.[[:space:]]+(Phase|Step)[[:space:]]*[0-9]')
+    D_BODY=$(grep -cE '^##[[:space:]]+(Phase|Step)[[:space:]]*[0-9]' "$PLAN_FILE")
+    if [ "$D_SCAF" -gt 0 ] && [ "$D_BODY" -gt "$D_SCAF" ]; then
+        D_EXCESS=$(grep -nE '^##[[:space:]]+(Phase|Step)[[:space:]]*[0-9]' "$PLAN_FILE" \
+            | awk -v n="$D_SCAF" 'NR>n' | tr '\n' ';')
+        viol "[D] draft phase drift: $D_BODY body phases but the turn-1 scaffold declares $D_SCAF (over by $((D_BODY - D_SCAF))) — the scaffold is binding; fold the excess into the last declared phase as prose, do not add headings. Excess headings (line:heading): $D_EXCESS"
+    fi
+    if [ -s "$VIOL_FILE" ]; then
+        echo "check-plan: violations in $PLAN_FILE" >&2
+        cat "$VIOL_FILE" >&2
+        exit 1
+    fi
+    echo "check-plan: OK (draft mode, $D_BODY/$D_SCAF phases) ($PLAN_FILE)"
+    exit 0
+fi
 
 # --- Shared matrix-row cell extraction (gate V; mirrored by /post-plan Phase 5.0) ---
 # A matrix row is `| N | what | type | timing | location |`, optionally with a

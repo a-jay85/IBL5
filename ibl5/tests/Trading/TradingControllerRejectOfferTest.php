@@ -7,10 +7,12 @@ namespace Tests\Trading;
 use PHPUnit\Framework\TestCase;
 use Tests\WideUnit\Mocks\MockDatabase;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
+use Security\CsrfGuard;
 use Trading\Contracts\TradingServiceInterface;
 use Trading\Contracts\TradeOfferRepositoryInterface;
 use Trading\Contracts\TradeOfferInterface;
 use Trading\Contracts\TradingViewInterface;
+use Trading\Contracts\TradeDecisionServiceInterface;
 use Trading\Contracts\TradeExecutionServiceInterface;
 use Auth\Contracts\AuthServiceInterface;
 use Trading\TradingController;
@@ -18,10 +20,10 @@ use Trading\TradingController;
 /**
  * Tests for TradingController::rejectTradeOffer()
  *
- * All code paths in rejectTradeOffer() reach HtmxHelper::redirect() (or
- * loginBox()) which calls exit — full invocation tests require E2E coverage, so
- * these verify instantiation/interface compliance only. The reject-path IDOR
- * gate (Matrix #13) is asserted exit-free in
+ * The unauthenticated bail returns rather than exiting and is asserted exit-free
+ * here. Post-auth decision paths move to Trading\TradeDecisionService in the
+ * stacked unit authz-verdict-refactor-1b-trading-reject-service and are asserted
+ * exit-free there. The reject-path IDOR gate (Matrix #13) is asserted exit-free in
  * {@see TradeExecutionServiceTest::testAssertActingTeamIsPartyDistinguishesPartyFromNonParty()}.
  */
 class TradingControllerRejectOfferTest extends TestCase
@@ -31,10 +33,20 @@ class TradingControllerRejectOfferTest extends TestCase
     protected function setUp(): void
     {
         $this->mockDb = new MockDatabase();
+        $_SESSION = [];
+        $_POST = [];
+    }
+
+    protected function tearDown(): void
+    {
+        $_SESSION = [];
+        $_POST = [];
     }
 
     private function buildController(
         ?TradeOfferRepositoryInterface $offerRepo = null,
+        ?\Utilities\NukeCompat $nukeCompat = null,
+        ?TradeDecisionServiceInterface $decisionService = null,
     ): TradingController {
         return new TradingController(
             self::createStub(TradingServiceInterface::class),
@@ -42,10 +54,13 @@ class TradingControllerRejectOfferTest extends TestCase
             self::createStub(TradeOfferInterface::class),
             self::createStub(TradingViewInterface::class),
             self::createStub(TeamIdentityRepositoryInterface::class),
-            self::createStub(\Utilities\NukeCompat::class),
+            $nukeCompat ?? self::createStub(\Utilities\NukeCompat::class),
             $this->mockDb,
             self::createStub(TradeExecutionServiceInterface::class),
             self::createStub(AuthServiceInterface::class),
+            null,
+            null,
+            $decisionService,
         );
     }
 
@@ -56,5 +71,73 @@ class TradingControllerRejectOfferTest extends TestCase
             \Trading\Contracts\TradingControllerInterface::class,
             (array) class_implements($controller)
         );
+    }
+
+    public function testUnauthenticatedRejectShowsLoginAndDoesNotDelete(): void
+    {
+        // The auth gate fires before CSRF; this token is set only to keep the harness identical to the submit-path pin.
+        $token = CsrfGuard::generateRawToken('trade_reject');
+        $_POST['_csrf_token'] = $token;
+
+        $loginBoxCalled = false;
+        $nukeCompat = self::createStub(\Utilities\NukeCompat::class);
+        $nukeCompat->method('isUser')->willReturn(false);
+        $nukeCompat->method('loginBox')->willReturnCallback(function () use (&$loginBoxCalled): void {
+            $loginBoxCalled = true;
+        });
+
+        $offerRepo = self::createMock(TradeOfferRepositoryInterface::class);
+        $offerRepo->expects(self::never())->method('deleteTradeOffer');
+
+        $controller = $this->buildController(offerRepo: $offerRepo, nukeCompat: $nukeCompat);
+        $controller->rejectTradeOffer(null, ['offer' => '1', 'teamRejecting' => 'Stars', '_csrf_token' => $token]);
+
+        $this->assertTrue($loginBoxCalled);
+    }
+
+    public function testRejectDelegatesToDecisionServiceWithSessionTeam(): void
+    {
+        $token = CsrfGuard::generateRawToken('trade_reject');
+        $_POST['_csrf_token'] = $token;
+
+        $authService = self::createStub(AuthServiceInterface::class);
+        $authService->method('getUsername')->willReturn('gm_metros');
+
+        $teamIdentityRepo = self::createStub(TeamIdentityRepositoryInterface::class);
+        $teamIdentityRepo->method('getTeamnameFromUsername')->willReturn('Metros');
+
+        $decisionService = self::createMock(TradeDecisionServiceInterface::class);
+        $decisionService->expects(self::once())
+            ->method('reject')
+            ->with(5, 'Metros', 'Attacker Team', 'Stars')
+            ->willThrowException(new \RuntimeException('delegation_verified'));
+
+        $nukeCompat = self::createStub(\Utilities\NukeCompat::class);
+        $nukeCompat->method('isUser')->willReturn(true);
+
+        $controller = new \Trading\TradingController(
+            self::createStub(TradingServiceInterface::class),
+            self::createStub(TradeOfferRepositoryInterface::class),
+            self::createStub(TradeOfferInterface::class),
+            self::createStub(TradingViewInterface::class),
+            $teamIdentityRepo,
+            $nukeCompat,
+            $this->mockDb,
+            self::createStub(TradeExecutionServiceInterface::class),
+            $authService,
+            null,
+            null,
+            $decisionService,
+        );
+
+        try {
+            $controller->rejectTradeOffer(
+                'gm_metros',
+                ['offer' => '5', 'teamRejecting' => 'Attacker Team', 'teamReceiving' => 'Stars', '_csrf_token' => $token]
+            );
+            self::fail('Expected delegation exception was not thrown');
+        } catch (\RuntimeException) {
+            // ->with() verified the session team reached the authz slot, not the attacker
+        }
     }
 }

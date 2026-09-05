@@ -15,7 +15,7 @@ class LiveGit:
 
     def _run(self, *args: str, check: bool = True) -> str:
         proc = subprocess.run(["git", "-C", self.worktree, *args],
-                              capture_output=True, text=True)
+                              capture_output=True, text=True, errors="replace")
         if check and proc.returncode != 0:
             raise HarnessError("git", f"git {' '.join(args)}: {proc.stderr.strip()[:400]}")
         return proc.stdout
@@ -82,10 +82,10 @@ class LiveGit:
         onto origin/master. Conflict → abort, restore the tree, typed failure
         (fail closed: the skill fallback owns conflict judgment)."""
         proc = subprocess.run(["git", "-C", self.worktree, "rebase", base],
-                              capture_output=True, text=True)
+                              capture_output=True, text=True, errors="replace")
         if proc.returncode != 0:
             subprocess.run(["git", "-C", self.worktree, "rebase", "--abort"],
-                           capture_output=True, text=True)
+                           capture_output=True, text=True, errors="replace")
             raise HarnessError("rebase-conflict",
                                (proc.stderr or proc.stdout).strip()[:400])
 

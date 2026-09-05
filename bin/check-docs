@@ -223,11 +223,15 @@ function memoryDirForRepo(string $repoRoot): ?string
 /**
  * Drop repo-relative paths that git considers ignored (gitignored local files are
  * on-disk but never committed, so they must not participate in freshness tracking).
- * Fail-open: any git error returns $files unchanged — never silently lose coverage.
+ * Exit-status contract: 0 = some paths ignored, 1 = no paths ignored (a valid empty
+ * result, NOT an error). Anything else — including proc_close()'s -1 — means git
+ * itself failed and is raised as a RuntimeException carrying git's stderr, because a
+ * silently-degraded filter over-reports freshness coverage on files it never checked.
  * Memory files outside $root pass through unchanged.
  *
  * @param  list<string> $files Absolute paths (may include memory files outside $root).
  * @return list<string>
+ * @throws \RuntimeException
  */
 function filterGitignored(array $files, string $root): array
 {
@@ -241,23 +245,35 @@ function filterGitignored(array $files, string $root): array
     }
     $relPaths = array_map(static fn(string $f) => substr($f, strlen($prefix)), $repoFiles);
     $proc = proc_open(
-        ['git', '-C', $root, 'check-ignore', '--stdin'],
+        ['git', '-C', $root, 'check-ignore', '-z', '--stdin'],
         [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
         $pipes
     );
     if (!is_resource($proc)) {
         return $files;
     }
-    fwrite($pipes[0], implode("\n", $relPaths));
+    fwrite($pipes[0], implode("\0", $relPaths));
     fclose($pipes[0]);
     $raw = stream_get_contents($pipes[1]);
+    $err = stream_get_contents($pipes[2]);
     fclose($pipes[1]);
     fclose($pipes[2]);
-    proc_close($proc);
-    if ($raw === false || trim($raw) === '') {
+    $exit = proc_close($proc);
+    if ($exit !== 0 && $exit !== 1) {
+        throw new \RuntimeException(sprintf(
+            'git check-ignore failed in %s (exit %d): %s',
+            $root,
+            $exit,
+            trim((string) $err) !== '' ? trim((string) $err) : '(no stderr output)'
+        ));
+    }
+    if ($raw === false || $raw === '') {
         return $files;
     }
-    $ignored = array_flip(array_filter(array_map('trim', explode("\n", $raw))));
+    $ignored = array_flip(array_filter(
+        explode("\0", $raw),
+        static fn(string $p): bool => $p !== ''
+    ));
     if (empty($ignored)) {
         return $files;
     }
@@ -1483,6 +1499,108 @@ function selfTestChangedDocPaths(): int
 }
 
 /**
+ * Fixtures for filterGitignored()'s subprocess contract, in a throwaway git repo under
+ * sys_get_temp_dir() (never this repo). Peer of selfTestRetiredFigures() and
+ * selfTestChangedDocPaths(). Both failure modes here are silent: a C-quoted non-ASCII
+ * path misses the isset() lookup and an unchecked git exit degrades the filter to a
+ * no-op — in both cases the gate prints "passed" over files it never filtered.
+ */
+function selfTestGitignoreFilter(): int
+{
+    $failed = 0;
+    $total  = 0;
+
+    // Case A: non-ASCII path in ignored dir
+    $total++;
+    $tmpA = sys_get_temp_dir() . '/check-docs-gitignore-selftest-' . getmypid();
+    exec('rm -rf ' . escapeshellarg($tmpA) . ' && mkdir -p ' . escapeshellarg($tmpA . '/ign/café'));
+    exec('git init -q ' . escapeshellarg($tmpA));
+    exec('git -C ' . escapeshellarg($tmpA) . ' config user.email test@test.com && git -C ' . escapeshellarg($tmpA) . ' config user.name Test');
+    file_put_contents($tmpA . '/ign/café/ñ.md', '');
+    file_put_contents($tmpA . '/ok.md', '');
+    file_put_contents($tmpA . '/.gitignore', "ign/\n");
+    $resultA = filterGitignored([$tmpA . '/ign/café/ñ.md', $tmpA . '/ok.md'], $tmpA);
+    if ($resultA === [$tmpA . '/ok.md']) {
+        echo "  PASS: A — non-ASCII ignored path filtered\n";
+    } else {
+        echo "  FAIL: A — expected [ok.md] got " . json_encode($resultA) . "\n";
+        $failed++;
+    }
+    exec('rm -rf ' . escapeshellarg($tmpA));
+
+    // Case B: path with trailing space in ignored dir
+    $total++;
+    $tmpB = sys_get_temp_dir() . '/check-docs-gitignore-selftest-' . getmypid() . 'b';
+    exec('rm -rf ' . escapeshellarg($tmpB) . ' && mkdir -p ' . escapeshellarg($tmpB . '/ign'));
+    exec('git init -q ' . escapeshellarg($tmpB));
+    exec('git -C ' . escapeshellarg($tmpB) . ' config user.email test@test.com && git -C ' . escapeshellarg($tmpB) . ' config user.name Test');
+    // Create file whose repo-relative path ends in a space
+    file_put_contents($tmpB . '/ign/trim-probe.md ', '');
+    file_put_contents($tmpB . '/ok.md', '');
+    file_put_contents($tmpB . '/.gitignore', "ign/\n");
+    $resultB = filterGitignored([$tmpB . '/ign/trim-probe.md ', $tmpB . '/ok.md'], $tmpB);
+    if ($resultB === [$tmpB . '/ok.md']) {
+        echo "  PASS: B — whitespace-bearing ignored path filtered\n";
+    } else {
+        echo "  FAIL: B — expected [ok.md] got " . json_encode($resultB) . "\n";
+        $failed++;
+    }
+    exec('rm -rf ' . escapeshellarg($tmpB));
+
+    // Case C: git repo with no .gitignore, all files pass through
+    $total++;
+    $tmpC = sys_get_temp_dir() . '/check-docs-gitignore-clean-' . getmypid();
+    exec('rm -rf ' . escapeshellarg($tmpC) . ' && mkdir -p ' . escapeshellarg($tmpC));
+    exec('git init -q ' . escapeshellarg($tmpC));
+    exec('git -C ' . escapeshellarg($tmpC) . ' config user.email test@test.com && git -C ' . escapeshellarg($tmpC) . ' config user.name Test');
+    file_put_contents($tmpC . '/a.md', '');
+    file_put_contents($tmpC . '/b.md', '');
+    try {
+        $resultC = filterGitignored([$tmpC . '/a.md', $tmpC . '/b.md'], $tmpC);
+        if ($resultC === [$tmpC . '/a.md', $tmpC . '/b.md']) {
+            echo "  PASS: C — exit 1 (nothing ignored) returns all inputs unchanged\n";
+        } else {
+            echo "  FAIL: C — expected both files back, got " . json_encode($resultC) . "\n";
+            $failed++;
+        }
+    } catch (\Throwable $e) {
+        echo "  FAIL: C — unexpected throw: " . $e->getMessage() . "\n";
+        $failed++;
+    }
+    exec('rm -rf ' . escapeshellarg($tmpC));
+
+    // Case D: non-git dir must throw RuntimeException with exit code and message
+    $total++;
+    $tmpD = sys_get_temp_dir() . '/check-docs-gitignore-nogit-' . getmypid();
+    exec('rm -rf ' . escapeshellarg($tmpD) . ' && mkdir -p ' . escapeshellarg($tmpD));
+    file_put_contents($tmpD . '/x.md', '');
+    try {
+        filterGitignored([$tmpD . '/x.md'], $tmpD);
+        echo "  FAIL: D — expected RuntimeException but nothing was thrown\n";
+        $failed++;
+    } catch (\RuntimeException $e) {
+        $msg = $e->getMessage();
+        if (str_contains($msg, '128') && str_contains($msg, 'not a git repository')) {
+            echo "  PASS: D — git failure throws RuntimeException with exit code and message\n";
+        } else {
+            echo "  FAIL: D — RuntimeException message missing '128' or 'not a git repository': " . $msg . "\n";
+            $failed++;
+        }
+    } catch (\Throwable $e) {
+        echo "  FAIL: D — wrong exception type " . get_class($e) . ": " . $e->getMessage() . "\n";
+        $failed++;
+    }
+    exec('rm -rf ' . escapeshellarg($tmpD));
+
+    if ($failed === 0) {
+        echo "\nselfTestGitignoreFilter: {$total}/{$total} cases passed.\n";
+        return 0;
+    }
+    echo "\nselfTestGitignoreFilter: {$failed}/{$total} cases FAILED.\n";
+    return 1;
+}
+
+/**
  * Resolved (✅/🚫) findings must not remain as rows in a per-axis table — they collapse
  * to the axis's `> ✅ resolved (N): …` summary line with evidence moved to the sibling
  * archive (ibl5/docs/backlog/README.md § Archiving an item).
@@ -1507,6 +1625,27 @@ function checkMaintenanceResolved(string $repoRoot): array
         $rel,
         $n
     )] : [];
+}
+
+function checkSkillDraftPlaceholder(string $repoRoot): array
+{
+    $issues = [];
+    foreach (glob($repoRoot . '/.claude/skills/*/SKILL.md') ?: [] as $file) {
+        $lines = file($file, FILE_IGNORE_NEW_LINES);
+        if ($lines === false) continue;
+        $inFence = false;
+        foreach ($lines as $i => $line) {
+            if (preg_match('/^```/', $line)) {
+                $inFence = !$inFence;
+                continue;
+            }
+            if ($inFence && preg_match('/^DRAFT=\$\(/', $line)) {
+                $rel = ltrim(str_replace($repoRoot, '', $file), '/');
+                $issues[] = "{$rel}:" . ($i + 1) . " — DRAFT= uses command substitution; use an inert <slug> placeholder instead";
+            }
+        }
+    }
+    return $issues;
 }
 
 // --- main ---
@@ -1540,11 +1679,13 @@ foreach (array_slice($argv, 1) as $arg) {
             $opts['staleness_report'] = true;
             break;
         case '--self-test':
-            // Run both suites unconditionally (no short-circuit) so one failure
-            // never hides the other's result.
+            // Run all suites unconditionally (no short-circuit) so one failure
+            // never hides another's result.
             $rc = selfTestRetiredFigures();
             echo "\n";
-            exit(max($rc, selfTestChangedDocPaths()));
+            $rc = max($rc, selfTestChangedDocPaths());
+            echo "\n";
+            exit(max($rc, selfTestGitignoreFilter()));
         case '--help':
         case '-h':
             echo usage();
@@ -1664,6 +1805,15 @@ $maintenanceIssues = checkMaintenanceResolved($root);
 if ($maintenanceIssues !== []) {
     echo "FAIL maintenance-backlog resolved rows\n";
     foreach ($maintenanceIssues as $issue) {
+        echo "     - {$issue}\n";
+    }
+    $failures++;
+}
+
+$skillDraftIssues = checkSkillDraftPlaceholder($root);
+if ($skillDraftIssues !== []) {
+    echo "FAIL skill DRAFT= command-substitution\n";
+    foreach ($skillDraftIssues as $issue) {
         echo "     - {$issue}\n";
     }
     $failures++;

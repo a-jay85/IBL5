@@ -64,6 +64,30 @@ test.describe('Forged CSRF token is rejected', () => {
     expect(location).not.toContain('offer_sent');
   });
 
+  test('rejecttradeoffer.php with forged token → redirected to Trading error, offer not deleted', async ({
+    request,
+  }) => {
+    const response = await request.post(
+      '/ibl5/modules/Trading/rejecttradeoffer.php',
+      {
+        form: {
+          _csrf_token: forgedToken(),
+          offer: '999999',
+          teamRejecting: 'Metros',
+          teamReceiving: 'Stars',
+        },
+        maxRedirects: 0,
+      },
+    );
+    expect([301, 302, 303]).toContain(response.status());
+    const location = response.headers()['location'] ?? '';
+    expect(location).toContain('name=Trading');
+    expect(location).toContain('Invalid');
+    // Corroborating sanity pin: the positive 'Invalid' assertion above is the primary ordering evidence; this confirms the offer lookup never ran.
+    expect(location).not.toContain('result=already_processed');
+    expect(location).not.toContain('result=trade_rejected');
+  });
+
   test('extension.php with forged token → redirected to index.php, contract untouched', async ({
     request,
   }) => {

@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+set -euo pipefail
+
+# Prune stale per-SHA VR gallery directories from the gh-pages checkout.
+# Operates on cwd (the gh-pages checkout) and never clones.
+# A fresh checkout resets filesystem mtimes, so `find -mtime` is unreliable;
+# derive each per-SHA dir's age from its newest commit date instead.
+
+usage() {
+  cat >&2 <<'EOF'
+Usage: prune-vr-galleries [--dry-run] [--cutoff-days N]
+
+Options:
+  --dry-run        Report only, never git rm.
+  --cutoff-days N  Age threshold in whole days (default: 7). Must be a positive integer.
+
+Directories matching ./<40-hex-char SHA> whose most-recent commit date is
+older than N days are pruned. Directories with no git history are skipped.
+EOF
+}
+
+dry_run=0
+days=7
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run)
+      dry_run=1
+      shift
+      ;;
+    --cutoff-days)
+      shift
+      N="${1:-}"
+      case "$N" in
+        ''|*[!0-9]*)
+          usage
+          exit 1
+          ;;
+      esac
+      if ! [ "$N" -gt 0 ]; then
+        usage
+        exit 1
+      fi
+      days="$N"
+      shift
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+now=$(date +%s)
+cutoff=$(( now - days * 86400 ))
+
+removed=0
+
+while IFS= read -r dir; do
+  b="${dir#./}"
+  # \{40\} interval notation is unreliable across find implementations (BSD vs GNU emacs mode);
+  # filter in bash instead — same semantics, portable everywhere.
+  [ "${#b}" -eq 40 ] || continue
+  case "$b" in (*[!0-9a-f]*) continue ;; esac
+  ts=$(git log -1 --format=%ct -- "$dir")
+  if [[ -z "$ts" ]]; then
+    echo "WARN: no git history for $dir, skipping" >&2
+    continue
+  fi
+  age=$(( (now - ts) / 86400 ))
+  if [ "$ts" -lt "$cutoff" ]; then
+    removed=$(( removed + 1 ))
+    if [[ "$dry_run" -eq 1 ]]; then
+      echo "WOULD PRUNE: $dir (age=${age}d)"
+    else
+      git rm -rq "$dir"
+    fi
+  else
+    if [[ "$dry_run" -eq 1 ]]; then
+      echo "KEEP: $dir (age=${age}d)"
+    else
+      echo "KEEP: $dir (age=${age}d)" >&2
+    fi
+  fi
+done < <(find . -mindepth 1 -maxdepth 1 -type d)
+
+echo "$removed"

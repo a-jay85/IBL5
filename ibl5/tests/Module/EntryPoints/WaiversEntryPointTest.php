@@ -47,4 +47,75 @@ class WaiversEntryPointTest extends ModuleEntryPointTestCase
 
         $this->assertNotEmpty($output);
     }
+
+    public function testDisplayParameterSelectsRequestedTab(): void
+    {
+        $this->authenticateAs('testgm');
+        $this->seedSeasonMocks();
+        $this->mockDb->onQuery('auth_users', [
+            ['user_id' => 1, 'username' => 'testgm', 'user_email' => 'test@test.com'],
+        ]);
+        $this->mockDb->setMockTeamData([self::fullTeamData()]);
+        $this->mockDb->setMockData([]);
+
+        $output = $this->runModule('Waivers', ['display' => 'total_s'], [], ['user' => $GLOBALS['user']]);
+
+        $this->assertStringContainsString('class="ibl-tab ibl-tab--active" data-display="total_s"', $output);
+    }
+
+    public function testAbsentDisplayParameterDefaultsToRatingsTab(): void
+    {
+        $this->authenticateAs('testgm');
+        $this->seedSeasonMocks();
+        $this->mockDb->onQuery('auth_users', [
+            ['user_id' => 1, 'username' => 'testgm', 'user_email' => 'test@test.com'],
+        ]);
+        $this->mockDb->setMockTeamData([self::fullTeamData()]);
+        $this->mockDb->setMockData([]);
+
+        $output = $this->runModule('Waivers', [], [], ['user' => $GLOBALS['user']]);
+
+        $this->assertStringContainsString('class="ibl-tab ibl-tab--active" data-display="ratings"', $output);
+    }
+
+    public function testEmptyDisplayParameterSelectsNoActiveTab(): void
+    {
+        $this->authenticateAs('testgm');
+        $this->seedSeasonMocks();
+        $this->mockDb->onQuery('auth_users', [
+            ['user_id' => 1, 'username' => 'testgm', 'user_email' => 'test@test.com'],
+        ]);
+        $this->mockDb->setMockTeamData([self::fullTeamData()]);
+        $this->mockDb->setMockData([]);
+
+        $output = $this->runModule('Waivers', ['display' => ''], [], ['user' => $GLOBALS['user']]);
+
+        $this->assertStringNotContainsString('ibl-tab--active', $output);
+    }
+
+    public function testDisplayParameterReachesRenderedOutputThroughHttpRequest(): void
+    {
+        $this->authenticateAs('testgm');
+        $this->seedSeasonMocks();
+        $this->mockDb->onQuery('auth_users', [
+            ['user_id' => 1, 'username' => 'testgm', 'user_email' => 'test@test.com'],
+        ]);
+        $this->mockDb->setMockTeamData([self::fullTeamData()]);
+        $this->mockDb->setMockData([]);
+
+        $first = $this->runModule('Waivers', ['display' => 'ratings'], [], ['user' => $GLOBALS['user']]);
+
+        $this->seedSeasonMocks();
+        $this->mockDb->onQuery('auth_users', [
+            ['user_id' => 1, 'username' => 'testgm', 'user_email' => 'test@test.com'],
+        ]);
+        $this->mockDb->setMockTeamData([self::fullTeamData()]);
+        $this->mockDb->setMockData([]);
+
+        $second = $this->runModule('Waivers', ['display' => 'total_s'], [], ['user' => $GLOBALS['user']]);
+
+        $this->assertNotEmpty($first);
+        $this->assertNotEmpty($second);
+        $this->assertNotSame($first, $second, 'display parameter must reach rendered output through the injected request');
+    }
 }

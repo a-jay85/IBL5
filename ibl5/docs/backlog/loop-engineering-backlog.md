@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-09-04
+last_verified: 2026-09-05
 ---
 
 # Loop-Engineering Backlog
@@ -66,7 +66,7 @@ last_verified: 2026-09-04
 | L37 | PR body declares only the plan's named files; changes the plan never named ship undeclared, so a reviewer cannot separate intended scope from drift | ⬜ Open | 🟦 | S |
 | L38 | Headless CI watcher killed: `local_bash` not awaited by wind-down sweep — phantom success under `claude -p` | ✅ Shipped #2026 | 🟦 | S |
 | L39 | Autonomous PR body omits plan-deliverable moot-at-branch-cut explanation and asserts unchecked test coverage | ⬜ Open | 🟥 | S |
-| L40 | Compiled post-plan harness crashes on any PR containing a binary file (`git diff` decoded as strict UTF-8) | ⬜ Open | 🟥 | S |
+| L40 | Compiled post-plan harness crashes on any PR containing a binary file (`git diff` decoded as strict UTF-8) | ✅ Shipped #2112 | 🟥 | S |
 | L41 | Plan Verification Matrix rows can ship unrealised — nothing checks a plan's declared assertions against the tests actually delivered | ⬜ Open | 🟥 | S |
 | L42 | Autonomous-loop PR ships stale line citations, undeclared plan substitution, unmentioned diff file, and duplicate backlog ID | ⬜ Open | 🟦 | S |
 | L43 | Autonomous-loop doc-fix PR body contains stale claims and inconsistent ADR authoring format after post-review commit | ⬜ Open | 🟦 | S |
@@ -74,7 +74,9 @@ last_verified: 2026-09-04
 | L45 | `/pr-ready` Phase 2 squashes load-bearing commit boundaries when `auto_merge: false`; PR body SHAs go stale after force-push | ⬜ Open | 🟥 | S |
 | L46 | Queued matrix-less plan with non-canonical `impl_model:` alias slips all pre-queue gates; runner disposes on first nightly run | ⬜ Open | 🟦 | S |
 | L47 | `/pr-ready` folds a recoverable pre-push-hook rebase rejection into the terminal `PUSH FAILED` verdict, stranding the Phase 6.5 remediation commit locally | ⬜ Open | 🟥 | M |
-| L48 | Planning pipeline prose coverage gap: code-block path expressions in `SKILL.md` are invisible to `bin/check-docs`, so they can diverge from `bin/plan-now`'s runtime slug derivation silently | ⬜ Open | 🟦 | S |
+| L48 | Planning pipeline prose coverage gap: code-block path expressions in `SKILL.md` are invisible to `bin/check-docs`, so they can diverge from `bin/plan-now`'s runtime slug derivation silently | ✅ Implemented (2026-09-04) | 🟦 | S |
+| L49 | `/pr-ready` Phase 6.5 files backlog rows with non-canonical status glyphs and automouse values, making them invisible to open-work filters | ⬜ Open | 🟥 | S |
+| L50 | `bin/pr-cycle` logs gate nominees as "excluded this run" but then orders and readies them (`--gate-edges /dev/null` re-admits every nominee) | ⬜ Open | 🟦 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -430,20 +432,7 @@ Rung 1 does not require the `meta-tooling-bar.md` extend-before-add conditions (
 
 
 ### L40 Compiled post-plan harness crashes on any PR containing a binary file (`git diff` decoded as strict UTF-8)
-
-*(discovered 2026-09-01 while shipping #2056, whose diff contained the binary artifact `ibl5/data/finals2008-g4.rec`)*
-
-**Location:** `tools/postplan-harness/harness/adapters/gitad.py:18` — `_run()` calls `subprocess.run([...], capture_output=True, text=True)` with no `errors=` argument. The crash surfaces at `gitad.py:42` (`diff_vs_base`), which shells out to `git diff <merge-base>`. Same unguarded `text=True` at six other call sites: `gitad.py:85`, `gitad.py:88`, `ciwatch.py:71`, `llm.py:68`, `ghad.py:116`, `verify.py:42`. (`llm.py:58` is the only place in the harness that passes `errors=` at all.) Regression-test host: `tools/postplan-harness/tests/test_gitad_live.py`.
-
-**Problem:** `text=True` decodes the child's stdout as strict UTF-8. `git diff` emits raw bytes for a binary file, so any diff touching one raises `UnicodeDecodeError` and kills the compiled harness *before any phase runs*. Observed 2026-09-01 at 18:19: `UnicodeDecodeError: 'utf-8' codec can't decode byte 0x9e in position 23462: invalid start byte`, traceback `gitad.py:42 diff_vs_base` → `gitad.py:17 _run`. This is not a corner case — it fires on **every** PR whose diff contains a binary file, which is the entire boxscore-restore class of work (`.rec` artifacts) plus any image, font, or fixture blob.
-
-The failure is quiet because the two-engine design absorbs it: the harness exits non-zero, `should_fallback()` returns true for any rc except 0 and 3, and `bin/post-plan-now` silently hands off to the slower Sonnet `/post-plan` skill. Work still completes, so nothing alarms — but the run costs ~40 min instead of a few, and the fallback agent reasons without the harness's guardrails. In #2056 it invented a `@codeCoverageIgnore` annotation with zero precedent anywhere in the repo, which did not clear the coverage gate anyway (83.98% → 84.24%, minimum 84.46%); the fix had to be reverted by hand and replaced with the repo's actual precedent (lowering `coverage-baseline.json`, as in #2001 and #2022).
-
-**Suggested direction:** Add `errors="replace"` to `_run()` in `gitad.py` — mojibake in a diff string the harness only pattern-matches over is strictly better than a crash. Then sweep the other six `text=True` sites for the same guard, since `git log`, `gh` output, and CI logs can all carry non-UTF-8 bytes. Regression test in `tests/test_gitad_live.py`: create a temp repo, commit a file containing byte `0x9e`, and assert `diff_vs_base()` returns a string rather than raising.
-
-**Risk if untouched:** Every binary-touching PR silently loses the fast, guardrailed engine and falls through to an unconstrained agent — the expensive path, taken invisibly, with lower-quality output. Because the fallback usually *succeeds*, there is no signal that the primary engine has been dead for that whole class of PR.
-
-**Status (2026-09-01):** ⬜ Open — 🟥 (self-contained fix in a dev-tooling adapter; no user-facing surface, no gate weakened).
+➜ L40 Compiled post-plan harness crashes on any PR containing a binary file (`git diff` decoded as strict UTF-8) — ✅ Implemented (2026-09-05): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ---
 
@@ -483,6 +472,9 @@ not add backticks or markdown links to a row.
 | 2026-08-29 | #2023 | class: an unconditional detection check in an audit class is nested inside a fail-open guard conditioned on data availability, causing the check to silently skip when the guard condition is false instead of running independently | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan adding or modifying a detection check in an audit class that has a fail-open guard must verify the check fires even when the guard-controlling condition is false (e.g., ScheduleReconciliationAudit with empty schedule index) | prior: -- |
 | 2026-09-01 | #2054 | class: a two-phase CLI tool that collects human judgment for a set of items does not short-circuit when the set is empty, forcing an unnecessary second invocation and opening a failure window in the inter-invocation gap | routed to: Rung 4 - rule doc in .claude/rules/ stating that two-invocation CLI scripts must implement the trivial bypass when invocation 1 produces an empty judgment set | prior: -- |
 | 2026-09-04 | #2087 | class: Shell script wrapper that cd's to its module root before invoking Python invalidates caller-provided relative path arguments, silently breaking callers that pass repo-relative paths | routed to: Rung 4 - .claude/rules/shell-wrapper-path-resolution.md | prior: -- |
+| 2026-09-04 | #2092 | class: a plan-level portability claim for a shell script uses find -regex with \{n\} interval notation, verified only on macOS BSD find (where BRE supports \{n\}), not on Ubuntu GNU find (which uses emacs regex type by default and does not treat \{n\} as an interval) — the regex silently matches nothing in CI, causing the script to find no directories and skip its entire body without error | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan introducing a find -regex pattern claiming cross-platform portability between macOS and Ubuntu must carry a CI-run verification row demonstrating the regex matches on the Ubuntu runner, OR must use bash-level character-class and length filtering instead of find interval expressions | prior: -- |
+| 2026-09-05 | #2117 | class: proc_open subprocess contract violations (unchecked proc_close exit, undrained stderr, NUL-unsafe delimiter) shipped undetected when a plan adds or modifies a proc_open call site without requiring subprocess contract verification | routed to: Rung 1 (partial, shipped in #2117) - BanProcOpenUncheckedExitRule in ibl5/phpstan-rules/ enforces checked proc_close exit; broader contract (stderr drain, NUL-delimiter correctness) routed to Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger) | prior: -- |
+| 2026-09-05 | #2121 | class: new always-loaded rule doc committed to wrong directory tree during implementation — bin/check-rules-byte-budget scans only the correct $RULES_DIR, so the misplaced file passes the gate silently until manually relocated | routed to: Rung 4 - note in .claude/rules/doc-freshness.md clarifying always-loaded .claude/rules/*.md files must be created at the exact repo-root path, not inside any subdirectory (e.g. not ibl5/.claude/rules/) | prior: -- |
 ```
 
 ---
@@ -673,28 +665,57 @@ Landing rung: **1** (extend `scripts/push.sh`'s verdict vocabulary plus its two 
 
 ---
 
-### L48 Planning pipeline prose coverage gap: code-block path expressions in `SKILL.md` are invisible to `bin/check-docs`, so they can diverge from `bin/plan-now`'s runtime slug derivation silently
+### L48 Planning pipeline prose coverage gap: code-block path expressions in `SKILL.md` are invisible to `bin/check-docs`
+➜ L48 Planning pipeline prose coverage gap: code-block path expressions in `SKILL.md` are invisible to `bin/check-docs`, so they can diverge from `bin/plan-now`'s runtime slug derivation silently — ✅ Implemented (2026-09-04): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
-**class:** Any shell code block inside `.claude/skills/plan/SKILL.md` that constructs a file path is invisible to `bin/check-docs`'s dead-reference checker, because the check operates on prose tokens matching `bin/<name>` / `ibl5/<path>` / `.claude/<path>` patterns — not on dynamic expressions inside fenced blocks. A path expression that silently produces the wrong value causes the gate to read a nonexistent file and exit 0 without firing.
+### L49 `/pr-ready` Phase 6.5 files backlog rows with non-canonical status glyphs and automouse values
 
-**Immediate instance fixed in PR #1946:** `SKILL.md` Step 5 pre-finalize drift check derived the draft path via `$(git rev-parse --abbrev-ref HEAD)`. On the dominant `bin/plan-now` path the branch is `master`, so the check silently read `$HOME/claude-plans/.drafts/master.draft.md` (nonexistent), exiting 0 as "no scaffold found" and never detecting drift. Fixed by substituting the `<slug>` placeholder already established earlier in Step 5.
+**class:** A `/pr-ready` Phase 6.5 remediation filing using non-canonical status glyphs (`🔵 filed`) and automouse values (`✗`) outside the documented five-glyph set, causing filed rows to be invisible to open-work filters and readers relying on the canonical taxonomy.
 
-**Prevention gap.** `bin/check-docs` explicitly skips paths containing shell variable syntax (`$FOO/bar`). Dynamic expressions inside code fences are not covered. A PR that changes a path expression in a SKILL.md code block passes all CI gates while quietly introducing a runtime divergence.
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/docs/backlog/maintenance-backlog.md:682` — row 15.31, Status and Automouse columns | yes | was live; fixed this pass | fixed this pass |
+| 2 | `ibl5/docs/backlog/e2e-backlog.md:233` — row E15, Status and Automouse columns | yes | was live; fixed this pass | fixed this pass |
+| 3 | `ibl5/docs/backlog/maintenance-backlog.md:28` — roll-up total not updated when row 15.31 was added | yes (related filing defect — stale count) | was live; fixed this pass | fixed this pass |
 
 **prevention_ladder:**
 
-- rung 0 — no existing gate covers this surface.
-- rung 1 — extend `bin/check-docs` (or add a narrow `bin/check-plan-skill-paths` (example)) to grep fenced blocks in `SKILL.md` for `DRAFT=` assignments and assert the path uses the `<slug>` placeholder, not a `$(git rev-parse ...)` expression. Structural grep, no behavioral execution required. Effort: S.
-- rung 2 — a rule doc under `.claude/rules/`: useful but not enforcement.
-- rung 3 — PHPStan: not applicable (shell/markdown).
-- rung 4 — a CI gate extension: `bin/test-check-plan` already covers the path-not-found case (`gateD-no-path-exits-2`); a wrong-but-present path cannot be caught without knowing the expected slug — rung 1 is the natural landing.
-- rung 5 — a new hook: not warranted per `meta-tooling-bar.md` (no distinct trigger; a `bin/check-docs` extension is the natural host).
+- rung 0 — no existing gate validates status glyph values of new backlog rows.
+- rung 1 — `bin/check-docs` could be extended to grep new `| <ID> |` rows added by the diff and validate Status and Automouse column values against the canonical set in `ibl5/docs/backlog/README.md`. Effort: S.
+- rung 2 — add an explicit note to `.claude/skills/fix-and-prevent/_remediation.md` step 4 specifying the five canonical status glyphs (`⬜ Open`, `◑ Partial`, `📋 Planned`, `✅ Done`, `🚫 Declined`) and canonical automouse values (`🟩`/`🟦`/`🟨`/`🟥`/`—`). Cheaper than a CI gate and catches the defect at write time. Effort: XS.
+- rung 3 — not applicable (markdown surface; PHPStan does not parse `.md` files).
+- rung 4 — CI gate via extended `bin/check-docs`: possible but rung 2 is cheaper and faster.
+- rung 5 — a new hook: not warranted per `meta-tooling-bar.md` (no distinct trigger event; rung 2 is the natural landing).
 
-Landing rung: **1** (extend `bin/check-docs` or add a narrow lint for `DRAFT=` expressions in SKILL.md fenced blocks).
+Landing rung: **2** — add an explicit note to `.claude/skills/fix-and-prevent/_remediation.md` step 4 before the "Bump that file's `last_verified:`" instruction, specifying canonical status glyphs and automouse values.
 
-**artifact destination:** `bin/check-docs` or a new `bin/check-plan-skill-paths` (example) (in-repo)
+**artifact destination:** `.claude/skills/fix-and-prevent/_remediation.md` step 4 (in-repo)
 
-**provenance:** (discovered 2026-09-04 during PR #1946 plan-intent review)
+**provenance:** (discovered 2026-09-04 during #1956)
+
+---
+
+### L50 `bin/pr-cycle` logs gate nominees as "excluded this run" but then orders and readies them
+
+**class:** A log line that states a disposition the code does not apply — the worker prints `excluded this run (gate nominee, unjudged)` for every `### #N` nominee in `bin/pr-attack --gate-candidates` output, then calls `bin/pr-attack --work <WORK> --gate-edges /dev/null`, which is the *judged-empty* form: every nominee is re-admitted as orderable with no gate edges. The first live run (2026-09-05, `/tmp/pr-cycle-20260905-023625-80966.log`) printed seven "excluded" lines and then readied #2108, the first one on that list.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/pr-cycle` — the `excluded this run (gate nominee, unjudged)` echo inside the nominee loop, followed by the `--gate-edges /dev/null` re-run | yes | live — fires on every run with gate nominees | ⬜ Open |
+
+**Why it matters:** The plan (`~/claude-plans/pr-cycle-driver.md`) said nominees are excluded for the run; the implementation orders them unjudged. Either is a defensible overnight policy — arming stays fail-closed in `bin/pr-triage`, and a gate PR merged out of order lands the affected PR in BLOCKED-CHECK for the human rather than merging it wrong. But the log must not lie: a reader debugging a surprising merge order will trust "excluded" and look elsewhere.
+
+**Fix (pick one, S):**
+- Reword to `ordered with no gate edges (gate nominee, unjudged)` and say so in the usage header — matches what the code does today; or
+- Actually exclude: pass each nominee to `bin/pr-attack` as excluded (or filter them from `tried`/pick) so the log and behavior agree, at the cost of fewer merges per night.
+
+The static-guard case in `bin/test-pr-cycle` should pin whichever wording lands, so the two cannot drift again.
+
+**provenance:** (discovered 2026-09-05 during the first live `bin/pr-cycle --go` run, right after #2081 merged)
 
 ---
 

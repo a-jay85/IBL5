@@ -1,10 +1,12 @@
 ---
 description: Playwright E2E testing rules, Docker requirements, and actionability pitfalls.
 paths: ibl5/tests/e2e/**/*.ts
-last_verified: 2026-09-04
+last_verified: 2026-09-05
 ---
 
 # Playwright E2E Testing Rules
+
+Production-learned pitfalls (CSRF/session isolation, hx-boost waits, PRG `waitForURL` races, selector clashes, seed traps) live in the companion `playwright-gotchas.md`, loaded on the same paths.
 
 ## Commands
 

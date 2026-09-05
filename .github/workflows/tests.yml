@@ -911,6 +911,8 @@ jobs:
         run: bin/test-backlog-open
       - name: bin/test-adr-check
         run: bin/test-adr-check
+      - name: bin/test-check-docs
+        run: bin/test-check-docs
       - name: bin/test-check-numbering
         run: bin/test-check-numbering
       - name: bin/test-postplan-arm-conditions
@@ -969,6 +971,8 @@ jobs:
         run: bin/test-automouse-disarm
       - name: bin/test-bun-audit-triage
         run: bin/test-bun-audit-triage
+      - name: bin/test-prune-eligibility
+        run: bin/test-prune-eligibility
       - name: bin/test-scrub-log-credentials
         run: bin/test-scrub-log-credentials
       - name: bin/test-db-query-routing

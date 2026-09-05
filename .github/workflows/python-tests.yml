@@ -44,5 +44,4 @@ jobs:
         run: |
           python -m pytest tools/postplan-harness/tests/ \
             --ignore=tools/postplan-harness/tests/test_ghad_live.py \
-            --ignore=tools/postplan-harness/tests/test_gitad_live.py \
             -q

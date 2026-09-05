@@ -77,6 +77,7 @@ last_verified: 2026-09-05
 | L48 | Planning pipeline prose coverage gap: code-block path expressions in `SKILL.md` are invisible to `bin/check-docs`, so they can diverge from `bin/plan-now`'s runtime slug derivation silently | ✅ Implemented (2026-09-04) | 🟦 | S |
 | L49 | `/pr-ready` Phase 6.5 files backlog rows with non-canonical status glyphs and automouse values, making them invisible to open-work filters | ⬜ Open | 🟥 | S |
 | L50 | `bin/pr-cycle` logs gate nominees as "excluded this run" but then orders and readies them (`--gate-edges /dev/null` re-admits every nominee) | ⬜ Open | 🟦 | S |
+| L51 | Forced-verification row in `_plan-verification.md` references lsof port guard deleted before shipping — row's live-instance check cannot self-verify | ⬜ Open | 🟥 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -465,6 +466,7 @@ not add backticks or markdown links to a row.
 | 2026-08-19 | #1925 | class: queue enqueue operation inherits mtime from the queued file rather than stamping the ordering key at insertion time, silently misordering entries with old authoring dates | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan adding or modifying an enqueue or requeue path in bin/automouse/queue must test back-of-queue placement with an ancient-mtime plan | prior: -- |
 | 2026-08-19 | #1930 | class: a plan that stops ongoing data corruption in an import or upsert path ships without a compensating backfill migration for rows already corrupted before the fix | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan removing or modifying an importer or upsert path that was writing an incorrect value must verify a compensating backfill ships in the same PR or explicitly scope out already-corrupted rows in the plan | prior: -- |
 | 2026-08-21 | #1953 | class: cap-validation or salary-comparison logic selects a salary-basis column (current vs. next-year) without consulting the league phase, producing incorrect hard-cap outcomes during offseason | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan adding or modifying salary-comparison or cap-enforcement logic must carry verification rows for both the in-season path (advancesContractYears()=false, current_salary basis) and the offseason path (advancesContractYears()=true, next_year_salary basis) | prior: -- |
+| 2026-08-21 | #1950 | class: a shell port-guard that pipes lsof output to grep -qv without stripping the column header always fires the "occupied by other process" branch regardless of actual port state, because the lsof header line never matches the process name | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan adding or modifying a port-guard or process-detection guard that pipes lsof to a pattern filter must assert the port-free case exits with the expected free-port verdict (no false positive from the header line) | prior: -- |
 | 2026-08-22 | #1963 | class: a fail-closed validation gate on a store/import path is relaxed to warn-only before the compensating resolution path that makes relaxation safe is shipped, allowing uncorrectable orphaned rows to accumulate undetected | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan that relaxes a fail-closed guard on a store or import path (error → warn or removed) must verify that the compensating resolution path ships in the same PR or is already in prod, OR explicitly scope out orphan accumulation with a follow-up | prior: -- |
 | 2026-08-23 | #1969 | class: an importer writes to a secondary tracking table but omits the corresponding write to the canonical flag column in the primary table — the secondary write satisfies the importer's narrow contract while the flag silently stays at its default | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan adding or modifying an importer that writes to a secondary/audit table must carry an integration test verifying the canonical flag column in the primary table is also updated after a full import cycle | prior: -- |
 | 2026-08-26 | #1996 | class: SQL table names in BaseMysqliRepository subclasses inserted without backtick quoting, silently bypassing the rewriteTableNames() invariant that all repository SQL be rewrite-eligible | routed to: Rung 1 - PHPStan rule over SQL string literals in BaseMysqliRepository subclasses, asserting all bare table-name identifiers are backtick-quoted in INSERT/UPDATE/DELETE statements | prior: -- |
@@ -716,6 +718,33 @@ Landing rung: **2** — add an explicit note to `.claude/skills/fix-and-prevent/
 The static-guard case in `bin/test-pr-cycle` should pin whichever wording lands, so the two cannot drift again.
 
 **provenance:** (discovered 2026-09-05 during the first live `bin/pr-cycle --go` run, right after #2081 merged)
+
+---
+
+### L51 Forced-verification row in `_plan-verification.md` references lsof port guard deleted before shipping
+
+**class:** A forced-verification row in `.claude/review-shared/_plan-verification.md` whose described guard (lsof port guard) no longer exists in the diff when the PR was reviewed, leaving a trigger pattern with no live instance to self-verify — the class of "body written → guard deleted → body row now asserts something absent."
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `.claude/review-shared/_plan-verification.md` (lsof port-guard row, added in the Phase 9 retrospective commit) — the lsof guard it describes was removed before shipping | yes — same class as `pr-body-negative-claim-recheck.md` | live | not fixed — filed |
+
+**Why it matters:** The forced-verification row existed to enforce that lsof-style port guards are reviewed on any PR introducing them. When the guard itself was removed from the diff, the row became a phantom trigger — it neither protects against a guard-in-PR nor signals its own obsolescence. The pr-body-negative-claim-recheck.md rule covers PR body negative claims; this class applies to `_plan-verification.md` trigger rows, which are structurally identical in their failure mode.
+
+**Fix:** When a retrospective commit adds a `_plan-verification.md` row that references a guard, a cross-check should confirm the guard exists in the current diff before the row is committed. Alternatively, extend `pr-body-negative-claim-recheck.md` to name `_plan-verification.md` rows as a second surface where the "negative claim vs. actual diff" check applies.
+
+**prevention_ladder:**
+- rung 0 — not covered; `_plan-verification.md` rows are not checked against the current diff.
+- rung 1 — cannot extend an existing gate to catch this (no gate reads `_plan-verification.md` content against the live diff).
+- rung 2 — a rule doc noting that `_plan-verification.md` rows describing deleted guards must be removed or retargeted at time of deletion; `.claude/rules/pr-body-negative-claim-recheck.md` partially covers this class (the failure mode is identical); extending that rule's scope to `_plan-verification.md` rows is the landing rung.
+- rung 3/4/5 — no PHPStan or CI check can validate markdown-prose alignment with a live diff.
+- **landing rung: rung 2** — extend `pr-body-negative-claim-recheck.md` scope to cover `_plan-verification.md` rows; no gate warranted.
+
+**artifact destination:** `.claude/rules/pr-body-negative-claim-recheck.md` — in-repo (extend scope to `_plan-verification.md` rows)
+
+**provenance:** (discovered 2026-09-05 during #1950 Phase 6.5 review)
 
 ---
 

@@ -231,6 +231,7 @@ value). For fake-POST tests (D7), assert the banner *after a real submit*, not a
 | E13 | ⬜ Open | 🟩 | Plan-specified diagnostic strings and DOM observation evidence omitted during E2E assertion implementation. Messages fixed inline (PR #1807). DOM dumps for D15's four no-team pages not captured — needs a Playwright run against the worktree stack with `IBL_TEST_USER_REGULAR` credentials. (discovered 2026-09-02 during #1807) |
 | E14 | ⬜ Open | 🟥 | Autofix bot (`IBL5 Bug Hunter (sandbox)`, commit `ede59f41d`) silently removed the D15 Player-negotiate `.ibl-alert--error` assertion without declaring a scope change, leaving permissive-form coverage on a route with assertable production behavior. (discovered 2026-09-03 during #1807) |
 | E15 | ⬜ Open | — | E2E spec inline comment overstates ordering assertion; matrix row #8 not provably run — see prose |
+| E16 | ⬜ Open | — | E2E assertion in `bin/bug-pipeline-e2e:180` exercises extra-argument rejection rather than declared migration-153 ENUM boundary — not fixed, filed. (discovered 2026-09-05 during #1950) |
 
 **Suggested direction (axis):** All E1–E12 items complete (PR #1805). E9's final implementation uses `evaluate(form.submit())` + auto-retrying `toContainText` DOM assertion rather than `waitForResponse` — `form.submit()` triggers full-page navigation, making `page.content()` race the navigate; the DOM assertion survives the navigation. E9 STOP GUARD: not triggered — PHP validation confirmed working.
 **Est. effort:** complete. **Risk if untouched:** n/a.
@@ -302,6 +303,27 @@ prevention_ladder:
 artifact_destination: n/a — no gate
 
 provenance: (discovered 2026-09-04 during #1956)
+
+### E16 E2E assertion in `bin/bug-pipeline-e2e` exercises extra-argument rejection rather than declared migration-153 ENUM boundary
+
+class: a test-assertion mismatch where the assertion label claims to verify an ENUM boundary (migration 153's status column) but the invocation exercises a different failure mode (extra positional argument vs. invalid status value), meaning the ENUM boundary is not actually verified.
+
+occurrence table:
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/bug-pipeline-e2e:180` | yes — invocation uses an extra positional argument to trigger failure rather than an invalid status value as declared | live | not fixed — filed |
+
+prevention_ladder:
+- rung 0: no existing gate checks that plan-declared assertion inputs match the failure mode under test.
+- rung 1: could extend the `bin/bug-pipeline-e2e` harness to use `transition.php "$ID2" not_a_status` (the declared ENUM boundary input from plan row 7.e) — no new gate needed.
+- rung 2: no rule doc warranted — this is a one-off invocation mismatch.
+- rung 3–5: no PHPStan or CI check can validate shell-script test input semantics.
+- landing rung: rung 1 — fix the invocation to use the declared ENUM-invalid status value; no new gate needed.
+
+artifact_destination: `bin/bug-pipeline-e2e:180` — in-repo
+
+provenance: (discovered 2026-09-05 during #1950)
 
 ---
 

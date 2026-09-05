@@ -696,6 +696,8 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 | N3 | `BanRawSuperglobalsRule` suffix allowlist unchanged — plan Phase 6 §Correction forbids removing `Controller.php` | correct — intentional; `ControllerSuperglobalFreedomTest.php` is the scoped enforcement |
 | N4 | `codebase-map.md` regenerated as a side effect of other work | correct — expected artifact |
 | N5 | `Team/README.md` `last_verified: 2026-08-16` vs `maintenance-backlog.md` `2026-09-04` — cosmetic inconsistency | fixed this pass (bumped to 2026-09-04) |
+| E52 | PR #2064 Phase 6.5 — stale hand-written PR body claims contradicting the final diff and code | ⬜ Open | — | XS |
+| E54 | PR #2123 Phase 6.5 — PR body page-count overclaim, selector mis-attribution, plan VR command defect, and three confirmatory notes | ⬜ Open | — | XS |
 
 **prevention_ladder: no gate warranted** — all five are reviewer-confirmed correct behaviors, not defects; the existing `/pr-ready` Phase 6 review pipeline is the mechanism and it worked correctly here.
 
@@ -870,6 +872,11 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 ### E54 PR #2084 Phase 6.5 — rebase silently dropped implementation commit; lost-work proof blind to pre-run loss
 
 **class:** `rebase-dropped-commit` — an `--onto` rebase replay range that started above the branch's own commits, compounded by a lost-work proof that only compares pre-to-post within a single `/pr-ready` run and cannot detect a branch that arrives already emptied by a previous run's bad rebase.
+---
+
+### E54 PR #2123 Phase 6.5 — PR body page-count overclaim, selector mis-attribution, plan VR command defect, and three confirmatory notes
+
+**class:** PR body prose that extends a scope claim to a page explicitly excluded from the confirm-or-add decision set, and that mis-attributes a selector shape to the wrong assertion line; plus a plan VR command that names a non-working invocation path for the VR suite. Consolidated: PR body / plan accuracy defects in the ship-pipeline authoring surface.
 
 **occurrence table:**
 
@@ -1045,3 +1052,19 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 `artifact destination: this entry`
 
 *(discovered 2026-09-06 during Phase 6 review of #2140)*
+| 1 | PR #2123 body Phase 2 — "All four Block F pages were confirmed"; Player negotiate was never in the confirm-or-add set and emits no `h1.ibl-title` by design | yes | yes | fixed this pass — corrected to "all three chrome pages"; Player negotiate clarified |
+| 2 | PR #2123 body Summary — "to `h1.ibl-title` with `.first()` retained for the visibility assertion"; the visibility locator is `.ibl-title`, not `h1.ibl-title`; `h1.ibl-title` carries `toHaveCount(1)` and `toHaveText()` | yes | yes | fixed this pass — summary reworded to attribute selectors per-assertion |
+| 3 | `~/claude-plans/no-team-pages-canonical-title-hook.md` Phase 5 — `bin/e2e-wt <slug> smoke/visual-regression.spec.ts`; `ibl5/playwright.config.ts:61` excludes `/visual-regression/` from the chromium project; VR requires `ibl5/bin/visual-regression` with `ibl5/playwright.visual.config.ts` | near-miss | n/a — plan is historical | not fixed — plan is a historical artifact; substituted correct route and disclosed in body |
+| 4 | PR #2123 matrix row 8 — Truly-manual row not ticked; no-team account requires Docker stack provisioning not available in the preview environment | yes | n/a — by design | not fixed — by design; the plan itself names this constraint |
+| 5 | PR #2123 matrix row 4 — mutation result evidence recorded in `ibl5/docs/backlog/e2e-backlog.md` rather than the PR body | near-miss | yes | not fixed — placement note; evidence is present in the diff |
+
+**prevention_ladder:**
+- **rung 0 — already covered?** `/pr-ready` Phase 6 check 4 (PR body vs. reality) caught F1 and N2; check 2 (intent fidelity) caught N1 as a divergence note. All fires were correct.
+- **rungs 1–5 — N/A** given rung 0 coverage for F1/N2; plan VR command defect (N1) is a plan-prose accuracy issue with no feasible static gate.
+- **landing rung:** no gate warranted — Phase 6 checks 2 and 4 are the existing catch surface and fired correctly.
+
+`prevention_ladder: no gate warranted — /pr-ready Phase 6 checks 2 and 4 are the correct catch surface and fired correctly`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-05 during Phase 6 review of #2123)*

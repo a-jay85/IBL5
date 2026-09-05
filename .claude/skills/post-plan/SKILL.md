@@ -108,6 +108,8 @@ If the working tree is clean and `git diff origin/master...HEAD` is also empty (
 
    > **Files-changed block:** the PR body must carry a machine-generated scope block, so the hand-written Scope prose can never silently disagree with the diff. Build it from `git diff --name-status origin/master...HEAD` and include it in the body at creation, delimited exactly by `<!-- files-changed:begin -->` / `<!-- files-changed:end -->`, one `- \`<status>\` \`<path>\`` bullet per file. On any later body write (including Phase 6 below), regenerate the block and **replace what sits between the two markers** rather than appending a second copy; if only one marker is present, append a fresh block and leave the orphan alone. Generated data cannot drift — the prose Scope line then carries *why*, not *what*.
 
+   > **Scope-expansion justification:** when the diff touches production module code under `ibl5/modules/`, the files-changed block records *what* changed but never *why* a production file was in a non-feature PR. The body must then carry a short `**Scope expansion:**` paragraph naming each such file and the reason it changed. Place it **immediately above** the `<!-- files-changed:begin -->` marker — **outside** the marker pair, never between the markers. Anything between the markers is destroyed on the next regeneration (Phase 6 here, and `/pr-ready` Phase 5.9), so a justification written inside them silently disappears on the next body write. Norm and per-title-type expectations: `.claude/rules/scope-expansion-justification.md` — NEW in this PR.
+
    > **Retrospective-origin block:** if `git diff origin/master...HEAD` **adds** a row to the `## Class registry` table in `ibl5/docs/backlog/loop-engineering-backlog.md`, this branch is a Phase 9 retrospective routing that got materialized as its own PR — usually because the origin PR had already merged. The body must then carry a `## Why this PR exists` section immediately above `## Manual Testing`. Without it the PR reads as an unexplained doc edit: the files-changed block shows *what* row was added, never why the class exists. Derive the section from the **added row alone** — it is self-sufficient (`#<origin PR>`, `class:`, `routed to: Rung <n>`, `prior:`), so this works on a plan-blind run, or a run months later that never saw the retrospective. Four required elements:
    >
    > 1. **Origin defect** — the `#<PR>` the row names and what it actually broke. Read its title/body with `gh pr view <n>` rather than guessing from the class sentence.
@@ -122,6 +124,33 @@ If the working tree is clean and `git diff origin/master...HEAD` is also empty (
 4. Use Haiku agents for commit message generation if delegating
 
 **Static-guard self-verify (mandatory when a path-unscoped rule is touched):** if `git diff origin/master...HEAD --name-only` (substitute the PR base for a stacked PR) lists any `.claude/rules/*.md`, run `bin/check-rules-byte-budget` **before pushing**. On failure, trim the offending rule (or move detail into a path-scoped `*-detail.md` companion) and re-commit. This mirrors the git pre-commit hook so a byte-budget overflow is caught here instead of only in CI (the Static guards job) — and covers post-plan runs where the pre-commit hook did not fire (e.g. a harness commit path).
+
+**Scope-expansion self-check (run once, after the PR exists):** the block below emits one verdict line — `SCOPE_EXPANSION=flagged`, `clear`, or `none`. A `flagged` result means the body needs the `**Scope expansion:**` paragraph described in step 2 above; add it immediately above the `<!-- files-changed:begin -->` marker and re-run.
+
+```bash
+# scope-expansion:begin
+# phase 2 scope-expansion check: emits exactly ONE verdict line,
+# SCOPE_EXPANSION=flagged|clear|none, as the FIRST line of stdout, optionally followed
+# by the indented list of flagged paths. Self-contained on purpose — every /post-plan
+# Bash block runs in its own fresh shell, so nothing from earlier in Phase 2 is in
+# scope here. The two *_OVERRIDE vars exist only so this block can be exercised
+# without a live PR (same seam shape as Phase 2.5's $PLAN_FILE); in a real run both
+# are unset and the values come from gh. Note the colon-LESS ${VAR-default} form: it
+# substitutes only when the var is UNSET, so an explicitly-empty override (VAR='')
+# is honored instead of silently falling through to a live gh call. Do not add the colon.
+SCOPE_FILES="${SCOPE_FILES_OVERRIDE-$(gh pr diff --name-only 2>/dev/null || true)}"
+SCOPE_TITLE="${SCOPE_TITLE_OVERRIDE-$(gh pr view --json title -q .title 2>/dev/null || true)}"
+MODULE_HITS=$(printf '%s\n' "$SCOPE_FILES" | grep -E '^ibl5/modules/' || true)
+if [ -z "$MODULE_HITS" ]; then
+  echo "SCOPE_EXPANSION=none"
+elif printf '%s' "$SCOPE_TITLE" | grep -qiE '^feat(\([^)]*\))?!?:'; then
+  echo "SCOPE_EXPANSION=clear"
+else
+  echo "SCOPE_EXPANSION=flagged"
+  printf '%s\n' "$MODULE_HITS" | sed 's/^/  /'
+fi
+# scope-expansion:end
+```
 
 ---
 

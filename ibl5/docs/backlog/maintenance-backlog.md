@@ -647,7 +647,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):** Most FK/type/idempotency work is done (maintenance-27/28/41–44). Open items are mostly **column renames / destructive schema** → 🟦 human-merge (gate-14c + rename-sweep blast radius); a *reversible* type-narrowing (15.17) can arm 🟨 via the `/plan` schema-safety guard; doc items are 🟩.
 
-> ✅ resolved (19): 15.2, 15.4, 15.5, 15.8, 15.9, 15.10, 15.11, 15.12, 15.13, 15.14, 15.15, 15.16, 15.18, 15.19, 15.20, 15.21, 15.22, 15.23, 15.28 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (20): 15.2, 15.4, 15.5, 15.8, 15.9, 15.10, 15.11, 15.12, 15.13, 15.14, 15.15, 15.16, 15.18, 15.19, 15.20, 15.21, 15.22, 15.23, 15.28, 15.29 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
@@ -657,8 +657,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 15.7 | ◑ Partial | 🟦 | `name`→`setting_key` done (#143); `value`→`setting_value` deferred (reserved-word rename + sweep → human-merge). |
 | 15.17 | ⬜ Open | 🟨 | olympics_career int(11)→smallint/mediumint. Reversible narrowing → arm via the `/plan` schema-safety guard (apply-time fail-closed + DatabaseIntegration test); else 🟦. |
 | 15.24 | ⬜ Open | 🟦 | Pre-existing duplicate rows in `ibl_box_scores`: 1993 (29), 1994 (7), 2002 (1), 2004 (24) — 61 excess by `(game_date, name)`. Distinct signature from the 2007 HEAT re-import (no schedule overload, no `created_at` batch, no month shift); cause unknown. Destructive delete → human-merge. (discovered 2026-08-04 during the PR #1771 review) |
-
-| 15.29 | ⬜ Open | 🟩 | Production PHP changes (`Player/index.php` null guards, `LeagueStarters/index.php` free-agent fallback) entered a test-scoped PR without a plan phase, structured code review, or scope justification; six PR-body claims were contradicted by the actual diff. Adding a files-changed reconciliation gate is additive → auto-mergeable. (discovered 2026-09-03 during #1807) |
 | 15.31 | ⬜ Open | — | Plan-authored inaccuracies in test code and frontmatter discovered during PR review — see prose |
 | 15.32 | ⬜ Open | 🟩 | `TradeDecisionService::reject()` omitted `EventLogger::setAction('trade_offer_rejected')` when transcribing the controller success path, silently dropping `ibl_events` rows when unit 1c swaps in. Code fixed in PR #1957; unit test gap filed — static call requires EventLogger injection refactor to pin. (discovered 2026-09-04 during #1957) |
 | 15.34 | 🔵 filed | ✗ | Reject-swap unit-1c verification and implementation residuals (B/C/E/G) — exit-exiting shim leaves redirect line with E2E-only coverage; dead factory param in `buildController()`; mechanism logging change (informational); self-wired constructor unverified (Docker stack not running at review time). All filed, none blocking. (discovered 2026-09-04 during #1958) |
@@ -735,15 +733,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Status:** Fixed this pass (PR #1824) — added `capturedLog` non-empty assertion plus expected closing-message substring to `runPipeline()`, and added `ob_get_clean` assertion alongside the existing `ob_start` assertion.
 **Suggested direction:** When a migration introduces a new seam (buffer drain, output capture interface), ensure the pipeline integration test asserts data flows through the seam end-to-end in at least one real call path. The regression guard should assert both sides of every paired construct (`ob_start`/`ob_get_clean`, etc.).
 **Est. effort:** XS (already fixed)
-### 15.30 Production Module Drift Into Test-Scoped PR — Undeclared Scope Expansion
-
-**Location:** `ibl5/modules/Player/index.php`, `ibl5/modules/LeagueStarters/index.php` — PR #1807
-**Problem:** `Player/index.php` (null guards for `negotiate()` and `rookieoption()`) and `LeagueStarters/index.php` (free-agent fallback) entered a PR scoped to test-only assertion tightening (D-cluster-3) without a plan phase, structured code review of the production surface, or a verification matrix row covering the changed production paths. Six PR-body claims were contradicted by the actual diff as a result: the body asserted the diff was assertion-only and introduced no new production behavior — both false. Findings 3 and 4 from the PR #1807 Phase 6 plan-fidelity review are combined here (same root cause: undeclared scope expansion).
-**Suggested direction:** Phase 5.9 (files-changed reconciliation) in `/post-plan` or the PR template should require explicit scope-expansion justification when production modules appear in the diff of a plan scoped to test/doc changes. A files-changed gate checking for `modules/` edits in a test-only plan branch would surface these automatically at PR-creation time.
-**Est. effort:** S
-**Risk if untouched:** Production behavior changes enter the codebase without a plan phase, dedicated code review, or verification matrix row, and the PR body can misrepresent the diff scope without a gate catching the contradiction.
-**provenance:** (discovered 2026-09-03 during #1807; Findings 3 and 4 combined)
-
 ### 15.31 Plan-authored inaccuracies propagated into test code and plan frontmatter
 
 class: plan-authored prose about control-flow ordering that misidentifies the gate sequence (F1), and a plan frontmatter/prose contradiction on auto_merge value (F4) — both transcribed faithfully from the plan and both invisible to CI.

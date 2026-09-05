@@ -6,7 +6,7 @@ name: pr-review
 description: Token-efficient code review for pull requests
 disable-model-invocation: true
 model: claude-sonnet-4-6
-last_verified: 2026-08-29
+last_verified: 2026-09-04
 ---
 
 Provide a code review for the given pull request. This command optimizes token usage by fetching the diff once and distributing only what each agent needs.
@@ -57,7 +57,7 @@ Store all of these results — they will be passed as context to agents below.
 
 ## Step 3: Launch parallel agents (merged by tier)
 
-**Read** `.claude/review-shared/_review-agents.md` for the canonical agent definitions. It defines 3 merged agents (A=architecture+bugs+DB, B=git history+code comments, C=previous PRs).
+**Read** `.claude/review-shared/_review-agents.md` for the canonical agent definitions. It defines 3 merged agents (A=architecture+bugs+DB, B=git history+code comments, C=previous PRs). For a PR touching shell, workflow, or `.claude/` prose files, also **Read** `.claude/review-shared/_shell-workflow-agent.md` (Agent E) — it gets `$DIFF` from Step 2c and the file list from Step 2b like every other agent, and the **CRITICAL: No agent should call `gh pr diff`** rule below applies to it unchanged. No awk pre-slice here: `/pr-review` has no `$DIFF_FILE` temp file, and its 100KB fallback path already handles oversized diffs.
 
 Launch applicable agents in parallel. Each agent receives:
 - The filtered diff from Step 2c
@@ -68,6 +68,7 @@ Launch applicable agents in parallel. Each agent receives:
 - Agent A (Architecture + Bug detection + DB performance): **Sonnet 4.6** (`subagent_type: "sonnet-4-6"`, omit `model`) — skip if no code files; omit DB section if no PHP
 - Agent B (Git history + Code comments): **Sonnet 4.6** (`subagent_type: "sonnet-4-6"`, omit `model`) — skip if no PHP and no code comments in diff
 - Agent C (Previous PRs): **Haiku** — skip if no modified (non-added) files
+- Agent E (Shell / Workflow / Agent-prose): **Sonnet 4.6** (`subagent_type: "sonnet-4-6"`, omit `model`) — skip unless the Step 2b file list contains a file under a `bin/` directory, a `*.sh`, a `.github/workflows/*.yml`, or a `.claude/**.md`
 
 **CRITICAL: No agent should call `gh pr diff`.** The diff was already fetched in Step 2.
 

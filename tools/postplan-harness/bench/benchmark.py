@@ -71,6 +71,8 @@ def classification_parity(cls, block: str) -> dict:
         "HAS_E2E_SPECS": cls.has_e2e_specs, "HAS_E2E_PROD_OVERLAP": cls.has_e2e_prod_overlap,
         "HAS_GO": cls.has_go, "GO_TOUCHED": cls.go_touched,
         "ENGINE_ONLY": cls.engine_only, "GOLDEN_CHANGED": cls.golden_changed,
+        "HAS_SHELL": cls.has_shell, "HAS_WORKFLOW": cls.has_workflow,
+        "HAS_SKILL_PROSE": cls.has_skill_prose,
     }
     mism = [f"{k}: got {got[k]} != hist {h[k]}" for k in got if k in h and got[k] != h[k]]
     if "LINES_PHP_CHANGED" in h:

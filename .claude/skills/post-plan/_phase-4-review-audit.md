@@ -37,6 +37,7 @@ Pass each agent: PR metadata, file list, and filtered `$DIFF`. **No agent calls 
 - Agent A: skip if `$NON_CODE_ONLY` or `$ENGINE_ONLY`. (Agent A is a "Senior PHP Architect"; a pure-Go engine diff has no PHP architecture to review — skipping avoids low-signal PHP-rubric review of Go code. A **mixed** PR — `HAS_PHP=true`, `ENGINE_ONLY=false` — still launches Agent A to review the PHP portion.) If `$MIGRATION_ONLY`, instruct agent to skip Section 2 (bug detection). If `! $HAS_PHP`, instruct agent to skip Section 3 (DB performance).
 - Agent B: skip if BOTH sub-gates fail: (`! $HAS_PHP` or `$LINES_PHP_CHANGED <= 50`) AND (`$NON_CODE_ONLY` or `! $HAS_COMMENTS_IN_DIFF`). If only one sub-gate passes, instruct agent to run only that section.
 - Agent C: skip if `$NON_CODE_ONLY` or `! $HAS_MODIFIED` or `$LINES_PHP_CHANGED <= 50`
+- Agent E (Shell / Workflow / Agent-prose): **Sonnet 4.6** (`subagent_type: "sonnet-4-6"`, omit `model`) — launch when `$HAS_SHELL || $HAS_WORKFLOW || $HAS_SKILL_PROSE`; skip when all three are false. No line-count threshold.
 - Agent D: skip if `! $HAS_E2E_SPECS`. When launched, pre-slice the diff into two temp files before forwarding to the agent:
   ```bash
   # Spec portion of the diff (only .ts under ibl5/tests/e2e/)
@@ -59,6 +60,19 @@ Pass each agent: PR metadata, file list, and filtered `$DIFF`. **No agent calls 
   fi
   ```
   Pass Agent D: PR metadata, the spec file list, `/tmp/post-plan-spec-diff-$PPID`, `/tmp/post-plan-spec-prod-diff-$PPID`, and `$HAS_E2E_PROD_OVERLAP`. The agent does **not** call `gh pr diff`.
+
+```bash
+# Agent E pre-slice: shell + workflow + .claude prose sections only.
+# Same predicate as LINES_SHELL_CHANGED in Phase 3 — keep them identical.
+awk '
+  /^diff --git/ { p=$NF; sub(/^b\//,"",p)
+    keep = (p ~ /^\.github\/workflows\/.*\.ya?ml$/ || p ~ /^\.claude\/.*\.md$/ || \
+            ((p ~ /(^|\/)bin\// || p ~ /\.sh$/) && p !~ /\.(php|md|json|py|ts|tsx|css|sql|ya?ml|lock|txt|neon)$/)) ? 1 : 0 }
+  keep==1 {print}
+' "$DIFF_FILE" > /tmp/post-plan-shell-diff-$PPID
+```
+
+Read `.claude/review-shared/_shell-workflow-agent.md` for the canonical Agent E definition and pass it the contents of `/tmp/post-plan-shell-diff-$PPID` plus the Phase 3 file list. If that file is empty (possible when the flags fire on a rename-only change), skip the spawn — do not send an agent an empty diff.
 
 ### 4C: Security Audit — single conditional Haiku agent
 

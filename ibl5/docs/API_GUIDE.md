@@ -1,5 +1,5 @@
 ---
-description: REST API architectural overview — auth, rate limiting, ETag caching, controller inventory, route table.
+description: REST API architectural overview — auth, rate limiting, ETag caching, controller inventory, route table, and full per-endpoint reference.
 last_verified: 2026-09-05
 ---
 
@@ -453,6 +453,224 @@ X-API-Key: <key>
 ```
 **Response `200`:** standard envelope; `data` is a season object. Fields: `phase` (string), `last_sim` (object: `number` (int), `phase_sim_number` (int), `start_date` (string), `end_date` (string)), `projected_next_sim_end_date` (string, `YYYY-MM-DD` format).
 **Errors:** none defined.
+
+### POST /trades/{offerId}/accept
+Accepts a pending trade offer on behalf of the receiving GM.
+**Auth:** API key required.
+**Path parameters:** `offerId` (integer) — numeric offer ID.
+**Request body:**
+- `discord_user_id` (string, **required**) — Discord user ID of the caller; must match the receiving team's GM.
+Example request:
+```
+POST /ibl5/api/v1/trades/{offerId}/accept
+X-API-Key: <key>
+Content-Type: application/json
+
+{
+  "discord_user_id": "<discord-user-id>"
+}
+```
+**Response `200`:** standard envelope; `data` fields: `accepted` (bool, always `true`), `story` (string — trade story text).
+**Conditional requests:** not supported.
+**Errors:** `400 bad_request` — missing or invalid `offerId`, or missing `discord_user_id`. `403 forbidden` — caller's Discord ID does not match the receiving team's GM. `404 not_found` — offer not found or already processed. `500 processing_error` — trade processing failed.
+
+### POST /trades/{offerId}/decline
+Declines a pending trade offer on behalf of the receiving GM and notifies the offering team.
+**Auth:** API key required.
+**Path parameters:** `offerId` (integer) — numeric offer ID.
+**Request body:**
+- `discord_user_id` (string, **required**) — Discord user ID of the caller; must match the receiving team's GM.
+Example request:
+```
+POST /ibl5/api/v1/trades/{offerId}/decline
+X-API-Key: <key>
+Content-Type: application/json
+
+{
+  "discord_user_id": "<discord-user-id>"
+}
+```
+**Response `200`:** standard envelope; `data` fields: `declined` (bool, always `true`), `offering_team` (string — team name of the offering side), `offering_gm_discord_id` (string — Discord ID of the offering GM).
+**Conditional requests:** not supported.
+**Errors:** `400 bad_request` — missing or invalid `offerId`, or missing `discord_user_id`. `403 forbidden` — caller's Discord ID does not match the receiving team's GM. `404 not_found` — offer not found or already processed.
+
+### POST /bug-pipeline/enqueue
+Enqueues a Discord message as a bug report candidate; advances the channel watermark unconditionally.
+**Auth:** API key required.
+**Path parameters:** none.
+**Request body:**
+- `author_id` (string, **required**) — Discord snowflake of the message author.
+- `channel_id` (string, **required**) — Discord snowflake of the source channel.
+- `message_id` (string, **required**) — Discord snowflake of the message.
+- `text` (string, **required**) — message text; may be an empty string only when `attachments` is also provided.
+- `attachments` (array, **optional**) — attachment objects; stored best-effort and never cause a failure on their own.
+Example request:
+```
+POST /ibl5/api/v1/bug-pipeline/enqueue
+X-API-Key: <key>
+Content-Type: application/json
+
+{
+  "author_id": "<discord-snowflake>",
+  "channel_id": "<discord-snowflake>",
+  "message_id": "<discord-snowflake>",
+  "text": "Game crash on sim start",
+  "attachments": []
+}
+```
+**Response `200`:** standard envelope; `data` fields differ by authorization. Unauthorized (author not a known GM): `authorized` (bool, `false`), `report_id` (null). Authorized: `authorized` (bool, `true`), `report_id` (string), `attachments_stored` (int — count of validated attachments accepted for storage).
+**Conditional requests:** not supported.
+**Errors:** `400 bad_request` — missing request body, or missing/invalid `author_id`, `channel_id`, `message_id`, or `text`.
+
+### POST /bug-pipeline/thread-reply
+Records that a Discord thread reply was received for a bug report thread.
+**Auth:** API key required.
+**Path parameters:** none.
+**Request body:**
+- `thread_id` (string, **required**) — Discord snowflake of the thread.
+- `message_id` (string, **required**) — Discord snowflake of the reply message.
+Example request:
+```
+POST /ibl5/api/v1/bug-pipeline/thread-reply
+X-API-Key: <key>
+Content-Type: application/json
+
+{
+  "thread_id": "<discord-snowflake>",
+  "message_id": "<discord-snowflake>"
+}
+```
+**Response `200`:** standard envelope; `data` fields: `matched` (bool — `true` if a bug report row was found and stamped).
+**Conditional requests:** not supported.
+**Errors:** `400 bad_request` — missing or empty `thread_id` or `message_id`.
+
+### POST /bug-pipeline/reaction
+Records a Discord reaction event; advances the bug report pipeline if the reaction is the configured approval emoji from the configured approver.
+**Auth:** API key required.
+**Path parameters:** none.
+**Request body:**
+- `message_id` (string, **required**) — Discord snowflake of the reacted-to message.
+- `emoji` (string, **required**) — the emoji character that was reacted.
+- `reactor_id` (string, **required**) — Discord snowflake of the user who reacted.
+Example request:
+```
+POST /ibl5/api/v1/bug-pipeline/reaction
+X-API-Key: <key>
+Content-Type: application/json
+
+{
+  "message_id": "<discord-snowflake>",
+  "emoji": "✅",
+  "reactor_id": "<discord-snowflake>"
+}
+```
+**Response `200`:** standard envelope; `data` fields: `advanced` (bool — `true` if the report was advanced to the next pipeline stage).
+**Conditional requests:** not supported.
+**Errors:** `400 bad_request` — missing or empty `message_id`, `emoji`, or `reactor_id`.
+
+### POST /bug-pipeline/last-seen
+Updates the pipeline watermark for a channel to the given message ID (monotonic upsert).
+**Auth:** API key required.
+**Path parameters:** none.
+**Request body:**
+- `channel_id` (string, **required**) — Discord snowflake of the channel.
+- `message_id` (string, **required**) — Discord snowflake of the last-seen message.
+Example request:
+```
+POST /ibl5/api/v1/bug-pipeline/last-seen
+X-API-Key: <key>
+Content-Type: application/json
+
+{
+  "channel_id": "<discord-snowflake>",
+  "message_id": "<discord-snowflake>"
+}
+```
+**Response `200`:** standard envelope; `data` fields: `ok` (bool, always `true`).
+**Conditional requests:** not supported.
+**Errors:** `400 bad_request` — missing or empty `channel_id` or `message_id`.
+
+### POST /bug-pipeline/state
+Returns the current pipeline watermark (last processed message ID) for a channel.
+**Auth:** API key required.
+**Path parameters:** none.
+**Request body:**
+- `channel_id` (string, **required**) — Discord snowflake of the channel.
+Example request:
+```
+POST /ibl5/api/v1/bug-pipeline/state
+X-API-Key: <key>
+Content-Type: application/json
+
+{
+  "channel_id": "<discord-snowflake>"
+}
+```
+**Response `200`:** standard envelope; `data` fields: `last_processed_message_id` (string|null — null on first boot / no cursor yet).
+**Conditional requests:** not supported.
+**Errors:** `400 bad_request` — missing or empty `channel_id`.
+
+### POST /bug-pipeline/thread-by-pr
+Returns the Discord thread ID associated with a GitHub PR number.
+**Auth:** API key required.
+**Path parameters:** none.
+**Request body:**
+- `pr_number` (integer or numeric string, **required**) — GitHub PR number; must be a positive integer.
+Example request:
+```
+POST /ibl5/api/v1/bug-pipeline/thread-by-pr
+X-API-Key: <key>
+Content-Type: application/json
+
+{
+  "pr_number": 42
+}
+```
+**Response `200`:** standard envelope; `data` fields: `thread_id` (string|null — null if no thread is associated with this PR).
+**Conditional requests:** not supported.
+**Errors:** `400 bad_request` — missing `pr_number`, or value is not a valid positive integer or numeric string.
+
+### POST /bug-pipeline/source-updated
+Handles a Discord message-edit event; updates the stored bug report text and optionally re-queues the report for reclassification.
+**Auth:** API key required.
+**Path parameters:** none.
+**Request body:**
+- `message_id` (string, **required**) — Discord snowflake of the original message.
+- `text` (string, **required**) — updated message text.
+Example request:
+```
+POST /ibl5/api/v1/bug-pipeline/source-updated
+X-API-Key: <key>
+Content-Type: application/json
+
+{
+  "message_id": "<discord-snowflake>",
+  "text": "Updated bug description"
+}
+```
+**Response `200`:** standard envelope; `data` fields: `matched` (bool), `changed` (bool), `revived` (bool — `true` if the report was re-queued for reclassification), `status` (string|null — current pipeline status after update), `thread_id` (string|null).
+**Conditional requests:** not supported.
+**Errors:** `400 bad_request` — missing or non-string `message_id` or `text`.
+
+### POST /bug-pipeline/source-deleted
+Handles a Discord message-delete event; marks the associated bug report as source-deleted.
+**Auth:** API key required.
+**Path parameters:** none.
+**Request body:**
+- `message_id` (string, **required**) — Discord snowflake of the deleted message.
+Example request:
+```
+POST /ibl5/api/v1/bug-pipeline/source-deleted
+X-API-Key: <key>
+Content-Type: application/json
+
+{
+  "message_id": "<discord-snowflake>"
+}
+```
+**Response `200`:** standard envelope; `data` fields: `matched` (bool), `dropped` (bool — `true` if the report row was marked deleted), `status` (string|null — pipeline status at time of deletion), `thread_id` (string|null).
+**Conditional requests:** not supported.
+**Errors:** `400 bad_request` — missing or non-string `message_id`.
 
 ## Features
 

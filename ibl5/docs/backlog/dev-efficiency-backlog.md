@@ -869,3 +869,31 @@ For the accuracy findings (2–6): prevention is the existing `/pr-ready` Phase 
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-05 during Phase 6 review of #2092)*
+
+---
+
+### E52 PR #2064 Phase 6.5 — stale hand-written PR body claims contradicting the final diff and code
+
+**class:** a stale hand-written PR body claim in the ship-pipeline surface (Scope prose or Manual Testing section) that contradicts the final implementation, code, or test counts — specifically: a guard described as hunk-scoped when the code is file-scoped (B1); case range stated as 48–63 when the diff adds 49–64 (B2); and a Manual Testing claim citing E2E tests when the change is bash tooling with no E2E component (B3); plus an omission of a changed file from the Scope prose (N1).
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #2064 body — "provided the file also carries an advancing date bump in the same hunk" (contradicts code, plan, ADR-0104, and the body's own next sentence) | yes | yes | fixed this pass — corrected to "in the same file" |
+| 2 | PR #2064 body — "gains cases 48–63" (case 48 exists on master; diff adds 49–64) | yes | yes | fixed this pass — corrected to "cases 49–64" with idempotency note |
+| 3 | PR #2064 body — "all changes are covered by unit and E2E tests" (no E2E in diff; CI E2E jobs report skipping) | yes | yes | fixed this pass — corrected to name bash tooling and CI job names |
+| 4 | PR #2064 body — bin/docfix-run not mentioned in Scope prose despite being a changed file | near-miss | yes | fixed this pass — added one-line mention |
+
+**prevention_ladder:**
+- **rung 0 — already covered?** No existing gate checks PR body prose for consistency with the diff after implementation.
+- **rung 1 — extend existing gate?** No existing gate to extend; `/pr-ready` Phase 6 check 4 is the current mechanism — this entry describes a class it is designed to catch, and it did catch it.
+- **rung 2 — a rule doc?** A rule noting that plan-authored case ranges and guard descriptions must be verified post-impl before the body is published would help, but is low-value: the failure mode is a hand-edit omission, not ignorance of the rule.
+- **rungs 3–5 — not warranted:** a lint rule or hook cannot read implementation intent against prose claims.
+- **landing rung:** no gate warranted — `/pr-ready` Phase 6 check 4 is the catch mechanism; the class is inherently judgment-gated.
+
+`prevention_ladder: no gate warranted — Phase 6 check 4 is the existing catch; no mechanical gate can verify prose-vs-intent consistency`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-05 during Phase 6 review of #2064)*

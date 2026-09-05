@@ -206,8 +206,7 @@ else
     bad 15 "headingless stub malformed in $L2FILE"
 fi
 
-if grep -q 'ibl5/docs/backlog/does-not-exist-yet/thing.md' "$FIX" \
-   && ! grep -q '`ibl5/docs/backlog/does-not-exist-yet/thing.md`' "$FIX"; then
+if ! grep -rq '`ibl5/docs/backlog/does-not-exist-yet/thing.md`' "$OUT"; then
     ok 16 "class-registry paths are still bare after a --split round trip"
 else
     bad 16 "class-registry paths gained backticks or link syntax"
@@ -228,13 +227,16 @@ assert_eq 18 "$?" 0 "--help exits 0"
 
 IDOUT=$("$NEXTID" 2>/dev/null)
 RC=$?
-if [ "$RC" = 0 ] && printf '%s' "$IDOUT" | grep -qE '^L[0-9]+$'; then
+IDNUM=${IDOUT#L}
+if [ "$RC" = 0 ] && printf '%s' "$IDOUT" | grep -qE '^L[0-9]+$' && [ "$IDNUM" -gt 0 ]; then
     ok 19 "prints a bare L<n> and exits 0 (tolerating an absent per-item directory)"
 else
     bad 19 "should print a bare L<n> and exit 0 (rc=$RC out=[$IDOUT])"
 fi
 
-if grep -qE 'ls-remote|git fetch|curl|wget' "$NEXTID"; then
+GIT_HELPERS="$REPO_ROOT/bin/lib/git-helpers.sh"
+if grep -qE 'ls-remote|git fetch|curl|wget' "$NEXTID" \
+   || grep -qE '^[^#]*(ls-remote|git fetch|curl|wget)' "$GIT_HELPERS"; then
     bad 20 "allocator must never contact the network"
 else
     ok 20 "allocator makes no network call"
@@ -248,7 +250,7 @@ assert_eq 21 "$?" 2 "a mistyped flag exits 2 rather than falling through to whol
 "$CHECKIDX" --help >/dev/null 2>&1
 assert_eq 22 "$?" 0 "--help exits 0"
 
-"$CHECKIDX" --since=HEAD >"$SCRATCH/scope.out" 2>&1
+"$CHECKIDX" --since="$(git -C "$REPO_ROOT" rev-parse HEAD~1)" >"$SCRATCH/scope.out" 2>&1
 RC=$?
 if [ "$RC" = 0 ]; then
     ok 23 "scope gate exits 0 when no backlog path changed since the ref"

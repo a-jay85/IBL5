@@ -58,8 +58,8 @@ CANONICAL_ROOT=$(resolve_canonical_root "$REPO_ROOT")
 MAX_TABLE=$(max_from_table "$REPO_ROOT/$MONOLITH_REL")
 MAX_TABLE_CANON=$(max_from_table "$CANONICAL_ROOT/$MONOLITH_REL")
 MAX_DIR=$( { ls -1 "$REPO_ROOT/$ITEM_DIR_REL" 2>/dev/null || true; } | max_from_names)
-MAX_ORIGIN=$(scan_origin_refs "$ITEM_DIR_REL" "$REPO_ROOT" | max_from_names)
-MAX_WTS=$(scan_worktrees "$ITEM_DIR_REL" "$REPO_ROOT" | max_from_names)
+MAX_ORIGIN=$( { scan_origin_refs "$ITEM_DIR_REL" "$REPO_ROOT" || true; } | max_from_names)
+MAX_WTS=$( { scan_worktrees "$ITEM_DIR_REL" "$REPO_ROOT" || true; } | max_from_names)
 
 MAX=0
 for CANDIDATE in "$MAX_TABLE" "$MAX_TABLE_CANON" "$MAX_DIR" "$MAX_ORIGIN" "$MAX_WTS"; do

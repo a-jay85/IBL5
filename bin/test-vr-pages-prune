@@ -131,7 +131,7 @@ else
 fi
 
 # Case 4: untracked_dir_survives
-# 4 tracked dirs + untracked stray/; rc 0; stray/ on disk; no fatal: in stderr; 1 tracked removed
+# 4 tracked dirs + untracked stray/; rc 0; stray/ on disk; no fatal: in stderr
 W4="$(make_fixture c4)"
 add_dir "$W4" f4 4
 add_dir "$W4" f3 3

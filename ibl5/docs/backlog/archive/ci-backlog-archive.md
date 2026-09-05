@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed/declined CI workflow simplification entries, extracted from ci-backlog.md.
-last_verified: 2026-09-04
+last_verified: 2026-09-05
 ---
 
 # CI Workflow Simplification Backlog — Archive

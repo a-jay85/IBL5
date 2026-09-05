@@ -196,4 +196,19 @@ final class BanRawSuperglobalsRuleTest extends RuleTestCase
             [],
         );
     }
+
+    public function testFlagsRequestSuperglobalAccessInController(): void
+    {
+        $this->analyse(
+            [__DIR__ . '/Fixtures/classes/RequestInController.php'],
+            [
+                [
+                    'Direct $_REQUEST access is banned outside the HTTP '
+                    . 'boundary layer (Controllers, ApiHandlers, Bootstraps, Authenticators). '
+                    . 'Accept typed inputs as parameters instead.',
+                    5,
+                ],
+            ],
+        );
+    }
 }

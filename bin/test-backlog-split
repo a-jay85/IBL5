@@ -1,0 +1,267 @@
+#!/bin/bash
+# Harness for bin/backlog-split, bin/check-backlog-index and bin/next-backlog-id.
+#
+# One harness, not three: all three scripts share one fixture corpus and one
+# round-trip invariant, so splitting them would triplicate the fixture and let the
+# three copies drift.
+#
+# Fixtures are synthetic and built in a mktemp -d scratch tree. Nothing here reads
+# the real backlog, so the harness stays green as that file churns and can exercise
+# shapes the real file does not currently contain.
+#
+# Usage: bin/test-backlog-split
+# Exit: 0 all cases ok, 1 on any failure (the failing case number is named).
+
+set -uo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+SPLIT="$REPO_ROOT/bin/backlog-split"
+NEXTID="$REPO_ROOT/bin/next-backlog-id"
+CHECKIDX="$REPO_ROOT/bin/check-backlog-index"
+
+FAILED=0
+PASSED=0
+
+ok() { PASSED=$((PASSED + 1)); echo "  ok   case $1: $2"; }
+bad() { FAILED=$((FAILED + 1)); echo "  FAIL case $1: $2"; }
+assert_eq() {
+    if [ "$2" = "$3" ]; then ok "$1" "$4"; else bad "$1" "$4 (got [$2] want [$3])"; fi
+}
+
+SCRATCH=$(mktemp -d)
+trap 'rm -rf "$SCRATCH"' EXIT
+
+FIX="$SCRATCH/mono.md"
+OUT="$SCRATCH/items"
+mkdir -p "$OUT"
+
+# Synthetic monolith. Shapes deliberately present:
+#   L1  heading text longer than and different from its table Title
+#   L2  table row with no ### heading anywhere (stub case)
+#   L4  body terminated by --- then ## (structural separator)
+#   L10 heading sits AFTER ## Class registry, and sorts after L2 only under -V
+#   L5  Title needing slugging (backticks, ; — /) and long enough to truncate at 60
+cat > "$FIX" <<'FIXTURE_EOF'
+---
+description: Synthetic fixture backlog
+last_verified: 2026-01-01
+---
+
+# Fixture Backlog
+
+## Entries
+
+| # | Title | Status | Automouse | Effort |
+|---|-------|--------|-----------|-------:|
+| L1 | Short title | ⬜ Open | 🟦 | M |
+| L2 | Headingless item | ✅ Implemented | — | S |
+| L4 | Dash terminated | ⬜ Open | 🟥 | L |
+| L5 | A `very` long; title — with/slashable punctuation that runs past sixty characters | ⬜ Open | 🟦 | S |
+| L10 | After the registry | ⬜ Open | 🟦 | M |
+
+### L1 A much longer heading than the table Title carries
+
+Body of one. It ends at a blank line before the next heading.
+
+### L4 Dash terminated
+
+Body of four.
+
+---
+
+## Class registry
+
+Paths in this table are bare on purpose.
+
+```
+| class | destination |
+|-------|-------------|
+| A | ibl5/docs/backlog/does-not-exist-yet/thing.md |
+| B | bin/not-a-real-script |
+```
+
+### L5 A `very` long; title — with/slashable punctuation that runs past sixty characters
+
+Body of five.
+
+---
+
+### L10 After the registry
+
+Body of ten, which sits after the class registry and must still be extracted.
+FIXTURE_EOF
+
+FIX_SHA_BEFORE=$(shasum -a 256 "$FIX" | awk '{print $1}')
+
+echo "=== bin/backlog-split ==="
+
+BACKLOG_SPLIT_OUTDIR="$OUT" "$SPLIT" --split "$FIX" >/dev/null 2>&1
+SPLIT_RC=$?
+assert_eq 1 "$SPLIT_RC" 0 "--split exits 0 on the fixture"
+
+EMITTED=$(ls -1 "$OUT" | sed -E 's/^(L[0-9]+)-.*/\1/' | sort -V | tr '\n' ' ')
+assert_eq 2 "$EMITTED" "L1 L2 L4 L5 L10 " "ID totality: one file per table row, headingless L2 included"
+
+L10FILE=$(ls "$OUT"/L10-*.md 2>/dev/null | head -1)
+if [ -n "$L10FILE" ] && grep -q 'Body of ten' "$L10FILE"; then
+    ok 3 "post-registry item L10 body extracted (the predecessor's silent drop)"
+else
+    bad 3 "post-registry item L10 body missing"
+fi
+
+L4FILE=$(ls "$OUT"/L4-*.md 2>/dev/null | head -1)
+if [ -n "$L4FILE" ] && grep -q 'Body of four' "$L4FILE" && ! grep -qE '^---$' <(tail -n 3 "$L4FILE"); then
+    ok 4 "body terminated by --- then ## keeps its content and drops the structural separator"
+else
+    bad 4 "L4 body or its trailing structural --- handled wrongly"
+fi
+
+"$SPLIT" --splt x >"$SCRATCH/o1" 2>/dev/null
+RC=$?
+if [ "$RC" = 2 ] && [ ! -s "$SCRATCH/o1" ]; then
+    ok 5 "unknown mode exits 2 with empty stdout"
+else
+    bad 5 "unknown mode should exit 2 with empty stdout (rc=$RC)"
+fi
+
+"$SPLIT" >"$SCRATCH/o2" 2>/dev/null
+RC=$?
+if [ "$RC" = 2 ] && [ ! -s "$SCRATCH/o2" ]; then
+    ok 6 "bare invocation exits 2 with empty stdout"
+else
+    bad 6 "bare invocation should exit 2 with empty stdout (rc=$RC)"
+fi
+
+FIX_SHA_AFTER=$(shasum -a 256 "$FIX" | awk '{print $1}')
+assert_eq 7 "$FIX_SHA_AFTER" "$FIX_SHA_BEFORE" "--split leaves its input byte-identical"
+
+ORDER=$("$SPLIT" --index "$OUT" | grep -oE '^\| L[0-9]+ ' | tr -d '| ' | tr '\n' ' ')
+assert_eq 8 "$ORDER" "L1 L2 L4 L5 L10 " "--index emits rows in sort -V order (L10 last, not after L1)"
+
+# The post-split monolith: the same fixture with its ## Entries table replaced by the
+# generated one. This is the shape --check is contracted against — the pre-split table
+# carries plain Titles, the generated one carries links, so only this comparison is
+# meaningful.
+"$SPLIT" --index "$OUT" > "$SCRATCH/gen.tbl"
+awk -v gen="$SCRATCH/gen.tbl" '
+    /^\| # \| Title \|/ { while ((getline l < gen) > 0) print l; skip = 1; next }
+    skip && /^\|/ { next }
+    { skip = 0; print }
+' "$FIX" > "$SCRATCH/indexed.md"
+
+"$SPLIT" --check "$SCRATCH/indexed.md" "$OUT" >/dev/null 2>&1
+RC=$?
+assert_eq 9 "$RC" 0 "--check exits 0 when the table and the files agree"
+
+# Duplicate the row in place, inside ## Entries — that is where a union merge lands one.
+sed '/^| L2 | \[/p' "$SCRATCH/indexed.md" > "$SCRATCH/dup.md"
+"$SPLIT" --check "$SCRATCH/dup.md" "$OUT" >"$SCRATCH/dup.out" 2>&1
+RC=$?
+if [ "$RC" = 1 ] && grep -q 'L2' "$SCRATCH/dup.out"; then
+    ok 10 "a duplicated index row (the union-merge failure) exits 1 and names the row"
+else
+    bad 10 "duplicated index row should exit 1 and appear in the diff (rc=$RC)"
+fi
+
+printf -- '---\ndescription: Orphan\nlast_verified: 2026-01-01\nstatus: x\nautomouse: x\neffort: x\n---\n\n# L999 Orphan\n' \
+    > "$OUT/L999-orphan.md"
+"$SPLIT" --check "$SCRATCH/indexed.md" "$OUT" >"$SCRATCH/orph.out" 2>&1
+RC=$?
+if [ "$RC" = 1 ] && grep -q 'L999' "$SCRATCH/orph.out"; then
+    ok 11 "an orphan L<n>-*.md with no table row exits 1"
+else
+    bad 11 "orphan file should exit 1 and appear in the diff (rc=$RC)"
+fi
+rm -f "$OUT/L999-orphan.md"
+
+echo "=== fidelity ==="
+
+L5NAME=$(for f in "$OUT"/L5-*.md; do [ -f "$f" ] && basename "$f" && break; done)
+L5SLUG=${L5NAME#L5-}
+L5SLUG=${L5SLUG%.md}
+if [ "${#L5SLUG}" -le 60 ] && [ "${#L5SLUG}" -gt 40 ]; then
+    ok 12 "slug truncated to 60 chars (got ${#L5SLUG})"
+else
+    bad 12 "slug should be truncated to 60 chars (got ${#L5SLUG} for $L5NAME)"
+fi
+
+if printf '%s' "$L5SLUG" | grep -qE '^[a-z0-9-]+$'; then
+    ok 13 "slug collapses backticks, semicolons, em dashes and slashes to hyphens"
+else
+    bad 13 "slug contains characters that should have been collapsed: $L5SLUG"
+fi
+
+L1FILE=$(ls "$OUT"/L1-*.md | head -1)
+if grep -qx '# L1 A much longer heading than the table Title carries' "$L1FILE" \
+   && grep -qx 'description: Short title' "$L1FILE"; then
+    ok 14 "heading text is preserved verbatim while description takes the table Title"
+else
+    bad 14 "heading/description resolution wrong in $L1FILE"
+fi
+
+L2FILE=$(ls "$OUT"/L2-*.md | head -1)
+if grep -qx '# L2 — Headingless item' "$L2FILE" && grep -q 'Implemented' "$L2FILE"; then
+    ok 15 "headingless ID still gets a stub carrying the heading and its Status prose"
+else
+    bad 15 "headingless stub malformed in $L2FILE"
+fi
+
+if ! grep -rq '`ibl5/docs/backlog/does-not-exist-yet/thing.md`' "$OUT"; then
+    ok 16 "class-registry paths are still bare after a --split round trip"
+else
+    bad 16 "class-registry paths gained backticks or link syntax"
+fi
+
+echo "=== bin/next-backlog-id ==="
+
+OUTV=$("$NEXTID" foo 2>/dev/null)
+RC=$?
+if [ "$RC" = 2 ] && [ -z "$OUTV" ]; then
+    ok 17 "argument rejection exits 2 with empty stdout"
+else
+    bad 17 "an argument should exit 2 with empty stdout (rc=$RC out=[$OUTV])"
+fi
+
+"$NEXTID" --help >/dev/null 2>&1
+assert_eq 18 "$?" 0 "--help exits 0"
+
+IDOUT=$("$NEXTID" 2>/dev/null)
+RC=$?
+IDNUM=${IDOUT#L}
+if [ "$RC" = 0 ] && printf '%s' "$IDOUT" | grep -qE '^L[0-9]+$' && [ "$IDNUM" -gt 0 ]; then
+    ok 19 "prints a bare L<n> and exits 0 (tolerating an absent per-item directory)"
+else
+    bad 19 "should print a bare L<n> and exit 0 (rc=$RC out=[$IDOUT])"
+fi
+
+GIT_HELPERS="$REPO_ROOT/bin/lib/git-helpers.sh"
+if grep -qE 'ls-remote|git fetch|curl|wget' "$NEXTID" \
+   || grep -qE '^[^#]*(ls-remote|git fetch|curl|wget)' "$GIT_HELPERS"; then
+    bad 20 "allocator must never contact the network"
+else
+    ok 20 "allocator makes no network call"
+fi
+
+echo "=== bin/check-backlog-index ==="
+
+"$CHECKIDX" --sinc=x >/dev/null 2>&1
+assert_eq 21 "$?" 2 "a mistyped flag exits 2 rather than falling through to whole-tree mode"
+
+"$CHECKIDX" --help >/dev/null 2>&1
+assert_eq 22 "$?" 0 "--help exits 0"
+
+"$CHECKIDX" --since="$(git -C "$REPO_ROOT" rev-parse HEAD~1)" >"$SCRATCH/scope.out" 2>&1
+RC=$?
+if [ "$RC" = 0 ]; then
+    ok 23 "scope gate exits 0 when no backlog path changed since the ref"
+else
+    bad 23 "scope gate should exit 0 on an unrelated changed set (rc=$RC)"
+fi
+
+echo
+if [ "$FAILED" -gt 0 ]; then
+    echo "FAIL: $FAILED case(s) failed, $PASSED passed."
+    exit 1
+fi
+echo "PASS: all $PASSED cases ok."
+exit 0

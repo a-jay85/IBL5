@@ -1,0 +1,71 @@
+#!/bin/bash
+# Print the next unused L<n> ID for ibl5/docs/backlog/loop-engineering-backlog.md.
+#
+# Usage: bin/next-backlog-id
+#
+# Scans the index table, the per-item directory, every origin remote-tracking ref,
+# and every registered worktree — so an ID claimed on a pushed-but-unmerged branch
+# or in an uncommitted sibling worktree is never handed out twice. Same defense
+# bin/next-adr and bin/next-migration use. Read-only: prints, never writes.
+#
+# Exit: 0 with the ID on stdout. 2 on a usage error.
+
+set -euo pipefail
+
+source "$(dirname "$0")/lib/git-helpers.sh"
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ITEM_DIR_REL="ibl5/docs/backlog/loop-engineering"
+MONOLITH_REL="ibl5/docs/backlog/loop-engineering-backlog.md"
+
+usage() {
+    sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+case "${1-}" in
+    "") ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "Error: bin/next-backlog-id takes no arguments (got: $1)" >&2
+       usage >&2
+       exit 2 ;;
+esac
+
+# Max L-number from a stream of "L<n>-slug.md" BASENAMES on stdin.
+# `|| true` absorbs the empty-pipeline case under `set -o pipefail`.
+max_from_names() {
+    (
+        grep -oE '^L[0-9]+-' \
+            | grep -oE '[0-9]+' \
+            | sort -n \
+            | tail -1
+    ) || true
+}
+
+# Max L-number from index-table rows in a monolith file.
+max_from_table() {
+    local file="$1"
+    [ -f "$file" ] || return 0
+    (
+        grep -oE '^\| L[0-9]+ \|' "$file" \
+            | grep -oE '[0-9]+' \
+            | sort -n \
+            | tail -1
+    ) || true
+}
+
+CANONICAL_ROOT=$(resolve_canonical_root "$REPO_ROOT")
+
+MAX_TABLE=$(max_from_table "$REPO_ROOT/$MONOLITH_REL")
+MAX_TABLE_CANON=$(max_from_table "$CANONICAL_ROOT/$MONOLITH_REL")
+MAX_DIR=$( { ls -1 "$REPO_ROOT/$ITEM_DIR_REL" 2>/dev/null || true; } | max_from_names)
+MAX_ORIGIN=$( { scan_origin_refs "$ITEM_DIR_REL" "$REPO_ROOT" || true; } | max_from_names)
+MAX_WTS=$( { scan_worktrees "$ITEM_DIR_REL" "$REPO_ROOT" || true; } | max_from_names)
+
+MAX=0
+for CANDIDATE in "$MAX_TABLE" "$MAX_TABLE_CANON" "$MAX_DIR" "$MAX_ORIGIN" "$MAX_WTS"; do
+    if [ -n "$CANDIDATE" ] && [ "$((10#$CANDIDATE))" -gt "$((10#$MAX))" ]; then
+        MAX=$CANDIDATE
+    fi
+done
+
+echo "L$((10#$MAX + 1))"

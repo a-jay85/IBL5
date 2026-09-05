@@ -882,3 +882,57 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-05 during Phase 6 review of #2064)*
+
+---
+
+### E53 bin/test-backlog-split: case 16 greps fixture instead of output (false-green assertion)
+
+**class:** a test harness assertion that checks the input fixture (`$FIX`) instead of the actual split output (`$OUT`), causing the test to pass regardless of what the split operation produces.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | bin/test-backlog-split case 16 — both grep calls target `$FIX`; the split output `$OUT` is never consulted | yes | yes | fixed this pass — changed to `! grep -rq '...' "$OUT"` |
+
+**prevention_ladder:**
+- **rung 0 — already covered?** No existing gate checks that a test harness asserts on the correct target variable.
+- **rung 1 — extend existing gate?** No existing gate to extend; `/pr-ready` Phase 4B test-quality review is the current catch mechanism and it caught this.
+- **rung 2 — a rule doc?** Low value — the failure mode is an inattentive variable name, not ignorance of principle.
+- **rungs 3–5 — not warranted:** no mechanical check can determine whether `$FIX` or `$OUT` is the intended assertion target in context.
+- **landing rung:** no gate warranted — Phase 4B review is the existing catch; fix applied this pass.
+
+`prevention_ladder: no gate warranted — Phase 4B test-quality review is the catch; fix applied this pass`
+
+`artifact destination: n/a — no gate`
+
+`last_verified: 2026-09-05`
+
+*(discovered 2026-09-05 during Phase 6 review of #2125)*
+
+---
+
+### E54 bin/test-backlog-split: case 23 `--since=HEAD` always skips on a clean tree (vacuous scope-guard test)
+
+**class:** a test harness assertion that uses `--since=HEAD` to exercise a scope guard — but `--since=HEAD` on a clean working tree produces an empty changed-files set, so the guard exits 0 trivially without ever consulting the guard logic.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | bin/test-backlog-split case 23 — `"$CHECKIDX" --since=HEAD` on a scratch tree; the scope guard always short-circuits on an empty diff | yes | yes | fixed this pass — changed to `--since=$(git -C "$REPO_ROOT" rev-parse HEAD~1)` so the guard processes the real last-commit diff |
+
+**prevention_ladder:**
+- **rung 0 — already covered?** No existing gate checks that scope-guard tests use a non-trivial ref.
+- **rung 1 — extend existing gate?** No existing gate to extend; `/pr-ready` Phase 4B test-quality review is the catch mechanism.
+- **rung 2 — a rule doc?** Low value — the failure mode is a since-ref that doesn't exercise real diff content, not a pattern generalizable to a rule.
+- **rungs 3–5 — not warranted:** no mechanical check can determine whether a given `--since` ref produces a meaningful diff in context.
+- **landing rung:** no gate warranted — Phase 4B review is the existing catch; fix applied this pass.
+
+`prevention_ladder: no gate warranted — Phase 4B test-quality review is the catch; fix applied this pass`
+
+`artifact destination: n/a — no gate`
+
+`last_verified: 2026-09-05`
+
+*(discovered 2026-09-05 during Phase 6 review of #2125)*

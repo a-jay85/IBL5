@@ -26,27 +26,41 @@ _branch_base_valid_name() {
     return 0
 }
 
-# _branch_base_accept <repo_root> <name>
-# Shared acceptance gate: validate the name, verify origin/<name> resolves and is an ancestor
-# of HEAD (D6). Both resolution layers funnel through here so neither can accept something
-# the other would reject. On success prints "origin/<name>" and returns 0.
+# _branch_base_accept <repo_root> <name> <require_ancestor: 0|1>
+# Shared acceptance gate: validate the name, verify origin/<name> resolves, and optionally
+# check that it is an ancestor of HEAD (D6). Both resolution layers funnel through here so
+# neither can accept something the other would reject. On success prints "origin/<name>" and
+# returns 0. require_ancestor defaults to 1 when omitted.
 _branch_base_accept() {
-    local repo="$1" name="$2" ref
+    local repo="$1" name="$2" require_ancestor="${3:-1}" ref
     _branch_base_valid_name "$name" || return 1
     ref="origin/$name"
     git -C "$repo" rev-parse --verify --quiet "$ref^{commit}" >/dev/null 2>&1 || return 1
-    git -C "$repo" merge-base --is-ancestor "$ref" HEAD 2>/dev/null || return 1
+    if [ "$require_ancestor" = "1" ]; then
+        git -C "$repo" merge-base --is-ancestor "$ref" HEAD 2>/dev/null || return 1
+    fi
     printf '%s\n' "$ref"
     return 0
 }
 
+# branch_base_recorded <repo_root> <branch>
+# Strictly offline — reads branch.<name>.iblBase from git config, validates, verifies the ref
+# exists. No ancestry check: used by wt-rebase, which needs the base precisely because the
+# branch is behind it. Prints the resolved ref on success, returns 1 on any failure.
+branch_base_recorded() {
+    local name
+    name="$(git -C "$1" config --get "branch.$2.iblBase" 2>/dev/null)" || return 1
+    _branch_base_accept "$1" "$name" 0
+}
+
 # branch_base_from_config <repo_root> <branch>
-# Strictly offline — reads branch.<name>.iblBase from git config, validates, verifies ancestry.
-# Prints the resolved ref on success, returns 1 on any failure (missing key, bad name, stale base).
+# Strictly offline — branch_base_recorded plus the ancestry check (D6). Used by
+# branch_base_resolve (hook layer 1). Prints the resolved ref on success, returns 1 on any
+# failure (missing key, bad name, stale or non-ancestor base).
 branch_base_from_config() {
     local name
     name="$(git -C "$1" config --get "branch.$2.iblBase" 2>/dev/null)" || return 1
-    _branch_base_accept "$1" "$name"
+    _branch_base_accept "$1" "$name" 1
 }
 
 # _branch_base_run_timed <seconds> <cmd...>

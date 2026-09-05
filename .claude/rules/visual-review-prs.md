@@ -11,7 +11,7 @@ paths:
   - "bin/vr-changed-coverage"
   - "bin/vr-build-gallery"
   - "bin/vr-review-comment"
-last_verified: 2026-08-21
+last_verified: 2026-09-04
 ---
 
 # Visual-review PRs
@@ -66,7 +66,7 @@ They are skipped only during baseline regen (the `update-baselines` label).
 5. **Post sticky comment** — `marocchino/sticky-pull-request-comment@v3`, header `visual-review`.
 
 A `vr-pages-cleanup` job (push-to-master only, not part of the required gate) prunes
-per-SHA gallery dirs whose newest commit is older than 14 days. Its `gh-pages` push carries the same
+per-SHA gallery dirs whose newest commit is older than 7 days. Its `gh-pages` push carries the same
 rebase-and-retry loop for the same ref contention. A prune reaches the served site when
 `pages-deploy.yml` next re-publishes the tree (the cleanup job dispatches `pages-deploy.yml` itself once its prune push lands).
 

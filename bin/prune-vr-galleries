@@ -71,11 +71,11 @@ while IFS= read -r dir; do
   fi
   age=$(( (now - ts) / 86400 ))
   if [ "$ts" -lt "$cutoff" ]; then
+    removed=$(( removed + 1 ))
     if [[ "$dry_run" -eq 1 ]]; then
       echo "WOULD PRUNE: $dir (age=${age}d)"
     else
       git rm -rq "$dir"
-      removed=$(( removed + 1 ))
     fi
   else
     if [[ "$dry_run" -eq 1 ]]; then

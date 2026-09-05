@@ -271,4 +271,37 @@ else
          "wc -l is 1 and line matches ^[0-9]+$"
 fi
 
+# ---------------------------------------------------------------------------
+# Case: dry-run-count-matches-would-prune-count
+# ---------------------------------------------------------------------------
+SHA_P1="1111111111111111111111111111111111111111"
+SHA_P2="2222222222222222222222222222222222222222"
+SHA_K1="3333333333333333333333333333333333333333"
+REPO="$TMP/case-dryrun-count"
+git_init "$REPO"
+mkdir -p "$REPO/$SHA_P1" "$REPO/$SHA_P2" "$REPO/$SHA_K1"
+echo "content" > "$REPO/$SHA_P1/index.html"
+echo "content" > "$REPO/$SHA_P2/index.html"
+echo "content" > "$REPO/$SHA_K1/index.html"
+git -C "$REPO" add .
+git_commit_at "$REPO" $(( NOW - 10*86400 )) "two old one fresh"
+echo "updated" > "$REPO/$SHA_K1/index.html"
+git -C "$REPO" add .
+git_commit_at "$REPO" $(( NOW - 2*86400 )) "fresh update"
+
+run_prune "$REPO" --dry-run --cutoff-days 7
+WOULD_COUNT="$(printf '%s\n' "$OUT" | grep -c '^WOULD PRUNE:')"
+TRAIL="$(printf '%s\n' "$OUT" | tail -1)"
+
+CASE_PASS=1
+if ! printf '%s\n' "$TRAIL" | grep -qE '^[0-9]+$'; then CASE_PASS=0; fi
+if [ "$TRAIL" != "$WOULD_COUNT" ]; then CASE_PASS=0; fi
+if [ "$CASE_PASS" -eq 1 ]; then
+    pass "dry-run-count-matches-would-prune-count"
+else
+    fail "dry-run-count-matches-would-prune-count" \
+         "trailing='$TRAIL' would_prune_count='$WOULD_COUNT'" \
+         "trailing integer == number of WOULD PRUNE: lines (expected 2)"
+fi
+
 exit "$FAILED"

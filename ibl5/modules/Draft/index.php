@@ -16,7 +16,8 @@ get_lang($module_name);
 
 global $mysqli_db, $user;
 
-$op = is_string($_REQUEST['op'] ?? null) ? $_REQUEST['op'] : '';
+$httpRequest = \Http\HttpRequest::fromGlobals();
+$op = is_string($httpRequest->request('op')) ? $httpRequest->request('op') : '';
 
 $commonRepository = new \Repositories\TeamIdentityRepository($mysqli_db);
 $season = new \Season\Season($mysqli_db);

@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed/declined CI workflow simplification entries, extracted from ci-backlog.md.
-last_verified: 2026-09-04
+last_verified: 2026-09-05
 ---
 
 # CI Workflow Simplification Backlog — Archive
@@ -124,3 +124,11 @@ The `Build IBLbot` step (lines 120-121) is the only CI-runner npm build without 
 - Rungs 3-5: an actionlint custom rule could qualify as rung 4 if meta-tooling-bar conditions hold on the next review; defer until the rung-2 rule is in place and a recurring breach is observed.
 **Landing rung:** 2. **Artifact owed:** a `ci-node-toolchain-pin` rule doc in `.claude/rules/` (not yet written).
 **Status (2026-09-04):** ✅ Implemented — `actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0` step inserted immediately before `Build IBLbot` in `.github/workflows/main.yml`; prevention rule doc created at `.claude/rules/ci-node-toolchain-pin.md`. (ci-9-3-node-toolchain-pin)
+
+### 7.1 `gh-pages` tree unbounded by size — p95 deploy 540s
+*(discovered 2026-08-14 during #1874)*
+**Location:** `.github/workflows/e2e-tests.yml` `vr-pages-cleanup` job (14-day age prune); `.github/workflows/pages-deploy.yml` (uploads the whole `gh-pages` tree as the Pages artifact).
+**Problem:** The 14-day prune bounds age, not size. As of the audit: 1861 commits, 692 per-SHA dirs, 1595 files — the tree re-uploads entirely on every Pages deploy, which is why p95 wall-clock is 540s. Against `concurrency: group: pages, cancel-in-progress: false`, a queue of one plus the in-flight deploy is always building. The trigger-dedupe in #1874 cuts dispatch frequency (~100 → ~63 per 6.5h) but not upload size.
+**Suggested direction:** Prune by count (keep the N most recent SHAs), or switch to serving only the N most recent SHAs by generating a thin index that re-points `/<sha>/` to a shared CDN copy. The former is simpler; the latter also reduces storage. Either direction requires deciding N.
+**Risk if untouched:** Deploy wall-clock drifts up as more SHAs accumulate; the 14-day prune converges on a steady state only if SHAs age out before the tree grows past some threshold, which is not guaranteed under high-velocity usage.
+**Status (2026-08-30):** ✅ Implemented — N decided at 300 and shipped as a count cap layered after the existing 14-day age prune in `.github/workflows/e2e-tests.yml` (`vr-pages-cleanup`). Investigation correction: the age prune was **not** broken — measured 2026-08-30, arrival is ~76 dirs/day gross and the age histogram terminates hard at day 14, so 1072 per-SHA dirs was the *correct* steady state for a 14-day window. The real defect was that the tree was age-bounded but not size-bounded. The cap cuts retention to ~4 days; the first run removes ~625 dirs (recoverable from `gh-pages` history). Regression-covered by `bin/test-vr-pages-prune`. The CDN/thin-index alternative was declined — see the plan's trade-offs. `auto_merge: false` — first-run blast radius warranted human review.

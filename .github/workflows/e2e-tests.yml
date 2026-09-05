@@ -857,8 +857,10 @@ jobs:
 
   # Retention/cleanup for the per-SHA visual-review reports on gh-pages. Runs on
   # pushes to master (not on PRs, so it is NOT part of the `gate` required check)
-  # and prunes per-SHA dirs whose newest commit is older than 14 days, keeping the
-  # gh-pages branch from growing unbounded.
+  # and prunes per-SHA dirs twice: a 14-day age prune (by newest commit date),
+  # then a count cap keeping only the 300 most recent survivors. At the measured
+  # ~76 dirs/day arrival rate the cap is the binding bound; both run so the tree is
+  # bounded by age AND by size.
   vr-pages-cleanup:
     name: VR Pages retention cleanup
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
@@ -875,7 +877,7 @@ jobs:
           ref: gh-pages
           fetch-depth: 0
 
-      - name: Prune per-SHA report dirs older than 14 days
+      - name: Prune per-SHA report dirs (14-day age prune + 300-dir count cap)
         id: prune
         if: steps.checkout-pages.outcome == 'success'
         run: |
@@ -891,8 +893,32 @@ jobs:
               git rm -rq "$d" && removed=$((removed + 1))
             fi
           done < <(find . -mindepth 1 -maxdepth 1 -type d -not -name '.git')
+          # --- Pass 2: count cap over the age prune's survivors ------------------
+          # `git rm -r` above already removed each pruned dir from the working tree,
+          # so this second `find` enumerates survivors only.
+          # N=300. Measured 2026-08-30 on a scratch clone of gh-pages: 1072 per-SHA
+          # dirs, ~76 dirs/day gross arrival, and an age histogram terminating hard
+          # at day 14 — i.e. the age prune above is verified WORKING, not a no-op.
+          # So 300 is ~4 days of retention: a deliberate cut from the 14-day window,
+          # taken to bound the Pages upload. Re-measure before changing this number.
+          N=300
+          ranked=$(mktemp)
+          while IFS= read -r d; do
+            ts=$(git log -1 --format=%ct -- "$d")
+            # No commit (untracked/stray dir): rank it as "now" so it survives — the
+            # age pass above deliberately spares that class too, via its `-n` guard.
+            printf '%s\t%s\n' "${ts:-$(date +%s)}" "$d" >> "$ranked"
+          done < <(find . -mindepth 1 -maxdepth 1 -type d -not -name '.git')
+          # Newest first, dir name as a deterministic tiebreak. `tail -n +$((N + 1))`
+          # emits nothing when survivors <= N, so the exactly-at-N boundary is a
+          # natural no-op. Process substitution (never a pipe) so the `removed`
+          # increments below run in THIS shell rather than a discarded subshell.
+          while IFS= read -r d; do
+            git rm -rq "$d" && removed=$((removed + 1))
+          done < <(sort -k1,1nr -k2,2 "$ranked" | tail -n +$((N + 1)) | cut -f2-)
+          rm -f "$ranked"
           if [ "$removed" -gt 0 ]; then
-            git commit -m "chore(vr-pages): prune ${removed} per-SHA report dir(s) older than 14d"
+            git commit -m "chore(vr-pages): prune ${removed} per-SHA report dir(s) (14d age + 300-dir cap)"
             # Same shared-ref contention as the per-SHA deploy above: in-flight PR VR
             # jobs push their own <sha>/ dirs to gh-pages while we prune. Those commits
             # add paths we never touch, so a rejected push is always contention and a

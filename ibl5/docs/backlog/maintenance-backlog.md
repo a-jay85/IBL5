@@ -554,14 +554,13 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
-> ✅ resolved (10): 13.1, 13.2, 13.3, 13.5, 13.6, 13.7, 13.8, 13.9, 13.11, 13.13 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (11): 13.1, 13.2, 13.3, 13.5, 13.6, 13.7, 13.8, 13.9, 13.11, 13.13, 13.14 — evidence in [archive](archive/maintenance-backlog-archive.md)
 > 🚫 declined (2): 13.4, 13.10 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 13.7b | ⬜ Open | 🟨 | Needs `ValidationError`/`ValidationResultWithContext` type design (Depth/Trade carry structured + cap-total payloads) before the sweep. |
 | 13.12 | ◑ Partial | 🟩 | Exact-match sites consolidated onto the `PlayerTeamJoinQuery` trait (TeamQuery ×8, FreeAgency, LeagueStarters). Six divergent sites remain in the surveyed repositories (INNER JOIN / wider column list), plus 7 player↔team joins outside the original survey. |
-| 13.14 | ⬜ Open | 🟨 | Phase-blind `getTeamTotalSalary()` in waiver-claim cap check — same defect class as the trade accept-path fix (PR heat-nuggets-hardcap). |
 | 13.15 | ⬜ Open | 🟨 | `PlayerContractCalculator::getCurrentSeasonSalary()` is a fourth cap basis keyed on raw `cy` with no phase shift. |
 
 ### 13.7b Structured and Dict-Family Validators — Design Decision Needed
@@ -579,14 +578,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Database view (`vw_players_with_team`) or `BaseMysqliRepository::fetchPlayersWithTeam()` helper. Document the preference in CLAUDE.md; fix opportunistically.
 **Est. effort:** L
 **Risk if untouched:** New `ibl_team_info` columns require touching 15+ queries.
-
-### 13.14 Waiver-Claim Cap Check Uses the Phase-Blind Salary Basis
-**Status:** Backlog
-**Location:** `Waivers/WaiversController.php:167`
-**Problem:** calls `SalaryCapRepository::getTeamTotalSalary()`, which sums `vw_current_salary.current_salary` regardless of phase. During Draft/Free Agency — exactly when waiver claims fire — the current-season basis is `next_year_salary`, so the check runs one contract year behind. Reproduction (the numbers that drove PR `heat-nuggets-hardcap`, prod snapshot 2026-08-21, phase `Draft`, `HARD_CAP_MAX` 7000): Heat read as **6861** on the phase-blind basis vs **5159** on the correct shifted basis — a 1702 overstatement, enough to false-reject a legal transaction (offer 12190's Heat post-trade total came out 7232 instead of 5556).
-**Suggested direction:** apply the same `Season::advancesContractYears()` gate this PR added to `TradeExecutionService::validateParties()`, selecting `getTeamNextYearSalary()`; keep the repository phase-ignorant.
-**Est. effort:** S
-**Risk if untouched:** legal waiver claims rejected as over-cap for the whole offseason, and (symmetrically) over-cap claims allowed where next-year salary is higher.
 
 ### 13.15 `PlayerContractCalculator::getCurrentSeasonSalary()` Is a Fourth, Unshifted Cap Basis
 **Status:** Backlog

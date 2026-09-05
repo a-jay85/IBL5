@@ -1,0 +1,63 @@
+#!/bin/bash
+# CI gate: the loop-engineering backlog index table must match the per-item files.
+#
+# Usage:
+#   bin/check-backlog-index                  Check unconditionally (whole tree).
+#   bin/check-backlog-index --since=<ref>    Check only when the backlog changed.
+#
+# This is the only thing standing between the .gitattributes merge=union on the
+# index table and a silently duplicated row, so it is cheap enough to run on every
+# PR. With --since it computes the changed set as the union of <ref>...HEAD, the
+# unstaged diff, and the staged diff — the same three-way union bin/check-docs
+# uses, so a pre-commit self-check gives the verdict CI gives.
+#
+# Exit: 0 clean or out of scope. 1 on drift. 2 on a usage error.
+
+set -uo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+MONOLITH="ibl5/docs/backlog/loop-engineering-backlog.md"
+ITEM_DIR="ibl5/docs/backlog/loop-engineering"
+
+usage() {
+    sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+SINCE=""
+case "${1-}" in
+    "") ;;
+    -h|--help) usage; exit 0 ;;
+    --since=*) SINCE="${1#--since=}"
+               [ -n "$SINCE" ] || { echo "Error: --since= requires a ref" >&2; exit 2; } ;;
+    *) echo "Error: unknown argument: $1" >&2; usage >&2; exit 2 ;;
+esac
+
+[ $# -le 1 ] || { echo "Error: too many arguments" >&2; usage >&2; exit 2; }
+
+cd "$REPO_ROOT" || exit 2
+
+if [ -n "$SINCE" ]; then
+    CHANGED=$(
+        {
+            git diff --name-only "$SINCE...HEAD" 2>/dev/null
+            git diff --name-only HEAD 2>/dev/null
+            git diff --cached --name-only 2>/dev/null
+        } | sort -u
+    )
+    if ! printf '%s\n' "$CHANGED" | grep -qE "^($MONOLITH|$ITEM_DIR/)"; then
+        echo "check-backlog-index: no backlog index or per-item file changed since $SINCE — skipping."
+        exit 0
+    fi
+fi
+
+[ -f "$MONOLITH" ] || { echo "check-backlog-index: $MONOLITH absent — nothing to check."; exit 0; }
+[ -d "$ITEM_DIR" ] || { echo "check-backlog-index: $ITEM_DIR absent — nothing to check."; exit 0; }
+
+bin/backlog-split --check "$MONOLITH" "$ITEM_DIR"
+RC=$?
+if [ "$RC" != 0 ]; then
+    echo "check-backlog-index: FAIL — the index table and the per-item files disagree." >&2
+    echo "Remedy: bin/backlog-split --index $ITEM_DIR" >&2
+    echo "        then paste the result over the ## Entries table in $MONOLITH" >&2
+fi
+exit "$RC"

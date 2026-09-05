@@ -2760,3 +2760,6 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Risk if untouched:** Production behavior changes enter the codebase without a plan phase, dedicated code review, or verification matrix row, and the PR body can misrepresent the diff scope without a gate catching the contradiction.
 **provenance:** (discovered 2026-09-03 during #1807; Findings 3 and 4 combined)
 **Status:** ✅ Implemented (branch: files-changed-scope-reconciliation-gate, 2026-09-05) — added `.claude/rules/scope-expansion-justification.md` (NEW authorship norm for justifying `ibl5/modules/` files in a non-`feat:` PR body) and a sentinel-delimited scope-expansion self-check block in `/post-plan` Phase 2 that emits `SCOPE_EXPANSION=flagged|clear|none`. The justification paragraph is placed outside the `<!-- files-changed:begin -->` / `<!-- files-changed:end -->` marker pair so regeneration cannot destroy it. Advisory, not blocking: Phase 6.5 arming conditions are unchanged.
+
+### 8.18
+`bin/bug-pipeline-tick` parses and writes DB timestamps in **host-local** time while MariaDB stores UTC — idle reminders fire ~7h late and `blocked_until` backoffs expire on write. Fix is mechanical (force UTC on both sides); 🟨 because the bash driver has no regression pin, so one must ship with it. (discovered 2026-08-09 during the PR #1683 review)

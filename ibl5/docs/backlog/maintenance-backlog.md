@@ -334,13 +334,13 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
-> ✅ resolved (15): 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8, 8.9, 8.11, 8.12, 8.13, 8.14, 8.16, 8.17 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (16): 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8, 8.9, 8.11, 8.12, 8.13, 8.14, 8.16, 8.17, 8.18 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 8.10 | ⬜ Open | 🟨 | Interactive-vs-CI convention — upfront decision (`check-*`/`test-*` prefix vs a dedicated `ci/` subdir). |
 | 8.15 | ⬜ Open | 🟨 | Consolidate the two E2E drivers — context-detection design; mind the outside-repo `e2e-for-pr` gotcha. |
-| 8.18 | ⬜ Open | 🟨 | `bin/bug-pipeline-tick` parses and writes DB timestamps in **host-local** time while MariaDB stores UTC — idle reminders fire ~7h late and `blocked_until` backoffs expire on write. Fix is mechanical (force UTC on both sides); 🟨 because the bash driver has no regression pin, so one must ship with it. (discovered 2026-08-09 during the PR #1683 review) |
+
 
 ### 8.10 No Convention for Interactive vs CI Scripts
 **Location:** `/bin/`

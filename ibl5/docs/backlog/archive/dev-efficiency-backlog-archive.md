@@ -234,3 +234,28 @@ Body summary text was authored pre-implementation and hand-updated during coding
 `artifact destination:` `bin/check-docs`, `bin/lighthouse-pr-urls`, `ibl5/phpstan-rules/BanProcOpenUncheckedExitRule.php` (in-repo). **Status:** ✅ Implemented.
 
 *(discovered 2026-08-31 during #2046, fixed 2026-09-04)*
+
+### E31 `bin/plan-now` help span truncated by bare `#`; test assertions miss declared secondary-behaviour tokens
+
+*(discovered 2026-09-01 during #1966)*
+
+**class:** a bin/ help-block edit inserts a bare `#` that silently terminates the `sed -n '/^# Usage:/,/^#$/p'` span, dropping a documented operator section from `--help`; or a verification-matrix row is implemented positive-only, omitting an asserted secondary stderr token — in both cases a reviewer sees the declared behaviour and the test suite does not contradict it, so the gap ships.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/plan-now:18` — bare `#` terminated the help span, dropping the 6-line DM-contract paragraph | yes | fixed this pass | fixed this pass |
+| 2 | `bin/test-plan-now` — verification-matrix row declared secondary assertion `proceeding` in non-3-exit warning case; no `want` called it | yes | fixed this pass | fixed this pass |
+| 3 | `bin/test-plan-now` — verification-matrix row 2 (secondary assertion text for non-3 path) missing positive assertion for `--proceed-on-non-gate-exit` activation token | yes | fixed this pass | fixed this pass |
+
+`prevention_ladder:`
+
+- **rung 0 — already covered by an existing gate?** No gate checks that verification-matrix rows assert every named secondary token, or that a help-comment block contains no bare `#` terminators.
+- **rung 1 — extend an existing gate?** No existing gate owns this surface.
+- **rung 2 — a rule doc? Yes — landing rung.** A `.claude/rules/` note that: (a) help-block comment spans must not contain a bare `#` line (terminator hazard); (b) verification-matrix rows that declare a secondary stderr or stdout token must have a matching `want` assertion in the harness for that token specifically. Meta-tooling-bar: no host to extend ✓, distinct trigger ✓, earns its upkeep ✓, no cheaper alternative ✓. Rule authored this pass.
+- **rungs 3–5** — N/A. Mechanical detection of missing assertions requires understanding which tokens a row declares — outside the scope of a linter without semantic knowledge of the plan's matrix.
+
+`artifact destination:` `.claude/rules/bin-help-span-and-secondary-assertions.md` (created this pass). **Status:** ✅ Implemented.
+
+*(fixed 2026-09-05)*

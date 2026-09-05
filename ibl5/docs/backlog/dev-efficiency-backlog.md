@@ -74,6 +74,7 @@ last_verified: 2026-09-05
 | E46 | PR body "What is NOT in this PR" written before all plan phases complete | ✅ Implemented | — | XS |
 | E50 | PR #2092 Phase 6.5 — `--dry-run` counter increment in live-only branch; no harness case for dry-run count (Findings 1+5); both fixed this pass | ⬜ Open | — | XS |
 | E51 | PR #2092 Phase 6.5 — notes Findings 2–4: find-regex deviation already filed, benign out-of-plan changes, body claim fixed by E50; class n/a for all | ⬜ Open | — | XS |
+| E53 | PR #1899 Phase 6.5 — stale test-row labels and PR body claims when rows renumbered post-impl (F1, F2, F5); out-of-plan timeout fix noted (F4); all fixed or noted this pass | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -882,3 +883,32 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-05 during Phase 6 review of #2064)*
+
+---
+
+### E53 PR #1899 Phase 6.5 — stale test-row labels and PR body claims when rows renumbered post-impl
+
+**class:** hand-authored test-file row-number header and PR body bullets that name specific row numbers become stale when rows are renumbered mid-implementation — the same class as E45 and E52.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/test-bug-pipeline-hunt:9` — header row list named `41,42,43,44,45,46,47`; rows were renumbered to `50–56` during implementation | yes | yes | fixed this pass |
+| 2 | PR #1899 body — "rows 41–47 covering gate acceptance/rejection paths" | yes | yes | fixed this pass |
+| 3 | PR #1899 body — "all changes are covered by unit and E2E tests" (no E2E component in diff; all tests are bash harness rows) | near-miss | yes | fixed this pass |
+| 4 | `bin/test-bug-pipeline-hunt:588` — DB-reachability block named `Row 47` / `R47` / `r47:`, identical to the pre-existing DM Row 47 at line 449 | yes | yes | fixed this pass — renamed to Row 56 / R56 / r56: |
+
+**F4 sub-note (out-of-plan):** `timeout 30 run_under_starved_env` in `bin/test-bug-pipeline-hunt` wrapped a shell function — `timeout(1)` exec's its argument, so a shell function always exits 127. Fixed out-of-plan by moving `timeout` inside the function. No separate prevention entry warranted; the shell-function-as-timeout-argument class is filed in `ibl5/docs/backlog/loop-engineering-backlog.md`.
+
+**prevention_ladder:**
+- **rung 0 — already covered?** `/pr-ready` Phase 6 check 4 catches PR body prose inconsistencies. No gate checks test-file row-number headers against the diff.
+- **rung 1 — extend existing gate?** Extending Phase 6 check 4 to scan test-file row-number headers is too fragile — row headers are human-authored summaries of implementation intent.
+- **rungs 2–5 — not warranted:** a lint rule or hook cannot read implementation intent against prose claims.
+- **landing rung:** no gate warranted — Phase 6 check 4 is the catch; row-list accuracy in test-file headers requires reading implementation intent.
+
+`prevention_ladder: no gate warranted — Phase 6 check 4 is the existing catch; row-number list accuracy in test-file headers cannot be verified mechanically`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-05 during Phase 6 review of #1899)*

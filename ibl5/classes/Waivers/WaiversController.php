@@ -108,7 +108,7 @@ class WaiversController implements WaiversControllerInterface
         }
 
         // PRG: Process POST submission, then redirect
-        $action_ = $this->request->post('Action');
+        $action_ = $this->request->post('Action'); // underscore avoids shadowing $action param
         if ($action_ === 'add' || $action_ === 'waive') {
             $postAction = $action_;
 

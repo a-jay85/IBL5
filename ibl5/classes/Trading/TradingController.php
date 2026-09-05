@@ -368,9 +368,6 @@ class TradingController implements TradingControllerInterface
             $teamReceiving
         );
 
-        if ($verdict['success'] === true) {
-            EventLogger::setAction('trade_offer_rejected');
-        }
         \Utilities\HtmxHelper::redirect($verdict['redirect']);
     }
 

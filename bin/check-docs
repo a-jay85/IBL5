@@ -1509,6 +1509,27 @@ function checkMaintenanceResolved(string $repoRoot): array
     )] : [];
 }
 
+function checkSkillDraftPlaceholder(string $repoRoot): array
+{
+    $issues = [];
+    foreach (glob($repoRoot . '/.claude/skills/*/SKILL.md') ?: [] as $file) {
+        $lines = file($file, FILE_IGNORE_NEW_LINES);
+        if ($lines === false) continue;
+        $inFence = false;
+        foreach ($lines as $i => $line) {
+            if (preg_match('/^```/', $line)) {
+                $inFence = !$inFence;
+                continue;
+            }
+            if ($inFence && preg_match('/^DRAFT=\$\(/', $line)) {
+                $rel = ltrim(str_replace($repoRoot, '', $file), '/');
+                $issues[] = "{$rel}:" . ($i + 1) . " — DRAFT= uses command substitution; use an inert <slug> placeholder instead";
+            }
+        }
+    }
+    return $issues;
+}
+
 // --- main ---
 
 $opts = ['fix_dates' => false, 'include_memory' => false, 'verbose' => false, 'since' => null, 'no_staleness' => false, 'staleness_report' => false];
@@ -1664,6 +1685,15 @@ $maintenanceIssues = checkMaintenanceResolved($root);
 if ($maintenanceIssues !== []) {
     echo "FAIL maintenance-backlog resolved rows\n";
     foreach ($maintenanceIssues as $issue) {
+        echo "     - {$issue}\n";
+    }
+    $failures++;
+}
+
+$skillDraftIssues = checkSkillDraftPlaceholder($root);
+if ($skillDraftIssues !== []) {
+    echo "FAIL skill DRAFT= command-substitution\n";
+    foreach ($skillDraftIssues as $issue) {
         echo "     - {$issue}\n";
     }
     $failures++;

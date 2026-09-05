@@ -187,7 +187,7 @@ UI -> League Player Season Security Team
 Updater -> BasketballStats Boxscore BulkImport Discord JsbParser League LeagueConfig PageLayout PlrParser SavedDepthChart Season Security Standings Utilities
 Utilities -> Security
 Voting -> League Player Season Security
-Waivers -> Auth BaseMysqliRepository Discord EventLog League Player Repositories Season Team UI Validation
+Waivers -> Auth BaseMysqliRepository Discord EventLog Http League Player Repositories Season Team UI Validation
 YourAccount -> Auth League Logging Mail Repositories Security
 
 ## Usage

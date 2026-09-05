@@ -616,7 +616,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 |---|--------|-----------|-----------------|
 | 14.5 | ⬜ Open | 🟨 | Module index.php → front-controller composition root (42 modules). Very large; routing/auth-sensitive → decompose + sequence (some modules touch mutations). |
 | 14.10 | ◑ Partial | 🟨 | Container accessor registered (PR1); side-effect removal deferred to PR3 (boosted-HTMX cookie-population hazard) → careful sequencing. |
-| 14.12 | ◑ Partial | 🟩 | `HttpRequest` VO shipped (14.8) and wired into 5 module entry points; residual: `ComparePlayers`, `Draft`, `ProjectedDraftOrder`, `Voting`, `ApiKeys` `index.php` still read `$op` from `$_REQUEST` directly. |
+| 14.12 | ◑ Partial | 🟩 | `HttpRequest` VO shipped (14.8) and wired into 5 module entry points; residual: `modules/Waivers/index.php` still reads superglobals directly. |
 
 ### 14.5 Module `index.php` Files Are the Real Composition Root (42 of 47)
 **Location:** `ibl5/modules/*/index.php`
@@ -639,7 +639,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Replace with explicit `Request` object; module entry points read named parameters by key.
 **Est. effort:** L
 **Risk if untouched:** Name collisions silently overwrite globals; PHPStan needs per-site `@var` annotations.
-**Status:** Partially completed (verified 2026-05-29 audit) — the wholesale `$_REQUEST`→`$GLOBALS` copy is gone; `ConfigBootstrap` now allowlists only `newlang`/`redirect` (see [[3.6]]). Modules still read `$op`/`$pid`/`$action` directly from `$_REQUEST` — a `Request` object remains the longer-term fix. A `Http\HttpRequest` value object shipped (item 14.8) and is now the boundary for the FreeAgency, DepthChartEntry, Team and Player entry points (four); residual: `WaiversController`/`modules/Waivers/index.php` still read superglobals directly, plus ComparePlayers, Draft, ProjectedDraftOrder, Voting, ApiKeys `index.php` still read `$op` from `$_REQUEST`.
+**Status:** Partially completed (verified 2026-05-29 audit) — the wholesale `$_REQUEST`→`$GLOBALS` copy is gone; `ConfigBootstrap` now allowlists only `newlang`/`redirect` (see [[3.6]]). Modules still read `$op`/`$pid`/`$action` directly from `$_REQUEST` — a `Request` object remains the longer-term fix. A `Http\HttpRequest` value object shipped (item 14.8) and is now the boundary for the FreeAgency, DepthChartEntry, Team and Player entry points (four); residual: `WaiversController`/`modules/Waivers/index.php` still read superglobals directly.
 
 ---
 

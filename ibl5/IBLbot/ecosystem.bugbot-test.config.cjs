@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const dotenv = require('dotenv');
 
-const HERE = '/Users/ajaynicolas/GitHub/IBL5/ibl5/IBLbot';
+const HERE = __dirname;
 const TEST_ENV = path.join(HERE, '.env.bugbot.test');
 const PROD_ENV = path.join(HERE, '.env.bugbot');
 

@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-09-04
+last_verified: 2026-09-05
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -289,22 +289,13 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):** Adding tests is inherently green-green (no production change) → every open coverage gap is 🟩 auto-mergeable. If writing a test surfaces a real bug, the *fix* becomes its own finding with its own classification. (Exceptions: **6.21** and **6.23** are 🟨, not 🟩 — in each the target code is unreachable from PHPUnit, so no test is writable until a production seam is decided: a teamless-fixture / non-`exit()` refactor for 6.21, a SAPI-independent hashing seam for 6.23.)
 
-> ✅ resolved (22): 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 6.13, 6.14, 6.15, 6.16, 6.17, 6.18, 6.20, 6.22, 6.24, 6.26 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (23): 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 6.13, 6.14, 6.15, 6.16, 6.17, 6.18, 6.19, 6.20, 6.22, 6.24, 6.26 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
-| 6.19 | ◑ Partial | 🟩 | AllStarAppearances + GMContactList repo unit tests added. Season entity predicates blocked by `Season\Season`→mock alias (QueryRepo plumbing covered). `Shared` N/A (deleted 2.23). |
 | 6.21 | ⬜ Open | 🟨 | Row-12 (Free-Agents/teamless session) `processrookieoption` ownership-rejection path untested: PHPUnit entry-point test impossible (handler `exit()`s), E2E auth fixture always has a session team. Needs a teamless-fixture / non-`exit()` refactor decision before it's writable → 🟨. From PR #1107 Phase 5.0 note. |
 | 6.23 | ⬜ Open | 🟨 | **Same family as 6.22, different guard.** `RequestEventLoggingBootstrap::boot()` returns at line 35 when `\PHP_SAPI === 'cli'`, and PHPUnit is always CLI (DB group included), so the `hash('sha256', session_id())` derivation at lines 66–70 is unreachable from any PHPUnit test — the file's three existing tests are all `expectNotToPerformAssertions()` for exactly this reason. A regression storing the **raw** session id would break zero tests. Extract the derivation to a pure static (or inject the SAPI) so the PII boundary is unit-pinnable. 🟨: production change on a PII boundary; needs a seam decision. (discovered 2026-08-08 during #1670) |
 | 6.25 | ⬜ Open | 🟨 | **Residual of 6.22.** The verdict + thin-redirect-shim conversion landed for Waivers, FreeAgency, and the Trade API accept/decline controllers; `Trading\TradingController`'s reject path still gates inline and still ends in `HtmxHelper::redirect()→exit()`, so its "non-party refused + no mutation" property remains E2E-only. Apply the same pattern: move the authz decision into a verdict-returning method on the service that owns the mutation, leave the controller a shim. Verdict shape is now settled (`array{success: bool, error?: string}`), so the design fork 6.22 carried is closed. 🟨: production refactor on a security surface. Split out of 6.22 when it resolved. |
-
-### 6.19 Small Modules With Single-Test Coverage
-**Location:** `AllStarAppearances` (4/1), `GMContactList` (4/1), `Season` (3/1), `Shared` (3/1)
-**Problem:** Minimal coverage on aggregation, dedup, phase transitions, shared-data constraints.
-**Suggested direction:** Targeted single-class tests.
-**Est. effort:** S each
-**Risk if untouched:** AS appearances double-counted; duplicate GMs; season state inconsistencies; shared data leaks.
-**Status:** ◑ Partial (2026-06-26) — added AllStarAppearancesRepositoryTest and GMContactListRepositoryTest (return-shape + empty negative). Season: phase plumbing covered by SeasonQueryRepositoryTest (getSeasonPhase, calculatePhaseSimNumber); the Season-entity phase predicates (isFreeAgencyPhase, areTradesAllowed, areWaiversAllowed, advancesContractYears) are structurally untestable because classes/Bootstrap/TestAliasesBootstrap.php:22 aliases Season\Season → the mock — left as-is (removing the alias is a cross-suite infra change, out of scope). Shared: N/A (deleted, backlog 2.23). Residual (DatabaseIntegration-only): AS-appearance aggregation / GM dedup correctness.
 
 ### 6.21 Rookie-option Free-Agents/teamless ownership gate is untested
 **Location:** `ibl5/modules/Player/index.php` (`processrookieoption()` ownership gate); planned `tests/Module/EntryPoints/PlayerRookieOptionEntryPointTest.php`

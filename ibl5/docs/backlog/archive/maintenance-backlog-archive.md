@@ -1267,6 +1267,16 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 
 **Table evidence (2026-08-15):** Unit tests added: DraftPickLocator repo, LeagueSchedule Game, TransactionHistory repo, CapSpace repo. NextSim/SavedDepthChart/DepthChartEntry verified covered. Residual: SQL aggregation/ordering + SDC write-path are DB-integration-only. Residual closed: testGetTransactionsOrdersNewestFirst added (PR #1885); SDC write-path covered by testGetSavedDepthChartByIdReturnsRow; aggregation covered by testGetWinLossRecord* tests.
 
+### 6.19 Small Modules With Single-Test Coverage
+**Location:** `AllStarAppearances` (4/1), `GMContactList` (4/1), `Season` (3/1), `Shared` (3/1)
+**Problem:** Minimal coverage on aggregation, dedup, phase transitions, shared-data constraints.
+**Suggested direction:** Targeted single-class tests.
+**Est. effort:** S each
+**Risk if untouched:** AS appearances double-counted; duplicate GMs; season state inconsistencies; shared data leaks.
+**Status:** ✅ Done (2026-09-04) — DatabaseIntegration residual closed. AS-appearance aggregation was already covered by the 10 seeded-row tests in `ibl5/tests/DatabaseIntegration/AllStarAppearancesRepositoryTest.php`. GM dedup correctness now covered end-to-end by `testExcludesTeamsOutsideRealFranchiseRange` (seeds an out-of-range `teamid` and proves it is filtered) and `testTwoDistinctInRangeTeamsAreNotCollapsed` (proves the returned `teamid` multiset is duplicate-free) in `ibl5/tests/DatabaseIntegration/GMContactListRepositoryTest.php`. Season-entity phase predicates remain structurally untestable (the `TestAliasesBootstrap` mock alias) and `Shared` is N/A (deleted, backlog 2.23) — both are non-goals, not residuals.
+
+**Table evidence (2026-09-04):** AllStarAppearances + GMContactList repo unit tests added. Season entity predicates blocked by `Season\Season`→mock alias (QueryRepo plumbing covered). `Shared` N/A (deleted 2.23).
+
 ### 6.20 Anonymous rookie-option lockdown E2E assertion is non-discriminating
 **Location:** `tests/e2e/security/draft-rookie-anon-lockdown.spec.ts` (under `ibl5/`; added by PR #1107, not yet on `master`)
 **Problem:** The unauthenticated `processrookieoption` lockdown test asserts the response `toContain('YourAccount')` — a string emitted by `loginbox()` / global nav chrome on *every* anonymous page. It therefore does not discriminate a working auth gate from a broken one: if the `is_user()` gate regressed, the success marker (`result=rookie_option_success`) appears only in the redirect *URL*, not the response body, so the test would still pass. (The sibling Draft lockdown test is independently saved by its `not.toMatch(/select\s*\*\*.*!\*\*/)` negative matcher; the rookie test has no such backstop.)

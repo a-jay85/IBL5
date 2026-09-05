@@ -139,3 +139,24 @@ def test_push_after_rebase_uses_force_with_lease(repo):
 
     # push() must succeed (--force-with-lease handles the diverged remote)
     g.push()  # raises HarnessError("git", ...) if plain push, passes if --force-with-lease
+
+
+def test_diff_vs_base_non_utf8_bytes(repo):
+    """Regression pin for UnicodeDecodeError: a file containing byte 0x9e must
+    produce a str result (with U+FFFD replacements), not raise.
+
+    Fails on master (text=True without errors="replace") and passes after Phase 1."""
+    g = LiveGit(repo)
+    bin_path = os.path.join(repo, "binary.bin")
+    with open(bin_path, "wb") as f:
+        f.write(b"binary\x9ebytes")
+    subprocess.run(["git", "-C", repo, "add", "binary.bin"], check=True,
+                   capture_output=True)
+    subprocess.run(["git", "-C", repo, "commit", "-m", "add binary file"],
+                   check=True, capture_output=True,
+                   env={**os.environ,
+                        "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+                        "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"})
+    result = g.diff_vs_base(base="HEAD~1")
+    assert isinstance(result, str), "diff_vs_base must return str, not raise"
+    assert "�" in result, "U+FFFD replacement character must appear for byte 0x9e"

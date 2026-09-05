@@ -66,7 +66,7 @@ last_verified: 2026-09-05
 | L37 | PR body declares only the plan's named files; changes the plan never named ship undeclared, so a reviewer cannot separate intended scope from drift | ⬜ Open | 🟦 | S |
 | L38 | Headless CI watcher killed: `local_bash` not awaited by wind-down sweep — phantom success under `claude -p` | ✅ Shipped #2026 | 🟦 | S |
 | L39 | Autonomous PR body omits plan-deliverable moot-at-branch-cut explanation and asserts unchecked test coverage | ⬜ Open | 🟥 | S |
-| L40 | Compiled post-plan harness crashes on any PR containing a binary file (`git diff` decoded as strict UTF-8) | ⬜ Open | 🟥 | S |
+| L40 | Compiled post-plan harness crashes on any PR containing a binary file (`git diff` decoded as strict UTF-8) | ✅ Done | 🟥 | S |
 | L41 | Plan Verification Matrix rows can ship unrealised — nothing checks a plan's declared assertions against the tests actually delivered | ⬜ Open | 🟥 | S |
 | L42 | Autonomous-loop PR ships stale line citations, undeclared plan substitution, unmentioned diff file, and duplicate backlog ID | ⬜ Open | 🟦 | S |
 | L43 | Autonomous-loop doc-fix PR body contains stale claims and inconsistent ADR authoring format after post-review commit | ⬜ Open | 🟦 | S |
@@ -446,6 +446,8 @@ The failure is quiet because the two-engine design absorbs it: the harness exits
 **Risk if untouched:** Every binary-touching PR silently loses the fast, guardrailed engine and falls through to an unconstrained agent — the expensive path, taken invisibly, with lower-quality output. Because the fallback usually *succeeds*, there is no signal that the primary engine has been dead for that whole class of PR.
 
 **Status (2026-09-01):** ⬜ Open — 🟥 (self-contained fix in a dev-tooling adapter; no user-facing surface, no gate weakened).
+
+**Resolved:** 2026-09-04 — PR adds `errors="replace"` to all three `text=True` sites in `gitad.py`; regression pin wired into CI.
 
 ---
 

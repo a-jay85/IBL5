@@ -74,6 +74,8 @@ last_verified: 2026-09-05
 | E46 | PR body "What is NOT in this PR" written before all plan phases complete | ✅ Implemented | — | XS |
 | E50 | PR #2092 Phase 6.5 — `--dry-run` counter increment in live-only branch; no harness case for dry-run count (Findings 1+5); both fixed this pass | ⬜ Open | — | XS |
 | E51 | PR #2092 Phase 6.5 — notes Findings 2–4: find-regex deviation already filed, benign out-of-plan changes, body claim fixed by E50; class n/a for all | ⬜ Open | — | XS |
+| E52 | PR #2064 Phase 6.5 — stale hand-written PR body claims contradicting the final diff and code; all fixed this pass | ⬜ Open | — | XS |
+| E53 | PR #1897 Phase 6.5 — plan-text staleness and meta-text accuracy notes (stale plan literals, vestigial test arg, Manual Testing boilerplate, post-plan retrospective scope count); class n/a or no gate warranted for all | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -887,3 +889,31 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-05 during Phase 6 review of #2064)*
+
+---
+
+### E53 PR #1897 Phase 6.5 — plan-text staleness and meta-text accuracy notes
+
+**class:** `n/a` for all five notes — each is a cosmetic plan-accuracy or machine-generated-boilerplate observation with no live defect to fix; the implementation was correct in every case.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `~/claude-plans/maint-2-39-cash-year-range-bound.md` Phase 8 Edit 8e — old→new `last_verified` values stale (`2026-08-08 → 2026-08-09`; master already at `2026-09-05`); implementation satisfied without any diff line | yes | yes (stale plan text) | not fixed — no code change warranted; `bin/check-docs` confirmed correct |
+| 2 | `ibl5/tests/Trading/TradeRosterPreviewParamValidatorTest.php` — `testValidateCashYearRangeRejectsAttackInput` passes `2031` as `$maxYear` (calendar-year vestige from earlier design; production ceiling is `6`) | yes | yes | not fixed — test still proves rejection (`999999 > 2031`); real ceiling pinned by three other tests; matches plan Verification Matrix row 1 verbatim |
+| 3 | `~/claude-plans/maint-2-39-cash-year-range-bound.md` Verification Matrix row 10 — cites "`resolved (21)`" and "ten files"; master absorbed 2.40–2.41 between plan-write and merge; actual counts are `resolved (24)` and 12 files | yes | yes (stale plan text) | not fixed — implementation tracked master correctly; plan text is accepted as stale historical context |
+| 4 | PR #1897 body `## Manual Testing` sentinel — "all changes are covered by unit and E2E tests"; no E2E test in diff | yes | yes (machine-generated) | not fixed — boilerplate from `/post-plan`; clearance correct (zero `Truly-manual` rows); a template concern, not a PR #1897 defect |
+| 5 | `~/claude-plans/maint-2-39-cash-year-range-bound.md` Critical Files — "Ten files, one reviewable change"; diff carries 12 files (post-plan retrospective added `loop-engineering-backlog.md` and `.claude/review-shared/_plan-verification.md`) | yes | yes (stale plan text) | not fixed — plan-authoring responsibility; retrospective output is correct by construction |
+
+**prevention_ladder:**
+- **rung 0 — already covered?** `/pr-ready` Phase 6 checks 1, 2, 4, and 5 caught all five occurrences.
+- **rung 1 — extend existing gate?** Phase 6 check 4's prose-vs-reality scan could flag test arguments that don't match the production constant; not worth the false-positive risk.
+- **rungs 2–5 — not warranted:** plan-text staleness is inherent when master evolves between plan-write and merge; no mechanical gate can keep plan literal values current, and the test argument (row 2) still proves the contract correctly.
+- **landing rung:** no gate warranted — Phase 6 is the existing catch mechanism; all five are cosmetic and self-resolving.
+
+`prevention_ladder: no gate warranted — Phase 6 caught all; plan-text staleness is inherent; no mechanical gate can verify prose-vs-implementation consistency`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-05 during Phase 6 review of #1897)*

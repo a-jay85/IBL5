@@ -10,11 +10,12 @@
 # ~70-line bin/ scripts with no ADR and only learned at CI; this hook surfaces
 # the same trigger at push time.
 #
-# Mechanism: pipe the branch's commit-message blob (git log origin/master..HEAD)
-# into `bin/adr-check --pr --bypass-from-stdin`. adr-check's fetchPrBody() reads
-# STDIN before its mode check, so the commit-message blob supplies the bypass
-# body while detectTriggers('pr') scans the origin/master...HEAD diff. bin/adr-check
-# is reused UNCHANGED — zero CI-behavior regression risk.
+# Mechanism: resolve the branch's real base ($BASE_REF, which may be a stacked parent
+# rather than origin/master), then pipe `git log $BASE_REF..HEAD` commit messages into
+# `bin/adr-check --pr --bypass-from-stdin --base=$BASE_REF`. adr-check's fetchPrBody()
+# reads STDIN before its mode check, so the commit-message blob supplies the bypass
+# body while detectTriggers('pr') scans the $BASE_REF...HEAD diff. The same base ref
+# is handed to adr-check so the hook and CI evaluate the identical range.
 #
 # Invoked by the .git/hooks/pre-push shim that bin/install-git-hooks writes; the
 # shim chains git-lfs first, then exec's this script. Hard-blocks (exit 1) on a
@@ -26,7 +27,8 @@
 # collision — do not read the hook's stdin.
 #
 # Exit codes: 0 = pass (no trigger, ADR present, bypass marker, or origin/master
-# absent — degrade-open), 1 = trigger without resolution.
+# absent — degrade-open), 1 = trigger without resolution, or a base that could not
+# be resolved.
 #
 # Bash 3.2 / macOS compatible. `shell=bash` keeps shellcheck's SC3xxx quiet.
 
@@ -46,36 +48,55 @@ if [ "$REPO_ROOT" = "/" ]; then
 fi
 
 # Degrade-open when origin/master is unknown (fresh clone, never fetched): the CI
-# adr-check gate (in pr-meta-checks.yml) remains the backstop, and blocking a legitimate push here
-# would be worse than deferring to CI.
+# adr-check gate (in pr-meta-checks.yml) remains the backstop, and blocking a legitimate push
+# here would be worse than deferring to CI. Degrade-open is safe here because CI still
+# enforces the identical origin/master gate; contrast with an unresolvable stacked base below,
+# where CI is now base-parameterized too — a wrong base would skip both sides at once, so
+# that case fails closed.
 if ! git -C "$REPO_ROOT" rev-parse --verify origin/master >/dev/null 2>&1; then
     echo "pre-push-adr-hook: origin/master not found; skipping gates (CI still enforces them)." >&2
     exit 0
 fi
 
-# Block pushes where the branch hasn't been rebased onto origin/master. No fetch here —
-# keep push latency low; wt-new already syncs at creation time. If origin/master has
-# advanced since then, `git fetch origin master && git rebase origin/master` or
-# `bin/wt-rebase` brings the branch current.
+# Block pushes where the branch hasn't been rebased onto its real base. No fetch here —
+# keep push latency low; wt-new already syncs at creation time. Freshness-versus-
+# origin/master is owned by the stack root: when the root is pushed its hook enforces that
+# obligation; this hook deliberately does not walk the stack. If a branch is behind its base,
+# `git fetch origin master && git rebase origin/master` or `bin/wt-rebase` brings it current.
 CURRENT_BRANCH=$(git -C "$REPO_ROOT" symbolic-ref --short HEAD 2>/dev/null || true)
+BASE_REF="origin/master"
 if [ -n "$CURRENT_BRANCH" ] && [ "$CURRENT_BRANCH" != "master" ]; then
     if ! git -C "$REPO_ROOT" merge-base --is-ancestor origin/master HEAD 2>/dev/null; then
-        cat >&2 <<'EOF'
+        RESOLVED=""
+        if [ -r "$REPO_ROOT/bin/lib/branch-base.sh" ]; then
+            # shellcheck source=bin/lib/branch-base.sh
+            . "$REPO_ROOT/bin/lib/branch-base.sh"
+            RESOLVED="$(branch_base_resolve "$REPO_ROOT" "$CURRENT_BRANCH" 2>/dev/null)" \
+                || RESOLVED=""
+        fi
+        if [ -n "$RESOLVED" ]; then
+            BASE_REF="$RESOLVED"
+        else
+            BASE_NAME="${BASE_REF#origin/}"
+            cat >&2 <<EOF
 
-pre-push-adr-hook: branch is not rebased onto origin/master.
+pre-push-adr-hook: branch is not rebased onto $BASE_REF.
 Fetch and rebase before pushing:
-  git fetch origin master && git rebase origin/master
+  git fetch origin $BASE_NAME && git rebase $BASE_REF
   # or rebase all active worktrees at once: bin/wt-rebase
+If this branch is stacked on another PR, record its real base and retry:
+  git config branch.$CURRENT_BRANCH.iblBase <parent-branch>
 EOF
-        exit 1
+            exit 1
+        fi
     fi
 fi
 
 # Pipe the branch's commit-message blob to adr-check. Run inside REPO_ROOT so both
 # git and adr-check (which uses cwd-relative git) operate on the right repo. Under
 # bash the pipe's exit status is adr-check's (no pipefail needed).
-if ( cd "$REPO_ROOT" && git log origin/master..HEAD --format='%B' \
-        | "$REPO_ROOT/bin/adr-check" --pr --bypass-from-stdin ); then
+if ( cd "$REPO_ROOT" && git log "$BASE_REF..HEAD" --format='%B' \
+        | "$REPO_ROOT/bin/adr-check" --pr --bypass-from-stdin --base="$BASE_REF" ); then
     exit 0
 fi
 

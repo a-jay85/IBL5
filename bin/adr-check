@@ -35,8 +35,11 @@ surfaces without also adding an ADR (or a bypass marker in the PR body).
 
 Modes:
   --staged           Scan staged changes via `git diff --cached`. Default.
-  --pr               Scan the current PR against origin/master. Fetches the
-                     PR body via `gh pr view` for bypass marker detection.
+  --pr               Scan the current PR against its base ref (default: origin/master).
+                     Fetches the PR body via `gh pr view` for bypass marker detection.
+  --base=<ref>       Override the base ref for --pr. CI supplies
+                     github.event.pull_request.base.sha; the local hook supplies its
+                     resolved base. Requires --pr; rejected in --staged mode.
 
 Options:
   --bypass-from-stdin   Read the PR body from stdin (for local testing).
@@ -56,9 +59,16 @@ function runCmd(string $cmd): array
     return [$output, $exit];
 }
 
+function adrBaseRef(?string $set = null): string
+{
+    static $base = 'origin/master';
+    if ($set !== null) { $base = $set; }
+    return $base;
+}
+
 function gitDiffRange(string $mode): string
 {
-    return $mode === 'pr' ? 'origin/master...HEAD' : '--cached';
+    return $mode === 'pr' ? adrBaseRef() . '...HEAD' : '--cached';
 }
 
 /** @return list<string> */
@@ -249,6 +259,7 @@ function extractBypassReason(?string $body): ?string
 // --- main ---
 
 $opts = ['mode' => 'staged', 'bypass_from_stdin' => false];
+$baseArg = null;
 foreach (array_slice($argv, 1) as $arg) {
     switch ($arg) {
         case '--staged':
@@ -265,10 +276,23 @@ foreach (array_slice($argv, 1) as $arg) {
             echo usage();
             exit(0);
         default:
+            if (strncmp($arg, '--base=', 7) === 0) { $baseArg = substr($arg, 7); break; }
             fwrite(STDERR, "unknown flag: {$arg}\n");
             fwrite(STDERR, usage());
             exit(2);
     }
+}
+if ($baseArg !== null) {
+    if ($opts['mode'] !== 'pr') {
+        fwrite(STDERR, "--base is only valid with --pr\n");
+        exit(2);
+    }
+    if (!preg_match('#^[A-Za-z0-9][A-Za-z0-9._/-]*$#', $baseArg)
+        || strpos($baseArg, '..') !== false) {
+        fwrite(STDERR, "invalid --base value: {$baseArg}\n");
+        exit(2);
+    }
+    adrBaseRef($baseArg);
 }
 
 $triggers = detectTriggers($opts['mode']);

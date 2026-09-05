@@ -49,4 +49,16 @@ interface TradeRosterPreviewParamValidatorInterface
      * Validate a cash amount query parameter (0-2000)
      */
     public function validateCashAmount(string $paramName): int;
+
+    /**
+     * Validate cash year range parameters and enforce horizon bound.
+     *
+     * Returns [cashStartYear, cashEndYear] if valid; [0, 0] on any violation:
+     *   - either year missing or non-digit
+     *   - cashEndYear > $maxYear (over-horizon)
+     *   - cashStartYear > cashEndYear (inverted ordering)
+     *
+     * @return array{0: int, 1: int}
+     */
+    public function validateCashYearRange(int $maxYear): array;
 }

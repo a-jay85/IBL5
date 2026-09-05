@@ -29,6 +29,37 @@ Read at runtime via `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase4-push-
 
    Verdict words. `PUSHED PR #<N> <sha>` (rc 0) — origin holds this HEAD; proceed. `STALE LEASE` (rc 2) — origin holds something this worktree has never seen (someone pushed into the branch, or it was never fetched here); git rejected with `stale info`, or the script refused for want of a lease, and **nothing was clobbered**. Stop and re-run Phase 3; never drop the lease, never retry with `--force`. `PUSH FAILED` (rc 1) — origin does **not** hold this HEAD. Print it and stop; do not continue to Phase 5. **"No error printed" is not evidence of a push.** Any `STOP:` line — stop the run and make no further tool call.
 
+   `HOOK REJECTED` (rc 3) — **not terminal.** `bin/pre-push-adr-hook` refused the push because the
+   branch is not rebased onto `origin/master`. The remote is unchanged, nothing was pushed and
+   nothing was clobbered. Run the **bounded hook-rebase recovery**, exactly once:
+
+   1. `git status --porcelain` — if it prints anything, STOP: the tree must be clean to rebase.
+   2. `git fetch origin master` — **exactly this refspec.** Never bare `git fetch origin`: that
+      advances `refs/remotes/origin/<branch>`, which is the very ref `push.sh` derives its lease
+      from. That silently degrades the bare `--force-with-lease` into a plain `--force`.
+   3. `git rebase origin/master`.
+      - **Conflict** (the rebase stops, or exits non-zero): run `git rebase --abort`, then treat
+        this run as `PUSH FAILED` and go to Phase 7. Do **not** resolve the conflict. A clean
+        rebase preserves every commit's patch; a conflict-resolving rebase does not, and would
+        change code that has already been reviewed.
+      - **Clean:** continue.
+   4. Re-run the step 3 push command above **verbatim, once**. That command re-materializes the
+      same pinned copy of `push.sh` and re-invokes it; there is no separate re-push command.
+   5. Read the second verdict:
+      - `PUSHED PR #<N> <sha>` → recovered. Continue into Phase 4.5 exactly as on a first-try
+        push. Describe it as "initial push was hook-rejected; recovered by one clean rebase" —
+        do **not** write the words `PUSH FAILED` into your own narration on a recovered run, or
+        the status reader in `bin/pr-ready-now` will mark a successful run NOT READY.
+      - `HOOK REJECTED` a second time → `origin/master` moved again during the rebase.
+        **Terminal.** Report `PUSH FAILED — the pre-push rebase gate rejected this push again
+        after one bounded rebase; origin/master moved during recovery.` and go to Phase 7.
+      - Any other verdict → its own rule above.
+
+   **This is one attempt, not a loop.** There is no counter to increment, no "try again", and no
+   condition under which `git rebase` runs twice in this phase. The cap is one because the rebase's
+   only job is to restore the invariant the hook checks; if that invariant is already broken again
+   by the time the re-push lands, the branch is losing a race that further attempts cannot win.
+
    **Do not use `git ls-remote origin HEAD`** — that returns origin's default-branch (master) tip, not this branch's, and the lease would never match. The script reads `refs/heads/<branch>` fully qualified for exactly that reason.
 
 4. **`mergeable=UNKNOWN` handling — bounded, and never with a foreground `sleep`.** GitHub computes mergeability asynchronously, so the first read right after a push is usually `UNKNOWN`. Read once:
@@ -80,5 +111,9 @@ Read at runtime via `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase4-push-
    The 540s window is deliberately under the 600000ms `Bash` cap, so the delegate never meets the auto-background message at all. Read its report exactly as if the script had printed it here.
 
    The verdict block's first word is one of six, each with its own exit code: `CI COMPLETE` (0), `CI FAILED` (1 — one indented line per check that did not end `pass` or `skipping`), `MERGE CONFLICT` (2 — `mergeStateStatus=DIRTY`, so stop and re-run Phases 2–3), `STALE` (3 — the head moved, so this watcher is obsolete), `CI TIMEOUT` (4 — only after all 6 windows), `STOP` (5 — a usage error). **Silence is not success**, so no path exits quietly and no verdict is a success-only filter: naming *every* red check is what makes one wake enough to drive Phase 6.5 remediation instead of one round trip per failure. Every verdict also carries the last `mergeStateStatus` the script read, which is what resolves step 4's `UNKNOWN` without a second main-thread read.
+
+   > **rc namespaces are per-script.** `watch-ci.sh` rc 3 is `STALE`; `push.sh` rc 3 is
+   > `HOOK REJECTED`. They never mean each other — read each rc only against the verdict table of
+   > the script that produced it.
 
    The script's own header carries the rest — why it does not fail fast, and why the `seen` grace gate (the false `CI COMPLETE` on the pre-push head, observed on PR #1830) must not be removed. **The script is the only copy of that logic**; do not paste a reference loop back into this file, or the two drift and the reader follows the stale one.

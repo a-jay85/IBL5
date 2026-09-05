@@ -1,0 +1,275 @@
+#!/bin/bash
+# Split / index / check engine for the loop-engineering backlog.
+#
+# Usage:
+#   bin/backlog-split --split <monolith>        Write one file per authoritative ID
+#                                               into the per-item directory. Never
+#                                               modifies <monolith>.
+#   bin/backlog-split --index <dir>             Print the regenerated ## Entries
+#                                               table to stdout. Never writes.
+#   bin/backlog-split --check <monolith> <dir>  Compare the regenerated table against
+#                                               the monolith's committed one.
+#
+# Exit: 0 on success / no drift. 1 on drift (unified diff to stderr). 2 on usage error.
+#
+# The authoritative ID set is the ## Entries table rows, never the ### L<n> headings —
+# some IDs have a table row and no heading, and deriving from headings silently drops
+# them. An item body runs from its ### L<n> heading to the first later line matching
+# ^### L[0-9]+ or ^## , or EOF; the scan never stops at ## Class registry, because
+# item headings sit after it. A trailing --- immediately before the terminator is a
+# structural separator and stays in the monolith.
+#
+# Split output directory defaults to ibl5/docs/backlog/loop-engineering under the repo
+# root; override with BACKLOG_SPLIT_OUTDIR (used by the test harness to stay dry).
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+DEFAULT_OUTDIR="$REPO_ROOT/ibl5/docs/backlog/loop-engineering"
+
+usage() {
+    sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+MODE="${1-}"
+case "$MODE" in
+    --split)
+        [ $# -eq 2 ] || { echo "Error: --split takes exactly one <monolith> argument" >&2; usage >&2; exit 2; }
+        [ -f "$2" ] || { echo "Error: no such file: $2" >&2; exit 2; }
+        ;;
+    --index)
+        [ $# -eq 2 ] || { echo "Error: --index takes exactly one <dir> argument" >&2; usage >&2; exit 2; }
+        [ -d "$2" ] || { echo "Error: no such directory: $2" >&2; exit 2; }
+        ;;
+    --check)
+        [ $# -eq 3 ] || { echo "Error: --check takes <monolith> <dir>" >&2; usage >&2; exit 2; }
+        [ -f "$2" ] || { echo "Error: no such file: $2" >&2; exit 2; }
+        [ -d "$3" ] || { echo "Error: no such directory: $3" >&2; exit 2; }
+        ;;
+    -h|--help)
+        usage; exit 0 ;;
+    *)
+        echo "Error: unknown or missing mode: ${MODE:-(none)}" >&2
+        usage >&2
+        exit 2 ;;
+esac
+
+OUTDIR="${BACKLOG_SPLIT_OUTDIR:-$DEFAULT_OUTDIR}"
+
+exec python3 - "$OUTDIR" "$@" <<'PYEOF'
+import datetime
+import os
+import re
+import sys
+
+OUTDIR = sys.argv[1]
+MODE = sys.argv[2]
+ARGS = sys.argv[3:]
+
+ROW_RE = re.compile(r'^\|\s*(L[0-9]+)\s*\|')
+HEADING_RE = re.compile(r'^### (L[0-9]+)\b')
+ANY_ITEM_HEADING = re.compile(r'^### L[0-9]+')
+TABLE_HEADER = '| # | Title | Status | Automouse | Effort |'
+TABLE_SEP = '|---|-------|--------|-----------|-------:|'
+
+
+def read_lines(path):
+    with open(path, encoding='utf-8') as handle:
+        return handle.read().split('\n')
+
+
+def entries_rows(lines):
+    """Authoritative rows: the ## Entries table, in source order.
+
+    Returns a list of (id, title, [status, automouse, effort]).
+    """
+    rows = []
+    in_entries = False
+    for line in lines:
+        if line.startswith('## '):
+            in_entries = line.strip() == '## Entries'
+            continue
+        if not in_entries:
+            continue
+        match = ROW_RE.match(line)
+        if not match:
+            continue
+        cells = [cell.strip() for cell in line.split('|')[1:-1]]
+        if len(cells) < 5:
+            continue
+        rows.append((cells[0], cells[1], cells[2:5]))
+    return rows
+
+
+def headings(lines):
+    """id -> (index of the ### line, verbatim heading text)."""
+    found = {}
+    for index, line in enumerate(lines):
+        match = HEADING_RE.match(line)
+        if match and match.group(1) not in found:
+            found[match.group(1)] = (index, line)
+    return found
+
+
+def body_span(lines, start):
+    """First line after `start` matching ^### L[0-9]+ or ^## , else EOF."""
+    for index in range(start + 1, len(lines)):
+        if ANY_ITEM_HEADING.match(lines[index]) or lines[index].startswith('## '):
+            return index
+    return len(lines)
+
+
+def strip_structural_tail(body):
+    """Drop the trailing --- separator (and surrounding blanks); it stays in the monolith."""
+    while body and body[-1].strip() == '':
+        body.pop()
+    if body and body[-1].strip() == '---':
+        body.pop()
+    while body and body[-1].strip() == '':
+        body.pop()
+    return body
+
+
+def slugify(title):
+    slug = re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-')
+    return slug[:60].strip('-')
+
+
+def yaml_scalar(value):
+    """Plain scalar when safe, double-quoted otherwise."""
+    unsafe = (': ' in value or value.endswith(':') or '#' in value
+              or value[:1] in ('"', "'", '[', '{', '&', '*', '!', '|', '>', '%', '@', '`', '-', '?'))
+    if unsafe:
+        return '"' + value.replace('\\', '\\\\').replace('"', '\\"') + '"'
+    return value
+
+
+def item_filename(item_id, title):
+    return '%s-%s.md' % (item_id, slugify(title))
+
+
+def render_item(item_id, title, cells, heading_line, body, today):
+    status, automouse, effort = cells
+    out = ['---']
+    out.append('description: ' + yaml_scalar(title))
+    out.append('last_verified: ' + today)
+    out.append('status: ' + yaml_scalar(status))
+    out.append('automouse: ' + yaml_scalar(automouse))
+    out.append('effort: ' + yaml_scalar(effort))
+    out.append('---')
+    out.append('')
+    if heading_line is not None:
+        out.append('# ' + heading_line[len('### '):])
+    else:
+        out.append('# %s — %s' % (item_id, title))
+    out.append('')
+    if body:
+        out.extend(body)
+    else:
+        out.append('**Status:** %s' % status)
+    while out and out[-1].strip() == '':
+        out.pop()
+    return '\n'.join(out) + '\n'
+
+
+def do_split(monolith):
+    lines = read_lines(monolith)
+    rows = entries_rows(lines)
+    if not rows:
+        sys.stderr.write('Error: no ## Entries rows found in %s\n' % monolith)
+        return 1
+    heads = headings(lines)
+    today = datetime.date.today().isoformat()
+    os.makedirs(OUTDIR, exist_ok=True)
+    for item_id, title, cells in rows:
+        heading_line = None
+        body = []
+        if item_id in heads:
+            start, heading_line = heads[item_id]
+            body = strip_structural_tail(lines[start + 1:body_span(lines, start)])
+            while body and body[0].strip() == '':
+                body.pop(0)
+        path = os.path.join(OUTDIR, item_filename(item_id, title))
+        with open(path, 'w', encoding='utf-8') as handle:
+            handle.write(render_item(item_id, title, cells, heading_line, body, today))
+    sys.stderr.write('Wrote %d item files to %s\n' % (len(rows), OUTDIR))
+    return 0
+
+
+def read_frontmatter(path):
+    values = {}
+    with open(path, encoding='utf-8') as handle:
+        lines = handle.read().split('\n')
+    if not lines or lines[0].strip() != '---':
+        return values
+    for line in lines[1:]:
+        if line.strip() == '---':
+            break
+        match = re.match(r'^([a-z_]+):\s*(.*)$', line)
+        if match:
+            value = match.group(2).strip()
+            if len(value) >= 2 and value[0] == '"' and value[-1] == '"':
+                value = value[1:-1].replace('\\"', '"').replace('\\\\', '\\')
+            values[match.group(1)] = value
+    return values
+
+
+def version_key(item_id):
+    return int(item_id[1:])
+
+
+def generated_rows(directory):
+    rows = []
+    for name in os.listdir(directory):
+        match = re.match(r'^(L[0-9]+)-.*\.md$', name)
+        if not match:
+            continue
+        item_id = match.group(1)
+        front = read_frontmatter(os.path.join(directory, name))
+        rows.append((item_id, '| %s | [%s](loop-engineering/%s) | %s | %s | %s |' % (
+            item_id, front.get('description', ''), name,
+            front.get('status', ''), front.get('automouse', ''), front.get('effort', ''))))
+    rows.sort(key=lambda pair: (version_key(pair[0]), pair[1]))
+    return [row for _, row in rows]
+
+
+def do_index(directory):
+    print(TABLE_HEADER)
+    print(TABLE_SEP)
+    for row in generated_rows(directory):
+        print(row)
+    return 0
+
+
+def do_check(monolith, directory):
+    import difflib
+    lines = read_lines(monolith)
+    current = []
+    in_entries = False
+    for line in lines:
+        if line.startswith('## '):
+            in_entries = line.strip() == '## Entries'
+            continue
+        if in_entries and ROW_RE.match(line):
+            current.append(line)
+    wanted = generated_rows(directory)
+    if current == wanted:
+        return 0
+    diff = difflib.unified_diff(current, wanted, 'monolith ## Entries',
+                                'generated from ' + directory, lineterm='')
+    sys.stderr.write('\n'.join(diff) + '\n')
+    sys.stderr.write(
+        '\nBacklog index drift. Remedy: run\n'
+        '  bin/backlog-split --index %s\n'
+        'and paste the result over the ## Entries table in %s\n' % (directory, monolith))
+    return 1
+
+
+if MODE == '--split':
+    sys.exit(do_split(ARGS[0]))
+elif MODE == '--index':
+    sys.exit(do_index(ARGS[0]))
+elif MODE == '--check':
+    sys.exit(do_check(ARGS[0], ARGS[1]))
+sys.exit(2)
+PYEOF

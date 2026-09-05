@@ -19,6 +19,17 @@ use Trading\Contracts\TradeRosterPreviewParamValidatorInterface;
  */
 class TradeRosterPreviewCashRowBuilder implements TradeRosterPreviewCashRowBuilderInterface
 {
+    /**
+     * Maximum cash year index accepted by buildCashRows().
+     *
+     * cashStartYear/cashEndYear are contract-year indices (1–6), matching the
+     * six salary columns (salary_yr1…salary_yr6) and makeCashRow()'s own
+     * cyIndex guard. Anything above 6 would be silently dropped by makeCashRow()
+     * anyway; reject it here so a crafted cashEndYear cannot drive the loop past
+     * the useful range.
+     */
+    public const CASH_YEAR_FORWARD_HORIZON = 6;
+
     public function __construct(private TradeRosterPreviewParamValidatorInterface $validator)
     {
     }
@@ -29,15 +40,17 @@ class TradeRosterPreviewCashRowBuilder implements TradeRosterPreviewCashRowBuild
      * Creates in-memory player-format rows representing cash exchanges,
      * mirroring the pattern used by CashTransactionHandler::createCashTransaction().
      *
+     * @param int $maxCashYear Ceiling for cashEndYear; a requested end year above
+     *                         this is rejected outright (no rows built) rather than
+     *                         clamped.
      * @return list<array<string, mixed>> Synthetic cash player rows with isCashRow flag
      */
-    public function buildCashRows(int $viewingTeamId): array
+    public function buildCashRows(int $viewingTeamId, int $maxCashYear): array
     {
         $userTeam = $this->validator->validateStringParam('userTeam');
         $partnerTeam = $this->validator->validateStringParam('partnerTeam');
         $userTeamId = $this->validator->validateIntParam('userTeamId');
-        $cashStartYear = $this->validator->validateIntParam('cashStartYear');
-        $cashEndYear = $this->validator->validateIntParam('cashEndYear');
+        [$cashStartYear, $cashEndYear] = $this->validator->validateCashYearRange($maxCashYear);
 
         if ($userTeam === '' || $partnerTeam === '' || $cashStartYear === 0 || $cashEndYear === 0) {
             return [];

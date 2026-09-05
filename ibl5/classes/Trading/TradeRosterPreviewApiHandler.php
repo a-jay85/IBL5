@@ -121,8 +121,13 @@ class TradeRosterPreviewApiHandler
                     $roster[] = \Team\TeamTableService::cashConsiderationToRosterRow($cashRow);
                 }
 
-                // Synthetic cash rows for the in-progress trade
-                $tradeCashRows = $this->cashRowBuilder->buildCashRows($teamid);
+                // Synthetic cash rows for the in-progress trade. cashStartYear and
+                // cashEndYear are contract-year indices (1–6), so the ceiling is the
+                // horizon constant directly — no Season access needed.
+                $tradeCashRows = $this->cashRowBuilder->buildCashRows(
+                    $teamid,
+                    TradeRosterPreviewCashRowBuilder::CASH_YEAR_FORWARD_HORIZON
+                );
                 foreach ($tradeCashRows as $cashRow) {
                     $roster[] = $cashRow;
                 }

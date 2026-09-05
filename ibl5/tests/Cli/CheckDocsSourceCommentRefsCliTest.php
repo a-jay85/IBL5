@@ -20,7 +20,10 @@ final class CheckDocsSourceCommentRefsCliTest extends TestCase
 
         $this->tmpDir = sys_get_temp_dir() . '/check-docs-src-refs-' . bin2hex(random_bytes(8));
         mkdir($this->tmpDir . '/tools', 0755, true);
-        mkdir($this->tmpDir . '/.git', 0755, true);
+        // git init so filterGitignored() gets exit 0/1 (not 128) — an empty .git dir is not a valid repo
+        exec(sprintf('git -C %s init -q 2>/dev/null', escapeshellarg($this->tmpDir)));
+        exec(sprintf('git -C %s config user.email test@test.com 2>/dev/null', escapeshellarg($this->tmpDir)));
+        exec(sprintf('git -C %s config user.name Test 2>/dev/null', escapeshellarg($this->tmpDir)));
         mkdir($this->tmpDir . '/bin/lib', 0755, true);
         mkdir($this->tmpDir . '/ibl5/classes/Foo', 0755, true);
         mkdir($this->tmpDir . '/ibl5/tests/Cli', 0755, true);

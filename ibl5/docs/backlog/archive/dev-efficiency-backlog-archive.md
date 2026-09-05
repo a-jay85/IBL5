@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed development-efficiency backlog entries, extracted from dev-efficiency-backlog.md.
-last_verified: 2026-08-31
+last_verified: 2026-09-05
 ---
 
 # Development-Efficiency Backlog — Archive
@@ -218,3 +218,19 @@ Body summary text was authored pre-implementation and hand-updated during coding
 **Suggested direction:** Do not treat label-absence as terminal until the label has been seen alive at least once, or until a bounded startup grace (a few poll intervals) has elapsed. Alternatively require label-absence on two consecutive polls before exiting, so a transient `launchctl` gap cannot terminate the watch.
 **Risk if untouched:** Every caller that arms the watch command `bin/post-plan-now` prints — the documented usage — can get a false "finished" on a run that just started, and act on a verdict that does not exist yet.
 **Status (2026-08-31):** ✅ Implemented — seen-alive latch plus `--startup-grace` (default 60s, exit 4) in `bin/watch-run`, guarded by `bin/test-watch-run` (NEW) in the `harness-tests` CI job.
+
+### E27 `filterGitignored()` in `bin/check-docs`: unchecked proc exit, non-NUL-delimited check-ignore paths
+
+`filterGitignored()` closed the stderr pipe without draining it and discarded `proc_close()`'s return value, so a git failure (exit 128 — a non-repository root, or dubious-ownership in a container checkout) fell through to "nothing is ignored" and the freshness gate over-reported coverage. The same call invoked `git check-ignore --stdin` without `-z`, so git C-quoted any path containing non-ASCII bytes; the quoted token missed the `isset()` lookup and such files were never filtered.
+
+**Fix:** Drain stderr before closing, capture `proc_close()`'s exit status, and throw `\RuntimeException` carrying git's exit code and stderr for any status other than 0 or 1 (exit 1 = "no paths ignored" is a valid empty result). Switched to `git check-ignore -z --stdin` with NUL-separated input and NUL-split output, dropping the per-element `trim()` that corrupted paths with leading or trailing whitespace. Fixed the same discarded-`proc_close` pattern in `bin/lighthouse-pr-urls`.
+
+`prevention_ladder:`
+
+- **rung 0 — already covered?** No gate checked `proc_open` idioms in PHP. **rung 2 / rungs 4–5** — N/A.
+- **rung 1 — extend an existing gate?** Yes, for coverage: added a third suite `selfTestGitignoreFilter()` to the existing `bin/check-docs --self-test` harness, already CI-wired in `.github/workflows/pr-meta-checks.yml`. No new test script.
+- **rung 3 — a PHPStan rule. LANDS HERE.** `ibl5/phpstan-rules/BanProcOpenUncheckedExitRule.php` fails any analysed file that calls `proc_open()` and either discards `proc_close()`'s return value or never calls it. `ShadowProcessLauncher::spawn()` carries an inline `@phpstan-ignore ibl.procOpenExitUnchecked` waiver (intentional: `setsid --fork`).
+
+`artifact destination:` `bin/check-docs`, `bin/lighthouse-pr-urls`, `ibl5/phpstan-rules/BanProcOpenUncheckedExitRule.php` (in-repo). **Status:** ✅ Implemented.
+
+*(discovered 2026-08-31 during #2046, fixed 2026-09-04)*

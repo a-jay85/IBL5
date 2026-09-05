@@ -35,6 +35,12 @@ COUNT_NON_CODE=$(( COUNT_MD + COUNT_LOCK + COUNT_SNAPSHOT ))
 COUNT_GO=$(echo "$FILES" | grep -cE '^engine/.*\.go$' || true)
 COUNT_IBL5=$(echo "$FILES" | grep -cE '^ibl5/' || true)
 GO_TOUCHED_COUNT=$(echo "$FILES" | grep -cE '^engine/' || true)
+# Shell / workflow / agent-prose (gates Phase 4B Agent E).
+# Shell = anything under a bin/ directory (bin/ holds extensionless executables,
+# and ibl5/bin/ exists too) OR any *.sh anywhere, MINUS known non-shell
+# extensions, because bin/lib/ mixes languages (e.g. bin/lib/*.php, bin/lib/README.md).
+COUNT_SHELL=$(echo "$FILES" | grep -E '(^|/)bin/|\.sh$' | grep -cvE '\.(php|md|json|py|ts|tsx|css|sql|ya?ml|lock|txt|neon)$' || true)
+COUNT_WORKFLOW=$(echo "$FILES" | grep -cE '^\.github/workflows/.*\.ya?ml$' || true)
 
 # Derived flags (true/false strings for readable gates downstream)
 HAS_PHP=$([ "$COUNT_PHP" -gt 0 ] && echo true || echo false)
@@ -50,6 +56,10 @@ ENGINE_ONLY=$([ "$GO_TOUCHED" = true ] && [ "$COUNT_PHP" -eq 0 ] && [ "$COUNT_IB
 # Golden-snapshot change — INDEPENDENT of HAS_GO (golden.json is not a .go file).
 # Drives the Phase 6.5 headless auto-merge block.
 GOLDEN_CHANGED=$(echo "$FILES" | grep -qxF 'engine/internal/sim/testdata/golden.json' && echo true || echo false)
+HAS_SHELL=$([ "$COUNT_SHELL" -gt 0 ] && echo true || echo false)
+HAS_WORKFLOW=$([ "$COUNT_WORKFLOW" -gt 0 ] && echo true || echo false)
+# No COUNT_SKILL_PROSE — nothing reads a count, so only the boolean is computed.
+HAS_SKILL_PROSE=$(echo "$FILES" | grep -qE '^\.claude/.*\.md$' && echo true || echo false)
 
 # E2E spec module extraction (drives Agent D cross-reference)
 E2E_SPEC_MODULES=""
@@ -110,6 +120,15 @@ HAS_COMMENTS_IN_DIFF=$([ "$COMMENT_COUNT" -gt 0 ] && echo true || echo false)
 
 # PHP lines changed (gates Phase 4B Agents B-C size threshold)
 LINES_PHP_CHANGED=$(git diff origin/master...HEAD -- '*.php' | grep -cE '^\+[^+]' || true)
+# Added shell lines. Reads $DIFF_FILE (built above) with the SAME predicate the
+# Phase 4B Agent E slicer uses, so count and slice can never disagree.
+LINES_SHELL_CHANGED=$(awk '
+  /^diff --git/ { p=$NF; sub(/^b\//,"",p)
+    keep = (p ~ /(^|\/)bin\// || p ~ /\.sh$/) && p !~ /\.(php|md|json|py|ts|tsx|css|sql|ya?ml|lock|txt|neon)$/ ? 1 : 0
+    next }
+  keep==1 && /^\+[^+]/ { n++ }
+  END { print n+0 }
+' "$DIFF_FILE")
 
 # Does this branch fix behavior a merged plan shipped? (gates the Phase 9 escalation ladder)
 # Two dots, not three: `git log A...B` is symmetric difference, so a master-side commit can win
@@ -124,6 +143,7 @@ echo "  HAS_PHP=$HAS_PHP HAS_CSS=$HAS_CSS HAS_MODIFIED=$HAS_MODIFIED HAS_COMMENT
 echo "  IS_FIX_OF_PLAN_BEHAVIOR=$IS_FIX_OF_PLAN_BEHAVIOR"
 echo "  HAS_E2E_SPECS=$HAS_E2E_SPECS HAS_E2E_PROD_OVERLAP=$HAS_E2E_PROD_OVERLAP"
 echo "  HAS_GO=$HAS_GO GO_TOUCHED=$GO_TOUCHED ENGINE_ONLY=$ENGINE_ONLY GOLDEN_CHANGED=$GOLDEN_CHANGED COUNT_GO=$COUNT_GO"
+echo "  HAS_SHELL=$HAS_SHELL HAS_WORKFLOW=$HAS_WORKFLOW HAS_SKILL_PROSE=$HAS_SKILL_PROSE COUNT_SHELL=$COUNT_SHELL COUNT_WORKFLOW=$COUNT_WORKFLOW LINES_SHELL_CHANGED=$LINES_SHELL_CHANGED"
 echo "  E2E_SPEC_MODULES=$(echo $E2E_SPEC_MODULES | tr '\n' ' ')"
 echo "  DIFF_FILE=$DIFF_FILE ($(wc -c < "$DIFF_FILE") bytes)"
 ```

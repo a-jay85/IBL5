@@ -72,6 +72,8 @@ last_verified: 2026-09-05
 | E44 | Phase 6 review findings on PR #2082 — gate [V] main.localhost bootstrap defect (blocking), body count mismatch, vacuous range fixture, stale corpus count, nonexistent `bin/db-wait` (example) reference, wrong baseline claim; all fixed in Phase 6.5 | ⬜ Open | 🟩 | S |
 | E45 | Phase 6 review notes on PR #1924 — stale Scope forward-reference and false Manual Testing claim; PR-body-only fixes; no gate warranted | ⬜ Open | — | XS |
 | E46 | Documentation gaps in bin/pr-cycle toolchain — missing seam declarations and overstated harness assertions | ⬜ Open | — | XS |
+| E50 | PR #2092 Phase 6.5 — `--dry-run` counter increment in live-only branch; no harness case for dry-run count (Findings 1+5); both fixed this pass | ⬜ Open | — | XS |
+| E51 | PR #2092 Phase 6.5 — notes Findings 2–4: find-regex deviation already filed, benign out-of-plan changes, body claim fixed by E50; class n/a for all | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -836,3 +838,48 @@ For the accuracy findings (2–6): prevention is the existing `/pr-ready` Phase 
 `last_verified: 2026-09-04`
 
 *(discovered 2026-09-04 during Phase 6 review of #1957)*
+
+### E50 PR #2092 Phase 6.5 — `--dry-run` counter increment in live-only branch, no harness case for dry-run count (Findings 1+5)
+
+**class:** a counter increment placed inside the live-only branch of a `--dry-run` conditional in a bin/ script (`bin/prune-vr-galleries`), causing `--dry-run` to always emit `0` as its trailing stdout line regardless of how many directories were selected; and the absence of a harness case asserting the dry-run trailing count equals the number of `WOULD PRUNE:` lines emitted
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/prune-vr-galleries:78` — `removed=$(( removed + 1 ))` inside `else` (live-only) branch, not at the outer `if [ "$ts" -lt "$cutoff" ]` branch | yes | yes | fixed this pass — hoisted increment above the dry_run/live fork |
+| 2 | `bin/test-prune-eligibility` — no case asserted the trailing integer in dry-run mode | yes | yes | fixed this pass — added `dry-run-count-matches-would-prune-count` case |
+
+**prevention_ladder:**
+- **rung 0 — already covered?** No existing gate checks that a `--dry-run` trailing count is correct.
+- **rung 1 — extend existing gate?** The harness (`bin/test-prune-eligibility`) is the natural host — the new case added here is exactly this extension. Rung 1 satisfied by the fix itself.
+- **rungs 2–5 — not warranted:** the harness now covers this semantically; a lint rule or hook would be over-specified for a one-off count placement.
+- **landing rung:** rung 1 — harness extended; fix ships with its own regression coverage.
+
+`prevention_ladder: rung 1 — harness extended with dry-run-count-matches-would-prune-count case`
+
+`artifact destination: bin/test-prune-eligibility (in-repo, part of this PR)`
+
+*(discovered 2026-09-05 during Phase 6 review of #2092)*
+
+---
+
+### E51 PR #2092 Phase 6.5 — notes Findings 2–4: find-regex deviation, out-of-plan changes, stale body claim
+
+**class:** n/a — three non-blocking review notes that required no code gate
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | Finding 2 — `find -regex` replaced by bash length+charclass filter; declared in-code and already filed in `ibl5/docs/backlog/loop-engineering-backlog.md` as part of this PR's out-of-plan changes | n/a | n/a | not fixed — no gate warranted; declared and filed |
+| 2 | Finding 3 — `.gitignore` and one `loop-engineering-backlog.md` row added without a plan phase; benign and scope-adjacent | n/a | n/a | not fixed — no gate warranted; benign out-of-plan changes |
+| 3 | Finding 4 — PR body Summary claimed harness covers "stdout-contract semantics" while dry-run count was unasserted and broken | n/a | n/a | fixed this pass — body claim becomes true after E50 fix |
+
+**prevention_ladder:** no gate warranted — Finding 2 is a declared deviation with an existing backlog entry; Finding 3 is a benign scope-adjacency judgment; Finding 4 is resolved as a side-effect of E50.
+
+`prevention_ladder: no gate warranted — all three are either already-filed, benign, or fixed as a side-effect of E50`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-05 during Phase 6 review of #2092)*

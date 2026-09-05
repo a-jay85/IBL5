@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-09-04
+last_verified: 2026-09-05
 ---
 
 # Post-Plan Orchestrator
@@ -16,7 +16,7 @@ Execute all phases below **sequentially in a single response**. Do NOT stop, ask
 
 **No background-completion re-invocation exists here.** Post-plan runs headless (`claude -p` under the automouse runner), NOT in the interactive harness. When a `run_in_background` task finishes there is **nothing that re-invokes you** — emitting `end_turn` ends the run for good. So **"Waiting for PHPUnit/PHPStan/E2E to complete" is NEVER a valid final message or a stopping point.** If you launch any background work, you MUST drain it **within the same turn** — poll `BashOutput` until every background shell reports a terminal result — before you compute that phase's status and move on. Ending the turn with a background task still alive is the exact failure that stall-kills the run and (after 3 burns) poison-pills the plan.
 
-Phase numbers below are local to this skill. The variables computed in Phase 3 (`HAS_PHP`, `NON_CODE_ONLY`, `DOCS_ONLY`, `CSS_ONLY`, `MIGRATION_ONLY`, `HAS_MODIFIED`, `HAS_COMMENTS_IN_DIFF`, `HAS_GO`, `GO_TOUCHED`, `ENGINE_ONLY`, `GOLDEN_CHANGED`, `DIFF`, etc.) are consulted by every downstream phase to gate sub-agent launches — never recompute them locally.
+Phase numbers below are local to this skill. The variables computed in Phase 3 (`HAS_PHP`, `NON_CODE_ONLY`, `DOCS_ONLY`, `CSS_ONLY`, `MIGRATION_ONLY`, `HAS_MODIFIED`, `HAS_COMMENTS_IN_DIFF`, `HAS_GO`, `GO_TOUCHED`, `ENGINE_ONLY`, `GOLDEN_CHANGED`, `HAS_SHELL`, `HAS_WORKFLOW`, `HAS_SKILL_PROSE`, `DIFF`, etc.) are consulted by every downstream phase to gate sub-agent launches — never recompute them locally.
 
 ## Incremental Checkpoints
 
@@ -221,9 +221,9 @@ Each Bash tool call runs in a fresh shell, so the classification flags are **not
 
 ## Phase 4: Code Review + Security Audit
 
-> Phase 4 runs code review (up to four sub-agents A–D) and a conditional security audit, then scores, filters, and posts findings to the PR. Every sub-agent launch is gated on the Phase 3 flags (`NON_CODE_ONLY`, `ENGINE_ONLY`, `HAS_PHP`, `HAS_MODIFIED`, `HAS_COMMENTS_IN_DIFF`, `HAS_E2E_SPECS`, `LINES_PHP_CHANGED`) — a non-code diff skips the code agents cleanly. Phase 4 emits PR comments only; no Phase-4 output is a variable a later phase keys on.
+> Phase 4 runs code review (up to five sub-agents A–E) and a conditional security audit, then scores, filters, and posts findings to the PR. Every sub-agent launch is gated on the Phase 3 flags (`NON_CODE_ONLY`, `ENGINE_ONLY`, `HAS_PHP`, `HAS_MODIFIED`, `HAS_COMMENTS_IN_DIFF`, `HAS_E2E_SPECS`, `LINES_PHP_CHANGED`, `HAS_SHELL`, `HAS_WORKFLOW`, `HAS_SKILL_PROSE`) — a non-code diff skips the code agents cleanly. Phase 4 emits PR comments only; no Phase-4 output is a variable a later phase keys on.
 >
-> **Read `.claude/skills/post-plan/_phase-4-review-audit.md` now and follow 4A→4D in order.** It holds the PR-data fetch (4A), the Agent A/B/C/D launch gates + model tiers + Agent-D diff pre-slice (4B), the security-audit agent (4C), and the score/filter/post procedure including the `bin/lib/post-review-findings.sh` sourcing (4D).
+> **Read `.claude/skills/post-plan/_phase-4-review-audit.md` now and follow 4A→4D in order.** It holds the PR-data fetch (4A), the Agent A/B/C/D/E launch gates + model tiers + Agent-D and Agent-E diff pre-slices (4B), the security-audit agent (4C), and the score/filter/post procedure including the `bin/lib/post-review-findings.sh` sourcing (4D).
 
 ---
 

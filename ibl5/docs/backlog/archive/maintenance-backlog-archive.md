@@ -634,6 +634,17 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 
 **Table evidence (2026-09-03)** — the Axis 2 table cell as it read at archiving time, preserved verbatim: `modules/Player/index.php:79,114` (+ 3 candidates in Player/extension.php, DepthChartEntry, LeagueStarters) pass `getTeamnameFromUsername()`'s `?string` return into a `string` sink under `strict_types=1` — no-team users get a `TypeError`. Reverted from PR #1807 per plan STOP guard; needs a full sweep + PHPStan gate. (discovered 2026-09-02 during #1807) [CORRECTED 2026-09-03: two of the three "candidates" were already guarded (see occurrence table above), and the observed symptom is **not** a `TypeError` reaching the client — it is HTTP 200 with a blank main content area (header + footer render, body empty, nothing logged). Reproduced on branch e2e-d-cluster-3-gating by unassigning the auto-login user's `gm_username`: 2389 chars of visible text before the fix on all three URLs, 14936 after on LeagueStarters.]
 
+### 2.39 TradeRosterPreviewCashRowBuilder — Unbounded Cash-Year Range From `$_GET`
+**Status:** ✅ Implemented (2026-08-16) — `validateCashYearRange(int $maxYear): array` added to `TradeRosterPreviewParamValidator` (+ interface); rejects a missing/non-digit/zero year, `cashEndYear > $maxYear`, and `cashStartYear > cashEndYear`, returning `[0, 0]` so `buildCashRows()` short-circuits to `[]`. `buildCashRows(int $viewingTeamId, int $maxCashYear)` now takes a required ceiling; `TradeRosterPreviewApiHandler::handle()` supplies `TradeRosterPreviewCashRowBuilder::CASH_YEAR_FORWARD_HORIZON` (= 6) directly — cashStartYear/cashEndYear are contract-year indices (1–6), not calendar years, mirroring `makeCashRow()`'s existing 1–6 column cap.
+**Location:** `ibl5/classes/Trading/TradeRosterPreviewCashRowBuilder.php` (`buildCashRows()`)
+**Problem:** `cashStartYear` and `cashEndYear` come directly from `$_GET` with no upper bound and no ordering check. `cashStartYear=1&cashEndYear=999999` drives an ~1M-iteration loop in `buildCashRows()` — a DoS vector on an authenticated endpoint.
+**Suggested direction:** Add an upper bound (e.g. current season + a reasonable forward horizon) and an ordering check (`cashStartYear ≤ cashEndYear`); ideally wire the validation into `TradeRosterPreviewParamValidator` (already extracted in trading-1-31-api-handler-extract).
+**Est. effort:** S
+**Risk if untouched:** Authenticated users can trigger arbitrary-length computation loops via crafted requests to the trade-roster-preview API endpoint.
+**Provenance:** Discovered 2026-07-27 during trading-1-31-api-handler-extract.
+
+**Table evidence (2026-08-16):** `cashStartYear=1&cashEndYear=999999` now yields zero cash rows instead of ~1M loop iterations; pinned by `testValidateCashYearRangeRejectsAttackInput` and `testBuildCashRowsRejectsOverHorizonEndYear`.
+
 ## Axis 3: Top-Level Legacy PHP Files
 
 ### 3.2 `DEMO_LOGIN_TOKEN` Hardcoded to `'demo'`

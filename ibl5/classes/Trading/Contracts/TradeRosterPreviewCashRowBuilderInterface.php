@@ -19,7 +19,10 @@ interface TradeRosterPreviewCashRowBuilderInterface
     /**
      * Build synthetic cash rows for the contracts view
      *
+     * @param int $maxCashYear Highest cash year the caller will accept; a
+     *                         requested end year above this is rejected outright
+     *                         (no rows are built) rather than clamped.
      * @return list<array<string, mixed>> Synthetic cash player rows with isCashRow flag
      */
-    public function buildCashRows(int $viewingTeamId): array;
+    public function buildCashRows(int $viewingTeamId, int $maxCashYear): array;
 }

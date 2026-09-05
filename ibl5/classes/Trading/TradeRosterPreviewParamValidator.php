@@ -143,4 +143,32 @@ class TradeRosterPreviewParamValidator implements TradeRosterPreviewParamValidat
         }
         return $amount;
     }
+
+    /**
+     * @see TradeRosterPreviewParamValidatorInterface::validateCashYearRange()
+     */
+    public function validateCashYearRange(int $maxYear): array
+    {
+        $start = $this->validateIntParam('cashStartYear');
+        $end = $this->validateIntParam('cashEndYear');
+
+        // Missing, non-digit, negative, or literal zero — validateIntParam already
+        // collapses all of those to 0.
+        if ($start === 0 || $end === 0) {
+            return [0, 0];
+        }
+
+        // Over-horizon: reject rather than clamp, so a crafted cashEndYear can never
+        // drive the caller's per-year loop past the caller's own horizon.
+        if ($end > $maxYear) {
+            return [0, 0];
+        }
+
+        // Inverted ordering.
+        if ($start > $end) {
+            return [0, 0];
+        }
+
+        return [$start, $end];
+    }
 }

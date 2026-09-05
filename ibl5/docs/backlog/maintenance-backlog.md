@@ -652,7 +652,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):** Most FK/type/idempotency work is done (maintenance-27/28/41–44). Open items are mostly **column renames / destructive schema** → 🟦 human-merge (gate-14c + rename-sweep blast radius); a *reversible* type-narrowing (15.17) can arm 🟨 via the `/plan` schema-safety guard; doc items are 🟩.
 
-> ✅ resolved (18): 15.2, 15.4, 15.5, 15.8, 15.9, 15.10, 15.11, 15.12, 15.13, 15.14, 15.15, 15.16, 15.18, 15.19, 15.20, 15.21, 15.22, 15.23 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (19): 15.2, 15.4, 15.5, 15.8, 15.9, 15.10, 15.11, 15.12, 15.13, 15.14, 15.15, 15.16, 15.18, 15.19, 15.20, 15.21, 15.22, 15.23, 15.28 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
@@ -662,7 +662,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 15.7 | ◑ Partial | 🟦 | `name`→`setting_key` done (#143); `value`→`setting_value` deferred (reserved-word rename + sweep → human-merge). |
 | 15.17 | ⬜ Open | 🟨 | olympics_career int(11)→smallint/mediumint. Reversible narrowing → arm via the `/plan` schema-safety guard (apply-time fail-closed + DatabaseIntegration test); else 🟦. |
 | 15.24 | ⬜ Open | 🟦 | Pre-existing duplicate rows in `ibl_box_scores`: 1993 (29), 1994 (7), 2002 (1), 2004 (24) — 61 excess by `(game_date, name)`. Distinct signature from the 2007 HEAT re-import (no schedule overload, no `created_at` batch, no month shift); cause unknown. Destructive delete → human-merge. (discovered 2026-08-04 during the PR #1771 review) |
-| 15.28 | ⬜ Open | 🟩 | `bin/check-boxscore-schedule`'s missing-game and orphan detectors are never run automatically — both automated call sites pass `--duplicates-only`. A played 2008 Finals game sat unimported for two weeks until a GM reported it. Wiring the full audit into an existing nightly is additive → auto-mergeable. (discovered 2026-09-01 while backfilling that game) |
+
 | 15.29 | ⬜ Open | 🟩 | Production PHP changes (`Player/index.php` null guards, `LeagueStarters/index.php` free-agent fallback) entered a test-scoped PR without a plan phase, structured code review, or scope justification; six PR-body claims were contradicted by the actual diff. Adding a files-changed reconciliation gate is additive → auto-mergeable. (discovered 2026-09-03 during #1807) |
 
 ### 15.1 `tid` / `teamid` / `team_id` — Three Spellings Survive ADR-0009
@@ -728,13 +728,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Status:** Fixed this pass (PR #2023) — added `testUpdateTraditionExcludesInProgressCurrentSeasonBeforeAveraging` which supplies a 2024 row with 40 games and verifies the averages are computed from the two completed seasons only.
 **Suggested direction:** When adding a conditional exclusion to a method with existing tests, verify the new branch is exercised by at least one test path before committing.
 **Est. effort:** XS (already fixed)
-
-### 15.28 Boxscore Schedule Audit — the Missing-Game Detector Is Never Actually Run
-**Location:** `.github/workflows/db-backup.yml:173`, `.github/workflows/deploy-rehearsal.yml:175`, `bin/check-boxscore-schedule`, `ibl5/bin/check-boxscore-schedule-run`
-**Problem:** `check-boxscore-schedule` reconciles `ibl_box_scores_teams` against `ibl_schedule` in both directions — orphan boxscores (no schedule row) *and* played schedule rows with no boxscore. Only the first direction is ever exercised automatically: the two automated call sites both invoke `check-boxscore-schedule-run --duplicates-only`, and that mode explicitly "reports only duplicate regular-season matchups; orphan and missing findings are not queried." Nothing on any schedule computes the missing-game finding, so it surfaces only when a human happens to run the bare command. Concrete cost: the `boxscore-schedule-guard` plan recorded `2008-06-25 3@19 (134-147)` as the season's single played-but-unimported game and classified it "row 9 (warning only)"; no follow-up was filed anywhere, and the gap was next observed two weeks later as a GM bug report that the Clippers' 2008 Finals series rendered 3-0 instead of 4-0. The root-cause code defect had already been fixed (PR #1918, the `RECORD_SIZE` → `GAME_PAYLOAD_SIZE` loop bound) and deployed; only the data was left behind, which is exactly the class this detector exists to catch.
-**Suggested direction:** Run the full audit (drop `--duplicates-only`) on a schedule against a prod-shaped snapshot, and route a non-clean verdict somewhere a human reads — the existing nightly docfix/audit + Discord-DM plumbing is the cheap host, so this should extend a job rather than add one (`meta-tooling-bar.md`). Decide deliberately whether a missing-game finding should be exit-1 (blocking) or warn-and-notify; warn-and-notify is the safer default given historical seasons carry known unexplained gaps (see 15.24). Note this is the *detection* sibling of 15.26, which covers the missing test for `storeSimRecap`'s warn-only orphan path — same blind spot, different surface.
-**Est. effort:** S
-**Risk if untouched:** A played game that fails to import is invisible to automation. Detection latency is however long it takes a GM to notice a wrong series score or standings row — two weeks in the observed case — and every derived surface is silently wrong meanwhile, including the materialized `ibl_playoff_series_results` and anything summing `ibl_box_scores`.
 
 ### 15.29 Missing Test Coverage for the `takeOutputBuffer` Seam — StandingsUpdater Migration
 **Location:** `ibl5/tests/DatabaseIntegration/UpdateAllTheThings/PipelineIntegrationTestCase.php`; `ibl5/tests/UpdateAllTheThings/StandingsUpdaterRegressionGuardTest.php`

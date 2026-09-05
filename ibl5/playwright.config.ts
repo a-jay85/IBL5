@@ -58,7 +58,7 @@ export default defineConfig({
         storageState: 'playwright/.auth/user.json',
       },
       dependencies: ['setup'],
-      testIgnore: [/auth\.setup\.ts/, /auth-regular\.setup\.ts/, /visual-regression/, /updater-awards\.spec\.ts$/, /league-control-panel\.spec\.ts$/, /engine-shadow-spawn-on-update\.spec\.ts$/, /admin-pages\.spec\.ts$/, /olympics-admin\.spec\.ts$/, /contract-extension-submission\.spec\.ts$/, /api-v1-rest\.spec\.ts$/],
+      testIgnore: [/auth\.setup\.ts/, /auth-regular\.setup\.ts/, /visual-regression/, /updater-awards\.spec\.ts$/, /league-control-panel\.spec\.ts$/, /engine-shadow-spawn-on-update\.spec\.ts$/, /admin-pages\.spec\.ts$/, /olympics-admin\.spec\.ts$/, /contract-extension-submission\.spec\.ts$/, /api-v1-rest\.spec\.ts$/, /depth-chart-entry-mobile\.spec\.ts$/],
     },
     {
       // Destructive full-season updater specs mutate GLOBAL DB rows (schedules,
@@ -86,13 +86,27 @@ export default defineConfig({
       //     cleanup), so it survived retries and outlived the first isolation pass.
       // Mutation via a trade/ownership change carries no "pid=30" literal, which is
       // exactly why a grep-for-pid audit misses it — hence the broader gate below.
+      //
+      // depth-chart-entry-mobile is here for the shared-seed-row half of the rule,
+      // not the updater half: mid-test it submits the Monarchs (tid=8) depth chart,
+      // reads it back to prove persistence, then restores the slot it changed. Two
+      // other specs write those same rows (depth-chart-entry-submission,
+      // depth-chart-saved-dc-api) via the auth-isolated fixture, and `mode: 'serial'`
+      // is file-scoped so it does not order them against each other. The restore
+      // closes the durable half of the exposure, but a sharded worker reading tid=8
+      // inside the submit → read-back → restore window still sees a mutated roster.
+      // --workers=1 against a dedicated DB removes that window.
+      //
+      // This move is NOT what fixed the spec's flake — that was a non-idempotency
+      // bug in the spec itself (see the restore block at the end of the test). The
+      // move stands on the shared-seed-row rule above, on its own.
       name: 'mutators',
       use: {
         ...devices['Desktop Chrome'],
         storageState: 'playwright/.auth/user.json',
       },
       dependencies: ['setup'],
-      testMatch: [/updater-awards\.spec\.ts$/, /league-control-panel\.spec\.ts$/, /engine-shadow-spawn-on-update\.spec\.ts$/, /admin-pages\.spec\.ts$/, /olympics-admin\.spec\.ts$/, /contract-extension-submission\.spec\.ts$/, /api-v1-rest\.spec\.ts$/],
+      testMatch: [/updater-awards\.spec\.ts$/, /league-control-panel\.spec\.ts$/, /engine-shadow-spawn-on-update\.spec\.ts$/, /admin-pages\.spec\.ts$/, /olympics-admin\.spec\.ts$/, /contract-extension-submission\.spec\.ts$/, /api-v1-rest\.spec\.ts$/, /depth-chart-entry-mobile\.spec\.ts$/],
     },
   ],
 });

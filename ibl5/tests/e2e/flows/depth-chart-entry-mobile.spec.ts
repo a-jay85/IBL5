@@ -416,6 +416,13 @@ isolatedTest.describe('DCE mobile: form submission', () => {
     // Stepper must have changed the value — if the down-arrow was already at the
     // bottom it wraps; an unchanged value here means the stepper UI is broken.
     await expect(firstSelect).not.toHaveValue(valueBeforeMutation);
+    // The stepper WRAPS: one step down from the last slot lands on 0 ("No").
+    // An unassigned PG puts the roster below the server's 3-non-injured-players-
+    // per-position minimum, so DepthChartEntryValidator rejects the whole submit
+    // and the read-back below fails for a reason unrelated to mobile submission.
+    // The restore at the end of this test keeps the baseline at its seed value so
+    // this never fires — it is here so a drifted DB fails loudly and legibly.
+    await expect(firstSelect).not.toHaveValue('0');
 
     // Capture after mutation: this is the state the save must persist.
     const selectsBefore = await page.locator('.dc-mobile-cards select').evaluateAll(
@@ -446,13 +453,42 @@ isolatedTest.describe('DCE mobile: form submission', () => {
     await assertNoPhpErrors(page, 'after mobile depth chart submission');
     // Read-back: navigate away and back to prove the mutated depth chart was
     // persisted to the DB, not merely that the form reloaded without an error.
-    await page.goto('modules.php?name=Standings');
+    // The away-hop is about:blank, not another module — routing through Standings
+    // coupled this test to an unrelated heavy page and aborted the round trip with
+    // net::ERR_ABORTED. That hop was also accidentally load-bearing as a delay, so
+    // do not "restore" it: about:blank discards the document without a server
+    // request, and the goto below is still a genuine fresh GET of the entry URL.
+    await page.goto('about:blank');
     await page.goto(entryUrl);
     await expect(page.locator('.dc-mobile-cards')).toBeVisible({ timeout: 10000 });
+    await expect(
+      page.locator('.dc-mobile-cards select[name^="pg"]').first(),
+    ).toBeEnabled();
     const selectsAfter = await page.locator('.dc-mobile-cards select').evaluateAll(
       els => els.map(el => (el as HTMLSelectElement).value),
     );
     expect(selectsAfter).toEqual(selectsBefore);
+
+    // Restore the slot this test demoted — the spec MUST be idempotent. It was
+    // not: nothing reset the tid=8 row, so each run stepped DC Test PG one slot
+    // further down (1 → 2 → 3 → 4 → 5), and the run that started at 5 wrapped the
+    // stepper to 0. Validation then rejected that submit, the DB kept its old
+    // value, and the read-back above failed. That accumulation — NOT a
+    // cross-worker race — was the flake. The up-arrow is the exact inverse of the
+    // down-arrow in jslib/depth-chart-mobile.js, so one click returns the seed
+    // value, and re-submitting writes it back.
+    await firstField.locator('.dc-card__stepper-arrow--up').click();
+    await expect(firstSelect).toHaveValue(valueBeforeMutation);
+    await expect(submitBtn).toBeVisible();
+    await submitBtn.click();
+    await page.waitForURL(
+      /modules\.php\?name=DepthChartEntry(?!.*op=submit)/,
+      { timeout: 15_000 },
+    );
+    await expect(page.locator('.dc-mobile-cards')).toBeVisible({ timeout: 10000 });
+    // A rejected restore would leave the roster drifted and re-arm the flake for
+    // the next run, so it has to be asserted just as hard as the mutation submit.
+    await expect(page.locator('.ibl-alert--error')).not.toBeVisible();
   });
 
   isolatedTest.afterAll(async ({ request }) => {

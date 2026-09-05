@@ -10,7 +10,7 @@ last_verified: 2026-09-02
 **Supersedes:** ADR-0079 *Autonomous stale-docs remediation via a self-hosted macOS runner*
 (`0079-stale-docs-auto-remediation.md`) — transport only; its human-merge posture is carried forward
 deliberately.
-**Narrowed by:** [ADR-0104](0104-verification-only-doc-refresh-auto-merge.md) — decision 2's human-merge posture still governs, except for verification-only `last_verified:` diffs proven by `bin/docfix-check-veronly`.
+**Narrowed by:** [ADR-0104](0104-verification-only-doc-refresh-auto-merge.md) — decision 2's human-merge posture still governs, except for verification-only diffs (date bumps and same-line numeric corrections on tracked files under `ibl5/docs/`) proven by `bin/docfix-check-veronly`.
 
 > **Numbering note.** The number 0079 is **duplicated on master**: this ADR supersedes
 > `0079-stale-docs-auto-remediation.md` (2026-07-04), **not** `0079-sha-pin-github-actions.md`

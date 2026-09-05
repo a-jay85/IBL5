@@ -46,7 +46,11 @@ LAZY_MAX_BYTES="${RULES_LAZY_BUDGET:-16000}"
 # tripwire. Largest lazy file 2026-08-11: playwright-tests.md 13775 B. Cap at 16000 —
 # 2225 B of headroom catches unexpected growth without blocking legitimate companion
 # verbosity. Lower it as the lazy tier is curated; never raise it to accommodate growth.
-MAX_TOTAL="${RULES_TOTAL_BUDGET:-16000}"
+# 2026-09-05: raised from 16000 to 20000 to accommodate pr-body-negative-claim-recheck.md
+# (E46, rung 1 — 2994 B). Resident total now 18772 B across five files. Deliberate raise
+# for a new always-loaded rule within its per-file cap; not a bloat-creep override.
+# Lower if any resident rule is de-residented; never raise to accommodate file growth.
+MAX_TOTAL="${RULES_TOTAL_BUDGET:-20000}"
 ROOT="$(git rev-parse --show-toplevel)"
 RULES_DIR="$ROOT/.claude/rules"
 # Allowlist: the ONLY top-level rules permitted to be always-loaded (path-unscoped).
@@ -55,7 +59,8 @@ RULES_DIR="$ROOT/.claude/rules"
 # 2026-07-25: worktree-hostname + linear-history-squash-merge de-residented behind
 # paths: globs; both keep a one-line trigger stub in workflow-continuity.md, which
 # names the scoped file so the payload stays one Read away. See Check 4 below.
-ALLOWLIST="agent-tiering auto-commit work-triage workflow-continuity"
+# 2026-09-05: pr-body-negative-claim-recheck added (E46, rung 1) — always-loaded authoring norm.
+ALLOWLIST="agent-tiering auto-commit pr-body-negative-claim-recheck work-triage workflow-continuity"
 
 # Shared by Check 3 and --report-mode — the single paths: parser. Prints one glob
 # per line for $1; prints nothing when the file has no paths: key. Handles BOTH

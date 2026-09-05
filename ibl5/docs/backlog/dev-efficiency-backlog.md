@@ -57,7 +57,7 @@ last_verified: 2026-09-05
 | E28 | PR body hand-authored migration numbers not updated after a forced renumber | ⬜ Open | — | S |
 | E29 | Shell-harness cases pre-populate `$WORK` instead of driving invocation 1 | ✅ Implemented | — | S |
 | E30 | `bin/pr-ready-now` already-running skip only sees its own launchd jobs, so an interactive `/pr-ready` is invisible and both runs share PR-keyed `/tmp` scratch | ⬜ Open | 🟨 | S |
-| E31 | `bin/plan-now` help span truncated by bare `#`; test assertions miss declared secondary-behaviour tokens | ⬜ Open | 🟦 | S |
+| E31 | `bin/plan-now` help span truncated by bare `#`; test assertions miss declared secondary-behaviour tokens | ✅ Implemented | 🟦 | S |
 | E32 | Phase 6 review notes on PR #1861 — minor plan-vs-implementation drifts and in-flight artifacts on a long-lived branch, all non-blocking | ⬜ Open | — | S |
 | E33 | Phase 6 review notes on PR #1815 — F1/F2 blocking (body inaccuracy, backlog 6.24 collision); F3–F7 notes (reflection test, coercion guards, smoke narrative, last_verified); F1/F2/F5 remediated in Phase 6.5 | ⬜ Open | — | S |
 | E34 | Auto-generated `codebase-map.md` row added in #1903 — mechanical output of `bin/generate-codebase-map`, no defect | 🚫 Declined | — | XS |
@@ -71,7 +71,7 @@ last_verified: 2026-09-05
 | E43 | `bin/check-plan` PR6 gates: migration literals [A], line-number anchors [L], docker liveness [E], shellcheck CI-class [I], PHP coverage advisory [J], plus gate [V] `/path/to` + `main.localhost` extensions | ⬜ Open | 🟩 | S |
 | E44 | Phase 6 review findings on PR #2082 — gate [V] main.localhost bootstrap defect (blocking), body count mismatch, vacuous range fixture, stale corpus count, nonexistent `bin/db-wait` (example) reference, wrong baseline claim; all fixed in Phase 6.5 | ⬜ Open | 🟩 | S |
 | E45 | Phase 6 review notes on PR #1924 — stale Scope forward-reference and false Manual Testing claim; PR-body-only fixes; no gate warranted | ⬜ Open | — | XS |
-| E46 | Documentation gaps in bin/pr-cycle toolchain — missing seam declarations and overstated harness assertions | ⬜ Open | — | XS |
+| E46 | PR body "What is NOT in this PR" written before all plan phases complete | ✅ Implemented | — | XS |
 | E50 | PR #2092 Phase 6.5 — `--dry-run` counter increment in live-only branch; no harness case for dry-run count (Findings 1+5); both fixed this pass | ⬜ Open | — | XS |
 | E51 | PR #2092 Phase 6.5 — notes Findings 2–4: find-regex deviation already filed, benign out-of-plan changes, body claim fixed by E50; class n/a for all | ⬜ Open | — | XS |
 
@@ -362,14 +362,6 @@ Consequence is size control, not correctness — reviews get *more* context than
 
 **class:** a concurrency guard whose liveness probe covers only the launcher's own spawn mechanism, while the guarded resource is keyed by a launcher-independent identifier. `bin/pr-ready-now:717-720` decides "already running" solely by matching `com.ibl5.pr-ready-now-<pr>` against a one-shot `launchctl list` snapshot, so a `/pr-ready` started interactively in another Claude session carries no launchd label and is never detected. The two runs then collide on shared state: `.claude/skills/pr-ready/SKILL.md:41` mandates scratch filenames keyed to the PR number and explicitly forbids `$$`, and `bin/pr-ready-now:246` (`--stop`) confirms the convention with `rm -f /tmp/pr-ready-*-"${PR}".*`. Two concurrent runs on one PR therefore overwrite each other's mid-phase scratch, and both push to the same branch.
 
----
-
-### E31 `bin/plan-now` help span truncated by bare `#`; test assertions miss declared secondary-behaviour tokens
-
-*(discovered 2026-09-01 during #1966)*
-
-**class:** a bin/ help-block edit inserts a bare `#` that silently terminates the `sed -n '/^# Usage:/,/^#$/p'` span, dropping a documented operator section from `--help`; or a verification-matrix row is implemented positive-only, omitting an asserted secondary stderr token — in both cases a reviewer sees the declared behaviour and the test suite does not contradict it, so the gap ships.
-
 **occurrence table:**
 
 | # | File:line | Same class? | Live? | Status |
@@ -389,18 +381,12 @@ Not a defect in the anchoring or the SIGPIPE handling: the `$`-anchor (guarding 
 `artifact destination:` `bin/pr-ready-now` (skip predicate + `--stop` ownership check), `.claude/skills/pr-ready/SKILL.md` (Phase 0 lock acquisition + release), and a case in `bin/test-pr-ready-now` that seeds a live-PID lock and asserts the PR is skipped.
 
 *(discovered 2026-09-01 while assessing en-masse `/pr-ready` readiness; not tied to a single PR)*
-| 1 | `bin/plan-now:18` — bare `#` terminated the help span, dropping the 6-line DM-contract paragraph | yes | fixed this pass | fixed this pass |
-| 2 | `bin/test-plan-now` — verification-matrix row declared secondary assertion `proceeding` in non-3-exit warning case; no `want` called it | yes | fixed this pass | fixed this pass |
-| 3 | `bin/test-plan-now` — verification-matrix row 2 (secondary assertion text for non-3 path) missing positive assertion for `--proceed-on-non-gate-exit` activation token | yes | fixed this pass | fixed this pass |
 
-`prevention_ladder:`
+---
 
-- **rung 0 — already covered by an existing gate?** No gate checks that verification-matrix rows assert every named secondary token, or that a help-comment block contains no bare `#` terminators.
-- **rung 1 — extend an existing gate?** No existing gate owns this surface.
-- **rung 2 — a rule doc? Yes — landing rung.** A `.claude/rules/` note that: (a) help-block comment spans must not contain a bare `#` line (terminator hazard); (b) verification-matrix rows that declare a secondary stderr or stdout token must have a matching `want` assertion in the harness for that token specifically. Meta-tooling-bar: no host to extend ✓, distinct trigger ✓, earns its upkeep ✓, no cheaper alternative ✓. Rule not authored this pass.
-- **rungs 3–5** — N/A. Mechanical detection of missing assertions requires understanding which tokens a row declares — outside the scope of a linter without semantic knowledge of the plan's matrix.
+### E31 `bin/plan-now` help span truncated by bare `#`; test assertions miss declared secondary-behaviour tokens
 
-`artifact destination:` a new `.claude/rules/` doc on help-span terminator hygiene and secondary-assertion completeness (not created this pass).
+> ✅ Implemented 2026-09-04 — see [archive](archive/dev-efficiency-backlog-archive.md#e31-binplan-now-help-span-truncated-by-bare--test-assertions-miss-declared-secondary-behaviour-tokens).
 
 ### E32 Phase 6 review notes on PR #1861 (long-lived branch drift)
 
@@ -744,24 +730,9 @@ For the accuracy findings (2–6): prevention is the existing `/pr-ready` Phase 
 
 *(discovered 2026-09-04 during #1924)*
 
-### E46 PR body "What is NOT in this PR" written before all plan phases complete
+### E46 PR body "What is NOT in this PR" written before all plan phases complete — ✅ Implemented (2026-09-04)
 
-**class: scope-claim staleness** — a PR body "What is NOT in this PR" residual entry that asserts an absence which the same PR's diff contradicts: a plan deliverable (scoped enforcement test) ships in a remediation commit during the same PR cycle, but the body is not updated to reflect it, leaving the PR claiming the conversion "is not yet self-enforcing" when `ControllerSuperglobalFreedomTest.php` is already in the diff.
-
-| # | File:line | Same class? | Live? | Status |
-|---|-----------|-------------|-------|--------|
-| 1 | PR #2077 body — "What is NOT in this PR" residual #2 claimed "conversion is not yet self-enforcing" after `ControllerSuperglobalFreedomTest.php` landed in the remediation commit | yes | no | fixed this pass |
-
-**prevention_ladder:**
-- rung 0: No existing gate checks "What is NOT" claims against the actual diff.
-- rung 1: Add a `.claude/rules/` doc reminding authors to re-read every "What is NOT in this PR" bullet when a remediation commit adds a plan deliverable — the negative claim may have been overtaken. **Landing rung: 1** — a rule doc is the cheapest enforcement and matches the risk level (rare, easy to spot in review).
-- rungs 2–5: Not warranted; the Phase 6 review pipeline already catches this class when it fires.
-
-`artifact destination: .claude/rules/` (doc addition — not yet filed; proposed prevention)
-
-`last_verified: 2026-09-04`
-
-*(discovered 2026-09-04 during Phase 6 review of #2077)*
+Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficiency-backlog-archive.md) — rung 1 filed as `.claude/rules/pr-body-negative-claim-recheck.md`.
 
 ### E47 Phase 6 review notes on PR #2077 — five confirmatory observations
 
@@ -888,3 +859,31 @@ For the accuracy findings (2–6): prevention is the existing `/pr-ready` Phase 
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-05 during Phase 6 review of #2092)*
+
+---
+
+### E52 PR #2064 Phase 6.5 — stale hand-written PR body claims contradicting the final diff and code
+
+**class:** a stale hand-written PR body claim in the ship-pipeline surface (Scope prose or Manual Testing section) that contradicts the final implementation, code, or test counts — specifically: a guard described as hunk-scoped when the code is file-scoped (B1); case range stated as 48–63 when the diff adds 49–64 (B2); and a Manual Testing claim citing E2E tests when the change is bash tooling with no E2E component (B3); plus an omission of a changed file from the Scope prose (N1).
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #2064 body — "provided the file also carries an advancing date bump in the same hunk" (contradicts code, plan, ADR-0104, and the body's own next sentence) | yes | yes | fixed this pass — corrected to "in the same file" |
+| 2 | PR #2064 body — "gains cases 48–63" (case 48 exists on master; diff adds 49–64) | yes | yes | fixed this pass — corrected to "cases 49–64" with idempotency note |
+| 3 | PR #2064 body — "all changes are covered by unit and E2E tests" (no E2E in diff; CI E2E jobs report skipping) | yes | yes | fixed this pass — corrected to name bash tooling and CI job names |
+| 4 | PR #2064 body — bin/docfix-run not mentioned in Scope prose despite being a changed file | near-miss | yes | fixed this pass — added one-line mention |
+
+**prevention_ladder:**
+- **rung 0 — already covered?** No existing gate checks PR body prose for consistency with the diff after implementation.
+- **rung 1 — extend existing gate?** No existing gate to extend; `/pr-ready` Phase 6 check 4 is the current mechanism — this entry describes a class it is designed to catch, and it did catch it.
+- **rung 2 — a rule doc?** A rule noting that plan-authored case ranges and guard descriptions must be verified post-impl before the body is published would help, but is low-value: the failure mode is a hand-edit omission, not ignorance of the rule.
+- **rungs 3–5 — not warranted:** a lint rule or hook cannot read implementation intent against prose claims.
+- **landing rung:** no gate warranted — `/pr-ready` Phase 6 check 4 is the catch mechanism; the class is inherently judgment-gated.
+
+`prevention_ladder: no gate warranted — Phase 6 check 4 is the existing catch; no mechanical gate can verify prose-vs-intent consistency`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-05 during Phase 6 review of #2064)*

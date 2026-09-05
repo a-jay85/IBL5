@@ -27,6 +27,8 @@ trap 'rm -rf "$BASE_TMP"' EXIT
 
 FAILED=0
 REPO=""
+GH_DIR=""
+NO_GH=""
 
 expect() { # name want got
     if [ "$3" -eq "$2" ]; then
@@ -78,6 +80,34 @@ add_no_trigger() {
     git -C "$REPO" commit -qm "add notes"
 }
 
+# new_stack_repo — master -> parent -> child, with origin/master ADVANCED past the fork
+# so origin/master is genuinely NOT an ancestor of child. Sets $REPO.
+new_stack_repo() {
+    new_repo 1
+    git -C "$REPO" branch -M master
+    git -C "$REPO" checkout -qb parent
+    echo p > "$REPO/p.txt"; git -C "$REPO" add p.txt; git -C "$REPO" commit -qm "parent work"
+    git -C "$REPO" update-ref refs/remotes/origin/parent "$(git -C "$REPO" rev-parse HEAD)"
+    git -C "$REPO" checkout -q master
+    echo m > "$REPO/m.txt"; git -C "$REPO" add m.txt; git -C "$REPO" commit -qm "master moves"
+    git -C "$REPO" update-ref refs/remotes/origin/master "$(git -C "$REPO" rev-parse HEAD)"
+    git -C "$REPO" checkout -q parent; git -C "$REPO" checkout -qb child
+}
+
+# fake_gh <answer> [<sleep-secs>] — PATH shim printing <answer> as baseRefName. Sets $GH_DIR.
+fake_gh() {
+    GH_DIR="$(mktemp -d "$BASE_TMP/gh.XXXXXX")"
+    printf '%s\n' "$1" > "$GH_DIR/answer"
+    { echo '#!/bin/sh'
+      [ -n "${2:-}" ] && echo "sleep $2"
+      echo 'cat "$(dirname "$0")/answer"'; } > "$GH_DIR/gh"
+    chmod +x "$GH_DIR/gh"
+}
+
+run_hook_env() { # <env-assignments...> — runs the hook in $REPO with extra env
+    ( cd "$REPO" && env "$@" "$REPO/bin/pre-push-adr-hook" </dev/null ) >/dev/null 2>&1
+}
+
 run_adr_check() { # runs the stdin composition inside $REPO
     ( cd "$REPO" && git log origin/master..HEAD --format='%B' \
         | "$REPO/bin/adr-check" --pr --bypass-from-stdin ) >/dev/null 2>&1
@@ -118,6 +148,143 @@ run_hook; expect "hook-bypass-trailer" 0 $?
 # origin/master absent → degrade-open (exit 0) even with a trigger present.
 new_repo 0; add_bin_trigger "add foo tool"
 run_hook; expect "hook-no-origin-master" 0 $?
+
+# --- stacked-PR base-resolution hook cases ---
+
+# config base: no-trigger commit on child, config resolves to origin/parent, offline → pass
+new_stack_repo
+add_no_trigger
+git -C "$REPO" config branch.child.iblBase parent
+run_hook_env "BRANCH_BASE_OFFLINE=1"; expect "hook-stacked-config-base" 0 $?
+
+# trigger on child with config base: trigger fires, no bypass → block
+new_stack_repo
+git -C "$REPO" config branch.child.iblBase parent
+add_bin_trigger "add foo tool"
+run_hook_env "BRANCH_BASE_OFFLINE=1"; expect "hook-stacked-trigger-still-blocks" 1 $?
+
+# bypass marker in commit message: trigger fires but bypass honoured → pass
+new_stack_repo
+git -C "$REPO" config branch.child.iblBase parent
+printf '#!/usr/bin/env bash\n' > "$REPO/bin/foo2"
+i=1; while [ "$i" -le 60 ]; do echo "# line $i" >> "$REPO/bin/foo2"; i=$((i + 1)); done
+git -C "$REPO" add bin/foo2
+git -C "$REPO" commit -qm "add tool
+<!-- no-adr: stacked PR uses parent base no ADR needed -->"
+run_hook_env "BRANCH_BASE_OFFLINE=1"; expect "hook-stacked-bypass-honoured" 0 $?
+
+# empty range: child has no commits beyond parent, config resolves base → pass
+new_stack_repo
+git -C "$REPO" config branch.child.iblBase parent
+run_hook_env "BRANCH_BASE_OFFLINE=1"; expect "hook-stacked-empty-range" 0 $?
+
+# parent branch not rebased onto master, no config, offline → block
+new_stack_repo
+git -C "$REPO" checkout -q parent
+run_hook_env "BRANCH_BASE_OFFLINE=1"; expect "hook-behind-master-blocks" 1 $?
+
+# child branch, no config, offline → unresolvable → block
+new_stack_repo
+run_hook_env "BRANCH_BASE_OFFLINE=1"; expect "hook-unresolvable-blocks" 1 $?
+
+# stale config pointing at master (non-ancestor of child) → D6 rejects → block
+new_stack_repo
+git -C "$REPO" config branch.child.iblBase master
+run_hook_env "BRANCH_BASE_OFFLINE=1"; expect "hook-stale-config-master-blocks" 1 $?
+
+# missing branch-base.sh → fail-closed
+new_stack_repo
+git -C "$REPO" config branch.child.iblBase parent
+rm "$REPO/bin/lib/branch-base.sh"
+run_hook_env "BRANCH_BASE_OFFLINE=1"; expect "hook-missing-lib-blocks" 1 $?
+
+# gh resolves base: no config, fake_gh returns "parent", offline unset → pass
+new_stack_repo
+fake_gh parent
+run_hook_env "PATH=$GH_DIR:$PATH"; expect "hook-gh-resolves-base" 0 $?
+
+# BRANCH_BASE_OFFLINE empty (not "1") → gh still called → resolves → pass
+new_stack_repo
+fake_gh parent
+run_hook_env "PATH=$GH_DIR:$PATH" "BRANCH_BASE_OFFLINE="; expect "hook-gh-offline-empty-still-calls-gh" 0 $?
+
+# BRANCH_BASE_OFFLINE=1 → gh skipped → unresolvable → block
+new_stack_repo
+fake_gh parent
+run_hook_env "PATH=$GH_DIR:$PATH" "BRANCH_BASE_OFFLINE=1"; expect "hook-gh-offline-one-skips-gh" 1 $?
+
+# hostile baseRefName from gh: starts with "--" → validation rejects → block
+new_stack_repo
+fake_gh "--upload-pack=evil"
+run_hook_env "PATH=$GH_DIR:$PATH"; expect "hook-gh-hostile-baserefname" 1 $?
+
+# injection: gh returns shell-metachar string; must not exec it, sentinel absent
+new_stack_repo
+fake_gh "p;touch $BASE_TMP/pwned"
+run_hook_env "PATH=$GH_DIR:$PATH"; ex=$?
+expect "hook-gh-injection-no-exec" 1 "$ex"
+[ ! -e "$BASE_TMP/pwned" ] || { echo "FAIL: hook-gh-injection-no-exec — sentinel created"; FAILED=1; }
+
+# timeout: fake_gh sleeps 30s; hook must exit within 15s total
+new_stack_repo
+fake_gh parent 30
+start=$SECONDS
+run_hook_env "PATH=$GH_DIR:$PATH"; expect "hook-gh-timeout-bounded" 1 $?
+elapsed=$(( SECONDS - start ))
+if [ "$elapsed" -lt 15 ]; then
+    echo "ok: hook-gh-timeout-bounded-elapsed (${elapsed}s < 15)"
+else
+    echo "FAIL: hook-gh-timeout-bounded-elapsed — took ${elapsed}s (expected < 15)"
+    FAILED=1
+fi
+
+# --- adrcheck --base=<ref> flag cases ---
+
+# Shared setup: trigger on parent branch, origin/parent advanced, child merges parent.
+# A null gh shim prevents any accidental call to the real gh binary.
+NO_GH="$(mktemp -d "$BASE_TMP/nogh.XXXXXX")"
+printf '#!/bin/sh\nexit 1\n' > "$NO_GH/gh"; chmod +x "$NO_GH/gh"
+
+new_stack_repo
+git -C "$REPO" checkout -q parent
+printf '#!/usr/bin/env bash\n' > "$REPO/bin/foo"
+i=1; while [ "$i" -le 60 ]; do echo "# line $i" >> "$REPO/bin/foo"; i=$((i + 1)); done
+git -C "$REPO" add bin/foo
+git -C "$REPO" commit -qm "add foo tool"
+git -C "$REPO" update-ref refs/remotes/origin/parent "$(git -C "$REPO" rev-parse HEAD)"
+git -C "$REPO" checkout -q child
+git -C "$REPO" merge -q parent -m merge
+
+( cd "$REPO" && PATH="$NO_GH:$PATH" "$REPO/bin/adr-check" --pr --base=origin/parent ) >/dev/null 2>&1
+expect "adrcheck-base-parent-clean" 0 $?
+
+( cd "$REPO" && PATH="$NO_GH:$PATH" "$REPO/bin/adr-check" --pr --base=origin/master ) >/dev/null 2>&1
+expect "adrcheck-base-master-trips" 1 $?
+
+( cd "$REPO" && PATH="$NO_GH:$PATH" "$REPO/bin/adr-check" --base=origin/parent --pr ) >/dev/null 2>&1
+expect "adrcheck-base-order-swapped" 0 $?
+
+( cd "$REPO" && PATH="$NO_GH:$PATH" "$REPO/bin/adr-check" --pr --base origin/parent ) >/dev/null 2>&1
+expect "adrcheck-base-space-form" 2 $?
+
+( cd "$REPO" && PATH="$NO_GH:$PATH" "$REPO/bin/adr-check" --pr --base= ) >/dev/null 2>&1
+expect "adrcheck-base-empty" 2 $?
+
+( cd "$REPO" && PATH="$NO_GH:$PATH" "$REPO/bin/adr-check" --pr --base=-x ) >/dev/null 2>&1
+expect "adrcheck-base-leading-dash" 2 $?
+
+( cd "$REPO" && PATH="$NO_GH:$PATH" "$REPO/bin/adr-check" --pr --base=a..b ) >/dev/null 2>&1
+expect "adrcheck-base-dotdot" 2 $?
+
+( cd "$REPO" && PATH="$NO_GH:$PATH" "$REPO/bin/adr-check" --staged --base=origin/parent ) >/dev/null 2>&1
+expect "adrcheck-base-with-staged" 2 $?
+
+# staged mode with a non-trigger file: no triggers → pass
+new_repo 1
+echo "plain" > "$REPO/notes.txt"
+git -C "$REPO" add notes.txt
+( cd "$REPO" && "$REPO/bin/adr-check" --staged ) >/dev/null 2>&1
+expect "adrcheck-staged-unchanged" 0 $?
 
 # --- install-git-hooks idempotency + backup-once ---
 # install-git-hooks resolves the hooks dir from cwd's git (--git-common-dir), so

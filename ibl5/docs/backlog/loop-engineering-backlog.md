@@ -77,6 +77,7 @@ last_verified: 2026-09-05
 | L48 | Planning pipeline prose coverage gap: code-block path expressions in `SKILL.md` are invisible to `bin/check-docs`, so they can diverge from `bin/plan-now`'s runtime slug derivation silently | ✅ Implemented (2026-09-04) | 🟦 | S |
 | L49 | `/pr-ready` Phase 6.5 files backlog rows with non-canonical status glyphs and automouse values, making them invisible to open-work filters | ⬜ Open | 🟥 | S |
 | L50 | `bin/pr-cycle` logs gate nominees as "excluded this run" but then orders and readies them (`--gate-edges /dev/null` re-admits every nominee) | ⬜ Open | 🟦 | S |
+| L51 | PR #1899 Phase 6 notes: (F3) `fixed`+`terminal:true` reject skips tier-climbing and goes direct to `give_up_needs_human`; (F6) loop-engineering backlog changed by PR but not declared in Scope prose | 📝 Note | — | XS |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -460,6 +461,7 @@ not add backticks or markdown links to a row.
 | 2026-07-25 | #1654 | class: CLI entrypoint accepts an unknown flag silently instead of erroring | routed to: Rung 1 - PHPStan rule over argv option parsing, queued as L33 in this backlog, not yet built; interim Rung 3 backstop shipped in #1668 (section: Forced integration-verification trigger). A fourth occurrence forces the Rung 1 rule. | prior: #1354, #1496 |
 | 2026-08-10 | #1834 | class: app-generated file read by an updater is force-tracked via .gitignore negation, so deploy git-reset clobbers live data with stale committed content | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): updater/importer that reads a generated file from a repo-relative path must assert git ls-files exits nonzero for that path | prior: -- |
 | 2026-08-14 | #1880 | class: gate escape path conditioned on a git-range query silently blocks when the range is empty (first-branch-commit), with no null fallback | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan adding or modifying an escape path in a CI check gate that calls a git-range helper must test the empty-range (no-prior-commits-on-branch) scenario | prior: -- |
+| 2026-08-16 | #1899 | class: shell-function-as-timeout-argument — timeout(1) execvp()s its argument; wrapping a shell function name exits 127 at exec time, undetectable at plan-authoring time | routed to: Rung 4 - verification test at the execution site (row 9 of bin/test-bug-pipeline-hunt exercises run_under_starved_env+timeout under the credential-starved env); the exit-127 failure surfaced and fixed the argument order inline during implementation | prior: -- |
 | 2026-08-16 | #1901 | class: htmx request-lifecycle handlers (beforeRequest/afterRequest) that mutate DOM state leave that mutation serialized in the history cache; browser Back restores request-time snapshot, making the mutation permanent until a historyRestore handler repairs it | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced E2E triggers): plan adding/modifying htmx beforeRequest/afterRequest DOM mutations must require E2E coverage of browser Back behavior | prior: -- |
 | 2026-08-19 | #1925 | class: queue enqueue operation inherits mtime from the queued file rather than stamping the ordering key at insertion time, silently misordering entries with old authoring dates | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan adding or modifying an enqueue or requeue path in bin/automouse/queue must test back-of-queue placement with an ancient-mtime plan | prior: -- |
 | 2026-08-19 | #1930 | class: a plan that stops ongoing data corruption in an import or upsert path ships without a compensating backfill migration for rows already corrupted before the fix | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan removing or modifying an importer or upsert path that was writing an incorrect value must verify a compensating backfill ships in the same PR or explicitly scope out already-corrupted rows in the plan | prior: -- |
@@ -715,6 +717,33 @@ Landing rung: **2** — add an explicit note to `.claude/skills/fix-and-prevent/
 The static-guard case in `bin/test-pr-cycle` should pin whichever wording lands, so the two cannot drift again.
 
 **provenance:** (discovered 2026-09-05 during the first live `bin/pr-cycle --go` run, right after #2081 merged)
+
+---
+
+### L51 PR #1899 Phase 6 notes — `fixed`+`terminal` skip and undeclared backlog addition
+
+**class:** two notes from Phase 6 review of #1899, both non-blocking.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/bug-pipeline-tick` — `terminal:true` check fires before a Gate-1 reject exits the tier-1 loop, sending the hunt to `give_up_needs_human` without climbing further tiers; the plan described rejection at tier 1 as never reaching a human directly (F3) | yes | live | 📝 Note — fail-safe direction; warrants its own plan |
+| 2 | `ibl5/docs/backlog/loop-engineering-backlog.md` — PR #1899 added a shell-function-as-timeout-argument row but did not mention the backlog change in the body Scope prose (F6) | near-miss | resolved | 📝 Note — additive and doc-only |
+
+**F3 detail:** A result carrying `verdict="fixed"` AND `terminal:true` that fails Gate 1 (`observed_before != reported`) triggers the `terminal` branch and calls `give_up_needs_human` immediately. The plan stated tier-1 rejections climb to tier 2 before giving up. The observed behavior is fail-safe — the hunter never ships a bad fix; a human receives the findings — but the escalation path is bypassed. Fixing it requires either clearing `terminal` before the reject exits, or adding a dedicated test row for this combination. Neither is a quick tweak; file as its own plan.
+
+**F6 detail:** `ibl5/docs/backlog/loop-engineering-backlog.md` is listed in the `files-changed` block, but the Scope prose does not mention it. The change is additive and doc-only. Phase 5.9 already surfaces it via the files-changed block.
+
+**prevention_ladder:**
+- F3: no gate warranted — the combination of `fixed`+`terminal:true` being rejected by Gate 1 is not exercised in rows 50–55; fixing correctly requires a dedicated plan.
+- F6: no gate warranted — additive backlog additions are already surfaced by Phase 5.9 files-changed; a rule requiring Scope prose for every backlog touch would be low-value.
+
+`prevention_ladder: no gate warranted for either finding`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-05 during Phase 6 review of #1899)*
 
 ---
 

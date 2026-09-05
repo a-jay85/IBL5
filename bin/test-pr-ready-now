@@ -1872,6 +1872,7 @@ end_case pr-ready-push-fail-closed
 # Measured at implementation: 33224 B (Step 3.5 post Phase-6-delegate rewrite; the plan
 # predicted 29021 B but a separate merged PR added the Phase 6 Opus-delegate block (+4203 B)
 # before this PR rebased onto master).
+# Re-measured 2026-09-05: 34552 B (post-rebase on master 4721cb2ce; band [33047, 35047] still contains it — no re-centre needed).
 begin_case
 _sz=$(wc -c < "$PRD/SKILL.md" | tr -d ' ')
 if [[ "$_sz" -lt 32224 || "$_sz" -gt 34224 ]]; then

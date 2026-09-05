@@ -230,6 +230,7 @@ value). For fake-POST tests (D7), assert the banner *after a real submit*, not a
 | E12 | ✅ Done | 🟩 | sleep-in-retry `setTimeout(r,200)` loop — `ajax-api-endpoints.spec.ts fetchJson` |
 | E13 | ⬜ Open | 🟩 | Plan-specified diagnostic strings and DOM observation evidence omitted during E2E assertion implementation. Messages fixed inline (PR #1807). DOM dumps for D15's four no-team pages not captured — needs a Playwright run against the worktree stack with `IBL_TEST_USER_REGULAR` credentials. (discovered 2026-09-02 during #1807) |
 | E14 | ⬜ Open | 🟥 | Autofix bot (`IBL5 Bug Hunter (sandbox)`, commit `ede59f41d`) silently removed the D15 Player-negotiate `.ibl-alert--error` assertion without declaring a scope change, leaving permissive-form coverage on a route with assertable production behavior. (discovered 2026-09-03 during #1807) |
+| E15 | ⬜ Open | — | E2E spec inline comment overstates ordering assertion; matrix row #8 not provably run — see prose |
 
 **Suggested direction (axis):** All E1–E12 items complete (PR #1805). E9's final implementation uses `evaluate(form.submit())` + auto-retrying `toContainText` DOM assertion rather than `waitForResponse` — `form.submit()` triggers full-page navigation, making `page.content()` race the navigate; the DOM assertion survives the navigation. E9 STOP GUARD: not triggered — PHP validation confirmed working.
 **Est. effort:** complete. **Risk if untouched:** n/a.
@@ -279,6 +280,28 @@ value). For fake-POST tests (D7), assert the banner *after a real submit*, not a
 
 **artifact destination:** CODEOWNERS update or CI bot-scope restriction
 **provenance:** (discovered 2026-09-03 during #1807)
+
+### E15 E2E spec comment overstates, and verification matrix row not provably run (PR #1956)
+
+class: E2E inline comment that overstates what a negative assertion proves (F2), and a verification matrix row declared 'not committed' with no CI artifact proving it was run (F3).
+
+occurrence table:
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/tests/e2e/flows/csrf-rejection.spec.ts` — rejecttradeoffer.php test, ordering comment | yes (F2 — overstated comment) | was live; fixed this pass | fixed this pass |
+| 2 | `~/claude-plans/authz-verdict-refactor-1a-trading-pins.md` — verification matrix row #8 | yes (F3 — declared not-committed; no CI artifact) | yes (plan only; throwaway check by design) | not fixed — filed |
+
+prevention_ladder:
+- rung 0: no existing gate checks comment precision.
+- rung 1: no existing gate to extend.
+- rung 2: no rule doc warranted — comment precision is a code-review concern, not a structural defect class.
+- rung 3–5: no PHPStan or CI check can validate comment accuracy.
+- landing rung: no gate warranted — F2 was a one-off plan prose imprecision fixed in-pass; F3 is a deliberate design choice (the plan explicitly marks row #8 "not committed"), and CI cannot run throwaway manual confidence checks by design.
+
+artifact_destination: n/a — no gate
+
+provenance: (discovered 2026-09-04 during #1956)
 
 ---
 

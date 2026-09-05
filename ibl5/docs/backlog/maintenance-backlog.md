@@ -25,7 +25,7 @@ Effort scale:
 - **M** — multi-step plan, 1-3 days, may touch several modules
 - **L** — refactor or platform shift, > 3 days, likely needs ADR
 
-**Status:** Complete — 15-axis audit, 312 findings (+2 post-audit follow-ups from the PR #1107 review, +1 from the #1066 reject-IDOR review → 315 tracked; +11 Axis-1 size seeds 1.21–1.31 from the hot-files comment→backlog migration 2026-07-24 → 326 tracked; +5 Axis-1 size seeds 1.32–1.36 from the ground-truth audit 2026-07-24 → 331 tracked; +1 Axis-2 robustness item 2.39 discovered 2026-07-27 during trading-1-31-api-handler-extract → 332 tracked; +1 Axis-15 data-integrity item 15.24 discovered 2026-08-04 during the PR #1771 review → 333 tracked; +1 Axis-6 coverage item 6.23 discovered 2026-08-08 during the PR #1670 review → 334 tracked; +1 Axis-8 correctness item 8.18 discovered 2026-08-09 during the PR #1683 review → 335 tracked; +1 Axis-6 robustness item 6.24 discovered 2026-08-10 during #1825 → 336 tracked; +1 Axis-6 coverage item 6.25 discovered 2026-09-01 during #1903 → 337 tracked; +1 Axis-9 process-observation item 9.28 discovered 2026-09-01 during #1903 → 338 tracked; +1 Axis-2 robustness item 2.40 discovered 2026-09-02 during #1807 → 339 tracked; +1 Axis-10 PHPStan-coverage item 10.27 discovered 2026-09-03 during #1807 → 340 tracked; +1 Axis-15 process-observation item 15.29 discovered 2026-09-03 during #1807 → 341 tracked; +1 Axis-9 doc-drift item 9.29 discovered 2026-09-02 during #1961 → 342 tracked).
+**Status:** Complete — 15-axis audit, 312 findings (+2 post-audit follow-ups from the PR #1107 review, +1 from the #1066 reject-IDOR review → 315 tracked; +11 Axis-1 size seeds 1.21–1.31 from the hot-files comment→backlog migration 2026-07-24 → 326 tracked; +5 Axis-1 size seeds 1.32–1.36 from the ground-truth audit 2026-07-24 → 331 tracked; +1 Axis-2 robustness item 2.39 discovered 2026-07-27 during trading-1-31-api-handler-extract → 332 tracked; +1 Axis-15 data-integrity item 15.24 discovered 2026-08-04 during the PR #1771 review → 333 tracked; +1 Axis-6 coverage item 6.23 discovered 2026-08-08 during the PR #1670 review → 334 tracked; +1 Axis-8 correctness item 8.18 discovered 2026-08-09 during the PR #1683 review → 335 tracked; +1 Axis-6 robustness item 6.24 discovered 2026-08-10 during #1825 → 336 tracked; +1 Axis-6 coverage item 6.25 discovered 2026-09-01 during #1903 → 337 tracked; +1 Axis-9 process-observation item 9.28 discovered 2026-09-01 during #1903 → 338 tracked; +1 Axis-2 robustness item 2.40 discovered 2026-09-02 during #1807 → 339 tracked; +1 Axis-10 PHPStan-coverage item 10.27 discovered 2026-09-03 during #1807 → 340 tracked; +1 Axis-15 process-observation item 15.29 discovered 2026-09-03 during #1807 → 341 tracked; +1 Axis-9 doc-drift item 9.29 discovered 2026-09-02 during #1961 → 342 tracked; +1 Axis-15 process-observation item 15.31 discovered 2026-09-04 during #1956 → 343 tracked).
 
 ---
 
@@ -664,6 +664,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 15.24 | ⬜ Open | 🟦 | Pre-existing duplicate rows in `ibl_box_scores`: 1993 (29), 1994 (7), 2002 (1), 2004 (24) — 61 excess by `(game_date, name)`. Distinct signature from the 2007 HEAT re-import (no schedule overload, no `created_at` batch, no month shift); cause unknown. Destructive delete → human-merge. (discovered 2026-08-04 during the PR #1771 review) |
 
 | 15.29 | ⬜ Open | 🟩 | Production PHP changes (`Player/index.php` null guards, `LeagueStarters/index.php` free-agent fallback) entered a test-scoped PR without a plan phase, structured code review, or scope justification; six PR-body claims were contradicted by the actual diff. Adding a files-changed reconciliation gate is additive → auto-mergeable. (discovered 2026-09-03 during #1807) |
+| 15.31 | ⬜ Open | — | Plan-authored inaccuracies in test code and frontmatter discovered during PR review — see prose |
 
 ### 15.1 `tid` / `teamid` / `team_id` — Three Spellings Survive ADR-0009
 **Location:** `ibl_box_scores` (`visitorTID`, `homeTID`, `teamID`), `ibl_box_scores_teams` (`visitorTeamID`, `homeTeamID`), `ibl_rcb_*` (`team_id`), `ibl_league_config` (`team_id`)
@@ -745,3 +746,25 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Est. effort:** S
 **Risk if untouched:** Production behavior changes enter the codebase without a plan phase, dedicated code review, or verification matrix row, and the PR body can misrepresent the diff scope without a gate catching the contradiction.
 **provenance:** (discovered 2026-09-03 during #1807; Findings 3 and 4 combined)
+
+### 15.31 Plan-authored inaccuracies propagated into test code and plan frontmatter
+
+class: plan-authored prose about control-flow ordering that misidentifies the gate sequence (F1), and a plan frontmatter/prose contradiction on auto_merge value (F4) — both transcribed faithfully from the plan and both invisible to CI.
+
+occurrence table:
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/tests/Trading/TradingControllerRejectOfferTest.php:73` | yes (F1 — false comment) | was live; fixed this pass | fixed this pass |
+| 2 | `~/claude-plans/authz-verdict-refactor-1a-trading-pins.md` — `auto_merge` field | yes (F4 — frontmatter vs. prose contradiction) | yes (plan file; unfixable inline) | not fixed — filed |
+
+prevention_ladder:
+- rung 0: no existing gate catches plan-level prose inaccuracies or frontmatter contradictions.
+- rung 1: no existing gate to extend.
+- rung 2: a rule doc could advise plan authors to verify comment accuracy against the production source before implementation. Low ROI for a rare class.
+- rung 3–5: no PHPStan rule or CI check can validate prose accuracy in plan files.
+- landing rung: no gate warranted — these are one-off plan authoring imprecisions; the Phase 7 verdict documents the correct auto_merge behavior (false), and the code comment was fixed in-pass.
+
+artifact_destination: n/a — no gate
+
+provenance: (discovered 2026-09-04 during #1956)

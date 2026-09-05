@@ -296,6 +296,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 6.21 | ⬜ Open | 🟨 | Row-12 (Free-Agents/teamless session) `processrookieoption` ownership-rejection path untested: PHPUnit entry-point test impossible (handler `exit()`s), E2E auth fixture always has a session team. Needs a teamless-fixture / non-`exit()` refactor decision before it's writable → 🟨. From PR #1107 Phase 5.0 note. |
 | 6.23 | ⬜ Open | 🟨 | **Same family as 6.22, different guard.** `RequestEventLoggingBootstrap::boot()` returns at line 35 when `\PHP_SAPI === 'cli'`, and PHPUnit is always CLI (DB group included), so the `hash('sha256', session_id())` derivation at lines 66–70 is unreachable from any PHPUnit test — the file's three existing tests are all `expectNotToPerformAssertions()` for exactly this reason. A regression storing the **raw** session id would break zero tests. Extract the derivation to a pure static (or inject the SAPI) so the PII boundary is unit-pinnable. 🟨: production change on a PII boundary; needs a seam decision. (discovered 2026-08-08 during #1670) |
 | 6.25 | ⬜ Open | 🟨 | **Residual of 6.22.** The verdict + thin-redirect-shim conversion landed for Waivers, FreeAgency, and the Trade API accept/decline controllers; `Trading\TradingController`'s reject path still gates inline and still ends in `HtmxHelper::redirect()→exit()`, so its "non-party refused + no mutation" property remains E2E-only. Apply the same pattern: move the authz decision into a verdict-returning method on the service that owns the mutation, leave the controller a shim. Verdict shape is now settled (`array{success: bool, error?: string}`), so the design fork 6.22 carried is closed. 🟨: production refactor on a security surface. Split out of 6.22 when it resolved. |
+| 6.27 | ⬜ Open | 🟩 | Plan-prescribed test phase (`ControllerSuperglobalFreedomTest.php`) shipped in remediation pass rather than in original PR; descope was declared under wrong artifact (allowlist ratchet). `Phase 6 plan-fidelity review` is the detection gate. |
 
 ### 6.21 Rookie-option Free-Agents/teamless ownership gate is untested
 **Location:** `ibl5/modules/Player/index.php` (`processrookieoption()` ownership gate); planned `tests/Module/EntryPoints/PlayerRookieOptionEntryPointTest.php`
@@ -312,6 +313,21 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Est. effort:** S
 **Risk if untouched:** The `session_id` column is documented and reviewed as a non-replayable digest. If the derivation regresses to the raw token, every CI gate stays green and the failure is only visible by inspecting production rows — a PII exposure with no automated detector.
 **Status:** ⬜ Open — raised from the #1670 review (the plan listed the bootstrap test as `[modify]`; the item was not implementable as specified). 🟨 conditional: a production change on a PII boundary, gated on the seam decision above.
+
+### 6.27 Plan-prescribed test class omitted from PR diff with descope misdeclared
+
+**class:** a plan-prescribed test class (`ControllerSuperglobalFreedomTest.php`) absent from the PR diff, with the omission declared under a different artifact (the allowlist ratchet) rather than the missing test file.
+
+**occurrences:**
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/tests/Http/ControllerSuperglobalFreedomTest.php` | yes | fixed | fixed this pass |
+
+**prevention_ladder:** no gate warranted — `/pr-ready` Phase 6 plan-fidelity review IS the detection gate and caught this; adding a second layer for one observed instance is not warranted.
+
+**artifact destination:** n/a — no gate
+
+**provenance:** (discovered 2026-09-04 during #2077)
 
 ---
 
@@ -384,6 +400,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 9.30 | ⬜ Open | 🟩 | Migration backup-table suffix (_165) fossilized from intermediate renaming — header comment corrected this pass. No gate warranted. (discovered 2026-09-03 during #1961) |
 | 9.31 | ⬜ Open | 🟩 | PR body manual-test row naming a pre-existing UI mislabel as the actual label — PR #1961 body row 23 corrected this pass via gh pr edit. No gate warranted. (discovered 2026-09-03 during #1961) |
 | 9.32 | ⬜ Open | 🟩 | Unperformed Truly-manual verification row — PR #1961 row 23; protected by auto_merge: false hold. No gate warranted. (discovered 2026-09-03 during #1961) |
+| 9.33 | ⬜ Open | 🟩 | Backlog Status prose named a controller as converted when its source still reads superglobals (14.8 and 14.12 Status blocks); creating an intra-doc contradiction with the Evidence cell. |
 
 
 ### 9.4b API_GUIDE — Full Endpoint-by-Endpoint OpenAPI Reference (Deferred from 9.4)
@@ -439,6 +456,22 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **prevention_ladder:** no gate warranted — covered by existing human-signoff hold
 **artifact destination:** n/a — no gate
 **provenance:** (discovered 2026-09-03 during #1961)
+
+### 9.33 Backlog Status sentence names controller as converted when source still reads superglobals
+
+**class:** a backlog Status sentence naming a controller as converted when its source file still reads superglobals directly, creating an intra-doc contradiction between the Evidence cell and the Status prose.
+
+**occurrences:**
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/docs/backlog/maintenance-backlog.md:14.8 Status` | yes | yes | fixed this pass |
+| 2 | `ibl5/docs/backlog/maintenance-backlog.md:14.12 Status` | yes | yes | fixed this pass |
+
+**prevention_ladder:** no gate warranted — `/pr-ready` Phase 6 plan-fidelity review covers 6d.4 (body vs. reality); the equivalent check for backlog Status prose is already performed inline during review. Adding a CI gate that parses status claims against file contents would require custom static analysis beyond the established bar.
+
+**artifact destination:** n/a — no gate
+
+**provenance:** (discovered 2026-09-04 during #2077)
 
 ## Axis 10: PHPStan Rule Coverage Gaps
 
@@ -603,9 +636,9 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 14.5 | ⬜ Open | 🟨 | Module index.php → front-controller composition root (42 modules). Very large; routing/auth-sensitive → decompose + sequence (some modules touch mutations). |
-| 14.8 | ⬜ Open | 🟩 | Introduce `HttpRequest` VO wrapping superglobals; green-green abstraction. |
+| 14.8 | ◑ Partial | 🟩 | `Http\HttpRequest` VO shipped and wired into 4 controllers (Player, Team, DepthChartEntry, FreeAgency) + their module entry points; residual: `Waivers/WaiversController.php` (6 superglobal reads) and the `BanRawSuperglobalsRule` `_REQUEST` ratchet. |
 | 14.10 | ◑ Partial | 🟨 | Container accessor registered (PR1); side-effect removal deferred to PR3 (boosted-HTMX cookie-population hazard) → careful sequencing. |
-| 14.12 | ◑ Partial | 🟩 | Wholesale `$_REQUEST`→`$GLOBALS` gone; modules still read `$op/$pid` from `$_REQUEST` → Request object is the residual (folds into 14.8). |
+| 14.12 | ◑ Partial | 🟩 | `HttpRequest` VO shipped (14.8) and wired into 4 module entry points; residual: `ComparePlayers`, `Draft`, `ProjectedDraftOrder`, `Voting`, `ApiKeys` `index.php` still read `$op` from `$_REQUEST` directly. |
 
 ### 14.5 Module `index.php` Files Are the Real Composition Root (42 of 47)
 **Location:** `ibl5/modules/*/index.php`
@@ -615,11 +648,12 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Risk if untouched:** New collaborators added module-by-module (42x); shared services instantiated N times per request.
 
 ### 14.8 Controllers Directly Read `$_GET`/`$_POST`/`$_REQUEST`
-**Location:** `Waivers/WaiversController.php:87-154`, `FreeAgency/FreeAgencyController.php:111-166`, `DepthChartEntry/DepthChartEntryController.php`, `Team/TeamController.php`, `Player/PlayerPageController.php`
+**Location:** `Waivers/WaiversController.php:87-154` (residual), `FreeAgency/FreeAgencyController.php`, `DepthChartEntry/DepthChartEntryController.php`, `Team/TeamController.php`, `Player/PlayerPageController.php` (all four converted)
 **Problem:** No `Request` abstraction; controllers can't be invoked with synthetic input.
 **Suggested direction:** Thin `HttpRequest` value object wrapping `$_GET`/`$_POST`/`$_SERVER`; composition root creates from superglobals.
-**Est. effort:** M
+**Est. effort:** M (residual: S)
 **Risk if untouched:** PRG/HTMX redirect logic untestable; superglobals must be polluted in tests.
+**Status:** ◑ Partial (2026-09-04) — `ibl5/classes/Http/HttpRequest.php` landed and four of the five named controllers convert cleanly; `tests/Http/ControllerSuperglobalFreedomTest.php` now guards the converted set automatically. **Residual:** `WaiversController.php` still holds 6 superglobal reads. **Note:** `Controller.php` must **stay** on the `_REQUEST` suffix allowlist in `BanRawSuperglobalsRule` — removing it would break unrelated controllers (plan Phase 6 §Correction). To close the item: convert Waivers and land a matching guard for it.
 
 ### 14.10 `PageLayout::header()` Has Side Effect Controllers Depend On
 **Location:** `PageLayout/PageLayout.php:16` (`cookiedecode($user)`); `FreeAgency/FreeAgencyController.php:55` comment "Must come first"
@@ -635,7 +669,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Replace with explicit `Request` object; module entry points read named parameters by key.
 **Est. effort:** L
 **Risk if untouched:** Name collisions silently overwrite globals; PHPStan needs per-site `@var` annotations.
-**Status:** Partially completed (verified 2026-05-29 audit) — the wholesale `$_REQUEST`→`$GLOBALS` copy is gone; `ConfigBootstrap` now allowlists only `newlang`/`redirect` (see [[3.6]]). Modules still read `$op`/`$pid`/`$action` directly from `$_REQUEST` — a `Request` object remains the longer-term fix.
+**Status:** Partially completed (verified 2026-05-29 audit) — the wholesale `$_REQUEST`→`$GLOBALS` copy is gone; `ConfigBootstrap` now allowlists only `newlang`/`redirect` (see [[3.6]]). Modules still read `$op`/`$pid`/`$action` directly from `$_REQUEST` — a `Request` object remains the longer-term fix. A `Http\HttpRequest` value object shipped (item 14.8) and is now the boundary for the FreeAgency, DepthChartEntry, Team and Player entry points (four); residual: `WaiversController`/`modules/Waivers/index.php` still read superglobals directly, plus ComparePlayers, Draft, ProjectedDraftOrder, Voting, ApiKeys `index.php` still read `$op` from `$_REQUEST`.
 
 ---
 

@@ -7,6 +7,7 @@ namespace FreeAgency;
 use Auth\Contracts\AuthServiceInterface;
 use FreeAgency\Contracts\FreeAgencyProcessorInterface;
 use FreeAgency\Contracts\FreeAgencyServiceInterface;
+use Http\HttpRequest;
 use Team\Team;
 use Season\Season;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
@@ -21,6 +22,7 @@ class FreeAgencyController
     private TeamIdentityRepositoryInterface $commonRepository;
     private \Utilities\NukeCompat $nukeCompat;
     private AuthServiceInterface $authService;
+    private HttpRequest $request;
 
     /**
      * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit').
@@ -38,6 +40,7 @@ class FreeAgencyController
         FreeAgencyServiceInterface $service,
         FreeAgencyView $view,
         FreeAgencyProcessorInterface $processor,
+        HttpRequest $request,
         ?\Utilities\NukeCompat $nukeCompat = null,
         ?\Psr\Log\LoggerInterface $logger = null,
         ?Season $season = null
@@ -49,6 +52,7 @@ class FreeAgencyController
         $this->service = $service;
         $this->view = $view;
         $this->processor = $processor;
+        $this->request = $request;
         $this->nukeCompat = $nukeCompat ?? new \Utilities\NukeCompat();
         $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
     }
@@ -80,7 +84,8 @@ class FreeAgencyController
         $season = $this->season ?? new Season($this->db);
 
         $mainPageData = $this->service->getMainPageData($team, $season);
-        $result = isset($_GET['result']) && is_string($_GET['result']) ? $_GET['result'] : null;
+        $rawResult = $this->request->get('result');
+        $result = is_string($rawResult) ? $rawResult : null;
         $responder = new \Api\Response\HtmlResponder();
         $responder->html($this->view->render($mainPageData, $result));
         $responder->html('<script src="jslib/contract-hint.js"></script>');
@@ -102,7 +107,8 @@ class FreeAgencyController
         $negotiationData = $this->service->getNegotiationData($pid, $team, $season);
         $negotiationData['team'] = $team;
 
-        $error = isset($_GET['error']) && is_string($_GET['error']) ? $_GET['error'] : null;
+        $rawError = $this->request->get('error');
+        $error = is_string($rawError) ? $rawError : null;
 
         // On validation error redirect, restore submitted offer values into form
         if ($error !== null) {
@@ -131,8 +137,7 @@ class FreeAgencyController
         $verifiedTeamName = $this->commonRepository->getTeamnameFromUsername($username);
 
         try {
-            /** @var array<string, mixed> $postData */
-            $postData = $_POST;
+            $postData = $this->request->allPost();
             $result = $this->processor->processOfferSubmission($postData, $verifiedTeamName);
         } catch (\Throwable $e) {
             $this->logger->error('fa_offer_error', [
@@ -170,14 +175,14 @@ class FreeAgencyController
      */
     private function extractSubmittedOfferFromQuery(): ?array
     {
-        if (!isset($_GET['offer1'])) {
+        if ($this->request->get('offer1') === null) {
             return null;
         }
 
         $offer = [];
         for ($i = 1; $i <= 6; $i++) {
             $key = 'offer' . $i;
-            $raw = $_GET[$key] ?? null;
+            $raw = $this->request->get($key);
             $offer[$key] = is_numeric($raw) ? (int) $raw : 0;
         }
         return $offer;
@@ -193,7 +198,8 @@ class FreeAgencyController
         $verifiedTeamName = $this->commonRepository->getTeamnameFromUsername($username);
 
         try {
-            $playerID = isset($_POST['playerID']) && is_numeric($_POST['playerID']) ? (int) $_POST['playerID'] : 0;
+            $rawPlayerId = $this->request->post('playerID');
+            $playerID = is_numeric($rawPlayerId) ? (int) $rawPlayerId : 0;
             $result = $this->processor->deleteOffers($verifiedTeamName, $playerID);
         } catch (\Throwable $e) {
             $this->logger->error('fa_delete_error', [

@@ -77,6 +77,8 @@ last_verified: 2026-09-05
 | L48 | Planning pipeline prose coverage gap: code-block path expressions in `SKILL.md` are invisible to `bin/check-docs`, so they can diverge from `bin/plan-now`'s runtime slug derivation silently | ✅ Implemented (2026-09-04) | 🟦 | S |
 | L49 | `/pr-ready` Phase 6.5 files backlog rows with non-canonical status glyphs and automouse values, making them invisible to open-work filters | ⬜ Open | 🟥 | S |
 | L50 | `bin/pr-cycle` logs gate nominees as "excluded this run" but then orders and readies them (`--gate-edges /dev/null` re-admits every nominee) | ⬜ Open | 🟦 | S |
+| L51 | `/pr-ready` rebase silently merges `merge=union` files; the Phase 3 conflict list never names them, and `bin/check-numbering` does not catch two ADR index rows that share the same number but carry differing descriptions | ⬜ Open | 🟥 | S |
+| L52 | Hand-authored PR body `## Manual Testing` asserts "unit and E2E tests" without verifying the diff contains PHPUnit tests or Playwright specs; same class as L36, different surface (hand-authored body vs. `/post-plan` template) | ⬜ Open | 🟥 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -473,6 +475,7 @@ not add backticks or markdown links to a row.
 | 2026-09-01 | #2054 | class: a two-phase CLI tool that collects human judgment for a set of items does not short-circuit when the set is empty, forcing an unnecessary second invocation and opening a failure window in the inter-invocation gap | routed to: Rung 4 - rule doc in .claude/rules/ stating that two-invocation CLI scripts must implement the trivial bypass when invocation 1 produces an empty judgment set | prior: -- |
 | 2026-09-04 | #2087 | class: Shell script wrapper that cd's to its module root before invoking Python invalidates caller-provided relative path arguments, silently breaking callers that pass repo-relative paths | routed to: Rung 4 - .claude/rules/shell-wrapper-path-resolution.md | prior: -- |
 | 2026-09-04 | #2092 | class: a plan-level portability claim for a shell script uses find -regex with \{n\} interval notation, verified only on macOS BSD find (where BRE supports \{n\}), not on Ubuntu GNU find (which uses emacs regex type by default and does not treat \{n\} as an interval) — the regex silently matches nothing in CI, causing the script to find no directories and skip its entire body without error | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan introducing a find -regex pattern claiming cross-platform portability between macOS and Ubuntu must carry a CI-run verification row demonstrating the regex matches on the Ubuntu runner, OR must use bash-level character-class and length filtering instead of find interval expressions | prior: -- |
+| 2026-09-05 | #2111 | class: a hook or gate computing a git diff range derives the base from a hardcoded canonical ref (origin/master) rather than the branch's declared base, causing false blocks on stacked PRs whose changes exist in both master and the declared parent | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan adding or modifying a hook or gate that computes a git diff range must assert the stacked-PR scenario | prior: -- |
 | 2026-09-05 | #2117 | class: proc_open subprocess contract violations (unchecked proc_close exit, undrained stderr, NUL-unsafe delimiter) shipped undetected when a plan adds or modifies a proc_open call site without requiring subprocess contract verification | routed to: Rung 1 (partial, shipped in #2117) - BanProcOpenUncheckedExitRule in ibl5/phpstan-rules/ enforces checked proc_close exit; broader contract (stderr drain, NUL-delimiter correctness) routed to Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger) | prior: -- |
 | 2026-09-05 | #2121 | class: new always-loaded rule doc committed to wrong directory tree during implementation — bin/check-rules-byte-budget scans only the correct $RULES_DIR, so the misplaced file passes the gate silently until manually relocated | routed to: Rung 4 - note in .claude/rules/doc-freshness.md clarifying always-loaded .claude/rules/*.md files must be created at the exact repo-root path, not inside any subdirectory (e.g. not ibl5/.claude/rules/) | prior: -- |
 ```
@@ -716,6 +719,48 @@ Landing rung: **2** — add an explicit note to `.claude/skills/fix-and-prevent/
 The static-guard case in `bin/test-pr-cycle` should pin whichever wording lands, so the two cannot drift again.
 
 **provenance:** (discovered 2026-09-05 during the first live `bin/pr-cycle --go` run, right after #2081 merged)
+
+---
+
+### L51 `/pr-ready` rebase silently merges `merge=union` files; Phase 3 list never names them; `bin/check-numbering` misses same-number rows with differing descriptions
+
+**class:** A `merge=union` file that receives additive rows from both rebase sides; the Phase 3 conflict list never enumerates it (it never conflicted, so it never surfaced for human review), and `bin/check-numbering` Check 3 does not fire when two rows share the same `[NNNN]` ADR hyperlink but carry differing description text — because the check matches on row identity, not on the extracted number.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/docs/decisions/README.md` — ADR-0104 row duplicated during rebase of #2111; older shorter description resurrected over master's current text | yes | fixed this pass | fixed this pass |
+
+**prevention ladder:**
+- rung 0 — `bin/check-numbering` Check 3 fires on a duplicate *number* in the shape it recognises, but not on two rows that share `[0104]` with different descriptions; partial coverage, not this class.
+- rung 1 — Extend `bin/check-numbering` Check 3 to additionally fail when two rows in the ADR index table share the same `| [NNNN]` leading pattern, regardless of trailing description text. Direct prevention: the duplicate 0104 row would have tripped it.
+- rung 2 — A rule doc requiring Phase 3 to also enumerate every rebased path whose `.gitattributes` driver is `union`. Cheaper, but post-hoc: the row is already silently merged and unchecked by the time the list is written.
+- Landing: **rung 1** — extend `bin/check-numbering`. Directly prevents the defect class without requiring the human to remember to scan `.gitattributes` during rebase. All four meta-tooling-bar extend-before-add conditions hold: host already exists (`bin/check-numbering`), trigger is the same CI step, surface is live and recurring (every rebase of an ADR-adding branch), no cheaper alternative closes the class.
+
+**artifact destination:** `bin/check-numbering` (in-repo; lands in PR diff).
+
+**provenance:** (discovered 2026-09-05 during #2111)
+
+---
+
+### L52 Hand-authored PR body `## Manual Testing` asserts "unit and E2E tests" without verifying the diff contains those test types
+
+**class:** A hand-authored PR body section that copies a generic coverage claim ("covered by unit and E2E tests") without checking whether the diff actually contains PHPUnit tests or Playwright specs — same defect class as L36 (`/post-plan` Phase 3 hardcoded claim), different surface: here the claim is written by a human, not generated from a template.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #2111 `## Manual Testing` body section — "covered by unit and E2E tests"; diff contains zero PHPUnit tests or Playwright specs; 23 new cases live in `bin/test-adr-check` shell harness | yes | fixed this pass | fixed this pass |
+
+**prevention ladder:**
+- rung 0 — `/pr-ready` Phase 6 check 4 already catches this class and routes it to Phase 6.5 for correction. The catch-and-fix path is operative. Covered.
+- Landing: **no gate warranted** — already caught by `/pr-ready` Phase 6 check 4; the Phase 6.5 fix path is the gate. Adding a separate authoring-time gate would duplicate coverage already in place.
+
+**artifact destination:** n/a — no gate.
+
+**provenance:** (discovered 2026-09-05 during #2111)
 
 ---
 

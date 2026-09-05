@@ -634,6 +634,17 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 
 **Table evidence (2026-09-03)** — the Axis 2 table cell as it read at archiving time, preserved verbatim: `modules/Player/index.php:79,114` (+ 3 candidates in Player/extension.php, DepthChartEntry, LeagueStarters) pass `getTeamnameFromUsername()`'s `?string` return into a `string` sink under `strict_types=1` — no-team users get a `TypeError`. Reverted from PR #1807 per plan STOP guard; needs a full sweep + PHPStan gate. (discovered 2026-09-02 during #1807) [CORRECTED 2026-09-03: two of the three "candidates" were already guarded (see occurrence table above), and the observed symptom is **not** a `TypeError` reaching the client — it is HTTP 200 with a blank main content area (header + footer render, body empty, nothing logged). Reproduced on branch e2e-d-cluster-3-gating by unassigning the auto-login user's `gm_username`: 2389 chars of visible text before the fix on all three URLs, 14936 after on LeagueStarters.]
 
+### 2.39 TradeRosterPreviewCashRowBuilder — Unbounded Cash-Year Range From `$_GET`
+**Status:** ✅ Implemented (2026-08-16) — `validateCashYearRange(int $maxYear): array` added to `TradeRosterPreviewParamValidator` (+ interface); rejects a missing/non-digit/zero year, `cashEndYear > $maxYear`, and `cashStartYear > cashEndYear`, returning `[0, 0]` so `buildCashRows()` short-circuits to `[]`. `buildCashRows(int $viewingTeamId, int $maxCashYear)` now takes a required ceiling; `TradeRosterPreviewApiHandler::handle()` supplies `TradeRosterPreviewCashRowBuilder::CASH_YEAR_FORWARD_HORIZON` (= 6) directly — cashStartYear/cashEndYear are contract-year indices (1–6), not calendar years, mirroring `makeCashRow()`'s existing 1–6 column cap.
+**Location:** `ibl5/classes/Trading/TradeRosterPreviewCashRowBuilder.php` (`buildCashRows()`)
+**Problem:** `cashStartYear` and `cashEndYear` come directly from `$_GET` with no upper bound and no ordering check. `cashStartYear=1&cashEndYear=999999` drives an ~1M-iteration loop in `buildCashRows()` — a DoS vector on an authenticated endpoint.
+**Suggested direction:** Add an upper bound (e.g. current season + a reasonable forward horizon) and an ordering check (`cashStartYear ≤ cashEndYear`); ideally wire the validation into `TradeRosterPreviewParamValidator` (already extracted in trading-1-31-api-handler-extract).
+**Est. effort:** S
+**Risk if untouched:** Authenticated users can trigger arbitrary-length computation loops via crafted requests to the trade-roster-preview API endpoint.
+**Provenance:** Discovered 2026-07-27 during trading-1-31-api-handler-extract.
+
+**Table evidence (2026-08-16):** `cashStartYear=1&cashEndYear=999999` now yields zero cash rows instead of ~1M loop iterations; pinned by `testValidateCashYearRangeRejectsAttackInput` and `testBuildCashRowsRejectsOverHorizonEndYear`.
+
 ## Axis 3: Top-Level Legacy PHP Files
 
 ### 3.2 `DEMO_LOGIN_TOKEN` Hardcoded to `'demo'`
@@ -2749,3 +2760,6 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Risk if untouched:** Production behavior changes enter the codebase without a plan phase, dedicated code review, or verification matrix row, and the PR body can misrepresent the diff scope without a gate catching the contradiction.
 **provenance:** (discovered 2026-09-03 during #1807; Findings 3 and 4 combined)
 **Status:** ✅ Implemented (branch: files-changed-scope-reconciliation-gate, 2026-09-05) — added `.claude/rules/scope-expansion-justification.md` (NEW authorship norm for justifying `ibl5/modules/` files in a non-`feat:` PR body) and a sentinel-delimited scope-expansion self-check block in `/post-plan` Phase 2 that emits `SCOPE_EXPANSION=flagged|clear|none`. The justification paragraph is placed outside the `<!-- files-changed:begin -->` / `<!-- files-changed:end -->` marker pair so regeneration cannot destroy it. Advisory, not blocking: Phase 6.5 arming conditions are unchanged.
+
+### 8.18
+`bin/bug-pipeline-tick` parses and writes DB timestamps in **host-local** time while MariaDB stores UTC — idle reminders fire ~7h late and `blocked_until` backoffs expire on write. Fix is mechanical (force UTC on both sides); 🟨 because the bash driver has no regression pin, so one must ship with it. (discovered 2026-08-09 during the PR #1683 review)

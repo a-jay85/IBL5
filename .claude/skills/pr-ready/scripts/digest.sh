@@ -42,8 +42,7 @@ VERDICT="$1"
 
 # Heading presence is checked separately from body extraction so the two failures get
 # distinct reasons. Guarded by `if !` so the non-zero grep cannot trip `set -e`.
-# `[[:space:]]*$` tolerates a trailing CR, since the verdict file is written by the
-# agent's Write tool and may arrive CRLF.
+# `[[:space:]]*$` tolerates trailing whitespace (CR or spaces) in the heading line.
 if ! grep -qE '^## DIGEST[[:space:]]*$' "$VERDICT"; then
   degrade "no DIGEST section in verdict file"
 fi
@@ -57,8 +56,12 @@ fi
 # Do NOT rewrite it as `grep -A5` or a `grep -c` pipeline: a zero-match `grep -c` exits 1
 # and, under `set -euo pipefail`, would kill the script BEFORE degrade() prints anything —
 # the caller would then see an empty file rather than five placeholder lines.
+#
+# Both strips (CR and trailing spaces) must match what grep allows above. The grep accepts
+# `## DIGEST ` (trailing space); without the trailing-space strip the awk `== "## DIGEST"`
+# check would not match, producing the wrong degrade reason ("empty" instead of "no section").
 BODY="$(awk '
-  { sub(/\r$/, "") }
+  { sub(/\r$/, ""); sub(/[[:space:]]*$/, "") }
   $0 == "## DIGEST" { out = ""; seen = 1; next }
   seen && $0 != ""  { out = out $0 "\n" }
   END               { printf "%s", out }

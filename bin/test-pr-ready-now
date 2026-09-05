@@ -2084,6 +2084,14 @@ grep -qE '^last_verified: 2026-09-04$' "$f" || fail "28k: last_verified not bump
 n_ends_in_one=$(grep -c 'the file ends in one' "$f" || true)
 [[ $n_ends_in_one -eq 0 ]] || fail "28k: 'the file ends in one' still present in SKILL.md — stale claim not removed"
 
+# --- 28l: trailing space on ## DIGEST heading is normalised, not degraded ---
+FIX="$DG/l.md"
+printf 'READY\n## DIGEST \n**What changed:** trailing-space fix\n**Why:** grep and awk agree\n**Watch:** nothing specific\n**Touches:** digest.sh\n**Machine-authored fixes:** none\n' > "$FIX"
+out=$(bash "$D" "$FIX" 2>&1); rc=$?
+[[ $rc -eq 0 ]] || fail "28l: rc=$rc (expected 0) — trailing-space heading degraded"
+[[ $(printf '%s\n' "$out" | wc -l | tr -d ' ') -eq 5 ]] || fail "28l: expected 5 lines, got $(printf '%s\n' "$out" | wc -l | tr -d ' ')"
+grep -qF 'unavailable' <<<"$out" && fail "28l: trailing-space heading produced unavailable placeholder: $out" || true
+
 end_case pr-ready-merge-digest-shape
 
 # --- verdict -----------------------------------------------------------------------------

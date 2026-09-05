@@ -14,6 +14,7 @@ use Waivers\Contracts\WaiversProcessorInterface;
 use Waivers\Contracts\WaiversServiceInterface;
 use Waivers\Contracts\WaiversViewInterface;
 use EventLog\EventLogger;
+use Http\HttpRequest;
 
 /**
  * @see WaiversControllerInterface
@@ -32,6 +33,7 @@ class WaiversController implements WaiversControllerInterface
     private \Utilities\NukeCompat $nukeCompat;
     private \mysqli $db;
     private AuthServiceInterface $authService;
+    private HttpRequest $request;
 
     /**
      * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit').
@@ -51,6 +53,7 @@ class WaiversController implements WaiversControllerInterface
         \Utilities\NukeCompat $nukeCompat,
         \mysqli $db,
         AuthServiceInterface $authService,
+        HttpRequest $request,
         ?\Psr\Log\LoggerInterface $logger = null,
         ?Season $season = null,
         ?\Waivers\Contracts\WaiversSubmissionServiceInterface $submissionService = null
@@ -61,6 +64,7 @@ class WaiversController implements WaiversControllerInterface
         $this->nukeCompat = $nukeCompat;
         $this->db = $db;
         $this->authService = $authService;
+        $this->request = $request;
         $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
         $this->season = $season;
         $this->submissionService = $submissionService
@@ -104,8 +108,9 @@ class WaiversController implements WaiversControllerInterface
         }
 
         // PRG: Process POST submission, then redirect
-        if (isset($_POST['Action']) && ($_POST['Action'] === 'add' || $_POST['Action'] === 'waive')) {
-            $postAction = is_string($_POST['Action']) ? $_POST['Action'] : 'add';
+        $action_ = $this->request->post('Action'); // underscore avoids shadowing $action param
+        if ($action_ === 'add' || $action_ === 'waive') {
+            $postAction = $action_;
 
             if (!\Security\CsrfGuard::validateSubmittedToken('waivers')) {
                 \Utilities\HtmxHelper::redirect('modules.php?name=Waivers&action=' . rawurlencode($postAction) . '&error=' . rawurlencode('Invalid or expired form submission. Please try again.'));
@@ -117,8 +122,7 @@ class WaiversController implements WaiversControllerInterface
             }
 
             try {
-                /** @var array<string, string> $postData */
-                $postData = $_POST;
+                $postData = $this->request->allPost();
                 $result = $this->submissionService->submit($postData, $verifiedTeamName);
             } catch (\Throwable $e) {
                 $this->logger->error('waiver_submission_error', [
@@ -148,11 +152,14 @@ class WaiversController implements WaiversControllerInterface
      */
     private function displayWaiverForm(array $userInfo, string $action): void
     {
-        $display = isset($_REQUEST['display']) && is_string($_REQUEST['display']) ? $_REQUEST['display'] : 'ratings';
+        $rawDisplay = $this->request->request('display');
+        $display = is_string($rawDisplay) ? $rawDisplay : 'ratings';
         $username = is_string($userInfo['username'] ?? null) ? $userInfo['username'] : '';
 
-        $resultParam = isset($_GET['result']) && is_string($_GET['result']) ? $_GET['result'] : null;
-        $errorParam = isset($_GET['error']) && is_string($_GET['error']) ? $_GET['error'] : null;
+        $rawResult = $this->request->get('result');
+        $resultParam = is_string($rawResult) ? $rawResult : null;
+        $rawError = $this->request->get('error');
+        $errorParam = is_string($rawError) ? $rawError : null;
 
         $formData = $this->service->getWaiverFormData($username, $action);
 

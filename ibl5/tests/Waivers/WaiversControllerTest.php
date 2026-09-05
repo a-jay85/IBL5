@@ -12,6 +12,7 @@ use Waivers\Contracts\WaiversViewInterface;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Repositories\Contracts\SalaryCapRepositoryInterface;
 use Auth\Contracts\AuthServiceInterface;
+use Http\HttpRequest;
 use Waivers\WaiversController;
 
 class WaiversControllerTest extends TestCase
@@ -25,6 +26,7 @@ class WaiversControllerTest extends TestCase
         ?TeamIdentityRepositoryInterface $teamIdentityRepo = null,
         ?AuthServiceInterface $authService = null,
         ?\Utilities\NukeCompat $nukeCompat = null,
+        ?HttpRequest $request = null,
     ): WaiversController {
         if ($nukeCompat === null) {
             $nukeCompatStub = self::createStub(\Utilities\NukeCompat::class);
@@ -44,6 +46,7 @@ class WaiversControllerTest extends TestCase
             $nukeCompat,
             self::createStub(\mysqli::class),
             $authService ?? self::createStub(AuthServiceInterface::class),
+            $request ?? new HttpRequest(),
             null,
             $seasonStub,
         );

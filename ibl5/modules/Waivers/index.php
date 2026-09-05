@@ -32,5 +32,6 @@ $view = new Waivers\WaiversView();
 $teamQueryRepo = new Team\TeamQueryRepository($mysqli_db);
 $service = new Waivers\WaiversService($teamIdentityRepo, $processor, $view, $teamQueryRepo, $mysqli_db);
 $nukeCompat = new Utilities\NukeCompat();
-$controller = new Waivers\WaiversController($service, $processor, $view, $teamIdentityRepo, $salaryCapRepo, $nukeCompat, $mysqli_db, $authService);
+$request = \Http\HttpRequest::fromGlobals();
+$controller = new Waivers\WaiversController($service, $processor, $view, $teamIdentityRepo, $salaryCapRepo, $nukeCompat, $mysqli_db, $authService, $request);
 $controller->handleWaiverRequest($user, $action ?? 'add');

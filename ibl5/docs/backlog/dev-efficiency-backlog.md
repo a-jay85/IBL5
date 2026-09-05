@@ -1,6 +1,6 @@
 ---
 description: Development-efficiency backlog — inner-loop speed (diff-scoped analysis, parallel tests), CI caching, dependency-bump batching, and worktree lifecycle automation, with per-entry status.
-last_verified: 2026-09-04
+last_verified: 2026-09-05
 ---
 
 # Development-Efficiency Backlog
@@ -815,6 +815,8 @@ For the accuracy findings (2–6): prevention is the existing `/pr-ready` Phase 
 `last_verified: 2026-09-04`
 
 *(discovered 2026-09-04 during Phase 6 review of #2077)*
+
+**Superseded by:** #2109 — N1 (WaiversController superglobal reads) and N3 (allowlist unchanged) are now stale: #2109 converts WaiversController and removes Controller.php from the `_REQUEST` allowlist, fully resolving 14.8.
 
 ### E48 Phase 6 review notes on PR #2081 — documentation gaps in bin/pr-cycle toolchain (missing seam declarations and overstated harness assertions)
 

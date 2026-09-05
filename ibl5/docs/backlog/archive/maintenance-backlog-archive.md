@@ -2418,6 +2418,16 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 
 **Table evidence (2026-07-25):** Lazy PDO factory injected (#1042).
 
+### 14.8 Controllers Directly Read `$_GET`/`$_POST`/`$_REQUEST`
+**Location:** `Waivers/WaiversController.php:87-154` (residual), `FreeAgency/FreeAgencyController.php`, `DepthChartEntry/DepthChartEntryController.php`, `Team/TeamController.php`, `Player/PlayerPageController.php` (all five converted)
+**Problem:** No `Request` abstraction; controllers can't be invoked with synthetic input.
+**Suggested direction:** Thin `HttpRequest` value object wrapping `$_GET`/`$_POST`/`$_SERVER`; composition root creates from superglobals.
+**Est. effort:** M (residual: S)
+**Risk if untouched:** PRG/HTMX redirect logic untestable; superglobals must be polluted in tests.
+**Status:** ✅ Implemented 2026-09-04 — Injected `HttpRequest` into `WaiversController`, replaced 6 superglobal reads (`$_REQUEST`, `$_POST`, `$_GET`). PHPStan `_REQUEST` allowlist ratcheted (Controller.php removed). 5 characterization tests added.
+
+**Table evidence (2026-09-04):** `WaiversController` superglobal reads replaced with `HttpRequest` injection; `BanRawSuperglobalsRule` `_REQUEST` allowlist ratcheted; 5 characterization tests green; full suite clean (PR `maint-14-8-waivers-httprequest`).
+
 ### 14.9 `$cookie[1]` Username Ritual — 21 Occurrences Across 11 Files
 **Location:** `modules/Trading/index.php` lines 74, 91, 111; `modules/FreeAgency/index.php`; `modules/Player/index.php` etc. (21 occurrences across 11 files, verified 2026-07-24)
 **Problem:** Controllers call `cookiedecode($user)` to populate `global $cookie`, then read `$cookie[1]` — despite `AuthService::getUsername()` existing at `classes/Auth/AuthService.php:111`. The original audit listed 17 sites; a 2026-07-24 rescan found 21 occurrences across 11 files.

@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-09-05
+last_verified: 2026-09-04
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -620,15 +620,14 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):** The big bootstrap consolidation (14.1–14.4, 14.7, 14.11, 14.13, 14.14) is done (ADR-0030). Remaining items are large DI sweeps that overlap open IDOR PRs or carry security/identity hazards.
 
-> ✅ resolved (10): 14.1, 14.2, 14.3, 14.4, 14.6, 14.7, 14.9, 14.11, 14.13, 14.14 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (11): 14.1, 14.2, 14.3, 14.4, 14.6, 14.7, 14.8, 14.9, 14.11, 14.13, 14.14 — evidence in [archive](archive/maintenance-backlog-archive.md)
 > 🚫 declined (2): 14.15, 14.16 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 14.5 | ⬜ Open | 🟨 | Module index.php → front-controller composition root (42 modules). Very large; routing/auth-sensitive → decompose + sequence (some modules touch mutations). |
-| 14.8 | ◑ Partial | 🟩 | `Http\HttpRequest` VO shipped and wired into 4 controllers (Player, Team, DepthChartEntry, FreeAgency) + their module entry points; residual: `Waivers/WaiversController.php` (6 superglobal reads) and the `BanRawSuperglobalsRule` `_REQUEST` ratchet. |
 | 14.10 | ◑ Partial | 🟨 | Container accessor registered (PR1); side-effect removal deferred to PR3 (boosted-HTMX cookie-population hazard) → careful sequencing. |
-| 14.12 | ◑ Partial | 🟩 | `HttpRequest` VO shipped (14.8) and wired into 4 module entry points; residual: `ComparePlayers`, `Draft`, `ProjectedDraftOrder`, `Voting`, `ApiKeys` `index.php` still read `$op` from `$_REQUEST` directly. |
+| 14.12 | ◑ Partial | 🟩 | `HttpRequest` VO shipped (14.8) and wired into 5 module entry points; residual: `ComparePlayers`, `Draft`, `ProjectedDraftOrder`, `Voting`, `ApiKeys` `index.php` still read `$op` from `$_REQUEST` directly. |
 
 ### 14.5 Module `index.php` Files Are the Real Composition Root (42 of 47)
 **Location:** `ibl5/modules/*/index.php`
@@ -636,14 +635,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Route all module requests through a front controller (`modules.php` exists); resolve module controllers from the container by name. Module `index.php` shrinks to one line.
 **Est. effort:** L
 **Risk if untouched:** New collaborators added module-by-module (42x); shared services instantiated N times per request.
-
-### 14.8 Controllers Directly Read `$_GET`/`$_POST`/`$_REQUEST`
-**Location:** `Waivers/WaiversController.php:87-154` (residual), `FreeAgency/FreeAgencyController.php`, `DepthChartEntry/DepthChartEntryController.php`, `Team/TeamController.php`, `Player/PlayerPageController.php` (all four converted)
-**Problem:** No `Request` abstraction; controllers can't be invoked with synthetic input.
-**Suggested direction:** Thin `HttpRequest` value object wrapping `$_GET`/`$_POST`/`$_SERVER`; composition root creates from superglobals.
-**Est. effort:** M (residual: S)
-**Risk if untouched:** PRG/HTMX redirect logic untestable; superglobals must be polluted in tests.
-**Status:** ◑ Partial (2026-09-04) — `ibl5/classes/Http/HttpRequest.php` landed and four of the five named controllers convert cleanly; `tests/Http/ControllerSuperglobalFreedomTest.php` now guards the converted set automatically. **Residual:** `WaiversController.php` still holds 6 superglobal reads. **Note:** `Controller.php` must **stay** on the `_REQUEST` suffix allowlist in `BanRawSuperglobalsRule` — removing it would break unrelated controllers (plan Phase 6 §Correction). To close the item: convert Waivers and land a matching guard for it.
 
 ### 14.10 `PageLayout::header()` Has Side Effect Controllers Depend On
 **Location:** `PageLayout/PageLayout.php:16` (`cookiedecode($user)`); `FreeAgency/FreeAgencyController.php:55` comment "Must come first"

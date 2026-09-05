@@ -63,7 +63,7 @@ Pass each agent: PR metadata, file list, and filtered `$DIFF`. **No agent calls 
 
 ```bash
 # Agent E pre-slice: shell + workflow + .claude prose sections only.
-# Same predicate as LINES_SHELL_CHANGED in Phase 3 — keep them identical.
+# Superset of LINES_SHELL_CHANGED — adds .github/workflows/ and .claude/ arms to cover HAS_WORKFLOW and HAS_SKILL_PROSE.
 awk '
   /^diff --git/ { p=$NF; sub(/^b\//,"",p)
     keep = (p ~ /^\.github\/workflows\/.*\.ya?ml$/ || p ~ /^\.claude\/.*\.md$/ || \

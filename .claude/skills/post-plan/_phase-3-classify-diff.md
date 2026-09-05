@@ -120,8 +120,8 @@ HAS_COMMENTS_IN_DIFF=$([ "$COMMENT_COUNT" -gt 0 ] && echo true || echo false)
 
 # PHP lines changed (gates Phase 4B Agents B-C size threshold)
 LINES_PHP_CHANGED=$(git diff origin/master...HEAD -- '*.php' | grep -cE '^\+[^+]' || true)
-# Added shell lines. Reads $DIFF_FILE (built above) with the SAME predicate the
-# Phase 4B Agent E slicer uses, so count and slice can never disagree.
+# Shell-arm lines only (bin/ + .sh). Agent E slicer is a superset — it also covers
+# .github/workflows/ and .claude/ arms — so the two share the shell-arm predicate.
 LINES_SHELL_CHANGED=$(awk '
   /^diff --git/ { p=$NF; sub(/^b\//,"",p)
     keep = (p ~ /(^|\/)bin\// || p ~ /\.sh$/) && p !~ /\.(php|md|json|py|ts|tsx|css|sql|ya?ml|lock|txt|neon)$/ ? 1 : 0

@@ -279,14 +279,13 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):** Adding tests is inherently green-green (no production change) → every open coverage gap is 🟩 auto-mergeable. If writing a test surfaces a real bug, the *fix* becomes its own finding with its own classification. (Exceptions: **6.21** and **6.23** are 🟨, not 🟩 — in each the target code is unreachable from PHPUnit, so no test is writable until a production seam is decided: a teamless-fixture / non-`exit()` refactor for 6.21, a SAPI-independent hashing seam for 6.23.)
 
-> ✅ resolved (23): 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 6.13, 6.14, 6.15, 6.16, 6.17, 6.18, 6.19, 6.20, 6.22, 6.24, 6.26 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (24): 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 6.13, 6.14, 6.15, 6.16, 6.17, 6.18, 6.19, 6.20, 6.22, 6.24, 6.26, 6.27 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 6.21 | ⬜ Open | 🟨 | Row-12 (Free-Agents/teamless session) `processrookieoption` ownership-rejection path untested: PHPUnit entry-point test impossible (handler `exit()`s), E2E auth fixture always has a session team. Needs a teamless-fixture / non-`exit()` refactor decision before it's writable → 🟨. From PR #1107 Phase 5.0 note. |
 | 6.23 | ⬜ Open | 🟨 | **Same family as 6.22, different guard.** `RequestEventLoggingBootstrap::boot()` returns at line 35 when `\PHP_SAPI === 'cli'`, and PHPUnit is always CLI (DB group included), so the `hash('sha256', session_id())` derivation at lines 66–70 is unreachable from any PHPUnit test — the file's three existing tests are all `expectNotToPerformAssertions()` for exactly this reason. A regression storing the **raw** session id would break zero tests. Extract the derivation to a pure static (or inject the SAPI) so the PII boundary is unit-pinnable. 🟨: production change on a PII boundary; needs a seam decision. (discovered 2026-08-08 during #1670) |
 | 6.25 | ⬜ Open | 🟨 | **Residual of 6.22.** The verdict + thin-redirect-shim conversion landed for Waivers, FreeAgency, and the Trade API accept/decline controllers; `Trading\TradingController`'s reject path still gates inline and still ends in `HtmxHelper::redirect()→exit()`, so its "non-party refused + no mutation" property remains E2E-only. Apply the same pattern: move the authz decision into a verdict-returning method on the service that owns the mutation, leave the controller a shim. Verdict shape is now settled (`array{success: bool, error?: string}`), so the design fork 6.22 carried is closed. 🟨: production refactor on a security surface. Split out of 6.22 when it resolved. |
-| 6.27 | ⬜ Open | 🟩 | Plan-prescribed test phase (`ControllerSuperglobalFreedomTest.php`) shipped in remediation pass rather than in original PR; descope was declared under wrong artifact (allowlist ratchet). `Phase 6 plan-fidelity review` is the detection gate. |
 
 ### 6.21 Rookie-option Free-Agents/teamless ownership gate is untested
 **Location:** `ibl5/modules/Player/index.php` (`processrookieoption()` ownership gate); planned `tests/Module/EntryPoints/PlayerRookieOptionEntryPointTest.php`
@@ -379,17 +378,13 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):** All open items here are docs-only → 🟩 auto-mergeable (a docs PR never trips the `feat:` human-signoff hold), except 9.26 which needs one upfront decision.
 
-> ✅ resolved (27): 9.1, 9.2, 9.3, 9.4, 9.4b, 9.5, 9.6, 9.7, 9.8, 9.9, 9.10, 9.11, 9.12, 9.13, 9.14, 9.15, 9.16, 9.17, 9.18, 9.19, 9.20, 9.21, 9.22, 9.23, 9.24, 9.25, 9.27 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (31): 9.1, 9.2, 9.3, 9.4, 9.4b, 9.5, 9.6, 9.7, 9.8, 9.9, 9.10, 9.11, 9.12, 9.13, 9.14, 9.15, 9.16, 9.17, 9.18, 9.19, 9.20, 9.21, 9.22, 9.23, 9.24, 9.25, 9.27, 9.29, 9.30, 9.31, 9.32 — evidence in [archive](archive/maintenance-backlog-archive.md)
 > 🚫 declined (1): 9.28 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 9.26 | ⬜ Open | 🟨 | No CHANGELOG — upfront decision: ADRs-as-substitute (document) vs post-plan-fed CHANGELOG tooling. |
-| 9.29 | ⬜ Open | 🟩 | Stale migration-number cross-references in docblocks (165 instead of 174): 6 sites; 4 fixed 2026-08-22, 2 fixed 2026-09-03. Finding B (truly-manual Verification Matrix row 23): n/a — no gate warranted. (discovered 2026-09-02 during #1961) |
-| 9.30 | ⬜ Open | 🟩 | Migration backup-table suffix (_165) fossilized from intermediate renaming — header comment corrected this pass. No gate warranted. (discovered 2026-09-03 during #1961) |
-| 9.31 | ⬜ Open | 🟩 | PR body manual-test row naming a pre-existing UI mislabel as the actual label — PR #1961 body row 23 corrected this pass via gh pr edit. No gate warranted. (discovered 2026-09-03 during #1961) |
-| 9.32 | ⬜ Open | 🟩 | Unperformed Truly-manual verification row — PR #1961 row 23; protected by auto_merge: false hold. No gate warranted. (discovered 2026-09-03 during #1961) |
-| 9.33 | ⬜ Open | 🟩 | Backlog Status prose named a controller as converted when its source still reads superglobals (14.8 and 14.12 Status blocks); creating an intra-doc contradiction with the Evidence cell. |
+| 9.33 | ⬜ Open | 🟩 | Backlog Status prose named a controller as converted when its source still reads superglobals (14.8 and 14.12 Status blocks); creating an intra-doc contradiction with the Evidence cell. Re-verification 2026-09-05: `WaiversController.php` now has 0 superglobal hits — controller was already converted; 14.8/14.12 Status prose is now stale. Leave open until 14.8/14.12 Status prose is corrected separately. |
 | 9.34 | ⬜ Open | 🟩 | API_GUIDE.md route inventory drifted from Router.php (25/24 documented vs 27/26 actual; two POST routes undocumented) — corrected this pass. No gate warranted. (discovered 2026-09-05 during #2110) |
 
 

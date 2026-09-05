@@ -48,7 +48,8 @@ last_verified: 2026-09-05
 | L19 | Weekly product-analytics review | ⬜ Open | 🟦 | M |
 | L20 | post-plan body-rewrite clobbers `Depends-on:`, bypassing arm condition (6) | ⬜ Open | 🟥 | M |
 | L21 | Phase 5.0 parsers fail-open on an unclosed code fence (conformance check covers nothing) | ⬜ Open | 🟥 | S |
-| L22 | Sweep queue-vs-review disposition gates across other skills/scripts | ✅ Done | 🟦 | S |
+| L22 | Sweep queue-vs-review disposition gates across other skills/scripts | ✅ Implemented | — | S |
+| L51 | Archive closure Status line can assert full sweep completion while named candidate sites lack documented dispositions, creating a permanently false record | ⬜ Open | 🟥 | S |
 | L23 | sim-recap degraded path emits no Discord signal; qctx() failure ships roster-blind with CI green | 📋 Planned | 🟦 | S |
 | L24 | Phase 5.0 conformance is path-level only; planned method names absent from diff pass undetected | ✅ Implemented | — | S |
 | L25 | CI-wiring gap: matrix CLI-executable rows may live in jobs the PR's own path filters never trigger | ✅ Implemented | — | S |
@@ -713,6 +714,20 @@ Landing rung: **2** — add an explicit note to `.claude/skills/fix-and-prevent/
 The static-guard case in `bin/test-pr-cycle` should pin whichever wording lands, so the two cannot drift again.
 
 **provenance:** (discovered 2026-09-05 during the first live `bin/pr-cycle --go` run, right after #2081 merged)
+
+---
+
+### L51 Archive closure Status line can assert full sweep completion while named candidate sites lack documented dispositions
+
+*(discovered 2026-09-05 via PR #2040 Phase 6 plan-intent fidelity review)*
+
+**Location:** Any `loop-engineering-backlog-archive.md` entry whose body enumerates candidate sites for a multi-site sweep.
+
+**Problem:** A Status line stamped ✅ Implemented after converting one site — while the body still names other sites as candidates requiring assessment — produces a permanently false closure. The archive is read-only after merge; a false closure there is uncorrectable without a follow-up PR.
+
+**Suggested direction:** When archiving a multi-site sweep entry, the Status line must name every site listed in the body and state its disposition (converted, assessed/out-of-scope, or waived with reason). Add a check to `.claude/skills/fix-and-prevent/_remediation.md` step 4 noting this requirement before "Bump that file's `last_verified`".
+
+**provenance:** (discovered 2026-09-05; PR #2040 L22 Status line claimed full sweep when gate-14, post-plan/SKILL.md, and bin/plan-now candidate dispositions were undocumented; corrected in same PR)
 
 ---
 

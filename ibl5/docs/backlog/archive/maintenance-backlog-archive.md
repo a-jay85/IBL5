@@ -2390,6 +2390,19 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 
 
 **Table evidence (2026-07-25):** #1033 + DNP follow-ups #1087/#1088.
+
+### 13.14 Waiver-Claim Cap Check Uses the Phase-Blind Salary Basis
+**Status:** ✅ Resolved 2026-09-05 — PR `waivers-13-14-phase-aware-cap-basis`
+**Location:** `Waivers/WaiversSubmissionService.php:47`
+**Problem:** calls `SalaryCapRepository::getTeamTotalSalary()`, which sums `vw_current_salary.current_salary` regardless of phase. During Draft/Free Agency — exactly when waiver claims fire — the current-season basis is `next_year_salary`, so the check runs one contract year behind. Reproduction (the numbers that drove PR `heat-nuggets-hardcap`, prod snapshot 2026-08-21, phase `Draft`, `HARD_CAP_MAX` 7000): Heat read as **6861** on the phase-blind basis vs **5159** on the correct shifted basis — a 1702 overstatement, enough to false-reject a legal transaction (offer 12190's Heat post-trade total came out 7232 instead of 5556).
+**Suggested direction:** apply the same `Season::advancesContractYears()` gate this PR added to `TradeExecutionService::validateParties()`, selecting `getTeamNextYearSalary()`; keep the repository phase-ignorant.
+**Est. effort:** S
+**Risk if untouched:** legal waiver claims rejected as over-cap for the whole offseason, and (symmetrically) over-cap claims allowed where next-year salary is higher.
+
+---
+
+
+**Table evidence (2026-09-05):** Phase-blind `getTeamTotalSalary()` in waiver-claim cap check — same defect class as the trade accept-path fix (PR heat-nuggets-hardcap).
 ## Axis 14: Bootstrap / Dependency Injection
 
 ### 14.1 `Bootstrap\Application` Container Built But Never Wired

@@ -93,6 +93,10 @@ jobs:
               # Agent defs are asserted by bin/test-pr-ready-now's static case (the /pr-ready
               # Phase 6 reviewer def), so an agent-def-only PR must run harness-tests too.
               - '.claude/agents/**'
+              # The vr-pages-prune harness extracts the vr-pages-cleanup prune block from
+              # this workflow and runs it against fixture repos, so an e2e-tests.yml-only
+              # edit must run the harness job too.
+              - '.github/workflows/e2e-tests.yml'
             ibl5ts:
               # Everything the ibl5 TS unit suite executes or imports
               # (tests/ts-unit/ specs cover the pure VR-review helpers and
@@ -979,6 +983,9 @@ jobs:
         run: bin/test-scrub-log-credentials
       - name: bin/test-db-query-routing
         run: bin/test-db-query-routing
+
+      - name: bin/test-vr-pages-prune
+        run: bin/test-vr-pages-prune
       - name: bin/test-watch-run
         run: bin/test-watch-run
 

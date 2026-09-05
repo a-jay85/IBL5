@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-vr-pages-prune — regression harness for the prune shell in the
+# vr-pages-cleanup job (.github/workflows/e2e-tests.yml, id: prune). Extracts
+# the run: block and executes it against throwaway git fixtures with a real
+# local bare remote.
+#
+# Run: bin/test-vr-pages-prune  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+WORKFLOW="$REPO_ROOT/.github/workflows/e2e-tests.yml"
+
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+BLOCK="$TMP/block.sh"
+FAILED=0
+
+# ---- extraction ------------------------------------------------------------
+
+extract_prune_block() {
+    awk '
+        /^[[:space:]]*id: prune[[:space:]]*$/ { found = 1 }
+        found && /^[[:space:]]*run: \|[[:space:]]*$/ { indent = match($0, /[^ ]/); inblock = 1; next }
+        inblock {
+            if ($0 ~ /^[[:space:]]*$/) { print ""; next }
+            if (match($0, /[^ ]/) <= indent) exit
+            print substr($0, indent + 2)
+        }
+    ' "$WORKFLOW"
+}
+
+if [ "${1:-}" = "--emit-block" ]; then
+    extract_prune_block
+    exit 0
+fi
+
+extract_prune_block > "$BLOCK"
+grep -q '^N=300$'     "$BLOCK" || { echo "FAIL: extraction lost the count cap"; exit 1; }
+grep -q '14 \* 86400' "$BLOCK" || { echo "FAIL: extraction lost the age cutoff"; exit 1; }
+
+# ---- helpers ---------------------------------------------------------------
+
+ok()   { echo "ok: $1"; }
+fail() { echo "FAIL: $1"; FAILED=1; }
+
+commit_at() {  # $1 work tree, $2 days ago, $3 message
+    local w
+    w="$(date -u -r "$(( $(date +%s) - $2 * 86400 ))" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null \
+      || date -u -d "@$(( $(date +%s) - $2 * 86400 ))" +%Y-%m-%dT%H:%M:%SZ)"
+    GIT_AUTHOR_DATE="$w" GIT_COMMITTER_DATE="$w" git -C "$1" commit -qm "$3"
+}
+
+make_fixture() {  # $1 name -> echoes work-tree path; creates $TMP/$1 + bare $TMP/$1.git
+    git init -q --bare "$TMP/$1.git"
+    git init -q -b gh-pages "$TMP/$1"
+    git -C "$TMP/$1" config user.email "ci@example.com"
+    git -C "$TMP/$1" config user.name "CI"
+    git -C "$TMP/$1" remote add origin "$TMP/$1.git"
+    : > "$TMP/$1/.nojekyll"
+    git -C "$TMP/$1" add .nojekyll
+    commit_at "$TMP/$1" 0 seed
+    git -C "$TMP/$1" push -q origin gh-pages
+    echo "$TMP/$1"
+}
+
+add_dir() {  # $1 work tree, $2 dir name, $3 days ago — one commit per dir
+    mkdir -p "$1/$2"
+    echo x > "$1/$2/index.html"
+    git -C "$1" add "$2"
+    commit_at "$1" "$3" "add $2"
+}
+
+run_block() {  # $1 work tree, $2 N override ("" = leave the literal 300)
+    if [ -n "$2" ]; then
+        sed "s/^N=300$/N=$2/" "$BLOCK" > "$TMP/run.sh"
+    else
+        cp "$BLOCK" "$TMP/run.sh"
+    fi
+    : > "$TMP/gh_output"
+    GITHUB_OUTPUT="$TMP/gh_output" bash -e -c "cd '$1' && . '$TMP/run.sh'" >"$TMP/out" 2>"$TMP/err"
+}
+
+# ---- cases -----------------------------------------------------------------
+
+# Case 1: age_prune_still_fires
+# dir 'a' (20d, past 14d cutoff) must be removed; 'b' (1d) must survive
+W1="$(make_fixture c1)"
+add_dir "$W1" a 20
+add_dir "$W1" b 1
+run_block "$W1" 3
+if [ ! -d "$W1/a" ] && [ -d "$W1/b" ]; then
+    ok "age_prune_still_fires"
+else
+    fail "age_prune_still_fires — a exists=$([ -d "$W1/a" ] && echo y || echo n) b exists=$([ -d "$W1/b" ] && echo y || echo n)"
+fi
+
+# Case 2: cap_removes_exactly_the_N_plus_1th
+# 4 dirs inside age window; oldest (4d) removed; 3 newest survive; commit mentions 'prune 1 '
+W2="$(make_fixture c2)"
+add_dir "$W2" d4 4
+add_dir "$W2" d3 3
+add_dir "$W2" d2 2
+add_dir "$W2" d1 1
+run_block "$W2" 3
+cp "$TMP/gh_output" "$TMP/gh_output.c2"
+commit_msg="$(git -C "$W2" log -1 --format=%s)"
+if [ ! -d "$W2/d4" ] && [ -d "$W2/d3" ] && [ -d "$W2/d2" ] && [ -d "$W2/d1" ] \
+   && echo "$commit_msg" | grep -q 'prune 1 '; then
+    ok "cap_removes_exactly_the_N_plus_1th"
+else
+    fail "cap_removes_exactly_the_N_plus_1th — d4=$([ -d "$W2/d4" ] && echo present || echo gone) commit='$commit_msg'"
+fi
+
+# Case 3: cap_noop_at_exactly_N
+# exactly 3 recent dirs; nothing removed; stdout says 'Nothing to prune.'
+W3="$(make_fixture c3)"
+add_dir "$W3" e1 1
+add_dir "$W3" e2 2
+add_dir "$W3" e3 3
+run_block "$W3" 3
+if [ -d "$W3/e1" ] && [ -d "$W3/e2" ] && [ -d "$W3/e3" ] \
+   && grep -q 'Nothing to prune.' "$TMP/out"; then
+    ok "cap_noop_at_exactly_N"
+else
+    fail "cap_noop_at_exactly_N — dirs=$(ls "$W3") out=$(cat "$TMP/out")"
+fi
+
+# Case 4: untracked_dir_survives
+# 4 tracked dirs + untracked stray/; rc 0; stray/ on disk; no fatal: in stderr; 1 tracked removed
+W4="$(make_fixture c4)"
+add_dir "$W4" f4 4
+add_dir "$W4" f3 3
+add_dir "$W4" f2 2
+add_dir "$W4" f1 1
+mkdir -p "$W4/stray"; echo x > "$W4/stray/index.html"
+run_block "$W4" 3
+rc4=$?
+if [ "$rc4" -eq 0 ] && [ -d "$W4/stray" ] \
+   && ! grep -q 'fatal:' "$TMP/err" \
+   && ! grep -q 'did not match any files' "$TMP/err"; then
+    ok "untracked_dir_survives"
+else
+    fail "untracked_dir_survives — rc=$rc4 stray=$([ -d "$W4/stray" ] && echo present || echo gone) stderr=$(cat "$TMP/err")"
+fi
+
+# Case 5: default_N_is_not_binding_at_small_trees
+# 5 recent dirs, no N override (N=300) — nothing removed; 'Nothing to prune.'
+W5="$(make_fixture c5)"
+add_dir "$W5" g1 1
+add_dir "$W5" g2 2
+add_dir "$W5" g3 3
+add_dir "$W5" g4 4
+add_dir "$W5" g5 5
+run_block "$W5" ""
+if [ -d "$W5/g1" ] && [ -d "$W5/g5" ] && grep -q 'Nothing to prune.' "$TMP/out"; then
+    ok "default_N_is_not_binding_at_small_trees"
+else
+    fail "default_N_is_not_binding_at_small_trees — out=$(cat "$TMP/out")"
+fi
+
+# Case 6: push_matches_worktree
+# bare remote for c2 has exactly 3 survivors + .nojekyll (=4 entries); gh_output has pruned=true
+bare_count="$(git -C "$TMP/c2.git" ls-tree --name-only gh-pages | wc -l | tr -d ' ')"
+if [ "$bare_count" = "4" ] && grep -q 'pruned=true' "$TMP/gh_output.c2"; then
+    ok "push_matches_worktree"
+else
+    fail "push_matches_worktree — bare_count=$bare_count gh_output=$(cat "$TMP/gh_output.c2" 2>/dev/null)"
+fi
+
+# Case 7: static_invariants — grep the extracted block for key invariants
+si_failed=0
+grep -q 'for attempt in 1 2 3'           "$BLOCK" || { echo "  missing: push retry loop"; si_failed=1; }
+grep -q 'git pull --rebase origin gh-pages' "$BLOCK" || { echo "  missing: pull --rebase"; si_failed=1; }
+grep -q '^N=300$'                         "$BLOCK" || { echo "  missing: N=300 literal"; si_failed=1; }
+grep -q 'done < <(sort -k1,1nr'           "$BLOCK" || { echo "  missing: process substitution for count cap"; si_failed=1; }
+if [ "$si_failed" -eq 0 ]; then
+    ok "static_invariants"
+else
+    fail "static_invariants — see lines above"
+fi
+
+# ---- result ----------------------------------------------------------------
+
+if [ "$FAILED" -eq 0 ]; then
+    echo "All vr-pages-prune checks passed."
+else
+    echo "Some vr-pages-prune checks FAILED."
+fi
+exit "$FAILED"

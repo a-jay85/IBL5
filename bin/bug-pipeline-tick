@@ -218,11 +218,11 @@ bot_reply_to_message() { # message_id message
 # ── Time helpers — the cron is Mac-local (BSD date), but the test harnesses run
 # in CI (GNU date), so both are supported: try BSD form, fall back to GNU. ──────
 epoch_of() { # 'YYYY-MM-DD HH:MM:SS' -> epoch
-    date -j -f '%Y-%m-%d %H:%M:%S' "$1" '+%s' 2>/dev/null || date -d "$1" '+%s' 2>/dev/null
+    TZ=UTC date -j -f '%Y-%m-%d %H:%M:%S' "$1" '+%s' 2>/dev/null || TZ=UTC date -d "$1" '+%s' 2>/dev/null
 }
 future_ts() { # seconds-from-now -> 'YYYY-MM-DD HH:MM:SS'
-    local target=$(( $(date '+%s') + $1 ))
-    date -r "$target" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date -d "@$target" '+%Y-%m-%d %H:%M:%S'
+    local target=$(( $(TZ=UTC date '+%s') + $1 ))
+    TZ=UTC date -r "$target" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || TZ=UTC date -d "@$target" '+%Y-%m-%d %H:%M:%S'
 }
 
 # Park a row in place with a backoff (status/class preserved; enumerator skips future-blocked).

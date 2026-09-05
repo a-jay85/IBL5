@@ -355,6 +355,81 @@ else
     bpt_ok "P6f-h: skipped (running as root)"
 fi
 
+# ── P7: epoch_of()/future_ts() are UTC-correct under a non-UTC host TZ ─────────
+# The DB stores timestamps in UTC. These helpers format/parse wall-clock strings
+# that are compared against those DB values, so they must not honour the host TZ.
+# The helper bodies are extracted verbatim from the production script (it is not
+# sourceable — it runs a tick at load), so this arm exercises real production text.
+_utc_src="$STUB/time-helpers.sh"
+awk '/^epoch_of\(\) \{/{f=1} f{print} f && /^\}$/{n++; if (n==2) exit}' \
+    "$(cd "$(dirname "$0")" && pwd)/bug-pipeline-tick" > "$_utc_src"
+# shellcheck disable=SC1090
+. "$_utc_src"
+
+# P7a — vacuity guard: if the extraction range ever breaks, every arm below would
+# pass on an empty file. Fail loudly instead.
+if [ -n "$(declare -F epoch_of)" ] && [ -n "$(declare -F future_ts)" ]; then
+    bpt_ok "P7a: both time helpers extracted and defined"
+else
+    bpt_fail "P7a: helper extraction produced no epoch_of/future_ts — arms below are vacuous"
+fi
+
+# An INDEPENDENT UTC parser for P7c. It must NOT call epoch_of(): a round trip
+# epoch_of "$(future_ts N)" cancels its own skew (format-local then parse-local)
+# and stays green while both helpers are broken. Do not "simplify" this away.
+_utc_parse() {
+    TZ=UTC date -j -f '%Y-%m-%d %H:%M:%S' "$1" '+%s' 2>/dev/null \
+        || TZ=UTC date -d "$1" '+%s' 2>/dev/null
+}
+
+# Capture every helper result under a deliberately non-UTC host TZ, then restore
+# TZ before asserting (bpt_fail sets FAILED in this shell, so no subshell).
+_utc_tz_saved="${TZ-}"
+export TZ=America/Los_Angeles
+_utc_p7b="$(epoch_of '2024-01-15 12:00:00')"
+_utc_p7e="$(epoch_of '2024-03-10 02:30:00')"
+_utc_now="$(date '+%s')"
+_utc_fts="$(future_ts 3600)"
+_utc_p7f_err="$(epoch_of 'not a timestamp' 2>&1 >/dev/null)"
+_utc_p7f_out="$(epoch_of 'not a timestamp' 2>/dev/null)"; _utc_p7f_rc=$?
+if [ -n "$_utc_tz_saved" ]; then export TZ="$_utc_tz_saved"; else unset TZ; fi
+
+# P7b — a known instant parses to its UTC epoch, not its LA epoch.
+bpt_expect_eq "P7b: epoch_of parses as UTC under TZ=America/Los_Angeles" \
+    "1705320000" "$_utc_p7b"
+
+# P7c — future_ts emits a UTC-formatted stamp: parsed as UTC it is ~3600s ahead
+# of now. Window absorbs the second that may tick over between the two reads.
+_utc_delta=$(( $(_utc_parse "$_utc_fts") - _utc_now ))
+if [ "$_utc_delta" -ge 3595 ] && [ "$_utc_delta" -le 3605 ]; then
+    bpt_ok "P7c: future_ts 3600 is UTC-formatted (delta ${_utc_delta}s)"
+else
+    bpt_fail "P7c: future_ts 3600 delta ${_utc_delta}s — want 3595..3605 (TZ skew leaked)"
+fi
+
+# P7d — branch parity. Only one of the BSD/GNU branches executes per host, so a
+# missing TZ=UTC in the other branch is invisible to P7b/P7c on that host. Assert
+# the property statically over the extracted bodies: every `date ` invocation in
+# the two helpers is TZ=UTC-prefixed.
+_utc_all=$(grep -oE '(^|[^=[:alnum:]_-])date ' "$_utc_src" | grep -c .)
+_utc_pfx=$(grep -oE 'TZ=UTC date ' "$_utc_src" | grep -c .)
+bpt_expect_eq "P7d: every date call in the time helpers is TZ=UTC-prefixed" \
+    "$_utc_all" "$_utc_pfx"
+
+# P7e — boundary: 02:30 on 2024-03-10 does not exist in America/Los_Angeles
+# (spring-forward gap). BSD date silently normalises it with rc=0, so an unfixed
+# epoch_of returns a plausible-but-wrong 1710066600 rather than erroring.
+bpt_expect_eq "P7e: epoch_of survives the LA spring-forward gap as UTC" \
+    "1710037800" "$_utc_p7e"
+
+# P7f — negative: garbage input still fails closed and stays quiet. Scoped to
+# epoch_of only; future_ts's GNU fallback has no 2>/dev/null and is not covered.
+if [ -z "$_utc_p7f_out" ] && [ "$_utc_p7f_rc" -ne 0 ] && [ -z "$_utc_p7f_err" ]; then
+    bpt_ok "P7f: epoch_of on garbage — empty stdout, non-zero rc, silent stderr"
+else
+    bpt_fail "P7f: epoch_of on garbage — out=[$_utc_p7f_out] rc=$_utc_p7f_rc err=[$_utc_p7f_err]"
+fi
+
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"
 exit "$FAILED"

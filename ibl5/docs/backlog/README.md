@@ -1,6 +1,6 @@
 ---
 description: Index of tracked backlogs under docs/backlog/ — one row per LIVE backlog, the standalone single-item files, and the archive pointer, plus the canonical status taxonomy shared by all backlogs and the archive / dated-pointer / supersession housekeeping conventions.
-last_verified: 2026-09-04
+last_verified: 2026-09-05
 ---
 
 # Backlog index

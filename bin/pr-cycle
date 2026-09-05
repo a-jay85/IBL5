@@ -1,0 +1,718 @@
+#!/usr/bin/env bash
+# pr-cycle — serial, unattended driver that readies and arms one open PR at a time.
+#
+# Drives the hand-equivalent sequence: bin/pr-attack picks the order, bin/pr-ready-now
+# rebases and greens one PR, bin/pr-triage arms whatever is genuinely ARMABLE. Because
+# every merge re-BEHINDs every other open PR, that sequence has to be repeated after each
+# merge — this script is the loop that repeats it, detached, so a human need not sit in it.
+#
+# Dry-run by default: prints what it would do and exits. Nothing fires without --go.
+#
+# Usage:
+#   bin/pr-cycle [--go] [--dry-run] [--stop] [--no-dm] [--max-merges N] [--help]
+#
+#   --go            Detach a worker via launchd and return. Without it the script only
+#                   reports (default).
+#   --dry-run       Explicit alias for the default. Useful in scripts that state intent.
+#   --stop          Create the stop file, then call bin/pr-ready-now --stop-all. The stop
+#                   file is never removed by this script; clearing it is the human's
+#                   explicit re-enable.
+#   --no-dm         Suppress the single end-of-run Discord DM.
+#   --max-merges N  Stop starting new work once N merges are confirmed (default 5).
+#                   One `pr-triage --arm` call arms every ARMABLE PR, so a single
+#                   iteration can confirm more than one merge; every confirmed merge
+#                   is still ledgered. This caps work started, not merges caused.
+#   --help, -h      Print this usage and exit 0.
+#
+# Env seams (used by bin/test-pr-cycle):
+#   PR_CYCLE_ATTACK_CMD      Path to the ordering tool.       Default: bin/pr-attack
+#   PR_CYCLE_TRIAGE_CMD      Path to the triage tool.         Default: bin/pr-triage
+#   PR_CYCLE_READY_CMD       Path to the ready tool.          Default: bin/pr-ready-now
+#   PR_CYCLE_DM_CMD          Path to the notifier.            Default: bin/discord-dm
+#   PR_CYCLE_GH_CMD          The gh binary.                   Default: gh
+#   PR_CYCLE_MAIN_CHECKOUT   The only tree this may run in.
+#   PR_CYCLE_POLL_INTERVAL   Seconds between merge polls.     Default: 60
+#   PR_CYCLE_POLL_CEILING    Seconds to wait per PR.          Default: 2700
+#   PR_CYCLE_LEDGER          Merge digest ledger path.        Default: $HOME/IBL5-merge-digest.md
+#   PR_CYCLE_STOP_FILE       Stop file path.                  Default: $HOME/.ibl5-pr-cycle.stop
+#   PR_CYCLE_NOW             Pin the ledger timestamp (tests). Unset = current UTC time.
+#   PR_CYCLE_DRY_LAUNCH      With --go: emit runner + plist but skip launchctl bootstrap.
+#   PR_CYCLE_TS              Timestamp token for runner/log/plist paths (tests). Unset = date+PID at launch.
+#   PR_CYCLE_LOG             Detached-worker log path; set by --go, read by the worker. Derived from TS.
+#
+#   Every seam is PR_CYCLE_-prefixed on purpose. bin/pr-attack reads a bare PR_TRIAGE_CMD
+#   itself, and this script spawns the real bin/pr-attack as a child — an unprefixed export
+#   here would silently redirect that child's own triage calls too.
+#
+# Artifacts:
+#   $HOME/IBL5-merge-digest.md   one six-line ledger row per CONFIRMED merge
+#   $HOME/.ibl5-pr-cycle.stop    the interrupt; create it to halt a running worker
+#   /tmp/pr-cycle-<TS>.log       the detached worker's combined log (path printed by --go)
+#   /tmp/pr-cycle-<TS>.sh        the emitted runner
+#   /tmp/pr-cycle-<TS>/          per-run scratch (attack plan, triage reports, run state)
+#
+# Hard invariants (asserted statically by bin/test-pr-cycle, not merely intended):
+#   * This script never merges anything itself. There is no gh merge subcommand anywhere
+#     in this file, not even as a fallback when arming succeeds but a PR sits unmerged.
+#   * Arming is exactly one call to the triage tool, with no added flags. This script never
+#     judges eligibility, never widens a bucket, never relaxes a human sign-off, and never
+#     sources or reimplements the armable library.
+#   * A ledger row is written if and only if `gh pr view N --json state` reported MERGED.
+#     Not a green --wait, not a successful arm, not a CI conclusion.
+#   * The merge poll loop lives exclusively inside the detached worker, never in the parent.
+
+set -euo pipefail
+
+# --- PATH prelude ------------------------------------------------------------------------
+# A safety net for invocation from a restricted context (launchd, a hook) that lacks the
+# usual tool dirs. Appended, not prepended: an interactive caller's own PATH — and the test
+# harness's shim dir — must still win. The runner emitted below prepends instead, because
+# launchd hands it a minimal PATH with no caller preference to respect.
+export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin"
+
+# --- ROOT pin ----------------------------------------------------------------------------
+# Resolve the MAIN checkout, never the worktree we happen to be standing in.
+# --git-common-dir points at the main .git even from a linked worktree, where
+# --show-toplevel would return the worktree instead. Used only to locate sibling tools.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+GIT_COMMON="$(git -C "$SCRIPT_DIR" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+if [ -z "$GIT_COMMON" ]; then
+    # git < 2.31 has no --path-format; fall back to resolving the relative answer by hand.
+    GIT_COMMON="$(cd "$SCRIPT_DIR" && cd "$(git rev-parse --git-common-dir)" && pwd -P)"
+fi
+ROOT="$(dirname "$GIT_COMMON")"
+
+# --- env seams ---------------------------------------------------------------------------
+# All :- (not -) so an EMPTY value falls back to the default exactly as an unset one does.
+PR_CYCLE_ATTACK_CMD="${PR_CYCLE_ATTACK_CMD:-$ROOT/bin/pr-attack}"
+PR_CYCLE_TRIAGE_CMD="${PR_CYCLE_TRIAGE_CMD:-$ROOT/bin/pr-triage}"
+PR_CYCLE_READY_CMD="${PR_CYCLE_READY_CMD:-$ROOT/bin/pr-ready-now}"
+PR_CYCLE_DM_CMD="${PR_CYCLE_DM_CMD:-$ROOT/bin/discord-dm}"
+PR_CYCLE_GH_CMD="${PR_CYCLE_GH_CMD:-gh}"
+PR_CYCLE_MAIN_CHECKOUT="${PR_CYCLE_MAIN_CHECKOUT:-/Users/ajaynicolas/GitHub/IBL5}"
+PR_CYCLE_POLL_INTERVAL="${PR_CYCLE_POLL_INTERVAL:-60}"
+PR_CYCLE_POLL_CEILING="${PR_CYCLE_POLL_CEILING:-2700}"
+PR_CYCLE_LEDGER="${PR_CYCLE_LEDGER:-$HOME/IBL5-merge-digest.md}"
+PR_CYCLE_STOP_FILE="${PR_CYCLE_STOP_FILE:-$HOME/.ibl5-pr-cycle.stop}"
+PR_CYCLE_NOW="${PR_CYCLE_NOW:-}"
+PR_CYCLE_DRY_LAUNCH="${PR_CYCLE_DRY_LAUNCH:-}"
+
+# Print the usage header above: every comment line from the shebang to `set -euo pipefail`.
+usage() {
+    awk 'NR>1 { if ($0 !~ /^#/) exit; sub(/^# ?/, ""); print }' "${BASH_SOURCE[0]}"
+}
+
+# --- flags -------------------------------------------------------------------------------
+GO=0
+DRY=0
+STOP=0
+NO_DM=""
+WORKER=0
+MAX_MERGES=5
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --go)      GO=1; shift ;;
+        --dry-run) DRY=1; shift ;;
+        --stop)    STOP=1; shift ;;
+        --no-dm)   NO_DM=1; shift ;;
+        # --worker: set by the emitted runner; do not pass by hand.
+        --worker)  WORKER=1; shift ;;
+        --max-merges)
+            # A `case` glob, not [ "$N" -gt 0 ] and not a grep pipe: the arithmetic test
+            # *errors* on `abc` under set -e rather than rejecting it, and any `x | grep -q`
+            # form risks the same pipefail/SIGPIPE inversion as the liveness guard below.
+            # `0*` rejects both 0 and a leading-zero count; `*[!0-9]*` rejects abc and -1.
+            [ $# -ge 2 ] || { usage >&2; exit 2; }
+            case "$2" in ''|0*|*[!0-9]*) usage >&2; exit 2 ;; esac
+            MAX_MERGES="$2"; shift 2 ;;
+        --help|-h) usage; exit 0 ;;
+        *) usage >&2; exit 2 ;;
+    esac
+done
+
+if [ "$GO" = "1" ] && [ "$STOP" = "1" ]; then usage >&2; exit 2; fi
+
+# --- --stop ------------------------------------------------------------------------------
+# Handled before every other guard so it works from any cwd, including a worktree.
+# The stop file is created FIRST: a failing --stop-all must still halt the loop at its
+# next check rather than leaving the run armed.
+if [ "$STOP" = "1" ]; then
+    mkdir -p "$(dirname "$PR_CYCLE_STOP_FILE")"
+    : > "$PR_CYCLE_STOP_FILE"
+    echo "pr-cycle: stop file created: $PR_CYCLE_STOP_FILE"
+    "$PR_CYCLE_READY_CMD" --stop-all
+    exit $?
+fi
+
+# --- refusal guards ----------------------------------------------------------------------
+# Guard (a) applies to --go, --dry-run and --worker alike; never to --stop or --help.
+# A guard wired only into the --go branch would let a dry run read the wrong tree.
+# Guard (b) skips for --worker: the worker invocation IS the live session; testing for its
+# own label would make it exit 1 immediately, killing every real run silently.
+
+# (a) Main checkout only. .git is a DIRECTORY in the main checkout and a FILE in a linked
+# worktree, so -d structurally rejects a worktree even if the path somehow matched.
+TOP="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+if [ -z "$TOP" ] || [ "$TOP" != "$PR_CYCLE_MAIN_CHECKOUT" ] || [ ! -d "$TOP/.git" ]; then
+    echo "ERROR: pr-cycle runs only from the main checkout ($PR_CYCLE_MAIN_CHECKOUT);" >&2
+    echo "       the current directory resolves to '${TOP:-<not a git repository>}'." >&2
+    exit 1
+fi
+
+# (b) No live session. Skipped for --worker (the worker IS the running session).
+# Snapshot the job table ONCE into a variable, then match it with a `case` glob —
+# no pipe, no subprocess.
+#
+# The obvious `printf '%s\n' "$LIST" | grep -q ...` is WRONG under `set -o pipefail`, and
+# wrong in the direction that disables the guard: grep -q exits on the first match, the
+# writer takes SIGPIPE on its remaining thousands of lines, pipefail promotes that 141 to
+# the pipeline's status, and the `if` concludes "no match" precisely BECAUSE a match was
+# found. bin/pr-ready-now documents the same trap at its own call site.
+# `|| true` also covers Linux CI, which has no launchctl at all.
+if [ "$WORKER" = "0" ]; then
+    LAUNCHCTL_LIST="$(launchctl list 2>/dev/null || true)"
+    case "$LAUNCHCTL_LIST" in
+        *com.ibl5.pr-ready-now-*|*com.ibl5.pr-cycle-*)
+            echo "ERROR: a pr-ready-now or pr-cycle session is already live; refusing to start another." >&2
+            exit 1 ;;
+    esac
+fi
+
+# --- run state ---------------------------------------------------------------------------
+TS="${PR_CYCLE_TS:-$(date +%Y%m%d-%H%M%S)-$$}"
+RUNDIR="/tmp/pr-cycle-$TS"
+HALT=""
+DRAINED=0
+MERGES=0
+LEFT=0
+BUCKET=""
+ACTION=""
+NEXT_PR=""
+ATTACK_NEEDS=""
+
+_now() {
+    if [ -n "$PR_CYCLE_NOW" ]; then printf '%s' "$PR_CYCLE_NOW"
+    else date -u +%Y-%m-%dT%H:%M:%SZ; fi
+}
+
+# ==========================================================================================
+# Phase 2 — selection
+# ==========================================================================================
+
+# _attack_plan [retry-count] — leave an ordered plan of attack in $RUNDIR/attack.md.
+#
+# `--gate-candidates` ALWAYS exits 0: bin/pr-attack runs gate_candidates and then falls
+# through to emit_order only when the nominee file is empty. Exit 2 is raised inside
+# emit_order, i.e. reachable only from the second invocation. So the discriminator between
+# "this is already the plan" and "nominees need excluding" is the stdout content, never $?.
+_attack_plan() {
+    _retry="${1:-0}"
+
+    set +e
+    "$PR_CYCLE_ATTACK_CMD" --gate-candidates > "$RUNDIR/attack.md" 2> "$RUNDIR/attack.err"
+    _rc=$?
+    set -e
+    if [ "$_rc" -ne 0 ]; then
+        cat "$RUNDIR/attack.err" >&2 || true
+        HALT="pr-attack --gate-candidates exit $_rc"
+        return 1
+    fi
+
+    if grep -qF '# Plan of attack' "$RUNDIR/attack.md"; then
+        return 0
+    fi
+
+    # Nominees exist. They are excluded for this run — the driver never invents a gate edge.
+    grep -E '^### #[0-9]+' "$RUNDIR/attack.md" 2>/dev/null | while read -r _line; do
+        echo "  $_line — excluded this run (gate nominee, unjudged)"
+    done || true
+
+    # LAST match, so a slug containing the literal WORK= cannot spoof the real trailer.
+    _work="$(sed -n 's/^WORK=//p' "$RUNDIR/attack.md" | tail -n 1)"
+    if [ -z "$_work" ]; then
+        HALT="pr-attack emitted no WORK= trailer"
+        return 1
+    fi
+
+    set +e
+    "$PR_CYCLE_ATTACK_CMD" --work "$_work" --gate-edges /dev/null \
+        > "$RUNDIR/attack.md" 2> "$RUNDIR/attack.err"
+    _rc=$?
+    set -e
+    if [ "$_rc" -eq 0 ]; then
+        return 0
+    fi
+
+    # Exit 3 means $WORK went stale because origin/master moved — expected right after a
+    # merge. Retry exactly once, tracked by the counter argument, never by a `while true`.
+    if [ "$_rc" -eq 3 ]; then
+        if [ "$_retry" -ge 1 ]; then
+            HALT="pr-attack WORK stale twice"
+            return 1
+        fi
+        echo "  pr-attack WORK went stale (exit 3) — recomputing the plan once"
+        _attack_plan $((_retry + 1))
+        return $?
+    fi
+
+    cat "$RUNDIR/attack.err" >&2 || true
+    HALT="pr-attack --work exit $_rc"
+    return 1
+}
+
+# _attack_rows — emit "<pr>\t<needs-you>" for every orderable row, in table order.
+#
+# The table is `| <pos> | #<PR> <slug> | <constraint> | <needs> |`. Splitting on | gives
+# an empty $1, so the position is $2 and the PR cell is $3. Requiring $2 to be an integer
+# AND $3 to start with # rejects the |---|----| separator row, which would otherwise be
+# collected as data.
+_attack_rows() {
+    awk -F'|' '
+        NF >= 5 {
+            pos = $2; gsub(/[ \t]/, "", pos)
+            cell = $3; gsub(/^[ \t]+|[ \t]+$/, "", cell)
+            if (pos ~ /^[0-9]+$/ && cell ~ /^#[0-9]+/) {
+                split(cell, a, /[ \t]+/)
+                n = a[1]; sub(/^#/, "", n)
+                needs = $5; gsub(/^[ \t]+|[ \t]+$/, "", needs)
+                print n "\t" needs
+            }
+        }
+    ' "$RUNDIR/attack.md"
+}
+
+# _next_pr — set NEXT_PR to the first orderable PR not already in tried.txt; non-zero when
+# drained. Draining is the loop's normal termination, not a halt.
+#
+# Answers through globals rather than stdout on purpose: the callers need ATTACK_NEEDS too,
+# and `$(_next_pr)` would run the whole thing in a subshell where that assignment dies.
+# The read loop is fed by a heredoc, not a pipe, so it stays in the current shell.
+_next_pr() {
+    _found=""
+    NEXT_PR=""
+    ATTACK_NEEDS=""
+    while IFS="$(printf '\t')" read -r _n _needs; do
+        [ -n "$_n" ] || continue
+        if grep -qxF "$_n" "$RUNDIR/tried.txt" 2>/dev/null; then continue; fi
+        _found="$_n"
+        ATTACK_NEEDS="$_needs"
+        break
+    done <<EOF
+$(_attack_rows)
+EOF
+    [ -n "$_found" ] || return 1
+    NEXT_PR="$_found"
+    return 0
+}
+
+# ==========================================================================================
+# Phase 3 — ready, then arm
+# ==========================================================================================
+
+# _ready_pr N — run one readying session to completion. Returns non-zero (with HALT set)
+# on failure OR on a --wait timeout.
+_ready_pr() {
+    _n="$1"
+    # --jobs 1 is hard-coded, never plumbed from a flag: every merge re-BEHINDs every other
+    # open PR, so a second concurrent session would burn its rebase immediately.
+    set +e
+    "$PR_CYCLE_READY_CMD" --pr "$_n" --jobs 1 --go --wait \
+        > "$RUNDIR/ready-$_n.out" 2> "$RUNDIR/ready-$_n.err"
+    _rc=$?
+    set -e
+    cat "$RUNDIR/ready-$_n.out" || true
+    cat "$RUNDIR/ready-$_n.err" >&2 || true
+
+    # Timeout is detected from stderr TEXT, not from the exit code: bin/pr-ready-now exits
+    # 0 on timeout as well as on success, and the only signal is this line. A timed-out
+    # session is still alive and still holds the concurrency slot, so continuing would make
+    # the next iteration block in wait_for_slot for its full 7200s ceiling — one timeout
+    # would stall the whole queue while looking like progress. Halting hands the session
+    # to the human intact, matching the tool's own "leaving them running" posture.
+    if grep -qF 'TIMED OUT waiting for' "$RUNDIR/ready-$_n.err"; then
+        HALT="pr-ready-now --wait timed out on #$_n; session left running"
+        return 1
+    fi
+    if [ "$_rc" -ne 0 ]; then
+        HALT="pr-ready-now exit $_rc on #$_n"
+        return 1
+    fi
+    return 0
+}
+
+# _arm_and_classify N — the one arming call, then read PR N's bucket out of the report.
+# Sets BUCKET and ACTION. Returns non-zero (with HALT set) only on an unusable report.
+_arm_and_classify() {
+    _n="$1"
+
+    # A second, separate stop check: readying can take an hour, so the top-of-loop check
+    # is far too stale to gate the side effect that follows.
+    if [ -e "$PR_CYCLE_STOP_FILE" ]; then
+        HALT="stopped by $PR_CYCLE_STOP_FILE"
+        return 1
+    fi
+
+    set +e
+    "$PR_CYCLE_TRIAGE_CMD" --arm > "$RUNDIR/triage-$_n.txt" 2> "$RUNDIR/triage-$_n.err"
+    _rc=$?
+    set -e
+    cat "$RUNDIR/triage-$_n.err" >&2 || true
+
+    # Exit 2 is usage/auth: every later classification would be garbage, so halt. Exit 1
+    # means an attempted arm failed — that failure may belong to another PR, and the merge
+    # poll is the authority anyway, so log it and carry on with the report.
+    if [ "$_rc" -eq 2 ]; then
+        HALT="pr-triage exit 2 (usage or auth)"
+        return 1
+    fi
+    if [ "$_rc" -ne 0 ]; then
+        echo "  pr-triage exit $_rc — an arm attempt failed; continuing with the report"
+    fi
+
+    BUCKET="$(awk -v pr="#$_n" '$1 == pr { print $2; exit }' "$RUNDIR/triage-$_n.txt")"
+    ACTION="$(awk -v pr="#$_n" '$1 == pr { print $3; exit }' "$RUNDIR/triage-$_n.txt")"
+
+    # Record EVERY ARMABLE row, not just PR N: one --arm call arms all of them, so a cap
+    # that counted only the readied PR would let --max-merges 5 cause more than five
+    # merges. The ^#[0-9]+$ anchor excludes the dashed separator row.
+    awk '$1 ~ /^#[0-9]+$/ && $2 == "ARMABLE" { print substr($1, 2) }' \
+        "$RUNDIR/triage-$_n.txt" >> "$RUNDIR/armed.txt"
+
+    return 0
+}
+
+# ==========================================================================================
+# Phase 4 — confirm, ledger
+# ==========================================================================================
+
+# _gh_state N — the ONE merge predicate. MERGED from this call is the only thing that
+# counts as a merge: not a green --wait, not a successful arm, not a CI conclusion.
+_gh_state() {
+    "$PR_CYCLE_GH_CMD" pr view "$1" --json state --jq .state 2>/dev/null || true
+}
+
+# _poll_merge N — 0 merged, 1 not confirmed (ceiling or closed), 2 stop file.
+# Poll FIRST, then test the deadline, so a ceiling of 0 yields exactly one poll.
+# A ceiling hit is NOT a halt: it logs, writes no row, and the run moves on — the armed PR
+# usually lands shortly after and _reconcile picks it up on a later iteration.
+_poll_merge() {
+    _n="$1"
+    _deadline=$(( $(date +%s) + PR_CYCLE_POLL_CEILING ))
+    while :; do
+        if [ -e "$PR_CYCLE_STOP_FILE" ]; then
+            HALT="stopped by $PR_CYCLE_STOP_FILE"
+            return 2
+        fi
+        _st="$(_gh_state "$_n")"
+        [ "$_st" = "MERGED" ] && return 0
+        if [ "$_st" = "CLOSED" ]; then
+            echo "  #$_n closed without merging"
+            return 1
+        fi
+        if [ "$(date +%s)" -ge "$_deadline" ]; then
+            echo "  #$_n: merge not confirmed within ${PR_CYCLE_POLL_CEILING}s"
+            return 1
+        fi
+        # The only sleep in this file, and it lives inside the detached worker.
+        sleep "$PR_CYCLE_POLL_INTERVAL"
+    done
+}
+
+# _digest_labels — fold a `### Merge digest` block into "<label>\t<one-line value>" records.
+# Values spanning several lines are folded so a ledger row is always exactly six lines.
+_digest_labels() {
+    # The squeeze happens INSIDE awk, at print time. A `| sed s/[[:space:]]\+/ /g` after
+    # this would also collapse the tab this function emits as its field separator, and
+    # every later `awk -F'\t'` lookup would silently find nothing.
+    awk '
+        function emit(l, v) {
+            gsub(/[[:space:]]+/, " ", v); sub(/^ /, "", v); sub(/ $/, "", v)
+            print l "\t" v
+        }
+        /^### Merge digest[[:space:]]*$/ { inblk = 1; next }
+        inblk && /^#+ / { exit }
+        inblk {
+            line = $0
+            sub(/^[[:space:]]*[-*][[:space:]]*/, "", line)
+            if (match(line, /^\*\*[^*]+:\*\*/)) {
+                if (label != "") emit(label, val)
+                label = substr(line, 3, RLENGTH - 5)
+                val = substr(line, RLENGTH + 1)
+            } else if (label != "" && line ~ /[^[:space:]]/) {
+                val = val " " line
+            }
+        }
+        END { if (label != "") emit(label, val) }
+    '
+}
+
+# _digest_row N — emit the six-line ledger row for a CONFIRMED merge, on stdout.
+_digest_row() {
+    _n="$1"
+    "$PR_CYCLE_GH_CMD" pr view "$_n" --json title,url,comments > "$RUNDIR/view-$_n.json" 2>/dev/null || true
+
+    _title="$(jq -r '.title // ""' "$RUNDIR/view-$_n.json" 2>/dev/null || true)"
+    _url="$(jq -r '.url // ""' "$RUNDIR/view-$_n.json" 2>/dev/null || true)"
+
+    # The LAST sticky verdict comment wins — /pr-ready rewrites it across phases.
+    # `.comments[]?` plus the `// ""` fallbacks keep an empty array from erroring out
+    # and aborting the run under set -e.
+    _body="$(jq -r '[.comments[]? | select((.body // "") | contains("<!-- pr-ready-verdict -->"))] | last | .body // ""' \
+        "$RUNDIR/view-$_n.json" 2>/dev/null || true)"
+
+    printf -- '- [ ] #%s %s — merged %s — %s\n' "$_n" "$_title" "$(_now)" "$_url"
+
+    _labels="$(printf '%s\n' "$_body" | _digest_labels)"
+    if [ -z "$_labels" ]; then
+        # A confirmed merge is ALWAYS ledgered — §4.4. A missing or unparseable digest
+        # degrades the row's detail; it never suppresses the row.
+        printf '  digest: unavailable\n'
+        return 0
+    fi
+    for _lab in "What changed" "Why" "Watch" "Touches" "Machine-authored fixes"; do
+        _val="$(printf '%s\n' "$_labels" | awk -F'\t' -v l="$_lab" '$1 == l { print $2; exit }')"
+        [ -n "$_val" ] || _val="(missing)"
+        printf '  **%s:** %s\n' "$_lab" "$_val"
+    done
+}
+
+_ledger_init() {
+    if [ ! -e "$PR_CYCLE_LEDGER" ]; then
+        mkdir -p "$(dirname "$PR_CYCLE_LEDGER")"
+        {
+            printf '# IBL5 merge digest — written by bin/pr-cycle\n'
+            printf 'One row per confirmed merge. Tick the box once you have read the digest.\n\n'
+        } > "$PR_CYCLE_LEDGER"
+    fi
+}
+
+# _reconcile — ledger every merge this run caused, then recompute MERGES from the file.
+_reconcile() {
+    [ -s "$RUNDIR/armed.txt" ] || { MERGES="$(wc -l < "$RUNDIR/ledgered.txt" | tr -d ' ')"; return 0; }
+    # Bodyless subshell: a `while` after a pipe runs in a subshell in bash 3.2, so results
+    # go to files, never to a counter variable that would not survive the pipeline.
+    sort -u "$RUNDIR/armed.txt" | while read -r _p; do
+        [ -n "$_p" ] || continue
+        grep -qxF "$_p" "$RUNDIR/ledgered.txt" 2>/dev/null && continue
+        [ "$(_gh_state "$_p")" = "MERGED" ] || continue
+        _ledger_init
+        _digest_row "$_p" > "$RUNDIR/row-$_p.txt"
+        cat "$RUNDIR/row-$_p.txt" >> "$PR_CYCLE_LEDGER"
+        echo "$_p" >> "$RUNDIR/ledgered.txt"
+        echo "  ledgered #$_p (merge confirmed)"
+    done
+    MERGES="$(wc -l < "$RUNDIR/ledgered.txt" | tr -d ' ')"
+}
+
+# ==========================================================================================
+# Phase 5 — the worker loop
+# ==========================================================================================
+
+_worker() {
+    mkdir -p "$RUNDIR"
+    : > "$RUNDIR/tried.txt"
+    : > "$RUNDIR/armed.txt"
+    : > "$RUNDIR/ledgered.txt"
+
+    echo "pr-cycle worker starting — max-merges $MAX_MERGES, rundir $RUNDIR"
+
+    while :; do
+        if [ -e "$PR_CYCLE_STOP_FILE" ]; then
+            HALT="stopped by $PR_CYCLE_STOP_FILE"
+            break
+        fi
+        # Checked BEFORE selecting a PR, so hitting the cap costs no wasted ready.
+        if [ "$MERGES" -ge "$MAX_MERGES" ]; then
+            HALT="merge cap ($MAX_MERGES) reached"
+            break
+        fi
+
+        _attack_plan 0 || break
+
+        if ! _next_pr; then
+            DRAINED=1
+            break
+        fi
+        _n="$NEXT_PR"
+
+        # Written BEFORE any side effect: that is what makes "readied at most once per run"
+        # hold even when the iteration halts partway through.
+        echo "$_n" >> "$RUNDIR/tried.txt"
+        echo "--- #$_n (needs you? ${ATTACK_NEEDS:-?})"
+
+        _ready_pr "$_n" || break
+        _arm_and_classify "$_n" || break
+
+        if [ "$BUCKET" = "ARMABLE" ]; then
+            set +e
+            _poll_merge "$_n"
+            _prc=$?
+            set -e
+            if [ "$_prc" -eq 2 ]; then _reconcile; break; fi
+            [ "$_prc" -ne 0 ] && LEFT=$((LEFT + 1))
+        else
+            LEFT=$((LEFT + 1))
+            echo "  #$_n: ${BUCKET:-absent} — ${ACTION:-left for a human}"
+        fi
+
+        # Runs on EVERY completed iteration, including non-armable ones, so a PR armed in
+        # an earlier iteration that lands later is still ledgered and still counted.
+        _reconcile
+    done
+
+    if [ -s "$RUNDIR/ledgered.txt" ]; then
+        MERGES="$(wc -l < "$RUNDIR/ledgered.txt" | tr -d ' ')"
+    fi
+
+    _reason="queue drained"
+    [ -n "$HALT" ] && _reason="$HALT"
+    [ "$DRAINED" = "1" ] && _reason="queue drained"
+
+    echo "pr-cycle finished — merged $MERGES, left for human $LEFT — $_reason"
+
+    if [ -z "$NO_DM" ]; then
+        _msg="pr-cycle finished — merged $MERGES, left for human $LEFT — $_reason
+log: ${PR_CYCLE_LOG:-<foreground>}   ledger: $PR_CYCLE_LEDGER"
+        # A failed notification must never change the run's exit status or the ledger.
+        "$PR_CYCLE_DM_CMD" "$_msg" || true
+    fi
+
+    # 0 for every intended termination — drained, capped, or stopped. 1 for an error halt.
+    case "$_reason" in
+        "queue drained"|"merge cap "*|"stopped by "*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+# ==========================================================================================
+# Phase 6 — dry-run report and detached parent
+# ==========================================================================================
+
+_report_dry_run() {
+    mkdir -p "$RUNDIR"
+    : > "$RUNDIR/tried.txt"
+
+    echo "pr-cycle DRY RUN — nothing fires. Re-run with --go to detach a worker."
+    echo ""
+    _attack_plan 0 || { echo "ERROR: $HALT" >&2; return 1; }
+
+    if _next_pr; then
+        echo "next PR: #$NEXT_PR (needs you? ${ATTACK_NEEDS:-?})"
+    else
+        echo "next PR: none — no orderable PRs in the plan of attack."
+    fi
+    echo ""
+    echo "Triage report (read-only — this run arms nothing):"
+    # The plain report, with no arguments. Arming appears in exactly one place in this
+    # file, and the dry-run path is deliberately not it.
+    "$PR_CYCLE_TRIAGE_CMD" || true
+    echo ""
+    echo "would use max-merges: $MAX_MERGES"
+    echo "would use ledger:     $PR_CYCLE_LEDGER"
+    echo "would use stop file:  $PR_CYCLE_STOP_FILE"
+    echo "would use rundir:     $RUNDIR"
+    return 0
+}
+
+_launch() {
+    LABEL="com.ibl5.pr-cycle-$TS"
+    LOG="/tmp/pr-cycle-$TS.log"
+    RUNNER="/tmp/pr-cycle-$TS.sh"
+    PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+
+    # The driver never removes the stop file — clearing it is the human's explicit
+    # re-enable. Detaching a worker that would halt on its first check is pure noise.
+    if [ -e "$PR_CYCLE_STOP_FILE" ]; then
+        echo "ERROR: stop file present: $PR_CYCLE_STOP_FILE" >&2
+        echo "       clear it first:  rm $PR_CYCLE_STOP_FILE" >&2
+        exit 1
+    fi
+    for _p in "$RUNNER" "$LOG" "$PLIST"; do
+        if [ -e "$_p" ]; then
+            echo "ERROR: artifact collision, refusing to overwrite: $_p" >&2
+            exit 1
+        fi
+    done
+
+    # ~/Library/LaunchAgents always exists on the Mac this runs on; the mkdir is for the
+    # Linux CI box, where bin/test-pr-cycle drives this under PR_CYCLE_DRY_LAUNCH.
+    mkdir -p "$(dirname "$PLIST")"
+
+    # Header shell-quoted once via %q; the body is a QUOTED heredoc emitted verbatim, so
+    # nothing in it expands twice.
+    {   printf '#!/usr/bin/env bash\n'
+        printf 'ROOT=%q\n'       "$ROOT"
+        printf 'LABEL=%q\n'      "$LABEL"
+        printf 'PLIST=%q\n'      "$PLIST"
+        printf 'LOG=%q\n'        "$LOG"
+        printf 'TS=%q\n'         "$TS"
+        printf 'MAX_MERGES=%q\n' "$MAX_MERGES"
+        printf 'NO_DM=%q\n'      "$NO_DM"
+        printf 'export PR_CYCLE_TS=%q\n'   "$TS"
+        printf 'export PR_CYCLE_LOG=%q\n'  "$LOG"
+        for _v in PR_CYCLE_ATTACK_CMD PR_CYCLE_TRIAGE_CMD PR_CYCLE_READY_CMD \
+                  PR_CYCLE_DM_CMD PR_CYCLE_GH_CMD PR_CYCLE_MAIN_CHECKOUT \
+                  PR_CYCLE_POLL_INTERVAL PR_CYCLE_POLL_CEILING \
+                  PR_CYCLE_LEDGER PR_CYCLE_STOP_FILE; do
+            eval "_val=\${$_v}"
+            printf 'export %s=%q\n' "$_v" "$_val"
+        done
+        cat <<'RUNNER_EOF'
+# launchd hands this a minimal PATH with no caller preference to respect, so PREPEND here —
+# the opposite of the driver's own appended prelude.
+export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+cd "$ROOT" || exit 1
+"$ROOT/bin/pr-cycle" --worker --max-merges "$MAX_MERGES" ${NO_DM:+--no-dm}
+# Release the label so the "already live" guard stops matching.
+rm -f "$PLIST"
+launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
+RUNNER_EOF
+    } > "$RUNNER"
+    chmod +x "$RUNNER"
+
+    # Unquoted heredoc: ${LABEL}/${RUNNER}/${ROOT}/${LOG}/${HOME} expand at write time.
+    # KeepAlive is FALSE and that is specific to this tool, not inherited style: a merge
+    # loop that launchd silently restarted would re-arm PRs a human had just halted.
+    cat > "$PLIST" <<PLIST_EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>${LABEL}</string>
+  <key>ProgramArguments</key><array>
+    <string>/bin/bash</string><string>-lc</string><string>exec ${RUNNER}</string>
+  </array>
+  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><false/>
+  <key>WorkingDirectory</key><string>${ROOT}</string>
+  <key>StandardOutPath</key><string>${LOG}</string>
+  <key>StandardErrorPath</key><string>${LOG}</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>/usr/local/bin:/opt/homebrew/bin:${HOME}/.bun/bin:${HOME}/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+</dict></plist>
+PLIST_EOF
+
+    if [ -n "$PR_CYCLE_DRY_LAUNCH" ]; then
+        echo "DRY(plist) pr-cycle: runner=${RUNNER} plist=${PLIST} log=${LOG}"
+        exit 0
+    fi
+    launchctl bootout "gui/$(id -u)/${LABEL}" 2>/dev/null || true
+    launchctl bootstrap "gui/$(id -u)" "$PLIST"
+    echo "pr-cycle started: label=${LABEL}"
+    echo "log: ${LOG}"
+}
+
+# --- dispatch ----------------------------------------------------------------------------
+if [ "$WORKER" = "1" ]; then
+    _worker
+    exit $?
+fi
+if [ "$GO" = "1" ]; then
+    _launch
+    exit 0
+fi
+# Dry run is the default; --dry-run only states the intent explicitly.
+: "$DRY"
+_report_dry_run
+exit $?

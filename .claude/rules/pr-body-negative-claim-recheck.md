@@ -1,6 +1,6 @@
 ---
 description: Re-check every "What is NOT in this PR" negative claim after a remediation commit lands a plan deliverable — always-loaded; governs PR body authorship.
-last_verified: 2026-09-04
+last_verified: 2026-09-05
 ---
 
 # PR Body Negative-Claim Re-check

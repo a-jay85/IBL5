@@ -732,7 +732,7 @@ For the accuracy findings (2–6): prevention is the existing `/pr-ready` Phase 
 
 ### E46 PR body "What is NOT in this PR" written before all plan phases complete — ✅ Implemented (2026-09-04)
 
-Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficiency-backlog-archive.md) — rung 1 filed as `ibl5/.claude/rules/pr-body-negative-claim-recheck.md`.
+Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficiency-backlog-archive.md) — rung 1 filed as `.claude/rules/pr-body-negative-claim-recheck.md`.
 
 ### E47 Phase 6 review notes on PR #2077 — five confirmatory observations
 

@@ -262,7 +262,7 @@ Body summary text was authored pre-implementation and hand-updated during coding
 
 ### E46 PR body "What is NOT in this PR" written before all plan phases complete
 
-**Status (2026-09-04):** ✅ Implemented — rung 1 filed as `ibl5/.claude/rules/pr-body-negative-claim-recheck.md`.
+**Status (2026-09-04):** ✅ Implemented — rung 1 filed as `.claude/rules/pr-body-negative-claim-recheck.md`.
 
 **class: scope-claim staleness** — a PR body "What is NOT in this PR" residual entry that asserts an absence which the same PR's diff contradicts: a plan deliverable (scoped enforcement test) ships in a remediation commit during the same PR cycle, but the body is not updated to reflect it, leaving the PR claiming the conversion "is not yet self-enforcing" when `ControllerSuperglobalFreedomTest.php` is already in the diff.
 
@@ -275,7 +275,7 @@ Body summary text was authored pre-implementation and hand-updated during coding
 - rung 1: Add a `.claude/rules/` doc reminding authors to re-read every "What is NOT in this PR" bullet when a remediation commit adds a plan deliverable — the negative claim may have been overtaken. **Landing rung: 1** — a rule doc is the cheapest enforcement and matches the risk level (rare, easy to spot in review).
 - rungs 2–5: Not warranted; the Phase 6 review pipeline already catches this class when it fires.
 
-`artifact destination: ibl5/.claude/rules/pr-body-negative-claim-recheck.md` (filed 2026-09-04)
+`artifact destination: .claude/rules/pr-body-negative-claim-recheck.md` (filed 2026-09-04)
 
 `last_verified: 2026-09-04`
 

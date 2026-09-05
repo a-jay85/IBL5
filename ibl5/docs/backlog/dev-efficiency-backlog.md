@@ -903,6 +903,11 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 ### E54 PR #2084 Phase 6.5 — rebase silently dropped implementation commit; lost-work proof blind to pre-run loss
 
 **class:** `rebase-dropped-commit` — an `--onto` rebase replay range that started above the branch's own commits, compounded by a lost-work proof that only compares pre-to-post within a single `/pr-ready` run and cannot detect a branch that arrives already emptied by a previous run's bad rebase.
+---
+
+### E54 bin/test-backlog-split: case 16 greps fixture instead of output (false-green assertion)
+
+**class:** a test harness assertion that checks the input fixture (`$FIX`) instead of the actual split output (`$OUT`), causing the test to pass regardless of what the split operation produces.
 
 **occurrence table:**
 
@@ -974,6 +979,28 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 ### E58 PR #2133 Phase 6.5 — plan verification rows 4.e and 6.a false-positive on correct code; PR authoring notes
 
 **class:** Plan verification shell commands that extract a function body with `sed` then grep the full text—including comment lines—for forbidden identifiers, producing false positives when the function's own comments document the property being verified.
+| 1 | bin/test-backlog-split case 16 — both grep calls target `$FIX`; the split output `$OUT` is never consulted | yes | yes | fixed this pass — changed to `! grep -rq '...' "$OUT"` |
+
+**prevention_ladder:**
+- **rung 0 — already covered?** No existing gate checks that a test harness asserts on the correct target variable.
+- **rung 1 — extend existing gate?** No existing gate to extend; `/pr-ready` Phase 4B test-quality review is the current catch mechanism and it caught this.
+- **rung 2 — a rule doc?** Low value — the failure mode is an inattentive variable name, not ignorance of principle.
+- **rungs 3–5 — not warranted:** no mechanical check can determine whether `$FIX` or `$OUT` is the intended assertion target in context.
+- **landing rung:** no gate warranted — Phase 4B review is the existing catch; fix applied this pass.
+
+`prevention_ladder: no gate warranted — Phase 4B test-quality review is the catch; fix applied this pass`
+
+`artifact destination: n/a — no gate`
+
+`last_verified: 2026-09-05`
+
+*(discovered 2026-09-05 during Phase 6 review of #2125)*
+
+---
+
+### E55 bin/test-backlog-split: case 23 `--since=HEAD` always skips on a clean tree (vacuous scope-guard test)
+
+**class:** a test harness assertion that uses `--since=HEAD` to exercise a scope guard — but `--since=HEAD` on a clean working tree produces an empty changed-files set, so the guard exits 0 trivially without ever consulting the guard logic.
 
 **occurrence table:**
 
@@ -1015,3 +1042,19 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 - **Check 2 deviation — `${arr[@]+"${arr[@]}"}` form:** `class: n/a` — deliberate correctness fix over the plan's literal text; required for `set -uo pipefail` + bash 3.2 unbound-variable guard; reviewer confirmed it is the better route. prevention_ladder: no gate warranted.
 - **Check 4 Note (b) — `feat:` vs `chore:` title typing:** `class: n/a` — maps to no 6d clause per reviewer; `feat:` is consistent with plan intent (`auto_merge: false` + human-signoff hold before unattended merge). prevention_ladder: rung 2 — `commit-conventions.md` already documents the GM-test rubric; no additional gate.
 - **Check 4 Note (c) — commit subject under-describes:** `class: n/a` — ephemeral; this repo squash-merges and master takes the PR title, not the branch commit subject. prevention_ladder: no gate warranted.
+| 1 | bin/test-backlog-split case 23 — `"$CHECKIDX" --since=HEAD` on a scratch tree; the scope guard always short-circuits on an empty diff | yes | yes | fixed this pass — changed to `--since=$(git -C "$REPO_ROOT" rev-parse HEAD~1)` so the guard processes the real last-commit diff |
+
+**prevention_ladder:**
+- **rung 0 — already covered?** No existing gate checks that scope-guard tests use a non-trivial ref.
+- **rung 1 — extend existing gate?** No existing gate to extend; `/pr-ready` Phase 4B test-quality review is the catch mechanism.
+- **rung 2 — a rule doc?** Low value — the failure mode is a since-ref that doesn't exercise real diff content, not a pattern generalizable to a rule.
+- **rungs 3–5 — not warranted:** no mechanical check can determine whether a given `--since` ref produces a meaningful diff in context.
+- **landing rung:** no gate warranted — Phase 4B review is the existing catch; fix applied this pass.
+
+`prevention_ladder: no gate warranted — Phase 4B test-quality review is the catch; fix applied this pass`
+
+`artifact destination: n/a — no gate`
+
+`last_verified: 2026-09-05`
+
+*(discovered 2026-09-05 during Phase 6 review of #2125)*

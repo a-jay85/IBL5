@@ -19,7 +19,7 @@
 # item headings sit after it. A trailing --- immediately before the terminator is a
 # structural separator and stays in the monolith.
 #
-# Split output directory defaults to ibl5/docs/backlog/loop-engineering under the repo
+# Split output directory defaults to ibl5/docs/backlog/loop-engineering (example) under the repo
 # root; override with BACKLOG_SPLIT_OUTDIR (used by the test harness to stay dry).
 
 set -euo pipefail

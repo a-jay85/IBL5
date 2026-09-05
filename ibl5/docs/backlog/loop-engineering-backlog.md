@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-09-04
+last_verified: 2026-09-05
 ---
 
 # Loop-Engineering Backlog
@@ -75,6 +75,7 @@ last_verified: 2026-09-04
 | L46 | Queued matrix-less plan with non-canonical `impl_model:` alias slips all pre-queue gates; runner disposes on first nightly run | ⬜ Open | 🟦 | S |
 | L47 | `/pr-ready` folds a recoverable pre-push-hook rebase rejection into the terminal `PUSH FAILED` verdict, stranding the Phase 6.5 remediation commit locally | ⬜ Open | 🟥 | M |
 | L48 | Planning pipeline prose coverage gap: code-block path expressions in `SKILL.md` are invisible to `bin/check-docs`, so they can diverge from `bin/plan-now`'s runtime slug derivation silently | ⬜ Open | 🟦 | S |
+| L49 | `/pr-ready` Phase 6.5 files backlog rows with non-canonical status glyphs and automouse values, making them invisible to open-work filters | ⬜ Open | 🟥 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -694,6 +695,33 @@ Landing rung: **1** (extend `bin/check-docs` or add a narrow lint for `DRAFT=` e
 **artifact destination:** `bin/check-docs` or a new `bin/check-plan-skill-paths` (example) (in-repo)
 
 **provenance:** (discovered 2026-09-04 during PR #1946 plan-intent review)
+
+### L49 `/pr-ready` Phase 6.5 files backlog rows with non-canonical status glyphs and automouse values
+
+**class:** A `/pr-ready` Phase 6.5 remediation filing using non-canonical status glyphs (`🔵 filed`) and automouse values (`✗`) outside the documented five-glyph set, causing filed rows to be invisible to open-work filters and readers relying on the canonical taxonomy.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/docs/backlog/maintenance-backlog.md:682` — row 15.31, Status and Automouse columns | yes | was live; fixed this pass | fixed this pass |
+| 2 | `ibl5/docs/backlog/e2e-backlog.md:233` — row E15, Status and Automouse columns | yes | was live; fixed this pass | fixed this pass |
+| 3 | `ibl5/docs/backlog/maintenance-backlog.md:28` — roll-up total not updated when row 15.31 was added | yes (related filing defect — stale count) | was live; fixed this pass | fixed this pass |
+
+**prevention_ladder:**
+
+- rung 0 — no existing gate validates status glyph values of new backlog rows.
+- rung 1 — `bin/check-docs` could be extended to grep new `| <ID> |` rows added by the diff and validate Status and Automouse column values against the canonical set in `ibl5/docs/backlog/README.md`. Effort: S.
+- rung 2 — add an explicit note to `.claude/skills/fix-and-prevent/_remediation.md` step 4 specifying the five canonical status glyphs (`⬜ Open`, `◑ Partial`, `📋 Planned`, `✅ Done`, `🚫 Declined`) and canonical automouse values (`🟩`/`🟦`/`🟨`/`🟥`/`—`). Cheaper than a CI gate and catches the defect at write time. Effort: XS.
+- rung 3 — not applicable (markdown surface; PHPStan does not parse `.md` files).
+- rung 4 — CI gate via extended `bin/check-docs`: possible but rung 2 is cheaper and faster.
+- rung 5 — a new hook: not warranted per `meta-tooling-bar.md` (no distinct trigger event; rung 2 is the natural landing).
+
+Landing rung: **2** — add an explicit note to `.claude/skills/fix-and-prevent/_remediation.md` step 4 before the "Bump that file's `last_verified:`" instruction, specifying canonical status glyphs and automouse values.
+
+**artifact destination:** `.claude/skills/fix-and-prevent/_remediation.md` step 4 (in-repo)
+
+**provenance:** (discovered 2026-09-04 during #1956)
 
 ---
 

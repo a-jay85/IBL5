@@ -230,7 +230,7 @@ value). For fake-POST tests (D7), assert the banner *after a real submit*, not a
 | E12 | ✅ Done | 🟩 | sleep-in-retry `setTimeout(r,200)` loop — `ajax-api-endpoints.spec.ts fetchJson` |
 | E13 | ⬜ Open | 🟩 | Plan-specified diagnostic strings and DOM observation evidence omitted during E2E assertion implementation. Messages fixed inline (PR #1807). DOM dumps for D15's four no-team pages not captured — needs a Playwright run against the worktree stack with `IBL_TEST_USER_REGULAR` credentials. (discovered 2026-09-02 during #1807) |
 | E14 | ⬜ Open | 🟥 | Autofix bot (`IBL5 Bug Hunter (sandbox)`, commit `ede59f41d`) silently removed the D15 Player-negotiate `.ibl-alert--error` assertion without declaring a scope change, leaving permissive-form coverage on a route with assertable production behavior. (discovered 2026-09-03 during #1807) |
-| E15 | 🔵 filed | ✗ | E2E spec inline comment overstates ordering assertion; matrix row #8 not provably run — see prose |
+| E15 | ⬜ Open | — | E2E spec inline comment overstates ordering assertion; matrix row #8 not provably run — see prose |
 
 **Suggested direction (axis):** All E1–E12 items complete (PR #1805). E9's final implementation uses `evaluate(form.submit())` + auto-retrying `toContainText` DOM assertion rather than `waitForResponse` — `form.submit()` triggers full-page navigation, making `page.content()` race the navigate; the DOM assertion survives the navigation. E9 STOP GUARD: not triggered — PHP validation confirmed working.
 **Est. effort:** complete. **Risk if untouched:** n/a.

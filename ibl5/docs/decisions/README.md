@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-09-04
+last_verified: 2026-09-05
 ---
 
 # IBL5 Architecture Decision Records
@@ -44,6 +44,8 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0110](0110-numbering-collision-prevention.md) | ADR and migration numbering collision prevention | Accepted | Allocators fold in `refs/remotes/origin/*` and sibling worktrees (offline); `merge=union` on this index stops concurrent-append rebase conflicts; `bin/check-numbering` fails a PR introducing a duplicate number or a duplicated index row. Nine legacy duplicates are grandfathered in `--all` only. |
 | [0113](0113-pr-attack-gate-judgment-as-sort-input.md) | Gate judgment is a sort input, not a post-hoc annotation | Accepted | `bin/pr-attack` uses a two-invocation design: `--gate-candidates` identifies nominees and halts; `--work --gate-edge` injects human-supplied judgments as `gate`-type MUST edges before running Kahn's sort. Exit 2 if candidates are present and no judgment is supplied; `--gate-edges /dev/null` is the judged-empty case. |
 | [0104](0104-verification-only-doc-refresh-auto-merge.md) | Verification-only doc refreshes may self-ship | Accepted | A docfix PR is released to auto-merge only when `bin/docfix-check-veronly` proves every changed file under `ibl5/docs/` carries only a strictly-advancing `last_verified:` date bump and, optionally, same-line numeric corrections; the release is a frontmatter flip in the seeded plan, not a merge-gate special case, and Phase 6.5's (9) safety verdict and (11) finding floor still gate the arm. |
+| [0117](0117-stacked-pr-base-resolution.md) | Stacked-PR-aware base resolution for the ADR gate | Accepted | `bin/lib/branch-base.sh` resolves a branch's real base via three layers: `branch.<name>.iblBase` config (written by `bin/wt-new`), `gh pr view` with a 5s timeout, then BLOCK. Fail-closed because CI is also base-parameterized; `bin/adr-check --base=` accepts the resolved ref. |
+| [0104](0104-verification-only-doc-refresh-auto-merge.md) | Verification-only doc refreshes may self-ship | Accepted | A docfix PR is released to auto-merge only when `bin/docfix-check-veronly` proves every changed line is a strictly-advancing `last_verified:` date on an already-tracked file; the release is a frontmatter flip in the seeded plan, not a merge-gate special case, and Phase 6.5's (9) safety verdict and (11) finding floor still gate the arm. |
 | [0118](0118-shell-wrapper-path-resolution-via-pythonpath.md) | Shell wrapper path resolution via `PYTHONPATH`, not `cd` | Accepted | A shell wrapper invoking a Python module exports `PYTHONPATH` and keeps the caller cwd, so caller-supplied relative paths keep resolving; a required `cd` must be preceded by absolutising every positional argument. Rung-4 authoring norm, not a mechanical gate. |
 | [0119](0119-entity-field-accessor-trait-split.md) | Entity field-accessor trait splits are not trait composition | Accepted | Narrows ADR-0001: a single-consumer trait carrying only one entity's own pure field reads is a file split, not composition. First applied to `Player`'s 66 field getters. |
 

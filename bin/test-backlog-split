@@ -176,7 +176,7 @@ rm -f "$OUT/L999-orphan.md"
 
 echo "=== fidelity ==="
 
-L5NAME=$(ls -1 "$OUT" | grep '^L5-' | head -1)
+L5NAME=$(for f in "$OUT"/L5-*.md; do [ -f "$f" ] && basename "$f" && break; done)
 L5SLUG=${L5NAME#L5-}
 L5SLUG=${L5SLUG%.md}
 if [ "${#L5SLUG}" -le 60 ] && [ "${#L5SLUG}" -gt 40 ]; then

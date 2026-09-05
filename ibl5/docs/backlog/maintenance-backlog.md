@@ -279,14 +279,13 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):** Adding tests is inherently green-green (no production change) → every open coverage gap is 🟩 auto-mergeable. If writing a test surfaces a real bug, the *fix* becomes its own finding with its own classification. (Exceptions: **6.21** and **6.23** are 🟨, not 🟩 — in each the target code is unreachable from PHPUnit, so no test is writable until a production seam is decided: a teamless-fixture / non-`exit()` refactor for 6.21, a SAPI-independent hashing seam for 6.23.)
 
-> ✅ resolved (23): 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 6.13, 6.14, 6.15, 6.16, 6.17, 6.18, 6.19, 6.20, 6.22, 6.24, 6.26 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (24): 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 6.10, 6.11, 6.12, 6.13, 6.14, 6.15, 6.16, 6.17, 6.18, 6.19, 6.20, 6.22, 6.24, 6.26, 6.27 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 6.21 | ⬜ Open | 🟨 | Row-12 (Free-Agents/teamless session) `processrookieoption` ownership-rejection path untested: PHPUnit entry-point test impossible (handler `exit()`s), E2E auth fixture always has a session team. Needs a teamless-fixture / non-`exit()` refactor decision before it's writable → 🟨. From PR #1107 Phase 5.0 note. |
 | 6.23 | ⬜ Open | 🟨 | **Same family as 6.22, different guard.** `RequestEventLoggingBootstrap::boot()` returns at line 35 when `\PHP_SAPI === 'cli'`, and PHPUnit is always CLI (DB group included), so the `hash('sha256', session_id())` derivation at lines 66–70 is unreachable from any PHPUnit test — the file's three existing tests are all `expectNotToPerformAssertions()` for exactly this reason. A regression storing the **raw** session id would break zero tests. Extract the derivation to a pure static (or inject the SAPI) so the PII boundary is unit-pinnable. 🟨: production change on a PII boundary; needs a seam decision. (discovered 2026-08-08 during #1670) |
 | 6.25 | ⬜ Open | 🟨 | **Residual of 6.22.** The verdict + thin-redirect-shim conversion landed for Waivers, FreeAgency, and the Trade API accept/decline controllers; `Trading\TradingController`'s reject path still gates inline and still ends in `HtmxHelper::redirect()→exit()`, so its "non-party refused + no mutation" property remains E2E-only. Apply the same pattern: move the authz decision into a verdict-returning method on the service that owns the mutation, leave the controller a shim. Verdict shape is now settled (`array{success: bool, error?: string}`), so the design fork 6.22 carried is closed. 🟨: production refactor on a security surface. Split out of 6.22 when it resolved. |
-| 6.27 | ⬜ Open | 🟩 | Plan-prescribed test phase (`ControllerSuperglobalFreedomTest.php`) shipped in remediation pass rather than in original PR; descope was declared under wrong artifact (allowlist ratchet). `Phase 6 plan-fidelity review` is the detection gate. |
 
 ### 6.21 Rookie-option Free-Agents/teamless ownership gate is untested
 **Location:** `ibl5/modules/Player/index.php` (`processrookieoption()` ownership gate); planned `tests/Module/EntryPoints/PlayerRookieOptionEntryPointTest.php`
@@ -379,17 +378,13 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):** All open items here are docs-only → 🟩 auto-mergeable (a docs PR never trips the `feat:` human-signoff hold), except 9.26 which needs one upfront decision.
 
-> ✅ resolved (27): 9.1, 9.2, 9.3, 9.4, 9.4b, 9.5, 9.6, 9.7, 9.8, 9.9, 9.10, 9.11, 9.12, 9.13, 9.14, 9.15, 9.16, 9.17, 9.18, 9.19, 9.20, 9.21, 9.22, 9.23, 9.24, 9.25, 9.27 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (31): 9.1, 9.2, 9.3, 9.4, 9.4b, 9.5, 9.6, 9.7, 9.8, 9.9, 9.10, 9.11, 9.12, 9.13, 9.14, 9.15, 9.16, 9.17, 9.18, 9.19, 9.20, 9.21, 9.22, 9.23, 9.24, 9.25, 9.27, 9.29, 9.30, 9.31, 9.32 — evidence in [archive](archive/maintenance-backlog-archive.md)
 > 🚫 declined (1): 9.28 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 9.26 | ⬜ Open | 🟨 | No CHANGELOG — upfront decision: ADRs-as-substitute (document) vs post-plan-fed CHANGELOG tooling. |
-| 9.29 | ⬜ Open | 🟩 | Stale migration-number cross-references in docblocks (165 instead of 174): 6 sites; 4 fixed 2026-08-22, 2 fixed 2026-09-03. Finding B (truly-manual Verification Matrix row 23): n/a — no gate warranted. (discovered 2026-09-02 during #1961) |
-| 9.30 | ⬜ Open | 🟩 | Migration backup-table suffix (_165) fossilized from intermediate renaming — header comment corrected this pass. No gate warranted. (discovered 2026-09-03 during #1961) |
-| 9.31 | ⬜ Open | 🟩 | PR body manual-test row naming a pre-existing UI mislabel as the actual label — PR #1961 body row 23 corrected this pass via gh pr edit. No gate warranted. (discovered 2026-09-03 during #1961) |
-| 9.32 | ⬜ Open | 🟩 | Unperformed Truly-manual verification row — PR #1961 row 23; protected by auto_merge: false hold. No gate warranted. (discovered 2026-09-03 during #1961) |
-| 9.33 | ⬜ Open | 🟩 | Backlog Status prose named a controller as converted when its source still reads superglobals (14.8 and 14.12 Status blocks); creating an intra-doc contradiction with the Evidence cell. |
+| 9.33 | ⬜ Open | 🟩 | Backlog Status prose named a controller as converted when its source still reads superglobals (14.8 and 14.12 Status blocks); creating an intra-doc contradiction with the Evidence cell. Re-verification 2026-09-05: `WaiversController.php` now has 0 superglobal hits — controller was already converted; 14.8/14.12 Status prose is now stale. Leave open until 14.8/14.12 Status prose is corrected separately. |
 | 9.34 | ⬜ Open | 🟩 | API_GUIDE.md route inventory drifted from Router.php (25/24 documented vs 27/26 actual; two POST routes undocumented) — corrected this pass. No gate warranted. (discovered 2026-09-05 during #2110) |
 
 
@@ -652,7 +647,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):** Most FK/type/idempotency work is done (maintenance-27/28/41–44). Open items are mostly **column renames / destructive schema** → 🟦 human-merge (gate-14c + rename-sweep blast radius); a *reversible* type-narrowing (15.17) can arm 🟨 via the `/plan` schema-safety guard; doc items are 🟩.
 
-> ✅ resolved (19): 15.2, 15.4, 15.5, 15.8, 15.9, 15.10, 15.11, 15.12, 15.13, 15.14, 15.15, 15.16, 15.18, 15.19, 15.20, 15.21, 15.22, 15.23, 15.28 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (20): 15.2, 15.4, 15.5, 15.8, 15.9, 15.10, 15.11, 15.12, 15.13, 15.14, 15.15, 15.16, 15.18, 15.19, 15.20, 15.21, 15.22, 15.23, 15.28, 15.29 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
@@ -662,8 +657,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 15.7 | ◑ Partial | 🟦 | `name`→`setting_key` done (#143); `value`→`setting_value` deferred (reserved-word rename + sweep → human-merge). |
 | 15.17 | ⬜ Open | 🟨 | olympics_career int(11)→smallint/mediumint. Reversible narrowing → arm via the `/plan` schema-safety guard (apply-time fail-closed + DatabaseIntegration test); else 🟦. |
 | 15.24 | ⬜ Open | 🟦 | Pre-existing duplicate rows in `ibl_box_scores`: 1993 (29), 1994 (7), 2002 (1), 2004 (24) — 61 excess by `(game_date, name)`. Distinct signature from the 2007 HEAT re-import (no schedule overload, no `created_at` batch, no month shift); cause unknown. Destructive delete → human-merge. (discovered 2026-08-04 during the PR #1771 review) |
-
-| 15.29 | ⬜ Open | 🟩 | Production PHP changes (`Player/index.php` null guards, `LeagueStarters/index.php` free-agent fallback) entered a test-scoped PR without a plan phase, structured code review, or scope justification; six PR-body claims were contradicted by the actual diff. Adding a files-changed reconciliation gate is additive → auto-mergeable. (discovered 2026-09-03 during #1807) |
 | 15.31 | ⬜ Open | — | Plan-authored inaccuracies in test code and frontmatter discovered during PR review — see prose |
 | 15.32 | ⬜ Open | 🟩 | `TradeDecisionService::reject()` omitted `EventLogger::setAction('trade_offer_rejected')` when transcribing the controller success path, silently dropping `ibl_events` rows when unit 1c swaps in. Code fixed in PR #1957; unit test gap filed — static call requires EventLogger injection refactor to pin. (discovered 2026-09-04 during #1957) |
 | 15.34 | 🔵 filed | ✗ | Reject-swap unit-1c verification and implementation residuals (B/C/E/G) — exit-exiting shim leaves redirect line with E2E-only coverage; dead factory param in `buildController()`; mechanism logging change (informational); self-wired constructor unverified (Docker stack not running at review time). All filed, none blocking. (discovered 2026-09-04 during #1958) |
@@ -740,15 +733,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Status:** Fixed this pass (PR #1824) — added `capturedLog` non-empty assertion plus expected closing-message substring to `runPipeline()`, and added `ob_get_clean` assertion alongside the existing `ob_start` assertion.
 **Suggested direction:** When a migration introduces a new seam (buffer drain, output capture interface), ensure the pipeline integration test asserts data flows through the seam end-to-end in at least one real call path. The regression guard should assert both sides of every paired construct (`ob_start`/`ob_get_clean`, etc.).
 **Est. effort:** XS (already fixed)
-### 15.30 Production Module Drift Into Test-Scoped PR — Undeclared Scope Expansion
-
-**Location:** `ibl5/modules/Player/index.php`, `ibl5/modules/LeagueStarters/index.php` — PR #1807
-**Problem:** `Player/index.php` (null guards for `negotiate()` and `rookieoption()`) and `LeagueStarters/index.php` (free-agent fallback) entered a PR scoped to test-only assertion tightening (D-cluster-3) without a plan phase, structured code review of the production surface, or a verification matrix row covering the changed production paths. Six PR-body claims were contradicted by the actual diff as a result: the body asserted the diff was assertion-only and introduced no new production behavior — both false. Findings 3 and 4 from the PR #1807 Phase 6 plan-fidelity review are combined here (same root cause: undeclared scope expansion).
-**Suggested direction:** Phase 5.9 (files-changed reconciliation) in `/post-plan` or the PR template should require explicit scope-expansion justification when production modules appear in the diff of a plan scoped to test/doc changes. A files-changed gate checking for `modules/` edits in a test-only plan branch would surface these automatically at PR-creation time.
-**Est. effort:** S
-**Risk if untouched:** Production behavior changes enter the codebase without a plan phase, dedicated code review, or verification matrix row, and the PR body can misrepresent the diff scope without a gate catching the contradiction.
-**provenance:** (discovered 2026-09-03 during #1807; Findings 3 and 4 combined)
-
 ### 15.31 Plan-authored inaccuracies propagated into test code and plan frontmatter
 
 class: plan-authored prose about control-flow ordering that misidentifies the gate sequence (F1), and a plan frontmatter/prose contradiction on auto_merge value (F4) — both transcribed faithfully from the plan and both invisible to CI.

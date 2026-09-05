@@ -2724,3 +2724,28 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 **Est. effort:** S
 **Risk if untouched:** A played game that fails to import is invisible to automation. Detection latency is however long it takes a GM to notice a wrong series score or standings row — two weeks in the observed case — and every derived surface is silently wrong meanwhile, including the materialized `ibl_playoff_series_results` and anything summing `ibl_box_scores`.
 **Status:** ✅ Implemented (PR #2100, 2026-09-04) — added a non-fatal full-audit step to the `backup` job in `.github/workflows/db-backup.yml` that runs `check-boxscore-schedule-run` without `--duplicates-only`, guarded by `if: ${{ !cancelled() }}` so it runs even on nights the duplicate check fails. A conditional Discord DM fires via the existing `notify-discord` composite action when `audit_rc != 0`. Both existing `--duplicates-only` call sites are byte-identical. First run is expected to report findings (historical data debt, including the confirmed 2008 gap) — this is the detector working for the first time, not a new regression.
+
+### 6.27
+**Table evidence (2026-09-05):** Plan-prescribed test phase (`ControllerSuperglobalFreedomTest.php`) shipped in remediation pass rather than in original PR; descope was declared under wrong artifact (allowlist ratchet). `Phase 6 plan-fidelity review` is the detection gate. Verified on disk: `find ibl5/tests/Http -name ControllerSuperglobalFreedomTest.php` returns the file path.
+
+### 9.29
+**Table evidence (2026-09-05):** Stale migration-number cross-references in docblocks (165 instead of 174): 6 sites; 4 fixed 2026-08-22, 2 fixed 2026-09-03. Finding B (truly-manual Verification Matrix row 23): n/a — no gate warranted. (discovered 2026-09-02 during #1961) Verified on disk: grep returns 0 hits.
+
+### 9.30
+**Table evidence (2026-09-05):** Migration backup-table suffix (_165) fossilized from intermediate renaming — header comment corrected this pass. No gate warranted. (discovered 2026-09-03 during #1961) Verified on disk: grep returns 0 hits.
+
+### 9.31
+**Table evidence (2026-09-05):** PR body manual-test row naming a pre-existing UI mislabel as the actual label — PR #1961 body row 23 corrected this pass via gh pr edit. No gate warranted. (discovered 2026-09-03 during #1961) Verified: PR #1961 state = MERGED.
+
+### 9.32
+**Table evidence (2026-09-05):** Unperformed Truly-manual verification row — PR #1961 row 23; protected by auto_merge: false hold. No gate warranted. (discovered 2026-09-03 during #1961) Verified: PR #1961 state = MERGED.
+
+### 15.30 Production Module Drift Into Test-Scoped PR — Undeclared Scope Expansion
+
+**Location:** `ibl5/modules/Player/index.php`, `ibl5/modules/LeagueStarters/index.php` — PR #1807
+**Problem:** `Player/index.php` (null guards for `negotiate()` and `rookieoption()`) and `LeagueStarters/index.php` (free-agent fallback) entered a PR scoped to test-only assertion tightening (D-cluster-3) without a plan phase, structured code review of the production surface, or a verification matrix row covering the changed production paths. Six PR-body claims were contradicted by the actual diff as a result: the body asserted the diff was assertion-only and introduced no new production behavior — both false. Findings 3 and 4 from the PR #1807 Phase 6 plan-fidelity review are combined here (same root cause: undeclared scope expansion).
+**Suggested direction:** Phase 5.9 (files-changed reconciliation) in `/post-plan` or the PR template should require explicit scope-expansion justification when production modules appear in the diff of a plan scoped to test/doc changes. A files-changed gate checking for `modules/` edits in a test-only plan branch would surface these automatically at PR-creation time.
+**Est. effort:** S
+**Risk if untouched:** Production behavior changes enter the codebase without a plan phase, dedicated code review, or verification matrix row, and the PR body can misrepresent the diff scope without a gate catching the contradiction.
+**provenance:** (discovered 2026-09-03 during #1807; Findings 3 and 4 combined)
+**Status:** ✅ Implemented (branch: files-changed-scope-reconciliation-gate, 2026-09-05) — added `.claude/rules/scope-expansion-justification.md` (NEW authorship norm for justifying `ibl5/modules/` files in a non-`feat:` PR body) and a sentinel-delimited scope-expansion self-check block in `/post-plan` Phase 2 that emits `SCOPE_EXPANSION=flagged|clear|none`. The justification paragraph is placed outside the `<!-- files-changed:begin -->` / `<!-- files-changed:end -->` marker pair so regeneration cannot destroy it. Advisory, not blocking: Phase 6.5 arming conditions are unchanged.

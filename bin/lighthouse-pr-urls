@@ -84,9 +84,18 @@ if ($useStdin) {
     if ($rawDiff === false) {
         $rawDiff = '';
     }
+    $errDiff = stream_get_contents($pipes[2]);
     fclose($pipes[1]);
     fclose($pipes[2]);
-    proc_close($proc);
+    $exit = proc_close($proc);
+    if ($exit !== 0) {
+        fwrite(STDERR, sprintf(
+            "git diff --name-only origin/master...HEAD failed (exit %d): %s\n",
+            $exit,
+            trim((string) $errDiff) !== '' ? trim((string) $errDiff) : '(no stderr output)'
+        ));
+        exit(1);
+    }
 }
 
 $paths = array_values(array_filter(

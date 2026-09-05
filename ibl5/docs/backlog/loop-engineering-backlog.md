@@ -74,7 +74,7 @@ last_verified: 2026-09-05
 | L45 | `/pr-ready` Phase 2 squashes load-bearing commit boundaries when `auto_merge: false`; PR body SHAs go stale after force-push | ⬜ Open | 🟥 | S |
 | L46 | Queued matrix-less plan with non-canonical `impl_model:` alias slips all pre-queue gates; runner disposes on first nightly run | ⬜ Open | 🟦 | S |
 | L47 | `/pr-ready` folds a recoverable pre-push-hook rebase rejection into the terminal `PUSH FAILED` verdict, stranding the Phase 6.5 remediation commit locally | ⬜ Open | 🟥 | M |
-| L48 | Planning pipeline prose coverage gap: code-block path expressions in `SKILL.md` are invisible to `bin/check-docs`, so they can diverge from `bin/plan-now`'s runtime slug derivation silently | ⬜ Open | 🟦 | S |
+| L48 | Planning pipeline prose coverage gap: code-block path expressions in `SKILL.md` are invisible to `bin/check-docs`, so they can diverge from `bin/plan-now`'s runtime slug derivation silently | ✅ Implemented (2026-09-04) | 🟦 | S |
 | L49 | `/pr-ready` Phase 6.5 files backlog rows with non-canonical status glyphs and automouse values, making them invisible to open-work filters | ⬜ Open | 🟥 | S |
 | L50 | `bin/pr-cycle` logs gate nominees as "excluded this run" but then orders and readies them (`--gate-edges /dev/null` re-admits every nominee) | ⬜ Open | 🟦 | S |
 
@@ -472,6 +472,9 @@ not add backticks or markdown links to a row.
 | 2026-08-31 | #2039 | class: an awk filter in a skill file uses a reset pattern that fires after the set pattern on the same diff-header line, making the exclusion a no-op and silently passing all lines through | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan adding or modifying an awk filter in a skill or bin/ file must carry a CLI-executable smoke test that verifies the negative path (excluded content absent from output) and the positive path (non-excluded content present) | prior: -- |
 | 2026-09-01 | #2054 | class: a two-phase CLI tool that collects human judgment for a set of items does not short-circuit when the set is empty, forcing an unnecessary second invocation and opening a failure window in the inter-invocation gap | routed to: Rung 4 - rule doc in .claude/rules/ stating that two-invocation CLI scripts must implement the trivial bypass when invocation 1 produces an empty judgment set | prior: -- |
 | 2026-09-04 | #2087 | class: Shell script wrapper that cd's to its module root before invoking Python invalidates caller-provided relative path arguments, silently breaking callers that pass repo-relative paths | routed to: Rung 4 - .claude/rules/shell-wrapper-path-resolution.md | prior: -- |
+| 2026-09-04 | #2092 | class: a plan-level portability claim for a shell script uses find -regex with \{n\} interval notation, verified only on macOS BSD find (where BRE supports \{n\}), not on Ubuntu GNU find (which uses emacs regex type by default and does not treat \{n\} as an interval) — the regex silently matches nothing in CI, causing the script to find no directories and skip its entire body without error | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan introducing a find -regex pattern claiming cross-platform portability between macOS and Ubuntu must carry a CI-run verification row demonstrating the regex matches on the Ubuntu runner, OR must use bash-level character-class and length filtering instead of find interval expressions | prior: -- |
+| 2026-09-05 | #2117 | class: proc_open subprocess contract violations (unchecked proc_close exit, undrained stderr, NUL-unsafe delimiter) shipped undetected when a plan adds or modifies a proc_open call site without requiring subprocess contract verification | routed to: Rung 1 (partial, shipped in #2117) - BanProcOpenUncheckedExitRule in ibl5/phpstan-rules/ enforces checked proc_close exit; broader contract (stderr drain, NUL-delimiter correctness) routed to Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger) | prior: -- |
+| 2026-09-05 | #2121 | class: new always-loaded rule doc committed to wrong directory tree during implementation — bin/check-rules-byte-budget scans only the correct $RULES_DIR, so the misplaced file passes the gate silently until manually relocated | routed to: Rung 4 - note in .claude/rules/doc-freshness.md clarifying always-loaded .claude/rules/*.md files must be created at the exact repo-root path, not inside any subdirectory (e.g. not ibl5/.claude/rules/) | prior: -- |
 ```
 
 ---
@@ -662,28 +665,8 @@ Landing rung: **1** (extend `scripts/push.sh`'s verdict vocabulary plus its two 
 
 ---
 
-### L48 Planning pipeline prose coverage gap: code-block path expressions in `SKILL.md` are invisible to `bin/check-docs`, so they can diverge from `bin/plan-now`'s runtime slug derivation silently
-
-**class:** Any shell code block inside `.claude/skills/plan/SKILL.md` that constructs a file path is invisible to `bin/check-docs`'s dead-reference checker, because the check operates on prose tokens matching `bin/<name>` / `ibl5/<path>` / `.claude/<path>` patterns — not on dynamic expressions inside fenced blocks. A path expression that silently produces the wrong value causes the gate to read a nonexistent file and exit 0 without firing.
-
-**Immediate instance fixed in PR #1946:** `SKILL.md` Step 5 pre-finalize drift check derived the draft path via `$(git rev-parse --abbrev-ref HEAD)`. On the dominant `bin/plan-now` path the branch is `master`, so the check silently read `$HOME/claude-plans/.drafts/master.draft.md` (nonexistent), exiting 0 as "no scaffold found" and never detecting drift. Fixed by substituting the `<slug>` placeholder already established earlier in Step 5.
-
-**Prevention gap.** `bin/check-docs` explicitly skips paths containing shell variable syntax (`$FOO/bar`). Dynamic expressions inside code fences are not covered. A PR that changes a path expression in a SKILL.md code block passes all CI gates while quietly introducing a runtime divergence.
-
-**prevention_ladder:**
-
-- rung 0 — no existing gate covers this surface.
-- rung 1 — extend `bin/check-docs` (or add a narrow `bin/check-plan-skill-paths` (example)) to grep fenced blocks in `SKILL.md` for `DRAFT=` assignments and assert the path uses the `<slug>` placeholder, not a `$(git rev-parse ...)` expression. Structural grep, no behavioral execution required. Effort: S.
-- rung 2 — a rule doc under `.claude/rules/`: useful but not enforcement.
-- rung 3 — PHPStan: not applicable (shell/markdown).
-- rung 4 — a CI gate extension: `bin/test-check-plan` already covers the path-not-found case (`gateD-no-path-exits-2`); a wrong-but-present path cannot be caught without knowing the expected slug — rung 1 is the natural landing.
-- rung 5 — a new hook: not warranted per `meta-tooling-bar.md` (no distinct trigger; a `bin/check-docs` extension is the natural host).
-
-Landing rung: **1** (extend `bin/check-docs` or add a narrow lint for `DRAFT=` expressions in SKILL.md fenced blocks).
-
-**artifact destination:** `bin/check-docs` or a new `bin/check-plan-skill-paths` (example) (in-repo)
-
-**provenance:** (discovered 2026-09-04 during PR #1946 plan-intent review)
+### L48 Planning pipeline prose coverage gap: code-block path expressions in `SKILL.md` are invisible to `bin/check-docs`
+➜ L48 Planning pipeline prose coverage gap: code-block path expressions in `SKILL.md` are invisible to `bin/check-docs`, so they can diverge from `bin/plan-now`'s runtime slug derivation silently — ✅ Implemented (2026-09-04): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ### L49 `/pr-ready` Phase 6.5 files backlog rows with non-canonical status glyphs and automouse values
 

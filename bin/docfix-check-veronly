@@ -31,10 +31,75 @@ SLUG="${1:-$(git rev-parse --abbrev-ref HEAD)}"
 PLAN_FILE="${PLAN_FILE:-$HOME/claude-plans/$SLUG.md}"
 BASE_REF="${DOCFIX_BASE_REF:-master}"
 
-# Compile the per-line regexes once.  Do NOT quote these variables when used
-# in [[ =~ ]] — quoted right-hand sides match literally, not as ERE.
-MINUS_RE='^-last_verified: [0-9]{4}-[0-9]{2}-[0-9]{2}$'
-PLUS_RE='^[+]last_verified: [0-9]{4}-[0-9]{2}-[0-9]{2}$'
+# Date regex (prefix-free — applied after stripping the +/- diff prefix).
+# Do NOT quote when used in [[ =~ ]] — quoted RHS matches literally, not ERE.
+DATE_RE='^last_verified: [0-9]{4}-[0-9]{2}-[0-9]{2}$'
+
+# Mask all digit-runs with a placeholder.  BRE [0-9][0-9]* (not ERE +) for
+# BSD sed.  printf '%s\n' instead of echo to avoid backslash mangling.
+mask_numbers() { printf '%s\n' "$1" | sed 's/[0-9][0-9]*/__NUM__/g'; }
+
+# pair_hunk — called at each @@ boundary and once after the final hunk.
+# Reads HUNK_MINUS[0..HM_N-1] / HUNK_PLUS[0..HP_N-1] (diff-prefix already
+# stripped).  Writes CONTENT_HOLD, DATE_PAIRS, NUM_PAIRS, OLD_DATE, NEW_DATE
+# as globals; resets the buffers on success.
+pair_hunk() {
+    if [ "$HM_N" -ne "$HP_N" ]; then
+        CONTENT_HOLD="unpaired change lines in '$path': hunk has ${HM_N} removed / ${HP_N} added"
+        return
+    fi
+    i=0
+    while [ "$i" -lt "$HM_N" ]; do
+        a="${HUNK_MINUS[$i]}"
+        b="${HUNK_PLUS[$i]}"
+        i=$(( i + 1 ))
+        # Date branch — classify by the last_verified: PREFIX, not a full regex
+        # match.  A malformed date (last_verified: 2026-8-9) has the prefix but
+        # fails DATE_RE, so it holds here rather than falling to numeric.
+        if [ "${a#last_verified: }" != "$a" ] || [ "${b#last_verified: }" != "$b" ]; then
+            if ! [[ "$a" =~ $DATE_RE ]] || ! [[ "$b" =~ $DATE_RE ]]; then
+                CONTENT_HOLD="non-date change line in '$path': ${a:0:80}"
+                return
+            fi
+            DATE_PAIRS=$(( DATE_PAIRS + 1 ))
+            if [ "$DATE_PAIRS" -gt 1 ]; then
+                CONTENT_HOLD="more than 1 last_verified pair in '$path' (found ${DATE_PAIRS})"
+                return
+            fi
+            OLD_DATE="${a#last_verified: }"
+            NEW_DATE="${b#last_verified: }"
+            if [[ ! "$NEW_DATE" > "$OLD_DATE" ]]; then
+                CONTENT_HOLD="date not strictly advancing in '$path': '$OLD_DATE' → '$NEW_DATE' (equal or backwards)"
+                return
+            fi
+        else
+            # Numeric branch — guard against the placeholder already present in
+            # the raw text (skeleton comparison would be meaningless).
+            case "$a" in *__NUM__*)
+                CONTENT_HOLD="mask placeholder in change line in '$path': ${a:0:80}"
+                return ;;
+            esac
+            case "$b" in *__NUM__*)
+                CONTENT_HOLD="mask placeholder in change line in '$path': ${b:0:80}"
+                return ;;
+            esac
+            skel_a="$(mask_numbers "$a")"
+            skel_b="$(mask_numbers "$b")"
+            if [ "$skel_a" != "$skel_b" ]; then
+                CONTENT_HOLD="non-numeric change line in '$path': ${a:0:80}"
+                return
+            fi
+            if [ "$a" = "$b" ]; then
+                CONTENT_HOLD="change line with no numeric difference in '$path': ${a:0:80}"
+                return
+            fi
+            NUM_PAIRS=$(( NUM_PAIRS + 1 ))
+        fi
+    done
+    # Success — reset buffers for the next hunk.
+    HM_N=0; HP_N=0
+    unset HUNK_MINUS HUNK_PLUS
+}
 
 # --- Step 2.2: Merge-base against working tree -------------------------------
 # Compare merge-base..working-tree so that an uncommitted prose edit is visible
@@ -55,8 +120,9 @@ if [ -n "$UNTRACKED" ]; then
 fi
 
 # --- Step 2.4: Name-status gate ----------------------------------------------
-# Every changed file must carry status exactly 'M'.  An empty diff is not a
-# pass — it would make "every file is M" vacuously true with zero rows.
+# Every changed file must carry status exactly 'M' and live under ibl5/docs/.
+# An empty diff is not a pass — it would make "every file is M" vacuously true
+# with zero rows.
 ROW_COUNT=0
 NAME_STATUS_HOLD=""
 
@@ -66,6 +132,13 @@ while IFS=$'\t' read -r status path; do
         NAME_STATUS_HOLD="non-M change in diff: status '$status' on '$path'"
         break
     fi
+    case "$path" in
+        ibl5/docs/*) ;;
+        *)
+            NAME_STATUS_HOLD="path outside ibl5/docs/: '$path'"
+            break
+            ;;
+    esac
 done < <(git diff "$BASE" --name-status)
 
 if [ -n "$NAME_STATUS_HOLD" ]; then
@@ -79,17 +152,22 @@ if [ "$ROW_COUNT" -eq 0 ]; then
 fi
 
 # --- Step 2.5: Per-file content gate -----------------------------------------
-# For each M file: every diff change line must be exactly one last_verified:
-# date pair (one - line, one + line), and the date must strictly advance.
-# Two-level process substitution: outer iterates files, inner reads each diff.
+# For each M file: diff change lines are buffered hunk-by-hunk and pair_hunk()
+# classifies each positionally-paired (-,+) line as either a date bump or a
+# same-skeleton numeric correction.  Every change line must fall into one of
+# these two categories; anything else holds.  Two-level process substitution:
+# outer iterates files, inner reads each diff.
 
 while IFS=$'\t' read -r _status path; do
 
-    MINUS_COUNT=0
-    PLUS_COUNT=0
+    DATE_PAIRS=0
+    NUM_PAIRS=0
+    HM_N=0
+    HP_N=0
     OLD_DATE=""
     NEW_DATE=""
     CONTENT_HOLD=""
+    unset HUNK_MINUS HUNK_PLUS
 
     while IFS= read -r line; do
         # Skip diff file-header lines.  Trailing space after --- / +++ is
@@ -99,30 +177,14 @@ while IFS=$'\t' read -r _status path; do
         case "$line" in
             "--- "*|"+++ "*) continue ;;
             "diff --git "*|"index "*) continue ;;
-            "@@"*) continue ;;
+            "@@"*) pair_hunk; [ -n "$CONTENT_HOLD" ] && break; continue ;;
             " "*|"") continue ;;  # context lines (leading space) or empty
         esac
 
         # Remaining lines are change lines (start with + or -).
         case "$line" in
-            -*)
-                if [[ "$line" =~ $MINUS_RE ]]; then
-                    MINUS_COUNT=$(( MINUS_COUNT + 1 ))
-                    OLD_DATE="${line#-last_verified: }"
-                else
-                    CONTENT_HOLD="non-date change line in '$path': ${line:0:80}"
-                    break
-                fi
-                ;;
-            +*)
-                if [[ "$line" =~ $PLUS_RE ]]; then
-                    PLUS_COUNT=$(( PLUS_COUNT + 1 ))
-                    NEW_DATE="${line#+last_verified: }"
-                else
-                    CONTENT_HOLD="non-date change line in '$path': ${line:0:80}"
-                    break
-                fi
-                ;;
+            -*) HUNK_MINUS[$HM_N]="${line#-}"; HM_N=$(( HM_N + 1 )) ;;
+            +*) HUNK_PLUS[$HP_N]="${line#+}"; HP_N=$(( HP_N + 1 )) ;;
             *)
                 # Unexpected line type — hold; diff format changed or corrupted.
                 CONTENT_HOLD="unexpected diff line in '$path': ${line:0:80}"
@@ -131,23 +193,24 @@ while IFS=$'\t' read -r _status path; do
         esac
     done < <(git diff --no-color "$BASE" -- "$path")
 
+    # Flush the final hunk (not preceded by another @@ boundary).
+    [ -z "$CONTENT_HOLD" ] && pair_hunk
+
     if [ -n "$CONTENT_HOLD" ]; then
         echo "docfix-check-veronly: HOLD — $CONTENT_HOLD"
         exit 1
     fi
 
-    # Exactly one minus line and one plus line per file.  Two pairs catch docs
-    # like doc-freshness.md whose fenced YAML example also has last_verified:.
-    if [ "$MINUS_COUNT" -ne 1 ] || [ "$PLUS_COUNT" -ne 1 ]; then
-        echo "docfix-check-veronly: HOLD — expected exactly 1 date-change pair in '$path', found ${MINUS_COUNT} removed / ${PLUS_COUNT} added last_verified lines"
+    # Fail-closed floor: a status-M file that produced zero classified pairs holds
+    # rather than passing vacuously.
+    if [ "$DATE_PAIRS" -eq 0 ] && [ "$NUM_PAIRS" -eq 0 ]; then
+        echo "docfix-check-veronly: HOLD — no recognized change pairs in '$path'"
         exit 1
     fi
 
-    # Strict advance: new date must be lexically GREATER than old date.
-    # ISO-8601 (YYYY-MM-DD) sorts correctly as plain strings — no date parsing.
-    # Equal dates are not a pass (nothing was re-verified).
-    if [[ ! "$NEW_DATE" > "$OLD_DATE" ]]; then
-        echo "docfix-check-veronly: HOLD — date not strictly advancing in '$path': '$OLD_DATE' → '$NEW_DATE' (equal or backwards)"
+    # Numbers must ride along with a re-verification date bump in the same file.
+    if [ "$NUM_PAIRS" -gt 0 ] && [ "$DATE_PAIRS" -ne 1 ]; then
+        echo "docfix-check-veronly: HOLD — numeric change without a last_verified bump in '$path' (${NUM_PAIRS} numeric pair(s), ${DATE_PAIRS} date pair(s))"
         exit 1
     fi
 

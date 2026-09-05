@@ -71,6 +71,7 @@ class ShadowProcessLauncher implements ShadowProcessLauncherInterface
         if (is_resource($process)) {
             // Do NOT wait: setsid --fork already detached the run into its own
             // session. proc_close reaps the short-lived intermediate child only.
+            // @phpstan-ignore ibl.procOpenExitUnchecked (setsid --fork detaches the run; this proc_close reaps only the short-lived intermediate child, which always exits 0)
             proc_close($process);
         }
     }

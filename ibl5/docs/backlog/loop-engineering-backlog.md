@@ -59,7 +59,7 @@ last_verified: 2026-09-04
 | L30 | Concurrent `automouse-run` sessions corrupt the shared cost report (lost rows, duplicated weekly aggregate) | ⬜ Open | 🟦 | S |
 | L31 | One shared daily log per calendar day: concurrent runners cross-read each other's cost, stall-kill, and env-stop signals | ⬜ Open | 🟥 | M |
 | L32 | Concurrent `bin/wt-new` on the shared main checkout can lose a queued plan to a `skipped/` disposition | ⬜ Open | 🟥 | S |
-| L33 | CLI entrypoints accept unknown flags silently; no static rule enforces argv option allowlisting | ⬜ Open | 🟦 | S |
+| L33 | CLI entrypoints accept unknown flags silently; no static rule enforces argv option allowlisting | ✅ Implemented | — | S |
 | L34 | `bin/pr-ready-now` has no working stop path; `launchctl bootout` orphans the session and corrupts slot accounting | ✅ Implemented | — | S |
 | L35 | automouse: cap-timeout kill (exit 143) misclassified as genuine plan failure, burns attempt | ⬜ Open | 🟥 | S |
 | L36 | `/post-plan` Phase 3 writes a hardcoded "covered by unit and E2E tests" clause into the PR body without checking the diff contains those test types | ⬜ Open | 🟥 | S |
@@ -252,13 +252,7 @@ last_verified: 2026-09-04
 **Status (2026-08-08):** ⬜ Open — 🟥 (touches impl-disposition classification; reproduce before designing).
 
 ### L33 CLI entrypoints accept unknown flags silently; no static rule enforces argv option allowlisting
-**Location:** `ibl5/phpstan-rules/` — no rule inspects `$argv` / `getopt()` option parsing (verified 2026-08-09: zero rule files mention either). The one hardened entrypoint is `ibl5/scripts/bug-pipeline/transition.php`, allowlisted by hand in PR #1654.
-**Problem:** A CLI entrypoint that ignores an unrecognized option runs with the caller's intent silently dropped — a typo'd or renamed flag produces a successful-looking run that did something else. It has now recurred three times (#1354, #1496, #1654), each fixed one entrypoint at a time, which is the signature of a class that needs a mechanical check rather than another point fix.
-**Suggested direction:** A PHPStan rule over argv/`getopt()` option parsing in CLI entrypoints, asserting that an unrecognized option is rejected rather than ignored. Extend the existing `ibl5/phpstan-rules/` set — this is Rung 1 on the `/post-plan` Phase 9 ladder, and the class registry routes it there.
-**Interim backstop (2026-08-08):** PR #1668 added a forced integration-verification trigger — a plan that adds a CLI flag or flag-parsing branch must carry a row asserting the rejected form fails loudly (`.claude/review-shared/_plan-verification.md` § Forced integration-verification trigger). That is plan-time, so it catches *new* flags only; it does not sweep the entrypoints that already exist.
-**Risk if untouched:** A fourth occurrence, and the existing unhardened entrypoints stay unswept — the backstop above never looks at them.
-**Status (2026-08-09):** ⬜ Open — 🟦.
-**Provenance (2026-08-09):** Surfaced by the `## Class registry` seed row for this class, which routed it to Rung 1 and recorded it as queued; nothing was in fact queued. This entry is that queue.
+➜ L33 CLI entrypoints accept unknown flags silently — ✅ Implemented (2026-08-30): PR #2042. see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 
 ### L34 `bin/pr-ready-now` has no working stop path; `launchctl bootout` orphans the session and corrupts slot accounting
@@ -480,6 +474,7 @@ not add backticks or markdown links to a row.
 | 2026-08-26 | #1996 | class: SQL table names in BaseMysqliRepository subclasses inserted without backtick quoting, silently bypassing the rewriteTableNames() invariant that all repository SQL be rewrite-eligible | routed to: Rung 1 - PHPStan rule over SQL string literals in BaseMysqliRepository subclasses, asserting all bare table-name identifiers are backtick-quoted in INSERT/UPDATE/DELETE statements | prior: -- |
 | 2026-08-27 | #2002 | class: Phase 6 conflict-audit runtime dependency (/tmp/pr-ready-diff-pre-<N>.patch) deletable by bin/pr-ready-now:246 (rm -f /tmp/pr-ready-*-"${PR}".*), leaving the audit unable to verify conflict resolution without a reconstruction workaround | routed to: Rung 3 - forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan modifying the /pr-ready skill's tmp-file cleanup in bin/pr-ready-now must verify the Phase 6 conflict-audit path (/tmp/pr-ready-diff-pre-<N>.patch) is excluded from the cleanup glob | prior: -- |
 | 2026-08-29 | #2023 | class: an unconditional detection check in an audit class is nested inside a fail-open guard conditioned on data availability, causing the check to silently skip when the guard condition is false instead of running independently | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan adding or modifying a detection check in an audit class that has a fail-open guard must verify the check fires even when the guard-controlling condition is false (e.g., ScheduleReconciliationAudit with empty schedule index) | prior: -- |
+| 2026-08-31 | #2042 | class: CLI entrypoint accepts an unknown flag silently instead of erroring — Rung 1 rule delivered | routed to: Rung 1 complete — BanUnknownCliOptionRule added in ibl5/phpstan-rules/; fires on all getopt() calls; 2 existing callers (scripts/build-engine-bundle.php, scripts/runEngineShadow.php) baselined as temporary; closes class registered 2026-07-25 row (#1654 trigger, interim Rung 3 in #1668) | prior: #1354, #1496, #1654 |
 | 2026-09-01 | #2054 | class: a two-phase CLI tool that collects human judgment for a set of items does not short-circuit when the set is empty, forcing an unnecessary second invocation and opening a failure window in the inter-invocation gap | routed to: Rung 4 - rule doc in .claude/rules/ stating that two-invocation CLI scripts must implement the trivial bypass when invocation 1 produces an empty judgment set | prior: -- |
 | 2026-09-04 | #2087 | class: Shell script wrapper that cd's to its module root before invoking Python invalidates caller-provided relative path arguments, silently breaking callers that pass repo-relative paths | routed to: Rung 4 - .claude/rules/shell-wrapper-path-resolution.md | prior: -- |
 ```

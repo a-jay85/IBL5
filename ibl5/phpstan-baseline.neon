@@ -895,28 +895,6 @@ parameters:
 			path: classes/Topics/News/NewsController.php
 
 		-
-			rawMessage: '''
-				Call to deprecated function CloseTable():
-				Use CSS classes directly: </div> (closing .ibl-card)
-				Legacy PHP-Nuke table closer. Prefer modern CSS components.
-				Remaining callers: ~60 legacy PHP-Nuke module files (News, Your_Account, Trading, etc.)
-			'''
-			identifier: function.deprecated
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: '''
-				Call to deprecated function OpenTable():
-				Use CSS classes directly: <div class="ibl-card">
-				Legacy PHP-Nuke table wrapper. Prefer modern CSS components.
-				Remaining callers: ~60 legacy PHP-Nuke module files (News, Your_Account, Trading, etc.)
-			'''
-			identifier: function.deprecated
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
 			rawMessage: Cannot access offset 'storynum' on mixed.
 			identifier: offsetAccess.nonOffsetAccessible
 			count: 1
@@ -1225,7 +1203,7 @@ parameters:
 		-
 			rawMessage: 'echo is banned outside View classes, Responders, and Bootstrap/Updater emitters. Move HTML/text output into a *View.php (composed by the Controller) or a Responder (composed by the ApiHandler).'
 			identifier: ibl.echoInNonView
-			count: 6
+			count: 8
 			path: classes/Topics/News/NewsController.php
 
 		-
@@ -2721,3 +2699,15 @@ parameters:
 			identifier: encapsedStringPart.nonString
 			count: 6
 			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'getopt() call lacks an unknown-option guard. After calling getopt(), compare $argv against the accepted option list and call usage_error() / exit(1) on any unrecognized argument. Suppress with @phpstan-ignore ibl.unknownCliOption only after the guard is in place.'
+			identifier: ibl.unknownCliOption
+			count: 1
+			path: scripts/build-engine-bundle.php
+
+		-
+			rawMessage: 'getopt() call lacks an unknown-option guard. After calling getopt(), compare $argv against the accepted option list and call usage_error() / exit(1) on any unrecognized argument. Suppress with @phpstan-ignore ibl.unknownCliOption only after the guard is in place.'
+			identifier: ibl.unknownCliOption
+			count: 1
+			path: scripts/runEngineShadow.php

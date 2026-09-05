@@ -7,6 +7,7 @@ namespace Waivers;
 use Waivers\Contracts\WaiversSubmissionServiceInterface;
 use Waivers\Contracts\WaiversProcessorInterface;
 use Repositories\Contracts\SalaryCapRepositoryInterface;
+use Season\Season;
 
 /**
  * @see WaiversSubmissionServiceInterface
@@ -15,13 +16,16 @@ class WaiversSubmissionService implements WaiversSubmissionServiceInterface
 {
     private WaiversProcessorInterface $processor;
     private SalaryCapRepositoryInterface $salaryCapRepo;
+    private readonly Season $season;
 
     public function __construct(
         WaiversProcessorInterface $processor,
-        SalaryCapRepositoryInterface $salaryCapRepo
+        SalaryCapRepositoryInterface $salaryCapRepo,
+        Season $season
     ) {
         $this->processor = $processor;
         $this->salaryCapRepo = $salaryCapRepo;
+        $this->season = $season;
     }
 
     /**

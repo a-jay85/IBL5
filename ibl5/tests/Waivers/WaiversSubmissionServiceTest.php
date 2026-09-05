@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace Tests\Waivers;
 
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\MockObject\MockObject;
+use PHPUnit\Framework\MockObject\Stub;
 use Waivers\WaiversSubmissionService;
 use Waivers\Contracts\WaiversProcessorInterface;
 use Repositories\Contracts\SalaryCapRepositoryInterface;
+use Season\Season;
 
 /**
  * Security deliverable for backlog 6.22 (Waivers half).
@@ -28,6 +31,7 @@ class WaiversSubmissionServiceTest extends TestCase
         $processor->expects($this->never())->method('processAdd');
         $processor->expects($this->never())->method('processDrop');
         $salaryCapRepo->expects($this->never())->method('getTeamTotalSalary');
+        $salaryCapRepo->expects($this->never())->method('getTeamNextYearSalary');
 
         $result = $service->submit(['Action' => 'add', 'Player_ID' => 42, 'healthyrosterslots' => 12], null);
 
@@ -41,6 +45,7 @@ class WaiversSubmissionServiceTest extends TestCase
         $processor->expects($this->never())->method('processAdd');
         $processor->expects($this->never())->method('processDrop');
         $salaryCapRepo->expects($this->never())->method('getTeamTotalSalary');
+        $salaryCapRepo->expects($this->never())->method('getTeamNextYearSalary');
 
         $result = $service->submit(['Action' => 'waive', 'Player_ID' => 42, 'rosterslots' => 14], '');
 
@@ -136,14 +141,61 @@ class WaiversSubmissionServiceTest extends TestCase
     }
 
     /**
-     * @return array{0: WaiversSubmissionService, 1: WaiversProcessorInterface&MockObject, 2: SalaryCapRepositoryInterface&MockObject}
+     * Backlog 13.14 — the cap basis must follow the contract-year phase.
      */
-    private function buildServiceWithMocks(): array
+    #[DataProvider('salaryBasisProvider')]
+    public function testSubmitSelectsSalaryBasisByContractYearPhase(
+        string $action,
+        bool $advancesContractYears,
+        string $expectedMethod,
+        string $unusedMethod,
+        int $expectedSalary
+    ): void {
+        [$service, $processor, $salaryCapRepo] = $this->buildServiceWithMocks($advancesContractYears);
+
+        $salaryCapRepo->expects($this->once())
+            ->method($expectedMethod)
+            ->with('Miami Heat')
+            ->willReturn($expectedSalary);
+        $salaryCapRepo->expects($this->never())->method($unusedMethod);
+
+        $processorMethod = $action === 'waive' ? 'processDrop' : 'processAdd';
+        $processor->expects($this->once())
+            ->method($processorMethod)
+            ->with(42, 'Miami Heat', 12, $expectedSalary)
+            ->willReturn(['success' => true]);
+
+        $service->submit(
+            ['Action' => $action, 'Player_ID' => 42, 'rosterslots' => 12, 'healthyrosterslots' => 12],
+            'Miami Heat'
+        );
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: bool, 2: string, 3: string, 4: int}>
+     */
+    public static function salaryBasisProvider(): array
+    {
+        return [
+            // name => [action, advancesContractYears, expected, unused, salary]
+            'add in-season uses current-year basis'   => ['add',   false, 'getTeamTotalSalary',    'getTeamNextYearSalary', 6861],
+            'add offseason uses next-year basis'      => ['add',   true,  'getTeamNextYearSalary', 'getTeamTotalSalary',    5159],
+            'waive in-season uses current-year basis' => ['waive', false, 'getTeamTotalSalary',    'getTeamNextYearSalary', 6861],
+            'waive offseason uses next-year basis'    => ['waive', true,  'getTeamNextYearSalary', 'getTeamTotalSalary',    5159],
+        ];
+    }
+
+    /**
+     * @return array{0: WaiversSubmissionService, 1: WaiversProcessorInterface&MockObject, 2: SalaryCapRepositoryInterface&MockObject, 3: Season&Stub}
+     */
+    private function buildServiceWithMocks(bool $advancesContractYears = false): array
     {
         $processor = $this->createMock(WaiversProcessorInterface::class);
         $salaryCapRepo = $this->createMock(SalaryCapRepositoryInterface::class);
-        $service = new WaiversSubmissionService($processor, $salaryCapRepo);
+        $season = $this->createStub(Season::class);
+        $season->method('advancesContractYears')->willReturn($advancesContractYears);
+        $service = new WaiversSubmissionService($processor, $salaryCapRepo, $season);
 
-        return [$service, $processor, $salaryCapRepo];
+        return [$service, $processor, $salaryCapRepo, $season];
     }
 }

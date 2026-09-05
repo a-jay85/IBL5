@@ -666,6 +666,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 | 15.29 | ⬜ Open | 🟩 | Production PHP changes (`Player/index.php` null guards, `LeagueStarters/index.php` free-agent fallback) entered a test-scoped PR without a plan phase, structured code review, or scope justification; six PR-body claims were contradicted by the actual diff. Adding a files-changed reconciliation gate is additive → auto-mergeable. (discovered 2026-09-03 during #1807) |
 | 15.31 | ⬜ Open | — | Plan-authored inaccuracies in test code and frontmatter discovered during PR review — see prose |
 | 15.32 | ⬜ Open | 🟩 | `TradeDecisionService::reject()` omitted `EventLogger::setAction('trade_offer_rejected')` when transcribing the controller success path, silently dropping `ibl_events` rows when unit 1c swaps in. Code fixed in PR #1957; unit test gap filed — static call requires EventLogger injection refactor to pin. (discovered 2026-09-04 during #1957) |
+| 15.34 | 🔵 filed | ✗ | Reject-swap unit-1c verification and implementation residuals (B/C/E/G) — exit-exiting shim leaves redirect line with E2E-only coverage; dead factory param in `buildController()`; mechanism logging change (informational); self-wired constructor unverified (Docker stack not running at review time). All filed, none blocking. (discovered 2026-09-04 during #1958) |
 
 ### 15.1 `tid` / `teamid` / `team_id` — Three Spellings Survive ADR-0009
 **Location:** `ibl_box_scores` (`visitorTID`, `homeTID`, `teamID`), `ibl_box_scores_teams` (`visitorTeamID`, `homeTeamID`), `ibl_rcb_*` (`team_id`), `ibl_league_config` (`team_id`)
@@ -793,6 +794,7 @@ provenance: (discovered 2026-09-04 during #1956)
 
 **Location:** `ibl5/tests/Trading/TradeDecisionServiceTest.php` (method name)
 **class:** A plan's Required Test Methods list names a method that differs from the method actually committed in the branch, causing plan-fidelity review to flag a missing test that is present under a different name.
+
 **Occurrences:**
 
 | # | File:line | Same class? | Live? | Status |
@@ -808,3 +810,27 @@ provenance: (discovered 2026-09-04 during #1956)
 
 **artifact destination:** n/a — no gate
 **provenance:** (discovered 2026-09-04 during #1957)
+
+### 15.34 Reject-Swap Unit-1c Verification and Implementation Residuals
+
+**class:** A controller shim that ends in a `never`-return-type call (`HtmxHelper::redirect()`) cannot have its success-path branch or the exit-ending line exercised by a unit test when the mock throws to avoid process-kill; this is a structural coverage gap for exit-exiting controller methods. Dead factory parameter (C) and informational logging-mechanism change (E) are consolidated here.
+
+**Occurrences:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/classes/Trading/TradingController.php:371` — `HtmxHelper::redirect()` call, exit-path coverage gap (finding B) | yes | yes | not fixed — filed; matrix row 10 (E2E) and service-level mirror in unit 1b are the only coverage |
+| 2 | `ibl5/tests/Trading/TradingControllerRejectOfferTest.php:49` — dead `?TradeDecisionServiceInterface $decisionService = null` in `buildController()`; no caller passes it (finding C) | near-miss — dead param residue | yes | not fixed — filed |
+| 3 | `ibl5/classes/Trading/TradingController.php` — self-wired constructor default; `curl` matrix row 10 unverified (finding G); Docker stack not running at review time | yes — integration coverage gap | yes | not fixed — filed; requires worktree Docker up |
+| 4 | `ibl5/classes/Trading/TradingController.php` — non-party warning: mechanism changed from static `LoggerFactory::getChannel('trade')->warning(...)` to injected `$this->tradeLogger`; resolved channel and output identical in production (finding E) | near-miss — mechanism change, not output change | yes | not fixed — filed (informational only) |
+
+**prevention_ladder:**
+- rung 0: No existing gate catches "unit test cannot exercise exit-exiting method."
+- rung 1: No existing gate to extend.
+- rung 2: A `.claude/rules/` note advising authors that a shim ending in `HtmxHelper::redirect()` should document that its success-path branch and redirect line are intentionally E2E-only, with a reference to the covering matrix row. Low friction, no tooling.
+- rungs 3–5: PHPStan rule detecting `never`-return-type callsite with uncovered branch is feasible but high false-positive rate for this pattern; skip.
+- **Landing rung: no gate warranted** — the gap is structural to the `exit`-ending design (deliberate, recorded in the plan) and the coverage is provided by the E2E suite. Dead param (C) is one-off cleanup. Row 10 gap (G) is operational (Docker not running).
+
+**artifact_destination:** n/a — no gate
+
+**provenance:** (discovered 2026-09-04 during #1958)

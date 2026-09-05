@@ -9,6 +9,7 @@ use Trading\Contracts\TradingServiceInterface;
 use Trading\Contracts\TradeOfferRepositoryInterface;
 use Trading\Contracts\TradeOfferInterface;
 use Trading\Contracts\TradingViewInterface;
+use Trading\Contracts\TradeDecisionServiceInterface;
 use Trading\Contracts\TradeExecutionServiceInterface;
 use Auth\Contracts\AuthServiceInterface;
 use EventLog\EventLogger;
@@ -31,6 +32,8 @@ class TradingController implements TradingControllerInterface
     private \Psr\Log\LoggerInterface $auditLogger;
     /** Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('trade'). */
     private \Psr\Log\LoggerInterface $tradeLogger;
+    /** Optional. When null, self-wired from the collaborators above. */
+    private TradeDecisionServiceInterface $decisionService;
 
     public function __construct(
         TradingServiceInterface $service,
@@ -43,7 +46,8 @@ class TradingController implements TradingControllerInterface
         TradeExecutionServiceInterface $executionService,
         AuthServiceInterface $authService,
         ?\Psr\Log\LoggerInterface $auditLogger = null,
-        ?\Psr\Log\LoggerInterface $tradeLogger = null
+        ?\Psr\Log\LoggerInterface $tradeLogger = null,
+        ?TradeDecisionServiceInterface $decisionService = null
     ) {
         $this->service = $service;
         $this->offerRepository = $offerRepository;
@@ -56,6 +60,13 @@ class TradingController implements TradingControllerInterface
         $this->authService = $authService;
         $this->auditLogger = $auditLogger ?? \Logging\LoggerFactory::getChannel('audit');
         $this->tradeLogger = $tradeLogger ?? \Logging\LoggerFactory::getChannel('trade');
+        $this->decisionService = $decisionService ?? new TradeDecisionService(
+            $this->offerRepository,
+            $this->executionService,
+            $this->teamIdentityRepo,
+            $this->auditLogger,
+            $this->tradeLogger
+        );
     }
 
     /**
@@ -346,43 +357,18 @@ class TradingController implements TradingControllerInterface
         $teamRejecting = is_string($post['teamRejecting'] ?? null) ? $post['teamRejecting'] : '';
         $teamReceiving = is_string($post['teamReceiving'] ?? null) ? $post['teamReceiving'] : '';
 
-        $tradeRows = $this->offerRepository->getTradesByOfferId($offerId);
+        // Decision, mutation, audit and notification all live in the service, which
+        // RETURNS its verdict instead of exiting — that is what makes the authz gate
+        // (and its non-mutation guarantee) unit-assertable. See
+        // Trading\Contracts\TradeDecisionServiceInterface.
+        $verdict = $this->decisionService->reject(
+            $offerId,
+            $this->resolveActingTeam(),
+            $teamRejecting,
+            $teamReceiving
+        );
 
-        if ($tradeRows === []) {
-            \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=already_processed');
-        }
-
-        // Authz/IDOR gate: only a GM whose team is a party to the offer may reject
-        // it. Identity comes from the authenticated session, never $post['teamRejecting']
-        // (which is attacker-controlled and used only for the Discord DM below).
-        $actingTeam = $this->resolveActingTeam();
-
-        if (!$this->executionService->assertActingTeamIsParty($offerId, $actingTeam)) {
-            \Logging\LoggerFactory::getChannel('trade')->warning('Rejected non-party trade reject attempt', [
-                'offer_id' => $offerId,
-            ]);
-            \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=reject_error');
-        }
-
-        $this->offerRepository->deleteTradeOffer($offerId);
-
-        $this->auditLogger->info('trade_offer_rejected', [
-            'offer_id' => $offerId,
-        ]);
-
-        try {
-            $discord = new \Discord\Discord($this->teamIdentityRepo);
-            $rejectingUserDiscordID = $discord->getDiscordIDFromTeamname($teamRejecting);
-            $receivingUserDiscordID = $discord->getDiscordIDFromTeamname($teamReceiving);
-            $declineMessage = TradingService::buildDeclineMessage($rejectingUserDiscordID, $teamRejecting);
-            \Discord\Discord::sendDM($receivingUserDiscordID, $declineMessage);
-        } catch (\Exception $e) {
-            // Silently fail if Discord notification fails
-            // The trade rejection itself has already succeeded
-        }
-
-        EventLogger::setAction('trade_offer_rejected');
-        \Utilities\HtmxHelper::redirect('/ibl5/modules.php?name=Trading&op=reviewtrade&result=trade_rejected');
+        \Utilities\HtmxHelper::redirect($verdict['redirect']);
     }
 
     private function renderTradeReview(string $username): void

@@ -71,7 +71,7 @@ last_verified: 2026-09-05
 | E43 | `bin/check-plan` PR6 gates: migration literals [A], line-number anchors [L], docker liveness [E], shellcheck CI-class [I], PHP coverage advisory [J], plus gate [V] `/path/to` + `main.localhost` extensions | ⬜ Open | 🟩 | S |
 | E44 | Phase 6 review findings on PR #2082 — gate [V] main.localhost bootstrap defect (blocking), body count mismatch, vacuous range fixture, stale corpus count, nonexistent `bin/db-wait` (example) reference, wrong baseline claim; all fixed in Phase 6.5 | ⬜ Open | 🟩 | S |
 | E45 | Phase 6 review notes on PR #1924 — stale Scope forward-reference and false Manual Testing claim; PR-body-only fixes; no gate warranted | ⬜ Open | — | XS |
-| E46 | Documentation gaps in bin/pr-cycle toolchain — missing seam declarations and overstated harness assertions | ⬜ Open | — | XS |
+| E46 | PR body "What is NOT in this PR" written before all plan phases complete | ✅ Implemented | — | XS |
 | E50 | PR #2092 Phase 6.5 — `--dry-run` counter increment in live-only branch; no harness case for dry-run count (Findings 1+5); both fixed this pass | ⬜ Open | — | XS |
 | E51 | PR #2092 Phase 6.5 — notes Findings 2–4: find-regex deviation already filed, benign out-of-plan changes, body claim fixed by E50; class n/a for all | ⬜ Open | — | XS |
 
@@ -730,24 +730,9 @@ For the accuracy findings (2–6): prevention is the existing `/pr-ready` Phase 
 
 *(discovered 2026-09-04 during #1924)*
 
-### E46 PR body "What is NOT in this PR" written before all plan phases complete
+### E46 PR body "What is NOT in this PR" written before all plan phases complete — ✅ Implemented (2026-09-04)
 
-**class: scope-claim staleness** — a PR body "What is NOT in this PR" residual entry that asserts an absence which the same PR's diff contradicts: a plan deliverable (scoped enforcement test) ships in a remediation commit during the same PR cycle, but the body is not updated to reflect it, leaving the PR claiming the conversion "is not yet self-enforcing" when `ControllerSuperglobalFreedomTest.php` is already in the diff.
-
-| # | File:line | Same class? | Live? | Status |
-|---|-----------|-------------|-------|--------|
-| 1 | PR #2077 body — "What is NOT in this PR" residual #2 claimed "conversion is not yet self-enforcing" after `ControllerSuperglobalFreedomTest.php` landed in the remediation commit | yes | no | fixed this pass |
-
-**prevention_ladder:**
-- rung 0: No existing gate checks "What is NOT" claims against the actual diff.
-- rung 1: Add a `.claude/rules/` doc reminding authors to re-read every "What is NOT in this PR" bullet when a remediation commit adds a plan deliverable — the negative claim may have been overtaken. **Landing rung: 1** — a rule doc is the cheapest enforcement and matches the risk level (rare, easy to spot in review).
-- rungs 2–5: Not warranted; the Phase 6 review pipeline already catches this class when it fires.
-
-`artifact destination: .claude/rules/` (doc addition — not yet filed; proposed prevention)
-
-`last_verified: 2026-09-04`
-
-*(discovered 2026-09-04 during Phase 6 review of #2077)*
+Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficiency-backlog-archive.md) — rung 1 filed as `.claude/rules/pr-body-negative-claim-recheck.md`.
 
 ### E47 Phase 6 review notes on PR #2077 — five confirmatory observations
 

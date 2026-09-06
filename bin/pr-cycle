@@ -33,6 +33,7 @@
 #   PR_CYCLE_MAIN_CHECKOUT   The only tree this may run in.
 #   PR_CYCLE_POLL_INTERVAL   Seconds between merge polls.     Default: 60
 #   PR_CYCLE_POLL_CEILING    Seconds to wait per PR.          Default: 2700
+#   PR_CYCLE_RESCUE          0 disables DIRTY-PR rescue.      Default: 1 (enabled)
 #   PR_CYCLE_LEDGER          Merge digest ledger path.        Default: $HOME/IBL5-merge-digest.md
 #   PR_CYCLE_STOP_FILE       Stop file path.                  Default: $HOME/.ibl5-pr-cycle.stop
 #   PR_CYCLE_NOW             Pin the ledger timestamp (tests). Unset = current UTC time.
@@ -92,6 +93,7 @@ PR_CYCLE_GH_CMD="${PR_CYCLE_GH_CMD:-gh}"
 PR_CYCLE_MAIN_CHECKOUT="${PR_CYCLE_MAIN_CHECKOUT:-/Users/ajaynicolas/GitHub/IBL5}"
 PR_CYCLE_POLL_INTERVAL="${PR_CYCLE_POLL_INTERVAL:-60}"
 PR_CYCLE_POLL_CEILING="${PR_CYCLE_POLL_CEILING:-2700}"
+PR_CYCLE_RESCUE="${PR_CYCLE_RESCUE:-1}"
 PR_CYCLE_LEDGER="${PR_CYCLE_LEDGER:-$HOME/IBL5-merge-digest.md}"
 PR_CYCLE_STOP_FILE="${PR_CYCLE_STOP_FILE:-$HOME/.ibl5-pr-cycle.stop}"
 PR_CYCLE_NOW="${PR_CYCLE_NOW:-}"
@@ -306,6 +308,62 @@ EOF
     return 0
 }
 
+# Rescue candidates: PR numbers under the attack document's `## Excluded` section carrying a
+# DIRTY classification, in document order. Read from $RUNDIR/attack.md, which _attack_plan has
+# already written -- no extra gh call, no access to pr-attack's private work directory.
+#
+# SECTION-SCOPED on purpose. `## Hand-resolutions needed` follows `## Excluded` in the same
+# document and can name a conflicted PR; an unscoped line-regex would collect it and rescue a
+# PR that was never excluded. The classification is taken from the LAST " — " on the line,
+# because a slug may contain that separator -- the same reason pr-attack reads its own `WORK=`
+# trailer with `tail -n 1`. The number is cut at the first non-digit rather than by field
+# position, because an empty slug (pr-attack's `jq ... // ""`) leaves a DOUBLE space after it.
+# DRAFT bullets never match: the classification must begin with DIRTY. That is where the
+# "only DIRTY is rescuable" rule lives -- in the parser, not in a downstream filter.
+_excluded_dirty_rows() {
+    [ -f "$RUNDIR/attack.md" ] || return 0
+    awk '
+        /^## Excluded[[:space:]]*$/ { in_ex = 1; next }
+        /^## / { in_ex = 0 }
+        in_ex && /^- #[0-9]+/ {
+            rest = $0; found = 0
+            while ((p = index(rest, " — ")) > 0) {
+                rest = substr(rest, p + length(" — ")); found = 1
+            }
+            if (!found) next
+            if (rest !~ /^DIRTY/) next
+            n = $0
+            sub(/^- #/, "", n)
+            sub(/[^0-9].*$/, "", n)
+            if (n != "") print n
+        }
+    ' "$RUNDIR/attack.md"
+}
+
+# True when launchd already holds a pr-ready-now slot for this PR. The plist IS the slot
+# token (bin/pr-ready-now:214), so firing a rescue against a PR whose session is already in
+# flight would put two sessions on one PR.
+#
+# The list is snapshotted into a VARIABLE and matched with a `case` glob. NEVER
+# `printf '%s\n' "$list" | grep -q ...`: under `set -o pipefail` grep exits at the first
+# match, the writer takes SIGPIPE, pipefail promotes the status to 141, and the `if`
+# concludes "no match" precisely BECAUSE a match was found. Same trap the live-session guard
+# above documents -- this is the same idiom, not a second one.
+#
+# The pattern is END-ANCHORED with a trailing newline. bin/pr-ready-now:194 spells out why:
+# an unanchored `com.ibl5.pr-ready-now-190` also matches the label for PR #1901, which would
+# make a live session for #1901 silently veto every rescue of #190.
+_slot_held() {
+    _sh_label="com.ibl5.pr-ready-now-$1"
+    _sh_list="$(launchctl list 2>/dev/null || true)"
+    _sh_nl='
+'
+    case "$_sh_list$_sh_nl" in
+        *"$_sh_label$_sh_nl"*) return 0 ;;
+    esac
+    return 1
+}
+
 # ==========================================================================================
 # Phase 3 — ready, then arm
 # ==========================================================================================
@@ -338,6 +396,73 @@ _ready_pr() {
         HALT="pr-ready-now exit $_rc on #$_n"
         return 1
     fi
+    return 0
+}
+
+# _rescue_one — hand at most ONE excluded-DIRTY PR to bin/pr-ready-now.
+#   0  a rescue was fired and its session completed
+#   1  no eligible candidate; the caller carries on unchanged
+#   2  HALT is set (stop file, or _ready_pr failed / timed out); the caller must break
+#
+# EXACTLY ONE per call. The two call sites in _worker are mutually exclusive within an
+# iteration, so "one rescue per loop iteration, never a batch" is structural rather than a
+# convention. That bound is the defense against a rebase storm — do NOT turn this into a
+# loop, and do NOT add a second call site without re-deriving the mutual exclusion.
+_rescue_one() {
+    if [ "$PR_CYCLE_RESCUE" = "0" ]; then
+        return 1
+    fi
+
+    _rc_pick=""
+    while IFS= read -r _rc_n; do
+        [ -n "$_rc_n" ] || continue
+        if grep -qxF "$_rc_n" "$RUNDIR/rescued.txt" 2>/dev/null; then continue; fi
+        if _slot_held "$_rc_n"; then
+            echo "pr-cycle: rescue skipped for #$_rc_n — a pr-ready-now slot is already live"
+            continue
+        fi
+        _rc_pick="$_rc_n"
+        break
+    done <<EOF
+$(_excluded_dirty_rows)
+EOF
+
+    [ -n "$_rc_pick" ] || return 1
+
+    # A second, separate stop check, exactly as _arm_and_classify does: the ready session
+    # that preceded this call can take an hour, so the top-of-loop check is far too stale to
+    # gate the hour-long session that follows.
+    if [ -e "$PR_CYCLE_STOP_FILE" ]; then
+        HALT="stopped by $PR_CYCLE_STOP_FILE"
+        return 2
+    fi
+
+    # Written BEFORE the side effect, exactly as tried.txt is. That is what makes "attempted
+    # at most once per run" hold even when the session halts partway through, and it is what
+    # stops a PR that is STILL DIRTY afterwards from being retried forever inside one run:
+    # the next _attack_plan re-lists it under ## Excluded and this grep skips it. The set is
+    # per-run scratch on purpose — once a human resolves the conflict, the next run must be
+    # free to try again, which a durable ledger would suppress forever.
+    echo "$_rc_pick" >> "$RUNDIR/rescued.txt"
+    echo "pr-cycle: rescuing DIRTY #$_rc_pick via pr-ready-now"
+
+    # Delegates to _ready_pr: identical `--pr N --jobs 1 --go --wait` argv, identical
+    # stderr-TEXT timeout detection (pr-ready-now exits 0 on timeout), identical HALT
+    # protocol, identical output surfacing.
+    #
+    # A rescue is NOT a merge and is not accounted as one: MERGES is untouched, armed.txt and
+    # ledgered.txt are not written, _arm_and_classify and _poll_merge are never called. So a
+    # rescue can never count against --max-merges. PR_CYCLE_POLL_CEILING is not consulted
+    # either — it belongs to _poll_merge; the bound here is pr-ready-now's own --wait
+    # timeout, surfaced through _ready_pr's existing TIMED OUT branch.
+    if ! _ready_pr "$_rc_pick"; then
+        return 2
+    fi
+
+    # NOTE: a successfully rescued PR consumes a SECOND --wait session on a later iteration.
+    # It was never in tried.txt, so once it is mergeable the ordered table lists it, _next_pr
+    # selects it, and it is readied through the normal path. Intended: rescue restores
+    # orderability, it does not substitute for the ready cycle.
     return 0
 }
 
@@ -524,6 +649,7 @@ _worker() {
     : > "$RUNDIR/tried.txt"
     : > "$RUNDIR/armed.txt"
     : > "$RUNDIR/ledgered.txt"
+    : > "$RUNDIR/rescued.txt"
 
     echo "pr-cycle worker starting — max-merges $MAX_MERGES, rundir $RUNDIR"
 
@@ -541,6 +667,19 @@ _worker() {
         _attack_plan 0 || break
 
         if ! _next_pr; then
+            # Nothing orderable is left. Before declaring the queue drained, try ONE excluded
+            # DIRTY PR -- that is the only path by which a conflicted PR can re-enter the
+            # ordered table at all. On success `continue`, so the next iteration re-runs
+            # _attack_plan and picks the now-clean PR up through the NORMAL path; _rescue_one
+            # restores orderability, it does not substitute for the ready cycle.
+            set +e
+            _rescue_one
+            _rrc=$?
+            set -e
+            [ "$_rrc" -eq 2 ] && break
+            if [ "$_rrc" -eq 0 ]; then
+                continue
+            fi
             DRAINED=1
             break
         fi
@@ -569,6 +708,20 @@ _worker() {
         # Runs on EVERY completed iteration, including non-armable ones, so a PR armed in
         # an earlier iteration that lands later is still ledgered and still counted.
         _reconcile
+
+        # ONE rescue attempt per completed iteration. Placed after _reconcile so that a run
+        # which eventually hits the merge cap has already rescued once per iteration: the cap
+        # check sits at the TOP of the loop body, so a drain-point-only rescue would never
+        # fire on exactly the runs that manufacture the most DIRTY state.
+        #
+        # Mutually exclusive with site A: the drain block above always continues or breaks,
+        # so at most ONE _rescue_one call runs per iteration. That is what makes "exactly one
+        # rescue per loop iteration, never a batch" structural rather than a convention.
+        set +e
+        _rescue_one
+        _rrc=$?
+        set -e
+        [ "$_rrc" -eq 2 ] && break
     done
 
     if [ -s "$RUNDIR/ledgered.txt" ]; then
@@ -602,6 +755,7 @@ log: ${PR_CYCLE_LOG:-<foreground>}   ledger: $PR_CYCLE_LEDGER"
 _report_dry_run() {
     mkdir -p "$RUNDIR"
     : > "$RUNDIR/tried.txt"
+    : > "$RUNDIR/rescued.txt"
 
     echo "pr-cycle DRY RUN — nothing fires. Re-run with --go to detach a worker."
     echo ""
@@ -611,6 +765,36 @@ _report_dry_run() {
         echo "next PR: #$NEXT_PR (needs you? ${ATTACK_NEEDS:-?})"
     else
         echo "next PR: none — no orderable PRs in the plan of attack."
+    fi
+    echo ""
+    # Report-only. The dry run is what a human reads before deciding to --go, so it must not
+    # stay silent about the rescue path: "next PR: none" alone would read as "this run is a
+    # no-op" while --go would in fact hand a DIRTY PR to pr-ready-now. This block reads
+    # (attack.md, launchctl list) and never calls _rescue_one or _ready_pr.
+    if [ "$PR_CYCLE_RESCUE" = "0" ]; then
+        echo "DIRTY rescue: disabled (PR_CYCLE_RESCUE=0) — excluded PRs stay unreachable."
+    else
+        _dr_all="$(_excluded_dirty_rows)"
+        if [ -z "$_dr_all" ]; then
+            echo "DIRTY rescue candidates: none — no DIRTY entries under ## Excluded."
+        else
+            _dr_n="$(printf '%s\n' "$_dr_all" | wc -l | tr -d ' ')"
+            # shellcheck disable=SC2086  # PR numbers from a digit-only parse; splitting is intended
+            echo "DIRTY rescue candidates ($_dr_n): $(printf '#%s ' $_dr_all)"
+            _dr_first=""
+            for _dr_p in $_dr_all; do
+                if grep -qxF "$_dr_p" "$RUNDIR/rescued.txt" 2>/dev/null; then
+                    echo "  #$_dr_p — already attempted this run; would be skipped"
+                elif _slot_held "$_dr_p"; then
+                    echo "  #$_dr_p — a pr-ready-now slot is already live; would be skipped"
+                elif [ -z "$_dr_first" ]; then
+                    _dr_first="$_dr_p"
+                    echo "  #$_dr_p — would be rescued FIRST (exactly one per loop iteration)"
+                else
+                    echo "  #$_dr_p — eligible; would wait for a later iteration"
+                fi
+            done
+        fi
     fi
     echo ""
     echo "Triage report (read-only — this run arms nothing):"
@@ -664,6 +848,7 @@ _launch() {
         for _v in PR_CYCLE_ATTACK_CMD PR_CYCLE_TRIAGE_CMD PR_CYCLE_READY_CMD \
                   PR_CYCLE_DM_CMD PR_CYCLE_GH_CMD PR_CYCLE_MAIN_CHECKOUT \
                   PR_CYCLE_POLL_INTERVAL PR_CYCLE_POLL_CEILING \
+                  PR_CYCLE_RESCUE \
                   PR_CYCLE_LEDGER PR_CYCLE_STOP_FILE; do
             eval "_val=\${$_v}"
             printf 'export %s=%q\n' "$_v" "$_val"

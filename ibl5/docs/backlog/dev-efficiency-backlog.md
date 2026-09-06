@@ -917,3 +917,26 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-05 during Phase 6 review of #1897)*
+
+### E54 PR #2084 Phase 6.5 — rebase silently dropped implementation commit; lost-work proof blind to pre-run loss
+
+**class:** `rebase-dropped-commit` — an `--onto` rebase replay range that started above the branch's own commits, compounded by a lost-work proof that only compares pre-to-post within a single `/pr-ready` run and cannot detect a branch that arrives already emptied by a previous run's bad rebase.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `.claude/skills/pr-ready/_rebase-and-conflicts.md` 2d — `--onto` replay range; 2026-09-05 05:48:41 −0700 rebase dropped `096320b0e` (13 files, +1252/−4) from PR #2084 by computing the merge-base against a parent SHA that had already moved | yes | fixed | fixed this pass — cherry-picked `096320b0e` onto HEAD; implementation restored |
+| 2 | `.claude/skills/pr-ready/scripts/lostwork.sh` — lost-work proof compares pre-rebase snapshot to post-rebase HEAD within one run; passes trivially when the branch arrives already emptied from a prior run's bad rebase | yes | yes | not fixed — filed; rung-1 gate extension needed |
+
+**prevention_ladder:**
+- **rung 0 — already covered?** Partially: `_rebase-and-conflicts.md` 2d documents the `--onto` form but does not guard against a replay range that excludes the branch's own commits. `lostwork.sh` has no guard against a pre-run loss.
+- **rung 1 — extend existing gate?** Yes — extend `lostwork.sh` to compare `origin/<branch>` as it stood before this run's push: if the pre-push origin branch has more files than the post-rebase HEAD diff, the branch arrived already emptied. Alternatively, assert file count against the plan's Files Changed table (already machine-generated in the PR body).
+- **rungs 2–5 — not warranted:** the existing gate surface (`lostwork.sh`) already runs in the right place; extension is the cheaper fix.
+- **landing rung:** rung 1 — extend `lostwork.sh` with a pre-push origin comparison.
+
+`prevention_ladder: rung 1 — extend lostwork.sh to compare origin/<branch> before push`
+
+`artifact destination: .claude/skills/pr-ready/scripts/lostwork.sh — add origin/<branch> pre-push comparison`
+
+*(discovered 2026-09-05 during Phase 6 review of #2084; root cause: prior /pr-ready run's Phase 2 rebase dropped 096320b0e using a bad --onto range)*

@@ -2082,7 +2082,7 @@ grep -qF '## DIGEST' "$f" || fail "28k: ## DIGEST missing from SKILL.md"
 grep -qF 'scripts/digest.sh' "$f" || fail "28k: scripts/digest.sh missing from SKILL.md"
 n_skill_merge=$(grep -c '### Merge digest' "$f" || true)
 [[ $n_skill_merge -eq 2 ]] || fail "28k: expected exactly 2 '### Merge digest' in SKILL.md, got $n_skill_merge"
-grep -qE '^last_verified: 2026-09-04$' "$f" || fail "28k: last_verified not bumped in SKILL.md"
+grep -qE '^last_verified: 2026-09-06$' "$f" || fail "28k: last_verified not bumped in SKILL.md"
 n_ends_in_one=$(grep -c 'the file ends in one' "$f" || true)
 [[ $n_ends_in_one -eq 0 ]] || fail "28k: 'the file ends in one' still present in SKILL.md — stale claim not removed"
 

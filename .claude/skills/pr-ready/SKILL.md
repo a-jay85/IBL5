@@ -152,7 +152,19 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
 
 3. **Pin master before spawning anything.** Run `git rev-parse origin/master` bare and record the printed SHA as `<MASTER_SHA>` in the run notes — a **literal**, per the invariants above, never a shell variable. Every later step, and the Phase 2 delegate, substitute that literal — never a re-resolved `origin/master`.
 
-4. **Branch-protection strict flag.**
+4. **Prior-collapse guard.** A previous run of this skill can have collapsed this branch with a forced `git rebase --onto origin/master --root`; Phase 4's lost-work proof cannot see that, because it only compares within the current run. Run:
+
+   ```bash
+   git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/collapse-guard.sh > /tmp/pr-ready-collapse-<N>.sh && test -s /tmp/pr-ready-collapse-<N>.sh && bash /tmp/pr-ready-collapse-<N>.sh check <N> <BRANCH>
+   ```
+
+   - `COLLAPSE-GUARD: NO-COLLAPSE` or `NO-PRIOR-REWRITE` — continue.
+   - `COLLAPSE-GUARD: WARN` — record the named paths in the run notes, then continue. Phase 6 must name them, for the same reason Phase 3 step 5 records resolved paths.
+   - `STOP: PRIOR-COLLAPSE-DETECTED` — **stop the run and print the guard's output verbatim to the user.** Do not rebase, commit, push, or force-push. Do not attempt the recovery yourself; the guard's message tells the user what to run.
+
+   This guard never rewrites history. It is additive to, and never a substitute for, the Phase 4 lost-work proof.
+
+5. **Branch-protection strict flag.**
 
    ```bash
    gh api "repos/{owner}/{repo}/branches/master/protection" --jq '.required_status_checks.strict // false'
@@ -160,7 +172,7 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
 
    Record the printed value as `<STRICT>` in the run notes. On a 403/404 (a token without admin read), record `<STRICT>` as `true` and say so in the verdict. Failing closed costs one extra divergence check; failing open ships a stale-base merge.
 
-5. **Prior-Phase-4B probe.** Look for the review heading in **both** the issue comments and the review bodies — findings are posted as a review body with inline threads, not only as issue comments. `git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/4b-probe.sh > /tmp/pr-ready-4bprobe-<N>.sh && test -s /tmp/pr-ready-4bprobe-<N>.sh && bash /tmp/pr-ready-4bprobe-<N>.sh <N>`. The probe prints `PROBE-COMPLETE` as its last line; no output before it means no prior review, and no `PROBE-COMPLETE` at all means the probe never ran.
+6. **Prior-Phase-4B probe.** Look for the review heading in **both** the issue comments and the review bodies — findings are posted as a review body with inline threads, not only as issue comments. `git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/4b-probe.sh > /tmp/pr-ready-4bprobe-<N>.sh && test -s /tmp/pr-ready-4bprobe-<N>.sh && bash /tmp/pr-ready-4bprobe-<N>.sh <N>`. The probe prints `PROBE-COMPLETE` as its last line; no output before it means no prior review, and no `PROBE-COMPLETE` at all means the probe never ran.
 
    Record `PHASE_4B_RAN` (any line printed ⇒ true) **and the earliest timestamp printed**, which runtime Phase 6 reports. This is a **probe, not a gate**: the value is reported in Phase 6 and never used to skip work.
 

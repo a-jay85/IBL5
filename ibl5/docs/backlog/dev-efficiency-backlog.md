@@ -1,6 +1,6 @@
 ---
 description: Development-efficiency backlog — inner-loop speed (diff-scoped analysis, parallel tests), CI caching, dependency-bump batching, and worktree lifecycle automation, with per-entry status.
-last_verified: 2026-09-05
+last_verified: 2026-09-06
 ---
 
 # Development-Efficiency Backlog
@@ -63,7 +63,7 @@ last_verified: 2026-09-05
 | E34 | Auto-generated `codebase-map.md` row added in #1903 — mechanical output of `bin/generate-codebase-map`, no defect | 🚫 Declined | — | XS |
 | E35 | Phase 6 review notes on PR #1800 — PR body test count conflated Verification Matrix row count (18) with PHPUnit method count (7 methods / 9 cases); same wrong number replicated into archive entry; both fixed in Phase 6.5 | ⬜ Open | — | XS |
 | E37 | Phase 6 review notes on PR #2045 — plan under-specified assertion discriminator and archive step; PR body Scope omitted mutation context; "No manual testing" claim tensioned with hold; check 5 outstanding hold (n/a); PR body fixed in Phase 6.5 | ⬜ Open | — | XS |
-| E38 | `/pr-ready` lost-work guard blind to prior-run destructive rebase | ⬜ Open | 🟨 | S |
+| E38 | `/pr-ready` lost-work guard blind to prior-run destructive rebase | ✅ Implemented | — | S |
 | E39 | Phase 6 review notes on PR #1824 (StandingsUpdater echo→logger) — B1 wrong seam name + scope count in body; N3 scope creep unbundled; N4 stale plan literal; N5 manual backlog row not retired in plan; N7 wrong method name in body; B1+N7 remediated this pass | ⬜ Open | — | S |
 | E40 | `bin/scrub-log-credentials` prod path: unquoted outer heredoc mangles remote jq filter escapes (F1) + local per-file hit report silently discarded (F4) — both fixed Phase 6.5 #1920; case 8 harness guards regression | ⬜ Open | — | S |
 | E41 | `ErrorHandlerRegistrarTest` + `bin/test-scrub-log-credentials`: SYNTHETIC_SECRET 32 chars truncated to 15 in `getTraceAsString()` causes vacuous assertion (F2) + closure assertion replaced with unconditional pass (F3) — both fixed Phase 6.5 #1920 | ⬜ Open | — | XS |
@@ -537,29 +537,8 @@ Not a defect in the anchoring or the SIGPIPE handling: the `$`-anchor (guarding 
 
 *(discovered 2026-09-02 during #2045)*
 
-### E38 /pr-ready lost-work guard blind to prior-run destructive rebase
+➜ E38 `/pr-ready` lost-work guard blind to prior-run destructive rebase — ✅ Implemented (2026-09-05): see [archive](archive/dev-efficiency-backlog-archive.md).
 
-`class:` a `/pr-ready` Phase 2a pre-image capture that occurs inside the current run, making the lost-work guard invisible to a destructive rebase performed by an earlier run on the same branch.
-
-**occurrence table:**
-
-| # | File:line | Same class? | Live? | Status |
-|---|-----------|-------------|-------|--------|
-| 1 | `.claude/skills/pr-ready/SKILL.md` Phase 2a | yes | yes | not fixed — filed |
-
-**prevention_ladder:**
-
-- rung 0 — not already covered by an existing gate
-- rung 1 — could extend the existing lost-work guard to also compare against a persisted pre-image from the previous run (e.g. stored as `/tmp/pr-ready-preimage-<N>-<branch>.patch` keyed to PR+branch across runs)
-- rung 2 — a rule doc under `.claude/rules/` would not prevent a code path from executing; not applicable
-- rung 3 — PHPStan rule not applicable (skill/shell code)
-- rung 4 — a CI gate not applicable (harness-side behavior)
-- rung 5 — hook not applicable
-- **Landing: rung 1** — extend the guard to compare the current pre-image against a persistent cross-run patch file; OR add a check that verifies the plan's Critical Files list is represented in the pre-rebase diff (a planned file absent from pre means the pre was already post-loss). Either check is a code change to `scripts/lostwork.sh` or Phase 2a of `SKILL.md`.
-
-`artifact destination:` `.claude/skills/pr-ready/scripts/lostwork.sh` (in-repo; lands in a PR diff)
-
-`provenance:` (discovered 2026-09-02 during #2045)
 ### E39 Phase 6 review notes on PR #1824 (StandingsUpdater echo→logger migration)
 
 **class:** PR body / plan accuracy drift — wrong method name, wrong scope count, undocumented scope creep, stale plan literal, and a manual backlog row not retired in the plan

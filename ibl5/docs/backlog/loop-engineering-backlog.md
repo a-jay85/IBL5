@@ -79,7 +79,7 @@ last_verified: 2026-09-06
 | L50 | `bin/pr-cycle` logs gate nominees as "excluded this run" but then orders and readies them (`--gate-edges /dev/null` re-admits every nominee) | ⬜ Open | 🟦 | S |
 | L51 | Plan Phase 5 dry-run count propagated to archive only, not PR body; reviewer blast-radius instruction stale by ~23% | ⬜ Open | 🟦 | S |
 | L52 | Test harness case comment over-claims assertion scope; adjacent cases leave `run_block` exit codes unchecked | ✅ fixed this pass | — | S |
-| L51 | Forced-verification row in `_plan-verification.md` references lsof port guard deleted before shipping — row's live-instance check cannot self-verify | ⬜ Open | 🟥 | S |
+| L53 | Forced-verification row in `_plan-verification.md` references lsof port guard deleted before shipping — row's live-instance check cannot self-verify | ⬜ Open | 🟥 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -724,7 +724,7 @@ The static-guard case in `bin/test-pr-cycle` should pin whichever wording lands,
 *(discovered 2026-09-05 during #2108)*
 
 **class:** A plan Phase 5 stated deliverable — recording the dry-run-measured blast-radius count in the PR body — propagated to the archive entry but not the PR body, leaving a reviewer-facing instruction citing the planning-time estimate (~772) rather than the measured figure (~626), a ~23% overstatement.
-### L51 Forced-verification row in `_plan-verification.md` references lsof port guard deleted before shipping
+### L53 Forced-verification row in `_plan-verification.md` references lsof port guard deleted before shipping
 
 **class:** A forced-verification row in `.claude/review-shared/_plan-verification.md` whose described guard (lsof port guard) no longer exists in the diff when the PR was reviewed, leaving a trigger pattern with no live instance to self-verify — the class of "body written → guard deleted → body row now asserts something absent."
 

@@ -82,13 +82,13 @@ last_verified: 2026-09-06
 | E54 | PR #2084 Phase 6.5 — rebase silently dropped implementation commit; lost-work proof blind to pre-run loss | ⬜ Open | — | XS |
 | E55 | PR #2129 Phase 6.5 — PR body false E2E claim, omitted grep finding, vacuous VM selector; all fixed this pass | ⬜ Open | — | XS |
 | E56 | PR #2129 Phase 6.5 — SKILL.md size-band gate not updated after deliberate file growth; fixed this pass | ⬜ Open | — | XS |
-| E54 | Incomplete seam list in `bin/bug-pipeline-test-env` env block and `bin/bug-pipeline-e2e` guard causes production contact through unguarded tick seams | ✅ fixed this pass | — | S |
-| E55 | Hardcoded main-checkout path in `ibl5/IBLbot/ecosystem.bugbot-test.config.cjs` splits precondition check from PM2 artifact | ✅ fixed this pass | — | XS |
-| E56 | PR body carried stale ADR number (0108 vs 0111) and false no-manual-testing claim | ✅ fixed this pass | — | XS |
-| E57 | `REPLACE_WITH_` sentinel passes the non-empty approver-ID guard in `bin/bug-pipeline-test-env` | ✅ fixed this pass | — | XS |
-| E58 | No committed regression tests for guards in `bin/bug-pipeline-e2e` and `ecosystem.bugbot-test.config.cjs` fail-closed checks | ⬜ Open | — | S |
-| E59 | Unasked-for `last_verified` change with duplicate YAML key in `ibl5/docs/decisions/README.md` | ✅ fixed this pass | — | XS |
-| E60 | Three residual isolation/scope gaps in `bin/bug-pipeline-test-env` (F3/F6/F7 from #1950 Phase 6) | ⬜ Open | — | S |
+| E62 | Incomplete seam list in `bin/bug-pipeline-test-env` env block and `bin/bug-pipeline-e2e` guard causes production contact through unguarded tick seams | ✅ fixed this pass | — | S |
+| E63 | Hardcoded main-checkout path in `ibl5/IBLbot/ecosystem.bugbot-test.config.cjs` splits precondition check from PM2 artifact | ✅ fixed this pass | — | XS |
+| E64 | PR body carried stale ADR number (0108 vs 0111) and false no-manual-testing claim | ✅ fixed this pass | — | XS |
+| E65 | `REPLACE_WITH_` sentinel passes the non-empty approver-ID guard in `bin/bug-pipeline-test-env` | ✅ fixed this pass | — | XS |
+| E66 | No committed regression tests for guards in `bin/bug-pipeline-e2e` and `ecosystem.bugbot-test.config.cjs` fail-closed checks | ⬜ Open | — | S |
+| E67 | Unasked-for `last_verified` change with duplicate YAML key in `ibl5/docs/decisions/README.md` | ✅ fixed this pass | — | XS |
+| E68 | Three residual isolation/scope gaps in `bin/bug-pipeline-test-env` (F3/F6/F7 from #1950 Phase 6) | ⬜ Open | — | S |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -874,7 +874,7 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 **class:** `rebase-dropped-commit` — an `--onto` rebase replay range that started above the branch's own commits, compounded by a lost-work proof that only compares pre-to-post within a single `/pr-ready` run and cannot detect a branch that arrives already emptied by a previous run's bad rebase.
 ---
 
-### E54 Incomplete seam list in `bin/bug-pipeline-test-env` env block and `bin/bug-pipeline-e2e` guard causes production contact through unguarded tick seams
+### E62 Incomplete seam list in `bin/bug-pipeline-test-env` env block and `bin/bug-pipeline-e2e` guard causes production contact through unguarded tick seams
 
 **class:** a missing-seam class in a test-isolation env block and guard that allows production-defaulted tick seams to contact real infrastructure (real GitHub, real log files, real liveness heartbeat) when the env block is not fully sourced or the guard fails to detect them.
 
@@ -925,7 +925,7 @@ All three fixed this pass: B1 and N3 via `gh pr edit`; N4 via the plan file VM.
 
 ---
 
-### E55 Hardcoded main-checkout path in `ibl5/IBLbot/ecosystem.bugbot-test.config.cjs` splits precondition check from PM2 artifact
+### E63 Hardcoded main-checkout path in `ibl5/IBLbot/ecosystem.bugbot-test.config.cjs` splits precondition check from PM2 artifact
 
 **class:** a hardcoded absolute path in a config file that splits the precondition check (worktree build) from the PM2 process start (main-checkout build), causing the guard to pass on the wrong artifact.
 
@@ -966,7 +966,7 @@ All three fixed this pass: B1 and N3 via `gh pr edit`; N4 via the plan file VM.
 
 ---
 
-### E56 PR body carried stale ADR number (0108 vs 0111) and false no-manual-testing claim
+### E64 PR body carried stale ADR number (0108 vs 0111) and false no-manual-testing claim
 
 **class:** a PR body accuracy failure where hand-authored prose was not re-checked after a mid-PR ADR renumber and after the plan's own opt-in/local-only testing constraints were written.
 
@@ -1032,7 +1032,7 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 
 ---
 
-### E57 `REPLACE_WITH_` sentinel passes the non-empty approver-ID guard in `bin/bug-pipeline-test-env`
+### E65 `REPLACE_WITH_` sentinel passes the non-empty approver-ID guard in `bin/bug-pipeline-test-env`
 
 **class:** an unfilled template placeholder that satisfies a non-empty guard while remaining semantically unset, causing the test environment to start with a fake snowflake that will produce Discord API errors at runtime.
 
@@ -1128,7 +1128,7 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 
 ---
 
-### E58 No committed regression tests for guards in `bin/bug-pipeline-e2e` and `ecosystem.bugbot-test.config.cjs` fail-closed checks
+### E66 No committed regression tests for guards in `bin/bug-pipeline-e2e` and `ecosystem.bugbot-test.config.cjs` fail-closed checks
 
 **class:** a test-coverage gap where one-shot CLI assertions serve as the only verification of guard behavior, allowing future edits to silently remove them (as happened to the lsof port guard between review and shipping).
 
@@ -1154,7 +1154,7 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 
 ---
 
-### E59 Unasked-for `last_verified` change with duplicate YAML key in `ibl5/docs/decisions/README.md`
+### E67 Unasked-for `last_verified` change with duplicate YAML key in `ibl5/docs/decisions/README.md`
 
 **class:** a scope-creep edit to a gate-surface doc that was not requested by any plan phase, containing a duplicate frontmatter key that would break YAML parsers and regress the verified date.
 
@@ -1176,7 +1176,7 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 
 ---
 
-### E60 Three residual isolation/scope gaps in `bin/bug-pipeline-test-env` (F3/F6/F7 from #1950 Phase 6)
+### E68 Three residual isolation/scope gaps in `bin/bug-pipeline-test-env` (F3/F6/F7 from #1950 Phase 6)
 
 **class:** three distinct documentation-accuracy and isolation-completeness gaps on the `bin/bug-pipeline-test-env` surface: (F3) the script uses `IBLBOT="$REPO_ROOT/ibl5/IBLbot"` where `REPO_ROOT` is the worktree root, so a worktree bring-up fails on the compiled-entrypoint precondition rather than dangerously; (F6) `prune_attachment_cache` in the Phase 4.3 control run executes against the real production attachment cache directory before the non-executing probe shunts all other seams; (F7) six files in the diff were not named by any plan phase, against the plan's explicit "no other doc is edited" promise.
 

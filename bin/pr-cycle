@@ -51,6 +51,12 @@
 #   /tmp/pr-cycle-<TS>.sh        the emitted runner
 #   /tmp/pr-cycle-<TS>/          per-run scratch (attack plan, triage reports, run state)
 #
+# Gate nominees:
+#   bin/pr-attack --gate-candidates may nominate a PR for a gate edge. This driver never
+#   invents one. It re-runs pr-attack with --gate-edges /dev/null — pr-attack's documented
+#   judged-empty form — so every nominee is ordered and readied like any other PR. The
+#   nominee lines printed during a run are a heads-up for the log reader, not an exclusion.
+#
 # Hard invariants (asserted statically by bin/test-pr-cycle, not merely intended):
 #   * This script never merges anything itself. There is no gh merge subcommand anywhere
 #     in this file, not even as a fallback when arming succeeds but a PR sits unmerged.
@@ -223,9 +229,11 @@ _attack_plan() {
         return 0
     fi
 
-    # Nominees exist. They are excluded for this run — the driver never invents a gate edge.
+    # Nominees exist. The driver never invents a gate edge, so it re-runs pr-attack with the
+    # documented judged-empty form (--gate-edges /dev/null): every nominee is re-admitted and
+    # ordered like any other PR. These lines are a heads-up for the log reader, not a skip.
     grep -E '^### #[0-9]+' "$RUNDIR/attack.md" 2>/dev/null | while read -r _line; do
-        echo "  $_line — excluded this run (gate nominee, unjudged)"
+        echo "  $_line — ordered with no gate edges (gate nominee, judged-empty)"
     done || true
 
     # LAST match, so a slug containing the literal WORK= cannot spoof the real trailer.

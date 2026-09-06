@@ -238,6 +238,8 @@ for f in -- --go --dry-run --stop --no-dm --max-merges --help; do
     [[ "$f" == "--" ]] && continue
     grep -qF -- "$f" <<< "$OUT" || fail "--help omits $f"
 done
+grep -qF 'judged-empty form' <<< "$OUT" \
+    || fail "--help omits the gate-nominee handling note"
 for bad in "--nope" "--max-merges 0" "--max-merges -1" "--max-merges abc" "--max-merges" "--go --stop"; do
     # shellcheck disable=SC2086
     run $bad
@@ -344,8 +346,11 @@ run --worker
     || fail "first attack call: $(sed -n '1p' "$SCRATCH/attack.argv")"
 [[ "$(sed -n '2p' "$SCRATCH/attack.argv")" == "--work abc123 --gate-edges /dev/null" ]] \
     || fail "second attack call: $(sed -n '2p' "$SCRATCH/attack.argv")"
-grep -qF '#999' <<< "$OUT" || fail "gate nominee was not reported as excluded"
-[[ "$(calls ready)" == "3" ]] || fail "want 3 ready calls after nominee exclusion, got $(calls ready)"
+grep -qF '#999 dangling-gate — ordered with no gate edges (gate nominee, judged-empty)' <<< "$OUT" \
+    || fail "gate nominee log line missing or misworded: $(grep -F '#999' <<< "$OUT")"
+! grep -qF 'excluded this run' <<< "$OUT" \
+    || fail "driver still claims nominees are excluded; --gate-edges /dev/null re-admits every one"
+[[ "$(calls ready)" == "3" ]] || fail "want 3 ready calls after nominee re-admission, got $(calls ready)"
 end_case "case 6 gate nominees"
 
 # ==========================================================================================

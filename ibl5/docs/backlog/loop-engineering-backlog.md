@@ -81,6 +81,7 @@ last_verified: 2026-09-06
 | L52 | Test harness case comment over-claims assertion scope; adjacent cases leave `run_block` exit codes unchecked | ✅ fixed this pass | — | S |
 | L53 | `bin/pr-ready-now:434` claims both `STOP:` and `PUSH FAILED` are matched as line prefixes, but only `STOP:` is anchored; `PUSH FAILED` uses unanchored `grep -qF`. Decide whether to anchor `PUSH FAILED` or correct the comment — a gate change needing its own verification, deliberately out of scope for L47. | ⬜ Open | 🟥 | S |
 | L54 | Reconcile `~/claude-plans/pr-ready-dm-and-push-retry.md` with the `HOOK REJECTED` verdict: §6.1's *"`PUSH FAILED` is genuinely non-retriable"* is now scoped, and the `.claude/skills/pr-ready/scripts/push.sh` `shasum` pinned at Phase 6.6/8.3 is stale because this PR edited that file. Re-record the digest before executing that plan. | ⬜ Open | 🟦 | S |
+| L55 | PR body coordinate citations (backlog row IDs, source line numbers) go stale after commits that renumber rows or shift code — no gate recomputes or validates them after push | ⬜ Open | 🟦 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -760,6 +761,34 @@ Landing rung: **no gate warranted** — neither occurrence exists in the tree af
 **artifact destination:** n/a — no gate
 
 **provenance:** (discovered 2026-09-04 during #2083; row dropped by the 2026-09-04 18:12:52 rebase onto `0e71e6f4b`, restored 2026-09-05)
+
+---
+
+### L55 PR body coordinate citations go stale after commits that renumber backlog rows or shift source-file lines
+
+**class:** A PR body prose claim that cites a coordinate (backlog row ID or source-file line number) that a post-body commit changes — no gate recomputes these citations, and no rule names them as a re-read trigger alongside the negative-claim list.
+
+**occurrence table:**
+
+| # | Finding | Same class? | Live? | Status |
+|---|---------|-------------|-------|--------|
+| 1 | F1 — `#2083` body notes (c)/(d)/(e) cited `L51`/`L52` after rows were renumbered to `L53`/`L54`; archive cross-ref `(see L51)` was also stale | yes | fixed | fixed this pass (`gh pr edit` + archive file) |
+| 2 | F2 — `#2083` body cited `push.sh:55`/`:41`/`:59-63` after hunk B shifted them to `:56`/`:42`/`:60-62` | yes | fixed | fixed this pass (`gh pr edit`) |
+
+**prevention_ladder:**
+
+- rung 0 — `.claude/rules/pr-body-negative-claim-recheck.md` exists and fires on negative-scope claims after every commit. It does not cover positive citations (row IDs, line numbers). Not covered for this class.
+- rung 1 — extend `pr-body-negative-claim-recheck.md`: add a parallel "positive-cite re-check" trigger that re-reads any `(see L<N>)` or `:NN` line citation in the body after any commit that renumbers rows or touches the cited file. Landing rung for the F1 sub-class.
+- rung 2 — a companion rule doc reminding authors to re-verify prose line citations after any commit that adds or removes lines in the cited region. Landing rung for the F2 sub-class (automated verification would require parsing arbitrary prose numbers, which is higher cost than a rule).
+- rung 3 — PHPStan rule: not applicable (shell and markdown, no PHP).
+- rung 4 — CI gate: a gate could scan PR body for `:<N>` patterns and cross-check against live file line counts, but false-positive risk on prose text is high and the cost exceeds the benefit for an infrequent class.
+- rung 5 — new hook: not warranted; `pr-body-negative-claim-recheck.md` is the natural host for extension.
+
+Landing rung: **1** for backlog ID citations (extend `pr-body-negative-claim-recheck.md`); **2** for line-number citations (rule doc).
+
+**artifact destination:** `.claude/rules/pr-body-negative-claim-recheck.md` (extension); optionally a companion rule for line citations.
+
+**provenance:** (discovered 2026-09-06 during /pr-ready Phase 6 review of #2083; second recurrence of F1 class on this same PR)
 
 ---
 

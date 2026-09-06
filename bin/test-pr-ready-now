@@ -2039,7 +2039,7 @@ BODY="$DG/body.md"
 { printf '### Plan fidelity\nPASS\n\n### Merge digest\n%s\n\n### Remediation\nnone\n\n<!-- pr-ready-verdict -->\n' "$out2"; } > "$BODY"
 # Use fixture A output for the digest lines
 out_a=$(bash "$D" "$DG/a.md" 2>&1)
-{ printf '### Plan fidelity\nPASS\n\n### Merge digest\n%s\n\n### Remediation\nnone\n\n<!-- pr-ready-verdict -->\n' "$out_a"; } > "$BODY"
+{ printf '`covers head 8ec4cd648189 \xc2\xb7 master d9e4478d64a9 \xc2\xb7 written 2026-09-06T22:04Z`\n\n### Plan fidelity\nPASS\n\n### Merge digest\n%s\n\n### Remediation\nnone\n\n<!-- pr-ready-verdict -->\n' "$out_a"; } > "$BODY"
 n_fid=$(grep -n '^### Plan fidelity' "$BODY" | head -1 | cut -d: -f1)
 n_dig=$(grep -n '^### Merge digest' "$BODY" | head -1 | cut -d: -f1)
 n_rem=$(grep -n '^### Remediation' "$BODY" | head -1 | cut -d: -f1)
@@ -2049,6 +2049,21 @@ n_dig_count=$(grep -c '^### Merge digest' "$BODY" || true)
 [[ $n_dig_count -eq 1 ]] || fail "28g: expected exactly 1 ### Merge digest, got $n_dig_count"
 [[ "$(tail -1 "$BODY")" == '<!-- pr-ready-verdict -->' ]] || fail "28g: <!-- pr-ready-verdict --> must be last line"
 [[ $(grep -c '^<!-- pr-ready-verdict -->$' "$BODY" || true) -eq 1 ]] || fail "28g: expected exactly 1 marker"
+
+# --- 28m: provenance line is the body's first line, above every heading ---
+# It must sit above the first `### ` heading, never in or after the digest block:
+# bin/pr-cycle's _digest_labels folds any line lacking a `**Label:**` prefix onto the
+# preceding label's value, so a provenance line inside that block corrupts the ledger row.
+head -1 "$BODY" | grep -qE '^`covers head [0-9a-f]{12} [^ ]+ master [0-9a-f]{12} [^ ]+ written [0-9T:Z-]+`$' \
+  || fail "28m: first body line is not the provenance line: $(head -1 "$BODY")"
+n_prov=$(grep -c '^`covers head ' "$BODY" || true)
+[[ $n_prov -eq 1 ]] || fail "28m: expected exactly 1 provenance line, got $n_prov"
+n_prov_line=$(grep -n '^`covers head ' "$BODY" | head -1 | cut -d: -f1)
+n_first_head=$(grep -n '^#' "$BODY" | head -1 | cut -d: -f1)
+[[ $n_prov_line -lt $n_first_head ]] || fail "28m: provenance line must precede the first heading"
+# The digest block must still fold to exactly the five labels with the provenance line present.
+n_lbl=$(sed -n '/^### Merge digest/,/^### /p' "$BODY" | grep -c '^\*\*[^*]*:\*\*' || true)
+[[ $n_lbl -eq 5 ]] || fail "28m: digest block folds to $n_lbl labels, expected 5"
 
 # --- 28h: .claude/agents/pr-ready-phase6.md prose pins ---
 f="$PRD/../../agents/pr-ready-phase6.md"
@@ -2077,6 +2092,11 @@ grep -qF '**Watch:**' "$f" || fail "28j: **Watch:** missing from _phase7-verdict
 grep -qF '**Touches:**' "$f" || fail "28j: **Touches:** missing from _phase7-verdict.md"
 grep -qF '**Machine-authored fixes:**' "$f" || fail "28j: **Machine-authored fixes:** missing from _phase7-verdict.md"
 grep -qF 'a stable-shaped degraded block is' "$f" || fail "28j: degraded-block clause missing from _phase7-verdict.md"
+grep -qF 'covers head <SHORT_HEAD_SHA>' "$f" || fail "28j: provenance-line template missing from _phase7-verdict.md"
+grep -qF 'the first line of the body, above every heading' "$f" || fail "28j: provenance placement clause missing from _phase7-verdict.md"
+grep -qF '_digest_labels' "$f" || fail "28j: _digest_labels rationale missing from _phase7-verdict.md"
+grep -qF 'git rev-parse --short=12 HEAD' "$f" || fail "28j: provenance capture command missing from _phase7-verdict.md"
+grep -qE '^last_verified: 2026-09-06$' "$f" || fail "28j: last_verified not bumped in _phase7-verdict.md"
 
 # --- 28k: SKILL.md prose pins ---
 f="$PRD/SKILL.md"
@@ -2085,6 +2105,7 @@ grep -qF 'scripts/digest.sh' "$f" || fail "28k: scripts/digest.sh missing from S
 n_skill_merge=$(grep -c '### Merge digest' "$f" || true)
 [[ $n_skill_merge -eq 2 ]] || fail "28k: expected exactly 2 '### Merge digest' in SKILL.md, got $n_skill_merge"
 grep -qE '^last_verified: 2026-09-06$' "$f" || fail "28k: last_verified not bumped in SKILL.md"
+grep -qF 'covers head <sha>' "$f" || fail "28k: provenance line missing from SKILL.md Phase 7 stub"
 n_ends_in_one=$(grep -c 'the file ends in one' "$f" || true)
 [[ $n_ends_in_one -eq 0 ]] || fail "28k: 'the file ends in one' still present in SKILL.md — stale claim not removed"
 

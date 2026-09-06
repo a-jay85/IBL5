@@ -73,12 +73,15 @@ last_verified: 2026-09-06
 | L44 | Upstream overlap silently drops a plan phase; Phase 2a pre-rebase artifact captures post-rebase state, making the drop undetectable | ✅ fixed this pass | 🟦 | S |
 | L45 | `/pr-ready` Phase 2 squashes load-bearing commit boundaries when `auto_merge: false`; PR body SHAs go stale after force-push | ⬜ Open | 🟥 | S |
 | L46 | Queued matrix-less plan with non-canonical `impl_model:` alias slips all pre-queue gates; runner disposes on first nightly run | ⬜ Open | 🟦 | S |
-| L47 | `/pr-ready` folds a recoverable pre-push-hook rebase rejection into the terminal `PUSH FAILED` verdict, stranding the Phase 6.5 remediation commit locally | ⬜ Open | 🟥 | M |
+| L47 | `/pr-ready` folds a recoverable pre-push-hook rebase rejection into the terminal `PUSH FAILED` verdict, stranding the Phase 6.5 remediation commit locally | ✅ Implemented | 🟥 | M |
 | L48 | Planning pipeline prose coverage gap: code-block path expressions in `SKILL.md` are invisible to `bin/check-docs`, so they can diverge from `bin/plan-now`'s runtime slug derivation silently | ✅ Implemented (2026-09-04) | 🟦 | S |
 | L49 | `/pr-ready` Phase 6.5 files backlog rows with non-canonical status glyphs and automouse values, making them invisible to open-work filters | ⬜ Open | 🟥 | S |
 | L50 | `bin/pr-cycle` logs gate nominees as "excluded this run" but then orders and readies them (`--gate-edges /dev/null` re-admits every nominee) | ⬜ Open | 🟦 | S |
 | L51 | Plan Phase 5 dry-run count propagated to archive only, not PR body; reviewer blast-radius instruction stale by ~23% | ⬜ Open | 🟦 | S |
 | L52 | Test harness case comment over-claims assertion scope; adjacent cases leave `run_block` exit codes unchecked | ✅ fixed this pass | — | S |
+| L53 | `bin/pr-ready-now:434` claims both `STOP:` and `PUSH FAILED` are matched as line prefixes, but only `STOP:` is anchored; `PUSH FAILED` uses unanchored `grep -qF`. Decide whether to anchor `PUSH FAILED` or correct the comment — a gate change needing its own verification, deliberately out of scope for L47. | ⬜ Open | 🟥 | S |
+| L54 | Reconcile `~/claude-plans/pr-ready-dm-and-push-retry.md` with the `HOOK REJECTED` verdict: §6.1's *"`PUSH FAILED` is genuinely non-retriable"* is now scoped, and the `.claude/skills/pr-ready/scripts/push.sh` `shasum` pinned at Phase 6.6/8.3 is stale because this PR edited that file. Re-record the digest before executing that plan. | ⬜ Open | 🟦 | S |
+| L55 | PR body coordinate citations (backlog row IDs, source line numbers) go stale after commits that renumber rows or shift code — no gate recomputes or validates them after push | ⬜ Open | 🟦 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -621,45 +624,7 @@ Landing rung: 1 (extend `bin/automouse/queue add` validation to cover all plans,
 
 ---
 
-### L47 `/pr-ready` folds a recoverable pre-push-hook rebase rejection into the terminal `PUSH FAILED` verdict, stranding the Phase 6.5 remediation commit locally
-
-**class:** Any `/pr-ready` push site that pushes long after its last rebase treats a **pre-push-hook** rejection — `rc 1`, remote ref *unmoved*, nothing clobbered, fully recoverable by one `fetch` + clean `rebase` — as the same terminal `PUSH FAILED` as a genuine divergence, so the run ends `NOT READY` with committed work stranded locally.
-
-**Mechanism, end to end.** `bin/pre-push-adr-hook:61-71` gates on `git merge-base --is-ancestor origin/master HEAD` against the **local** remote-tracking ref, deliberately without fetching (its own comment: *"No fetch here — keep push latency low; wt-new already syncs at creation time"*). `SKILL.md:182` (Phase 5) runs a second `git fetch origin`, which advances local `origin/master` mid-run. Phase 6.5 then spends 10–15+ minutes in CI-wait plus the Opus fidelity review and pushes with **no fetch+rebase step anywhere before its push** (`_phase65-remediation.md` steps 1–5). If master merged anything in that window, the hook rejects. `scripts/push.sh` captures the push output at line 55 but inspects `$OUT` **only** for `"stale info"` (line 66); with no `pre-push-adr-hook` branch, control falls to the line-79 catch-all and the run dies on a condition that a single clean rebase would have cleared.
-
-**occurrence table:**
-
-| # | File:line | Same class? | Live? | Status |
-|---|-----------|-------------|-------|--------|
-| 1 | `.claude/skills/pr-ready/scripts/push.sh:79` | yes — the catch-all `PUSH FAILED` branch; `$OUT` (captured line 55) is grepped only for `stale info` at line 66, never for `pre-push-adr-hook` | yes | not fixed — filed |
-| 2 | `.claude/skills/pr-ready/_phase65-remediation.md:46` | yes — *"`PUSH FAILED` — origin does not hold this HEAD; stop."* Phase 6.5 has no fetch+rebase before its push, so it is the site with the widest staleness window | yes | not fixed — filed (**the PR #1956 kill site**) |
-| 3 | `.claude/skills/pr-ready/_phase4-push-and-ci.md:30` | yes — *"`PUSH FAILED` (rc 1) … Print it and stop; do not continue to Phase 5."* Same terminal treatment of `rc 1` | yes | not fixed — filed; see rung 0 for why the pending push-retry plan does **not** close this |
-| 4 | `bin/pr-ready-now:434` | yes — the runner classifies any `PUSH FAILED` substring in the log as a hard-stop marker, so a new non-terminal verdict word must be taught here too | yes | not fixed — filed |
-| 5 | PR #1956, branch `authz-verdict-refactor-1a-trading-pins` (the reported occurrence) | n/a — instance, not a code site | — | fixed this pass, manually: `fetch origin` → clean rebase onto `origin/master` (2/2, no conflicts) → lease-guarded force push; head `0a7dc8315` → `0da61d9bc`, CI green (32 SUCCESS / 14 SKIPPED / 0 failures) |
-
-**Frequency — one confirmed occurrence.** A transcript sweep of `~/.claude/projects/` first appeared to show ~23 affected runs, but that count is an artifact: `scripts/push.sh` contains the literal string `PUSH FAILED`, and the hook's message text appears in `bin/pre-push-adr-hook` and in skill prose, so any transcript that merely `cat`'d those files scores a double hit. Discriminating on a real *emission* (`push rc: 1` — the line-79 format string, resolved — co-occurring with the hook message) leaves PR #1956 alone. This is why the entry lands at rung 1 rather than a new gate: the class is real and the failure is expensive, but it is not yet recurring.
-
-**prevention_ladder:**
-
-- rung 0 — **partially covered, and not for this case.** `~/claude-plans/pr-ready-dm-and-push-retry.md` Phase 6 (authored 2026-09-04; **not implemented** — no branch, no worktree, no PR as of this entry) adds a bounded three-attempt retry ladder, but it lands **only** in `_phase4-push-and-ci.md`, routes **only** `STALE LEASE` (rc 2), `mergeStateStatus=DIRTY`, and `MERGE CONFLICT` (rc 2) into that ladder, and its §6.1 states verbatim that *"`PUSH FAILED` is genuinely non-retriable and stays a hard stop."* Its §6.5 puts `_phase65-remediation.md` explicitly out of scope. PR #1956 failed at Phase 6.5 with `PUSH FAILED`, so **shipping that plan unchanged leaves this defect intact.** Whoever plans L47 should read that plan first and decide whether to extend it or stack on it.
-- rung 1 — **extend the existing mechanism. This is the landing rung.** Three coordinated edits, no new tooling:
-  1. `scripts/push.sh` — alongside the existing `stale info` check, grep `$OUT` for `pre-push-adr-hook` and, **only when the post-push remote read shows the ref unmoved**, emit a distinct verdict word (e.g. `HOOK REJECTED`, `rc 3`). Semantically this belongs next to `STALE LEASE` — nothing was clobbered and remote state is known — not next to `PUSH FAILED`, which means *remote state unknown or diverged*. The lease derivation, the explicit refspec, and every fail-closed path stay byte-identical.
-  2. `_phase4-push-and-ci.md:30` and `_phase65-remediation.md:46` — name the new verdict and route it into **one bounded** `fetch` + `rebase` + single re-push. `rc 3` is unhandled by both callers today, so this is a two-file coordination, not a one-liner; a new verdict word that only one caller knows is worse than none.
-  3. `bin/pr-ready-now:434` — must not classify the new word as a hard stop.
-- rung 2 — a rule doc under `.claude/rules/`: insufficient on its own. The failure happens inside a headless `claude -p` run whose behaviour is fixed by the skill includes it loads; there is no human reading a rule mid-run.
-- rung 3 — a PHPStan rule: not applicable (shell and markdown, no PHP).
-- rung 4 — a CI gate: not applicable as *the* gate — the trigger is a runtime race (master merging during a CI-wait), not a static property any checkout can evaluate. `bin/test-pr-ready-now` should gain arms for the new verdict word and for the two callers naming it, but that is test coverage *for* the fix, not the prevention itself.
-- rung 5 — a new hook: not warranted. `.claude/rules/meta-tooling-bar.md`'s extend-before-add bar fails its first condition, **"no host to extend"**: `scripts/push.sh` is the natural host and already owns the verdict vocabulary. Conditions "distinct trigger" and "no cheaper alternative" also fail.
-
-Landing rung: **1** (extend `scripts/push.sh`'s verdict vocabulary plus its two callers and the runner classifier).
-
-**Design constraint the implementing plan must carry — or it will stall.** `_phase65-remediation.md:62` forbids looping back into Phases 2–3 after Phase 6, because *"re-rebasing here would invalidate the fidelity review Phase 6 has already performed on a diff that no longer exists."* That invariant is sound but its prose over-forbids: the hazard it actually guards is a **conflict-resolving** rebase, which introduces content nobody reviewed. A **clean** rebase is patch-preserving — every branch commit's diff is unchanged, so the completed fidelity review still describes exactly what ships. The bounded shape that respects the invariant is therefore: on `HOOK REJECTED` only, one `fetch` + `rebase`; **clean** → re-push once; **any conflict** → `git rebase --abort` and fall through to today's terminal behaviour. One attempt, never a loop, and it never re-enters Phases 2–3. This is precisely the path the manual PR #1956 recovery took.
-
-**Planning tier and merge posture.** This relaxes a terminal STOP in the ship-pipeline surface (`.claude/skills`) and is a bootstrap hazard — it edits the push path the pipeline uses to merge itself. `/plan` Step 3 check 1 therefore selects **`plan-architect-xhigh`**, and the plan should carry `auto_merge: false`.
-
-**artifact destination:** `.claude/skills/pr-ready/scripts/push.sh`, `.claude/skills/pr-ready/_phase4-push-and-ci.md`, `.claude/skills/pr-ready/_phase65-remediation.md`, `bin/pr-ready-now`, `bin/test-pr-ready-now` — all in-repo; nothing out-of-repo, so the whole change appears in the PR diff.
-
-**provenance:** (discovered 2026-09-04 during #1956)
+➜ L47 `/pr-ready` hook rejection resilience — ✅ Implemented (2026-09-04): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ---
 
@@ -771,6 +736,59 @@ Landing rung: **no gate warranted** — neither occurrence exists in the tree af
 **provenance:** (discovered 2026-09-05 during #2108)
 
 **Status (2026-09-05):** ✅ moot — harness retired this PR.
+### L53 `bin/pr-ready-now:434` claims both `STOP:` and `PUSH FAILED` are matched as line prefixes, but only `STOP:` is anchored
+
+`STOP:` is checked with a line-anchored pattern; `PUSH FAILED` uses unanchored `grep -qF`, so a log line containing the substring anywhere (e.g. in quoted prose or a commented-out rule) would be classified as a hard-stop marker. Decide whether to anchor `PUSH FAILED` to the line start or correct the comment to reflect the current behaviour — this is a gate change needing its own verification, and was deliberately left out of scope for L47's implementation. See also the L47 archive body for context.
+
+**Status (2026-09-04):** ⬜ Open — 🟥.
+
+**provenance:** (discovered 2026-09-04 during L47 implementation)
+
+---
+
+### L54 Reconcile `~/claude-plans/pr-ready-dm-and-push-retry.md` — §6.1 scoped, Phase 6.6/8.3 `push.sh` shasum stale
+
+**class:** A plan-doc (`~/claude-plans/pr-ready-dm-and-push-retry.md`) whose §6.1 prose claim (`PUSH FAILED` is genuinely non-retriable) and Phase 6.6/8.3 `shasum` pin for `.claude/skills/pr-ready/scripts/push.sh` both become stale when `push.sh` is edited in a sibling PR — non-discoverable at diff time because the plan file lives outside the repo.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `~/claude-plans/pr-ready-dm-and-push-retry.md` — §6.1 claim and Phase 6.6/8.3 `push.sh` shasum pin | yes | live | not fixed — filed (this entry) |
+
+**prevention_ladder:** no gate warranted — the stale shasum pin fails closed (loud mismatch at run time, not silent loss); plan files live outside the repo at `~/claude-plans/` and are unreachable by CI or `bin/check-docs`. The durable fix is documented here: re-record the `.claude/skills/pr-ready/scripts/push.sh` digest before executing `pr-ready-dm-and-push-retry.md` Phase 6.6/8.3.
+
+**artifact destination:** n/a — no gate
+
+**provenance:** (discovered 2026-09-04 during #2083; row dropped by the 2026-09-04 18:12:52 rebase onto `0e71e6f4b`, restored 2026-09-05)
+
+---
+
+### L55 PR body coordinate citations go stale after commits that renumber backlog rows or shift source-file lines
+
+**class:** A PR body prose claim that cites a coordinate (backlog row ID or source-file line number) that a post-body commit changes — no gate recomputes these citations, and no rule names them as a re-read trigger alongside the negative-claim list.
+
+**occurrence table:**
+
+| # | Finding | Same class? | Live? | Status |
+|---|---------|-------------|-------|--------|
+| 1 | F1 — `#2083` body notes (c)/(d)/(e) cited `L51`/`L52` after rows were renumbered to `L53`/`L54`; archive cross-ref `(see L51)` was also stale | yes | fixed | fixed this pass (`gh pr edit` + archive file) |
+| 2 | F2 — `#2083` body cited `push.sh:55`/`:41`/`:59-63` after hunk B shifted them to `:56`/`:42`/`:60-62` | yes | fixed | fixed this pass (`gh pr edit`) |
+
+**prevention_ladder:**
+
+- rung 0 — `.claude/rules/pr-body-negative-claim-recheck.md` exists and fires on negative-scope claims after every commit. It does not cover positive citations (row IDs, line numbers). Not covered for this class.
+- rung 1 — extend `pr-body-negative-claim-recheck.md`: add a parallel "positive-cite re-check" trigger that re-reads any `(see L<N>)` or `:NN` line citation in the body after any commit that renumbers rows or touches the cited file. Landing rung for the F1 sub-class.
+- rung 2 — a companion rule doc reminding authors to re-verify prose line citations after any commit that adds or removes lines in the cited region. Landing rung for the F2 sub-class (automated verification would require parsing arbitrary prose numbers, which is higher cost than a rule).
+- rung 3 — PHPStan rule: not applicable (shell and markdown, no PHP).
+- rung 4 — CI gate: a gate could scan PR body for `:<N>` patterns and cross-check against live file line counts, but false-positive risk on prose text is high and the cost exceeds the benefit for an infrequent class.
+- rung 5 — new hook: not warranted; `pr-body-negative-claim-recheck.md` is the natural host for extension.
+
+Landing rung: **1** for backlog ID citations (extend `pr-body-negative-claim-recheck.md`); **2** for line-number citations (rule doc).
+
+**artifact destination:** `.claude/rules/pr-body-negative-claim-recheck.md` (extension); optionally a companion rule for line citations.
+
+**provenance:** (discovered 2026-09-06 during /pr-ready Phase 6 review of #2083; second recurrence of F1 class on this same PR)
 
 ---
 

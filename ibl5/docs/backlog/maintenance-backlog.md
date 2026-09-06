@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-09-05
+last_verified: 2026-09-06
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -554,14 +554,13 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
-> ✅ resolved (11): 13.1, 13.2, 13.3, 13.5, 13.6, 13.7, 13.8, 13.9, 13.11, 13.13, 13.14 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (12): 13.1, 13.2, 13.3, 13.5, 13.6, 13.7, 13.8, 13.9, 13.11, 13.13, 13.14, 13.15 — evidence in [archive](archive/maintenance-backlog-archive.md)
 > 🚫 declined (2): 13.4, 13.10 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 13.7b | ⬜ Open | 🟨 | Needs `ValidationError`/`ValidationResultWithContext` type design (Depth/Trade carry structured + cap-total payloads) before the sweep. |
 | 13.12 | ◑ Partial | 🟩 | Exact-match sites consolidated onto the `PlayerTeamJoinQuery` trait (TeamQuery ×8, FreeAgency, LeagueStarters). Six divergent sites remain in the surveyed repositories (INNER JOIN / wider column list), plus 7 player↔team joins outside the original survey. |
-| 13.15 | ⬜ Open | 🟨 | `PlayerContractCalculator::getCurrentSeasonSalary()` is a fourth cap basis keyed on raw `cy` with no phase shift. |
 
 ### 13.7b Structured and Dict-Family Validators — Design Decision Needed
 **Status:** Backlog
@@ -578,14 +577,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Database view (`vw_players_with_team`) or `BaseMysqliRepository::fetchPlayersWithTeam()` helper. Document the preference in CLAUDE.md; fix opportunistically.
 **Est. effort:** L
 **Risk if untouched:** New `ibl_team_info` columns require touching 15+ queries.
-
-### 13.15 `PlayerContractCalculator::getCurrentSeasonSalary()` Is a Fourth, Unshifted Cap Basis
-**Status:** Backlog
-**Location:** `Team/TeamCapCalculator.php:143` → `PlayerContractCalculator::getCurrentSeasonSalary()`
-**Problem:** computes the season salary from the raw `cy` column with no phase shift, giving a fourth basis alongside `vw_current_salary.current_salary`, `.next_year_salary`, and the cash `salary_yr1`/`salary_yr2` pair. It drives `canAddContractWithoutGoingOverHardCap()`, used by Free Agency and waivers, so during Draft/FA it reproduces 13.14's one-year lag through a different code path.
-**Suggested direction:** converge on one phase-aware accessor (extract the `advancesContractYears()` selection into a small `CurrentSeasonSalaryBasis` helper both trade and contract paths consume) rather than adding a fourth ad-hoc branch.
-**Est. effort:** M
-**Risk if untouched:** every new cap consumer picks whichever of the four bases it finds first; the same false-positive keeps recurring.
 
 ## Axis 14: Bootstrap / Dependency Injection
 

@@ -42,15 +42,22 @@ class TeamCapCalculatorTest extends TestCase
         $this->stubCash = self::createStub(BuyoutLedgerRepositoryInterface::class);
     }
 
-    private function buildCalculator(): TeamCapCalculator
+    private function buildCalculator(bool $advancesContractYears = false): TeamCapCalculator
     {
-        return new TeamCapCalculator($this->mockDb, $this->stubRepo, $this->stubCash);
+        return new TeamCapCalculator($this->mockDb, $this->stubRepo, $this->stubCash, $this->capPhaseSeason($advancesContractYears));
     }
 
     private function season(bool $offseason): Season
     {
         $season = self::createStub(Season::class);
         $season->method('isOffseasonPhase')->willReturn($offseason);
+        return $season;
+    }
+
+    private function capPhaseSeason(bool $advances): Season
+    {
+        $season = self::createStub(Season::class);
+        $season->method('advancesContractYears')->willReturn($advances);
         return $season;
     }
 
@@ -248,5 +255,45 @@ class TeamCapCalculatorTest extends TestCase
     public function testGetTotalNextSeasonSalariesIsZeroForEmptyRoster(): void
     {
         self::assertSame(0, $this->buildCalculator()->getTotalNextSeasonSalaries([]));
+    }
+
+    // ── Phase-aware aggregates (advances=true) ─────────────────────
+
+    public function testGetTotalCurrentSeasonSalariesUsesPhaseAwareSalaryWhenAdvancing(): void
+    {
+        // advances=true: cy=1 → current basis shifts to yr2.
+        $rows = [
+            TestDataFactory::createPlayer(['pid' => 1, 'cy' => 1, 'salary_yr2' => 800]),
+            TestDataFactory::createPlayer(['pid' => 2, 'cy' => 1, 'salary_yr2' => 1200]),
+        ];
+
+        self::assertSame(2000, $this->buildCalculator(true)->getTotalCurrentSeasonSalaries($rows));
+    }
+
+    public function testGetTotalNextSeasonSalariesUsesPhaseAwareSalaryWhenAdvancing(): void
+    {
+        // advances=true: cy=1 → next basis shifts to yr3.
+        $rows = [
+            TestDataFactory::createPlayer(['pid' => 1, 'cy' => 1, 'salary_yr3' => 900]),
+            TestDataFactory::createPlayer(['pid' => 2, 'cy' => 1, 'salary_yr3' => 1100]),
+        ];
+
+        self::assertSame(2000, $this->buildCalculator(true)->getTotalNextSeasonSalaries($rows));
+    }
+
+    public function testSalaryAggregatesStayOneYearApartInOffseason(): void
+    {
+        // advances=true, cy=1: current=yr2=900, next=yr3=1200.
+        $rows = [
+            TestDataFactory::createPlayer(['pid' => 1, 'cy' => 1, 'salary_yr2' => 900, 'salary_yr3' => 1200]),
+        ];
+        $calculator = $this->buildCalculator(true);
+
+        $current = $calculator->getTotalCurrentSeasonSalaries($rows);
+        $next = $calculator->getTotalNextSeasonSalaries($rows);
+
+        self::assertSame(900, $current);
+        self::assertSame(1200, $next);
+        self::assertGreaterThan($current, $next);
     }
 }

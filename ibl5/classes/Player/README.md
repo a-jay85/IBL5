@@ -1,6 +1,6 @@
 ---
 description: Player data facade with specialized classes for contract calculation, validation, name decoration, injury dates, and stats repositories.
-last_verified: 2026-07-24
+last_verified: 2026-09-05
 ---
 
 # Player Module
@@ -113,21 +113,26 @@ Handles all contract-related mathematical calculations. This class:
 - Contains no data persistence logic
 - Uses shared helpers to eliminate duplication
 
+**Constructor**: `__construct(?Season $season = null)` — when `$season` is `null` the calculator is phase-blind and returns the raw `cy` salary (backward-compatible default). Pass a `Season` instance to enable phase-aware pricing: during Playoffs / Draft / Free Agency phases (`Season::advancesContractYears()` returns `true`) the effective contract year shifts +1, so current-season pricing reflects the upcoming year rather than the year whose DB column has not yet advanced.
+
 **Key Methods**:
-- `getCurrentSeasonSalary(PlayerData $playerData): int` - Calculate current season salary
-- `getNextSeasonSalary(PlayerData $playerData): int` - Calculate next season salary
+- `getCurrentSeasonSalary(PlayerData $playerData): int` - Calculate current season salary; phase-shifts by +1 when Season::advancesContractYears() is true
+- `getNextSeasonSalary(PlayerData $playerData): int` - Calculate next season salary; always one year ahead of the resolved current-season basis
 - `getTotalRemainingSalary(PlayerData $playerData): int` - Sum remaining contract value
 - `getRemainingContractArray(PlayerData $playerData): array` - Get array of remaining years
 - `getLongBuyoutArray(PlayerData $playerData): array` - Calculate 6-year buyout terms
 - `getShortBuyoutArray(PlayerData $playerData): array` - Calculate 2-year buyout terms
 
 **Private Helper Methods** (to reduce duplication):
+- `resolveCurrentContractYear()` - Returns effective cy: raw cy when phase-blind, cy+1 during advancing phases
 - `getSalaryForYear()` - Unified salary retrieval for any contract year
 - `getBuyoutArray()` - Generalized buyout calculation for any number of years
 
-**Location**: `/ibl5/classes/Player/PlayerContractCalculator.php`
+**Season-awareness note**: `Player` and `WaiversProcessor` deliberately create a phase-blind calculator (`new PlayerContractCalculator()`) because their salary display paths apply phase adjustments externally (via `isOffseasonPhase()`). `TeamCapCalculator` injects the current `Season` so that `canAddContractWithoutGoingOverHardCap()` prices on the correct basis during Draft and Free Agency.
 
-**Tests**: `/ibl5/tests/Player/PlayerContractCalculatorTest.php` (10 test cases)
+**Location**: `/ibl5/classes/Player/Contract/PlayerContractCalculator.php`
+
+**Tests**: `/ibl5/tests/Player/PlayerContractCalculatorTest.php`
 
 ---
 
@@ -266,8 +271,12 @@ The refactoring maintains complete backward compatibility. All existing code usi
 If you need to use the specialized classes directly:
 
 ```php
-// Example: Using PlayerContractCalculator directly
+// Example: Using PlayerContractCalculator directly (phase-blind — raw cy)
 $calculator = new PlayerContractCalculator();
+$salary = $calculator->getCurrentSeasonSalary($playerData);
+
+// Example: Phase-aware usage (shifts +1 during Playoffs/Draft/Free Agency)
+$calculator = new PlayerContractCalculator($season);
 $salary = $calculator->getCurrentSeasonSalary($playerData);
 
 // Example: Using PlayerContractValidator directly

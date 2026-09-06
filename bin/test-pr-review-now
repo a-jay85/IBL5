@@ -1,0 +1,349 @@
+#!/usr/bin/env bash
+# test-pr-review-now — generation-slice tests for bin/pr-review-now.
+#
+# Covers everything up to and including artifact generation: flag validation,
+# dry-run behaviour, the concurrency-cap label anchor, per-PR path uniqueness,
+# the env seams, prompt body, runner ordering, and coupling invariants.
+# It never bootstraps a launchd job and never touches a real PR, so it
+# runs identically on macOS and Linux CI — there is deliberately no platform skip.
+#
+# Driven entirely through bin/pr-review-now's documented env seams plus a scratch HOME,
+# so no state outside the scratch dir is read or written.
+#
+# Usage: bin/test-pr-review-now
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+DRIVER="$SCRIPT_DIR/pr-review-now"
+[[ -x "$DRIVER" ]] || { echo "FAIL: $DRIVER missing or not executable" >&2; exit 1; }
+
+SCRATCH="$(mktemp -d)"
+TMP_LOGS=()
+_cleanup() {
+    rm -rf "$SCRATCH"
+    rm -f /tmp/pr-review-now-runner-1901.sh \
+          /tmp/pr-review-now-runner-1902.sh \
+          /tmp/pr-review-now-prompt-1901.md \
+          /tmp/pr-review-now-prompt-1902.md \
+          /tmp/pr-review-now-1901.log \
+          /tmp/pr-review-now-1901.log.aborted \
+          /tmp/pr-review-now-1902.log \
+          /tmp/pr-review-now-1902.log.aborted
+    rm -f /tmp/prn-keep.*
+    [[ ${#TMP_LOGS[@]} -gt 0 ]] && rm -f "${TMP_LOGS[@]}"
+}
+trap _cleanup EXIT
+
+FAILED=0
+CASE_BASE=0
+fail() { echo "FAIL: $*" >&2; FAILED=$((FAILED + 1)); }
+begin_case() { CASE_BASE=$FAILED; }
+end_case() {  # $1 = case name; prints "<name> OK" only if the case added no failures
+    if [[ $FAILED -eq $CASE_BASE ]]; then echo "$1 OK"; else echo "$1 FAILED" >&2; fi
+}
+
+# --- fixtures ----------------------------------------------------------------------------
+mkdir -p "$SCRATCH/.local/bin" "$SCRATCH/.bun/bin"
+
+# Stub claude. /bin/true is not portable (macOS ships /usr/bin/true), so make our own.
+printf '#!/usr/bin/env bash\nexit 0\n' > "$SCRATCH/.local/bin/claude-stub"
+chmod +x "$SCRATCH/.local/bin/claude-stub"
+CLAUDE_STUB="$SCRATCH/.local/bin/claude-stub"
+
+# Long-lived process fixture. The stop cases need a process that carries a launchd label in
+# its argv and outlives the driver's poll tick. It must be a REAL script: `bash -c 'sleep N'`
+# exec-optimizes into sleep itself, which drops the trailing argv and makes the label vanish.
+printf '#!/usr/bin/env bash\nsleep "${SLEEP_SECS:-12}"\n' > "$SCRATCH/.local/bin/pr-review-now-sleeper"
+chmod +x "$SCRATCH/.local/bin/pr-review-now-sleeper"
+SLEEPER="$SCRATCH/.local/bin/pr-review-now-sleeper"
+
+# gh shim installed where PATH prelude will find it. The driver itself does not call gh,
+# but the shim dir must be populated so the PATH seam works correctly.
+cat > "$SCRATCH/.local/bin/gh" <<'GH_EOF'
+#!/usr/bin/env bash
+echo "gh shim: unexpected args: $*" >&2
+exit 1
+GH_EOF
+chmod +x "$SCRATCH/.local/bin/gh"
+cp "$SCRATCH/.local/bin/gh" "$SCRATCH/.bun/bin/gh"
+
+# launchctl shim — makes the "already running" skip testable, and testable on Linux CI
+# where launchctl does not exist at all. `launchctl list` echoes whatever the current
+# case wrote to launchctl-list.txt; everything else is a no-op.
+#
+# The trailing filler is load-bearing, not padding. The bug case 3 guards is a SIGPIPE
+# under `set -o pipefail`, which only reproduces when the writer still has queued output
+# after the reader exits. Real `launchctl list` prints hundreds of lines; a three-line
+# shim would finish writing before grep -q exited and the buggy code would pass. The
+# filler follows the fixture labels so a match always leaves bytes unwritten, and it
+# exceeds the 64KB pipe buffer so the writer cannot dump-and-exit.
+: > "$SCRATCH/launchctl-list.txt"
+cat > "$SCRATCH/.local/bin/launchctl" <<LC_EOF
+#!/usr/bin/env bash
+if [[ "\${1:-}" == "list" && \$# -eq 1 ]]; then
+    cat "$SCRATCH/launchctl-list.txt"
+    i=0
+    while [[ \$i -lt 6000 ]]; do
+        printf -- '-\t0\tcom.apple.filler.service.number.%s\n' "\$i"
+        i=\$((i + 1))
+    done
+fi
+if [[ "\${1:-}" == "list" && \$# -eq 2 ]]; then
+    grep -qF "\${2}" "$SCRATCH/launchctl-list.txt" 2>/dev/null && exit 0 || exit 1
+fi
+exit 0
+LC_EOF
+chmod +x "$SCRATCH/.local/bin/launchctl"
+
+set_live_labels() { printf '%s\n' "$@" > "$SCRATCH/launchctl-list.txt"; }
+clear_live_labels() { : > "$SCRATCH/launchctl-list.txt"; }
+
+# Run the driver in a sealed environment: scratch HOME (so plists land in the scratch
+# tree), stubbed claude, shim dir on PATH.
+run_driver() {
+    env HOME="$SCRATCH" \
+        PATH="$SCRATCH/.local/bin:$PATH" \
+        PR_REVIEW_NOW_CLAUDE="$CLAUDE_STUB" \
+        "$DRIVER" "$@"
+}
+
+plist_count() {
+    local f n=0
+    for f in "$SCRATCH/Library/LaunchAgents"/com.ibl5.pr-review-now-*.plist; do
+        if [[ -e "$f" ]]; then n=$((n + 1)); fi
+    done
+    printf '%s\n' "$n"
+}
+
+clean_slots() { rm -rf "$SCRATCH/Library/LaunchAgents"; clear_live_labels; }
+
+# --- case 1: pr-review-now-dry-run -------------------------------------------------------
+# DRY_RUN must print DRY(plist) and skip launchctl bootstrap. It DOES write the plist
+# (fire_pr writes it before the dry-run check; the concurrency cap counts plists, and
+# reap_stale early-returns under dry-run so it doesn't eat them). The correct invariant
+# is "no real job bootstrapped" — not "LaunchAgents dir empty".
+# [Plan defect: the packet said LaunchAgents is empty under dry-run; that cannot hold
+# because fire_pr calls mkdir + cat > "$PLIST" before the DRY_RUN branch. Assertion
+# corrected to: DRY(plist) printed + plist written + bootstrap never called.]
+begin_case
+# Override launchctl to record every call so we can assert bootstrap was never invoked.
+cat > "$SCRATCH/.local/bin/launchctl" <<LC2_EOF
+#!/usr/bin/env bash
+echo "launchctl \$*" >> "$SCRATCH/launchctl-calls.txt"
+if [[ "\${1:-}" == "list" && \$# -eq 1 ]]; then
+    cat "$SCRATCH/launchctl-list.txt"
+    i=0
+    while [[ \$i -lt 6000 ]]; do
+        printf -- '-\t0\tcom.apple.filler.service.number.%s\n' "\$i"
+        i=\$((i + 1))
+    done
+fi
+if [[ "\${1:-}" == "list" && \$# -eq 2 ]]; then
+    grep -qF "\${2}" "$SCRATCH/launchctl-list.txt" 2>/dev/null && exit 0 || exit 1
+fi
+exit 0
+LC2_EOF
+chmod +x "$SCRATCH/.local/bin/launchctl"
+: > "$SCRATCH/launchctl-calls.txt"
+out="$(PR_REVIEW_NOW_DRY_RUN=1 run_driver 1901 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "dry-run: exited $rc, want 0"
+grep -qF 'DRY(plist)' <<< "$out" || fail "dry-run: 'DRY(plist)' not in output (got: $out)"
+DRY_PLIST="$SCRATCH/Library/LaunchAgents/com.ibl5.pr-review-now-1901.plist"
+[[ -f "$DRY_PLIST" ]] \
+    || fail "dry-run: plist not written (fire_pr writes it before the dry-run check)"
+grep -q 'bootstrap' "$SCRATCH/launchctl-calls.txt" 2>/dev/null \
+    && fail "dry-run: launchctl bootstrap was called — dry-run leaked a live job"
+# Restore plain launchctl shim for subsequent cases
+cat > "$SCRATCH/.local/bin/launchctl" <<LC_EOF
+#!/usr/bin/env bash
+if [[ "\${1:-}" == "list" && \$# -eq 1 ]]; then
+    cat "$SCRATCH/launchctl-list.txt"
+    i=0
+    while [[ \$i -lt 6000 ]]; do
+        printf -- '-\t0\tcom.apple.filler.service.number.%s\n' "\$i"
+        i=\$((i + 1))
+    done
+fi
+if [[ "\${1:-}" == "list" && \$# -eq 2 ]]; then
+    grep -qF "\${2}" "$SCRATCH/launchctl-list.txt" 2>/dev/null && exit 0 || exit 1
+fi
+exit 0
+LC_EOF
+chmod +x "$SCRATCH/.local/bin/launchctl"
+clean_slots
+rm -f /tmp/pr-review-now-runner-1901.sh /tmp/pr-review-now-prompt-1901.md \
+      /tmp/pr-review-now-1901.log
+end_case pr-review-now-dry-run
+
+# --- case 2: pr-review-now-label-anchor --------------------------------------------------
+# The fire-path skip uses `grep -qE "com\.ibl5\.pr-review-now-${TARGET_PR}$"` against the
+# captured launchctl list. A running job for PR 19011 must NOT suppress a new fire for PR
+# 1901: the $ end-anchor on that regex is what enforces per-PR exclusivity.
+# [Plan defect: the packet cited the pgrep -f anchor in _label_alive; the fire-path skip
+# actually uses grep -qE on LAUNCHCTL_LIST. Assertion corrected to test where the anchor
+# lives: via set_live_labels, not a live sleeper process.]
+begin_case
+set_live_labels "com.ibl5.pr-review-now-19011"
+out="$(PR_REVIEW_NOW_DRY_RUN=1 run_driver 1901 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "label-anchor: exited $rc, want 0"
+grep -qF 'DRY(plist)' <<< "$out" \
+    || fail "label-anchor: PR 1901 was skipped by a live 19011 job — anchor dropped? (got: $out)"
+grep -qi 'already running' <<< "$out" \
+    && fail "label-anchor: got 'already running' skip for 1901 when only 19011 is live"
+clean_slots
+rm -f /tmp/pr-review-now-runner-1901.sh /tmp/pr-review-now-prompt-1901.md \
+      /tmp/pr-review-now-1901.log
+end_case pr-review-now-label-anchor
+
+# --- case 3: pr-review-now-already-running -----------------------------------------------
+# When launchctl list contains the label for the target PR, a second fire must print the
+# skip message to stderr and exit 0. This also guards the `launchctl list | grep -q`
+# SIGPIPE regression: the 6000-line filler in the launchctl shim exceeds the pipe buffer,
+# so a grep -q that exits early on a match causes launchctl to receive SIGPIPE; under
+# set -o pipefail that reads as pipeline failure, silently disabling the already-running
+# skip. The driver avoids this by capturing LAUNCHCTL_LIST into a variable first.
+begin_case
+set_live_labels "com.ibl5.pr-review-now-1901"
+out="$(PR_REVIEW_NOW_DRY_RUN=1 run_driver 1901 2>&1)"; rc=$?
+[[ $rc -eq 0 ]] || fail "already-running: exited $rc, want 0 (out: $out)"
+grep -qi 'already running' <<< "$out" \
+    || fail "already-running: skip message not printed (got: $out)"
+grep -qF 'DRY(plist)' <<< "$out" \
+    && fail "already-running: fire_pr was called despite the label being live (got: $out)"
+clean_slots
+end_case pr-review-now-already-running
+
+# --- case 4: pr-review-now-stop-releases-slot --------------------------------------------
+# --stop releases the plist ONLY after _label_alive returns 1 (dead). The slot is the
+# plist file; releasing it before the process is provably dead would hand the slot to a
+# second session while the first session still runs.
+#
+# Two sub-cases proven by shimming pgrep:
+#   4a: pgrep exits 1 (dead) → stop exits 0, plist gone, "stopped" printed
+#   4b: pgrep exits 0 (alive forever) → stop hits SIGKILL-wait ceiling, exits 1, plist held
+#
+# Note: stop_one_pr has an unconditional sleep 2 (TERM grace) plus up to 5 × sleep 1
+# (wait loop) in sub-case 4b, so this case takes ~9s total.
+begin_case
+
+# 4a: pgrep exits 1 (label provably dead) → slot must be released
+PR_REVIEW_NOW_DRY_RUN=1 run_driver 1901 >/dev/null 2>&1
+PLIST_A="$SCRATCH/Library/LaunchAgents/com.ibl5.pr-review-now-1901.plist"
+[[ -f "$PLIST_A" ]] || fail "stop-releases-slot/4a: setup — plist not created by dry-run fire"
+printf '#!/usr/bin/env bash\nexit 1\n' > "$SCRATCH/.local/bin/pgrep"
+chmod +x "$SCRATCH/.local/bin/pgrep"
+out_a="$(run_driver --stop 1901 2>&1)"; rc_a=$?
+[[ $rc_a -eq 0 ]] \
+    || fail "stop-releases-slot/4a: --stop exited $rc_a, want 0 (out: $out_a)"
+[[ ! -f "$PLIST_A" ]] \
+    || fail "stop-releases-slot/4a: plist still present after --stop — rm -f moved before wait loop?"
+grep -q 'stopped PR #1901' <<< "$out_a" \
+    || fail "stop-releases-slot/4a: expected 'stopped PR #1901' in output (got: $out_a)"
+
+# 4b: pgrep exits 0 (label alive through SIGKILL) → slot must be retained
+PR_REVIEW_NOW_DRY_RUN=1 run_driver 1902 >/dev/null 2>&1
+PLIST_B="$SCRATCH/Library/LaunchAgents/com.ibl5.pr-review-now-1902.plist"
+[[ -f "$PLIST_B" ]] || fail "stop-releases-slot/4b: setup — plist not created by dry-run fire"
+printf '#!/usr/bin/env bash\nexit 0\n' > "$SCRATCH/.local/bin/pgrep"
+chmod +x "$SCRATCH/.local/bin/pgrep"
+out_b="$(run_driver --stop 1902 2>&1)"; rc_b=$?
+[[ $rc_b -ne 0 ]] \
+    || fail "stop-releases-slot/4b: --stop exited 0, want nonzero (slot should be held)"
+[[ -f "$PLIST_B" ]] \
+    || fail "stop-releases-slot/4b: plist removed while label still alive — rm -f moved before wait loop"
+grep -q 'slot left occupied' <<< "$out_b" \
+    || fail "stop-releases-slot/4b: expected 'slot left occupied' in output (got: $out_b)"
+
+# Restore: remove pgrep shim; clean up /tmp files and plist
+rm -f "$SCRATCH/.local/bin/pgrep"
+clean_slots
+rm -f /tmp/pr-review-now-runner-1901.sh /tmp/pr-review-now-runner-1902.sh \
+      /tmp/pr-review-now-prompt-1901.md /tmp/pr-review-now-prompt-1902.md \
+      /tmp/pr-review-now-1901.log /tmp/pr-review-now-1902.log
+end_case pr-review-now-stop-releases-slot
+
+# --- case 5: pr-review-now-bad-flag ------------------------------------------------------
+# An unknown flag must exit 2 with an ERROR line; a missing PR number must exit 1 with
+# an ERROR line. Silent acceptance of a typo'd flag would fire a session for no PR.
+begin_case
+out="$(run_driver --bogus-flag 2>&1)"; rc=$?
+[[ $rc -eq 2 ]] || fail "bad-flag: unknown flag exited $rc, want 2"
+grep -q 'ERROR' <<< "$out" || fail "bad-flag: no ERROR for unknown flag (got: $out)"
+out="$(run_driver 2>&1)"; rc=$?
+[[ $rc -eq 1 ]] || fail "bad-flag: missing PR number exited $rc, want 1"
+grep -q 'ERROR' <<< "$out" || fail "bad-flag: no ERROR for missing PR number (got: $out)"
+end_case pr-review-now-bad-flag
+
+# --- case 6: pr-review-now-prompt-body ---------------------------------------------------
+# The generated prompt file must contain exactly '/pr-review <N>\n'. If it still says
+# '/pr-ready' the fired session runs the wrong skill.
+begin_case
+PR_REVIEW_NOW_DRY_RUN=1 run_driver 1901 >/dev/null 2>&1
+PROMPT=/tmp/pr-review-now-prompt-1901.md
+[[ -f "$PROMPT" ]] || fail "prompt-body: prompt file not created at $PROMPT"
+body="$(cat "$PROMPT")"
+[[ "$body" == "/pr-review 1901" ]] \
+    || fail "prompt-body: want '/pr-review 1901', got: $(cat "$PROMPT")"
+rm -f "$PROMPT" /tmp/pr-review-now-runner-1901.sh /tmp/pr-review-now-1901.log
+clean_slots
+end_case pr-review-now-prompt-body
+
+# --- case 7: pr-review-now-no-pid-temp-paths ---------------------------------------------
+# Every temp path must be keyed to the PR number, never to $$ (process ID) or a timestamp:
+# those are process-local and do not survive the launchd boundary. The driver contains one
+# comment that mentions $$ as a symbol; filter comment lines before counting.
+# [Plan defect: the packet's grep without comment-stripping counts 1, not 0, because the
+# comment "never to $$ or a timestamp" is itself present on a comment line. Assertion
+# corrected to grep -v comment lines first.]
+begin_case
+count="$(grep -v '^[[:space:]]*#' "$DRIVER" | grep -c '\$\$' || true)"
+[[ "$count" -eq 0 ]] \
+    || fail "no-pid-temp-paths: found $count non-comment \$\$ path(s) in $DRIVER"
+end_case pr-review-now-no-pid-temp-paths
+
+# --- case 8: pr-review-now-notify-before-bootout -----------------------------------------
+# In the generated runner the bare 'notify' call must appear on an earlier line than the
+# 'launchctl bootout' call. Reordering them would race the DM send against job termination:
+# bootout terminates this job, and discord-dm may retry across a window longer than a pm2
+# restart; a DM sent after bootout can be silently dropped.
+begin_case
+PR_REVIEW_NOW_DRY_RUN=1 run_driver 1901 >/dev/null 2>&1
+RUNNER=/tmp/pr-review-now-runner-1901.sh
+[[ -f "$RUNNER" ]] || fail "notify-before-bootout: runner not generated at $RUNNER"
+# grep -n '^notify$' anchors on the bare call (no parens), skipping the function def line
+# 'notify() {' and the comment '# BEFORE the teardown below'.
+notify_line="$(grep -n '^notify$' "$RUNNER" | head -1 | cut -d: -f1)"
+# awk skips comment lines: the runner has a comment on line 41 that mentions 'launchctl
+# bootout' in prose; grep without the comment filter would return that line (41 < 66)
+# and make the assertion fail vacuously.
+bootout_line="$(awk '!/^[[:space:]]*#/ && /launchctl bootout/ {print NR; exit}' "$RUNNER")"
+[[ -n "$notify_line" ]] \
+    || fail "notify-before-bootout: bare 'notify' call not found in generated runner"
+[[ -n "$bootout_line" ]] \
+    || fail "notify-before-bootout: 'launchctl bootout' not found in generated runner"
+[[ "$notify_line" -lt "$bootout_line" ]] \
+    || fail "notify-before-bootout: notify at line $notify_line, bootout at $bootout_line — order wrong"
+rm -f "$RUNNER" /tmp/pr-review-now-prompt-1901.md /tmp/pr-review-now-1901.log
+clean_slots
+end_case pr-review-now-notify-before-bootout
+
+# --- case 9: pr-review-now-no-shared-machinery -------------------------------------------
+# bin/pr-review-now must contain no reference to 'pr-ready-now' and no 'PR_READY_NOW_'
+# token. Either would silently re-couple the two siblings, making pr-review-now depend on
+# its mirror source.
+begin_case
+count_prn="$(grep -cF 'pr-ready-now' "$DRIVER" || true)"
+count_env="$(grep -cF 'PR_READY_NOW_' "$DRIVER" || true)"
+[[ "$count_prn" -eq 0 ]] \
+    || fail "no-shared-machinery: found $count_prn 'pr-ready-now' reference(s) in $DRIVER"
+[[ "$count_env" -eq 0 ]] \
+    || fail "no-shared-machinery: found $count_env 'PR_READY_NOW_' token(s) in $DRIVER"
+end_case pr-review-now-no-shared-machinery
+
+# --- verdict -----------------------------------------------------------------------------
+if [[ $FAILED -ne 0 ]]; then
+    echo "test-pr-review-now: FAILED ($FAILED assertion failure(s))" >&2
+    exit 1
+fi
+echo "test-pr-review-now: all cases passed"

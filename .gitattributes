@@ -6,3 +6,8 @@ bin/* text eol=lf
 # append instead of raising a rebase conflict. Duplicate rows that union can
 # produce from a non-append edit are caught by bin/check-numbering.
 ibl5/docs/decisions/README.md merge=union
+
+# Backlog entries are append-only sections; union merge keeps both sides of a
+# concurrent append instead of raising a rebase conflict. Duplicate entry IDs
+# that two branches can independently allocate are caught by bin/check-numbering.
+ibl5/docs/backlog/**/*.md merge=union

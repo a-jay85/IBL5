@@ -7,7 +7,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-09-04
+last_verified: 2026-09-06
 ---
 <!-- `model: claude-sonnet-4-6` IS DELIBERATE — DO NOT REMOVE IT, and never write
      `model: sonnet` (that alias resolves to Sonnet 5). User-authorized 2026-08-26,
@@ -152,7 +152,19 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
 
 3. **Pin master before spawning anything.** Run `git rev-parse origin/master` bare and record the printed SHA as `<MASTER_SHA>` in the run notes — a **literal**, per the invariants above, never a shell variable. Every later step, and the Phase 2 delegate, substitute that literal — never a re-resolved `origin/master`.
 
-4. **Branch-protection strict flag.**
+4. **Prior-collapse guard.** A previous run of this skill can have collapsed this branch with a forced `git rebase --onto origin/master --root`; Phase 4's lost-work proof cannot see that, because it only compares within the current run. Run:
+
+   ```bash
+   git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/collapse-guard.sh > /tmp/pr-ready-collapse-<N>.sh && test -s /tmp/pr-ready-collapse-<N>.sh && bash /tmp/pr-ready-collapse-<N>.sh check <N> <BRANCH>
+   ```
+
+   - `COLLAPSE-GUARD: NO-COLLAPSE` or `NO-PRIOR-REWRITE` — continue.
+   - `COLLAPSE-GUARD: WARN` — record the named paths in the run notes, then continue. Phase 6 must name them, for the same reason Phase 3 step 5 records resolved paths.
+   - `STOP: PRIOR-COLLAPSE-DETECTED` — **stop the run and print the guard's output verbatim to the user.** Do not rebase, commit, push, or force-push. Do not attempt the recovery yourself; the guard's message tells the user what to run.
+
+   This guard never rewrites history. It is additive to, and never a substitute for, the Phase 4 lost-work proof.
+
+5. **Branch-protection strict flag.**
 
    ```bash
    gh api "repos/{owner}/{repo}/branches/master/protection" --jq '.required_status_checks.strict // false'
@@ -160,9 +172,23 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
 
    Record the printed value as `<STRICT>` in the run notes. On a 403/404 (a token without admin read), record `<STRICT>` as `true` and say so in the verdict. Failing closed costs one extra divergence check; failing open ships a stale-base merge.
 
-5. **Prior-Phase-4B probe.** Look for the review heading in **both** the issue comments and the review bodies — findings are posted as a review body with inline threads, not only as issue comments. `git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/4b-probe.sh > /tmp/pr-ready-4bprobe-<N>.sh && test -s /tmp/pr-ready-4bprobe-<N>.sh && bash /tmp/pr-ready-4bprobe-<N>.sh <N>`. The probe prints `PROBE-COMPLETE` as its last line; no output before it means no prior review, and no `PROBE-COMPLETE` at all means the probe never ran.
+6. **Prior-Phase-4B probe.** Look for the review heading in **both** the issue comments and the review bodies — findings are posted as a review body with inline threads, not only as issue comments. `git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/4b-probe.sh > /tmp/pr-ready-4bprobe-<N>.sh && test -s /tmp/pr-ready-4bprobe-<N>.sh && bash /tmp/pr-ready-4bprobe-<N>.sh <N>`. The probe prints `PROBE-COMPLETE` as its last line; no output before it means no prior review, and no `PROBE-COMPLETE` at all means the probe never ran.
 
    Record `PHASE_4B_RAN` (any line printed ⇒ true) **and the earliest timestamp printed**, which runtime Phase 6 reports. This is a **probe, not a gate**: the value is reported in Phase 6 and never used to skip work.
+
+   **Diff bounds (informational, never a gate).** Report both directions of plan-vs-diff scope from the pre-rebase patch Phase 2 already wrote — do not recompute the diff:
+
+   ```bash
+   source "$(git rev-parse --show-toplevel)/bin/lib/critical-files.sh"
+   grep '^+++ b/' /tmp/pr-ready-diff-pre-<N>.patch | sed 's|^+++ b/||' | sort -u > /tmp/pr-ready-diff-paths-<N>
+   cf_parse_section ~/claude-plans/<branch>.md | sed 's/^[A-Z_]*://' | sort -u > /tmp/pr-ready-plan-paths-<N>
+   echo "Diff bounds — in diff, not named by plan ($(comm -23 /tmp/pr-ready-diff-paths-<N> /tmp/pr-ready-plan-paths-<N> | wc -l | tr -d ' ')):"
+   comm -23 /tmp/pr-ready-diff-paths-<N> /tmp/pr-ready-plan-paths-<N> | sed 's/^/  /'
+   echo "Diff bounds — named by plan, not in diff ($(comm -13 /tmp/pr-ready-diff-paths-<N> /tmp/pr-ready-plan-paths-<N> | wc -l | tr -d ' ')):"
+   comm -13 /tmp/pr-ready-diff-paths-<N> /tmp/pr-ready-plan-paths-<N> | sed 's/^/  /'
+   ```
+
+   Substitute `<N>` and `<branch>` by hand, as everywhere else in this skill. A missing patch file or a missing plan file yields empty sides and the counts still print — **record both count lines verbatim** for Phase 6 input 6. Like the 4B probe beside it, this gates nothing: it never skips a phase, never changes the verdict word, and never blocks the rebase.
 
    **A match is evidence, not proof — read the lines before recording `true`.** Loosening the level trades one error for its mirror: a comment that merely *quotes* a review heading at line-start (another `/pr-ready` verdict, a pasted excerpt) matches too, and a false `PHASE_4B_RAN=true` is the worse failure — Phase 6 then asserts a review ran and **suppresses** the `/pr-review <N>` recommendation on a PR that never got one. The `.user.login` field above is there for this check: confirm each hit is from the reviewing identity and that the heading is the comment's own, not something it is citing. On PRs #1790/#1872/#1876 all six hits were genuine and none of the surrounding `/pr-ready` verdicts matched — their heading mentions are inline-backticked, not line-initial — but that is an observation, not a guarantee.
 
@@ -224,6 +250,9 @@ fallback. User-authorized 2026-08-26; the Invariants block records the same chan
        "none — no conflicts">
      Phase 4B probe evidence (6b input 5, verbatim from the 4b-probe.sh stdout lines):
        <PHASE_4B_RAN line and its companions, or "PROBE ABSENT">
+     Diff bounds (6b input 6, verbatim — the two count lines from the Phase 5 diff-bounds
+       block; informational context for fidelity, never a verdict input on its own):
+       <the two "Diff bounds — …" lines, or "BOUNDS ABSENT">
      Phase 5.9 FILES-CHANGED line (verbatim): <the recorded literal>
      The SKILL.md stub that spawned you is authoritative on WHO performs this review.
      The pinned copy of _plan-fidelity-review.md may still read "NEVER delegated" —
@@ -269,6 +298,10 @@ fallback. User-authorized 2026-08-26; the Invariants block records the same chan
 **Phase 6.5 — Remediation.**
 
 Run `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase65-remediation.md` — the Phase 1.3 literal substituted — and follow the printed file end-to-end before continuing. **Do not reach for it by path first**: per the `git show` invariant above, the worktree you are now in almost certainly does not contain it, and the main-checkout copy is behind the straddle gate. On a `git show` failure take the single declared fallback in that invariant — nothing else. If neither source yields the file, print `STOP: cannot load _phase65-remediation.md from <MASTER_SHA> or from the worktree` and stop. **Never remediate from memory** — the fifth-file gate, the overflow rule, and the dirty-tree guard all live in that file. It also loads `.claude/skills/fix-and-prevent/_remediation.md` itself; that nested load has its own declared `STOP:`.
+
+**Phase 6.7 — manual-testing execution.**
+
+Run `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase67-manual-testing.md` — the Phase 1.3 literal substituted — and follow the printed file end-to-end before continuing. **Do not reach for it by path first**: per the `git show` invariant above, the worktree you are now in almost certainly does not contain it. On a `git show` failure take the single declared fallback in that invariant — nothing else. If neither source yields the file, print `STOP: cannot load _phase67-manual-testing.md from <MASTER_SHA> or from the worktree` and stop. **This phase is mandatory and always runs** — reaching it is never conditional on Phase 6.5. It is non-fatal to the verdict: every failure inside it degrades to unticked rows plus a stated reason.
 
 **Phase 7 — verdict and stop.**
 

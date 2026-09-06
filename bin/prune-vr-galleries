@@ -9,22 +9,31 @@ set -euo pipefail
 
 usage() {
   cat >&2 <<'EOF'
-Usage: prune-vr-galleries [--dry-run] [--cutoff-days N]
+Usage: prune-vr-galleries [--dry-run] [--cutoff-days N] [--max-dirs N]
 
 Options:
   --dry-run        Report only, never git rm.
   --cutoff-days N  Age threshold in whole days (default: 7). Must be a positive integer.
+  --max-dirs N     After the age pass, keep only the N most recent survivors.
+                   Must be a positive integer. Default: unset (no count cap).
 
 Directories matching ./<40-hex-char SHA> whose most-recent commit date is
 older than N days are pruned. Directories with no git history are skipped.
+Dirs with no git history are never cap-pruned (they are skipped before they
+can enter the survivor list — intentional fail-closed behaviour).
 EOF
 }
 
 dry_run=0
 days=7
+max_dirs=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --help)
+      usage
+      exit 0
+      ;;
     --dry-run)
       dry_run=1
       shift
@@ -45,6 +54,22 @@ while [[ $# -gt 0 ]]; do
       days="$N"
       shift
       ;;
+    --max-dirs)
+      shift
+      N="${1:-}"
+      case "$N" in
+        ''|*[!0-9]*)
+          usage
+          exit 1
+          ;;
+      esac
+      if ! [ "$N" -gt 0 ]; then
+        usage
+        exit 1
+      fi
+      max_dirs="$N"
+      shift
+      ;;
     *)
       echo "Unknown option: $1" >&2
       usage
@@ -57,6 +82,11 @@ now=$(date +%s)
 cutoff=$(( now - days * 86400 ))
 
 removed=0
+
+# survivors collects "$ts<TAB>$dir" for every dir that survives the age filter.
+# Dirs with no git history are skipped before they reach this list, so they are
+# never eligible for the count cap either — intentional fail-closed behaviour.
+survivors=()
 
 while IFS= read -r dir; do
   b="${dir#./}"
@@ -78,12 +108,49 @@ while IFS= read -r dir; do
       git rm -rq "$dir"
     fi
   else
-    if [[ "$dry_run" -eq 1 ]]; then
-      echo "KEEP: $dir (age=${age}d)"
-    else
-      echo "KEEP: $dir (age=${age}d)" >&2
+    survivors+=("$ts"$'\t'"$dir")
+    # With --max-dirs set the KEEP line is deferred to pass 2: a survivor the
+    # count cap goes on to prune must never log KEEP first, or the run log
+    # contradicts itself (and in live mode the dir is git rm'd silently after).
+    if [[ -z "$max_dirs" ]]; then
+      if [[ "$dry_run" -eq 1 ]]; then
+        echo "KEEP: $dir (age=${age}d)"
+      else
+        echo "KEEP: $dir (age=${age}d)" >&2
+      fi
     fi
   fi
 done < <(find . -mindepth 1 -maxdepth 1 -type d)
+
+# Pass 2: count cap — prune the oldest survivors beyond --max-dirs N, and emit
+# the deferred KEEP lines for the ones that survive it.
+# Only runs when --max-dirs was given and there are survivors to rank.
+# Ranking: sort by timestamp descending (-k1,1nr), dir name as deterministic
+# tiebreak (-k2,2). The first N rows are kept; tail -n +$((N+1)) emits the
+# oldest survivors beyond the cap, and emits nothing when survivors <= N — a
+# natural no-op at the exactly-at-N boundary.
+# Process substitution (not a pipe) keeps removed increments in the current shell.
+if [[ -n "$max_dirs" && ${#survivors[@]} -gt 0 ]]; then
+  ranked=$(printf '%s\n' "${survivors[@]}" | sort -k1,1nr -k2,2)
+  while IFS=$'\t' read -r keep_ts keep_dir; do
+    [[ -n "$keep_dir" ]] || continue
+    keep_age=$(( (now - keep_ts) / 86400 ))
+    if [[ "$dry_run" -eq 1 ]]; then
+      echo "KEEP: $keep_dir (age=${keep_age}d)"
+    else
+      echo "KEEP: $keep_dir (age=${keep_age}d)" >&2
+    fi
+  done < <(printf '%s\n' "$ranked" | head -n "$max_dirs")
+  while IFS=$'\t' read -r cap_ts cap_dir; do
+    [[ -n "$cap_dir" ]] || continue
+    cap_age=$(( (now - cap_ts) / 86400 ))
+    removed=$(( removed + 1 ))
+    if [[ "$dry_run" -eq 1 ]]; then
+      echo "WOULD PRUNE: $cap_dir (age=${cap_age}d)"
+    else
+      git rm -rq "$cap_dir"
+    fi
+  done < <(printf '%s\n' "$ranked" | tail -n +$(( max_dirs + 1 )))
+fi
 
 echo "$removed"

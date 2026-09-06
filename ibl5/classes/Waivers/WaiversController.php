@@ -27,7 +27,7 @@ class WaiversController implements WaiversControllerInterface
     public const WAIVER_POOL_MOVES_CATEGORY_ID = 1;
 
     private WaiversServiceInterface $service;
-    private \Waivers\Contracts\WaiversSubmissionServiceInterface $submissionService;
+    private ?\Waivers\Contracts\WaiversSubmissionServiceInterface $submissionService = null;
     private WaiversViewInterface $view;
     private \Repositories\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepo;
     private \Utilities\NukeCompat $nukeCompat;
@@ -39,6 +39,8 @@ class WaiversController implements WaiversControllerInterface
      * Optional PSR-3 logger. When null, falls back to LoggerFactory::getChannel('audit').
      */
     private \Psr\Log\LoggerInterface $logger;
+    private WaiversProcessorInterface $processor;
+    private \Repositories\Contracts\SalaryCapRepositoryInterface $salaryCapRepo;
     /**
      * Optional injected Season. When null, methods fall back to new Season($db) (timing identical to today).
      */
@@ -67,8 +69,26 @@ class WaiversController implements WaiversControllerInterface
         $this->request = $request;
         $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
         $this->season = $season;
-        $this->submissionService = $submissionService
-            ?? new \Waivers\WaiversSubmissionService($processor, $salaryCapRepo);
+        $this->processor = $processor;
+        $this->salaryCapRepo = $salaryCapRepo;
+        $this->submissionService = $submissionService;
+    }
+
+    /**
+     * Deferred construction: building the submission service eagerly would force a real
+     * Season (and its DB read) on every Waivers page load, including the logged-out path.
+     */
+    private function getSubmissionService(): \Waivers\Contracts\WaiversSubmissionServiceInterface
+    {
+        if ($this->submissionService === null) {
+            $this->submissionService = new \Waivers\WaiversSubmissionService(
+                $this->processor,
+                $this->salaryCapRepo,
+                $this->season ?? new Season($this->db)
+            );
+        }
+
+        return $this->submissionService;
     }
 
     /**
@@ -81,7 +101,7 @@ class WaiversController implements WaiversControllerInterface
             return;
         }
 
-        $season = $this->season ?? new Season($this->db);
+        $season = ($this->season ??= new Season($this->db));
 
         if (!$season->areWaiversAllowed()) {
             \PageLayout\PageLayout::header();
@@ -123,7 +143,7 @@ class WaiversController implements WaiversControllerInterface
 
             try {
                 $postData = $this->request->allPost();
-                $result = $this->submissionService->submit($postData, $verifiedTeamName);
+                $result = $this->getSubmissionService()->submit($postData, $verifiedTeamName);
             } catch (\Throwable $e) {
                 $this->logger->error('waiver_submission_error', [
                     'error' => $e->getMessage(),

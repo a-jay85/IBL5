@@ -11,6 +11,8 @@ from .state import Classification
 
 FILES_CHANGED_BEGIN = "<!-- files-changed:begin -->"
 FILES_CHANGED_END = "<!-- files-changed:end -->"
+MANUAL_CONFIRMATION_BEGIN = "<!-- manual-confirmation:begin -->"
+MANUAL_CONFIRMATION_END = "<!-- manual-confirmation:end -->"
 
 STRIP_RE = re.compile(r"(migrations/|composer\.lock|package-lock\.json|bun\.lock|__snapshots__/|\.snap$)")
 _PHP = re.compile(r"\.php$")
@@ -182,6 +184,71 @@ def upsert_files_changed(body: str, block: str) -> str:
         return body[:begin_idx] + block + body[after_end:]
 
     # Neither both present and in order: append fresh, leave any orphan in place.
+    return body.rstrip() + "\n\n" + block + "\n"
+
+
+def _neutralize_headings(text: str) -> list[str]:
+    """Blockquote every line so no line of plan prose can present as a heading.
+
+    ARMING-GATE DEFENSE, not formatting. armable.manual_testing_clearance()
+    enters on `^## Manual Testing` and breaks at the next `^## ` line; a plan's
+    hold justification that quotes either shape would otherwise open a
+    counterfeit clearance window in the PR body (a `- [x]` inside quoted prose
+    would read as the sentinel). `> ` prefixing makes every emitted line fail
+    both `^#`-anchored scans. Same reason classify.strip_manual_testing_section
+    (`^#{1,6}\\s`) cannot be tricked into excising the wrong span.
+    """
+    return [("> " + l) if l.strip() else ">" for l in text.splitlines()]
+
+
+def render_manual_confirmation(justification: str) -> str:
+    """Marker-delimited `## Manual confirmation needed` block, or "" when absent.
+
+    Empty/whitespace-only input returns "" — never an empty heading. Every line
+    of the justification is emitted as a blockquote so no line of plan prose can
+    present as a markdown heading in the PR body (see _neutralize_headings).
+    """
+    text = (justification or "").strip()
+    if not text:
+        return ""
+    header = ("**Manual confirmation needed** (from the plan's "
+              "`## Automouse Hold Justification` — auto-merge is held):")
+    parts = [MANUAL_CONFIRMATION_BEGIN, "## Manual confirmation needed", "", header, ""]
+    parts.extend(_neutralize_headings(text))
+    parts.append(MANUAL_CONFIRMATION_END)
+    return "\n".join(parts)
+
+
+def upsert_manual_confirmation(body: str, block: str) -> str:
+    """Idempotent upsert, positioned ahead of `## Manual Testing`.
+
+    Both markers present, BEGIN before END: replace BEGIN..END inclusive (empty
+    `block` therefore REMOVES the block — a plan whose hold section was deleted
+    must not leave a stale one behind). Neither present: insert immediately
+    before the first `^#{2,6}\\s*Manual\\s+Testing\\b` heading when one exists,
+    else append at the end. Exactly one marker, or END before BEGIN: insert a
+    fresh block by the same rule and leave the orphan (mirrors
+    upsert_files_changed — never silently rewrite a half-corrupt body).
+    Empty body: return `block`.
+    """
+    body = body or ""
+    if not body.strip():
+        return block
+
+    begin_idx = body.find(MANUAL_CONFIRMATION_BEGIN)
+    end_idx = body.find(MANUAL_CONFIRMATION_END)
+
+    if begin_idx != -1 and end_idx != -1 and begin_idx < end_idx:
+        after_end = end_idx + len(MANUAL_CONFIRMATION_END)
+        return body[:begin_idx] + block + body[after_end:]
+
+    # Neither both present and in order — insert before ## Manual Testing or append.
+    if not block:
+        return body
+
+    m = _MANUAL_HEADING_RE.search(body)
+    if m:
+        return body[:m.start()] + block + "\n\n" + body[m.start():]
     return body.rstrip() + "\n\n" + block + "\n"
 
 

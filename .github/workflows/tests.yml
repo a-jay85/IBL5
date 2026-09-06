@@ -883,6 +883,8 @@ jobs:
         run: bin/test-pr-ready-now
       - name: bin/test-pr-cycle
         run: bin/test-pr-cycle
+      - name: bin/test-pr-review-now
+        run: bin/test-pr-review-now
       - name: bin/test-check-phpunit-hygiene
         run: bin/test-check-phpunit-hygiene
       - name: bin/test-test

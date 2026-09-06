@@ -2390,6 +2390,31 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 
 
 **Table evidence (2026-07-25):** #1033 + DNP follow-ups #1087/#1088.
+
+### 13.14 Waiver-Claim Cap Check Uses the Phase-Blind Salary Basis
+**Status:** ✅ Resolved 2026-09-05 — PR `waivers-13-14-phase-aware-cap-basis`
+**Location:** `Waivers/WaiversSubmissionService.php:47`
+**Problem:** calls `SalaryCapRepository::getTeamTotalSalary()`, which sums `vw_current_salary.current_salary` regardless of phase. During Draft/Free Agency — exactly when waiver claims fire — the current-season basis is `next_year_salary`, so the check runs one contract year behind. Reproduction (the numbers that drove PR `heat-nuggets-hardcap`, prod snapshot 2026-08-21, phase `Draft`, `HARD_CAP_MAX` 7000): Heat read as **6861** on the phase-blind basis vs **5159** on the correct shifted basis — a 1702 overstatement, enough to false-reject a legal transaction (offer 12190's Heat post-trade total came out 7232 instead of 5556).
+**Suggested direction:** apply the same `Season::advancesContractYears()` gate this PR added to `TradeExecutionService::validateParties()`, selecting `getTeamNextYearSalary()`; keep the repository phase-ignorant.
+**Est. effort:** S
+**Risk if untouched:** legal waiver claims rejected as over-cap for the whole offseason, and (symmetrically) over-cap claims allowed where next-year salary is higher.
+
+---
+
+
+**Table evidence (2026-09-05):** Phase-blind `getTeamTotalSalary()` in waiver-claim cap check — same defect class as the trade accept-path fix (PR heat-nuggets-hardcap).
+### 13.15 `PlayerContractCalculator::getCurrentSeasonSalary()` Is a Fourth, Unshifted Cap Basis
+**Status:** ✅ Resolved 2026-09-05 — PR `maint-13-15-phase-aware-contract-salary`
+**Location:** `Team/TeamCapCalculator.php` → `PlayerContractCalculator::getCurrentSeasonSalary()`
+**Problem:** computed the season salary from the raw `cy` column with no phase shift, giving a fourth basis alongside `vw_current_salary.current_salary`, `.next_year_salary`, and the cash `salary_yr1`/`salary_yr2` pair. It drove `canAddContractWithoutGoingOverHardCap()`, used by Free Agency and waivers, so during Draft/FA it reproduced 13.14's one-year lag through a different code path.
+**Suggested direction:** converge on one phase-aware accessor (extract the `advancesContractYears()` selection into a small `CurrentSeasonSalaryBasis` helper both trade and contract paths consume) rather than adding a fourth ad-hoc branch.
+**Est. effort:** M
+**Risk if untouched:** every new cap consumer picks whichever of the four bases it finds first; the same false-positive keeps recurring.
+
+**Table evidence (2026-09-05):** `PlayerContractCalculator` gains an optional `?Season $season` constructor param and a `resolveCurrentContractYear()` private method that shifts the basis +1 during `advancesContractYears()` phases. `TeamCapCalculator` injects the current Season into a memoized `PlayerContractCalculator` and iterates raw rows via `PlayerDataConverter::arrayToPlayerData()` in both salary aggregates; `convertPlrResultIntoPlayerArray()` (Player facade construction) removed. `Player` and `WaiversProcessor` remain deliberately phase-blind (regression-guarded by `PlayerContractCalculatorCallSiteAuditTest`).
+
+---
+
 ## Axis 14: Bootstrap / Dependency Injection
 
 ### 14.1 `Bootstrap\Application` Container Built But Never Wired

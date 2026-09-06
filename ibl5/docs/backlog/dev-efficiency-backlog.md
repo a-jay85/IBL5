@@ -82,7 +82,8 @@ last_verified: 2026-09-06
 | E54 | PR #2084 Phase 6.5 — rebase silently dropped implementation commit; lost-work proof blind to pre-run loss | ⬜ Open | — | XS |
 | E55 | PR #2129 Phase 6.5 — PR body false E2E claim, omitted grep finding, vacuous VM selector; all fixed this pass | ⬜ Open | — | XS |
 | E56 | PR #2129 Phase 6.5 — SKILL.md size-band gate not updated after deliberate file growth; fixed this pass | ⬜ Open | — | XS |
-| E54 | /pr-ready Phase 6.5 remediation — PR #2091: dual-channel transport omission, test pin drift, over-broad scan | ⬜ Open | — | S |
+| E62 | /pr-ready Phase 6.5 remediation — PR #2091: backlog entry structural defect (ID collision, split entry body, orphaned content) | ⬜ Open | — | XS |
+| E63 | PR #2091 Phase 6.5 — plan/code alignment notes (usage sed-range arithmetic, --help indentation, matrix pin drift, body omission); class n/a — all notes | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -871,11 +872,6 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 ### E54 PR #2084 Phase 6.5 — rebase silently dropped implementation commit; lost-work proof blind to pre-run loss
 
 **class:** `rebase-dropped-commit` — an `--onto` rebase replay range that started above the branch's own commits, compounded by a lost-work proof that only compares pre-to-post within a single `/pr-ready` run and cannot detect a branch that arrives already emptied by a previous run's bad rebase.
----
-
-### E54 /pr-ready Phase 6.5 remediation — PR #2091: dual-channel transport omission, test pin drift, over-broad scan
-
-**class:** a missing log-fallback channel in `notify()` (file primary, log silently absent); a line-number pin in a test that breaks when the target gains new paragraphs; an over-broad `EnterWorktree` scan that flags prose files with no EnterWorktree; and PR body accuracy divergences — all surfaced by `/pr-ready` Phase 6 review.
 
 **occurrence table:**
 
@@ -1051,6 +1047,15 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 `artifact destination: this entry`
 
 *(discovered 2026-09-06 during Phase 6 review of #2140)*
+
+### E62 /pr-ready Phase 6.5 remediation — PR #2091: dual-channel transport omission, test pin drift, over-broad scan
+
+**class:** a missing log-fallback channel in `notify()` (file primary, log silently absent); a line-number pin in a test that breaks when the target gains new paragraphs; an over-broad `EnterWorktree` scan that flags prose files with no EnterWorktree; and PR body accuracy divergences — all surfaced by `/pr-ready` Phase 6 review.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
 | 1 | `bin/pr-ready-now:851` — `notify()` reads only `$MARKER` file; no fallback to `$LOG` | yes (2A) | was live | fixed this pass |
 | 2 | `bin/test-pr-ready-now:2287` — case 38 pinned line 34 by shasum instead of content-based grep | yes (2B) | was live | fixed this pass |
 | 3 | `bin/test-pr-ready-now:2252` — case 35 scanned whole file when no `EnterWorktree` present | yes (3A) | was live | fixed this pass |
@@ -1073,3 +1078,22 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-04 during #2091)*
+
+### E63 PR #2091 Phase 6.5 — plan/code alignment notes
+
+**class:** n/a — four cosmetic/alignment notes from Phase 6: off-by-one in plan's sed arithmetic (F2), flush-left --help line from de-indenting source comment (F3), wrong case-number citations in PR body matrix rows 14/17/33 (F4), PR body Summary omitting the backlog file from its change list (F5).
+
+**occurrence table:**
+
+| # | Finding | Live? | Status |
+|---|---------|-------|--------|
+| 1 | F2: plan's `2,73p` arithmetic was off-by-one; code shipped `2,72p` which is correct | yes | not fixed — no action needed; shipped value satisfies plan's invariant |
+| 2 | F3: `bin/pr-ready-now` header comment de-indented to satisfy a literal test assertion; cosmetic misalignment in `--help` output | yes | not fixed — filed |
+| 3 | F4: Matrix rows 14, 17, 33 cite non-existent driver case 45; assertions landed in case 27 (extended) | yes | not fixed — filed |
+| 4 | F5: PR body Summary omits `ibl5/docs/backlog/dev-efficiency-backlog.md` from change list | yes | not fixed — no action needed; machine files-changed block lists it |
+
+**prevention_ladder:** no gate warranted — all four are cosmetic or one-off alignment notes with no recurring defect class; no rung-1 through rung-5 gate is warranted.
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-06 during #2091)*

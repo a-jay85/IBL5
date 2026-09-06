@@ -78,6 +78,7 @@ last_verified: 2026-09-06
 | E53 | PR #1897 Phase 6.5 — plan-text staleness and meta-text accuracy notes (stale plan literals, vestigial test arg, Manual Testing boilerplate, post-plan retrospective scope count); class n/a or no gate warranted for all | ⬜ Open | — | XS |
 | E55 | PR #2126 Phase 6.5 — machine-authored post-review commit undisclosed in PR body scope/coverage claims; Checks 3, 4-i, 4-ii fixed this pass | ⬜ Open | — | XS |
 | E56 | PR #2126 Phase 6.5 — stale entry-point counts in plan-preserved maintenance-backlog prose; both fixed this pass | ⬜ Open | — | XS |
+| E57 | PR #2133 Phase 6.5 — plan verification rows 4.e and 6.a false-positive on correct code; PR authoring notes | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -970,6 +971,9 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 **class:** A decision-trigger-surface PR merged with the "Meta checks" `bin/adr-check` step red, because that check is **advisory** — `master`'s `required_status_checks.contexts` is `["Tests and Analysis", "E2E Tests", "human-signoff"]` only. GitHub permitted every merge; no protection was bypassed and no admin override was used. The residue is an audit-trail gap: `ibl5/docs/decisions/README.md` § "When an ADR is Required" item 2 fires on a new `.claude/rules/*.md` doc, and the policy's own remedy (`<!-- no-adr: reason -->` in the PR body) was never typed, so the record shows a triggered requirement with no disposition.
 
 A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4` placed the rule doc at `ibl5/.claude/rules/bin-help-span-and-secondary-assertions.md` (example) — an `ibl5/`-prefixed path that does not exist. The `adr` `dorny/paths-filter` glob is `.claude/rules/*.md` (no prefix), so the filter did not match, the `Run bin/adr-check` step was **skipped**, and the job reported green. Commit `c572dd6b` corrected the path, the filter then matched, and the step ran and genuinely failed ~2.5 minutes before merge. **A path-prefix typo converts a required-by-policy gate into a free green with no signal that anything was skipped.**
+### E57 PR #2133 Phase 6.5 — plan verification rows 4.e and 6.a false-positive on correct code; PR authoring notes
+
+**class:** Plan verification shell commands that extract a function body with `sed` then grep the full text—including comment lines—for forbidden identifiers, producing false positives when the function's own comments document the property being verified.
 
 **occurrence table:**
 
@@ -992,3 +996,22 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 `artifact destination: this entry, plus retroactive <!-- no-adr: --> markers applied to the bodies of #2124 and #2119`
 
 *(discovered 2026-09-05 while investigating recently merged PRs that carried red CI)*
+| 1 | `~/claude-plans/pr-cycle-dirty-rescue.md` row 4.e — greps `_rescue_one()` body for `MERGES\|armed.txt\|ledgered.txt\|pr merge\|_poll_merge\|_arm_and_classify\|POLL_CEILING`; hits five comment lines that document the "rescue is not a merge" invariant | yes | was live at plan-write | not fixed — filed (plan already merged; fix is authoring discipline) |
+| 2 | `~/claude-plans/pr-cycle-dirty-rescue.md` row 6.a — greps `_report_dry_run()` body for `_rescue_one\|_ready_pr\|--go`; hits three comment lines and one operator-facing echo string | yes | was live at plan-write | not fixed — filed |
+
+**prevention_ladder:**
+- rung 0 — no existing gate; plan files live at `~/claude-plans/` (outside the repo; CI cannot reach them).
+- rungs 1–5 — not warranted; fix is plan-authoring discipline only.
+- **landing rung:** no gate warranted — when writing function-body grep verification commands, exclude comment lines first: pipe through `grep -v '^[[:space:]]*#'` before the forbidden-token search.
+
+`prevention_ladder: no gate warranted — plan-authoring discipline: exclude comment lines before grepping function bodies for forbidden tokens`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-05 during Phase 6 review of #2133)*
+
+**Additional n/a notes from the same Phase 6 review (consolidated):**
+- **Check 4 Note (a) — "unit and E2E tests" label:** `class: n/a` — fixed in-PR; Manual Testing updated to "the `bin/test-pr-cycle` shell harness". prevention_ladder: no gate warranted — one-off cosmetic label imprecision; plan's Required Test Methods block already names the correct phrasing.
+- **Check 2 deviation — `${arr[@]+"${arr[@]}"}` form:** `class: n/a` — deliberate correctness fix over the plan's literal text; required for `set -uo pipefail` + bash 3.2 unbound-variable guard; reviewer confirmed it is the better route. prevention_ladder: no gate warranted.
+- **Check 4 Note (b) — `feat:` vs `chore:` title typing:** `class: n/a` — maps to no 6d clause per reviewer; `feat:` is consistent with plan intent (`auto_merge: false` + human-signoff hold before unattended merge). prevention_ladder: rung 2 — `commit-conventions.md` already documents the GM-test rubric; no additional gate.
+- **Check 4 Note (c) — commit subject under-describes:** `class: n/a` — ephemeral; this repo squash-merges and master takes the PR title, not the branch commit subject. prevention_ladder: no gate warranted.

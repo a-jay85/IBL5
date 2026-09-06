@@ -30,7 +30,7 @@ last_verified: 2026-09-06
 | E1 | Warm-standby worktree pool | ⬜ Open | 🟨 | M |
 | E2 | Dependabot grouping | ✅ Implemented | — | S |
 | E3 | PHPStan result-cache in CI | ✅ Implemented | — | S |
-| E4 | Flake-quarantine ledger | ⬜ Open | 🟨 | M |
+| E4 | Flake-quarantine ledger | ✅ Implemented | — | M |
 | E5 | Scheduled stale-worktree GC | ◑ Partial | 🟨 | S |
 | E6 | Diff-scoped PHPStan wrapper | ✅ Implemented | — | S |
 | E7 | Parallel PHPUnit | ✅ Implemented | — | M |
@@ -98,12 +98,7 @@ last_verified: 2026-09-06
 
 ➜ E3 PHPStan result-cache in CI — ✅ Implemented (2026-07-03): see [archive](archive/dev-efficiency-backlog-archive.md).
 
-### E4 Flake-quarantine ledger
-**Location:** E2E CI (`.github/workflows/`) — no quarantine mechanism (verified; "flake" mentions are VR-specific).
-**Problem:** Specs that pass only on retry are invisible until a red run poison-pills the nightly queue (the post-plan skip-on-red behavior exists because of this).
-**Suggested direction:** Auto-detect passed-on-retry specs from Playwright reports, log them to a ledger, and report a quarantine list for triage.
-**Risk if untouched:** Recurring lost nights; flake debt accumulates unmeasured.
-**Status (2026-07-07):** ⬜ Open — 🟨 (one policy decision: what quarantine *does* — report-only vs auto-skip).
+➜ E4 Flake-quarantine ledger — ✅ Implemented (2026-09-06): see [archive](archive/dev-efficiency-backlog-archive.md).
 
 ### E5 Scheduled stale-worktree GC
 **Location:** `bin/cleanup` (`--all` / `--dry-run` sweep of worktrees, branches, and Docker stacks) + `bin/wt-status` (MERGED / OPEN-PR / UNPUSHED / STALLED / EMPTY classifier — the safety layer).

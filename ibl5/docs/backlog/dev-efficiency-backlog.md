@@ -78,7 +78,7 @@ last_verified: 2026-09-06
 | E53 | PR #1897 Phase 6.5 — plan-text staleness and meta-text accuracy notes (stale plan literals, vestigial test arg, Manual Testing boilerplate, post-plan retrospective scope count); class n/a or no gate warranted for all | ⬜ Open | — | XS |
 | E55 | PR #2126 Phase 6.5 — machine-authored post-review commit undisclosed in PR body scope/coverage claims; Checks 3, 4-i, 4-ii fixed this pass | ⬜ Open | — | XS |
 | E56 | PR #2126 Phase 6.5 — stale entry-point counts in plan-preserved maintenance-backlog prose; both fixed this pass | ⬜ Open | — | XS |
-| E57 | PR #2133 Phase 6.5 — plan verification rows 4.e and 6.a false-positive on correct code; PR authoring notes | ⬜ Open | — | XS |
+| E58 | PR #2133 Phase 6.5 — plan verification rows 4.e and 6.a false-positive on correct code; PR authoring notes | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -971,7 +971,7 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 **class:** A decision-trigger-surface PR merged with the "Meta checks" `bin/adr-check` step red, because that check is **advisory** — `master`'s `required_status_checks.contexts` is `["Tests and Analysis", "E2E Tests", "human-signoff"]` only. GitHub permitted every merge; no protection was bypassed and no admin override was used. The residue is an audit-trail gap: `ibl5/docs/decisions/README.md` § "When an ADR is Required" item 2 fires on a new `.claude/rules/*.md` doc, and the policy's own remedy (`<!-- no-adr: reason -->` in the PR body) was never typed, so the record shows a triggered requirement with no disposition.
 
 A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4` placed the rule doc at `ibl5/.claude/rules/bin-help-span-and-secondary-assertions.md` (example) — an `ibl5/`-prefixed path that does not exist. The `adr` `dorny/paths-filter` glob is `.claude/rules/*.md` (no prefix), so the filter did not match, the `Run bin/adr-check` step was **skipped**, and the job reported green. Commit `c572dd6b` corrected the path, the filter then matched, and the step ran and genuinely failed ~2.5 minutes before merge. **A path-prefix typo converts a required-by-policy gate into a free green with no signal that anything was skipped.**
-### E57 PR #2133 Phase 6.5 — plan verification rows 4.e and 6.a false-positive on correct code; PR authoring notes
+### E58 PR #2133 Phase 6.5 — plan verification rows 4.e and 6.a false-positive on correct code; PR authoring notes
 
 **class:** Plan verification shell commands that extract a function body with `sed` then grep the full text—including comment lines—for forbidden identifiers, producing false positives when the function's own comments document the property being verified.
 

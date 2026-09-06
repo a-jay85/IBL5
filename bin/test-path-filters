@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-path-filters — asserts the tests.yml `changes:` path filters keep the
+# sim-recap producer/consumer pair coupled: any path under the `both:` group must
+# trigger BOTH db-integration and harness-tests. Greps the workflow only; it never
+# stats the listed paths.
+#
+# Run: bin/test-path-filters [workflow.yml]   (exit 0 = all pass, 1 = a case failed)
+set -u
+WF="${1:-.github/workflows/tests.yml}"
+FAILED=0
+ok()  { echo "ok: $1"; }
+bad() { echo "FAIL: $1"; FAILED=1; }
+
+# group <name> → the body lines of one filter group (comments included, next group excluded)
+group() { awk -v g="^            $1:\$" '$0 ~ g {i=1; next} i && /^            [a-z0-9]+:$/ {exit} i' "$WF"; }
+# job_if <name> → the `if:` line of one top-level job
+job_if() { awk -v j="^  $1:\$" '$0 ~ j {i=1; next} i && /^  [a-z]/ {exit} i && /^    if:/ {print; exit}' "$WF"; }
+
+grep -q "^      both: .*steps\.filter\.outputs\.both == 'true'" "$WF" \
+  && ok "changes: declares a both output" || bad "changes: is missing the both output"
+
+BOTH="$(group both)"
+for p in 'bin/sim-recap-*' 'ibl5/scripts/simRecapQueue.php' 'ibl5/scripts/storeSimRecap.php' \
+         'ibl5/scripts/simRecapContext.php' 'ibl5/classes/SimRecap/**'; do
+  printf '%s\n' "$BOTH" | grep -qF -- "- '$p'" \
+    && ok "both: covers $p" || bad "both: is missing $p — producer/consumer pair would split"
+done
+
+for j in db-integration harness-tests; do
+  job_if "$j" | grep -qF "needs.changes.outputs.both == 'true'" \
+    && ok "$j honors the both output" || bad "$j ignores the both output"
+done
+
+# Regression guard: src: must never swallow all of bin/, or every shell-only PR
+# would drag the whole DB-integration suite along.
+group src | grep -qF -- "- 'bin/**'" \
+  && bad "src: swallows bin/** — non-sim-recap bin changes would run db-integration" \
+  || ok "src: does not swallow bin/**"
+
+[ "$FAILED" -eq 0 ] || { echo "RESULT: FAILED"; exit 1; }
+echo "RESULT: all passed"

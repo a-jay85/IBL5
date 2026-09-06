@@ -80,6 +80,9 @@ last_verified: 2026-09-06
 | L51 | Plan Phase 5 dry-run count propagated to archive only, not PR body; reviewer blast-radius instruction stale by ~23% | ⬜ Open | 🟦 | S |
 | L52 | Test harness case comment over-claims assertion scope; adjacent cases leave `run_block` exit codes unchecked | ✅ fixed this pass | — | S |
 | L53 | Phase 2 test code lost in branch rebuild — invisible because CI passed without the tests | ✅ fixed this pass | — | S |
+| L54 | PR body `## Manual Testing` rotting step-ordinal + false coverage-type claim contradicts diff | ✅ fixed this pass | 🟦 | XS |
+| L55 | Three Phase 6 review notes from PR #1801: plan supersession (F3), undeclared scope (F4), stale comment (F5) | ✅ fixed this pass | 🟦 | XS |
+| L56 | Phase 6 notes from PR #1801 (second /pr-ready pass): missing Changes bullet (F4, fixed), carry-forward notes F1/F2/F5 | ✅ fixed this pass | 🟦 | XS |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -783,3 +786,90 @@ Landing rung: **no gate warranted** — neither occurrence exists in the tree af
 1. Pick an entry; `/plan` it. Loop-machinery changes should default to `auto_merge: false` — a bug here costs whole nights.
 2. Ship the measurement half first (T1, L3) so later entries' effects are visible.
 3. Update this doc's status; bump `last_verified` (CI enforces via `bin/check-docs`).
+---
+
+### L54 PR body `## Manual Testing` rotting step-ordinal + false coverage-type claim contradicts diff
+
+**class:** A hand-written PR body `## Manual Testing` section that makes a specific step-ordinal claim ("step 43") and a false categorical claim ("unit and E2E tests") that both contradict the actual diff, causing the review gate to pass a PR whose body misrepresents its test coverage.
+
+**Occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #1801 body `## Manual Testing` — "step 43" (actual: final step, #52 of 52 harnesses) | yes | yes | fixed this pass |
+| 2 | PR #1801 body `## Manual Testing` — "unit and E2E tests" (actual: CLI shell harness + grep assertions; zero PHPUnit/E2E in diff) | yes | yes | fixed this pass |
+| 3 | GitHub PR bodies generally (other PRs) | yes | out-of-scope | not fixed — filed |
+
+**prevention_ladder:**
+
+- rung 0 — not covered by an existing gate. Phase 6.5 step 4 reconciles the post-6.5 diff's stat claims, but does not check pre-existing body prose for rotting step ordinals or false coverage-type claims.
+- rung 1 — extend Phase 6.5 step 4 body reconciliation to (a) flag any literal integer in `## Manual Testing` that appears to be a step ordinal (pattern: "step N" or "as step N"), prompting a non-rotting reword, and (b) reject coverage-type words ("unit", "E2E", "integration") not backed by test files in the diff. This is the landing rung: it augments an existing step rather than creating new tooling.
+- rung 2 — add a rule under `.claude/rules/` noting that `## Manual Testing` must not contain CI step ordinals (they rot on every harness addition) and must not claim test coverage types absent from the diff. Cheaper than a hook and sufficient for an authored body section.
+- rung 3/4/5 — not applicable; the surface is PR body prose, not compiled code.
+
+Landing rung: 1 (extend Phase 6.5 step 4) + rung 2 as supplemental documentation.
+
+**artifact destination:** `.claude/skills/pr-ready/_phase65-remediation.md` (in-repo, extend step 4 body reconciliation) and a new rule doc under .claude/rules/ (e.g. pr-body-manual-testing.md; to be created by the prevention plan).
+
+**provenance:** (discovered 2026-09-04 during #1801)
+
+**Status (2026-09-04):** ✅ fixed this pass — both claims reworded in the PR body via `gh pr edit`; "step 43" replaced with "final `bin/test-*` step"; "unit and E2E tests" replaced with accurate Verification Matrix description — 🟦.
+
+---
+
+### L55 Three Phase 6 review notes from PR #1801: plan supersession (F3), undeclared scope (F4), stale comment (F5)
+
+**class (F3) — n/a:** Plan recipe superseded by master moving past the plan's authoring point; the implementation diverged to the only correct route and declared the divergence in the PR body.
+
+**class (F4) — n/a:** Undeclared docs-only scope creep (`ibl5/docs/backlog/archive/ci-backlog-archive.md` +9 lines) that follows the file's existing archival pattern; no functional surface.
+
+**class (F5):** A stale in-code comment in `bin/test-path-filters` whose accuracy depended on a sibling branch (`fix-sim-recap-roster-blindness`) not yet merged at time of authoring; the sibling branch has since landed, making `ibl5/scripts/simRecapContext.php` exist on master.
+
+**Occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #1801 — F3: plan recipe for ci-backlog.md Axis 6 insertion superseded by master deleting the target table and creating the axis pre-emptively | n/a (forced by master state) | n/a | not fixed — no action needed |
+| 2 | PR #1801 — F4: `ibl5/docs/backlog/archive/ci-backlog-archive.md` +9 lines undeclared in plan; follows existing archival pattern; additive only | n/a (docs-only, pattern-conforming) | n/a | not fixed — no action needed |
+| 3 | `bin/test-path-filters:7` — stale parenthetical "one of them is created by a sibling PR" | yes | yes | fixed this pass |
+
+**prevention_ladder:**
+
+- F3: `prevention_ladder: no gate warranted — plan temporal drift when master moves during a long-running branch is an inherent property of linear-history repos; Phase 6 fidelity review is the appropriate catch, as demonstrated.`
+- F4: `prevention_ladder: no gate warranted — undeclared docs-only scope following an established pattern; the Phase 6 scope-creep check (6d.3) is the appropriate catch.`
+- F5: `prevention_ladder: no gate warranted — sibling-branch dependency comments are one-off; adding a gate for comments whose accuracy depends on merge order would produce false positives on every open branch.`
+
+**artifact destination:** n/a — no gate.
+
+**provenance:** (discovered 2026-09-04 during #1801)
+
+**Status (2026-09-04):** ✅ fixed this pass — F3/F4 require no action; F5 stale parenthetical removed from `bin/test-path-filters:7` — 🟦.
+
+---
+
+### L56 Phase 6 notes from PR #1801 (second /pr-ready pass): missing Changes bullet (F4, fixed), carry-forward notes F1/F2/F5
+
+**class (F4):** a PR body `### Changes` bullet list that omits a file added by a prior Phase 6.5 remediation pass, because the PR body's bullet list is drafted at plan time and Phase 6.5 adds files after the fact.
+
+**class (F1, F2, F5) — n/a:** notes from this pass requiring no code fix — plan recipe superseded by master (F1), undeclared scope for loop-engineering-backlog.md added by the prior remediation pass (F2), shellcheck default severity differing from CI job enforcement (F5).
+
+**Occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #1801 — F4: `ibl5/docs/backlog/loop-engineering-backlog.md` +61 lines missing from `### Changes` bullets | yes | yes | fixed this pass |
+| 2 | PR #1801 — F1: plan recipe for ci-backlog.md Axis 6 superseded by master | n/a (forced by master state) | n/a | not fixed — no action needed |
+| 3 | PR #1801 — F2: loop-engineering-backlog.md undeclared scope from prior remediation pass | n/a (docs-only, additive) | n/a | not fixed — no action needed |
+| 4 | PR #1801 — F5: plan specifies bare `shellcheck` (emits SC2015 info); CI runs `--severity=warning` (suppresses info) | n/a (cosmetic; CI green) | n/a | not fixed — no action needed |
+| 5 | Prior pass — L55 F4: same class (undeclared scope in PR body) | yes | yes | not fixed — filed in L55 |
+
+**prevention_ladder (F4):** Phase 6.5 step 4 already requires reconciling body numeric stats against `git diff --numstat HEAD`; the gap is that the step does not also require a bullet-per-changed-file check. No new gate warranted — rung 2 (extend `.claude/skills/pr-ready/_phase65-remediation.md` step 4 to require bullet-list completeness) is sufficient and can be addressed in a future `/plan`.
+
+**prevention_ladder (F1, F2, F5):** no gate warranted — same reasoning as L55 for each.
+
+**artifact destination:** n/a — no gate.
+
+**provenance:** (discovered 2026-09-04 during #1801)
+
+**Status (2026-09-04):** ✅ fixed this pass — F4 missing bullet added via `gh pr edit`; F1/F2/F5 require no action — 🟦.
+

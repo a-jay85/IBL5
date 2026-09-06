@@ -17,6 +17,9 @@
 # triggers themselves. The trigger file (bin/foo) is the only thing committed into
 # bin/, so the diff sees exactly one added bin/ script.
 #
+# NOTE: The skip-observability-* structural assertions read the tracked file
+# .github/workflows/pr-meta-checks.yml rather than a throwaway repo.
+#
 # Run: bin/test-adr-check  (exit 0 = all pass, 1 = a case failed)
 
 set -u
@@ -75,6 +78,15 @@ add_no_trigger() {
     echo "notes" > "$REPO/notes.txt"
     git -C "$REPO" add notes.txt
     git -C "$REPO" commit -qm "add notes"
+}
+
+# add_misplaced_rule — commit a rule doc under ibl5/.claude/rules/ (a path the
+# workflow adr filter covers but that adr-check should not require an ADR for).
+add_misplaced_rule() {
+    mkdir -p "$REPO/ibl5/.claude/rules"
+    echo "# a rule doc committed under the wrong prefix" > "$REPO/ibl5/.claude/rules/something.md"
+    git -C "$REPO" add "ibl5/.claude/rules/something.md"
+    git -C "$REPO" commit -q -m "docs: add rule doc"
 }
 
 run_adr_check() { # runs the stdin composition inside $REPO
@@ -139,6 +151,22 @@ grep -qF 'original git-lfs hook' "$REPO/.git/hooks/pre-push.pre-adr.bak" 2>/dev/
 ok_check "install-rerun-clean-exit" "$reinstall_exit"
 grep -qF '# IBL5-ADR-HOOK' "$REPO/.git/hooks/pre-push"; ok_check "install-idempotent-shim" $?
 grep -qF 'original git-lfs hook' "$REPO/.git/hooks/pre-push.pre-adr.bak" 2>/dev/null; ok_check "install-backup-preserved" $?
+
+# --- adrcheck misplaced-rules prefix does not trigger ADR requirement ---
+new_repo 1
+add_misplaced_rule
+run_adr_check; expect "adrcheck-misplaced-rules-prefix-no-trigger" 0 $?
+
+# --- skip-observability: assert the workflow carries a visible skip step ---
+WF="$SCRIPT_DIR/../.github/workflows/pr-meta-checks.yml"
+SKIP_IF="$(grep -A3 -F '- name: adr-check skipped' "$WF" 2>/dev/null | grep -m1 -F 'if:' || true)"
+
+[ -f "$WF" ]; ok_check "skip-observability-workflow-file-present" $?
+grep -qF 'adr-check skipped' "$WF"; ok_check "skip-observability-else-branch-exists" $?
+grep -qF 'adr-check skipped: no decision-trigger paths in diff' "$WF"; ok_check "skip-observability-message-exact" $?
+echo "$SKIP_IF" | grep -qF "steps.filter.outputs.adr != 'true'"; ok_check "skip-observability-if-is-filter-complement" $?
+echo "$SKIP_IF" | grep -qF "github.event_name == 'pull_request'"; ok_check "skip-observability-if-guards-pull-request" $?
+echo "$SKIP_IF" | grep -qF '!cancelled()'; ok_check "skip-observability-if-runs-when-job-red" $?
 
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"

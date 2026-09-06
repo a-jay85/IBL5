@@ -3,7 +3,7 @@
 #
 # test-check-numbering — behavioural harness for bin/check-numbering, the widened
 # allocators (bin/next-adr, bin/next-migration) and the merge=union attribute on
-# the ADR index.
+# the ADR index and the backlog files.
 #
 # Each case builds a throwaway git repo under a temp dir, seeds a fixture, runs
 # the real script from a copy inside that repo, and asserts on the exit code.
@@ -99,6 +99,26 @@ index() {
             echo "| [$n]($n-placeholder.md) | Placeholder $n | Accepted | Because. |"
         done
     } > "$REPO/ibl5/docs/decisions/README.md"
+}
+
+# backlog <relpath> <id>...  — write a backlog file carrying one
+# `### <id> ...` section per id, in exactly the shape Check 4's regex matches.
+backlog() {
+    local f="$1"; shift
+    local h
+    mkdir -p "$REPO/$(dirname "$f")"
+    {
+        echo "# Backlog"
+        echo
+        echo "## Entries"
+        echo
+        for h in "$@"; do
+            echo "### $h placeholder title"
+            echo
+            echo "Body for $h."
+            echo
+        done
+    } > "$REPO/$f"
 }
 
 gadd()    { git -C "$REPO" add -- "$@"; }
@@ -271,6 +291,115 @@ expect "union-merge-corruption rebases clean" 0 $?
 run_gate --all; expect "union-merge-corruption-is-caught" 1 $?
 expect_out "union-merge-corruption names a duplicated row" 'duplicated row'
 
+echo "== backlog entry IDs =="
+
+# 17. A backlog file with distinct entry IDs passes.
+new_repo
+backlog ibl5/docs/backlog/dev-efficiency-backlog.md E52 E53 E54
+gadd ibl5/docs/backlog/dev-efficiency-backlog.md; gcommit base-backlog
+run_gate --all; expect "clean-backlog-passes" 0 $?
+
+# 18. The same ID twice inside one backlog file is caught.
+new_repo
+backlog ibl5/docs/backlog/dev-efficiency-backlog.md E52 E54 E54
+gadd ibl5/docs/backlog/dev-efficiency-backlog.md; gcommit dup-backlog
+run_gate --all; expect "dup-backlog-id-is-caught" 1 $?
+expect_out "dup-backlog-id names the ID" 'E54: duplicated entry ID'
+expect_out "dup-backlog-id names the file" 'dev-efficiency-backlog\.md'
+
+# 19. The trailing space in the ID pattern: `### E2E ...` is a title, not an
+#     entry with ID E2, so it must not read as a duplicate of `### E2 ...`.
+new_repo
+backlog ibl5/docs/backlog/dev-efficiency-backlog.md E2 E2E
+gadd ibl5/docs/backlog/dev-efficiency-backlog.md; gcommit e2e-title
+run_gate --all; expect "E2E-title-is-not-an-E2-duplicate" 0 $?
+
+# 20. Cross-file duplicates are deliberately NOT a finding: an ID present in both
+#     a live backlog and its archive is what archiving an entry looks like.
+new_repo
+backlog ibl5/docs/backlog/loop-engineering-backlog.md L40 L48
+backlog ibl5/docs/backlog/archive/loop-engineering-backlog-archive.md L40 L48
+gadd ibl5/docs/backlog/loop-engineering-backlog.md \
+     ibl5/docs/backlog/archive/loop-engineering-backlog-archive.md
+gcommit live-and-archive
+run_gate --all; expect "archived-ID-in-two-files-is-not-a-finding" 0 $?
+
+# 21. Diff scoping: a pre-existing duplicate in a file this change does not touch
+#     is out of scope for --staged, so an unrelated staged edit stays green.
+new_repo
+backlog ibl5/docs/backlog/dev-efficiency-backlog.md E54 E54
+gadd ibl5/docs/backlog/dev-efficiency-backlog.md; gcommit preexisting-dup
+echo changed > "$REPO/README.md"
+gadd README.md
+run_gate; expect "untouched-backlog-dup-is-out-of-scope-for-staged" 0 $?
+printf '### E55 a real edit\n\nBody.\n\n' >> "$REPO/ibl5/docs/backlog/dev-efficiency-backlog.md"
+gadd ibl5/docs/backlog/dev-efficiency-backlog.md
+run_gate; expect "staged-backlog-dup-is-in-scope" 1 $?
+expect_out "staged-backlog-dup names the ID" 'E54: duplicated entry ID'
+
+# 22. Two branches appending different backlog entries rebase without a conflict.
+new_repo
+printf 'ibl5/docs/backlog/**/*.md merge=union\n' > "$REPO/.gitattributes"
+backlog ibl5/docs/backlog/dev-efficiency-backlog.md E52 E53
+gadd .gitattributes ibl5/docs/backlog/dev-efficiency-backlog.md; gcommit base-backlog
+BASE_SHA="$(git -C "$REPO" rev-parse HEAD)"
+git -C "$REPO" checkout -q -b backlog-a
+printf '### E54 from branch a\n\nBody a.\n\n' >> "$REPO/ibl5/docs/backlog/dev-efficiency-backlog.md"
+gadd ibl5/docs/backlog/dev-efficiency-backlog.md; gcommit append-e54-a
+git -C "$REPO" checkout -q -b backlog-b "$BASE_SHA"
+printf '### E55 from branch b\n\nBody b.\n\n' >> "$REPO/ibl5/docs/backlog/dev-efficiency-backlog.md"
+gadd ibl5/docs/backlog/dev-efficiency-backlog.md; gcommit append-e55-b
+( cd "$REPO" && git rebase backlog-a ) > "$OUT" 2>&1
+expect "backlog-union-concurrent-appends rebases clean" 0 $?
+CONFLICTS="$(grep -c '<<<<<<<' "$REPO/ibl5/docs/backlog/dev-efficiency-backlog.md" || true)"
+expect_eq "backlog-union leaves no conflict markers" "0" "$CONFLICTS"
+ENTRIES="$(grep -cE '^### E5[2-5] ' "$REPO/ibl5/docs/backlog/dev-efficiency-backlog.md" || true)"
+expect_eq "backlog-union keeps all four entries" "4" "$ENTRIES"
+run_gate --all; expect "backlog-union clean append stays green" 0 $?
+
+# 22b. Control: the identical sequence without .gitattributes must conflict, so
+#      the case above is proving the attribute and not a git default.
+new_repo
+backlog ibl5/docs/backlog/dev-efficiency-backlog.md E52 E53
+gadd ibl5/docs/backlog/dev-efficiency-backlog.md; gcommit base-backlog
+BASE_SHA="$(git -C "$REPO" rev-parse HEAD)"
+git -C "$REPO" checkout -q -b backlog-a
+printf '### E54 from branch a\n\nBody a.\n\n' >> "$REPO/ibl5/docs/backlog/dev-efficiency-backlog.md"
+gadd ibl5/docs/backlog/dev-efficiency-backlog.md; gcommit append-e54-a
+git -C "$REPO" checkout -q -b backlog-b "$BASE_SHA"
+printf '### E55 from branch b\n\nBody b.\n\n' >> "$REPO/ibl5/docs/backlog/dev-efficiency-backlog.md"
+gadd ibl5/docs/backlog/dev-efficiency-backlog.md; gcommit append-e55-b
+( cd "$REPO" && git rebase backlog-a ) > "$OUT" 2>&1
+RC=$?
+( cd "$REPO" && git rebase --abort >/dev/null 2>&1 ) || true
+if [ "$RC" -ne 0 ]; then
+    echo "ok: backlog-no-gitattributes-control conflicts (exit $RC)"
+else
+    echo "FAIL: backlog-no-gitattributes-control — expected a rebase conflict, got exit 0"
+    FAILED=1
+fi
+
+# 23. The union failure mode this gate exists for: two branches independently
+#     allocate the SAME entry ID. The rebase is clean and silent; the gate is
+#     what turns it into a red run.
+new_repo
+printf 'ibl5/docs/backlog/**/*.md merge=union\n' > "$REPO/.gitattributes"
+backlog ibl5/docs/backlog/dev-efficiency-backlog.md E52 E53
+gadd .gitattributes ibl5/docs/backlog/dev-efficiency-backlog.md; gcommit base-backlog
+BASE_SHA="$(git -C "$REPO" rev-parse HEAD)"
+git -C "$REPO" checkout -q -b collide-a
+printf '### E54 allocated by branch a\n\nBody a.\n\n' >> "$REPO/ibl5/docs/backlog/dev-efficiency-backlog.md"
+gadd ibl5/docs/backlog/dev-efficiency-backlog.md; gcommit alloc-e54-a
+git -C "$REPO" checkout -q -b collide-b "$BASE_SHA"
+printf '### E54 allocated by branch b\n\nBody b.\n\n' >> "$REPO/ibl5/docs/backlog/dev-efficiency-backlog.md"
+gadd ibl5/docs/backlog/dev-efficiency-backlog.md; gcommit alloc-e54-b
+( cd "$REPO" && git rebase collide-a ) > "$OUT" 2>&1
+expect "backlog-union-ID-collision rebases clean" 0 $?
+CONFLICTS="$(grep -c '<<<<<<<' "$REPO/ibl5/docs/backlog/dev-efficiency-backlog.md" || true)"
+expect_eq "backlog-union-ID-collision is silent (no markers)" "0" "$CONFLICTS"
+run_gate --all; expect "backlog-union-ID-collision-is-caught" 1 $?
+expect_out "backlog-union-ID-collision names the ID" 'E54: duplicated entry ID'
+
 echo "== allocators =="
 
 # 13. bin/next-adr sees a number that exists only on an origin ref.
@@ -311,8 +440,9 @@ expect_eq "next-migration skips timestamp names, honours letter suffix" "038" "$
 
 echo "== CI wiring =="
 
-# 16. The paths-filter that gates bin/check-numbering must cover both numbered
-#     directories with an extension-agnostic glob. Grep-based on purpose: this
+# 16. The paths-filter that gates bin/check-numbering must cover every numbered
+#     directory with an extension-agnostic glob. Without the backlog entry the
+#     gate never fires on a backlog-only PR, which is the common shape. Grep-based on purpose: this
 #     runs in CI and must not depend on a YAML library being installed.
 WORKFLOW="$SCRIPT_DIR/../.github/workflows/pr-meta-checks.yml"
 FILTER_BLOCK="$(awk '
@@ -320,7 +450,7 @@ FILTER_BLOCK="$(awk '
     f && /^ *[a-zA-Z_-]+: *$/ { f = 0 }
     f { print }
 ' "$WORKFLOW")"
-for GLOB in "ibl5/docs/decisions/\*\*" "ibl5/migrations/\*\*"; do
+for GLOB in "ibl5/docs/decisions/\*\*" "ibl5/migrations/\*\*" "ibl5/docs/backlog/\*\*"; do
     if printf '%s\n' "$FILTER_BLOCK" | grep -qF "$(printf '%s' "$GLOB" | tr -d '\\')"; then
         echo "ok: numbering filter covers $(printf '%s' "$GLOB" | tr -d '\\')"
     else

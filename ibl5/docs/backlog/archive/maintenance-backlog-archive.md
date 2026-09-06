@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed/declined maintenance-audit findings, extracted from maintenance-backlog.md.
-last_verified: 2026-09-05
+last_verified: 2026-09-06
 ---
 
 # Maintenance-Cost Reduction Backlog — Archive
@@ -627,7 +627,7 @@ Split completed in PR #1145. `SeasonArchiveView.php` deleted; replaced by `ibl5/
 - rung 0 (root cause) — `ibl5/modules/` is absent from the `paths:` list of every PHPStan config: `phpstan.neon` covers `classes`, `themes`, `phpstan-rules`, a hand-listed set of `bin/` scripts, and `scripts`; `phpstan-tests.neon` covers `tests` only. `ibl5/bin/analyse-diff`'s file classifier has an explicit `*) : ;;` arm that silently drops any changed file under `modules/` rather than routing it to either config. That is why `Player/index.php:79` was never flagged despite PHPStan already running at `level: max`.
 - rung 1 — `ibl5/phpstan.neon` is already at `level: max`; the strictness dial has no headroom.
 - rung 2 — `ibl5/phpstan-baseline.neon` contains no suppression for this class. The only `getTeamnameFromUsername` baseline entry (line 1112) is the opposite direction — `mixed given` into the `?string` parameter — not a `?string → string` return-side sink.
-- rung 3 (deferred) — add `modules/` to `phpstan.neon`'s `paths:` and wire a `modules/*` arm in `ibl5/bin/analyse-diff`'s classifier. Measured as-is cost: 549 errors. Tracked as **10.27**; needs a `/plan` on its own branch off master.
+- rung 3 (discharged 2026-09-06) — `modules` added to `phpstan.neon` `paths:` and `modules/*` arm wired into `bin/analyse-diff`'s classifier; 549 pre-existing errors absorbed into `phpstan-baseline.neon` (baseline-and-burn). See archived **10.27** for full implementation details.
 **Landing rung: 3 (deferred — prevention not landed; see 10.27).**
 **artifact destination:** `ibl5/phpstan.neon` (`paths:` addition) + `ibl5/bin/analyse-diff` (classifier arm). Deferred to 10.27.
 **provenance:** (discovered 2026-09-02 during #1807)
@@ -2088,6 +2088,23 @@ one-time backfill (its tables now live in the baseline schema + migrations).
 
 
 **Table evidence (2026-07-25):** The 4 cited counts at 0; drift fix folds into 10.1.
+
+### 10.27 `ibl5/modules/` Absent from PHPStan Analysis Paths
+**Location:** `ibl5/phpstan.neon` (`paths:`), `ibl5/bin/analyse-diff` (classifier)
+**Problem:** `phpstan.neon` covers `classes`, `themes`, `phpstan-rules`, hand-listed `bin/` scripts, and `scripts` — but not `modules/`. `phpstan-tests.neon` covers `tests` only. `ibl5/bin/analyse-diff`'s file classifier has an explicit `*) : ;;` arm that silently drops any changed file under `modules/` rather than routing it to either config. The practical effect: type errors in module entrypoints (e.g. `?string → string` sinks, global variables passed into typed parameters) are invisible to CI — discovered when `Player/index.php:79` was fixed in #1807 without any PHPStan signal. PHPStan already runs at `level: max`; the gap is the missing path, not the strictness dial.
+**Suggested direction:** Add `modules/` to `phpstan.neon`'s `paths:` and wire a `modules/*` arm in `ibl5/bin/analyse-diff`'s classifier. Measured as-is cost: 549 errors (top identifiers: `argument.type` 290, `ibl.bannedNukeGlobal` 65, `cast.int` 31, `method.nonObject` 30, `variable.undefined` 29); a baseline-and-burn or fix-first approach needs upfront decision. 🟨: upfront decision gates implementation.
+**Est. effort:** L
+**Risk if untouched:** Module entrypoint type errors (nullability sinks, untyped globals into typed parameters) remain invisible to CI and PHPStan's PR-diff check indefinitely.
+**provenance:** (discovered 2026-09-03 during #1807; root cause of 2.40)
+
+**Status:** ✅ Implemented (2026-09-06) — `modules` added to `phpstan.neon` `paths:`; all 549 pre-existing
+errors absorbed into `phpstan-baseline.neon` (baseline-and-burn: no inline fixes, no rule relaxation, no
+`@phpstan-ignore`); `phpstan-baseline-counts.json` re-snapshotted; `bin/analyse-diff`'s prod arm extended to
+`classes/*|phpstan-rules/*|modules/*`. New module errors now fail CI. Burning the 549 down is separate,
+unscheduled follow-up work.
+
+**Table evidence (2026-09-06):** `ibl5/modules/` is absent from every PHPStan config's `paths:` and from `ibl5/bin/analyse-diff`'s classifier (explicit `*) : ;;` arm silently drops all `modules/` diffs). Measured cost to add as-is: 549 errors (`argument.type` 290, `ibl.bannedNukeGlobal` 65, `cast.int` 31, `method.nonObject` 30, `variable.undefined` 29). Needs a `/plan` on its own branch; upfront decision: baseline-and-burn vs. fix-first. See 2.40 for root-cause context. (discovered 2026-09-03 during #1807)
+
 ## Axis 11: CSS, Themes, Design System
 
 ### 11.5 `import-demands.css` Loaded Standalone Without Token Definitions

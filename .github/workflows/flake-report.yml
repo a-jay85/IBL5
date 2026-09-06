@@ -1,0 +1,93 @@
+name: Weekly Flake Report
+
+on:
+  # Sunday ~9:45am ET (13:43 UTC). Offset from log-review's 12:57 so the two DMs do not collide.
+  schedule:
+    - cron: '43 13 * * 0'
+
+  workflow_dispatch: {}
+
+  # Path-filtered PR trigger: runs the whole job body from the PR branch so the report
+  # logic is exercised pre-merge. The Discord send is gated off for pull_request.
+  pull_request:
+    paths:
+      - '.github/workflows/flake-report.yml'
+      - 'ibl5/bin/flake-ledger-report'
+      - 'ibl5/bin/parse-playwright-flakes'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  report:
+    name: Flake Ledger Report
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download latest flake ledger
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          : > /tmp/flake-ledger.ndjson
+          ART_ID="$(gh api \
+            "repos/${{ github.repository }}/actions/artifacts?name=flake-ledger&per_page=100" \
+            --jq '[.artifacts[] | select(.name == "flake-ledger" and .expired == false)] | sort_by(.created_at) | last | .id // empty' \
+            2>/dev/null || true)"
+          if [ -z "$ART_ID" ]; then
+            echo "::notice::no flake-ledger artifact found; reporting an empty ledger"
+            exit 0
+          fi
+          if gh api "repos/${{ github.repository }}/actions/artifacts/$ART_ID/zip" \
+               > /tmp/flake-ledger.zip 2>/dev/null \
+             && unzip -o -q /tmp/flake-ledger.zip -d /tmp/flake-ledger \
+             && [ -f /tmp/flake-ledger/flake-ledger.ndjson ]; then
+            cp /tmp/flake-ledger/flake-ledger.ndjson /tmp/flake-ledger.ndjson
+          else
+            echo "::notice::flake-ledger artifact $ART_ID unreadable; reporting an empty ledger"
+          fi
+
+      - name: Build flake report
+        id: report
+        run: |
+          set -euo pipefail
+          COUNT="$(ibl5/bin/flake-ledger-report --ledger /tmp/flake-ledger.ndjson --threshold 3 --format count)"
+          ibl5/bin/flake-ledger-report \
+            --ledger /tmp/flake-ledger.ndjson \
+            --threshold 3 \
+            --ledger-url "${{ github.server_url }}/${{ github.repository }}/actions/workflows/e2e-tests.yml" \
+            > /tmp/discord-msg.txt
+          {
+            echo "### E2E flake ledger report"
+            echo '```'
+            cat /tmp/discord-msg.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat /tmp/discord-msg.txt
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+
+      - name: Setup SSH
+        if: github.event_name != 'pull_request' && steps.report.outputs.count != '0'
+        uses: ./.github/actions/setup-ssh
+        with:
+          host: ${{ secrets.HOST }}
+          port: ${{ secrets.PORT }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Send Discord DM
+        if: github.event_name != 'pull_request' && steps.report.outputs.count != '0'
+        uses: ./.github/actions/notify-discord
+        with:
+          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
+          port: ${{ secrets.PORT }}
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          fail-on-delivery: 'false'

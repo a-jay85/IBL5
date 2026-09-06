@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# parse-playwright-flakes - extract flaky-test records from a Playwright JSON report.
+#
+# Usage:
+#   bin/parse-playwright-flakes --json <report.json> --run-id <id> [--run-url <url>]
+#                               [--date YYYY-MM-DD] [--merge <ledger.ndjson>] [--retain-days N]
+#
+# Without --merge: emits one NDJSON record per flaky test in this run.
+# With --merge:    emits the merged ledger (prior records + this run's), deduped on
+#                  (spec, title, run_id) and pruned to the last N days (default 90).
+#
+# A "flaky" test is one Playwright retried and then passed: test-level status == "flaky".
+
+set -euo pipefail
+
+JSON=""; RUN_ID=""; RUN_URL=""; MERGE=""; RETAIN_DAYS=90
+DATE="$(date -u +%Y-%m-%d)"
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --json)        JSON="${2:-}"; shift 2 ;;
+    --run-id)      RUN_ID="${2:-}"; shift 2 ;;
+    --run-url)     RUN_URL="${2:-}"; shift 2 ;;
+    --date)        DATE="${2:-}"; shift 2 ;;
+    --merge)       MERGE="${2:-}"; shift 2 ;;
+    --retain-days) RETAIN_DAYS="${2:-}"; shift 2 ;;
+    *) echo "Unknown option: $1" >&2; exit 2 ;;
+  esac
+done
+
+[ -n "$JSON" ]   || { echo "--json is required" >&2; exit 2; }
+[ -n "$RUN_ID" ] || { echo "--run-id is required" >&2; exit 2; }
+[ -f "$JSON" ]   || { echo "No such Playwright report: $JSON" >&2; exit 1; }
+case "$RETAIN_DAYS" in ''|*[!0-9]*) echo "--retain-days must be a non-negative integer" >&2; exit 2 ;; esac
+jq -e . "$JSON" >/dev/null 2>&1 || { echo "Not valid JSON: $JSON" >&2; exit 1; }
+
+TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+
+jq -c --arg date "$DATE" --arg rid "$RUN_ID" --arg rurl "$RUN_URL" '
+  [ .suites[]? | recurse(.suites[]?) | .specs[]?
+    | . as $s
+    | .tests[]?
+    | select(.status == "flaky")
+    | { spec:  ($s.file // $s.title // "unknown"),
+        title: ($s.title // "unknown"),
+        date: $date, run_id: $rid, run_url: $rurl } ]
+  | unique_by(.spec + "|" + .title)
+  | .[]
+' "$JSON" > "$TMP/new.ndjson"
+
+if [ -z "$MERGE" ]; then
+  cat "$TMP/new.ndjson"
+  exit 0
+fi
+
+CUTOFF="$(jq -rn --argjson d "$RETAIN_DAYS" 'now - ($d * 86400) | strftime("%Y-%m-%d")')"
+: > "$TMP/prev.ndjson"
+if [ -f "$MERGE" ]; then cp "$MERGE" "$TMP/prev.ndjson"; fi
+
+cat "$TMP/prev.ndjson" "$TMP/new.ndjson" | jq -sc --arg cutoff "$CUTOFF" '
+  map(select(type == "object" and has("spec") and has("title") and has("run_id")))
+  | unique_by(.spec + "|" + .title + "|" + .run_id)
+  | map(select((.date // "0000-00-00") >= $cutoff))
+  | .[]'

@@ -90,11 +90,12 @@ if ($useStdin) {
     $exit = proc_close($proc);
     if ($exit !== 0) {
         fwrite(STDERR, sprintf(
-            "git diff --name-only origin/master...HEAD failed (exit %d): %s\n",
+            "git diff --name-only origin/master...HEAD failed (exit %d): %s — falling back to representative set\n",
             $exit,
             trim((string) $errDiff) !== '' ? trim((string) $errDiff) : '(no stderr output)'
         ));
-        exit(1);
+        $emit(LighthouseUrls::representativeUrls($baseUrl));
+        exit(0);
     }
 }
 

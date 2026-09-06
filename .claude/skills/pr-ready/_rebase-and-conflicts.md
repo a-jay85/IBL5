@@ -15,6 +15,14 @@ git rev-list --count <MASTER_SHA>..HEAD   # commit count drives the squash decis
 
 **The filename is keyed to the PR number, deliberately — never `$$`.** Each Bash call gets a fresh shell, so `$$` differs between the call that writes this file and Phase 4's call that reads it; a PID-keyed name is guaranteed to miss, and Phase 4 would then report `TREE DIVERGED` on every run. The PR number is stable across calls and still unique per concurrent run. Substitute the real number before running — the same reason `<MASTER_SHA>` above is a literal rather than `"$MASTER_SHA"`.
 
+**Then record the pre-rebase tip.** This is the input to the Phase 1.4 prior-collapse guard on the *next* run, so it must be written after the pre-rebase diff and still before any history is rewritten:
+
+```bash
+git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/collapse-guard.sh > /tmp/pr-ready-collapse-<N>.sh && test -s /tmp/pr-ready-collapse-<N>.sh && bash /tmp/pr-ready-collapse-<N>.sh record <N> <BRANCH>
+```
+
+The recorded tip is a convenience, not a dependency: the guard's reflog arm works without it. If this command fails, note it and continue — a failed `record` is never a reason to stop a run.
+
 **2b. The Phase 2 delegation packet.** Hand this to exactly one sub-agent. Substitute the real `<MASTER_SHA>`, branch name, and commit count before spawning — the delegate must never resolve them itself.
 
 ````

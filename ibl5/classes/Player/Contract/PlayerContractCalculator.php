@@ -6,18 +6,26 @@ namespace Player\Contract;
 
 use Player\Contract\Contracts\PlayerContractCalculatorInterface;
 use Player\PlayerData;
+use Season\Season;
 
 /**
  * @see PlayerContractCalculatorInterface
  */
 class PlayerContractCalculator implements PlayerContractCalculatorInterface
 {
+    private ?Season $season;
+
+    public function __construct(?Season $season = null)
+    {
+        $this->season = $season;
+    }
+
     /**
      * @see PlayerContractCalculatorInterface::getCurrentSeasonSalary()
      */
     public function getCurrentSeasonSalary(PlayerData $playerData): int
     {
-        return $this->getSalaryForYear($playerData, $playerData->contractCurrentYear ?? 0);
+        return $this->getSalaryForYear($playerData, $this->resolveCurrentContractYear($playerData));
     }
 
     /**
@@ -25,7 +33,18 @@ class PlayerContractCalculator implements PlayerContractCalculatorInterface
      */
     public function getNextSeasonSalary(PlayerData $playerData): int
     {
-        return $this->getSalaryForYear($playerData, ($playerData->contractCurrentYear ?? 0) + 1);
+        return $this->getSalaryForYear($playerData, $this->resolveCurrentContractYear($playerData) + 1);
+    }
+
+    /**
+     * Resolve the effective current contract year, shifting +1 during
+     * phases where contract years advance (Playoffs / Draft / Free Agency).
+     * When no Season is injected the calculator is phase-blind (raw cy).
+     */
+    private function resolveCurrentContractYear(PlayerData $playerData): int
+    {
+        $advancesContractYears = $this->season !== null && $this->season->advancesContractYears();
+        return ($playerData->contractCurrentYear ?? 0) + ($advancesContractYears ? 1 : 0);
     }
 
     /**

@@ -146,6 +146,37 @@ ATTACK_1PR='# Plan of attack
 | 1 | #101 first-slug | none | no |
 '
 
+# A one-PR plan of attack that also carries an ## Excluded section, in the shape bin/pr-attack
+# emits it. Four adversarial shapes on purpose: an ordinary DIRTY bullet; a DIRTY bullet whose
+# slug is empty (pr-attack's `jq ... // ""`), giving a double space; a DIRTY bullet whose slug
+# itself contains a literal " — "; a DRAFT bullet that is excluded but NOT a rescue candidate;
+# and a DIRTY-looking decoy in the NEXT section, which a section-scoped parser must not reach.
+ATTACK_EXCLUDED='# Plan of attack
+
+| # | PR | Constraint | Needs you? |
+|---|----|-----------|------------|
+| 1 | #101 first-slug | none | no |
+
+## Excluded
+
+- #201 dirty-slug — DIRTY (merge conflict; rebase before it can be ordered)
+- #202  — DIRTY (merge conflict; rebase before it can be ordered)
+- #203 draft-slug — DRAFT
+- #205 weird — slug — DIRTY (merge conflict; rebase before it can be ordered)
+
+## Hand-resolutions needed
+
+- #204 decoy-slug — DIRTY (merge conflict; rebase before it can be ordered)
+'
+
+# The same document with an EMPTY ordered table: the ordered work is drained on the first
+# iteration, so the drain-point call site is the only one that can fire.
+ATTACK_EXCLUDED_ONLY='# Plan of attack
+
+| # | PR | Constraint | Needs you? |
+|---|----|-----------|------------|
+'"${ATTACK_EXCLUDED#*| 1 | #101 first-slug | none | no |}"
+
 triage_report() {  # $@ = "PR BUCKET ACTION" triples, one per argument
     printf '%-8s %-18s %-24s\n' "PR#" "BUCKET" "NEXT-ACTION"
     printf -- '-------- ------------------ ------------------------\n'
@@ -157,17 +188,28 @@ triage_report() {  # $@ = "PR BUCKET ACTION" triples, one per argument
     done
 }
 
-digest_comment() {  # $1 = extra body text appended after the standard digest block
+# Bare (unbulleted) bold labels. This is the shape `.claude/skills/pr-ready/_phase7-verdict.md`
+# obliges the producer to emit, and the shape real verdict comments carry (PRs #2092, #2064,
+# #2084). The bulleted fixture this replaced silently exempted _digest_labels from the only
+# format it ever parses in production, which is why the suite stayed green while every live
+# ledger row read `digest: unavailable`. Case 15's `partial` variant keeps the bulleted form,
+# so the parser is still held to both.
+digest_comment() {  # no arguments; the fixture is fixed text
     cat <<'DIG_EOF'
 <!-- pr-ready-verdict -->
 Verdict: green.
 
 ### Merge digest
-- **What changed:** the driver landed
-- **Why:** because the loop was manual
-- **Watch:** the ledger
-- **Touches:** bin/pr-cycle
-- **Machine-authored fixes:** none
+**What changed:** the driver landed
+**Why:** because the loop was manual
+**Watch:** the ledger
+**Touches:** bin/pr-cycle
+**Machine-authored fixes:** none
+
+---
+
+## Remediation
+Prose after a horizontal rule must not be folded onto the last label's value.
 DIG_EOF
 }
 
@@ -197,8 +239,12 @@ reset_state() {
 OUT=""; ERR=""; RC=0
 run_in() {
     local cwd="$1"; shift
+    # PR_CYCLE_RESCUE is passed through ONLY when the caller set it, so a test can distinguish
+    # unset (seam absent) from empty (seam present but blank) — `env VAR=$X` cannot express that.
+    local -a extra=()
+    [[ -n "${RESCUE+x}" ]] && extra+=("PR_CYCLE_RESCUE=$RESCUE")
     ERR="$SCRATCH/last.err"
-    OUT="$(cd "$cwd" && env HOME="$SCRATCH" PATH="$BIN:$PATH" \
+    OUT="$(cd "$cwd" && env HOME="$SCRATCH" PATH="$BIN:$PATH" "${extra[@]+"${extra[@]}"}" \
         PR_CYCLE_ATTACK_CMD="$BIN/attack" \
         PR_CYCLE_TRIAGE_CMD="$BIN/triage" \
         PR_CYCLE_READY_CMD="$BIN/ready" \
@@ -408,6 +454,139 @@ run --worker
 [[ "$(rows)" == "0" ]] || fail "wrote $(rows) rows without an ARMABLE row"
 grep -qF 'absent' <<< "$OUT" || fail "a PR missing from the report was not reported as absent"
 end_case "case 11 non-armable and absent"
+
+# --- rescue: baseline characterization -----------------------------------------------------
+# Passes BEFORE the rescue path exists (the driver ignores an unknown seam) and AFTER it
+# exists (the kill switch is honored). That dual property is what makes it a characterization.
+begin_case
+reset_state
+printf '%s' "$ATTACK_EXCLUDED" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+RESCUE=0 run --worker
+[[ $RC -eq 0 ]] || fail "rescue-off run exit $RC, want 0"
+[[ "$(calls ready)" == "1" ]] || fail "rescue-off run made $(calls ready) ready calls, want 1"
+grep -qF -- '--pr 101' "$SCRATCH/ready.argv" || fail "the one orderable PR was not readied"
+for n in 201 202 203 204 205; do
+    grep -qF -- "--pr $n" "$SCRATCH/ready.argv" \
+        && fail "excluded #$n was handed to pr-ready-now with rescue off"
+done
+[[ "$(calls gh)" == "0" ]] || fail "polled with no ARMABLE row: $(calls gh) gh calls"
+end_case "case 11a rescue off leaves excluded PRs untouched"
+# --- 11b: exactly ONE rescue per iteration, never a batch ------------------------------------
+# Iter 1: #101 readied normally, then site B rescues #201. Iter 2: nothing orderable, site A
+# rescues #202 and continues. Iter 3: site A rescues #205. Iter 4: no candidate left, drained.
+# 4 attack calls + 4 ready calls. A BATCHING implementation produces the same 4 ready calls but
+# only 2 attack calls -- that is why the attack count is asserted, not just the ready count.
+begin_case
+reset_state
+printf '%s' "$ATTACK_EXCLUDED" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+run --worker
+[[ $RC -eq 0 ]] || fail "rescue run exit $RC, want 0"
+[[ "$(calls ready)" == "4" ]] || fail "want 4 ready calls, got $(calls ready)"
+[[ "$(calls attack)" == "4" ]] || fail "want 4 attack calls (one per iteration), got $(calls attack)"
+grep -qF -- '--pr 101' <<< "$(sed -n 1p "$SCRATCH/ready.argv")" || fail "iter 1 did not ready #101 first"
+grep -qF -- '--pr 201' <<< "$(sed -n 2p "$SCRATCH/ready.argv")" || fail "iter 1 did not rescue #201"
+grep -qF -- '--pr 202' <<< "$(sed -n 3p "$SCRATCH/ready.argv")" || fail "iter 2 did not rescue #202"
+grep -qF -- '--pr 205' <<< "$(sed -n 4p "$SCRATCH/ready.argv")" || fail "iter 3 did not rescue #205"
+grep -qF -- '--go' "$SCRATCH/ready.argv" || fail "rescue did not pass --go to pr-ready-now"
+grep -qF -- '--wait' "$SCRATCH/ready.argv" || fail "rescue did not pass --wait (the completion signal)"
+grep -qF 'rescuing DIRTY #201' <<< "$OUT" || fail "rescue was not announced in the log"
+[[ "$(calls gh)" == "0" ]] || fail "rescue polled gh: $(calls gh) calls"
+end_case "case 11b one rescue per iteration"
+
+# --- 11c: an attempted PR is never re-attempted, and a still-DIRTY PR cannot spin the loop ---
+# The attack document is IDENTICAL on every call: #201/#202/#205 stay DIRTY throughout, exactly
+# as they would if pr-ready-now failed to resolve the conflict. rescued.txt is what stops the
+# loop re-picking #201 forever.
+begin_case
+reset_state
+printf '%s' "$ATTACK_EXCLUDED_ONLY" > "$SCRATCH/attack-out"
+grep -qF '#201' <<< "$ATTACK_EXCLUDED_ONLY" || fail "fixture ATTACK_EXCLUDED_ONLY lost its Excluded section"
+grep -qF '#101' <<< "$ATTACK_EXCLUDED_ONLY" && fail "fixture ATTACK_EXCLUDED_ONLY still has an orderable row"
+run --worker
+[[ $RC -eq 0 ]] || fail "excluded-only run exit $RC, want 0"
+[[ "$(calls ready)" == "3" ]] || fail "want 3 rescues (201,202,205), got $(calls ready)"
+[[ "$(calls attack)" == "4" ]] || fail "want 4 attack calls, got $(calls attack)"
+[[ "$(sort "$SCRATCH/ready.argv" | uniq | wc -l | tr -d ' ')" == "3" ]] \
+    || fail "a PR was rescued twice in one run"
+[[ "$(grep -cF -- '--pr 201' "$SCRATCH/ready.argv")" == "1" ]] \
+    || fail "still-DIRTY #201 was re-attempted: the loop can spin"
+grep -qF 'queue drained' <<< "$OUT" || fail "run did not terminate as drained"
+end_case "case 11c attempted set prevents re-attempt and spin"
+
+# --- 11d: pr-cycle never merges, and the merge cap does not starve rescue --------------------
+# #101 is ARMABLE and lands, so MERGES hits the cap of 1 and iteration 2 breaks at the TOP of
+# the loop -- before the drain point. Site B has nonetheless already rescued once. Under a
+# drain-point-ONLY wiring this run rescues nothing, which is the regression this case pins.
+begin_case
+reset_state
+printf '%s' "$ATTACK_EXCLUDED" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE merge" > "$SCRATCH/triage-out"
+echo MERGED > "$SCRATCH/state-101"
+view_json 101 "$(digest_comment)" > "$SCRATCH/view-101.json"
+run --worker --max-merges 1
+[[ $RC -eq 0 ]] || fail "capped run exit $RC, want 0"
+[[ "$(calls ready)" == "2" ]] || fail "capped run made $(calls ready) ready calls, want 2 (#101 + one rescue)"
+grep -qF -- '--pr 201' "$SCRATCH/ready.argv" || fail "merge cap starved the rescue path"
+grep -qE '(^| )merge( |$)' "$SCRATCH/gh.argv" && fail "pr-cycle invoked a gh merge subcommand"
+grep -vE '^[[:space:]]*#' "$DRIVER" | grep -qE 'pr +merge|merge +--auto' \
+    && fail "a gh merge / auto-merge call appeared in the driver source"
+grep -qF 'merge cap' <<< "$OUT" || fail "capped run did not report the cap"
+end_case "case 11d never merges; cap does not starve rescue"
+
+# --- 11e: only DIRTY is eligible; unset and empty seam values BOTH mean enabled ---------------
+begin_case
+reset_state
+printf '%s' "$ATTACK_EXCLUDED" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+run --worker                                   # PR_CYCLE_RESCUE genuinely UNSET
+[[ "$(calls ready)" == "4" ]] || fail "unset seam did not enable rescue: $(calls ready) ready calls"
+grep -qF -- '--pr 203' "$SCRATCH/ready.argv" && fail "the DRAFT-excluded #203 was rescued"
+grep -qF -- '--pr 204' "$SCRATCH/ready.argv" \
+    && fail "#204 from '## Hand-resolutions needed' was rescued: the parse is not section-scoped"
+UNSET_ARGV="$(cat "$SCRATCH/ready.argv")"
+reset_state
+printf '%s' "$ATTACK_EXCLUDED" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+RESCUE="" run --worker                         # seam PRESENT but EMPTY
+[[ "$(cat "$SCRATCH/ready.argv")" == "$UNSET_ARGV" ]] \
+    || fail "an empty PR_CYCLE_RESCUE behaved differently from an unset one"
+end_case "case 11e DIRTY-only; unset and empty seam both enable"
+
+# --- 11f: a live launchd slot blocks that PR only; and the dry run reports, never fires -------
+begin_case
+reset_state
+printf '%s' "$ATTACK_EXCLUDED_ONLY" > "$SCRATCH/attack-out"
+set_live_labels "-	0	com.ibl5.pr-ready-now-201"
+run --worker
+grep -qF -- '--pr 201' "$SCRATCH/ready.argv" && fail "rescued #201 while its launchd slot was live"
+grep -qF -- '--pr 202' <<< "$(sed -n 1p "$SCRATCH/ready.argv")" \
+    || fail "did not fall through to the next unheld candidate"
+grep -qF 'slot is already live' <<< "$OUT" || fail "the slot skip was not logged"
+clear_live_labels
+reset_state
+printf '%s' "$ATTACK_EXCLUDED_ONLY" > "$SCRATCH/attack-out"
+set_live_labels "-	0	com.ibl5.pr-ready-now-2011"     # longer label: must NOT match #201
+run --worker
+grep -qF -- '--pr 201' "$SCRATCH/ready.argv" \
+    || fail "an unanchored label match let #2011 veto the rescue of #201"
+clear_live_labels
+reset_state
+printf '%s' "$ATTACK_EXCLUDED" > "$SCRATCH/attack-out"
+run --dry-run
+[[ $RC -eq 0 ]] || fail "dry run exit $RC, want 0"
+[[ "$(calls ready)" == "0" ]] || fail "dry run fired $(calls ready) ready calls"
+grep -qF 'DIRTY rescue candidates (3)' <<< "$OUT" || fail "dry run did not count the candidates"
+[[ "$(grep -c 'would be rescued FIRST' <<< "$OUT")" == "1" ]] \
+    || fail "dry run marked more than one candidate as first: it implies a batch"
+grep -qF '#203' <<< "$OUT" && fail "dry run listed the DRAFT PR as a rescue candidate"
+grep -qF '#204' <<< "$OUT" && fail "dry run listed the out-of-section decoy as a candidate"
+RESCUE=0 run --dry-run
+grep -qF 'DIRTY rescue: disabled' <<< "$OUT" || fail "dry run did not report the kill switch"
+grep -qF 'would be rescued FIRST' <<< "$OUT" && fail "dry run promised a rescue with rescue off"
+end_case "case 11f slot guard and dry-run report"
+
 
 # ==========================================================================================
 # 12 — triage exit codes

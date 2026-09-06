@@ -18,7 +18,8 @@ if (stripos($_SERVER['PHP_SELF'], 'modules.php') === false) {
 
 global $mysqli_db, $user, $authService;
 
-$op = is_string($_REQUEST['op'] ?? null) ? $_REQUEST['op'] : 'main';
+$httpRequest = \Http\HttpRequest::fromGlobals();
+$op = is_string($httpRequest->request('op')) ? $httpRequest->request('op') : 'main';
 
 $repository = new \ApiKeys\ApiKeysRepository($mysqli_db);
 $service    = new \ApiKeys\ApiKeysService($repository);

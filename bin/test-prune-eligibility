@@ -304,4 +304,364 @@ else
          "trailing integer == number of WOULD PRUNE: lines (expected 2)"
 fi
 
+# ---------------------------------------------------------------------------
+# Case: no-max-dirs-flag-means-no-cap
+# ---------------------------------------------------------------------------
+SHA_NM1="cc11cc11cc11cc11cc11cc11cc11cc11cc11cc11"
+SHA_NM2="cc22cc22cc22cc22cc22cc22cc22cc22cc22cc22"
+SHA_NM3="cc33cc33cc33cc33cc33cc33cc33cc33cc33cc33"
+REPO="$TMP/case-no-max-dirs"
+git_init "$REPO"
+mkdir -p "$REPO/$SHA_NM1" "$REPO/$SHA_NM2" "$REPO/$SHA_NM3"
+echo "content" > "$REPO/$SHA_NM1/index.html"
+echo "content" > "$REPO/$SHA_NM2/index.html"
+echo "content" > "$REPO/$SHA_NM3/index.html"
+git -C "$REPO" add .
+git_commit_at "$REPO" $(( NOW - 2*86400 )) "three fresh dirs"
+
+run_prune "$REPO" --dry-run --cutoff-days 7
+TRAIL_NM="$(printf '%s\n' "$OUT" | tail -1)"
+WOULD_NM="$(printf '%s\n' "$OUT" | grep -c '^WOULD PRUNE:' || true)"
+
+CASE_PASS=1
+if [ "$WOULD_NM" -ne 0 ]; then CASE_PASS=0; fi
+if [ "$TRAIL_NM" != "0" ]; then CASE_PASS=0; fi
+if [ "$CASE_PASS" -eq 1 ]; then
+    pass "no-max-dirs-flag-means-no-cap"
+else
+    fail "no-max-dirs-flag-means-no-cap" \
+         "would_prune=$WOULD_NM trailing=$TRAIL_NM" \
+         "0 WOULD PRUNE lines and trailing=0 (all 3 kept, no cap)"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: max-dirs-prunes-oldest-survivors
+# Five fresh dirs at distinct timestamps; --max-dirs 3 prunes the 2 oldest.
+# ---------------------------------------------------------------------------
+SHA_D1="d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1"   # oldest: NOW-5d
+SHA_D2="d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2"   # NOW-4d
+SHA_D3="d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3"   # NOW-3d
+SHA_D4="d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4"   # NOW-2d
+SHA_D5="d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5"   # newest: NOW-1d
+REPO="$TMP/case-max-dirs-prunes"
+git_init "$REPO"
+for sha in "$SHA_D1" "$SHA_D2" "$SHA_D3" "$SHA_D4" "$SHA_D5"; do
+    mkdir -p "$REPO/$sha"
+    echo "content" > "$REPO/$sha/index.html"
+done
+git -C "$REPO" add "$REPO/$SHA_D1"
+git_commit_at "$REPO" $(( NOW - 5*86400 )) "d1 oldest"
+git -C "$REPO" add "$REPO/$SHA_D2"
+git_commit_at "$REPO" $(( NOW - 4*86400 )) "d2"
+git -C "$REPO" add "$REPO/$SHA_D3"
+git_commit_at "$REPO" $(( NOW - 3*86400 )) "d3"
+git -C "$REPO" add "$REPO/$SHA_D4"
+git_commit_at "$REPO" $(( NOW - 2*86400 )) "d4"
+git -C "$REPO" add "$REPO/$SHA_D5"
+git_commit_at "$REPO" $(( NOW - 1*86400 )) "d5 newest"
+
+run_prune "$REPO" --dry-run --cutoff-days 7 --max-dirs 3
+WOULD_D="$(printf '%s\n' "$OUT" | grep -c '^WOULD PRUNE:' || true)"
+TRAIL_D="$(printf '%s\n' "$OUT" | tail -1)"
+
+CASE_PASS=1
+if [ "$WOULD_D" -ne 2 ]; then CASE_PASS=0; fi
+if [ "$TRAIL_D" != "2" ]; then CASE_PASS=0; fi
+# Oldest two pruned, newest three kept
+if ! printf '%s\n' "$OUT" | grep -qF "WOULD PRUNE: ./$SHA_D1"; then CASE_PASS=0; fi
+if ! printf '%s\n' "$OUT" | grep -qF "WOULD PRUNE: ./$SHA_D2"; then CASE_PASS=0; fi
+if printf '%s\n' "$OUT" | grep -qF "WOULD PRUNE: ./$SHA_D5"; then CASE_PASS=0; fi
+if [ "$CASE_PASS" -eq 1 ]; then
+    pass "max-dirs-prunes-oldest-survivors"
+else
+    fail "max-dirs-prunes-oldest-survivors" \
+         "would=$WOULD_D trailing=$TRAIL_D out='$OUT'" \
+         "2 WOULD PRUNE (d1+d2, the oldest), trailing=2, d5 kept"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: max-dirs-exactly-at-n-is-noop
+# Survivors == N → zero cap prunes.
+# ---------------------------------------------------------------------------
+SHA_E1="e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1"
+SHA_E2="e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2"
+SHA_E3="e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3e3"
+REPO="$TMP/case-exact-n"
+git_init "$REPO"
+for sha in "$SHA_E1" "$SHA_E2" "$SHA_E3"; do
+    mkdir -p "$REPO/$sha"
+    echo "content" > "$REPO/$sha/index.html"
+done
+git -C "$REPO" add .
+git_commit_at "$REPO" $(( NOW - 2*86400 )) "three fresh"
+
+run_prune "$REPO" --dry-run --cutoff-days 7 --max-dirs 3
+WOULD_E="$(printf '%s\n' "$OUT" | grep -c '^WOULD PRUNE:' || true)"
+TRAIL_E="$(printf '%s\n' "$OUT" | tail -1)"
+
+CASE_PASS=1
+if [ "$WOULD_E" -ne 0 ]; then CASE_PASS=0; fi
+if [ "$TRAIL_E" != "0" ]; then CASE_PASS=0; fi
+if [ "$CASE_PASS" -eq 1 ]; then
+    pass "max-dirs-exactly-at-n-is-noop"
+else
+    fail "max-dirs-exactly-at-n-is-noop" \
+         "would=$WOULD_E trailing=$TRAIL_E" \
+         "0 WOULD PRUNE, trailing=0 (3 survivors == N=3)"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: max-dirs-under-n-is-noop
+# Survivors < N → zero cap prunes.
+# ---------------------------------------------------------------------------
+SHA_U1="f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1"
+SHA_U2="f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2f2"
+REPO="$TMP/case-under-n"
+git_init "$REPO"
+for sha in "$SHA_U1" "$SHA_U2"; do
+    mkdir -p "$REPO/$sha"
+    echo "content" > "$REPO/$sha/index.html"
+done
+git -C "$REPO" add .
+git_commit_at "$REPO" $(( NOW - 2*86400 )) "two fresh"
+
+run_prune "$REPO" --dry-run --cutoff-days 7 --max-dirs 3
+WOULD_U="$(printf '%s\n' "$OUT" | grep -c '^WOULD PRUNE:' || true)"
+TRAIL_U="$(printf '%s\n' "$OUT" | tail -1)"
+
+CASE_PASS=1
+if [ "$WOULD_U" -ne 0 ]; then CASE_PASS=0; fi
+if [ "$TRAIL_U" != "0" ]; then CASE_PASS=0; fi
+if [ "$CASE_PASS" -eq 1 ]; then
+    pass "max-dirs-under-n-is-noop"
+else
+    fail "max-dirs-under-n-is-noop" \
+         "would=$WOULD_U trailing=$TRAIL_U" \
+         "0 WOULD PRUNE, trailing=0 (2 survivors < N=3)"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: max-dirs-no-history-dir-exempt-from-cap
+# One fresh dir (the only survivor) + one untracked dir (no git history).
+# With --max-dirs 1, the no-history dir must not appear as a cap victim.
+# If the bug existed (no-history dir counted in survivors), cap would prune
+# one dir; correct behaviour is 0 cap prunes (1 survivor == N=1).
+# ---------------------------------------------------------------------------
+SHA_HC="a1b2c3d4e5a1b2c3d4e5a1b2c3d4e5a1b2c3d4e5"   # fresh, committed
+SHA_HU="5e4d3c2b1a5e4d3c2b1a5e4d3c2b1a5e4d3c2b1a"   # untracked, no history
+REPO="$TMP/case-hist-exempt"
+git_init "$REPO"
+mkdir -p "$REPO/$SHA_HC"
+echo "content" > "$REPO/$SHA_HC/index.html"
+git -C "$REPO" add .
+git_commit_at "$REPO" $(( NOW - 2*86400 )) "one fresh committed"
+# Untracked dir — git log -1 --format=%ct returns empty for it
+mkdir -p "$REPO/$SHA_HU"
+echo "content" > "$REPO/$SHA_HU/index.html"
+
+run_prune "$REPO" --dry-run --cutoff-days 7 --max-dirs 1
+WOULD_HC="$(printf '%s\n' "$OUT" | grep -c '^WOULD PRUNE:' || true)"
+TRAIL_HC="$(printf '%s\n' "$OUT" | tail -1)"
+
+CASE_PASS=1
+if [ "$WOULD_HC" -ne 0 ]; then CASE_PASS=0; fi
+if [ "$TRAIL_HC" != "0" ]; then CASE_PASS=0; fi
+if printf '%s\n' "$OUT" | grep -qF "WOULD PRUNE: ./$SHA_HU"; then CASE_PASS=0; fi
+if ! printf '%s\n' "$ERR" | grep -qF "no git history"; then CASE_PASS=0; fi
+if [ "$CASE_PASS" -eq 1 ]; then
+    pass "max-dirs-no-history-dir-exempt-from-cap"
+else
+    fail "max-dirs-no-history-dir-exempt-from-cap" \
+         "would=$WOULD_HC trailing=$TRAIL_HC OUT='$OUT' ERR='$ERR'" \
+         "0 WOULD PRUNE, trailing=0, no-history dir not cap-pruned, stderr has 'no git history'"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: max-dirs-rejects-non-positive
+# --max-dirs 0 must exit 1 with empty stdout and usage on stderr.
+# ---------------------------------------------------------------------------
+OUT_MP="$(STUB_NOW=$NOW PATH="$TMP/stub:$PATH" \
+          "$SCRIPT_DIR/prune-vr-galleries" --max-dirs 0 2>"$TMP/mp_err")"
+RC_MP=$?
+ERR_MP="$(cat "$TMP/mp_err")"
+
+CASE_PASS=1
+if [ "$RC_MP" -ne 1 ]; then CASE_PASS=0; fi
+if [ -n "$OUT_MP" ]; then CASE_PASS=0; fi
+if ! echo "$ERR_MP" | grep -qi "usage"; then CASE_PASS=0; fi
+if [ "$CASE_PASS" -eq 1 ]; then
+    pass "max-dirs-rejects-non-positive"
+else
+    fail "max-dirs-rejects-non-positive" \
+         "RC=$RC_MP OUT='$OUT_MP' ERR='$ERR_MP'" \
+         "exit 1, empty stdout, usage on stderr"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: max-dirs-rejects-non-integer
+# --max-dirs abc must exit 1 with empty stdout.
+# ---------------------------------------------------------------------------
+OUT_MI="$(STUB_NOW=$NOW PATH="$TMP/stub:$PATH" \
+          "$SCRIPT_DIR/prune-vr-galleries" --max-dirs abc 2>/dev/null)"
+RC_MI=$?
+
+CASE_PASS=1
+if [ "$RC_MI" -ne 1 ]; then CASE_PASS=0; fi
+if [ -n "$OUT_MI" ]; then CASE_PASS=0; fi
+if [ "$CASE_PASS" -eq 1 ]; then
+    pass "max-dirs-rejects-non-integer"
+else
+    fail "max-dirs-rejects-non-integer" \
+         "RC=$RC_MI OUT='$OUT_MI'" \
+         "exit 1, empty stdout"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: dry-run-no-double-count-across-both-passes
+# 2 old dirs (age-pruned) + 3 fresh dirs at distinct timestamps.
+# --cutoff-days 7 --max-dirs 2 → age prunes 2, cap prunes 1 = total 3.
+# The key assertion: WOULD PRUNE count == distinct pruned dirs == trailing int.
+# A re-find bug would add old dirs to the cap pass, inflating the count.
+# ---------------------------------------------------------------------------
+SHA_OX="0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"  # old, age-pruned
+SHA_OY="0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"  # old, age-pruned
+SHA_NP="0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"  # fresh NOW-6d, cap-pruned
+SHA_NQ="0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d"  # fresh NOW-5d, kept
+SHA_NR="0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e"  # fresh NOW-4d, kept
+REPO="$TMP/case-no-double-count"
+git_init "$REPO"
+mkdir -p "$REPO/$SHA_OX" "$REPO/$SHA_OY"
+echo "content" > "$REPO/$SHA_OX/index.html"
+echo "content" > "$REPO/$SHA_OY/index.html"
+git -C "$REPO" add .
+git_commit_at "$REPO" $(( NOW - 10*86400 )) "two old dirs"
+mkdir -p "$REPO/$SHA_NP"
+echo "content" > "$REPO/$SHA_NP/index.html"
+git -C "$REPO" add .
+git_commit_at "$REPO" $(( NOW - 6*86400 )) "np: oldest fresh"
+mkdir -p "$REPO/$SHA_NQ"
+echo "content" > "$REPO/$SHA_NQ/index.html"
+git -C "$REPO" add .
+git_commit_at "$REPO" $(( NOW - 5*86400 )) "nq: mid fresh"
+mkdir -p "$REPO/$SHA_NR"
+echo "content" > "$REPO/$SHA_NR/index.html"
+git -C "$REPO" add .
+git_commit_at "$REPO" $(( NOW - 4*86400 )) "nr: newest fresh"
+
+run_prune "$REPO" --dry-run --cutoff-days 7 --max-dirs 2
+PRUNED_LINES="$(printf '%s\n' "$OUT" | grep -c '^WOULD PRUNE:' || true)"
+PRUNED_DISTINCT="$(printf '%s\n' "$OUT" | grep '^WOULD PRUNE:' | awk '{print $3}' | sort -u | wc -l | tr -d ' ')"
+TRAIL_DD="$(printf '%s\n' "$OUT" | tail -1)"
+
+CASE_PASS=1
+if [ "$PRUNED_LINES" -ne 3 ]; then CASE_PASS=0; fi
+if [ "$PRUNED_DISTINCT" != "$PRUNED_LINES" ]; then CASE_PASS=0; fi
+if [ "$TRAIL_DD" != "$PRUNED_DISTINCT" ]; then CASE_PASS=0; fi
+# OX and OY age-pruned, NP cap-pruned, NQ and NR kept
+if ! printf '%s\n' "$OUT" | grep -qF "WOULD PRUNE: ./$SHA_OX"; then CASE_PASS=0; fi
+if ! printf '%s\n' "$OUT" | grep -qF "WOULD PRUNE: ./$SHA_OY"; then CASE_PASS=0; fi
+if ! printf '%s\n' "$OUT" | grep -qF "WOULD PRUNE: ./$SHA_NP"; then CASE_PASS=0; fi
+if printf '%s\n' "$OUT" | grep -qF "WOULD PRUNE: ./$SHA_NR"; then CASE_PASS=0; fi
+if [ "$CASE_PASS" -eq 1 ]; then
+    pass "dry-run-no-double-count-across-both-passes"
+else
+    fail "dry-run-no-double-count-across-both-passes" \
+         "lines=$PRUNED_LINES distinct=$PRUNED_DISTINCT trailing=$TRAIL_DD" \
+         "3 WOULD PRUNE lines, all distinct, trailing=3 (OX+OY age-pruned, NP cap-pruned)"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: live-mode-cap-stages-and-counts
+# 1 stale dir (age-pruned) + 3 fresh dirs; --max-dirs 2 cap-prunes the oldest fresh.
+# ---------------------------------------------------------------------------
+SHA_STALE_L="a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0"  # old, age-pruned
+SHA_CAP_OLD="b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"  # fresh NOW-5d, cap-pruned
+SHA_KEPT_1="c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2c2"  # fresh NOW-3d, kept
+SHA_KEPT_2="d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3"  # fresh NOW-2d, kept
+REPO="$TMP/case-live-cap"
+git_init "$REPO"
+mkdir -p "$REPO/$SHA_STALE_L"
+echo "content" > "$REPO/$SHA_STALE_L/index.html"
+git -C "$REPO" add .
+git_commit_at "$REPO" $(( NOW - 10*86400 )) "stale"
+mkdir -p "$REPO/$SHA_CAP_OLD"
+echo "content" > "$REPO/$SHA_CAP_OLD/index.html"
+git -C "$REPO" add .
+git_commit_at "$REPO" $(( NOW - 5*86400 )) "cap-oldest fresh"
+mkdir -p "$REPO/$SHA_KEPT_1"
+echo "content" > "$REPO/$SHA_KEPT_1/index.html"
+git -C "$REPO" add .
+git_commit_at "$REPO" $(( NOW - 3*86400 )) "kept-1"
+mkdir -p "$REPO/$SHA_KEPT_2"
+echo "content" > "$REPO/$SHA_KEPT_2/index.html"
+git -C "$REPO" add .
+git_commit_at "$REPO" $(( NOW - 2*86400 )) "kept-2"
+
+LIVE_CAP_OUT="$(cd "$REPO" && STUB_NOW=$NOW PATH="$TMP/stub:$PATH" \
+                "$SCRIPT_DIR/prune-vr-galleries" --cutoff-days 7 --max-dirs 2 2>/dev/null)"
+LIVE_CAP_STAGED="$(git -C "$REPO" diff --cached --name-only)"
+
+CASE_PASS=1
+if ! echo "$LIVE_CAP_STAGED" | grep -qF "$SHA_STALE_L/"; then CASE_PASS=0; fi
+if ! echo "$LIVE_CAP_STAGED" | grep -qF "$SHA_CAP_OLD/"; then CASE_PASS=0; fi
+if echo "$LIVE_CAP_STAGED" | grep -qF "$SHA_KEPT_1/"; then CASE_PASS=0; fi
+if echo "$LIVE_CAP_STAGED" | grep -qF "$SHA_KEPT_2/"; then CASE_PASS=0; fi
+if [ "$LIVE_CAP_OUT" != "2" ]; then CASE_PASS=0; fi
+if [ "$CASE_PASS" -eq 1 ]; then
+    pass "live-mode-cap-stages-and-counts"
+else
+    fail "live-mode-cap-stages-and-counts" \
+         "OUT='$LIVE_CAP_OUT' STAGED='$LIVE_CAP_STAGED'" \
+         "stale+cap_old staged, kept_1+kept_2 not staged, stdout=2"
+fi
+
+# ---------------------------------------------------------------------------
+# Case: a dir the count cap prunes must NEVER also emit a KEEP line. The age
+# pass sees it as a survivor, so a naive implementation logs KEEP and then the
+# cap prunes it anyway — in live mode that means the run log says KEEP for a
+# dir it silently git rm's. KEEP for survivors is therefore deferred to pass 2.
+# ---------------------------------------------------------------------------
+SHA_NK_STALE="e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4e4"   # NOW-10d, age-pruned
+SHA_NK_CAPPED="f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5f5"  # NOW-5d, survives age, cap-pruned
+SHA_NK_KEPT1="a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6a6"   # NOW-3d, kept
+SHA_NK_KEPT2="b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7b7"   # NOW-2d, kept
+REPO="$TMP/case-no-keep-for-capped"
+git_init "$REPO"
+for pair in "$SHA_NK_STALE:10" "$SHA_NK_CAPPED:5" "$SHA_NK_KEPT1:3" "$SHA_NK_KEPT2:2"; do
+    d="${pair%%:*}"; agedays="${pair##*:}"
+    mkdir -p "$REPO/$d"
+    echo "content" > "$REPO/$d/index.html"
+    git -C "$REPO" add .
+    git_commit_at "$REPO" $(( NOW - agedays*86400 )) "$d"
+done
+
+run_prune "$REPO" --dry-run --cutoff-days 7 --max-dirs 2
+
+NK_PRUNE_COUNT="$(echo "$OUT" | grep -c '^WOULD PRUNE: ')"
+NK_TAIL="$(echo "$OUT" | tail -n 1)"
+
+CASE_PASS=1
+# The capped dir is pruned...
+echo "$OUT" | grep -qF "WOULD PRUNE: ./$SHA_NK_CAPPED" || CASE_PASS=0
+# ...and must not ALSO be reported as kept.
+echo "$OUT" | grep -qF "KEEP: ./$SHA_NK_CAPPED" && CASE_PASS=0
+# The two genuine survivors still report KEEP.
+echo "$OUT" | grep -qF "KEEP: ./$SHA_NK_KEPT1" || CASE_PASS=0
+echo "$OUT" | grep -qF "KEEP: ./$SHA_NK_KEPT2" || CASE_PASS=0
+# No dir is named by both a KEEP and a WOULD PRUNE line.
+NK_BOTH="$(comm -12 \
+    <(echo "$OUT" | sed -n 's/^KEEP: \(\.\/[0-9a-f]*\) .*/\1/p' | sort -u) \
+    <(echo "$OUT" | sed -n 's/^WOULD PRUNE: \(\.\/[0-9a-f]*\) .*/\1/p' | sort -u))"
+[ -z "$NK_BOTH" ] || CASE_PASS=0
+# Count still matches the WOULD PRUNE lines (stale + capped).
+[ "$NK_TAIL" = "2" ] || CASE_PASS=0
+[ "$NK_PRUNE_COUNT" -eq 2 ] || CASE_PASS=0
+if [ "$CASE_PASS" -eq 1 ]; then
+    pass "max-dirs-cap-pruned-dir-never-logs-keep"
+else
+    fail "max-dirs-cap-pruned-dir-never-logs-keep" \
+         "OUT='$OUT' both='$NK_BOTH'" \
+         "capped dir only in WOULD PRUNE, no dir in both lists, stdout=2"
+fi
+
 exit "$FAILED"

@@ -214,4 +214,4 @@ Landing rung: **1** (extend `bin/check-docs` or add a narrow lint for `DRAFT=` e
 
 `provenance:` (discovered 2026-09-02 during #2059)
 
-**Status (2026-09-05):** ✅ Implemented — `.claude/rules/pr-body-claims.md` landed (rung 2 of L43 prevention ladder).
+**Status (2026-09-05):** ✅ Implemented (#2131) — `.claude/rules/pr-body-claims.md` landed (rung 2 of L43 prevention ladder).

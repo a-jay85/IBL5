@@ -505,7 +505,7 @@ not add backticks or markdown links to a row.
 
 
 ### L43 Autonomous-loop doc-fix PR body contains stale claims and inconsistent ADR authoring format after post-review commit
-➜ L43 Autonomous-loop doc-fix PR body contains stale claims and inconsistent ADR authoring format after post-review commit — ✅ Implemented (2026-09-05): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
+➜ L43 Autonomous-loop doc-fix PR body contains stale claims and inconsistent ADR authoring format after post-review commit — ✅ Implemented (2026-09-05, #2131): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ### L44 Upstream overlap silently drops a plan phase; Phase 2a pre-rebase artifact captures post-rebase state, making the drop undetectable
 

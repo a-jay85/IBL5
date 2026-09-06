@@ -1042,3 +1042,43 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 `artifact destination: this entry`
 
 *(discovered 2026-09-06 during Phase 6 review of #2140)*
+
+### E62 `/pr-ready` merge digest is authored in Phase 6 and published verbatim in Phase 7 — Phase 6.5 remediation between them can falsify it, and nothing re-reads it
+
+**class:** A **stale descriptive claim published as current**. The five-line merge digest is written by the Phase 6 reviewer from the *pre-remediation* diff, and emitted by the Phase 7 composer **verbatim**. Any Phase 6.5 remediation commit landing between those two phases silently falsifies the digest, and no phase, script, or test re-reads it against the final diff. This is the same failure *ordering* as `.claude/rules/pr-body-negative-claim-recheck.md` (claim written at T → commit at T+1 falsifies it → nothing re-reads), applied to the digest instead of a negative-scope bullet.
+
+The staleness is **structural, not incidental** — four independent contract clauses guarantee it:
+
+1. `.claude/skills/pr-ready/_plan-fidelity-review.md:54` — "The digest is written **from the read you already performed**. It is not a second pass." The read is the post-rebase, **pre-remediation** diff.
+2. `.claude/agents/pr-ready-phase6.md:3` — the reviewer is "Spawned exactly once per run", so a re-read after 6.5 is not merely skipped, it is **impossible** by the agent contract.
+3. `.claude/skills/pr-ready/_phase65-remediation.md` — remediation lands commits here; the file contains **zero** occurrences of `digest`. No refresh step exists.
+4. `.claude/skills/pr-ready/_phase7-verdict.md:50` — "Paste the five lines … **verbatim** — do not re-word, re-order, merge, or add a sixth line." The composer is contractually forbidden from correcting it.
+
+Note the asymmetry: `_phase7-verdict.md:43` **already** handles this exact staleness class for the sibling **files-changed** block — "the block is one commit behind by design … If Phase 6.5 pushed remediation commits after it, say so on the refresh line." The digest, sitting in the same comment and subject to the same ordering, gets no equivalent caveat.
+
+**occurrence table:**
+
+| # | Location | Same class? | Live at review? | Status |
+|---|-----------|-------------|-----------------|--------|
+| 1 | PR #2084 merge digest — asserted "a rebase silently discarded this PR's entire implementation, so the branch now carries only a stale one-line test comment and five backlog bookkeeping rows", and named `ba8af56a7` as "the branch's only commit". Commit `cffee4bc1` ("restore implementation") landed afterwards; merge commit `4dab518a1` shipped all 14 files, +1283/−6, including `bin/pr-review-now` (410 lines) and four new `.claude/skills/pr-ready/scripts/*.sh`, all mode `100755`. The digest was **accurate when written** and false when published. | yes | yes — published on a merged PR | not fixed — filed |
+| 2 | `.claude/skills/pr-ready/_phase65-remediation.md` — no digest-refresh step; zero `digest` occurrences in the file | yes | yes | not fixed — filed; this is the gap the landing rung closes |
+| 3 | `bin/test-pr-ready-now:1934` case 28a — asserts the digest body is preserved **verbatim** through extraction (`28a: body text not preserved verbatim`). Case 28 tests digest *shape* (28a–28c), *ordering* (28g), and *prose pins* (28h–k); no case tests digest **freshness**. The suite therefore locks the staleness in rather than catching it. | yes | yes | not fixed — filed |
+
+**prevention_ladder:**
+- **rung 0 — already covered?** No. Full surface swept: `_phase65-remediation.md` (0 hits), `SKILL.md:278–308` (describes the hand-off only — 294–296 explicitly instruct Phase 6 *not* to paste the DIGEST, confirming Phase 7 is the sole publisher), `scripts/digest.sh` (a pure extractor — it degrades on a missing/malformed section but has no notion of freshness), `bin/test-pr-ready-now` case 28 (shape only). No gate anywhere compares the digest against the post-remediation diff.
+- **rung 1 — extend an existing gate?** **Yes, and cheaply.** Give the digest the same treatment `_phase7-verdict.md:43` already gives files-changed: when Phase 6.5 pushed any remediation commit, the Phase 7 composer emits one `digest-basis:` line under `### Merge digest` naming the SHA the digest describes and stating that commits landed after it. This preserves the verbatim-paste contract (the caveat is a *sibling* line, not an edit to the five), needs no new script, and no second Phase 6 spawn. Pair it with a case-28 assertion that the caveat line is present whenever the remediation section is non-empty.
+- **rung 2 — alternative:** have Phase 6.5 append a refreshed `## DIGEST` to the verdict file, so `digest.sh`'s existing "read the LAST `## DIGEST`" behaviour picks up the fresh one for free. Cheaper still in mechanism, but it makes a remediation agent author descriptive prose — a role the 6a one-spawn boundary deliberately reserves for the Phase 6 reviewer. Prefer rung 1.
+- **rungs 3–5 — not warranted:** the publication point (`_phase7-verdict.md`) is already the right place; extension beats new machinery.
+- **landing rung:** **rung 1** — add a `digest-basis:` caveat line to the Phase 7 `### Merge digest` block, mirroring the files-changed refresh-line precedent at `_phase7-verdict.md:43`, plus a `bin/test-pr-ready-now` case-28 assertion binding the caveat to a non-empty remediation section.
+
+`prevention_ladder: rung 1 — Phase 7 emits a digest-basis: caveat when 6.5 pushed remediation commits, mirroring the files-changed refresh line; case-28 assertion binds it`
+
+`artifact destination: .claude/skills/pr-ready/_phase7-verdict.md — add the digest-basis caveat line to the ### Merge digest block; bin/test-pr-ready-now case 28 — add the freshness assertion`
+
+**relationship to E54:** E54 covers the *underlying event* on the same PR (`rebase-dropped-commit`, and `lostwork.sh` being blind to a pre-run loss). E62 is a distinct class: E54 is about work being lost, E62 is about the **report** of that loss outliving its own correction. Fixing E54 would not fix E62 — any remediation commit, for any reason, falsifies the digest the same way.
+
+**exposure measurement (2026-09-06):** the `### Merge digest` block is new (landed via #2106), so the population is small by construction — but the exposure rate within it is total. Of the 20 most recently merged PRs, 4 carry a `/pr-ready` sticky verdict comment (#2141, #2133, #2129, #2126); **all 4 carry both a `### Merge digest` block and evidence that Phase 6.5 remediation commits landed after the Phase 6 review**. That is 4/4 structurally exposed, i.e. every digest published so far describes a diff that was subsequently changed.
+
+Read this as exposure, not as four confirmed-false digests: only #2084 is verified to have been *materially* wrong (it reported the implementation as lost after restoration). The other three may be stale in ways too minor to have been noticed — which is precisely the problem, since nothing checks. The measurement upgrades the landing rung from "one anecdote" to "the ordering fires on every run that remediates", and remediation is the common case, not the exception.
+
+*(discovered 2026-09-06 while reading the merge digest for #2084, which reported the implementation as lost after it had already been restored in-branch)*

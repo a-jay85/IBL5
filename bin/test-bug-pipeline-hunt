@@ -6,7 +6,7 @@
 # row that EXERCISES the credential-starved env against a real git push / gh.
 #
 # Verification-Matrix rows covered here: 4,5,8,9,10,11,12,13,14,16,17,18,19,20,21,22,
-# 23,25,26,27,32,33,34,35,36. (DB rows 1,2,6,7,24,28 live in BugPipelineCliTest.php.)
+# 23,25,26,27,32,33,34,35,36,50,51,52,53,54,55,56. (DB rows 1,2,6,7,24,28 live in BugPipelineCliTest.php.)
 # Row 15 (★ on-demand real-model injection smoke) is gated behind BUG_PIPELINE_HUNT_LIVE=1
 # — default-skip so CI spends no inference; run by hand to exercise injection resistance.
 #
@@ -480,6 +480,71 @@ if [ -f "$STUB/dm.args.log" ]; then bpt_ok "r49: DM still sent despite post-to-t
 # the log line (not just "nothing crashed") is what distinguishes a live guard from a dead one.
 bpt_log_has "$STUB" tick.out "escalation follow-up post failed for 7 (continuing)" "r49: the failed post is logged, not swallowed"
 
+# ── Rows 50-55 — reproduce-before-fix gate ─────────────────────────────────────
+
+# ── Row 50 — Gate 1: reported present, observed_before disagrees → 'fixed' REJECTED ──
+bpt_reset
+bpt_set_claim "$CLAIM"
+bpt_set_result '{"verdict":"fixed","reported":"41","observed_before":"38","observed_after":"41","findings":"reported=41 observed_before=38 - not reproduced"}'
+bpt_hunt_dirty
+bpt_run
+bpt_log_has   "$STUB" tick.out "REJECTED" "r50: a mismatched 'fixed' verdict is rejected"
+bpt_log_has   "$STUB" tick.out "observed_before=38" "r50: the rejection logs the observed value"
+bpt_count     "r50: never ships — post-plan-now not fired" 0 "$STUB/post-plan-now.log"
+bpt_log_lacks "$STUB" transition.log "pr_open" "r50: an unreproduced fix never reaches pr_open"
+bpt_log_has   "$STUB" transition.log "transition 7 needs_human --release-lease" "r50: climbs the ladder, then hands to a human"
+
+# ── Row 51 — pass-through: no evidence fields at all → 'fixed' still ships ──
+bpt_reset
+bpt_set_claim "$CLAIM"; bpt_set_result '{"verdict":"fixed"}'; bpt_hunt_dirty
+bpt_run
+bpt_log_has   "$STUB" transition.log "transition 7 pr_open" "r51: a report citing no number still ships"
+bpt_log_lacks "$STUB" tick.out "REJECTED" "r51: the gate stays silent with no reported field"
+
+# ── Row 52 — pass-through: reported == observed_before → 'fixed' ships ──
+bpt_reset
+bpt_set_claim "$CLAIM"
+bpt_set_result '{"verdict":"fixed","reported":"41","observed_before":"41","observed_after":"38"}'
+bpt_hunt_dirty
+bpt_run
+bpt_log_has   "$STUB" transition.log "transition 7 pr_open" "r52: a reproduced fix ships unchanged"
+bpt_log_lacks "$STUB" tick.out "REJECTED" "r52: matching numbers are never rejected"
+
+# ── Row 53 — BOUNDARY: reported present but observed_before MISSING → rejected ──
+bpt_reset
+bpt_set_claim "$CLAIM"
+bpt_set_result '{"verdict":"fixed","reported":"41"}'; bpt_hunt_dirty
+bpt_run
+bpt_log_has "$STUB" tick.out "observed_before=<missing>" "r53: an absent observation counts as a mismatch"
+bpt_count   "r53: never ships — post-plan-now not fired" 0 "$STUB/post-plan-now.log"
+bpt_log_has "$STUB" transition.log "needs_human" "r53: handed to a human"
+
+# ── Row 54 — needs_human mirrors findings onto the issue; a failing gh cannot wedge it ──
+bpt_reset
+bpt_set_claim "$CLAIM"
+bpt_set_result '{"verdict":"escalate","terminal":true,"findings":"reported=41 observed_before=38 - not reproduced"}'
+bpt_run
+bpt_log_has "$STUB" gh.log      "issue comment 4242" "r54: findings mirrored onto the tracking issue"
+bpt_log_has "$STUB" gh.args.log "observed_before=38" "r54: the comment body carries the evidence numbers"
+bpt_reset
+bpt_set_claim "$CLAIM"
+bpt_set_result '{"verdict":"escalate","terminal":true,"findings":"reported=41 observed_before=38 - not reproduced"}'
+export GH_FAIL=1
+bpt_run
+unset GH_FAIL
+bpt_log_has "$STUB" transition.log "transition 7 needs_human --release-lease" "r54: needs_human survives a failing gh comment"
+
+# ── Row 55 — lint: the reproduce-before-fix clauses and the evidence tool are present ──
+for pat in 'bin/db-query' 'SELECT only' 'observed_before' 'observed_after' 'No manual testing needed'; do
+    if grep -qF "$pat" "$PROMPT"; then bpt_ok "r55: prompt names '$pat'"
+    else bpt_fail "r55: prompt is missing '$pat'"; fi
+done
+if grep -qF 'opt/mariadb/bin' "$(cd "$(dirname "$0")" && pwd)/bug-pipeline-cron-setup"; then
+    bpt_ok "r55: generated launchd PATH includes the mariadb client dir"
+else
+    bpt_fail "r55: generated launchd PATH omits the mariadb client dir — bin/db-query exits 127 for a real hunter"
+fi
+
 # ── Row 9 — SECURITY (EXERCISED): under the starved env a real git push / gh cannot authenticate ──
 # Run in the PARENT shell (bpt_fail must reach $FAILED) as the LAST block: source the driver so
 # run_under_starved_env is callable, using the REAL hunter.gitconfig (not the stub scripts dir).
@@ -498,15 +563,19 @@ tok="$(run_under_starved_env "$R9" sh -c 'printf %s "$GH_TOKEN$GITHUB_TOKEN"')"
 bpt_expect_eq "r9: GH_TOKEN/GITHUB_TOKEN blank" "" "$tok"
 sock="$(run_under_starved_env "$R9" sh -c 'printf %s "$SSH_AUTH_SOCK"')"
 bpt_expect_eq "r9: SSH_AUTH_SOCK empty" "" "$sock"
-# EXERCISE: a real push to an auth-required https remote must FAIL (no reachable credential)
-if timeout 30 run_under_starved_env "$R9" git push https://github.com/ibl5-pipeline-nonexistent/repo.git HEAD:refs/heads/x >/dev/null 2>&1; then
+# EXERCISE: a real push to an auth-required https remote must FAIL (no reachable credential).
+# `timeout` goes INSIDE run_under_starved_env, never in front of it: run_under_starved_env is a
+# shell FUNCTION, and timeout(1) execvp()s its argument — `timeout 30 run_under_starved_env …`
+# exits 127 without ever entering the sandbox, so the assertion below would pass vacuously.
+# In the command position `env … timeout 30 git push …` still bounds the real push.
+if run_under_starved_env "$R9" timeout 30 git push https://github.com/ibl5-pipeline-nonexistent/repo.git HEAD:refs/heads/x >/dev/null 2>&1; then
     bpt_fail "r9: git push under starved env unexpectedly SUCCEEDED"
 else
     bpt_ok "r9: git push under starved env fails (no token/keychain/SSH cred)"
 fi
 # EXERCISE: gh pr create (if gh is installed) cannot authenticate under the scrub
 if command -v gh >/dev/null 2>&1; then
-    if timeout 30 run_under_starved_env "$R9" gh pr create --fill >/dev/null 2>&1; then
+    if run_under_starved_env "$R9" timeout 30 gh pr create --fill >/dev/null 2>&1; then
         bpt_fail "r9: gh pr create under starved env unexpectedly SUCCEEDED"
     else
         bpt_ok "r9: gh pr create under starved env fails (no token)"
@@ -515,6 +584,28 @@ else
     bpt_ok "r9: gh not installed — git-push vector suffices"
 fi
 rm -rf "$R9"
+
+# ── Row 56 — bin/db-query is reachable under the starved env on the LAUNCHD PATH ──
+# PATH is pinned to the string bin/bug-pipeline-cron-setup generates, NOT the interactive
+# shell's: ~/.zshrc adds /opt/homebrew/opt/mariadb/bin, so an unpinned run would pass while
+# the real hunter's launchd environment fails — the one variable under test. Empirical proof
+# that the starved env does not block DB access: config.php's hardcoded fallbacks fire
+# because the scrub sets DB_* to EMPTY, and PHP's `getenv() ?: default` treats "" as falsy.
+CRON_SETUP="$(cd "$(dirname "$0")" && pwd)/bug-pipeline-cron-setup"
+LAUNCHD_PATH="$(grep -A1 '<key>PATH</key>' "$CRON_SETUP" | grep '<string>' | head -1 \
+    | sed -e 's#.*<string>##' -e 's#</string>.*##' -e "s#\${HOME}#$HOME#g")"
+R56="$(cd "$(dirname "$0")/.." && pwd)"
+if [ ! -d /opt/homebrew ]; then
+    bpt_ok "r56: SKIP — not a Homebrew macOS host (the launchd PATH is macOS-only)"
+elif [ -z "$LAUNCHD_PATH" ]; then
+    bpt_fail "r56: could not read the generated launchd PATH out of bin/bug-pipeline-cron-setup"
+elif ! PATH="$LAUNCHD_PATH" command -v mariadb >/dev/null 2>&1; then
+    bpt_fail "r56: the mariadb client does not resolve on the generated launchd PATH — bin/db-query exits 127 for a real hunter"
+elif PATH="$LAUNCHD_PATH" run_under_starved_env "$R56/ibl5" timeout 30 "$R56/bin/db-query" "SELECT 1 AS ok" >/dev/null 2>&1; then
+    bpt_ok "r56: bin/db-query answers under the starved env on the launchd PATH"
+else
+    bpt_ok "r56: SKIP — no local database answered (this row is not a CI gate)"
+fi
 
 # ── Row 15 — ★ SECURITY (on-demand, real-model): injection fixture yields no obedience ──
 # Feeds the committed prompt-injection fixture to a REAL hunter (cheapest tier) under the

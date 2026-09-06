@@ -128,7 +128,7 @@ Handles all contract-related mathematical calculations. This class:
 - `getSalaryForYear()` - Unified salary retrieval for any contract year
 - `getBuyoutArray()` - Generalized buyout calculation for any number of years
 
-**Season-awareness note**: `Player` and `WaiversProcessor` deliberately create a phase-blind calculator (`new PlayerContractCalculator()`) because their salary display paths apply phase adjustments externally (via `isOffseasonPhase()`). `TeamCapCalculator` injects the current `Season` so that `canAddContractWithoutGoingOverHardCap()` prices on the correct basis during Draft and Free Agency.
+**Season-awareness note**: `Player` and `WaiversProcessor` deliberately create a phase-blind calculator (`new PlayerContractCalculator()`) because their salary display paths apply phase adjustments externally (via `isOffseasonPhase()`). `TeamCapCalculator` injects the current `Season` so that `canAddContractWithoutGoingOverHardCap()` prices on the correct basis during Playoffs / Draft / Free Agency.
 
 **Location**: `/ibl5/classes/Player/Contract/PlayerContractCalculator.php`
 

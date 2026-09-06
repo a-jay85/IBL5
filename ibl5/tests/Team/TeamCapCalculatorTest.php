@@ -296,4 +296,39 @@ class TeamCapCalculatorTest extends TestCase
         self::assertSame(1200, $next);
         self::assertGreaterThan($current, $next);
     }
+
+    public function testCanAddContractHardCapVerdictFlipsBetweenPhases(): void
+    {
+        // cy=1, salary_yr1=500 (in-season basis), salary_yr2=900 (advancing basis).
+        // contractValue = HARD_CAP_MAX - 700, so:
+        //   in-season:  500 + (HARD_CAP_MAX - 700) = HARD_CAP_MAX - 200 → fits
+        //   advancing:  900 + (HARD_CAP_MAX - 700) = HARD_CAP_MAX + 200 → over
+        $this->stubRepo->method('getRosterUnderContractOrderedByName')
+            ->willReturn([TestDataFactory::createPlayer(['pid' => 1, 'cy' => 1, 'salary_yr1' => 500, 'salary_yr2' => 900])]);
+
+        $contractValue = League::HARD_CAP_MAX - 700;
+
+        self::assertTrue($this->buildCalculator(false)->canAddContractWithoutGoingOverHardCap(1, $contractValue));
+        self::assertFalse($this->buildCalculator(true)->canAddContractWithoutGoingOverHardCap(1, $contractValue));
+    }
+
+    public function testInjectedSeasonPreventsInternalSeasonConstruction(): void
+    {
+        // When a Season is injected, TeamCapCalculator must NOT construct a new Season
+        // internally (which would fire a DB settings query). Asserting the DB log stays
+        // empty proves no internal construction happened.
+        $rows = [TestDataFactory::createPlayer(['pid' => 1, 'cy' => 1, 'salary_yr1' => 500])];
+        $calculator = $this->buildCalculator(true);
+
+        $calculator->getTotalCurrentSeasonSalaries($rows);
+        $calculator->getTotalNextSeasonSalaries($rows);
+
+        self::assertSame([], $this->mockDb->getExecutedQueries());
+    }
+
+    public function testTotalCurrentSeasonSalariesIsZeroForEmptyRosterInBothPhases(): void
+    {
+        self::assertSame(0, $this->buildCalculator(false)->getTotalCurrentSeasonSalaries([]));
+        self::assertSame(0, $this->buildCalculator(true)->getTotalCurrentSeasonSalaries([]));
+    }
 }

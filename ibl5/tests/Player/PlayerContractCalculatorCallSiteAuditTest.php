@@ -61,4 +61,19 @@ class PlayerContractCalculatorCallSiteAuditTest extends TestCase
             'WaiversProcessor must create a phase-blind PlayerContractCalculator (season=null)'
         );
     }
+
+    public function testPlayerFacadeCurrentSeasonSalaryUsesRawContractYear(): void
+    {
+        // Phase-blind path: Player injects no Season, so getCurrentSeasonSalary uses
+        // the raw cy. cy=2 → salary_yr2=1100, not salary_yr3=1200.
+        $mockDb = new MockDatabase();
+        $player = Player::withPlrRow($mockDb, TestDataFactory::createPlayer([
+            'pid' => 1,
+            'cy' => 2,
+            'salary_yr2' => 1100,
+            'salary_yr3' => 1200,
+        ]));
+
+        self::assertSame(1100, $player->getCurrentSeasonSalary());
+    }
 }

@@ -181,6 +181,14 @@ echo "launchctl $*" >> "$STUB/launchctl.log"
 exit 0
 SH
 
+    STUB_CALLS="$STUB/db-sync-calls"
+    export STUB_CALLS
+    cat > "$STUB/db-sync-now" <<'EOF'
+#!/bin/bash
+printf 'fired %s\n' "$(date +%s%N)" >> "$STUB_CALLS"
+EOF
+    chmod +x "$STUB/db-sync-now"
+
     chmod +x "$STUB/ssh" "$STUB/claude" "$STUB/prompt" "$STUB/mysql" "$STUB/curl" "$STUB/launchctl"
 
     export STUB
@@ -215,6 +223,7 @@ srt_reset() {
           "$STUB"/record-stdin "$STUB"/store.cmd "$STUB"/store.stdin \
           "$STUB"/curl.log "$STUB"/prompt.argv "$STUB"/launchctl.log "$STUB"/launchctl.sentinel \
           "$STUB"/ops-alert.json "$STUB"/ops-alert.json.tmp* \
+          "$STUB_CALLS" \
           2>/dev/null
     export SIM_RECAP_DB_PASSWORD="test_db_password"
     export SIM_RECAP_MYSQL_BIN="$STUB/mysql"
@@ -245,6 +254,14 @@ srt_matches() {
     n=$(grep -c -- "$2" "$STUB/$1" 2>/dev/null)
     [ -n "$n" ] || n=0
     printf '%s' "$n"
+}
+
+srt_settle() {
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        [ -s "$1" ] && return 0
+        sleep 0.1
+    done
+    return 0
 }
 
 srt_setup
@@ -583,6 +600,7 @@ printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
     printf '%s' '{"intro_text":"intro","outro_text":"outro","recap_text":"recap","themes":["t"],'
     printf '%s' '"games":[{"season_year":2008,"game_date":"2026-07-23","visitor_teamid":1,'
     printf '%s' '"home_teamid":2,"game_of_that_day":1,"box_id":null,"sort_order":1,"recap_text":"'
+    # shellcheck disable=SC2183  # intentional: printf '%280s' pads with spaces (no args = empty string pads to width)
     printf '%280s' | tr ' ' 'x'
     printf '%s' '"}]}'
 } > "$STUB/resp.payload"
@@ -600,6 +618,7 @@ printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
     printf '%s' '{"intro_text":"intro","outro_text":"outro","recap_text":"recap","themes":["t"],'
     printf '%s' '"games":[{"season_year":2008,"game_date":"2026-07-23","visitor_teamid":1,'
     printf '%s' '"home_teamid":2,"game_of_that_day":1,"box_id":null,"sort_order":1,"recap_text":"'
+    # shellcheck disable=SC2183  # intentional: printf '%570s' pads with spaces (no args = empty string pads to width)
     printf '%570s' | tr ' ' 'x'
     printf '%s' '"}]}'
 } > "$STUB/resp.payload"
@@ -616,6 +635,7 @@ printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
     printf '%s' '{"intro_text":"intro","outro_text":"outro","recap_text":"recap","themes":["t"],'
     printf '%s' '"games":[{"season_year":2008,"game_date":"2026-07-23","visitor_teamid":1,'
     printf '%s' '"home_teamid":2,"game_of_that_day":0,"box_id":null,"sort_order":1,"recap_text":"'
+    # shellcheck disable=SC2183  # intentional: printf '%280s' pads with spaces (no args = empty string pads to width)
     printf '%280s' | tr ' ' 'x'
     printf '%s' '"}]}'
 } > "$STUB/resp.payload"
@@ -1031,6 +1051,65 @@ srt_run
 srt_expect_eq "ops_alert_corrupt_count_does_not_kill_the_tick — exit 0" 0 "$SRT_RC"
 srt_count "ops_alert_corrupt_count_does_not_kill_the_tick — the recap still ran" \
     1 "$STUB/claude.log"
+
+# ══ DB-SYNC HOOK CASES ═══════════════════════════════════════════════════════
+
+# ── DB-SYNC-1: fires once per stored sim ─────────────────────────────────────
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+SIM_RECAP_DB_SYNC_BIN="$STUB/db-sync-now" SIM_RECAP_DB_SYNC_LOG="$STUB/db-sync.log" srt_run
+srt_settle "$STUB_CALLS"
+srt_count "DB-SYNC-1: fires once per stored sim" 1 "$STUB_CALLS"
+srt_log_has "$STUB" tick.out "triggering local DB sync" "DB-SYNC-1: trigger logged"
+
+# ── DB-SYNC-2: does NOT fire per poll when no sim queued ─────────────────────
+srt_reset
+SIM_RECAP_DB_SYNC_BIN="$STUB/db-sync-now" SIM_RECAP_DB_SYNC_LOG="$STUB/db-sync.log" srt_run
+srt_count "DB-SYNC-2: no fire on no-sim" 0 "$STUB_CALLS"
+
+# ── DB-SYNC-3: store failure fires nothing ────────────────────────────────────
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+touch "$STUB/store-fails"
+SIM_RECAP_DB_SYNC_BIN="$STUB/db-sync-now" SIM_RECAP_DB_SYNC_LOG="$STUB/db-sync.log" srt_run
+srt_count "DB-SYNC-3: no fire on store-fail" 0 "$STUB_CALLS"
+srt_log_lacks "$STUB" tick.out "triggering local DB sync" "DB-SYNC-3: no trigger logged"
+
+# ── DB-SYNC-4: agent failure fires nothing ────────────────────────────────────
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+touch "$STUB/agent-fails"
+SIM_RECAP_DB_SYNC_BIN="$STUB/db-sync-now" SIM_RECAP_DB_SYNC_LOG="$STUB/db-sync.log" srt_run
+srt_count "DB-SYNC-4: no fire on agent-fail" 0 "$STUB_CALLS"
+
+# ── DB-SYNC-5: --dry-run fires nothing ────────────────────────────────────────
+srt_reset
+SIM_RECAP_DB_SYNC_BIN="$STUB/db-sync-now" SIM_RECAP_DB_SYNC_LOG="$STUB/db-sync.log" srt_run --dry-run --sim=42
+srt_count "DB-SYNC-5: no fire on --dry-run" 0 "$STUB_CALLS"
+
+# ── DB-SYNC-6: missing binary degrades quietly ────────────────────────────────
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+SIM_RECAP_DB_SYNC_BIN="$STUB/does-not-exist" SIM_RECAP_DB_SYNC_LOG="$STUB/db-sync.log" srt_run
+srt_expect_eq "DB-SYNC-6: tick exits 0 with missing binary" "0" "$SRT_RC"
+srt_log_has "$STUB" tick.out "stored" "DB-SYNC-6: stored logged"
+srt_log_lacks "$STUB" tick.out "triggering" "DB-SYNC-6: no sync line"
+
+# ── DB-SYNC-7: non-blocking (stub sleeps 30s, tick must finish in <10s) ───────
+srt_reset
+printf '{"ok":true,"cmd":"claim-next","sim":"42"}' > "$STUB/resp.claim-next"
+cat > "$STUB/db-sync-slow" <<'EOS'
+#!/bin/bash
+sleep 30
+EOS
+chmod +x "$STUB/db-sync-slow"
+start_s=$SECONDS
+SIM_RECAP_DB_SYNC_BIN="$STUB/db-sync-slow" SIM_RECAP_DB_SYNC_LOG="$STUB/db-sync.log" srt_run
+elapsed=$(( SECONDS - start_s ))
+if [ "$elapsed" -lt 10 ]; then srt_ok "DB-SYNC-7: non-blocking (${elapsed}s)"
+else srt_fail "DB-SYNC-7: tick blocked (${elapsed}s >= 10s)"; fi
+# Kill any lingering sleeper so the suite does not hand a 30s child to the caller.
+pkill -f "$STUB/db-sync-slow" 2>/dev/null || true
 
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"

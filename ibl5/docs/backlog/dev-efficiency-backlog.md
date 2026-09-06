@@ -87,6 +87,7 @@ last_verified: 2026-09-06
 | E54 | /pr-ready Phase 6.5 remediation — PR #2091: dual-channel transport omission, test pin drift, over-broad scan | ⬜ Open | — | S |
 | E62 | /pr-ready Phase 6.5 remediation — PR #2091: backlog entry structural defect (ID collision, split entry body, orphaned content) | ⬜ Open | — | XS |
 | E63 | PR #2091 Phase 6.5 — plan/code alignment notes (usage sed-range arithmetic, --help indentation, matrix pin drift, body omission); class n/a — all notes | ⬜ Open | — | XS |
+| E57 | `bin/adr-check` red at merge on #2124 and #2119 — new rule docs landed with no ADR and no `no-adr:` marker | ◑ Partial | 🟥 | S |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -992,6 +993,9 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 `artifact destination: this entry, plus retroactive <!-- no-adr: --> markers applied to the bodies of #2124 and #2119`
 
 *(discovered 2026-09-05 while investigating recently merged PRs that carried red CI)*
+
+**Status (2026-09-06):** ◑ Partial — rung 3 built: the `adr` paths-filter gained an explicit skip step, so a filter miss is now stated in the job log and in the Actions step list instead of being indistinguishable from a pass. Rung 2 is decided and recorded (ADR-0120) but **not yet applied**: promoting "Meta checks" to a required status check on `master` is a post-merge operator action against the branch-protection API, and this entry stays ◑ until that call is made and read back. Rung 0 (the two merged PRs' disposition) is unchanged — the retroactive `no-adr:` markers remain proposed, not applied. 🟥 (bootstrap hazard: the PR changes the enforcement mechanism governing its own merge, so `auto_merge: false` and a human merges it).
+
 | 1 | `~/claude-plans/pr-cycle-dirty-rescue.md` row 4.e — greps `_rescue_one()` body for `MERGES\|armed.txt\|ledgered.txt\|pr merge\|_poll_merge\|_arm_and_classify\|POLL_CEILING`; hits five comment lines that document the "rescue is not a merge" invariant | yes | was live at plan-write | not fixed — filed (plan already merged; fix is authoring discipline) |
 | 2 | `~/claude-plans/pr-cycle-dirty-rescue.md` row 6.a — greps `_report_dry_run()` body for `_rescue_one\|_ready_pr\|--go`; hits three comment lines and one operator-facing echo string | yes | was live at plan-write | not fixed — filed |
 

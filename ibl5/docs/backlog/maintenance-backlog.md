@@ -447,20 +447,11 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20 — 35 custom rules live in `phpstan-rules/`):** Most findings asked for a new rule and the **rule has landed**; where baseline sites remain, the rule-finding is ✅ and the *burndown* is the 🟩 residual.
 
-> ✅ resolved (25): 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7, 10.8, 10.9, 10.10, 10.11, 10.12, 10.13, 10.14, 10.15, 10.16, 10.17, 10.18, 10.19, 10.20, 10.21, 10.22, 10.23, 10.24, 10.25 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (26): 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7, 10.8, 10.9, 10.10, 10.11, 10.12, 10.13, 10.14, 10.15, 10.16, 10.17, 10.18, 10.19, 10.20, 10.21, 10.22, 10.23, 10.24, 10.25, 10.27 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 10.26 | ⬜ Open | 🟥 | `BanSqlStringConcatenationRule` flags the identifier-concatenation sites introduced by the sqlInterp burndown (PR #1203) — 100 occurrences across 33 file entries baselined (2026-07-24). Convert `in_array`-guarded identifier sites to `match()`/constant-array lookup so PHPStan types them as constant-string (rule-inert), clearing the concat baseline. |
-| 10.27 | ⬜ Open | 🟨 | `ibl5/modules/` is absent from every PHPStan config's `paths:` and from `ibl5/bin/analyse-diff`'s classifier (explicit `*) : ;;` arm silently drops all `modules/` diffs). Measured cost to add as-is: 549 errors (`argument.type` 290, `ibl.bannedNukeGlobal` 65, `cast.int` 31, `method.nonObject` 30, `variable.undefined` 29). Needs a `/plan` on its own branch; upfront decision: baseline-and-burn vs. fix-first. See 2.40 for root-cause context. (discovered 2026-09-03 during #1807) |
-
-### 10.27 `ibl5/modules/` Absent from PHPStan Analysis Paths
-**Location:** `ibl5/phpstan.neon` (`paths:`), `ibl5/bin/analyse-diff` (classifier)
-**Problem:** `phpstan.neon` covers `classes`, `themes`, `phpstan-rules`, hand-listed `bin/` scripts, and `scripts` — but not `modules/`. `phpstan-tests.neon` covers `tests` only. `ibl5/bin/analyse-diff`'s file classifier has an explicit `*) : ;;` arm that silently drops any changed file under `modules/` rather than routing it to either config. The practical effect: type errors in module entrypoints (e.g. `?string → string` sinks, global variables passed into typed parameters) are invisible to CI — discovered when `Player/index.php:79` was fixed in #1807 without any PHPStan signal. PHPStan already runs at `level: max`; the gap is the missing path, not the strictness dial.
-**Suggested direction:** Add `modules/` to `phpstan.neon`'s `paths:` and wire a `modules/*` arm in `ibl5/bin/analyse-diff`'s classifier. Measured as-is cost: 549 errors (top identifiers: `argument.type` 290, `ibl.bannedNukeGlobal` 65, `cast.int` 31, `method.nonObject` 30, `variable.undefined` 29); a baseline-and-burn or fix-first approach needs upfront decision. 🟨: upfront decision gates implementation.
-**Est. effort:** L
-**Risk if untouched:** Module entrypoint type errors (nullability sinks, untyped globals into typed parameters) remain invisible to CI and PHPStan's PR-diff check indefinitely.
-**provenance:** (discovered 2026-09-03 during #1807; root cause of 2.40)
 
 ## Axis 11: CSS, Themes, Design System
 

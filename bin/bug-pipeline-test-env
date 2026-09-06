@@ -203,10 +203,17 @@ SH
     # Step 3.2 — Start the test bot.
     # Two preconditions before pm2 start (each failure would present as a green bring-up):
     # 1. The compiled entrypoint must exist.
+    # 2. Port 50002 must not be held by a foreign process.
     if [ ! -f "$IBLBOT/dist/bug-bot/index.js" ]; then
         echo "missing $IBLBOT/dist/bug-bot/index.js — build first:" >&2
         echo "  (cd $IBLBOT && npm run build)" >&2
         exit 1
+    fi
+    # 2. Port 50002 must not be held by a foreign process (a stale listener answering /
+    #    satisfies the liveness probe while ibl-bug-bot-test dies on EADDRINUSE).
+    if lsof -nP -iTCP:50002 -sTCP:LISTEN 2>/dev/null | grep -v 'ibl-bug-bot-test' | grep -q LISTEN; then
+      echo "FAIL: port 50002 already held by a foreign process — stop it before starting the test bot" >&2
+      exit 1
     fi
     # Delete-then-start so the config file is always re-evaluated (not --update-env,
     # which re-reads the process env and silently ignores a rotated token).

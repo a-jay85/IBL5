@@ -88,6 +88,7 @@ last_verified: 2026-09-06
 | E57 | `REPLACE_WITH_` sentinel passes the non-empty approver-ID guard in `bin/bug-pipeline-test-env` | ✅ fixed this pass | — | XS |
 | E58 | No committed regression tests for guards in `bin/bug-pipeline-e2e` and `ecosystem.bugbot-test.config.cjs` fail-closed checks | ⬜ Open | — | S |
 | E59 | Unasked-for `last_verified` change with duplicate YAML key in `ibl5/docs/decisions/README.md` | ✅ fixed this pass | — | XS |
+| E60 | Three residual isolation/scope gaps in `bin/bug-pipeline-test-env` (F3/F6/F7 from #1950 Phase 6) | ⬜ Open | — | S |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -1172,5 +1173,32 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 `prevention_ladder: rung 1 — extend bin/check-docs to detect duplicate YAML frontmatter keys`
 
 `artifact destination:` `bin/check-docs` — in-repo, extend to detect duplicate YAML frontmatter keys
+
+---
+
+### E60 Three residual isolation/scope gaps in `bin/bug-pipeline-test-env` (F3/F6/F7 from #1950 Phase 6)
+
+**class:** three distinct documentation-accuracy and isolation-completeness gaps on the `bin/bug-pipeline-test-env` surface: (F3) the script uses `IBLBOT="$REPO_ROOT/ibl5/IBLbot"` where `REPO_ROOT` is the worktree root, so a worktree bring-up fails on the compiled-entrypoint precondition rather than dangerously; (F6) `prune_attachment_cache` in the Phase 4.3 control run executes against the real production attachment cache directory before the non-executing probe shunts all other seams; (F7) six files in the diff were not named by any plan phase, against the plan's explicit "no other doc is edited" promise.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/bug-pipeline-test-env` — `IBLBOT="$REPO_ROOT/ibl5/IBLbot"` | yes (F3 — worktree cwd vs. plan's stated main-checkout) | live | not fixed — filed |
+| 2 | `bin/bug-pipeline-test-env` — `prune_attachment_cache` in Phase 4.3 control run | yes (F6 — production-state write during isolation test) | live | not fixed — filed |
+| 3 | `.claude/review-shared/_plan-verification.md`, `ibl5/docs/backlog/*.md` (5 files), `ibl5/docs/decisions/README.md` | yes (F7 — doc drift vs. plan's "no other docs" promise) | live | not fixed — filed |
+
+**prevention_ladder:**
+- rung 0 — already covered by an existing gate? No. No gate checks that bring-up writes nothing outside `/tmp` or that the control run uses only non-production paths.
+- rung 1 — extend an existing gate? No existing gate to extend for this surface.
+- rung 2 — a rule doc under `.claude/rules/`? Not warranted — these are localized to one script.
+- rungs 3–5 — not warranted: no PHPStan or CI runner can validate local bring-up isolation.
+- landing rung: no gate warranted — fix F3 and F6 in a future bring-up script iteration; F7 is inherent to `/post-plan`'s backlog-housekeep chain and not suppressable without a plan note.
+
+`prevention_ladder: no gate warranted — localized to one script; F3/F6 are future bring-up fixes; F7 is post-plan housekeeping`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-06 during #1950)*
 
 *(discovered 2026-09-05 during #1950)*

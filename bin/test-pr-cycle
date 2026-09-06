@@ -157,17 +157,23 @@ triage_report() {  # $@ = "PR BUCKET ACTION" triples, one per argument
     done
 }
 
+# Bare (unbulleted) bold labels. This is the shape `.claude/skills/pr-ready/_phase7-verdict.md`
+# obliges the producer to emit, and the shape real verdict comments carry (PRs #2092, #2064,
+# #2084). The bulleted fixture this replaced silently exempted _digest_labels from the only
+# format it ever parses in production, which is why the suite stayed green while every live
+# ledger row read `digest: unavailable`. Case 15's `partial` variant keeps the bulleted form,
+# so the parser is still held to both.
 digest_comment() {  # $1 = extra body text appended after the standard digest block
     cat <<'DIG_EOF'
 <!-- pr-ready-verdict -->
 Verdict: green.
 
 ### Merge digest
-- **What changed:** the driver landed
-- **Why:** because the loop was manual
-- **Watch:** the ledger
-- **Touches:** bin/pr-cycle
-- **Machine-authored fixes:** none
+**What changed:** the driver landed
+**Why:** because the loop was manual
+**Watch:** the ledger
+**Touches:** bin/pr-cycle
+**Machine-authored fixes:** none
 DIG_EOF
 }
 

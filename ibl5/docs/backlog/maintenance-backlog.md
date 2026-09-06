@@ -791,3 +791,48 @@ provenance: (discovered 2026-09-04 during #1956)
 **artifact_destination:** n/a — no gate
 
 **provenance:** (discovered 2026-09-04 during #1958)
+
+### 15.35 Phase-aware aggregate de-duplication contract removed — no test pins row-wise equivalence
+
+**class:** A behavioral contract implicit in a deleted helper was not carried forward as an explicit test. `PlayerContractCalculator::getTotalCurrentSeasonSalaries()` previously delegated to `convertPlrResultIntoPlayerArray()`, which keyed its accumulator by `$plrRow['pid']`, silently de-duplicating repeated `pid`s before summing. The replacement row-wise loop in both `getTotalCurrentSeasonSalaries()` and `getTotalNextSeasonSalaries()` sums every row unconditionally. For the unique-pid roster queries that feed these methods the result is identical, but no test pins the equivalence.
+
+**Occurrences:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/classes/Player/Contract/PlayerContractCalculator.php` — `getTotalCurrentSeasonSalaries()` row-wise sum replaces pid-keyed accumulator | yes | yes | not fixed — filed; unique-pid query guarantee not tested |
+| 2 | `ibl5/classes/Player/Contract/PlayerContractCalculator.php` — `getTotalNextSeasonSalaries()` same replacement | yes | yes | not fixed — filed |
+
+**prevention_ladder:**
+- rung 0: No existing gate catches "deleted keyed accumulator leaves no equivalence test."
+- rung 1: No existing gate to extend.
+- rung 2: A unit test asserting that `getTotalCurrentSeasonSalaries()` with a two-row input where both rows share the same `pid` returns the same value as a single-row input with the same `pid` would pin the unique-pid contract. Low friction.
+- rungs 3–5: A PHPStan rule for keyed-accumulator deletions is disproportionate.
+- **Landing rung: no gate warranted this pass** — the unique-pid guarantee comes from the repository query, not the calculator, so the equivalence test belongs at the repository layer.
+
+**artifact_destination:** n/a — no gate
+
+**provenance:** (discovered 2026-09-06 during Phase 6 review of PR #2140, finding N4)
+
+### 15.36 Phase-basis split on cap-space page and untested extension-pricing shift from PR #2140
+
+**class:** Two behavioral consequences of the phase-aware `TeamCapCalculator` that are not covered by any test and are the sharpest things to watch after merge.
+
+**Occurrences:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/classes/CapSpace/CapSpaceService.php:103` — `getTotalNextSeasonSalaries()` now branches on `advancesContractYears()` (Playoffs \| Draft \| Free Agency), while the adjacent `getSalaryCapArray()` branches on `isOffseasonPhase()` (Draft \| Free Agency only); during Playoffs the two halves of the same rendered page are computed on different contract-year bases | yes | yes | not fixed — filed; Playoffs-only display split; no test pins cross-aggregate consistency within a phase |
+| 2 | `ibl5/classes/Extension/ExtensionService.php:188` — `getTotalNextSeasonSalaries()` result feeds `teamFactors['money_committed_at_position']` in `buildEvaluationContext()`, consumed as a scoring input by `ExtensionOfferEvaluator::computePlayingTimeModifier()` and `Negotiation\ExtensionContractDemandCalculator`; the shifted value moves extension demands and the playing-time modifier; no test exercises the real path under an advancing season | no — `ExtensionService` | yes | not fixed — filed; plan declares change deliberate (plan line 433) but concedes no test covers it (plan line 504) |
+
+**prevention_ladder:**
+- rung 0: No existing gate covers cross-aggregate phase consistency within a single view.
+- rung 1: No existing gate to extend.
+- rung 2 (occurrence 1): A unit test asserting that during Playoffs `CapSpaceService` uses consistent contract-year bases for both aggregates, or a documented acknowledgement that the split is intentional, would pin the behavior. Medium friction.
+- rung 2 (occurrence 2): An integration test for `ExtensionService::buildEvaluationContext()` exercising a phase-advancing season and asserting on `money_committed_at_position` would close the coverage gap. Medium friction.
+- rungs 3–5: No automated gate is proportionate at this time.
+- **Landing rung: no gate warranted this pass** — both consequences are deliberate per plan and recorded; coverage gap is the residual risk.
+
+**artifact_destination:** n/a — no gate
+
+**provenance:** (discovered 2026-09-06 during Phase 6 review of PR #2140, finding N8)

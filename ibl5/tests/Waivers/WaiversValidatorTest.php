@@ -637,4 +637,46 @@ class WaiversValidatorTest extends TestCase
         $result = $this->validator->validateAdd(100, 5, League::HARD_CAP_MAX + 1, $vetMin);
         $this->assertTrue($result->isValid());
     }
+
+    /**
+     * Backlog 13.14 — the same claim flips outcome purely on which salary basis it is handed.
+     * Real Miami Heat figures (prod snapshot 2026-08-21, phase Draft): current 6861, next-year 5159.
+     */
+    public function testValidateAddCapOutcomeFollowsSalaryBasis(): void
+    {
+        $healthyRosterSlots = 3; // < 4, so the hard-cap branch applies
+        $playerSalary = 200;
+
+        $currentYearBasis = $this->validator->validateAdd(42, $healthyRosterSlots, 6861, $playerSalary);
+        $this->assertFalse(
+            $currentYearBasis->isValid(),
+            '6861 + 200 = 7061 exceeds League::HARD_CAP_MAX (' . League::HARD_CAP_MAX . ') — the false rejection item 13.14 reports.'
+        );
+
+        $nextYearBasis = $this->validator->validateAdd(42, $healthyRosterSlots, 5159, $playerSalary);
+        $this->assertTrue(
+            $nextYearBasis->isValid(),
+            '5159 + 200 = 5359 is under the hard cap — the claim is legal on the phase-correct basis.'
+        );
+    }
+
+    /**
+     * Backlog 13.14 — the waive path reads the same basis and flips the same way.
+     */
+    public function testValidateDropCapOutcomeFollowsSalaryBasis(): void
+    {
+        $rosterSlots = 12; // > 2, so the hard-cap branch applies
+
+        $currentYearBasis = $this->validator->validateDrop($rosterSlots, 7232);
+        $this->assertFalse(
+            $currentYearBasis->isValid(),
+            '7232 exceeds League::HARD_CAP_MAX (' . League::HARD_CAP_MAX . ') on the stale current-year basis.'
+        );
+
+        $nextYearBasis = $this->validator->validateDrop($rosterSlots, 5556);
+        $this->assertTrue(
+            $nextYearBasis->isValid(),
+            '5556 is under the hard cap — the drop is legal on the phase-correct basis.'
+        );
+    }
 }

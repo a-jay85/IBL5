@@ -60,6 +60,7 @@ jobs:
               # shapes (an ADR-only PR, and a .php/.md migration).
               - 'ibl5/docs/decisions/**'
               - 'ibl5/migrations/**'
+              - 'ibl5/docs/backlog/**'
               - '.gitattributes'
             refactor:
               - 'ibl5/classes/**'

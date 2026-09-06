@@ -111,6 +111,7 @@ class PlanInfo:
     truly_manual_rows: list[ManualRow] = field(default_factory=list)
     security_section: str = ""
     reuse_section: str = ""
+    hold_justification: str = ""
     variant_selection: Optional[str] = None            # "highest" when multi-variant selection ran
     rejected: list[str] = field(default_factory=list)  # basenames of non-selected candidates
 

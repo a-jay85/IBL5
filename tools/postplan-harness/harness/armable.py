@@ -29,7 +29,14 @@ DESTRUCTIVE_SQL = re.compile(
 
 
 def manual_testing_clearance(body: str) -> str:
-    """pr_manual_testing_clearance port: CLEARED / HELD / UNKNOWN."""
+    """pr_manual_testing_clearance port: CLEARED / HELD / UNKNOWN.
+
+    Scan window: from `^## Manual Testing` to the next `^## ` line. Any body
+    section the runner appends must therefore either sit BEFORE this heading or
+    emit no `^#`-anchored line; classify.upsert_manual_confirmation does the
+    former and classify._neutralize_headings the latter. Pinned by
+    tests/test_hold_justification.py.
+    """
     lines = (body or "").splitlines()
     section: list[str] = []
     in_sec = False

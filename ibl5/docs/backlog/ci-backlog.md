@@ -1,6 +1,6 @@
 ---
 description: CI/GitHub-Actions workflow simplification backlog — duplicated setup/notify boilerplate, job consolidation, and verified-not-redundant workflows, with per-entry status + automouse-readiness.
-last_verified: 2026-09-04
+last_verified: 2026-09-05
 ---
 
 # CI Workflow Simplification Backlog
@@ -148,16 +148,10 @@ Entries 6.1 and 6.2 are CI/coverage gaps surfaced by the 2026-07-31 audit of PR 
 
 | # | Title | Status | Automouse | Effort |
 |---|-------|--------|-----------|-------:|
-| 7.1 | `gh-pages` tree unbounded by size — p95 deploy 540s | ⬜ Open | 🟨 | M |
+| 7.1 | `gh-pages` tree unbounded by size — p95 deploy 540s | ✅ Implemented | 🟨 | M |
 | 7.2 | Fork-PR hard failure in VR gallery push (peaceiris hard-assert) | ⬜ Open | 🟥 | M |
 
-### 7.1 `gh-pages` tree unbounded by size — p95 deploy 540s
-*(discovered 2026-08-14 during #1874)*
-**Location:** `.github/workflows/e2e-tests.yml` `vr-pages-cleanup` job (14-day age prune); `.github/workflows/pages-deploy.yml` (uploads the whole `gh-pages` tree as the Pages artifact).
-**Problem:** The 14-day prune bounds age, not size. As of the audit: 1861 commits, 692 per-SHA dirs, 1595 files — the tree re-uploads entirely on every Pages deploy, which is why p95 wall-clock is 540s. Against `concurrency: group: pages, cancel-in-progress: false`, a queue of one plus the in-flight deploy is always building. The trigger-dedupe in #1874 cuts dispatch frequency (~100 → ~63 per 6.5h) but not upload size.
-**Suggested direction:** Prune by count (keep the N most recent SHAs), or switch to serving only the N most recent SHAs by generating a thin index that re-points `/<sha>/` to a shared CDN copy. The former is simpler; the latter also reduces storage. Either direction requires deciding N.
-**Risk if untouched:** Deploy wall-clock drifts up as more SHAs accumulate; the 14-day prune converges on a steady state only if SHAs age out before the tree grows past some threshold, which is not guaranteed under high-velocity usage.
-**Status (2026-08-14):** ⬜ Open — out of scope for #1874; needs a design decision on N before a `/plan` can be written. 🟨.
+➜ 7.1 `gh-pages` tree unbounded by size — ✅ Implemented (2026-09-05): see [archive](archive/ci-backlog-archive.md).
 
 ### 7.2 Fork-PR hard failure in VR gallery push (peaceiris hard-assert)
 *(discovered 2026-08-14 during #1874)*

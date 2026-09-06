@@ -32,8 +32,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from harness import ciwatch, conformance, llm_calls, manual_rows, schemas
 from harness.armable import ArmInputs, evaluate, manual_testing_clearance
 from harness.classify import (classify, files_from_diff, modified_files_from_diff,
-                              render_files_changed, strip_manual_testing_section,
-                              upsert_files_changed)
+                              render_files_changed, render_manual_confirmation,
+                              strip_manual_testing_section,
+                              upsert_files_changed, upsert_manual_confirmation)
 from harness.planfile import locate_plan
 from harness.review import ReviewPhase
 from harness.state import (HarnessError, RunResult, TerminalState, UsageLedger)
@@ -226,6 +227,12 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 log(f"phase6 (plan-blind): {len(manual)} truly-manual steps -> {clearance}")
         else:
             log(f"phase6: PR body already carries clearance state {clearance}")
+        # Hold justification: surface the plan's `## Automouse Hold Justification`
+        # so the PR body explains every hold a reader will hit. Positioned by
+        # upsert_manual_confirmation ahead of `## Manual Testing` — appending it
+        # after would truncate manual_testing_clearance's scan window.
+        body = upsert_manual_confirmation(
+            body, render_manual_confirmation(plan.hold_justification))
         # files-changed block is machine-generated: refresh it on every run so the
         # PR body's scope can't silently drift from the actual diff.
         body = upsert_files_changed(body, render_files_changed(diff))

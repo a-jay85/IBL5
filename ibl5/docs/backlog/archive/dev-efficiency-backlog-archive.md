@@ -91,6 +91,48 @@ Read-only historical record of ✅ Implemented / 🚫 Declined entries. For OPEN
 
 **Status (2026-08-25):** ✅ Implemented — the single occurrence was fixed in PR #1981 (`either` → `any`); no gate was warranted (prevention_ladder: no gate warranted); watch-item closed by owner decision on 2026-08-25. *(discovered 2026-08-25 during #1981)*
 
+---
+
+### E20 Ship-pipeline coverage assertions are emitted against a narrower slice than the PR's cumulative diff
+
+`class:` a ship-pipeline step that emits a **coverage assertion** — a PR-body `## Manual Testing` claim, a Phase 4B structured-review verdict — scoped to something narrower than the PR's cumulative diff, so the assertion reads as endorsing lines it never examined.
+
+Surfaced by `/pr-ready` running on PR #1964 (a docs-only J7 RE correction). Two independent instances of the same shape landed on one PR:
+
+1. The body's `## Manual Testing` block reads *"No manual testing needed — all changes are covered by automated tests."* The diff is one markdown backlog file; **no** automated test covers it, and the governing plan's own § *Automouse Hold Justification* names three properties that need subjective human confirmation and states "Human eyes required before merge." The boilerplate asserts a coverage source that does not exist for this diff class.
+2. The Phase 4B review (comment `5384312129`, 2026-08-23T04:58:43Z, head `205e851f5`) posted *"No issues found… a one-line date stamp added to the J29 backlog entry."* That description is the **incremental commit** `c0effc44a..205e851f5` — 1 changed line. The PR's cumulative diff at that same head is **12 changed lines**; the other 11 (the J29 table rewrite, the J7 `[CORRECTED]` append, the `RETIRED-OK` marker, the Next-RE rewrite, the `last_verified` bump) were never structurally reviewed. The verdict is worded as if it covered the PR.
+
+Both are silent: the assertion is well-formed, the gate is green, and nothing in the artifact records which slice it actually read. A reader of either one over-trusts it by exactly the amount of diff it skipped.
+
+**Occurrences**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #1964 body, `## Manual Testing` block | yes — asserts automated coverage that does not exist for a docs-only diff | yes | fixed this pass (body rewritten to the plan's three human-confirmation properties) |
+| 2 | PR #1964 comment `5384312129` (Phase 4B verdict) | yes — verdict scoped to the last commit, worded as covering the PR | yes | not fixed — filed; `/pr-review 1964` recommended before merge |
+| 3 | `.claude/skills/post-plan/SKILL.md` — the body generator that emits the `## Manual Testing` default | yes — the producer of occurrence 1; picks the boilerplate without consulting the plan's hold justification | yes | not fixed — filed (the gate belongs here, not on #1964) |
+| 4 | `.claude/skills/pr-ready/_plan-fidelity-review.md:6c(a)` | no — already *requires* bounding 4B's coverage; it is the check that caught occurrence 2 | yes | not fixed — correct as written |
+| 5 | PR #2023 body, `## Manual Testing` block — "all changes are covered by unit and E2E tests" | yes — asserts E2E test coverage; the diff contains only unit and database-integration tests, no E2E | yes | fixed this pass (body rewritten to "unit and database-integration tests, plus two CI hosts running the duplicate invariant") |
+
+`prevention_ladder:`
+
+- **rung 0 — already covered by an existing gate?** Partially, and only downstream: `/pr-ready` 6c(a) bounds 4B coverage and 6d.4 catches a body claim the diff contradicts. Neither fires until a human invokes `/pr-ready`, which is optional — both instances here sat green for three days first.
+- **rung 1 — extend an existing gate? LANDS HERE.** Two one-surface extensions, both on producers that already own the artifact: (a) `/post-plan`'s body generator picks `## Manual Testing` boilerplate from the plan it already reads — when that plan carries an `Automouse Hold Justification` naming human-confirmation properties, emit those as unchecked boxes instead of the "no manual testing needed" default; (b) the Phase 4B runner already computes the diff it reviews — have it print the base ref and changed-line count in its verdict block, so scope is legible without recomputation. Neither adds a mechanism.
+- **rung 2 — a rule doc under `.claude/rules/`?** Insufficient. Both artifacts are emitted by automated skills mid-run; a documented norm has no reader at the moment it is violated (same reasoning as [E18](#e18-pr-ready-phase-65-commits-new-files-but-never-regenerates-the-pr-bodys-files-changed-block) and [E19](#e19-pr-ready-materialize-from-pin-sites-declare-no-fallback-so-a-pin-that-predates-the-script-loops-forever)).
+- **rung 3 — a PHPStan rule?** N/A — no PHP on this surface.
+- **rung 4 — a CI gate?** Rejected for (a): a gate would have to decide whether a diff "needs" manual testing, which is the subjective judgment the plan's hold justification already records — cheaper to read it than to re-derive it. Worth reconsidering for (b) only if rung 1 proves insufficient.
+- **rung 5 — a new hook?** Rejected. Neither failure reaches a tool call the hook layer can intercept.
+
+Landing rung is **1**, so rungs 3–5 are never reached and the four `.claude/rules/meta-tooling-bar.md` extend-before-add conditions do not apply.
+
+`artifact destination:` `.claude/skills/post-plan/SKILL.md` (the `## Manual Testing` body-generation step) and the Phase 4B review runner's verdict block. Both in-repo.
+
+**Related.** [E18](#e18-pr-ready-phase-65-commits-new-files-but-never-regenerates-the-pr-bodys-files-changed-block) also concerns a PR body that stops matching its diff, but there the artifact is *machine-generated and stale*; here it is *hand-shaped and over-broad from the start* — the body was never right, rather than having drifted.
+
+*(discovered 2026-08-26 during #1964)*
+
+**Resolved (2026-09-05):** the PR body now carries a `## Manual confirmation needed` block rendered from the plan's `## Automouse Hold Justification` (harness `classify.render_manual_confirmation`, mirrored in `/post-plan` SKILL.md Phase 6), and both `/post-plan` and `/pr-ready` Phase 4B print plan-vs-diff bounds in each direction. Instance 1 (a `## Manual Testing` boilerplate claim that contradicted the plan's own hold justification) is addressed by surfacing that justification beside the claim; instance 2 (a review verdict scoped narrower than the cumulative diff) is addressed by the printed bounds. Neither surfacing blocks — both are informational, per the plan's Out of Scope.
+
 ### E21 Test assertions land as static source greps that pass while the behavior they name is absent
 
 `class:` a verification phase specifies a **behavioral** assertion (run the thing, inspect what it emitted) and the implementation lands a **static source grep** instead. The grep matches text that can be present while the behavior is absent — comment prose, or a key line that could never structurally carry the token being banned — so the assertion is green from birth and stays green through the exact regression it was written to catch. It is worse than no test: the coverage matrix records the row as backed.
@@ -280,3 +322,33 @@ Body summary text was authored pre-implementation and hand-updated during coding
 `last_verified: 2026-09-04`
 
 *(discovered 2026-09-04 during Phase 6 review of #2077)*
+
+### E38 /pr-ready lost-work guard blind to prior-run destructive rebase
+
+*(discovered 2026-09-02 during #2045)*
+
+`class:` a `/pr-ready` Phase 2a pre-image capture that occurs inside the current run, making the lost-work guard invisible to a destructive rebase performed by an earlier run on the same branch.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `.claude/skills/pr-ready/SKILL.md` Phase 2a | yes | yes | not fixed — filed |
+
+**prevention_ladder:**
+
+- rung 0 — not already covered by an existing gate
+- rung 1 — could extend the existing lost-work guard to also compare against a persisted pre-image from the previous run (e.g. stored as `/tmp/pr-ready-preimage-<N>-<branch>.patch` keyed to PR+branch across runs)
+- rung 2 — a rule doc under `.claude/rules/` would not prevent a code path from executing; not applicable
+- rung 3 — PHPStan rule not applicable (skill/shell code)
+- rung 4 — a CI gate not applicable (harness-side behavior)
+- rung 5 — hook not applicable
+- **Landing: rung 1** — extend the guard to compare the current pre-image against a persistent cross-run patch file; OR add a check that verifies the plan's Critical Files list is represented in the pre-rebase diff (a planned file absent from pre means the pre was already post-loss). Either check is a code change to `scripts/lostwork.sh` or Phase 2a of `SKILL.md`.
+
+`artifact destination:` `.claude/skills/pr-ready/scripts/collapse-guard.sh` (created this pass)
+
+**What shipped:** a prior-collapse guard invoked at /pr-ready runtime Phase 1.4 that
+compares HEAD against the branch tip preceding the most recent history rewrite and
+stops the run when no branch-changed path survives.
+
+**Status (2026-09-05):** ✅ Implemented.

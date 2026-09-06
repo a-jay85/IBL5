@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Player\Contract\PlayerContractCalculator;
 use Player\PlayerData;
+use Season\Season;
 
 class PlayerContractCalculatorTest extends TestCase
 {
@@ -731,5 +732,91 @@ class PlayerContractCalculatorTest extends TestCase
         $result = $this->calculator->getCurrentSeasonSalary($playerData);
 
         $this->assertSame(0, $result);
+    }
+
+    // ── Phase-aware constructor / resolveCurrentContractYear ───────────
+
+    private function seasonStub(bool $advances): Season
+    {
+        $season = self::createStub(Season::class);
+        $season->method('advancesContractYears')->willReturn($advances);
+        return $season;
+    }
+
+    private function midContractPlayer(): PlayerData
+    {
+        $playerData = new PlayerData();
+        $playerData->contractCurrentYear = 2;
+        $playerData->contractYear1Salary = 1000;
+        $playerData->contractYear2Salary = 1100;
+        $playerData->contractYear3Salary = 1200;
+        $playerData->contractYear4Salary = 1300;
+        return $playerData;
+    }
+
+    public function testGetCurrentSeasonSalaryPhaseBlindWhenNoSeasonInjected(): void
+    {
+        // No Season injected — phase-blind; cy=2 returns salary_yr2.
+        $player = $this->midContractPlayer();
+
+        self::assertSame(1100, $this->calculator->getCurrentSeasonSalary($player));
+    }
+
+    public function testGetCurrentSeasonSalaryDoesNotAdvanceWhenAdvancesContractYearsIsFalse(): void
+    {
+        // Season injected but advances=false — same result as phase-blind; cy=2 returns salary_yr2.
+        $calculator = new PlayerContractCalculator($this->seasonStub(false));
+        $player = $this->midContractPlayer();
+
+        self::assertSame(1100, $calculator->getCurrentSeasonSalary($player));
+    }
+
+    public function testGetCurrentSeasonSalaryAdvancesWhenAdvancesContractYearsIsTrue(): void
+    {
+        // advances=true — basis shifts to cy+1=3 → salary_yr3.
+        $calculator = new PlayerContractCalculator($this->seasonStub(true));
+        $player = $this->midContractPlayer();
+
+        self::assertSame(1200, $calculator->getCurrentSeasonSalary($player));
+    }
+
+    public function testGetNextSeasonSalaryIsAlwaysOneYearAheadOfCurrent(): void
+    {
+        // advances=true: current uses cy+1=3, next uses cy+2=4.
+        $calculator = new PlayerContractCalculator($this->seasonStub(true));
+        $player = $this->midContractPlayer();
+
+        $current = $calculator->getCurrentSeasonSalary($player);
+        $next = $calculator->getNextSeasonSalary($player);
+
+        self::assertSame(1200, $current);
+        self::assertSame(1300, $next);
+    }
+
+    public function testGetCurrentSeasonSalaryFallsOffBooksAtYear7WhenAdvancing(): void
+    {
+        // cy=6, advances=true → resolveCurrentContractYear=7 → off-books → 0.
+        $calculator = new PlayerContractCalculator($this->seasonStub(true));
+        $player = new PlayerData();
+        $player->contractCurrentYear = 6;
+        $player->contractYear6Salary = 3000;
+
+        self::assertSame(0, $calculator->getCurrentSeasonSalary($player));
+    }
+
+    public function testGetCurrentSeasonSalaryYearZeroSpecialCaseSurvivesPhaseShift(): void
+    {
+        // cy=0, advances=true → resolveCurrentContractYear=1 → getSalaryForYear(1) = yr1Salary.
+        // cy=0, advances=false → resolveCurrentContractYear=0 → getSalaryForYear(0) = yr1Salary (special case).
+        // Both branches return the same year-1 salary value.
+        $player = new PlayerData();
+        $player->contractCurrentYear = 0;
+        $player->contractYear1Salary = 1000;
+
+        $advancing = new PlayerContractCalculator($this->seasonStub(true));
+        $static = new PlayerContractCalculator($this->seasonStub(false));
+
+        self::assertSame(1000, $advancing->getCurrentSeasonSalary($player));
+        self::assertSame(1000, $static->getCurrentSeasonSalary($player));
     }
 }

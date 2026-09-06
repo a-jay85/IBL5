@@ -23,6 +23,24 @@ Capture the `cat` output — that is `$DIFF` for every sub-agent prompt below. N
 
 Pass each agent: PR metadata, file list, and filtered `$DIFF`. **No agent calls `gh pr diff`.** Do not forward CLAUDE.md content (auto-loaded).
 
+**Diff bounds — print before launching agents (informational, never blocking).** Report both directions of plan-vs-diff scope so the human reading 4B sees what the diff actually ships. Run yourself, not via an agent:
+
+```bash
+source "$(git rev-parse --show-toplevel)/bin/lib/critical-files.sh"
+git diff --name-only origin/master...HEAD | sort -u > /tmp/post-plan-diff-paths-$PPID
+if [ -n "${PLAN_FILE:-}" ] && [ -f "$PLAN_FILE" ]; then
+  cf_parse_section "$PLAN_FILE" | sed 's/^[A-Z_]*://' | sort -u > /tmp/post-plan-plan-paths-$PPID
+else
+  : > /tmp/post-plan-plan-paths-$PPID
+fi
+echo "Diff bounds — in diff, not named by plan ($(comm -23 /tmp/post-plan-diff-paths-$PPID /tmp/post-plan-plan-paths-$PPID | wc -l | tr -d ' ')):"
+comm -23 /tmp/post-plan-diff-paths-$PPID /tmp/post-plan-plan-paths-$PPID | sed 's/^/  /'
+echo "Diff bounds — named by plan, not in diff ($(comm -13 /tmp/post-plan-diff-paths-$PPID /tmp/post-plan-plan-paths-$PPID | wc -l | tr -d ' ')):"
+comm -13 /tmp/post-plan-diff-paths-$PPID /tmp/post-plan-plan-paths-$PPID | sed 's/^/  /'
+```
+
+Both counts and both path lists are printed even when zero — a `0` is the informative answer, and a silent section is indistinguishable from a skipped one. **Neither list gates anything**: it does not skip an agent, does not change a launch gate, and does not feed Phase 4D scoring or Phase 6.5 arming. Plan-blind runs (`PLAN_FILE` unset) print an empty plan side and the full diff on the first list; that is correct, not an error. Phase 5.0's conformance check and condition (3) are unaffected — this reads the same section and blocks on nothing.
+
 **Reuse conformance (Agent A only, when `PLAN_FOUND` and `$HAS_PLAN_REUSE`):** extract the plan's Reuse notes from `$PLAN_FILE` and append them to Agent A's prompt under a `PLANNED REUSE:` heading, instructing it to flag any step that hand-rolled logic the plan directed it to reuse (e.g. plan named `SalaryCapRepository::getTeamTotalSalary()`, impl wrote a raw query). This turns Section 1's open-ended architectural judgment into a concrete conformance check.
 
 **Model tiers:**

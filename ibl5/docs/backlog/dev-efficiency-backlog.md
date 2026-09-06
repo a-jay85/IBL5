@@ -46,7 +46,7 @@ last_verified: 2026-09-06
 | E17 | Skill prose carries fixed-count words (`either`, `the two`) that go stale when the enumerated set grows | ✅ Implemented | — | S |
 | E18 | `/pr-ready` Phase 6.5 commits new files but never regenerates the PR body `files-changed` block | ✅ Implemented | — | S |
 | E19 | `/pr-ready` materialize-from-pin sites declare no fallback, so a pin that predates the script loops forever | ✅ Implemented | — | S |
-| E20 | Ship-pipeline coverage assertions (PR-body Manual Testing block, Phase 4B review) are emitted against a narrower slice than the PR's cumulative diff | ⬜ Open | 🟦 | M |
+| E20 | Ship-pipeline coverage assertions (PR-body Manual Testing block, Phase 4B review) are emitted against a narrower slice than the PR's cumulative diff | ✅ Implemented | — | M |
 | E21 | Test assertions land as static source greps that pass while the behavior they name is absent | ✅ Implemented | — | S |
 | E22 | Plan-declared negatives and PR body Scope dropped during Phase 6.5 remediation | ✅ Implemented | — | S |
 | E23 | PR body deletion volumes diverged from code's `EXPECTED` constants | ✅ Implemented | — | S |
@@ -79,6 +79,9 @@ last_verified: 2026-09-06
 | E55 | PR #2126 Phase 6.5 — machine-authored post-review commit undisclosed in PR body scope/coverage claims; Checks 3, 4-i, 4-ii fixed this pass | ⬜ Open | — | XS |
 | E56 | PR #2126 Phase 6.5 — stale entry-point counts in plan-preserved maintenance-backlog prose; both fixed this pass | ⬜ Open | — | XS |
 | E58 | PR #2133 Phase 6.5 — plan verification rows 4.e and 6.a false-positive on correct code; PR authoring notes | ⬜ Open | — | XS |
+| E54 | PR #2084 Phase 6.5 — rebase silently dropped implementation commit; lost-work proof blind to pre-run loss | ⬜ Open | — | XS |
+| E55 | PR #2129 Phase 6.5 — PR body false E2E claim, omitted grep finding, vacuous VM selector; all fixed this pass | ⬜ Open | — | XS |
+| E56 | PR #2129 Phase 6.5 — SKILL.md size-band gate not updated after deliberate file growth; fixed this pass | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -212,43 +215,7 @@ Landing rung is **1**, so rungs 3–5 are never reached and the four `.claude/ru
 
 *(discovered 2026-08-25 during #1982)*
 
-### E20 Ship-pipeline coverage assertions are emitted against a narrower slice than the PR's cumulative diff
-
-`class:` a ship-pipeline step that emits a **coverage assertion** — a PR-body `## Manual Testing` claim, a Phase 4B structured-review verdict — scoped to something narrower than the PR's cumulative diff, so the assertion reads as endorsing lines it never examined.
-
-Surfaced by `/pr-ready` running on PR #1964 (a docs-only J7 RE correction). Two independent instances of the same shape landed on one PR:
-
-1. The body's `## Manual Testing` block reads *"No manual testing needed — all changes are covered by automated tests."* The diff is one markdown backlog file; **no** automated test covers it, and the governing plan's own § *Automouse Hold Justification* names three properties that need subjective human confirmation and states "Human eyes required before merge." The boilerplate asserts a coverage source that does not exist for this diff class.
-2. The Phase 4B review (comment `5384312129`, 2026-08-23T04:58:43Z, head `205e851f5`) posted *"No issues found… a one-line date stamp added to the J29 backlog entry."* That description is the **incremental commit** `c0effc44a..205e851f5` — 1 changed line. The PR's cumulative diff at that same head is **12 changed lines**; the other 11 (the J29 table rewrite, the J7 `[CORRECTED]` append, the `RETIRED-OK` marker, the Next-RE rewrite, the `last_verified` bump) were never structurally reviewed. The verdict is worded as if it covered the PR.
-
-Both are silent: the assertion is well-formed, the gate is green, and nothing in the artifact records which slice it actually read. A reader of either one over-trusts it by exactly the amount of diff it skipped.
-
-**Occurrences**
-
-| # | File:line | Same class? | Live? | Status |
-|---|-----------|-------------|-------|--------|
-| 1 | PR #1964 body, `## Manual Testing` block | yes — asserts automated coverage that does not exist for a docs-only diff | yes | fixed this pass (body rewritten to the plan's three human-confirmation properties) |
-| 2 | PR #1964 comment `5384312129` (Phase 4B verdict) | yes — verdict scoped to the last commit, worded as covering the PR | yes | not fixed — filed; `/pr-review 1964` recommended before merge |
-| 3 | `.claude/skills/post-plan/SKILL.md` — the body generator that emits the `## Manual Testing` default | yes — the producer of occurrence 1; picks the boilerplate without consulting the plan's hold justification | yes | not fixed — filed (the gate belongs here, not on #1964) |
-| 4 | `.claude/skills/pr-ready/_plan-fidelity-review.md:6c(a)` | no — already *requires* bounding 4B's coverage; it is the check that caught occurrence 2 | yes | not fixed — correct as written |
-| 5 | PR #2023 body, `## Manual Testing` block — "all changes are covered by unit and E2E tests" | yes — asserts E2E test coverage; the diff contains only unit and database-integration tests, no E2E | yes | fixed this pass (body rewritten to "unit and database-integration tests, plus two CI hosts running the duplicate invariant") |
-
-`prevention_ladder:`
-
-- **rung 0 — already covered by an existing gate?** Partially, and only downstream: `/pr-ready` 6c(a) bounds 4B coverage and 6d.4 catches a body claim the diff contradicts. Neither fires until a human invokes `/pr-ready`, which is optional — both instances here sat green for three days first.
-- **rung 1 — extend an existing gate? LANDS HERE.** Two one-surface extensions, both on producers that already own the artifact: (a) `/post-plan`'s body generator picks `## Manual Testing` boilerplate from the plan it already reads — when that plan carries an `Automouse Hold Justification` naming human-confirmation properties, emit those as unchecked boxes instead of the "no manual testing needed" default; (b) the Phase 4B runner already computes the diff it reviews — have it print the base ref and changed-line count in its verdict block, so scope is legible without recomputation. Neither adds a mechanism.
-- **rung 2 — a rule doc under `.claude/rules/`?** Insufficient. Both artifacts are emitted by automated skills mid-run; a documented norm has no reader at the moment it is violated (same reasoning as [E18](#e18-pr-ready-phase-65-commits-new-files-but-never-regenerates-the-pr-bodys-files-changed-block) and [E19](#e19-pr-ready-materialize-from-pin-sites-declare-no-fallback-so-a-pin-that-predates-the-script-loops-forever)).
-- **rung 3 — a PHPStan rule?** N/A — no PHP on this surface.
-- **rung 4 — a CI gate?** Rejected for (a): a gate would have to decide whether a diff "needs" manual testing, which is the subjective judgment the plan's hold justification already records — cheaper to read it than to re-derive it. Worth reconsidering for (b) only if rung 1 proves insufficient.
-- **rung 5 — a new hook?** Rejected. Neither failure reaches a tool call the hook layer can intercept.
-
-Landing rung is **1**, so rungs 3–5 are never reached and the four `.claude/rules/meta-tooling-bar.md` extend-before-add conditions do not apply.
-
-`artifact destination:` `.claude/skills/post-plan/SKILL.md` (the `## Manual Testing` body-generation step) and the Phase 4B review runner's verdict block. Both in-repo.
-
-**Related.** [E18](#e18-pr-ready-phase-65-commits-new-files-but-never-regenerates-the-pr-bodys-files-changed-block) also concerns a PR body that stops matching its diff, but there the artifact is *machine-generated and stale*; here it is *hand-shaped and over-broad from the start* — the body was never right, rather than having drifted.
-
-*(discovered 2026-08-26 during #1964)*
+➜ E20 Ship-pipeline coverage assertions are emitted against a narrower slice than the PR's cumulative diff — ✅ Implemented (2026-09-05): see [archive](archive/dev-efficiency-backlog-archive.md).
 
 ➜ E21 Test assertions land as static source greps that pass while the behavior they name is absent — ✅ Implemented (2026-09-04): see [archive](archive/dev-efficiency-backlog-archive.md).
 
@@ -926,6 +893,14 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 ### E55 PR #2126 Phase 6.5 — machine-authored post-review commit undisclosed in PR body
 
 **class:** A machine-authored remediation commit riding into an open PR post-review without the PR body's hand-written scope expansion paragraph and manual-testing coverage claim being updated — leaving a false positive "fully covered" assertion and an undisclosed extra file in the diff.
+### E55 PR #2129 Phase 6.5 — PR body false E2E claim, omitted grep finding, vacuous VM selector
+
+**class (consolidated — B1, N3, N4):**
+- B1: a false test-class assertion in a PR body naming a testing class (E2E) absent from the diff — a verbatim recurrence of the defect the same PR archives.
+- N3: an omitted empirical grep result in the PR body `## Why` section, where the plan explicitly directed the author to record which case (live vector / prophylactic) was found.
+- N4: a vacuous pytest selector in a Verification Matrix row (`-k prready`) that can never collect any test.
+
+All three fixed this pass: B1 and N3 via `gh pr edit`; N4 via the plan file VM.
 
 **occurrence table:**
 
@@ -974,6 +949,25 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 ### E58 PR #2133 Phase 6.5 — plan verification rows 4.e and 6.a false-positive on correct code; PR authoring notes
 
 **class:** Plan verification shell commands that extract a function body with `sed` then grep the full text—including comment lines—for forbidden identifiers, producing false positives when the function's own comments document the property being verified.
+| 1 | PR #2129 body `## Manual Testing` — "all changes are covered by unit and E2E tests"; diff has zero E2E tests | yes (B1) | yes | fixed this pass — corrected to sentinel template with CLI-executable outcome sentence |
+| 2 | PR #2129 body `## Why` — grep case (live vector vs. prophylactic) not stated | yes (N3) | yes | fixed this pass — added: 265 plan files carry `## Automouse Hold Justification`; 703 heading/checkbox lines confirm the injection vector is live |
+| 3 | `~/claude-plans/postplan-hold-justification-diff-bounds.md` VM row 12 — `-k prready` deselects all 17 tests | yes (N4) | yes | fixed this pass — corrected to `-k pr_ready` in plan file |
+
+**prevention_ladder:**
+- rung 0 — already covered? B1: yes — `.claude/rules/pr-body-test-claim.md` + Phase 6 check 4. N3/N4: no prior mechanism.
+- rung 1 — extend existing gate? N4 selector could be verified by a VM harness row asserting `pytest -k <selector>` collects at least one test; niche.
+- rungs 2–5 — not warranted for any of the three.
+- landing rung: no gate warranted — Phase 6 check 4 and `pr-body-test-claim.md` catch B1; N3/N4 are authoring notes caught by Phase 6 checks 2 and 5.
+
+`prevention_ladder: no gate warranted — Phase 6 check 4 + pr-body-test-claim.md catch B1; N3/N4 caught by Phase 6 checks 2 and 5`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-06 during Phase 6 review of #2129)*
+
+### E56 PR #2129 Phase 6.5 — SKILL.md size-band gate not updated after deliberate file growth
+
+**class:** a test-maintenance omission — a size-band gate (`bin/test-pr-ready-now` case 25) not updated when the guarded file grew by deliberate plan work in the same PR.
 
 **occurrence table:**
 
@@ -1015,3 +1009,16 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 - **Check 2 deviation — `${arr[@]+"${arr[@]}"}` form:** `class: n/a` — deliberate correctness fix over the plan's literal text; required for `set -uo pipefail` + bash 3.2 unbound-variable guard; reviewer confirmed it is the better route. prevention_ladder: no gate warranted.
 - **Check 4 Note (b) — `feat:` vs `chore:` title typing:** `class: n/a` — maps to no 6d clause per reviewer; `feat:` is consistent with plan intent (`auto_merge: false` + human-signoff hold before unattended merge). prevention_ladder: rung 2 — `commit-conventions.md` already documents the GM-test rubric; no additional gate.
 - **Check 4 Note (c) — commit subject under-describes:** `class: n/a` — ephemeral; this repo squash-merges and master takes the PR title, not the branch commit subject. prevention_ladder: no gate warranted.
+| 1 | `bin/test-pr-ready-now:1880` — band [34616, 36616]; SKILL.md grew to 37174 B after diff-bounds block added by E20; gate fired correctly, band not updated | yes | yes | fixed this pass — band re-centred to [36174, 38174] |
+
+**prevention_ladder:**
+- rung 0 — already covered? Yes — the band gate itself caught the violation in CI.
+- rung 1 — extend existing gate? The gate could read expected size from a comment in SKILL.md; adds coupling.
+- rungs 2–5 — not warranted.
+- landing rung: no gate warranted — the existing gate caught it; authoring discipline (update the band when SKILL.md grows intentionally) is the prevention.
+
+`prevention_ladder: no gate warranted — existing band gate caught it; rung-0 is the prevention mechanism`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-06 during Phase 6 remediation of #2129)*

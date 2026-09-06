@@ -1875,10 +1875,11 @@ end_case pr-ready-push-fail-closed
 # Re-measured 2026-09-04: 34047 B (Phase 6.7 stub added to SKILL.md; band updated to [33047, 35047]).
 # Re-measured 2026-09-05: 34552 B (post-rebase on master 4721cb2ce; band [33047, 35047] still contains it — no re-centre needed).
 # Re-measured 2026-09-05: 35616 B (collapse-guard Phase 1 step 4 added to SKILL.md; band re-centred to [34616, 36616]).
+# Re-measured 2026-09-06: 37174 B (diff-bounds informational block added to Phase 4B by E20 PR #2129; band re-centred to [36174, 38174]).
 begin_case
 _sz=$(wc -c < "$PRD/SKILL.md" | tr -d ' ')
-if [[ "$_sz" -lt 34616 || "$_sz" -gt 36616 ]]; then
-    fail "SKILL.md is $_sz B, outside the [34616, 36616] resident-bytes band -- a phase was re-inlined, a relocation was reverted, or the file grew unreviewed"
+if [[ "$_sz" -lt 36174 || "$_sz" -gt 38174 ]]; then
+    fail "SKILL.md is $_sz B, outside the [36174, 38174] resident-bytes band -- a phase was re-inlined, a relocation was reverted, or the file grew unreviewed"
 fi
 end_case pr-ready-skill-size-band
 

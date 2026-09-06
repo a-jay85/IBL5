@@ -176,6 +176,20 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
 
    Record `PHASE_4B_RAN` (any line printed ⇒ true) **and the earliest timestamp printed**, which runtime Phase 6 reports. This is a **probe, not a gate**: the value is reported in Phase 6 and never used to skip work.
 
+   **Diff bounds (informational, never a gate).** Report both directions of plan-vs-diff scope from the pre-rebase patch Phase 2 already wrote — do not recompute the diff:
+
+   ```bash
+   source "$(git rev-parse --show-toplevel)/bin/lib/critical-files.sh"
+   grep '^+++ b/' /tmp/pr-ready-diff-pre-<N>.patch | sed 's|^+++ b/||' | sort -u > /tmp/pr-ready-diff-paths-<N>
+   cf_parse_section ~/claude-plans/<branch>.md | sed 's/^[A-Z_]*://' | sort -u > /tmp/pr-ready-plan-paths-<N>
+   echo "Diff bounds — in diff, not named by plan ($(comm -23 /tmp/pr-ready-diff-paths-<N> /tmp/pr-ready-plan-paths-<N> | wc -l | tr -d ' ')):"
+   comm -23 /tmp/pr-ready-diff-paths-<N> /tmp/pr-ready-plan-paths-<N> | sed 's/^/  /'
+   echo "Diff bounds — named by plan, not in diff ($(comm -13 /tmp/pr-ready-diff-paths-<N> /tmp/pr-ready-plan-paths-<N> | wc -l | tr -d ' ')):"
+   comm -13 /tmp/pr-ready-diff-paths-<N> /tmp/pr-ready-plan-paths-<N> | sed 's/^/  /'
+   ```
+
+   Substitute `<N>` and `<branch>` by hand, as everywhere else in this skill. A missing patch file or a missing plan file yields empty sides and the counts still print — **record both count lines verbatim** for Phase 6 input 6. Like the 4B probe beside it, this gates nothing: it never skips a phase, never changes the verdict word, and never blocks the rebase.
+
    **A match is evidence, not proof — read the lines before recording `true`.** Loosening the level trades one error for its mirror: a comment that merely *quotes* a review heading at line-start (another `/pr-ready` verdict, a pasted excerpt) matches too, and a false `PHASE_4B_RAN=true` is the worse failure — Phase 6 then asserts a review ran and **suppresses** the `/pr-review <N>` recommendation on a PR that never got one. The `.user.login` field above is there for this check: confirm each hit is from the reviewing identity and that the heading is the comment's own, not something it is citing. On PRs #1790/#1872/#1876 all six hits were genuine and none of the surrounding `/pr-ready` verdicts matched — their heading mentions are inline-backticked, not line-initial — but that is an observation, not a guarantee.
 
 **Phases 2 and 3 — rebase and conflict resolution.**
@@ -236,6 +250,9 @@ fallback. User-authorized 2026-08-26; the Invariants block records the same chan
        "none — no conflicts">
      Phase 4B probe evidence (6b input 5, verbatim from the 4b-probe.sh stdout lines):
        <PHASE_4B_RAN line and its companions, or "PROBE ABSENT">
+     Diff bounds (6b input 6, verbatim — the two count lines from the Phase 5 diff-bounds
+       block; informational context for fidelity, never a verdict input on its own):
+       <the two "Diff bounds — …" lines, or "BOUNDS ABSENT">
      Phase 5.9 FILES-CHANGED line (verbatim): <the recorded literal>
      The SKILL.md stub that spawned you is authoritative on WHO performs this review.
      The pinned copy of _plan-fidelity-review.md may still read "NEVER delegated" —

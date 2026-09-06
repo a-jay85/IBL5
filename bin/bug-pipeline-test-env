@@ -211,8 +211,22 @@ SH
     fi
     # 2. Port 50002 must not be held by a foreign process (a stale listener answering /
     #    satisfies the liveness probe while ibl-bug-bot-test dies on EADDRINUSE).
-    if lsof -nP -iTCP:50002 -sTCP:LISTEN 2>/dev/null | grep -v 'ibl-bug-bot-test' | grep -q LISTEN; then
-      echo "FAIL: port 50002 already held by a foreign process — stop it before starting the test bot" >&2
+    #    Identify the owner by PID, never by name: lsof's COMMAND column reports the
+    #    interpreter (`node`), never the PM2 app name, so a `grep -v ibl-bug-bot-test`
+    #    filter matches nothing and the guard fires on the test bot's OWN listener —
+    #    making every re-entrant bring-up without a prior teardown fail spuriously.
+    #    `sed -n '/^\[/,$p'` strips PM2's daemon-spawn banner, which it prints on
+    #    STDOUT ahead of the JSON when the daemon is cold — without it jq aborts the
+    #    whole script under `set -o pipefail`. `|| true` keeps an empty result
+    #    non-fatal; empty OWN_PID fails safe (every listener counts as foreign).
+    OWN_PID="$(pm2 jlist 2>/dev/null \
+        | sed -n '/^\[/,$p' \
+        | jq -r '.[]? | select(.name == "ibl-bug-bot-test") | .pid // empty' 2>/dev/null \
+        | head -1 || true)"
+    FOREIGN_PIDS="$(lsof -nP -iTCP:50002 -sTCP:LISTEN -t 2>/dev/null \
+        | grep -vx "${OWN_PID:-__no_such_pid__}" || true)"
+    if [ -n "$FOREIGN_PIDS" ]; then
+      echo "FAIL: port 50002 already held by a foreign process (pid: $(echo "$FOREIGN_PIDS" | tr '\n' ' ')) — stop it before starting the test bot" >&2
       exit 1
     fi
     # Delete-then-start so the config file is always re-evaluated (not --update-env,

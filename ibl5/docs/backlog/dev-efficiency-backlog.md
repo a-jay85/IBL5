@@ -1045,3 +1045,25 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 `artifact destination: this entry`
 
 *(discovered 2026-09-06 during Phase 6 review of #2140)*
+
+### E66 PR #2042 Phase 6.5 — post-PR-open commit introduced unplanned production code; PR body scope and testing claims went stale with no gate
+
+**class:** A commit pushed to an open PR after the body was written introduces unplanned production code changes outside the PR's stated scope. The PR body's `## Scope` and `## Manual Testing` sections become false, but no automated gate re-validates those claims against the actual diff. The gap persists until the next Phase 6 Opus fidelity review.
+
+**occurrence table:**
+
+| # | Location | Same class? | Live at review? | Status |
+|---|-----------|-------------|-----------------|--------|
+| 1 | PR #2042 — commit `a73f995c3` pushed post-PR-open added unplanned `classes/Topics/News/NewsController.php` rendering change (replaced `OpenTable()`/`CloseTable()` with raw `echo` div wrappers) and baselines 2 new `ibl.echoInNonView` violations (count 6→8); PR body `## Scope` named only the getopt() rule and `bin/lighthouse-pr-urls`; `## Manual Testing` claim became false | yes | 2026-09-06 Phase 6 review | fixed — reverted in Phase 6.5 remediation; baseline restored |
+
+**prevention_ladder:**
+- rung 0 — `.claude/rules/pr-body-negative-claim-recheck.md` documents the requirement to re-check scope claims after every commit; doc-only, no enforcement.
+- rung 1 — a pre-push warning hook that flags when `ibl5/classes/` or `ibl5/modules/` files appear in a PR diff with a `chore:` title; surfaces the anomaly at push time rather than at Phase 6 review.
+- rung 2 — a CI gate that diffs the PR body `## Scope` wording against the actual changed-file set and fails when production controller files appear with no matching justification sentence.
+- **landing rung:** rung 0 — existing rule doc is the prevention mechanism; a new gate is warranted only if the class recurs.
+
+`prevention_ladder: existing rule doc (pr-body-negative-claim-recheck.md); no new gate this pass — recurrence triggers escalation`
+
+`artifact destination: this entry`
+
+*(discovered 2026-09-06 during Phase 6 review of #2042)*

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import re
 
-from .state import Classification, Finding, PlanInfo
+from .state import Classification, Finding, HarnessError, PlanInfo
 from . import schemas
 from .classify import slice_spec_diffs
 
@@ -193,12 +193,20 @@ class ReviewPhase:
         }
 
     def run(self, meta: dict, cls: Classification,
-            plan: PlanInfo) -> tuple[list[Finding], dict, list[dict]]:
+            plan: PlanInfo) -> tuple[list[Finding], dict, list[dict], list[str]]:
         gates = self.gates(cls)
         findings: list[Finding] = []
+        degraded_agents: list[str] = []
 
         def collect(agent: str, source: str, purpose: str, model: str, prompt: str):
-            data = self.llm.call(purpose, model, prompt, schemas.validate_findings)
+            try:
+                data = self.llm.call(purpose, model, prompt, schemas.validate_findings,
+                                     normalizer=schemas.unwrap_findings_envelope)
+            except HarnessError as e:
+                if e.kind != "llm-invalid-output":
+                    raise                      # llm-fixture-missing, gh, etc. stay terminal
+                degraded_agents.append(purpose)
+                return
             for f in data:
                 findings.append(Finding(source=source, agent=agent, path=f["path"],
                                         line=f["line"], body=f["body"]))
@@ -235,16 +243,25 @@ class ReviewPhase:
         sha = meta.get("headRefOid") or meta.get("sha") or ""
         code = [f for f in surviving if f.source == "code-review"]
         sec = [f for f in surviving if f.source == "security-audit"]
+        code_degraded = [p for p in degraded_agents if p.startswith("review-agent-")]
         if code:
             self.gh.post_review_findings(pr, sha, "Code review", code)
+        elif code_degraded:
+            self.gh.post_review_summary(pr, "Code review",
+                                        "Review unavailable - unparseable output from: "
+                                        + ", ".join(code_degraded))
         else:
             self.gh.post_review_summary(pr, "Code review", "No issues found.")
         if gates["security"]:
             if sec:
                 self.gh.post_review_findings(pr, sha, "Security audit", sec)
+            elif "security-audit" in degraded_agents:
+                self.gh.post_review_summary(pr, "Security audit",
+                                            "Review unavailable - unparseable output from: "
+                                            "security-audit")
             else:
                 self.gh.post_review_summary(
                     pr, "Security audit",
                     "No security issues found. (XSS and input validation are enforced "
                     "by PHPStan custom rules.)")
-        return surviving, gates, scored
+        return surviving, gates, scored, degraded_agents

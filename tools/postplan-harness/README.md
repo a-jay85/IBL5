@@ -89,6 +89,7 @@ intent log — without touching GitHub.
 - **Human gates preserved.** `feat:` floor, `auto_merge: false`, golden-file
   and manual-testing holds all land in `SHIPPED_HELD` — exactly the PRs a
   human had to merge before.
+- **Degraded-review handling.** When a review agent's reply cannot be parsed, the harness records `degraded`, holds the PR, notes the failed agents on the PR body, and exits 0 — the PR is open and held for manual merge.
 
 ## Installation (executed 2026-07-16 with explicit approval)
 

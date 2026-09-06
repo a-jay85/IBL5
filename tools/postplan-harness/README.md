@@ -22,7 +22,7 @@ Without `--live`, every would-be side effect remains a typed intent record.
 | Phase 3 diff classification (all flags) | `review-agent-a/b/d` — code review judgment (sonnet) |
 | Phase 5 verify aggregation | `security-audit` — security judgment (haiku) |
 | Phase 5.0 plan→test/file conformance | `score-findings` — rubric confidence scoring (haiku) |
-| All ten Phase 6.5 arming conditions | `safety-verdict` — condition (9), **add-only** holds (haiku) |
+| All eleven ported arming conditions (numbered 1–10 and 12; condition (11), unresolved review-thread findings, stays skill-only) | `safety-verdict` — condition (9), **add-only** holds (haiku) |
 | CI-watch interpretation | `manual-classify` — plan-blind manual-step triage (haiku) |
 | Side-effect gating + audit log | `retrospective` — save-a-lesson-or-not (haiku) |
 
@@ -39,7 +39,7 @@ harness/
   classify.py             Phase 3 port (flags, filtered diff, module extraction)
   planfile.py             plan location + frontmatter/matrix/Critical-Files parsing
   conformance.py          Phase 5.0 MISSING/MISSING-FILE detection
-  armable.py              ten arming conditions (pure functions, fail-closed)
+  armable.py              eleven ported arming conditions (numbered 1–10 and 12; condition (11), unresolved review-thread findings, stays skill-only)
   review.py               Phase 4 launch gates + bounded review/security/scoring calls
   ciwatch.py              Phase 7 outcome interpretation
   llm_calls.py            prompt builders for the non-review retained calls

@@ -204,7 +204,7 @@ edits are irreducible); interactive local-command sessions (heterogeneous, not o
 <tr><td>Phase 5 PHPUnit/PHPStan/Go/E2E + aggregation</td><td>compiled</td><td><code>adapters/verify.py</code>; live mode shells the real commands, replay judges recorded output</td></tr>
 <tr><td>Phase 5.0 plan→test / Critical-Files conformance</td><td>compiled</td><td><code>harness/conformance.py</code></td></tr>
 <tr><td>Phase 6 manual-testing automation</td><td>split</td><td>plan-matrix path compiled; plan-blind triage = bounded <code>manual-classify</code> call; execution of automations deferred (fail-closed HELD)</td></tr>
-<tr><td>Phase 6.5 ten arming conditions</td><td>compiled</td><td><code>harness/armable.py</code> — pure, fail-closed; condition (9) keeps an <b>add-only</b> LLM verdict</td></tr>
+<tr><td>Phase 6.5 eleven ported arming conditions (numbered 1–10 and 12; condition (11), unresolved review-thread findings, stays skill-only)</td><td>compiled</td><td><code>harness/armable.py</code> — pure, fail-closed; condition (9) keeps an <b>add-only</b> LLM verdict</td></tr>
 <tr><td>Phase 7 CI watch</td><td>compiled</td><td>single blocking <code>gh pr checks --watch</code> (live) / recorded outcome (replay)</td></tr>
 <tr><td>Phase 8–9 confirm + retrospective</td><td>split</td><td>terminal states compiled; lesson-worth-saving = bounded <code>retrospective</code> call</td></tr>
 <tr><td>Phase 10–11 preview + cleanup</td><td>dropped/kept-out</td><td>headless runs skip preview today; cleanup is a process concern of the live wrapper</td></tr>
@@ -215,7 +215,7 @@ edits are irreducible); interactive local-command sessions (heterogeneous, not o
 <p>Kept as LLM calls because they are irreducible judgment: what the change <i>means</i> (PR copy),
 whether code is <i>wrong</i> (review/security), how much to <i>trust</i> a finding (scoring), whether a
 change needs <i>human eyes</i> (safety verdict, add-only), what a run <i>taught</i> (retrospective).
-Everything with a checkable answer became code. The riskiest translation — the ten arming conditions —
+Everything with a checkable answer became code. The riskiest translation — the eleven ported arming conditions (numbered 1–10 and 12; condition (11), unresolved review-thread findings, stays skill-only) —
 is property-tested per condition and fail-closed on indeterminate inputs.</p>
 
 <h2>6. Benchmark — replayed historical scenarios</h2>

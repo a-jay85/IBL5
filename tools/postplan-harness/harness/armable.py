@@ -1,4 +1,4 @@
-"""Phase 6.5 — the ten arming conditions as pure, typed functions.
+"""Phase 6.5 — the eleven ported arming conditions (numbered 1–10 and 12; condition (11), unresolved review-thread findings, stays skill-only) as pure, typed functions.
 
 Faithful port of .claude/skills/post-plan/_phase-6.5-arm-auto-merge.md +
 bin/lib/pr-armable.sh. Historically each condition was a separate model-driven
@@ -94,6 +94,7 @@ class ArmInputs:
     headless: bool
     dep_state_lookup: Callable[[int], str]    # pr number -> state ("MERGED"/"OPEN"/"UNKNOWN")
     llm_safety_holds: list[str] = field(default_factory=list)  # bounded-LLM ADDed holds
+    fidelity_verdict: Optional[str] = None    # Phase 5.5 verdict word; None = never ran (blocks)
 
 
 def evaluate(inp: ArmInputs) -> ArmDecision:
@@ -150,5 +151,17 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     pipe = "pipeline-authored" in inp.pr_labels
     cs.append(ConditionResult(10, "pipeline-authored-floor", pipe,
                               "pipeline-authored label present" if pipe else ""))
+
+    # Condition (12) — NOT (11). The number tracks the skill's condition number, not
+    # this list's position: condition (11) (unresolved review-thread findings) reads
+    # the GitHub review-thread API and is not ported here, so the set is deliberately
+    # {1..10, 12} with a gap. Do not renumber this to 11.
+    # Fail-closed and additive: this can only add a hold. `None` means Phase 5.5 never
+    # ran, which is indeterminate, not clean.
+    fid = (inp.fidelity_verdict or "").strip()
+    fid_ok = fid in ("READY", "READY WITH NOTES")
+    cs.append(ConditionResult(12, "plan-fidelity-verdict", not fid_ok,
+                              f"fidelity verdict={inp.fidelity_verdict!r}; need READY or READY WITH NOTES"
+                              if not fid_ok else ""))
 
     return ArmDecision(armed=not any(c.blocked for c in cs), conditions=cs)

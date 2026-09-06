@@ -207,6 +207,7 @@ class RunResult:
     retrospective: Optional[dict] = None
     error: Optional[str] = None
     error_kind: Optional[str] = None   # stable HarnessError.kind of a FAILED run (e.g. "rebase-conflict")
+    fidelity_pending: bool = False   # harness phases done; Phase 5.5 review + digest + arming remain
     ledger: Optional[UsageLedger] = None
     scored_findings: list[dict] = field(default_factory=list)
     manual_demotions: list[dict] = field(default_factory=list)

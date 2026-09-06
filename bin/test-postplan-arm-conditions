@@ -29,6 +29,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SKILL="$REPO_ROOT/.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md"
 P25_SKILL="$REPO_ROOT/.claude/skills/post-plan/SKILL.md"
+P55_SKILL="$REPO_ROOT/.claude/skills/post-plan/_phase-5.5-fidelity.md"
 P5_SKILL="$REPO_ROOT/.claude/skills/post-plan/_phase-5-final-verification.md"
 PLAN_SKILL="$REPO_ROOT/.claude/skills/plan/SKILL.md"
 
@@ -111,6 +112,29 @@ run_cond3() {
         fileitems) echo 'MISSING-FILE: bin/check-plan (plan Critical File never appeared in the diff)' > "$bridge" ;;
     esac
     DONE_MARK="$mark" BRIDGE="$bridge" bash -c "$1" 2>&1
+}
+
+run_cond12() {
+    local vf="$BASE_TMP/fidelity-verdict.md"
+    mk_verdict_fixture "$2" "$vf"
+    printf '{"number":2100}' > "$BASE_TMP/fixture.json"
+    PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" \
+        FIDELITY_VERDICT_FILE="$vf" bash -c "$1" 2>&1
+}
+run_p55() {
+    local vf="$BASE_TMP/p55-verdict.md"
+    mk_verdict_fixture "$2" "$vf"
+    printf '{"number":2100}' > "$BASE_TMP/fixture.json"
+    PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" \
+        FIDELITY_VERDICT_FILE="$vf" bash -c "$1" 2>&1
+}
+expect_fidelity() {
+    if printf '%s' "$3" | grep -qxF "FIDELITY=$2"; then
+        echo "ok: $1"
+    else
+        echo "FAIL: $1 — expected FIDELITY=$2, got: '$3'"
+        FAILED=1
+    fi
 }
 
 expect_block() { # name  BLOCK|NONE  output
@@ -282,6 +306,19 @@ mk_bl_dir() {
     echo "$d"
 }
 
+mk_verdict_fixture() {
+    rm -f "$2"
+    case "$1" in
+        ready)       printf 'Findings: none.\n\nREADY\n\n## DIGEST\n**What changed:** x\n' > "$2" ;;
+        notes)       printf 'Findings: two advisory notes.\n\nREADY WITH NOTES\n\n## DIGEST\n**What changed:** x\n' > "$2" ;;
+        notready)    printf 'Findings: intent gap on phase 3.\n\nNOT READY\n\n## DIGEST\n**What changed:** x\n' > "$2" ;;
+        noverdict)   printf 'Findings: prose only, reviewer never emitted a verdict word.\n\n## DIGEST\n**What changed:** x\n' > "$2" ;;
+        digestready) printf 'Findings: intent gap.\n\nNOT READY\n\n## DIGEST\n**What changed:** the READY gate\n' > "$2" ;;
+        empty)       : > "$2" ;;
+        absent)      ;;
+    esac
+}
+
 B1="$(extract_block '# condition (1)')"
 B3="$(extract_block '# condition (3)')"
 B5="$(extract_block '# condition (5)')"
@@ -291,6 +328,9 @@ B10="$(extract_block '# condition (10)')"
 B25="$(extract_block '# phase 2.5 trigger' "$P25_SKILL")"
 BMC="$(extract_block '# phase 6 body-marker capture' "$P25_SKILL")"
 BMV="$(extract_block '# phase 6 body-marker verify'  "$P25_SKILL")"
+B12="$(extract_block '# condition (12)')"
+B55="$(extract_block '# phase 5.5 verdict parse' "$P55_SKILL")"
+BREB="$(extract_block '# phase 2 rebase' "$P25_SKILL")"
 
 # --- structural: every predicate-using block must source the lib itself ---
 assert_self_contained '# condition (1)' "condition (1)"
@@ -735,6 +775,245 @@ if grep -qF 'A row whose CI check the PR'\''s own diff never triggers.' "$PLAN_S
 else
     echo "FAIL: plan SKILL.md gate 16 shape (d) prose missing (expected 'A row whose CI check the PR'\''s own diff never triggers.')"
     FAILED=1
+fi
+
+# --- §5.5 condition (12): fidelity verdict gate behavioural cases ----------------
+expect_block "(12) no verdict file -> BLOCK (indeterminate, fail-closed)" BLOCK \
+    "$(run_cond12 "$B12" absent)"
+expect_block "(12) empty verdict file -> BLOCK (indeterminate)" BLOCK \
+    "$(run_cond12 "$B12" empty)"
+expect_block "(12) NOT READY -> BLOCK" BLOCK \
+    "$(run_cond12 "$B12" notready)"
+expect_block "(12) no parseable verdict word -> BLOCK (indeterminate)" BLOCK \
+    "$(run_cond12 "$B12" noverdict)"
+expect_block "(12) READY -> NONE (armable)" NONE \
+    "$(run_cond12 "$B12" ready)"
+expect_block "(12) READY WITH NOTES -> NONE (notes advisory; 5.5 already remediated)" NONE \
+    "$(run_cond12 "$B12" notes)"
+expect_block "(12) digest body says READY but verdict says NOT READY -> BLOCK" BLOCK \
+    "$(run_cond12 "$B12" digestready)"
+
+for pair in "absent:no Phase 5.5 fidelity verdict" \
+            "notready:is NOT READY" \
+            "noverdict:no parseable verdict word"; do
+    st="${pair%%:*}"; tok="${pair#*:}"
+    out="$(run_cond12 "$B12" "$st")"
+    if printf '%s' "$out" | grep -qF "$tok"; then
+        echo "ok: (12) $st takes its own arm ('$tok')"
+    else
+        echo "FAIL: (12) $st took the wrong BLOCKED arm — no '$tok' in: '$out'"
+        FAILED=1
+    fi
+done
+
+if grep -qF 'READY WITH NOTES' "$P55_SKILL" && grep -qF 'READY WITH NOTES' "$SKILL"; then
+    echo "ok: READY WITH NOTES is named in both the 5.5 procedure and the arming condition"
+else
+    echo "FAIL: READY WITH NOTES named in only one of $P55_SKILL / $SKILL — remediation and arming have drifted"
+    FAILED=1
+fi
+
+DEFAULT_VF="/tmp/post-plan-fidelity-verdict-999002.md"
+printf '{"number":999002}' > "$BASE_TMP/fixture.json"
+mk_verdict_fixture ready "$DEFAULT_VF"
+
+# unset: production shape. Must resolve to the PR-keyed default and clear.
+expect_block "(12) var unset -> default path keyed to the derived PR number -> NONE" NONE \
+    "$(PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" bash -c "$B12" 2>&1)"
+
+# set-but-empty: the colon form treats it as unset. Same outcome, deliberately.
+expect_block "(12) var set-but-empty behaves as unset (colon form) -> NONE" NONE \
+    "$(PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" FIDELITY_VERDICT_FILE= bash -c "$B12" 2>&1)"
+
+rm -f "$DEFAULT_VF"
+out_unset_gone="$(PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" bash -c "$B12" 2>&1)"
+expect_block "(12) var unset, default path absent -> BLOCK" BLOCK "$out_unset_gone"
+if printf '%s' "$out_unset_gone" | grep -qF "$DEFAULT_VF"; then
+    echo "ok: (12) default path is PR-keyed (PR_NUM derived in-block)"
+else
+    echo "FAIL: (12) default path is NOT PR-keyed — a dropped in-block PR_NUM would block every PR: '$out_unset_gone'"
+    FAILED=1
+fi
+
+if [ -z "$B55" ]; then
+    echo "FAIL: phase 5.5 — no block matching '# phase 5.5 verdict parse' in $P55_SKILL"
+    FAILED=1
+else
+    expect_fidelity "5.5 parse: verdict word absent -> FIDELITY=missing" "missing" \
+        "$(run_p55 "$B55" noverdict)"
+    expect_fidelity "5.5 parse: digest body mentions READY -> FIDELITY=NOT READY" "NOT READY" \
+        "$(run_p55 "$B55" digestready)"
+    expect_fidelity "5.5 parse: READY WITH NOTES survives verbatim" "READY WITH NOTES" \
+        "$(run_p55 "$B55" notes)"
+    expect_fidelity "5.5 parse: empty file -> FIDELITY=missing" "missing" \
+        "$(run_p55 "$B55" empty)"
+fi
+
+# --- §5.6 condition (12): structural assertions (no assert_self_contained — see below) --
+# Condition (12) reads run-local /tmp state and sources no library, so
+# assert_self_contained — hardwired to `source` + pr-armable.sh — does NOT apply and
+# must not be called on it; it would FAIL unconditionally. Its self-containment
+# obligation is in-block re-derivation: each /post-plan block runs in its own shell,
+# so a block that inherited $PR_NUM would key the default path to the empty string
+# and block every PR forever, silently.
+# cond12_structural <block> — printed verdict, so the vacuity mutant below can
+# assert the guard actually fires.
+# shellcheck disable=SC2016  # grep patterns match literal ${VAR:-...} text in the block
+cond12_structural() {
+    printf '%s' "$1" | grep -q 'gh pr view --json number' \
+        && printf '%s' "$1" | grep -qF 'FIDELITY_VERDICT_FILE="${FIDELITY_VERDICT_FILE:-' \
+        && { echo derives; return; }
+    echo missing
+}
+
+if [ -z "$B12" ]; then
+    echo "FAIL: condition (12) — no block matching '# condition (12)' in $SKILL"
+    FAILED=1
+elif [ "$(cond12_structural "$B12")" = derives ]; then
+    echo "ok: condition (12) re-derives PR_NUM and FIDELITY_VERDICT_FILE in-block"
+else
+    echo "FAIL: condition (12) does NOT re-derive PR_NUM/FIDELITY_VERDICT_FILE in-block (cross-shell state = permanent silent block)"
+    FAILED=1
+fi
+
+# Vacuity mutant: strip the derivation and confirm the guard notices.
+if [ "$(cond12_structural "$(printf '%s' "$B12" | grep -v 'gh pr view')")" = missing ]; then
+    echo "ok: cond12_structural is not vacuous (mutant detected)"
+else
+    echo "FAIL: cond12_structural passes a block with no PR_NUM derivation — the guard is vacuous"
+    FAILED=1
+fi
+
+if printf '%s' "$B12" | grep -vE '^[[:space:]]*#' | grep -qE '\$\$|\$PPID'; then
+    echo "FAIL: condition (12) keys its verdict path to \$\$/\$PPID — Phase 5.5 wrote that file from a different shell"
+    FAILED=1
+else
+    echo "ok: condition (12) verdict path is not PID-keyed"
+fi
+
+# --- §5.7 drift guards: path stem + parse agreement across phases ------------------
+for f in "$P55_SKILL" "$SKILL"; do
+    grep -qF 'post-plan-fidelity-verdict-' "$f" \
+        || { echo "FAIL: drift — $(basename "$f") lost the verdict-path stem"; FAILED=1; }
+    if grep -qE 'post-plan-fidelity-verdict-(\$\$|\$PPID)' "$f"; then
+        echo "FAIL: drift — $(basename "$f") keys the verdict path to a PID; the writer and the reader are different shells"
+        FAILED=1
+    fi
+done
+# shellcheck disable=SC2016  # literal shell text, not expansions
+PARSE_TOKENS=(
+    "sed '/^## DIGEST/,\$d'"
+    '^(READY WITH NOTES|NOT READY|READY)'
+    'tail -1'
+)
+for tok in "${PARSE_TOKENS[@]}"; do
+    for pair in "5.5:$B55" "cond12:$B12"; do
+        who="${pair%%:*}"; blk="${pair#*:}"
+        if printf '%s' "$blk" | grep -qF -- "$tok"; then
+            echo "ok: $who verdict parse carries [$tok]"
+        else
+            echo "FAIL: verdict-parse drift — $who is missing [$tok]; Phase 5.5 and condition (12) can now disagree about the same verdict file"
+            FAILED=1
+        fi
+    done
+done
+
+# --- §5.8 phase 2 rebase gate behavioural cases ----------------------------------
+# mk_rebase_repo <kind: clean|behind|conflict> — echo the path of a throwaway repo.
+# CI has no global git identity; set it per-repo or every commit here aborts.
+mk_rebase_repo() {
+    local d; d="$(mktemp -d "$BASE_TMP/rebase-XXXXXX")"
+    git -C "$d" init --quiet -b main
+    git -C "$d" config user.email 'postplan-test@example.invalid'
+    git -C "$d" config user.name  'postplan test'
+    printf 'base\n' > "$d/f.txt"
+    git -C "$d" add f.txt
+    git -C "$d" commit --quiet -m base
+    git -C "$d" branch fakebase
+    case "$1" in
+        clean) ;;                                  # HEAD already contains fakebase
+        behind)                                    # base moves on a DIFFERENT file
+            git -C "$d" checkout --quiet fakebase
+            printf 'other\n' > "$d/g.txt"; git -C "$d" add g.txt
+            git -C "$d" commit --quiet -m advance
+            git -C "$d" checkout --quiet main
+            printf 'mine\n' > "$d/h.txt"; git -C "$d" add h.txt
+            git -C "$d" commit --quiet -m mine ;;
+        conflict)                                  # both sides rewrite the same line
+            git -C "$d" checkout --quiet fakebase
+            printf 'theirs\n' > "$d/f.txt"; git -C "$d" commit --quiet -am theirs
+            git -C "$d" checkout --quiet main
+            printf 'mine\n'   > "$d/f.txt"; git -C "$d" commit --quiet -am mine ;;
+    esac
+    printf '%s' "$d"
+}
+
+# run_rebase <block> <repo> <base-ref> — own shell, own cwd.
+run_rebase() { ( cd "$2" && REBASE_BASE_REF="$3" bash -c "$1" 2>&1 ); }
+
+# expect_reb <name> <want-substr> <stop|nostop> <output>
+expect_reb() {
+    local ok=1
+    printf '%s' "$4" | grep -qF "$2" || ok=0
+    if [ "$3" = stop ]; then printf '%s' "$4" | grep -q '^STOP:' || ok=0
+    else                     printf '%s' "$4" | grep -q '^STOP:' && ok=0
+    fi
+    if [ "$ok" -eq 1 ]; then echo "ok: $1"
+    else echo "FAIL: $1 — expected '$2' and $3, got: '$4'"; FAILED=1; fi
+}
+
+if [ -z "$BREB" ]; then
+    echo "FAIL: phase 2 rebase — no block matching '# phase 2 rebase' in $P25_SKILL"
+    FAILED=1
+else
+    # Already up to date -> clean, no STOP. Also the empty-range boundary for the
+    # pre-existing `git diff origin/master...HEAD` check whose base this step moves.
+    R="$(mk_rebase_repo clean)"
+    expect_reb "phase 2 rebase: already contains base -> REBASE=clean, no STOP" \
+        "REBASE=clean" nostop "$(run_rebase "$BREB" "$R" fakebase)"
+
+    # Behind, non-conflicting -> rebased, no STOP, HEAD advances.
+    R="$(mk_rebase_repo behind)"; BEFORE="$(git -C "$R" rev-parse HEAD)"
+    expect_reb "phase 2 rebase: behind, no conflict -> REBASE=rebased, no STOP" \
+        "REBASE=rebased" nostop "$(run_rebase "$BREB" "$R" fakebase)"
+    [ "$(git -C "$R" rev-parse HEAD)" != "$BEFORE" ] \
+        && echo "ok: phase 2 rebase: HEAD advanced onto the base" \
+        || { echo "FAIL: phase 2 rebase: HEAD unchanged after a reported rebase"; FAILED=1; }
+
+    # NEGATIVE: conflict -> STOP, and the tree is left exactly as found.
+    R="$(mk_rebase_repo conflict)"; BEFORE="$(git -C "$R" rev-parse HEAD)"
+    OUT="$(run_rebase "$BREB" "$R" fakebase)"
+    expect_reb "phase 2 rebase: conflicting base -> REBASE=conflict + STOP" \
+        "REBASE=conflict" stop "$OUT"
+    printf '%s' "$OUT" | grep -qF 'linear-history-squash-merge.md' \
+        && echo "ok: phase 2 rebase: STOP text names the squash-trap escape route" \
+        || { echo "FAIL: phase 2 rebase: STOP text omits the squash-trap guidance the label promises"; FAILED=1; }
+    [ "$(git -C "$R" rev-parse HEAD)" = "$BEFORE" ] \
+        && echo "ok: phase 2 rebase: HEAD unchanged after a conflict" \
+        || { echo "FAIL: phase 2 rebase: HEAD moved despite a conflict — --abort did not restore"; FAILED=1; }
+    [ -z "$(git -C "$R" status --porcelain)" ] \
+        && echo "ok: phase 2 rebase: working tree clean after a conflict" \
+        || { echo "FAIL: phase 2 rebase: tree left dirty after a conflict"; FAILED=1; }
+    [ ! -d "$R/.git/rebase-merge" ] && [ ! -d "$R/.git/rebase-apply" ] \
+        && echo "ok: phase 2 rebase: no rebase left in progress" \
+        || { echo "FAIL: phase 2 rebase: left an in-progress rebase behind"; FAILED=1; }
+
+    # NEGATIVE: unresolvable base ref -> indeterminate + STOP, nothing rebased.
+    R="$(mk_rebase_repo clean)"; BEFORE="$(git -C "$R" rev-parse HEAD)"
+    expect_reb "phase 2 rebase: unresolvable base ref -> REBASE=indeterminate + STOP" \
+        "REBASE=indeterminate" stop "$(run_rebase "$BREB" "$R" refs/heads/no-such-ref)"
+    [ "$(git -C "$R" rev-parse HEAD)" = "$BEFORE" ] \
+        && echo "ok: phase 2 rebase: HEAD unchanged on an unresolvable base" \
+        || { echo "FAIL: phase 2 rebase: HEAD moved on an unresolvable base"; FAILED=1; }
+
+    # NEGATIVE: no override flag exists — a "proceed anyway" branch would be a
+    # gate weakening, so assert the block has no escape hatch.
+    if printf '%s' "$BREB" | grep -qiE 'FORCE|SKIP_REBASE|proceed anyway|--continue'; then
+        echo "FAIL: phase 2 rebase block grew an override/proceed-anyway path"
+        FAILED=1
+    else
+        echo "ok: phase 2 rebase has no override path"
+    fi
 fi
 
 if [ "$FAILED" -eq 0 ]; then

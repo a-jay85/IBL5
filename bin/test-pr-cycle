@@ -965,6 +965,172 @@ else
 fi
 end_case "case 29 CI wiring"
 
+# ==========================================================================================
+# 30 — digest round trip: a Phase 5.5 verdict file → digest.sh → sticky comment → ledger.
+#      Cases 14/15 assert the CONSUMER against hand-typed text. This one runs the real
+#      PRODUCER into the real consumer, because /post-plan is now a second producer feeding
+#      the same `### Merge digest` contract, and a hand-typed fixture cannot catch a producer
+#      that drifts. Two halves: real content, then a degraded verdict. Both must yield a row
+#      with five labels; only the VALUES differ. "Shape valid" and "content present" are
+#      different claims, and only asserting both distinguishes a working digest from a
+#      structurally perfect empty one.
+# ==========================================================================================
+begin_case
+DIGEST_SH="$SCRIPT_DIR/../.claude/skills/pr-ready/scripts/digest.sh"
+[[ -f "$DIGEST_SH" ]] || fail "digest.sh not found at $DIGEST_SH"
+
+FIXTURE_TREE="0123456789abcdef0123456789abcdef01234567"
+
+# The verdict-file shape Phase 5.5's reviewer writes: verdict word, findings prose, then
+# the `## DIGEST` section LAST (digest.sh reads the last occurrence of the heading).
+mk_verdict() {  # $1 = target path, $2 = "full" | "nodigest"
+    {
+        echo "READY"
+        echo
+        echo "## Findings"
+        echo "No blocking divergence from the plan."
+        if [[ "$2" == "full" ]]; then
+            echo
+            echo "## DIGEST"
+            echo "**What changed:** post-plan now runs the fidelity review inline"
+            echo "**Why:** every post-plan-merged PR should carry a merge digest"
+            echo "**Watch:** condition (12) blocks when the verdict file is missing"
+            echo "**Touches:** .claude/skills/post-plan/, tools/postplan-harness/"
+            echo "**Machine-authored fixes:** none"
+        fi
+    } > "$1"
+}
+
+# The sticky body exactly as Phase 5.5 composes it: `**Reviewed tree:**` BEFORE the heading
+# (inside the block it would become a sixth labelled line and break the five-line contract),
+# and the marker byte-identical and last.
+mk_sticky() {  # $1 = digest.sh output
+    printf '%s\n' \
+        "Verdict: READY" \
+        "" \
+        "**Reviewed tree:** $FIXTURE_TREE" \
+        "" \
+        "### Merge digest" \
+        "$1" \
+        "" \
+        "<!-- pr-ready-verdict -->"
+}
+
+# Lift the digest block back out of a composed body, mirroring _digest_labels' terminators.
+extract_digest_block() {
+    awk '
+        /^### Merge digest[[:space:]]*$/ { inb = 1; next }
+        inb && (/^#+ / || /^[[:space:]]*(---+|\*\*\*+|___+)[[:space:]]*$/ || /^<!--/) { exit }
+        inb && $0 != "" { print }
+    '
+}
+
+# ---- 30a: real content -------------------------------------------------------------------
+reset_state
+mk_verdict "$SCRATCH/verdict-101.md" full
+DIG_FULL="$(bash "$DIGEST_SH" "$SCRATCH/verdict-101.md")" \
+    || fail "30a: digest.sh exited non-zero on a well-formed verdict file"
+[[ "$(printf '%s\n' "$DIG_FULL" | wc -l | tr -d ' ')" == "5" ]] \
+    || fail "30a: digest.sh emitted $(printf '%s\n' "$DIG_FULL" | wc -l) lines, want 5"
+printf '%s\n' "$DIG_FULL" | grep -q 'unavailable —' \
+    && fail "30a: digest.sh degraded on a well-formed verdict file"
+
+BODY_FULL="$(mk_sticky "$DIG_FULL")"
+# Placement guard: the tree line must sit ABOVE the heading in the composed body.
+T_LINE="$(printf '%s\n' "$BODY_FULL" | grep -n '^\*\*Reviewed tree:\*\*' | cut -d: -f1)"
+H_LINE="$(printf '%s\n' "$BODY_FULL" | grep -n '^### Merge digest' | cut -d: -f1)"
+[[ -n "$T_LINE" && -n "$H_LINE" && "$T_LINE" -lt "$H_LINE" ]] \
+    || fail "30a: **Reviewed tree:** is not above the ### Merge digest heading"
+[[ "$(printf '%s\n' "$BODY_FULL" | tail -1)" == "<!-- pr-ready-verdict -->" ]] \
+    || fail "30a: marker is not the last line"
+
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
+    > "$SCRATCH/triage-out"
+echo MERGED > "$SCRATCH/state-101"
+printf '%s' "$(view_json 101 "$BODY_FULL")" > "$SCRATCH/view-101.json"
+run --worker
+
+[[ "$(rows)" == "1" ]] || fail "30a: want 1 ledger row, got $(rows)"
+ledger | grep -qF 'digest: unavailable' && fail "30a: ledger degraded on a real digest"
+ledger | grep -qF '(missing)'            && fail "30a: ledger reported a missing label"
+ledger | grep -qF '**What changed:** post-plan now runs the fidelity review inline' \
+    || fail "30a: 'What changed' value did not survive to the ledger"
+ledger | grep -qF '**Why:** every post-plan-merged PR should carry a merge digest' \
+    || fail "30a: 'Why' value did not survive to the ledger"
+ledger | grep -qF '**Watch:** condition (12) blocks when the verdict file is missing' \
+    || fail "30a: 'Watch' value did not survive to the ledger"
+ledger | grep -qF '**Touches:** .claude/skills/post-plan/, tools/postplan-harness/' \
+    || fail "30a: 'Touches' value did not survive to the ledger"
+ledger | grep -qF '**Machine-authored fixes:** none' \
+    || fail "30a: 'Machine-authored fixes' value did not survive to the ledger"
+ledger | grep -qF 'Reviewed tree' && fail "30a: the tree line leaked into the digest block"
+
+# Closure: the block, lifted back out of the POSTED body, must still satisfy digest.sh's
+# own five-line contract. This is what makes the placement guard non-decorative — a
+# **Reviewed tree:** line inside the block makes this re-parse degrade.
+printf '## DIGEST\n%s\n' "$(printf '%s\n' "$BODY_FULL" | extract_digest_block)" \
+    > "$SCRATCH/reparse.md"
+RE="$(bash "$DIGEST_SH" "$SCRATCH/reparse.md")"
+printf '%s\n' "$RE" | grep -q 'unavailable —' \
+    && fail "30a: the posted digest block does not round-trip through digest.sh"
+
+# ---- 30b: degraded verdict, same shape, no content ----------------------------------------
+reset_state
+mk_verdict "$SCRATCH/verdict-101.md" nodigest
+DIG_DEG="$(bash "$DIGEST_SH" "$SCRATCH/verdict-101.md")" \
+    || fail "30b: digest.sh must exit 0 on a degraded verdict, not fail the caller"
+[[ "$(printf '%s\n' "$DIG_DEG" | wc -l | tr -d ' ')" == "5" ]] \
+    || fail "30b: degrade() emitted $(printf '%s\n' "$DIG_DEG" | wc -l) lines, want 5"
+[[ "$(printf '%s\n' "$DIG_DEG" | grep -c 'unavailable — ')" == "5" ]] \
+    || fail "30b: not every degraded line carries a reason"
+
+BODY_DEG="$(mk_sticky "$DIG_DEG")"
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
+    > "$SCRATCH/triage-out"
+echo MERGED > "$SCRATCH/state-101"
+printf '%s' "$(view_json 101 "$BODY_DEG")" > "$SCRATCH/view-101.json"
+run --worker
+
+[[ "$(rows)" == "1" ]] || fail "30b: want 1 ledger row, got $(rows)"
+# SHAPE valid: five labels parsed, so the row is NOT the whole-digest fallback...
+ledger | grep -qF 'digest: unavailable' \
+    && fail "30b: five labels parsed, so the row must not fall back to 'digest: unavailable'"
+ledger | grep -qF '(missing)' && fail "30b: degrade() must fill all five labels, not omit any"
+# ...but CONTENT absent: every one of the five values says so.
+for lab in "What changed" "Why" "Watch" "Touches" "Machine-authored fixes"; do
+    ledger | grep -qF "**$lab:** unavailable — " \
+        || fail "30b: '$lab' does not read as unavailable in the ledger"
+done
+end_case "case 30 digest round trip"
+
+begin_case
+# The three ways this seam has actually broken, each shown to trip case 30's assertions.
+reset_state
+mk_verdict "$SCRATCH/v.md" full
+
+# (a) A relabelled DIGEST line degrades ALL FIVE — digest.sh never half-succeeds.
+sed 's/^\*\*Why:\*\*/**Reason:**/' "$SCRATCH/v.md" > "$SCRATCH/v-relabel.md"
+[[ "$(bash "$DIGEST_SH" "$SCRATCH/v-relabel.md" | grep -c 'unavailable — ')" == "5" ]] \
+    || fail "vacuous: a wrong label did not degrade the whole digest"
+
+# (b) A sixth labelled line inside the block breaks the five-line contract on re-parse —
+#     which is exactly why **Reviewed tree:** is composed ABOVE the heading.
+{ bash "$DIGEST_SH" "$SCRATCH/v.md"; echo "**Reviewed tree:** $FIXTURE_TREE"; } \
+    > "$SCRATCH/six.txt"
+printf '## DIGEST\n%s\n' "$(cat "$SCRATCH/six.txt")" > "$SCRATCH/six.md"
+# Write to a file before grepping: grep -q exits on first match (SIGPIPE under pipefail).
+bash "$DIGEST_SH" "$SCRATCH/six.md" > "$SCRATCH/six-dg.txt"
+grep -q 'unavailable — ' "$SCRATCH/six-dg.txt" \
+    || fail "vacuous: a six-line digest block round-tripped clean"
+
+# (c) A bulleted producer would silently self-strip. _digest_labels tolerates it; the
+#     BARE form is what production emits, and case 30's fixture must stay bare.
+grep -qE '^\*\*What changed:\*\*' <(bash "$DIGEST_SH" "$SCRATCH/v.md") \
+    || fail "vacuous: digest.sh output is not bare-bold — case 30 no longer models production"
+end_case "case 31 digest round-trip guards are not vacuous"
+
 # --- summary --------------------------------------------------------------------------------
 if [[ $FAILED -eq 0 ]]; then
     echo "test-pr-cycle: ALL PASS"

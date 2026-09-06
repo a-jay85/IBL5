@@ -215,3 +215,34 @@ def test_scored_findings_empty_when_no_findings():
     # findings and scored_findings left at defaults (empty lists)
     blob = json.loads(r.to_json())
     assert blob["scored_findings"] == []
+
+
+def test_rc4_line_names_pending_and_unarmed():
+    r = RunResult(terminal=TerminalState.SHIPPED_HELD, pr_number=123,
+                  fidelity_pending=True)
+    line = runner.verdict_line(r, 4, "https://github.com/o/r/pull")
+    assert line.startswith("RESULT:")
+    assert "\n" not in line
+    assert "PENDING" in line and "NOT armed" in line and "Phase 5.5" in line
+    assert "PR #123" in line and "pull/123" in line
+
+
+def test_rc4_does_not_claim_failure():
+    """A handoff must not trip a watcher's FAILED/ERROR filter."""
+    r = RunResult(terminal=TerminalState.SHIPPED_HELD, pr_number=123,
+                  fidelity_pending=True)
+    line = runner.verdict_line(r, 4)
+    assert "FAILED" not in line and "ERROR" not in line
+
+
+def test_rc3_wording_survives_fidelity_pending():
+    r = RunResult(terminal=TerminalState.FAILED, error_kind="rebase-conflict",
+                  fidelity_pending=True)
+    assert "rebase conflict" in runner.verdict_line(r, 3)
+
+
+def test_live_runs_pass_no_fidelity_verdict():
+    import pathlib
+    src = (pathlib.Path(__file__).resolve().parents[1] / "runner.py").read_text()
+    assert 'fidelity_verdict=None if live else "READY"' in src, \
+        "a live harness run must carry no fidelity verdict, or it can arm unreviewed"

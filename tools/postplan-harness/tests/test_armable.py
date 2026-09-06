@@ -18,7 +18,7 @@ def inputs(**kw):
     base = dict(pr_body=BODY_CLEARED, pr_title="chore: x", pr_labels=[],
                 classification=Classification(), findings=[], unresolved_conformance=[],
                 phase5_status="pass", plan_auto_merge_false=False, headless=True,
-                dep_state_lookup=lambda n: "MERGED")
+                dep_state_lookup=lambda n: "MERGED", fidelity_verdict="READY")
     base.update(kw)
     return ArmInputs(**base)
 
@@ -101,3 +101,48 @@ def test_render_rows_never_emits_sentinel():
 def test_assert_no_sentinel_has_teeth():
     with pytest.raises(ValueError, match="sentinel"):
         _assert_no_sentinel("No manual testing needed\n")
+
+
+@pytest.mark.parametrize("verdict,expect_armed", [
+    ("READY", True),
+    ("READY WITH NOTES", True),
+    ("READY  ", True),            # trailing whitespace, as the skill's sed strips it
+    ("NOT READY", False),
+    (None, False),                # Phase 5.5 never ran — indeterminate, fail-closed
+    ("", False),
+    ("   ", False),
+    ("ready", False),             # case-sensitive, matching the skill's grep exactly
+    ("READY, mostly", False),     # not the bare verdict word
+])
+def test_fidelity_verdict_states(verdict, expect_armed):
+    d = evaluate(inputs(fidelity_verdict=verdict))
+    assert d.armed is expect_armed
+    if not expect_armed:
+        assert [c.number for c in d.holds] == [12]
+
+
+def test_fidelity_default_is_fail_closed():
+    """A construction site that omits the field must HOLD, never arm."""
+    base = dict(pr_body=BODY_CLEARED, pr_title="chore: x", pr_labels=[],
+                classification=Classification(), findings=[], unresolved_conformance=[],
+                phase5_status="pass", plan_auto_merge_false=False, headless=True,
+                dep_state_lookup=lambda n: "MERGED")
+    d = evaluate(ArmInputs(**base))          # fidelity_verdict deliberately omitted
+    assert not d.armed
+    assert any(c.number == 12 for c in d.holds)
+
+
+def test_condition_set_is_eleven_with_a_gap_at_11():
+    nums = sorted(c.number for c in evaluate(inputs()).conditions)
+    assert nums == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12]
+
+
+def test_fidelity_is_additive_and_releases_nothing():
+    """(12) may add a hold; it may never clear one."""
+    feat = inputs(pr_title="feat: shiny new GM power")          # (8) holds
+    assert {c.number for c in evaluate(feat).holds} == {8}
+    both = inputs(pr_title="feat: shiny new GM power", fidelity_verdict=None)
+    assert {c.number for c in evaluate(both).holds} == {8, 12}
+    cleared = inputs(pr_title="feat: shiny new GM power", fidelity_verdict="READY")
+    assert 8 in {c.number for c in evaluate(cleared).holds}      # (12) did not release (8)
+    assert not evaluate(cleared).armed

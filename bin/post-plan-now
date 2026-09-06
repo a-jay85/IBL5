@@ -11,6 +11,7 @@
 # Sonnet 4.6 /post-plan skill session. POST_PLAN_SKILL=1 forces the skill path.
 # The harness intentionally omits backlog housekeeping, worktree teardown, the
 # E2E verify track, and Phase 10 preview — the skill fallback retains them.
+# It also cannot run the Phase 5.5 fidelity review (no repo access from its LLM adapter), so it exits 4 and the resume prompt below finishes the run.
 #
 # Either way the run is supervised by launchd (RunAtLoad one-shot), so it
 # survives closing Claude Code or the terminal — a plain `nohup … &` launched
@@ -138,12 +139,35 @@ if [ -n "$PLAN_OVERRIDE" ]; then
 else
     PROMPT="Invoke the /post-plan skill now on the current git branch. Resolve the plan from the branch slug per the skill Phase 1 (highest-numbered \`<slug>-N.md\` variant when several exist), then execute every phase. No human is present: never ask questions or wait for input — make the safe choice and continue."
 fi
+# Plan resolution for the resume prompt mirrors the two PROMPT branches above, but is
+# assembled into ONE assignment: test_plan_blind_prompt_reaches_the_model_intact counts
+# `^\s*PROMPT="…"$` lines and requires exactly two, in order (index 1 = the plan-blind
+# one). An if/else pair of RESUME_PROMPT assignments would not match that regex, but
+# keeping this to a single assignment keeps the invariant obvious rather than incidental.
+# Written as if/else, not `[ … ] && VAR=…`: under `set -e` a false test in a trailing
+# &&-list exits the script.
+if [ -n "$PLAN_OVERRIDE" ]; then
+    RESUME_PLAN_CLAUSE="Use this exact plan file as the Phase 1 plan context: $PLAN_OVERRIDE — do NOT derive the plan from the branch slug."
+else
+    RESUME_PLAN_CLAUSE="Resolve the plan from the branch slug per the skill Phase 1 (highest-numbered \`<slug>-N.md\` variant when several exist) and use it as the Phase 1 plan context."
+fi
+# Entry point for harness exit code 4 (runner.py exit_code_for): the harness ran its
+# phases and left the plan-intent fidelity review, the merge digest and arming undone,
+# because it cannot run a repo-reading Opus reviewer (harness/review.py). Re-entering at
+# Phase 0 instead would re-run Phase 4 and post a SECOND code-review comment on the same
+# PR — the whole reason this is a separate prompt rather than the fallback one.
+RESUME_PROMPT="Invoke the /post-plan skill now on the current git branch, RESUMING at Phase 5.5 — do NOT start at Phase 0. The compiled post-plan harness has already run Phases 0 through 5 on this branch: the work is committed, the branch is rebased onto origin/master, it is pushed, the PR is open, and the Phase 4 code-review and Phase 5 conformance results are already posted. Do NOT repeat any of those phases and do NOT open a second PR — read the existing PR number with \`gh pr view --json number --jq '.number'\`. $RESUME_PLAN_CLAUSE Run Phase 5.5 (plan-intent fidelity review, verdict file, and the sticky verdict + Merge digest comment), then Phases 6 through 11 in order, including all twelve of Phase 6.5's arm conditions. You MAY commit and push the remediation commit that Phase 5.5 itself calls for; that is the only writing this session does. No human is present: never ask questions or wait for input — make the safe choice and continue."
 
 # Compiled-harness engine (see header). The launchd job runs the harness, captures its exit code,
 # and escalates to the skill session ONLY when should_fallback permits it. Exit 3 (rebase-conflict
 # fail-closed sentinel from runner.py exit_code_for) is NOT a fallback trigger: it stops for a
 # human instead of escalating to a --dangerously-skip-permissions skill session on an unreviewed tree.
-HARNESS="/Users/ajaynicolas/GitHub/IBL5/tools/postplan-harness"
+# Overridable ONLY so tools/postplan-harness/tests/test_post_plan_now_fallback.py can
+# point the engine-selection branch at a stub and assert the generated $CMD in CI, where
+# this absolute path does not exist. Production never sets it. The default must stay the
+# MAIN-CHECKOUT absolute path — never $ROOT/tools/... — per ADR-0092: a worktree's own
+# harness copy is the one this run is changing, and must not judge its own change.
+HARNESS="${HARNESS:-/Users/ajaynicolas/GitHub/IBL5/tools/postplan-harness}"
 FALLBACK_FN=""
 HARNESS_SEG=""
 GATE_OPEN=""
@@ -153,9 +177,15 @@ if [ "${POST_PLAN_SKILL:-0}" != "1" ] && [ -x "$HARNESS/run" ]; then
     FALLBACK_FN="$(declare -f should_fallback); "
     PLAN_ARG="${PLAN_OVERRIDE:+ --plan $(shq "$PLAN_OVERRIDE")}"
     HARNESS_SEG="CLAUDE_HEADLESS=1 caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS/out/live-$SAFE_SLUG-$TS\" --live${PLAN_ARG}; rc=\$?; "
-    GATE_OPEN="if should_fallback \"\$rc\"; then "
+    # rc=4 is tested FIRST, ahead of should_fallback: should_fallback 4 returns 0
+    # ("escalate"), so reaching it would launch the full Phase-0 skill run this branch
+    # exists to avoid. should_fallback itself is unchanged — rc=4 simply never reaches it.
+    # $RESUME_PROMPT is shq()-quoted for the far-side `/bin/bash -lc` parse exactly like
+    # $PROMPT below; it carries backticks and a single-quoted --jq argument.
+    RESUME_SEG="CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p $(shq "$RESUME_PROMPT") --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name \"$LABEL\""
+    GATE_OPEN="if [ \"\$rc\" = 4 ]; then ${RESUME_SEG}; elif should_fallback \"\$rc\"; then "
     GATE_CLOSE="; elif [ \"\$rc\" = 3 ]; then echo \"post-plan-now: harness exited 3 (rebase-conflict fail-closed sentinel). SKIPPING the /post-plan skill fallback; a human must resolve the stacked-branch rebase conflict, then re-run bin/post-plan-now. See $LOG.\"; fi"
-    ENGINE="compiled post-plan harness (fails CLOSED on rebase conflict; falls back to the skill on other failures)"
+    ENGINE="compiled post-plan harness (fails CLOSED on rebase conflict; falls back to the skill on other failures; on exit 4 it resumes the skill at Phase 5.5 for the fidelity review + merge digest)"
 fi
 
 # launchd runs with a minimal env, so prepend the same PATH bin/automouse/run uses

@@ -76,6 +76,8 @@ last_verified: 2026-09-06
 | E51 | PR #2092 Phase 6.5 — notes Findings 2–4: find-regex deviation already filed, benign out-of-plan changes, body claim fixed by E50; class n/a for all | ⬜ Open | — | XS |
 | E52 | PR #2064 Phase 6.5 — stale hand-written PR body claims contradicting the final diff and code; all fixed this pass | ⬜ Open | — | XS |
 | E53 | PR #1897 Phase 6.5 — plan-text staleness and meta-text accuracy notes (stale plan literals, vestigial test arg, Manual Testing boilerplate, post-plan retrospective scope count); class n/a or no gate warranted for all | ⬜ Open | — | XS |
+| E55 | PR #2126 Phase 6.5 — machine-authored post-review commit undisclosed in PR body scope/coverage claims; Checks 3, 4-i, 4-ii fixed this pass | ⬜ Open | — | XS |
+| E56 | PR #2126 Phase 6.5 — stale entry-point counts in plan-preserved maintenance-backlog prose; both fixed this pass | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -919,3 +921,46 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 `artifact destination: .claude/skills/pr-ready/scripts/lostwork.sh — add origin/<branch> pre-push comparison`
 
 *(discovered 2026-09-05 during Phase 6 review of #2084; root cause: prior /pr-ready run's Phase 2 rebase dropped 096320b0e using a bad --onto range)*
+
+### E55 PR #2126 Phase 6.5 — machine-authored post-review commit undisclosed in PR body
+
+**class:** A machine-authored remediation commit riding into an open PR post-review without the PR body's hand-written scope expansion paragraph and manual-testing coverage claim being updated — leaving a false positive "fully covered" assertion and an undisclosed extra file in the diff.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #2126 `## Scope` — undisclosed `bin/lighthouse-pr-urls` machine-authored CI fix | yes | was live | fixed this pass — Scope paragraph updated to name and explain the machine-authored commit |
+| 2 | PR #2126 `## Manual Testing` — "all changes are covered" false; fallback branch in `bin/lighthouse-pr-urls` uncovered | yes | was live | fixed this pass — Manual Testing section narrowed to the five-module conversion |
+
+**prevention_ladder:**
+- rung 0 — `.claude/rules/pr-body-negative-claim-recheck.md` covers stale negative absence claims ("What is NOT in this PR") but does not explicitly extend to stale positive scope/coverage assertions.
+- rung 1 — Extend `pr-body-negative-claim-recheck.md`: the same trigger (any commit pushed to an open PR) already fires; add a parallel obligation to re-read hand-written scope expansion prose and coverage claims — not only the negative list.
+- rungs 2–5 — not warranted; the existing rule doc is the right surface and the cost is a prose edit only.
+- **landing rung:** rung 1 — extend `.claude/rules/pr-body-negative-claim-recheck.md`.
+
+`artifact destination: .claude/rules/pr-body-negative-claim-recheck.md`
+
+*(discovered 2026-09-05 during Phase 6 review of #2126)*
+
+### E56 PR #2126 Phase 6.5 — stale entry-point counts in plan-preserved maintenance-backlog prose
+
+**class:** Plan-prescribed "preserve surrounding clauses" anchor instructions that treat count literals as invariants, when those counts were accurate at plan-write time but became stale relative to the PR's final diff scope (plan expanded from 4 to 9 entry points).
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/docs/backlog/maintenance-backlog.md` — "wired into 5 module entry points" | yes | was live | fixed this pass — updated to 9 |
+| 2 | `ibl5/docs/backlog/maintenance-backlog.md` — "FreeAgency, DepthChartEntry, Team and Player entry points (four)" | yes | was live | fixed this pass — updated to all nine entry points |
+
+**prevention_ladder:**
+- rung 0 — no existing gate checks count literals embedded in backlog preserve-and-anchor instructions against the final diff.
+- rungs 1–5 — not warranted; adding a gate for prose count literals in backlog anchor instructions is not cost-justified for a one-off occurrence; the fix belongs in plan-authoring discipline.
+- **landing rung:** no gate — plan-authoring care; when writing preserve-and-anchor instructions for backlog edits, explicitly flag any count literal that may change if the plan's scope expands.
+
+`prevention_ladder: no gate warranted — flag stale count literals in plan preserve-and-anchor instructions at plan-write time`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-05 during Phase 6 review of #2126)*

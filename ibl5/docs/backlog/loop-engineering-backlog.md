@@ -82,7 +82,7 @@ last_verified: 2026-09-06
 | L52 | Test harness case comment over-claims assertion scope; adjacent cases leave `run_block` exit codes unchecked | ✅ fixed this pass | — | S |
 | L53 | Phase 2 test code lost in branch rebuild — invisible because CI passed without the tests | ✅ fixed this pass | — | S |
 | L55 | PR body mislabels Phase 6.5 remediation artifacts; new backlog entry inserted contextually collides with master's concurrent sequence advance | ✅ fixed this pass | 🟥 | S |
-| L53 | PR #1900 Phase 6.5 — PR body misidentified ADR (0104→0114), omitted plan-mandated consent statement, undercounted test cases, contradicted pre-prod exception; all four fixed this pass | ⬜ Open | — | XS |
+| L56 | PR #1900 Phase 6.5 — PR body misidentified ADR (0104→0114), omitted plan-mandated consent statement, undercounted test cases, contradicted pre-prod exception; all four fixed this pass | ⬜ Open | — | XS |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -821,7 +821,7 @@ Landing rung: **no gate warranted** — neither occurrence exists in the tree af
 2. Ship the measurement half first (T1, L3) so later entries' effects are visible.
 3. Update this doc's status; bump `last_verified` (CI enforces via `bin/check-docs`).
 
-### L53 PR body inaccuracies on PR #1900 (findings 4A/4B/4C/4D)
+### L56 PR body inaccuracies on PR #1900 (findings 4A/4B/4C/4D)
 
 **class:** A PR body written before or shortly after a renumber commit landed, and never re-read after that commit, leaving an incorrect ADR reference, a missing plan-mandated consent statement for a destructive operation, an understated test-coverage claim, and a manual-testing declaration that contradicted the plan's own pre-prod exception.
 

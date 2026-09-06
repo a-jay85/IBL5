@@ -893,7 +893,7 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 ### E55 PR #2126 Phase 6.5 — machine-authored post-review commit undisclosed in PR body
 
 **class:** A machine-authored remediation commit riding into an open PR post-review without the PR body's hand-written scope expansion paragraph and manual-testing coverage claim being updated — leaving a false positive "fully covered" assertion and an undisclosed extra file in the diff.
-### E55 PR #2129 Phase 6.5 — PR body false E2E claim, omitted grep finding, vacuous VM selector
+### E60 PR #2129 Phase 6.5 — PR body false E2E claim, omitted grep finding, vacuous VM selector
 
 **class (consolidated — B1, N3, N4):**
 - B1: a false test-class assertion in a PR body naming a testing class (E2E) absent from the diff — a verbatim recurrence of the defect the same PR archives.
@@ -965,7 +965,7 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 
 *(discovered 2026-09-06 during Phase 6 review of #2129)*
 
-### E56 PR #2129 Phase 6.5 — SKILL.md size-band gate not updated after deliberate file growth
+### E61 PR #2129 Phase 6.5 — SKILL.md size-band gate not updated after deliberate file growth
 
 **class:** a test-maintenance omission — a size-band gate (`bin/test-pr-ready-now` case 25) not updated when the guarded file grew by deliberate plan work in the same PR.
 

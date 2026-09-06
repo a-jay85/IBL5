@@ -2486,10 +2486,10 @@ end_case phase3-holds-tee-pin
 
 # --- case 37: phase3-marker-step-pin -------------------------------------------------------
 begin_case
-_step2_start="$(grep -n '2\. \*\*Post the sticky verdict' "$_P7" | head -1 | cut -d: -f1)"
-_stop_line37="$(grep -n '3\. \*\*STOP' "$_P7" | head -1 | cut -d: -f1)"
+_step2_start="$(grep -n '^[0-9]\+\. \*\*Post the sticky verdict' "$_P7" | head -1 | cut -d: -f1)"
+_stop_line37="$(grep -n '^[0-9]\+\. \*\*STOP' "$_P7" | head -1 | cut -d: -f1)"
 [[ -n "$_step2_start" && -n "$_stop_line37" ]] \
-    || fail "phase3-marker-step-pin: could not locate step 2 heading or STOP terminator in _phase7"
+    || fail "phase3-marker-step-pin: could not locate sticky-verdict step heading or STOP terminator in _phase7"
 _marker_in_step2="$(sed -n "${_step2_start},${_stop_line37}p" "$_P7" | grep -c 'verdict-marker.sh' || true)"
 [[ "$_marker_in_step2" -ge 1 ]] \
     || fail "phase3-marker-step-pin: verdict-marker.sh not found between step 2 and STOP terminator"
@@ -2499,11 +2499,11 @@ end_case phase3-marker-step-pin
 
 # --- case 38: phase3-terminator-shasum ---------------------------------------------------
 begin_case
-_term_line38="$(grep -n '^3\. \*\*STOP — hard terminator' "$_PRD/_phase7-verdict.md" | head -1 | cut -d: -f1)"
+_term_line38="$(grep -n '^[0-9]\+\. \*\*STOP — hard terminator' "$_PRD/_phase7-verdict.md" | head -1 | cut -d: -f1)"
 [[ -n "$_term_line38" ]] \
     || fail "phase3-terminator-shasum: could not locate STOP hard terminator in _phase7-verdict.md"
-sed -n "${_term_line38}p" "$_PRD/_phase7-verdict.md" \
-    | shasum | grep -q '0d2a416aabb68395778572ac4dd995137aebd462' \
+sed -n "${_term_line38}p" "$_PRD/_phase7-verdict.md" | sed 's/^[0-9]\{1,\}\. //' \
+    | shasum | grep -q '3ed36112f052884d86c682df1ae3b63275b78707' \
     || fail "phase3-terminator-shasum: STOP hard terminator content changed — update the pin if intentional"
 end_case phase3-terminator-shasum
 

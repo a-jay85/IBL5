@@ -79,8 +79,8 @@ last_verified: 2026-09-06
 | L50 | `bin/pr-cycle` logs gate nominees as "excluded this run" but then orders and readies them (`--gate-edges /dev/null` re-admits every nominee) | ⬜ Open | 🟦 | S |
 | L51 | Plan Phase 5 dry-run count propagated to archive only, not PR body; reviewer blast-radius instruction stale by ~23% | ⬜ Open | 🟦 | S |
 | L52 | Test harness case comment over-claims assertion scope; adjacent cases leave `run_block` exit codes unchecked | ✅ fixed this pass | — | S |
-| L51 | `bin/pr-ready-now:434` claims both `STOP:` and `PUSH FAILED` are matched as line prefixes, but only `STOP:` is anchored; `PUSH FAILED` uses unanchored `grep -qF`. Decide whether to anchor `PUSH FAILED` or correct the comment — a gate change needing its own verification, deliberately out of scope for L47. | ⬜ Open | 🟥 | S |
-| L52 | Reconcile `~/claude-plans/pr-ready-dm-and-push-retry.md` with the `HOOK REJECTED` verdict: §6.1's *"`PUSH FAILED` is genuinely non-retriable"* is now scoped, and the `.claude/skills/pr-ready/scripts/push.sh` `shasum` pinned at Phase 6.6/8.3 is stale because this PR edited that file. Re-record the digest before executing that plan. | ⬜ Open | 🟦 | S |
+| L53 | `bin/pr-ready-now:434` claims both `STOP:` and `PUSH FAILED` are matched as line prefixes, but only `STOP:` is anchored; `PUSH FAILED` uses unanchored `grep -qF`. Decide whether to anchor `PUSH FAILED` or correct the comment — a gate change needing its own verification, deliberately out of scope for L47. | ⬜ Open | 🟥 | S |
+| L54 | Reconcile `~/claude-plans/pr-ready-dm-and-push-retry.md` with the `HOOK REJECTED` verdict: §6.1's *"`PUSH FAILED` is genuinely non-retriable"* is now scoped, and the `.claude/skills/pr-ready/scripts/push.sh` `shasum` pinned at Phase 6.6/8.3 is stale because this PR edited that file. Re-record the digest before executing that plan. | ⬜ Open | 🟦 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -735,7 +735,7 @@ Landing rung: **no gate warranted** — neither occurrence exists in the tree af
 **provenance:** (discovered 2026-09-05 during #2108)
 
 **Status (2026-09-05):** ✅ moot — harness retired this PR.
-### L51 `bin/pr-ready-now:434` claims both `STOP:` and `PUSH FAILED` are matched as line prefixes, but only `STOP:` is anchored
+### L53 `bin/pr-ready-now:434` claims both `STOP:` and `PUSH FAILED` are matched as line prefixes, but only `STOP:` is anchored
 
 `STOP:` is checked with a line-anchored pattern; `PUSH FAILED` uses unanchored `grep -qF`, so a log line containing the substring anywhere (e.g. in quoted prose or a commented-out rule) would be classified as a hard-stop marker. Decide whether to anchor `PUSH FAILED` to the line start or correct the comment to reflect the current behaviour — this is a gate change needing its own verification, and was deliberately left out of scope for L47's implementation. See also the L47 archive body for context.
 
@@ -745,7 +745,7 @@ Landing rung: **no gate warranted** — neither occurrence exists in the tree af
 
 ---
 
-### L52 Reconcile `~/claude-plans/pr-ready-dm-and-push-retry.md` — §6.1 scoped, Phase 6.6/8.3 `push.sh` shasum stale
+### L54 Reconcile `~/claude-plans/pr-ready-dm-and-push-retry.md` — §6.1 scoped, Phase 6.6/8.3 `push.sh` shasum stale
 
 **class:** A plan-doc (`~/claude-plans/pr-ready-dm-and-push-retry.md`) whose §6.1 prose claim (`PUSH FAILED` is genuinely non-retriable) and Phase 6.6/8.3 `shasum` pin for `.claude/skills/pr-ready/scripts/push.sh` both become stale when `push.sh` is edited in a sibling PR — non-discoverable at diff time because the plan file lives outside the repo.
 

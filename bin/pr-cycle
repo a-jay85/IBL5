@@ -432,6 +432,12 @@ _digest_labels() {
         }
         /^### Merge digest[[:space:]]*$/ { inblk = 1; next }
         inblk && /^#+ / { exit }
+        # A horizontal rule ends the digest block just as a heading does. /pr-ready emits a
+        # `---` after the block and then keeps writing, and an HR is not a heading, so without
+        # this the rule and everything after it fall through to the continuation branch below
+        # and get folded onto the last label value. Live rows for PRs #2092 and #2084 both
+        # ended in a stray ` ---` this way.
+        inblk && /^[[:space:]]*(---+|\*\*\*+|___+)[[:space:]]*$/ { exit }
         inblk {
             line = $0
             # The trailing [[:space:]]+ is load-bearing, not cosmetic. `*` is a list marker

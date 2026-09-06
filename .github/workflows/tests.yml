@@ -937,6 +937,8 @@ jobs:
         run: bin/test-check-workflow-checkout
       - name: bin/test-check-composite-contracts
         run: bin/test-check-composite-contracts
+      - name: bin/test-promote-master-to-production
+        run: bin/test-promote-master-to-production
       - name: bin/test-check-e2e-mutator-isolation
         run: bin/test-check-e2e-mutator-isolation
       - name: bin/test-check-e2e-fixture-drift

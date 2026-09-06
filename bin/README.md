@@ -13,12 +13,40 @@ container.
 | Automouse automation | `automouse/run`, `automouse/queue`, `automouse/queue-reorder-ui`, `automouse/self-heal`, `automouse/prompt-impl`, `automouse/prompt-postplan`, `watch-automouse-plan` (wait for a queued plan's phase to finish, then DM) |
 | Notifications | `discord-dm` (host-side IBLbot DM with retries + spool; the sibling of `.github/actions/notify-discord`) |
 | CI / quality gates | `adr-check`, `check-docs`, `check-hot-files`, `check-master-ci-green`, `check-plan`, `check-plan-staleness`, `check-vr-coverage`, `check-e2e-hygiene`, `check-e2e-fa-offers-owner`, `check-e2e-mutator-isolation`, `check-e2e-fixture-drift`, `check-destructive-migrations`, `refactor-flag` |
-| Prod ops | `db-sync-prod`, `log-fetch-prod`, `merge-master-to-prod`, `smoke-prod` (SSH from host); `iblbot-healthcheck` (pm2 cron watchdog, runs on the prod box) |
+| Prod ops | `db-sync-prod`, `log-fetch-prod`, `promote-master-to-production` (the promotion primitive CI runs; `--dry-run` to rehearse), `merge-master-to-prod` (manual/emergency promotion), `smoke-prod` (SSH from host); `iblbot-healthcheck` (pm2 cron watchdog, runs on the prod box) |
 | Dev / Docker env | `dev-up`, `db-test-up`, `db-migrate` |
 | Scaffolding | `next-adr`, `next-migration`, `generate-codebase-map`, `sync-branches` |
 | Lighthouse | `lighthouse-audit-report`, `lighthouse-audit-urls`, `lighthouse-comment` |
 | E2E dispatch | `e2e-for-file`, `e2e-for-pr` |
 | Shared helpers | `lib/` (`db-helpers.sh`, `git-helpers.sh`, `wt-guards.sh`, `automouse-stream-filter.sh`) |
+
+### Promotion to production is automatic
+
+`master` fast-forwards to `production` on its own whenever a master SHA goes
+all-green on CI — `.github/workflows/promote-to-production.yml` does it, and
+the push to `production` is what triggers `Build and Deploy`. You get a Discord
+DM on every promotion, on every hard failure, and when a push arrives while the
+automation is paused. See [ADR-0112](../ibl5/docs/decisions/0112-auto-promote-master-to-production.md).
+
+**Pause it** (takes effect on the next push; no PR, no deploy):
+
+    gh variable set AUTO_PROMOTE_PAUSED --body 1
+
+**Resume it:**
+
+    gh variable set AUTO_PROMOTE_PAUSED --body 0
+
+**Check it:**
+
+    gh variable get AUTO_PROMOTE_PAUSED
+
+While paused, promote by hand with `bin/merge-master-to-prod`. Only the exact
+value `1` pauses the automation — unset, `0`, `true`, and `yes` all leave it
+running, which is deliberate: the pause must be a decision, never a typo.
+
+A docs-only merge does **not** self-promote (too few check-runs exist on such a
+SHA to satisfy the green gate), so it ships with the next code merge, or
+immediately via `bin/merge-master-to-prod`.
 
 ## What does NOT belong here
 

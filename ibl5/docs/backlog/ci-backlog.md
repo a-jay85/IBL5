@@ -151,7 +151,7 @@ Entries 6.1 and 6.2 are CI/coverage gaps surfaced by the 2026-07-31 audit of PR 
 | 7.1 | `gh-pages` tree unbounded by size — p95 deploy 540s | ✅ Implemented | 🟨 | M |
 | 7.2 | Fork-PR hard failure in VR gallery push (peaceiris hard-assert) | ⬜ Open | 🟥 | M |
 
-➜ 7.1 `gh-pages` tree unbounded by size — ✅ Implemented (2026-08-30): see [archive](archive/ci-backlog-archive.md).
+➜ 7.1 `gh-pages` tree unbounded by size — ✅ Implemented (2026-09-05): see [archive](archive/ci-backlog-archive.md).
 
 ### 7.2 Fork-PR hard failure in VR gallery push (peaceiris hard-assert)
 *(discovered 2026-08-14 during #1874)*

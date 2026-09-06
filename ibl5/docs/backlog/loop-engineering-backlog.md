@@ -759,8 +759,8 @@ Landing rung: **2** — add a sentence to the plan template's Phase 5 dry-run se
 
 | # | File:line | Same class? | Live? | Status |
 |---|-----------|-------------|-------|--------|
-| 1 | `bin/test-vr-pages-prune:134` — Case 4 comment said "1 tracked removed" but assertions only check rc=0, stray/ presence, and no fatal in stderr | yes | was live; fixed this pass | fixed this pass (comment narrowed to match assertions) |
-| 2 | `bin/test-vr-pages-prune:142` — `rc4=$?` captured but only asserted as `[ "$rc4" -eq 0 ]`; Cases 1, 2, 3 call `run_block` bare with no explicit exit-code capture | near-miss | live | not fixed — overflow rule; no gate warranted |
+| 1 | test-vr-pages-prune:134 — Case 4 comment said "1 tracked removed" but assertions only check rc=0, stray/ presence, and no fatal in stderr | yes | was live at discovery | moot — test-vr-pages-prune has since been retired on master; prune logic moved to `bin/prune-vr-galleries` / `bin/test-prune-eligibility` |
+| 2 | test-vr-pages-prune:142 — `rc4=$?` captured but only asserted as `[ "$rc4" -eq 0 ]`; Cases 1, 2, 3 call `run_block` bare with no explicit exit-code capture | near-miss | was live at discovery | moot — same retired harness |
 
 **prevention_ladder:**
 
@@ -768,13 +768,13 @@ Landing rung: **2** — add a sentence to the plan template's Phase 5 dry-run se
 - rung 1 — a dedicated per-harness comment-vs-assertion lint: not warranted for a single 7-case harness.
 - rung 2 — no rule doc warranted; the fix is inline and the occurrence is isolated.
 
-Landing rung: **no gate warranted** — the class is real but the fix is applied inline; a standing gate would be disproportionate to a comment/assertion mismatch in a single harness, and Phase 4B structured code review (Agent E) already surfaces this class at review time.
+Landing rung: **no gate warranted** — neither occurrence exists in the tree after test-vr-pages-prune was retired; the class is real but disproportionate to a standing gate, and Phase 4B structured code review (Agent E) already surfaces this class at review time.
 
 **artifact destination:** n/a
 
 **provenance:** (discovered 2026-09-05 during #2108)
 
-**Status (2026-09-05):** ✅ fixed this pass.
+**Status (2026-09-05):** ✅ moot — harness retired this PR.
 
 ---
 

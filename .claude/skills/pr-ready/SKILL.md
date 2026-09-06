@@ -7,7 +7,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-09-04
+last_verified: 2026-09-06
 ---
 <!-- `model: claude-sonnet-4-6` IS DELIBERATE — DO NOT REMOVE IT, and never write
      `model: sonnet` (that alias resolves to Sonnet 5). User-authorized 2026-08-26,
@@ -269,6 +269,10 @@ fallback. User-authorized 2026-08-26; the Invariants block records the same chan
 **Phase 6.5 — Remediation.**
 
 Run `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase65-remediation.md` — the Phase 1.3 literal substituted — and follow the printed file end-to-end before continuing. **Do not reach for it by path first**: per the `git show` invariant above, the worktree you are now in almost certainly does not contain it, and the main-checkout copy is behind the straddle gate. On a `git show` failure take the single declared fallback in that invariant — nothing else. If neither source yields the file, print `STOP: cannot load _phase65-remediation.md from <MASTER_SHA> or from the worktree` and stop. **Never remediate from memory** — the fifth-file gate, the overflow rule, and the dirty-tree guard all live in that file. It also loads `.claude/skills/fix-and-prevent/_remediation.md` itself; that nested load has its own declared `STOP:`.
+
+**Phase 6.7 — manual-testing execution.**
+
+Run `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase67-manual-testing.md` — the Phase 1.3 literal substituted — and follow the printed file end-to-end before continuing. **Do not reach for it by path first**: per the `git show` invariant above, the worktree you are now in almost certainly does not contain it. On a `git show` failure take the single declared fallback in that invariant — nothing else. If neither source yields the file, print `STOP: cannot load _phase67-manual-testing.md from <MASTER_SHA> or from the worktree` and stop. **This phase is mandatory and always runs** — reaching it is never conditional on Phase 6.5. It is non-fatal to the verdict: every failure inside it degrades to unticked rows plus a stated reason.
 
 **Phase 7 — verdict and stop.**
 

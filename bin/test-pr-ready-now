@@ -1872,10 +1872,12 @@ end_case pr-ready-push-fail-closed
 # Measured at implementation: 33224 B (Step 3.5 post Phase-6-delegate rewrite; the plan
 # predicted 29021 B but a separate merged PR added the Phase 6 Opus-delegate block (+4203 B)
 # before this PR rebased onto master).
+# Re-measured 2026-09-04: 34047 B (Phase 6.7 stub added to SKILL.md; band updated to [33047, 35047]).
+# Re-measured 2026-09-05: 34552 B (post-rebase on master 4721cb2ce; band [33047, 35047] still contains it — no re-centre needed).
 begin_case
 _sz=$(wc -c < "$PRD/SKILL.md" | tr -d ' ')
-if [[ "$_sz" -lt 32224 || "$_sz" -gt 34224 ]]; then
-    fail "SKILL.md is $_sz B, outside the [32224, 34224] resident-bytes band -- a phase was re-inlined, a relocation was reverted, or the file grew unreviewed"
+if [[ "$_sz" -lt 33047 || "$_sz" -gt 35047 ]]; then
+    fail "SKILL.md is $_sz B, outside the [33047, 35047] resident-bytes band -- a phase was re-inlined, a relocation was reverted, or the file grew unreviewed"
 fi
 end_case pr-ready-skill-size-band
 
@@ -2080,7 +2082,7 @@ grep -qF '## DIGEST' "$f" || fail "28k: ## DIGEST missing from SKILL.md"
 grep -qF 'scripts/digest.sh' "$f" || fail "28k: scripts/digest.sh missing from SKILL.md"
 n_skill_merge=$(grep -c '### Merge digest' "$f" || true)
 [[ $n_skill_merge -eq 2 ]] || fail "28k: expected exactly 2 '### Merge digest' in SKILL.md, got $n_skill_merge"
-grep -qE '^last_verified: 2026-09-04$' "$f" || fail "28k: last_verified not bumped in SKILL.md"
+grep -qE '^last_verified: 2026-09-06$' "$f" || fail "28k: last_verified not bumped in SKILL.md"
 n_ends_in_one=$(grep -c 'the file ends in one' "$f" || true)
 [[ $n_ends_in_one -eq 0 ]] || fail "28k: 'the file ends in one' still present in SKILL.md — stale claim not removed"
 
@@ -2093,6 +2095,149 @@ out=$(bash "$D" "$FIX" 2>&1); rc=$?
 grep -qF 'unavailable' <<<"$out" && fail "28l: trailing-space heading produced unavailable placeholder: $out" || true
 
 end_case pr-ready-merge-digest-shape
+
+# --- case pr-ready-terminator-still-forbids ----------------------------------------------
+# Pins the six hard-stop clauses in _phase7-verdict.md; dropping any one makes this fail.
+begin_case
+grep -qF 'No merge' "$PRD/_phase7-verdict.md" \
+  || fail "pr-ready-terminator-still-forbids: 'No merge' absent from _phase7-verdict.md"
+grep -qF 'No auto-merge arming' "$PRD/_phase7-verdict.md" \
+  || fail "pr-ready-terminator-still-forbids: 'No auto-merge arming' absent from _phase7-verdict.md"
+grep -qF 'No `/post-plan` chain' "$PRD/_phase7-verdict.md" \
+  || fail "pr-ready-terminator-still-forbids: 'No /post-plan chain' absent from _phase7-verdict.md"
+grep -qF 'No worktree teardown' "$PRD/_phase7-verdict.md" \
+  || fail "pr-ready-terminator-still-forbids: 'No worktree teardown' absent from _phase7-verdict.md"
+grep -qF 'No second comment' "$PRD/_phase7-verdict.md" \
+  || fail "pr-ready-terminator-still-forbids: 'No second comment' absent from _phase7-verdict.md"
+grep -qF '/backlog-housekeep' "$PRD/_phase7-verdict.md" \
+  || fail "pr-ready-terminator-still-forbids: '/backlog-housekeep' absent from _phase7-verdict.md"
+end_case pr-ready-terminator-still-forbids
+
+# --- case pr-ready-terminator-amendment --------------------------------------------------
+# Pins the one permitted amendment (review-owed fire) and the invariant restatement.
+begin_case
+grep -qF 'One amendment:' "$PRD/_phase7-verdict.md" \
+  || fail "pr-ready-terminator-amendment: 'One amendment:' absent from _phase7-verdict.md"
+grep -qF 'scripts/review-owed.sh' "$PRD/_phase7-verdict.md" \
+  || fail "pr-ready-terminator-amendment: 'scripts/review-owed.sh' absent from _phase7-verdict.md"
+grep -qF 'everything the invariant still forbids stays forbidden' "$PRD/_phase7-verdict.md" \
+  || fail "pr-ready-terminator-amendment: 'everything the invariant still forbids stays forbidden' absent from _phase7-verdict.md"
+end_case pr-ready-terminator-amendment
+
+# --- case pr-ready-review-coverage-marker ------------------------------------------------
+# Pins the coverage-marker idiom in _plan-fidelity-review.md.
+begin_case
+grep -qF 'REVIEW-COVERAGE: NONE' "$PRD/_plan-fidelity-review.md" \
+  || fail "pr-ready-review-coverage-marker: 'REVIEW-COVERAGE: NONE' absent from _plan-fidelity-review.md"
+grep -qF 'REVIEW-COVERAGE: CURRENT' "$PRD/_plan-fidelity-review.md" \
+  || fail "pr-ready-review-coverage-marker: 'REVIEW-COVERAGE: CURRENT' absent from _plan-fidelity-review.md"
+grep -qF "never as the file's last line" "$PRD/_plan-fidelity-review.md" \
+  || fail "pr-ready-review-coverage-marker: \"never as the file's last line\" absent from _plan-fidelity-review.md"
+end_case pr-ready-review-coverage-marker
+
+# --- case pr-ready-phase67-always-runs ---------------------------------------------------
+# Pins that Phase 6.7 stub exists in SKILL.md and the non-conditional clause appears twice.
+begin_case
+grep -qF '**Phase 6.7 — manual-testing execution.**' "$PRD/SKILL.md" \
+  || fail "pr-ready-phase67-always-runs: Phase 6.7 heading absent from SKILL.md"
+[[ "$(grep -cF 'reaching it is never conditional on Phase 6.5' "$PRD/SKILL.md")" -eq 2 ]] \
+  || fail "pr-ready-phase67-always-runs: 'reaching it is never conditional on Phase 6.5' does not appear exactly twice in SKILL.md"
+end_case pr-ready-phase67-always-runs
+
+# --- case pr-ready-phase67-no-substitution -----------------------------------------------
+# Pins that _phase67-manual-testing.md is substitution-free and all four scripts are executable.
+begin_case
+grep -qF '$(' "$PRD/_phase67-manual-testing.md" \
+  && fail "pr-ready-phase67-no-substitution: _phase67-manual-testing.md contains \$( — command substitution found"
+grep -qF '<(' "$PRD/_phase67-manual-testing.md" \
+  && fail "pr-ready-phase67-no-substitution: _phase67-manual-testing.md contains <( — process substitution found"
+for _s in wt-bring-up manual-rows tick-rows review-owed; do
+    [[ -x "$PRD/scripts/${_s}.sh" ]] \
+      || fail "pr-ready-phase67-no-substitution: scripts/${_s}.sh missing or not executable"
+done
+end_case pr-ready-phase67-no-substitution
+
+# --- case pr-ready-bringup-peer-safe (row 12) --------------------------------------------
+# Pins the dirty-guard preceding the first bin/wt-up call; deleting it lets this regress.
+begin_case
+grep -qF 'git -C "$WT" status --porcelain' "$PRD/scripts/wt-bring-up.sh" \
+  || fail "pr-ready-bringup-peer-safe (row 12): status --porcelain check absent from wt-bring-up.sh"
+grep -qF 'BRINGUP: SKIP peer-dirty' "$PRD/scripts/wt-bring-up.sh" \
+  || fail "pr-ready-bringup-peer-safe (row 12): 'BRINGUP: SKIP peer-dirty' absent from wt-bring-up.sh"
+_skip_ln=$(grep -n 'BRINGUP: SKIP peer-dirty' "$PRD/scripts/wt-bring-up.sh" | head -1 | cut -d: -f1)
+_wtup_ln=$(grep -n 'bin/wt-up' "$PRD/scripts/wt-bring-up.sh" | head -1 | cut -d: -f1)
+[[ -n "$_skip_ln" && -n "$_wtup_ln" && "$_skip_ln" -lt "$_wtup_ln" ]] \
+  || fail "pr-ready-bringup-peer-safe (row 12): BRINGUP: SKIP peer-dirty (line ${_skip_ln}) is not before bin/wt-up (line ${_wtup_ln})"
+end_case pr-ready-bringup-peer-safe
+
+# --- case pr-ready-bringup-already-up (row 13) -------------------------------------------
+# Pins the already-running guard, the localhost URL derivation, and NOT-READY output.
+begin_case
+grep -qF 'BRINGUP: ALREADY-UP' "$PRD/scripts/wt-bring-up.sh" \
+  || fail "pr-ready-bringup-already-up (row 13): 'BRINGUP: ALREADY-UP' absent from wt-bring-up.sh"
+grep -qF "docker inspect -f '{{.State.Running}}'" "$PRD/scripts/wt-bring-up.sh" \
+  || fail "pr-ready-bringup-already-up (row 13): docker inspect check absent from wt-bring-up.sh"
+_alup_ln=$(grep -n 'BRINGUP: ALREADY-UP' "$PRD/scripts/wt-bring-up.sh" | head -1 | cut -d: -f1)
+_wtup_ln=$(grep -n 'bin/wt-up' "$PRD/scripts/wt-bring-up.sh" | head -1 | cut -d: -f1)
+[[ -n "$_alup_ln" && -n "$_wtup_ln" && "$_alup_ln" -lt "$_wtup_ln" ]] \
+  || fail "pr-ready-bringup-already-up (row 13): BRINGUP: ALREADY-UP (line ${_alup_ln}) is not before bin/wt-up (line ${_wtup_ln})"
+grep -qF '.localhost' "$PRD/scripts/wt-bring-up.sh" \
+  || fail "pr-ready-bringup-already-up (row 13): .localhost not derived from slug variable in wt-bring-up.sh"
+[[ "$(grep -cF 'main.localhost' "$PRD/scripts/wt-bring-up.sh")" -eq 0 ]] \
+  || fail "pr-ready-bringup-already-up (row 13): literal 'main.localhost' found in wt-bring-up.sh"
+grep -qF '/ibl5/' "$PRD/scripts/wt-bring-up.sh" \
+  || fail "pr-ready-bringup-already-up (row 13): /ibl5/ path prefix absent from wt-bring-up.sh"
+grep -qF 'BRINGUP: NOT-READY' "$PRD/scripts/wt-bring-up.sh" \
+  || fail "pr-ready-bringup-already-up (row 13): 'BRINGUP: NOT-READY' absent from wt-bring-up.sh"
+end_case pr-ready-bringup-already-up
+
+# --- case pr-ready-rows-classifier-precedence (row 14) -----------------------------------
+# Pins all outcome tokens and the SKIP-DONE < SKIP-HUMAN < SKIP-NOURL ordering.
+begin_case
+for _tok in 'SKIP-DONE' 'SKIP-HUMAN' 'SKIP-NOURL' 'SKIP-AUTH' 'FAIL http-' 'FAIL php-error' 'FAIL missing-literal' 'PASS'; do
+    grep -qF "$_tok" "$PRD/scripts/manual-rows.sh" \
+      || fail "pr-ready-rows-classifier-precedence (row 14): outcome token '${_tok}' absent from manual-rows.sh"
+done
+_done_ln=$(grep -n 'SKIP-DONE' "$PRD/scripts/manual-rows.sh" | head -1 | cut -d: -f1)
+_human_ln=$(grep -n 'SKIP-HUMAN' "$PRD/scripts/manual-rows.sh" | head -1 | cut -d: -f1)
+_nourl_ln=$(grep -n 'SKIP-NOURL' "$PRD/scripts/manual-rows.sh" | head -1 | cut -d: -f1)
+[[ -n "$_done_ln" && -n "$_human_ln" && "$_done_ln" -lt "$_human_ln" ]] \
+  || fail "pr-ready-rows-classifier-precedence (row 14): SKIP-DONE (line ${_done_ln}) is not before first SKIP-HUMAN (line ${_human_ln})"
+[[ -n "$_human_ln" && -n "$_nourl_ln" && "$_human_ln" -lt "$_nourl_ln" ]] \
+  || fail "pr-ready-rows-classifier-precedence (row 14): first SKIP-HUMAN (line ${_human_ln}) is not before SKIP-NOURL (line ${_nourl_ln})"
+end_case pr-ready-rows-classifier-precedence
+
+# --- case pr-ready-rows-executor-negatives (row 15) --------------------------------------
+# Pins: no -L in curl, PHP error pattern present, SKIP-AUTH reached via 3xx+login check.
+begin_case
+grep -qF 'curl' "$PRD/scripts/manual-rows.sh" \
+  || fail "pr-ready-rows-executor-negatives (row 15): curl invocation absent from manual-rows.sh"
+if grep 'curl' "$PRD/scripts/manual-rows.sh" | grep -qF ' -L'; then
+    fail "pr-ready-rows-executor-negatives (row 15): a curl invocation in manual-rows.sh carries -L flag"
+fi
+grep -qF 'Fatal error|Parse error|Warning:|Notice:' "$PRD/scripts/manual-rows.sh" \
+  || fail "pr-ready-rows-executor-negatives (row 15): PHP error pattern 'Fatal error|Parse error|Warning:|Notice:' absent from manual-rows.sh"
+grep -qF "'^3'" "$PRD/scripts/manual-rows.sh" \
+  || fail "pr-ready-rows-executor-negatives (row 15): '^3' 3xx status check absent from manual-rows.sh — SKIP-AUTH unreachable from redirect"
+grep -qF 'login' "$PRD/scripts/manual-rows.sh" \
+  || fail "pr-ready-rows-executor-negatives (row 15): 'login' absent from manual-rows.sh — SKIP-AUTH condition incomplete"
+end_case pr-ready-rows-executor-negatives
+
+# --- case pr-ready-tick-zero-pass-no-edit (row 16) ---------------------------------------
+# Pins: TICKED: 0 early-return TICK-COMPLETE before first gh pr edit; gh pr view before gh pr edit.
+# grep patterns select the actual commands (not comments that name them) by anchoring on
+# flags that only the real invocations carry (--body-file for edit; --json for view).
+begin_case
+grep -qF 'TICKED: 0' "$PRD/scripts/tick-rows.sh" \
+  || fail "pr-ready-tick-zero-pass-no-edit (row 16): 'TICKED: 0' absent from tick-rows.sh"
+_tc_ln=$(grep -n 'TICK-COMPLETE' "$PRD/scripts/tick-rows.sh" | head -1 | cut -d: -f1)
+_edit_ln=$(grep -n 'gh pr edit.*--body-file' "$PRD/scripts/tick-rows.sh" | head -1 | cut -d: -f1)
+_view_ln=$(grep -n 'gh pr view.*--json' "$PRD/scripts/tick-rows.sh" | head -1 | cut -d: -f1)
+[[ -n "$_tc_ln" && -n "$_edit_ln" && "$_tc_ln" -lt "$_edit_ln" ]] \
+  || fail "pr-ready-tick-zero-pass-no-edit (row 16): zero-count TICK-COMPLETE (line ${_tc_ln}) is not before first gh pr edit (line ${_edit_ln})"
+[[ -n "$_view_ln" && -n "$_edit_ln" && "$_view_ln" -lt "$_edit_ln" ]] \
+  || fail "pr-ready-tick-zero-pass-no-edit (row 16): gh pr view (line ${_view_ln}) is not before gh pr edit (line ${_edit_ln})"
+end_case pr-ready-tick-zero-pass-no-edit
 
 # --- verdict -----------------------------------------------------------------------------
 if [[ $FAILED -ne 0 ]]; then

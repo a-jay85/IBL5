@@ -893,7 +893,7 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 ### E55 PR #2126 Phase 6.5 — machine-authored post-review commit undisclosed in PR body
 
 **class:** A machine-authored remediation commit riding into an open PR post-review without the PR body's hand-written scope expansion paragraph and manual-testing coverage claim being updated — leaving a false positive "fully covered" assertion and an undisclosed extra file in the diff.
-### E55 PR #2129 Phase 6.5 — PR body false E2E claim, omitted grep finding, vacuous VM selector
+### E60 PR #2129 Phase 6.5 — PR body false E2E claim, omitted grep finding, vacuous VM selector
 
 **class (consolidated — B1, N3, N4):**
 - B1: a false test-class assertion in a PR body naming a testing class (E2E) absent from the diff — a verbatim recurrence of the defect the same PR archives.
@@ -965,7 +965,7 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 
 *(discovered 2026-09-06 during Phase 6 review of #2129)*
 
-### E56 PR #2129 Phase 6.5 — SKILL.md size-band gate not updated after deliberate file growth
+### E61 PR #2129 Phase 6.5 — SKILL.md size-band gate not updated after deliberate file growth
 
 **class:** a test-maintenance omission — a size-band gate (`bin/test-pr-ready-now` case 25) not updated when the guarded file grew by deliberate plan work in the same PR.
 
@@ -1005,6 +1005,7 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 *(discovered 2026-09-05 during Phase 6 review of #2133)*
 
 **Additional n/a notes from the same Phase 6 review (consolidated):**
+
 - **Check 4 Note (a) — "unit and E2E tests" label:** `class: n/a` — fixed in-PR; Manual Testing updated to "the `bin/test-pr-cycle` shell harness". prevention_ladder: no gate warranted — one-off cosmetic label imprecision; plan's Required Test Methods block already names the correct phrasing.
 - **Check 2 deviation — `${arr[@]+"${arr[@]}"}` form:** `class: n/a` — deliberate correctness fix over the plan's literal text; required for `set -uo pipefail` + bash 3.2 unbound-variable guard; reviewer confirmed it is the better route. prevention_ladder: no gate warranted.
 - **Check 4 Note (b) — `feat:` vs `chore:` title typing:** `class: n/a` — maps to no 6d clause per reviewer; `feat:` is consistent with plan intent (`auto_merge: false` + human-signoff hold before unattended merge). prevention_ladder: rung 2 — `commit-conventions.md` already documents the GM-test rubric; no additional gate.
@@ -1022,3 +1023,25 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-06 during Phase 6 remediation of #2129)*
+
+### E59 PR #2140 Phase 6.5 — implementation omitted plan-declared test methods; method renaming breaks name-keyed conformance checks
+
+**class:** An automouse implementation run delivers tests that satisfy intent but omit plan-declared method names: some methods are renamed (N1), some are missing entirely (F1), and one assertion arm is dropped (N2). A name-keyed conformance check (e.g. grepping the diff for the exact names in `## Required Test Methods`) would read all three as failures.
+
+**occurrence table:**
+
+| # | Location | Same class? | Live at review? | Status |
+|---|-----------|-------------|-----------------|--------|
+| 1 (F1) | PR #2140 — `testCanAddContractHardCapVerdictFlipsBetweenPhases`, `testInjectedSeasonPreventsInternalSeasonConstruction`, `testTotalCurrentSeasonSalariesIsZeroForEmptyRosterInBothPhases`, `testPlayerFacadeCurrentSeasonSalaryUsesRawContractYear` absent from diff | yes | 2026-09-06 Phase 6 review | fixed — added in Phase 6.5 remediation |
+| 2 (N1) | PR #2140 — six delivered methods renamed from plan's exact names (e.g. `testGetCurrentSeasonSalaryUsesNextYearWhenPhaseAdvancesContractYears` → `testGetCurrentSeasonSalaryAdvancesWhenAdvancesContractYearsIsTrue`) | yes | 2026-09-06 Phase 6 review | not fixed — assertions equivalent; renaming is authoring discipline |
+| 3 (N2) | PR #2140 — `testGetNextSeasonSalaryIsAlwaysOneYearAheadOfCurrent` asserts only the `advances=true` arm; plan also wanted the `advances=false` arm | yes | 2026-09-06 Phase 6 review | not fixed — filed; narrow gap, pre-existing `testGetNextSeasonSalary` covers the phase-blind case |
+
+**prevention_ladder:**
+- rung 0 — no existing gate verifies plan-declared test method names against the diff.
+- rung 1 — a rule doc encoding "name tests exactly as the plan specifies" is authoring discipline; no enforcement mechanism runs against `~/claude-plans/` (outside the repo).
+- rung 2 — a post-implementation grep of the diff against the plan's `## Required Test Methods` block could flag missing names; would require a new `bin/` script and a CI step, each with maintenance cost.
+- **landing rung:** no gate warranted this pass — three occurrences of the same class in one PR, all authoring-discipline failures. Surface here as a candidate for a future automouse-fidelity probe (e.g. a `/post-plan`-phase grep against Required Test Methods); defer gate authoring to that planning context.
+
+`artifact destination: this entry`
+
+*(discovered 2026-09-06 during Phase 6 review of #2140)*

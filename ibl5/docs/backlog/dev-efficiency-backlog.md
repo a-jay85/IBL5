@@ -987,8 +987,8 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 - rung 1 — no rule-doc fix available: a rule doc cannot make an advisory check blocking, and the authoring discipline it would encode ("type the marker") is already stated verbatim in `ibl5/docs/decisions/README.md`.
 - rung 2 — promote `Meta checks` to a required context on `master`. **Deliberately not taken here.** That is a branch-protection change on the ship-pipeline surface, which trips `.claude/rules/work-triage.md`'s safety mirror and wants a `/plan`, not an ad-hoc edit riding a backlog entry.
 - rung 3 — for occurrence 4, make the `adr` filter's skip observable (e.g. an explicit `else`-branch step that prints "adr-check skipped: no decision-trigger paths in diff"), so a free green from a path typo is legible in the log. Cheap and additive; also wants its own change, not this one.
-- **landing rung:** rung 0 for the two merged PRs — record the disposition here. Retroactively editing each merged PR body to carry the `no-adr:` marker the policy names is the natural companion, but it mutates a closed artifact and is left as a separate, explicitly-authorized action; this entry is the durable record either way. Rungs 2 and 3 are surfaced, not built.
+- **landing rung:** rung 0 for the two merged PRs — record the disposition here, **and** carry it in each merged PR body as the `no-adr:` marker the policy names. Both bodies were edited on 2026-09-05 (user-authorized; a merged PR body is still editable) and each marker is stamped "retroactively recorded" so it cannot be misread as having been present at merge time. Rungs 2 and 3 are surfaced, not built.
 
-`artifact destination: this entry (retroactive <!-- no-adr: --> markers in the bodies of #2124 and #2119 proposed, not applied)`
+`artifact destination: this entry, plus retroactive <!-- no-adr: --> markers applied to the bodies of #2124 and #2119`
 
 *(discovered 2026-09-05 while investigating recently merged PRs that carried red CI)*

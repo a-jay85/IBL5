@@ -473,7 +473,7 @@ not add backticks or markdown links to a row.
 | 2026-09-05 | #2117 | class: proc_open subprocess contract violations (unchecked proc_close exit, undrained stderr, NUL-unsafe delimiter) shipped undetected when a plan adds or modifies a proc_open call site without requiring subprocess contract verification | routed to: Rung 1 (partial, shipped in #2117) - BanProcOpenUncheckedExitRule in ibl5/phpstan-rules/ enforces checked proc_close exit; broader contract (stderr drain, NUL-delimiter correctness) routed to Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger) | prior: -- |
 | 2026-09-05 | #2121 | class: new always-loaded rule doc committed to wrong directory tree during implementation — bin/check-rules-byte-budget scans only the correct $RULES_DIR, so the misplaced file passes the gate silently until manually relocated | routed to: Rung 4 - note in .claude/rules/doc-freshness.md clarifying always-loaded .claude/rules/*.md files must be created at the exact repo-root path, not inside any subdirectory (e.g. not ibl5/.claude/rules/) | prior: -- |
 | 2026-09-05 | #2140 | class: a plan phase prescribes a specific numeric expected value for a phase-sensitive salary boundary case (e.g., cy=0) without tracing the resolver chain under each phase condition, producing an incorrect assertion that a later plan phase must overwrite | routed to: Rung 4 - new path-scoped rule doc .claude/rules/plan-phase-sensitive-expected-values.md: when a plan phase specifies an expected value for a characterization test involving resolveCurrentContractYear() or Season::advancesContractYears(), trace the resolver path under each phase condition to derive the value — domain intuition is insufficient for boundary cases where the dispatch chain collapses apparent differences | prior: -- |
-| 2026-09-06 | #2145 | class: two ship paths arm the same auto-merge decision but enforce different review gates, so whether a PR receives a plan-intent fidelity review and a merge digest depends on which command shipped it | routed to: Rung 1 - extend the existing gate: /post-plan Phase 5.5 fidelity review plus arm condition (12) in .claude/skills/post-plan/_phase-6.5-arm-auto-merge.md, mirrored fail-closed in tools/postplan-harness/harness/armable.py which exits 4 to hand the review back to the skill | prior: -- |
+| 2026-09-06 | #2145 | class: two ship paths arm the same auto-merge decision but enforce different review gates, so whether a PR receives a plan-intent fidelity review and a merge digest depends on which command shipped it | routed to: Rung 1 - extend the existing gate: /post-plan Phase 5.5 fidelity review plus arm condition (12) in .claude/skills/post-plan/_phase-6.5-arm-auto-merge.md, mirrored fail-closed in tools/postplan-harness/harness/armable.py (ConditionResult(12)) and tools/postplan-harness/runner.py (exits 4 via exit_code_for() when fidelity_pending, handing the review back to the skill) | prior: -- |
 ```
 
 ---
@@ -785,7 +785,7 @@ Landing rung: **no gate warranted** — neither occurrence exists in the tree af
 
 | # | File:line | Same class? | Live? | Status |
 |---|-----------|-------------|-------|--------|
-| 1 | tools/postplan-harness/harness/armable.py — Phase 5.5 plan-intent fidelity review requires reading the plan file and diff from the repo; the harness LLM adapter cannot do this | yes | live | exported to resumed skill session via exit 4 and RESUME_PROMPT in this PR |
+| 1 | tools/postplan-harness/harness/armable.py — Phase 5.5 plan-intent fidelity review requires reading the plan file and diff from the repo; the harness LLM adapter cannot do this | yes | live | exported to resumed skill session: armable.py appends ConditionResult(12); runner.py::exit_code_for() exits 4 when fidelity_pending; skill resumes via RESUME_PROMPT in this PR |
 
 **prevention_ladder:**
 
@@ -794,7 +794,7 @@ Landing rung: **no gate warranted** — neither occurrence exists in the tree af
 
 Landing rung: **Rung 1 (shipped this PR)** — the fidelity review is exported to a resumed `/post-plan` Phase 5.5 session via the harness's exit-4 handoff. This is a different class from L28 (which is a gate the harness has not yet *ported*); this entry is about a gate the harness structurally *cannot host*. The residual: each future repo-reading gate this plan introduces will require the same export and creates another drift surface between the two engines.
 
-**artifact destination:** `.claude/skills/post-plan/_phase-5.5-fidelity.md` (Phase 5.5 fidelity review), `.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md` condition (12), `tools/postplan-harness/harness/armable.py` exit-4 path
+**artifact destination:** `.claude/skills/post-plan/_phase-5.5-fidelity.md` (Phase 5.5 fidelity review), `.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md` condition (12), `tools/postplan-harness/harness/armable.py` (ConditionResult(12)), `tools/postplan-harness/runner.py` exit-4 path (exit_code_for() / fidelity_pending)
 
 **provenance:** (discovered 2026-09-06 during #2145)
 

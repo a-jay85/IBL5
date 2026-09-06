@@ -59,6 +59,7 @@
 #   PR_CYCLE_DRY_LAUNCH      With --go: emit runner + plist but skip launchctl bootstrap.
 #   PR_CYCLE_TS              Timestamp token for runner/log/plist paths (tests). Unset = date+PID at launch.
 #   PR_CYCLE_LOG             Detached-worker log path; set by --go, read by the worker. Derived from TS.
+#   PR_CYCLE_VERDICT_DIR     Directory for pr-ready-verdict-N.md files.  Default: /tmp
 #
 #   Every seam is PR_CYCLE_-prefixed on purpose. bin/pr-attack reads a bare PR_TRIAGE_CMD
 #   itself, and this script spawns the real bin/pr-attack as a child — an unprefixed export
@@ -118,6 +119,7 @@ PR_CYCLE_LEDGER="${PR_CYCLE_LEDGER:-$HOME/IBL5-merge-digest.md}"
 PR_CYCLE_STOP_FILE="${PR_CYCLE_STOP_FILE:-$HOME/.ibl5-pr-cycle.stop}"
 PR_CYCLE_NOW="${PR_CYCLE_NOW:-}"
 PR_CYCLE_DRY_LAUNCH="${PR_CYCLE_DRY_LAUNCH:-}"
+PR_CYCLE_VERDICT_DIR="${PR_CYCLE_VERDICT_DIR:-/tmp}"
 
 # Print the usage header above: every comment line from the shebang to `set -euo pipefail`.
 usage() {
@@ -821,16 +823,28 @@ _digest_row() {
 
     _labels="$(printf '%s\n' "$_body" | _digest_labels)"
     if [ -z "$_labels" ]; then
-        # A confirmed merge is ALWAYS ledgered — §4.4. A missing or unparseable digest
-        # degrades the row's detail; it never suppresses the row.
-        printf '  digest: unavailable\n'
+        # Best-effort recovery from the on-disk verdict file written by /pr-ready Phase 7.
+        # /tmp is cleared eventually; if the file is gone, fall through to unavailable.
+        _vfile="$PR_CYCLE_VERDICT_DIR/pr-ready-verdict-$_n.md"
+        if [ -f "$_vfile" ]; then
+            _labels="$(_digest_labels < "$_vfile")"
+        fi
+    fi
+    if [ -n "$_labels" ]; then
+        for _lab in "What changed" "Why" "Watch" "Touches" "Machine-authored fixes"; do
+            _val="$(printf '%s\n' "$_labels" | awk -F'\t' -v l="$_lab" '$1 == l { print $2; exit }')"
+            [ -n "$_val" ] || _val="(missing)"
+            printf '  **%s:** %s\n' "$_lab" "$_val"
+        done
         return 0
     fi
-    for _lab in "What changed" "Why" "Watch" "Touches" "Machine-authored fixes"; do
-        _val="$(printf '%s\n' "$_labels" | awk -F'\t' -v l="$_lab" '$1 == l { print $2; exit }')"
-        [ -n "$_val" ] || _val="(missing)"
-        printf '  **%s:** %s\n' "$_lab" "$_val"
-    done
+    # A confirmed merge is ALWAYS ledgered — §4.4. A missing or unparseable digest
+    # degrades the row's detail; it never suppresses the row.
+    if [ -f "$RUNDIR/ready-$_n.out" ]; then
+        printf '  digest: unavailable — /pr-ready ran but posted no verdict comment\n'
+    else
+        printf '  digest: unavailable — no /pr-ready pass (armed by triage sweep)\n'
+    fi
 }
 
 _ledger_init() {

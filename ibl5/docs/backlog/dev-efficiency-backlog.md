@@ -82,6 +82,8 @@ last_verified: 2026-09-06
 | E54 | PR #2084 Phase 6.5 — rebase silently dropped implementation commit; lost-work proof blind to pre-run loss | ⬜ Open | — | XS |
 | E55 | PR #2129 Phase 6.5 — PR body false E2E claim, omitted grep finding, vacuous VM selector; all fixed this pass | ⬜ Open | — | XS |
 | E56 | PR #2129 Phase 6.5 — SKILL.md size-band gate not updated after deliberate file growth; fixed this pass | ⬜ Open | — | XS |
+| E63 | PR #1900 Phase 6.5 — dead self-references to old path `bin/db-sync-now` (example) in `ibl5/bin/db-sync-now` (4 sites: lines 11, 12, 67, 93); all fixed this pass | ⬜ Open | — | XS |
+| E64 | PR #1900 Phase 6.5 — 5 duplicate `last_verified:` keys in `ibl5/docs/decisions/README.md` frontmatter; collapsed to single key this pass | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -1082,3 +1084,44 @@ Note the asymmetry: `_phase7-verdict.md:43` **already** handles this exact stale
 Read this as exposure, not as four confirmed-false digests: only #2084 is verified to have been *materially* wrong (it reported the implementation as lost after restoration). The other three may be stale in ways too minor to have been noticed — which is precisely the problem, since nothing checks. The measurement upgrades the landing rung from "one anecdote" to "the ordering fires on every run that remediates", and remediation is the common case, not the exception.
 
 *(discovered 2026-09-06 while reading the merge digest for #2084, which reported the implementation as lost after it had already been restored in-branch)*
+### E63 Dead self-references in relocated script `ibl5/bin/db-sync-now`
+
+**class:** A shell script containing usage text, help output, and user-visible error messages that refer to its own invocation by the old pre-relocation path (`bin/db-sync-now` (example)), when the file now lives at `ibl5/bin/db-sync-now`. Four dead references (help comment lines 11/12, unknown-flag `printf` line 67, `--status` BROKEN echo line 93) were all fixed in PR #1900 Phase 6.5.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/bin/db-sync-now:11` | yes | yes | fixed this pass |
+| 2 | `ibl5/bin/db-sync-now:12` | yes | yes | fixed this pass |
+| 3 | `ibl5/bin/db-sync-now:67` | yes | yes | fixed this pass |
+| 4 | `ibl5/bin/db-sync-now:93` | yes | yes | fixed this pass |
+
+**prevention_ladder:**
+- rung 0 — no existing gate checks a script for self-references after relocation; `bin/check-docs`'s dead-reference scan covers repo-path tokens in `.md` files and source comment bodies, not a script's own invocation name.
+- rung 1 — `ibl5/bin/test-db-sync-now` case 13b now asserts the BROKEN recovery string contains `ibl5/bin/db-sync-now --force` (added this pass) — gates the runtime-visible occurrence (line 93); lines 11/12/67 (comment/printf) remain unasserted.
+- rung 2 — a rule doc: when relocating a `bin/` script, grep the script body for its old invocation path before considering the relocation complete.
+- **landing rung:** rung 2 — rule-doc note that surfaces the class at relocation authoring time. The harness already gates the one user-visible runtime string; the rule covers the comment/printf cases no harness reaches.
+
+`artifact destination: this entry`
+
+*(discovered 2026-09-05 during PR #1900 Phase 6 plan-intent fidelity review)*
+
+### E64 Duplicate `last_verified:` frontmatter keys in `ibl5/docs/decisions/README.md`
+
+**class:** A YAML frontmatter block accumulating duplicate `last_verified:` keys across commits; under YAML last-wins semantics only the final key is effective. Five keys were present (2026-09-04, 2026-09-01, 2026-08-31, 2026-08-17, 2026-09-02); collapsed to a single `last_verified: 2026-09-05` in PR #1900 Phase 6.5.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/docs/decisions/README.md:3–7` | yes | yes | fixed this pass |
+
+**prevention_ladder:**
+- rung 0 — `bin/check-docs` validates frontmatter schema and staleness but does not check for duplicate YAML keys; its frontmatter parser uses a regex, not a YAML parser, so duplicates are transparent to it.
+- rung 4 — extend `bin/check-docs` frontmatter parsing to detect duplicate keys and fail fast; the file already parses frontmatter on every changed doc. Cheap extension, no new script.
+- **landing rung:** rung 4 — extend `bin/check-docs`. The defect is machine-detectable (a strict YAML parser catches duplicates unconditionally) and the file already parses frontmatter; the extend-before-add bar is met.
+
+`artifact destination: this entry`
+
+*(discovered 2026-09-05 during PR #1900 Phase 6 plan-intent fidelity review)*

@@ -1,0 +1,359 @@
+#!/bin/bash
+# Sync the local main-stack database with prod.
+#
+# Main stack only — worktree DBs (ibl5-db-<slug>) are NEVER touched by this script.
+#
+# Two modes:
+#   (default)       Pull live from prod via bin/db-sync-prod (streaming mariadb-dump).
+#   --from-backup   Restore the newest ibl5-<date>.sql.gz artifact from the prod host.
+#
+# Usage:
+#   ibl5/bin/db-sync-now [--from-backup] [--status] [--dry-run] [--force] [--help]
+#   ibl5/bin/db-sync-now --from-backup [--ssh-host <host>] [--force]
+#
+# Guards (both modes):
+#   lock       mkdir-based (NOT flock — flock is util-linux, absent on macOS)
+#   busy       skips when bin/bug-pipeline-tick is in flight
+#   throttle   30 min between syncs (bypass with --force)
+#   container  skips when ibl5-mariadb is not running (stack down is not an error)
+#
+# Post-sync assertion: SELECT MAX(game_date) FROM ibl_box_scores WHERE game_type = 1
+# A sync that passes this assertion writes an OK marker; a failed sync writes BROKEN
+# and exits 1. The BROKEN state is visible via --status and prevents throttle resets.
+#
+# Prereqs: .env with REMOTE_* creds (live mode) or PROD_SSH_HOST (--from-backup).
+#          ibl5-mariadb container running.
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+DB_SYNC_PROD_BIN="${DB_SYNC_PROD_BIN:-$REPO_ROOT/bin/db-sync-prod}"
+DB_QUERY_BIN="${DB_QUERY_BIN:-$REPO_ROOT/ibl5/bin/db-query}"
+DB_SYNC_LOCK_DIR="${DB_SYNC_LOCK_DIR:-/tmp/ibl5-db-sync.lock}"
+DB_SYNC_MARKER="${DB_SYNC_MARKER:-$HOME/.ibl5-db-sync.timestamp}"
+DB_SYNC_MIN_INTERVAL="${DB_SYNC_MIN_INTERVAL:-1800}"
+DB_SYNC_CONTAINER="ibl5-mariadb"
+DB_SYNC_DOCKER_BIN="${DB_SYNC_DOCKER_BIN:-docker}"
+DB_SYNC_PGREP_BIN="${DB_SYNC_PGREP_BIN:-pgrep}"
+DB_SYNC_SSH_BIN="${DB_SYNC_SSH_BIN:-ssh}"
+DB_SYNC_SCP_BIN="${DB_SYNC_SCP_BIN:-scp}"
+DB_SYNC_BACKUP_DIR="${DB_SYNC_BACKUP_DIR:-backups/db}"
+DB_SYNC_DB_HELPERS="${DB_SYNC_DB_HELPERS:-$REPO_ROOT/bin/lib/db-helpers.sh}"
+
+log() {
+    printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
+}
+
+# ── Arg parse ──────────────────────────────────────────────────────────────────
+FROM_BACKUP=0
+STATUS_ONLY=0
+DRY_RUN=0
+FORCE=0
+SSH_HOST_OVERRIDE=""
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --from-backup)  FROM_BACKUP=1; shift ;;
+        --status)       STATUS_ONLY=1; shift ;;
+        --dry-run)      DRY_RUN=1; shift ;;
+        --force)        FORCE=1; shift ;;
+        --ssh-host)     SSH_HOST_OVERRIDE="$2"; shift 2 ;;
+        -h|--help)
+            awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"
+            exit 0
+            ;;
+        *)
+            printf 'Unknown flag: %s\n' "$1" >&2
+            printf 'Usage: ibl5/bin/db-sync-now [--from-backup] [--status] [--dry-run] [--force] [--help]\n' >&2
+            exit 2
+            ;;
+    esac
+done
+
+# ── --status: read-only observability ─────────────────────────────────────────
+if [ "$STATUS_ONLY" -eq 1 ]; then
+    if [ ! -f "$DB_SYNC_MARKER" ]; then
+        echo "STATUS: never synced"
+        exit 0
+    fi
+    state="$(sed -n '1p' "$DB_SYNC_MARKER" 2>/dev/null)"
+    ts_epoch="$(sed -n '2p' "$DB_SYNC_MARKER" 2>/dev/null)"
+    ts_human="$(sed -n '3p' "$DB_SYNC_MARKER" 2>/dev/null | cut -f1)"
+    game_date="$(sed -n '3p' "$DB_SYNC_MARKER" 2>/dev/null | cut -f2)"
+    now="$(date +%s)"
+    if [ -n "$ts_epoch" ] && printf '%s' "$ts_epoch" | grep -qE '^[0-9]+$'; then
+        age=$(( now - ts_epoch ))
+        age_h=$(( age / 3600 ))
+        age_m=$(( (age % 3600) / 60 ))
+        age_str="${age_h}h ${age_m}m ago"
+    else
+        age_str="unknown"
+    fi
+    if [ "$state" = "BROKEN" ]; then
+        echo "STATUS: BROKEN — last sync failed; local DB may be empty. Run ibl5/bin/db-sync-now --force"
+        echo "  last attempted: ${ts_human:-unknown} (${age_str})"
+    else
+        echo "STATUS: ${state:-unknown} — synced ${ts_human:-unknown} (${age_str}), newest game_date=${game_date:-unknown}"
+    fi
+    exit 0
+fi
+
+# ── Shared cleanup (lock + any tmp dirs) ──────────────────────────────────────
+CLEANUP_TMPDIR=""
+cleanup() {
+    rm -rf "$DB_SYNC_LOCK_DIR"
+    if [ -n "$CLEANUP_TMPDIR" ]; then
+        rm -rf "$CLEANUP_TMPDIR" || true
+    fi
+}
+
+# ── acquire_lock ──────────────────────────────────────────────────────────────
+acquire_lock() {
+    if mkdir "$DB_SYNC_LOCK_DIR" 2>/dev/null; then
+        trap 'cleanup' EXIT
+        printf '%s\n' "$$" > "$DB_SYNC_LOCK_DIR/pid"
+        return 0
+    fi
+    # Lock exists — check if stale
+    local pid_file="$DB_SYNC_LOCK_DIR/pid"
+    local existing_pid=""
+    [ -f "$pid_file" ] && existing_pid="$(cat "$pid_file" 2>/dev/null)"
+    local dir_age=0
+    if [ -d "$DB_SYNC_LOCK_DIR" ]; then
+        local dir_mtime
+        dir_mtime="$(stat -c %Y "$DB_SYNC_LOCK_DIR" 2>/dev/null || stat -f %m "$DB_SYNC_LOCK_DIR" 2>/dev/null || echo 0)"
+        dir_age=$(( $(date +%s) - dir_mtime ))
+    fi
+    if [ -n "$existing_pid" ] && ! kill -0 "$existing_pid" 2>/dev/null; then
+        log "stale lock (pid $existing_pid) — reaping"
+        rm -rf "$DB_SYNC_LOCK_DIR"
+        mkdir "$DB_SYNC_LOCK_DIR"
+        trap 'cleanup' EXIT
+        printf '%s\n' "$$" > "$DB_SYNC_LOCK_DIR/pid"
+        return 0
+    fi
+    if [ "$dir_age" -gt 7200 ]; then
+        log "stale lock (older than 2h) — reaping"
+        rm -rf "$DB_SYNC_LOCK_DIR"
+        mkdir "$DB_SYNC_LOCK_DIR"
+        trap 'cleanup' EXIT
+        printf '%s\n' "$$" > "$DB_SYNC_LOCK_DIR/pid"
+        return 0
+    fi
+    log "skip: sync already running (pid ${existing_pid:-unknown})"
+    exit 0
+}
+
+# ── bug_pipeline_busy ─────────────────────────────────────────────────────────
+bug_pipeline_busy() {
+    "$DB_SYNC_PGREP_BIN" -f 'bin/bug-pipeline-tick' >/dev/null 2>&1
+}
+
+# ── throttled ─────────────────────────────────────────────────────────────────
+throttled() {
+    [ "$FORCE" -eq 1 ] && return 1
+    local ts_epoch
+    ts_epoch="$(sed -n '2p' "$DB_SYNC_MARKER" 2>/dev/null || true)"
+    if [ -z "$ts_epoch" ] || ! printf '%s' "$ts_epoch" | grep -qE '^[0-9]+$'; then
+        return 1  # missing/unparseable — not throttled
+    fi
+    local now elapsed
+    now="$(date +%s)"
+    elapsed=$(( now - ts_epoch ))
+    if [ "$elapsed" -lt "$DB_SYNC_MIN_INTERVAL" ]; then
+        log "skip: last sync ${elapsed}s ago (< ${DB_SYNC_MIN_INTERVAL})"
+        return 0
+    fi
+    return 1
+}
+
+# ── container_running ─────────────────────────────────────────────────────────
+container_running() {
+    "$DB_SYNC_DOCKER_BIN" ps --format '{{.Names}}' 2>/dev/null | grep -qx "$DB_SYNC_CONTAINER"
+}
+
+# ── assert_not_empty ──────────────────────────────────────────────────────────
+assert_not_empty() {
+    local result
+    result="$("$DB_QUERY_BIN" "SELECT MAX(game_date) FROM ibl_box_scores WHERE game_type = 1" 2>/dev/null || true)"
+    if [ -z "$result" ] || [ "$result" = "NULL" ] || [ "$result" = "0" ]; then
+        return 1
+    fi
+    printf '%s' "$result"
+}
+
+# ── --dry-run ─────────────────────────────────────────────────────────────────
+dry_run_mode() {
+    acquire_lock
+    if bug_pipeline_busy; then
+        log "skip: bug-pipeline tick in flight"
+        exit 0
+    fi
+    if throttled; then
+        exit 0
+    fi
+    if ! container_running; then
+        log "skip: $DB_SYNC_CONTAINER not running"
+        exit 0
+    fi
+    log "dry-run: would invoke $DB_SYNC_PROD_BIN"
+    exit 0
+}
+
+# ── --from-backup restore ─────────────────────────────────────────────────────
+from_backup_mode() {
+    local ssh_host="$SSH_HOST_OVERRIDE"
+    if [ -z "$ssh_host" ]; then
+        local env_file="$REPO_ROOT/.env"
+        if [ ! -f "$env_file" ]; then
+            local git_root
+            git_root="$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null | sed 's|/\.git$||')" || true
+            if [ -n "$git_root" ] && [ -f "$git_root/.env" ]; then
+                env_file="$git_root/.env"
+            fi
+        fi
+        if [ ! -f "$env_file" ]; then
+            log "FAILED: PROD_SSH_HOST unset in .env"
+            exit 1
+        fi
+        # shellcheck source=/dev/null
+        source "$env_file"
+        ssh_host="${PROD_SSH_HOST:-}"
+    fi
+    if [ -z "$ssh_host" ]; then
+        log "FAILED: PROD_SSH_HOST unset in .env"
+        exit 1
+    fi
+
+    local remote_newest
+    remote_newest="$("$DB_SYNC_SSH_BIN" "$ssh_host" "ls -1 $DB_SYNC_BACKUP_DIR/ibl5-*.sql.gz 2>/dev/null | sort | tail -1" 2>/dev/null || true)"
+    if [ -z "$remote_newest" ]; then
+        log "skip: no backup artifact on $ssh_host"
+        exit 0
+    fi
+
+    local artifact_name
+    artifact_name="$(basename "$remote_newest")"
+    if [[ ! "$artifact_name" =~ ^ibl5-[0-9]{4}-[0-9]{2}-[0-9]{2}\.sql\.gz$ ]]; then
+        log "ERROR: unexpected artifact name '$artifact_name' — refusing"
+        exit 1
+    fi
+
+    # Freshness skip — local DB already newer than artifact
+    local artifact_date
+    artifact_date="${artifact_name#ibl5-}"
+    artifact_date="${artifact_date%.sql.gz}"
+    local artifact_epoch=0
+    artifact_epoch="$(date -u -j -f '%Y-%m-%d %H:%M:%S' "$artifact_date 07:30:00" '+%s' 2>/dev/null \
+        || TZ=UTC date -d "$artifact_date 07:30:00" '+%s' 2>/dev/null \
+        || echo 0)"
+    if [ "$artifact_epoch" -gt 0 ]; then
+        local marker_state marker_epoch
+        marker_state="$(sed -n '1p' "$DB_SYNC_MARKER" 2>/dev/null || true)"
+        marker_epoch="$(sed -n '2p' "$DB_SYNC_MARKER" 2>/dev/null || true)"
+        if [ "$marker_state" = "OK" ] && \
+           [ -n "$marker_epoch" ] && \
+           printf '%s' "$marker_epoch" | grep -qE '^[0-9]+$' && \
+           [ "$marker_epoch" -gt "$artifact_epoch" ]; then
+            log "skip: local DB (synced $(date -r "$marker_epoch" '+%Y-%m-%dT%H:%M:%S' 2>/dev/null || date -d "@$marker_epoch" '+%Y-%m-%dT%H:%M:%S' 2>/dev/null || echo 'unknown')) is fresher than $artifact_name"
+            exit 0
+        fi
+    fi
+
+    local tmp
+    tmp="$(mktemp -d)"
+    CLEANUP_TMPDIR="$tmp"
+    log "downloading $artifact_name from $ssh_host..."
+    "$DB_SYNC_SCP_BIN" "$ssh_host:$remote_newest" "$tmp/"
+
+    if ! gzip -t "$tmp/$artifact_name" 2>/dev/null; then
+        log "ERROR: artifact failed gzip integrity check"
+        exit 1
+    fi
+
+    log "restoring $artifact_name into $DB_SYNC_CONTAINER..."
+    # shellcheck source=bin/lib/db-helpers.sh
+    source "$DB_SYNC_DB_HELPERS"
+    if ! gunzip -c "$tmp/$artifact_name" | db_import_sql "$DB_SYNC_CONTAINER"; then
+        log "ERROR: db_import_sql failed during --from-backup restore"
+        write_marker_broken
+        exit 1
+    fi
+
+    local game_date=""
+    game_date="$(assert_not_empty)" || true
+    if [ -z "$game_date" ] || [ "$game_date" = "NULL" ]; then
+        log "ERROR: post-restore assertion failed — ibl_box_scores appears empty"
+        write_marker_broken
+        exit 1
+    fi
+
+    local now_epoch now_iso
+    now_epoch="$(date +%s)"
+    now_iso="$(date '+%Y-%m-%dT%H:%M:%S%z')"
+    printf 'OK\n%s\n%s from-backup %s\t%s\n' "$now_epoch" "$now_iso" "$artifact_name" "$game_date" > "$DB_SYNC_MARKER"
+    log "restore complete — newest game_date=$game_date"
+}
+
+# ── write_marker_broken ────────────────────────────────────────────────────────
+write_marker_broken() {
+    local tmp
+    tmp="$(mktemp)"
+    printf 'BROKEN\n' > "$tmp"
+    if [ -f "$DB_SYNC_MARKER" ]; then
+        tail -n +2 "$DB_SYNC_MARKER" >> "$tmp" 2>/dev/null || true
+    fi
+    mv "$tmp" "$DB_SYNC_MARKER"
+}
+
+# ── Live sync mode ─────────────────────────────────────────────────────────────
+live_sync_mode() {
+    log "starting live sync via $DB_SYNC_PROD_BIN..."
+    local sync_rc=0
+    "$DB_SYNC_PROD_BIN" || sync_rc=$?
+
+    if [ "$sync_rc" -ne 0 ]; then
+        log "ERROR: $DB_SYNC_PROD_BIN exited $sync_rc"
+        write_marker_broken
+        exit 1
+    fi
+
+    local game_date=""
+    game_date="$(assert_not_empty)" || true
+    if [ -z "$game_date" ] || [ "$game_date" = "NULL" ]; then
+        log "ERROR: post-sync assertion failed — ibl_box_scores appears empty after sync"
+        write_marker_broken
+        exit 1
+    fi
+
+    local now_epoch now_iso
+    now_epoch="$(date +%s)"
+    now_iso="$(date '+%Y-%m-%dT%H:%M:%S%z')"
+    printf 'OK\n%s\n%s\t%s\n' "$now_epoch" "$now_iso" "$game_date" > "$DB_SYNC_MARKER"
+    log "sync complete — newest game_date=$game_date"
+}
+
+# ── Main dispatch ──────────────────────────────────────────────────────────────
+[ "$DRY_RUN" -eq 1 ] && dry_run_mode
+
+acquire_lock
+
+if bug_pipeline_busy; then
+    log "skip: bug-pipeline tick in flight"
+    exit 0
+fi
+
+if throttled; then
+    exit 0
+fi
+
+if ! container_running; then
+    log "skip: $DB_SYNC_CONTAINER not running"
+    exit 0
+fi
+
+if [ "$FROM_BACKUP" -eq 1 ]; then
+    from_backup_mode
+else
+    live_sync_mode
+fi

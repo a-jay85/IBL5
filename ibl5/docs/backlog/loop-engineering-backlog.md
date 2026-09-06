@@ -79,7 +79,8 @@ last_verified: 2026-09-06
 | L50 | `bin/pr-cycle` logs gate nominees as "excluded this run" but then orders and readies them (`--gate-edges /dev/null` re-admits every nominee) | ⬜ Open | 🟦 | S |
 | L51 | Plan Phase 5 dry-run count propagated to archive only, not PR body; reviewer blast-radius instruction stale by ~23% | ⬜ Open | 🟦 | S |
 | L52 | Test harness case comment over-claims assertion scope; adjacent cases leave `run_block` exit codes unchecked | ✅ fixed this pass | — | S |
-| L51 | PR #1899 Phase 6 notes: (F3) `fixed`+`terminal:true` reject skips tier-climbing and goes direct to `give_up_needs_human`; (F6) loop-engineering backlog changed by PR but not declared in Scope prose | 📝 Note | — | XS |
+| L53 | PR #1899 Phase 6 notes — `fixed`+`terminal` skip and undeclared backlog addition | ⬜ Open | — | XS |
+| L54 | `fixed`+`terminal:true` in Gate-1 reject skips tier-climbing | ⬜ Open | — | XS |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -724,9 +725,6 @@ The static-guard case in `bin/test-pr-cycle` should pin whichever wording lands,
 *(discovered 2026-09-05 during #2108)*
 
 **class:** A plan Phase 5 stated deliverable — recording the dry-run-measured blast-radius count in the PR body — propagated to the archive entry but not the PR body, leaving a reviewer-facing instruction citing the planning-time estimate (~772) rather than the measured figure (~626), a ~23% overstatement.
-### L51 PR #1899 Phase 6 notes — `fixed`+`terminal` skip and undeclared backlog addition
-
-**class:** two notes from Phase 6 review of #1899, both non-blocking.
 
 **occurrence table:**
 
@@ -776,6 +774,15 @@ Landing rung: **no gate warranted** — neither occurrence exists in the tree af
 **provenance:** (discovered 2026-09-05 during #2108)
 
 **Status (2026-09-05):** ✅ moot — harness retired this PR.
+
+### L53 PR #1899 Phase 6 notes — `fixed`+`terminal` skip and undeclared backlog addition
+
+**class:** two notes from Phase 6 review of #1899, both non-blocking.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
 | 1 | `bin/bug-pipeline-tick` — `terminal:true` check fires before a Gate-1 reject exits the tier-1 loop, sending the hunt to `give_up_needs_human` without climbing further tiers; the plan described rejection at tier 1 as never reaching a human directly (F3) | yes | live | 📝 Note — fail-safe direction; warrants its own plan |
 | 2 | `ibl5/docs/backlog/loop-engineering-backlog.md` — PR #1899 added a shell-function-as-timeout-argument row but did not mention the backlog change in the body Scope prose (F6) | near-miss | resolved | 📝 Note — additive and doc-only |
 
@@ -792,6 +799,28 @@ Landing rung: **no gate warranted** — neither occurrence exists in the tree af
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-05 during Phase 6 review of #1899)*
+
+### L54 `fixed`+`terminal:true` in Gate-1 reject skips tier-climbing
+
+**class:** a `verdict:"fixed"` result also carrying `terminal:true` that is rejected by Gate 1 (`observed_before != reported`) falls through to the `terminal` check at line 956 of `bin/bug-pipeline-tick`, skips the remaining model tiers, and hands directly to `give_up_needs_human` — contrary to the plan's stated intent that every Gate-1 reject climbs the full ladder before reaching a human.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/bug-pipeline-tick:943-958` | yes | yes | not fixed — filed |
+
+**prevention_ladder:**
+- rung 0 — no existing gate covers this; the test harness does not exercise `fixed`+`terminal:true` together.
+- rung 1 — extend `bin/test-bug-pipeline-hunt`: a dedicated row asserting the combination climbs to sonnet/opus before landing on `give_up_needs_human`. Machine-verifiable.
+- rung 2 — n/a (no rule doc needed; the existing plan prose already states the intent).
+- rung 3–5 — n/a; a harness row (rung 1) is sufficient.
+
+Landing rung: **rung 1** — a test row plus the matching `bin/bug-pipeline-tick` fix; warrants its own `/plan` to design the assertion and the guard change correctly. Rungs 2–5 not needed for this class.
+
+**artifact destination:** `bin/test-bug-pipeline-hunt` (in-repo) + `bin/bug-pipeline-tick` (in-repo)
+
+**provenance:** (discovered 2026-09-06 during Phase 6 review of #1899, surfaced by Phase 4B on 2026-08-16 at 75/100 sub-threshold)
 
 ---
 

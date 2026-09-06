@@ -1,5 +1,5 @@
 ---
-description: /pr-ready runtime Phase 7 — arm-hold evaluation, sticky verdict comment, hard terminator. Loaded by SKILL.md via git show at Phase 7.
+description: /pr-ready runtime Phase 7 — arm-hold evaluation, sticky verdict comment, machine-readable verdict marker, hard terminator. Loaded by SKILL.md via git show at Phase 7.
 last_verified: 2026-09-04
 ---
 
@@ -15,7 +15,7 @@ Read at runtime via `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase7-verdi
 
 1. **Run the shared hold predicates.** `bin/lib/pr-armable.sh` is **sourced, not executed** — it carries no `set -euo pipefail` at file scope by design. Reuse its six predicates rather than re-deriving any hold logic:
 
-   `git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/holds.sh > /tmp/pr-ready-holds-<N>.sh && test -s /tmp/pr-ready-holds-<N>.sh && bash /tmp/pr-ready-holds-<N>.sh <N> <slug>`. The script is that single invocation, and prints exactly six labelled lines — fewer means a predicate aborted, itself a finding.
+   `git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/holds.sh > /tmp/pr-ready-holds-<N>.sh && test -s /tmp/pr-ready-holds-<N>.sh && bash /tmp/pr-ready-holds-<N>.sh <N> <slug> | tee /tmp/pr-ready-holdsout-<N>.txt`. The script is that single invocation, and prints exactly six labelled lines — fewer means a predicate aborted, itself a finding. The `tee` is what step 2's verdict marker reads: a value captured in one Bash call does not survive into the next, so the holds reach the marker through the file, never through a variable.
 
    Report each predicate's result as one line in the verdict. These are **advisory inputs to the human's merge decision** — `/pr-ready` never arms auto-merge and never merges.
 
@@ -54,5 +54,11 @@ Read at runtime via `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase7-verdi
    `unavailable — digest script did not produce output`; a stable-shaped degraded block is
    required, an omitted block is not acceptable. `<!-- pr-ready-verdict -->` remains the last
    line of the body, after the READY / NOT READY line — the digest never displaces it.
+
+   **Then emit the machine-readable verdict marker — the last tool call before the STOP terminator; the detached review-owed fire in step 3 is the sole exception.** The comment is posted; this publishes the same verdict in a form `bin/pr-ready-now` can read without parsing prose. Pick the token mechanically from the READY / NOT READY line just written — no judgment: `NOT-READY` if that line says NOT READY; `READY-WITH-NOTES` if it says READY **and** any hold predicate printed something other than `(clear)` or Phase 6.5 left anything `not fixed — filed`; `READY` otherwise.
+
+   `git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/verdict-marker.sh > /tmp/pr-ready-vmark-<N>.sh && test -s /tmp/pr-ready-vmark-<N>.sh && bash /tmp/pr-ready-vmark-<N>.sh <N> <TOKEN>`
+
+   It writes `/tmp/pr-ready-marker-<N>.txt` and prints one line beginning `PR-READY-VERDICT-MARKER-V1|`. **Your final message must end with that line, copied verbatim as its last line.** This is not decoration: `bin/pr-ready-now` runs this skill as `claude -p` in default text mode, which captures **only** your final assistant message into the log, so a marker printed only by the Bash step above reaches the file but never the log. The file is the primary channel and that last line is the fallback; emit both. Everything else you would normally say goes above it.
 
 3. **STOP — hard terminator.** The run ends at the posted-or-updated comment. No merge. No auto-merge arming. No `/backlog-housekeep` chain beyond the row and `last_verified` bump Phase 6.5 already filed. No `/post-plan` chain. No worktree teardown. No second comment. The user reviews every PR deliberately. One amendment: after the verdict comment is posted, when Phase 6 determined a structured code review is owed and no `/pr-review` slot is already live for this PR, fire it detached — `git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/review-owed.sh > /tmp/pr-ready-owed-<N>.sh && test -s /tmp/pr-ready-owed-<N>.sh && bash /tmp/pr-ready-owed-<N>.sh <N>` — and record the printed `REVIEW-OWED:` line. That script reads the `REVIEW-COVERAGE:` marker Phase 6 wrote and fires only on `NONE`, `STALE` or `UNKNOWN`, never on `CURRENT`. This is the one new permitted action; everything the invariant still forbids stays forbidden — no merge, no auto-merge arming, no `/backlog-housekeep` chain beyond the row and `last_verified` bump Phase 6.5 already filed, no `/post-plan` chain, no worktree teardown, no second comment. The fire is detached and fire-and-forget: never wait on it, never read its log, never let it extend this run. `scripts/review-owed.sh` is the only channel — `/pr-ready` carries `disallowed-tools: [EnterPlanMode, ExitPlanMode, Skill]` and cannot call `Skill` at all, so the launcher is reached through Bash.

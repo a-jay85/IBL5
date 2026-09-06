@@ -72,13 +72,14 @@ last_verified: 2026-09-06
 | L43 | Autonomous-loop doc-fix PR body contains stale claims and inconsistent ADR authoring format after post-review commit | ⬜ Open | 🟦 | S |
 | L44 | Upstream overlap silently drops a plan phase; Phase 2a pre-rebase artifact captures post-rebase state, making the drop undetectable | ✅ fixed this pass | 🟦 | S |
 | L45 | `/pr-ready` Phase 2 squashes load-bearing commit boundaries when `auto_merge: false`; PR body SHAs go stale after force-push | ⬜ Open | 🟥 | S |
-| L46 | Queued matrix-less plan with non-canonical `impl_model:` alias slips all pre-queue gates; runner disposes on first nightly run | ⬜ Open | 🟦 | S |
+| L46 | Queued matrix-less plan with non-canonical `impl_model:` alias slips all pre-queue gates; runner disposes on first nightly run | ✅ Done | 🟦 | S |
 | L47 | `/pr-ready` folds a recoverable pre-push-hook rebase rejection into the terminal `PUSH FAILED` verdict, stranding the Phase 6.5 remediation commit locally | ⬜ Open | 🟥 | M |
 | L48 | Planning pipeline prose coverage gap: code-block path expressions in `SKILL.md` are invisible to `bin/check-docs`, so they can diverge from `bin/plan-now`'s runtime slug derivation silently | ✅ Implemented (2026-09-04) | 🟦 | S |
 | L49 | `/pr-ready` Phase 6.5 files backlog rows with non-canonical status glyphs and automouse values, making them invisible to open-work filters | ⬜ Open | 🟥 | S |
 | L50 | `bin/pr-cycle` logs gate nominees as "excluded this run" but then orders and readies them (`--gate-edges /dev/null` re-admits every nominee) | ⬜ Open | 🟦 | S |
 | L51 | Plan Phase 5 dry-run count propagated to archive only, not PR body; reviewer blast-radius instruction stale by ~23% | ⬜ Open | 🟦 | S |
 | L52 | Test harness case comment over-claims assertion scope; adjacent cases leave `run_block` exit codes unchecked | ✅ fixed this pass | — | S |
+| L53 | Phase 2 test code lost in branch rebuild — invisible because CI passed without the tests | ✅ fixed this pass | — | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -595,30 +596,7 @@ Landing rung: 1 for Check 2 (extend `_rebase-and-conflicts.md`); rung 0 for Chec
 
 ---
 
-### L46 Queued matrix-less plan with non-canonical `impl_model:` alias slips all pre-queue gates; runner disposes on first nightly run
-
-**class:** A plan in the automouse queue declares a non-canonical `impl_model:` alias (e.g., `sonnet-4-6`) that slips through `bin/automouse/queue`'s add-time backstop (which calls `plan-model-consistency`, which skips matrix-less plans at its matrix-presence guard) and through `bin/check-plan` gate `[13]` (same skip), so the bad alias is not caught until `bin/automouse/run` disposes the plan to `skipped/` on the first nightly run — wasting one nightly slot.
-
-**occurrence table:**
-
-| # | File:line | Same class? | Live? | Status |
-|---|-----------|-------------|-------|--------|
-| 1 | `~/claude-plans/pr-ready-dm-and-push-retry.md` line 2: `impl_model: sonnet-4-6` (not a canonical alias; resolves to Opus silently pre-PR, rejected post-merge) | yes | yes | fixed this pass (changed to `impl_model: sonnet`) |
-
-**prevention_ladder:**
-
-- rung 0 — partially covered: `bin/automouse/run` Phase 4 disposal block (added by this PR) catches a bad alias at runtime and disposes with a report. Not sufficient: burns one nightly slot per occurrence.
-- rung 1 — extend `bin/automouse/queue add` to call `bin/lib/plan-impl-model` (not `plan-model-consistency`, which skips matrix-less plans) and reject a nonzero exit at queue-add time. This is the landing rung: it catches the alias before the plan enters the queue, at zero slot cost.
-- rung 2 — a rule doc alone is insufficient: the validator does not run during plan authoring.
-- rung 3 — not applicable (PHPStan cannot gate plan-file parsing).
-- rung 4 — not applicable (CI has no plan-corpus sweep over `~/claude-plans/`).
-- rung 5 — not warranted.
-
-Landing rung: 1 (extend `bin/automouse/queue add` validation to cover all plans, not just matrix-bearing ones).
-
-**artifact destination:** `bin/automouse/queue` (in-repo)
-
-**provenance:** (discovered 2026-09-04 during #1968)
+➜ L46 Queued matrix-less plan with non-canonical `impl_model:` alias slips all pre-queue gates; runner disposes on first nightly run — ✅ Implemented (2026-09-05): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ---
 
@@ -772,6 +750,31 @@ Landing rung: **no gate warranted** — neither occurrence exists in the tree af
 **provenance:** (discovered 2026-09-05 during #2108)
 
 **Status (2026-09-05):** ✅ moot — harness retired this PR.
+
+---
+
+### L53 Phase 2 test code lost in branch rebuild — invisible because CI passed without the tests
+
+*(discovered 2026-09-06 during #2141)*
+
+**class:** A plan phase's test code that was implemented and committed was lost in a manual branch rebuild; the loss was invisible because CI passed — the missing tests had no footprint left to catch their own absence.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/test-automouse-queue` (Phase 2 rows 21-26 + row-15 tightening) | yes | yes | fixed this pass |
+
+**prevention_ladder:**
+
+- rung 0 — already covered: `/pr-ready` Phase 6 check 5 (Verification Matrix realisation) catches absent declared automated test paths, as demonstrated by finding F3 in this very run. Landing rung is **0 — already covered by existing gate.**
+- rungs 1-5 — superseded by rung 0.
+
+**artifact destination:** `.claude/skills/pr-ready/SKILL.md` Phase 6 (the gate that caught this)
+
+**provenance:** (discovered 2026-09-06 during #2141)
+
+**Status (2026-09-06):** ✅ fixed this pass — 🟦.
 
 ---
 

@@ -52,11 +52,20 @@ run_heal() {
     NIGHTLY_DIR="$NDIR" PLANS_DIR="$PDIR" STALENESS_GUARD="$TMP/stub-guard" "$SCRIPT" "$@"
 }
 
+# Create fixture plans carrying a valid impl_model:, which bin/automouse/queue add
+# now requires. Use for plans the heal path is expected to requeue successfully.
+mkplan() {
+    local f
+    for f in "$@"; do
+        printf -- '---\nimpl_model: sonnet\n---\n\n# fixture plan %s\n' "$f" > "$PDIR/$f"
+    done
+}
+
 # ---------------------------------------------------------------------------
 # Row 1 — POSITIVE (healable): staleness-marked plan passes guard → requeued
 # ---------------------------------------------------------------------------
 setup
-touch "$PDIR/plan-fresh.md"
+mkplan plan-fresh.md
 ln -s "$PDIR/plan-fresh.md" "$NDIR/skipped/plan-fresh.md"
 touch "$NDIR/skipped/plan-fresh.md.staleness"
 run_heal >/dev/null 2>&1
@@ -94,7 +103,7 @@ echo "ok: row3 — NEGATIVE core safety (no marker, not recovered)"
 # Row 4 — DRY-RUN: healable plan listed but not moved, no report written
 # ---------------------------------------------------------------------------
 setup
-touch "$PDIR/plan-fresh-dry.md"
+mkplan plan-fresh-dry.md
 ln -s "$PDIR/plan-fresh-dry.md" "$NDIR/skipped/plan-fresh-dry.md"
 touch "$NDIR/skipped/plan-fresh-dry.md.staleness"
 out=$(run_heal --dry-run 2>&1)
@@ -127,7 +136,7 @@ echo "ok: row5 — EDGE empty skipped/"
 # Row 6 — CLEANUP: .attempts + .staleness sidecars gone after requeue
 # ---------------------------------------------------------------------------
 setup
-touch "$PDIR/plan-fresh-clean.md"
+mkplan plan-fresh-clean.md
 ln -s "$PDIR/plan-fresh-clean.md" "$NDIR/skipped/plan-fresh-clean.md"
 touch "$NDIR/skipped/plan-fresh-clean.md.attempts"
 touch "$NDIR/skipped/plan-fresh-clean.md.staleness"

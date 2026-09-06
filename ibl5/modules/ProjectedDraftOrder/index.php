@@ -17,10 +17,11 @@ get_lang($module_name);
 
 global $mysqli_db;
 
-// Module inputs read from $_REQUEST explicitly (legacy globals are no longer
-// auto-extracted). Only the JSON save_order route branches off $op; every other
+// Module inputs read via the Http\HttpRequest value object (legacy globals are no
+// longer auto-extracted). Only the JSON save_order route branches off $op; every other
 // request renders the projected/final draft-order page.
-$op = is_string($_REQUEST['op'] ?? null) ? $_REQUEST['op'] : '';
+$httpRequest = \Http\HttpRequest::fromGlobals();
+$op = is_string($httpRequest->request('op')) ? $httpRequest->request('op') : '';
 
 if ($op === 'save_order') {
     // Admin-only JSON POST endpoint. Replaces the former standalone

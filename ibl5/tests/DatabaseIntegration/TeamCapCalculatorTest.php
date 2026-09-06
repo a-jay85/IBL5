@@ -110,6 +110,15 @@ class TeamCapCalculatorTest extends DatabaseTestCase
         self::assertSame(2200, $total);
     }
 
+    public function testOneArgConstructionStillProducesNonNegativeSalaryAggregates(): void
+    {
+        $rows = $this->repo->getAllPlayersUnderContract(self::TEST_TID);
+        $current = $this->calculator->getTotalCurrentSeasonSalaries($rows);
+        $next = $this->calculator->getTotalNextSeasonSalaries($rows);
+        self::assertGreaterThanOrEqual(0, $current);
+        self::assertGreaterThanOrEqual(0, $next);
+    }
+
     // ── canAddBuyoutWithoutExceedingBuyoutLimit ─────────────────
 
     public function testCanAddBuyoutWithinLimitReturnsTrue(): void

@@ -20,8 +20,9 @@ get_lang($module_name);
 
 // Legacy globals previously populated by ConfigBootstrap::extractRequestToGlobals().
 // PR2 narrowed that extraction to a 2-key allowlist (newlang, redirect), so module
-// inputs are now read from $_REQUEST explicitly here.
-$op = is_string($_REQUEST['op'] ?? null) ? $_REQUEST['op'] : '';
+// inputs are read here via the Http\HttpRequest value object.
+$httpRequest = \Http\HttpRequest::fromGlobals();
+$op = is_string($httpRequest->request('op')) ? $httpRequest->request('op') : '';
 
 global $mysqli_db, $user;
 

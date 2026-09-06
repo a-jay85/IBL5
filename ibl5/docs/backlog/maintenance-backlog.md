@@ -1,6 +1,6 @@
 ---
 description: Long-running backlog of maintenance-cost reduction opportunities, organized by axis. Each item is a candidate for a future plan.
-last_verified: 2026-09-05
+last_verified: 2026-09-06
 ---
 
 # Maintenance-Cost Reduction Backlog
@@ -554,14 +554,13 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 
 **Automouse audit (verified 2026-06-20):**
 
-> ✅ resolved (11): 13.1, 13.2, 13.3, 13.5, 13.6, 13.7, 13.8, 13.9, 13.11, 13.13, 13.14 — evidence in [archive](archive/maintenance-backlog-archive.md)
+> ✅ resolved (12): 13.1, 13.2, 13.3, 13.5, 13.6, 13.7, 13.8, 13.9, 13.11, 13.13, 13.14, 13.15 — evidence in [archive](archive/maintenance-backlog-archive.md)
 > 🚫 declined (2): 13.4, 13.10 — evidence in [archive](archive/maintenance-backlog-archive.md)
 
 | # | Status | Automouse | Evidence / note |
 |---|--------|-----------|-----------------|
 | 13.7b | ⬜ Open | 🟨 | Needs `ValidationError`/`ValidationResultWithContext` type design (Depth/Trade carry structured + cap-total payloads) before the sweep. |
 | 13.12 | ◑ Partial | 🟩 | Exact-match sites consolidated onto the `PlayerTeamJoinQuery` trait (TeamQuery ×8, FreeAgency, LeagueStarters). Six divergent sites remain in the surveyed repositories (INNER JOIN / wider column list), plus 7 player↔team joins outside the original survey. |
-| 13.15 | ⬜ Open | 🟨 | `PlayerContractCalculator::getCurrentSeasonSalary()` is a fourth cap basis keyed on raw `cy` with no phase shift. |
 
 ### 13.7b Structured and Dict-Family Validators — Design Decision Needed
 **Status:** Backlog
@@ -579,14 +578,6 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Est. effort:** L
 **Risk if untouched:** New `ibl_team_info` columns require touching 15+ queries.
 
-### 13.15 `PlayerContractCalculator::getCurrentSeasonSalary()` Is a Fourth, Unshifted Cap Basis
-**Status:** Backlog
-**Location:** `Team/TeamCapCalculator.php:143` → `PlayerContractCalculator::getCurrentSeasonSalary()`
-**Problem:** computes the season salary from the raw `cy` column with no phase shift, giving a fourth basis alongside `vw_current_salary.current_salary`, `.next_year_salary`, and the cash `salary_yr1`/`salary_yr2` pair. It drives `canAddContractWithoutGoingOverHardCap()`, used by Free Agency and waivers, so during Draft/FA it reproduces 13.14's one-year lag through a different code path.
-**Suggested direction:** converge on one phase-aware accessor (extract the `advancesContractYears()` selection into a small `CurrentSeasonSalaryBasis` helper both trade and contract paths consume) rather than adding a fourth ad-hoc branch.
-**Est. effort:** M
-**Risk if untouched:** every new cap consumer picks whichever of the four bases it finds first; the same false-positive keeps recurring.
-
 ## Axis 14: Bootstrap / Dependency Injection
 
 **Automouse audit (verified 2026-06-20):** The big bootstrap consolidation (14.1–14.4, 14.7, 14.11, 14.13, 14.14) is done (ADR-0030). Remaining items are large DI sweeps that overlap open IDOR PRs or carry security/identity hazards.
@@ -598,7 +589,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 |---|--------|-----------|-----------------|
 | 14.5 | ⬜ Open | 🟨 | Module index.php → front-controller composition root (42 modules). Very large; routing/auth-sensitive → decompose + sequence (some modules touch mutations). |
 | 14.10 | ◑ Partial | 🟨 | Container accessor registered (PR1); side-effect removal deferred to PR3 (boosted-HTMX cookie-population hazard) → careful sequencing. |
-| 14.12 | ◑ Partial | 🟩 | `HttpRequest` VO shipped (14.8) and wired into 5 module entry points; residual: `ComparePlayers`, `Draft`, `ProjectedDraftOrder`, `Voting`, `ApiKeys` `index.php` still read `$op` from `$_REQUEST` directly. |
+| 14.12 | ◑ Partial | 🟩 | `HttpRequest` VO shipped (14.8) and wired into 9 module entry points; residual: `modules/Waivers/index.php` still reads superglobals directly. |
 
 ### 14.5 Module `index.php` Files Are the Real Composition Root (42 of 47)
 **Location:** `ibl5/modules/*/index.php`
@@ -621,7 +612,7 @@ Every finding is classified on two orthogonal axes below, **verified against on-
 **Suggested direction:** Replace with explicit `Request` object; module entry points read named parameters by key.
 **Est. effort:** L
 **Risk if untouched:** Name collisions silently overwrite globals; PHPStan needs per-site `@var` annotations.
-**Status:** Partially completed (verified 2026-05-29 audit) — the wholesale `$_REQUEST`→`$GLOBALS` copy is gone; `ConfigBootstrap` now allowlists only `newlang`/`redirect` (see [[3.6]]). Modules still read `$op`/`$pid`/`$action` directly from `$_REQUEST` — a `Request` object remains the longer-term fix. A `Http\HttpRequest` value object shipped (item 14.8) and is now the boundary for the FreeAgency, DepthChartEntry, Team and Player entry points (four); residual: `WaiversController`/`modules/Waivers/index.php` still read superglobals directly, plus ComparePlayers, Draft, ProjectedDraftOrder, Voting, ApiKeys `index.php` still read `$op` from `$_REQUEST`.
+**Status:** Partially completed (verified 2026-05-29 audit) — the wholesale `$_REQUEST`→`$GLOBALS` copy is gone; `ConfigBootstrap` now allowlists only `newlang`/`redirect` (see [[3.6]]). Modules still read `$op`/`$pid`/`$action` directly from `$_REQUEST` — a `Request` object remains the longer-term fix. A `Http\HttpRequest` value object shipped (item 14.8) and is now the boundary for the FreeAgency, DepthChartEntry, Team, Player, ComparePlayers, Draft, ProjectedDraftOrder, Voting, and ApiKeys entry points (nine); residual: `WaiversController`/`modules/Waivers/index.php` still read superglobals directly.
 
 ---
 
@@ -800,3 +791,48 @@ provenance: (discovered 2026-09-04 during #1956)
 **artifact_destination:** n/a — no gate
 
 **provenance:** (discovered 2026-09-04 during #1958)
+
+### 15.35 Phase-aware aggregate de-duplication contract removed — no test pins row-wise equivalence
+
+**class:** A behavioral contract implicit in a deleted helper was not carried forward as an explicit test. `PlayerContractCalculator::getTotalCurrentSeasonSalaries()` previously delegated to `convertPlrResultIntoPlayerArray()`, which keyed its accumulator by `$plrRow['pid']`, silently de-duplicating repeated `pid`s before summing. The replacement row-wise loop in both `getTotalCurrentSeasonSalaries()` and `getTotalNextSeasonSalaries()` sums every row unconditionally. For the unique-pid roster queries that feed these methods the result is identical, but no test pins the equivalence.
+
+**Occurrences:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/classes/Player/Contract/PlayerContractCalculator.php` — `getTotalCurrentSeasonSalaries()` row-wise sum replaces pid-keyed accumulator | yes | yes | not fixed — filed; unique-pid query guarantee not tested |
+| 2 | `ibl5/classes/Player/Contract/PlayerContractCalculator.php` — `getTotalNextSeasonSalaries()` same replacement | yes | yes | not fixed — filed |
+
+**prevention_ladder:**
+- rung 0: No existing gate catches "deleted keyed accumulator leaves no equivalence test."
+- rung 1: No existing gate to extend.
+- rung 2: A unit test asserting that `getTotalCurrentSeasonSalaries()` with a two-row input where both rows share the same `pid` returns the same value as a single-row input with the same `pid` would pin the unique-pid contract. Low friction.
+- rungs 3–5: A PHPStan rule for keyed-accumulator deletions is disproportionate.
+- **Landing rung: no gate warranted this pass** — the unique-pid guarantee comes from the repository query, not the calculator, so the equivalence test belongs at the repository layer.
+
+**artifact_destination:** n/a — no gate
+
+**provenance:** (discovered 2026-09-06 during Phase 6 review of PR #2140, finding N4)
+
+### 15.36 Phase-basis split on cap-space page and untested extension-pricing shift from PR #2140
+
+**class:** Two behavioral consequences of the phase-aware `TeamCapCalculator` that are not covered by any test and are the sharpest things to watch after merge.
+
+**Occurrences:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/classes/CapSpace/CapSpaceService.php:103` — `getTotalNextSeasonSalaries()` now branches on `advancesContractYears()` (Playoffs \| Draft \| Free Agency), while the adjacent `getSalaryCapArray()` branches on `isOffseasonPhase()` (Draft \| Free Agency only); during Playoffs the two halves of the same rendered page are computed on different contract-year bases | yes | yes | not fixed — filed; Playoffs-only display split; no test pins cross-aggregate consistency within a phase |
+| 2 | `ibl5/classes/Extension/ExtensionService.php:188` — `getTotalNextSeasonSalaries()` result feeds `teamFactors['money_committed_at_position']` in `buildEvaluationContext()`, consumed as a scoring input by `ExtensionOfferEvaluator::computePlayingTimeModifier()` and `Negotiation\ExtensionContractDemandCalculator`; the shifted value moves extension demands and the playing-time modifier; no test exercises the real path under an advancing season | no — `ExtensionService` | yes | not fixed — filed; plan declares change deliberate (plan line 433) but concedes no test covers it (plan line 504) |
+
+**prevention_ladder:**
+- rung 0: No existing gate covers cross-aggregate phase consistency within a single view.
+- rung 1: No existing gate to extend.
+- rung 2 (occurrence 1): A unit test asserting that during Playoffs `CapSpaceService` uses consistent contract-year bases for both aggregates, or a documented acknowledgement that the split is intentional, would pin the behavior. Medium friction.
+- rung 2 (occurrence 2): An integration test for `ExtensionService::buildEvaluationContext()` exercising a phase-advancing season and asserting on `money_committed_at_position` would close the coverage gap. Medium friction.
+- rungs 3–5: No automated gate is proportionate at this time.
+- **Landing rung: no gate warranted this pass** — both consequences are deliberate per plan and recorded; coverage gap is the residual risk.
+
+**artifact_destination:** n/a — no gate
+
+**provenance:** (discovered 2026-09-06 during Phase 6 review of PR #2140, finding N8)

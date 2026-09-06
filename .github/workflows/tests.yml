@@ -983,6 +983,8 @@ jobs:
         run: bin/test-db-query-routing
       - name: bin/test-watch-run
         run: bin/test-watch-run
+      - name: ibl5/bin/test-flake-ledger
+        run: ibl5/bin/test-flake-ledger
 
   gate:
     name: Tests and Analysis

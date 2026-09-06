@@ -159,7 +159,7 @@ run_adr_check; expect "adrcheck-misplaced-rules-prefix-no-trigger" 0 $?
 
 # --- skip-observability: assert the workflow carries a visible skip step ---
 WF="$SCRIPT_DIR/../.github/workflows/pr-meta-checks.yml"
-SKIP_IF="$(grep -A3 -F '- name: adr-check skipped' "$WF" 2>/dev/null | grep -m1 -F 'if:' || true)"
+SKIP_IF="$(grep -A3 -F -e '- name: adr-check skipped' "$WF" 2>/dev/null | grep -m1 -F 'if:' || true)"
 
 [ -f "$WF" ]; ok_check "skip-observability-workflow-file-present" $?
 grep -qF 'adr-check skipped' "$WF"; ok_check "skip-observability-else-branch-exists" $?

@@ -9,6 +9,14 @@ Purpose: ask whether the implementation does what the plan *intended*, not merel
 
 `<MASTER_SHA>` and `<N>` below are **literals to substitute** with the values pinned in step 1 — a value captured in one Bash call does not survive into the next, and every `/post-plan` block runs in a fresh shell.
 
+## Preamble — write synthetic Phase 5.0 done-marker
+
+Phase 5.0 ran inside the compiled harness (a different process, different PID) before the harness exited 4 and spawned this resumed skill session. Phase 6.5 condition (3) checks for `/tmp/post-plan-conformance-done-$PPID` using the **resumed session's** `$PPID`; the harness never wrote it. Write it now, unconditionally — the harness exits 4 only after Phase 5.0 passes, so the marker truthfully represents "Phase 5.0 conformance completed without failures."
+
+```bash
+touch /tmp/post-plan-conformance-done-$PPID
+```
+
 ## Step 1 — Pin the run's identifiers
 
 Each block runs in its own shell; nothing is exported between them. Re-derive everything in-block. `REVIEWED_TREE` is captured **before** the spawn so it names the tree the reviewer actually sees. Substitute the printed values as literals into every step below.
@@ -20,7 +28,7 @@ REVIEWED_TREE=$(git rev-parse HEAD^{tree})
 echo "PR_NUM=$PR_NUM MASTER_SHA=$MASTER_SHA REVIEWED_TREE=$REVIEWED_TREE"
 ```
 
-## Step 2 — Gather the five 6b inputs, then spawn exactly one reviewer
+## Step 2 — Gather the seven inputs, then spawn exactly one reviewer
 
 **One-spawn rule:** there is **exactly one `Agent` spawn per `/post-plan` run.** Spawn now and never again in this phase.
 
@@ -30,7 +38,7 @@ Spawn with `subagent_type: "pr-ready-phase6"` and **omit `model`** so the def's 
 
 The prompt hands the def its five 6b inputs and the output path. Output path: `/tmp/post-plan-fidelity-verdict-<N>.md` (substitute `<N>` with the `$PR_NUM` value from step 1). Keyed to the PR number, never to a per-shell PID — every block is a fresh shell, so a PID-keyed path would be written by one block and unreadable by the next.
 
-Provide these five inputs in the spawn prompt:
+Provide these seven inputs in the spawn prompt (items 1, 2, 6, 7 are post-plan-specific; items 3–5 are the `_plan-fidelity-review.md` contract inputs):
 
 1. **Output path** — `/tmp/post-plan-fidelity-verdict-<N>.md`. The def's output contract item 1 writes the verdict to the absolute path the prompt names.
 2. **`<MASTER_SHA>`** — the pinned value from step 1, so the def can `git show <MASTER_SHA>:.claude/skills/pr-ready/_plan-fidelity-review.md`. If the `Read`-by-worktree-path fallback fires instead, the def records `include-source: worktree (pin predates skill)` and step 6 surfaces that line in the sticky comment.

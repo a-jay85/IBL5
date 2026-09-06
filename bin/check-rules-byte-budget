@@ -47,7 +47,7 @@ LAZY_MAX_BYTES="${RULES_LAZY_BUDGET:-16000}"
 # 2225 B of headroom catches unexpected growth without blocking legitimate companion
 # verbosity. Lower it as the lazy tier is curated; never raise it to accommodate growth.
 # 2026-09-05: raised from 16000 to 20000 to accommodate pr-body-negative-claim-recheck.md
-# (E46, rung 1 — 2994 B). Resident total now 18772 B across five files. Deliberate raise
+# (E46, rung 1 — 2994 B). Resident total now 20000 B across six files. Deliberate raise
 # for a new always-loaded rule within its per-file cap; not a bloat-creep override.
 # Lower if any resident rule is de-residented; never raise to accommodate file growth.
 MAX_TOTAL="${RULES_TOTAL_BUDGET:-20000}"
@@ -60,7 +60,8 @@ RULES_DIR="$ROOT/.claude/rules"
 # paths: globs; both keep a one-line trigger stub in workflow-continuity.md, which
 # names the scoped file so the payload stays one Read away. See Check 4 below.
 # 2026-09-05: pr-body-negative-claim-recheck added (E46, rung 1) — always-loaded authoring norm.
-ALLOWLIST="agent-tiering auto-commit pr-body-negative-claim-recheck work-triage workflow-continuity"
+# 2026-09-05: pr-body-claims added (L43, rung 2) — inline source citation norm for PR body figures.
+ALLOWLIST="agent-tiering auto-commit pr-body-claims pr-body-negative-claim-recheck work-triage workflow-continuity"
 
 # Shared by Check 3 and --report-mode — the single paths: parser. Prints one glob
 # per line for $1; prints nothing when the file has no paths: key. Handles BOTH

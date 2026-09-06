@@ -891,7 +891,7 @@ parameters:
 		-
 			rawMessage: Binary operation "." between non-falsy-string and mixed results in an error.
 			identifier: binaryOp.invalid
-			count: 11
+			count: 1
 			path: classes/Topics/News/NewsController.php
 
 		-
@@ -971,63 +971,9 @@ parameters:
 			path: classes/Topics/News/NewsController.php
 
 		-
-			rawMessage: Constant _BYTESMORE not found.
-			identifier: constant.notFound
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: Constant _COMMENT not found.
-			identifier: constant.notFound
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
 			rawMessage: Constant _COMMENTS not found.
 			identifier: constant.notFound
 			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: Constant _COMMENTSQ not found.
-			identifier: constant.notFound
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: Constant _GOTOHOME not found.
-			identifier: constant.notFound
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: Constant _GOTONEWSINDEX not found.
-			identifier: constant.notFound
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: Constant _NOINFO4TOPIC not found.
-			identifier: constant.notFound
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: Constant _READMORE not found.
-			identifier: constant.notFound
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: Constant _SEARCHONTOPIC not found.
-			identifier: constant.notFound
-			count: 1
-			path: classes/Topics/News/NewsController.php
-
-		-
-			rawMessage: Constant _SELECTNEWTOPIC not found.
-			identifier: constant.notFound
-			count: 2
 			path: classes/Topics/News/NewsController.php
 
 		-
@@ -1377,6 +1323,2667 @@ parameters:
 			identifier: ibl.trustedVariable
 			count: 1
 			path: classes/YourAccount/LoginView.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/ActivityTracker/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class ActivityTracker\ActivityTrackerRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/ActivityTracker/index.php
+
+		-
+			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/ActivityTracker/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/AllStarAppearances/index.php
+
+		-
+			rawMessage: 'Parameter #1 $appearances of method AllStarAppearances\AllStarAppearancesView::render() expects array<int, array{name: string, appearances: int}>, array<int, array{name: string, pid: int|null, appearances: int}> given.'
+			identifier: argument.type
+			count: 1
+			path: modules/AllStarAppearances/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class AllStarAppearances\AllStarAppearancesRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/AllStarAppearances/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class ApiKeys\ApiKeysRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/ApiKeys/index.php
+
+		-
+			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/ApiKeys/index.php
+
+		-
+			rawMessage: 'Parameter #4 $authService of class ApiKeys\ApiKeysController constructor expects Auth\Contracts\AuthServiceInterface, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/ApiKeys/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/AwardHistory/index.php
+
+		-
+			rawMessage: 'Parameter #1 $award of method AwardHistory\AwardHistoryView::renderAwardRow() expects array{year: int, award: string, name: string, pid?: int}, array{year: int, award: string, name: string, table_id: int, pid: int|null} given.'
+			identifier: argument.type
+			count: 1
+			path: modules/AwardHistory/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class AwardHistory\AwardHistoryRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/AwardHistory/index.php
+
+		-
+			rawMessage: 'Parameter #1 $rawParams of method AwardHistory\AwardHistoryService::search() expects array<string, mixed>, array<mixed> given.'
+			identifier: argument.type
+			count: 1
+			path: modules/AwardHistory/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/CapSpace/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class CapSpace\CapSpaceRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/CapSpace/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/CapSpace/index.php
+
+		-
+			rawMessage: 'Parameter #2 $db of class CapSpace\CapSpaceService constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/CapSpace/index.php
+
+		-
+			rawMessage: 'Call to function array_search() requires parameter #3 to be set.'
+			identifier: function.strict
+			count: 2
+			path: modules/CareerLeaderboards/index.php
+
+		-
+			rawMessage: Cannot cast mixed to int.
+			identifier: cast.int
+			count: 1
+			path: modules/CareerLeaderboards/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/CareerLeaderboards/index.php
+
+		-
+			rawMessage: 'Loose comparison via "!=" between mixed and null is not allowed.'
+			identifier: notEqual.notAllowed
+			count: 1
+			path: modules/CareerLeaderboards/index.php
+
+		-
+			rawMessage: 'Parameter #1 $currentFilters of method CareerLeaderboards\CareerLeaderboardsView::renderFilterForm() expects array{boards_type?: string, sort_cat?: string, active?: string, display?: int|string}, array{boards_type: mixed, sort_cat: mixed, active: mixed, display: mixed, submitted: mixed} given.'
+			identifier: argument.type
+			count: 1
+			path: modules/CareerLeaderboards/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Cache\DatabaseCache constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/CareerLeaderboards/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class CareerLeaderboards\CareerLeaderboardsRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/CareerLeaderboards/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/ComparePlayers/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class ComparePlayers\ComparePlayersRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/ComparePlayers/index.php
+
+		-
+			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/ComparePlayers/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/ContractList/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class ContractList\ContractListRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/ContractList/index.php
+
+		-
+			rawMessage: 'Parameter #1 $authService of class Debug\DebugController constructor expects Auth\AuthService, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/DebugMenu/index.php
+
+		-
+			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/DebugMenu/index.php
+
+		-
+			rawMessage: 'Cannot call method getTeamnameFromUsername() on mixed.'
+			identifier: method.nonObject
+			count: 2
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Cannot call method getTidFromTeamname() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Cannot call method getUsername() on mixed.'
+			identifier: method.nonObject
+			count: 3
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 3
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Direct is_user() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 3
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Direct loginbox() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Function api() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Function api() has parameter $user with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Function main() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Function main() has parameter $user with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Function nextSimApi() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Function submit() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Function submit() has parameter $user with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Function tabApi() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Function userinfo() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Function userinfo() has parameter $username with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Only booleans are allowed in a negated boolean, int given.'
+			identifier: booleanNot.exprNotBoolean
+			count: 3
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Parameter #1 $action of method SavedDepthChart\SavedDepthChartApiHandler::handle() expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class DepthChartEntry\DepthChartEntryApiHandler constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class DepthChartEntry\DepthChartEntryController constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 2
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class DepthChartEntry\DepthChartEntryRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 2
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class DepthChartEntry\DepthChartEntrySubmissionHandler constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 2
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class NextSim\NextSimTabApiHandler constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class SavedDepthChart\SavedDepthChartApiHandler constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Team\TeamRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 2
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Team\TeamTableService constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 2
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Parameter #1 $leagueContext of class DepthChartEntry\DepthChartEntryView constructor expects League\LeagueContext, mixed given.'
+			identifier: argument.type
+			count: 2
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Parameter #1 $postData of method DepthChartEntry\DepthChartEntryController::handleSubmit() expects array<string, mixed>, array<mixed> given.'
+			identifier: argument.type
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Parameter #1 $username of method DepthChartEntry\DepthChartEntryController::displayForm() expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Parameter #2 $commonRepo of class DepthChartEntry\DepthChartEntryApiHandler constructor expects Repositories\Contracts\TeamIdentityRepositoryInterface, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Parameter #2 $commonRepo of class DepthChartEntry\DepthChartEntrySubmissionHandler constructor expects Repositories\Contracts\TeamIdentityRepositoryInterface, mixed given.'
+			identifier: argument.type
+			count: 2
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Parameter #2 $commonRepo of class SavedDepthChart\SavedDepthChartApiHandler constructor expects Repositories\Contracts\TeamIdentityRepositoryInterface, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Parameter #2 $commonRepository of class DepthChartEntry\DepthChartEntryController constructor expects Repositories\Contracts\TeamIdentityRepositoryInterface, mixed given.'
+			identifier: argument.type
+			count: 2
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Parameter #2 $sessionUsername of method DepthChartEntry\DepthChartEntryController::handleSubmit() expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Parameter #2 $teamid of method SavedDepthChart\SavedDepthChartApiHandler::handle() expects int, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Parameter #3 $leagueContext of class DepthChartEntry\DepthChartEntryApiHandler constructor expects League\LeagueContext, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Parameter #3 $username of method SavedDepthChart\SavedDepthChartApiHandler::handle() expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Parameter #4 $params of method SavedDepthChart\SavedDepthChartApiHandler::handle() expects array<string, mixed>, array<mixed> given.'
+			identifier: argument.type
+			count: 1
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: Variable $user might not be defined.
+			identifier: variable.undefined
+			count: 3
+			path: modules/DepthChartEntry/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/Draft/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Draft\DraftController constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Draft/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Draft\DraftRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Draft/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Draft\DraftService constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Draft/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Draft/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Draft/index.php
+
+		-
+			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Draft/index.php
+
+		-
+			rawMessage: 'Parameter #1 $post of method Draft\DraftController::submitSelection() expects array<string, mixed>, array<mixed> given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Draft/index.php
+
+		-
+			rawMessage: Cannot access property $name on mixed.
+			identifier: property.nonObject
+			count: 2
+			path: modules/DraftHistory/index.php
+
+		-
+			rawMessage: Cannot cast mixed to int.
+			identifier: cast.int
+			count: 2
+			path: modules/DraftHistory/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/DraftHistory/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class DraftHistory\DraftHistoryApiHandler constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/DraftHistory/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class DraftHistory\DraftHistoryRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/DraftHistory/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of static method Team\Team::initialize() expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/DraftHistory/index.php
+
+		-
+			rawMessage: 'Parameter #1 $team of method DraftHistory\DraftHistoryView::renderTeamHistory() expects Team\Team, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/DraftHistory/index.php
+
+		-
+			rawMessage: 'Parameter #1 $teamName of method DraftHistory\DraftHistoryRepository::getDraftPicksByTeam() expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/DraftHistory/index.php
+
+		-
+			rawMessage: 'Part $team->name (mixed) of encapsed string cannot be cast to string.'
+			identifier: encapsedStringPart.nonString
+			count: 1
+			path: modules/DraftHistory/index.php
+
+		-
+			rawMessage: Variable $team might not be defined.
+			identifier: variable.undefined
+			count: 3
+			path: modules/DraftHistory/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/DraftPickLocator/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class DraftPickLocator\DraftPickLocatorRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/DraftPickLocator/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/DraftPickLocator/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class FranchiseHistory\FranchiseHistoryRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/FranchiseHistory/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/FranchiseHistory/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class FranchiseRecordBook\FranchiseRecordBookApiHandler constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/FranchiseRecordBook/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class FranchiseRecordBook\FranchiseRecordBookRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/FranchiseRecordBook/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/FreeAgency/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class FreeAgency\FreeAgencyController constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/FreeAgency/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class FreeAgency\FreeAgencyDemandRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/FreeAgency/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class FreeAgency\FreeAgencyRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/FreeAgency/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/FreeAgency/index.php
+
+		-
+			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/FreeAgency/index.php
+
+		-
+			rawMessage: 'Parameter #1 $mysqli_db of class FreeAgency\FreeAgencyProcessor constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/FreeAgency/index.php
+
+		-
+			rawMessage: 'Parameter #3 $authService of class FreeAgency\FreeAgencyController constructor expects Auth\Contracts\AuthServiceInterface, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/FreeAgency/index.php
+
+		-
+			rawMessage: 'Parameter #3 $mysqli_db of class FreeAgency\FreeAgencyService constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/FreeAgency/index.php
+
+		-
+			rawMessage: Variable $mysqli_db might not be defined.
+			identifier: variable.undefined
+			count: 6
+			path: modules/FreeAgency/index.php
+
+		-
+			rawMessage: Variable $user might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: modules/FreeAgency/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/FreeAgencyPreview/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class FreeAgencyPreview\FreeAgencyPreviewRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/FreeAgencyPreview/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/FreeAgencyPreview/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/GMContactList/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class GMContactList\GMContactListRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/GMContactList/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/GameBoxscore/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class GameBoxscore\GameBoxscoreRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/GameBoxscore/index.php
+
+		-
+			rawMessage: 'Parameter #2 $leagueContext of class GameBoxscore\GameBoxscoreRepository constructor expects League\LeagueContext|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/GameBoxscore/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/Injuries/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Injuries\InjuriesService constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Injuries/index.php
+
+		-
+			rawMessage: 'Cannot call method getUsername() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: modules/LeagueStarters/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/LeagueStarters/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class LeagueStarters\LeagueStartersApiHandler constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/LeagueStarters/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class LeagueStarters\LeagueStartersService constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/LeagueStarters/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class League\League constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/LeagueStarters/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/LeagueStarters/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/LeagueStarters/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of method LeagueStarters\LeagueStartersView::render() expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/LeagueStarters/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of static method Team\Team::initialize() expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/LeagueStarters/index.php
+
+		-
+			rawMessage: 'Parameter #1 $username of method Repositories\TeamIdentityRepository::getTeamnameFromUsername() expects string|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/LeagueStarters/index.php
+
+		-
+			rawMessage: 'Parameter #3 $authService of class LeagueStarters\LeagueStartersApiHandler constructor expects Auth\Contracts\AuthServiceInterface, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/LeagueStarters/index.php
+
+		-
+			rawMessage: Binary operation "." between "\n\n<b>" and mixed results in an error.
+			identifier: binaryOp.invalid
+			count: 1
+			path: modules/News/article.php
+
+		-
+			rawMessage: 'Call to function header() with incorrect case: Header'
+			identifier: function.nameCase
+			count: 4
+			path: modules/News/article.php
+
+		-
+			rawMessage: Cannot cast mixed to int.
+			identifier: cast.int
+			count: 6
+			path: modules/News/article.php
+
+		-
+			rawMessage: Cannot cast mixed to string.
+			identifier: cast.string
+			count: 1
+			path: modules/News/article.php
+
+		-
+			rawMessage: Constant _DATESTRING not found.
+			identifier: constant.notFound
+			count: 1
+			path: modules/News/article.php
+
+		-
+			rawMessage: Constant _NOTE not found.
+			identifier: constant.notFound
+			count: 1
+			path: modules/News/article.php
+
+		-
+			rawMessage: 'Construct empty() is not allowed. Use more strict comparison.'
+			identifier: empty.notAllowed
+			count: 4
+			path: modules/News/article.php
+
+		-
+			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/News/article.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/News/article.php
+
+		-
+			rawMessage: 'Loose comparison via "==" between mixed and int is not allowed.'
+			identifier: equal.notAllowed
+			count: 1
+			path: modules/News/article.php
+
+		-
+			rawMessage: 'Only booleans are allowed in an if condition, string|false given.'
+			identifier: if.condNotBoolean
+			count: 1
+			path: modules/News/article.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Topics\News\NewsService constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/News/article.php
+
+		-
+			rawMessage: 'Parameter #1 $format of function date expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/News/article.php
+
+		-
+			rawMessage: 'Parameter #1 $haystack of function stristr expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/News/article.php
+
+		-
+			rawMessage: 'Parameter #1 $time of method Topics\News\NewsService::normalizeStoryTime() expects int|string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/News/article.php
+
+		-
+			rawMessage: 'Part $bodytext (mixed) of encapsed string cannot be cast to string.'
+			identifier: encapsedStringPart.nonString
+			count: 1
+			path: modules/News/article.php
+
+		-
+			rawMessage: 'Part $currentlang (mixed) of encapsed string cannot be cast to string.'
+			identifier: encapsedStringPart.nonString
+			count: 1
+			path: modules/News/article.php
+
+		-
+			rawMessage: 'Part $hometext (mixed) of encapsed string cannot be cast to string.'
+			identifier: encapsedStringPart.nonString
+			count: 2
+			path: modules/News/article.php
+
+		-
+			rawMessage: 'Binary operation "." between ''&amp;mode='' and mixed results in an error.'
+			identifier: binaryOp.invalid
+			count: 1
+			path: modules/News/categories.php
+
+		-
+			rawMessage: 'Binary operation "." between ''&amp;order='' and mixed results in an error.'
+			identifier: binaryOp.invalid
+			count: 1
+			path: modules/News/categories.php
+
+		-
+			rawMessage: 'Binary operation "." between ''&amp;thold='' and mixed results in an error.'
+			identifier: binaryOp.invalid
+			count: 1
+			path: modules/News/categories.php
+
+		-
+			rawMessage: Binary operation "." between non-falsy-string and mixed results in an error.
+			identifier: binaryOp.invalid
+			count: 1
+			path: modules/News/categories.php
+
+		-
+			rawMessage: 'Call to function header() with incorrect case: Header'
+			identifier: function.nameCase
+			count: 2
+			path: modules/News/categories.php
+
+		-
+			rawMessage: Cannot access offset 'storynum' on mixed.
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: modules/News/categories.php
+
+		-
+			rawMessage: Cannot access offset 'thold' on mixed.
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: modules/News/categories.php
+
+		-
+			rawMessage: Cannot access offset 'umode' on mixed.
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: modules/News/categories.php
+
+		-
+			rawMessage: Cannot access offset 'uorder' on mixed.
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: modules/News/categories.php
+
+		-
+			rawMessage: 'Cannot call method getUserInfo() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: modules/News/categories.php
+
+		-
+			rawMessage: Cannot cast mixed to int.
+			identifier: cast.int
+			count: 2
+			path: modules/News/categories.php
+
+		-
+			rawMessage: Cannot cast mixed to string.
+			identifier: cast.string
+			count: 2
+			path: modules/News/categories.php
+
+		-
+			rawMessage: Constant _COMMENTS not found.
+			identifier: constant.notFound
+			count: 1
+			path: modules/News/categories.php
+
+		-
+			rawMessage: Constant _DATESTRING not found.
+			identifier: constant.notFound
+			count: 1
+			path: modules/News/categories.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/News/categories.php
+
+		-
+			rawMessage: 'Direct is_user() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/News/categories.php
+
+		-
+			rawMessage: 'Function theindex() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: modules/News/categories.php
+
+		-
+			rawMessage: 'Function theindex() has parameter $catid with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: modules/News/categories.php
+
+		-
+			rawMessage: 'Loose comparison using == between int<min, -1>|int<1, max> and '''' will always evaluate to false.'
+			identifier: equal.alwaysFalse
+			count: 1
+			path: modules/News/categories.php
+
+		-
+			rawMessage: 'Loose comparison via "==" between int and int is not allowed.'
+			identifier: equal.notAllowed
+			count: 4
+			path: modules/News/categories.php
+
+		-
+			rawMessage: 'Loose comparison via "==" between int<min, -1>|int<1, max> and int is not allowed.'
+			identifier: equal.notAllowed
+			count: 1
+			path: modules/News/categories.php
+
+		-
+			rawMessage: 'Loose comparison via "==" between int<min, -1>|int<1, max> and string is not allowed.'
+			identifier: equal.notAllowed
+			count: 1
+			path: modules/News/categories.php
+
+		-
+			rawMessage: 'Loose comparison via "==" between mixed and int is not allowed.'
+			identifier: equal.notAllowed
+			count: 3
+			path: modules/News/categories.php
+
+		-
+			rawMessage: 'Only booleans are allowed in an if condition, int given.'
+			identifier: if.condNotBoolean
+			count: 1
+			path: modules/News/categories.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Topics\News\NewsService constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/News/categories.php
+
+		-
+			rawMessage: 'Parameter #1 $format of function date expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/News/categories.php
+
+		-
+			rawMessage: 'Parameter #1 $time of method Topics\News\NewsService::normalizeStoryTime() expects int|string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/News/categories.php
+
+		-
+			rawMessage: 'Parameter #1 $value of function intval expects array|bool|float|GMP|int|resource|SimpleXMLElement|string|null, mixed given.'
+			identifier: argument.type
+			count: 6
+			path: modules/News/categories.php
+
+		-
+			rawMessage: 'Part $currentlang (mixed) of encapsed string cannot be cast to string.'
+			identifier: encapsedStringPart.nonString
+			count: 1
+			path: modules/News/categories.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/News/index.php
+
+		-
+			rawMessage: 'Cannot call method getUsername() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: modules/NextSim/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/NextSim/index.php
+
+		-
+			rawMessage: 'Direct is_user() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/NextSim/index.php
+
+		-
+			rawMessage: 'Direct loginbox() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/NextSim/index.php
+
+		-
+			rawMessage: 'Only booleans are allowed in a negated boolean, int given.'
+			identifier: booleanNot.exprNotBoolean
+			count: 1
+			path: modules/NextSim/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class NextSim\NextSimService constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/NextSim/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/NextSim/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/NextSim/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Standings\StandingsRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/NextSim/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class TeamSchedule\TeamScheduleRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/NextSim/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of static method Team\Team::initialize() expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/NextSim/index.php
+
+		-
+			rawMessage: 'Parameter #1 $username of method Repositories\TeamIdentityRepository::getTeamnameFromUsername() expects string|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/NextSim/index.php
+
+		-
+			rawMessage: 'Cannot call method getUsername() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: modules/OneOnOneGame/index.php
+
+		-
+			rawMessage: Cannot cast mixed to int.
+			identifier: cast.int
+			count: 4
+			path: modules/OneOnOneGame/index.php
+
+		-
+			rawMessage: 'Construct empty() is not allowed. Use more strict comparison.'
+			identifier: empty.notAllowed
+			count: 1
+			path: modules/OneOnOneGame/index.php
+
+		-
+			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/OneOnOneGame/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/OneOnOneGame/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class OneOnOneGame\OneOnOneGameRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/OneOnOneGame/index.php
+
+		-
+			rawMessage: 'Parameter #3 $owner of method OneOnOneGame\OneOnOneGameService::playGame() expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/OneOnOneGame/index.php
+
+		-
+			rawMessage: Binary operation "." between '%%' and mixed results in an error.
+			identifier: binaryOp.invalid
+			count: 1
+			path: modules/Player/articles.php
+
+		-
+			rawMessage: Cannot access offset 'sid' on mixed.
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: modules/Player/articles.php
+
+		-
+			rawMessage: Cannot access offset 'time' on mixed.
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: modules/Player/articles.php
+
+		-
+			rawMessage: Cannot access offset 'title' on mixed.
+			identifier: offsetAccess.nonOffsetAccessible
+			count: 1
+			path: modules/Player/articles.php
+
+		-
+			rawMessage: 'Cannot call method bind_param() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: modules/Player/articles.php
+
+		-
+			rawMessage: 'Cannot call method close() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: modules/Player/articles.php
+
+		-
+			rawMessage: 'Cannot call method execute() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: modules/Player/articles.php
+
+		-
+			rawMessage: 'Cannot call method fetch_assoc() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: modules/Player/articles.php
+
+		-
+			rawMessage: 'Cannot call method get_result() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: modules/Player/articles.php
+
+		-
+			rawMessage: 'Cannot call method prepare() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: modules/Player/articles.php
+
+		-
+			rawMessage: 'Cannot call method real_escape_string() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: modules/Player/articles.php
+
+		-
+			rawMessage: Cannot cast mixed to string.
+			identifier: cast.string
+			count: 1
+			path: modules/Player/articles.php
+
+		-
+			rawMessage: 'Construct empty() is not allowed. Use more strict comparison.'
+			identifier: empty.notAllowed
+			count: 1
+			path: modules/Player/articles.php
+
+		-
+			rawMessage: 'Parameter #1 $string of function htmlspecialchars expects string, mixed given.'
+			identifier: argument.type
+			count: 2
+			path: modules/Player/articles.php
+
+		-
+			rawMessage: 'Parameter #1 $string of function trim expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/articles.php
+
+		-
+			rawMessage: 'Cannot call method getUsername() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: modules/Player/extension.php
+
+		-
+			rawMessage: Cannot cast mixed to int.
+			identifier: cast.int
+			count: 6
+			path: modules/Player/extension.php
+
+		-
+			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/Player/extension.php
+
+		-
+			rawMessage: 'Direct is_user() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/Player/extension.php
+
+		-
+			rawMessage: '''
+				Instantiation of deprecated class Extension\ExtensionProcessor:
+				Use ExtensionService instead
+			'''
+			identifier: new.deprecatedClass
+			count: 1
+			path: modules/Player/extension.php
+
+		-
+			rawMessage: 'Only booleans are allowed in a negated boolean, int given.'
+			identifier: booleanNot.exprNotBoolean
+			count: 1
+			path: modules/Player/extension.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Extension\ExtensionProcessor constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/extension.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/extension.php
+
+		-
+			rawMessage: 'Parameter #1 $extensionData of method Extension\ExtensionService::processExtension() expects array{playerID?: int, player?: Player\Player, teamName?: string, team?: Team\Team, offer: array{year1: int, year2: int, year3: int, year4: int, year5: int}, demands?: array{total: int, years: int}|array{year1: int, year2: int, year3: int, year4: int, year5: int}|null}, array{teamName: non-empty-string, playerID: int, playerName: string, offer: array{year1: int, year2: int, year3: int, year4: int, year5: int}, demands: array{total: mixed, years: mixed}} given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/extension.php
+
+		-
+			rawMessage: 'Parameter #1 $username of method Repositories\TeamIdentityRepository::getTeamnameFromUsername() expects string|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/extension.php
+
+		-
+			rawMessage: 'Parameter #2 $serverName of class Extension\ExtensionProcessor constructor expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/extension.php
+
+		-
+			rawMessage: 'Cannot call method getTeamnameFromUsername() on mixed.'
+			identifier: method.nonObject
+			count: 3
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Cannot call method getUsername() on mixed.'
+			identifier: method.nonObject
+			count: 5
+			path: modules/Player/index.php
+
+		-
+			rawMessage: Cannot cast mixed to int.
+			identifier: cast.int
+			count: 6
+			path: modules/Player/index.php
+
+		-
+			rawMessage: Cannot cast mixed to string.
+			identifier: cast.string
+			count: 2
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Direct is_user() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Direct loginbox() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Function negotiate() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Function negotiate() has parameter $playerID with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Function processrookieoption() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Function rookieoption() has no return type specified.'
+			identifier: missingType.return
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Function rookieoption() has parameter $pid with no type specified.'
+			identifier: missingType.parameter
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Offset ''error'' might not exist on array{valid: false, error?: string, finalYearSalary?: int}.'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Offset ''finalYearSalary'' might not exist on array{valid: true, error?: string, finalYearSalary?: int}.'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Only booleans are allowed in &&, int|false given on the right side.'
+			identifier: booleanAnd.rightNotBoolean
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Only booleans are allowed in a negated boolean, int given.'
+			identifier: booleanNot.exprNotBoolean
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Negotiation\ExtensionContractDemandCalculator constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Negotiation\NegotiationRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Negotiation\NegotiationService constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Negotiation\NegotiationValidator constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Player\PlayerPageService constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Player\PlayerRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 2
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Repositories\SalaryCapRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class RookieOption\RookieOptionController constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class RookieOption\RookieOptionRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Topics\News\NewsRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of static method Player\Player::withPlayerID() expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of static method Player\Stats\PlayerStats::withPlayerID() expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #1 $mysqliDb of class Player\PlayerPageController constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #1 $string of function rawurlencode expects string, mixed given.'
+			identifier: argument.type
+			count: 3
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #1 $username of class Debug\DebugSession constructor expects string|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #1 $value of function intval expects array|bool|float|GMP|int|resource|SimpleXMLElement|string|null, mixed given.'
+			identifier: argument.type
+			count: 2
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #2 $commonRepo of class Player\PlayerPageController constructor expects Repositories\Contracts\TeamIdentityRepositoryInterface, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #2 $commonRepo of class Player\PlayerPageService constructor expects Repositories\Contracts\TeamIdentityRepositoryInterface, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #2 $commonRepository of class RookieOption\RookieOptionController constructor expects Repositories\Contracts\TeamIdentityRepositoryInterface, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #2 $salaryCapRepo of class Negotiation\ExtensionContractDemandCalculator constructor expects Repositories\Contracts\SalaryCapRepositoryInterface, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #2 $salaryCapRepo of class Negotiation\NegotiationRepository constructor expects Repositories\Contracts\SalaryCapRepositoryInterface, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #2 $serverName of class Debug\DebugSession constructor expects string|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #2 $teamName of method RookieOption\RookieOptionView::renderForm() expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #2 $userTeamName of method Negotiation\NegotiationService::processNegotiation() expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #2 $userTeamName of method RookieOption\RookieOptionValidator::validatePlayerOwnership() expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #3 $cookieValue of class Debug\DebugSession constructor expects string|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #3 $prefix of method Negotiation\NegotiationService::processNegotiation() expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #3 $username of method Player\PlayerPageController::renderPage() expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #4 $error of method RookieOption\RookieOptionView::renderForm() expects string|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #4 $request of class Player\PlayerPageController constructor expects Http\HttpRequest, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #5 $result of method RookieOption\RookieOptionView::renderForm() expects string|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #6 $from of method RookieOption\RookieOptionView::renderForm() expects string|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Parameter #9 $db of static method Player\Views\PlayerTradingCardFlipView::render() expects mysqli|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Player/index.php
+
+		-
+			rawMessage: Unreachable statement - code above always terminates.
+			identifier: deadCode.unreachable
+			count: 2
+			path: modules/Player/index.php
+
+		-
+			rawMessage: 'Construct empty() is not allowed. Use more strict comparison.'
+			identifier: empty.notAllowed
+			count: 1
+			path: modules/PlayerDatabase/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/PlayerDatabase/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class PlayerDatabase\PlayerDatabaseRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/PlayerDatabase/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Player\PlayerRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/PlayerDatabase/index.php
+
+		-
+			rawMessage: 'Parameter #1 $rawParams of method PlayerDatabase\PlayerDatabaseService::search() expects array<string, mixed>, array<mixed> given.'
+			identifier: argument.type
+			count: 1
+			path: modules/PlayerDatabase/index.php
+
+		-
+			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/PlayerExportGuide/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/PlayerMovement/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class PlayerMovement\PlayerMovementRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/PlayerMovement/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/PlayerMovement/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/ProjectedDraftOrder/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Auth\AuthRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 2
+			path: modules/ProjectedDraftOrder/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class ProjectedDraftOrder\ProjectedDraftOrderRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 2
+			path: modules/ProjectedDraftOrder/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 2
+			path: modules/ProjectedDraftOrder/index.php
+
+		-
+			rawMessage: 'Parameter #1 $json of function json_decode expects string, string|false given.'
+			identifier: argument.type
+			count: 1
+			path: modules/ProjectedDraftOrder/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/RecordHolders/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Cache\DatabaseCache constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/RecordHolders/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class RecordHolders\RecordHoldersRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/RecordHolders/index.php
+
+		-
+			rawMessage: 'Parameter #2 $leagueContext of class RecordHolders\RecordHoldersRepository constructor expects League\LeagueContext|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/RecordHolders/index.php
+
+		-
+			rawMessage: Cannot cast mixed to int.
+			identifier: cast.int
+			count: 1
+			path: modules/Schedule/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class LeagueSchedule\LeagueScheduleRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Schedule/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Schedule/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Schedule\ScheduleController constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Schedule/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Standings\StandingsRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Schedule/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class TeamSchedule\TeamScheduleRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Schedule/index.php
+
+		-
+			rawMessage: 'Parameter #2 $leagueContext of class LeagueSchedule\LeagueScheduleRepository constructor expects League\LeagueContext|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Schedule/index.php
+
+		-
+			rawMessage: 'Parameter #2 $leagueContext of class Schedule\ScheduleController constructor expects League\LeagueContext, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Schedule/index.php
+
+		-
+			rawMessage: 'Parameter #2 $leagueContext of class Standings\StandingsRepository constructor expects League\LeagueContext|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Schedule/index.php
+
+		-
+			rawMessage: 'Parameter #2 $leagueContext of class TeamSchedule\TeamScheduleRepository constructor expects League\LeagueContext|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Schedule/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/Search/index.php
+
+		-
+			rawMessage: 'Parameter #1 $data of method Search\SearchView::render() expects array{query: string, type: string, topic: int, category: int, author: string, days: int, min: int, offset: int, ...}, array{query: string, type: string, topic: int, category: int, author: string, days: int, min: int, offset: 10, ...} given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Search/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Search\SearchRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Search/index.php
+
+		-
+			rawMessage: 'Parameter #2 $prefix of class Search\SearchRepository constructor expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Search/index.php
+
+		-
+			rawMessage: 'Part $module_name (mixed) of encapsed string cannot be cast to string.'
+			identifier: encapsedStringPart.nonString
+			count: 1
+			path: modules/Search/index.php
+
+		-
+			rawMessage: Cannot cast mixed to int.
+			identifier: cast.int
+			count: 1
+			path: modules/SeasonArchive/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class SeasonArchive\SeasonArchiveRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/SeasonArchive/index.php
+
+		-
+			rawMessage: 'Parameter #2 $leagueContext of class SeasonArchive\SeasonArchiveRepository constructor expects League\LeagueContext|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/SeasonArchive/index.php
+
+		-
+			rawMessage: 'Construct empty() is not allowed. Use more strict comparison.'
+			identifier: empty.notAllowed
+			count: 1
+			path: modules/SeasonHighs/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/SeasonHighs/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class SeasonHighs\SeasonHighsRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/SeasonHighs/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/SeasonHighs/index.php
+
+		-
+			rawMessage: 'Parameter #1 $seasonPhase of method SeasonHighs\SeasonHighsService::getHomeAwayHighs() expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/SeasonHighs/index.php
+
+		-
+			rawMessage: 'Parameter #1 $seasonPhase of method SeasonHighs\SeasonHighsService::getSeasonHighsData() expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/SeasonHighs/index.php
+
+		-
+			rawMessage: 'Parameter #1 $seasonPhase of method SeasonHighs\SeasonHighsView::render() expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/SeasonHighs/index.php
+
+		-
+			rawMessage: 'Parameter #1 $seasonPhase of method SeasonHighs\SeasonHighsView::renderHomeAwayHighs() expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/SeasonHighs/index.php
+
+		-
+			rawMessage: 'Parameter #2 $leagueContext of class SeasonHighs\SeasonHighsRepository constructor expects League\LeagueContext|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/SeasonHighs/index.php
+
+		-
+			rawMessage: 'Parameter #2 $leagueContext of class Season\Season constructor expects League\LeagueContext|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/SeasonHighs/index.php
+
+		-
+			rawMessage: 'Part $seasonPhase (mixed) of encapsed string cannot be cast to string.'
+			identifier: encapsedStringPart.nonString
+			count: 1
+			path: modules/SeasonHighs/index.php
+
+		-
+			rawMessage: Cannot cast mixed to int.
+			identifier: cast.int
+			count: 1
+			path: modules/SeasonLeaderboards/index.php
+
+		-
+			rawMessage: 'Construct empty() is not allowed. Use more strict comparison.'
+			identifier: empty.notAllowed
+			count: 1
+			path: modules/SeasonLeaderboards/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/SeasonLeaderboards/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Cache\DatabaseCache constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/SeasonLeaderboards/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class SeasonLeaderboards\SeasonLeaderboardsRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/SeasonLeaderboards/index.php
+
+		-
+			rawMessage: 'Parameter #1 $filters of method SeasonLeaderboards\SeasonLeaderboardsService::getFilteredLeaderboard() expects array{year?: string, team?: int|string, sortby?: string, limit?: int|string}, array{year: mixed, team: int, sortby: mixed, limit: mixed} given.'
+			identifier: argument.type
+			count: 1
+			path: modules/SeasonLeaderboards/index.php
+
+		-
+			rawMessage: 'Parameter #1 $sortBy of method SeasonLeaderboards\SeasonLeaderboardsView::setSortBy() expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/SeasonLeaderboards/index.php
+
+		-
+			rawMessage: 'Parameter #2 $leagueContext of class SeasonLeaderboards\SeasonLeaderboardsRepository constructor expects League\LeagueContext|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/SeasonLeaderboards/index.php
+
+		-
+			rawMessage: 'Parameter #3 $currentFilters of method SeasonLeaderboards\SeasonLeaderboardsView::renderFilterForm() expects array{year?: string, team?: int|string, sortby?: string, limit?: int|string}, array{year: mixed, team: int, sortby: mixed, limit: mixed} given.'
+			identifier: argument.type
+			count: 1
+			path: modules/SeasonLeaderboards/index.php
+
+		-
+			rawMessage: Variable $mysqli_db might not be defined.
+			identifier: variable.undefined
+			count: 2
+			path: modules/SeasonLeaderboards/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/SeriesRecords/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/SeriesRecords/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class SeriesRecords\SeriesRecordsRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/SeriesRecords/index.php
+
+		-
+			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/SeriesRecords/index.php
+
+		-
+			rawMessage: 'Cannot call method isOlympics() on mixed.'
+			identifier: method.nonObject
+			count: 1
+			path: modules/Standings/index.php
+
+		-
+			rawMessage: 'Only booleans are allowed in a negated boolean, int|false given.'
+			identifier: booleanNot.exprNotBoolean
+			count: 1
+			path: modules/Standings/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Standings/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Standings\StandingsRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Standings/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of static method League\OlympicsTeamFilter::getRealTeamIds() expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Standings/index.php
+
+		-
+			rawMessage: 'Parameter #2 $leagueContext of class Season\Season constructor expects League\LeagueContext|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Standings/index.php
+
+		-
+			rawMessage: 'Parameter #2 $leagueContext of class Standings\StandingsRepository constructor expects League\LeagueContext|null, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Standings/index.php
+
+		-
+			rawMessage: 'Parameter #2 $subject of function preg_match expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Standings/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/Team/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Team/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Team\TeamApiHandler constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Team/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Team\TeamController constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Team/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Team\TeamRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Team/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Team\TeamService constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Team/index.php
+
+		-
+			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Team/index.php
+
+		-
+			rawMessage: 'Parameter #3 $authService of class Team\TeamController constructor expects Auth\Contracts\AuthServiceInterface, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Team/index.php
+
+		-
+			rawMessage: 'Parameter #3 $leagueContext of class Team\TeamService constructor expects League\LeagueContext, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Team/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/TeamOffDefStats/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/TeamOffDefStats/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class TeamOffDefStats\TeamOffDefStatsRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/TeamOffDefStats/index.php
+
+		-
+			rawMessage: Cannot cast mixed to string.
+			identifier: cast.string
+			count: 1
+			path: modules/Topics/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/Topics/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Topics\TopicsService constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Topics/index.php
+
+		-
+			rawMessage: 'Parameter #2 $prefix of class Topics\TopicsService constructor expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Topics/index.php
+
+		-
+			rawMessage: 'Parameter #3 $searchFilters of method Topics\TopicsView::render() expects array{topics: list<array{topicId: int, topicText: string}>, categories: list<array{catId: int, title: string}>, authors: list<string>, articleComm: bool}, array{topics: list<array{topicId: int, topicText: string}>, categories: list<array{catId: int, title: string}>, authors: array<int, string>, articleComm: bool} given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Topics/index.php
+
+		-
+			rawMessage: 'Parameter #2 $post of method Trading\TradingController::acceptTradeOffer() expects array<string, mixed>, array<mixed> given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/accepttradeoffer.php
+
+		-
+			rawMessage: 'Parameter #2 $serverName of class Trading\TradeOfferRepository constructor expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/accepttradeoffer.php
+
+		-
+			rawMessage: 'Parameter #3 $serverName of class Trading\TradeOffer constructor expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/accepttradeoffer.php
+
+		-
+			rawMessage: 'Parameter #3 $serverName of class Trading\TradeProcessor constructor expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/accepttradeoffer.php
+
+		-
+			rawMessage: 'Parameter #9 $authService of class Trading\TradingController constructor expects Auth\Contracts\AuthServiceInterface, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/accepttradeoffer.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/Trading/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Repositories\SalaryCapRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Trading\TradeAssetRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Trading\TradeCashRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Trading\TradeFormRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Trading\TradeOffer constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Trading\TradeOfferRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Trading\TradeProcessor constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Trading\TradeValidator constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/index.php
+
+		-
+			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/index.php
+
+		-
+			rawMessage: 'Parameter #2 $serverName of class Trading\TradeOfferRepository constructor expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/index.php
+
+		-
+			rawMessage: 'Parameter #3 $serverName of class Trading\TradeOffer constructor expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/index.php
+
+		-
+			rawMessage: 'Parameter #3 $serverName of class Trading\TradeProcessor constructor expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/index.php
+
+		-
+			rawMessage: 'Parameter #4 $mysqli_db of class Trading\TradingService constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/index.php
+
+		-
+			rawMessage: 'Parameter #7 $db of class Trading\TradingController constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/index.php
+
+		-
+			rawMessage: 'Parameter #9 $authService of class Trading\TradingController constructor expects Auth\Contracts\AuthServiceInterface, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/index.php
+
+		-
+			rawMessage: Variable $user might not be defined.
+			identifier: variable.undefined
+			count: 4
+			path: modules/Trading/index.php
+
+		-
+			rawMessage: 'Parameter #2 $post of method Trading\TradingController::submitTradeOffer() expects array<string, mixed>, array<mixed> given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/maketradeoffer.php
+
+		-
+			rawMessage: 'Parameter #2 $serverName of class Trading\TradeOfferRepository constructor expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/maketradeoffer.php
+
+		-
+			rawMessage: 'Parameter #3 $serverName of class Trading\TradeOffer constructor expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/maketradeoffer.php
+
+		-
+			rawMessage: 'Parameter #3 $serverName of class Trading\TradeProcessor constructor expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/maketradeoffer.php
+
+		-
+			rawMessage: 'Parameter #9 $authService of class Trading\TradingController constructor expects Auth\Contracts\AuthServiceInterface, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/maketradeoffer.php
+
+		-
+			rawMessage: 'Parameter #2 $post of method Trading\TradingController::rejectTradeOffer() expects array<string, mixed>, array<mixed> given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/rejecttradeoffer.php
+
+		-
+			rawMessage: 'Parameter #2 $serverName of class Trading\TradeOfferRepository constructor expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/rejecttradeoffer.php
+
+		-
+			rawMessage: 'Parameter #3 $serverName of class Trading\TradeOffer constructor expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/rejecttradeoffer.php
+
+		-
+			rawMessage: 'Parameter #3 $serverName of class Trading\TradeProcessor constructor expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/rejecttradeoffer.php
+
+		-
+			rawMessage: 'Parameter #9 $authService of class Trading\TradingController constructor expects Auth\Contracts\AuthServiceInterface, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Trading/rejecttradeoffer.php
+
+		-
+			rawMessage: 'Direct is_user() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/TrainingCampRatingsDiff/index.php
+
+		-
+			rawMessage: 'Direct loginbox() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/TrainingCampRatingsDiff/index.php
+
+		-
+			rawMessage: 'Only booleans are allowed in a negated boolean, int given.'
+			identifier: booleanNot.exprNotBoolean
+			count: 1
+			path: modules/TrainingCampRatingsDiff/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class TrainingCampRatingsDiff\TrainingCampRatingsDiffRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/TrainingCampRatingsDiff/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/TransactionHistory/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class TransactionHistory\TransactionHistoryRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/TransactionHistory/index.php
+
+		-
+			rawMessage: 'Parameter #1 $queryParams of method TransactionHistory\TransactionHistoryService::getPageData() expects array<string, string>, array<mixed> given.'
+			identifier: argument.type
+			count: 1
+			path: modules/TransactionHistory/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/Voting/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Voting/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Voting\VotingBallotService constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Voting/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Voting\VotingController constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Voting/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Voting\VotingRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Voting/index.php
+
+		-
+			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Voting/index.php
+
+		-
+			rawMessage: 'Parameter #7 $authService of class Voting\VotingController constructor expects Auth\Contracts\AuthServiceInterface, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Voting/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/VotingResults/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/VotingResults/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Voting\VotingRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/VotingResults/index.php
+
+		-
+			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/VotingResults/index.php
+
+		-
+			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/Waivers/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/Waivers/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Repositories\PlayerLookupRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Waivers/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Repositories\SalaryCapRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Waivers/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Waivers/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Team\TeamQueryRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Waivers/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Topics\News\NewsRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Waivers/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Waivers\WaiversRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Waivers/index.php
+
+		-
+			rawMessage: 'Parameter #5 $db of class Waivers\WaiversService constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Waivers/index.php
+
+		-
+			rawMessage: 'Parameter #6 $db of class Waivers\WaiversProcessor constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Waivers/index.php
+
+		-
+			rawMessage: 'Parameter #7 $db of class Waivers\WaiversController constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Waivers/index.php
+
+		-
+			rawMessage: 'Parameter #8 $authService of class Waivers\WaiversController constructor expects Auth\Contracts\AuthServiceInterface, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Waivers/index.php
+
+		-
+			rawMessage: 'Cannot call method getUsername() on mixed.'
+			identifier: method.nonObject
+			count: 3
+			path: modules/YourAccount/index.php
+
+		-
+			rawMessage: Cannot cast mixed to int.
+			identifier: cast.int
+			count: 1
+			path: modules/YourAccount/index.php
+
+		-
+			rawMessage: Cannot cast mixed to string.
+			identifier: cast.string
+			count: 4
+			path: modules/YourAccount/index.php
+
+		-
+			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/YourAccount/index.php
+
+		-
+			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/YourAccount/index.php
+
+		-
+			rawMessage: 'Direct is_user() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
+			identifier: ibl.bannedNukeGlobal
+			count: 4
+			path: modules/YourAccount/index.php
+
+		-
+			rawMessage: 'Only booleans are allowed in a negated boolean, int given.'
+			identifier: booleanNot.exprNotBoolean
+			count: 1
+			path: modules/YourAccount/index.php
+
+		-
+			rawMessage: 'Only booleans are allowed in an if condition, int given.'
+			identifier: if.condNotBoolean
+			count: 3
+			path: modules/YourAccount/index.php
+
+		-
+			rawMessage: 'Parameter #1 $authService of class YourAccount\YourAccountService constructor expects Auth\Contracts\AuthServiceInterface, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/YourAccount/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/YourAccount/index.php
+
+		-
+			rawMessage: 'Parameter #1 $username of method YourAccount\YourAccountService::getTeamRedirectUrl() expects string, mixed given.'
+			identifier: argument.type
+			count: 3
+			path: modules/YourAccount/index.php
+
+		-
+			rawMessage: 'Parameter #4 $clientIp of method YourAccount\YourAccountService::attemptLogin() expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/YourAccount/index.php
+
+		-
+			rawMessage: Variable $authService might not be defined.
+			identifier: variable.undefined
+			count: 4
+			path: modules/YourAccount/index.php
+
+		-
+			rawMessage: Variable $mysqli_db might not be defined.
+			identifier: variable.undefined
+			count: 1
+			path: modules/YourAccount/index.php
+
+		-
+			rawMessage: Variable $user might not be defined.
+			identifier: variable.undefined
+			count: 5
+			path: modules/YourAccount/index.php
+
+		-
+			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/index.php
 
 		-
 			rawMessage: 'Direct is_admin() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'

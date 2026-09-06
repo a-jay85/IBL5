@@ -94,6 +94,7 @@ if ($useStdin) {
             $exit,
             trim((string) $errDiff) !== '' ? trim((string) $errDiff) : '(no stderr output)'
         ));
+        // shallow CI checkout has no origin/master; degrade gracefully.
         $emit(LighthouseUrls::representativeUrls($baseUrl));
         exit(0);
     }

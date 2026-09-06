@@ -186,7 +186,7 @@ Green tests that don't guard the behavior they're named for. **Fix first.** D1/D
 | D12 | ✅ | — | `ajax-api-endpoints.spec.ts` all-modes / fallback | `html.length>0` (or only content-type) → error page passes; first test in each block does `toContain('<table')`. ✓verified — 5 table assertion sites added; all green. ✓done |
 | D13 | ✅ | — | `next-sim.spec.ts` opponent colors | asserts `style` contains `--team-color-primary`, not that it resolves to data. Borderline. ✓verified — hex-color regex verified green against live stack. ✓done |
 | D14 | ✅ | — | `cross-module-navigation.spec.ts` chain | `if(playerCount>0){…}` silent-passes (no-silent-pass rule); also subsumed by two prior chain tests. ✓verified — hard count assertion replaces silent if-block; green. ✓done |
-| D15 | ◑ | 🟨 | `role-gating-non-admin.spec.ts` Block F | self-labelled exploratory; 4 no-team-user tests assert only HTTP 200 + no PHP error. ✓content assertions added and green in CI (`e2e-tests.yml` supplies `IBL_TEST_USER_REGULAR`/`IBL_TEST_PASS_REGULAR` with fallbacks, so the pre-existing skip gate is false there). Left ◑ because the selector had to stay `.ibl-title, .ibl-card__title, h1, h2` — narrowing to `.ibl-title` alone failed CI, so these pages still lack a single canonical title hook. |
+| D15 | ✅ | 🟨 | `role-gating-non-admin.spec.ts` Block F | self-labelled exploratory; 4 no-team-user tests assert only HTTP 200 + no PHP error. ✓content assertions added and green in CI (`e2e-tests.yml` supplies `IBL_TEST_USER_REGULAR`/`IBL_TEST_PASS_REGULAR` with fallbacks, so the pre-existing skip gate is false there). ✓closed: the earlier "narrowing to `.ibl-title` alone failed CI" note was wrong about the cause. A DOM capture against the worktree stack as `IBL_TEST_USER_REGULAR` shows all three chrome pages already emit `h1.ibl-title` **unconditionally** — Trading ("Trading", `TradeReviewView.php`), FreeAgency negotiate ("Free Agency", `FreeAgencyOfferView.php`), DepthChartEntry ("Depth Chart Entry", `DepthChartEntryController.php`) — so no markup change was needed. The selector is now `.ibl-title` alone, with `.first()` retained because DepthChartEntry legitimately also carries `h2.ibl-title` "Next Sim"; the exact-count assertion is scoped to `h1.ibl-title` for that reason, and each test also pins its heading text so the narrowing is non-vacuous (mutation-verified). Player negotiate renders no title for a no-team user and correctly asserts `.ibl-alert--error`, so it was excluded from the narrowing — narrowing it too is the most likely cause of the original CI failure. |
 | D16 | ✅ | 🟨 | `depth-chart-entry-mobile.spec.ts` save-flow: positive success assertion (`.ibl-alert--success`) removed due to session-shared flash race; only non-error gate remains (discovered #1805) |
 | D18 | ✅ | 🟩 | `.claude/rules/playwright-tests.md` | Serial-suite pre-capture invariant: AJAX assertions must capture pre-action state and assert change, not absolute values. Prevention rule from #1806 vacuous-D4-assertion discovery. |
 
@@ -228,7 +228,7 @@ value). For fake-POST tests (D7), assert the banner *after a real submit*, not a
 | E10 | ✅ Done | 🟩 | `waitForLoadState('domcontentloaded')` after HTMX form — `voting-submission.spec.ts:140`; tab-click pre-swap — `waivers.spec.ts` |
 | E11 | ✅ Done | 🟩 | browser-history `goBack/goForward` — `draft-history`, `franchise-record-book`, `league-starters`, `team` (load-sensitive; keep, watch) |
 | E12 | ✅ Done | 🟩 | sleep-in-retry `setTimeout(r,200)` loop — `ajax-api-endpoints.spec.ts fetchJson` |
-| E13 | ⬜ Open | 🟩 | Plan-specified diagnostic strings and DOM observation evidence omitted during E2E assertion implementation. Messages fixed inline (PR #1807). DOM dumps for D15's four no-team pages not captured — needs a Playwright run against the worktree stack with `IBL_TEST_USER_REGULAR` credentials. (discovered 2026-09-02 during #1807) |
+| E13 | ✅ | 🟩 | Plan-specified diagnostic strings and DOM observation evidence omitted during E2E assertion implementation. Messages fixed inline (PR #1807). ✓closed: the four no-team DOM dumps were captured via a throwaway Playwright spec run against the worktree stack as `IBL_TEST_USER_REGULAR`, and the per-page counts are recorded in the D15 note and the closing PR body. (discovered 2026-09-02 during #1807) |
 | E14 | ⬜ Open | 🟥 | Autofix bot (`IBL5 Bug Hunter (sandbox)`, commit `ede59f41d`) silently removed the D15 Player-negotiate `.ibl-alert--error` assertion without declaring a scope change, leaving permissive-form coverage on a route with assertable production behavior. (discovered 2026-09-03 during #1807) |
 | E15 | ⬜ Open | — | E2E spec inline comment overstates ordering assertion; matrix row #8 not provably run — see prose |
 
@@ -249,7 +249,18 @@ value). For fake-POST tests (D7), assert the banner *after a real submit*, not a
 |---|-----------|-------------|-------|--------|
 | 1 | `tests/e2e/flows/cross-module-navigation.spec.ts:54` | yes | yes | fixed this pass — message `'CI seed gives teamid 1 a roster (ci-seed.sql, ibl_plr)'` added |
 | 2 | `tests/e2e/flows/role-gating-non-admin.spec.ts:241,254,270,279` | yes | yes | fixed this pass — four plan-specified diagnostic messages added |
-| 3 | PR #1807 body — four D15 DOM dumps for no-team pages (Trading, FreeAgency negotiate, Player negotiate, DepthChartEntry) | yes | not fixed | not fixed — filed; requires a Playwright session with `IBL_TEST_USER_REGULAR` against the worktree stack |
+| 3 | PR #1807 body — four D15 DOM dumps for no-team pages (Trading, FreeAgency negotiate, Player negotiate, DepthChartEntry) | yes | no longer live | fixed — captured via a throwaway Playwright spec against the worktree stack as `IBL_TEST_USER_REGULAR`; per-page counts in the table below, and no page's dump contained `Fatal error` / `Warning:` / `Parse error` |
+
+**E13 occurrence 3 — captured no-team DOM counts** (regular user `ci-e2e-regular`, `roles_mask=0`, no `ibl_team_info` row):
+
+| Page | `.ibl-title` | `h1.ibl-title` | `h2.ibl-title` | `.ibl-card__title` | `.ibl-alert--error` |
+|---|---|---|---|---|---|
+| Trading | 1 | 1 ("Trading") | 0 | 0 | 0 |
+| FreeAgency negotiate | 1 | 1 ("Free Agency") | 0 | 4 | 0 |
+| DepthChartEntry | 2 | 1 ("Depth Chart Entry") | 1 ("Next Sim") | 0 | 0 |
+| Player negotiate | 0 | 0 | 0 | 0 | 1 |
+
+This is the evidence that closed D15: the three chrome pages already carried the canonical hook, so the narrowing needed no markup change.
 
 **prevention ladder:**
 - rung 0 — no existing gate enforces plan-specified message args in Playwright assertions.

@@ -1,0 +1,442 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-architect-contract-split — proves the rules/detail split dropped no operative rule.
+#
+# Four token classes extracted from each pre-split baseline fixture:
+#   bold lead-ins  : bullet-start **…** (every operative rule is named this way)
+#   gate tokens    : [A-Z0-9]+ references to bin/check-plan gate letters
+#   fenced blocks  : fenced code block bodies (sha256 hash + first non-blank line)
+#   headings       : ## and ### section headings (sort -u)
+#
+# Four assertions per file pair:
+#   1. No-loss    : every baseline token survives in rules ∪ detail
+#   2. Residency  : every operative token (bold/gate/fenced) survives in rules file specifically
+#   3. Orphans    : every Why: _…-detail.md § <heading> pointer in rules resolves
+#   4. Size caps  : _architect-contract.md ≤ 28672 B, _plan-verification.md ≤ 19456 B
+#                   (only enforced when the detail file exists — skipped on the un-split tree)
+#
+# Run: bin/test-architect-contract-split              (exit 0 = pass, 1 = rule missing)
+#      bin/test-architect-contract-split --self-test  (also proves checker catches a deletion)
+#      bin/test-architect-contract-split --help       (usage)
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+FAILED=0
+
+usage() {
+  printf 'usage: %s [--self-test | --help]\n' "$(basename "$0")"
+}
+
+# ── Flag parsing ─────────────────────────────────────────────────────────────
+MODE=check
+case "${1-}" in
+  "")           MODE=check ;;
+  --self-test)  MODE=selftest ;;
+  -h|--help)    usage; exit 0 ;;
+  *)            printf 'unknown argument: %s\n' "$1" >&2; usage >&2; exit 2 ;;
+esac
+
+# ── Allowlists ───────────────────────────────────────────────────────────────
+# Format: "token<TAB>reason" — reason must be ≥15 chars or the entry is itself a failure.
+# EXPECTED_ABSENT: baseline tokens deliberately deleted; exempt from no-loss assertion.
+EXPECTED_ABSENT=(
+)
+
+# Format: "token<TAB>detail-file-path<TAB>reason"
+# Waives residency for the token, but tightens no-loss: token must be in the named detail file.
+# A named detail file that does not yet exist is a hard failure.
+EXPECTED_MOVED=(
+)
+
+# ── Validate allowlists ───────────────────────────────────────────────────────
+validate_allowlists() {
+  local entry token reason rest
+  for entry in "${EXPECTED_ABSENT[@]+"${EXPECTED_ABSENT[@]}"}"; do
+    token="${entry%%	*}"
+    reason="${entry#*	}"
+    if [[ "${#reason}" -lt 15 ]]; then
+      printf 'FAIL: EXPECTED_ABSENT entry has reason shorter than 15 chars: "%s"\n' "$token"
+      FAILED=1
+    fi
+  done
+  for entry in "${EXPECTED_MOVED[@]+"${EXPECTED_MOVED[@]}"}"; do
+    token="${entry%%	*}"
+    rest="${entry#*	}"
+    local detail_file="${rest%%	*}"
+    reason="${rest#*	}"
+    if [[ "${#reason}" -lt 15 ]]; then
+      printf 'FAIL: EXPECTED_MOVED entry has reason shorter than 15 chars: "%s"\n' "$token"
+      FAILED=1
+    fi
+    if [[ ! -f "$detail_file" ]]; then
+      printf 'FAIL: EXPECTED_MOVED references non-existent detail file: %s (token: "%s")\n' "$detail_file" "$token"
+      FAILED=1
+    fi
+  done
+}
+
+# ── Token extractors ─────────────────────────────────────────────────────────
+extract_bold() {
+  sed -n 's/^[[:space:]]*[-*][[:space:]]*\*\*\([^*][^*]*\)\*\*.*/\1/p' "$1"
+}
+
+extract_gate() {
+  grep -oE '\[[A-Z0-9]+\]' "$1" | sort -u
+}
+
+sha256_file() {
+  shasum -a 256 "$1" 2>/dev/null | awk '{print $1}' \
+    || sha256sum "$1" 2>/dev/null | awk '{print $1}'
+}
+
+extract_fenced() {
+  local file="$1"
+  local tmpdir in_block block_num block_file hash first_line
+  tmpdir="$(mktemp -d)"
+  in_block=0
+  block_num=0
+
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" =~ ^[[:space:]]*\`\`\` ]]; then
+      if [[ "$in_block" -eq 0 ]]; then
+        in_block=1
+        block_num=$((block_num + 1))
+        block_file="$tmpdir/block_${block_num}"
+      else
+        if [[ -f "$block_file" ]]; then
+          hash="$(sha256_file "$block_file")"
+          first_line="$(grep -m1 '[^[:space:]]' "$block_file" 2>/dev/null || true)"
+          if [[ -n "$hash" && -n "$first_line" ]]; then
+            printf '%s\t%s\n' "$hash" "$first_line"
+          fi
+        fi
+        in_block=0
+      fi
+    elif [[ "$in_block" -eq 1 ]]; then
+      printf '%s\n' "$line" >> "$block_file"
+    fi
+  done < "$file"
+
+  rm -rf "$tmpdir"
+}
+
+extract_headings() {
+  grep -E '^#{2,3}[[:space:]]' "$1" | sort -u
+}
+
+# ── Allowlist lookup helpers ──────────────────────────────────────────────────
+is_expected_absent() {
+  local token="$1"
+  local entry
+  for entry in "${EXPECTED_ABSENT[@]+"${EXPECTED_ABSENT[@]}"}"; do
+    if [[ "${entry%%	*}" == "$token" ]]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+# Prints the detail-file path for an EXPECTED_MOVED token, or exits 1 if not found.
+expected_moved_detail() {
+  local token="$1"
+  local entry rest
+  for entry in "${EXPECTED_MOVED[@]+"${EXPECTED_MOVED[@]}"}"; do
+    if [[ "${entry%%	*}" == "$token" ]]; then
+      rest="${entry#*	}"
+      printf '%s' "${rest%%	*}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+count_tokens() {
+  local s="$1"
+  if [[ -z "$s" ]]; then printf '0'; return; fi
+  printf '%s\n' "$s" | grep -c . || printf '0'
+}
+
+# ── Vacuity spot-assertions ───────────────────────────────────────────────────
+assert_canonical_gate_tokens() {
+  local gate_tokens="$1"
+  local tok
+  # Canonical bin/check-plan gate tokens that must appear in the contract file.
+  # [D] was removed prior to this PR; [M][V] live in _plan-verification.md, not here.
+  for tok in '[C]' '[F]' '[H]' '[P]' '[S]' '[T]' '[8]' '[13]'; do
+    if ! printf '%s\n' "$gate_tokens" | grep -qF -- "$tok"; then
+      printf 'FAIL: gate class missing canonical token %s\n' "$tok"
+      FAILED=1
+    fi
+  done
+}
+
+assert_phase_drift_present() {
+  local baseline="$1"
+  if ! grep -qF 'PHASE_DRIFT:' "$baseline"; then
+    printf 'FAIL: PHASE_DRIFT: literal not found in %s — fenced extractor may be blind\n' \
+      "$(basename "$baseline")"
+    FAILED=1
+  fi
+}
+
+# ── Per-class check helpers ───────────────────────────────────────────────────
+check_token_noloss_residency() {
+  local class="$1" token="$2" combined_content="$3" rules_content="$4"
+  local moved_to=""
+  moved_to="$(expected_moved_detail "$token" 2>/dev/null || true)"
+  if [[ -n "$moved_to" ]]; then
+    if ! grep -qF -- "$token" "$moved_to" 2>/dev/null; then
+      printf 'FAIL [%s no-loss]: token absent from EXPECTED_MOVED detail file %s: "%s"\n' \
+        "$class" "$moved_to" "$token"
+      FAILED=1
+    fi
+  else
+    if ! printf '%s' "$combined_content" | grep -qF -- "$token"; then
+      printf 'FAIL [%s no-loss]: token missing from rules+detail: "%s"\n' "$class" "$token"
+      FAILED=1
+    fi
+    if ! printf '%s' "$rules_content" | grep -qF -- "$token"; then
+      printf 'FAIL [%s residency]: token not in rules file: "%s"\n' "$class" "$token"
+      FAILED=1
+    fi
+  fi
+}
+
+check_fenced_noloss_residency() {
+  local token="$1" combined_fenced="$2" rules_fenced="$3"
+  local fhash="${token%%	*}"
+  local fline="${token#*	}"
+  local moved_to=""
+  moved_to="$(expected_moved_detail "$fline" 2>/dev/null || true)"
+  if [[ -n "$moved_to" ]]; then
+    local moved_fenced
+    moved_fenced="$(extract_fenced "$moved_to" 2>/dev/null || true)"
+    if ! printf '%s\n' "$moved_fenced" | grep -qF -- "$fhash"; then
+      printf 'FAIL [fenced no-loss]: block absent from EXPECTED_MOVED detail file %s: "%s"\n' \
+        "$moved_to" "$fline"
+      FAILED=1
+    fi
+  else
+    if ! printf '%s\n' "$combined_fenced" | grep -qF -- "$fhash"; then
+      printf 'FAIL [fenced no-loss]: fenced block missing from rules+detail: "%s"\n' "$fline"
+      FAILED=1
+    fi
+    if ! printf '%s\n' "$rules_fenced" | grep -qF -- "$fhash"; then
+      printf 'FAIL [fenced residency]: fenced block not in rules file: "%s"\n' "$fline"
+      FAILED=1
+    fi
+  fi
+}
+
+# ── Main check function ───────────────────────────────────────────────────────
+# Args: baseline rules detail label size_cap check_phase_drift
+check_pair() {
+  local baseline="$1" rules="$2" detail="$3" label="$4" size_cap="$5"
+  local check_phase_drift="${6:-false}"
+
+  printf '\n=== %s ===\n' "$label"
+
+  # Extract baseline tokens
+  local bold gate fenced headings
+  bold="$(extract_bold "$baseline")"
+  gate="$(extract_gate "$baseline")"
+  fenced="$(extract_fenced "$baseline")"
+  headings="$(extract_headings "$baseline")"
+
+  # Count and print per-class summary (vacuity check)
+  local cnt_bold cnt_gate cnt_fenced cnt_headings
+  cnt_bold="$(count_tokens "$bold")"
+  cnt_gate="$(count_tokens "$gate")"
+  cnt_fenced="$(count_tokens "$fenced")"
+  cnt_headings="$(count_tokens "$headings")"
+  printf 'classes: bold=%d gate=%d fenced=%d heading=%d   (file: %s)\n' \
+    "$cnt_bold" "$cnt_gate" "$cnt_fenced" "$cnt_headings" "$(basename "$baseline")"
+
+  [[ "$cnt_bold" -gt 0 ]]     || { printf 'FAIL: bold lead-in extractor returned 0 tokens\n'; FAILED=1; }
+  [[ "$cnt_gate" -gt 0 ]]     || { printf 'FAIL: gate token extractor returned 0 tokens\n'; FAILED=1; }
+  [[ "$cnt_fenced" -gt 0 ]]   || { printf 'FAIL: fenced block extractor returned 0 tokens\n'; FAILED=1; }
+  [[ "$cnt_headings" -gt 0 ]] || { printf 'FAIL: heading extractor returned 0 tokens\n'; FAILED=1; }
+
+  # Canonical gate token and PHASE_DRIFT checks apply to contract pair only
+  if [[ "$check_phase_drift" == "true" ]]; then
+    assert_canonical_gate_tokens "$gate"
+    assert_phase_drift_present "$baseline"
+  fi
+
+  # Build target content
+  local rules_content detail_content combined_content
+  rules_content="$(cat "$rules" 2>/dev/null || true)"
+  if [[ -f "$detail" ]]; then
+    detail_content="$(cat "$detail" 2>/dev/null || true)"
+  else
+    detail_content=""
+  fi
+  combined_content="${rules_content}"$'\n'"${detail_content}"
+
+  local rules_fenced detail_fenced combined_fenced
+  rules_fenced="$(extract_fenced "$rules" 2>/dev/null || true)"
+  if [[ -f "$detail" ]]; then
+    detail_fenced="$(extract_fenced "$detail" 2>/dev/null || true)"
+  else
+    detail_fenced=""
+  fi
+  combined_fenced="${rules_fenced}"$'\n'"${detail_fenced}"
+
+  # ── Assertions 1+2: bold lead-ins ────────────────────────────────────────
+  while IFS= read -r token; do
+    [[ -n "$token" ]] || continue
+    is_expected_absent "$token" && continue
+    check_token_noloss_residency "bold" "$token" "$combined_content" "$rules_content"
+  done <<< "$bold"
+
+  # ── Assertions 1+2: gate tokens ──────────────────────────────────────────
+  while IFS= read -r token; do
+    [[ -n "$token" ]] || continue
+    is_expected_absent "$token" && continue
+    check_token_noloss_residency "gate" "$token" "$combined_content" "$rules_content"
+  done <<< "$gate"
+
+  # ── Assertions 1+2: fenced blocks ────────────────────────────────────────
+  while IFS= read -r token; do
+    [[ -n "$token" ]] || continue
+    local fline="${token#*	}"
+    is_expected_absent "$fline" && continue
+    check_fenced_noloss_residency "$token" "$combined_fenced" "$rules_fenced"
+  done <<< "$fenced"
+
+  # ── Assertion 1: headings (no-loss only; residency not required) ──────────
+  while IFS= read -r token; do
+    [[ -n "$token" ]] || continue
+    is_expected_absent "$token" && continue
+    local moved_to=""
+    moved_to="$(expected_moved_detail "$token" 2>/dev/null || true)"
+    if [[ -n "$moved_to" ]]; then
+      if ! grep -qF -- "$token" "$moved_to" 2>/dev/null; then
+        printf 'FAIL [heading no-loss]: heading absent from EXPECTED_MOVED detail file %s: "%s"\n' \
+          "$moved_to" "$token"
+        FAILED=1
+      fi
+    else
+      if ! printf '%s' "$combined_content" | grep -qF -- "$token"; then
+        printf 'FAIL [heading no-loss]: heading missing from rules+detail: "%s"\n' "$token"
+        FAILED=1
+      fi
+    fi
+  done <<< "$headings"
+
+  # ── Assertion 3: no orphan pointers ──────────────────────────────────────
+  local pointer_line detail_ref heading detail_path
+  while IFS= read -r pointer_line; do
+    [[ -n "$pointer_line" ]] || continue
+    detail_ref="$(printf '%s' "$pointer_line" | grep -oE '_[a-z-]+-detail\.md' | head -1 || true)"
+    heading="$(printf '%s' "$pointer_line" | sed 's/.*§ //' | tr -d '.,;)')"
+    [[ -n "$detail_ref" && -n "$heading" ]] || continue
+
+    # Try both possible locations for the detail file
+    detail_path="$REPO_ROOT/.claude/skills/plan/$detail_ref"
+    [[ -f "$detail_path" ]] || detail_path="$REPO_ROOT/.claude/review-shared/$detail_ref"
+    # If detail file doesn't exist yet (pre-split), skip the orphan check for it
+    [[ -f "$detail_path" ]] || continue
+
+    if ! grep -qE "^#{2,3}[[:space:]]+${heading}" "$detail_path" 2>/dev/null; then
+      printf 'FAIL [orphan pointer]: rules file pointer to missing heading "%s" in %s\n' \
+        "$heading" "$detail_ref"
+      FAILED=1
+    fi
+  done < <(grep -oE '_(architect-contract|plan-verification)-detail\.md § [^.,;)]+' "$rules" 2>/dev/null || true)
+
+  # ── Assertion 4: size cap (only when detail file exists) ─────────────────
+  if [[ -f "$detail" ]]; then
+    local actual_size
+    actual_size="$(wc -c < "$rules" | tr -d '[:space:]')"
+    if [[ "$actual_size" -gt "$size_cap" ]]; then
+      printf 'FAIL [size cap]: %s is %d bytes (cap: %d)\n' "$(basename "$rules")" "$actual_size" "$size_cap"
+      FAILED=1
+    else
+      printf 'size: %d bytes (cap %d) — OK\n' "$actual_size" "$size_cap"
+    fi
+  fi
+}
+
+# ── Self-test mode ────────────────────────────────────────────────────────────
+run_selftest() {
+  local tmpdir
+  tmpdir="$(mktemp -d)"
+  # shellcheck disable=SC2064
+  trap "rm -rf '$tmpdir'" EXIT
+
+  local rules_src="$REPO_ROOT/.claude/skills/plan/_architect-contract.md"
+  local mutated="$tmpdir/_architect-contract.md"
+  cp "$rules_src" "$mutated"
+
+  # Delete the **Size budget** bullet — a stable operative rule not touched by any sibling branch
+  grep -vF '**Size budget**' "$mutated" > "$tmpdir/clean.md" && mv "$tmpdir/clean.md" "$mutated"
+
+  if grep -qF '**Size budget**' "$mutated"; then
+    printf 'FAIL: self-test mutation did not remove target bullet\n' >&2
+    exit 1
+  fi
+
+  # Run check_pair against mutated file; expect FAILED > 0
+  local old_failed=$FAILED
+  FAILED=0
+  check_pair \
+    "$REPO_ROOT/bin/fixtures/architect-contract-presplit.md" \
+    "$mutated" \
+    "$REPO_ROOT/.claude/skills/plan/_architect-contract-detail.md" \
+    "self-test-mutation" \
+    28672 \
+    true
+
+  if [[ "$FAILED" -gt 0 ]]; then
+    printf 'PASS: self-test correctly detected dropped rule (%d failure(s))\n' "$FAILED"
+    FAILED=$old_failed
+  else
+    printf 'FAIL: self-test did not detect dropped rule — checker is vacuous\n'
+    FAILED=$((old_failed + 1))
+  fi
+}
+
+# ── Entry point ───────────────────────────────────────────────────────────────
+CONTRACT_BASELINE="$REPO_ROOT/bin/fixtures/architect-contract-presplit.md"
+VERIFICATION_BASELINE="$REPO_ROOT/bin/fixtures/plan-verification-presplit.md"
+CONTRACT_RULES="$REPO_ROOT/.claude/skills/plan/_architect-contract.md"
+CONTRACT_DETAIL="$REPO_ROOT/.claude/skills/plan/_architect-contract-detail.md"
+VERIFICATION_RULES="$REPO_ROOT/.claude/review-shared/_plan-verification.md"
+VERIFICATION_DETAIL="$REPO_ROOT/.claude/review-shared/_plan-verification-detail.md"
+
+[[ -f "$CONTRACT_BASELINE" ]]     || { printf 'FAIL: baseline missing: %s\n' "$CONTRACT_BASELINE"; exit 1; }
+[[ -f "$VERIFICATION_BASELINE" ]] || { printf 'FAIL: baseline missing: %s\n' "$VERIFICATION_BASELINE"; exit 1; }
+
+validate_allowlists
+
+if [[ "$MODE" == selftest ]]; then
+  run_selftest
+else
+  check_pair \
+    "$CONTRACT_BASELINE" \
+    "$CONTRACT_RULES" \
+    "$CONTRACT_DETAIL" \
+    "architect-contract" \
+    28672 \
+    true
+
+  check_pair \
+    "$VERIFICATION_BASELINE" \
+    "$VERIFICATION_RULES" \
+    "$VERIFICATION_DETAIL" \
+    "plan-verification" \
+    19456 \
+    false
+fi
+
+if [[ "$FAILED" -ne 0 ]]; then
+  printf '\n%d assertion(s) failed\n' "$FAILED"
+  exit 1
+fi
+
+printf '\nAll assertions passed\n'
+exit 0

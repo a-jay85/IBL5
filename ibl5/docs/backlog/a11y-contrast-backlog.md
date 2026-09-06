@@ -1,12 +1,12 @@
 ---
 description: WCAG 2.1 AA color-contrast failure inventory and burn-down backlog per page.
-last_verified: 2026-07-07
+last_verified: 2026-09-06
 ---
 
 # A11y Color-Contrast Backlog
 
 **Purpose:** Track which pages have known `color-contrast` WCAG 2.1 AA failures (PHP-Nuke legacy palette).  
-**When to reference:** Removing an entry from `CONTRAST_KNOWN_FAILING` in `ibl5/tests/e2e/smoke/accessibility.spec.ts` after palette CSS fixes.
+**When to reference:** Removing an entry from `KNOWN_FAILING` in `ibl5/tests/e2e/smoke/accessibility.spec.ts` after palette CSS fixes.
 
 **Companion to** [`a11y-backlog.md`](a11y-backlog.md) and the other backlogs in [README.md](README.md).
 
@@ -15,20 +15,21 @@ last_verified: 2026-07-07
 ## How the ratchet works
 
 `accessibility.spec.ts` enables axe-core's `color-contrast` rule everywhere.
-Pages listed in `CONTRAST_KNOWN_FAILING` have the rule suppressed **for that page only**.
+Pages listed in `KNOWN_FAILING` have the rule suppressed **for that page only**.
 All other pages — including any new page added to the spec — are **enforced** from day one.
 
-Removing a page from `CONTRAST_KNOWN_FAILING` = promoting it to enforced (the ratchet clicks).
+Removing a page from `KNOWN_FAILING` = promoting it to enforced (the ratchet clicks).
 CI will immediately catch any contrast regression on promoted pages.
 
 ---
 
-## Inventory (as of 2026-06-08)
+## Inventory (spec-derived 2026-09-06)
 
 Captured by running axe-core `color-contrast` against `http://main.localhost/ibl5/` with
 the current dev seed. Rerun whenever palette CSS changes land.
+Page lists reconciled against `KNOWN_FAILING` in `ibl5/tests/e2e/smoke/accessibility.spec.ts`; the 2026-06-08 axe-core run remains the last empirical capture.
 
-### Pages currently enforced (contrast passes — 13 pages)
+### Pages currently enforced (contrast passes — 14 pages)
 
 | Page | URL |
 |------|-----|
@@ -45,10 +46,11 @@ the current dev seed. Rerun whenever palette CSS changes land.
 | your account | `modules.php?name=YourAccount` |
 | voting ASG ballot | `modules.php?name=Voting` (ASG phase) |
 | voting EOY ballot | `modules.php?name=Voting` (EOY phase) |
+| training camp ratings diff | `modules.php?name=TrainingCampRatingsDiff` |
 
-### Pages in allowlist (contrast fails — 34 pages)
+### Pages in allowlist (contrast fails — 35 pages)
 
-Remove each entry from `CONTRAST_KNOWN_FAILING` in `ibl5/tests/e2e/smoke/accessibility.spec.ts`
+Remove each entry from `KNOWN_FAILING` in `ibl5/tests/e2e/smoke/accessibility.spec.ts`
 once the palette fix for that page is verified passing.
 
 **Public pages (28):**
@@ -86,7 +88,7 @@ once the palette fix for that page is verified passing.
 | news categories | `modules.php?name=News&file=categories` |
 | news article | `modules.php?name=News&file=article&sid=1` |
 
-**Authenticated pages (6):**
+**Authenticated pages (7):**
 
 | Page | URL |
 |------|-----|
@@ -96,6 +98,7 @@ once the palette fix for that page is verified passing.
 | gm contact list | `modules.php?name=GMContactList` |
 | draft | `modules.php?name=Draft` |
 | next sim | `modules.php?name=NextSim` |
+| league control panel | `leagueControlPanel.php` |
 
 ---
 
@@ -103,7 +106,7 @@ once the palette fix for that page is verified passing.
 
 1. Fix palette CSS for the target page(s).
 2. Run `npx playwright test tests/e2e/smoke/accessibility.spec.ts --project=chromium` locally to confirm the page now passes.
-3. Remove the page name from `CONTRAST_KNOWN_FAILING` in `ibl5/tests/e2e/smoke/accessibility.spec.ts`.
+3. Remove the page name from `KNOWN_FAILING` in `ibl5/tests/e2e/smoke/accessibility.spec.ts`.
 4. Update the tables above (move rows from the allowlist table to the enforced table).
 5. Bump `last_verified` in this file's frontmatter.
 6. CI enforces the change permanently.

@@ -3,7 +3,9 @@
 #
 # bin/test-postplan-arm-conditions — regression guard for the /post-plan blocks
 # that must survive being run in their own shell — the Phase 6.5 auto-merge
-# conditions and the Phase 2.5 backlog trigger.
+# conditions, the Phase 2.5 backlog trigger, and the Phase 6 body-marker
+# preservation blocks (L20: a body rewrite that drops `Depends-on:` silently
+# disarms condition (6)).
 # Phase 6.5 conditions call the shared predicate bin/lib/pr-armable.sh
 # (conditions (1) Manual-Testing, (5) golden, (6) Depends-on, (8) feat:, (10) pipeline-authored label OR bug-<id> branch name, (11) unresolved >= 80 findings), plus
 # condition (3), the Phase-5.0 conformance gate (no predicate; /tmp state only).
@@ -38,6 +40,7 @@ FAILED=0
 #   gh pr diff --name-only               -> $GH_DIFF_FIXTURE contents (or exit 1 if unset/missing)
 #   gh pr view <n> --json state          -> predecessor state (#1100 OPEN else MERGED)
 #   gh pr view --json <fields> --jq F    -> jq -r F applied to $GH_PR_FIXTURE
+#   gh pr edit --body-file|--body       -> appends the body to $GH_EDIT_RECORD
 SHIMD="$BASE_TMP/shim"
 mkdir -p "$SHIMD"
 cat > "$SHIMD/gh" <<'SHIM'
@@ -60,6 +63,14 @@ if [ "$1" = "pr" ] && [ "$2" = "view" ]; then
     if [ "${!i}" = "--jq" ]; then j=$((i+1)); filter="${!j}"; fi
   done
   jq -r "$filter" "$GH_PR_FIXTURE"
+  exit 0
+fi
+if [ "$1" = "pr" ] && [ "$2" = "edit" ]; then
+  # Record what post-plan would have written, so a repair write is observable.
+  for ((i=1; i<=$#; i++)); do
+    if [ "${!i}" = "--body-file" ]; then j=$((i+1)); cat "${!j}" >> "${GH_EDIT_RECORD:-/dev/null}"; fi
+    if [ "${!i}" = "--body" ];      then j=$((i+1)); printf '%s' "${!j}" >> "${GH_EDIT_RECORD:-/dev/null}"; fi
+  done
   exit 0
 fi
 exit 1
@@ -222,6 +233,26 @@ run_p25() {
         bash -c "$1" 2>&1
 }
 
+# run_markers <before-body-json> <after-body-json> — run the Phase 6 capture block
+# against the body as it stood BEFORE the rewrite, then the verify block against the
+# body as it stands AFTER it, sharing one $MARKERS_FILE. Each block gets its OWN
+# fresh shell (the failure model). $GH_EDIT_RECORD collects any repair write.
+run_markers() {
+    local mf="$BASE_TMP/markers" rec="$BASE_TMP/edit-record"
+    rm -f "$mf" "$mf".* "$rec"; : > "$rec"
+    printf '%s' "$1" > "$BASE_TMP/fixture.json"
+    PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" MARKERS_FILE="$mf" \
+        GH_EDIT_RECORD="$rec" bash -c "$BMC" 2>&1
+    printf '%s' "$2" > "$BASE_TMP/fixture.json"
+    PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" MARKERS_FILE="$mf" \
+        GH_EDIT_RECORD="$rec" bash -c "$BMV" 2>&1
+}
+
+expect_out() { # name  expected-substring  output
+    if [[ "$3" == *"$2"* ]]; then echo "ok: $1"
+    else echo "FAIL: $1 — expected '$2' in: '$3'"; FAILED=1; fi
+}
+
 # expect_p25 <name> <A|B|C|none> <hit|miss|absent> <output> — assert the verdict,
 # the probe state, and that EXACTLY ONE verdict line was printed (a second one
 # would mean a fallthrough, and the orchestrator reads only the first).
@@ -258,6 +289,8 @@ B6="$(extract_block '# condition (6)')"
 B8="$(extract_block '# condition (8)')"
 B10="$(extract_block '# condition (10)')"
 B25="$(extract_block '# phase 2.5 trigger' "$P25_SKILL")"
+BMC="$(extract_block '# phase 6 body-marker capture' "$P25_SKILL")"
+BMV="$(extract_block '# phase 6 body-marker verify'  "$P25_SKILL")"
 
 # --- structural: every predicate-using block must source the lib itself ---
 assert_self_contained '# condition (1)' "condition (1)"
@@ -566,6 +599,128 @@ expect_p25 'p25_probe_excludes_readme_archive' 'C' 'miss' \
 # Empty BL_DIR (glob stays literal) yields miss, not a crash.
 expect_p25 'p25_probe_empty_dir' 'C' 'miss' \
     "$(run_p25 "$B25" 'ibl5/classes/Updater/StandingsUpdater.php' '' "$BL_EMPTY")"
+
+# --- Phase 6 body-marker preservation (L20) --------------------------------
+# Fixtures: #1100 is OPEN (shim), everything else MERGED, so a preserved
+# Depends-on: #1100 still BLOCKs condition (6).
+
+# 1. Capture pulls a Depends-on: line
+BODY_DEP_BOTH='{"body":"intro\nDepends-on: #1100\n\n## Manual Testing\n- [ ] x"}'
+out_capture_depends_on="$(run_markers "$BODY_DEP_BOTH" "$BODY_DEP_BOTH")"
+expect_out 'markers_capture_depends_on' 'BODY_MARKERS_CAPTURED=1' "$out_capture_depends_on"
+expect_out 'markers_capture_depends_on (line present)' 'Depends-on: #1100' "$out_capture_depends_on"
+
+# 2. Capture is case-insensitive (matches pr_dep_holds's grep -iE)
+out_capture_ci="$(run_markers \
+    "$(printf '{"body":"%s"}' 'intro\ndepends-on: #1100\n\n## Manual Testing\n- [ ] x')" \
+    "$(printf '{"body":"%s"}' 'intro\ndepends-on: #1100\n\n## Manual Testing\n- [ ] x')")"
+expect_out 'markers_capture_case_insensitive' 'BODY_MARKERS_CAPTURED=1' "$out_capture_ci"
+
+# 3. Capture carries a multi-line <!-- no-adr: --> through its closing delimiter
+BEFORE_BODY_NOADR="$(cat <<'BEOF'
+{"body":"intro\n<!-- no-adr:\n  schema-only change, no decision recorded\n-->\n\n## Manual Testing\n- [ ] x"}
+BEOF
+)"
+out_capture_noadr="$(run_markers "$BEFORE_BODY_NOADR" "$BEFORE_BODY_NOADR")"
+expect_out 'markers_capture_multiline_no_adr (count=3)' 'BODY_MARKERS_CAPTURED=3' "$out_capture_noadr"
+expect_out 'markers_capture_multiline_no_adr (closing delimiter)' '-->' "$out_capture_noadr"
+
+# 4. Preserved marker => verdict=preserved, zero repair writes
+BODY_WITH_DEP='{"body":"Depends-on: #1100\n\n## Manual Testing\n..."}'
+out_preserved="$(run_markers "$BODY_WITH_DEP" "$BODY_WITH_DEP")"
+expect_out 'markers_verify_preserved_no_write' 'BODY_MARKERS=preserved' "$out_preserved"
+rec_preserved="$BASE_TMP/edit-record"
+if [ ! -s "$rec_preserved" ]; then
+    echo "ok: markers_verify_preserved_no_write (zero writes)"
+else
+    echo "FAIL: markers_verify_preserved_no_write — repair write fired on a preserved body"
+    FAILED=1
+fi
+
+# 5. Dropped marker => verdict=dropped, repair write fires with marker as first line
+BEFORE_BODY_DROP='{"body":"Depends-on: #1100\n\n## Manual Testing\n..."}'
+AFTER_BODY_DROP='{"body":"## Manual Testing\n...\n\n<!-- files-changed:begin -->\n- foo.php\n<!-- files-changed:end -->"}'
+out_dropped="$(run_markers "$BEFORE_BODY_DROP" "$AFTER_BODY_DROP")"
+expect_out 'markers_verify_dropped_repairs (verdict)' 'BODY_MARKERS=dropped:' "$out_dropped"
+rec_dropped="$BASE_TMP/edit-record"
+first_line_dropped="$(head -1 "$rec_dropped" 2>/dev/null)"
+if [ "$first_line_dropped" = "Depends-on: #1100" ]; then
+    echo "ok: markers_verify_dropped_repairs (first line of repair = Depends-on: #1100)"
+else
+    echo "FAIL: markers_verify_dropped_repairs — first line of repair body is '$first_line_dropped', expected 'Depends-on: #1100'"
+    FAILED=1
+fi
+
+# 6. End-to-end: repaired body makes condition (6) BLOCK again
+repaired_body_json="$(jq -Rs '{body:.}' < "$rec_dropped" 2>/dev/null)"
+if [ -n "$repaired_body_json" ]; then
+    expect_block 'markers_repaired_body_rearms_cond6' BLOCK \
+        "$(run_isolated "$B6" "$repaired_body_json" '' '')"
+else
+    echo "FAIL: markers_repaired_body_rearms_cond6 — rec_dropped was empty, case 5 must have failed"
+    FAILED=1
+fi
+
+# 7. Inline prose mention counts as dropped (grep -qxF = whole-line match)
+AFTER_BODY_INLINE='{"body":"See Depends-on: #1100 above for context.\n\n## Manual Testing\n..."}'
+out_inline="$(run_markers "$BEFORE_BODY_DROP" "$AFTER_BODY_INLINE")"
+expect_out 'markers_inline_mention_is_dropped' 'BODY_MARKERS=dropped:' "$out_inline"
+
+# 8. No markers => BODY_MARKERS_CAPTURED=0, verdict=none, zero writes
+BODY_NO_MARKERS='{"body":"## Manual Testing\nNo manual testing needed — automated."}'
+out_none="$(run_markers "$BODY_NO_MARKERS" "$BODY_NO_MARKERS")"
+expect_out 'markers_none_no_capture_no_write (captured=0)' 'BODY_MARKERS_CAPTURED=0' "$out_none"
+expect_out 'markers_none_no_capture_no_write (verdict=none)' 'BODY_MARKERS=none' "$out_none"
+rec_none="$BASE_TMP/edit-record"
+if [ ! -s "$rec_none" ]; then
+    echo "ok: markers_none_no_capture_no_write (zero writes)"
+else
+    echo "FAIL: markers_none_no_capture_no_write — spurious repair write on a marker-free body"
+    FAILED=1
+fi
+
+# --- Static assertions on instruction text ----------------------------------
+
+# 5s. Each literal block marker appears exactly once (extract_block latches on first match)
+for m in '# phase 6 body-marker capture' '# phase 6 body-marker verify'; do
+    cnt=$(grep -cF "$m" "$P25_SKILL")
+    if [ "$cnt" -eq 1 ]; then
+        echo "ok: markers_block_markers_unique ($m)"
+    else
+        echo "FAIL: markers_block_markers_unique — '$m' appears $cnt times in $P25_SKILL (expected 1)"
+        FAILED=1
+    fi
+done
+
+# 6s. Both extracted blocks parse as valid shell
+if printf '%s' "$BMC" | bash -n 2>/dev/null; then
+    echo "ok: markers_blocks_parse (capture block)"
+else
+    echo "FAIL: markers_blocks_parse — capture block does not parse as shell"
+    FAILED=1
+fi
+if printf '%s' "$BMV" | bash -n 2>/dev/null; then
+    echo "ok: markers_blocks_parse (verify block)"
+else
+    echo "FAIL: markers_blocks_parse — verify block does not parse as shell"
+    FAILED=1
+fi
+
+# 14s. Re-emit instruction text is present (an agent follows this prose)
+if grep -qF 're-emit every line the capture block printed, verbatim' "$P25_SKILL"; then
+    echo "ok: markers_reemit_prose_present"
+else
+    echo "FAIL: markers_reemit_prose_present — prose 're-emit every line the capture block printed, verbatim' not found in $P25_SKILL"
+    FAILED=1
+fi
+
+# 7s. BMC contains the same regex anchor as pr_dep_holds
+if printf '%s' "$BMC" | grep -qF '^[[:space:]]*depends-on:'; then
+    echo "ok: markers_regex_matches_predicate"
+else
+    echo "FAIL: markers_regex_matches_predicate — BMC does not contain '^[[:space:]]*depends-on:' (must match pr_dep_holds)"
+    FAILED=1
+fi
 
 # --- /plan SKILL.md gate 15 arm 2 + gate 16 shape (d) prose assertions -------
 if grep -qF 'Second arm — unconditional, keyed on the diff rather than on the hold'\''s justification.' "$PLAN_SKILL"; then

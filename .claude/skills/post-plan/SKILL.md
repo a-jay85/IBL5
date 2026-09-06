@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-09-05
+last_verified: 2026-09-06
 ---
 
 # Post-Plan Orchestrator
@@ -302,8 +302,45 @@ Using the Sonnet agent's classifications:
 1. **CLI-executable:** Run directly in the worktree. Fix failures, commit.
 2. **PHPUnit/API-test/E2E-replaceable:** Write the appropriate test type. Fix until green. Do not reclassify as truly manual — if the test is hard to write, that's a reason to spend more effort, not less. After 3 failed attempts, keep the item in the PR description as-is (not reclassified) and note what was tried.
 3. **Truly manual:** Keep in PR description.
-4. **Update PR:** Remove verified/automated steps. If none remain, replace section with: `No manual testing needed — remaining steps were verified by automated checks in Phase 6; <derived clause from Phase 2: either "verification is automated: <comma-separated classes>" or "verification is static; the plan's Verification Matrix has no executable rows">` — use the same class list derived in Phase 2 step 3; do not invent a class absent from the Verification Matrix. Apply: `gh pr edit --body "<updated>"` This `No manual testing needed` sentinel is exactly what **feeds Phase 6.5 condition (1)** (`pr_manual_testing_clearance`) to clear the manual-testing gate — if this write is skipped or reworded, condition (1) holds the PR for human review. Regenerate the `<!-- files-changed:begin -->` / `<!-- files-changed:end -->` block (Phase 2) as part of this same `gh pr edit --body` write — one write, block refreshed last, so the manual-testing sentinel above and the block cannot fight over the body.
-5. **Checkpoint:** If any new tests were written or files modified, commit and push before continuing to Phase 6.5.
+4. **Update PR:** Remove verified/automated steps. If none remain, replace section with: `No manual testing needed — remaining steps were verified by automated checks in Phase 6; <derived clause from Phase 2: either "verification is automated: <comma-separated classes>" or "verification is static; the plan's Verification Matrix has no executable rows">` — use the same class list derived in Phase 2 step 3; do not invent a class absent from the Verification Matrix.
+
+   **Capture preserved markers FIRST.** Earlier phases write body lines that later gates read; composing a fresh body drops them. Run this block before composing, and treat its stdout as literal text to re-emit:
+
+```bash
+# phase 6 body-marker capture
+MARKERS_FILE="${MARKERS_FILE:-/tmp/post-plan-body-markers-$PPID}"
+gh pr view --json body --jq '.body' > "$MARKERS_FILE.body" 2>/dev/null || : > "$MARKERS_FILE.body"
+awk '
+  tolower($0) ~ /^[[:space:]]*depends-on:/ { print; next }
+  /<!--[[:space:]]*no-adr:/                { inc=1 }
+  /<!--[[:space:]]*no-refactor-tests:/     { inc=1 }
+  inc { print; if ($0 ~ /-->/) inc=0 }
+' "$MARKERS_FILE.body" > "$MARKERS_FILE"
+echo "BODY_MARKERS_CAPTURED=$(grep -c . "$MARKERS_FILE" 2>/dev/null || echo 0)"
+cat "$MARKERS_FILE"
+```
+
+   Apply: `gh pr edit --body "<updated>"` — and **re-emit every line the capture block printed, verbatim, each on its own line, at the TOP of the new body**, above the `## ` sections and **outside** the `<!-- files-changed:begin -->` / `<!-- files-changed:end -->` pair (anything between those markers is destroyed on the next regeneration, and `Depends-on:` must stay start-of-line-anchored for `pr_dep_holds`). Never paraphrase, re-wrap, or reconstruct a captured line — `bin/adr-check` and `bin/refactor-flag` enforce minimum reason lengths on their bypass comments, so a reconstruction can fail their check even when the intent survives. This `No manual testing needed` sentinel is exactly what **feeds Phase 6.5 condition (1)** (`pr_manual_testing_clearance`) to clear the manual-testing gate — if this write is skipped or reworded, condition (1) holds the PR for human review. Regenerate the `<!-- files-changed:begin -->` / `<!-- files-changed:end -->` block (Phase 2) as part of this same `gh pr edit --body` write — **one write on the normal path**, block refreshed last, so the manual-testing sentinel above and the block cannot fight over the body. The verify block below adds a **second, conditional** write only when a captured marker was actually dropped; when nothing was dropped it writes nothing, so the one-write property holds for every non-defective run.
+5. **Verify markers survived (self-heal):** the write above is composed by an agent, so verify it mechanically rather than trusting it. Run:
+
+```bash
+# phase 6 body-marker verify
+MARKERS_FILE="${MARKERS_FILE:-/tmp/post-plan-body-markers-$PPID}"
+if [ ! -s "$MARKERS_FILE" ]; then echo "BODY_MARKERS=none"; exit 0; fi
+NEW=$(gh pr view --json body --jq '.body' 2>/dev/null)
+DROPPED=""
+while IFS= read -r line; do
+  [ -n "$line" ] || continue
+  printf '%s\n' "$NEW" | grep -qxF "$line" || DROPPED="${DROPPED}${line}"$'\n'
+done < "$MARKERS_FILE"
+if [ -z "$DROPPED" ]; then echo "BODY_MARKERS=preserved"; exit 0; fi
+{ printf '%s\n' "$DROPPED"; printf '%s\n' "$NEW"; } > "$MARKERS_FILE.repair"
+gh pr edit --body-file "$MARKERS_FILE.repair"
+echo "BODY_MARKERS=dropped:$(printf '%s' "$DROPPED" | tr '\n' ' ' | sed 's/  *$//')"
+```
+
+   Exactly one verdict line is emitted: `BODY_MARKERS=none` (nothing to preserve), `BODY_MARKERS=preserved` (normal path, zero extra writes), or `BODY_MARKERS=dropped:<lines>` (the rewrite lost a marker; the block has already re-applied it by prepending to the live body). A `dropped:` verdict is not an error to report and stop on — the repair has landed — but do note it in the run log, because it means the composed body was defective.
+6. **Checkpoint:** If any new tests were written or files modified, commit and push before continuing to Phase 6.5.
 
 ---
 

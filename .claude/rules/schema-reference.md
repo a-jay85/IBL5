@@ -1,7 +1,7 @@
 ---
 description: Canonical database schema reference; full current DDL lives in ibl5/docs/schema/current-schema.sql.
 paths: ibl5/docs/schema/current-schema.sql
-last_verified: 2026-07-07
+last_verified: 2026-09-06
 ---
 
 # Database Schema Reference
@@ -49,9 +49,9 @@ $query = "SELECT * FROM vw_player_current WHERE uuid = ?";
 ```
 
 ## API-Ready Features
-- **Timestamps:** 19 tables have `created_at`, `updated_at`
-- **UUIDs:** 5 critical tables for secure public IDs
-- **Views:** `vw_player_current`, `vw_team_standings`, `vw_game_schedule`, `vw_player_stats_summary`, `vw_trade_history`, `vw_team_awards`, `vw_franchise_summary`
+- **Timestamps:** 30 tables have `created_at`, `updated_at`
+- **UUIDs:** 11 tables carry a `uuid` column (including 2 backup tables)
+- **Views:** `vw_player_current`, `vw_team_standings`, `vw_schedule_upcoming`, `vw_player_career_stats`, `vw_team_awards`, `vw_franchise_summary`
 
 ## Foreign Key Relationships
 - `ibl_draft_picks.tid` -> `ibl_team_info.teamid`

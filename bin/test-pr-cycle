@@ -256,6 +256,7 @@ run_in() {
     # unset (seam absent) from empty (seam present but blank) — `env VAR=$X` cannot express that.
     local -a extra=()
     [[ -n "${RESCUE+x}" ]] && extra+=("PR_CYCLE_RESCUE=$RESCUE")
+    [[ -n "${SKIPARM+x}" ]] && extra+=("PR_CYCLE_SKIP_READY_WHEN_ARMABLE=$SKIPARM")
     ERR="$SCRATCH/last.err"
     OUT="$(cd "$cwd" && env HOME="$SCRATCH" PATH="$BIN:$PATH" "${extra[@]+"${extra[@]}"}" \
         PR_CYCLE_ATTACK_CMD="$BIN/attack" \
@@ -277,6 +278,9 @@ run_in() {
 run() { run_in "$REPO" "$@"; }
 
 calls() { wc -l < "$SCRATCH/$1.argv" | tr -d ' '; }
+# Count of triage invocations that actually ARM. The read-only pre-read shares this shim,
+# so a bare `calls triage` no longer distinguishes "did not arm" from "did not run".
+arm_calls() { grep -c -- '--arm' "$SCRATCH/triage.argv" 2>/dev/null || true; }
 ledger() { cat "$SCRATCH/IBL5-merge-digest.md" 2>/dev/null; }
 rows() { grep -c '^- \[ \] #' "$SCRATCH/IBL5-merge-digest.md" 2>/dev/null || echo 0; }
 
@@ -291,6 +295,10 @@ for f in -- --go --dry-run --stop --no-dm --max-merges --only --skip --help; do
     [[ "$f" == "--" ]] && continue
     grep -qF -- "$f" <<< "$OUT" || fail "--help omits $f"
 done
+grep -qF 'PR_CYCLE_SKIP_READY_WHEN_ARMABLE' <<< "$OUT" \
+    || fail "--help omits the PR_CYCLE_SKIP_READY_WHEN_ARMABLE seam"
+grep -qF 'PR_CYCLE_LOG' <<< "$OUT" \
+    || fail "--help truncated: the trailing PR_CYCLE_LOG seam line is missing"
 for bad in "--nope" "--max-merges 0" "--max-merges -1" "--max-merges abc" "--max-merges" "--go --stop" \
            "--only" "--only abc" "--only 0" "--only 007" "--only -1" "--only 101 --skip 102" \
            "--skip" "--skip abc" "--skip 1,x"; do
@@ -454,7 +462,7 @@ echo 0 > "$SCRATCH/ready-rc"
 run --worker
 [[ $RC -eq 1 ]] || fail "timeout should halt with 1, got $RC"
 [[ "$(calls ready)" == "1" ]] || fail "timeout should stop after one ready, got $(calls ready)"
-[[ "$(calls triage)" == "0" ]] || fail "timeout still armed"
+[[ "$(arm_calls)" == "0" ]] || fail "timeout still armed"
 end_case "case 9 wait timeout"
 
 # ==========================================================================================
@@ -467,7 +475,7 @@ echo ': > "$S/.ibl5-pr-cycle.stop"' > "$SCRATCH/ready-hook"
 run --worker
 [[ $RC -eq 0 ]] || fail "a stop is an intended termination, want 0, got $RC"
 [[ "$(calls ready)" == "1" ]] || fail "want 1 ready before the stop, got $(calls ready)"
-[[ "$(calls triage)" == "0" ]] || fail "arm ran despite the stop file"
+[[ "$(arm_calls)" == "0" ]] || fail "arm ran despite the stop file"
 end_case "case 10 stop during readying"
 
 # ==========================================================================================
@@ -554,6 +562,9 @@ begin_case
 reset_state
 printf '%s' "$ATTACK_EXCLUDED" > "$SCRATCH/attack-out"
 triage_report "101 ARMABLE merge" > "$SCRATCH/triage-out"
+# Call 1 is the read-only pre-read for #101; keep it non-ARMABLE so the ready run this
+# case counts still happens. Call 2 (the arm) falls back to the ARMABLE report above.
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out-1"
 echo MERGED > "$SCRATCH/state-101"
 view_json 101 "$(digest_comment)" > "$SCRATCH/view-101.json"
 run --worker --max-merges 1
@@ -690,6 +701,7 @@ reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
 triage_report "101 ARMABLE armed" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
     > "$SCRATCH/triage-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out-1"
 echo CLOSED > "$SCRATCH/state-101"
 run --worker
 [[ $RC -eq 0 ]] || fail "CLOSED should not halt, got $RC"
@@ -740,6 +752,7 @@ reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
 triage_report "101 ARMABLE armed" "102 ARMABLE armed" "103 NEEDS-WORK rebase" \
     > "$SCRATCH/triage-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out-1"
 echo MERGED > "$SCRATCH/state-101"
 echo MERGED > "$SCRATCH/state-102"
 printf '%s' "$(view_json 101 "$(digest_comment)")" > "$SCRATCH/view-101.json"
@@ -755,9 +768,12 @@ grep -qF 'merge cap' <<< "$OUT" || fail "cap termination not reported"
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
 # One PR becomes ARMABLE per iteration, so the cap has to survive two full rounds.
-triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out-1"
-triage_report "102 ARMABLE armed" > "$SCRATCH/triage-out-2"
-triage_report "103 ARMABLE armed" > "$SCRATCH/triage-out"
+# Two triage calls per iteration now: odd = the read-only pre-read, even = the arm.
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out-1"
+triage_report "101 ARMABLE armed"     > "$SCRATCH/triage-out-2"
+triage_report "102 NEEDS-WORK rebase" > "$SCRATCH/triage-out-3"
+triage_report "102 ARMABLE armed"     > "$SCRATCH/triage-out-4"
+triage_report "103 ARMABLE armed"     > "$SCRATCH/triage-out"
 echo MERGED > "$SCRATCH/state-101"
 echo MERGED > "$SCRATCH/state-102"
 echo MERGED > "$SCRATCH/state-103"
@@ -775,7 +791,9 @@ reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
 triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
     > "$SCRATCH/triage-out"
-echo ': > "$S/.ibl5-pr-cycle.stop"' > "$SCRATCH/triage-hook-1"
+# hook-2, not hook-1: call 1 is now the read-only pre-read. The stop must be created
+# during the ARM, so the halt is caught at the top of the next iteration.
+echo ': > "$S/.ibl5-pr-cycle.stop"' > "$SCRATCH/triage-hook-2"
 run --worker
 [[ $RC -eq 0 ]] || fail "stop between iterations exit $RC, want 0"
 [[ "$(calls ready)" == "1" ]] || fail "want 1 ready before the stop, got $(calls ready)"
@@ -862,6 +880,8 @@ grep -qF "log=/tmp/pr-cycle-$TSPIN.log" <<< "$OUT" || fail "--go did not print t
 bash -n "$RUNNER" || fail "runner does not parse"
 grep -qF -- '--worker' "$RUNNER" || fail "runner does not carry --worker"
 grep -qF "NO_DM=''" "$RUNNER" || fail "runner NO_DM not empty by default"
+grep -qE '^export PR_CYCLE_SKIP_READY_WHEN_ARMABLE=' "$RUNNER" \
+    || fail "runner does not export the ARMABLE-skip seam"
 
 rm -f "$RUNNER" "$PLIST"
 PR_CYCLE_DRY_LAUNCH=1 TSPIN="$TSPIN" run --go --no-dm
@@ -1160,6 +1180,102 @@ awk '/^_arm_and_classify\(\) \{/ { print; print "    _pr_allowed \"$1\" || retur
 g_scope_selection_only "$SCRATCH/mutant" \
     && fail "vacuous: g_scope_selection_only passed a scope filter inside _arm_and_classify"
 end_case "case 26 guards are not vacuous"
+
+# ==========================================================================================
+# 27 — the already-ARMABLE pr-ready skip: it fires, it is selective, and it does not halt
+# ==========================================================================================
+# 27a (Case A) — a pre-read that reports ARMABLE declines the readying session entirely,
+# and the PR still proceeds through arming, polling and the ledger.
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+echo MERGED > "$SCRATCH/state-101"
+printf '%s' "$(view_json 101 "$(digest_comment)")" > "$SCRATCH/view-101.json"
+run --worker
+[[ $RC -eq 0 ]] || fail "ARMABLE skip: exit $RC, want 0"
+[[ "$(calls ready)" == "0" ]] || fail "ARMABLE skip: pr-ready ran $(calls ready) time(s), want 0"
+grep -qF '#101 — already ARMABLE, skipping pr-ready' <<< "$OUT" \
+    || fail "ARMABLE skip: the skip log line is missing"
+[[ "$(arm_calls)" == "1" ]] || fail "ARMABLE skip: want 1 arm, got $(arm_calls)"
+[[ "$(rows)" == "1" ]] || fail "ARMABLE skip: the skipped PR was not ledgered"
+
+# 27b (Case B) — a non-ARMABLE pre-read leaves the readying session untouched.
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+run --worker
+[[ "$(calls ready)" == "1" ]] || fail "non-ARMABLE: want 1 ready call, got $(calls ready)"
+grep -qF 'skipping pr-ready' <<< "$OUT" && fail "non-ARMABLE: the skip fired anyway"
+
+# 27c (Case C) — the skip sets no HALT and breaks no loop: three ARMABLE PRs are all
+# reached, all armed, and none of them ever runs pr-ready.
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" "102 ARMABLE armed" "103 ARMABLE armed" \
+    > "$SCRATCH/triage-out"
+run --worker
+[[ $RC -eq 0 ]] || fail "three skips: exit $RC, want 0"
+[[ "$(calls ready)" == "0" ]] || fail "three skips: pr-ready ran $(calls ready) time(s), want 0"
+for p in 101 102 103; do
+    grep -qF -- "--- #$p" <<< "$OUT" || fail "three skips: the loop never reached #$p"
+    grep -qF "#$p — already ARMABLE, skipping pr-ready" <<< "$OUT" \
+        || fail "three skips: no skip line for #$p"
+done
+[[ "$(arm_calls)" == "3" ]] || fail "three skips: want 3 arms, got $(arm_calls)"
+end_case "case 27 already-ARMABLE skip"
+
+# ==========================================================================================
+# 28 — the skip's opt-out and its fail-toward-running-pr-ready paths
+# ==========================================================================================
+# 28a — the rejected form: PR_CYCLE_SKIP_READY_WHEN_ARMABLE=0 restores the old behaviour.
+begin_case
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+SKIPARM=0 run --worker
+[[ $RC -eq 0 ]] || fail "opt-out: exit $RC, want 0"
+[[ "$(calls ready)" == "1" ]] || fail "opt-out: want 1 ready call, got $(calls ready)"
+grep -qF 'skipping pr-ready' <<< "$OUT" && fail "opt-out: the skip fired with the seam at 0"
+
+# 28b — an empty seam behaves exactly like an unset one, i.e. the skip stays ON. This is
+# what pins the driver's test to `!= "0"`; a `= "1"` test would fail here.
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+SKIPARM="" run --worker
+[[ "$(calls ready)" == "0" ]] \
+    || fail "empty seam disabled the skip: $(calls ready) ready call(s), want 0"
+unset SKIPARM
+
+# 28c — a non-zero exit from the pre-read falls through to pr-ready, sets no HALT, and
+# lets the iteration finish. Only call 1 (the pre-read) fails; the arm still succeeds.
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+echo 2 > "$SCRATCH/triage-rc-1"
+run --worker
+[[ $RC -eq 0 ]] || fail "pre-read failure: exit $RC, want 0"
+[[ "$(calls ready)" == "1" ]] || fail "pre-read failure did not fall through to pr-ready"
+grep -qF 'skipping pr-ready' <<< "$OUT" && fail "pre-read failure still skipped"
+[[ "$(arm_calls)" == "1" ]] || fail "pre-read failure cost the arm call"
+
+# 28d — a report that carries no row for this PR reads as an empty bucket, so pr-ready runs.
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "999 ARMABLE armed" > "$SCRATCH/triage-out"
+run --worker
+[[ "$(calls ready)" == "1" ]] || fail "absent row: want 1 ready call, got $(calls ready)"
+grep -qF 'skipping pr-ready' <<< "$OUT" && fail "absent row still skipped"
+
+# 28e — boundary: the PR column is matched whole, so #1010's row must not satisfy #101.
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "1010 ARMABLE armed" "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+run --worker
+[[ "$(calls ready)" == "1" ]] || fail "prefix row: #1010 was read as #101's bucket"
+grep -qF 'skipping pr-ready' <<< "$OUT" && fail "prefix row triggered the skip"
+end_case "case 28 skip opt-out and fail-open paths"
 
 # ==========================================================================================
 # 29 — CI actually runs this harness

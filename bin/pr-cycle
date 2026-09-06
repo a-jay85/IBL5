@@ -49,6 +49,8 @@
 #   PR_CYCLE_POLL_INTERVAL   Seconds between merge polls.     Default: 60
 #   PR_CYCLE_POLL_CEILING    Seconds to wait per PR.          Default: 2700
 #   PR_CYCLE_RESCUE          0 disables DIRTY-PR rescue.      Default: 1 (enabled)
+#   PR_CYCLE_SKIP_READY_WHEN_ARMABLE
+#                            0 disables the already-ARMABLE pr-ready skip. Default: 1 (enabled)
 #   PR_CYCLE_LEDGER          Merge digest ledger path.        Default: $HOME/IBL5-merge-digest.md
 #   PR_CYCLE_STOP_FILE       Stop file path.                  Default: $HOME/.ibl5-pr-cycle.stop
 #   PR_CYCLE_NOW             Pin the ledger timestamp (tests). Unset = current UTC time.
@@ -109,6 +111,7 @@ PR_CYCLE_MAIN_CHECKOUT="${PR_CYCLE_MAIN_CHECKOUT:-/Users/ajaynicolas/GitHub/IBL5
 PR_CYCLE_POLL_INTERVAL="${PR_CYCLE_POLL_INTERVAL:-60}"
 PR_CYCLE_POLL_CEILING="${PR_CYCLE_POLL_CEILING:-2700}"
 PR_CYCLE_RESCUE="${PR_CYCLE_RESCUE:-1}"
+PR_CYCLE_SKIP_READY_WHEN_ARMABLE="${PR_CYCLE_SKIP_READY_WHEN_ARMABLE:-1}"
 PR_CYCLE_LEDGER="${PR_CYCLE_LEDGER:-$HOME/IBL5-merge-digest.md}"
 PR_CYCLE_STOP_FILE="${PR_CYCLE_STOP_FILE:-$HOME/.ibl5-pr-cycle.stop}"
 PR_CYCLE_NOW="${PR_CYCLE_NOW:-}"
@@ -471,6 +474,23 @@ _slot_held() {
 # Phase 3 — ready, then arm
 # ==========================================================================================
 
+# _precheck_bucket N — echo PR N's current bucket, or "" when it cannot be determined.
+# Read-only: this invocation deliberately omits --arm, so it reports and changes nothing.
+# Never sets HALT and never returns non-zero: an unknown bucket must fall through to the
+# normal readying path, so every failure mode here degrades to "" (= do not skip).
+_precheck_bucket() {
+    _pn="$1"
+    set +e
+    "$PR_CYCLE_TRIAGE_CMD" > "$RUNDIR/precheck-$_pn.txt" 2> "$RUNDIR/precheck-$_pn.err"
+    _prc=$?
+    set -e
+    [ "$_prc" -ne 0 ] && { echo ""; return 0; }
+    # Fixed-width columns separated by 2+ spaces — the consumer contract documented in
+    # bin/pr-triage. exit after the first match: one row per PR.
+    awk -F"  +" -v pr="#$_pn" '$1 == pr { print $2; exit }' "$RUNDIR/precheck-$_pn.txt"
+    return 0
+}
+
 # _ready_pr N — run one readying session to completion. Returns non-zero (with HALT set)
 # on failure OR on a --wait timeout.
 _ready_pr() {
@@ -811,7 +831,20 @@ _worker() {
         echo "$_n" >> "$RUNDIR/tried.txt"
         echo "--- #$_n (needs you? ${ATTACK_NEEDS:-?})"
 
-        _ready_pr "$_n" || break
+        # A PR already in the terminal bucket has nothing left for a readying session to
+        # do, so decline the 20-40 minute run. Fails toward running it: an empty or
+        # unknown bucket, a non-zero triage exit, or a closed PR all read as "".
+        _skip_ready=0
+        if [ "$PR_CYCLE_SKIP_READY_WHEN_ARMABLE" != "0" ]; then
+            _pre="$(_precheck_bucket "$_n")"
+            if [ "$_pre" = "ARMABLE" ]; then
+                _skip_ready=1
+                echo "#$_n — already ARMABLE, skipping pr-ready"
+            fi
+        fi
+        if [ "$_skip_ready" -eq 0 ]; then
+            _ready_pr "$_n" || break
+        fi
         _arm_and_classify "$_n" || break
 
         if [ "$BUCKET" = "ARMABLE" ]; then
@@ -979,7 +1012,7 @@ _launch() {
         for _v in PR_CYCLE_ATTACK_CMD PR_CYCLE_TRIAGE_CMD PR_CYCLE_READY_CMD \
                   PR_CYCLE_DM_CMD PR_CYCLE_GH_CMD PR_CYCLE_MAIN_CHECKOUT \
                   PR_CYCLE_POLL_INTERVAL PR_CYCLE_POLL_CEILING \
-                  PR_CYCLE_RESCUE \
+                  PR_CYCLE_RESCUE PR_CYCLE_SKIP_READY_WHEN_ARMABLE \
                   PR_CYCLE_LEDGER PR_CYCLE_STOP_FILE; do
             eval "_val=\${$_v}"
             printf 'export %s=%q\n' "$_v" "$_val"

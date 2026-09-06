@@ -49,7 +49,7 @@ last_verified: 2026-09-06
 | L20 | post-plan body-rewrite clobbers `Depends-on:`, bypassing arm condition (6) | ✅ Implemented (2026-09-06) | — | M |
 | L21 | Phase 5.0 parsers fail-open on an unclosed code fence (conformance check covers nothing) | ⬜ Open | 🟥 | S |
 | L22 | Sweep queue-vs-review disposition gates across other skills/scripts | ✅ Implemented | — | S |
-| L51 | Archive closure Status line can assert full sweep completion while named candidate sites lack documented dispositions, creating a permanently false record | ⬜ Open | 🟥 | S |
+| L54 | Archive closure Status line can assert full sweep completion while named candidate sites lack documented dispositions, creating a permanently false record | ⬜ Open | 🟥 | S |
 | L23 | sim-recap degraded path emits no Discord signal; qctx() failure ships roster-blind with CI green | 📋 Planned | 🟦 | S |
 | L24 | Phase 5.0 conformance is path-level only; planned method names absent from diff pass undetected | ✅ Implemented | — | S |
 | L25 | CI-wiring gap: matrix CLI-executable rows may live in jobs the PR's own path filters never trigger | ✅ Implemented | — | S |
@@ -81,6 +81,7 @@ last_verified: 2026-09-06
 | L51 | Plan Phase 5 dry-run count propagated to archive only, not PR body; reviewer blast-radius instruction stale by ~23% | ⬜ Open | 🟦 | S |
 | L52 | Test harness case comment over-claims assertion scope; adjacent cases leave `run_block` exit codes unchecked | ✅ fixed this pass | — | S |
 | L53 | Phase 2 test code lost in branch rebuild — invisible because CI passed without the tests | ✅ fixed this pass | — | S |
+| L55 | PR body mislabels Phase 6.5 remediation artifacts; new backlog entry inserted contextually collides with master's concurrent sequence advance | ✅ fixed this pass | 🟥 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -748,7 +749,7 @@ Landing rung: **no gate warranted** — neither occurrence exists in the tree af
 **provenance:** (discovered 2026-09-05 during #2108)
 
 **Status (2026-09-05):** ✅ moot — harness retired this PR.
-### L51 Archive closure Status line can assert full sweep completion while named candidate sites lack documented dispositions
+### L54 Archive closure Status line can assert full sweep completion while named candidate sites lack documented dispositions
 
 *(discovered 2026-09-05 via PR #2040 Phase 6 plan-intent fidelity review)*
 
@@ -784,6 +785,31 @@ Landing rung: **no gate warranted** — neither occurrence exists in the tree af
 **provenance:** (discovered 2026-09-06 during #2141)
 
 **Status (2026-09-06):** ✅ fixed this pass — 🟦.
+
+---
+
+### L55 PR body mislabels Phase 6.5 remediation artifacts; new backlog entry inserted contextually collides with master's concurrent sequence advance
+
+*(discovered 2026-09-06 during #2040)*
+
+**class:** A Phase 6.5 remediation that (a) inserts a new backlog entry adjacent to a thematically related entry rather than at the end of the numeric sequence, producing an ID collision when master concurrently assigns the same number; and (b) describes the new entry in the PR body Scope prose with the wrong artifact form and wrong defect class, making the actual artifacts invisible to a reviewer reading the body.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/docs/backlog/loop-engineering-backlog.md:52` (L51 contextual insert, renumbered L54) | yes | yes | fixed this pass |
+| 2 | `#2040 PR body Scope prose` (L51 labeled as class-registry row with wrong defect class) | yes | yes | fixed this pass |
+
+**prevention_ladder:**
+- rung 0 — `bin/check-numbering` (existing CI gate) already caught the ID collision (finding a). Phase 6 check 4 (existing gate) already caught the body misdescription (finding b). Landing rung is **0 — already covered by existing gates.**
+- rungs 1-5 — superseded by rung 0. Note: `_remediation.md` step 4 already says "read the last row's ID and increment"; a more explicit position instruction (end of sequence, not mid-table) would reinforce it without a new gate.
+
+**artifact destination:** n/a — no gate
+
+**provenance:** (discovered 2026-09-06 during #2040)
+
+**Status (2026-09-06):** ✅ fixed this pass — 🟥.
 
 ---
 

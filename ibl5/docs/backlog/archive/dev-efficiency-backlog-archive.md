@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed development-efficiency backlog entries, extracted from dev-efficiency-backlog.md.
-last_verified: 2026-09-05
+last_verified: 2026-09-06
 ---
 
 # Development-Efficiency Backlog — Archive
@@ -352,3 +352,11 @@ compares HEAD against the branch tip preceding the most recent history rewrite a
 stops the run when no branch-changed path survives.
 
 **Status (2026-09-05):** ✅ Implemented.
+
+### E4 Flake-quarantine ledger
+**Location:** E2E CI (`.github/workflows/`) — no quarantine mechanism (verified; "flake" mentions are VR-specific).
+**Problem:** Specs that pass only on retry are invisible until a red run poison-pills the nightly queue (the post-plan skip-on-red behavior exists because of this).
+**Suggested direction:** Auto-detect passed-on-retry specs from Playwright reports, log them to a ledger, and report a quarantine list for triage.
+**Risk if untouched:** Recurring lost nights; flake debt accumulates unmeasured.
+**What shipped:** `ibl5/bin/parse-playwright-flakes` extracts passed-on-retry specs from the merged Playwright JSON in `e2e-tests.yml`'s `merge-reports` job into a rolling `flake-ledger` artifact (90-day retention). `.github/workflows/flake-report.yml` (Sunday 13:43 UTC cron) downloads the latest ledger, runs `ibl5/bin/flake-ledger-report`, and DMs specs that flaked in ≥3 distinct runs via the existing `.github/actions/notify-discord` composite. Policy is **report-only**: nothing is auto-skipped or auto-retried.
+**Status (2026-09-06):** ✅ Implemented — shipped in e2e-flake-quarantine-ledger.

@@ -101,7 +101,7 @@ class WaiversController implements WaiversControllerInterface
             return;
         }
 
-        $season = $this->season ?? new Season($this->db);
+        $season = ($this->season ??= new Season($this->db));
 
         if (!$season->areWaiversAllowed()) {
             \PageLayout\PageLayout::header();

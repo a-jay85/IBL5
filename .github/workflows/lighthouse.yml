@@ -72,15 +72,20 @@ jobs:
           # pull_request fetches refs/pull/N/merge, so refs/remotes/origin/*
           # never exists here. Same base ref the `changes` job diffs against.
           CHANGED=$(git -C "$GITHUB_WORKSPACE" diff --name-only \
-            "${{ github.event.pull_request.base.sha }}"...HEAD)
-          URLS=$(printf '%s\n' "$CHANGED" \
-            | ../bin/lighthouse-pr-urls --stdin --json --base-url=http://localhost:8080)
-          jq --argjson urls "$URLS" \
-             '.ci.collect.url = $urls' .lighthouserc.json > /tmp/lhrc.pr.json
+            "$BASE_SHA"...HEAD)
+          if [ -n "$CHANGED" ]; then
+            URLS=$(printf '%s\n' "$CHANGED" \
+              | ../bin/lighthouse-pr-urls --stdin --json --base-url=http://localhost:8080)
+            jq --argjson urls "$URLS" \
+               '.ci.collect.url = $urls' .lighthouserc.json > /tmp/lhrc.pr.json
+          else
+            cp .lighthouserc.json /tmp/lhrc.pr.json
+          fi
           bunx @lhci/cli autorun --config=/tmp/lhrc.pr.json
         env:
           LHCI_GITHUB_APP_TOKEN: ${{ secrets.LHCI_GITHUB_APP_TOKEN }}
           CHROME_PATH: /usr/bin/google-chrome-stable
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
 
       # autorun's upload step uses temporary-public-storage (writes links.json
       # only). The comment formatter also needs manifest.json — emit it via a

@@ -1,6 +1,6 @@
 ---
-description: /pr-ready runtime Phase 7 — arm-hold evaluation, sticky verdict comment, hard terminator. Loaded by SKILL.md via git show at Phase 7.
-last_verified: 2026-09-04
+description: /pr-ready runtime Phase 7 — arm-hold evaluation, provenance line, sticky verdict comment, hard terminator. Loaded by SKILL.md via git show at Phase 7.
+last_verified: 2026-09-06
 ---
 
 # /pr-ready runtime Phase 7 — holds, sticky verdict, terminator
@@ -19,7 +19,15 @@ Read at runtime via `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase7-verdi
 
    Report each predicate's result as one line in the verdict. These are **advisory inputs to the human's merge decision** — `/pr-ready` never arms auto-merge and never merges.
 
-2. **Post the sticky verdict.** Marker, placed as the **last line of the body** so an update matches:
+2. **Capture the provenance triple — one Bash call, before composing anything.**
+
+   ```bash
+   git rev-parse --short=12 HEAD && git rev-parse --short=12 <MASTER_SHA> && date -u "+%Y-%m-%dT%H:%MZ"
+   ```
+
+   Three printed values, three uses — record each as a **literal**; like every other capture in this skill they do not survive into the next Bash call. Both SHAs come back already 12 characters, so nothing is hand-truncated: `<MASTER_SHA>` is the 40-char Phase 1.3 pin and the short form the line needs is derived here, not sliced by eye. `HEAD` is the branch head *after* any Phase 6.5 remediation push, which is exactly the commit this verdict describes. Run this at Phase 7 entry, not earlier — a SHA carried in from Phase 4.5 or Phase 5.9 predates remediation and would name a commit the verdict does not describe.
+
+3. **Post the sticky verdict.** Marker, placed as the **last line of the body** so an update matches:
 
    `<!-- pr-ready-verdict -->`
 
@@ -40,6 +48,16 @@ Read at runtime via `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase7-verdi
 
    `git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/post-verdict.sh > /tmp/pr-ready-post-<N>.sh && test -s /tmp/pr-ready-post-<N>.sh && bash /tmp/pr-ready-post-<N>.sh <N> <slug>`
 
+   **Provenance line — the first line of the body, above every heading.** Emit exactly one line, in backticks, using the three literals captured in step 2:
+
+   ```
+   `covers head <SHORT_HEAD_SHA> · master <SHORT_MASTER_SHA> · written <UTC>`
+   ```
+
+   Separator is the middle dot `·` (U+00B7). Use the 12-char short forms of both SHAs — the short form is what a reader compares against the PR's own head display. This line is a **freshness field, not decoration**: the sticky comment is edited in place, so GitHub renders it at its *original* timeline position forever, above every commit that has landed since — and commits routinely land after a run ends (PR #2083: verdict written, then six further commits including two `master` merges, comment untouched). Without this line neither a human reader nor a later pass can tell whether the verdict still describes the current head. Nothing in this skill re-posts or re-edits the comment to keep it current, and the stop-at-verdict invariant forbids a second comment; the line makes the staleness **legible** instead of pretending it does not exist.
+
+   It sits above `### Rebase` deliberately. `bin/pr-cycle`'s `_digest_labels` (grep the symbol) activates only inside the digest block — between that block's heading and the next heading or horizontal rule — and there folds any line lacking a `**Label:**` prefix onto the preceding label's value, so a provenance line placed in or after the digest block would silently corrupt the merge-digest ledger row. Above the first heading it is outside every parser.
+
    Comment body sections, in order: **rebase result** (the master SHA used, conflicts resolved), **CI result**, **files-changed refresh** (the Phase 5.9 `FILES-CHANGED:` line verbatim — `REPLACED` / `APPENDED` / `UNCHANGED` / `AMBIGUOUS`, with its file count and `+added -removed` delta; on `AMBIGUOUS`, state that the body was left untouched and that the markers need repair), **plan-fidelity verdict**, **merge digest** (the `### Merge digest` block, below), **remediation** (what Phase 6.5 fixed, each backlog item filed with its file and ID, anything left `not fixed — filed`, and the post-remediation CI result), **hold predicates**, and one explicit **READY / NOT READY** line — the last reflecting the state *after* remediation, not the Phase 6 findings. If any include was loaded by the declared fallback rather than from the pin, say so here — one `include-source:` line — so the verdict states which revision of its own procedure it followed. The files-changed block reflects the diff as of Phase 5.9. If Phase 6.5 pushed remediation commits after it, say so on the refresh line — the block is one commit behind by design, and the next `/post-plan` body write regenerates it. Never open a second body edit to catch it up.
 
    **`### Merge digest` block — fixed shape.** Emit the literal heading `### Merge digest` on
@@ -55,4 +73,4 @@ Read at runtime via `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase7-verdi
    required, an omitted block is not acceptable. `<!-- pr-ready-verdict -->` remains the last
    line of the body, after the READY / NOT READY line — the digest never displaces it.
 
-3. **STOP — hard terminator.** The run ends at the posted-or-updated comment. No merge. No auto-merge arming. No `/backlog-housekeep` chain beyond the row and `last_verified` bump Phase 6.5 already filed. No `/post-plan` chain. No worktree teardown. No second comment. The user reviews every PR deliberately. One amendment: after the verdict comment is posted, when Phase 6 determined a structured code review is owed and no `/pr-review` slot is already live for this PR, fire it detached — `git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/review-owed.sh > /tmp/pr-ready-owed-<N>.sh && test -s /tmp/pr-ready-owed-<N>.sh && bash /tmp/pr-ready-owed-<N>.sh <N>` — and record the printed `REVIEW-OWED:` line. That script reads the `REVIEW-COVERAGE:` marker Phase 6 wrote and fires only on `NONE`, `STALE` or `UNKNOWN`, never on `CURRENT`. This is the one new permitted action; everything the invariant still forbids stays forbidden — no merge, no auto-merge arming, no `/backlog-housekeep` chain beyond the row and `last_verified` bump Phase 6.5 already filed, no `/post-plan` chain, no worktree teardown, no second comment. The fire is detached and fire-and-forget: never wait on it, never read its log, never let it extend this run. `scripts/review-owed.sh` is the only channel — `/pr-ready` carries `disallowed-tools: [EnterPlanMode, ExitPlanMode, Skill]` and cannot call `Skill` at all, so the launcher is reached through Bash.
+4. **STOP — hard terminator.** The run ends at the posted-or-updated comment. No merge. No auto-merge arming. No `/backlog-housekeep` chain beyond the row and `last_verified` bump Phase 6.5 already filed. No `/post-plan` chain. No worktree teardown. No second comment. The user reviews every PR deliberately. One amendment: after the verdict comment is posted, when Phase 6 determined a structured code review is owed and no `/pr-review` slot is already live for this PR, fire it detached — `git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/review-owed.sh > /tmp/pr-ready-owed-<N>.sh && test -s /tmp/pr-ready-owed-<N>.sh && bash /tmp/pr-ready-owed-<N>.sh <N>` — and record the printed `REVIEW-OWED:` line. That script reads the `REVIEW-COVERAGE:` marker Phase 6 wrote and fires only on `NONE`, `STALE` or `UNKNOWN`, never on `CURRENT`. This is the one new permitted action; everything the invariant still forbids stays forbidden — no merge, no auto-merge arming, no `/backlog-housekeep` chain beyond the row and `last_verified` bump Phase 6.5 already filed, no `/post-plan` chain, no worktree teardown, no second comment. The fire is detached and fire-and-forget: never wait on it, never read its log, never let it extend this run. `scripts/review-owed.sh` is the only channel — `/pr-ready` carries `disallowed-tools: [EnterPlanMode, ExitPlanMode, Skill]` and cannot call `Skill` at all, so the launcher is reached through Bash.

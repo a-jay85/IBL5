@@ -1,0 +1,305 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# bin/test-flake-ledger — regression harness for bin/parse-playwright-flakes and bin/flake-ledger-report.
+# Run: bin/test-flake-ledger   (exit 0 = all passed, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PARSER="$SCRIPT_DIR/parse-playwright-flakes"
+REPORTER="$SCRIPT_DIR/flake-ledger-report"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+FAILED=0
+
+# Snapshot git status before any test runs — "tree unchanged" only fails if
+# the harness itself causes new modifications, not pre-existing ones.
+GIT_STATUS_BEFORE="$(git -C "$SCRIPT_DIR" status --porcelain | grep -Ev '^[\?\!]' || true)"
+
+# ── helpers ───────────────────────────────────────────────────────────────────
+
+assert_has() {
+    local label="$1" needle="$2" file="${3:-$TMP/out}"
+    if grep -qF -- "$needle" "$file"; then
+        echo "ok: $label"
+    else
+        echo "FAIL: $label — expected to contain: $needle"
+        FAILED=1
+    fi
+}
+
+assert_lacks() {
+    local label="$1" needle="$2" file="${3:-$TMP/out}"
+    if grep -qF -- "$needle" "$file"; then
+        echo "FAIL: $label — expected NOT to contain: $needle"
+        FAILED=1
+    else
+        echo "ok: $label"
+    fi
+}
+
+assert_exit() {
+    local label="$1" expected="$2" actual="$3"
+    if [ "$actual" -eq "$expected" ]; then
+        echo "ok: $label"
+    else
+        echo "FAIL: $label — expected exit $expected, got $actual"
+        FAILED=1
+    fi
+}
+
+# ── fixtures ──────────────────────────────────────────────────────────────────
+
+cat > "$TMP/report.json" <<'EOF'
+{
+  "config": {},
+  "suites": [
+    { "title": "flaky.spec.ts", "file": "tests/e2e/flaky.spec.ts",
+      "specs": [
+        { "title": "top-level flaky", "ok": true, "file": "tests/e2e/flaky.spec.ts",
+          "tests": [ {"status": "flaky"}, {"status": "flaky"} ] },
+        { "title": "clean one", "ok": true, "file": "tests/e2e/flaky.spec.ts",
+          "tests": [ {"status": "expected"} ] },
+        { "title": "hard failure", "ok": false, "file": "tests/e2e/flaky.spec.ts",
+          "tests": [ {"status": "unexpected"} ] },
+        { "title": "skipped one", "ok": true, "file": "tests/e2e/flaky.spec.ts",
+          "tests": [ {"status": "skipped"} ] }
+      ],
+      "suites": [
+        { "title": "a describe block",
+          "specs": [
+            { "title": "nested flaky", "ok": true, "file": "tests/e2e/flaky.spec.ts",
+              "tests": [ {"status": "flaky"} ] }
+          ] }
+      ] }
+  ]
+}
+EOF
+
+cat > "$TMP/clean.json" <<'EOF'
+{
+  "config": {},
+  "suites": [
+    { "title": "clean.spec.ts", "file": "tests/e2e/clean.spec.ts",
+      "specs": [
+        { "title": "passing test", "ok": true, "file": "tests/e2e/clean.spec.ts",
+          "tests": [ {"status": "expected"} ] }
+      ],
+      "suites": [] }
+  ]
+}
+EOF
+
+echo "not json at all" > "$TMP/bad.json"
+
+TODAY="$(date -u +%Y-%m-%d)"
+
+# ── parser cases ──────────────────────────────────────────────────────────────
+
+# 1 & 2: nested flaky extracted
+"$PARSER" --json "$TMP/report.json" --run-id r1 > "$TMP/out" 2>"$TMP/err"
+assert_has "top-level flaky extracted" '"title":"top-level flaky"'
+assert_has "spec field present" '"spec":"tests/e2e/flaky.spec.ts"'
+assert_has "nested flaky extracted" '"title":"nested flaky"'
+
+# 3: non-flaky statuses ignored
+assert_lacks "non-flaky statuses ignored" 'clean one'
+assert_lacks "non-flaky statuses ignored - unexpected" 'hard failure'
+assert_lacks "non-flaky statuses ignored - skipped" 'skipped one'
+
+# 4: per-run dedupe (top-level flaky has 2 flaky tests[] entries but should emit 1 record)
+COUNT="$(grep -c 'top-level flaky' "$TMP/out" || true)"
+if [ "$COUNT" -eq 1 ]; then
+    echo "ok: per-run dedupe"
+else
+    echo "FAIL: per-run dedupe — expected 1 record, got $COUNT"
+    FAILED=1
+fi
+
+# 5: clean report emits nothing
+"$PARSER" --json "$TMP/clean.json" --run-id r1 > "$TMP/out" 2>"$TMP/err"
+RC=$?
+assert_exit "clean exit 0" 0 "$RC"
+if [ ! -s "$TMP/out" ]; then
+    echo "ok: clean report emits nothing"
+else
+    echo "FAIL: clean report emits nothing — expected empty stdout"
+    FAILED=1
+fi
+
+# 6: bad input rejected - missing file (exit must be 1, not 0)
+"$PARSER" --json "$TMP/nope.json" --run-id r1 > "$TMP/out" 2>"$TMP/err"
+RC=$?
+assert_exit "bad input rejected - exit 1" 1 "$RC"
+assert_has "bad input rejected - stderr msg" 'No such Playwright report' "$TMP/err"
+
+# 7: bad input rejected - malformed JSON
+"$PARSER" --json "$TMP/bad.json" --run-id r1 > "$TMP/out" 2>"$TMP/err"
+RC=$?
+assert_exit "bad input rejected - malformed json exit 1" 1 "$RC"
+assert_has "bad input rejected - malformed json msg" 'Not valid JSON' "$TMP/err"
+
+# 8: parser rejects bad flags - unknown flag
+"$PARSER" --bogus x --json "$TMP/report.json" --run-id r1 > "$TMP/out" 2>"$TMP/err"
+RC=$?
+assert_exit "parser rejects bad flags - exit 2" 2 "$RC"
+assert_has "parser rejects bad flags - msg" 'Unknown option' "$TMP/err"
+
+# 9: parser rejects bad flags - equals-form
+"$PARSER" "--json=$TMP/report.json" --run-id r1 > "$TMP/out" 2>"$TMP/err"
+RC=$?
+assert_exit "parser rejects bad flags - equals form exit 2" 2 "$RC"
+assert_has "parser rejects bad flags - equals form msg" 'Unknown option' "$TMP/err"
+
+# 10 & 11: merge dedupe and growth
+# Build initial ledger from r1
+"$PARSER" --json "$TMP/report.json" --run-id r1 --date "$TODAY" > "$TMP/ledger_r1.ndjson" 2>"$TMP/err"
+LINES_BEFORE="$(grep -c . "$TMP/ledger_r1.ndjson" || true)"
+
+# Merge same run again (r1) — line count must not grow
+"$PARSER" --json "$TMP/report.json" --run-id r1 --date "$TODAY" --merge "$TMP/ledger_r1.ndjson" > "$TMP/ledger_merged.ndjson" 2>"$TMP/err"
+LINES_SAME="$(grep -c . "$TMP/ledger_merged.ndjson" || true)"
+if [ "$LINES_SAME" -eq "$LINES_BEFORE" ]; then
+    echo "ok: merge dedupe and growth - same run not duplicated"
+else
+    echo "FAIL: merge dedupe and growth - same run inflated from $LINES_BEFORE to $LINES_SAME"
+    FAILED=1
+fi
+
+# Merge with new run r2 — top-level flaky should now have 2 records
+"$PARSER" --json "$TMP/report.json" --run-id r2 --date "$TODAY" --merge "$TMP/ledger_r1.ndjson" > "$TMP/ledger_r2.ndjson" 2>"$TMP/err"
+COUNT_TOPLEVEL="$(grep -c 'top-level flaky' "$TMP/ledger_r2.ndjson" || true)"
+if [ "$COUNT_TOPLEVEL" -eq 2 ]; then
+    echo "ok: merge dedupe and growth - distinct run_id grows count"
+else
+    echo "FAIL: merge dedupe and growth - expected 2 top-level flaky records, got $COUNT_TOPLEVEL"
+    FAILED=1
+fi
+
+# 12: retention boundary
+cat > "$TMP/old_ledger.ndjson" <<EOF
+{"spec":"tests/e2e/old.spec.ts","title":"old test","date":"2000-01-01","run_id":"old1","run_url":""}
+{"spec":"tests/e2e/new.spec.ts","title":"new test","date":"$TODAY","run_id":"new1","run_url":""}
+EOF
+"$PARSER" --json "$TMP/clean.json" --run-id dummy --date "$TODAY" --merge "$TMP/old_ledger.ndjson" --retain-days 30 > "$TMP/retained.ndjson" 2>"$TMP/err"
+if grep -q 'old test' "$TMP/retained.ndjson"; then
+    echo "FAIL: retention boundary - old entry should have been pruned"
+    FAILED=1
+else
+    echo "ok: retention boundary - old entry pruned"
+fi
+if grep -q 'new test' "$TMP/retained.ndjson"; then
+    echo "ok: retention boundary - today entry kept"
+else
+    echo "FAIL: retention boundary - today entry should have been kept"
+    FAILED=1
+fi
+
+# 13: --retain-days with non-integer
+"$PARSER" --json "$TMP/clean.json" --run-id dummy --retain-days abc > "$TMP/out" 2>"$TMP/err"
+RC=$?
+assert_exit "retention boundary - non-integer exit 2" 2 "$RC"
+assert_has "retention boundary - non-integer msg" 'must be a non-negative integer' "$TMP/err"
+
+# ── reporter cases ────────────────────────────────────────────────────────────
+
+# Build a 3-run ledger for spec A (candidate) and 2-run for spec B (watchlist)
+cat > "$TMP/threshold_ledger.ndjson" <<EOF
+{"spec":"tests/e2e/a.spec.ts","title":"spec A","date":"$TODAY","run_id":"r1","run_url":""}
+{"spec":"tests/e2e/a.spec.ts","title":"spec A","date":"$TODAY","run_id":"r2","run_url":""}
+{"spec":"tests/e2e/a.spec.ts","title":"spec A","date":"$TODAY","run_id":"r3","run_url":""}
+{"spec":"tests/e2e/b.spec.ts","title":"spec B","date":"$TODAY","run_id":"r1","run_url":""}
+{"spec":"tests/e2e/b.spec.ts","title":"spec B","date":"$TODAY","run_id":"r2","run_url":""}
+EOF
+
+# 14: threshold boundary — spec A in candidates, spec B in watchlist only
+"$REPORTER" --ledger "$TMP/threshold_ledger.ndjson" --threshold 3 > "$TMP/out" 2>"$TMP/err"
+assert_has "threshold boundary - candidate in report" 'spec A'
+assert_has "threshold boundary - watchlist present" 'spec B'
+# spec B must NOT appear in the Quarantine candidates section (only in Watchlist)
+if awk '/Quarantine candidates/{p=1} /Watchlist/{p=0} p' "$TMP/out" | grep -qF 'spec B'; then
+    echo "FAIL: threshold boundary - spec B should not be in Quarantine candidates"
+    FAILED=1
+else
+    echo "ok: threshold boundary"
+fi
+
+# 15: format count
+COUNT_OUT="$("$REPORTER" --ledger "$TMP/threshold_ledger.ndjson" --threshold 3 --format count)"
+if [ "$COUNT_OUT" = "1" ]; then
+    echo "ok: format count prints integer"
+else
+    echo "FAIL: format count prints integer — expected 1, got $COUNT_OUT"
+    FAILED=1
+fi
+
+# 16: empty ledger tolerated - absent file
+"$REPORTER" --ledger "$TMP/nope.ndjson" --format count > "$TMP/out" 2>"$TMP/err"
+RC=$?
+assert_exit "empty ledger tolerated - absent exit 0" 0 "$RC"
+if [ "$(cat "$TMP/out")" = "0" ]; then
+    echo "ok: empty ledger tolerated - absent count"
+else
+    echo "FAIL: empty ledger tolerated - absent count: $(cat "$TMP/out")"
+    FAILED=1
+fi
+"$REPORTER" --ledger "$TMP/nope.ndjson" --format text > "$TMP/out" 2>"$TMP/err"
+RC=$?
+assert_exit "empty ledger tolerated - absent text exit 0" 0 "$RC"
+assert_has "empty ledger tolerated - no flake data msg" 'No flake data in the ledger yet'
+
+# 17: empty ledger file
+: > "$TMP/empty.ndjson"
+"$REPORTER" --ledger "$TMP/empty.ndjson" --format count > "$TMP/out" 2>"$TMP/err"
+RC=$?
+assert_exit "empty ledger tolerated - empty file exit 0" 0 "$RC"
+if [ "$(cat "$TMP/out")" = "0" ]; then
+    echo "ok: empty ledger tolerated - empty file count"
+else
+    echo "FAIL: empty ledger tolerated - empty file count: $(cat "$TMP/out")"
+    FAILED=1
+fi
+
+# 18: report under discord limit - generate 400 synthetic ledger lines
+: > "$TMP/big_ledger.ndjson"
+for i in $(seq 1 400); do
+    echo "{\"spec\":\"tests/e2e/spec${i}.spec.ts\",\"title\":\"test case ${i}\",\"date\":\"$TODAY\",\"run_id\":\"r${i}\",\"run_url\":\"\"}"
+done >> "$TMP/big_ledger.ndjson"
+"$REPORTER" --ledger "$TMP/big_ledger.ndjson" --format text > "$TMP/out" 2>"$TMP/err"
+BYTE_COUNT="$(wc -c < "$TMP/out")"
+if [ "$BYTE_COUNT" -lt 2000 ]; then
+    echo "ok: report under discord limit ($BYTE_COUNT bytes)"
+else
+    echo "FAIL: report under discord limit — got $BYTE_COUNT bytes"
+    FAILED=1
+fi
+
+# 19: report rejects bad flags - format bogus
+"$REPORTER" --ledger "$TMP/threshold_ledger.ndjson" --format bogus > "$TMP/out" 2>"$TMP/err"
+RC=$?
+assert_exit "report rejects bad flags - format bogus exit 2" 2 "$RC"
+assert_has "report rejects bad flags - format bogus msg" 'Unknown --format' "$TMP/err"
+
+# 20: report rejects bad flags - unknown flag
+"$REPORTER" --bogus > "$TMP/out" 2>"$TMP/err"
+RC=$?
+assert_exit "report rejects bad flags - unknown flag exit 2" 2 "$RC"
+assert_has "report rejects bad flags - unknown flag msg" 'Unknown option' "$TMP/err"
+
+# tree unchanged - verify scripts don't write tracked files in the repo
+TREE_MODIFIED_AFTER="$(git -C "$SCRIPT_DIR" status --porcelain | grep -Ev '^[\?\!]' || true)"
+if [ "$TREE_MODIFIED_AFTER" = "$GIT_STATUS_BEFORE" ]; then
+    echo "ok: tree unchanged after harness"
+else
+    echo "FAIL: tree unchanged after harness — new modifications: $TREE_MODIFIED_AFTER"
+    FAILED=1
+fi
+
+# ── result ────────────────────────────────────────────────────────────────────
+
+if [ "$FAILED" -ne 0 ]; then
+    echo "FAILED: one or more cases failed above"
+    exit 1
+fi
+echo "All tests passed."

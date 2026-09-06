@@ -185,3 +185,32 @@ Landing rung: **1** (extend `bin/check-docs` or add a narrow lint for `DRAFT=` e
 **Risk if untouched (was):** Silent merge-order violations in future stacked-plan programs where the parent branch is not yet in the child's commit history.
 **Status (2026-07-29):** ⬜ Open — 🟥 (ship-pipeline invariant; loop-machinery changes should default to `auto_merge: false`). (discovered 2026-07-29 during PR #1734 fence-parity-guard)
 **Status (2026-09-06):** ✅ Implemented — took direction (a): `/post-plan` Phase 6 Step 3 now captures the markers an earlier phase wrote (`Depends-on:`, plus the `<!-- no-adr: -->` / `<!-- no-refactor-tests: -->` bypass comments read by `bin/adr-check` and `bin/refactor-flag`), re-emits them at the top of the rewritten body, then verifies and self-heals via `gh pr edit --body-file`. Guarded by executable cases in `bin/test-postplan-arm-conditions`. Directions (b) and (c) were not taken — arm condition (6) and where Phase 1 writes the marker are unchanged.
+
+---
+
+### L46 Queued matrix-less plan with non-canonical `impl_model:` alias slips all pre-queue gates; runner disposes on first nightly run
+
+**class:** A plan in the automouse queue declares a non-canonical `impl_model:` alias (e.g., `sonnet-4-6`) that slips through `bin/automouse/queue`'s add-time backstop (which calls `plan-model-consistency`, which skips matrix-less plans at its matrix-presence guard) and through `bin/check-plan` gate `[13]` (same skip), so the bad alias is not caught until `bin/automouse/run` disposes the plan to `skipped/` on the first nightly run — wasting one nightly slot.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `~/claude-plans/pr-ready-dm-and-push-retry.md` line 2: `impl_model: sonnet-4-6` (not a canonical alias; resolves to Opus silently pre-PR, rejected post-merge) | yes | yes | fixed this pass (changed to `impl_model: sonnet`) |
+
+**prevention_ladder:**
+
+- rung 0 — partially covered: `bin/automouse/run` Phase 4 disposal block (added by this PR) catches a bad alias at runtime and disposes with a report. Not sufficient: burns one nightly slot per occurrence.
+- rung 1 — extend `bin/automouse/queue add` to call `bin/lib/plan-model-tier` (not `plan-model-consistency`, which skips matrix-less plans) and reject a nonzero exit at queue-add time. This is the landing rung: it catches the alias before the plan enters the queue, at zero slot cost.
+- rung 2 — a rule doc alone is insufficient: the validator does not run during plan authoring.
+- rung 3 — not applicable (PHPStan cannot gate plan-file parsing).
+- rung 4 — not applicable (CI has no plan-corpus sweep over `~/claude-plans/`).
+- rung 5 — not warranted.
+
+Landing rung: 1 (extend `bin/automouse/queue add` validation to cover all plans, not just matrix-bearing ones).
+
+**artifact destination:** `bin/automouse/queue` (in-repo)
+
+**provenance:** (discovered 2026-09-04 during #1968)
+
+**Status (2026-09-05):** ✅ Implemented — `bin/automouse/queue add` now validates `impl_model:` presence and validity for **every** plan, before and independently of the `bin/lib/plan-model-consistency` call, so a matrix-less plan no longer reaches the queue with the field unchecked. Landed rung 1, with one deviation from the ladder as written: the check calls `bin/lib/plan-model-tier` rather than `bin/lib/plan-impl-model`, because `plan-impl-model` resolves an absent or unrecognized field to `claude-opus-5` and so cannot distinguish "no marker" from a deliberate `impl_model: opus`. `plan-model-tier` returns `absent` for the former and exits nonzero for the latter — the discrimination the rung needs. Covered by `bin/test-automouse-queue` rows 21-24 and 26, with row 15 tightened to pin the check ordering.

@@ -304,14 +304,44 @@ if [ -e "$QUEUE_DIR/$FILENAME" ] || [ -L "$QUEUE_DIR/$FILENAME" ]; then
     exit 1
 fi
 
-# impl_model <-> Verification Matrix consistency backstop. bin/check-plan gate
-# 13 catches this at plan-authoring time, but the plan archive predates the
-# gate — an old unmarked plan can still be sitting in ~/claude-plans/ never
-# having been run through check-plan. Refuse to queue rather than let
-# automouse-run burn a full Opus-default implementation session (or a
-# forbidden Truly-manual-row-under-Sonnet run) on it. Shares the exact rule
-# with check-plan via bin/lib/plan-model-consistency so the two cannot drift.
+# Two independent model gates run before a plan enters the queue:
+#   (1) impl_model PRESENCE + VALIDITY (below) — every queued plan must declare a
+#       recognized impl_model:. plan-model-consistency cannot cover this: it exits
+#       0 on a plan with no Verification Matrix (loop-engineering backlog L46).
+#   (2) impl_model <-> Verification Matrix CONSISTENCY (further below), shared with
+#       bin/check-plan gate 13 via bin/lib/plan-model-consistency so the two cannot
+#       drift. The plan archive predates that gate, so an old unmarked plan can
+#       still be sitting in ~/claude-plans/ never having been run through it.
+# Order matters: (1) is the more fundamental problem and must report first.
+# bin/test-automouse-queue row 15 pins that ordering.
 LIB_DIR="$(cd "$(dirname "$0")/.." && pwd)/lib"
+
+# Same awk as bin/lib/plan-model-consistency's, deliberately — the two must agree
+# on what "the plan's impl_model" is. `|| true` is required here and not there
+# because this script runs under `set -euo pipefail`.
+IMPL_MODEL_RAW=$(awk '
+  NR==1 && /^---[[:space:]]*$/ {infm=1; next}
+  infm && /^---[[:space:]]*$/ {infm=0; exit}
+  infm && /^impl_model:[[:space:]]*/ {sub(/^impl_model:[[:space:]]*/,""); gsub(/[[:space:]]/,""); print; exit}
+' "$SOURCE" 2>/dev/null || true)
+
+# `if VAR=$(cmd); then` (not a bare assignment) so `set -e` does not abort on the
+# helper's non-zero exit. "$IMPL_MODEL_RAW" MUST stay quoted: plan-model-tier
+# exits 2 on a missing argument, so an unquoted empty value yields a usage error
+# on stderr and an empty TIER instead of the "absent" token this branch needs.
+if IMPL_MODEL_TIER=$("$LIB_DIR/plan-model-tier" "$IMPL_MODEL_RAW"); then
+    if [ "$IMPL_MODEL_TIER" = "absent" ]; then
+        echo "Error: $FILENAME has no usable impl_model: marker:" >&2
+        echo "  impl_model: is missing or blank — add it to the plan's line-1 frontmatter (one of: opus, sonnet, haiku, claude-opus-5, claude-sonnet-4-6, claude-haiku-4-5)" >&2
+        echo "Fix the plan's line-1 frontmatter, then requeue." >&2
+        exit 1
+    fi
+else
+    echo "Error: $FILENAME declares an unusable impl_model:" >&2
+    echo "  $IMPL_MODEL_TIER" >&2
+    echo "Fix the plan's line-1 frontmatter, then requeue." >&2
+    exit 1
+fi
 # `if VAR=$(cmd); then` (not a bare assignment) so `set -e` does not abort the
 # script on the script's non-zero exit — the exit code is tested, not thrown.
 if CONSISTENCY_MSG=$("$LIB_DIR/plan-model-consistency" "$SOURCE"); then

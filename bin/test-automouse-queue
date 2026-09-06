@@ -30,6 +30,15 @@ run_queue() {
     NIGHTLY_DIR="$NDIR" PLANS_DIR="$PDIR" "$SCRIPT" "$@"
 }
 
+# Create fixture plans carrying a valid impl_model:, which bin/automouse/queue add
+# now requires. Use for plans the queue add path is expected to accept.
+mkplan() {
+    local f
+    for f in "$@"; do
+        printf -- '---\nimpl_model: sonnet\n---\n\n# fixture plan %s\n' "$f" > "$PDIR/$f"
+    done
+}
+
 assert_present() {
     local desc="$1" path="$2"
     if [ ! -e "$path" ] && [ ! -L "$path" ]; then
@@ -55,7 +64,7 @@ assert_absent() {
 # Row 1 — plan in skipped/ only → evicted, lands in queue/
 # ---------------------------------------------------------------------------
 setup
-touch "$PDIR/plan-a.md"
+mkplan plan-a.md
 ln -s "$PDIR/plan-a.md" "$NDIR/skipped/plan-a.md"
 run_queue plan-a >/dev/null 2>&1
 assert_absent  "row1 skipped gone" "$NDIR/skipped/plan-a.md"
@@ -66,7 +75,7 @@ echo "ok: row1 — skipped-only eviction"
 # Row 2 — plan in done/ only → evicted, lands in queue/
 # ---------------------------------------------------------------------------
 setup
-touch "$PDIR/plan-b.md"
+mkplan plan-b.md
 ln -s "$PDIR/plan-b.md" "$NDIR/done/plan-b.md"
 run_queue plan-b >/dev/null 2>&1
 assert_absent  "row2 done gone" "$NDIR/done/plan-b.md"
@@ -78,7 +87,7 @@ echo "ok: row2 — done-only eviction"
 # (the core bug; asserts exactly one disposition folder after queuing)
 # ---------------------------------------------------------------------------
 setup
-touch "$PDIR/plan-c.md"
+mkplan plan-c.md
 ln -s "$PDIR/plan-c.md" "$NDIR/skipped/plan-c.md"
 ln -s "$PDIR/plan-c.md" "$NDIR/done/plan-c.md"
 run_queue plan-c >/dev/null 2>&1
@@ -91,7 +100,7 @@ echo "ok: row3 — both-dirs eviction (core bug)"
 # Row 4 — fresh plan in neither sibling → queues normally, no error
 # ---------------------------------------------------------------------------
 setup
-touch "$PDIR/plan-d.md"
+mkplan plan-d.md
 run_queue plan-d >/dev/null 2>&1
 assert_absent  "row4 no skipped" "$NDIR/skipped/plan-d.md"
 assert_absent  "row4 no done"    "$NDIR/done/plan-d.md"
@@ -100,6 +109,7 @@ echo "ok: row4 — fresh plan no-op eviction"
 
 # ---------------------------------------------------------------------------
 # Row 5 — requeue of a plan that also has a stale done/ entry → done evicted
+# (uses `requeue` subcommand — no impl_model check in that path)
 # ---------------------------------------------------------------------------
 setup
 touch "$PDIR/plan-e.md"
@@ -115,7 +125,7 @@ echo "ok: row5 — requeue done-eviction"
 # Row 6 — .attempts counter evicted alongside symlink
 # ---------------------------------------------------------------------------
 setup
-touch "$PDIR/plan-f.md"
+mkplan plan-f.md
 ln -s "$PDIR/plan-f.md" "$NDIR/skipped/plan-f.md"
 touch "$NDIR/skipped/plan-f.md.attempts"
 ln -s "$PDIR/plan-f.md" "$NDIR/done/plan-f.md"
@@ -133,7 +143,7 @@ echo "ok: row6 — .attempts eviction"
 # after eviction so a dangling symlink left behind would also fail
 # ---------------------------------------------------------------------------
 setup
-touch "$PDIR/plan-g.md"
+mkplan plan-g.md
 ln -s "$PDIR/plan-g.md" "$NDIR/skipped/plan-g.md"
 if [ ! -e "$NDIR/skipped/plan-g.md" ]; then
     echo "FAIL: row7 setup — symlink is dangling before eviction"
@@ -148,6 +158,7 @@ echo "ok: row7 — real-symlink eviction + dangling guard"
 # Row 8 — idempotent re-queue of the same plan (same target): exit 0,
 # "Already queued (no change)", and skipped/ entry left untouched (eviction
 # must not fire before the already-queued check).
+# (plan-h manually linked into queue via ln -s; already-queued check fires first)
 # ---------------------------------------------------------------------------
 setup
 touch "$PDIR/plan-h.md"
@@ -177,6 +188,7 @@ echo "ok: row8 — same-target re-queue is idempotent (exit 0), skipped/ untouch
 # Row 8a — genuine conflict: same filename, different physical source → error,
 # queue entry unchanged.  Without the idempotent-check, a naïve `ln -s` would
 # crash with a raw "ln: File exists" message and leave the queue corrupted.
+# (conflict check fires before impl_model check; touch'd plans are fine here)
 # ---------------------------------------------------------------------------
 setup
 touch "$PDIR/plan-h.md"
@@ -212,6 +224,7 @@ echo "ok: row8a — genuine conflict exits 1 with clean error, queue unchanged"
 # `-e` alone is false for a dangling link, control falls through to `ln -s`,
 # and the shell prints a raw fatal error.  Here the dangling symlink points at
 # a path that differs from the real source, so it is a genuine conflict too.
+# (conflict check fires before impl_model check; touch'd plan-h is fine here)
 # ---------------------------------------------------------------------------
 setup
 touch "$PDIR/plan-h.md"
@@ -270,7 +283,7 @@ link_mtime() {
 # stamp_back_of_queue, the plan would jump to the back.
 # ---------------------------------------------------------------------------
 setup
-touch "$PDIR/plan-a.md" "$PDIR/plan-b.md" "$PDIR/plan-c.md"
+mkplan plan-a.md plan-b.md plan-c.md
 run_queue plan-a >/dev/null 2>&1
 run_queue plan-b >/dev/null 2>&1
 run_queue plan-c >/dev/null 2>&1
@@ -307,8 +320,8 @@ echo "ok: row8c — idempotent re-queue preserves position and mtimes"
 # If stamp_back_of_queue ran, the ancient plan would move to last.
 # ---------------------------------------------------------------------------
 setup
-touch "$PDIR/plan-a.md" "$PDIR/plan-b.md"
-touch "$PDIR/plan-old.md"; touch -t 202001010000.00 "$PDIR/plan-old.md"
+mkplan plan-a.md plan-b.md plan-old.md
+touch -t 202001010000.00 "$PDIR/plan-old.md"
 run_queue plan-a >/dev/null 2>&1
 run_queue plan-old >/dev/null 2>&1
 run_queue plan-b >/dev/null 2>&1
@@ -335,7 +348,7 @@ echo "ok: row8d — idempotent re-queue of ancient-mtime plan keeps its position
 # Row 9 — .staleness sidecar evicted alongside symlink on (re)queue
 # ---------------------------------------------------------------------------
 setup
-touch "$PDIR/plan-i.md"
+mkplan plan-i.md
 ln -s "$PDIR/plan-i.md" "$NDIR/skipped/plan-i.md"
 touch "$NDIR/skipped/plan-i.md.staleness"
 run_queue plan-i >/dev/null 2>&1
@@ -401,7 +414,7 @@ echo "ok: row16 — queues a clean, correctly-marked plan"
 # Row 10 — happy path: reorder >=3 plans -> ls -1tr matches requested order
 # ---------------------------------------------------------------------------
 setup
-touch "$PDIR/plan-a.md" "$PDIR/plan-b.md" "$PDIR/plan-c.md"
+mkplan plan-a.md plan-b.md plan-c.md
 run_queue plan-a >/dev/null 2>&1
 run_queue plan-b >/dev/null 2>&1
 run_queue plan-c >/dev/null 2>&1
@@ -415,7 +428,7 @@ echo "ok: row10 — reorder happy path"
 # a same-second touch loop would let `ls` filename-tiebreak and scramble it.
 # ---------------------------------------------------------------------------
 setup
-touch "$PDIR/plan-a.md" "$PDIR/plan-b.md" "$PDIR/plan-c.md"
+mkplan plan-a.md plan-b.md plan-c.md
 run_queue plan-a >/dev/null 2>&1
 run_queue plan-b >/dev/null 2>&1
 run_queue plan-c >/dev/null 2>&1
@@ -433,7 +446,7 @@ echo "ok: row11 — spaced ascending mtimes, no tie-scramble"
 # Row 12 — reject a slug not currently queued (non-zero exit, order unchanged)
 # ---------------------------------------------------------------------------
 setup
-touch "$PDIR/plan-a.md" "$PDIR/plan-b.md" "$PDIR/plan-c.md"
+mkplan plan-a.md plan-b.md plan-c.md
 run_queue plan-a >/dev/null 2>&1; run_queue plan-b >/dev/null 2>&1; run_queue plan-c >/dev/null 2>&1
 run_queue reorder plan-a plan-b plan-c >/dev/null 2>&1
 before="$(queue_order)"
@@ -447,7 +460,7 @@ echo "ok: row12 — reject unqueued slug"
 # Row 13 — reject a non-permutation: missing entry AND duplicate-as-extra
 # ---------------------------------------------------------------------------
 setup
-touch "$PDIR/plan-a.md" "$PDIR/plan-b.md" "$PDIR/plan-c.md"
+mkplan plan-a.md plan-b.md plan-c.md
 run_queue plan-a >/dev/null 2>&1; run_queue plan-b >/dev/null 2>&1; run_queue plan-c >/dev/null 2>&1
 run_queue reorder plan-a plan-b plan-c >/dev/null 2>&1
 before="$(queue_order)"
@@ -465,7 +478,7 @@ echo "ok: row13 — reject non-permutation (missing/extra)"
 # Row 14 — touch-nothing-on-rejection: target mtimes unchanged after a reject
 # ---------------------------------------------------------------------------
 setup
-touch "$PDIR/plan-a.md" "$PDIR/plan-b.md" "$PDIR/plan-c.md"
+mkplan plan-a.md plan-b.md plan-c.md
 run_queue plan-a >/dev/null 2>&1; run_queue plan-b >/dev/null 2>&1; run_queue plan-c >/dev/null 2>&1
 run_queue reorder plan-a plan-b plan-c >/dev/null 2>&1
 a0=$(target_mtime plan-a.md); b0=$(target_mtime plan-b.md); c0=$(target_mtime plan-c.md)
@@ -491,11 +504,10 @@ echo "ok: row14 — touch-nothing on rejection"
 # reorder ladder. It must land LAST, not first.
 # ---------------------------------------------------------------------------
 setup
-touch "$PDIR/plan-a.md" "$PDIR/plan-b.md" "$PDIR/plan-c.md"
+mkplan plan-a.md plan-b.md plan-c.md plan-old.md
+touch -t 202001010000.00 "$PDIR/plan-old.md"
 run_queue plan-a >/dev/null 2>&1; run_queue plan-b >/dev/null 2>&1; run_queue plan-c >/dev/null 2>&1
 run_queue reorder plan-a plan-b plan-c >/dev/null 2>&1   # ladder stamped into the past
-touch "$PDIR/plan-old.md"
-touch -t 202001010000.00 "$PDIR/plan-old.md"             # authored long before the ladder
 run_queue plan-old >/dev/null 2>&1
 assert_order "row17 stale-mtime plan lands at the back" \
              "plan-a.md plan-b.md plan-c.md plan-old.md"
@@ -507,10 +519,10 @@ echo "ok: row17 — enqueue of an old plan goes to the back (core bug)"
 # Without both, the test passes on Linux CI while macOS keeps breaking.
 # ---------------------------------------------------------------------------
 setup
-touch "$PDIR/plan-a.md" "$PDIR/plan-b.md"
+mkplan plan-a.md plan-b.md plan-old.md
+touch -t 202001010000.00 "$PDIR/plan-old.md"
 run_queue plan-a >/dev/null 2>&1; run_queue plan-b >/dev/null 2>&1
 run_queue reorder plan-a plan-b >/dev/null 2>&1
-touch "$PDIR/plan-old.md"; touch -t 202001010000.00 "$PDIR/plan-old.md"
 run_queue plan-old >/dev/null 2>&1
 for incumbent in plan-a.md plan-b.md; do
     if [ "$(link_mtime plan-old.md)" -le "$(link_mtime "$incumbent")" ]; then
@@ -527,12 +539,13 @@ echo "ok: row18 — both symlink and target sort keys stamped"
 # ---------------------------------------------------------------------------
 # Row 19 — `requeue` (mv out of skipped/) is the second enqueue path and must
 # stamp too; `mv` otherwise carries the old mtime straight across.
+# (plan-old uses `requeue` path — no impl_model check; plan-a/b use queue add)
 # ---------------------------------------------------------------------------
 setup
-touch "$PDIR/plan-a.md" "$PDIR/plan-b.md"
+mkplan plan-a.md plan-b.md
+touch "$PDIR/plan-old.md"; touch -t 202001010000.00 "$PDIR/plan-old.md"
 run_queue plan-a >/dev/null 2>&1; run_queue plan-b >/dev/null 2>&1
 run_queue reorder plan-a plan-b >/dev/null 2>&1
-touch "$PDIR/plan-old.md"; touch -t 202001010000.00 "$PDIR/plan-old.md"
 ln -s "$PDIR/plan-old.md" "$NDIR/skipped/plan-old.md"
 touch -h -t 202001010000.00 "$NDIR/skipped/plan-old.md"
 run_queue requeue >/dev/null 2>&1
@@ -545,10 +558,9 @@ echo "ok: row19 — requeue stamps to the back"
 # 'y' before 'x' alphabetically would expose one).
 # ---------------------------------------------------------------------------
 setup
-touch "$PDIR/plan-a.md"
-run_queue plan-a >/dev/null 2>&1
-touch "$PDIR/plan-y.md" "$PDIR/plan-x.md"
+mkplan plan-a.md plan-y.md plan-x.md
 touch -t 202001010000.00 "$PDIR/plan-y.md" "$PDIR/plan-x.md"
+run_queue plan-a >/dev/null 2>&1
 run_queue plan-y >/dev/null 2>&1
 run_queue plan-x >/dev/null 2>&1
 assert_order "row20 insertion order preserved" "plan-a.md plan-y.md plan-x.md"

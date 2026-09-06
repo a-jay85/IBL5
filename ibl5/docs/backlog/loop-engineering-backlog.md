@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-09-06
+last_verified: 2026-09-05
 ---
 
 # Loop-Engineering Backlog
@@ -72,7 +72,7 @@ last_verified: 2026-09-06
 | L43 | Autonomous-loop doc-fix PR body contains stale claims and inconsistent ADR authoring format after post-review commit | ⬜ Open | 🟦 | S |
 | L44 | Upstream overlap silently drops a plan phase; Phase 2a pre-rebase artifact captures post-rebase state, making the drop undetectable | ✅ fixed this pass | 🟦 | S |
 | L45 | `/pr-ready` Phase 2 squashes load-bearing commit boundaries when `auto_merge: false`; PR body SHAs go stale after force-push | ⬜ Open | 🟥 | S |
-| L46 | Queued matrix-less plan with non-canonical `impl_model:` alias slips all pre-queue gates; runner disposes on first nightly run | ⬜ Open | 🟦 | S |
+| L46 | Queued matrix-less plan with non-canonical `impl_model:` alias slips all pre-queue gates; runner disposes on first nightly run | ✅ Done | 🟦 | S |
 | L47 | `/pr-ready` folds a recoverable pre-push-hook rebase rejection into the terminal `PUSH FAILED` verdict, stranding the Phase 6.5 remediation commit locally | ⬜ Open | 🟥 | M |
 | L48 | Planning pipeline prose coverage gap: code-block path expressions in `SKILL.md` are invisible to `bin/check-docs`, so they can diverge from `bin/plan-now`'s runtime slug derivation silently | ✅ Implemented (2026-09-04) | 🟦 | S |
 | L49 | `/pr-ready` Phase 6.5 files backlog rows with non-canonical status glyphs and automouse values, making them invisible to open-work filters | ⬜ Open | 🟥 | S |
@@ -594,30 +594,7 @@ Landing rung: 1 for Check 2 (extend `_rebase-and-conflicts.md`); rung 0 for Chec
 
 ---
 
-### L46 Queued matrix-less plan with non-canonical `impl_model:` alias slips all pre-queue gates; runner disposes on first nightly run
-
-**class:** A plan in the automouse queue declares a non-canonical `impl_model:` alias (e.g., `sonnet-4-6`) that slips through `bin/automouse/queue`'s add-time backstop (which calls `plan-model-consistency`, which skips matrix-less plans at its matrix-presence guard) and through `bin/check-plan` gate `[13]` (same skip), so the bad alias is not caught until `bin/automouse/run` disposes the plan to `skipped/` on the first nightly run — wasting one nightly slot.
-
-**occurrence table:**
-
-| # | File:line | Same class? | Live? | Status |
-|---|-----------|-------------|-------|--------|
-| 1 | `~/claude-plans/pr-ready-dm-and-push-retry.md` line 2: `impl_model: sonnet-4-6` (not a canonical alias; resolves to Opus silently pre-PR, rejected post-merge) | yes | yes | fixed this pass (changed to `impl_model: sonnet`) |
-
-**prevention_ladder:**
-
-- rung 0 — partially covered: `bin/automouse/run` Phase 4 disposal block (added by this PR) catches a bad alias at runtime and disposes with a report. Not sufficient: burns one nightly slot per occurrence.
-- rung 1 — extend `bin/automouse/queue add` to call `bin/lib/plan-impl-model` (not `plan-model-consistency`, which skips matrix-less plans) and reject a nonzero exit at queue-add time. This is the landing rung: it catches the alias before the plan enters the queue, at zero slot cost.
-- rung 2 — a rule doc alone is insufficient: the validator does not run during plan authoring.
-- rung 3 — not applicable (PHPStan cannot gate plan-file parsing).
-- rung 4 — not applicable (CI has no plan-corpus sweep over `~/claude-plans/`).
-- rung 5 — not warranted.
-
-Landing rung: 1 (extend `bin/automouse/queue add` validation to cover all plans, not just matrix-bearing ones).
-
-**artifact destination:** `bin/automouse/queue` (in-repo)
-
-**provenance:** (discovered 2026-09-04 during #1968)
+➜ L46 Queued matrix-less plan with non-canonical `impl_model:` alias slips all pre-queue gates; runner disposes on first nightly run — ✅ Implemented (2026-09-05): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ---
 

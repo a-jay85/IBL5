@@ -1874,10 +1874,11 @@ end_case pr-ready-push-fail-closed
 # before this PR rebased onto master).
 # Re-measured 2026-09-04: 34047 B (Phase 6.7 stub added to SKILL.md; band updated to [33047, 35047]).
 # Re-measured 2026-09-05: 34552 B (post-rebase on master 4721cb2ce; band [33047, 35047] still contains it — no re-centre needed).
+# Re-measured 2026-09-05: 35616 B (collapse-guard Phase 1 step 4 added to SKILL.md; band re-centred to [34616, 36616]).
 begin_case
 _sz=$(wc -c < "$PRD/SKILL.md" | tr -d ' ')
-if [[ "$_sz" -lt 33047 || "$_sz" -gt 35047 ]]; then
-    fail "SKILL.md is $_sz B, outside the [33047, 35047] resident-bytes band -- a phase was re-inlined, a relocation was reverted, or the file grew unreviewed"
+if [[ "$_sz" -lt 34616 || "$_sz" -gt 36616 ]]; then
+    fail "SKILL.md is $_sz B, outside the [34616, 36616] resident-bytes band -- a phase was re-inlined, a relocation was reverted, or the file grew unreviewed"
 fi
 end_case pr-ready-skill-size-band
 
@@ -2095,6 +2096,227 @@ out=$(bash "$D" "$FIX" 2>&1); rc=$?
 grep -qF 'unavailable' <<<"$out" && fail "28l: trailing-space heading produced unavailable placeholder: $out" || true
 
 end_case pr-ready-merge-digest-shape
+
+# --- cases pr-ready-collapse-guard-* (8 arms) --------------------------------------------
+# Cheap/static arms first; git fixtures after — harness aborts on first fail.
+CGS="$PRD/scripts/collapse-guard.sh"
+_SQEDIT="$SCRATCH/cg-sqedit.sh"
+printf '#!/bin/sh\nawk '"'"'NR>1 && /^pick /{sub(/^pick /,"squash ")}1'"'"' "$1" > "$1.tmp" && mv "$1.tmp" "$1"\n' \
+  > "$_SQEDIT" && chmod +x "$_SQEDIT"
+
+# arm: usage errors — zero-arg, missing branch, bogus mode all exit 1 with STOP: line
+begin_case
+[[ -x "$CGS" ]] || fail "pr-ready-collapse-guard-usage: not executable: $CGS"
+_out="$(bash "$CGS" 2>&1)"; _rc=$?
+[[ $_rc -eq 1 ]] || fail "pr-ready-collapse-guard-usage: zero-arg exit $_rc want 1"
+grep -q '^STOP:' <<<"$_out" || fail "pr-ready-collapse-guard-usage: zero-arg no STOP: line"
+_out="$(bash "$CGS" check 1 2>&1)"; _rc=$?
+[[ $_rc -eq 1 ]] || fail "pr-ready-collapse-guard-usage: check+PR-only exit $_rc want 1"
+grep -q '^STOP:' <<<"$_out" || fail "pr-ready-collapse-guard-usage: check+PR-only no STOP:"
+_out="$(bash "$CGS" bogus 1 feat 2>&1)"; _rc=$?
+[[ $_rc -eq 1 ]] || fail "pr-ready-collapse-guard-usage: bogus-mode exit $_rc want 1"
+grep -q '^STOP:' <<<"$_out" || fail "pr-ready-collapse-guard-usage: bogus-mode no STOP:"
+end_case pr-ready-collapse-guard-usage
+
+# arm: static prose pins — step 4 in SKILL.md, renumber 5/6, record in _rebase-and-conflicts.md
+begin_case
+grep -qF '4. **Prior-collapse guard.**' "$PRD/SKILL.md" \
+  || fail "pr-ready-collapse-guard-wiring: step 4 heading absent from SKILL.md"
+grep -qF '5. **Branch-protection strict flag.**' "$PRD/SKILL.md" \
+  || fail "pr-ready-collapse-guard-wiring: step 5 renumber absent from SKILL.md"
+grep -qF '6. **Prior-Phase-4B probe.**' "$PRD/SKILL.md" \
+  || fail "pr-ready-collapse-guard-wiring: step 6 renumber absent from SKILL.md"
+grep -qF 'git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/collapse-guard.sh' "$PRD/SKILL.md" \
+  || fail "pr-ready-collapse-guard-wiring: pinned git-show absent from SKILL.md"
+grep -qF 'pr-ready-collapse-<N>.sh record' "$PRD/_rebase-and-conflicts.md" \
+  || fail "pr-ready-collapse-guard-wiring: record invocation absent from _rebase-and-conflicts.md"
+grep -qF 'scripts/lostwork.sh' "$PRD/_phase4-push-and-ci.md" \
+  || fail "pr-ready-collapse-guard-wiring: lostwork.sh invocation absent from _phase4-push-and-ci.md"
+end_case pr-ready-collapse-guard-wiring
+
+# arm: no-rewrite — fresh branch, no reflog rewrite → NO-PRIOR-REWRITE, exit 0
+begin_case
+_FIX="$(mktemp -d "$SCRATCH/cg-no-rewrite-XXXX")"
+g init --bare -q "$_FIX/origin"
+g clone -q "$_FIX/origin" "$_FIX/work" >/dev/null 2>&1
+commit_on "$_FIX/work" seed
+g -C "$_FIX/work" push -q origin HEAD:refs/heads/master >/dev/null 2>&1
+g -C "$_FIX/work" update-ref refs/remotes/origin/master "$(g -C "$_FIX/work" rev-parse master)"
+g -C "$_FIX/work" checkout -q -b feat
+commit_on "$_FIX/work" feat1
+commit_on "$_FIX/work" feat2
+commit_on "$_FIX/work" feat3
+_out="$(cd "$_FIX/work" && bash "$CGS" check 1 feat 2>&1)"; _rc=$?
+[[ $_rc -eq 0 ]] || fail "pr-ready-collapse-guard-no-rewrite: exit $_rc want 0 (out: $_out)"
+grep -q 'NO-PRIOR-REWRITE' <<<"$_out" \
+  || fail "pr-ready-collapse-guard-no-rewrite: want NO-PRIOR-REWRITE (got: $_out)"
+end_case pr-ready-collapse-guard-no-rewrite
+
+# arm: positive — destructive --root collapse, all work lost → exit 1, PRIOR-COLLAPSE-DETECTED
+begin_case
+_FIX="$(mktemp -d "$SCRATCH/cg-positive-XXXX")"
+g init --bare -q "$_FIX/origin"
+g clone -q "$_FIX/origin" "$_FIX/work" >/dev/null 2>&1
+printf 'original\n' > "$_FIX/work/shared.txt"
+g -C "$_FIX/work" add shared.txt; g -C "$_FIX/work" commit -q -m "seed"
+g -C "$_FIX/work" push -q origin HEAD:refs/heads/master >/dev/null 2>&1
+g -C "$_FIX/work" checkout -q -b feat
+for _i in 1 2 3 4 5; do
+  printf "feat-v%s\n" "$_i" > "$_FIX/work/shared.txt"
+  g -C "$_FIX/work" add shared.txt; g -C "$_FIX/work" commit -q -m "feat$_i"
+done
+g -C "$_FIX/work" checkout -q master
+printf 'master-new\n' > "$_FIX/work/shared.txt"
+g -C "$_FIX/work" add shared.txt; g -C "$_FIX/work" commit -q -m "master-advance"
+g -C "$_FIX/work" push -q origin HEAD:refs/heads/master >/dev/null 2>&1
+g -C "$_FIX/work" update-ref refs/remotes/origin/master "$(g -C "$_FIX/work" rev-parse master)"
+g -C "$_FIX/work" checkout -q feat
+g -C "$_FIX/work" rebase --onto origin/master --root >/dev/null 2>&1 || true
+for _i in 1 2 3 4 5 6 7 8 9 10; do
+  [[ -d "$_FIX/work/.git/rebase-merge" || -d "$_FIX/work/.git/rebase-apply" ]] || break
+  g -C "$_FIX/work" rebase --skip >/dev/null 2>&1 || true
+done
+_out="$(cd "$_FIX/work" && bash "$CGS" check 1 feat 2>&1)"; _rc=$?
+[[ $_rc -eq 1 ]] || fail "pr-ready-collapse-guard-positive: exit $_rc want 1 (out: $_out)"
+grep -q 'PRIOR-COLLAPSE-DETECTED' <<<"$_out" \
+  || fail "pr-ready-collapse-guard-positive: want PRIOR-COLLAPSE-DETECTED (got: $_out)"
+grep -q 'feat-precollapse' <<<"$_out" \
+  || fail "pr-ready-collapse-guard-positive: want feat-precollapse in recovery instructions"
+grep -q 'shared.txt' <<<"$_out" \
+  || fail "pr-ready-collapse-guard-positive: want shared.txt in lost-paths list"
+end_case pr-ready-collapse-guard-positive
+
+# arm: negative-squash — legitimate rebase -i squash 5→1, tree-identity → NO-COLLAPSE, exit 0
+begin_case
+_FIX="$(mktemp -d "$SCRATCH/cg-squash-XXXX")"
+g init --bare -q "$_FIX/origin"
+g clone -q "$_FIX/origin" "$_FIX/work" >/dev/null 2>&1
+commit_on "$_FIX/work" seed
+g -C "$_FIX/work" push -q origin HEAD:refs/heads/master >/dev/null 2>&1
+g -C "$_FIX/work" update-ref refs/remotes/origin/master "$(g -C "$_FIX/work" rev-parse master)"
+g -C "$_FIX/work" checkout -q -b feat
+for _i in 1 2 3 4 5; do
+  printf "feat-v%s\n" "$_i" > "$_FIX/work/shared.txt"
+  g -C "$_FIX/work" add shared.txt; g -C "$_FIX/work" commit -q -m "feat$_i"
+done
+GIT_SEQUENCE_EDITOR="$_SQEDIT" GIT_EDITOR=true \
+  g -C "$_FIX/work" rebase -i origin/master >/dev/null 2>&1
+_out="$(cd "$_FIX/work" && bash "$CGS" check 2 feat 2>&1)"; _rc=$?
+[[ $_rc -eq 0 ]] || fail "pr-ready-collapse-guard-negative-squash: exit $_rc want 0 (out: $_out)"
+grep -q 'NO-COLLAPSE' <<<"$_out" \
+  || fail "pr-ready-collapse-guard-negative-squash: want NO-COLLAPSE (got: $_out)"
+grep -q 'PRIOR-COLLAPSE-DETECTED' <<<"$_out" \
+  && fail "pr-ready-collapse-guard-negative-squash: unwanted PRIOR-COLLAPSE-DETECTED" || true
+end_case pr-ready-collapse-guard-negative-squash
+
+# arm: negative-advanced-master — squash + --onto, conflict merged to third value;
+# proves the survivor predicate (not the short-circuit) clears the branch; expect WARN, exit 0
+begin_case
+_FIX="$(mktemp -d "$SCRATCH/cg-adv-master-XXXX")"
+g init --bare -q "$_FIX/origin"
+g clone -q "$_FIX/origin" "$_FIX/work" >/dev/null 2>&1
+commit_on "$_FIX/work" seed
+g -C "$_FIX/work" push -q origin HEAD:refs/heads/master >/dev/null 2>&1
+_INIT_MASTER="$(g -C "$_FIX/work" rev-parse master)"
+g -C "$_FIX/work" checkout -q -b feat
+for _i in 1 2 3 4 5; do
+  printf "feat-v%s\n" "$_i" > "$_FIX/work/feat-only-$_i.txt"
+  g -C "$_FIX/work" add "feat-only-$_i.txt"; g -C "$_FIX/work" commit -q -m "feat$_i"
+done
+printf 'feat-shared\n' > "$_FIX/work/shared.txt"
+g -C "$_FIX/work" add shared.txt; g -C "$_FIX/work" commit -q -m "feat-shared"
+g -C "$_FIX/work" checkout -q master
+printf 'master-shared\n' > "$_FIX/work/shared.txt"
+g -C "$_FIX/work" add shared.txt; g -C "$_FIX/work" commit -q -m "master-advance"
+g -C "$_FIX/work" push -q origin HEAD:refs/heads/master >/dev/null 2>&1
+_MASTER_NEW="$(g -C "$_FIX/work" rev-parse master)"
+g -C "$_FIX/work" update-ref refs/remotes/origin/master "$_MASTER_NEW"
+g -C "$_FIX/work" checkout -q feat
+GIT_SEQUENCE_EDITOR="$_SQEDIT" GIT_EDITOR=true \
+  g -C "$_FIX/work" rebase -i "$_INIT_MASTER" >/dev/null 2>&1 || true
+g -C "$_FIX/work" rebase --onto "$_MASTER_NEW" "$_INIT_MASTER" feat >/dev/null 2>&1 || true
+if [[ -d "$_FIX/work/.git/rebase-merge" || -d "$_FIX/work/.git/rebase-apply" ]]; then
+  printf 'merged-third-value\n' > "$_FIX/work/shared.txt"
+  g -C "$_FIX/work" add shared.txt
+  GIT_EDITOR=true g -C "$_FIX/work" rebase --continue >/dev/null 2>&1 || true
+fi
+_out="$(cd "$_FIX/work" && bash "$CGS" check 3 feat 2>&1)"; _rc=$?
+[[ $_rc -eq 0 ]] || fail "pr-ready-collapse-guard-negative-advanced-master: exit $_rc want 0 (out: $_out)"
+grep -q 'PRIOR-COLLAPSE-DETECTED' <<<"$_out" \
+  && fail "pr-ready-collapse-guard-negative-advanced-master: unwanted PRIOR-COLLAPSE-DETECTED" || true
+end_case pr-ready-collapse-guard-negative-advanced-master
+
+# arm: master-moved-after-collapse — positive fixture then master advances further → still STOP
+begin_case
+_FIX="$(mktemp -d "$SCRATCH/cg-moved-XXXX")"
+g init --bare -q "$_FIX/origin"
+g clone -q "$_FIX/origin" "$_FIX/work" >/dev/null 2>&1
+printf 'original\n' > "$_FIX/work/shared.txt"
+g -C "$_FIX/work" add shared.txt; g -C "$_FIX/work" commit -q -m "seed"
+g -C "$_FIX/work" push -q origin HEAD:refs/heads/master >/dev/null 2>&1
+g -C "$_FIX/work" checkout -q -b feat
+for _i in 1 2 3 4 5; do
+  printf "feat-v%s\n" "$_i" > "$_FIX/work/shared.txt"
+  g -C "$_FIX/work" add shared.txt; g -C "$_FIX/work" commit -q -m "feat$_i"
+done
+g -C "$_FIX/work" checkout -q master
+printf 'master-new\n' > "$_FIX/work/shared.txt"
+g -C "$_FIX/work" add shared.txt; g -C "$_FIX/work" commit -q -m "master-advance"
+g -C "$_FIX/work" push -q origin HEAD:refs/heads/master >/dev/null 2>&1
+g -C "$_FIX/work" update-ref refs/remotes/origin/master "$(g -C "$_FIX/work" rev-parse master)"
+g -C "$_FIX/work" checkout -q feat
+g -C "$_FIX/work" rebase --onto origin/master --root >/dev/null 2>&1 || true
+for _i in 1 2 3 4 5 6 7 8 9 10; do
+  [[ -d "$_FIX/work/.git/rebase-merge" || -d "$_FIX/work/.git/rebase-apply" ]] || break
+  g -C "$_FIX/work" rebase --skip >/dev/null 2>&1 || true
+done
+g -C "$_FIX/work" checkout -q master
+printf 'master-newer\n' > "$_FIX/work/shared.txt"
+g -C "$_FIX/work" add shared.txt; g -C "$_FIX/work" commit -q -m "master-advance-2"
+g -C "$_FIX/work" push -q origin HEAD:refs/heads/master >/dev/null 2>&1
+g -C "$_FIX/work" update-ref refs/remotes/origin/master "$(g -C "$_FIX/work" rev-parse master)"
+g -C "$_FIX/work" checkout -q feat
+_out="$(cd "$_FIX/work" && bash "$CGS" check 4 feat 2>&1)"; _rc=$?
+[[ $_rc -eq 1 ]] || fail "pr-ready-collapse-guard-master-moved-after-collapse: exit $_rc want 1 (out: $_out)"
+grep -q 'PRIOR-COLLAPSE-DETECTED' <<<"$_out" \
+  || fail "pr-ready-collapse-guard-master-moved-after-collapse: want PRIOR-COLLAPSE-DETECTED (got: $_out)"
+end_case pr-ready-collapse-guard-master-moved-after-collapse
+
+# arm: meta-arm — record before collapse, delete reflog → meta arm fires alone, exit 1
+begin_case
+_FIX="$(mktemp -d "$SCRATCH/cg-meta-XXXX")"
+_META_OUT="/tmp/pr-ready-collapse-guard-42-feat.meta"
+rm -f "$_META_OUT"
+g init --bare -q "$_FIX/origin"
+g clone -q "$_FIX/origin" "$_FIX/work" >/dev/null 2>&1
+printf 'original\n' > "$_FIX/work/shared.txt"
+g -C "$_FIX/work" add shared.txt; g -C "$_FIX/work" commit -q -m "seed"
+g -C "$_FIX/work" push -q origin HEAD:refs/heads/master >/dev/null 2>&1
+g -C "$_FIX/work" checkout -q -b feat
+for _i in 1 2 3 4 5; do
+  printf "feat-v%s\n" "$_i" > "$_FIX/work/shared.txt"
+  g -C "$_FIX/work" add shared.txt; g -C "$_FIX/work" commit -q -m "feat$_i"
+done
+g -C "$_FIX/work" checkout -q master
+printf 'master-new\n' > "$_FIX/work/shared.txt"
+g -C "$_FIX/work" add shared.txt; g -C "$_FIX/work" commit -q -m "master-advance"
+g -C "$_FIX/work" push -q origin HEAD:refs/heads/master >/dev/null 2>&1
+g -C "$_FIX/work" update-ref refs/remotes/origin/master "$(g -C "$_FIX/work" rev-parse master)"
+g -C "$_FIX/work" checkout -q feat
+(cd "$_FIX/work" && bash "$CGS" record 42 feat) >/dev/null 2>&1
+[[ -f "$_META_OUT" ]] || fail "pr-ready-collapse-guard-meta-arm: record did not create meta file"
+g -C "$_FIX/work" rebase --onto origin/master --root >/dev/null 2>&1 || true
+for _i in 1 2 3 4 5 6 7 8 9 10; do
+  [[ -d "$_FIX/work/.git/rebase-merge" || -d "$_FIX/work/.git/rebase-apply" ]] || break
+  g -C "$_FIX/work" rebase --skip >/dev/null 2>&1 || true
+done
+rm -f "$_FIX/work/.git/logs/refs/heads/feat"
+_out="$(cd "$_FIX/work" && bash "$CGS" check 42 feat 2>&1)"; _rc=$?
+rm -f "$_META_OUT"
+[[ $_rc -eq 1 ]] || fail "pr-ready-collapse-guard-meta-arm: exit $_rc want 1 (out: $_out)"
+grep -q 'PRIOR-COLLAPSE-DETECTED' <<<"$_out" \
+  || fail "pr-ready-collapse-guard-meta-arm: want PRIOR-COLLAPSE-DETECTED (got: $_out)"
+end_case pr-ready-collapse-guard-meta-arm
 
 # --- case pr-ready-terminator-still-forbids ----------------------------------------------
 # Pins the six hard-stop clauses in _phase7-verdict.md; dropping any one makes this fail.

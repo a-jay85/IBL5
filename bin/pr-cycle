@@ -434,7 +434,11 @@ _digest_labels() {
         inblk && /^#+ / { exit }
         inblk {
             line = $0
-            sub(/^[[:space:]]*[-*][[:space:]]*/, "", line)
+            # The trailing [[:space:]]+ is load-bearing, not cosmetic. `*` is a list marker
+            # in the class AND the first byte of `**Label:**`, so a zero-or-more space would
+            # let a bare (unbulleted) production line self-strip to `*Label:** ...`, the
+            # match below would fail, and every label would vanish into `digest: unavailable`.
+            sub(/^[[:space:]]*[-*][[:space:]]+/, "", line)
             if (match(line, /^\*\*[^*]+:\*\*/)) {
                 if (label != "") emit(label, val)
                 label = substr(line, 3, RLENGTH - 5)

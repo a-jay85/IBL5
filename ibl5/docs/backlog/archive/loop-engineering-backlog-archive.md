@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed autonomous-loop engineering entries, extracted from loop-engineering-backlog.md.
-last_verified: 2026-09-05
+last_verified: 2026-09-06
 ---
 
 # Autonomous-Loop Engineering Backlog — Archive
@@ -174,3 +174,14 @@ Landing rung: **1** (extend `bin/check-docs` or add a narrow lint for `DRAFT=` e
 **Status (2026-09-04):** ✅ Implemented — 🟦. PR: check-docs-skill-draft-placeholder.
 
 **provenance:** (discovered 2026-09-04 during PR #1946 plan-intent review)
+
+---
+
+### L20 post-plan body-rewrite clobbers `Depends-on:`, bypassing arm condition (6)
+**Location:** `.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md` (arm condition 6: `depends-on-merge-order`) and `.claude/skills/post-plan/SKILL.md:93` (prescribing `Depends-on: #<n>` as the alternative to `--base` stacking in this squash-merge repo).
+**Problem (was):** Arm condition (6) reads the live PR body via `gh pr view` and refuses to arm auto-merge until every PR named on a `Depends-on: #<n>` line is merged. `SKILL.md:93` prescribes `Depends-on:` as the correct alternative to `--base` when the repo squash-merges (a squash collapses the parent's commits, so a stacked child's branch carries pre-squash commits that conflict on auto-retarget). Observed 2026-07-29 on PR #1734 (`fence-parity-guard`): `Depends-on: #1715` was added as line 1 of the body. A later post-plan run rewrote that PR body wholesale; `gh pr view 1734 --json body` then returned a body starting `## Summary` with no `Depends-on:` line, so condition (6) evaluated `blocked=False` and #1734 armed and merged ahead of its declared dependency (commit `1b8249f4f7a651fb78b8e8bc3d60b7af25b460a4`). Effect was harmless this time only because the branch already contained #1715's commits. The structural problem: the same pipeline that reads the `Depends-on:` marker also overwrites the text carrying it — the prescribed alternative to `--base` is silently unreliable as a dependency declaration.
+**Suggested direction (was):** (a) Make body rewrites preserve/re-emit any existing `Depends-on:` lines before overwriting. (b) Move the dependency declaration somewhere the pipeline does not overwrite (a label, or plan frontmatter `depends_on:` — see **L1**, which proposes exactly this field for queue ordering). (c) Have condition (6) read from a source other than the mutable PR body. This needs design; do not pick a direction ad-hoc (touches a `.claude/skills` ship-pipeline invariant per `.claude/rules/work-triage.md` § Ad-hoc safety mirror — wants a `/plan`).
+**Blocked by:** peer session active on branch `postplan-arm-unresolved-findings`; coordinate before touching arm conditions to avoid duplicating work.
+**Risk if untouched (was):** Silent merge-order violations in future stacked-plan programs where the parent branch is not yet in the child's commit history.
+**Status (2026-07-29):** ⬜ Open — 🟥 (ship-pipeline invariant; loop-machinery changes should default to `auto_merge: false`). (discovered 2026-07-29 during PR #1734 fence-parity-guard)
+**Status (2026-09-06):** ✅ Implemented — took direction (a): `/post-plan` Phase 6 Step 3 now captures the markers an earlier phase wrote (`Depends-on:`, plus the `<!-- no-adr: -->` / `<!-- no-refactor-tests: -->` bypass comments read by `bin/adr-check` and `bin/refactor-flag`), re-emits them at the top of the rewritten body, then verifies and self-heals via `gh pr edit --body-file`. Guarded by executable cases in `bin/test-postplan-arm-conditions`. Directions (b) and (c) were not taken — arm condition (6) and where Phase 1 writes the marker are unchanged.

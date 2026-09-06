@@ -856,9 +856,14 @@ jobs:
         if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
 
   # Retention/cleanup for the per-SHA visual-review reports on gh-pages. Runs on
-  # pushes to master (not on PRs, so it is NOT part of the `gate` required check)
-  # and prunes per-SHA dirs whose newest commit is older than 7 days, keeping the
-  # gh-pages branch from growing unbounded.
+  # pushes to master (not on PRs, so it is NOT part of the `gate` required check).
+  # Two-pass prune run by bin/prune-vr-galleries:
+  #   Pass 1 (age): remove per-SHA dirs whose newest commit is older than 7 days.
+  #   Pass 2 (count cap): of the age-pass survivors, keep only the 300 most recent;
+  #     prune the rest. Under the 7-day window at ~76 dirs/day gross arrival
+  #     (measured 2026-08-30), the expected steady-state population is ~530 dirs,
+  #     so 300 is the binding bound (~4 days of retention). Re-measure the dry-run
+  #     count before changing this number.
   vr-pages-cleanup:
     name: VR Pages retention cleanup
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
@@ -883,15 +888,15 @@ jobs:
             bin
           path: master-scripts
 
-      - name: Prune per-SHA report dirs older than 7 days
+      - name: Prune per-SHA report dirs (7-day age prune + 300-dir count cap)
         id: prune
         if: steps.checkout-pages.outcome == 'success'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          removed=$(./master-scripts/bin/prune-vr-galleries --cutoff-days 7)
+          removed=$(./master-scripts/bin/prune-vr-galleries --cutoff-days 7 --max-dirs 300)
           if [ "$removed" -gt 0 ]; then
-            git commit -m "chore(vr-pages): prune ${removed} per-SHA report dir(s) older than 7d"
+            git commit -m "chore(vr-pages): prune ${removed} per-SHA report dir(s) (7d age + 300-dir cap)"
             # Same shared-ref contention as the per-SHA deploy above: in-flight PR VR
             # jobs push their own <sha>/ dirs to gh-pages while we prune. Those commits
             # add paths we never touch, so a rejected push is always contention and a

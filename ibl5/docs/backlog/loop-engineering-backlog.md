@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-09-05
+last_verified: 2026-09-06
 ---
 
 # Loop-Engineering Backlog
@@ -46,7 +46,7 @@ last_verified: 2026-09-05
 | L17 | Shared-context artifact for multi-plan splits | ✅ Implemented | — | S |
 | L18 | Tier-default correction (`impl_model:` fails open to Opus) | ✅ Implemented | — | S |
 | L19 | Weekly product-analytics review | ⬜ Open | 🟦 | M |
-| L20 | post-plan body-rewrite clobbers `Depends-on:`, bypassing arm condition (6) | ⬜ Open | 🟥 | M |
+| L20 | post-plan body-rewrite clobbers `Depends-on:`, bypassing arm condition (6) | ✅ Implemented (2026-09-06) | — | M |
 | L21 | Phase 5.0 parsers fail-open on an unclosed code fence (conformance check covers nothing) | ⬜ Open | 🟥 | S |
 | L22 | Sweep queue-vs-review disposition gates across other skills/scripts | ⬜ Open | 🟦 | S |
 | L23 | sim-recap degraded path emits no Discord signal; qctx() failure ships roster-blind with CI green | 📋 Planned | 🟦 | S |
@@ -77,6 +77,8 @@ last_verified: 2026-09-05
 | L48 | Planning pipeline prose coverage gap: code-block path expressions in `SKILL.md` are invisible to `bin/check-docs`, so they can diverge from `bin/plan-now`'s runtime slug derivation silently | ✅ Implemented (2026-09-04) | 🟦 | S |
 | L49 | `/pr-ready` Phase 6.5 files backlog rows with non-canonical status glyphs and automouse values, making them invisible to open-work filters | ⬜ Open | 🟥 | S |
 | L50 | `bin/pr-cycle` logs gate nominees as "excluded this run" but then orders and readies them (`--gate-edges /dev/null` re-admits every nominee) | ⬜ Open | 🟦 | S |
+| L51 | Plan Phase 5 dry-run count propagated to archive only, not PR body; reviewer blast-radius instruction stale by ~23% | ⬜ Open | 🟦 | S |
+| L52 | Test harness case comment over-claims assertion scope; adjacent cases leave `run_block` exit codes unchecked | ✅ fixed this pass | — | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -165,12 +167,7 @@ last_verified: 2026-09-05
 **Status (2026-07-24):** ⬜ Open — 🟦 (notify surface; human reads the recommendations, nothing auto-applies). (discovered 2026-07-24 during PR #1425 analytics review)
 
 ### L20 post-plan body-rewrite clobbers `Depends-on:`, bypassing arm condition (6)
-**Location:** `.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md` (arm condition 6: `depends-on-merge-order`) and `.claude/skills/post-plan/SKILL.md:93` (prescribing `Depends-on: #<n>` as the alternative to `--base` stacking in this squash-merge repo).
-**Problem:** Arm condition (6) reads the live PR body via `gh pr view` and refuses to arm auto-merge until every PR named on a `Depends-on: #<n>` line is merged. `SKILL.md:93` prescribes `Depends-on:` as the correct alternative to `--base` when the repo squash-merges (a squash collapses the parent's commits, so a stacked child's branch carries pre-squash commits that conflict on auto-retarget). Observed 2026-07-29 on PR #1734 (`fence-parity-guard`): `Depends-on: #1715` was added as line 1 of the body. A later post-plan run rewrote that PR body wholesale; `gh pr view 1734 --json body` then returned a body starting `## Summary` with no `Depends-on:` line, so condition (6) evaluated `blocked=False` and #1734 armed and merged ahead of its declared dependency (commit `1b8249f4f7a651fb78b8e8bc3d60b7af25b460a4`). Effect was harmless this time only because the branch already contained #1715's commits. The structural problem: the same pipeline that reads the `Depends-on:` marker also overwrites the text carrying it — the prescribed alternative to `--base` is silently unreliable as a dependency declaration.
-**Suggested direction:** (a) Make body rewrites preserve/re-emit any existing `Depends-on:` lines before overwriting. (b) Move the dependency declaration somewhere the pipeline does not overwrite (a label, or plan frontmatter `depends_on:` — see **L1**, which proposes exactly this field for queue ordering). (c) Have condition (6) read from a source other than the mutable PR body. This needs design; do not pick a direction ad-hoc (touches a `.claude/skills` ship-pipeline invariant per `.claude/rules/work-triage.md` § Ad-hoc safety mirror — wants a `/plan`).
-**Blocked by:** peer session active on branch `postplan-arm-unresolved-findings`; coordinate before touching arm conditions to avoid duplicating work.
-**Risk if untouched:** Silent merge-order violations in future stacked-plan programs where the parent branch is not yet in the child's commit history.
-**Status (2026-07-29):** ⬜ Open — 🟥 (ship-pipeline invariant; loop-machinery changes should default to `auto_merge: false`). (discovered 2026-07-29 during PR #1734 fence-parity-guard)
+➜ L20 post-plan body-rewrite clobbers `Depends-on:`, bypassing arm condition (6) — ✅ Implemented (2026-09-06): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ### L21 Phase 5.0 parsers fail-open on an unclosed code fence (conformance check covers nothing)
 **Location:** `tools/postplan-harness/harness/planfile.py` — `parse_matrix` and `parse_critical_files` both route through `_strip_fenced`; see the `parse_matrix` docstring on branch `matrix-fence-strip` for the full exposition. `bin/check-plan:477` (`cf_fence_unbalanced`) and its gate comment at `bin/check-plan:470`.
@@ -716,6 +713,63 @@ Landing rung: **2** — add an explicit note to `.claude/skills/fix-and-prevent/
 The static-guard case in `bin/test-pr-cycle` should pin whichever wording lands, so the two cannot drift again.
 
 **provenance:** (discovered 2026-09-05 during the first live `bin/pr-cycle --go` run, right after #2081 merged)
+
+---
+
+### L51 Plan Phase 5 dry-run count propagated to archive only, not PR body; reviewer blast-radius instruction stale by ~23%
+
+*(discovered 2026-09-05 during #2108)*
+
+**class:** A plan Phase 5 stated deliverable — recording the dry-run-measured blast-radius count in the PR body — propagated to the archive entry but not the PR body, leaving a reviewer-facing instruction citing the planning-time estimate (~772) rather than the measured figure (~626), a ~23% overstatement.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #2108 body § "What this PR does to `gh-pages`" — both `~772` occurrences and the reviewer check instruction; plan `~/claude-plans/gh-pages-count-prune.md` Phase 5 states "record 626 in the archive" but does not explicitly say "update the PR body" | yes | was live; fixed this pass | fixed this pass (both occurrences updated to ~626 with measurement note; reviewer instruction now uses `<N>` placeholder) |
+
+**prevention_ladder:**
+
+- rung 0 — not covered. Phase 6 check 4 (`_plan-fidelity-review.md` 6d.4) catches this at review time, as it did here, but not at authoring time.
+- rung 1 — extend Phase 5 of `/pr-ready` or the plan template to add an explicit instruction: "after recording the dry-run measurement, update the PR body in the same phase." No new gate required; the existing Phase 6 check 4a already flags a disagreement as blocking.
+- rung 2 — a rule doc (or an addition to the plan template's Phase 5 dry-run section) stating that any plan phase that measures and records a value must propagate that value to the PR body before proceeding. Cheaper than rung 1 but advisory only.
+
+Landing rung: **2** — add a sentence to the plan template's Phase 5 dry-run section stating that the measured count must be reflected in the PR body in the same phase, before CI is re-watched.
+
+**artifact destination:** plan template or `.claude/skills/pr-ready/SKILL.md` Phase 5 prose (in-repo)
+
+**provenance:** (discovered 2026-09-05 during #2108)
+
+**Status (2026-09-05):** ⬜ Open — 🟦.
+
+---
+
+### L52 Test harness case comment over-claims assertion scope; adjacent cases leave `run_block` exit codes unchecked
+
+*(discovered 2026-09-05 during #2108)*
+
+**class:** A test harness case comment asserts a behavioral property ("1 tracked removed") that the case's assertions do not verify; adjacent cases also capture `run_block` exit codes into a variable but do not assert them, so a non-zero exit silently masks the real cause.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | test-vr-pages-prune:134 — Case 4 comment said "1 tracked removed" but assertions only check rc=0, stray/ presence, and no fatal in stderr | yes | was live at discovery | moot — test-vr-pages-prune has since been retired on master; prune logic moved to `bin/prune-vr-galleries` / `bin/test-prune-eligibility` |
+| 2 | test-vr-pages-prune:142 — `rc4=$?` captured but only asserted as `[ "$rc4" -eq 0 ]`; Cases 1, 2, 3 call `run_block` bare with no explicit exit-code capture | near-miss | was live at discovery | moot — same retired harness |
+
+**prevention_ladder:**
+
+- rung 0 — not covered. `shellcheck` does not validate assertion accuracy vs comment claims.
+- rung 1 — a dedicated per-harness comment-vs-assertion lint: not warranted for a single 7-case harness.
+- rung 2 — no rule doc warranted; the fix is inline and the occurrence is isolated.
+
+Landing rung: **no gate warranted** — neither occurrence exists in the tree after test-vr-pages-prune was retired; the class is real but disproportionate to a standing gate, and Phase 4B structured code review (Agent E) already surfaces this class at review time.
+
+**artifact destination:** n/a
+
+**provenance:** (discovered 2026-09-05 during #2108)
+
+**Status (2026-09-05):** ✅ moot — harness retired this PR.
 
 ---
 

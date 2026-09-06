@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-09-05
+last_verified: 2026-09-06
 ---
 
 # Loop-Engineering Backlog
@@ -79,6 +79,7 @@ last_verified: 2026-09-05
 | L50 | `bin/pr-cycle` logs gate nominees as "excluded this run" but then orders and readies them (`--gate-edges /dev/null` re-admits every nominee) | ⬜ Open | 🟦 | S |
 | L51 | Plan Phase 5 dry-run count propagated to archive only, not PR body; reviewer blast-radius instruction stale by ~23% | ⬜ Open | 🟦 | S |
 | L52 | Test harness case comment over-claims assertion scope; adjacent cases leave `run_block` exit codes unchecked | ✅ fixed this pass | — | S |
+| L53 | Phase 2 test code lost in branch rebuild — invisible because CI passed without the tests | ✅ fixed this pass | — | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -748,6 +749,31 @@ Landing rung: **no gate warranted** — neither occurrence exists in the tree af
 **provenance:** (discovered 2026-09-05 during #2108)
 
 **Status (2026-09-05):** ✅ moot — harness retired this PR.
+
+---
+
+### L53 Phase 2 test code lost in branch rebuild — invisible because CI passed without the tests
+
+*(discovered 2026-09-06 during #2141)*
+
+**class:** A plan phase's test code that was implemented and committed was lost in a manual branch rebuild; the loss was invisible because CI passed — the missing tests had no footprint left to catch their own absence.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/test-automouse-queue` (Phase 2 rows 21-26 + row-15 tightening) | yes | yes | fixed this pass |
+
+**prevention_ladder:**
+
+- rung 0 — already covered: `/pr-ready` Phase 6 check 5 (Verification Matrix realisation) catches absent declared automated test paths, as demonstrated by finding F3 in this very run. Landing rung is **0 — already covered by existing gate.**
+- rungs 1-5 — superseded by rung 0.
+
+**artifact destination:** `.claude/skills/pr-ready/SKILL.md` Phase 6 (the gate that caught this)
+
+**provenance:** (discovered 2026-09-06 during #2141)
+
+**Status (2026-09-06):** ✅ fixed this pass — 🟦.
 
 ---
 

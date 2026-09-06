@@ -372,9 +372,20 @@ CLEAN_MATRIX='
 | 1 | thing works | PHPUnit | post-impl | `tests/X.php` |
 '
 
+# shellcheck disable=SC2016  # literal fixture text; nothing here should expand.
+MANUAL_MATRIX=$(printf '%s\n' \
+  '' \
+  '| # | What to verify | Test type | Timing | Test file / location |' \
+  '|---|---------------|-----------|--------|---------------------|' \
+  '| 1 | a human eyeballs the rendered page | Truly-manual | post-impl | browser |')
+
 # ---------------------------------------------------------------------------
 # Row 15 — a plan with a clean (zero-manual) matrix and NO impl_model marker
 # is refused at queue time (nonzero exit); it must NOT land in queue/.
+# The PRESENCE check (impl_model: is missing or blank) must fire BEFORE the
+# matrix-consistency check — this row is the harness's ordering assertion:
+# if the output matches the presence error message exactly, we know the gate
+# fires early and does not require a matrix to refuse an unmarked plan.
 # ---------------------------------------------------------------------------
 setup
 printf '%s\n' "$CLEAN_MATRIX" > "$PDIR/plan-j.md"
@@ -386,8 +397,9 @@ if [ "$ec" -eq 0 ]; then
     echo "FAIL: row15 — expected non-zero exit for a plan missing impl_model"
     FAILED=1
 fi
-if ! echo "$out" | grep -q "impl_model"; then
-    echo "FAIL: row15 — expected an impl_model-consistency error, got: $out"
+if ! echo "$out" | grep -q "impl_model: is missing or blank"; then
+    echo "FAIL: row15 — expected the impl_model PRESENCE error (which must fire before"
+    echo "      the matrix-consistency error), got: $out"
     FAILED=1
 fi
 assert_absent "row15 not queued" "$NDIR/queue/plan-j.md"
@@ -569,6 +581,72 @@ if [ "$(( $(target_mtime plan-x.md) - $(target_mtime plan-y.md) ))" -lt 60 ]; th
     FAILED=1
 fi
 echo "ok: row20 — successive enqueues stay spaced and ordered"
+
+# ===========================================================================
+# impl_model presence/validity gate — enforced independently of whether the
+# plan carries a Verification Matrix (L46).  bin/lib/plan-model-consistency
+# short-circuits to exit 0 on a matrix-less plan, so these rows exercise the
+# separate check in `queue add` that runs BEFORE it.
+# ===========================================================================
+
+# Assert `queue add` REFUSES a fixture: non-zero exit, plan absent from the
+# queue, and every $3.. token present in the combined output.
+expect_reject() {
+    local row="$1" plan="$2"; shift 2
+    local out ec tok
+    set +e; out=$(run_queue "$plan" 2>&1); ec=$?; set +e
+    if [ "$ec" -eq 0 ]; then
+        echo "FAIL: $row — expected non-zero exit, got 0"
+        FAILED=1
+    fi
+    for tok in "$@"; do
+        if ! echo "$out" | grep -q "$tok"; then
+            echo "FAIL: $row — output missing '$tok', got: $out"
+            FAILED=1
+        fi
+    done
+    assert_absent "$row not queued" "$NDIR/queue/$plan.md"
+    return 0
+}
+
+# Row 21 — NO matrix, valid `impl_model: sonnet` → queues.  Proves the gate does
+# not over-reject the (common) matrix-less plan.
+setup
+printf -- '---\nimpl_model: sonnet\n---\n\n# no matrix here\n' > "$PDIR/plan-m.md"
+run_queue plan-m >/dev/null 2>&1
+assert_present "row21 queued" "$NDIR/queue/plan-m.md"
+echo "ok: row21 — matrix-less plan with a valid impl_model queues"
+
+# Row 22 — NO matrix, NO impl_model → refused.  The exact L46 hole: before this
+# gate plan-model-consistency exited 0 and the plan queued unvalidated.
+setup
+printf -- '# no frontmatter, no matrix\n' > "$PDIR/plan-n.md"
+expect_reject row22 plan-n "impl_model: is missing or blank"
+echo "ok: row22 — matrix-less plan missing impl_model is refused"
+
+# Row 23 — NO matrix, `impl_model: fable` → refused, message NAMES the value.
+# plan-model-tier writes its rejection to STDOUT, so a dropped capture or a
+# stray `2>/dev/null` would silence it.
+setup
+printf -- '---\nimpl_model: fable\n---\n\n# no matrix here\n' > "$PDIR/plan-o.md"
+expect_reject row23 plan-o "fable" "not selectable"
+echo "ok: row23 — matrix-less plan with an unselectable impl_model is refused"
+
+# Row 24 — valid matrix + valid `impl_model: sonnet` → still queues.  Regression
+# guard: the presence check must not shadow the accepted path.
+setup
+printf -- '---\nimpl_model: sonnet\n---\n%s\n' "$CLEAN_MATRIX" > "$PDIR/plan-p.md"
+run_queue plan-p >/dev/null 2>&1
+assert_present "row24 queued" "$NDIR/queue/plan-p.md"
+echo "ok: row24 — matrixed, correctly-marked plan still queues"
+
+# Row 26 — a Truly-manual matrix row under `impl_model: sonnet` is STILL refused
+# by bin/lib/plan-model-consistency.  Without this row the whole consistency call
+# could be deleted and rows 15/21/22/23/24 would all stay green.
+setup
+printf -- '---\nimpl_model: sonnet\n---\n%s\n' "$MANUAL_MATRIX" > "$PDIR/plan-q.md"
+expect_reject row26 plan-q "Truly-manual row forbids impl_model: sonnet"
+echo "ok: row26 — consistency backstop still fires under the new gate"
 
 # ---------------------------------------------------------------------------
 if [ "$FAILED" -ne 0 ]; then

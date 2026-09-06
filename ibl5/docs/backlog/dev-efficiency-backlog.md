@@ -697,7 +697,7 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 | N4 | `codebase-map.md` regenerated as a side effect of other work | correct — expected artifact |
 | N5 | `Team/README.md` `last_verified: 2026-08-16` vs `maintenance-backlog.md` `2026-09-04` — cosmetic inconsistency | fixed this pass (bumped to 2026-09-04) |
 | E52 | PR #2064 Phase 6.5 — stale hand-written PR body claims contradicting the final diff and code | ⬜ Open | — | XS |
-| E54 | PR #2123 Phase 6.5 — PR body page-count overclaim, selector mis-attribution, plan VR command defect, and three confirmatory notes | ⬜ Open | — | XS |
+| E62 | PR #2123 Phase 6.5 — PR body page-count overclaim, selector mis-attribution, plan VR command defect, and three confirmatory notes | ⬜ Open | — | XS |
 
 **prevention_ladder: no gate warranted** — all five are reviewer-confirmed correct behaviors, not defects; the existing `/pr-ready` Phase 6 review pipeline is the mechanism and it worked correctly here.
 
@@ -874,7 +874,7 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 **class:** `rebase-dropped-commit` — an `--onto` rebase replay range that started above the branch's own commits, compounded by a lost-work proof that only compares pre-to-post within a single `/pr-ready` run and cannot detect a branch that arrives already emptied by a previous run's bad rebase.
 ---
 
-### E54 PR #2123 Phase 6.5 — PR body page-count overclaim, selector mis-attribution, plan VR command defect, and three confirmatory notes
+### E62 PR #2123 Phase 6.5 — PR body page-count overclaim, selector mis-attribution, plan VR command defect, and three confirmatory notes
 
 **class:** PR body prose that extends a scope claim to a page explicitly excluded from the confirm-or-add decision set, and that mis-attributes a selector shape to the wrong assertion line; plus a plan VR command that names a non-working invocation path for the VR suite. Consolidated: PR body / plan accuracy defects in the ship-pipeline authoring surface.
 

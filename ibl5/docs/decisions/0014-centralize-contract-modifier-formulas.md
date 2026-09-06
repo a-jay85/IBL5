@@ -1,6 +1,6 @@
 ---
 description: Centralizes shared contract modifier formulas (winner, tradition, loyalty, playing time) into ContractRules static methods, eliminating three divergent implementations.
-last_verified: 2026-07-07
+last_verified: 2026-09-06
 ---
 
 # ADR-0014: Centralize Contract Modifier Formulas

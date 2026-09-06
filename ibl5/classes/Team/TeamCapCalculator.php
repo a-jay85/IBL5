@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace Team;
 
 use League\League;
-use Player\Player;
+use Player\Contract\PlayerContractCalculator;
+use Player\PlayerDataConverter;
 use Season\Season;
 use Team\Contracts\TeamCapCalculatorInterface;
 use Team\Contracts\TeamQueryRepositoryInterface;
@@ -17,7 +18,7 @@ use Trading\Contracts\BuyoutLedgerRepositoryInterface;
  *
  * Holds the cap *business logic* extracted from {@see TeamQueryRepository}
  * (a data-access class per ADR-0001): hard-cap / buyout-limit verdicts and
- * salary aggregation over {@see Player} objects. The repository keeps only
+ * phase-aware salary aggregation over player rows. The repository keeps only
  * raw row/aggregate fetches; this collaborator turns those fetches into cap
  * decisions, mirroring {@see \FreeAgency\FreeAgencyCapCalculator}
  * (ADR-0028: a domain calculator, not a generic Service/Shared bucket).
@@ -31,20 +32,25 @@ class TeamCapCalculator implements TeamCapCalculatorInterface
     private \mysqli $db;
     private TeamQueryRepositoryInterface $teamQueryRepo;
     private BuyoutLedgerRepositoryInterface $cashConsiderationRepo;
+    private ?Season $season = null;
+    private ?PlayerContractCalculator $contractCalculator = null;
 
     /**
-     * @param \mysqli $db Database connection (used to hydrate Player objects)
+     * @param \mysqli $db Database connection
      * @param TeamQueryRepositoryInterface|null $teamQueryRepo Team query repository (created internally if not provided)
      * @param BuyoutLedgerRepositoryInterface|null $cashConsiderationRepo Cash consideration repository (created internally if not provided)
+     * @param Season|null $season Current season (used for phase-aware salary aggregation; when null, a lazy Season is built on first use)
      */
     public function __construct(
         \mysqli $db,
         ?TeamQueryRepositoryInterface $teamQueryRepo = null,
-        ?BuyoutLedgerRepositoryInterface $cashConsiderationRepo = null
+        ?BuyoutLedgerRepositoryInterface $cashConsiderationRepo = null,
+        ?Season $season = null
     ) {
         $this->db = $db;
         $this->teamQueryRepo = $teamQueryRepo ?? new TeamQueryRepository($db);
         $this->cashConsiderationRepo = $cashConsiderationRepo ?? new BuyoutLedgerRepository($db);
+        $this->season = $season;
     }
 
     /**
@@ -110,13 +116,11 @@ class TeamCapCalculator implements TeamCapCalculatorInterface
      */
     public function getTotalCurrentSeasonSalaries(array $result): int
     {
-        $totalCurrentSeasonSalaries = 0;
-
-        $playerArray = $this->convertPlrResultIntoPlayerArray($result);
-        foreach ($playerArray as $player) {
-            $totalCurrentSeasonSalaries += $player->getCurrentSeasonSalary();
+        $total = 0;
+        foreach ($result as $row) {
+            $total += $this->contractCalculator()->getCurrentSeasonSalary(PlayerDataConverter::arrayToPlayerData($row));
         }
-        return $totalCurrentSeasonSalaries;
+        return $total;
     }
 
     /**
@@ -126,15 +130,13 @@ class TeamCapCalculator implements TeamCapCalculatorInterface
      */
     public function getTotalNextSeasonSalaries(array $result): int
     {
-        $totalNextSeasonSalaries = 0;
-
+        $total = 0;
         /** @var list<PlayerRow> $typedResult */
         $typedResult = $result;
-        $playerArray = $this->convertPlrResultIntoPlayerArray($typedResult);
-        foreach ($playerArray as $player) {
-            $totalNextSeasonSalaries += $player->getNextSeasonSalary();
+        foreach ($typedResult as $row) {
+            $total += $this->contractCalculator()->getNextSeasonSalary(PlayerDataConverter::arrayToPlayerData($row));
         }
-        return $totalNextSeasonSalaries;
+        return $total;
     }
 
     /**
@@ -166,17 +168,15 @@ class TeamCapCalculator implements TeamCapCalculatorInterface
     }
 
     /**
-     * Convert player result array into Player objects.
-     *
-     * @param list<PlayerRow> $result
-     * @return array<int, Player> Array of Player objects indexed by player ID
+     * Return the memoized phase-aware contract calculator, building it on first
+     * call. The Season is resolved lazily so that callers that never touch a
+     * salary aggregate pay no settings-query cost.
      */
-    private function convertPlrResultIntoPlayerArray(array $result): array
+    private function contractCalculator(): PlayerContractCalculator
     {
-        $array = [];
-        foreach ($result as $plrRow) {
-            $array[$plrRow['pid']] = Player::withPlrRow($this->db, $plrRow);
+        if ($this->contractCalculator === null) {
+            $this->contractCalculator = new PlayerContractCalculator($this->season ?? new Season($this->db));
         }
-        return $array;
+        return $this->contractCalculator;
     }
 }

@@ -754,6 +754,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      actions: read
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -811,6 +812,63 @@ jobs:
           name: playwright-report
           path: ibl5/playwright-report/
           retention-days: 7
+
+      - name: Upload flake input JSON
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-flake-input
+          path: ibl5/test-results.json
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Roll flake ledger
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          WORK="$RUNNER_TEMP/flake"
+          mkdir -p "$WORK"
+          if [ ! -f ibl5/test-results.json ]; then
+            echo "::notice::no test-results.json produced; skipping flake ledger roll"
+            exit 0
+          fi
+          : > "$WORK/prev.ndjson"
+          ART_ID="$(gh api \
+            "repos/${{ github.repository }}/actions/artifacts?name=flake-ledger&per_page=100" \
+            --jq '[.artifacts[] | select(.name == "flake-ledger" and .expired == false)] | sort_by(.created_at) | last | .id // empty' \
+            2>/dev/null || true)"
+          if [ -n "$ART_ID" ]; then
+            if gh api "repos/${{ github.repository }}/actions/artifacts/$ART_ID/zip" \
+                 > "$WORK/prev.zip" 2>/dev/null \
+               && unzip -o -q "$WORK/prev.zip" -d "$WORK/prevdir" \
+               && [ -f "$WORK/prevdir/flake-ledger.ndjson" ]; then
+              cp "$WORK/prevdir/flake-ledger.ndjson" "$WORK/prev.ndjson"
+            else
+              echo "::notice::could not read previous flake-ledger artifact $ART_ID; starting fresh"
+            fi
+          else
+            echo "::notice::no previous flake-ledger artifact; starting fresh"
+          fi
+          echo "prior ledger records: $(grep -c . "$WORK/prev.ndjson" || true)"
+          ibl5/bin/parse-playwright-flakes \
+            --json ibl5/test-results.json \
+            --run-id "${{ github.run_id }}" \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --merge "$WORK/prev.ndjson" \
+            --retain-days 90 \
+            > "$WORK/flake-ledger.ndjson"
+          echo "flake ledger: $(grep -c . "$WORK/flake-ledger.ndjson" || true) record(s)"
+
+      - name: Upload flake ledger
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: flake-ledger
+          path: ${{ runner.temp }}/flake/flake-ledger.ndjson
+          retention-days: 90
+          if-no-files-found: ignore
 
       - name: Restore CML cache
         if: always() && github.event_name == 'pull_request'

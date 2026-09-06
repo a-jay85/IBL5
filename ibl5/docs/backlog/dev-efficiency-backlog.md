@@ -79,6 +79,9 @@ last_verified: 2026-09-06
 | E55 | PR #2126 Phase 6.5 — machine-authored post-review commit undisclosed in PR body scope/coverage claims; Checks 3, 4-i, 4-ii fixed this pass | ⬜ Open | — | XS |
 | E56 | PR #2126 Phase 6.5 — stale entry-point counts in plan-preserved maintenance-backlog prose; both fixed this pass | ⬜ Open | — | XS |
 | E58 | PR #2133 Phase 6.5 — plan verification rows 4.e and 6.a false-positive on correct code; PR authoring notes | ⬜ Open | — | XS |
+| E54 | PR #2084 Phase 6.5 — rebase silently dropped implementation commit; lost-work proof blind to pre-run loss | ⬜ Open | — | XS |
+| E55 | PR #2129 Phase 6.5 — PR body false E2E claim, omitted grep finding, vacuous VM selector; all fixed this pass | ⬜ Open | — | XS |
+| E56 | PR #2129 Phase 6.5 — SKILL.md size-band gate not updated after deliberate file growth; fixed this pass | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -890,6 +893,14 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 ### E55 PR #2126 Phase 6.5 — machine-authored post-review commit undisclosed in PR body
 
 **class:** A machine-authored remediation commit riding into an open PR post-review without the PR body's hand-written scope expansion paragraph and manual-testing coverage claim being updated — leaving a false positive "fully covered" assertion and an undisclosed extra file in the diff.
+### E55 PR #2129 Phase 6.5 — PR body false E2E claim, omitted grep finding, vacuous VM selector
+
+**class (consolidated — B1, N3, N4):**
+- B1: a false test-class assertion in a PR body naming a testing class (E2E) absent from the diff — a verbatim recurrence of the defect the same PR archives.
+- N3: an omitted empirical grep result in the PR body `## Why` section, where the plan explicitly directed the author to record which case (live vector / prophylactic) was found.
+- N4: a vacuous pytest selector in a Verification Matrix row (`-k prready`) that can never collect any test.
+
+All three fixed this pass: B1 and N3 via `gh pr edit`; N4 via the plan file VM.
 
 **occurrence table:**
 
@@ -938,6 +949,25 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 ### E58 PR #2133 Phase 6.5 — plan verification rows 4.e and 6.a false-positive on correct code; PR authoring notes
 
 **class:** Plan verification shell commands that extract a function body with `sed` then grep the full text—including comment lines—for forbidden identifiers, producing false positives when the function's own comments document the property being verified.
+| 1 | PR #2129 body `## Manual Testing` — "all changes are covered by unit and E2E tests"; diff has zero E2E tests | yes (B1) | yes | fixed this pass — corrected to sentinel template with CLI-executable outcome sentence |
+| 2 | PR #2129 body `## Why` — grep case (live vector vs. prophylactic) not stated | yes (N3) | yes | fixed this pass — added: 265 plan files carry `## Automouse Hold Justification`; 703 heading/checkbox lines confirm the injection vector is live |
+| 3 | `~/claude-plans/postplan-hold-justification-diff-bounds.md` VM row 12 — `-k prready` deselects all 17 tests | yes (N4) | yes | fixed this pass — corrected to `-k pr_ready` in plan file |
+
+**prevention_ladder:**
+- rung 0 — already covered? B1: yes — `.claude/rules/pr-body-test-claim.md` + Phase 6 check 4. N3/N4: no prior mechanism.
+- rung 1 — extend existing gate? N4 selector could be verified by a VM harness row asserting `pytest -k <selector>` collects at least one test; niche.
+- rungs 2–5 — not warranted for any of the three.
+- landing rung: no gate warranted — Phase 6 check 4 and `pr-body-test-claim.md` catch B1; N3/N4 are authoring notes caught by Phase 6 checks 2 and 5.
+
+`prevention_ladder: no gate warranted — Phase 6 check 4 + pr-body-test-claim.md catch B1; N3/N4 caught by Phase 6 checks 2 and 5`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-06 during Phase 6 review of #2129)*
+
+### E56 PR #2129 Phase 6.5 — SKILL.md size-band gate not updated after deliberate file growth
+
+**class:** a test-maintenance omission — a size-band gate (`bin/test-pr-ready-now` case 25) not updated when the guarded file grew by deliberate plan work in the same PR.
 
 **occurrence table:**
 
@@ -979,3 +1009,16 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 - **Check 2 deviation — `${arr[@]+"${arr[@]}"}` form:** `class: n/a` — deliberate correctness fix over the plan's literal text; required for `set -uo pipefail` + bash 3.2 unbound-variable guard; reviewer confirmed it is the better route. prevention_ladder: no gate warranted.
 - **Check 4 Note (b) — `feat:` vs `chore:` title typing:** `class: n/a` — maps to no 6d clause per reviewer; `feat:` is consistent with plan intent (`auto_merge: false` + human-signoff hold before unattended merge). prevention_ladder: rung 2 — `commit-conventions.md` already documents the GM-test rubric; no additional gate.
 - **Check 4 Note (c) — commit subject under-describes:** `class: n/a` — ephemeral; this repo squash-merges and master takes the PR title, not the branch commit subject. prevention_ladder: no gate warranted.
+| 1 | `bin/test-pr-ready-now:1880` — band [34616, 36616]; SKILL.md grew to 37174 B after diff-bounds block added by E20; gate fired correctly, band not updated | yes | yes | fixed this pass — band re-centred to [36174, 38174] |
+
+**prevention_ladder:**
+- rung 0 — already covered? Yes — the band gate itself caught the violation in CI.
+- rung 1 — extend existing gate? The gate could read expected size from a comment in SKILL.md; adds coupling.
+- rungs 2–5 — not warranted.
+- landing rung: no gate warranted — the existing gate caught it; authoring discipline (update the band when SKILL.md grows intentionally) is the prevention.
+
+`prevention_ladder: no gate warranted — existing band gate caught it; rung-0 is the prevention mechanism`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-06 during Phase 6 remediation of #2129)*

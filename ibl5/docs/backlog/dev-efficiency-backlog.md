@@ -964,3 +964,31 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-05 during Phase 6 review of #2126)*
+
+### E57 `bin/adr-check` red at merge on #2124 and #2119 — new rule docs landed with no ADR and no `no-adr:` marker
+
+**class:** A decision-trigger-surface PR merged with the "Meta checks" `bin/adr-check` step red, because that check is **advisory** — `master`'s `required_status_checks.contexts` is `["Tests and Analysis", "E2E Tests", "human-signoff"]` only. GitHub permitted every merge; no protection was bypassed and no admin override was used. The residue is an audit-trail gap: `ibl5/docs/decisions/README.md` § "When an ADR is Required" item 2 fires on a new `.claude/rules/*.md` doc, and the policy's own remedy (`<!-- no-adr: reason -->` in the PR body) was never typed, so the record shows a triggered requirement with no disposition.
+
+A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4` placed the rule doc at `ibl5/.claude/rules/bin-help-span-and-secondary-assertions.md` (example) — an `ibl5/`-prefixed path that does not exist. The `adr` `dorny/paths-filter` glob is `.claude/rules/*.md` (no prefix), so the filter did not match, the `Run bin/adr-check` step was **skipped**, and the job reported green. Commit `c572dd6b` corrected the path, the filter then matched, and the step ran and genuinely failed ~2.5 minutes before merge. **A path-prefix typo converts a required-by-policy gate into a free green with no signal that anything was skipped.**
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #2124 — added `.claude/rules/scope-expansion-justification.md`; body has zero `no-adr` markers | yes | merged red 2026-09-05T16:43:10Z | disposition recorded below; no ADR owed |
+| 2 | PR #2119 — added `.claude/rules/bin-help-span-and-secondary-assertions.md`; body has zero `no-adr` markers | yes | merged red 2026-09-05T13:03:01Z | disposition recorded below; no ADR owed |
+| 3 | PR #2121 — added a rule doc, `adr-check` green | no (control) | n/a | body carries `<!-- no-adr: new always-loaded rule doc, authoring discipline only -->` — the correct precedent for this file class |
+| 4 | `472fe0a4` misplaced path ⇒ `adr` filter miss ⇒ step skipped ⇒ green | yes (skip-as-green) | mechanism still live | not fixed — a skipped `if:`-gated step is indistinguishable from a passing one in `statusCheckRollup` |
+
+**retroactive disposition (the marker that should have been in each body):** both files are path-conditional / always-loaded **authoring-discipline** rule docs — they govern how a PR body or a `bin/` help comment is written. Neither records an architectural decision, so neither owes an ADR; `ibl5/docs/decisions/README.md`'s bypass clause ("changes that genuinely don't need an ADR") is the correct disposition, exactly as applied in #2121. Writing an ADR for either would violate `.claude/rules/doc-freshness.md` § "Decision Records Are Append-Only" by asserting a decision nobody took.
+
+**prevention_ladder:**
+- rung 0 — `bin/adr-check` already exists and already produced the correct FAIL on both PRs. The gate is not broken; it is **non-blocking** (advisory context) and **`pull_request`-event-only**, so nothing re-flags the debt after merge.
+- rung 1 — no rule-doc fix available: a rule doc cannot make an advisory check blocking, and the authoring discipline it would encode ("type the marker") is already stated verbatim in `ibl5/docs/decisions/README.md`.
+- rung 2 — promote `Meta checks` to a required context on `master`. **Deliberately not taken here.** That is a branch-protection change on the ship-pipeline surface, which trips `.claude/rules/work-triage.md`'s safety mirror and wants a `/plan`, not an ad-hoc edit riding a backlog entry.
+- rung 3 — for occurrence 4, make the `adr` filter's skip observable (e.g. an explicit `else`-branch step that prints "adr-check skipped: no decision-trigger paths in diff"), so a free green from a path typo is legible in the log. Cheap and additive; also wants its own change, not this one.
+- **landing rung:** rung 0 for the two merged PRs — record the disposition here. Retroactively editing each merged PR body to carry the `no-adr:` marker the policy names is the natural companion, but it mutates a closed artifact and is left as a separate, explicitly-authorized action; this entry is the durable record either way. Rungs 2 and 3 are surfaced, not built.
+
+`artifact destination: this entry (retroactive <!-- no-adr: --> markers in the bodies of #2124 and #2119 proposed, not applied)`
+
+*(discovered 2026-09-05 while investigating recently merged PRs that carried red CI)*

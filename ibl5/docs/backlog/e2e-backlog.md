@@ -1,6 +1,6 @@
 ---
 description: E2E (Playwright + api-e2e) test-quality backlog — refactoring, perf, weak/tautological assertions, tests that don't prove functionality, and flake-prone patterns, with per-entry status + automouse-readiness. Each open entry is a candidate for a /plan.
-last_verified: 2026-09-05
+last_verified: 2026-09-06
 ---
 
 # E2E Test-Quality Backlog
@@ -231,6 +231,8 @@ value). For fake-POST tests (D7), assert the banner *after a real submit*, not a
 | E13 | ⬜ Open | 🟩 | Plan-specified diagnostic strings and DOM observation evidence omitted during E2E assertion implementation. Messages fixed inline (PR #1807). DOM dumps for D15's four no-team pages not captured — needs a Playwright run against the worktree stack with `IBL_TEST_USER_REGULAR` credentials. (discovered 2026-09-02 during #1807) |
 | E14 | ⬜ Open | 🟥 | Autofix bot (`IBL5 Bug Hunter (sandbox)`, commit `ede59f41d`) silently removed the D15 Player-negotiate `.ibl-alert--error` assertion without declaring a scope change, leaving permissive-form coverage on a route with assertable production behavior. (discovered 2026-09-03 during #1807) |
 | E15 | ⬜ Open | — | E2E spec inline comment overstates ordering assertion; matrix row #8 not provably run — see prose |
+| E16 | ⬜ Open | — | E2E assertion in `bin/bug-pipeline-e2e:180` exercises extra-argument rejection rather than declared migration-153 ENUM boundary — not fixed, filed. (discovered 2026-09-05 during #1950) |
+| E17 | ⬜ Open | — | `server.e2e.test.ts` silently skips when `BUG_BOT_E2E=1` but `BUG_BOT_E2E_MESSAGE_ID` unset — gate is `describe.runIf(E2E && SEED !== '')` (discovered 2026-09-06 during #1950) |
 
 **Suggested direction (axis):** All E1–E12 items complete (PR #1805). E9's final implementation uses `evaluate(form.submit())` + auto-retrying `toContainText` DOM assertion rather than `waitForResponse` — `form.submit()` triggers full-page navigation, making `page.content()` race the navigate; the DOM assertion survives the navigation. E9 STOP GUARD: not triggered — PHP validation confirmed working.
 **Est. effort:** complete. **Risk if untouched:** n/a.
@@ -302,6 +304,52 @@ prevention_ladder:
 artifact_destination: n/a — no gate
 
 provenance: (discovered 2026-09-04 during #1956)
+
+### E16 E2E assertion in `bin/bug-pipeline-e2e` exercises extra-argument rejection rather than declared migration-153 ENUM boundary
+
+class: a test-assertion mismatch where the assertion label claims to verify an ENUM boundary (migration 153's status column) but the invocation exercises a different failure mode (extra positional argument vs. invalid status value), meaning the ENUM boundary is not actually verified.
+
+occurrence table:
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/bug-pipeline-e2e:180` | yes — invocation uses an extra positional argument to trigger failure rather than an invalid status value as declared | live | not fixed — filed |
+
+prevention_ladder:
+- rung 0: no existing gate checks that plan-declared assertion inputs match the failure mode under test.
+- rung 1: could extend the `bin/bug-pipeline-e2e` harness to use `transition.php "$ID2" not_a_status` (the declared ENUM boundary input from plan row 7.e) — no new gate needed.
+- rung 2: no rule doc warranted — this is a one-off invocation mismatch.
+- rung 3–5: no PHPStan or CI check can validate shell-script test input semantics.
+- landing rung: rung 1 — fix the invocation to use the declared ENUM-invalid status value; no new gate needed.
+
+artifact_destination: `bin/bug-pipeline-e2e:180` — in-repo
+
+provenance: (discovered 2026-09-05 during #1950)
+
+---
+
+### E17 `server.e2e.test.ts` silently skips when `BUG_BOT_E2E=1` but `BUG_BOT_E2E_MESSAGE_ID` is unset
+
+**class:** an E2E gate that silently no-ops rather than failing loudly when a required seed env var is absent, causing the whole Phase 8 Discord smoke to appear green without running.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/IBLbot/src/bug-bot/server.e2e.test.ts` — `describe.runIf(E2E && SEED !== '')` gate | yes | live | not fixed — filed |
+
+**prevention_ladder:**
+- rung 0 — already covered by an existing gate? No.
+- rung 1 — extend an existing gate? Could add a `SEED`-present check inside the `describe.runIf` block or throw when `E2E=1` but `SEED=''`, matching `server.live.test.ts`'s pattern.
+- rung 2 — a rule doc? Not warranted — this is a one-file pattern.
+- rungs 3–5 — not warranted: the test is opt-in and locally run only.
+- landing rung: rung 1 — change `describe.runIf(E2E && SEED !== '')` to `describe.runIf(E2E)` with an early `if (SEED === '') throw new Error('BUG_BOT_E2E_MESSAGE_ID is required')` so the opt-in run fails loudly.
+
+`prevention_ladder: rung 1 — guard inside describe block rather than silently gating on the seed value`
+
+`artifact destination: ibl5/IBLbot/src/bug-bot/server.e2e.test.ts`
+
+*(discovered 2026-09-06 during #1950)*
 
 ---
 

@@ -191,6 +191,36 @@ Entries 9.1–9.3 are defects and gaps surfaced by the 2026-09-01 audit of PR #2
 
 ---
 
+## Axis 10: Shallow-clone crash in CI tooling (PR #1950)
+
+`bin/lighthouse-pr-urls` crashed on shallow CI checkouts, failing the Performance Audit job entirely. Entry 10.1 is the fixed crash; future fetch-depth decisions should treat this as a precedent.
+
+| # | Title | Status | Automouse | Effort |
+|---|-------|--------|-----------|-------:|
+| 10.1 | `bin/lighthouse-pr-urls` crashes on shallow clones lacking `origin/master`, failing the Performance Audit CI job | ✅ fixed this pass | — | S |
+
+### 10.1 `bin/lighthouse-pr-urls` crashes on shallow clones lacking `origin/master`
+
+**class:** A CI script that calls `git diff --name-only origin/master...HEAD` without a shallow-clone fallback, causing exit 1 when CI checks out a shallow copy (no `fetch-depth: 0`) and `origin/master` is absent — the Performance Audit job fails entirely rather than running on a representative URL set.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/lighthouse-pr-urls:74` (approx) — `proc_open(['git', 'diff', '--name-only', 'origin/master...HEAD'], ...)` followed by `exit(1)` on non-zero exit | yes | live | fixed this pass (graceful empty-list fallback on git diff failure) |
+
+**prevention_ladder:**
+- rung 0 — not covered; no existing gate validates that git scripts have shallow-clone fallbacks.
+- rung 1 — the script itself is the correct extension point (done this pass: `exit(1)` replaced with `$rawDiff = ''` + STDERR message, downstream logic falls through to `LighthouseUrls::representativeUrls()` which emits a non-empty URL set).
+- rung 4 — a future improvement: a CI test running `bin/lighthouse-pr-urls` against a shallow clone would confirm the fallback works. Low priority now that the fix is in.
+- **landing rung: rung 1** — fallback added this pass; no new gate needed.
+
+**artifact destination:** `bin/lighthouse-pr-urls` — in-repo
+
+**provenance:** (discovered 2026-09-05 during #1950 CI run — Performance Audit job failed)
+
+---
+
 ## Burn-down process
 
 1. Pick an entry; `/plan` it (CI infra touching deploy/notify → expect `auto_merge: false`).

@@ -116,6 +116,7 @@ last_verified: 2026-09-07
 | E95 | Unasked-for `last_verified` change with duplicate YAML key in `ibl5/docs/decisions/README.md` | ✅ fixed this pass | — | XS |
 | E96 | Three residual isolation/scope gaps in `bin/bug-pipeline-test-env` (F3/F6/F7 from #1950 Phase 6) | ⬜ Open | — | S |
 | E97 | Stale numeric count in PR body Scope prose (Phase 6 findings from #2160) | ⬜ Open | — | XS |
+| E62 | PR #1801 Phase 6.5 — PR body `### Changes` ID drift after renumber commit, plan recipe staleness, undeclared Phase 6.5 scope creep (F4 fixed; F1/F2/F3 filed) | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -1790,3 +1791,25 @@ Landing rung: **1** — extend `bin/check-rules-byte-budget` to warn when the ag
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-07 during #2160)*
+### E62 PR #1801 Phase 6.5 — PR body `### Changes` ID drift after renumber commit, plan recipe staleness, undeclared Phase 6.5 scope creep
+
+**class:** a `/pr-ready` Phase 6.5 remediation pass that (F4) fails to re-read `### Changes` PR body bullets after a renumber commit changes the IDs being cited; (F1) applies plan recipes whose structural anchors master had already removed; (F2, F3) creates or modifies files not declared by any plan phase, producing scope creep flagged at Phase 6 6d.3.
+
+**occurrence table:**
+
+| # | Finding | Same class? | Live? | Status |
+|---|---------|-------------|-------|--------|
+| 1 (F4) | PR #1801 body `### Changes` — names `L51/L52/L53`; diff files `L54/L55/L56` (renumber commit `ae0a027ca` landed after bullet was authored) | yes | live at Phase 6 review | fixed this pass — bullet updated to name L54/L55/L56 and "two prior passes" |
+| 2 (F1) | PR #1801 — plan's Step 6.2 recipe referenced `## Axis 6`, roll-up table row `\| ✅ Implemented \| 8 \|`, and `last_verified: 2026-07-14`; none existed on master at landing time | yes | live at plan-write | not fixed — implementation took the only correct route (flip existing `6.1` row); plan recipe is unapplicable rather than wrong |
+| 3 (F2) | PR #1801 — `ibl5/docs/backlog/archive/ci-backlog-archive.md` (+9) written by prior Phase 6.5 pass but unnamed by any plan phase | yes | live at Phase 6 review | not fixed — additive; no blocking consequence; filed |
+| 4 (F3) | PR #1801 — `ibl5/docs/backlog/loop-engineering-backlog.md` L54–L56 bodies appended after `## Burn-down process` (line 784) rather than before it, placing them outside the section where L1–L53 bodies sit | yes | live at Phase 6 review | not fixed — cosmetic, docs-only; filed |
+
+**prevention_ladder:**
+- rung 0 — `.claude/rules/pr-body-negative-claim-recheck.md` (E46) governs re-reading "What is NOT in this PR" bullets after commits. It does not cover `### Changes` ID literals. L56 (loop-engineering-backlog.md) filed the completeness gap ("require bullet-list completeness"); today's finding is the content complement — a bullet present but citing stale IDs.
+- rung 1 — extend `.claude/rules/pr-body-negative-claim-recheck.md`: add a row to its `## Application` table for the `### Changes` ID-drift case (a bullet naming specific backlog IDs that a subsequent renumber commit changes). The existing table row for remediation commits covers the `## What is NOT` section; one new row covers `### Changes` ID claims. Low cost; no new script or CI step.
+- rungs 2–5 — not warranted; rung 1 closes the gap with no new tooling overhead.
+- **landing rung:** rung 1 — extend `.claude/rules/pr-body-negative-claim-recheck.md`.
+
+`artifact destination: .claude/rules/pr-body-negative-claim-recheck.md` (in-repo rule doc)
+
+*(discovered 2026-09-06 during Phase 6.5 remediation of #1801)*

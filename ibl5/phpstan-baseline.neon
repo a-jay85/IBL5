@@ -5328,3 +5328,15 @@ parameters:
 			identifier: encapsedStringPart.nonString
 			count: 6
 			path: themes/IBL/theme.php
+
+		-
+			rawMessage: 'getopt() call lacks an unknown-option guard. After calling getopt(), compare $argv against the accepted option list and call usage_error() / exit(1) on any unrecognized argument. Suppress with @phpstan-ignore ibl.unknownCliOption only after the guard is in place.'
+			identifier: ibl.unknownCliOption
+			count: 1
+			path: scripts/build-engine-bundle.php
+
+		-
+			rawMessage: 'getopt() call lacks an unknown-option guard. After calling getopt(), compare $argv against the accepted option list and call usage_error() / exit(1) on any unrecognized argument. Suppress with @phpstan-ignore ibl.unknownCliOption only after the guard is in place.'
+			identifier: ibl.unknownCliOption
+			count: 1
+			path: scripts/runEngineShadow.php

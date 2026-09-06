@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# flake-ledger-report - summarise the E2E flake ledger into a Discord message.
+#
+# Usage:
+#   bin/flake-ledger-report --ledger <ledger.ndjson> [--threshold N] [--format text|count]
+#                           [--ledger-url <url>]
+#
+# --format text  (default) prints the Discord message on stdout, capped under Discord's
+#                2000-character limit.
+# --format count prints only the number of quarantine candidates, for gating the send.
+#
+# A quarantine candidate is a spec+title that flaked in >= N distinct CI runs (default 3).
+# A missing or empty ledger is not an error: the report says so and the count is 0.
+
+set -euo pipefail
+
+LEDGER=""; THRESHOLD=3; FORMAT="text"; LEDGER_URL=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --ledger)     LEDGER="${2:-}"; shift 2 ;;
+    --threshold)  THRESHOLD="${2:-}"; shift 2 ;;
+    --format)     FORMAT="${2:-}"; shift 2 ;;
+    --ledger-url) LEDGER_URL="${2:-}"; shift 2 ;;
+    *) echo "Unknown option: $1" >&2; exit 2 ;;
+  esac
+done
+
+[ -n "$LEDGER" ] || { echo "--ledger is required" >&2; exit 2; }
+case "$THRESHOLD" in ''|*[!0-9]*) echo "--threshold must be a positive integer" >&2; exit 2 ;; esac
+[ "$THRESHOLD" -ge 1 ] || { echo "--threshold must be a positive integer" >&2; exit 2 ; }
+case "$FORMAT" in text|count) ;; *) echo "Unknown --format: $FORMAT (expected text or count)" >&2; exit 2 ;; esac
+
+TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+: > "$TMP/ledger.ndjson"
+if [ -f "$LEDGER" ]; then cp "$LEDGER" "$TMP/ledger.ndjson"; fi
+
+jq -s '
+  map(select(type == "object" and has("spec") and has("title") and has("run_id")))
+  | group_by(.spec + "|" + .title)
+  | map({ spec:  .[0].spec,
+          title: .[0].title,
+          count: (map(.run_id) | unique | length),
+          last:  (map(.date // "0000-00-00") | max) })
+  | sort_by(-.count, .spec, .title)
+' "$TMP/ledger.ndjson" > "$TMP/agg.json"
+
+CANDIDATES="$(jq --argjson th "$THRESHOLD" '[ .[] | select(.count >= $th) ] | length' "$TMP/agg.json")"
+
+if [ "$FORMAT" = "count" ]; then
+  echo "$CANDIDATES"
+  exit 0
+fi
+
+TOTAL="$(jq 'length' "$TMP/agg.json")"
+RECORDS="$(grep -c . "$TMP/ledger.ndjson" || true)"
+
+{
+  echo "E2E Flake Quarantine Report - $(date -u +%Y-%m-%d)"
+  if [ "$TOTAL" -eq 0 ]; then
+    echo "No flake data in the ledger yet - no E2E test has passed only on retry in the retention window."
+  else
+    echo "Tracking $TOTAL flaky spec(s) across $RECORDS ledger record(s)."
+    echo ""
+    if [ "$CANDIDATES" -eq 0 ]; then
+      echo "No quarantine candidates (threshold: $THRESHOLD runs)."
+    else
+      echo "Quarantine candidates (flaked in >= $THRESHOLD distinct runs):"
+      jq -r --argjson th "$THRESHOLD" '
+        .[] | select(.count >= $th)
+        | "  \(.count)x \(.spec) > \(.title)  (last \(.last))"' "$TMP/agg.json"
+    fi
+    WATCH="$(jq --argjson th "$THRESHOLD" '[ .[] | select(.count == $th - 1) ] | length' "$TMP/agg.json")"
+    if [ "$WATCH" -gt 0 ]; then
+      echo ""
+      echo "Watchlist ($((THRESHOLD - 1)) runs):"
+      jq -r --argjson th "$THRESHOLD" '
+        .[] | select(.count == $th - 1)
+        | "  \(.count)x \(.spec) > \(.title)  (last \(.last))"' "$TMP/agg.json"
+    fi
+  fi
+  if [ -n "$LEDGER_URL" ]; then
+    echo ""
+    echo "Ledger artifact: $LEDGER_URL"
+  fi
+} > "$TMP/report.txt"
+
+if [ "$(wc -c < "$TMP/report.txt")" -gt 1900 ]; then
+  head -c 1900 "$TMP/report.txt"
+  printf '\n... (truncated; full list in the flake-ledger artifact)\n'
+else
+  cat "$TMP/report.txt"
+fi

@@ -129,6 +129,12 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: bin/adr-check --pr
 
+      - name: adr-check skipped (no decision-trigger paths in diff)
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.adr != 'true' }}
+        run: |
+          echo "adr-check skipped: no decision-trigger paths in diff"
+          echo "If this is unexpected, check the adr filter globs in this workflow's paths-filter step."
+
       - name: Run bin/check-numbering
         if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.numbering == 'true' }}
         run: bin/check-numbering --since=${{ github.event.pull_request.base.sha }}

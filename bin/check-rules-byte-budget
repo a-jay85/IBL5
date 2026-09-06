@@ -60,7 +60,8 @@ RULES_DIR="$ROOT/.claude/rules"
 # paths: globs; both keep a one-line trigger stub in workflow-continuity.md, which
 # names the scoped file so the payload stays one Read away. See Check 4 below.
 # 2026-09-05: pr-body-negative-claim-recheck added (E46, rung 1) — always-loaded authoring norm.
-ALLOWLIST="agent-tiering auto-commit pr-body-negative-claim-recheck work-triage workflow-continuity"
+# 2026-09-05: pr-body-claims added (L43, rung 2) — inline source citation norm for PR body figures.
+ALLOWLIST="agent-tiering auto-commit pr-body-claims pr-body-negative-claim-recheck work-triage workflow-continuity"
 
 # Shared by Check 3 and --report-mode — the single paths: parser. Prints one glob
 # per line for $1; prints nothing when the file has no paths: key. Handles BOTH

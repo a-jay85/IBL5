@@ -185,3 +185,33 @@ Landing rung: **1** (extend `bin/check-docs` or add a narrow lint for `DRAFT=` e
 **Risk if untouched (was):** Silent merge-order violations in future stacked-plan programs where the parent branch is not yet in the child's commit history.
 **Status (2026-07-29):** ⬜ Open — 🟥 (ship-pipeline invariant; loop-machinery changes should default to `auto_merge: false`). (discovered 2026-07-29 during PR #1734 fence-parity-guard)
 **Status (2026-09-06):** ✅ Implemented — took direction (a): `/post-plan` Phase 6 Step 3 now captures the markers an earlier phase wrote (`Depends-on:`, plus the `<!-- no-adr: -->` / `<!-- no-refactor-tests: -->` bypass comments read by `bin/adr-check` and `bin/refactor-flag`), re-emits them at the top of the rewritten body, then verifies and self-heals via `gh pr edit --body-file`. Guarded by executable cases in `bin/test-postplan-arm-conditions`. Directions (b) and (c) were not taken — arm condition (6) and where Phase 1 writes the marker are unchanged.
+
+---
+
+### L43 Autonomous-loop doc-fix PR body contains stale claims and inconsistent ADR authoring format after post-review commit
+
+*(discovered 2026-09-02 during #2059)*
+
+**class:** a PR body hand-authored by an autonomous-loop run that contains specific version claims, figure values, or scope descriptions which become inaccurate when a post-review commit changes the referenced content without triggering a body update.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #2059 body — bullet 2 claimed gitleaks workflow v2→v3 upgrade; no workflow file was in the diff | yes | yes | fixed this pass (via `gh pr edit`) |
+| 2 | PR #2059 body — bullet 3 said "147 → 17 call sites"; authoritative count per `ibl5/phpstan-baseline.neon` is 134 sites across 17 files | yes | yes | fixed this pass (via `gh pr edit`) |
+| 3 | PR #2059 body — Manual Testing said "verified by automated tests"; all CI test jobs skipped by docs-only path filter | yes | yes | fixed this pass (via `gh pr edit`) |
+| 4 | PR #2059 — ADR-0026 Threshold Rationale was an in-place rewrite, inconsistent with addendum format used in ADR-0034 and ADR-0077 | yes | yes | fixed this pass (ADR restored to original + addendum section added) |
+
+`prevention_ladder:`
+
+- **rung 0 — already covered by an existing gate?** No — `bin/check-docs` validates ADR frontmatter and doc content vs. reality, but no gate re-validates hand-authored PR body claims against the final diff or authoritative source files after a post-review commit lands.
+- **rung 1 — extend an existing gate?** Partial landing rung. `bin/check-docs` could be extended to parse known structured claim patterns (version strings, numeric baselines cited as `X → Y`) from PR bodies and verify them against the diff or a declared source file. However, free-form prose patterns are hard to parse reliably and this would add significant false-positive risk. Better as a rule doc.
+- **rung 2 — a rule doc under `.claude/rules/`?** **Landing rung.** Add a companion note to `.claude/rules/auto-commit.md` or a new `.claude/rules/pr-body-claims.md` (example) rule requiring: (a) any autonomous-loop run that authors a PR body with specific version strings or numeric figures must cite the authoritative source file inline; (b) any post-review commit that modifies a file mentioned in the PR body Summary must trigger a body re-review before the commit is pushed. This addresses both the stale-claim defect and the ADR format inconsistency.
+- **rungs 3–5 — PHPStan rule / CI gate / hook?** Not applicable — the surface is PR body text, not PHP code, and a CI gate cannot validate semantic accuracy of free-form prose against an authoritative source at PR-check time.
+
+`artifact destination:` `.claude/rules/pr-body-claims.md` (example) — or an addendum to `.claude/rules/auto-commit.md`. Ships in a repo worktree as a normal PR.
+
+`provenance:` (discovered 2026-09-02 during #2059)
+
+**Status (2026-09-05):** ✅ Implemented — `.claude/rules/pr-body-claims.md` landed (rung 2 of L43 prevention ladder).

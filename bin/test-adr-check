@@ -81,7 +81,9 @@ add_no_trigger() {
 }
 
 # add_misplaced_rule — commit a rule doc under ibl5/.claude/rules/ (a path the
-# workflow adr filter covers but that adr-check should not require an ADR for).
+# workflow adr filter does NOT cover — the filter glob .claude/rules/*.md is
+# root-anchored, so ibl5/.claude/rules/ falls outside it — confirming adr-check
+# correctly exits 0 for a miss rather than a suppressed require).
 add_misplaced_rule() {
     mkdir -p "$REPO/ibl5/.claude/rules"
     echo "# a rule doc committed under the wrong prefix" > "$REPO/ibl5/.claude/rules/something.md"
@@ -162,8 +164,8 @@ WF="$SCRIPT_DIR/../.github/workflows/pr-meta-checks.yml"
 SKIP_IF="$(grep -A3 -F -e '- name: adr-check skipped' "$WF" 2>/dev/null | grep -m1 -F 'if:' || true)"
 
 [ -f "$WF" ]; ok_check "skip-observability-workflow-file-present" $?
-grep -qF 'adr-check skipped' "$WF"; ok_check "skip-observability-else-branch-exists" $?
-grep -qF 'adr-check skipped: no decision-trigger paths in diff' "$WF"; ok_check "skip-observability-message-exact" $?
+grep -qF 'adr-check skipped' "$WF" 2>/dev/null; ok_check "skip-observability-else-branch-exists" $?
+grep -qF 'adr-check skipped: no decision-trigger paths in diff' "$WF" 2>/dev/null; ok_check "skip-observability-message-exact" $?
 echo "$SKIP_IF" | grep -qF "steps.filter.outputs.adr != 'true'"; ok_check "skip-observability-if-is-filter-complement" $?
 echo "$SKIP_IF" | grep -qF "github.event_name == 'pull_request'"; ok_check "skip-observability-if-guards-pull-request" $?
 echo "$SKIP_IF" | grep -qF '!cancelled()'; ok_check "skip-observability-if-runs-when-job-red" $?

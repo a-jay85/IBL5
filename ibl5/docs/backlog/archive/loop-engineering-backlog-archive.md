@@ -188,7 +188,7 @@ Landing rung: **1** (extend `scripts/push.sh`'s verdict vocabulary plus its two 
 
 **artifact destination:** `.claude/skills/pr-ready/scripts/push.sh`, `.claude/skills/pr-ready/_phase4-push-and-ci.md`, `.claude/skills/pr-ready/_phase65-remediation.md`, `bin/pr-ready-now`, `bin/test-pr-ready-now` — all in-repo; nothing out-of-repo, so the whole change appears in the PR diff.
 
-**Status (2026-09-04):** ✅ Implemented — `scripts/push.sh` now emits `HOOK REJECTED` (rc 3) for a pre-push-hook rebase rejection with the remote provably unmoved, and `_phase4-push-and-ci.md` / `_phase65-remediation.md` route it into one bounded, clean-only fetch + rebase + re-push. Landed by PR branch `pr-ready-hook-rejected-recovery`. `bin/pr-ready-now` needed no source edit — the new verdict word contains no `PUSH FAILED` substring, so its `:434` classifier already treats it as non-terminal (see L51).
+**Status (2026-09-04):** ✅ Implemented — `scripts/push.sh` now emits `HOOK REJECTED` (rc 3) for a pre-push-hook rebase rejection with the remote provably unmoved, and `_phase4-push-and-ci.md` / `_phase65-remediation.md` route it into one bounded, clean-only fetch + rebase + re-push. Landed by PR branch `pr-ready-hook-rejected-recovery`. `bin/pr-ready-now` needed no source edit — the new verdict word contains no `PUSH FAILED` substring, so its `:434` classifier already treats it as non-terminal (see L53).
 
 **provenance:** (discovered 2026-09-04 during #1956)
 

@@ -41,14 +41,20 @@ REPO_SLUG="${REPO_SLUG:-a-jay85/IBL5}"
 #                `No manual testing needed` (case-insensitive). This is the
 #                positive "post-plan evaluated and cleared this" signal.
 #     HELD     — a `## Manual Testing` section exists but is NOT the sentinel
-#                (it carries real manual rows) -> a human must review.
+#                (it carries real manual rows) -> a human must review. Also HELD
+#                when the sentinel names an explicit type whose matching file is
+#                absent from <changed_files> (AND semantics, see tail-clause).
 #     UNKNOWN  — there is NO `## Manual Testing` section at all (a hand-made PR,
 #                or one post-plan never processed) -> NOT auto-armable.
-#   The sentinel has two suffixes in the source ("...unit and E2E tests" and
-#   "...automated tests"), so this PREFIX-matches `No manual testing needed`.
+#   The sentinel prefix `No manual testing needed` covers both the template-
+#   generated suffix ("...automated tests") and any historical PR that used the
+#   old wording ("...unit and E2E tests"); the tail-clause check (second param)
+#   uses AND semantics: each named type must have a matching file; any absent
+#   type holds. Type-agnostic wording ("automated tests") always clears.
 pr_manual_testing_clearance() {
     local body="$1"
-    local section content
+    local changed_files="${2:-}"
+    local section content sentinel_line tail
     section=$(printf '%s\n' "$body" | sed -n '/^## Manual Testing/,/^## /p')
     if [ -z "$section" ]; then
         echo "UNKNOWN"
@@ -56,10 +62,45 @@ pr_manual_testing_clearance() {
     fi
     # Drop the heading line; inspect the remaining content for the sentinel.
     content=$(printf '%s\n' "$section" | sed '1d')
-    if printf '%s\n' "$content" | grep -qiE '^[[:space:]]*No manual testing needed'; then
-        echo "CLEARED"
-    else
+    if ! printf '%s\n' "$content" | grep -qiE '^[[:space:]]*No manual testing needed'; then
         echo "HELD"
+        return
+    fi
+    # Sentinel found. Skip tail-clause check when no changed-file list provided.
+    if [ -z "$changed_files" ]; then
+        echo "CLEARED"
+        return
+    fi
+    # Extract the sentinel line and strip the prefix to isolate the tail clause.
+    sentinel_line=$(printf '%s\n' "$content" \
+        | grep -iE '^[[:space:]]*No manual testing needed' | head -1)
+    tail=$(printf '%s' "$sentinel_line" \
+        | sed 's/^[[:space:]]*[Nn]o manual testing needed[[:space:]]*[—–-]*[[:space:]]*//')
+    # Keyword → required changed-file pattern table (case-insensitive, \b word boundary).
+    # AND semantics: each named type must have a matching file; any absent type holds.
+    local held=0
+    if printf '%s' "$tail" | grep -qiE '\b(e2e|playwright)\b'; then
+        if ! printf '%s\n' "$changed_files" \
+                | grep -qE '^ibl5/tests/e2e/.*\.spec\.ts$'; then
+            held=1
+        fi
+    fi
+    if printf '%s' "$tail" | grep -qiE '\b(unit|phpunit)\b'; then
+        if ! printf '%s\n' "$changed_files" \
+                | grep -qE '^ibl5/tests/.*Test\.php$'; then
+            held=1
+        fi
+    fi
+    if printf '%s' "$tail" | grep -qiE '\bintegration\b'; then
+        if ! printf '%s\n' "$changed_files" \
+                | grep -qE '^ibl5/tests/DatabaseIntegration/'; then
+            held=1
+        fi
+    fi
+    if [ "$held" -eq 1 ]; then
+        echo "HELD"
+    else
+        echo "CLEARED"
     fi
 }
 

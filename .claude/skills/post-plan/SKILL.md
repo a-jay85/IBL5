@@ -1,6 +1,6 @@
 ---
 name: post-plan
-description: Single orchestrator for the post-plan workflow. Runs commit/push/PR, backlog housekeeping, diff classification, code review, security audit, verification, CI monitoring, retrospective, worktree teardown, and background process cleanup as one uninterrupted sequence.
+description: Single orchestrator for the post-plan workflow. Runs commit/push/PR, backlog housekeeping, diff classification, code review, security audit, verification, plan-intent fidelity review, merge digest, CI monitoring, retrospective, worktree teardown, and background process cleanup as one uninterrupted sequence.
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
@@ -103,8 +103,32 @@ When the automouse postplan prompt supplied an authoritative plan path, use it i
 
 If the working tree is clean and `git diff origin/master...HEAD` is also empty (nothing to ship), abort the entire skill — there is nothing to post-plan.
 
-1. **If working tree has uncommitted changes:** stage relevant changes, review with `git diff --staged`, commit, push. Commit-type rubric: `.claude/rules/commit-conventions.md` (the single source of truth for `feat:` vs. `chore:`/`fix:`/`refactor:`/`docs:`). **Decision test for the PR/commit title:** "Would a league GM notice a new ability they didn't have before?" — Yes → `feat:`; invisible to a GM (dev tooling, a new slash command, an internal refactor) → not `feat:` (`chore:`/`refactor:`/`docs:`). **Classify by what the diff IS, never by the desired merge outcome** — `feat:` triggering the human-signoff hold is the gate working, not a cost to route around. Skip this sub-step if the working tree is already clean (user committed before invoking the skill).
-2. **If no PR exists for the current branch:** create one with `gh pr create`.
+1. **If working tree has uncommitted changes:** stage relevant changes, review with `git diff --staged`, commit. Commit-type rubric: `.claude/rules/commit-conventions.md` (the single source of truth for `feat:` vs. `chore:`/`fix:`/`refactor:`/`docs:`). **Decision test for the PR/commit title:** "Would a league GM notice a new ability they didn't have before?" — Yes → `feat:`; invisible to a GM (dev tooling, a new slash command, an internal refactor) → not `feat:` (`chore:`/`refactor:`/`docs:`). **Classify by what the diff IS, never by the desired merge outcome** — `feat:` triggering the human-signoff hold is the gate working, not a cost to route around. Skip this sub-step if the working tree is already clean (user committed before invoking the skill).
+2. Rebase the branch onto `origin/master` before pushing so Phase 4 code review, Phase 5.0 conformance, and Phase 5.5 fidelity all judge the same post-rebase diff. `REBASE=conflict` and `REBASE=indeterminate` each print a `STOP:` line and **halt the skill** — resolve by hand (conflict) or fix the fetch (indeterminate) and re-run `/post-plan`. Do not advance to step 3.
+
+```bash
+# phase 2 rebase: land the branch on origin/master BEFORE the push, so Phase 4 review,
+# Phase 5.0 conformance and Phase 5.5 fidelity all judge the same post-rebase diff.
+# $REBASE_BASE_REF is overridable only so bin/test-postplan-arm-conditions can point
+# this block at a fixture ref; production leaves it unset and takes the default.
+REBASE_BASE_REF="${REBASE_BASE_REF:-origin/master}"
+git fetch origin master --quiet 2>/dev/null || true
+if ! git rev-parse --verify --quiet "$REBASE_BASE_REF" >/dev/null; then
+  echo "REBASE=indeterminate"
+  echo "STOP: cannot resolve $REBASE_BASE_REF — fail-closed. Nothing was rebased, committed-tree untouched. Fetch origin and re-run /post-plan."
+elif git merge-base --is-ancestor "$REBASE_BASE_REF" HEAD; then
+  echo "REBASE=clean (HEAD already contains $REBASE_BASE_REF)"
+elif git rebase "$REBASE_BASE_REF" >/dev/null 2>&1; then
+  echo "REBASE=rebased onto $REBASE_BASE_REF"
+else
+  git rebase --abort >/dev/null 2>&1 || true
+  echo "REBASE=conflict"
+  echo "STOP: rebase onto $REBASE_BASE_REF conflicted — fail-closed. 'git rebase --abort' has restored the tree; nothing was pushed. Resolve by hand and re-run /post-plan. Never auto-resolve here: conflict-resolved lines are code no structured review has seen. If this branch was stacked on a now-merged parent, this is the squash trap — replay only your own commits with 'git rebase --onto origin/master <parent-tip-before-merge> <branch>' (.claude/rules/linear-history-squash-merge.md)."
+fi
+```
+
+3. push
+4. **If no PR exists for the current branch:** create one with `gh pr create`.
 
    > **Files-changed block:** the PR body must carry a machine-generated scope block, so the hand-written Scope prose can never silently disagree with the diff. Build it from `git diff --name-status origin/master...HEAD` and include it in the body at creation, delimited exactly by `<!-- files-changed:begin -->` / `<!-- files-changed:end -->`, one `- \`<status>\` \`<path>\`` bullet per file. On any later body write (including Phase 6 below), regenerate the block and **replace what sits between the two markers** rather than appending a second copy; if only one marker is present, append a fresh block and leave the orphan alone. Generated data cannot drift — the prose Scope line then carries *why*, not *what*.
 
@@ -120,12 +144,12 @@ If the working tree is clean and `git diff origin/master...HEAD` is also empty (
    > If the row's `prior:` field is not `--`, say so explicitly: this is a recurrence of those PRs' class, which is why the routing moved one rung more mechanical than last time.
 
    **Stacked PRs:** If branched from a feature branch (not `master`), use `--base <parent-branch>`. Skip if a PR already exists. **Merge-order dependency:** When this PR shares files with, or must merge after, a sibling PR that is also based on `master` (so stacking via `--base` is unavailable / fragile under squash-merge), add a `Depends-on: #<n>[, #<n>...]` line to the PR body — **on its own line** (the parser anchors to start-of-line, so an inline prose mention of the marker is ignored). Phase 6.5 condition (6) reads it and refuses to arm auto-merge until every named PR is `MERGED`, so the series cannot ship out of order. Use this rather than stacking when the repo squash-merges (a squash collapses the parent's commits, leaving a stacked child's branch carrying the pre-squash commits → conflict on auto-retarget).
-3. **Manual testing in PR description:** Check the plan file for a Verification Matrix. If one exists and a `$PLAN_FILE` path is known: run `bin/normalize-manual-testing "$PLAN_FILE"` and paste its stdout verbatim under `## Manual Testing`. The script's stdout is already checkbox-formatted — do not re-edit or reformat it; `bin/normalize-manual-testing` is the single source of truth for this formatting and never paste the raw matrix row. When stdout is empty (zero Truly-manual rows), write the sentinel: `No manual testing needed — all changes are covered by unit and E2E tests.` If no plan file or no matrix exists, fall back to the original rule: list only steps requiring subjective human judgment on new or redesigned UI/UX ("does this look/feel good?", "does this flow work well?"). Production comparison and "does output still match?" are visual-regression-replaceable, not manual. Do NOT list CLI commands or script invocations — Phase 6 executes those.
-4. Use Haiku agents for commit message generation if delegating
+5. **Manual testing in PR description:** Check the plan file for a Verification Matrix. If one exists and a `$PLAN_FILE` path is known: run `bin/normalize-manual-testing "$PLAN_FILE"` and paste its stdout verbatim under `## Manual Testing`. The script's stdout is already checkbox-formatted — do not re-edit or reformat it; `bin/normalize-manual-testing` is the single source of truth for this formatting and never paste the raw matrix row. When stdout is empty (zero Truly-manual rows), write the sentinel: `No manual testing needed — all changes are covered by unit and E2E tests.` If no plan file or no matrix exists, fall back to the original rule: list only steps requiring subjective human judgment on new or redesigned UI/UX ("does this look/feel good?", "does this flow work well?"). Production comparison and "does output still match?" are visual-regression-replaceable, not manual. Do NOT list CLI commands or script invocations — Phase 6 executes those.
+6. Use Haiku agents for commit message generation if delegating
 
 **Static-guard self-verify (mandatory when a path-unscoped rule is touched):** if `git diff origin/master...HEAD --name-only` (substitute the PR base for a stacked PR) lists any `.claude/rules/*.md`, run `bin/check-rules-byte-budget` **before pushing**. On failure, trim the offending rule (or move detail into a path-scoped `*-detail.md` companion) and re-commit. This mirrors the git pre-commit hook so a byte-budget overflow is caught here instead of only in CI (the Static guards job) — and covers post-plan runs where the pre-commit hook did not fire (e.g. a harness commit path).
 
-**Scope-expansion self-check (run once, after the PR exists):** the block below emits one verdict line — `SCOPE_EXPANSION=flagged`, `clear`, or `none`. A `flagged` result means the body needs the `**Scope expansion:**` paragraph described in step 2 above; add it immediately above the `<!-- files-changed:begin -->` marker and re-run.
+**Scope-expansion self-check (run once, after the PR exists):** the block below emits one verdict line — `SCOPE_EXPANSION=flagged`, `clear`, or `none`. A `flagged` result means the body needs the `**Scope expansion:**` paragraph described in step 4 above; add it immediately above the `<!-- files-changed:begin -->` marker and re-run.
 
 ```bash
 # scope-expansion:begin
@@ -276,6 +300,20 @@ Emit `PHASE5_VERIFY_STATUS` ∈ {`pass`, `fail`, `skipped`}: `pass` = at least o
 
 ---
 
+## Phase 5.5: Plan-intent fidelity review & merge digest
+
+Phase 5.0 asserts the implementation's tests pass and planned tests are present — the structural question. Phase 5.5 asks the semantic question Phase 5.0 structurally cannot: does the implementation do what the plan *intended*, not merely what its tests assert?
+
+**You MUST Read `.claude/skills/post-plan/_phase-5.5-fidelity.md` and follow it in order — do not proceed to Phase 6 without it.**
+
+This phase is **never skipped**, including on a plan-blind run (`PLAN_FOUND=none`), because the reviewer degrades to the plan-independent checks rather than returning nothing.
+
+Exactly **one `Agent` spawn** (`subagent_type: "pr-ready-phase6"`, omit `model`); never a `/pr-ready` invocation, since this skill's `disallowed-tools` forbids `Skill`.
+
+The output consumed by Phase 6.5 condition (12): the verdict file `/tmp/post-plan-fidelity-verdict-<N>.md` and the `FIDELITY=<word>` line emitted by the include.
+
+---
+
 ## Phase 6: Manual Testing Automation
 
 **Skip if** PR description says "No manual testing needed."
@@ -350,7 +388,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 
 **Already merged?** If `gh pr view --json state --jq '.state'` returns `MERGED`, there is nothing to arm — skip to Phase 7 (which will early-exit).
 
-**All eleven** conditions must be true — an AND-of-not-blocked set (any one can HOLD; none can RELEASE another):
+**All twelve** conditions must be true — an AND-of-not-blocked set (any one can HOLD; none can RELEASE another):
 
 1. Manual testing cleared — the PR body carries the `No manual testing needed` sentinel Phase 6 writes.
 2. No review/audit finding scored `>= 80` (scored in Phase 4).
@@ -363,6 +401,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 9. PR-time safety verdict — the realized diff surfaces no reason to hold for a human.
 10. Pipeline-authored floor — the PR does NOT carry the `pipeline-authored` label AND the branch name does not match `^bug-[0-9]+(-|$)`. The branch-name axis is the label-timing guard: `reconcile_pr_open_rows()` in `bin/bug-pipeline-tick` applies the label on a later cron tick than `ship_via_cron()` which arms auto-merge, so at arming time the label may not yet exist. The digit anchor prevents catching human `bug-pipeline-*` branches.
 11. Unresolved scored finding — no unresolved GitHub review thread carries a `<!-- score: N -->` marker with N >= 80. Live-state counterpart to (2), which is run-local.
+12. Plan-intent fidelity — Phase 5.5's reviewer produced a verdict of `READY` or `READY WITH NOTES`.
 
 **These conditions only ever HOLD, never RELEASE.** They are an AND-of-not-blocked set: every condition can *add* a block; none can clear another's. Conditions (7)–(9) are **additive brakes on top of** the deterministic floors (1)–(6), the pipeline-authored floor (10), and the independent `human-signoff` required GitHub check — they exist to catch what those miss, never to override them. post-plan **always runs and opens the PR**; these conditions decide only whether auto-merge *arms*. A held PR stays open for a human to merge.
 
@@ -370,13 +409,13 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 
 **Each condition block is SELF-CONTAINED** — it `source`s the predicate and fetches its own inputs in-block, exactly as condition (7) re-derives `$PLAN_FILE` and the original (6)/(8) ran their own `gh pr view`. **Do not** hoist the `source` or a shared `PR_JSON` into a preamble block: a sourced function or a shell variable does not survive into a separately-executed block (only exported env vars like `$CLAUDE_HEADLESS` do), and a missing `source` would make `pr_feat_hold` a no-op — **failing OPEN, auto-arming a `feat:` PR**. Each block re-`source`ing the lib is idempotent and cheap. Every block extracts gh output with `gh ... --jq` (gh does the decode — no `echo`/`printf` round-trip needed); when a block must round-trip a multi-field `PR_JSON` it uses `printf '%s'` (never `echo`, whose zsh `\n` expansion corrupts jq's parse).
 
-**You MUST Read `.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md` and run each condition's block, in order, BEFORE arming — do not arm without it.** The reference holds the nine per-condition bash blocks (conditions 1, 3, 4, 5, 6, 7, 8, 10, 11 — conditions 2/9 are the Phase-4 score check and the realized-diff hold-enumeration, run against state you already hold), each **self-contained** per the SELF-CONTAINED invariant above (every block re-`source`s the predicate in-block — a hoisted `source` does not survive into a separately-executed block and would fail OPEN). It also holds the per-condition blocker-reporting detail. Phase 6.5 consumes carried state only — the Phase-3 flags `$GOLDEN_CHANGED`/`$HAS_MIGRATION`/`COUNT_*`, the env `$CLAUDE_HEADLESS`/`$PPID`, the Phase-4 finding scores, the Phase-6 manual-testing sentinel, and the Phase-5 status file — never recompute them.
+**You MUST Read `.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md` and run each condition's block, in order, BEFORE arming — do not arm without it.** The reference holds the ten per-condition bash blocks (conditions 1, 3, 4, 5, 6, 7, 8, 10, 11, 12 — conditions 2/9 are the Phase-4 score check and the realized-diff hold-enumeration, run against state you already hold), each **self-contained** per the SELF-CONTAINED invariant above (every block re-`source`s the predicate in-block — a hoisted `source` does not survive into a separately-executed block and would fail OPEN). It also holds the per-condition blocker-reporting detail. Phase 6.5 consumes carried state only — the Phase-3 flags `$GOLDEN_CHANGED`/`$HAS_MIGRATION`/`COUNT_*`, the env `$CLAUDE_HEADLESS`/`$PPID`, the Phase-4 finding scores, the Phase-6 manual-testing sentinel, and the Phase-5 status file — never recompute them.
 
 **Fail-closed default:** if any condition is indeterminate, errors, or you are unsure, treat it as **BLOCKED** and do NOT arm. A false HOLD costs one manual human merge; a false ARM ships unreviewed code — only under-holding is dangerous.
 
 **If every condition passes:** arm with `gh pr merge --squash --auto` — `--auto` *queues* the merge (it does not merge now); GitHub fires it once required checks pass. Do not sync local to master here. Never add `--delete-branch`: the repo sets `deleteBranchOnMerge`, so GitHub removes the head branch itself, and the flag only breaks things (the local delete fails in a multi-worktree clone, and a parent merge carrying it permanently closes stacked child PRs).
 
-**If any condition blocks:** do NOT arm. Report which condition(s) blocked — the per-condition report text is in the reference (for (3), report whether the block hit the no-done-marker branch — "Phase 5.0 never reached its end" — or listed unresolved items from `/tmp/post-plan-missing-tests-$PPID`; which Phase-5 track failed for (4)). Continue to Phase 7 regardless to monitor and fix CI; a re-run clears a red-track block, but the intent/type holds (7), (8), (10) stay held until a human acts.
+**If any condition blocks:** do NOT arm. Report which condition(s) blocked — the per-condition report text is in the reference (for (3), report whether the block hit the no-done-marker branch — "Phase 5.0 never reached its end" — or listed unresolved items from `/tmp/post-plan-missing-tests-$PPID`; which Phase-5 track failed for (4)). Continue to Phase 7 regardless to monitor and fix CI; a re-run clears a red-track block, but the intent/type holds (7), (8), (10) stay held until a human acts. For condition (12), a verdict that is missing, unparseable, or `NOT READY` is indeterminate-or-negative and blocks — remediate the reviewer's findings and re-run /post-plan; never hand-edit the verdict file to clear it.
 
 **Interactive golden warning:** when `$GOLDEN_CHANGED` is `true` and `$CLAUDE_HEADLESS` is unset (so condition 5 did not block), still surface the warning prominently so the human confirms the simulation change was an intentional `make -C engine golden-update`, not a masked regression.
 

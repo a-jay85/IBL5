@@ -147,8 +147,35 @@ case "$UNRESOLVED_HOLD" in
 esac
 ```
 
+```bash
+# condition (12): plan-intent fidelity. Additive — this block can only print a
+# BLOCKED line; it never clears another condition. Three-state and fail-closed: a
+# missing or unparseable verdict is INDETERMINATE, not clean, so it blocks.
+# There is no pr-armable.sh predicate for this one — the verdict is run-local state
+# written by Phase 5.5 — so self-containment means re-deriving inputs in-block, not
+# sourcing a lib. $PR_NUM is re-derived here and never inherited (an unexported
+# inherit would key the path to the empty string and block every PR forever);
+# $FIDELITY_VERDICT_FILE is overridable only so bin/test-postplan-arm-conditions
+# can exercise this block. Never keyed to $$ or $PPID — Phase 5.5 wrote this file
+# from a different shell.
+PR_NUM=$(gh pr view --json number --jq '.number')
+FIDELITY_VERDICT_FILE="${FIDELITY_VERDICT_FILE:-/tmp/post-plan-fidelity-verdict-$PR_NUM.md}"
+if [ ! -s "$FIDELITY_VERDICT_FILE" ]; then
+  echo "BLOCKED: no Phase 5.5 fidelity verdict at $FIDELITY_VERDICT_FILE — indeterminate, not clean"
+else
+  FID_WORD="$(sed '/^## DIGEST/,$d' "$FIDELITY_VERDICT_FILE" \
+    | grep -E '^(READY WITH NOTES|NOT READY|READY)[[:space:]]*$' \
+    | tail -1 | sed 's/[[:space:]]*$//')"
+  case "$FID_WORD" in
+    READY|'READY WITH NOTES') ;;
+    'NOT READY') echo "BLOCKED: Phase 5.5 fidelity verdict is NOT READY — remediate the reviewer's findings and re-run /post-plan" ;;
+    *) echo "BLOCKED: Phase 5.5 verdict file has no parseable verdict word — indeterminate, not clean" ;;
+  esac
+fi
+```
+
 If met: `gh pr merge --squash --auto`. The `--auto` flag queues the merge — it does **not** merge now, it arms; GitHub executes it once all required status checks pass. Do not sync local to master here; the merge has not happened yet. **Never add `--delete-branch`** — the repo already sets `deleteBranchOnMerge`, so remote cleanup is automatic; the flag's only effects are harmful (local delete fails in a multi-worktree clone, and a parent merge carrying it permanently closes stacked child PRs). `LiveGh.pr_merge_auto` in `tools/postplan-harness/harness/adapters/ghad.py` omits it for the same reason.
 
-If not met: do **not** arm auto-merge. Report which condition(s) blocked — the user merges manually after review. When condition (3) is the blocker, cite which planned test (`MISSING:`) or planned Critical File (`MISSING-FILE:`) is missing by `cat`-ing the bridge file (`cat /tmp/post-plan-missing-tests-$PPID`) into the report. When condition (4) is the blocker, report which Phase 5 track failed (PHPUnit / PHPStan / Go / E2E). When condition (5) is the blocker (headless + golden changed), report that the golden snapshot changed and the merge needs a human to confirm the behavior change was intentional. When condition (6) is the blocker, report which `Depends-on:` PR(s) are not yet `MERGED` — this PR re-arms on a later post-plan run once the predecessor ships (and this PR has been `git merge master`'d + re-greened). When condition (7) is the blocker, report that the plan declared `auto_merge: false` — the PR is open and reviewed but held for a human merge by author intent. When condition (8) is the blocker, report that this is a `feat:` PR — it waits for a maintainer to apply the `human-approved` label (the required `human-signoff` check). When condition (9) is the blocker, list each enumerated hold-reason from the realized-diff verdict. When condition (10) is the blocker, report whether the hold fired on the `pipeline-authored` label, the `^bug-[0-9]+` branch name, or both — every bug-pipeline PR is held for a human merge regardless of commit type. When condition (11) is the blocker, list each held thread's score and report that a review or audit finding scored >= 80 is still unresolved — the human fixes it and calls `resolve_review_finding`, after which a later post-plan run clears the hold. `unresolved-findings-api-error` and `unresolved-findings-cap` are fail-closed outcomes, not findings: report that the GraphQL call failed (or the PR exceeds the 100-thread page) and the merge is held pending a manual look. Continue to Phase 7 regardless, to monitor and fix CI — the fix-and-rerun there clears any red track so a later run can arm (conditions (7), (8), and (10) are intent/type holds that a re-run will not clear — those PRs stay held until the human acts; (11) clears on a re-run only after the threads are actually resolved).
+If not met: do **not** arm auto-merge. Report which condition(s) blocked — the user merges manually after review. When condition (3) is the blocker, cite which planned test (`MISSING:`) or planned Critical File (`MISSING-FILE:`) is missing by `cat`-ing the bridge file (`cat /tmp/post-plan-missing-tests-$PPID`) into the report. When condition (4) is the blocker, report which Phase 5 track failed (PHPUnit / PHPStan / Go / E2E). When condition (5) is the blocker (headless + golden changed), report that the golden snapshot changed and the merge needs a human to confirm the behavior change was intentional. When condition (6) is the blocker, report which `Depends-on:` PR(s) are not yet `MERGED` — this PR re-arms on a later post-plan run once the predecessor ships (and this PR has been `git merge master`'d + re-greened). When condition (7) is the blocker, report that the plan declared `auto_merge: false` — the PR is open and reviewed but held for a human merge by author intent. When condition (8) is the blocker, report that this is a `feat:` PR — it waits for a maintainer to apply the `human-approved` label (the required `human-signoff` check). When condition (9) is the blocker, list each enumerated hold-reason from the realized-diff verdict. When condition (10) is the blocker, report whether the hold fired on the `pipeline-authored` label, the `^bug-[0-9]+` branch name, or both — every bug-pipeline PR is held for a human merge regardless of commit type. When condition (11) is the blocker, list each held thread's score and report that a review or audit finding scored >= 80 is still unresolved — the human fixes it and calls `resolve_review_finding`, after which a later post-plan run clears the hold. `unresolved-findings-api-error` and `unresolved-findings-cap` are fail-closed outcomes, not findings: report that the GraphQL call failed (or the PR exceeds the 100-thread page) and the merge is held pending a manual look. Continue to Phase 7 regardless, to monitor and fix CI — the fix-and-rerun there clears any red track so a later run can arm (conditions (7), (8), and (10) are intent/type holds that a re-run will not clear — those PRs stay held until the human acts; (11) clears on a re-run only after the threads are actually resolved). For condition (12), the fix is to remediate the fidelity reviewer's findings and re-run /post-plan — never hand-edit or delete the verdict file to clear it, since an absent file is itself a blocking state.
 
 **Interactive golden warning:** Whenever `$GOLDEN_CHANGED` is `true` and `$CLAUDE_HEADLESS` is unset (so condition (5) did not block), still surface the warning prominently in the report — "⚠️ golden.json changed: simulation behavior changed. Confirm this was an intentional `make -C engine golden-update`, not a masked regression." — so the human reviews intent before the queued merge fires.

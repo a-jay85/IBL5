@@ -1,4 +1,4 @@
-import os, subprocess
+import os, re, shutil, subprocess
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 PPN = os.path.join(REPO, "bin", "post-plan-now")
@@ -213,3 +213,132 @@ def test_skill_block_plan_blind(tmp_path):
     assert r.returncode == 0, r.stderr
     assert "PLAN_VARIANT_SELECTED" not in r.stdout
     assert "PLAN_FOUND=none" in r.stdout
+
+
+def _fixture_repo(tmp_path):
+    """A dirty worktree on a non-master branch — enough to clear post-plan-now's guards.
+
+    CI has no global git identity, so the fixture sets its own.
+    """
+    repo = tmp_path / "wt"
+    repo.mkdir()
+    run = lambda *a: subprocess.run(a, cwd=repo, check=True, capture_output=True)
+    run("git", "init", "-q", "-b", "master")
+    run("git", "config", "user.email", "test@example.com")
+    run("git", "config", "user.name", "Test")
+    (repo / "f.txt").write_text("one\n")
+    run("git", "add", "-A")
+    run("git", "commit", "-qm", "base")
+    run("git", "checkout", "-qb", "some-feature")
+    (repo / "f.txt").write_text("two\n")      # dirty tree ⇒ "nothing to ship" guard passes
+    return repo
+
+def _generate_cmd(tmp_path, extra_env=None):
+    """Run bin/post-plan-now with launchctl stubbed and HOME redirected; return $CMD."""
+    home = tmp_path / "home"
+    (home / "Library" / "LaunchAgents").mkdir(parents=True)
+    shim = tmp_path / "shim"; shim.mkdir()
+    (shim / "launchctl").write_text("#!/bin/sh\nexit 0\n")
+    (shim / "launchctl").chmod(0o755)
+    harness = tmp_path / "fake-harness"; harness.mkdir()
+    (harness / "run").write_text("#!/bin/sh\nexit 0\n")
+    (harness / "run").chmod(0o755)
+
+    env = dict(os.environ, HOME=str(home), HARNESS=str(harness),
+               PATH=f"{shim}:{os.environ['PATH']}")
+    env.pop("POST_PLAN_SKILL", None)
+    env.update(extra_env or {})
+    repo = _fixture_repo(tmp_path)
+    r = subprocess.run(["bash", PPN], cwd=repo, env=env, capture_output=True, text=True)
+    assert r.returncode == 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+
+    plists = list((home / "Library" / "LaunchAgents").glob("*.plist"))
+    assert len(plists) == 1, f"expected one generated plist, got {plists}"
+    body = plists[0].read_text()
+    cmd = re.search(r"<string>(export PATH=.*?)</string>", body, re.S).group(1)
+    return cmd.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+
+def test_generated_cmd_tests_rc4_before_should_fallback(tmp_path):
+    cmd = _generate_cmd(tmp_path)
+    i4 = cmd.index('if [ "$rc" = 4 ]; then')
+    ifb = cmd.index('elif should_fallback "$rc"; then')
+    i3 = cmd.index('elif [ "$rc" = 3 ]; then')
+    assert i4 < ifb < i3, "rc=4 must be tested before should_fallback, and rc=3 last"
+
+def test_generated_cmd_carries_two_distinct_claude_invocations(tmp_path):
+    cmd = _generate_cmd(tmp_path)
+    assert cmd.count("caffeinate -s claude -p ") == 2
+    assert "RESUMING at Phase 5.5" in cmd            # the rc=4 prompt
+    assert "then execute every phase" in cmd         # the untouched fallback prompt
+    assert cmd.index("RESUMING at Phase 5.5") < cmd.index("then execute every phase")
+
+def test_generated_cmd_resume_prompt_is_single_quoted(tmp_path):
+    """Free-form text must cross the /bin/bash -lc boundary inside single quotes."""
+    cmd = _generate_cmd(tmp_path)
+    m = re.search(r"caffeinate -s claude -p ('.*?RESUMING at Phase 5\.5.*?') --dangerously", cmd, re.S)
+    assert m, "resume prompt is not single-quoted at the embed site"
+    assert '\\"' not in m.group(1)
+
+def test_gate_selects_the_right_arm_per_rc(tmp_path):
+    """Branch selection, exercised on the GENERATED chain with the claude calls stubbed.
+
+    Only the two `caffeinate -s claude … --name "…"` spans are replaced (with echo
+    markers) and the harness segment with a literal rc; every condition under test —
+    `[ "$rc" = 4 ]`, `should_fallback "$rc"`, `[ "$rc" = 3 ]` — is the generated text.
+    """
+    cmd = _generate_cmd(tmp_path)
+    gate = cmd.split("rc=$?; ", 1)[1].split("; }; rm -f", 1)[0]
+    seen = []
+    def _stub(_m):
+        seen.append(1)
+        return f'echo "RAN-{len(seen)}"'
+    gate = re.sub(r'CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0.*?--name "[^"]*"', _stub, gate)
+    assert len(seen) == 2
+
+    for rc, expect in ((4, "RAN-1"), (1, "RAN-2"), (2, "RAN-2"),
+                       (0, None), (3, None)):
+        r = subprocess.run(
+            ["bash", "-c", f'source "{PPN}" >/dev/null 2>&1; rc={rc}; {gate}'],
+            capture_output=True, text=True)
+        assert r.returncode == 0, f"rc={rc}: {r.stderr!r}"
+        if expect:
+            assert expect in r.stdout, f"rc={rc}: expected {expect}, got {r.stdout!r}"
+        else:
+            assert "RAN-" not in r.stdout, f"rc={rc} must launch no session: {r.stdout!r}"
+        if rc == 3:
+            assert "fail-closed sentinel" in r.stdout, "rc=3 lost its notice"
+
+def test_resume_prompt_reaches_the_model_intact():
+    """Round-trip the real literal: it carries backticks AND a single-quoted --jq arg."""
+    src = open(PPN).read()
+    m = re.search(r'^\s*(RESUME_PROMPT="(?:[^"\\]|\\.)*")$', src, re.M)
+    assert m, "RESUME_PROMPT assignment not found (or no longer a single line)"
+    script = (f'source "{PPN}" >/dev/null 2>&1\n'
+              'RESUME_PLAN_CLAUSE="CLAUSE"\n'
+              f'{m.group(1)}\n'
+              'q=$(shq "$RESUME_PROMPT")\nbash -c "printf %s $q"\n')
+    r = _bash(script)
+    assert r.stderr == "", f"far-side shell wrote to stderr: {r.stderr!r}"
+    assert "`gh pr view --json number --jq '.number'`" in r.stdout
+    assert "RESUMING at Phase 5.5" in r.stdout
+    assert "never ask questions" in r.stdout
+
+def test_prompt_assignment_count_is_still_two():
+    """RESUME_PROMPT must not be mistaken for a third PROMPT site, and the two real
+    PROMPT sites must keep their order (index 1 is the plan-blind one)."""
+    src = open(PPN).read()
+    prompts = re.findall(r'^\s*(PROMPT="(?:[^"\\]|\\.)*")$', src, re.M)
+    assert len(prompts) == 2, f"expected exactly two PROMPT= sites, got {len(prompts)}"
+    assert "<slug>-N.md" in prompts[1]
+    assert len(re.findall(r'^\s*RESUME_PROMPT="', src, re.M)) == 1
+
+def test_should_fallback_body_unchanged():
+    src = open(PPN).read()
+    assert 'should_fallback() { case "$1" in 0|3) return 1 ;; *) return 0 ;; esac; }' in src
+    assert _fb(4) == "0"     # unchanged: 4 still "escalates" — the rc=4 arm intercepts first
+
+def test_harness_default_is_the_main_checkout(tmp_path):
+    """ADR-0092: the seam must not become $ROOT/tools/postplan-harness."""
+    src = open(PPN).read()
+    assert 'HARNESS="${HARNESS:-/Users/ajaynicolas/GitHub/IBL5/tools/postplan-harness}"' in src
+    assert '$ROOT/tools/postplan-harness' not in src

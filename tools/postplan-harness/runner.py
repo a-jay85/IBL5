@@ -2,8 +2,9 @@
 """Compiled post-plan runner — the phase sequencer.
 
 Code owns: sequencing, classification, conformance, verification aggregation,
-all ten arming conditions, CI-watch interpretation, terminal states, side-effect
-gating, and the audit log. Bounded LLM calls own: PR copy, review/security
+all eleven ported arming conditions (numbered 1–10 and 12; condition (11), unresolved
+review-thread findings, stays skill-only), CI-watch interpretation, terminal states,
+side-effect gating, and the audit log. Bounded LLM calls own: PR copy, review/security
 judgment, finding scoring, plan-blind manual-step classification, the add-only
 safety verdict, and the retrospective.
 
@@ -242,6 +243,11 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             unresolved_conformance=unresolved, phase5_status=phase5,
             plan_auto_merge_false=plan.auto_merge_false, headless=headless,
             dep_state_lookup=lambda n: gh.pr_state(n),
+            # Live runs cannot execute the repo-reading Opus fidelity reviewer (see
+            # harness/review.py): the verdict is None, condition (12) holds, and rc=4
+            # hands off to the skill at Phase 5.5. Replay/isolated runs touch no real
+            # PR, so they carry a synthetic READY and existing fixtures stay green.
+            fidelity_verdict=None if live else "READY",
         )
         preview = evaluate(inputs)
         if not preview.holds:
@@ -252,6 +258,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             inputs.llm_safety_holds = verdict["holds"]
         decision = evaluate(inputs)
         res.arm = decision
+        res.fidelity_pending = bool(live and any(c.number == 12 for c in decision.holds))
         for c in decision.conditions:
             if c.warning:
                 log(f"phase6.5 WARNING ({c.name}): {c.warning}")
@@ -308,11 +315,15 @@ def _finish(res: RunResult, out_dir: str) -> RunResult:
 
 def exit_code_for(res: RunResult) -> int:
     """Process exit code from a terminal RunResult.
+    4 = harness phases complete, plan-fidelity review still owed: bin/post-plan-now
+        re-enters the /post-plan skill at Phase 5.5 for the review, digest and arming.
     3 = rebase-conflict fail-closed sentinel: bin/post-plan-now MUST NOT escalate to
         the /post-plan skill session; a human resolves the stacked-branch rebase.
     1 = any other typed failure.  0 = success / nothing-to-ship."""
     if res.terminal == TerminalState.FAILED and res.error_kind == "rebase-conflict":
         return 3
+    if res.terminal != TerminalState.FAILED and res.fidelity_pending:
+        return 4
     return 0 if res.terminal != TerminalState.FAILED else 1
 
 
@@ -362,6 +373,10 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
         return ("RESULT: post-plan BLOCKED — rebase conflict on a stacked branch, "
                 "human required; ERROR terminal=failed, no PR opened. "
                 "Resolve the rebase, then re-run bin/post-plan-now.")
+    if rc == 4:
+        return ("RESULT: post-plan harness phases complete — plan-fidelity review PENDING, "
+                f"auto-merge NOT armed{pr}. Resuming the /post-plan skill at Phase 5.5 for "
+                "the Opus fidelity review, the merge digest, and arming.")
     if res.terminal == TerminalState.FAILED:
         return (f"RESULT: post-plan FAILED — ERROR terminal=failed "
                 f"kind={res.error_kind or 'unknown'}: "

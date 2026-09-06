@@ -19,7 +19,20 @@ DRIVER="$SCRIPT_DIR/pr-cycle"
 [[ -x "$DRIVER" ]] || { echo "FAIL: $DRIVER missing or not executable" >&2; exit 1; }
 
 SCRATCH="$(mktemp -d)"
-_cleanup() { rm -rf "$SCRATCH"; }
+
+# The driver's run directory is /tmp/pr-cycle-<TS>, and TS comes from the PR_CYCLE_TS seam.
+# That token MUST be unique per suite run: reset_state rm -rf's the whole /tmp/pr-cycle-<TS>*
+# tree between cases, so two concurrent invocations of this suite sharing one token delete
+# each other's attack.md mid-iteration and both go red at random. $$ is the cheapest token
+# that is unique per process and still stable across every case in one run.
+#
+# The `tpc` prefix is deliberate and must NOT start with `testfix`. Until this fix is on
+# master, other checkouts of this suite still sweep the hardcoded glob /tmp/pr-cycle-testfix*
+# -- which a `testfix$$` token matches. A concurrent run from such a checkout would then
+# delete this run's directories out from under it, which is the exact failure being fixed.
+TSBASE="tpc$$"
+
+_cleanup() { rm -rf "$SCRATCH" "/tmp/pr-cycle-$TSBASE"* ; }
 trap _cleanup EXIT
 
 FAILED=0
@@ -226,8 +239,8 @@ reset_state() {
     rm -f "$SCRATCH"/*.argv "$SCRATCH"/attack-* "$SCRATCH"/ready-* "$SCRATCH"/triage-* \
           "$SCRATCH"/dm-* "$SCRATCH"/state-* "$SCRATCH"/view-*.json
     rm -f "$SCRATCH/IBL5-merge-digest.md" "$SCRATCH/.ibl5-pr-cycle.stop"
-    rm -rf /tmp/pr-cycle-testfix* 2>/dev/null
-    rm -f /tmp/pr-cycle-testfix*.sh /tmp/pr-cycle-testfix*.log 2>/dev/null
+    rm -rf "/tmp/pr-cycle-$TSBASE"* 2>/dev/null
+    rm -f "/tmp/pr-cycle-$TSBASE"*.sh "/tmp/pr-cycle-$TSBASE"*.log 2>/dev/null
     rm -f "$SCRATCH/Library/LaunchAgents"/com.ibl5.pr-cycle-*.plist 2>/dev/null
     clear_live_labels
     : > "$SCRATCH/attack.argv"; : > "$SCRATCH/ready.argv"
@@ -256,7 +269,7 @@ run_in() {
         PR_CYCLE_LEDGER="${LEDGER-$SCRATCH/IBL5-merge-digest.md}" \
         PR_CYCLE_STOP_FILE="$SCRATCH/.ibl5-pr-cycle.stop" \
         PR_CYCLE_NOW="2026-01-01T00:00:00Z" \
-        PR_CYCLE_TS="${TSPIN:-testfix}" \
+        PR_CYCLE_TS="${TSPIN:-$TSBASE}" \
         "$DRIVER" "$@" 2>"$ERR")"
     RC=$?
     return 0
@@ -274,15 +287,33 @@ begin_case
 reset_state
 run --help
 [[ $RC -eq 0 ]] || fail "--help exit $RC"
-for f in -- --go --dry-run --stop --no-dm --max-merges --help; do
+for f in -- --go --dry-run --stop --no-dm --max-merges --only --skip --help; do
     [[ "$f" == "--" ]] && continue
     grep -qF -- "$f" <<< "$OUT" || fail "--help omits $f"
 done
-for bad in "--nope" "--max-merges 0" "--max-merges -1" "--max-merges abc" "--max-merges" "--go --stop"; do
+for bad in "--nope" "--max-merges 0" "--max-merges -1" "--max-merges abc" "--max-merges" "--go --stop" \
+           "--only" "--only abc" "--only 0" "--only 007" "--only -1" "--only 101 --skip 102" \
+           "--skip" "--skip abc" "--skip 1,x"; do
     # shellcheck disable=SC2086
     run $bad
     [[ $RC -eq 2 ]] || fail "'$bad' exit $RC, want 2"
 done
+# Quoted separately: these arguments must reach the driver intact, and `run $bad` above
+# word-splits, so a lone `#` or `,` cannot be expressed in that list.
+run --only '#'
+[[ $RC -eq 2 ]] || fail "'--only #' exit $RC, want 2"
+run --only ','
+[[ $RC -eq 2 ]] || fail "'--only ,' exit $RC, want 2"
+run --only ''
+[[ $RC -eq 2 ]] || fail "'--only \"\"' exit $RC, want 2"
+# Accepted forms. --help short-circuits before any work, so this asserts parsing only.
+for good in "--only 101" "--only 101,102" "--skip 101,102"; do
+    # shellcheck disable=SC2086
+    run $good --help
+    [[ $RC -eq 0 ]] || fail "'$good' exit $RC, want 0"
+done
+run --only '#101,#102' --help
+[[ $RC -eq 0 ]] || fail "'--only #101,#102' exit $RC, want 0"
 end_case "case 1 flag validation"
 
 # ==========================================================================================
@@ -811,7 +842,7 @@ end_case "case 20 dry-run default"
 # ==========================================================================================
 begin_case
 reset_state
-TSPIN="testfix1"
+TSPIN="${TSBASE}1"
 PLIST="$SCRATCH/Library/LaunchAgents/com.ibl5.pr-cycle-$TSPIN.plist"
 RUNNER="/tmp/pr-cycle-$TSPIN.sh"
 rm -f "$RUNNER" "/tmp/pr-cycle-$TSPIN.log" "$PLIST"
@@ -872,6 +903,167 @@ unset MAIN_OVERRIDE LEDGER
 end_case "case 24 empty seams"
 
 # ==========================================================================================
+# 27 — --only / --skip scope the WORK, and only the work
+# ==========================================================================================
+# The filter is applied AFTER pr-attack's ordering, never inside it, so these cases assert
+# which PRs get a pr-ready-now session — never that the order among the kept PRs changed.
+
+# --- 27a: --only readies exactly the named PR, then drains -------------------------------
+begin_case
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
+    > "$SCRATCH/triage-out"
+run --worker --only 102
+[[ $RC -eq 0 ]] || fail "--only run exit $RC, want 0"
+[[ "$(calls ready)" == "1" ]] || fail "--only 102 made $(calls ready) ready calls, want 1"
+[[ "$(sed -n 1p "$SCRATCH/ready.argv")" == "--pr 102 --jobs 1 --go --wait" ]] \
+    || fail "--only 102 readied: $(sed -n 1p "$SCRATCH/ready.argv")"
+grep -qF 'queue drained' <<< "$OUT" || fail "--only run did not drain"
+grep -qF -- '--only 102' <<< "$OUT" || fail "worker did not announce its scope"
+
+# The hash form is the same set: normalization happens at parse time, not at match time.
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
+    > "$SCRATCH/triage-out"
+run --worker --only '#102'
+[[ "$(sed -n 1p "$SCRATCH/ready.argv")" == "--pr 102 --jobs 1 --go --wait" ]] \
+    || fail "--only '#102' readied: $(sed -n 1p "$SCRATCH/ready.argv")"
+
+# Two of three, in pr-attack's order — the filter drops rows, it never reorders them.
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
+    > "$SCRATCH/triage-out"
+run --worker --only 103,101
+[[ "$(calls ready)" == "2" ]] || fail "--only 103,101 made $(calls ready) ready calls, want 2"
+grep -qF -- '--pr 101' <<< "$(sed -n 1p "$SCRATCH/ready.argv")" || fail "--only did not keep pr-attack order"
+grep -qF -- '--pr 103' <<< "$(sed -n 2p "$SCRATCH/ready.argv")" || fail "--only second pick wrong"
+end_case "case 27a --only selects and preserves order"
+
+# --- 27b: --skip is the inverse ----------------------------------------------------------
+begin_case
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
+    > "$SCRATCH/triage-out"
+run --worker --skip 101,103
+[[ $RC -eq 0 ]] || fail "--skip run exit $RC, want 0"
+[[ "$(calls ready)" == "1" ]] || fail "--skip 101,103 made $(calls ready) ready calls, want 1"
+[[ "$(sed -n 1p "$SCRATCH/ready.argv")" == "--pr 102 --jobs 1 --go --wait" ]] \
+    || fail "--skip readied: $(sed -n 1p "$SCRATCH/ready.argv")"
+grep -qF -- '--skip 101,103' <<< "$OUT" || fail "worker did not announce its --skip scope"
+# No flag at all is the unfiltered baseline — the predicate must be a no-op by default.
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
+    > "$SCRATCH/triage-out"
+run --worker
+[[ "$(calls ready)" == "3" ]] || fail "unfiltered run made $(calls ready) ready calls, want 3"
+end_case "case 27b --skip and the unfiltered baseline"
+
+# --- 27c: an --only PR the plan never mentions is announced, not silently drained --------
+# Without the warning this run is indistinguishable from success: nothing is orderable, so
+# DRAINED=1 and the log reads "queue drained" — which a human reads as "already clean".
+begin_case
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+run --worker --only 999
+[[ $RC -eq 0 ]] || fail "unmatched --only exit $RC, want 0"
+[[ "$(calls ready)" == "0" ]] || fail "unmatched --only readied $(calls ready) PRs, want 0"
+grep -qF 'absent from the plan of attack' <<< "$OUT" || fail "unmatched --only was not announced"
+grep -qF '#999' <<< "$OUT" || fail "the warning does not name the missing PR"
+# A PR the plan DOES list must not be reported as missing, and the warning fires once.
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
+    > "$SCRATCH/triage-out"
+run --worker --only 101,102
+grep -qF 'absent from the plan of attack' <<< "$OUT" && fail "false-positive absent warning"
+end_case "case 27c unmatched --only is announced"
+
+# --- 27d: the DIRTY-rescue path honours the scope ----------------------------------------
+# Without this, --only 101 would still spend an hour-long pr-ready-now session rebasing an
+# out-of-set DIRTY PR, which is the exact cost the flag exists to avoid.
+begin_case
+reset_state
+printf '%s' "$ATTACK_EXCLUDED" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+run --worker --only 101
+[[ $RC -eq 0 ]] || fail "scoped rescue run exit $RC, want 0"
+[[ "$(calls ready)" == "1" ]] || fail "--only 101 made $(calls ready) ready calls, want 1 (no rescue)"
+grep -qF 'rescuing DIRTY' <<< "$OUT" && fail "--only 101 rescued an out-of-scope DIRTY PR"
+
+# An in-scope DIRTY PR is still rescued: the filter narrows the path, it does not disable it.
+reset_state
+printf '%s' "$ATTACK_EXCLUDED" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+run --worker --only 101,201
+[[ "$(calls ready)" == "2" ]] || fail "--only 101,201 made $(calls ready) ready calls, want 2"
+grep -qF -- '--pr 201' <<< "$(sed -n 2p "$SCRATCH/ready.argv")" || fail "in-scope DIRTY #201 was not rescued"
+grep -qF 'rescuing DIRTY #201' <<< "$OUT" || fail "in-scope rescue was not announced"
+end_case "case 27d rescue honours the scope"
+
+# --- 27e: the dry run reports the scope, including the rescues it would skip -------------
+begin_case
+reset_state
+printf '%s' "$ATTACK_EXCLUDED" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+run --only 101
+[[ $RC -eq 0 ]] || fail "dry run with --only exit $RC, want 0"
+grep -qF 'would use scope:      --only 101' <<< "$OUT" || fail "dry run does not report the --only scope"
+grep -qF '#201 — outside the --only/--skip scope' <<< "$OUT" \
+    || fail "dry run does not report the rescue it would skip"
+grep -qF 'would be rescued FIRST' <<< "$OUT" && fail "dry run promised an out-of-scope rescue"
+[[ "$(calls ready)" == "0" ]] || fail "dry run fired pr-ready-now"
+
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+run --skip 101
+grep -qF 'would use scope:      --skip 101' <<< "$OUT" || fail "dry run does not report the --skip scope"
+grep -qF 'next PR: #102' <<< "$OUT" || fail "dry run next-PR ignored --skip"
+run
+grep -qF 'would use scope:      every orderable PR' <<< "$OUT" || fail "unfiltered dry run mislabels its scope"
+end_case "case 27e dry run reports the scope"
+
+# --- 27f: --go threads the scope into the detached worker --------------------------------
+# --go re-invokes this script as --worker through an emitted runner. A flag not propagated
+# there is silently dropped: the dry run reports the scope and the real run ignores it.
+begin_case
+reset_state
+TSPIN="${TSBASE}2"
+PLIST="$SCRATCH/Library/LaunchAgents/com.ibl5.pr-cycle-$TSPIN.plist"
+RUNNER="/tmp/pr-cycle-$TSPIN.sh"
+rm -f "$RUNNER" "/tmp/pr-cycle-$TSPIN.log" "$PLIST"
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+PR_CYCLE_DRY_LAUNCH=1 TSPIN="$TSPIN" run --go
+[[ $RC -eq 0 ]] || fail "--go (no scope) exit $RC, want 0"
+grep -qF "ONLY=''" "$RUNNER" || fail "runner ONLY not empty by default"
+grep -qF "SKIP=''" "$RUNNER" || fail "runner SKIP not empty by default"
+
+rm -f "$RUNNER" "$PLIST" "/tmp/pr-cycle-$TSPIN.log"
+PR_CYCLE_DRY_LAUNCH=1 TSPIN="$TSPIN" run --go --only '#101,#102'
+[[ $RC -eq 0 ]] || fail "--go --only exit $RC, want 0"
+bash -n "$RUNNER" || fail "runner does not parse after --only"
+runner_var() {  # $1 = variable name; evaluate the runner's own %q-quoted assignment
+    bash -c "$(grep -m1 "^$1=" "$RUNNER"); printf '%s' \"\$$1\""
+}
+[[ "$(runner_var ONLY)" == "101,102" ]] \
+    || fail "runner ONLY is '$(runner_var ONLY)', want the normalized 101,102"
+grep -qF -- '${ONLY:+--only $ONLY}' "$RUNNER" || fail "runner does not pass --only to the worker"
+
+rm -f "$RUNNER" "$PLIST" "/tmp/pr-cycle-$TSPIN.log"
+PR_CYCLE_DRY_LAUNCH=1 TSPIN="$TSPIN" run --go --skip 103
+[[ "$(runner_var SKIP)" == "103" ]] || fail "runner SKIP is '$(runner_var SKIP)', want 103"
+grep -qF -- '${SKIP:+--skip $SKIP}' "$RUNNER" || fail "runner does not pass --skip to the worker"
+rm -f "$RUNNER" "$PLIST" "/tmp/pr-cycle-$TSPIN.log"
+unset TSPIN
+end_case "case 27f --go propagates the scope"
+
+# ==========================================================================================
 # 25 / 26 — static guards over the driver source, and their vacuity check
 # ==========================================================================================
 # Each guard is a function over a FILE, so it can be run against the real driver (expect
@@ -912,10 +1104,26 @@ g_sleep_in_poll() {
 g_cmd_prefix() {
     ! noncomment "$1" | grep -E '^[A-Z_]+_CMD=' | grep -qv '^PR_CYCLE_'
 }
+# --only/--skip scope SELECTION, never ACCOUNTING. _pr_allowed must not appear anywhere
+# between _arm_and_classify and _report_dry_run — that span holds the arm call, the merge
+# poll, the ledger and the MERGES counter. Filtering there would uncap --max-merges (one
+# blanket --arm arms out-of-set PRs too) and drop ledger rows for PRs that really merged.
+# Comment lines are BLANKED rather than deleted so the numbering still matches the file:
+# the driver's own explanatory comments in that span name _pr_allowed on purpose.
+g_scope_selection_only() {
+    local start end bad
+    start="$(grep -n '^_arm_and_classify()' "$1" | cut -d: -f1)"
+    end="$(grep -n '^_report_dry_run()' "$1" | cut -d: -f1)"
+    [[ -n "$start" && -n "$end" ]] || return 1
+    bad="$(awk '/^[[:space:]]*#/ { print ""; next } { print }' "$1" \
+        | grep -n '_pr_allowed' | cut -d: -f1 \
+        | awk -v s="$start" -v e="$end" '$1 > s && $1 < e')"
+    [[ -z "$bad" ]]
+}
 
 begin_case
 for g in g_no_merge g_no_armable_lib g_triage_pin g_one_arm g_no_bucket_cond \
-         g_sleep_in_poll g_cmd_prefix; do
+         g_sleep_in_poll g_cmd_prefix g_scope_selection_only; do
     "$g" "$DRIVER" || fail "static guard $g fails against the real bin/pr-cycle"
 done
 # Guard 7 — both new files are executable and parse.
@@ -945,6 +1153,12 @@ mutant; echo 'sleep 5' >> "$SCRATCH/mutant"
 g_sleep_in_poll "$SCRATCH/mutant" && fail "vacuous: g_sleep_in_poll passed a sleep outside _poll_merge"
 mutant; echo 'TRIAGE_CMD="${TRIAGE_CMD:-x}"' >> "$SCRATCH/mutant"
 g_cmd_prefix "$SCRATCH/mutant" && fail "vacuous: g_cmd_prefix passed an unprefixed *_CMD seam"
+# Appending cannot test this one — the guard is region-scoped, so the mutation has to land
+# INSIDE _arm_and_classify. awk inserts the line right after the function header.
+awk '/^_arm_and_classify\(\) \{/ { print; print "    _pr_allowed \"$1\" || return 0"; next } { print }' \
+    "$DRIVER" > "$SCRATCH/mutant"
+g_scope_selection_only "$SCRATCH/mutant" \
+    && fail "vacuous: g_scope_selection_only passed a scope filter inside _arm_and_classify"
 end_case "case 26 guards are not vacuous"
 
 # ==========================================================================================

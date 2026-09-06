@@ -9,7 +9,8 @@
 # Dry-run by default: prints what it would do and exits. Nothing fires without --go.
 #
 # Usage:
-#   bin/pr-cycle [--go] [--dry-run] [--stop] [--no-dm] [--max-merges N] [--help]
+#   bin/pr-cycle [--go] [--dry-run] [--stop] [--no-dm] [--max-merges N]
+#                [--only LIST | --skip LIST] [--help]
 #
 #   --go            Detach a worker via launchd and return. Without it the script only
 #                   reports (default).
@@ -22,7 +23,21 @@
 #                   One `pr-triage --arm` call arms every ARMABLE PR, so a single
 #                   iteration can confirm more than one merge; every confirmed merge
 #                   is still ledgered. This caps work started, not merges caused.
+#   --only LIST     Work ONLY these PRs. Comma-separated; a leading # is optional, so
+#                   `--only 2101,2108` and `--only '#2101,#2108'` name the same set.
+#                   The ORDER still comes from bin/pr-attack — this drops rows outside
+#                   the set, so the dependency order among the kept PRs is unchanged.
+#   --skip LIST     The inverse: work every orderable PR except these. Same format.
+#                   Mutually exclusive with --only (same precedent as --go --stop).
 #   --help, -h      Print this usage and exit 0.
+#
+# SCOPE LIMIT of --only/--skip — they scope the WORK ORDER, not the arm call. Arming is
+# exactly one `bin/pr-triage --arm` with no added flags (a hard invariant below), and that
+# single call arms EVERY ARMABLE PR, in-set or not. So an already-green out-of-set PR still
+# lands, and that merge still counts against --max-merges. Documenting this IS the fix:
+# narrowing the arm call would break the one-arm invariant. What these flags actually buy
+# is that no hour-long `pr-ready-now --wait` session is ever spent on an out-of-set PR —
+# which is the cost they exist to avoid.
 #
 # Env seams (used by bin/test-pr-cycle):
 #   PR_CYCLE_ATTACK_CMD      Path to the ordering tool.       Default: bin/pr-attack
@@ -104,6 +119,30 @@ usage() {
     awk 'NR>1 { if ($0 !~ /^#/) exit; sub(/^# ?/, ""); print }' "${BASH_SOURCE[0]}"
 }
 
+# _normalize_prs LIST -- echo LIST as a bare comma-joined digit-only set, or return 1.
+#
+# Normalization is a SAFETY dependency here, not cosmetics: the emitted runner interpolates
+# the result UNQUOTED (`${ONLY:+--only $ONLY}`) inside its quoted heredoc, and that is only
+# safe because this function guarantees the stored string matches [0-9,]+ with no
+# whitespace. Storing raw argv ("#2101, #2102") would hand the worker one space-broken
+# garbage token that %q would faithfully preserve.
+#
+# Each token is validated with the same `case` glob idiom --max-merges uses: never an
+# arithmetic test (which *errors* under set -e on `abc` rather than rejecting it) and never
+# a grep pipe (which inverts under pipefail/SIGPIPE -- the trap this file documents three
+# times). `0*` rejects both 0 and a leading-zero number; `*[!0-9]*` rejects abc and -1.
+_normalize_prs() {
+    _np_out=""
+    _np_in="${1//,/ }"
+    for _np_t in $_np_in; do
+        _np_t="${_np_t#\#}"
+        case "$_np_t" in ''|0*|*[!0-9]*) return 1 ;; esac
+        _np_out="${_np_out:+$_np_out,}$_np_t"
+    done
+    [ -n "$_np_out" ] || return 1
+    printf '%s' "$_np_out"
+}
+
 # --- flags -------------------------------------------------------------------------------
 GO=0
 DRY=0
@@ -111,6 +150,8 @@ STOP=0
 NO_DM=""
 WORKER=0
 MAX_MERGES=5
+ONLY=""
+SKIP=""
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -128,12 +169,23 @@ while [ $# -gt 0 ]; do
             [ $# -ge 2 ] || { usage >&2; exit 2; }
             case "$2" in ''|0*|*[!0-9]*) usage >&2; exit 2 ;; esac
             MAX_MERGES="$2"; shift 2 ;;
+        --only)
+            [ $# -ge 2 ] || { usage >&2; exit 2; }
+            ONLY="$(_normalize_prs "$2")" || { usage >&2; exit 2; }
+            shift 2 ;;
+        --skip)
+            [ $# -ge 2 ] || { usage >&2; exit 2; }
+            SKIP="$(_normalize_prs "$2")" || { usage >&2; exit 2; }
+            shift 2 ;;
         --help|-h) usage; exit 0 ;;
         *) usage >&2; exit 2 ;;
     esac
 done
 
 if [ "$GO" = "1" ] && [ "$STOP" = "1" ]; then usage >&2; exit 2; fi
+# Refused rather than merged: `--only 101 --skip 101` has no honest reading, and the
+# --go/--stop line above is this file's existing precedent for refusing over picking.
+if [ -n "$ONLY" ] && [ -n "$SKIP" ]; then usage >&2; exit 2; fi
 
 # --- --stop ------------------------------------------------------------------------------
 # Handled before every other guard so it works from any cwd, including a worktree.
@@ -192,6 +244,7 @@ BUCKET=""
 ACTION=""
 NEXT_PR=""
 ATTACK_NEEDS=""
+WARNED_ONLY=0
 
 _now() {
     if [ -n "$PR_CYCLE_NOW" ]; then printf '%s' "$PR_CYCLE_NOW"
@@ -284,6 +337,52 @@ _attack_rows() {
     ' "$RUNDIR/attack.md"
 }
 
+# _pr_allowed N -- true when PR N is inside the --only/--skip scope. Always true when
+# neither flag was given, so every call site below is a no-op on a default run.
+#
+# A comma-SENTINEL `case` glob, never `printf | grep`: the sentinels end-anchor the match for
+# free (a bare grep for 101 also matches 1010 and 2101), and a grep pipe would be the fourth
+# instance of the pipefail/SIGPIPE inversion this file already documents three times. $ONLY
+# and $SKIP are guaranteed [0-9,]+ by _normalize_prs, so the globs cannot be fooled.
+#
+# SELECTION ONLY. This predicate belongs at the points that CHOOSE what to work on
+# (_next_pr, _rescue_one) and nowhere near the accounting in _arm_and_classify, _reconcile,
+# or the MERGES counter -- see the warning above the armed.txt awk.
+_pr_allowed() {
+    if [ -n "$ONLY" ]; then
+        case ",$ONLY," in *",$1,"*) return 0 ;; esac
+        return 1
+    fi
+    case ",$SKIP," in *",$1,"*) return 1 ;; esac
+    return 0
+}
+
+# _warn_unmatched_only -- one advisory line naming every --only PR the plan of attack does
+# not mention at all. Advisory: it never sets HALT and never changes the exit status.
+#
+# Without it a typo'd number is indistinguishable from success. `--only 2110` when the real
+# PR is #2101 leaves _next_pr with nothing, so DRAINED=1 and the digest reports
+# "merged 0, left for human 0 -- queue drained", which reads as "your subset was already
+# clean". This line is the difference between a tool and a silent no-op.
+#
+# Deliberately generous: it accepts a #<digits> token ANYWHERE in the document -- the ordered
+# table, ## Excluded, ## Hand-resolutions alike. The job is catching a typo, so it must err
+# toward silence rather than crying wolf about a PR the plan does in fact list.
+_warn_unmatched_only() {
+    [ -n "$ONLY" ] || return 0
+    [ -f "$RUNDIR/attack.md" ] || return 0
+    _wu_seen="$(grep -oE '#[0-9]+' "$RUNDIR/attack.md" 2>/dev/null | tr -d '#' | sort -u | tr '\n' ',' || true)"
+    _wu_miss=""
+    for _wu_p in ${ONLY//,/ }; do
+        case ",$_wu_seen" in *",$_wu_p,"*) continue ;; esac
+        _wu_miss="${_wu_miss:+$_wu_miss }#$_wu_p"
+    done
+    if [ -n "$_wu_miss" ]; then
+        echo "pr-cycle: --only names PR(s) absent from the plan of attack: $_wu_miss"
+    fi
+    return 0
+}
+
 # _next_pr — set NEXT_PR to the first orderable PR not already in tried.txt; non-zero when
 # drained. Draining is the loop's normal termination, not a halt.
 #
@@ -296,6 +395,10 @@ _next_pr() {
     ATTACK_NEEDS=""
     while IFS="$(printf '\t')" read -r _n _needs; do
         [ -n "$_n" ] || continue
+        # Scope filter sits beside the tried.txt check because it is the same kind of skip:
+        # the row is real and correctly ordered, it is just not this run's business. The
+        # pr-attack ordering is never touched, so dependency order among the kept PRs holds.
+        if ! _pr_allowed "$_n"; then continue; fi
         if grep -qxF "$_n" "$RUNDIR/tried.txt" 2>/dev/null; then continue; fi
         _found="$_n"
         ATTACK_NEEDS="$_needs"
@@ -416,6 +519,10 @@ _rescue_one() {
     _rc_pick=""
     while IFS= read -r _rc_n; do
         [ -n "$_rc_n" ] || continue
+        # The rescue path honours --only/--skip too. Without this, `--only 2101` would still
+        # spend an hour-long pr-ready-now --wait session rebasing an out-of-set DIRTY PR --
+        # exactly the cost the flag exists to avoid.
+        if ! _pr_allowed "$_rc_n"; then continue; fi
         if grep -qxF "$_rc_n" "$RUNDIR/rescued.txt" 2>/dev/null; then continue; fi
         if _slot_held "$_rc_n"; then
             echo "pr-cycle: rescue skipped for #$_rc_n — a pr-ready-now slot is already live"
@@ -501,6 +608,12 @@ _arm_and_classify() {
     # Record EVERY ARMABLE row, not just PR N: one --arm call arms all of them, so a cap
     # that counted only the readied PR would let --max-merges 5 cause more than five
     # merges. The ^#[0-9]+$ anchor excludes the dashed separator row.
+    #
+    # NEVER filter this by _pr_allowed. --only/--skip scope SELECTION, not ACCOUNTING, and
+    # the arm call above is unscoped by construction (one call, no flags -- a hard invariant
+    # in the header). Filtering here would break two things at once: --max-merges would stop
+    # capping the merges that actually happen, and the digest ledger would lose rows for PRs
+    # that really did merge, violating "a ledger row iff gh pr view said MERGED".
     awk '$1 ~ /^#[0-9]+$/ && $2 == "ARMABLE" { print substr($1, 2) }' \
         "$RUNDIR/triage-$_n.txt" >> "$RUNDIR/armed.txt"
 
@@ -652,6 +765,8 @@ _worker() {
     : > "$RUNDIR/rescued.txt"
 
     echo "pr-cycle worker starting — max-merges $MAX_MERGES, rundir $RUNDIR"
+    if [ -n "$ONLY" ]; then echo "pr-cycle scope: --only $ONLY"; fi
+    if [ -n "$SKIP" ]; then echo "pr-cycle scope: --skip $SKIP"; fi
 
     while :; do
         if [ -e "$PR_CYCLE_STOP_FILE" ]; then
@@ -665,6 +780,12 @@ _worker() {
         fi
 
         _attack_plan 0 || break
+
+        # Once per run, against the first real plan: attack.md does not exist before this.
+        if [ "$WARNED_ONLY" = "0" ]; then
+            WARNED_ONLY=1
+            _warn_unmatched_only
+        fi
 
         if ! _next_pr; then
             # Nothing orderable is left. Before declaring the queue drained, try ONE excluded
@@ -760,6 +881,7 @@ _report_dry_run() {
     echo "pr-cycle DRY RUN — nothing fires. Re-run with --go to detach a worker."
     echo ""
     _attack_plan 0 || { echo "ERROR: $HALT" >&2; return 1; }
+    _warn_unmatched_only
 
     if _next_pr; then
         echo "next PR: #$NEXT_PR (needs you? ${ATTACK_NEEDS:-?})"
@@ -783,7 +905,11 @@ _report_dry_run() {
             echo "DIRTY rescue candidates ($_dr_n): $(printf '#%s ' $_dr_all)"
             _dr_first=""
             for _dr_p in $_dr_all; do
-                if grep -qxF "$_dr_p" "$RUNDIR/rescued.txt" 2>/dev/null; then
+                if ! _pr_allowed "$_dr_p"; then
+                    # Must be reported, not silently dropped: the dry run is what a human
+                    # reads before --go, so it must not promise a rescue the worker skips.
+                    echo "  #$_dr_p — outside the --only/--skip scope; would be skipped"
+                elif grep -qxF "$_dr_p" "$RUNDIR/rescued.txt" 2>/dev/null; then
                     echo "  #$_dr_p — already attempted this run; would be skipped"
                 elif _slot_held "$_dr_p"; then
                     echo "  #$_dr_p — a pr-ready-now slot is already live; would be skipped"
@@ -802,6 +928,9 @@ _report_dry_run() {
     # file, and the dry-run path is deliberately not it.
     "$PR_CYCLE_TRIAGE_CMD" || true
     echo ""
+    if [ -n "$ONLY" ]; then      echo "would use scope:      --only $ONLY"
+    elif [ -n "$SKIP" ]; then    echo "would use scope:      --skip $SKIP"
+    else                         echo "would use scope:      every orderable PR"; fi
     echo "would use max-merges: $MAX_MERGES"
     echo "would use ledger:     $PR_CYCLE_LEDGER"
     echo "would use stop file:  $PR_CYCLE_STOP_FILE"
@@ -843,6 +972,8 @@ _launch() {
         printf 'TS=%q\n'         "$TS"
         printf 'MAX_MERGES=%q\n' "$MAX_MERGES"
         printf 'NO_DM=%q\n'      "$NO_DM"
+        printf 'ONLY=%q\n'       "$ONLY"
+        printf 'SKIP=%q\n'       "$SKIP"
         printf 'export PR_CYCLE_TS=%q\n'   "$TS"
         printf 'export PR_CYCLE_LOG=%q\n'  "$LOG"
         for _v in PR_CYCLE_ATTACK_CMD PR_CYCLE_TRIAGE_CMD PR_CYCLE_READY_CMD \
@@ -858,7 +989,11 @@ _launch() {
 # the opposite of the driver's own appended prelude.
 export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 cd "$ROOT" || exit 1
-"$ROOT/bin/pr-cycle" --worker --max-merges "$MAX_MERGES" ${NO_DM:+--no-dm}
+# $ONLY/$SKIP are interpolated UNQUOTED so an empty one expands to nothing. That is safe
+# only because _normalize_prs guarantees the value is [0-9,]+ with no whitespace; a raw
+# "#2101, #2102" would word-split here into a garbage token. Do not "fix" this by quoting
+# the whole ${VAR:+...} -- that passes an empty argument when the flag is unset.
+"$ROOT/bin/pr-cycle" --worker --max-merges "$MAX_MERGES" ${NO_DM:+--no-dm} ${ONLY:+--only $ONLY} ${SKIP:+--skip $SKIP}
 # Release the label so the "already live" guard stops matching.
 rm -f "$PLIST"
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true

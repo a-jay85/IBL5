@@ -280,3 +280,33 @@ Body summary text was authored pre-implementation and hand-updated during coding
 `last_verified: 2026-09-04`
 
 *(discovered 2026-09-04 during Phase 6 review of #2077)*
+
+### E38 /pr-ready lost-work guard blind to prior-run destructive rebase
+
+*(discovered 2026-09-02 during #2045)*
+
+`class:` a `/pr-ready` Phase 2a pre-image capture that occurs inside the current run, making the lost-work guard invisible to a destructive rebase performed by an earlier run on the same branch.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `.claude/skills/pr-ready/SKILL.md` Phase 2a | yes | yes | not fixed — filed |
+
+**prevention_ladder:**
+
+- rung 0 — not already covered by an existing gate
+- rung 1 — could extend the existing lost-work guard to also compare against a persisted pre-image from the previous run (e.g. stored as `/tmp/pr-ready-preimage-<N>-<branch>.patch` keyed to PR+branch across runs)
+- rung 2 — a rule doc under `.claude/rules/` would not prevent a code path from executing; not applicable
+- rung 3 — PHPStan rule not applicable (skill/shell code)
+- rung 4 — a CI gate not applicable (harness-side behavior)
+- rung 5 — hook not applicable
+- **Landing: rung 1** — extend the guard to compare the current pre-image against a persistent cross-run patch file; OR add a check that verifies the plan's Critical Files list is represented in the pre-rebase diff (a planned file absent from pre means the pre was already post-loss). Either check is a code change to `scripts/lostwork.sh` or Phase 2a of `SKILL.md`.
+
+`artifact destination:` `.claude/skills/pr-ready/scripts/collapse-guard.sh` (created this pass)
+
+**What shipped:** a prior-collapse guard invoked at /pr-ready runtime Phase 1.4 that
+compares HEAD against the branch tip preceding the most recent history rewrite and
+stops the run when no branch-changed path survives.
+
+**Status (2026-09-05):** ✅ Implemented.

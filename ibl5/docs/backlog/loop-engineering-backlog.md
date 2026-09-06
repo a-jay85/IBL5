@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-09-05
+last_verified: 2026-09-06
 ---
 
 # Loop-Engineering Backlog
@@ -79,6 +79,7 @@ last_verified: 2026-09-05
 | L50 | `bin/pr-cycle` logs gate nominees as "excluded this run" but then orders and readies them (`--gate-edges /dev/null` re-admits every nominee) | ⬜ Open | 🟦 | S |
 | L51 | Plan Phase 5 dry-run count propagated to archive only, not PR body; reviewer blast-radius instruction stale by ~23% | ⬜ Open | 🟦 | S |
 | L52 | Test harness case comment over-claims assertion scope; adjacent cases leave `run_block` exit codes unchecked | ✅ fixed this pass | — | S |
+| L53 | `pr-body-negative-claim-recheck.md` does not trigger a body re-review when a post-review commit modifies a Summary-mentioned file | ⬜ Open | 🟦 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -747,6 +748,34 @@ Landing rung: **no gate warranted** — neither occurrence exists in the tree af
 **provenance:** (discovered 2026-09-05 during #2108)
 
 **Status (2026-09-05):** ✅ moot — harness retired this PR.
+
+---
+
+### L53 `pr-body-negative-claim-recheck.md` does not trigger a body re-review when a post-review commit modifies a Summary-mentioned file
+
+*(discovered 2026-09-05 during #2131)*
+
+**class:** A post-review commit that modifies a file already named in the PR body's `## Summary` section silently invalidates any negative-claim assertion in that body. The existing rule (`pr-body-negative-claim-recheck.md`) prompts a re-read on every commit but does not cross-reference the Summary-mentioned file set; nothing forces a targeted re-read of claims the committed file's change may have overtaken.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #2131 remediation commit `0ca67f8b4` — modified `ibl5/docs/backlog/loop-engineering-backlog.md`, a file named in the `## Summary`; the commit regressed `last_verified` from `2026-09-06` to `2026-09-05`, invalidating a negative-claim that had been accurate when the body was written | yes | yes — not prevented by existing rule | ⬜ Open |
+
+**prevention_ladder:**
+
+- rung 0 — `.claude/rules/pr-body-negative-claim-recheck.md` exists and fires on every commit, but it is a behavioral prompt only — it carries no parse of the Summary to derive a file-set trigger. Phase 6 catches this class at review time (as it did here), but not at commit-push time.
+- rung 1 — extend `pr-body-negative-claim-recheck.md` to add requirement (b): when a post-review commit modifies a file named in `## Summary`, the rule fires a targeted re-read of the negative-claim list and marks any stale entry for deletion or rewrite. Landing rung.
+- rung 2 — a separate rule doc is not warranted; requirement (b) belongs as a named clause in the existing rule.
+
+Landing rung: **1** (extend `pr-body-negative-claim-recheck.md` to add the Summary-file cross-reference trigger as requirement (b)).
+
+**artifact destination:** `.claude/rules/pr-body-negative-claim-recheck.md` (in-repo)
+
+**provenance:** (discovered 2026-09-05 during #2131)
+
+**Status (2026-09-05):** ⬜ Open — 🟦.
 
 ---
 

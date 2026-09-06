@@ -237,6 +237,19 @@ def parse_required_test_methods(content: str) -> list[str]:
     return methods
 
 
+def parse_hold_justification(content: str) -> str:
+    """Prose body of `## Automouse Hold Justification`, or "" when absent.
+
+    Fenced blocks are stripped before extraction (same reason as
+    parse_required_test_methods): a plan that *documents* the section format
+    inside a fence must not yield a phantom hold justification in the PR body.
+    Format is a level-2 heading over a prose paragraph — no per-entry bullet
+    structure — so the whole section body is returned verbatim.
+    """
+    return _section("\n".join(_strip_fenced(content)),
+                    r"Automouse Hold Justification")[:4000]
+
+
 def _resolve_variant(slug: str, base_dir: str, info: PlanInfo) -> str:
     """Highest-numbered plan variant for `slug` in `base_dir`.
 
@@ -300,4 +313,5 @@ def locate_plan(slug: str, plans_dir: str | None = None, explicit_path: str | No
         info.security_section = _section(content, "Security")[:4000]
     if info.has_reuse:
         info.reuse_section = _section(content, r"Reuse[^#\n]*")[:2000]
+    info.hold_justification = parse_hold_justification(content)
     return info

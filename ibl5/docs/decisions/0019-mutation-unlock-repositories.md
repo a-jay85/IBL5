@@ -1,6 +1,6 @@
 ---
 description: Rationale for removing the broad *Repository* mutation testing exclusion and adding MariaDB to the mutation CI workflow.
-last_verified: 2026-07-07
+last_verified: 2026-09-06
 ---
 
 # ADR-0019: Mutation Testing Unlock — Repositories

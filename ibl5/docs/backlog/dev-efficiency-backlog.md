@@ -82,6 +82,10 @@ last_verified: 2026-09-06
 | E54 | PR #2084 Phase 6.5 — rebase silently dropped implementation commit; lost-work proof blind to pre-run loss | ⬜ Open | — | XS |
 | E55 | PR #2129 Phase 6.5 — PR body false E2E claim, omitted grep finding, vacuous VM selector; all fixed this pass | ⬜ Open | — | XS |
 | E56 | PR #2129 Phase 6.5 — SKILL.md size-band gate not updated after deliberate file growth; fixed this pass | ⬜ Open | — | XS |
+| E62 | PR #2064 Phase 6.5 — stale hand-written PR body claims contradicting the final diff and code; B1/B2/B3/N1 fixed this pass | ⬜ Open | — | XS |
+| E63 | PR #1967 Phase 6.5 — duplicate `last_verified:` in ADR index + stale body path reference (Findings 1+2); body note finding; all fixed this pass or filed | ⬜ Open | — | S |
+| E64 | PR #1967 Phase 6.5 — stale PR body acceptance list claiming wrong ADR alternatives | ⬜ Open | — | XS |
+| E65 | PR #1967 Phase 6.5 — Phase 6.5 backlog entries inserted in wrong structural location | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -696,8 +700,6 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 | N3 | `BanRawSuperglobalsRule` suffix allowlist unchanged — plan Phase 6 §Correction forbids removing `Controller.php` | correct — intentional; `ControllerSuperglobalFreedomTest.php` is the scoped enforcement |
 | N4 | `codebase-map.md` regenerated as a side effect of other work | correct — expected artifact |
 | N5 | `Team/README.md` `last_verified: 2026-08-16` vs `maintenance-backlog.md` `2026-09-04` — cosmetic inconsistency | fixed this pass (bumped to 2026-09-04) |
-| E55 | PR #1967 Phase 6.5 — duplicate `last_verified:` in ADR index + stale body path reference (Findings 1+2); body note finding; all fixed this pass or filed | ⬜ Open | — | S |
-| E54 | PR #2064 Phase 6.5 — stale hand-written PR body claims contradicting the final diff and code; B1/B2/B3/N1 fixed this pass | ⬜ Open | — | XS |
 
 **prevention_ladder: no gate warranted** — all five are reviewer-confirmed correct behaviors, not defects; the existing `/pr-ready` Phase 6 review pipeline is the mechanism and it worked correctly here.
 
@@ -872,17 +874,6 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 ### E54 PR #2084 Phase 6.5 — rebase silently dropped implementation commit; lost-work proof blind to pre-run loss
 
 **class:** `rebase-dropped-commit` — an `--onto` rebase replay range that started above the branch's own commits, compounded by a lost-work proof that only compares pre-to-post within a single `/pr-ready` run and cannot detect a branch that arrives already emptied by a previous run's bad rebase.
-### E54 PR #2064 Phase 6.5 — stale hand-written PR body claims contradicting the final diff and code
-
----
-
-### E55 PR #1967 Phase 6.5 — ADR index duplicate frontmatter key and stale body path reference
-
-**class (finding 1):** a duplicate YAML frontmatter mapping key (`last_verified:`) in a doc index that accumulates independent date bumps from concurrent auto-merged commits without deduplication, causing invalid YAML that strict parsers reject.
-
-**class (finding 2):** a hand-written PR body path reference to an ADR that was renumbered after the body was written, leaving the manual-test row pointing at a nonexistent file.
-
-**class (findings 3–6 / notes):** class: n/a — scope-prose "unchanged" wording (substance accurate; second clause discloses), unperformed pre-merge manual rows (by design), stale matrix acceptance-list items, cosmetic commit-subject and row-placement inconsistencies; none gatable.
 
 **occurrence table:**
 
@@ -902,6 +893,100 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 `artifact destination: .claude/skills/pr-ready/scripts/lostwork.sh — add origin/<branch> pre-push comparison`
 
 *(discovered 2026-09-05 during Phase 6 review of #2084; root cause: prior /pr-ready run's Phase 2 rebase dropped 096320b0e using a bad --onto range)*
+
+### E62 PR #2064 Phase 6.5 — stale hand-written PR body claims contradicting the final diff and code
+
+**class:** stale hand-written PR body claims contradicting the final diff and code — the PR body asserted behaviors, file lists, or test coverage that the final diff contradicted.
+
+**occurrence table:**
+
+| # | Finding | Status |
+|---|---------|--------|
+| B1 | stale PR body claim contradicting final diff — fixed this pass | fixed this pass |
+| B2 | stale PR body claim contradicting final diff — fixed this pass | fixed this pass |
+| B3 | stale PR body claim contradicting final diff — fixed this pass | fixed this pass |
+| N1 | stale PR body note contradicting final diff — fixed this pass | fixed this pass |
+
+**prevention_ladder:** no gate warranted this pass — all four findings fixed in-pass via `gh pr edit`; Phase 6 review is the existing catch mechanism.
+
+`artifact destination: n/a — no gate`
+
+*(discovered during Phase 6 review of #2064; all findings B1/B2/B3/N1 fixed in-pass)*
+
+### E63 PR #1967 Phase 6.5 — ADR index duplicate frontmatter key and stale body path reference
+
+**class (finding 1):** a duplicate YAML frontmatter mapping key (`last_verified:`) in a doc index that accumulates independent date bumps from concurrent auto-merged commits without deduplication, causing invalid YAML that strict parsers reject.
+
+**class (finding 2):** a hand-written PR body path reference to an ADR that was renumbered after the body was written, leaving the manual-test row pointing at a nonexistent file.
+
+**class (findings 3–6 / notes):** class: n/a — scope-prose "unchanged" wording (substance accurate; second clause discloses), unperformed pre-merge manual rows (by design), stale matrix acceptance-list items, cosmetic commit-subject and row-placement inconsistencies; none gatable.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/docs/decisions/README.md:3-5` | yes (finding 1) | yes | fixed this pass |
+| 2 | PR #1967 body Row 60 | yes (finding 2) | yes | fixed this pass (gh pr edit by caller) |
+| 3 | matrix row 60 acceptance list (four named alternatives) | near-miss (finding 2) | yes | not fixed — filed (stale matrix row; ADR content correct) |
+| 4 | matrix rows 30, 55 stale commands | near-miss (finding 2) | yes | not fixed — filed |
+
+Scan for other files with duplicate `last_verified:` keys:
+
+```bash
+find ibl5/docs -name '*.md' -exec sh -c 'c=$(grep -c "^last_verified:" "$1" 2>/dev/null); [ "$c" -gt 1 ] && echo "$1: $c"' _ {} \;
+```
+
+Result: `ibl5/docs/decisions/README.md` is the only occurrence; fixed this pass.
+
+**prevention ladder:**
+- rung 0: `bin/check-docs` runs on every PR but accepts any number of `last_verified:` keys per file — not covered.
+- rung 1: extend `bin/check-docs` to reject more than one `^last_verified:` line in a single file's frontmatter. This catches the defect at the point of introduction rather than at review time. All four `meta-tooling-bar.md` extend-before-add conditions hold: the extension is 1–2 lines of `grep -c` logic, it lives where the rest of the frontmatter checks already live, it has a direct measurable surface (frontmatter parsing), and no separate tool is needed.
+- Landing rung: **rung 1** — extend `bin/check-docs`.
+- For finding 2 (stale body path): no gate warranted — PR body references are hand-written and ephemeral; an ADR renumber is a rare event; the existing Phase 6 6d(4) check is the review-time backstop and already caught it.
+
+**artifact destination:** `bin/check-docs` (in-repo script, path `bin/check-docs`).
+
+**provenance:** (discovered 2026-09-05 during #1967)
+
+### E64 PR #1967 Phase 6.5 — stale PR body acceptance list claiming wrong ADR alternatives
+
+**class:** A manual-test acceptance list in a PR body that names specific ADR alternatives-considered items, but lists alternatives that are not present in the ADR's `## Alternatives Considered` section — the list was written against an early draft and never reconciled against the final ADR.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #1967 body Row 60 — claimed four alternatives (GITHUB_TOKEN, lease-based force flag, committed pause file, push-triggered workflow) but ADR-0112 names six different alternatives | yes | fixed | fixed this pass — corrected via gh pr edit to name all six actual alternatives |
+
+**prevention_ladder:**
+- rung 0 — no existing gate checks manual-test acceptance lists against ADR content.
+- rung 1 — Phase 6 review (6d check) already catches this; no mechanical gate can verify a PR body claim against an ADR's content cheaply.
+- **landing rung:** no gate warranted — Phase 6 is the existing catch mechanism; the defect is authoring-time drift between a PR body draft and the final ADR.
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-06 during Phase 6 review of #1967; fixed this pass via gh pr edit)*
+
+### E65 PR #1967 Phase 6.5 — Phase 6.5 backlog entries inserted in wrong structural location
+
+**class:** A Phase 6.5 remediation run inserted new backlog section entries between an existing entry's `**class:**` line and its `**occurrence table:**`, splitting that entry's content. The occurrence table and prevention_ladder of the split entry ended up rendered inside the newly-inserted entry's section. Additionally, the index table rows for the new entries were appended to a different section's observation table (which has a different column schema) instead of to the main index table at the top of the file.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/docs/backlog/dev-efficiency-backlog.md` — E62 (PR #2064) and E63 (PR #1967) section headers inserted between E54/PR#2084's `**class:**` and its `**occurrence table:**`; E54's content orphaned inside E63's section | yes | was live | fixed this pass — structural repair in Phase 6.5 remediation commit |
+| 2 | `ibl5/docs/backlog/dev-efficiency-backlog.md` lines 699-700 — E62/E63 index rows appended to E47's 3-column observation table instead of main index table | yes | was live | fixed this pass — moved to main index table |
+| 3 | `ibl5/docs/backlog/dev-efficiency-backlog.md` end of file — E63's occurrence table and prevention_ladder orphaned with no section header | yes | was live | fixed this pass — reunited with E63's section header |
+
+**prevention_ladder:**
+- rung 0 — no existing gate validates backlog file structural integrity (column counts, section containment).
+- rung 1 — a structural lint for backlog files (checking that `**occurrence table:**` follows `**class:**` within the same section before the next `###` heading) could catch this at commit time; high false-positive risk on varied entry formats.
+- **landing rung:** no gate warranted this pass — three occurrences of the same root cause; surfacing as a known pattern for the future Phase 6.5 authoring prompt to note "insert at end of file, not between existing sections."
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-06 during Phase 6 review of #1967; structural repair done in Phase 6.5 remediation)*
 
 ### E55 PR #2126 Phase 6.5 — machine-authored post-review commit undisclosed in PR body
 
@@ -1058,25 +1143,3 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 `artifact destination: this entry`
 
 *(discovered 2026-09-06 during Phase 6 review of #2140)*
-| 1 | `ibl5/docs/decisions/README.md:3-5` | yes (finding 1) | yes | fixed this pass |
-| 2 | PR #1967 body Row 60 | yes (finding 2) | yes | fixed this pass (gh pr edit by caller) |
-| 3 | matrix row 60 acceptance list (four named alternatives) | near-miss (finding 2) | yes | not fixed — filed (stale matrix row; ADR content correct) |
-| 4 | matrix rows 30, 55 stale commands | near-miss (finding 2) | yes | not fixed — filed |
-
-Scan for other files with duplicate `last_verified:` keys:
-
-```bash
-find ibl5/docs -name '*.md' -exec sh -c 'c=$(grep -c "^last_verified:" "$1" 2>/dev/null); [ "$c" -gt 1 ] && echo "$1: $c"' _ {} \;
-```
-
-Result: `ibl5/docs/decisions/README.md` is the only occurrence; fixed this pass.
-
-**prevention ladder:**
-- rung 0: `bin/check-docs` runs on every PR but accepts any number of `last_verified:` keys per file — not covered.
-- rung 1: extend `bin/check-docs` to reject more than one `^last_verified:` line in a single file's frontmatter. This catches the defect at the point of introduction rather than at review time. All four `meta-tooling-bar.md` extend-before-add conditions hold: the extension is 1–2 lines of `grep -c` logic, it lives where the rest of the frontmatter checks already live, it has a direct measurable surface (frontmatter parsing), and no separate tool is needed.
-- Landing rung: **rung 1** — extend `bin/check-docs`.
-- For finding 2 (stale body path): no gate warranted — PR body references are hand-written and ephemeral; an ADR renumber is a rare event; the existing Phase 6 6d(4) check is the review-time backstop and already caught it.
-
-**artifact destination:** `bin/check-docs` (in-repo script, path `bin/check-docs`).
-
-**provenance:** (discovered 2026-09-05 during #1967)

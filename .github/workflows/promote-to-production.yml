@@ -90,6 +90,7 @@ jobs:
           MIN_REQUIRED_CHECKS: '3'
           MAX_WALKBACK: '0'
           SKIP_CHECKS: Promote master to production,Auto-promotion paused
+        shell: bash
         run: bin/promote-master-to-production "$PROMOTE_SHA" | tee -a "$GITHUB_OUTPUT"
 
       - name: Setup SSH

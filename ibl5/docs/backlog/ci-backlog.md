@@ -1,6 +1,6 @@
 ---
 description: CI/GitHub-Actions workflow simplification backlog — duplicated setup/notify boilerplate, job consolidation, and verified-not-redundant workflows, with per-entry status + automouse-readiness.
-last_verified: 2026-09-05
+last_verified: 2026-09-06
 ---
 
 # CI Workflow Simplification Backlog
@@ -188,6 +188,33 @@ Entries 9.1–9.3 are defects and gaps surfaced by the 2026-09-01 audit of PR #2
 ➜ 9.2 PR body `## Manual Testing` falsely claimed test coverage — ✅ Implemented (2026-09-04, #2095): see [archive](archive/ci-backlog-archive.md).
 
 ➜ 9.3 No Node toolchain pin before `Build IBLbot` on CI runner — ✅ Implemented (2026-09-04): see [archive](archive/ci-backlog-archive.md).
+
+---
+
+## Axis 10: Workflow shell-correctness spin-offs (PR #1967 audit)
+
+Entry 10.1 is a correctness fix surfaced by the 2026-09-06 audit of PR #1967. The `run:` step used a pipe without `shell: bash`, so `pipefail` was inactive and hard failures were silently discarded.
+
+| # | Title | Status | Automouse | Effort |
+|---|-------|--------|-----------|-------:|
+| 10.1 | `run:` step using pipe without `shell: bash` silently swallows non-zero exit on `tee` | ✅ Implemented | — | XS |
+
+### 10.1 `run:` step using pipe without `shell: bash` silently swallows non-zero exit on `tee`
+
+**class:** A GitHub Actions `run:` step using a pipe (`| tee -a "$GITHUB_OUTPUT"`) without `shell: bash` runs as `bash -e {0}` (no pipefail), so `tee`'s exit code (always 0) is the step's exit code. Any non-zero exit from the left side of the pipe is silently discarded — hard failures (diverged ref, invalid SHA, push rejected) appear green and send no notification.
+
+**occurrence:** `.github/workflows/promote-to-production.yml` `Promote if green` step — `run: bin/promote-master-to-production "$PROMOTE_SHA" | tee -a "$GITHUB_OUTPUT"` had no `shell: bash`.
+
+**fix:** Added `shell: bash` to the step, which uses `bash --noprofile --norc -eo pipefail {0}` and makes pipefail active, so the promoter's `exit 1` propagates correctly.
+
+**prevention_ladder:**
+- rung 0 — no existing gate checks for piped `run:` steps without `shell: bash` in workflow files.
+- rung 1 — extend the existing workflow linter or Phase 4B review agent E to flag `run:` steps containing `|` without an explicit `shell: bash`.
+- **landing rung:** rung 1 — extend the Phase 4B shell/workflow review agent (Agent E in `.claude/review-shared/_shell-workflow-agent.md`) to check for piped `run:` steps missing `shell: bash`.
+
+`artifact destination: .claude/review-shared/_shell-workflow-agent.md`
+
+*(discovered 2026-09-06 during Phase 6 review of #1967; fixed this pass — added shell: bash to Promote if green step)*
 
 ---
 

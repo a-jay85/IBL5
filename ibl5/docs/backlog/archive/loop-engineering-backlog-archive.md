@@ -185,3 +185,27 @@ Landing rung: **1** (extend `bin/check-docs` or add a narrow lint for `DRAFT=` e
 **Risk if untouched (was):** Silent merge-order violations in future stacked-plan programs where the parent branch is not yet in the child's commit history.
 **Status (2026-07-29):** ⬜ Open — 🟥 (ship-pipeline invariant; loop-machinery changes should default to `auto_merge: false`). (discovered 2026-07-29 during PR #1734 fence-parity-guard)
 **Status (2026-09-06):** ✅ Implemented — took direction (a): `/post-plan` Phase 6 Step 3 now captures the markers an earlier phase wrote (`Depends-on:`, plus the `<!-- no-adr: -->` / `<!-- no-refactor-tests: -->` bypass comments read by `bin/adr-check` and `bin/refactor-flag`), re-emits them at the top of the rewritten body, then verifies and self-heals via `gh pr edit --body-file`. Guarded by executable cases in `bin/test-postplan-arm-conditions`. Directions (b) and (c) were not taken — arm condition (6) and where Phase 1 writes the marker are unchanged.
+
+---
+
+### L50 `bin/pr-cycle` logs gate nominees as "excluded this run" but then orders and readies them
+
+**class:** A log line that states a disposition the code does not apply — the worker prints `excluded this run (gate nominee, unjudged)` for every `### #N` nominee in `bin/pr-attack --gate-candidates` output, then calls `bin/pr-attack --work <WORK> --gate-edges /dev/null`, which is the *judged-empty* form: every nominee is re-admitted as orderable with no gate edges. The first live run (2026-09-05, `/tmp/pr-cycle-20260905-023625-80966.log`) printed seven "excluded" lines and then readied #2108, the first one on that list.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/pr-cycle` — the `excluded this run (gate nominee, unjudged)` echo inside the nominee loop, followed by the `--gate-edges /dev/null` re-run | yes | fixed — log now matches behavior | ✅ Implemented |
+
+**Why it matters:** The plan (`~/claude-plans/pr-cycle-driver.md`) said nominees are excluded for the run; the implementation orders them unjudged. Either is a defensible overnight policy — arming stays fail-closed in `bin/pr-triage`, and a gate PR merged out of order lands the affected PR in BLOCKED-CHECK for the human rather than merging it wrong. But the log must not lie: a reader debugging a surprising merge order will trust "excluded" and look elsewhere.
+
+**Fix (pick one, S):**
+- Reword to `ordered with no gate edges (gate nominee, unjudged)` and say so in the usage header — matches what the code does today; or
+- Actually exclude: pass each nominee to `bin/pr-attack` as excluded (or filter them from `tried`/pick) so the log and behavior agree, at the cost of fewer merges per night.
+
+The static-guard case in `bin/test-pr-cycle` should pin whichever wording lands, so the two cannot drift again.
+
+**Status (2026-09-05):** ✅ Implemented — message-only reword (the first of the two fix options listed above); behavior unchanged. `bin/pr-cycle` now prints `ordered with no gate edges (gate nominee, judged-empty)` and the usage header carries a `Gate nominees:` block stating that `--gate-edges /dev/null` re-admits every nominee. Behavior is unchanged and asserted so: `bin/test-pr-cycle` case 6 pins the second pr-attack call as `--work abc123 --gate-edges /dev/null` and `calls ready == 3`. Wording note: shipped `judged-empty` rather than this entry's suggested `unjudged`, because `/dev/null` *is* pr-attack's documented judged-empty form (`bin/pr-attack:66`) — "unjudged" would leave a smaller version of the same lie in the parenthetical. The "static-guard case should pin whichever wording lands" suggestion is satisfied more strongly by runtime assertions: case 6 now greps the rendered line for the new wording and asserts `excluded this run` is absent from the driver's actual output, which a source-level static guard cannot do; case 1 pins the header note via `--help`. No new static guard was added.
+
+**provenance:** (discovered 2026-09-05 during the first live `bin/pr-cycle --go` run, right after #2081 merged)

@@ -101,16 +101,12 @@ last_verified: 2026-09-06
 | E81 | PR #1967 Phase 6.5 — duplicate `last_verified:` in ADR index + stale body path reference (Findings 1+2); body note finding; all fixed this pass or filed | ⬜ Open | — | S |
 | E82 | PR #1967 Phase 6.5 — stale PR body acceptance list claiming wrong ADR alternatives | ⬜ Open | — | XS |
 | E83 | PR #1967 Phase 6.5 — Phase 6.5 backlog entries inserted in wrong structural location | ⬜ Open | — | XS |
-| E72 | PR #2064 Phase 6.5 — stale hand-written PR body claims contradicting the final diff and code; B1/B2/B3/N1 fixed this pass | ⬜ Open | — | XS |
-| E73 | PR #1967 Phase 6.5 — duplicate `last_verified:` in ADR index + stale body path reference (Findings 1+2); body note finding; all fixed this pass or filed | ⬜ Open | — | S |
-| E74 | PR #1967 Phase 6.5 — stale PR body acceptance list claiming wrong ADR alternatives | ⬜ Open | — | XS |
-| E75 | PR #1967 Phase 6.5 — Phase 6.5 backlog entries inserted in wrong structural location | ⬜ Open | — | XS |
-| E79 | PR #1967 Phase 6.5 — orphaned duplicate block + stale plan-file matrix literals | ⬜ Open | — | XS |
-| E84 | PR #1967 Phase 6.5 — missing `pp-absent-skips` test case for absent promote-to-production workflow | ✅ Implemented | — | XS |
-| E85 | PR #1967 Phase 6.5 — orphan reference bullet in ADR-0112 placed after `## Addendum` instead of `## References` | ✅ Implemented | — | XS |
-| E86 | PR #1967 Phase 6.5 — no duplicate-ID gate for backlog files; four duplicate-ID pairs undetected | ⬜ Open | — | XS |
-| E87 | PR #1967 Phase 6.5 — `pp-skip-renamed` test case removed; coverage note only | ⬜ Open | — | XS |
-| E88 | PR #1967 Phase 6.5 — first commit subject type `feat:` vs plan-mandated `chore:` | ⬜ Open | — | XS |
+| E84 | Always-loaded rule addition fills resident byte budget to zero, leaving no headroom | ⬜ Open | — | S |
+| E85 | PR #1967 Phase 6.5 — missing `pp-absent-skips` test case for absent promote-to-production workflow | ✅ Implemented | — | XS |
+| E86 | PR #1967 Phase 6.5 — orphan reference bullet in ADR-0112 placed after `## Addendum` instead of `## References` | ✅ Implemented | — | XS |
+| E87 | PR #1967 Phase 6.5 — no duplicate-ID gate for backlog files; four duplicate-ID pairs undetected | ⬜ Open | — | XS |
+| E88 | PR #1967 Phase 6.5 — `pp-skip-renamed` test case removed; coverage note only | ⬜ Open | — | XS |
+| E89 | PR #1967 Phase 6.5 — first commit subject type `feat:` vs plan-mandated `chore:` | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -1491,7 +1487,7 @@ Landing rung: **1** — extend `bin/check-rules-byte-budget` to warn when the ag
 
 *(discovered 2026-09-07 during Phase 6 review of #1967)*
 
-### E84 PR #1967 Phase 6.5 — missing `pp-absent-skips` test case for absent promote-to-production workflow
+### E85 PR #1967 Phase 6.5 — missing `pp-absent-skips` test case for absent promote-to-production workflow
 
 **class:** A `bin/check-composite-contracts` skip path (line 74 — workflow file absent, exit 0 with skip line) had no corresponding test case in `bin/test-check-composite-contracts`; the skip code was reachable but entirely untested.
 
@@ -1510,7 +1506,7 @@ Landing rung: **1** — extend `bin/check-rules-byte-budget` to warn when the ag
 
 *(discovered 2026-09-06 during Phase 6 review of #1967; fixed this pass — `pp-absent-skips` test case added)*
 
-### E85 PR #1967 Phase 6.5 — orphan reference bullet in ADR-0112 placed after `## Addendum` instead of `## References`
+### E86 PR #1967 Phase 6.5 — orphan reference bullet in ADR-0112 placed after `## Addendum` instead of `## References`
 
 **class:** A reference bullet (`.claude/rules/meta-tooling-bar.md`) was stranded at the end of the `## Addendum` section of ADR-0112 rather than in the `## References` section, making it appear as trailing addendum prose instead of a structured reference list entry.
 
@@ -1529,7 +1525,7 @@ Landing rung: **1** — extend `bin/check-rules-byte-budget` to warn when the ag
 
 *(discovered 2026-09-06 during Phase 6 review of #1967; fixed this pass — bullet moved to `## References`)*
 
-### E86 PR #1967 Phase 6.5 — no duplicate-ID gate for backlog files; four duplicate-ID pairs undetected
+### E87 PR #1967 Phase 6.5 — no duplicate-ID gate for backlog files; four duplicate-ID pairs undetected
 
 **class:** Four duplicate entry-ID pairs in `dev-efficiency-backlog.md` (E80=E72, E81=E73, E82=E74, E83=E75) went undetected — no gate validates uniqueness of `### E<n>` section headings or `| E<n> |` index rows within a backlog file. The duplicate IDs caused a cascade of structural corruption: duplicate index rows, a spurious body-section heading (`### E80`), and false status records in E75's occurrence table.
 
@@ -1548,7 +1544,7 @@ Landing rung: **1** — extend `bin/check-rules-byte-budget` to warn when the ag
 
 *(discovered 2026-09-06 during Phase 6 review of #1967; structural corruption fixed this pass)*
 
-### E87 PR #1967 Phase 6.5 — `pp-skip-renamed` test case removed; coverage note only
+### E88 PR #1967 Phase 6.5 — `pp-skip-renamed` test case removed; coverage note only
 
 **class:** The `pp-skip-renamed` fixture in `bin/test-check-composite-contracts` was removed. Coverage is equivalent by construction — the remaining test cases exercise the same skip path; no untested branch results.
 
@@ -1565,7 +1561,7 @@ Landing rung: **1** — extend `bin/check-rules-byte-budget` to warn when the ag
 
 *(discovered 2026-09-06 during Phase 6 review of #1967; note only — no action required)*
 
-### E88 PR #1967 Phase 6.5 — first commit subject type `feat:` vs plan-mandated `chore:`
+### E89 PR #1967 Phase 6.5 — first commit subject type `feat:` vs plan-mandated `chore:`
 
 **class:** Commit hygiene note. The first commit on the branch (`dbc0c5f17`) used a `feat:` subject line; the plan specified `chore:`. Cosmetic — the PR title is `chore:` and governs the squash-merge subject.
 

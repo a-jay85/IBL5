@@ -94,6 +94,9 @@ last_verified: 2026-09-07
 | E69 | PR #1899 Phase 6.5 — stale test-row labels and PR body claims when rows renumbered post-impl | ⬜ Open | — | XS |
 | E70 | PR #2123 Phase 6.5 — PR body page-count overclaim, selector mis-attribution, plan VR command defect, and three confirmatory notes | ⬜ Open | — | XS |
 | E71 | PR #2123 — remediation commit structural defects: backlog entry with duplicate ID, misplaced rows, and orphan file outside plan scope | ⬜ Open | — | XS |
+| E76 | PR #2042 Phase 6.5 — post-PR-open commit introduced unplanned production code; PR body scope and testing claims went stale with no gate | ⬜ Open | — | XS |
+| E77 | Rebase auto-merge silently mis-splices concurrent EOF entries in backlog docs | ⬜ Open | — | XS |
+| E78 | PR #2042 Phase 6.5 — N2 benign unplanned files, N3 PR body Scope under-enumeration, N4 PR title/commit subject mismatch | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -1269,3 +1272,65 @@ Landing: rung 1 — `bin/check-docs` duplicate-ID check for dev-efficiency-backl
 **artifact destination:** `bin/check-docs` (in-repo).
 
 *(discovered 2026-09-06 during /pr-ready Phase 6 review of #2123)*
+
+### E76 PR #2042 Phase 6.5 — post-PR-open commit introduced unplanned production code; PR body scope and testing claims went stale with no gate
+
+**class:** A commit pushed to an open PR after the body was written introduces unplanned production code changes outside the PR's stated scope. The PR body's `## Scope` and `## Manual Testing` sections become false, but no automated gate re-validates those claims against the actual diff. The gap persists until the next Phase 6 Opus fidelity review.
+
+**occurrence table:**
+
+| # | Location | Same class? | Live at review? | Status |
+|---|-----------|-------------|-----------------|--------|
+| 1 | PR #2042 — commit `a73f995c3` pushed post-PR-open added unplanned `classes/Topics/News/NewsController.php` rendering change (replaced `OpenTable()`/`CloseTable()` with raw `echo` div wrappers) and baselines 2 new `ibl.echoInNonView` violations (count 6→8); PR body `## Scope` named only the getopt() rule and `bin/lighthouse-pr-urls`; `## Manual Testing` claim became false | yes | 2026-09-06 Phase 6 review | fixed — reverted in Phase 6.5 remediation; baseline restored |
+
+**prevention_ladder:**
+- rung 0 — `.claude/rules/pr-body-negative-claim-recheck.md` documents the requirement to re-check scope claims after every commit; doc-only, no enforcement.
+- rung 1 — a pre-push warning hook that flags when `ibl5/classes/` or `ibl5/modules/` files appear in a PR diff with a `chore:` title; surfaces the anomaly at push time rather than at Phase 6 review.
+- rung 2 — a CI gate that diffs the PR body `## Scope` wording against the actual changed-file set and fails when production controller files appear with no matching justification sentence.
+- **landing rung:** rung 0 — existing rule doc is the prevention mechanism; a new gate is warranted only if the class recurs.
+
+`prevention_ladder: existing rule doc (pr-body-negative-claim-recheck.md); no new gate this pass — recurrence triggers escalation`
+
+`artifact destination: this entry`
+
+*(discovered 2026-09-06 during Phase 6 review of #2042)*
+
+### E77 Rebase auto-merge silently mis-splices concurrent EOF entries in backlog docs
+
+**class:** A clean git rebase auto-merge silently mis-splices adjacent EOF entries in a backlog doc that multiple PRs append to concurrently. Neither entry is individually malformed; the auto-merge inserts content from one entry's heading and class paragraph into the body of another, and orphans the remaining body of the new entry at EOF — producing a structurally corrupted file that passes most syntax checks but fails `bin/check-numbering` on the duplicate heading ID. The same auto-merge can also drop an existing entry entirely when the replacement content occupies the same position in the file.
+
+**occurrence table:**
+
+| # | Location | Same class? | Live at review? | Status |
+|---|-----------|-------------|-----------------|--------|
+| 1 | `ibl5/docs/backlog/dev-efficiency-backlog.md` — auto-merge spliced the branch's E76 heading and class paragraph into master's E66 entry body; orphaned E76's occurrence table and prevention_ladder at EOF; additionally dropped master's E68 entry entirely | yes | 2026-09-06 Phase 6 review | fixed this pass |
+
+**prevention_ladder:**
+- rung 0 — `bin/check-numbering` already catches duplicate heading IDs (the symptom: duplicate `### E66`); that gate is what flags this class for remediation. No new detection gate needed.
+- rung 1 — no existing hook governs concurrent EOF appends to backlog docs; not applicable.
+- rung 2 — a rule doc could document the "concurrent EOF append" hazard and recommend a blank separator line or a deliberate trailing sentinel between entries to reduce auto-merge splice risk; doc-only.
+- rung 3 — N/A; PHPStan does not check markdown docs.
+- rung 4 — `bin/check-numbering` already covers the symptom; the root cause (concurrent EOF appends) is not independently machine-detectable before the fact.
+- **landing rung:** rung 0 — existing `bin/check-numbering` CI gate catches the symptom; root cause is a one-off shaped by concurrent EOF growth; no additional gate warranted this pass — recurrence triggers rung 2.
+
+`artifact destination: n/a — no new gate this pass`
+
+*(discovered 2026-09-06 during /pr-ready run on PR #2042 Phase 6)*
+
+### E78 PR #2042 Phase 6.5 — N2 benign unplanned files, N3 PR body Scope under-enumeration, N4 PR title/commit subject mismatch
+
+**class:** n/a — N2 is benign (unplanned files are comment-only changes with no behavior impact); N3 is a PR body Scope that under-enumerates companion files (corrected in Phase 6.5 Scope reconciliation); N4 is cosmetic (unsquashed commit subject disagrees with PR title but PR title wins at merge).
+
+**occurrence table:**
+
+| # | Finding | Same class? | Live at review? | Status |
+|---|---------|-------------|-----------------|--------|
+| 1 | N2 — unplanned comment-only files in diff | n/a — benign | 2026-09-06 Phase 6 review | not fixed — n/a; no behavior impact |
+| 2 | N3 — PR body `## Scope` under-enumerates companion files | n/a — corrected in Phase 6.5 Scope reconciliation | 2026-09-06 Phase 6 review | not fixed — already addressed |
+| 3 | N4 — unsquashed commit subject `feat:` disagrees with PR title `chore:` | n/a — cosmetic; PR title wins at merge | 2026-09-06 Phase 6 review | not fixed — n/a |
+
+**prevention_ladder:** no gate warranted — N2 needs no gate (benign by design); N3 is already addressed by Phase 6.5 Scope reconciliation; N4 is cosmetic with no merge impact.
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-06 during /pr-ready run on PR #2042 Phase 6)*

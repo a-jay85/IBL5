@@ -89,6 +89,12 @@ if ($useStdin) {
     fclose($pipes[2]);
     $exit = proc_close($proc);
     if ($exit !== 0) {
+        // Degrade, never die: the consumer interpolates stdout straight into
+        // `jq --argjson`, so an empty stdout is a hard workflow failure. An
+        // unresolvable base ref (shallow CI clone with no `origin/master`, a
+        // fresh repo, a fork) is a "changed paths unknown" signal, not a fatal
+        // one — honour the same `never emit an empty list` invariant as the
+        // no-mappable-paths fallback below and audit the representative set.
         fwrite(STDERR, sprintf(
             "git diff --name-only origin/master...HEAD failed (exit %d): %s — falling back to representative set\n",
             $exit,

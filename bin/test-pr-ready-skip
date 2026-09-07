@@ -1,0 +1,313 @@
+#!/usr/bin/env bash
+# test-pr-ready-skip — unit tests for .claude/skills/pr-ready/scripts/skip-review.sh.
+#
+# Usage: bin/test-pr-ready-skip
+#   Run all skip-predicate unit cases.
+#   Each case: exits 0, line-1 starts CURRENT-TREE:, last line = expected verdict.
+#
+# Driven entirely through a scratch git repo and a gh shim — no real PR is touched.
+# Runs identically on macOS and Linux CI.
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+SKIP_SCRIPT="$SCRIPT_DIR/../.claude/skills/pr-ready/scripts/skip-review.sh"
+test -s "$SKIP_SCRIPT" || { echo "FAIL: skip-review.sh not found at $SKIP_SCRIPT"; exit 1; }
+test -x "$SKIP_SCRIPT" || { echo "FAIL: skip-review.sh not executable"; exit 1; }
+
+SCRATCH="$(mktemp -d)"
+# /tmp pr-ready files are PR-9999-keyed; clean them alongside SCRATCH.
+_cleanup() {
+    rm -rf "$SCRATCH"
+    rm -f "/tmp/pr-ready-digest-lines-9999.txt" "/tmp/pr-ready-prior-verdict-9999.md"
+}
+trap _cleanup EXIT
+
+FAILED=0
+CASE_BASE=0
+fail() { echo "FAIL: $*" >&2; FAILED=$((FAILED + 1)); }
+begin_case() { CASE_BASE=$FAILED; }
+end_case() {
+    if [[ $FAILED -eq $CASE_BASE ]]; then echo "$1 OK"; else echo "$1 FAILED" >&2; fi
+}
+
+want() {
+    local label="$1" haystack="$2" token="$3"
+    printf '%s\n' "$haystack" | grep -qF "$token" || fail "$label: expected '$token' not found in: $haystack"
+}
+
+# --- scratch git repo --------------------------------------------------------------------
+GIT_REPO="$SCRATCH/repo"
+git init -b pr-branch "$GIT_REPO" >/dev/null 2>&1
+git -C "$GIT_REPO" config user.email "test@example.com"
+git -C "$GIT_REPO" config user.name "Test"
+echo "test" > "$GIT_REPO/test.txt"
+git -C "$GIT_REPO" add test.txt
+git -C "$GIT_REPO" commit -m "init" >/dev/null 2>&1
+TREE="$(git -C "$GIT_REPO" rev-parse 'HEAD^{tree}')"
+
+# --- gh shim -----------------------------------------------------------------------------
+mkdir -p "$SCRATCH/.local/bin"
+cat > "$SCRATCH/.local/bin/gh" << 'SHIM_EOF'
+#!/usr/bin/env bash
+# Shim: cat GH_FIXTURE if set; else exit 1
+if [ -n "${GH_FIXTURE:-}" ]; then
+    cat "$GH_FIXTURE"
+    exit 0
+fi
+exit 1
+SHIM_EOF
+chmod +x "$SCRATCH/.local/bin/gh"
+export PATH="$SCRATCH/.local/bin:$PATH"
+
+# --- case 1: no-verdict-comment ----------------------------------------------------------
+# Step-0 stale-state clear: pre-seeded /tmp files must be removed even on this bail path.
+begin_case
+fixture1="$SCRATCH/fix1.json"
+printf '{"comments": [], "headRefName": "pr-branch"}\n' > "$fixture1"
+# Pre-create sentinel files that step 0 should clear.
+echo "stale-digest" > "/tmp/pr-ready-digest-lines-9999.txt"
+echo "stale-verdict" > "/tmp/pr-ready-prior-verdict-9999.md"
+OUT1="$(cd "$GIT_REPO" && GH_FIXTURE="$fixture1" bash "$SKIP_SCRIPT" 9999 "")"
+STATUS1=$?
+FIRST1="$(printf '%s\n' "$OUT1" | head -1)"
+LAST1="$(printf '%s\n' "$OUT1" | tail -1)"
+[ "$STATUS1" -eq 0 ] || fail "case 1: exit status was $STATUS1, want 0"
+printf '%s' "$FIRST1" | grep -q '^CURRENT-TREE: ' || fail "case 1: line 1 not CURRENT-TREE:, got: $FIRST1"
+want "no-verdict-comment verdict" "$LAST1" "no-verdict-comment"
+[ ! -f "/tmp/pr-ready-digest-lines-9999.txt" ] || fail "case 1: digest file not cleared by step-0"
+[ ! -f "/tmp/pr-ready-prior-verdict-9999.md" ] || fail "case 1: prior-verdict file not cleared by step-0"
+end_case no-verdict-comment
+
+# --- case 2: comment-no-tree-line --------------------------------------------------------
+begin_case
+fixture2="$SCRATCH/fix2.json"
+cat > "$fixture2" << 'JSON'
+{"comments": [{"body": "<!-- pr-ready-verdict -->\nSome body without tree line\n### Merge digest\n**What changed:** x\n**Why:** y\n**Watch:** z\n**Touches:** a\n**Machine-authored fixes:** b"}], "headRefName": "pr-branch"}
+JSON
+OUT2="$(cd "$GIT_REPO" && GH_FIXTURE="$fixture2" bash "$SKIP_SCRIPT" 9999 "")"
+STATUS2=$?
+FIRST2="$(printf '%s\n' "$OUT2" | head -1)"
+LAST2="$(printf '%s\n' "$OUT2" | tail -1)"
+[ "$STATUS2" -eq 0 ] || fail "case 2: exit status was $STATUS2, want 0"
+printf '%s' "$FIRST2" | grep -q '^CURRENT-TREE: ' || fail "case 2: line 1 not CURRENT-TREE:, got: $FIRST2"
+want "no-tree-line verdict" "$LAST2" "RUN-REVIEW no-tree-line"
+end_case comment-no-tree-line
+
+# --- case 3: tree-equal-no-conflicts (SKIP path) -----------------------------------------
+# A well-formed sticky comment with matching tree must produce SKIP-REVIEW.
+# Also verifies carry-forward files are written.
+begin_case
+fixture3="$SCRATCH/fix3.json"
+# Build body with TREE substituted, then JSON-encode as a single-line string.
+BODY3="$(printf '%s\n' \
+    "**Reviewed tree:** $TREE" \
+    "### Merge digest" \
+    "**What changed:** desc" \
+    "**Why:** reason" \
+    "**Watch:** nothing" \
+    "**Touches:** test.txt" \
+    "**Machine-authored fixes:** none" \
+    "### Verdict" \
+    "READY" \
+    "<!-- pr-ready-verdict -->")"
+# Encode newlines as \n for JSON string value.
+BODY3_JSON="$(printf '%s' "$BODY3" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')"
+printf '{"comments": [{"body": %s}], "headRefName": "pr-branch"}\n' "$BODY3_JSON" > "$fixture3"
+OUT3="$(cd "$GIT_REPO" && GH_FIXTURE="$fixture3" bash "$SKIP_SCRIPT" 9999 "")"
+STATUS3=$?
+FIRST3="$(printf '%s\n' "$OUT3" | head -1)"
+LAST3="$(printf '%s\n' "$OUT3" | tail -1)"
+[ "$STATUS3" -eq 0 ] || fail "case 3: exit status was $STATUS3, want 0"
+printf '%s' "$FIRST3" | grep -q '^CURRENT-TREE: ' || fail "case 3: line 1 not CURRENT-TREE:, got: $FIRST3"
+want "SKIP-REVIEW verdict" "$LAST3" "SKIP-REVIEW"
+want "SKIP-REVIEW contains tree sha" "$LAST3" "$TREE"
+# Carry-forward files must exist after SKIP.
+[ -f "/tmp/pr-ready-digest-lines-9999.txt" ] || fail "case 3: digest-lines file not written"
+DLINE_COUNT="$(wc -l < /tmp/pr-ready-digest-lines-9999.txt | tr -d ' ')"
+[ "$DLINE_COUNT" -eq 5 ] || fail "case 3: digest-lines file has $DLINE_COUNT lines, want 5"
+[ -s "/tmp/pr-ready-prior-verdict-9999.md" ] || fail "case 3: prior-verdict file missing or empty"
+end_case tree-equal-no-conflicts
+
+# --- case 4: tree-differs ----------------------------------------------------------------
+# A comment with a mismatched tree must produce RUN-REVIEW tree-changed (not wrong-worktree).
+begin_case
+fixture4="$SCRATCH/fix4.json"
+WRONG_TREE="ffffffffffffffffffffffffffffffffffffffff"
+BODY4="$(printf '%s\n' \
+    "**Reviewed tree:** $WRONG_TREE" \
+    "### Merge digest" \
+    "**What changed:** desc" \
+    "**Why:** reason" \
+    "**Watch:** nothing" \
+    "**Touches:** test.txt" \
+    "**Machine-authored fixes:** none" \
+    "### Verdict" \
+    "READY" \
+    "<!-- pr-ready-verdict -->")"
+BODY4_JSON="$(printf '%s' "$BODY4" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')"
+printf '{"comments": [{"body": %s}], "headRefName": "pr-branch"}\n' "$BODY4_JSON" > "$fixture4"
+OUT4="$(cd "$GIT_REPO" && GH_FIXTURE="$fixture4" bash "$SKIP_SCRIPT" 9999 "")"
+STATUS4=$?
+FIRST4="$(printf '%s\n' "$OUT4" | head -1)"
+LAST4="$(printf '%s\n' "$OUT4" | tail -1)"
+[ "$STATUS4" -eq 0 ] || fail "case 4: exit status was $STATUS4, want 0"
+printf '%s' "$FIRST4" | grep -q '^CURRENT-TREE: ' || fail "case 4: line 1 not CURRENT-TREE:, got: $FIRST4"
+want "tree-changed verdict" "$LAST4" "RUN-REVIEW tree-changed"
+# Negative pairing: must NOT be wrong-worktree (proves guard order is correct).
+printf '%s\n' "$LAST4" | grep -qF "RUN-REVIEW wrong-worktree" && fail "case 4: got wrong-worktree, expected tree-changed"
+end_case tree-differs
+
+# --- case 5: tree-equal-with-conflicts ---------------------------------------------------
+# Same body as case 3, but conflicts flag non-empty → RUN-REVIEW conflicts-resolved.
+begin_case
+# Clear any carry-forward from previous cases before running.
+rm -f "/tmp/pr-ready-digest-lines-9999.txt" "/tmp/pr-ready-prior-verdict-9999.md"
+OUT5="$(cd "$GIT_REPO" && GH_FIXTURE="$fixture3" bash "$SKIP_SCRIPT" 9999 "conflicts")"
+STATUS5=$?
+FIRST5="$(printf '%s\n' "$OUT5" | head -1)"
+LAST5="$(printf '%s\n' "$OUT5" | tail -1)"
+[ "$STATUS5" -eq 0 ] || fail "case 5: exit status was $STATUS5, want 0"
+printf '%s' "$FIRST5" | grep -q '^CURRENT-TREE: ' || fail "case 5: line 1 not CURRENT-TREE:, got: $FIRST5"
+want "conflicts-resolved verdict" "$LAST5" "RUN-REVIEW conflicts-resolved"
+# Step 0 clears carry-forward even on conflicts path.
+[ ! -f "/tmp/pr-ready-digest-lines-9999.txt" ] || fail "case 5: digest file not cleared by step-0"
+[ ! -f "/tmp/pr-ready-prior-verdict-9999.md" ] || fail "case 5: prior-verdict file not cleared by step-0"
+end_case tree-equal-with-conflicts
+
+# --- case 6: multiple-sticky-comments ----------------------------------------------------
+begin_case
+fixture6="$SCRATCH/fix6.json"
+cat > "$fixture6" << JSON
+{"comments": [{"body": "**Reviewed tree:** $TREE\n<!-- pr-ready-verdict -->"},{"body": "**Reviewed tree:** $TREE\n<!-- pr-ready-verdict -->"}], "headRefName": "pr-branch"}
+JSON
+OUT6="$(cd "$GIT_REPO" && GH_FIXTURE="$fixture6" bash "$SKIP_SCRIPT" 9999 "")"
+STATUS6=$?
+FIRST6="$(printf '%s\n' "$OUT6" | head -1)"
+LAST6="$(printf '%s\n' "$OUT6" | tail -1)"
+[ "$STATUS6" -eq 0 ] || fail "case 6: exit status was $STATUS6, want 0"
+printf '%s' "$FIRST6" | grep -q '^CURRENT-TREE: ' || fail "case 6: line 1 not CURRENT-TREE:, got: $FIRST6"
+want "multiple-sticky-comments verdict" "$LAST6" "RUN-REVIEW multiple-sticky-comments"
+end_case multiple-sticky-comments
+
+# --- case 7: missing-args ----------------------------------------------------------------
+# Called with 0 args and with 1 arg must both return RUN-REVIEW missing-args, exit 0.
+begin_case
+OUT7a="$(cd "$GIT_REPO" && bash "$SKIP_SCRIPT")"
+STATUS7a=$?
+LAST7a="$(printf '%s\n' "$OUT7a" | tail -1)"
+[ "$STATUS7a" -eq 0 ] || fail "case 7a: exit status was $STATUS7a, want 0"
+want "0-arg missing-args verdict" "$LAST7a" "RUN-REVIEW missing-args"
+OUT7b="$(cd "$GIT_REPO" && bash "$SKIP_SCRIPT" 9999)"
+STATUS7b=$?
+LAST7b="$(printf '%s\n' "$OUT7b" | tail -1)"
+[ "$STATUS7b" -eq 0 ] || fail "case 7b: exit status was $STATUS7b, want 0"
+want "1-arg missing-args verdict" "$LAST7b" "RUN-REVIEW missing-args"
+end_case missing-args
+
+# --- case 8: wrong-worktree --------------------------------------------------------------
+# headRefName in the PR differs from the local branch → RUN-REVIEW wrong-worktree.
+begin_case
+fixture8="$SCRATCH/fix8.json"
+cat > "$fixture8" << JSON
+{"comments": [{"body": "**Reviewed tree:** $TREE\n<!-- pr-ready-verdict -->"}], "headRefName": "different-branch"}
+JSON
+OUT8="$(cd "$GIT_REPO" && GH_FIXTURE="$fixture8" bash "$SKIP_SCRIPT" 9999 "")"
+STATUS8=$?
+FIRST8="$(printf '%s\n' "$OUT8" | head -1)"
+LAST8="$(printf '%s\n' "$OUT8" | tail -1)"
+[ "$STATUS8" -eq 0 ] || fail "case 8: exit status was $STATUS8, want 0"
+printf '%s' "$FIRST8" | grep -q '^CURRENT-TREE: ' || fail "case 8: line 1 not CURRENT-TREE:, got: $FIRST8"
+want "wrong-worktree verdict" "$LAST8" "RUN-REVIEW wrong-worktree"
+end_case wrong-worktree
+
+# --- case 9: malformed-tree-value --------------------------------------------------------
+# Short hex, uppercase, or the literal 'unavailable' all produce RUN-REVIEW no-tree-line.
+begin_case
+for BAD_TREE in "abc123" "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA" "unavailable"; do
+    fixture9="$SCRATCH/fix9-${BAD_TREE:0:10}.json"
+    BAD_BODY9="$(printf '%s\n' \
+        "**Reviewed tree:** $BAD_TREE" \
+        "<!-- pr-ready-verdict -->")"
+    BAD_BODY9_JSON="$(printf '%s' "$BAD_BODY9" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')"
+    printf '{"comments": [{"body": %s}], "headRefName": "pr-branch"}\n' "$BAD_BODY9_JSON" > "$fixture9"
+    OUT9="$(cd "$GIT_REPO" && GH_FIXTURE="$fixture9" bash "$SKIP_SCRIPT" 9999 "")"
+    LAST9="$(printf '%s\n' "$OUT9" | tail -1)"
+    printf '%s\n' "$LAST9" | grep -qF "SKIP-REVIEW" \
+        && fail "case 9 ($BAD_TREE): malformed tree produced SKIP-REVIEW"
+    want "malformed-tree no-tree-line ($BAD_TREE)" "$LAST9" "RUN-REVIEW no-tree-line"
+done
+end_case malformed-tree-value
+
+# --- case 10: prior-digest-unparseable ---------------------------------------------------
+# Matching tree but digest block absent or wrong label count → RUN-REVIEW prior-digest-unparseable.
+begin_case
+BODY10a="$(printf '%s\n' \
+    "**Reviewed tree:** $TREE" \
+    "Some prose without a digest block." \
+    "READY" \
+    "<!-- pr-ready-verdict -->")"
+BODY10a_JSON="$(printf '%s' "$BODY10a" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')"
+fixture10a="$SCRATCH/fix10a.json"
+printf '{"comments": [{"body": %s}], "headRefName": "pr-branch"}\n' "$BODY10a_JSON" > "$fixture10a"
+OUT10a="$(cd "$GIT_REPO" && GH_FIXTURE="$fixture10a" bash "$SKIP_SCRIPT" 9999 "")"
+LAST10a="$(printf '%s\n' "$OUT10a" | tail -1)"
+want "no-digest-block" "$LAST10a" "RUN-REVIEW prior-digest-unparseable"
+
+BODY10b="$(printf '%s\n' \
+    "**Reviewed tree:** $TREE" \
+    "### Merge digest" \
+    "**What changed:** desc" \
+    "**Why:** reason" \
+    "**Watch:** nothing" \
+    "**Touches:** test.txt" \
+    "READY" \
+    "<!-- pr-ready-verdict -->")"
+BODY10b_JSON="$(printf '%s' "$BODY10b" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')"
+fixture10b="$SCRATCH/fix10b.json"
+printf '{"comments": [{"body": %s}], "headRefName": "pr-branch"}\n' "$BODY10b_JSON" > "$fixture10b"
+OUT10b="$(cd "$GIT_REPO" && GH_FIXTURE="$fixture10b" bash "$SKIP_SCRIPT" 9999 "")"
+LAST10b="$(printf '%s\n' "$OUT10b" | tail -1)"
+want "wrong-label-count" "$LAST10b" "RUN-REVIEW prior-digest-unparseable"
+end_case prior-digest-unparseable
+
+# --- case 11: carry-forward-files-on-run -------------------------------------------------
+# On RUN-REVIEW paths, no carry-forward file is left behind.
+begin_case
+echo "stale-digest" > "/tmp/pr-ready-digest-lines-9999.txt"
+echo "stale-verdict" > "/tmp/pr-ready-prior-verdict-9999.md"
+OUT11="$(cd "$GIT_REPO" && GH_FIXTURE="$fixture4" bash "$SKIP_SCRIPT" 9999 "")"
+LAST11="$(printf '%s\n' "$OUT11" | tail -1)"
+want "carry-forward-clear-on-run verdict" "$LAST11" "RUN-REVIEW"
+[ ! -f "/tmp/pr-ready-digest-lines-9999.txt" ] \
+    || fail "case 11: digest file not cleared on RUN-REVIEW path"
+[ ! -f "/tmp/pr-ready-prior-verdict-9999.md" ] \
+    || fail "case 11: prior-verdict file not cleared on RUN-REVIEW path"
+end_case carry-forward-files-on-run
+
+# --- mutation check ----------------------------------------------------------------------
+# Invert the tree comparison in step 10 and confirm case 4's fixture now produces SKIP-REVIEW.
+# Skippable with --skip-mutation for environments where sed -i differs.
+if [[ "${1:-}" != "--skip-mutation" ]]; then
+    begin_case
+    MUTANT="$SCRATCH/skip-review-mutant.sh"
+    cp "$SKIP_SCRIPT" "$MUTANT"
+    # Anchor on the exact step-10 line to avoid collateral damage.
+    sed -i.bak 's/\[ "\$RECORDED_TREE" != "\$CUR" \]/[ "$RECORDED_TREE" = "$CUR" ]/' "$MUTANT"
+    grep -qF '"$RECORDED_TREE" = "$CUR"' "$MUTANT" || fail "mutation: substitution did not apply — test has no teeth"
+    OUT_MUT="$(cd "$GIT_REPO" && GH_FIXTURE="$fixture4" bash "$MUTANT" 9999 "")"
+    LAST_MUT="$(printf '%s\n' "$OUT_MUT" | tail -1)"
+    # Mutant with inverted comparison should pass through and produce SKIP-REVIEW for
+    # a mismatched tree, proving the real guard actually catches tree changes.
+    printf '%s\n' "$LAST_MUT" | grep -qF "SKIP-REVIEW" \
+        || fail "mutation: mutant did not produce SKIP-REVIEW for mismatched tree — mutation check is inert"
+    rm -f "$MUTANT" "$MUTANT.bak"
+    end_case mutation-check
+fi
+
+# --- verdict -----------------------------------------------------------------------------
+if [[ $FAILED -ne 0 ]]; then
+    echo "test-pr-ready-skip: FAILED ($FAILED assertion failure(s))" >&2
+    exit 1
+fi
+echo "test-pr-ready-skip: all cases passed"

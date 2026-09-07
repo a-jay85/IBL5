@@ -2298,10 +2298,11 @@ end_case push-hook-rejected
 # Re-measured 2026-09-05: 34552 B (post-rebase on master 4721cb2ce; band [33047, 35047] still contains it — no re-centre needed).
 # Re-measured 2026-09-05: 35616 B (collapse-guard Phase 1 step 4 added to SKILL.md; band re-centred to [34616, 36616]).
 # Re-measured 2026-09-06: 37174 B (diff-bounds informational block added to Phase 4B by E20 PR #2129; band re-centred to [36174, 38174]).
+# Re-measured 2026-09-06: 40427 B (skip-review.sh predicate + skip-path branch added to Phase 6 in SKILL.md; band re-centred to [39427, 41427]).
 begin_case
 _sz=$(wc -c < "$PRD/SKILL.md" | tr -d ' ')
-if [[ "$_sz" -lt 36174 || "$_sz" -gt 38174 ]]; then
-    fail "SKILL.md is $_sz B, outside the [36174, 38174] resident-bytes band -- a phase was re-inlined, a relocation was reverted, or the file grew unreviewed"
+if [[ "$_sz" -lt 39427 || "$_sz" -gt 41427 ]]; then
+    fail "SKILL.md is $_sz B, outside the [39427, 41427] resident-bytes band -- a phase was re-inlined, a relocation was reverted, or the file grew unreviewed"
 fi
 end_case pr-ready-skill-size-band
 
@@ -2507,7 +2508,7 @@ grep -qF 'descriptive, never a verdict' "$f" || fail "28i: 'descriptive, never a
 f="$PRD/_phase7-verdict.md"
 grep -qF 'scripts/digest.sh' "$f" || fail "28j: digest.sh materialise line missing from _phase7-verdict.md"
 n_merge=$(grep -c '### Merge digest' "$f" || true)
-[[ $n_merge -eq 2 ]] || fail "28j: expected exactly 2 '### Merge digest' in _phase7-verdict.md, got $n_merge"
+[[ $n_merge -eq 4 ]] || fail "28j: expected exactly 4 '### Merge digest' in _phase7-verdict.md, got $n_merge"
 grep -qF '**What changed:**' "$f" || fail "28j: **What changed:** missing from _phase7-verdict.md"
 grep -qF '**Why:**' "$f" || fail "28j: **Why:** missing from _phase7-verdict.md"
 grep -qF '**Watch:**' "$f" || fail "28j: **Watch:** missing from _phase7-verdict.md"
@@ -2515,10 +2516,10 @@ grep -qF '**Touches:**' "$f" || fail "28j: **Touches:** missing from _phase7-ver
 grep -qF '**Machine-authored fixes:**' "$f" || fail "28j: **Machine-authored fixes:** missing from _phase7-verdict.md"
 grep -qF 'a stable-shaped degraded block is' "$f" || fail "28j: degraded-block clause missing from _phase7-verdict.md"
 grep -qF 'covers head <SHORT_HEAD_SHA>' "$f" || fail "28j: provenance-line template missing from _phase7-verdict.md"
-grep -qF 'the first line of the body, above every heading' "$f" || fail "28j: provenance placement clause missing from _phase7-verdict.md"
+grep -qF 'the second line of the body' "$f" || fail "28j: provenance placement clause missing from _phase7-verdict.md"
 grep -qF '_digest_labels' "$f" || fail "28j: _digest_labels rationale missing from _phase7-verdict.md"
 grep -qF 'git rev-parse --short=12 HEAD' "$f" || fail "28j: provenance capture command missing from _phase7-verdict.md"
-grep -qE '^last_verified: 2026-09-06$' "$f" || fail "28j: last_verified not bumped in _phase7-verdict.md"
+lv=$(grep -m1 -oE '^last_verified: [0-9-]+' "$f" | cut -d' ' -f2); [[ "$lv" > "2026-09-05" ]] || fail "28j: last_verified not bumped in _phase7-verdict.md (got $lv)"
 
 # --- 28k: SKILL.md prose pins ---
 f="$PRD/SKILL.md"
@@ -2526,7 +2527,7 @@ grep -qF '## DIGEST' "$f" || fail "28k: ## DIGEST missing from SKILL.md"
 grep -qF 'scripts/digest.sh' "$f" || fail "28k: scripts/digest.sh missing from SKILL.md"
 n_skill_merge=$(grep -c '### Merge digest' "$f" || true)
 [[ $n_skill_merge -eq 2 ]] || fail "28k: expected exactly 2 '### Merge digest' in SKILL.md, got $n_skill_merge"
-grep -qE '^last_verified: 2026-09-06$' "$f" || fail "28k: last_verified not bumped in SKILL.md"
+lv=$(grep -m1 -oE '^last_verified: [0-9-]+' "$f" | cut -d' ' -f2); [[ "$lv" > "2026-09-05" ]] || fail "28k: last_verified not bumped in SKILL.md (got $lv)"
 grep -qF 'covers head <sha>' "$f" || fail "28k: provenance line missing from SKILL.md Phase 7 stub"
 n_ends_in_one=$(grep -c 'the file ends in one' "$f" || true)
 [[ $n_ends_in_one -eq 0 ]] || fail "28k: 'the file ends in one' still present in SKILL.md — stale claim not removed"
@@ -2960,8 +2961,10 @@ end_case pr-ready-review-coverage-marker
 begin_case
 grep -qF '**Phase 6.7 — manual-testing execution.**' "$PRD/SKILL.md" \
   || fail "pr-ready-phase67-always-runs: Phase 6.7 heading absent from SKILL.md"
-[[ "$(grep -cF 'reaching it is never conditional on Phase 6.5' "$PRD/SKILL.md")" -eq 2 ]] \
-  || fail "pr-ready-phase67-always-runs: 'reaching it is never conditional on Phase 6.5' does not appear exactly twice in SKILL.md"
+[[ "$(grep -cF 'reaching it is never conditional on Phase 6.5' "$PRD/SKILL.md")" -eq 1 ]] \
+  || fail "pr-ready-phase67-always-runs: 'reaching it is never conditional on Phase 6.5' does not appear exactly once in SKILL.md (Phase 7 only; Phase 6.7 now says rows are carried verbatim on skip path)"
+grep -qF 'manual-testing rows are mandatory and always present' "$PRD/SKILL.md" \
+  || fail "pr-ready-phase67-always-runs: Phase 6.7 updated guarantee ('manual-testing rows are mandatory and always present') missing from SKILL.md"
 end_case pr-ready-phase67-always-runs
 
 # --- case pr-ready-phase67-no-substitution -----------------------------------------------
@@ -3058,6 +3061,30 @@ _view_ln=$(grep -n 'gh pr view.*--json' "$PRD/scripts/tick-rows.sh" | head -1 | 
 [[ -n "$_view_ln" && -n "$_edit_ln" && "$_view_ln" -lt "$_edit_ln" ]] \
   || fail "pr-ready-tick-zero-pass-no-edit (row 16): gh pr view (line ${_view_ln}) is not before gh pr edit (line ${_edit_ln})"
 end_case pr-ready-tick-zero-pass-no-edit
+
+# --- skip-review companion assertions (rows 24-29) ---------------------------------------
+# These rows assert contracts between skip-review.sh and the /pr-ready doc union that
+# must hold across edits. The UNION was built earlier in this harness.
+
+begin_case
+# Row 24a: union contains Reviewed tree contract line.
+grep -qF '**Reviewed tree:**' "$UNION" || fail "union missing Reviewed tree contract line"
+# Row 24b: union still carries the sticky marker.
+grep -qF 'pr-ready-verdict' "$UNION" || fail "union missing sticky marker"
+# Row 24c: union documents skip-review.sh load.
+grep -qF 'skip-review.sh' "$UNION" || fail "union missing skip-review.sh load reference"
+# Row 24d: union documents the SKIP-REVIEW branch.
+grep -qF 'SKIP-REVIEW' "$UNION" || fail "union missing SKIP-REVIEW branch"
+# Row 24e: label-list identity — five labels in skip-review.sh match digest.sh.
+PRD_SR=".claude/skills/pr-ready"
+SKIP_LABELS="$(grep "'\*\*" "$PRD_SR/scripts/skip-review.sh" | grep -v '^#' | sed "s/.*'\(.*\)'.*/\1/" | sort)"
+DIGEST_LABELS="$(grep "'\*\*" "$PRD_SR/scripts/digest.sh" | grep -v '^#' | sed "s/.*'\(.*\)'.*/\1/" | sort)"
+[ "$SKIP_LABELS" = "$DIGEST_LABELS" ] || fail "LABELS in skip-review.sh and digest.sh diverge"
+# Row 24f: test-pr-ready-skip help span is not truncated (a bare '#' inside would shorten it).
+HELP_SPAN="$(sed -n '/^# Usage:/,/^#$/p' "$(dirname "$0")/test-pr-ready-skip")"
+SPAN_LINES="$(printf '%s\n' "$HELP_SPAN" | wc -l | tr -d ' ')"
+[ "$SPAN_LINES" -gt 1 ] || fail "test-pr-ready-skip help span truncated (bare # inside?)"
+end_case skip-review-companion-assertions
 
 # --- verdict -----------------------------------------------------------------------------
 if [[ $FAILED -ne 0 ]]; then

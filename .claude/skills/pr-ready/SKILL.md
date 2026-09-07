@@ -7,7 +7,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-09-06
+last_verified: 2026-09-07
 ---
 <!-- `model: claude-sonnet-4-6` IS DELIBERATE — DO NOT REMOVE IT, and never write
      `model: sonnet` (that alias resolves to Sonnet 5). User-authorized 2026-08-26,
@@ -15,8 +15,8 @@ last_verified: 2026-09-06
      The orchestrator runs the mechanical phases (0 through 5.9, 6.5, 7). Runtime
      Phase 6 — the plan-intent fidelity review, the one Opus-column judgment in this
      skill — is NOT performed here: it runs in the pinned Opus def
-     `.claude/agents/pr-ready-phase6.md`, spawned exactly once per run by the Phase 6
-     stub. `.claude/rules/agent-tiering.md`'s "Never delegate understanding" is
+     `.claude/agents/pr-ready-phase6.md`, spawned at most once per run by the Phase 6
+     stub (skipped when `skip-review.sh` emits `SKIP-REVIEW`, never more than once). `.claude/rules/agent-tiering.md`'s "Never delegate understanding" is
      honoured by keeping that judgment on Opus, not by keeping it on whatever tier the
      orchestrator happens to run at — a Sonnet orchestrator with no pin was the failure
      mode this pin closes, not the one it opens.
@@ -32,7 +32,7 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
 ## Invariants — stated once; later phases cite these rather than repeat them
 
 - **One PR per invocation.** No batch mode, no PR-list iteration.
-- **Runtime Phase 6 runs in the pinned Opus def, spawned exactly once.** The fidelity judgment is the deliverable and stays on the Opus tier; performing it on the Sonnet orchestrator, splitting it across agents, or re-spawning the reviewer per finding is a defect. The handoff is a written verdict file (`/tmp/pr-ready-phase6-verdict-<N>.md`), never a captured stdout — see the substitution invariant below.
+- **Runtime Phase 6 runs in the pinned Opus def, spawned at most once per cycle and never more than once.** The fidelity judgment is the deliverable and stays on the Opus tier; performing it on the Sonnet orchestrator, splitting it across agents, or re-spawning the reviewer per finding is a defect. The spawn is skipped only when `skip-review.sh` emits `SKIP-REVIEW`, which requires the current tree SHA to be byte-identical to the one the prior reviewer judged. The handoff is a written verdict file (`/tmp/pr-ready-phase6-verdict-<N>.md`), never a captured stdout — see the substitution invariant below.
 - **Sub-agent returns are thin pointers** — `path:line`, SHAs, status words. Never pasted diffs or file bodies.
 - **Flat fan-out only.** A delegate may not spawn a delegate.
 - **Every glob is quoted** — `--include="*.md"`, never `--include=*.md`.
@@ -222,6 +222,42 @@ This phase does not run on the orchestrator. It runs **once** in the pinned Opus
 the Phase 2 include uses (`git show` invariant above) and applies its own declared
 fallback. User-authorized 2026-08-26; the Invariants block records the same change.
 
+0. **Skip predicate — run before spawning the fidelity reviewer.** One Bash chain, no
+   command substitution, no captured variable — the script prints its verdict to stdout
+   and the orchestrator branches on the last line:
+
+     git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/skip-review.sh > /tmp/pr-ready-skip-<N>.sh && test -s /tmp/pr-ready-skip-<N>.sh && bash /tmp/pr-ready-skip-<N>.sh <N> "<CONFLICTS_FLAG>"
+
+   `<CONFLICTS_FLAG>` is a literal substituted here: `""` when Phase 2–3 resolved no
+   conflicts, `"conflicts"` when any were resolved. The script reads `git rev-parse
+   HEAD^{tree}` from the current worktree cwd, so it reflects the final pushed tree, not
+   the pre-rebase head.
+
+   **Fail-closed on unavailability — deliberate carve-out from invariant bullet 42.**
+   Invariant bullet 42's declared shape ends a failed materialise with `STOP:`. Here it
+   must not: if `git show` fails, `test -s` fails, or the output's last line is anything
+   other than a line beginning `SKIP-REVIEW `, the orchestrator treats the result as
+   `RUN-REVIEW script-missing` and proceeds into step 1 exactly as today. This is safe in
+   one direction only: the script gates an **omission**, so unavailability can only ever
+   cost an Opus spawn that would have run anyway. Do not add a `STOP:` here to match
+   bullet 42; that would convert a degraded predicate into a hard abort of every
+   `/pr-ready` run.
+
+   Branch on the last line of the script's output:
+
+   - **Last line begins `RUN-REVIEW `** — continue to step 1 unchanged. Record the
+     printed reason on the verdict comment (e.g. `skip-predicate: RUN-REVIEW
+     <reason>`) so a run that could have skipped but did not is explainable.
+
+   - **Last line begins `SKIP-REVIEW `** — do not spawn `pr-ready-phase6`. Instead:
+     run `rm -f /tmp/pr-ready-phase6-verdict-<N>.md` (preserves the same invariant
+     step 1 maintains when it does run — nothing left over from a prior cycle);
+     skip Phase 6.5 entirely (structurally unreachable — no new findings, nothing to
+     remediate); carry the Phase 6.7 manual-testing rows verbatim from the prior body
+     in `/tmp/pr-ready-prior-verdict-<N>.md`; and proceed to Phase 7 carrying the
+     tree SHA from the `SKIP-REVIEW <tree>` line and the fact that Phase 6 did not
+     run this cycle.
+
 1. **Clear the stale verdict, then spawn exactly one reviewer.** First, one Bash call.
    The verdict path is PR-keyed and nothing else ever removes it, so a prior `/pr-ready`
    run on this same PR leaves its file behind — and step 2's `test -s` cannot tell that
@@ -301,8 +337,8 @@ Run `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase65-remediation.md` — 
 
 **Phase 6.7 — manual-testing execution.**
 
-Run `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase67-manual-testing.md` — the Phase 1.3 literal substituted — and follow the printed file end-to-end before continuing. **Do not reach for it by path first**: per the `git show` invariant above, the worktree you are now in almost certainly does not contain it. On a `git show` failure take the single declared fallback in that invariant — nothing else. If neither source yields the file, print `STOP: cannot load _phase67-manual-testing.md from <MASTER_SHA> or from the worktree` and stop. **This phase is mandatory and always runs** — reaching it is never conditional on Phase 6.5. It is non-fatal to the verdict: every failure inside it degrades to unticked rows plus a stated reason.
+Run `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase67-manual-testing.md` — the Phase 1.3 literal substituted — and follow the printed file end-to-end before continuing. **Do not reach for it by path first**: per the `git show` invariant above, the worktree you are now in almost certainly does not contain it. On a `git show` failure take the single declared fallback in that invariant — nothing else. If neither source yields the file, print `STOP: cannot load _phase67-manual-testing.md from <MASTER_SHA> or from the worktree` and stop. **The manual-testing rows are mandatory and always present in the verdict comment.** On the run path, the rows are derived by executing this phase. On the skip path, they are carried verbatim from the prior comment body in `/tmp/pr-ready-prior-verdict-<N>.md` — the phase procedure does not re-execute, but the rows appear in Phase 7 unchanged. The phase is non-fatal to the verdict: every failure inside it degrades to unticked rows plus a stated reason.
 
 **Phase 7 — verdict and stop.**
 
-Run `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase7-verdict.md` — the Phase 1.3 literal substituted — and follow the printed file end-to-end before continuing. **Do not reach for it by path first**: per the `git show` invariant above, the worktree you are now in almost certainly does not contain it, and the main-checkout copy is behind the straddle gate. On a `git show` failure take the single declared fallback in that invariant — nothing else. If neither source yields the file, print `STOP: cannot load _phase7-verdict.md from <MASTER_SHA> or from the worktree` and stop. **This phase is mandatory and always runs** — reaching it is never conditional on Phase 6.5. It holds the arm-hold evaluation, the sticky verdict comment, and the hard terminator. The comment body now carries a `### Merge digest` block — the five digest lines, after the plan-fidelity verdict section and before the remediation section. Its **first line**, above every heading, is the provenance line `covers head <sha> · master <sha> · written <utc>` — the sticky comment is edited in place and so keeps its original timeline position forever, and that line is the only thing in the body that says which commit the verdict describes.
+Run `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase7-verdict.md` — the Phase 1.3 literal substituted — and follow the printed file end-to-end before continuing. **Do not reach for it by path first**: per the `git show` invariant above, the worktree you are now in almost certainly does not contain it, and the main-checkout copy is behind the straddle gate. On a `git show` failure take the single declared fallback in that invariant — nothing else. If neither source yields the file, print `STOP: cannot load _phase7-verdict.md from <MASTER_SHA> or from the worktree` and stop. **This phase is mandatory and always runs** — reaching it is never conditional on Phase 6.5. It holds the arm-hold evaluation, the sticky verdict comment, and the hard terminator. The comment body now carries a `### Merge digest` block — the five digest lines, after the plan-fidelity verdict section and before the remediation section. Its **first line** is `**Reviewed tree:** <40-hex>`, the skip-predicate contract line. The **second line**, above every heading, is the provenance line `covers head <sha> · master <sha> · written <utc>` — the sticky comment is edited in place and so keeps its original timeline position forever, and that line is the only thing in the body that says which commit the verdict describes.

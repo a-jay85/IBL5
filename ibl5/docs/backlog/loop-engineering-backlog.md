@@ -83,6 +83,7 @@ last_verified: 2026-09-07
 | L53 | Phase 2 test code lost in branch rebuild — invisible because CI passed without the tests | ✅ fixed this pass | — | S |
 | L55 | PR body mislabels Phase 6.5 remediation artifacts; new backlog entry inserted contextually collides with master's concurrent sequence advance | ✅ fixed this pass | 🟥 | S |
 | L56 | PR #1900 Phase 6.5 — PR body misidentified ADR (0104→0114), omitted plan-mandated consent statement, undercounted test cases, contradicted pre-prod exception; all four fixed this pass | ⬜ Open | — | XS |
+| L69 | `/pr-ready` re-ran Phase 6 Opus fidelity spawn on every cycle, even when tree SHA unchanged | ✅ Implemented | — | S |
 | L57 | `bin/pr-ready-now:434` claims both `STOP:` and `PUSH FAILED` are matched as line prefixes, but only `STOP:` is anchored; `PUSH FAILED` uses unanchored `grep -qF`. Decide whether to anchor `PUSH FAILED` or correct the comment — a gate change needing its own verification, deliberately out of scope for L47. | ⬜ Open | 🟥 | S |
 | L58 | Reconcile `~/claude-plans/pr-ready-dm-and-push-retry.md` with the `HOOK REJECTED` verdict: §6.1's *"`PUSH FAILED` is genuinely non-retriable"* is now scoped, and the `.claude/skills/pr-ready/scripts/push.sh` `shasum` pinned at Phase 6.6/8.3 is stale because this PR edited that file. Re-record the digest before executing that plan. | ⬜ Open | 🟦 | S |
 | L59 | PR body coordinate citations (backlog row IDs, source line numbers) go stale after commits that renumber rows or shift code — no gate recomputes or validates them after push | ⬜ Open | 🟦 | S |
@@ -983,6 +984,26 @@ Landing rung: **2** — rule doc under `.claude/rules/` (or addendum to `.claude
 
 *(discovered 2026-09-05 during PR #1900 Phase 6 plan-intent fidelity review)*
 
+### L69 `/pr-ready` re-ran Phase 6 Opus fidelity spawn on every cycle, even when tree SHA unchanged
+
+**class:** A fail-open absence of a skip predicate in the `/pr-ready` Phase 6 orchestration: the Opus fidelity reviewer was spawned unconditionally on every cycle, even when the post-rebase `HEAD^{tree}` was byte-identical to the `**Reviewed tree:**` SHA recorded in the sticky verdict comment from the prior run. No new signal was produced; the spawn cost was paid in full.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `.claude/skills/pr-ready/SKILL.md` Phase 6 — no skip gate before the fidelity reviewer spawn | yes | yes (pre-fix) | fixed this pass |
+
+**fix shipped (PR #2158):** Added a fail-closed skip predicate `skip-review.sh` invoked as Phase 6 step 0. It compares `HEAD^{tree}` to the `**Reviewed tree:**` SHA on line 1 of the sticky verdict comment. On a match with no conflicts, it writes carry-forward files for the prior digest and emits `SKIP-REVIEW <sha>`, authorising Phase 6 to omit the spawn. Every failure path emits `RUN-REVIEW <reason>` and exits 0 — unavailability degrades to full review, never to a halted run. `_phase7-verdict.md` updated with the body-order contract (`**Reviewed tree:**` as line 1) and skip-path composition table. `bin/test-pr-ready-skip` added (6 predicate cases + mutation check); companion assertions in `bin/test-pr-ready-now`; `bin/test-pr-cycle` fixture proving the Reviewed-tree line is invisible to `_digest_labels`.
+
+**prevention_ladder:**
+- rung 0 — no existing rule covered this class.
+- **landing rung:** shipped directly — the predicate, its test harness, and the SKILL.md wiring are all in this PR. No further prevention gate is needed; the harness is the gate.
+
+`artifact destination: .claude/skills/pr-ready/scripts/skip-review.sh, .claude/skills/pr-ready/SKILL.md, .claude/skills/pr-ready/_phase7-verdict.md, bin/test-pr-ready-skip`
+
+*(discovered during Phase 6 cost review; shipped 2026-09-06)*
+
 ---
 
 ### L60 Third recurrence of stale coordinate citation (L59 class): PR body notes cited L53/L54 after Phase 3 renaming to L57/L58; archive cross-ref also stale
@@ -1009,25 +1030,6 @@ Third recurrence of this class on #2083 (previous two: L53/L54→L51/L52 renamin
 ### L61 Plan document mandated wrong string literal for push.sh discriminator; initial implementation shipped dead recovery code
 
 **class:** A plan document that quoted a string literal to match at runtime without cross-checking the source that emits it, causing the initial implementation to ship a `case` arm that can never fire.
-
-**occurrence table:**
-
-| # | File:line | Same class? | Live? | Status |
-|---|-----------|-------------|-------|--------|
-| 1 | `~/claude-plans/pr-ready-hook-rejected-recovery.md` §2.1 — mandated grepping for `"branch is not rebased onto origin/master"` but `bin/pre-push-adr-hook` emits `"branch does not contain origin/master"` | yes | fixed | fixed this pass (commit `1f4bb089b`) |
-
-**prevention_ladder:**
-- rung 0 — no existing gate verifies that a plan's quoted string literals appear in the cited source. Not covered.
-- rung 1 — not applicable; no existing gate to extend.
-- rung 2 — rule doc: when a plan quotes a string literal to match at runtime, cite the source file and line rather than the literal; the implementation then reads the source, not the plan. Low-overhead authoring norm.
-- **landing rung:** rung 2 — rule doc addition to plan-authoring guidance.
-
-**artifact destination:** a new clause in `.claude/skills/plan/_architect-contract.md` or a companion rule.
-
-**provenance:** (discovered 2026-09-06 during /pr-ready Phase 6 review of #2083, N-1)
-
----
-
 ### L62 Phase 6 notes N-2 and N-3 — plan quality issues, class n/a for both
 
 **class:** n/a — N-2 (sixth file mandatory by backlog-housekeep, declared in PR body, deviation is correct); N-3 (plan Verification Matrix rows cite the wrong literal string, but the matrix lives outside the repo and is not modified in in-PR mode).

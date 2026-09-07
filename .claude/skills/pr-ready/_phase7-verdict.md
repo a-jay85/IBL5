@@ -33,22 +33,27 @@ Read at runtime via `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase7-verdi
 
    **First write the composed comment body to `/tmp/pr-ready-verdict-<N>.md` with the `Write` tool.** The path is keyed to the PR number for the same reason Phase 2a's is: a `tmpfile=$(mktemp)` assigned in one Bash call is gone by the next one, so the post below would send an empty `--body-file`. Compose the body in full, write it, then run the post.
 
-   **Before composing, materialise the digest lines.** The Phase 6 agent wrote them into
-   `/tmp/pr-ready-phase6-verdict-<N>.md` under a trailing `## DIGEST` section; `digest.sh`
-   extracts them, normalises them, and prints exactly five labelled lines:
+   **Before composing, materialise the digest lines — run-path and skip-path differ.**
+
+   **Run path only:** The Phase 6 agent wrote them into `/tmp/pr-ready-phase6-verdict-<N>.md` under a trailing `## DIGEST` section; `digest.sh` extracts them, normalises them, and prints exactly five labelled lines:
 
    `git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/digest.sh > /tmp/pr-ready-digest-<N>.sh && test -s /tmp/pr-ready-digest-<N>.sh && bash /tmp/pr-ready-digest-<N>.sh /tmp/pr-ready-phase6-verdict-<N>.md > /tmp/pr-ready-digest-lines-<N>.txt && cat /tmp/pr-ready-digest-lines-<N>.txt`
 
-   The trailing `cat` is load-bearing: without it the five lines sit on disk and never enter
-   context, so there is nothing to paste into the `Write` call below. `digest.sh` exits 0 on
-   every degrade path and emits five `unavailable — <reason>` lines rather than failing, so
-   this chain does not abort the run when Phase 6 was skipped or wrote no `## DIGEST` section.
+   The trailing `cat` is load-bearing: without it the five lines sit on disk and never enter context, so there is nothing to paste into the `Write` call below. `digest.sh` exits 0 on every degrade path and emits five `unavailable — <reason>` lines rather than failing, so this chain does not abort the run when Phase 6 was skipped or wrote no `## DIGEST` section. This degrade clause is a **run-path safety net only** — structurally unreachable on the skip path, because successful carry-forward extraction is a precondition of `SKIP-REVIEW`.
+
+   **Skip path only — do NOT run the `digest.sh` chain:** `skip-review.sh` already wrote the five verbatim prior digest lines to `/tmp/pr-ready-digest-lines-<N>.txt` and the CRLF-stripped prior comment body to `/tmp/pr-ready-prior-verdict-<N>.md`. Running `digest.sh` here would clobber the carry-forward file before it can be read. Instead:
+
+   `cat /tmp/pr-ready-digest-lines-<N>.txt`
+
+   `cat /tmp/pr-ready-prior-verdict-<N>.md`
+
+   Both are plain `cat`s of literal paths — no `$(…)`. The trailing-`cat` rationale above applies identically to the digest lines file.
 
    There is no helper in `bin/lib/` for this, so use the find-and-update-else-create shape from `bin/pr-canary-check` (see its `STICKY_MARKER` constant and the `post_sticky()` below it — grep the symbols rather than trusting a line number, which drifts).
 
    `git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/post-verdict.sh > /tmp/pr-ready-post-<N>.sh && test -s /tmp/pr-ready-post-<N>.sh && bash /tmp/pr-ready-post-<N>.sh <N> <slug>`
 
-   **Provenance line — the first line of the body, above every heading.** Emit exactly one line, in backticks, using the three literals captured in step 2:
+   **Provenance line — the second line of the body, immediately after the `**Reviewed tree:**` contract line and above every heading.** Emit exactly one line, in backticks, using the three literals captured in step 2:
 
    ```
    `covers head <SHORT_HEAD_SHA> · master <SHORT_MASTER_SHA> · written <UTC>`
@@ -58,7 +63,30 @@ Read at runtime via `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase7-verdi
 
    It sits above `### Rebase` deliberately. `bin/pr-cycle`'s `_digest_labels` (grep the symbol) activates only inside the digest block — between that block's heading and the next heading or horizontal rule — and there folds any line lacking a `**Label:**` prefix onto the preceding label's value, so a provenance line placed in or after the digest block would silently corrupt the merge-digest ledger row. Above the first heading it is outside every parser.
 
-   Comment body sections, in order: **rebase result** (the master SHA used, conflicts resolved), **CI result**, **files-changed refresh** (the Phase 5.9 `FILES-CHANGED:` line verbatim — `REPLACED` / `APPENDED` / `UNCHANGED` / `AMBIGUOUS`, with its file count and `+added -removed` delta; on `AMBIGUOUS`, state that the body was left untouched and that the markers need repair), **plan-fidelity verdict**, **merge digest** (the `### Merge digest` block, below), **remediation** (what Phase 6.5 fixed, each backlog item filed with its file and ID, anything left `not fixed — filed`, and the post-remediation CI result), **hold predicates**, and one explicit **READY / NOT READY** line — the last reflecting the state *after* remediation, not the Phase 6 findings. If any include was loaded by the declared fallback rather than from the pin, say so here — one `include-source:` line — so the verdict states which revision of its own procedure it followed. The files-changed block reflects the diff as of Phase 5.9. If Phase 6.5 pushed remediation commits after it, say so on the refresh line — the block is one commit behind by design, and the next `/post-plan` body write regenerates it. Never open a second body edit to catch it up.
+   **`**Reviewed tree:**` contract line — the very first line of the comment body, before `### Rebase` and before `### Merge digest`.** Exact shape: the literal `**Reviewed tree:** ` followed by exactly 40 lowercase hex characters and nothing else on the line — no trailing period, no backticks, no bold on the SHA. `skip-review.sh` matches `^\*\*Reviewed tree:\*\* [0-9a-f]{40}$` against line 1 only; any decoration causes `RUN-REVIEW no-tree-line` on the next run. Being above `### Merge digest` means `bin/pr-cycle`'s `_digest_labels` awk never sees it — the awk only begins scanning at `^### Merge digest[[:space:]]*$`. Phase 6 proves this rather than asserting it.
+
+   **Where the SHA comes from:** it is the tree the Phase 6 fidelity reviewer actually judged, captured at Phase 6, not `git rev-parse HEAD^{tree}` evaluated here at Phase 7 compose time. Phase 6.5 remediation can push commits between the two; recording the post-remediation tree would assert that unreviewed content had been reviewed. On the **skip path** the value is the SHA printed by `SKIP-REVIEW <tree>` — carried forward unchanged, which is sound precisely because SKIP is only reachable when the current tree equals it. If the value cannot be resolved for any reason, emit `**Reviewed tree:** unavailable` — a stable line that degrades to `RUN-REVIEW no-tree-line` on the next run. Never omit the line and never leave the placeholder `<sha>` in place.
+
+   `<!-- pr-ready-verdict -->` **remains the last line of the body**, after the READY / NOT READY line. The body is now bracketed: contract line first, sticky marker last.
+
+   Comment body sections, in order: **Reviewed tree** (`**Reviewed tree:** <sha>`, as above), **rebase result** (the master SHA used, conflicts resolved), **CI result**, **files-changed refresh** (the Phase 5.9 `FILES-CHANGED:` line verbatim — `REPLACED` / `APPENDED` / `UNCHANGED` / `AMBIGUOUS`, with its file count and `+added -removed` delta; on `AMBIGUOUS`, state that the body was left untouched and that the markers need repair), **plan-fidelity verdict**, **merge digest** (the `### Merge digest` block, below), **remediation** (what Phase 6.5 fixed, each backlog item filed with its file and ID, anything left `not fixed — filed`, and the post-remediation CI result), **hold predicates**, and one explicit **READY / NOT READY** line — the last reflecting the state *after* remediation, not the Phase 6 findings. If any include was loaded by the declared fallback rather than from the pin, say so here — one `include-source:` line — so the verdict states which revision of its own procedure it followed. The files-changed block reflects the diff as of Phase 5.9. If Phase 6.5 pushed remediation commits after it, say so on the refresh line — the block is one commit behind by design, and the next `/post-plan` body write regenerates it. Never open a second body edit to catch it up.
+
+   **Skip-path body composition.** When `skip-review.sh` emits `SKIP-REVIEW`, the following table fixes which sections are refreshed and which are carried verbatim (no judgment left to the composing turn):
+
+   | Section | Skip path |
+   |---|---|
+   | `**Reviewed tree:** <sha>` | Carried forward — same SHA the predicate matched |
+   | Rebase result | **Refreshed** — this run's master SHA, conflicts none |
+   | CI result | **Refreshed** — this run's CI outcome |
+   | Files-changed refresh | **Refreshed** — this run's Phase 5.9 `FILES-CHANGED:` line verbatim |
+   | Plan-fidelity verdict | **Carried verbatim** from `/tmp/pr-ready-prior-verdict-<N>.md`, plus the disclosure line below |
+   | `### Merge digest` | **Carried verbatim** from `/tmp/pr-ready-digest-lines-<N>.txt` |
+   | Remediation | **Carried verbatim** — Phase 6.5 is structurally unreachable on the skip path |
+   | Phase 6.7 manual-testing rows | **Carried verbatim** from the prior body |
+   | Hold predicates | **Refreshed** — `holds.sh` runs every cycle |
+   | READY / NOT READY | **Carried verbatim** from the prior body |
+
+   **Required disclosure line — not optional.** On the skip path the plan-fidelity section must open with one line naming what did not happen: the verdict is carried forward from the recorded reviewed tree, Phase 6 was not re-run this cycle because the tree is unchanged, and the named tree SHA. A reader must never have to infer from the absence of a `phase6-agent:` line that no review ran. Correspondingly, the existing `phase6-agent: pr-ready-phase6 (claude-opus-5)` line is **omitted** on the skip path — claiming an agent ran when it did not is the precise failure this line prevents.
 
    **`### Merge digest` block — fixed shape.** Emit the literal heading `### Merge digest` on
    its own line, immediately after the plan-fidelity verdict section and immediately before the

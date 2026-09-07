@@ -291,7 +291,16 @@ echo "$EXTRACTED"
 
 ### Step 2: Sonnet Review Gate
 
-**Skip this gate when `PLAN_FOUND` and the surviving Manual Testing steps came from the plan's matrix** — `/plan` gates 3, 9, and 12 already classified automatable-vs-manual upstream and authoritatively, so re-litigating it here is wasted. Treat the remaining steps as truly-manual and leave them in the PR. Run the gate below only for plan-less PRs, where no upstream classification occurred.
+**Run this gate on every PR that reaches it — plan-derived and plan-less alike.** There is no upstream classification to defer to:
+
+- `bin/check-plan` gate 3 (the `[3] truly-manual row uses an automatable verb` check) is a four-verb blocklist — `verify|check that|confirm|ensure`. It detects *wording*, not automatability, so a `Truly-manual` row phrased declaratively ("emits", "holds", "reads") passes it untouched.
+- `/plan` gates 9 and 12 are **negative-path coverage** and **security-surface resolution**. Neither classifies manual-vs-automatable at all.
+
+So on the skill path this gate holds the **only** semantic classifier (`.claude/skills/post-plan/_phase-6-manual-testing.md`). Skipping it for plan-derived rows left nothing between a mis-authored `Truly-manual` row and the PR body — and one such row forces `impl_model: opus` across the whole implementation via `/plan` gate 13a, which costs far more than the single Sonnet spawn this gate runs.
+
+The compiled harness re-checks plan-derived rows separately (`tools/postplan-harness/runner.py` → `_recheck_manual_rows`, prompted by `harness/llm_calls.py::manual_recheck_prompt`), so the harness path was never fully blind. But it demotes a row **only** when the model can name a concrete probe whose argv[0] matches its safety allowlist — `pytest`, `grep`, or `bin/(check|test)-<name>` — and returns `hold` otherwise. A row that is genuinely automatable by some other means (reading a live PR, a `bin/` script outside that prefix) is therefore held for want of a *safe probe*, not for want of human judgment. Widening that allowlist is a sandbox-safety change, out of scope here; this gate is the path that can classify without needing to execute.
+
+Widening gate 3 is **not** the alternative fix: dry-run over the `~/claude-plans/` corpus (2026-09-07, ~65 `Truly-manual` rows) showed every regex-shaped detector firing on ~65% of rows, most of them legitimately manual (live-channel tests, prod-only deploys, human go/no-go before an irreversible push). Classification here needs a model, not a pattern.
 
 Launch a **single Sonnet 4.6 agent** (`subagent_type: "sonnet-4-6"`, omit `model`) with the QA-classification prompt in `.claude/skills/post-plan/_phase-6-manual-testing.md` (substitute the extracted steps from Step 1 and the changed-file list from Phase 4A). The prompt classifies each surviving manual step into CLI-executable / PHPUnit-replaceable / API-test-replaceable / E2E-replaceable / Visual-regression-replaceable / Truly-manual and returns a JSON array; the full prompt text + JSON schema live in that reference — Read it before spawning.
 

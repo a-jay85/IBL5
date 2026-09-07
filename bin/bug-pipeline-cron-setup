@@ -85,9 +85,14 @@ build_plist() {
 		     inside timeout, which reads downstream as "the agent produced nothing". That
 		     silently killed this pipeline for days. HOME interpolates HERE, at
 		     generation time — launchd does NOT expand variables in
-		     EnvironmentVariables, so a literal $HOME would bake in a dead path. -->
+		     EnvironmentVariables, so a literal $HOME would bake in a dead path.
+		     mariadb is keg-only, so its client lives at /opt/homebrew/opt/mariadb/bin and
+		     is NOT on /opt/homebrew/bin; it is PREPENDED because /opt/homebrew/bin/mysql
+		     is a MySQL 9 client that cannot authenticate to MariaDB (ERROR 2059). Without
+		     this, bin/db-query exits 127 for every hunter and no data bug is ever
+		     reproduced — a silent throughput cliff, not a visible failure. -->
 		<key>PATH</key>
-		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${HOME}/.local/bin</string>
+		<string>/opt/homebrew/opt/mariadb/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${HOME}/.local/bin</string>
 		<key>BUG_PIPELINE_ISSUE_REPO</key>
 		<string>${BUG_PIPELINE_ISSUE_REPO}</string>
 		<key>BUG_PIPELINE_APPROVER_ID</key>

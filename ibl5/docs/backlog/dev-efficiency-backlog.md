@@ -97,10 +97,11 @@ last_verified: 2026-09-06
 | E76 | PR #2042 Phase 6.5 — post-PR-open commit introduced unplanned production code; PR body scope and testing claims went stale with no gate | ⬜ Open | — | XS |
 | E77 | Rebase auto-merge silently mis-splices concurrent EOF entries in backlog docs | ⬜ Open | — | XS |
 | E78 | PR #2042 Phase 6.5 — N2 benign unplanned files, N3 PR body Scope under-enumeration, N4 PR title/commit subject mismatch | ⬜ Open | — | XS |
-| E80 | PR #2064 Phase 6.5 — stale hand-written PR body claims contradicting the final diff and code; B1/B2/B3/N1 fixed this pass | ⬜ Open | — | XS |
-| E81 | PR #1967 Phase 6.5 — duplicate `last_verified:` in ADR index + stale body path reference (Findings 1+2); body note finding; all fixed this pass or filed | ⬜ Open | — | S |
-| E82 | PR #1967 Phase 6.5 — stale PR body acceptance list claiming wrong ADR alternatives | ⬜ Open | — | XS |
-| E83 | PR #1967 Phase 6.5 — Phase 6.5 backlog entries inserted in wrong structural location | ⬜ Open | — | XS |
+| E72 | PR #2064 Phase 6.5 — stale hand-written PR body claims contradicting the final diff and code; B1/B2/B3/N1 fixed this pass | ⬜ Open | — | XS |
+| E73 | PR #1967 Phase 6.5 — duplicate `last_verified:` in ADR index + stale body path reference (Findings 1+2); body note finding; all fixed this pass or filed | ⬜ Open | — | S |
+| E74 | PR #1967 Phase 6.5 — stale PR body acceptance list claiming wrong ADR alternatives | ⬜ Open | — | XS |
+| E75 | PR #1967 Phase 6.5 — Phase 6.5 backlog entries inserted in wrong structural location | ⬜ Open | — | XS |
+| E79 | PR #1967 Phase 6.5 — orphaned duplicate block + stale plan-file matrix literals | ⬜ Open | — | XS |
 | E84 | Always-loaded rule addition fills resident byte budget to zero, leaving no headroom | ⬜ Open | — | S |
 | E85 | PR #1967 Phase 6.5 — missing `pp-absent-skips` test case for absent promote-to-production workflow | ✅ Implemented | — | XS |
 | E86 | PR #1967 Phase 6.5 — orphan reference bullet in ADR-0112 placed after `## Addendum` instead of `## References` | ✅ Implemented | — | XS |
@@ -1446,16 +1447,6 @@ Landing: rung 1 — `bin/check-docs` duplicate-ID check for dev-efficiency-backl
 *(discovered 2026-09-06 during #2131)*
 
 **class:** An always-loaded rule addition that fills the resident byte budget to exactly its maximum (20000 B), with the gate comment forbidding a raise, leaving zero headroom for any future always-loaded rule or growth in an existing resident file.
-| 1 | `ibl5/docs/decisions/README.md:3-5` | yes (finding 1) | yes | fixed this pass |
-| 2 | PR #1967 body Row 60 | yes (finding 2) | yes | fixed this pass (gh pr edit by caller) |
-| 3 | matrix row 60 acceptance list (four named alternatives) | near-miss (finding 2) | yes | not fixed — filed (stale matrix row; ADR content correct) |
-| 4 | matrix rows 30, 55 stale commands | near-miss (finding 2) | yes | not fixed — filed |
-
-### E79 PR #1967 Phase 6.5 — orphaned duplicate block in backlog + stale plan-file matrix literals
-
-**class (finding 1):** a Phase 6.5 remediation commit duplicated rather than moved a backlog entry's occurrence table and prevention ladder, leaving a headerless duplicate block appended at end of file (the block was E73's content, already present in E73's section at line 921).
-
-**class (finding 2):** plan-file matrix rows referencing a renamed workflow and a renumbered ADR by stale names (`Promote master to production` instead of `Auto-promote to production`; `0108-auto-promote-master-to-production.md` instead of `0112-...`), causing the post-merge verification steps to fail silently.
 
 **occurrence table:**
 
@@ -1475,6 +1466,17 @@ Landing rung: **1** — extend `bin/check-rules-byte-budget` to warn when the ag
 **provenance:** (discovered 2026-09-06 during #2131)
 
 **Status (2026-09-06):** ⬜ Open — 🟦.
+
+### E79 PR #1967 Phase 6.5 — orphaned duplicate block in backlog + stale plan-file matrix literals
+
+**class (finding 1):** a Phase 6.5 remediation commit duplicated rather than moved a backlog entry's occurrence table and prevention ladder, leaving a headerless duplicate block appended at end of file (the block was E73's content, already present in E73's section at line 921).
+
+**class (finding 2):** plan-file matrix rows referencing a renamed workflow and a renumbered ADR by stale names (`Promote master to production` instead of `Auto-promote to production`; `0108-auto-promote-master-to-production.md` instead of `0112-...`), causing the post-merge verification steps to fail silently.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
 | 1 | `ibl5/docs/backlog/dev-efficiency-backlog.md` end of file — E73's occurrence table and prevention_ladder duplicated with no section header | yes (finding 1) | was live | fixed this pass — deleted duplicate block |
 | 2 | `~/claude-plans/auto-promote-master-to-production.md` rows 46/48 — `--workflow "Promote master to production"` should be `--workflow "Auto-promote to production"` | yes (finding 2) | yes | fixed outside repo — plan file corrected manually |
 | 3 | `~/claude-plans/auto-promote-master-to-production.md` rows 55/60 — `0108-auto-promote-master-to-production.md` should be `0112-...` | yes (finding 2) | yes | fixed outside repo — plan file corrected manually |

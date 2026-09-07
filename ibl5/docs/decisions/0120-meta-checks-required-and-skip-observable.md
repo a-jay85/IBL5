@@ -18,7 +18,7 @@ The second structural problem is skip observability. When a GitHub Actions step 
 
 ## Decision
 
-1. **"Meta checks" is promoted to a required status check on `master`**, applied via `gh api` after this PR merges. Branch protection for this repository is API-only — there is no `.github/rulesets/*.json` and `bin/sync-branches` does not manage `required_status_checks` — so this ADR is the in-repo record of the change. The exact `gh api` recipe and its round-trip verification are documented in Phase 5 of the plan that drove this change; they must be executed by an operator after merge.
+1. **"Meta checks" is promoted to a required status check on `master`**, applied via `gh api` after this PR merges. Branch protection for this repository is API-only — there is no `.github/rulesets/*.json` and `bin/sync-branches` does not manage `required_status_checks` — so this ADR is the in-repo record of the change. The exact `gh api` recipe and its round-trip verification are documented in this PR's `## Post-merge steps` section (PR #2144); they must be executed by an operator after merge.
 
 2. **An else-branch step is added to the `adr` paths-filter in `.github/workflows/pr-meta-checks.yml`** so that when the paths-filter does not match the PR's diff, the step explicitly echoes a message stating that adr-check was skipped and why. The step's `if:` guard is the complement of the run step's guard, restricted to `pull_request` events (where a PR context exists), and conditioned on the job not being cancelled. A skipped run now produces a named, visible log line instead of a blank.
 

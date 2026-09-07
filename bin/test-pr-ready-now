@@ -1489,7 +1489,7 @@ else
         || fail "lost the recovered-run narration clause that keeps derive_status from misreading a success"
     [[ "$(grep -c 'HOOK REJECTED' "$PUSHSH")" -ge 2 ]] \
         || fail "push.sh header verdict list or the new arm is missing HOOK REJECTED"
-    grep -qF 'branch is not rebased onto origin/master' "$SCRIPT_DIR/pre-push-adr-hook" \
+    grep -qF 'branch does not contain origin/master' "$SCRIPT_DIR/pre-push-adr-hook" \
         || fail "the hook was reworded -- push.sh's discriminator no longer matches and recovery is silently dead"
 fi
 end_case pr-ready-doc-shape
@@ -2266,7 +2266,7 @@ grep -q 'HOOK REJECTED' <<< "$out" && fail "push-hook-rejected (d): ADR-gate rej
 # A passthru hook that emits the rebase sentence but exits 0 lets the push land.
 # Without the MOVED=no guard, push.sh would misclassify a successful push as HOOK REJECTED.
 W=$(mk_hookfix e "$HOOKSRC")
-printf '#!/bin/sh\necho "pre-push-adr-hook: branch is not rebased onto origin/master." >&2\nexit 0\n' \
+printf '#!/bin/sh\necho "pre-push-adr-hook: branch does not contain origin/master." >&2\nexit 0\n' \
   > "$W/.git/hooks/pre-push"; chmod 755 "$W/.git/hooks/pre-push"
 H=$(g -C "$W" rev-parse HEAD)
 out=$(cd "$W" && bash "$PUSHSH" 9999 2>&1); rc=$?

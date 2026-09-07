@@ -70,13 +70,13 @@ case "$OUT" in
     echo "Re-read the remote and re-run push.sh. Do NOT drop the lease."
     exit 2
     ;;
-  *"pre-push-adr-hook: branch is not rebased onto origin/master"*)
+  *"pre-push-adr-hook: branch does not contain origin/master"*)
     # Client-side pre-push hook refused the update. Recoverable ONLY when the remote is
     # provably unchanged: nothing was pushed, nothing was clobbered, and origin/$BRANCH is
     # known -- the STALE LEASE neighbourhood, not the PUSH FAILED one. If the remote moved,
     # it is not in the state we reasoned about, so fall through to the catch-all below.
     if [ "$MOVED" = no ]; then
-      echo "HOOK REJECTED — pre-push-adr-hook refused this push: the branch is not rebased onto origin/master."
+      echo "HOOK REJECTED — pre-push-adr-hook refused this push: the branch does not contain origin/master."
       echo "origin/$BRANCH is unchanged at $AFTER; nothing was pushed and nothing was clobbered."
       echo "Recover with ONE bounded attempt: git fetch origin master && git rebase origin/master, then re-run push.sh."
       echo "If that rebase reports a conflict: git rebase --abort — and treat this as terminal."

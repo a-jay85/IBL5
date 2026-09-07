@@ -75,6 +75,43 @@ final class PrArmableLibCliTest extends TestCase
         self::assertSame('UNKNOWN', $this->runFn('pr_manual_testing_clearance', [$body])['output']);
     }
 
+    // --- (1) Manual-Testing clearance: tail-clause keyword gate (Phase 2 extension) ---
+
+    public function testClearanceE2eClaimedWithNoSpecFileIsHeld(): void
+    {
+        // E2E named in tail clause; unit test present but no *.spec.ts → HELD (AND semantics).
+        // With OR semantics the unit match would clear despite the missing spec file.
+        $body = "## Manual Testing\nNo manual testing needed — all changes are covered by unit and E2E tests.";
+        $changedFiles = "ibl5/tests/Cli/FooTest.php\nibl5/src/Foo.php";
+        self::assertSame('HELD', $this->runFn('pr_manual_testing_clearance', [$body, $changedFiles])['output']);
+    }
+
+    public function testClearanceE2eClaimedWithSpecFileIsCleared(): void
+    {
+        // Both types named; both matching files present → CLEARED (AND semantics: all types satisfied).
+        $body = "## Manual Testing\nNo manual testing needed — all changes are covered by unit and E2E tests.";
+        $changedFiles = "ibl5/tests/e2e/foo.spec.ts\nibl5/tests/Cli/FooTest.php";
+        self::assertSame('CLEARED', $this->runFn('pr_manual_testing_clearance', [$body, $changedFiles])['output']);
+    }
+
+    public function testClearanceAutomatedSuffixNoTypeNamedIsCleared(): void
+    {
+        // "automated tests" names no explicit type → keyword gate never fires → CLEARED
+        // even when changed files contain no test file at all.
+        $body = "## Manual Testing\nNo manual testing needed — all changes are covered by automated tests.";
+        $changedFiles = "ibl5/src/Foo.php";
+        self::assertSame('CLEARED', $this->runFn('pr_manual_testing_clearance', [$body, $changedFiles])['output']);
+    }
+
+    public function testClearanceNoSentinelIsUnknown(): void
+    {
+        // No ## Manual Testing section → UNKNOWN regardless of the changed-files arg.
+        // Regression guard: the second arg must not change the UNKNOWN decision.
+        $body = "# Hand-made PR\n\nJust a description, no manual testing heading.";
+        $changedFiles = "ibl5/tests/e2e/foo.spec.ts";
+        self::assertSame('UNKNOWN', $this->runFn('pr_manual_testing_clearance', [$body, $changedFiles])['output']);
+    }
+
     // --- (5) golden-snapshot touch ---
 
     public function testGoldenHoldFiresWhenGoldenTouched(): void

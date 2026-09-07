@@ -116,7 +116,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
     res = RunResult(terminal=TerminalState.FAILED, slug=slug, plan=plan,
                     ledger=ledger, audit=audit)
     log(f"phase1 plan: found={plan.found} auto_merge_false={plan.auto_merge_false} "
-        f"matrix={plan.has_matrix} critical_files={len(plan.critical_files)}")
+        f"matrix={plan.has_matrix} critical_files={len(plan.critical_files)} "
+        f"slug_drift={plan.slug_drift or '-'}")
 
     try:
         # ---- Phase 2/3: ship + classify -------------------------------
@@ -242,6 +243,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             unresolved_conformance=unresolved, phase5_status=phase5,
             plan_auto_merge_false=plan.auto_merge_false, headless=headless,
             dep_state_lookup=lambda n: gh.pr_state(n),
+            plan_slug_drift=plan.slug_drift,
         )
         preview = evaluate(inputs)
         if not preview.holds:

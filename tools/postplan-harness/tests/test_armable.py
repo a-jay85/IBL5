@@ -101,3 +101,21 @@ def test_render_rows_never_emits_sentinel():
 def test_assert_no_sentinel_has_teeth():
     with pytest.raises(ValueError, match="sentinel"):
         _assert_no_sentinel("No manual testing needed\n")
+
+
+# ---------------------------------------------------------------------------
+# Condition (11) — slug-drift hold tests (f, g)
+# ---------------------------------------------------------------------------
+
+def test_slug_drift_blocks_arm():
+    """(f) plan_slug_drift set -> condition 11 blocked, decision.armed False."""
+    d = evaluate(inputs(plan_slug_drift="plan-x.md"))
+    assert not d.armed
+    assert any(c.number == 11 for c in d.holds)
+
+
+def test_slug_drift_empty_does_not_block():
+    """(g) plan_slug_drift="" on otherwise-armable input -> condition 11 not blocked."""
+    d = evaluate(inputs(plan_slug_drift=""))
+    assert d.armed
+    assert not any(c.number == 11 and c.blocked for c in d.conditions)

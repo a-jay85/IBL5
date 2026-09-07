@@ -113,6 +113,7 @@ class PlanInfo:
     hold_justification: str = ""
     variant_selection: Optional[str] = None            # "highest" when multi-variant selection ran
     rejected: list[str] = field(default_factory=list)  # basenames of non-selected candidates
+    slug_drift: str = ""   # basename adopted by prefix-drift resolution (branch slug != filename stem)
 
 
 @dataclass
@@ -223,4 +224,6 @@ class RunResult:
                 d["plan"].pop("rejected", None)
             if not d["plan"].get("required_test_methods"):
                 d["plan"].pop("required_test_methods", None)
+            if not d["plan"].get("slug_drift"):
+                d["plan"].pop("slug_drift", None)
         return json.dumps(d, indent=1, default=str)

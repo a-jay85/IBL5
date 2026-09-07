@@ -250,6 +250,44 @@ def parse_hold_justification(content: str) -> str:
                     r"Automouse Hold Justification")[:4000]
 
 
+def _resolve_drift(slug: str, base_dir: str, entries: list[str], bare: str,
+                   info: PlanInfo) -> str:
+    """Prefix-drift fallback: `<prefix>-{slug}.md` when no `{slug}.md` exists.
+
+    Observed shape: `/plan` named the file `plan-autonomy-contract-frontmatter.md`
+    while `bin/wt-new` named the branch `autonomy-contract-frontmatter`, so the
+    exact-name derivation missed and the run went plan-blind — which silently
+    zeroes condition (7), because `auto_merge: false` can only be read off a plan
+    that was found. The `-{slug}.md` suffix anchor keeps `{slug}-shared-context.md`
+    shaped names out; a non-numeric suffix is never a variant.
+
+    Exact match always wins. Two or more candidates is ambiguous and stays blind.
+    An adopted match sets `info.slug_drift`, which HOLDS auto-merge via condition
+    (11) — adoption is a guess, and a wrong guess can release a hold.
+    """
+    if os.path.isfile(bare):
+        return bare
+    pattern = re.compile(rf"^.+-{re.escape(slug)}\.md$")
+    cands = sorted(n for n in entries
+                   if pattern.match(n) and os.path.isfile(os.path.join(base_dir, n)))
+    if len(cands) != 1:
+        if cands:
+            print(f"post-plan: WARNING — {len(cands)} slug-drift candidates for branch "
+                  f"'{slug}': {', '.join(cands)}\n"
+                  f"  none adopted (ambiguous); running plan-blind\n"
+                  f"  override:   bin/post-plan-now --plan <abs-path>",
+                  file=sys.stderr)
+        return bare
+    selected = cands[0]
+    print(f"post-plan: WARNING — no plan at {slug}.md; adopted '{selected}' by slug drift\n"
+          f"  branch name and plan filename disagree\n"
+          f"  auto-merge is HELD for this run (condition 11)\n"
+          f"  override:   bin/post-plan-now --plan <abs-path>",
+          file=sys.stderr)
+    info.slug_drift = selected
+    return os.path.join(base_dir, selected)
+
+
 def _resolve_variant(slug: str, base_dir: str, info: PlanInfo) -> str:
     """Highest-numbered plan variant for `slug` in `base_dir`.
 
@@ -267,7 +305,7 @@ def _resolve_variant(slug: str, base_dir: str, info: PlanInfo) -> str:
                 for m in (pattern.match(n) for n in entries) if m
                 and os.path.isfile(os.path.join(base_dir, m.string))]
     if not variants:
-        return bare
+        return _resolve_drift(slug, base_dir, entries, bare, info)
     candidates = ([(0, bare)] if os.path.isfile(bare) else []) + variants
     candidates.sort(key=lambda c: c[0])
     _, selected = candidates[-1]

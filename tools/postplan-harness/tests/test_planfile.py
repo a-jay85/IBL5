@@ -579,6 +579,64 @@ def test_variant_regex_special_chars_in_slug(tmp_path):
     assert not info.path.endswith("featXv2Yx-3.md")
 
 
+# ---------------------------------------------------------------------------
+# Slug-drift resolution tests (a–e)
+# ---------------------------------------------------------------------------
+
+def test_slug_drift_exact_wins_over_prefix(tmp_path):
+    """(a) exact {slug}.md present AND plan-{slug}.md present -> exact wins, slug_drift == ""."""
+    plans_dir = _mkplans(tmp_path, "my-slug.md", "plan-my-slug.md")
+    info = locate_plan("my-slug", plans_dir=plans_dir)
+    assert info.found
+    assert info.path.endswith("my-slug.md")
+    assert info.slug_drift == ""
+
+
+def test_slug_drift_adopted_when_only_prefixed(tmp_path):
+    """(b) only plan-{slug}.md present -> adopted, found True, slug_drift == 'plan-<slug>.md', path points at it."""
+    plans_dir = _mkplans(tmp_path, "plan-my-slug.md")
+    buf = io.StringIO()
+    with contextlib.redirect_stderr(buf):
+        info = locate_plan("my-slug", plans_dir=plans_dir)
+    assert info.found
+    assert info.slug_drift == "plan-my-slug.md"
+    assert info.path == str(tmp_path / "plan-my-slug.md")
+    err = buf.getvalue()
+    assert "slug drift" in err
+    assert "plan-my-slug.md" in err
+    assert "condition 11" in err
+
+
+def test_slug_drift_suffix_anchor_excludes_shared_context(tmp_path):
+    """(c) only {slug}-shared-context.md present -> NOT adopted (found False, slug_drift == "")."""
+    plans_dir = _mkplans(tmp_path, "my-slug-shared-context.md")
+    info = locate_plan("my-slug", plans_dir=plans_dir)
+    assert not info.found
+    assert info.slug_drift == ""
+
+
+def test_slug_drift_ambiguous_stays_blind(tmp_path):
+    """(d) two drift candidates -> neither adopted, found False, slug_drift == ""."""
+    plans_dir = _mkplans(tmp_path, "plan-my-slug.md", "draft-my-slug.md")
+    buf = io.StringIO()
+    with contextlib.redirect_stderr(buf):
+        info = locate_plan("my-slug", plans_dir=plans_dir)
+    assert not info.found
+    assert info.slug_drift == ""
+    err = buf.getvalue()
+    assert "ambiguous" in err
+
+
+def test_slug_drift_numeric_variants_still_win(tmp_path):
+    """(e) numeric variants still win as before when {slug}.md/{slug}-2.md exist — slug_drift == ""."""
+    plans_dir = _mkplans(tmp_path, "my-slug.md", "my-slug-2.md")
+    info = locate_plan("my-slug", plans_dir=plans_dir)
+    assert info.found
+    assert info.path.endswith("my-slug-2.md")
+    assert info.variant_selection == "highest"
+    assert info.slug_drift == ""
+
+
 # Phase 4 — runner wiring assertion
 def test_runner_threads_explicit_path():
     runner_path = os.path.join(

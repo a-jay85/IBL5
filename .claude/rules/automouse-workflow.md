@@ -112,6 +112,28 @@ is non-fatal.
 
 `bin/automouse/run` sets `CLAUDE_HEADLESS=1`. This environment variable gates `/post-plan` Phase 10 (Preview Environment), which is skipped since no human is present to verify visually. All other phases run normally.
 
+## Plan frontmatter: the autonomy contract
+
+Two **optional** line-1 fields let a plan declare *when it is done*, so `/post-plan` can hold a PR whose deliverable never landed. They are a **unit** — **both or neither**; exactly one is a `bin/check-plan` `[K]` violation.
+
+**`stop_condition:`** — a closed enum; any other value, **including empty**, is rejected.
+
+- `tests-green` — holds unless Phase 5 status is `pass` (`fail`, `skipped` and *no status recorded* all fail).
+- `evidence-present` — no executable track (docs / tooling-only); done when the declared artifacts are in the diff; no run-outcome check.
+
+**`evidence:`** — a **single line** (not a YAML block list), comma-separated, of repo-relative path tokens; surrounding whitespace ignored, **one token minimum**, each must appear in the PR's changed-file list at post-plan time. Name the **deliverable artifacts**, never Verification Matrix rows.
+
+**Neither field grants merge authority** — an unmet contract only **adds** a hold; a satisfied one never arms a PR. `auto_merge:`, plan gate 14 and `feat:` human-signoff remain that surface, untouched.
+
+**Malformed values fail at authoring time**, before a run is spent — `bin/check-plan` `[K]` names the specific defect. Unknown keys stay **silently ignored**: this adds two *recognised* keys, not a reject-unknown-key rule.
+
+```yaml
+stop_condition: tests-green
+evidence: bin/lib/plan-autonomy-contract, bin/test-check-plan
+```
+
+Every parser is **line-1-anchored** (frontmatter only, to the closing `---`), so the example above never self-selects. Enforced by `bin/lib/plan-autonomy-contract`, `bin/check-plan` `[K]`, `/post-plan` Phase 5.0.
+
 ## Feature PRs cannot auto-merge
 
 Conventional-commit **`feat:`** PRs are gated by the required `human-signoff` check and will **not** auto-merge unattended — they wait for a human to apply the `human-approved` label after inspection (ADR-0062). `/post-plan` Phase 6.5 condition (8) deterministically **never arms** a `feat:` PR (a literal title grep), so there is no arm-then-strip; the required `human-signoff` check remains the independent floor that blocks the merge regardless. Maintenance PRs (`fix`/`refactor`/`chore`/`ci`/`docs`/`revert`) auto-merge as before — still subject to Phase 6.5's other conditions, including the PR-time safety verdict (9) on the realized diff. Check `gh pr list` afterward for `feat:` PRs awaiting your label.

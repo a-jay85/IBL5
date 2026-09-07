@@ -114,6 +114,20 @@ impl_model: opus
 ---
 '
 
+FM_CONTRACT='---
+impl_model: sonnet
+stop_condition: tests-green
+evidence: bin/lib/plan-autonomy-contract, bin/test-check-plan
+---
+'
+
+FM_CONTRACT_DOCS='---
+impl_model: sonnet
+stop_condition: evidence-present
+evidence: .claude/rules/automouse-workflow.md
+---
+'
+
 CF_MATRIX='
 ## Verification Matrix
 
@@ -2378,6 +2392,126 @@ else
     echo "FAIL: gateD-no-path-exits-2 — expected exit 2, got $_got_2"
     FAILED=1
 fi
+
+# Gate [K]: autonomy-contract frontmatter validation.
+# [K] fires when stop_condition:/evidence: frontmatter fields are present but
+# malformed or unpaired. [K] must NOT fire when both fields are absent.
+
+# Regression: neither field in frontmatter must not trigger [K].
+assert_viol "[K]-absent-fields-clean" 0 "[K]" "$FM$CF_MATRIX"
+
+# Well-formed: tests-green + two-token evidence list passes.
+assert_viol "[K]-well-formed-clears" 0 "[K]" "$FM_CONTRACT$CF_MATRIX"
+
+# Second enum value: evidence-present + single-token evidence list passes.
+assert_viol "[K]-evidence-present-clears" 0 "[K]" "$FM_CONTRACT_DOCS$CF_MATRIX"
+
+# Closed enum: stop_condition: whenever is not a legal value.
+assert_viol "[K]-bad-enum" 1 "[K]" '---
+impl_model: sonnet
+stop_condition: whenever
+evidence: bin/x
+---
+'"$CF_MATRIX"
+
+# Present-but-empty stop_condition is not the same as absent.
+assert_viol "[K]-empty-stop-condition" 1 "[K]" '---
+impl_model: sonnet
+stop_condition:
+evidence: bin/x
+---
+'"$CF_MATRIX"
+
+# Pairing rule direction 1: stop_condition without evidence is malformed.
+assert_viol "[K]-unpaired-stop-condition" 1 "[K]" '---
+impl_model: sonnet
+stop_condition: tests-green
+---
+'"$CF_MATRIX"
+
+# Pairing rule direction 2: evidence without stop_condition is malformed.
+assert_viol "[K]-unpaired-evidence" 1 "[K]" '---
+impl_model: sonnet
+evidence: bin/x
+---
+'"$CF_MATRIX"
+
+# Empty evidence list is rejected even when stop_condition is present.
+assert_viol "[K]-empty-evidence" 1 "[K]" '---
+impl_model: sonnet
+stop_condition: tests-green
+evidence:
+---
+'"$CF_MATRIX"
+
+# Token shape: semicolons and spaces are shell metacharacters and are rejected.
+assert_viol "[K]-shell-metachar-token" 1 "[K]" '---
+impl_model: sonnet
+stop_condition: tests-green
+evidence: bin/x; rm -rf /
+---
+'"$CF_MATRIX"
+
+# Repo-relative only: absolute paths are rejected.
+assert_viol "[K]-absolute-path-token" 1 "[K]" '---
+impl_model: sonnet
+stop_condition: tests-green
+evidence: /etc/passwd
+---
+'"$CF_MATRIX"
+
+# Repo-relative only: parent-traversal segments are rejected.
+assert_viol "[K]-parent-traversal-token" 1 "[K]" '---
+impl_model: sonnet
+stop_condition: tests-green
+evidence: ../../etc/passwd
+---
+'"$CF_MATRIX"
+
+# Line-1 anchoring: stop_condition:/evidence: as plain prose in the body must
+# not trigger [K]. The NR==1 guard makes the awk exit after the frontmatter
+# closing ---; lines below it are never scanned by the original code.
+# The prose keys sit at column 0 so the mutation (removing NR==1 &&) would
+# capture them and flip gate K — making this fixture catch mutation check 4.
+assert_viol "[K]-body-mention-does-not-fire" 0 "[K]" "$FM$CF_MATRIX"'
+
+The autonomy contract fields are documented in .claude/rules/automouse-workflow.md.
+The required shape is shown below as body prose only, not as frontmatter:
+
+stop_condition: whenever
+evidence: nonsense
+'
+
+# Fenced-block anchoring: a ```yaml block containing stop_condition:/evidence:
+# must not trigger [K]. The NR==1 guard exits after the frontmatter ---; the
+# fenced block below is never scanned by the original code. After mutation the
+# awk never exits and captures the keys inside the fence — catching mutation 4.
+assert_viol "[K]-fenced-example-does-not-fire" 0 "[K]" "$FM$CF_MATRIX"'
+
+Autonomy-contract field reference (body prose only, not frontmatter):
+
+```yaml
+---
+impl_model: sonnet
+stop_condition: whenever
+evidence: nonsense
+---
+```
+'
+
+# --draft mode exits on gate [D] alone; gate [K] is never reached.
+# A draft body with contract-field prose but no line-1 frontmatter exits 0.
+assert_draft "K-draft-prose-clears" 0 '## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | thing works | E2E | post-impl | `tests/X.spec.ts` |
+
+Once implemented, frontmatter will declare:
+
+stop_condition: evidence-present
+evidence: bin/lib/plan-autonomy-contract
+'
 
 # regex_canon_divergence — the three call sites must stay byte-identical.
 # Canon lives in bin/check-plan gate [D]; SKILL.md and _architect-contract.md

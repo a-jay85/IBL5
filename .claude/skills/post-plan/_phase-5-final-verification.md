@@ -2,7 +2,7 @@
 
 Purpose: the full Phase 5 final-verification how-to (all prose steps + all bash blocks).
 
-### Phase 5.0: Plan→test & Plan→file conformance — skip if `PLAN_FOUND=none` or `! $HAS_MATRIX`
+### Phase 5.0: Plan→test, Plan→file & autonomy-contract conformance — skip if `PLAN_FOUND=none`; the matrix-derived sub-checks additionally skip if `! $HAS_MATRIX`
 
 At Phase 5.0 START, clear the conformance bridge file AND remove the done-marker, so each run begins from a clean slate. An empty bridge file alone is **not** enough to mean "nothing unresolved" — it is byte-identical to "5.0 died before writing anything", which is why the separate done-marker exists (Phase 6.5 condition (3) treats a missing marker as indeterminate → BLOCKED):
 
@@ -98,7 +98,39 @@ cf_section_named "$PLAN_FILE" "Required Test Methods" \
     done
 ```
 
-At Phase 5.0 END, append each remaining **UNRESOLVED** `MISSING:`, `MISSING-FILE:` and `MISSING-METHOD:` item (label + path-or-method-name + reason) to `/tmp/post-plan-missing-tests-$PPID`, one per line. Authored-green / implemented-and-checkpointed / cut-with-comment items are NOT written. This bridge file is consulted by the Phase 6.5 auto-merge gate.
+**Autonomy contract (Phase 5.0d)** — a plan may declare the optional line-1 pair `stop_condition:` / `evidence:`. `bin/lib/plan-autonomy-contract --print` is the **only** parser (the same one `bin/check-plan` gate `[K]` calls, so the two cannot drift); a non-zero exit means the contract is malformed and **holds** rather than being silently skipped. Unlike every other 5.0 check this one is gated on `$PLAN_FOUND` alone, never on `$HAS_MATRIX`.
+
+```bash
+# Phase 5.0d — autonomy contract (stop_condition / evidence).
+# Runs even when the plan has no Verification Matrix: a docs/tooling plan
+# declaring `stop_condition: evidence-present` is exactly the case the
+# matrix-gated checks above skip.
+if [ "$PLAN_FOUND" != "none" ]; then
+  if CONTRACT=$(bin/lib/plan-autonomy-contract --print "$PLAN_FILE"); then
+    SC=$(printf '%s\n' "$CONTRACT" | sed -n 's/^stop_condition=//p')
+    EV=$(printf '%s\n' "$CONTRACT" | sed -n 's/^evidence=//p')
+    if [ -n "$SC" ]; then
+      if [ "$SC" = "tests-green" ] && [ "${PHASE5_VERIFY_STATUS:-none}" != "pass" ]; then
+        echo "UNMET-CONTRACT: stop_condition tests-green declared but PHASE5_VERIFY_STATUS=${PHASE5_VERIFY_STATUS:-none}" \
+          >> "/tmp/post-plan-missing-tests-$PPID"
+      fi
+      [ -f "/tmp/post-plan-changed-$PPID" ] || git diff --name-only origin/master...HEAD > "/tmp/post-plan-changed-$PPID"
+      printf '%s\n' "$EV" | tr ',' '\n' | while IFS= read -r tok; do
+        [ -z "$tok" ] && continue
+        if ! grep -qxF "$tok" "/tmp/post-plan-changed-$PPID" \
+           && ! grep -qE "/$(printf '%s' "$tok" | sed 's/[][\.*^$/]/\\&/g')\$" "/tmp/post-plan-changed-$PPID"; then
+          echo "UNMET-CONTRACT: evidence $tok declared but never appeared in the diff" \
+            >> "/tmp/post-plan-missing-tests-$PPID"
+        fi
+      done
+    fi
+  else
+    echo "UNMET-CONTRACT: malformed autonomy contract — $CONTRACT" >> "/tmp/post-plan-missing-tests-$PPID"
+  fi
+fi
+```
+
+At Phase 5.0 END, append each remaining **UNRESOLVED** `MISSING:`, `MISSING-FILE:`, `MISSING-METHOD:` and `UNMET-CONTRACT:` item (label + path-or-method-name + reason) to `/tmp/post-plan-missing-tests-$PPID`, one per line. Authored-green / implemented-and-checkpointed / cut-with-comment items are NOT written. This bridge file is consulted by the Phase 6.5 auto-merge gate.
 
 Then — **last action of Phase 5.0, after the appends above** — write the done-marker:
 
@@ -106,7 +138,7 @@ Then — **last action of Phase 5.0, after the appends above** — write the don
 touch /tmp/post-plan-conformance-done-$PPID
 ```
 
-The marker is the positive assertion that 5.0 reached its end; the bridge file only says *what* was unresolved. Without it, "5.0 ran and found nothing" and "5.0 died mid-section" are indistinguishable and condition (3) would fail OPEN. **The marker must also be written on the skip path** (`PLAN_FOUND=none` or `! $HAS_MATRIX`) — that instruction lives in `SKILL.md` Phase 5.0, because a run that skips 5.0 may never read this file. Omitting the skip-path write would block auto-merge on every plan-blind PR, which is the dominant case.
+The marker is the positive assertion that 5.0 reached its end; the bridge file only says *what* was unresolved. Without it, "5.0 ran and found nothing" and "5.0 died mid-section" are indistinguishable and condition (3) would fail OPEN. **The marker must also be written on the skip path** (`PLAN_FOUND=none`) — that instruction lives in `SKILL.md` Phase 5.0, because a run that skips 5.0 entirely may never read this file. Omitting the skip-path write would block auto-merge on every plan-blind PR, which is the dominant case. When `! $HAS_MATRIX` but `PLAN_FOUND != none`, the matrix-derived sub-checks skip but 5.0d runs and this block executes normally; no separate skip-path write is needed.
 
 Compiled-harness note: `tools/postplan-harness` computes conformance in-process (`harness/conformance.py` returns the unresolved list to `armable.py`) and never touches either `/tmp` file. The marker is a **skill-path** mechanism only — do not "port" it to the harness. Per ADR-0092 `bin/post-plan-now` pins the **main-checkout** harness, so `planfile.py`'s matching change is inert until this PR merges to main-checkout `master`; until then the skill-path block above is the live parser.
 

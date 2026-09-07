@@ -1,0 +1,135 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/lib/plan-autonomy-contract — shared autonomy-contract frontmatter validator.
+# Used by BOTH bin/check-plan (gate [K]) and the /post-plan Phase 5.0d skill path
+# so the two call sites cannot drift.
+#
+# Validates the stop_condition: and evidence: frontmatter fields added by
+# .claude/rules/automouse-workflow.md. The two fields are a unit: both must be
+# present or both must be absent; a plan carrying one without the other is
+# malformed.
+#
+# Usage: bin/lib/plan-autonomy-contract <plan-file>
+#        bin/lib/plan-autonomy-contract --print <plan-file>
+#   exit 0, no output           -> contract is well-formed, or absent entirely (nothing to check)
+#   exit 1, one line on stdout  -> the violation message (caller prefixes/labels it)
+#   exit 2                      -> usage error (missing arg / unreadable file)
+
+set -u
+
+# Force the C locale — same rationale as bin/check-plan: deterministic
+# byte-wise glob/char-class matching across locales.
+export LC_ALL=C
+
+PRINT_MODE=0
+if [ "${1:-}" = "--print" ]; then
+    PRINT_MODE=1
+    shift
+fi
+
+PLAN_FILE="${1:-}"
+if [ -z "$PLAN_FILE" ] || [ ! -e "$PLAN_FILE" ]; then
+    echo "Usage: bin/lib/plan-autonomy-contract [--print] <plan-file>" >&2
+    exit 2
+fi
+
+# Parse BOTH keys in one awk pass from the line-1-anchored frontmatter block.
+# Line-1-anchored: NR==1 && /^---/ means a plan whose *body* documents the
+# syntax cannot self-select. Do not relax the NR==1 guard.
+# gsub(/[[:space:]]/,"") strips all whitespace, so "a, b" and "a,b" normalise
+# identically — which is precisely why the single-line comma-separated evidence:
+# shape was chosen.
+# A duplicated key takes the first occurrence (next skips further matches).
+FM=$(awk '
+  NR==1 && /^---[[:space:]]*$/ {infm=1; next}
+  infm && /^---[[:space:]]*$/ {exit}
+  infm && /^stop_condition:[[:space:]]*/ {v=$0; sub(/^stop_condition:[[:space:]]*/,"",v); gsub(/[[:space:]]/,"",v); print "stop_condition\t" v; next}
+  infm && /^evidence:[[:space:]]*/       {v=$0; sub(/^evidence:[[:space:]]*/,"",v);       gsub(/[[:space:]]/,"",v); print "evidence\t" v; next}
+' "$PLAN_FILE" 2>/dev/null)
+
+# Extract presence and values from the tab-separated awk output.
+# A row is "present" (SC_PRESENT=1 or EV_PRESENT=1) whether or not its value
+# is empty — present-but-empty is a distinct state that must be rejected, not
+# silently treated as absent.
+SC_ROW=$(printf '%s\n' "$FM" | grep '^stop_condition	' || true)
+EV_ROW=$(printf '%s\n' "$FM" | grep '^evidence	' || true)
+
+SC_PRESENT=0; SC=""
+EV_PRESENT=0; EV=""
+if [ -n "$SC_ROW" ]; then SC_PRESENT=1; SC="${SC_ROW#*	}"; fi
+if [ -n "$EV_ROW" ]; then EV_PRESENT=1; EV="${EV_ROW#*	}"; fi
+
+# Violation message goes to STDOUT: the caller renders exactly one stdout line
+# via `viol "[K] ${MSG}"`, so a stderr message would vanish from check-plan output.
+viol() { printf '%s\n' "$1"; exit 1; }
+
+# Rule 1: both absent — nothing to validate.
+if [ "$SC_PRESENT" -eq 0 ] && [ "$EV_PRESENT" -eq 0 ]; then
+    if [ "$PRINT_MODE" -eq 1 ]; then
+        printf 'stop_condition=\nevidence=\n'
+    fi
+    exit 0
+fi
+
+# Rule 2: stop_condition present, evidence absent.
+if [ "$SC_PRESENT" -eq 1 ] && [ "$EV_PRESENT" -eq 0 ]; then
+    viol "stop_condition: declared without evidence: — the two fields are a unit (see .claude/rules/automouse-workflow.md)"
+fi
+
+# Rule 3: evidence present, stop_condition absent.
+if [ "$EV_PRESENT" -eq 1 ] && [ "$SC_PRESENT" -eq 0 ]; then
+    viol "evidence: declared without stop_condition: — the two fields are a unit (see .claude/rules/automouse-workflow.md)"
+fi
+
+# Rule 4: stop_condition value must be in the allowed set.
+if [ "$SC" != "tests-green" ] && [ "$SC" != "evidence-present" ]; then
+    viol "stop_condition: '$SC' is not a legal value — expected one of: tests-green, evidence-present"
+fi
+
+# Rule 5: evidence must be non-empty after whitespace stripping.
+if [ -z "$EV" ]; then
+    viol "evidence: is empty — expected at least one repo-relative path token"
+fi
+
+# Rule 6: validate each comma-separated token for repo-relative path shape.
+# Split EV on comma using positional parameters (avoids a subshell so viol's
+# exit 1 propagates to the script, not just a child process).
+set -f          # disable glob expansion during split
+_OLD_IFS="$IFS"
+IFS=','
+# shellcheck disable=SC2086
+set -- $EV
+IFS="$_OLD_IFS"
+set +f
+
+for tok in "$@"; do
+    # non-empty token (guards against trailing/adjacent commas)
+    if [ -z "$tok" ]; then
+        viol "evidence: is empty — expected at least one repo-relative path token"
+    fi
+    # allowed character set: ^[A-Za-z0-9._/-]+$
+    # rejects every shell metacharacter (& | ; > < $ \ backtick, quotes) and spaces
+    if ! printf '%s' "$tok" | grep -qE '^[A-Za-z0-9._/-]+$'; then
+        viol "evidence: token '$tok' is not a repo-relative path (no shell metacharacters, no leading /, no ..)"
+    fi
+    # no leading slash (repo-relative only)
+    case "$tok" in
+        /*) viol "evidence: token '$tok' is not a repo-relative path (no shell metacharacters, no leading /, no ..)" ;;
+    esac
+    # no leading dash (would read as a flag)
+    case "$tok" in
+        -*) viol "evidence: token '$tok' is not a repo-relative path (no shell metacharacters, no leading /, no ..)" ;;
+    esac
+    # no .. path segment
+    case "$tok" in
+        *..*) viol "evidence: token '$tok' is not a repo-relative path (no shell metacharacters, no leading /, no ..)" ;;
+    esac
+done
+
+# All checks passed. In --print mode, emit the normalised fields.
+if [ "$PRINT_MODE" -eq 1 ]; then
+    printf 'stop_condition=%s\nevidence=%s\n' "$SC" "$EV"
+fi
+
+exit 0

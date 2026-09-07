@@ -18,6 +18,7 @@ Sourced (not executed directly) by scripts in `bin/` and `bin/automouse/`. Each 
 | `docfix-dm.sh` | Compose the docs-refreshed Discord DM for a docfix PR; holds the numeric-input, OPEN-state, and `docs-stale-refresh-` head-ref guards lifted out of `docs-refreshed-notify.yml` so they are exercisable by `bin/test-docfix-run` |
 | `git-helpers.sh` | Shared git-layout helpers: canonical repo root resolution and related utilities |
 | `human-signoff-classifier.sh` | Single source of truth for the feature-PR human sign-off classifier (ADR-0062), sourced by both the workflow and its regression harness |
+| `plan-autonomy-contract` | Shared `stop_condition:` / `evidence:` frontmatter validator; invoked by `bin/check-plan` gate `[K]` and the `/post-plan` Phase 5.0d skill path |
 | `plan-model-tier` | Validate a raw `impl_model:` value against the accepted whitelist and classify it (`absent`/`opus-tier`/`sonnet-tier`/`haiku-tier`); shared by `plan-impl-model` and `plan-model-consistency` |
 | `plan-impl-model` | Resolve the automouse impl-agent model for a given plan file; rejects any value outside the `plan-model-tier` whitelist (exit 1, one line on stderr) instead of defaulting to Opus |
 | `plan-model-consistency` | Shared `impl_model` ↔ Verification-Matrix consistency check, invoked by `bin/check-plan` gate `[13]` and by the `bin/automouse/queue` add-time backstop |

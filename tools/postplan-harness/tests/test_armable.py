@@ -167,3 +167,26 @@ def test_slug_drift_empty_does_not_block():
     d = evaluate(inputs(plan_slug_drift=""))
     assert d.armed
     assert not any(c.number == 13 and c.blocked for c in d.conditions)
+
+
+# sect-7d -- Autonomy-contract arming integration
+
+
+def test_armable_unmet_contract_blocks_arming():
+    """UNMET-CONTRACT: items in unresolved_conformance block arming via condition (3).
+
+    Two assertions are required:
+    1. An UNMET-CONTRACT: item routes through condition (3) -- not a new condition.
+    2. phase5_status='skipped' alone (empty unresolved_conformance) still arms,
+       pinning that condition (4) was not touched.
+    """
+    # An UNMET-CONTRACT: item in unresolved_conformance blocks via condition (3).
+    d = evaluate(inputs(unresolved_conformance=[
+        "UNMET-CONTRACT: stop_condition tests-green declared but PHASE5_VERIFY_STATUS=skipped",
+    ]))
+    assert not d.armed
+    assert any(c.blocked and c.name == "unresolved-MISSING-items" for c in d.conditions)
+
+    # phase5_status='skipped' with empty unresolved_conformance still arms (condition (4) not touched).
+    d2 = evaluate(inputs(phase5_status="skipped", unresolved_conformance=[]))
+    assert d2.armed

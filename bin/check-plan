@@ -70,7 +70,8 @@
 #                              only (body > scaffold); skips when the scaffold is
 #                              absent (SCAF=0). Draft mode runs this gate alone
 #                              because a draft has no frontmatter, so the
-#                              frontmatter-anchored gates — 13, [H], [T], [S] —
+#                              frontmatter-anchored gates — 13, [H], [T], [S],
+#                              [K] —
 #                              would all fire spuriously; draft mode exits 0/1 on
 #                              gate D alone.
 #   B  Security-surface discharge — a plan carrying '## Security-Surface Discharge'
@@ -83,6 +84,14 @@
 #                              Step-4.5 artifact). PRESENCE only — validity of the
 #                              rationale stays Opus judgment; this just catches a
 #                              hold declared with the challenge skipped entirely.
+#   K  Autonomy contract    — a plan's optional `stop_condition:`/`evidence:`
+#                              line-1 frontmatter must be well-formed and PAIRED
+#                              (both or neither). Delegates the parse and the
+#                              grammar to bin/lib/plan-autonomy-contract, which
+#                              both this gate and /post-plan Phase 5.0 call, so
+#                              the two cannot drift. Absent fields are legal and
+#                              silent — every plan authored before the fields
+#                              existed is unaffected.
 #   R  Reuse-target exists   — a `Class::method` token named in a **Reuse** note
 #                              must resolve: if the class exists in ibl5/ but the
 #                              method name appears nowhere as a `function`, it is a
@@ -217,7 +226,7 @@ fi
 # --draft: run ONLY gate [D] (phase-count drift) against an in-progress
 # sectioned-delivery draft, then exit. A draft has no line-1 YAML frontmatter
 # (its line 1 is the plan title), so the frontmatter-anchored gates — 13, [H],
-# [T], [S] — would all fire spuriously; draft mode never reaches them.
+# [T], [S], [K] — would all fire spuriously; draft mode never reaches them.
 DRAFT_MODE=0
 if [ "${1:-}" = "--draft" ]; then
     DRAFT_MODE=1
@@ -615,6 +624,22 @@ if [ "$FM_HOLD" -eq 1 ]; then
     if ! grep -qiE '^##[[:space:]]+Automouse Hold Justification[[:space:]]*$' "$PLAN_FILE"; then
         viol "[H] plan declares auto_merge: false but has no '## Automouse Hold Justification' section (Step 4.5 — record why the hold is reducible-confirmed or intrinsic)"
     fi
+fi
+
+# ---------------------------------------------------------------------------
+# Gate K: autonomy-contract frontmatter well-formed and paired.
+# ---------------------------------------------------------------------------
+# Delegates to bin/lib/plan-autonomy-contract, which BOTH this gate and the
+# /post-plan Phase 5.0 contract check call — kept in one place so the shell
+# parse of stop_condition:/evidence: cannot drift into two dialects. That
+# script exits 0 silently when the plan declares neither field, which is every
+# plan authored before the fields existed, so this gate is a no-op for them.
+# Only rc == 1 is a violation: rc == 2 is a usage error (missing/unreadable
+# lib), and turning that into a violation would fail every plan at once.
+GATEK_MSG=$("$SCRIPT_DIR/lib/plan-autonomy-contract" "$PLAN_FILE")
+GATEK_RC=$?
+if [ "$GATEK_RC" -eq 1 ]; then
+    viol "[K] ${GATEK_MSG}"
 fi
 
 # ---------------------------------------------------------------------------

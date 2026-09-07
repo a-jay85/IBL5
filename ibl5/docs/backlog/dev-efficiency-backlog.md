@@ -92,6 +92,8 @@ last_verified: 2026-09-07
 | E68 | PR #2144 `## Post-merge steps` recipe carried a wrong repo slug (404) and a `jq` payload that would have dropped `human-signoff`'s `app_id` binding, with a verification step that `del()`d the field it was asserting about | ⬜ Open | 🟥 | S |
 | E62 | PR #1899 Phase 6.5 — stale test-row labels and PR body claims when rows renumbered post-impl | ⬜ Open | — | XS |
 | E69 | PR #1899 Phase 6.5 — stale test-row labels and PR body claims when rows renumbered post-impl | ⬜ Open | — | XS |
+| E70 | PR #2123 Phase 6.5 — PR body page-count overclaim, selector mis-attribution, plan VR command defect, and three confirmatory notes | ⬜ Open | — | XS |
+| E71 | PR #2123 — remediation commit structural defects: backlog entry with duplicate ID, misplaced rows, and orphan file outside plan scope | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -1207,6 +1209,9 @@ Read this as exposure, not as four confirmed-false digests: only #2084 is verifi
 **class:** A PR body's post-merge operator recipe — hand-authored shell that runs against a live production API *after* the PR's own CI has passed, so no gate ever executes it. Two independent defects shipped green: a hardcoded owner (`ajaynicolas/IBL5`) that does not resolve (the repo is `a-jay85/IBL5`, remote `ssh://git@github.com/a-jay85/IBL5.git`), and a `jq` payload that reconstructed `required_status_checks` from the legacy `contexts` string array rather than the `checks` object array.
 
 The second is the sharper one. GitHub's branch-protection PUT accepts either shape, but `contexts` carries no `app_id`, so a round-trip through it silently rewrites every required check from a specific app binding to "any app may report this context". On `master` that would have moved `human-signoff` from `app_id: 15368` to `null` — converting an app-attested gate into one any token could satisfy. **The recipe's own Step 5.3 assertion 2, described in the PR body as "the load-bearing check", `del(...)`s `.required_status_checks.checks` from both sides before diffing — the only field carrying `app_id`.** Assertion 1 only counted `contexts` membership. The verification was structurally incapable of observing the regression the payload caused, and the recipe's rollback block reconstructed from `contexts` too, so a rollback would have re-applied the same damage.
+### E70 PR #2123 Phase 6.5 — PR body page-count overclaim, selector mis-attribution, plan VR command defect, and three confirmatory notes
+
+**class:** PR body prose that extends a scope claim to a page explicitly excluded from the confirm-or-add decision set, and that mis-attributes a selector shape to the wrong assertion line; plus a plan VR command that names a non-working invocation path for the VR suite. Consolidated: PR body / plan accuracy defects in the ship-pipeline authoring surface.
 
 **occurrence table:**
 
@@ -1227,3 +1232,40 @@ The second is the sharper one. GitHub's branch-protection PUT accepts either sha
 `artifact destination: this entry; rung 2 → PR-body slug check in the /pr-ready Phase 6 surface; rung 3 → new rule doc on post-merge API recipe authoring`
 
 *(discovered 2026-09-06 while executing PR #2144's own `## Post-merge steps` Phase 5)*
+| 1 | PR #2123 body Phase 2 — "All four Block F pages were confirmed"; Player negotiate was never in the confirm-or-add set and emits no `h1.ibl-title` by design | yes | yes | fixed this pass — corrected to "all three chrome pages"; Player negotiate clarified |
+| 2 | PR #2123 body Summary — "to `h1.ibl-title` with `.first()` retained for the visibility assertion"; the visibility locator is `.ibl-title`, not `h1.ibl-title`; `h1.ibl-title` carries `toHaveCount(1)` and `toHaveText()` | yes | yes | fixed this pass — summary reworded to attribute selectors per-assertion |
+| 3 | `~/claude-plans/no-team-pages-canonical-title-hook.md` Phase 5 — `bin/e2e-wt <slug> smoke/visual-regression.spec.ts`; `ibl5/playwright.config.ts:61` excludes `/visual-regression/` from the chromium project; VR requires `ibl5/bin/visual-regression` with `ibl5/playwright.visual.config.ts` | near-miss | n/a — plan is historical | not fixed — plan is a historical artifact; substituted correct route and disclosed in body |
+| 4 | PR #2123 matrix row 8 — Truly-manual row not ticked; no-team account requires Docker stack provisioning not available in the preview environment | yes | n/a — by design | not fixed — by design; the plan itself names this constraint |
+| 5 | PR #2123 matrix row 4 — mutation result evidence recorded in `ibl5/docs/backlog/e2e-backlog.md` rather than the PR body | near-miss | yes | not fixed — placement note; evidence is present in the diff |
+
+**prevention_ladder:**
+- **rung 0 — already covered?** `/pr-ready` Phase 6 check 4 (PR body vs. reality) caught F1 and N2; check 2 (intent fidelity) caught N1 as a divergence note. All fires were correct.
+- **rungs 1–5 — N/A** given rung 0 coverage for F1/N2; plan VR command defect (N1) is a plan-prose accuracy issue with no feasible static gate.
+- **landing rung:** no gate warranted — Phase 6 checks 2 and 4 are the existing catch surface and fired correctly.
+
+`prevention_ladder: no gate warranted — /pr-ready Phase 6 checks 2 and 4 are the correct catch surface and fired correctly`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-05 during Phase 6 review of #2123)*
+
+### E71 PR #2123 — remediation commit structural defects: duplicate ID, misplaced index rows, split entry body, orphan out-of-scope file
+
+**class:** a Phase 6.5 remediation commit that introduces a backlog entry using an already-occupied ID, inserts its index rows into a neighbouring entry's occurrence table instead of the main index table, splits a sibling entry's heading from its body, and carries an out-of-scope comment-only file outside the plan's scope grep.
+
+**occurrence table:**
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | ibl5/docs/backlog/dev-efficiency-backlog.md — E62 collision, E47 misplaced rows, E54 split body | yes | fixed this pass | fixed this pass |
+| 2 | bin/lighthouse-pr-urls — orphan comment line outside plan scope | yes | fixed this pass | fixed this pass |
+
+**prevention_ladder:**
+- rung 0 — no existing gate checks for ID collisions or misplaced index rows in backlog files; not already covered.
+- rung 1 — extend `bin/check-docs` to detect duplicate `### E<n>` headings and `| E<n> |` index rows within the same file; this is the landing rung.
+- rung 2 — n/a; a script check is cleaner than a rule doc for a structural property.
+- rungs 3–5 — n/a; PHPStan does not parse Markdown.
+Landing: rung 1 — `bin/check-docs` duplicate-ID check for dev-efficiency-backlog.md. The four `.claude/rules/meta-tooling-bar.md` conditions: (1) we cannot extend an existing gate that already checks this; (2) the cost is one grep pass added to check-docs; (3) the false-positive rate is zero (duplicate headings are never intentional); (4) it is machine-verifiable (grep exits non-zero on dup).
+
+**artifact destination:** `bin/check-docs` (in-repo).
+
+*(discovered 2026-09-06 during /pr-ready Phase 6 review of #2123)*

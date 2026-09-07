@@ -947,6 +947,7 @@ All three fixed this pass: B1 and N3 via `gh pr edit`; N4 via the plan file VM.
 *(discovered 2026-09-05 during Phase 6 review of #2126)*
 
 ➜ E57 `bin/adr-check` red at merge on #2124 and #2119 — new rule docs landed with no ADR and no `no-adr:` marker — ✅ Implemented (2026-09-06): see [archive](archive/dev-efficiency-backlog-archive.md).
+
 ### E58 PR #2133 Phase 6.5 — plan verification rows 4.e and 6.a false-positive on correct code; PR authoring notes
 
 **class:** Plan verification shell commands that extract a function body with `sed` then grep the full text—including comment lines—for forbidden identifiers, producing false positives when the function's own comments document the property being verified.
@@ -969,32 +970,6 @@ All three fixed this pass: B1 and N3 via `gh pr edit`; N4 via the plan file VM.
 ### E61 PR #2129 Phase 6.5 — SKILL.md size-band gate not updated after deliberate file growth
 
 **class:** a test-maintenance omission — a size-band gate (`bin/test-pr-ready-now` case 25) not updated when the guarded file grew by deliberate plan work in the same PR.
-
-**occurrence table:**
-
-| # | File:line | Same class? | Live? | Status |
-|---|-----------|-------------|-------|--------|
-| 1 | PR #2124 — added `.claude/rules/scope-expansion-justification.md`; body has zero `no-adr` markers | yes | merged red 2026-09-05T16:43:10Z | disposition recorded below; no ADR owed |
-| 2 | PR #2119 — added `.claude/rules/bin-help-span-and-secondary-assertions.md`; body has zero `no-adr` markers | yes | merged red 2026-09-05T13:03:01Z | disposition recorded below; no ADR owed |
-| 3 | PR #2121 — added a rule doc, `adr-check` green | no (control) | n/a | body carries `<!-- no-adr: new always-loaded rule doc, authoring discipline only -->` — the correct precedent for this file class |
-| 4 | `472fe0a4` misplaced path ⇒ `adr` filter miss ⇒ step skipped ⇒ green | yes (skip-as-green) | mechanism still live | not fixed — a skipped `if:`-gated step is indistinguishable from a passing one in `statusCheckRollup` |
-
-**retroactive disposition (the marker that should have been in each body):** both files are path-conditional / always-loaded **authoring-discipline** rule docs — they govern how a PR body or a `bin/` help comment is written. Neither records an architectural decision, so neither owes an ADR; `ibl5/docs/decisions/README.md`'s bypass clause ("changes that genuinely don't need an ADR") is the correct disposition, exactly as applied in #2121. Writing an ADR for either would violate `.claude/rules/doc-freshness.md` § "Decision Records Are Append-Only" by asserting a decision nobody took.
-
-**prevention_ladder:**
-- rung 0 — `bin/adr-check` already exists and already produced the correct FAIL on both PRs. The gate is not broken; it is **non-blocking** (advisory context) and **`pull_request`-event-only**, so nothing re-flags the debt after merge.
-- rung 1 — no rule-doc fix available: a rule doc cannot make an advisory check blocking, and the authoring discipline it would encode ("type the marker") is already stated verbatim in `ibl5/docs/decisions/README.md`.
-- rung 2 — promote `Meta checks` to a required context on `master`. **Deliberately not taken here.** That is a branch-protection change on the ship-pipeline surface, which trips `.claude/rules/work-triage.md`'s safety mirror and wants a `/plan`, not an ad-hoc edit riding a backlog entry.
-- rung 3 — for occurrence 4, make the `adr` filter's skip observable (e.g. an explicit `else`-branch step that prints "adr-check skipped: no decision-trigger paths in diff"), so a free green from a path typo is legible in the log. Cheap and additive; also wants its own change, not this one.
-- **landing rung:** rung 0 for the two merged PRs — record the disposition here, **and** carry it in each merged PR body as the `no-adr:` marker the policy names. Both bodies were edited on 2026-09-05 (user-authorized; a merged PR body is still editable) and each marker is stamped "retroactively recorded" so it cannot be misread as having been present at merge time. Rungs 2 and 3 are surfaced, not built.
-
-`artifact destination: this entry, plus retroactive <!-- no-adr: --> markers applied to the bodies of #2124 and #2119`
-
-*(discovered 2026-09-05 while investigating recently merged PRs that carried red CI)*
-
-**Status (2026-09-06):** ◑ Partial — rung 3 built: the `adr` paths-filter gained an explicit skip step, so a filter miss is now stated in the job log and in the Actions step list instead of being indistinguishable from a pass. Rung 2 is decided and recorded (ADR-0120) but **not yet applied**: promoting "Meta checks" to a required status check on `master` is a post-merge operator action against the branch-protection API, and this entry stays ◑ until that call is made and read back. Rung 0 (the two merged PRs' disposition) is closed: the retroactive `no-adr:` markers were applied to both bodies on 2026-09-05 (PR #2136). 🟥 (bootstrap hazard: the PR changes the enforcement mechanism governing its own merge, so `auto_merge: false` and a human merges it).
-
-*(E57 fully implemented 2026-09-06 — archived: see [archive](archive/dev-efficiency-backlog-archive.md#e57-binadr-check-red-at-merge-on-2124-and-2119--new-rule-docs-landed-with-no-adr-and-no-no-adr-marker))*
 
 | 1 | `~/claude-plans/pr-cycle-dirty-rescue.md` row 4.e — greps `_rescue_one()` body for `MERGES\|armed.txt\|ledgered.txt\|pr merge\|_poll_merge\|_arm_and_classify\|POLL_CEILING`; hits five comment lines that document the "rescue is not a merge" invariant | yes | was live at plan-write | not fixed — filed (plan already merged; fix is authoring discipline) |
 | 2 | `~/claude-plans/pr-cycle-dirty-rescue.md` row 6.a — greps `_report_dry_run()` body for `_rescue_one\|_ready_pr\|--go`; hits three comment lines and one operator-facing echo string | yes | was live at plan-write | not fixed — filed |

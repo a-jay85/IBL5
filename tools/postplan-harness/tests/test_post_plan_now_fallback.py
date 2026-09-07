@@ -155,26 +155,16 @@ def test_skill_block_matches_resolver(tmp_path):
     assert m, "SKILL.md Phase 1 shell block not found"
     shell_block = m.group(1)
 
+    # Use plan-resolve.sh test seams: PLAN_DIR and PLAN_SLUG override slug derivation.
     env = os.environ.copy()
-    env["HOME"] = str(tmp_path.parent)
-    env["SLUG"] = "s"
+    env["PLAN_DIR"] = str(plans)
+    env["PLAN_SLUG"] = "s"
     script = (
         f"cd {REPO!r}\n"
         f'mkdir -p "{tmp_path!s}"\n'
         + shell_block
         + '\necho "PLAN_FILE=$PLAN_FILE"\n'
         + '\necho "BEST=$BEST"\n'
-    )
-    # Override claude-plans to our tmp dir and fix SLUG so git rev-parse doesn't clobber it
-    script = script.replace(
-        '"$HOME/claude-plans/$SLUG.md"',
-        f'"{tmp_path!s}/$SLUG.md"'
-    ).replace(
-        '"$HOME/claude-plans/$SLUG"-*.md',
-        f'"{tmp_path!s}/$SLUG"-*.md'
-    ).replace(
-        'SLUG=$(git rev-parse --abbrev-ref HEAD)',
-        'SLUG=s'
     )
     r = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env=env)
     assert r.returncode == 0, r.stderr
@@ -197,19 +187,17 @@ def test_skill_block_plan_blind(tmp_path):
 
     plans_dir = str(tmp_path / "empty-plans")
     os.makedirs(plans_dir, exist_ok=True)
+    # Use plan-resolve.sh test seams: PLAN_DIR and PLAN_SLUG override slug derivation.
+    env = os.environ.copy()
+    env["PLAN_DIR"] = plans_dir
+    env["PLAN_SLUG"] = "no-such-slug"
     script = (
-        "SLUG=no-such-slug\n"
-        + shell_block.replace(
-            '"$HOME/claude-plans/$SLUG.md"',
-            f'"{plans_dir}/$SLUG.md"'
-        ).replace(
-            '"$HOME/claude-plans/$SLUG"-*.md',
-            f'"{plans_dir}/$SLUG"-*.md'
-        )
+        f"cd {REPO!r}\n"
+        + shell_block
         + '\necho "PLAN_FILE=${PLAN_FILE:-}"\n'
         + 'if [ -z "${PLAN_FILE:-}" ]; then echo "PLAN_FOUND=none"; fi\n'
     )
-    r = subprocess.run(["bash", "-c", script], capture_output=True, text=True)
+    r = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env=env)
     assert r.returncode == 0, r.stderr
     assert "PLAN_VARIANT_SELECTED" not in r.stdout
     assert "PLAN_FOUND=none" in r.stdout

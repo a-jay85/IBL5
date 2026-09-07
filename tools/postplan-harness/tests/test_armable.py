@@ -111,11 +111,11 @@ def test_slug_drift_blocks_arm():
     """(f) plan_slug_drift set -> condition 11 blocked, decision.armed False."""
     d = evaluate(inputs(plan_slug_drift="plan-x.md"))
     assert not d.armed
-    assert any(c.number == 11 for c in d.holds)
+    assert any(c.number == 13 for c in d.holds)
 
 
 def test_slug_drift_empty_does_not_block():
     """(g) plan_slug_drift="" on otherwise-armable input -> condition 11 not blocked."""
     d = evaluate(inputs(plan_slug_drift=""))
     assert d.armed
-    assert not any(c.number == 11 and c.blocked for c in d.conditions)
+    assert not any(c.number == 13 and c.blocked for c in d.conditions)

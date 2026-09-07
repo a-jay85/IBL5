@@ -604,7 +604,7 @@ def test_slug_drift_adopted_when_only_prefixed(tmp_path):
     err = buf.getvalue()
     assert "slug drift" in err
     assert "plan-my-slug.md" in err
-    assert "condition 11" in err
+    assert "condition 13" in err
 
 
 def test_slug_drift_suffix_anchor_excludes_shared_context(tmp_path):

@@ -281,7 +281,7 @@ def _resolve_drift(slug: str, base_dir: str, entries: list[str], bare: str,
     selected = cands[0]
     print(f"post-plan: WARNING — no plan at {slug}.md; adopted '{selected}' by slug drift\n"
           f"  branch name and plan filename disagree\n"
-          f"  auto-merge is HELD for this run (condition 11)\n"
+          f"  auto-merge is HELD for this run (condition 13)\n"
           f"  override:   bin/post-plan-now --plan <abs-path>",
           file=sys.stderr)
     info.slug_drift = selected

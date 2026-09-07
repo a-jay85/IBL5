@@ -68,23 +68,20 @@ Then locate the plan backing this branch so later phases can verify the implemen
 ```bash
 # Authoritative when a path was handed to this run (automouse handoff JSON's plan_file, or
 # `bin/post-plan-now --plan <abs-path>`): use that path verbatim and skip the derivation below.
-# Otherwise derive from the branch slug, HIGHEST-NUMBERED variant first — /plan's own loop
-# writes <slug>-2.md, <slug>-3.md when bin/check-plan rejects a draft, and the superseded
-# <slug>.md stays on disk and still passes check-plan. Mirrors harness/planfile.py::_resolve_variant.
+# Otherwise derive from the branch slug via the shared resolver — variant-aware (highest-numbered
+# wins) and drift-aware (a single <prefix>-<slug>.md is adopted when no exact match exists, holding
+# auto-merge via condition (13)). Mirrors bin/lib/plan-resolve.sh (shared with condition (7)/(13)
+# blocks) and harness/planfile.py::_resolve_variant/_resolve_drift.
 SLUG=$(git rev-parse --abbrev-ref HEAD)
-PLAN_FILE=""; BEST=-1
-for f in "$HOME/claude-plans/$SLUG.md" "$HOME/claude-plans/$SLUG"-*.md; do
-    [ -f "$f" ] || continue
-    stem=${f##*/}; stem=${stem%.md}
-    if [ "$stem" = "$SLUG" ]; then v=0
-    else
-        v=${stem#"$SLUG"-}
-        case "$v" in ''|*[!0-9]*) continue ;;   # -shared-context, -1a-trading-pins: not a revision
-        esac
-    fi
-    [ "$v" -gt "$BEST" ] && { BEST=$v; PLAN_FILE=$f; }
-done
-[ "$BEST" -gt 0 ] && echo "PLAN_VARIANT_SELECTED=$PLAN_FILE (highest-numbered; pass --plan <abs-path> to override)"
+PLAN_FILE="${PLAN_FILE:-}"   # honor automouse pre-set; empty triggers slug derivation
+PLAN_SLUG_DRIFT=""
+source "$(git rev-parse --show-toplevel)/bin/lib/plan-resolve.sh"
+resolve_plan_file
+# PLAN_FILE: resolved absolute path, or empty string (plan-blind)
+# PLAN_SLUG_DRIFT: non-empty when a drift match was adopted (condition (13) holds auto-merge)
+if [ -n "$PLAN_FILE" ] && [ -z "$PLAN_SLUG_DRIFT" ] && [ "$(basename "$PLAN_FILE")" != "$SLUG.md" ]; then
+    echo "PLAN_VARIANT_SELECTED=$PLAN_FILE (highest-numbered; pass --plan <abs-path> to override)"
+fi
 if [ -n "$PLAN_FILE" ]; then
     echo "PLAN_FOUND=$PLAN_FILE"
     grep -qiE '^\s*\|.*Test type' "$PLAN_FILE" && echo "HAS_MATRIX=true" || echo "HAS_MATRIX=false"
@@ -164,10 +161,12 @@ If the shipped work implemented or resolved a backlog item, backlog housekeeping
 # phase 2.5 trigger: emits exactly ONE verdict line, BL_TRIGGER=A|B|C|none, as the
 # first line of stdout. Self-contained on purpose — every /post-plan Bash block runs
 # in its own fresh shell, so nothing from Phase 1 is in scope here. $PLAN_FILE is
-# overridable only so bin/test-postplan-arm-conditions can exercise this block (and
-# so an automouse run can pass Phase 1's authoritative handoff path instead of the
-# slug guess).
-PLAN_FILE="${PLAN_FILE:-$HOME/claude-plans/$(git rev-parse --abbrev-ref HEAD).md}"
+# overridable (via the PLAN_FILE env seam in bin/lib/plan-resolve.sh) so
+# bin/test-postplan-arm-conditions can exercise this block and so an automouse run can
+# pass Phase 1's authoritative handoff path (variant-aware and drift-aware) directly.
+source "$(git rev-parse --show-toplevel)/bin/lib/plan-resolve.sh"
+PLAN_SLUG_DRIFT=""
+resolve_plan_file
 CHANGED=$(gh pr diff --name-only 2>/dev/null || true)
 
 # Trigger A — a backlog file is already in the diff. Excludes README.md (no
@@ -372,14 +371,15 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 9. PR-time safety verdict — the realized diff surfaces no reason to hold for a human.
 10. Pipeline-authored floor — the PR does NOT carry the `pipeline-authored` label AND the branch name does not match `^bug-[0-9]+(-|$)`. The branch-name axis is the label-timing guard: `reconcile_pr_open_rows()` in `bin/bug-pipeline-tick` applies the label on a later cron tick than `ship_via_cron()` which arms auto-merge, so at arming time the label may not yet exist. The digit anchor prevents catching human `bug-pipeline-*` branches.
 11. Unresolved scored finding — no unresolved GitHub review thread carries a `<!-- score: N -->` marker with N >= 80. Live-state counterpart to (2), which is run-local.
+13. Plan-slug drift — the plan was located by drift (`<prefix>-<slug>.md`) rather than the exact branch-slug path; adoption is a guess, so auto-merge is held until a human confirms the plan is this branch's plan.
 
 **These conditions only ever HOLD, never RELEASE.** They are an AND-of-not-blocked set: every condition can *add* a block; none can clear another's. Conditions (7)–(9) are **additive brakes on top of** the deterministic floors (1)–(6), the pipeline-authored floor (10), and the independent `human-signoff` required GitHub check — they exist to catch what those miss, never to override them. post-plan **always runs and opens the PR**; these conditions decide only whether auto-merge *arms*. A held PR stays open for a human to merge.
 
-**Conditions (1)/(5)/(6)/(8)/(10)/(11) come from the shared predicate `bin/lib/pr-armable.sh`** — the single source of truth also used by `bin/pr-triage`, so the live-readable arming judgment has **one executable home** and cannot drift between consumers (hand-re-derived divergence is exactly what mis-armed #1163/#1188). The run-only conditions (2)/(3)/(4)/(7)/(9) stay inline below — they read post-plan-run-local state (`/tmp`, the local plan file, the realized diff) that no cross-PR consumer can see, so they cannot move into the shared predicate.
+**Conditions (1)/(5)/(6)/(8)/(10)/(11) come from the shared predicate `bin/lib/pr-armable.sh`** — the single source of truth also used by `bin/pr-triage`, so the live-readable arming judgment has **one executable home** and cannot drift between consumers (hand-re-derived divergence is exactly what mis-armed #1163/#1188). The run-only conditions (2)/(3)/(4)/(7)/(9)/(13) stay inline below — they read post-plan-run-local state (`/tmp`, the local plan file, the realized diff) that no cross-PR consumer can see, so they cannot move into the shared predicate.
 
 **Each condition block is SELF-CONTAINED** — it `source`s the predicate and fetches its own inputs in-block, exactly as condition (7) re-derives `$PLAN_FILE` and the original (6)/(8) ran their own `gh pr view`. **Do not** hoist the `source` or a shared `PR_JSON` into a preamble block: a sourced function or a shell variable does not survive into a separately-executed block (only exported env vars like `$CLAUDE_HEADLESS` do), and a missing `source` would make `pr_feat_hold` a no-op — **failing OPEN, auto-arming a `feat:` PR**. Each block re-`source`ing the lib is idempotent and cheap. Every block extracts gh output with `gh ... --jq` (gh does the decode — no `echo`/`printf` round-trip needed); when a block must round-trip a multi-field `PR_JSON` it uses `printf '%s'` (never `echo`, whose zsh `\n` expansion corrupts jq's parse).
 
-**You MUST Read `.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md` and run each condition's block, in order, BEFORE arming — do not arm without it.** The reference holds the nine per-condition bash blocks (conditions 1, 3, 4, 5, 6, 7, 8, 10, 11 — conditions 2/9 are the Phase-4 score check and the realized-diff hold-enumeration, run against state you already hold), each **self-contained** per the SELF-CONTAINED invariant above (every block re-`source`s the predicate in-block — a hoisted `source` does not survive into a separately-executed block and would fail OPEN). It also holds the per-condition blocker-reporting detail. Phase 6.5 consumes carried state only — the Phase-3 flags `$GOLDEN_CHANGED`/`$HAS_MIGRATION`/`COUNT_*`, the env `$CLAUDE_HEADLESS`/`$PPID`, the Phase-4 finding scores, the Phase-6 manual-testing sentinel, and the Phase-5 status file — never recompute them.
+**You MUST Read `.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md` and run each condition's block, in order, BEFORE arming — do not arm without it.** The reference holds the ten per-condition bash blocks (conditions 1, 3, 4, 5, 6, 7, 8, 10, 11, 13 — conditions 2/9 are the Phase-4 score check and the realized-diff hold-enumeration, run against state you already hold), each **self-contained** per the SELF-CONTAINED invariant above (every block re-`source`s the predicate in-block — a hoisted `source` does not survive into a separately-executed block and would fail OPEN). It also holds the per-condition blocker-reporting detail. Phase 6.5 consumes carried state only — the Phase-3 flags `$GOLDEN_CHANGED`/`$HAS_MIGRATION`/`COUNT_*`, the env `$CLAUDE_HEADLESS`/`$PPID`, the Phase-4 finding scores, the Phase-6 manual-testing sentinel, and the Phase-5 status file — never recompute them.
 
 **Fail-closed default:** if any condition is indeterminate, errors, or you are unsure, treat it as **BLOCKED** and do NOT arm. A false HOLD costs one manual human merge; a false ARM ships unreviewed code — only under-holding is dangerous.
 

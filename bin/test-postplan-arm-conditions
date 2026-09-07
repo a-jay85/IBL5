@@ -7,7 +7,7 @@
 # preservation blocks (L20: a body rewrite that drops `Depends-on:` silently
 # disarms condition (6)).
 # Phase 6.5 conditions call the shared predicate bin/lib/pr-armable.sh
-# (conditions (1) Manual-Testing, (5) golden, (6) Depends-on, (8) feat:, (10) pipeline-authored label OR bug-<id> branch name, (11) unresolved >= 80 findings), plus
+# (conditions (1) Manual-Testing, (5) golden, (6) Depends-on, (8) feat:, (10) pipeline-authored label OR bug-<id> branch name, (11) unresolved >= 80 findings, (13) slug-drift hold), plus
 # condition (3), the Phase-5.0 conformance gate (no predicate; /tmp state only).
 #
 # Why this exists: those blocks live as separate ```bash blocks inside
@@ -111,6 +111,25 @@ run_cond3() {
         fileitems) echo 'MISSING-FILE: bin/check-plan (plan Critical File never appeared in the diff)' > "$bridge" ;;
     esac
     DONE_MARK="$mark" BRIDGE="$bridge" bash -c "$1" 2>&1
+}
+
+# run_cond7 <block> <plan-body|""> — run condition (7) in its own shell.
+# Sets PLAN_FILE to a temp file (if plan-body non-empty) or unsets it (no plan -> no hold).
+run_cond7() {
+    local plan_f="$BASE_TMP/c7-plan.md"
+    rm -f "$plan_f"
+    if [ -n "$2" ]; then
+        printf '%s' "$2" > "$plan_f"
+        PLAN_FILE="$plan_f" bash -c "$1" 2>&1
+    else
+        PLAN_FILE="" bash -c "$1" 2>&1
+    fi
+}
+
+# run_cond13 <block> <slug> <plan-dir> — run condition (13) in its own shell.
+# PLAN_DIR and PLAN_SLUG are the test seams; the block calls resolve_plan_file.
+run_cond13() {
+    PLAN_DIR="$3" PLAN_SLUG="$2" bash -c "$1" 2>&1
 }
 
 expect_block() { # name  BLOCK|NONE  output
@@ -288,6 +307,8 @@ B5="$(extract_block '# condition (5)')"
 B6="$(extract_block '# condition (6)')"
 B8="$(extract_block '# condition (8)')"
 B10="$(extract_block '# condition (10)')"
+B7="$(extract_block '# condition (7)')"
+B13="$(extract_block '# condition (13)')"
 B25="$(extract_block '# phase 2.5 trigger' "$P25_SKILL")"
 BMC="$(extract_block '# phase 6 body-marker capture' "$P25_SKILL")"
 BMV="$(extract_block '# phase 6 body-marker verify'  "$P25_SKILL")"
@@ -299,6 +320,8 @@ assert_self_contained '# condition (6)' "condition (6)"
 assert_self_contained '# condition (8)' "condition (8)"
 assert_self_contained '# condition (10)' "condition (10)"
 assert_self_contained '# condition (11)' "condition (11)"
+assert_block_sources '# condition (7)' "condition (7)" "plan-resolve.sh" "$SKILL"
+assert_block_sources '# condition (13)' "condition (13)" "plan-resolve.sh" "$SKILL"
 
 # The Phase 2.5 failure model: each /post-plan block runs in its own shell, so a
 # block that read Phase 1's $PLAN_FILE without re-deriving it would silently take
@@ -307,9 +330,9 @@ assert_self_contained '# condition (11)' "condition (11)"
 if [ -z "$B25" ]; then
     echo "FAIL: phase 2.5 — no block matching '# phase 2.5 trigger' in $P25_SKILL"
     FAILED=1
-elif printf '%s' "$B25" | grep -q 'PLAN_FILE="${PLAN_FILE:-' \
+elif printf '%s' "$B25" | grep -q 'plan-resolve.sh' \
     && printf '%s' "$B25" | grep -q 'BL_DIR="${BL_DIR:-'; then
-    echo "ok: phase 2.5 block re-derives PLAN_FILE and BL_DIR in-block"
+    echo "ok: phase 2.5 block sources plan-resolve.sh and re-derives BL_DIR in-block"
 else
     echo "FAIL: phase 2.5 block does NOT re-derive PLAN_FILE/BL_DIR in-block (cross-shell state = wrong verdict)"
     FAILED=1
@@ -473,6 +496,55 @@ expect_block "(6) unmerged Depends-on -> BLOCK" BLOCK \
     "$(run_isolated "$B6" '{"body":"x\nDepends-on: #1100"}' '' '')"
 expect_block "(6) merged Depends-on -> NONE" NONE \
     "$(run_isolated "$B6" '{"body":"x\nDepends-on: #1071"}' '' '')"
+
+# condition (7) — plan-time auto_merge: false hold
+c7_auto_merge_false="$(printf '%s\n' '---' 'auto_merge: false' '---' '# Plan')"
+c7_auto_merge_true="$(printf '%s\n' '---' 'auto_merge: true' '---' '# Plan')"
+expect_block "(7) plan auto_merge: false -> BLOCK" BLOCK \
+    "$(run_cond7 "$B7" "$c7_auto_merge_false")"
+expect_block "(7) plan auto_merge: true -> NONE" NONE \
+    "$(run_cond7 "$B7" "$c7_auto_merge_true")"
+expect_block "(7) no plan file -> NONE" NONE \
+    "$(run_cond7 "$B7" "")"
+
+# condition (7) via SLUG DERIVATION — the fail-open the bare-slug derivation had.
+# run_cond7_slug <block> <slug> <plan-dir>: PLAN_FILE empty so the block derives from
+# the slug through resolve_plan_file (variant-aware + drift-aware).
+run_cond7_slug() { PLAN_FILE="" PLAN_DIR="$3" PLAN_SLUG="$2" bash -c "$1" 2>&1; }
+
+c7_dir="$BASE_TMP/c7-plans"; mkdir -p "$c7_dir"
+# A superseded <slug>.md says auto_merge: true; the live <slug>-2.md says false.
+# The old bare-slug derivation read <slug>.md and did NOT hold — that was the bug.
+printf '%s\n' '---' 'auto_merge: true'  '---' '# superseded' > "$c7_dir/myvar.md"
+printf '%s\n' '---' 'auto_merge: false' '---' '# live'       > "$c7_dir/myvar-2.md"
+expect_block "(7) highest variant declares auto_merge: false -> BLOCK" BLOCK \
+    "$(run_cond7_slug "$B7" "myvar" "$c7_dir")"
+# Inverse: superseded says false, live variant says true -> no hold (variant really wins).
+printf '%s\n' '---' 'auto_merge: false' '---' '# superseded' > "$c7_dir/myvar.md"
+printf '%s\n' '---' 'auto_merge: true'  '---' '# live'       > "$c7_dir/myvar-2.md"
+expect_block "(7) highest variant declares auto_merge: true -> NONE" NONE \
+    "$(run_cond7_slug "$B7" "myvar" "$c7_dir")"
+# Drift: no <slug>.md at all, one <prefix>-<slug>.md declaring auto_merge: false.
+rm -f "$c7_dir"/myvar*.md
+printf '%s\n' '---' 'auto_merge: false' '---' '# drifted' > "$c7_dir/plan-myvar.md"
+expect_block "(7) drift-adopted plan declares auto_merge: false -> BLOCK" BLOCK \
+    "$(run_cond7_slug "$B7" "myvar" "$c7_dir")"
+
+# condition (13) — slug-drift hold
+c13_dir="$BASE_TMP/c13-plans"
+mkdir -p "$c13_dir"
+# drift case: no exact slug.md, but plan-<slug>.md exists
+printf '# A plan\n' > "$c13_dir/plan-myfeature.md"
+expect_block "(13) slug drift adopted -> BLOCK" BLOCK \
+    "$(run_cond13 "$B13" "myfeature" "$c13_dir")"
+# exact match: <slug>.md exists -> PLAN_SLUG_DRIFT stays empty -> NONE
+printf '# A plan\n' > "$c13_dir/myfeature.md"
+expect_block "(13) exact slug match -> NONE" NONE \
+    "$(run_cond13 "$B13" "myfeature" "$c13_dir")"
+# no plan at all -> plan-blind -> NONE
+rm -f "$c13_dir/myfeature.md" "$c13_dir/plan-myfeature.md"
+expect_block "(13) plan-blind -> NONE" NONE \
+    "$(run_cond13 "$B13" "myfeature" "$c13_dir")"
 
 # --- predicate exit-status invariant (the truncation bug) -------------------
 # The shim answers OPEN for #1100 and MERGED for every other number, so #1071 is

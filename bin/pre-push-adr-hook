@@ -78,12 +78,15 @@ if [ -n "$CURRENT_BRANCH" ] && [ "$CURRENT_BRANCH" != "master" ]; then
         if [ -n "$RESOLVED" ]; then
             BASE_REF="$RESOLVED"
         else
-            BASE_NAME="${BASE_REF#origin/}"
+            # This branch is reached only when base resolution found nothing, so
+            # BASE_REF is still the origin/master default — the message names it
+            # literally, which is also the discriminator scripts/push.sh matches on
+            # (coupling asserted by bin/test-pr-ready-now).
             cat >&2 <<EOF
 
-pre-push-adr-hook: branch does not contain $BASE_REF.
-Fetch and reconcile before pushing:
-  git fetch origin $BASE_NAME && git merge $BASE_REF
+pre-push-adr-hook: branch does not contain origin/master.
+Fetch and merge before pushing:
+  git fetch origin master && git merge origin/master
   # or update all active worktrees at once: bin/wt-rebase (merges despite its name)
 If this branch is stacked on another PR, record its real base and retry:
   git config branch.$CURRENT_BRANCH.iblBase <parent-branch>

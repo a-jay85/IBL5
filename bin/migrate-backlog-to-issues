@@ -1,0 +1,915 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * bin/migrate-backlog-to-issues — One-shot idempotent migration that reads
+ * every IBL5 backlog source file and creates a GitHub Issue for each item
+ * in a-jay85/IBL5-backlog (or the repo named by BACKLOG_ISSUES_REPO).
+ *
+ * Default mode is dry-run — prints the planned creates, touches nothing.
+ * Pass --apply to perform creation. Safe to re-run: idempotency key is
+ * (area-label, leading-ID-token) so an interrupted run resumes from where
+ * it left off on the next invocation.
+ */
+
+const DEFAULT_REPO = 'a-jay85/IBL5-backlog';
+const BODY_CAP     = 60000;
+const RATE_SLEEP   = 3.5;
+const DEFERRAL_STOP     = 3;
+const LIST_ATTEMPTS     = 4;
+const LIST_RETRY_SLEEP  = 5;
+const BODY_TRUNCATION_SUFFIX = "\n\n> [truncated — see git history of the retired backlog file]";
+
+// ─── source map ───────────────────────────────────────────────────────────────
+// Path literals here are PHP array data — not inside a comment body — and are
+// not scanned by bin/check-docs's dead-reference check.
+function sourcesMap(): array
+{
+    return [
+        // live backlogs ────────────────────────────────────────────────────────
+        'ibl5/docs/backlog/a11y-backlog.md'             => ['labels' => ['a11y'],             'archive' => false, 'table_rows' => false, 'skip_missing' => false],
+        'ibl5/docs/backlog/a11y-contrast-backlog.md'    => ['labels' => ['a11y-contrast'],    'archive' => false, 'table_rows' => false, 'skip_missing' => false],
+        'ibl5/docs/backlog/ci-backlog.md'               => ['labels' => ['ci'],               'archive' => false, 'table_rows' => false, 'skip_missing' => false],
+        'ibl5/docs/backlog/dev-efficiency-backlog.md'   => ['labels' => ['dev-efficiency'],   'archive' => false, 'table_rows' => false, 'skip_missing' => false],
+        'ibl5/docs/backlog/e2e-backlog.md'              => ['labels' => ['e2e'],              'archive' => false, 'table_rows' => false, 'skip_missing' => false],
+        'ibl5/docs/backlog/loop-engineering-backlog.md' => ['labels' => ['loop-engineering'], 'archive' => false, 'table_rows' => false, 'skip_missing' => false],
+        // maintenance-backlog uses per-axis tables; table-row-only items are extracted
+        'ibl5/docs/backlog/maintenance-backlog.md'      => ['labels' => ['maintenance'],      'archive' => false, 'table_rows' => true,  'skip_missing' => false],
+        'ibl5/docs/backlog/token-spend-backlog.md'      => ['labels' => ['token-spend'],      'archive' => false, 'table_rows' => false, 'skip_missing' => false],
+        // standalone items ─────────────────────────────────────────────────────
+        'ibl5/docs/backlog/voting-csrf-single-use-post-redisplay.md' => ['labels' => ['security'],   'archive' => false, 'table_rows' => false, 'skip_missing' => false],
+        'ibl5/docs/backlog/draft-selection-pick-ownership.md'        => ['labels' => ['security'],   'archive' => false, 'table_rows' => false, 'skip_missing' => false, 'whole_file' => true],
+        'ibl5/docs/backlog/retired-flag-backfill-and-ret-propagation.md' => ['labels' => ['maintenance'], 'archive' => false, 'table_rows' => false, 'skip_missing' => false],
+        // gitignored; may be absent on this machine
+        'ibl5/docs/security-backlog.md'                 => ['labels' => ['security'],        'archive' => false, 'table_rows' => false, 'skip_missing' => true],
+        // jsb-native live ──────────────────────────────────────────────────────
+        'engine/docs/backlog/jsb-native-backlog.md'     => ['labels' => ['jsb-native'],      'archive' => false, 'table_rows' => false, 'skip_missing' => false],
+        // archives ─────────────────────────────────────────────────────────────
+        'ibl5/docs/backlog/archive/ci-backlog-archive.md'               => ['labels' => ['ci', 'archived'],               'archive' => true, 'table_rows' => false, 'skip_missing' => false],
+        'ibl5/docs/backlog/archive/dev-efficiency-backlog-archive.md'   => ['labels' => ['dev-efficiency', 'archived'],   'archive' => true, 'table_rows' => false, 'skip_missing' => false],
+        'ibl5/docs/backlog/archive/e2e-backlog-archive.md'              => ['labels' => ['e2e', 'archived'],              'archive' => true, 'table_rows' => false, 'skip_missing' => false],
+        'ibl5/docs/backlog/archive/jsb-native-backlog-archive.md'       => ['labels' => ['jsb-native', 'archived'],       'archive' => true, 'table_rows' => false, 'skip_missing' => false],
+        'ibl5/docs/backlog/archive/loop-engineering-backlog-archive.md' => ['labels' => ['loop-engineering', 'archived'], 'archive' => true, 'table_rows' => false, 'skip_missing' => false],
+        'ibl5/docs/backlog/archive/maintenance-backlog-archive.md'      => ['labels' => ['maintenance', 'archived'],      'archive' => true, 'table_rows' => false, 'skip_missing' => false],
+        'ibl5/docs/backlog/archive/token-spend-backlog-archive.md'      => ['labels' => ['token-spend', 'archived'],      'archive' => true, 'table_rows' => false, 'skip_missing' => false],
+    ];
+}
+
+// ─── help ─────────────────────────────────────────────────────────────────────
+
+function usage(): string
+{
+    return <<<USAGE
+Usage: bin/migrate-backlog-to-issues [options]
+
+One-shot idempotent migration of IBL5 backlog items to GitHub Issues.
+Each backlog item becomes one Issue in the destination repo. The tool
+reads every source file, checks existing Issues for duplicates via an
+idempotency key, and (with --apply) creates only the missing ones.
+
+Default is dry-run — prints the planned creates, touches nothing.
+---
+Options:
+  --apply              Perform creation (default is dry-run).
+  --dry-run            Explicit dry-run (the default; overrides --apply if
+                       both are passed).
+  --limit=N            Process at most N items per run (0 = no limit).
+  --manifest=<path>    After --apply, write a JSON manifest of created Issues
+                       to <path>. Rejected if the path is inside the repo
+                       (exit 2) — runs must not dirty the working tree.
+  --existing-json=<path>
+                       Test seam: inject a pre-baked gh-issue-list JSON
+                       payload instead of calling the network. Dry-run
+                       never shells out to gh regardless.
+  --help, -h           Show this message.
+---
+Environment:
+  BACKLOG_ISSUES_REPO  Override the destination repo slug.
+                       Unset: use default (a-jay85/IBL5-backlog).
+                       Set but empty: exit 2.
+---
+Idempotency key: (area-label, leading-ID-token) — falls back to
+(area-label, normalized-title) when the heading carries no valid ID.
+Label scoping is load-bearing: the same dotted ID (e.g. 1.1, 3.5)
+appears in both ci and maintenance source files.
+---
+Exit codes:
+  0  Success (dry-run or all items created / already present).
+  1  Runtime error (file unreadable, gh error, etc.).
+  2  Usage error (unknown option, bad manifest path, empty env var).
+
+USAGE;
+}
+
+// ─── repo root ─────────────────────────────────────────────────────────────────
+// Lifted from bin/check-docs: handles both real .git dirs and worktree .git files.
+
+function repoRoot(): string
+{
+    $dir = __DIR__;
+    while ($dir !== '/' && !is_dir($dir . '/.git') && !is_file($dir . '/.git')) {
+        $dir = dirname($dir);
+    }
+    if ($dir === '/') {
+        fwrite(STDERR, "error: could not locate repo root\n");
+        exit(1);
+    }
+    return $dir;
+}
+
+// ─── ID validation ─────────────────────────────────────────────────────────────
+// Regex lifted verbatim from bin/backlog-open's is_valid_id() awk function.
+
+function isValidId(string $s): bool
+{
+    return (bool) preg_match('/^[0-9]+\.[0-9]+[a-z]*$/', $s)
+        || (bool) preg_match('/^[A-Za-z]+[0-9]+[a-z]*$/', $s);
+}
+
+// ─── status detection ─────────────────────────────────────────────────────────
+// Ported from bin/backlog-open's cell_status() awk function.
+
+function cellStatus(string $cell): string
+{
+    $t = trim($cell);
+    if (str_starts_with($t, '✅') || str_starts_with($t, '🚫')) {
+        return 'resolved';
+    }
+    if (str_starts_with($t, '⬜') || str_starts_with($t, '◑') || str_starts_with($t, '📋')) {
+        return 'open';
+    }
+    return '';
+}
+
+function sectionStatus(string $bodyText, bool $isArchive): string
+{
+    if ($isArchive) {
+        return 'resolved';
+    }
+    // Look for a **Status...:** line first (most reliable)
+    foreach (explode("\n", $bodyText) as $line) {
+        $trimmed = ltrim($line);
+        if (preg_match('/^\*\*Status[^:]*:\*\*\s*(.+)/u', $trimmed, $m)) {
+            $s = cellStatus($m[1]);
+            if ($s !== '') {
+                return $s;
+            }
+        }
+    }
+    // Fall back: check table cells in the body
+    foreach (explode("\n", $bodyText) as $line) {
+        $trimmed = ltrim($line);
+        if (!str_starts_with($trimmed, '|')) {
+            continue;
+        }
+        $cells = explode('|', $trimmed);
+        foreach ($cells as $cell) {
+            $s = cellStatus($cell);
+            if ($s !== '') {
+                return $s;
+            }
+        }
+    }
+    return 'open'; // absent ⇒ open
+}
+
+// ─── title normalization ───────────────────────────────────────────────────────
+
+function normalizeTitle(string $title): string
+{
+    return strtolower(trim(preg_replace('/\s+/', ' ', $title)));
+}
+
+// ─── section extraction ───────────────────────────────────────────────────────
+// Returns array of ['heading' => string, 'body' => string].
+// Lines inside ``` code fences are skipped so format-description headings
+// (e.g. the "### <short title>" in the maintenance-backlog template block)
+// are never treated as real sections.
+
+function extractSections(string $content): array
+{
+    $lines    = explode("\n", $content);
+    $sections = [];
+    $current  = null;
+    $bodyBuf  = [];
+    $inFence  = false;
+    $fenceRe  = '/^```/';
+
+    foreach ($lines as $line) {
+        if (preg_match($fenceRe, $line)) {
+            $inFence = !$inFence;
+            if ($current !== null) {
+                $bodyBuf[] = $line;
+            }
+            continue;
+        }
+        if (!$inFence && str_starts_with($line, '### ')) {
+            // Save previous section
+            if ($current !== null) {
+                $sections[] = ['heading' => $current, 'body' => implode("\n", $bodyBuf)];
+            }
+            $current = $line;
+            $bodyBuf = [];
+        } else {
+            if ($current !== null) {
+                $bodyBuf[] = $line;
+            }
+        }
+    }
+    if ($current !== null) {
+        $sections[] = ['heading' => $current, 'body' => implode("\n", $bodyBuf)];
+    }
+    return $sections;
+}
+
+// ─── table-row extraction (maintenance-backlog only) ──────────────────────────
+// Returns array of items for rows that carry a valid ID but have no ### section.
+// Each item has: title, body, status, id, idempotency_key.
+
+function extractTableRowItems(string $content, array $sectionIds, array $labels): array
+{
+    $items = [];
+    foreach (explode("\n", $content) as $line) {
+        $trimmed = ltrim($line);
+        if (!str_starts_with($trimmed, '|')) {
+            continue;
+        }
+        $cells = array_map('trim', explode('|', $trimmed));
+        // Remove empty cells produced by leading/trailing pipes
+        $cells = array_values(array_filter($cells, fn($c) => $c !== ''));
+        if (count($cells) < 2) {
+            continue;
+        }
+        $firstCell = $cells[0];
+        if (!isValidId($firstCell)) {
+            continue; // header, separator, or non-ID row
+        }
+        if (in_array($firstCell, $sectionIds, true)) {
+            continue; // already covered by a ### section
+        }
+        // Determine status from any cell
+        $status = 'open';
+        foreach ($cells as $cell) {
+            $s = cellStatus($cell);
+            if ($s !== '') {
+                $status = $s;
+                break;
+            }
+        }
+        // Build title from last non-empty cell (the evidence/note column)
+        $note = end($cells);
+        $noteText = strip_tags($note); // strip any markdown links
+        // Strip markdown bold/italic
+        $noteText = preg_replace('/\*\*([^*]+)\*\*/', '$1', $noteText);
+        $noteText = trim($noteText);
+        if (mb_strlen($noteText) > 100) {
+            $noteText = mb_substr($noteText, 0, 97) . '...';
+        }
+        $title = $firstCell . ' — ' . $noteText;
+        $body  = $line; // the raw table row is the body
+        $primaryLabel = $labels[0];
+        $items[] = [
+            'id'              => $firstCell,
+            'title'           => $title,
+            'body'            => $body,
+            'status'          => $status,
+            'labels'          => $labels,
+            'idempotency_key' => [$primaryLabel, $firstCell],
+        ];
+    }
+    return $items;
+}
+
+// ─── H1 extraction ─────────────────────────────────────────────────────────────
+
+function extractH1(string $content): string
+{
+    foreach (explode("\n", $content) as $line) {
+        if (str_starts_with($line, '# ') && !str_starts_with($line, '## ')) {
+            return trim(substr($line, 2));
+        }
+    }
+    return 'Untitled';
+}
+
+// ─── per-file item extraction ─────────────────────────────────────────────────
+
+/**
+ * @return list<array{id: string|null, title: string, body: string, status: string, labels: list<string>, idempotency_key: array{0: string, 1: string}}>
+ */
+function extractItems(string $filePath, array $source): array
+{
+    $content      = file_get_contents($filePath);
+    $isArchive    = $source['archive'];
+    $labels       = $source['labels'];
+    $primaryLabel = $labels[0];
+    // whole_file sources nest ### as *subsections* of a larger finding rather than
+    // using them as item boundaries, so splitting on ### both fragments one work item
+    // and collides generic sub-headings ("Problem", "Suggested fix") that repeat under
+    // every finding into a single idempotency key — silently dropping every body after
+    // the first. Force tier (c) for those files.
+    $sections     = ($source['whole_file'] ?? false) ? [] : extractSections($content);
+
+    // Tier (c): zero ### headings (or a whole_file source) ⇒ one whole-file Issue
+    if ($sections === []) {
+        $h1     = extractH1($content);
+        $status = sectionStatus($content, $isArchive);
+        return [[
+            'id'              => null,
+            'title'           => $h1,
+            'body'            => $content,
+            'status'          => $status,
+            'labels'          => $labels,
+            'idempotency_key' => [$primaryLabel, normalizeTitle($h1)],
+        ]];
+    }
+
+    $items      = [];
+    $sectionIds = [];
+
+    foreach ($sections as $sec) {
+        $headingLine = $sec['heading'];
+        $bodyText    = $sec['body'];
+        // Strip '### ' prefix
+        $headingText = substr($headingLine, 4);
+        // Split into first token and rest
+        $spacePos = strpos($headingText, ' ');
+        if ($spacePos !== false) {
+            $firstToken = substr($headingText, 0, $spacePos);
+            $rest       = substr($headingText, $spacePos + 1);
+        } else {
+            $firstToken = $headingText;
+            $rest       = '';
+        }
+
+        if (isValidId($firstToken)) {
+            // Tier (a): valid ID in heading
+            $id              = $firstToken;
+            $title           = $id . ' — ' . $rest;
+            $idempotencyKey  = [$primaryLabel, $id];
+            $sectionIds[]    = $id;
+        } else {
+            // Tier (b): no valid ID
+            $id              = null;
+            $title           = $headingText;
+            $idempotencyKey  = [$primaryLabel, normalizeTitle($headingText)];
+        }
+
+        $fullBody = $headingLine . "\n" . $bodyText;
+        $status   = sectionStatus($bodyText, $isArchive);
+
+        $items[] = [
+            'id'              => $id,
+            'title'           => $title,
+            'body'            => $fullBody,
+            'status'          => $status,
+            'labels'          => $labels,
+            'idempotency_key' => $idempotencyKey,
+        ];
+    }
+
+    // Table-row-only items (maintenance-backlog and similar table-status files)
+    if ($source['table_rows']) {
+        $tableItems = extractTableRowItems($content, $sectionIds, $labels);
+        $items      = array_merge($items, $tableItems);
+    }
+
+    assertNoKeyCollisions($filePath, $items);
+
+    return $items;
+}
+
+/**
+ * Two items in the SAME file that produce the same idempotency key are a silent
+ * data-loss bug: the first one creates the Issue and every later one skips onto
+ * it, so its body never reaches GitHub. The created/skipped counters cannot
+ * reveal this, because a collision is indistinguishable from a legitimate
+ * live/archive twin collapse (which is always CROSS-file). Fail loudly instead —
+ * extraction happens before any Issue is created, so aborting here is safe.
+ *
+ * @param list<array{title: string, idempotency_key: array{0: string, 1: string}}> $items
+ */
+function assertNoKeyCollisions(string $filePath, array $items): void
+{
+    $seen       = [];
+    $collisions = [];
+
+    foreach ($items as $item) {
+        $key = serialize($item['idempotency_key']);
+        if (isset($seen[$key])) {
+            $collisions[$key][] = $item['title'];
+            continue;
+        }
+        $seen[$key] = $item['title'];
+    }
+
+    if ($collisions === []) {
+        return;
+    }
+
+    fwrite(STDERR, "ERROR: colliding idempotency keys in {$filePath}\n");
+    foreach ($collisions as $key => $laterTitles) {
+        /** @var array{0: string, 1: string} $parts */
+        $parts = unserialize($key);
+        fwrite(STDERR, "  key ({$parts[0]}, {$parts[1]})\n");
+        fwrite(STDERR, "    first: {$seen[$key]}\n");
+        foreach ($laterTitles as $title) {
+            fwrite(STDERR, "    dropped: {$title}\n");
+        }
+    }
+    fwrite(STDERR, "Every item after the first would be silently skipped onto the first one's\n");
+    fwrite(STDERR, "Issue. Give the headings distinct text, or mark the source 'whole_file'.\n");
+    exit(1);
+}
+
+// ─── body cap ─────────────────────────────────────────────────────────────────
+
+function capBody(string $body): string
+{
+    if (mb_strlen($body) <= BODY_CAP) {
+        return $body;
+    }
+    return mb_substr($body, 0, BODY_CAP) . BODY_TRUNCATION_SUFFIX;
+}
+
+// ─── idempotency map ──────────────────────────────────────────────────────────
+
+/**
+ * Load existing Issues from the repo (or a test-seam JSON file).
+ * Returns a map of serialized idempotency key → issue number.
+ *
+ * The gh call is retried on transient failure. When it still cannot be loaded:
+ * $fatal = true (the startup load, where an unknown map means guaranteed
+ * duplicates) exits 1; $fatal = false (a mid-loop re-read) returns null so the
+ * caller can defer the item to the next idempotent run.
+ *
+ * @return array<string, int>|null
+ */
+function loadExistingIssues(
+    string $repo,
+    ?string $existingJson,
+    bool $fatal = true,
+    ?array &$states = null
+): ?array {
+    $issues = null;
+
+    if ($existingJson !== null) {
+        $raw = file_get_contents($existingJson);
+        if ($raw === false) {
+            fwrite(STDERR, "error: cannot read --existing-json file: {$existingJson}\n");
+            exit(1);
+        }
+        $issues = json_decode($raw, true);
+    } else {
+        // Retry transient network failures. A TLS handshake timeout against
+        // api.github.com killed a 320-item run mid-flight; one blip must not
+        // end a multi-hundred-item migration.
+        $cmd = sprintf(
+            'gh issue list --repo %s --state all --limit 2000 --json number,title,labels,state 2>&1',
+            escapeshellarg($repo)
+        );
+        for ($attempt = 1; $attempt <= LIST_ATTEMPTS; $attempt++) {
+            $raw     = shell_exec($cmd);
+            $decoded = is_string($raw) ? json_decode($raw, true) : null;
+            if (is_array($decoded)) {
+                $issues = $decoded;
+                break;
+            }
+            fwrite(STDERR, sprintf(
+                "warn: gh issue list attempt %d/%d failed: %s\n",
+                $attempt,
+                LIST_ATTEMPTS,
+                is_string($raw) ? trim($raw) : '(no output)'
+            ));
+            if ($attempt < LIST_ATTEMPTS) {
+                sleep(LIST_RETRY_SLEEP * $attempt);
+            }
+        }
+    }
+
+    if (!is_array($issues)) {
+        fwrite(STDERR, "error: could not load existing Issues from {$repo}\n");
+        if ($fatal) {
+            exit(1);
+        }
+
+        return null;
+    }
+
+    $map    = [];
+    $states = [];
+    foreach ($issues as $issue) {
+        $title  = $issue['title'] ?? '';
+        $labels = $issue['labels'] ?? [];
+
+        // Determine area label (first non-'archived' label name)
+        $areaLabel = '';
+        foreach ($labels as $lbl) {
+            $name = $lbl['name'] ?? '';
+            if ($name !== 'archived') {
+                $areaLabel = $name;
+                break;
+            }
+        }
+        if ($areaLabel === '') {
+            continue;
+        }
+
+        // Extract idempotency key
+        $spacePos   = strpos($title, ' ');
+        $firstToken = $spacePos !== false ? substr($title, 0, $spacePos) : $title;
+        if (isValidId($firstToken)) {
+            $key = serialize([$areaLabel, $firstToken]);
+        } else {
+            $key = serialize([$areaLabel, normalizeTitle($title)]);
+        }
+        $map[$key]    = (int) ($issue['number'] ?? 0);
+        $states[$key] = (string) ($issue['state'] ?? '');
+    }
+
+    return $map;
+}
+
+/**
+ * Close an Issue, verifying the result and retrying once. gh prints nothing
+ * useful on success, so treat "already closed" as success too. Returns false
+ * when the Issue is still not closed after the retry, so the caller can report
+ * it rather than leave an archived Issue silently open.
+ */
+function closeIssue(string $repo, int $number): bool
+{
+    $cmd = sprintf('gh issue close --repo %s %d 2>&1', escapeshellarg($repo), $number);
+
+    for ($attempt = 1; $attempt <= 2; $attempt++) {
+        $out = shell_exec($cmd);
+        if (is_string($out)
+            && (str_contains($out, 'Closed issue') || str_contains($out, 'already closed'))
+        ) {
+            return true;
+        }
+        if ($attempt === 1) {
+            sleep(LIST_RETRY_SLEEP);
+        }
+    }
+
+    return false;
+}
+
+// ─── manifest path validation ─────────────────────────────────────────────────
+
+function validateManifestPath(string $path, string $root): string
+{
+    // Resolve the directory — file may not exist yet
+    $dir = dirname($path);
+    if ($dir === '') {
+        $dir = '.';
+    }
+    $resolvedDir = realpath($dir);
+    if ($resolvedDir === false) {
+        fwrite(STDERR, "error: manifest directory does not exist: {$dir}\n");
+        exit(2);
+    }
+    $resolvedPath = $resolvedDir . DIRECTORY_SEPARATOR . basename($path);
+    $resolvedRoot = realpath($root);
+    if ($resolvedRoot === false) {
+        $resolvedRoot = $root;
+    }
+    // Reject if inside the repo
+    if (str_starts_with($resolvedPath, $resolvedRoot . DIRECTORY_SEPARATOR)
+        || $resolvedPath === $resolvedRoot
+    ) {
+        fwrite(STDERR, "error: --manifest path is inside the repo and would dirty the working tree: {$path}\n");
+        fwrite(STDERR, usage());
+        exit(2);
+    }
+    return $resolvedPath;
+}
+
+// ─── issue creation ───────────────────────────────────────────────────────────
+
+/**
+ * Call gh issue create. On success, return the issue number. On any failure —
+ * 403 / rate limit, no output, or an unrecognised envelope — return null; the
+ * caller re-checks the map, retries once, and otherwise defers the item to the
+ * next (idempotent) --apply run. Never fatal: this loop runs unattended.
+ */
+function createIssue(string $repo, string $title, string $body, array $labels, bool $close): ?int
+{
+    // Write body to a temp file to avoid shell quoting issues
+    $tmp = tempnam(sys_get_temp_dir(), 'mbi_');
+    file_put_contents($tmp, $body);
+
+    // Build labels arguments
+    $labelArgs = '';
+    foreach ($labels as $lbl) {
+        $labelArgs .= ' --label ' . escapeshellarg($lbl);
+    }
+
+    $cmd = sprintf(
+        'gh issue create --repo %s --title %s --body-file %s%s 2>&1',
+        escapeshellarg($repo),
+        escapeshellarg($title),
+        escapeshellarg($tmp),
+        $labelArgs
+    );
+
+    $output = shell_exec($cmd);
+    unlink($tmp);
+
+    if ($output === null) {
+        // Treat as a deferral, not a fatal. This runs unattended over ~700
+        // creations; a transient gh/network failure must not kill the loop and
+        // lose the manifest of everything already created. The caller's
+        // null-handling re-reads the map, retries once, and otherwise defers
+        // the item to the next --apply run, which is idempotent.
+        fwrite(STDERR, "warn: gh issue create produced no output — deferring this item\n");
+        return null;
+    }
+
+    // Success detection FIRST. A created-Issue URL is the unambiguous success
+    // signal, and it must be tested before the rate-limit token scan: the URL of
+    // Issue #403 literally contains "403", so scanning for that token first would
+    // misread a successful create as a rate-limit response, re-read the map, and
+    // create a duplicate.
+    if (preg_match('#/issues/(\d+)#', $output, $m)) {
+        $number = (int) $m[1];
+        if ($close) {
+            if (!closeIssue($repo, $number)) {
+                fwrite(STDERR, sprintf(
+                    "warn: could not close #%d — re-run --apply to heal it\n",
+                    $number
+                ));
+            }
+            // A close is a second content-creating request against the same
+            // secondary limit as the create; pace it the same way.
+            usleep((int) (RATE_SLEEP * 1_000_000));
+        }
+
+        return $number;
+    }
+
+    // No URL ⇒ not a success. Rate-limited or 403?
+    if (str_contains($output, '403') || str_contains($output, 'was submitted too quickly')) {
+        return null;
+    }
+
+    // Anything else — a 502, an auth refresh, a malformed envelope — is also a
+    // deferral rather than a fatal, for the same reason as the no-output case
+    // above. Print the payload so the operator can see what happened.
+    fwrite(STDERR, "warn: unexpected gh issue create output — deferring this item: {$output}\n");
+
+    return null;
+}
+
+// ─── option parsing ───────────────────────────────────────────────────────────
+
+$opts = [
+    'apply'         => false,
+    'dry_run'       => false,
+    'limit'         => 0,
+    'manifest'      => null,
+    'existing_json' => null,
+];
+
+foreach (array_slice($argv, 1) as $arg) {
+    if (str_starts_with($arg, '--limit=')) {
+        $val = substr($arg, strlen('--limit='));
+        if (!ctype_digit($val)) {
+            fwrite(STDERR, "error: --limit requires a non-negative integer\n");
+            fwrite(STDERR, usage());
+            exit(2);
+        }
+        $opts['limit'] = (int) $val;
+        continue;
+    }
+    if (str_starts_with($arg, '--manifest=')) {
+        $opts['manifest'] = substr($arg, strlen('--manifest='));
+        continue;
+    }
+    if (str_starts_with($arg, '--existing-json=')) {
+        $opts['existing_json'] = substr($arg, strlen('--existing-json='));
+        continue;
+    }
+    switch ($arg) {
+        case '--apply':
+            $opts['apply'] = true;
+            break;
+        case '--dry-run':
+            $opts['dry_run'] = true;
+            break;
+        case '--help':
+        case '-h':
+            echo usage();
+            exit(0);
+        default:
+            fwrite(STDERR, "unknown option: {$arg}\n");
+            fwrite(STDERR, usage());
+            exit(2);
+    }
+}
+
+// --dry-run overrides --apply
+if ($opts['dry_run']) {
+    $opts['apply'] = false;
+}
+$dryRun = !$opts['apply'];
+
+// ─── env: BACKLOG_ISSUES_REPO ─────────────────────────────────────────────────
+
+$envRepo = getenv('BACKLOG_ISSUES_REPO');
+if ($envRepo === false) {
+    // Unset: use default
+    $repo = DEFAULT_REPO;
+} elseif ($envRepo === '') {
+    // Set but empty: error
+    fwrite(STDERR, "BACKLOG_ISSUES_REPO is set but empty\n");
+    fwrite(STDERR, usage());
+    exit(2);
+} else {
+    $repo = $envRepo;
+}
+
+// ─── repo root and manifest path validation ───────────────────────────────────
+
+$root = repoRoot();
+
+if ($opts['manifest'] !== null) {
+    $manifestPath = validateManifestPath($opts['manifest'], $root);
+} else {
+    $manifestPath = null;
+}
+
+// ─── collect items ────────────────────────────────────────────────────────────
+
+$allItems = [];
+foreach (sourcesMap() as $relPath => $source) {
+    $absPath = $root . '/' . $relPath;
+    if (!file_exists($absPath)) {
+        if ($source['skip_missing']) {
+            // Gracefully skip optional files (e.g. gitignored security-backlog)
+            continue;
+        }
+        fwrite(STDERR, "error: source file not found: {$relPath}\n");
+        exit(1);
+    }
+    $items      = extractItems($absPath, $source);
+    $allItems   = array_merge($allItems, $items);
+}
+
+// Apply --limit
+if ($opts['limit'] > 0) {
+    $allItems = array_slice($allItems, 0, $opts['limit']);
+}
+
+// ─── dry-run: print plan and counts ──────────────────────────────────────────
+
+if ($dryRun) {
+    $byLabel = [];
+    $skipped = 0;
+    foreach ($allItems as $item) {
+        $primaryLabel = $item['idempotency_key'][0];
+        $byLabel[$primaryLabel] = ($byLabel[$primaryLabel] ?? 0) + 1;
+    }
+    ksort($byLabel);
+    $total = count($allItems);
+    echo "Dry run — {$total} item(s) would be created (subject to idempotency check):\n\n";
+    foreach ($byLabel as $label => $count) {
+        printf("  %-30s %d\n", $label, $count);
+    }
+    echo "\nPass --apply to perform creation.\n";
+    exit(0);
+}
+
+// ─── apply: load existing Issues and create ───────────────────────────────────
+
+echo "Loading existing Issues from {$repo}...\n";
+// $fatal defaults to true here, so a null return is unreachable; the ?? keeps
+// the array type honest for static analysis.
+$existingStates = [];
+$existingMap    = loadExistingIssues($repo, $opts['existing_json'], true, $existingStates) ?? [];
+echo sprintf("  %d existing Issue(s) loaded.\n\n", count($existingMap));
+
+$created  = [];
+$skipped  = 0;
+$total    = count($allItems);
+$idx      = 0;
+
+// Once the secondary limit bites it stays in force for a while, so every
+// further item would burn two futile gh calls before deferring. Stop after a
+// short run of consecutive deferrals and let the operator re-run instead.
+$consecutiveDeferrals = 0;
+
+// Closes that failed on an earlier run and were repaired / still need repair.
+$healed        = 0;
+$closeFailures = [];
+
+foreach ($allItems as $item) {
+    $idx++;
+    $key       = serialize($item['idempotency_key']);
+    $labelStr  = implode(', ', $item['labels']);
+
+    if (isset($existingMap[$key])) {
+        $skipped++;
+        $existingNumber = $existingMap[$key];
+        printf("[%d/%d] SKIP  %s (%s) — already #%d\n",
+            $idx, $total, $item['title'], $labelStr, $existingNumber);
+
+        // Heal a close that failed on an earlier run. Creation is idempotent
+        // but a missed close is not self-correcting otherwise: every later run
+        // skips the item and the Issue stays open forever, breaking the
+        // "no archived Issue is open" invariant.
+        if ($item['status'] === 'resolved' && ($existingStates[$key] ?? '') === 'OPEN') {
+            if (closeIssue($repo, $existingNumber)) {
+                $healed++;
+                printf("  Healed: closed #%d (resolved item was left open)\n", $existingNumber);
+                $existingStates[$key] = 'CLOSED';
+            } else {
+                $closeFailures[] = $existingNumber;
+                printf("  WARN: could not close #%d\n", $existingNumber);
+            }
+        }
+        continue;
+    }
+
+    $body = capBody($item['body']);
+    printf("[%d/%d] CREATE %s (%s)%s\n",
+        $idx, $total,
+        $item['title'],
+        $labelStr,
+        $item['status'] === 'resolved' ? ' [will close]' : ''
+    );
+
+    $number = createIssue($repo, $item['title'], $body, $item['labels'], $item['status'] === 'resolved');
+    if ($number === null) {
+        // Rate-limited or a transient failure: re-read map and retry.
+        echo "  Create failed — re-reading existing Issues...\n";
+        $reread = loadExistingIssues($repo, $opts['existing_json'], false, $existingStates);
+        if ($reread === null) {
+            // Cannot confirm whether the item landed. Creating it again risks a
+            // duplicate, so defer it to the next run rather than guess.
+            $consecutiveDeferrals++;
+            echo "  Could not re-read existing Issues — deferring (will be created on next run).\n";
+            if ($consecutiveDeferrals >= DEFERRAL_STOP) {
+                echo "\nStopping: GitHub is not reachable well enough to continue safely.\n"
+                    . "Everything created so far is on GitHub; re-run the same --apply command\n"
+                    . "later to create the remainder (creation is idempotent).\n";
+                break;
+            }
+            continue;
+        }
+        $existingMap = $reread;
+        if (isset($existingMap[$key])) {
+            $skipped++;
+            printf("  Already created as #%d\n", $existingMap[$key]);
+            continue;
+        }
+        // Retry
+        $number = createIssue($repo, $item['title'], $body, $item['labels'], $item['status'] === 'resolved');
+        if ($number === null) {
+            $consecutiveDeferrals++;
+            echo "  Still rate-limited — skipping (will be created on next run).\n";
+            if ($consecutiveDeferrals >= DEFERRAL_STOP) {
+                printf(
+                    "\nStopping: %d consecutive items deferred — the secondary rate limit is\n"
+                    . "still in force. Everything created so far is on GitHub; re-run the same\n"
+                    . "--apply command later to create the remainder (creation is idempotent).\n",
+                    $consecutiveDeferrals
+                );
+                break;
+            }
+            continue;
+        }
+    }
+
+    $consecutiveDeferrals = 0;
+
+    $created[] = ['number' => $number, 'title' => $item['title'], 'labels' => $item['labels']];
+    $existingMap[$key] = $number;
+
+    if ($idx < $total) {
+        usleep((int)(RATE_SLEEP * 1_000_000));
+    }
+}
+
+echo "\n";
+printf("Done: %d created, %d skipped (already present).\n", count($created), $skipped);
+if ($healed > 0) {
+    printf("Healed: %d resolved Issue(s) closed that an earlier run left open.\n", $healed);
+}
+if ($closeFailures !== []) {
+    printf(
+        "WARNING: %d Issue(s) could not be closed: %s — re-run --apply to heal.\n",
+        count($closeFailures),
+        implode(', ', array_map(static fn (int $n): string => '#' . $n, $closeFailures))
+    );
+}
+
+// Write manifest if requested
+if ($manifestPath !== null && $created !== []) {
+    file_put_contents($manifestPath, json_encode($created, JSON_PRETTY_PRINT) . "\n");
+    echo "Manifest written to {$manifestPath}\n";
+}
+
+exit(0);

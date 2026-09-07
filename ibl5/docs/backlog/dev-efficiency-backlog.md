@@ -82,11 +82,13 @@ last_verified: 2026-09-06
 | E54 | PR #2084 Phase 6.5 — rebase silently dropped implementation commit; lost-work proof blind to pre-run loss | ⬜ Open | — | XS |
 | E55 | PR #2129 Phase 6.5 — PR body false E2E claim, omitted grep finding, vacuous VM selector; all fixed this pass | ⬜ Open | — | XS |
 | E56 | PR #2129 Phase 6.5 — SKILL.md size-band gate not updated after deliberate file growth; fixed this pass | ⬜ Open | — | XS |
-| E63 | PR #1900 Phase 6.5 — dead self-references to old path `bin/db-sync-now` (example) in `ibl5/bin/db-sync-now` (4 sites: lines 11, 12, 67, 93); all fixed this pass | ⬜ Open | — | XS |
+| E67 | PR #1900 Phase 6.5 — dead self-references to old path `bin/db-sync-now` (example) in `ibl5/bin/db-sync-now` (4 sites: lines 11, 12, 67, 93); all fixed this pass | ⬜ Open | — | XS |
 | E64 | PR #1900 Phase 6.5 — 5 duplicate `last_verified:` keys in `ibl5/docs/decisions/README.md` frontmatter; collapsed to single key this pass | ⬜ Open | — | XS |
 | E54 | /pr-ready Phase 6.5 remediation — PR #2091: dual-channel transport omission, test pin drift, over-broad scan | ⬜ Open | — | S |
 | E62 | /pr-ready Phase 6.5 remediation — PR #2091: backlog entry structural defect (ID collision, split entry body, orphaned content) | ⬜ Open | — | XS |
 | E63 | PR #2091 Phase 6.5 — plan/code alignment notes (usage sed-range arithmetic, --help indentation, matrix pin drift, body omission); class n/a — all notes | ⬜ Open | — | XS |
+| E57 | `bin/adr-check` red at merge on #2124 and #2119 — new rule docs landed with no ADR and no `no-adr:` marker | ◑ Partial | 🟥 | S |
+| E65 | PR #2144 Phase 6.5 — E57 Status paragraph claimed retroactive `no-adr:` markers were "proposed, not applied" when they had been applied to both PR bodies on 2026-09-05 (PR #2136); fixed this pass | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -992,6 +994,9 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 `artifact destination: this entry, plus retroactive <!-- no-adr: --> markers applied to the bodies of #2124 and #2119`
 
 *(discovered 2026-09-05 while investigating recently merged PRs that carried red CI)*
+
+**Status (2026-09-06):** ◑ Partial — rung 3 built: the `adr` paths-filter gained an explicit skip step, so a filter miss is now stated in the job log and in the Actions step list instead of being indistinguishable from a pass. Rung 2 is decided and recorded (ADR-0120) but **not yet applied**: promoting "Meta checks" to a required status check on `master` is a post-merge operator action against the branch-protection API, and this entry stays ◑ until that call is made and read back. Rung 0 (the two merged PRs' disposition) is closed: the retroactive `no-adr:` markers were applied to both bodies on 2026-09-05 (PR #2136). 🟥 (bootstrap hazard: the PR changes the enforcement mechanism governing its own merge, so `auto_merge: false` and a human merges it).
+
 | 1 | `~/claude-plans/pr-cycle-dirty-rescue.md` row 4.e — greps `_rescue_one()` body for `MERGES\|armed.txt\|ledgered.txt\|pr merge\|_poll_merge\|_arm_and_classify\|POLL_CEILING`; hits five comment lines that document the "rescue is not a merge" invariant | yes | was live at plan-write | not fixed — filed (plan already merged; fix is authoring discipline) |
 | 2 | `~/claude-plans/pr-cycle-dirty-rescue.md` row 6.a — greps `_report_dry_run()` body for `_rescue_one\|_ready_pr\|--go`; hits three comment lines and one operator-facing echo string | yes | was live at plan-write | not fixed — filed |
 
@@ -1048,7 +1053,7 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 
 *(discovered 2026-09-06 during Phase 6 review of #2140)*
 
-### E62 `/pr-ready` merge digest is authored in Phase 6 and published verbatim in Phase 7 — Phase 6.5 remediation between them can falsify it, and nothing re-reads it
+### E66 `/pr-ready` merge digest is authored in Phase 6 and published verbatim in Phase 7 — Phase 6.5 remediation between them can falsify it, and nothing re-reads it
 
 **class:** A **stale descriptive claim published as current**. The five-line merge digest is written by the Phase 6 reviewer from the *pre-remediation* diff, and emitted by the Phase 7 composer **verbatim**. Any Phase 6.5 remediation commit landing between those two phases silently falsifies the digest, and no phase, script, or test re-reads it against the final diff. This is the same failure *ordering* as `.claude/rules/pr-body-negative-claim-recheck.md` (claim written at T → commit at T+1 falsifies it → nothing re-reads), applied to the digest instead of a negative-scope bullet.
 
@@ -1082,14 +1087,14 @@ Note the asymmetry: `_phase7-verdict.md:43` **already** handles this exact stale
 
 `artifact destination: .claude/skills/pr-ready/_phase7-verdict.md — add the digest basis field to the provenance line, NOT to the ### Merge digest block; bin/test-pr-ready-now case 28 — add the freshness assertion`
 
-**relationship to E54:** E54 covers the *underlying event* on the same PR (`rebase-dropped-commit`, and `lostwork.sh` being blind to a pre-run loss). E62 is a distinct class: E54 is about work being lost, E62 is about the **report** of that loss outliving its own correction. Fixing E54 would not fix E62 — any remediation commit, for any reason, falsifies the digest the same way.
+**relationship to E54:** E54 covers the *underlying event* on the same PR (`rebase-dropped-commit`, and `lostwork.sh` being blind to a pre-run loss). E66 is a distinct class: E54 is about work being lost, E66 is about the **report** of that loss outliving its own correction. Fixing E54 would not fix E66 — any remediation commit, for any reason, falsifies the digest the same way.
 
 **exposure measurement (2026-09-06):** the `### Merge digest` block is new (landed via #2106), so the population is small by construction — but the exposure rate within it is total. Of the 20 most recently merged PRs, 4 carry a `/pr-ready` sticky verdict comment (#2141, #2133, #2129, #2126); **all 4 carry both a `### Merge digest` block and evidence that Phase 6.5 remediation commits landed after the Phase 6 review**. That is 4/4 structurally exposed, i.e. every digest published so far describes a diff that was subsequently changed.
 
 Read this as exposure, not as four confirmed-false digests: only #2084 is verified to have been *materially* wrong (it reported the implementation as lost after restoration). The other three may be stale in ways too minor to have been noticed — which is precisely the problem, since nothing checks. The measurement upgrades the landing rung from "one anecdote" to "the ordering fires on every run that remediates", and remediation is the common case, not the exception.
 
 *(discovered 2026-09-06 while reading the merge digest for #2084, which reported the implementation as lost after it had already been restored in-branch)*
-### E63 Dead self-references in relocated script `ibl5/bin/db-sync-now`
+### E67 Dead self-references in relocated script `ibl5/bin/db-sync-now`
 
 **class:** A shell script containing usage text, help output, and user-visible error messages that refer to its own invocation by the old pre-relocation path (`bin/db-sync-now` (example)), when the file now lives at `ibl5/bin/db-sync-now`. Four dead references (help comment lines 11/12, unknown-flag `printf` line 67, `--status` BROKEN echo line 93) were all fixed in PR #1900 Phase 6.5.
 ### E62 /pr-ready Phase 6.5 remediation — PR #2091: dual-channel transport omission, test pin drift, over-broad scan
@@ -1174,3 +1179,22 @@ Read this as exposure, not as four confirmed-false digests: only #2084 is verifi
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-06 during #2091)*
+
+### E65 Stale plan anchor text transcribed into E57 Status paragraph without live-state verification
+
+**class:** Phase 6.5 remediation author transcribed the E57 entry's status from plan anchor text without checking whether the referenced artifact (the retroactive `no-adr:` marker application) had since been completed. The resulting Status paragraph asserted the markers were "proposed, not applied" when PR #2136 (merged 2026-09-05) had already applied them to both PR bodies — self-contradictory within 4 lines of the entry body.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/docs/backlog/dev-efficiency-backlog.md:994` | yes | yes | fixed this pass |
+
+**prevention_ladder:**
+- rung 0 — `pr-body-negative-claim-recheck.md` covers PR body absence claims but not backlog Status paragraphs; no existing gate covers this class.
+- rung 1 — extend `pr-body-negative-claim-recheck.md` to cover Status paragraphs in E-items: whenever a Status paragraph references a prior artifact's disposition, re-read the live artifact before writing.
+- **landing rung:** rung 1 — extend the rule. Same defect class as PR body stale absence assertions; covering backlog Status paragraphs is the natural extension of an existing rule.
+
+`artifact destination: this entry`
+
+*(discovered 2026-09-06 during PR #2144 Phase 6 plan-intent fidelity review)*

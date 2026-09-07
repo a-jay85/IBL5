@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-09-06
+last_verified: 2026-09-07
 ---
 
 # Loop-Engineering Backlog
@@ -93,6 +93,7 @@ last_verified: 2026-09-06
 | L64 | `fixed`+`terminal:true` in Gate-1 reject skips tier-climbing | ⬜ Open | — | XS |
 | L65 | PR #1899 Phase 6.5 — backlog ID collisions from Phase 6.5 self-filing; three new entries collided with pre-existing IDs (L53→L63, L54→L64, E62→E68) | ✅ fixed this pass | — | S |
 | L66 | PR #1899 Phase 6 plan-quality notes N-2/N-3/N-4 — class n/a; out-of-plan diff files (N-2), out-of-plan `timeout` fix (N-3), test-row renumbering consistent (N-4) | 📝 Note | — | XS |
+| L67 | PR #2123 Phase 6.5 — stale hand-written Scope prose after remediation commit; VR matrix path note; row-8 tick vs. prior-run record | ⬜ Open | — | XS |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -1027,3 +1028,27 @@ Landing rung: **rung 2** — a rule doc change; warrants a prose edit to `.claud
 **artifact destination:** n/a — no gate.
 
 **provenance:** (discovered 2026-09-06 during /pr-ready Phase 6 review of #1899, N-2/N-3/N-4)
+### L67 PR #2123 Phase 6.5 — stale Scope prose, VR matrix note, row-8 record note
+
+**class:** a hand-written Scope prose block in a PR body not re-read after a post-review remediation commit changes file count and entry IDs; combined with two matrix notes (class: n/a) that resolve once sibling findings are fixed.
+
+**occurrence table:**
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #2123 body — Scope prose | yes | fixed this pass | fixed this pass |
+| 2 | `.claude/rules/pr-body-negative-claim-recheck.md` scopes to negative-claim lists only | near-miss | yes | not fixed — filed |
+
+**prevention_ladder:**
+- rung 0 — `.claude/rules/pr-body-negative-claim-recheck.md` covers negative-claim list staleness, not general Scope prose; not already covered.
+- rung 1 — extend that rule to cover all hand-written Scope prose after a remediation commit; this is the landing rung.
+- rung 2 — n/a; the rule doc is the mechanism.
+- rungs 3–5 — n/a; the check is prose comprehension, not mechanical.
+Landing: rung 1 — extend `.claude/rules/pr-body-negative-claim-recheck.md` to require re-reading ALL hand-written Scope / diff-stat prose (not just negative-claim lists) after any commit.
+
+**artifact destination:** `.claude/rules/pr-body-negative-claim-recheck.md` (in-repo, present in every worktree's checkout).
+
+**F7 note (class: n/a):** Matrix row 5's declared path `ibl5/tests/e2e/smoke/visual-regression.spec.ts` is absent from the diff. Expected: the plan declares this suite to run against existing baselines; a clean VR run produces no diff by construction. prevention_ladder: no gate warranted — expected-absent path for a run-not-ship matrix row.
+
+**F8 note (class: n/a):** Row 8 tick `[x]` in PR body conflicts with the E62 record (which logged the row as unticked from the prior review). Resolves when E62 is renumbered to E70 and its content reflects the current run. prevention_ladder: no gate warranted — one-off artifact of an ID collision that is fixed in E70.
+
+*(discovered 2026-09-06 during /pr-ready Phase 6 review of #2123)*

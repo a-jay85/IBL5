@@ -222,8 +222,19 @@ test.describe('Trivia-mode hidden modules: non-admin sees notice', () => {
 //
 // These pages don't enforce admin or team-membership in code today; the plan
 // intentionally exercises the "no team" branch to document current behavior.
-// Each page renders module chrome for a no-team user; assertions below were
-// grounded against the running stack. IBL_TEST_USER_REGULAR must be set to run.
+//
+// Trading, FreeAgency negotiate and DepthChartEntry each render a canonical
+// `h1.ibl-title` for a no-team user, so those three assert `.ibl-title` alone
+// — no `.ibl-card__title, h1, h2` fallback — plus an exact `h1.ibl-title`
+// count of 1 and the page's heading text, which is what makes the check
+// non-vacuous. `.first()` is retained on the visibility assertion because
+// DepthChartEntry legitimately emits a second `.ibl-title` (the `h2` "Next
+// Sim" heading); the count assertion is scoped to `h1.ibl-title` for the same
+// reason. Player negotiate is deliberately different: it renders no title for
+// a no-team user and asserts `.ibl-alert--error` instead.
+//
+// Assertions below were grounded against the running stack.
+// IBL_TEST_USER_REGULAR must be set to run.
 // ---------------------------------------------------------------------------
 
 test.describe('GM-only pages: non-admin / no-team behavior', () => {
@@ -238,7 +249,9 @@ test.describe('GM-only pages: non-admin / no-team behavior', () => {
     const response = await page.goto('modules.php?name=Trading');
     expect(response?.status()).toBe(200);
     await assertNoPhpErrors(page, 'on Trading as non-admin');
-    await expect(page.locator('.ibl-title, .ibl-card__title, h1, h2').first(), 'Trading must render module chrome for a no-team user, not a blank page').toBeVisible();
+    await expect(page.locator('.ibl-title').first(), 'Trading must render module chrome for a no-team user, not a blank page').toBeVisible();
+    await expect(page.locator('h1.ibl-title')).toHaveCount(1);
+    await expect(page.locator('h1.ibl-title')).toHaveText('Trading');
   });
 
   test('FreeAgency negotiate renders without PHP errors for a user with no team', async ({
@@ -251,7 +264,9 @@ test.describe('GM-only pages: non-admin / no-team behavior', () => {
     );
     expect(response?.status()).toBe(200);
     await assertNoPhpErrors(page, 'on FreeAgency negotiate as non-admin');
-    await expect(page.locator('.ibl-title, .ibl-card__title, h1, h2').first(), 'FreeAgency negotiate must render module chrome for a no-team user, not a blank page').toBeVisible();
+    await expect(page.locator('.ibl-title').first(), 'FreeAgency negotiate must render module chrome for a no-team user, not a blank page').toBeVisible();
+    await expect(page.locator('h1.ibl-title')).toHaveCount(1);
+    await expect(page.locator('h1.ibl-title')).toHaveText('Free Agency');
   });
 
   test('Player negotiate renders without PHP errors for a user with no team', async ({
@@ -279,7 +294,9 @@ test.describe('GM-only pages: non-admin / no-team behavior', () => {
     const response = await page.goto('modules.php?name=DepthChartEntry');
     expect(response?.status()).toBe(200);
     await assertNoPhpErrors(page, 'on DepthChartEntry as non-admin');
-    await expect(page.locator('.ibl-title, .ibl-card__title, h1, h2').first(), 'DepthChartEntry must render module chrome for a no-team user, not a blank page').toBeVisible();
+    await expect(page.locator('.ibl-title').first(), 'DepthChartEntry must render module chrome for a no-team user, not a blank page').toBeVisible();
+    await expect(page.locator('h1.ibl-title')).toHaveCount(1);
+    await expect(page.locator('h1.ibl-title')).toHaveText('Depth Chart Entry');
   });
 });
 

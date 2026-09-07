@@ -1,7 +1,9 @@
 #!/bin/bash
-# bin/check-composite-contracts — pins two behavior contracts of the shared CI
-# composites that CI itself cannot exercise (the prod SSH + IBLbot Discord path is
-# unreachable from CI, so actionlint proves wiring but not these semantics).
+# bin/check-composite-contracts — pins behavior contracts of the shared CI
+# composites and the promotion workflow that CI itself cannot exercise: the prod
+# SSH + IBLbot Discord path is unreachable from CI (actionlint proves wiring but
+# not these semantics); and actionlint validates expression syntax but not the
+# security-policy properties that guard the unattended fast-forward push path.
 #
 #   setup-ssh:      the host keyscan must keep its `|| true` guard, so a transient
 #                   keyscan failure never aborts a deploy/backup/smoke job.
@@ -10,17 +12,26 @@
 #                   pins the default only; it does NOT verify that no caller passes
 #                   fail-on-delivery: false on an alert path — that intent is not
 #                   mechanizable from the composite alone.)
+#   promote-to-production: eight invariants (P1-P8) that guard the unattended
+#                   fast-forward push path — force-push flags, permissions, PAT
+#                   credential, kill-switch count, walkback setting, fork guard,
+#                   SKIP_CHECKS/job-name sync, and merge-script parity.
 #
-# Conditional by design: each check is SKIPPED (visibly) when its composite file is
-# absent, so this no-ops on a branch without the composites and auto-activates the
-# moment they land. The visible "skipped" line means a path typo can't silently turn
-# the gate into a vacuous pass.
+# Conditional by design: each check is SKIPPED (visibly) when its target file is
+# absent, so this no-ops on a branch without the file and auto-activates the
+# moment it lands. The visible "skipped" line means a path typo can't silently
+# turn the gate into a vacuous pass.
 #
-# Usage: bin/check-composite-contracts [actions-dir]   (default: .github/actions)
+# Usage: bin/check-composite-contracts [actions-dir] [workflows-dir] [merge-script] [promote-script]
+#   defaults: .github/actions, .github/workflows, bin/merge-master-to-prod,
+#             bin/promote-master-to-production
 set -eu
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 ACTIONS="${1:-$ROOT/.github/actions}"
+WORKFLOWS="${2:-$ROOT/.github/workflows}"
+MERGE_SCRIPT="${3:-$ROOT/bin/merge-master-to-prod}"
+PROMOTE_SCRIPT="${4:-$ROOT/bin/promote-master-to-production}"
 
 fail=0
 
@@ -57,5 +68,124 @@ if [ -f "$nd_file" ]; then
 else
   echo "composite-contracts: notify-discord absent — skipped"
 fi
+
+pp_file="$WORKFLOWS/promote-to-production.yml"
+if [ ! -f "$pp_file" ]; then
+  echo "composite-contracts: promote-to-production absent — skipped"
+else
+
+  # P1: No force-push flags or +-prefixed refspec targeting production. A force
+  # push would overwrite a diverged production unattended; the lost commits are
+  # unrecoverable and nothing is red.
+  _p1_bad=0
+  if grep -qE -- '--force|force-with-lease|\+[^[:space:]]*production' "$pp_file" 2>/dev/null; then
+    _p1_bad=1
+  fi
+  if [ -f "$PROMOTE_SCRIPT" ] && grep -qE -- '--force|force-with-lease|\+[^[:space:]]*production' "$PROMOTE_SCRIPT" 2>/dev/null; then
+    _p1_bad=1
+  fi
+  if [ "$_p1_bad" -eq 1 ]; then
+    echo "composite-contracts: promote-to-production (P1) — force-push flag or +-prefixed refspec found; a diverged production would be overwritten unattended and the lost commits are unrecoverable ($pp_file or $PROMOTE_SCRIPT)" >&2
+    fail=1
+  else
+    echo "composite-contracts: promote-to-production no force-push flags or +-refspec (P1)"
+  fi
+
+  # P2: permissions must contain 'contents: read' and must NOT contain
+  # 'contents: write'. Withholding write means a regression to GITHUB_TOKEN
+  # fails loudly; a GITHUB_TOKEN push updates the ref but starts no Build and
+  # Deploy, marking the site shipped while nothing shipped.
+  if ! grep -q 'contents: read' "$pp_file"; then
+    echo "composite-contracts: promote-to-production (P2) — 'contents: read' is absent; without it a regression to GITHUB_TOKEN would push production silently starting no Build and Deploy ($pp_file)" >&2
+    fail=1
+  elif grep -v '^\s*#' "$pp_file" | grep -q 'contents: write'; then
+    echo "composite-contracts: promote-to-production (P2) — 'contents: write' is present; this restores the GITHUB_TOKEN push path which updates the ref but starts no Build and Deploy ($pp_file)" >&2
+    fail=1
+  else
+    echo "composite-contracts: promote-to-production permissions: contents: read only (P2)"
+  fi
+
+  # P3: must use secrets.CI_PAT and must not fall back to GITHUB_TOKEN or
+  # github.token. A GITHUB_TOKEN push does not start downstream workflows —
+  # the ref says shipped while the site is unchanged.
+  if ! grep -q 'secrets\.CI_PAT' "$pp_file"; then
+    echo "composite-contracts: promote-to-production (P3) — secrets.CI_PAT absent; a GITHUB_TOKEN push would update the ref but start no Build and Deploy, marking the site deployed while nothing deployed ($pp_file)" >&2
+    fail=1
+  elif grep -qE 'secrets\.GITHUB_TOKEN|github\.token' "$pp_file"; then
+    echo "composite-contracts: promote-to-production (P3) — secrets.GITHUB_TOKEN or github.token present; this credential cannot trigger Build and Deploy, causing a silent no-deploy ($pp_file)" >&2
+    fail=1
+  else
+    echo "composite-contracts: promote-to-production uses secrets.CI_PAT only (P3)"
+  fi
+
+  # P4: kill switch — vars.AUTO_PROMOTE_PAUSED != '1' must appear exactly once
+  # and vars.AUTO_PROMOTE_PAUSED == '1' must appear exactly once. The operator
+  # will reach for this in an emergency; a duplicated or missing clause makes it
+  # silently inert.
+  ne1_count="$(grep -c "vars\.AUTO_PROMOTE_PAUSED != '1'" "$pp_file" || true)"
+  eq1_count="$(grep -c "vars\.AUTO_PROMOTE_PAUSED == '1'" "$pp_file" || true)"
+  if [ "$ne1_count" -eq 1 ] && [ "$eq1_count" -eq 1 ]; then
+    echo "composite-contracts: promote-to-production kill-switch clauses each appear exactly once (P4)"
+  else
+    echo "composite-contracts: promote-to-production (P4) — kill-switch clause counts: != '1' appears ${ne1_count}x, == '1' appears ${eq1_count}x (each must be exactly 1); the kill switch may be silently inert ($pp_file)" >&2
+    fail=1
+  fi
+
+  # P5: MAX_WALKBACK must be '0'. Any other value allows bin/check-master-ci-green
+  # to fall back to an ancestor's checks, which would deploy a SHA nobody verified.
+  if grep -q "MAX_WALKBACK: '0'" "$pp_file"; then
+    echo "composite-contracts: promote-to-production MAX_WALKBACK: '0' (P5)"
+  else
+    echo "composite-contracts: promote-to-production (P5) — MAX_WALKBACK: '0' absent; a nonzero value falls back to an ancestor's checks and promotes a SHA nobody verified ($pp_file)" >&2
+    fail=1
+  fi
+
+  # P6: fork-PR guard. Both head_repository.full_name == github.repository and
+  # workflow_run.event == 'push' must each appear exactly twice (once per job).
+  # Without both guards on every job, a fork whose head branch is literally named
+  # 'master' could trigger an unintended promotion.
+  repo_count="$(grep -c 'head_repository\.full_name == github\.repository' "$pp_file" || true)"
+  event_count="$(grep -c "workflow_run\.event == 'push'" "$pp_file" || true)"
+  if [ "$repo_count" -eq 2 ] && [ "$event_count" -eq 2 ]; then
+    echo "composite-contracts: promote-to-production fork guard present in both jobs (P6)"
+  else
+    echo "composite-contracts: promote-to-production (P6) — fork guard incomplete: head_repository.full_name == github.repository appears ${repo_count}x (want 2), workflow_run.event == 'push' appears ${event_count}x (want 2); removing either from one job reopens the fork-PR hole ($pp_file)" >&2
+    fail=1
+  fi
+
+  # P7: SKIP_CHECKS must equal the set of job name: values, and no job name may
+  # contain a comma (SKIP_CHECKS is comma-delimited). Drift causes the promoter's
+  # own in-progress check-runs to reappear in its own green check — it self-deadlocks
+  # and silently stops promoting.
+  job_names="$(sed -n 's/^    name: *//p' "$pp_file" | sed 's/[[:space:]]*$//' | sort)"
+  skip_raw="$(sed -n 's/^ *SKIP_CHECKS: *//p' "$pp_file" | head -1 | tr -d "\"'")"
+  skip_names="$(printf '%s' "$skip_raw" | tr ',' '\n' | sed 's/^ *//; s/ *$//' | grep -v '^$' | sort)"
+  if printf '%s' "$job_names" | grep -q ','; then
+    echo "composite-contracts: promote-to-production (P7) — a job name contains a comma; SKIP_CHECKS is comma-delimited so this corrupts the split and the promoter self-deadlocks ($pp_file)" >&2
+    fail=1
+  elif [ "$job_names" = "$skip_names" ]; then
+    echo "composite-contracts: promote-to-production SKIP_CHECKS matches its job names (P7)"
+  else
+    echo "composite-contracts: promote-to-production (P7) — SKIP_CHECKS does not match job names; the workflow's own check-runs land on the SHA it evaluates, so any drift makes it self-deadlock and silently stop promoting ($pp_file)" >&2
+    fail=1
+  fi
+
+  # P8: MERGE_SCRIPT (when present) must carry the identical SKIP_CHECKS list,
+  # or bin/merge-master-to-prod fails its CI-green gate on the promoter's own
+  # cancelled check-runs.
+  if [ ! -f "$MERGE_SCRIPT" ]; then
+    echo "composite-contracts: promote-to-production MERGE_SCRIPT absent — P8 skipped ($MERGE_SCRIPT)"
+  else
+    merge_skip_raw="$(sed -n 's/^ *SKIP_CHECKS=//p' "$MERGE_SCRIPT" | head -1 | tr -d "\"'" | sed 's/[[:space:]]*\\[[:space:]]*$//')"
+    merge_skip_names="$(printf '%s' "$merge_skip_raw" | tr ',' '\n' | sed 's/^ *//; s/ *$//' | grep -v '^$' | sort)"
+    if [ "$merge_skip_names" = "$skip_names" ]; then
+      echo "composite-contracts: promote-to-production merge script SKIP_CHECKS matches workflow (P8)"
+    else
+      echo "composite-contracts: promote-to-production (P8) — merge script SKIP_CHECKS does not match workflow SKIP_CHECKS; bin/merge-master-to-prod will fail its CI-green gate on the promoter's own cancelled check-runs ($MERGE_SCRIPT)" >&2
+      fail=1
+    fi
+  fi
+
+fi  # end pp_file present
 
 exit "$fail"

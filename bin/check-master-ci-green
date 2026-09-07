@@ -9,6 +9,10 @@ set -euo pipefail
 
 MIN_REQUIRED_CHECKS="${MIN_REQUIRED_CHECKS:-1}"
 GH_API_CMD="${GH_API_CMD:-gh api}"
+# Comma-separated EXACT check-run names to ignore. Empty by default: this gate
+# stays policy-free, and every caller that needs a skip states it explicitly
+# (bin/merge-master-to-prod below, .github/workflows/promote-to-production.yml).
+SKIP_CHECKS="${SKIP_CHECKS:-}"
 
 usage() {
     cat <<'EOF'
@@ -31,11 +35,16 @@ Environment:
                         check-runs (default: 10). Handles path-filtered
                         commits (e.g. Dependabot bumps outside workflow
                         path globs).
+  SKIP_CHECKS           Comma-separated EXACT check-run names to ignore
+                        (default: none). Matching is exact — a name that
+                        merely contains a listed name is NOT skipped.
+                        Applied BEFORE the MIN_REQUIRED_CHECKS floor, so
+                        skipping everything fails rather than passing.
+                        Matched names are echoed to stdout.
 
 Trade-off: uses an "all-must-pass" model rather than a hardcoded check-name
 list. A new optional check that lands red will block. Use --skip-ci-check
-as the escape hatch. A future SKIP_CHECKS env var (comma-separated names
-to ignore) may be added but is out of scope for v1.
+as the escape hatch, or SKIP_CHECKS for a named, logged exclusion.
 
 Limitation: fetches one page of check-runs (100 results). IBL5's combined
 workflow count is well under 50, so a single page suffices. Results are
@@ -103,11 +112,27 @@ JSON="$(bash -c "$GH_API_CMD \"repos/$REPO/commits/$SHA/check-runs?per_page=100\
     exit 2
 }
 
-# Keep only the most recent run per check name (re-runs supersede earlier failures)
-JSON="$(echo "$JSON" | jq '{
-  total_count: ([.check_runs | group_by(.name) | .[] | sort_by(.completed_at // .started_at) | last] | length),
-  check_runs: [.check_runs | group_by(.name) | .[] | sort_by(.completed_at // .started_at) | last]
-}')"
+# Exact-name skip list as a JSON array. "" -> [""] -> [] after the length filter,
+# so an unset SKIP_CHECKS is byte-for-byte a no-op.
+SKIP_JSON="$(printf '%s\n' "$SKIP_CHECKS" \
+  | jq -R 'split(",") | map(sub("^ +";"") | sub(" +$";"")) | map(select(length > 0))')"
+
+# Drop skipped names, then keep only the most recent run per check name
+# (re-runs supersede earlier failures). $skip is a jq variable, not shell.
+# shellcheck disable=SC2016
+DEDUPE_JQ='
+  [ .check_runs[] | select(.name | IN($skip[]) | not) ]
+  | group_by(.name) | map(sort_by(.completed_at // .started_at) | last)
+  | { total_count: length, check_runs: . }
+'
+
+if [ "$(printf '%s\n' "$SKIP_JSON" | jq 'length')" -gt 0 ]; then
+    MATCHED="$(echo "$JSON" | jq -r --argjson skip "$SKIP_JSON" \
+      '[.check_runs[].name] | unique | map(select(IN($skip[]))) | join(", ")')"
+    echo "SKIP_CHECKS active — ignoring: ${MATCHED:-<none matched>}"
+fi
+
+JSON="$(echo "$JSON" | jq --argjson skip "$SKIP_JSON" "$DEDUPE_JQ")"
 
 TOTAL="$(echo "$JSON" | jq '.check_runs | length')"
 
@@ -116,10 +141,7 @@ if [ "$TOTAL" -eq 0 ]; then
     FOUND=0
     for ANCESTOR_SHA in $(git log --format=%H "$SHA" --skip=1 --max-count="$MAX_WALKBACK"); do
         ANCESTOR_JSON="$(bash -c "$GH_API_CMD \"repos/$REPO/commits/$ANCESTOR_SHA/check-runs?per_page=100\"" 2>/dev/null)" || continue
-        ANCESTOR_JSON="$(echo "$ANCESTOR_JSON" | jq '{
-          total_count: ([.check_runs | group_by(.name) | .[] | sort_by(.completed_at // .started_at) | last] | length),
-          check_runs: [.check_runs | group_by(.name) | .[] | sort_by(.completed_at // .started_at) | last]
-        }')"
+        ANCESTOR_JSON="$(echo "$ANCESTOR_JSON" | jq --argjson skip "$SKIP_JSON" "$DEDUPE_JQ")"
         ANCESTOR_TOTAL="$(echo "$ANCESTOR_JSON" | jq '.check_runs | length')"
         if [ "$ANCESTOR_TOTAL" -ge "$MIN_REQUIRED_CHECKS" ]; then
             echo "HEAD ${SHA:0:11} has no check-runs (path-filtered). Falling back to ancestor ${ANCESTOR_SHA:0:11} ($ANCESTOR_TOTAL run(s))."

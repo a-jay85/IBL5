@@ -24,6 +24,10 @@ fresh_actions() {
   mktemp -d "$TMP/actions.XXXXXX"
 }
 
+fresh_workflows() {
+  mktemp -d "$TMP/workflows.XXXXXX"
+}
+
 put_ssh() { # dir, guarded(1|0)
   mkdir -p "$1/setup-ssh"
   # $PORT/$HOST are intentionally literal in the fixture YAML, not shell-expanded.
@@ -57,6 +61,101 @@ put_nd() {
     echo '    description: port'
     echo '    required: true'
   } > "$f"
+}
+
+# put_promote <dir> <variant>
+# Writes a minimal but structurally faithful promote-to-production.yml to <dir>.
+# The base ("good") satisfies all P1-P8 invariants; each variant mutates exactly
+# one invariant so a failure names its own cause.
+# ${{ secrets.CI_PAT }} and "$SHA:..." are intentionally literal YAML, not expanded.
+put_promote() {
+  mkdir -p "$1"
+  local f="$1/promote-to-production.yml"
+  local tmp
+  # shellcheck disable=SC2016
+  cat > "$f" << 'PPEOF'
+permissions:
+  contents: read
+jobs:
+  promote:
+    name: Promote master to production
+    if: >-
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.event == 'push' &&
+      vars.AUTO_PROMOTE_PAUSED != '1'
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.CI_PAT }}
+      - name: Promote if green
+        env:
+          MAX_WALKBACK: '0'
+          SKIP_CHECKS: Promote master to production,Auto-promotion paused
+        run: |
+          git push origin "$SHA:refs/heads/production"
+  paused:
+    name: Auto-promotion paused
+    if: >-
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.event == 'push' &&
+      vars.AUTO_PROMOTE_PAUSED == '1'
+PPEOF
+  case "${2:-good}" in
+    good) ;;
+    p1-force-flag-workflow)
+      tmp="$(mktemp)"
+      sed 's/git push origin /git push --force origin /' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    p1-force-lease)
+      tmp="$(mktemp)"
+      sed 's/git push origin /git push --force-with-lease origin /' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    p1-plus-refspec)
+      tmp="$(mktemp)"
+      sed 's/git push origin /git push origin +/' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    p2-contents-write)
+      tmp="$(mktemp)"
+      sed 's/contents: read/contents: write/' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    p2-no-contents-read)
+      tmp="$(mktemp)"
+      sed 's/contents: read/checks: read/' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    p3-github-token)
+      tmp="$(mktemp)"
+      sed 's/secrets\.CI_PAT/secrets.GITHUB_TOKEN/g' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    p3-github-token-ref)
+      tmp="$(mktemp)"
+      sed 's/secrets\.CI_PAT/github.token/g' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    p4-killswitch-missing)
+      tmp="$(mktemp)"
+      sed "s/vars\.AUTO_PROMOTE_PAUSED != '1'/vars.SOMETHING_ELSE != '1'/g" "$f" | \
+        sed "s/vars\.AUTO_PROMOTE_PAUSED == '1'/vars.SOMETHING_ELSE == '1'/g" > "$tmp" && mv "$tmp" "$f" ;;
+    p4-killswitch-duplicated)
+      # Append extra != '1' line so grep -c returns 2; structurally invalid YAML is intentional
+      printf "      vars.AUTO_PROMOTE_PAUSED != '1'\n" >> "$f" ;;
+    p5-walkback-nonzero)
+      tmp="$(mktemp)"
+      sed "s/MAX_WALKBACK: '0'/MAX_WALKBACK: '10'/" "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    p6-no-repo-check)
+      tmp="$(mktemp)"
+      sed '/head_repository\.full_name == github\.repository/d' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    p6-no-event-check)
+      tmp="$(mktemp)"
+      sed "/workflow_run\.event == 'push'/d" "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    p7-job-rename)
+      # Replace only the 4-space-indented job name line, not the SKIP_CHECKS value
+      tmp="$(mktemp)"
+      sed 's/^    name: Promote master to production$/    name: Promote master to prod/' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    p7-comma-in-name)
+      tmp="$(mktemp)"
+      sed 's/^    name: Promote master to production$/    name: Promote master, then notify/' "$f" > "$tmp" && mv "$tmp" "$f" ;;
+    *)
+      echo "put_promote: unknown variant '${2:-}'" >&2; return 1 ;;
+  esac
+}
+
+# put_merge <file> <skip-list>
+# Writes a minimal merge-script stub whose SKIP_CHECKS matches <skip-list>.
+put_merge() {
+  # shellcheck disable=SC2016
+  printf 'SKIP_CHECKS="%s" \\\n    bin/check-master-ci-green "$SHA"\n' "$2" > "$1"
 }
 
 expect() { # name want got
@@ -103,6 +202,116 @@ d="$(fresh_actions)"; put_nd "$d" true lead
 # --- same shape but fail-on-delivery=false with a leading true default → fail ---
 d="$(fresh_actions)"; put_nd "$d" false lead
 "$CHECK" "$d" >/dev/null 2>&1; expect "nd-reads-correct-block-false" 1 $?
+
+# ---------------------------------------------------------------------------
+# promote-to-production invariants (P1-P8) — 18 cases
+# ---------------------------------------------------------------------------
+
+# Permanent fixtures reused across promote-to-production cases
+CLEAN_PROMOTE="$TMP/promote-clean"
+printf '#!/bin/bash\ngit push origin production\n' > "$CLEAN_PROMOTE"
+chmod +x "$CLEAN_PROMOTE"
+FORCE_PROMOTE="$TMP/promote-force"
+printf '#!/bin/bash\ngit push --force origin production\n' > "$FORCE_PROMOTE"
+chmod +x "$FORCE_PROMOTE"
+CLEAN_MERGE="$TMP/merge-clean"
+put_merge "$CLEAN_MERGE" "Promote master to production,Auto-promotion paused"
+
+# pp-good: all invariants satisfied → exit 0
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" good
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
+expect "pp-good" 0 $?
+
+# pp-p1-force-flag-promote-script: --force in promote script, good workflow → exit 1 (P1)
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" good
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$FORCE_PROMOTE" >/dev/null 2>&1
+expect "pp-p1-force-flag-promote-script" 1 $?
+
+# pp-p1-force-flag-workflow: --force in workflow push line → exit 1 (P1)
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" p1-force-flag-workflow
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
+expect "pp-p1-force-flag-workflow" 1 $?
+
+# pp-p1-force-lease: --force-with-lease in workflow → exit 1 (P1)
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" p1-force-lease
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
+expect "pp-p1-force-lease" 1 $?
+
+# pp-p1-plus-refspec: +-prefixed refspec in workflow → exit 1 (P1)
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" p1-plus-refspec
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
+expect "pp-p1-plus-refspec" 1 $?
+
+# pp-p2-contents-write: permissions: contents: write → exit 1 (P2)
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" p2-contents-write
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
+expect "pp-p2-contents-write" 1 $?
+
+# pp-p2-no-contents-read: no contents: read line → exit 1 (P2)
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" p2-no-contents-read
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
+expect "pp-p2-no-contents-read" 1 $?
+
+# pp-p3-github-token: secrets.GITHUB_TOKEN instead of CI_PAT → exit 1 (P3)
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" p3-github-token
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
+expect "pp-p3-github-token" 1 $?
+
+# pp-p3-github-token-ref: github.token instead of CI_PAT → exit 1 (P3)
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" p3-github-token-ref
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
+expect "pp-p3-github-token-ref" 1 $?
+
+# pp-p4-killswitch-missing: no AUTO_PROMOTE_PAUSED clauses → exit 1 (P4)
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" p4-killswitch-missing
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
+expect "pp-p4-killswitch-missing" 1 $?
+
+# pp-p4-killswitch-duplicated: two != '1' clauses → exit 1 (P4)
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" p4-killswitch-duplicated
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
+expect "pp-p4-killswitch-duplicated" 1 $?
+
+# pp-p5-walkback-nonzero: MAX_WALKBACK: '10' → exit 1 (P5)
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" p5-walkback-nonzero
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
+expect "pp-p5-walkback-nonzero" 1 $?
+
+# pp-p6-no-repo-check: head_repository.full_name guard deleted → exit 1 (P6)
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" p6-no-repo-check
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
+expect "pp-p6-no-repo-check" 1 $?
+
+# pp-p6-no-event-check: workflow_run.event == 'push' guard deleted → exit 1 (P6)
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" p6-no-event-check
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
+expect "pp-p6-no-event-check" 1 $?
+
+# pp-p7-job-rename: job renamed but SKIP_CHECKS unchanged → exit 1 (P7)
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" p7-job-rename
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
+expect "pp-p7-job-rename" 1 $?
+
+# pp-p7-comma-in-name: job name contains a comma → exit 1 (P7)
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" p7-comma-in-name
+"$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" >/dev/null 2>&1
+expect "pp-p7-comma-in-name" 1 $?
+
+# pp-p8-merge-script-mismatch: merge script has different SKIP_CHECKS → exit 1 (P8)
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" good
+merge_bad="$TMP/merge-bad"; put_merge "$merge_bad" "Only One Job"
+"$CHECK" "$d_a" "$d_wf" "$merge_bad" "$CLEAN_PROMOTE" >/dev/null 2>&1
+expect "pp-p8-merge-script-mismatch" 1 $?
+
+# pp-merge-script-absent: absent merge script → exit 0 with visible P8 skip line
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" good
+out="$("$CHECK" "$d_a" "$d_wf" "$TMP/no-such-merge" "$CLEAN_PROMOTE" 2>&1)"; rc=$?
+expect "pp-merge-script-absent" 0 "$rc"
+if printf '%s' "$out" | grep -q 'P8 skipped'; then
+  echo "ok: pp-merge-script-absent-skip-visible"
+else
+  echo "FAIL: pp-merge-script-absent — no visible P8 skipped line; output: $out"; FAILED=1
+fi
 
 if [ "$FAILED" -ne 0 ]; then
   echo "RESULT: FAILED"

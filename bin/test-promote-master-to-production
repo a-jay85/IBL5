@@ -1,0 +1,401 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-promote-master-to-production — regression test for the auto-promotion
+# primitives. Two parts, no network, nothing real touched:
+#
+#   Part A  bin/check-master-ci-green's SKIP_CHECKS filter, driven by GH_API_CMD
+#           JSON fixtures. Proves exact-name matching and — critically — that
+#           skipping every check FAILS rather than passing vacuously.
+#   Part B  bin/promote-master-to-production against a real local bare repo used
+#           as `origin`. Proves the fast-forward-only property by making the
+#           remote DIVERGE and asserting the ref is untouched afterwards.
+#
+# Run: bin/test-promote-master-to-production  (exit 0 = all pass, 1 = a case failed)
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+GREEN="$SCRIPT_DIR/check-master-ci-green"
+PROMOTE="$SCRIPT_DIR/promote-master-to-production"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+FAILED=0
+
+# --- helpers ---
+
+expect() { # label want got
+  if [ "$2" -eq "$3" ]; then echo "ok   $1"
+  else echo "FAIL $1 (want exit $2, got $3)"; FAILED=1; fi
+}
+expect_out() { # label needle haystack
+  case "$3" in *"$2"*) echo "ok   $1" ;;
+  *) echo "FAIL $1 (missing: $2)"; FAILED=1 ;; esac
+}
+refuse_out() { # label needle haystack — needle must be ABSENT
+  case "$3" in *"$2"*) echo "FAIL $1 (unexpectedly present: $2)"; FAILED=1 ;;
+  *) echo "ok   $1" ;; esac
+}
+
+# stub gh: auth succeeds, everything else fails (exit 1 → loud error rather than
+# a silent network call, so a case that reaches the real gh is immediately visible)
+STUBBIN="$TMP/stubbin"
+mkdir -p "$STUBBIN"
+cat > "$STUBBIN/gh" << 'STUBEOF'
+#!/bin/sh
+case "$1" in auth) exit 0 ;; *) exit 1 ;; esac
+STUBEOF
+chmod +x "$STUBBIN/gh"
+export PATH="$STUBBIN:$PATH"
+
+# mkfixture <file> <name:status:conclusion> ...
+# status=in_progress → conclusion=null, completed_at=null
+mkfixture() {
+  local f="$1"; shift
+  local runs="" first=1 spec name status conclusion
+  for spec; do
+    name="${spec%%:*}"; spec="${spec#*:}"
+    status="${spec%%:*}"; conclusion="${spec#*:}"
+    if [ "$first" -eq 0 ]; then runs="$runs,"; fi
+    first=0
+    if [ "$status" = "in_progress" ]; then
+      runs="${runs}{\"name\":\"${name}\",\"status\":\"in_progress\",\"conclusion\":null,\"completed_at\":null,\"started_at\":\"2026-08-20T09:00:00Z\"}"
+    else
+      runs="${runs}{\"name\":\"${name}\",\"status\":\"completed\",\"conclusion\":\"${conclusion}\",\"completed_at\":\"2026-08-20T10:00:00Z\",\"started_at\":\"2026-08-20T09:00:00Z\"}"
+    fi
+  done
+  printf '{"check_runs":[%s]}\n' "$runs" > "$f"
+}
+
+# ============================================================
+# Part A — SKIP_CHECKS filter (bin/check-master-ci-green)
+# ============================================================
+
+DSHA="deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+
+# 1. skip-unset-is-inert — 2 green + 1 in_progress promote job, no SKIP_CHECKS
+mkfixture "$TMP/A-base.json" \
+  "Tests and Analysis:completed:success" \
+  "gitleaks:completed:success" \
+  "Promote master to production:in_progress:null"
+out="$(MIN_REQUIRED_CHECKS=2 MAX_WALKBACK=0 GH_API_CMD="cat $TMP/A-base.json #" \
+  "$GREEN" "$DSHA" 2>&1)"; rc=$?
+expect     "skip-unset-is-inert"     1 "$rc"
+expect_out "skip-unset-is-inert-msg" "checks still running" "$out"
+
+# 2. skip-clears-self-deadlock — same fixture, skip the promote job
+out="$(SKIP_CHECKS='Promote master to production' \
+  MIN_REQUIRED_CHECKS=1 MAX_WALKBACK=0 GH_API_CMD="cat $TMP/A-base.json #" \
+  "$GREEN" "$DSHA" 2>&1)"; rc=$?
+expect     "skip-clears-self-deadlock"        0 "$rc"
+expect_out "skip-clears-self-deadlock-active" "SKIP_CHECKS active" "$out"
+expect_out "skip-clears-self-deadlock-pass"   "PASS: 2" "$out"
+
+# 3. skip-is-exact-not-prefix — prefix 'Promote master' must NOT skip the job
+out="$(SKIP_CHECKS='Promote master' \
+  MIN_REQUIRED_CHECKS=1 MAX_WALKBACK=0 GH_API_CMD="cat $TMP/A-base.json #" \
+  "$GREEN" "$DSHA" 2>&1)"; rc=$?
+expect     "skip-is-exact-not-prefix"      1 "$rc"
+expect_out "skip-is-exact-not-prefix-none" "<none matched>" "$out"
+
+# 4. skip-is-exact-not-substring — 'leak' must NOT skip 'gitleaks'
+mkfixture "$TMP/A-gitleaks.json" "gitleaks:in_progress:null"
+out="$(SKIP_CHECKS='leak' \
+  MIN_REQUIRED_CHECKS=1 MAX_WALKBACK=0 GH_API_CMD="cat $TMP/A-gitleaks.json #" \
+  "$GREEN" "$DSHA" 2>&1)"; rc=$?
+expect "skip-is-exact-not-substring" 1 "$rc"
+
+# 5. skip-all-fails-closed — skipping every check must still fail (MIN_REQUIRED floor)
+out="$(SKIP_CHECKS='Tests and Analysis,gitleaks,Promote master to production' \
+  MIN_REQUIRED_CHECKS=3 MAX_WALKBACK=0 GH_API_CMD="cat $TMP/A-base.json #" \
+  "$GREEN" "$DSHA" 2>&1)"; rc=$?
+expect     "skip-all-fails-closed"     1 "$rc"
+expect_out "skip-all-fails-closed-msg" "only 0 check-run(s)" "$out"
+
+# 6. skip-red-does-not-rescue-red — skipping a red job doesn't clear a red sibling
+mkfixture "$TMP/A-red.json" \
+  "Tests and Analysis:completed:failure" \
+  "Promote master to production:completed:failure"
+out="$(SKIP_CHECKS='Promote master to production' \
+  MIN_REQUIRED_CHECKS=1 MAX_WALKBACK=0 GH_API_CMD="cat $TMP/A-red.json #" \
+  "$GREEN" "$DSHA" 2>&1)"; rc=$?
+expect     "skip-red-does-not-rescue-red"     1 "$rc"
+expect_out "skip-red-does-not-rescue-red-msg" "Tests and Analysis (failure)" "$out"
+
+# 7. skip-trims-whitespace — leading/trailing spaces around names are stripped
+mkfixture "$TMP/A-ws.json" \
+  "Tests and Analysis:completed:success" \
+  "gitleaks:completed:success" \
+  "Promote master to production:in_progress:null"
+out="$(SKIP_CHECKS=' Promote master to production , gitleaks ' \
+  MIN_REQUIRED_CHECKS=1 MAX_WALKBACK=0 GH_API_CMD="cat $TMP/A-ws.json #" \
+  "$GREEN" "$DSHA" 2>&1)"; rc=$?
+expect     "skip-trims-whitespace"      0 "$rc"
+expect_out "skip-trims-whitespace-pass" "PASS: 1" "$out"
+
+# 8. skip-cancelled-conclusion — a cancelled promote job is skipped successfully
+mkfixture "$TMP/A-cancelled.json" \
+  "Tests and Analysis:completed:success" \
+  "gitleaks:completed:success" \
+  "Promote master to production:completed:cancelled"
+out="$(SKIP_CHECKS='Promote master to production' \
+  MIN_REQUIRED_CHECKS=1 MAX_WALKBACK=0 GH_API_CMD="cat $TMP/A-cancelled.json #" \
+  "$GREEN" "$DSHA" 2>&1)"; rc=$?
+expect "skip-cancelled-conclusion" 0 "$rc"
+
+# 9. skip-cancelled-unskipped-blocks — proves 'cancelled' really blocks without skip
+out="$(MIN_REQUIRED_CHECKS=1 MAX_WALKBACK=0 GH_API_CMD="cat $TMP/A-cancelled.json #" \
+  "$GREEN" "$DSHA" 2>&1)"; rc=$?
+expect     "skip-cancelled-unskipped-blocks"     1 "$rc"
+expect_out "skip-cancelled-unskipped-blocks-msg" "(cancelled)" "$out"
+
+# ============================================================
+# Part B — promote-master-to-production against a bare repo
+# ============================================================
+
+# Shared fixture files for Part B
+mkfixture "$TMP/B-green.json"  "Tests and Analysis:completed:success"
+mkfixture "$TMP/B-red.json"    "Tests and Analysis:completed:failure"
+mkfixture "$TMP/B-inprog.json" "Tests and Analysis:in_progress:null"
+
+# mkrepo — creates a fresh bare+clone. Sets ORIGIN and WORK globals.
+# Adds bin/ symlink so check-master-ci-green is reachable from $WORK via
+# "$(git rev-parse --show-toplevel)/bin/check-master-ci-green".
+mkrepo() {
+  local base
+  base="$(mktemp -d "$TMP/repo.XXXXXX")"
+  git init -q --bare "$base/origin.git" >/dev/null 2>&1
+  git clone -q "$base/origin.git" "$base/work" >/dev/null 2>&1
+  git -C "$base/work" config user.email t@example.com
+  git -C "$base/work" config user.name Tester
+  git -C "$base/work" config commit.gpgsign false
+  ln -s "$SCRIPT_DIR" "$base/work/bin"
+  ORIGIN="$base/origin.git"
+  WORK="$base/work"
+}
+
+# prod_ref <origin> — echoes current production SHA or "<absent>"
+prod_ref() {
+  git -C "$1" rev-parse --verify -q "refs/heads/production" 2>/dev/null \
+    || echo "<absent>"
+}
+
+# ---- promotes-when-green ----
+mkrepo
+git -C "$WORK" commit -q --allow-empty -m "base" >/dev/null 2>&1
+git -C "$WORK" branch -M master >/dev/null 2>&1
+git -C "$WORK" push -q origin master:refs/heads/master >/dev/null 2>&1
+git -C "$WORK" push -q origin master:refs/heads/production >/dev/null 2>&1
+git -C "$WORK" commit -q --allow-empty -m "new work" >/dev/null 2>&1
+git -C "$WORK" push -q origin master >/dev/null 2>&1
+SHA="$(git -C "$WORK" rev-parse HEAD)"
+out="$(cd "$WORK" && GH_API_CMD="cat $TMP/B-green.json #" MIN_REQUIRED_CHECKS=1 \
+  "$PROMOTE" "$SHA" 2>&1)"; rc=$?
+expect     "promotes-when-green"         0 "$rc"
+expect_out "promotes-when-green-outcome" "outcome=promoted" "$out"
+prod_sha="$(prod_ref "$ORIGIN")"
+if [ "$prod_sha" = "$SHA" ]; then echo "ok   promotes-when-green-ref"
+else echo "FAIL promotes-when-green-ref (got $prod_sha, want $SHA)"; FAILED=1; fi
+
+# ---- idempotent-already-current ---- (re-run on same repo, production already at SHA)
+out="$(cd "$WORK" && GH_API_CMD="cat $TMP/B-green.json #" MIN_REQUIRED_CHECKS=1 \
+  "$PROMOTE" "$SHA" 2>&1)"; rc=$?
+expect     "idempotent-already-current"         0 "$rc"
+expect_out "idempotent-already-current-outcome" "outcome=already-current" "$out"
+
+# ---- diverged-is-rejected-and-ref-unchanged ----
+mkrepo
+git -C "$WORK" commit -q --allow-empty -m "base" >/dev/null 2>&1
+git -C "$WORK" branch -M master >/dev/null 2>&1
+git -C "$WORK" push -q origin master:refs/heads/master >/dev/null 2>&1
+git -C "$WORK" push -q origin master:refs/heads/production >/dev/null 2>&1
+git -C "$WORK" commit -q --allow-empty -m "new work" >/dev/null 2>&1
+git -C "$WORK" push -q origin master >/dev/null 2>&1
+SHA="$(git -C "$WORK" rev-parse HEAD)"
+# Create a diverged production: orphan commit unrelated to master.
+# Force-push is only in this TEST SETUP, not in the script under test.
+git -C "$WORK" checkout -q --orphan divbranch >/dev/null 2>&1
+git -C "$WORK" commit -q --allow-empty -m "diverged" >/dev/null 2>&1
+git -C "$WORK" push -q --force origin divbranch:refs/heads/production >/dev/null 2>&1
+git -C "$WORK" checkout -q master >/dev/null 2>&1
+before="$(prod_ref "$ORIGIN")"
+out="$(cd "$WORK" && GH_API_CMD="cat $TMP/B-green.json #" MIN_REQUIRED_CHECKS=1 \
+  "$PROMOTE" "$SHA" 2>&1)"; rc=$?
+after="$(prod_ref "$ORIGIN")"
+expect     "diverged-is-rejected-and-ref-unchanged"      1 "$rc"
+expect_out "diverged-outcome"                            "outcome=diverged" "$out"
+refuse_out "diverged-nothing-forced"                     "outcome=promoted" "$out"
+if [ "$before" = "$after" ]; then echo "ok   diverged-ref-unchanged"
+else echo "FAIL diverged-ref-unchanged (before=$before after=$after)"; FAILED=1; fi
+
+# ---- not-green-no-push ----
+mkrepo
+git -C "$WORK" commit -q --allow-empty -m "base" >/dev/null 2>&1
+git -C "$WORK" branch -M master >/dev/null 2>&1
+git -C "$WORK" push -q origin master:refs/heads/master >/dev/null 2>&1
+git -C "$WORK" push -q origin master:refs/heads/production >/dev/null 2>&1
+git -C "$WORK" commit -q --allow-empty -m "new work" >/dev/null 2>&1
+git -C "$WORK" push -q origin master >/dev/null 2>&1
+SHA="$(git -C "$WORK" rev-parse HEAD)"
+before="$(prod_ref "$ORIGIN")"
+out="$(cd "$WORK" && GH_API_CMD="cat $TMP/B-red.json #" MIN_REQUIRED_CHECKS=1 \
+  "$PROMOTE" "$SHA" 2>&1)"; rc=$?
+after="$(prod_ref "$ORIGIN")"
+expect     "not-green-no-push"             0 "$rc"
+expect_out "not-green-no-push-outcome"     "outcome=not-green" "$out"
+if [ "$before" = "$after" ]; then echo "ok   not-green-no-push-ref-unchanged"
+else echo "FAIL not-green-no-push-ref-unchanged"; FAILED=1; fi
+
+# ---- still-running-no-push ----
+mkrepo
+git -C "$WORK" commit -q --allow-empty -m "base" >/dev/null 2>&1
+git -C "$WORK" branch -M master >/dev/null 2>&1
+git -C "$WORK" push -q origin master:refs/heads/master >/dev/null 2>&1
+git -C "$WORK" push -q origin master:refs/heads/production >/dev/null 2>&1
+git -C "$WORK" commit -q --allow-empty -m "new work" >/dev/null 2>&1
+git -C "$WORK" push -q origin master >/dev/null 2>&1
+SHA="$(git -C "$WORK" rev-parse HEAD)"
+before="$(prod_ref "$ORIGIN")"
+out="$(cd "$WORK" && GH_API_CMD="cat $TMP/B-inprog.json #" MIN_REQUIRED_CHECKS=1 \
+  "$PROMOTE" "$SHA" 2>&1)"; rc=$?
+after="$(prod_ref "$ORIGIN")"
+expect     "still-running-no-push"             0 "$rc"
+expect_out "still-running-no-push-outcome"     "outcome=not-green" "$out"
+if [ "$before" = "$after" ]; then echo "ok   still-running-no-push-ref-unchanged"
+else echo "FAIL still-running-no-push-ref-unchanged"; FAILED=1; fi
+
+# ---- not-ancestor-rejected ----
+mkrepo
+git -C "$WORK" commit -q --allow-empty -m "base" >/dev/null 2>&1
+git -C "$WORK" branch -M master >/dev/null 2>&1
+git -C "$WORK" push -q origin master:refs/heads/master >/dev/null 2>&1
+git -C "$WORK" push -q origin master:refs/heads/production >/dev/null 2>&1
+# side branch commit not in master's history
+git -C "$WORK" checkout -q -b sidebranch >/dev/null 2>&1
+git -C "$WORK" commit -q --allow-empty -m "side" >/dev/null 2>&1
+git -C "$WORK" push -q origin sidebranch >/dev/null 2>&1
+SHA="$(git -C "$WORK" rev-parse HEAD)"
+git -C "$WORK" checkout -q master >/dev/null 2>&1
+before="$(prod_ref "$ORIGIN")"
+out="$(cd "$WORK" && GH_API_CMD="cat $TMP/B-green.json #" MIN_REQUIRED_CHECKS=1 \
+  "$PROMOTE" "$SHA" 2>&1)"; rc=$?
+after="$(prod_ref "$ORIGIN")"
+expect     "not-ancestor-rejected"             1 "$rc"
+expect_out "not-ancestor-rejected-outcome"     "outcome=not-ancestor" "$out"
+if [ "$before" = "$after" ]; then echo "ok   not-ancestor-rejected-ref-unchanged"
+else echo "FAIL not-ancestor-rejected-ref-unchanged"; FAILED=1; fi
+
+# ---- invalid-sha cases — these die before any git fetch, so repo setup is minimal ----
+# (reuse $WORK from the last mkrepo above — we just need to be inside a git repo)
+
+out="$(cd "$WORK" && "$PROMOTE" HEAD 2>&1)"; rc=$?
+expect     "invalid-sha-HEAD"         1 "$rc"
+expect_out "invalid-sha-HEAD-outcome" "outcome=invalid-sha" "$out"
+
+out="$(cd "$WORK" && "$PROMOTE" master 2>&1)"; rc=$?
+expect     "invalid-sha-branch-name"         1 "$rc"
+expect_out "invalid-sha-branch-name-outcome" "outcome=invalid-sha" "$out"
+
+ABBREV="$(git -C "$WORK" rev-parse --short HEAD)"
+out="$(cd "$WORK" && "$PROMOTE" "$ABBREV" 2>&1)"; rc=$?
+expect     "invalid-sha-abbreviated"         1 "$rc"
+expect_out "invalid-sha-abbreviated-outcome" "outcome=invalid-sha" "$out"
+
+out="$(cd "$WORK" && "$PROMOTE" '--upload-pack=/bin/sh' 2>&1)"; rc=$?
+expect "invalid-sha-option-lookalike" 1 "$rc"
+
+# ---- shallow-rejected ----
+mkrepo
+git -C "$WORK" commit -q --allow-empty -m "base" >/dev/null 2>&1
+git -C "$WORK" branch -M master >/dev/null 2>&1
+git -C "$WORK" push -q origin master:refs/heads/master >/dev/null 2>&1
+git -C "$WORK" push -q origin master:refs/heads/production >/dev/null 2>&1
+git -C "$WORK" commit -q --allow-empty -m "v2" >/dev/null 2>&1
+git -C "$WORK" push -q origin master >/dev/null 2>&1
+SHA="$(git -C "$WORK" rev-parse HEAD)"
+SHALLOW_WORK="$TMP/shallow-work"
+# file:// protocol is required for --depth to take effect on a local repo
+git clone --depth 1 --quiet "file://$ORIGIN" "$SHALLOW_WORK" >/dev/null 2>&1
+git -C "$SHALLOW_WORK" config user.email t@example.com
+git -C "$SHALLOW_WORK" config user.name Tester
+git -C "$SHALLOW_WORK" config commit.gpgsign false
+ln -s "$SCRIPT_DIR" "$SHALLOW_WORK/bin"
+is_shallow="$(git -C "$SHALLOW_WORK" rev-parse --is-shallow-repository 2>/dev/null || echo false)"
+if [ "$is_shallow" = "true" ]; then
+  out="$(cd "$SHALLOW_WORK" && GH_API_CMD="cat $TMP/B-green.json #" MIN_REQUIRED_CHECKS=1 \
+    "$PROMOTE" "$SHA" 2>&1)"; rc=$?
+  expect     "shallow-rejected"         1 "$rc"
+  expect_out "shallow-rejected-outcome" "outcome=shallow" "$out"
+else
+  echo "FAIL shallow-rejected (clone was not shallow: is-shallow=$is_shallow)"; FAILED=1
+fi
+
+# ---- superseded-no-push ----
+mkrepo
+git -C "$WORK" commit -q --allow-empty -m "base" >/dev/null 2>&1
+git -C "$WORK" branch -M master >/dev/null 2>&1
+git -C "$WORK" push -q origin master:refs/heads/master >/dev/null 2>&1
+git -C "$WORK" push -q origin master:refs/heads/production >/dev/null 2>&1
+git -C "$WORK" commit -q --allow-empty -m "v2" >/dev/null 2>&1
+git -C "$WORK" push -q origin master >/dev/null 2>&1
+SHA_OLD="$(git -C "$WORK" rev-parse HEAD)"
+git -C "$WORK" commit -q --allow-empty -m "v3" >/dev/null 2>&1
+git -C "$WORK" push -q origin master >/dev/null 2>&1
+git -C "$WORK" push -q origin master:refs/heads/production >/dev/null 2>&1
+# production is now at v3; promoting SHA_OLD (v2) should be superseded
+before="$(prod_ref "$ORIGIN")"
+out="$(cd "$WORK" && GH_API_CMD="cat $TMP/B-green.json #" MIN_REQUIRED_CHECKS=1 \
+  "$PROMOTE" "$SHA_OLD" 2>&1)"; rc=$?
+after="$(prod_ref "$ORIGIN")"
+expect     "superseded-no-push"             0 "$rc"
+expect_out "superseded-no-push-outcome"     "outcome=superseded" "$out"
+if [ "$before" = "$after" ]; then echo "ok   superseded-no-push-ref-unchanged"
+else echo "FAIL superseded-no-push-ref-unchanged"; FAILED=1; fi
+
+# ---- dry-run-writes-nothing ----
+mkrepo
+git -C "$WORK" commit -q --allow-empty -m "base" >/dev/null 2>&1
+git -C "$WORK" branch -M master >/dev/null 2>&1
+git -C "$WORK" push -q origin master:refs/heads/master >/dev/null 2>&1
+git -C "$WORK" push -q origin master:refs/heads/production >/dev/null 2>&1
+git -C "$WORK" commit -q --allow-empty -m "new work" >/dev/null 2>&1
+git -C "$WORK" push -q origin master >/dev/null 2>&1
+SHA="$(git -C "$WORK" rev-parse HEAD)"
+before="$(prod_ref "$ORIGIN")"
+out="$(cd "$WORK" && GH_API_CMD="cat $TMP/B-green.json #" MIN_REQUIRED_CHECKS=1 \
+  "$PROMOTE" "$SHA" --dry-run 2>&1)"; rc=$?
+after="$(prod_ref "$ORIGIN")"
+expect     "dry-run-writes-nothing"             0 "$rc"
+expect_out "dry-run-writes-nothing-outcome"     "outcome=would-promote" "$out"
+if [ "$before" = "$after" ]; then echo "ok   dry-run-writes-nothing-ref-unchanged"
+else echo "FAIL dry-run-writes-nothing-ref-unchanged"; FAILED=1; fi
+
+# ---- stdout-is-key-value-only ----
+mkrepo
+git -C "$WORK" commit -q --allow-empty -m "base" >/dev/null 2>&1
+git -C "$WORK" branch -M master >/dev/null 2>&1
+git -C "$WORK" push -q origin master:refs/heads/master >/dev/null 2>&1
+git -C "$WORK" push -q origin master:refs/heads/production >/dev/null 2>&1
+git -C "$WORK" commit -q --allow-empty -m "new work" >/dev/null 2>&1
+git -C "$WORK" push -q origin master >/dev/null 2>&1
+SHA="$(git -C "$WORK" rev-parse HEAD)"
+# Capture stdout only; stderr goes to /dev/null
+stdout_only="$(cd "$WORK" && GH_API_CMD="cat $TMP/B-green.json #" MIN_REQUIRED_CHECKS=1 \
+  "$PROMOTE" "$SHA" 2>/dev/null)"
+violators="$(printf '%s\n' "$stdout_only" | grep -vE '^(outcome|sha)=[0-9a-z-]+$' || true)"
+if [ -z "$violators" ]; then echo "ok   stdout-is-key-value-only"
+else echo "FAIL stdout-is-key-value-only (violating lines: $violators)"; FAILED=1; fi
+
+# ---- no-force-tokens grep invariant ----
+if grep -qE -- '--force|force-with-lease' "$PROMOTE"; then
+  echo "FAIL no-force-tokens (bin/promote-master-to-production must never force-push)"; FAILED=1
+else
+  echo "ok   no-force-tokens"
+fi
+
+# ============================================================
+if [ "$FAILED" -ne 0 ]; then
+  echo "RESULT: FAILED"
+  exit 1
+fi
+echo "RESULT: all passed"
+exit 0

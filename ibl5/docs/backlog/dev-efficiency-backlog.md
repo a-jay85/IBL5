@@ -83,7 +83,7 @@ last_verified: 2026-09-07
 | E55 | PR #2129 Phase 6.5 — PR body false E2E claim, omitted grep finding, vacuous VM selector; all fixed this pass | ⬜ Open | — | XS |
 | E56 | PR #2129 Phase 6.5 — SKILL.md size-band gate not updated after deliberate file growth; fixed this pass | ⬜ Open | — | XS |
 | E67 | PR #1900 Phase 6.5 — dead self-references to old path `bin/db-sync-now` (example) in `ibl5/bin/db-sync-now` (4 sites: lines 11, 12, 67, 93); all fixed this pass | ⬜ Open | — | XS |
-| E65 | `/pr-ready` Phase 6 re-runs a full Opus plan-fidelity review on every cycle pass; reuse the prior verdict when the branch diff is unchanged | ⬜ Open | 🟥 | M |
+| E98 | `/pr-ready` Phase 6 re-runs a full Opus plan-fidelity review on every cycle pass; reuse the prior verdict when the branch diff is unchanged | ⬜ Open | 🟥 | M |
 | E63 | PR #1900 Phase 6.5 — dead self-references to old path `bin/db-sync-now` (example) in `ibl5/bin/db-sync-now` (4 sites: lines 11, 12, 67, 93); all fixed this pass | ⬜ Open | — | XS |
 | E97 | `/pr-ready` Phase 6 re-runs a full Opus plan-fidelity review on every cycle pass; reuse the prior verdict when the branch diff is unchanged | ⬜ Open | 🟥 | M |
 | E67 | PR #1900 Phase 6.5 — dead self-references to old path `bin/db-sync-now` (example) in `ibl5/bin/db-sync-now` (4 sites: lines 11, 12, 67, 93); all fixed this pass | ⬜ Open | — | XS |
@@ -1795,7 +1795,7 @@ Landing rung: **1** — extend `bin/check-rules-byte-budget` to warn when the ag
 
 *(discovered 2026-09-07 during #2160)*
 
-### E65 Reuse the `/pr-ready` Phase 6 verdict when the branch diff has not changed
+### E98 Reuse the `/pr-ready` Phase 6 verdict when the branch diff has not changed
 **Location:** `.claude/skills/pr-ready/SKILL.md` (Phase 6), the `pr-ready-phase6` agent
 definition, and the Phase 7 sticky verdict comment written to the PR.
 **Problem:** `bin/pr-cycle` can pass over the same PR on several nights. Every pass that
@@ -1825,7 +1825,7 @@ about. `ARMABLE` binds the PR body's clearance text and the head-SHA check state
 never binds the base SHA. So a `master` move can leave a PR reading `ARMABLE` on a
 clearance granted against an older base, and the skip declines a Phase 6 run that might
 have caught the drift. The skip inherits that exposure rather than creating it — the very
-next line, `_arm_and_classify`, already arms auto-merge on the identical bucket. E65
+next line, `_arm_and_classify`, already arms auto-merge on the identical bucket. E98
 therefore covers both halves: the remaining case (a PR that genuinely still needs readying
 but whose diff has not moved) and the shared key (any reuse decision must survive a base
 move, which is what makes base SHA plus patch-id the candidate rather than patch-id

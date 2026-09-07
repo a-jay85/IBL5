@@ -10,6 +10,17 @@
 # a partial digest, never to fewer than five lines, never to a silent empty output.
 #
 # Usage: bash digest.sh /tmp/pr-ready-phase6-verdict-<N>.md
+#
+# Run-path only. On the skip path, skip-review.sh extracts the five digest lines from the
+# prior sticky comment and writes them to /tmp/pr-ready-digest-lines-<N>.txt; the Phase 7
+# composer cats that file directly. The unavailable-degrade below is therefore the run-path
+# safety net — it is structurally unreachable on the skip path. Invoking this script on the
+# skip path would overwrite the carried-forward lines with five "unavailable" placeholders,
+# defeating the purpose of the skip.
+#
+# Label list note: skip-review.sh carries a duplicate of the five LABELS below. The two
+# must remain byte-identical; bin/test-pr-ready-now asserts this. A label change here
+# requires the same change in skip-review.sh.
 
 set -euo pipefail
 

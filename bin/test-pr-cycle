@@ -1179,6 +1179,100 @@ else
 fi
 end_case "case 29 CI wiring"
 
+# ==========================================================================================
+# 30 — digest parser ignores Reviewed-tree line when placed above ### Merge digest
+# ==========================================================================================
+begin_case
+
+# Source _digest_labels directly for label-count and order checks.
+# Process substitution (. <(cmd)) does not reliably define functions on macOS bash;
+# write to a temp file and source that instead.
+_DIGEST_TMPF="$(mktemp)"
+sed -n '/^_digest_labels()/,/^}$/p' "$DRIVER" > "$_DIGEST_TMPF"
+# shellcheck disable=SC1090
+. "$_DIGEST_TMPF"
+rm -f "$_DIGEST_TMPF"
+unset _DIGEST_TMPF
+
+TREE_SHA="0000000000000000000000000000000000000000"
+
+# Fixture A: **Reviewed tree:** on line 1 (above ### Merge digest).
+# _digest_labels must return exactly 5 labels, in order, with no "Reviewed tree" entry.
+BODY_A="**Reviewed tree:** ${TREE_SHA}
+\`covers head abc123456789ab · master def456789abcde · written 2026-09-06T12:00Z\`
+
+Rebase: clean. CI: pass.
+
+### Merge digest
+**What changed:** the skip predicate landed
+**Why:** avoid re-running Phase 6 on unchanged tree
+**Watch:** carry-forward files
+**Touches:** .claude/skills/pr-ready/scripts
+**Machine-authored fixes:** none
+
+READY
+<!-- pr-ready-verdict -->"
+
+LABELS_A="$(printf '%s\n' "$BODY_A" | _digest_labels)"
+if [[ -n "$LABELS_A" ]]; then
+    COUNT_A="$(printf '%s\n' "$LABELS_A" | wc -l | tr -d ' ')"
+else
+    COUNT_A=0
+fi
+[[ "$COUNT_A" -eq 5 ]] || fail "fixture A: expected 5 labels, got $COUNT_A"
+
+ORDERED_A="$(printf '%s\n' "$LABELS_A" | awk -F'\t' '{print $1}' | tr '\n' ',')"
+[[ "$ORDERED_A" == "What changed,Why,Watch,Touches,Machine-authored fixes," ]] \
+    || fail "fixture A: label order wrong, got: $ORDERED_A"
+
+printf '%s\n' "$LABELS_A" | grep -qF 'Reviewed tree' \
+    && fail "fixture A: 'Reviewed tree' label leaked into digest parse — placement above heading is not invisible"
+
+# Also verify via the full harness: the ledger row must not contain "Reviewed tree".
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
+    > "$SCRATCH/triage-out"
+echo MERGED > "$SCRATCH/state-101"
+printf '%s' "$(view_json 101 "$BODY_A")" > "$SCRATCH/view-101.json"
+run --worker
+[[ "$(rows)" == "1" ]] || fail "fixture A: want 1 ledger row, got $(rows)"
+ledger | grep -qF '**What changed:** the skip predicate landed' \
+    || fail "fixture A: What changed label not in ledger"
+ledger | grep -qF 'Reviewed tree' \
+    && fail "fixture A: 'Reviewed tree' appeared in ledger — placement above heading is not invisible"
+
+# Fixture B: **Reviewed tree:** moved inside ### Merge digest (below the heading).
+# _digest_labels must return 6 labels — proves "above the heading" is the specific
+# property keeping it invisible, not coincidence.
+BODY_B="\`covers head abc123456789ab · master def456789abcde · written 2026-09-06T12:00Z\`
+
+Rebase: clean. CI: pass.
+
+### Merge digest
+**Reviewed tree:** ${TREE_SHA}
+**What changed:** the skip predicate landed
+**Why:** avoid re-running Phase 6 on unchanged tree
+**Watch:** carry-forward files
+**Touches:** .claude/skills/pr-ready/scripts
+**Machine-authored fixes:** none
+
+READY
+<!-- pr-ready-verdict -->"
+
+LABELS_B="$(printf '%s\n' "$BODY_B" | _digest_labels)"
+if [[ -n "$LABELS_B" ]]; then
+    COUNT_B="$(printf '%s\n' "$LABELS_B" | wc -l | tr -d ' ')"
+else
+    COUNT_B=0
+fi
+[[ "$COUNT_B" -eq 6 ]] || fail "fixture B: expected 6 labels when tree line is inside digest block, got $COUNT_B"
+
+printf '%s\n' "$LABELS_B" | grep -qF 'Reviewed tree' \
+    || fail "fixture B: 'Reviewed tree' not parsed when placed inside digest block — placement is not load-bearing"
+
+end_case "digest-parser ignores Reviewed-tree line"
+
 # --- summary --------------------------------------------------------------------------------
 if [[ $FAILED -eq 0 ]]; then
     echo "test-pr-cycle: ALL PASS"

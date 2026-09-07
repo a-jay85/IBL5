@@ -881,6 +881,8 @@ jobs:
         run: bin/test-pr-attack
       - name: bin/test-pr-ready-now
         run: bin/test-pr-ready-now
+      - name: bin/test-pr-ready-skip
+        run: bin/test-pr-ready-skip
       - name: bin/test-pr-cycle
         run: bin/test-pr-cycle
       - name: bin/test-pr-review-now

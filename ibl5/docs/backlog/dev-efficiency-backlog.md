@@ -115,6 +115,7 @@ last_verified: 2026-09-07
 | E94 | No committed regression tests for guards in `bin/bug-pipeline-e2e` and `ecosystem.bugbot-test.config.cjs` fail-closed checks | ⬜ Open | — | S |
 | E95 | Unasked-for `last_verified` change with duplicate YAML key in `ibl5/docs/decisions/README.md` | ✅ fixed this pass | — | XS |
 | E96 | Three residual isolation/scope gaps in `bin/bug-pipeline-test-env` (F3/F6/F7 from #1950 Phase 6) | ⬜ Open | — | S |
+| E97 | Stale numeric count in PR body Scope prose (Phase 6 findings from #2160) | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -1762,3 +1763,30 @@ Landing rung: **1** — extend `bin/check-rules-byte-budget` to warn when the ag
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-06 during #1950)*
+
+---
+
+### E97 Stale numeric count in PR body Scope prose (Phase 6 findings from #2160)
+
+**class (BLOCKING, check 4):** a stale hand-authored count in a PR body's Scope prose — a number sourced from the plan's Verification Matrix row count (30) rather than the harness output it describes (15 fixture cases + 6 static drift checks = 23 assertions), so the stated figure contradicted `bin/test-plan-tier-hint`'s own stdout.
+
+**class (NOTEs, checks 2/3/5):** n/a — four Phase 6 notes were informational observations: a CI autofix added `ibl5/docs/decisions/0122-plan-tier-hint-advisory-tool.md` (correcting the no-adr: marker's scope assumption about which gate would fire); the path-filter landed 3 entries instead of the plan's 5 (pre-existing entries already covered the two omitted); `.claude/rules/work-triage.md` bullet landed as a shorter paraphrase (predicate intact, byte budget respected); two Verification Matrix rows carried stale expected values (rows 29 and 6, underlying properties held).
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #2160 body — "30-case table" in Scope prose | yes | live | fixed this pass (via `gh pr edit`) |
+
+**prevention_ladder:**
+- rung 0 — already covered by an existing gate? `.claude/rules/pr-body-claims.md` requires inline citations for numeric claims in PR bodies. The defect was sourcing the plan's matrix row count (30) rather than running the harness to count fixture rows (15).
+- rung 1 — extend an existing gate? Not warranted; the rule already covers this class.
+- rung 2 — a rule doc? Not warranted; `pr-body-claims.md` already covers it.
+- rungs 3–5 — a pattern match on numbers in PR body prose has too many false positives; no CI gate is achievable.
+- landing rung: no gate warranted — `pr-body-claims.md` already covers this class; Phase 6.5 step 4 already requires reconciling body counts against `git diff --numstat HEAD` before committing; the defect was an application error, not a missing rule.
+
+`prevention_ladder: no gate warranted — pr-body-claims.md already covers this class; Phase 6.5 step 4 already requires the reconciliation`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-07 during #2160)*

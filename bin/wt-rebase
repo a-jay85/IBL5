@@ -1,15 +1,17 @@
 #!/bin/bash
-# Reconcile all active worktree branches with origin/<branch>, then merge
-# origin/master into each one. Fetches once up front (including in --dry-run,
-# since classification is entirely a function of remote refs). Never pushes
-# anything. Skips worktrees that are actively in use or have uncommitted
-# changes. Aborts the merge on conflicts, leaving the worktree as found.
+# Reconcile all active worktree branches with origin/<branch>, then merge each
+# branch's recorded base (branch.<name>.iblBase, falling back to origin/master)
+# into it. Fetches once up front (including in --dry-run, since classification is
+# entirely a function of remote refs). Never pushes anything. Skips worktrees that
+# are actively in use or have uncommitted changes. Aborts the merge on conflicts,
+# leaving the worktree as found.
 #
-# Stacking: if a branch's PR base is not master, origin/master is still merged
-# in — there is no stacked-base detection. Merging origin/master into a stacked
-# child is harmless (it adds an ancestor the child would gain on merge anyway),
-# unlike rebasing it, which rewrites the child's shared commits. No stacked PRs
-# exist in this repo today; revisit only if `bin/wt-new --base` sees real use.
+# Stacking: a branch whose PR base is not master records that base via
+# `git config branch.<name>.iblBase <parent-branch>` — bin/wt-new persists it at
+# creation time and this script merges that base instead of origin/master.
+# Merging rather than rebasing is what keeps this safe for a stacked child: a
+# merge adds an ancestor the child would gain on merge anyway, where a rebase
+# would rewrite the child's shared commits.
 #
 # Read-only toward the remote: this script only fetches. Reconciliation is
 # local-only; a worktree left behind its own origin/<branch> after a skip is
@@ -23,6 +25,7 @@ set -euo pipefail
 source "$(dirname "$0")/lib/wt-guards.sh"
 # shellcheck source=bin/lib/git-helpers.sh
 source "$(dirname "$0")/lib/git-helpers.sh"
+source "$(dirname "$0")/lib/branch-base.sh"
 
 REPO_ROOT="$(git worktree list --porcelain | head -1 | sed 's/^worktree //')"
 WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
@@ -56,7 +59,7 @@ UPDATED=0
 FAILED=0
 SKIPPED=0
 
-echo "Reconciling worktrees and merging origin/master..."
+echo "Reconciling worktrees and merging each branch's recorded base..."
 
 while IFS= read -r wt_path; do
     [[ "$wt_path" == "$REPO_ROOT" ]] && continue
@@ -65,9 +68,10 @@ while IFS= read -r wt_path; do
     wt_name=$(basename "$wt_path")
     branch=$(git -C "$wt_path" branch --show-current 2>/dev/null || true)
     [[ -z "$branch" ]] && continue
+    base="$(branch_base_recorded "$wt_path" "$branch")" || base="origin/master"
 
     # Guards run before classification — an in-use or dirty worktree is always
-    # reported, even if it happens to be current with master.
+    # reported, even if it happens to be current with its base.
     if is_worktree_in_use "$wt_path"; then
         echo "  SKIP    $wt_name — actively in use"
         SKIPPED=$((SKIPPED + 1)); continue
@@ -118,13 +122,13 @@ while IFS= read -r wt_path; do
         ff|reset)
             merge_needed=false
             tmp_head="$(git -C "$wt_path" rev-parse "origin/$branch")"
-            # Would origin/master be an ancestor of origin/<branch> after reconcile?
-            git -C "$wt_path" merge-base --is-ancestor origin/master "$tmp_head" 2>/dev/null \
+            # Would the recorded base be an ancestor of origin/<branch> after reconcile?
+            git -C "$wt_path" merge-base --is-ancestor "$base" "$tmp_head" 2>/dev/null \
                 || merge_needed=true
             ;;
         none)
             merge_needed=false
-            git -C "$wt_path" merge-base --is-ancestor origin/master HEAD 2>/dev/null \
+            git -C "$wt_path" merge-base --is-ancestor "$base" HEAD 2>/dev/null \
                 || merge_needed=true
             ;;
     esac
@@ -135,7 +139,7 @@ while IFS= read -r wt_path; do
     fi
 
     if [ "$DRY_RUN" = true ]; then
-        echo "  WOULD   $wt_name ($branch) — reconcile:$reconcile merge:$merge_needed"
+        echo "  WOULD   $wt_name ($branch -> $base) — reconcile:$reconcile merge:$merge_needed"
         UPDATED=$((UPDATED + 1)); continue
     fi
 
@@ -147,20 +151,20 @@ while IFS= read -r wt_path; do
 
     # Execute merge if needed (re-evaluate after reconcile moved HEAD)
     merge_needed=false
-    git -C "$wt_path" merge-base --is-ancestor origin/master HEAD 2>/dev/null \
+    git -C "$wt_path" merge-base --is-ancestor "$base" HEAD 2>/dev/null \
         || merge_needed=true
 
     if [[ "$merge_needed" == "true" ]]; then
-        if git -C "$wt_path" merge origin/master -q; then
+        if git -C "$wt_path" merge "$base" -q; then
             :
         else
             git -C "$wt_path" merge --abort 2>/dev/null || true
-            echo "  FAILED  $wt_name ($branch) — conflicts, merge aborted"
+            echo "  FAILED  $wt_name ($branch -> $base) — conflicts, merge aborted"
             FAILED=$((FAILED + 1)); continue
         fi
     fi
 
-    echo "  OK      $wt_name ($branch) — reconcile:$reconcile merge:$merge_needed"
+    echo "  OK      $wt_name ($branch -> $base) — reconcile:$reconcile merge:$merge_needed"
     UPDATED=$((UPDATED + 1))
 
 done < <(git -C "$REPO_ROOT" worktree list --porcelain | awk '/^worktree / { print substr($0, 10) }')

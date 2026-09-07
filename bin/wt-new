@@ -78,6 +78,9 @@ fi
 # Create worktree + branch in one step
 echo "Creating worktree '$NAME' from $BASE_BRANCH..."
 git -C "$REPO_ROOT" worktree add "$WT_ROOT" -b "$NAME" "$BASE_BRANCH"
+# Persist the base so the pre-push ADR gate and bin/wt-rebase can later resolve this
+# branch's real parent instead of assuming origin/master (see ADR-0117).
+git -C "$WT_ROOT" config "branch.$NAME.iblBase" "$BASE_BRANCH"
 
 # config.php: real copy, NOT a symlink. A symlink's absolute host target
 # (/Users/.../IBL5/ibl5/config.php) doesn't resolve inside the worktree's Docker

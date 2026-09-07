@@ -147,7 +147,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: bin/adr-check --pr
+        run: bin/adr-check --pr --base=${{ github.event.pull_request.base.sha }}
 
       - name: adr-check skipped (no decision-trigger paths in diff)
         if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.filter.outputs.adr != 'true' }}

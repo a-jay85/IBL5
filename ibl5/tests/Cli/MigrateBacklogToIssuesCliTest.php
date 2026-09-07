@@ -123,7 +123,7 @@ SH;
     private function runScript(string $args = '', array $extraEnv = []): array
     {
         $baseEnv = [
-            'PATH'   => $this->tmpDir . '/bin:' . (getenv('PATH') ?: '/usr/local/bin:/usr/bin:/bin'),
+            'PATH'   => $this->tmpDir . '/bin:' . (getenv('PATH') !== false ? getenv('PATH') : '/usr/local/bin:/usr/bin:/bin'),
             'HOME'   => $this->tmpDir,
             'TMPDIR' => sys_get_temp_dir(),
         ];

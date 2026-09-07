@@ -1334,3 +1334,30 @@ Landing: rung 1 — `bin/check-docs` duplicate-ID check for dev-efficiency-backl
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-06 during /pr-ready run on PR #2042 Phase 6)*
+
+---
+
+### E84 Always-loaded rule addition fills resident byte budget to zero, leaving no headroom
+
+*(discovered 2026-09-06 during #2131)*
+
+**class:** An always-loaded rule addition that fills the resident byte budget to exactly its maximum (20000 B), with the gate comment forbidding a raise, leaving zero headroom for any future always-loaded rule or growth in an existing resident file.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/check-rules-byte-budget` — after PR #2131 adds `pr-body-claims.md`, the resident aggregate is exactly 20000 of 20000 bytes; gate comment reads "never raise to accommodate file growth" | yes | yes | not fixed — filed |
+
+**prevention_ladder:**
+- rung 0 — `bin/check-rules-byte-budget` is the gate; it enforces the limit but does not forecast approaching it.
+- rung 1 — extend the gate: emit a warning when the aggregate exceeds 90% (18000 B) of the limit, so headroom depletion is visible before it hits zero. Landing rung. The four meta-tooling-bar conditions: (1) `bin/check-rules-byte-budget` already exists — this extends it, not adds a new script; (2) cost is one comparison added to the script; (3) false-positive rate is zero (approaching the limit is always worth noting); (4) machine-verifiable.
+- rungs 2–5 — a rule doc alone cannot enforce a numeric budget check; the gate extension (rung 1) is the correct lever.
+
+Landing rung: **1** — extend `bin/check-rules-byte-budget` to warn when the aggregate reaches ≥90% (18000 B) of the 20000 B limit, giving advance notice before the gate fails.
+
+**artifact destination:** `bin/check-rules-byte-budget` (in-repo)
+
+**provenance:** (discovered 2026-09-06 during #2131)
+
+**Status (2026-09-06):** ⬜ Open — 🟦.

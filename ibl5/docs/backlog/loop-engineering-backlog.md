@@ -70,7 +70,7 @@ last_verified: 2026-09-07
 | L40 | Compiled post-plan harness crashes on any PR containing a binary file (`git diff` decoded as strict UTF-8) | ✅ Shipped #2112 | 🟥 | S |
 | L41 | Plan Verification Matrix rows can ship unrealised — nothing checks a plan's declared assertions against the tests actually delivered | ⬜ Open | 🟥 | S |
 | L42 | Autonomous-loop PR ships stale line citations, undeclared plan substitution, unmentioned diff file, and duplicate backlog ID | ⬜ Open | 🟦 | S |
-| L43 | Autonomous-loop doc-fix PR body contains stale claims and inconsistent ADR authoring format after post-review commit | ⬜ Open | 🟦 | S |
+| L43 | Autonomous-loop doc-fix PR body contains stale claims and inconsistent ADR authoring format after post-review commit | ✅ Implemented | — | S |
 | L44 | Upstream overlap silently drops a plan phase; Phase 2a pre-rebase artifact captures post-rebase state, making the drop undetectable | ✅ fixed this pass | 🟦 | S |
 | L45 | `/pr-ready` Phase 2 squashes load-bearing commit boundaries when `auto_merge: false`; PR body SHAs go stale after force-push | ⬜ Open | 🟥 | S |
 | L46 | Queued matrix-less plan with non-canonical `impl_model:` alias slips all pre-queue gates; runner disposes on first nightly run | ✅ Done | 🟦 | S |
@@ -95,6 +95,9 @@ last_verified: 2026-09-07
 | L66 | PR #1899 Phase 6 plan-quality notes N-2/N-3/N-4 — class n/a; out-of-plan diff files (N-2), out-of-plan `timeout` fix (N-3), test-row renumbering consistent (N-4) | 📝 Note | — | XS |
 | L67 | PR #2123 Phase 6.5 — stale hand-written Scope prose after remediation commit; VR matrix path note; row-8 tick vs. prior-run record | ⬜ Open | — | XS |
 | L68 | `pr_manual_testing_clearance` callers in the ship pipeline pass only one argument; the keyword–file AND gate never fires at runtime | ⬜ Open | 🟦 | S |
+| L70 | `pr-body-negative-claim-recheck.md` covers negative-claim-list re-reads but not Summary-prose re-reads when a post-review commit modifies a Summary-mentioned file | ⬜ Open | 🟦 | S |
+| L71 | Autonomous-loop impl deviated from plan "exact content" recipe without declaring the deviation in the PR body | 📝 Note | — | XS |
+| L72 | Loop-authored backlog entry cited unreachable squash-artifact SHA; archive entry missing blank line before GFM table | 📝 Note | — | XS |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -483,30 +486,7 @@ not add backticks or markdown links to a row.
 
 
 ### L43 Autonomous-loop doc-fix PR body contains stale claims and inconsistent ADR authoring format after post-review commit
-
-*(discovered 2026-09-02 during #2059)*
-
-**class:** a PR body hand-authored by an autonomous-loop run that contains specific version claims, figure values, or scope descriptions which become inaccurate when a post-review commit changes the referenced content without triggering a body update.
-
-**occurrence table:**
-
-| # | File:line | Same class? | Live? | Status |
-|---|-----------|-------------|-------|--------|
-| 1 | PR #2059 body — bullet 2 claimed gitleaks workflow v2→v3 upgrade; no workflow file was in the diff | yes | yes | fixed this pass (via `gh pr edit`) |
-| 2 | PR #2059 body — bullet 3 said "147 → 17 call sites"; authoritative count per `ibl5/phpstan-baseline.neon` is 134 sites across 17 files | yes | yes | fixed this pass (via `gh pr edit`) |
-| 3 | PR #2059 body — Manual Testing said "verified by automated tests"; all CI test jobs skipped by docs-only path filter | yes | yes | fixed this pass (via `gh pr edit`) |
-| 4 | PR #2059 — ADR-0026 Threshold Rationale was an in-place rewrite, inconsistent with addendum format used in ADR-0034 and ADR-0077 | yes | yes | fixed this pass (ADR restored to original + addendum section added) |
-
-`prevention_ladder:`
-
-- **rung 0 — already covered by an existing gate?** No — `bin/check-docs` validates ADR frontmatter and doc content vs. reality, but no gate re-validates hand-authored PR body claims against the final diff or authoritative source files after a post-review commit lands.
-- **rung 1 — extend an existing gate?** Partial landing rung. `bin/check-docs` could be extended to parse known structured claim patterns (version strings, numeric baselines cited as `X → Y`) from PR bodies and verify them against the diff or a declared source file. However, free-form prose patterns are hard to parse reliably and this would add significant false-positive risk. Better as a rule doc.
-- **rung 2 — a rule doc under `.claude/rules/`?** **Landing rung.** Add a companion note to `.claude/rules/auto-commit.md` or a new `.claude/rules/pr-body-claims.md` (example) rule requiring: (a) any autonomous-loop run that authors a PR body with specific version strings or numeric figures must cite the authoritative source file inline; (b) any post-review commit that modifies a file mentioned in the PR body Summary must trigger a body re-review before the commit is pushed. This addresses both the stale-claim defect and the ADR format inconsistency.
-- **rungs 3–5 — PHPStan rule / CI gate / hook?** Not applicable — the surface is PR body text, not PHP code, and a CI gate cannot validate semantic accuracy of free-form prose against an authoritative source at PR-check time.
-
-`artifact destination:` `.claude/rules/pr-body-claims.md` (example) — or an addendum to `.claude/rules/auto-commit.md`. Ships in a repo worktree as a normal PR.
-
-`provenance:` (discovered 2026-09-02 during #2059)
+➜ L43 Autonomous-loop doc-fix PR body contains stale claims and inconsistent ADR authoring format after post-review commit — ✅ Implemented (2026-09-05, #2131): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ### L44 Upstream overlap silently drops a plan phase; Phase 2a pre-rebase artifact captures post-rebase state, making the drop undetectable
 
@@ -887,6 +867,91 @@ Landing rung: **1** for backlog ID citations (extend `pr-body-negative-claim-rec
 **provenance:** (discovered 2026-09-06 during /pr-ready Phase 6 review of #2083; second recurrence of F1 class on this same PR)
 
 **Status (2026-09-06):** ⬜ Open — 🟦.
+
+---
+
+### L70 `pr-body-negative-claim-recheck.md` covers negative-claim-list re-reads but not Summary-prose re-reads when a post-review commit modifies a Summary-mentioned file
+
+*(discovered 2026-09-05 during #2131)*
+
+**class:** A post-review commit that modifies a file already named in the PR body's `## Summary` section silently invalidates Summary-section prose without triggering a targeted re-read. The existing rule (`pr-body-negative-claim-recheck.md`) already re-reads the negative-claim list on every commit; the uncovered gap is Summary-section prose — nothing cross-references the Summary-mentioned file set to trigger a re-read there.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #2131 — a post-review commit modified `ibl5/docs/backlog/loop-engineering-backlog.md` (named in `## Summary`); no mechanism triggered a re-read of Summary-section prose, leaving the requirement (b) bullet inaccurate until caught by Phase 6 plan-fidelity review | yes | yes — not prevented by existing rule | ⬜ Open |
+
+**prevention_ladder:**
+
+- rung 0 — `.claude/rules/pr-body-negative-claim-recheck.md` exists and fires on every commit, but it is a behavioral prompt only — it carries no parse of the Summary to derive a file-set trigger. Phase 6 catches this class at review time (as it did here), but not at commit-push time.
+- rung 1 — extend `pr-body-negative-claim-recheck.md` to add requirement (b): when a post-review commit modifies a file named in `## Summary`, the rule fires a targeted re-read of **Summary-section prose** (the negative-claim list is already covered by the existing rule). Landing rung.
+- rung 2 — a separate rule doc is not warranted; requirement (b) belongs as a named clause in the existing rule.
+
+Landing rung: **1** (extend `pr-body-negative-claim-recheck.md` to add the Summary-file cross-reference trigger for Summary-prose re-reads as requirement (b)).
+
+**artifact destination:** `.claude/rules/pr-body-negative-claim-recheck.md` (in-repo)
+
+**provenance:** (discovered 2026-09-05 during #2131)
+
+**Status (2026-09-05):** ⬜ Open — 🟦.
+
+---
+
+### L71 Autonomous-loop impl deviated from plan "exact content" recipe without declaring the deviation
+
+*(discovered 2026-09-06 during #2131)*
+
+**class:** An autonomous-loop implementation that delivers a rule doc at significant compression relative to the plan's stated "exact content" recipe without recording the deviation or its rationale in the PR body, leaving reviewers unable to assess whether the compression was intentional.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #2131 — `.claude/rules/pr-body-claims.md` shipped at ~1.2 KB against a plan recipe of ~4.5 KB; the `## What triggered this rule` section (both PR #2059 failure narratives) was dropped without declaration in the PR body | yes | yes | not fixed — filed |
+
+**prevention_ladder:**
+- rung 0 — no existing gate compares shipped rule doc content against plan recipe content.
+- rung 1 — extending an existing gate: not feasible; plan recipes are free-form Markdown with no canonical diff surface.
+- rung 2 — a rule doc requiring that any deviation from a plan's "exact content" recipe be declared in the PR body Scope with a one-line rationale. Landing rung.
+- rungs 3–5 — not applicable; the surface is PR body authoring, not PHP code or CI.
+
+Landing rung: **2** — a rule doc under `.claude/rules/` requiring declared deviations from "exact content" plan recipes. Zero gate overhead; surfaced at the authoring step where the cost of a miss is lowest.
+
+**artifact destination:** `.claude/rules/` (new file, in-repo)
+
+**provenance:** (discovered 2026-09-06 during #2131)
+
+**Status (2026-09-06):** 📝 Note — not fixed; deviation is non-regression (enforcement norm intact); prevention filed.
+
+---
+
+### L72 Loop-authored backlog entry cited unreachable squash-artifact SHA; archive entry missing blank line before GFM table
+
+*(discovered 2026-09-06 during #2131)*
+
+**class:** An autonomous-loop-authored backlog entry that cites a commit SHA that is a squash artifact and will be unreachable on `master` after merge; and a companion archive entry whose `**occurrence table:**` heading is not followed by a blank line, causing GFM to render the table as prose.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/docs/backlog/loop-engineering-backlog.md` L70 — cited `0ca67f8b4` (squash artifact; unreachable post-merge) | yes | fixed this pass | fixed this pass |
+| 2 | `ibl5/docs/backlog/archive/loop-engineering-backlog-archive.md` L43 entry — `**occurrence table:**` not followed by blank line; GFM table renders as prose | yes | fixed this pass | fixed this pass |
+
+**prevention_ladder:**
+- rung 0 — no existing gate validates that SHAs cited in backlog entries resolve to reachable ancestors of HEAD.
+- rung 1 — extending `bin/check-docs`: could warn on commit-SHA tokens in backlog prose whose SHA is not a reachable ancestor of HEAD. Feasible; low false-positive risk.
+- rung 2 — a rule doc: "when filing a backlog entry, cite the PR number rather than a commit SHA; if a SHA is essential, confirm it is a reachable ancestor of HEAD at filing time." Cheaper and sufficient. Landing rung.
+- rungs 3–5 — not applicable; the surface is backlog authoring, not PHP code or CI.
+
+Landing rung: **2** — rule doc under `.claude/rules/` (or addendum to `.claude/rules/pr-body-claims.md` since both govern PR/backlog authoring quality).
+
+**artifact destination:** `.claude/rules/` (addendum or new file, in-repo)
+
+**provenance:** (discovered 2026-09-06 during #2131)
+
+**Status (2026-09-06):** 📝 Note — fixed this pass (SHA replaced, blank line added); prevention filed.
 
 ---
 

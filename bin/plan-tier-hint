@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+# plan-tier-hint — advisory architect-tier pre-check for the /plan Step 3
+# routing decision. Prints one of: xhigh | default | sonnet, and exits 0.
+#
+# The hint is ADVISORY. The canonical checklist at
+# .claude/skills/plan/SKILL.md Step 3 check 1 is authoritative, and the
+# orchestrating session owns the final routing call. Nothing consumes this
+# script's exit status as a gate.
+#
+# The decision keys on what a change DOES to an enforcement mechanism, never on
+# which directory it touches: a gate path alone never escalates, a gate path
+# plus a weakening verb does. Description text and the file list feed one
+# haystack, because at Step 3 there is usually no file list yet.
+#
+# Deliberately no `set -e`: a non-matching grep returns 1 and would abort.
+# Bash 3.2 compatible — no associative arrays, no mapfile, no ${var,,}.
+
+set -u
+
+usage() {
+    cat <<'USAGE'
+Usage: bin/plan-tier-hint [--files <p>[,<p>...]] [--desc <text>] [--explain]
+       <description> | bin/plan-tier-hint
+
+  --files    comma-separated paths the change touches (optional)
+  --desc     task description text (optional; read from stdin if absent)
+  --explain  append a TAB and the reason (which check fired, which token matched)
+  -h|--help  print usage, exit 0
+
+Prints exactly one of: xhigh | default | sonnet      exit 0
+No input at all (no --files, no --desc, empty/absent stdin): usage on stderr, exit 2.
+USAGE
+}
+
+FILES=""
+DESC=""
+EXPLAIN=0
+HAVE_DESC=0
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --files)
+            if [ $# -lt 2 ]; then usage >&2; exit 2; fi
+            FILES="$2"; shift 2 ;;
+        --files=*)
+            FILES="${1#--files=}"; shift ;;
+        --desc)
+            if [ $# -lt 2 ]; then usage >&2; exit 2; fi
+            DESC="$2"; HAVE_DESC=1; shift 2 ;;
+        --desc=*)
+            DESC="${1#--desc=}"; HAVE_DESC=1; shift ;;
+        --explain)
+            EXPLAIN=1; shift ;;
+        -h|--help)
+            usage; exit 0 ;;
+        --)
+            shift ;;
+        -*)
+            usage >&2; exit 2 ;;
+        *)
+            if [ -z "$DESC" ]; then DESC="$1"; else DESC="$DESC $1"; fi
+            HAVE_DESC=1; shift ;;
+    esac
+done
+
+# Read the description from stdin only when --desc was absent and stdin is not a
+# terminal, so an interactive invocation with no arguments exits 2 rather than
+# hanging on a read that will never come.
+if [ "$HAVE_DESC" -eq 0 ] && [ ! -t 0 ]; then
+    DESC="$(cat)"
+fi
+
+if [ -z "$DESC" ] && [ -z "$FILES" ]; then
+    usage >&2
+    exit 2
+fi
+
+FILES_NL="$(printf '%s' "$FILES" | tr ',' '\n')"
+HAY="$(printf '%s\n%s\n' "$DESC" "$FILES_NL" | tr '[:upper:]' '[:lower:]')"
+
+# Alternations live in variables, never in a comment body: the whole-tree doc
+# scan resolves repo-path tokens inside leading comments of scripts here.
+SECURITY_RE='(sql injection|xss|csrf|authz|authoriz|authentic|auth-gated|credential|secret|token leak|privilege|sanitiz|escap[ei]|trust boundary|security surface)'
+DESTRUCTIVE_RE='(drop table|drop column|destructive migration|delete from|truncate|data loss|irreversible migration)'
+BOOTSTRAP_RE='(bootstrap hazard|governs its own|its own merge|auto[_ -]merge|human[- ]signoff|phase 6\.5|arming condition)'
+GATE_RE='(bin/check-[a-z0-9-]+|bin/lib/plan-(impl-model|model-consistency|model-tier)|plan-gate-(edit|skill|commit)|output-guard|bash-guard|explore-model-gate|plans-write-guard|subagent-persist-gate|ci-log-guard|headless-wakeup-guard|executable gate|hook deny|gate condition|enforcement mechanism)'
+WEAKEN_RE='(remov|delet|relax|disabl|weaken|loosen|bypass|waive|exempt|turn off|opt[- ]out|strip|soften)'
+RECIPE_RE='(explicit recipe|step-by-step recipe|mechanical sweep|marker[- ]swap)'
+PATTERN_RE='(existing pattern|pattern to copy|copy the pattern|same shape as)'
+RECIPE_BACKED_RE='recipe-backed'
+
+match() {
+    printf '%s' "$HAY" | grep -Eq "$1"
+}
+
+first_token() {
+    printf '%s' "$HAY" | grep -Eo "$1" | head -n 1
+}
+
+TIER=""
+REASON=""
+
+if match "$SECURITY_RE"; then
+    TIER="xhigh"
+    REASON="check 1a — security surface / trust boundary token '$(first_token "$SECURITY_RE")'"
+elif match "$DESTRUCTIVE_RE"; then
+    TIER="xhigh"
+    REASON="check 1a — destructive migration token '$(first_token "$DESTRUCTIVE_RE")'"
+elif match "$BOOTSTRAP_RE"; then
+    TIER="xhigh"
+    REASON="check 1b — bootstrap hazard token '$(first_token "$BOOTSTRAP_RE")'"
+elif match "$GATE_RE" && match "$WEAKEN_RE"; then
+    TIER="xhigh"
+    REASON="check 1c — executable gate '$(first_token "$GATE_RE")' plus weakening verb '$(first_token "$WEAKEN_RE")'"
+elif match "$RECIPE_BACKED_RE"; then
+    TIER="sonnet"
+    REASON="check 2 — recipe-backed"
+elif match "$RECIPE_RE" && match "$PATTERN_RE"; then
+    TIER="sonnet"
+    REASON="check 2 — explicit recipe '$(first_token "$RECIPE_RE")' plus named existing pattern '$(first_token "$PATTERN_RE")'"
+else
+    TIER="default"
+    REASON="check 3 — no check-1 trigger matched and nothing marks the task recipe-backed"
+fi
+
+if [ "$EXPLAIN" -eq 1 ]; then
+    printf '%s\t%s\n' "$TIER" "$REASON"
+else
+    printf '%s\n' "$TIER"
+fi
+exit 0

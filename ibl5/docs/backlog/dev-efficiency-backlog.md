@@ -116,7 +116,7 @@ last_verified: 2026-09-07
 | E95 | Unasked-for `last_verified` change with duplicate YAML key in `ibl5/docs/decisions/README.md` | ✅ fixed this pass | — | XS |
 | E96 | Three residual isolation/scope gaps in `bin/bug-pipeline-test-env` (F3/F6/F7 from #1950 Phase 6) | ⬜ Open | — | S |
 | E97 | Stale numeric count in PR body Scope prose (Phase 6 findings from #2160) | ⬜ Open | — | XS |
-| E62 | PR #1801 Phase 6.5 — PR body `### Changes` ID drift after renumber commit, plan recipe staleness, undeclared Phase 6.5 scope creep (F4 fixed; F1/F2/F3 filed) | ⬜ Open | — | XS |
+| E98 | PR #1801 Phase 6.5 — PR body `### Changes` ID drift after renumber commit, plan recipe staleness, undeclared Phase 6.5 scope creep (F4 fixed; F1/F2/F3 filed) | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -1791,7 +1791,7 @@ Landing rung: **1** — extend `bin/check-rules-byte-budget` to warn when the ag
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-07 during #2160)*
-### E62 PR #1801 Phase 6.5 — PR body `### Changes` ID drift after renumber commit, plan recipe staleness, undeclared Phase 6.5 scope creep
+### E98 PR #1801 Phase 6.5 — PR body `### Changes` ID drift after renumber commit, plan recipe staleness, undeclared Phase 6.5 scope creep
 
 **class:** a `/pr-ready` Phase 6.5 remediation pass that (F4) fails to re-read `### Changes` PR body bullets after a renumber commit changes the IDs being cited; (F1) applies plan recipes whose structural anchors master had already removed; (F2, F3) creates or modifies files not declared by any plan phase, producing scope creep flagged at Phase 6 6d.3.
 

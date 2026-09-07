@@ -99,6 +99,7 @@ last_verified: 2026-09-07
 | L70 | `pr-body-negative-claim-recheck.md` covers negative-claim-list re-reads but not Summary-prose re-reads when a post-review commit modifies a Summary-mentioned file | ⬜ Open | 🟦 | S |
 | L71 | Autonomous-loop impl deviated from plan "exact content" recipe without declaring the deviation in the PR body | 📝 Note | — | XS |
 | L72 | Loop-authored backlog entry cited unreachable squash-artifact SHA; archive entry missing blank line before GFM table | 📝 Note | — | XS |
+| L73 | Forced-verification row in `_plan-verification.md` references lsof port guard deleted before shipping — row's live-instance check cannot self-verify | ⬜ Open | 🟥 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -453,6 +454,7 @@ not add backticks or markdown links to a row.
 | 2026-09-05 | #2121 | class: new always-loaded rule doc committed to wrong directory tree during implementation — bin/check-rules-byte-budget scans only the correct $RULES_DIR, so the misplaced file passes the gate silently until manually relocated | routed to: Rung 4 - note in .claude/rules/doc-freshness.md clarifying always-loaded .claude/rules/*.md files must be created at the exact repo-root path, not inside any subdirectory (e.g. not ibl5/.claude/rules/) | prior: -- |
 | 2026-09-05 | #2140 | class: a plan phase prescribes a specific numeric expected value for a phase-sensitive salary boundary case (e.g., cy=0) without tracing the resolver chain under each phase condition, producing an incorrect assertion that a later plan phase must overwrite | routed to: Rung 4 - new path-scoped rule doc .claude/rules/plan-phase-sensitive-expected-values.md: when a plan phase specifies an expected value for a characterization test involving resolveCurrentContractYear() or Season::advancesContractYears(), trace the resolver path under each phase condition to derive the value — domain intuition is insufficient for boundary cases where the dispatch chain collapses apparent differences | prior: -- |
 | 2026-08-16 | #1899 | class: shell-function-as-timeout-argument — timeout(1) execvp()s its argument; wrapping a shell function name exits 127 at exec time, undetectable at plan-authoring time | routed to: Rung 4 - verification test at the execution site (row 9 of bin/test-bug-pipeline-hunt exercises run_under_starved_env+timeout under the credential-starved env); the exit-127 failure surfaced and fixed the argument order inline during implementation | prior: -- |
+| 2026-08-21 | #1950 | class: a shell port-guard that pipes lsof output to grep -qv without stripping the column header always fires the "occupied by other process" branch regardless of actual port state, because the lsof header line never matches the process name | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan adding or modifying a port-guard or process-detection guard that pipes lsof to a pattern filter must assert the port-free case exits with the expected free-port verdict (no false positive from the header line) | prior: -- |
 ```
 
 ---
@@ -1114,3 +1116,30 @@ Landing: rung 1 — extend `.claude/rules/pr-body-negative-claim-recheck.md` to 
 **F8 note (class: n/a):** Row 8 tick `[x]` in PR body conflicts with the E62 record (which logged the row as unticked from the prior review). Resolves when E62 is renumbered to E70 and its content reflects the current run. prevention_ladder: no gate warranted — one-off artifact of an ID collision that is fixed in E70.
 
 *(discovered 2026-09-06 during /pr-ready Phase 6 review of #2123)*
+
+---
+
+### L73 Forced-verification row in `_plan-verification.md` references lsof port guard deleted before shipping
+
+**class:** A forced-verification row in `.claude/review-shared/_plan-verification.md` whose described guard (lsof port guard) no longer exists in the diff when the PR was reviewed, leaving a trigger pattern with no live instance to self-verify — the class of "body written → guard deleted → body row now asserts something absent."
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `.claude/review-shared/_plan-verification.md` (lsof port-guard row, added in the Phase 9 retrospective commit) — the lsof guard it describes was removed before shipping | yes — same class as `pr-body-negative-claim-recheck.md` | live | not fixed — filed |
+
+**Why it matters:** The forced-verification row existed to enforce that lsof-style port guards are reviewed on any PR introducing them. When the guard itself was removed from the diff, the row became a phantom trigger — it neither protects against a guard-in-PR nor signals its own obsolescence. The pr-body-negative-claim-recheck.md rule covers PR body negative claims; this class applies to `_plan-verification.md` trigger rows, which are structurally identical in their failure mode.
+
+**Fix:** When a retrospective commit adds a `_plan-verification.md` row that references a guard, a cross-check should confirm the guard exists in the current diff before the row is committed. Alternatively, extend `pr-body-negative-claim-recheck.md` to name `_plan-verification.md` rows as a second surface where the "negative claim vs. actual diff" check applies.
+
+**prevention_ladder:**
+- rung 0 — not covered; `_plan-verification.md` rows are not checked against the current diff.
+- rung 1 — cannot extend an existing gate to catch this (no gate reads `_plan-verification.md` content against the live diff).
+- rung 2 — a rule doc noting that `_plan-verification.md` rows describing deleted guards must be removed or retargeted at time of deletion; `.claude/rules/pr-body-negative-claim-recheck.md` partially covers this class (the failure mode is identical); extending that rule's scope to `_plan-verification.md` rows is the landing rung.
+- rung 3/4/5 — no PHPStan or CI check can validate markdown-prose alignment with a live diff.
+- **landing rung: rung 2** — extend `pr-body-negative-claim-recheck.md` scope to cover `_plan-verification.md` rows; no gate warranted.
+
+**artifact destination:** `.claude/rules/pr-body-negative-claim-recheck.md` — in-repo (extend scope to `_plan-verification.md` rows)
+
+**provenance:** (discovered 2026-09-05 during #1950 Phase 6.5 review)

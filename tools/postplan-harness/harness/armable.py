@@ -1,9 +1,8 @@
-"""Phase 6.5 — the eleven ported arming conditions as pure, typed functions.
+"""Phase 6.5 — the twelve ported arming conditions as pure, typed functions.
 
 The numbers track the SKILL's condition numbers, not this list's position, so the
-set is deliberately {1..10, 13} with gaps: condition (11) (unresolved review-thread
-findings) reads the GitHub review-thread API and stays skill-only, and (12)
-(plan-intent fidelity) is not in the harness yet.
+set is deliberately {1..10, 12, 13} with gaps: condition (11) (unresolved
+review-thread findings) reads the GitHub review-thread API and stays skill-only.
 
 Faithful port of .claude/skills/post-plan/_phase-6.5-arm-auto-merge.md +
 bin/lib/pr-armable.sh. Historically each condition was a separate model-driven
@@ -99,6 +98,7 @@ class ArmInputs:
     headless: bool
     dep_state_lookup: Callable[[int], str]    # pr number -> state ("MERGED"/"OPEN"/"UNKNOWN")
     llm_safety_holds: list[str] = field(default_factory=list)  # bounded-LLM ADDed holds
+    fidelity_verdict: Optional[str] = None    # Phase 5.5 verdict word; None = never ran (blocks)
     plan_slug_drift: str = ""                 # plan adopted by slug drift -> hold
 
 
@@ -164,5 +164,19 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
                               f"plan '{inp.plan_slug_drift}' adopted by slug drift — "
                               "confirm it is this branch's plan"
                               if inp.plan_slug_drift else ""))
+
+    # Condition (12) — NOT (11). The number tracks the skill's condition number, not
+    # this list's position: the skill's condition (11) (unresolved review-thread
+    # findings) reads the GitHub review-thread API and is not ported here. The
+    # harness's condition (13) above is a different condition — master's
+    # plan-slug-drift hold (PR #2164) — and does not correspond to the skill's
+    # (11). Do not renumber this to 11.
+    # Fail-closed and additive: this can only add a hold. `None` means Phase 5.5 never
+    # ran, which is indeterminate, not clean.
+    fid = (inp.fidelity_verdict or "").strip()
+    fid_ok = fid in ("READY", "READY WITH NOTES")
+    cs.append(ConditionResult(12, "plan-fidelity-verdict", not fid_ok,
+                              f"fidelity verdict={inp.fidelity_verdict!r}; need READY or READY WITH NOTES"
+                              if not fid_ok else ""))
 
     return ArmDecision(armed=not any(c.blocked for c in cs), conditions=cs)

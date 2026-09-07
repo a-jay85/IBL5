@@ -1263,48 +1263,6 @@ Read this as exposure, not as four confirmed-false digests: only #2084 is verifi
 `artifact destination: this entry`
 
 *(discovered 2026-09-05 during PR #1900 Phase 6 plan-intent fidelity review)*
-
-### E97 Reuse the `/pr-ready` Phase 6 verdict when the branch diff has not changed
-**Location:** `.claude/skills/pr-ready/SKILL.md` (Phase 6), the `pr-ready-phase6` agent
-definition, and the Phase 7 sticky verdict comment written to the PR.
-**Problem:** `bin/pr-cycle` can pass over the same PR on several nights. Every pass that
-reaches Phase 6 spawns the pinned Opus 5 `pr-ready-phase6` agent for a full plan-fidelity
-review over the whole post-rebase diff — the single most expensive step in a readying
-session — even when nothing about the branch's own commits changed since the last verdict.
-**Suggested direction:** Key the verdict on a digest of `git patch-id` over `master...HEAD`
-and store that key inside the Phase 7 sticky verdict comment the run already writes. On a
-later pass, recompute the key; on a match, reuse the stored verdict and skip the Phase 6
-spawn. Conflict resolution during a rebase rewrites the affected commits and therefore
-changes their patch-ids, so that sub-case fails closed on its own and needs no special
-handling.
-**The hole this idea has not closed:** patch-id equality proves the *branch's own commits*
-are unchanged. It does **not** prove the rebase left them semantically intact. `master` can
-rename a symbol the branch calls; every patch-id on the branch is preserved, the merge is
-clean, and the fidelity verdict is nonetheless invalid — which is exactly the class Phase 6
-exists to catch. A stricter key would have to bind the base as well (base SHA **plus** the
-patch-id digest), at the cost of invalidating the cache on every `master` commit and
-recovering much less of the saving. Choosing between the cheap key and the correct one is
-the design fork, and it needs its own plan; do not implement the cheap key on the strength
-of this entry alone.
-**Cheap sibling already shipped:** the pre-read guard in `bin/pr-cycle` (this PR) declines
-the entire readying session — Phase 6 included — when `bin/pr-triage` already reports the
-PR as `ARMABLE`. That recovers the repeat-pass cost for terminal-bucket PRs with no cache
-and no new key — but it does **not** escape the base-staleness question this entry is
-about. `ARMABLE` binds the PR body's clearance text and the head-SHA check states; it
-never binds the base SHA. So a `master` move can leave a PR reading `ARMABLE` on a
-clearance granted against an older base, and the skip declines a Phase 6 run that might
-have caught the drift. The skip inherits that exposure rather than creating it — the very
-next line, `_arm_and_classify`, already arms auto-merge on the identical bucket. E65
-therefore covers both halves: the remaining case (a PR that genuinely still needs readying
-but whose diff has not moved) and the shared key (any reuse decision must survive a base
-move, which is what makes base SHA plus patch-id the candidate rather than patch-id
-alone).
-**Risk if untouched:** one avoidable Opus 5 Phase 6 run per cycle pass per
-still-being-readied PR — recurring, and the largest single line item in a readying session.
-**Status (2026-09-06):** Open — deferred from the `bin/pr-cycle` ARMABLE-skip PR, which
-deliberately scoped `/pr-ready` out.
-
-*(discovered 2026-09-06 during Phase 6 review of the pr-cycle-skip-ready-when-armable PR)*
 | 1 | `bin/pr-ready-now:851` — `notify()` reads only `$MARKER` file; no fallback to `$LOG` | yes (2A) | was live | fixed this pass |
 | 2 | `bin/test-pr-ready-now:2287` — case 38 pinned line 34 by shasum instead of content-based grep | yes (2B) | was live | fixed this pass |
 | 3 | `bin/test-pr-ready-now:2252` — case 35 scanned whole file when no `EnterWorktree` present | yes (3A) | was live | fixed this pass |

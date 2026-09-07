@@ -83,10 +83,6 @@ last_verified: 2026-09-07
 | E55 | PR #2129 Phase 6.5 — PR body false E2E claim, omitted grep finding, vacuous VM selector; all fixed this pass | ⬜ Open | — | XS |
 | E56 | PR #2129 Phase 6.5 — SKILL.md size-band gate not updated after deliberate file growth; fixed this pass | ⬜ Open | — | XS |
 | E67 | PR #1900 Phase 6.5 — dead self-references to old path `bin/db-sync-now` (example) in `ibl5/bin/db-sync-now` (4 sites: lines 11, 12, 67, 93); all fixed this pass | ⬜ Open | — | XS |
-| E98 | `/pr-ready` Phase 6 re-runs a full Opus plan-fidelity review on every cycle pass; reuse the prior verdict when the branch diff is unchanged | ⬜ Open | 🟥 | M |
-| E63 | PR #1900 Phase 6.5 — dead self-references to old path `bin/db-sync-now` (example) in `ibl5/bin/db-sync-now` (4 sites: lines 11, 12, 67, 93); all fixed this pass | ⬜ Open | — | XS |
-| E97 | `/pr-ready` Phase 6 re-runs a full Opus plan-fidelity review on every cycle pass; reuse the prior verdict when the branch diff is unchanged | ⬜ Open | 🟥 | M |
-| E67 | PR #1900 Phase 6.5 — dead self-references to old path `bin/db-sync-now` (example) in `ibl5/bin/db-sync-now` (4 sites: lines 11, 12, 67, 93); all fixed this pass | ⬜ Open | — | XS |
 | E64 | PR #1900 Phase 6.5 — 5 duplicate `last_verified:` keys in `ibl5/docs/decisions/README.md` frontmatter; collapsed to single key this pass | ⬜ Open | — | XS |
 | E54 | /pr-ready Phase 6.5 remediation — PR #2091: dual-channel transport omission, test pin drift, over-broad scan | ⬜ Open | — | S |
 | E62 | /pr-ready Phase 6.5 remediation — PR #2091: backlog entry structural defect (ID collision, split entry body, orphaned content) | ⬜ Open | — | XS |
@@ -1794,45 +1790,3 @@ Landing rung: **1** — extend `bin/check-rules-byte-budget` to warn when the ag
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-07 during #2160)*
-
-### E98 Reuse the `/pr-ready` Phase 6 verdict when the branch diff has not changed
-**Location:** `.claude/skills/pr-ready/SKILL.md` (Phase 6), the `pr-ready-phase6` agent
-definition, and the Phase 7 sticky verdict comment written to the PR.
-**Problem:** `bin/pr-cycle` can pass over the same PR on several nights. Every pass that
-reaches Phase 6 spawns the pinned Opus 5 `pr-ready-phase6` agent for a full plan-fidelity
-review over the whole post-rebase diff — the single most expensive step in a readying
-session — even when nothing about the branch's own commits changed since the last verdict.
-**Suggested direction:** Key the verdict on a digest of `git patch-id` over `master...HEAD`
-and store that key inside the Phase 7 sticky verdict comment the run already writes. On a
-later pass, recompute the key; on a match, reuse the stored verdict and skip the Phase 6
-spawn. Conflict resolution during a rebase rewrites the affected commits and therefore
-changes their patch-ids, so that sub-case fails closed on its own and needs no special
-handling.
-**The hole this idea has not closed:** patch-id equality proves the *branch's own commits*
-are unchanged. It does **not** prove the rebase left them semantically intact. `master` can
-rename a symbol the branch calls; every patch-id on the branch is preserved, the merge is
-clean, and the fidelity verdict is nonetheless invalid — which is exactly the class Phase 6
-exists to catch. A stricter key would have to bind the base as well (base SHA **plus** the
-patch-id digest), at the cost of invalidating the cache on every `master` commit and
-recovering much less of the saving. Choosing between the cheap key and the correct one is
-the design fork, and it needs its own plan; do not implement the cheap key on the strength
-of this entry alone.
-**Cheap sibling already shipped:** the pre-read guard in `bin/pr-cycle` (this PR) declines
-the entire readying session — Phase 6 included — when `bin/pr-triage` already reports the
-PR as `ARMABLE`. That recovers the repeat-pass cost for terminal-bucket PRs with no cache
-and no new key — but it does **not** escape the base-staleness question this entry is
-about. `ARMABLE` binds the PR body's clearance text and the head-SHA check states; it
-never binds the base SHA. So a `master` move can leave a PR reading `ARMABLE` on a
-clearance granted against an older base, and the skip declines a Phase 6 run that might
-have caught the drift. The skip inherits that exposure rather than creating it — the very
-next line, `_arm_and_classify`, already arms auto-merge on the identical bucket. E98
-therefore covers both halves: the remaining case (a PR that genuinely still needs readying
-but whose diff has not moved) and the shared key (any reuse decision must survive a base
-move, which is what makes base SHA plus patch-id the candidate rather than patch-id
-alone).
-**Risk if untouched:** one avoidable Opus 5 Phase 6 run per cycle pass per
-still-being-readied PR — recurring, and the largest single line item in a readying session.
-**Status (2026-09-06):** Open — deferred from the `bin/pr-cycle` ARMABLE-skip PR, which
-deliberately scoped `/pr-ready` out.
-
-*(discovered 2026-09-06 during Phase 6 review of the pr-cycle-skip-ready-when-armable PR)*

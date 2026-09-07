@@ -86,6 +86,9 @@ last_verified: 2026-09-06
 | L57 | `bin/pr-ready-now:434` claims both `STOP:` and `PUSH FAILED` are matched as line prefixes, but only `STOP:` is anchored; `PUSH FAILED` uses unanchored `grep -qF`. Decide whether to anchor `PUSH FAILED` or correct the comment — a gate change needing its own verification, deliberately out of scope for L47. | ⬜ Open | 🟥 | S |
 | L58 | Reconcile `~/claude-plans/pr-ready-dm-and-push-retry.md` with the `HOOK REJECTED` verdict: §6.1's *"`PUSH FAILED` is genuinely non-retriable"* is now scoped, and the `.claude/skills/pr-ready/scripts/push.sh` `shasum` pinned at Phase 6.6/8.3 is stale because this PR edited that file. Re-record the digest before executing that plan. | ⬜ Open | 🟦 | S |
 | L59 | PR body coordinate citations (backlog row IDs, source line numbers) go stale after commits that renumber rows or shift code — no gate recomputes or validates them after push | ⬜ Open | 🟦 | S |
+| L60 | Third recurrence of L59 class on PR #2083: body notes (c)/(d)/(e) cited L53/L54 after Phase 3 renaming to L57/L58; archive `(see L53)` also stale — both fixed this pass | ✅ fixed this pass | — | XS |
+| L61 | Plan document mandated a string literal for the push.sh discriminator without cross-checking the hook source; initial implementation shipped dead recovery code | ✅ fixed this pass | — | XS |
+| L62 | Phase 6 notes N-2 and N-3 — class n/a for both: N-2 (sixth file mandatory by backlog-housekeep, declared), N-3 (plan Verification Matrix rows cite wrong literal, outside repo scope) | ✅ fixed this pass | — | XS |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -866,3 +869,65 @@ Landing rung: **1** for backlog ID citations (extend `pr-body-negative-claim-rec
 `artifact destination: this entry`
 
 *(discovered 2026-09-05 during PR #1900 Phase 6 plan-intent fidelity review)*
+
+---
+
+### L60 Third recurrence of stale coordinate citation (L59 class): PR body notes cited L53/L54 after Phase 3 renaming to L57/L58; archive cross-ref also stale
+
+**class:** A PR body coordinate citation (backlog row L-number) not updated after a Phase 3 rebase renumbering caused the cited IDs to change, with the same stale reference appearing in the archive file that recorded the resolved row.
+
+**occurrence table:**
+
+| # | Finding | Same class? | Live? | Status |
+|---|---------|-------------|-------|--------|
+| 1 | F-1 — `#2083` body notes (c)/(d)/(e) cited L53/L54 after Phase 3 renamed branch rows to L57/L58 | yes | yes | fixed this pass (`gh pr edit`) |
+| 2 | F-2 — archive `loop-engineering-backlog-archive.md:199` `(see L53)` should be `(see L57)` | yes | yes | fixed this pass |
+
+Third recurrence of this class on #2083 (previous two: L53/L54→L51/L52 renaming and push.sh line-shift; both fixed in a prior remediation pass, recorded in L59). Prevention gate tracked in L59; this entry records the occurrence only.
+
+**prevention_ladder:** rung 0 — L59 is the filed prevention item for exactly this class; gate not yet built. No additional prevention warranted here beyond L59.
+
+**artifact destination:** n/a — prevention is L59.
+
+**provenance:** (discovered 2026-09-06 during /pr-ready Phase 6 review of #2083, third occurrence)
+
+---
+
+### L61 Plan document mandated wrong string literal for push.sh discriminator; initial implementation shipped dead recovery code
+
+**class:** A plan document that quoted a string literal to match at runtime without cross-checking the source that emits it, causing the initial implementation to ship a `case` arm that can never fire.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `~/claude-plans/pr-ready-hook-rejected-recovery.md` §2.1 — mandated grepping for `"branch is not rebased onto origin/master"` but `bin/pre-push-adr-hook` emits `"branch does not contain origin/master"` | yes | fixed | fixed this pass (commit `1f4bb089b`) |
+
+**prevention_ladder:**
+- rung 0 — no existing gate verifies that a plan's quoted string literals appear in the cited source. Not covered.
+- rung 1 — not applicable; no existing gate to extend.
+- rung 2 — rule doc: when a plan quotes a string literal to match at runtime, cite the source file and line rather than the literal; the implementation then reads the source, not the plan. Low-overhead authoring norm.
+- **landing rung:** rung 2 — rule doc addition to plan-authoring guidance.
+
+**artifact destination:** a new clause in `.claude/skills/plan/_architect-contract.md` or a companion rule.
+
+**provenance:** (discovered 2026-09-06 during /pr-ready Phase 6 review of #2083, N-1)
+
+---
+
+### L62 Phase 6 notes N-2 and N-3 — plan quality issues, class n/a for both
+
+**class:** n/a — N-2 (sixth file mandatory by backlog-housekeep, declared in PR body, deviation is correct); N-3 (plan Verification Matrix rows cite the wrong literal string, but the matrix lives outside the repo and is not modified in in-PR mode).
+
+**occurrence table:**
+
+| # | Finding | Same class? | Live? | Status |
+|---|---------|-------------|-------|--------|
+| 1 | N-2 — sixth file (`loop-engineering-backlog-archive.md`) beyond plan's five-file bound; deviation mandatory and declared | class n/a | n/a | not fixed — no fix needed |
+| 2 | N-3 — four Verification Matrix rows cite the old discriminator literal; matrix is outside the repo | class n/a | n/a | not fixed — outside repo scope; plan hygiene only |
+
+**prevention_ladder:** no gate warranted — N-2's deviation is correct behavior (backlog-housekeep mandates the archive); N-3 is stale plan documentation in an out-of-repo file, acceptable given that the tests still pass and the correct behavior shipped.
+
+**artifact destination:** n/a — no gate.
+
+**provenance:** (discovered 2026-09-06 during /pr-ready Phase 6 review of #2083, N-2 and N-3)

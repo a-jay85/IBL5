@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-07-30
+last_verified: 2026-09-07
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -49,3 +49,9 @@ human signoff.
 beats `<slug>-2.md` beats `<slug>.md`; a non-numeric suffix like `-shared-context.md` is never a
 variant), so no handoff file is needed, and the detached child reparents under launchd and clears
 its own plan-gate independently. Override the selection with `bin/post-plan-now --plan <abs-path>`.
+
+When no `<slug>.md` exists at all, resolution falls back once to a **slug-drift** match —
+exactly one `<prefix>-<slug>.md` (the shape `/plan` produces when the plan filename and the
+branch name disagree). An adopted drift match HOLDS auto-merge for that run via arming
+condition (11), because adoption is a guess; two or more candidates is ambiguous and stays
+plan-blind.

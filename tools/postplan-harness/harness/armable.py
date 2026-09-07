@@ -1,4 +1,4 @@
-"""Phase 6.5 — the ten arming conditions as pure, typed functions.
+"""Phase 6.5 — the eleven arming conditions as pure, typed functions.
 
 Faithful port of .claude/skills/post-plan/_phase-6.5-arm-auto-merge.md +
 bin/lib/pr-armable.sh. Historically each condition was a separate model-driven
@@ -94,6 +94,7 @@ class ArmInputs:
     headless: bool
     dep_state_lookup: Callable[[int], str]    # pr number -> state ("MERGED"/"OPEN"/"UNKNOWN")
     llm_safety_holds: list[str] = field(default_factory=list)  # bounded-LLM ADDed holds
+    plan_slug_drift: str = ""                 # plan adopted by slug drift -> hold
 
 
 def evaluate(inp: ArmInputs) -> ArmDecision:
@@ -150,5 +151,10 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     pipe = "pipeline-authored" in inp.pr_labels
     cs.append(ConditionResult(10, "pipeline-authored-floor", pipe,
                               "pipeline-authored label present" if pipe else ""))
+
+    cs.append(ConditionResult(11, "plan-slug-drift", bool(inp.plan_slug_drift),
+                              f"plan '{inp.plan_slug_drift}' adopted by slug drift — "
+                              "confirm it is this branch's plan"
+                              if inp.plan_slug_drift else ""))
 
     return ArmDecision(armed=not any(c.blocked for c in cs), conditions=cs)

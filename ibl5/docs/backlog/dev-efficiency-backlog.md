@@ -82,7 +82,7 @@ last_verified: 2026-09-06
 | E54 | PR #2084 Phase 6.5 — rebase silently dropped implementation commit; lost-work proof blind to pre-run loss | ⬜ Open | — | XS |
 | E55 | PR #2129 Phase 6.5 — PR body false E2E claim, omitted grep finding, vacuous VM selector; all fixed this pass | ⬜ Open | — | XS |
 | E56 | PR #2129 Phase 6.5 — SKILL.md size-band gate not updated after deliberate file growth; fixed this pass | ⬜ Open | — | XS |
-| E63 | PR #1900 Phase 6.5 — dead self-references to old path `bin/db-sync-now` (example) in `ibl5/bin/db-sync-now` (4 sites: lines 11, 12, 67, 93); all fixed this pass | ⬜ Open | — | XS |
+| E67 | PR #1900 Phase 6.5 — dead self-references to old path `bin/db-sync-now` (example) in `ibl5/bin/db-sync-now` (4 sites: lines 11, 12, 67, 93); all fixed this pass | ⬜ Open | — | XS |
 | E64 | PR #1900 Phase 6.5 — 5 duplicate `last_verified:` keys in `ibl5/docs/decisions/README.md` frontmatter; collapsed to single key this pass | ⬜ Open | — | XS |
 | E54 | /pr-ready Phase 6.5 remediation — PR #2091: dual-channel transport omission, test pin drift, over-broad scan | ⬜ Open | — | S |
 | E62 | /pr-ready Phase 6.5 remediation — PR #2091: backlog entry structural defect (ID collision, split entry body, orphaned content) | ⬜ Open | — | XS |
@@ -1053,7 +1053,7 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 
 *(discovered 2026-09-06 during Phase 6 review of #2140)*
 
-### E62 `/pr-ready` merge digest is authored in Phase 6 and published verbatim in Phase 7 — Phase 6.5 remediation between them can falsify it, and nothing re-reads it
+### E66 `/pr-ready` merge digest is authored in Phase 6 and published verbatim in Phase 7 — Phase 6.5 remediation between them can falsify it, and nothing re-reads it
 
 **class:** A **stale descriptive claim published as current**. The five-line merge digest is written by the Phase 6 reviewer from the *pre-remediation* diff, and emitted by the Phase 7 composer **verbatim**. Any Phase 6.5 remediation commit landing between those two phases silently falsifies the digest, and no phase, script, or test re-reads it against the final diff. This is the same failure *ordering* as `.claude/rules/pr-body-negative-claim-recheck.md` (claim written at T → commit at T+1 falsifies it → nothing re-reads), applied to the digest instead of a negative-scope bullet.
 
@@ -1087,14 +1087,14 @@ Note the asymmetry: `_phase7-verdict.md:43` **already** handles this exact stale
 
 `artifact destination: .claude/skills/pr-ready/_phase7-verdict.md — add the digest basis field to the provenance line, NOT to the ### Merge digest block; bin/test-pr-ready-now case 28 — add the freshness assertion`
 
-**relationship to E54:** E54 covers the *underlying event* on the same PR (`rebase-dropped-commit`, and `lostwork.sh` being blind to a pre-run loss). E62 is a distinct class: E54 is about work being lost, E62 is about the **report** of that loss outliving its own correction. Fixing E54 would not fix E62 — any remediation commit, for any reason, falsifies the digest the same way.
+**relationship to E54:** E54 covers the *underlying event* on the same PR (`rebase-dropped-commit`, and `lostwork.sh` being blind to a pre-run loss). E66 is a distinct class: E54 is about work being lost, E66 is about the **report** of that loss outliving its own correction. Fixing E54 would not fix E66 — any remediation commit, for any reason, falsifies the digest the same way.
 
 **exposure measurement (2026-09-06):** the `### Merge digest` block is new (landed via #2106), so the population is small by construction — but the exposure rate within it is total. Of the 20 most recently merged PRs, 4 carry a `/pr-ready` sticky verdict comment (#2141, #2133, #2129, #2126); **all 4 carry both a `### Merge digest` block and evidence that Phase 6.5 remediation commits landed after the Phase 6 review**. That is 4/4 structurally exposed, i.e. every digest published so far describes a diff that was subsequently changed.
 
 Read this as exposure, not as four confirmed-false digests: only #2084 is verified to have been *materially* wrong (it reported the implementation as lost after restoration). The other three may be stale in ways too minor to have been noticed — which is precisely the problem, since nothing checks. The measurement upgrades the landing rung from "one anecdote" to "the ordering fires on every run that remediates", and remediation is the common case, not the exception.
 
 *(discovered 2026-09-06 while reading the merge digest for #2084, which reported the implementation as lost after it had already been restored in-branch)*
-### E63 Dead self-references in relocated script `ibl5/bin/db-sync-now`
+### E67 Dead self-references in relocated script `ibl5/bin/db-sync-now`
 
 **class:** A shell script containing usage text, help output, and user-visible error messages that refer to its own invocation by the old pre-relocation path (`bin/db-sync-now` (example)), when the file now lives at `ibl5/bin/db-sync-now`. Four dead references (help comment lines 11/12, unknown-flag `printf` line 67, `--status` BROKEN echo line 93) were all fixed in PR #1900 Phase 6.5.
 ### E62 /pr-ready Phase 6.5 remediation — PR #2091: dual-channel transport omission, test pin drift, over-broad scan

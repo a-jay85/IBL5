@@ -1,6 +1,6 @@
 ---
 description: Automouse autonomous workflow (formerly "nightly") — launchd fires claude -p on a recurring schedule, running two context-isolated agents per plan (implementation + post-plan) with time guards and incremental checkpoints.
-last_verified: 2026-08-29
+last_verified: 2026-09-06
 paths: "bin/automouse/**"
 ---
 
@@ -27,6 +27,7 @@ A headless `claude -p` process runs on a recurring schedule via macOS `launchd`.
 | Re-enable the automouse job | `launchctl load ~/Library/LaunchAgents/com.ibl5.automouse.plist` |
 | Force-trigger now | `launchctl start com.ibl5.automouse` |
 | Requeue skipped plans | `bin/automouse/queue requeue` |
+| Skip the between-plans master canary | `AUTOMOUSE_SKIP_CANARY=1 bin/automouse/run` |
 | Self-heal staleness-FP skips | `bin/automouse/self-heal` |
 | Preview self-heal (no changes) | `bin/automouse/self-heal --dry-run` |
 | Check logs | `cat ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/logs/$(date +%Y-%m-%d).log` |
@@ -47,7 +48,9 @@ A headless `claude -p` process runs on a recurring schedule via macOS `launchd`.
   skipped/  symlinks moved here when skipped (ambiguity/errors/poison-pill);
             a sibling <plan>.md.staleness marker tags a *staleness* skip (read by bin/automouse/self-heal)
   handoff/  JSON files bridging state from implementation to post-plan agent
-  reports/  per-run markdown reports (YYYY-MM-DD-{done|skipped|env-stop|no-queue|error}-<slug>.md);
+  reports/  per-run markdown reports (YYYY-MM-DD-{done|skipped|env-stop|no-queue|error}-<slug>.md
+            and YYYY-MM-DD-canary-park.md — no -<slug> suffix, written at plan boundaries when the
+            master health check fails; there is no current plan at a boundary so no slug applies);
             plus YYYY-MM-DD-costs.md — per-phase token cost roll-up written by bin/automouse/run
   logs/     claude -p output logs + launchd stdout/stderr
   *.archive/  startup archival: logs/reports/done/skipped entries idle >7 days are
@@ -84,7 +87,8 @@ absolute targets keep resolving after the move. `queue/` (pending work) and `han
 ### Self-heal
 
 Before the startup archival block, `bin/automouse/run` freshens the local master checkout (a
-`git fetch` + `merge --ff-only`), then runs `bin/automouse/self-heal`. The self-heal script
+`git fetch` + `merge --ff-only`); this same refresh also runs at each plan boundary when plans
+remain queued (the between-plans master canary). Then it runs `bin/automouse/self-heal`. The self-heal script
 scans `skipped/` for plans carrying a `<plan>.md.staleness` sidecar marker — the signal that
 a plan was skipped specifically by the staleness gate, not for ambiguity / poison-pill
 (already-merged plans are not skipped at all — they land in `done/`). For each such plan, it re-runs `bin/check-plan-staleness` against the

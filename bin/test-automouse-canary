@@ -1,0 +1,290 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-automouse-canary — regression test for the between-plans master
+# health canary in bin/automouse/run (run_between_plans_canary,
+# write_canary_park_report, and the loop-bottom dispatch block).
+#
+# The canary runs at a plan boundary, freshens the main checkout's master, and
+# checks two signals: bin/check-master-ci-green, then a 5s curl smoke against
+# the main Docker stack. A genuinely red signal PARKS the queue — the loop
+# breaks, every remaining plan stays in queue/, and no attempt counter moves.
+#
+# The load-bearing polarity this locks: bin/check-master-ci-green exits 1 for
+# THREE distinct conditions, and only "checks failed:" means master is poisoned.
+# "checks still running:" and "check-run(s) found" mean the verdict is not known
+# yet — and /post-plan arms `gh pr merge --auto` BEFORE watching CI, so a
+# just-merged master is pending at exactly this moment on every successful
+# night. Parking on pending would convert the loop's own success into a stall,
+# so those two return 4 (proceed with a warning) instead of 1 (park).
+#
+# Cases 8 and 9 run the REAL bin/check-master-ci-green against fixture JSON via
+# its documented GH_API_CMD stub, so the two stderr strings the proceed/park
+# split keys on are pinned to the shipped implementation rather than to a stub.
+# A reword of those messages fails here instead of silently flipping polarity.
+#
+# The two functions are EXTRACTED from bin/automouse/run and eval'd rather than
+# copied, so the test can never drift from the implementation.
+#
+# Run: bin/test-automouse-canary  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+RUNNER="$SCRIPT_DIR/automouse/run"
+GREEN="$SCRIPT_DIR/check-master-ci-green"
+
+if [ ! -f "$RUNNER" ]; then
+    echo "FAIL: cannot find $RUNNER"
+    exit 1
+fi
+
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+FAILED=0
+
+# --- extract the implementation under test -------------------------------
+
+# extract_fn <name> — from the definition line to the first lone `}`.
+extract_fn() {
+    awk -v fn="$1" '
+        $0 ~ "^" fn "\\(\\) \\{" { capture = 1 }
+        capture { print }
+        capture && /^\}/ { exit }
+    ' "$RUNNER"
+}
+
+for fn in write_canary_park_report run_between_plans_canary; do
+    FN_SRC="$(extract_fn "$fn")"
+    if [ -z "$FN_SRC" ]; then
+        echo "FAIL: could not extract $fn from $RUNNER"
+        exit 1
+    fi
+    eval "$FN_SRC"
+done
+
+# --- assertion helpers ---------------------------------------------------
+
+expect() { # label want got
+    if [ "$2" -eq "$3" ]; then echo "ok: $1"
+    else echo "FAIL: $1 (want exit $2, got $3)"; FAILED=1; fi
+}
+want() { # label haystack needle
+    case "$2" in *"$3"*) echo "ok: $1" ;;
+    *) echo "FAIL: $1 (missing: $3)"; FAILED=1 ;; esac
+}
+refuse() { # label haystack needle — needle must be ABSENT
+    case "$2" in *"$3"*) echo "FAIL: $1 (unexpectedly present: $3)"; FAILED=1 ;;
+    *) echo "ok: $1" ;; esac
+}
+same() { # label want got
+    if [ "$2" = "$3" ]; then echo "ok: $1"
+    else echo "FAIL: $1 (want '$2', got '$3')"; FAILED=1; fi
+}
+
+# --- per-case sandbox ----------------------------------------------------
+
+# A PATH-prepended curl stub. Its exit code is read from $TMP/curl-rc at call
+# time, so a case can flip the smoke signal without rebuilding the sandbox.
+STUBBIN="$TMP/stubbin"
+mkdir -p "$STUBBIN"
+cat > "$STUBBIN/curl" <<'STUBEOF'
+#!/bin/sh
+exit "$(cat "$CANARY_TEST_TMP/curl-rc" 2>/dev/null || echo 0)"
+STUBEOF
+chmod +x "$STUBBIN/curl"
+export PATH="$STUBBIN:$PATH"
+export CANARY_TEST_TMP="$TMP"
+
+CASE_N=0
+
+# setup_case <ci-stderr-text> <ci-exit> <curl-exit>
+# Builds a fresh REPO/NIGHTLY_DIR/QUEUE_DIR/LOG sandbox and a
+# $REPO/bin/check-master-ci-green stub. Populates the queue with two real plan
+# files plus a matching .attempts counter so the queue-unchanged assertion is
+# behavioural, not vacuous.
+setup_case() {
+    CASE_N=$(( CASE_N + 1 ))
+    SANDBOX="$TMP/case$CASE_N"
+    REPO="$SANDBOX/repo"
+    NIGHTLY_DIR="$SANDBOX/nightly"
+    QUEUE_DIR="$NIGHTLY_DIR/queue"
+    LOG="$SANDBOX/run.log"
+    PLANS_RUN=1
+    export REPO NIGHTLY_DIR QUEUE_DIR LOG PLANS_RUN
+
+    mkdir -p "$REPO/bin" "$QUEUE_DIR" "$NIGHTLY_DIR/reports"
+    git init -q "$REPO"
+    : > "$LOG"
+
+    # Two queued plans + an attempt counter — the bytes the park path must not touch.
+    printf '# Plan alpha\n' > "$QUEUE_DIR/alpha.md"
+    printf '# Plan beta\n'  > "$QUEUE_DIR/beta.md"
+    printf '1\n'            > "$QUEUE_DIR/alpha.md.attempts"
+
+    # Signal-1 stub. Touches a sentinel so "never invoked" is assertable.
+    CI_SENTINEL="$SANDBOX/ci-invoked"
+    cat > "$REPO/bin/check-master-ci-green" <<STUBEOF
+#!/bin/sh
+touch "$CI_SENTINEL"
+echo "$1" >&2
+exit $2
+STUBEOF
+    chmod +x "$REPO/bin/check-master-ci-green"
+
+    printf '%s\n' "$3" > "$TMP/curl-rc"
+}
+
+# snapshot_queue — content-addressed snapshot of every file under QUEUE_DIR.
+snapshot_queue() {
+    find "$QUEUE_DIR" -type f -exec shasum {} \; | sort
+}
+
+# --- Case 1: both signals green ------------------------------------------
+
+setup_case "PASS: 12 check-run(s) all green" 0 0
+BEFORE="$(snapshot_queue)"
+RC=0; run_between_plans_canary || RC=$?
+expect "green-returns-0" 0 "$RC"
+PARK_REPORTS="$(find "$NIGHTLY_DIR/reports" -name '*-canary-park.md' | wc -l | tr -d ' ')"
+same "green-writes-no-park-report" "0" "$PARK_REPORTS"
+same "green-queue-unchanged" "$BEFORE" "$(snapshot_queue)"
+
+# --- Case 2: CI genuinely red → park -------------------------------------
+
+setup_case "FAIL: checks failed: phpunit (failure)" 1 0
+BEFORE="$(snapshot_queue)"
+RC=0; run_between_plans_canary || RC=$?
+expect "ci-red-returns-1" 1 "$RC"
+want "ci-red-detail-names-failure" "$CANARY_DETAIL" "checks failed"
+same "ci-red-queue-unchanged" "$BEFORE" "$(snapshot_queue)"
+
+# --- Case 3: CI pending → PROCEED (4), not park (1) ----------------------
+# This inverts the handed spec deliberately: /post-plan manufactures a pending
+# master at exactly this moment on every night a plan auto-merges.
+
+setup_case "FAIL: checks still running: e2e" 1 0
+BEFORE="$(snapshot_queue)"
+RC=0; run_between_plans_canary || RC=$?
+expect "ci-pending-returns-4-not-1" 4 "$RC"
+PARK_REPORTS="$(find "$NIGHTLY_DIR/reports" -name '*-canary-park.md' | wc -l | tr -d ' ')"
+same "ci-pending-writes-no-park-report" "0" "$PARK_REPORTS"
+same "ci-pending-queue-unchanged" "$BEFORE" "$(snapshot_queue)"
+
+# --- Case 3b: too-few / walkback-exhausted check-runs → PROCEED (4) -------
+
+setup_case "FAIL: only 0 check-run(s) found (minimum: 1)." 1 0
+BEFORE="$(snapshot_queue)"
+RC=0; run_between_plans_canary || RC=$?
+expect "ci-too-few-returns-4" 4 "$RC"
+same "ci-too-few-queue-unchanged" "$BEFORE" "$(snapshot_queue)"
+
+# --- Case 4: smoke red → park --------------------------------------------
+
+setup_case "PASS: 12 check-run(s) all green" 0 7
+BEFORE="$(snapshot_queue)"
+RC=0; run_between_plans_canary || RC=$?
+expect "smoke-red-returns-3" 3 "$RC"
+want "smoke-red-detail-names-curl-exit" "$CANARY_DETAIL" "curl exit 7"
+want "smoke-red-detail-names-ibl5-path" "$CANARY_DETAIL" "/ibl5/"
+same "smoke-red-queue-unchanged" "$BEFORE" "$(snapshot_queue)"
+
+# --- Case 5: AUTOMOUSE_SKIP_CANARY=1 bypasses everything ------------------
+
+setup_case "FAIL: checks failed: phpunit (failure)" 1 0
+BEFORE="$(snapshot_queue)"
+RC=0; AUTOMOUSE_SKIP_CANARY=1 run_between_plans_canary || RC=$?
+expect "skip-returns-0-despite-red-ci" 0 "$RC"
+want "skip-logs-bypass" "$(cat "$LOG")" "skipped (AUTOMOUSE_SKIP_CANARY=1)"
+if [ -e "$CI_SENTINEL" ]; then
+    echo "FAIL: skip-never-invokes-ci-stub (sentinel present)"; FAILED=1
+else
+    echo "ok: skip-never-invokes-ci-stub"
+fi
+same "skip-queue-unchanged" "$BEFORE" "$(snapshot_queue)"
+
+# --- Case 6: CI auth/usage error (exit 2) → env-stop ----------------------
+
+setup_case "ERROR: GitHub CLI is not authenticated." 2 0
+RC=0; run_between_plans_canary || RC=$?
+expect "ci-auth-error-returns-2" 2 "$RC"
+
+# --- Case 7: the park report's contents ----------------------------------
+
+setup_case "PASS: 12 check-run(s) all green" 0 0
+write_canary_park_report "ci-red" "detail text"
+REPORT="$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-canary-park.md"
+if [ -f "$REPORT" ]; then
+    echo "ok: park-report-written-at-dated-path"
+    BODY="$(cat "$REPORT")"
+    want "park-report-names-signal"    "$BODY" "ci-red"
+    want "park-report-names-detail"    "$BODY" "detail text"
+    want "park-report-counts-remaining" "$BODY" "Plans left in queue (untouched):** 2"
+    want "park-report-names-bypass"    "$BODY" "AUTOMOUSE_SKIP_CANARY=1"
+else
+    echo "FAIL: park-report-written-at-dated-path (no $REPORT)"; FAILED=1
+fi
+
+# --- Cases 8 & 9: the REAL bin/check-master-ci-green ----------------------
+# Pins the two stderr strings the proceed/park split keys on. Uses the script's
+# documented GH_API_CMD stub plus a `gh` stub whose auth check passes, so no
+# network and no gh credentials are needed. MAX_WALKBACK=0 keeps it off git log.
+
+cat > "$STUBBIN/gh" <<'STUBEOF'
+#!/bin/sh
+case "$1" in auth) exit 0 ;; *) exit 1 ;; esac
+STUBEOF
+chmod +x "$STUBBIN/gh"
+
+DSHA="deadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+
+printf '%s\n' '{"check_runs":[{"name":"e2e","status":"in_progress","conclusion":null,"completed_at":null,"started_at":"2026-09-06T09:00:00Z"}]}' \
+    > "$TMP/real-inprogress.json"
+OUT="$(MIN_REQUIRED_CHECKS=1 MAX_WALKBACK=0 GH_API_CMD="cat $TMP/real-inprogress.json #" \
+    "$GREEN" "$DSHA" 2>&1)"; RC=$?
+expect "real-inprogress-exits-1" 1 "$RC"
+want "real-inprogress-says-still-running" "$OUT" "checks still running"
+
+printf '%s\n' '{"check_runs":[{"name":"phpunit","status":"completed","conclusion":"failure","completed_at":"2026-09-06T10:00:00Z","started_at":"2026-09-06T09:00:00Z"}]}' \
+    > "$TMP/real-failure.json"
+OUT="$(MIN_REQUIRED_CHECKS=1 MAX_WALKBACK=0 GH_API_CMD="cat $TMP/real-failure.json #" \
+    "$GREEN" "$DSHA" 2>&1)"; RC=$?
+expect "real-failure-exits-1" 1 "$RC"
+want "real-failure-says-checks-failed" "$OUT" "checks failed"
+
+# --- Case 10: the dispatch block never refunds an attempt ----------------
+# The plan that just finished already had its .attempts file deleted on success,
+# so a refund here would credit a plan that did not fail. Every OTHER env-stop
+# call site in the runner calls refund_attempt first, which makes copying that
+# pattern into this block the obvious mistake.
+
+DISPATCH="$(awk '
+    /# --- Between-plans master health canary dispatch ---/ { capture = 1 }
+    capture { print }
+    capture && /^[[:space:]]*fi[[:space:]]*$/ { exit }
+' "$RUNNER")"
+
+if [ -z "$DISPATCH" ]; then
+    echo "FAIL: dispatch-block-extractable (empty extraction from $RUNNER)"; FAILED=1
+else
+    echo "ok: dispatch-block-extractable"
+    refuse "dispatch-block-has-no-refund" "$DISPATCH" "refund_attempt"
+    want "dispatch-block-guards-on-queue" "$DISPATCH" 'ls "$QUEUE_DIR"/*.md'
+    want "dispatch-block-parks-on-ci-red" "$DISPATCH" 'write_canary_park_report "ci-red"'
+    want "dispatch-block-parks-on-smoke-red" "$DISPATCH" 'write_canary_park_report "smoke-red"'
+fi
+
+# --- Case 11: the runner still parses ------------------------------------
+
+if bash -n "$RUNNER" 2>/dev/null; then
+    echo "ok: runner-parses-after-edit"
+else
+    echo "FAIL: runner-parses-after-edit (bash -n failed)"; FAILED=1
+fi
+
+if [ "$FAILED" -ne 0 ]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

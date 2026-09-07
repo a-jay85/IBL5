@@ -303,6 +303,16 @@ merge_bad="$TMP/merge-bad"; put_merge "$merge_bad" "Only One Job"
 "$CHECK" "$d_a" "$d_wf" "$merge_bad" "$CLEAN_PROMOTE" >/dev/null 2>&1
 expect "pp-p8-merge-script-mismatch" 1 $?
 
+# pp-absent-skips: no promote-to-production workflow → exit 0 with skip line
+d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"
+out="$("$CHECK" "$d_a" "$d_wf" "$CLEAN_MERGE" "$CLEAN_PROMOTE" 2>&1)"; rc=$?
+expect "pp-absent-skips" 0 "$rc"
+if printf '%s' "$out" | grep -q 'promote-to-production absent — skipped'; then
+  echo "ok: pp-absent-skips-skip-visible"
+else
+  echo "FAIL: pp-absent-skips — no skip line in output; output: $out"; FAILED=1
+fi
+
 # pp-merge-script-absent: absent merge script → exit 0 with visible P8 skip line
 d_a="$(fresh_actions)"; d_wf="$(fresh_workflows)"; put_promote "$d_wf" good
 out="$("$CHECK" "$d_a" "$d_wf" "$TMP/no-such-merge" "$CLEAN_PROMOTE" 2>&1)"; rc=$?

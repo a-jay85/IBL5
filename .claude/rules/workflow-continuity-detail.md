@@ -53,5 +53,5 @@ its own plan-gate independently. Override the selection with `bin/post-plan-now 
 When no `<slug>.md` exists at all, resolution falls back once to a **slug-drift** match —
 exactly one `<prefix>-<slug>.md` (the shape `/plan` produces when the plan filename and the
 branch name disagree). An adopted drift match HOLDS auto-merge for that run via arming
-condition (11), because adoption is a guess; two or more candidates is ambiguous and stays
+condition (13), because adoption is a guess; two or more candidates is ambiguous and stays
 plan-blind.

@@ -1,4 +1,9 @@
-"""Phase 6.5 — the eleven arming conditions as pure, typed functions.
+"""Phase 6.5 — the eleven ported arming conditions as pure, typed functions.
+
+The numbers track the SKILL's condition numbers, not this list's position, so the
+set is deliberately {1..10, 13} with gaps: condition (11) (unresolved review-thread
+findings) reads the GitHub review-thread API and stays skill-only, and (12)
+(plan-intent fidelity) is not in the harness yet.
 
 Faithful port of .claude/skills/post-plan/_phase-6.5-arm-auto-merge.md +
 bin/lib/pr-armable.sh. Historically each condition was a separate model-driven
@@ -152,7 +157,10 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     cs.append(ConditionResult(10, "pipeline-authored-floor", pipe,
                               "pipeline-authored label present" if pipe else ""))
 
-    cs.append(ConditionResult(11, "plan-slug-drift", bool(inp.plan_slug_drift),
+    # Condition (13) — NOT (11). The number tracks the skill's condition number, not
+    # this list's position: (11) is the skill-only unresolved-review-thread condition
+    # and (12) is plan-intent fidelity. Do not renumber this to 11 or 12.
+    cs.append(ConditionResult(13, "plan-slug-drift", bool(inp.plan_slug_drift),
                               f"plan '{inp.plan_slug_drift}' adopted by slug drift — "
                               "confirm it is this branch's plan"
                               if inp.plan_slug_drift else ""))

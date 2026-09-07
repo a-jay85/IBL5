@@ -2519,7 +2519,7 @@ grep -qF 'covers head <SHORT_HEAD_SHA>' "$f" || fail "28j: provenance-line templ
 grep -qF 'the second line of the body' "$f" || fail "28j: provenance placement clause missing from _phase7-verdict.md"
 grep -qF '_digest_labels' "$f" || fail "28j: _digest_labels rationale missing from _phase7-verdict.md"
 grep -qF 'git rev-parse --short=12 HEAD' "$f" || fail "28j: provenance capture command missing from _phase7-verdict.md"
-grep -qE '^last_verified: 2026-09-06$' "$f" || fail "28j: last_verified not bumped in _phase7-verdict.md"
+lv=$(grep -m1 -oE '^last_verified: [0-9-]+' "$f" | cut -d' ' -f2); [[ "$lv" > "2026-09-05" ]] || fail "28j: last_verified not bumped in _phase7-verdict.md (got $lv)"
 
 # --- 28k: SKILL.md prose pins ---
 f="$PRD/SKILL.md"
@@ -2527,7 +2527,7 @@ grep -qF '## DIGEST' "$f" || fail "28k: ## DIGEST missing from SKILL.md"
 grep -qF 'scripts/digest.sh' "$f" || fail "28k: scripts/digest.sh missing from SKILL.md"
 n_skill_merge=$(grep -c '### Merge digest' "$f" || true)
 [[ $n_skill_merge -eq 2 ]] || fail "28k: expected exactly 2 '### Merge digest' in SKILL.md, got $n_skill_merge"
-grep -qE '^last_verified: 2026-09-06$' "$f" || fail "28k: last_verified not bumped in SKILL.md"
+lv=$(grep -m1 -oE '^last_verified: [0-9-]+' "$f" | cut -d' ' -f2); [[ "$lv" > "2026-09-05" ]] || fail "28k: last_verified not bumped in SKILL.md (got $lv)"
 grep -qF 'covers head <sha>' "$f" || fail "28k: provenance line missing from SKILL.md Phase 7 stub"
 n_ends_in_one=$(grep -c 'the file ends in one' "$f" || true)
 [[ $n_ends_in_one -eq 0 ]] || fail "28k: 'the file ends in one' still present in SKILL.md — stale claim not removed"

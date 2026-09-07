@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed development-efficiency backlog entries, extracted from dev-efficiency-backlog.md.
-last_verified: 2026-09-06
+last_verified: 2026-09-07
 ---
 
 # Development-Efficiency Backlog — Archive
@@ -360,3 +360,33 @@ stops the run when no branch-changed path survives.
 **Risk if untouched:** Recurring lost nights; flake debt accumulates unmeasured.
 **What shipped:** `ibl5/bin/parse-playwright-flakes` extracts passed-on-retry specs from the merged Playwright JSON in `e2e-tests.yml`'s `merge-reports` job into a rolling `flake-ledger` artifact (90-day retention). `.github/workflows/flake-report.yml` (Sunday 13:43 UTC cron) downloads the latest ledger, runs `ibl5/bin/flake-ledger-report`, and DMs specs that flaked in ≥3 distinct runs via the existing `.github/actions/notify-discord` composite. Policy is **report-only**: nothing is auto-skipped or auto-retried.
 **Status (2026-09-06):** ✅ Implemented — shipped in e2e-flake-quarantine-ledger.
+
+### E57 `bin/adr-check` red at merge on #2124 and #2119 — new rule docs landed with no ADR and no `no-adr:` marker
+
+**class:** A decision-trigger-surface PR merged with the "Meta checks" `bin/adr-check` step red, because that check is **advisory** — `master`'s `required_status_checks.contexts` is `["Tests and Analysis", "E2E Tests", "human-signoff"]` only. GitHub permitted every merge; no protection was bypassed and no admin override was used. The residue is an audit-trail gap: `ibl5/docs/decisions/README.md` § "When an ADR is Required" item 2 fires on a new `.claude/rules/*.md` doc, and the policy's own remedy (`<!-- no-adr: reason -->` in the PR body) was never typed, so the record shows a triggered requirement with no disposition.
+
+A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4` placed the rule doc at `ibl5/.claude/rules/bin-help-span-and-secondary-assertions.md` (example) — an `ibl5/`-prefixed path that does not exist. The `adr` `dorny/paths-filter` glob is `.claude/rules/*.md` (no prefix), so the filter did not match, the `Run bin/adr-check` step was **skipped**, and the job reported green. Commit `c572dd6b` corrected the path, the filter then matched, and the step ran and genuinely failed ~2.5 minutes before merge. **A path-prefix typo converts a required-by-policy gate into a free green with no signal that anything was skipped.**
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #2124 — added `.claude/rules/scope-expansion-justification.md`; body has zero `no-adr` markers | yes | merged red 2026-09-05T16:43:10Z | disposition recorded below; no ADR owed |
+| 2 | PR #2119 — added `.claude/rules/bin-help-span-and-secondary-assertions.md`; body has zero `no-adr` markers | yes | merged red 2026-09-05T13:03:01Z | disposition recorded below; no ADR owed |
+| 3 | PR #2121 — added a rule doc, `adr-check` green | no (control) | n/a | body carries `<!-- no-adr: new always-loaded rule doc, authoring discipline only -->` — the correct precedent for this file class |
+| 4 | `472fe0a4` misplaced path ⇒ `adr` filter miss ⇒ step skipped ⇒ green | yes (skip-as-green) | mechanism still live | not fixed — a skipped `if:`-gated step is indistinguishable from a passing one in `statusCheckRollup` |
+
+**retroactive disposition (the marker that should have been in each body):** both files are path-conditional / always-loaded **authoring-discipline** rule docs — they govern how a PR body or a `bin/` help comment is written. Neither records an architectural decision, so neither owes an ADR; `ibl5/docs/decisions/README.md`'s bypass clause ("changes that genuinely don't need an ADR") is the correct disposition, exactly as applied in #2121. Writing an ADR for either would violate `.claude/rules/doc-freshness.md` § "Decision Records Are Append-Only" by asserting a decision nobody took.
+
+**prevention_ladder:**
+- rung 0 — `bin/adr-check` already exists and already produced the correct FAIL on both PRs. The gate is not broken; it is **non-blocking** (advisory context) and **`pull_request`-event-only**, so nothing re-flags the debt after merge.
+- rung 1 — no rule-doc fix available: a rule doc cannot make an advisory check blocking, and the authoring discipline it would encode ("type the marker") is already stated verbatim in `ibl5/docs/decisions/README.md`.
+- rung 2 — promote `Meta checks` to a required context on `master`. Delivered in PR #2144; applied as a post-merge operator action after that PR merged.
+- rung 3 — for occurrence 4, make the `adr` filter's skip observable (explicit `else`-branch step that prints "adr-check skipped: no decision-trigger paths in diff"). Delivered in PR #2144 (the adr paths-filter explicit skip step).
+- **landing rung:** rung 2 — `Meta checks` promoted to required status check on `master` after #2144 merged.
+
+`artifact destination: this entry, plus retroactive <!-- no-adr: --> markers applied to the bodies of #2124 and #2119`
+
+*(discovered 2026-09-05 while investigating recently merged PRs that carried red CI)*
+
+**Status (2026-09-06):** ✅ Implemented — rung 2 applied. "Meta checks" was promoted to a required status check on `master` via the branch-protection API after #2144 merged; `required_status_checks.contexts` is now `["Tests and Analysis", "E2E Tests", "human-signoff", "Meta checks"]` with `strict: true` unchanged. Read-back confirmed the `checks` array gained exactly one entry and that every field outside `required_status_checks` is byte-identical to the pre-call snapshot. Two operator corrections to the #2144 `## Post-merge steps` recipe were required and are recorded in E68: the repo slug was wrong (`ajaynicolas/IBL5`; the repo is `a-jay85/IBL5`), and the `jq` payload reconstructed protection from the legacy `contexts` array, which would have silently dropped `human-signoff`'s `app_id: 15368` binding — the PUT was rebuilt from `checks` to preserve it. All 16 then-open PRs already carried a `Meta checks` run, so no PR was wedged into permanent-pending; #2111 and #2043 carry a red `Meta checks` and are now correctly blocked from merging.

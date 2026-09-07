@@ -1,6 +1,6 @@
 ---
 description: Development-efficiency backlog — inner-loop speed (diff-scoped analysis, parallel tests), CI caching, dependency-bump batching, and worktree lifecycle automation, with per-entry status.
-last_verified: 2026-09-06
+last_verified: 2026-09-07
 ---
 
 # Development-Efficiency Backlog
@@ -87,8 +87,9 @@ last_verified: 2026-09-06
 | E54 | /pr-ready Phase 6.5 remediation — PR #2091: dual-channel transport omission, test pin drift, over-broad scan | ⬜ Open | — | S |
 | E62 | /pr-ready Phase 6.5 remediation — PR #2091: backlog entry structural defect (ID collision, split entry body, orphaned content) | ⬜ Open | — | XS |
 | E63 | PR #2091 Phase 6.5 — plan/code alignment notes (usage sed-range arithmetic, --help indentation, matrix pin drift, body omission); class n/a — all notes | ⬜ Open | — | XS |
-| E57 | `bin/adr-check` red at merge on #2124 and #2119 — new rule docs landed with no ADR and no `no-adr:` marker | ◑ Partial | 🟥 | S |
+| E57 | `bin/adr-check` red at merge on #2124 and #2119 — new rule docs landed with no ADR and no `no-adr:` marker | ✅ Implemented | 🟥 | S |
 | E65 | PR #2144 Phase 6.5 — E57 Status paragraph claimed retroactive `no-adr:` markers were "proposed, not applied" when they had been applied to both PR bodies on 2026-09-05 (PR #2136); fixed this pass | ⬜ Open | — | XS |
+| E68 | PR #2144 `## Post-merge steps` recipe carried a wrong repo slug (404) and a `jq` payload that would have dropped `human-signoff`'s `app_id` binding, with a verification step that `del()`d the field it was asserting about | ⬜ Open | 🟥 | S |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -945,11 +946,7 @@ All three fixed this pass: B1 and N3 via `gh pr edit`; N4 via the plan file VM.
 
 *(discovered 2026-09-05 during Phase 6 review of #2126)*
 
-### E57 `bin/adr-check` red at merge on #2124 and #2119 — new rule docs landed with no ADR and no `no-adr:` marker
-
-**class:** A decision-trigger-surface PR merged with the "Meta checks" `bin/adr-check` step red, because that check is **advisory** — `master`'s `required_status_checks.contexts` is `["Tests and Analysis", "E2E Tests", "human-signoff"]` only. GitHub permitted every merge; no protection was bypassed and no admin override was used. The residue is an audit-trail gap: `ibl5/docs/decisions/README.md` § "When an ADR is Required" item 2 fires on a new `.claude/rules/*.md` doc, and the policy's own remedy (`<!-- no-adr: reason -->` in the PR body) was never typed, so the record shows a triggered requirement with no disposition.
-
-A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4` placed the rule doc at `ibl5/.claude/rules/bin-help-span-and-secondary-assertions.md` (example) — an `ibl5/`-prefixed path that does not exist. The `adr` `dorny/paths-filter` glob is `.claude/rules/*.md` (no prefix), so the filter did not match, the `Run bin/adr-check` step was **skipped**, and the job reported green. Commit `c572dd6b` corrected the path, the filter then matched, and the step ran and genuinely failed ~2.5 minutes before merge. **A path-prefix typo converts a required-by-policy gate into a free green with no signal that anything was skipped.**
+➜ E57 `bin/adr-check` red at merge on #2124 and #2119 — new rule docs landed with no ADR and no `no-adr:` marker — ✅ Implemented (2026-09-06): see [archive](archive/dev-efficiency-backlog-archive.md).
 ### E58 PR #2133 Phase 6.5 — plan verification rows 4.e and 6.a false-positive on correct code; PR authoring notes
 
 **class:** Plan verification shell commands that extract a function body with `sed` then grep the full text—including comment lines—for forbidden identifiers, producing false positives when the function's own comments document the property being verified.
@@ -996,6 +993,8 @@ A second, sharper mechanism showed up inside #2119: its earlier commit `472fe0a4
 *(discovered 2026-09-05 while investigating recently merged PRs that carried red CI)*
 
 **Status (2026-09-06):** ◑ Partial — rung 3 built: the `adr` paths-filter gained an explicit skip step, so a filter miss is now stated in the job log and in the Actions step list instead of being indistinguishable from a pass. Rung 2 is decided and recorded (ADR-0120) but **not yet applied**: promoting "Meta checks" to a required status check on `master` is a post-merge operator action against the branch-protection API, and this entry stays ◑ until that call is made and read back. Rung 0 (the two merged PRs' disposition) is closed: the retroactive `no-adr:` markers were applied to both bodies on 2026-09-05 (PR #2136). 🟥 (bootstrap hazard: the PR changes the enforcement mechanism governing its own merge, so `auto_merge: false` and a human merges it).
+
+*(E57 fully implemented 2026-09-06 — archived: see [archive](archive/dev-efficiency-backlog-archive.md#e57-binadr-check-red-at-merge-on-2124-and-2119--new-rule-docs-landed-with-no-adr-and-no-no-adr-marker))*
 
 | 1 | `~/claude-plans/pr-cycle-dirty-rescue.md` row 4.e — greps `_rescue_one()` body for `MERGES\|armed.txt\|ledgered.txt\|pr merge\|_poll_merge\|_arm_and_classify\|POLL_CEILING`; hits five comment lines that document the "rescue is not a merge" invariant | yes | was live at plan-write | not fixed — filed (plan already merged; fix is authoring discipline) |
 | 2 | `~/claude-plans/pr-cycle-dirty-rescue.md` row 6.a — greps `_report_dry_run()` body for `_rescue_one\|_ready_pr\|--go`; hits three comment lines and one operator-facing echo string | yes | was live at plan-write | not fixed — filed |
@@ -1198,3 +1197,29 @@ Read this as exposure, not as four confirmed-false digests: only #2084 is verifi
 `artifact destination: this entry`
 
 *(discovered 2026-09-06 during PR #2144 Phase 6 plan-intent fidelity review)*
+
+### E68 PR #2144 `## Post-merge steps` recipe shipped a wrong repo slug and an `app_id`-dropping `jq` payload, with a verification step blind to the damage
+
+**class:** A PR body's post-merge operator recipe — hand-authored shell that runs against a live production API *after* the PR's own CI has passed, so no gate ever executes it. Two independent defects shipped green: a hardcoded owner (`ajaynicolas/IBL5`) that does not resolve (the repo is `a-jay85/IBL5`, remote `ssh://git@github.com/a-jay85/IBL5.git`), and a `jq` payload that reconstructed `required_status_checks` from the legacy `contexts` string array rather than the `checks` object array.
+
+The second is the sharper one. GitHub's branch-protection PUT accepts either shape, but `contexts` carries no `app_id`, so a round-trip through it silently rewrites every required check from a specific app binding to "any app may report this context". On `master` that would have moved `human-signoff` from `app_id: 15368` to `null` — converting an app-attested gate into one any token could satisfy. **The recipe's own Step 5.3 assertion 2, described in the PR body as "the load-bearing check", `del(...)`s `.required_status_checks.checks` from both sides before diffing — the only field carrying `app_id`.** Assertion 1 only counted `contexts` membership. The verification was structurally incapable of observing the regression the payload caused, and the recipe's rollback block reconstructed from `contexts` too, so a rollback would have re-applied the same damage.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #2144 body `## Post-merge steps` Step 5.1/5.2/5.3 — slug `ajaynicolas/IBL5` | yes | yes — `gh api` returned `HTTP 404` on first invocation | corrected at run time; PUT issued against `a-jay85/IBL5` |
+| 2 | PR #2144 body Step 5.2 — `jq` builds `required_status_checks.contexts`, dropping `app_id` | yes (silent-weakening) | yes — would have nulled `human-signoff`'s `app_id: 15368` | not executed; payload rebuilt from `.required_status_checks.checks` before the PUT |
+| 3 | PR #2144 body Step 5.3 assertion 2 — `del(.required_status_checks.checks)` on both diff sides | yes (blind verification) | yes | replaced at run time with a `checks`-array diff plus a `del(.required_status_checks, .url)` whole-object diff |
+| 4 | PR #2144 body Step 5.3 rollback block — same `contexts` reconstruction, same wrong slug | yes | yes | corrected rollback written to `/tmp/master-protection-rollback.json` before the PUT; never needed |
+
+**prevention_ladder:**
+- rung 0 — already covered? No. `bin/check-docs` and the `Meta checks` job read repo files; a fenced block inside a PR *body* is not a repo file and no gate parses one. `.claude/rules/pr-body-negative-claim-recheck.md` governs absence claims, not executable recipes.
+- rung 1 — extend an existing gate: `.claude/skills/pr-ready/SKILL.md`'s Phase 6 body checks already parse PR bodies for required sections. A cheap additive check could flag any fenced block in a PR body containing a repo slug literal that does not match `git remote get-url origin`. Catches occurrence 1 mechanically and cheaply; says nothing about 2–4.
+- rung 2 — forbid hardcoded slugs in PR-body recipes outright, requiring `$(gh repo view --json nameWithOwner -q .nameWithOwner)` or a bare `repos/{owner}/{repo}` template that `gh api` expands itself. Strictly better than rung 1 — removes the defect class rather than detecting instances.
+- rung 3 — the deeper defect (2–4) is that a post-merge recipe mutating a production API is authored by the same pass that authors its own verification, so a blind spot in the author's model appears in both halves and cancels out. The structural fix is a rule requiring that any branch-protection or other idempotent-API recipe round-trip through the **object** form (`checks`), and that its verification diff the *whole* object with only `.url`-family fields deleted — never `del()` a payload field it is asserting about.
+- **landing rung:** rung 2 + rung 3. Rung 2 is mechanical and belongs in the PR-body check surface; rung 3 is a rule doc governing post-merge recipe authoring. Rung 1 is subsumed by rung 2.
+
+`artifact destination: this entry; rung 2 → PR-body slug check in the /pr-ready Phase 6 surface; rung 3 → new rule doc on post-merge API recipe authoring`
+
+*(discovered 2026-09-06 while executing PR #2144's own `## Post-merge steps` Phase 5)*

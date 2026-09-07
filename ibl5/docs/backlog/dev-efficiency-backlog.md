@@ -91,6 +91,7 @@ last_verified: 2026-09-07
 | E65 | PR #2144 Phase 6.5 — E57 Status paragraph claimed retroactive `no-adr:` markers were "proposed, not applied" when they had been applied to both PR bodies on 2026-09-05 (PR #2136); fixed this pass | ⬜ Open | — | XS |
 | E68 | PR #2144 `## Post-merge steps` recipe carried a wrong repo slug (404) and a `jq` payload that would have dropped `human-signoff`'s `app_id` binding, with a verification step that `del()`d the field it was asserting about | ⬜ Open | 🟥 | S |
 | E62 | PR #1899 Phase 6.5 — stale test-row labels and PR body claims when rows renumbered post-impl | ⬜ Open | — | XS |
+| E68 | PR #1899 Phase 6.5 — stale test-row labels and PR body claims when rows renumbered post-impl | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -896,7 +897,7 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 
 *(discovered 2026-09-05 during Phase 6 review of #2084; root cause: prior /pr-ready run's Phase 2 rebase dropped 096320b0e using a bad --onto range)*
 
-### E62 PR #1899 Phase 6.5 — stale test-row labels and PR body claims when rows renumbered post-impl
+### E68 PR #1899 Phase 6.5 — stale test-row labels and PR body claims when rows renumbered post-impl
 
 **class:** hand-authored test-file row-number header and PR body bullets that name specific row numbers become stale when rows are renumbered mid-implementation — the same class as E45 and E52.
 

@@ -89,9 +89,10 @@ last_verified: 2026-09-06
 | L60 | Third recurrence of L59 class on PR #2083: body notes (c)/(d)/(e) cited L53/L54 after Phase 3 renaming to L57/L58; archive `(see L53)` also stale — both fixed this pass | ✅ fixed this pass | — | XS |
 | L61 | Plan document mandated a string literal for the push.sh discriminator without cross-checking the hook source; initial implementation shipped dead recovery code | ✅ fixed this pass | — | XS |
 | L62 | Phase 6 notes N-2 and N-3 — class n/a for both: N-2 (sixth file mandatory by backlog-housekeep, declared), N-3 (plan Verification Matrix rows cite wrong literal, outside repo scope) | ✅ fixed this pass | — | XS |
-| L51 | PR #1899 Phase 6 notes: (F3) `fixed`+`terminal:true` reject skips tier-climbing and goes direct to `give_up_needs_human`; (F6) loop-engineering backlog changed by PR but not declared in Scope prose | 📝 Note | — | XS |
-| L53 | PR #1899 Phase 6 notes — `fixed`+`terminal` skip and undeclared backlog addition | ⬜ Open | — | XS |
-| L54 | `fixed`+`terminal:true` in Gate-1 reject skips tier-climbing | ⬜ Open | — | XS |
+| L63 | PR #1899 Phase 6 notes — `fixed`+`terminal` skip and undeclared backlog addition | 📝 Note | — | XS |
+| L64 | `fixed`+`terminal:true` in Gate-1 reject skips tier-climbing | ⬜ Open | — | XS |
+| L65 | PR #1899 Phase 6.5 — backlog ID collisions from Phase 6.5 self-filing; three new entries collided with pre-existing IDs (L53→L63, L54→L64, E62→E68) | ✅ fixed this pass | — | S |
+| L66 | PR #1899 Phase 6 plan-quality notes N-2/N-3/N-4 — class n/a; out-of-plan diff files (N-2), out-of-plan `timeout` fix (N-3), test-row renumbering consistent (N-4) | 📝 Note | — | XS |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -744,10 +745,6 @@ Landing rung: **no gate warranted** — neither occurrence exists in the tree af
 
 **class:** A plan phase's test code that was implemented and committed was lost in a manual branch rebuild; the loss was invisible because CI passed — the missing tests had no footprint left to catch their own absence.
 
-### L53 PR #1899 Phase 6 notes — `fixed`+`terminal` skip and undeclared backlog addition
-
-**class:** two notes from Phase 6 review of #1899, both non-blocking.
-
 **occurrence table:**
 
 | # | File:line | Same class? | Live? | Status |
@@ -764,6 +761,15 @@ Landing rung: **no gate warranted** — neither occurrence exists in the tree af
 **provenance:** (discovered 2026-09-06 during #2141)
 
 **Status (2026-09-06):** ✅ fixed this pass — 🟦.
+
+### L63 PR #1899 Phase 6 notes — `fixed`+`terminal` skip and undeclared backlog addition
+
+**class:** two notes from Phase 6 review of #1899, both non-blocking.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
 | 1 | `bin/bug-pipeline-tick` — `terminal:true` check fires before a Gate-1 reject exits the tier-1 loop, sending the hunt to `give_up_needs_human` without climbing further tiers; the plan described rejection at tier 1 as never reaching a human directly (F3) | yes | live | 📝 Note — fail-safe direction; warrants its own plan |
 | 2 | `ibl5/docs/backlog/loop-engineering-backlog.md` — PR #1899 added a shell-function-as-timeout-argument row but did not mention the backlog change in the body Scope prose (F6) | near-miss | resolved | 📝 Note — additive and doc-only |
 
@@ -781,7 +787,7 @@ Landing rung: **no gate warranted** — neither occurrence exists in the tree af
 
 *(discovered 2026-09-05 during Phase 6 review of #1899)*
 
-### L54 `fixed`+`terminal:true` in Gate-1 reject skips tier-climbing
+### L64 `fixed`+`terminal:true` in Gate-1 reject skips tier-climbing
 
 **class:** a `verdict:"fixed"` result also carrying `terminal:true` that is rejected by Gate 1 (`observed_before != reported`) falls through to the `terminal` check at line 956 of `bin/bug-pipeline-tick`, skips the remaining model tiers, and hands directly to `give_up_needs_human` — contrary to the plan's stated intent that every Gate-1 reject climbs the full ladder before reaching a human.
 
@@ -977,3 +983,47 @@ Third recurrence of this class on #2083 (previous two: L53/L54→L51/L52 renamin
 **artifact destination:** n/a — no gate.
 
 **provenance:** (discovered 2026-09-06 during /pr-ready Phase 6 review of #2083, N-2 and N-3)
+
+---
+
+### L65 PR #1899 Phase 6.5 — backlog ID collisions from Phase 6.5 self-filing
+
+**class:** A Phase 6.5 self-filing pass assigned backlog IDs (L53, L54, E62) that were already in use in the same files; the collisions broke `bin/check-numbering` and corrupted the pre-existing L53 entry by splicing the new heading into the middle of its body.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/docs/backlog/loop-engineering-backlog.md` — new L53/L54 collided with pre-existing L53/L54 | yes | no | fixed this pass (renamed L63/L64) |
+| 2 | `ibl5/docs/backlog/dev-efficiency-backlog.md` — new E62 collided with pre-existing E62 | yes | no | fixed this pass (renamed E68) |
+
+**prevention_ladder:**
+- rung 0 — no existing gate catches this at filing time; `bin/check-numbering` catches it at CI but only after the commit lands.
+- rung 1 — extend `bin/check-numbering` with a pre-file check or add a helper that reads the highest ID before filing, so Phase 6.5 self-filing always uses the next available ID.
+- rung 2 — add a rule to `.claude/skills/pr-ready/_phase65-remediation.md` requiring the next available ID to be computed from `grep "^### [EL][0-9]"` before writing any new entry.
+
+Landing rung: **rung 2** — a rule doc change; warrants a prose edit to `.claude/skills/pr-ready/_phase65-remediation.md` or a dedicated `/plan`.
+
+**artifact destination:** `.claude/skills/pr-ready/_phase65-remediation.md` (rule addition)
+
+**provenance:** (discovered 2026-09-06 during /pr-ready Phase 6 review of #1899, B-1/B-2)
+
+---
+
+### L66 PR #1899 Phase 6 plan-quality notes N-2/N-3/N-4 — class n/a for all three
+
+**class:** n/a — N-2 (two backlog docs in diff not named by plan — additive and declared via Phase 5.9 files-changed block); N-3 (out-of-plan `timeout` argument fix in `bin/bug-pipeline-tick` — beneficial, not a regression); N-4 (test-row labels renumbered post-impl consistent throughout the test harness).
+
+**occurrence table:**
+
+| # | Finding | Same class? | Live? | Status |
+|---|---------|-------------|-------|--------|
+| 1 | N-2 — `ibl5/docs/backlog/loop-engineering-backlog.md` and `ibl5/docs/backlog/dev-efficiency-backlog.md` in diff but not named in plan | class n/a | n/a | not fixed — no fix needed; Phase 5.9 surfaced them |
+| 2 | N-3 — `bin/bug-pipeline-tick` `timeout` argument fix shipped out-of-plan | class n/a | n/a | not fixed — fix is correct; no action needed |
+| 3 | N-4 — test-row labels renumbered post-impl (rows 50-55→50-56) | class n/a | n/a | not fixed — renumbering consistent; no action needed |
+
+**prevention_ladder:** no gate warranted — N-2 is already surfaced by Phase 5.9 files-changed; N-3/N-4 are beneficial and self-consistent out-of-plan touches.
+
+**artifact destination:** n/a — no gate.
+
+**provenance:** (discovered 2026-09-06 during /pr-ready Phase 6 review of #1899, N-2/N-3/N-4)

@@ -1,6 +1,6 @@
 ---
 description: Development-efficiency backlog — inner-loop speed (diff-scoped analysis, parallel tests), CI caching, dependency-bump batching, and worktree lifecycle automation, with per-entry status.
-last_verified: 2026-09-07
+last_verified: 2026-09-06
 ---
 
 # Development-Efficiency Backlog
@@ -97,6 +97,17 @@ last_verified: 2026-09-07
 | E76 | PR #2042 Phase 6.5 — post-PR-open commit introduced unplanned production code; PR body scope and testing claims went stale with no gate | ⬜ Open | — | XS |
 | E77 | Rebase auto-merge silently mis-splices concurrent EOF entries in backlog docs | ⬜ Open | — | XS |
 | E78 | PR #2042 Phase 6.5 — N2 benign unplanned files, N3 PR body Scope under-enumeration, N4 PR title/commit subject mismatch | ⬜ Open | — | XS |
+| E72 | PR #2064 Phase 6.5 — stale hand-written PR body claims contradicting the final diff and code; B1/B2/B3/N1 fixed this pass | ⬜ Open | — | XS |
+| E73 | PR #1967 Phase 6.5 — duplicate `last_verified:` in ADR index + stale body path reference (Findings 1+2); body note finding; all fixed this pass or filed | ⬜ Open | — | S |
+| E74 | PR #1967 Phase 6.5 — stale PR body acceptance list claiming wrong ADR alternatives | ⬜ Open | — | XS |
+| E75 | PR #1967 Phase 6.5 — Phase 6.5 backlog entries inserted in wrong structural location | ⬜ Open | — | XS |
+| E79 | PR #1967 Phase 6.5 — orphaned duplicate block + stale plan-file matrix literals | ⬜ Open | — | XS |
+| E84 | Always-loaded rule addition fills resident byte budget to zero, leaving no headroom | ⬜ Open | — | S |
+| E85 | PR #1967 Phase 6.5 — missing `pp-absent-skips` test case for absent promote-to-production workflow | ✅ Implemented | — | XS |
+| E86 | PR #1967 Phase 6.5 — orphan reference bullet in ADR-0112 placed after `## Addendum` instead of `## References` | ✅ Implemented | — | XS |
+| E87 | PR #1967 Phase 6.5 — no duplicate-ID gate for backlog files; four duplicate-ID pairs undetected | ⬜ Open | — | XS |
+| E88 | PR #1967 Phase 6.5 — `pp-skip-renamed` test case removed; coverage note only | ⬜ Open | — | XS |
+| E89 | PR #1967 Phase 6.5 — first commit subject type `feat:` vs plan-mandated `chore:` | ⬜ Open | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -929,6 +940,100 @@ Archived: see [`archive/dev-efficiency-backlog-archive.md`](archive/dev-efficien
 
 *(discovered 2026-09-05 during Phase 6 review of #1899)*
 
+### E72 PR #2064 Phase 6.5 — stale hand-written PR body claims contradicting the final diff and code
+
+**class:** stale hand-written PR body claims contradicting the final diff and code — the PR body asserted behaviors, file lists, or test coverage that the final diff contradicted.
+
+**occurrence table:**
+
+| # | Finding | Status |
+|---|---------|--------|
+| B1 | stale PR body claim contradicting final diff — fixed this pass | fixed this pass |
+| B2 | stale PR body claim contradicting final diff — fixed this pass | fixed this pass |
+| B3 | stale PR body claim contradicting final diff — fixed this pass | fixed this pass |
+| N1 | stale PR body note contradicting final diff — fixed this pass | fixed this pass |
+
+**prevention_ladder:** no gate warranted this pass — all four findings fixed in-pass via `gh pr edit`; Phase 6 review is the existing catch mechanism.
+
+`artifact destination: n/a — no gate`
+
+*(discovered during Phase 6 review of #2064; all findings B1/B2/B3/N1 fixed in-pass)*
+
+### E73 PR #1967 Phase 6.5 — ADR index duplicate frontmatter key and stale body path reference
+
+**class (finding 1):** a duplicate YAML frontmatter mapping key (`last_verified:`) in a doc index that accumulates independent date bumps from concurrent auto-merged commits without deduplication, causing invalid YAML that strict parsers reject.
+
+**class (finding 2):** a hand-written PR body path reference to an ADR that was renumbered after the body was written, leaving the manual-test row pointing at a nonexistent file.
+
+**class (findings 3–6 / notes):** class: n/a — scope-prose "unchanged" wording (substance accurate; second clause discloses), unperformed pre-merge manual rows (by design), stale matrix acceptance-list items, cosmetic commit-subject and row-placement inconsistencies; none gatable.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/docs/decisions/README.md:3-5` | yes (finding 1) | yes | fixed this pass |
+| 2 | PR #1967 body Row 60 | yes (finding 2) | yes | fixed this pass (gh pr edit by caller) |
+| 3 | matrix row 60 acceptance list (four named alternatives) | near-miss (finding 2) | yes | not fixed — filed (stale matrix row; ADR content correct) |
+| 4 | matrix rows 30, 55 stale commands | near-miss (finding 2) | yes | not fixed — filed |
+
+Scan for other files with duplicate `last_verified:` keys:
+
+```bash
+find ibl5/docs -name '*.md' -exec sh -c 'c=$(grep -c "^last_verified:" "$1" 2>/dev/null); [ "$c" -gt 1 ] && echo "$1: $c"' _ {} \;
+```
+
+Result: `ibl5/docs/decisions/README.md` is the only occurrence; fixed this pass.
+
+**prevention ladder:**
+- rung 0: `bin/check-docs` runs on every PR but accepts any number of `last_verified:` keys per file — not covered.
+- rung 1: extend `bin/check-docs` to reject more than one `^last_verified:` line in a single file's frontmatter. This catches the defect at the point of introduction rather than at review time. All four `meta-tooling-bar.md` extend-before-add conditions hold: the extension is 1–2 lines of `grep -c` logic, it lives where the rest of the frontmatter checks already live, it has a direct measurable surface (frontmatter parsing), and no separate tool is needed.
+- Landing rung: **rung 1** — extend `bin/check-docs`.
+- For finding 2 (stale body path): no gate warranted — PR body references are hand-written and ephemeral; an ADR renumber is a rare event; the existing Phase 6 6d(4) check is the review-time backstop and already caught it.
+
+**artifact destination:** `bin/check-docs` (in-repo script, path `bin/check-docs`).
+
+**provenance:** (discovered 2026-09-05 during #1967)
+
+### E74 PR #1967 Phase 6.5 — stale PR body acceptance list claiming wrong ADR alternatives
+
+**class:** A manual-test acceptance list in a PR body that names specific ADR alternatives-considered items, but lists alternatives that are not present in the ADR's `## Alternatives Considered` section — the list was written against an early draft and never reconciled against the final ADR.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #1967 body Row 60 — claimed four alternatives (GITHUB_TOKEN, lease-based force flag, committed pause file, push-triggered workflow) but ADR-0112 names six different alternatives | yes | fixed | fixed this pass — corrected via gh pr edit to name all six actual alternatives |
+
+**prevention_ladder:**
+- rung 0 — no existing gate checks manual-test acceptance lists against ADR content.
+- rung 1 — Phase 6 review (6d check) already catches this; no mechanical gate can verify a PR body claim against an ADR's content cheaply.
+- **landing rung:** no gate warranted — Phase 6 is the existing catch mechanism; the defect is authoring-time drift between a PR body draft and the final ADR.
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-06 during Phase 6 review of #1967; fixed this pass via gh pr edit)*
+
+### E75 PR #1967 Phase 6.5 — Phase 6.5 backlog entries inserted in wrong structural location
+
+**class:** A Phase 6.5 remediation run inserted new backlog section entries between an existing entry's `**class:**` line and its `**occurrence table:**`, splitting that entry's content. The occurrence table and prevention_ladder of the split entry ended up rendered inside the newly-inserted entry's section. Additionally, the index table rows for the new entries were appended to a different section's observation table (which has a different column schema) instead of to the main index table at the top of the file.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/docs/backlog/dev-efficiency-backlog.md` — E72 (PR #2064) and E73 (PR #1967) section headers inserted between E69/PR#1899's `**class:**` and its `**occurrence table:**`; E69's content orphaned inside E73's section | yes | yes | fixed this pass — E69 body restored to E69's section (Part 1b structural repair) |
+| 2 | `ibl5/docs/backlog/dev-efficiency-backlog.md` lines 699-700 — E72/E73 index rows appended to E47's 3-column observation table instead of main index table | yes | yes | ⬜ Open — this occurrence as described was not present in any committed state of the PR diff |
+| 3 | `ibl5/docs/backlog/dev-efficiency-backlog.md` end of file — E73's occurrence table and prevention_ladder orphaned with no section header | yes | was live | fixed this pass — deleted duplicate block (was appended at file end, not moved) |
+
+**prevention_ladder:**
+- rung 0 — no existing gate validates backlog file structural integrity (column counts, section containment).
+- rung 1 — a structural lint for backlog files (checking that `**occurrence table:**` follows `**class:**` within the same section before the next `###` heading) could catch this at commit time; high false-positive risk on varied entry formats.
+- **landing rung:** no gate warranted this pass — three occurrences of the same root cause; surfacing as a known pattern for the future Phase 6.5 authoring prompt to note "insert at end of file, not between existing sections."
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-06 during Phase 6 review of #1967; structural repair done in Phase 6.5 remediation)*
+
 ### E55 PR #2126 Phase 6.5 — machine-authored post-review commit undisclosed in PR body
 
 **class:** A machine-authored remediation commit riding into an open PR post-review without the PR body's hand-written scope expansion paragraph and manual-testing coverage claim being updated — leaving a false positive "fully covered" assertion and an undisclosed extra file in the diff.
@@ -1361,3 +1466,116 @@ Landing rung: **1** — extend `bin/check-rules-byte-budget` to warn when the ag
 **provenance:** (discovered 2026-09-06 during #2131)
 
 **Status (2026-09-06):** ⬜ Open — 🟦.
+
+### E79 PR #1967 Phase 6.5 — orphaned duplicate block in backlog + stale plan-file matrix literals
+
+**class (finding 1):** a Phase 6.5 remediation commit duplicated rather than moved a backlog entry's occurrence table and prevention ladder, leaving a headerless duplicate block appended at end of file (the block was E73's content, already present in E73's section at line 921).
+
+**class (finding 2):** plan-file matrix rows referencing a renamed workflow and a renumbered ADR by stale names (`Promote master to production` instead of `Auto-promote to production`; `0108-auto-promote-master-to-production.md` instead of `0112-...`), causing the post-merge verification steps to fail silently.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/docs/backlog/dev-efficiency-backlog.md` end of file — E73's occurrence table and prevention_ladder duplicated with no section header | yes (finding 1) | was live | fixed this pass — deleted duplicate block |
+| 2 | `~/claude-plans/auto-promote-master-to-production.md` rows 46/48 — `--workflow "Promote master to production"` should be `--workflow "Auto-promote to production"` | yes (finding 2) | yes | fixed outside repo — plan file corrected manually |
+| 3 | `~/claude-plans/auto-promote-master-to-production.md` rows 55/60 — `0108-auto-promote-master-to-production.md` should be `0112-...` | yes (finding 2) | yes | fixed outside repo — plan file corrected manually |
+
+**prevention_ladder:**
+- finding 1: rung 0 — no existing gate validates backlog structural integrity (duplicate content blocks). rung 1 — a structural lint could flag duplicate paragraph blocks across sections; high false-positive risk. **landing rung: no gate warranted** — the Phase 6 conflict-resolution audit is the existing backstop.
+- finding 2: rung 0 — plan files are outside the repo CI scope; no gate reads them. **landing rung: no gate warranted** — plan files are ephemeral (post-merge) and their stale literals can only cause the plan's own post-merge verification to fail silently, not a user-visible regression.
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-07 during Phase 6 review of #1967)*
+
+### E85 PR #1967 Phase 6.5 — missing `pp-absent-skips` test case for absent promote-to-production workflow
+
+**class:** A `bin/check-composite-contracts` skip path (line 74 — workflow file absent, exit 0 with skip line) had no corresponding test case in `bin/test-check-composite-contracts`; the skip code was reachable but entirely untested.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/test-check-composite-contracts` — no test for absent promote-to-production workflow (`bin/check-composite-contracts:74` skip path) | yes | was live | fixed this pass — `pp-absent-skips` case added (exit 0 + skip-visible assertion, mutation-verified) |
+
+**prevention_ladder:**
+- rung 0 — `bin/test-check-composite-contracts` is the test surface; gap was introduced when the skip path was added without a matching test case.
+- rung 1 — the existing test suite is the mechanism; no additional gate warranted — the suite (now extended) covers this path.
+- **landing rung:** no new gate warranted — existing test suite extended.
+
+`artifact destination: n/a — no new gate`
+
+*(discovered 2026-09-06 during Phase 6 review of #1967; fixed this pass — `pp-absent-skips` test case added)*
+
+### E86 PR #1967 Phase 6.5 — orphan reference bullet in ADR-0112 placed after `## Addendum` instead of `## References`
+
+**class:** A reference bullet (`.claude/rules/meta-tooling-bar.md`) was stranded at the end of the `## Addendum` section of ADR-0112 rather than in the `## References` section, making it appear as trailing addendum prose instead of a structured reference list entry.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/docs/decisions/0112-auto-promote-master-to-production.md` — `.claude/rules/meta-tooling-bar.md` bullet stranded after `## Addendum` block instead of in `## References` | yes | was live | fixed this pass — bullet moved to `## References` section |
+
+**prevention_ladder:**
+- rung 0 — `bin/check-docs` dead-reference rule catches paths that stop resolving; it does not check section placement of reference bullets.
+- rung 1 — no gate warranted; section placement of reference bullets is a structural-prose concern not mechanically verifiable without full-document semantic parsing.
+- **landing rung:** no gate warranted — `bin/check-docs` dead-reference rule is the existing backstop for path validity.
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-06 during Phase 6 review of #1967; fixed this pass — bullet moved to `## References`)*
+
+### E87 PR #1967 Phase 6.5 — no duplicate-ID gate for backlog files; four duplicate-ID pairs undetected
+
+**class:** Four duplicate entry-ID pairs in `dev-efficiency-backlog.md` (E80=E72, E81=E73, E82=E74, E83=E75) went undetected — no gate validates uniqueness of `### E<n>` section headings or `| E<n> |` index rows within a backlog file. The duplicate IDs caused a cascade of structural corruption: duplicate index rows, a spurious body-section heading (`### E80`), and false status records in E75's occurrence table.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/docs/backlog/dev-efficiency-backlog.md` — E80=E72, E81=E73, E82=E74, E83=E75 duplicate-ID pairs undetected | yes | was live | fixed this pass — structural repair in Part 1a/1b |
+
+**prevention_ladder:**
+- rung 0 — no gate exists; `bin/check-docs` does not check for duplicate `### E<n>` headings or `| E<n> |` index rows within backlog files.
+- rung 1 — extend `bin/check-docs` to detect duplicate entry IDs in backlog files; already filed as E71's rung-1 artifact destination.
+- **landing rung:** no gate warranted this pass — structural corruption fixed; E71 rung 1 is the existing filed candidate for the check extension.
+
+`artifact destination: bin/check-docs (no gate exists; candidate for extension — already filed as E71 rung 1)`
+
+*(discovered 2026-09-06 during Phase 6 review of #1967; structural corruption fixed this pass)*
+
+### E88 PR #1967 Phase 6.5 — `pp-skip-renamed` test case removed; coverage note only
+
+**class:** The `pp-skip-renamed` fixture in `bin/test-check-composite-contracts` was removed. Coverage is equivalent by construction — the remaining test cases exercise the same skip path; no untested branch results.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/test-check-composite-contracts` — `pp-skip-renamed` fixture removed | yes | no | note only — remaining cases cover the same path; no untested branch |
+
+**prevention_ladder:**
+- No gate warranted — coverage is equivalent by construction; note filed for the record.
+
+`artifact destination: n/a — note only`
+
+*(discovered 2026-09-06 during Phase 6 review of #1967; note only — no action required)*
+
+### E89 PR #1967 Phase 6.5 — first commit subject type `feat:` vs plan-mandated `chore:`
+
+**class:** Commit hygiene note. The first commit on the branch (`dbc0c5f17`) used a `feat:` subject line; the plan specified `chore:`. Cosmetic — the PR title is `chore:` and governs the squash-merge subject.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #1967 commit `dbc0c5f17` — subject `feat: add SKIP_CHECKS filter...`; plan mandated `chore:` | yes | no | note only — PR title `chore:` governs squash-merge subject; no functional impact |
+
+**prevention_ladder:**
+- No gate warranted — PR title type is enforced at merge; individual commit subject type is not gated.
+
+`artifact destination: n/a — note only`
+
+*(discovered 2026-09-06 during Phase 6 review of #1967; note only — no action required)*

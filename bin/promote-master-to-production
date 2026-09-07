@@ -1,0 +1,145 @@
+#!/bin/bash
+
+# Fast-forwards origin/production to an already-verified master SHA.
+#
+# Runner-side counterpart to bin/merge-master-to-prod (the human/emergency path).
+# Unlike that script it NEVER checks out, pulls, unshallows, prunes, or cleans:
+# it validates, asks bin/check-master-ci-green, and pushes one ref.
+#
+# The push is fast-forward-only BY SERVER RULE: a plain refspec with no `+`
+# prefix and no force flag of any kind anywhere in this file. Divergence is
+# detected and reported, never resolved.
+#
+# Usage: bin/promote-master-to-production <SHA> [--dry-run] [--help|-h]
+#
+# Emits `key=value` lines on STDOUT (safe for `>> "$GITHUB_OUTPUT"`); all human
+# logging goes to STDERR.
+#   outcome=promoted|already-current|superseded|not-green|would-promote  -> exit 0
+#   outcome=invalid-sha|not-ancestor|shallow|diverged|push-rejected      -> exit 1
+#   sha=<40-hex>
+#
+# Exit codes: 0 = handled (promoted or a legitimate no-op), 1 = hard failure.
+
+set -euo pipefail
+
+REMOTE=origin
+PROD_REF=refs/heads/production
+
+log()  { echo "$*" >&2; }
+emit() { echo "$1"; }
+die()  { emit "outcome=$1"; log "FAILED: $2"; exit 1; }
+
+usage() {
+    cat <<'EOF'
+Usage: bin/promote-master-to-production <SHA> [--dry-run] [--help|-h]
+
+Fast-forwards origin/production to an already-verified master SHA.
+
+Arguments:
+  SHA         Exact 40-character lowercase hex commit SHA to promote.
+
+Options:
+  --dry-run   Simulate the push without writing anything. Reports
+              outcome=would-promote on success, outcome=push-rejected
+              on failure. Performs real negotiation with the remote.
+  --help, -h  Show this message.
+
+Environment:
+  MIN_REQUIRED_CHECKS   Passed to bin/check-master-ci-green (default: 3).
+  MAX_WALKBACK          Passed to bin/check-master-ci-green (default: 0).
+  SKIP_CHECKS           Passed to bin/check-master-ci-green (default:
+                        "Promote master to production,Auto-promotion paused").
+  GH_API_CMD            Override the API command (testing only).
+
+Exit codes: 0 = handled (promoted or no-op), 1 = hard failure.
+EOF
+}
+
+DRY_RUN=0
+SHA=""
+
+for arg in "$@"; do
+    case "$arg" in
+        --dry-run)
+            DRY_RUN=1
+            ;;
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        --*)
+            log "unknown flag: $arg"
+            usage >&2
+            exit 1
+            ;;
+        *)
+            SHA="$arg"
+            ;;
+    esac
+done
+
+[ -n "$SHA" ] || die invalid-sha "no SHA given"
+
+# Hard-pin the alphabet. The caller is a workflow expression; accepting only a
+# full 40-hex object name means no ref name, no option-looking string, and no
+# shell metacharacter can ever reach a git invocation below.
+case "$SHA" in
+    *[!0-9a-f]* | "" ) die invalid-sha "not a 40-char lowercase hex SHA: $SHA" ;;
+esac
+[ "${#SHA}" -eq 40 ] || die invalid-sha "not a 40-char lowercase hex SHA: $SHA"
+
+git rev-parse --git-dir >/dev/null 2>&1 || die invalid-sha "not a git repository"
+
+# A grafted object store makes `merge-base --is-ancestor` answer "no" for commits
+# that ARE ancestors, which would silently turn every promotion into not-ancestor.
+# Fail loudly instead of unshallowing: bin/merge-master-to-prod:21-25 can afford a
+# multi-minute --unshallow on a workstation; a runner cannot, and a promotion that
+# quietly stops promoting is worse than one that goes red.
+[ "$(git rev-parse --is-shallow-repository 2>/dev/null)" = "true" ] \
+    && die shallow "shallow checkout — promote-to-production requires fetch-depth: 0"
+
+git fetch --no-tags --quiet "$REMOTE" master "$PROD_REF" \
+    || die invalid-sha "cannot fetch $REMOTE master/production"
+
+git rev-parse --verify --quiet "$SHA^{commit}" >/dev/null \
+    || die invalid-sha "commit $SHA not found after fetch"
+
+git merge-base --is-ancestor "$SHA" "$REMOTE/master" \
+    || die not-ancestor "$SHA is not an ancestor of $REMOTE/master — refusing to promote"
+
+PROD_SHA="$(git ls-remote --exit-code "$REMOTE" "$PROD_REF" | cut -f1)" \
+    || die diverged "cannot read $REMOTE $PROD_REF"
+
+emit "sha=$SHA"
+
+if [ "$PROD_SHA" = "$SHA" ]; then
+    emit "outcome=already-current"; log "production is already at $SHA — nothing to do."; exit 0
+fi
+
+if git merge-base --is-ancestor "$SHA" "$PROD_SHA" 2>/dev/null; then
+    # A later run already promoted a newer commit. Benign race, not an alarm.
+    emit "outcome=superseded"; log "production ($PROD_SHA) is already ahead of $SHA."; exit 0
+fi
+
+if ! git merge-base --is-ancestor "$PROD_SHA" "$SHA" 2>/dev/null; then
+    die diverged "production ($PROD_SHA) has diverged from $SHA — a human must reconcile. NOT forcing."
+fi
+
+MIN_REQUIRED_CHECKS="${MIN_REQUIRED_CHECKS:-3}" \
+MAX_WALKBACK="${MAX_WALKBACK:-0}" \
+SKIP_CHECKS="${SKIP_CHECKS:-Promote master to production,Auto-promotion paused}" \
+    "$(git rev-parse --show-toplevel)/bin/check-master-ci-green" "$SHA" >/dev/null || {
+        emit "outcome=not-green"
+        log "master $SHA is not green (or still running) — no promotion this pass."
+        exit 0
+    }
+
+if [ "$DRY_RUN" -eq 1 ]; then
+    log "--dry-run: asking $REMOTE whether $SHA -> $PROD_REF would fast-forward"
+    git push --dry-run "$REMOTE" "$SHA:$PROD_REF" || die push-rejected "dry-run push rejected"
+    emit "outcome=would-promote"; exit 0
+fi
+
+git push "$REMOTE" "$SHA:$PROD_REF" || die push-rejected "push to $PROD_REF rejected by remote"
+emit "outcome=promoted"
+log "promoted $SHA -> production"

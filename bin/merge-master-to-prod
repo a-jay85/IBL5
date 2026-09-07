@@ -3,6 +3,21 @@
 # Merges master into production and pushes both branches to origin.
 # All git output is suppressed; only errors or the final summary are printed.
 #
+# THIS IS THE MANUAL / EMERGENCY PATH. Routine promotion is automatic:
+# .github/workflows/promote-to-production.yml fast-forwards master to
+# production whenever a master SHA goes all-green (ADR-0112). Reach for this
+# script when the automation is paused (`AUTO_PROMOTE_PAUSED=1`), when it is
+# wrong, or when you need a docs-only merge live now — a docs-only SHA has too
+# few check-runs to satisfy the automatic green gate and will otherwise wait
+# for the next code merge.
+#
+# Pausing the automation does NOT block this script, by design: the kill
+# switch stops the robot, not you.
+#
+# The CI-green gate ignores the auto-promoter's own check-run names, which land
+# on the same SHA it evaluates; keep that list in sync with the job names in
+# .github/workflows/promote-to-production.yml (pinned by bin/check-composite-contracts).
+#
 # Set SKIP_CI_CHECK=1 to bypass the CI-green gate (emergency use only).
 
 set -e
@@ -32,7 +47,12 @@ git pull origin master -q
 if [ "${SKIP_CI_CHECK:-0}" != "1" ]; then
     MASTER_SHA="$(git rev-parse origin/master)"
     SCRIPT_ROOT="$(git rev-parse --show-toplevel)"
-    "$SCRIPT_ROOT/bin/check-master-ci-green" "$MASTER_SHA" || fail "master HEAD is not green on CI (set SKIP_CI_CHECK=1 to bypass)"
+    # The auto-promotion workflow's own jobs attach check-runs to this same
+    # master SHA (workflow_run jobs land on the triggering run's head_sha), and
+    # its superseded runs land as `cancelled`. Neither says anything about
+    # master's health, so exclude them by exact name.
+    SKIP_CHECKS="Promote master to production,Auto-promotion paused" \
+        "$SCRIPT_ROOT/bin/check-master-ci-green" "$MASTER_SHA" || fail "master HEAD is not green on CI (set SKIP_CI_CHECK=1 to bypass)"
 fi
 
 git push origin master -q 2>/dev/null || fail "push master"

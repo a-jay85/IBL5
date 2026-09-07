@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-09-06
+last_verified: 2026-09-07
 ---
 
 # IBL5 Architecture Decision Records
@@ -48,6 +48,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0119](0119-entity-field-accessor-trait-split.md) | Entity field-accessor trait splits are not trait composition | Accepted | Narrows ADR-0001: a single-consumer trait carrying only one entity's own pure field reads is a file split, not composition. First applied to `Player`'s 66 field getters. |
 | [0114](0114-local-db-snapshot-freshness.md) | Local DB snapshot freshness | Accepted | Adds `ibl5/bin/db-sync-now` (lock, throttle, marker, `--from-backup`), a detached sim-hook in `bin/sim-recap-tick`, a main-stack guard in `bin/db-test-up`, and `bin/db-sync-cron-setup` for a nightly launchd restore. |
 | [0120](0120-meta-checks-required-and-skip-observable.md) | "Meta checks" required, and adr-filter skips made observable | Accepted | Promotes the "Meta checks" context to a required status check on `master` via the branch-protection API post-merge, and adds an else-branch to the `adr` paths-filter so a skipped adr-check is stated in the job log instead of being indistinguishable from a pass. |
+| [0112](0112-auto-promote-master-to-production.md) | Auto-promote master to production on green CI | Accepted | `workflow_run` promoter fast-forwards `master` to `production` when the SHA is all-green; paused by the `AUTO_PROMOTE_PAUSED` repo variable, pushed FF-only with `CI_PAT`, announced by Discord DM. |
 
 ## When an ADR is Required
 

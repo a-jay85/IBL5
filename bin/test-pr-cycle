@@ -106,6 +106,22 @@ case "\$*" in
         if [[ -f "\$S/state-\$num" ]]; then cat "\$S/state-\$num"; else echo OPEN; fi ;;
     *"--json title,url,comments"*)
         if [[ -f "\$S/view-\$num.json" ]]; then cat "\$S/view-\$num.json"; else echo '{}'; fi ;;
+    *"--json comments,headRefOid"*)
+        # The verdict pre-read. A dedicated file so a case can give the ledger digest and
+        # the verdict pre-read different bodies. \$S/gh-fail-verdict forces the non-zero
+        # exit the driver has to degrade through.
+        [[ -f "\$S/gh-fail-verdict" ]] && exit 3
+        if [[ -f "\$S/verdictview-\$num.json" ]]; then cat "\$S/verdictview-\$num.json"
+        else echo '{"comments":[],"headRefOid":""}'; fi ;;
+    *"api repos/"*"/git/commits/"*)
+        # \$* is: api repos/{owner}/{repo}/git/commits/<oid> --jq .tree.sha
+        # Join into a plain variable FIRST. \${*##pat} applies the removal to each
+        # positional parameter separately and only then joins, so it yields "api" here.
+        all="\$*"; oid="\${all##*/git/commits/}"; oid="\${oid%% *}"
+        # No fixture for this oid = the lookup failed, which is a degrade path the driver
+        # owes a test. Exit non-zero rather than printing an empty tree.
+        [[ -f "\$S/tree-\$oid" ]] || exit 4
+        cat "\$S/tree-\$oid" ;;
 esac
 exit 0
 GH_EOF
@@ -226,6 +242,64 @@ Prose after a horizontal rule must not be folded onto the last label's value.
 DIG_EOF
 }
 
+# Two distinct 40-hex tree SHAs. TREE_A is "the tree /pr-ready reviewed"; TREE_B is any
+# other tree, used to stage the stale-verdict case.
+TREE_A="1111111111111111111111111111111111111111"
+TREE_B="2222222222222222222222222222222222222222"
+
+# A sticky /pr-ready verdict comment. $1 = the reviewed-tree SHA recorded on line 1,
+# $2 = the verdict line verbatim (default `**READY**`).
+#
+# The `Phase 6 initial verdict: NOT READY` line is part of the fixture ON PURPOSE, not
+# noise: real READY bodies narrate the findings remediation then fixed — PR #2144 carries
+# "Phase 6 returned **NOT READY** (one blocking finding F1...)" and PR #2160 carries
+# "**Initial verdict: NOT READY**", both above a final READY verdict. A body-wide grep for
+# "NOT READY" would reject both. This fixture is what holds the driver to the anchored,
+# last-match rule instead.
+verdict_comment() {
+    local tree="$1" line="${2:-**READY**}"
+    cat <<VC_EOF
+**Reviewed tree:** $tree
+\`covers head e583673dbf0a · master ffb6d1995a95 · written 2026-09-07T22:30Z\`
+
+### Rebase
+onto master, no conflicts.
+
+### Plan fidelity
+**Phase 6 initial verdict: NOT READY** — one blocking finding, fixed by Phase 6.5.
+
+### Merge digest
+**What changed:** the driver landed
+**Why:** because the loop was manual
+**Watch:** the ledger
+**Touches:** bin/pr-cycle
+**Machine-authored fixes:** none
+
+---
+
+$line
+
+<!-- pr-ready-verdict -->
+VC_EOF
+}
+
+# Stage a verdict for PR $1 across BOTH gh views the driver reads — the ledger digest
+# (`--json title,url,comments`) and the verdict pre-read (`--json comments,headRefOid`) —
+# plus the head commit's tree lookup.
+#   $2 = reviewed-tree SHA recorded in the comment
+#   $3 = the head's ACTUAL tree (default: equal to $2, i.e. the verdict is current)
+#   $4 = the verdict line (default `**READY**`)
+# The oid is derived from the PR number so three PRs in one case get three tree fixtures.
+install_verdict() {
+    local n="$1" rtree="$2" htree="${3:-$2}" line="${4:-**READY**}" body oid
+    oid="deadbeefcafe$(printf '%028d' "$n")"
+    body="$(verdict_comment "$rtree" "$line")"
+    printf '%s' "$(view_json "$n" "$body")" > "$SCRATCH/view-$n.json"
+    printf '{"comments":[{"body":%s}],"headRefOid":"%s"}' \
+        "$(printf '%s' "$body" | jq -Rs .)" "$oid" > "$SCRATCH/verdictview-$n.json"
+    printf '%s\n' "$htree" > "$SCRATCH/tree-$oid"
+}
+
 view_json() {  # $1 = PR number, $2 = comment body (may be empty for the no-comments case)
     if [[ -z "${2:-}" ]]; then
         printf '{"title":"t%s","url":"https://x/%s","comments":[]}' "$1" "$1"
@@ -237,7 +311,8 @@ view_json() {  # $1 = PR number, $2 = comment body (may be empty for the no-comm
 
 reset_state() {
     rm -f "$SCRATCH"/*.argv "$SCRATCH"/attack-* "$SCRATCH"/ready-* "$SCRATCH"/triage-* \
-          "$SCRATCH"/dm-* "$SCRATCH"/state-* "$SCRATCH"/view-*.json
+          "$SCRATCH"/dm-* "$SCRATCH"/state-* "$SCRATCH"/view-*.json \
+          "$SCRATCH"/verdictview-*.json "$SCRATCH"/tree-* "$SCRATCH"/gh-fail-verdict
     rm -f "$SCRATCH/IBL5-merge-digest.md" "$SCRATCH/.ibl5-pr-cycle.stop"
     rm -rf "/tmp/pr-cycle-$TSBASE"* 2>/dev/null
     rm -f "/tmp/pr-cycle-$TSBASE"*.sh "/tmp/pr-cycle-$TSBASE"*.log 2>/dev/null
@@ -278,6 +353,9 @@ run_in() {
 run() { run_in "$REPO" "$@"; }
 
 calls() { wc -l < "$SCRATCH/$1.argv" | tr -d ' '; }
+# Poll/reconcile gh calls only. The driver also calls gh to read a PR's sticky verdict, so
+# a bare `calls gh` no longer isolates the merge-poll loop the ceiling cases are about.
+state_calls() { grep -c -- '--json state' "$SCRATCH/gh.argv" || true; }
 # Count of triage invocations that actually ARM. The read-only pre-read shares this shim,
 # so a bare `calls triage` no longer distinguishes "did not arm" from "did not run".
 arm_calls() { grep -c -- '--arm' "$SCRATCH/triage.argv" 2>/dev/null || true; }
@@ -693,7 +771,8 @@ IVAL=30 CEIL=0 run --worker    # a second poll would sleep 30s; the run must not
 [[ $RC -eq 0 ]] || fail "ceiling hit should not halt, got $RC"
 [[ "$(rows)" == "0" ]] || fail "unconfirmed merge wrote $(rows) rows"
 # 2 gh state calls: one poll, then one reconcile check. A retry loop would show more.
-[[ "$(calls gh)" == "2" ]] || fail "want exactly 1 poll + 1 reconcile, got $(calls gh) gh calls"
+[[ "$(state_calls)" == "2" ]] \
+    || fail "want exactly 1 poll + 1 reconcile, got $(state_calls) state calls"
 grep -qF 'not confirmed' <<< "$OUT" || fail "ceiling hit was not reported"
 unset IVAL CEIL
 
@@ -1182,57 +1261,87 @@ g_scope_selection_only "$SCRATCH/mutant" \
 end_case "case 26 guards are not vacuous"
 
 # ==========================================================================================
-# 27 — the already-ARMABLE pr-ready skip: it fires, it is selective, and it does not halt
+# 27 — the pr-ready skip needs BOTH ARMABLE and a current READY verdict
 # ==========================================================================================
-# 27a (Case A) — a pre-read that reports ARMABLE declines the readying session entirely,
-# and the PR still proceeds through arming, polling and the ledger.
+# 27a (Case A) — both conditions hold: ARMABLE, and a sticky verdict whose recorded
+# reviewed tree still equals the head's tree and whose verdict line reads READY. The
+# readying session is declined and the PR still proceeds through arming, polling and the
+# ledger. The same fixture serves the digest parser, so this also holds the ledger row.
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
 triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
 echo MERGED > "$SCRATCH/state-101"
-printf '%s' "$(view_json 101 "$(digest_comment)")" > "$SCRATCH/view-101.json"
+install_verdict 101 "$TREE_A"
 run --worker
-[[ $RC -eq 0 ]] || fail "ARMABLE skip: exit $RC, want 0"
-[[ "$(calls ready)" == "0" ]] || fail "ARMABLE skip: pr-ready ran $(calls ready) time(s), want 0"
-grep -qF '#101 — already ARMABLE, skipping pr-ready' <<< "$OUT" \
-    || fail "ARMABLE skip: the skip log line is missing"
-[[ "$(arm_calls)" == "1" ]] || fail "ARMABLE skip: want 1 arm, got $(arm_calls)"
-[[ "$(rows)" == "1" ]] || fail "ARMABLE skip: the skipped PR was not ledgered"
+[[ $RC -eq 0 ]] || fail "ARMABLE+READY skip: exit $RC, want 0"
+[[ "$(calls ready)" == "0" ]] \
+    || fail "ARMABLE+READY skip: pr-ready ran $(calls ready) time(s), want 0"
+grep -qF '#101 — already ARMABLE with a current READY verdict, skipping pr-ready' <<< "$OUT" \
+    || fail "ARMABLE+READY skip: the skip log line is missing"
+[[ "$(arm_calls)" == "1" ]] || fail "ARMABLE+READY skip: want 1 arm, got $(arm_calls)"
+[[ "$(rows)" == "1" ]] || fail "ARMABLE+READY skip: the skipped PR was not ledgered"
 
-# 27b (Case B) — a non-ARMABLE pre-read leaves the readying session untouched.
+# 27b (Case B) — THE REGRESSION THIS CASE EXISTS FOR. ARMABLE with NO verdict comment at
+# all must still run pr-ready. This is the modal path, not a corner: ARMABLE is reachable
+# on a PR /pr-ready has never touched, because `pr_manual_testing_clearance` greps the PR
+# *body* for "No manual testing needed" and `/post-plan` writes that sentinel when it
+# opens the PR. A bucket-only skip would decline the readying session on exactly the PRs
+# that have never had one.
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+run --worker
+[[ $RC -eq 0 ]] || fail "ARMABLE, no verdict: exit $RC, want 0"
+[[ "$(calls ready)" == "1" ]] \
+    || fail "ARMABLE with no verdict comment skipped pr-ready: $(calls ready) ready call(s), want 1"
+grep -qF '#101 — ARMABLE but no current READY verdict, running pr-ready' <<< "$OUT" \
+    || fail "ARMABLE, no verdict: the run-anyway log line is missing"
+[[ "$(arm_calls)" == "1" ]] || fail "ARMABLE, no verdict: want 1 arm, got $(arm_calls)"
+
+# 27c (Case C) — a non-ARMABLE pre-read leaves the readying session untouched, and never
+# reaches the verdict pre-read at all.
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
 triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+install_verdict 101 "$TREE_A"
 run --worker
 [[ "$(calls ready)" == "1" ]] || fail "non-ARMABLE: want 1 ready call, got $(calls ready)"
 grep -qF 'skipping pr-ready' <<< "$OUT" && fail "non-ARMABLE: the skip fired anyway"
+grep -qF 'no current READY verdict' <<< "$OUT" \
+    && fail "non-ARMABLE: the verdict pre-read ran despite the bucket short-circuit"
 
-# 27c (Case C) — the skip sets no HALT and breaks no loop: three ARMABLE PRs are all
-# reached, all armed, and none of them ever runs pr-ready.
+# 27d (Case D) — the skip sets no HALT and breaks no loop: three ARMABLE PRs, each with a
+# current READY verdict, are all reached, all armed, and none of them ever runs pr-ready.
 reset_state
 printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
 triage_report "101 ARMABLE armed" "102 ARMABLE armed" "103 ARMABLE armed" \
     > "$SCRATCH/triage-out"
+for p in 101 102 103; do install_verdict "$p" "$TREE_A"; done
 run --worker
 [[ $RC -eq 0 ]] || fail "three skips: exit $RC, want 0"
 [[ "$(calls ready)" == "0" ]] || fail "three skips: pr-ready ran $(calls ready) time(s), want 0"
 for p in 101 102 103; do
     grep -qF -- "--- #$p" <<< "$OUT" || fail "three skips: the loop never reached #$p"
-    grep -qF "#$p — already ARMABLE, skipping pr-ready" <<< "$OUT" \
+    grep -qF "#$p — already ARMABLE with a current READY verdict, skipping pr-ready" <<< "$OUT" \
         || fail "three skips: no skip line for #$p"
 done
 [[ "$(arm_calls)" == "3" ]] || fail "three skips: want 3 arms, got $(arm_calls)"
-end_case "case 27 already-ARMABLE skip"
+end_case "case 27 skip requires ARMABLE and a current READY verdict"
 
 # ==========================================================================================
 # 28 — the skip's opt-out and its fail-toward-running-pr-ready paths
 # ==========================================================================================
+# Every case below stages a verdict that WOULD authorise the skip, then breaks exactly one
+# thing. Without that staging a case would pass for the wrong reason — the skip declining
+# because no verdict exists rather than because of the fault under test.
+#
 # 28a — the rejected form: PR_CYCLE_SKIP_READY_WHEN_ARMABLE=0 restores the old behaviour.
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
 triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+install_verdict 101 "$TREE_A"
 SKIPARM=0 run --worker
 [[ $RC -eq 0 ]] || fail "opt-out: exit $RC, want 0"
 [[ "$(calls ready)" == "1" ]] || fail "opt-out: want 1 ready call, got $(calls ready)"
@@ -1243,16 +1352,18 @@ grep -qF 'skipping pr-ready' <<< "$OUT" && fail "opt-out: the skip fired with th
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
 triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+install_verdict 101 "$TREE_A"
 SKIPARM="" run --worker
 [[ "$(calls ready)" == "0" ]] \
     || fail "empty seam disabled the skip: $(calls ready) ready call(s), want 0"
 unset SKIPARM
 
-# 28c — a non-zero exit from the pre-read falls through to pr-ready, sets no HALT, and
-# lets the iteration finish. Only call 1 (the pre-read) fails; the arm still succeeds.
+# 28c — a non-zero exit from the bucket pre-read falls through to pr-ready, sets no HALT,
+# and lets the iteration finish. Only call 1 (the pre-read) fails; the arm still succeeds.
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
 triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+install_verdict 101 "$TREE_A"
 echo 2 > "$SCRATCH/triage-rc-1"
 run --worker
 [[ $RC -eq 0 ]] || fail "pre-read failure: exit $RC, want 0"
@@ -1264,6 +1375,7 @@ grep -qF 'skipping pr-ready' <<< "$OUT" && fail "pre-read failure still skipped"
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
 triage_report "999 ARMABLE armed" > "$SCRATCH/triage-out"
+install_verdict 101 "$TREE_A"
 run --worker
 [[ "$(calls ready)" == "1" ]] || fail "absent row: want 1 ready call, got $(calls ready)"
 grep -qF 'skipping pr-ready' <<< "$OUT" && fail "absent row still skipped"
@@ -1272,10 +1384,88 @@ grep -qF 'skipping pr-ready' <<< "$OUT" && fail "absent row still skipped"
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
 triage_report "1010 ARMABLE armed" "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out"
+install_verdict 101 "$TREE_A"
 run --worker
 [[ "$(calls ready)" == "1" ]] || fail "prefix row: #1010 was read as #101's bucket"
 grep -qF 'skipping pr-ready' <<< "$OUT" && fail "prefix row triggered the skip"
-end_case "case 28 skip opt-out and fail-open paths"
+
+# 28f — STALE VERDICT. The comment says READY, but the tree it names is not the head's
+# tree any more. The sticky comment is edited in place and so renders at its original
+# timeline position above every commit that has landed since, which is why "the comment
+# says READY" is not on its own a live signal. Observed on PR #2160: recorded tree
+# f95a5675…, head tree 8857bf91….
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+install_verdict 101 "$TREE_A" "$TREE_B"
+run --worker
+[[ $RC -eq 0 ]] || fail "stale verdict: exit $RC, want 0"
+[[ "$(calls ready)" == "1" ]] \
+    || fail "a verdict for a superseded tree authorised the skip: $(calls ready) ready call(s), want 1"
+grep -qF 'no current READY verdict' <<< "$OUT" || fail "stale verdict: wrong log line"
+
+# 28g — a NOT READY verdict with a matching tree does not authorise the skip.
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+install_verdict 101 "$TREE_A" "$TREE_A" '**NOT READY** — CI is red on the rebased head'
+run --worker
+[[ "$(calls ready)" == "1" ]] \
+    || fail "a NOT READY verdict authorised the skip: $(calls ready) ready call(s), want 1"
+
+# 28h — a verdict comment with no `**Reviewed tree:**` contract line on line 1 cannot be
+# checked for currency, so it does not authorise the skip. This is every verdict written
+# before that line existed, which is why the skip is expected to be rare at first.
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+printf '%s' "$(view_json 101 "$(digest_comment)")" > "$SCRATCH/view-101.json"
+printf '{"comments":[{"body":%s}],"headRefOid":"%s"}' \
+    "$(digest_comment | jq -Rs .)" "deadbeefcafe$(printf '%028d' 101)" \
+    > "$SCRATCH/verdictview-101.json"
+printf '%s\n' "$TREE_A" > "$SCRATCH/tree-deadbeefcafe$(printf '%028d' 101)"
+run --worker
+[[ "$(calls ready)" == "1" ]] \
+    || fail "a verdict with no reviewed-tree line authorised the skip: want 1 ready call"
+
+# 28i — the head-tree lookup failing (no fixture for the oid = gh api exits non-zero) is a
+# degrade, not a licence to skip, and it costs neither the arm nor the exit code.
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+install_verdict 101 "$TREE_A"
+rm -f "$SCRATCH/tree-deadbeefcafe$(printf '%028d' 101)"
+run --worker
+[[ $RC -eq 0 ]] || fail "tree lookup failure: exit $RC, want 0"
+[[ "$(calls ready)" == "1" ]] || fail "tree lookup failure authorised the skip"
+[[ "$(arm_calls)" == "1" ]] || fail "tree lookup failure cost the arm call"
+
+# 28j — the verdict pre-read's own gh call failing degrades to running pr-ready.
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+install_verdict 101 "$TREE_A"
+: > "$SCRATCH/gh-fail-verdict"
+run --worker
+[[ $RC -eq 0 ]] || fail "verdict gh failure: exit $RC, want 0"
+[[ "$(calls ready)" == "1" ]] || fail "verdict gh failure authorised the skip"
+rm -f "$SCRATCH/gh-fail-verdict"
+
+# 28k — the other direction, and the reason the verdict line is matched anchored: a body
+# that NARRATES a superseded NOT READY finding above a final READY verdict is READY. Real
+# bodies do exactly this (PRs #2144, #2160); a body-wide `grep 'NOT READY'` would reject
+# every remediated PR and the skip would never fire at all. The fixture carries the
+# narrating line, so this is a live assertion, not a tautology.
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+install_verdict 101 "$TREE_A" "$TREE_A" '### READY'
+grep -qF 'NOT READY' "$SCRATCH/verdictview-101.json" \
+    || fail "fixture regression: 28k needs a narrated NOT READY line to be meaningful"
+run --worker
+[[ "$(calls ready)" == "0" ]] \
+    || fail "a narrated NOT READY finding blocked a READY verdict: $(calls ready) ready call(s), want 0"
+end_case "case 28 skip opt-out and fail-toward-running paths"
 
 # ==========================================================================================
 # 29 — CI actually runs this harness

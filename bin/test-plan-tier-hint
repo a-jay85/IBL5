@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# test-plan-tier-hint — behavioural harness for the advisory architect-tier
+# pre-check, plus the static drift assertions that keep the five copies of the
+# /plan Step 3 check-1 trigger in agreement.
+#
+# The fixture table pins the decision procedure: a gate path alone never
+# escalates, a gate path plus a weakening verb does, and directory membership is
+# never the trigger. The negative/boundary rows are the ones that go red if the
+# implementation regresses to directory-led matching — do not drop them.
+#
+# Run: bin/test-plan-tier-hint  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+HINT="$SCRIPT_DIR/plan-tier-hint"
+BASE_TMP="$(mktemp -d)"
+trap 'rm -rf "$BASE_TMP"' EXIT
+
+FAILED=0
+OUT="$BASE_TMP/out"
+ERR="$BASE_TMP/err"
+
+expect_eq() { # name want got
+    if [ "$3" = "$2" ]; then
+        echo "ok: $1 ($3)"
+    else
+        echo "FAIL: $1 — expected '$2', got '$3'"
+        FAILED=1
+    fi
+}
+
+expect_exit() { # name want-code got-code
+    if [ "$3" -eq "$2" ]; then
+        echo "ok: $1 (exit $3)"
+    else
+        echo "FAIL: $1 — expected exit $2, got $3"
+        sed 's/^/      | /' "$ERR" 2>/dev/null | head -10
+        FAILED=1
+    fi
+}
+
+expect_match() { # name pattern file
+    if grep -qE "$2" "$3"; then
+        echo "ok: $1"
+    else
+        echo "FAIL: $1 — output did not match /$2/"
+        sed 's/^/      | /' "$3" 2>/dev/null | head -10
+        FAILED=1
+    fi
+}
+
+assert_contains() { # name file literal
+    if grep -qF "$3" "$ROOT/$2"; then
+        echo "ok: $1"
+    else
+        echo "FAIL: $1 — $2 no longer contains the expected text"
+        FAILED=1
+    fi
+}
+
+assert_absent() { # name file literal
+    if grep -qF "$3" "$ROOT/$2"; then
+        echo "FAIL: $1 — $2 still contains the retired text"
+        FAILED=1
+    else
+        echo "ok: $1"
+    fi
+}
+
+echo "== fixture table =="
+
+# 1 — prose-only skill edit does not escalate
+expect_eq "1 prose-only skill edit" "default" \
+    "$("$HINT" --desc 'prose-only edit to .claude/skills/plan/SKILL.md — rewording the authoring guidance, decision procedure preserved')"
+
+# 2 — gate-condition removal, described in prose only
+expect_eq "2 gate-condition removal in prose" "xhigh" \
+    "$("$HINT" --desc 'remove the bin/check-plan gate condition that rejects plans over 500 lines')"
+
+# 3 — security surface unchanged
+expect_eq "3 security surface" "xhigh" \
+    "$("$HINT" --desc 'add authorization checks to the admin trade-approval endpoint')"
+
+# 4 — destructive migration unchanged
+expect_eq "4 destructive migration" "xhigh" \
+    "$("$HINT" --desc 'migration that will drop column retired and backfill it')"
+
+# 5 — bootstrap hazard
+expect_eq "5 bootstrap hazard" "xhigh" \
+    "$("$HINT" --desc 'change the Phase 6.5 arming condition so digest-bearing PRs auto-merge')"
+
+# 6 — recipe-backed downgrade
+expect_eq "6 recipe-backed downgrade" "sonnet" \
+    "$("$HINT" --desc 'recipe-backed marker swap: apply the explicit recipe, copying the existing pattern in the same file')"
+
+# 7 — precedence: check 1 outranks check 2
+expect_eq "7 check 1 outranks check 2" "xhigh" \
+    "$("$HINT" --desc 'recipe-backed: remove the bin/check-plan gate condition, copying the existing pattern')"
+
+# 8 — additive gate: a gate path with no weakening verb is NOT a trigger
+expect_eq "8 additive gate" "default" \
+    "$("$HINT" --desc 'add a new bin/check-actions-pinned gate that rejects unpinned actions')"
+
+# 9 — directory alone is never the trigger
+expect_eq "9 rules path, no weakening" "default" \
+    "$("$HINT" --files .claude/rules/core-coding.md --desc 'reword a rule for clarity')"
+
+# 10 — --files and --desc share one haystack
+expect_eq "10 files and desc share one haystack" "xhigh" \
+    "$("$HINT" --files bin/check-plan --desc 'relax the phase-count limit')"
+
+# 11 — a non-gate bin/ path does not escalate
+expect_eq "11 non-gate bin path" "default" \
+    "$("$HINT" --files bin/wt-new --desc 'add a --base flag')"
+
+# 12 — bare-auth regression guard
+expect_eq "12 authoring is not an auth keyword" "default" \
+    "$("$HINT" --desc 'authoring a new ADR about plan authorship')"
+
+# 13 — stdin is equivalent to --desc
+expect_eq "13 description on stdin" "xhigh" \
+    "$(printf 'remove the bin/check-plan gate condition' | "$HINT")"
+
+# 14 — --explain names a non-empty reason after a TAB
+TAB="$(printf '\t')"
+"$HINT" --desc 'remove the bin/check-plan gate condition' --explain > "$OUT" 2>"$ERR"
+expect_match "14 explain emits tier TAB reason" "^xhigh${TAB}.+" "$OUT"
+
+# 15 — empty input fails loudly, never silently defaults
+"$HINT" > "$OUT" 2>"$ERR" </dev/null
+expect_exit "15 empty input exits 2" 2 "$?"
+expect_eq "15 empty input prints nothing on stdout" "" "$(cat "$OUT")"
+expect_match "15 empty input prints usage on stderr" '^Usage:' "$ERR"
+
+echo
+echo "== static drift assertions (five copies of the trigger) =="
+
+assert_contains "canonical states the behavioural test" \
+    '.claude/skills/plan/SKILL.md' 'previously rejected now passes'
+assert_absent "canonical has no dangling clause reference" \
+    '.claude/skills/plan/SKILL.md' 'clause 4'
+assert_absent "safety mirror is no longer directory-led" \
+    '.claude/rules/work-triage.md' 'ship-pipeline surface'
+assert_contains "tiers table points at the canonical check" \
+    '.claude/rules/agent-tiering.md' '/plan` Step 3 check 1'
+assert_contains "plan-prompt points at the canonical check" \
+    '.claude/skills/plan-prompt/SKILL.md' '/plan` Step 3 check 1'
+assert_contains "agent def carries the directory clause" \
+    '.claude/agents/plan-architect-xhigh.md' 'Directory alone is never the trigger'
+
+echo
+if [ "$FAILED" -ne 0 ]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

@@ -1,6 +1,6 @@
 ---
 description: Triage every non-trivial unit of work as ad-hoc vs /plan before starting; ad-hoc bar, ad-hoc safety mirror, Sonnet execution-routing, hard trigger (≥5 files), /plan-verdict routing (bin/plan-now, never inline), and calibration.
-last_verified: 2026-08-21
+last_verified: 2026-09-07
 ---
 
 # Work Triage Rule
@@ -27,7 +27,7 @@ Even when the bar says ad-hoc, run a quick safety check. If the change touches a
 - a **security surface** (SQL, POST/form endpoint, auth/authz-gated route, user-facing output rendering),
 - a **destructive or schema-tightening migration**,
 - **new or redesigned user-visible UI/UX**,
-- a **gate removal or weakening** in the ship-pipeline surface (`.claude/skills`, `.claude/rules`, `~/.claude/hooks`) — deletes, relaxes, or disables an enforcement mechanism — or a **bootstrap hazard** (it rewrites the rules governing its own merge); *not* an additive gate, a decision-procedure-preserving prose edit, or a mechanism/plumbing change, or
+- a **gate removal or weakening** — input an executable gate (a hook deny, a `bin/check-*` condition, a Phase 6.5 arming condition) previously rejected now passes — or a **bootstrap hazard** (it rewrites the rule governing its own merge); *not* decision-procedure-preserving prose, an additive gate, or a mechanism/plumbing change, or
 - a property needing **subjective human judgment** to confirm,
 
 then prefer `/plan`, so the defense and its verification are designed up front. Which mechanisms count, and why the PR-time backstop isn't a substitute: `work-triage-detail.md` § Safety mirror backstop.

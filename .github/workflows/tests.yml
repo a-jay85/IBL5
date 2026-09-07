@@ -93,6 +93,13 @@ jobs:
               # Agent defs are asserted by bin/test-pr-ready-now's static case (the /pr-ready
               # Phase 6 reviewer def), so an agent-def-only PR must run harness-tests too.
               - '.claude/agents/**'
+              # bin/test-plan-tier-hint statically asserts the five copies of the
+              # /plan Step 3 check-1 trigger still agree, so an edit to any of them
+              # alone must run the harness job. Two of the five are already listed
+              # above ('.claude/skills/plan/SKILL.md' and '.claude/agents/**').
+              - '.claude/skills/plan-prompt/SKILL.md'
+              - '.claude/rules/agent-tiering.md'
+              - '.claude/rules/work-triage.md'
             ibl5ts:
               # Everything the ibl5 TS unit suite executes or imports
               # (tests/ts-unit/ specs cover the pure VR-review helpers and
@@ -913,6 +920,8 @@ jobs:
         run: bin/test-check-plan
       - name: bin/test-check-plan-staleness
         run: bin/test-check-plan-staleness
+      - name: bin/test-plan-tier-hint
+        run: bin/test-plan-tier-hint
       - name: bin/test-backlog-open
         run: bin/test-backlog-open
       - name: bin/test-adr-check

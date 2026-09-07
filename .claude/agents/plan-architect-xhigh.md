@@ -1,6 +1,6 @@
 ---
 name: plan-architect-xhigh
-description: Software architect for high-stakes implementation plans — tasks touching a security surface, trust boundary (auth/authz-gated route), destructive migration, or a gate removal/weakening or bootstrap hazard in the ship-pipeline surface (.claude/skills, .claude/rules, ~/.claude/hooks). Additive gates and decision-procedure-preserving prose edits are NOT triggers. Runs at xhigh effort. Use only as the Step-3 escalated planning agent invoked by /plan.
+description: Software architect for high-stakes implementation plans — tasks touching a security surface, trust boundary (auth/authz-gated route), destructive migration, an executable-gate removal or weakening (the change lets an input a hook deny, a bin/check-* condition, or a Phase 6.5 arming condition previously rejected now pass), or a bootstrap hazard (the change rewrites the rule governing its own merge). Directory alone is never the trigger — prose edits that preserve the decision procedure, additive gates, and mechanism/plumbing changes are NOT triggers wherever they sit. Full trigger: /plan Step 3 check 1. Runs at xhigh effort. Use only as the Step-3 escalated planning agent invoked by /plan.
 model: opus
 effort: xhigh
 disallowedTools: ExitPlanMode, Edit, Write, NotebookEdit

@@ -1,0 +1,14 @@
+{
+  "generated": "2026-07-28T23:59:15-07:00",
+  "corpus": "/Users/ajaynicolas/GitHub/IBL5/jsb-native/corpus-matched-98",
+  "era": "recent (04-08)",
+  "stride": 1,
+  "runs": 4,
+  "seed": 20240621,
+  "snapshots": 97,
+  "total_possessions": 95116118,
+  "drb_push_class": 12558193,
+  "half_court": 82557925,
+  "drb_push_share_pct": 13.203012553561111,
+  "half_court_share_pct": 86.79698744643889
+}

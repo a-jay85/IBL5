@@ -1,0 +1,16 @@
+{
+  "generated": "2026-07-19T02:29:18-07:00",
+  "stride": 1,
+  "runs": 4,
+  "seed": 20240601,
+  "base_time_mid": 17.7,
+  "snapshots": 64,
+  "games": 252568,
+  "total_possessions": 41948777,
+  "code7_push": 3729148,
+  "half_court": 38219629,
+  "putback_class": 5026501,
+  "code7_share_pct": 8.889765725470376,
+  "half_court_share_pct": 91.11023427452963,
+  "putback_per_game": 19.90157502138038
+}

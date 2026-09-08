@@ -374,7 +374,7 @@ def _resolve_variant(slug: str, base_dir: str, info: PlanInfo) -> str:
 
 def locate_plan(slug: str, plans_dir: str | None = None, explicit_path: str | None = None,
                 content_override: str | None = None) -> PlanInfo:
-    """Authoritative explicit path (automouse handoff) first, else variant-aware slug derivation."""
+    """Authoritative explicit path (operator --plan override) first, else variant-aware slug derivation."""
     info = PlanInfo()
     content = content_override
     if content is None:

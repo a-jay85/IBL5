@@ -42,7 +42,8 @@ class CapSpaceRepository extends \BaseMysqliRepository implements CapSpaceReposi
             "SELECT cy, cyt FROM `ibl_plr`
              WHERE retired = 0
                AND teamid = ?
-               AND cy <> cyt",
+               AND cy <> cyt
+               AND ordinal <= '" . \JSB::WAIVERS_ORDINAL . "'",
             "i",
             $teamId
         );

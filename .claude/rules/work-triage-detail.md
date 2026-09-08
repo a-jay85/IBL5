@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for work-triage — NO auto-attach trigger (its `paths:` entries are all out-of-repo and never match); Read it when work-triage.md cites it. Covers measurement context for the inline-Opus leak, ADR-0067 gateway framing, hard-trigger gate properties (sub-agent exemption, per-turn scoping, escape hatch, self-test), the cross-worktree straddle gate's four-rung remedy ladder, inline-vs-delegated criteria, safety-mirror backstop, repeat-polling spend rationale, and /plan-verdict routing gate properties and escape hatch.
-last_verified: 2026-08-24
+last_verified: 2026-09-08
 paths:
   - "~/.claude/hooks/plan-gate-edit.sh"
   - "~/.claude/hooks/plan-gate-skill.sh"
@@ -83,6 +83,10 @@ Stay inline (Opus edits directly) only when:
 - the chunk is **trivial** — a one-or-two-edit change where the sub-agent's fixed spawn cost (~17–23K tokens [CORRECTED 2026-08-14: was "~3–5K"; measured p50 spawn context is 17–23K], `agent-tiering-detail.md` § Skip the Agent) exceeds the work being moved.
 
 Either way the routing decision is **stated, not silent** — one line, like the triage verdict. The user should see which way it went and be able to override in the moment.
+
+**One delegate is a default, not a ceiling.** When the chunk splits cleanly into parts that do not depend on each other — separate modules, separate test files, a doc sweep alongside an unrelated script fix — issue the `Agent` calls in a single message so they run **concurrently** rather than chaining one delegate through them serially. The extra 17–23K per spawn is negligible (`agent-tiering-detail.md` § Fan out by independence: we sit ~2.5× below delegation break-even), and wall-clock is what the split actually buys.
+
+The ≥5-file hard trigger in `work-triage.md` still names **one** sub-agent, and that is deliberate rather than a leftover: a file sweep is one coherent change whose edits must stay consistent with each other, so its parts are *dependent* and splitting them buys no wall-clock while risking divergence. Fan out across **independent** chunks, not within a single sweep.
 
 ## /plan verdict routing
 

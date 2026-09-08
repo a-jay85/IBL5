@@ -119,6 +119,17 @@ jobs:
         if: ${{ !cancelled() && github.event_name == 'pull_request' }}
         run: bin/check-docs --since=${{ github.event.pull_request.base.sha }}
 
+      # --- PR body shape gate: UNCONDITIONAL (no path filter). Must run on every
+      # PR regardless of which files changed — a prose ## Manual Testing section
+      # is invisible to pr_manual_testing_clearance in bin/lib/pr-armable.sh and
+      # causes the PR to be silently skipped by bin/pr-attack / bin/pr-cycle.
+      # Blocking: a non-zero exit fails the job. No continue-on-error. ---
+      - name: Run bin/check-pr-manual-testing
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bin/check-pr-manual-testing --pr "${{ github.event.pull_request.number }}"
+
       # --- Hard gates (path-gated): a non-zero exit fails the job, same as the
       # former standalone workflows. `!cancelled()` makes each report
       # independently of an earlier step's failure (no sequential masking). ---

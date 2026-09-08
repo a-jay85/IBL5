@@ -1,0 +1,231 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# test-check-pr-manual-testing — behavioural harness for bin/check-pr-manual-testing.
+#
+# Writes body fixtures to temp files and drives the script with --body-file so no
+# gh credential or network access is needed.  Also includes cross-check cases that
+# source bin/lib/pr-armable.sh and assert that the bodies the gate passes are
+# classified without drift by pr_manual_testing_clearance.
+#
+# Run: bin/test-check-pr-manual-testing  (exit 0 = all pass, exit 1 = any fail)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BASE_TMP="$(mktemp -d)"
+trap 'rm -rf "$BASE_TMP"' EXIT
+
+FAILED=0
+
+expect() { # name want got
+    if [ "$3" -eq "$2" ]; then
+        echo "ok: $1 (exit $3)"
+    else
+        echo "FAIL: $1 — expected exit $2, got $3"
+        FAILED=1
+    fi
+}
+
+# Helper: write a fixture body and run the gate against it; capture exit code.
+run_gate() { # body_content
+    local tmp="$BASE_TMP/body_$$_${RANDOM}.txt"
+    printf '%s' "$1" > "$tmp"
+    "$SCRIPT_DIR/check-pr-manual-testing" --body-file "$tmp" >/dev/null 2>&1
+    echo $?
+}
+
+# ---------------------------------------------------------------------------
+# Case 1: body with no ## Manual Testing heading → 0 (absent is not drift)
+# ---------------------------------------------------------------------------
+body1="## Summary
+- Some change
+
+## What is NOT in this PR
+- foo
+
+## Checklist
+- [x] Done
+"
+expect "1 — no ## Manual Testing heading" 0 "$(run_gate "$body1")"
+
+# ---------------------------------------------------------------------------
+# Case 2: exact template sentinel → 0
+# ---------------------------------------------------------------------------
+body2="## Manual Testing
+
+No manual testing needed — all changes are covered by automated tests.
+
+## Checklist
+- [x] Tests pass
+"
+expect "2 — exact sentinel line" 0 "$(run_gate "$body2")"
+
+# ---------------------------------------------------------------------------
+# Case 3: sentinel different case → 0 (grep is case-insensitive)
+# ---------------------------------------------------------------------------
+body3="## Manual Testing
+
+no manual testing needed — all changes are covered by automated tests.
+
+## Checklist
+- [x] Tests pass
+"
+expect "3 — lowercase sentinel" 0 "$(run_gate "$body3")"
+
+# ---------------------------------------------------------------------------
+# Case 4: sentinel on a line below other prose inside the section → 0
+# The predicate greps ANY line, not just the first; this case matches that.
+# ---------------------------------------------------------------------------
+body4="## Manual Testing
+
+Some context prose first.
+
+No manual testing needed — all changes are covered by automated tests.
+
+## Checklist
+- [x] Done
+"
+expect "4 — sentinel below other prose in the section" 0 "$(run_gate "$body4")"
+
+# ---------------------------------------------------------------------------
+# Case 5: unticked checkbox rows → 0 (structured manual testing, correctly HELD)
+# ---------------------------------------------------------------------------
+body5="## Manual Testing
+
+- [ ] **Row 1** — open the page and verify it loads
+- [ ] **Row 2** — check the footer link
+
+## Checklist
+- [x] Done
+"
+expect "5 — unticked checkbox rows" 0 "$(run_gate "$body5")"
+
+# ---------------------------------------------------------------------------
+# Case 6: ticked checkbox rows → 0
+# ---------------------------------------------------------------------------
+body6="## Manual Testing
+
+- [x] **Row 1** — verified page loads
+- [x] **Row 2** — footer link works
+
+## Checklist
+- [x] Done
+"
+expect "6 — ticked checkbox rows" 0 "$(run_gate "$body6")"
+
+# ---------------------------------------------------------------------------
+# Case 7: PR #2152 regression — body reconstructed from #2152's current body
+# by removing the sentinel line that was added during repair.
+# The prose paragraph is verbatim from the repaired body.
+# Live smoke --pr 2152 now exits 0 (sentinel present); this fixture proves the
+# PRE-repair shape correctly fails the gate.
+# ---------------------------------------------------------------------------
+body7="## Manual Testing
+
+Verified by \`bin/test-pr-cycle\` (CLI-executable, wired into \`.github/workflows/tests.yml\`): all 29 cases pass, including three new case-15 sub-cases covering verdict-file recovery, the triage-sweep arming path, and the /pr-ready-ran-without-comment path. \`bash -n bin/pr-cycle\` clean.
+
+## Checklist
+- [x] Done
+"
+expect "7 — #2152 pre-repair prose (regression case)" 1 "$(run_gate "$body7")"
+
+# ---------------------------------------------------------------------------
+# Case 8: PR #2111 style — prose with no sentinel, no checkboxes → 1
+# Body is the verbatim ## Manual Testing section text from #2111.
+# ---------------------------------------------------------------------------
+body8="## Manual Testing
+
+No PHPUnit or Playwright tests — the logic lives in shell scripts. Exercised by the \`bin/test-adr-check\` shell harness (43 cases post-rebase, including the stacked-PR base-resolution scenarios, the injection sentinel, the bounded-timeout assertion, and master's skip-observability cases), all passing locally, plus the CI \`pr-meta-checks\` run. \`bin/wt-rebase --dry-run\` was run against the live worktree set to confirm the reconciliation classifier still reports \`0 failed\` with the base parameterized.
+
+## Backlog migration
+
+The backlog edit originally in this PR was removed.
+"
+expect "8 — #2111 prose style (no sentinel, no checkboxes)" 1 "$(run_gate "$body8")"
+
+# ---------------------------------------------------------------------------
+# Case 9: prose section, but a later ## section contains a checkbox row → 1
+# Proves the section window is bounded at the next ## heading; a later section
+# with checkboxes cannot rescue a prose-only ## Manual Testing section.
+# ---------------------------------------------------------------------------
+body9="## Manual Testing
+
+Only prose here, no sentinel or checkboxes.
+
+## Checklist
+
+- [ ] **Row 1** — this is in the NEXT section, not Manual Testing
+
+"
+expect "9 — checkbox in later section does not rescue prose Manual Testing" 1 "$(run_gate "$body9")"
+
+# ---------------------------------------------------------------------------
+# Case 10: empty section (heading immediately followed by next ## heading) → 1
+# The predicate treats missing content the same as prose — still HELD.
+# ---------------------------------------------------------------------------
+body10="## Manual Testing
+
+## Checklist
+- [x] Done
+"
+expect "10 — empty section (no content at all)" 1 "$(run_gate "$body10")"
+
+# ---------------------------------------------------------------------------
+# Case 11: usage errors → 2
+# ---------------------------------------------------------------------------
+
+# no args
+exit_code=0
+"$SCRIPT_DIR/check-pr-manual-testing" >/dev/null 2>&1 || exit_code=$?
+expect "11a — no args yields usage error" 2 "$exit_code"
+
+# both --pr and --body-file
+tmp_f="$BASE_TMP/both.txt"
+printf '## Manual Testing\n\nsome content\n' > "$tmp_f"
+exit_code=0
+"$SCRIPT_DIR/check-pr-manual-testing" --pr 1234 --body-file "$tmp_f" >/dev/null 2>&1 || exit_code=$?
+expect "11b — both --pr and --body-file yields usage error" 2 "$exit_code"
+
+# --body-file pointing at a nonexistent path
+exit_code=0
+"$SCRIPT_DIR/check-pr-manual-testing" --body-file "$BASE_TMP/does-not-exist.txt" >/dev/null 2>&1 || exit_code=$?
+expect "11c — --body-file nonexistent path yields usage error" 2 "$exit_code"
+
+# ---------------------------------------------------------------------------
+# Case 12: cross-check — the bodies that the gate passes (cases 2 and 5) must
+# be classified by pr_manual_testing_clearance without drift.
+# Sentinel body (case 2) → CLEARED; checkbox body (case 5) → HELD.
+# This ensures every body the gate clears is one the predicate handles correctly.
+# ---------------------------------------------------------------------------
+
+# Source the predicate (this defines pr_manual_testing_clearance in this shell).
+# shellcheck source=bin/lib/pr-armable.sh
+source "$SCRIPT_DIR/lib/pr-armable.sh"
+
+verdict2=$(pr_manual_testing_clearance "$body2")
+if [[ "$verdict2" == "CLEARED" ]]; then
+    echo "ok: 12a — cross-check: sentinel body (case 2) → pr_manual_testing_clearance=CLEARED"
+else
+    echo "FAIL: 12a — cross-check: sentinel body (case 2) → expected CLEARED, got $verdict2"
+    FAILED=1
+fi
+
+verdict5=$(pr_manual_testing_clearance "$body5")
+if [[ "$verdict5" == "HELD" ]]; then
+    echo "ok: 12b — cross-check: checkbox body (case 5) → pr_manual_testing_clearance=HELD"
+else
+    echo "FAIL: 12b — cross-check: checkbox body (case 5) → expected HELD, got $verdict5"
+    FAILED=1
+fi
+
+# ---------------------------------------------------------------------------
+# Summary
+# ---------------------------------------------------------------------------
+if [[ "$FAILED" -eq 0 ]]; then
+    echo "All cases passed."
+    exit 0
+else
+    echo "Some cases FAILED."
+    exit 1
+fi

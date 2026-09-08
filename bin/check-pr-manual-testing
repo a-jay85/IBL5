@@ -1,0 +1,183 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/check-pr-manual-testing — Blocking gate: rejects a drifted ## Manual Testing section.
+#
+# A prose-only ## Manual Testing section is invisible to pr_manual_testing_clearance
+# in bin/lib/pr-armable.sh: it returns HELD and bin/pr-attack / bin/pr-cycle silently
+# skip the PR for human merge even when no human testing is actually required.
+# This gate catches the drift at PR time so the predicate and the body can never disagree.
+#
+# Modes:
+#   --pr <n>          Fetch the body via gh and check it (live gate use).
+#   --body-file <p>   Read the body from a file path (test seam).
+#
+# Exit codes:
+#   0  Section absent, or section is well-formed (sentinel line or checkbox rows).
+#   1  Section is present but contains only freeform prose (drifted — blocks CI).
+#   2  Usage error.
+
+set -euo pipefail
+
+GH_CMD="${GH_CMD:-gh}"
+
+usage() {
+    cat <<'EOF'
+Usage: bin/check-pr-manual-testing [--pr <n>] [--body-file <path>] [--help|-h]
+
+Checks that the ## Manual Testing section of a PR body is in a shape that
+bin/lib/pr-armable.sh pr_manual_testing_clearance can classify without drift.
+
+Options:
+  --pr <n>          PR number — body is fetched via gh.
+  --body-file <p>   Read the body from a file (test seam; mutually exclusive with --pr).
+  --help, -h        Show this message.
+
+Environment (test seams):
+  GH_CMD            Override the gh command (default: "gh").
+
+Exit codes:
+  0  Section absent or well-formed (sentinel present, or structured checkbox rows).
+  1  Drifted prose section — see stderr for fix instructions.
+  2  Usage error (both or neither of --pr / --body-file given; file not found).
+EOF
+}
+
+MODE=""
+PR_NUM=""
+BODY_FILE=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --pr)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: --pr requires a PR number" >&2
+                usage >&2
+                exit 2
+            fi
+            MODE="pr"
+            PR_NUM="$2"
+            shift 2
+            ;;
+        --body-file)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: --body-file requires a path" >&2
+                usage >&2
+                exit 2
+            fi
+            MODE="file"
+            BODY_FILE="$2"
+            shift 2
+            ;;
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Error: unknown option: $1" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+done
+
+if [[ -z "$MODE" ]]; then
+    echo "Error: exactly one of --pr or --body-file is required" >&2
+    usage >&2
+    exit 2
+fi
+
+if [[ "$MODE" == "pr" && -n "$BODY_FILE" ]] || [[ "$MODE" == "file" && -n "$PR_NUM" ]]; then
+    echo "Error: --pr and --body-file are mutually exclusive" >&2
+    usage >&2
+    exit 2
+fi
+
+# Resolve body source.
+if [[ "$MODE" == "file" ]]; then
+    if [[ ! -f "$BODY_FILE" ]]; then
+        echo "Error: --body-file not found: $BODY_FILE" >&2
+        exit 2
+    fi
+    body=$(cat "$BODY_FILE")
+    LABEL="file $BODY_FILE"
+else
+    # A gh failure must NOT fall through to the shape check — an outage would
+    # otherwise surface as a "drifted section" (exit 1) and red the PR falsely.
+    body=$("$GH_CMD" pr view "$PR_NUM" --json body --jq '.body') || {
+        echo "Error: $GH_CMD pr view failed for PR #$PR_NUM" >&2
+        exit 2
+    }
+    LABEL="PR #$PR_NUM"
+fi
+
+# Extract the ## Manual Testing section.
+# IMPORTANT: The idiom below is byte-identical to bin/lib/pr-armable.sh function
+# pr_manual_testing_clearance (the section-window extraction at the top of that
+# function). They must stay in sync so this gate and the predicate can never
+# disagree about where the section starts or ends.
+section=$(printf '%s\n' "$body" | sed -n '/^## Manual Testing/,/^## /p')
+
+if [[ -z "$section" ]]; then
+    echo "check-pr-manual-testing: no ## Manual Testing section — nothing to check ($LABEL)"
+    exit 0
+fi
+
+# Drop the heading line; inspect the remaining content.
+content=$(printf '%s\n' "$section" | sed '1d')
+
+# Well-formed case 1: sentinel line present (case-insensitive).
+# Mirrors the grep in pr_manual_testing_clearance exactly.
+if printf '%s\n' "$content" | grep -qiE '^[[:space:]]*No manual testing needed'; then
+    echo "check-pr-manual-testing: sentinel present — section is well-formed ($LABEL)"
+    exit 0
+fi
+
+# Well-formed case 2: structured checkbox rows (real manual testing, correctly HELD).
+# These rows are already the right shape; the predicate returns HELD as intended.
+if printf '%s\n' "$content" | grep -qE '^[[:space:]]*- \[[ x]\]'; then
+    echo "check-pr-manual-testing: checkbox rows present — section is well-formed ($LABEL)"
+    exit 0
+fi
+
+# Drifted prose section — the predicate will return HELD but a human hold is not
+# what the author intended. Emit an actionable fix message on stderr and fail.
+
+# NOTE on type-agnostic sentinel wording: do NOT suggest a sentinel tail that names
+# a specific test type (e.g. "unit", "phpunit", "e2e", "playwright", "integration").
+# pr_manual_testing_clearance's tail-clause (bin/lib/pr-armable.sh) runs a keyword
+# scan on that tail and will hold the PR unless a matching test file is in the diff.
+# The type-agnostic phrasing "all changes are covered by automated tests." always
+# clears regardless of which harnesses are involved.
+
+cat >&2 <<EOF
+check-pr-manual-testing: DRIFTED ## Manual Testing section in $LABEL
+
+Offending section content:
+$(printf '%s\n' "$content" | sed 's/^/    /')
+
+This prose section is invisible to pr_manual_testing_clearance in
+bin/lib/pr-armable.sh: the predicate returns HELD, and bin/pr-attack /
+bin/pr-cycle will silently skip this PR for human merge even if no manual
+testing is required.
+
+To fix, choose one of:
+
+  Option A — prepend the exact sentinel line (keep your prose below as evidence):
+
+      No manual testing needed — all changes are covered by automated tests.
+
+      <your existing prose here>
+
+  Option B — convert the steps to structured checkbox rows:
+
+      - [ ] **Row 1** — <what to do>
+      - [ ] **Row 2** — <what to check>
+
+The sentinel (Option A) must appear as its own line and must begin with the
+words "No manual testing needed" (case-insensitive). Avoid tails that name a
+specific test type (e.g. "unit tests", "PHPUnit", "Playwright") — use
+"automated tests" to stay type-agnostic.
+EOF
+
+exit 1

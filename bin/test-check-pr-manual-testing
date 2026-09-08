@@ -146,8 +146,17 @@ expect "8 — #2111 prose style (no sentinel, no checkboxes)" 1 "$(run_gate "$bo
 
 # ---------------------------------------------------------------------------
 # Case 9: prose section, but a later ## section contains a checkbox row → 1
-# Proves the section window is bounded at the next ## heading; a later section
-# with checkboxes cannot rescue a prose-only ## Manual Testing section.
+# Proves the section window terminates at the next ## heading WHEN ONE EXISTS;
+# a later section with checkboxes cannot rescue a prose-only ## Manual Testing
+# section.
+#
+# The guarantee is conditional, and the earlier wording ("bounded at the next
+# ## heading", unqualified) overstated it. Markdown has no section terminator
+# other than the next same-or-higher heading, so when ## Manual Testing is the
+# LAST ## heading its window necessarily runs to EOF and swallows any trailing
+# machine footer. Case 9b below pins that real behaviour so the limit is
+# documented rather than assumed away; bin/lib/pr-armable.sh carries the
+# unchecked-box guard that makes the EOF window safe on the clearance axis.
 # ---------------------------------------------------------------------------
 body9="## Manual Testing
 
@@ -159,6 +168,23 @@ Only prose here, no sentinel or checkboxes.
 
 "
 expect "9 — checkbox in later section does not rescue prose Manual Testing" 1 "$(run_gate "$body9")"
+
+# ---------------------------------------------------------------------------
+# Case 9b: ## Manual Testing is the LAST ## heading → its window runs to EOF.
+# Documents the conditional-ness of case 9's guarantee. The trailing
+# <!-- files-changed --> footer that /post-plan appends sits INSIDE the window,
+# so its `- \`M\` path` rows are visible to the gate. They are not `- [ ]` rows,
+# so the section is still correctly judged drifted prose → 1.
+# ---------------------------------------------------------------------------
+body9b="## Manual Testing
+
+Only prose here, no sentinel or checkboxes.
+
+<!-- files-changed:begin -->
+- \`M\` \`bin/check-pr-manual-testing\`
+<!-- files-changed:end -->
+"
+expect "9b — last ## section window runs to EOF; footer rows are not checkboxes" 1 "$(run_gate "$body9b")"
 
 # ---------------------------------------------------------------------------
 # Case 10: empty section (heading immediately followed by next ## heading) → 1
@@ -216,6 +242,45 @@ if [[ "$verdict5" == "HELD" ]]; then
     echo "ok: 12b — cross-check: checkbox body (case 5) → pr_manual_testing_clearance=HELD"
 else
     echo "FAIL: 12b — cross-check: checkbox body (case 5) → expected HELD, got $verdict5"
+    FAILED=1
+fi
+
+# 12c/12d pin the divergence the two layers are SUPPOSED to have. The gate
+# judges shape only, so both bodies below are well-formed → exit 0. The
+# predicate judges clearance, where an unchecked box must outrank the sentinel
+# but a checked one must not.
+
+# 12c: sentinel AND an unchecked box in the same window → gate 0, predicate HELD.
+body12c="## Manual Testing
+
+- [ ] **Verify the export by hand** — an outstanding manual step
+
+<!-- files-changed:begin -->
+No manual testing needed — all changes are covered by automated tests.
+"
+expect "12c — mixed sentinel + unchecked box is well-formed SHAPE" 0 "$(run_gate "$body12c")"
+verdict12c=$(pr_manual_testing_clearance "$body12c")
+if [[ "$verdict12c" == "HELD" ]]; then
+    echo "ok: 12c — unchecked box outranks sentinel → pr_manual_testing_clearance=HELD"
+else
+    echo "FAIL: 12c — unchecked box outranks sentinel → expected HELD, got $verdict12c"
+    FAILED=1
+fi
+
+# 12d: sentinel AND a CHECKED box (completed automated evidence) → still CLEARED.
+# This is the guard's blast-radius limit: holding here would block correct PRs.
+body12d="## Manual Testing
+
+No manual testing needed — all changes are covered by automated tests.
+
+- [x] \`bin/test-check-pr-manual-testing\` — all cases PASS
+"
+expect "12d — sentinel + checked evidence box is well-formed SHAPE" 0 "$(run_gate "$body12d")"
+verdict12d=$(pr_manual_testing_clearance "$body12d")
+if [[ "$verdict12d" == "CLEARED" ]]; then
+    echo "ok: 12d — checked evidence box does NOT hold → pr_manual_testing_clearance=CLEARED"
+else
+    echo "FAIL: 12d — checked evidence box must not hold → expected CLEARED, got $verdict12d"
     FAILED=1
 fi
 

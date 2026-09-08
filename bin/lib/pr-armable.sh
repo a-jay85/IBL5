@@ -42,8 +42,10 @@ REPO_SLUG="${REPO_SLUG:-a-jay85/IBL5}"
 #                positive "post-plan evaluated and cleared this" signal.
 #     HELD     — a `## Manual Testing` section exists but is NOT the sentinel
 #                (it carries real manual rows) -> a human must review. Also HELD
-#                when the sentinel names an explicit type whose matching file is
-#                absent from <changed_files> (AND semantics, see tail-clause).
+#                when the section carries an UNCHECKED `- [ ]` row even if the
+#                sentinel is also present (the row outranks it); and when the
+#                sentinel names an explicit type whose matching file is absent
+#                from <changed_files> (AND semantics, see tail-clause).
 #     UNKNOWN  — there is NO `## Manual Testing` section at all (a hand-made PR,
 #                or one post-plan never processed) -> NOT auto-armable.
 #   The sentinel prefix `No manual testing needed` covers both the template-
@@ -62,6 +64,24 @@ pr_manual_testing_clearance() {
     fi
     # Drop the heading line; inspect the remaining content for the sentinel.
     content=$(printf '%s\n' "$section" | sed '1d')
+    # An UNCHECKED box is an outstanding manual step, and it outranks the
+    # sentinel: a section carrying both must HOLD, never clear. Without this the
+    # sentinel grep below wins on a mixed section and arms auto-merge on a PR
+    # with real manual work left. The window is markdown-bounded at the next
+    # `## ` heading only when one exists — the LAST section runs to EOF — so a
+    # sentinel-looking line in a trailing machine footer lands inside the window
+    # of a checkbox-bearing section. Hardening: 0 occurrences across the most
+    # recent 200 PR bodies (`gh pr list --state all --limit 200`, 2026-09-07).
+    #
+    # Deliberately NOT `[[ x]]`: a CHECKED `- [x]` row is completed evidence and
+    # legitimately co-occurs with the sentinel ("no manual testing needed" +
+    # "- [x] bin/test-check-pr-manual-testing — 19/19 PASS"). Holding on those would block correct
+    # PRs. bin/check-pr-manual-testing's shape regex conflates the two on
+    # purpose (both shapes are well-formed); this clearance axis must not.
+    if printf '%s\n' "$content" | grep -qE '^[[:space:]]*- \[ \]'; then
+        echo "HELD"
+        return
+    fi
     if ! printf '%s\n' "$content" | grep -qiE '^[[:space:]]*No manual testing needed'; then
         echo "HELD"
         return

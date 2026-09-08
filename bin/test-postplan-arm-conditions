@@ -559,6 +559,47 @@ expect_rc0 "rc0: pr_dep_holds, no Depends-on marker" \
     "pr_dep_holds 'a body with no markers'"
 expect_rc0 "rc0: pr_manual_testing_clearance, no section" \
     "pr_manual_testing_clearance 'a body with no sections'"
+
+# --- (1) clearance precedence: unchecked box outranks the sentinel -----------
+# The section window terminates at the next `## ` heading only when one exists.
+# When `## Manual Testing` is the LAST `## ` heading — the shape /post-plan
+# emits, since it appends the <!-- files-changed --> footer after it — the
+# window runs to EOF, so a sentinel-looking line anywhere in that footer lands
+# inside a section that also carries real unchecked manual rows. Sentinel-only
+# matching then returns CLEARED and arms auto-merge on a PR with outstanding
+# manual work. Hardening, not a live repair: 0 occurrences across the most
+# recent 200 PR bodies (`gh pr list --state all --limit 200`, 2026-09-07).
+#
+# Canary: deleting the `- \[ \]` guard in bin/lib/pr-armable.sh flips the first
+# case to CLEARED and it FAILS; restoring it PASSES. Not vacuous.
+# expect_clearance <name> <CLEARED|HELD|UNKNOWN> <body> — assert the verdict.
+# Sources the lib in a generated subscript for the same reason expect_rc0 does:
+# pr-armable.sh is SOURCED, not executed, and is not in this harness's shell.
+expect_clearance() { # name  expected  body
+    local script="$BASE_TMP/clearance.sh" out
+    {
+        echo 'set -euo pipefail'
+        echo "source '$REPO_ROOT/bin/lib/pr-armable.sh'"
+        printf 'pr_manual_testing_clearance "$1"\n'
+    } > "$script"
+    out="$(PATH="$SHIMD:$PATH" bash "$script" "$3" 2>&1)"
+    if [[ "$out" == "$2" ]]; then
+        echo "ok: $1"
+    else
+        echo "FAIL: $1 — expected '$2', got '$out'"
+        FAILED=1
+    fi
+}
+
+expect_clearance "(1) unchecked box + sentinel in one window → HELD" "HELD" \
+    "$(printf '## Manual Testing\n\n- [ ] **Verify by hand**\n\n<!-- files-changed:begin -->\nNo manual testing needed - all changes are covered by automated tests.\n')"
+
+# The complement, which fixes the guard's blast radius: a CHECKED box is
+# completed evidence, legitimately printed under the sentinel. It must NOT hold,
+# or correct PRs stop auto-arming. This is why the guard matches `- [ ]` only
+# and not bin/check-pr-manual-testing's shape regex `- \[[ x]\]`.
+expect_clearance "(1) checked evidence box + sentinel → still CLEARED" "CLEARED" \
+    "$(printf '## Manual Testing\n\nNo manual testing needed - all changes are covered by automated tests.\n\n- [x] bin/test-foo - all cases PASS\n')"
 expect_rc0 "rc0: pr_golden_hold, golden untouched" \
     "pr_golden_hold '[]'"
 expect_rc0 "rc0: pr_feat_hold, non-feat title" \

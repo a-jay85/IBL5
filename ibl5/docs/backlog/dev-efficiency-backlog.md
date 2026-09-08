@@ -116,6 +116,7 @@ last_verified: 2026-09-08
 | E95 | Unasked-for `last_verified` change with duplicate YAML key in `ibl5/docs/decisions/README.md` | ✅ fixed this pass | — | XS |
 | E96 | Three residual isolation/scope gaps in `bin/bug-pipeline-test-env` (F3/F6/F7 from #1950 Phase 6) | ⬜ Open | — | S |
 | E97 | Stale numeric count in PR body Scope prose (Phase 6 findings from #2160) | ⬜ Open | — | XS |
+| E98 | Dead ref in source comment, direction error in comment, plan-required PR body content dropped (Phase 6 findings from #2167) | ✅ fixed this pass | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -1790,3 +1791,31 @@ Landing rung: **1** — extend `bin/check-rules-byte-budget` to warn when the ag
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-07 during #2160)*
+
+### E98 Dead ref in source comment, direction error in comment, plan-required PR body content dropped (Phase 6 findings from #2167)
+
+**class (CI-blocking):** a dead reference in a source-file comment — `bin/lib/pr-armable.sh:78` cited `bin/test-foo` (example) (non-existent) as an example path; `bin/check-docs` full-scan caught it and failed the `Meta checks` job.
+
+**class (NOTE, check 2):** a direction error in an inline comment — `.github/workflows/pr-meta-checks.yml:22` said "group above" but the concurrency block is below (line 29); changed to "below".
+
+**class (NOTEs, checks 1/4/5):** plan-required PR body content not shipped in the initial push — the `### Correction to the review's finding #1` section, the out-of-scope declaration, source citations, and the `- [x]` evidence rows in Manual Testing were all missing; restored via `gh pr edit`.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/lib/pr-armable.sh:78` — `bin/test-foo` (example) dead ref | CI-blocking dead ref | live | fixed this pass (`bin/test-check-pr-manual-testing`) |
+| 2 | `.github/workflows/pr-meta-checks.yml:22` — "above" vs "below" | comment direction error | live | fixed this pass |
+| 3 | PR #2167 body — plan-required sections and evidence rows missing | PR body content dropped | live | fixed this pass (via `gh pr edit`) |
+
+**prevention_ladder:**
+- rung 0 — dead reference: already caught by `bin/check-docs` full-scan (demonstrated by this CI failure); no additional gate warranted.
+- rung 0 — comment direction: no gate achievable for prose directional correctness; Phase 6 review catches it.
+- rung 0 — PR body content: Phase 6.5 remediation procedure already covers this class; `pr-body-claims.md` covers citations.
+- landing rung: no gate warranted — all three classes are already caught by existing mechanisms (CI, Phase 6 review, Phase 6.5 remediation).
+
+`prevention_ladder: no gate warranted — check-docs catches dead refs at CI; Phase 6 catches comment errors; Phase 6.5 catches PR body gaps`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-07 during #2167)*

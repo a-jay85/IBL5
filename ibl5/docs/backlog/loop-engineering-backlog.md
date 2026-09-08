@@ -1,6 +1,6 @@
 ---
 description: Loop-engineering backlog — automouse queue robustness (dependency ordering, circuit breakers, canaries, self-healing), autonomous intake loops, plan decomposition/tier-routing machinery, and the human comprehension counter-loop, with per-entry status.
-last_verified: 2026-09-07
+last_verified: 2026-09-08
 ---
 
 # Loop-Engineering Backlog
@@ -100,6 +100,7 @@ last_verified: 2026-09-07
 | L71 | Autonomous-loop impl deviated from plan "exact content" recipe without declaring the deviation in the PR body | 📝 Note | — | XS |
 | L72 | Loop-authored backlog entry cited unreachable squash-artifact SHA; archive entry missing blank line before GFM table | 📝 Note | — | XS |
 | L73 | Forced-verification row in `_plan-verification.md` references lsof port guard deleted before shipping — row's live-instance check cannot self-verify | ⬜ Open | 🟥 | S |
+| L74 | `write_canary_park_report()` glob-pipeline abort under `set -euo pipefail` (fixed); N1 declared-omission note (n/a) | ✅ Fixed | — | XS |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -1143,3 +1144,30 @@ Landing: rung 1 — extend `.claude/rules/pr-body-negative-claim-recheck.md` to 
 **artifact destination:** `.claude/rules/pr-body-negative-claim-recheck.md` — in-repo (extend scope to `_plan-verification.md` rows)
 
 **provenance:** (discovered 2026-09-05 during #1950 Phase 6.5 review)
+
+---
+
+### L74 `write_canary_park_report()` glob-pipeline abort under `set -euo pipefail` (fixed); N1 declared-omission note
+
+**class:** A glob-expansion pipeline in a `set -euo pipefail` command substitution (`ls "$QUEUE_DIR"/*.md`) that exits non-zero when the target directory is empty, which under the runner's `set -euo pipefail` can abort the enclosing function — fixed by replacing `ls` with `find`, which exits 0 on empty.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/automouse/run:1009` — `remaining=$(ls "$QUEUE_DIR"/*.md 2>/dev/null \| wc -l \| tr -d ' ')` | yes | live but currently unreachable (dispatch guard guarantees non-empty queue at this call site) | fixed this pass |
+
+**prevention_ladder:**
+- rung 0 — not covered by any existing gate.
+- rung 1 — no existing gate checks ls-vs-find glob patterns in shell scripts.
+- rung 2 — a rule note ("prefer `find` over glob-`ls` in `set -euo pipefail` subshells") is possible but the fix is a local one-liner; the rule would govern an unusually narrow pattern.
+- rung 3/4/5 — shellcheck SC2012 flags this class; wiring shellcheck to CI requires a new workflow step and justification under the meta-tooling bar.
+- **landing rung: no gate warranted** — the class is narrow (glob-ls in an assignment subshell under set -euo pipefail), the fix is trivially local, and shellcheck CI integration is a separate decision under the meta-tooling bar.
+
+**artifact destination:** n/a — no gate
+
+**provenance:** (discovered 2026-09-07 during #2161 Phase 6.5 review)
+
+**N1 note (class: n/a):** Plan Phase 3 item 2 (mark backlog item L5 done in-repo) was withdrawn before this PR: commit `3cb8e15f3` removed the branch's backlog edits after L5 was migrated to IBL5-backlog issue #107 (closed 2026-09-07T20:05:56Z). The omission is declared in the PR body under `## Backlog migration`. No in-repo artifact exists to fix or gate. prevention_ladder: no gate warranted — one-off migration artifact, already handled.
+
+*(discovered 2026-09-07 during /pr-ready Phase 6.5 review of #2161)*

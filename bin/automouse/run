@@ -1006,7 +1006,8 @@ write_canary_park_report() {
     local reports_dir="$NIGHTLY_DIR/reports"
     mkdir -p "$reports_dir"
     local remaining
-    remaining=$(ls "$QUEUE_DIR"/*.md 2>/dev/null | wc -l | tr -d ' ')
+    # find exits 0 on empty; ls with a glob does not under set -euo pipefail
+    remaining=$(find "$QUEUE_DIR" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
     cat > "$reports_dir/$(date +%Y-%m-%d)-canary-park.md" <<EOF
 # Automouse parked — master health canary failed
 

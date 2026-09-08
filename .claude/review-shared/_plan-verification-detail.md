@@ -19,10 +19,6 @@ Each row in the `## Forced integration-verification trigger` table was added fro
 
 An assertion grounded in an imagined value is how PR #887 shipped: it expected a display-cap count (~500, full-league) while the CI seed has only ~24 career rows, so the test was deterministically red the moment it ran. Grounding on the CI seed or a live DOM curl prevents that class.
 
-### Why a negative row must name its mutation
-
-Minimal section — no additional detail beyond the rule text.
-
 ### Why the test-type boundaries fall where they do
 
 A truly-manual row must be performable on the *open PR*, before it merges (orthogonal to the Timing column — pre-/post-impl is when a test is *written*, not when it can be *performed*). The test is *"can a reviewer render this row's judgment now, against the worktree/local stack?"* — never "does a command exit 0."

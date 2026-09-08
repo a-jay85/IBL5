@@ -12,6 +12,8 @@ Every plan must include a **Verification Matrix** — a table classifying each v
 
 ## Required format
 
+Why: _plan-verification-detail.md § Why the matrix format is closed
+
 Each implementation phase that changes behavior must have a corresponding row (or rows) in the matrix. Place the matrix after the implementation phases, before any "Out of Scope" section.
 
 ```
@@ -141,6 +143,8 @@ A plan that trips this trigger therefore **cannot** carry the "All verification 
 
 ## Forced integration-verification trigger
 
+Why: _plan-verification-detail.md § Why each integration trigger exists
+
 If a plan matches a left-hand row, its Verification Matrix must carry a row asserting the right-hand property.
 
 | If the plan... | it MUST carry a row that... |
@@ -206,3 +210,5 @@ If the plan has no phases adding trigger-pattern files, no action is needed.
 - Defer test classification to post-plan Phase 6. Phase 6 is a safety net, not the primary classification point.
 - Add a standalone "Testing" or "Verification" section with prose descriptions instead of the matrix.
 - Use "run X and check Y" without specifying the test type and file path.
+
+Why: _plan-verification-detail.md § Counter-examples

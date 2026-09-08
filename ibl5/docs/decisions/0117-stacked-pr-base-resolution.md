@@ -1,6 +1,6 @@
 ---
 description: Layered base-ref resolution for the ADR gate so stacked-PR branches are not blocked by a hardcoded origin/master assumption.
-last_verified: 2026-09-05
+last_verified: 2026-09-07
 ---
 
 # ADR-0117: Stacked-PR-aware base resolution for the ADR gate
@@ -59,6 +59,14 @@ Enforcement: `bin/pre-push-adr-hook`, `bin/adr-check --base=`,
   Rejected as an escape-hatch role; the var is deliberately asymmetric: it can only
   turn a PASS into a BLOCK (removes the network layer), never open what would otherwise
   be closed.
+- **Duplicate the resolver in each consumer** — copy the ~40 lines of base-resolution
+  logic into `bin/pre-push-adr-hook`, `bin/adr-check`, and `bin/wt-rebase` separately.
+  Rejected because a new standalone `bin/<script>` of ≥50 lines triggers an ADR decision
+  via `bin/adr-check`'s `#^bin/[^/]+$#` pattern, but a `bin/lib/` path cannot match
+  that pattern, so a shared helper carries no trigger cost. More importantly, duplicating
+  the logic would allow the hook's notion of "base" to drift from `wt-rebase`'s —
+  the exact failure mode that produces a branch which rebases clean and then blocks at
+  push.
 
 ## Consequences
 
@@ -71,6 +79,16 @@ Enforcement: `bin/pre-push-adr-hook`, `bin/adr-check --base=`,
 - **Negative:** a branch with no `iblBase` config, no network, and `BRANCH_BASE_OFFLINE=1`
   gets a hard block rather than a degraded pass. The correct fix is to set the config key,
   not to weaken the gate.
+- **Freshness obligation transfers to the stack root.** The hook does not walk the full
+  stack; it checks only whether the immediate base is an ancestor of HEAD. A stacked child
+  current with its parent passes even when that parent is behind `origin/master`. Ensuring
+  the stack root is rebased onto `origin/master` is enforced when the root is pushed, not
+  propagated downward.
+- **Name allowlist requires a leading-alnum rule, not just a character-class restriction.**
+  The allowlist is `^[A-Za-z0-9][A-Za-z0-9._/-]*$` with `..` rejected. The leading-character
+  rule is the load-bearing part: a value starting with `-` would be handed to `git` as an
+  *option*, not a branch ref — `escapeshellarg` does not prevent this because the parsing
+  happens inside git's own argument handling, not the shell's.
 
 ## References
 

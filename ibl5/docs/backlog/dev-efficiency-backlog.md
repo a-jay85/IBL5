@@ -1,6 +1,6 @@
 ---
 description: Development-efficiency backlog — inner-loop speed (diff-scoped analysis, parallel tests), CI caching, dependency-bump batching, and worktree lifecycle automation, with per-entry status.
-last_verified: 2026-09-08
+last_verified: 2026-09-07
 ---
 
 # Development-Efficiency Backlog
@@ -117,6 +117,7 @@ last_verified: 2026-09-08
 | E96 | Three residual isolation/scope gaps in `bin/bug-pipeline-test-env` (F3/F6/F7 from #1950 Phase 6) | ⬜ Open | — | S |
 | E97 | Stale numeric count in PR body Scope prose (Phase 6 findings from #2160) | ⬜ Open | — | XS |
 | E98 | Dead ref in source comment, direction error in comment, plan-required PR body content dropped (Phase 6 findings from #2167) | ✅ fixed this pass | — | XS |
+| E99 | ADR-index frontmatter key duplication via merge=union (Phase 6 blocker from #2111) | ✅ fixed this pass | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -1819,3 +1820,24 @@ Landing rung: **1** — extend `bin/check-rules-byte-budget` to warn when the ag
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-07 during #2167)*
+
+### E99 ADR-index frontmatter key duplication via merge=union (Phase 6 blocker from #2111)
+
+**class:** a duplicated YAML frontmatter key (`last_verified:`) in a `merge=union`-attributed file, where the parser reads last-key-wins, causing the effective verification date to silently regress below master's value on every rebase.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `ibl5/docs/decisions/README.md` frontmatter — three `last_verified:` keys after eight rebases | yes | live | fixed this pass (collapsed to single key) |
+
+**prevention_ladder:**
+- rung 0 — already covered? No existing gate checks for duplicate frontmatter keys.
+- rung 1 — extend an existing gate? `bin/check-docs`'s `parseFrontmatter` uses last-key-wins silently; extending it to error on a duplicate key would catch this at CI. This is the landing rung.
+- rung 2 — a `.claude/rules/` rule? Phase 6 review caught it this time; a rule alone is not enforcement.
+- rung 3-5 — not needed; a CI extension is sufficient and proportionate.
+- landing rung: **rung 1** — extend `bin/check-docs::parseFrontmatter` to `exit 1` when any frontmatter key appears more than once. Four extend-before-add conditions: (a) an existing gate (`bin/check-docs`) exists; (b) the extension is smaller than a new gate; (c) the surface is already under `check-docs` full-scan scope; (d) no meta-tooling bar trigger applies since `bin/check-docs` already exists.
+
+`artifact destination: bin/check-docs` (in-repo; edited in place in a future PR)
+
+*(discovered 2026-09-07 during #2111)*

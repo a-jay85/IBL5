@@ -11,7 +11,16 @@ on:
     branches: [ master, develop ]
   pull_request:
     branches: [ master, develop ]
-    types: [opened, synchronize, reopened, ready_for_review]
+    # `edited` is required, not cosmetic: the check-pr-manual-testing step reads
+    # the LIVE PR body via `gh pr view`, and the only remediation it prints is a
+    # body edit. Without `edited` that edit cannot re-trigger the run, and since
+    # `Meta checks` is a required status check the PR stays merge-blocked until
+    # an unrelated commit is pushed. `human-signoff.yml` lists `edited` for the
+    # same reason. Safe here: this workflow posts only sticky comments
+    # (marocchino/sticky-pull-request-comment updates in place) and never writes
+    # the PR body, so `edited` cannot self-retrigger; the per-PR `concurrency`
+    # group above collapses edit storms.
+    types: [opened, synchronize, reopened, ready_for_review, edited]
 
 permissions:
   contents: read

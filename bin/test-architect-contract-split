@@ -166,7 +166,7 @@ assert_canonical_gate_tokens() {
   # Canonical bin/check-plan gate tokens that must appear in the contract file.
   # [D] was removed prior to this PR; [M][V] live in _plan-verification.md, not here.
   for tok in '[C]' '[F]' '[H]' '[P]' '[S]' '[T]' '[8]' '[13]'; do
-    if ! printf '%s\n' "$gate_tokens" | grep -qF -- "$tok"; then
+    if ! grep -qF -- "$tok" <<< "$gate_tokens"; then
       printf 'FAIL: gate class missing canonical token %s\n' "$tok"
       FAILED=1
     fi
@@ -194,11 +194,11 @@ check_token_noloss_residency() {
       FAILED=1
     fi
   else
-    if ! printf '%s' "$combined_content" | grep -qF -- "$token"; then
+    if ! grep -qF -- "$token" <<< "$combined_content"; then
       printf 'FAIL [%s no-loss]: token missing from rules+detail: "%s"\n' "$class" "$token"
       FAILED=1
     fi
-    if ! printf '%s' "$rules_content" | grep -qF -- "$token"; then
+    if ! grep -qF -- "$token" <<< "$rules_content"; then
       printf 'FAIL [%s residency]: token not in rules file: "%s"\n' "$class" "$token"
       FAILED=1
     fi
@@ -214,17 +214,17 @@ check_fenced_noloss_residency() {
   if [[ -n "$moved_to" ]]; then
     local moved_fenced
     moved_fenced="$(extract_fenced "$moved_to" 2>/dev/null || true)"
-    if ! printf '%s\n' "$moved_fenced" | grep -qF -- "$fhash"; then
+    if ! grep -qF -- "$fhash" <<< "$moved_fenced"; then
       printf 'FAIL [fenced no-loss]: block absent from EXPECTED_MOVED detail file %s: "%s"\n' \
         "$moved_to" "$fline"
       FAILED=1
     fi
   else
-    if ! printf '%s\n' "$combined_fenced" | grep -qF -- "$fhash"; then
+    if ! grep -qF -- "$fhash" <<< "$combined_fenced"; then
       printf 'FAIL [fenced no-loss]: fenced block missing from rules+detail: "%s"\n' "$fline"
       FAILED=1
     fi
-    if ! printf '%s\n' "$rules_fenced" | grep -qF -- "$fhash"; then
+    if ! grep -qF -- "$fhash" <<< "$rules_fenced"; then
       printf 'FAIL [fenced residency]: fenced block not in rules file: "%s"\n' "$fline"
       FAILED=1
     fi
@@ -320,7 +320,7 @@ check_pair() {
         FAILED=1
       fi
     else
-      if ! printf '%s' "$combined_content" | grep -qF -- "$token"; then
+      if ! grep -qF -- "$token" <<< "$combined_content"; then
         printf 'FAIL [heading no-loss]: heading missing from rules+detail: "%s"\n' "$token"
         FAILED=1
       fi

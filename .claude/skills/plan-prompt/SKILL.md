@@ -1,7 +1,7 @@
 ---
 name: plan-prompt
 description: "Draft a /plan prompt distilled from the current conversation — ground-truth pointers, already-measured evidence, scope, constraints, verification, and the Step-3 architect tier — then, unless the Step-1.5 size triage says the work clears the ad-hoc bar, fire it as a detached headless Sonnet 4.6 run via bin/plan-now. Use after a design discussion when the planning run should be offloaded off the expensive session."
-last_verified: 2026-09-07
+last_verified: 2026-09-08
 ---
 
 # Draft a `/plan` handoff prompt and fire it headless
@@ -156,6 +156,10 @@ isn't obvious:
 - explicit recipe **plus** a named existing pattern to copy →
   **`plan-architect-sonnet`**
 - otherwise → **`plan-architect`**
+
+Before writing the tier directive, run `bin/plan-tier-hint --explain --desc "<task-line>"` on
+the `/plan` task statement line and confirm the returned tier matches your call. `bin/plan-now`
+now cross-checks the declared tier against this hint and exits 4 on a mismatch involving xhigh.
 
 Also state the orchestrator model outside the block: a single item → **Sonnet**;
 several items decomposed in one pass → **Opus** (`agent-tiering.md` §

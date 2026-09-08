@@ -11,10 +11,19 @@
 #   bin/plan-now --queue <prompt-file>      # explicit form of the default
 #   bin/plan-now --model opus <prompt-file> # orchestrator model (default claude-sonnet-4-6)
 #   bin/plan-now --no-dm <prompt-file>      # ... and skip the finish DM
+#   bin/plan-now --tier-ok "reason" ...     # suppress the tier mismatch gate with a reason
 #   Pre-flight duplicate gate (--queue only): if the prompt's branch slug already has a
 #   planning artifact on disk (queue, plans dir, done, or skipped), plan-now declines
 #   before spending a model run and exits 3. --implement always bypasses the gate.
-#   Exit codes: 0 ok, 1 internal error, 2 bad flag or missing file, 3 declined by gate.
+#   Pre-flight tier gate (all dispositions): compares the declared tier in the prompt
+#   against bin/plan-tier-hint. Exits 4 when the declared and hinted tiers differ AND
+#   at least one is xhigh. Gate is advisory — always overridable with --tier-ok "reason".
+#   The hint is fed the prompt's /plan task statement line only — the whole file
+#   false-positives on security words sitting inside negations. Gate skips silently
+#   when: the hint is not executable, no `MUST route to` directive, the hint exits
+#   non-zero, or it returns an unknown value.
+#   Exit codes: 0 ok, 1 internal error, 2 bad flag or missing file, 3 declined by dup
+#   gate, 4 declined by tier gate.
 # ---
 # EVERY terminal outcome DMs you through bin/discord-dm — icon, verdict, elapsed,
 # what to do next, the plan path and the log path — so learning that a run
@@ -100,6 +109,7 @@ MODEL="claude-sonnet-4-6"
 DISPOSITION="queue"
 NOTIFY=1
 PROMPT_SRC=""
+TIER_OK_REASON=""
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -107,6 +117,11 @@ while [ $# -gt 0 ]; do
         --implement) DISPOSITION="implement"; shift ;;
         --model)     MODEL="${2:?--model needs a value}"; shift 2 ;;
         --no-dm)     NOTIFY=0; shift ;;
+        --tier-ok)
+            if [ $# -lt 2 ] || [ -z "${2:-}" ]; then
+                echo "plan-now: --tier-ok requires a non-empty reason string." >&2; exit 2
+            fi
+            TIER_OK_REASON="$2"; shift 2 ;;
         -h|--help)
             sed -n '/^# Usage:/,/^#$/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         -*)
@@ -151,6 +166,62 @@ if [ "$DISPOSITION" = "queue" ] && [ -n "$PROMPT_SRC" ] && [ -f "$PROMPT_SRC" ];
         elif [ "$DUP_RC" != 0 ]; then
             echo "plan-now: dup-check exited $DUP_RC (not a decline) — proceeding." >&2
             [ -z "$DUP_OUT" ] || echo "$DUP_OUT" >&2
+        fi
+    fi
+fi
+
+# --- pre-flight architect-tier mismatch gate ---
+TIER_HINT="${PLAN_NOW_TIER_HINT:-$ROOT/bin/plan-tier-hint}"
+if [ -x "$TIER_HINT" ]; then
+    TASK_LINE=$(grep -m1 '^/plan' "$PROMPT_SRC" || true)
+    if [ -n "$TASK_LINE" ]; then
+        DIRECTIVE_LINE=$(grep -m1 'MUST route to' "$PROMPT_SRC" 2>/dev/null || true)
+        if [ -n "$DIRECTIVE_LINE" ]; then
+            DECLARED_NAME=$(grep -oE 'plan-architect(-xhigh|-sonnet)?' <<< "$DIRECTIVE_LINE" | head -1 || true)
+            if [ -n "$DECLARED_NAME" ]; then
+                case "$DECLARED_NAME" in
+                    plan-architect-xhigh)  DECLARED_TIER="xhigh" ;;
+                    plan-architect-sonnet) DECLARED_TIER="sonnet" ;;
+                    plan-architect)        DECLARED_TIER="default" ;;
+                    *)                     DECLARED_TIER="" ;;
+                esac
+                if [ -n "$DECLARED_TIER" ]; then
+                    TIER_HINT_RC=0
+                    HINT_OUT=$("$TIER_HINT" --explain --desc "$TASK_LINE" 2>/dev/null) || TIER_HINT_RC=$?
+                    if [ "$TIER_HINT_RC" -eq 0 ]; then
+                        HINTED_TIER=$(cut -f1 <<< "$HINT_OUT" || true)
+                        HINT_EXPLAIN=$(cut -f2- <<< "$HINT_OUT" || true)
+                        case "$HINTED_TIER" in
+                            xhigh|default|sonnet) ;;
+                            *) HINTED_TIER="" ;;
+                        esac
+                        if [ -n "$HINTED_TIER" ] && [ "$DECLARED_TIER" != "$HINTED_TIER" ]; then
+                            if [ "$DECLARED_TIER" = "xhigh" ] || [ "$HINTED_TIER" = "xhigh" ]; then
+                                if [ -n "$TIER_OK_REASON" ]; then
+                                    echo "plan-now: tier-ok override: declared=$DECLARED_TIER hinted=$HINTED_TIER reason: $TIER_OK_REASON"
+                                else
+                                    {
+                                        printf 'plan-now: TIER MISMATCH — declared %s but bin/plan-tier-hint says %s\n' "$DECLARED_TIER" "$HINTED_TIER"
+                                        printf 'plan-now: hint reason: %s\n' "$HINT_EXPLAIN"
+                                        printf 'plan-now: to override: bin/plan-now --tier-ok "your reason" ...\n'
+                                        printf 'plan-now: exiting 4 — recheck the tier or pass --tier-ok.\n'
+                                    } >&2
+                                    if [ "$NOTIFY" = 1 ]; then
+                                        DISCORD_DM="${PLAN_NOW_DISCORD_DM:-$ROOT/bin/discord-dm}"
+                                        if [ -x "$DISCORD_DM" ]; then
+                                            printf '%s\ndeclared=%s hinted=%s\n%s\n' \
+                                                "**plan-now DECLINED — tier mismatch**" \
+                                                "$DECLARED_TIER" "$HINTED_TIER" "$HINT_EXPLAIN" \
+                                                | "$DISCORD_DM" - || true
+                                        fi
+                                    fi
+                                    exit 4
+                                fi
+                            fi
+                        fi
+                    fi
+                fi
+            fi
         fi
     fi
 fi
@@ -251,7 +322,8 @@ CODA
     printf 'PLIST=%q\n'      "$PLIST"
     printf 'DISPOSITION=%q\n' "$DISPOSITION"
     printf 'LOG=%q\n'         "$LOG"
-    printf 'NOTIFY=%q\n'      "$NOTIFY"
+    printf 'NOTIFY=%q\n'         "$NOTIFY"
+    printf 'TIER_OVERRIDE=%q\n'  "${TIER_OK_REASON:-}"
     printf 'CHECK_PLAN=%q\n' "$ROOT/bin/check-plan"
     # PLAN_NOW_CLAUDE / PLAN_NOW_AUTOMOUSE_QUEUE / PLAN_NOW_DISCORD_DM let a smoke
     # test stub the model call, the queue call and the DM, and so exercise the
@@ -265,6 +337,7 @@ CODA
 # launchd runs with a minimal env — same PATH prelude bin/automouse/run uses.
 export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
 cd "$ROOT" || exit 1
+if [ -n "${TIER_OVERRIDE:-}" ]; then echo "plan-now: tier-ok override was active: $TIER_OVERRIDE"; fi
 
 before=$(ls "$PLANS_DIR"/*.md 2>/dev/null | sort)
 started=$(date +%s)
@@ -647,6 +720,10 @@ ${elapsed}s · ${DM_NEXT:-read the log}"
     if [ -n "$DM_PLAN" ]; then
         msg="$msg
 ${DM_PLAN/#$HOME/~}"
+    fi
+    if [ -n "${TIER_OVERRIDE:-}" ]; then
+        msg="$msg
+tier-ok: $TIER_OVERRIDE"
     fi
     msg="$msg
 log: $LOG"

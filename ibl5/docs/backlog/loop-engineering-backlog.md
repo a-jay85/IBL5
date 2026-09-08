@@ -101,6 +101,7 @@ last_verified: 2026-09-08
 | L72 | Loop-authored backlog entry cited unreachable squash-artifact SHA; archive entry missing blank line before GFM table | 📝 Note | — | XS |
 | L73 | Forced-verification row in `_plan-verification.md` references lsof port guard deleted before shipping — row's live-instance check cannot self-verify | ⬜ Open | 🟥 | S |
 | L74 | `write_canary_park_report()` glob-pipeline abort under `set -euo pipefail` (fixed); N1 declared-omission note (n/a) | ✅ Fixed | — | XS |
+| L75 | `/plan` section-byte inventory unverified before deriving split targets — `_plan-verification.md` cap corrected to 21504 B | ⬜ Open | 🟦 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -1171,3 +1172,30 @@ Landing: rung 1 — extend `.claude/rules/pr-body-negative-claim-recheck.md` to 
 **N1 note (class: n/a):** Plan Phase 3 item 2 (mark backlog item L5 done in-repo) was withdrawn before this PR: commit `3cb8e15f3` removed the branch's backlog edits after L5 was migrated to IBL5-backlog issue #107 (closed 2026-09-07T20:05:56Z). The omission is declared in the PR body under `## Backlog migration`. No in-repo artifact exists to fix or gate. prevention_ladder: no gate warranted — one-off migration artifact, already handled.
 
 *(discovered 2026-09-07 during /pr-ready Phase 6.5 review of #2161)*
+
+---
+
+### L75 `/plan` section-byte inventory unverified before deriving split targets
+
+**class:** A `/plan` architect derives file-size targets from a section-byte inventory measured at plan-authoring time, but no `/plan` phase asserts that claimed section sizes match the actual file before targets are derived — so a stale or misread inventory yields targets the implementation cannot reach without deleting operative content.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `~/claude-plans/architect-contract-rules-detail-split-shared-context.md` — section inventory placed `## Required format` in `.claude/review-shared/_plan-verification.md` at 11,172 B; measured against `bin/fixtures/plan-verification-presplit.md` at implementation time the movable-rationale content in that section was 587 B, so ~10.6 KB of assumed-movable rationale did not exist; the plan's 16 KB target and 19,456 B hard cap were unreachable without deleting content the plan required to stay verbatim (forced-trigger tables, closed enums, the decision-trigger table) | yes (inventory-derived target unverifiable before implementation) | live | not fixed — filed; cap corrected to 21,504 B in `bin/test-architect-contract-split` with an inline measurement citation |
+
+**Why it matters:** A size target derived from an incorrect section inventory causes the implementation to either fall short of the target (requiring a post-hoc cap correction) or to reach it by deleting operative content the plan required to keep. The byte-count gate (`bin/test-architect-contract-split` assertion 4) cannot distinguish "cap met by moving rationale" from "cap met by deleting rules" on size alone — assertions 1–3 (no-loss, residency, orphan pointers) are the real discriminator. But when the target itself is derived from a wrong inventory, the cap is wrong from the start, and the correction must be made in the gate rather than in the plan.
+
+**Fix:** The `/plan` split-authoring workflow should require a CLI-executable characterization step that measures actual section sizes from the target file before any byte target is derived — e.g. `awk '/^## Required format/{f=1} f && /^## / && !/^## Required format/{exit} f{print}' _plan-verification.md | wc -c`. This closes the gap between the inventory claim and the live file without adding a new CI gate.
+
+**prevention_ladder:**
+- rung 0 — not covered; no plan phase checks claimed section sizes against the live file.
+- rung 1 — no existing gate reads a plan's section-byte inventory against the current repo state.
+- rung 2 — a note in `.claude/skills/plan/_architect-contract.md` requiring a CLI-executable section-size characterization step before any byte-reduction target is declared. Low friction, no new gate.
+- rung 3/4/5 — cannot be mechanized: section-byte inventories live in plan prose outside the repo, and plan content is not parsed by any CI gate.
+- **landing rung: rung 2** — add a characterization-step requirement to the plan-authoring contract; no CI gate warranted.
+
+**artifact destination:** `.claude/skills/plan/_architect-contract.md` — byte-reduction recipe section, or wherever split-file targets are specified.
+
+**provenance:** (discovered 2026-09-08 during architect-contract-rules-detail-split)

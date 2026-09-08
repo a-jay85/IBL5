@@ -1294,3 +1294,27 @@ Landing: rung 1 — extend `.claude/rules/pr-body-negative-claim-recheck.md` to 
 **artifact destination:** `.claude/rules/shell-pipefail-grep.md` — add a note on `stat -f` portability: use `uname` branching, not `||` fallback.
 
 **provenance:** (discovered 2026-09-08 during PR #2178 Phase 7 CI monitoring)
+
+---
+
+### L80 PR #2181 Phase 5.5 fidelity-review — Changes list omits subset of changed behaviors
+
+**class:** an autonomous-authored PR body Changes list that omits a subset of changed code behaviors within the modified file, causing the body to under-describe the diff even though no claim is contradicted.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #2181 `## Changes` — two `digest: unavailable` fallback lines at `bin/pr-cycle:852–854` re-prefixed with `- ` bullet but not mentioned in the Changes list | yes | fixed (PR body updated in Phase 5.5 remediation) | fixed this pass |
+
+**prevention_ladder:**
+- rung 0 — no gate checks that a PR body Changes list enumerates all changed code behaviors.
+- rung 1 — not decidable by static analysis: a PHPStan rule cannot compare prose list completeness to diff content.
+- rung 2 — not a CI-gate candidate: any gate here would require semantic understanding of both the diff and the prose.
+- rung 3 — not a forced-trigger candidate: the trigger table checks for test coverage patterns, not PR body completeness.
+- rung 4 — a reminder in an always-loaded rule or in the fidelity-review prompt: "When authoring the Changes list, enumerate every distinct behavior change, not just the primary one; the fallback/edge-case branches of the changed function count."
+- **landing rung: rung 4** — a note in the fidelity-review prompt or Phase 5.5 review criteria (check 4 already catches contradicted claims; an addendum covering omissions would prevent this without adding a new gate).
+
+**artifact destination:** `.claude/skills/pr-ready/_plan-fidelity-review.md` — a note under check 4 that the review should flag a Changes list that omits behaviors changed in the diff (even non-contradicting omissions), so future plan-blind PRs enumerate fallback/edge-case branches alongside primary behaviors.
+
+**provenance:** (discovered 2026-09-08 during PR #2181 Phase 5.5 fidelity review, Note 1)

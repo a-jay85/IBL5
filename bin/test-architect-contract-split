@@ -341,7 +341,8 @@ check_pair() {
     # If detail file doesn't exist yet (pre-split), skip the orphan check for it
     [[ -f "$detail_path" ]] || continue
 
-    if ! grep -qE "^#{2,3}[[:space:]]+${heading}" "$detail_path" 2>/dev/null; then
+    heading_esc=$(printf '%s' "$heading" | sed 's/[][\\^$.|?*+(){}]/\\&/g')
+    if ! grep -qE "^#{2,3}[[:space:]]+${heading_esc}" "$detail_path" 2>/dev/null; then
       printf 'FAIL [orphan pointer]: rules file pointer to missing heading "%s" in %s\n' \
         "$heading" "$detail_ref"
       FAILED=1

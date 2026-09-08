@@ -75,7 +75,7 @@ pr_manual_testing_clearance() {
     #
     # Deliberately NOT `[[ x]]`: a CHECKED `- [x]` row is completed evidence and
     # legitimately co-occurs with the sentinel ("no manual testing needed" +
-    # "- [x] bin/test-foo — 19/19 PASS"). Holding on those would block correct
+    # "- [x] bin/test-check-pr-manual-testing — 19/19 PASS"). Holding on those would block correct
     # PRs. bin/check-pr-manual-testing's shape regex conflates the two on
     # purpose (both shapes are well-formed); this clearance axis must not.
     if printf '%s\n' "$content" | grep -qE '^[[:space:]]*- \[ \]'; then

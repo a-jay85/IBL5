@@ -19,7 +19,7 @@ on:
     # same reason. Safe here: this workflow posts only sticky comments
     # (marocchino/sticky-pull-request-comment updates in place) and never writes
     # the PR body, so `edited` cannot self-retrigger; the per-PR `concurrency`
-    # group above collapses edit storms.
+    # group below collapses edit storms.
     types: [opened, synchronize, reopened, ready_for_review, edited]
 
 permissions:

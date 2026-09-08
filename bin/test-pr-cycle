@@ -753,11 +753,11 @@ run --worker
 [[ "$(rows)" == "1" ]] || fail "want 1 ledger row, got $(rows)"
 cat > "$SCRATCH/expected-row" <<'EXP_EOF'
 - [ ] #101 t101 — merged 2026-01-01T00:00:00Z — https://x/101
-  **What changed:** the driver landed
-  **Why:** because the loop was manual
-  **Watch:** the ledger
-  **Touches:** bin/pr-cycle
-  **Machine-authored fixes:** none
+  - **What changed:** the driver landed
+  - **Why:** because the loop was manual
+  - **Watch:** the ledger
+  - **Touches:** bin/pr-cycle
+  - **Machine-authored fixes:** none
 EXP_EOF
 ledger | grep -n '' >/dev/null
 ledger | tail -n 6 > "$SCRATCH/actual-row"

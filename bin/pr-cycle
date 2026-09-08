@@ -842,16 +842,16 @@ _digest_row() {
         for _lab in "What changed" "Why" "Watch" "Touches" "Machine-authored fixes"; do
             _val="$(printf '%s\n' "$_labels" | awk -F'\t' -v l="$_lab" '$1 == l { print $2; exit }')"
             [ -n "$_val" ] || _val="(missing)"
-            printf '  **%s:** %s\n' "$_lab" "$_val"
+            printf '  - **%s:** %s\n' "$_lab" "$_val"
         done
         return 0
     fi
     # A confirmed merge is ALWAYS ledgered — §4.4. A missing or unparseable digest
     # degrades the row's detail; it never suppresses the row.
     if [ -f "$RUNDIR/ready-$_n.out" ]; then
-        printf '  digest: unavailable — /pr-ready ran but posted no verdict comment\n'
+        printf '  - digest: unavailable — /pr-ready ran but posted no verdict comment\n'
     else
-        printf '  digest: unavailable — no /pr-ready pass (armed by triage sweep)\n'
+        printf '  - digest: unavailable — no /pr-ready pass (armed by triage sweep)\n'
     fi
 }
 

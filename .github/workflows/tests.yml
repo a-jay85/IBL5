@@ -98,6 +98,9 @@ jobs:
               # three files, so a skill-only edit must run the harness job too.
               - '.claude/skills/plan/SKILL.md'
               - '.claude/review-shared/_plan-verification.md'
+              - '.claude/review-shared/_plan-verification-detail.md'
+              - '.claude/skills/plan/_architect-contract.md'
+              - '.claude/skills/plan/_architect-contract-detail.md'
               - '.claude/skills/post-plan/_phase-5-final-verification.md'
               # bin/test-human-signoff-classifier guards the classifier lib that
               # human-signoff.yml sources, so a workflow-only edit must run it too.
@@ -1021,6 +1024,8 @@ jobs:
         run: bin/test-path-filters
       - name: ibl5/bin/test-db-sync-now
         run: ibl5/bin/test-db-sync-now
+      - name: bin/test-architect-contract-split
+        run: bin/test-architect-contract-split
 
   gate:
     name: Tests and Analysis

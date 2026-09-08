@@ -105,6 +105,7 @@ last_verified: 2026-09-08
 | L76 | `bin/lib/plan-depends-on` fail-open on unreadable plan (fixed); portable self-heal cases placed behind macOS-only guard in test harness (fixed) | ✅ Fixed | — | S |
 | L77 | PR body claimed "20 verification rows, V1–V20" when 12 matrix rows realized; `automouse-workflow.md` compression undeclared (both fixed in PR body) | ✅ Fixed | — | XS |
 | L78 | PR #2178 fidelity-review notes (a–e): doc omissions in `automouse-workflow.md`, test-harness escape hatches, V17/V20 annotation mismatches, dead-code guard asymmetry — all non-blocking, none fixed this pass | ⬜ Open | 🟦 | S |
+| L79 | `mtime_of()` in `bin/test-automouse-depends-on` used `stat -f %m \|\| stat -c %Y`; GNU stat `-f` exits 0 with filesystem verbatim output on Linux, blocking the `\|\|` fallback — V9 failed on Linux CI (fixed) | ✅ Fixed | — | XS |
 
 ### L1 Plan dependency DAG
 ➜ L1 Plan dependency DAG — ✅ Implemented (2026-09-08): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
@@ -1271,3 +1272,25 @@ Landing: rung 1 — extend `.claude/rules/pr-body-negative-claim-recheck.md` to 
 **artifact destination:** `.claude/rules/automouse-workflow.md` (occurrence 1), `.claude/rules/bin-help-span-and-secondary-assertions.md` or a new harness-annotation rule doc (occurrences 2–4)
 
 **provenance:** (discovered 2026-09-08 during PR #2178 fidelity review, notes a–e)
+
+---
+
+### L79 `mtime_of()` GNU stat `-f` exits 0 with wrong output — Linux CI V9 failure
+
+**class:** A portable-stat helper that uses `stat -f %m || stat -c %Y` fails silently on Linux because GNU `stat -f` (filesystem-stat mode) exits 0 but produces verbose block/inode output, never triggering the `||` fallback — a platform-divergence defect that passes all macOS development tests but fails Linux CI.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/test-automouse-depends-on:56` — `mtime_of() { stat -f %m "$1" 2>/dev/null \|\| stat -c %Y "$1" 2>/dev/null; }` — V9 "plan mtime changed" FAIL on Linux CI (run 34272784060 job 102218662249) | yes | live | fixed (commit f2584c8e1, PR #2178 Phase 7) |
+
+**prevention_ladder:**
+- rung 0 — no gate checks portable-stat helpers for Linux/BSD divergence.
+- rung 1 — ShellCheck does not catch this pattern; `-f` is a valid flag on both platforms with different semantics.
+- rung 2 — norm: portable-mtime helpers must use `uname` branching, not `|| fallback`, because GNU `stat -f` exits 0 with wrong output. Add a note to `.claude/rules/shell-pipefail-grep.md` or a new rule covering portable-stat pitfalls.
+- **landing rung: rung 2** — a one-sentence authoring norm; no new gate warranted.
+
+**artifact destination:** `.claude/rules/shell-pipefail-grep.md` — add a note on `stat -f` portability: use `uname` branching, not `||` fallback.
+
+**provenance:** (discovered 2026-09-08 during PR #2178 Phase 7 CI monitoring)

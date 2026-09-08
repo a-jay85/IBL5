@@ -1,6 +1,6 @@
 ---
 description: The plan-architect's full output contract, Read on demand from Step 3 of plan/SKILL.md — the MUST-produce list, the conditional-section catalogue, the agent-tiering labels to inject, and the delegation-packet format.
-last_verified: 2026-09-07
+last_verified: 2026-09-08
 ---
 
 The `plan-architect` Reads this file when Step 3 of `plan/SKILL.md` points to it, so this contract lands in the architect's own sub-context and never enters the orchestrator's. Mirrors the on-demand convention of the `.claude/review-shared/_*.md` reference files.

@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 5.5 — plan-intent fidelity review (one Opus reviewer spawn), verdict parse, remediation, and sticky merge-digest comment.
-last_verified: 2026-09-06
+last_verified: 2026-09-07
 ---
 
 # /post-plan Phase 5.5 — Plan-intent fidelity review & merge digest
@@ -8,14 +8,6 @@ last_verified: 2026-09-06
 Purpose: ask whether the implementation does what the plan *intended*, not merely what its tests assert — the semantic question Phase 5.0 structurally cannot answer. The fidelity criteria stay in `.claude/skills/pr-ready/_plan-fidelity-review.md`; the remediation procedure stays in `.claude/skills/pr-ready/_phase65-remediation.md`. This file sequences them and adds the post-plan-specific glue.
 
 `<MASTER_SHA>` and `<N>` below are **literals to substitute** with the values pinned in step 1 — a value captured in one Bash call does not survive into the next, and every `/post-plan` block runs in a fresh shell.
-
-## Preamble — write synthetic Phase 5.0 done-marker
-
-Phase 5.0 ran inside the compiled harness (a different process, different PID) before the harness exited 4 and spawned this resumed skill session. Phase 6.5 condition (3) checks for `/tmp/post-plan-conformance-done-$PPID` using the **resumed session's** `$PPID`; the harness never wrote it. Write it now, unconditionally — the harness exits 4 only after Phase 5.0 passes, so the marker truthfully represents "Phase 5.0 conformance completed without failures."
-
-```bash
-touch /tmp/post-plan-conformance-done-$PPID
-```
 
 ## Step 1 — Pin the run's identifiers
 

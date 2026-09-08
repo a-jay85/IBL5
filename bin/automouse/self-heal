@@ -16,8 +16,11 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 : "${NIGHTLY_DIR:=$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse}"
 : "${PLANS_DIR:=$HOME/claude-plans}"
 : "${STALENESS_GUARD:=$SCRIPT_DIR/../check-plan-staleness}"
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/../lib/plan-depends-on"
 
 SKIPPED_DIR="$NIGHTLY_DIR/skipped"
+QUEUE_DIR="$NIGHTLY_DIR/queue"
 
 DRY_RUN=0
 [ "${1:-}" = "--dry-run" ] && DRY_RUN=1
@@ -27,8 +30,62 @@ still_stale=0
 healed_names_file="$(mktemp)"
 trap 'rm -f "$healed_names_file"' EXIT
 
+holds_cleared=0
+holds_waiting=0
+holds_reaped=0
+
+# Clear dependency holds written by bin/automouse/run's depends_on: gate.
+# Runs BEFORE the skipped/-empty guard below, because skipped/ is usually empty
+# and a hold scan placed after it would never execute.
+scan_depends_holds() {
+    local sc name plan status dep rest reason
+    for sc in "$QUEUE_DIR"/*.md.depends-hold; do
+        [ -e "$sc" ] || continue                      # no matches → literal glob
+        name="$(basename "$sc" .depends-hold)"        # e.g. foo.md
+        plan="$QUEUE_DIR/$name"
+
+        # Orphan reap: the plan left queue/ (a manual `queue remove`, or a
+        # disposition move). bin/automouse/queue evicts .staleness/.attempts but
+        # knows nothing about .depends-hold, and this PR does not modify it —
+        # so the orphan is reaped here or never.
+        if [ ! -e "$plan" ] && [ ! -L "$plan" ]; then
+            [ "$DRY_RUN" -eq 1 ] || rm -f "$sc"
+            holds_reaped=$((holds_reaped + 1))
+            continue
+        fi
+
+        status="$(plan_depends_on_status "$plan")"
+        case "$status" in
+            met)
+                if [ "$DRY_RUN" -eq 1 ]; then
+                    echo "would clear hold: $name (dependency met)"
+                else
+                    rm -f "$sc"
+                    echo "[depends-heal] $name: dep met, cleared hold"
+                fi
+                holds_cleared=$((holds_cleared + 1))
+                ;;
+            unmet:*)
+                # Silent no-op: still waiting is the normal, expected state and
+                # must not generate a line every cycle for every held plan.
+                holds_waiting=$((holds_waiting + 1))
+                ;;
+            *)
+                rest="${status#unresolvable:}"
+                dep="${rest%%:*}"
+                reason="${rest#*:}"
+                echo "[depends-heal-warn] $name: still unresolvable — $reason (dep: $dep)"
+                holds_waiting=$((holds_waiting + 1))
+                ;;
+        esac
+    done
+    echo "self-heal: $holds_cleared hold(s) cleared, $holds_waiting still held, $holds_reaped orphan sidecar(s) reaped."
+}
+
+scan_depends_holds
+
 if ! ls "$SKIPPED_DIR"/*.md >/dev/null 2>&1; then
-    echo "self-heal: skipped/ is empty — nothing to recover."
+    echo "self-heal: skipped/ is empty — nothing else to recover."
     exit 0
 fi
 

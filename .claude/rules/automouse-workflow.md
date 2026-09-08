@@ -137,3 +137,36 @@ Every parser is **line-1-anchored** (frontmatter only, to the closing `---`), so
 ## Feature PRs cannot auto-merge
 
 Conventional-commit **`feat:`** PRs are gated by the required `human-signoff` check and will **not** auto-merge unattended — they wait for a human to apply the `human-approved` label after inspection (ADR-0062). `/post-plan` Phase 6.5 condition (8) deterministically **never arms** a `feat:` PR (a literal title grep), so there is no arm-then-strip; the required `human-signoff` check remains the independent floor that blocks the merge regardless. Maintenance PRs (`fix`/`refactor`/`chore`/`ci`/`docs`/`revert`) auto-merge as before — still subject to Phase 6.5's other conditions, including the PR-time safety verdict (9) on the realized diff. Check `gh pr list` afterward for `feat:` PRs awaiting your label.
+
+## `depends_on:` hold gate
+
+A plan can declare prerequisites in its YAML frontmatter. When a plan is picked from the queue, `bin/automouse/run` calls `bin/lib/plan-depends-on` to evaluate the key before touching the attempt counter. If any dependency is unmet, the plan is **held** (not attempted) and a `.depends-hold` sidecar is written to `queue/<plan>.md.depends-hold`.
+
+**Frontmatter syntax:**
+
+```yaml
+---
+depends_on:
+  - 2099          # PR number — held until merged
+  - other-plan    # plan slug — held until other-plan.md appears in done/
+---
+```
+
+Inline scalar form also works: `depends_on: 2099`.
+
+**Three-state verdict** (from `bin/lib/plan-depends-on`):
+
+| Verdict | Meaning |
+|---------|---------|
+| `met` | All deps satisfied (or key absent). Proceed to impl. |
+| `unmet:<dep>` | Dep resolved cleanly but not yet merged/done. Hold. |
+| `unresolvable:<dep>:<reason>` | Dep cannot be evaluated. Hold. Reasons: `gh-error`, `bad-value`, `empty-value`, `no-done-dir`. |
+
+**Hold lifecycle:**
+
+- A held plan stays in `queue/` with a `.depends-hold` sidecar and is skipped every pick cycle (zero attempt cost — the counter never increments).
+- `bin/automouse/self-heal` scans `queue/*.depends-hold` on every run and removes the sidecar when the dep is now `met`, re-enabling the plan for the next pick.
+- An orphan sidecar (plan left `queue/` via manual removal) is reaped by `self-heal`.
+- The `.depends-hold` sidecar is NOT touched by `bin/automouse/queue remove` — self-heal's orphan-reap is the cleanup path.
+
+**Run-scoped dedup:** once a plan is held within a run, it is skipped for the rest of that run (space-padded `DEPENDS_HELD` string). When every plan in the queue is held, the run terminates cleanly rather than spinning.

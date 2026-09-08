@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/lib/plan-depends-on — evaluate the depends_on: frontmatter field for a plan.
+#
+# DUAL-MODE: sourced by bin/automouse/self-heal (many sidecars, one shell) and
+# by the test harness; executed as a subprocess by bin/automouse/run (one plan
+# per pick, matching how that runner calls every other bin/lib helper).
+# The naming convention in bin/lib/ uses a .sh suffix for sourced files; this
+# file omits the suffix because fixing that convention is outside this PR's scope.
+# Do not rename it without updating bin/automouse/run and bin/automouse/self-heal.
+#
+# plan_depends_on_status <plan_file>
+#
+#   Prints exactly one line to stdout and ALWAYS returns 0. Never writes stderr
+#   on a normal outcome. Callers branch on the string, not on the exit code.
+#
+#     met                            every declared dependency is satisfied
+#                                    (also the verdict when no depends_on: key exists)
+#     unmet:<dep>                    <dep> resolved cleanly and has not merged
+#     unresolvable:<dep>:<reason>    <dep> could not be evaluated at all
+#
+#   <reason> is drawn from a closed set: gh-error | bad-value | empty-value | no-done-dir
+#
+#   The function is a pure query. It writes no files, mutates no globals, and
+#   MUST NOT touch the attempt counter or any queue/ sidecar. Its only external
+#   effect is a read-only `gh pr view` when a dependency is a PR number.
+#
+# Why "always return 0": both call sites run under set -euo pipefail. A function
+# returning non-zero inside RESULT=$(plan_depends_on_status ...) aborts the entire
+# runner. Returning 0 and branching on the string with case makes the failure mode
+# structurally impossible. This diverges from bin/lib/plan-impl-model, which signals
+# via exit code because its caller wraps it in an `if`.
+
+plan_depends_on_status() {
+    local plan_file="$1"
+
+    # ── 1. Parse the frontmatter for the depends_on: key ──────────────────────
+    # Line-1-anchored: only a `---` on line 1 opens the block.
+    # Collects an inline scalar OR an indented YAML list, until the list ends.
+    local raw_deps
+    raw_deps=$(awk '
+        NR==1 && /^---[[:space:]]*$/ { infm=1; next }
+        infm && /^---[[:space:]]*$/  { exit }
+        infm && /^depends_on:[[:space:]]*/ {
+            line = $0
+            sub(/^depends_on:[[:space:]]*/, "", line)
+            gsub(/[[:space:]]+$/, "", line)
+            if (line != "") { print line }
+            inlist = 1
+            next
+        }
+        inlist && /^[[:space:]]+-[[:space:]]*/ {
+            sub(/^[[:space:]]+-[[:space:]]*/, "", $0)
+            gsub(/[[:space:]]+$/, "", $0)
+            if ($0 != "") { print $0 }
+            next
+        }
+        inlist && /^[^[:space:]]/ { inlist = 0 }
+    ' "$plan_file" 2>/dev/null)
+
+    # ── 2. Fast path: key absent → met ────────────────────────────────────────
+    # Detect key presence with a second pass restricted to the frontmatter block.
+    local key_present
+    key_present=$(awk '
+        NR==1 && /^---[[:space:]]*$/ { infm=1; next }
+        infm && /^---[[:space:]]*$/  { exit }
+        infm && /^depends_on:[[:space:]]*/ { print "yes"; exit }
+    ' "$plan_file" 2>/dev/null)
+
+    if [ -z "$key_present" ]; then
+        printf 'met\n'
+        return 0
+    fi
+
+    # Key present but yielded no dependency values → malformed contract
+    if [ -z "$raw_deps" ]; then
+        printf 'unresolvable:<none>:empty-value\n'
+        return 0
+    fi
+
+    # ── 3. Load deps into an array ────────────────────────────────────────────
+    local deps=()
+    while IFS= read -r dep; do
+        deps+=("$dep")
+    done <<< "$raw_deps"
+
+    # ── 4. Derive DONE_DIR ────────────────────────────────────────────────────
+    # Computed lazily below (only when a slug dep is reached), but derive the
+    # path once here so every slug dep resolves against the same directory.
+    # Priority: DONE_DIR env > NIGHTLY_DIR/done > plan-file sibling ../done.
+    local done_dir
+    if [ -n "${DONE_DIR:-}" ]; then
+        done_dir="$DONE_DIR"
+    elif [ -n "${NIGHTLY_DIR:-}" ]; then
+        done_dir="$NIGHTLY_DIR/done"
+    else
+        done_dir="$(cd "$(dirname "$plan_file")/.." 2>/dev/null && pwd)/done"
+    fi
+
+    # ── 5. Resolve each dependency in declared order ──────────────────────────
+    : "${GH:=gh}"
+    local repo_root
+    repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+
+    local dep
+    for dep in "${deps[@]}"; do
+        # 5a. Malformed value
+        if [[ ! "$dep" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*$ ]]; then
+            printf 'unresolvable:%s:bad-value\n' "$dep"
+            return 0
+        fi
+
+        # 5b. PR number
+        if [[ "$dep" =~ ^[0-9]+$ ]]; then
+            local state
+            if state=$(cd "$repo_root" && GH_PROMPT_DISABLED=1 "$GH" pr view "$dep" \
+                       --json state --jq '.state' 2>/dev/null); then
+                if [ "$state" != "MERGED" ]; then
+                    printf 'unmet:%s\n' "$dep"
+                    return 0
+                fi
+            else
+                printf 'unresolvable:%s:gh-error\n' "$dep"
+                return 0
+            fi
+            continue
+        fi
+
+        # 5c. Plan slug — check done/
+        if [ ! -d "$done_dir" ]; then
+            printf 'unresolvable:%s:no-done-dir\n' "$dep"
+            return 0
+        fi
+        if ! { [ -e "$done_dir/$dep.md" ] || [ -L "$done_dir/$dep.md" ]; }; then
+            printf 'unmet:%s\n' "$dep"
+            return 0
+        fi
+    done
+
+    printf 'met\n'
+    return 0
+}
+
+# Sourced by bin/automouse/self-heal and the test harness; executed as a
+# subprocess by bin/automouse/run. The guard is what makes dual-mode work:
+# when sourced, only the function definition above is evaluated; when executed
+# directly, the function is called with the script's arguments.
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+    plan_depends_on_status "$@"
+    exit 0
+fi

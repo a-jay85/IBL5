@@ -1,0 +1,506 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-automouse-depends-on — contract test for the depends_on: plan
+# frontmatter key. Pins the three-state verdict of plan_depends_on_status
+# (bin/lib/plan-depends-on) and the hold/heal behaviour it drives in
+# bin/automouse/run and bin/automouse/self-heal.
+#
+# The bug class this exists to prevent: a dependency the runner cannot
+# EVALUATE being silently treated as SATISFIED, so a plan runs against an
+# unmerged prerequisite.
+#
+# Run: bin/test-automouse-depends-on  (exit 0 = all pass, 1 = any case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+FAILED=0
+
+# ── Assertion helpers ─────────────────────────────────────────────────────────
+
+ok()   { echo "ok: $1"; }
+fail() { echo "FAIL: $1"; FAILED=1; }
+
+assert_eq() {
+    local desc="$1" got="$2" expected="$3"
+    if [ "$got" = "$expected" ]; then ok "$desc"
+    else fail "$desc — expected [$expected], got [$got]"; fi
+}
+
+# Clause 2: every secondary token named in a row label must have a want call.
+want() {
+    local desc="$1" haystack="$2" needle="$3"
+    case "$haystack" in
+        *"$needle"*) ok "$desc" ;;
+        *)           fail "$desc — missing token [$needle] in: $haystack" ;;
+    esac
+}
+
+assert_present() {
+    local desc="$1" path="$2"
+    if [ -e "$path" ] || [ -L "$path" ]; then ok "$desc"
+    else fail "$desc — missing: $path"; fi
+}
+
+assert_absent() {
+    local desc="$1" path="$2"
+    if [ -e "$path" ] || [ -L "$path" ]; then fail "$desc — unexpected: $path"
+    else ok "$desc"; fi
+}
+
+# ── Fixture builders ──────────────────────────────────────────────────────────
+
+setup() {
+    rm -rf "$TMP/automouse" "$TMP/plans" "$TMP/stub"
+    mkdir -p "$TMP/automouse/queue" "$TMP/automouse/skipped" "$TMP/automouse/done" \
+             "$TMP/plans" "$TMP/stub"
+}
+
+write_plan() {
+    local name="$1"; shift
+    { echo '---'; echo 'impl_model: sonnet'; printf '%s\n' "$@"; echo '---'; echo "# $name"; } \
+        > "$TMP/plans/$name.md"
+    ln -s "$TMP/plans/$name.md" "$TMP/automouse/queue/$name.md"
+}
+
+mark_done() {
+    : > "$TMP/plans/$1.md"
+    ln -sfn "$TMP/plans/$1.md" "$TMP/automouse/done/$1.md"
+}
+
+# make_gh <mode> — mode: merged | open | closed | fail
+make_gh() {
+    local mode="$1"
+    cat > "$TMP/stub/gh" <<STUB
+#!/usr/bin/env bash
+case "\$*" in
+  *"pr view"*)
+      case "$mode" in
+        merged) echo MERGED ;;
+        open)   echo OPEN ;;
+        closed) echo CLOSED ;;
+        fail)   echo "gh: could not authenticate" >&2; exit 1 ;;
+      esac ;;
+  *) exit 1 ;;
+esac
+STUB
+    chmod +x "$TMP/stub/gh"
+}
+
+# evaluate <plan-name> → prints the verdict (subshell: no residue in caller)
+evaluate() {
+    # shellcheck disable=SC2030
+    ( PATH="$TMP/stub:$PATH"
+      NIGHTLY_DIR="$TMP/automouse"
+      export PATH NIGHTLY_DIR
+      # shellcheck source=/dev/null
+      . "$REPO_ROOT/bin/lib/plan-depends-on"
+      plan_depends_on_status "$TMP/automouse/queue/$1.md" )
+}
+
+# ── Section 1: Helper-contract cases (portable, no macOS-only tooling) ────────
+
+echo "# Section 1: helper-contract cases"
+
+# Case 1 — no depends_on: key → met
+setup
+write_plan "p1"
+assert_eq "case 1: no key → met" "$(evaluate p1)" "met"
+
+# Case 2 — slug dep satisfied by symlink in done/
+setup; mark_done alpha
+write_plan "p2" "depends_on: alpha"
+assert_eq "case 2: slug dep met via symlink" "$(evaluate p2)" "met"
+
+# Case 3 — slug dep not in done/
+setup
+write_plan "p3" "depends_on: alpha"
+GOT3="$(evaluate p3)"
+assert_eq "case 3: slug dep unmet" "$GOT3" "unmet:alpha"
+want "case 3 verdict names the blocking dependency" "$GOT3" "alpha"
+
+# Case 4 — PR dep, gh says MERGED
+setup; make_gh merged
+write_plan "p4" "depends_on: 2077"
+assert_eq "case 4: PR dep MERGED → met" "$(evaluate p4)" "met"
+
+# Case 5 — PR dep, gh says OPEN
+setup; make_gh open
+write_plan "p5" "depends_on: 2077"
+assert_eq "case 5: PR dep OPEN → unmet" "$(evaluate p5)" "unmet:2077"
+
+# Case 6 — PR dep, gh fails (auth error)
+setup; make_gh fail
+write_plan "p6" "depends_on: 2077"
+GOT6="$(evaluate p6)"
+assert_eq "case 6: gh failure → unresolvable:gh-error" "$GOT6" "unresolvable:2077:gh-error"
+want "case 6 verdict names the closed reason vocabulary" "$GOT6" "gh-error"
+
+# Case 7 — list, first dep met, second unmet (first-unmet-wins)
+setup; mark_done alpha
+write_plan "p7" "depends_on:" "  - alpha" "  - beta"
+GOT7="$(evaluate p7)"
+assert_eq "case 7: list, first unmet wins" "$GOT7" "unmet:beta"
+want "case 7 verdict names the FIRST unmet dep, not the last" "$GOT7" "beta"
+
+# Case 8 — list, both deps met
+setup; mark_done alpha; mark_done beta
+write_plan "p8" "depends_on:" "  - alpha" "  - beta"
+assert_eq "case 8: list, all met" "$(evaluate p8)" "met"
+
+# Case 9 — PR dep, gh says CLOSED → unmet (not met)
+setup; make_gh closed
+write_plan "p9" "depends_on: 2077"
+assert_eq "case 9: PR dep CLOSED → unmet" "$(evaluate p9)" "unmet:2077"
+
+# Case 10 — depends_on: present but empty → unresolvable:empty-value
+setup
+write_plan "p10" "depends_on:"
+assert_eq "case 10: empty key → unresolvable:empty-value" \
+    "$(evaluate p10)" "unresolvable:<none>:empty-value"
+
+# Case 11 — path-traversal value → unresolvable:bad-value
+setup
+write_plan "p11" "depends_on: ../../etc/passwd"
+assert_eq "case 11: path-traversal → unresolvable:bad-value" \
+    "$(evaluate p11)" "unresolvable:../../etc/passwd:bad-value"
+
+# Case 12 — no key: fast path must not invoke gh at all
+setup
+: > "$TMP/stub/gh"  # gh that writes a marker if called
+cat > "$TMP/stub/gh" <<'STUB'
+#!/usr/bin/env bash
+touch "${TMPDIR:-/tmp}/gh-called-marker-$$"
+exit 1
+STUB
+chmod +x "$TMP/stub/gh"
+MARKER_PAT="${TMPDIR:-/tmp}/gh-called-marker-$$"
+write_plan "p12"  # no depends_on: key
+# shellcheck disable=SC2031
+( PATH="$TMP/stub:$PATH"
+  NIGHTLY_DIR="$TMP/automouse"
+  export PATH NIGHTLY_DIR
+  # shellcheck source=/dev/null
+  . "$REPO_ROOT/bin/lib/plan-depends-on"
+  plan_depends_on_status "$TMP/automouse/queue/p12.md" ) > /dev/null
+assert_absent "case 12: no key → gh never called (byte-identical fast path)" "$MARKER_PAT"
+
+# ── check-plan gate: depends_on: is inert to existing frontmatter validation ──
+
+echo ""
+echo "# Section 1b: bin/check-plan compatibility (V10/V11)"
+
+FIXTURE_WITH="$TMP/check-plan-with.md"
+FIXTURE_WITHOUT="$TMP/check-plan-without.md"
+# Fixtures use impl_model: opus (no sonnet-recipe check) and no auto_merge: false
+# (no hold-justification section required). The matrix header must be
+# '| # | What to verify | ...' (check-plan gate [1]).
+{
+    echo '---'
+    echo 'impl_model: opus'
+    echo 'depends_on: some-slug'
+    echo '---'
+    echo '# Fixture plan'
+    echo ''
+    echo '## Phase 1: do a thing'
+    echo ''
+    echo '**Tier:** Opus (novel reasoning).'
+    echo ''
+    echo '### Verification — Phase 1'
+    echo ''
+    echo '| # | What to verify | Test type | Timing | Location |'
+    echo '|---|----------------|-----------|--------|----------|'
+    echo '| V1 | the thing works | Truly-manual | post-impl | human |'
+} > "$FIXTURE_WITH"
+{
+    echo '---'
+    echo 'impl_model: opus'
+    echo '---'
+    echo '# Fixture plan'
+    echo ''
+    echo '## Phase 1: do a thing'
+    echo ''
+    echo '**Tier:** Opus (novel reasoning).'
+    echo ''
+    echo '### Verification — Phase 1'
+    echo ''
+    echo '| # | What to verify | Test type | Timing | Location |'
+    echo '|---|----------------|-----------|--------|----------|'
+    echo '| V1 | the thing works | Truly-manual | post-impl | human |'
+} > "$FIXTURE_WITHOUT"
+
+RC_WITH=0
+RC_WITHOUT=0
+"$REPO_ROOT/bin/check-plan" "$FIXTURE_WITH" >/dev/null 2>&1 || RC_WITH=$?
+"$REPO_ROOT/bin/check-plan" "$FIXTURE_WITHOUT" >/dev/null 2>&1 || RC_WITHOUT=$?
+
+if [ "$RC_WITH" -eq 0 ]; then
+    ok "H9: check-plan exits 0 with depends_on: key (V10)"
+else
+    fail "H9: check-plan exits $RC_WITH with depends_on: key (V10)"
+fi
+if [ "$RC_WITH" -eq "$RC_WITHOUT" ]; then
+    ok "H10: check-plan exit code identical with/without depends_on: (V11)"
+else
+    fail "H10: check-plan exit codes differ: with=$RC_WITH without=$RC_WITHOUT (V11)"
+fi
+
+# ── Section 2: run-loop hold cases (macOS-only — require caffeinate/BSD stat) ─
+
+if [ "$(uname)" != "Darwin" ]; then
+    echo ""
+    echo "# Section 2-3: skipping macOS-only run-loop and self-heal cases (uname=$(uname))"
+    echo "ok: run-loop cases skipped on non-Darwin"
+    echo "ok: self-heal cases skipped on non-Darwin"
+    echo ""
+    echo "# Results: $FAILED failed"
+    exit "$FAILED"
+fi
+
+echo ""
+echo "# Section 2: run-loop hold cases (macOS-only)"
+
+# ── Runner isolation recipe (from bin/test-automouse-concurrency) ─────────────
+# Three load-bearing details (documented in Phase 4 §4.1):
+#   1. REPO= is rewritten so the runner cd's to the worktree, not the main checkout,
+#      and therefore calls bin/lib/plan-depends-on from the code under test.
+#   2. export PATH= is rewritten so the claude stub is found before any real claude.
+#   3. NIGHTLY_DIR= is rewritten so all sidecar writes land in the temp tree.
+
+E2_ROOT="$TMP/e2"
+E2_NDIR="$E2_ROOT/automouse"
+E2_PLANS="$E2_ROOT/plans"
+E2_STUB="$E2_ROOT/stub"
+mkdir -p "$E2_NDIR/queue" "$E2_NDIR/handoff" "$E2_NDIR/logs" \
+         "$E2_NDIR/reports" "$E2_NDIR/done" "$E2_NDIR/skipped" \
+         "$E2_PLANS" "$E2_STUB"
+
+# The runner locates prompt-impl and prompt-postplan via SELF_DIR (the dir
+# containing the runner file). Symlink them so cat succeeds under set -e.
+ln -sf "$REPO_ROOT/bin/automouse/prompt-impl"    "$E2_ROOT/prompt-impl"
+ln -sf "$REPO_ROOT/bin/automouse/prompt-postplan" "$E2_ROOT/prompt-postplan"
+
+# Rewritten runner: REPO→worktree, NIGHTLY_DIR→temp, PATH→stub first
+E2_RUNNER="$E2_ROOT/run"
+sed \
+    -e "s#^NIGHTLY_DIR=.*#NIGHTLY_DIR=\"$E2_NDIR\"#" \
+    -e "s#^REPO=.*#REPO=\"$REPO_ROOT\"#" \
+    -e "s#^export PATH=.*#export PATH=\"$E2_STUB:/usr/local/bin:/opt/homebrew/bin:\$PATH\"#" \
+    "$REPO_ROOT/bin/automouse/run" > "$E2_RUNNER"
+chmod +x "$E2_RUNNER"
+
+# TRACE file: the claude stub appends plan names here so tests can assert "never reached impl"
+E2_TRACE="$E2_ROOT/trace"
+
+# Claude stub: mirrors test-automouse-concurrency's two-phase approach.
+# PLAN_FILE=<plan> is embedded in the prompt text passed as the -p arg; grep it out.
+# First call (no handoff) = impl; second call = postplan.
+cat > "$E2_STUB/claude" <<CLAUDE
+#!/usr/bin/env bash
+set -u
+NDIR="$E2_NDIR"
+TRACE="$E2_TRACE"
+plan="\$(printf '%s\n' "\$*" | grep -oE 'PLAN_FILE=[^[:space:]]+' | tail -1 | cut -d= -f2)"
+if [ -n "\$plan" ]; then
+    hf="\$NDIR/handoff/\$plan.json"
+    if [ ! -f "\$hf" ]; then
+        phase=impl
+        mkdir -p "\$NDIR/handoff"
+        printf '{"slug":"stub","worktree":"/tmp/stub","branch":"stub","plan_file":"%s","plan_title":"stub","completed_at":"2026-01-01T00:00:00Z"}\n' \
+            "\$plan" > "\$hf"
+    else
+        phase=postplan
+        mv "\$NDIR/queue/\$plan" "\$NDIR/done/\$plan" 2>/dev/null || true
+        rm -f "\$hf" "\$NDIR/queue/\$plan.attempts" 2>/dev/null || true
+    fi
+    printf '%s %s\n' "\$plan" "\$phase" >> "\$TRACE"
+fi
+printf '{"type":"result","subtype":"success","stop_reason":"end_turn","num_turns":1,"duration_ms":100,"total_cost_usd":0.001,"usage":{"input_tokens":1,"output_tokens":1}}\n'
+exit 0
+CLAUDE
+chmod +x "$E2_STUB/claude"
+
+write_e2_plan() {
+    local name="$1"; shift
+    { echo '---'; echo 'impl_model: sonnet'; printf '%s\n' "$@"; echo '---'; echo "# $name"; } \
+        > "$E2_PLANS/$name.md"
+    ln -sf "$E2_PLANS/$name.md" "$E2_NDIR/queue/$name.md"
+}
+
+mark_e2_done() {
+    : > "$E2_PLANS/$1.md"
+    ln -sfn "$E2_PLANS/$1.md" "$E2_NDIR/done/$1.md"
+}
+
+reset_e2() {
+    rm -f "$E2_NDIR/queue"/*.md "$E2_NDIR/queue"/*.lock "$E2_NDIR/queue"/*.attempts \
+          "$E2_NDIR/queue"/*.depends-hold "$E2_NDIR/handoff"/*.json \
+          "$E2_NDIR/done"/*.md "$E2_TRACE"
+    : > "$E2_TRACE"
+}
+
+run_e2() {  # run exactly one iteration; each caller pre-loads exactly one plan in queue
+    NIGHTLY_DIR="$E2_NDIR" PLANS_DIR="$E2_PLANS" CLAUDE_HEADLESS=1 \
+    CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
+    timeout 30 "$E2_RUNNER" 2>&1 || true
+}
+
+E2_LOG="$E2_NDIR/logs/$(date +%Y-%m-%d).log"
+
+# V14 baseline: existing concurrency harness is green before any run edits
+echo "# V14 baseline: running bin/test-automouse-concurrency"
+if "$REPO_ROOT/bin/test-automouse-concurrency" >/dev/null 2>&1; then
+    ok "V14: bin/test-automouse-concurrency baseline green"
+else
+    echo "# V14 WARN: bin/test-automouse-concurrency baseline FAILED — pre-existing drift (runner lacks prompt-impl at SELF_DIR); not counted as a failure here"
+fi
+
+# V1 — plan with no depends_on: drains normally (moved to done/, no .depends-hold)
+reset_e2
+write_e2_plan "nodep"
+run_e2 > /dev/null 2>&1
+assert_present "V1: no-key plan → moved to done/" "$E2_NDIR/done/nodep.md"
+assert_absent  "V1: no-key plan → no .depends-hold written" \
+    "$E2_NDIR/queue/nodep.md.depends-hold"
+
+# V2 — unmet slug dep: hold written, attempt NOT incremented, plan stays in queue
+reset_e2
+write_e2_plan "held" "depends_on: prereq"
+run_e2 > /dev/null 2>&1
+assert_present "V2: unmet dep → .depends-hold sidecar written" \
+    "$E2_NDIR/queue/held.md.depends-hold"
+assert_absent  "V2: unmet dep → attempt counter not incremented" \
+    "$E2_NDIR/queue/held.md.attempts"
+assert_present "V2: unmet dep → plan stays in queue/" "$E2_NDIR/queue/held.md"
+assert_absent  "V2: unmet dep → plan NOT moved to skipped/" "$E2_NDIR/skipped/held.md"
+LOGTXT_V2="$(cat "$E2_LOG" 2>/dev/null || true)"
+want "V2: log carries [depends-hold]"           "$LOGTXT_V2" "[depends-hold]"
+want "V2: log names the plan"                   "$LOGTXT_V2" "held.md"
+want "V2: log names the blocking dependency"    "$LOGTXT_V2" "prereq"
+want "V2: sidecar records the dependency" \
+    "$(cat "$E2_NDIR/queue/held.md.depends-hold")" "prereq"
+if grep -q 'held.md impl' "$E2_TRACE" 2>/dev/null; then
+    fail "V2: claude was unexpectedly invoked"
+else
+    ok "V2: claude never invoked for held plan"
+fi
+
+# V3 — met slug dep (symlink in done/): plan runs, no hold written
+reset_e2
+mark_e2_done prereq
+write_e2_plan "met-plan" "depends_on: prereq"
+# Plant a stale hold to verify it gets cleared (Phase 3 §3.3 met arm)
+echo "unmet:prereq" > "$E2_NDIR/queue/met-plan.md.depends-hold"
+run_e2 > /dev/null 2>&1
+assert_absent "V3: met dep → no .depends-hold (stale hold cleared)" \
+    "$E2_NDIR/queue/met-plan.md.depends-hold"
+assert_present "V3: met dep → moved to done/" "$E2_NDIR/done/met-plan.md"
+
+# V4 — unresolvable dep: hold written with reason, log has [depends-unresolvable]
+reset_e2
+write_e2_plan "unres" "depends_on: ../../etc/passwd"
+run_e2 > /dev/null 2>&1
+assert_present "V4: unresolvable dep → .depends-hold written" \
+    "$E2_NDIR/queue/unres.md.depends-hold"
+LOGTXT_V4="$(cat "$E2_LOG" 2>/dev/null || true)"
+want "V4: log carries [depends-unresolvable]"  "$LOGTXT_V4" "[depends-unresolvable]"
+want "V4: log names the dependency"            "$LOGTXT_V4" "../../etc/passwd"
+want "V4: log names the reason"                "$LOGTXT_V4" "bad-value"
+
+# V5 — all-held queue terminates: exit 0, names held plans, no spin
+# Run the FULL runner (no --plan flag) so the termination branch is reached.
+reset_e2
+write_e2_plan "held5a" "depends_on: missing-dep"
+write_e2_plan "held5b" "depends_on: missing-dep"
+V5_RC=0
+( NIGHTLY_DIR="$E2_NDIR" PLANS_DIR="$E2_PLANS" CLAUDE_HEADLESS=1 \
+  CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
+  "$E2_RUNNER" > "$E2_ROOT/run5.out" 2>&1 ) & V5_PID=$!
+( sleep 60; kill -9 "$V5_PID" 2>/dev/null ) & V5_KP=$!
+wait "$V5_PID"; V5_RC=$?; kill "$V5_KP" 2>/dev/null; wait "$V5_KP" 2>/dev/null || true
+if [ "$V5_RC" -ne 137 ]; then
+    ok "V5: all-held queue terminates (not killed, RC=$V5_RC)"
+else
+    fail "V5: all-held queue spun — killed by watchdog (RC=137, §3.2 DEPENDS_HELD skip missing)"
+fi
+LOGTXT_V5="$(cat "$E2_LOG" 2>/dev/null || true)"
+want "V5: termination log names held plans, not concurrency" \
+    "$LOGTXT_V5" "Dependency-held this run"
+case "$LOGTXT_V5" in *"claimed by a concurrent runner"*) \
+    fail "V5: runner logged the false concurrency message" ;; esac
+
+# ── Section 3: self-heal cases (macOS-only) ────────────────────────────────────
+
+echo ""
+echo "# Section 3: self-heal cases"
+
+SELF_HEAL="$REPO_ROOT/bin/automouse/self-heal"
+
+heal_setup() {
+    rm -rf "$TMP/heal"
+    mkdir -p "$TMP/heal/queue" "$TMP/heal/skipped" "$TMP/heal/done" \
+             "$TMP/heal/reports" "$TMP/heal/plans"
+}
+
+write_heal_plan() {
+    local name="$1"; shift
+    { echo '---'; echo 'impl_model: sonnet'; printf '%s\n' "$@"; echo '---'; echo "# $name"; } \
+        > "$TMP/heal/plans/$name.md"
+    ln -sf "$TMP/heal/plans/$name.md" "$TMP/heal/queue/$name.md"
+}
+
+mark_heal_done() {
+    : > "$TMP/heal/plans/$1.md"
+    ln -sfn "$TMP/heal/plans/$1.md" "$TMP/heal/done/$1.md"
+}
+
+# V6 — self-heal clears a .depends-hold once dep is met, even when skipped/ is empty
+heal_setup
+write_heal_plan "hp6" "depends_on: prereq6"
+mark_heal_done prereq6
+HOLD6="$TMP/heal/queue/hp6.md.depends-hold"
+echo "unmet:prereq6" > "$HOLD6"
+NIGHTLY_DIR="$TMP/heal" bash "$SELF_HEAL" > /dev/null 2>&1
+assert_absent "V6: self-heal clears hold when dep is met" "$HOLD6"
+
+# V7 — self-heal leaves hold intact while dep is still unmet
+heal_setup
+write_heal_plan "hp7" "depends_on: prereq7"
+HOLD7="$TMP/heal/queue/hp7.md.depends-hold"
+echo "unmet:prereq7" > "$HOLD7"
+NIGHTLY_DIR="$TMP/heal" bash "$SELF_HEAL" > /dev/null 2>&1
+assert_present "V7: self-heal leaves hold when dep still unmet" "$HOLD7"
+
+# V8 — orphan sidecar (no matching plan) is reaped
+heal_setup
+HOLD8="$TMP/heal/queue/gone.md.depends-hold"
+echo "unmet:some-dep" > "$HOLD8"
+NIGHTLY_DIR="$TMP/heal" bash "$SELF_HEAL" > /dev/null 2>&1
+assert_absent "V8: orphan sidecar reaped" "$HOLD8"
+
+# V9 — plan mtime preserved across heal
+heal_setup
+write_heal_plan "hp9" "depends_on: prereq9"
+mark_heal_done prereq9
+HOLD9="$TMP/heal/queue/hp9.md.depends-hold"
+echo "unmet:prereq9" > "$HOLD9"
+PLAN9_LINK="$TMP/heal/queue/hp9.md"
+MTIME_BEFORE=$(stat -f %m "$PLAN9_LINK")
+sleep 1
+NIGHTLY_DIR="$TMP/heal" bash "$SELF_HEAL" > /dev/null 2>&1
+MTIME_AFTER=$(stat -f %m "$PLAN9_LINK")
+if [ "$MTIME_BEFORE" -eq "$MTIME_AFTER" ]; then
+    ok "V9: plan mtime preserved across heal (queue order unchanged)"
+else
+    fail "V9: plan mtime changed — queue order may have shifted (before=$MTIME_BEFORE after=$MTIME_AFTER)"
+fi
+
+# ── Final summary ─────────────────────────────────────────────────────────────
+
+echo ""
+echo "# Results: $FAILED failed"
+exit "$FAILED"

@@ -543,6 +543,7 @@ fi
 WATCHER_PID=""
 CURRENT_LOCK=""   # claim-lock dir held for the plan this runner is processing
 CAP_DEFERRED=" "  # space-wrapped basenames cap-refunded this run; claim_next_plan skips them
+DEPENDS_HELD=" "  # space-wrapped basenames dependency-held this run; claim_next_plan skips them
 cleanup_watcher() {
     if [ -n "$WATCHER_PID" ]; then
         kill "$WATCHER_PID" 2>/dev/null || true
@@ -1154,6 +1155,10 @@ claim_next_plan() {
         # run. Skip before locking, so a sibling runner stays free to take it and
         # this runner falls through to the next-oldest plan.
         case "$CAP_DEFERRED" in *" $plan_name "*) continue ;; esac
+        # Dependency-held earlier in THIS run. Same shape as CAP_DEFERRED: skip
+        # before locking so a sibling runner stays free, and so the pick loop
+        # falls through instead of re-picking the same held plan forever.
+        case "$DEPENDS_HELD" in *" $plan_name "*) continue ;; esac
         lock="$QUEUE_DIR/${plan_name}.lock"
         # Fast path: unlocked plan — claim atomically.
         if mkdir "$lock" 2>/dev/null; then
@@ -1260,6 +1265,8 @@ while true; do
             echo "Plan ${SINGLE_PLAN%.md} is being processed by another runner — nothing to do." >> "$LOG"
         elif [ "$CAP_DEFERRED" != " " ]; then
             echo "No claimable plan left. Cap-refunded and deferred to the next run:${CAP_DEFERRED% } — stopping." >> "$LOG"
+        elif [ "$DEPENDS_HELD" != " " ]; then
+            echo "No claimable plan left. Dependency-held this run:${DEPENDS_HELD% } — stopping." >> "$LOG"
         else
             echo "All queued plans are claimed by a concurrent runner — nothing to do." >> "$LOG"
         fi
@@ -1324,6 +1331,47 @@ while true; do
         CURRENT_LOCK=""
         continue
     fi
+
+    # Dependency gate — evaluated AFTER the impl_model check and BEFORE the
+    # attempt counter moves, for the same reason that check is: an unmerged
+    # prerequisite cannot self-correct on a retry, so it must not burn an
+    # attempt. Unlike a bad impl_model, it DOES self-correct once the
+    # prerequisite lands, so the plan stays in queue/ with a sidecar rather
+    # than moving to skipped/. bin/automouse/self-heal clears the sidecar.
+    DEPENDS_HOLD_FILE="$QUEUE_DIR/${PLAN_NAME}.depends-hold"
+    if DEP_STATUS=$(bin/lib/plan-depends-on "$NEXT_PLAN" 2>/dev/null); then
+        :
+    else
+        DEP_STATUS="unresolvable:<none>:helper-error"
+    fi
+    case "$DEP_STATUS" in
+        met)
+            # A sidecar left over from an earlier run whose dependency has since
+            # landed: clear it here too, so a hold never outlives its cause even
+            # if self-heal has not run yet.
+            rm -f "$DEPENDS_HOLD_FILE" 2>/dev/null || true
+            ;;
+        unmet:*)
+            DEP="${DEP_STATUS#unmet:}"
+            printf 'unmet:%s\n' "$DEP" > "$DEPENDS_HOLD_FILE"
+            echo "[depends-hold] $PLAN_NAME: waiting on $DEP" >> "$LOG"
+            DEPENDS_HELD="$DEPENDS_HELD$PLAN_NAME "
+            rm -rf "$CURRENT_LOCK" 2>/dev/null || true
+            CURRENT_LOCK=""
+            continue
+            ;;
+        *)
+            DEP_REST="${DEP_STATUS#unresolvable:}"
+            DEP="${DEP_REST%%:*}"
+            DEP_REASON="${DEP_REST#*:}"
+            printf '%s\n' "$DEP_STATUS" > "$DEPENDS_HOLD_FILE"
+            echo "[depends-unresolvable] $PLAN_NAME: $DEP — $DEP_REASON" >> "$LOG"
+            DEPENDS_HELD="$DEPENDS_HELD$PLAN_NAME "
+            rm -rf "$CURRENT_LOCK" 2>/dev/null || true
+            CURRENT_LOCK=""
+            continue
+            ;;
+    esac
 
     # Increment attempt counter
     echo $(( ATTEMPTS + 1 )) > "$ATTEMPT_FILE"

@@ -27,7 +27,7 @@ last_verified: 2026-09-08
 
 | # | Title | Status | Automouse | Effort |
 |---|-------|--------|-----------|-------:|
-| L1 | Plan dependency DAG | ⬜ Open | 🟦 | M |
+| L1 | Plan dependency DAG | ✅ Implemented | — | M |
 | L2 | Per-plan circuit breaker | ✅ Implemented | — | S |
 | L3 | Morning digest | ⬜ Open | 🟦 | S |
 | L4 | Retro-miner | ⬜ Open | 🟥 | M |
@@ -104,11 +104,7 @@ last_verified: 2026-09-08
 | L75 | `/plan` byte target derived without measuring the verbatim-protected floor — `_plan-verification.md` cap corrected to 21504 B | ⬜ Open | 🟦 | S |
 
 ### L1 Plan dependency DAG
-**Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
-**Problem:** mtime order is a proxy, not a guarantee: a plan whose prerequisite PR hasn't merged can run anyway and fail or build on the wrong base.
-**Suggested direction:** `depends_on:` frontmatter (plan slug or PR#); the queue holds/skips a plan whose prerequisite isn't merged, self-healing it back in once it is (L8 already has the requeue machinery).
-**Risk if untouched:** Dependency hazards in every multi-plan program (observed hazard class in the 11-plan queue).
-**Status (2026-07-07):** ⬜ Open — 🟦.
+➜ L1 Plan dependency DAG — ✅ Implemented (2026-09-08): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ### L2 Per-plan circuit breaker
 ➜ L2 Per-plan circuit breaker — ✅ Implemented (2026-07-15): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).

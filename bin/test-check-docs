@@ -97,22 +97,34 @@ else
     echo "  output: $OUT"
 fi
 
-# ── Test 4: non-skill — DRAFT=$(...) in non-SKILL.md file → label absent ─────
+# ── Test 4: skill-dir sibling — DRAFT=$(...) in a non-SKILL.md → label absent ─
+
+# The fixture must sit INSIDE .claude/skills/<name>/. That directory is the only
+# place checkSkillDraftPlaceholder() looks: it globs .claude/skills/*/SKILL.md
+# itself and never consults IN_SCOPE_GLOBS, so a fixture anywhere else (docs/,
+# say) is not merely out of scope — it is never opened, and the assertion holds
+# no matter how the filename filter is written. A sibling inside the skill dir
+# exercises the SKILL.md part of the glob, which is the boundary under test.
 
 REPO=$(make_repo)
-mkdir -p "$REPO/docs"
-printf '%s' "${FM}"'# Other
+make_skill_md "$REPO" "${FM}"'# Foo
+
+```bash
+DRAFT=<slug>
+```
+'
+printf '%s' "${FM}"'# Notes
 
 ```bash
 DRAFT=$(git rev-parse HEAD)
 ```
-' > "$REPO/docs/OTHER.md"
+' > "$REPO/.claude/skills/foo/NOTES.md"
 OUT=$(cd "$REPO" && bin/check-docs --no-staleness 2>&1) || true
 rm -rf "$REPO"
 if label_absent "$OUT"; then
-    pass "non-skill: DRAFT=\$(...) in non-SKILL.md is not flagged"
+    pass "skill-dir sibling: DRAFT=\$(...) in a non-SKILL.md is not flagged"
 else
-    fail "non-skill: DRAFT=\$(...) in non-SKILL.md should not be flagged"
+    fail "skill-dir sibling: DRAFT=\$(...) in a non-SKILL.md should not be flagged"
     echo "  output: $OUT"
 fi
 

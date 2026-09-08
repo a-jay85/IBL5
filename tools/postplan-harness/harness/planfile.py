@@ -387,6 +387,19 @@ def locate_plan(slug: str, plans_dir: str | None = None, explicit_path: str | No
         if not os.path.isfile(path):
             return info
         info.path = path
+        # Record HOW the file was chosen, so a cleared condition (13) is distinguishable from
+        # one that never fired. `--plan` is the only producer of explicit_path (runner.py's
+        # `args.plan`, fed by `bin/post-plan-now --plan`), so an explicit path is always an
+        # operator override — never an automouse handoff. See PlanInfo.plan_source for the
+        # value contract and for why "override-mismatch" is a string comparison, not a claim
+        # about which hold the override displaced.
+        if explicit_path:
+            info.plan_source = ("override" if os.path.basename(path) == f"{slug}.md"
+                                else "override-mismatch")
+        elif info.slug_drift:
+            info.plan_source = "drift"
+        elif info.variant_selection:
+            info.plan_source = "variant"
         with open(path) as fh:
             content = fh.read()
     info.found = True

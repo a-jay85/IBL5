@@ -118,6 +118,23 @@ class PlanInfo:
     evidence: list[str] = field(default_factory=list)         # [] = absent
     contract_error: str = ""                                  # "" = well-formed or absent
     slug_drift: str = ""   # basename adopted by prefix-drift resolution (branch slug != filename stem)
+    # How the plan file was CHOSEN — the audit counterpart to `slug_drift`, which records only
+    # what drift adopted. "" means one of three things (`found` disambiguates the last): the exact
+    # `{slug}.md` derivation hit, a replay `content_override` supplied the body with no file
+    # involved, or no plan was located at all. Non-empty values:
+    #   "variant"           highest-numbered `{slug}-N.md` selection ran (see `variant_selection`)
+    #   "drift"             adopted by `_resolve_drift`; also sets `slug_drift`, which HOLDS
+    #                       auto-merge via condition (13)
+    #   "override"          `--plan` named a file whose stem IS the branch slug
+    #   "override-mismatch" `--plan` named a file whose stem is NOT the branch slug
+    # `--plan` skips `_resolve_drift` entirely, so `slug_drift` stays "" and condition (13) reads
+    # `blocked: false`. That is by design — naming the plan removes the guess the hold exists to
+    # cover — but without this field an override run is byte-identical in audit.log and result.json
+    # to a run where branch and filename simply agreed. "override-mismatch" reports exactly the
+    # basename-vs-`{slug}.md` string comparison: slug derivation could not have reached this file
+    # by exact name. It does NOT assert that a condition-(13) hold would otherwise have fired —
+    # the derivation might equally have found nothing and run plan-blind.
+    plan_source: str = ""
 
 
 @dataclass
@@ -232,4 +249,6 @@ class RunResult:
                 d["plan"].pop("required_test_methods", None)
             if not d["plan"].get("slug_drift"):
                 d["plan"].pop("slug_drift", None)
+            if not d["plan"].get("plan_source"):
+                d["plan"].pop("plan_source", None)
         return json.dumps(d, indent=1, default=str)

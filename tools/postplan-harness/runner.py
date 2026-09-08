@@ -119,7 +119,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                     ledger=ledger, audit=audit)
     log(f"phase1 plan: found={plan.found} auto_merge_false={plan.auto_merge_false} "
         f"matrix={plan.has_matrix} critical_files={len(plan.critical_files)} "
-        f"slug_drift={plan.slug_drift or '-'}")
+        f"slug_drift={plan.slug_drift or '-'} plan_source={plan.plan_source or '-'}")
 
     try:
         # ---- Phase 2/3: ship + classify -------------------------------

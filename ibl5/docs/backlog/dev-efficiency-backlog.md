@@ -118,7 +118,6 @@ last_verified: 2026-09-07
 | E97 | Stale numeric count in PR body Scope prose (Phase 6 findings from #2160) | ⬜ Open | — | XS |
 | E98 | Dead ref in source comment, direction error in comment, plan-required PR body content dropped (Phase 6 findings from #2167) | ✅ fixed this pass | — | XS |
 | E99 | ADR-index frontmatter key duplication via merge=union (Phase 6 blocker from #2111) | ✅ fixed this pass | — | XS |
-| E100 | Incomplete PR body Summary and stale cross-reference to corpus path scheduled for deletion (Phase 6 notes from #2135) | ✅ fixed this pass | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -1842,27 +1841,3 @@ Landing rung: **1** — extend `bin/check-rules-byte-budget` to warn when the ag
 `artifact destination: bin/check-docs` (in-repo; edited in place in a future PR)
 
 *(discovered 2026-09-07 during #2111)*
-
-### E100 Incomplete PR body Summary and stale cross-reference to corpus path scheduled for deletion (Phase 6 notes from #2135)
-
-**class:** two surface-adjacent documentation-accuracy defects in developer-tooling artifacts: (1) a PR body hand-authored Summary that enumerates files by name but omits a modified file already disclosed in the machine-generated files-changed block, and (2) a cross-reference in `.claude/review-shared/_plan-verification.md` pointing at a loop-backlog corpus path that is scheduled for deletion by ADR-0121, causing it to dangle when the corpus is removed.
-
-**occurrence table:**
-
-| # | File:line | Same class? | Live? | Status |
-|---|-----------|-------------|-------|--------|
-| 1 | PR #2135 body, hand-authored Summary — enumerated "Three changes" but omitted `.claude/review-shared/_plan-verification.md` | yes (incomplete prose enumeration) | live | fixed this pass (PR body updated to "Four changes") |
-| 2 | `.claude/review-shared/_plan-verification.md:191` — `(see loop-engineering-backlog.md L50, PR #2135)` pointing at a corpus path scheduled for ADR-0121 deletion | yes (stale cross-reference to corpus) | live | fixed this pass (citation repointed to a-jay85/IBL5-backlog#144) |
-
-**prevention_ladder:**
-- rung 0 — already covered? Phase 6 check 6d.4 catches incomplete PR body prose, and Phase 6 6c(a) can surface a stale citation via diff-bounds analysis. Both classes were caught this cycle by that route. No dedicated gate exists for either.
-- rung 1 — extend an existing gate? `bin/check-docs` validates `last_verified` and backlog consistency but does not scan `_plan-verification.md` for corpus path references. Extending it to warn when a row cites a corpus file is feasible but fragile (any local path in a citation triggers it). Not recommended.
-- rung 2 — a `.claude/rules/` rule? A rule requiring `_plan-verification.md` citations to use issue URLs rather than file paths would prevent class 2. PR body completeness is already implicitly covered by `pr-body-claims.md`; no new rule needed there.
-- rung 3-5 — not proportionate for either class; both are tiny documentation issues caught by the existing Phase 6 review.
-- landing rung: **no gate warranted** — Phase 6 already catches both classes; a dedicated gate would be disproportionate to their size and frequency. The citation-format convention (prefer issue URLs over corpus file paths in `_plan-verification.md`) is worth encoding as a rule if the pattern recurs.
-
-`prevention_ladder: no gate warranted — Phase 6 6d.4 and diff-bounds catches these classes; corpus-path citation convention tracked informally`
-
-`artifact destination: n/a — no gate`
-
-*(discovered 2026-09-07 during #2135)*

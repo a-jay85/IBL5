@@ -52,6 +52,9 @@ assert_absent() {
     else ok "$desc"; fi
 }
 
+# Portable mtime: BSD stat on macOS, GNU stat on Linux.
+mtime_of() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null; }
+
 # ── Fixture builders ──────────────────────────────────────────────────────────
 
 setup() {
@@ -189,6 +192,18 @@ write_plan "p12"  # no depends_on: key
   plan_depends_on_status "$TMP/automouse/queue/p12.md" ) > /dev/null
 assert_absent "case 12: no key → gh never called (byte-identical fast path)" "$MARKER_PAT"
 
+# Case 13 — dangling queue symlink (plan file deleted): must answer unresolvable, not met
+# This is the reachable production path: bin/automouse/queue/ stores every entry
+# as a symlink into ~/claude-plans; deleting or renaming the plan file strands
+# the link. An unreadable plan file is not evidence the dependency is met.
+setup
+write_plan "p13" "depends_on: alpha"
+rm "$TMP/plans/p13.md"  # strand the queue symlink
+GOT13="$(evaluate p13)"
+assert_eq "case 13: dangling symlink → unresolvable (not met)" \
+    "$GOT13" "unresolvable:<none>:unreadable-plan"
+want "case 13 verdict names the unreadable-plan reason" "$GOT13" "unreadable-plan"
+
 # ── check-plan gate: depends_on: is inert to existing frontmatter validation ──
 
 echo ""
@@ -249,13 +264,81 @@ else
     fail "H10: check-plan exit codes differ: with=$RC_WITH without=$RC_WITHOUT (V11)"
 fi
 
+# ── Section 3: self-heal cases (portable) ─────────────────────────────────────
+# Phase 6 §6.1 requires these cases to run outside the macOS guard so that the
+# Linux CI step exercises the release side of the mechanism. V9 uses mtime_of()
+# (BSD/GNU portable) rather than BSD-only stat -f %m directly.
+
+echo ""
+echo "# Section 3: self-heal cases"
+
+SELF_HEAL="$REPO_ROOT/bin/automouse/self-heal"
+
+heal_setup() {
+    rm -rf "$TMP/heal"
+    mkdir -p "$TMP/heal/queue" "$TMP/heal/skipped" "$TMP/heal/done" \
+             "$TMP/heal/reports" "$TMP/heal/plans"
+}
+
+write_heal_plan() {
+    local name="$1"; shift
+    { echo '---'; echo 'impl_model: sonnet'; printf '%s\n' "$@"; echo '---'; echo "# $name"; } \
+        > "$TMP/heal/plans/$name.md"
+    ln -sf "$TMP/heal/plans/$name.md" "$TMP/heal/queue/$name.md"
+}
+
+mark_heal_done() {
+    : > "$TMP/heal/plans/$1.md"
+    ln -sfn "$TMP/heal/plans/$1.md" "$TMP/heal/done/$1.md"
+}
+
+# V6 — self-heal clears a .depends-hold once dep is met, even when skipped/ is empty
+heal_setup
+write_heal_plan "hp6" "depends_on: prereq6"
+mark_heal_done prereq6
+HOLD6="$TMP/heal/queue/hp6.md.depends-hold"
+echo "unmet:prereq6" > "$HOLD6"
+NIGHTLY_DIR="$TMP/heal" bash "$SELF_HEAL" > /dev/null 2>&1
+assert_absent "V6: self-heal clears hold when dep is met" "$HOLD6"
+
+# V7 — self-heal leaves hold intact while dep is still unmet
+heal_setup
+write_heal_plan "hp7" "depends_on: prereq7"
+HOLD7="$TMP/heal/queue/hp7.md.depends-hold"
+echo "unmet:prereq7" > "$HOLD7"
+NIGHTLY_DIR="$TMP/heal" bash "$SELF_HEAL" > /dev/null 2>&1
+assert_present "V7: self-heal leaves hold when dep still unmet" "$HOLD7"
+
+# V8 — orphan sidecar (no matching plan) is reaped
+heal_setup
+HOLD8="$TMP/heal/queue/gone.md.depends-hold"
+echo "unmet:some-dep" > "$HOLD8"
+NIGHTLY_DIR="$TMP/heal" bash "$SELF_HEAL" > /dev/null 2>&1
+assert_absent "V8: orphan sidecar reaped" "$HOLD8"
+
+# V9 — plan mtime preserved across heal
+heal_setup
+write_heal_plan "hp9" "depends_on: prereq9"
+mark_heal_done prereq9
+HOLD9="$TMP/heal/queue/hp9.md.depends-hold"
+echo "unmet:prereq9" > "$HOLD9"
+PLAN9_LINK="$TMP/heal/queue/hp9.md"
+MTIME_BEFORE=$(mtime_of "$PLAN9_LINK")
+sleep 1
+NIGHTLY_DIR="$TMP/heal" bash "$SELF_HEAL" > /dev/null 2>&1
+MTIME_AFTER=$(mtime_of "$PLAN9_LINK")
+if [ "$MTIME_BEFORE" -eq "$MTIME_AFTER" ]; then
+    ok "V9: plan mtime preserved across heal (queue order unchanged)"
+else
+    fail "V9: plan mtime changed — queue order may have shifted (before=$MTIME_BEFORE after=$MTIME_AFTER)"
+fi
+
 # ── Section 2: run-loop hold cases (macOS-only — require caffeinate/BSD stat) ─
 
 if [ "$(uname)" != "Darwin" ]; then
     echo ""
-    echo "# Section 2-3: skipping macOS-only run-loop and self-heal cases (uname=$(uname))"
-    echo "ok: run-loop cases skipped on non-Darwin"
-    echo "ok: self-heal cases skipped on non-Darwin"
+    echo "# Section 2: skipping macOS-only run-loop cases (uname=$(uname))"
+    echo "SKIP: run-loop cases skipped on non-Darwin"
     echo ""
     echo "# Results: $FAILED failed"
     exit "$FAILED"
@@ -432,72 +515,6 @@ want "V5: termination log names held plans, not concurrency" \
     "$LOGTXT_V5" "Dependency-held this run"
 case "$LOGTXT_V5" in *"claimed by a concurrent runner"*) \
     fail "V5: runner logged the false concurrency message" ;; esac
-
-# ── Section 3: self-heal cases (macOS-only) ────────────────────────────────────
-
-echo ""
-echo "# Section 3: self-heal cases"
-
-SELF_HEAL="$REPO_ROOT/bin/automouse/self-heal"
-
-heal_setup() {
-    rm -rf "$TMP/heal"
-    mkdir -p "$TMP/heal/queue" "$TMP/heal/skipped" "$TMP/heal/done" \
-             "$TMP/heal/reports" "$TMP/heal/plans"
-}
-
-write_heal_plan() {
-    local name="$1"; shift
-    { echo '---'; echo 'impl_model: sonnet'; printf '%s\n' "$@"; echo '---'; echo "# $name"; } \
-        > "$TMP/heal/plans/$name.md"
-    ln -sf "$TMP/heal/plans/$name.md" "$TMP/heal/queue/$name.md"
-}
-
-mark_heal_done() {
-    : > "$TMP/heal/plans/$1.md"
-    ln -sfn "$TMP/heal/plans/$1.md" "$TMP/heal/done/$1.md"
-}
-
-# V6 — self-heal clears a .depends-hold once dep is met, even when skipped/ is empty
-heal_setup
-write_heal_plan "hp6" "depends_on: prereq6"
-mark_heal_done prereq6
-HOLD6="$TMP/heal/queue/hp6.md.depends-hold"
-echo "unmet:prereq6" > "$HOLD6"
-NIGHTLY_DIR="$TMP/heal" bash "$SELF_HEAL" > /dev/null 2>&1
-assert_absent "V6: self-heal clears hold when dep is met" "$HOLD6"
-
-# V7 — self-heal leaves hold intact while dep is still unmet
-heal_setup
-write_heal_plan "hp7" "depends_on: prereq7"
-HOLD7="$TMP/heal/queue/hp7.md.depends-hold"
-echo "unmet:prereq7" > "$HOLD7"
-NIGHTLY_DIR="$TMP/heal" bash "$SELF_HEAL" > /dev/null 2>&1
-assert_present "V7: self-heal leaves hold when dep still unmet" "$HOLD7"
-
-# V8 — orphan sidecar (no matching plan) is reaped
-heal_setup
-HOLD8="$TMP/heal/queue/gone.md.depends-hold"
-echo "unmet:some-dep" > "$HOLD8"
-NIGHTLY_DIR="$TMP/heal" bash "$SELF_HEAL" > /dev/null 2>&1
-assert_absent "V8: orphan sidecar reaped" "$HOLD8"
-
-# V9 — plan mtime preserved across heal
-heal_setup
-write_heal_plan "hp9" "depends_on: prereq9"
-mark_heal_done prereq9
-HOLD9="$TMP/heal/queue/hp9.md.depends-hold"
-echo "unmet:prereq9" > "$HOLD9"
-PLAN9_LINK="$TMP/heal/queue/hp9.md"
-MTIME_BEFORE=$(stat -f %m "$PLAN9_LINK")
-sleep 1
-NIGHTLY_DIR="$TMP/heal" bash "$SELF_HEAL" > /dev/null 2>&1
-MTIME_AFTER=$(stat -f %m "$PLAN9_LINK")
-if [ "$MTIME_BEFORE" -eq "$MTIME_AFTER" ]; then
-    ok "V9: plan mtime preserved across heal (queue order unchanged)"
-else
-    fail "V9: plan mtime changed — queue order may have shifted (before=$MTIME_BEFORE after=$MTIME_AFTER)"
-fi
 
 # ── Final summary ─────────────────────────────────────────────────────────────
 

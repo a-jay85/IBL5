@@ -102,6 +102,8 @@ last_verified: 2026-09-08
 | L73 | Forced-verification row in `_plan-verification.md` references lsof port guard deleted before shipping — row's live-instance check cannot self-verify | ⬜ Open | 🟥 | S |
 | L74 | `write_canary_park_report()` glob-pipeline abort under `set -euo pipefail` (fixed); N1 declared-omission note (n/a) | ✅ Fixed | — | XS |
 | L75 | `/plan` byte target derived without measuring the verbatim-protected floor — `_plan-verification.md` cap corrected to 21504 B | ⬜ Open | 🟦 | S |
+| L76 | `bin/lib/plan-depends-on` fail-open on unreadable plan (fixed); portable self-heal cases placed behind macOS-only guard in test harness (fixed) | ✅ Fixed | — | S |
+| L77 | PR body claimed "20 verification rows, V1–V20" when 12 matrix rows realized; `automouse-workflow.md` compression undeclared (both fixed in PR body) | ✅ Fixed | — | XS |
 
 ### L1 Plan dependency DAG
 ➜ L1 Plan dependency DAG — ✅ Implemented (2026-09-08): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
@@ -1197,3 +1199,47 @@ Landing: rung 1 — extend `.claude/rules/pr-body-negative-claim-recheck.md` to 
 **artifact destination:** `.claude/skills/plan/_architect-contract.md` — byte-reduction recipe section, or wherever split-file targets are specified.
 
 **provenance:** (discovered 2026-09-08 during architect-contract-rules-detail-split)
+
+### L76 `bin/lib/plan-depends-on` fail-open on unreadable plan; portable self-heal cases behind macOS guard
+
+**class:** A `bin/lib/` dependency evaluator that suppresses `awk` errors with `2>/dev/null`, so an unreadable plan file produces empty output — the key-absent fast-path then returns `met` rather than `unresolvable`, inverting the stated contract. A companion defect: a test harness places its portable verification cases (V6–V9) inside a macOS-only OS guard, so the Linux CI step never exercises them.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/lib/plan-depends-on:42` (pre-fix) — `awk '…' "$plan_file" 2>/dev/null` silently returns empty on EACCES/ENOENT; key-absent fast-path promoted empty to `met` | yes | live | fixed this pass |
+| 2 | `bin/test-automouse-depends-on:436` (pre-fix) — Section 3 (V6–V9 self-heal cases) inside `if [ "$(uname)" = Darwin ]` guard; V9 used BSD-only `stat -f %m` | yes | live | fixed this pass |
+
+**prevention_ladder:**
+- rung 0 — no existing gate checks for `2>/dev/null` on a user-supplied path argument.
+- rung 1 — no existing gate covers OS-guard placement in test harnesses.
+- rung 2 — a note in `.claude/rules/automouse-workflow.md` that `plan_depends_on_status` must fail-closed (return `unresolvable`) on any file it cannot read; and that self-heal cases must not sit inside an OS guard because `bin/automouse/self-heal` itself is portable.
+- rung 3/4/5 — no PHPStan/CI gate can mechanize OS-guard placement or awk-suppress scope.
+- **landing rung: rung 2** — add prose note to the rule doc; no new gate warranted.
+
+**artifact destination:** `.claude/rules/automouse-workflow.md` — `depends_on:` hold gate section.
+
+**provenance:** (discovered 2026-09-08 during PR #2178 fidelity review)
+
+### L77 PR body claimed unrealized verification-row count; `automouse-workflow.md` compression undeclared
+
+**class:** A PR body that states a verification-row count higher than the number of matrix rows realized in the harness, and that silently compresses a rules file without disclosing the byte-cap trade-off — giving reviewers a false picture of test coverage and scope.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #2178 Summary — "20 verification rows, V1–V20" when only V1–V11 and V14 realized; V12–V13 and V15–V20 absent from harness | yes | live | fixed this pass (PR body updated) |
+| 2 | PR #2178 Summary — `.claude/rules/automouse-workflow.md` listed as "documents the `depends_on:` key" with no mention of the byte-cap compression that deleted the `$1.82→$12.86` cost example | yes | live | fixed this pass (PR body updated) |
+
+**prevention_ladder:**
+- rung 0 — no existing gate cross-checks PR body row counts against the realized test cases.
+- rung 1 — no gate owns PR body accuracy for autonomous-loop runs.
+- rung 2 — the existing `.claude/rules/pr-body-claims.md` and `.claude/rules/pr-body-negative-claim-recheck.md` rules cover cited figures and negative claims; extend them to require that any rules-file edit that compresses content discloses the byte-cap reason in the PR body.
+- rung 3/4/5 — not mechanizable.
+- **landing rung: rung 2** — add a note to `.claude/rules/pr-body-claims.md` that a rules-file edit driven by the byte cap must name the cap in the PR body.
+
+**artifact destination:** `.claude/rules/pr-body-claims.md` — add a row to the Application table covering rules-file byte-cap compression.
+
+**provenance:** (discovered 2026-09-08 during PR #2178 fidelity review)

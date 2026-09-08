@@ -20,7 +20,7 @@
 #     unmet:<dep>                    <dep> resolved cleanly and has not merged
 #     unresolvable:<dep>:<reason>    <dep> could not be evaluated at all
 #
-#   <reason> is drawn from a closed set: gh-error | bad-value | empty-value | no-done-dir
+#   <reason> is drawn from a closed set: gh-error | bad-value | empty-value | no-done-dir | unreadable-plan
 #
 #   The function is a pure query. It writes no files, mutates no globals, and
 #   MUST NOT touch the attempt counter or any queue/ sidecar. Its only external
@@ -34,6 +34,12 @@
 
 plan_depends_on_status() {
     local plan_file="$1"
+
+    # Fail-safe: an unreadable/dangling plan file is not evidence the dependency
+    # is met. A dangling queue symlink (plan file deleted/renamed) silently returns
+    # empty awk output, which the key-absent fast path treats as "met" — inverting
+    # the stated contract. Fail toward "unresolvable" instead.
+    [ -r "$plan_file" ] || { printf 'unresolvable:<none>:unreadable-plan\n'; return 0; }
 
     # ── 1. Parse the frontmatter for the depends_on: key ──────────────────────
     # Line-1-anchored: only a `---` on line 1 opens the block.

@@ -24,6 +24,14 @@ branch; it survives you closing Claude Code. Engine selection:
   copy, never the worktree's (ADR-0092).
 - **Fallback:** a fresh **Sonnet 4.6** `/post-plan` skill session, used if the harness
   fails or is absent. `POST_PLAN_SKILL=1` forces the skill path.
+- **Fidelity handoff (exit 4):** the harness cannot run Phase 5.5's plan-intent review — its
+  LLM adapter is a `claude -p --max-turns 1 --tools ""` call in a neutral temp cwd, so an agent
+  there cannot read the repo. When every other arm condition clears but no fidelity verdict
+  exists, the harness holds condition (12) and exits **4**. That is a handoff, not a failure:
+  `bin/post-plan-now` re-enters the skill **at Phase 5.5** — the fidelity review, the sticky
+  verdict + merge-digest comment, and a fresh twelve-condition arming pass, per
+  `.claude/skills/post-plan/_phase-5.5-fidelity.md` — instead of replaying the whole pipeline.
+  Exit **3** (rebase conflict) is unchanged and still suppresses the skill fallback entirely.
 
 ## What `--auto` adds
 

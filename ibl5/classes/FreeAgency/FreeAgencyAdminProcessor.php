@@ -6,6 +6,7 @@ namespace FreeAgency;
 
 use FreeAgency\Contracts\FreeAgencyAdminProcessorInterface;
 use FreeAgency\Contracts\FreeAgencyAdminRepositoryInterface;
+use FreeAgency\Contracts\FreeAgencyDiscordDispatcherInterface;
 use Player\Player;
 use Team\Team;
 
@@ -29,11 +30,22 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
      */
     private \Psr\Log\LoggerInterface $logger;
 
-    public function __construct(FreeAgencyAdminRepositoryInterface $repository, \mysqli $db, ?\Psr\Log\LoggerInterface $logger = null)
-    {
+    private FreeAgencyDiscordDispatcherInterface $discordDispatcher;
+
+    /** Dedicated channel for Discord delivery failures, separate from the audit log. */
+    private \Psr\Log\LoggerInterface $discordLogger;
+
+    public function __construct(
+        FreeAgencyAdminRepositoryInterface $repository,
+        \mysqli $db,
+        ?\Psr\Log\LoggerInterface $logger = null,
+        ?FreeAgencyDiscordDispatcherInterface $discordDispatcher = null
+    ) {
         $this->repository = $repository;
         $this->db = $db;
         $this->logger = $logger ?? \Logging\LoggerFactory::getChannel('audit');
+        $this->discordDispatcher = $discordDispatcher ?? new FreeAgencyDiscordDispatcher();
+        $this->discordLogger = \Logging\LoggerFactory::getChannel('discord');
     }
 
     /**
@@ -243,6 +255,7 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
 
         $successCount = $counts['successCount'];
         $errorCount = $counts['errorCount'];
+        $newsSid = $counts['newsSid'];
 
         $this->logger->info('fa_signings_executed', [
             'action' => 'fa_signings_executed',
@@ -252,11 +265,29 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
         ]);
 
         if ($errorCount === 0 && $successCount > 0) {
+            $message = "Successfully executed {$successCount} operations. Free agents have been assigned to teams.";
+
+            if ($newsSid > 0) {
+                try {
+                    foreach ($this->buildDiscordChunks($newsHomeText, $newsSid) as $chunk) {
+                        $this->discordDispatcher->dispatch($chunk);
+                    }
+                } catch (\Throwable $e) {
+                    $this->discordLogger->error('fa_signings_discord_post_failed', [
+                        'action' => 'fa_signings_discord_post_failed',
+                        'day' => $day,
+                        'news_sid' => $newsSid,
+                        'error' => $e->getMessage(),
+                    ]);
+                    $message .= ' (Discord post to #free-agency failed — post manually.)';
+                }
+            }
+
             return [
                 'success' => true,
                 'successCount' => $successCount,
                 'errorCount' => $errorCount,
-                'message' => "Successfully executed {$successCount} operations. Free agents have been assigned to teams.",
+                'message' => $message,
             ];
         }
 
@@ -305,6 +336,59 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
         $totalDemand = $demRow['dem1'] + $demRow['dem2'] + $demRow['dem3']
                      + $demRow['dem4'] + $demRow['dem5'] + $demRow['dem6'];
         return ($totalDemand / $demYears) * ((11 - $day) / 10);
+    }
+
+    private const DISCORD_MESSAGE_LIMIT = 2000;
+
+    /**
+     * Split the signings summary into Discord-sized messages.
+     *
+     * @return list<string> Each entry is at most self::DISCORD_MESSAGE_LIMIT characters.
+     */
+    private function buildDiscordChunks(string $text, int $newsSid): array
+    {
+        $normalized = str_replace(["\r\n", "\r"], "\n", $text);
+        $normalized = str_replace('<br>', "\n", $normalized);
+        $normalized = (string) preg_replace('/\n{2,}/', "\n", $normalized);
+        $normalized = trim($normalized);
+
+        if ($normalized === '') {
+            return [];
+        }
+
+        $lines = [];
+        foreach (explode("\n", $normalized) as $line) {
+            if (mb_strlen($line) > self::DISCORD_MESSAGE_LIMIT) {
+                foreach (mb_str_split($line, self::DISCORD_MESSAGE_LIMIT) as $piece) {
+                    $lines[] = $piece;
+                }
+                continue;
+            }
+            $lines[] = $line;
+        }
+
+        $chunks = [];
+        $current = '';
+        foreach ($lines as $line) {
+            $candidate = $current === '' ? $line : $current . "\n" . $line;
+            if (mb_strlen($candidate) > self::DISCORD_MESSAGE_LIMIT) {
+                $chunks[] = $current;
+                $current = $line;
+                continue;
+            }
+            $current = $candidate;
+        }
+        $chunks[] = $current;
+
+        $link = 'https://iblhoops.net/ibl5/modules.php?name=News&file=article&sid=' . $newsSid;
+        $lastIndex = count($chunks) - 1;
+        if (mb_strlen($chunks[$lastIndex]) + mb_strlen($link) + 1 <= self::DISCORD_MESSAGE_LIMIT) {
+            $chunks[$lastIndex] .= "\n" . $link;
+        } else {
+            $chunks[] = $link;
+        }
+
+        return $chunks;
     }
 
     /**

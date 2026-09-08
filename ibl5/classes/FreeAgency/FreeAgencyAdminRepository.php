@@ -139,7 +139,7 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
     {
         $currentTime = date('Y-m-d H:i:s');
 
-        return $this->execute(
+        $affected = $this->execute(
             "INSERT INTO nuke_stories
              (catid, aid, title, time, hometext, bodytext, comments, counter, topic, informant, notes, ihome, alanguage, acomm, haspoll, poll_id, associated)
              VALUES (8, 'chibul', ?, ?, ?, ?, 0, 0, 29, 'chibul', '', 0, 'english', 0, 0, 0, '29-')",
@@ -149,6 +149,8 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
             $homeText,
             $bodyText
         );
+
+        return $affected > 0 ? $this->getLastInsertId() : 0;
     }
 
     /**
@@ -200,16 +202,17 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
                 }
             }
 
+            $newsSid = 0;
             if ($successCount > 0 && $newsHomeText !== '' && $newsBodyText !== '') {
-                $affected = $this->insertNewsStory($newsTitle, $newsHomeText, $newsBodyText);
-                if ($affected > 0) {
+                $newsSid = $this->insertNewsStory($newsTitle, $newsHomeText, $newsBodyText);
+                if ($newsSid > 0) {
                     $successCount++;
                 } else {
                     $errorCount++;
                 }
             }
 
-            return ['successCount' => $successCount, 'errorCount' => $errorCount];
+            return ['successCount' => $successCount, 'errorCount' => $errorCount, 'newsSid' => $newsSid];
         });
     }
 }

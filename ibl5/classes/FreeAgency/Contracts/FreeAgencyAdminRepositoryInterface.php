@@ -94,7 +94,7 @@ interface FreeAgencyAdminRepositoryInterface
      * @param string $title News article title
      * @param string $homeText News article home/summary text
      * @param string $bodyText News article full body text
-     * @return int Number of affected rows
+     * @return int The inserted nuke_stories sid, or 0 if the insert affected no rows
      */
     public function insertNewsStory(string $title, string $homeText, string $bodyText): int;
 
@@ -121,7 +121,7 @@ interface FreeAgencyAdminRepositoryInterface
      * @param string $newsTitle News article title
      * @param string $newsHomeText News article summary text
      * @param string $newsBodyText News article full body text
-     * @return array{successCount: int, errorCount: int}
+     * @return array{successCount: int, errorCount: int, newsSid: int}
      */
     public function executeSigningsTransactionally(
         array $signings,

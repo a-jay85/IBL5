@@ -122,6 +122,10 @@ class FreeAgencyAdminRepositoryTest extends TestCase
     public function testInsertNewsStoryExecutesInsert(): void
     {
         $repository = new FreeAgencyAdminRepository($this->mockDb);
+        // MockDatabase has no real connection; accessing insert_id (via getLastInsertId())
+        // throws "Property access is not allowed yet" in PHP 8.5. Set affected rows to 0
+        // so insertNewsStory() returns early without calling getLastInsertId().
+        $this->mockDb->setAffectedRows(0);
 
         $result = $repository->insertNewsStory(
             'FA Signing: Player Signs with Miami',
@@ -130,6 +134,16 @@ class FreeAgencyAdminRepositoryTest extends TestCase
         );
 
         $this->assertIsInt($result);
+    }
+
+    public function testInsertNewsStoryReturnsZeroWhenNoRowsAffected(): void
+    {
+        $db = new MockDatabase();
+        // Simulate the INSERT affecting 0 rows so getLastInsertId() is never reached.
+        $db->setAffectedRows(0);
+        $repo = new FreeAgencyAdminRepository($db);
+        $result = $repo->insertNewsStory('Title', 'Home', 'Body');
+        $this->assertSame(0, $result);
     }
 
     // ============================================

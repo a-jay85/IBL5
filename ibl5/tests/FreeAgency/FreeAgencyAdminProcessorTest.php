@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\FreeAgency;
 
 use FreeAgency\Contracts\FreeAgencyAdminRepositoryInterface;
+use FreeAgency\Contracts\FreeAgencyDiscordDispatcherInterface;
 use FreeAgency\FreeAgencyAdminProcessor;
 use PHPUnit\Framework\TestCase;
 use Tests\WideUnit\Mocks\MockDatabase;
@@ -32,7 +33,7 @@ class FreeAgencyAdminProcessorTest extends TestCase
         $mock->expects($this->once())
             ->method('executeSigningsTransactionally')
             ->with($signings, 'FA Day 1', 'Home text', 'Body text')
-            ->willReturn(['successCount' => 3, 'errorCount' => 0]);
+            ->willReturn(['successCount' => 3, 'errorCount' => 0, 'newsSid' => 0]);
 
         $processor = new FreeAgencyAdminProcessor($mock, $this->mockDb);
         $result = $processor->executeSignings(1, $signings, 'FA Day 1', 'Home text', 'Body text');
@@ -50,7 +51,7 @@ class FreeAgencyAdminProcessorTest extends TestCase
 
         $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
         $stub->method('executeSigningsTransactionally')
-            ->willReturn(['successCount' => 1, 'errorCount' => 1]);
+            ->willReturn(['successCount' => 1, 'errorCount' => 1, 'newsSid' => 0]);
 
         $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb);
         $result = $processor->executeSignings(1, $signings, 'FA Day 1', 'Home text', 'Body text');
@@ -69,7 +70,7 @@ class FreeAgencyAdminProcessorTest extends TestCase
         $mock->expects($this->once())
             ->method('executeSigningsTransactionally')
             ->with($signings, 'FA Day 1', '', '')
-            ->willReturn(['successCount' => 1, 'errorCount' => 0]);
+            ->willReturn(['successCount' => 1, 'errorCount' => 0, 'newsSid' => 0]);
 
         $processor = new FreeAgencyAdminProcessor($mock, $this->mockDb);
         $result = $processor->executeSignings(1, $signings, 'FA Day 1', '', '');
@@ -423,6 +424,207 @@ class FreeAgencyAdminProcessorTest extends TestCase
     }
 
     // ============================================
+    // buildDiscordChunks() — via executeSignings()
+    // ============================================
+
+    public function testBuildDiscordChunksShortTextProducesOneChunk(): void
+    {
+        $signings = [$this->makeSigning(1, 10, 'Miami', 500, 0, 0, 0, 0, 0, 1, false, false)];
+        $dispatcher = $this->makeRecordingDispatcher();
+
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub->method('executeSigningsTransactionally')
+            ->willReturn(['successCount' => 1, 'errorCount' => 0, 'newsSid' => 42]);
+
+        $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb, null, $dispatcher);
+        $homeText = "Player A signs with Miami.\nPlayer B signs with Chicago.\nPlayer C signs with Boston.";
+        $processor->executeSignings(1, $signings, 'FA Day 1', $homeText, 'Body text');
+
+        $this->assertGreaterThan(0, count($dispatcher->messages), 'Dispatcher must be called');
+        $this->assertCount(1, $dispatcher->messages, 'Short text should produce exactly one chunk');
+        $this->assertStringEndsWith(
+            'https://iblhoops.net/ibl5/modules.php?name=News&file=article&sid=42',
+            $dispatcher->messages[0]
+        );
+    }
+
+    public function testBuildDiscordChunksLongTextSplitsOnLineBoundaries(): void
+    {
+        $signings = [$this->makeSigning(1, 10, 'Miami', 500, 0, 0, 0, 0, 0, 1, false, false)];
+        $dispatcher = $this->makeRecordingDispatcher();
+
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub->method('executeSigningsTransactionally')
+            ->willReturn(['successCount' => 1, 'errorCount' => 0, 'newsSid' => 7]);
+
+        // Build text that is well over 2000 characters with explicit line boundaries
+        $lines = [];
+        for ($i = 0; $i < 30; $i++) {
+            $lines[] = str_repeat('A', 80) . " signing line $i";
+        }
+        $homeText = implode("\n", $lines);
+
+        $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb, null, $dispatcher);
+        $processor->executeSignings(1, $signings, 'FA Day 1', $homeText, 'Body text');
+
+        $this->assertGreaterThan(0, count($dispatcher->messages), 'Dispatcher must be called');
+        $this->assertGreaterThanOrEqual(2, count($dispatcher->messages), 'Long text should split into multiple chunks');
+
+        foreach ($dispatcher->messages as $chunk) {
+            $this->assertLessThanOrEqual(2000, mb_strlen($chunk), 'No chunk may exceed 2000 characters');
+        }
+
+        // Concatenating all messages (minus the final link) should recover all input lines
+        $allText = implode("\n", $dispatcher->messages);
+        foreach ($lines as $line) {
+            $this->assertStringContainsString($line, $allText);
+        }
+    }
+
+    public function testBuildDiscordChunksNormalizesBrNewline(): void
+    {
+        $signings = [$this->makeSigning(1, 10, 'Miami', 500, 0, 0, 0, 0, 0, 1, false, false)];
+        $dispatcher = $this->makeRecordingDispatcher();
+
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub->method('executeSigningsTransactionally')
+            ->willReturn(['successCount' => 1, 'errorCount' => 0, 'newsSid' => 5]);
+
+        $homeText = "Player A signs.<br>Player B signs.\r\nPlayer C signs.\r\n\r\nPlayer D signs.";
+        $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb, null, $dispatcher);
+        $processor->executeSignings(1, $signings, 'FA Day 1', $homeText, 'Body text');
+
+        $this->assertGreaterThan(0, count($dispatcher->messages), 'Dispatcher must be called');
+        $allText = implode('', $dispatcher->messages);
+        $this->assertStringNotContainsString('<br>', $allText);
+        $this->assertStringNotContainsString("\r", $allText);
+        $this->assertStringNotContainsString("\n\n", $allText);
+    }
+
+    public function testBuildDiscordChunksArticleLinkOnLastChunkOnly(): void
+    {
+        $signings = [$this->makeSigning(1, 10, 'Miami', 500, 0, 0, 0, 0, 0, 1, false, false)];
+        $dispatcher = $this->makeRecordingDispatcher();
+
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub->method('executeSigningsTransactionally')
+            ->willReturn(['successCount' => 1, 'errorCount' => 0, 'newsSid' => 99]);
+
+        // Build multi-chunk text
+        $lines = [];
+        for ($i = 0; $i < 30; $i++) {
+            $lines[] = str_repeat('B', 80) . " line $i";
+        }
+        $homeText = implode("\n", $lines);
+
+        $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb, null, $dispatcher);
+        $processor->executeSignings(1, $signings, 'FA Day 1', $homeText, 'Body text');
+
+        $this->assertGreaterThan(0, count($dispatcher->messages), 'Dispatcher must be called');
+        $link = 'https://iblhoops.net/ibl5/modules.php?name=News&file=article&sid=99';
+        $linkCount = 0;
+        foreach ($dispatcher->messages as $chunk) {
+            if (str_contains($chunk, $link)) {
+                $linkCount++;
+            }
+        }
+        $this->assertSame(1, $linkCount, 'Link must appear exactly once');
+        $this->assertStringContainsString($link, $dispatcher->messages[array_key_last($dispatcher->messages)], 'Link must be on the last chunk');
+    }
+
+    public function testBuildDiscordChunksOversizedSingleLine(): void
+    {
+        $signings = [$this->makeSigning(1, 10, 'Miami', 500, 0, 0, 0, 0, 0, 1, false, false)];
+        $dispatcher = $this->makeRecordingDispatcher();
+
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub->method('executeSigningsTransactionally')
+            ->willReturn(['successCount' => 1, 'errorCount' => 0, 'newsSid' => 3]);
+
+        // Single line of 5000 characters with no newline
+        $homeText = str_repeat('X', 5000);
+
+        $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb, null, $dispatcher);
+        $processor->executeSignings(1, $signings, 'FA Day 1', $homeText, 'Body text');
+
+        $this->assertGreaterThan(0, count($dispatcher->messages), 'Dispatcher must be called');
+        foreach ($dispatcher->messages as $chunk) {
+            $this->assertLessThanOrEqual(2000, mb_strlen($chunk), 'No chunk may exceed 2000 characters');
+        }
+
+        // All the X characters plus the link must be present somewhere
+        $allText = implode('', $dispatcher->messages);
+        $this->assertStringContainsString(str_repeat('X', 100), $allText, 'Content must be preserved');
+    }
+
+    public function testExecuteSigningsDiscordFailureDoesNotPropagateAndAddsNotice(): void
+    {
+        $signings = [$this->makeSigning(1, 10, 'Miami', 500, 0, 0, 0, 0, 0, 1, false, false)];
+        $dispatcher = $this->makeThrowingDispatcher();
+
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub->method('executeSigningsTransactionally')
+            ->willReturn(['successCount' => 1, 'errorCount' => 0, 'newsSid' => 42]);
+
+        $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb, null, $dispatcher);
+        $result = $processor->executeSignings(1, $signings, 'FA Day 1', 'Home text', 'Body text');
+
+        $this->assertTrue($result['success'], 'success must stay true when Discord fails');
+        $this->assertSame(1, $result['successCount']);
+        $this->assertStringContainsString('post manually', $result['message']);
+    }
+
+    public function testExecuteSigningsDispatcherNotCalledWhenErrorCountPositive(): void
+    {
+        $signings = [$this->makeSigning(1, 10, 'Miami', 500, 0, 0, 0, 0, 0, 1, false, false)];
+        $dispatcher = $this->makeRecordingDispatcher();
+
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub->method('executeSigningsTransactionally')
+            ->willReturn(['successCount' => 1, 'errorCount' => 1, 'newsSid' => 7]);
+
+        $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb, null, $dispatcher);
+        $result = $processor->executeSignings(1, $signings, 'FA Day 1', 'Home text', 'Body text');
+
+        $this->assertFalse($result['success']);
+        $this->assertCount(0, $dispatcher->messages, 'Dispatcher must not be called when errorCount > 0');
+    }
+
+    public function testExecuteSigningsDispatcherNotCalledWhenNewsSidZero(): void
+    {
+        $signings = [$this->makeSigning(1, 10, 'Miami', 500, 0, 0, 0, 0, 0, 1, false, false)];
+        $dispatcher = $this->makeRecordingDispatcher();
+
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub->method('executeSigningsTransactionally')
+            ->willReturn(['successCount' => 3, 'errorCount' => 0, 'newsSid' => 0]);
+
+        $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb, null, $dispatcher);
+        $result = $processor->executeSignings(1, $signings, 'FA Day 1', 'Home text', 'Body text');
+
+        $this->assertTrue($result['success']);
+        $this->assertCount(0, $dispatcher->messages, 'Dispatcher must not be called when newsSid is 0');
+    }
+
+    public function testExecuteSigningsDispatchesSigningsTextNotBodyText(): void
+    {
+        $signings = [$this->makeSigning(1, 10, 'Miami', 500, 0, 0, 0, 0, 0, 1, false, false)];
+        $dispatcher = $this->makeRecordingDispatcher();
+
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub->method('executeSigningsTransactionally')
+            ->willReturn(['successCount' => 1, 'errorCount' => 0, 'newsSid' => 10]);
+
+        $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb, null, $dispatcher);
+        $processor->executeSignings(1, $signings, 'FA Day 1', 'HOMETEXT_MARKER', 'BODYTEXT_MARKER');
+
+        $this->assertGreaterThan(0, count($dispatcher->messages), 'Dispatcher must be called');
+        $allText = implode('', $dispatcher->messages);
+        $this->assertStringContainsString('HOMETEXT_MARKER', $allText);
+        $this->assertStringNotContainsString('BODYTEXT_MARKER', $allText);
+    }
+
+    // ============================================
     // HELPERS
     // ============================================
 
@@ -511,6 +713,32 @@ class FreeAgencyAdminProcessorTest extends TestCase
         // PlayerRepository::loadByID() JOINs ibl_team_info, which would otherwise
         // trigger MockDatabase's built-in team handler and return team data
         $this->mockDb->onQuery('FROM ibl_plr', [$playerRow]);
+    }
+
+    /**
+     * @return FreeAgencyDiscordDispatcherInterface&object{messages: list<string>}
+     */
+    private function makeRecordingDispatcher(): object
+    {
+        return new class implements FreeAgencyDiscordDispatcherInterface {
+            /** @var list<string> */
+            public array $messages = [];
+
+            public function dispatch(string $message): void
+            {
+                $this->messages[] = $message;
+            }
+        };
+    }
+
+    private function makeThrowingDispatcher(): FreeAgencyDiscordDispatcherInterface
+    {
+        return new class implements FreeAgencyDiscordDispatcherInterface {
+            public function dispatch(string $message): void
+            {
+                throw new \RuntimeException('Discord unavailable');
+            }
+        };
     }
 
     /**

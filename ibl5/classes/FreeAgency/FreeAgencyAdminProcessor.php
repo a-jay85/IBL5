@@ -111,7 +111,7 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
             ];
 
             // Build extended news text for all offers
-            $newsBodyText .= "The {$offeringTeamName} offered {$playerName} a {$offerYears}-year deal worth a total of {$offerTotal} million dollars.<br>\n";
+            $newsBodyText .= "The {$offeringTeamName} offered {$playerName} a {$offerYears}-year deal worth a total of {$offerTotal} million dollars.\n";
 
             // Get demands for this player (from pre-loaded batch)
             $demands = $this->calculateDemandValue($demandsMap[$playerId] ?? null, $day);
@@ -180,7 +180,7 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
                     ];
 
                     $outcomeText = "{$playerName} accepts the {$offeringTeamName} offer of a {$offerYears}-year deal worth a total of {$offerTotal} million dollars.";
-                    $newsHomeText .= $outcomeText . "<br>\n";
+                    $newsHomeText .= $outcomeText . "\n";
                     $pendingAcceptanceLine = $outcomeText . " <@!{$offeringTeamDiscordId}>\n\n";
                 } else {
                     // Offer rejected

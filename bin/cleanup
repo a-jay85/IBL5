@@ -35,8 +35,8 @@ for arg in "$@"; do
 done
 
 if [ -z "$TARGET_NAME" ] && [ "$ALL" = false ]; then
-    echo "Usage: bin/wt-cleanup <worktree-name> [--dry-run] [--discard-generated] [--discard-closed] [--drop-merged-stashes]" >&2
-    echo "       bin/wt-cleanup --all [--dry-run] [--discard-generated] [--discard-closed] [--drop-merged-stashes]" >&2
+    echo "Usage: bin/cleanup <worktree-name> [--dry-run] [--discard-generated] [--discard-closed] [--drop-merged-stashes]" >&2
+    echo "       bin/cleanup --all [--dry-run] [--discard-generated] [--discard-closed] [--drop-merged-stashes]" >&2
     exit 1
 fi
 

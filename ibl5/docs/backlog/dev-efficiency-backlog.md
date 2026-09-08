@@ -1,6 +1,6 @@
 ---
 description: Development-efficiency backlog — inner-loop speed (diff-scoped analysis, parallel tests), CI caching, dependency-bump batching, and worktree lifecycle automation, with per-entry status.
-last_verified: 2026-09-07
+last_verified: 2026-09-08
 ---
 
 # Development-Efficiency Backlog
@@ -635,7 +635,7 @@ Not a defect in the anchoring or the SIGPIPE handling: the `$`-anchor (guarding 
 |---|-----------|-------------|-------|--------|
 | N1 | `~/claude-plans/impl-model-accept-full-ids.md` Phase 8e literal spec vs. `.claude/rules/agent-tiering.md:22` — implementation compressed the six-literal enumeration to a pointer; the route is better than specified (avoids a second drift surface for the whitelist) | route deviation, non-blocking | no | not fixed — filed |
 | N2 | `bin/automouse/run:1235` — `rm -f "$CAP_REFUND_FILE"` added beyond plan Phase 4 fence; safe by symmetry with sibling poison-pill block at `:1205` and exercised by `bin/test-automouse-single` case 6 | safe scope addition, non-blocking | no | not fixed — filed |
-| N3 | `.claude/rules/agent-tiering.md` `last_verified` bump dropped by rebase; master advanced past the branch's bump; `bin/check-docs` green | doc-bump dropped by rebase, non-blocking | no | not fixed — filed |
+| N3 | `.claude/rules/agent-tiering.md` `last_verified` bump dropped by rebase; master advanced past the branch's bump; `bin/check-docs` green | doc-bump dropped by rebase, non-blocking | no | fixed — #2168 |
 | N4 | `~/claude-plans/impl-model-accept-full-ids.md` matrix row 15: `bin/automouse/queue list` is not a valid subcommand; correct command is bare `bin/automouse/queue`; property holds when re-run correctly | wrong command in plan verification matrix, non-blocking | no | not fixed — filed |
 
 **prevention_ladder: no gate warranted** — all four divergences are plan-author responsibility; runtime gates cannot distinguish intentional route deviation from accidental staleness in plan text; N2 is a correct addition; N3 is self-healed by master; N4 is a plan-text typo discovered post-implementation with the property verified.

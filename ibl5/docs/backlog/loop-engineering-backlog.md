@@ -101,6 +101,7 @@ last_verified: 2026-09-08
 | L72 | Loop-authored backlog entry cited unreachable squash-artifact SHA; archive entry missing blank line before GFM table | 📝 Note | — | XS |
 | L73 | Forced-verification row in `_plan-verification.md` references lsof port guard deleted before shipping — row's live-instance check cannot self-verify | ⬜ Open | 🟥 | S |
 | L74 | `write_canary_park_report()` glob-pipeline abort under `set -euo pipefail` (fixed); N1 declared-omission note (n/a) | ✅ Fixed | — | XS |
+| L75 | `/plan` byte target derived without measuring the verbatim-protected floor — `_plan-verification.md` cap corrected to 21504 B | ⬜ Open | 🟦 | S |
 
 ### L1 Plan dependency DAG
 **Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
@@ -1171,3 +1172,30 @@ Landing: rung 1 — extend `.claude/rules/pr-body-negative-claim-recheck.md` to 
 **N1 note (class: n/a):** Plan Phase 3 item 2 (mark backlog item L5 done in-repo) was withdrawn before this PR: commit `3cb8e15f3` removed the branch's backlog edits after L5 was migrated to IBL5-backlog issue #107 (closed 2026-09-07T20:05:56Z). The omission is declared in the PR body under `## Backlog migration`. No in-repo artifact exists to fix or gate. prevention_ladder: no gate warranted — one-off migration artifact, already handled.
 
 *(discovered 2026-09-07 during /pr-ready Phase 6.5 review of #2161)*
+
+---
+
+### L75 `/plan` byte target derived without measuring the verbatim-protected floor
+
+**class:** A `/plan` architect derives a file-size target by inventorying the *movable* rationale in the source file, but no `/plan` phase requires measuring the complementary quantity — the **floor** of content the same plan requires to stay verbatim. A target set below that floor is unreachable no matter how well the implementation executes, and the miss surfaces only at implementation time.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `~/claude-plans/architect-contract-rules-detail-split-shared-context.md` — inventory sized the movable rationale correctly (`## Required format` claimed 11,172 B, measures 11,197 B in `bin/fixtures/plan-verification-presplit.md` counting its `###` subsections) and that rationale was duly moved (block now 4,952 B; file 29,191 B → 20,474 B). But the plan never measured the verbatim-protected residue: it put `## Forced integration-verification trigger` at 5,647 B when it measures 7,237 B, and that section must stay verbatim. The 1,590 B underestimate of protected content exceeds the 1,018 B by which the split file misses the 19,456 B hard cap | yes (target derived without a protected-floor measurement) | live | not fixed — filed; cap corrected to 21,504 B in `bin/test-architect-contract-split` with an inline measurement citation |
+
+**Why it matters:** When the target sits below the verbatim floor, the implementation has only two exits: correct the cap after the fact (what happened here) or reach the cap by deleting operative content. The byte-count gate (`bin/test-architect-contract-split` assertion 4) cannot tell those apart on size alone — assertions 1–3 (no-loss, residency, orphan pointers) are the real discriminator. Sizing only the movable side of the split hides the constraint that actually binds.
+
+**Fix:** The `/plan` split-authoring workflow should require the architect to measure **both** sides from the live file before declaring a byte target: the movable rationale *and* the sum of every section the plan's own Approach marks stays-verbatim. The target must be ≥ the protected floor plus the non-movable remainder. Both are CLI-measurable, e.g. `awk '/^## Forced integration-verification trigger/{f=1} f && /^## / && !/^## Forced/{exit} f{print}' _plan-verification.md | wc -c`.
+
+**prevention_ladder:**
+- rung 0 — not covered; no plan phase measures the verbatim-protected floor.
+- rung 1 — no existing gate compares a plan's declared byte target against the protected residue of the target file.
+- rung 2 — a note in `.claude/skills/plan/_architect-contract.md` requiring that any byte-reduction target be accompanied by a CLI-measured protected-floor figure from the live file. Low friction, no new gate.
+- rung 3/4/5 — cannot be mechanized: which sections are "stays verbatim" is declared in plan prose outside the repo, and plan content is not parsed by any CI gate.
+- **landing rung: rung 2** — add a protected-floor measurement requirement to the plan-authoring contract; no CI gate warranted.
+
+**artifact destination:** `.claude/skills/plan/_architect-contract.md` — byte-reduction recipe section, or wherever split-file targets are specified.
+
+**provenance:** (discovered 2026-09-08 during architect-contract-rules-detail-split)

@@ -946,8 +946,8 @@ jobs:
         run: bin/test-check-plan-staleness
       - name: bin/test-plan-tier-hint
         run: bin/test-plan-tier-hint
-      - name: bin/test-backlog-open
-        run: bin/test-backlog-open
+      - name: bin/test-backlog
+        run: bin/test-backlog
       - name: bin/test-adr-check
         run: bin/test-adr-check
       - name: bin/test-check-docs

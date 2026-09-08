@@ -28,7 +28,7 @@ governs every future automouse run; a human must read the diff.
 
 ## Critical Files
 
-- `ibl5/docs/backlog/dev-efficiency-backlog.md` — body-status backlog.
+- `ibl5/docs/STRATEGIC_PRIORITIES.md` — priorities doc.
 """
 
 PLAN_WITHOUT_HOLD = """\
@@ -39,7 +39,7 @@ auto_merge: false
 
 ## Critical Files
 
-- `ibl5/docs/backlog/dev-efficiency-backlog.md` — body-status backlog.
+- `ibl5/docs/STRATEGIC_PRIORITIES.md` — priorities doc.
 """
 
 PLAN_FENCED_HOLD = """\
@@ -59,7 +59,7 @@ governs every future automouse run; a human must read the diff.
 
 ## Critical Files
 
-- `ibl5/docs/backlog/dev-efficiency-backlog.md` — body-status backlog.
+- `ibl5/docs/STRATEGIC_PRIORITIES.md` — priorities doc.
 """
 
 PLAN_HOSTILE_HOLD = """\
@@ -81,7 +81,7 @@ This is why we hold.
 
 ## Critical Files
 
-- `ibl5/docs/backlog/dev-efficiency-backlog.md` — body-status backlog.
+- `ibl5/docs/STRATEGIC_PRIORITIES.md` — priorities doc.
 """
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/backlog — thin passthrough to a-jay85/IBL5-backlog via gh.
+#
+# Usage:
+#   bin/backlog search <term>            gh issue list --search "<term>"
+#   bin/backlog open [<label>]           gh issue list --state open [--label <label>]
+#   bin/backlog new <label> <title>      gh issue create --label <label> --title "<title>"
+#   bin/backlog close <n> <reason>       gh issue close <n> -c "<reason>"
+#
+# Flags (must precede subcommand):
+#   --help, -h       Show this help and exit 0
+#   --dry-run        Print the composed gh command; do not execute
+#
+# Requires: gh authenticated against the repo.
+set -uo pipefail
+
+REPO="a-jay85/IBL5-backlog"
+
+usage() {
+    cat <<'USAGE'
+Usage: bin/backlog [--dry-run] <subcommand> [args...]
+
+  search <term>         List open issues matching <term>
+  open [<label>]        List open issues (optionally filtered by label)
+  new <label> <title>   Create an issue with the given label and title
+  close <n> <reason>    Close issue #<n> with a comment
+
+Flags:
+  --help, -h    Show this help
+  --dry-run     Print the gh command without executing it
+
+Repository: a-jay85/IBL5-backlog
+USAGE
+}
+
+DRY_RUN=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --help|-h) usage; exit 0 ;;
+        --dry-run) DRY_RUN=1; shift ;;
+        --) shift; break ;;
+        -*) printf 'Unknown flag: %s\n' "$1" >&2; usage >&2; exit 2 ;;
+        *) break ;;
+    esac
+done
+
+if [ $# -eq 0 ]; then
+    usage
+    exit 0
+fi
+
+CMD="$1"; shift
+
+run() {
+    if [ "$DRY_RUN" -eq 1 ]; then
+        echo "$*"
+    else
+        exec "$@"
+    fi
+}
+
+case "$CMD" in
+    search)
+        if [ $# -eq 0 ]; then
+            printf 'search requires a <term>\n' >&2; exit 2
+        fi
+        run gh issue list --repo "$REPO" --state open --search "$*"
+        ;;
+    open)
+        if [ $# -eq 0 ]; then
+            run gh issue list --repo "$REPO" --state open
+        else
+            run gh issue list --repo "$REPO" --state open --label "$1"
+        fi
+        ;;
+    new)
+        if [ $# -lt 2 ]; then
+            printf 'new requires <label> <title>\n' >&2; exit 2
+        fi
+        LABEL="$1"; shift
+        TITLE="$*"
+        run gh issue create --repo "$REPO" --label "$LABEL" --title "$TITLE"
+        ;;
+    close)
+        if [ $# -lt 2 ]; then
+            printf 'close requires <n> <reason>\n' >&2; exit 2
+        fi
+        NUM="$1"; shift
+        REASON="$*"
+        run gh issue close "$NUM" --repo "$REPO" -c "$REASON"
+        ;;
+    *)
+        printf 'Unknown subcommand: %s\n' "$CMD" >&2
+        usage >&2
+        exit 2
+        ;;
+esac

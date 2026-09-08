@@ -1,11 +1,11 @@
 ---
 description: Go/RE development context for the JSB native engine under engine/ — Makefile targets, the pinned-toolchain rationale, module layout, and where engine STATE vs runtime-behavior facts vs RE artifacts live. Fires on any engine/ file interaction.
-last_verified: 2026-07-22
+last_verified: 2026-09-08
 ---
 
 # Engine Development Context (Go / RE)
 
-Scope: how to build, test, and cite sources when working in `engine/`. This is **process context, not state** — engine STATUS (open J-items, current frontier, NOT-A-LEVER traps) lives only in `engine/docs/backlog/jsb-native-backlog.md`; runtime-behavior facts live only in the master reference. Do not restate either here — the companion-memory split-brain was deliberately eliminated (see `engine/.claude/rules/jsb-engine-post-work.md`).
+Scope: how to build, test, and cite sources when working in `engine/`. This is **process context, not state** — engine STATUS (open J-items, current frontier, NOT-A-LEVER traps) lives only in `a-jay85/IBL5-backlog`; runtime-behavior facts live only in the master reference. Do not restate either here — the companion-memory split-brain was deliberately eliminated (see `engine/.claude/rules/jsb-engine-post-work.md`).
 
 ## Build & test (engine/Makefile — mirrors `.github/workflows/engine.yml`)
 

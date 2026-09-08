@@ -271,7 +271,7 @@ def _count(files: list[str], rx: re.Pattern) -> int:
 def retro_registry_row_from_diff(diff_text: str) -> str:
     """First `## Class registry` row ADDED by this diff, or "".
 
-    Phase 9 routing rows live in ibl5/docs/backlog/loop-engineering-backlog.md and
+    Phase 9 routing rows live in ibl5/docs/retrospective-class-registry.md and
     have the shape `| <YYYY-MM-DD> | #<PR> | class: ... | routed to: Rung <n> - ... | prior: ... |`.
     An added row means this branch materializes a retrospective routing, which
     obliges the PR body to explain the class (see /post-plan Phase 2).
@@ -280,7 +280,7 @@ def retro_registry_row_from_diff(diff_text: str) -> str:
     for line in diff_text.splitlines():
         if line.startswith("diff --git "):
             m = re.match(r"diff --git a/(.*?) b/(.*)$", line)
-            in_backlog = bool(m and m.group(2) == "ibl5/docs/backlog/loop-engineering-backlog.md")
+            in_backlog = bool(m and m.group(2) == "ibl5/docs/retrospective-class-registry.md")
         elif in_backlog and line.startswith("+") and not line.startswith("+++"):
             candidate = line[1:].strip()
             if _RETRO_ROW_RE.match(candidate):

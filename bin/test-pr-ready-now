@@ -731,75 +731,6 @@ out="$(PR_READY_NOW_DRY_RUN=1 run_driver --go 2>&1)"; rc=$?
 [[ "$(plist_count)" -eq 2 ]] || fail "report-no-mutation: plist_count=$(plist_count), want 2"
 end_case report-no-mutation
 
-# --- case 24: backlog-routing ------------------------------------------------------------
-# FINDING[loop], [ci], [e2e], [dev], [a11y], [maintenance] each route to a distinct
-# backlog file and produce a non-empty diff section in the report.
-begin_case
-clean_slots
-_rdate="$(date +%F)"
-rm -f /tmp/pr-ready-now-1901.log /tmp/pr-ready-now-1902.log
-TMP_LOGS+=("/tmp/pr-ready-now-1901.log")
-printf '%s\n' \
-    'FINDING[loop]: Loop engineering issue discovered in PR' \
-    'FINDING[ci]: CI configuration gap discovered in PR' \
-    'FINDING[e2e]: E2E coverage gap discovered in PR' \
-    'FINDING[dev]: Dev efficiency issue discovered in PR' \
-    'FINDING[a11y]: Accessibility issue discovered in PR' \
-    'FINDING[maintenance]: Maintenance debt discovered in PR' \
-    > /tmp/pr-ready-now-1901.log
-out="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" \
-       PR_READY_NOW_DRY_RUN=1 \
-       run_driver --go 2>&1)"; rc=$?
-[[ $rc -eq 0 ]] || fail "backlog-routing: exit $rc (out: $out)"
-rp="$SCRATCH/pr-firstpass-${_rdate}.md"
-[[ -f "$rp" ]] || fail "backlog-routing: report not found at $rp"
-diff_count="$(grep -c '### Diff for' "$rp" 2>/dev/null)"; diff_count="${diff_count:-0}"
-[[ "${diff_count:-0}" -eq 6 ]] || fail "backlog-routing: expected 6 diff sections, got $diff_count (report: $(cat "$rp"))"
-rm -f /tmp/pr-ready-now-1901.log
-end_case backlog-routing
-
-# --- case 25: backlog-catchall -----------------------------------------------------------
-# FINDING[foobar] (unrecognised class) routes via the catch-all to dev-efficiency-backlog.md.
-begin_case
-clean_slots
-_rdate="$(date +%F)"
-rm -f /tmp/pr-ready-now-1901.log
-TMP_LOGS+=("/tmp/pr-ready-now-1901.log")
-printf 'FINDING[foobar]: Unrecognised class routes to catch-all\n' > /tmp/pr-ready-now-1901.log
-out="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" \
-       PR_READY_NOW_DRY_RUN=1 \
-       run_driver --go 2>&1)"; rc=$?
-[[ $rc -eq 0 ]] || fail "backlog-catchall: exit $rc (out: $out)"
-rp="$SCRATCH/pr-firstpass-${_rdate}.md"
-[[ -f "$rp" ]] || fail "backlog-catchall: report not found at $rp"
-grep -qF '### Diff for `dev-efficiency-backlog.md`' "$rp" || \
-    fail "backlog-catchall: dev-efficiency-backlog.md diff section missing (report: $(cat "$rp"))"
-diff_count="$(grep -c '### Diff for' "$rp" 2>/dev/null)"; diff_count="${diff_count:-0}"
-[[ "${diff_count:-0}" -eq 1 ]] || fail "backlog-catchall: expected 1 diff section, got $diff_count"
-rm -f /tmp/pr-ready-now-1901.log
-end_case backlog-catchall
-
-# --- case 26: backlog-security-note ------------------------------------------------------
-# FINDING[security] writes to security.txt (no diff) and appears under ## Security notes.
-begin_case
-clean_slots
-_rdate="$(date +%F)"
-rm -f /tmp/pr-ready-now-1901.log
-TMP_LOGS+=("/tmp/pr-ready-now-1901.log")
-printf 'FINDING[security]: A security issue was found in this PR\n' > /tmp/pr-ready-now-1901.log
-out="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" \
-       PR_READY_NOW_DRY_RUN=1 \
-       run_driver --go 2>&1)"; rc=$?
-[[ $rc -eq 0 ]] || fail "backlog-security-note: exit $rc (out: $out)"
-rp="$SCRATCH/pr-firstpass-${_rdate}.md"
-[[ -f "$rp" ]] || fail "backlog-security-note: report not found at $rp"
-grep -qF '## Security notes' "$rp" || fail "backlog-security-note: no '## Security notes' section"
-grep -qF 'A security issue was found in this PR (PR #1901)' "$rp" || \
-    fail "backlog-security-note: security finding not in security notes section"
-grep -qF '### Diff for' "$rp" && fail "backlog-security-note: unexpected diff section for security finding"
-rm -f /tmp/pr-ready-now-1901.log
-end_case backlog-security-note
-
 # --- case 27: usage-not-truncated --------------------------------------------------------
 # --help output documents all three Phase 8 flags (--pr-attack, --top-n, --wait).
 begin_case
@@ -2692,7 +2623,7 @@ _term_line38="$(grep -n '^[0-9]\+\. \*\*STOP — hard terminator' "$_PRD/_phase7
 [[ -n "$_term_line38" ]] \
     || fail "phase3-terminator-shasum: could not locate STOP hard terminator in _phase7-verdict.md"
 sed -n "${_term_line38}p" "$_PRD/_phase7-verdict.md" | sed 's/^[0-9]\{1,\}\. //' \
-    | shasum | grep -q '3ed36112f052884d86c682df1ae3b63275b78707' \
+    | shasum | grep -q '5e204890bd71f37d56dc755e37aec89ae0df7dd5' \
     || fail "phase3-terminator-shasum: STOP hard terminator content changed — update the pin if intentional"
 end_case phase3-terminator-shasum
 
@@ -2930,8 +2861,6 @@ grep -qF 'No worktree teardown' "$PRD/_phase7-verdict.md" \
   || fail "pr-ready-terminator-still-forbids: 'No worktree teardown' absent from _phase7-verdict.md"
 grep -qF 'No second comment' "$PRD/_phase7-verdict.md" \
   || fail "pr-ready-terminator-still-forbids: 'No second comment' absent from _phase7-verdict.md"
-grep -qF '/backlog-housekeep' "$PRD/_phase7-verdict.md" \
-  || fail "pr-ready-terminator-still-forbids: '/backlog-housekeep' absent from _phase7-verdict.md"
 end_case pr-ready-terminator-still-forbids
 
 # --- case pr-ready-terminator-amendment --------------------------------------------------

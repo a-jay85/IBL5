@@ -83,7 +83,7 @@ type possCouplingArtifact struct {
 // ported (sim/tempo.go, gameloop.go), but the engine ARMS them at ~29% of
 // possessions vs real ~11.5%. That arming-share gap is STILL OPEN at 16.0 — the
 // walkback did not close it and this constant is not a lever on it (measured; see
-// the "Do NOT re-open" list in docs/backlog/jsb-native-backlog.md). The
+// the "Do NOT re-open" list in a-jay85/IBL5-backlog (label: jsb-native)). The
 // dispersion/Cov carriers likewise remain unidentified. See ADR-0085 and the
 // tempo.go const block for the residual RE sub-steps.
 func TestRealArchive_PossessionCoupling(t *testing.T) {

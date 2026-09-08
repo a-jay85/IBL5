@@ -120,7 +120,7 @@ fences) only in the draft-only case where you do print it.
 
 4. **Hard constraints** — ADR references, invariants and orderings to preserve, PII
    boundaries, `auto_merge: false` when the change wants human signoff, whether
-   `/backlog-housekeep` ships with the PR.
+   a resolved GitHub Issue should be closed in this PR (via `gh issue close`).
 
 5. **Blocking questions to resolve inside the plan** — unknowns that *change the
    design*. Mark them "resolve inside the plan"; don't leave them implicit and don't

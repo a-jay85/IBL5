@@ -1,6 +1,6 @@
 ---
 description: Transient request-time DOM state must be undone in htmx:historyRestore and scoped to a data-* marker, because htmx snapshots the DOM between beforeRequest and the swap.
-last_verified: 2026-08-16
+last_verified: 2026-09-08
 ---
 
 # ADR-0103: Repair Transient htmx Request-Time DOM State on History Restore
@@ -36,4 +36,4 @@ Any DOM mutation made in an htmx pre-request handler must be undone in **`htmx:h
 - `ibl5/jslib/htmx-init.js` — the `htmx:beforeRequest` / `htmx:afterRequest` / `htmx:historyRestore` handlers.
 - `ibl5/jslib/trade-submit-guard.js` — the server-disabled button the marker scoping protects.
 - `ibl5/tests/e2e/flows/voting-submission.spec.ts` — regression test pinning the reported defect.
-- `ibl5/docs/backlog/voting-csrf-single-use-post-redisplay.md` — the adjacent CSRF dead-end surfaced by the same report, deferred to a plan.
+- `ibl5/docs/backlog/voting-csrf-single-use-post-redisplay.md` (example) — the adjacent CSRF dead-end surfaced by the same report, deferred to a plan.

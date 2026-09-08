@@ -1,6 +1,6 @@
 ---
 description: Narrows ADR-0001's trait rejection — a single-consumer trait carrying only one entity's own pure field reads is a file split, not composition, and is permitted.
-last_verified: 2026-09-04
+last_verified: 2026-09-08
 ---
 
 # ADR-0119: Entity field-accessor trait splits are not trait composition
@@ -36,4 +36,4 @@ A trait is permitted when **all** of the following hold: it has exactly one cons
 - `ibl5/docs/decisions/0001-interface-driven-architecture.md` — the trait-composition rejection this ADR narrows
 - `ibl5/classes/Player/Player.php` — the consumer; declares the three traits and retains every collaborator-backed method
 - `ibl5/tests/Player/PlayerPublicApiSurfaceTest.php` — pins the public signature surface across the split
-- `ibl5/docs/backlog/maintenance-backlog.md` — item 1.33, the finding this resolves
+- `ibl5/docs/backlog/maintenance-backlog.md` (example) — item 1.33, the finding this resolves

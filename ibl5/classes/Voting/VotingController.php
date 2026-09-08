@@ -39,7 +39,7 @@ class VotingController implements VotingControllerInterface
             // Not "go back": the token is single-use, so the Back page carries the
             // dead one and a resubmit lands right back here. Only a fresh ballot
             // (fresh token) recovers. See
-            // ibl5/docs/backlog/voting-csrf-single-use-post-redisplay.md
+            // a-jay85/IBL5-backlog (label: voting-csrf)
             $responder->html('Invalid or expired form submission. <a href="modules.php?name=Voting">Return to the ballot</a> to start over with a fresh form.');
             \PageLayout\PageLayout::footer();
             return;
@@ -111,7 +111,7 @@ class VotingController implements VotingControllerInterface
             // Not "go back": the token is single-use, so the Back page carries the
             // dead one and a resubmit lands right back here. Only a fresh ballot
             // (fresh token) recovers. See
-            // ibl5/docs/backlog/voting-csrf-single-use-post-redisplay.md
+            // a-jay85/IBL5-backlog (label: voting-csrf)
             $responder->html('Invalid or expired form submission. <a href="modules.php?name=Voting">Return to the ballot</a> to start over with a fresh form.');
             \PageLayout\PageLayout::footer();
             return;

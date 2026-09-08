@@ -1745,10 +1745,10 @@ inner code block
 # unmarked prose form it replaces does not.
 assert_cf "cf-conditional-marker" '## Critical Files
 
-- `ibl5/docs/backlog/README.md` (conditional) — only if the skill'"'"'s op changes it
-- `ibl5/docs/backlog/other.md` — only if the skill'"'"'s op changes it
-' 'EXEMPT:ibl5/docs/backlog/README.md
-MUST_APPEAR:ibl5/docs/backlog/other.md'
+- `ibl5/docs/decisions/README.md` (conditional) — only if the skill'"'"'s op changes it
+- `ibl5/docs/decisions/other.md` — only if the skill'"'"'s op changes it
+' 'EXEMPT:ibl5/docs/decisions/README.md
+MUST_APPEAR:ibl5/docs/decisions/other.md'
 
 # (5) Every canonical marker is recognized, including capitalized.
 assert_cf "cf-all-canonical-markers" '## Critical Files

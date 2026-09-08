@@ -120,7 +120,7 @@ function repoRoot(): string
 }
 
 // ─── ID validation ─────────────────────────────────────────────────────────────
-// Regex lifted verbatim from bin/backlog-open's is_valid_id() awk function.
+// Regex lifted verbatim from bin/backlog's is_valid_id() awk function.
 
 function isValidId(string $s): bool
 {
@@ -129,7 +129,7 @@ function isValidId(string $s): bool
 }
 
 // ─── status detection ─────────────────────────────────────────────────────────
-// Ported from bin/backlog-open's cell_status() awk function.
+// Ported from bin/backlog's cell_status() awk function.
 
 function cellStatus(string $cell): string
 {

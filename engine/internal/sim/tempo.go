@@ -54,7 +54,7 @@ const (
 	// conclusion, not a coincidence. Installed on faithfulness grounds alone: the
 	// fast-class arming-share gap is still open, and this constant is NOT a lever on
 	// it (measured — see the "Do NOT re-open" list in
-	// engine/docs/backlog/jsb-native-backlog.md).
+	// a-jay85/IBL5-backlog (label: jsb-native)).
 )
 
 // possessionTime is the integer seconds ONE POSSESSION removes from the game

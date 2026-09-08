@@ -61,48 +61,30 @@ can carry: fix the reported occurrence, mark the remainder `not fixed — filed`
 and paste this same table into the backlog entry written at step 4. Do not open
 a second backlog item for the remainder.
 
-## Step 3 — Select the backlog file
+## Step 3 — Select the backlog label
 
 Deterministic. Select by the defect class's surface:
 
-- App code / game logic / data model → `ibl5/docs/backlog/maintenance-backlog.md`
-- CI or GitHub Actions → `ibl5/docs/backlog/ci-backlog.md`
-- E2E test quality → `ibl5/docs/backlog/e2e-backlog.md`
-- Accessibility (non-contrast) → `ibl5/docs/backlog/a11y-backlog.md`
-- Accessibility contrast → `ibl5/docs/backlog/a11y-contrast-backlog.md`
-- Token spend / Claude context economy → `ibl5/docs/backlog/token-spend-backlog.md`
-- Developer tooling (inner loop, scripts, worktree) → `ibl5/docs/backlog/dev-efficiency-backlog.md`
-- Autonomous-loop or harness behavior → `ibl5/docs/backlog/loop-engineering-backlog.md`
-
-When the defect class spans surfaces or fits none cleanly, use a standalone item
-(a new file at `ibl5/docs/backlog/<slug>.md`) and add a row to
-`ibl5/docs/backlog/README.md` § Standalone items.
-
-**Prefer an existing LIVE backlog.** Appending to one costs a `last_verified`
-bump on that one file. A new standalone file additionally forces a `README.md`
-row and a second `last_verified` bump — avoid it in `Mode: in-PR`, where the
-edit budget is shared with the fixes.
+- App code / game logic / data model → label: `maintenance`; command: `bin/backlog new maintenance "<title>"`
+- CI or GitHub Actions → label: `ci`; command: `bin/backlog new ci "<title>"`
+- E2E test quality → label: `e2e`; command: `bin/backlog new e2e "<title>"`
+- Accessibility (non-contrast) → label: `a11y`; command: `bin/backlog new a11y "<title>"`
+- Accessibility contrast → label: `a11y`; command: `bin/backlog new a11y "<title>"`
+- Token spend / Claude context economy → label: `token-spend`; command: `bin/backlog new token-spend "<title>"`
+- Developer tooling (inner loop, scripts, worktree) → label: `dev-efficiency`; command: `bin/backlog new dev-efficiency "<title>"`
+- Autonomous-loop or harness behavior → label: `loop-engineering`; command: `bin/backlog new loop-engineering "<title>"`
 
 **Consolidate.** When one invocation produces two or more findings sharing a
-surface, file ONE entry with a combined occurrence table, not N entries. Never
-file zero entries.
+surface, file ONE issue with a combined body, not N issues. Never
+file zero issues.
 
-## Step 4 — Write the backlog entry
+## Step 4 — File the backlog issue
 
-Reuse the target file's existing ID scheme: read the last row's ID and
-increment. `dev-efficiency-backlog.md` uses `E<n>`,
-`loop-engineering-backlog.md` uses `L<n>`, `ci-backlog.md` and
-`maintenance-backlog.md` use `<major>.<minor>`. Never invent a new scheme and
-never renumber existing rows.
+Run `bin/backlog search <keywords>` first — search before filing. If no
+matching open issue exists, run the `bin/backlog new <label> "<title>"` command
+from Step 3. Legacy markdown IDs survive as title prefixes (e.g. `E46: <title>`).
 
-Two edits to the selected file, then one bump:
-
-1. Append one row to its table, matching that file's existing column order
-   exactly (they differ between files — read the header before writing).
-2. Append one prose section, `### <ID> <title>`, carrying all five fields below.
-3. Bump that file's `last_verified:` to today's date.
-
-The five fields:
+The issue body must carry the five fields:
 
 1. **class** — the step 1 sentence, verbatim. Where no class was nameable this
    line reads `class: n/a — <one-line reason>`.
@@ -130,7 +112,7 @@ The five fields:
 The entry must be **self-sufficient**: a later `/plan` reading only this entry
 must be able to build the gate without re-deriving any of the analysis above.
 
-**Do not build the gate now.** Prevention is always a filed backlog item, in
+**Do not build the gate now.** Prevention is always a filed GitHub Issue, in
 both modes. There is deliberately no "prove the gate fires" step, because no
 gate lands in this pass — the ladder-rung choice recorded at field 3 is what a
 later `/plan` consumes in its place.

@@ -3,9 +3,8 @@
 #
 # bin/test-postplan-arm-conditions — regression guard for the /post-plan blocks
 # that must survive being run in their own shell — the Phase 6.5 auto-merge
-# conditions, the Phase 2.5 backlog trigger, and the Phase 6 body-marker
-# preservation blocks (L20: a body rewrite that drops `Depends-on:` silently
-# disarms condition (6)).
+# conditions and the Phase 6 body-marker preservation blocks (L20: a body
+# rewrite that drops `Depends-on:` silently disarms condition (6)).
 # Phase 6.5 conditions call the shared predicate bin/lib/pr-armable.sh
 # (conditions (1) Manual-Testing, (5) golden, (6) Depends-on, (8) feat:, (10) pipeline-authored label OR bug-<id> branch name, (11) unresolved >= 80 findings, (13) slug-drift hold), plus
 # condition (3), the Phase-5.0 conformance gate (no predicate; /tmp state only).
@@ -15,9 +14,7 @@
 # block in its OWN shell after Reading those files. A block that relied on a
 # hoisted `source` or a shared `PR_JSON` from a preamble would have an UNDEFINED
 # predicate function — and for condition (8) that fails OPEN (no BLOCKED line
-# emitted → a feat: PR auto-arms). A Phase 2.5 block that emitted no verdict,
-# or fell through to `none` on a plan-blind code PR, would silently restore the
-# 87%-of-PRs skip this trigger exists to fix. This test runs each block in an
+# emitted → a feat: PR auto-arms). This test runs each block in an
 # isolated `bash -c` against a gh shim and asserts the holds, plus a structural
 # check that every predicate-using block re-`source`s the lib itself.
 #
@@ -116,18 +113,18 @@ run_cond3() {
 
 # run_cond7 <block> <plan-body|""> — run condition (7) in its own shell.
 # Sets PLAN_FILE to a temp file (if plan-body non-empty) or unsets it (no plan -> no hold).
-# PLAN_DIR is always pinned to an empty temp dir: with it unset, resolve_plan_file falls
-# back to the real $HOME/claude-plans and the "no plan file" case picks up the plan of
-# whatever branch the suite happens to be running on.
+# Also sets PLAN_DIR to an empty temp dir when plan-body is empty, so resolve_plan_file
+# cannot find the real branch plan file and silently return BLOCKED.
 run_cond7() {
     local plan_f="$BASE_TMP/c7-plan.md"
-    local empty_dir="$BASE_TMP/c7-empty"
-    rm -f "$plan_f"; mkdir -p "$empty_dir"
+    local empty_dir="$BASE_TMP/c7-empty-plans"
+    mkdir -p "$empty_dir"
+    rm -f "$plan_f"
     if [ -n "$2" ]; then
         printf '%s' "$2" > "$plan_f"
         PLAN_DIR="$empty_dir" PLAN_FILE="$plan_f" bash -c "$1" 2>&1
     else
-        PLAN_DIR="$empty_dir" PLAN_FILE="" bash -c "$1" 2>&1
+        PLAN_FILE="" PLAN_DIR="$empty_dir" bash -c "$1" 2>&1
     fi
 }
 
@@ -266,20 +263,6 @@ assert_block_sources() {
     fi
 }
 
-# run_p25 <block> <changed-paths|__GHFAIL__> <plan-body|""> <bl-dir> — the Phase 2.5
-# block reads `gh pr diff --name-only`, an optional plan file, and $BL_DIR; all
-# three are env-overridable in-block, so supply them from $BASE_TMP and run the
-# block in its OWN fresh shell (the failure model this whole test guards).
-run_p25() {
-    local diff_f="$BASE_TMP/p25-diff.txt" plan_f="$BASE_TMP/p25-plan.md"
-    rm -f "$diff_f" "$plan_f"
-    [ "$2" != "__GHFAIL__" ] && printf '%s' "$2" > "$diff_f"
-    [ -n "$3" ] && printf '%s' "$3" > "$plan_f"
-    PATH="$SHIMD:$PATH" GH_DIFF_FIXTURE="$diff_f" \
-        PLAN_FILE="$plan_f" BL_DIR="$4" \
-        bash -c "$1" 2>&1
-}
-
 # run_markers <before-body-json> <after-body-json> — run the Phase 6 capture block
 # against the body as it stood BEFORE the rewrite, then the verify block against the
 # body as it stands AFTER it, sharing one $MARKERS_FILE. Each block gets its OWN
@@ -350,7 +333,6 @@ B8="$(extract_block '# condition (8)')"
 B10="$(extract_block '# condition (10)')"
 B7="$(extract_block '# condition (7)')"
 B13="$(extract_block '# condition (13)')"
-B25="$(extract_block '# phase 2.5 trigger' "$P25_SKILL")"
 BMC="$(extract_block '# phase 6 body-marker capture' "$P25_SKILL")"
 BMV="$(extract_block '# phase 6 body-marker verify'  "$P25_SKILL")"
 B12="$(extract_block '# condition (12)')"
@@ -366,21 +348,6 @@ assert_self_contained '# condition (10)' "condition (10)"
 assert_self_contained '# condition (11)' "condition (11)"
 assert_block_sources '# condition (7)' "condition (7)" "plan-resolve.sh" "$SKILL"
 assert_block_sources '# condition (13)' "condition (13)" "plan-resolve.sh" "$SKILL"
-
-# The Phase 2.5 failure model: each /post-plan block runs in its own shell, so a
-# block that read Phase 1's $PLAN_FILE without re-deriving it would silently take
-# the C branch on EVERY PR, including plan-present ones.
-# shellcheck disable=SC2016  # grep patterns match literal ${VAR:-...} text in the block
-if [ -z "$B25" ]; then
-    echo "FAIL: phase 2.5 — no block matching '# phase 2.5 trigger' in $P25_SKILL"
-    FAILED=1
-elif printf '%s' "$B25" | grep -q 'plan-resolve.sh' \
-    && printf '%s' "$B25" | grep -q 'BL_DIR="${BL_DIR:-'; then
-    echo "ok: phase 2.5 block sources plan-resolve.sh and re-derives BL_DIR in-block"
-else
-    echo "FAIL: phase 2.5 block does NOT re-derive PLAN_FILE/BL_DIR in-block (cross-shell state = wrong verdict)"
-    FAILED=1
-fi
 
 # --- behavioral: each block, run in isolation, holds correctly ---
 expect_block "(1) HELD manual rows -> BLOCK" BLOCK \
@@ -441,8 +408,8 @@ inner 3-backtick block — fence_len=3 < 4, does NOT close the outer fence
 
 - `bin/check-plan` — add gate [F]
 - `ibl5/schema.sql` (reference)
-- `ibl5/docs/backlog/README.md` (conditional)
-- `ibl5/docs/backlog/other.md` (conditional — only if diff touches it)
+- `ibl5/docs/README.md` (conditional)
+- `ibl5/docs/other.md` (conditional — only if diff touches it)
 - `tools/postplan-harness/harness/planfile.py` (read-only reference)
 - `ibl5/a.php` — add the context menu helper
 - `ibl5/b.php` (reference — pattern to mirror; unchanged)
@@ -699,63 +666,6 @@ expect_block "(10) bare bug-<id> branch -> BLOCK" BLOCK \
     "$(run_isolated "$B10" '{"labels":[],"headRefName":"bug-7"}' '' '')"
 expect_block "(10) bug-pipeline-* human branch -> NONE (digit anchor)" NONE \
     "$(run_isolated "$B10" '{"labels":[],"headRefName":"bug-pipeline-reproduce-gate"}' '' '')"
-
-# --- Phase 2.5 backlog trigger cases ---
-BL_HIT="$(mk_bl_dir hit ibl5/classes/Updater/StandingsUpdater.php)"
-BL_MISS="$(mk_bl_dir miss ibl5/classes/Unrelated.php)"
-BL_EMPTY="$BASE_TMP/bl-empty"
-mkdir -p "$BL_EMPTY"
-BL_NOBL="$(mk_bl_dir nobl ibl5/classes/Updater/StandingsUpdater.php)"
-rm "$BL_NOBL/x-backlog.md"
-
-# Trigger A fires when a backlog file is in the diff; probe does not run.
-expect_p25 'p25_trigger_a' 'A' 'absent' \
-    "$(run_p25 "$B25" "$(printf 'ibl5/docs/backlog/ci-backlog.md\nbin/foo')" '' "$BL_MISS")"
-
-# Trigger B outranks C when both would match.
-expect_p25 'p25_trigger_b_precedence' 'B' 'absent' \
-    "$(run_p25 "$B25" 'bin/foo' "$(printf '## Backlog\n- resolved x')" "$BL_MISS")"
-
-# Trigger C fires on plan-blind PRs with substantive code changes.
-expect_p25 'p25_trigger_c_planblind_code' 'C' 'miss' \
-    "$(run_p25 "$B25" 'ibl5/classes/Updater/StandingsUpdater.php' '' "$BL_MISS")"
-
-# Trigger C also fires on tooling-only diffs (.claude/, bin/).
-expect_p25 'p25_trigger_c_tooling' 'C' 'miss' \
-    "$(run_p25 "$B25" "$(printf '.claude/skills/foo/SKILL.md\nbin/wt-new')" '' "$BL_MISS")"
-
-# Trivial diffs (docs/README/lockfile/workflow only) yield none.
-expect_p25 'p25_trigger_none_trivial' 'none' 'absent' \
-    "$(run_p25 "$B25" "$(printf 'ibl5/docs/x.md\nREADME.md\nibl5/composer.lock\n.github/workflows/tests.yml')" '' "$BL_MISS")"
-
-# backlog/README.md and backlog/archive/* fire neither A nor C.
-expect_p25 'p25_trigger_backlog_readme_archive' 'none' 'absent' \
-    "$(run_p25 "$B25" "$(printf 'ibl5/docs/backlog/README.md\nibl5/docs/backlog/archive/old-backlog.md')" '' "$BL_MISS")"
-
-# gh failure: block must yield none with exit 0, not crash.
-out_ghfail="$(run_p25 "$B25" '__GHFAIL__' '' "$BL_MISS")"
-rc_ghfail=$?
-expect_p25 'p25_trigger_gh_failure' 'none' 'absent' "$out_ghfail"
-if [ "$rc_ghfail" -ne 0 ]; then
-    echo "FAIL: p25_trigger_gh_failure — block exited $rc_ghfail (not 0); gh failure must not abort the block"
-    FAILED=1
-fi
-
-# Probe hit: a changed path named by a backlog entry yields BL_PROBE=hit.
-expect_p25 'p25_probe_hit' 'C' 'hit' \
-    "$(run_p25 "$B25" 'ibl5/classes/Updater/StandingsUpdater.php' '' "$BL_HIT")"
-
-# Probe miss: substantive changes no entry references yield BL_PROBE=miss.
-expect_p25 'p25_probe_miss' 'C' 'miss' \
-    "$(run_p25 "$B25" 'ibl5/classes/Unrelated2.php' '' "$BL_MISS")"
-
-# Probe excludes README.md and archive/: only those name the path → miss.
-expect_p25 'p25_probe_excludes_readme_archive' 'C' 'miss' \
-    "$(run_p25 "$B25" 'ibl5/classes/Updater/StandingsUpdater.php' '' "$BL_NOBL")"
-
-# Empty BL_DIR (glob stays literal) yields miss, not a crash.
-expect_p25 'p25_probe_empty_dir' 'C' 'miss' \
-    "$(run_p25 "$B25" 'ibl5/classes/Updater/StandingsUpdater.php' '' "$BL_EMPTY")"
 
 # --- Phase 6 body-marker preservation (L20) --------------------------------
 # Fixtures: #1100 is OPEN (shim), everything else MERGED, so a preserved

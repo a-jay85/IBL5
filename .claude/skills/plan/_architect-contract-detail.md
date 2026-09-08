@@ -70,19 +70,11 @@ Silence is not coverage, and "we'll see once it's live" is not a plan. Dissolvin
 
 ## Conditional sections
 
-### Backlog — table-status format
+### Backlog — GitHub Issue bookkeeping
 
-For a **table-status** backlog (`maintenance-backlog.md`), the status-update step is **not** a glyph swap. The step must:
+Findings live as GitHub Issues in `a-jay85/IBL5-backlog` (ADR-0121); the in-repo markdown backlog corpus and its table-status format are retired. There is no row to flip, no archive to move an evidence cell into, and no tracking doc to add to **Critical Files** — the bookkeeping is one `gh issue close` call, which is why the parent contract states it in a single bullet.
 
-1. **Remove** the `| <id> | ⬜ Open | … |` row entirely from the per-axis table.
-2. Add `<id>` to that axis's `> ✅ resolved (N): …` (or `> 🚫 declined (N): …`) blockquote above the table header and **increment its `(N)`**.
-3. Move the row's `Evidence / note` cell **verbatim** into `archive/maintenance-backlog-archive.md` under `### <id>` as `**Table evidence (YYYY-MM-DD):** <cell>`.
-
-Quote both the row and the axis's summary line as edit anchors. A resolved row left in a per-axis table fails `bin/check-docs` (`checkMaintenanceResolved`).
-
-Add the tracking doc and the sibling archive to **Critical Files** as change targets — a bare path or a change-description, **never** a `(reference)` marker, since the doc IS edited.
-
-Quote the exact current table row / status line as the edit anchor — find it by running `bin/backlog-open <doc-path>` and Reading its output (redirect to a temp file first for `maintenance-backlog.md`, ~93 KB filtered); the filter emits table rows byte-identically, so a row quoted from its output matches the source file exactly. Fall back to reading the doc directly if the filter errors or the doc is not one of the 8 LIVE backlogs.
+Resolve the Issue number while authoring (`bin/backlog search "<term>"`) and quote it in the step, so the closing call needs no lookup at implementation time.
 
 ### Post-merge — watcher setup procedure
 

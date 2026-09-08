@@ -3,8 +3,8 @@
 # session transcripts. Sums usage tokens per model over a trailing window and
 # prints a markdown table. Companion to the automouse nightly cost roll-up
 # (bin/automouse/run): that measures headless queue spend; this measures the
-# interactive sessions the nightly ledger never sees. See T1 in
-# ibl5/docs/backlog/token-spend-backlog.md.
+# interactive sessions the nightly ledger never sees. Outliers and follow-up
+# tracked as issues under the token-spend label on a-jay85/IBL5-backlog.
 #
 # Usage: bin/token-report [--days N]   # N = trailing days by file mtime, default 7
 #

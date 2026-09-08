@@ -1,6 +1,6 @@
 ---
 description: /pr-ready runtime Phase 6.5 — fix every Phase 6 finding in-PR, commit, re-push, re-arm CI. Loaded by SKILL.md via git show at Phase 6.5.
-last_verified: 2026-09-04
+last_verified: 2026-09-08
 ---
 
 # /pr-ready runtime Phase 6.5 — in-PR remediation
@@ -23,7 +23,7 @@ Every Phase 6 finding gets fixed and its prevention filed, in this PR's existing
 "Never zero entries" binds the findings Phase 6 actually emitted — it does not manufacture one. A Phase 5.9 outcome of `REPLACED`, `APPENDED` or `UNCHANGED` is a routine refresh, not a finding: it produces no remediation entry, no backlog row, and no `last_verified:` bump. Only `AMBIGUOUS` reaches this phase, as the 6d.4 finding it is, and that one does get an entry.
 
    - **Worktree:** this PR's existing one. Never `bin/wt-new`, never a second worktree, never a teardown.
-   - **Backlog:** append the table row and the prose entry to the LIVE backlog file `_remediation.md` step 3 selects, and bump that file's `last_verified:`. Bump no other file's, and do not run the rest of the `/backlog-housekeep` chain. Consolidate findings sharing a surface into one entry.
+   - **Backlog:** run `bin/backlog new <label> "<title>"` for each finding (the `gh issue create` wrapper; search before filing with `bin/backlog search`). Do not run the full `/backlog` chain. Consolidate findings sharing a surface into one issue.
    - **Fifth-file gate — design the handoff before you reach it, not after the denial.** `~/.claude/hooks/plan-gate-edit.sh` Check 1 **denies** the 5th distinct repo file edited on the main thread in one turn. Count the distinct files edited this turn. Before the 5th, route the remaining fixes to **one** `subagent_type: "sonnet-4-6"` sub-agent (omit `model`; `model: "sonnet"` now resolves to Sonnet 5). State the delegate's boundary out loud before spawning: **remaining code fixes and backlog-row appends only — no commit, no push, no auto-merge arming, no worktree change, and no further delegates** (flat fan-out, per the invariants). Exactly one delegate; if its share is still too large, apply the overflow rule rather than spawning a second.
    - **Overflow rule.** Fix what is clearly in scope of this PR; file the remainder as backlog rows marked `not fixed — filed`; say so in the Phase 7 verdict. A `/pr-ready` run never expands into a sweep.
 

@@ -250,7 +250,7 @@ func possession(gs *gameState, offense, defense *teamState, periodIdx int, prev 
 		net := netAdvantage(pt, bh, def, penalty, false, gs.gameType)
 		// Phase 4 stays INERT (J-fgpct-re): the usage-dominance flag is RE-pinned and
 		// MEASURED not to move FG% (fires 0.0005% of slot-evals → +0.01pp, band NOT
-		// closed). Pass [6]bool{} so phase4 == 0 (matchup.go, jsb-native-backlog J-fgpct-re).
+		// closed). Pass [6]bool{} so phase4 == 0 (matchup.go, a-jay85/IBL5-backlog label jsb-native, J-fgpct-re).
 		mq := matchupQuality(bh, defense.players, gs.leagueAST48ByPos, [6]bool{}, [6]bool{})
 
 		// Make/foul/turnover arms route through the gameState freeze wrappers

@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-backlog — offline harness for bin/backlog (all cases use --dry-run).
+set -uo pipefail
+
+PASS=0
+FAIL=0
+FAILURES=()
+
+ok()   { printf '[PASS] %s\n' "$1"; PASS=$((PASS + 1)); }
+fail() { printf '[FAIL] %s\n' "$1"; FAIL=$((FAIL + 1)); FAILURES+=("$1"); }
+want() {
+    local label="$1" output="$2" token="$3"
+    if echo "$output" | grep -qF -- "$token"; then
+        ok "$label"
+    else
+        fail "$label (missing: $token)"
+    fi
+}
+
+SCRIPT="$(cd "$(dirname "$0")" && pwd)/backlog"
+
+# Case 1: --help exits 0 and names the repo
+OUT="$("$SCRIPT" --help 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "--help exits 0" || fail "--help exits 0 (got $RC)"
+want "--help names the repo" "$OUT" "a-jay85/IBL5-backlog"
+
+# Case 2: --dry-run new prints gh issue create with correct flags
+OUT="$("$SCRIPT" --dry-run new ci "x" 2>&1)"; RC=$?
+[ "$RC" -eq 0 ] && ok "--dry-run new exits 0" || fail "--dry-run new exits 0 (got $RC)"
+want "--dry-run new: gh issue create" "$OUT" "gh issue create"
+want "--dry-run new: repo flag" "$OUT" "--repo a-jay85/IBL5-backlog"
+want "--dry-run new: label flag" "$OUT" "--label ci"
+
+# Case 3: unknown subcommand exits non-zero
+"$SCRIPT" bogus-subcommand >/dev/null 2>&1; RC=$?
+[ "$RC" -ne 0 ] && ok "unknown subcommand exits non-zero" || fail "unknown subcommand exits non-zero (got $RC)"
+
+echo ""
+echo "Results: $PASS passed, $FAIL failed"
+if [ "$FAIL" -gt 0 ]; then
+    for f in "${FAILURES[@]}"; do printf '  FAIL: %s\n' "$f"; done
+    exit 1
+fi
+exit 0

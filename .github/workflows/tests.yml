@@ -923,6 +923,8 @@ jobs:
         run: bin/test-automouse-stream-filter
       - name: bin/test-automouse-cost-rows
         run: bin/test-automouse-cost-rows
+      - name: bin/test-automouse-canary
+        run: bin/test-automouse-canary
       - name: bin/test-wt-status
         run: bin/test-wt-status
       - name: bin/test-wt-new-root

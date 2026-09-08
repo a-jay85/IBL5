@@ -997,6 +997,85 @@ write_env_stop_report() {
     } > "$reports_dir/$(date +%Y-%m-%d)-env-stop-$slug.md"
 }
 
+# write_canary_park_report <signal> <detail>
+# Dated report written when the between-plans canary parks the queue. Separate
+# from write_env_stop_report(): at a plan boundary there is no "current plan",
+# so there is no slug and no phase-log tail to attribute the stop to.
+write_canary_park_report() {
+    local signal=$1 detail=$2
+    local reports_dir="$NIGHTLY_DIR/reports"
+    mkdir -p "$reports_dir"
+    local remaining
+    # find exits 0 on empty; ls with a glob does not under set -euo pipefail
+    remaining=$(find "$QUEUE_DIR" -maxdepth 1 -name '*.md' 2>/dev/null | wc -l | tr -d ' ')
+    cat > "$reports_dir/$(date +%Y-%m-%d)-canary-park.md" <<EOF
+# Automouse parked — master health canary failed
+
+**Signal:** $signal
+**Time:** $(date '+%Y-%m-%d %H:%M:%S')
+**Plans completed this run:** $PLANS_RUN
+**Plans left in queue (untouched):** $remaining
+
+## Detail
+
+\`\`\`
+$detail
+\`\`\`
+
+The queue was left intact and no attempt counter was changed. Fix master, then
+re-run \`bin/automouse/run\`, or set \`AUTOMOUSE_SKIP_CANARY=1\` to bypass the
+canary for one run.
+EOF
+}
+
+# run_between_plans_canary
+# Two-signal master health check, run at a plan boundary.
+# Returns: 0 green | 1 CI red, park | 2 CI auth/usage error, env-stop
+#          3 smoke red, park | 4 CI verdict not yet known, proceed with warning
+# Sets CANARY_DETAIL to the text the park report should carry.
+run_between_plans_canary() {
+    local ci_out url
+    local ci_rc=0 smoke_rc=0
+    CANARY_DETAIL=""
+
+    if [ -n "${AUTOMOUSE_SKIP_CANARY:-}" ]; then
+        printf '[%s] canary: skipped (AUTOMOUSE_SKIP_CANARY=1)\n' "$(date +%H:%M:%S)" >> "$LOG"
+        return 0
+    fi
+
+    # Judge the tip the NEXT plan will branch from, not the one this plan did.
+    git -C "$REPO" fetch origin master >> "$LOG" 2>&1 || true
+    git -C "$REPO" merge --ff-only origin/master >> "$LOG" 2>&1 || true
+
+    ci_out=$("$REPO/bin/check-master-ci-green" 2>&1) || ci_rc=$?
+    CANARY_DETAIL="$ci_out"
+    printf '%s\n' "$ci_out" >> "$LOG"
+
+    [ "$ci_rc" -eq 2 ] && return 2
+    if [ "$ci_rc" -ne 0 ]; then
+        # check-master-ci-green exits 1 for three conditions. Only "checks
+        # failed:" is evidence master is poisoned; "checks still running" and
+        # "check-run(s) found" mean the verdict is not known yet, and parking
+        # on those would stall the queue every night a plan auto-merges.
+        case "$ci_out" in
+            *"checks failed:"*) return 1 ;;
+            *) return 4 ;;
+        esac
+    fi
+
+    # Signal 2: the MAIN checkout's stack. docker-compose.yml:67 sets
+    # Host(`main.localhost`) for it; the basename-derived hostname is the
+    # WORKTREE rule and 404s here. Override with AUTOMOUSE_CANARY_URL.
+    url="${AUTOMOUSE_CANARY_URL:-http://main.localhost/ibl5/}"
+    curl -sf --max-time 5 "$url" -o /dev/null || smoke_rc=$?
+    if [ "$smoke_rc" -ne 0 ]; then
+        CANARY_DETAIL="smoke: curl exit $smoke_rc for $url"
+        printf '[%s] canary: %s\n' "$(date +%H:%M:%S)" "$CANARY_DETAIL" >> "$LOG"
+        return 3
+    fi
+    return 0
+}
+
 # Persist a per-attempt failure report for the escalated final retry (ADR-0085).
 # Writes a CAPPED tail of THIS attempt's log slice to a `.failure` sidecar in
 # QUEUE_DIR, a sibling of the `.attempts` counter, so it shares that counter's
@@ -1543,6 +1622,31 @@ PLAN_FILE=$PLAN_NAME" \
     # Single-plan mode: exactly one attempt, then stop — predictable for a
     # watched one-off. A genuine failure does NOT retry to MAX_ATTEMPTS.
     [ -n "${SINGLE_PLAN:-}" ] && break
+
+    # --- Between-plans master health canary dispatch ---
+    # Bottom of the loop body on purpose: it never fires before the first plan
+    # (a cold Docker stack at 01:00 would otherwise park the whole night) and
+    # never fires on an already-drained queue (that would emit a spurious
+    # canary-park report on a clean, successful night).
+    if ls "$QUEUE_DIR"/*.md &>/dev/null; then
+        CANARY_LOG_BEFORE=$(wc -l < "$LOG" 2>/dev/null || echo 0)
+        CANARY_RC=0
+        run_between_plans_canary || CANARY_RC=$?
+        case "$CANARY_RC" in
+            0) : ;;
+            4) printf '[%s] canary: ci-pending — master CI verdict not yet known, proceeding\n' \
+                   "$(date +%H:%M:%S)" >> "$LOG" ;;
+            1) printf '[%s] canary: ci-red — parking, queue left intact\n' "$(date +%H:%M:%S)" >> "$LOG"
+               write_canary_park_report "ci-red" "$CANARY_DETAIL"
+               break ;;
+            3) printf '[%s] canary: smoke-red — parking, queue left intact\n' "$(date +%H:%M:%S)" >> "$LOG"
+               write_canary_park_report "smoke-red" "$CANARY_DETAIL"
+               break ;;
+            2) printf '[%s] canary: ci-auth-error — env stop\n' "$(date +%H:%M:%S)" >> "$LOG"
+               write_env_stop_report "canary" "canary" "CI auth error: $CANARY_DETAIL" "$CANARY_LOG_BEFORE"
+               break ;;
+        esac
+    fi
 done
 
 # Clean up any leftover attempt files for plans that completed

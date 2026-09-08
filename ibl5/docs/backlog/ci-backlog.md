@@ -1,6 +1,6 @@
 ---
 description: CI/GitHub-Actions workflow simplification backlog — duplicated setup/notify boilerplate, job consolidation, and verified-not-redundant workflows, with per-entry status + automouse-readiness.
-last_verified: 2026-09-07
+last_verified: 2026-09-08
 ---
 
 # CI Workflow Simplification Backlog
@@ -270,6 +270,80 @@ Entry 11.1 is a staleness defect surfaced by the 2026-09-07 Phase 6 fidelity rev
 **artifact destination:** `bin/lighthouse-pr-urls` — in-repo
 
 **provenance:** (discovered 2026-09-05 during #1950 CI run — Performance Audit job failed)
+
+---
+
+## Axis 13: Notification-message spin-offs (PR #2183 audit)
+
+Three fidelity-review notes from Phase 5.5 of #2183 (`discord-promote-msg-links`).
+
+| # | Title | Status | Automouse | Effort |
+|---|-------|--------|-----------|-------:|
+| 13.1 | `git log` assignment in `set -e` block could abort on object-lookup failure; missing `|| true` degrade | ✅ fixed this pass | — | XS |
+| 13.2 | PR body Summary omitted layout change and overstated regex scope | ✅ fixed this pass | — | XS |
+| 13.3 | Discord promotion DM has no automated test coverage | 🔜 Open | — | M |
+
+### 13.1 `git log` standalone assignment in `set -e` block — degrade-to-blank omitted
+
+**class:** a standalone shell assignment `VAR="$(cmd)"` in a `set -e` context that converts a tolerated-degrade `cmd` failure into a step abort, where the argument-position form `f "$(cmd)"` previously allowed the failure to degrade quietly.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `.github/workflows/promote-to-production.yml` line 154 — `SUBJECT="$(git log -1 --format=%s "$PROMOTE_SHA")"` | yes | was live | fixed this pass (`|| true` added) |
+
+**prevention_ladder:**
+- rung 0 — no existing gate catches this pattern.
+- rung 1 — an existing shell-lint pass (ShellCheck) could flag bare assignment-RHS substitutions missing `|| true`; ShellCheck SC2155 covers this but is not enabled for workflows.
+- rung 2 — a rule doc noting "standalone `$(cmd)` assignments in `set -e` blocks need `|| true` when cmd failure should degrade".
+- **landing rung:** no gate warranted — the object is guaranteed resolvable in this job (full fetch-depth, master ref); the fix is single-occurrence and applied this pass.
+
+**artifact destination:** n/a — no gate (single occurrence fixed)
+
+**provenance:** (discovered 2026-09-08 during Phase 5.5 fidelity review of #2183; fixed this pass)
+
+---
+
+### 13.2 PR body Summary omitted a user-visible change and overstated regex scope
+
+**class:** a PR body Summary that omits a user-visible rendering change (message line-separator collapse) and overstates a regex's matching scope (claims bare `#N` is linked when only parenthesized `(#N)` form is matched).
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #2183 body — "PR numbers in the message (like #123) become links to the PR" | yes | was live | fixed this pass (bullet tightened; layout change noted) |
+
+**prevention_ladder:**
+- rung 0 — not covered by any existing gate.
+- rung 2 — the Phase 5.5 fidelity reviewer (check 4) is the correct catcher; this entry records the miss so a later `/plan` can ask whether a check-4 pattern is recurrent.
+- **landing rung:** no gate warranted — fidelity review is the gate; this was a one-time body edit and is fixed.
+
+**artifact destination:** n/a — no gate
+
+**provenance:** (discovered 2026-09-08 during Phase 5.5 fidelity review of #2183; fixed this pass)
+
+---
+
+### 13.3 Discord promotion DM has no automated test coverage
+
+**class:** a CI workflow that constructs user-visible notification content with no automated test verifying the constructed message, making regressions observable only in production on the next promotion.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `.github/workflows/promote-to-production.yml` — "Build Discord message" step | yes | live | not fixed — filed |
+
+**prevention_ladder:**
+- rung 0 — no existing test covers the message construction.
+- rung 1 — the step is a shell script; a `bin/test-promote-discord-msg` (example) fixture could exercise the sed transform and printf format with known inputs.
+- **landing rung: rung 1 (extend/add)** — a test fixture for the message-building block. Meets meta-tooling-bar: distinct trigger (notification content, not covered), earns its keep (next format change is invisible until production), no cheaper alternative.
+
+**artifact destination:** `bin/test-promote-discord-msg` (example) — in-repo (to be created)
+
+**provenance:** (discovered 2026-09-08 during Phase 5.5 fidelity review of #2183; not fixed — filed)
 
 ---
 

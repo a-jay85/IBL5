@@ -139,6 +139,8 @@ jobs:
           OUTCOME: ${{ steps.promote.outputs.outcome }}
           PROMOTE_SHA: ${{ github.event.workflow_run.head_sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SERVER_URL: ${{ github.server_url }}
+          REPO: ${{ github.repository }}
           DEPLOY_URL: ${{ steps.deploy_url.outputs.deploy_url }}
           # Race-free fallback when the poll times out. Never fall back to
           # RUN_URL here — that is the promoter's own run, i.e. the exact wrong
@@ -147,9 +149,15 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$OUTCOME" = "promoted" ]; then
+            # Discord renders masked links ([text](url)) in bot-authored messages,
+            # so the short SHA and any trailing (#NNNN) are clickable in place.
+            SUBJECT="$(git log -1 --format=%s "$PROMOTE_SHA" || true)"
+            SUBJECT="$(printf '%s' "$SUBJECT" \
+              | sed -E "s@\(#([0-9]+)\)@([#\1]($SERVER_URL/$REPO/pull/\1))@g")"
             {
-              printf 'Auto-promoted master to production: %s\n\n' "${PROMOTE_SHA:0:11}"
-              printf '%s\n\n' "$(git log -1 --format=%s "$PROMOTE_SHA")"
+              printf 'Auto-promoted master to production: [%s](%s)\n' \
+                     "${PROMOTE_SHA:0:11}" "$SERVER_URL/$REPO/commit/$PROMOTE_SHA"
+              printf '%s\n' "$SUBJECT"
               printf 'Deploy: %s\n' "${DEPLOY_URL:-$CHECKS_URL}"
             } > /tmp/discord-msg.txt
           else

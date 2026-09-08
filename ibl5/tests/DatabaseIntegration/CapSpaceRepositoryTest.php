@@ -68,6 +68,21 @@ class CapSpaceRepositoryTest extends DatabaseTestCase
         }
     }
 
+    public function testGetPlayersUnderContractAfterSeasonExcludesWaivedPlayers(): void
+    {
+        // Waiving leaves teamid intact and only bumps ordinal past JSB::WAIVERS_ORDINAL,
+        // so a waived player must be filtered out here or he keeps eating a roster slot.
+        $this->insertTestPlayer(200100011, 'CapSpace Rostrd', ['teamid' => 1, 'cy' => 1, 'cyt' => 3, 'ordinal' => 5]);
+        $this->insertTestPlayer(200100012, 'CapSpace Waived', ['teamid' => 1, 'cy' => 1, 'cyt' => 3, 'ordinal' => 1000, 'droptime' => 1757000000]);
+
+        $before = count($this->repo->getPlayersUnderContractAfterSeason(1));
+
+        // A second waived player must not change the count.
+        $this->insertTestPlayer(200100013, 'CapSpace Waivd2', ['teamid' => 1, 'cy' => 1, 'cyt' => 3, 'ordinal' => 1000, 'droptime' => 1757000000]);
+
+        self::assertCount($before, $this->repo->getPlayersUnderContractAfterSeason(1));
+    }
+
     // ── Negative paths ──────────────────────────────────────────
 
     public function testGetPlayersUnderContractAfterSeasonReturnsEmptyForUnknownTeam(): void

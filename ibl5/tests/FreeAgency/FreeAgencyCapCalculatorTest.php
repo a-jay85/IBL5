@@ -370,6 +370,78 @@ class FreeAgencyCapCalculatorTest extends TestCase
         $this->assertSame(Team::ROSTER_SPOTS_MAX, $result['rosterSpots'][2]);
     }
 
+    /**
+     * @group cap-calculator
+     * @group waivers
+     */
+    public function testWaivedPlayerFreesRosterSpotButStillCountsAgainstCap(): void
+    {
+        // Waiving only bumps ordinal to 1000 (WaiversRepository::dropPlayerToWaivers);
+        // teamid is untouched, so the player is still in the roster rows.
+        $players = [
+            TestDataFactory::createPlayer([
+                'name' => 'Waived Player',
+                'ordinal' => 1000,
+                'cy' => 0,
+                'salary_yr1' => 500,
+                'salary_yr2' => 0,
+                'salary_yr3' => 0,
+                'salary_yr4' => 0,
+                'salary_yr5' => 0,
+                'salary_yr6' => 0,
+            ]),
+        ];
+
+        $team = $this->createMockTeamEntity();
+        $mockSeason = self::createStub(Season::class);
+        $mockTeamQueryRepo = $this->createMockTeamQueryRepo($players, []);
+        $calculator = new FreeAgencyCapCalculator($this->mockDb, $team, $mockSeason, $mockTeamQueryRepo);
+
+        $result = $calculator->calculateTeamCapMetrics();
+
+        $this->assertSame(
+            Team::ROSTER_SPOTS_MAX,
+            $result['rosterSpots'][0],
+            'A waived player must not occupy a roster spot'
+        );
+        $this->assertSame(
+            500,
+            $result['totalSalaries'][0],
+            'A waived player is dead money — his salary still counts against the cap'
+        );
+    }
+
+    /**
+     * @group cap-calculator
+     * @group waivers
+     */
+    public function testPlayerAtWaiversOrdinalBoundaryStillOccupiesRosterSpot(): void
+    {
+        // ordinal === WAIVERS_ORDINAL is NOT waived; only strictly greater is.
+        $players = [
+            TestDataFactory::createPlayer([
+                'name' => 'Boundary Player',
+                'ordinal' => \JSB::WAIVERS_ORDINAL,
+                'cy' => 0,
+                'salary_yr1' => 500,
+                'salary_yr2' => 0,
+                'salary_yr3' => 0,
+                'salary_yr4' => 0,
+                'salary_yr5' => 0,
+                'salary_yr6' => 0,
+            ]),
+        ];
+
+        $team = $this->createMockTeamEntity();
+        $mockSeason = self::createStub(Season::class);
+        $mockTeamQueryRepo = $this->createMockTeamQueryRepo($players, []);
+        $calculator = new FreeAgencyCapCalculator($this->mockDb, $team, $mockSeason, $mockTeamQueryRepo);
+
+        $result = $calculator->calculateTeamCapMetrics();
+
+        $this->assertSame(Team::ROSTER_SPOTS_MAX - 1, $result['rosterSpots'][0]);
+    }
+
     // Helper Methods
 
     /**

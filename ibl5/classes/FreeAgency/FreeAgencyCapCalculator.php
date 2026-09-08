@@ -129,6 +129,14 @@ class FreeAgencyCapCalculator implements FreeAgencyCapCalculatorInterface
             /** @var PlayerRow $playerRow */
             $player = Player::withPlrRow($this->mysqli_db, $playerRow);
 
+            // Waiving a player leaves teamid intact (WaiversRepository::dropPlayerToWaivers
+            // only bumps ordinal), so waived players are still in $rosterData. They no longer
+            // occupy a roster spot. Their salary still counts against the cap as dead money —
+            // calculateTotalSalaries() deliberately does not apply this filter.
+            if (($player->getOrdinal() ?? 0) > \JSB::WAIVERS_ORDINAL) {
+                continue;
+            }
+
             if (!$player->isPlayerFreeAgent($this->season)) {
                 $futureSalaries = $player->getFutureSalaries();
                 $this->decrementRosterSpotsForSalaries($rosterSpots, $futureSalaries);

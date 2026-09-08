@@ -424,13 +424,16 @@ else
     28672 \
     true
 
-  # Cap is 21504 (21 KB), not the plan's 19456 (19 KB). The plan derived 19 KB from a
-  # section inventory that put "## Required format" at 11,172 B; measured against
-  # bin/fixtures/plan-verification-presplit.md that section is 587 B, so ~10.6 KB of the
-  # assumed movable rationale does not exist. What remains above 19 KB is content the plan
-  # requires to stay verbatim (forced-trigger tables, closed enums, the decision-trigger
-  # table). 29191 B baseline -> 21504 B cap is still a ~26% ratchet, and assertions 1-3
-  # (no-loss, residency, orphan pointers) are what stop a cap met by deleting rules.
+  # Cap is 21504 (21 KB), not the plan's 19456 (19 KB). The plan's movable-rationale
+  # inventory was right: "## Required format" measures 11197 B in
+  # bin/fixtures/plan-verification-presplit.md when its ### subsections are counted with it,
+  # matching the plan's 11,172 B, and that rationale was in fact moved (the block is 4952 B
+  # now). The gap is elsewhere -- the plan put "## Forced integration-verification trigger"
+  # at 5,647 B when it measures 7237 B in the same fixture, and that section is content the
+  # plan requires to stay verbatim. That 1590 B underestimate of protected content exceeds
+  # the 1018 B by which the split file misses 19456. 29191 B baseline -> 21504 B cap is
+  # still a ~26% ratchet, and assertions 1-3 (no-loss, residency, orphan pointers) are what
+  # stop a cap met by deleting rules.
   check_pair \
     "$VERIFICATION_BASELINE" \
     "$VERIFICATION_RULES" \

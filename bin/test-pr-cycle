@@ -378,6 +378,8 @@ grep -qF 'PR_CYCLE_SKIP_READY_WHEN_ARMABLE' <<< "$OUT" \
     || fail "--help omits the PR_CYCLE_SKIP_READY_WHEN_ARMABLE seam"
 grep -qF 'PR_CYCLE_LOG' <<< "$OUT" \
     || fail "--help truncated: the trailing PR_CYCLE_LOG seam line is missing"
+grep -qF 'judged-empty form' <<< "$OUT" \
+    || fail "--help omits the gate-nominee handling note"
 for bad in "--nope" "--max-merges 0" "--max-merges -1" "--max-merges abc" "--max-merges" "--go --stop" \
            "--only" "--only abc" "--only 0" "--only 007" "--only -1" "--only 101 --skip 102" \
            "--skip" "--skip abc" "--skip 1,x"; do
@@ -502,8 +504,11 @@ run --worker
     || fail "first attack call: $(sed -n '1p' "$SCRATCH/attack.argv")"
 [[ "$(sed -n '2p' "$SCRATCH/attack.argv")" == "--work abc123 --gate-edges /dev/null" ]] \
     || fail "second attack call: $(sed -n '2p' "$SCRATCH/attack.argv")"
-grep -qF '#999' <<< "$OUT" || fail "gate nominee was not reported as excluded"
-[[ "$(calls ready)" == "3" ]] || fail "want 3 ready calls after nominee exclusion, got $(calls ready)"
+grep -qF '#999 dangling-gate — ordered with no gate edges (gate nominee, judged-empty)' <<< "$OUT" \
+    || fail "gate nominee log line missing or misworded: $(grep -F '#999' <<< "$OUT")"
+! grep -qF 'excluded this run' <<< "$OUT" \
+    || fail "driver still claims nominees are excluded; --gate-edges /dev/null re-admits every one"
+[[ "$(calls ready)" == "3" ]] || fail "want 3 ready calls after nominee re-admission, got $(calls ready)"
 end_case "case 6 gate nominees"
 
 # ==========================================================================================

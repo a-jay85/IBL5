@@ -42,3 +42,16 @@ def test_existing_codes_unchanged_without_fidelity_pending():
     for t in (TerminalState.SHIPPED_ARMED, TerminalState.SHIPPED_HELD,
               TerminalState.NOTHING_TO_SHIP):
         assert runner.exit_code_for(_res(t)) == 0
+
+def test_degraded_exits_zero():                 # no /post-plan skill fallback on a shipped+held PR
+    assert runner.exit_code_for(_res(TerminalState.DEGRADED)) == 0
+
+def test_degraded_does_not_shadow_rebase_sentinel():   # negative: ordering, not a duplicate
+    assert runner.exit_code_for(_res(TerminalState.FAILED, "rebase-conflict")) == 3
+
+def test_degraded_beats_fidelity_pending():
+    """A live degraded run is ALSO fidelity_pending (condition (12) always holds live).
+    Exit 0, not 4: the resumed skill session re-arms from scratch and cannot see the
+    degradation, so handing it off would arm auto-merge on an unreviewed PR."""
+    assert runner.exit_code_for(
+        _res(TerminalState.DEGRADED, fidelity_pending=True)) == 0

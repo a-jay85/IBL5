@@ -49,6 +49,10 @@
 #   PR_CYCLE_POLL_INTERVAL   Seconds between merge polls.     Default: 60
 #   PR_CYCLE_POLL_CEILING    Seconds to wait per PR.          Default: 2700
 #   PR_CYCLE_RESCUE          0 disables DIRTY-PR rescue.      Default: 1 (enabled)
+#   PR_CYCLE_SKIP_READY_WHEN_ARMABLE
+#                            0 disables the pr-ready skip. The skip needs BOTH: the ARMABLE
+#                            bucket AND a /pr-ready READY verdict over the head's current
+#                            tree. Default: 1 (enabled)
 #   PR_CYCLE_LEDGER          Merge digest ledger path.        Default: $HOME/IBL5-merge-digest.md
 #   PR_CYCLE_STOP_FILE       Stop file path.                  Default: $HOME/.ibl5-pr-cycle.stop
 #   PR_CYCLE_NOW             Pin the ledger timestamp (tests). Unset = current UTC time.
@@ -109,6 +113,7 @@ PR_CYCLE_MAIN_CHECKOUT="${PR_CYCLE_MAIN_CHECKOUT:-/Users/ajaynicolas/GitHub/IBL5
 PR_CYCLE_POLL_INTERVAL="${PR_CYCLE_POLL_INTERVAL:-60}"
 PR_CYCLE_POLL_CEILING="${PR_CYCLE_POLL_CEILING:-2700}"
 PR_CYCLE_RESCUE="${PR_CYCLE_RESCUE:-1}"
+PR_CYCLE_SKIP_READY_WHEN_ARMABLE="${PR_CYCLE_SKIP_READY_WHEN_ARMABLE:-1}"
 PR_CYCLE_LEDGER="${PR_CYCLE_LEDGER:-$HOME/IBL5-merge-digest.md}"
 PR_CYCLE_STOP_FILE="${PR_CYCLE_STOP_FILE:-$HOME/.ibl5-pr-cycle.stop}"
 PR_CYCLE_NOW="${PR_CYCLE_NOW:-}"
@@ -471,6 +476,109 @@ _slot_held() {
 # Phase 3 — ready, then arm
 # ==========================================================================================
 
+# _precheck_bucket N — echo PR N's current bucket, or "" when it cannot be determined.
+# Read-only: this invocation deliberately omits --arm, so it reports and changes nothing.
+# Never sets HALT and never returns non-zero: an unknown bucket must fall through to the
+# normal readying path, so every failure mode here degrades to "" (= do not skip).
+_precheck_bucket() {
+    _pn="$1"
+    set +e
+    "$PR_CYCLE_TRIAGE_CMD" > "$RUNDIR/precheck-$_pn.txt" 2> "$RUNDIR/precheck-$_pn.err"
+    _prc=$?
+    set -e
+    [ "$_prc" -ne 0 ] && { echo ""; return 0; }
+    # Fixed-width columns separated by 2+ spaces — the consumer contract documented in
+    # bin/pr-triage. exit after the first match: one row per PR.
+    awk -F"  +" -v pr="#$_pn" '$1 == pr { print $2; exit }' "$RUNDIR/precheck-$_pn.txt"
+    return 0
+}
+
+# _precheck_verdict N — echo READY when PR N carries a /pr-ready sticky verdict that is
+# BOTH a READY verdict AND still describes the PR head's current tree. Echo "" otherwise.
+#
+# ARMABLE alone is NOT evidence that /pr-ready ever ran. The `pr_manual_testing_clearance`
+# predicate bin/pr-triage sources greps the PR *body* for "No manual testing needed", and
+# `/post-plan` writes that sentinel when it opens the PR — so a brand-new chore: PR with
+# green CI is ARMABLE minutes later, having never been readied once. The two verdicts
+# share only those six hold predicates: ARMABLE adds merge-state and checks-green, READY
+# adds rebase currency, plan-fidelity review and remediation. Neither verdict contains the
+# other, so both are required before a readying session may be declined.
+#
+# This function reaches the clearance signal only through bin/pr-triage's report, never by
+# sourcing the shared predicate library itself — the boundary static guard
+# `g_no_armable_lib` in bin/test-pr-cycle enforces.
+#
+# The tree comparison is load-bearing, not belt-and-braces. The sticky comment is edited
+# in place and therefore renders at its original timeline position forever, above every
+# commit that has landed since (_phase7-verdict.md records PR #2083: verdict written, then
+# six further commits, comment untouched). A bare "the comment says READY" test honours a
+# verdict for a tree that no longer exists.
+#
+# Read-only, and fails toward running /pr-ready in every arm: a failed gh call, no sticky
+# comment, a missing or malformed tree line, an unresolvable head tree, a tree mismatch,
+# and a NOT READY verdict all echo "". Never sets HALT and never returns non-zero.
+_precheck_verdict() {
+    _vn="$1"
+
+    set +e
+    "$PR_CYCLE_GH_CMD" pr view "$_vn" --json comments,headRefOid \
+        > "$RUNDIR/verdict-$_vn.json" 2> "$RUNDIR/verdict-$_vn.err"
+    _vrc=$?
+    set -e
+    [ "$_vrc" -ne 0 ] && { echo ""; return 0; }
+
+    # The LAST sticky comment wins — the same rule _digest_row applies, and for the same
+    # reason: /pr-ready rewrites the comment across phases.
+    _vbody="$(jq -r '[.comments[]? | select((.body // "") | contains("<!-- pr-ready-verdict -->"))] | last | .body // ""' \
+        "$RUNDIR/verdict-$_vn.json" 2>/dev/null || true)"
+    [ -n "$_vbody" ] || { echo ""; return 0; }
+    printf '%s\n' "$_vbody" | tr -d '\r' > "$RUNDIR/verdict-body-$_vn.md"
+
+    # Line 1 only, exactly 40 lowercase hex, nothing else on the line — the identical
+    # anchored shape .claude/skills/pr-ready/scripts/skip-review.sh matches, so this skip
+    # and /pr-ready's own Phase 6 skip agree by construction rather than by coincidence.
+    # A verdict written before that contract line existed simply has no match here, which
+    # is the safe direction.
+    _vtree="$(sed -n '1s/^\*\*Reviewed tree:\*\* \([0-9a-f]\{40\}\)$/\1/p' \
+        "$RUNDIR/verdict-body-$_vn.md")"
+    [ -n "$_vtree" ] || { echo ""; return 0; }
+
+    _void="$(jq -r '.headRefOid // ""' "$RUNDIR/verdict-$_vn.json" 2>/dev/null || true)"
+    [ -n "$_void" ] || { echo ""; return 0; }
+
+    # The head's TREE, not its commit: a rebase that changes no content leaves the tree
+    # equal, and that is exactly the case the skip is for.
+    set +e
+    "$PR_CYCLE_GH_CMD" api "repos/{owner}/{repo}/git/commits/$_void" --jq .tree.sha \
+        > "$RUNDIR/verdict-tree-$_vn.txt" 2> "$RUNDIR/verdict-tree-$_vn.err"
+    _vrc=$?
+    set -e
+    [ "$_vrc" -ne 0 ] && { echo ""; return 0; }
+    _vcur="$(tr -d ' \r\n' < "$RUNDIR/verdict-tree-$_vn.txt")"
+    [ -n "$_vcur" ] || { echo ""; return 0; }
+    [ "$_vcur" = "$_vtree" ] || { echo ""; return 0; }
+
+    # The verdict line, matched ANCHORED and taking the LAST match. /pr-ready's own body
+    # narrates its Phase 6 findings in prose, so a body-wide grep is wrong in both
+    # directions: real READY verdicts carry lines like "Phase 6 returned **NOT READY**"
+    # (PR #2144) and "**Initial verdict: NOT READY**" (PR #2160) describing findings that
+    # remediation then fixed. Only a line whose entire content — after stripping markdown
+    # emphasis, heading hashes and backticks — begins with the bare word READY or NOT
+    # READY is the verdict itself. Verified against the three live shapes: `READY`
+    # (#2160), `**READY** (after Phase 6.5 remediation; ...)` (#2144), `### READY`
+    # (#2141), and against the narrating lines above, which this excludes.
+    _vline="$(sed 's/[*`#]//g; s/^[[:space:]]*//; s/[[:space:]]*$//' \
+        "$RUNDIR/verdict-body-$_vn.md" \
+        | grep -E '^(NOT )?READY([[:space:]]|$)' | tail -1)"
+    [ -n "$_vline" ] || { echo ""; return 0; }
+    case "$_vline" in
+        "NOT READY"*) echo ""; return 0 ;;
+    esac
+
+    echo "READY"
+    return 0
+}
+
 # _ready_pr N — run one readying session to completion. Returns non-zero (with HALT set)
 # on failure OR on a --wait timeout.
 _ready_pr() {
@@ -811,7 +919,28 @@ _worker() {
         echo "$_n" >> "$RUNDIR/tried.txt"
         echo "--- #$_n (needs you? ${ATTACK_NEEDS:-?})"
 
-        _ready_pr "$_n" || break
+        # Decline the 20-40 minute readying session only when BOTH hold: the PR is in the
+        # terminal bucket, and /pr-ready has already returned READY over this exact tree.
+        # Neither alone is sufficient — see _precheck_verdict for why ARMABLE does not
+        # imply a READY verdict, and why a READY verdict does not imply it is current.
+        # Fails toward running pr-ready: any unknown bucket, non-zero triage exit, closed
+        # PR, absent or stale verdict reads as "" and the session runs as before.
+        _skip_ready=0
+        if [ "$PR_CYCLE_SKIP_READY_WHEN_ARMABLE" != "0" ]; then
+            _pre="$(_precheck_bucket "$_n")"
+            if [ "$_pre" = "ARMABLE" ]; then
+                _vpre="$(_precheck_verdict "$_n")"
+                if [ "$_vpre" = "READY" ]; then
+                    _skip_ready=1
+                    echo "#$_n — already ARMABLE with a current READY verdict, skipping pr-ready"
+                else
+                    echo "#$_n — ARMABLE but no current READY verdict, running pr-ready"
+                fi
+            fi
+        fi
+        if [ "$_skip_ready" -eq 0 ]; then
+            _ready_pr "$_n" || break
+        fi
         _arm_and_classify "$_n" || break
 
         if [ "$BUCKET" = "ARMABLE" ]; then
@@ -979,7 +1108,7 @@ _launch() {
         for _v in PR_CYCLE_ATTACK_CMD PR_CYCLE_TRIAGE_CMD PR_CYCLE_READY_CMD \
                   PR_CYCLE_DM_CMD PR_CYCLE_GH_CMD PR_CYCLE_MAIN_CHECKOUT \
                   PR_CYCLE_POLL_INTERVAL PR_CYCLE_POLL_CEILING \
-                  PR_CYCLE_RESCUE \
+                  PR_CYCLE_RESCUE PR_CYCLE_SKIP_READY_WHEN_ARMABLE \
                   PR_CYCLE_LEDGER PR_CYCLE_STOP_FILE; do
             eval "_val=\${$_v}"
             printf 'export %s=%q\n' "$_v" "$_val"

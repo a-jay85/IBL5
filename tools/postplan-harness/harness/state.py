@@ -114,6 +114,9 @@ class PlanInfo:
     hold_justification: str = ""
     variant_selection: Optional[str] = None            # "highest" when multi-variant selection ran
     rejected: list[str] = field(default_factory=list)  # basenames of non-selected candidates
+    stop_condition: str = ""                                  # "" = absent
+    evidence: list[str] = field(default_factory=list)         # [] = absent
+    contract_error: str = ""                                  # "" = well-formed or absent
     slug_drift: str = ""   # basename adopted by prefix-drift resolution (branch slug != filename stem)
 
 

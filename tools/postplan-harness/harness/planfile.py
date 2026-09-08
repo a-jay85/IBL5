@@ -43,6 +43,8 @@ EXEMPT_RE = re.compile(
 _MATRIX_HEADER = re.compile(r"^\s*\|.*Test type", re.IGNORECASE)
 _SECURITY_H = re.compile(r"^#+ *Security", re.IGNORECASE)
 _REUSE = re.compile(r"Reuse", re.IGNORECASE)
+_LEGAL_STOP_CONDITIONS = ("tests-green", "evidence-present")
+_EVIDENCE_TOKEN = re.compile(r"^[A-Za-z0-9._/-]+$")
 
 
 def frontmatter_auto_merge_false(content: str) -> bool:
@@ -57,6 +59,55 @@ def frontmatter_auto_merge_false(content: str) -> bool:
         if m:
             return m.group(1).strip() == "false"
     return False
+
+
+def frontmatter_autonomy_contract(content: str) -> tuple[str, list[str], str]:
+    """(stop_condition, evidence_tokens, error) from line-1 YAML frontmatter only
+    (a body documenting the syntax can't self-select).
+
+    error == "" means well-formed OR entirely absent. Mirror of the shell single
+    source of truth, bin/lib/plan-autonomy-contract; pinned by
+    tests/test_planfile.py::test_contract_lib_sync.
+    """
+    lines = content.splitlines()
+    if not lines or not re.match(r"^---\s*$", lines[0]):
+        return ("", [], "")
+    sc_raw = None   # None = absent, "" = present-but-empty, other = value
+    ev_raw = None   # None = absent, "" = present-but-empty, other = value
+    for line in lines[1:]:
+        if re.match(r"^---\s*$", line):
+            break
+        m = re.match(r"^stop_condition:\s*(.*?)\s*$", line)
+        if m and sc_raw is None:
+            sc_raw = m.group(1)
+        m = re.match(r"^evidence:\s*(.*?)\s*$", line)
+        if m and ev_raw is None:
+            ev_raw = m.group(1)
+    # both absent → well-formed absence
+    if sc_raw is None and ev_raw is None:
+        return ("", [], "")
+    # exactly one present (including present-but-empty) → unit error
+    if (sc_raw is None) != (ev_raw is None):
+        return ("", [], "stop_condition:/evidence: — the two fields are a unit")
+    # normalise: remove all whitespace
+    sc_norm = re.sub(r"\s", "", sc_raw)
+    ev_norm = re.sub(r"\s", "", ev_raw)
+    # validate stop_condition enum
+    if sc_norm not in _LEGAL_STOP_CONDITIONS:
+        return ("", [], f"stop_condition: '{sc_norm}' is not a legal value")
+    # split evidence on comma, drop empty tokens
+    tokens = [t for t in ev_norm.split(",") if t]
+    if not tokens:
+        return ("", [], "evidence: is empty")
+    # validate each token
+    for t in tokens:
+        if t.startswith("/") or t.startswith("-"):
+            return ("", [], f"evidence: token '{t}' is not a repo-relative path")
+        if ".." in t.split("/"):
+            return ("", [], f"evidence: token '{t}' is not a repo-relative path")
+        if not _EVIDENCE_TOKEN.match(t):
+            return ("", [], f"evidence: token '{t}' is not a repo-relative path")
+    return (sc_norm, tokens, "")
 
 
 def _section(content: str, heading_re: str) -> str:
@@ -340,6 +391,7 @@ def locate_plan(slug: str, plans_dir: str | None = None, explicit_path: str | No
             content = fh.read()
     info.found = True
     info.auto_merge_false = frontmatter_auto_merge_false(content)
+    info.stop_condition, info.evidence, info.contract_error = frontmatter_autonomy_contract(content)
     info.has_matrix = any(_MATRIX_HEADER.match(l) for l in content.splitlines())
     info.has_security = any(_SECURITY_H.match(l) for l in content.splitlines())
     info.has_reuse = bool(_REUSE.search(content))

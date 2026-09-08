@@ -10,7 +10,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import conformance
 from harness.planfile import (EXEMPT_RE, _strip_fenced, frontmatter_auto_merge_false,
-                              locate_plan, parse_critical_files, parse_matrix,
+                              frontmatter_autonomy_contract, locate_plan,
+                              parse_critical_files, parse_matrix,
                               parse_required_test_methods)
 from harness.state import PlanInfo, RunResult
 
@@ -808,3 +809,227 @@ def test_real_path_lands_in_planned():
     planned, _ = parse_matrix(plan)
     assert "ibl5/tests/e2e/admin/events.spec.ts" in planned
     assert "tools/postplan-harness/tests/test_planfile.py" in planned
+
+
+# ---------------------------------------------------------------------------
+# Phase 7 (autonomy-contract) -- frontmatter parser, mirror sync, enforcement
+# ---------------------------------------------------------------------------
+
+AUTONOMY_CONTRACT_LIB = os.path.join(REPO_ROOT, "bin", "lib", "plan-autonomy-contract")
+
+# Shared fixture list used by both the sect-7a individual tests and the sect-7b sync sweep.
+# Each tuple: (content, label, expected_sc, expected_err_nonempty_when_malformed)
+# expected_err_nonempty_when_malformed=None means well-formed (error == "")
+_CONTRACT_SYNC_FIXTURES = [
+    # absent -> silent
+    ("---\nimpl_model: sonnet\n---\n# Plan\n",
+     "absent-only-impl-model", "", None),
+    # body prose with no frontmatter -- NR==1 guard prevents self-selection
+    ("# Docs\n\nstop_condition: whenever\nevidence: some/path\n",
+     "body-prose-no-frontmatter", "", None),
+    # well-formed: tests-green, two tokens
+    ("---\nstop_condition: tests-green\nevidence: a/b, c/d\n---\n# Plan\n",
+     "tests-green-two-token", "tests-green", None),
+    # well-formed: evidence-present, single token
+    ("---\nstop_condition: evidence-present\nevidence: tools/check.sh\n---\n# Plan\n",
+     "evidence-present-single", "evidence-present", None),
+    # malformed: empty stop_condition
+    ("---\nstop_condition:\nevidence: ibl5/foo.php\n---\n# Plan\n",
+     "empty-stop-condition", "", "not a legal value"),
+    # malformed: stop_condition without evidence
+    ("---\nstop_condition: tests-green\n---\n# Plan\n",
+     "stop-condition-alone", "", "unit"),
+    # malformed: evidence without stop_condition
+    ("---\nevidence: ibl5/foo.php\n---\n# Plan\n",
+     "evidence-alone", "", "unit"),
+    # malformed: absolute path token
+    ("---\nstop_condition: tests-green\nevidence: /etc/passwd\n---\n# Plan\n",
+     "evidence-absolute-path", "", "repo-relative"),
+    # malformed: path traversal token
+    ("---\nstop_condition: tests-green\nevidence: ../../etc/passwd\n---\n# Plan\n",
+     "evidence-path-traversal", "", "repo-relative"),
+    # malformed: shell metacharacter in token (semicolon)
+    ("---\nstop_condition: tests-green\nevidence: bin/x; rm -rf /\n---\n# Plan\n",
+     "evidence-shell-metachar", "", "repo-relative"),
+    # malformed: empty evidence field after whitespace stripping
+    ("---\nstop_condition: tests-green\nevidence:\n---\n# Plan\n",
+     "empty-evidence", "", "empty"),
+]
+
+
+# sect-7a -- Parser unit tests
+
+
+def test_contract_absent_fields_silent():
+    """No stop_condition/evidence -> full tuple is ("", [], "")."""
+    content = "---\nimpl_model: sonnet\n---\n# Plan\n"
+    assert frontmatter_autonomy_contract(content) == ("", [], "")
+
+
+def test_contract_parses_well_formed():
+    """Well-formed pair returns normalised stop_condition, token list, no error."""
+    content = "---\nstop_condition: tests-green\nevidence: a/b, c/d\n---\n# Plan\n"
+    sc, tokens, err = frontmatter_autonomy_contract(content)
+    assert sc == "tests-green"
+    assert tokens == ["a/b", "c/d"]
+    assert err == ""
+
+
+def test_contract_evidence_present_single_token():
+    """evidence-present with a single token round-trips correctly."""
+    content = "---\nstop_condition: evidence-present\nevidence: tools/check.sh\n---\n# Plan\n"
+    sc, tokens, err = frontmatter_autonomy_contract(content)
+    assert sc == "evidence-present"
+    assert tokens == ["tools/check.sh"]
+    assert err == ""
+
+
+def test_contract_body_prose_does_not_self_select():
+    """Fields in the body (not frontmatter) are silently ignored -- NR==1 guard."""
+    content = "# Docs\n\nstop_condition: whenever\nevidence: some/path\n"
+    assert frontmatter_autonomy_contract(content) == ("", [], "")
+
+
+def test_contract_present_but_empty_stop_condition_flagged():
+    """stop_condition: (empty) with evidence present -> enum error (not a legal value)."""
+    content = "---\nstop_condition:\nevidence: ibl5/foo.php\n---\n# Plan\n"
+    _, _, err = frontmatter_autonomy_contract(content)
+    assert "not a legal value" in err
+
+
+@pytest.mark.parametrize("content,label", [
+    ("---\nstop_condition: tests-green\n---\n# Plan\n", "stop_condition-alone"),
+    ("---\nevidence: ibl5/foo.php\n---\n# Plan\n", "evidence-alone"),
+])
+def test_contract_unpaired_field_flagged(content, label):
+    """Either field alone (without its partner) -> paired-unit error."""
+    _, _, err = frontmatter_autonomy_contract(content)
+    assert "unit" in err, f"expected unit error for {label!r}, got {err!r}"
+
+
+@pytest.mark.parametrize("content,label", [
+    ("---\nstop_condition: tests-green\nevidence: /etc/passwd\n---\n# Plan\n",
+     "absolute-path"),
+    ("---\nstop_condition: tests-green\nevidence: ../../etc/passwd\n---\n# Plan\n",
+     "path-traversal"),
+    ("---\nstop_condition: tests-green\nevidence: bin/x; rm -rf /\n---\n# Plan\n",
+     "shell-metachar"),
+    ("---\nstop_condition: tests-green\nevidence:\n---\n# Plan\n",
+     "empty-evidence"),
+])
+def test_contract_malformed_evidence_token_flagged(content, label):
+    """Illegal evidence tokens are rejected with an error (not silently accepted)."""
+    _, _, err = frontmatter_autonomy_contract(content)
+    assert err != "", f"expected error for {label!r}, got empty string"
+
+
+# sect-7b -- Shell/Python mirror sync test
+
+
+def test_contract_lib_sync(tmp_path):
+    """Python parser and bin/lib/plan-autonomy-contract classify identically."""
+    if not os.path.isfile(AUTONOMY_CONTRACT_LIB):
+        pytest.skip("plan-autonomy-contract lib not found: " + AUTONOMY_CONTRACT_LIB)
+    if not os.access(AUTONOMY_CONTRACT_LIB, os.X_OK):
+        pytest.skip("plan-autonomy-contract not executable: " + AUTONOMY_CONTRACT_LIB)
+
+    for content, label, _expected_sc, _expected_err in _CONTRACT_SYNC_FIXTURES:
+        f = tmp_path / f"{label}.md"
+        f.write_text(content)
+        proc = subprocess.run(
+            [AUTONOMY_CONTRACT_LIB, str(f)],
+            capture_output=True, text=True,
+        )
+        assert proc.returncode in (0, 1), (
+            f"unexpected rc={proc.returncode} for '{label}': stderr={proc.stderr!r}")
+        _, _, py_err = frontmatter_autonomy_contract(content)
+        shell_ok = proc.returncode == 0
+        py_ok = py_err == ""
+        assert shell_ok == py_ok, (
+            f"classification divergence on '{label}': "
+            f"shell rc={proc.returncode}, python err={py_err!r}")
+
+
+# sect-7c -- conformance.check enforcement tests
+
+
+def test_conformance_contract_absent_is_noop():
+    """Plans with no autonomy contract never emit UNMET-CONTRACT items."""
+    # Matrix-less, no contract -> always []
+    plan_no_matrix = PlanInfo(found=True, has_matrix=False)
+    assert conformance.check(plan_no_matrix, []) == []
+
+    # Matrix present, no contract -> same behaviour as before this PR (existing PLAN fixture)
+    plan_with_matrix = locate_plan("x", content_override=PLAN)
+    all_present = conformance.check(plan_with_matrix, [
+        "ibl5/tests/Unit/EventLoggerTest.php",
+        "ibl5/tests/e2e/admin/events.spec.ts",
+        "ibl5/classes/EventLogger.php",
+    ])
+    assert all_present == []
+    one_missing = conformance.check(plan_with_matrix, ["ibl5/classes/EventLogger.php"])
+    assert len(one_missing) == 2 and all(m.startswith("MISSING:") for m in one_missing)
+    assert not any("UNMET-CONTRACT:" in m for m in one_missing)
+
+
+def test_conformance_tests_green_clean_on_pass():
+    """tests-green + evidence in diff + phase5_status='pass' -> []."""
+    plan = PlanInfo(found=True, stop_condition="tests-green", evidence=["ibl5/foo.php"])
+    items = conformance.check(plan, ["ibl5/foo.php"], phase5_status="pass")
+    assert items == []
+
+
+@pytest.mark.parametrize("phase5_status", ["fail", "skipped", None])
+def test_conformance_tests_green_holds_on_skipped_and_none(phase5_status):
+    """tests-green contract holds when phase5_status is not 'pass'.
+
+    Seam: an == 'fail' implementation passes only the 'fail' case and silently
+    no-ops 'skipped' and None. This parametrized test is the only guard between
+    the feature and a plausible-looking no-op.
+    """
+    plan = PlanInfo(found=True, stop_condition="tests-green", evidence=["ibl5/foo.php"])
+    items = conformance.check(plan, ["ibl5/foo.php"], phase5_status=phase5_status)
+    unmet = [i for i in items if i.startswith("UNMET-CONTRACT: stop_condition")]
+    assert len(unmet) == 1, (
+        f"expected 1 UNMET-CONTRACT: stop_condition item for {phase5_status=}, "
+        f"got {items!r}")
+
+
+def test_conformance_evidence_present_ignores_phase5():
+    """evidence-present + evidence in diff + any phase5_status -> []."""
+    plan = PlanInfo(found=True, stop_condition="evidence-present", evidence=["tools/check.sh"])
+    items = conformance.check(plan, ["tools/check.sh"], phase5_status=None)
+    assert items == []
+
+
+def test_conformance_evidence_missing_holds_without_matrix():
+    """has_matrix=False + evidence token absent from diff -> UNMET-CONTRACT: evidence item.
+
+    Pins that _contract_items runs above the has_matrix early return in check().
+    """
+    plan = PlanInfo(found=True, has_matrix=False,
+                    stop_condition="evidence-present", evidence=["ibl5/foo.php"])
+    items = conformance.check(plan, [], phase5_status=None)
+    unmet = [i for i in items if "UNMET-CONTRACT: evidence" in i]
+    assert len(unmet) == 1, f"expected 1 UNMET-CONTRACT: evidence item, got {items!r}"
+
+
+def test_conformance_evidence_substring_does_not_satisfy():
+    """evidence token 'bin/x' is not discharged by a diff containing 'bin/xylophone'."""
+    plan = PlanInfo(found=True, stop_condition="evidence-present", evidence=["bin/x"])
+    items = conformance.check(plan, ["bin/xylophone"], phase5_status=None)
+    unmet = [i for i in items if "UNMET-CONTRACT: evidence" in i]
+    assert len(unmet) == 1, (
+        f"expected evidence to hold against substring match, got {items!r}")
+
+
+def test_conformance_malformed_contract_single_item():
+    """contract_error set -> exactly one UNMET-CONTRACT: malformed item; evidence loop skipped."""
+    plan = PlanInfo(found=True,
+                    contract_error="stop_condition:/evidence: -- the two fields are a unit",
+                    evidence=["ibl5/missing.php"])
+    items = conformance.check(plan, [], phase5_status=None)
+    assert len(items) == 1
+    assert items[0].startswith("UNMET-CONTRACT: malformed")
+    # Pin that the evidence loop did not execute alongside the malformed item.
+    assert not any("never appeared in the diff" in i for i in items)

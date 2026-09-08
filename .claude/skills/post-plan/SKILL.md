@@ -281,13 +281,15 @@ Each Bash tool call runs in a fresh shell, so the classification flags are **not
 
 ## Phase 5: Final Verification
 
-### Phase 5.0: Plan→test & Plan→file conformance — skip if `PLAN_FOUND=none` or `! $HAS_MATRIX`
+### Phase 5.0: Plan→test, Plan→file & autonomy-contract conformance — skip if `PLAN_FOUND=none`; the matrix-derived sub-checks additionally skip if `! $HAS_MATRIX`
+
+**Autonomy-contract sub-check (5.0d):** when the plan declares the optional line-1 `stop_condition:` / `evidence:` pair, each unmet part emits an `UNMET-CONTRACT:` item into the same UNRESOLVED bridge file the three labels above use, so it blocks Phase 6.5 arming through existing condition (3) — no new condition. This sub-check is gated on `$PLAN_FOUND` alone and runs **even when `! $HAS_MATRIX`**, because a docs/tooling plan declaring `stop_condition: evidence-present` is precisely the case the matrix-derived checks skip. A malformed contract holds rather than being skipped.
 
 **INLINE invariant — Critical-Files must-appear rule (do NOT move to the reference file):** every file listed in the plan's `## Critical Files` section MUST appear in the PR diff, **unless** its annotation carries an explicit reference marker (`reference` / `read-only` / `verify` / `template` / `no-edit` / `unchanged` / `context`). A must-appear Critical File absent from the diff is a `MISSING-FILE:` finding that stays UNRESOLVED — and **blocks Phase 6.5 arming** — until you either make the dropped change (the #923 remedy) or note the legitimate cut in a PR comment. The matching regex, the `awk` that enforces it, and the sibling planned-test conformance check live in the reference file.
 
 Phase 5 consumes the Phase-3 flags `$HAS_PHP`, `$HAS_GO`, `$HAS_MATRIX`, `$PLAN_FOUND` — carried from Phase 3, never recomputed. **You MUST Read `.claude/skills/post-plan/_phase-5-final-verification.md` and run every block it lists, in order,** before computing the status. It writes the three carry-forward artifacts Phase 6.5 reads: the UNRESOLVED-items bridge `/tmp/post-plan-missing-tests-$PPID`, the Phase-5.0 done-marker `/tmp/post-plan-conformance-done-$PPID`, and the status file `/tmp/post-plan-phase5-status-$PPID`.
 
-**Write the done-marker whether 5.0 runs or is skipped — this is mandatory on BOTH paths.** An empty bridge file cannot distinguish "5.0 ran clean" from "5.0 never finished", so condition (3) blocks when the marker is absent. When you **skip** Phase 5.0 (`PLAN_FOUND=none` or `! $HAS_MATRIX` — the majority case, since most PRs are plan-blind), write it here, before moving on; the reference file's END-of-5.0 write never executes on this path:
+**Write the done-marker whether 5.0 runs or is skipped — this is mandatory on BOTH paths.** An empty bridge file cannot distinguish "5.0 ran clean" from "5.0 never finished", so condition (3) blocks when the marker is absent. When you **skip** Phase 5.0 entirely (`PLAN_FOUND=none` — the majority case, since most PRs are plan-blind), write it here, before moving on; the reference file's END-of-5.0 write never executes on this path. When `! $HAS_MATRIX` but `PLAN_FOUND != none`, the matrix-derived sub-checks skip but **5.0d still runs** (gated on `$PLAN_FOUND` alone, per its heading in the reference file); the reference file's own END-of-5.0 block writes the marker on that path:
 
 ```bash
 touch /tmp/post-plan-conformance-done-$PPID
@@ -400,7 +402,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 
 1. Manual testing cleared — the PR body carries the `No manual testing needed` sentinel Phase 6 writes.
 2. No review/audit finding scored `>= 80` (scored in Phase 4).
-3. No unresolved `MISSING:` planned-test **or** `MISSING-FILE:` planned-file items from Phase 5.0 — **and Phase 5.0 provably finished**: the done-marker `/tmp/post-plan-conformance-done-$PPID` exists AND the bridge `/tmp/post-plan-missing-tests-$PPID` is absent or empty. Marker absent = indeterminate = BLOCKED (an empty bridge file alone means nothing — 5.0 truncates it at START).
+3. No unresolved `MISSING:` planned-test, `MISSING-FILE:` planned-file **or** `UNMET-CONTRACT:` autonomy-contract items from Phase 5.0 — **and Phase 5.0 provably finished**: the done-marker `/tmp/post-plan-conformance-done-$PPID` exists AND the bridge `/tmp/post-plan-missing-tests-$PPID` is absent or empty. Marker absent = indeterminate = BLOCKED (an empty bridge file alone means nothing — 5.0 truncates it at START).
 4. Phase 5 did not deterministically fail — `PHASE5_VERIFY_STATUS` is `pass` or `skipped`, **not** `fail`.
 5. Golden-snapshot safety — a change to `engine/internal/sim/testdata/golden.json` does NOT auto-ship unattended (headless-only block).
 6. Merge-order — every PR named in a `Depends-on:` line is already `MERGED`.

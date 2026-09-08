@@ -189,7 +189,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         log("phase5 tracks: " + ", ".join(f"{t.name}={t.status}" for t in tracks)
             + f" -> PHASE5_VERIFY_STATUS={phase5}"
             + (f" (fidelity degraded: {unavailable} unavailable)" if unavailable else ""))
-        unresolved = conformance.check(plan, files, diff)
+        unresolved = conformance.check(plan, files, diff, phase5_status=phase5)
         res.unresolved_conformance = unresolved
         log(f"phase5.0 conformance: {unresolved or 'clean'}")
 

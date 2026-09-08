@@ -176,14 +176,33 @@ assert_eq "case 11: path-traversal → unresolvable:bad-value" \
 
 # Case 12 — no key: fast path must not invoke gh at all
 setup
-: > "$TMP/stub/gh"  # gh that writes a marker if called
-cat > "$TMP/stub/gh" <<'STUB'
+# The marker path is expanded HERE (unquoted heredoc delimiter) so the stub and the
+# assertion agree on it. A quoted delimiter defers "$$" to the stub's own PID, which
+# never equals the harness PID — the negative assertion could then never fail.
+MARKER="$TMP/gh-called-marker"
+rm -f "$MARKER"
+cat > "$TMP/stub/gh" <<STUB
 #!/usr/bin/env bash
-touch "${TMPDIR:-/tmp}/gh-called-marker-$$"
+touch "$MARKER"
 exit 1
 STUB
 chmod +x "$TMP/stub/gh"
-MARKER_PAT="${TMPDIR:-/tmp}/gh-called-marker-$$"
+
+# Positive control: the SAME recipe against a plan that DOES declare a PR dep must
+# reach the stub. Without it, a stub unreachable from inside plan_depends_on_status
+# would make the negative assertion below pass vacuously — the same class of
+# unfalsifiable green this case was written to rule out.
+write_plan "p12ctl" "depends_on: 2099"
+# shellcheck disable=SC2030,SC2031
+( PATH="$TMP/stub:$PATH"
+  NIGHTLY_DIR="$TMP/automouse"
+  export PATH NIGHTLY_DIR
+  # shellcheck source=/dev/null
+  . "$REPO_ROOT/bin/lib/plan-depends-on"
+  plan_depends_on_status "$TMP/automouse/queue/p12ctl.md" ) > /dev/null
+assert_present "case 12 control: stub gh IS reached when a PR dep is declared" "$MARKER"
+rm -f "$MARKER"
+
 write_plan "p12"  # no depends_on: key
 # shellcheck disable=SC2031
 ( PATH="$TMP/stub:$PATH"
@@ -192,7 +211,7 @@ write_plan "p12"  # no depends_on: key
   # shellcheck source=/dev/null
   . "$REPO_ROOT/bin/lib/plan-depends-on"
   plan_depends_on_status "$TMP/automouse/queue/p12.md" ) > /dev/null
-assert_absent "case 12: no key → gh never called (byte-identical fast path)" "$MARKER_PAT"
+assert_absent "case 12: no key → gh never called (byte-identical fast path)" "$MARKER"
 
 # Case 13 — dangling queue symlink (plan file deleted): must answer unresolvable, not met
 # This is the reachable production path: bin/automouse/queue/ stores every entry

@@ -104,6 +104,7 @@ last_verified: 2026-09-08
 | L75 | `/plan` byte target derived without measuring the verbatim-protected floor — `_plan-verification.md` cap corrected to 21504 B | ⬜ Open | 🟦 | S |
 | L76 | `bin/lib/plan-depends-on` fail-open on unreadable plan (fixed); portable self-heal cases placed behind macOS-only guard in test harness (fixed) | ✅ Fixed | — | S |
 | L77 | PR body claimed "20 verification rows, V1–V20" when 12 matrix rows realized; `automouse-workflow.md` compression undeclared (both fixed in PR body) | ✅ Fixed | — | XS |
+| L78 | PR #2178 fidelity-review notes (a–e): doc omissions in `automouse-workflow.md`, test-harness escape hatches, V17/V20 annotation mismatches, dead-code guard asymmetry — all non-blocking, none fixed this pass | ⬜ Open | 🟦 | S |
 
 ### L1 Plan dependency DAG
 ➜ L1 Plan dependency DAG — ✅ Implemented (2026-09-08): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
@@ -1243,3 +1244,30 @@ Landing: rung 1 — extend `.claude/rules/pr-body-negative-claim-recheck.md` to 
 **artifact destination:** `.claude/rules/pr-body-claims.md` — add a row to the Application table covering rules-file byte-cap compression.
 
 **provenance:** (discovered 2026-09-08 during PR #2178 fidelity review)
+
+---
+
+### L78 PR #2178 fidelity-review notes (a–e): doc omissions, test-harness escape hatches, annotation mismatches, dead-code guard asymmetry
+
+**class:** Coverage gaps left unfixed in a nightly-pipeline PR: doc omissions in a rules file, escape hatches in the test harness that suppress failure output for a known-broken row, annotation mismatches between the plan matrix and harness realisation, and a dead-code guard added asymmetrically — each individually non-blocking but collectively leaving regression paths open.
+
+**occurrence table:**
+
+| # | File:line | Note | Same class? | Live? | Status |
+|---|-----------|------|-------------|-------|--------|
+| 1 | `.claude/rules/automouse-workflow.md` — `paths:` not widened to include `bin/lib/plan-depends-on`; Phase 7 items 7.2 (queue layout line) and 7.4 (self-heal paragraph) absent; "symlink mtime preserved" and "scan before skipped/ guard" facts documented nowhere | note (a) | yes | live | not fixed — filed |
+| 2 | `bin/test-automouse-depends-on` — V2/V4/V5 declare `.lock`-absent assertions; no `.lock` assertion exists in the harness; the Automouse Hold Justification's "each has a verification row" claim is therefore false for this bug shape | note (b) | yes | live | not fixed — filed |
+| 3 | `bin/test-automouse-depends-on` — V14 escape hatch: hardcoded `# V14 WARN: … not counted as a failure here`; masks a genuine future regression locally on macOS | note (c) | yes | live | not fixed — filed |
+| 4 | `bin/test-automouse-depends-on` / plan matrix — V17 and V20 carry "(wired in this PR)" annotation in the matrix but appear nowhere in the harness; V19 likewise has no realisation in the diff | note (d) | yes | live | not fixed — filed |
+| 5 | `bin/automouse/run:1161` — `case "${DEPENDS_HELD:- }" in …` guard is dead code; `DEPENDS_HELD=" "` at top-level line 546 executes unconditionally before both call sites (1161, 1268); the `:- ` form is asymmetric with the sibling `CAP_DEFERRED` line one row above | note (e) | yes | live | not fixed — filed |
+
+**prevention_ladder:**
+- rung 0 — not covered by any existing gate.
+- rung 1 — no existing gate checks rule-file `paths:` widening completeness, harness escape-hatch prose, or plan-matrix annotation fidelity.
+- rung 2 — a note in `automouse-workflow.md`'s `depends_on:` section that `paths:` must list all helper scripts; and a test-authoring norm (e.g. in `.claude/rules/bin-help-span-and-secondary-assertions.md` or a new rule) that every declared secondary token and every "(wired in this PR)" annotation must have a corresponding `want` or `assert` call. Rung 2 is the landing rung for all five occurrences.
+- rung 3/4/5 — not mechanizable: PHPStan/CI cannot validate prose annotations against test implementations.
+- **landing rung: rung 2** — prose notes in the relevant rule docs; no new gate warranted.
+
+**artifact destination:** `.claude/rules/automouse-workflow.md` (occurrence 1), `.claude/rules/bin-help-span-and-secondary-assertions.md` or a new harness-annotation rule doc (occurrences 2–4)
+
+**provenance:** (discovered 2026-09-08 during PR #2178 fidelity review, notes a–e)

@@ -173,10 +173,13 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         meta = gh.pr_meta() or {"number": pr, "title": copy["title"], "body": copy["summary_md"]}
 
         # ---- Phase 4: review + security (gated bounded calls) ---------
-        findings, gates, scored = ReviewPhase(llm, gh).run(meta, cls, plan)
+        findings, gates, scored, degraded_agents = ReviewPhase(llm, gh).run(meta, cls, plan)
         res.findings = findings
         res.scored_findings = scored
+        res.degraded_agents = degraded_agents
         log(f"phase4 gates={ {k: v for k, v in gates.items()} } findings: raw={len(scored)} surviving={len(findings)} scores={[s['score'] for s in scored]}")
+        if degraded_agents:
+            log(f"phase4 DEGRADED: unparseable review output from {', '.join(degraded_agents)}")
 
         # ---- Phase 5 + 5.0: verify + conformance -----------------------
         tracks = verifier.run(cls)
@@ -250,6 +253,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             # hands off to the skill at Phase 5.5. Replay/isolated runs touch no real
             # PR, so they carry a synthetic READY and existing fixtures stay green.
             fidelity_verdict=None if live else "READY",
+            degraded_agents=degraded_agents,
             plan_slug_drift=plan.slug_drift,
         )
         preview = evaluate(inputs)
@@ -271,6 +275,16 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         if decision.armed:
             gh.pr_merge_auto(pr)
 
+        if degraded_agents:
+            current = gh.pr_body() or body
+            if "## Review Unavailable" not in current:
+                note = ("\n\n## Review Unavailable\n\n"
+                        "The compiled post-plan harness could not parse the reply from: "
+                        + ", ".join(degraded_agents)
+                        + ". Those checks did not run; auto-merge was not armed. "
+                          "Re-run the review or review this PR by hand before merging.\n")
+                gh.pr_edit_body(pr, current + note)
+
         # ---- Phase 7/8: CI watch + confirm -----------------------------
         if mode == "replay":
             fx_ci = (fixture or {}).get("checks_outcome")
@@ -285,7 +299,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         res.final_pr_state = gh.pr_state() if (mode == "replay" or live) else "N/A"
         log(f"phase7 ci: exit={outcome.exit_code} failed={outcome.failed} ({outcome.evidence})")
 
-        res.terminal = (TerminalState.SHIPPED_ARMED if decision.armed
+        res.terminal = (TerminalState.DEGRADED if degraded_agents else
+                        TerminalState.SHIPPED_ARMED if decision.armed
                         else TerminalState.SHIPPED_HELD)
 
         # ---- Phase 9: retrospective (bounded) ---------------------------
@@ -320,11 +335,25 @@ def exit_code_for(res: RunResult) -> int:
     """Process exit code from a terminal RunResult.
     4 = harness phases complete, plan-fidelity review still owed: bin/post-plan-now
         re-enters the /post-plan skill at Phase 5.5 for the review, digest and arming.
+        DEGRADED runs are excluded from this handoff -- see the ordering note below.
     3 = rebase-conflict fail-closed sentinel: bin/post-plan-now MUST NOT escalate to
         the /post-plan skill session; a human resolves the stacked-branch rebase.
-    1 = any other typed failure.  0 = success / nothing-to-ship."""
+    1 = any other typed failure.  0 = success / nothing-to-ship / degraded (PR shipped + held)."""
     if res.terminal == TerminalState.FAILED and res.error_kind == "rebase-conflict":
         return 3
+    # DEGRADED is checked BEFORE fidelity_pending, and the order is load-bearing.
+    # A live degraded run is *also* fidelity_pending (condition (12) always holds
+    # live), so fidelity-first would route every degraded run into a resumed skill
+    # session at Phase 5.5. That session re-evaluates all thirteen arm conditions
+    # from scratch, and nothing carries the degradation across: the skill's
+    # condition (9) is an LLM enumeration over the realized diff, and it has no
+    # knowledge of an unparseable review agent. Fidelity-first would therefore let
+    # the skill ARM auto-merge on a PR whose review never parsed -- defeating the
+    # "hold" half of degrade-and-hold. Returning 0 keeps the PR open, held by the
+    # harness's own condition (9), and awaiting a human. Pinned by
+    # tests/test_runner_exit_codes.py::test_degraded_beats_fidelity_pending.
+    if res.terminal == TerminalState.DEGRADED:
+        return 0          # PR is open and held: nothing for the skill fallback to redo
     if res.terminal != TerminalState.FAILED and res.fidelity_pending:
         return 4
     return 0 if res.terminal != TerminalState.FAILED else 1
@@ -432,7 +461,7 @@ def main() -> int:
         with open(args.canned) as fh:
             llm = FixtureLlm(ledger, json.load(fh))
     else:
-        llm = ClaudeCli(ledger)
+        llm = ClaudeCli(ledger, out_dir=args.out)
 
     res = run(fixture, args.out, llm, mode=args.mode, worktree=args.worktree,
               headless=not args.interactive, live=args.live, explicit_path=args.plan)

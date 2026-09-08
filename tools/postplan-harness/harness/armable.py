@@ -99,6 +99,7 @@ class ArmInputs:
     dep_state_lookup: Callable[[int], str]    # pr number -> state ("MERGED"/"OPEN"/"UNKNOWN")
     llm_safety_holds: list[str] = field(default_factory=list)  # bounded-LLM ADDed holds
     fidelity_verdict: Optional[str] = None    # Phase 5.5 verdict word; None = never ran (blocks)
+    degraded_agents: list[str] = field(default_factory=list)   # unparseable review agents
     plan_slug_drift: str = ""                 # plan adopted by slug drift -> hold
 
 
@@ -151,6 +152,8 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
 
     det_holds = deterministic_safety_holds(inp.classification, inp.pr_title)
     all_holds = det_holds + list(inp.llm_safety_holds)
+    if inp.degraded_agents:
+        all_holds = all_holds + ["review unavailable: " + ", ".join(inp.degraded_agents)]
     cs.append(ConditionResult(9, "pr-time-safety-verdict", bool(all_holds), "; ".join(all_holds)))
 
     pipe = "pipeline-authored" in inp.pr_labels

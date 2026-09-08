@@ -1,6 +1,6 @@
 ---
 description: Development-efficiency backlog — inner-loop speed (diff-scoped analysis, parallel tests), CI caching, dependency-bump batching, and worktree lifecycle automation, with per-entry status.
-last_verified: 2026-09-07
+last_verified: 2026-09-08
 ---
 
 # Development-Efficiency Backlog
@@ -118,6 +118,7 @@ last_verified: 2026-09-07
 | E97 | Stale numeric count in PR body Scope prose (Phase 6 findings from #2160) | ⬜ Open | — | XS |
 | E98 | Dead ref in source comment, direction error in comment, plan-required PR body content dropped (Phase 6 findings from #2167) | ✅ fixed this pass | — | XS |
 | E99 | ADR-index frontmatter key duplication via merge=union (Phase 6 blocker from #2111) | ✅ fixed this pass | — | XS |
+| E100 | PR body stale after revert removed plan deliverables; unplanned scope in diff (Phase 6 findings from #1921) | ✅ fixed this pass | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -1841,3 +1842,54 @@ Landing rung: **1** — extend `bin/check-rules-byte-budget` to warn when the ag
 `artifact destination: bin/check-docs` (in-repo; edited in place in a future PR)
 
 *(discovered 2026-09-07 during #2111)*
+
+### E100 PR body stale after revert removed plan deliverables; unplanned scope in diff (Phase 6 findings from #1921)
+
+**class (blocking, check 1 + notes checks 4/5):** a PR body Scope claim that reads as "all plan phases shipped" after a revert commit removed plan deliverables (Phases 7 and 8c) and the body was never updated; orphaned commit SHA and overstated test tier in the same body; declared test node ID absent after the revert.
+
+**class (note, check 3):** diff includes additive changes not requested by any plan phase (`_plan-verification.md` required-verification row; idempotency guard in `runner.py`); neither lands on a blocking surface.
+
+**occurrence table:**
+
+| # | File:line | Class | Live? | Status |
+|---|-----------|-------|-------|--------|
+| 1 | PR #1921 body Scope — "full test coverage" with Phases 7/8c absent | blocking body stale-claim | live | fixed this pass (via `gh pr edit`) |
+| 2 | PR #1921 body Backlog migration — orphaned SHA `af66a0e` | stale body SHA | live | fixed this pass (via `gh pr edit`) |
+| 3 | PR #1921 body Manual Testing — "E2E" overstates test tier | cosmetic body overstatement | live | fixed this pass (via `gh pr edit`) |
+| 4 | PR #1921 Verification Matrix row 35 — `test_prompt_has_no_backticks` absent after revert | declared-but-absent test node | live | not fixed — consequence of descoped Phase 8c (no fix warranted) |
+| 5 | `_plan-verification.md` and `runner.py` — additive changes not in plan | unplanned scope addition | live | not fixed — additive, non-blocking, correct on the merits |
+
+**prevention_ladder:**
+- rung 0 — already covered? `.claude/rules/pr-body-negative-claim-recheck.md` is an always-loaded rule that covers the stale-claim class explicitly (its "What triggered this rule" is an identical event: body written → remediation commit landed → body became false). The unplanned-scope class is already caught by `/pr-ready` Phase 6 check 3.
+- landing rung: **rung 0** — both classes are already caught by existing mechanisms (always-loaded rule for body staleness; Phase 6 check 3 for scope additions).
+
+`prevention_ladder: no gate warranted — pr-body-negative-claim-recheck.md already governs body staleness; Phase 6 check 3 already catches unplanned scope`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-07 during #1921)*
+
+### E101 Stale PR attribution in descope justification; consolidated notes for Phase 6 findings F2–F5 (from #1921)
+
+**class:** stale-attribution — a PR body descope justification cites the wrong master PR number, making the justification appear unsupported to a reviewer who follows the link (F1); plus four notes (F2–F5) where plan deviations and scope additions were correct on the merits or are no-action.
+
+**occurrence table:**
+
+| # | File:line | Class | Live? | Status |
+|---|-----------|-------|-------|--------|
+| 1 (F1) | PR #1921 body Scope — `shq()` descope credited to #2164, actually #1819 (`3ce0b037b`) | stale PR attribution | was live | fixed this pass (via `gh pr edit`) |
+| 2 (F2) | PR #1921 diff — plan Phases 7 and 8c absent, Matrix row 35 absent | declared descope — correct behavior | n/a | not fixed — declared in body, sound on the merits |
+| 3 (F3) | `.claude/review-shared/_plan-verification.md` — additive required-verification row | unplanned Phase 9 retrospective artifact | n/a | not fixed — additive, non-blocking, correct |
+| 4 (F4) | `runner.py` — idempotency guard on `## Review Unavailable` body note | unplanned but correct in-run; cross-run stale-signal path noted | n/a | not fixed — better than plan's version in-run; residual documented in F4 |
+| 5 (F5) | Plan Phases 4a/6a and Matrix row 24 — tuple arity stale against master's `scored` addition | plan text stale; shipped code correct | n/a | not fixed — plan is the stale artifact; code correct |
+
+**prevention_ladder:**
+- rung 0 — already covered? `.claude/rules/pr-body-claims.md` governs citations that must be *present* (version strings, numeric baselines, `X → Y` figures); it does not govern whether a PR-number attribution is *correct*. Phase 6 check 4 catches the broader body-vs-diff class and classified F1 as a note (both diff-checkable halves were true). No existing gate verifies PR-number correctness in a descope sentence.
+- rung 1 — a gate? A gate that resolves a cited PR number and checks it for the named change would be high false-positive risk and low frequency. Phase 6 already catches this class; a rule is not enforcement.
+- landing rung: **rung 0** — Phase 6 check 4 already catches the broader class; F1 was found and fixed this pass. No additional gate warranted for a low-frequency one-off.
+
+`prevention_ladder: no gate warranted — Phase 6 check 4 catches body-vs-reality class; pr-body-claims.md governs citation presence, not PR-number correctness; low-frequency one-off`
+
+`artifact destination: n/a — no gate`
+
+*(discovered 2026-09-08 during #1921)*

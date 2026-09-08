@@ -151,7 +151,7 @@ jobs:
           if [ "$OUTCOME" = "promoted" ]; then
             # Discord renders masked links ([text](url)) in bot-authored messages,
             # so the short SHA and any trailing (#NNNN) are clickable in place.
-            SUBJECT="$(git log -1 --format=%s "$PROMOTE_SHA")"
+            SUBJECT="$(git log -1 --format=%s "$PROMOTE_SHA" || true)"
             SUBJECT="$(printf '%s' "$SUBJECT" \
               | sed -E "s@\(#([0-9]+)\)@([#\1]($SERVER_URL/$REPO/pull/\1))@g")"
             {

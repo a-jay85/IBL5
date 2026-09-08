@@ -698,11 +698,16 @@ function checkAdrTransitions(string $repoRoot): array
     return $issues;
 }
 
-/** @param list<string> $files */
-function fixDates(array $files, \DateTimeImmutable $today): int
+/**
+ * Writes $dateStr into last_verified. The caller passes localToday() so a bumped
+ * date matches the clock iterChangedDocs() compares it against — a UTC date here
+ * would land tomorrow's date in a doc for an evening edit.
+ *
+ * @param list<string> $files
+ */
+function fixDates(array $files, string $dateStr): int
 {
     $updated = 0;
-    $dateStr = $today->format('Y-m-d');
     foreach ($files as $path) {
         if (!is_file($path)) {
             continue;
@@ -727,6 +732,41 @@ function fixDates(array $files, \DateTimeImmutable $today): int
         $updated++;
     }
     return $updated;
+}
+
+/**
+ * Calendar date (Y-m-d) on the machine running this script, read in the OS-local
+ * timezone rather than PHP's default. PHP's default is UTC whenever `date.timezone`
+ * is unset (the case here), so `new \DateTimeImmutable('today')` is already
+ * tomorrow for a late-evening edit in a negative-offset zone like PDT.
+ *
+ * This is the no-commit-yet counterpart to editCommitDate(): both answer "what
+ * calendar day is this edit on, per the author", one from an author timestamp and
+ * one from the author's own clock. Only the fallback paths use it — never the
+ * future-date check, which stays on UTC so a doc dated in UTC-today is not
+ * retroactively rejected as a future date.
+ *
+ * `CHECK_DOCS_TODAY` (ISO date) overrides it so tests can pin the clock without
+ * depending on the runner's ambient timezone — CI runners are UTC, so the
+ * evening-PDT case cannot occur there naturally. Falls back to PHP's UTC "today"
+ * when `date` is unavailable.
+ */
+function localToday(): string
+{
+    $override = getenv('CHECK_DOCS_TODAY');
+    if (is_string($override) && preg_match('/^\d{4}-\d{2}-\d{2}$/', trim($override)) === 1) {
+        return trim($override);
+    }
+
+    $out = [];
+    $code = 0;
+    exec('date +%Y-%m-%d 2>/dev/null', $out, $code);
+    $date = trim(implode('', $out));
+    if ($code === 0 && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) === 1) {
+        return $date;
+    }
+
+    return (new \DateTimeImmutable('today'))->format('Y-m-d');
 }
 
 /**
@@ -893,14 +933,15 @@ function changedDocPaths(string $base, string $escapedRoot, string $escapedBase)
  *
  * Null-editDate fallback: editCommitDate() returns null when base..HEAD is empty
  * (first commit on the branch — no commits exist in that range yet) or when the
- * git log command fails. In that case we fall back to PHP's process-local "today"
- * so the same-day escape still fires: a file whose last_verified == today passes
- * even before the commit lands (headLv >= today is true, matching the behavior
- * immediately after). Exception to the wall-clock-avoidance above: this path
- * uses the CI wall clock, so a developer who sets last_verified at 11:58 PM and
- * whose CI run crosses midnight sees a false-fail. Exposure is limited to the
- * first-commit-on-branch edge case; rebased or multi-commit branches still key
- * off the immutable author date.
+ * git log command fails. In that case we fall back to localToday() so the same-day
+ * escape still fires: a file whose last_verified == today passes even before the
+ * commit lands (headLv >= today is true, matching the behavior immediately after).
+ * localToday() reads the author machine's LOCAL calendar day, matching the author
+ * timezone this function already keys off everywhere else — PHP's default clock is
+ * UTC, which made an evening-PDT edit compare against tomorrow and false-fail the
+ * pre-commit hook (the hook runs before the commit exists, so "it passes once
+ * committed" was false). The narrowness is unchanged: a date older than today
+ * still fails.
  *
  * @return list<array{rel: string, abs: string, headLv: ?string, baseLv: ?string, needsBump: bool}>
  */
@@ -943,8 +984,10 @@ function iterChangedDocs(string $base, string $repoRoot): array
         $headLv = $headFm['last_verified'] ?? null;
         $baseLv = $baseFm['last_verified'] ?? null;
         $editDate = editCommitDate($repoRoot, $base, $rel);
-        // Fall back to today when editDate is null (first commit on branch — base..HEAD empty).
-        $effectiveEditDate = $editDate ?? (new \DateTimeImmutable('today'))->format('Y-m-d');
+        // Fall back to the author machine's local today when editDate is null
+        // (first commit on branch — base..HEAD empty). localToday(), not PHP's
+        // UTC default: see localToday().
+        $effectiveEditDate = $editDate ?? localToday();
         $verifiedAtEdit = $headLv !== null && $headLv >= $effectiveEditDate;
 
         $docs[] = [
@@ -1728,7 +1771,7 @@ if ($opts['since'] !== null) {
                 $toFix[] = $doc['abs'];
             }
         }
-        $n = fixDates($toFix, $today);
+        $n = fixDates($toFix, localToday());
         echo "bumped last_verified on {$n} changed-but-unbumped file(s) vs {$opts['since']}\n";
         exit(0);
     }

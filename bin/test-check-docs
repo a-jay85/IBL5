@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Test harness for bin/check-docs checkSkillDraftPlaceholder().
+# Test harness for bin/check-docs: checkSkillDraftPlaceholder() (tests 1-4) and
+# the iterChangedDocs() local-date fallback (tests 5-6).
 # Follows bin/test-check-plan style.
 #
 # Each fixture is a minimal git repo so bin/check-docs can locate the root.
@@ -23,6 +24,8 @@ make_repo() {
     local repo
     repo=$(mktemp -d)
     git -C "$repo" init -q
+    git -C "$repo" config user.email "test@example.com"
+    git -C "$repo" config user.name "check-docs test"
     # Copy check-docs into the temp repo's bin/ so __DIR__ resolves to the temp repo root.
     mkdir -p "$repo/bin"
     cp "$REAL_SCRIPT" "$repo/bin/check-docs"
@@ -110,6 +113,72 @@ if label_absent "$OUT"; then
     pass "non-skill: DRAFT=\$(...) in non-SKILL.md is not flagged"
 else
     fail "non-skill: DRAFT=\$(...) in non-SKILL.md should not be flagged"
+    echo "  output: $OUT"
+fi
+
+# ── Local-date fallback (iterChangedDocs null-editCommitDate path) ────────────
+#
+# When base..HEAD is empty — the pre-commit hook's shape: dirty tree, no commit
+# on the branch yet — editCommitDate() returns null and check-docs falls back to
+# localToday(). That clock must be the author machine's LOCAL calendar day, not
+# PHP's UTC default: after ~17:00 PDT the UTC day is already tomorrow, so a doc
+# verified today was compared against tomorrow and false-failed with "last_verified
+# not bumped". CHECK_DOCS_TODAY pins the clock, because a CI runner is UTC and the
+# evening-PDT offset cannot occur there naturally.
+
+bump_present() {   echo "$1" | grep -qF 'last_verified not bumped'; }
+bump_absent()  { ! echo "$1" | grep -qF 'last_verified not bumped'; }
+
+# Both dates come from PHP's default (UTC) clock, so PINNED is guaranteed to differ
+# from UTC-today by one day — the same offset an evening-PDT edit carries.
+PINNED=$(php -r 'echo (new DateTimeImmutable("yesterday"))->format("Y-m-d");')
+STALER=$(php -r 'echo (new DateTimeImmutable("-2 days"))->format("Y-m-d");')
+
+# .claude/rules/ is an IN_SCOPE_GLOBS path — docs/ at the repo root is NOT, so a
+# fixture there is silently skipped and every assertion passes vacuously.
+write_doc() {   # write_doc <repo> <last_verified> <body>
+    local repo="$1" lv="$2" body="$3"
+    mkdir -p "$repo/.claude/rules"
+    printf -- '---\ndescription: Test fixture\nlast_verified: %s\n---\n# Doc\n\n%s\n' \
+        "$lv" "$body" > "$repo/.claude/rules/fixture.md"
+}
+
+commit_doc() {  # commit_doc <repo>
+    local repo="$1"
+    git -C "$repo" add -A
+    git -C "$repo" commit -qm fixture
+}
+
+# ── Test 5: doc verified on the local day passes with no commit on the branch ─
+
+REPO=$(make_repo)
+write_doc "$REPO" "$PINNED" "Original body."
+commit_doc "$REPO"
+BR=$(git -C "$REPO" rev-parse --abbrev-ref HEAD)
+# Body changes in the working tree only; last_verified deliberately unchanged.
+write_doc "$REPO" "$PINNED" "Edited body."
+OUT=$(cd "$REPO" && CHECK_DOCS_TODAY="$PINNED" bin/check-docs --since="$BR" --no-staleness 2>&1) || true
+rm -rf "$REPO"
+if bump_absent "$OUT"; then
+    pass "local-date fallback: last_verified == local today passes pre-commit"
+else
+    fail "local-date fallback: last_verified == local today should pass pre-commit"
+    echo "  output: $OUT"
+fi
+
+# ── Test 6: the fallback stays tight — a staler date still fails ──────────────
+
+REPO=$(make_repo)
+write_doc "$REPO" "$STALER" "Original body."
+commit_doc "$REPO"
+BR=$(git -C "$REPO" rev-parse --abbrev-ref HEAD)
+write_doc "$REPO" "$STALER" "Edited body."
+OUT=$(cd "$REPO" && CHECK_DOCS_TODAY="$PINNED" bin/check-docs --since="$BR" --no-staleness 2>&1) || true
+rm -rf "$REPO"
+if bump_present "$OUT"; then
+    pass "local-date fallback: last_verified older than local today still fails"
+else
+    fail "local-date fallback: last_verified older than local today should still fail"
     echo "  output: $OUT"
 fi
 

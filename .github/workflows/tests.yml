@@ -895,6 +895,8 @@ jobs:
         run: bin/test-cleanup-safety
       - name: bin/test-check-pr-collisions
         run: bin/test-check-pr-collisions
+      - name: bin/test-check-pr-manual-testing
+        run: bin/test-check-pr-manual-testing
       - name: bin/test-pr-overlap
         run: bin/test-pr-overlap
       - name: bin/test-pr-attack

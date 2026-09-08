@@ -799,6 +799,156 @@ want "benign re-queue (recovery): keeps the recovery verdict" "$(dm)" \
 want "benign re-queue (recovery): says it queued" "$(dm)" "queued for automouse"
 want_no "benign re-queue (recovery): no false failure verdict" "$(dm)" "automouse-queue FAILED"
 
+echo "── pre-flight architect-tier gate ──"
+
+# Two fixtures for the tier gate tests.
+#
+# Fixture A: declares plan-architect-xhigh; task line hinted as default
+# by bin/plan-tier-hint (no security tokens in the task description).
+TIER_PROMPT_A="$TMP/tier-prompt-a.md"
+cat > "$TIER_PROMPT_A" <<'TIER_A_EOF'
+/plan Add a helper method to the standings renderer.
+
+Step 3 MUST route to `plan-architect-xhigh`.
+TIER_A_EOF
+
+# Fixture B: declares plan-architect; negates plan-architect-xhigh on a
+# LATER line. Catches the extractor bug where grep grabs xhigh from the
+# negation reference rather than the MUST-route-to directive.
+TIER_PROMPT_B="$TMP/tier-prompt-b.md"
+cat > "$TIER_PROMPT_B" <<'TIER_B_EOF'
+/plan Add a helper method to the standings renderer.
+
+Step 3 MUST route to `plan-architect`.
+Do NOT escalate to `plan-architect-xhigh`.
+TIER_B_EOF
+
+# T-1. Fixture A (declared xhigh, real hint returns default) → exit 4, no runner.
+TPRE_RC=0
+TPRE_OUT=$(PLAN_NOW_TIER_HINT="$ROOT/bin/plan-tier-hint" \
+    PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" PLAN_NOW_DRY_RUN=1 \
+    PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+    "$PLAN_NOW" --implement "$TIER_PROMPT_A" 2>&1) || TPRE_RC=$?
+[ "$TPRE_RC" = 4 ] && ok "T-1: declared xhigh/hinted default: exits 4" || \
+    fail "T-1: declared xhigh/hinted default: exits 4 (got $TPRE_RC)"
+want    "T-1: mismatch message printed"       "$TPRE_OUT" "TIER MISMATCH"
+want_no "T-1: no runner written on exit 4"    "$TPRE_OUT" "runner:"
+preflight_cleanup "$TPRE_OUT"
+
+# T-2. Fixture B (declares default; xhigh appears only in a negation on a later
+#      line) → exits 0, runner written, no tier warning. Pins the extractor bug.
+TPRE_RC=0
+TPRE_OUT=$(PLAN_NOW_TIER_HINT="$ROOT/bin/plan-tier-hint" \
+    PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" PLAN_NOW_DRY_RUN=1 \
+    PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+    "$PLAN_NOW" --implement "$TIER_PROMPT_B" 2>&1) || TPRE_RC=$?
+[ "$TPRE_RC" = 0 ] && ok "T-2: fixture-B negated xhigh exits 0 — no false positive" || \
+    fail "T-2: fixture-B negated xhigh exits 0 (got $TPRE_RC)"
+want    "T-2: runner is written"              "$TPRE_OUT" "runner:"
+want_no "T-2: no tier warning"                "$TPRE_OUT" "TIER MISMATCH"
+preflight_cleanup "$TPRE_OUT"
+
+# T-3. Fixture A + --tier-ok: exits 0, runner written, reason in stdout, and
+#      TIER_OVERRIDE= is present in the generated runner script. Read the runner
+#      BEFORE preflight_cleanup removes it. printf '%q' backslash-escapes spaces,
+#      so grep on an alphanumeric token ('csrf') or the bare variable name.
+TPRE_RC=0
+TPRE_OUT=$(PLAN_NOW_TIER_HINT="$ROOT/bin/plan-tier-hint" \
+    PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" PLAN_NOW_DRY_RUN=1 \
+    PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+    "$PLAN_NOW" --implement "$TIER_PROMPT_A" \
+    --tier-ok "false positive on a negated csrf mention" 2>&1) || TPRE_RC=$?
+T3_RUNNER=$(printf '%s\n' "$TPRE_OUT" | sed -n 's/^  runner: //p')
+T3_RUNNER_CONTENT=$(cat "$T3_RUNNER" 2>/dev/null || true)
+[ "$TPRE_RC" = 0 ] && ok "T-3: tier-ok override: exits 0" || \
+    fail "T-3: tier-ok override: exits 0 (got $TPRE_RC)"
+want "T-3: runner is written"                "$TPRE_OUT" "runner:"
+want "T-3: reason appears in stdout"         "$TPRE_OUT" "false positive"
+want "T-3: TIER_OVERRIDE written to runner"  "$T3_RUNNER_CONTENT" "TIER_OVERRIDE="
+want "T-3: csrf token survives %q escaping"  "$T3_RUNNER_CONTENT" "csrf"
+preflight_cleanup "$TPRE_OUT"
+
+# T-4. --tier-ok with no value → exit 2. Flag is last; prompt is already set so
+#      the missing-file exit 2 cannot fire — only the guard fires.
+TPRE_RC=0
+TPRE_OUT=$(PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" PLAN_NOW_DRY_RUN=1 \
+    PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+    "$PLAN_NOW" --implement "$TIER_PROMPT_A" --tier-ok 2>&1) || TPRE_RC=$?
+[ "$TPRE_RC" = 2 ] && ok "T-4: bare --tier-ok exits 2" || \
+    fail "T-4: bare --tier-ok exits 2 (got $TPRE_RC)"
+want "T-4: error names --tier-ok"            "$TPRE_OUT" "--tier-ok"
+preflight_cleanup "$TPRE_OUT"
+
+# T-5. No MUST route to line in prompt → gate skips silently, exits 0, runner written.
+TPRE_RC=0
+TPRE_OUT=$(PLAN_NOW_TIER_HINT="$ROOT/bin/plan-tier-hint" \
+    PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" PLAN_NOW_DRY_RUN=1 \
+    PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+    "$PLAN_NOW" --implement "$PROMPT" 2>&1) || TPRE_RC=$?
+[ "$TPRE_RC" = 0 ] && ok "T-5: no directive line: exits 0 silently" || \
+    fail "T-5: no directive line: exits 0 (got $TPRE_RC)"
+want    "T-5: runner is written"              "$TPRE_OUT" "runner:"
+want_no "T-5: no tier warning"                "$TPRE_OUT" "TIER MISMATCH"
+preflight_cleanup "$TPRE_OUT"
+
+# T-6. PLAN_NOW_TIER_HINT unset → falls back to real bin/plan-tier-hint.
+#      Fixture A declares xhigh; real hint returns default → gate fires (exit 4).
+TPRE_RC=0
+TPRE_OUT=$(unset PLAN_NOW_TIER_HINT; \
+    PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" PLAN_NOW_DRY_RUN=1 \
+    PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+    "$PLAN_NOW" --implement "$TIER_PROMPT_A" 2>&1) || TPRE_RC=$?
+[ "$TPRE_RC" = 4 ] && ok "T-6: TIER_HINT unset: falls back to repo script, exits 4" || \
+    fail "T-6: TIER_HINT unset: falls back to repo script (got $TPRE_RC)"
+want_no "T-6: no runner written"              "$TPRE_OUT" "runner:"
+preflight_cleanup "$TPRE_OUT"
+
+# T-7. PLAN_NOW_TIER_HINT='' → same as unset via \${:-}; repo script declines (exit 4).
+TPRE_RC=0
+TPRE_OUT=$(PLAN_NOW_TIER_HINT='' \
+    PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" PLAN_NOW_DRY_RUN=1 \
+    PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+    "$PLAN_NOW" --implement "$TIER_PROMPT_A" 2>&1) || TPRE_RC=$?
+[ "$TPRE_RC" = 4 ] && ok "T-7: TIER_HINT empty string: same as unset, exits 4" || \
+    fail "T-7: TIER_HINT empty string: same as unset (got $TPRE_RC)"
+want_no "T-7: no runner written"              "$TPRE_OUT" "runner:"
+preflight_cleanup "$TPRE_OUT"
+
+# T-8. Hint stub exits non-zero (exit 2 = usage error) → gate skips, exits 0, runner written.
+TIER_EXIT2_STUB="$TMP/tier-hint-exit2"
+printf '#!/usr/bin/env bash\nexit 2\n' > "$TIER_EXIT2_STUB"
+chmod +x "$TIER_EXIT2_STUB"
+TPRE_RC=0
+TPRE_OUT=$(PLAN_NOW_TIER_HINT="$TIER_EXIT2_STUB" \
+    PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" PLAN_NOW_DRY_RUN=1 \
+    PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+    "$PLAN_NOW" --implement "$TIER_PROMPT_A" 2>&1) || TPRE_RC=$?
+[ "$TPRE_RC" = 0 ] && ok "T-8: hint exits 2: gate skips, exits 0" || \
+    fail "T-8: hint exits 2: gate skips (got $TPRE_RC)"
+want    "T-8: runner is written"              "$TPRE_OUT" "runner:"
+preflight_cleanup "$TPRE_OUT"
+
+# T-9. Live hint stub forces mismatch: Fixture B declares default; stub returns
+#      xhigh → mismatch, hinted=xhigh → exit 4, SEAM-TIER-MARKER in output.
+TIER_LIVE_STUB="$TMP/tier-hint-live"
+cat > "$TIER_LIVE_STUB" <<'TIER_LIVE_EOF'
+#!/usr/bin/env bash
+printf 'xhigh\tSEAM-TIER-MARKER: forced xhigh\n'
+exit 0
+TIER_LIVE_EOF
+chmod +x "$TIER_LIVE_STUB"
+TPRE_RC=0
+TPRE_OUT=$(PLAN_NOW_TIER_HINT="$TIER_LIVE_STUB" \
+    PLAN_NOW_PLANS_DIR="$PLANS" NIGHTLY_DIR="$NDIR" PLAN_NOW_DRY_RUN=1 \
+    PLAN_NOW_DISCORD_DM="$DM_STUB" PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" \
+    "$PLAN_NOW" --implement "$TIER_PROMPT_B" 2>&1) || TPRE_RC=$?
+[ "$TPRE_RC" = 4 ] && ok "T-9: live stub mismatch: exits 4" || \
+    fail "T-9: live stub mismatch: exits 4 (got $TPRE_RC)"
+want    "T-9: SEAM-TIER-MARKER reaches output" "$TPRE_OUT" "SEAM-TIER-MARKER"
+want    "T-9: mismatch message printed"         "$TPRE_OUT" "TIER MISMATCH"
+want_no "T-9: no runner written"                "$TPRE_OUT" "runner:"
+preflight_cleanup "$TPRE_OUT"
+
 echo "── the coda still tells the model where to put it ──"
 
 dry=$(PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" PLAN_NOW_PLANS_DIR="$PLANS" \

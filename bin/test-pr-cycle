@@ -314,7 +314,7 @@ reset_state() {
           "$SCRATCH"/dm-* "$SCRATCH"/state-* "$SCRATCH"/view-*.json \
           "$SCRATCH"/verdictview-*.json "$SCRATCH"/tree-* "$SCRATCH"/gh-fail-verdict
     rm -f "$SCRATCH/IBL5-merge-digest.md" "$SCRATCH/.ibl5-pr-cycle.stop"
-    rm -rf "/tmp/pr-cycle-$TSBASE"* 2>/dev/null
+    rm -rf "$SCRATCH/verdicts" "/tmp/pr-cycle-$TSBASE"* 2>/dev/null
     rm -f "/tmp/pr-cycle-$TSBASE"*.sh "/tmp/pr-cycle-$TSBASE"*.log 2>/dev/null
     rm -f "$SCRATCH/Library/LaunchAgents"/com.ibl5.pr-cycle-*.plist 2>/dev/null
     clear_live_labels
@@ -345,6 +345,7 @@ run_in() {
         PR_CYCLE_LEDGER="${LEDGER-$SCRATCH/IBL5-merge-digest.md}" \
         PR_CYCLE_STOP_FILE="$SCRATCH/.ibl5-pr-cycle.stop" \
         PR_CYCLE_NOW="2026-01-01T00:00:00Z" \
+        PR_CYCLE_VERDICT_DIR="${VERDICT_DIR:-$SCRATCH/verdicts}" \
         PR_CYCLE_TS="${TSPIN:-$TSBASE}" \
         "$DRIVER" "$@" 2>"$ERR")"
     RC=$?
@@ -377,6 +378,8 @@ grep -qF 'PR_CYCLE_SKIP_READY_WHEN_ARMABLE' <<< "$OUT" \
     || fail "--help omits the PR_CYCLE_SKIP_READY_WHEN_ARMABLE seam"
 grep -qF 'PR_CYCLE_LOG' <<< "$OUT" \
     || fail "--help truncated: the trailing PR_CYCLE_LOG seam line is missing"
+grep -qF 'judged-empty form' <<< "$OUT" \
+    || fail "--help omits the gate-nominee handling note"
 for bad in "--nope" "--max-merges 0" "--max-merges -1" "--max-merges abc" "--max-merges" "--go --stop" \
            "--only" "--only abc" "--only 0" "--only 007" "--only -1" "--only 101 --skip 102" \
            "--skip" "--skip abc" "--skip 1,x"; do
@@ -501,8 +504,11 @@ run --worker
     || fail "first attack call: $(sed -n '1p' "$SCRATCH/attack.argv")"
 [[ "$(sed -n '2p' "$SCRATCH/attack.argv")" == "--work abc123 --gate-edges /dev/null" ]] \
     || fail "second attack call: $(sed -n '2p' "$SCRATCH/attack.argv")"
-grep -qF '#999' <<< "$OUT" || fail "gate nominee was not reported as excluded"
-[[ "$(calls ready)" == "3" ]] || fail "want 3 ready calls after nominee exclusion, got $(calls ready)"
+grep -qF '#999 dangling-gate — ordered with no gate edges (gate nominee, judged-empty)' <<< "$OUT" \
+    || fail "gate nominee log line missing or misworded: $(grep -F '#999' <<< "$OUT")"
+! grep -qF 'excluded this run' <<< "$OUT" \
+    || fail "driver still claims nominees are excluded; --gate-edges /dev/null re-admits every one"
+[[ "$(calls ready)" == "3" ]] || fail "want 3 ready calls after nominee re-admission, got $(calls ready)"
 end_case "case 6 gate nominees"
 
 # ==========================================================================================
@@ -821,6 +827,58 @@ Verdict: green. No digest block here.')" > "$SCRATCH/view-101.json" ;;
             ledger | grep -qF '**Touches:** partial' || fail "partial: present label lost" ;;
     esac
 done
+
+# 15d — verdict file on disk recovers the digest when no comment exists
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
+    > "$SCRATCH/triage-out"
+echo MERGED > "$SCRATCH/state-101"
+printf '%s' "$(view_json 101 '')" > "$SCRATCH/view-101.json"
+mkdir -p "$SCRATCH/verdicts"
+cat > "$SCRATCH/verdicts/pr-ready-verdict-101.md" <<'VFILE_EOF'
+<!-- pr-ready-verdict -->
+Verdict: green.
+
+### Merge digest
+**What changed:** recovered change
+**Why:** recovered reason
+**Watch:** recovered watch
+**Touches:** bin/pr-cycle
+**Machine-authored fixes:** none
+VFILE_EOF
+VERDICT_DIR="$SCRATCH/verdicts" run --worker
+[[ "$(rows)" == "1" ]] || fail "verdict_file_recovery: want 1 row, got $(rows)"
+ledger | grep -qF '**What changed:** recovered change' \
+    || fail "verdict_file_recovery: recovered label not in ledger"
+ledger | grep -qF 'digest: unavailable' && fail "verdict_file_recovery: unavailable line still emitted"
+
+# 15e — no ready file and no verdict file → reason names triage-sweep arming
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" "102 ARMABLE armed" "103 NEEDS-WORK rebase" \
+    > "$SCRATCH/triage-out"
+echo MERGED > "$SCRATCH/state-101"
+echo MERGED > "$SCRATCH/state-102"
+printf '%s' "$(view_json 101 "$(digest_comment)")" > "$SCRATCH/view-101.json"
+printf '%s' "$(view_json 102 '')" > "$SCRATCH/view-102.json"
+run --worker
+[[ "$(rows)" == "2" ]] || fail "no_ready: want 2 rows, got $(rows)"
+ledger | grep -qF 'no /pr-ready pass (armed by triage sweep)' \
+    || fail "no_ready: triage-sweep reason not found for unreadied #102"
+
+# 15f — ready file exists but no verdict comment and no verdict file → reason names /pr-ready
+reset_state
+printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
+    > "$SCRATCH/triage-out"
+echo MERGED > "$SCRATCH/state-101"
+printf '%s' "$(view_json 101 '')" > "$SCRATCH/view-101.json"
+run --worker
+[[ "$(rows)" == "1" ]] || fail "ready_no_verdict: want 1 row, got $(rows)"
+ledger | grep -qF 'digest: unavailable — /pr-ready ran but posted no verdict comment' \
+    || fail "ready_no_verdict: /pr-ready reason string not found"
+
 end_case "case 15 degraded digests"
 
 # ==========================================================================================

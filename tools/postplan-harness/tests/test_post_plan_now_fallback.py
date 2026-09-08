@@ -330,3 +330,18 @@ def test_harness_default_is_the_main_checkout(tmp_path):
     src = open(PPN).read()
     assert 'HARNESS="${HARNESS:-/Users/ajaynicolas/GitHub/IBL5/tools/postplan-harness}"' in src
     assert '$ROOT/tools/postplan-harness' not in src
+
+
+def test_plan_override_reaches_the_python_harness_in_live_mode():
+    """--plan must land in the HARNESS invocation, not only the skill-fallback prompt.
+
+    plan_source (harness/state.py) is recorded by harness/planfile.py::locate_plan, which
+    only sees an explicit path via runner.py's --plan. runner.py rejects --plan outside
+    --mode isolated, and --live is itself isolated-only, so the INSTALLED live mode is the
+    one place both apply. If PLAN_ARG were interpolated into $PROMPT instead, a live
+    override would resolve through bin/lib/plan-resolve.sh, which writes no result.json —
+    and the audit trail this field exists for would not cover the live run class.
+    """
+    src = open(PPN).read()
+    seg = next(l for l in src.splitlines() if l.startswith("    HARNESS_SEG="))
+    assert "--live${PLAN_ARG}" in seg

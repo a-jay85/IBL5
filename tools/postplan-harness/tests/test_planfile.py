@@ -638,6 +638,75 @@ def test_slug_drift_numeric_variants_still_win(tmp_path):
     assert info.slug_drift == ""
 
 
+# ---------------------------------------------------------------------------
+# plan_source audit-trail tests — a cleared condition (13) must be readable as
+# "cleared by --plan", not identical to "never fired".
+# ---------------------------------------------------------------------------
+
+def test_plan_source_empty_on_exact_slug_match(tmp_path):
+    """Exact {slug}.md derivation leaves plan_source "" (result.json stays byte-identical)."""
+    info = locate_plan("my-slug", plans_dir=_mkplans(tmp_path, "my-slug.md"))
+    assert info.found
+    assert info.plan_source == ""
+
+
+def test_plan_source_variant(tmp_path):
+    plans_dir = _mkplans(tmp_path, "my-slug.md", "my-slug-2.md")
+    with contextlib.redirect_stderr(io.StringIO()):
+        info = locate_plan("my-slug", plans_dir=plans_dir)
+    assert info.plan_source == "variant"
+
+
+def test_plan_source_drift(tmp_path):
+    """Drift adoption is labelled "drift" and still sets slug_drift (condition 13 holds)."""
+    plans_dir = _mkplans(tmp_path, "plan-my-slug.md")
+    with contextlib.redirect_stderr(io.StringIO()):
+        info = locate_plan("my-slug", plans_dir=plans_dir)
+    assert info.plan_source == "drift"
+    assert info.slug_drift == "plan-my-slug.md"
+
+
+def test_plan_source_override_when_stem_matches_slug(tmp_path):
+    """--plan naming {slug}.md is a no-op restatement: condition (13) was never going to fire."""
+    plans_dir = _mkplans(tmp_path, "my-slug.md")
+    info = locate_plan("my-slug", explicit_path=os.path.join(plans_dir, "my-slug.md"))
+    assert info.found
+    assert info.plan_source == "override"
+    assert info.slug_drift == ""
+
+
+def test_plan_source_override_mismatch_records_bypassed_derivation(tmp_path):
+    """--plan naming a stem != branch slug: slug_drift stays "" (13 clear) but the audit says why."""
+    plans_dir = _mkplans(tmp_path, "plan-my-slug.md")
+    info = locate_plan("my-slug", explicit_path=os.path.join(plans_dir, "plan-my-slug.md"))
+    assert info.found
+    assert info.plan_source == "override-mismatch"
+    assert info.slug_drift == ""   # the hold is cleared by the flag, exactly as designed
+
+
+def test_plan_source_empty_when_override_path_absent(tmp_path):
+    """A --plan path that does not exist is plan-blind — no source label to record."""
+    info = locate_plan("my-slug", explicit_path=str(tmp_path / "nope.md"))
+    assert not info.found
+    assert info.plan_source == ""
+
+
+def test_to_json_strips_empty_plan_source():
+    res = RunResult(terminal="shipped-held", slug="x",
+                    plan=PlanInfo(found=True, path="x.md"))
+    assert "plan_source" not in __import__("json").loads(res.to_json())["plan"]
+    res.plan.plan_source = "override-mismatch"
+    d = __import__("json").loads(res.to_json())
+    assert d["plan"]["plan_source"] == "override-mismatch"
+
+
+def test_runner_audit_line_carries_plan_source():
+    """The phase1 audit line is the only per-run record an auditor reads without result.json."""
+    runner_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "runner.py")
+    assert "plan_source={plan.plan_source or '-'}" in open(runner_path).read()
+
+
 # Phase 4 — runner wiring assertion
 def test_runner_threads_explicit_path():
     runner_path = os.path.join(

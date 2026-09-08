@@ -101,19 +101,56 @@ jobs:
           port: ${{ secrets.PORT }}
           private-key: ${{ secrets.PRIVATE_KEY }}
 
+      # The DM's Deploy: line must point at the deploy the promotion started, not
+      # at this promoter run. The push above fast-forwards production to
+      # PROMOTE_SHA, which starts main.yml ("Build and Deploy") on branch
+      # production at that same SHA — so that pair identifies the run uniquely.
+      # The run is created a few seconds after the push, hence the poll.
+      # Keyed to the workflow FILE .github/workflows/main.yml: renaming that
+      # file degrades this silently to the checks-URL fallback below.
+      - name: Resolve the Build and Deploy run URL
+        id: deploy_url
+        if: steps.promote.outputs.outcome == 'promoted'
+        env:
+          PROMOTE_SHA: ${{ github.event.workflow_run.head_sha }}
+          GH_TOKEN: ${{ secrets.CI_PAT }}
+          TARGET_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          # Deliberately NOT `set -e`: this step is cosmetic. A transient API
+          # error must never turn a promotion that actually succeeded red.
+          set -uo pipefail
+          url=''
+          for attempt in $(seq 1 12); do
+            url="$(gh api \
+              "/repos/$TARGET_REPO/actions/workflows/main.yml/runs?head_sha=$PROMOTE_SHA&branch=production" \
+              --jq '[.workflow_runs[]] | sort_by(.created_at) | last | .html_url' 2>/dev/null || true)"
+            if [ -n "$url" ] && [ "$url" != "null" ]; then
+              break
+            fi
+            url=''
+            [ "$attempt" -lt 12 ] && sleep 5
+          done
+          printf 'deploy_url=%s\n' "$url" >> "$GITHUB_OUTPUT"
+
       - name: Build Discord message
         if: steps.promote.outputs.outcome == 'promoted' || failure()
         env:
           OUTCOME: ${{ steps.promote.outputs.outcome }}
           PROMOTE_SHA: ${{ github.event.workflow_run.head_sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          DEPLOY_URL: ${{ steps.deploy_url.outputs.deploy_url }}
+          # Race-free fallback when the poll times out. Never fall back to
+          # RUN_URL here — that is the promoter's own run, i.e. the exact wrong
+          # link this step exists to stop sending.
+          CHECKS_URL: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.event.workflow_run.head_sha }}/checks
         run: |
           set -euo pipefail
           if [ "$OUTCOME" = "promoted" ]; then
             {
               printf 'Auto-promoted master to production: %s\n\n' "${PROMOTE_SHA:0:11}"
               printf '%s\n\n' "$(git log -1 --format=%s "$PROMOTE_SHA")"
-              printf 'Deploy: %s\n' "$RUN_URL"
+              printf 'Deploy: %s\n' "${DEPLOY_URL:-$CHECKS_URL}"
             } > /tmp/discord-msg.txt
           else
             {

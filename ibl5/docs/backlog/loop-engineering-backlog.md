@@ -27,7 +27,7 @@ last_verified: 2026-09-08
 
 | # | Title | Status | Automouse | Effort |
 |---|-------|--------|-----------|-------:|
-| L1 | Plan dependency DAG | ⬜ Open | 🟦 | M |
+| L1 | Plan dependency DAG | ✅ Implemented | — | M |
 | L2 | Per-plan circuit breaker | ✅ Implemented | — | S |
 | L3 | Morning digest | ⬜ Open | 🟦 | S |
 | L4 | Retro-miner | ⬜ Open | 🟥 | M |
@@ -102,13 +102,13 @@ last_verified: 2026-09-08
 | L73 | Forced-verification row in `_plan-verification.md` references lsof port guard deleted before shipping — row's live-instance check cannot self-verify | ⬜ Open | 🟥 | S |
 | L74 | `write_canary_park_report()` glob-pipeline abort under `set -euo pipefail` (fixed); N1 declared-omission note (n/a) | ✅ Fixed | — | XS |
 | L75 | `/plan` byte target derived without measuring the verbatim-protected floor — `_plan-verification.md` cap corrected to 21504 B | ⬜ Open | 🟦 | S |
+| L76 | `bin/lib/plan-depends-on` fail-open on unreadable plan (fixed); portable self-heal cases placed behind macOS-only guard in test harness (fixed) | ✅ Fixed | — | S |
+| L77 | PR body claimed "20 verification rows, V1–V20" when 12 matrix rows realized; `automouse-workflow.md` compression undeclared (both fixed in PR body) | ✅ Fixed | — | XS |
+| L78 | PR #2178 fidelity-review notes (a–e): doc omissions in `automouse-workflow.md`, test-harness escape hatches, V17/V20 annotation mismatches, dead-code guard asymmetry — all non-blocking, none fixed this pass | ⬜ Open | 🟦 | S |
+| L79 | `mtime_of()` in `bin/test-automouse-depends-on` used `stat -f %m \|\| stat -c %Y`; GNU stat `-f` exits 0 with filesystem verbatim output on Linux, blocking the `\|\|` fallback — V9 failed on Linux CI (fixed) | ✅ Fixed | — | XS |
 
 ### L1 Plan dependency DAG
-**Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
-**Problem:** mtime order is a proxy, not a guarantee: a plan whose prerequisite PR hasn't merged can run anyway and fail or build on the wrong base.
-**Suggested direction:** `depends_on:` frontmatter (plan slug or PR#); the queue holds/skips a plan whose prerequisite isn't merged, self-healing it back in once it is (L8 already has the requeue machinery).
-**Risk if untouched:** Dependency hazards in every multi-plan program (observed hazard class in the 11-plan queue).
-**Status (2026-07-07):** ⬜ Open — 🟦.
+➜ L1 Plan dependency DAG — ✅ Implemented (2026-09-08): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
 
 ### L2 Per-plan circuit breaker
 ➜ L2 Per-plan circuit breaker — ✅ Implemented (2026-07-15): see [loop-engineering-backlog-archive.md](archive/loop-engineering-backlog-archive.md).
@@ -1201,3 +1201,96 @@ Landing: rung 1 — extend `.claude/rules/pr-body-negative-claim-recheck.md` to 
 **artifact destination:** `.claude/skills/plan/_architect-contract.md` — byte-reduction recipe section, or wherever split-file targets are specified.
 
 **provenance:** (discovered 2026-09-08 during architect-contract-rules-detail-split)
+
+### L76 `bin/lib/plan-depends-on` fail-open on unreadable plan; portable self-heal cases behind macOS guard
+
+**class:** A `bin/lib/` dependency evaluator that suppresses `awk` errors with `2>/dev/null`, so an unreadable plan file produces empty output — the key-absent fast-path then returns `met` rather than `unresolvable`, inverting the stated contract. A companion defect: a test harness places its portable verification cases (V6–V9) inside a macOS-only OS guard, so the Linux CI step never exercises them.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/lib/plan-depends-on:42` (pre-fix) — `awk '…' "$plan_file" 2>/dev/null` silently returns empty on EACCES/ENOENT; key-absent fast-path promoted empty to `met` | yes | live | fixed this pass |
+| 2 | `bin/test-automouse-depends-on:436` (pre-fix) — Section 3 (V6–V9 self-heal cases) inside `if [ "$(uname)" = Darwin ]` guard; V9 used BSD-only `stat -f %m` | yes | live | fixed this pass |
+
+**prevention_ladder:**
+- rung 0 — no existing gate checks for `2>/dev/null` on a user-supplied path argument.
+- rung 1 — no existing gate covers OS-guard placement in test harnesses.
+- rung 2 — a note in `.claude/rules/automouse-workflow.md` that `plan_depends_on_status` must fail-closed (return `unresolvable`) on any file it cannot read; and that self-heal cases must not sit inside an OS guard because `bin/automouse/self-heal` itself is portable.
+- rung 3/4/5 — no PHPStan/CI gate can mechanize OS-guard placement or awk-suppress scope.
+- **landing rung: rung 2** — add prose note to the rule doc; no new gate warranted.
+
+**artifact destination:** `.claude/rules/automouse-workflow.md` — `depends_on:` hold gate section.
+
+**provenance:** (discovered 2026-09-08 during PR #2178 fidelity review)
+
+### L77 PR body claimed unrealized verification-row count; `automouse-workflow.md` compression undeclared
+
+**class:** A PR body that states a verification-row count higher than the number of matrix rows realized in the harness, and that silently compresses a rules file without disclosing the byte-cap trade-off — giving reviewers a false picture of test coverage and scope.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | PR #2178 Summary — "20 verification rows, V1–V20" when only V1–V11 and V14 realized; V12–V13 and V15–V20 absent from harness | yes | live | fixed this pass (PR body updated) |
+| 2 | PR #2178 Summary — `.claude/rules/automouse-workflow.md` listed as "documents the `depends_on:` key" with no mention of the byte-cap compression that deleted the `$1.82→$12.86` cost example | yes | live | fixed this pass (PR body updated) |
+
+**prevention_ladder:**
+- rung 0 — no existing gate cross-checks PR body row counts against the realized test cases.
+- rung 1 — no gate owns PR body accuracy for autonomous-loop runs.
+- rung 2 — the existing `.claude/rules/pr-body-claims.md` and `.claude/rules/pr-body-negative-claim-recheck.md` rules cover cited figures and negative claims; extend them to require that any rules-file edit that compresses content discloses the byte-cap reason in the PR body.
+- rung 3/4/5 — not mechanizable.
+- **landing rung: rung 2** — add a note to `.claude/rules/pr-body-claims.md` that a rules-file edit driven by the byte cap must name the cap in the PR body.
+
+**artifact destination:** `.claude/rules/pr-body-claims.md` — add a row to the Application table covering rules-file byte-cap compression.
+
+**provenance:** (discovered 2026-09-08 during PR #2178 fidelity review)
+
+---
+
+### L78 PR #2178 fidelity-review notes (a–e): doc omissions, test-harness escape hatches, annotation mismatches, dead-code guard asymmetry
+
+**class:** Coverage gaps left unfixed in a nightly-pipeline PR: doc omissions in a rules file, escape hatches in the test harness that suppress failure output for a known-broken row, annotation mismatches between the plan matrix and harness realisation, and a dead-code guard added asymmetrically — each individually non-blocking but collectively leaving regression paths open.
+
+**occurrence table:**
+
+| # | File:line | Note | Same class? | Live? | Status |
+|---|-----------|------|-------------|-------|--------|
+| 1 | `.claude/rules/automouse-workflow.md` — `paths:` not widened to include `bin/lib/plan-depends-on`; Phase 7 items 7.2 (queue layout line) and 7.4 (self-heal paragraph) absent; "symlink mtime preserved" and "scan before skipped/ guard" facts documented nowhere | note (a) | yes | live | not fixed — filed |
+| 2 | `bin/test-automouse-depends-on` — V2/V4/V5 declare `.lock`-absent assertions; no `.lock` assertion exists in the harness; the Automouse Hold Justification's "each has a verification row" claim is therefore false for this bug shape | note (b) | yes | live | not fixed — filed |
+| 3 | `bin/test-automouse-depends-on` — V14 escape hatch: hardcoded `# V14 WARN: … not counted as a failure here`; masks a genuine future regression locally on macOS | note (c) | yes | live | not fixed — filed |
+| 4 | `bin/test-automouse-depends-on` / plan matrix — V17 and V20 carry "(wired in this PR)" annotation in the matrix but appear nowhere in the harness; V19 likewise has no realisation in the diff | note (d) | yes | live | not fixed — filed |
+| 5 | `bin/automouse/run:1161` — `case "${DEPENDS_HELD:- }" in …` guard is dead code; `DEPENDS_HELD=" "` at top-level line 546 executes unconditionally before both call sites (1161, 1268); the `:- ` form is asymmetric with the sibling `CAP_DEFERRED` line one row above | note (e) | yes | live | not fixed — filed |
+
+**prevention_ladder:**
+- rung 0 — not covered by any existing gate.
+- rung 1 — no existing gate checks rule-file `paths:` widening completeness, harness escape-hatch prose, or plan-matrix annotation fidelity.
+- rung 2 — a note in `automouse-workflow.md`'s `depends_on:` section that `paths:` must list all helper scripts; and a test-authoring norm (e.g. in `.claude/rules/bin-help-span-and-secondary-assertions.md` or a new rule) that every declared secondary token and every "(wired in this PR)" annotation must have a corresponding `want` or `assert` call. Rung 2 is the landing rung for all five occurrences.
+- rung 3/4/5 — not mechanizable: PHPStan/CI cannot validate prose annotations against test implementations.
+- **landing rung: rung 2** — prose notes in the relevant rule docs; no new gate warranted.
+
+**artifact destination:** `.claude/rules/automouse-workflow.md` (occurrence 1), `.claude/rules/bin-help-span-and-secondary-assertions.md` or a new harness-annotation rule doc (occurrences 2–4)
+
+**provenance:** (discovered 2026-09-08 during PR #2178 fidelity review, notes a–e)
+
+---
+
+### L79 `mtime_of()` GNU stat `-f` exits 0 with wrong output — Linux CI V9 failure
+
+**class:** A portable-stat helper that uses `stat -f %m || stat -c %Y` fails silently on Linux because GNU `stat -f` (filesystem-stat mode) exits 0 but produces verbose block/inode output, never triggering the `||` fallback — a platform-divergence defect that passes all macOS development tests but fails Linux CI.
+
+**occurrence table:**
+
+| # | File:line | Same class? | Live? | Status |
+|---|-----------|-------------|-------|--------|
+| 1 | `bin/test-automouse-depends-on:56` — `mtime_of() { stat -f %m "$1" 2>/dev/null \|\| stat -c %Y "$1" 2>/dev/null; }` — V9 "plan mtime changed" FAIL on Linux CI (run 34272784060 job 102218662249) | yes | live | fixed (commit f2584c8e1, PR #2178 Phase 7) |
+
+**prevention_ladder:**
+- rung 0 — no gate checks portable-stat helpers for Linux/BSD divergence.
+- rung 1 — ShellCheck does not catch this pattern; `-f` is a valid flag on both platforms with different semantics.
+- rung 2 — norm: portable-mtime helpers must use `uname` branching, not `|| fallback`, because GNU `stat -f` exits 0 with wrong output. Add a note to `.claude/rules/shell-pipefail-grep.md` or a new rule covering portable-stat pitfalls.
+- **landing rung: rung 2** — a one-sentence authoring norm; no new gate warranted.
+
+**artifact destination:** `.claude/rules/shell-pipefail-grep.md` — add a note on `stat -f` portability: use `uname` branching, not `||` fallback.
+
+**provenance:** (discovered 2026-09-08 during PR #2178 Phase 7 CI monitoring)

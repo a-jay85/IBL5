@@ -61,7 +61,7 @@ A headless `claude -p` process runs on a recurring schedule via macOS `launchd`.
 
 Each phase's cost is recorded in two places: the markdown row in `reports/YYYY-MM-DD-costs.md` and a line-delimited JSON file `logs/YYYY-MM-DD.costs.jsonl` (the *sidecar ledger*). One JSON object per priced phase is written next to the log by `bin/automouse/run` going forward, and by `bin/automouse/backfill-costs` for history. The weekly aggregate in the costs report reads the sidecar rather than re-parsing the markdown rows, replacing the old fragile column-count heuristic.
 
-**Recomputed vs. harness cost.** The harness `result` event undercounts badly: it sums only the top-level `usage` of the main transcript, missing (a) every entry in `usage.iterations[]` and (b) every subagent transcript. `bin/lib/automouse-pricer` recomputes from the transcripts after the phase exits — subagent transcripts are still flushing when `result` fires. Concrete magnitude: for the 2026-08-18 `db-query-worktree-routing` impl phase, the harness reported $1.82 <!-- RETIRED-OK: superseded by recomputed $12.86 --> while recomputation gives $12.86.
+**Recomputed vs. harness cost.** The harness `result` event undercounts: it sums only the top-level `usage` of the main transcript, missing `usage.iterations[]` entries and all subagent transcripts. `bin/lib/automouse-pricer` recomputes from transcripts after the phase exits — subagent transcripts are still flushing when `result` fires.
 
 **Prov column.** Each cost row carries a `Prov` (provenance) value:
 
@@ -71,9 +71,9 @@ Each phase's cost is recorded in two places: the markdown row in `reports/YYYY-M
 | `recomputed-anomalous` | Recomputation succeeded but diverges from the harness figure in a way the mechanical check flags: recomputed cost falls more than $0.01 below the harness figure, or the joined transcript spans materially longer than the logged phase duration. |
 | `unknown` | No transcript could be joined to this row — the harness figure is left as-is (transcripts age out after ~30 days). |
 
-**`peak_ctx` semantics.** `peak_ctx` is the maximum context occupancy of the **main** transcript only, taken over `usage.iterations[]` when present (the top-level `usage` on such a record is their sum across iterations, not any single occupancy) and excluding `advisor_message` iterations (which run against a separate inference window). Sub-agent occupancy is excluded because a sub-agent runs in its own context window. Rows written before 2026-08-26 carry the older summed figure and read high compared to post-fix rows.
+**`peak_ctx` semantics.** Maximum context occupancy of the **main** transcript only, taken over `usage.iterations[]` when present (the top-level `usage` is their sum, not a single occupancy) and excluding `advisor_message` iterations. Sub-agent occupancy is excluded. Rows before 2026-08-26 carry the older summed figure and read high.
 
-**Reported cost is a floor.** Compaction summarization is not recorded in any transcript record, so it is carried separately as a bounded interval in the "Surcharge est ($)" column: `low–high`, where low is the cache-read cost of the pre-boundary context and high is a full input re-read plus summary output. This interval is never folded into the cost column.
+**Reported cost is a floor.** Compaction cost is not in any transcript record — carried separately as `low–high` in "Surcharge est ($)" (cache-read of pre-boundary context → full re-read plus summary output). Not folded into the cost column.
 
 ### Startup archival
 
@@ -137,3 +137,36 @@ Every parser is **line-1-anchored** (frontmatter only, to the closing `---`), so
 ## Feature PRs cannot auto-merge
 
 Conventional-commit **`feat:`** PRs are gated by the required `human-signoff` check and will **not** auto-merge unattended — they wait for a human to apply the `human-approved` label after inspection (ADR-0062). `/post-plan` Phase 6.5 condition (8) deterministically **never arms** a `feat:` PR (a literal title grep), so there is no arm-then-strip; the required `human-signoff` check remains the independent floor that blocks the merge regardless. Maintenance PRs (`fix`/`refactor`/`chore`/`ci`/`docs`/`revert`) auto-merge as before — still subject to Phase 6.5's other conditions, including the PR-time safety verdict (9) on the realized diff. Check `gh pr list` afterward for `feat:` PRs awaiting your label.
+
+## `depends_on:` hold gate
+
+A plan can declare prerequisites in its YAML frontmatter. When a plan is picked from the queue, `bin/automouse/run` calls `bin/lib/plan-depends-on` to evaluate the key before touching the attempt counter. If any dependency is unmet, the plan is **held** (not attempted) and a `.depends-hold` sidecar is written to `queue/<plan>.md.depends-hold`.
+
+**Frontmatter syntax:**
+
+```yaml
+---
+depends_on:
+  - 2099          # PR number — held until merged
+  - other-plan    # plan slug — held until other-plan.md appears in done/
+---
+```
+
+Inline scalar form also works: `depends_on: 2099`.
+
+**Three-state verdict** (from `bin/lib/plan-depends-on`):
+
+| Verdict | Meaning |
+|---------|---------|
+| `met` | All deps satisfied (or key absent). Proceed to impl. |
+| `unmet:<dep>` | Dep resolved cleanly but not yet merged/done. Hold. |
+| `unresolvable:<dep>:<reason>` | Dep cannot be evaluated. Hold. Reasons: `gh-error`, `bad-value`, `empty-value`, `no-done-dir`. |
+
+**Hold lifecycle:**
+
+- A held plan stays in `queue/` with a `.depends-hold` sidecar and is skipped every pick cycle (zero attempt cost — the counter never increments).
+- `bin/automouse/self-heal` scans `queue/*.depends-hold` on every run and removes the sidecar when the dep is now `met`, re-enabling the plan for the next pick.
+- An orphan sidecar (plan left `queue/` via manual removal) is reaped by `self-heal`.
+- The `.depends-hold` sidecar is NOT touched by `bin/automouse/queue remove` — self-heal's orphan-reap is the cleanup path.
+
+**Run-scoped dedup:** once a plan is held within a run, it is skipped for the rest of that run (space-padded `DEPENDS_HELD` string). When every plan in the queue is held, the run terminates cleanly rather than spinning.

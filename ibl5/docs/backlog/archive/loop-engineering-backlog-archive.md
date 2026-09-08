@@ -1,6 +1,6 @@
 ---
 description: Historical archive: completed autonomous-loop engineering entries, extracted from loop-engineering-backlog.md.
-last_verified: 2026-09-06
+last_verified: 2026-09-08
 ---
 
 # Autonomous-Loop Engineering Backlog — Archive
@@ -330,3 +330,10 @@ Landing rung: 1 (extend `bin/automouse/queue add` validation to cover all plans,
 `artifact destination:` `.claude/rules/pr-body-claims.md` (example) — or an addendum to `.claude/rules/auto-commit.md`. Ships in a repo worktree as a normal PR.
 `provenance:` (discovered 2026-09-02 during #2059)
 **Status (2026-09-05):** ✅ Implemented (#2131) — `.claude/rules/pr-body-claims.md` landed (rung 2 of L43 prevention ladder).
+
+### L1 Plan dependency DAG
+**Location:** `bin/automouse/queue` — queue order is symlink mtime (`ls -1tr`); `bin/automouse/queue-reorder-ui` re-touches mtimes by hand. No `depends_on` anywhere (verified).
+**Problem (was):** mtime order is a proxy, not a guarantee: a plan whose prerequisite PR hasn't merged can run anyway and fail or build on the wrong base.
+**Suggested direction (was):** `depends_on:` frontmatter (plan slug or PR#); the queue holds/skips a plan whose prerequisite isn't merged, self-healing it back in once it is (L8 already has the requeue machinery).
+**Risk if untouched (was):** Dependency hazards in every multi-plan program (observed hazard class in the 11-plan queue).
+**Status (2026-09-08):** ✅ Implemented — `depends_on:` frontmatter, held in `bin/automouse/run` at pick time via a `queue/<plan>.md.depends-hold` sidecar, cleared by `bin/automouse/self-heal`; contract in `.claude/rules/automouse-workflow.md`, locked by `bin/test-automouse-depends-on`.

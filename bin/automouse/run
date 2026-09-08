@@ -1158,7 +1158,7 @@ claim_next_plan() {
         # Dependency-held earlier in THIS run. Same shape as CAP_DEFERRED: skip
         # before locking so a sibling runner stays free, and so the pick loop
         # falls through instead of re-picking the same held plan forever.
-        case "$DEPENDS_HELD" in *" $plan_name "*) continue ;; esac
+        case "${DEPENDS_HELD:- }" in *" $plan_name "*) continue ;; esac
         lock="$QUEUE_DIR/${plan_name}.lock"
         # Fast path: unlocked plan — claim atomically.
         if mkdir "$lock" 2>/dev/null; then

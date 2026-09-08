@@ -12,7 +12,7 @@ owner: ajaynicolas
 
 ## Context
 
-PR #2174 added `bin/test-architect-contract-split` with 37 bold-token assertions using `printf '%s' "$var" | grep -qF -- "$token"` under `set -euo pipefail`. All 37 passed on macOS in development but failed in CI (ubuntu-latest) because `grep` found a match and exited early (exit 0), sending SIGPIPE to `printf` (exit 141). Under `pipefail`, the pipeline's exit status is the leftmost non-zero — 141 — making the `if !` check enter the failure branch even though `grep` succeeded. ShellCheck does not catch this pattern.
+PR #2174 added `bin/test-architect-contract-split` with 37 bold-token assertions using `printf '%s' "$var" | grep -qF -- "$token"` under `set -euo pipefail`. All 37 passed on macOS in development but failed in CI (ubuntu-latest) because `grep` found a match and exited early (exit 0), sending SIGPIPE to `printf` (exit 141). Under `pipefail`, the pipeline's exit status is the rightmost non-zero — 141 — making the `if !` check enter the failure branch even though `grep` succeeded. ShellCheck does not catch this pattern.
 
 ## Decision
 

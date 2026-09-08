@@ -14,7 +14,7 @@ Under `set -o pipefail`, never write:
 printf '%s' "$var" | grep -qF -- "$token"
 ```
 
-When grep finds a match and exits early, printf gets SIGPIPE (exit 141). Under pipefail, the pipeline's exit status is the leftmost non-zero — 141 — even though grep succeeded with 0. The `if !` check then enters the failure branch on macOS-passing, Linux-failing grounds.
+When grep finds a match and exits early, printf gets SIGPIPE (exit 141). Under pipefail, the pipeline's exit status is the rightmost non-zero — 141 — even though grep succeeded with 0. The `if !` check then enters the failure branch on macOS-passing, Linux-failing grounds.
 
 **Use a herestring instead:**
 

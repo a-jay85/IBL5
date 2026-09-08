@@ -20,8 +20,8 @@
 #   at least one is xhigh. Gate is advisory — always overridable with --tier-ok "reason".
 #   The hint is fed the prompt's /plan task statement line only — the whole file
 #   false-positives on security words sitting inside negations. Gate skips silently
-#   when: the hint is not executable, there is no task line, no `MUST route to`
-#   directive, the hint exits non-zero, or it returns an unknown value.
+#   when: the hint is not executable, no `MUST route to` directive, the hint exits
+#   non-zero, or it returns an unknown value.
 #   Exit codes: 0 ok, 1 internal error, 2 bad flag or missing file, 3 declined by dup
 #   gate, 4 declined by tier gate.
 # ---
@@ -206,6 +206,15 @@ if [ -x "$TIER_HINT" ]; then
                                         printf 'plan-now: to override: bin/plan-now --tier-ok "your reason" ...\n'
                                         printf 'plan-now: exiting 4 — recheck the tier or pass --tier-ok.\n'
                                     } >&2
+                                    if [ "$NOTIFY" = 1 ]; then
+                                        DISCORD_DM="${PLAN_NOW_DISCORD_DM:-$ROOT/bin/discord-dm}"
+                                        if [ -x "$DISCORD_DM" ]; then
+                                            printf '%s\ndeclared=%s hinted=%s\n%s\n' \
+                                                "**plan-now DECLINED — tier mismatch**" \
+                                                "$DECLARED_TIER" "$HINTED_TIER" "$HINT_EXPLAIN" \
+                                                | "$DISCORD_DM" - || true
+                                        fi
+                                    fi
                                     exit 4
                                 fi
                             fi
@@ -328,7 +337,7 @@ CODA
 # launchd runs with a minimal env — same PATH prelude bin/automouse/run uses.
 export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
 cd "$ROOT" || exit 1
-[ -n "${TIER_OVERRIDE:-}" ] && echo "plan-now: tier-ok override was active: $TIER_OVERRIDE"
+if [ -n "${TIER_OVERRIDE:-}" ]; then echo "plan-now: tier-ok override was active: $TIER_OVERRIDE"; fi
 
 before=$(ls "$PLANS_DIR"/*.md 2>/dev/null | sort)
 started=$(date +%s)

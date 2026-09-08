@@ -119,6 +119,7 @@ last_verified: 2026-09-08
 | E98 | Dead ref in source comment, direction error in comment, plan-required PR body content dropped (Phase 6 findings from #2167) | ✅ fixed this pass | — | XS |
 | E99 | ADR-index frontmatter key duplication via merge=union (Phase 6 blocker from #2111) | ✅ fixed this pass | — | XS |
 | E100 | PR body stale after revert removed plan deliverables; unplanned scope in diff (Phase 6 findings from #1921) | ✅ fixed this pass | — | XS |
+| E102 | `bin/plan-now` exit-4 path skips DM contract; unreachable skip-condition in docs (Phase 5.5 notes from #2185) | ✅ fixed this pass | — | XS |
 
 ### E1 Warm-standby worktree pool
 **Location:** `bin/wt-new` (no pool/claim logic today).
@@ -1893,3 +1894,27 @@ Landing rung: **1** — extend `bin/check-rules-byte-budget` to warn when the ag
 `artifact destination: n/a — no gate`
 
 *(discovered 2026-09-08 during #1921)*
+
+### E102 `bin/plan-now` exit-4 path skips DM contract; unreachable skip-condition in docs (Phase 5.5 notes from #2185)
+
+**class (note, F2):** a new terminal exit path (`exit 4`) in `bin/plan-now` that contradicts the tool's stated "EVERY terminal outcome DMs you through bin/discord-dm" invariant — the tier mismatch decline exits 4 to stderr with no Discord DM, making a detached-run decline invisible until the operator checks the log.
+
+**class (note, F1):** the usage header and PR body both document "no task line" as a skip condition for the tier gate, but this branch is unreachable — a prompt without a `/plan` line already triggers `exit 2` at line 138-139, so the gate's `if [ -n "$TASK_LINE" ]` guard can never fail.
+
+**occurrence table:**
+
+| # | File:line | Class | Live? | Status |
+|---|-----------|-------|-------|--------|
+| 1 (F2) | `bin/plan-now:209` — `exit 4` with no DM block | DM contract violation | was live | fixed this pass (added DM block mirroring dup gate) |
+| 2 (F1) | `bin/plan-now:22-24` + PR body — "no task line" listed as skip condition | unreachable doc | was live | fixed this pass (removed from header comment) |
+| 3 (N1) | `bin/plan-now:338` — `[ -n "${TIER_OVERRIDE:-}" ] && echo` fragile under set -e | latent fragility | was live | fixed this pass (changed to if/fi form) |
+
+**prevention_ladder:**
+- rung 0 — covered by existing tests? `bin/test-plan-now` T-1 through T-9 cover exit codes and output markers but do not assert that a DM is sent on exit 4. Adding a `want "DM sent on exit 4" "$(dm)" "DECLINED — tier mismatch"` assertion to T-1 would catch future regressions.
+- landing rung: **rung 0** — the fix is in place; the prevention improvement (DM assertion in T-1) is an additive test enhancement, filed here rather than as a separate PR.
+
+`prevention_ladder: additive test assertion in bin/test-plan-now T-1 would pin DM-on-exit-4 contract`
+
+`artifact destination: bin/test-plan-now T-1 — add want assertion for DM output`
+
+*(discovered 2026-09-08 during #2185)**

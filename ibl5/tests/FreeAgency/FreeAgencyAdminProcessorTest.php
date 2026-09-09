@@ -532,6 +532,31 @@ class FreeAgencyAdminProcessorTest extends TestCase
         $this->assertStringContainsString($link, $dispatcher->messages[array_key_last($dispatcher->messages)], 'Link must be on the last chunk');
     }
 
+    public function testBuildDiscordChunksArticleLinkForcedToOwnChunkAtBoundary(): void
+    {
+        $signings = [$this->makeSigning(1, 10, 'Miami', 500, 0, 0, 0, 0, 0, 1, false, false)];
+        $dispatcher = $this->makeRecordingDispatcher();
+
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub->method('executeSigningsTransactionally')
+            ->willReturn(['successCount' => 1, 'errorCount' => 0, 'newsSid' => 99]);
+
+        // Final chunk is 1933 chars; link for sid=99 is 67 chars; 1933 + 1("\n") + 67 = 2001 > 2000,
+        // forcing the link into its own final message (the else branch of the link-budget check).
+        $homeText = str_repeat('B', 2000) . "\n" . str_repeat('A', 1933);
+
+        $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb, null, $dispatcher);
+        $processor->executeSignings(1, $signings, 'FA Day 1', $homeText, 'Body text');
+
+        $this->assertGreaterThan(0, count($dispatcher->messages), 'Dispatcher must be called');
+        $link = 'https://iblhoops.net/ibl5/modules.php?name=News&file=article&sid=99';
+        $lastChunk = $dispatcher->messages[array_key_last($dispatcher->messages)];
+        $this->assertSame($link, $lastChunk, 'Link must be the sole content of the last chunk when the previous chunk is too full');
+        foreach ($dispatcher->messages as $chunk) {
+            $this->assertLessThanOrEqual(2000, mb_strlen($chunk), 'No chunk may exceed 2000 characters');
+        }
+    }
+
     public function testBuildDiscordChunksOversizedSingleLine(): void
     {
         $signings = [$this->makeSigning(1, 10, 'Miami', 500, 0, 0, 0, 0, 0, 1, false, false)];

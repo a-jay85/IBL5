@@ -157,7 +157,7 @@ push — see § CI.
 ## Alternatives Considered
 
 - **Sibling clone at `~/GitHub/jsb-native/`** — a separate directory outside IBL5's tree.
-  Rejected because: every existing citation in `engine/docs/backlog/jsb-native-backlog.md`,
+  Rejected because: every existing citation in the JSB RE backlog (now `a-jay85/IBL5-backlog`, label `jsb-native`),
   `engine/.claude/rules/jsb-engine-post-work.md`, `engine/Makefile`, and the accumulated
   `~/claude-plans/*.md` is written as `jsb-native/...` relative to the IBL5 root. A move
   breaks all of them at once for no gain in isolation — git already treats an ignored
@@ -277,4 +277,4 @@ work without change.
 - `ibl5/docs/decisions/0062-all-work-in-worktrees.md` — the rule this ADR excepts
 - `.claude/rules/doc-freshness.md` — the IBL5 frontmatter rule this mirrors
 - `engine/.claude/rules/jsb-engine-post-work.md` — content-anchored citation norm
-- `engine/docs/backlog/jsb-native-backlog.md` — the JSB RE backlog
+- `a-jay85/IBL5-backlog` (label `jsb-native`) — the JSB RE backlog (per ADR-0121, which retired the in-repo markdown corpus)

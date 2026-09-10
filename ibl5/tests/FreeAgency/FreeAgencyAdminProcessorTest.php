@@ -12,6 +12,14 @@ use Tests\WideUnit\Mocks\MockDatabase;
 
 class FreeAgencyAdminProcessorTest extends TestCase
 {
+    private const FIXTURES = __DIR__ . '/fixtures';
+
+    /** Discord's hard per-message ceiling, mirrored from FreeAgencyAdminProcessor. */
+    private const DISCORD_MESSAGE_LIMIT = 2000;
+
+    /** The news sid the fa-day12-hometext.txt fixture was captured from. */
+    private const DAY12_NEWS_SID = 4401;
+
     private MockDatabase $mockDb;
 
     protected function setUp(): void
@@ -650,8 +658,167 @@ class FreeAgencyAdminProcessorTest extends TestCase
     }
 
     // ============================================
+    // buildDiscordChunks() — real production story regression
+    //
+    // fixtures/fa-day12-hometext.txt is the verbatim nuke_stories.hometext
+    // captured from a Day 12 free agency run (sid 4401) in which 80 players
+    // signed. That run was posted to Discord end-to-end and produced exactly
+    // four messages; these tests pin that observed behaviour.
+    // ============================================
+
+    public function testBuildDiscordChunksRealDay12StoryProducesFourMessagesOfExactLength(): void
+    {
+        $dispatcher = $this->dispatchDay12Story();
+
+        // Observed byte-for-byte in the end-to-end run that posted this story.
+        // Exact lengths (not just the count) catch an off-by-one in the greedy
+        // packer that a bare "4 chunks" assertion would sail past — chunk 3 sits
+        // three characters under the limit.
+        $lengths = array_map(
+            static fn (string $m): int => mb_strlen($m),
+            $dispatcher->messages
+        );
+        $this->assertSame([1946, 1899, 1997, 1929], $lengths);
+    }
+
+    public function testBuildDiscordChunksRealDay12StoryKeepsEveryMessageUnderTheLimit(): void
+    {
+        $dispatcher = $this->dispatchDay12Story();
+
+        foreach ($dispatcher->messages as $index => $message) {
+            $this->assertLessThanOrEqual(
+                self::DISCORD_MESSAGE_LIMIT,
+                mb_strlen($message),
+                "Message {$index} exceeds Discord's " . self::DISCORD_MESSAGE_LIMIT . '-character limit'
+            );
+        }
+    }
+
+    public function testBuildDiscordChunksRealDay12StoryAppendsLinkToLastMessageOnly(): void
+    {
+        $dispatcher = $this->dispatchDay12Story();
+        $link = 'https://iblhoops.net/ibl5/modules.php?name=News&file=article&sid=' . self::DAY12_NEWS_SID;
+
+        $last = array_key_last($dispatcher->messages);
+        foreach ($dispatcher->messages as $index => $message) {
+            if ($index === $last) {
+                $this->assertStringEndsWith("\n" . $link, $message, 'Last message must carry the article link');
+                continue;
+            }
+            $this->assertStringNotContainsString($link, $message, "Message {$index} must not carry the article link");
+        }
+
+        // The link fits inside message 4 (1929 chars), so it must NOT become a
+        // fifth, near-empty message.
+        $this->assertCount(4, $dispatcher->messages);
+    }
+
+    public function testBuildDiscordChunksRealDay12StoryRoundTripsWithNoLossOrReordering(): void
+    {
+        $dispatcher = $this->dispatchDay12Story();
+        $link = 'https://iblhoops.net/ibl5/modules.php?name=News&file=article&sid=' . self::DAY12_NEWS_SID;
+
+        // Precondition: this invariant holds only when no single input line
+        // exceeds the limit. Over-limit lines take the mb_str_split() path,
+        // which inserts no separator and so cannot be rejoined with "\n".
+        $normalized = $this->normalizeLikeProcessor($this->loadDay12HomeText());
+        foreach (explode("\n", $normalized) as $line) {
+            self::assertLessThanOrEqual(
+                self::DISCORD_MESSAGE_LIMIT,
+                mb_strlen($line),
+                'Fixture must contain no over-limit line, or the round-trip invariant does not apply'
+            );
+        }
+
+        $rejoined = implode("\n", $dispatcher->messages);
+        $rejoined = mb_substr($rejoined, 0, mb_strlen($rejoined) - mb_strlen("\n" . $link));
+
+        // Exact equality proves three things at once: no line was dropped, no
+        // line was duplicated, and the original line order survived splitting.
+        $this->assertSame($normalized, $rejoined);
+    }
+
+    public function testBuildDiscordChunksRealDay12StoryPacksGreedily(): void
+    {
+        $dispatcher = $this->dispatchDay12Story();
+        $link = 'https://iblhoops.net/ibl5/modules.php?name=News&file=article&sid=' . self::DAY12_NEWS_SID;
+
+        $chunks = $dispatcher->messages;
+        $lastIndex = array_key_last($chunks);
+        $chunks[$lastIndex] = mb_substr(
+            $chunks[$lastIndex],
+            0,
+            mb_strlen($chunks[$lastIndex]) - mb_strlen("\n" . $link)
+        );
+
+        // A split is only legitimate when the very next line could not have fit.
+        // Without this, an over-eager splitter that emitted 8 half-full messages
+        // would still pass every other assertion here.
+        for ($i = 0; $i < $lastIndex; $i++) {
+            $nextLine = explode("\n", $chunks[$i + 1], 2)[0];
+            $this->assertGreaterThan(
+                self::DISCORD_MESSAGE_LIMIT,
+                mb_strlen($chunks[$i]) + 1 + mb_strlen($nextLine),
+                "Message {$i} was split early — the first line of message " . ($i + 1) . ' would have fit'
+            );
+        }
+    }
+
+    public function testExecuteSigningsDiscordFailureMidLoopDropsRemainingChunks(): void
+    {
+        // Documents current behaviour, not desired behaviour: the dispatch loop
+        // aborts into its catch on the first throw, so chunks after the failure
+        // are silently never sent. The operator sees only "post manually", which
+        // does not say how much of the story already made it to Discord.
+        $signings = [$this->makeSigning(1, 10, 'Miami', 500, 0, 0, 0, 0, 0, 1, false, false)];
+        $dispatcher = $this->makeDispatcherFailingAfter(1);
+
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub->method('executeSigningsTransactionally')
+            ->willReturn(['successCount' => 80, 'errorCount' => 0, 'newsSid' => self::DAY12_NEWS_SID]);
+
+        $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb, null, $dispatcher);
+        $result = $processor->executeSignings(
+            12,
+            $signings,
+            'FA Day 12',
+            $this->loadDay12HomeText(),
+            'Body text'
+        );
+
+        // Anchor the claim: this story really does produce 4 chunks, so the
+        // single delivered message below means 3 were dropped — not that the
+        // story happened to fit in one message all along.
+        $this->assertCount(4, $this->dispatchDay12Story()->messages, 'Precondition: this story splits into 4 chunks');
+        $this->assertCount(1, $dispatcher->messages, 'Chunks after the failing one are dropped, not retried');
+        $this->assertTrue($result['success'], 'A Discord outage must not fail the signings themselves');
+        $this->assertSame(80, $result['successCount']);
+        $this->assertStringContainsString('post manually', $result['message']);
+    }
+
+    // ============================================
     // HELPERS
     // ============================================
+
+    /**
+     * Run the real Day 12 story through executeSignings() and capture what was dispatched.
+     *
+     * @return FreeAgencyDiscordDispatcherInterface&object{messages: list<string>}
+     */
+    private function dispatchDay12Story(): object
+    {
+        $signings = [$this->makeSigning(1, 10, 'Miami', 500, 0, 0, 0, 0, 0, 1, false, false)];
+        $dispatcher = $this->makeRecordingDispatcher();
+
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub->method('executeSigningsTransactionally')
+            ->willReturn(['successCount' => 80, 'errorCount' => 0, 'newsSid' => self::DAY12_NEWS_SID]);
+
+        $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb, null, $dispatcher);
+        $processor->executeSignings(12, $signings, 'FA Day 12', $this->loadDay12HomeText(), 'Body text');
+
+        return $dispatcher;
+    }
 
     /**
      * Configure MockDatabase with team and player rows for processDay() tests.
@@ -764,6 +931,57 @@ class FreeAgencyAdminProcessorTest extends TestCase
                 throw new \RuntimeException('Discord unavailable');
             }
         };
+    }
+
+    /**
+     * A dispatcher that succeeds for the first $succeedFor calls and then throws.
+     *
+     * Models a partial Discord outage part-way through a multi-chunk post.
+     *
+     * @return FreeAgencyDiscordDispatcherInterface&object{messages: list<string>}
+     */
+    private function makeDispatcherFailingAfter(int $succeedFor): object
+    {
+        return new class ($succeedFor) implements FreeAgencyDiscordDispatcherInterface {
+            /** @var list<string> */
+            public array $messages = [];
+
+            public function __construct(private int $succeedFor)
+            {
+            }
+
+            public function dispatch(string $message): void
+            {
+                if (count($this->messages) >= $this->succeedFor) {
+                    throw new \RuntimeException('Discord unavailable');
+                }
+                $this->messages[] = $message;
+            }
+        };
+    }
+
+    /** Load the real production Day 12 signings story captured from nuke_stories sid 4401. */
+    private function loadDay12HomeText(): string
+    {
+        $path = self::FIXTURES . '/fa-day12-hometext.txt';
+        $text = file_get_contents($path);
+        self::assertIsString($text, "Fixture must be readable: {$path}");
+
+        return $text;
+    }
+
+    /**
+     * Re-apply buildDiscordChunks()'s normalization so tests can compare against its input.
+     *
+     * Mirrors FreeAgencyAdminProcessor::buildDiscordChunks() lines 350-353.
+     */
+    private function normalizeLikeProcessor(string $text): string
+    {
+        $normalized = str_replace(["\r\n", "\r"], "\n", $text);
+        $normalized = str_replace('<br>', "\n", $normalized);
+        $normalized = (string) preg_replace('/\n{2,}/', "\n", $normalized);
+
+        return trim($normalized);
     }
 
     /**

@@ -17,6 +17,7 @@
 #   • resolve_review_finding refuses an unknown / malformed comment id
 #   • all 3 callers document the disposition step (structural)
 #   • sourcing under zsh installs a working cleanup trap and leaks no temp dir
+#   • 4b-probe.sh's helper-envelope regex still matches what this lib actually emits
 #
 # Run: bin/test-post-review-findings  (exit 0 = all pass, 1 = some failed)
 
@@ -575,6 +576,57 @@ do
         fail "case25: $name no longer reads _posting-procedure.md — it stops inheriting the never-hand-write prohibition"
     fi
 done
+
+# ── case 25b: 4b-probe.sh's envelope regex still matches what this lib emits ───
+# /pr-ready Phase 4B's probe answers "is this hit a real review artifact?" mechanically,
+# by testing each comment body against an envelope regex copied from this lib's printf
+# calls. If either side is reworded the probe silently reclassifies every genuine review
+# as `freehand`, the Phase 6 reviewer is left with suspicion and no positive test, and it
+# drifts back to reading the /pulls/<N>/reviews endpoint — which is empty by construction
+# here, because post_review_summary posts via `gh pr comment`. That is the PR #2182 false
+# `REVIEW-COVERAGE: NONE`. Assert the coupling functionally rather than by eye: pull the
+# regex out of the probe itself, then run it over output this lib really produced.
+PROBE_SH="$REPO_ROOT/.claude/skills/pr-ready/scripts/4b-probe.sh"
+ENVELOPE_RE=""
+if [ -r "$PROBE_SH" ]; then
+    # The probe embeds the regex inside a jq string literal, so its backslashes are
+    # doubled there; halve them to recover the regex jq actually compiles.
+    ENVELOPE_RE="$(grep -o 'test("<summary>[^"]*")' "$PROBE_SH" | head -1 | sed 's/^test("//; s/")$//; s/\\\\/\\/g')"
+    ENVELOPE_HITS="$(grep -c 'test("<summary>[^"]*")' "$PROBE_SH" || true)"
+fi
+if [ -n "$ENVELOPE_RE" ] && [ "${ENVELOPE_HITS:-0}" -ge 2 ]; then
+    ok "case25b: recovered the helper-envelope regex from 4b-probe.sh (present in ${ENVELOPE_HITS} channels)"
+elif [ -n "$ENVELOPE_RE" ]; then
+    fail "case25b: helper-envelope regex exists but appears in only ${ENVELOPE_HITS} channel(s) in 4b-probe.sh — the reviews-channel copy may have drifted"
+else
+    fail "case25b: no helper-envelope regex in 4b-probe.sh — the probe lost its discriminator, so every real review reclassifies as freehand (PR #2182 class)"
+fi
+
+if [ -n "$ENVELOPE_RE" ]; then
+    _C25B_SAVED_COMMENT_OUT="$COMMENT_OUT"
+    COMMENT_OUT="$BASE_TMP/c25b-summary.txt"
+    : > "$COMMENT_OUT"
+    post_review_summary 999 "Code review" "No issues found. Architecture clean." >/dev/null 2>&1
+    # `jq -e` exits 1 on a false/null result, so the verdict is the exit status.
+    # Do NOT grep for a word here: a "NOMATCH" sentinel contains "MATCH".
+    if jq -e -Rs --arg re "$ENVELOPE_RE" 'test($re)' < "$COMMENT_OUT" >/dev/null; then
+        ok "case25b: post_review_summary output matches the probe's helper-envelope regex"
+    else
+        fail "case25b: post_review_summary output NO LONGER matches 4b-probe.sh's envelope regex — a clean review would be labelled freehand; fix both sides together"
+    fi
+    COMMENT_OUT="$_C25B_SAVED_COMMENT_OUT"
+    unset _C25B_SAVED_COMMENT_OUT
+fi
+
+# The regex's second alternative covers both post_review_findings channels, which share
+# the "Found N issue(s)" opener. Assert that opener still exists rather than re-driving
+# the whole partition path a second time.
+# shellcheck disable=SC2016  # ${on_count} is a literal in the lib source, not an expansion here
+if grep -qF "Found %d issue(s)" "$LIB" && grep -qF 'Found ${on_count} issue(s)' "$LIB"; then
+    ok "case25b: both post_review_findings channels still emit the 'Found N issue(s)' opener"
+else
+    fail "case25b: a post_review_findings channel lost the 'Found N issue(s)' opener that 4b-probe.sh's envelope regex keys on"
+fi
 
 # ── case 26: no temp-dir leak under zsh ───────────────────────────────────────
 # `trap ... RETURN` is bash-only. /pr-review sources this lib from a zsh shell,

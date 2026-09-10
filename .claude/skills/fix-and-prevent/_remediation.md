@@ -69,7 +69,7 @@ Deterministic. Select by the defect class's surface:
 - CI or GitHub Actions → label: `ci`; command: `bin/backlog new ci "<title>"`
 - E2E test quality → label: `e2e`; command: `bin/backlog new e2e "<title>"`
 - Accessibility (non-contrast) → label: `a11y`; command: `bin/backlog new a11y "<title>"`
-- Accessibility contrast → label: `a11y`; command: `bin/backlog new a11y "<title>"`
+- Accessibility contrast → label: `a11y-contrast`; command: `bin/backlog new a11y-contrast "<title>"`
 - Token spend / Claude context economy → label: `token-spend`; command: `bin/backlog new token-spend "<title>"`
 - Developer tooling (inner loop, scripts, worktree) → label: `dev-efficiency`; command: `bin/backlog new dev-efficiency "<title>"`
 - Autonomous-loop or harness behavior → label: `loop-engineering`; command: `bin/backlog new loop-engineering "<title>"`

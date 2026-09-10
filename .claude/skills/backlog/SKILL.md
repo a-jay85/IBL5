@@ -20,5 +20,5 @@ second Issue.
 | Close | `bin/backlog close <n> "<what closed it>"` |
 
 Labels are the areas: `ci`, `dev-efficiency`, `e2e`, `maintenance`, `token-spend`,
-`a11y`, `jsb-native`, `security`, `loop-engineering`. Legacy markdown IDs survive as
+`a11y`, `a11y-contrast`, `jsb-native`, `security`, `loop-engineering`. Legacy markdown IDs survive as
 title prefixes.

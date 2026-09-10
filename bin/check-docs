@@ -850,7 +850,7 @@ function checkChanged(string $base, string $repoRoot, \DateTimeImmutable $today)
  *
  * View 1 alone is HEAD-anchored, and that was a silent false negative: a caller
  * that edits docs and then runs `--since` to check ITSELF before committing
- * (backlog-housekeep op 7, post-plan Phase 2.5) cannot see its own edits, so the
+ * cannot see its own edits, so the
  * gate printed "On-touch doc check passed" four seconds before committing the
  * very edit CI then failed on (PR #1878, 2026-08-14). Views 2 and 3 close it.
  *

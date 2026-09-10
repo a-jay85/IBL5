@@ -297,6 +297,8 @@
     <groups>
         <exclude>
             <group>database</group>
+            <!-- Really posts to Discord. Opt in via IBL5_DISCORD_LIVE=1 plus an explicit group filter; see tests/FreeAgency/FreeAgencyDiscordLivePostTest.php -->
+            <group>discord-live</group>
         </exclude>
     </groups>
     <source baseline="phpunit-baseline.xml">

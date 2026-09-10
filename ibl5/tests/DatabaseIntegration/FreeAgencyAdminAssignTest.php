@@ -89,6 +89,7 @@ class FreeAgencyAdminAssignTest extends DatabaseTestCase
         // Both the player update and the news insert count as successes
         self::assertSame(2, $counts['successCount']);
         self::assertSame(0, $counts['errorCount']);
+        self::assertGreaterThan(0, $counts['newsSid'], 'newsSid must be positive when a story is inserted');
 
         // (a) ibl_plr mutation
         $stmt = $this->db->prepare('SELECT teamid, fa_signing_flag, cy, cyt, salary_yr1, salary_yr2, salary_yr3 FROM ibl_plr WHERE pid = ?');
@@ -166,6 +167,7 @@ class FreeAgencyAdminAssignTest extends DatabaseTestCase
         // Only the player update contributes to successCount (news not attempted)
         self::assertSame(1, $counts['successCount']);
         self::assertSame(0, $counts['errorCount']);
+        self::assertSame(0, $counts['newsSid'], 'newsSid must be 0 when news texts are empty');
 
         // Player was updated
         $stmt = $this->db->prepare('SELECT teamid FROM ibl_plr WHERE pid = ?');
@@ -197,5 +199,6 @@ class FreeAgencyAdminAssignTest extends DatabaseTestCase
         // No signings → successCount=0, news-insert gated (successCount was 0)
         self::assertSame(0, $counts['successCount']);
         self::assertSame(0, $counts['errorCount']);
+        self::assertSame(0, $counts['newsSid'], 'newsSid must be 0 when there are no signings');
     }
 }

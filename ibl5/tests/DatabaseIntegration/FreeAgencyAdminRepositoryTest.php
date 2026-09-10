@@ -180,23 +180,24 @@ class FreeAgencyAdminRepositoryTest extends DatabaseTestCase
 
     public function testInsertNewsStoryCreatesRow(): void
     {
-        $affected = $this->repo->insertNewsStory(
+        $newsSid = $this->repo->insertNewsStory(
             'B10 FA Signing Test',
             'Home text content',
             'Body text content'
         );
 
-        self::assertGreaterThan(0, $affected);
+        self::assertGreaterThan(0, $newsSid);
 
-        $stmt = $this->db->prepare("SELECT title, hometext, bodytext FROM nuke_stories WHERE title = ?");
+        // Prove the returned sid identifies the row that was just written
+        $stmt = $this->db->prepare("SELECT sid, title, hometext, bodytext FROM nuke_stories WHERE sid = ?");
         self::assertNotFalse($stmt);
-        $title = 'B10 FA Signing Test';
-        $stmt->bind_param('s', $title);
+        $stmt->bind_param('i', $newsSid);
         $stmt->execute();
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
 
-        self::assertNotNull($row);
+        self::assertNotNull($row, 'Row must exist for the returned sid');
+        self::assertSame('B10 FA Signing Test', $row['title']);
         self::assertSame('Home text content', $row['hometext']);
         self::assertSame('Body text content', $row['bodytext']);
     }

@@ -1,6 +1,6 @@
 ---
 description: Free agency offer submission, market demand calculation, cap validation, and admin management.
-last_verified: 2026-07-24
+last_verified: 2026-09-08
 ---
 
 # FreeAgency
@@ -14,4 +14,5 @@ Manages the complete free agency workflow: GMs submit contract offers, market de
 | `FreeAgencyCapCalculator` | Validates team salary cap implications |
 | `FreeAgencyOfferValidator` / `CommonContractValidator` | Offer and contract validation |
 | `FreeAgencyProcessor` / `FreeAgencyAdminProcessor` | Commits or processes offers |
+| `FreeAgencyDiscordDispatcher` | Posts free agency signings summaries to the #free-agency Discord channel |
 | `FreeAgencyRepository` / `FreeAgencyDemandRepository` / `FreeAgencyAdminRepository` | Database access |

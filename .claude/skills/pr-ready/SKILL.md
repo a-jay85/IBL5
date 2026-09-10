@@ -7,7 +7,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-09-08
+last_verified: 2026-09-10
 ---
 <!-- `model: claude-sonnet-4-6` IS DELIBERATE — DO NOT REMOVE IT, and never write
      `model: sonnet` (that alias resolves to Sonnet 5). User-authorized 2026-08-26,
@@ -172,9 +172,9 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
 
    Record the printed value as `<STRICT>` in the run notes. On a 403/404 (a token without admin read), record `<STRICT>` as `true` and say so in the verdict. Failing closed costs one extra divergence check; failing open ships a stale-base merge.
 
-6. **Prior-Phase-4B probe.** Look for the review heading in **both** the issue comments and the review bodies — findings are posted as a review body with inline threads, not only as issue comments. `git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/4b-probe.sh > /tmp/pr-ready-4bprobe-<N>.sh && test -s /tmp/pr-ready-4bprobe-<N>.sh && bash /tmp/pr-ready-4bprobe-<N>.sh <N>`. The probe prints `PROBE-COMPLETE` as its last line; no output before it means no prior review, and no `PROBE-COMPLETE` at all means the probe never ran.
+6. **Prior-Phase-4B probe.** Look for the review heading in **both** the issue comments and the review bodies — findings are posted as a review body with inline threads, not only as issue comments. `git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/4b-probe.sh > /tmp/pr-ready-4bprobe-<N>.sh && test -s /tmp/pr-ready-4bprobe-<N>.sh && bash /tmp/pr-ready-4bprobe-<N>.sh <N>`. The probe prints `PROBE-COMPLETE` as its last line; no output before it means no prior review, and no `PROBE-COMPLETE` at all means the probe never ran. Each hit is five tab-separated fields: kind, id, login, timestamp, **envelope**.
 
-   Record `PHASE_4B_RAN` (any line printed ⇒ true) **and the earliest timestamp printed**, which runtime Phase 6 reports. This is a **probe, not a gate**: the value is reported in Phase 6 and never used to skip work.
+   Record `PHASE_4B_RAN` (any line printed ⇒ true, refined by the envelope block below) **and the earliest timestamp printed**, which runtime Phase 6 reports. This is a **probe, not a gate**: the value is reported in Phase 6 and never used to skip work.
 
    **Diff bounds (informational, never a gate).** Report both directions of plan-vs-diff scope from the pre-rebase patch Phase 2 already wrote — do not recompute the diff:
 
@@ -190,7 +190,7 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
 
    Substitute `<N>` and `<branch>` by hand, as everywhere else in this skill. A missing patch file or a missing plan file yields empty sides and the counts still print — **record both count lines verbatim** for Phase 6 input 6. Like the 4B probe beside it, this gates nothing: it never skips a phase, never changes the verdict word, and never blocks the rebase.
 
-   **A match is evidence, not proof — read the lines before recording `true`.** Loosening the level trades one error for its mirror: a comment that merely *quotes* a review heading at line-start (another `/pr-ready` verdict, a pasted excerpt) matches too, and a false `PHASE_4B_RAN=true` is the worse failure — Phase 6 then asserts a review ran and **suppresses** the `/pr-review <N>` recommendation on a PR that never got one. The `.user.login` field above is there for this check: confirm each hit is from the reviewing identity and that the heading is the comment's own, not something it is citing. On PRs #1790/#1872/#1876 all six hits were genuine and none of the surrounding `/pr-ready` verdicts matched — their heading mentions are inline-backticked, not line-initial — but that is an observation, not a guarantee.
+   **A match is evidence, not proof — the envelope column says *which* matches still need reading.** The heading level stays as it is: loosening it would let a comment that merely *quotes* a review heading at line-start match too, and a false `PHASE_4B_RAN=true` is the worse failure — Phase 6 would then assert a review ran and **suppress** the `/pr-review <N>` recommendation. The fifth column is the **positive** test `.user.login` never could be — on a solo repo every comment is `a-jay85`, so an identity check is vacuous, and that gap is how a run came to distrust two genuine hits on PR #2182 and record `REVIEW-COVERAGE: NONE`. Read it as: any **`helper-envelope`** row ⇒ `PHASE_4B_RAN=true`, nothing further to read and **no second-guessing via another endpoint** — `gh api repos/{owner}/{repo}/pulls/<N>/reviews` returning empty is *expected*, because `post_review_summary` (`bin/lib/post-review-findings.sh`) posts through `gh pr comment`, so emptiness there is never evidence a review did not run; **only `freehand`** rows ⇒ read those bodies (a hand-composed review counts, backlog E24; a comment citing a heading does not); **no rows** ⇒ false. On PRs #1790/#1872/#1876 all six hits were genuine — an observation, not a guarantee, which is why the column exists.
 
 **Phases 2 and 3 — rebase and conflict resolution.**
 

@@ -268,18 +268,32 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
             $message = "Successfully executed {$successCount} operations. Free agents have been assigned to teams.";
 
             if ($newsSid > 0) {
+                $chunks = $this->buildDiscordChunks($newsHomeText, $newsSid);
+                $totalChunks = count($chunks);
+                $deliveredChunks = 0;
+
                 try {
-                    foreach ($this->buildDiscordChunks($newsHomeText, $newsSid) as $chunk) {
+                    foreach ($chunks as $chunk) {
                         $this->discordDispatcher->dispatch($chunk);
+                        $deliveredChunks++;
                     }
                 } catch (\Throwable $e) {
                     $this->discordLogger->error('fa_signings_discord_post_failed', [
                         'action' => 'fa_signings_discord_post_failed',
                         'day' => $day,
                         'news_sid' => $newsSid,
+                        'delivered_chunks' => $deliveredChunks,
+                        'total_chunks' => $totalChunks,
                         'error' => $e->getMessage(),
                     ]);
-                    $message .= ' (Discord post to #free-agency failed — post manually.)';
+                    // Parts already delivered are visible to the whole league, so the
+                    // operator must be told where to resume — reposting the whole story
+                    // would duplicate everything up to the failure point.
+                    $message .= $deliveredChunks === 0
+                        ? ' (Discord post to #free-agency failed — nothing was posted; post manually.)'
+                        : " (Discord post to #free-agency failed after {$deliveredChunks} of {$totalChunks}"
+                            . " parts — parts 1-{$deliveredChunks} are already in the channel; post manually"
+                            . ' from part ' . ($deliveredChunks + 1) . '.)';
                 }
             }
 

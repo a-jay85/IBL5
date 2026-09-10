@@ -764,12 +764,12 @@ class FreeAgencyAdminProcessorTest extends TestCase
         }
     }
 
-    public function testExecuteSigningsDiscordFailureMidLoopDropsRemainingChunks(): void
+    public function testExecuteSigningsDiscordFailureMidLoopReportsResumePoint(): void
     {
-        // Documents current behaviour, not desired behaviour: the dispatch loop
-        // aborts into its catch on the first throw, so chunks after the failure
-        // are silently never sent. The operator sees only "post manually", which
-        // does not say how much of the story already made it to Discord.
+        // The dispatch loop aborts into its catch on the first throw, so parts after
+        // the failure are never sent. Parts already delivered are visible to the whole
+        // league, so the operator notice must name how many landed and where to resume
+        // — otherwise reposting the full story duplicates everything up to the failure.
         $signings = [$this->makeSigning(1, 10, 'Miami', 500, 0, 0, 0, 0, 0, 1, false, false)];
         $dispatcher = $this->makeDispatcherFailingAfter(1);
 
@@ -794,6 +794,56 @@ class FreeAgencyAdminProcessorTest extends TestCase
         $this->assertTrue($result['success'], 'A Discord outage must not fail the signings themselves');
         $this->assertSame(80, $result['successCount']);
         $this->assertStringContainsString('post manually', $result['message']);
+
+        // The whole point of the notice: it must distinguish "1 of 4 landed" from
+        // "nothing landed", and name the part to resume from.
+        $this->assertStringContainsString(
+            '1 of 4 parts',
+            $result['message'],
+            'Notice must name how many parts were delivered out of the total'
+        );
+        $this->assertStringContainsString(
+            'parts 1-1 are already in the channel',
+            $result['message'],
+            'Notice must say which parts the league can already see'
+        );
+        $this->assertStringContainsString(
+            'from part 2',
+            $result['message'],
+            'Notice must name the part to resume manual posting from'
+        );
+    }
+
+    public function testExecuteSigningsDiscordFailureOnFirstChunkReportsNothingPosted(): void
+    {
+        // The complementary case: when the very first dispatch throws, nothing reached
+        // the channel, so the operator must be told to post the whole story — not
+        // handed a resume point that would silently skip the opening part.
+        $signings = [$this->makeSigning(1, 10, 'Miami', 500, 0, 0, 0, 0, 0, 1, false, false)];
+        $dispatcher = $this->makeDispatcherFailingAfter(0);
+
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub->method('executeSigningsTransactionally')
+            ->willReturn(['successCount' => 80, 'errorCount' => 0, 'newsSid' => self::DAY12_NEWS_SID]);
+
+        $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb, null, $dispatcher);
+        $result = $processor->executeSignings(
+            12,
+            $signings,
+            'FA Day 12',
+            $this->loadDay12HomeText(),
+            'Body text'
+        );
+
+        $this->assertCount(0, $dispatcher->messages, 'Nothing may reach the channel when the first dispatch throws');
+        $this->assertTrue($result['success'], 'A Discord outage must not fail the signings themselves');
+        $this->assertStringContainsString('nothing was posted', $result['message']);
+        $this->assertStringContainsString('post manually', $result['message']);
+        $this->assertStringNotContainsString(
+            'from part',
+            $result['message'],
+            'A total failure must not offer a resume point'
+        );
     }
 
     // ============================================

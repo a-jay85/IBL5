@@ -12,7 +12,10 @@ use League\LeagueContext;
  * Computes wins, losses, home/away splits, streaks, and ranking scores
  * from game result data for power rankings updates.
  *
- * @phpstan-type GameRow array{visitor_teamid: int, visitor_score: int, home_teamid: int, home_score: int}
+ * Every key of GameRow is optional and nullable because normalizeGameData() reads all
+ * four with `?? 0` on every path — the annotation mirrors what the body already tolerates.
+ *
+ * @phpstan-type GameRow array{visitor_teamid?: int|null, visitor_score?: int|null, home_teamid?: int|null, home_score?: int|null}
  * @phpstan-type NormalizedGame array{awayTeam: int, awayScore: int, homeTeam: int, homeScore: int}
  * @phpstan-type TeamStats array{wins: int, losses: int, homeWins: int, homeLosses: int, awayWins: int, awayLosses: int, winPoints: int, lossPoints: int, winsInLast10Games: int, lossesInLast10Games: int, streak: int, streakType: string}
  */

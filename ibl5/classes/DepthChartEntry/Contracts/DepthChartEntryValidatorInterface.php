@@ -11,9 +11,10 @@ namespace DepthChartEntry\Contracts;
  * including position depth requirements, active player counts, and constraints.
  * All validation errors are collected internally and can be retrieved for display.
  *
- * @phpstan-import-type ProcessedSubmission from DepthChartEntryProcessorInterface
+ * @phpstan-import-type ProcessedPlayerData from DepthChartEntryProcessorInterface
  *
  * @phpstan-type ValidationError array{type: string, message: string, detail: string}
+ * @phpstan-type ValidatorInput array{playerData?: list<ProcessedPlayerData>, activePlayers: int, pos_1: int, pos_2: int, pos_3: int, pos_4: int, pos_5: int, hasStarterAtMultiplePositions: bool, nameOfProblemStarter: string}
  */
 interface DepthChartEntryValidatorInterface
 {
@@ -30,7 +31,7 @@ interface DepthChartEntryValidatorInterface
      * 
      * All errors are collected internally and can be retrieved via getErrors() or getErrorMessagesHtml().
      * 
-     * @param ProcessedSubmission $depthChartData Processed depth chart data
+     * @param ValidatorInput $depthChartData Processed depth chart data
      * @param string $phase Season phase ('Playoffs' or 'Regular Season')
      * @return bool True if all validations pass, false if any violation detected
      * 

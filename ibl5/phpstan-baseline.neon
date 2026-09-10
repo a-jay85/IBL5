@@ -1349,12 +1349,6 @@ parameters:
 			path: modules/AllStarAppearances/index.php
 
 		-
-			rawMessage: 'Parameter #1 $appearances of method AllStarAppearances\AllStarAppearancesView::render() expects array<int, array{name: string, appearances: int}>, array<int, array{name: string, pid: int|null, appearances: int}> given.'
-			identifier: argument.type
-			count: 1
-			path: modules/AllStarAppearances/index.php
-
-		-
 			rawMessage: 'Parameter #1 $db of class AllStarAppearances\AllStarAppearancesRepository constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
@@ -1381,12 +1375,6 @@ parameters:
 		-
 			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
 			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/AwardHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $award of method AwardHistory\AwardHistoryView::renderAwardRow() expects array{year: int, award: string, name: string, pid?: int}, array{year: int, award: string, name: string, table_id: int, pid: int|null} given.'
-			identifier: argument.type
 			count: 1
 			path: modules/AwardHistory/index.php
 

@@ -25,7 +25,7 @@ class PlayerImageHelper implements PlayerImageHelperInterface
      * Returns a data URI placeholder (1x1 transparent pixel) if playerID is missing, null, or invalid.
      * This approach prevents 404 errors entirely.
      * 
-     * @param int|string|null $playerID The player's ID to use in the image path
+     * @param int|float|string|null $playerID The player's ID to use in the image path
      * @param string $basePath Optional base path prefix (default: './images/player/')
      * @return string Safe image URL or placeholder data URI if playerID is invalid
      * 

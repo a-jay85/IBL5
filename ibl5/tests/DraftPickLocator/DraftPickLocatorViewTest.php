@@ -68,7 +68,6 @@ class DraftPickLocatorViewTest extends TestCase
     {
         $teams = [
             [
-                'teamid' => 1,
                 'teamId' => 1,
                 'teamCity' => 'Test<script>',
                 'teamName' => 'Team&Name',

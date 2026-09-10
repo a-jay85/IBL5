@@ -22,7 +22,7 @@ interface PlayerImageHelperInterface
      * Valid playerID returns a path like: "./images/player/123.jpg"
      * Invalid playerID returns a base64-encoded data URI for transparent pixel.
      * 
-     * @param int|string|null $playerID The player's ID to use in the image path
+     * @param int|float|string|null $playerID The player's ID to use in the image path
      * @param string $basePath Optional base path prefix (default: './images/player/')
      * @return string Safe image URL (e.g., "./images/player/123.jpg") or placeholder data URI
      * 

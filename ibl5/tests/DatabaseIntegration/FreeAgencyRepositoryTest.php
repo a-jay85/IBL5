@@ -10,6 +10,9 @@ use FreeAgency\FreeAgencyRepository;
 
 /**
  * Tests FreeAgencyRepository against real MariaDB — offer CRUD, player signing status.
+ *
+ * @phpstan-import-type OfferData from \FreeAgency\Contracts\FreeAgencyRepositoryInterface
+ * @phpstan-type OfferDataOverrides array{pid?: int, teamid?: int, teamName?: string, playerName?: string, offer1?: int, offer2?: int, offer3?: int, offer4?: int, offer5?: int, offer6?: int, modifier?: float, random?: int, perceivedValue?: float, mle?: int, lle?: int, offerType?: int}
  */
 #[Group('database')]
 class FreeAgencyRepositoryTest extends DatabaseTestCase
@@ -25,8 +28,8 @@ class FreeAgencyRepositoryTest extends DatabaseTestCase
     /**
      * Build a valid OfferData array for saveOffer().
      *
-     * @param array<string, int|float|string> $overrides
-     * @return array<string, int|float|string>
+     * @param OfferDataOverrides $overrides
+     * @return OfferData
      */
     private function buildOfferData(int $pid, int $teamid, array $overrides = []): array
     {
@@ -42,8 +45,8 @@ class FreeAgencyRepositoryTest extends DatabaseTestCase
             'offer5' => 0,
             'offer6' => 0,
             'modifier' => 1.0,
-            'random' => 0.5,
-            'perceivedValue' => 4800,
+            'random' => 0,
+            'perceivedValue' => 4800.0,
             'mle' => 0,
             'lle' => 0,
             'offerType' => 0,

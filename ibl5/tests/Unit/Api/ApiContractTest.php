@@ -26,6 +26,8 @@ use PHPUnit\Framework\TestCase;
  * 2. The PR diff makes the breaking change visible to reviewers
  *
  * @phpstan-import-type InjuredPlayerRow from \Api\Repository\ApiInjuriesRepository
+ * @phpstan-import-type TeamListRow from \Api\Repository\ApiTeamRepository
+ * @phpstan-import-type TeamDetailRow from \Api\Repository\ApiTeamRepository
  */
 class ApiContractTest extends TestCase
 {
@@ -305,7 +307,7 @@ class ApiContractTest extends TestCase
         ];
     }
 
-    /** @return array<string, mixed> */
+    /** @return TeamListRow */
     private function mockTeamListRow(): array
     {
         return [
@@ -321,10 +323,19 @@ class ApiContractTest extends TestCase
         ];
     }
 
-    /** @return array<string, mixed> */
+    /** @return TeamDetailRow */
     private function mockTeamDetailRow(): array
     {
-        return array_merge($this->mockTeamListRow(), [
+        return [
+            'teamid' => 1,
+            'uuid' => 'team-uuid-test',
+            'team_city' => 'Test City',
+            'team_name' => 'Testers',
+            'owner_name' => 'Test Owner',
+            'discord_id' => 123456789,
+            'arena' => 'Test Arena',
+            'conference' => 'Eastern',
+            'division' => 'Atlantic',
             'league_record' => '45-10',
             'conference_record' => '25-5',
             'division_record' => '15-2',
@@ -332,11 +343,11 @@ class ApiContractTest extends TestCase
             'home_losses' => 4,
             'away_wins' => 22,
             'away_losses' => 6,
-            'win_percentage' => '.818',
+            'win_percentage' => 0.818,
             'conference_games_back' => '2.5',
             'division_games_back' => '0.0',
             'games_remaining' => 27,
-        ]);
+        ];
     }
 
     /** @return array<string, mixed> */

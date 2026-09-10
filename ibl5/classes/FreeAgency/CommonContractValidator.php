@@ -26,7 +26,8 @@ class CommonContractValidator implements CommonContractValidatorInterface
      */
     public function validateRaises(array $offer, int $birdYears): array
     {
-        $maxIncrease = \ContractRules::calculateMaxRaise($offer['year1'] ?? 0, $birdYears);
+        $year1Value = $offer['year1'] ?? 0;
+        $maxIncrease = \ContractRules::calculateMaxRaise($year1Value, $birdYears);
         
         $years = ['year1', 'year2', 'year3', 'year4', 'year5', 'year6'];
         
@@ -49,7 +50,7 @@ class CommonContractValidator implements CommonContractValidatorInterface
                 
                 return [
                     'valid' => false,
-                    'error' => "Sorry, you tried to offer a larger raise than is permitted. Your first year offer was {$offer['year1']} which means the maximum raise allowed each year is {$maxIncrease}. Your offer in Year {$yearNumber} was {$currentValue}, which is more than your Year {$prevYearNumber} offer, {$previousValue}, plus the max increase of {$maxIncrease}. Given your offer in Year {$prevYearNumber}, the most you can offer in Year {$yearNumber} is {$legalOffer}."
+                    'error' => "Sorry, you tried to offer a larger raise than is permitted. Your first year offer was {$year1Value} which means the maximum raise allowed each year is {$maxIncrease}. Your offer in Year {$yearNumber} was {$currentValue}, which is more than your Year {$prevYearNumber} offer, {$previousValue}, plus the max increase of {$maxIncrease}. Given your offer in Year {$prevYearNumber}, the most you can offer in Year {$yearNumber} is {$legalOffer}."
                 ];
             }
         }

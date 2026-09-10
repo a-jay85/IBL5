@@ -7,6 +7,10 @@ namespace Tests\Api\Transformer;
 use Api\Transformer\TeamTransformer;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * @phpstan-import-type TeamListRow from \Api\Repository\ApiTeamRepository
+ * @phpstan-import-type TeamDetailRow from \Api\Repository\ApiTeamRepository
+ */
 class TeamTransformerTest extends TestCase
 {
     private TeamTransformer $transformer;
@@ -17,7 +21,7 @@ class TeamTransformerTest extends TestCase
     }
 
     /**
-     * @return array<string, mixed>
+     * @return TeamListRow
      */
     private function makeTeamRow(): array
     {
@@ -31,6 +35,64 @@ class TeamTransformerTest extends TestCase
             'arena' => 'United Center',
             'conference' => 'East',
             'division' => 'Central',
+        ];
+    }
+
+    /**
+     * @return TeamDetailRow
+     */
+    private function makeTeamDetailRow(): array
+    {
+        return [
+            'teamid' => 10,
+            'uuid' => 'team-uuid-123',
+            'team_city' => 'Chicago',
+            'team_name' => 'Bulls',
+            'owner_name' => 'TestOwner',
+            'discord_id' => 123456789,
+            'arena' => 'United Center',
+            'conference' => 'East',
+            'division' => 'Central',
+            'league_record' => '42-20',
+            'conference_record' => '28-12',
+            'division_record' => '10-4',
+            'home_wins' => 25,
+            'home_losses' => 6,
+            'away_wins' => 17,
+            'away_losses' => 14,
+            'win_percentage' => 0.677,
+            'conference_games_back' => '2.5',
+            'division_games_back' => '0.0',
+            'games_remaining' => 20,
+        ];
+    }
+
+    /**
+     * @return TeamDetailRow
+     */
+    private function makeTeamDetailRowNullStandings(): array
+    {
+        return [
+            'teamid' => 10,
+            'uuid' => 'team-uuid-123',
+            'team_city' => 'Chicago',
+            'team_name' => 'Bulls',
+            'owner_name' => 'TestOwner',
+            'discord_id' => 123456789,
+            'arena' => 'United Center',
+            'conference' => null,
+            'division' => null,
+            'league_record' => null,
+            'conference_record' => null,
+            'division_record' => null,
+            'home_wins' => null,
+            'home_losses' => null,
+            'away_wins' => null,
+            'away_losses' => null,
+            'win_percentage' => null,
+            'conference_games_back' => null,
+            'division_games_back' => null,
+            'games_remaining' => null,
         ];
     }
 
@@ -60,19 +122,7 @@ class TeamTransformerTest extends TestCase
 
     public function testTransformDetailIncludesRecords(): void
     {
-        $row = $this->makeTeamRow();
-        $row['league_record'] = '42-20';
-        $row['conference_record'] = '28-12';
-        $row['division_record'] = '10-4';
-        $row['home_wins'] = 25;
-        $row['home_losses'] = 6;
-        $row['away_wins'] = 17;
-        $row['away_losses'] = 14;
-        $row['win_percentage'] = 0.677;
-        $row['conference_games_back'] = '2.5';
-        $row['division_games_back'] = '0.0';
-        $row['games_remaining'] = 20;
-
+        $row = $this->makeTeamDetailRow();
         $result = $this->transformer->transformDetail($row);
 
         $this->assertSame('42-20', $result['record']['league']);
@@ -85,19 +135,7 @@ class TeamTransformerTest extends TestCase
 
     public function testTransformDetailHandlesNullStandings(): void
     {
-        $row = $this->makeTeamRow();
-        $row['league_record'] = null;
-        $row['conference_record'] = null;
-        $row['division_record'] = null;
-        $row['home_wins'] = null;
-        $row['home_losses'] = null;
-        $row['away_wins'] = null;
-        $row['away_losses'] = null;
-        $row['win_percentage'] = null;
-        $row['conference_games_back'] = null;
-        $row['division_games_back'] = null;
-        $row['games_remaining'] = null;
-
+        $row = $this->makeTeamDetailRowNullStandings();
         $result = $this->transformer->transformDetail($row);
 
         $this->assertNull($result['record']['league']);

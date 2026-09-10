@@ -31,6 +31,9 @@ final class VotingSubmissionServiceTest extends TestCase
 
     // ==================== EOY: Self-Vote ====================
 
+    /**
+     * @param 'mvp_1'|'mvp_2'|'mvp_3'|'six_1'|'six_2'|'six_3'|'roy_1'|'roy_2'|'roy_3' $field
+     */
     #[DataProvider('eoyPlayerSelfVoteFieldProvider')]
     public function testEoyRejectsSelfVoteForOwnPlayer(string $field): void
     {
@@ -45,7 +48,7 @@ final class VotingSubmissionServiceTest extends TestCase
     }
 
     /**
-     * @return array<string, array{string}>
+     * @return array<string, array{'mvp_1'|'mvp_2'|'mvp_3'|'six_1'|'six_2'|'six_3'|'roy_1'|'roy_2'|'roy_3'}>
      */
     public static function eoyPlayerSelfVoteFieldProvider(): array
     {
@@ -56,6 +59,9 @@ final class VotingSubmissionServiceTest extends TestCase
         ];
     }
 
+    /**
+     * @param 'gm_1'|'gm_2'|'gm_3' $field
+     */
     #[DataProvider('eoyGmSelfVoteFieldProvider')]
     public function testEoyRejectsSelfVoteForGm(string $field): void
     {
@@ -70,7 +76,7 @@ final class VotingSubmissionServiceTest extends TestCase
     }
 
     /**
-     * @return array<string, array{string}>
+     * @return array<string, array{'gm_1'|'gm_2'|'gm_3'}>
      */
     public static function eoyGmSelfVoteFieldProvider(): array
     {

@@ -13,6 +13,10 @@ use TeamOffDefStats\Contracts\TeamOffDefStatsViewInterface;
  *
  * Verifies HTML rendering of league statistics tables including
  * team highlighting and proper output sanitization.
+ *
+ * @phpstan-import-type RenderData from \TeamOffDefStats\Contracts\TeamOffDefStatsViewInterface
+ * @phpstan-import-type ProcessedTeamStats from \TeamOffDefStats\Contracts\TeamOffDefStatsServiceInterface
+ * @phpstan-import-type RawStatValues from \TeamOffDefStats\Contracts\TeamOffDefStatsServiceInterface
  */
 class TeamOffDefStatsViewTest extends TestCase
 {
@@ -162,11 +166,7 @@ class TeamOffDefStatsViewTest extends TestCase
      */
     public function testRenderHandlesEmptyData(): void
     {
-        $data = [
-            'teams' => [],
-            'league' => ['totals' => [], 'averages' => []],
-            'differentials' => [],
-        ];
+        $data = $this->createMinimalViewData();
 
         $result = $this->view->render($data);
 
@@ -273,7 +273,7 @@ class TeamOffDefStatsViewTest extends TestCase
     /**
      * Create minimal view data for basic tests
      *
-     * @return array{teams: list<mixed>, league: array{totals: array<string, string>, averages: array<string, string>, games: int}, differentials: array<string, mixed>}
+     * @return RenderData
      */
     private function createMinimalViewData(): array
     {
@@ -326,7 +326,7 @@ class TeamOffDefStatsViewTest extends TestCase
      * Create view data with specified teams
      *
      * @param list<array{teamid: int, team_city: string, team_name: string}> $teamConfigs
-     * @return array{teams: list<mixed>, league: array{totals: array<string, string>, averages: array<string, string>, games: int}, differentials: array<string, mixed>}
+     * @return RenderData
      */
     private function createViewDataWithTeams(array $teamConfigs): array
     {
@@ -347,7 +347,7 @@ class TeamOffDefStatsViewTest extends TestCase
     /**
      * Create a team data structure for testing
      *
-     * @return array{teamid: int, team_city: string, team_name: string, color1: string, color2: string, offense_totals: array<string, string>, offense_averages: array<string, string>, defense_totals: array<string, string>, defense_averages: array<string, string>, raw_offense: list<mixed>, raw_defense: list<mixed>, offense_games: int, defense_games: int}
+     * @return ProcessedTeamStats
      */
     private function createTeamData(int $teamId, string $city, string $name): array
     {
@@ -399,8 +399,38 @@ class TeamOffDefStatsViewTest extends TestCase
             'offense_averages' => $averages,
             'defense_totals' => $stats,
             'defense_averages' => $averages,
-            'raw_offense' => [],
-            'raw_defense' => [],
+            'raw_offense' => [
+                'fgm' => 3200,
+                'fga' => 7000,
+                'ftm' => 1500,
+                'fta' => 2000,
+                'tgm' => 1000,
+                'tga' => 2800,
+                'orb' => 900,
+                'reb' => 3600,
+                'ast' => 2000,
+                'stl' => 600,
+                'tvr' => 1200,
+                'blk' => 400,
+                'pf' => 1700,
+                'pts' => 8900,
+            ],
+            'raw_defense' => [
+                'fgm' => 3100,
+                'fga' => 6900,
+                'ftm' => 1400,
+                'fta' => 1900,
+                'tgm' => 950,
+                'tga' => 2700,
+                'orb' => 850,
+                'reb' => 3500,
+                'ast' => 1900,
+                'stl' => 580,
+                'tvr' => 1250,
+                'blk' => 380,
+                'pf' => 1650,
+                'pts' => 8600,
+            ],
             'offense_games' => 82,
             'defense_games' => 82,
         ];

@@ -117,8 +117,8 @@
 -- migration that repaired nothing. salary_yr1 stays in the guard as a
 -- cross-check because it is the fabricated value proven above. Since pass one
 -- zeroes droptime, a second run matches nothing. The story statements are bounded
--- to 2026-09-10 or later and the counter rollback is gated on those stories still
--- existing, so it too is self-disarming.
+-- to 2026-09-10 or later (and before 2026-09-12) and the counter rollback is gated
+-- on those stories still existing, so it too is self-disarming.
 
 -- ---------------------------------------------------------------------------
 -- 1. Restore the three players to unsigned Free Agent state
@@ -178,6 +178,7 @@ UPDATE nuke_stories_cat
          FROM nuke_stories
        WHERE topic IN (32, 33)
           AND `time` >= '2026-09-10'
+          AND `time` < '2026-09-12'
           AND hometext IN (
               'The Sting sign Gheorghe Muresan from waivers for 89.',
               'The Sting sign Juan Antonio San Epifanio from waivers for 103.',
@@ -193,6 +194,7 @@ UPDATE nuke_stories_cat
          FROM nuke_stories
        WHERE topic IN (32, 33)
           AND `time` >= '2026-09-10'
+          AND `time` < '2026-09-12'
           AND hometext IN (
               'The Sting sign Gheorghe Muresan from waivers for 89.',
               'The Sting sign Juan Antonio San Epifanio from waivers for 103.',
@@ -222,16 +224,18 @@ UPDATE nuke_stories_cat
 -- an unbounded DELETE would remove it too. The mistake happened on 2026-09-10
 -- (droptime 1789077790 = 2026-09-10 22:03:10 UTC), so a lower bound of that date
 -- captures all six under any plausible server timezone while excluding every
--- historical duplicate. The bound is provably safe rather than merely likely:
+-- historical duplicate. The bounds are provably safe rather than merely likely:
 -- nuke_stories.time is written by PHP date() in the server's local timezone
 -- (NewsRepository.php line 18), and 22:03:10 UTC reads as 2026-09-10 in every
--- timezone from UTC-12 (10:03) to UTC+14 (next day, still after the bound).
--- A lower bound with no upper bound therefore captures all six regardless.
+-- timezone from UTC-12 (10:03) to UTC+14 (next day, still after the lower bound).
+-- The upper bound of '2026-09-12' closes the forward-facing tail: UTC+14 reads the
+-- last event (22:20:37 UTC) as 2026-09-11 at most, still before '2026-09-12'.
 -- `time` is backticked because TIME is a reserved word.
 
 DELETE FROM nuke_stories
  WHERE topic IN (32, 33)
    AND `time` >= '2026-09-10'
+   AND `time` < '2026-09-12'
    AND hometext IN (
        'The Sting sign Gheorghe Muresan from waivers for 89.',
        'The Sting sign Juan Antonio San Epifanio from waivers for 103.',

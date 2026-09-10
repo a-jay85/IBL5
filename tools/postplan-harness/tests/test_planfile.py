@@ -203,10 +203,10 @@ def test_false_exempt_regression():
 def test_conditional_marker_exempt():
     """The 2026-07-26 false MISSING-FILE: the marked form exempts, the prose form does not."""
     plan = ("## Critical Files\n\n"
-            "- `ibl5/docs/backlog/README.md` (conditional) - only if the op changes it\n"
-            "- `ibl5/docs/backlog/other.md` - only if the op changes it\n")
-    assert _classify(plan) == ["EXEMPT:ibl5/docs/backlog/README.md",
-                               "MUST_APPEAR:ibl5/docs/backlog/other.md"]
+            "- `ibl5/docs/README.md` (conditional) - only if the op changes it\n"
+            "- `ibl5/docs/other.md` - only if the op changes it\n")
+    assert _classify(plan) == ["EXEMPT:ibl5/docs/README.md",
+                               "MUST_APPEAR:ibl5/docs/other.md"]
 
 
 def test_read_only_reference_exempt():

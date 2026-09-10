@@ -16,10 +16,8 @@ const IN_SCOPE_GLOBS = [
     '.claude/rules/*.md',
     '.claude/skills/*/SKILL.md',
     'ibl5/docs/*.md',
-    'ibl5/docs/backlog/*.md',
     'ibl5/docs/decisions/*.md',
     'ibl5/classes/*/README.md',
-    'engine/docs/backlog/*.md',
     'engine/.claude/rules/*.md',
 ];
 
@@ -76,19 +74,6 @@ const REFERENCE_ALLOWLIST = [
     'ibl5/themes/IBL/style/style.css',  // gitignored — compiled Tailwind build artifact (absent on clean CI checkout)
     'ibl5/vr-actuals',                  // gitignored — per-run PR render scratch dir (written at CI runtime, never committed)
     'ibl5/vr-gallery',                  // gitignored — per-run generated gallery scratch dir (written at CI runtime, never committed)
-];
-
-// Backlogs that mark items done with a table-cell glyph (e.g. `| C1 | … | ✅ |`)
-// rather than a `**Status:** ✅ Implemented` body line. They keep resolved rows
-// in place instead of archiving them, so the (c) done→archive invariant in
-// checkBacklogTransitions() does not apply to them. Empirically (2026-07-10)
-// both maintenance-backlog.md and a11y-backlog.md are pure table-status; only
-// maintenance is listed here because the (c) check is anchored strictly to
-// `**Status:**`-shaped lines, so a table-cell flip never trips it regardless —
-// keeping the set minimal preserves the catch if a11y-backlog.md ever grows a
-// real body `**Status:**` line without archiving.
-const TABLE_STATUS_BACKLOGS = [
-    'maintenance-backlog.md',
 ];
 
 // Figures that a dated correction retired. The observed failure mode (PRs #1620,
@@ -865,7 +850,7 @@ function checkChanged(string $base, string $repoRoot, \DateTimeImmutable $today)
  *
  * View 1 alone is HEAD-anchored, and that was a silent false negative: a caller
  * that edits docs and then runs `--since` to check ITSELF before committing
- * (backlog-housekeep op 7, post-plan Phase 2.5) cannot see its own edits, so the
+ * cannot see its own edits, so the
  * gate printed "On-touch doc check passed" four seconds before committing the
  * very edit CI then failed on (PR #1878, 2026-08-14). Views 2 and 3 close it.
  *
@@ -1000,112 +985,6 @@ function iterChangedDocs(string $base, string $repoRoot): array
     }
 
     return $docs;
-}
-
-/**
- * Diff-scoped backlog archive-transition invariants (--since mode only).
- *
- * Body-status backlogs (docs/backlog/<x>-backlog.md) mark an item ✅ Implemented /
- * 🚫 Declined and archive the resolved body behind a dated `archive/…` pointer so the
- * LIVE file stays short. This enforces that pairing at PR time, ONLY on files the diff
- * actually changed — never a full-scan corpus migration. Three transition invariants:
- *
- *   (a) Every `archive/<x>-backlog-archive.md` link present in the head body must
- *       resolve to an existing file.
- *   (b) When the head body ADDS an archive pointer the base body lacked (a
- *       done→archived transition), the canonical sibling derived from the LIVE
- *       filename (archive/<stem>-backlog-archive.md) must exist. Derived from the
- *       filename, not the link text, so it also catches a pointer that links the
- *       wrong archive file.
- *   (c) Body-status backlogs only: when the diff ADDS a `**Status:** ✅ Implemented`
- *       / `🚫 Declined` line the base lacked, the same file must also add an archive
- *       pointer. Anchored to `**Status:**`-shaped lines, so a table-cell status flip
- *       (a11y style) never trips it. TABLE_STATUS_BACKLOGS files are exempt: a resolved
- *       row there is **removed** rather than status-flipped, and that removal is enforced
- *       separately and corpus-wide by checkMaintenanceResolved().
- *
- * README.md (the index) and archive/ files are out of scope for all three. Base-missing
- * (added) files read as an empty base body, matching iterChangedDocs' base-blob fetch.
- *
- * @return list<string>
- */
-function checkBacklogTransitions(string $base, string $repoRoot): array
-{
-    $escapedRoot = escapeshellarg($repoRoot);
-    $escapedBase = escapeshellarg($base);
-    $archiveDir = 'ibl5/docs/backlog/archive/';
-    $pointerRe = '/\]\(archive\/([A-Za-z0-9._-]+-backlog-archive\.md)\)/';
-    $doneRe = '/^\s*\*\*Status[^*]*:\*\*\s*(?:✅ Implemented|🚫 Declined)/m';
-
-    $issues = [];
-    foreach (iterChangedDocs($base, $repoRoot) as $doc) {
-        $rel = $doc['rel'];
-        if (!str_starts_with($rel, 'ibl5/docs/backlog/')) {
-            continue;
-        }
-        $name = basename($rel);
-        // The index and archived history are out of scope — only LIVE item files.
-        if ($name === 'README.md' || str_contains($rel, '/archive/') || !str_ends_with($name, '-backlog.md')) {
-            continue;
-        }
-
-        $headBody = is_file($doc['abs']) ? (string) file_get_contents($doc['abs']) : '';
-        // Base blob: fails when the file did not exist at $base (added) => empty base.
-        $showCmd = sprintf('git -C %s show %s:%s 2>/dev/null', $escapedRoot, $escapedBase, escapeshellarg($rel));
-        $baseOut = [];
-        $baseCode = 0;
-        exec($showCmd, $baseOut, $baseCode);
-        $baseBody = $baseCode === 0 ? implode("\n", $baseOut) : '';
-
-        $headPointers = preg_match_all($pointerRe, $headBody, $m) > 0 ? array_values(array_unique($m[1])) : [];
-        $basePointers = preg_match_all($pointerRe, $baseBody, $m) > 0 ? array_values(array_unique($m[1])) : [];
-        $newPointers = array_diff($headPointers, $basePointers);
-
-        // (a) Every archive pointer in the head body must resolve.
-        foreach ($headPointers as $ptr) {
-            if (!is_file($repoRoot . '/' . $archiveDir . $ptr)) {
-                $issues[] = sprintf(
-                    '%s: archive pointer `archive/%s` does not resolve — %s%s is missing (commit the sibling archive file or fix the link)',
-                    $rel,
-                    $ptr,
-                    $archiveDir,
-                    $ptr
-                );
-            }
-        }
-
-        // (b) A newly-added pointer signals a done→archived transition; the canonical
-        // sibling derived from the LIVE filename must exist.
-        if ($newPointers !== []) {
-            $canonical = substr($name, 0, -strlen('-backlog.md')) . '-backlog-archive.md';
-            if (!is_file($repoRoot . '/' . $archiveDir . $canonical)) {
-                $issues[] = sprintf(
-                    '%s: archived an item but its canonical archive sibling %s%s is missing — create it (LIVE %s pairs with archive/%s)',
-                    $rel,
-                    $archiveDir,
-                    $canonical,
-                    $name,
-                    $canonical
-                );
-            }
-        }
-
-        // (c) Body-status backlogs: a newly-added done Status line must be paired with a
-        // newly-added archive pointer (move the body out, leave a dated pointer).
-        if (!in_array($name, TABLE_STATUS_BACKLOGS, true)) {
-            $headDone = preg_match_all($doneRe, $headBody, $m) > 0 ? $m[0] : [];
-            $baseDone = preg_match_all($doneRe, $baseBody, $m) > 0 ? $m[0] : [];
-            if (array_diff($headDone, $baseDone) !== [] && $newPointers === []) {
-                $issues[] = sprintf(
-                    '%s: item marked done inline (`**Status:** ✅ Implemented` / `🚫 Declined`) but no archive pointer added — move the resolved body into archive/%s-backlog-archive.md and replace the LIVE entry with a dated pointer',
-                    $rel,
-                    substr($name, 0, -strlen('-backlog.md'))
-                );
-            }
-        }
-    }
-
-    return $issues;
 }
 
 /**
@@ -1643,33 +1522,6 @@ function selfTestGitignoreFilter(): int
     return 1;
 }
 
-/**
- * Resolved (✅/🚫) findings must not remain as rows in a per-axis table — they collapse
- * to the axis's `> ✅ resolved (N): …` summary line with evidence moved to the sibling
- * archive (ibl5/docs/backlog/README.md § Archiving an item).
- *
- * Reads the one LIVE table-status backlog directly rather than the changed-file set: a
- * resolved row that slipped in on an untouched commit is exactly the miss this catches.
- *
- * @return list<string>
- */
-function checkMaintenanceResolved(string $repoRoot): array
-{
-    $rel = 'ibl5/docs/backlog/maintenance-backlog.md';
-    $abs = $repoRoot . '/' . $rel;
-    if (!is_file($abs)) {
-        return [];
-    }
-    $body = (string) file_get_contents($abs);
-    $n = preg_match_all('/^\|\s*\d+\.\d+\s*\|\s*(?:✅|🚫)/mu', $body);
-
-    return $n > 0 ? [sprintf(
-        '%s: %d resolved (✅/🚫) table row(s) found — collapse to per-axis summary lines and move evidence to archive/ (README.md § Archive)',
-        $rel,
-        $n
-    )] : [];
-}
-
 function checkSkillDraftPlaceholder(string $repoRoot): array
 {
     $issues = [];
@@ -1777,9 +1629,6 @@ if ($opts['since'] !== null) {
     }
 
     $issues = checkChanged($opts['since'], $root, $today);
-    // Diff-scoped backlog archive-transition invariants — --since mode only, never
-    // full-scan (avoids forcing a corpus migration of pre-existing backlog history).
-    $issues = array_merge($issues, checkBacklogTransitions($opts['since'], $root));
     if ($issues === []) {
         echo "On-touch doc check passed (changed files vs {$opts['since']}).\n";
         exit(0);
@@ -1839,15 +1688,6 @@ $sourceRefIssues = checkSourceCommentReferences($root);
 if ($sourceRefIssues !== []) {
     echo "FAIL dead references in source comments\n";
     foreach ($sourceRefIssues as $issue) {
-        echo "     - {$issue}\n";
-    }
-    $failures++;
-}
-
-$maintenanceIssues = checkMaintenanceResolved($root);
-if ($maintenanceIssues !== []) {
-    echo "FAIL maintenance-backlog resolved rows\n";
-    foreach ($maintenanceIssues as $issue) {
         echo "     - {$issue}\n";
     }
     $failures++;

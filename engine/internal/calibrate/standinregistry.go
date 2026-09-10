@@ -57,7 +57,7 @@ func StandInRegistry() []StandIn {
 				"construction. The J25 walkback from the provisional 17.7 happened on that faithfulness " +
 				"proof alone, WITH THE FAST-CLASS ARMING-SHARE GAP STILL OPEN — this constant is not a " +
 				"lever on that gap (measured; see the 'Do NOT re-open' list in " +
-				"docs/backlog/jsb-native-backlog.md). The sweep baseline is therefore the shipped 16.0, " +
+				"a-jay85/IBL5-backlog (label: jsb-native)). The sweep baseline is therefore the shipped 16.0, " +
 				"bracketed symmetrically inside the faithful band by 13.65 (the retired J23 center) and " +
 				"above it by 17.7 (the retired provisional), so the bracket still spans a pace range " +
 				"wide enough to clear noise. Perturbable as a research lever — the harness reproduces " +

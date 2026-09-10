@@ -1,6 +1,6 @@
 ---
 description: Why a genuinely-failed non-Opus automouse plan escalates only its FINAL retry to Opus with the prior attempt's capped failure report, and why environmental (refunded) failures never escalate or write a report.
-last_verified: 2026-07-27
+last_verified: 2026-09-08
 owner: A-Jay
 ---
 
@@ -49,7 +49,7 @@ The `.failure` sidecar shares the lifecycle of the `.attempts` counter: it is ev
 - Positive: the `.failure` artifact is a durable, inspectable record of why an attempt failed (useful beyond escalation, for morning triage).
 - Negative: a genuine 3rd-attempt failure now costs one Opus run. Bounded: at most one Opus escalation per plan per night, and only when the plan was already about to poison-pill anyway.
 - Negative: one more sidecar in the lifecycle to evict correctly. Mitigated by adding it at every existing `.attempts` eviction site and testing eviction.
-- This does **not** invert the "Opus-by-omission" default in `plan-impl-model` — an unlabeled plan still resolves to Opus. The eventual inversion (cheap tier by default, Opus only via escalation) is a token-spend direction tracked in `ibl5/docs/backlog/token-spend-backlog.md` (T1/T11), not part of this change.
+- This does **not** invert the "Opus-by-omission" default in `plan-impl-model` — an unlabeled plan still resolves to Opus. The eventual inversion (cheap tier by default, Opus only via escalation) is a token-spend direction tracked in `ibl5/docs/backlog/token-spend-backlog.md` (example) (T1/T11), not part of this change.
 
 ## Lineage
 
@@ -63,4 +63,4 @@ Builds on L13 (per-plan impl-model tier binding, PR1 of this stacked pair), whic
 - `bin/automouse/prompt-impl` — reads `PRIOR_FAILURE_REPORT` when present.
 - `bin/automouse/queue` — `.failure` sidecar eviction sites (mirrors `.attempts`).
 - `bin/test-automouse-escalation` — unit test for the escalation decision (Phase 3).
-- `ibl5/docs/backlog/loop-engineering-backlog.md` — backlog item L14.
+- `ibl5/docs/backlog/loop-engineering-backlog.md` (example) — backlog item L14.

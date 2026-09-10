@@ -413,7 +413,7 @@ _REAL_REGISTRY_ROW = (
     "(no-prior-commits-on-branch) scenario | prior: -- |"
 )
 
-_BACKLOG_FILE = "ibl5/docs/backlog/loop-engineering-backlog.md"
+_BACKLOG_FILE = "ibl5/docs/retrospective-class-registry.md"
 
 
 def _diff_adding_row_in_file(path: str, row: str, leading: str = "+") -> str:

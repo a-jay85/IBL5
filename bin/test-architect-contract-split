@@ -43,6 +43,7 @@ esac
 # Format: "token<TAB>reason" — reason must be ≥15 chars or the entry is itself a failure.
 # EXPECTED_ABSENT: baseline tokens deliberately deleted; exempt from no-loss assertion.
 EXPECTED_ABSENT=(
+  "Backlog / tracking-doc status update	replaced by the \"Backlog / GitHub Issue close\" bullet when ADR-0121 retired the in-repo markdown backlog corpus; there is no tracking doc row left to flip"
 )
 
 # Format: "token<TAB>detail-file-path<TAB>reason"

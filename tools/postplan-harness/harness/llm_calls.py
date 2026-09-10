@@ -16,7 +16,7 @@ def pr_copy_prompt(slug: str, cls: Classification, plan: PlanInfo, plan_excerpt:
     if cls.retro_registry_row:
         retro_block = (
             "\nRETROSPECTIVE ROUTING — this branch adds a row to the `## Class registry` "
-            "in `ibl5/docs/backlog/loop-engineering-backlog.md`, so it materializes a "
+            "in `ibl5/docs/retrospective-class-registry.md`, so it materializes a "
             "`/post-plan` Phase 9 retrospective routing. The `summary_md` field MUST "
             "contain a `## Why this PR exists` section derivable from the registry row "
             "alone. Four required elements in that section:\n"

@@ -12,7 +12,7 @@
 #                                               sweep only, JSON array on stdout,
 #                                               always exit 0, no gate semantics
 #
-# Four checks (T2 + T13 — ibl5/docs/backlog/token-spend-backlog.md):
+# Four checks (T2 + T13 — token-spend label on a-jay85/IBL5-backlog):
 #   1. Per-file caps, by residency tier (a `paths:` key is the only test):
 #      resident (no paths:) <= RULES_RESIDENT_BUDGET (default 5200);
 #      lazy (has paths:)    <= RULES_LAZY_BUDGET (default 16000)

@@ -592,14 +592,18 @@ if [ -r "$PROBE_SH" ]; then
     # The probe embeds the regex inside a jq string literal, so its backslashes are
     # doubled there; halve them to recover the regex jq actually compiles.
     ENVELOPE_RE="$(grep -o 'test("<summary>[^"]*")' "$PROBE_SH" | head -1 | sed 's/^test("//; s/")$//; s/\\\\/\\/g')"
+    ENVELOPE_HITS="$(grep -c 'test("<summary>[^"]*")' "$PROBE_SH" || true)"
 fi
-if [ -n "$ENVELOPE_RE" ]; then
-    ok "case25b: recovered the helper-envelope regex from 4b-probe.sh"
+if [ -n "$ENVELOPE_RE" ] && [ "${ENVELOPE_HITS:-0}" -ge 2 ]; then
+    ok "case25b: recovered the helper-envelope regex from 4b-probe.sh (present in ${ENVELOPE_HITS} channels)"
+elif [ -n "$ENVELOPE_RE" ]; then
+    fail "case25b: helper-envelope regex exists but appears in only ${ENVELOPE_HITS} channel(s) in 4b-probe.sh — the reviews-channel copy may have drifted"
 else
     fail "case25b: no helper-envelope regex in 4b-probe.sh — the probe lost its discriminator, so every real review reclassifies as freehand (PR #2182 class)"
 fi
 
 if [ -n "$ENVELOPE_RE" ]; then
+    _C25B_SAVED_COMMENT_OUT="$COMMENT_OUT"
     COMMENT_OUT="$BASE_TMP/c25b-summary.txt"
     : > "$COMMENT_OUT"
     post_review_summary 999 "Code review" "No issues found. Architecture clean." >/dev/null 2>&1
@@ -610,6 +614,8 @@ if [ -n "$ENVELOPE_RE" ]; then
     else
         fail "case25b: post_review_summary output NO LONGER matches 4b-probe.sh's envelope regex — a clean review would be labelled freehand; fix both sides together"
     fi
+    COMMENT_OUT="$_C25B_SAVED_COMMENT_OUT"
+    unset _C25B_SAVED_COMMENT_OUT
 fi
 
 # The regex's second alternative covers both post_review_findings channels, which share

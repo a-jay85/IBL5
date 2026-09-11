@@ -73,7 +73,7 @@ Load the procedure in place: `git show <MASTER_SHA>:.claude/skills/pr-ready/_pha
 
 Three post-plan-specific rules on top — these are where a re-spawn would otherwise creep in:
 
-1. **Two channels; the gate word is frozen, the comment's last line is not.** The `FIDELITY=<word>` that condition (12) reads is the step-3 word and never changes — remediation never upgrades it and never re-runs the reviewer. The sticky comment's **terminal verdict line** is a separate channel governed by `_phase7-verdict.md`: it states what this run left the PR in, so it must name its own reason whenever that state is anything but a plain `READY`. Compose it from the terminal-line recipe below; never emit the bare step-3 word as the last line.
+1. **Two channels; the gate word is frozen, the comment's last line is not.** The `FIDELITY=<word>` that condition (12) reads is the step-3 word and never changes — remediation never upgrades it and never re-runs the reviewer. The sticky comment's **terminal verdict line** is a separate channel governed by `_phase7-verdict.md`: it states what this run left the PR in, so it must name its own reason whenever that state is anything but a plain `READY`. Compose it from the terminal-line recipe below; never emit the bare step-3 word as the last line for any outcome other than a plain `READY`.
 2. **`**Reviewed tree:**` keeps the step 1 value** — the tree the reviewer actually saw, not the post-remediation tree. That line tells a reader exactly how much of the shipped head the verdict covers.
 3. **The remediation commit is named in the existing `**Machine-authored fixes:**` digest label** — no new field, no sixth line. Append ` (post-plan remediation: <sha>)` to that one line's value. This is the only permitted deviation from `_phase7-verdict.md`'s paste-verbatim rule; it changes a value, not the label set.
 
@@ -86,7 +86,7 @@ The last line of the sticky comment, immediately above the `<!-- pr-ready-verdic
 | Step-3 `FIDELITY` | Step 4 outcome | Terminal line |
 |---|---|---|
 | `READY` | step 4 skipped | `READY` |
-| `READY WITH NOTES` | every `Mode: in-PR` finding fixed | `READY WITH NOTES — all notes remediated in <sha>; reviewer verdict covers tree <REVIEWED_TREE>` |
+| `READY WITH NOTES` | every `Mode: in-PR` finding fixed | `READY WITH NOTES — all notes remediated in <sha>; reviewer verdict covers tree <REVIEWED_TREE>, not the post-remediation head` |
 | `READY WITH NOTES` | something left unfixed | `READY WITH NOTES — <what remains, named>; remediated the rest in <sha>` |
 | `NOT READY` | every `Mode: in-PR` finding fixed | `NOT READY — all findings remediated in <sha>; no reviewer verdict covers the post-remediation tree, so auto-merge stays held. Re-run /post-plan to clear.` |
 | `NOT READY` | something left unfixed | `NOT READY — <what remains, named>; remediated the rest in <sha>` |

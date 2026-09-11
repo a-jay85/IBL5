@@ -74,9 +74,12 @@ safe rather than clobbering.
 
 Two corrections were made to the restored script relative to its retired form:
 
-- The force-push exit status is now checked. The retired version printed `✓ Rebased` and
-  incremented its `rebased` counter regardless of whether the push succeeded, so a
-  `--force-with-lease` rejection was reported as a successful rebase.
+- The force-push exit status is now checked. In the retired version the `git push` was a
+  bare command inside a `then` block; under `bash -e` (GitHub Actions' default for `run:`
+  blocks) a rejected `--force-with-lease` aborted the entire step — the batch stopped at
+  the first rejection, remaining PRs went unrebased, and no step summary was written. The
+  restored script puts the push in a condition so a rejection is reported per-PR and the
+  loop continues.
 - A `dry_run` input was added. It rebases each branch locally to prove it applies cleanly,
   prints every commit the Phase 1.5 orphan heuristic would drop, and pushes nothing — the
   only cheap guard against that heuristic's false positive (two open PRs carrying a genuinely

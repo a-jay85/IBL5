@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 5.5 — plan-intent fidelity review (one Opus reviewer spawn), verdict parse, remediation, and sticky merge-digest comment.
-last_verified: 2026-09-07
+last_verified: 2026-09-10
 ---
 
 # /post-plan Phase 5.5 — Plan-intent fidelity review & merge digest
@@ -73,11 +73,25 @@ Load the procedure in place: `git show <MASTER_SHA>:.claude/skills/pr-ready/_pha
 
 Three post-plan-specific rules on top — these are where a re-spawn would otherwise creep in:
 
-1. **The verdict does not change.** Remediation never upgrades `READY WITH NOTES` to `READY`, and never re-runs the reviewer. The word posted in step 6 and read by condition (12) is the one from step 3.
+1. **Two channels; the gate word is frozen, the comment's last line is not.** The `FIDELITY=<word>` that condition (12) reads is the step-3 word and never changes — remediation never upgrades it and never re-runs the reviewer. The sticky comment's **terminal verdict line** is a separate channel governed by `_phase7-verdict.md`: it states what this run left the PR in, so it must name its own reason whenever that state is anything but a plain `READY`. Compose it from the terminal-line recipe below; never emit the bare step-3 word as the last line.
 2. **`**Reviewed tree:**` keeps the step 1 value** — the tree the reviewer actually saw, not the post-remediation tree. That line tells a reader exactly how much of the shipped head the verdict covers.
 3. **The remediation commit is named in the existing `**Machine-authored fixes:**` digest label** — no new field, no sixth line. Append ` (post-plan remediation: <sha>)` to that one line's value. This is the only permitted deviation from `_phase7-verdict.md`'s paste-verbatim rule; it changes a value, not the label set.
 
-On `NOT READY`, run the same remediation for every `Mode: in-PR` finding, then stop — the verdict stays `NOT READY` and condition (12) will block. Do not attempt to reach `READY`.
+On `NOT READY`, run the same remediation for every `Mode: in-PR` finding, then stop. `FIDELITY` stays `NOT READY` and condition (12) will block; do not attempt to reach `READY` and do not re-spawn the reviewer.
+
+### Terminal-line recipe
+
+The last line of the sticky comment, immediately above the `<!-- pr-ready-verdict -->` marker. The row is chosen by two lookups, not by judgement. Column 1 is the step-3 `FIDELITY` literal. Column 2 is decided by re-reading `$FIDELITY_VERDICT_FILE`'s finding list — `Mode: in-PR` treats every Phase 6 finding, notes and blockers alike — and checking each one against what step 4's commit actually changed. Every finding addressed is the "fixed" row; anything else is the "left unfixed" row, and the unfixed finding is named in the line by copying its title verbatim. Re-read the file; do not answer this from memory of what step 4 did. The `READY`/`NOT READY` **prefix** is load-bearing: `bin/pr-cycle`'s verdict parse anchors on it (`"NOT READY"*` is a prefix glob) and `bin/pr-ready-now`'s `derive_status` anchors likewise, so a trailing ` — <reason>` is invisible to both. Never put the reason *before* the word.
+
+| Step-3 `FIDELITY` | Step 4 outcome | Terminal line |
+|---|---|---|
+| `READY` | step 4 skipped | `READY` |
+| `READY WITH NOTES` | every `Mode: in-PR` finding fixed | `READY WITH NOTES — all notes remediated in <sha>; reviewer verdict covers tree <REVIEWED_TREE>` |
+| `READY WITH NOTES` | something left unfixed | `READY WITH NOTES — <what remains, named>; remediated the rest in <sha>` |
+| `NOT READY` | every `Mode: in-PR` finding fixed | `NOT READY — all findings remediated in <sha>; no reviewer verdict covers the post-remediation tree, so auto-merge stays held. Re-run /post-plan to clear.` |
+| `NOT READY` | something left unfixed | `NOT READY — <what remains, named>; remediated the rest in <sha>` |
+
+The fourth row is the one that matters: a run that fixed everything and still blocks is blocking on *review coverage*, not on defects, and a bare `NOT READY` there reads as a false claim that the PR is broken (PR #2192). The hold itself is unchanged — condition (12) still reads the frozen `FIDELITY` word from the verdict file, never this line.
 
 Skip this step entirely when `FIDELITY=READY`.
 
@@ -115,7 +129,7 @@ Plan-fidelity verdict: <FIDELITY word> — <reviewer findings, REVIEW-COVERAGE: 
 
 <Remediation: what step 4 fixed, anything left unfixed, and the commit SHA>
 
-READY WITH NOTES
+<terminal verdict line — build it from step 4's terminal-line recipe; never a bare verdict word>
 <!-- pr-ready-verdict -->
 ```
 

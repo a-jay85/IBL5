@@ -1471,6 +1471,34 @@ run --worker
 [[ "$(calls ready)" == "1" ]] \
     || fail "a NOT READY verdict authorised the skip: $(calls ready) ready call(s), want 1"
 
+# 28g2 — the /post-plan Phase 5.5 terminal-line recipe (_phase-5.5-fidelity.md step 4)
+# emits `NOT READY — <reason>` so the comment states why the PR is held instead of a bare
+# word that contradicts the remediation narrated above it. The reason is a SUFFIX precisely
+# so _verdict_word's `"NOT READY"*` prefix glob still classifies it as blocking. This row
+# pins that: move the reason before the word and the skip is wrongly authorised.
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+install_verdict 101 "$TREE_A" "$TREE_A" \
+    'NOT READY — all findings remediated in abc1234; no reviewer verdict covers the post-remediation tree, so auto-merge stays held. Re-run /post-plan to clear.'
+run --worker
+[[ "$(calls ready)" == "1" ]] \
+    || fail "a NOT READY verdict with a reason suffix authorised the skip: $(calls ready) ready call(s), want 1"
+
+# 28g3 — the same recipe's READY WITH NOTES rows also carry a reason suffix. `READY WITH
+# NOTES` has always authorised the skip (the pre-recipe step-6 template hardcoded that exact
+# bare word), and that is correct: the fidelity reviewer's `READY WITH NOTES` means no
+# BLOCKING finding, so an unremediated note is not a hold. This row pins that the added
+# suffix does not change that classification either way.
+reset_state
+printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
+triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
+install_verdict 101 "$TREE_A" "$TREE_A" \
+    'READY WITH NOTES — all notes remediated in abc1234; reviewer verdict covers tree '"$TREE_A"
+run --worker
+[[ "$(calls ready)" == "0" ]] \
+    || fail "READY WITH NOTES with a reason suffix did not authorise the skip: $(calls ready) ready call(s), want 0"
+
 # 28h — a verdict comment with no `**Reviewed tree:**` contract line on line 1 cannot be
 # checked for currency, so it does not authorise the skip. This is every verdict written
 # before that line existed, which is why the skip is expected to be rare at first.

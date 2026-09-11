@@ -151,7 +151,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         if stripped:
             copy["summary_md"] = summary
             log("phase2: stripped model-authored Manual Testing section from PR copy")
-        sha = git.commit_all(f"{copy['title']}\n\n{copy['summary_md']}")
+        copy["commit_subject"] = schemas.coerce_commit_subject(copy["commit_subject"], cls)
+        sha = git.commit_all(f"{copy['commit_subject']}\n\n{copy['summary_md']}")
         if live:
             git.rebase_onto()      # pre-push policy: branch must sit on origin/master
             sha = git.head()

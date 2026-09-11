@@ -3,7 +3,9 @@ validates what the model returns; invalid output is a typed failure, never
 silently accepted."""
 from __future__ import annotations
 
-from .state import HarnessError
+import re
+
+from .state import Classification, HarnessError
 
 FINDING_KEYS = {"path", "line", "body"}
 MANUAL_CATEGORIES = {"cli-executable", "phpunit", "api-test", "e2e",
@@ -84,16 +86,51 @@ def validate_manual_recheck(data) -> None:
 
 
 def validate_pr_copy(data) -> None:
-    """{type, title, summary_md} — commit/PR copy generation."""
+    """{type, title, commit_subject, summary_md} — commit/PR copy generation.
+
+    `title` is the PR title; `commit_subject` is the git commit subject. They are separate
+    artifacts and both must start with `type`.
+    """
     if not isinstance(data, dict):
         raise HarnessError("schema", "pr copy must be a JSON object")
-    for k in ("type", "title", "summary_md"):
+    for k in ("type", "title", "summary_md", "commit_subject"):
         if k not in data or not isinstance(data[k], str):
             raise HarnessError("schema", f"pr copy missing string field {k!r}")
     if data["type"] not in COMMIT_TYPES:
         raise HarnessError("schema", f"type {data['type']!r} not a conventional-commit type")
     if not data["title"].lower().startswith(data["type"]):
         raise HarnessError("schema", "title must start with its conventional-commit type")
+    if not data["commit_subject"].lower().startswith(data["type"]):
+        raise HarnessError("schema", "commit_subject must start with its conventional-commit type")
+
+
+def coerce_commit_subject(subject: str, cls: Classification) -> str:
+    """Decoration layer: re-type a commit subject against what the diff actually contains.
+
+    Never raises — the caller always gets a usable subject back. An unparseable subject is
+    returned byte-identical (that is `validate_pr_copy`'s problem, not this function's), and a
+    classification with no *_only flag set leaves the subject unchanged.
+
+    The flag check order is load-bearing: `count_non_code = count_md + count_lock +
+    count_snapshot` in classify.py, so a docs-only set also satisfies `non_code_only`. Checking
+    `docs_only` first is what makes `chore:` + docs-only coerce to `docs:` rather than being
+    waved through as an already-allowed `chore` on the `non_code_only` branch.
+    """
+    m = re.match(r"^([a-z]+)(\([^)]*\))?(!)?:", subject)
+    if not m:
+        return subject
+    parsed, scope, bang = m.group(1), m.group(2) or "", m.group(3) or ""
+    if cls.docs_only:
+        allowed, coerce_to = {"docs"}, "docs"
+    elif cls.test_only:
+        allowed, coerce_to = {"test", "chore"}, "test"
+    elif cls.non_code_only:
+        allowed, coerce_to = {"chore", "docs", "build", "ci"}, "chore"
+    else:
+        return subject
+    if parsed in allowed:
+        return subject
+    return coerce_to + scope + bang + subject[m.end() - 1:]
 
 
 def validate_safety_verdict(data) -> None:

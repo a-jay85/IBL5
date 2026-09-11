@@ -271,11 +271,14 @@ jobs:
             if [ "$DRY_RUN" = "true" ]; then
               echo "DRY RUN — rebase applied cleanly; NOT pushing ${branch} (would drop ${drop_n} orphan(s))"
               ((++would_rebase))
-            # The push exit status is CHECKED, not assumed. --force-with-lease legitimately
-            # rejects when someone (a human, or update-behind-prs) touched the branch after
-            # our fetch. The retired version ignored this status and printed ✓ regardless,
-            # so the summary could report rebases that never happened — precisely the number
-            # an operator watching the storm settle is relying on.
+            # The push exit status is HANDLED, not left to abort the step. --force-with-lease
+            # legitimately rejects when someone (a human, or update-behind-prs) touched the
+            # branch after our fetch — a normal race, not a bug. GitHub's default shell for a
+            # `run:` block is `bash -e` (this step sets no `shell:` key), so in the retired
+            # version — where the push was a bare command inside an `if` body — that rejection
+            # aborted the WHOLE step, abandoning every PR still queued behind it. Putting the
+            # push in an `elif` condition exempts it from -e, so one stale lease costs one PR
+            # instead of the rest of the run, and the operator still sees it in the summary.
             elif git push origin "HEAD:${branch}" --force-with-lease; then
               echo "✓ Rebased ${branch} onto master (dropped ${drop_n} orphan(s))"
               ((++rebased))

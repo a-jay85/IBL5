@@ -533,7 +533,7 @@ def test_coerce_commit_subject_table():
         ("feat: add roster cache", _flagged(test_only=True), "test: add roster cache"),
         ("test: add roster cache", _flagged(test_only=True), "test: add roster cache"),
         ("feat: add roster cache", _flagged(), "feat: add roster cache"),
-        ("chore: update backlog", _flagged(docs_only=True), "docs: update backlog"),
+        ("chore: update backlog", _flagged(docs_only=True, non_code_only=True), "docs: update backlog"),
         ("feat: bump lockfile", _flagged(non_code_only=True), "chore: bump lockfile"),
     ]
     for subject, cls, expected in cases:

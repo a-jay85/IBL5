@@ -139,7 +139,7 @@ fi
 # assigned until much later in this script. Keep the two in sync.
 if [ "${FORCE:-0}" -eq 0 ]; then
     PR_NUM=$(gh pr list --head "$(git rev-parse --abbrev-ref HEAD)" --state open \
-                 --json number --jq '.[0].number' 2>/dev/null || true)
+                 --json number --jq '.[0].number // empty' 2>/dev/null || true)
     if [ -n "$PR_NUM" ]; then
         CHANGED=$( { git diff --name-only origin/master...HEAD 2>/dev/null || true
                      git diff --name-only HEAD 2>/dev/null || true

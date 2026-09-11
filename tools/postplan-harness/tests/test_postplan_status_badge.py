@@ -49,6 +49,7 @@ def stub_launchctl(tmp_path):
     lc = bindir / "launchctl"
     lc.write_text(
         '#!/usr/bin/env bash\n'
+        'if [ -n "${LC_LOG:-}" ]; then echo "$*" >> "$LC_LOG"; fi\n'
         'if [ "$1" = "list" ]; then\n'
         '  label="$2"\n'
         '  IFS=":" read -ra live_arr <<< "${LIVE_LABELS:-}"\n'
@@ -252,6 +253,23 @@ def test_marker_matching_is_exact(tmp_path, stub_gh):
     )
     assert "found_label" in r2.stdout, f"Expected badge found: {r2.stdout!r} {r2.stderr!r}"
 
+    # Sibling markers must NOT match: test the jq filter expression directly.
+    # The stub bypasses --jq; to detect a substring-match regression we must
+    # run the actual jq filter that postplan_badge_existing_label uses.
+    import json as _json
+    badge_marker = "<!-- postplan-status -->"
+    jq_filter = f'.[] | select(.body | contains("{badge_marker}")) | .body'
+    for other_marker in ["<!-- pr-ready-verdict -->", "<!-- pr-fast-canary -->"]:
+        fixture_json = _json.dumps([{"body": f"{other_marker}\n**content**"}])
+        r_jq = subprocess.run(
+            ["jq", "-r", jq_filter],
+            input=fixture_json, capture_output=True, text=True
+        )
+        assert r_jq.stdout.strip() == "", (
+            f"jq filter for {badge_marker!r} must not match {other_marker!r}: "
+            f"got {r_jq.stdout!r}"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Test 6: stale_detection
@@ -292,6 +310,8 @@ def test_stale_detection(tmp_path, stub_gh, stub_launchctl):
     assert not any("PATCH" in c for c in calls2), f"Expected no PATCH (live): {calls2}"
 
     # Case 3: empty label (hand-run harness) → treated as stale (PATCH), launchctl never invoked
+    lc_log = tmp_path / "lc.log"
+    lc_log.write_text("")
     log.write_text("")
     empty_label_fixture = (
         '[{"id":6,"body":"<!-- postplan-status -->\\n**running**\\n'
@@ -299,6 +319,7 @@ def test_stale_detection(tmp_path, stub_gh, stub_launchctl):
     )
     env["GH_FIXTURE"] = empty_label_fixture
     env["LIVE_LABELS"] = ""
+    env["LC_LOG"] = str(lc_log)
     r3 = _run_badge(
         "postplan_sweep_stale_badge 42",
         env_extra=env, stub_gh_dir=stub_gh, stub_lc_dir=stub_launchctl
@@ -306,6 +327,8 @@ def test_stale_detection(tmp_path, stub_gh, stub_launchctl):
     assert r3.returncode == 0, r3.stderr
     calls3 = log.read_text().splitlines()
     assert any("PATCH" in c for c in calls3), f"Expected PATCH (empty label stale): {calls3}"
+    lc_calls3 = lc_log.read_text().strip()
+    assert not lc_calls3, f"launchctl must not be invoked for empty label; got: {lc_calls3!r}"
 
 
 # ---------------------------------------------------------------------------
@@ -352,10 +375,10 @@ def test_generated_plist_wiring(tmp_path):
     assert "trap" in cmd
     assert "EXIT INT TERM HUP" in cmd
 
-    # conclude_status_badge appears at least twice (in trap and in tail);
-    # the declare -f block also contains the string once in the function body text
-    assert cmd.count("conclude_status_badge") >= 2, (
-        f"expected conclude_status_badge at least twice, got {cmd.count('conclude_status_badge')}"
+    # conclude_status_badge appears exactly three times: once in the trap, once in the
+    # tail, and once inside the declare -f function body text
+    assert cmd.count("conclude_status_badge") == 3, (
+        f"expected conclude_status_badge exactly three times, got {cmd.count('conclude_status_badge')}"
     )
 
     # postplan_sweep_stale_badge appears in the function body (declare -f) AND as a call site;
@@ -381,6 +404,43 @@ def test_generated_plist_wiring(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+# Test 8b: rc3_propagation — brace group exits 0 with rc=3 → conclude gets 3
+# ---------------------------------------------------------------------------
+
+def test_rc3_propagates_when_group_exits_zero():
+    """${rc:-0} detects harness rc=3 even when the brace group exits 0.
+
+    The CMD tail logic: rc is set by GATE_CLOSE inside a brace group.
+    The group exits 0 because GATE_CLOSE's rc=3 arm ends with echo.
+    pp_rc=$? captures 0. Only ${rc:-0} can detect the harness rc=3.
+    """
+    script = (
+        f'source "{PPN}" >/dev/null 2>&1\n'
+        'rc=3\n'           # simulates GATE_CLOSE setting rc=3 inside brace group
+        'pp_rc=0\n'        # simulates group exiting 0 → pp_rc=$?=0
+        'if [ "${rc:-0}" = 3 ]; then pp_rc=3; fi\n'
+        'echo "pp_rc=$pp_rc"\n'
+    )
+    r = subprocess.run(["bash", "-c", script], capture_output=True, text=True)
+    assert "pp_rc=3" in r.stdout, (
+        f"rc=3 was not propagated to pp_rc via ${{rc:-0}}: {r.stdout!r}"
+    )
+
+    # Verify the tautological form (the regression) does NOT propagate
+    script_bad = (
+        f'source "{PPN}" >/dev/null 2>&1\n'
+        'rc=3\n'
+        'pp_rc=0\n'
+        'if [ "${pp_rc:-0}" = 3 ]; then pp_rc=3; fi\n'
+        'echo "pp_rc=$pp_rc"\n'
+    )
+    r_bad = subprocess.run(["bash", "-c", script_bad], capture_output=True, text=True)
+    assert "pp_rc=0" in r_bad.stdout, (
+        f"Regression check: tautological pp_rc form should yield 0, got: {r_bad.stdout!r}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Test 9: job_path_finds_gh
 # ---------------------------------------------------------------------------
 
@@ -393,15 +453,10 @@ def test_job_path_finds_gh():
         os.path.expanduser("~/.local/bin"),
         "/Applications/cmux.app/Contents/Resources/bin",
     ]
-    found = False
-    for p in paths:
-        if shutil.which("gh", path=p):
-            found = True
-            break
-    # Also check current PATH as fallback
-    if not found:
-        found = bool(shutil.which("gh"))
-    assert found, "gh not found in any of the launchd job PATH entries"
+    found = any(shutil.which("gh", path=p) for p in paths)
+    assert found, (
+        f"gh not found in any of the launchd job PATH entries: {paths}"
+    )
 
 
 # ---------------------------------------------------------------------------

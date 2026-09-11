@@ -165,6 +165,33 @@ last_line() {
     fi
 }
 
+# The branch slug a plan-now run is working on.
+#
+# Unlike com.ibl5.postplan-now-<slug>-<ts>, the plan-now label carries only a
+# timestamp (bin/plan-now sets LABEL="com.ibl5.plan-now-$TS"), so the row would
+# otherwise read as an opaque number. The slug lives in the prompt the run was
+# fired with — /tmp/plan-now-<ts>.prompt, written by that same script — on a line
+# of the form:  - Branch slug: `some-slug`. Base: `master`.
+#
+# THE PATTERN REQUIRES THE COLON; bin/plan-now's own run_slug() does not. That
+# difference is deliberate, not drift. plan-now can afford the loose parse because
+# downstream it demands the slug name an existing file under $PLANS_DIR, so a
+# garbled match costs it a false negative. This tool has no such backstop — it
+# prints whatever it parsed. Checked against 230 real prompt files in /tmp: the
+# colon-less form matched the explanatory prose "branch slug, with a `PLAN_FILE`"
+# and would have shown PLAN_FILE as the slug; requiring the colon misread none.
+prompt_slug() {
+    local f="${1:-}" slug
+    [ -f "$f" ] || return 1
+    slug="$(grep -ioE 'branch slug[*[:space:]]*:[*[:space:]]*`[^`]+`' "$f" 2>/dev/null \
+        | head -n 1 | grep -oE '`[^`]+`' | head -n 1 | tr -d '`')"
+    # Shape guard. A branch slug is what bin/wt-new accepts; anything else is a
+    # parse that went wrong, and showing a wrong slug is worse than showing none.
+    case "$slug" in ''|*[!a-zA-Z0-9._-]*) return 1 ;; esac
+    [ "${#slug}" -gt 64 ] && return 1
+    printf '%s' "$slug"
+}
+
 section() { printf '\n%s%s%s\n' "$B" "$1" "$R"; }
 note()    { printf '  %s%s%s\n' "$DIM" "$1" "$R"; }
 
@@ -198,6 +225,7 @@ pid_is_accounted_for() {
 
 render_launchd() {
     local count=0 line label pid status suffix producer log outdir progress
+    local ident ident_note slug
 
     section "LAUNCHD JOBS  (com.ibl5.*)"
 
@@ -214,6 +242,7 @@ render_launchd() {
 
         suffix="${label#com.ibl5.}"
         producer="$suffix"; log=''; outdir=''; progress=''
+        ident="$suffix"; ident_note=''
 
         case "$suffix" in
             postplan-now-*)
@@ -221,7 +250,18 @@ render_launchd() {
                 log="$LOG_DIR/post-plan-now-${suffix#postplan-now-}.log"
                 outdir="$HARNESS_OUT/live-${suffix#postplan-now-}"
                 ;;
-            plan-now-*)     producer="plan";     log="$LOG_DIR/${suffix}.log" ;;
+            plan-now-*)
+                producer="plan"
+                log="$LOG_DIR/${suffix}.log"
+                # Slug first, timestamp demoted to a dim tail: the slug is what
+                # identifies the run to a human, the timestamp only disambiguates
+                # two concurrent runs planning the same slug.
+                slug="$(prompt_slug "$LOG_DIR/${suffix}.prompt")" || slug=''
+                if [ -n "$slug" ]; then
+                    ident="$slug"
+                    ident_note="  ${DIM}${suffix#plan-now-}${R}"
+                fi
+                ;;
             pr-ready-now-*) producer="pr-ready"; log="$LOG_DIR/${suffix}.log" ;;
             docfix-*)       producer="docfix";   log="$LOG_DIR/${suffix}.log" ;;
         esac
@@ -238,7 +278,8 @@ render_launchd() {
 
         count=$(( count + 1 ))
         track_pid "$pid"
-        printf '  %s●%s %-10s %s%s%s\n' "$GRN" "$R" "$producer" "$B" "$suffix" "$R"
+        printf '  %s●%s %-10s %s%s%s%s\n' \
+            "$GRN" "$R" "$producer" "$B" "$ident" "$R" "$ident_note"
         printf '      pid %-7s up %-8s last-exit-col %s\n' \
             "$pid" "$(human_age "$(pid_elapsed_secs "$pid")")" "$status"
         printf '      %s%s%s\n' "$DIM" "$progress" "$R"
@@ -254,11 +295,12 @@ EOF
 # ── section 2: automouse runners ───────────────────────────────────────────────
 #
 # bin/automouse/run writes .heartbeat-<pid>-<phase> and .cmdpid-<pid>-<phase> per
-# active phase, and leaves them behind on exit. The PID is in the filename, so
+# active phase, and removes them on normal exit (cleanup_watcher EXIT trap). They
+# survive only a SIGKILL'd or stall-killed runner. The PID is in the filename, so
 # aliveness is checkable without trusting the file's existence at all.
 
 render_automouse() {
-    local count=0 stale=0 hb base rest pid phase now hb_ts hb_age slug lock attempts
+    local count=0 stale=0 hb base rest pid phase now hb_ts hb_age slug lock attempts slug_ld slug_lb
 
     section "AUTOMOUSE RUNNERS"
 
@@ -281,9 +323,26 @@ render_automouse() {
             *) hb_age="$(( now - hb_ts ))" ;;
         esac
 
-        # Which plan this runner is on comes from the runner's own command line,
-        # which names the plan file it was invoked with.
-        slug="$(ps -o command= -p "$pid" 2>/dev/null | sed -n 's/.*automouse\/run plan \([^ ]*\)\.md.*/\1/p' | head -n 1)"
+        # Which plan this runner is on: the lock directory that bin/automouse/run
+        # writes a pid file into is authoritative for both nightly (no-arg queue-
+        # draining) and one-off (plan <slug>) invocations. Fallback: command-line
+        # scrape, which only matches the undocumented explicit .md invocation form.
+        slug=''
+        for slug_ld in "$AUTOMOUSE_DIR/queue/"*.lock; do
+            [ -d "$slug_ld" ] || continue
+            [ -f "$slug_ld/pid" ] || continue
+            if [ "$(tr -dc '0-9' < "$slug_ld/pid" 2>/dev/null)" = "$pid" ]; then
+                slug_lb="$(basename "$slug_ld")"
+                slug="${slug_lb%.lock}"
+                slug="${slug%.md}"
+                break
+            fi
+        done
+        if [ -z "$slug" ]; then
+            slug="$(ps -o command= -p "$pid" 2>/dev/null \
+                | sed -n 's/.*automouse\/run plan \([^ ]*\)\.md.*/\1/p' \
+                | head -n 1)"
+        fi
         [ -z "$slug" ] && slug='(unknown plan)'
 
         # Locks are DIRECTORIES — bin/automouse/run takes them with mkdir, which

@@ -40,6 +40,16 @@ SPAWNED_PIDS=""
 # making a clean run look like it errored.
 # shellcheck disable=SC2329  # invoked indirectly, via the EXIT trap below
 cleanup() {
+    # Re-sweep the runners' pid files at exit, not only the list built during
+    # setup: a runner may fork its child after that list is taken, and an
+    # unreaped `claude -p` outlives this script and surfaces in a later
+    # fleet-status run as an unaccounted headless session.
+    # ${STUBBIN:-} because the trap is armed before STUBBIN is assigned; an
+    # early exit would otherwise abort cleanup on set -u.
+    for _f in "${STUBBIN:-/nonexistent}"/child.*.pid; do
+        [ -s "$_f" ] || continue
+        SPAWNED_PIDS="$SPAWNED_PIDS $(tr -dc '0-9' < "$_f")"
+    done
     for _p in $SPAWNED_PIDS; do kill "$_p" 2>/dev/null; done
     chmod -R u+w "$TMP" 2>/dev/null
     rm -rf "$TMP" 2>/dev/null
@@ -97,7 +107,12 @@ cat > "$STUBBIN/automouse/run" <<'RUNNER'
 #!/bin/bash
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 "$HERE/claude" -p --name fixture-phase-child >/dev/null 2>&1 &
-printf '%s\n' "$!" > "$HERE/child.pid"
+# Keyed by THIS runner's own pid. Three runners share $STUBBIN, so a single
+# shared child.pid path is a race: the last writer wins, cleanup() then reaps
+# only that one child (the other two leak — 2 observed surviving every run, and
+# they show up in the real fleet-status page as orphans), and case 10 asserts on
+# whichever child won rather than on one whose parent is known to be listed.
+printf '%s\n' "$!" > "$HERE/child.$$.pid"
 sleep 120
 RUNNER
 chmod +x "$STUBBIN/automouse/run"
@@ -118,6 +133,21 @@ UNRELATED_PID=$!
 disown "$UNRELATED_PID" 2>/dev/null
 SPAWNED_PIDS="$SPAWNED_PIDS $UNRELATED_PID"
 
+# No-.md runner: invoked as `plan slug` (the documented form, without .md suffix).
+# The lock-dir primary path must resolve its slug even though the command line
+# does not contain a `.md` token.
+"$STUBBIN/automouse/run" plan nodotmd-plan >/dev/null 2>&1 &
+NODOTMD_PID=$!
+disown "$NODOTMD_PID" 2>/dev/null
+SPAWNED_PIDS="$SPAWNED_PIDS $NODOTMD_PID"
+
+# Nightly-mode runner: invoked with no plan argument (queue-draining mode).
+# Its command line carries no plan token at all; only the lock-dir path works.
+"$STUBBIN/automouse/run" >/dev/null 2>&1 &
+NIGHTLY_PID=$!
+disown "$NIGHTLY_PID" 2>/dev/null
+SPAWNED_PIDS="$SPAWNED_PIDS $NIGHTLY_PID"
+
 # An ORPHAN: a `claude -p` with no job above it. Spawned by this script, so its
 # ancestry never reaches a PID fleet-status printed — which is exactly the state
 # of a headless run whose supervisor died, and the only thing case 10's section
@@ -127,14 +157,26 @@ ORPHAN_PID=$!
 disown "$ORPHAN_PID" 2>/dev/null
 SPAWNED_PIDS="$SPAWNED_PIDS $ORPHAN_PID"
 
-# Give the runner a moment to fork its child and write the pid file.
+# Give the runners a moment to fork their children and write their pid files.
+# Wait on the LIVE runner's file specifically, not "any file appeared" — case 10
+# asserts that this child is deduped by ancestry, which only holds for a child
+# whose parent is a PID the launchd/automouse sections actually printed.
 CHILD_PID=''
 for _ in 1 2 3 4 5 6 7 8 9 10; do
-    [ -s "$STUBBIN/child.pid" ] && break
+    [ -s "$STUBBIN/child.$LIVE_AUTOMOUSE_PID.pid" ] && break
     sleep 0.2
 done
-[ -s "$STUBBIN/child.pid" ] && CHILD_PID="$(tr -dc '0-9' < "$STUBBIN/child.pid")"
-[ -n "$CHILD_PID" ] && SPAWNED_PIDS="$SPAWNED_PIDS $CHILD_PID"
+[ -s "$STUBBIN/child.$LIVE_AUTOMOUSE_PID.pid" ] \
+    && CHILD_PID="$(tr -dc '0-9' < "$STUBBIN/child.$LIVE_AUTOMOUSE_PID.pid")"
+
+# Every runner's child, not just the live one's. Each is a real `claude -p` that
+# outlives this script unless cleanup() reaps it, and a leaked one shows up in a
+# later fleet-status run as an unaccounted headless session.
+for _f in "$STUBBIN"/child.*.pid; do
+    [ -s "$_f" ] || continue
+    _c="$(tr -dc '0-9' < "$_f")"
+    [ -n "$_c" ] && SPAWNED_PIDS="$SPAWNED_PIDS $_c"
+done
 
 # A definitely-dead PID: spawn, reap, reuse the number.
 sleep 0 &
@@ -145,12 +187,23 @@ NOW="$(date +%s)"
 printf '%s\n' "$NOW"        > "$AM/.heartbeat-$LIVE_AUTOMOUSE_PID-impl"
 printf '%s\n' "$NOW"        > "$AM/.heartbeat-$UNRELATED_PID-impl"
 printf '%s\n' "$(( NOW - 200000 ))" > "$AM/.heartbeat-$DEAD_PID-postplan"
+printf '%s\n' "$NOW"        > "$AM/.heartbeat-$NODOTMD_PID-impl"
+printf '%s\n' "$NOW"        > "$AM/.heartbeat-$NIGHTLY_PID-postplan"
 
-# Queue: one plain plain plan, one held by a mkdir-style lock DIRECTORY.
+# Queue: one plain plan, one held by a mkdir-style lock DIRECTORY, two more for
+# the new invocation-form fixtures. Each lock directory contains a `pid` file so
+# the primary lock-dir slug-resolution path works for all three live runners.
 printf 'plan\n' > "$AM/queue/live-plan.md"
 printf 'plan\n' > "$AM/queue/idle-plan.md"
 mkdir -p "$AM/queue/live-plan.md.lock"
+printf '%s\n' "$LIVE_AUTOMOUSE_PID" > "$AM/queue/live-plan.md.lock/pid"
 printf '2\n' > "$AM/queue/live-plan.md.attempts"
+mkdir -p "$AM/queue/nodotmd-plan.md.lock"
+printf '%s\n' "$NODOTMD_PID" > "$AM/queue/nodotmd-plan.md.lock/pid"
+printf '1\n' > "$AM/queue/nodotmd-plan.md.attempts"
+mkdir -p "$AM/queue/nightly-plan.md.lock"
+printf '%s\n' "$NIGHTLY_PID" > "$AM/queue/nightly-plan.md.lock/pid"
+printf '3\n' > "$AM/queue/nightly-plan.md.attempts"
 
 # Harness output for the "shown" launchd job. The trailing `outputs:` line is the
 # real shape that made the progress column useless before the phase filter.
@@ -161,6 +214,23 @@ cat > "$OUT/live-demo-slug-20260910-120000-4242/audit.log" <<'AUDIT'
 outputs: /some/path/that/is/not/progress
 AUDIT
 
+# plan-now prompt files. The plan-now LABEL carries no slug, so the row has to read
+# it out of the prompt the run was fired with. Both fixtures are real shapes copied
+# from /tmp: one declares the slug, the other only mentions the words in prose.
+cat > "$LOGS/plan-now-20260910-171016-38521.prompt" <<'PROMPT'
+Write an implementation plan.
+ - Branch slug: `stop-waiting-on-doomed-ci`. Base: `master`.
+PROMPT
+
+# THE FALSE-POSITIVE FIXTURE. bin/plan-now's own tolerant (colon-less) regex matches
+# the prose below and yields "PLAN_FILE"; plan-now survives that because it later
+# requires the slug to name a file under $PLANS_DIR, but this tool only prints.
+# Deleting the colon from prompt_slug()'s pattern makes this row render PLAN_FILE.
+cat > "$LOGS/plan-now-20260910-174905-98101.prompt" <<'PROMPT'
+Write an implementation plan.
+End your final message with the branch slug, with a `PLAN_FILE` line after it.
+PROMPT
+
 # Stub launchctl. Three labels covering the two residue shapes and one live job.
 # Column order matches the real `launchctl list`: PID, last-exit-status, label.
 cat > "$STUBBIN/launchctl" <<LAUNCHCTL
@@ -170,6 +240,9 @@ cat <<'ROWS'
 -	0	com.ibl5.postplan-now-exited-slug-20260910-100000-1111
 -	-9	com.ibl5.postplan-now-killed-slug-20260910-110000-2222
 4242	0	com.ibl5.postplan-now-demo-slug-20260910-120000-4242
+5151	0	com.ibl5.plan-now-20260910-171016-38521
+5252	0	com.ibl5.plan-now-20260910-174905-98101
+5353	0	com.ibl5.plan-now-20260910-090000-77000
 99999	0	com.apple.something.unrelated
 ROWS
 LAUNCHCTL
@@ -198,6 +271,22 @@ assert_lacks "launchd: killed job (status -9) hidden" "$OUTPUT" 'killed-slug'
 assert_has "launchd: live job shown"          "$OUTPUT" 'post-plan +postplan-now-demo-slug'
 assert_has "launchd: live job shows its pid"  "$OUTPUT" 'pid 4242'
 
+# 11 — a plan-now row leads with the slug it is planning for, and keeps the
+# timestamp as a tail so two concurrent runs on one slug stay distinguishable.
+assert_has "plan-now: slug shown"            "$OUTPUT" 'plan +stop-waiting-on-doomed-ci'
+assert_has "plan-now: timestamp kept"        "$OUTPUT" '20260910-171016-38521'
+
+# 12 — the prose fixture must NOT render a slug. This is the whole reason the
+# pattern is stricter than bin/plan-now's.
+assert_lacks "plan-now: prose is not read as a slug" "$OUTPUT" 'PLAN_FILE'
+assert_has   "plan-now: falls back to the bare label" \
+    "$OUTPUT" 'plan +plan-now-20260910-174905-98101'
+
+# 12b — no prompt file at all. The common state for an older run: /tmp is reaped
+# on reboot, so the file the slug lives in is gone while the job is still listed.
+assert_has   "plan-now: missing prompt file falls back to the label" \
+    "$OUTPUT" 'plan +plan-now-20260910-090000-77000'
+
 # 8 — progress uses the phase line, not the `outputs:` trailer.
 assert_has   "progress: phase line wins"      "$OUTPUT" 'phase7: watching CI'
 assert_lacks "progress: outputs trailer lost" "$OUTPUT" 'that/is/not/progress'
@@ -217,6 +306,14 @@ assert_has "automouse: attempts surfaced"     "$OUTPUT" 'attempt 2'
 assert_has "automouse: lock dir marks runner locked" "$OUTPUT" 'locked'
 assert_has "queue: lock dir marks plan in progress"  "$OUTPUT" 'live-plan\.md +in progress'
 assert_has "queue: unlocked plan reads queued"       "$OUTPUT" 'idle-plan\.md +queued'
+
+# 6b — lock-dir slug resolution for documented forms (no .md / no plan arg).
+assert_has "automouse: nodotmd runner shown"         "$OUTPUT" "pid $NODOTMD_PID "
+assert_has "automouse: nodotmd slug via lock-dir"    "$OUTPUT" 'impl +nodotmd-plan'
+assert_has "automouse: nodotmd attempt surfaced"     "$OUTPUT" 'attempt 1'
+assert_has "automouse: nightly runner shown"         "$OUTPUT" "pid $NIGHTLY_PID "
+assert_has "automouse: nightly slug via lock-dir"    "$OUTPUT" 'postplan +nightly-plan'
+assert_has "automouse: nightly attempt surfaced"     "$OUTPUT" 'attempt 3'
 
 # 10 — the ancestry dedupe. Both directions matter: without the positive case a
 # render_loose that printed nothing at all would still pass.

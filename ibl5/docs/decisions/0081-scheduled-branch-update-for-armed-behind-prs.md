@@ -1,6 +1,6 @@
 ---
 description: A GitHub Actions workflow that finds open PRs stuck BEHIND master and refreshes them via the update-branch API using CI_PAT. Triggered on push to master (auto-merge-armed PRs only, coalesced) and on a best-effort schedule (all open non-draft PRs, debounced on an hour of master quiet), guarded by concurrency-cancel plus a per-PR check-run gate, so PRs stay current without manual intervention and without a CI storm per merge.
-last_verified: 2026-08-29
+last_verified: 2026-09-10
 ---
 
 # ADR-0081: Scheduled branch-update for armed PRs stuck BEHIND master
@@ -50,7 +50,40 @@ A second daily cron (`30 11 * * *`) was added as an overnight full-sweep backsto
 - Negative (bounded by the debounce and, since 2026-08-28, by the event-dependent scope): an update pass still costs one full CI matrix per PR in scope. The debounce caps the scheduled all-open pass at roughly one per quiet period instead of one per merge; the armed-only push scope caps the per-merge pass at the PRs that BEHIND actually blocks. Neither makes an individual pass cheaper.
 - Negative: while master moves more often than once an hour, PRs go un-updated. Acceptable: this workflow never merges and never arms auto-merge, so a stale-but-clean PR blocks nothing — and `workflow_dispatch` forces a pass when one is actually needed.
 
+## Addendum — eager-rebase workflow restored as manual-dispatch-only (2026-09-10)
+
+`## Alternatives Considered` above rejects folding rebase-and-force-push into this workflow,
+and `## References` below records the eager-rebase workflow as "retired". Both sentences stay
+as written: they were true of the **auto-firing** workflow, and that workflow is still retired.
+
+What changed is narrower. `.github/workflows/rebase-prs.yml` has been restored as a
+**`workflow_dispatch`-only** workflow (no `push` trigger, no `schedule`), so the rebase
+strategy is available on demand when an operator deliberately starts it and watches it settle.
+The trigger that caused the retirement — a rebase storm across the whole open-PR set on every
+master merge (#1949) — is **not** restored, and the restored file's header comment says so.
+
+This does not disturb the decision this ADR records. The separate-files conclusion at
+`## Alternatives Considered` is *reinforced*, not reversed: the two workflows remain distinct
+files with independent `concurrency` groups (`update-behind-prs` and `rebase-prs`), because
+concurrency groups are repo-scoped and the canceling run's setting wins — a shared group would
+let a scheduled `update-behind-prs` tick cancel a manual rebase mid-flight. Their strategies
+still differ exactly as described above: merge commit (preserves commits, keeps auto-merge
+armed) versus rebase + force-push (rewrites commits, linear history, drops orphaned stacking
+remnants). When both touch the same branch, `--force-with-lease` in the rebase workflow fails
+safe rather than clobbering.
+
+Two corrections were made to the restored script relative to its retired form:
+
+- The force-push exit status is now checked. The retired version printed `✓ Rebased` and
+  incremented its `rebased` counter regardless of whether the push succeeded, so a
+  `--force-with-lease` rejection was reported as a successful rebase.
+- A `dry_run` input was added. It rebases each branch locally to prove it applies cleanly,
+  prints every commit the Phase 1.5 orphan heuristic would drop, and pushes nothing — the
+  only cheap guard against that heuristic's false positive (two open PRs carrying a genuinely
+  identical diff look like an orphan pair).
+
 ## References
 
 - `.github/workflows/update-behind-prs.yml` — the workflow this ADR introduces.
 - the eager-rebase workflow (retired; its `paths-ignore` gap was the motivation for this ADR; its `CI_PAT` pattern was adopted here).
+- `.github/workflows/rebase-prs.yml` — the same workflow restored on 2026-09-10 as manual `workflow_dispatch` only, with no auto-trigger. See the 2026-09-10 addendum above.

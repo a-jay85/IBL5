@@ -504,3 +504,82 @@ def test_strip_manual_testing_subsection_strips_only_up_to_next_heading():
     assert stripped is True
     assert "some steps" not in new_body
     assert "Conclusion" in new_body
+
+
+# ---------------------------------------------------------------------------
+# commit_subject: coercion (decoration layer) and schema validation
+# ---------------------------------------------------------------------------
+
+from harness.schemas import coerce_commit_subject, validate_pr_copy
+from harness.state import Classification, HarnessError
+
+
+def _flagged(**flags) -> Classification:
+    c = Classification()
+    for k, v in flags.items():
+        setattr(c, k, v)
+    return c
+
+
+def test_coerce_commit_subject_table():
+    """The three flag checks are order-sensitive — docs_only MUST be tested first.
+
+    classify.py computes count_non_code = count_md + count_lock + count_snapshot, so a
+    docs-only working set ALSO satisfies non_code_only. The `chore:` + docs_only row below
+    is the one that fails if the checks are reordered: on the non_code_only branch `chore`
+    is already an allowed type and the subject would be waved through as-is.
+    """
+    cases = [
+        ("feat: add roster cache", _flagged(test_only=True), "test: add roster cache"),
+        ("test: add roster cache", _flagged(test_only=True), "test: add roster cache"),
+        ("feat: add roster cache", _flagged(), "feat: add roster cache"),
+        ("chore: update backlog", _flagged(docs_only=True), "docs: update backlog"),
+        ("feat: bump lockfile", _flagged(non_code_only=True), "chore: bump lockfile"),
+    ]
+    for subject, cls, expected in cases:
+        assert coerce_commit_subject(subject, cls) == expected, (
+            f"{subject!r} under docs={cls.docs_only} test={cls.test_only} "
+            f"non_code={cls.non_code_only}")
+
+
+def test_coerce_commit_subject_preserves_scope_and_bang():
+    out = coerce_commit_subject("feat(harness)!: x", _flagged(test_only=True))
+    assert out == "test(harness)!: x"
+
+
+def test_coerce_commit_subject_unparseable_returns_unchanged():
+    for subject in ("no type prefix here", "FEAT: uppercase type"):
+        assert coerce_commit_subject(subject, _flagged(test_only=True)) == subject
+
+
+def _valid_pr_copy() -> dict:
+    return {"type": "chore", "title": "chore: a title",
+            "commit_subject": "chore: a commit subject",
+            "summary_md": "## Summary\n- x\n"}
+
+
+def test_validate_pr_copy_requires_commit_subject():
+    validate_pr_copy(_valid_pr_copy())          # control: the four-field object validates
+
+    absent = _valid_pr_copy()
+    absent.pop("commit_subject")
+    non_string = _valid_pr_copy()
+    non_string["commit_subject"] = 123
+    wrong_type = _valid_pr_copy()
+    wrong_type["commit_subject"] = "feat: disagrees with the type field"
+
+    for bad in (absent, non_string, wrong_type):
+        with pytest.raises(HarnessError) as ei:
+            validate_pr_copy(bad)
+        assert ei.value.kind == "schema"
+
+
+def test_validate_pr_copy_rejects_envelope_wrapped_payload():
+    """No envelope tolerance here — tolerance stays in the decoration layer.
+
+    An envelope-wrapped payload must fail loudly rather than validating an object the
+    validator never actually inspected.
+    """
+    with pytest.raises(HarnessError) as ei:
+        validate_pr_copy({"pr_copy": _valid_pr_copy()})
+    assert ei.value.kind == "schema"

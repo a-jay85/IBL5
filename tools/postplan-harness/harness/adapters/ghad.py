@@ -199,7 +199,7 @@ class LiveGh(RecordingGh):
                          "-F", f"body=@{fname}")
             else:
                 self._gh("pr", "comment", str(pr), "--body-file", fname)
-            self.record("pr_status_badge", pr=pr, body=body[:4000], executed=True)
+            self.record("pr_status_badge", pr=pr, body=body[:4000])
         except HarnessError:
             pass
         finally:

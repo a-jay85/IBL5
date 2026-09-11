@@ -48,7 +48,7 @@ def stub_launchctl(tmp_path):
     bindir.mkdir()
     lc = bindir / "launchctl"
     lc.write_text(
-        '#!/bin/sh\n'
+        '#!/usr/bin/env bash\n'
         'if [ "$1" = "list" ]; then\n'
         '  label="$2"\n'
         '  IFS=":" read -ra live_arr <<< "${LIVE_LABELS:-}"\n'
@@ -135,17 +135,13 @@ def test_conclude_is_idempotent(tmp_path, stub_gh):
     )
     assert r.returncode == 0, r.stderr
     calls = log.read_text().splitlines() if log.exists() else []
-    delete_calls = [c for c in calls if "DELETE" in c or "issues/comments/42" in c and "PATCH" not in c]
-    # Should have found the id and then deleted exactly once
-    # The POSTPLAN_CONCLUDED guard should block the second call
-    # Count how many times we queried for the PR (2nd call should be skipped)
-    api_calls = [c for c in calls if c.startswith("api")]
     # First conclude: find (api) + delete (api DELETE) = 2 api calls
     # Second conclude: skipped by POSTPLAN_CONCLUDED guard = 0 additional api calls
+    api_calls = [c for c in calls if c.startswith("api")]
     assert len(api_calls) <= 3, f"expected <=3 api calls (find+delete+possibly one more), got {api_calls}"
-    # Most importantly: idempotent — second call is a no-op
+    # Idempotent — exactly one DELETE, never two
     delete_calls_total = [c for c in calls if "--method DELETE" in c or "DELETE" in c]
-    assert len(delete_calls_total) <= 1, f"DELETE called more than once: {delete_calls_total}"
+    assert len(delete_calls_total) == 1, f"expected exactly 1 DELETE, got {delete_calls_total}"
 
 
 # ---------------------------------------------------------------------------

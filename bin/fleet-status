@@ -37,10 +37,13 @@
 # a true progress signal. Other producers get elapsed time plus their last log
 # line, which is honest about being coarse.
 #
-# Usage: bin/fleet-status [--watch [SECS]] [--no-worktrees]
+# Usage: bin/fleet-status [--watch [SECS]]
 #
 # --watch [SECS]   re-render every SECS seconds (default 15) until interrupted.
-# --no-worktrees   skip the worktree section (which shells out to bin/wt-status).
+#
+# SCOPE. Processes only. Worktree/branch shipping state is bin/wt-status's job and
+# is deliberately not mirrored here — the two answer different questions and a
+# copy would just be a second place to keep correct.
 #
 # Exit: 0 always when rendering succeeded. This is a reporting tool; "nothing is
 # running" is information, not a failure.
@@ -77,7 +80,6 @@ LOG_DIR="${FLEET_STATUS_LOG_DIR:-/tmp}"
 
 WATCH=0
 WATCH_SECS=15
-SHOW_WORKTREES=1
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -89,8 +91,7 @@ while [ $# -gt 0 ]; do
                 *) WATCH_SECS="$2"; shift ;;
             esac
             ;;
-        --no-worktrees) SHOW_WORKTREES=0 ;;
-        -h|--help) sed -n '4,47p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '4,50p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) printf 'fleet-status: unknown option %s\n' "$1" >&2; exit 2 ;;
     esac
     shift
@@ -368,25 +369,12 @@ EOF
     return 0
 }
 
-# ── section 5: worktrees ───────────────────────────────────────────────────────
-
-render_worktrees() {
-    section "WORKTREES  (bin/wt-status — cached refs, no fetch)"
-    if [ -x "$SCRIPT_DIR/wt-status" ]; then
-        "$SCRIPT_DIR/wt-status" 2>/dev/null | sed 's/^/  /'
-    else
-        note "bin/wt-status not found"
-    fi
-    return 0
-}
-
 render_all() {
     printf '%sFLEET STATUS%s  %s%s%s\n' "$B" "$R" "$DIM" "$(date '+%Y-%m-%d %H:%M:%S %Z')" "$R"
     render_launchd
     render_automouse
     render_queue
     render_loose
-    [ "$SHOW_WORKTREES" -eq 1 ] && render_worktrees
     printf '\n'
 }
 

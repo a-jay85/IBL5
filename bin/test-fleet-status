@@ -18,7 +18,7 @@
 #   6  heartbeat file whose PID is alive AND is an automouse runner     -> shown
 #   7  mkdir-based lock DIRECTORY is detected (a `-f` test never matches)
 #   8  progress prefers the audit.log phase line over its `outputs:` trailer
-#   9  --no-worktrees suppresses the wt-status section
+#   9  no worktree/branch section — this tool reports processes only
 #  10  a `claude -p` descending from a job already listed is NOT re-counted,
 #      while one with no job above it (an orphan) IS shown
 #
@@ -184,7 +184,7 @@ OUTPUT="$(
     FLEET_STATUS_AUTOMOUSE_DIR="$AM" \
     FLEET_STATUS_HARNESS_OUT="$OUT" \
     FLEET_STATUS_LOG_DIR="$LOGS" \
-    "$FLEET" --no-worktrees 2>&1
+    "$FLEET" 2>&1
 )"
 RC=$?
 
@@ -228,8 +228,11 @@ else
 fi
 assert_has "loose: a true orphan IS shown" "$OUTPUT" "pid $ORPHAN_PID "
 
-# 9 — --no-worktrees really suppresses the section.
-assert_lacks "--no-worktrees suppresses worktree section" "$OUTPUT" 'WORKTREES'
+# 9 — scope guard. bin/wt-status owns worktree/branch shipping state; this tool
+# reports processes. A re-added section would also make the default run shell out
+# to another script on every render.
+assert_lacks "no worktree section" "$OUTPUT" 'WORKTREES'
+assert_lacks "does not shell out to wt-status" "$OUTPUT" 'wt-status'
 
 # Non-ibl5 labels are none of this tool's business.
 assert_lacks "launchd: non-ibl5 labels ignored" "$OUTPUT" 'com\.apple\.something'

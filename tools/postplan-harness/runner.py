@@ -46,6 +46,22 @@ from harness.adapters.llm import ClaudeCli, FixtureLlm
 from harness.adapters.probe import FixtureProbe, LiveProbe
 from harness.adapters.verify import LiveVerify, ReplayVerify, aggregate
 
+_BADGE_FALLBACK = (
+    "<!-- postplan-status -->\n**post-plan is running**\n\n"
+    "Started outside `bin/post-plan-now`, so there is no launchd job to probe.\n"
+    "<!-- postplan-label:  -->\n"
+)
+
+
+def _post_status_badge(gh, pr):
+    if not pr:
+        return
+    body = os.environ.get("POSTPLAN_BADGE_BODY") or _BADGE_FALLBACK
+    try:
+        gh.pr_status_badge(pr, body)
+    except Exception:
+        pass
+
 
 def _recheck_manual_rows(llm, probe, plan, cls, log, res) -> list:
     """Phase 6 attempt-then-demote: may drop a truly-manual row only when a
@@ -170,6 +186,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             pr = gh.pr_create(copy["title"], create_body, "master")
             log(f"phase2: pr_create intent recorded (title={copy['title']!r})")
         res.pr_number = pr
+        _post_status_badge(gh, pr)
         meta = gh.pr_meta() or {"number": pr, "title": copy["title"], "body": copy["summary_md"]}
 
         # ---- Phase 4: review + security (gated bounded calls) ---------

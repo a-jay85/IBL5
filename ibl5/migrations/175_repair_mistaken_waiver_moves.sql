@@ -36,36 +36,66 @@
 -- migration repairs.
 --
 -- ---------------------------------------------------------------------------
--- Proof the players had NO contract before the mistake
+-- Why the target state is Free Agent, and what the sign destroyed
 -- ---------------------------------------------------------------------------
--- The signing branch above only fires when hasExistingContract is false. The
--- salaries it stamped are the offseason veteran minimum (exp + 1) from
+-- The signing branch above only fires when hasExistingContract is false. That
+-- predicate is computed in WaiversProcessor::determineContractData() and, in the
+-- offseason branch, reduces to:
+--     hasExistingContract = salary_yr[cy + 1] > 0
+-- So it proves only that the NEXT contract year was empty -- that the contract had
+-- already expired. It says nothing about salary_yr1, salary_yr2 or bird.
+--
+-- The salaries the sign stamped are the offseason veteran minimum (exp + 1) from
 -- ibl5/classes/ContractRules.php :: VETERAN_MINIMUM_SALARIES:
 --   pid 4163  exp  7 -> 8 rung  -> 89   (news feed said 89)
 --   pid 1998  exp 14 -> 10+ rung -> 103 (news feed said 103)
 --   pid 2001  exp 14 -> 10+ rung -> 103 (news feed said 103)
--- All three match exactly. So salary_yr1 was 0 before the mistake and zeroing it
--- is a restoration, not a guess. salary_yr2..yr6 were already 0 and are already
--- correct -- they are left alone so a partial re-run cannot clobber a real
--- contract signed in between.
+-- All three match exactly. The exp + 1 rung is reached ONLY inside the
+-- isOffseasonPhase() branch of determineContractData() -- in-season, pid 4163
+-- would have drawn the raw exp 7 rung of 82, not 89. So the exact match is
+-- independent confirmation the league had already rolled over into the offseason
+-- and these three were already free agents when the mistake happened.
+--
+-- What is NOT recoverable: signPlayerFromWaivers() overwrites bird, cy, cyt and
+-- salary_yr1..salary_yr6 unconditionally, so every pre-mistake value in those
+-- columns is gone. A production copy taken 2026-09-05, before the mistake, shows
+-- all three still under contract -- pid 4163 in the final year of a two-year deal
+-- at bird = 2, cy = 2, cyt = 2, salary_yr1 = 740, salary_yr2 = 814; pid 1998 at
+-- bird = 1, salary_yr1 = 480; pid 2001 at bird = 14, salary_yr1 = 800. Those
+-- numbers are NOT restored below and cannot be: they belong to contracts that
+-- expired at the rollover, and no code path records what the rollover wrote.
+--
+-- The target state is therefore justified by the free-agent population, not by
+-- reconstructing history. On that same 2026-09-05 copy, all 281 rows matching
+--     teamid = 0 AND retired = 0 AND cyt = 0
+-- carry salary_yr1 = 0, salary_yr2 = 0, bird = 0 and cy = 0 -- 281 of 281, no
+-- exceptions. The columns this migration writes land exactly on that fingerprint.
 --
 -- ---------------------------------------------------------------------------
 -- Column-by-column decisions (verified against the live free-agent population:
--- 20 sampled rows with teamid = 0 AND retired = 0)
+-- all 281 rows with teamid = 0 AND retired = 0 AND cyt = 0)
 -- ---------------------------------------------------------------------------
 --   teamid      10/10/24 -> 0    THE real damage. 0 = League::FREE_AGENTS_TEAMID.
---   cyt         1        -> 0    Every sampled free agent has cyt = 0.
---   salary_yr1  89/103/103 -> 0  Fabricated veteran minimum (see proof above).
+--   cyt         1        -> 0    All 281 sampled free agents have cyt = 0.
+--   salary_yr1  89/103/103 -> 0  Fabricated veteran minimum (see above). 0 is the
+--                                free-agent value -- NOT a reconstruction of the
+--                                740/480/800 the expired contracts carried.
 --   droptime    <today>  -> 0    See note below.
---   bird        0        -> 0    NO CHANGE NEEDED. The sign zeroed it, but 0 is
---                                already the correct free-agent value: every
---                                sampled free agent has bird = 0, and
---                                setWaiversToFreeAgents() explicitly writes
---                                bird = 0 alongside teamid = 0. Nothing was lost.
---   cy          0        -> 0    NO CHANGE NEEDED; already correct.
+--   bird        0        -> 0    NO WRITE NEEDED -- already at the target value.
+--                                The sign zeroed it (pid 4163 was bird = 2), so
+--                                this is real damage that happens to coincide with
+--                                the correct end state: all 281 sampled free agents
+--                                have bird = 0, and setWaiversToFreeAgents()
+--                                explicitly writes bird = 0 alongside teamid = 0.
+--   cy          0        -> 0    NO WRITE NEEDED -- same situation as bird.
+--   salary_yr2  0        -> 0    NO WRITE NEEDED -- the sign zeroed yr2..yr6 too
+--   ..yr6                        (pid 4163 was salary_yr2 = 814), and 0 is the
+--                                free-agent value. Left out of the SET list so a
+--                                partial re-run cannot clobber a real contract
+--                                signed in between.
 --   ordinal     1000     -> left at 1000. See note below.
 --
--- droptime: two of the twenty sampled free agents carry a nonzero droptime, so 0
+-- droptime: 18 of the 281 sampled free agents carry a nonzero droptime, so 0
 -- is not strictly the free-agent fingerprint. But the value sitting there now was
 -- written by TODAY's mistaken cut, so it is wrong either way, and a nonzero
 -- droptime starts the 24-hour waiver claim clock. 0 is the safe choice: it clears
@@ -105,7 +135,11 @@
 -- migration and the production .plr still holds the mistaken roster/contract
 -- values, the import will silently re-apply them and revert this repair.
 -- After deploying, run ibl5/scripts/jsbExport.php to push the corrected DB rows
--- out to the .plr BEFORE the next import.
+-- out to the .plr BEFORE the next import. That export writes teamid, bird, cy,
+-- cyt and salary_yr1..6 (all are in PlrFileWriter::FIELD_MAP), so it is what makes
+-- the free-agent state above authoritative in the file as well as the DB. It is
+-- also the point at which the expired-contract values listed as unrecoverable
+-- above stop existing anywhere -- that is intended, not collateral.
 --
 -- Idempotency and guard choice: each ibl_plr statement is keyed on droptime, the
 -- one damaged column that nothing else rewrites -- no .plr field maps to it and

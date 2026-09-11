@@ -30,6 +30,10 @@
 #                               #   PR; whether auto-merge ARMS is decided later, at
 #                               #   /post-plan Phase 6.5 (a plan's `auto_merge: false`
 #                               #   holds the merge — it no longer holds post-plan).
+#   bin/post-plan-now --force   # override the "PR already exists and the working set
+#                               #   touches no production files" guard (exit 5), which
+#                               #   otherwise points you at the cheaper
+#                               #   /commit-commands:commit-push-pr. Bare flag only.
 #
 # Run from anywhere inside the target worktree.
 
@@ -61,14 +65,16 @@ shq() { local q="'\\''"; printf "'%s'" "${1//\'/$q}"; }
 set -euo pipefail
 
 AUTO=0
+FORCE=0
 PLAN_OVERRIDE=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --auto)   AUTO=1 ; shift ;;
+        --force)  FORCE=1 ; shift ;;
         --plan)   [ $# -ge 2 ] || { echo "post-plan-now: --plan requires a path argument" >&2; exit 1; }
                   PLAN_OVERRIDE="$2" ; shift 2 ;;
         --plan=*) PLAN_OVERRIDE="${1#--plan=}" ; shift ;;
-        *)        echo "post-plan-now: unknown argument '$1' (accepts --auto, --plan <path>)" >&2
+        *)        echo "post-plan-now: unknown argument '$1' (accepts --auto, --force, --plan <path>)" >&2
                   exit 1 ;;
     esac
 done
@@ -124,6 +130,32 @@ if git diff --quiet && git diff --cached --quiet \
    && [ -z "$(git log --oneline origin/master..HEAD 2>/dev/null)" ]; then
     echo "post-plan-now: nothing to do — clean tree and no commits ahead of master." >&2
     exit 1
+fi
+
+# A PR already exists and nothing production-facing changed? /post-plan is the wrong tool —
+# /commit-commands:commit-push-pr is cheaper and CI runs the same tests on push.
+# The regex below deliberately mirrors _TEST in tools/postplan-harness/harness/classify.py.
+# Python is the single source of truth; this is a known duplicate, because HARNESS is not
+# assigned until much later in this script. Keep the two in sync.
+if [ "${FORCE:-0}" -eq 0 ]; then
+    PR_NUM=$(gh pr list --head "$(git rev-parse --abbrev-ref HEAD)" --state open \
+                 --json number --jq '.[0].number' 2>/dev/null || true)
+    if [ -n "$PR_NUM" ]; then
+        CHANGED=$( { git diff --name-only origin/master...HEAD 2>/dev/null || true
+                     git diff --name-only HEAD 2>/dev/null || true
+                     git diff --name-only --cached 2>/dev/null || true
+                     git ls-files --others --exclude-standard 2>/dev/null || true
+                   } | sort -u )
+        PROD_FILES=$(printf '%s\n' "$CHANGED" \
+            | grep -vE '^ibl5/tests/|\.test\.(ts|js|php)$|\.spec\.(ts|js)$' \
+            | grep -v '^$' || true)
+        if [ -z "$PROD_FILES" ]; then
+            echo "post-plan-now: PR #$PR_NUM exists and the working set touches no production files." >&2
+            echo "  Use /commit-commands:commit-push-pr instead — cheaper, and CI already runs those tests on push." >&2
+            echo "  To override: bin/post-plan-now --force" >&2
+            exit 5
+        fi
+    fi
 fi
 
 [ -f "$PLAN_FILE" ] \

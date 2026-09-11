@@ -444,6 +444,7 @@ def test_rc3_propagates_when_group_exits_zero():
 # Test 9: job_path_finds_gh
 # ---------------------------------------------------------------------------
 
+@pytest.mark.skipif(sys.platform != "darwin", reason="launchd PATH is macOS-only")
 def test_job_path_finds_gh():
     """The launchd job PATH includes a directory where gh can be found."""
     paths = [

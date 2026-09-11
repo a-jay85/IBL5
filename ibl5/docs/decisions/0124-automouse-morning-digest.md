@@ -1,6 +1,6 @@
 ---
 description: bin/automouse/morning-digest sends one aggregated Discord DM per morning summarising overnight automouse outcomes; bin/automouse/morning-digest-cron-setup generates and installs the launchd LaunchAgent that fires it at 07:00 local.
-last_verified: 2026-09-05
+last_verified: 2026-09-10
 owner: ajaynicolas
 ---
 
@@ -51,7 +51,7 @@ Five constraints shaped the design:
 
 - `bin/automouse/morning-digest` — the digest script
 - `bin/automouse/morning-digest-cron-setup` — the launchd scheduler
-- `bin/test-automouse-morning-digest` — the 19-row fixture harness
+- `bin/test-automouse-morning-digest` — the 21-row fixture harness (rows 20–21 added as regression guards during implementation, beyond the plan's 19)
 - `bin/discord-dm` — the send interface (stdin `-`, `--chunk`, exit codes 0/1/2)
 - `bin/sim-recap-cron-setup` — launchd pattern copied for Phase 3
 - `a-jay85/IBL5-backlog` (label `loop-engineering`) — the L3 resolution record (per ADR-0121, which retired the in-repo markdown backlog corpus)

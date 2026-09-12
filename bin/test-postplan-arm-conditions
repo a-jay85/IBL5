@@ -978,12 +978,19 @@ mk_rebase_repo() {
 # run_rebase <block> <repo> <base-ref> — own shell, own cwd.
 run_rebase() { ( cd "$2" && REBASE_BASE_REF="$3" bash -c "$1" 2>&1 ); }
 
-# expect_reb <name> <want-substr> <stop|nostop> <output>
+# expect_reb <name> <want-substr> <stop|resolve|nostop> <output>
+# `resolve` is the conflict arm's hand-off token: it must print ^STOP-AND-RESOLVE: and
+# must NOT print a bare ^STOP:, which in this codebase means the skill halts.
 expect_reb() {
     local ok=1
     printf '%s' "$4" | grep -qF "$2" || ok=0
     if [ "$3" = stop ]; then printf '%s' "$4" | grep -q '^STOP:' || ok=0
-    else                     printf '%s' "$4" | grep -q '^STOP:' && ok=0
+    elif [ "$3" = resolve ]; then
+        printf '%s' "$4" | grep -q '^STOP-AND-RESOLVE:' || ok=0
+        printf '%s' "$4" | grep -q '^STOP:' && ok=0
+    else
+        printf '%s' "$4" | grep -q '^STOP:' && ok=0
+        printf '%s' "$4" | grep -q '^STOP-AND-RESOLVE:' && ok=0
     fi
     if [ "$ok" -eq 1 ]; then echo "ok: $1"
     else echo "FAIL: $1 — expected '$2' and $3, got: '$4'"; FAILED=1; fi
@@ -1010,8 +1017,8 @@ else
     # NEGATIVE: conflict -> STOP, and the tree is left exactly as found.
     R="$(mk_rebase_repo conflict)"; BEFORE="$(git -C "$R" rev-parse HEAD)"
     OUT="$(run_rebase "$BREB" "$R" fakebase)"
-    expect_reb "phase 2 rebase: conflicting base -> REBASE=conflict + STOP" \
-        "REBASE=conflict" stop "$OUT"
+    expect_reb "phase 2 rebase: conflicting base -> REBASE=conflict + STOP-AND-RESOLVE" \
+        "REBASE=conflict" resolve "$OUT"
     printf '%s' "$OUT" | grep -qF 'linear-history-squash-merge.md' \
         && echo "ok: phase 2 rebase: STOP text names the squash-trap escape route" \
         || { echo "FAIL: phase 2 rebase: STOP text omits the squash-trap guidance the label promises"; FAILED=1; }

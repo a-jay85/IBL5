@@ -101,7 +101,7 @@ When the automouse postplan prompt supplied an authoritative plan path, use it i
 If the working tree is clean and `git diff origin/master...HEAD` is also empty (nothing to ship), abort the entire skill — there is nothing to post-plan.
 
 1. **If working tree has uncommitted changes:** stage relevant changes, review with `git diff --staged`, commit. Commit-type rubric: `.claude/rules/commit-conventions.md` (the single source of truth for `feat:` vs. `chore:`/`fix:`/`refactor:`/`docs:`). **Decision test for the PR/commit title:** "Would a league GM notice a new ability they didn't have before?" — Yes → `feat:`; invisible to a GM (dev tooling, a new slash command, an internal refactor) → not `feat:` (`chore:`/`refactor:`/`docs:`). **Classify by what the diff IS, never by the desired merge outcome** — `feat:` triggering the human-signoff hold is the gate working, not a cost to route around. Skip this sub-step if the working tree is already clean (user committed before invoking the skill).
-2. Pin `origin/master` and capture the pre-rebase diff first — the lost-work proof consumes those inputs if the rebase conflicts. Rebase the branch onto `origin/master` before pushing so Phase 4 code review, Phase 5.0 conformance, and Phase 5.5 fidelity all judge the same post-rebase diff. `REBASE=conflict` and `REBASE=indeterminate` each print a `STOP:` line and **halt the skill** — resolve by hand (conflict) or fix the fetch (indeterminate) and re-run `/post-plan`. Do not advance to step 3.
+2. Pin `origin/master` and capture the pre-rebase diff first — the lost-work proof consumes those inputs if the rebase conflicts. Rebase the branch onto `origin/master` before pushing so Phase 4 code review, Phase 5.0 conformance, and Phase 5.5 fidelity all judge the same post-rebase diff. `REBASE=indeterminate` prints a `STOP:` line and **halts the skill** — fix the fetch and re-run `/post-plan`. `REBASE=conflict` prints a `STOP-AND-RESOLVE:` line: the tree has been restored by `git rebase --abort`, and the run continues into `.claude/skills/post-plan/_phase-2-conflict-resolution.md`, which must complete — including its `TREE-EQUIVALENT` proof — before step 3's push. A resolved conflict holds auto-merge at Phase 6.5 condition (14). In either case, do not advance to step 3 from here.
 
    > Before rebasing, pin `origin/master` and capture the pre-rebase diff — these are the inputs the lost-work proof consumes if the rebase conflicts. Record the printed SHA and the printed `key=` value as run notes and substitute them as literals (`<MASTER_SHA>`, `<KEY>`) into every later command in this phase; nothing survives between Bash blocks.
 
@@ -124,6 +124,12 @@ echo "PRECAPTURE=ok key=$PPCAP_KEY"
 # $REBASE_BASE_REF is overridable only so bin/test-postplan-arm-conditions can point
 # this block at a fixture ref; production leaves it unset and takes the default.
 REBASE_BASE_REF="${REBASE_BASE_REF:-origin/master}"
+# Re-derived here because nothing survives between Bash blocks; idempotent with the
+# capture block above. Asymmetry on purpose: the capture block ignores $REBASE_BASE_REF
+# and always diffs origin/master...HEAD, because lostwork.sh hardcodes that base — do
+# not "fix" it to follow the seam or every clean run reports TREE DIVERGED.
+PPCAP_TMP="${PPCAP_TMP:-/tmp}"
+PPCAP_KEY="${PPCAP_KEY:-$(git rev-parse --abbrev-ref HEAD | tr '/:' '--')}"
 git fetch origin master --quiet 2>/dev/null || true
 if ! git rev-parse --verify --quiet "$REBASE_BASE_REF" >/dev/null; then
   echo "REBASE=indeterminate"
@@ -135,7 +141,8 @@ elif git rebase "$REBASE_BASE_REF" >/dev/null 2>&1; then
 else
   git rebase --abort >/dev/null 2>&1 || true
   echo "REBASE=conflict"
-  echo "STOP: rebase onto $REBASE_BASE_REF conflicted — fail-closed. 'git rebase --abort' has restored the tree; nothing was pushed. Resolve by hand and re-run /post-plan. Never auto-resolve here: conflict-resolved lines are code no structured review has seen. If this branch was stacked on a now-merged parent, this is the squash trap — replay only your own commits with 'git rebase --onto origin/master <parent-tip-before-merge> <branch>' (.claude/rules/linear-history-squash-merge.md)."
+  : > "$PPCAP_TMP/postplan-conflict-resolved-$PPCAP_KEY"
+  echo "STOP-AND-RESOLVE: rebase onto $REBASE_BASE_REF conflicted. 'git rebase --abort' has restored the tree; nothing was pushed and the committed tree is untouched. Do not push from here. Go to .claude/skills/post-plan/_phase-2-conflict-resolution.md and follow it end to end: it re-runs the rebase in the --onto form, resolves three-way, and proves no work was lost before any push is allowed. Conflict-resolved lines are code no structured review has seen, so this run will hold auto-merge at Phase 6.5 condition (14) and announce that hold on the PR. If this branch was stacked on a now-merged parent, this is the squash trap — replay only your own commits with 'git rebase --onto origin/master <parent-tip-before-merge> <branch>' (.claude/rules/linear-history-squash-merge.md)."
 fi
 ```
 

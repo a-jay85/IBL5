@@ -181,3 +181,40 @@ Proceed to Phase 2 step 3 (push) and step 4 (`gh pr create`). The PR body's file
 block must reflect the post-resolution diff, and per
 `.claude/rules/pr-body-negative-claim-recheck.md` every residual / out-of-scope bullet is
 re-read against that diff before the PR is opened.
+
+---
+
+## Appendix — sticky conflict-hold comment body
+
+Phase 6.5 step 0 renders this into `/tmp/post-plan-conflict-comment-<KEY>.md` with the `Write`
+tool and posts it under the marker `<!-- post-plan-conflict-hold -->`. The wording is
+maintained **here only**; `SKILL.md` points at this appendix rather than carrying a copy.
+
+````markdown
+<!-- post-plan-conflict-hold -->
+## Auto-merge held — this run auto-resolved a rebase conflict
+
+**(a) What happened.** Rebasing this branch onto `master` conflicted. `/post-plan` resolved
+the conflict automatically (three-way, per `.claude/skills/pr-ready/_rebase-and-conflicts.md` §2e)
+and proved no work was lost: `lostwork.sh` reported **TREE-EQUIVALENT** against the pre-rebase
+diff, which is a precondition for the push that produced this PR.
+
+**(b) Why auto-merge is held.** Conflict-resolved lines are code no structured review has seen.
+`/post-plan` Phase 6.5 condition (14) therefore refuses to arm auto-merge on this PR. This is
+the gate working as designed, not a failure — **merge it by hand after reviewing the files below.**
+
+**(c) Files the resolution touched.**
+
+<one bullet per path from /tmp/postplan-conflict-resolution-<KEY>.md, each with the
+one-line description of which side the resolution took and why>
+
+<COLLAPSE-GUARD: WARN line from step 3, if any>
+
+_Posted by `/post-plan`. Updated in place on re-run._
+````
+
+The "merge it by hand" sentence is load-bearing: a held PR with no stated remedy reads as a
+bug, and the stated remedy is what turns the hold into a one-line human action.
+
+When the Phase 7 CI-watch re-rebase loop is what hit the conflict, add one line to section (a)
+naming that loop as the trigger. Same marker, same comment — no second mechanism.

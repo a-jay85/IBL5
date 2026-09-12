@@ -383,6 +383,52 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 
 **These conditions only ever HOLD, never RELEASE.** They are an AND-of-not-blocked set: every condition can *add* a block; none can clear another's. Conditions (7)–(9) are **additive brakes on top of** the deterministic floors (1)–(6), the pipeline-authored floor (10), and the independent `human-signoff` required GitHub check — they exist to catch what those miss, never to override them. post-plan **always runs and opens the PR**; these conditions decide only whether auto-merge *arms*. A held PR stays open for a human to merge.
 
+### Step 0 — announce a conflict hold on the PR (before the arming evaluation)
+
+Run this **first**, before evaluating any condition. The comment must reach the PR even if
+something later in the arming block errors out — the whole point is that nobody has to read a
+log to learn why a PR stalled.
+
+```bash
+# phase 6.5 conflict-hold announcement: fires only when this run auto-resolved a rebase
+# conflict. Defaults re-derived here (idempotent with the phase 2 blocks) because nothing
+# survives between Bash blocks. CONFLICT_FLAG is overridable only so
+# bin/test-postplan-arm-conditions can point this at a fixture.
+PPCAP_TMP="${PPCAP_TMP:-/tmp}"
+PPCAP_KEY="${PPCAP_KEY:-$(git rev-parse --abbrev-ref HEAD | tr '/:' '--')}"
+CONFLICT_FLAG="${CONFLICT_FLAG:-$PPCAP_TMP/postplan-conflict-resolved-$PPCAP_KEY}"
+test -f "$CONFLICT_FLAG" && echo "CONFLICT-HOLD=fired" || echo "CONFLICT-HOLD=none"
+```
+
+`CONFLICT-HOLD=none` ⇒ **skip the rest of this step entirely** and go straight to the arming
+evaluation; a clean run posts nothing. `CONFLICT-HOLD=fired` ⇒ post the sticky comment, then
+continue into the arming evaluation, where condition (14) blocks on the same flag.
+
+To post it:
+
+1. Read `/tmp/postplan-conflict-resolution-<KEY>.md`, the manifest
+   `.claude/skills/post-plan/_phase-2-conflict-resolution.md` step 7 wrote. **If it is absent,
+   halt with a `STOP:` line** naming the path — an announcement that says a conflict was
+   resolved and then lists no files is worse than none. Never re-derive the file list from
+   `git diff --name-only` here; that lists the whole PR, not the resolved subset.
+2. With the **`Write` tool** (not a heredoc — nothing survives between Bash blocks), render the
+   body template in the appendix of `.claude/skills/post-plan/_phase-2-conflict-resolution.md`
+   into `/tmp/post-plan-conflict-comment-<KEY>.md`, substituting the manifest's paths and
+   descriptions and any `COLLAPSE-GUARD: WARN` line.
+3. Post it sticky, reusing the `STICKY_MARKER` + `post_sticky()` **shape** in `bin/pr-canary-check`
+   (grep for them; never trust a line number): find an existing comment id via
+   `gh api "repos/{owner}/{repo}/issues/<PR>/comments" --paginate --jq` selecting on the marker,
+   PATCH it with `-F body=@<file>` if found, else `gh pr comment <PR> --body-file <file>`.
+   The marker is `<!-- post-plan-conflict-hold -->` and **never** `<!-- pr-fast-canary -->` or
+   `<!-- pr-ready-verdict -->` — reuse the shape, not the string, or the conflict hold
+   overwrites an unrelated verdict on the same PR. Do **not** call `/pr-ready`'s
+   `scripts/post-verdict.sh`: it is keyed to the PR-number `/tmp/pr-ready-verdict-` namespace a
+   concurrent `/pr-ready` run would collide on.
+
+The Phase 7 re-rebase loop can hit a *second* conflict after auto-merge is already armed; that
+path disarms and posts through this same marker, so the existing comment is updated in place
+rather than stacked.
+
 **Conditions (1)/(5)/(6)/(8)/(10)/(11) come from the shared predicate `bin/lib/pr-armable.sh`** — the single source of truth also used by `bin/pr-triage`, so the live-readable arming judgment has **one executable home** and cannot drift between consumers (hand-re-derived divergence is exactly what mis-armed #1163/#1188). The run-only conditions (2)/(3)/(4)/(7)/(9)/(12)/(13) stay inline below — they read post-plan-run-local state (`/tmp`, the local plan file, the realized diff) that no cross-PR consumer can see, so they cannot move into the shared predicate.
 
 **Each condition block is SELF-CONTAINED** — it `source`s the predicate and fetches its own inputs in-block, exactly as condition (7) re-derives `$PLAN_FILE` and the original (6)/(8) ran their own `gh pr view`. **Do not** hoist the `source` or a shared `PR_JSON` into a preamble block: a sourced function or a shell variable does not survive into a separately-executed block (only exported env vars like `$CLAUDE_HEADLESS` do), and a missing `source` would make `pr_feat_hold` a no-op — **failing OPEN, auto-arming a `feat:` PR**. Each block re-`source`ing the lib is idempotent and cheap. Every block extracts gh output with `gh ... --jq` (gh does the decode — no `echo`/`printf` round-trip needed); when a block must round-trip a multi-field `PR_JSON` it uses `printf '%s'` (never `echo`, whose zsh `\n` expansion corrupts jq's parse).

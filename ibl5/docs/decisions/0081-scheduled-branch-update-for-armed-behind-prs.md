@@ -1,6 +1,6 @@
 ---
-description: A GitHub Actions workflow that finds open PRs stuck BEHIND master and refreshes them via the update-branch API using CI_PAT. Triggered on push to master (auto-merge-armed PRs only, coalesced) and on a best-effort schedule (all open non-draft PRs, debounced on an hour of master quiet), guarded by concurrency-cancel plus a per-PR check-run gate, so PRs stay current without manual intervention and without a CI storm per merge.
-last_verified: 2026-09-10
+description: A GitHub Actions workflow that finds open PRs stuck BEHIND master and refreshes them via the update-branch API using CI_PAT. Triggered on push to master (auto-merge-armed PRs only, coalesced) and on a best-effort schedule (all open non-draft PRs, debounced on an hour of master quiet), guarded by concurrency-cancel, so PRs stay current without manual intervention and without a CI storm per merge.
+last_verified: 2026-09-12
 ---
 
 # ADR-0081: Scheduled branch-update for armed PRs stuck BEHIND master
@@ -49,6 +49,57 @@ A second daily cron (`30 11 * * *`) was added as an overnight full-sweep backsto
 - Negative: A small recurring CI cost (one short job every 15 min); bounded and cheap, as most ticks find nothing to do and exit quickly.
 - Negative (bounded by the debounce and, since 2026-08-28, by the event-dependent scope): an update pass still costs one full CI matrix per PR in scope. The debounce caps the scheduled all-open pass at roughly one per quiet period instead of one per merge; the armed-only push scope caps the per-merge pass at the PRs that BEHIND actually blocks. Neither makes an individual pass cheaper.
 - Negative: while master moves more often than once an hour, PRs go un-updated. Acceptable: this workflow never merges and never arms auto-merge, so a stale-but-clean PR blocks nothing — and `workflow_dispatch` forces a pass when one is actually needed.
+
+## Addendum — CI-wait guard removal (2026-09-10)
+
+The per-PR check-run gate described in the Decision section above, and the event-dependent
+retry budgets added by the 2026-08-28 amendment, are **removed**. The original figures were
+`CI_WAIT_ATTEMPTS=10` on `push` (10 x 60s, poll-then-warn) and `CI_WAIT_ATTEMPTS=0` on
+`schedule`/`workflow_dispatch` (skip immediately, defer to the next tick). Both are gone; a
+BEHIND PR is now refreshed unconditionally on every trigger.
+
+The guard rested on a premise that does not survive inspection: that a queued/in_progress check
+run on a BEHIND PR's head commit is worth preserving. `master` enforces strict required status
+checks, so a PR that is BEHIND cannot merge on checks computed against its stale head — those
+runs are already doomed at the instant the guard observes them. Waiting up to ten minutes per
+PR for a doomed run to finish bought nothing but wall-clock, and on a `push` pass it fired on
+essentially every armed PR, because a push is precisely when those PRs have CI in flight.
+
+Nothing replaces the guard, because the replacement was already in place. The `update-branch`
+push **is** the cancel signal. Every workflow in `required_status_checks.contexts` carries
+`cancel-in-progress: true` on a ref-keyed (or PR-number-keyed) concurrency group, confirmed
+2026-09-10:
+
+- `.github/workflows/tests.yml` — Tests and Analysis
+- `.github/workflows/e2e-tests.yml` — E2E Tests
+- `.github/workflows/pr-meta-checks.yml` — Meta checks
+- `.github/workflows/human-signoff.yml` — human-signoff
+
+So the new head commit cancels the stale run and starts the only run that can actually satisfy
+the merge gate. Cancel and update remain the same action: the workflow no longer reads check-run
+state at all, so no code path can invalidate CI without calling `update-branch` in the same loop
+iteration.
+
+**This addendum supersedes two Consequences bullets above.** The bullet reading "a push run
+coalesces for 300s and then waits on any in-flight CI for up to 10 minutes per PR" no longer
+describes the workflow — a push run coalesces for 300s and then updates. The bullet reading
+"Positive: Loop safety guarantees the same branch is never re-updated while its CI is live" is
+withdrawn: that guarantee is deliberately abandoned, and the thrash it prevented is bounded
+instead by the workflow-level `concurrency: update-behind-prs` group with `cancel-in-progress:
+true` (one pass at a time) plus the `DEBOUNCE_SECONDS` (3600) quiet-time gate and the
+`PUSH_COALESCE_SECONDS` (300) coalesce window, all unchanged.
+
+`timeout-minutes` drops from 60 to 30, since the 10-minute-per-PR CI wait it was sized around no
+longer exists; the remaining consumers are the 300s coalesce and the `UNKNOWN_ATTEMPTS`
+mergeability retries.
+
+Accepted cost: a human who pushes to a PR moments before a sweep can have that push's CI
+cancelled by the refresh. This is self-correcting — the refresh immediately re-triggers CI on
+the merged head, so the developer loses a partial run, not a result, and the run they get back
+is the one that can actually merge. A head-commit-age guard was considered and rejected: see the
+plan's trade-offs, but in short `committedDate` is authorship time rather than push time, so it
+misfires in both directions, and any window wide enough to protect a CI run is the wait loop
+this change exists to delete.
 
 ## Addendum — eager-rebase workflow restored as manual-dispatch-only (2026-09-10)
 

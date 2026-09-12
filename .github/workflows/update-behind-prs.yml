@@ -62,7 +62,7 @@ jobs:
   update-behind:
     name: Update open PRs stuck BEHIND master
     runs-on: ubuntu-latest
-    timeout-minutes: 60   # a push pass waits on in-flight CI (see step 2); bound it hard
+    timeout-minutes: 30   # coalesce wait + mergeability retries only; no CI wait remains
     steps:
       - name: Update BEHIND PRs
         env:
@@ -156,17 +156,15 @@ jobs:
           #    open-PR set and while the runner pool is busy with the merge that just landed,
           #    AND it has no next tick — the run after a push is the next master merge. A
           #    single skip there is therefore not a deferral, it is a silent permanent miss
-          #    for the exact PRs this trigger exists to unstick. So the push path waits longer
-          #    at both gates instead of skipping once.
+          #    for the exact PRs this trigger exists to unstick. So the push path only needs a
+          #    longer mergeability settle window; there is no CI gate left to wait on.
           if [ "$EVENT_NAME" = "push" ]; then
             SCOPE_FILTER='| select(.autoMergeRequest != null)'
             UNKNOWN_ATTEMPTS=20   # x 3s  = up to 60s for GitHub to settle mergeStateStatus
-            CI_WAIT_ATTEMPTS=10   # x 60s = up to 10min for a PR's in-flight CI to finish
             echo "Scope: auto-merge-armed PRs only (push event)."
           else
             SCOPE_FILTER=''
             UNKNOWN_ATTEMPTS=5    # a dropped/slow scheduled tick is retried by the next tick
-            CI_WAIT_ATTEMPTS=0    # ...so a scheduled pass skips rather than waits
             echo "Scope: all open non-draft PRs ($EVENT_NAME event)."
           fi
 
@@ -191,7 +189,6 @@ jobs:
               | \"\\(.number) \\(.headRefOid) \\(.mergeStateStatus) \\(.mergeable)\"")
 
           updated=0
-          skipped_ci=0
           skipped_conflict=0
           already_current=0
           still_unknown=0
@@ -259,44 +256,16 @@ jobs:
               continue
             fi
 
-            # 2. Loop safety (step-level): never re-update a branch while CI from a prior
-            #    update is live. REST check-runs statuses are lowercase: queued / in_progress
-            #    / completed.
-            #
-            #    On a SCHEDULED pass (CI_WAIT_ATTEMPTS=0) this skips immediately — the next
-            #    tick retries. On a PUSH pass it POLLS instead, because there is no next tick
-            #    and because a push fires precisely when the runner pool is busiest, so a
-            #    single check here would skip the armed PRs on essentially every push and
-            #    still report success. Same shape as the UNKNOWN retry loop above.
-            running=$(gh api "repos/$REPO/commits/$sha/check-runs" \
-              --jq '[.check_runs[] | select(.status=="in_progress" or .status=="queued")] | length' \
-              || echo 0)
-
-            ci_attempt=0
-            while [ "${running:-0}" -gt 0 ] && [ "$ci_attempt" -lt "$CI_WAIT_ATTEMPTS" ]; do
-              ci_attempt=$((ci_attempt + 1))
-              echo "CI in progress ($running run(s)) — waiting 60s (attempt $ci_attempt/$CI_WAIT_ATTEMPTS)"
-              sleep 60
-              running=$(gh api "repos/$REPO/commits/$sha/check-runs" \
-                --jq '[.check_runs[] | select(.status=="in_progress" or .status=="queued")] | length' \
-                || echo 0)
-            done
-
-            if [ "${running:-0}" -gt 0 ]; then
-              # On push this is a permanent miss until master next moves, so make it loud
-              # rather than a quiet summary line.
-              if [ "$EVENT_NAME" = "push" ]; then
-                echo "::warning::PR #$number still had $running CI run(s) in flight after ${CI_WAIT_ATTEMPTS}min of waiting — left BEHIND until the next master merge or scheduled sweep."
-              else
-                echo "CI in progress ($running check run(s) queued/in_progress) — skipping"
-              fi
-              skipped_ci=$((skipped_ci + 1))
-              echo "::endgroup::"
-              continue
-            fi
-
-            # 3. Update the branch via merge commit from master. Authenticated as CI_PAT so the
+            # 2. Update the branch via merge commit from master. Authenticated as CI_PAT so the
             #    resulting push triggers CI on the refreshed branch (GITHUB_TOKEN would not).
+            #
+            #    We do NOT check whether CI is currently in flight on $sha. master enforces
+            #    strict required checks, so a BEHIND PR's running checks cannot satisfy the
+            #    merge gate no matter how they finish — they are doomed before we look. This
+            #    push IS the canceller: every required check workflow (tests.yml,
+            #    e2e-tests.yml, pr-meta-checks.yml, human-signoff.yml) carries
+            #    cancel-in-progress: true on a ref-keyed concurrency group, so the new head
+            #    cancels the stale run and starts the only run that can actually merge.
             if gh api -X PUT "repos/$REPO/pulls/$number/update-branch"; then
               echo "Updated PR #$number onto master"
               updated=$((updated + 1))
@@ -306,12 +275,14 @@ jobs:
             echo "::endgroup::"
           done <<< "$candidates"
 
-          # 4. Step summary counts.
+          # 3. Step summary counts.
           {
             echo "## Update BEHIND PRs"
             echo "- Updated: $updated"
-            echo "- Skipped (CI running): $skipped_ci"
             echo "- Skipped (merge conflict): $skipped_conflict"
             echo "- Already current (not BEHIND): $already_current"
             echo "- Still UNKNOWN after poll: $still_unknown"
+            echo ""
+            echo "_Updates are unconditional: an updated PR's in-flight CI is cancelled by the"
+            echo "update push via cancel-in-progress. Cancelled runs on these PRs are expected._"
           } >> "$GITHUB_STEP_SUMMARY"

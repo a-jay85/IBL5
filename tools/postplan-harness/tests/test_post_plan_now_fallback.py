@@ -375,6 +375,18 @@ def test_should_fallback_body_unchanged():
     assert 'should_fallback() { case "$1" in 0|3) return 1 ;; *) return 0 ;; esac; }' in src
     assert _fb(4) == "0"     # unchanged: 4 still "escalates" — the rc=4 arm intercepts first
 
+def test_bare_invocation_cmd_has_no_plan_slug_export(tmp_path):
+    """Bare invocation (no --pr) must not inject PLAN_SLUG into $CMD."""
+    cmd = _generate_cmd(tmp_path)
+    assert "PLAN_SLUG" not in cmd, f"bare path must not export PLAN_SLUG; got {cmd!r}"
+
+    # Boundary: PLAN_SLUG explicitly empty in caller env — still must not appear in CMD
+    tmp2 = tmp_path / "b2"
+    tmp2.mkdir()
+    cmd2 = _generate_cmd(tmp2, extra_env={"PLAN_SLUG": ""})
+    assert "PLAN_SLUG" not in cmd2, f"PLAN_SLUG='' must not be injected; got {cmd2!r}"
+
+
 def test_harness_default_is_the_main_checkout(tmp_path):
     """ADR-0092: the seam must not become $ROOT/tools/postplan-harness."""
     src = open(PPN).read()
@@ -401,26 +413,29 @@ def test_plan_override_reaches_the_python_harness_in_live_mode():
 # --pr flag tests
 # ---------------------------------------------------------------------------
 
-def test_pr_flag_missing_argument_errors():
+def test_pr_flag_requires_an_argument():
     r = subprocess.run(["bash", PPN, "--pr"],
                        capture_output=True, text=True, cwd=REPO)
     assert r.returncode == 1
     assert "--pr requires a PR number argument" in r.stderr
 
 
-def test_pr_flag_non_integer_errors():
-    r = subprocess.run(["bash", PPN, "--pr", "abc"],
-                       capture_output=True, text=True, cwd=REPO)
-    assert r.returncode == 1
-    assert "--pr needs a positive integer PR number" in r.stderr
-    assert "abc" in r.stderr
+def test_pr_flag_rejects_non_numeric():
+    for bad in ("abc", "-3", "12x"):
+        r = subprocess.run(["bash", PPN, "--pr", bad],
+                           capture_output=True, text=True, cwd=REPO)
+        assert r.returncode == 1, f"--pr {bad!r}: expected rc=1, got {r.returncode}"
+        assert "--pr needs a positive integer PR number" in r.stderr, \
+            f"--pr {bad!r}: {r.stderr!r}"
+        assert bad in r.stderr, f"--pr {bad!r}: bad value not echoed in {r.stderr!r}"
 
 
-def test_pr_flag_unknown_arg_errors():
+def test_unknown_argument_message_lists_pr():
     r = subprocess.run(["bash", PPN, "--prr", "5"],
                        capture_output=True, text=True, cwd=REPO)
     assert r.returncode == 1
     assert "unknown argument" in r.stderr
+    assert "--pr" in r.stderr
 
 
 def test_pr_flag_unresolvable_branch_errors(tmp_path):
@@ -437,7 +452,7 @@ def test_pr_flag_unresolvable_branch_errors(tmp_path):
     assert "could not resolve a head branch" in r.stderr
 
 
-def test_pr_flag_no_worktree_for_branch_errors(tmp_path):
+def test_pr_flag_rejects_a_branch_with_no_worktree(tmp_path):
     """gh resolves branch, but no worktree has it checked out."""
     main_root, _ = _fixture_worktree(tmp_path, "some-branch")
     stub_dir = tmp_path / "stub-bin"
@@ -453,8 +468,8 @@ def test_pr_flag_no_worktree_for_branch_errors(tmp_path):
     assert "no worktree has it checked out" in r.stderr
 
 
-def test_pr_flag_resolves_worktree_and_writes_plist(tmp_path):
-    """--pr finds the worktree and succeeds (writes one plist)."""
+def test_pr_flag_targets_the_matching_worktree_and_exports_plan_slug(tmp_path):
+    """--pr resolves the worktree, writes one plist, and injects PLAN_SLUG before cd."""
     main_root, wt_root = _fixture_worktree(tmp_path, "pr-branch")
     home = tmp_path / "home"
     (home / "Library" / "LaunchAgents").mkdir(parents=True)
@@ -478,13 +493,22 @@ def test_pr_flag_resolves_worktree_and_writes_plist(tmp_path):
     assert r.returncode == 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
     plists = list((home / "Library" / "LaunchAgents").glob("*.plist"))
     assert len(plists) == 1, f"expected one plist, got {plists}"
+    body = plists[0].read_text()
+    cmd = re.search(r"<string>(export PATH=.*?)</string>", body, re.S).group(1)
+    cmd = cmd.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+    assert "export PLAN_SLUG=" in cmd
+    assert "pr-branch" in cmd
+    assert f'cd "{wt_root}"' in cmd
+    # PLAN_SLUG export must precede the cd to the worktree root
+    assert cmd.index("export PLAN_SLUG=") < cmd.index(f'cd "')
 
 
-def test_pr_flag_injects_plan_slug_into_cmd(tmp_path):
-    """CMD carries 'export PLAN_SLUG=...' when --pr is used."""
-    main_root, wt_root = _fixture_worktree(tmp_path, "my-feature")
+def test_pr_flag_plan_blind_when_no_plan_file_exists(tmp_path):
+    """--pr succeeds even when no plan file exists for the branch (plan-blind mode)."""
+    main_root, wt_root = _fixture_worktree(tmp_path, "pr-branch")
     home = tmp_path / "home"
     (home / "Library" / "LaunchAgents").mkdir(parents=True)
+    (home / "claude-plans").mkdir(parents=True)   # plans dir exists but empty
     shim = tmp_path / "shim"; shim.mkdir()
     (shim / "launchctl").write_text("#!/bin/sh\nexit 0\n")
     (shim / "launchctl").chmod(0o755)
@@ -492,25 +516,26 @@ def test_pr_flag_injects_plan_slug_into_cmd(tmp_path):
     (harness / "run").write_text("#!/bin/sh\nexit 0\n")
     (harness / "run").chmod(0o755)
     stub_dir = tmp_path / "stub-bin"; stub_dir.mkdir()
-    _gh_stub(stub_dir, "my-feature")
+    _gh_stub(stub_dir, "pr-branch")
     env = dict(os.environ,
                HOME=str(home),
                HARNESS=str(harness),
                PATH=f"{shim}:{stub_dir}:{os.environ['PATH']}",
                POST_PLAN_MAIN_ROOT=str(main_root))
     env.pop("POST_PLAN_SKILL", None)
-    r = subprocess.run(["bash", PPN, "--pr", "10"],
+    r = subprocess.run(["bash", PPN, "--pr", "42"],
                        capture_output=True, text=True,
                        cwd=str(wt_root), env=env)
     assert r.returncode == 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
     plists = list((home / "Library" / "LaunchAgents").glob("*.plist"))
+    assert len(plists) == 1, f"expected one plist, got {plists}"
+    assert "plan-blind" in r.stderr or "no plan at" in r.stderr, \
+        f"expected plan-missing warning in stderr: {r.stderr!r}"
     body = plists[0].read_text()
     cmd = re.search(r"<string>(export PATH=.*?)</string>", body, re.S).group(1)
     cmd = cmd.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
-    assert "export PLAN_SLUG=" in cmd
-    assert "my-feature" in cmd
-    # PLAN_SLUG export must precede the cd to the worktree root
-    assert cmd.index("export PLAN_SLUG=") < cmd.index(f'cd "')
+    assert "export PLAN_SLUG=" in cmd, "PLAN_SLUG must be in CMD even in plan-blind mode"
+    assert "pr-branch" in cmd
 
 
 def test_refuses_to_run_in_the_main_checkout(tmp_path):
@@ -546,7 +571,7 @@ def test_phase0_guard_extracts_cleanly():
     assert len(block) > 100
 
 
-def test_phase0_guard_linked_worktree_arm_exits_zero(tmp_path):
+def test_phase0_guard_already_in_target_arm_is_a_noop(tmp_path):
     """ALREADY-IN-TARGET arm: linked worktree on the right branch → exit 0."""
     _, wt_root = _fixture_worktree(tmp_path, "target-branch")
     block = _guard_block()

@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 2 — resolve a rebase conflict, prove no work was lost, and arm the conflict hold. Loaded only when the Phase 2 rebase block prints STOP-AND-RESOLVE.
-last_verified: 2026-09-10
+last_verified: 2026-09-12
 paths:
   - .claude/skills/post-plan/SKILL.md
   - .claude/skills/pr-ready/_rebase-and-conflicts.md

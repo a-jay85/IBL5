@@ -24,7 +24,7 @@ def load(slug):
 
 
 CANNED = {
-    "pr-copy": {"type": "chore", "title": "chore: replay", "summary_md": "## Summary\n- x\n"},
+    "pr-copy": {"type": "chore", "title": "chore: replay", "commit_subject": "chore: replay commit", "summary_md": "## Summary\n- x\n"},
     "review-agent-a": [], "review-agent-b": [], "review-agent-d": [],
     "security-audit": [],
     "safety-verdict": {"holds": []},
@@ -287,6 +287,41 @@ _INLINE_FIXTURE = {
     "checks_outcome": {"exit": 0, "failed": []},
     "probes": {},
 }
+
+
+def test_replay_commit_subject_is_not_the_pr_title(monkeypatch):
+    """The commit subject comes from copy['commit_subject']; the PR title from copy['title'].
+
+    CANNED deliberately sets the two to different strings, so this fails if runner.py is
+    reverted to committing copy['title'], or if the two schema fields are collapsed into
+    one. _INLINE_FIXTURE's diff is a production .php file, so no *_only flag is set and
+    coerce_commit_subject returns the subject unchanged — the value asserted here is the
+    fixture's, not a coercion artifact.
+    """
+    captured = []
+
+    class _CapturingReplayGit(runner.ReplayGit):
+        def __init__(self, fixture):
+            super().__init__(fixture)
+            captured.append(self)
+
+    monkeypatch.setattr(runner, "ReplayGit", _CapturingReplayGit)
+    res, out = _run_inline()
+
+    assert len(captured) == 1, f"expected one ReplayGit instance, got {len(captured)}"
+    messages = captured[0].commit_messages
+    assert messages, "commit_all was never called — the commit path did not run"
+    subject = messages[0].split("\n", 1)[0]
+
+    assert subject == CANNED["pr-copy"]["commit_subject"] == "chore: replay commit"
+    assert subject != CANNED["pr-copy"]["title"]
+    assert not messages[0].startswith("chore: replay\n"), \
+        "commit subject is the PR title — the two fields have been collapsed"
+
+    # The PR-creation site deliberately keeps using copy['title'].
+    creates = [a for a in _actions(out) if a.get("action") == "pr_create"]
+    if creates:
+        assert creates[-1].get("title") == CANNED["pr-copy"]["title"]
 
 
 def _run_inline(canned_extra=None, probes=None):

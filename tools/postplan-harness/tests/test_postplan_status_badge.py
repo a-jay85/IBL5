@@ -79,19 +79,29 @@ def _run_badge(script, env_extra=None, stub_gh_dir=None, stub_lc_dir=None):
 
 
 def _fixture_repo(tmp_path):
-    """Minimal dirty worktree on a non-master branch."""
+    """Minimal dirty linked worktree on a non-master branch.
+
+    Creates a main checkout at tmp_path/wt with bin/lib/git-helpers.sh committed,
+    then adds a linked worktree at tmp_path/wt-base. Returns tmp_path/wt-base so
+    is_in_worktree() passes in callers (post-plan-now requires a linked worktree).
+    """
     repo = tmp_path / "wt"
     repo.mkdir()
-    run = lambda *a: subprocess.run(a, cwd=repo, check=True, capture_output=True)
+    run = lambda *a: subprocess.run(a, cwd=str(repo), check=True, capture_output=True)
     run("git", "init", "-q", "-b", "master")
     run("git", "config", "user.email", "test@example.com")
     run("git", "config", "user.name", "Test")
+    (repo / "bin" / "lib").mkdir(parents=True)
+    shutil.copy(os.path.join(REPO, "bin", "lib", "git-helpers.sh"),
+                str(repo / "bin" / "lib" / "git-helpers.sh"))
     (repo / "f.txt").write_text("one\n")
     run("git", "add", "-A")
     run("git", "commit", "-qm", "base")
     run("git", "checkout", "-qb", "some-feature")
-    (repo / "f.txt").write_text("two\n")
-    return repo
+    linked = tmp_path / "wt-base"
+    run("git", "worktree", "add", str(linked), "-b", "wt-feature")
+    (linked / "f.txt").write_text("two\n")
+    return linked
 
 
 def _generate_cmd(tmp_path, extra_env=None):

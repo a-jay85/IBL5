@@ -386,6 +386,12 @@ def test_bare_invocation_cmd_has_no_plan_slug_export(tmp_path):
     cmd2 = _generate_cmd(tmp2, extra_env={"PLAN_SLUG": ""})
     assert "PLAN_SLUG" not in cmd2, f"PLAN_SLUG='' must not be injected; got {cmd2!r}"
 
+    # Boundary: PLAN_SLUG non-empty in caller env — bare path must still not inject it
+    tmp3 = tmp_path / "b3"
+    tmp3.mkdir()
+    cmd3 = _generate_cmd(tmp3, extra_env={"PLAN_SLUG": "SOME-OTHER-BRANCH"})
+    assert "PLAN_SLUG" not in cmd3, f"ambient PLAN_SLUG must not be injected on bare path; got {cmd3!r}"
+
 
 def test_harness_default_is_the_main_checkout(tmp_path):
     """ADR-0092: the seam must not become $ROOT/tools/postplan-harness."""

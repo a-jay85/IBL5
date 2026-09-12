@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-09-10
+last_verified: 2026-09-12
 ---
 
 # Post-Plan Orchestrator
@@ -101,7 +101,22 @@ When the automouse postplan prompt supplied an authoritative plan path, use it i
 If the working tree is clean and `git diff origin/master...HEAD` is also empty (nothing to ship), abort the entire skill — there is nothing to post-plan.
 
 1. **If working tree has uncommitted changes:** stage relevant changes, review with `git diff --staged`, commit. Commit-type rubric: `.claude/rules/commit-conventions.md` (the single source of truth for `feat:` vs. `chore:`/`fix:`/`refactor:`/`docs:`). **Decision test for the PR/commit title:** "Would a league GM notice a new ability they didn't have before?" — Yes → `feat:`; invisible to a GM (dev tooling, a new slash command, an internal refactor) → not `feat:` (`chore:`/`refactor:`/`docs:`). **Classify by what the diff IS, never by the desired merge outcome** — `feat:` triggering the human-signoff hold is the gate working, not a cost to route around. Skip this sub-step if the working tree is already clean (user committed before invoking the skill).
-2. Rebase the branch onto `origin/master` before pushing so Phase 4 code review, Phase 5.0 conformance, and Phase 5.5 fidelity all judge the same post-rebase diff. `REBASE=conflict` and `REBASE=indeterminate` each print a `STOP:` line and **halt the skill** — resolve by hand (conflict) or fix the fetch (indeterminate) and re-run `/post-plan`. Do not advance to step 3.
+2. Pin `origin/master` and capture the pre-rebase diff first — the lost-work proof consumes those inputs if the rebase conflicts. Rebase the branch onto `origin/master` before pushing so Phase 4 code review, Phase 5.0 conformance, and Phase 5.5 fidelity all judge the same post-rebase diff. `REBASE=conflict` and `REBASE=indeterminate` each print a `STOP:` line and **halt the skill** — resolve by hand (conflict) or fix the fetch (indeterminate) and re-run `/post-plan`. Do not advance to step 3.
+
+   > Before rebasing, pin `origin/master` and capture the pre-rebase diff — these are the inputs the lost-work proof consumes if the rebase conflicts. Record the printed SHA and the printed `key=` value as run notes and substitute them as literals (`<MASTER_SHA>`, `<KEY>`) into every later command in this phase; nothing survives between Bash blocks.
+
+```bash
+# phase 2 pre-rebase capture: write the inputs the lost-work proof needs BEFORE any
+# history rewrite. On a clean rebase these files are never read; the cost is one diff.
+# PPCAP_KEY / PPCAP_TMP are overridable only so bin/test-postplan-arm-conditions can
+# point this block at a fixture; production leaves both unset and takes the defaults.
+PPCAP_TMP="${PPCAP_TMP:-/tmp}"
+PPCAP_KEY="${PPCAP_KEY:-$(git rev-parse --abbrev-ref HEAD | tr '/:' '--')}"
+git fetch origin master --quiet 2>/dev/null || true
+git rev-parse origin/master
+git diff origin/master...HEAD > "$PPCAP_TMP/pr-ready-diff-pre-$PPCAP_KEY.patch"
+echo "PRECAPTURE=ok key=$PPCAP_KEY"
+```
 
 ```bash
 # phase 2 rebase: land the branch on origin/master BEFORE the push, so Phase 4 review,

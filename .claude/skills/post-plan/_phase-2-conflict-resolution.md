@@ -134,8 +134,11 @@ bash /tmp/post-plan-lostwork-<KEY>.sh <KEY> ; echo "LOSTWORK-RC=$?"
 if** this prints `TREE-EQUIVALENT` **and** `LOSTWORK-RC=0`. Any other outcome —
 `TREE DIVERGED — inspect before pushing`, a non-zero rc, or no output at all — halts the run
 with a `STOP:` line naming the script and both patch paths. Every failure path inside
-`lostwork.sh` (missing arg, absent pre-patch, empty numstat, differing numstat) emits
-`TREE DIVERGED` and exits 1, so this single conjunctive check covers all of them.
+`lostwork.sh` emits `TREE DIVERGED`, but only the early guards (missing arg, absent or empty
+patch, failed `git apply --numstat`, empty pre-numstat) also exit 1 — the final
+differing-numstat branch prints `TREE DIVERGED — inspect before pushing` and exits **0**.
+That is exactly why this check is conjunctive on the printed verdict and not on the rc alone:
+gating on `LOSTWORK-RC=0` by itself would wave the commonest divergence straight through.
 
 Reviewing a resolution *after* it shipped is exactly what this replaces: an unreviewed
 resolution that dropped a hunk would otherwise reach master through auto-merge.

@@ -978,12 +978,19 @@ mk_rebase_repo() {
 # run_rebase <block> <repo> <base-ref> — own shell, own cwd.
 run_rebase() { ( cd "$2" && REBASE_BASE_REF="$3" bash -c "$1" 2>&1 ); }
 
-# expect_reb <name> <want-substr> <stop|nostop> <output>
+# expect_reb <name> <want-substr> <stop|resolve|nostop> <output>
+# `resolve` is the conflict arm's hand-off token: it must print ^STOP-AND-RESOLVE: and
+# must NOT print a bare ^STOP:, which in this codebase means the skill halts.
 expect_reb() {
     local ok=1
     printf '%s' "$4" | grep -qF "$2" || ok=0
     if [ "$3" = stop ]; then printf '%s' "$4" | grep -q '^STOP:' || ok=0
-    else                     printf '%s' "$4" | grep -q '^STOP:' && ok=0
+    elif [ "$3" = resolve ]; then
+        printf '%s' "$4" | grep -q '^STOP-AND-RESOLVE:' || ok=0
+        printf '%s' "$4" | grep -q '^STOP:' && ok=0
+    else
+        printf '%s' "$4" | grep -q '^STOP:' && ok=0
+        printf '%s' "$4" | grep -q '^STOP-AND-RESOLVE:' && ok=0
     fi
     if [ "$ok" -eq 1 ]; then echo "ok: $1"
     else echo "FAIL: $1 — expected '$2' and $3, got: '$4'"; FAILED=1; fi
@@ -1010,8 +1017,8 @@ else
     # NEGATIVE: conflict -> STOP, and the tree is left exactly as found.
     R="$(mk_rebase_repo conflict)"; BEFORE="$(git -C "$R" rev-parse HEAD)"
     OUT="$(run_rebase "$BREB" "$R" fakebase)"
-    expect_reb "phase 2 rebase: conflicting base -> REBASE=conflict + STOP" \
-        "REBASE=conflict" stop "$OUT"
+    expect_reb "phase 2 rebase: conflicting base -> REBASE=conflict + STOP-AND-RESOLVE" \
+        "REBASE=conflict" resolve "$OUT"
     printf '%s' "$OUT" | grep -qF 'linear-history-squash-merge.md' \
         && echo "ok: phase 2 rebase: STOP text names the squash-trap escape route" \
         || { echo "FAIL: phase 2 rebase: STOP text omits the squash-trap guidance the label promises"; FAILED=1; }
@@ -1043,6 +1050,254 @@ else
     fi
 fi
 
+
+# --- §5.9 conflict-resolution + BEHIND re-rebase ---------------------------------
+# These extend §5.8 rather than living in a sibling harness: mk_rebase_repo,
+# extract_block and run_isolated are already here, and a second bin/test-* would
+# duplicate then drift from them (.claude/rules/meta-tooling-bar.md).
+CRES="$REPO_ROOT/.claude/skills/post-plan/_phase-2-conflict-resolution.md"
+CIMON="$REPO_ROOT/.claude/skills/post-plan/_phase-7-ci-monitoring.md"
+
+# have <name> <haystack> <needle> — literal substring assertion. Herestring, never a
+# pipe into grep -q: .claude/rules/shell-pipefail-grep.md.
+have() {
+    if grep -qF -- "$3" <<< "$2"; then echo "ok: $1"
+    else echo "FAIL: $1 — missing literal '$3'"; FAILED=1; fi
+}
+# lacks <name> <haystack> <needle>
+lacks() {
+    if grep -qF -- "$3" <<< "$2"; then
+        echo "FAIL: $1 — must NOT contain '$3'"; FAILED=1
+    else echo "ok: $1"; fi
+}
+# before <name> <haystack> <first> <second> — assert <first> appears at a lower line
+# number than <second>. Ordering assertions are how a "do it, then check it"
+# reordering gets caught; a plain both-present grep cannot see it.
+before() {
+    local a b
+    a="$(grep -nF -- "$3" <<< "$2" | head -1 | cut -d: -f1)"
+    b="$(grep -nF -- "$4" <<< "$2" | tail -1 | cut -d: -f1)"
+    if [ -n "$a" ] && [ -n "$b" ] && [ "$a" -lt "$b" ]; then echo "ok: $1"
+    else echo "FAIL: $1 — '$3' (line ${a:-none}) must precede '$4' (line ${b:-none})"; FAILED=1; fi
+}
+
+# §5.9a marker isolation. extract_block matches the FIRST fence whose body contains
+# the literal as a SUBSTRING, so a capture block marked "# phase 2 rebase capture"
+# would silently steal $BREB and run every §5.8 assertion against the wrong code
+# while still reporting green. The live marker is "# phase 2 pre-rebase capture"
+# precisely so that substring never matches.
+BCAP="$(extract_block '# phase 2 pre-rebase capture' "$P25_SKILL")"
+if [ -z "${BREB:-}" ] || [ -z "$BCAP" ]; then
+    echo "FAIL: §5.9a — could not extract both the rebase and the pre-rebase capture block"
+    FAILED=1
+else
+    have  "§5.9a: '# phase 2 rebase' still binds to the rebase block" "$BREB" 'git rebase --abort'
+    lacks "§5.9a: '# phase 2 rebase' did not bind to the capture block" "$BREB" 'PRECAPTURE=ok'
+    have  "§5.9a: the capture block is the one that prints PRECAPTURE=ok" "$BCAP" 'PRECAPTURE=ok'
+
+    # §5.9b deliberate asymmetry: lostwork.sh hardcodes `git diff origin/master...HEAD`,
+    # so the capture block must too. "Fixing" it to follow $REBASE_BASE_REF makes EVERY
+    # run — clean ones included — report TREE DIVERGED.
+    have  "§5.9b: capture block pins the literal origin/master...HEAD base" "$BCAP" 'git diff origin/master...HEAD'
+    lacks "§5.9b: capture block ignores the REBASE_BASE_REF seam" "$BCAP" 'REBASE_BASE_REF'
+    # Test seams must stay defaulted, or the block writes into a developer's real /tmp.
+    have  "§5.9b: PPCAP_TMP seam keeps its default" "$BCAP" 'PPCAP_TMP:-/tmp'
+    have  "§5.9b: PPCAP_KEY seam keeps its default" "$BCAP" 'PPCAP_KEY:-$(git rev-parse --abbrev-ref HEAD'
+    have  "§5.9b: capture block sanitises the branch slug" "$BCAP" "tr '/:' '--'"
+fi
+
+# §5.9c condition (14): the flag decides, and it must decide in BOTH directions.
+B14="$(extract_block '# phase 6.5 condition 14' "$P25_SKILL")"
+if [ -z "$B14" ]; then
+    echo "FAIL: §5.9c — no block matching '# phase 6.5 condition 14' in $P25_SKILL"
+    FAILED=1
+else
+    have "§5.9c: CONFLICT_FLAG seam keeps its default" "$B14" 'CONFLICT_FLAG:-/tmp/postplan-conflict-resolved-'
+    lacks "§5.9c: condition (14) never arms auto-merge itself" "$B14" 'gh pr merge'
+
+    # Flag present -> hold, with the full remedy wording. A HOLD line that does not
+    # say what the human should do reads as a bug report, not a gate.
+    F14="$BASE_TMP/cond14-present"; : > "$F14"
+    O14="$(CONFLICT_FLAG="$F14" bash -c "$B14" 2>&1)"
+    have "§5.9c: flag present -> COND14=blocked"            "$O14" 'COND14=blocked'
+    have "§5.9c: HOLD names the condition"                  "$O14" 'condition (14)'
+    have "§5.9c: HOLD says the lost-work proof passed"      "$O14" 'TREE-EQUIVALENT'
+    have "§5.9c: HOLD names the remedy"                     "$O14" 'merge by hand'
+    have "§5.9c: HOLD names the non-remedy"                 "$O14" 'do not re-run /post-plan'
+    lacks "§5.9c: a held run emits no arming command"       "$O14" 'gh pr merge --squash --auto'
+
+    # NEGATIVE, and the highest-value case in the set: an inverted `[ ! -e ]` would
+    # hold EVERY clean run and stall the whole merge pipeline while every other
+    # assertion here stayed green.
+    O14C="$(CONFLICT_FLAG="$BASE_TMP/cond14-absent" bash -c "$B14" 2>&1)"
+    have  "§5.9c: no flag -> COND14=clear"        "$O14C" 'COND14=clear'
+    lacks "§5.9c: a clean run emits no HOLD line" "$O14C" 'HOLD:'
+
+    # Same block, a second unrelated tmp root: proves nothing leaks between runs.
+    ALT_TMP="$(mktemp -d "$BASE_TMP/alt-XXXXXX")"
+    O14D="$(CONFLICT_FLAG="$ALT_TMP/cond14-absent" bash -c "$B14" 2>&1)"
+    have "§5.9c: clear verdict is not sticky across tmp roots" "$O14D" 'COND14=clear'
+fi
+
+# §5.9d Phase 6.5 step 0 announcement guard.
+BANN="$(extract_block '# phase 6.5 conflict-hold announcement' "$P25_SKILL")"
+if [ -z "$BANN" ]; then
+    echo "FAIL: §5.9d — no block matching '# phase 6.5 conflict-hold announcement' in $P25_SKILL"
+    FAILED=1
+else
+    OA="$(CONFLICT_FLAG="$BASE_TMP/ann-absent" bash -c "$BANN" 2>&1)"
+    have "§5.9d: no flag -> CONFLICT-HOLD=none" "$OA" 'CONFLICT-HOLD=none'
+    lacks "§5.9d: a clean run posts no comment" "$OA" 'gh pr comment'
+    FA="$BASE_TMP/ann-present"; : > "$FA"
+    OB="$(CONFLICT_FLAG="$FA" bash -c "$BANN" 2>&1)"
+    have "§5.9d: flag present -> CONFLICT-HOLD=fired" "$OB" 'CONFLICT-HOLD=fired'
+fi
+
+# §5.9e sticky-marker isolation. Reusing /pr-ready's canary or verdict marker would
+# OVERWRITE that comment on the same PR, destroying an unrelated verdict.
+P25_TXT="$(cat "$P25_SKILL")"; CRES_TXT="$(cat "$CRES")"
+have  "§5.9e: the conflict comment has its own marker"   "$P25_TXT" '<!-- post-plan-conflict-hold -->'
+have  "§5.9e: the appendix carries the same marker"      "$CRES_TXT" '<!-- post-plan-conflict-hold -->'
+# The appendix body is what a reviewer actually reads; asserting only that the posting
+# code path ran would pass with an empty comment, which is the realistic failure.
+have "§5.9e: appendix states the hold"        "$CRES_TXT" 'Auto-merge held — this run auto-resolved a rebase conflict'
+have "§5.9e: appendix cites the proof"        "$CRES_TXT" 'TREE-EQUIVALENT'
+have "§5.9e: appendix names the condition"    "$CRES_TXT" 'condition (14)'
+have "§5.9e: appendix names the remedy"       "$CRES_TXT" 'merge it by hand'
+
+# §5.9f the lost-work proof is a GATE, not a report: the invocation must precede the
+# push instruction, with TREE-EQUIVALENT named in between. A "push first, print the
+# verdict after" reordering satisfies a naive both-present grep and protects nothing.
+before "§5.9f: lostwork.sh runs before the push instruction" "$CRES_TXT" 'lostwork-' 'Proceed to Phase 2 step 3 (push)'
+have   "§5.9f: TREE-EQUIVALENT is named as the precondition" "$CRES_TXT" 'TREE-EQUIVALENT'
+before "§5.9f: collapse-guard check precedes collapse-guard record" "$CRES_TXT" 'collapse-guard-<KEY>.sh check' 'collapse-guard-<KEY>.sh record'
+have   "§5.9f: the --onto squash-trap recipe is spelled out" "$CRES_TXT" 'git rebase --onto origin/master <parent-tip-before-merge> <branch>'
+have   "§5.9f: the squash-trap rule is cited"                "$CRES_TXT" '.claude/rules/linear-history-squash-merge.md'
+
+# §5.9g behavioural: lostwork.sh against real fixture repos, in BOTH directions.
+# The fixtures need a real refs/remotes/origin/master — the script hardcodes
+# `git diff origin/master...HEAD` and ignores every seam, so without the ref its
+# post-diff is empty and a DIVERGED case would pass for the wrong reason.
+LW="$REPO_ROOT/.claude/skills/pr-ready/scripts/lostwork.sh"
+mk_lostwork_repo() {
+    local d; d="$(mktemp -d "$BASE_TMP/lw-XXXXXX")"
+    git -C "$d" init --quiet -b main
+    git -C "$d" config user.email 'postplan-test@example.invalid'
+    git -C "$d" config user.name  'postplan test'
+    printf 'base\n' > "$d/f.txt"; git -C "$d" add f.txt; git -C "$d" commit --quiet -m base
+    git -C "$d" update-ref refs/remotes/origin/master "$(git -C "$d" rev-parse HEAD)"
+    printf 'mine\n' >> "$d/f.txt"; git -C "$d" commit --quiet -am mine
+    printf '%s' "$d"
+}
+if [ ! -x "$LW" ]; then
+    echo "FAIL: §5.9g — $LW missing or not executable"; FAILED=1
+else
+    # Happy twin: unchanged tree -> TREE-EQUIVALENT, rc 0. Without this the DIVERGED
+    # case below could pass against a script that always says DIVERGED.
+    LWR="$(mk_lostwork_repo)"; LWK="lw-clean-$$"
+    ( cd "$LWR" && git diff origin/master...HEAD > "/tmp/pr-ready-diff-pre-$LWK.patch" )
+    LWO="$( cd "$LWR" && bash "$LW" "$LWK" 2>&1 )"; LWRC=$?
+    have "§5.9g: unchanged tree -> TREE-EQUIVALENT" "$LWO" 'TREE-EQUIVALENT'
+    if [ "$LWRC" -eq 0 ]; then echo "ok: §5.9g: TREE-EQUIVALENT exits 0"
+    else echo "FAIL: §5.9g: TREE-EQUIVALENT exited $LWRC"; FAILED=1; fi
+
+    # NEGATIVE: a commit added after the capture makes the numstats disagree.
+    LWR2="$(mk_lostwork_repo)"; LWK2="lw-div-$$"
+    ( cd "$LWR2" && git diff origin/master...HEAD > "/tmp/pr-ready-diff-pre-$LWK2.patch" )
+    ( cd "$LWR2" && printf 'extra\n' >> f.txt && git commit --quiet -am extra )
+    LWO2="$( cd "$LWR2" && bash "$LW" "$LWK2" 2>&1 )" || true
+    have "§5.9g: a tree that gained work -> TREE DIVERGED" "$LWO2" 'TREE DIVERGED'
+    # The differing-numstat branch is the ONE failure path that exits 0, which is why
+    # _phase-2-conflict-resolution.md gates on the printed verdict, not on the rc alone.
+    have "§5.9g: the doc gates on the verdict string, not just the rc" "$CRES_TXT" 'exits **0**'
+
+    # Slug sanitation: a branch with a slash must key the patch file as a flat slug,
+    # or the capture block's redirect lands in a nonexistent directory and the halt
+    # that follows is spurious.
+    SL="$(printf '%s' 'feat/slash-in-name' | tr '/:' '--')"
+    if [ "$SL" = 'feat-slash-in-name' ]; then echo "ok: §5.9g: branch slug sanitation flattens a slash"
+    else echo "FAIL: §5.9g: slug sanitation produced '$SL'"; FAILED=1; fi
+    rm -f "/tmp/pr-ready-diff-pre-$LWK.patch" "/tmp/pr-ready-diff-pre-$LWK2.patch" \
+          "/tmp/pr-ready-diff-post-$LWK.patch" "/tmp/pr-ready-diff-post-$LWK2.patch" \
+          "/tmp/pr-ready-numstat-pre-$LWK.txt" "/tmp/pr-ready-numstat-post-$LWK.txt" \
+          "/tmp/pr-ready-numstat-pre-$LWK2.txt" "/tmp/pr-ready-numstat-post-$LWK2.txt"
+fi
+
+# §5.9h the BEHIND re-rebase loop. The loop body is orchestrator prose interleaved
+# with per-step blocks, not one runnable script, so the bound and the ordering are
+# asserted statically against that text — a mutation to either fails here.
+CIMON_TXT="$(cat "$CIMON")"
+have  "§5.9h: the loop bound is stated as 3"          "$CIMON_TXT" '**Bound: 3 iterations.**'
+have  "§5.9h: iteration 4 is explicitly excluded"     "$CIMON_TXT" 'Iteration 4 does not run.'
+have  "§5.9h: the ceiling halt carries its literal"   "$CIMON_TXT" '3-iteration ceiling'
+have  "§5.9h: the ceiling leaves auto-merge disarmed" "$CIMON_TXT" 'Auto-merge has been left disarmed.'
+# Disarm must precede the rewrite: a reordering rewrites the branch out from under an
+# armed auto-merge, the one sequence that can merge a tree nobody watched land.
+before "§5.9h: --disable-auto precedes the rebase invocation" \
+    "$CIMON_TXT" 'gh pr merge <N> --disable-auto' 'Re-run the `# phase 2 rebase` block'
+before "§5.9h: prior arm state is recorded before the disarm" \
+    "$CIMON_TXT" 'postplan-automerge-was-<KEY>.txt' 'gh pr merge <N> --disable-auto'
+# The re-arm gate is the second entry point into the hold — condition (14) cannot
+# cover it, because Phase 6.5 has already run by then.
+have  "§5.9h: re-arm is gated on the prior arm state"   "$CIMON_TXT" 'postplan-automerge-was-<KEY>.txt)" = armed'
+have  "§5.9h: re-arm is gated on the conflict flag too" "$CIMON_TXT" '! test -e /tmp/postplan-conflict-resolved-<KEY>'
+have  "§5.9h: the loop forbids deleting the branch"     "$CIMON_TXT" 'Never add `--delete-branch`'
+# The strict probe is fail-safe AWAY from rewriting history.
+have  "§5.9h: the strict probe defaults to not-strict"  "$P25_TXT" '.required_status_checks.strict // false'
+have  "§5.9h: the probe reads mergeStateStatus"         "$P25_TXT" 'mergeStateStatus'
+# Worktrees have no upstream, so a lease flag with no named ref silently no-ops there.
+have  "§5.9h: the rewrite push names remote and ref"    "$CIMON_TXT" 'origin HEAD:<BRANCH>'
+have  "§5.9h: indeterminate still halts, fail-closed"   "$CIMON_TXT" '`REBASE=indeterminate` → **halt**'
+
+# §5.9i clean-run inertness. A flag write hoisted above the `if` would hold auto-merge
+# on every run forever, and every other assertion here would stay green.
+for KIND in clean behind; do
+    R="$(mk_rebase_repo "$KIND")"
+    PPCAP_TMP="$BASE_TMP" run_rebase "$BREB" "$R" fakebase > /dev/null 2>&1 || true
+done
+if ls "$BASE_TMP"/postplan-conflict-resolved-* >/dev/null 2>&1; then
+    echo "FAIL: §5.9i — a non-conflicting rebase wrote a conflict flag"; FAILED=1
+else
+    echo "ok: §5.9i: clean and behind rebases write no conflict flag"
+fi
+
+# §5.9j the shared surfaces this change deliberately does NOT touch. Condition (14)'s
+# evidence is a /tmp flag local to one run — not live-derivable, so a predicate reading
+# it would emit machine-dependent columns in bin/pr-triage.
+for F in bin/lib/pr-armable.sh bin/pr-triage; do
+    if git -C "$REPO_ROOT" diff --quiet origin/master...HEAD -- "$F"; then
+        echo "ok: §5.9j: $F unchanged vs origin/master"
+    else
+        echo "FAIL: §5.9j: $F changed — condition (14) is run-local and must stay inline"
+        FAILED=1
+    fi
+done
+
+# §5.9k prose-level invariants the blocks cannot carry. These are the half-applied-edit
+# catches: a block can be perfect while the surrounding prose still claims twelve
+# conditions, still points at /pr-ready's marker, or still hands the rebase to a spawn.
+have "§5.9k: SKILL.md counts fourteen conditions"        "$P25_TXT" '**All fourteen conditions**'
+have "§5.9k: the run-only enumeration ends /(13)/(14)"   "$P25_TXT" '(2)/(3)/(4)/(7)/(9)/(12)/(13)/(14)'
+have "§5.9k: the shared-predicate list is unchanged"     "$P25_TXT" '(1)/(5)/(6)/(8)/(10)/(11)'
+
+# The resolution file runs headless: a spawn handed work past the turn boundary is
+# unrecoverable under `claude -p`, and §2b of the /pr-ready guide is exactly that shape.
+lacks "§5.9k: the resolution file spawns no sub-agent"   "$CRES_TXT" 'subagent_type'
+lacks "§5.9k: the resolution file calls no Agent()"      "$CRES_TXT" 'Agent('
+# The flag is written at conflict DETECTION in SKILL.md, never here — writing it after a
+# successful proof would invert the fail-closed property (a run that dies mid-resolution
+# would find no flag and could arm).
+lacks "§5.9k: the resolution file never creates the flag" "$CRES_TXT" 'touch /tmp/postplan-conflict-resolved-'
+have  "§5.9k: the resolution file keeps the --onto form"  "$CRES_TXT" '--onto origin/master'
+
+# Marker isolation, at the one place it can actually do damage: the block that posts.
+BANN2="$(extract_block '# phase 6.5 conflict-hold announcement' "$P25_SKILL")"
+if [ -z "$BANN2" ]; then
+    echo "FAIL: §5.9k — announcement block vanished"; FAILED=1
+else
+    lacks "§5.9k: the announcement never reuses pr-fast-canary"  "$BANN2" 'pr-fast-canary'
+    lacks "§5.9k: the announcement never reuses pr-ready-verdict" "$BANN2" 'pr-ready-verdict'
+fi
 if [ "$FAILED" -eq 0 ]; then
     echo "All post-plan block checks passed."
 else

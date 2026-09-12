@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-09-10
+last_verified: 2026-09-12
 ---
 
 # Post-Plan Orchestrator
@@ -101,7 +101,22 @@ When the automouse postplan prompt supplied an authoritative plan path, use it i
 If the working tree is clean and `git diff origin/master...HEAD` is also empty (nothing to ship), abort the entire skill — there is nothing to post-plan.
 
 1. **If working tree has uncommitted changes:** stage relevant changes, review with `git diff --staged`, commit. Commit-type rubric: `.claude/rules/commit-conventions.md` (the single source of truth for `feat:` vs. `chore:`/`fix:`/`refactor:`/`docs:`). **Decision test for the PR/commit title:** "Would a league GM notice a new ability they didn't have before?" — Yes → `feat:`; invisible to a GM (dev tooling, a new slash command, an internal refactor) → not `feat:` (`chore:`/`refactor:`/`docs:`). **Classify by what the diff IS, never by the desired merge outcome** — `feat:` triggering the human-signoff hold is the gate working, not a cost to route around. Skip this sub-step if the working tree is already clean (user committed before invoking the skill).
-2. Rebase the branch onto `origin/master` before pushing so Phase 4 code review, Phase 5.0 conformance, and Phase 5.5 fidelity all judge the same post-rebase diff. `REBASE=conflict` and `REBASE=indeterminate` each print a `STOP:` line and **halt the skill** — resolve by hand (conflict) or fix the fetch (indeterminate) and re-run `/post-plan`. Do not advance to step 3.
+2. Pin `origin/master` and capture the pre-rebase diff first — the lost-work proof consumes those inputs if the rebase conflicts. Rebase the branch onto `origin/master` before pushing so Phase 4 code review, Phase 5.0 conformance, and Phase 5.5 fidelity all judge the same post-rebase diff. `REBASE=indeterminate` prints a `STOP:` line and **halts the skill** — fix the fetch and re-run `/post-plan`. `REBASE=conflict` prints a `STOP-AND-RESOLVE:` line: the tree has been restored by `git rebase --abort`, and the run continues into `.claude/skills/post-plan/_phase-2-conflict-resolution.md`, which must complete — including its `TREE-EQUIVALENT` proof — before step 3's push. A resolved conflict holds auto-merge at Phase 6.5 condition (14). In either case, do not advance to step 3 from here.
+
+   > Before rebasing, pin `origin/master` and capture the pre-rebase diff — these are the inputs the lost-work proof consumes if the rebase conflicts. Record the printed SHA and the printed `key=` value as run notes and substitute them as literals (`<MASTER_SHA>`, `<KEY>`) into every later command in this phase; nothing survives between Bash blocks.
+
+```bash
+# phase 2 pre-rebase capture: write the inputs the lost-work proof needs BEFORE any
+# history rewrite. On a clean rebase these files are never read; the cost is one diff.
+# PPCAP_KEY / PPCAP_TMP are overridable only so bin/test-postplan-arm-conditions can
+# point this block at a fixture; production leaves both unset and takes the defaults.
+PPCAP_TMP="${PPCAP_TMP:-/tmp}"
+PPCAP_KEY="${PPCAP_KEY:-$(git rev-parse --abbrev-ref HEAD | tr '/:' '--')}"
+git fetch origin master --quiet 2>/dev/null || true
+git rev-parse origin/master
+git diff origin/master...HEAD > "$PPCAP_TMP/pr-ready-diff-pre-$PPCAP_KEY.patch"
+echo "PRECAPTURE=ok key=$PPCAP_KEY"
+```
 
 ```bash
 # phase 2 rebase: land the branch on origin/master BEFORE the push, so Phase 4 review,
@@ -109,6 +124,12 @@ If the working tree is clean and `git diff origin/master...HEAD` is also empty (
 # $REBASE_BASE_REF is overridable only so bin/test-postplan-arm-conditions can point
 # this block at a fixture ref; production leaves it unset and takes the default.
 REBASE_BASE_REF="${REBASE_BASE_REF:-origin/master}"
+# Re-derived here because nothing survives between Bash blocks; idempotent with the
+# capture block above. Asymmetry on purpose: the capture block ignores $REBASE_BASE_REF
+# and always diffs origin/master...HEAD, because lostwork.sh hardcodes that base — do
+# not "fix" it to follow the seam or every clean run reports TREE DIVERGED.
+PPCAP_TMP="${PPCAP_TMP:-/tmp}"
+PPCAP_KEY="${PPCAP_KEY:-$(git rev-parse --abbrev-ref HEAD | tr '/:' '--')}"
 git fetch origin master --quiet 2>/dev/null || true
 if ! git rev-parse --verify --quiet "$REBASE_BASE_REF" >/dev/null; then
   echo "REBASE=indeterminate"
@@ -120,7 +141,8 @@ elif git rebase "$REBASE_BASE_REF" >/dev/null 2>&1; then
 else
   git rebase --abort >/dev/null 2>&1 || true
   echo "REBASE=conflict"
-  echo "STOP: rebase onto $REBASE_BASE_REF conflicted — fail-closed. 'git rebase --abort' has restored the tree; nothing was pushed. Resolve by hand and re-run /post-plan. Never auto-resolve here: conflict-resolved lines are code no structured review has seen. If this branch was stacked on a now-merged parent, this is the squash trap — replay only your own commits with 'git rebase --onto origin/master <parent-tip-before-merge> <branch>' (.claude/rules/linear-history-squash-merge.md)."
+  : > "$PPCAP_TMP/postplan-conflict-resolved-$PPCAP_KEY"
+  echo "STOP-AND-RESOLVE: rebase onto $REBASE_BASE_REF conflicted. 'git rebase --abort' has restored the tree; nothing was pushed and the committed tree is untouched. Do not push from here. Go to .claude/skills/post-plan/_phase-2-conflict-resolution.md and follow it end to end: it re-runs the rebase in the --onto form, resolves three-way, and proves no work was lost before any push is allowed. Conflict-resolved lines are code no structured review has seen, so this run will hold auto-merge at Phase 6.5 condition (14) and announce that hold on the PR. If this branch was stacked on a now-merged parent, this is the squash trap — replay only your own commits with 'git rebase --onto origin/master <parent-tip-before-merge> <branch>' (.claude/rules/linear-history-squash-merge.md)."
 fi
 ```
 
@@ -343,7 +365,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 
 **Already merged?** If `gh pr view --json state --jq '.state'` returns `MERGED`, there is nothing to arm — skip to Phase 7 (which will early-exit).
 
-**All twelve** conditions must be true — an AND-of-not-blocked set (any one can HOLD; none can RELEASE another):
+**All fourteen conditions** must be true — an AND-of-not-blocked set (any one can HOLD; none can RELEASE another):
 
 1. Manual testing cleared — the PR body carries the `No manual testing needed` sentinel Phase 6 writes.
 2. No review/audit finding scored `>= 80` (scored in Phase 4).
@@ -358,16 +380,78 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 11. Unresolved scored finding — no unresolved GitHub review thread carries a `<!-- score: N -->` marker with N >= 80. Live-state counterpart to (2), which is run-local.
 12. Plan-intent fidelity — Phase 5.5's reviewer produced a verdict of `READY` or `READY WITH NOTES`.
 13. Plan-slug drift — the plan was located by drift (`<prefix>-<slug>.md`) rather than the exact branch-slug path; adoption is a guess, so auto-merge is held until a human confirms the plan is this branch's plan.
+14. **No conflict auto-resolved this run** — the Phase 2 rebase did not conflict, or if it did, the flag file written by its `STOP-AND-RESOLVE` arm is absent. A run that auto-resolved a conflict carries lines no structured review has seen; it ships the PR but never arms auto-merge, and announces the hold on the PR itself (Phase 6.5 sticky step). Fail-closed: the flag existing blocks, its absence clears.
 
 **These conditions only ever HOLD, never RELEASE.** They are an AND-of-not-blocked set: every condition can *add* a block; none can clear another's. Conditions (7)–(9) are **additive brakes on top of** the deterministic floors (1)–(6), the pipeline-authored floor (10), and the independent `human-signoff` required GitHub check — they exist to catch what those miss, never to override them. post-plan **always runs and opens the PR**; these conditions decide only whether auto-merge *arms*. A held PR stays open for a human to merge.
 
-**Conditions (1)/(5)/(6)/(8)/(10)/(11) come from the shared predicate `bin/lib/pr-armable.sh`** — the single source of truth also used by `bin/pr-triage`, so the live-readable arming judgment has **one executable home** and cannot drift between consumers (hand-re-derived divergence is exactly what mis-armed #1163/#1188). The run-only conditions (2)/(3)/(4)/(7)/(9)/(12)/(13) stay inline below — they read post-plan-run-local state (`/tmp`, the local plan file, the realized diff) that no cross-PR consumer can see, so they cannot move into the shared predicate.
+### Step 0 — announce a conflict hold on the PR (before the arming evaluation)
+
+Run this **first**, before evaluating any condition. The comment must reach the PR even if
+something later in the arming block errors out — the whole point is that nobody has to read a
+log to learn why a PR stalled.
+
+```bash
+# phase 6.5 conflict-hold announcement: fires only when this run auto-resolved a rebase
+# conflict. Defaults re-derived here (idempotent with the phase 2 blocks) because nothing
+# survives between Bash blocks. CONFLICT_FLAG is overridable only so
+# bin/test-postplan-arm-conditions can point this at a fixture.
+PPCAP_TMP="${PPCAP_TMP:-/tmp}"
+PPCAP_KEY="${PPCAP_KEY:-$(git rev-parse --abbrev-ref HEAD | tr '/:' '--')}"
+CONFLICT_FLAG="${CONFLICT_FLAG:-$PPCAP_TMP/postplan-conflict-resolved-$PPCAP_KEY}"
+test -f "$CONFLICT_FLAG" && echo "CONFLICT-HOLD=fired" || echo "CONFLICT-HOLD=none"
+```
+
+`CONFLICT-HOLD=none` ⇒ **skip the rest of this step entirely** and go straight to the arming
+evaluation; a clean run posts nothing. `CONFLICT-HOLD=fired` ⇒ post the sticky comment, then
+continue into the arming evaluation, where condition (14) blocks on the same flag.
+
+To post it:
+
+1. Read `/tmp/postplan-conflict-resolution-<KEY>.md`, the manifest
+   `.claude/skills/post-plan/_phase-2-conflict-resolution.md` step 7 wrote. **If it is absent,
+   halt with a `STOP:` line** naming the path — an announcement that says a conflict was
+   resolved and then lists no files is worse than none. Never re-derive the file list from
+   `git diff --name-only` here; that lists the whole PR, not the resolved subset.
+2. With the **`Write` tool** (not a heredoc — nothing survives between Bash blocks), render the
+   body template in the appendix of `.claude/skills/post-plan/_phase-2-conflict-resolution.md`
+   into `/tmp/post-plan-conflict-comment-<KEY>.md`, substituting the manifest's paths and
+   descriptions and any `COLLAPSE-GUARD: WARN` line.
+3. Post it sticky, reusing the `STICKY_MARKER` + `post_sticky()` **shape** in `bin/pr-canary-check`
+   (grep for them; never trust a line number): find an existing comment id via
+   `gh api "repos/{owner}/{repo}/issues/<PR>/comments" --paginate --jq` selecting on the marker,
+   PATCH it with `-F body=@<file>` if found, else `gh pr comment <PR> --body-file <file>`.
+   The marker is `<!-- post-plan-conflict-hold -->` and **never** `<!-- pr-fast-canary -->` or
+   `<!-- pr-ready-verdict -->` — reuse the shape, not the string, or the conflict hold
+   overwrites an unrelated verdict on the same PR. Do **not** call `/pr-ready`'s
+   `scripts/post-verdict.sh`: it is keyed to the PR-number `/tmp/pr-ready-verdict-` namespace a
+   concurrent `/pr-ready` run would collide on.
+
+The Phase 7 re-rebase loop can hit a *second* conflict after auto-merge is already armed; that
+path disarms and posts through this same marker, so the existing comment is updated in place
+rather than stacked.
+
+**Conditions (1)/(5)/(6)/(8)/(10)/(11) come from the shared predicate `bin/lib/pr-armable.sh`** — the single source of truth also used by `bin/pr-triage`, so the live-readable arming judgment has **one executable home** and cannot drift between consumers (hand-re-derived divergence is exactly what mis-armed #1163/#1188). The run-only conditions (2)/(3)/(4)/(7)/(9)/(12)/(13)/(14) stay inline below — they read post-plan-run-local state (`/tmp`, the local plan file, the realized diff) that no cross-PR consumer can see, so they cannot move into the shared predicate.
 
 **Each condition block is SELF-CONTAINED** — it `source`s the predicate and fetches its own inputs in-block, exactly as condition (7) re-derives `$PLAN_FILE` and the original (6)/(8) ran their own `gh pr view`. **Do not** hoist the `source` or a shared `PR_JSON` into a preamble block: a sourced function or a shell variable does not survive into a separately-executed block (only exported env vars like `$CLAUDE_HEADLESS` do), and a missing `source` would make `pr_feat_hold` a no-op — **failing OPEN, auto-arming a `feat:` PR**. Each block re-`source`ing the lib is idempotent and cheap. Every block extracts gh output with `gh ... --jq` (gh does the decode — no `echo`/`printf` round-trip needed); when a block must round-trip a multi-field `PR_JSON` it uses `printf '%s'` (never `echo`, whose zsh `\n` expansion corrupts jq's parse).
 
 **You MUST Read `.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md` and run each condition's block, in order, BEFORE arming — do not arm without it.** The reference holds the eleven per-condition bash blocks (conditions 1, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13 — conditions 2/9 are the Phase-4 score check and the realized-diff hold-enumeration, run against state you already hold), each **self-contained** per the SELF-CONTAINED invariant above (every block re-`source`s the predicate in-block — a hoisted `source` does not survive into a separately-executed block and would fail OPEN). It also holds the per-condition blocker-reporting detail. Phase 6.5 consumes carried state only — the Phase-3 flags `$GOLDEN_CHANGED`/`$HAS_MIGRATION`/`COUNT_*`, the env `$CLAUDE_HEADLESS`/`$PPID`, the Phase-4 finding scores, the Phase-6 manual-testing sentinel, and the Phase-5 status file — never recompute them.
 
 **Fail-closed default:** if any condition is indeterminate, errors, or you are unsure, treat it as **BLOCKED** and do NOT arm. A false HOLD costs one manual human merge; a false ARM ships unreviewed code — only under-holding is dangerous.
+
+**Condition (14) — conflict auto-resolved this run.** Run-local, inline here (not in the shared predicate — the flag lives in `/tmp` and no cross-PR consumer can see it):
+
+```bash
+# phase 6.5 condition 14: a rebase conflict auto-resolved by this run holds auto-merge.
+# CONFLICT_FLAG is overridable only so bin/test-postplan-arm-conditions can point this
+# block at a fixture path; production leaves it unset and takes the default.
+CONFLICT_FLAG="${CONFLICT_FLAG:-/tmp/postplan-conflict-resolved-$(git rev-parse --abbrev-ref HEAD | tr '/:' '--')}"
+if [ -e "$CONFLICT_FLAG" ]; then
+  echo "COND14=blocked"
+  echo "HOLD: auto-merge NOT armed — this /post-plan run auto-resolved a rebase conflict. Conflict-resolved lines are code no structured review has seen, so condition (14) refuses to arm. The lost-work proof passed (TREE-EQUIVALENT), so nothing was dropped — this PR is correct, it just needs a human merge. The hold and the resolved files are posted on the PR under the post-plan-conflict-hold sticky comment. Review those files and merge by hand; do not re-run /post-plan to clear this."
+else
+  echo "COND14=clear"
+fi
+```
 
 **If every condition passes:** arm with `gh pr merge --squash --auto` — `--auto` *queues* the merge (it does not merge now); GitHub fires it once required checks pass. Do not sync local to master here. Never add `--delete-branch`: the repo sets `deleteBranchOnMerge`, so GitHub removes the head branch itself, and the flag only breaks things (the local delete fails in a multi-worktree clone, and a parent merge carrying it permanently closes stacked child PRs).
 
@@ -391,6 +475,14 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 1. **Wait for checks to register:** Poll `gh pr checks <pr> --json name,state 2>/dev/null | jq 'length'` up to 4 times with 15s waits. If count stays 0, warn user and continue to Phase 8.
 2. **Block until CI settles:** `gh pr checks <pr> --watch --fail-fast --interval 20` (Bash timeout 1200000 = 20 min cap — leaves a ~40-min cushion under `MAX_PP_SECS=3600` for Phase 5.0 conformance + Phases 8-11 cleanup). The gh CLI handles the polling and exit logic itself; do not re-implement it in jq. Exit codes: `0` = all checks passed, `8` = at least one failed, other = transport error.
 3. **If exit 0** → Phase 8. (Mid-watch merge detection was intentionally dropped: `gh pr checks --watch` exits as soon as the last check settles, so the only window auto-merge could fire inside the watch is the ~5–30s between final-check-pass and auto-merge action — not worth a hand-rolled poll loop. Step 0 already covers the case where the PR merged before Phase 7 started.)
+3.5. **BEHIND re-rebase (green path only, before Phase 8):** master may have moved while step 2 was waiting on CI. Probe it strictly — a re-rebase and force-push is destructive, so this only fires where BEHIND actually blocks the merge:
+
+    ```bash
+    gh api "repos/{owner}/{repo}/branches/master/protection" --jq '.required_status_checks.strict // false'
+    gh pr view <pr> --json mergeStateStatus --jq .mergeStateStatus
+    ```
+
+    `true` **and** `BEHIND` ⇒ **Read `.claude/skills/post-plan/_phase-7-ci-monitoring.md` § BEHIND re-rebase loop and run it** — a bounded 3-iteration disarm → re-pin → re-capture → rebase → force-push cycle that manages arm state, because Phase 6.5 already ran and the PR may already be armed. Anything else ⇒ continue to Phase 8 unchanged: no disarm, no rewrite, no re-arm. The `// false` default makes a permissions error or a missing protection block read as "not strict", i.e. do nothing — fail-safe away from rewriting history. `mergeStateStatus` comes from `gh pr view --json`, never from `gh pr checks` (field-shape gotcha above).
 4. **If exit 8:** Get failed checks via `gh pr checks <pr> --json name,state,link --jq '[.[] | select(.state == "FAILURE")]'` (uppercase `FAILURE`, field is `state` not `conclusion`). Download logs (`gh run view <id> --log-failed`). **Fix all failures** — master's CI is green, so any failure on this PR is this PR's fault (even in files outside the diff). The only exception is a flaky test that passes on retry with no code change; note it in a PR comment and move on. Fix, commit, push, loop back to step 1.
 
    **When out of depth, escalate to Opus** — failing-check `name` matching `mutation|MSI|engine|golden|migration` (case-insensitive) → Opus on attempt 1; otherwise Sonnet does attempts 1–2 and Opus takes attempt 3. **Read `.claude/skills/post-plan/_phase-7-ci-monitoring.md`** for the escalation procedure: capture the failed log + `origin/master...HEAD` diff to temp paths and pass the **paths** (never summarize the log), spawn **one** `Agent(model: "opus")` that fixes/commits/pushes itself and returns one line. The Opus attempt **counts toward** the 3-iteration ceiling. Loop back to step 1.

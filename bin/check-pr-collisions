@@ -18,6 +18,7 @@ set -euo pipefail
 GH_CMD="${GH_CMD:-gh}"
 STICKY_HEADER="pr-collisions"
 STICKY_MARKER="<!-- Sticky Pull Request Comment${STICKY_HEADER} -->"
+source "$(cd "$(dirname "$0")" && pwd)/lib/pr-sticky.sh"
 
 COLLISION_PATHS=(
     "ibl5/tests/e2e/smoke/accessibility.spec.ts"
@@ -196,27 +197,7 @@ pr_body() {
     fi
 }
 
-post_sticky() {
-    local n="$1"
-    local body="$2"
-    local tmpfile
-    tmpfile="$(mktemp)"
-
-    printf '%s\n%s\n' "$body" "$STICKY_MARKER" > "$tmpfile"
-
-    local existing_id
-    existing_id="$("$GH_CMD" api "repos/{owner}/{repo}/issues/$n/comments" --paginate \
-        --jq ".[] | select(.body | contains(\"$STICKY_MARKER\")) | .id" | head -1 || true)"
-
-    if [[ -n "$existing_id" ]]; then
-        "$GH_CMD" api --method PATCH "repos/{owner}/{repo}/issues/comments/$existing_id" \
-            -F body=@"$tmpfile" >/dev/null || true
-    else
-        "$GH_CMD" pr comment "$n" --body-file "$tmpfile" >/dev/null || true
-    fi
-
-    rm -f "$tmpfile"
-}
+post_sticky() { pr_sticky_upsert "$1" "$STICKY_MARKER" "$(printf '%s\n%s' "$2" "$STICKY_MARKER")"; }
 
 if [[ "$MODE" == "pr" ]]; then
     pr_body "$PR_NUM"

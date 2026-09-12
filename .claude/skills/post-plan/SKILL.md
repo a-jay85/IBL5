@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-09-08
+last_verified: 2026-09-10
 ---
 
 # Post-Plan Orchestrator
@@ -141,6 +141,31 @@ fi
    > If the row's `prior:` field is not `--`, say so explicitly: this is a recurrence of those PRs' class, which is why the routing moved one rung more mechanical than last time.
 
    **Stacked PRs:** If branched from a feature branch (not `master`), use `--base <parent-branch>`. Skip if a PR already exists. **Merge-order dependency:** When this PR shares files with, or must merge after, a sibling PR that is also based on `master` (so stacking via `--base` is unavailable / fragile under squash-merge), add a `Depends-on: #<n>[, #<n>...]` line to the PR body — **on its own line** (the parser anchors to start-of-line, so an inline prose mention of the marker is ignored). Phase 6.5 condition (6) reads it and refuses to arm auto-merge until every named PR is `MERGED`, so the series cannot ship out of order. Use this rather than stacking when the repo squash-merges (a squash collapses the parent's commits, leaving a stacked child's branch carrying the pre-squash commits → conflict on auto-retarget).
+
+Post an in-flight status badge so the PR shows the run is active (best-effort — never blocks Phase 2 if it fails):
+
+```bash
+# In-flight status badge — best-effort, never blocks. Skip silently if POSTPLAN_BADGE_BODY is unset.
+if [ -n "${POSTPLAN_BADGE_BODY:-}" ]; then
+  PR=$(gh pr view --json number --jq .number 2>/dev/null || true)
+  f=$(mktemp); printf '%s\n' "$POSTPLAN_BADGE_BODY" > "$f"
+  id=$(gh api "repos/{owner}/{repo}/issues/$PR/comments" --paginate \
+        --jq '.[] | select(.body | contains("<!-- postplan-status -->")) | .id' | head -1 || true)
+  if [ -n "$id" ]; then
+    gh api --method PATCH "repos/{owner}/{repo}/issues/comments/$id" -F body=@"$f" >/dev/null || true
+  else
+    gh pr comment "$PR" --body-file "$f" >/dev/null || true
+  fi
+  rm -f "$f"
+fi
+```
+
+Three constraints on this step:
+
+1. This step is **best-effort**. A failure here is never reported as a Phase 2 failure.
+2. Do **not** clear or edit this comment later in the run. `bin/post-plan-now`'s `$CMD` tail owns conclusion — it removes the badge on clean exit or replaces it with a failure banner.
+3. This is **not** the Phase 5.5 verdict comment (which carries `<!-- pr-ready-verdict -->`).
+
 5. **Manual testing in PR description:** Check the plan file for a Verification Matrix. If one exists and a `$PLAN_FILE` path is known: run `bin/normalize-manual-testing "$PLAN_FILE"` and paste its stdout verbatim under `## Manual Testing`. The script's stdout is already checkbox-formatted — do not re-edit or reformat it; `bin/normalize-manual-testing` is the single source of truth for this formatting and never paste the raw matrix row. When stdout is empty (zero Truly-manual rows), write the sentinel: `No manual testing needed — all changes are covered by automated tests.` If no plan file or no matrix exists, fall back to the original rule: list only steps requiring subjective human judgment on new or redesigned UI/UX ("does this look/feel good?", "does this flow work well?"). Production comparison and "does output still match?" are visual-regression-replaceable, not manual. Do NOT list CLI commands or script invocations — Phase 6 executes those.
 6. Use Haiku agents for commit message generation if delegating
 

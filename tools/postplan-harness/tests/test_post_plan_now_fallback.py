@@ -312,7 +312,7 @@ def test_gate_selects_the_right_arm_per_rc(tmp_path):
     `[ "$rc" = 4 ]`, `should_fallback "$rc"`, `[ "$rc" = 3 ]` — is the generated text.
     """
     cmd = _generate_cmd(tmp_path)
-    gate = cmd.split("rc=$?; ", 1)[1].split("; }; rm -f", 1)[0]
+    gate = cmd.split("rc=$?; ", 1)[1].split("; }; pp_rc=", 1)[0]
     seen = []
     def _stub(_m):
         seen.append(1)

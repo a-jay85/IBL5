@@ -34,10 +34,13 @@ re-invocation, so a turn that ends with work still running is a stall-kill.
 
 ### Each iteration, in this order
 
-1. **Record prior arm state**, before anything is disarmed:
+1. **Record prior arm state**, before anything is disarmed. Write once — do not overwrite on
+   subsequent iterations (the disarm in step 2 changes what GitHub reports, so a second write
+   would record the post-disarm state, and the loop-exit re-arm gate would never fire):
 
    ```bash
-   gh pr view <N> --json autoMergeRequest --jq 'if .autoMergeRequest then "armed" else "unarmed" end' > /tmp/postplan-automerge-was-<KEY>.txt
+   test -e /tmp/postplan-automerge-was-<KEY>.txt || \
+     gh pr view <N> --json autoMergeRequest --jq 'if .autoMergeRequest then "armed" else "unarmed" end' > /tmp/postplan-automerge-was-<KEY>.txt
    cat /tmp/postplan-automerge-was-<KEY>.txt
    ```
 

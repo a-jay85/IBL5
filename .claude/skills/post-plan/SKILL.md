@@ -365,7 +365,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 
 **Already merged?** If `gh pr view --json state --jq '.state'` returns `MERGED`, there is nothing to arm — skip to Phase 7 (which will early-exit).
 
-**All twelve** conditions must be true — an AND-of-not-blocked set (any one can HOLD; none can RELEASE another):
+**All fourteen conditions** must be true — an AND-of-not-blocked set (any one can HOLD; none can RELEASE another):
 
 1. Manual testing cleared — the PR body carries the `No manual testing needed` sentinel Phase 6 writes.
 2. No review/audit finding scored `>= 80` (scored in Phase 4).
@@ -380,6 +380,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 11. Unresolved scored finding — no unresolved GitHub review thread carries a `<!-- score: N -->` marker with N >= 80. Live-state counterpart to (2), which is run-local.
 12. Plan-intent fidelity — Phase 5.5's reviewer produced a verdict of `READY` or `READY WITH NOTES`.
 13. Plan-slug drift — the plan was located by drift (`<prefix>-<slug>.md`) rather than the exact branch-slug path; adoption is a guess, so auto-merge is held until a human confirms the plan is this branch's plan.
+14. **No conflict auto-resolved this run** — the Phase 2 rebase did not conflict, or if it did, the flag file written by its `STOP-AND-RESOLVE` arm is absent. A run that auto-resolved a conflict carries lines no structured review has seen; it ships the PR but never arms auto-merge, and announces the hold on the PR itself (Phase 6.5 sticky step). Fail-closed: the flag existing blocks, its absence clears.
 
 **These conditions only ever HOLD, never RELEASE.** They are an AND-of-not-blocked set: every condition can *add* a block; none can clear another's. Conditions (7)–(9) are **additive brakes on top of** the deterministic floors (1)–(6), the pipeline-authored floor (10), and the independent `human-signoff` required GitHub check — they exist to catch what those miss, never to override them. post-plan **always runs and opens the PR**; these conditions decide only whether auto-merge *arms*. A held PR stays open for a human to merge.
 
@@ -429,13 +430,28 @@ The Phase 7 re-rebase loop can hit a *second* conflict after auto-merge is alrea
 path disarms and posts through this same marker, so the existing comment is updated in place
 rather than stacked.
 
-**Conditions (1)/(5)/(6)/(8)/(10)/(11) come from the shared predicate `bin/lib/pr-armable.sh`** — the single source of truth also used by `bin/pr-triage`, so the live-readable arming judgment has **one executable home** and cannot drift between consumers (hand-re-derived divergence is exactly what mis-armed #1163/#1188). The run-only conditions (2)/(3)/(4)/(7)/(9)/(12)/(13) stay inline below — they read post-plan-run-local state (`/tmp`, the local plan file, the realized diff) that no cross-PR consumer can see, so they cannot move into the shared predicate.
+**Conditions (1)/(5)/(6)/(8)/(10)/(11) come from the shared predicate `bin/lib/pr-armable.sh`** — the single source of truth also used by `bin/pr-triage`, so the live-readable arming judgment has **one executable home** and cannot drift between consumers (hand-re-derived divergence is exactly what mis-armed #1163/#1188). The run-only conditions (2)/(3)/(4)/(7)/(9)/(12)/(13)/(14) stay inline below — they read post-plan-run-local state (`/tmp`, the local plan file, the realized diff) that no cross-PR consumer can see, so they cannot move into the shared predicate.
 
 **Each condition block is SELF-CONTAINED** — it `source`s the predicate and fetches its own inputs in-block, exactly as condition (7) re-derives `$PLAN_FILE` and the original (6)/(8) ran their own `gh pr view`. **Do not** hoist the `source` or a shared `PR_JSON` into a preamble block: a sourced function or a shell variable does not survive into a separately-executed block (only exported env vars like `$CLAUDE_HEADLESS` do), and a missing `source` would make `pr_feat_hold` a no-op — **failing OPEN, auto-arming a `feat:` PR**. Each block re-`source`ing the lib is idempotent and cheap. Every block extracts gh output with `gh ... --jq` (gh does the decode — no `echo`/`printf` round-trip needed); when a block must round-trip a multi-field `PR_JSON` it uses `printf '%s'` (never `echo`, whose zsh `\n` expansion corrupts jq's parse).
 
 **You MUST Read `.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md` and run each condition's block, in order, BEFORE arming — do not arm without it.** The reference holds the eleven per-condition bash blocks (conditions 1, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13 — conditions 2/9 are the Phase-4 score check and the realized-diff hold-enumeration, run against state you already hold), each **self-contained** per the SELF-CONTAINED invariant above (every block re-`source`s the predicate in-block — a hoisted `source` does not survive into a separately-executed block and would fail OPEN). It also holds the per-condition blocker-reporting detail. Phase 6.5 consumes carried state only — the Phase-3 flags `$GOLDEN_CHANGED`/`$HAS_MIGRATION`/`COUNT_*`, the env `$CLAUDE_HEADLESS`/`$PPID`, the Phase-4 finding scores, the Phase-6 manual-testing sentinel, and the Phase-5 status file — never recompute them.
 
 **Fail-closed default:** if any condition is indeterminate, errors, or you are unsure, treat it as **BLOCKED** and do NOT arm. A false HOLD costs one manual human merge; a false ARM ships unreviewed code — only under-holding is dangerous.
+
+**Condition (14) — conflict auto-resolved this run.** Run-local, inline here (not in the shared predicate — the flag lives in `/tmp` and no cross-PR consumer can see it):
+
+```bash
+# phase 6.5 condition 14: a rebase conflict auto-resolved by this run holds auto-merge.
+# CONFLICT_FLAG is overridable only so bin/test-postplan-arm-conditions can point this
+# block at a fixture path; production leaves it unset and takes the default.
+CONFLICT_FLAG="${CONFLICT_FLAG:-/tmp/postplan-conflict-resolved-$(git rev-parse --abbrev-ref HEAD | tr '/:' '--')}"
+if [ -e "$CONFLICT_FLAG" ]; then
+  echo "COND14=blocked"
+  echo "HOLD: auto-merge NOT armed — this /post-plan run auto-resolved a rebase conflict. Conflict-resolved lines are code no structured review has seen, so condition (14) refuses to arm. The lost-work proof passed (TREE-EQUIVALENT), so nothing was dropped — this PR is correct, it just needs a human merge. The hold and the resolved files are posted on the PR under the post-plan-conflict-hold sticky comment. Review those files and merge by hand; do not re-run /post-plan to clear this."
+else
+  echo "COND14=clear"
+fi
+```
 
 **If every condition passes:** arm with `gh pr merge --squash --auto` — `--auto` *queues* the merge (it does not merge now); GitHub fires it once required checks pass. Do not sync local to master here. Never add `--delete-branch`: the repo sets `deleteBranchOnMerge`, so GitHub removes the head branch itself, and the flag only breaks things (the local delete fails in a multi-worktree clone, and a parent merge carrying it permanently closes stacked child PRs).
 

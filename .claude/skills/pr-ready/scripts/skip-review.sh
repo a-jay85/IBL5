@@ -115,7 +115,8 @@ if [ "$DELTA_MODE" = true ]; then
     TL_OIDS="$(gh api graphql -f "query=${_GQL}" \
         --jq '.data.repository.pullRequest.timelineItems.nodes | reverse | .[].beforeCommit | select(. != null) | .oid' \
         2>/dev/null)" || delta_run "timeline-unavailable"
-    [ -n "$TL_OIDS" ] || delta_run "timeline-unavailable"
+    # No timeline node at all: Rung 1 found no object and Rung 2 has nothing to recover from.
+    [ -n "$TL_OIDS" ] || delta_run "base-object-missing"
 
     while IFS= read -r OID; do
       [ -z "$OID" ] && continue
@@ -140,14 +141,25 @@ if [ "$DELTA_MODE" = true ]; then
   # Phase 3: delta file set, whole-file emission, size guard, DELTA_* flags.
 
   # File set: intersection of tree diff and PR diff (excludes rebase-only master changes).
-  DELTA_FILES_TREE="$(git diff --name-only "$DELTA_BASE" HEAD 2>/dev/null | sort -u || true)"
-  DELTA_FILES_PR="$(git diff --name-only origin/master...HEAD 2>/dev/null | sort -u || true)"
-  if [ -z "$DELTA_FILES_TREE" ] || [ -z "$DELTA_FILES_PR" ]; then
+  # Both name lists must RESOLVE. A failed command is not an empty set: treating an
+  # unresolvable `origin/master...HEAD` as "no files" would emit `DELTA-STATUS: delta`
+  # over an empty file set and narrow Phase 4B to reviewing nothing -- the exact
+  # direction the fail-closed invariant forbids. Fall back to the full diff instead.
+  DELTA_FILES_TREE="$(git diff --name-only "$DELTA_BASE" HEAD 2>/dev/null | sort -u)" \
+    || delta_run "tree-diff-failed"
+  DELTA_FILES_PR="$(git diff --name-only origin/master...HEAD 2>/dev/null | sort -u)" \
+    || delta_run "pr-diff-failed"
+  # An empty PR-side list means the PR changes nothing vs. master -- unresolvable as a
+  # review scope, so fall back rather than narrow.
+  [ -n "$DELTA_FILES_PR" ] || delta_run "pr-diff-empty"
+  if [ -z "$DELTA_FILES_TREE" ]; then
+    # Genuinely empty: HEAD's tree equals the recorded reviewed tree. Nothing has landed
+    # since the review -- a proven-empty delta, not an unresolved one.
     DELTA_FILES=""
   else
     DELTA_FILES="$(comm -12 \
       <(printf '%s\n' "$DELTA_FILES_TREE") \
-      <(printf '%s\n' "$DELTA_FILES_PR"))"
+      <(printf '%s\n' "$DELTA_FILES_PR"))" || delta_run "intersection-failed"
   fi
 
   # Whole-file context diff artifact (filtered, same DIFF_AWK as Phase 3).

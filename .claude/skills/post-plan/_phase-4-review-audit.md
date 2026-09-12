@@ -19,6 +19,56 @@ Capture the `cat` output — that is `$DIFF` for every sub-agent prompt below. N
 
 ### 4B: Code Review — up to 3 parallel agents (merged by tier)
 
+**Delta review scope — resolve this FIRST, before anything else in 4B.** 4B reviews only the diff
+added since the last recorded reviewed tree, when — and only when — that delta is positively
+proven. Run yourself (not via an agent), with `<N>` the PR number, `<MASTER_SHA>` the current
+`origin/master` SHA, and `<CONFLICTS_FLAG>` the same literal Phase 2 passes to `/pr-ready` (the
+empty string when no conflicts were resolved):
+
+```bash
+git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/skip-review.sh > /tmp/post-plan-skip-<N>.sh && test -s /tmp/post-plan-skip-<N>.sh && bash /tmp/post-plan-skip-<N>.sh --delta <N> "<CONFLICTS_FLAG>"
+```
+
+The `<MASTER_SHA>` pin mirrors the live caller at `.claude/skills/pr-ready/SKILL.md:229` and is
+deliberate, not incidental: running the worktree copy would let a PR that edits `skip-review.sh`
+scope its own review with its own not-yet-reviewed delta code.
+
+**Fail-closed parse boundary — this is the gate, not a convenience.** If the `DELTA-STATUS:` line
+is **absent, empty, or anything other than the literal `delta`**, 4B uses `$DIFF` (the full Phase 3
+diff) and the unprefixed Phase 3 flags, exactly as today. The same full-diff default applies if the
+command above fails for any reason, prints nothing, or names a `DELTA_FILE` that is missing or
+unreadable. Only `DELTA-STATUS: delta` **plus** a readable `DELTA_FILE` switches the inputs. Never
+narrow on a partial, unparseable, or ambiguous read — narrowing happens only on a positive proof.
+`DELTA-REASON:` names which resolution rung failed and is worth printing either way.
+
+When the inputs do switch:
+
+- `$DIFF` for Agents A–E becomes the contents of `$DELTA_FILE`, and `$DIFF_FILE` — the input to the
+  Agent D and Agent E `awk` pre-slices below — becomes `$DELTA_FILE`. Both pre-slicers keep their
+  existing `^diff --git` keys unchanged, because the delta artifact is emitted with
+  `--unified=100000`, which preserves those headers.
+- Model tiers are untouched: Agents A/B/D stay `subagent_type: "sonnet-4-6"` with `model` omitted,
+  Agent C stays Haiku.
+
+**Flag resolution for the launch gates.** The launch gates below name `$DELTA_*` flags. In delta
+mode, read each one literally from the command's stdout. **In full mode — the default — read each
+one with the `DELTA_` prefix stripped** (`$DELTA_HAS_PHP` → `$HAS_PHP`): the Phase 3 flag, exactly
+as today. One gate list with two resolutions, so there is no second copy to drift and no 4B gate
+can be left reading a bare Phase 3 flag while its siblings read the delta. `$MIGRATION_ONLY` is the
+one exception and stays unprefixed — the script emits ten `DELTA_*` flags and no delta counterpart
+for it. Sections `### 4C` and `### 4D` are outside this rule entirely and keep reading the
+**unprefixed** `$HAS_PHP`: 4C's whole-skip condition feeds the security-audit path, and 4D's
+scoring must describe the PR, not the delta.
+
+**Empty resolved delta.** When `DELTA-STATUS: delta` and the delta file set is empty, every Agent
+A–E gate evaluates false. Do **not** return early and do **not** skip 4B. Still post a
+`#### Code review` heading, with a body stating that no changes have landed since the last reviewed
+tree, naming the `DELTA-BASE` SHA, and recording zero findings.
+`.claude/skills/pr-ready/scripts/4b-probe.sh` matches `^#{1,6} +Code review` to set
+`PHASE_4B_RAN`, so a silent 4B stalls the Phase 6.5 arming pass — this heading is load-bearing, not
+cosmetic. Phase 4D then scores it as an ordinary zero-finding review: `post_review_findings` 0,
+`post_review_summary` naming the empty delta, and the `prf_envelope_count` envelope still lands.
+
 **Read** `.claude/review-shared/_review-agents.md` (Agents A/B/C) and `.claude/review-shared/_test-spec-agent.md` (Agent D — E2E specs). The canonical agent definitions.
 
 Pass each agent: PR metadata, file list, and filtered `$DIFF`. **No agent calls `gh pr diff`.** Do not forward CLAUDE.md content (auto-loaded).
@@ -50,13 +100,13 @@ Both counts and both path lists are printed even when zero — a `0` is the info
 - Agent C (Previous PRs): **Haiku**
 - Agent D (E2E specs — POST-effect + assertion discrimination + coverage-branch): **Sonnet 4.6** (`subagent_type: "sonnet-4-6"`, omit `model`)
 
-**Launch gates** (consult Phase 3 variables — skip the launch entirely, don't let the agent exit early):
+**Launch gates** (resolve each `$DELTA_*` name per the flag-resolution rule above — skip the launch entirely, don't let the agent exit early):
 
-- Agent A: skip if `$NON_CODE_ONLY` or `$ENGINE_ONLY`. (Agent A is a "Senior PHP Architect"; a pure-Go engine diff has no PHP architecture to review — skipping avoids low-signal PHP-rubric review of Go code. A **mixed** PR — `HAS_PHP=true`, `ENGINE_ONLY=false` — still launches Agent A to review the PHP portion.) If `$MIGRATION_ONLY`, instruct agent to skip Section 2 (bug detection). If `! $HAS_PHP`, instruct agent to skip Section 3 (DB performance).
-- Agent B: skip if BOTH sub-gates fail: (`! $HAS_PHP` or `$LINES_PHP_CHANGED <= 50`) AND (`$NON_CODE_ONLY` or `! $HAS_COMMENTS_IN_DIFF`). If only one sub-gate passes, instruct agent to run only that section.
-- Agent C: skip if `$NON_CODE_ONLY` or `! $HAS_MODIFIED` or `$LINES_PHP_CHANGED <= 50`
-- Agent E (Shell / Workflow / Agent-prose): **Sonnet 4.6** (`subagent_type: "sonnet-4-6"`, omit `model`) — launch when `$HAS_SHELL || $HAS_WORKFLOW || $HAS_SKILL_PROSE`; skip when all three are false. No line-count threshold.
-- Agent D: skip if `! $HAS_E2E_SPECS`. When launched, pre-slice the diff into two temp files before forwarding to the agent:
+- Agent A: skip if `$DELTA_NON_CODE_ONLY` or `$DELTA_ENGINE_ONLY`. (Agent A is a "Senior PHP Architect"; a pure-Go engine diff has no PHP architecture to review — skipping avoids low-signal PHP-rubric review of Go code. A **mixed** PR — `HAS_PHP=true`, `ENGINE_ONLY=false` — still launches Agent A to review the PHP portion.) If `$MIGRATION_ONLY`, instruct agent to skip Section 2 (bug detection). If `! $DELTA_HAS_PHP`, instruct agent to skip Section 3 (DB performance).
+- Agent B: skip if BOTH sub-gates fail: (`! $DELTA_HAS_PHP` or `$DELTA_LINES_PHP_CHANGED <= 50`) AND (`$DELTA_NON_CODE_ONLY` or `! $DELTA_HAS_COMMENTS_IN_DIFF`). If only one sub-gate passes, instruct agent to run only that section.
+- Agent C: skip if `$DELTA_NON_CODE_ONLY` or `! $DELTA_HAS_MODIFIED` or `$DELTA_LINES_PHP_CHANGED <= 50`
+- Agent E (Shell / Workflow / Agent-prose): **Sonnet 4.6** (`subagent_type: "sonnet-4-6"`, omit `model`) — launch when `$DELTA_HAS_SHELL || $DELTA_HAS_WORKFLOW || $DELTA_HAS_SKILL_PROSE`; skip when all three are false. No line-count threshold.
+- Agent D: skip if `! $DELTA_HAS_E2E_SPECS`. When launched, pre-slice the diff into two temp files before forwarding to the agent:
   ```bash
   # Spec portion of the diff (only .ts under ibl5/tests/e2e/)
   awk '

@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-09-10
+last_verified: 2026-09-12
 ---
 
 # Post-Plan Orchestrator
@@ -37,7 +37,10 @@ Phase 2 makes the initial commit and opens the PR. Phases that may modify files 
 
 ## Phase 0: Fresh-Session Cost Advisory (interactive only, non-blocking)
 
-The single exception to the "never stop or ask" rule above is that this phase may emit **one** advisory line — it still does **not** stop, wait, or return control. Run the gate, emit at most one line, then continue straight into Phase 1.
+Two exceptions to the "never stop or ask" rule apply in Phase 0 only:
+
+1. **Cost advisory (non-blocking):** this phase may emit **one** advisory line — it still does **not** stop, wait, or return control. Run the gate, emit at most one line, then continue straight into Phase 1.
+2. **Worktree guard (hard stop):** the bash block below is a hard stop for the model, not just the shell. On `MAIN-CHECKOUT` or `WRONG-WORKTREE` the run ends immediately at Phase 0 and does **not** continue to Phase 1. `exit 1` ends the bash block — it does not end the model's turn by itself; the instruction to end the run is explicit in the printed `STOP:` message. **Phase 11 does not apply to a Phase-0 guard stop**, because no phase has run and no background process has been launched, so there is nothing to clean up.
 
 ```bash
 # Interactive only. In automouse/headless mode this skill is already invoked as a
@@ -52,6 +55,27 @@ Otherwise, self-assess the one thing only you can know: **did you perform a subs
 > 💡 Large in-session context detected — post-plan re-reads it on every phase. To save roughly half the cost on big sessions, you can interrupt now and re-run `/post-plan` in a **fresh** session on this branch (it auto-resolves the plan from the slug and fetches the diff itself). Continuing in this session…
 
 Do **not** wait for a response, and do **not** abort on your own — the human decides. If the implementation was trivial, or this is already a fresh post-plan-only session, emit nothing and proceed silently. Either way, fall through to Phase 1 in the same response.
+
+Then run the worktree guard. A `STOP:` output is a hard stop for the model, not just the shell — end the run immediately; do not continue to Phase 1.
+
+```bash
+# --- post-plan worktree guard (Phase 0) ---
+TOP=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "STOP: not inside a git repository."; exit 1; }
+[ -r "$TOP/bin/lib/git-helpers.sh" ] || { echo "STOP: $TOP/bin/lib/git-helpers.sh is missing — cannot resolve is_in_worktree."; exit 1; }
+. "$TOP/bin/lib/git-helpers.sh"
+HERE=$(git rev-parse --abbrev-ref HEAD)
+WANT="${PLAN_SLUG:-$HERE}"
+if ! is_in_worktree; then
+  echo "STOP: MAIN-CHECKOUT — cwd is the main checkout ($TOP). /post-plan commits and pushes; ADR-0062 forbids that here. Do NOT continue to Phase 1; end the run."
+  exit 1
+elif [ "$HERE" = "$WANT" ]; then
+  echo "ALREADY-IN-TARGET — worktree $TOP is on branch '$HERE'. Continue to Phase 1."
+else
+  echo "STOP: WRONG-WORKTREE — this worktree is on '$HERE' but the run targets '$WANT'. Re-run as: bin/post-plan-now --pr <n>. Do NOT continue to Phase 1; end the run."
+  exit 1
+fi
+# --- end post-plan worktree guard ---
+```
 
 ---
 

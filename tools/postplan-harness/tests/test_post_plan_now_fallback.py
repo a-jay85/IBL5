@@ -1,4 +1,4 @@
-import os, re, shutil, subprocess
+import os, pathlib, re, shlex, shutil, subprocess
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 PPN = os.path.join(REPO, "bin", "post-plan-now")
@@ -204,22 +204,72 @@ def test_skill_block_plan_blind(tmp_path):
 
 
 def _fixture_repo(tmp_path):
-    """A dirty worktree on a non-master branch — enough to clear post-plan-now's guards.
+    """A dirty linked worktree on a non-master branch — enough to clear post-plan-now's guards.
 
+    Creates a main checkout at tmp_path/wt (on some-feature) with bin/lib/git-helpers.sh
+    committed, then adds a linked worktree at tmp_path/wt-base (on wt-feature).
+    Returns tmp_path/wt-base so is_in_worktree() passes in callers.
     CI has no global git identity, so the fixture sets its own.
     """
     repo = tmp_path / "wt"
     repo.mkdir()
-    run = lambda *a: subprocess.run(a, cwd=repo, check=True, capture_output=True)
+    run = lambda *a: subprocess.run(a, cwd=str(repo), check=True, capture_output=True)
     run("git", "init", "-q", "-b", "master")
     run("git", "config", "user.email", "test@example.com")
     run("git", "config", "user.name", "Test")
+    (repo / "bin" / "lib").mkdir(parents=True)
+    shutil.copy(os.path.join(REPO, "bin", "lib", "git-helpers.sh"),
+                str(repo / "bin" / "lib" / "git-helpers.sh"))
     (repo / "f.txt").write_text("one\n")
     run("git", "add", "-A")
     run("git", "commit", "-qm", "base")
     run("git", "checkout", "-qb", "some-feature")
-    (repo / "f.txt").write_text("two\n")      # dirty tree ⇒ "nothing to ship" guard passes
-    return repo
+    linked = tmp_path / "wt-base"
+    run("git", "worktree", "add", str(linked), "-b", "wt-feature")
+    (linked / "f.txt").write_text("two\n")      # dirty tree ⇒ "nothing to ship" guard passes
+    return linked
+
+
+def _fixture_worktree(tmp_path, branch):
+    """Return (main_root, wt_root) where wt_root is a linked worktree on `branch`.
+
+    Uses _fixture_repo to build the main checkout, then adds another linked worktree.
+    """
+    feature_wt = _fixture_repo(tmp_path)
+    # Derive main_root from the linked worktree's git-common-dir
+    main_root = tmp_path / "wt"          # _fixture_repo always puts main here
+    wt_root = tmp_path / f"wt-{branch}"
+    subprocess.run(
+        ["git", "worktree", "add", str(wt_root), "-b", branch],
+        cwd=str(main_root), check=True, capture_output=True)
+    (wt_root / "f.txt").write_text("wt-dirty\n")
+    return main_root, wt_root
+
+
+def _gh_stub(bin_dir, branch, rc=0):
+    """Write a gh stub that answers headRefName queries with `branch`."""
+    stub = pathlib.Path(bin_dir) / "gh"
+    stub.write_text(
+        "#!/bin/sh\n"
+        f"case \"$*\" in\n"
+        f"  *headRefName*) printf '%s\\n' {shlex.quote(branch)} ; exit 0 ;;\n"
+        f"  *) exit {rc} ;;\n"
+        f"esac\n"
+    )
+    stub.chmod(0o755)
+
+
+def _guard_block():
+    """Extract the Phase 0 guard block verbatim from SKILL.md."""
+    skill_path = os.path.join(REPO, ".claude", "skills", "post-plan", "SKILL.md")
+    src = open(skill_path).read()
+    START = "# --- post-plan worktree guard (Phase 0) ---"
+    END   = "# --- end post-plan worktree guard ---"
+    parts = src.split(START)
+    assert len(parts) == 2, f"expected exactly one guard block start, got {len(parts) - 1}"
+    inner = parts[1].split(END)
+    assert len(inner) == 2, f"expected exactly one guard block end, got {len(inner) - 1}"
+    return (START + inner[0] + END).strip()
 
 def _generate_cmd(tmp_path, extra_env=None):
     """Run bin/post-plan-now with launchctl stubbed and HOME redirected; return $CMD."""
@@ -345,3 +395,212 @@ def test_plan_override_reaches_the_python_harness_in_live_mode():
     src = open(PPN).read()
     seg = next(l for l in src.splitlines() if l.startswith("    HARNESS_SEG="))
     assert "--live${PLAN_ARG}" in seg
+
+
+# ---------------------------------------------------------------------------
+# --pr flag tests
+# ---------------------------------------------------------------------------
+
+def test_pr_flag_missing_argument_errors():
+    r = subprocess.run(["bash", PPN, "--pr"],
+                       capture_output=True, text=True, cwd=REPO)
+    assert r.returncode == 1
+    assert "--pr requires a PR number argument" in r.stderr
+
+
+def test_pr_flag_non_integer_errors():
+    r = subprocess.run(["bash", PPN, "--pr", "abc"],
+                       capture_output=True, text=True, cwd=REPO)
+    assert r.returncode == 1
+    assert "--pr needs a positive integer PR number" in r.stderr
+    assert "abc" in r.stderr
+
+
+def test_pr_flag_unknown_arg_errors():
+    r = subprocess.run(["bash", PPN, "--prr", "5"],
+                       capture_output=True, text=True, cwd=REPO)
+    assert r.returncode == 1
+    assert "unknown argument" in r.stderr
+
+
+def test_pr_flag_unresolvable_branch_errors(tmp_path):
+    """gh returns empty/failure → no worktree found error."""
+    stub_dir = tmp_path / "stub-bin"
+    stub_dir.mkdir()
+    gh = stub_dir / "gh"
+    gh.write_text("#!/bin/sh\nexit 1\n")
+    gh.chmod(0o755)
+    env = dict(os.environ, PATH=f"{stub_dir}:{os.environ['PATH']}")
+    r = subprocess.run(["bash", PPN, "--pr", "99"],
+                       capture_output=True, text=True, cwd=REPO, env=env)
+    assert r.returncode == 1
+    assert "could not resolve a head branch" in r.stderr
+
+
+def test_pr_flag_no_worktree_for_branch_errors(tmp_path):
+    """gh resolves branch, but no worktree has it checked out."""
+    main_root, _ = _fixture_worktree(tmp_path, "some-branch")
+    stub_dir = tmp_path / "stub-bin"
+    stub_dir.mkdir()
+    _gh_stub(stub_dir, "orphan-branch")
+    env = dict(os.environ,
+               PATH=f"{stub_dir}:{os.environ['PATH']}",
+               POST_PLAN_MAIN_ROOT=str(main_root))
+    r = subprocess.run(["bash", PPN, "--pr", "7"],
+                       capture_output=True, text=True,
+                       cwd=str(main_root), env=env)
+    assert r.returncode == 1
+    assert "no worktree has it checked out" in r.stderr
+
+
+def test_pr_flag_resolves_worktree_and_writes_plist(tmp_path):
+    """--pr finds the worktree and succeeds (writes one plist)."""
+    main_root, wt_root = _fixture_worktree(tmp_path, "pr-branch")
+    home = tmp_path / "home"
+    (home / "Library" / "LaunchAgents").mkdir(parents=True)
+    shim = tmp_path / "shim"; shim.mkdir()
+    (shim / "launchctl").write_text("#!/bin/sh\nexit 0\n")
+    (shim / "launchctl").chmod(0o755)
+    harness = tmp_path / "fake-harness"; harness.mkdir()
+    (harness / "run").write_text("#!/bin/sh\nexit 0\n")
+    (harness / "run").chmod(0o755)
+    stub_dir = tmp_path / "stub-bin"; stub_dir.mkdir()
+    _gh_stub(stub_dir, "pr-branch")
+    env = dict(os.environ,
+               HOME=str(home),
+               HARNESS=str(harness),
+               PATH=f"{shim}:{stub_dir}:{os.environ['PATH']}",
+               POST_PLAN_MAIN_ROOT=str(main_root))
+    env.pop("POST_PLAN_SKILL", None)
+    r = subprocess.run(["bash", PPN, "--pr", "42"],
+                       capture_output=True, text=True,
+                       cwd=str(wt_root), env=env)
+    assert r.returncode == 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    plists = list((home / "Library" / "LaunchAgents").glob("*.plist"))
+    assert len(plists) == 1, f"expected one plist, got {plists}"
+
+
+def test_pr_flag_injects_plan_slug_into_cmd(tmp_path):
+    """CMD carries 'export PLAN_SLUG=...' when --pr is used."""
+    main_root, wt_root = _fixture_worktree(tmp_path, "my-feature")
+    home = tmp_path / "home"
+    (home / "Library" / "LaunchAgents").mkdir(parents=True)
+    shim = tmp_path / "shim"; shim.mkdir()
+    (shim / "launchctl").write_text("#!/bin/sh\nexit 0\n")
+    (shim / "launchctl").chmod(0o755)
+    harness = tmp_path / "fake-harness"; harness.mkdir()
+    (harness / "run").write_text("#!/bin/sh\nexit 0\n")
+    (harness / "run").chmod(0o755)
+    stub_dir = tmp_path / "stub-bin"; stub_dir.mkdir()
+    _gh_stub(stub_dir, "my-feature")
+    env = dict(os.environ,
+               HOME=str(home),
+               HARNESS=str(harness),
+               PATH=f"{shim}:{stub_dir}:{os.environ['PATH']}",
+               POST_PLAN_MAIN_ROOT=str(main_root))
+    env.pop("POST_PLAN_SKILL", None)
+    r = subprocess.run(["bash", PPN, "--pr", "10"],
+                       capture_output=True, text=True,
+                       cwd=str(wt_root), env=env)
+    assert r.returncode == 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    plists = list((home / "Library" / "LaunchAgents").glob("*.plist"))
+    body = plists[0].read_text()
+    cmd = re.search(r"<string>(export PATH=.*?)</string>", body, re.S).group(1)
+    cmd = cmd.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+    assert "export PLAN_SLUG=" in cmd
+    assert "my-feature" in cmd
+    # PLAN_SLUG export must precede the cd to the worktree root
+    assert cmd.index("export PLAN_SLUG=") < cmd.index(f'cd "')
+
+
+def test_refuses_to_run_in_the_main_checkout(tmp_path):
+    """post-plan-now exits 1 with ADR-0062 message when run from main checkout."""
+    main_root, _ = _fixture_worktree(tmp_path, "some-branch")
+    home = tmp_path / "home"
+    (home / "Library" / "LaunchAgents").mkdir(parents=True)
+    shim = tmp_path / "shim"; shim.mkdir()
+    (shim / "launchctl").write_text("#!/bin/sh\nexit 0\n")
+    (shim / "launchctl").chmod(0o755)
+    env = dict(os.environ, HOME=str(home),
+               PATH=f"{shim}:{os.environ['PATH']}")
+    env.pop("POST_PLAN_SKILL", None)
+    # Run from the main checkout itself (which is on some-feature, not master/main/HEAD)
+    r = subprocess.run(["bash", PPN],
+                       capture_output=True, text=True,
+                       cwd=str(main_root), env=env)
+    assert r.returncode == 1
+    assert "refusing to run in the main checkout" in r.stderr
+    plists = list((home / "Library" / "LaunchAgents").glob("*.plist"))
+    assert plists == [], "no plist should be written when refusing"
+
+
+# ---------------------------------------------------------------------------
+# SKILL.md Phase 0 guard block tests
+# ---------------------------------------------------------------------------
+
+def test_phase0_guard_extracts_cleanly():
+    """_guard_block() must return a non-empty string containing both markers."""
+    block = _guard_block()
+    assert "# --- post-plan worktree guard (Phase 0) ---" in block
+    assert "# --- end post-plan worktree guard ---" in block
+    assert len(block) > 100
+
+
+def test_phase0_guard_linked_worktree_arm_exits_zero(tmp_path):
+    """ALREADY-IN-TARGET arm: linked worktree on the right branch → exit 0."""
+    _, wt_root = _fixture_worktree(tmp_path, "target-branch")
+    block = _guard_block()
+    env = dict(os.environ, PLAN_SLUG="target-branch")
+    r = subprocess.run(["bash", "-c", block],
+                       capture_output=True, text=True,
+                       cwd=str(wt_root), env=env)
+    assert r.returncode == 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    assert "ALREADY-IN-TARGET" in r.stdout
+
+
+def test_phase0_guard_main_checkout_arm_exits_nonzero(tmp_path):
+    """MAIN-CHECKOUT arm: running from the main checkout → exit 1, STOP in output."""
+    main_root, _ = _fixture_worktree(tmp_path, "some-branch")
+    block = _guard_block()
+    r = subprocess.run(["bash", "-c", block],
+                       capture_output=True, text=True,
+                       cwd=str(main_root))
+    assert r.returncode == 1
+    assert "STOP" in r.stdout
+    assert "MAIN-CHECKOUT" in r.stdout
+
+
+def test_phase0_guard_wrong_worktree_arm_exits_nonzero(tmp_path):
+    """WRONG-WORKTREE arm: linked worktree on wrong branch → exit 1."""
+    _, wt_root = _fixture_worktree(tmp_path, "wrong-branch")
+    block = _guard_block()
+    env = dict(os.environ, PLAN_SLUG="different-branch")
+    r = subprocess.run(["bash", "-c", block],
+                       capture_output=True, text=True,
+                       cwd=str(wt_root), env=env)
+    assert r.returncode == 1
+    assert "STOP" in r.stdout
+    assert "WRONG-WORKTREE" in r.stdout
+
+
+def test_phase0_guard_main_checkout_arm_wins_over_a_branch_match(tmp_path):
+    """MAIN-CHECKOUT must win even when PLAN_SLUG matches the main checkout's branch.
+
+    If the guard checked branch equality first, a main-checkout run on the correct
+    branch would slip through to ALREADY-IN-TARGET and exit 0. The is_in_worktree
+    check must be the outer gate.
+    """
+    main_root, _ = _fixture_worktree(tmp_path, "some-branch")
+    # The main checkout is on 'some-feature' (set by _fixture_repo).
+    main_branch_r = subprocess.run(
+        ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+        capture_output=True, text=True, cwd=str(main_root), check=True)
+    main_branch = main_branch_r.stdout.strip()
+    block = _guard_block()
+    # Set PLAN_SLUG to the main checkout's own branch — branch matches, but it's still main.
+    env = dict(os.environ, PLAN_SLUG=main_branch)
+    r = subprocess.run(["bash", "-c", block],
+                       capture_output=True, text=True,
+                       cwd=str(main_root), env=env)
+    assert r.returncode == 1, "main checkout must be refused even when branch matches PLAN_SLUG"
+    assert "MAIN-CHECKOUT" in r.stdout

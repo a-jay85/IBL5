@@ -200,7 +200,7 @@ if [ -n "$PR_NUM" ]; then
     # path components, and a renamed worktree directory no longer matches its branch name.
     WT_ROOT=$(git -C "$MAIN_ROOT" worktree list --porcelain | awk -v want="refs/heads/$PR_BRANCH" '
         /^worktree / { wt = substr($0, 10) }
-        /^branch /   { if (substr($0, 8) == want) { print wt; exit } }')
+        /^branch /   { if (substr($0, 8) == want) { print wt; exit } }') || true
     if [ -z "$WT_ROOT" ] || [ ! -d "$WT_ROOT" ]; then
         echo "post-plan-now: PR #$PR_NUM is on branch '$PR_BRANCH', but no worktree has it checked out." >&2
         echo "  Create one and re-run (never run post-plan from the main checkout — ADR-0062):" >&2

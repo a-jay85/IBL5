@@ -64,6 +64,9 @@ TOP=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "STOP: not inside a g
 [ -r "$TOP/bin/lib/git-helpers.sh" ] || { echo "STOP: $TOP/bin/lib/git-helpers.sh is missing — cannot resolve is_in_worktree."; exit 1; }
 . "$TOP/bin/lib/git-helpers.sh"
 HERE=$(git rev-parse --abbrev-ref HEAD)
+case "$HERE" in
+  master|main|HEAD) echo "STOP: MAIN-CHECKOUT or detached HEAD — branch '$HERE' is not a feature branch. Do NOT continue to Phase 1; end the run."; exit 1 ;;
+esac
 WANT="${PLAN_SLUG:-$HERE}"
 if ! is_in_worktree; then
   echo "STOP: MAIN-CHECKOUT — cwd is the main checkout ($TOP). /post-plan commits and pushes; ADR-0062 forbids that here. Do NOT continue to Phase 1; end the run."

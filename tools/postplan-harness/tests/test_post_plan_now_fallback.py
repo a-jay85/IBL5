@@ -421,7 +421,7 @@ def test_pr_flag_requires_an_argument():
 
 
 def test_pr_flag_rejects_non_numeric():
-    for bad in ("abc", "-3", "12x"):
+    for bad in ("abc", "-3", "12x", "0"):
         r = subprocess.run(["bash", PPN, "--pr", bad],
                            capture_output=True, text=True, cwd=REPO)
         assert r.returncode == 1, f"--pr {bad!r}: expected rc=1, got {r.returncode}"
@@ -555,6 +555,7 @@ def test_refuses_to_run_in_the_main_checkout(tmp_path):
                        cwd=str(main_root), env=env)
     assert r.returncode == 1
     assert "refusing to run in the main checkout" in r.stderr
+    assert "ADR-0062" in r.stderr
     plists = list((home / "Library" / "LaunchAgents").glob("*.plist"))
     assert plists == [], "no plist should be written when refusing"
 
@@ -606,6 +607,8 @@ def test_phase0_guard_wrong_worktree_arm_exits_nonzero(tmp_path):
     assert r.returncode == 1
     assert "STOP" in r.stdout
     assert "WRONG-WORKTREE" in r.stdout
+    assert "wrong-branch" in r.stdout
+    assert "different-branch" in r.stdout
 
 
 def test_phase0_guard_main_checkout_arm_wins_over_a_branch_match(tmp_path):

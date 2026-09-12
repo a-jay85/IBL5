@@ -184,7 +184,7 @@ fi
 # target worktree for free.
 if [ -n "$PR_NUM" ]; then
     case "$PR_NUM" in
-        ''|*[!0-9]*) echo "post-plan-now: --pr needs a positive integer PR number (got '$PR_NUM')" >&2 ; exit 1 ;;
+        ''|0|*[!0-9]*) echo "post-plan-now: --pr needs a positive integer PR number (got '$PR_NUM')" >&2 ; exit 1 ;;
     esac
     command -v gh >/dev/null 2>&1 || { echo "post-plan-now: --pr needs the gh CLI on PATH" >&2 ; exit 1; }
     PR_BRANCH=$(gh pr view "$PR_NUM" --json headRefName --jq .headRefName 2>/dev/null) || PR_BRANCH=""

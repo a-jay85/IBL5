@@ -54,7 +54,7 @@ should_fallback() { case "$1" in 0|3) return 1 ;; *) return 0 ;; esac; }
 shq() { local q="'\\''"; printf "'%s'" "${1//\'/$q}"; }
 
 POSTPLAN_BADGE_MARKER="<!-- postplan-status -->"
-POSTPLAN_STICKY_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/pr-sticky.sh"
+POSTPLAN_STICKY_LIB="${POSTPLAN_STICKY_LIB:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/pr-sticky.sh}"
 # shellcheck source=/dev/null
 [ -r "$POSTPLAN_STICKY_LIB" ] && source "$POSTPLAN_STICKY_LIB"
 
@@ -258,7 +258,7 @@ HARNESS="${HARNESS:-/Users/ajaynicolas/GitHub/IBL5/tools/postplan-harness}"
 BADGE_FN="$(declare -f pr_sticky_find pr_sticky_upsert pr_sticky_delete \
     postplan_badge_body postplan_badge_banner_body postplan_badge_label_live \
     postplan_badge_pr_number postplan_badge_existing_label \
-    post_status_badge conclude_status_badge postplan_sweep_stale_badge); "
+    post_status_badge conclude_status_badge postplan_sweep_stale_badge || true); "
 FALLBACK_FN=""
 HARNESS_SEG=""
 GATE_OPEN=""

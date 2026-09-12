@@ -632,3 +632,42 @@ def test_phase0_guard_main_checkout_arm_wins_over_a_branch_match(tmp_path):
                        cwd=str(main_root), env=env)
     assert r.returncode == 1, "main checkout must be refused even when branch matches PLAN_SLUG"
     assert "MAIN-CHECKOUT" in r.stdout
+
+
+def test_phase0_guard_prearm_blocks_reserved_branch_name(tmp_path):
+    """Pre-arm: a worktree whose branch is named 'master' exits 1 before is_in_worktree.
+
+    The master|main|HEAD case fires on the branch-name check, not the worktree
+    check, so it catches a linked worktree on a reserved name as well as the main
+    checkout itself.
+
+    Uses the fixture repo's existing 'master' branch rather than -b master, which
+    git rejects when 'master' already exists as the initial default branch.
+    """
+    main_root, _ = _fixture_worktree(tmp_path, "some-branch")
+    wt_master = tmp_path / "wt-on-master"
+    subprocess.run(
+        ["git", "worktree", "add", str(wt_master), "master"],
+        cwd=str(main_root), check=True, capture_output=True)
+    wt_root = wt_master
+    block = _guard_block()
+    r = subprocess.run(["bash", "-c", block],
+                       capture_output=True, text=True,
+                       cwd=str(wt_root))
+    assert r.returncode == 1, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    assert "STOP" in r.stdout
+    assert "MAIN-CHECKOUT or detached HEAD" in r.stdout
+
+
+def test_phase0_guard_prearm_blocks_detached_head(tmp_path):
+    """Pre-arm: a detached HEAD state exits 1 before the is_in_worktree check."""
+    _, wt_root = _fixture_worktree(tmp_path, "some-detach-branch")
+    subprocess.run(["git", "checkout", "--detach", "HEAD"],
+                   cwd=str(wt_root), check=True, capture_output=True)
+    block = _guard_block()
+    r = subprocess.run(["bash", "-c", block],
+                       capture_output=True, text=True,
+                       cwd=str(wt_root))
+    assert r.returncode == 1, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    assert "STOP" in r.stdout
+    assert "MAIN-CHECKOUT or detached HEAD" in r.stdout

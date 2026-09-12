@@ -1272,6 +1272,32 @@ for F in bin/lib/pr-armable.sh bin/pr-triage; do
         FAILED=1
     fi
 done
+
+# §5.9k prose-level invariants the blocks cannot carry. These are the half-applied-edit
+# catches: a block can be perfect while the surrounding prose still claims twelve
+# conditions, still points at /pr-ready's marker, or still hands the rebase to a spawn.
+have "§5.9k: SKILL.md counts fourteen conditions"        "$P25_TXT" '**All fourteen conditions**'
+have "§5.9k: the run-only enumeration ends /(13)/(14)"   "$P25_TXT" '(2)/(3)/(4)/(7)/(9)/(12)/(13)/(14)'
+have "§5.9k: the shared-predicate list is unchanged"     "$P25_TXT" '(1)/(5)/(6)/(8)/(10)/(11)'
+
+# The resolution file runs headless: a spawn handed work past the turn boundary is
+# unrecoverable under `claude -p`, and §2b of the /pr-ready guide is exactly that shape.
+lacks "§5.9k: the resolution file spawns no sub-agent"   "$CRES_TXT" 'subagent_type'
+lacks "§5.9k: the resolution file calls no Agent()"      "$CRES_TXT" 'Agent('
+# The flag is written at conflict DETECTION in SKILL.md, never here — writing it after a
+# successful proof would invert the fail-closed property (a run that dies mid-resolution
+# would find no flag and could arm).
+lacks "§5.9k: the resolution file never creates the flag" "$CRES_TXT" 'touch /tmp/postplan-conflict-resolved-'
+have  "§5.9k: the resolution file keeps the --onto form"  "$CRES_TXT" '--onto origin/master'
+
+# Marker isolation, at the one place it can actually do damage: the block that posts.
+BANN2="$(extract_block '# phase 6.5 conflict-hold announcement' "$P25_SKILL")"
+if [ -z "$BANN2" ]; then
+    echo "FAIL: §5.9k — announcement block vanished"; FAILED=1
+else
+    lacks "§5.9k: the announcement never reuses pr-fast-canary"  "$BANN2" 'pr-fast-canary'
+    lacks "§5.9k: the announcement never reuses pr-ready-verdict" "$BANN2" 'pr-ready-verdict'
+fi
 if [ "$FAILED" -eq 0 ]; then
     echo "All post-plan block checks passed."
 else

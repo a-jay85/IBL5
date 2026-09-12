@@ -53,6 +53,92 @@ should_fallback() { case "$1" in 0|3) return 1 ;; *) return 0 ;; esac; }
 # Defined above the sourced-guard so the unit test can source and exercise it.
 shq() { local q="'\\''"; printf "'%s'" "${1//\'/$q}"; }
 
+POSTPLAN_BADGE_MARKER="<!-- postplan-status -->"
+POSTPLAN_STICKY_LIB="${POSTPLAN_STICKY_LIB:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/pr-sticky.sh}"
+# shellcheck source=/dev/null
+[ -r "$POSTPLAN_STICKY_LIB" ] && source "$POSTPLAN_STICKY_LIB"
+
+# shellcheck disable=SC2016
+postplan_badge_body() {   # <label> <started>
+    local label="$1" started="$2"
+    printf '%s\n' "$POSTPLAN_BADGE_MARKER"
+    printf '**post-plan is running** — started %s\n\n' "${started:-unknown}"
+    if [ -n "$label" ]; then
+        printf 'Detached launchd job `%s`.\n' "$label"
+        printf 'Liveness: `launchctl list %s`\n\n' "$label"
+    else
+        printf 'Run started outside `bin/post-plan-now`, so there is no launchd job to probe.\n\n'
+    fi
+    printf 'This comment is removed automatically when the run finishes cleanly.\n'
+    printf '<!-- postplan-label: %s -->\n' "$label"
+}
+
+# shellcheck disable=SC2016
+postplan_badge_banner_body() {   # <rc> <label> <started>
+    local rc="$1" label="$2" started="$3"
+    printf '%s\n' "$POSTPLAN_BADGE_MARKER"
+    printf '**post-plan did not finish cleanly** (exit %s)\n\n' "$rc"
+    printf 'Started %s.\n' "${started:-unknown}"
+    case "$rc" in
+        3) printf 'The harness bailed on a rebase conflict and deliberately did not fall back.\n' ;;
+        *) printf 'The run ended abnormally — check the log under `/tmp/post-plan-now-*.log`.\n' ;;
+    esac
+    printf '\nRe-run with `bin/post-plan-now --auto` once the cause is addressed.\n'
+    printf '<!-- postplan-label: %s -->\n' "$label"
+}
+
+postplan_badge_label_live() {   # <label> -> 0 when launchd still knows it
+    local label="$1"
+    [ -n "$label" ] || return 1
+    "${LAUNCHCTL_CMD:-launchctl}" list "$label" >/dev/null 2>&1
+}
+
+postplan_badge_pr_number() {
+    "${GH_CMD:-gh}" pr view --json number --jq .number 2>/dev/null || true
+}
+
+postplan_badge_existing_label() {   # <pr> -> prints label; rc 1 when no badge exists
+    local n="$1" body
+    body="$("${GH_CMD:-gh}" api "repos/{owner}/{repo}/issues/$n/comments" --paginate \
+        --jq ".[] | select(.body | contains(\"$POSTPLAN_BADGE_MARKER\")) | .body" 2>/dev/null || true)"
+    [ -n "$body" ] || return 1
+    printf '%s' "$body" | sed -n 's/.*<!-- postplan-label: \(.*\) -->.*/\1/p' | head -1
+    return 0
+}
+
+post_status_badge() {   # <pr> [label] [started]
+    local n="$1" label="${2:-${POSTPLAN_LABEL:-}}" started="${3:-${POSTPLAN_STARTED:-}}"
+    [ -n "$n" ] || return 0
+    pr_sticky_upsert "$n" "$POSTPLAN_BADGE_MARKER" \
+        "$(postplan_badge_body "$label" "$started")" || true
+    return 0
+}
+
+conclude_status_badge() {   # <rc> [pr]
+    local rc="${1:-1}" n="${2:-}"
+    if [ "${POSTPLAN_CONCLUDED:-0}" = 1 ]; then return 0; fi
+    POSTPLAN_CONCLUDED=1
+    [ -n "$n" ] || n="$(postplan_badge_pr_number)"
+    [ -n "$n" ] || return 0
+    if [ "$rc" = 0 ]; then
+        pr_sticky_delete "$n" "$POSTPLAN_BADGE_MARKER" || true
+    else
+        pr_sticky_upsert "$n" "$POSTPLAN_BADGE_MARKER" \
+            "$(postplan_badge_banner_body "$rc" "${POSTPLAN_LABEL:-}" "${POSTPLAN_STARTED:-}")" || true
+    fi
+    return 0
+}
+
+postplan_sweep_stale_badge() {   # <pr>
+    local n="$1" label
+    [ -n "$n" ] || return 0
+    label="$(postplan_badge_existing_label "$n")" || return 0
+    if postplan_badge_label_live "$label"; then return 0; fi
+    pr_sticky_upsert "$n" "$POSTPLAN_BADGE_MARKER" \
+        "$(postplan_badge_banner_body "stale" "$label" "unknown")" || true
+    return 0
+}
+
 # Sourced-guard: the unit test does `source bin/post-plan-now` to load should_fallback, then this
 # returns before the body executes. Must sit before `set -euo pipefail` (sourcing must not alter
 # the caller's shell options).
@@ -130,6 +216,7 @@ fi
     || echo "post-plan-now: warn — no plan at $PLAN_FILE; the harness will try a slug-drift match (<prefix>-$SLUG.md) and otherwise run plan-blind. Pass --plan <abs-path> to name one explicitly." >&2
 
 TS=$(date +%Y%m%d-%H%M%S)-$$
+STARTED=$(date '+%Y-%m-%d %H:%M:%S %Z')
 LOG="/tmp/post-plan-now-$SAFE_SLUG-$TS.log"
 LABEL="com.ibl5.postplan-now-$SAFE_SLUG-$TS"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
@@ -168,6 +255,10 @@ RESUME_PROMPT="Invoke the /post-plan skill now on the current git branch, RESUMI
 # MAIN-CHECKOUT absolute path — never $ROOT/tools/... — per ADR-0092: a worktree's own
 # harness copy is the one this run is changing, and must not judge its own change.
 HARNESS="${HARNESS:-/Users/ajaynicolas/GitHub/IBL5/tools/postplan-harness}"
+BADGE_FN="$(declare -f pr_sticky_find pr_sticky_upsert pr_sticky_delete \
+    postplan_badge_body postplan_badge_banner_body postplan_badge_label_live \
+    postplan_badge_pr_number postplan_badge_existing_label \
+    post_status_badge conclude_status_badge postplan_sweep_stale_badge || true); "
 FALLBACK_FN=""
 HARNESS_SEG=""
 GATE_OPEN=""
@@ -221,7 +312,7 @@ fi
 # do not "simplify" either one away.
 xml_escape() { printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
 
-CMD="export PATH=\"/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH\"; cd \"$ROOT\" && { ${FALLBACK_FN}${HARNESS_SEG}${GATE_OPEN}CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p $(shq "$PROMPT") --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name \"$LABEL\"${GATE_CLOSE}; }; rm -f \"$PLIST\"; launchctl bootout gui/\$(id -u)/$LABEL"
+CMD="export PATH=\"/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH\"; export POSTPLAN_LABEL=$(shq "$LABEL") POSTPLAN_STARTED=$(shq "$STARTED") POSTPLAN_BADGE_MARKER=$(shq "$POSTPLAN_BADGE_MARKER"); ${BADGE_FN}POSTPLAN_BADGE_BODY=\"\$(postplan_badge_body \"\$POSTPLAN_LABEL\" \"\$POSTPLAN_STARTED\")\"; export POSTPLAN_BADGE_BODY; trap 'conclude_status_badge \"\${pp_rc:-1}\"' EXIT INT TERM HUP; cd \"$ROOT\" && { postplan_sweep_stale_badge \"\$(postplan_badge_pr_number)\"; ${FALLBACK_FN}${HARNESS_SEG}${GATE_OPEN}CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p $(shq "$PROMPT") --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name \"$LABEL\"${GATE_CLOSE}; }; pp_rc=\$?; if [ \"\${rc:-0}\" = 3 ]; then pp_rc=3; fi; conclude_status_badge \"\$pp_rc\"; rm -f \"$PLIST\"; launchctl bootout gui/\$(id -u)/$LABEL"
 
 CMD_XML=$(xml_escape "$CMD")
 LABEL_XML=$(xml_escape "$LABEL")

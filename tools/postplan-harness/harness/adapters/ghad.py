@@ -6,7 +6,7 @@ typed intent record to <out>/actions.jsonl. Reads are served from fixtures
 (replay) or recorded local state (isolated).
 
 LiveGh is the installed mode (README §Installation, approved 2026-07-16): it
-executes exactly the six allowlisted mutations via `gh` — there is no generic
+executes exactly the seven allowlisted mutations via `gh` — there is no generic
 "run a gh command" escape hatch — and still appends every executed action to
 actions.jsonl (executed=true) so the audit trail survives the install.
 """
@@ -16,14 +16,17 @@ import json
 import os
 import re
 import subprocess
+import tempfile
 import time
 
 from ..state import HarnessError
 
+POSTPLAN_BADGE_MARKER = "<!-- postplan-status -->"
+
 
 class RecordingGh:
     MUTATIONS = ("pr_create", "pr_comment", "pr_review_findings", "pr_edit_body",
-                 "pr_merge_auto", "label_add")
+                 "pr_merge_auto", "label_add", "pr_status_badge")
 
     def __init__(self, out_dir: str, fixture: dict | None = None):
         self.out_dir = out_dir
@@ -56,6 +59,9 @@ class RecordingGh:
 
     def post_review_summary(self, pr: int, title: str, body: str) -> None:
         self.record("pr_comment", pr=pr, title=title, body=body[:4000])
+
+    def pr_status_badge(self, pr: int, body: str) -> None:
+        self.record("pr_status_badge", pr=pr, body=body[:4000])
 
     # -- reads (fixture-backed) ------------------------------------------
     def pr_exists(self) -> bool:
@@ -97,7 +103,7 @@ class RecordingGh:
 
 
 class LiveGh(RecordingGh):
-    """Installed live adapter. Each of the six MUTATIONS maps to one fixed `gh`
+    """Installed live adapter. Each of the seven MUTATIONS maps to one fixed `gh`
     invocation built inside its method — the allowlist IS the method set.
     Reads come from live `gh pr view` state. Merge deliberately omits
     --delete-branch: in a multi-worktree clone it errors benignly, and a parent
@@ -172,6 +178,35 @@ class LiveGh(RecordingGh):
     def post_review_summary(self, pr: int, title: str, body: str) -> None:
         self._gh("pr", "comment", str(pr), "--body", f"## {title}\n\n{body}")
         self.record("pr_comment", pr=pr, title=title, body=body[:4000])
+
+    def pr_status_badge(self, pr: int, body: str) -> None:
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as f:
+                f.write(body)
+                fname = f.name
+            try:
+                existing = self._gh(
+                    "api", f"repos/{{owner}}/{{repo}}/issues/{pr}/comments",
+                    "--paginate", "--jq",
+                    f'.[] | select(.body | contains("{POSTPLAN_BADGE_MARKER}")) | .id',
+                )
+                existing_id = existing.strip().splitlines()[0] if existing.strip() else ""
+            except HarnessError:
+                existing_id = ""
+            if existing_id:
+                self._gh("api", "--method", "PATCH",
+                         f"repos/{{owner}}/{{repo}}/issues/comments/{existing_id}",
+                         "-F", f"body=@{fname}")
+            else:
+                self._gh("pr", "comment", str(pr), "--body-file", fname)
+            self.record("pr_status_badge", pr=pr, body=body[:4000])
+        except HarnessError:
+            pass
+        finally:
+            try:
+                os.unlink(fname)
+            except Exception:
+                pass
 
     # -- reads (live) -----------------------------------------------------
     def _fetch_meta(self) -> dict:

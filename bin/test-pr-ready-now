@@ -3013,6 +3013,20 @@ DIGEST_LABELS="$(grep "'\*\*" "$PRD_SR/scripts/digest.sh" | grep -v '^#' | sed "
 HELP_SPAN="$(sed -n '/^# Usage:/,/^#$/p' "$(dirname "$0")/test-pr-ready-skip")"
 SPAN_LINES="$(printf '%s\n' "$HELP_SPAN" | wc -l | tr -d ' ')"
 [ "$SPAN_LINES" -gt 1 ] || fail "test-pr-ready-skip help span truncated (bare # inside?)"
+# Row 30a: skip-review.sh contains the --delta flag.
+grep -qF -- '--delta' "$PRD_SR/scripts/skip-review.sh" || fail "skip-review.sh missing --delta flag"
+# Row 30b: skip-review.sh emits DELTA-STATUS output token.
+grep -qF 'DELTA-STATUS' "$PRD_SR/scripts/skip-review.sh" || fail "skip-review.sh missing DELTA-STATUS token"
+# Row 30c: _phase-4-review-audit.md contains parse-boundary fallback sentence.
+grep -qF 'absent, empty, or anything other than the literal' \
+    ".claude/skills/post-plan/_phase-4-review-audit.md" \
+    || fail "_phase-4-review-audit.md missing parse-boundary fallback sentence"
+# Row 30d: _phase-4-review-audit.md contains #### Code review inside empty-delta branch.
+grep -qF '#### Code review' ".claude/skills/post-plan/_phase-4-review-audit.md" \
+    || fail "_phase-4-review-audit.md missing '#### Code review' heading in empty-delta branch"
+# Row 30e: _phase7-verdict.md is byte-unchanged against origin/master (Reviewed tree contract).
+git diff --quiet origin/master -- ".claude/skills/pr-ready/_phase7-verdict.md" \
+    || fail "_phase7-verdict.md has drifted from origin/master"
 end_case skip-review-companion-assertions
 
 # --- verdict -----------------------------------------------------------------------------

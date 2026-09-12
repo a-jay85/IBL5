@@ -32,6 +32,14 @@
 #                               #   holds the merge — it no longer holds post-plan).
 #
 # Run from anywhere inside the target worktree.
+#
+# --pr <n> drives the worktree that has PR <n>'s head branch checked out, instead
+# of the current branch.  --pr selects the TREE; --plan selects the PLAN FILE.
+# They are orthogonal and may be combined; --plan wins for the plan path only.
+# An ambient PLAN_FILE in the caller's environment does not reach the detached child
+# (launchd gives the job a minimal environment), so --pr needs no unset.
+# POST_PLAN_MAIN_ROOT is a test-only override of the resolved main-checkout path.
+# Production never sets it.
 
 # should_fallback <rc> — decide whether to escalate to the /post-plan skill session after the
 # compiled harness exits with <rc>. Returns 0 (DO fall back) for a generic harness failure;
@@ -148,13 +156,17 @@ set -euo pipefail
 
 AUTO=0
 PLAN_OVERRIDE=""
+PR_NUM=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --auto)   AUTO=1 ; shift ;;
         --plan)   [ $# -ge 2 ] || { echo "post-plan-now: --plan requires a path argument" >&2; exit 1; }
                   PLAN_OVERRIDE="$2" ; shift 2 ;;
         --plan=*) PLAN_OVERRIDE="${1#--plan=}" ; shift ;;
-        *)        echo "post-plan-now: unknown argument '$1' (accepts --auto, --plan <path>)" >&2
+        --pr)     [ $# -ge 2 ] || { echo "post-plan-now: --pr requires a PR number argument" >&2; exit 1; }
+                  PR_NUM="$2" ; shift 2 ;;
+        --pr=*)   PR_NUM="${1#--pr=}" ; shift ;;
+        *)        echo "post-plan-now: unknown argument '$1' (accepts --auto, --plan <path>, --pr <n>)" >&2
                   exit 1 ;;
     esac
 done
@@ -164,6 +176,40 @@ if [ -n "$PLAN_OVERRIDE" ]; then
         || { echo "post-plan-now: --plan '$PLAN_OVERRIDE' does not exist — aborting." >&2; exit 1; }
     # launchd runs the job from a different cwd; the plist needs an absolute path.
     PLAN_OVERRIDE="$(cd "$(dirname "$PLAN_OVERRIDE")" && pwd)/$(basename "$PLAN_OVERRIDE")"
+fi
+
+# --pr <n>: drive the worktree holding PR <n>'s head branch instead of the current branch.
+# This runs BEFORE ROOT/SLUG are computed on purpose — every downstream derivation
+# (ROOT, SLUG, SAFE_SLUG, PLAN_FILE, and the plist's own `cd "$ROOT"`) then points at the
+# target worktree for free.
+if [ -n "$PR_NUM" ]; then
+    case "$PR_NUM" in
+        ''|*[!0-9]*) echo "post-plan-now: --pr needs a positive integer PR number (got '$PR_NUM')" >&2 ; exit 1 ;;
+    esac
+    command -v gh >/dev/null 2>&1 || { echo "post-plan-now: --pr needs the gh CLI on PATH" >&2 ; exit 1; }
+    PR_BRANCH=$(gh pr view "$PR_NUM" --json headRefName --jq .headRefName 2>/dev/null) || PR_BRANCH=""
+    [ -n "$PR_BRANCH" ] || { echo "post-plan-now: could not resolve a head branch for PR #$PR_NUM" >&2 ; exit 1; }
+    case "$PR_BRANCH" in
+        master|main|HEAD) echo "post-plan-now: PR #$PR_NUM head branch is '$PR_BRANCH' — refusing" >&2 ; exit 1 ;;
+    esac
+    SELF_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "post-plan-now: not inside a git repository" >&2 ; exit 1; }
+    # shellcheck source=bin/lib/git-helpers.sh
+    . "$SELF_ROOT/bin/lib/git-helpers.sh"
+    MAIN_ROOT="${POST_PLAN_MAIN_ROOT:-$(resolve_canonical_root "$SELF_ROOT")}"
+    # Branch-authoritative, not path arithmetic: slash-bearing branch names are not single
+    # path components, and a renamed worktree directory no longer matches its branch name.
+    WT_ROOT=$(git -C "$MAIN_ROOT" worktree list --porcelain | awk -v want="refs/heads/$PR_BRANCH" '
+        /^worktree / { wt = substr($0, 10) }
+        /^branch /   { if (substr($0, 8) == want) { print wt; exit } }')
+    if [ -z "$WT_ROOT" ] || [ ! -d "$WT_ROOT" ]; then
+        echo "post-plan-now: PR #$PR_NUM is on branch '$PR_BRANCH', but no worktree has it checked out." >&2
+        echo "  Create one and re-run (never run post-plan from the main checkout — ADR-0062):" >&2
+        echo "    git -C '$MAIN_ROOT' fetch origin '$PR_BRANCH'" >&2
+        echo "    git -C '$MAIN_ROOT' worktree add '$(worktrees_parent_dir "$MAIN_ROOT")/$(basename "$PR_BRANCH")' '$PR_BRANCH'" >&2
+        exit 1
+    fi
+    cd "$WT_ROOT" || { echo "post-plan-now: cannot cd to $WT_ROOT" >&2 ; exit 1; }
+    PLAN_SLUG="$PR_BRANCH"
 fi
 
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) \
@@ -176,6 +222,17 @@ case "$SLUG" in
         echo "post-plan-now: refusing to run on '$SLUG' — switch to the feature branch." >&2
         exit 1 ;;
 esac
+
+# ADR-0062: post-plan commits and pushes. It must never do that in the main checkout.
+# This is NOT --pr-only: the compiled harness (tools/postplan-harness) never executes
+# SKILL.md, so this assertion is the ONLY enforcement on the primary engine path.
+# shellcheck source=bin/lib/git-helpers.sh
+. "$ROOT/bin/lib/git-helpers.sh"
+if ! is_in_worktree "$ROOT"; then
+    echo "post-plan-now: refusing to run in the main checkout ($ROOT) — ADR-0062." >&2
+    echo "  cd into the branch's worktree (or use --pr <n>) and re-run." >&2
+    exit 1
+fi
 
 # A branch name may contain "/" (a Dependabot branch is
 # `dependabot/composer/...`), but a launchd label and the paths derived from it
@@ -312,7 +369,12 @@ fi
 # do not "simplify" either one away.
 xml_escape() { printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
 
-CMD="export PATH=\"/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH\"; export POSTPLAN_LABEL=$(shq "$LABEL") POSTPLAN_STARTED=$(shq "$STARTED") POSTPLAN_BADGE_MARKER=$(shq "$POSTPLAN_BADGE_MARKER"); ${BADGE_FN}POSTPLAN_BADGE_BODY=\"\$(postplan_badge_body \"\$POSTPLAN_LABEL\" \"\$POSTPLAN_STARTED\")\"; export POSTPLAN_BADGE_BODY; trap 'conclude_status_badge \"\${pp_rc:-1}\"' EXIT INT TERM HUP; cd \"$ROOT\" && { postplan_sweep_stale_badge \"\$(postplan_badge_pr_number)\"; ${FALLBACK_FN}${HARNESS_SEG}${GATE_OPEN}CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p $(shq "$PROMPT") --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name \"$LABEL\"${GATE_CLOSE}; }; pp_rc=\$?; if [ \"\${rc:-0}\" = 3 ]; then pp_rc=3; fi; conclude_status_badge \"\$pp_rc\"; rm -f \"$PLIST\"; launchctl bootout gui/\$(id -u)/$LABEL"
+# One splice covers all three far-side arms (harness, skill fallback, rc=4 Phase-5.5 resume).
+# Empty on the bare path, so $CMD stays byte-identical and existing CMD tests are unaffected.
+PLAN_SLUG_SEG=""
+[ -n "${PLAN_SLUG:-}" ] && PLAN_SLUG_SEG="export PLAN_SLUG=$(shq "$PLAN_SLUG"); "
+
+CMD="export PATH=\"/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH\"; ${PLAN_SLUG_SEG}export POSTPLAN_LABEL=$(shq "$LABEL") POSTPLAN_STARTED=$(shq "$STARTED") POSTPLAN_BADGE_MARKER=$(shq "$POSTPLAN_BADGE_MARKER"); ${BADGE_FN}POSTPLAN_BADGE_BODY=\"\$(postplan_badge_body \"\$POSTPLAN_LABEL\" \"\$POSTPLAN_STARTED\")\"; export POSTPLAN_BADGE_BODY; trap 'conclude_status_badge \"\${pp_rc:-1}\"' EXIT INT TERM HUP; cd \"$ROOT\" && { postplan_sweep_stale_badge \"\$(postplan_badge_pr_number)\"; ${FALLBACK_FN}${HARNESS_SEG}${GATE_OPEN}CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p $(shq "$PROMPT") --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name \"$LABEL\"${GATE_CLOSE}; }; pp_rc=\$?; if [ \"\${rc:-0}\" = 3 ]; then pp_rc=3; fi; conclude_status_badge \"\$pp_rc\"; rm -f \"$PLIST\"; launchctl bootout gui/\$(id -u)/$LABEL"
 
 CMD_XML=$(xml_escape "$CMD")
 LABEL_XML=$(xml_escape "$LABEL")

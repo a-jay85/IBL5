@@ -486,7 +486,7 @@ fi
 
 WORKFLOW="$SCRIPT_DIR/../.github/workflows/tests.yml"
 # g1: the test is wired into CI
-if grep -qF 'bin/test-automouse-postplan-disposition (wired in this PR)' "$WORKFLOW"; then
+if grep -qF 'bin/test-automouse-postplan-disposition' "$WORKFLOW"; then
     echo "ok: g1-wired-in-ci"
 else
     echo "FAIL: g1-wired-in-ci — test not found in $WORKFLOW"

@@ -62,10 +62,10 @@ derived from the plan slug otherwise; a wrong guess finds no PR and is therefore
 **The environmental breaker keeps precedence.** A usage-limit or auth exit still
 refunds the attempt, writes an `env-stop` report, and stops the run — it is never
 re-read as "done". The disposition check runs strictly after the breaker's `break`,
-and `bin/test-automouse-postplan-disposition (wired in this PR)` asserts that ordering statically so the
+and `bin/test-automouse-postplan-disposition` asserts that ordering statically so the
 guarantee cannot be refactored away.
 
-Locked by `bin/test-automouse-postplan-disposition (wired in this PR)`; the agent-facing statement of the
+Locked by `bin/test-automouse-postplan-disposition`; the agent-facing statement of the
 same three outcomes lives in `bin/automouse/prompt-postplan` Step 4.
 
 ## Host-state runbook — REQUIRED after this rename merges

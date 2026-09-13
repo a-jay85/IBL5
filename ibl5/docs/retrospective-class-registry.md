@@ -1,6 +1,6 @@
 ---
 description: Class registry for /post-plan Phase 9 retrospective routing — one row per defect class, written by /post-plan, never edited by hand.
-last_verified: 2026-09-08
+last_verified: 2026-09-13
 ---
 
 # Retrospective Class Registry
@@ -57,6 +57,7 @@ not add backticks or markdown links to a row.
 | 2026-08-21 | #1950 | class: a shell port-guard that pipes lsof output to grep -qv without stripping the column header always fires the "occupied by other process" branch regardless of actual port state, because the lsof header line never matches the process name | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan adding or modifying a port-guard or process-detection guard that pipes lsof to a pattern filter must assert the port-free case exits with the expected free-port verdict (no false positive from the header line) | prior: -- |
 | 2026-09-08 | #2174 | class: a shared plan-architect context file accumulates rationale content over successive plans with no byte-cap enforcement, silently growing the architect's cold-read token load beyond what it needs | routed to: Rung 2 - bin/test-architect-contract-split CI gate (wired in tests.yml) asserts both plan-architect context files stay within hard byte caps and that all operative content survived the split | prior: -- |
 | 2026-09-08 | #2174 | class: a shell test harness under set -o pipefail uses printf-pipe-grep-q, causing grep's early exit (match found) to SIGPIPE printf and make pipefail report failure — passes on macOS, fails on Linux CI | routed to: Rung 4 - new lazy rule doc .claude/rules/shell-pipefail-grep.md (path-scoped to bin/ shell scripts, not resident) explaining the herestring fix | prior: -- |
+| 2026-09-13 | #2208 | class: a shell test harness awk region-demarcation anchor uses a non-unique indent-level pattern (e.g., ^        fi$) that matches an earlier occurrence in the file, causing the assertion to scan the wrong code region silently — a mutation injected into the correct region passes the test | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan adding a shell-script test harness that uses awk to demarcate a code region must carry a mutation proof (inject continue/break/wrong-value into the correct target region) and confirm the test FAILS — proving the anchor is unique and on-target; unique comment strings must be preferred over indent-level tokens as anchors | prior: -- |
 ```
 
 ---

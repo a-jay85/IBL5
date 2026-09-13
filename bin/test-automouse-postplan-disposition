@@ -352,11 +352,13 @@ rm -rf "$D"
 # Group c — claim-time call site (Phase 4), static assertions over $RUNNER
 # ---------------------------------------------------------------------------
 
-# c1: ordering — esac < automouse_pr_state "$CLAIM_BRANCH" < attempt counter increment
+# c1: ordering — Terminal-disposition guard comment < automouse_pr_state "$CLAIM_BRANCH" < attempt counter increment
+# Anchor on the unique comment immediately after the depends_on esac (at ~1437), not the first
+# bare esac in the file (~line 615), so the ordering assertion targets the correct insertion point.
 c1_result=$(awk '
-    /^    esac$/ && !esac_seen { e=NR; esac_seen=1 }
+    /# Terminal-disposition guard:/ { e=NR }
     /automouse_pr_state "\$CLAIM_BRANCH"/ { g=NR }
-    /^    echo \$\(\( ATTEMPTS \+ 1 \)\) > "\$ATTEMPT_FILE"$/ { i=NR }
+    /# Increment attempt counter$/ { i=NR }
     END { if (e>0 && g>0 && i>0 && e<g && g<i) print "OK"; else print "ORDER-FAIL e="e" g="g" i="i }
 ' "$RUNNER")
 if [ "$c1_result" = "OK" ]; then
@@ -417,12 +419,12 @@ else
     FAILED=1
 fi
 
-# e2: region between breaker fi and disposition fi contains neither continue nor break
-# The breaker's fi (8-space indent) closes before the disposition; the disposition
-# is inside the handoff block (4-space fi closes it).
+# e2: region between the post-postplan disposition comment and its closing fi contains
+# neither continue nor break. Anchored on the unique comment string (same pattern as c4),
+# not on indent-level fi, to avoid matching earlier fi lines in the file.
 e2_region=$(awk '
-    /^        fi$/ && !breaker_seen { breaker_seen=1; in_region=1; next }
-    in_region && /^    fi$/ { exit }
+    /# Terminal-disposition: the environmental breaker/ { in_region=1; next }
+    in_region && /^        fi$/ { exit }
     in_region { print }
 ' "$RUNNER")
 if printf '%s\n' "$e2_region" | grep -qE '^\s*(continue|break)\s*$'; then

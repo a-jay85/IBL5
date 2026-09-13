@@ -22,9 +22,11 @@ echo "PR_NUM=$PR_NUM MASTER_SHA=$MASTER_SHA REVIEWED_TREE=$REVIEWED_TREE"
 
 ## Step 2 — Gather the seven inputs, then spawn exactly one reviewer
 
-**One-spawn rule:** there is **exactly one `Agent` spawn per `/post-plan` run.** Spawn now and never again in this phase.
+**Bounded-re-spawn rule:** at most two `Agent` spawns per `/post-plan` run, and never more. Spawn the first reviewer now. **Exactly one re-spawn** is permitted, in step 4b, and only when **both** hold: (a) step 4's remediation addressed **every** `Mode: in-PR` finding, and (b) the plan does **not** declare `auto_merge: false`.
 
-**No-re-spawn rule:** a `NOT READY` or `READY WITH NOTES` verdict never re-spawns the reviewer — step 3 keeps the verdict already produced. Re-spawning would let a follow-up run replace the original finding, which undermines the record.
+**The first verdict is never replaced.** The re-review writes a **separate file** (`/tmp/post-plan-fidelity-verdict-<N>-2.md`); verdict 1's word, findings and digest stay exactly as the reviewer wrote them. The record grows, it never gets rewritten. Never hand-edit or regenerate verdict 1 to flip its word.
+
+If anything was left unfixed, do **not** re-spawn — a reviewer looking at a tree that still carries a known finding buys nothing and costs an Opus turn.
 
 Spawn with `subagent_type: "pr-ready-phase6"` and **omit `model`** so the def's `model: claude-opus-5` pin wins. This must be an `Agent` spawn and not a `/pr-ready` invocation: this skill's frontmatter carries `disallowed-tools: [EnterPlanMode, ExitPlanMode, Skill]`, so `Skill` is not callable at all.
 
@@ -67,6 +69,28 @@ If `$FIDELITY_VERDICT_FILE` does not exist or is empty → `FIDELITY=missing` �
 
 If `FIDELITY=missing` for any other reason (no parseable verdict word before `## DIGEST`) — STOP. The verdict is indeterminate, not clean.
 
+## Step 3b — Record the reviewed tree on the verdict file
+
+```bash
+# phase 5.5 record reviewed tree
+PR_NUM=$(gh pr view --json number --jq '.number')
+FIDELITY_VERDICT_FILE="${FIDELITY_VERDICT_FILE:-/tmp/post-plan-fidelity-verdict-$PR_NUM.md}"
+if [ -s "$FIDELITY_VERDICT_FILE" ] && ! grep -q '^REVIEWED_TREE=' "$FIDELITY_VERDICT_FILE"; then
+  printf 'REVIEWED_TREE=%s\n' "$(git rev-parse "HEAD^{tree}")" >> "$FIDELITY_VERDICT_FILE"
+fi
+grep -m1 '^REVIEWED_TREE=' "$FIDELITY_VERDICT_FILE" || echo "REVIEWED_TREE=unrecorded"
+```
+
+The value is the **tree** SHA (`HEAD^{tree}`), the same value step 1 pins as `REVIEWED_TREE` and step 6 prints as `**Reviewed tree:**`. One concept, one name, one value — an operator can grep the sticky comment's SHA straight out of the verdict file.
+
+The append is **guarded and idempotent** — a second pass never writes a second line, and `grep -m1` means only the first would ever be read anyway.
+
+The line lands at **end of file, after the `## DIGEST` section**, so the canonical parse (`sed '/^## DIGEST/,$d'` first) deletes it before the verdict grep ever sees it. The verdict word is unaffected by construction; condition (12) reads the raw file for this field.
+
+Appending a metadata line is **not** editing the verdict: the word, the findings and the digest are untouched. The prohibition that stands is on changing the **verdict word**.
+
+**Negative-path note:** if the verdict file is missing or empty, write nothing and do not create it — an absent verdict is condition (12)'s blocking state and this step must not manufacture a file that makes it look present.
+
 ## Step 4 — Remediation on `READY WITH NOTES` (and `NOT READY`)
 
 Load the procedure in place: `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase65-remediation.md`. Run it as written — including its step 2 clean-tree precondition (`STOP: worktree dirty before remediation`), its fifth-file gate handoff to one `subagent_type: "sonnet-4-6"` delegate, its single `chore:` commit, and its push through `scripts/push.sh` (a bare `--force-with-lease` publishes nothing on a branch with no upstream).
@@ -88,12 +112,48 @@ The last line of the sticky comment, immediately above the `<!-- pr-ready-verdic
 | `READY` | step 4 skipped | `READY` |
 | `READY WITH NOTES` | every `Mode: in-PR` finding fixed | `READY WITH NOTES — all notes remediated in <sha>; reviewer verdict covers tree <REVIEWED_TREE>, not the post-remediation head` |
 | `READY WITH NOTES` | something left unfixed | `READY WITH NOTES — <what remains, named>; remediated the rest in <sha>` |
-| `NOT READY` | every `Mode: in-PR` finding fixed | `NOT READY — all findings remediated in <sha>; no reviewer verdict covers the post-remediation tree, so auto-merge stays held. Re-run /post-plan to clear.` |
+| `NOT READY` | all fixed; step 4b re-review returned `READY` or `READY WITH NOTES` | `READY (re-review) — findings remediated in <sha> and re-reviewed clean on tree <tree>; condition (12) arms on the next /post-plan Phase 6.5 run` |
+| `NOT READY` | all fixed; step 4b re-review returned `NOT READY` | `NOT READY (re-review) — remediation in <sha> did not clear the reviewer; remediate the re-review's findings and re-run /post-plan` |
+| `NOT READY` | all fixed; step 4b skipped (`auto_merge: false`) | `NOT READY — findings remediated in <sha>; the plan declares auto_merge: false, so a human merger reviews this PR and no re-review was spawned` |
 | `NOT READY` | something left unfixed | `NOT READY — <what remains, named>; remediated the rest in <sha>` |
 
-The fourth row is the one that matters: a run that fixed everything and still blocks is blocking on *review coverage*, not on defects, and a bare `NOT READY` there reads as a false claim that the PR is broken (PR #2192). The hold itself is unchanged — condition (12) still reads the frozen `FIDELITY` word from the verdict file, never this line.
+The three rows that replace the old "all fixed" row say what the second reviewer found, or say plainly that the author's `auto_merge: false` is the reason no second reviewer ran. A run that fixed everything now reports exactly what happened next (PR #2192 prompted the original split; the same "don't mis-report the reason for the hold" principle governs all three). The hold itself is unchanged for the `NOT READY (re-review)` and `NOT READY — findings remediated` rows — condition (12) still reads the frozen `FIDELITY` word from the verdict file, never this line. The `READY (re-review)` line signals the fidelity hold is cleared, but **does not mean the PR is armed** — Phase 6.5 has not run yet, and conditions (1)-(11) and (13) may still hold it.
 
 Skip this step entirely when `FIDELITY=READY`.
+
+## Step 4b — Bounded re-review on a fully remediated tree
+
+Run this step only when step 4 addressed **every** `Mode: in-PR` finding. Skip it when `FIDELITY=READY` (step 4 never ran) or when any finding was left unfixed.
+
+**Skip gate first.** Reuse the existing condition-(7) resolver rather than re-implementing plan lookup — `bin/lib/plan-resolve.sh` sets `$PLAN_FILE`, and the `awk` below is the same line-1-frontmatter parse condition (7) uses. The `</dev/null` is load-bearing: macOS `awk` with a program and no file argument reads STDIN and hangs.
+
+```bash
+# phase 5.5 re-review skip gate
+source "$(git rev-parse --show-toplevel)/bin/lib/plan-resolve.sh"
+PLAN_SLUG_DRIFT=""
+resolve_plan_file
+AUTO_MERGE=""
+if [ -n "${PLAN_FILE:-}" ] && [ -f "$PLAN_FILE" ]; then
+    AUTO_MERGE=$(awk '
+        NR==1 && /^---[[:space:]]*$/ {infm=1; next}
+        infm && /^---[[:space:]]*$/ {infm=0; exit}
+        infm && /^auto_merge:[[:space:]]*/ { sub(/^auto_merge:[[:space:]]*/,""); gsub(/[[:space:]]/,""); print; exit }
+    ' "$PLAN_FILE" </dev/null 2>/dev/null)
+fi
+echo "RE_REVIEW=$([ "$AUTO_MERGE" = false ] && echo skip || echo spawn)"
+```
+
+On `RE_REVIEW=skip`, do not spawn. The plan's author already decided a human merges this PR, so a second Opus verdict changes nothing that will happen to it. Terminal line for that case is the `auto_merge: false` row in the terminal-line recipe above.
+
+On `RE_REVIEW=spawn`, spawn **one** reviewer: `subagent_type: "pr-ready-phase6"`, **omit `model`** so the def's `model: claude-opus-5` pin wins. An `Agent` spawn, never a `/pr-ready` invocation — this skill's frontmatter carries `disallowed-tools: [EnterPlanMode, ExitPlanMode, Skill]`.
+
+**Output path:** `/tmp/post-plan-fidelity-verdict-<N>-2.md` (substitute `<N>` = step 1's `$PR_NUM`). PR-number-keyed, never `$$`/`$PPID`-keyed — condition (12) reads it from a different shell. The `-2` suffix ensures verdict 2 can never overwrite verdict 1.
+
+**The same seven inputs as step 2**, with two changes: input 4 is the **post-remediation** diff (`gh pr diff <N>` re-run after step 4's push, so it includes the remediation commit), and one added pointer — "reviewer 1's findings are at `/tmp/post-plan-fidelity-verdict-<N>.md`; confirm each was addressed by the remediation commit, and report a new finding only if the remediation itself introduced one."
+
+After the reviewer returns, re-run step 3's parse against the `-2` path to get the second verdict word, then run step 3b's record block against the `-2` path so verdict 2 also carries `REVIEWED_TREE=`. Both must run **after** step 4's push, so the recorded tree is the tree the reviewer saw.
+
+**Failure paths:** if the re-review writes no file, or writes one with no parseable verdict word, treat it as "no re-review happened" — verdict 1 stands, condition (12) blocks on verdict 1's word, and the terminal line is the fully-remediated `NOT READY` row. Never re-spawn a third time to retry.
 
 ## Step 5 — Materialise the digest lines
 
@@ -119,6 +179,7 @@ CI: <result — and post-remediation CI result when step 4 ran>
 Plan-fidelity verdict: <FIDELITY word> — <reviewer findings, REVIEW-COVERAGE: marker line, and include-source: line if the fallback fired>
 
 **Reviewed tree:** <REVIEWED_TREE from step 1>
+**Re-reviewed tree:** <tree from step 4b, and the re-review's verdict word — omit this line entirely when step 4b did not run>
 
 ### Merge digest
 **What changed:** <paste line 1 from /tmp/post-plan-digest-lines-<N>.txt>
@@ -133,7 +194,7 @@ Plan-fidelity verdict: <FIDELITY word> — <reviewer findings, REVIEW-COVERAGE: 
 <!-- pr-ready-verdict -->
 ```
 
-**`**Reviewed tree:**` placement rule:** this line must appear before the digest heading. `bin/pr-cycle`'s `_digest_labels` starts capturing at that heading and treats every `^\*\*[^*]+:\*\*` line inside that span as a label — a bold-labelled line placed inside the block becomes a sixth label and corrupts the ledger parse. Before the heading it is invisible to the parser.
+**`**Reviewed tree:**` and `**Re-reviewed tree:**` placement rule:** both bold-labelled lines must appear before the digest heading. `bin/pr-cycle`'s `_digest_labels` starts capturing at that heading and treats every `^\*\*[^*]+:\*\*` line inside that span as a label — a bold-labelled line placed inside the block becomes a sixth label and corrupts the ledger parse. Before the heading they are invisible to the parser. The five digest labels and their order are unchanged.
 
 **Five digest labels — do not re-word, re-order, merge, or add a sixth line.** The labels in the given order are: `**What changed:**`, `**Why:**`, `**Watch:**`, `**Touches:**`, `**Machine-authored fixes:**`. If `/tmp/post-plan-digest-lines-<N>.txt` is absent or empty, emit the heading anyway with all five labels carrying `unavailable — digest script did not produce output`. The one permitted amendment is step 4 rule 3 (appending remediation SHA to `**Machine-authored fixes:**`).
 

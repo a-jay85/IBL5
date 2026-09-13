@@ -972,7 +972,8 @@ automouse_branch_for_plan() {
 dispose_plan_done() {
     local plan_name=$1 slug=$2 pr_state=$3 pr_url=$4 site=$5
     local reports_dir="$NIGHTLY_DIR/reports"
-    local report="$reports_dir/$(date +%Y-%m-%d)-done-${slug}.md"
+    local report
+    report="$reports_dir/$(date +%Y-%m-%d)-done-${slug}.md"
     mkdir -p "$NIGHTLY_DIR/done" "$reports_dir"
     mv -f "$QUEUE_DIR/$plan_name" "$NIGHTLY_DIR/done/" 2>/dev/null || true
     rm -f "$QUEUE_DIR/${plan_name}.attempts" \

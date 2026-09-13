@@ -1,5 +1,5 @@
 ---
-description: /post-plan Phase 5.5 — plan-intent fidelity review (one Opus reviewer spawn), verdict parse, remediation, and sticky merge-digest comment.
+description: /post-plan Phase 5.5 — plan-intent fidelity review (one Opus reviewer spawn, plus one bounded re-review after remediation), verdict parse, remediation, and sticky merge-digest comment.
 last_verified: 2026-09-13
 ---
 

@@ -896,6 +896,20 @@ for tok in \
     fi
 done
 
+# Prose assertion 6: B55 (phase 5.5 verdict parse) must contain no rev-parse —
+# proof the record block stayed in its own fence and the four existing parse tests
+# are still hermetic. A future edit that folds git rev-parse into the parse fence
+# would make those tests run git against a fixture path and silently stop being hermetic.
+if [ -z "$B55" ]; then
+    echo "FAIL: B55 absent — skipping rev-parse hermeticity check"
+    FAILED=1
+elif grep -qF 'rev-parse' <<< "$B55"; then
+    echo "FAIL: B55 (phase 5.5 verdict parse) contains 'rev-parse' — record block leaked into parse fence; hermetic tests compromised"
+    FAILED=1
+else
+    echo "ok: B55 (phase 5.5 verdict parse) contains no 'rev-parse' (hermetic)"
+fi
+
 # --- §5.8b condition (12): second-verdict (re-review) behavioural cases ------------
 CUR_TREE="$(git -C "$REPO_ROOT" rev-parse "HEAD^{tree}" 2>/dev/null || echo none)"
 STALE_TREE="0000000000000000000000000000000000000000"
@@ -945,6 +959,40 @@ if grep -qF 'stale re-review' <<< "$out89"; then
     echo "ok: (12) missing REVIEWED_TREE treated as stale (NOTE emitted)"
 else
     echo "FAIL: (12) missing REVIEWED_TREE not treated as stale: '$out89'"
+    FAILED=1
+fi
+
+# Case 8.7 (plan) — verdict-1 record integrity: after v2 clears condition 12,
+# re-parse v1 and assert it still yields NOT READY with a byte-identical pre-DIGEST body.
+# Byte identity of the whole file is the wrong assertion (Phase 5.5 appends REVIEWED_TREE=
+# to v1), so compare only the pre-## DIGEST section.
+vf1_87="$BASE_TMP/fidelity-verdict-87.md"
+vf2_87="$BASE_TMP/fidelity-verdict-87-2.md"
+mk_verdict_fixture notready "$vf1_87"
+mk_verdict_fixture ready "$vf2_87"
+printf 'REVIEWED_TREE=%s\n' "$CUR_TREE" >> "$vf2_87"
+printf '{"number":2100}' > "$BASE_TMP/fixture.json"
+out87="$(PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" \
+    FIDELITY_VERDICT_FILE="$vf1_87" FIDELITY_VERDICT_FILE_2="$vf2_87" bash -c "$B12" 2>&1)"
+expect_block "(12) case 8.7 setup: v2 clears v1 NOT READY -> NONE" NONE "$out87"
+# Re-parse v1 with the canonical expression
+v1_word_87="$(sed '/^## DIGEST/,$d' "$vf1_87" \
+    | grep -E '^(READY WITH NOTES|NOT READY|READY)[[:space:]]*$' | tail -1 | sed 's/[[:space:]]*$//')"
+if [ "$v1_word_87" = "NOT READY" ]; then
+    echo "ok: (12) v1 record integrity: re-parse still yields NOT READY"
+else
+    echo "FAIL: (12) v1 record integrity: re-parse yielded '$v1_word_87', expected NOT READY"
+    FAILED=1
+fi
+# Assert pre-DIGEST body byte-identical to a fresh notready fixture
+vf_ref87="$BASE_TMP/fidelity-verdict-ref87.md"
+mk_verdict_fixture notready "$vf_ref87"
+v1_body_87="$(sed '/^## DIGEST/,$d' "$vf1_87")"
+ref_body_87="$(sed '/^## DIGEST/,$d' "$vf_ref87")"
+if [ "$v1_body_87" = "$ref_body_87" ]; then
+    echo "ok: (12) v1 record integrity: pre-DIGEST body byte-identical to notready fixture"
+else
+    echo "FAIL: (12) v1 record integrity: pre-DIGEST body modified — verdict 1 was mutated"
     FAILED=1
 fi
 

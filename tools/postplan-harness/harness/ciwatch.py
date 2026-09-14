@@ -56,6 +56,33 @@ def derive_from_trace(ci: dict | None) -> CiOutcome:
     return CiOutcome(-1, [], "no CI watch output recorded in trace")
 
 
+def probe_failed_checks(worktree: str, pr: int, timeout: int = 60) -> list[str]:
+    """Names of checks on the PR's current head already in gh's `fail` bucket.
+
+    `bucket` is a documented `gh pr checks --json` field with values
+    pass|fail|pending|skipping|cancel. Strictly additive and best-effort: any
+    failure to run, exit, or parse returns [] so the caller falls through to the
+    blocking watch. An empty list means "no failure proven", never "green" — this
+    function can only ever ADD a failure verdict, never manufacture a pass.
+    """
+    try:
+        proc = subprocess.run(
+            ["gh", "pr", "checks", str(pr), "--json", "name,state,bucket"],
+            cwd=worktree, capture_output=True, text=True, timeout=timeout)
+    except (subprocess.TimeoutExpired, OSError):
+        return []
+    if proc.returncode not in (0, 8):   # 1 = "no checks reported" yet
+        return []
+    try:
+        rows = json.loads(proc.stdout or "[]")
+    except (ValueError, json.JSONDecodeError):
+        return []
+    if not isinstance(rows, list):
+        return []
+    return sorted({str(r.get("name") or "?") for r in rows
+                   if isinstance(r, dict) and r.get("bucket") == "fail"})
+
+
 def watch_live(worktree: str, pr: int, timeout: int = 5400,
                settle_tries: int = 10, settle_wait: int = 30) -> CiOutcome:
     """Block on `gh pr checks --watch` until CI settles.
@@ -65,7 +92,14 @@ def watch_live(worktree: str, pr: int, timeout: int = 5400,
     indeterminate. Never raises: Phase 7 only decides SHIPPED reporting.
     """
     deadline = time.time() + timeout
+    last_rc = "none"          # str, so the message renders cleanly when the loop never ran
+    last_stderr = ""
     for _ in range(settle_tries):
+        already_failed = probe_failed_checks(worktree, pr)
+        if already_failed:
+            return CiOutcome(8, already_failed,
+                             "gh pr checks --json: fail bucket on HEAD: "
+                             + ", ".join(already_failed))
         try:
             proc = subprocess.run(["gh", "pr", "checks", str(pr), "--watch"],
                                   cwd=worktree, capture_output=True, text=True,
@@ -86,9 +120,11 @@ def watch_live(worktree: str, pr: int, timeout: int = 5400,
         # any other exit is treated as "checks not settled yet" (right after pr
         # create, gh exits 1 — sometimes with EMPTY stderr — until checks
         # register), so retry until the settle budget runs out
+        last_rc, last_stderr = str(proc.returncode), (proc.stderr or "").strip()[:200]
         if time.time() < deadline:
             time.sleep(settle_wait)
             continue
         return CiOutcome(-1, [], f"gh pr checks exit {proc.returncode}: "
                                  f"{(proc.stderr or '').strip()[:200]}")
-    return CiOutcome(-1, [], f"checks never settled after {settle_tries} tries")
+    return CiOutcome(-1, [], f"checks never settled after {settle_tries} tries; "
+                             f"last gh exit {last_rc}: {last_stderr}")

@@ -442,17 +442,15 @@ test.describe('Free Agency admin: assign free agents', () => {
     });
     expect(response.status()).toBeLessThan(400);
 
-    // Assert the POST response body contains the success message element and the
-    // "Clear All Free Agency Offers" button — both gated on $actionCompleted (block.php:231,316).
-    // The substring 'message-success' alone is not sufficient because the CSS class
-    // definition '.message-success {' appears in the <style> block on every response.
-    // We match the rendered attribute string 'id="actionMessage" class="message-success"'
-    // which block.php:231 only emits when $actionCompleted is true.
+    // A successful assign_free_agents POST returns 303 → block.php?day=N&executed=1.
+    // page.request follows the redirect automatically, so `response` is the final GET.
+    // That page renders #executedBanner (because $_GET['executed']==='1') and shows the
+    // Clear All Free Agency Offers button (because $processedAt !== null after the marker insert).
     const body = await response.text();
-    expect(body, 'POST response must render message-success element on successful assign').toContain(
-      'id="actionMessage" class="message-success"',
+    expect(body, 'POST response (after PRG redirect) must render #executedBanner').toContain(
+      'id="executedBanner"',
     );
-    expect(body, 'POST response must show Clear All Free Agency Offers button on success').toContain(
+    expect(body, 'POST response (after PRG redirect) must show Clear All Free Agency Offers button').toContain(
       'Clear All Free Agency Offers',
     );
 

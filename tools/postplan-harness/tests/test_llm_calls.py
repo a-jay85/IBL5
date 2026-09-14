@@ -28,6 +28,17 @@ def test_pr_copy_prompt_with_retro_row_contains_required_elements():
     assert "## Why this PR exists" in prompt
 
 
+def test_pr_copy_prompt_requests_commit_subject():
+    """The model is only told to emit commit_subject by this template.
+
+    validate_pr_copy requires the field, so reverting the template line would make every
+    live run raise HarnessError("schema", ...) with nothing in the suite noticing.
+    """
+    prompt = pr_copy_prompt("some-slug", _cls(), PlanInfo(), "")
+    assert "commit_subject" in prompt
+    assert "must NOT be" in prompt      # the two-artifacts instruction, not just the key
+
+
 def test_pr_copy_prompt_without_retro_row_omits_retro_block():
     prompt = pr_copy_prompt("some-slug", _cls(""), PlanInfo(), "")
     assert _REAL_REGISTRY_ROW not in prompt

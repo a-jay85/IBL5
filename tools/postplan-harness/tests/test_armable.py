@@ -255,11 +255,13 @@ def test_rebase_conflict_fails_the_run_before_evaluate():
             LiveGit(d).rebase_onto("master")
         assert exc.value.kind == "rebase-conflict"
 
-        # Prove git rebase --abort actually ran: no in-progress rebase in the tree
-        result = subprocess.run(
-            ["git", "-C", d, "status", "--porcelain=v2", "--branch"],
-            capture_output=True, text=True)
-        assert "rebase" not in result.stdout.lower(), (
-            "git rebase --abort did not run: rebase still in progress\n" + result.stdout)
+        # Prove git rebase --abort actually ran: no in-progress rebase in the tree.
+        # `git status --porcelain=v2` never emits the word "rebase" — mid-rebase it
+        # prints only `# branch.oid`, `# branch.head (detached)` and the unmerged rows —
+        # so a substring probe of that output is vacuous. The state directories are the
+        # predicate git itself uses, and exactly one of them exists mid-rebase.
+        for state_dir in ("rebase-merge", "rebase-apply"):
+            assert not os.path.exists(os.path.join(d, ".git", state_dir)), (
+                "git rebase --abort did not run: .git/%s still present" % state_dir)
     finally:
         shutil.rmtree(d, ignore_errors=True)

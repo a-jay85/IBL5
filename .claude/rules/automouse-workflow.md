@@ -1,6 +1,6 @@
 ---
 description: Automouse autonomous workflow (formerly "nightly") — launchd fires claude -p on a recurring schedule, running two context-isolated agents per plan (implementation + post-plan) with time guards and incremental checkpoints.
-last_verified: 2026-09-08
+last_verified: 2026-09-13
 paths: "bin/automouse/**"
 ---
 
@@ -70,6 +70,7 @@ Each phase's cost is recorded in two places: the markdown row in `reports/YYYY-M
 | `recomputed` | Transcript recomputation succeeded and agrees with expectations. |
 | `recomputed-anomalous` | Recomputation succeeded but diverges from the harness figure in a way the mechanical check flags: recomputed cost falls more than $0.01 below the harness figure, or the joined transcript spans materially longer than the logged phase duration. |
 | `unknown` | No transcript could be joined to this row — the harness figure is left as-is (transcripts age out after ~30 days). |
+| `harness-ledger` | Cost row from the harness's own `result.json` usage ledger (harness-only runs — exit 0 or 3; no Sonnet skill session ran). |
 
 **`peak_ctx` semantics.** Maximum context occupancy of the **main** transcript only, taken over `usage.iterations[]` when present (the top-level `usage` is their sum, not a single occupancy) and excluding `advisor_message` iterations. Sub-agent occupancy is excluded. Rows before 2026-08-26 carry the older summed figure and read high.
 
@@ -102,8 +103,8 @@ is non-fatal.
 1. **Daytime:** Work with Claude in plan mode. After approval, queue the plan: `bin/automouse/queue <slug>`
 2. **On schedule:** `launchd` fires `bin/automouse/run`
 3. **Loop:** For each queued plan (oldest first), `bin/automouse/run` fires two `claude -p` invocations sequentially:
-   - **Implementation agent** (`bin/automouse/prompt-impl`): creates worktree, implements the plan, makes checkpoint commits, writes a handoff file. Its model is selectable per-plan via a line-1 `impl_model:` frontmatter field accepting six values — `sonnet`/`claude-sonnet-4-6` → Sonnet, `haiku`/`claude-haiku-4-5` → Haiku, `opus`/`claude-opus-5` or an absent field → Opus — resolved by `bin/lib/plan-impl-model` against the whitelist in `bin/lib/plan-model-tier`. Any other value (including `fable`) is rejected before the attempt counter moves. Declare `sonnet` only for uniformly-mechanical plans whose every verification row is objectively machine-checkable. The post-plan agent is always Sonnet.
-   - **Post-plan agent** (`bin/automouse/prompt-postplan`): reads the handoff file, runs `/post-plan` (code review, security audit, PR, CI monitoring, auto-merge), writes the completion report
+   - **Implementation agent** (`bin/automouse/prompt-impl`): creates worktree, implements the plan, makes checkpoint commits, writes a handoff file. Model per-plan via `impl_model:` (six values: `sonnet`/`claude-sonnet-4-6` → Sonnet, `haiku`/`claude-haiku-4-5` → Haiku, `opus`/`claude-opus-5` or absent → Opus; validated by `bin/lib/plan-impl-model`; other values rejected before the counter). Declare `sonnet` for uniformly-mechanical plans only. Post-plan runs `bin/post-plan-now` (Sonnet `/post-plan` fallback).
+   - **Post-plan** (`bin/post-plan-now --foreground`, run in the handoff's worktree): runs `/post-plan` (code review, security audit, PR, CI monitoring, auto-merge), writes the completion report
 4. **Guards:** The loop stops when the queue is empty or ~4h45m have elapsed. Plans that fail 3 times (after genuine, full-length attempts) are moved to `skipped/` as poison pills.
    - **Environmental failures stop the run cleanly instead of skipping.** A usage/rate limit, auth error, or any transient that kills an agent refunds the attempt and breaks the loop, leaving the **entire queue intact** to resume next run — so one dead-budget run cannot grind every queued plan into `skipped/`. Each stop writes a `YYYY-MM-DD-env-stop-<slug>.md` report. The watchdog stall threshold is **30 min, not 10**, because an asynchronous `Agent` delegate emits nothing on the parent's stream while it works — for the delegate's whole runtime a healthy impl is indistinguishable from a wedged one. A deliberate impl disposition (to `done/` or `skipped/`) is an **outcome, not a transient**, so the loop continues. A wall-clock cap-timeout is refunded too, but only a bounded number of times per plan, and does not break the loop. Exact signatures, thresholds and refund limits: `should_impl_env_stop()`, `impl_cap_timeout()`, `should_refund_cap_timeout()` — locked by `bin/test-automouse-env-breaker` and `bin/test-automouse-impl-cap-timeout`.
 5. **After a run:** Check `gh pr list` for new PRs, read reports for details

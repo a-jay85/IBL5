@@ -9,7 +9,8 @@ context (same convention as `bin/lib/db-helpers.sh`).
 
 ```
 queue/ ──► run ──► (per plan) claude -p impl  ──► handoff/<plan>.json
-  ▲          │                 claude -p postplan ──► PR
+  ▲          │                 bin/post-plan-now --foreground ──► PR
+  │          │                 (harness-first; Sonnet /post-plan fallback)
   │          └─► self-heal (top of run: requeue plans that now pass staleness)
 queue ◄──── queue-reorder-ui (browser drag-reorder UI, writes queue order)
 ```
@@ -23,7 +24,7 @@ queue ◄──── queue-reorder-ui (browser drag-reorder UI, writes queue or
 | `queue-reorder-ui` | Local browser UI to drag-reorder the queue; shells out to `queue reorder` and `../lib/automouse-reorder-router.php`. |
 | `self-heal` | Top-of-run recovery. Requeues plans skipped by the staleness gate that now pass `../check-plan-staleness` (only those carrying a `.md.staleness` sidecar marker). |
 | `prompt-impl` | The implementation-phase prompt text fed to `claude -p`. |
-| `prompt-postplan` | The post-plan-phase prompt text fed to `claude -p`. |
+| `prompt-postplan` | The post-plan-phase prompt text (no longer invoked directly by the runner — `bin/post-plan-now --foreground` is invoked instead). |
 
 `bin/test-automouse-*` (still in `bin/`, NOT here) are the test harnesses for these
 scripts — they are tests, not operational pipeline members, and CI references them

@@ -316,8 +316,8 @@ COSTS
 out=$(run_digest --dry-run)
 assert_contains     "row22: Completed 1 (dedup collapses two shapes)" "Completed 1" "$out"
 assert_not_contains "row22: not Completed 2"                          "Completed 2" "$out"
-assert_contains     "row22: cost summed once"                         "2.5000"      "$out"
-echo "ok: row22 — duplicate done/ shapes collapse and cost is summed once"
+assert_contains     "row22: cost appears in output (normalization join)"           "2.5000"      "$out"
+echo "ok: row22 — duplicate done/ shapes collapse; cost appears via normalization join"
 
 # --- row23: date-prefixed-only done/ entry joins costs (negative path) ---
 setup

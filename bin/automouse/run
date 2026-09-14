@@ -623,7 +623,7 @@ append_cost_row() {
     local plan=$1 phase=$2 log_before=$3 model=${4:-?}
     local logged_cost sid pricer_json provenance cost tier peak_raw peak_k
     local inp out cr w5 w1 peak_ctx_raw compactions_main compactions_sub
-    local surcharge_low surcharge_high price_asof surcharge_cell report sidecar
+    local surcharge_low surcharge_high price_asof surcharge_cell report sidecar hrc hdir hcost hin hout hcr
     # Sibling-relative, never $REPO: a worktree copy of `run` must price with its
     # own checkout's pricer, not the main checkout's.
     local root="${SELF_DIR:-}/.."
@@ -636,6 +636,22 @@ append_cost_row() {
     sid=$(tail -n +"$((log_before + 1))" "$LOG" | grep -oE 'session_id=[^ ]+' | tail -1 | sed 's/session_id=//') || true
     peak_raw=$(tail -n +"$((log_before + 1))" "$LOG" | grep -oE 'peak_ctx=[0-9]+' | tail -1 | sed 's/peak_ctx=//') || true
     peak_k=$(( ${peak_raw:-0} / 1000 ))
+    # Harness-ledger source. bin/post-plan-now --foreground prints one marker line; a
+    # harness-rc of 0 or 3 means NO /post-plan skill session ran, which is the only case
+    # where result.json's ledger is the complete spend. Any other value (1, 4, none) means
+    # a Sonnet session also ran and the ledger would under-count it — stay on the pricer.
+    hrc=$(tail -n +"$((log_before + 1))" "$LOG" | grep -oE 'harness-rc=[^ ]+' | tail -1 | sed 's/harness-rc=//') || true
+    hdir=$(tail -n +"$((log_before + 1))" "$LOG" | grep -oE 'harness-run-dir=[^ ]+' | tail -1 | sed 's/harness-run-dir=//') || true
+    hcost=""
+    case "${hrc:-}" in 0|3)
+        if [ -n "${hdir:-}" ] && [ "$hdir" != none ] && [ -f "$hdir/result.json" ]; then
+            IFS=$'\t' read -r hcost hin hout hcr <<< "$(jq -r '
+                [(.ledger.calls // [])] | .[0] as $c |
+                [ ([$c[].cost_usd] | add // 0), ([$c[].input_tokens] | add // 0),
+                  ([$c[].output_tokens] | add // 0), ([$c[].cache_read_input_tokens] | add // 0)
+                ] | @tsv' "$hdir/result.json" 2>/dev/null)" || hcost=""
+        fi ;;
+    esac
     # Call pricer; || pricer_json="" prevents a non-zero pricer exit from aborting
     # the automouse loop under set -euo pipefail — degrade to logged_cost, never abort.
     pricer_json=""
@@ -649,6 +665,11 @@ append_cost_row() {
             <<< "$(printf '%s' "$pricer_json" | jq -r '[.cost,.surcharge_low,.surcharge_high,.inp,.out,.cr,.w5,.w1,.peak_ctx,.compactions_main,.compactions_sub,(.price_asof // "")] | @tsv')" || true
         provenance="recomputed"
         peak_k=$(( ${peak_ctx_raw:-0} / 1000 ))
+    elif [ -n "$hcost" ]; then
+        cost="$hcost"
+        surcharge_low="" surcharge_high="" inp="$hin" out="$hout" cr="$hcr" w5="" w1=""
+        peak_ctx_raw=0 compactions_main="" compactions_sub="" price_asof=""
+        provenance="harness-ledger"
     else
         cost="$logged_cost"
         surcharge_low="" surcharge_high="" inp="" out="" cr="" w5="" w1=""

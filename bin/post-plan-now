@@ -30,6 +30,10 @@
 #                               #   PR; whether auto-merge ARMS is decided later, at
 #                               #   /post-plan Phase 6.5 (a plan's `auto_merge: false`
 #                               #   holds the merge — it no longer holds post-plan).
+#   bin/post-plan-now --foreground   # run the engine in THIS shell instead of
+#                               #   detaching via launchd; exits with post-plan's own
+#                               #   status. For a supervising caller (bin/automouse/run)
+#                               #   that owns its own timeout and logging.
 #
 # Run from anywhere inside the target worktree.
 
@@ -148,13 +152,15 @@ set -euo pipefail
 
 AUTO=0
 PLAN_OVERRIDE=""
+FOREGROUND=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --auto)   AUTO=1 ; shift ;;
+        --foreground) FOREGROUND=1 ; shift ;;
         --plan)   [ $# -ge 2 ] || { echo "post-plan-now: --plan requires a path argument" >&2; exit 1; }
                   PLAN_OVERRIDE="$2" ; shift 2 ;;
         --plan=*) PLAN_OVERRIDE="${1#--plan=}" ; shift ;;
-        *)        echo "post-plan-now: unknown argument '$1' (accepts --auto, --plan <path>)" >&2
+        *)        echo "post-plan-now: unknown argument '$1' (accepts --auto, --foreground, --plan <path>)" >&2
                   exit 1 ;;
     esac
 done

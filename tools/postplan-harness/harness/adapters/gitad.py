@@ -102,6 +102,7 @@ class ReplayGit:
 
     def __init__(self, fixture: dict):
         self.fx = fixture
+        self.commit_messages: list[str] = []
 
     def branch(self) -> str:
         return self.fx.get("slug", "unknown-branch")
@@ -127,6 +128,7 @@ class ReplayGit:
         return modified_files_from_diff(self.diff_vs_base())
 
     def commit_all(self, message: str) -> str:
+        self.commit_messages.append(message)
         return "replay-sha-" + self.fx.get("slug", "x")[:12]
 
     def push(self) -> None:  # replay: recorded as a no-op; ghad records PR intents

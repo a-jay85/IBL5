@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-09-12
+last_verified: 2026-09-13
 ---
 
 # Post-Plan Orchestrator
@@ -383,7 +383,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 9. PR-time safety verdict — the realized diff surfaces no reason to hold for a human.
 10. Pipeline-authored floor — the PR does NOT carry the `pipeline-authored` label AND the branch name does not match `^bug-[0-9]+(-|$)`. The branch-name axis is the label-timing guard: `reconcile_pr_open_rows()` in `bin/bug-pipeline-tick` applies the label on a later cron tick than `ship_via_cron()` which arms auto-merge, so at arming time the label may not yet exist. The digit anchor prevents catching human `bug-pipeline-*` branches.
 11. Unresolved scored finding — no unresolved GitHub review thread carries a `<!-- score: N -->` marker with N >= 80. Live-state counterpart to (2), which is run-local.
-12. Plan-intent fidelity — Phase 5.5's reviewer produced a verdict of `READY` or `READY WITH NOTES`.
+12. Plan-intent fidelity — Phase 5.5 produced a verdict of `READY` or `READY WITH NOTES` **covering the current `HEAD` tree** — either the first reviewer's verdict, or the bounded second-review verdict Phase 5.5 writes after remediation.
 13. Plan-slug drift — the plan was located by drift (`<prefix>-<slug>.md`) rather than the exact branch-slug path; adoption is a guess, so auto-merge is held until a human confirms the plan is this branch's plan.
 
 **These conditions only ever HOLD, never RELEASE.** They are an AND-of-not-blocked set: every condition can *add* a block; none can clear another's. Conditions (7)–(9) are **additive brakes on top of** the deterministic floors (1)–(6), the pipeline-authored floor (10), and the independent `human-signoff` required GitHub check — they exist to catch what those miss, never to override them. post-plan **always runs and opens the PR**; these conditions decide only whether auto-merge *arms*. A held PR stays open for a human to merge.
@@ -398,7 +398,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 
 **If every condition passes:** arm with `gh pr merge --squash --auto` — `--auto` *queues* the merge (it does not merge now); GitHub fires it once required checks pass. Do not sync local to master here. Never add `--delete-branch`: the repo sets `deleteBranchOnMerge`, so GitHub removes the head branch itself, and the flag only breaks things (the local delete fails in a multi-worktree clone, and a parent merge carrying it permanently closes stacked child PRs).
 
-**If any condition blocks:** do NOT arm. Report which condition(s) blocked — the per-condition report text is in the reference (for (3), report whether the block hit the no-done-marker branch — "Phase 5.0 never reached its end" — or listed unresolved items from `/tmp/post-plan-missing-tests-$PPID`; which Phase-5 track failed for (4)). Continue to Phase 7 regardless to monitor and fix CI; a re-run clears a red-track block, but the intent/type holds (7), (8), (10) stay held until a human acts. For condition (12), a verdict that is missing, unparseable, or `NOT READY` is indeterminate-or-negative and blocks — remediate the reviewer's findings and re-run /post-plan; never hand-edit the verdict file to clear it.
+**If any condition blocks:** do NOT arm. Report which condition(s) blocked — the per-condition report text is in the reference (for (3), report whether the block hit the no-done-marker branch — "Phase 5.0 never reached its end" — or listed unresolved items from `/tmp/post-plan-missing-tests-$PPID`; which Phase-5 track failed for (4)). Continue to Phase 7 regardless to monitor and fix CI; a re-run clears a red-track block, but the intent/type holds (7), (8), (10) stay held until a human acts. For condition (12), a verdict that is missing, unparseable, or `NOT READY` is indeterminate-or-negative and blocks — after remediation closes every `Mode: in-PR` finding, Phase 5.5 automatically spawns one bounded second reviewer on the post-remediation tree, and condition (12) reads whichever verdict covers the current tree; a re-run is needed only when that second reviewer also blocks, or when commits landed after it ran. Never hand-edit either verdict file to clear the hold.
 
 **Interactive golden warning:** when `$GOLDEN_CHANGED` is `true` and `$CLAUDE_HEADLESS` is unset (so condition 5 did not block), still surface the warning prominently so the human confirms the simulation change was an intentional `make -C engine golden-update`, not a masked regression.
 

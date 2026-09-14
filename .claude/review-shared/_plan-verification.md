@@ -1,12 +1,9 @@
 ---
-description: Requires plans to classify every verification step into the test-type taxonomy at plan-write time, preventing manual-testing items from deferring to post-plan cleanup, and grounds seed/DOM-dependent E2E assertions in real fixtures.
+description: Requires plans to classify every verification step into the test-type taxonomy at plan-write time; no deferred manual items; E2E assertions must be seed- and DOM-grounded.
 last_verified: 2026-09-14
 ---
 
 # Plan Verification Matrix
-
-Shared include — read by `/plan` (Step 1), `/post-plan`, and `_test-spec-corpus`. Not an
-always-loaded rule; `/plan` reads it on invocation.
 
 Every plan must include a **Verification Matrix** — a table classifying each verification item at plan-write time. No verification step may be deferred as "manual" or left unclassified.
 
@@ -97,7 +94,7 @@ At least one E2E row is required whenever a plan triggers any of the following p
 | New `<details>`, modal, toggle, or expandable section | Expand/collapse, visibility toggling, and content rendering are DOM interactions |
 | New indicator or status element that changes with state | Visual state feedback (dots, badges, labels) must be verified in-browser across both states |
 | Plan adds or modifies `htmx:beforeRequest` / `htmx:afterRequest` handlers that mutate DOM state (element disabled/enabled, text changed) | These mutations are serialized into the htmx history cache between the before-request event and the swap; browser Back restores the request-time snapshot, making the mutation permanent unless a `historyRestore` handler repairs it — only a real browser navigation catches this (see `.claude/rules/htmx-history-cache.md`) |
-| Plan changes the HTTP response shape of a PHP endpoint — adds a redirect (PRG), changes inline-render to JSON, or removes/replaces a response branch that existing E2E tests assert against | When an endpoint was already covered by E2E response-body assertions, those assertions become stale on the new shape; PHPUnit does not test the browser-observed response chain. The plan must audit all existing E2E tests asserting against that endpoint's response body and update any whose expected value depended on the old shape. |
+| Plan changes a PHP endpoint's HTTP response shape (PRG redirect, inline-render to JSON, or removes an E2E-tested response branch) | Audit E2E tests for that endpoint; update assertions that depended on the old response shape. |
 
 When a plan introduces any of these patterns, add one E2E row per distinct user-visible state. If E2E coverage is blocked by a missing test fixture, the plan must include a phase that creates the fixture — "no fixture exists" is not a reason to downgrade to PHPUnit.
 

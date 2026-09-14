@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _plan-verification.md — why each forced trigger exists, the incidents behind them, the worked pre-prod exercise-path catalogue, and the non-compliant counter-examples. Read only when editing the verification rules; the plan-architect never reads it.
-last_verified: 2026-09-08
+last_verified: 2026-09-14
 ---
 
 # _plan-verification Detail
@@ -60,3 +60,7 @@ Only an *intrinsic* deploy-dependency that survives that challenge may be record
 ### Counter-examples
 
 Minimal section — specific counter-examples are embedded inline in the rules themselves (PR #887 for seed grounding, PR #1067 for forced manual rows, PR #1753 for required test methods).
+
+### HTTP response shape changes
+
+When an endpoint was already covered by E2E response-body assertions, those assertions become stale on the new shape; PHPUnit does not test the browser-observed response chain. The plan must audit all existing E2E tests asserting against that endpoint's response body and update any whose expected value depended on the old shape.

@@ -19,7 +19,8 @@ SCRATCH="$(mktemp -d)"
 # /tmp pr-ready files are PR-9999-keyed; clean them alongside SCRATCH.
 _cleanup() {
     rm -rf "$SCRATCH"
-    rm -f "/tmp/pr-ready-digest-lines-9999.txt" "/tmp/pr-ready-prior-verdict-9999.md"
+    rm -f "/tmp/pr-ready-digest-lines-9999.txt" "/tmp/pr-ready-prior-verdict-9999.md" \
+          "/tmp/post-plan-delta-diff-9999"
 }
 trap _cleanup EXIT
 
@@ -50,15 +51,76 @@ TREE="$(git -C "$GIT_REPO" rev-parse 'HEAD^{tree}')"
 mkdir -p "$SCRATCH/.local/bin"
 cat > "$SCRATCH/.local/bin/gh" << 'SHIM_EOF'
 #!/usr/bin/env bash
-# Shim: cat GH_FIXTURE if set; else exit 1
-if [ -n "${GH_FIXTURE:-}" ]; then
-    cat "$GH_FIXTURE"
-    exit 0
+# Shim: dispatch by subcommand.
+# gh api graphql ...        -> serve GH_FIXTURE_GRAPHQL (pre-jq-filtered content)
+# gh api repos/... ...      -> serve GH_FIXTURE_COMMIT  (pre-jq-filtered content)
+# gh pr view ...            -> serve GH_FIXTURE
+if [ "${1:-}" = "api" ]; then
+    if [ "${2:-}" = "graphql" ]; then
+        [ -n "${GH_FIXTURE_GRAPHQL:-}" ] && { cat "$GH_FIXTURE_GRAPHQL"; exit 0; }
+        exit 1
+    else
+        [ -n "${GH_FIXTURE_COMMIT:-}" ] && { cat "$GH_FIXTURE_COMMIT"; exit 0; }
+        exit 1
+    fi
 fi
+[ -n "${GH_FIXTURE:-}" ] && { cat "$GH_FIXTURE"; exit 0; }
 exit 1
 SHIM_EOF
 chmod +x "$SCRATCH/.local/bin/gh"
 export PATH="$SCRATCH/.local/bin:$PATH"
+
+# --- delta scratch repo (cases 12-20, carry-forward-preserved, delta-too-large) ------
+# Three commits: base (= origin/master), +src.php, +notes.md.
+DELTA_REPO="$SCRATCH/delta-repo"
+git init -b pr-branch "$DELTA_REPO" >/dev/null 2>&1
+git -C "$DELTA_REPO" config user.email "test@example.com"
+git -C "$DELTA_REPO" config user.name "Test"
+printf 'base\n' > "$DELTA_REPO/base.txt"
+git -C "$DELTA_REPO" add base.txt
+git -C "$DELTA_REPO" commit -m "base" >/dev/null 2>&1
+D_MASTER_SHA="$(git -C "$DELTA_REPO" rev-parse HEAD)"
+D_BASE_TREE="$(git -C "$DELTA_REPO" rev-parse 'HEAD^{tree}')"
+# Pin origin/master tracking ref to the base commit so git diff origin/master...HEAD works.
+git -C "$DELTA_REPO" update-ref refs/remotes/origin/master "$D_MASTER_SHA"
+printf '<?php\n' > "$DELTA_REPO/src.php"
+git -C "$DELTA_REPO" add src.php
+git -C "$DELTA_REPO" commit -m "add src.php" >/dev/null 2>&1
+D_MID_TREE="$(git -C "$DELTA_REPO" rev-parse 'HEAD^{tree}')"
+printf '# readme\n' > "$DELTA_REPO/notes.md"
+git -C "$DELTA_REPO" add notes.md
+git -C "$DELTA_REPO" commit -m "add notes.md" >/dev/null 2>&1
+D_HEAD_TREE="$(git -C "$DELTA_REPO" rev-parse 'HEAD^{tree}')"
+
+# --- Rung-2 setup: bare origin with a historical commit delta-repo has never seen ---
+DELTA_ORIGIN="$SCRATCH/delta-origin.git"
+git init --bare "$DELTA_ORIGIN" >/dev/null 2>&1
+git -C "$DELTA_ORIGIN" config uploadpack.allowAnySHA1InWant true
+git -C "$DELTA_ORIGIN" config uploadpack.allowReachableSHA1InWant true
+# Build historical commit in a temp repo; push to bare origin.
+DELTA_TEMP="$SCRATCH/delta-temp"
+git init "$DELTA_TEMP" >/dev/null 2>&1
+git -C "$DELTA_TEMP" config user.email "test@example.com"
+git -C "$DELTA_TEMP" config user.name "Test"
+printf 'old\n' > "$DELTA_TEMP/old.txt"
+git -C "$DELTA_TEMP" add old.txt
+git -C "$DELTA_TEMP" commit -m "old" >/dev/null 2>&1
+RUNG2_COMMIT="$(git -C "$DELTA_TEMP" rev-parse HEAD)"
+RUNG2_TREE="$(git -C "$DELTA_TEMP" rev-parse 'HEAD^{tree}')"
+git -C "$DELTA_TEMP" push "file://$DELTA_ORIGIN" HEAD:refs/heads/history >/dev/null 2>&1
+# Wire delta-repo's origin to the bare repo; push pr-branch so fetch can succeed.
+git -C "$DELTA_REPO" remote add origin "file://$DELTA_ORIGIN"
+git -C "$DELTA_REPO" push origin pr-branch >/dev/null 2>&1
+
+# Helper: write a minimal gh-pr-view fixture for delta-repo (headRefName=pr-branch).
+# The body's first line must be exactly "**Reviewed tree:** <40hex>".
+_mk_delta_fixture() {
+    local recorded_tree="$1" out_file="$2"
+    local body_json
+    body_json="$(printf '**Reviewed tree:** %s\n<!-- pr-ready-verdict -->' "$recorded_tree" \
+        | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')"
+    printf '{"comments": [{"body": %s}], "headRefName": "pr-branch"}\n' "$body_json" > "$out_file"
+}
 
 # --- case 1: no-verdict-comment ----------------------------------------------------------
 # Step-0 stale-state clear: pre-seeded /tmp files must be removed even on this bail path.
@@ -284,6 +346,131 @@ want "carry-forward-clear-on-run verdict" "$LAST11" "RUN-REVIEW"
 [ ! -f "/tmp/pr-ready-prior-verdict-9999.md" ] \
     || fail "case 11: prior-verdict file not cleared on RUN-REVIEW path"
 end_case carry-forward-files-on-run
+
+# --- case 12: delta resolves via Rung 1 --------------------------------------------------
+# RECORDED_TREE = D_BASE_TREE (exists locally) → Rung 1 succeeds → DELTA-STATUS: delta.
+begin_case
+fix12="$SCRATCH/fix12.json"
+_mk_delta_fixture "$D_BASE_TREE" "$fix12"
+OUT12="$(cd "$DELTA_REPO" && GH_FIXTURE="$fix12" bash "$SKIP_SCRIPT" --delta 9999 "")"
+want "case 12 DELTA-STATUS delta" "$OUT12" "DELTA-STATUS: delta"
+want "case 12 DELTA_HAS_PHP true" "$OUT12" "DELTA_HAS_PHP=true"
+end_case "case 12 rung1-delta-resolves"
+
+# --- case 13: base-object-missing --------------------------------------------------------
+# RECORDED_TREE doesn't exist locally; graphql returns empty timeline → base-object-missing.
+begin_case
+fix13="$SCRATCH/fix13.json"
+FAKE_TREE="aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+_mk_delta_fixture "$FAKE_TREE" "$fix13"
+fix13_gql="$SCRATCH/fix13-gql.txt"
+printf '' > "$fix13_gql"
+OUT13="$(cd "$DELTA_REPO" && GH_FIXTURE="$fix13" GH_FIXTURE_GRAPHQL="$fix13_gql" bash "$SKIP_SCRIPT" --delta 9999 "")"
+want "case 13 DELTA-STATUS full" "$OUT13" "DELTA-STATUS: full"
+want "case 13 DELTA-REASON base-object-missing" "$OUT13" "DELTA-REASON: base-object-missing"
+end_case "case 13 base-object-missing"
+
+# --- case 14: Rung 2 recovers via graphql ------------------------------------------------
+# RECORDED_TREE not in delta-repo; graphql returns RUNG2_COMMIT; commit API maps to
+# RUNG2_TREE; git fetch brings the object in → DELTA-STATUS: delta.
+begin_case
+fix14="$SCRATCH/fix14.json"
+_mk_delta_fixture "$RUNG2_TREE" "$fix14"
+fix14_gql="$SCRATCH/fix14-gql.txt"
+printf '%s\n' "$RUNG2_COMMIT" > "$fix14_gql"
+fix14_commit="$SCRATCH/fix14-commit.txt"
+printf '%s\n' "$RUNG2_TREE" > "$fix14_commit"
+OUT14="$(cd "$DELTA_REPO" && \
+    GH_FIXTURE="$fix14" GH_FIXTURE_GRAPHQL="$fix14_gql" GH_FIXTURE_COMMIT="$fix14_commit" \
+    bash "$SKIP_SCRIPT" --delta 9999 "")"
+want "case 14 DELTA-STATUS delta" "$OUT14" "DELTA-STATUS: delta"
+end_case "case 14 rung2-graphql-recovery"
+
+# --- case 15: conflicts flag → DELTA-STATUS: full even when tree matches ----------------
+begin_case
+fix15="$SCRATCH/fix15.json"
+_mk_delta_fixture "$D_BASE_TREE" "$fix15"
+OUT15="$(cd "$DELTA_REPO" && GH_FIXTURE="$fix15" bash "$SKIP_SCRIPT" --delta 9999 "conflicts")"
+want "case 15 DELTA-STATUS full" "$OUT15" "DELTA-STATUS: full"
+want "case 15 DELTA-REASON conflicts-resolved" "$OUT15" "DELTA-REASON: conflicts-resolved"
+end_case "case 15 conflicts-force-full"
+
+# --- case 16: no verdict comment in delta mode → DELTA-STATUS: full ---------------------
+begin_case
+fix16="$SCRATCH/fix16.json"
+printf '{"comments": [], "headRefName": "pr-branch"}\n' > "$fix16"
+OUT16="$(cd "$DELTA_REPO" && GH_FIXTURE="$fix16" bash "$SKIP_SCRIPT" --delta 9999 "")"
+want "case 16 DELTA-STATUS full" "$OUT16" "DELTA-STATUS: full"
+want "case 16 DELTA-REASON no-verdict-comment" "$OUT16" "DELTA-REASON: no-verdict-comment"
+end_case "case 16 no-verdict-comment-delta"
+
+# --- case 17: post-rebase content-identical → DELTA-STATUS: delta, empty file set ------
+# RECORDED_TREE = current HEAD's tree → diff vs HEAD is empty → DELTA_FILES = "".
+begin_case
+fix17="$SCRATCH/fix17.json"
+_mk_delta_fixture "$D_HEAD_TREE" "$fix17"
+OUT17="$(cd "$DELTA_REPO" && GH_FIXTURE="$fix17" bash "$SKIP_SCRIPT" --delta 9999 "")"
+want "case 17 DELTA-STATUS delta" "$OUT17" "DELTA-STATUS: delta"
+DELTA_FILE17="$(printf '%s\n' "$OUT17" | grep '^DELTA_FILE=' | cut -d= -f2)"
+[ -f "$DELTA_FILE17" ] || fail "case 17: DELTA_FILE not written"
+DELTA_SIZE17="$(wc -c < "$DELTA_FILE17" | tr -d ' ')"
+[ "$DELTA_SIZE17" -eq 0 ] || fail "case 17: expected empty delta artifact, got $DELTA_SIZE17 bytes"
+end_case "case 17 post-rebase-identical-empty-delta"
+
+# --- case 18: DELTA_HAS_PHP=false when delta lacks PHP but full set has it -------------
+# RECORDED_TREE = D_MID_TREE (after src.php commit); delta diff = notes.md only.
+# Full PR diff = src.php + notes.md; intersection = notes.md → DELTA_HAS_PHP=false.
+begin_case
+fix18="$SCRATCH/fix18.json"
+_mk_delta_fixture "$D_MID_TREE" "$fix18"
+OUT18="$(cd "$DELTA_REPO" && GH_FIXTURE="$fix18" bash "$SKIP_SCRIPT" --delta 9999 "")"
+want "case 18 DELTA-STATUS delta" "$OUT18" "DELTA-STATUS: delta"
+want "case 18 DELTA_HAS_PHP false" "$OUT18" "DELTA_HAS_PHP=false"
+end_case "case 18 DELTA_HAS_PHP-false"
+
+# --- case 19: delta equals full set → DELTA_* match unprefixed computation --------------
+# RECORDED_TREE = D_BASE_TREE: both tree diff and PR diff yield {src.php, notes.md}.
+begin_case
+fix19="$SCRATCH/fix19.json"
+_mk_delta_fixture "$D_BASE_TREE" "$fix19"
+OUT19="$(cd "$DELTA_REPO" && GH_FIXTURE="$fix19" bash "$SKIP_SCRIPT" --delta 9999 "")"
+want "case 19 DELTA-STATUS delta" "$OUT19" "DELTA-STATUS: delta"
+want "case 19 DELTA_HAS_PHP true" "$OUT19" "DELTA_HAS_PHP=true"
+want "case 19 DELTA_NON_CODE_ONLY false" "$OUT19" "DELTA_NON_CODE_ONLY=false"
+end_case "case 19 delta-equals-full-set"
+
+# --- case 20: --deltaX → non-digit PR → bad-pr-number, no DELTA- lines ----------------
+begin_case
+OUT20="$(cd "$GIT_REPO" && bash "$SKIP_SCRIPT" --deltaX 9999 "")"
+LINE_COUNT20="$(printf '%s\n' "$OUT20" | wc -l | tr -d ' ')"
+[ "$LINE_COUNT20" -eq 2 ] || fail "case 20: expected 2 output lines, got $LINE_COUNT20"
+want "case 20 RUN-REVIEW bad-pr-number" "$OUT20" "RUN-REVIEW bad-pr-number"
+grep -qF "DELTA-" <<< "$OUT20" && fail "case 20: unexpected DELTA- line in output"
+end_case "case 20 deltaX-bad-pr-number"
+
+# --- carry-forward-preserved: delta mode skips Step-0, digest file survives -----------
+begin_case
+fix_cfp="$SCRATCH/fix-cfp.json"
+_mk_delta_fixture "$D_BASE_TREE" "$fix_cfp"
+printf 'existing-digest\n' > "/tmp/pr-ready-digest-lines-9999.txt"
+_cfp_out="$(cd "$DELTA_REPO" && GH_FIXTURE="$fix_cfp" bash "$SKIP_SCRIPT" --delta 9999 "")"
+[ -f "/tmp/pr-ready-digest-lines-9999.txt" ] \
+    || fail "carry-forward-preserved: digest file was cleared in delta mode"
+rm -f "/tmp/pr-ready-digest-lines-9999.txt" "/tmp/post-plan-delta-diff-9999"
+end_case "carry-forward-preserved"
+
+# --- delta-too-large: whole-file artifact > 102400 bytes falls back to full -----------
+# Add big.php to delta-repo (RECORDED_TREE = D_HEAD_TREE → delta diff = big.php only).
+begin_case
+python3 -c 'import sys; sys.stdout.write(("xxxxxxxxxx\n") * 11000)' > "$DELTA_REPO/big.php"
+git -C "$DELTA_REPO" add big.php
+git -C "$DELTA_REPO" commit -m "add big.php" >/dev/null 2>&1
+fix_dtl="$SCRATCH/fix-dtl.json"
+_mk_delta_fixture "$D_HEAD_TREE" "$fix_dtl"
+OUT_DTL="$(cd "$DELTA_REPO" && GH_FIXTURE="$fix_dtl" bash "$SKIP_SCRIPT" --delta 9999 "")"
+want "delta-too-large DELTA-STATUS full" "$OUT_DTL" "DELTA-STATUS: full"
+want "delta-too-large DELTA-REASON delta-too-large" "$OUT_DTL" "DELTA-REASON: delta-too-large"
+end_case "delta-too-large"
 
 # --- mutation check ----------------------------------------------------------------------
 # Invert the tree comparison in step 10 and confirm case 4's fixture now produces SKIP-REVIEW.

@@ -3015,6 +3015,24 @@ SPAN_LINES="$(printf '%s\n' "$HELP_SPAN" | wc -l | tr -d ' ')"
 [ "$SPAN_LINES" -gt 1 ] || fail "test-pr-ready-skip help span truncated (bare # inside?)"
 end_case skip-review-companion-assertions
 
+# --- case: delta-mode companion assertions (Verification Matrix row 30) ------------------
+begin_case
+# Row 30a: skip-review.sh contains the --delta flag.
+grep -qF -- '--delta' "$PRD_SR/scripts/skip-review.sh" || fail "skip-review.sh missing --delta flag"
+# Row 30b: skip-review.sh emits DELTA-STATUS output token.
+grep -qF 'DELTA-STATUS' "$PRD_SR/scripts/skip-review.sh" || fail "skip-review.sh missing DELTA-STATUS token"
+# Row 30c: _phase-4-review-audit.md contains parse-boundary fallback sentence.
+grep -qF 'absent, empty, or anything other than the literal' \
+    ".claude/skills/post-plan/_phase-4-review-audit.md" \
+    || fail "_phase-4-review-audit.md missing parse-boundary fallback sentence"
+# Row 30d: _phase-4-review-audit.md contains #### Code review inside empty-delta branch.
+grep -qF '#### Code review' ".claude/skills/post-plan/_phase-4-review-audit.md" \
+    || fail "_phase-4-review-audit.md missing '#### Code review' heading in empty-delta branch"
+# Row 30e: _phase7-verdict.md still carries the Reviewed-tree contract string (skip-review.sh match target).
+grep -qF '**Reviewed tree:**' ".claude/skills/pr-ready/_phase7-verdict.md" \
+    || fail "_phase7-verdict.md missing Reviewed-tree contract line (skip-review.sh match target)"
+end_case "skip-review-delta-row 30"
+
 # --- verdict -----------------------------------------------------------------------------
 if [[ $FAILED -ne 0 ]]; then
     echo "test-pr-ready-now: FAILED ($FAILED assertion failure(s))" >&2

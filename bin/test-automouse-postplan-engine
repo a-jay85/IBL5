@@ -1,0 +1,239 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-automouse-postplan-engine — regression tests for the automouse post-plan
+# invocation wiring added in the automouse-postplan-harness-engine branch.
+#
+# Covers Verification Matrix rows 8-11:
+#
+#   8  The postplan block cd's into the handoff worktree and invokes
+#      $SELF_DIR/../post-plan-now --foreground --plan <abs>
+#   9  Handoff absent, or .worktree empty / not a directory → no invocation,
+#      PP_STATUS non-zero, log line names the handoff path
+#  10  A seeded 'api error: 429' on the invocation's stderr lands in $LOG
+#      before the slice read, so phase_env_error still fires
+#  11  Static negative — bin/automouse/run never sets/exports HARNESS
+#      (ADR-0092) and never passes --auto to post-plan-now
+#
+# Extraction idiom: awk pulls the live blocks from bin/automouse/run and
+# bin/automouse/run so tests cannot drift from the real code.
+#
+# Run: bin/test-automouse-postplan-engine  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+FAILED=0
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+assert_eq() {
+    if [ "$1" = "$2" ]; then
+        printf '  ok   %s\n' "$3"
+    else
+        printf '  FAIL %s: got %s, expected %s\n' "$3" "$1" "$2"
+        FAILED=1
+    fi
+}
+
+assert_contains() {
+    # Use -e so strings starting with -- aren't mistaken for grep options.
+    if printf '%s' "$1" | grep -qF -e "$2"; then
+        printf '  ok   %s\n' "$3"
+    else
+        printf '  FAIL %s: %q not found in output\n' "$3" "$2"
+        FAILED=1
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Extract live blocks — never copy them.
+# ---------------------------------------------------------------------------
+
+# shellcheck disable=SC2034  # PP_BLOCK, ENV_ERR_FN read via eval
+PP_BLOCK=$(awk '/^        PP_WORKTREE=""/,/^        fi$/' "$REPO_ROOT/bin/automouse/run")
+ENV_ERR_FN=$(awk '/^phase_env_error\(\)/,/^}/' "$REPO_ROOT/bin/automouse/run")
+
+# Sanity: confirm extraction captured the right block before evaling anything.
+assert_contains "$PP_BLOCK" 'PP_WORKTREE=""' "PP block starts with PP_WORKTREE initialisation"
+assert_contains "$PP_BLOCK" '--foreground'   "PP block invokes --foreground"
+
+eval "$ENV_ERR_FN"
+
+# Timeout passthrough shim: the PP block uses `timeout $secs cmd`, but the
+# unit-test sandbox does not need a real wall-clock limit.
+timeout() { local _s="$1"; shift; "$@"; }
+
+echo
+echo "-- row 8: postplan block cd's into worktree and runs post-plan-now --foreground --plan <abs> --"
+
+# ---------------------------------------------------------------------------
+# Row 8
+# ---------------------------------------------------------------------------
+S8=$(mktemp -d)
+mkdir -p "$S8/run-dir/bin" "$S8/worktree" "$S8/plans"
+LOG="$S8/log"; : > "$LOG"
+HANDOFF_FILE="$S8/handoff.json"
+PLANS_DIR="$S8/plans"
+PLAN_NAME="test-plan.md"
+PLAN_SLUG="test-plan"
+CMDPID_FILE="$S8/cmdpid"
+REMAINING_SECS=30
+SELF_DIR="$S8/run-dir/bin"  # SELF_DIR/../post-plan-now = $S8/run-dir/post-plan-now
+
+# Stub writes PWD and argv to STUB_RECORD, then exits 0.
+# $S8 is expanded here (unquoted delimiter); $PWD/$@ are escaped for the stub.
+STUB_RECORD="$S8/stub-record"
+: > "$STUB_RECORD"
+cat > "$S8/run-dir/post-plan-now" <<STUBEOF
+#!/bin/sh
+printf 'STUB-PWD: %s\n' "\$PWD" >> "$STUB_RECORD"
+printf 'STUB-ARG: %s\n' "\$@" >> "$STUB_RECORD"
+exit 0
+STUBEOF
+chmod +x "$S8/run-dir/post-plan-now"
+
+printf '{"worktree": "%s"}\n' "$S8/worktree" > "$HANDOFF_FILE"
+
+PP_STATUS=0
+eval "$PP_BLOCK"
+
+assert_eq "$PP_STATUS" "0"                              "row 8: PP_STATUS=0 when worktree is valid"
+assert_contains "$(cat "$STUB_RECORD")" "STUB-PWD: $S8/worktree" \
+                                                        "row 8: cd'd into the handoff worktree"
+assert_contains "$(cat "$STUB_RECORD")" "--foreground"  "row 8: --foreground passed to post-plan-now"
+assert_contains "$(cat "$STUB_RECORD")" "--plan"        "row 8: --plan passed to post-plan-now"
+assert_contains "$(cat "$STUB_RECORD")" "$PLANS_DIR/$PLAN_NAME" \
+                                                        "row 8: absolute plan path in args"
+
+rm -rf "$S8"
+
+echo
+echo "-- row 9: missing/empty handoff → skip, PP_STATUS non-zero, log names handoff path --"
+
+# ---------------------------------------------------------------------------
+# Row 9: three sub-cases (absent file, empty worktree key, nonexistent dir)
+# ---------------------------------------------------------------------------
+for SCENARIO in "no-handoff" "empty-worktree" "missing-worktree-dir"; do
+    S9=$(mktemp -d)
+    mkdir -p "$S9/run-dir/bin" "$S9/plans"
+    LOG="$S9/log"; : > "$LOG"
+    HANDOFF_FILE="$S9/handoff.json"
+    PLANS_DIR="$S9/plans"
+    PLAN_NAME="test-plan.md"
+    PLAN_SLUG="test-plan"
+    CMDPID_FILE="$S9/cmdpid"
+    REMAINING_SECS=30
+    SELF_DIR="$S9/run-dir/bin"
+
+    case "$SCENARIO" in
+        no-handoff)
+            # HANDOFF_FILE does not exist — leave it absent
+            ;;
+        empty-worktree)
+            printf '{"worktree": ""}\n' > "$HANDOFF_FILE"
+            ;;
+        missing-worktree-dir)
+            printf '{"worktree": "%s/nonexistent"}\n' "$S9" > "$HANDOFF_FILE"
+            ;;
+    esac
+
+    PP_STATUS=0
+    eval "$PP_BLOCK"
+
+    if [ "$PP_STATUS" -ne 0 ]; then
+        printf '  ok   row 9 [%s]: PP_STATUS=%d (non-zero as expected)\n' "$SCENARIO" "$PP_STATUS"
+    else
+        printf '  FAIL row 9 [%s]: PP_STATUS=0, expected non-zero\n' "$SCENARIO"
+        FAILED=1
+    fi
+    assert_contains "$(cat "$LOG")" "$HANDOFF_FILE" \
+        "row 9 [$SCENARIO]: log names the handoff path"
+
+    rm -rf "$S9"
+done
+
+echo
+echo "-- row 10: api error: 429 on stub stderr triggers phase_env_error --"
+
+# ---------------------------------------------------------------------------
+# Row 10: stderr of the post-plan-now invocation lands in $LOG via `>> "$LOG" 2>&1`
+# ---------------------------------------------------------------------------
+S10=$(mktemp -d)
+mkdir -p "$S10/run-dir/bin" "$S10/worktree" "$S10/plans"
+LOG="$S10/log"; : > "$LOG"
+HANDOFF_FILE="$S10/handoff.json"
+PLANS_DIR="$S10/plans"
+PLAN_NAME="test-plan.md"
+# shellcheck disable=SC2034  # read by the eval'd PP block extracted from bin/automouse/run
+PLAN_SLUG="test-plan"
+# shellcheck disable=SC2034  # read by the eval'd PP block extracted from bin/automouse/run
+CMDPID_FILE="$S10/cmdpid"
+# shellcheck disable=SC2034  # read by the eval'd PP block extracted from bin/automouse/run
+REMAINING_SECS=30
+# shellcheck disable=SC2034  # read by the eval'd PP block extracted from bin/automouse/run
+SELF_DIR="$S10/run-dir/bin"
+
+cat > "$S10/run-dir/post-plan-now" <<'STUBEOF'
+#!/bin/sh
+printf 'api error: 429 Too Many Requests\n' >&2
+exit 1
+STUBEOF
+chmod +x "$S10/run-dir/post-plan-now"
+
+printf '{"worktree": "%s"}\n' "$S10/worktree" > "$HANDOFF_FILE"
+
+log_before=$(wc -l < "$LOG")
+
+PP_STATUS=0
+eval "$PP_BLOCK"
+
+# phase_env_error reads $LOG from line $log_before+1 and greps for the pattern.
+if phase_env_error "$log_before"; then
+    printf '  ok   row 10: phase_env_error fires when api error: 429 appears in LOG\n'
+else
+    printf '  FAIL row 10: phase_env_error did not fire (api error: 429 must reach LOG via stderr)\n'
+    FAILED=1
+fi
+
+rm -rf "$S10"
+
+echo
+echo "-- row 11: static negative — no HARNESS export, no --auto in post-plan-now invocation --"
+
+# ---------------------------------------------------------------------------
+# Row 11: assertions on bin/automouse/run source text
+# ---------------------------------------------------------------------------
+RUN_SRC="$REPO_ROOT/bin/automouse/run"
+
+# HARNESS must not be exported or assigned on a live (non-comment) line.
+# The comment block inside the replaced section mentions "HARNESS" — anchor
+# on assignment syntax to avoid a false positive.
+if grep -nE '^[[:space:]]*(export[[:space:]]+)?HARNESS=' "$RUN_SRC" | grep -qv '^[0-9]*:[[:space:]]*#'; then
+    printf '  FAIL row 11: bin/automouse/run exports or assigns HARNESS\n'
+    FAILED=1
+else
+    printf '  ok   row 11: HARNESS is not exported or assigned in bin/automouse/run\n'
+fi
+
+# --auto must not appear alongside post-plan-now in any non-comment line.
+if grep -n 'post-plan-now' "$RUN_SRC" | grep -v '^[0-9]*:[[:space:]]*#' | grep -q -- '--auto'; then
+    printf '  FAIL row 11: bin/automouse/run passes --auto to post-plan-now\n'
+    FAILED=1
+else
+    printf '  ok   row 11: --auto not passed to post-plan-now\n'
+fi
+
+# Positive: --foreground IS present in the PP block (the bash -c inner command
+# and the post-plan-now path are on adjacent lines; checking the extracted block
+# is more robust than a multi-line grep over the source file).
+if printf '%s' "$PP_BLOCK" | grep -qF -e '--foreground'; then
+    printf '  ok   row 11: --foreground is present in the postplan invocation block\n'
+else
+    printf '  FAIL row 11: --foreground not found in the postplan invocation block\n'
+    FAILED=1
+fi
+
+exit "$FAILED"

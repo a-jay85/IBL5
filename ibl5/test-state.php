@@ -488,6 +488,17 @@ if ($method === 'DELETE' && $action === 'reset-demands') {
     exit;
 }
 
+// GET ?action=count-fa-stories — return row count for FA assign news stories
+// (title LIKE '2006 IBL Free Agency, Days %') so the duplicate-submit E2E can
+// verify no second row was inserted after an already-processed re-submit.
+if ($method === 'GET' && $action === 'count-fa-stories') {
+    $result = $db->query("SELECT COUNT(*) AS cnt FROM nuke_stories WHERE title LIKE '2006 IBL Free Agency, Days %'");
+    $row = $result ? $result->fetch_assoc() : null;
+    echo json_encode(['count' => $row !== null ? (int) $row['cnt'] : 0]);
+    $db->close();
+    exit;
+}
+
 // GET ?action=count-demands — return current row count for ibl_demands
 if ($method === 'GET' && $action === 'count-demands') {
     $result = $db->query('SELECT COUNT(*) AS cnt FROM ibl_demands');
@@ -789,6 +800,8 @@ if ($method === 'DELETE' && $action === 'reset-fa-signings') {
     // Delete the FA assign news story.
     $db->query("DELETE FROM nuke_stories WHERE title LIKE '2006 IBL Free Agency, Days %'");
     $storiesDeleted = $db->affected_rows;
+    $db->query("DELETE FROM ibl_fa_days_processed WHERE league = 'ibl'");
+    $markersDeleted = $db->affected_rows;
     // Re-seed ibl_fa_offers (same three rows as reset-fa-offers).
     $db->query('DELETE FROM ibl_fa_offers');
     $db->query(
@@ -798,7 +811,7 @@ if ($method === 'DELETE' && $action === 'reset-fa-signings') {
           ('FA Center',  11, 'Metros', 1, 480, 528, 0,   0, 0, 0,  1.0, 0.5, 600.0,  0, 0, 0),
           ('FA Forward', 12, 'Metros', 1, 380, 418, 460, 0, 0, 0,  1.0, 0.5, 550.0,  0, 0, 0)"
     );
-    echo json_encode(['reset' => 'ok', 'stories_deleted' => $storiesDeleted]);
+    echo json_encode(['reset' => 'ok', 'stories_deleted' => $storiesDeleted, 'markers_deleted' => $markersDeleted]);
     $db->close();
     exit;
 }

@@ -224,6 +224,7 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
             'newsHomeText' => $newsHomeText,
             'newsBodyText' => $newsBodyText,
             'discordText' => $discordText,
+            'processed_at' => $this->repository->getDayProcessedMarker($day),
         ];
     }
 
@@ -246,12 +247,28 @@ class FreeAgencyAdminProcessor implements FreeAgencyAdminProcessorInterface
             ];
         }
 
-        $counts = $this->repository->executeSigningsTransactionally(
-            $signings,
-            $newsTitle,
-            $newsHomeText,
-            $newsBodyText
-        );
+        try {
+            $counts = $this->repository->executeSigningsTransactionally(
+                $day,
+                $signings,
+                $newsTitle,
+                $newsHomeText,
+                $newsBodyText
+            );
+        } catch (DayAlreadyProcessedException $e) {
+            $this->logger->warning('fa_signings_blocked_already_processed', [
+                'action' => 'fa_signings_blocked_already_processed',
+                'day' => $day,
+                'signings_submitted' => count($signings),
+            ]);
+
+            return [
+                'success' => false,
+                'successCount' => 0,
+                'errorCount' => 0,
+                'message' => "Day {$day} has already been processed. Re-running it is blocked.",
+            ];
+        }
 
         $successCount = $counts['successCount'];
         $errorCount = $counts['errorCount'];

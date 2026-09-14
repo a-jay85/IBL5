@@ -40,7 +40,7 @@ class FreeAgencyAdminProcessorTest extends TestCase
         $mock = $this->createMock(FreeAgencyAdminRepositoryInterface::class);
         $mock->expects($this->once())
             ->method('executeSigningsTransactionally')
-            ->with($signings, 'FA Day 1', 'Home text', 'Body text')
+            ->with(1, $signings, 'FA Day 1', 'Home text', 'Body text')
             ->willReturn(['successCount' => 3, 'errorCount' => 0, 'newsSid' => 0]);
 
         $processor = new FreeAgencyAdminProcessor($mock, $this->mockDb);
@@ -77,7 +77,7 @@ class FreeAgencyAdminProcessorTest extends TestCase
         $mock = $this->createMock(FreeAgencyAdminRepositoryInterface::class);
         $mock->expects($this->once())
             ->method('executeSigningsTransactionally')
-            ->with($signings, 'FA Day 1', '', '')
+            ->with(1, $signings, 'FA Day 1', '', '')
             ->willReturn(['successCount' => 1, 'errorCount' => 0, 'newsSid' => 0]);
 
         $processor = new FreeAgencyAdminProcessor($mock, $this->mockDb);
@@ -97,6 +97,74 @@ class FreeAgencyAdminProcessorTest extends TestCase
         $this->assertFalse($result['success']);
         $this->assertSame(0, $result['successCount']);
         $this->assertStringContainsString('No operations', $result['message']);
+    }
+
+    public function testExecuteSigningsReturnsBlockedResultWhenDayAlreadyProcessed(): void
+    {
+        $signings = [$this->makeSigning(1, 10, 'Miami', 500, 0, 0, 0, 0, 0, 1, false, false)];
+
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub->method('executeSigningsTransactionally')
+            ->willThrowException(new \FreeAgency\DayAlreadyProcessedException('Day already processed'));
+
+        $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb);
+        $result = $processor->executeSignings(1, $signings, 'FA Day 1', 'Home text', 'Body text');
+
+        $this->assertFalse($result['success']);
+        $this->assertStringContainsString('already been processed', $result['message']);
+        $this->assertSame(0, $result['successCount']);
+        $this->assertSame(0, $result['errorCount']);
+    }
+
+    public function testExecuteSigningsDoesNotDispatchDiscordWhenDayAlreadyProcessed(): void
+    {
+        $signings = [$this->makeSigning(1, 10, 'Miami', 500, 0, 0, 0, 0, 0, 1, false, false)];
+        $dispatcher = $this->makeRecordingDispatcher();
+
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub->method('executeSigningsTransactionally')
+            ->willThrowException(new \FreeAgency\DayAlreadyProcessedException('Day already processed'));
+
+        $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb, null, $dispatcher);
+        $processor->executeSignings(1, $signings, 'FA Day 1', 'Home text', 'Body text');
+
+        $this->assertCount(0, $dispatcher->messages, 'Discord must not be called when day is already processed');
+    }
+
+    public function testExecuteSigningsLogsBlockedAttemptWhenDayAlreadyProcessed(): void
+    {
+        $signings = [$this->makeSigning(1, 10, 'Miami', 500, 0, 0, 0, 0, 0, 1, false, false)];
+
+        $logger = new class extends \Psr\Log\AbstractLogger {
+            /** @var list<string> */
+            public array $messages = [];
+
+            public function log(mixed $level, string|\Stringable $message, array $context = []): void
+            {
+                $this->messages[] = (string) $message;
+            }
+        };
+
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub->method('executeSigningsTransactionally')
+            ->willThrowException(new \FreeAgency\DayAlreadyProcessedException('Day already processed'));
+
+        $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb, $logger);
+        $processor->executeSignings(1, $signings, 'FA Day 1', 'Home text', 'Body text');
+
+        $this->assertContains('fa_signings_blocked_already_processed', $logger->messages);
+        $this->assertNotContains('fa_signings_executed', $logger->messages);
+    }
+
+    public function testExecuteSigningsWithEmptySigningsDoesNotTouchRepository(): void
+    {
+        $mock = $this->createMock(FreeAgencyAdminRepositoryInterface::class);
+        $mock->expects($this->never())->method('executeSigningsTransactionally');
+
+        $processor = new FreeAgencyAdminProcessor($mock, $this->mockDb);
+        $result = $processor->executeSignings(1, [], 'FA Day 1', '', '');
+
+        $this->assertSame('No operations were executed.', $result['message']);
     }
 
     // ============================================
@@ -844,6 +912,36 @@ class FreeAgencyAdminProcessorTest extends TestCase
             $result['message'],
             'A total failure must not offer a resume point'
         );
+    }
+
+    // ============================================
+    // processDay() — processed_at field from repository
+    // ============================================
+
+    public function testProcessDayExposesProcessedAtFromRepository(): void
+    {
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub->method('getAllOffersWithBirdYears')->willReturn([]);
+        $stub->method('getPlayerDemandsBatch')->willReturn([]);
+        $stub->method('getDayProcessedMarker')->willReturn('2026-09-14 12:00:00');
+
+        $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb);
+        $result = $processor->processDay(1);
+
+        $this->assertSame('2026-09-14 12:00:00', $result['processed_at']);
+    }
+
+    public function testProcessDayExposesNullProcessedAtWhenDayNotRun(): void
+    {
+        $stub = self::createStub(FreeAgencyAdminRepositoryInterface::class);
+        $stub->method('getAllOffersWithBirdYears')->willReturn([]);
+        $stub->method('getPlayerDemandsBatch')->willReturn([]);
+        $stub->method('getDayProcessedMarker')->willReturn(null);
+
+        $processor = new FreeAgencyAdminProcessor($stub, $this->mockDb);
+        $result = $processor->processDay(1);
+
+        $this->assertNull($result['processed_at']);
     }
 
     // ============================================

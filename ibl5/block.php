@@ -23,6 +23,7 @@ global $mysqli_db, $authService;
 
 use FreeAgency\FreeAgencyAdminProcessor;
 use FreeAgency\FreeAgencyAdminRepository;
+use League\LeagueContext;
 use Security\CsrfGuard;
 use Security\HtmlSanitizer;
 
@@ -52,7 +53,7 @@ if ($day < 1 || $day > 12) {
     $day = 1;
 }
 
-$repository = new FreeAgencyAdminRepository($mysqli_db);
+$repository = new FreeAgencyAdminRepository($mysqli_db, new LeagueContext());
 $processor = new FreeAgencyAdminProcessor($repository, $mysqli_db);
 $actionMessage = '';
 $actionCompleted = false;
@@ -90,6 +91,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
                     $newsBodyText
                 );
 
+                if ($result['success']) {
+                    // Post/Redirect/Get: a refresh of the landing page re-issues a GET,
+                    // so the browser can no longer replay the submit. Failures do not
+                    // redirect — the commissioner must see why nothing happened.
+                    header('Location: block.php?day=' . $day . '&executed=1', true, 303);
+                    exit;
+                }
+
                 $actionMessage = $result['message'];
                 $actionCompleted = $result['success'];
             } else {
@@ -112,6 +121,7 @@ $discordText = $dayData['discordText'];
 $newsHomeText = $dayData['newsHomeText'];
 $newsBodyText = $dayData['newsBodyText'];
 $numOffers = count($allOffers);
+$processedAt = $dayData['processed_at'];
 
 // Build auto-rejected text for Discord
 $autoRejectedText = "These offers have been **auto-rejected** for being under half of the player's demands:";
@@ -153,6 +163,19 @@ $csrfToken = CsrfGuard::generateRawToken('free_agency_admin');
 <body>
     <h1>You are viewing <span class="block-fa-day-banner">Day <?= $day ?></span> results!</h1>
     <h2>Total number of offers: <?= $numOffers ?></h2>
+
+    <?php if ($processedAt !== null): ?>
+        <p id="dayProcessedBanner" class="message-error">
+            Day <?= $day ?> was already processed on <?= HtmlSanitizer::e($processedAt) ?>.
+            Re-running it is blocked.
+        </p>
+    <?php endif; ?>
+
+    <?php if (($_GET['executed'] ?? '') === '1'): ?>
+        <p id="executedBanner" class="message-success">
+            Free agents assigned and the news story was inserted.
+        </p>
+    <?php endif; ?>
 
     <?php if ($actionMessage !== ''): ?>
         <p id="actionMessage" class="<?= $actionCompleted ? 'message-success' : 'message-error' ?>">
@@ -239,7 +262,7 @@ $csrfToken = CsrfGuard::generateRawToken('free_agency_admin');
     ?></textarea>
 
     <br>
-    <?php if ($actionCompleted): ?>
+    <?php if ($processedAt !== null || $actionCompleted): ?>
         <button type="button" class="action-button-red" onclick="showClearOffersModal()">Clear All Free Agency Offers</button>
     <?php else: ?>
         <button type="button" class="action-button" onclick="showAssignFreeAgentsModal()">Assign Free Agents to Teams and Insert News Story</button>

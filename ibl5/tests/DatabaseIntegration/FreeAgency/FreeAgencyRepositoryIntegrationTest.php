@@ -149,6 +149,7 @@ class FreeAgencyRepositoryIntegrationTest extends DatabaseTestCase
         ];
 
         $result = $this->adminRepository->executeSigningsTransactionally(
+            3,
             $signings,
             'FA Signings',
             'Players signed',
@@ -208,6 +209,7 @@ class FreeAgencyRepositoryIntegrationTest extends DatabaseTestCase
         ];
 
         $this->adminRepository->executeSigningsTransactionally(
+            5,
             $signings,
             'MLE Signing',
             'MLE used',

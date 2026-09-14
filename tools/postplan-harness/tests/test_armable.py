@@ -1,14 +1,17 @@
 import os
+import subprocess
 import sys
+import tempfile
 
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from harness.adapters.gitad import LiveGit
 from harness.armable import (ArmInputs, SENTINEL_RE, dep_numbers, evaluate, feat_hold,
                              manual_testing_clearance)
 from harness.manual_rows import ManualRow, _assert_no_sentinel, render_rows
-from harness.state import Classification, Finding
+from harness.state import Classification, Finding, HarnessError
 
 BODY_CLEARED = "## Summary\nx\n\n## Manual Testing\n\nNo manual testing needed — covered.\n"
 BODY_HELD = "## Summary\nx\n\n## Manual Testing\n\n- [ ] eyeball the layout\n"
@@ -190,3 +193,73 @@ def test_armable_unmet_contract_blocks_arming():
     # phase5_status='skipped' with empty unresolved_conformance still arms (condition (4) not touched).
     d2 = evaluate(inputs(phase5_status="skipped", unresolved_conformance=[]))
     assert d2.armed
+
+
+def test_condition_14_is_absent_and_the_reason_is_recorded():
+    """(14) must not appear in evaluate()'s condition set, AND the reason must be
+    recorded as a comment in armable.py so the absence is documented, not silent."""
+    nums = [c.number for c in evaluate(inputs()).conditions]
+    assert 14 not in nums
+    # Read armable.py off disk to verify the vacuity reason is recorded there.
+    src = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                       "..", "harness", "armable.py")
+    text = open(src).read()
+    assert "Condition (14)" in text, "armable.py must name condition (14) in a comment"
+    assert "rebase-conflict" in text, "armable.py must cite rebase-conflict as the vacuity reason"
+
+
+def test_rebase_conflict_fails_the_run_before_evaluate():
+    """A conflicted rebase raises HarnessError('rebase-conflict') and aborts before
+    evaluate() is ever reached — proving (14) has nothing to observe in the harness."""
+    import shutil
+    d = tempfile.mkdtemp(prefix="postplan-arm-test-")
+    try:
+        git_env = {**os.environ,
+                   "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+                   "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
+
+        def sh(*a):
+            subprocess.run(["git", "-C", d, *a], check=True, capture_output=True,
+                           env=git_env)
+
+        subprocess.run(["git", "init", "-b", "master", d],
+                       check=True, capture_output=True)
+        subprocess.run(["git", "-C", d, "config", "user.email", "t@t"],
+                       check=True, capture_output=True)
+        subprocess.run(["git", "-C", d, "config", "user.name", "t"],
+                       check=True, capture_output=True)
+
+        # Base commit: a file both branches will edit
+        with open(os.path.join(d, "a.txt"), "w") as f:
+            f.write("original line\n")
+        sh("add", "-A")
+        sh("commit", "-m", "base")
+
+        # Feature branch: edit the same line
+        sh("checkout", "-b", "feature")
+        with open(os.path.join(d, "a.txt"), "w") as f:
+            f.write("feature change\n")
+        sh("add", "-A")
+        sh("commit", "-m", "feature edit")
+
+        # Master: conflicting edit on the same line
+        sh("checkout", "master")
+        with open(os.path.join(d, "a.txt"), "w") as f:
+            f.write("master change\n")
+        sh("add", "-A")
+        sh("commit", "-m", "master edit")
+
+        # Return to feature and attempt rebase — must conflict
+        sh("checkout", "feature")
+        with pytest.raises(HarnessError) as exc:
+            LiveGit(d).rebase_onto("master")
+        assert exc.value.kind == "rebase-conflict"
+
+        # Prove git rebase --abort actually ran: no in-progress rebase in the tree
+        result = subprocess.run(
+            ["git", "-C", d, "status", "--porcelain=v2", "--branch"],
+            capture_output=True, text=True)
+        assert "rebase" not in result.stdout.lower(), (
+            "git rebase --abort did not run: rebase still in progress\n" + result.stdout)
+    finally:
+        shutil.rmtree(d, ignore_errors=True)

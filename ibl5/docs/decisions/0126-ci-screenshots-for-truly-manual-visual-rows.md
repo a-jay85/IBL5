@@ -103,3 +103,16 @@ the look-and-feel lexicon and carries neither a `vr:` cell nor a `no-vr:` reason
 - `tools/postplan-harness/harness/manual_rows.py` — renders the `## Manual Testing` bullets the
   `vr:` cell must survive into.
 - `ibl5/test-state.php` — the action dispatcher the capture step drives to reach each UI state.
+
+## Addendum — Phases 5, 7, and 8 deferred to follow-up PRs (2026-09-14)
+
+The PR that shipped Phases 1–4 and 6 of the backing plan did not include Phases 5, 7, or 8. Phase 5.5 plan-intent fidelity review identified this as an undeclared omission.
+
+**What shipped (Phases 1, 2, 3, 4, 6):** gate `[Q]` in `bin/check-plan`; `bin/vr-review-comment` builder modes `--manual-rows-from-pr` and `--manual-gallery`; `ibl5/tests/e2e/vr-manual-rows.ts` and `ibl5/tests/ts-unit/vr-manual-rows.test.ts`; `tools/postplan-harness/harness/manual_rows.py` and `tools/postplan-harness/tests/test_manual_rows.py`.
+
+**What is deferred:**
+- **Phase 5** — Playwright config `ibl5/playwright.manual-rows.config.ts` (example) and E2E spec `ibl5/tests/e2e/manual-rows.spec.ts` (example); `ibl5/test-state.php` unknown-action 400 guard.
+- **Phase 7** — CI workflow steps in `.github/workflows/e2e-tests.yml` for capture, Pages publish, and sticky-comment invocation (the `bin/vr-review-comment --manual-gallery` caller).
+- **Phase 8** — Tooling-doc updates in `.claude/rules/visual-review-prs.md` (example) and plan-skill docs; end-to-end local rehearsal.
+
+**Consequence while deferred:** Gate `[Q]` is live and requires `vr:` cells from plan authors, but no CI step captures or publishes the screenshots those cells describe. The `## Consequences` bullet "a reviewer judges a newly built screen from the PR page itself" describes the end-state of the full pipeline; it does not yet hold. The References entry naming `ibl5/test-state.php` as "the action dispatcher the capture step drives" is accurate in intent but the capture step does not yet exist.

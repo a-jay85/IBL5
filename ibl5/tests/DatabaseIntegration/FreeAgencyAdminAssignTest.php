@@ -392,7 +392,7 @@ class FreeAgencyAdminAssignTest extends DatabaseTestCase
     // ---- helpers -------------------------------------------------------------
 
     /**
-     * @return array{playerId: int, teamId: int, offerYears: int, offers: array<string, int>, usedMle: bool, usedLle: bool, teamName: string}
+     * @return array{playerId: int, teamId: int, teamName: string, offers: array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int}, offerYears: int, usedMle: bool, usedLle: bool}
      */
     private function signingPayload(
         int $pid,

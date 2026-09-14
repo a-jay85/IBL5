@@ -203,13 +203,23 @@ def test_skill_block_plan_blind(tmp_path):
     assert "PLAN_FOUND=none" in r.stdout
 
 
-def _fixture_repo(tmp_path):
+def _fixture_repo(tmp_path, dirty_default=True, dirty=None):
     """A dirty linked worktree on a non-master branch — enough to clear post-plan-now's guards.
 
     Creates a main checkout at tmp_path/wt (on some-feature) with bin/lib/git-helpers.sh
     committed, then adds a linked worktree at tmp_path/wt-base (on wt-feature).
     Returns tmp_path/wt-base so is_in_worktree() passes in callers.
     CI has no global git identity, so the fixture sets its own.
+
+    `dirty_default=False` leaves `f.txt` clean so a caller can choose exactly which paths
+    are dirty; `f.txt` is a production path as far as the exit-5 guard is concerned, so the
+    default dirtying would mask a test-only working set.
+
+    `dirty` maps repo-relative paths to their post-branch content. Those paths are COMMITTED
+    into the base commit first and only then rewritten, so they show up as tracked
+    modifications: the "nothing to ship" guard above tests `git diff --quiet`, which an
+    untracked file does not trip, and zero commits ahead of origin/master is exactly the
+    shape the exit-5 guard must handle.
     """
     repo = tmp_path / "wt"
     repo.mkdir()
@@ -221,12 +231,22 @@ def _fixture_repo(tmp_path):
     shutil.copy(os.path.join(REPO, "bin", "lib", "git-helpers.sh"),
                 str(repo / "bin" / "lib" / "git-helpers.sh"))
     (repo / "f.txt").write_text("one\n")
+    for rel in (dirty or {}):
+        p = repo / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text("base\n")
     run("git", "add", "-A")
     run("git", "commit", "-qm", "base")
     run("git", "checkout", "-qb", "some-feature")
     linked = tmp_path / "wt-base"
     run("git", "worktree", "add", str(linked), "-b", "wt-feature")
-    (linked / "f.txt").write_text("two\n")      # dirty tree ⇒ "nothing to ship" guard passes
+    # Without an origin/master ref the `origin/master...HEAD` leg of the guard's changed-set
+    # union errors out, and every guard test below would pass for the wrong reason.
+    run("git", "update-ref", "refs/remotes/origin/master", "master")
+    if dirty_default:
+        (linked / "f.txt").write_text("two\n")    # dirty tree ⇒ "nothing to ship" guard passes
+    for rel, text in (dirty or {}).items():
+        (linked / rel).write_text(text)         # tracked-and-modified, so `git diff` sees it
     return linked
 
 
@@ -271,13 +291,23 @@ def _guard_block():
     assert len(inner) == 2, f"expected exactly one guard block end, got {len(inner) - 1}"
     return (START + inner[0] + END).strip()
 
-def _generate_cmd(tmp_path, extra_env=None):
-    """Run bin/post-plan-now with launchctl stubbed and HOME redirected; return $CMD."""
+def _run_ppn(tmp_path, args=(), extra_env=None, dirty=None):
+    """Run bin/post-plan-now with launchctl + gh stubbed and HOME redirected.
+
+    Returns the raw CompletedProcess — the guard tests need the return code, which
+    _generate_cmd asserts away.
+
+    The `gh` stub prints $FAKE_PR_NUMBER when it is non-empty and nothing otherwise, so a
+    test selects the PR-exists / no-PR case purely through the environment.
+    """
     home = tmp_path / "home"
     (home / "Library" / "LaunchAgents").mkdir(parents=True)
     shim = tmp_path / "shim"; shim.mkdir()
     (shim / "launchctl").write_text("#!/bin/sh\nexit 0\n")
     (shim / "launchctl").chmod(0o755)
+    (shim / "gh").write_text(
+        '#!/bin/sh\nif [ -n "${FAKE_PR_NUMBER:-}" ]; then echo "$FAKE_PR_NUMBER"; fi\nexit 0\n')
+    (shim / "gh").chmod(0o755)
     harness = tmp_path / "fake-harness"; harness.mkdir()
     (harness / "run").write_text("#!/bin/sh\nexit 0\n")
     (harness / "run").chmod(0o755)
@@ -285,9 +315,16 @@ def _generate_cmd(tmp_path, extra_env=None):
     env = dict(os.environ, HOME=str(home), HARNESS=str(harness),
                PATH=f"{shim}:{os.environ['PATH']}")
     env.pop("POST_PLAN_SKILL", None)
+    env.pop("FAKE_PR_NUMBER", None)
     env.update(extra_env or {})
-    repo = _fixture_repo(tmp_path)
-    r = subprocess.run(["bash", PPN], cwd=repo, env=env, capture_output=True, text=True)
+    repo = _fixture_repo(tmp_path, dirty_default=dirty is None, dirty=dirty)
+    return subprocess.run(["bash", PPN, *args], cwd=repo, env=env,
+                          capture_output=True, text=True)
+
+def _generate_cmd(tmp_path, extra_env=None):
+    """Run bin/post-plan-now with launchctl stubbed and HOME redirected; return $CMD."""
+    home = tmp_path / "home"
+    r = _run_ppn(tmp_path, extra_env=extra_env)
     assert r.returncode == 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
 
     plists = list((home / "Library" / "LaunchAgents").glob("*.plist"))
@@ -677,3 +714,59 @@ def test_phase0_guard_prearm_blocks_detached_head(tmp_path):
     assert r.returncode == 1, f"stdout={r.stdout!r} stderr={r.stderr!r}"
     assert "STOP" in r.stdout
     assert "MAIN-CHECKOUT or detached HEAD" in r.stdout
+
+# Exit-5 guard: a PR already exists and the working set touches no production files.
+# The failure mode is a SILENTLY DEAD guard, so each test below names the mutation it
+# catches; a guard that never fires still leaves the whole rest of this file green.
+# ---------------------------------------------------------------------------
+
+_TEST_ONLY_DIRTY = {"ibl5/tests/Foo/BarTest.php": "<?php\n// test-only change\n"}
+
+
+def test_guard_exits_5_when_pr_exists_and_no_production_files(tmp_path):
+    """Catches: the guard block deleted, the exit code changed, or the message no longer
+    naming the cheaper command."""
+    r = _run_ppn(tmp_path, extra_env={"FAKE_PR_NUMBER": "2186"}, dirty=_TEST_ONLY_DIRTY)
+    assert r.returncode == 5, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    assert "/commit-commands:commit-push-pr" in r.stderr
+    assert "PR #2186" in r.stderr
+
+
+def test_guard_proceeds_when_pr_exists_and_uncommitted_production_files(tmp_path):
+    """The false-block case: zero commits ahead of origin/master, one UNCOMMITTED
+    production file. Catches narrowing the changed set back to
+    `git diff --name-only origin/master...HEAD` alone, which sees nothing here."""
+    dirty = dict(_TEST_ONLY_DIRTY)
+    dirty["ibl5/modules/Player/index.php"] = "<?php\n// production change\n"
+    r = _run_ppn(tmp_path, extra_env={"FAKE_PR_NUMBER": "2186"}, dirty=dirty)
+    assert r.returncode == 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    assert "no production files" not in r.stderr
+
+
+def test_guard_force_flag_overrides_exit_5(tmp_path):
+    """Catches: the --force arm dropped, or the guard reading FORCE before the arg loop
+    assigns it (which under `set -u` is exit 2, not 0)."""
+    r = _run_ppn(tmp_path, args=("--force",),
+                 extra_env={"FAKE_PR_NUMBER": "2186"}, dirty=_TEST_ONLY_DIRTY)
+    assert r.returncode == 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+
+
+def test_guard_proceeds_when_no_pr_exists(tmp_path):
+    """The hard stop: the guard must NOT widen to the no-PR case. Catches removing or
+    inverting `[ -n "$PR_NUM" ]`."""
+    r = _run_ppn(tmp_path, dirty=_TEST_ONLY_DIRTY)      # FAKE_PR_NUMBER unset ⇒ gh prints nothing
+    assert r.returncode == 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    assert "no production files" not in r.stderr
+
+
+def test_force_flag_rejected_forms_fail_loudly(tmp_path):
+    """--force is a BARE flag only. Catches a permissive `--force=*)` arm, under which a
+    typo'd `--force=0` would silently ENABLE the override."""
+    # index, not a slug of `args` — both forms slugify to "force1" and would collide on
+    # the same tmp dir, making the second iteration blow up in setup instead of asserting.
+    for i, args in enumerate((("--force=1",), ("--force", "1"))):
+        r = _run_ppn(tmp_path / f"case{i}",
+                     args=args, extra_env={"FAKE_PR_NUMBER": "2186"},
+                     dirty=_TEST_ONLY_DIRTY)
+        assert r.returncode != 0, f"{args}: expected failure, got 0"
+        assert "unknown argument" in r.stderr, f"{args}: got {r.stderr!r}"

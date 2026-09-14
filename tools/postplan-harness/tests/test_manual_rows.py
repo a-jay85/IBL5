@@ -24,6 +24,31 @@ def test_five_column_house_row_drops_classification_and_timing():
     assert "post-impl" not in rendered
 
 
+def test_vr_cell_survives_verbatim():
+    # The `vr:` cell is CI's only channel to a Truly-manual row (ADR-0126), so it
+    # must reach the bullet character-for-character — `=`, `;` and `&` included.
+    vr = "vr: label=roster-grid; role=admin; url=modules.php?name=Roster&teamID=1"
+    cells = ["3", "does the roster grid look right", "Truly-manual", "post-impl", vr]
+    rendered = render_rows([row_from_cells(cells, 3)])
+    assert rendered == f"- [ ] **Row 3** \u2014 does the roster grid look right \u2014 {vr}"
+    assert vr in rendered
+
+
+def test_vr_cell_survives_beside_noise_tokens():
+    # Mutation guard: a `no-vr:` reason that says "truly-manual" collides with
+    # CLASS_RE, and a `vr:` cell that opens with a timing word collides with
+    # TIMING_RE. Both are dropped outright without the VR_RE exemption, so this
+    # case goes red the moment the exemption is removed.
+    novr = "no-vr: truly-manual polish judgment, nothing to screenshot"
+    cells_novr = ["5", "does the print layout look right", "Truly-manual", "post-impl", novr]
+    assert novr in render_rows([row_from_cells(cells_novr, 5)])
+
+    vr = "post-impl vr: label=home; role=anon; url=index.php"
+    cells = ["4", "does the home page look right", "Truly-manual", "post-impl", vr]
+    rendered = render_rows([row_from_cells(cells, 4)])
+    assert vr in rendered
+
+
 def test_legacy_three_column_row_uses_ordinal():
     cells = ["looks right", "Truly-manual", "eyeball the dashboard"]
     row = row_from_cells(cells, 2)

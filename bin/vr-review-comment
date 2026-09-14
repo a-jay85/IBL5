@@ -14,6 +14,11 @@
 //   --update-pr-body=N        splice a new-screens image section into PR #N's
 //                             body (offset 0, marker-delimited), then exit.
 //
+// Additive modes (see ADR-0126 — truly-manual visual rows):
+//   --manual-rows-from-pr=N   read PR #N's body, parse the `vr:` cells out of
+//                             its `## Manual Testing` bullets, write JSON, exit.
+//   --out-json=PATH           destination for the above.
+//
 // Usage:
 //   bin/vr-review-comment --gallery=ibl5/vr-gallery.json --coverage=coverage.json \
 //     --pages-url=https://a-jay85.github.io/IBL5/<sha>/visual-review/ --out=vr-review-comment.md
@@ -28,11 +33,13 @@ const ibl5Dir = resolve(__dir, '..', 'ibl5');
 const { buildComment } = await import(resolve(ibl5Dir, 'tests/e2e/vr-review-comment.ts'));
 const { buildCopyPlan, buildNewScreensSection, newScreenUrl, normalizeBody, spliceBody } =
   await import(resolve(ibl5Dir, 'tests/e2e/vr-pr-body.ts'));
+const { parseManualBullets } = await import(resolve(ibl5Dir, 'tests/e2e/vr-manual-rows.ts'));
 
 const USAGE =
   'Usage: bin/vr-review-comment --gallery=PATH --coverage=PATH --pages-url=URL [--out=PATH]\n' +
   '   or: bin/vr-review-comment --gallery=PATH --copy-new-screens=DEST [--renders-dir=SRC]\n' +
-  '   or: bin/vr-review-comment --gallery=PATH --pages-url=URL --update-pr-body=N [--dry-run] [--body-file-in=PATH]';
+  '   or: bin/vr-review-comment --gallery=PATH --pages-url=URL --update-pr-body=N [--dry-run] [--body-file-in=PATH]\n' +
+  '   or: bin/vr-review-comment --manual-rows-from-pr=N [--out-json=PATH] [--body-file-in=PATH]';
 
 let galleryPath: string | null = null;
 let coveragePath: string | null = null;
@@ -43,6 +50,8 @@ let rendersDir = 'ibl5/vr-gallery';
 let updatePr: string | null = null;
 let dryRun = false;
 let bodyFileIn: string | null = null;
+let manualRowsFromPr: string | null = null;
+let outJson = 'ibl5/vr-manual-rows.json';
 
 for (const arg of process.argv.slice(2)) {
   if (arg.startsWith('--gallery=')) galleryPath = arg.slice('--gallery='.length);
@@ -54,6 +63,9 @@ for (const arg of process.argv.slice(2)) {
   else if (arg.startsWith('--update-pr-body=')) updatePr = arg.slice('--update-pr-body='.length);
   else if (arg === '--dry-run') dryRun = true;
   else if (arg.startsWith('--body-file-in=')) bodyFileIn = arg.slice('--body-file-in='.length);
+  else if (arg.startsWith('--manual-rows-from-pr='))
+    manualRowsFromPr = arg.slice('--manual-rows-from-pr='.length);
+  else if (arg.startsWith('--out-json=')) outJson = arg.slice('--out-json='.length);
   else if (arg === '--help') {
     process.stdout.write(USAGE + '\n');
     process.exit(0);
@@ -61,6 +73,28 @@ for (const arg of process.argv.slice(2)) {
     process.stderr.write(`Unknown argument: ${arg}\n${USAGE}\n`);
     process.exit(2);
   }
+}
+
+// Manual-row extraction mode (ADR-0126) — read PR #N's body, pull the `vr:`
+// cells out of its `## Manual Testing` bullets, write JSON, exit. Needs neither
+// the gallery nor a pages URL, so it sits ahead of both. Zero rows still writes
+// a well-formed file so every downstream step is a clean no-op.
+if (manualRowsFromPr !== null) {
+  const raw =
+    bodyFileIn !== null && existsSync(bodyFileIn)
+      ? readFileSync(bodyFileIn, 'utf-8')
+      : execFileSync('gh', ['pr', 'view', manualRowsFromPr, '--json', 'body', '-q', '.body'], {
+          encoding: 'utf-8',
+        });
+  const { rows, errors } = parseManualBullets(raw === 'null' ? '' : raw);
+  const dir = dirname(outJson);
+  if (dir !== '' && dir !== '.' && !existsSync(dir)) mkdirSync(dir, { recursive: true });
+  writeFileSync(outJson, JSON.stringify({ rows, errors }, null, 2) + '\n');
+  for (const e of errors) process.stderr.write(`vr-review-comment: ${e}\n`);
+  process.stdout.write(
+    `vr-review-comment: ${rows.length} manual vr row(s), ${errors.length} error(s) -> ${outJson}\n`
+  );
+  process.exit(0);
 }
 
 // Change-driven gallery JSON — cells are PRE-CLASSIFIED by bin/vr-build-gallery

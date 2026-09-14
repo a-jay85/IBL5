@@ -362,7 +362,7 @@ def exit_code_for(res: RunResult) -> int:
     # DEGRADED is checked BEFORE fidelity_pending, and the order is load-bearing.
     # A live degraded run is *also* fidelity_pending (condition (12) always holds
     # live), so fidelity-first would route every degraded run into a resumed skill
-    # session at Phase 5.5. That session re-evaluates all thirteen arm conditions
+    # session at Phase 5.5. That session re-evaluates all fourteen arm conditions
     # from scratch, and nothing carries the degradation across: the skill's
     # condition (9) is an LLM enumeration over the realized diff, and it has no
     # knowledge of an unparseable review agent. Fidelity-first would therefore let

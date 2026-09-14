@@ -37,12 +37,28 @@ Invoke /post-plan using the Skill tool and let it run to completion. Completion 
 
 ## Step 4: Report and Clean Up
 
-After /post-plan completes successfully:
+/post-plan has three terminal outcomes. Two of them are success and both take the
+steps below:
+
+- **Merged or auto-merge armed** — the PR is on its way in.
+- **PR opened but auto-merge HELD** (feat: title, human-signoff required, an unmet
+  plan autonomy contract, or any Phase 6.5 condition not met) — this is post-plan's
+  NORMAL terminal state, not a failure. A held PR stays open for a human to merge.
+  The work has shipped. Take the steps below exactly as for a merged PR.
+
+The third outcome — /post-plan itself failed to run to completion — is Error
+Handling below, and only that outcome goes to skipped/.
+
+For either success outcome:
 
 1. Move the plan symlink from queue/ to done/:
    ```bash
    mv "$NIGHTLY_DIR/queue/<plan-filename>" "$NIGHTLY_DIR/done/"
    ```
+   Do this even when auto-merge was held. Leaving the plan in queue/ does not
+   "wait for the merge" — it makes the loop re-claim the plan and re-run post-plan
+   on the next iteration. If you skip this move, bin/automouse/run performs the
+   disposition itself once it sees an OPEN or MERGED PR on the branch.
 
 2. Write a completion report to $NIGHTLY_DIR/reports/YYYY-MM-DD-done-<slug>.md containing:
    - Plan title
@@ -60,6 +76,10 @@ After /post-plan completes successfully:
    ```
 
 ## Error Handling
+
+If ANY step fails — /post-plan aborted, the PR could not be opened, or CI is
+genuinely broken. A HELD auto-merge is NOT a failure and must NOT come here;
+it is the second success outcome in Step 4.
 
 If ANY step fails:
 1. Write a detailed error report to $NIGHTLY_DIR/reports/YYYY-MM-DD-error-<slug>.md

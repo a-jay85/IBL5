@@ -30,6 +30,45 @@ queue ◄──── queue-reorder-ui (browser drag-reorder UI, writes queue or
 scripts — they are tests, not operational pipeline members, and CI references them
 by their `bin/test-automouse-*` paths.
 
+## Loop-side terminal disposition
+
+`bin/automouse/run` no longer depends on the post-plan agent's prose to learn that a
+plan is finished. At two points it asks git-forge directly whether the plan's branch
+already carries an **OPEN or MERGED** pull request, and if so it performs the
+disposition itself: move the plan symlink `queue/` → `done/`, delete the handoff JSON,
+clear the `.attempts` / `.failure` / `.cap-refunds` sidecars, and write
+`reports/YYYY-MM-DD-done-<slug>.md` if the agent did not write one.
+
+**A held-open PR counts as done.** `/post-plan` always opens the PR; its conditions
+decide only whether auto-merge arms, so a PR held for a human (a `feat:` title, an
+unmet autonomy contract, any unmet Phase 6.5 condition) is the pipeline's *normal*
+terminal state — not a failure. Agents that read "held" as "not success" used to leave
+the plan in `queue/`, where it was re-claimed and re-post-planned every iteration,
+forever: creating the handoff resets the attempt counter, so `MAX_ATTEMPTS` never
+retired it. The loop-side check ends that cycle.
+
+The two check points:
+
+| When | Condition | Effect |
+|------|-----------|--------|
+| **Claim time**, before the attempt counter increments | no handoff to resume **and** branch has an OPEN/MERGED PR | dispose to `done/`, release the lock, `continue` — **zero `claude -p` spend**, zero attempts burned |
+| **After post-plan exits**, only if the environmental breaker did not trip | plan still in `queue/` **and** branch has an OPEN/MERGED PR | dispose to `done/`, then fall through to the normal lock release and between-plans canary |
+
+**Fail-closed.** Only a positive OPEN/MERGED answer triggers a disposition. A forge
+error (auth, network, rate limit), no PR for the branch, or a CLOSED-only match all
+fall through to the existing behaviour: the plan stays in `queue/` and retries as
+before. The branch is taken from the handoff JSON's `branch` field when present and
+derived from the plan slug otherwise; a wrong guess finds no PR and is therefore safe.
+
+**The environmental breaker keeps precedence.** A usage-limit or auth exit still
+refunds the attempt, writes an `env-stop` report, and stops the run — it is never
+re-read as "done". The disposition check runs strictly after the breaker's `break`,
+and `bin/test-automouse-postplan-disposition` asserts that ordering statically so the
+guarantee cannot be refactored away.
+
+Locked by `bin/test-automouse-postplan-disposition`; the agent-facing statement of the
+same three outcomes lives in `bin/automouse/prompt-postplan` Step 4.
+
 ## Host-state runbook — REQUIRED after this rename merges
 
 The rename from `bin/automouse-run` to `bin/automouse/run` touches **live host

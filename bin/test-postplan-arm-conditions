@@ -1261,16 +1261,15 @@ else
     echo "ok: §5.9i: clean and behind rebases write no conflict flag"
 fi
 
-# §5.9j the shared surfaces this change deliberately does NOT touch. Condition (14)'s
-# evidence is a /tmp flag local to one run — not live-derivable, so a predicate reading
-# it would emit machine-dependent columns in bin/pr-triage.
+# §5.9j the shared surfaces condition (14) must never reach. Its evidence is a /tmp flag
+# local to one run — not live-derivable, so a predicate reading it would emit
+# machine-dependent columns in bin/pr-triage. Checked by content, not by history: the CI
+# checkout is shallow with no origin/master ref (tests.yml harness-tests), and the property
+# is "the shared predicate never reads the flag", not "the file is untouched".
 for F in bin/lib/pr-armable.sh bin/pr-triage; do
-    if git -C "$REPO_ROOT" diff --quiet origin/master...HEAD -- "$F"; then
-        echo "ok: §5.9j: $F unchanged vs origin/master"
-    else
-        echo "FAIL: §5.9j: $F changed — condition (14) is run-local and must stay inline"
-        FAILED=1
-    fi
+    F_TXT="$(cat "$REPO_ROOT/$F")"
+    lacks "§5.9j: $F never reads the conflict flag" "$F_TXT" '/tmp/postplan-conflict-resolved-'
+    lacks "§5.9j: $F never names condition (14)"    "$F_TXT" 'condition (14)'
 done
 
 # §5.9k prose-level invariants the blocks cannot carry. These are the half-applied-edit

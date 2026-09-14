@@ -997,6 +997,11 @@ dispose_plan_done() {
     report="$reports_dir/$(date +%Y-%m-%d)-done-${slug}.md"
     mkdir -p "$NIGHTLY_DIR/done" "$reports_dir"
     mv -f "$QUEUE_DIR/$plan_name" "$NIGHTLY_DIR/done/" 2>/dev/null || true
+    # The morning digest selects done/ entries by their OWN mtime — the disposition date
+    # (.claude/rules/automouse-workflow.md). `mv` preserves the queue symlink's mtime (queue
+    # time), so stamp the moved entry now. -h touches the LINK, never its target, and works on
+    # a broken symlink; a failed/absent mv leaves nothing to touch, hence `|| true`.
+    touch -h -- "$NIGHTLY_DIR/done/$plan_name" 2>/dev/null || true
     rm -f "$QUEUE_DIR/${plan_name}.attempts" \
           "$QUEUE_DIR/${plan_name}.failure" \
           "$QUEUE_DIR/${plan_name}.cap-refunds" \

@@ -304,4 +304,32 @@ assert_contains "row21: WorkingDirectory falls back to REPO_ROOT" "<string>${NOG
 assert_contains "row21: Program path under REPO_ROOT" "${NOGIT}/bin/automouse/morning-digest" "$out21"
 echo "ok: row21 — MAIN_WT fallback outside a git tree"
 
+# --- row22: duplicate done/ shapes collapse and cost is summed once ---
+setup
+pin "$NDIR/done/dup-plan.md"
+pin "$NDIR/done/${TODAY}-done-dup-plan.md"
+cat > "$NDIR/reports/${TODAY}-costs.md" <<'COSTS'
+| Plan | Phase | Model | Tier | Cost ($) | Surcharge est ($) | Peak Ctx (K) | In | Out | Cache-read | CW-5m | CW-1h | Prov |
+|------|-------|-------|------|----------|-------------------|------------|-----|-----|-----------|-------|-------|------|
+| dup-plan.md | impl | claude-sonnet-4-6 | Sonnet | 2.5000 | — | 50 | 100 | 200 | 300 | — | — | real |
+COSTS
+out=$(run_digest --dry-run)
+assert_contains     "row22: Completed 1 (dedup collapses two shapes)" "Completed 1" "$out"
+assert_not_contains "row22: not Completed 2"                          "Completed 2" "$out"
+assert_contains     "row22: cost appears in output (normalization join)"           "2.5000"      "$out"
+echo "ok: row22 — duplicate done/ shapes collapse; cost appears via normalization join"
+
+# --- row23: date-prefixed-only done/ entry joins costs (negative path) ---
+setup
+pin "$NDIR/done/${TODAY}-done-dup-plan.md"
+cat > "$NDIR/reports/${TODAY}-costs.md" <<'COSTS'
+| Plan | Phase | Model | Tier | Cost ($) | Surcharge est ($) | Peak Ctx (K) | In | Out | Cache-read | CW-5m | CW-1h | Prov |
+|------|-------|-------|------|----------|-------------------|------------|-----|-----|-----------|-------|-------|------|
+| dup-plan.md | impl | claude-sonnet-4-6 | Sonnet | 2.5000 | — | 50 | 100 | 200 | 300 | — | — | real |
+COSTS
+out=$(run_digest --dry-run)
+assert_contains     "row23: prefixed name joins costs"  "2.5000"    "$out"
+assert_not_contains "row23: not Spend: \$0"             'Spend: $0' "$out"
+echo "ok: row23 — date-prefixed-only done/ entry joins costs"
+
 [ $FAILED -eq 0 ] && echo "All rows passed" || exit 1

@@ -95,6 +95,21 @@ DONE_DIR="$NIGHTLY_DIR/done"
 SKIPPED_DIR="$NIGHTLY_DIR/skipped"
 QUEUE_DIR="$NIGHTLY_DIR/queue"
 
+# done/ and skipped/ legitimately hold two name shapes — a bare `<slug>.md` symlink and a
+# `YYYY-MM-DD-done-<slug>.md` entry — while reports/*-costs.md plan cells are always bare.
+# Normalize both to the bare slug so the spend join and the counts agree. Bash 3.2: case
+# globs, no ${var//pattern/} regex, no associative arrays.
+normalize_plan_name() {
+  local n="$1"
+  case "$n" in
+    [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-done-*)    n="${n#????-??-??-done-}" ;;
+    [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-skipped-*) n="${n#????-??-??-skipped-}" ;;
+  esac
+  printf '%s' "${n%.md}"
+}
+COMPLETED_SEEN=""
+SKIPPED_SEEN=""
+
 COMPLETED=()
 SKIPPED_PLANS=()
 FAILED=()
@@ -106,6 +121,9 @@ if [ -d "$DONE_DIR" ]; then
     base="$(basename "$f")"
     # Exclude sidecar files
     [[ "$base" == *.attempts || "$base" == *.failure || "$base" == *.cap-refunds || "$base" == *.staleness ]] && continue
+    base="$(normalize_plan_name "$base")"
+    case "$COMPLETED_SEEN" in *":${base}:"*) continue ;; esac
+    COMPLETED_SEEN="${COMPLETED_SEEN}:${base}:"
     COMPLETED+=("$base")
   done < <(find_in_window "$DONE_DIR" \( -type f -o -type l \))
 fi
@@ -115,6 +133,9 @@ if [ -d "$SKIPPED_DIR" ]; then
   while IFS= read -r f; do
     base="$(basename "$f")"
     [[ "$base" == *.attempts || "$base" == *.failure || "$base" == *.cap-refunds || "$base" == *.staleness ]] && continue
+    base="$(normalize_plan_name "$base")"
+    case "$SKIPPED_SEEN" in *":${base}:"*) continue ;; esac
+    SKIPPED_SEEN="${SKIPPED_SEEN}:${base}:"
     SKIPPED_PLANS+=("$base")
   done < <(find_in_window "$SKIPPED_DIR" \( -type f -o -type l \))
 fi
@@ -134,7 +155,7 @@ if [ -d "$QUEUE_DIR" ]; then
     plan_file="${base%.attempts}"
     [ -z "$plan_file" ] && continue
     # Skip if already in completed
-    case "$COMPLETED_SET" in *":${plan_file}:"*) continue ;; esac
+    case "$COMPLETED_SET" in *":$(normalize_plan_name "$plan_file"):"*) continue ;; esac
     failure_file="$QUEUE_DIR/${plan_file}.failure"
     attempt_count="$(cat "$attempts_file" 2>/dev/null || echo 0)"
     if [ -f "$failure_file" ]; then
@@ -148,7 +169,7 @@ if [ -d "$QUEUE_DIR" ]; then
     base="$(basename "$failure_file")"
     plan_file="${base%.failure}"
     [ -z "$plan_file" ] && continue
-    case "$COMPLETED_SET" in *":${plan_file}:"*) continue ;; esac
+    case "$COMPLETED_SET" in *":$(normalize_plan_name "$plan_file"):"*) continue ;; esac
     [ -f "$QUEUE_DIR/${plan_file}.attempts" ] && continue
     FAILED+=("${plan_file}|0")
   done < <(find_in_window "$QUEUE_DIR" -type f -name '*.failure')
@@ -165,7 +186,7 @@ done
 for entry in "${FAILED[@]:-}" "${PARKED[@]:-}"; do
   [ -z "$entry" ] && continue
   plan_file="${entry%|*}"
-  NIGHT_PLANS="${NIGHT_PLANS}:${plan_file}:"
+  NIGHT_PLANS="${NIGHT_PLANS}:$(normalize_plan_name "$plan_file"):"
 done
 
 parse_costs_file() {
@@ -187,7 +208,8 @@ parse_costs_file() {
       cost_cell="$(echo "$line" | cut -d'|' -f6 | tr -d ' ')"
       prov_cell="$(echo "$line" | awk -F'|' '{print $14}' | tr -d ' ')"
       # Skip if plan not in last night's set (unless NIGHT_PLANS is empty = zero-run)
-      local plan_base="$plan_cell"
+      local plan_base
+      plan_base="$(normalize_plan_name "$plan_cell")"
       # Check membership in the colon-delimited NIGHT_PLANS string (bash 3.2 compat)
       local matched=0
       case "$NIGHT_PLANS" in

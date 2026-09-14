@@ -1432,6 +1432,14 @@ else
     lacks "§5.9k: the announcement never reuses pr-fast-canary"  "$BANN2" 'pr-fast-canary'
     lacks "§5.9k: the announcement never reuses pr-ready-verdict" "$BANN2" 'pr-ready-verdict'
 fi
+# §5.9l: the Phase 6.5 reference doc carries the (14) entry that SKILL.md's
+# "All fourteen conditions" count promises, as prose pointing at SKILL.md's block.
+ARM_TXT="$(cat "$SKILL")"
+have  "§5.9l: reference doc has a (14) entry"               "$ARM_TXT" '**(14)'
+have  "§5.9l: (14) entry names the conflict flag path"      "$ARM_TXT" '/tmp/postplan-conflict-resolved-'
+have  "§5.9l: (14) entry records the shared-predicate why"  "$ARM_TXT" 'not in the shared predicate'
+lacks "§5.9l: (14) entry adds no per-condition bash block"  "$ARM_TXT" 'CONFLICT_FLAG='
+
 if [ "$FAILED" -eq 0 ]; then
     echo "All post-plan block checks passed."
 else

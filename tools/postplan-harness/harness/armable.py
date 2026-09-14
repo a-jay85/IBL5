@@ -182,4 +182,10 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
                               f"fidelity verdict={inp.fidelity_verdict!r}; need READY or READY WITH NOTES"
                               if not fid_ok else ""))
 
+    # Condition (14) — conflict auto-resolved this run — is absent here because it is
+    # VACUOUS in the harness, not merely unported. adapters/gitad.py::rebase_onto raises
+    # HarnessError("rebase-conflict", ...) after `git rebase --abort`, so a conflicted
+    # rebase FAILS the run (runner.py maps it to exit 3) and never reaches evaluate().
+    # The harness never auto-resolves a conflict, so there is nothing for (14) to observe.
+    # Do not add a (14) ConditionResult: test_condition_set_is_skill_numbered pins the set.
     return ArmDecision(armed=not any(c.blocked for c in cs), conditions=cs)

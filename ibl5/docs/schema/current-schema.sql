@@ -995,6 +995,18 @@ CREATE TABLE `ibl_events` (
   KEY `idx_traffic_created` (`traffic_class`,`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `ibl_fa_days_processed`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ibl_fa_days_processed` (
+  `league` varchar(20) NOT NULL COMMENT 'League identifier from LeagueContext (ibl | olympics)',
+  `season_ending_year` int(11) NOT NULL COMMENT 'ibl_settings "Current Season Ending Year" at execution time',
+  `day` tinyint(3) unsigned NOT NULL COMMENT 'Free agency day 1-12 as clamped by block.php',
+  `processed_at` datetime NOT NULL DEFAULT current_timestamp() COMMENT 'When the day was executed',
+  `signings_submitted` int(10) unsigned NOT NULL DEFAULT 0 COMMENT 'Count of signings in the submitted payload',
+  PRIMARY KEY (`league`,`season_ending_year`,`day`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_fa_offers`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;

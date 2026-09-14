@@ -312,7 +312,21 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
                 $day,
                 $signingsSubmitted
             );
+        } catch (\mysqli_sql_exception $e) {
+            // mysqli runs in exception mode here, so a constraint violation surfaces as
+            // a driver exception before BaseMysqliRepository's own code-1003 path can
+            // fire. 1062 is MySQL's ER_DUP_ENTRY — anything else is a real failure.
+            if ($e->getCode() === 1062) {
+                throw new DayAlreadyProcessedException(
+                    "Free agency day {$day} has already been processed for {$league} {$seasonEndingYear}.",
+                    0,
+                    $e
+                );
+            }
+            throw $e;
         } catch (\RuntimeException $e) {
+            // Kept for the non-exception mysqli reporting mode, where executeQuery()
+            // converts the failed execute() into a RuntimeException itself.
             if ($e->getCode() === 1003 && str_contains($e->getMessage(), 'Duplicate entry')) {
                 throw new DayAlreadyProcessedException(
                     "Free agency day {$day} has already been processed for {$league} {$seasonEndingYear}.",

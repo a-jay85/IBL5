@@ -452,7 +452,8 @@ class FreeAgencyAdminAssignTest extends DatabaseTestCase
         $key = 'Current Season Ending Year';
         $value = (string) $year;
         $stmt = $this->db->prepare(
-            "INSERT INTO `ibl_settings` (setting_key, value, league) VALUES (?, ?, ?)"
+            "INSERT INTO `ibl_settings` (setting_key, value, league) VALUES (?, ?, ?)
+             ON DUPLICATE KEY UPDATE value = VALUES(value)"
         );
         self::assertNotFalse($stmt);
         $stmt->bind_param('sss', $key, $value, $league);

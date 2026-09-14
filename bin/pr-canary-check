@@ -16,6 +16,7 @@ set -euo pipefail
 
 GH_CMD="${GH_CMD:-gh}"
 STICKY_MARKER="<!-- pr-fast-canary -->"
+source "$(cd "$(dirname "$0")" && pwd)/lib/pr-sticky.sh"
 
 # Test seams — override in tests to inject stub commands without real git/composer.
 # The -c identity is scoped to this one invocation (no global git state mutated).
@@ -161,27 +162,7 @@ render_body() {
     printf '%s\n' "$STICKY_MARKER"
 }
 
-post_sticky() {
-    local n="$1"
-    local body="$2"
-    local tmpfile
-    tmpfile="$(mktemp)"
-
-    printf '%s\n' "$body" > "$tmpfile"
-
-    local existing_id
-    existing_id="$("$GH_CMD" api "repos/{owner}/{repo}/issues/$n/comments" --paginate \
-        --jq ".[] | select(.body | contains(\"$STICKY_MARKER\")) | .id" | head -1 || true)"
-
-    if [[ -n "$existing_id" ]]; then
-        "$GH_CMD" api --method PATCH "repos/{owner}/{repo}/issues/comments/$existing_id" \
-            -F body=@"$tmpfile" >/dev/null || true
-    else
-        "$GH_CMD" pr comment "$n" --body-file "$tmpfile" >/dev/null || true
-    fi
-
-    rm -f "$tmpfile"
-}
+post_sticky() { pr_sticky_upsert "$1" "$STICKY_MARKER" "$2"; }
 
 body="$(render_body)"
 printf '%s\n' "$body"

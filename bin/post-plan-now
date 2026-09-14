@@ -30,8 +30,20 @@
 #                               #   PR; whether auto-merge ARMS is decided later, at
 #                               #   /post-plan Phase 6.5 (a plan's `auto_merge: false`
 #                               #   holds the merge — it no longer holds post-plan).
+#   bin/post-plan-now --force   # override the "PR already exists and the working set
+#                               #   touches no production files" guard (exit 5), which
+#                               #   otherwise points you at the cheaper
+#                               #   /commit-commands:commit-push-pr. Bare flag only.
 #
 # Run from anywhere inside the target worktree.
+#
+# --pr <n> drives the worktree that has PR <n>'s head branch checked out, instead
+# of the current branch.  --pr selects the TREE; --plan selects the PLAN FILE.
+# They are orthogonal and may be combined; --plan wins for the plan path only.
+# An ambient PLAN_FILE in the caller's environment does not reach the detached child
+# (launchd gives the job a minimal environment), so --pr needs no unset.
+# POST_PLAN_MAIN_ROOT is a test-only override of the resolved main-checkout path.
+# Production never sets it.
 
 # should_fallback <rc> — decide whether to escalate to the /post-plan skill session after the
 # compiled harness exits with <rc>. Returns 0 (DO fall back) for a generic harness failure;
@@ -53,6 +65,92 @@ should_fallback() { case "$1" in 0|3) return 1 ;; *) return 0 ;; esac; }
 # Defined above the sourced-guard so the unit test can source and exercise it.
 shq() { local q="'\\''"; printf "'%s'" "${1//\'/$q}"; }
 
+POSTPLAN_BADGE_MARKER="<!-- postplan-status -->"
+POSTPLAN_STICKY_LIB="${POSTPLAN_STICKY_LIB:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/pr-sticky.sh}"
+# shellcheck source=/dev/null
+[ -r "$POSTPLAN_STICKY_LIB" ] && source "$POSTPLAN_STICKY_LIB"
+
+# shellcheck disable=SC2016
+postplan_badge_body() {   # <label> <started>
+    local label="$1" started="$2"
+    printf '%s\n' "$POSTPLAN_BADGE_MARKER"
+    printf '**post-plan is running** — started %s\n\n' "${started:-unknown}"
+    if [ -n "$label" ]; then
+        printf 'Detached launchd job `%s`.\n' "$label"
+        printf 'Liveness: `launchctl list %s`\n\n' "$label"
+    else
+        printf 'Run started outside `bin/post-plan-now`, so there is no launchd job to probe.\n\n'
+    fi
+    printf 'This comment is removed automatically when the run finishes cleanly.\n'
+    printf '<!-- postplan-label: %s -->\n' "$label"
+}
+
+# shellcheck disable=SC2016
+postplan_badge_banner_body() {   # <rc> <label> <started>
+    local rc="$1" label="$2" started="$3"
+    printf '%s\n' "$POSTPLAN_BADGE_MARKER"
+    printf '**post-plan did not finish cleanly** (exit %s)\n\n' "$rc"
+    printf 'Started %s.\n' "${started:-unknown}"
+    case "$rc" in
+        3) printf 'The harness bailed on a rebase conflict and deliberately did not fall back.\n' ;;
+        *) printf 'The run ended abnormally — check the log under `/tmp/post-plan-now-*.log`.\n' ;;
+    esac
+    printf '\nRe-run with `bin/post-plan-now --auto` once the cause is addressed.\n'
+    printf '<!-- postplan-label: %s -->\n' "$label"
+}
+
+postplan_badge_label_live() {   # <label> -> 0 when launchd still knows it
+    local label="$1"
+    [ -n "$label" ] || return 1
+    "${LAUNCHCTL_CMD:-launchctl}" list "$label" >/dev/null 2>&1
+}
+
+postplan_badge_pr_number() {
+    "${GH_CMD:-gh}" pr view --json number --jq .number 2>/dev/null || true
+}
+
+postplan_badge_existing_label() {   # <pr> -> prints label; rc 1 when no badge exists
+    local n="$1" body
+    body="$("${GH_CMD:-gh}" api "repos/{owner}/{repo}/issues/$n/comments" --paginate \
+        --jq ".[] | select(.body | contains(\"$POSTPLAN_BADGE_MARKER\")) | .body" 2>/dev/null || true)"
+    [ -n "$body" ] || return 1
+    printf '%s' "$body" | sed -n 's/.*<!-- postplan-label: \(.*\) -->.*/\1/p' | head -1
+    return 0
+}
+
+post_status_badge() {   # <pr> [label] [started]
+    local n="$1" label="${2:-${POSTPLAN_LABEL:-}}" started="${3:-${POSTPLAN_STARTED:-}}"
+    [ -n "$n" ] || return 0
+    pr_sticky_upsert "$n" "$POSTPLAN_BADGE_MARKER" \
+        "$(postplan_badge_body "$label" "$started")" || true
+    return 0
+}
+
+conclude_status_badge() {   # <rc> [pr]
+    local rc="${1:-1}" n="${2:-}"
+    if [ "${POSTPLAN_CONCLUDED:-0}" = 1 ]; then return 0; fi
+    POSTPLAN_CONCLUDED=1
+    [ -n "$n" ] || n="$(postplan_badge_pr_number)"
+    [ -n "$n" ] || return 0
+    if [ "$rc" = 0 ]; then
+        pr_sticky_delete "$n" "$POSTPLAN_BADGE_MARKER" || true
+    else
+        pr_sticky_upsert "$n" "$POSTPLAN_BADGE_MARKER" \
+            "$(postplan_badge_banner_body "$rc" "${POSTPLAN_LABEL:-}" "${POSTPLAN_STARTED:-}")" || true
+    fi
+    return 0
+}
+
+postplan_sweep_stale_badge() {   # <pr>
+    local n="$1" label
+    [ -n "$n" ] || return 0
+    label="$(postplan_badge_existing_label "$n")" || return 0
+    if postplan_badge_label_live "$label"; then return 0; fi
+    pr_sticky_upsert "$n" "$POSTPLAN_BADGE_MARKER" \
+        "$(postplan_badge_banner_body "stale" "$label" "unknown")" || true
+    return 0
+}
+
 # Sourced-guard: the unit test does `source bin/post-plan-now` to load should_fallback, then this
 # returns before the body executes. Must sit before `set -euo pipefail` (sourcing must not alter
 # the caller's shell options).
@@ -61,14 +159,20 @@ shq() { local q="'\\''"; printf "'%s'" "${1//\'/$q}"; }
 set -euo pipefail
 
 AUTO=0
+FORCE=0
 PLAN_OVERRIDE=""
+PR_NUM=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --auto)   AUTO=1 ; shift ;;
+        --force)  FORCE=1 ; shift ;;
         --plan)   [ $# -ge 2 ] || { echo "post-plan-now: --plan requires a path argument" >&2; exit 1; }
                   PLAN_OVERRIDE="$2" ; shift 2 ;;
         --plan=*) PLAN_OVERRIDE="${1#--plan=}" ; shift ;;
-        *)        echo "post-plan-now: unknown argument '$1' (accepts --auto, --plan <path>)" >&2
+        --pr)     [ $# -ge 2 ] || { echo "post-plan-now: --pr requires a PR number argument" >&2; exit 1; }
+                  PR_NUM="$2" ; shift 2 ;;
+        --pr=*)   PR_NUM="${1#--pr=}" ; shift ;;
+        *)        echo "post-plan-now: unknown argument '$1' (accepts --auto, --force, --plan <path>, --pr <n>)" >&2
                   exit 1 ;;
     esac
 done
@@ -78,6 +182,40 @@ if [ -n "$PLAN_OVERRIDE" ]; then
         || { echo "post-plan-now: --plan '$PLAN_OVERRIDE' does not exist — aborting." >&2; exit 1; }
     # launchd runs the job from a different cwd; the plist needs an absolute path.
     PLAN_OVERRIDE="$(cd "$(dirname "$PLAN_OVERRIDE")" && pwd)/$(basename "$PLAN_OVERRIDE")"
+fi
+
+# --pr <n>: drive the worktree holding PR <n>'s head branch instead of the current branch.
+# This runs BEFORE ROOT/SLUG are computed on purpose — every downstream derivation
+# (ROOT, SLUG, SAFE_SLUG, PLAN_FILE, and the plist's own `cd "$ROOT"`) then points at the
+# target worktree for free.
+if [ -n "$PR_NUM" ]; then
+    case "$PR_NUM" in
+        ''|0|*[!0-9]*) echo "post-plan-now: --pr needs a positive integer PR number (got '$PR_NUM')" >&2 ; exit 1 ;;
+    esac
+    command -v gh >/dev/null 2>&1 || { echo "post-plan-now: --pr needs the gh CLI on PATH" >&2 ; exit 1; }
+    PR_BRANCH=$(gh pr view "$PR_NUM" --json headRefName --jq .headRefName 2>/dev/null) || PR_BRANCH=""
+    [ -n "$PR_BRANCH" ] || { echo "post-plan-now: could not resolve a head branch for PR #$PR_NUM" >&2 ; exit 1; }
+    case "$PR_BRANCH" in
+        master|main|HEAD) echo "post-plan-now: PR #$PR_NUM head branch is '$PR_BRANCH' — refusing" >&2 ; exit 1 ;;
+    esac
+    SELF_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "post-plan-now: not inside a git repository" >&2 ; exit 1; }
+    # shellcheck source=bin/lib/git-helpers.sh
+    . "$SELF_ROOT/bin/lib/git-helpers.sh"
+    MAIN_ROOT="${POST_PLAN_MAIN_ROOT:-$(resolve_canonical_root "$SELF_ROOT")}"
+    # Branch-authoritative, not path arithmetic: slash-bearing branch names are not single
+    # path components, and a renamed worktree directory no longer matches its branch name.
+    WT_ROOT=$(git -C "$MAIN_ROOT" worktree list --porcelain | awk -v want="refs/heads/$PR_BRANCH" '
+        /^worktree / { wt = substr($0, 10) }
+        /^branch /   { if (substr($0, 8) == want) { print wt; exit } }') || true
+    if [ -z "$WT_ROOT" ] || [ ! -d "$WT_ROOT" ]; then
+        echo "post-plan-now: PR #$PR_NUM is on branch '$PR_BRANCH', but no worktree has it checked out." >&2
+        echo "  Create one and re-run (never run post-plan from the main checkout — ADR-0062):" >&2
+        echo "    git -C '$MAIN_ROOT' fetch origin '$PR_BRANCH'" >&2
+        echo "    git -C '$MAIN_ROOT' worktree add '$(worktrees_parent_dir "$MAIN_ROOT")/$(basename "$PR_BRANCH")' '$PR_BRANCH'" >&2
+        exit 1
+    fi
+    cd "$WT_ROOT" || { echo "post-plan-now: cannot cd to $WT_ROOT" >&2 ; exit 1; }
+    PLAN_SLUG="$PR_BRANCH"
 fi
 
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) \
@@ -90,6 +228,17 @@ case "$SLUG" in
         echo "post-plan-now: refusing to run on '$SLUG' — switch to the feature branch." >&2
         exit 1 ;;
 esac
+
+# ADR-0062: post-plan commits and pushes. It must never do that in the main checkout.
+# This is NOT --pr-only: the compiled harness (tools/postplan-harness) never executes
+# SKILL.md, so this assertion is the ONLY enforcement on the primary engine path.
+# shellcheck source=bin/lib/git-helpers.sh
+. "$ROOT/bin/lib/git-helpers.sh"
+if ! is_in_worktree "$ROOT"; then
+    echo "post-plan-now: refusing to run in the main checkout ($ROOT) — ADR-0062." >&2
+    echo "  cd into the branch's worktree (or use --pr <n>) and re-run." >&2
+    exit 1
+fi
 
 # A branch name may contain "/" (a Dependabot branch is
 # `dependabot/composer/...`), but a launchd label and the paths derived from it
@@ -126,10 +275,37 @@ if git diff --quiet && git diff --cached --quiet \
     exit 1
 fi
 
+# A PR already exists and nothing production-facing changed? /post-plan is the wrong tool —
+# /commit-commands:commit-push-pr is cheaper and CI runs the same tests on push.
+# The regex below deliberately mirrors _TEST in tools/postplan-harness/harness/classify.py.
+# Python is the single source of truth; this is a known duplicate, because HARNESS is not
+# assigned until much later in this script. Keep the two in sync.
+if [ "${FORCE:-0}" -eq 0 ]; then
+    OPEN_PR_NUM=$(gh pr list --head "$(git rev-parse --abbrev-ref HEAD)" --state open \
+                 --json number --jq '.[0].number // empty' 2>/dev/null || true)
+    if [ -n "$OPEN_PR_NUM" ]; then
+        CHANGED=$( { git diff --name-only origin/master...HEAD 2>/dev/null || true
+                     git diff --name-only HEAD 2>/dev/null || true
+                     git diff --name-only --cached 2>/dev/null || true
+                     git ls-files --others --exclude-standard 2>/dev/null || true
+                   } | sort -u )
+        PROD_FILES=$(printf '%s\n' "$CHANGED" \
+            | grep -vE '^ibl5/tests/|\.test\.(ts|js|php)$|\.spec\.(ts|js)$' \
+            | grep -v '^$' || true)
+        if [ -z "$PROD_FILES" ]; then
+            echo "post-plan-now: PR #$OPEN_PR_NUM exists and the working set touches no production files." >&2
+            echo "  Use /commit-commands:commit-push-pr instead — cheaper, and CI already runs those tests on push." >&2
+            echo "  To override: bin/post-plan-now --force" >&2
+            exit 5
+        fi
+    fi
+fi
+
 [ -f "$PLAN_FILE" ] \
     || echo "post-plan-now: warn — no plan at $PLAN_FILE; the harness will try a slug-drift match (<prefix>-$SLUG.md) and otherwise run plan-blind. Pass --plan <abs-path> to name one explicitly." >&2
 
 TS=$(date +%Y%m%d-%H%M%S)-$$
+STARTED=$(date '+%Y-%m-%d %H:%M:%S %Z')
 LOG="/tmp/post-plan-now-$SAFE_SLUG-$TS.log"
 LABEL="com.ibl5.postplan-now-$SAFE_SLUG-$TS"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
@@ -168,6 +344,10 @@ RESUME_PROMPT="Invoke the /post-plan skill now on the current git branch, RESUMI
 # MAIN-CHECKOUT absolute path — never $ROOT/tools/... — per ADR-0092: a worktree's own
 # harness copy is the one this run is changing, and must not judge its own change.
 HARNESS="${HARNESS:-/Users/ajaynicolas/GitHub/IBL5/tools/postplan-harness}"
+BADGE_FN="$(declare -f pr_sticky_find pr_sticky_upsert pr_sticky_delete \
+    postplan_badge_body postplan_badge_banner_body postplan_badge_label_live \
+    postplan_badge_pr_number postplan_badge_existing_label \
+    post_status_badge conclude_status_badge postplan_sweep_stale_badge || true); "
 FALLBACK_FN=""
 HARNESS_SEG=""
 GATE_OPEN=""
@@ -221,7 +401,12 @@ fi
 # do not "simplify" either one away.
 xml_escape() { printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
 
-CMD="export PATH=\"/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH\"; cd \"$ROOT\" && { ${FALLBACK_FN}${HARNESS_SEG}${GATE_OPEN}CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p $(shq "$PROMPT") --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name \"$LABEL\"${GATE_CLOSE}; }; rm -f \"$PLIST\"; launchctl bootout gui/\$(id -u)/$LABEL"
+# One splice covers all three far-side arms (harness, skill fallback, rc=4 Phase-5.5 resume).
+# Only set when --pr was given (PR_NUM is non-empty), so the bare path stays byte-identical.
+PLAN_SLUG_SEG=""
+[ -n "${PR_NUM:-}" ] && PLAN_SLUG_SEG="export PLAN_SLUG=$(shq "$PLAN_SLUG"); "
+
+CMD="export PATH=\"/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH\"; ${PLAN_SLUG_SEG}export POSTPLAN_LABEL=$(shq "$LABEL") POSTPLAN_STARTED=$(shq "$STARTED") POSTPLAN_BADGE_MARKER=$(shq "$POSTPLAN_BADGE_MARKER"); ${BADGE_FN}POSTPLAN_BADGE_BODY=\"\$(postplan_badge_body \"\$POSTPLAN_LABEL\" \"\$POSTPLAN_STARTED\")\"; export POSTPLAN_BADGE_BODY; trap 'conclude_status_badge \"\${pp_rc:-1}\"' EXIT INT TERM HUP; cd \"$ROOT\" && { postplan_sweep_stale_badge \"\$(postplan_badge_pr_number)\"; ${FALLBACK_FN}${HARNESS_SEG}${GATE_OPEN}CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p $(shq "$PROMPT") --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name \"$LABEL\"${GATE_CLOSE}; }; pp_rc=\$?; if [ \"\${rc:-0}\" = 3 ]; then pp_rc=3; fi; conclude_status_badge \"\$pp_rc\"; rm -f \"$PLIST\"; launchctl bootout gui/\$(id -u)/$LABEL"
 
 CMD_XML=$(xml_escape "$CMD")
 LABEL_XML=$(xml_escape "$LABEL")

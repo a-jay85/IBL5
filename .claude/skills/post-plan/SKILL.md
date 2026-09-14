@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-09-08
+last_verified: 2026-09-13
 ---
 
 # Post-Plan Orchestrator
@@ -37,7 +37,10 @@ Phase 2 makes the initial commit and opens the PR. Phases that may modify files 
 
 ## Phase 0: Fresh-Session Cost Advisory (interactive only, non-blocking)
 
-The single exception to the "never stop or ask" rule above is that this phase may emit **one** advisory line — it still does **not** stop, wait, or return control. Run the gate, emit at most one line, then continue straight into Phase 1.
+Two exceptions to the "never stop or ask" rule apply in Phase 0 only:
+
+1. **Cost advisory (non-blocking):** this phase may emit **one** advisory line — it still does **not** stop, wait, or return control. Run the gate, emit at most one line, then continue straight into Phase 1.
+2. **Worktree guard (hard stop):** the bash block below is a hard stop for the model, not just the shell. On `MAIN-CHECKOUT` or `WRONG-WORKTREE` the run ends immediately at Phase 0 and does **not** continue to Phase 1. `exit 1` ends the bash block — it does not end the model's turn by itself; the instruction to end the run is explicit in the printed `STOP:` message. **Phase 11 does not apply to a Phase-0 guard stop**, because no phase has run and no background process has been launched, so there is nothing to clean up.
 
 ```bash
 # Interactive only. In automouse/headless mode this skill is already invoked as a
@@ -52,6 +55,30 @@ Otherwise, self-assess the one thing only you can know: **did you perform a subs
 > 💡 Large in-session context detected — post-plan re-reads it on every phase. To save roughly half the cost on big sessions, you can interrupt now and re-run `/post-plan` in a **fresh** session on this branch (it auto-resolves the plan from the slug and fetches the diff itself). Continuing in this session…
 
 Do **not** wait for a response, and do **not** abort on your own — the human decides. If the implementation was trivial, or this is already a fresh post-plan-only session, emit nothing and proceed silently. Either way, fall through to Phase 1 in the same response.
+
+Then run the worktree guard. A `STOP:` output is a hard stop for the model, not just the shell — end the run immediately; do not continue to Phase 1.
+
+```bash
+# --- post-plan worktree guard (Phase 0) ---
+TOP=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "STOP: not inside a git repository."; exit 1; }
+[ -r "$TOP/bin/lib/git-helpers.sh" ] || { echo "STOP: $TOP/bin/lib/git-helpers.sh is missing — cannot resolve is_in_worktree."; exit 1; }
+. "$TOP/bin/lib/git-helpers.sh"
+HERE=$(git rev-parse --abbrev-ref HEAD)
+case "$HERE" in
+  master|main|HEAD) echo "STOP: MAIN-CHECKOUT or detached HEAD — branch '$HERE' is not a feature branch. Do NOT continue to Phase 1; end the run."; exit 1 ;;
+esac
+WANT="${PLAN_SLUG:-$HERE}"
+if ! is_in_worktree; then
+  echo "STOP: MAIN-CHECKOUT — cwd is the main checkout ($TOP). /post-plan commits and pushes; ADR-0062 forbids that here. Do NOT continue to Phase 1; end the run."
+  exit 1
+elif [ "$HERE" = "$WANT" ]; then
+  echo "ALREADY-IN-TARGET — worktree $TOP is on branch '$HERE'. Continue to Phase 1."
+else
+  echo "STOP: WRONG-WORKTREE — this worktree is on '$HERE' but the run targets '$WANT'. Re-run as: bin/post-plan-now --pr <n>. Do NOT continue to Phase 1; end the run."
+  exit 1
+fi
+# --- end post-plan worktree guard ---
+```
 
 ---
 
@@ -141,6 +168,31 @@ fi
    > If the row's `prior:` field is not `--`, say so explicitly: this is a recurrence of those PRs' class, which is why the routing moved one rung more mechanical than last time.
 
    **Stacked PRs:** If branched from a feature branch (not `master`), use `--base <parent-branch>`. Skip if a PR already exists. **Merge-order dependency:** When this PR shares files with, or must merge after, a sibling PR that is also based on `master` (so stacking via `--base` is unavailable / fragile under squash-merge), add a `Depends-on: #<n>[, #<n>...]` line to the PR body — **on its own line** (the parser anchors to start-of-line, so an inline prose mention of the marker is ignored). Phase 6.5 condition (6) reads it and refuses to arm auto-merge until every named PR is `MERGED`, so the series cannot ship out of order. Use this rather than stacking when the repo squash-merges (a squash collapses the parent's commits, leaving a stacked child's branch carrying the pre-squash commits → conflict on auto-retarget).
+
+Post an in-flight status badge so the PR shows the run is active (best-effort — never blocks Phase 2 if it fails):
+
+```bash
+# In-flight status badge — best-effort, never blocks. Skip silently if POSTPLAN_BADGE_BODY is unset.
+if [ -n "${POSTPLAN_BADGE_BODY:-}" ]; then
+  PR=$(gh pr view --json number --jq .number 2>/dev/null || true)
+  f=$(mktemp); printf '%s\n' "$POSTPLAN_BADGE_BODY" > "$f"
+  id=$(gh api "repos/{owner}/{repo}/issues/$PR/comments" --paginate \
+        --jq '.[] | select(.body | contains("<!-- postplan-status -->")) | .id' | head -1 || true)
+  if [ -n "$id" ]; then
+    gh api --method PATCH "repos/{owner}/{repo}/issues/comments/$id" -F body=@"$f" >/dev/null || true
+  else
+    gh pr comment "$PR" --body-file "$f" >/dev/null || true
+  fi
+  rm -f "$f"
+fi
+```
+
+Three constraints on this step:
+
+1. This step is **best-effort**. A failure here is never reported as a Phase 2 failure.
+2. Do **not** clear or edit this comment later in the run. `bin/post-plan-now`'s `$CMD` tail owns conclusion — it removes the badge on clean exit or replaces it with a failure banner.
+3. This is **not** the Phase 5.5 verdict comment (which carries `<!-- pr-ready-verdict -->`).
+
 5. **Manual testing in PR description:** Check the plan file for a Verification Matrix. If one exists and a `$PLAN_FILE` path is known: run `bin/normalize-manual-testing "$PLAN_FILE"` and paste its stdout verbatim under `## Manual Testing`. The script's stdout is already checkbox-formatted — do not re-edit or reformat it; `bin/normalize-manual-testing` is the single source of truth for this formatting and never paste the raw matrix row. When stdout is empty (zero Truly-manual rows), write the sentinel: `No manual testing needed — all changes are covered by automated tests.` If no plan file or no matrix exists, fall back to the original rule: list only steps requiring subjective human judgment on new or redesigned UI/UX ("does this look/feel good?", "does this flow work well?"). Production comparison and "does output still match?" are visual-regression-replaceable, not manual. Do NOT list CLI commands or script invocations — Phase 6 executes those.
 6. Use Haiku agents for commit message generation if delegating
 
@@ -331,7 +383,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 9. PR-time safety verdict — the realized diff surfaces no reason to hold for a human.
 10. Pipeline-authored floor — the PR does NOT carry the `pipeline-authored` label AND the branch name does not match `^bug-[0-9]+(-|$)`. The branch-name axis is the label-timing guard: `reconcile_pr_open_rows()` in `bin/bug-pipeline-tick` applies the label on a later cron tick than `ship_via_cron()` which arms auto-merge, so at arming time the label may not yet exist. The digit anchor prevents catching human `bug-pipeline-*` branches.
 11. Unresolved scored finding — no unresolved GitHub review thread carries a `<!-- score: N -->` marker with N >= 80. Live-state counterpart to (2), which is run-local.
-12. Plan-intent fidelity — Phase 5.5's reviewer produced a verdict of `READY` or `READY WITH NOTES`.
+12. Plan-intent fidelity — Phase 5.5 produced a verdict of `READY` or `READY WITH NOTES` **covering the current `HEAD` tree** — either the first reviewer's verdict, or the bounded second-review verdict Phase 5.5 writes after remediation.
 13. Plan-slug drift — the plan was located by drift (`<prefix>-<slug>.md`) rather than the exact branch-slug path; adoption is a guess, so auto-merge is held until a human confirms the plan is this branch's plan.
 
 **These conditions only ever HOLD, never RELEASE.** They are an AND-of-not-blocked set: every condition can *add* a block; none can clear another's. Conditions (7)–(9) are **additive brakes on top of** the deterministic floors (1)–(6), the pipeline-authored floor (10), and the independent `human-signoff` required GitHub check — they exist to catch what those miss, never to override them. post-plan **always runs and opens the PR**; these conditions decide only whether auto-merge *arms*. A held PR stays open for a human to merge.
@@ -346,7 +398,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 
 **If every condition passes:** arm with `gh pr merge --squash --auto` — `--auto` *queues* the merge (it does not merge now); GitHub fires it once required checks pass. Do not sync local to master here. Never add `--delete-branch`: the repo sets `deleteBranchOnMerge`, so GitHub removes the head branch itself, and the flag only breaks things (the local delete fails in a multi-worktree clone, and a parent merge carrying it permanently closes stacked child PRs).
 
-**If any condition blocks:** do NOT arm. Report which condition(s) blocked — the per-condition report text is in the reference (for (3), report whether the block hit the no-done-marker branch — "Phase 5.0 never reached its end" — or listed unresolved items from `/tmp/post-plan-missing-tests-$PPID`; which Phase-5 track failed for (4)). Continue to Phase 7 regardless to monitor and fix CI; a re-run clears a red-track block, but the intent/type holds (7), (8), (10) stay held until a human acts. For condition (12), a verdict that is missing, unparseable, or `NOT READY` is indeterminate-or-negative and blocks — remediate the reviewer's findings and re-run /post-plan; never hand-edit the verdict file to clear it.
+**If any condition blocks:** do NOT arm. Report which condition(s) blocked — the per-condition report text is in the reference (for (3), report whether the block hit the no-done-marker branch — "Phase 5.0 never reached its end" — or listed unresolved items from `/tmp/post-plan-missing-tests-$PPID`; which Phase-5 track failed for (4)). Continue to Phase 7 regardless to monitor and fix CI; a re-run clears a red-track block, but the intent/type holds (7), (8), (10) stay held until a human acts. For condition (12), a verdict that is missing, unparseable, or `NOT READY` is indeterminate-or-negative and blocks — after remediation closes every `Mode: in-PR` finding, Phase 5.5 automatically spawns one bounded second reviewer on the post-remediation tree, and condition (12) reads whichever verdict covers the current tree; a re-run is needed only when that second reviewer also blocks, or when commits landed after it ran. Never hand-edit either verdict file to clear the hold.
 
 **Interactive golden warning:** when `$GOLDEN_CHANGED` is `true` and `$CLAUDE_HEADLESS` is unset (so condition 5 did not block), still surface the warning prominently so the human confirms the simulation change was an intentional `make -C engine golden-update`, not a masked regression.
 

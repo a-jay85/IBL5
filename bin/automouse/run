@@ -930,6 +930,68 @@ should_impl_env_stop() {
     [ "$env_err" -eq 1 ] || [ "$stalled" -eq 1 ] || [ "$fast" -eq 1 ]
 }
 
+# Resolve a branch's PR state, fail-closed.
+# Echoes "<STATE> <URL>" (STATE = OPEN or MERGED) and returns 0 only on a positive
+# answer. Every other outcome — gh non-zero (auth/network/rate limit), no PR for the
+# branch, or a CLOSED-only match — echoes nothing and returns 1, so the caller falls
+# through to today's behaviour. Never let gh's exit status reach errexit: the
+# assignment lives inside the if-condition on purpose.
+automouse_pr_state() {
+    local branch=$1 hit
+    [ -n "$branch" ] || return 1
+    if hit=$(GH_PROMPT_DISABLED=1 gh pr list --head "$branch" --state all \
+                 --limit 10 --json state,url \
+                 --jq '[.[] | select(.state == "OPEN" or .state == "MERGED")][0]
+                       | if . == null then empty else "\(.state) \(.url)" end' \
+                 2>/dev/null); then
+        [ -n "$hit" ] || return 1
+        printf '%s\n' "$hit"
+        return 0
+    fi
+    return 1
+}
+
+# Resolve the git branch for a plan. Prefers the handoff JSON's "branch" field
+# (exact, written by the impl agent); falls back to the plan slug when the handoff
+# is absent, unreadable, malformed, or carries no branch. A wrong guess is safe:
+# `gh pr list --head` simply finds nothing and the caller keeps today's behaviour.
+automouse_branch_for_plan() {
+    local plan_name=$1 slug=$2 handoff branch=""
+    handoff="$HANDOFF_DIR/${plan_name}.json"
+    if [ -f "$handoff" ]; then
+        branch=$(jq -r '.branch // empty' "$handoff" 2>/dev/null) || branch=""
+    fi
+    [ -n "$branch" ] && [ "$branch" != "null" ] || branch=$slug
+    printf '%s\n' "$branch"
+}
+
+# Loop-side terminal disposition: the branch has an OPEN or MERGED PR, so this plan
+# is finished regardless of what the agent did or did not do. Moves the plan to done/,
+# removes the handoff, clears the attempt sidecars, and writes a minimal completion
+# report if the agent did not write one. Caller owns lock release and control flow.
+dispose_plan_done() {
+    local plan_name=$1 slug=$2 pr_state=$3 pr_url=$4 site=$5
+    local reports_dir="$NIGHTLY_DIR/reports"
+    local report
+    report="$reports_dir/$(date +%Y-%m-%d)-done-${slug}.md"
+    mkdir -p "$NIGHTLY_DIR/done" "$reports_dir"
+    mv -f "$QUEUE_DIR/$plan_name" "$NIGHTLY_DIR/done/" 2>/dev/null || true
+    rm -f "$QUEUE_DIR/${plan_name}.attempts" \
+          "$QUEUE_DIR/${plan_name}.failure" \
+          "$QUEUE_DIR/${plan_name}.cap-refunds" \
+          "$HANDOFF_DIR/${plan_name}.json"
+    if [ ! -f "$report" ]; then
+        {
+            printf 'Automouse disposed "%s" to done/ — branch PR is %s.\n\n' "$slug" "$pr_state"
+            printf -- '- PR: %s\n' "$pr_url"
+            printf -- '- Disposition: loop-side (%s), not agent-reported.\n' "$site"
+            printf -- '- The post-plan agent left the plan in queue/; the loop treats an OPEN or\n'
+            printf -- '  MERGED PR on the branch as terminal. A held-open PR is done for the loop.\n'
+        } > "$report"
+    fi
+    echo "Loop-side disposition ($site): PR $pr_state ($pr_url) — moved $plan_name to done/." >> "$LOG"
+}
+
 # Was this phase killed by the per-phase wall clock (the `timeout` cap)?
 #
 # Narrow by construction. The exit status alone proves nothing: 143 is ALSO the
@@ -1373,6 +1435,21 @@ while true; do
             ;;
     esac
 
+    # Terminal-disposition guard: no handoff to resume, but the branch already has an
+    # OPEN or MERGED PR ⇒ this plan's work has shipped. Dispose to done/ without
+    # spending a single claude -p invocation. Fail-closed: any gh error, no PR, or a
+    # CLOSED-only match falls through to the normal attempt below.
+    if [ ! -f "$HANDOFF_DIR/${PLAN_NAME}.json" ]; then
+        CLAIM_BRANCH=$(automouse_branch_for_plan "$PLAN_NAME" "$PLAN_SLUG")
+        if CLAIM_PR=$(automouse_pr_state "$CLAIM_BRANCH"); then
+            dispose_plan_done "$PLAN_NAME" "$PLAN_SLUG" \
+                "${CLAIM_PR%% *}" "${CLAIM_PR#* }" claim-time
+            rm -rf "$CURRENT_LOCK" 2>/dev/null || true
+            CURRENT_LOCK=""
+            continue
+        fi
+    fi
+
     # Increment attempt counter
     echo $(( ATTEMPTS + 1 )) > "$ATTEMPT_FILE"
 
@@ -1651,6 +1728,20 @@ PLAN_FILE=$PLAN_NAME" \
             refund_attempt
             write_env_stop_report "$PLAN_NAME" postplan "$REASON" "$PP_LOG_BEFORE"
             break
+        fi
+
+        # Terminal-disposition: the environmental breaker did not trip, so the
+        # post-plan agent exited on its own terms. If it left the plan in queue/
+        # but the branch carries an OPEN or MERGED PR, the work has shipped — a
+        # held-open PR is post-plan's normal terminal state, not a failure. The
+        # loop dispositions it rather than re-claiming the plan next iteration.
+        # Fail-closed: gh error, no PR, or CLOSED-only ⇒ today's behaviour.
+        if [ -e "$NEXT_PLAN" ]; then
+            PP_BRANCH=$(automouse_branch_for_plan "$PLAN_NAME" "$PLAN_SLUG")
+            if PP_PR=$(automouse_pr_state "$PP_BRANCH"); then
+                dispose_plan_done "$PLAN_NAME" "$PLAN_SLUG" \
+                    "${PP_PR%% *}" "${PP_PR#* }" post-postplan
+            fi
         fi
     fi
 

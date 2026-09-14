@@ -46,8 +46,17 @@ def pr_copy_prompt(slug: str, cls: Classification, plan: PlanInfo, plan_excerpt:
         + '\n\nNEVER write a "## Manual Testing" heading or any manual-testing checklist '
         'inside summary_md. The runner owns that section and appends it after you; '
         'duplicating it corrupts the arming gate.'
-        + '\n\nReturn ONLY JSON: {"type": "chore", "title": "chore(scope): ...", '
-        '"summary_md": "## Summary\\n- ..."}. Title <= 72 chars, starts with its type.'
+        + '\n\nReturn ONLY JSON with exactly these four keys: {"type": "chore", '
+        '"title": "chore(scope): ...", "commit_subject": "chore(scope): ...", '
+        '"summary_md": "## Summary\\n- ..."}.\n'
+        "`title` is the PR TITLE: it describes the PURPOSE of the branch -- why the "
+        "change exists and what it enables.\n"
+        "`commit_subject` is the GIT COMMIT SUBJECT: it describes what the diff "
+        "PHYSICALLY CONTAINS, scoped to the files and behaviour actually changed "
+        "above. Type it against the diff, not against the intent.\n"
+        "Both strings must be <= 72 chars and must each start with their own "
+        "conventional-commit type. They are two separate artifacts and must NOT be "
+        "identical -- write commit_subject from the diff, then title from the purpose."
     )
 
 

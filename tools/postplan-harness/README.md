@@ -8,7 +8,7 @@ every mechanical step turn-by-turn. This harness **compiles** the stable
 procedure into code and keeps the LLM only where judgment is irreducible.
 
 **Status: INSTALLED (2026-07-16, explicit approval).** `./run isolated
-<worktree> --live` is the live mode: it pushes to origin, executes the six
+<worktree> --live` is the live mode: it pushes to origin, executes the seven
 allowlisted `gh` mutations (each still audited to `out/actions.jsonl` with
 `executed: true`), and watches CI. `bin/post-plan-now` in IBL5 invokes it,
 falling back to the Sonnet `/post-plan` skill session if the harness fails.
@@ -81,7 +81,7 @@ intent log — without touching GitHub.
 
 - **No mutation escape hatch.** `RecordingGh` has no code path that executes a
   mutating `gh` command; `LiveGit.push()` raises `push-disabled` unless an
-  explicit remote is injected. `LiveGh` (live mode) can only reach the six
+  explicit remote is injected. `LiveGh` (live mode) can only reach the seven
   fixed mutation commands its methods construct, and audits each execution.
 - **Fail-closed arming.** Indeterminate inputs (UNKNOWN dep state, missing
   clearance section, degraded fixtures) block arming; the LLM safety verdict
@@ -93,7 +93,7 @@ intent log — without touching GitHub.
 
 ## Installation (executed 2026-07-16 with explicit approval)
 
-1. ✅ `LiveGh` (`harness/adapters/ghad.py`) executes the six allowlisted
+1. ✅ `LiveGh` (`harness/adapters/ghad.py`) executes the seven allowlisted
    mutations behind `--live` — the allowlist is the method set; there is no
    generic gh escape hatch. Merge uses `--squash --auto` (no `--delete-branch`:
    benign-error in multi-worktree clones, and it permanently closes stacked

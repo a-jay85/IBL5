@@ -685,6 +685,8 @@ jobs:
         run: bin/test-automouse-env-breaker
       - name: Run automouse impl cap-timeout regression test
         run: bin/test-automouse-impl-cap-timeout
+      - name: Run automouse postplan terminal-disposition regression test
+        run: bin/test-automouse-postplan-disposition
 
   update-baselines:
     name: Update coverage & PHPStan baselines
@@ -936,6 +938,8 @@ jobs:
         run: bin/test-automouse-morning-digest
       - name: bin/test-automouse-canary
         run: bin/test-automouse-canary
+      - name: bin/test-fleet-status
+        run: bin/test-fleet-status
       - name: bin/test-wt-status
         run: bin/test-wt-status
       - name: bin/test-wt-new-root

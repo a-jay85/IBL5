@@ -1,0 +1,507 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-automouse-postplan-disposition — regression test for the loop-side
+# terminal disposition after post-plan (automouse_pr_state,
+# automouse_branch_for_plan, dispose_plan_done) and the two call sites wired
+# in bin/automouse/run.
+#
+# The defect this locks: post-plan agents reading a held-open PR as "not success"
+# left the plan in queue/, causing the loop to re-claim and re-post-plan it every
+# iteration forever (creating the handoff resets the attempt counter, so
+# MAX_ATTEMPTS never retired it). Observed 2026-09-12 06:52 and 07:41.
+#
+# The load-bearing safety property (group e case e1): the environmental breaker
+# keeps strict ordering precedence — a session-limit exit still refunds the attempt
+# and stops the run. The disposition check runs strictly AFTER the breaker's break,
+# and the static ordering assertion cannot be refactored away.
+#
+# Predicates are EXTRACTED from bin/automouse/run rather than copied, so the test
+# can never drift from the implementation. Each reads only its positional args or
+# harness-settable globals (NIGHTLY_DIR, QUEUE_DIR, HANDOFF_DIR, LOG).
+#
+# Run: bin/test-automouse-postplan-disposition (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+RUNNER="$SCRIPT_DIR/automouse/run"
+PROMPT="$SCRIPT_DIR/automouse/prompt-postplan"
+FAILED=0
+
+for f in "$RUNNER" "$PROMPT"; do
+    if [ ! -f "$f" ]; then
+        echo "FAIL: cannot find $f"
+        exit 1
+    fi
+done
+
+# --- Extract each function from the runner --------------------------------
+# Same awk idiom as the family: from the column-0 definition line to the first
+# lone column-0 }.
+extract_fn() {
+    awk -v fn="$1" '
+        $0 ~ "^" fn "\\(\\) \\{" { capture = 1 }
+        capture { print }
+        capture && /^\}/ { exit }
+    ' "$RUNNER"
+}
+
+for fn in automouse_pr_state automouse_branch_for_plan dispose_plan_done; do
+    FN_SRC="$(extract_fn "$fn")"
+    if [ -z "$FN_SRC" ]; then
+        echo "FAIL: could not extract $fn from $RUNNER"
+        FAILED=1
+    else
+        eval "$FN_SRC"
+    fi
+done
+
+if [ "$FAILED" -ne 0 ]; then
+    echo "RESULT: FAILED (extraction)"
+    exit 1
+fi
+
+# --- gh stub setup --------------------------------------------------------
+STUB_DIR=$(mktemp -d)
+STUB_CALLS="$STUB_DIR/calls"
+cat > "$STUB_DIR/gh" <<'STUB'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$STUB_CALLS"
+case "${STUB_MODE:-none}" in
+    open)   printf 'OPEN https://example.invalid/pr/1\n' ;;
+    merged) printf 'MERGED https://example.invalid/pr/2\n' ;;
+    closed) : ;;
+    none)   : ;;
+    error)  exit 1 ;;
+esac
+STUB
+chmod +x "$STUB_DIR/gh"
+export PATH="$STUB_DIR:$PATH"
+export STUB_CALLS
+trap 'rm -rf "$STUB_DIR"' EXIT
+
+# ---------------------------------------------------------------------------
+# Group p — automouse_pr_state (Phase 1)
+# ---------------------------------------------------------------------------
+
+# p1: OPEN answer — rc 0, stdout OPEN …
+rm -f "$STUB_CALLS"
+STUB_MODE=open; export STUB_MODE
+p1_out=$(automouse_pr_state some-branch 2>/dev/null); p1_rc=$?
+if [ "$p1_rc" -eq 0 ] && [ "$p1_out" = "OPEN https://example.invalid/pr/1" ]; then
+    echo "ok: p1-open-rc0-correct-stdout"
+else
+    echo "FAIL: p1-open-rc0-correct-stdout — rc=$p1_rc out='$p1_out'"
+    FAILED=1
+fi
+
+# p2: MERGED answer — rc 0, stdout starts MERGED
+STUB_MODE=merged; export STUB_MODE
+p2_out=$(automouse_pr_state some-branch 2>/dev/null); p2_rc=$?
+if [ "$p2_rc" -eq 0 ] && printf '%s\n' "$p2_out" | grep -q '^MERGED '; then
+    echo "ok: p2-merged-rc0"
+else
+    echo "FAIL: p2-merged-rc0 — rc=$p2_rc out='$p2_out'"
+    FAILED=1
+fi
+
+# p3: CLOSED-only answer — rc 1, stdout empty
+STUB_MODE=closed; export STUB_MODE
+p3_out=$(automouse_pr_state some-branch 2>/dev/null); p3_rc=$?
+if [ "$p3_rc" -ne 0 ] && [ -z "$p3_out" ]; then
+    echo "ok: p3-closed-rc1-empty"
+else
+    echo "FAIL: p3-closed-rc1-empty — rc=$p3_rc out='$p3_out'"
+    FAILED=1
+fi
+
+# p4: no PR (none mode) — rc 1, stdout empty; also test with STUB_MODE unset
+STUB_MODE=none; export STUB_MODE
+p4_out=$(automouse_pr_state some-branch 2>/dev/null); p4_rc=$?
+if [ "$p4_rc" -ne 0 ] && [ -z "$p4_out" ]; then
+    echo "ok: p4-none-rc1-empty"
+else
+    echo "FAIL: p4-none-rc1-empty — rc=$p4_rc out='$p4_out'"
+    FAILED=1
+fi
+# Same with STUB_MODE unset — ${STUB_MODE:-none} must apply
+unset STUB_MODE
+p4u_out=$(automouse_pr_state some-branch 2>/dev/null); p4u_rc=$?
+if [ "$p4u_rc" -ne 0 ] && [ -z "$p4u_out" ]; then
+    echo "ok: p4u-unset-stub-mode-same-as-none"
+else
+    echo "FAIL: p4u-unset-stub-mode-same-as-none — rc=$p4u_rc out='$p4u_out'"
+    FAILED=1
+fi
+export STUB_MODE=none
+
+# p5: gh exits 1 — subshell with set -euo pipefail must survive
+p5_result=$(set -euo pipefail
+    STUB_MODE=error; export STUB_MODE
+    automouse_pr_state some-branch 2>/dev/null || true
+    echo "survived"
+)
+if printf '%s\n' "$p5_result" | grep -q 'survived'; then
+    echo "ok: p5-gh-error-subshell-survives"
+else
+    echo "FAIL: p5-gh-error-subshell-survives — subshell aborted"
+    FAILED=1
+fi
+
+# p6: static — extracted body contains --state all AND "OPEN" AND "MERGED" in --jq
+p6_body=$(extract_fn automouse_pr_state)
+if printf '%s\n' "$p6_body" | grep -q -- '--state all' \
+   && printf '%s\n' "$p6_body" | grep -q '"OPEN"' \
+   && printf '%s\n' "$p6_body" | grep -q '"MERGED"'; then
+    echo "ok: p6-static-state-all-open-merged"
+else
+    echo "FAIL: p6-static-state-all-open-merged — missing --state all or OPEN/MERGED in jq"
+    FAILED=1
+fi
+
+# p7: empty branch arg — rc 1, no gh call
+rm -f "$STUB_CALLS"
+STUB_MODE=open; export STUB_MODE
+p7_rc=0; automouse_pr_state "" 2>/dev/null || p7_rc=$?
+if [ "$p7_rc" -ne 0 ] && [ ! -s "$STUB_CALLS" ]; then
+    echo "ok: p7-empty-branch-rc1-no-gh-call"
+else
+    echo "FAIL: p7-empty-branch-rc1-no-gh-call — rc=$p7_rc stub_calls=$(cat "$STUB_CALLS" 2>/dev/null)"
+    FAILED=1
+fi
+
+# ---------------------------------------------------------------------------
+# Group b — automouse_branch_for_plan (Phase 2)
+# ---------------------------------------------------------------------------
+
+HANDOFF_DIR=$(mktemp -d)
+export HANDOFF_DIR
+
+# b1: handoff has branch field — prefer it
+printf '{"branch":"real-branch"}\n' > "$HANDOFF_DIR/p.md.json"
+b1_out=$(automouse_branch_for_plan p.md p-slug 2>/dev/null)
+if [ "$b1_out" = "real-branch" ]; then
+    echo "ok: b1-prefers-handoff-branch"
+else
+    echo "FAIL: b1-prefers-handoff-branch — got '$b1_out'"
+    FAILED=1
+fi
+rm -f "$HANDOFF_DIR/p.md.json"
+
+# b2: no handoff file — falls back to slug
+b2_out=$(automouse_branch_for_plan p.md p-slug 2>/dev/null)
+if [ "$b2_out" = "p-slug" ]; then
+    echo "ok: b2-absent-handoff-slug-fallback"
+else
+    echo "FAIL: b2-absent-handoff-slug-fallback — got '$b2_out'"
+    FAILED=1
+fi
+
+# b3: malformed JSON — prints slug, subshell survives under set -euo pipefail
+printf 'not json at all\n' > "$HANDOFF_DIR/p.md.json"
+b3_result=$(set -euo pipefail
+    automouse_branch_for_plan p.md p-slug 2>/dev/null
+    echo "survived"
+)
+b3_out=$(printf '%s\n' "$b3_result" | head -1)
+if [ "$b3_out" = "p-slug" ] && printf '%s\n' "$b3_result" | grep -q 'survived'; then
+    echo "ok: b3-malformed-json-slug-fallback-survives"
+else
+    echo "FAIL: b3-malformed-json-slug-fallback-survives — out='$b3_out' result='$b3_result'"
+    FAILED=1
+fi
+rm -f "$HANDOFF_DIR/p.md.json"
+
+# b4: branch-less handoff — prints slug, never literal "null"
+printf '{"plan":"p.md"}\n' > "$HANDOFF_DIR/p.md.json"
+b4_out=$(automouse_branch_for_plan p.md p-slug 2>/dev/null)
+if [ "$b4_out" = "p-slug" ]; then
+    echo "ok: b4-branchless-handoff-slug-fallback"
+else
+    echo "FAIL: b4-branchless-handoff-slug-fallback — got '$b4_out' (literal null?)"
+    FAILED=1
+fi
+rm -f "$HANDOFF_DIR/p.md.json"
+
+# b5: explicit JSON null branch — prints slug
+printf '{"branch":null}\n' > "$HANDOFF_DIR/p.md.json"
+b5_out=$(automouse_branch_for_plan p.md p-slug 2>/dev/null)
+if [ "$b5_out" = "p-slug" ]; then
+    echo "ok: b5-json-null-branch-slug-fallback"
+else
+    echo "FAIL: b5-json-null-branch-slug-fallback — got '$b5_out'"
+    FAILED=1
+fi
+rm -f "$HANDOFF_DIR/p.md.json"
+
+# ---------------------------------------------------------------------------
+# Group d — dispose_plan_done (Phase 3)
+# ---------------------------------------------------------------------------
+
+make_fixture() {
+    local base; base=$(mktemp -d)
+    mkdir -p "$base/queue" "$base/done" "$base/reports" "$base/handoff"
+    # plan symlink pointing at a real temp file (matches -e semantics)
+    local target; target=$(mktemp)
+    ln -s "$target" "$base/queue/p.md"
+    touch "$base/queue/p.md.attempts" "$base/queue/p.md.failure" "$base/queue/p.md.cap-refunds"
+    printf '{"branch":"some-branch"}\n' > "$base/handoff/p.md.json"
+    printf '' > "$base/run.log"
+    echo "$base"
+}
+
+# d1: full side-effect check
+D=$(make_fixture)
+NIGHTLY_DIR="$D"; QUEUE_DIR="$D/queue"; HANDOFF_DIR="$D/handoff"; LOG="$D/run.log"
+export NIGHTLY_DIR QUEUE_DIR HANDOFF_DIR LOG
+dispose_plan_done p.md p OPEN https://example.invalid/pr/1 claim-time
+today=$(date +%Y-%m-%d)
+if [ -e "$D/done/p.md" ] \
+   && [ ! -e "$D/queue/p.md" ] \
+   && [ ! -f "$D/queue/p.md.attempts" ] \
+   && [ ! -f "$D/queue/p.md.failure" ] \
+   && [ ! -f "$D/queue/p.md.cap-refunds" ] \
+   && [ ! -f "$D/handoff/p.md.json" ] \
+   && [ -f "$D/reports/${today}-done-p.md" ] \
+   && grep -q 'https://example.invalid/pr/1' "$D/reports/${today}-done-p.md"; then
+    echo "ok: d1-all-side-effects"
+else
+    echo "FAIL: d1-all-side-effects"
+    ls -la "$D/queue/" "$D/done/" "$D/reports/" "$D/handoff/" 2>&1 | head -20
+    FAILED=1
+fi
+rm -rf "$D"
+
+# d2: pre-existing report is preserved byte-for-byte
+D=$(make_fixture)
+NIGHTLY_DIR="$D"; QUEUE_DIR="$D/queue"; HANDOFF_DIR="$D/handoff"; LOG="$D/run.log"
+export NIGHTLY_DIR QUEUE_DIR HANDOFF_DIR LOG
+printf 'AGENT WROTE THIS\n' > "$D/reports/${today}-done-p.md"
+dispose_plan_done p.md p OPEN https://example.invalid/pr/1 claim-time
+if grep -q 'AGENT WROTE THIS' "$D/reports/${today}-done-p.md"; then
+    echo "ok: d2-report-preserved"
+else
+    echo "FAIL: d2-report-preserved — agent report was overwritten"
+    FAILED=1
+fi
+rm -rf "$D"
+
+# d3: queue/p.md already absent — rc 0, report still written, no abort under set -euo pipefail
+D=$(make_fixture)
+rm -f "$D/queue/p.md"
+NIGHTLY_DIR="$D"; QUEUE_DIR="$D/queue"; HANDOFF_DIR="$D/handoff"; LOG="$D/run.log"
+export NIGHTLY_DIR QUEUE_DIR HANDOFF_DIR LOG
+d3_rc=0
+(set -euo pipefail
+ dispose_plan_done p.md p OPEN https://example.invalid/pr/1 claim-time) || d3_rc=$?
+if [ "$d3_rc" -eq 0 ] && [ -f "$D/reports/${today}-done-p.md" ]; then
+    echo "ok: d3-already-absent-ok"
+else
+    echo "FAIL: d3-already-absent-ok — rc=$d3_rc report_exists=$([ -f "$D/reports/${today}-done-p.md" ] && echo yes || echo no)"
+    FAILED=1
+fi
+rm -rf "$D"
+
+# d4: idempotent — second call rc 0, tree unchanged
+D=$(make_fixture)
+NIGHTLY_DIR="$D"; QUEUE_DIR="$D/queue"; HANDOFF_DIR="$D/handoff"; LOG="$D/run.log"
+export NIGHTLY_DIR QUEUE_DIR HANDOFF_DIR LOG
+dispose_plan_done p.md p OPEN https://example.invalid/pr/1 claim-time
+d4_rc=0
+(set -euo pipefail
+ dispose_plan_done p.md p OPEN https://example.invalid/pr/1 claim-time) || d4_rc=$?
+if [ "$d4_rc" -eq 0 ]; then
+    echo "ok: d4-idempotent"
+else
+    echo "FAIL: d4-idempotent — second call rc=$d4_rc"
+    FAILED=1
+fi
+rm -rf "$D"
+
+# d5: log line with correct site string (claim-time)
+D=$(make_fixture)
+NIGHTLY_DIR="$D"; QUEUE_DIR="$D/queue"; HANDOFF_DIR="$D/handoff"; LOG="$D/run.log"
+export NIGHTLY_DIR QUEUE_DIR HANDOFF_DIR LOG
+dispose_plan_done p.md p OPEN https://example.invalid/pr/1 claim-time
+log_lines=$(grep 'Loop-side disposition (claim-time)' "$D/run.log" | grep 'https://example.invalid/pr/1' | wc -l)
+if [ "$log_lines" -eq 1 ]; then
+    echo "ok: d5-log-claim-time"
+else
+    echo "FAIL: d5-log-claim-time — matching lines=$log_lines"
+    cat "$D/run.log"
+    FAILED=1
+fi
+rm -rf "$D"
+
+# d6: site string post-postplan propagates to log and report
+D=$(make_fixture)
+NIGHTLY_DIR="$D"; QUEUE_DIR="$D/queue"; HANDOFF_DIR="$D/handoff"; LOG="$D/run.log"
+export NIGHTLY_DIR QUEUE_DIR HANDOFF_DIR LOG
+dispose_plan_done p.md p OPEN https://example.invalid/pr/2 post-postplan
+if grep -q 'post-postplan' "$D/run.log" && grep -q 'post-postplan' "$D/reports/${today}-done-p.md"; then
+    echo "ok: d6-site-post-postplan"
+else
+    echo "FAIL: d6-site-post-postplan"
+    cat "$D/run.log" "$D/reports/${today}-done-p.md" 2>&1 | head -10
+    FAILED=1
+fi
+rm -rf "$D"
+
+# ---------------------------------------------------------------------------
+# Group c — claim-time call site (Phase 4), static assertions over $RUNNER
+# ---------------------------------------------------------------------------
+
+# c1: ordering — Terminal-disposition guard comment < automouse_pr_state "$CLAIM_BRANCH" < attempt counter increment
+# Anchor on the unique comment immediately after the depends_on esac (at ~1437), not the first
+# bare esac in the file (~line 615), so the ordering assertion targets the correct insertion point.
+c1_result=$(awk '
+    /# Terminal-disposition guard:/ { e=NR }
+    /automouse_pr_state "\$CLAIM_BRANCH"/ { g=NR }
+    /# Increment attempt counter$/ { i=NR }
+    END { if (e>0 && g>0 && i>0 && e<g && g<i) print "OK"; else print "ORDER-FAIL e="e" g="g" i="i }
+' "$RUNNER")
+if [ "$c1_result" = "OK" ]; then
+    echo "ok: c1-claim-ordering"
+else
+    echo "FAIL: c1-claim-ordering — $c1_result"
+    FAILED=1
+fi
+
+# c2: guard contains handoff existence check
+if grep -qF '[ ! -f "$HANDOFF_DIR/${PLAN_NAME}.json" ]' "$RUNNER"; then
+    echo "ok: c2-handoff-outer-gate"
+else
+    echo "FAIL: c2-handoff-outer-gate — missing handoff gate"
+    FAILED=1
+fi
+
+# c3: guard contains lock release and continue
+if grep -qF 'rm -rf "$CURRENT_LOCK" 2>/dev/null || true' "$RUNNER" \
+   && grep -qF 'CURRENT_LOCK=""' "$RUNNER" \
+   && grep -qF 'continue' "$RUNNER"; then
+    echo "ok: c3-lock-release-and-continue"
+else
+    echo "FAIL: c3-lock-release-and-continue — missing rm CURRENT_LOCK or continue"
+    FAILED=1
+fi
+
+# c4: guard block contains no break (break stops the whole run, not just this entry)
+# Extract the lines from the Terminal-disposition guard comment to the attempt counter increment.
+# Using the comment as anchor avoids matching earlier esac lines from helper functions.
+c4_region=$(awk '
+    /# Terminal-disposition guard:/ { in_region=1; next }
+    in_region && /^    echo \$\(\( ATTEMPTS \+ 1 \)\)/ { exit }
+    in_region { print }
+' "$RUNNER")
+if printf '%s\n' "$c4_region" | grep -qw 'break'; then
+    echo "FAIL: c4-no-break-in-claim-guard — found break in guard region"
+    FAILED=1
+else
+    echo "ok: c4-no-break-in-claim-guard"
+fi
+
+# ---------------------------------------------------------------------------
+# Group e — post-postplan call site (Phase 5), static assertions over $RUNNER
+# ---------------------------------------------------------------------------
+
+# e1: ordering — write_env_stop_report … postplan < automouse_pr_state "$PP_BRANCH" < if [ ! -e "$NEXT_PLAN" ]
+e1_result=$(awk '
+    /write_env_stop_report "\$PLAN_NAME" postplan/ { b=NR }
+    /automouse_pr_state "\$PP_BRANCH"/ { d=NR }
+    /if \[ ! -e "\$NEXT_PLAN" \]/ { c=NR }
+    END { if (b>0 && d>0 && c>0 && b<d && d<c) print "OK"; else print "ORDER-FAIL b="b" d="d" c="c }
+' "$RUNNER")
+if [ "$e1_result" = "OK" ]; then
+    echo "ok: e1-postpostplan-ordering-hard-constraint"
+else
+    echo "FAIL: e1-postpostplan-ordering-hard-constraint — $e1_result"
+    FAILED=1
+fi
+
+# e2: region between the post-postplan disposition comment and its closing fi contains
+# neither continue nor break. Anchored on the unique comment string (same pattern as c4),
+# not on indent-level fi, to avoid matching earlier fi lines in the file.
+e2_region=$(awk '
+    /# Terminal-disposition: the environmental breaker/ { in_region=1; next }
+    in_region && /^        fi$/ { exit }
+    in_region { print }
+' "$RUNNER")
+if printf '%s\n' "$e2_region" | grep -qE '^\s*(continue|break)\s*$'; then
+    echo "FAIL: e2-no-continue-break-in-postpostplan — found continue or break"
+    FAILED=1
+else
+    echo "ok: e2-no-continue-break-in-postpostplan"
+fi
+
+# e3: disposition is guarded by [ -e "$NEXT_PLAN" ]
+if grep -qF '[ -e "$NEXT_PLAN" ]' "$RUNNER"; then
+    echo "ok: e3-next-plan-guard"
+else
+    echo "FAIL: e3-next-plan-guard — missing [ -e \"$NEXT_PLAN\" ] gate"
+    FAILED=1
+fi
+
+# e4: env-breaker is unchanged — phase_env_error and refund_attempt still present inside breaker arm
+e4_breaker_err=$(grep -c 'phase_env_error "$PP_LOG_BEFORE"' "$RUNNER" || true)
+e4_refund=$(grep -c 'refund_attempt' "$RUNNER" || true)
+if [ "$e4_breaker_err" -ge 1 ] && [ "$e4_refund" -ge 1 ]; then
+    echo "ok: e4-breaker-unchanged"
+else
+    echo "FAIL: e4-breaker-unchanged — phase_env_error=$e4_breaker_err refund_attempt=$e4_refund"
+    FAILED=1
+fi
+
+# ---------------------------------------------------------------------------
+# Group s — bin/automouse/prompt-postplan prose (Phase 6), static
+# ---------------------------------------------------------------------------
+
+# s1: HELD appears at least twice
+s1_count=$(grep -c 'HELD' "$PROMPT" || true)
+if [ "$s1_count" -ge 2 ]; then
+    echo "ok: s1-held-named-twice"
+else
+    echo "FAIL: s1-held-named-twice — count=$s1_count"
+    FAILED=1
+fi
+
+# s2: skipped/ route for genuine failures still present
+if grep -qF 'NIGHTLY_DIR/skipped/' "$PROMPT"; then
+    echo "ok: s2-skipped-route-intact"
+else
+    echo "FAIL: s2-skipped-route-intact — skipped/ route was removed"
+    FAILED=1
+fi
+
+# s3: code fences are balanced
+s3_odd=$(awk '/^```/{n++} END{print n%2}' "$PROMPT")
+if [ "$s3_odd" -eq 0 ]; then
+    echo "ok: s3-fences-balanced"
+else
+    echo "FAIL: s3-fences-balanced — odd number of fences"
+    FAILED=1
+fi
+
+# ---------------------------------------------------------------------------
+# Group g — CI wiring guard
+# ---------------------------------------------------------------------------
+
+WORKFLOW="$SCRIPT_DIR/../.github/workflows/tests.yml"
+# g1: the test is wired into CI
+if grep -qF 'bin/test-automouse-postplan-disposition' "$WORKFLOW"; then
+    echo "ok: g1-wired-in-ci"
+else
+    echo "FAIL: g1-wired-in-ci — test not found in $WORKFLOW"
+    FAILED=1
+fi
+
+# ---------------------------------------------------------------------------
+# Tail
+# ---------------------------------------------------------------------------
+
+if [ "$FAILED" -ne 0 ]; then
+    echo "RESULT: FAILED"
+    exit 1
+fi
+echo "RESULT: all passed"
+exit 0

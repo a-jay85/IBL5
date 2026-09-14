@@ -1,6 +1,6 @@
 ---
 description: Faithful 5.60 foul buckets from live per-player composites (defQ = Σ STL/MIN×44, offQ = Σ TOV/48 − HCA), HCA re-homed to the basis-scaled site-2 effect, and the foul level re-anchored to the paired .sco FTA — superseding the ADR-0061 offQ-constant and ADR-0082 defMatchupQuality fidelity claims.
-last_verified: 2026-07-12
+last_verified: 2026-09-11
 ---
 
 # ADR-0084: Faithful 5.60 foul buckets from live composites, HCA re-homing, and FTA-level re-anchor

@@ -383,6 +383,11 @@ test.describe('block.php — Free Agency admin clear_offers flow', () => {
 test.describe('Free Agency admin: assign free agents', () => {
   test.describe.configure({ mode: 'serial' });
 
+  // Captured in the first test for re-use in the duplicate-submit negative-path test.
+  let capturedSigningsData = '[]';
+  let capturedNewsHometext = '';
+  let capturedNewsBodytext = '';
+
   test.beforeAll(async ({ request }) => {
     // Re-seed offers so processDay(1) has data to compute signings from.
     // (The outer file-level beforeAll cleared them; this describe needs them present.)
@@ -419,6 +424,11 @@ test.describe('Free Agency admin: assign free agents', () => {
       .getAttribute('value');
     expect(csrfToken, 'CSRF token must be present in #assignFreeAgentsForm').toBeTruthy();
 
+    // Capture form values for the duplicate-submit negative-path test below.
+    capturedSigningsData = signingsData!;
+    capturedNewsHometext = newsHometext;
+    capturedNewsBodytext = newsBodytext;
+
     // POST the assign action. page.request shares the pinned PHPSESSID with the page
     // context, so CSRF validation passes (same session as the GET that generated the token).
     const response = await page.request.post('block.php?day=1', {
@@ -452,9 +462,61 @@ test.describe('Free Agency admin: assign free agents', () => {
     await assertNoPhpErrors(page, 'on block.php?day=1 after assign');
   });
 
+  // New test: verify block.php renders #executedBanner when executed=1 is present
+  // in the URL — this is the landing page after the 303 redirect that block.php
+  // issues on a successful assign_free_agents submit.
+  test('executedBanner visible on redirect target URL', async ({ page }) => {
+    await page.goto('block.php?day=1&executed=1');
+    await expect(page).toHaveURL(/block\.php.*day=\d+.*executed=1/);
+    await expect(page.locator('#executedBanner')).toBeVisible();
+  });
+
+  // New test: after day=1 is processed, reloading block.php?day=1 (no executed param)
+  // must show #dayProcessedBanner and must NOT show the assign button.
+  test('dayProcessedBanner visible and assign button absent once day is processed', async ({ page }) => {
+    await page.goto('block.php?day=1');
+    await assertNoPhpErrors(page, 'on block.php?day=1 (processed day reload)');
+    await expect(page.locator('#dayProcessedBanner')).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /Assign Free Agents to Teams and Insert News Story/i }),
+    ).not.toBeVisible();
+  });
+
+  // New test (negative path): re-submitting the same assign_free_agents payload
+  // when day=1 already has a marker row must render the already-processed state
+  // and must NOT insert a second news story row.
+  test('duplicate assign blocked - already processed, no second news story', async ({ page, request }) => {
+    // Get a fresh CSRF token from any form on block.php?day=1 (the clear_offers
+    // form is present in the already-processed state and carries a valid token).
+    await page.goto('block.php?day=1');
+    const csrfToken = await page.locator('input[name="_csrf_token"]').first().getAttribute('value');
+    expect(csrfToken, 'CSRF token must be present on block.php for the duplicate-submit test').toBeTruthy();
+
+    const response = await page.request.post('block.php?day=1', {
+      form: {
+        action: 'assign_free_agents',
+        signings_data: capturedSigningsData,
+        news_hometext: capturedNewsHometext,
+        news_bodytext: capturedNewsBodytext,
+        _csrf_token: csrfToken!,
+      },
+    });
+    expect(response.status()).toBeLessThan(400);
+    const body = await response.text();
+    expect(body, 'duplicate assign_free_agents submit must render dayProcessedBanner').toContain(
+      'id="dayProcessedBanner"',
+    );
+
+    // Verify nuke_stories has exactly one FA row — no duplicate was inserted.
+    const countResponse = await request.get('test-state.php?action=count-fa-stories');
+    const countData = await countResponse.json() as { count: number };
+    expect(countData.count, 'nuke_stories must have exactly one FA story row (no duplicate)').toBe(1);
+  });
+
   test.afterAll(async ({ request }) => {
     // Restore pids 10/11/12 to their pre-signing seed state, reset Metros MLE/LLE,
-    // delete the assign news story, and re-seed ibl_fa_offers.
+    // delete the assign news story, delete the ibl_fa_days_processed marker, and
+    // re-seed ibl_fa_offers.
     await resetFaSignings(request);
   });
 });

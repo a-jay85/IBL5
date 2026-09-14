@@ -348,6 +348,29 @@ else
 fi
 rm -rf "$D"
 
+# d7: the moved done/ entry carries a DISPOSITION-time mtime, not the queue symlink's own.
+# Asserted with the SAME predicate the digest uses (find -newermt, which lstat()s a symlink
+# because -L is absent) so the test cannot pass while the digest still misses the entry.
+D=$(make_fixture)
+touch -h -t 200001010000 "$D/queue/p.md"
+# vacuity guard: prove the fixture really starts OUTSIDE the window, else the assert is empty
+if [ -n "$(find "$D/queue" -maxdepth 1 -name p.md -newermt '2020-01-01 00:00:00' 2>/dev/null)" ]; then
+    echo "FAIL: d7-vacuity — fixture symlink was not pinned to the past; d7 would prove nothing"
+    FAILED=1
+fi
+NIGHTLY_DIR="$D"; QUEUE_DIR="$D/queue"; HANDOFF_DIR="$D/handoff"; LOG="$D/run.log"
+export NIGHTLY_DIR QUEUE_DIR HANDOFF_DIR LOG
+dispose_plan_done p.md p OPEN https://example.invalid/pr/1 claim-time
+d7_since="$(date -v-1H '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date -d '1 hour ago' '+%Y-%m-%d %H:%M:%S')"
+if [ -n "$(find "$D/done" -maxdepth 1 -name p.md -newermt "$d7_since" 2>/dev/null)" ]; then
+    echo "ok: d7-disposition-mtime"
+else
+    echo "FAIL: d7-disposition-mtime — done/p.md kept queue-time mtime; the digest will not see it"
+    ls -la "$D/done/"
+    FAILED=1
+fi
+rm -rf "$D"
+
 # ---------------------------------------------------------------------------
 # Group c — claim-time call site (Phase 4), static assertions over $RUNNER
 # ---------------------------------------------------------------------------

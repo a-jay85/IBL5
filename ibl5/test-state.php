@@ -886,6 +886,18 @@ if ($method === 'POST') {
     exit;
 }
 
+// A named-but-unrecognised action is a client mistake, not a method mistake.
+// Falling through to 405 below is actively misleading for a typo'd `vr:` cell
+// (ADR-0126) — the method was fine, the action was not. Every one of the
+// existing actions exits inside its own branch above, so this can only be
+// reached by an action nothing handles.
+if ($action !== '') {
+    http_response_code(400);
+    echo json_encode(['error' => 'Unknown action: ' . $action]);
+    $db->close();
+    exit;
+}
+
 http_response_code(405);
 echo json_encode(['error' => 'Method not allowed']);
 $db->close();

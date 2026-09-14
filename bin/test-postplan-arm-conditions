@@ -136,10 +136,14 @@ run_cond13() {
 
 run_cond12() {
     local vf="$BASE_TMP/fidelity-verdict.md"
+    local vf2="$BASE_TMP/fidelity-verdict-2.md"
     mk_verdict_fixture "$2" "$vf"
+    rm -f "$vf2"
+    [ -n "${3:-}" ] && mk_verdict_fixture "$3" "$vf2"
+    [ -n "${4:-}" ] && printf 'REVIEWED_TREE=%s\n' "$4" >> "$vf2"
     printf '{"number":2100}' > "$BASE_TMP/fixture.json"
     PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" \
-        FIDELITY_VERDICT_FILE="$vf" bash -c "$1" 2>&1
+        FIDELITY_VERDICT_FILE="$vf" FIDELITY_VERDICT_FILE_2="$vf2" bash -c "$1" 2>&1
 }
 run_p55() {
     local vf="$BASE_TMP/p55-verdict.md"
@@ -876,6 +880,122 @@ else
         "$(run_p55 "$B55" empty)"
 fi
 
+# prose/structural assertions: Phase 5.5 skill must contain step 3b + step 4b tokens
+for tok in \
+    'REVIEWED_TREE=' \
+    'fidelity-verdict-<N>-2.md' \
+    'Re-reviewed tree:' \
+    'pr-ready-phase6' \
+    'auto_merge: false' \
+    'READY (re-review)'; do
+    if grep -qF "$tok" "$P55_SKILL"; then
+        echo "ok: P55_SKILL contains [$tok]"
+    else
+        echo "FAIL: P55_SKILL missing [$tok] — step 3b/4b prose drifted"
+        FAILED=1
+    fi
+done
+
+# Prose assertion 6: B55 (phase 5.5 verdict parse) must contain no rev-parse —
+# proof the record block stayed in its own fence and the four existing parse tests
+# are still hermetic. A future edit that folds git rev-parse into the parse fence
+# would make those tests run git against a fixture path and silently stop being hermetic.
+if [ -z "$B55" ]; then
+    echo "FAIL: B55 absent — skipping rev-parse hermeticity check"
+    FAILED=1
+elif grep -qF 'rev-parse' <<< "$B55"; then
+    echo "FAIL: B55 (phase 5.5 verdict parse) contains 'rev-parse' — record block leaked into parse fence; hermetic tests compromised"
+    FAILED=1
+else
+    echo "ok: B55 (phase 5.5 verdict parse) contains no 'rev-parse' (hermetic)"
+fi
+
+# --- §5.8b condition (12): second-verdict (re-review) behavioural cases ------------
+CUR_TREE="$(git -C "$REPO_ROOT" rev-parse "HEAD^{tree}" 2>/dev/null || echo none)"
+STALE_TREE="0000000000000000000000000000000000000000"
+
+# 8.1 v2 absent → falls back to v1 (ready)
+expect_block "(12) v2 absent, v1 ready -> NONE" NONE \
+    "$(run_cond12 "$B12" ready)"
+
+# 8.2 v2 tree-match, v2 READY → arm; overrides v1 NOT READY
+expect_block "(12) v2 tree-match, v2 READY -> NONE (overrides v1 NOT READY)" NONE \
+    "$(run_cond12 "$B12" notready ready "$CUR_TREE")"
+
+# 8.3 v2 tree-match, v2 NOT READY → block
+expect_block "(12) v2 tree-match, v2 NOT READY -> BLOCK" BLOCK \
+    "$(run_cond12 "$B12" ready notready "$CUR_TREE")"
+
+# 8.4 v2 tree-match, v2 no parseable verdict → BLOCK (indeterminate)
+expect_block "(12) v2 tree-match, v2 no verdict -> BLOCK (indeterminate)" BLOCK \
+    "$(run_cond12 "$B12" ready noverdict "$CUR_TREE")"
+
+# 8.5 v2 tree-match, v2 READY WITH NOTES → arm (advisory)
+expect_block "(12) v2 tree-match, v2 READY WITH NOTES -> NONE (advisory)" NONE \
+    "$(run_cond12 "$B12" notready notes "$CUR_TREE")"
+
+# 8.6 v2 stale tree → NOTE diagnostic + falls back to v1 (ready) → arm
+out86="$(run_cond12 "$B12" ready ready "$STALE_TREE")"
+expect_block "(12) v2 stale tree, v1 ready -> NONE (falls back to v1)" NONE "$out86"
+if grep -qF 'stale re-review' <<< "$out86"; then
+    echo "ok: (12) stale re-review emits NOTE diagnostic"
+else
+    echo "FAIL: (12) stale re-review missing NOTE diagnostic: '$out86'"
+    FAILED=1
+fi
+
+# 8.7 v2 stale tree, v1 NOT READY → falls back to v1 → block
+expect_block "(12) v2 stale tree, v1 NOT READY -> BLOCK (falls back to v1 NOT READY)" BLOCK \
+    "$(run_cond12 "$B12" notready ready "$STALE_TREE")"
+
+# 8.8 v2 empty file (-s fails) → falls back to v1 (ready) → arm
+expect_block "(12) v2 empty (-s fails) -> NONE (falls back to v1)" NONE \
+    "$(run_cond12 "$B12" ready empty "")"
+
+# 8.9 v2 no REVIEWED_TREE line → treated as stale → NOTE + falls back to v1 → arm
+out89="$(run_cond12 "$B12" ready ready "")"
+expect_block "(12) v2 no REVIEWED_TREE line -> NONE (stale, falls back to v1)" NONE "$out89"
+if grep -qF 'stale re-review' <<< "$out89"; then
+    echo "ok: (12) missing REVIEWED_TREE treated as stale (NOTE emitted)"
+else
+    echo "FAIL: (12) missing REVIEWED_TREE not treated as stale: '$out89'"
+    FAILED=1
+fi
+
+# Case 8.7 (plan) — verdict-1 record integrity: after v2 clears condition 12,
+# re-parse v1 and assert it still yields NOT READY with a byte-identical pre-DIGEST body.
+# Byte identity of the whole file is the wrong assertion (Phase 5.5 appends REVIEWED_TREE=
+# to v1), so compare only the pre-## DIGEST section.
+vf1_87="$BASE_TMP/fidelity-verdict-87.md"
+vf2_87="$BASE_TMP/fidelity-verdict-87-2.md"
+mk_verdict_fixture notready "$vf1_87"
+mk_verdict_fixture ready "$vf2_87"
+printf 'REVIEWED_TREE=%s\n' "$CUR_TREE" >> "$vf2_87"
+printf '{"number":2100}' > "$BASE_TMP/fixture.json"
+out87="$(PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" \
+    FIDELITY_VERDICT_FILE="$vf1_87" FIDELITY_VERDICT_FILE_2="$vf2_87" bash -c "$B12" 2>&1)"
+expect_block "(12) case 8.7 setup: v2 clears v1 NOT READY -> NONE" NONE "$out87"
+# Re-parse v1 with the canonical expression
+v1_word_87="$(sed '/^## DIGEST/,$d' "$vf1_87" \
+    | grep -E '^(READY WITH NOTES|NOT READY|READY)[[:space:]]*$' | tail -1 | sed 's/[[:space:]]*$//')"
+if [ "$v1_word_87" = "NOT READY" ]; then
+    echo "ok: (12) v1 record integrity: re-parse still yields NOT READY"
+else
+    echo "FAIL: (12) v1 record integrity: re-parse yielded '$v1_word_87', expected NOT READY"
+    FAILED=1
+fi
+# Assert pre-DIGEST body byte-identical to a fresh notready fixture
+vf_ref87="$BASE_TMP/fidelity-verdict-ref87.md"
+mk_verdict_fixture notready "$vf_ref87"
+v1_body_87="$(sed '/^## DIGEST/,$d' "$vf1_87")"
+ref_body_87="$(sed '/^## DIGEST/,$d' "$vf_ref87")"
+if [ "$v1_body_87" = "$ref_body_87" ]; then
+    echo "ok: (12) v1 record integrity: pre-DIGEST body byte-identical to notready fixture"
+else
+    echo "FAIL: (12) v1 record integrity: pre-DIGEST body modified — verdict 1 was mutated"
+    FAILED=1
+fi
+
 # --- §5.6 condition (12): structural assertions (no assert_self_contained — see below) --
 # Condition (12) reads run-local /tmp state and sources no library, so
 # assert_self_contained — hardwired to `source` + pr-armable.sh — does NOT apply and
@@ -889,6 +1009,7 @@ fi
 cond12_structural() {
     printf '%s' "$1" | grep -q 'gh pr view --json number' \
         && printf '%s' "$1" | grep -qF 'FIDELITY_VERDICT_FILE="${FIDELITY_VERDICT_FILE:-' \
+        && grep -qF 'FIDELITY_VERDICT_FILE_2="${FIDELITY_VERDICT_FILE_2:-' <<< "$1" \
         && { echo derives; return; }
     echo missing
 }
@@ -911,6 +1032,14 @@ else
     FAILED=1
 fi
 
+# Vacuity mutant 2: strip FIDELITY_VERDICT_FILE_2 and confirm the guard notices.
+if [ "$(cond12_structural "$(printf '%s' "$B12" | grep -v 'FIDELITY_VERDICT_FILE_2')")" = missing ]; then
+    echo "ok: cond12_structural is not vacuous on FIDELITY_VERDICT_FILE_2 (mutant 2 detected)"
+else
+    echo "FAIL: cond12_structural passes a block with no FIDELITY_VERDICT_FILE_2 derivation — guard 2 is vacuous"
+    FAILED=1
+fi
+
 if printf '%s' "$B12" | grep -vE '^[[:space:]]*#' | grep -qE '\$\$|\$PPID'; then
     echo "FAIL: condition (12) keys its verdict path to \$\$/\$PPID — Phase 5.5 wrote that file from a different shell"
     FAILED=1
@@ -927,6 +1056,12 @@ for f in "$P55_SKILL" "$SKILL"; do
         FAILED=1
     fi
 done
+if grep -qF 'post-plan-fidelity-verdict-$PR_NUM-2.md' <<< "$B12"; then
+    echo "ok: condition (12) block names the -2 verdict path"
+else
+    echo "FAIL: drift — condition (12) block lost the -2 verdict path (post-plan-fidelity-verdict-\$PR_NUM-2.md)"
+    FAILED=1
+fi
 # shellcheck disable=SC2016  # literal shell text, not expansions
 PARSE_TOKENS=(
     "sed '/^## DIGEST/,\$d'"

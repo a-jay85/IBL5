@@ -22,8 +22,10 @@ Capture the `cat` output — that is `$DIFF` for every sub-agent prompt below. N
 **Delta review scope — resolve this FIRST, before anything else in 4B.** 4B reviews only the diff
 added since the last recorded reviewed tree, when — and only when — that delta is positively
 proven. Run yourself (not via an agent), with `<N>` the PR number, `<MASTER_SHA>` the current
-`origin/master` SHA, and `<CONFLICTS_FLAG>` the same literal Phase 2 passes to `/pr-ready` (the
-empty string when no conflicts were resolved):
+`origin/master` SHA, and `<CONFLICTS_FLAG>` derived locally: `""` when Phase 2 ran clean, or
+`"conflicts"` when Phase 2 auto-resolved a rebase conflict. Check for the Phase 2 flag file to
+decide: `test -f "/tmp/postplan-conflict-resolved-$(git rev-parse --abbrev-ref HEAD | tr '/:' '--')"
+&& echo conflicts || echo ""`.
 
 ```bash
 git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/skip-review.sh > /tmp/post-plan-skip-<N>.sh && test -s /tmp/post-plan-skip-<N>.sh && bash /tmp/post-plan-skip-<N>.sh --delta <N> "<CONFLICTS_FLAG>"

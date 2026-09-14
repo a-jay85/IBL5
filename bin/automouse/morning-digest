@@ -1,0 +1,320 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# bin/automouse/morning-digest — daily digest of last night's automouse run.
+#
+# Usage:
+#   bin/automouse/morning-digest                   # compose and send the digest
+#   bin/automouse/morning-digest --dry-run         # compose and print to stdout (no send)
+#   bin/automouse/morning-digest --date YYYY-MM-DD # override the digest date
+#   bin/automouse/morning-digest -h|--help         # show this help
+#
+# "Prior night" is the 24 hours ENDING at 07:00 on the digest date: entries in
+# done/, skipped/, and queue/ sidecars whose mtime falls in
+# (prior-date 07:00:00, digest-date 07:00:00].  The window is anchored to the
+# digest DATE, not to wall-clock now, so --date reproduces a past digest exactly.
+# 07:00 matches StartCalendarInterval Hour=7 in morning-digest-cron-setup.
+# Spend is the sum of per-plan rows in reports/YYYY-MM-DD-costs.md for both the
+# digest date and the prior date; the weekly-aggregate block is never read.
+# A zero-run night sends a coherent "no plans ran" line rather than silencing.
+
+set -uo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+
+# NIGHTLY_DIR seam — copied verbatim from bin/automouse/queue:23
+# Reject an explicitly empty NIGHTLY_DIR before applying the default; `:=` would
+# silently replace "" with the fallback path, defeating the guard below.
+if [ "${NIGHTLY_DIR+x}" = "x" ] && [ -z "$NIGHTLY_DIR" ]; then
+  echo "morning-digest: NIGHTLY_DIR not found: $NIGHTLY_DIR" >&2
+  exit 1
+fi
+: "${NIGHTLY_DIR:=$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse}"
+
+DRY_RUN=0
+DATE_OVERRIDE=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --dry-run) DRY_RUN=1; shift ;;
+    --date)
+      if [ $# -lt 2 ] || [[ "$2" == --* ]]; then
+        echo "morning-digest: --date requires a value" >&2; exit 1
+      fi
+      if ! [[ "$2" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+        echo "Invalid --date (want YYYY-MM-DD): $2" >&2; exit 1
+      fi
+      DATE_OVERRIDE="$2"; shift 2 ;;
+    -h|--help)
+      awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"
+      exit 0 ;;
+    *) echo "Unknown option: $1" >&2; exit 1 ;;
+  esac
+done
+
+# Validate NIGHTLY_DIR exists
+if [ ! -d "$NIGHTLY_DIR" ]; then
+  echo "morning-digest: NIGHTLY_DIR not found: $NIGHTLY_DIR" >&2
+  exit 1
+fi
+
+D="${DATE_OVERRIDE:-$(date +%F)}"
+
+# --- Collection window --------------------------------------------------------
+# Prior date (BSD date first, then GNU date).
+if PRIOR_D=$(date -v-1d -j -f %F "$D" +%F 2>/dev/null); then
+  :
+else
+  PRIOR_D=$(date -d "$D - 1 day" +%F 2>/dev/null || echo "")
+fi
+# Hard-fail rather than fall through with an empty PRIOR_D: BSD find accepts a
+# malformed -newermt argument SILENTLY and returns the wrong file set with rc=0,
+# so an empty anchor would produce a plausible-looking but wrong digest forever.
+if [ -z "$PRIOR_D" ]; then
+  echo "morning-digest: cannot derive the day before ${D} (neither BSD nor GNU date worked)." >&2
+  exit 1
+fi
+
+DIGEST_HOUR="07:00:00"
+WINDOW_START="${PRIOR_D} ${DIGEST_HOUR}"   # exclusive lower bound
+WINDOW_END="${D} ${DIGEST_HOUR}"           # inclusive upper bound
+
+# find_in_window DIR [find predicates...]
+#   Emits paths directly under DIR whose mtime is in (WINDOW_START, WINDOW_END].
+#   -newermt X is "mtime > X"; ! -newermt Y is "mtime <= Y".  Both BSD and GNU
+#   find support -newermt.  stderr is deliberately NOT suppressed: a bad
+#   timestamp is silently wrong on BSD, so the error text is the only signal.
+find_in_window() {
+  local dir="$1"
+  shift
+  find "$dir" -maxdepth 1 "$@" -newermt "$WINDOW_START" ! -newermt "$WINDOW_END"
+}
+
+# --- Collect prior night's outcomes -------------------------------------------
+
+DONE_DIR="$NIGHTLY_DIR/done"
+SKIPPED_DIR="$NIGHTLY_DIR/skipped"
+QUEUE_DIR="$NIGHTLY_DIR/queue"
+
+COMPLETED=()
+SKIPPED_PLANS=()
+FAILED=()
+PARKED=()
+
+# Find completed plans
+if [ -d "$DONE_DIR" ]; then
+  while IFS= read -r f; do
+    base="$(basename "$f")"
+    # Exclude sidecar files
+    [[ "$base" == *.attempts || "$base" == *.failure || "$base" == *.cap-refunds || "$base" == *.staleness ]] && continue
+    COMPLETED+=("$base")
+  done < <(find_in_window "$DONE_DIR" \( -type f -o -type l \))
+fi
+
+# Find skipped plans
+if [ -d "$SKIPPED_DIR" ]; then
+  while IFS= read -r f; do
+    base="$(basename "$f")"
+    [[ "$base" == *.attempts || "$base" == *.failure || "$base" == *.cap-refunds || "$base" == *.staleness ]] && continue
+    SKIPPED_PLANS+=("$base")
+  done < <(find_in_window "$SKIPPED_DIR" \( -type f -o -type l \))
+fi
+
+# Build a colon-delimited set of completed slugs for dedup (bash 3.2 compat)
+COMPLETED_SET=""
+for p in "${COMPLETED[@]:-}"; do
+  [ -z "$p" ] && continue
+  COMPLETED_SET="${COMPLETED_SET}:${p}:"
+done
+
+# Find failed and parked from queue sidecars
+if [ -d "$QUEUE_DIR" ]; then
+  while IFS= read -r attempts_file; do
+    base="$(basename "$attempts_file")"
+    # Strip the .attempts suffix to get the plan filename
+    plan_file="${base%.attempts}"
+    [ -z "$plan_file" ] && continue
+    # Skip if already in completed
+    case "$COMPLETED_SET" in *":${plan_file}:"*) continue ;; esac
+    failure_file="$QUEUE_DIR/${plan_file}.failure"
+    attempt_count="$(cat "$attempts_file" 2>/dev/null || echo 0)"
+    if [ -f "$failure_file" ]; then
+      FAILED+=("${plan_file}|${attempt_count}")
+    else
+      PARKED+=("${plan_file}|${attempt_count}")
+    fi
+  done < <(find_in_window "$QUEUE_DIR" -type f -name '*.attempts')
+  # Also catch plans with a .failure sidecar but no .attempts (failed before attempt counter was written)
+  while IFS= read -r failure_file; do
+    base="$(basename "$failure_file")"
+    plan_file="${base%.failure}"
+    [ -z "$plan_file" ] && continue
+    case "$COMPLETED_SET" in *":${plan_file}:"*) continue ;; esac
+    [ -f "$QUEUE_DIR/${plan_file}.attempts" ] && continue
+    FAILED+=("${plan_file}|0")
+  done < <(find_in_window "$QUEUE_DIR" -type f -name '*.failure')
+fi
+
+# --- Read spend — sum per-plan rows, stop before weekly aggregate -------------
+
+# Build a colon-delimited set of plan basenames from the prior night (bash 3.2 compat)
+NIGHT_PLANS=""
+for p in "${COMPLETED[@]:-}" "${SKIPPED_PLANS[@]:-}"; do
+  [ -z "$p" ] && continue
+  NIGHT_PLANS="${NIGHT_PLANS}:${p}:"
+done
+for entry in "${FAILED[@]:-}" "${PARKED[@]:-}"; do
+  [ -z "$entry" ] && continue
+  plan_file="${entry%|*}"
+  NIGHT_PLANS="${NIGHT_PLANS}:${plan_file}:"
+done
+
+parse_costs_file() {
+  local file="$1"
+  [ -f "$file" ] || return
+  while IFS= read -r line; do
+    # Stop at weekly aggregate block
+    if [[ "$line" =~ ^##\ Weekly\ aggregate ]]; then
+      break
+    fi
+    # Match table rows: | plan | phase | model | tier | cost | ...
+    if [[ "$line" =~ ^\|[^|]+\|[^|]+\|[^|]+\|[^|]+\|[^|]+\| ]]; then
+      # Skip header and separator rows
+      [[ "$line" =~ ^\|[[:space:]]*Plan[[:space:]]*\| ]] && continue
+      [[ "$line" =~ ^\|[[:space:]]*[-:]+ ]] && continue
+      # Extract plan name (col 1) and cost (col 5)
+      local plan_cell cost_cell prov_cell
+      plan_cell="$(echo "$line" | cut -d'|' -f2 | tr -d ' ')"
+      cost_cell="$(echo "$line" | cut -d'|' -f6 | tr -d ' ')"
+      prov_cell="$(echo "$line" | awk -F'|' '{print $14}' | tr -d ' ')"
+      # Skip if plan not in last night's set (unless NIGHT_PLANS is empty = zero-run)
+      local plan_base="$plan_cell"
+      # Check membership in the colon-delimited NIGHT_PLANS string (bash 3.2 compat)
+      local matched=0
+      case "$NIGHT_PLANS" in
+        *":${plan_base}:"*) matched=1 ;;
+        *":${plan_base%.md}:"*) matched=1 ;;
+      esac
+      [ $matched -eq 0 ] && continue
+      # Exclude unpriced rows
+      if [[ "$cost_cell" == "?" || "$cost_cell" == "-" || "$cost_cell" == "—" || "$cost_cell" == "" || "$prov_cell" == "unknown" ]]; then
+        echo "UNPRICED"
+        continue
+      fi
+      # Emit the numeric cost
+      echo "COST:$cost_cell"
+    fi
+  done < "$file"
+}
+
+SPEND_TOTAL=0
+UNPRICED_COUNT=0
+COSTS_FOUND=0
+
+for costs_file in "$NIGHTLY_DIR/reports/${D}-costs.md" "$NIGHTLY_DIR/reports/${PRIOR_D:-}-costs.md"; do
+  [ -f "$costs_file" ] || continue
+  COSTS_FOUND=1
+  while IFS= read -r row; do
+    if [[ "$row" == "UNPRICED" ]]; then
+      (( UNPRICED_COUNT++ )) || true
+    elif [[ "$row" == COST:* ]]; then
+      val="${row#COST:}"
+      # Use awk for float addition (bash doesn't do floats)
+      SPEND_TOTAL="$(awk -v a="$SPEND_TOTAL" -v b="$val" 'BEGIN{printf "%.4f", a+b}')"
+    fi
+  done < <(parse_costs_file "$costs_file")
+done
+
+if [ $COSTS_FOUND -eq 1 ]; then
+  SPEND_LINE="Spend: \$${SPEND_TOTAL} (floor)"
+  [ $UNPRICED_COUNT -gt 0 ] && SPEND_LINE+=" · excludes ${UNPRICED_COUNT} unpriced rows"
+else
+  SPEND_LINE="Spend: unavailable (no costs roll-up for ${D}, ${PRIOR_D:-unknown})"
+fi
+
+# --- Compose body -------------------------------------------------------------
+
+n_completed=${#COMPLETED[@]}
+n_skipped=${#SKIPPED_PLANS[@]}
+n_failed=${#FAILED[@]}
+n_parked=${#PARKED[@]}
+total=$(( n_completed + n_skipped + n_failed + n_parked ))
+
+if [ $total -eq 0 ]; then
+  BODY="🌙 Automouse — no plans ran last night (${D})."
+else
+  # Build counts line (omit zero counts)
+  counts_line=""
+  [ $n_completed -gt 0 ] && counts_line+="✅ Completed ${n_completed}"
+  if [ $n_skipped -gt 0 ]; then
+    [ -n "$counts_line" ] && counts_line+=" · "
+    counts_line+="⏭ Skipped ${n_skipped}"
+  fi
+  if [ $n_failed -gt 0 ]; then
+    [ -n "$counts_line" ] && counts_line+=" · "
+    counts_line+="❌ Failed ${n_failed}"
+  fi
+  if [ $n_parked -gt 0 ]; then
+    [ -n "$counts_line" ] && counts_line+=" · "
+    counts_line+="🅿️ Parked ${n_parked}"
+  fi
+
+  # Sort plans alphabetically within each bucket
+  # completed
+  sorted_completed=()
+  if [ $n_completed -gt 0 ]; then
+    while IFS= read -r line; do sorted_completed+=("$line"); done < <(printf '%s\n' "${COMPLETED[@]}" | sort)
+  fi
+  sorted_skipped=()
+  if [ $n_skipped -gt 0 ]; then
+    while IFS= read -r line; do sorted_skipped+=("$line"); done < <(printf '%s\n' "${SKIPPED_PLANS[@]}" | sort)
+  fi
+  sorted_failed=()
+  if [ $n_failed -gt 0 ]; then
+    while IFS= read -r line; do sorted_failed+=("$line"); done < <(printf '%s\n' "${FAILED[@]}" | sort)
+  fi
+  sorted_parked=()
+  if [ $n_parked -gt 0 ]; then
+    while IFS= read -r line; do sorted_parked+=("$line"); done < <(printf '%s\n' "${PARKED[@]}" | sort)
+  fi
+
+  # Build plan lines
+  plan_lines=""
+  for p in "${sorted_completed[@]:-}"; do
+    [ -z "$p" ] && continue
+    plan_lines+=$'\n'"✅ ${p%.md}"
+  done
+  for p in "${sorted_skipped[@]:-}"; do
+    [ -z "$p" ] && continue
+    plan_lines+=$'\n'"⏭ ${p%.md}"
+  done
+  for entry in "${sorted_failed[@]:-}"; do
+    [ -z "$entry" ] && continue
+    plan_file="${entry%|*}"
+    attempts="${entry#*|}"
+    plan_lines+=$'\n'"❌ ${plan_file%.md} (${attempts} attempt$([ "$attempts" -eq 1 ] || echo 's'))"
+  done
+  for entry in "${sorted_parked[@]:-}"; do
+    [ -z "$entry" ] && continue
+    plan_file="${entry%|*}"
+    attempts="${entry#*|}"
+    plan_lines+=$'\n'"🅿️ ${plan_file%.md} (${attempts} attempt$([ "$attempts" -eq 1 ] || echo 's'))"
+  done
+
+  BODY="🌙 Automouse digest — ${D}
+
+${counts_line}
+${plan_lines}
+
+${SPEND_LINE}
+Next: review held PRs, then \`gh pr list --search \"is:open label:automouse\"\`
+Reports: ${NIGHTLY_DIR}/reports/"
+fi
+
+# --- Send or dry-run ----------------------------------------------------------
+
+if [ $DRY_RUN -eq 1 ]; then
+  printf '%s\n' "$BODY"
+  exit 0
+fi
+
+printf '%s\n' "$BODY" | "${DISCORD_DM_BIN:-$REPO_ROOT/bin/discord-dm}" --chunk -

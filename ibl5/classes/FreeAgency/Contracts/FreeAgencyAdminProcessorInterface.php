@@ -59,7 +59,8 @@ interface FreeAgencyAdminProcessorInterface
      *     }>,
      *     newsHomeText: string,
      *     newsBodyText: string,
-     *     discordText: string
+     *     discordText: string,
+     *     processed_at: ?string
      * }
      */
     public function processDay(int $day): array;

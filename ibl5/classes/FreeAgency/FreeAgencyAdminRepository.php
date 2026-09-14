@@ -6,6 +6,7 @@ namespace FreeAgency;
 
 use BaseMysqliRepository;
 use FreeAgency\Contracts\FreeAgencyAdminRepositoryInterface;
+use League\LeagueContext;
 
 /**
  * Repository for admin free agency database operations
@@ -162,15 +163,91 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
     }
 
     /**
+     * Resolve the active league for marker keying.
+     */
+    private function resolveLeague(): string
+    {
+        return $this->leagueContext?->getCurrentLeague() ?? LeagueContext::LEAGUE_IBL;
+    }
+
+    /**
+     * Season ending year for the active league, from ibl_settings.
+     *
+     * @throws \RuntimeException when the setting row is absent — see D8, fail closed.
+     */
+    private function getSeasonEndingYear(): int
+    {
+        $league = $this->resolveLeague();
+        $row = $this->fetchOne(
+            "SELECT value FROM `ibl_settings` WHERE setting_key = ? AND league = ?",
+            "ss",
+            'Current Season Ending Year',
+            $league
+        );
+
+        if ($row === null) {
+            throw new \RuntimeException(
+                "Missing 'Current Season Ending Year' setting for league '{$league}'"
+            );
+        }
+
+        $value = $row['value'];
+        if (!is_numeric($value)) {
+            // D8: fail closed. A non-numeric setting would key the marker under a
+            // value no later run reproduces, silently disabling the guard.
+            throw new \RuntimeException(
+                "Non-numeric 'Current Season Ending Year' setting for league '{$league}'"
+            );
+        }
+
+        return (int) $value;
+    }
+
+    /**
+     * @see FreeAgencyAdminRepositoryInterface::getDayProcessedMarker()
+     */
+    public function getDayProcessedMarker(int $day): ?string
+    {
+        $row = $this->fetchOne(
+            "SELECT processed_at FROM `ibl_fa_days_processed`
+             WHERE league = ? AND season_ending_year = ? AND day = ?",
+            "sii",
+            $this->resolveLeague(),
+            $this->getSeasonEndingYear(),
+            $day
+        );
+
+        if ($row === null) {
+            return null;
+        }
+
+        $processedAt = $row['processed_at'];
+        if (!is_string($processedAt)) {
+            // Never report "not processed" for a marker row that exists — that would
+            // fail open on the advisory read and re-offer the Assign button.
+            throw new \RuntimeException(
+                "Unexpected processed_at value on the day {$day} marker row"
+            );
+        }
+
+        return $processedAt;
+    }
+
+    /**
      * @see FreeAgencyAdminRepositoryInterface::executeSigningsTransactionally()
      */
     public function executeSigningsTransactionally(
+        int $day,
         array $signings,
         string $newsTitle,
         string $newsHomeText,
         string $newsBodyText
     ): array {
-        return $this->transactional(function () use ($signings, $newsTitle, $newsHomeText, $newsBodyText): array {
+        return $this->transactional(function () use ($day, $signings, $newsTitle, $newsHomeText, $newsBodyText): array {
+            // MUST be the first write in this closure. On a replay the PRIMARY KEY
+            // rejects it before any player row, MLE/LLE flag, or news story moves.
+            $this->insertDayProcessedMarker($day, count($signings));
+
             $successCount = 0;
             $errorCount = 0;
 
@@ -214,5 +291,36 @@ class FreeAgencyAdminRepository extends BaseMysqliRepository implements FreeAgen
 
             return ['successCount' => $successCount, 'errorCount' => $errorCount, 'newsSid' => $newsSid];
         });
+    }
+
+    /**
+     * @throws DayAlreadyProcessedException when this day was already executed.
+     */
+    private function insertDayProcessedMarker(int $day, int $signingsSubmitted): void
+    {
+        $league = $this->resolveLeague();
+        $seasonEndingYear = $this->getSeasonEndingYear();
+
+        try {
+            $this->execute(
+                "INSERT INTO `ibl_fa_days_processed`
+                     (league, season_ending_year, day, signings_submitted)
+                 VALUES (?, ?, ?, ?)",
+                "siii",
+                $league,
+                $seasonEndingYear,
+                $day,
+                $signingsSubmitted
+            );
+        } catch (\RuntimeException $e) {
+            if ($e->getCode() === 1003 && str_contains($e->getMessage(), 'Duplicate entry')) {
+                throw new DayAlreadyProcessedException(
+                    "Free agency day {$day} has already been processed for {$league} {$seasonEndingYear}.",
+                    0,
+                    $e
+                );
+            }
+            throw $e;
+        }
     }
 }

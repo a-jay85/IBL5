@@ -112,18 +112,26 @@ interface FreeAgencyAdminRepositoryInterface
     public function clearAllOffers(): void;
 
     /**
+     * When this (league, season, day) was executed, or null if it has not been.
+     */
+    public function getDayProcessedMarker(int $day): ?string;
+
+    /**
      * Execute signings atomically within a transaction
      *
      * Updates player contracts, marks MLE/LLE as used, and inserts news stories
      * within a single transaction using SAVEPOINT support.
      *
+     * @param int $day Free agency day number (1-10)
      * @param list<array{playerId: int, teamId: int, teamName: string, offers: array{offer1: int, offer2: int, offer3: int, offer4: int, offer5: int, offer6: int}, offerYears: int, offerTotal?: float, usedMle: bool, usedLle: bool}> $signings
      * @param string $newsTitle News article title
      * @param string $newsHomeText News article summary text
      * @param string $newsBodyText News article full body text
      * @return array{successCount: int, errorCount: int, newsSid: int}
+     * @throws \FreeAgency\DayAlreadyProcessedException
      */
     public function executeSigningsTransactionally(
+        int $day,
         array $signings,
         string $newsTitle,
         string $newsHomeText,

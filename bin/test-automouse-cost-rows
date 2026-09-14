@@ -503,6 +503,58 @@ assert_eq "$(printf '%s' "$old_row" | awk -F'|' '{gsub(/[ \t]/,"",$8); print $8}
 assert_eq "$(grep -c '^| Plan | Phase | Model | Tier | Cost (\$) | Surcharge est (\$) |' "$S3_REPORT")" "1" \
     "header is rewritten to the 13-column schema exactly once"
 
+echo
+echo "-- append_cost_row: harness-ledger path (rows 13-15) --"
+
+# Restore S2 context (S3 stanza above overwrote NIGHTLY_DIR/SELF_DIR/LOG).
+NIGHTLY_DIR="$S2"
+SELF_DIR="$S2/bin/automouse"
+LOG="$S2/logs/$(date +%F).log"
+
+# Create a HARNESS_RUN_DIR with a result.json containing two calls summing to
+# 3.25 (1.5 + 1.75) — a distinctive float that cannot be confused with the
+# harness logged_cost ($5.0000) or any pricer figure.
+S13_HDIR="$S2/harness/out/live-some-plan-123"
+mkdir -p "$S13_HDIR"
+cat > "$S13_HDIR/result.json" <<'JSONEOF'
+{"ledger":{"calls":[{"cost_usd":1.5,"input_tokens":100,"output_tokens":50,"cache_read_input_tokens":0},{"cost_usd":1.75,"input_tokens":200,"output_tokens":75,"cache_read_input_tokens":10}]}}
+JSONEOF
+
+# Row 13: harness-rc=0 + readable result.json → Prov=harness-ledger, cost=ledger sum.
+before=$(wc -l < "$LOG")
+printf '[00:05:00] ledger-ok.md/impl exit: cost=$5.0000 peak_ctx=50000 session_id=stub-missing\n' >> "$LOG"
+printf 'post-plan-now: postplan-rc=0 harness-rc=0 harness-run-dir=%s\n' "$S13_HDIR" >> "$LOG"
+append_cost_row "ledger-ok.md" "impl" "$before" "claude-opus-4-1"
+
+ledger_ok_row=$(grep -m1 '^| ledger-ok.md |' "$S2_REPORT")
+assert_eq "$(printf '%s' "$ledger_ok_row" | awk -F'|' '{gsub(/[ \t]/,"",$14); print $14}')" \
+    "harness-ledger" "row 13: harness-rc=0 with result.json → Prov=harness-ledger"
+assert_near "$(printf '%s' "$ledger_ok_row" | awk -F'|' '{gsub(/[ \t]/,"",$6); print $6}')" \
+    "3.25" 0.0001 "row 13: cost is the ledger sum 1.5+1.75=3.25"
+
+# Row 14: harness-rc=1 → pricer also fails → Prov=unknown (not harness-ledger).
+before=$(wc -l < "$LOG")
+printf '[00:06:00] ledger-rc1.md/impl exit: cost=$5.0000 peak_ctx=50000 session_id=stub-missing\n' >> "$LOG"
+printf 'post-plan-now: postplan-rc=1 harness-rc=1 harness-run-dir=%s\n' "$S13_HDIR" >> "$LOG"
+append_cost_row "ledger-rc1.md" "impl" "$before" "claude-opus-4-1"
+
+ledger_rc1_row=$(grep -m1 '^| ledger-rc1.md |' "$S2_REPORT")
+assert_ne "$(printf '%s' "$ledger_rc1_row" | awk -F'|' '{gsub(/[ \t]/,"",$14); print $14}')" \
+    "harness-ledger" "row 14: harness-rc=1 does not trigger harness-ledger"
+
+# Row 15: harness-rc=0 but result.json absent → Prov=unknown; returns 0.
+before=$(wc -l < "$LOG")
+printf '[00:07:00] ledger-miss.md/impl exit: cost=$5.0000 peak_ctx=50000 session_id=stub-missing\n' >> "$LOG"
+printf 'post-plan-now: postplan-rc=0 harness-rc=0 harness-run-dir=%s\n' \
+    "$S2/harness/out/live-nonexistent" >> "$LOG"
+rc15=0
+append_cost_row "ledger-miss.md" "impl" "$before" "claude-opus-4-1" || rc15=$?
+assert_eq "$rc15" "0" "row 15: append_cost_row returns 0 when result.json is absent"
+
+ledger_miss_row=$(grep -m1 '^| ledger-miss.md |' "$S2_REPORT")
+assert_eq "$(printf '%s' "$ledger_miss_row" | awk -F'|' '{gsub(/[ \t]/,"",$14); print $14}')" \
+    "unknown" "row 15: missing result.json falls back to Prov=unknown"
+
 rm -rf "$S2" "$S3"
 
 echo

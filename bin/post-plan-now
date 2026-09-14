@@ -30,6 +30,10 @@
 #                               #   PR; whether auto-merge ARMS is decided later, at
 #                               #   /post-plan Phase 6.5 (a plan's `auto_merge: false`
 #                               #   holds the merge — it no longer holds post-plan).
+#   bin/post-plan-now --foreground   # run the engine in THIS shell instead of
+#                               #   detaching via launchd; exits with post-plan's own
+#                               #   status. For a supervising caller (bin/automouse/run)
+#                               #   that owns its own timeout and logging.
 #   bin/post-plan-now --force   # override the "PR already exists and the working set
 #                               #   touches no production files" guard (exit 5), which
 #                               #   otherwise points you at the cheaper
@@ -161,18 +165,20 @@ set -euo pipefail
 AUTO=0
 FORCE=0
 PLAN_OVERRIDE=""
+FOREGROUND=0
 PR_NUM=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --auto)   AUTO=1 ; shift ;;
         --force)  FORCE=1 ; shift ;;
+        --foreground) FOREGROUND=1 ; shift ;;
         --plan)   [ $# -ge 2 ] || { echo "post-plan-now: --plan requires a path argument" >&2; exit 1; }
                   PLAN_OVERRIDE="$2" ; shift 2 ;;
         --plan=*) PLAN_OVERRIDE="${1#--plan=}" ; shift ;;
         --pr)     [ $# -ge 2 ] || { echo "post-plan-now: --pr requires a PR number argument" >&2; exit 1; }
                   PR_NUM="$2" ; shift 2 ;;
         --pr=*)   PR_NUM="${1#--pr=}" ; shift ;;
-        *)        echo "post-plan-now: unknown argument '$1' (accepts --auto, --force, --plan <path>, --pr <n>)" >&2
+        *)        echo "post-plan-now: unknown argument '$1' (accepts --auto, --force, --foreground, --plan <path>, --pr <n>)" >&2
                   exit 1 ;;
     esac
 done
@@ -350,13 +356,15 @@ BADGE_FN="$(declare -f pr_sticky_find pr_sticky_upsert pr_sticky_delete \
     post_status_badge conclude_status_badge postplan_sweep_stale_badge || true); "
 FALLBACK_FN=""
 HARNESS_SEG=""
+HARNESS_RUN_DIR=""
 GATE_OPEN=""
 GATE_CLOSE=""
 ENGINE="Sonnet 4.6 /post-plan skill session"
 if [ "${POST_PLAN_SKILL:-0}" != "1" ] && [ -x "$HARNESS/run" ]; then
     FALLBACK_FN="$(declare -f should_fallback); "
     PLAN_ARG="${PLAN_OVERRIDE:+ --plan $(shq "$PLAN_OVERRIDE")}"
-    HARNESS_SEG="CLAUDE_HEADLESS=1 caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS/out/live-$SAFE_SLUG-$TS\" --live${PLAN_ARG}; rc=\$?; "
+    HARNESS_RUN_DIR="$HARNESS/out/live-$SAFE_SLUG-$TS"
+    HARNESS_SEG="CLAUDE_HEADLESS=1 caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG}; rc=\$?; "
     # rc=4 is tested FIRST, ahead of should_fallback: should_fallback 4 returns 0
     # ("escalate"), so reaching it would launch the full Phase-0 skill run this branch
     # exists to avoid. should_fallback itself is unchanged — rc=4 simply never reaches it.
@@ -401,12 +409,31 @@ fi
 # do not "simplify" either one away.
 xml_escape() { printf '%s' "$1" | sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
 
+# $CMD's tail is launch-mechanism-specific. The launchd form is byte-identical to what
+# this script has always emitted — do not "unify" the two. The foreground form is the
+# only place the exit status and the cost marker can escape: launchctl bootout swallows
+# both. HARNESS_RUN_DIR is empty on the skill-only path, hence the :-none default.
+if [ "$FOREGROUND" -eq 1 ]; then
+    CMD_TAIL="conclude_status_badge \"\$pp_rc\"; echo \"post-plan-now: postplan-rc=\$pp_rc harness-rc=\${rc:-none} harness-run-dir=${HARNESS_RUN_DIR:-none}\"; exit \$pp_rc"
+else
+    CMD_TAIL="conclude_status_badge \"\$pp_rc\"; rm -f \"$PLIST\"; launchctl bootout gui/\$(id -u)/$LABEL"
+fi
+
 # One splice covers all three far-side arms (harness, skill fallback, rc=4 Phase-5.5 resume).
 # Only set when --pr was given (PR_NUM is non-empty), so the bare path stays byte-identical.
 PLAN_SLUG_SEG=""
 [ -n "${PR_NUM:-}" ] && PLAN_SLUG_SEG="export PLAN_SLUG=$(shq "$PLAN_SLUG"); "
 
-CMD="export PATH=\"/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH\"; ${PLAN_SLUG_SEG}export POSTPLAN_LABEL=$(shq "$LABEL") POSTPLAN_STARTED=$(shq "$STARTED") POSTPLAN_BADGE_MARKER=$(shq "$POSTPLAN_BADGE_MARKER"); ${BADGE_FN}POSTPLAN_BADGE_BODY=\"\$(postplan_badge_body \"\$POSTPLAN_LABEL\" \"\$POSTPLAN_STARTED\")\"; export POSTPLAN_BADGE_BODY; trap 'conclude_status_badge \"\${pp_rc:-1}\"' EXIT INT TERM HUP; cd \"$ROOT\" && { postplan_sweep_stale_badge \"\$(postplan_badge_pr_number)\"; ${FALLBACK_FN}${HARNESS_SEG}${GATE_OPEN}CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p $(shq "$PROMPT") --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name \"$LABEL\"${GATE_CLOSE}; }; pp_rc=\$?; if [ \"\${rc:-0}\" = 3 ]; then pp_rc=3; fi; conclude_status_badge \"\$pp_rc\"; rm -f \"$PLIST\"; launchctl bootout gui/\$(id -u)/$LABEL"
+CMD="export PATH=\"/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH\"; ${PLAN_SLUG_SEG}export POSTPLAN_LABEL=$(shq "$LABEL") POSTPLAN_STARTED=$(shq "$STARTED") POSTPLAN_BADGE_MARKER=$(shq "$POSTPLAN_BADGE_MARKER"); ${BADGE_FN}POSTPLAN_BADGE_BODY=\"\$(postplan_badge_body \"\$POSTPLAN_LABEL\" \"\$POSTPLAN_STARTED\")\"; export POSTPLAN_BADGE_BODY; trap 'conclude_status_badge \"\${pp_rc:-1}\"' EXIT INT TERM HUP; cd \"$ROOT\" && { postplan_sweep_stale_badge \"\$(postplan_badge_pr_number)\"; ${FALLBACK_FN}${HARNESS_SEG}${GATE_OPEN}CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p $(shq "$PROMPT") --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name \"$LABEL\"${GATE_CLOSE}; }; pp_rc=\$?; if [ \"\${rc:-0}\" = 3 ]; then pp_rc=3; fi; ${CMD_TAIL}"
+
+if [ "$FOREGROUND" -eq 1 ]; then
+    echo "post-plan-now: foreground mode on branch '$SLUG' — engine: $ENGINE"
+    echo "post-plan-now: plan: $PLAN_FILE"
+    # exec, not a call: `timeout` signals the whole process group, and a surviving
+    # wrapper shell would outlive the SIGTERM its child just took. `/bin/bash -lc`
+    # matches the plist's ProgramArguments so both modes parse $CMD identically.
+    exec /bin/bash -lc "$CMD"
+fi
 
 CMD_XML=$(xml_escape "$CMD")
 LABEL_XML=$(xml_escape "$LABEL")

@@ -623,7 +623,7 @@ append_cost_row() {
     local plan=$1 phase=$2 log_before=$3 model=${4:-?}
     local logged_cost sid pricer_json provenance cost tier peak_raw peak_k
     local inp out cr w5 w1 peak_ctx_raw compactions_main compactions_sub
-    local surcharge_low surcharge_high price_asof surcharge_cell report sidecar
+    local surcharge_low surcharge_high price_asof surcharge_cell report sidecar hrc hdir hcost hin hout hcr
     # Sibling-relative, never $REPO: a worktree copy of `run` must price with its
     # own checkout's pricer, not the main checkout's.
     local root="${SELF_DIR:-}/.."
@@ -636,6 +636,22 @@ append_cost_row() {
     sid=$(tail -n +"$((log_before + 1))" "$LOG" | grep -oE 'session_id=[^ ]+' | tail -1 | sed 's/session_id=//') || true
     peak_raw=$(tail -n +"$((log_before + 1))" "$LOG" | grep -oE 'peak_ctx=[0-9]+' | tail -1 | sed 's/peak_ctx=//') || true
     peak_k=$(( ${peak_raw:-0} / 1000 ))
+    # Harness-ledger source. bin/post-plan-now --foreground prints one marker line; a
+    # harness-rc of 0 or 3 means NO /post-plan skill session ran, which is the only case
+    # where result.json's ledger is the complete spend. Any other value (1, 4, none) means
+    # a Sonnet session also ran and the ledger would under-count it — stay on the pricer.
+    hrc=$(tail -n +"$((log_before + 1))" "$LOG" | grep -oE 'harness-rc=[^ ]+' | tail -1 | sed 's/harness-rc=//') || true
+    hdir=$(tail -n +"$((log_before + 1))" "$LOG" | grep -oE 'harness-run-dir=[^ ]+' | tail -1 | sed 's/harness-run-dir=//') || true
+    hcost=""
+    case "${hrc:-}" in 0|3)
+        if [ -n "${hdir:-}" ] && [ "$hdir" != none ] && [ -f "$hdir/result.json" ]; then
+            IFS=$'\t' read -r hcost hin hout hcr <<< "$(jq -r '
+                [(.ledger.calls // [])] | .[0] as $c |
+                [ ([$c[].cost_usd] | add // 0), ([$c[].input_tokens] | add // 0),
+                  ([$c[].output_tokens] | add // 0), ([$c[].cache_read_input_tokens] | add // 0)
+                ] | @tsv' "$hdir/result.json" 2>/dev/null)" || hcost=""
+        fi ;;
+    esac
     # Call pricer; || pricer_json="" prevents a non-zero pricer exit from aborting
     # the automouse loop under set -euo pipefail — degrade to logged_cost, never abort.
     pricer_json=""
@@ -649,6 +665,11 @@ append_cost_row() {
             <<< "$(printf '%s' "$pricer_json" | jq -r '[.cost,.surcharge_low,.surcharge_high,.inp,.out,.cr,.w5,.w1,.peak_ctx,.compactions_main,.compactions_sub,(.price_asof // "")] | @tsv')" || true
         provenance="recomputed"
         peak_k=$(( ${peak_ctx_raw:-0} / 1000 ))
+    elif [ -n "$hcost" ]; then
+        cost="$hcost"
+        surcharge_low="" surcharge_high="" inp="$hin" out="$hout" cr="$hcr" w5="" w1=""
+        peak_ctx_raw=0 compactions_main="" compactions_sub="" price_asof=""
+        provenance="harness-ledger"
     else
         cost="$logged_cost"
         surcharge_low="" surcharge_high="" inp="" out="" cr="" w5="" w1=""
@@ -1668,6 +1689,11 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         CMDPID_FILE="$NIGHTLY_DIR/.cmdpid-$$-postplan"
         rm -f "$HEARTBEAT_FILE" "$CMDPID_FILE"
 
+        # Inert for postplan since the engine became bin/post-plan-now: only
+        # bin/lib/automouse-stream-filter.sh writes the heartbeat file, and that needs
+        # --output-format stream-json, which post-plan-now's $CMD never emits. The watcher
+        # short-circuits on `[ ! -f "$hb_file" ]`, so it costs one idle sleep loop. The live
+        # bound here is `timeout "$REMAINING_SECS"` (MAX_PP_SECS, 3600). Kept deliberately.
         run_heartbeat_watcher "$HEARTBEAT_FILE" "$LOG" "postplan" "$CMDPID_FILE" "$PLAN_SLUG" &
         WATCHER_PID=$!
 
@@ -1680,21 +1706,27 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # that is legitimately still working. It does NOT protect a backgrounded Bash
         # shell — see the impl-phase comment above for why the ceiling cannot; that is
         # what the skill's drain barrier and bash-guard.sh check 17 are for.
-        CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
-        NIGHTLY_CMDPID_FILE="$CMDPID_FILE" \
-        timeout "$REMAINING_SECS" \
-            claude -p "$(cat "$SELF_DIR/prompt-postplan")
-
-PLAN_FILE=$PLAN_NAME" \
-                --dangerously-skip-permissions \
-                --model claude-sonnet-4-6 \
-                --effort high \
-                --output-format stream-json \
-                --verbose \
-                --name "automouse-postplan-$(date +%Y-%m-%d-%H%M)" \
-            2> >(grep -v 'thinking.type=enabled' >> "$LOG") \
-            | bin/lib/automouse-stream-filter.sh "$HEARTBEAT_FILE" "$CMDPID_FILE" "$PLAN_SLUG" postplan \
-            >> "$LOG" || PP_STATUS=$?
+        # bin/automouse/run is cd'd to $REPO (master) and post-plan-now hard-refuses master,
+        # so the worktree cd that prompt-postplan Step 2 used to do must happen here. The
+        # path is the "worktree" key bin/automouse/prompt-impl Step 7 writes into the handoff.
+        # Sibling-relative, never $REPO/bin: a worktree copy of `run` must invoke its own
+        # checkout's post-plan-now, matching append_cost_row's pricer resolution. HARNESS is
+        # deliberately NOT exported — post-plan-now's own default pins the MAIN checkout
+        # (ADR-0092) and a worktree harness must never judge its own change.
+        PP_WORKTREE=""
+        [ -f "$HANDOFF_FILE" ] && PP_WORKTREE=$(jq -r '.worktree // empty' "$HANDOFF_FILE" 2>/dev/null)
+        if [ -z "$PP_WORKTREE" ] || [ ! -d "$PP_WORKTREE" ]; then
+            printf '[%s] %s postplan: no usable worktree in %s — skipping\n' \
+                "$(date +%H:%M:%S)" "$PLAN_SLUG" "$HANDOFF_FILE" >> "$LOG"
+            PP_STATUS=1
+        else
+            CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
+            NIGHTLY_CMDPID_FILE="$CMDPID_FILE" \
+            timeout "$REMAINING_SECS" \
+                bash -c 'cd "$1" && exec "$2" --foreground --plan "$3"' _ \
+                    "$PP_WORKTREE" "$SELF_DIR/../post-plan-now" "$PLANS_DIR/$PLAN_NAME" \
+                >> "$LOG" 2>&1 || PP_STATUS=$?
+        fi
 
         kill "$WATCHER_PID" 2>/dev/null || true
         wait "$WATCHER_PID" 2>/dev/null || true
@@ -1702,7 +1734,7 @@ PLAN_FILE=$PLAN_NAME" \
         rm -f "$HEARTBEAT_FILE" "$CMDPID_FILE"
 
         if [ "$PP_STATUS" -ne 0 ]; then
-            printf '[%s] %s claude exited code=%d (postplan phase)\n' "$(date +%H:%M:%S)" "$PLAN_SLUG" "$PP_STATUS" >> "$LOG"
+            printf '[%s] %s post-plan-now exited code=%d (postplan phase)\n' "$(date +%H:%M:%S)" "$PLAN_SLUG" "$PP_STATUS" >> "$LOG"
         fi
 
         echo "--- Plan #$PLANS_RUN postplan finished at $(date) ---" >> "$LOG"

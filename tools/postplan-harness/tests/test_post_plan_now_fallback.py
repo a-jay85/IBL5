@@ -345,3 +345,149 @@ def test_plan_override_reaches_the_python_harness_in_live_mode():
     src = open(PPN).read()
     seg = next(l for l in src.splitlines() if l.startswith("    HARNESS_SEG="))
     assert "--live${PLAN_ARG}" in seg
+
+
+# ---------------------------------------------------------------------------
+# Rows 1-7: --foreground mode (Verification Matrix, Phase 5)
+# ---------------------------------------------------------------------------
+
+def _run_foreground(tmp_path, harness_rc, with_claude_stub=False):
+    """Run post-plan-now --foreground with a fake harness exiting harness_rc.
+
+    Stubs placed in HOME/.bun/bin/ land at position 3 of the CMD-exported PATH
+    (/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:…), ahead of /usr/bin and
+    the original $PATH tail, so they shadow any system caffeinate and, when
+    with_claude_stub=True, any real claude.
+    """
+    home = tmp_path / "home"
+    bun_bin = home / ".bun" / "bin"
+    la_dir = home / "Library" / "LaunchAgents"
+    la_dir.mkdir(parents=True)
+    bun_bin.mkdir(parents=True)
+
+    # caffeinate stub: swallow leading flags (-s etc.), exec the rest.
+    (bun_bin / "caffeinate").write_text(
+        '#!/bin/sh\nwhile [ $# -gt 0 ] && [ "${1#-}" != "$1" ]; do shift; done\nexec "$@"\n')
+    (bun_bin / "caffeinate").chmod(0o755)
+
+    # fake harness: ignore all args, exit with the requested code.
+    harness = tmp_path / "fake-harness"
+    harness.mkdir(exist_ok=True)
+    (harness / "run").write_text(f"#!/bin/sh\nexit {harness_rc}\n")
+    (harness / "run").chmod(0o755)
+
+    env = dict(os.environ, HOME=str(home), HARNESS=str(harness))
+    env.pop("POST_PLAN_SKILL", None)
+
+    if with_claude_stub:
+        # claude stub: record each argv item on its own line via CLAUDE_LOG, exit 0.
+        claude_log = tmp_path / "claude-log.txt"
+        env["CLAUDE_LOG"] = str(claude_log)
+        (bun_bin / "claude").write_text(
+            '#!/bin/sh\nprintf "CLAUDE-ARG: %s\\n" "$@" >> "$CLAUDE_LOG"\nexit 0\n')
+        (bun_bin / "claude").chmod(0o755)
+
+    repo = _fixture_repo(tmp_path)
+    return subprocess.run(
+        ["bash", PPN, "--foreground"],
+        cwd=repo, env=env, capture_output=True, text=True
+    )
+
+
+def test_detached_default_still_bootstraps(tmp_path):
+    """Row 1: detached default (no flag) still writes the plist and CMD ends launchctl bootout.
+
+    $LABEL is already interpolated when post-plan-now assembles the CMD string, so the
+    CMD tail reads 'launchctl bootout gui/$(id -u)/com.ibl5.postplan-now-<slug>-<ts>'.
+    """
+    cmd = _generate_cmd(tmp_path)
+    home = tmp_path / "home"
+    plists = list((home / "Library" / "LaunchAgents").glob("*.plist"))
+    assert len(plists) == 1, f"detached mode must write exactly one plist, found: {plists}"
+    assert re.search(
+        r'launchctl bootout gui/\$\(id -u\)/com\.ibl5\.postplan-now-some-feature-\S+$',
+        cmd
+    ), f"CMD must end with launchctl bootout: {cmd[-160:]!r}"
+
+
+def test_rejects_misspelled_foreground():
+    """Row 2: --foregound (misspelled) exits non-zero with 'unknown argument' on stderr."""
+    r = subprocess.run(
+        ["bash", PPN, "--foregound"],
+        capture_output=True, text=True, cwd=REPO
+    )
+    assert r.returncode != 0
+    assert "unknown argument" in r.stderr
+    assert "foreground mode" not in r.stdout
+
+
+def test_foreground_writes_no_plist(tmp_path):
+    """Row 3: --foreground writes no file under $HOME/Library/LaunchAgents/."""
+    r = _run_foreground(tmp_path, 0)
+    home = tmp_path / "home"
+    plists = list((home / "Library" / "LaunchAgents").glob("*.plist"))
+    assert len(plists) == 0, \
+        f"--foreground must write no plist (exec happens before plist code), found: {plists}"
+    # Secondary: no 'launchctl bootstrap' should appear in stdout or stderr.
+    assert "launchctl bootstrap" not in r.stdout + r.stderr
+
+
+def test_foreground_marker_wording_harness_ok(tmp_path):
+    """Row 4: harness exit 0 → FULL marker wording in stdout, exit 0.
+
+    Asserts the entire marker token-for-token; the harness-run-dir path is
+    anchored on the actual fake-harness path and a timestamp wildcard.
+    """
+    r = _run_foreground(tmp_path, 0)
+    assert r.returncode == 0, \
+        f"expected exit 0, got {r.returncode}: stderr={r.stderr!r}"
+    harness = tmp_path / "fake-harness"
+    pattern = re.compile(
+        r'^post-plan-now: postplan-rc=0 harness-rc=0 harness-run-dir='
+        + re.escape(str(harness))
+        + r'/out/live-some-feature-\S+$',
+        re.MULTILINE
+    )
+    assert pattern.search(r.stdout), \
+        f"full marker not found in stdout:\n{r.stdout!r}"
+
+
+def test_foreground_exit3_fails_closed(tmp_path):
+    """Row 5: harness exit 3 fails closed — no claude fallback, postplan-rc=3 harness-rc=3, exit 3."""
+    r = _run_foreground(tmp_path, 3)
+    assert r.returncode == 3, \
+        f"expected exit 3 (fail-closed), got {r.returncode}: stderr={r.stderr!r}"
+    assert re.search(
+        r'^post-plan-now: postplan-rc=3 harness-rc=3 harness-run-dir=\S+$',
+        r.stdout, re.MULTILINE
+    ), f"postplan-rc=3 harness-rc=3 marker not found in stdout:\n{r.stdout!r}"
+
+
+def test_foreground_exit1_falls_back(tmp_path):
+    """Row 6: harness exit 1 → claude fallback runs; marker carries harness-rc=1."""
+    r = _run_foreground(tmp_path, 1, with_claude_stub=True)
+    assert re.search(
+        r'^post-plan-now: postplan-rc=\d+ harness-rc=1 harness-run-dir=\S+$',
+        r.stdout, re.MULTILINE
+    ), f"harness-rc=1 marker not found in stdout:\n{r.stdout!r}"
+    claude_log = tmp_path / "claude-log.txt"
+    assert claude_log.exists(), "claude stub must have been invoked for harness-rc=1"
+    log_text = claude_log.read_text()
+    assert "then execute every phase" in log_text, \
+        f"fallback prompt not found in claude args:\n{log_text!r}"
+
+
+def test_foreground_exit4_resumes_phase_55(tmp_path):
+    """Row 7: harness exit 4 → RESUME_PROMPT fires (not full restart); marker carries harness-rc=4."""
+    r = _run_foreground(tmp_path, 4, with_claude_stub=True)
+    assert re.search(
+        r'^post-plan-now: postplan-rc=\d+ harness-rc=4 harness-run-dir=\S+$',
+        r.stdout, re.MULTILINE
+    ), f"harness-rc=4 marker not found in stdout:\n{r.stdout!r}"
+    claude_log = tmp_path / "claude-log.txt"
+    assert claude_log.exists(), "claude stub must have been invoked for rc=4"
+    log_text = claude_log.read_text()
+    assert "RESUMING at Phase 5.5" in log_text, \
+        f"resume prompt not found in claude args:\n{log_text!r}"
+    assert "then execute every phase" not in log_text, \
+        "rc=4 must fire RESUME_PROMPT, not the full-restart fallback prompt"

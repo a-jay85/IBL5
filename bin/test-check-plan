@@ -178,7 +178,7 @@ assert "false-manual" 1 "$FM_OPUS"'
 assert "real-manual-ok" 0 "$FM_OPUS"'
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
-| 1 | does the new dashboard feel polished | Truly-manual | post-impl | n/a |
+| 1 | does the new dashboard feel polished | Truly-manual | post-impl | `no-vr: subjective polish, no single screen to shoot` |
 '
 
 # Gate 7: a DECIDE token in a table row must flag (exit 1).
@@ -598,7 +598,7 @@ sonnet-recipe: gate-C size fixture; recipe completeness not under test.
 M_MANUAL='
 | # | What to verify | Test type | Timing | Test file / location |
 |---|---------------|-----------|--------|---------------------|
-| 1 | does the new dashboard feel polished | Truly-manual | post-impl | n/a |
+| 1 | does the new dashboard feel polished | Truly-manual | post-impl | `no-vr: subjective polish, no single screen to shoot` |
 '
 
 # (a) A Truly-manual row plus `impl_model: sonnet` is a forbidden combo (exit 1).
@@ -2392,6 +2392,59 @@ else
     echo "FAIL: gateD-no-path-exits-2 — expected exit 2, got $_got_2"
     FAILED=1
 fi
+
+
+# ---------------------------------------------------------------------------
+# Gate [Q]: a look-and-feel Truly-manual row needs a `vr:` cell (ADR-0126).
+# ---------------------------------------------------------------------------
+# Reachable only from inside the truly-manual branch AND only when the
+# look-and-feel lexicon matches the *What to verify* cell, so a non-visual
+# Truly-manual row ("the exported CSV opens in Excel") never reaches it.
+
+# (a) Look-and-feel row with a bare location cell -> [Q] fires.
+assert_viol "q_lookandfeel_missing_vr" 1 "[Q]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | does the roster grid layout still look right | Truly-manual | post-impl | n/a |
+'
+
+# (b) The same row carrying a well-formed `vr:` cell -> clean.
+assert_viol "q_lookandfeel_with_vr_passes" 0 "[Q]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | does the roster grid layout still look right | Truly-manual | post-impl | `vr: label=roster-grid; role=admin; url=modules.php?name=Roster; anchor=.ibl-data-table` |
+'
+
+# (c) A NON-visual Truly-manual row is untouched by [Q] — this is the
+# additivity pin: widen the lexicon carelessly and this case goes red.
+assert_viol "q_nonvisual_truly_manual_passes" 0 "[Q]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | the exported CSV opens in Excel without a repair prompt | Truly-manual | post-impl | n/a |
+'
+
+# (d) The `no-vr:` escape with a real reason -> clean.
+assert_viol "q_no_vr_escape_passes" 0 "[Q]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | does the print stylesheet look right on paper | Truly-manual | post-impl | `no-vr: paper output, a browser screenshot proves nothing` |
+'
+
+# (e) A token `no-vr:` reason (< 15 chars) is not an escape -> [Q] fires.
+# Same bar bin/adr-check sets for `no-adr:`.
+assert_viol "q_no_vr_escape_short_reason_fails" 1 "[Q]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | does the print stylesheet look right on paper | Truly-manual | post-impl | `no-vr: hard` |
+'
+
+# (f) A malformed `vr:` cell (bad role) -> [Q] fires, so a broken cell never
+# reaches CI where it could only degrade silently.
+assert_viol "q_malformed_vr_cell_fails" 1 "[Q]" "$FM_OPUS"'
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---------------|-----------|--------|---------------------|
+| 1 | does the roster grid layout still look right | Truly-manual | post-impl | `vr: label=roster-grid; role=owner; url=modules.php?name=Roster` |
+'
 
 # Gate [K]: autonomy-contract frontmatter validation.
 # [K] fires when stop_condition:/evidence: frontmatter fields are present but

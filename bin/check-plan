@@ -176,6 +176,23 @@
 #                              is no on-disk existence skip: activating or newly
 #                              scheduling an EXISTING tick script is the change
 #                              this gate exists to catch.
+#   Q  Manual visual row `vr:` — a Truly-manual row whose "What to verify" cell
+#                              matches the look-and-feel lexicon (look/feel/
+#                              visual/layout/spacing/styl/design/renders/ui/ux …)
+#                              must carry a `vr:` capture cell in its location
+#                              column so CI screenshots it (ADR-0126), or an
+#                              explicit `no-vr: <reason>` escape of at least 15
+#                              characters (the same bar bin/adr-check sets for
+#                              `no-adr:`). A present `vr:` cell is validated
+#                              in place (kebab `label=`, `role=` in
+#                              anon|regular|admin, a `url=`, and any `setup=`
+#                              using GET|POST|DELETE) so a broken cell fails
+#                              here rather than degrading silently in CI.
+#                              Reachable ONLY from inside the truly-manual
+#                              branch and only on a lexicon hit: a plan with no
+#                              Truly-manual rows, or whose manual rows are
+#                              non-visual ("the exported CSV opens in Excel"),
+#                              never reaches it.
 #
 # Deliberately NOT linted (kept as /plan Opus judgment): tests-woven-inline,
 # production-comparison classification, test-file-path presence, negative-path
@@ -328,9 +345,10 @@ matrix_split() {
         *) return 1 ;;              # separator / all-dashes row
     esac
     _r="${1//\\|/$MSEN}"
-    IFS='|' read -r _lead MC_NUM _what MC_TYPE MC_TIME MC_LOC _rest <<< "$_r"
+    IFS='|' read -r _lead MC_NUM MC_WHAT MC_TYPE MC_TIME MC_LOC _rest <<< "$_r"
     MC_PIPES=$(printf '%s' "$_r" | tr -cd '|' | wc -c | tr -d ' ')
     MC_NUM=$(mtrim "$MC_NUM"); MC_TYPE=$(mtrim "$MC_TYPE"); MC_TIME=$(mtrim "$MC_TIME")
+    MC_WHAT=$(mtrim "$MC_WHAT")
     MC_LOC=$(mtrim "${MC_LOC//$MSEN/|}")
     case "$MC_LOC" in '`'*'`') MC_LOC=$(mtrim "${MC_LOC#\`}"); MC_LOC=$(mtrim "${MC_LOC%\`}") ;; esac
     [ -n "$MC_LOC" ] || return 1
@@ -379,6 +397,41 @@ while IFS= read -r row; do
     if printf '%s' "$low" | grep -qE 'truly[- ]manual'; then
         if printf '%s' "$low" | grep -qE 'verify|check that|confirm|ensure'; then
             viol "[3] truly-manual row uses an automatable verb (reclassify): ${row}"
+        fi
+        # Gate [Q]: a LOOK-AND-FEEL truly-manual row must carry a `vr:` cell so CI
+        # can screenshot it (ADR-0126), or an explicit `no-vr: <reason>` escape.
+        # Reachable only from inside this truly-manual branch, and only when the
+        # lexicon matches — a non-visual truly-manual row never gets here.
+        # The truly-manual branch keys on the WHOLE row, so a CLI-executable row
+        # that merely *mentions* truly-manual reaches here. [Q] additionally
+        # requires the TYPE CELL itself to be truly-manual.
+        if matrix_split "$row" && grep -qiE 'truly[- ]manual' <<< "$MC_TYPE"; then
+            what_low="$(printf '%s' "$MC_WHAT" | tr '[:upper:]' '[:lower:]')"
+            # Herestring, not printf|grep: .claude/rules/shell-pipefail-grep.md.
+            if grep -qE '(look|feel|visual|appearance|layout|spacing|alignment|legible|readable|styl|design|renders?|\bui\b|\bux\b)' <<< "$what_low"; then
+                if grep -qE 'no-vr:' <<< "$MC_LOC"; then
+                    _novr_reason="$(sed -E 's/.*no-vr:[[:space:]]*//' <<< "$MC_LOC")"
+                    if [ "${#_novr_reason}" -lt 15 ]; then
+                        viol "[Q] no-vr: needs a reason of at least 15 characters: ${row}"
+                    fi
+                elif grep -qE '(^|[^-])vr:' <<< "$MC_LOC"; then
+                    _vr="${MC_LOC#*vr:}"
+                    _vrbad=""
+                    grep -qE '(^|;)[[:space:]]*label=[a-z0-9]+(-[a-z0-9]+)*[[:space:]]*(;|$)' <<< "$_vr" \
+                        || _vrbad="label= must be a kebab slug"
+                    [ -n "$_vrbad" ] || grep -qE '(^|;)[[:space:]]*role=(anon|regular|admin)[[:space:]]*(;|$)' <<< "$_vr" \
+                        || _vrbad="role= must be anon|regular|admin"
+                    [ -n "$_vrbad" ] || grep -qE '(^|;)[[:space:]]*url=[^[:space:];]' <<< "$_vr" \
+                        || _vrbad="url= is required"
+                    if [ -z "$_vrbad" ] && grep -qE '(^|;)[[:space:]]*setup=' <<< "$_vr"; then
+                        grep -qE '(^|;)[[:space:]]*setup=(GET|POST|DELETE)[[:space:]]' <<< "$_vr" \
+                            || _vrbad="setup= method must be GET, POST or DELETE"
+                    fi
+                    [ -z "$_vrbad" ] || viol "[Q] malformed vr: cell — ${_vrbad}: ${row}"
+                else
+                    viol "[Q] look-and-feel truly-manual row needs a \`vr:\` cell (or \`no-vr: <reason>\`): ${row}"
+                fi
+            fi
         fi
     fi
     # Gate V: a CLI-executable row's location cell must be ONE runnable command.

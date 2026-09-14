@@ -15,6 +15,10 @@ from .armable import SENTINEL_RE
 NOISE = {"", "-", "--", "—", "n/a", "na", "manual", "none", "human"}
 CLASS_RE = re.compile(r"truly.?manual", re.I)
 TIMING_RE = re.compile(r"^(pre|post).?impl\b", re.I)
+# A `vr:` capture cell (or its `no-vr:` escape) must reach the PR body verbatim —
+# it is the only channel CI has to the plan, which lives outside the repo (ADR-0126).
+# Exempt it from the noise filters explicitly; today it survives only by luck.
+VR_RE = re.compile(r"\bno-vr:|\bvr:", re.I)
 NUM_RE = re.compile(r"^\d+$")
 
 
@@ -30,9 +34,11 @@ def row_from_cells(cells: list[str], ordinal: int) -> ManualRow:
     number = cells[0] if cells and NUM_RE.match(cells[0].strip()) else str(ordinal)
     kept = [
         c for c in cells[1:]
-        if not CLASS_RE.search(c)
-        and not TIMING_RE.match(c.strip())
-        and c.strip().lower() not in NOISE
+        if VR_RE.search(c) or (
+            not CLASS_RE.search(c)
+            and not TIMING_RE.match(c.strip())
+            and c.strip().lower() not in NOISE
+        )
     ]
     text = " — ".join(kept) if kept else raw
     return ManualRow(number=number, text=text, raw=raw)

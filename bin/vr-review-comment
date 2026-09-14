@@ -18,6 +18,8 @@
 //   --manual-rows-from-pr=N   read PR #N's body, parse the `vr:` cells out of
 //                             its `## Manual Testing` bullets, write JSON, exit.
 //   --out-json=PATH           destination for the above.
+//   --manual-gallery=PATH     the capture spec's status-merged JSON; render the
+//                             manual-row sticky comment markdown to --out, exit.
 //
 // Usage:
 //   bin/vr-review-comment --gallery=ibl5/vr-gallery.json --coverage=coverage.json \
@@ -33,13 +35,15 @@ const ibl5Dir = resolve(__dir, '..', 'ibl5');
 const { buildComment } = await import(resolve(ibl5Dir, 'tests/e2e/vr-review-comment.ts'));
 const { buildCopyPlan, buildNewScreensSection, newScreenUrl, normalizeBody, spliceBody } =
   await import(resolve(ibl5Dir, 'tests/e2e/vr-pr-body.ts'));
-const { parseManualBullets } = await import(resolve(ibl5Dir, 'tests/e2e/vr-manual-rows.ts'));
+const { parseManualBullets, buildManualSection, manualShotUrl } =
+  await import(resolve(ibl5Dir, 'tests/e2e/vr-manual-rows.ts'));
 
 const USAGE =
   'Usage: bin/vr-review-comment --gallery=PATH --coverage=PATH --pages-url=URL [--out=PATH]\n' +
   '   or: bin/vr-review-comment --gallery=PATH --copy-new-screens=DEST [--renders-dir=SRC]\n' +
   '   or: bin/vr-review-comment --gallery=PATH --pages-url=URL --update-pr-body=N [--dry-run] [--body-file-in=PATH]\n' +
-  '   or: bin/vr-review-comment --manual-rows-from-pr=N [--out-json=PATH] [--body-file-in=PATH]';
+  '   or: bin/vr-review-comment --manual-rows-from-pr=N [--out-json=PATH] [--body-file-in=PATH]\n' +
+  '   or: bin/vr-review-comment --manual-gallery=PATH --pages-url=URL [--out=PATH]';
 
 let galleryPath: string | null = null;
 let coveragePath: string | null = null;
@@ -52,6 +56,7 @@ let dryRun = false;
 let bodyFileIn: string | null = null;
 let manualRowsFromPr: string | null = null;
 let outJson = 'ibl5/vr-manual-rows.json';
+let manualGallery: string | null = null;
 
 for (const arg of process.argv.slice(2)) {
   if (arg.startsWith('--gallery=')) galleryPath = arg.slice('--gallery='.length);
@@ -66,6 +71,7 @@ for (const arg of process.argv.slice(2)) {
   else if (arg.startsWith('--manual-rows-from-pr='))
     manualRowsFromPr = arg.slice('--manual-rows-from-pr='.length);
   else if (arg.startsWith('--out-json=')) outJson = arg.slice('--out-json='.length);
+  else if (arg.startsWith('--manual-gallery=')) manualGallery = arg.slice('--manual-gallery='.length);
   else if (arg === '--help') {
     process.stdout.write(USAGE + '\n');
     process.exit(0);
@@ -105,6 +111,7 @@ if (manualRowsFromPr !== null) {
 // Loaded here (right after arg parsing) because copy mode needs it but not a
 // pages URL.
 type LeanCell = { module: string; viewport: 'desktop' | 'mobile'; title: string };
+type ManualRowResult = { label: string; row: string; status: string; error?: string };
 let gallery: { changedCells?: LeanCell[]; newCells?: LeanCell[]; flakeCells?: LeanCell[] } = {};
 if (galleryPath !== null && existsSync(galleryPath)) {
   try {
@@ -145,6 +152,35 @@ async function waitForFirstScreen(url: string): Promise<boolean> {
     await new Promise((res) => setTimeout(res, i < 5 ? 5000 : 0)); // 5s backoff, no tail wait
   }
   return false; // timed out -> proceed anyway
+}
+
+// Manual-gallery mode (ADR-0126) — render the manual-row sticky comment markdown
+// from the capture spec's status-merged JSON, then exit. Zero rows means
+// buildManualSection returns '' and we write NO file, so the sticky-comment step
+// has nothing to post (its `if` keys on the file existing).
+if (manualGallery !== null) {
+  let results: ManualRowResult[] = [];
+  if (existsSync(manualGallery)) {
+    try {
+      const parsed = JSON.parse(readFileSync(manualGallery, 'utf-8'));
+      results = Array.isArray(parsed) ? parsed : (parsed.results ?? parsed.rows ?? []);
+    } catch {
+      // keep zero rows -> no comment, never a crash in CI
+    }
+  }
+  const section = buildManualSection(results, pagesUrl);
+  if (section === '') {
+    process.stdout.write('vr-review-comment: no manual rows to publish\n');
+    process.exit(0);
+  }
+  const firstOk = results.find((r) => r.status === 'ok');
+  if (firstOk !== undefined) {
+    const ok = await waitForFirstScreen(manualShotUrl(pagesUrl, firstOk.label));
+    if (!ok) process.stderr.write('vr-review-comment: manual shot URL not live; posting anyway\n');
+  }
+  if (outPath !== null) writeFileSync(outPath, section);
+  else process.stdout.write(section);
+  process.exit(0);
 }
 
 // Update-body mode — splice the new-screens section into the PR body, then exit.

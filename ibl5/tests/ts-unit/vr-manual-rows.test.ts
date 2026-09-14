@@ -233,6 +233,23 @@ describe('buildManualSection', () => {
     expect(md).toContain('**Row 4 — `later`** — skipped');
   });
 
+  it('buildManualSection mixes ok and failed rows without cross-contamination', () => {
+    // Mutation guard: an image must be tied to its OWN row's status. If the
+    // builder ever emitted an image per row regardless of status, the count
+    // would be 2 instead of 1 and the failed label would appear inside `![`.
+    const md = buildManualSection(
+      [
+        { label: 'good', row: '1', status: 'ok' },
+        { label: 'bad', row: '2', status: 'failed', error: 'nav timeout' },
+      ],
+      PAGES_URL
+    );
+    expect((md.match(/!\[/g) ?? []).length).toBe(1);
+    expect(md).toContain(`![good](${PAGES_URL}manual-rows/good.png)`);
+    expect(md).not.toContain('![bad]');
+    expect(md).toContain('**Row 2 — `bad`** — failed: nav timeout');
+  });
+
   it('buildManualSection returns empty for zero rows', () => {
     expect(buildManualSection([], PAGES_URL)).toBe('');
   });

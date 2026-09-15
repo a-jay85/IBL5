@@ -1,6 +1,6 @@
 ---
 description: Run the Discord bug/feature pipeline orchestrator as a Mac-local launchd LaunchAgent firing a poll-only bash driver every 180s via StartInterval — not a daemon, tmux, or persistent claude — with single-flight enforced by an atomic DB lease and no prod credentials in its environment.
-last_verified: 2026-08-09
+last_verified: 2026-09-14
 ---
 
 # ADR-0080: Mac-local launchd cron topology for the Discord bug/feature pipeline
@@ -99,3 +99,42 @@ cron on the trusted Mac, never in prod PHP.
   process liveness alone cannot establish health. It performs **no remediation** of any kind — no
   service restart, no lease reset, no re-queue, no `blocked_until` edit — by design: detection and
   alerting only, so a diagnostic run can never itself perturb the pipeline it is measuring.
+
+## Addendum — the bug-bot moves from PM2 to launchd (2026-09-14)
+
+The original ADR scoped only the **orchestrator** (`bin/bug-pipeline-tick`). The other
+half of the Mac-local pipeline — the bug-bot Discord process — was supervised by PM2
+(`ibl5/IBLbot/ecosystem.bugbot.config.cjs` (example), `max_restarts: 10`, started by hand inside
+tmux). That file is deleted; the bot is now the LaunchAgent `com.ibl5.bug-bot`
+(`RunAtLoad` + `KeepAlive`, `ThrottleInterval` 10), generated and installed by
+`bin/bug-pipeline-cron-setup --install-bot`.
+
+**What changed and why.** On 2026-09-14 the pipeline was found to have been dead for
+roughly four weeks. The cron was healthy throughout (`runs = 2414`, last exit code 0); the
+*bot* was down. Its last successful start was 2026-08-18 20:33; the PM2 daemon restarted
+2026-09-06 12:17:50 and brought back zero apps, because no `pm2 startup` job had ever been
+installed. `~/.pm2/dump.pm2` still listed `ibl-bug-bot`, so the loss was silent — nothing
+in the topology could resume it, and `bin/bug-pipeline-check` reports only on launchd, so
+it read `VERDICT: healthy` for the whole outage.
+
+This is the same argument the original `## Alternatives Considered` already made against
+"a persistent daemon / tmux session running `claude`" — *it couples liveness to a
+long-lived process*. That reasoning was applied to the orchestrator and not to the bot;
+the outage is what that gap costs. launchd was already the sole persistence mechanism for
+half this pipeline, and is now the sole persistence mechanism for both halves.
+
+Three properties the swap buys: the job starts at login with no `pm2 startup` sudo step
+and no tmux; `KeepAlive` retries **forever** where `max_restarts: 10` gave up; and no
+secret enters the plist, because `WorkingDirectory` points at `ibl5/IBLbot` and
+`src/bug-bot/config.ts` resolves its own dotenv file against `process.cwd()`.
+
+**Scope limit.** PM2 remains the supervisor for the **test** bot
+(`ibl5/IBLbot/ecosystem.bugbot-test.config.cjs`, port 50002) under ADR-0111. That is a
+distinct Discord application with its own token and is unaffected.
+
+**Not addressed here.** `bin/bug-pipeline-check` still probes only launchd and would still
+have called this outage healthy — a `127.0.0.1:50001` reachability probe is the open gap.
+Separately, `bin/db-sync-prod` drops and re-creates `ibl_bug_reports` and
+`ibl_bug_pipeline_state` from prod (where they ship via migrations 153/158 but are always
+empty, the bot being Mac-only), so every `bin/dev-up` destroys the pipeline's state. Both
+are tracked as follow-ups, not closed by this change.

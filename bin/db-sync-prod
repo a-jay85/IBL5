@@ -204,7 +204,10 @@ for t in $PRESERVE_TABLES; do
     # information_schema also avoids LIKE treating `_` as a single-char wildcard.
     # Fail-closed: a probe error (container unreachable, mariadb auth blip) must abort
     # the sync — treating a failed probe as "absent" lets DROP TABLE destroy the table.
-    if ! _exists="$(docker exec "$DB_CONTAINER" mariadb -uroot -proot iblhoops_ibl5 -N -B \
+    # No database argument: information_schema needs none, and naming a database that
+    # does not exist yet (container still initialising) would error "Unknown database"
+    # and trip the fail-closed abort below on the very bootstrap path we support.
+    if ! _exists="$(docker exec "$DB_CONTAINER" mariadb -uroot -proot -N -B \
         -e "SELECT COUNT(*) FROM information_schema.tables
             WHERE table_schema='iblhoops_ibl5' AND table_name='$t'" 2> >(db_strip_warnings >&2))"; then
         printf 'ERROR: preserve-tables probe failed for table %s — aborting sync.\n' "$t" >&2

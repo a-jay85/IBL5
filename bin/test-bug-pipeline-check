@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# bin/test-bug-pipeline-check — test harness for bin/bug-pipeline-check (16 cases)
+# bin/test-bug-pipeline-check — test harness for bin/bug-pipeline-check
+# (16 stub cases + R1-R11 real-DB cases + B1-B4 bot-probe cases)
 #
 # No set -e (constraint a). Verdict assertions use tail -n 1 (constraint b).
 # BUG_PIPELINE_HEARTBEAT_MAX_AGE=600 pinned per case (constraint c).
@@ -19,6 +20,7 @@ FAILED=0
 HEARTBEAT_FILE=""
 LAUNCHCTL_STUB=""
 DB_STUB=""
+CURL_STUB=""
 CHECK_RC=0
 SCRATCH_DB=""
 MAIN_DB="iblhoops_ibl5"
@@ -76,7 +78,21 @@ printf '| n |\n|---|\n| %s |\n' "$cnt"
 exit 0
 SH
 
-chmod +x "$STUB/bin/launchctl" "$STUB/bin/db-query"
+# curl stub: per-case files drive it. curl-exit non-zero simulates a transport
+# failure (connection refused is exit 7, which is what a dead bot looks like);
+# curl-code is the %{http_code} printed on a successful transport.
+cat > "$STUB/bin/curl" <<'SH'
+#!/usr/bin/env bash
+_rc="$(cat "$STUB/curl-exit" 2>/dev/null || echo 0)"
+if [ "$_rc" != "0" ]; then
+    printf '000'
+    exit "$_rc"
+fi
+printf '%s' "$(cat "$STUB/curl-code" 2>/dev/null || echo 200)"
+exit 0
+SH
+
+chmod +x "$STUB/bin/launchctl" "$STUB/bin/db-query" "$STUB/bin/curl"
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -85,6 +101,7 @@ reset_case() {
     rm -f "$STUB/launchctl-list-rc" "$STUB/launchctl-print-out" \
           "$STUB/db-unavailable" "$STUB/db-unparseable" \
           "$STUB/db-count-blocked" "$STUB/db-count-hunting" "$STUB/db-count-other" \
+          "$STUB/curl-exit" "$STUB/curl-code" \
           "$STUB/sql.log" "$STUB/out.txt" "$STUB/err.txt" "$STUB/rc"
     # healthy launchctl
     printf '0\n' > "$STUB/launchctl-list-rc"
@@ -96,9 +113,13 @@ reset_case() {
     printf '0\n' > "$STUB/db-count-blocked"
     printf '0\n' > "$STUB/db-count-hunting"
     printf '0\n' > "$STUB/db-count-other"
+    # bot reachable, HTTP 200
+    printf '0\n'   > "$STUB/curl-exit"
+    printf '200\n' > "$STUB/curl-code"
     # stub pointers
     LAUNCHCTL_STUB="$STUB/bin/launchctl"
     DB_STUB="$STUB/bin/db-query"
+    CURL_STUB="$STUB/bin/curl"
     CHECK_RC=0
 }
 
@@ -108,6 +129,7 @@ run_check() {
     local _rc=0
     BUG_PIPELINE_CHECK_LAUNCHCTL_BIN="$LAUNCHCTL_STUB" \
     BUG_PIPELINE_CHECK_DB_QUERY_BIN="$DB_STUB" \
+    BUG_PIPELINE_CHECK_CURL_BIN="$CURL_STUB" \
     BUG_PIPELINE_TICK_HEARTBEAT="$HEARTBEAT_FILE" \
     BUG_PIPELINE_HEARTBEAT_MAX_AGE=600 \
     "$CHECK_BIN" "$@" > "$STUB/out.txt" 2>"$STUB/err.txt" || _rc=$?
@@ -387,6 +409,70 @@ else
     bpt_fail "16b: --bogus should produce usage on stderr"
 fi
 
+# ── Case B1: curl binary absent → bot:curl-unavailable (UNKNOWN, not DEGRADED) ─
+reset_case
+CURL_STUB="/nonexistent/curl"
+run_check
+bpt_expect_eq "B1: rc=2" "2" "$CHECK_RC"
+if grep -q 'SIGNAL: bot:curl-unavailable' "$STUB/out.txt"; then
+    bpt_ok "B1: SIGNAL bot:curl-unavailable present"
+else
+    bpt_fail "B1: SIGNAL bot:curl-unavailable absent — got $(cat "$STUB/out.txt")"
+fi
+_vb1="$(tail -n 1 "$STUB/out.txt")"
+case "$_vb1" in
+    VERDICT:\ unknown*) bpt_ok "B1: verdict starts VERDICT: unknown" ;;
+    *) bpt_fail "B1: verdict should start VERDICT: unknown — got [$_vb1]" ;;
+esac
+
+# ── Case B2: connection refused (curl exit 7) → bot:unreachable ───────────────
+reset_case
+printf '7\n' > "$STUB/curl-exit"
+run_check
+bpt_expect_eq "B2: rc=1" "1" "$CHECK_RC"
+if grep -qE 'SIGNAL: bot:unreachable.*curl exit 7' "$STUB/out.txt"; then
+    bpt_ok "B2: SIGNAL bot:unreachable names curl exit 7"
+else
+    bpt_fail "B2: expected SIGNAL bot:unreachable with curl exit 7 — got $(cat "$STUB/out.txt")"
+fi
+if grep -q 'bot:http-error' "$STUB/out.txt"; then
+    bpt_fail "B2: bot:http-error must be absent (transport failure is not an HTTP error)"
+else
+    bpt_ok "B2: bot:http-error absent (transport failure not conflated with HTTP error)"
+fi
+
+# ── Case B3: bot answers HTTP 500 → bot:http-error ───────────────────────────
+reset_case
+printf '500\n' > "$STUB/curl-code"
+run_check
+bpt_expect_eq "B3: rc=1" "1" "$CHECK_RC"
+if grep -qE 'SIGNAL: bot:http-error.*500' "$STUB/out.txt"; then
+    bpt_ok "B3: SIGNAL bot:http-error with 500 in detail"
+else
+    bpt_fail "B3: expected SIGNAL bot:http-error with 500 — got $(cat "$STUB/out.txt")"
+fi
+if grep -q 'bot:unreachable' "$STUB/out.txt"; then
+    bpt_fail "B3: bot:unreachable must be absent (transport succeeded)"
+else
+    bpt_ok "B3: bot:unreachable absent (transport succeeded)"
+fi
+
+# ── Case B4: bot answers HTTP 200 → ok: bot:reachable, no bot SIGNAL ──────────
+reset_case
+run_check
+bpt_expect_eq "B4: verdict healthy" "VERDICT: healthy" "$(tail -n 1 "$STUB/out.txt")"
+bpt_expect_eq "B4: rc=0" "0" "$CHECK_RC"
+if grep -q 'ok: bot:reachable' "$STUB/out.txt"; then
+    bpt_ok "B4: ok: bot:reachable line present"
+else
+    bpt_fail "B4: expected 'ok: bot:reachable' — got $(cat "$STUB/out.txt")"
+fi
+if grep -q 'SIGNAL: bot:' "$STUB/out.txt"; then
+    bpt_fail "B4: no bot SIGNAL expected — got $(grep 'SIGNAL: bot:' "$STUB/out.txt")"
+else
+    bpt_ok "B4: no bot SIGNAL for a 200-answering bot"
+fi
+
 # ── Real-DB gate ──────────────────────────────────────────────────────────────
 REQUIRE_DB="${BUG_PIPELINE_CHECK_REQUIRE_DB:-0}"
 if ! DB_NAME="$MAIN_DB" "$SCRIPT_DIR/db-query" "SELECT 1" >/dev/null 2>&1; then
@@ -466,6 +552,7 @@ run_real_check() {
     local _rc=0
     BUG_PIPELINE_CHECK_LAUNCHCTL_BIN="$STUB/bin/launchctl-healthy" \
     BUG_PIPELINE_CHECK_DB_QUERY_BIN="$STUB/bin/db-query-wrap" \
+    BUG_PIPELINE_CHECK_CURL_BIN="$STUB/bin/curl" \
     BUG_PIPELINE_TICK_HEARTBEAT="$REAL_DB_HB" \
     BUG_PIPELINE_HEARTBEAT_MAX_AGE=600 \
     "$CHECK_BIN" > "$STUB/out.txt" 2>"$STUB/err.txt" || _rc=$?
@@ -601,6 +688,7 @@ run_real_check
 _r11_after="$(DB_NAME="$SCRATCH_DB" "$SCRIPT_DIR/db-query" \
     "SELECT COUNT(*) AS n, IFNULL(MAX(updated_at),'-') AS m FROM ibl_bug_reports" 2>/dev/null)"
 bpt_expect_eq "R11: no writes — scratch DB snapshot unchanged" "$_r11_before" "$_r11_after"
+
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 printf '\npassed %d / failed %d\n' "$PASSED" "$FAILED"

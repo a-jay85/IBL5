@@ -1004,6 +1004,8 @@ jobs:
         run: bin/test-bug-pipeline-hunt
       - name: bin/test-bug-pipeline-check
         run: bin/test-bug-pipeline-check
+      - name: bin/test-bug-pipeline-cron-setup
+        run: bin/test-bug-pipeline-cron-setup
       - name: bin/test-bug-pipeline-ci-autofix
         run: bin/test-bug-pipeline-ci-autofix
       - name: bin/test-sim-recap-tick

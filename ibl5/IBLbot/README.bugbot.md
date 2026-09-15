@@ -49,6 +49,11 @@ Logs are `bug-bot-stdout.log` / `bug-bot-stderr.log` beside the cron's, under
 `bin/bug-pipeline-cron-setup --uninstall-bot` removes it; `--print-bot` dumps the
 generated plist without touching anything.
 
+`bin/bug-pipeline-check` covers the bot as well as the cron, and separates the two
+ways it can be down: `bot:unloaded` means the LaunchAgent is not registered (fix
+with `--install-bot` above), `bot:unreachable` means it is registered but not
+answering on `http://127.0.0.1:50001/` (restart it and read the log). Either exits 1.
+
 **The bot is never started by a prod deploy.** It is a LaunchAgent in your user's gui
 domain on this Mac — prod has no such job and no bug-bot token. (It ran under its own PM2
 ecosystem file until 2026-09-14; that file is deleted, because leaving it would let

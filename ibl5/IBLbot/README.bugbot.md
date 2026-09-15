@@ -31,8 +31,8 @@ Two I/O directions:
 ## Start
 
 ```bash
-cd ibl5/IBLbot && npm run build
-bin/bug-pipeline-cron-setup --install-bot   # from the repo root
+cd ibl5/IBLbot && npm run build && cd ../..
+bin/bug-pipeline-cron-setup --install-bot
 ```
 
 That installs and loads the `com.ibl5.bug-bot` LaunchAgent (`RunAtLoad` + `KeepAlive`),

@@ -9,11 +9,19 @@
 # Also bootstraps the best-effort GitHub issue-tracking projection (§3f): the private
 # tracking repo, its issue labels, and the code-repo `pipeline-authored` hold label.
 #
+# Also installs the Mac-local bug-bot itself (com.ibl5.bug-bot) as a second
+# LaunchAgent. The bot ran under pm2 until 2026-09-14; see the addendum on ADR-0080
+# for why that was dropped. Both halves of the pipeline are now launchd-supervised,
+# so neither needs a daemon, a tmux session, or a `pm2 startup` sudo step.
+#
 # Usage:
-#   bin/bug-pipeline-cron-setup --print-schedule      # emit the plist to stdout (no side effect)
-#   bin/bug-pipeline-cron-setup --install-schedule    # install + load the LaunchAgent + bootstrap issues
-#   bin/bug-pipeline-cron-setup --uninstall-schedule  # unload + remove the LaunchAgent
+#   bin/bug-pipeline-cron-setup --print-schedule      # emit the cron plist to stdout (no side effect)
+#   bin/bug-pipeline-cron-setup --install-schedule    # install + load the cron LaunchAgent + bootstrap issues
+#   bin/bug-pipeline-cron-setup --uninstall-schedule  # unload + remove the cron LaunchAgent
 #   bin/bug-pipeline-cron-setup --bootstrap-issues    # (re)create the tracking repo + labels only
+#   bin/bug-pipeline-cron-setup --print-bot           # emit the bug-bot plist to stdout (no side effect)
+#   bin/bug-pipeline-cron-setup --install-bot         # install + load the bug-bot LaunchAgent
+#   bin/bug-pipeline-cron-setup --uninstall-bot       # unload + remove the bug-bot LaunchAgent
 #
 # Install AFTER this lands on master — the launchd Program points at the main
 # checkout's bin/bug-pipeline-tick, which must exist there.
@@ -29,6 +37,9 @@ while [ $# -gt 0 ]; do
     --uninstall-schedule) ACTION="uninstall"; shift ;;
     --print-schedule) ACTION="print"; shift ;;      # internal: emit plist to stdout, no side effect
     --bootstrap-issues) ACTION="bootstrap-issues"; shift ;;
+    --install-bot) ACTION="install-bot"; shift ;;
+    --uninstall-bot) ACTION="uninstall-bot"; shift ;;
+    --print-bot) ACTION="print-bot"; shift ;;        # internal: emit plist to stdout, no side effect
     -h|--help) awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
@@ -47,6 +58,17 @@ PLIST_LABEL="com.ibl5.bug-pipeline-cron"
 PLIST_PATH="$HOME/Library/LaunchAgents/${PLIST_LABEL}.plist"
 LOG_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/bug-pipeline/logs"
 PROGRAM="$MAIN_WT/bin/bug-pipeline-tick"   # the Phase-3 poll-only driver
+
+# --- bug-bot LaunchAgent (the pm2 replacement) -------------------------------
+BOT_LABEL="com.ibl5.bug-bot"
+BOT_PLIST_PATH="$HOME/Library/LaunchAgents/${BOT_LABEL}.plist"
+IBLBOT_DIR="$MAIN_WT/ibl5/IBLbot"          # durable main checkout, same rule as PROGRAM
+BOT_SCRIPT="$IBLBOT_DIR/dist/bug-bot/index.js"
+BOT_DOTENV="$IBLBOT_DIR/.env.bugbot"
+# Absolute node path: a launchd agent's minimal PATH omits Homebrew, and resolving
+# node through PATH at exec time is the rc=127 failure mode that already cost this
+# pipeline days (see the cron plist's PATH comment). Resolve HERE, at generation time.
+NODE_BIN="${NODE_BIN:-$(command -v node || true)}"
 
 # The PRIVATE tracking repo the cron mirrors issues to (§3f). Override via env.
 BUG_PIPELINE_ISSUE_REPO="${BUG_PIPELINE_ISSUE_REPO:-a-jay85/ibl5-bugs}"
@@ -106,6 +128,57 @@ build_plist() {
 	<string>${LOG_DIR}/launchd-stdout.log</string>
 	<key>StandardErrorPath</key>
 	<string>${LOG_DIR}/launchd-stderr.log</string>
+</dict>
+</plist>
+PLIST
+}
+
+# Single source of truth for the bug-bot plist — used by both --print-bot and
+# --install-bot, so the MAIN-checkout derivation is exercised without a side effect.
+build_bot_plist() {
+  cat <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>${BOT_LABEL}</string>
+	<!-- ProgramArguments, not Program: the bot is \`node <script>\`, not an executable. -->
+	<key>ProgramArguments</key>
+	<array>
+		<string>${NODE_BIN}</string>
+		<string>${BOT_SCRIPT}</string>
+	</array>
+	<!-- WorkingDirectory is LOAD-BEARING, not cosmetic: src/bug-bot/config.ts resolves
+	     its dotenv file against process.cwd(). Point this anywhere else and every
+	     requireEnv() throws at boot. It is also WHY no secret appears in this plist —
+	     the bot reads its own token from that file, so the plist stays committable. -->
+	<key>WorkingDirectory</key>
+	<string>${IBLBOT_DIR}</string>
+	<!-- The bot holds a long-lived Discord gateway connection; it is not a poll, so it
+	     takes RunAtLoad+KeepAlive rather than the cron's StartInterval. Do NOT "unify"
+	     these two jobs onto one key — they are different launchd shapes on purpose. -->
+	<key>RunAtLoad</key>
+	<true/>
+	<key>KeepAlive</key>
+	<true/>
+	<!-- 10s respawn floor, matching the retired ecosystem.bugbot.config.cjs min_uptime.
+	     Unlike pm2's max_restarts: 10, launchd retries FOREVER, deliberately: the
+	     2026-09-14 outage diagnosis found a supervisor that had given up and a dead bot
+	     that nothing noticed for ~4 weeks. Giving up is the failure mode, not the fix. -->
+	<key>ThrottleInterval</key>
+	<integer>10</integer>
+	<key>EnvironmentVariables</key>
+	<dict>
+		<!-- node is exec'd by absolute path above; this keeps PATH sane for anything
+		     the bot spawns. launchd agents otherwise start with Homebrew missing. -->
+		<key>PATH</key>
+		<string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+	</dict>
+	<key>StandardOutPath</key>
+	<string>${LOG_DIR}/bug-bot-stdout.log</string>
+	<key>StandardErrorPath</key>
+	<string>${LOG_DIR}/bug-bot-stderr.log</string>
 </dict>
 </plist>
 PLIST
@@ -172,5 +245,36 @@ case "$ACTION" in
   bootstrap-issues)
     bootstrap_issue_tracking
     echo "Issue-tracking bootstrap complete (repo: $BUG_PIPELINE_ISSUE_REPO)."
+    ;;
+  print-bot)
+    build_bot_plist
+    ;;
+  install-bot)
+    # Refusal, checked BEFORE any launchctl call. KeepAlive means a misconfigured job
+    # does not fail once and stop — it respawns forever at the ThrottleInterval floor,
+    # writing an identical stack trace to the log every 10s. Every one of these three
+    # is a boot-time hard failure, so catch them here where the message is readable.
+    missing=""
+    [ -n "$NODE_BIN" ] && [ -x "$NODE_BIN" ] || missing="${missing}\n  node not found — set NODE_BIN=/path/to/node"
+    [ -f "$BOT_SCRIPT" ] || missing="${missing}\n  missing $BOT_SCRIPT — run 'npm run build' in $IBLBOT_DIR"
+    [ -f "$BOT_DOTENV" ] || missing="${missing}\n  missing $BOT_DOTENV — see ibl5/IBLbot/README.bugbot.md § One-time setup"
+    if [ -n "$missing" ]; then
+      # shellcheck disable=SC2059
+      printf "Error: cannot install ${BOT_LABEL}:${missing}\n" >&2
+      exit 1
+    fi
+    mkdir -p "$HOME/Library/LaunchAgents" "$LOG_DIR"
+    launchctl bootout "gui/$(id -u)/${BOT_LABEL}" 2>/dev/null || true  # idempotent: ignore "not loaded"
+    build_bot_plist > "$BOT_PLIST_PATH"
+    launchctl bootstrap "gui/$(id -u)" "$BOT_PLIST_PATH"
+    echo "Installed ${BOT_LABEL} (RunAtLoad + KeepAlive). Script: $BOT_SCRIPT"
+    # printf, not echo: the literal \n belongs to curl's -w format string, and echo's
+    # escape handling is shell-dependent (SC2028).
+    printf "%s\n" "Verify: curl -s -o /dev/null -w '%{http_code}\\n' http://127.0.0.1:50001/"
+    ;;
+  uninstall-bot)
+    launchctl bootout "gui/$(id -u)/${BOT_LABEL}" 2>/dev/null || true  # idempotent
+    rm -f "$BOT_PLIST_PATH"                                            # idempotent: no error if absent
+    echo "Uninstalled ${BOT_LABEL}."
     ;;
 esac

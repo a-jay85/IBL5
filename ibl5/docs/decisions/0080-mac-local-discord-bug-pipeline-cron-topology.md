@@ -1,6 +1,6 @@
 ---
 description: Run the Discord bug/feature pipeline orchestrator as a Mac-local launchd LaunchAgent firing a poll-only bash driver every 180s via StartInterval — not a daemon, tmux, or persistent claude — with single-flight enforced by an atomic DB lease and no prod credentials in its environment.
-last_verified: 2026-09-14
+last_verified: 2026-09-15
 ---
 
 # ADR-0080: Mac-local launchd cron topology for the Discord bug/feature pipeline
@@ -103,3 +103,99 @@ cron on the trusted Mac, never in prod PHP.
 ## Addendum — file-issues-only mode (2026-09-14)
 
 `bin/bug-pipeline-tick` gains a `BUG_PIPELINE_FILE_ISSUES_ONLY` flag (default empty = normal mode; set `1` to enable). When on, the driver files a GitHub Issue and replies to the GM's original Discord message for every incoming report, then transitions the row to a new `filed` terminal status — no autonomous hunting, no CI autofix, no feature-gathering. In-flight rows in `gathering`, `awaiting_ajay`, and `blocked` states are drained to `filed` on the next tick. The `bin/bug-pipeline-cron-setup` plist now emits a `BUG_PIPELINE_FILE_ISSUES_ONLY` `EnvironmentVariables` key (default empty) so the operator can enable the mode without rewriting the plist. Migration 177 adds the `filed` enum value and three idempotent backfill UPDATE statements that clear in-flight rows safely when the migration runs on an existing DB.
+## Addendum — a third health signal, and local-only tables survive a prod sync (2026-09-14)
+
+Two gaps this ADR's topology left open both fired at once on 2026-09-14, and both are now closed.
+
+**The health check watched the wrong process.** The `## Decision` bullet above records that
+`bin/bug-pipeline-check` "asserts two independent signals". As of this addendum it asserts
+**three**: process liveness and semantic staleness as described, plus a bounded HTTP probe of the
+bug-bot's loopback Express port (`http://127.0.0.1:50001/`, `BOT_BASE_URL`, 5-second `--max-time`),
+emitting `bot:reachable` / `bot:unreachable` / `bot:http-error`, and `bot:curl-unavailable` as
+UNKNOWN on a host with no `curl`. The original two signals both describe the **cron**; the bug-bot
+is a *separate* job. The bot sat dead for roughly four weeks while this script reported
+`VERDICT: healthy` every time — the cron ticked correctly over a queue nothing was filling. Both
+prior signals were satisfied and the pipeline was fully down.
+
+**`bin/db-sync-prod` destroyed the pipeline's own state.** `bin/dev-up` prod-syncs by default, and
+that sync streams `DROP TABLE` / `CREATE TABLE` for every prod table. `ibl_bug_reports`,
+`ibl_bug_report_attachments`, `ibl_bug_reporter_profile`, `ibl_bug_pipeline_state` and
+`ibl_api_keys` hold state that exists only on this Mac, so every sync wiped the queue, the Discord
+cursor, and the locally-minted API key the bot authenticates with — after which every
+`/api/v1/bug-pipeline/*` call returned 401 with no visible cause. `bin/db-sync-prod` now carries a
+`PRESERVE_TABLES` list covering those five, applied **preserve-if-exists**: a table already present
+locally is excluded from both the schema dump (`--ignore-table`) and the data passes; a table that
+does not exist yet is left alone so the prod dump still creates it. The condition is load-bearing —
+the `schema_migrations` backfill copies prod's applied-migration list, so `bin/db-migrate` treats
+migrations 153 and 158 as already done and skips them; an unconditionally-excluded table would
+therefore never be created by anything.
+
+Deliberate trade-off: preserving `ibl_api_keys` wholesale means prod key changes no longer
+propagate to local. API keys are per-environment credentials, so a local mirror of prod's keys was
+never the point.
+## Addendum — the bug-bot moves from PM2 to launchd (2026-09-14)
+
+The original ADR scoped only the **orchestrator** (`bin/bug-pipeline-tick`). The other
+half of the Mac-local pipeline — the bug-bot Discord process — was supervised by PM2
+(`ibl5/IBLbot/ecosystem.bugbot.config.cjs` (example), `max_restarts: 10`, started by hand inside
+tmux). That file is deleted; the bot is now the LaunchAgent `com.ibl5.bug-bot`
+(`RunAtLoad` + `KeepAlive`, `ThrottleInterval` 10), generated and installed by
+`bin/bug-pipeline-cron-setup --install-bot`.
+
+**What changed and why.** On 2026-09-14 the pipeline was found to have been dead for
+roughly four weeks. The cron was healthy throughout (`runs = 2414`, last exit code 0); the
+*bot* was down. Its last successful start was 2026-08-18 20:33; the PM2 daemon restarted
+2026-09-06 12:17:50 and brought back zero apps, because no `pm2 startup` job had ever been
+installed. `~/.pm2/dump.pm2` still listed `ibl-bug-bot`, so the loss was silent — nothing
+in the topology could resume it, and `bin/bug-pipeline-check` reports only on launchd, so
+it read `VERDICT: healthy` for the whole outage.
+
+This is the same argument the original `## Alternatives Considered` already made against
+"a persistent daemon / tmux session running `claude`" — *it couples liveness to a
+long-lived process*. That reasoning was applied to the orchestrator and not to the bot;
+the outage is what that gap costs. launchd was already the sole persistence mechanism for
+half this pipeline, and is now the sole persistence mechanism for both halves.
+
+Three properties the swap buys: the job starts at login with no `pm2 startup` sudo step
+and no tmux; `KeepAlive` retries **forever** where `max_restarts: 10` gave up; and no
+secret enters the plist, because `WorkingDirectory` points at `ibl5/IBLbot` and
+`src/bug-bot/config.ts` resolves its own dotenv file against `process.cwd()`.
+
+**Scope limit.** PM2 remains the supervisor for the **test** bot
+(`ibl5/IBLbot/ecosystem.bugbot-test.config.cjs`, port 50002) under ADR-0111. That is a
+distinct Discord application with its own token and is unaffected.
+
+**Not addressed here.** `bin/bug-pipeline-check` still probes only launchd and would still
+have called this outage healthy — a `127.0.0.1:50001` reachability probe is the open gap.
+Separately, `bin/db-sync-prod` drops and re-creates `ibl_bug_reports` and
+`ibl_bug_pipeline_state` from prod (where they ship via migrations 153/158 but are always
+empty, the bot being Mac-only), so every `bin/dev-up` destroys the pipeline's state. Both
+are tracked as follow-ups, not closed by this change.
+
+## Addendum — a fourth signal: the bot's launchd load state (2026-09-15)
+
+The addendum above closed the detection gap with a **reachability** probe. This one adds the
+**registration** probe beside it, because the two are not the same question and neither implies
+the other.
+
+`bin/bug-pipeline-check` now runs `check_bot_loaded` immediately before `check_bot_reachability`:
+`launchctl list com.ibl5.bug-bot` (`BUG_BOT_LAUNCHD_LABEL`), emitting `bot:loaded`,
+`bot:unloaded` as DEGRADED, or `bot:launchctl-unavailable` as UNKNOWN on a host with no
+`launchctl`. UNKNOWN rather than DEGRADED is the same fail-open discipline ADR-0127 records for
+the curl probe: "cannot answer" and "answered, it is down" must not collapse into one signal.
+
+Why both: `curl` failing tells you the bot is not serving, but not *why*, and the two causes want
+different fixes. A job that was never re-bootstrapped after a reboot is `bot:unloaded` — remediate
+with `bin/bug-pipeline-cron-setup --install-bot`. A job that is loaded but wedged is `bot:loaded`
+with `bot:unreachable` — remediate by restarting it and reading its log. Behind a bare connection
+refused those two are indistinguishable, and the four-week outage was the first kind.
+
+**The plist generator is now tested.** `--print-bot` / `--install-bot` shipped with no automated
+coverage. `bin/test-bug-pipeline-cron-setup` asserts the generated `ProgramArguments`, the
+MAIN-checkout `WorkingDirectory`, the pinned `PATH`, `RunAtLoad` / `KeepAlive` /
+`ThrottleInterval`, the log paths, and — the committability property this ADR claims — that **the
+plist carries no credential**. That property is asserted two ways, because either alone is
+bypassable: XML comments are stripped and the remainder scanned for credential-shaped names (a
+blacklist), *and* `EnvironmentVariables` is asserted to hold exactly one key, `PATH` (a whitelist,
+which catches a future variable whatever it is named). Both harnesses run in the
+`Shell harness regression tests` job.

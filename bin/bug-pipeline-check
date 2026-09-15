@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # bin/bug-pipeline-check — read-only liveness + staleness diagnostic for the
 # com.ibl5.bug-pipeline-cron LaunchAgent (ADR-0080). Detect and alert only.
+#
+# Also probes the com.ibl5.bug-bot LaunchAgent's loopback Express port. The cron
+# and the bot are separate jobs: the cron can tick green forever while the bot is
+# dead and no Discord report reaches the queue at all.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -11,6 +15,11 @@ HEARTBEAT_MAX_AGE="${BUG_PIPELINE_HEARTBEAT_MAX_AGE:-600}"   # seconds; 3.3x the
 LAUNCHD_LABEL="${BUG_PIPELINE_LAUNCHD_LABEL:-com.ibl5.bug-pipeline-cron}"
 LAUNCHCTL_BIN="${BUG_PIPELINE_CHECK_LAUNCHCTL_BIN:-launchctl}"
 DB_QUERY_BIN="${BUG_PIPELINE_CHECK_DB_QUERY_BIN:-$SCRIPT_DIR/db-query}"
+CURL_BIN="${BUG_PIPELINE_CHECK_CURL_BIN:-curl}"
+# Same var name and default as bin/bug-pipeline-tick — one knob moves both.
+BOT_LAUNCHD_LABEL="${BUG_BOT_LAUNCHD_LABEL:-com.ibl5.bug-bot}"
+BOT_BASE_URL="${BOT_BASE_URL:-http://127.0.0.1:50001}"
+BOT_PROBE_TIMEOUT=5   # seconds; this runs from a 180s cron, so the probe must be bounded
 
 DEGRADED_SIGNALS=""
 UNKNOWN_SIGNALS=""
@@ -18,7 +27,8 @@ UNKNOWN_SIGNALS=""
 usage() {
     printf 'Usage: %s [--help]\n' "$(basename "$0")"
     printf '\n'
-    printf 'Read-only liveness + staleness diagnostic for the %s LaunchAgent.\n' "$LAUNCHD_LABEL"
+    printf 'Read-only liveness + staleness diagnostic for the %s LaunchAgent,\n' "$LAUNCHD_LABEL"
+    printf 'plus an HTTP reachability probe of the bug-bot at %s.\n' "$BOT_BASE_URL"
     printf '\n'
     printf 'Options:\n'
     printf '  --help, -h    Show this help and exit\n'
@@ -167,8 +177,54 @@ check_staleness() {
     [ "$n" -gt 0 ] && emit DEGRADED stale:rows-stuck "$n non-terminal row(s) past their per-status staleness threshold"
 }
 
+# check_bot_loaded — launchd-level companion to check_bot_reachability below.
+# The two answer different questions and neither subsumes the other: launchctl
+# says whether the job is REGISTERED, curl says whether it is SERVING. A job
+# that is loaded but wedged is reachable-fail/loaded-ok; a job that was never
+# bootstrapped after a reboot is loaded-fail while curl also fails. Naming the
+# launchd state tells you which remediation applies — `launchctl bootstrap`
+# versus restart-and-read-the-log — instead of leaving both indistinguishable
+# behind a single connection refused.
+check_bot_loaded() {
+    if ! command -v "$LAUNCHCTL_BIN" >/dev/null 2>&1; then
+        emit UNKNOWN bot:launchctl-unavailable "launchctl not on PATH — not a macOS host; bot load state unprobeable"
+    elif ! "$LAUNCHCTL_BIN" list "$BOT_LAUNCHD_LABEL" >/dev/null 2>&1; then
+        emit DEGRADED bot:unloaded "LaunchAgent $BOT_LAUNCHD_LABEL is not loaded — re-bootstrap it with bin/bug-pipeline-cron-setup --install-bot"
+    else
+        emit OK bot:loaded "LaunchAgent $BOT_LAUNCHD_LABEL is loaded"
+    fi
+}
+
+# The bug-bot is a SEPARATE LaunchAgent (com.ibl5.bug-bot) from the cron this
+# script was originally written for. On 2026-09-14 the bot was found dead for
+# ~4 weeks while this checker reported healthy the whole time: the cron ticked,
+# the queue was empty, and nothing probed the one process that fills the queue.
+check_bot_reachability() {
+    local code rc
+
+    if ! command -v "$CURL_BIN" >/dev/null 2>&1; then
+        emit UNKNOWN bot:curl-unavailable "curl not on PATH — bug-bot reachability unprobeable"
+        return 0
+    fi
+
+    code="$("$CURL_BIN" -s -o /dev/null -m "$BOT_PROBE_TIMEOUT" \
+        -w '%{http_code}' "$BOT_BASE_URL/" 2>/dev/null)"; rc=$?
+
+    if [ "$rc" -ne 0 ]; then
+        emit DEGRADED bot:unreachable "no HTTP response from $BOT_BASE_URL (curl exit $rc) — com.ibl5.bug-bot is down; Discord reports are not being ingested"
+        return 0
+    fi
+
+    case "$code" in
+        2*) emit OK bot:reachable "bug-bot answered HTTP $code at $BOT_BASE_URL" ;;
+        *)  emit DEGRADED bot:http-error "bug-bot answered HTTP $code at $BOT_BASE_URL (want 2xx)" ;;
+    esac
+}
+
 main() {
     check_process_liveness
+    check_bot_loaded
+    check_bot_reachability
     check_staleness
 
     if [ -n "$DEGRADED_SIGNALS" ]; then

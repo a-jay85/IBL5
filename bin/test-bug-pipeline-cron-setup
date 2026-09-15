@@ -1,0 +1,286 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# bin/test-bug-pipeline-cron-setup — test harness for bin/bug-pipeline-cron-setup's
+# bot half (--print-bot, --install-bot refusal gates). 15 cases.
+#
+# No set -e (constraint a). bash 3.2 safe (constraint f). Cleanup via trap EXIT
+# (constraint g). Does NOT require node, does NOT call real launchctl, does NOT
+# write to ~/Library/LaunchAgents.
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SETUP_BIN="$SCRIPT_DIR/bug-pipeline-cron-setup"
+
+PASSED=0
+FAILED=0
+
+bpt_ok()   { echo "ok: $1";  PASSED=$(( PASSED + 1 )); }
+bpt_fail() { echo "FAIL: $1"; FAILED=$(( FAILED + 1 )); }
+bpt_expect_eq() {
+    if [ "$2" = "$3" ]; then bpt_ok "$1"
+    else bpt_fail "$1 — want [$2] got [$3]"
+    fi
+}
+
+STUB="$(mktemp -d)"
+_cleanup() { rm -rf "$STUB"; }
+trap '_cleanup' EXIT
+
+# Capture --print-bot output once (side-effect-free).
+OUT="$("$SETUP_BIN" --print-bot 2>/dev/null)"
+PRINT_BOT_RC=$?
+
+# ── Case 1: --print-bot exits 0 ───────────────────────────────────────────────
+bpt_expect_eq "1: --print-bot rc=0" "0" "$PRINT_BOT_RC"
+
+# ── Case 2: plist XML structure ───────────────────────────────────────────────
+_first_line="$(printf '%s\n' "$OUT" | head -n 1)"
+_last_line="$(printf '%s\n' "$OUT" | tail -n 1)"
+case "$_first_line" in
+    '<?xml'*) bpt_ok "2: output starts with <?xml" ;;
+    *) bpt_fail "2: output should start with <?xml — got [$_first_line]" ;;
+esac
+if printf '%s\n' "$OUT" | grep -qF '<plist version="1.0">'; then
+    bpt_ok "2: output contains <plist version=\"1.0\">"
+else
+    bpt_fail "2: output should contain <plist version=\"1.0\">"
+fi
+bpt_expect_eq "2: last line is </plist>" "</plist>" "$_last_line"
+
+# ── Case 3: bot label ─────────────────────────────────────────────────────────
+if printf '%s\n' "$OUT" | grep -qF '<string>com.ibl5.bug-bot</string>'; then
+    bpt_ok "3: plist contains com.ibl5.bug-bot label"
+else
+    bpt_fail "3: plist should contain <string>com.ibl5.bug-bot</string>"
+fi
+
+# ── Case 4: required launchd keys ─────────────────────────────────────────────
+if printf '%s\n' "$OUT" | grep -qF '<key>RunAtLoad</key>'; then
+    bpt_ok "4: plist contains RunAtLoad"
+else
+    bpt_fail "4: plist should contain <key>RunAtLoad</key>"
+fi
+if printf '%s\n' "$OUT" | grep -qF '<key>KeepAlive</key>'; then
+    bpt_ok "4: plist contains KeepAlive"
+else
+    bpt_fail "4: plist should contain <key>KeepAlive</key>"
+fi
+# ThrottleInterval 10 — the value must immediately follow the key
+_thr_ok=0
+_prev=""
+while IFS= read -r _line; do
+    _line_stripped="$(printf '%s' "$_line" | sed 's/^[[:space:]]*//')"
+    if [ "$_prev" = "<key>ThrottleInterval</key>" ] && [ "$_line_stripped" = "<integer>10</integer>" ]; then
+        _thr_ok=1
+    fi
+    _prev="$_line_stripped"
+done <<EOF
+$(printf '%s\n' "$OUT")
+EOF
+if [ "$_thr_ok" -eq 1 ]; then
+    bpt_ok "4: ThrottleInterval is <integer>10</integer>"
+else
+    bpt_fail "4: ThrottleInterval <integer>10</integer> not found immediately after its key"
+fi
+
+# ── Case 5: WorkingDirectory is an absolute path ending in /ibl5/IBLbot ───────
+_wd=""
+_in_wd=0
+while IFS= read -r _line; do
+    _line_stripped="$(printf '%s' "$_line" | sed 's/^[[:space:]]*//')"
+    if [ "$_in_wd" -eq 1 ]; then
+        _wd="$(printf '%s' "$_line_stripped" | sed -e 's#.*<string>##' -e 's#</string>.*##')"
+        _in_wd=0
+    fi
+    if [ "$_line_stripped" = "<key>WorkingDirectory</key>" ]; then
+        _in_wd=1
+    fi
+done <<EOF
+$(printf '%s\n' "$OUT")
+EOF
+case "$_wd" in
+    /*) bpt_ok "5: WorkingDirectory is an absolute path" ;;
+    *) bpt_fail "5: WorkingDirectory should be an absolute path — got [$_wd]" ;;
+esac
+case "$_wd" in
+    */ibl5/IBLbot) bpt_ok "5: WorkingDirectory ends in /ibl5/IBLbot" ;;
+    *) bpt_fail "5: WorkingDirectory should end in /ibl5/IBLbot — got [$_wd]" ;;
+esac
+
+# ── Case 6: WorkingDirectory does NOT point inside IBL5-worktrees ────────────
+# The LaunchAgent must point at the durable MAIN checkout — a worktree path
+# gets torn down after merge and would leave the agent aimed at a dead path.
+case "$_wd" in
+    *IBL5-worktrees*)
+        bpt_fail "6: WorkingDirectory must NOT contain IBL5-worktrees — got [$_wd]" ;;
+    *)
+        bpt_ok "6: WorkingDirectory does not contain IBL5-worktrees (main checkout)" ;;
+esac
+
+# ── Case 7: ProgramArguments paths ───────────────────────────────────────────
+# Extract ProgramArguments strings in order: first = node binary, second = index.js
+_prog_args=""
+_in_prog_args=0
+_in_array=0
+while IFS= read -r _line; do
+    _ls="$(printf '%s' "$_line" | sed 's/^[[:space:]]*//')"
+    if [ "$_in_prog_args" -eq 1 ] && [ "$_ls" = "<array>" ]; then
+        _in_array=1; _in_prog_args=0; continue
+    fi
+    if [ "$_ls" = "<key>ProgramArguments</key>" ]; then
+        _in_prog_args=1; continue
+    fi
+    if [ "$_in_array" -eq 1 ]; then
+        case "$_ls" in
+            "</array>") _in_array=0 ;;
+            "<string>"*"</string>")
+                _val="$(printf '%s' "$_ls" | sed -e 's#.*<string>##' -e 's#</string>.*##')"
+                _prog_args="${_prog_args}${_val}
+"
+                ;;
+        esac
+    fi
+done <<EOF
+$(printf '%s\n' "$OUT")
+EOF
+_node_arg="$(printf '%s\n' "$_prog_args" | sed -n '1p')"
+_script_arg="$(printf '%s\n' "$_prog_args" | sed -n '2p')"
+if command -v node >/dev/null 2>&1; then
+    case "$_node_arg" in
+        /*) bpt_ok "7: first ProgramArguments string is an absolute path" ;;
+        *) bpt_fail "7: first ProgramArguments string should be absolute — got [$_node_arg]" ;;
+    esac
+else
+    bpt_ok "7: skipped absolute-node-path assertion — node is not on PATH"
+fi
+case "$_script_arg" in
+    */dist/bug-bot/index.js) bpt_ok "7: second ProgramArguments ends in /dist/bug-bot/index.js" ;;
+    *) bpt_fail "7: second ProgramArguments should end in /dist/bug-bot/index.js — got [$_script_arg]" ;;
+esac
+
+# ── Case 8: generated PATH contains /opt/homebrew/bin ────────────────────────
+# launchd agents start with a minimal PATH that omits Homebrew; the PATH entry
+# in EnvironmentVariables pins the required paths. This mirrors the same check
+# in bin/test-bug-pipeline-hunt row 56, which asserts the cron plist's PATH.
+_path_val=""
+_in_env=0
+_in_path_key=0
+while IFS= read -r _line; do
+    _ls="$(printf '%s' "$_line" | sed 's/^[[:space:]]*//')"
+    if [ "$_ls" = "<key>EnvironmentVariables</key>" ]; then _in_env=1; continue; fi
+    if [ "$_in_env" -eq 1 ] && [ "$_ls" = "<key>PATH</key>" ]; then _in_path_key=1; continue; fi
+    if [ "$_in_path_key" -eq 1 ]; then
+        _path_val="$(printf '%s' "$_ls" | sed -e 's#.*<string>##' -e 's#</string>.*##')"
+        _in_path_key=0
+    fi
+done <<EOF
+$(printf '%s\n' "$OUT")
+EOF
+case "$_path_val" in
+    */opt/homebrew/bin*) bpt_ok "8: generated launchd PATH contains /opt/homebrew/bin" ;;
+    *) bpt_fail "8: generated launchd PATH should contain /opt/homebrew/bin — got [$_path_val]" ;;
+esac
+
+# EnvironmentVariables must hold exactly ONE key, PATH. This is the whitelist half
+# of the committability property: case 9 blacklists credential-shaped NAMES, but a
+# key called BOT_AUTH would slip past a name match. Counting the keys catches any
+# future env var regardless of what it is called.
+_env_keys="$(printf '%s\n' "$OUT" \
+    | sed -e 's/<!--.*-->//' -e '/<!--/,/-->/d' \
+    | sed -n '/<key>EnvironmentVariables<\/key>/,/<\/dict>/p' \
+    | grep -c '<key>')"
+# 2 = the EnvironmentVariables key itself plus PATH.
+bpt_expect_eq "8: EnvironmentVariables holds exactly one key (PATH)" "2" "$_env_keys"
+
+# ── Case 9: NO secrets in plist ─────────────────────────────────
+# The plist must stay committable/pasteable: it carries no credential. The bot loads
+# its own credentials from its dotenv file via WorkingDirectory (process.cwd()). A
+# credential here would leak into ~/Library/LaunchAgents and into any support paste
+# of --print-bot output.
+#
+# XML comments in the plist legitimately explain the design using the words "token"
+# and "secret", so strip comments FIRST, then scan everything that remains — keys as
+# well as values. Scanning only <string> lines would miss the real leak shape, where
+# the name sits in <key>DISCORD_TOKEN</key> and the value is an opaque <string>.
+_OUT_NOCOMMENTS="$(printf '%s\n' "$OUT" | sed -e 's/<!--.*-->//' -e '/<!--/,/-->/d')"
+if printf '%s\n' "$_OUT_NOCOMMENTS" | grep -qiE '(TOKEN|API_KEY|SECRET|PASSWORD|CLIENT_ID|WEBHOOK)'; then
+    bpt_fail "9: plist (comments stripped) holds a credential-shaped key or value — it must stay committable (ADR-0080)"
+else
+    bpt_ok "9: no credential-shaped keys or values in plist (committability property holds)"
+fi
+
+# ── Case 10: determinism — two --print-bot runs produce byte-identical output ─
+OUT2="$("$SETUP_BIN" --print-bot 2>/dev/null)"
+bpt_expect_eq "10: two --print-bot runs are byte-identical" "$OUT" "$OUT2"
+
+# ── Case 11: --print-bot has no side effect on ~/Library/LaunchAgents ─────────
+_md5_before=""
+_md5_after=""
+_la_dir="$HOME/Library/LaunchAgents"
+if command -v md5 >/dev/null 2>&1; then
+    _md5_before="$(ls -la "$_la_dir" 2>/dev/null | md5 -q 2>/dev/null || echo empty)"
+elif command -v md5sum >/dev/null 2>&1; then
+    _md5_before="$(ls -la "$_la_dir" 2>/dev/null | md5sum 2>/dev/null || echo empty)"
+else
+    _md5_before="unavailable"
+fi
+_unused="$("$SETUP_BIN" --print-bot 2>/dev/null)"
+if command -v md5 >/dev/null 2>&1; then
+    _md5_after="$(ls -la "$_la_dir" 2>/dev/null | md5 -q 2>/dev/null || echo empty)"
+elif command -v md5sum >/dev/null 2>&1; then
+    _md5_after="$(ls -la "$_la_dir" 2>/dev/null | md5sum 2>/dev/null || echo empty)"
+else
+    _md5_after="unavailable"
+fi
+bpt_expect_eq "11: --print-bot does not modify ~/Library/LaunchAgents" "$_md5_before" "$_md5_after"
+
+# ── Case 12: NODE_BIN absent → --install-bot exits 1, STDERR contains 'node not found' ──
+NODE_BIN=/nonexistent/node "$SETUP_BIN" --install-bot > "$STUB/install-out.txt" 2>"$STUB/install-err.txt"
+_install_rc=$?
+bpt_expect_eq "12: NODE_BIN absent --install-bot rc=1" "1" "$_install_rc"
+if grep -q 'node not found' "$STUB/install-err.txt"; then
+    bpt_ok "12: STDERR contains 'node not found'"
+else
+    bpt_fail "12: STDERR should contain 'node not found' — got [$(cat "$STUB/install-err.txt")]"
+fi
+
+# ── Case 13: refusal happens BEFORE any launchctl call ───────────────────────
+# Put a launchctl sentinel stub early on PATH; verify it is NOT invoked.
+mkdir -p "$STUB/sbin"
+cat > "$STUB/sbin/launchctl" <<'SH'
+#!/usr/bin/env bash
+touch "$STUB/launchctl-was-called"
+exit 0
+SH
+chmod +x "$STUB/sbin/launchctl"
+export STUB
+NODE_BIN=/nonexistent/node PATH="$STUB/sbin:$PATH" \
+    "$SETUP_BIN" --install-bot > /dev/null 2>&1 || true
+if [ -f "$STUB/launchctl-was-called" ]; then
+    bpt_fail "13: launchctl was called before the NODE_BIN refusal — refusal is not pre-launchctl"
+else
+    bpt_ok "13: launchctl was NOT called (refusal fires before launchctl)"
+fi
+
+# ── Case 14: unknown option exits 1 ──────────────────────────────────────────
+"$SETUP_BIN" --unknown-option-xyz > /dev/null 2>&1
+_unknown_rc=$?
+bpt_expect_eq "14: unknown option exits 1" "1" "$_unknown_rc"
+
+# ── Case 15: --help exits 0 and mentions --install-bot ───────────────────────
+HELP_OUT="$("$SETUP_BIN" --help 2>/dev/null)"
+HELP_RC=$?
+bpt_expect_eq "15: --help rc=0" "0" "$HELP_RC"
+if printf '%s\n' "$HELP_OUT" | grep -q -- '--install-bot'; then
+    bpt_ok "15: --help mentions --install-bot"
+else
+    bpt_fail "15: --help should mention --install-bot"
+fi
+
+# ── Summary ───────────────────────────────────────────────────────────────────
+printf '\npassed %d / failed %d\n' "$PASSED" "$FAILED"
+if [ "$FAILED" -ne 0 ]; then
+    exit 1
+fi
+exit 0

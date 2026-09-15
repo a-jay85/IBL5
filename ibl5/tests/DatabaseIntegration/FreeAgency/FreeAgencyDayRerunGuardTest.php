@@ -8,8 +8,8 @@ use PHPUnit\Framework\Attributes\Group;
 use Psr\Log\NullLogger;
 
 use FreeAgency\Contracts\FreeAgencyDiscordDispatcherInterface;
-use FreeAgency\FreeAgencyAdminProcessor;
-use FreeAgency\FreeAgencyAdminRepository;
+use FreeAgency\Admin\FreeAgencyAdminProcessor;
+use FreeAgency\Admin\FreeAgencyAdminRepository;
 use League\LeagueContext;
 use Tests\DatabaseIntegration\DatabaseTestCase;
 

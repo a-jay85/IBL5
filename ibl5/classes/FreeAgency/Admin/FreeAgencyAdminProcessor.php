@@ -8,6 +8,7 @@ use FreeAgency\Admin\Contracts\FreeAgencyAdminProcessorInterface;
 use FreeAgency\Admin\Contracts\FreeAgencyAdminRepositoryInterface;
 use FreeAgency\Contracts\FreeAgencyDiscordDispatcherInterface;
 use FreeAgency\DayAlreadyProcessedException;
+use FreeAgency\FreeAgencyDiscordDispatcher;
 use FreeAgency\OfferType;
 use Player\Player;
 use Team\Team;

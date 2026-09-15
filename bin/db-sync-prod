@@ -202,9 +202,15 @@ for t in $PRESERVE_TABLES; do
     # docker call (141) and the `if` then reads "table absent" — which would drop
     # the very table we are protecting (.claude/rules/shell-pipefail-grep.md).
     # information_schema also avoids LIKE treating `_` as a single-char wildcard.
-    _exists="$(docker exec "$DB_CONTAINER" mariadb -uroot -proot iblhoops_ibl5 -N -B \
+    # Fail-closed: a probe error (container unreachable, mariadb auth blip) must abort
+    # the sync — treating a failed probe as "absent" lets DROP TABLE destroy the table.
+    if ! _exists="$(docker exec "$DB_CONTAINER" mariadb -uroot -proot iblhoops_ibl5 -N -B \
         -e "SELECT COUNT(*) FROM information_schema.tables
-            WHERE table_schema='iblhoops_ibl5' AND table_name='$t'" 2>/dev/null || echo 0)"
+            WHERE table_schema='iblhoops_ibl5' AND table_name='$t'" 2> >(db_strip_warnings >&2))"; then
+        printf 'ERROR: preserve-tables probe failed for table %s — aborting sync.\n' "$t" >&2
+        printf '  Cannot safely distinguish absent table from unreachable DB container.\n' >&2
+        exit 1
+    fi
     if [ "${_exists:-0}" != "0" ]; then
         PRESERVE_EXISTING="$PRESERVE_EXISTING $t"
         # The schema step dumps the WHOLE database, not a table list, so

@@ -557,7 +557,7 @@ else
     while IFS= read -r svc; do
         [ -z "$svc" ] && continue
         assert_match "docker-drift-pass1-covers-$svc" "\\\$project-$svc" "$img_list"
-        assert_match "docker-drift-pass2-covers-$svc" "[(|]$svc[|)]"    "$img_regex"
+        assert_match "docker-drift-pass2-covers-$svc" "[(|]${svc}[|)]"    "$img_regex"
     done <<< "$built_services"
 fi
 

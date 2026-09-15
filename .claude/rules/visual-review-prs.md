@@ -11,7 +11,10 @@ paths:
   - "bin/vr-changed-coverage"
   - "bin/vr-build-gallery"
   - "bin/vr-review-comment"
-last_verified: 2026-09-04
+  - "ibl5/tests/e2e/vr-manual-rows.ts"
+  - "ibl5/tests/e2e/manual-rows.spec.ts"
+  - "ibl5/playwright.manual-rows.config.ts"
+last_verified: 2026-09-14
 ---
 
 # Visual-review PRs
@@ -146,6 +149,37 @@ a mechanical-enforcement surface and requires an ADR** (current: ADR-0074). The 
 publishing surface (`--copy-new-screens`/`--update-pr-body` on `bin/vr-review-comment`,
 `ibl5/tests/e2e/vr-pr-body.ts`, `ibl5/tests/ts-unit/vr-pr-body.test.ts`) is likewise a
 mechanical-enforcement surface, covered by **ADR-0076**.
+
+## Manual-row screenshots
+
+A **Truly-manual** Verification-Matrix row about look and feel carries a `vr:` cell in its location
+column (`bin/check-plan` gate `[Q]`; ADR-0126), so CI can screenshot the thing the human is being
+asked to judge:
+
+```
+vr: label=team-page-header; role=anon; url=modules.php?name=Team&op=view&teamID=1; anchor=.ibl-title; setup=DELETE test-state.php?action=clear-throttle
+```
+
+`label=` is a kebab slug, `role=` is `anon|regular|admin`, `url=` is relative to the app root, and
+`anchor=` is the selector waited on before the shot. Zero or more `setup=<GET|POST|DELETE> <path>`
+clauses drive `ibl5/test-state.php` into the state the shot needs — an unknown `action=` there
+answers **400**, so a typo surfaces in the PR comment as a failed row instead of a silently wrong
+screenshot. Clauses are `;`-separated because `|` would break the matrix table. A row that genuinely
+cannot be shot (print CSS, an email render) uses `no-vr: <reason ≥ 15 chars>` instead.
+
+The pipeline is a **review aid, never a gate** — every step below is `continue-on-error: true` and
+runs in its own config so a bad `vr:` cell can never turn the baseline-diff step red:
+
+| Stage | Where |
+|---|---|
+| Parse the PR body's `## Manual Testing` bullets | `bin/vr-review-comment --manual-rows-from-pr=N --out-json=ibl5/vr-manual-rows.json` |
+| Capture one PNG per row | `ibl5/playwright.manual-rows.config.ts` + `ibl5/tests/e2e/manual-rows.spec.ts` → `ibl5/vr-manual-shots/<label>.png` |
+| Publish | copied into the gallery deploy tree, served at `<pages-url>manual-rows/<label>.png` |
+| Post | `bin/vr-review-comment --manual-gallery=…` under sticky header `manual-row-screenshots` |
+
+Capture runs **after** the baseline diff has shot its actuals, so a `setup=` mutation cannot
+invalidate a baseline; the pure grammar/markup helpers live in `ibl5/tests/e2e/vr-manual-rows.ts`
+(unit-tested in `ibl5/tests/ts-unit/vr-manual-rows.test.ts`). Both output paths are gitignored.
 
 ## One-time deployment prerequisite
 

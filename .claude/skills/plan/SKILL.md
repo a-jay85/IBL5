@@ -4,7 +4,7 @@ description: "Plan an implementation task: enforces a verification matrix, direc
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
-last_verified: 2026-09-08
+last_verified: 2026-09-14
 ---
 
 # /plan — Implementation Planning with Verification Matrix
@@ -281,6 +281,7 @@ After receiving the Plan agent's output, check these gates yourself — do NOT d
 3. *(scripted — see above)*
 4. **Tests woven inline** — pre-impl tests appear before their implementation step, not collected in a bottom appendix
 5. **Production comparison classified correctly** — any "compare against production" or "match iblhoops.net" row must be Visual-regression, not Truly-manual
+    - *(scripted — `bin/check-plan` gate `[Q]`)* A `Truly-manual` row whose *what* names look/feel/layout/styling/UI/UX must carry a **`vr:` cell** in its location column, so CI screenshots the render the human is asked to judge and posts it on the PR (ADR-0126): `vr: label=<kebab-slug>; role=anon|regular|admin; url=<app-relative path>; anchor=<selector>`, plus zero or more `setup=<GET|POST|DELETE> test-state.php?action=…` clauses. Clauses are `;`-separated — a `|` would break the matrix table. When the row genuinely cannot be screenshotted (print CSS, an email render, a hardware-dependent view), write **`no-vr: <reason>`** instead; the reason must be at least 15 characters. Pipeline detail: `.claude/rules/visual-review-prs.md` § Manual-row screenshots.
 6. **Test file paths present** — every PHPUnit/API-test/E2E/Visual-regression row names a concrete test file path, not just a category
 7. **No unresolved decisions** — the literal tokens are scripted (see above). You still hand-resolve an unresolved **`(or `** fork (e.g. "STAY (or move)") — `bin/check-plan` skips that token because the corpus showed it is overwhelmingly a benign aside (`≤5 (or 0 ideally)`, `(or extend existing)`), and telling a real fork from an aside needs reading the alternative. Resolve any genuine fork in-place; the automouse agent cannot make judgment calls.
 8. *(scripted — `bin/check-plan` gate `[8]`)* **Decision-trigger pre-classified** — gate `[8]` flags any declared NEW file matching a `bin/adr-check` trigger surface (the pattern table lives in `_plan-verification.md` § Decision-trigger pre-classification — the single source of truth; do not duplicate it) that lacks a resolution. When it fires, do **not** merely "add an ADR step": pre-name the ADR slug and pre-fill the ADR's Context and Decision text directly into the plan body, so the spec carries the ADR draft. The conservative flags (any new `bin/` script; a new migration only when the plan text mentions `DROP`; a `composer.json` `require`/`require-dev` add) cannot read LOC/content at plan time, so they over-include slightly — clear a false flag with a `no-adr:` marker when no real decision is introduced.

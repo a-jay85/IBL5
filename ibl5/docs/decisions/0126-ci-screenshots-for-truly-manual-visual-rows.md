@@ -116,3 +116,35 @@ The PR that shipped Phases 1–4 and 6 of the backing plan did not include Phase
 - **Phase 8** — Tooling-doc updates in `.claude/rules/visual-review-prs.md` (example) and plan-skill docs; end-to-end local rehearsal.
 
 **Consequence while deferred:** Gate `[Q]` is live and requires `vr:` cells from plan authors, but no CI step captures or publishes the screenshots those cells describe. The `## Consequences` bullet "a reviewer judges a newly built screen from the PR page itself" describes the end-state of the full pipeline; it does not yet hold. The References entry naming `ibl5/test-state.php` as "the action dispatcher the capture step drives" is accurate in intent but the capture step does not yet exist.
+
+## Addendum — deferral closed (2026-09-14)
+
+Phases 5, 7, and 8 — the ones the addendum above records as deferred — shipped together in the
+follow-up PR for plan `ci-vr-screenshots-r2`. The pipeline this record describes is now whole:
+
+- **Phase 5** — `ibl5/playwright.manual-rows.config.ts` (a capture-only sibling of
+  `playwright.visual.config.ts`, deliberately not a widening of it) and
+  `ibl5/tests/e2e/manual-rows.spec.ts`, which shoots one `ibl5/vr-manual-shots/<label>.png` per row
+  and merges a `status` (and `error`) onto every row of the gitignored run artifact `ibl5/vr-manual-rows.json` (example). Plus the
+  `ibl5/test-state.php` unknown-action guard.
+- **Phase 7** — five `continue-on-error: true` steps in the `Visual Regression` job of
+  `.github/workflows/e2e-tests.yml`: extract the `vr:` cells from the PR body, capture, copy into
+  the gallery deploy tree, build the comment, and post it under the `manual-row-screenshots` sticky
+  header. Capture runs after the baseline diff has shot its actuals, and all five precede the Pages
+  deploy so the published URLs resolve when the comment lands.
+- **Phase 8** — `.claude/rules/visual-review-prs.md` § Manual-row screenshots, plus the `vr:` /
+  `no-vr:` grammar in `.claude/skills/plan/SKILL.md` and
+  `.claude/skills/plan/_architect-contract.md`.
+
+**Implementation note on the unknown-action guard.** The backing plan specified a fall-through
+guard placed immediately above `test-state.php`'s trailing `http_response_code(405)` block. That
+position is unreachable for a GET: a bare `if ($method === 'GET')` settings dump near the end of the
+file is a catch-all, so a typo'd `action=` returned the league settings with HTTP 200 and never
+reached the 405. The guard shipped instead as an explicit `$knownActions` allowlist checked **above
+every branch**, which also preserves the existing behaviour that a wrong-*method* call on a *known*
+action still falls through untouched. `$knownActions` must be kept in sync when a branch is added —
+a missing entry makes the new action 400 immediately, which is loud rather than silent.
+
+**What the `## Consequences` bullet now means.** "A reviewer judges a newly built screen from the PR
+page itself" holds from this PR forward, for any row whose `vr:` cell captures successfully; a row
+that fails capture is reported as a failed row in the sticky comment rather than silently omitted.

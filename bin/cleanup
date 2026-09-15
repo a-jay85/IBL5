@@ -300,6 +300,20 @@ check_worktree() {
     cleanup_worktree "$wt_name" "$branch" "$wt_path"
 }
 
+# Bare branches that produced no deletion signal, accumulated for the post-loop
+# report. REPORTING ONLY — record_unresolved never sets should_delete and never
+# deletes. A newline-terminated TAB-separated string (not a bash array): this
+# script runs `set -euo pipefail` under bash 3.2, where expanding an EMPTY array
+# as "${arr[@]}" is an unbound-variable abort, and the empty case is the common
+# case on a clean repo.
+UNRESOLVED_ROWS=""
+record_unresolved() {
+    local ub="$1" note="$2" ahead lastdate
+    ahead=$(git -C "$REPO_ROOT" rev-list --count "origin/master..$ub" 2>/dev/null || true)
+    lastdate=$(git -C "$REPO_ROOT" log -1 --format=%cs "$ub" 2>/dev/null || true)
+    UNRESOLVED_ROWS="${UNRESOLVED_ROWS}${ub}"$'\t'"${ahead:-?}"$'\t'"${lastdate:-?}"$'\t'"${note}"$'\n'
+}
+
 # Fetch to ensure origin/master is current
 echo "Fetching remote refs..."
 git -C "$REPO_ROOT" fetch --prune origin 2>/dev/null || echo "Warning: git fetch failed, using cached refs"
@@ -431,6 +445,13 @@ if [ "$ALL" = true ]; then
         # Determine if branch should be cleaned up
         should_delete=false
         delete_reason=""
+        # Reset per-iteration: bare_pr_state is assigned only inside `command -v gh`,
+        # and num_pr/num_pr_state only inside Check 4 — without a reset they are
+        # either unset (set -u abort in the report) or leak the PREVIOUS branch's
+        # PR into this branch's report row.
+        bare_pr_state=""
+        num_pr=""
+        num_pr_state=""
 
         # Check 1: PR state (most authoritative signal)
         if command -v gh &>/dev/null; then
@@ -486,11 +507,17 @@ if [ "$ALL" = true ]; then
         # `gh pr view <branch>` resolves PRs by HEAD-ref name, so it returns
         # nothing; a squash-merge leaves the tip off master so Check 3 misses too;
         # and the branch was never tracked under this name so Check 2 misses. Here
-        # we resolve by PR NUMBER and require the local tip to equal the PR's head
-        # OID before trusting the state — otherwise a stale/renamed pr-<N> branch
-        # could be deleted on the strength of an unrelated PR's status.
+        # we resolve by PR NUMBER. The branch-name regex is ONLY a pre-filter for
+        # deciding WHICH PR number to query — it is never the safety guarantee.
+        # The real safety guarantee is: if the PR is MERGED and the local tip is an
+        # ancestor of headRefOid, every commit on the local branch is contained in
+        # what shipped. That invariant survives squash-merge, which is why it is
+        # used here where `ancestor of origin/master` (Check 3) cannot be.
+        # A CLOSED PR shipped NOTHING, so the ancestor relaxation must not apply to
+        # it — CLOSED still requires exact tip == headRefOid, or the branch is
+        # reported rather than deleted.
         if [ "$should_delete" = false ] && command -v gh &>/dev/null \
-           && [[ "$bare_branch" =~ ^pr-?([0-9]+)$ ]]; then
+           && [[ "$bare_branch" =~ ^pr-?([0-9]+) ]]; then
             num_pr="${BASH_REMATCH[1]}"
             num_pr_state=$(cd "$REPO_ROOT" && gh pr view "$num_pr" --json state -q .state 2>/dev/null || true)
             if [ "$num_pr_state" = "MERGED" ] || [ "$num_pr_state" = "CLOSED" ]; then
@@ -499,16 +526,28 @@ if [ "$ALL" = true ]; then
                 if [ -n "$num_pr_head" ] && [ "$num_pr_head" = "$bare_tip" ]; then
                     should_delete=true
                     delete_reason="PR #$num_pr $num_pr_state (matched by number; tip == head)"
+                elif [ -n "$num_pr_head" ] && [ "$num_pr_state" = "MERGED" ] \
+                     && git -C "$REPO_ROOT" merge-base --is-ancestor "$bare_branch" "$num_pr_head" 2>/dev/null; then
+                    should_delete=true
+                    delete_reason="PR #$num_pr MERGED (matched by number; tip is ancestor of PR head)"
                 else
                     echo "  SKIP bare branch $bare_branch: PR #$num_pr $num_pr_state but tip != PR head"
                     SKIPPED=$((SKIPPED + 1))
-                    continue
                 fi
             fi
         fi
 
-        # No deletion signal — leave the branch alone
+        # No deletion signal — leave the branch alone, but RECORD it so the run
+        # reports what it could not resolve instead of skipping in silence.
         if [ "$should_delete" = false ]; then
+            if [ -n "$num_pr" ] && [ -n "$num_pr_state" ]; then
+                unresolved_note="#$num_pr $num_pr_state (local tip not contained in PR head)"
+            elif [ -n "$bare_pr_state" ]; then
+                unresolved_note="$bare_pr_state"
+            else
+                unresolved_note="none found"
+            fi
+            record_unresolved "$bare_branch" "$unresolved_note"
             continue
         fi
 
@@ -520,6 +559,25 @@ if [ "$ALL" = true ]; then
         fi
         CLEANED=$((CLEANED + 1))
     done < <(git -C "$REPO_ROOT" branch)
+
+    # Unresolved bare branches — no deletion signal was found, so cleanup left
+    # them alone. REPORTING ONLY: this block never deletes and never sets
+    # should_delete. Printed after the loop so a clean repo emits no bare heading.
+    # NOTE: the loop above feeds from a process substitution (`done < <(...)`),
+    # NOT a pipe — that is what lets record_unresolved's writes survive into this
+    # block. Do not "simplify" it to `git branch | while`.
+    if [ -n "$UNRESOLVED_ROWS" ]; then
+        echo ""
+        echo "Unresolved bare branches (no deletion signal — left alone):"
+        while IFS=$'\t' read -r ub_name ub_ahead ub_date ub_note; do
+            [ -z "$ub_name" ] && continue
+            echo "  $ub_name — $ub_ahead ahead of origin/master, last commit $ub_date, PR: $ub_note"
+        done <<< "$UNRESOLVED_ROWS"
+        # Separator: without it the next section's first line (e.g. the Docker
+        # "WOULD prune unused build cache") sits at the same 2-space indent as a
+        # report row and reads as another unresolved branch.
+        echo ""
+    fi
 
     # Clean up orphaned Docker environments.
     # Worktree Docker stacks use compose project name "ibl5-$SLUG".

@@ -1,6 +1,6 @@
 ---
 description: Run the Discord bug/feature pipeline orchestrator as a Mac-local launchd LaunchAgent firing a poll-only bash driver every 180s via StartInterval — not a daemon, tmux, or persistent claude — with single-flight enforced by an atomic DB lease and no prod credentials in its environment.
-last_verified: 2026-09-14
+last_verified: 2026-09-15
 ---
 
 # ADR-0080: Mac-local launchd cron topology for the Discord bug/feature pipeline

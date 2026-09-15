@@ -208,20 +208,24 @@ final class PlayerRecordRepository extends \BaseMysqliRepository
             $results[$label] = [];
         }
 
+        // Same UNION ALL DECIMAL-promotion hazard as
+        // TeamRecordRepository::getTopTeamSingleGameBatch(): the merged column
+        // type depends on which stat expressions are in the batch, so never
+        // trust the driver to hand these back as int.
         foreach ($rows as $row) {
-            /** @var array{stat_type: string, pid: int, name: string, teamid: int, team_name: string, date: string, box_id: int, game_of_that_day: int, oppTid: int, opp_team_name: string, value: int} $row */
+            /** @var array{stat_type: string, pid: int|string, name: string, teamid: int|string, team_name: string, date: string, box_id: int|string, game_of_that_day: int|string, oppTid: int|string, opp_team_name: string, value: int|string} $row */
             $label = $row['stat_type'];
             $results[$label][] = [
-                'pid' => $row['pid'],
+                'pid' => (int) $row['pid'],
                 'name' => $row['name'],
-                'teamid' => $row['teamid'],
+                'teamid' => (int) $row['teamid'],
                 'team_name' => $row['team_name'],
                 'date' => $row['date'],
-                'box_id' => $row['box_id'],
-                'game_of_that_day' => $row['game_of_that_day'],
-                'oppTid' => $row['oppTid'],
+                'box_id' => (int) $row['box_id'],
+                'game_of_that_day' => (int) $row['game_of_that_day'],
+                'oppTid' => (int) $row['oppTid'],
                 'opp_team_name' => $row['opp_team_name'],
-                'value' => $row['value'],
+                'value' => (int) $row['value'],
             ];
         }
 

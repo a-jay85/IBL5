@@ -266,18 +266,23 @@ final class TeamRecordRepository extends \BaseMysqliRepository
             $results[$label] = [];
         }
 
+        // MySQL promotes a UNION ALL column to DECIMAL when the branches alias
+        // source columns of differing integer widths (here `calc_points`
+        // smallint unsigned vs `game_ast` int), and mysqlnd hands DECIMAL back
+        // as a PHP string. The merged type therefore depends on which stats are
+        // in the batch, so cast here rather than trusting the driver's type.
         foreach ($rows as $row) {
-            /** @var array{stat_type: string, teamid: int, team_name: string, date: string, box_id: int, game_of_that_day: int, oppTid: int, opp_team_name: string, value: int} $row */
+            /** @var array{stat_type: string, teamid: int|string, team_name: string, date: string, box_id: int|string, game_of_that_day: int|string, oppTid: int|string, opp_team_name: string, value: int|string} $row */
             $label = $row['stat_type'];
             $results[$label][] = [
-                'teamid' => $row['teamid'],
+                'teamid' => (int) $row['teamid'],
                 'team_name' => $row['team_name'],
                 'date' => $row['date'],
-                'box_id' => $row['box_id'],
-                'game_of_that_day' => $row['game_of_that_day'],
-                'oppTid' => $row['oppTid'],
+                'box_id' => (int) $row['box_id'],
+                'game_of_that_day' => (int) $row['game_of_that_day'],
+                'oppTid' => (int) $row['oppTid'],
                 'opp_team_name' => $row['opp_team_name'],
-                'value' => $row['value'],
+                'value' => (int) $row['value'],
             ];
         }
 

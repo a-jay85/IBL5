@@ -17,6 +17,7 @@ LAUNCHCTL_BIN="${BUG_PIPELINE_CHECK_LAUNCHCTL_BIN:-launchctl}"
 DB_QUERY_BIN="${BUG_PIPELINE_CHECK_DB_QUERY_BIN:-$SCRIPT_DIR/db-query}"
 CURL_BIN="${BUG_PIPELINE_CHECK_CURL_BIN:-curl}"
 # Same var name and default as bin/bug-pipeline-tick — one knob moves both.
+BOT_LAUNCHD_LABEL="${BUG_BOT_LAUNCHD_LABEL:-com.ibl5.bug-bot}"
 BOT_BASE_URL="${BOT_BASE_URL:-http://127.0.0.1:50001}"
 BOT_PROBE_TIMEOUT=5   # seconds; this runs from a 180s cron, so the probe must be bounded
 
@@ -176,6 +177,24 @@ check_staleness() {
     [ "$n" -gt 0 ] && emit DEGRADED stale:rows-stuck "$n non-terminal row(s) past their per-status staleness threshold"
 }
 
+# check_bot_loaded — launchd-level companion to check_bot_reachability below.
+# The two answer different questions and neither subsumes the other: launchctl
+# says whether the job is REGISTERED, curl says whether it is SERVING. A job
+# that is loaded but wedged is reachable-fail/loaded-ok; a job that was never
+# bootstrapped after a reboot is loaded-fail while curl also fails. Naming the
+# launchd state tells you which remediation applies — `launchctl bootstrap`
+# versus restart-and-read-the-log — instead of leaving both indistinguishable
+# behind a single connection refused.
+check_bot_loaded() {
+    if ! command -v "$LAUNCHCTL_BIN" >/dev/null 2>&1; then
+        emit UNKNOWN bot:launchctl-unavailable "launchctl not on PATH — not a macOS host; bot load state unprobeable"
+    elif ! "$LAUNCHCTL_BIN" list "$BOT_LAUNCHD_LABEL" >/dev/null 2>&1; then
+        emit DEGRADED bot:unloaded "LaunchAgent $BOT_LAUNCHD_LABEL is not loaded — re-bootstrap it with bin/bug-pipeline-cron-setup --install-bot"
+    else
+        emit OK bot:loaded "LaunchAgent $BOT_LAUNCHD_LABEL is loaded"
+    fi
+}
+
 # The bug-bot is a SEPARATE LaunchAgent (com.ibl5.bug-bot) from the cron this
 # script was originally written for. On 2026-09-14 the bot was found dead for
 # ~4 weeks while this checker reported healthy the whole time: the cron ticked,
@@ -204,6 +223,7 @@ check_bot_reachability() {
 
 main() {
     check_process_liveness
+    check_bot_loaded
     check_bot_reachability
     check_staleness
 

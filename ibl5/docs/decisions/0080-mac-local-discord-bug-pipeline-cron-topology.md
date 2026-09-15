@@ -168,3 +168,31 @@ Separately, `bin/db-sync-prod` drops and re-creates `ibl_bug_reports` and
 `ibl_bug_pipeline_state` from prod (where they ship via migrations 153/158 but are always
 empty, the bot being Mac-only), so every `bin/dev-up` destroys the pipeline's state. Both
 are tracked as follow-ups, not closed by this change.
+
+## Addendum — a fourth signal: the bot's launchd load state (2026-09-15)
+
+The addendum above closed the detection gap with a **reachability** probe. This one adds the
+**registration** probe beside it, because the two are not the same question and neither implies
+the other.
+
+`bin/bug-pipeline-check` now runs `check_bot_loaded` immediately before `check_bot_reachability`:
+`launchctl list com.ibl5.bug-bot` (`BUG_BOT_LAUNCHD_LABEL`), emitting `bot:loaded`,
+`bot:unloaded` as DEGRADED, or `bot:launchctl-unavailable` as UNKNOWN on a host with no
+`launchctl`. UNKNOWN rather than DEGRADED is the same fail-open discipline ADR-0127 records for
+the curl probe: "cannot answer" and "answered, it is down" must not collapse into one signal.
+
+Why both: `curl` failing tells you the bot is not serving, but not *why*, and the two causes want
+different fixes. A job that was never re-bootstrapped after a reboot is `bot:unloaded` — remediate
+with `bin/bug-pipeline-cron-setup --install-bot`. A job that is loaded but wedged is `bot:loaded`
+with `bot:unreachable` — remediate by restarting it and reading its log. Behind a bare connection
+refused those two are indistinguishable, and the four-week outage was the first kind.
+
+**The plist generator is now tested.** `--print-bot` / `--install-bot` shipped with no automated
+coverage. `bin/test-bug-pipeline-cron-setup` asserts the generated `ProgramArguments`, the
+MAIN-checkout `WorkingDirectory`, the pinned `PATH`, `RunAtLoad` / `KeepAlive` /
+`ThrottleInterval`, the log paths, and — the committability property this ADR claims — that **the
+plist carries no credential**. That property is asserted two ways, because either alone is
+bypassable: XML comments are stripped and the remainder scanned for credential-shaped names (a
+blacklist), *and* `EnvironmentVariables` is asserted to hold exactly one key, `PATH` (a whitelist,
+which catches a future variable whatever it is named). Both harnesses run in the
+`Shell harness regression tests` job.

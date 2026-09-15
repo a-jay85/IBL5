@@ -76,7 +76,15 @@ if (rows.length > 0) {
   });
 
   for (const row of rows) {
-    const storageState = row.role === 'anon' ? ANON_STATE : AUTH_STATE[row.role];
+    // Fall back to ANON_STATE when regular.json is absent so test.use() doesn't
+    // throw before the body guard can record 'skipped' (Playwright resolves a
+    // path-string storageState in the context fixture, before the test body runs).
+    const storageState =
+      row.role === 'anon'
+        ? ANON_STATE
+        : row.role === 'regular' && !existsSync(AUTH_STATE.regular)
+          ? ANON_STATE
+          : AUTH_STATE[row.role];
 
     test.describe(`manual row ${row.row} — ${row.label}`, () => {
       test.use({ storageState });

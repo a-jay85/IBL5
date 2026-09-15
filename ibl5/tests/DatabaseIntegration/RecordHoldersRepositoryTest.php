@@ -597,6 +597,74 @@ class RecordHoldersRepositoryTest extends DatabaseTestCase
         self::assertNotEmpty($result['Points']);
     }
 
+    /**
+     * Regression: RecordBreakingDetector::formatTeamRecordMessage() declares
+     * `int $newValue` under strict_types, so a string `value` is a fatal
+     * TypeError that aborts the whole nightly announcement run.
+     *
+     * A mocked repository cannot reproduce this — the promotion happens inside
+     * MySQL. Two UNION ALL branches aliasing source columns of differing
+     * integer widths (`calc_points` smallint unsigned vs `game_ast` int) merge
+     * to DECIMAL, which mysqlnd returns as a PHP string. One branch alone stays
+     * a native int, so the single-stat case above does not catch it.
+     */
+    public function testGetTopTeamSingleGameBatchReturnsNativeIntsAcrossMixedWidthUnionBranches(): void
+    {
+        $this->insertTeamBoxscoreRow('2098-01-15', 'Metros', 1, 2, 1);
+
+        $result = $this->repo->getTopTeamSingleGameBatch(
+            [
+                'team_points' => ['expression' => 'bs.calc_points', 'order' => 'DESC'],
+                'team_assists' => ['expression' => 'bs.game_ast', 'order' => 'DESC'],
+            ],
+            '1=1'
+        );
+
+        self::assertNotEmpty($result['team_points']);
+        $row = $result['team_points'][0];
+
+        foreach (['teamid', 'box_id', 'game_of_that_day', 'oppTid', 'value'] as $field) {
+            self::assertIsInt(
+                $row[$field],
+                sprintf('%s must be a native int, not a UNION-promoted DECIMAL string', $field),
+            );
+        }
+    }
+
+    /**
+     * The player batch is the same UNION ALL shape as the team batch and is one
+     * stat-set change away from the same DECIMAL promotion. It happens to
+     * return native ints today; this pins that down.
+     */
+    public function testGetTopPlayerSingleGameBatchReturnsNativeIntsAcrossMixedWidthUnionBranches(): void
+    {
+        $pid = 200090560;
+        $this->insertTestPlayer($pid, 'Union Type Test');
+        $this->insertHistRow($pid, 'Union Type Test', 2099);
+        $this->insertPlayerBoxscoreRow(
+            '2099-04-09', $pid, 'Union Type Test', 'PG', 2, 1, 1,
+            points2m: 20, ftm: 0, points3m: 0, ast: 11,
+        );
+
+        $result = $this->repo->getTopPlayerSingleGameBatch(
+            [
+                'points' => 'bs.calc_points',
+                'assists' => 'bs.game_ast',
+            ],
+            "bs.game_date = '2099-04-09' AND bs.game_type = 1"
+        );
+
+        self::assertNotEmpty($result['points']);
+        $row = $result['points'][0];
+
+        foreach (['pid', 'teamid', 'box_id', 'game_of_that_day', 'oppTid', 'value'] as $field) {
+            self::assertIsInt(
+                $row[$field],
+                sprintf('%s must be a native int, not a UNION-promoted DECIMAL string', $field),
+            );
+        }
+    }
+
     // --- Top Season Average Batch ---
 
     public function testGetTopSeasonAverageBatchReturnsRows(): void

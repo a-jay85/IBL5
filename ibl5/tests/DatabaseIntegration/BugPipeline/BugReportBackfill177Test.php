@@ -147,7 +147,7 @@ final class BugReportBackfill177Test extends DatabaseTestCase
         self::assertNotFalse($stmt);
         $stmt->bind_param('i', $id);
         $stmt->execute();
-        /** @var array<string, mixed>|null $row */
+        /** @var array<string, float|int|string|null>|null $row */
         $row = $stmt->get_result()->fetch_assoc();
         $stmt->close();
         return $row;

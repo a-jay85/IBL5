@@ -561,6 +561,112 @@ else
     done <<< "$built_services"
 fi
 
+# ----------------------------------------------------------------------------
+# Phase 8: unresolved-branch report + MERGED-only ancestor acceptance in Check 4.
+# ----------------------------------------------------------------------------
+# Case 1: prN-merged-tip-ancestor-of-head-deleted — the pr2178chk shape.
+# Branch tip is a genuine ancestor of the PR head (not equal to it).
+# Check 4's is-ancestor arm must accept this and delete it (MERGED only).
+e="$(new_env)"
+git -C "$e" checkout -q -b pr2178 master
+printf 'a\n' > "$e/a.txt"; git -C "$e" add a.txt; git -C "$e" commit -qm tipwork
+tipA="$(wt_tip "$e" pr2178)"
+printf 'b\n' > "$e/b.txt"; git -C "$e" add b.txt; git -C "$e" commit -qm headwork
+headA="$(wt_tip "$e" pr2178)"
+git -C "$e" tag -f prhead2178 >/dev/null 2>&1
+git -C "$e" reset -q --hard "$tipA"
+git -C "$e" checkout -q master
+fx="$e/ghfx"; printf 'view\t2178\tMERGED\t%s\t2178\n' "$headA" > "$fx"
+out="$(run_cleanup_gh "$e" "$fx")"
+assert_match "prN-merged-tip-ancestor-of-head-deleted" \
+    'WOULD delete bare branch: pr2178 \(PR #2178 MERGED \(matched by number; tip is ancestor of PR head\)\)' "$out"
+
+# Case 2: prN-merged-tip-not-ancestor-reported — the pr2192tmp shape.
+# Branch tip DESCENDS FROM the fixture head (direction reversed), so
+# --is-ancestor "$bare_branch" "$num_pr_head" is false; branch is reported.
+e="$(new_env)"
+git -C "$e" checkout -q -b pr2192 master
+printf 'a\n' > "$e/a.txt"; git -C "$e" add a.txt; git -C "$e" commit -qm prwork1
+printf 'b\n' > "$e/b.txt"; git -C "$e" add b.txt; git -C "$e" commit -qm prwork2
+headRefOid="$(wt_tip "$e" 'pr2192^')"
+git -C "$e" checkout -q master
+fx="$e/ghfx"; printf 'view\t2192\tMERGED\t%s\t2192\n' "$headRefOid" > "$fx"
+out="$(run_cleanup_gh "$e" "$fx")"
+assert_match "prN-merged-tip-not-ancestor-reported" \
+    'SKIP bare branch pr2192: PR #2192 MERGED but tip != PR head' "$out"
+assert_match "prN-merged-not-ancestor-in-report" \
+    'pr2192 — [0-9]+ ahead of origin/master' "$out"
+
+# Case 3: prN-closed-ancestor-not-deleted — identical construction to case 1
+# but state = CLOSED. The is-ancestor arm is MERGED-only, so CLOSED is NOT
+# deleted even when the local tip is an ancestor of the fixture head.
+e="$(new_env)"
+git -C "$e" checkout -q -b pr2179 master
+printf 'a\n' > "$e/a.txt"; git -C "$e" add a.txt; git -C "$e" commit -qm tipwork
+tipC="$(wt_tip "$e" pr2179)"
+printf 'b\n' > "$e/b.txt"; git -C "$e" add b.txt; git -C "$e" commit -qm headwork
+headC="$(wt_tip "$e" pr2179)"
+git -C "$e" tag -f prhead2179 >/dev/null 2>&1
+git -C "$e" reset -q --hard "$tipC"
+git -C "$e" checkout -q master
+fx="$e/ghfx"; printf 'view\t2179\tCLOSED\t%s\t2179\n' "$headC" > "$fx"
+out="$(run_cleanup_gh "$e" "$fx")"
+assert_absent "prN-closed-ancestor-not-deleted" 'WOULD delete bare branch: pr2179' "$out"
+assert_match  "prN-closed-ancestor-reported"    'pr2179 — [0-9]+ ahead of origin/master' "$out"
+
+# Case 4: noPR-branch-reported-not-deleted — a non-prN branch with one unique
+# commit, no push (no tracking config), no fixture. No deletion signal is found;
+# the branch must appear in the unresolved report and must NOT be deleted.
+e="$(new_env)"
+git -C "$e" checkout -q -b shelved-work master
+printf 'x\n' > "$e/x.txt"; git -C "$e" add x.txt; git -C "$e" commit -qm shelfwork
+git -C "$e" checkout -q master
+out="$(run_cleanup "$e")"
+assert_match  "noPR-branch-reported-not-deleted" \
+    'shelved-work — 1 ahead of origin/master, last commit [0-9]{4}-[0-9]{2}-[0-9]{2}, PR: none found' "$out"
+assert_absent "noPR-branch-not-deleted" 'delete bare branch: shelved-work' "$out"
+
+# Case 5: widened-regex-does-not-match-maint-branch — a maintenance branch whose
+# name contains a digit run after a non-pr prefix. If the regex loosened to match
+# the digit, Check 4 would delete it; the test asserts it cannot.
+e="$(new_env)"
+git -C "$e" checkout -q -b maint-2-13-freeagency-admin-split master
+printf 'x\n' > "$e/x.txt"; git -C "$e" add x.txt; git -C "$e" commit -qm maintwork
+tip="$(wt_tip "$e" maint-2-13-freeagency-admin-split)"
+git -C "$e" checkout -q master
+fx="$e/ghfx"; printf 'view\t2\tMERGED\t%s\t2\n' "$tip" > "$fx"
+out="$(run_cleanup_gh "$e" "$fx")"
+assert_absent "widened-regex-does-not-match-maint-branch" \
+    'delete bare branch: maint-2-13-freeagency-admin-split' "$out"
+assert_match  "maint-branch-reported-instead" \
+    'maint-2-13-freeagency-admin-split — ' "$out"
+
+# Case 6: prN-suffix-name-resolves-leading-number — a pr-NNNN-suffix branch where
+# the regex captures the LEADING digit run only. Verifies the dropped $ anchor
+# actually widened the match without over-widening the captured number.
+e="$(new_env)"
+git -C "$e" checkout -q -b pr-2192-followup-v2 master
+printf 'x\n' > "$e/x.txt"; git -C "$e" add x.txt; git -C "$e" commit -qm prwork
+tip="$(wt_tip "$e" pr-2192-followup-v2)"
+git -C "$e" checkout -q master
+fx="$e/ghfx"; printf 'view\t2192\tMERGED\t%s\t2192\n' "$tip" > "$fx"
+out="$(run_cleanup_gh "$e" "$fx")"
+assert_match "prN-suffix-name-resolves-leading-number" \
+    'WOULD delete bare branch: pr-2192-followup-v2' "$out"
+
+# Case 7: unresolved-zero-no-header — a repo with no bare branches emits no
+# "Unresolved bare branches" heading. Mirrors the stash-zero-no-header case.
+assert_absent "unresolved-zero-no-header" 'Unresolved bare branches' "$(run_cleanup "$(new_env)")"
+
+# Case 8: structural — the report block is non-destructive and dry-run-independent.
+report_block="$(sed -n '/^    # Unresolved bare branches/,/^    fi$/p' "$CLEANUP")"
+rec_fn="$(sed -n '/^record_unresolved()/,/^}/p' "$CLEANUP")"
+assert_match  "report-block-exists"             'Unresolved bare branches'     "$report_block"
+assert_match  "record-fn-exists"                'UNRESOLVED_ROWS='             "$rec_fn"
+assert_absent "report-block-never-deletes"      'branch -D|should_delete=true' "$report_block"
+assert_absent "record-fn-never-deletes"         'branch -D|should_delete=true' "$rec_fn"
+assert_absent "report-block-not-dry-run-gated"  'DRY_RUN'                      "$report_block"
+
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"
     exit 1

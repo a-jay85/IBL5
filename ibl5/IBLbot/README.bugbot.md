@@ -31,14 +31,30 @@ Two I/O directions:
 ## Start
 
 ```bash
-cd ibl5/IBLbot
-npm run build
-pm2 start ecosystem.bugbot.config.cjs   # run inside tmux so it survives terminal close
+cd ibl5/IBLbot && npm run build
+bin/bug-pipeline-cron-setup --install-bot   # from the repo root
 ```
 
-The bug-bot uses its OWN PM2 ecosystem file (`ecosystem.bugbot.config.cjs`) — it is
-deliberately NOT added to the prod `ecosystem.config.cjs`, so a prod deploy never
-starts it.
+That installs and loads the `com.ibl5.bug-bot` LaunchAgent (`RunAtLoad` + `KeepAlive`),
+the same launchd topology the pipeline cron already uses (ADR-0080). It starts at login,
+respawns on crash, needs no tmux and no `sudo`. Verify:
+
+```bash
+launchctl print gui/$(id -u)/com.ibl5.bug-bot | grep -E 'state|pid|last exit'
+curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:50001/
+```
+
+Logs are `bug-bot-stdout.log` / `bug-bot-stderr.log` beside the cron's, under
+`~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/bug-pipeline/logs/`.
+`bin/bug-pipeline-cron-setup --uninstall-bot` removes it; `--print-bot` dumps the
+generated plist without touching anything.
+
+**The bot is never started by a prod deploy.** It is a LaunchAgent in your user's gui
+domain on this Mac — prod has no such job and no bug-bot token. (It ran under its own PM2
+ecosystem file until 2026-09-14; that file is deleted, because leaving it would let
+`pm2 start` open a *second* gateway connection on the one token. PM2 is still used by
+`bin/bug-pipeline-test-env` for the **test** bot on port 50002 — ADR-0111 — which is a
+separate app and unaffected.)
 
 **Runtime dependency:** the bot targets `http://main.localhost/ibl5`, so the always-up
 main stack must be running (`bin/dev-up`, which prod-syncs the DB by default). It is not

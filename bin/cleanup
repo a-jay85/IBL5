@@ -573,6 +573,10 @@ if [ "$ALL" = true ]; then
             [ -z "$ub_name" ] && continue
             echo "  $ub_name — $ub_ahead ahead of origin/master, last commit $ub_date, PR: $ub_note"
         done <<< "$UNRESOLVED_ROWS"
+        # Separator: without it the next section's first line (e.g. the Docker
+        # "WOULD prune unused build cache") sits at the same 2-space indent as a
+        # report row and reads as another unresolved branch.
+        echo ""
     fi
 
     # Clean up orphaned Docker environments.

@@ -1,6 +1,6 @@
 ---
 description: Run the Discord bug/feature pipeline orchestrator as a Mac-local launchd LaunchAgent firing a poll-only bash driver every 180s via StartInterval — not a daemon, tmux, or persistent claude — with single-flight enforced by an atomic DB lease and no prod credentials in its environment.
-last_verified: 2026-08-09
+last_verified: 2026-09-14
 ---
 
 # ADR-0080: Mac-local launchd cron topology for the Discord bug/feature pipeline
@@ -99,3 +99,34 @@ cron on the trusted Mac, never in prod PHP.
   process liveness alone cannot establish health. It performs **no remediation** of any kind — no
   service restart, no lease reset, no re-queue, no `blocked_until` edit — by design: detection and
   alerting only, so a diagnostic run can never itself perturb the pipeline it is measuring.
+
+## Addendum — a third health signal, and local-only tables survive a prod sync (2026-09-14)
+
+Two gaps this ADR's topology left open both fired at once on 2026-09-14, and both are now closed.
+
+**The health check watched the wrong process.** The `## Decision` bullet above records that
+`bin/bug-pipeline-check` "asserts two independent signals". As of this addendum it asserts
+**three**: process liveness and semantic staleness as described, plus a bounded HTTP probe of the
+bug-bot's loopback Express port (`http://127.0.0.1:50001/`, `BOT_BASE_URL`, 5-second `--max-time`),
+emitting `bot:reachable` / `bot:unreachable` / `bot:http-error`, and `bot:curl-unavailable` as
+UNKNOWN on a host with no `curl`. The original two signals both describe the **cron**; the bug-bot
+is a *separate* job. The bot sat dead for roughly four weeks while this script reported
+`VERDICT: healthy` every time — the cron ticked correctly over a queue nothing was filling. Both
+prior signals were satisfied and the pipeline was fully down.
+
+**`bin/db-sync-prod` destroyed the pipeline's own state.** `bin/dev-up` prod-syncs by default, and
+that sync streams `DROP TABLE` / `CREATE TABLE` for every prod table. `ibl_bug_reports`,
+`ibl_bug_report_attachments`, `ibl_bug_reporter_profile`, `ibl_bug_pipeline_state` and
+`ibl_api_keys` hold state that exists only on this Mac, so every sync wiped the queue, the Discord
+cursor, and the locally-minted API key the bot authenticates with — after which every
+`/api/v1/bug-pipeline/*` call returned 401 with no visible cause. `bin/db-sync-prod` now carries a
+`PRESERVE_TABLES` list covering those five, applied **preserve-if-exists**: a table already present
+locally is excluded from both the schema dump (`--ignore-table`) and the data passes; a table that
+does not exist yet is left alone so the prod dump still creates it. The condition is load-bearing —
+the `schema_migrations` backfill copies prod's applied-migration list, so `bin/db-migrate` treats
+migrations 153 and 158 as already done and skips them; an unconditionally-excluded table would
+therefore never be created by anything.
+
+Deliberate trade-off: preserving `ibl_api_keys` wholesale means prod key changes no longer
+propagate to local. API keys are per-environment credentials, so a local mirror of prod's keys was
+never the point.

@@ -156,6 +156,20 @@ remote_dump() {
         "$@"
 }
 
+# Tables holding LOCAL-ONLY state that a prod sync must not destroy.
+#
+# Prod either has no rows here or has different ones, so the prod dump's
+# DROP/CREATE silently wipes them. On 2026-09-14 this cost ~4 weeks of Discord
+# bug reports AND the bug-bot's API key — the bot then 401'd on every call with
+# no visible cause, because the key was minted locally and lives only here
+# (see ibl5/docs/decisions/0080-mac-local-discord-bug-pipeline-cron-topology.md).
+#
+# Trade-off, deliberate: preserving ibl_api_keys wholesale means prod key
+# changes (new keys, revocations) no longer propagate to local. API keys are
+# per-environment credentials, so a local copy of prod's keys was never the
+# point; keeping the local bot working is.
+PRESERVE_TABLES="ibl_api_keys ibl_bug_reports ibl_bug_report_attachments ibl_bug_reporter_profile ibl_bug_pipeline_state"
+
 # Detect STORED GENERATED column tables — their data needs dedicated column-list
 # INSERTs (mariadb-dump emits those with --no-create-info) to avoid ERROR 1906.
 GENERATED_TABLES=$(remote_query "
@@ -175,6 +189,35 @@ ALL_TABLES=$(remote_query "
     ORDER BY table_name;
 ")
 
+# Preserve-if-EXISTS. Only skip a table that is already present locally; on a
+# fresh container nothing is skipped, so the prod dump still creates everything.
+# That condition is load-bearing, because nothing else would create the table:
+# the schema_migrations backfill below copies prod's applied-migration list, so
+# bin/db-migrate treats 153/158 as already done and skips them even when the
+# table they create is missing.
+PRESERVE_EXISTING=""
+IGNORE_ARGS=""
+for t in $PRESERVE_TABLES; do
+    # No pipe into grep: under `set -o pipefail` an early grep exit SIGPIPEs the
+    # docker call (141) and the `if` then reads "table absent" — which would drop
+    # the very table we are protecting (.claude/rules/shell-pipefail-grep.md).
+    # information_schema also avoids LIKE treating `_` as a single-char wildcard.
+    _exists="$(docker exec "$DB_CONTAINER" mariadb -uroot -proot iblhoops_ibl5 -N -B \
+        -e "SELECT COUNT(*) FROM information_schema.tables
+            WHERE table_schema='iblhoops_ibl5' AND table_name='$t'" 2>/dev/null || echo 0)"
+    if [ "${_exists:-0}" != "0" ]; then
+        PRESERVE_EXISTING="$PRESERVE_EXISTING $t"
+        # The schema step dumps the WHOLE database, not a table list, so
+        # filtering the data pass alone would still let DROP TABLE through.
+        IGNORE_ARGS="$IGNORE_ARGS --ignore-table=$REMOTE_DATABASE.$t"
+    fi
+done
+
+PRESERVE_RE=""
+for t in $PRESERVE_EXISTING; do
+    PRESERVE_RE="${PRESERVE_RE:+$PRESERVE_RE|}$t"
+done
+
 GEN_RE=""
 for t in $GENERATED_TABLES; do
     GEN_RE="${GEN_RE:+$GEN_RE|}$t"
@@ -185,12 +228,34 @@ for name in $ALL_TABLES; do
     if [ -n "$GEN_RE" ] && echo "$name" | grep -qE "^($GEN_RE)$"; then
         continue
     fi
+    if [ -n "$PRESERVE_RE" ] && echo "$name" | grep -qE "^($PRESERVE_RE)$"; then
+        continue
+    fi
     REGULAR_TABLES="$REGULAR_TABLES $name"
 done
+
+# Same filter on the generated-column pass. Without it the data INSERTs would
+# still land on top of the preserved rows (a duplicate-key error db_import_sql
+# filters out — invisible, and wrong).
+if [ -n "$PRESERVE_RE" ]; then
+    _kept_gen=""
+    for name in $GENERATED_TABLES; do
+        if echo "$name" | grep -qE "^($PRESERVE_RE)$"; then
+            continue
+        fi
+        _kept_gen="$_kept_gen $name"
+    done
+    GENERATED_TABLES="$_kept_gen"
+fi
 
 echo "Dumping prod → $DB_CONTAINER..."
 if [ -n "$GENERATED_TABLES" ]; then
     echo "  Generated-column tables:$(printf ' %s' $GENERATED_TABLES)"
+fi
+if [ -n "$PRESERVE_EXISTING" ]; then
+    echo "  Preserved (local-only, not synced):$(printf ' %s' $PRESERVE_EXISTING)"
+else
+    echo "  Preserved: none — no local-only table exists yet; the prod dump creates them."
 fi
 echo ""
 
@@ -217,8 +282,9 @@ STEP=0
 {
     STEP=$((STEP + 1))
     echo "  [$STEP/$TOTAL_STEPS] Schema (tables, views, triggers)..." >&2
+    # shellcheck disable=SC2086
     remote_dump --triggers --no-data --max-statement-time="$SCHEMA_TIMEOUT" \
-        "$REMOTE_DATABASE"
+        $IGNORE_ARGS "$REMOTE_DATABASE"
 
     STEP=$((STEP + 1))
     echo "  [$STEP/$TOTAL_STEPS] Table data..." >&2

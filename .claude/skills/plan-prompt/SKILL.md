@@ -1,7 +1,7 @@
 ---
 name: plan-prompt
 description: "Draft a /plan prompt distilled from the current conversation — ground-truth pointers, already-measured evidence, scope, constraints, verification, and the Step-3 architect tier — then, unless the Step-1.5 size triage says the work clears the ad-hoc bar, fire it as a detached headless Sonnet 4.6 run via bin/plan-now. Use after a design discussion when the planning run should be offloaded off the expensive session."
-last_verified: 2026-09-08
+last_verified: 2026-09-15
 ---
 
 # Draft a `/plan` handoff prompt and fire it headless
@@ -161,10 +161,10 @@ Before writing the tier directive, run `bin/plan-tier-hint --explain --desc "<ta
 the `/plan` task statement line and confirm the returned tier matches your call. `bin/plan-now`
 now cross-checks the declared tier against this hint and exits 4 on a mismatch involving xhigh.
 
-Also state the orchestrator model outside the block: a single item → **Sonnet**;
-several items decomposed in one pass → **Opus** (`agent-tiering.md` §
-`/plan` orchestrator model). If the answer is Opus, say so — this skill's default
-isn't always right.
+Also pick the orchestrator model — a single item → **Sonnet**; several items decomposed
+in one pass → **Opus** (`agent-tiering.md` § `/plan` orchestrator model) — and pass
+`--model opus` at Step 5 when the answer is Opus. **Report it only when it is Opus**
+(Step 5.3): Sonnet is this skill's default, so naming it tells the user nothing.
 
 ## Step 4.5 — Pre-resolve the user-facing forks (gate)
 
@@ -279,24 +279,36 @@ step 3.
    Skip the fire (draft only) when the user asked for the prompt itself, or when
    Step 4.5 left a fork you could not resolve. Say which happened — and only in the
    first case print the block, since there the prompt *is* the deliverable.
-3. Report, in prose:
-   - **the log path, pasted from `bin/plan-now`'s own stdout — never composed.** If
-     that output is not in front of you, you have not fired it: say so plainly and
-     fire it. A path you wrote instead of read is a fabricated one, and it reads
-     exactly like a real report. Then don't poll the log — `claude -p` doesn't
-     stream, so it stays empty until the run exits. Say the run **DMs its verdict
-     on finish**, every outcome, queued or not (`bin/plan-now` → `bin/discord-dm`;
-     `--no-dm` opts out): that ping, not the log, is how the user learns it
-     finished, and it is the only thing that surfaces a plan left unqueued for
-     them to read.
-   - which model should run it, and why (Step 4);
-   - any judgment call you made for the user (scope picked, split chosen);
-   - if a network failure kills the architect mid-run, **re-spawn the same tier**.
-     `/plan` Step 3 already delivers the plan section-by-section with each section
-     appended to disk before the next turn, so a stall costs one section, not the
-     plan — the prompt doesn't need to ask for piecewise delivery, and a stall is
-     never a reason to downgrade the tier.
+3. **Report — unique information only.** The user built this pipeline and reads every
+   report. Mechanism they already know carries zero information, so emitting it is pure
+   output cost. When the run fired, emit these, and nothing else:
+
+   - **The log path and launchd label, pasted from `bin/plan-now`'s own stdout — never
+     composed.** If that output is not in front of you, you have not fired it: say so
+     plainly and fire it. A path you wrote instead of read is a fabricated one, and it
+     reads exactly like a real report.
+   - **Where the plan lands** — `~/claude-plans/<slug>.md`.
+   - **Judgment calls you made for the user** — scope picked, split chosen, a gap you
+     caught and folded into the block, a fork you resolved at Step 4.5. This is the
+     part only this run can tell them.
+   - **Non-defaults, and only non-defaults.** Architect tier: name it **only when
+     `plan-architect-xhigh`**. Orchestrator: name it **only when Opus**. Disposition:
+     name it **only when `--implement`**, and then only because it means the plan is
+     waiting on them to read it.
+
+   **Never re-explain the mechanism.** No "detached headless run", no "it writes a plan
+   then a robot implements it", no "Sonnet orchestrator designing with an Opus
+   architect", no "it DMs you on Discord", no "don't tail the log — `claude -p` doesn't
+   stream", no explanation of what `queue` means or that no human reads the plan first.
+   Every one of those is invariant across runs, and the user designed the pipeline that
+   makes them true. **When there is nothing for the user to do, say that in one line and
+   stop** — do not pad the ending with reassurance about how the default path works.
 
 Then stop. The plan is being written in another process; do not wait on it, tail its
 log on a loop, or start implementing. The user picks it up from
 `~/claude-plans/<slug>.md` when the run finishes.
+
+If a network failure kills the architect mid-run, **re-spawn the same tier**. `/plan`
+Step 3 already delivers the plan section-by-section with each section appended to disk
+before the next turn, so a stall costs one section, not the plan — the prompt doesn't
+need to ask for piecewise delivery, and a stall is never a reason to downgrade the tier.

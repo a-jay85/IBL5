@@ -112,6 +112,56 @@ $method = $_SERVER['REQUEST_METHOD'];
 $action = $_GET['action'] ?? '';
 header('Content-Type: application/json');
 
+// Every action this harness answers, in the `$method === X && $action === Y`
+// branches below. KEEP IN SYNC when adding a branch — a missing entry makes the
+// new action 400 immediately, which is loud rather than silent.
+$knownActions = [
+    'clear-fa-offers',
+    'clear-throttle',
+    'clear-trade-offers',
+    'count-demands',
+    'count-fa-stories',
+    'count-shadow-rows',
+    'delete-test-user',
+    'engine-binary-ready',
+    'get-allstar-ids',
+    'get-allstar-name',
+    'get-votes',
+    'reset-allstar-names',
+    'reset-demands',
+    'reset-draft-order',
+    'reset-draft-pick',
+    'reset-extension',
+    'reset-fa-offers',
+    'reset-fa-signings',
+    'reset-rookie-option',
+    'reset-saved-dc-names',
+    'reset-trade-offers',
+    'reset-vote',
+    'reset-waiver-player',
+    'seed-confirm-user',
+    'seed-reset-user',
+    'set-award',
+    'set-champion',
+    'set-eoy-votes',
+    'set-leaders-htm',
+];
+
+// A named-but-unrecognised action is a client mistake, not a method mistake.
+// This guard sits ABOVE every branch rather than beside the trailing 405,
+// because the bare `$method === 'GET'` settings dump near the end of this file
+// is a catch-all: without this, a typo'd action silently returned the league
+// settings with HTTP 200. A wrong-METHOD call on a KNOWN action deliberately
+// falls through untouched (405, or the GET settings dump) — this rejects
+// unknown names only, never a live action. The 400 is what surfaces a typo'd
+// `setup=` in a `vr:` cell (ADR-0126) in the PR comment instead of a mystery.
+if ($action !== '' && !in_array($action, $knownActions, true)) {
+    http_response_code(400);
+    echo json_encode(['error' => 'Unknown action: ' . $action]);
+    $db->close();
+    exit;
+}
+
 // DELETE ?action=clear-throttle — clear auth throttling for E2E login
 if ($method === 'DELETE' && $action === 'clear-throttle') {
     $db->query('DELETE FROM auth_users_throttling WHERE 1=1');
@@ -882,18 +932,6 @@ if ($method === 'POST') {
     $upsertStmt->close();
 
     echo json_encode(['previous' => $previous, 'applied' => $applied]);
-    $db->close();
-    exit;
-}
-
-// A named-but-unrecognised action is a client mistake, not a method mistake.
-// Falling through to 405 below is actively misleading for a typo'd `vr:` cell
-// (ADR-0126) — the method was fine, the action was not. Every one of the
-// existing actions exits inside its own branch above, so this can only be
-// reached by an action nothing handles.
-if ($action !== '') {
-    http_response_code(400);
-    echo json_encode(['error' => 'Unknown action: ' . $action]);
     $db->close();
     exit;
 }

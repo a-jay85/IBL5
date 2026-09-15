@@ -2,11 +2,14 @@
 
 declare(strict_types=1);
 
-namespace FreeAgency;
+namespace FreeAgency\Admin;
 
-use FreeAgency\Contracts\FreeAgencyAdminProcessorInterface;
-use FreeAgency\Contracts\FreeAgencyAdminRepositoryInterface;
+use FreeAgency\Admin\Contracts\FreeAgencyAdminProcessorInterface;
+use FreeAgency\Admin\Contracts\FreeAgencyAdminRepositoryInterface;
 use FreeAgency\Contracts\FreeAgencyDiscordDispatcherInterface;
+use FreeAgency\DayAlreadyProcessedException;
+use FreeAgency\FreeAgencyDiscordDispatcher;
+use FreeAgency\OfferType;
 use Player\Player;
 use Team\Team;
 

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\FreeAgency;
 
-use FreeAgency\Contracts\FreeAgencyAdminRepositoryInterface;
+use FreeAgency\Admin\Contracts\FreeAgencyAdminRepositoryInterface;
 use FreeAgency\Contracts\FreeAgencyDiscordDispatcherInterface;
-use FreeAgency\FreeAgencyAdminProcessor;
+use FreeAgency\Admin\FreeAgencyAdminProcessor;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
 use Tests\WideUnit\Mocks\MockDatabase;

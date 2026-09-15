@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\FreeAgency;
 
-use FreeAgency\FreeAgencyFormComponents;
+use FreeAgency\FreeAgencyFormView;
 use FreeAgency\FreeAgencyOfferView;
 use PHPUnit\Framework\TestCase;
 use Player\Player;
@@ -28,9 +28,9 @@ class FreeAgencyViewXssTest extends TestCase
         $team->name = 'TestTeam';
         $team->teamid = 1;
 
-        $formComponents = new FreeAgencyFormComponents('TestTeam', $player);
+        $formView = new FreeAgencyFormView('TestTeam', $player);
 
-        $view = new FreeAgencyOfferView($formComponents);
+        $view = new FreeAgencyOfferView($formView);
 
         $negotiationData = [
             'player' => $player,
@@ -71,8 +71,8 @@ class FreeAgencyViewXssTest extends TestCase
         $team->name = 'TestTeam';
         $team->teamid = 1;
 
-        $formComponents = new FreeAgencyFormComponents('TestTeam', $player);
-        $view = new FreeAgencyOfferView($formComponents);
+        $formView = new FreeAgencyFormView('TestTeam', $player);
+        $view = new FreeAgencyOfferView($formView);
 
         $negotiationData = [
             'player' => $player,

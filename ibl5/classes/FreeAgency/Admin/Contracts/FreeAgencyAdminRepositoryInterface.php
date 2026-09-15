@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace FreeAgency\Contracts;
+namespace FreeAgency\Admin\Contracts;
 
 /**
  * Interface for FreeAgency admin repository database operations

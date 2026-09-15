@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\DatabaseIntegration\FreeAgency;
 
-use FreeAgency\FreeAgencyAdminRepository;
+use FreeAgency\Admin\FreeAgencyAdminRepository;
 use FreeAgency\FreeAgencyRepository;
 use PHPUnit\Framework\Attributes\Group;
 use Repositories\PlayerLookupRepository;

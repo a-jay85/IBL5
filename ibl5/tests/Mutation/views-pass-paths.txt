@@ -1,7 +1,7 @@
 classes/Boxscore/BoxscoreView.php
 classes/FreeAgency/FreeAgencyOfferView.php
 classes/FreeAgency/FreeAgencyView.php
-classes/FreeAgency/FreeAgencyFormComponents.php
+classes/FreeAgency/FreeAgencyFormView.php
 classes/LeagueConfig/LeagueConfigView.php
 classes/Player/Views/PlayerAwardsAndNewsView.php
 classes/Player/Stats/Views/PlayerHeatAveragesView.php

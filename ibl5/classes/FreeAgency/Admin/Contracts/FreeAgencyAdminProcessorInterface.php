@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace FreeAgency\Contracts;
+namespace FreeAgency\Admin\Contracts;
 
 /**
  * Interface for processing admin free agency operations

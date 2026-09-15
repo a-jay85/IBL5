@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace Tests\FreeAgency;
 
-use FreeAgency\FreeAgencyFormComponents;
+use FreeAgency\FreeAgencyFormView;
 use PHPUnit\Framework\TestCase;
 use Player\Player;
 
-/** @covers \FreeAgency\FreeAgencyFormComponents */
-class FreeAgencyFormComponentsTest extends TestCase
+/** @covers \FreeAgency\FreeAgencyFormView */
+class FreeAgencyFormViewTest extends TestCase
 {
     private const FIXTURES = __DIR__ . '/fixtures';
 
     private Player $player;
-    private FreeAgencyFormComponents $formComponents;
+    private FreeAgencyFormView $formView;
 
     protected function setUp(): void
     {
@@ -45,19 +45,19 @@ class FreeAgencyFormComponentsTest extends TestCase
         $this->player->method('getTeamName')->willReturn('TestTeam');
 
         // No setCsrfHtml() call — $csrfHtml defaults to '' → deterministic output
-        $this->formComponents = new FreeAgencyFormComponents('TestTeam', $this->player);
+        $this->formView = new FreeAgencyFormView('TestTeam', $this->player);
     }
 
     public function testRenderPlayerRatings(): void
     {
-        $html = FreeAgencyFormComponents::renderPlayerRatings($this->player);
+        $html = FreeAgencyFormView::renderPlayerRatings($this->player);
         $golden = self::FIXTURES . '/fa-form-player-ratings.golden.html';
         $this->assertStringEqualsFile($golden, $html);
     }
 
     public function testRenderDemandDisplay(): void
     {
-        $html = $this->formComponents->renderDemandDisplay([
+        $html = $this->formView->renderDemandDisplay([
             'dem1' => 100,
             'dem2' => 0,
             'dem3' => 50,
@@ -71,7 +71,7 @@ class FreeAgencyFormComponentsTest extends TestCase
 
     public function testRenderOfferInputs(): void
     {
-        $html = $this->formComponents->renderOfferInputs([
+        $html = $this->formView->renderOfferInputs([
             'offer1' => 0,
             'offer2' => 200,
             'offer3' => 220,
@@ -85,7 +85,7 @@ class FreeAgencyFormComponentsTest extends TestCase
 
     public function testRenderMaxContractButtonsNoBird(): void
     {
-        $html = $this->formComponents->renderMaxContractButtons(
+        $html = $this->formView->renderMaxContractButtons(
             [0 => 1063, 1 => 1169, 2 => 1275, 3 => 1381, 4 => 1487, 5 => 1593],
             0
         );
@@ -95,7 +95,7 @@ class FreeAgencyFormComponentsTest extends TestCase
 
     public function testRenderMaxContractButtonsWithBird(): void
     {
-        $html = $this->formComponents->renderMaxContractButtons(
+        $html = $this->formView->renderMaxContractButtons(
             [0 => 1063, 1 => 1196, 2 => 1329, 3 => 1462, 4 => 1595, 5 => 1728],
             3
         );
@@ -105,28 +105,28 @@ class FreeAgencyFormComponentsTest extends TestCase
 
     public function testRenderExceptionButtonsMle(): void
     {
-        $html = $this->formComponents->renderExceptionButtons('MLE');
+        $html = $this->formView->renderExceptionButtons('MLE');
         $golden = self::FIXTURES . '/fa-form-exception-mle.golden.html';
         $this->assertStringEqualsFile($golden, $html);
     }
 
     public function testRenderExceptionButtonsLle(): void
     {
-        $html = $this->formComponents->renderExceptionButtons('LLE');
+        $html = $this->formView->renderExceptionButtons('LLE');
         $golden = self::FIXTURES . '/fa-form-exception-lle.golden.html';
         $this->assertStringEqualsFile($golden, $html);
     }
 
     public function testRenderExceptionButtonsVet(): void
     {
-        $html = $this->formComponents->renderExceptionButtons('VET');
+        $html = $this->formView->renderExceptionButtons('VET');
         $golden = self::FIXTURES . '/fa-form-exception-vet.golden.html';
         $this->assertStringEqualsFile($golden, $html);
     }
 
     public function testRenderExceptionButtonsUnrecognizedTypeReturnsEmpty(): void
     {
-        $html = $this->formComponents->renderExceptionButtons('FOO');
+        $html = $this->formView->renderExceptionButtons('FOO');
         $this->assertSame('', $html);
     }
 }

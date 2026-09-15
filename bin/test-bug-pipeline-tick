@@ -464,6 +464,23 @@ bpt_expect_eq "flag-on blocked exits 0" 0 "$BPT_RC"
 bpt_log_has   "$STUB" transition.log "filed"    "flag-on blocked → filed"
 bpt_log_lacks "$STUB" calls.log     "CLAIM_NEXT" "flag-on blocked skips resume_blocked_hunt"
 
+# flag-on + CI_AUTOFIX_ENABLED=1: no gh pr list, no autofix spawn
+bpt_reset
+bpt_set_actionable '[{"id":54,"status":"queued","class":null,"original_text":"x","thread_id":null,"issue_number":null}]'
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true,"issue_title":"CI test","severity":"low"}'
+BUG_PIPELINE_FILE_ISSUES_ONLY=1 BUG_PIPELINE_CI_AUTOFIX_ENABLED=1 bpt_run
+bpt_expect_eq "flag-on+ci-autofix exits 0" 0 "$BPT_RC"
+bpt_log_has   "$STUB" transition.log "filed"     "flag-on+ci-autofix still files the row"
+bpt_log_lacks "$STUB" gh.log         "pr list"   "flag-on+ci-autofix: no gh pr list (no autofix)"
+bpt_log_lacks "$STUB" calls.log      "CLAIM_NEXT" "flag-on+ci-autofix: no hunt spawn"
+
+# reversibility: gathering row with flag UNSET → feature path, never filed
+bpt_reset
+bpt_set_actionable '[{"id":55,"status":"gathering","class":"feature","original_text":"y","thread_id":"880000000000000001","issue_number":null,"last_gm_reply_at":null,"last_processed_at":null}]'
+bpt_run
+bpt_expect_eq "flag-off gathering exits 0" 0 "$BPT_RC"
+bpt_log_lacks "$STUB" transition.log "filed"  "flag-off gathering never reaches filed"
+
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"
 exit "$FAILED"

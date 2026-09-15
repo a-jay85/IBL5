@@ -87,21 +87,25 @@ file_issues_only() { [ "${BUG_PIPELINE_FILE_ISSUES_ONLY:-}" = "1" ]; }
 # shellcheck disable=SC2086
 file_and_close_row() { # row_json
     local row="$1"
-    local id msg_id blocked clear_opt
+    local id msg_id blocked clear_opt existing_issue
     id="$(printf '%s' "$row" | jq -r '.id')"
     msg_id="$(printf '%s' "$row" | jq -r '.original_message_id // empty')"
     blocked="$(printf '%s' "$row" | jq -r '.blocked_until // empty')"
+    existing_issue="$(printf '%s' "$row" | jq -r '.issue_number // empty')"
     clear_opt=""; [ -n "$blocked" ] && clear_opt="--clear-blocked"
 
+    bpgh_ensure_label "gm-reported" 2>/dev/null || true
     local n; n="$(bpgh_ensure_issue "$row")"
-    local url_part=""
-    [ -n "$n" ] && url_part=" https://github.com/${BUG_PIPELINE_ISSUE_REPO}/issues/$n"
+    [ -n "$n" ] || { log "file-and-close $id: no issue number — leaving row for next tick"; return 0; }
+    local url_part=" https://github.com/${BUG_PIPELINE_ISSUE_REPO}/issues/$n"
 
-    local reply="Thanks for the report! I've filed a GitHub Issue so it doesn't get lost.${url_part}"
-    bot_reply_to_message "$msg_id" "$reply" >/dev/null \
-        || log "file_and_close_row $id: reply failed (continuing)"
-    cli transition "$id" filed $clear_opt >/dev/null \
-        && log "file_and_close_row $id: → filed (issue ${n:-none})"
+    if [ -z "$existing_issue" ]; then
+        local reply="Thanks for the report! I've filed a GitHub Issue so it doesn't get lost.${url_part}"
+        bot_reply_to_message "$msg_id" "$reply" >/dev/null \
+            || log "file_and_close_row $id: reply failed (continuing)"
+    fi
+    cli transition "$id" filed --issue="$n" $clear_opt >/dev/null \
+        && log "file_and_close_row $id: → filed (issue $n)"
 }
 
 # ── Hunter seams (#5b) — all default to production; tests override ─────────────
@@ -422,7 +426,10 @@ classify_row() { # row_json
 
     local issue_number; issue_number="$(printf '%s' "$row" | jq -r '.issue_number // empty')"
     local issue_opt=""
-    if [ "$class" = "bug" ] || [ "$class" = "feature" ]; then
+    # file_issues_only: skip early issue creation here; file_and_close_row handles it,
+    # which lets file_and_close_row distinguish a fresh issue (row.issue_number=null →
+    # send reply) from a re-tick (row.issue_number already set → skip duplicate reply).
+    if { [ "$class" = "bug" ] || [ "$class" = "feature" ]; } && ! file_issues_only; then
         if [ -z "$issue_number" ] || [ "$issue_number" = "null" ]; then
             local n; n="$(bpgh_ensure_issue "$row")"
             # Persist AT THE CREATION SITE. open_thread_and_ask returns early without

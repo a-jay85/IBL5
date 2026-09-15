@@ -171,11 +171,32 @@ BUG_PIPELINE_FILE_ISSUES_ONLY=1 bpt_run
 bpt_log_has   "$STUB" transition.log "dropped"     "flag-on not_a_thing still dropped"
 bpt_log_lacks "$STUB" transition.log "filed"       "flag-on not_a_thing not filed"
 
-# flag-on: gh issue creation attempted (gh stub writes to gh.log)
+# flag-on: gh issue creation attempted; issue number persisted via --issue=
 bpt_reset; bpt_set_actionable "$QUEUED"
 bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true,"issue_title":"Box score wrong","severity":"medium"}'
 BUG_PIPELINE_FILE_ISSUES_ONLY=1 bpt_run
 bpt_log_has "$STUB" gh.log "issue create" "flag-on files a GitHub Issue"
+bpt_log_has "$STUB" transition.log "--issue=" "flag-on persists issue number via --issue="
+
+# flag-on re-tick: row already has issue_number → no new gh create, no new reply
+QUEUED_WITH_ISSUE='[{"id":7,"status":"queued","class":null,"original_text":"the box score is wrong","original_message_id":"1420000000000000007","thread_id":null,"issue_number":42}]'
+bpt_reset; bpt_set_actionable "$QUEUED_WITH_ISSUE"
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true,"issue_title":"Box score wrong","severity":"medium"}'
+BUG_PIPELINE_FILE_ISSUES_ONLY=1 bpt_run
+bpt_expect_eq "re-tick exits 0" 0 "$BPT_RC"
+bpt_log_has   "$STUB" transition.log "filed"           "re-tick still transitions to filed"
+bpt_log_lacks "$STUB" gh.log     "issue create"        "re-tick mints no second GitHub issue"
+bpt_log_lacks "$STUB" calls.log  "REPLY_TO_MESSAGE"    "re-tick sends no duplicate reply"
+
+# flag-on GH_FAIL: ensure_issue returns empty → row left for next tick, not filed
+bpt_reset; bpt_set_actionable "$QUEUED"
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true,"issue_title":"Box score wrong","severity":"medium"}'
+BUG_PIPELINE_FILE_ISSUES_ONLY=1 GH_FAIL=1 bpt_run
+bpt_expect_eq "GH_FAIL exits 0" 0 "$BPT_RC"
+bpt_log_lacks "$STUB" transition.log "filed"           "GH_FAIL: row NOT transitioned to filed"
+grep -qF "no issue number" "$STUB/tick.out" \
+    && bpt_ok "GH_FAIL: 'no issue number' logged" \
+    || bpt_fail "GH_FAIL: 'no issue number' not found in tick.out"
 
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"

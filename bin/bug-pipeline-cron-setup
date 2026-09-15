@@ -100,7 +100,7 @@ build_plist() {
 		<!-- Set to 1 to enable file-issues-only mode: files GitHub Issues + replies to GMs
 		     instead of autonomous hunting/fixing. Default empty = normal mode. -->
 		<key>BUG_PIPELINE_FILE_ISSUES_ONLY</key>
-		<string>${BUG_PIPELINE_FILE_ISSUES_ONLY:-}</string>
+		<string>${BUG_PIPELINE_FILE_ISSUES_ONLY:-0}</string>
 	</dict>
 	<key>StandardOutPath</key>
 	<string>${LOG_DIR}/launchd-stdout.log</string>

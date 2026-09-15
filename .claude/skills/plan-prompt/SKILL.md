@@ -281,7 +281,7 @@ step 3.
    first case print the block, since there the prompt *is* the deliverable.
 3. **Report — unique information only.** The user built this pipeline and reads every
    report. Mechanism they already know carries zero information, so emitting it is pure
-   output cost. Emit these, and nothing else:
+   output cost. When the run fired, emit these, and nothing else:
 
    - **The log path and launchd label, pasted from `bin/plan-now`'s own stdout — never
      composed.** If that output is not in front of you, you have not fired it: say so

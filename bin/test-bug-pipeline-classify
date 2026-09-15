@@ -144,6 +144,39 @@ bpt_reset; bpt_set_actionable "$QUEUED"; bpt_set_claude_result '{"class":"garbag
 bpt_reset; bpt_set_actionable "$QUEUED"; : > "$STUB/claude.out"; malformed_case "malformed(d) empty stdout"
 bpt_reset; bpt_set_actionable "$QUEUED"; bpt_set_claude_raw '{"type":"result","is_error":false,"result":"{}"}'; bpt_set_claude_rc 3; malformed_case "malformed(e) non-zero exit"
 
+# ── BUG_PIPELINE_FILE_ISSUES_ONLY=1 — classify, file issue, reply, close ───────
+# When the flag is on, a bug row must: file a GH issue, reply in-channel, and
+# transition to 'filed'. No thread opened, no hunting transition.
+bpt_reset; bpt_set_actionable "$QUEUED"
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true,"issue_title":"Box score wrong","severity":"medium"}'
+BUG_PIPELINE_FILE_ISSUES_ONLY=1 bpt_run
+bpt_expect_eq "flag-on bug exits 0" 0 "$BPT_RC"
+bpt_log_has   "$STUB" transition.log "filed"         "flag-on bug → filed"
+bpt_log_has   "$STUB" calls.log     "REPLY_TO_MESSAGE" "flag-on bug replies in-channel"
+bpt_log_lacks "$STUB" transition.log "queued --class=bug" "flag-on bug never emits queued"
+bpt_log_lacks "$STUB" calls.log     "CREATE_THREAD"  "flag-on bug opens no thread"
+
+# flag-on feature row: filed, not gathering
+bpt_reset; bpt_set_actionable "$QUEUED"
+bpt_set_claude_result '{"class":"feature","issue_title":"Add dark mode","severity":"low"}'
+BUG_PIPELINE_FILE_ISSUES_ONLY=1 bpt_run
+bpt_expect_eq "flag-on feature exits 0" 0 "$BPT_RC"
+bpt_log_has   "$STUB" transition.log "filed"       "flag-on feature → filed"
+bpt_log_lacks "$STUB" transition.log "gathering"   "flag-on feature never emits gathering"
+
+# flag-on not_a_thing: still dropped (not filed)
+bpt_reset; bpt_set_actionable "$QUEUED"
+bpt_set_claude_result '{"class":"not_a_thing"}'
+BUG_PIPELINE_FILE_ISSUES_ONLY=1 bpt_run
+bpt_log_has   "$STUB" transition.log "dropped"     "flag-on not_a_thing still dropped"
+bpt_log_lacks "$STUB" transition.log "filed"       "flag-on not_a_thing not filed"
+
+# flag-on: gh issue creation attempted (gh stub writes to gh.log)
+bpt_reset; bpt_set_actionable "$QUEUED"
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true,"issue_title":"Box score wrong","severity":"medium"}'
+BUG_PIPELINE_FILE_ISSUES_ONLY=1 bpt_run
+bpt_log_has "$STUB" gh.log "issue create" "flag-on files a GitHub Issue"
+
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"
 exit "$FAILED"

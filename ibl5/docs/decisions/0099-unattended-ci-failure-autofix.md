@@ -1,6 +1,6 @@
 ---
 description: Adds unattended CI-failure autofix to bug-pipeline-tick — detects settled red PRs, dispatches a sandboxed Claude agent to fix and commit, then pushes if the agent reports a fix.
-last_verified: 2026-08-09
+last_verified: 2026-09-14
 ---
 
 # ADR-0099: Unattended CI-Failure Autofix via bug-pipeline-tick
@@ -39,3 +39,7 @@ After the bug-pipeline hunter (ADR-0081) was shipping fixes to PRs, the remainin
 - `bin/test-bug-pipeline-ci-autofix` — integration test suite (23 rows)
 - `.github/workflows/tests.yml` — CI wiring for the test suite
 - `ibl5/docs/decisions/0081-hunter-trust-split-starved-env-sandbox.md` — trust-split foundation this builds on
+
+## Addendum — file-issues-only mode bypasses ci_autofix_main (2026-09-14)
+
+When `BUG_PIPELINE_FILE_ISSUES_ONLY=1`, the tick's `ci_autofix_main` call is gated by `! file_issues_only` and is never reached — the driver skips CI autofix for the duration the flag is on. The feature's own kill switch (`BUG_PIPELINE_CI_AUTOFIX_ENABLED`) and dry-run flag remain unchanged.

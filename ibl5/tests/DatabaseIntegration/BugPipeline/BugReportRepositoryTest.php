@@ -602,6 +602,19 @@ class BugReportRepositoryTest extends DatabaseTestCase
         );
     }
 
+    public function testListActiveConversationsExcludesFiledRows(): void
+    {
+        // A 'filed' row must be invisible to the enumerator — it is terminal.
+        $this->insertBugReport([
+            'original_message_id' => '900000000000000001',
+            'status'              => 'filed',
+        ]);
+
+        $rows = $this->repo->listActiveConversations();
+        $ids  = array_map(static fn (array $r): int => $r['id'], $rows);
+        self::assertSame([], $ids, "'filed' rows must be excluded from listActiveConversations");
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────
 
     /**

@@ -141,7 +141,7 @@ class BugReportRepository extends \BaseMysqliRepository
     {
         $rows = $this->fetchAll(
             "SELECT * FROM `ibl_bug_reports`
-             WHERE status NOT IN ('hunting','dropped','fixed','needs_human','parked_idle','pr_open')
+             WHERE status NOT IN ('hunting','dropped','fixed','needs_human','parked_idle','pr_open','filed')
                AND (blocked_until IS NULL OR blocked_until <= NOW())
                AND (
                      (status = 'queued' AND class IS NULL)

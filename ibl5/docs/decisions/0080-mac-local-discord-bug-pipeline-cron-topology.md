@@ -1,6 +1,6 @@
 ---
 description: Run the Discord bug/feature pipeline orchestrator as a Mac-local launchd LaunchAgent firing a poll-only bash driver every 180s via StartInterval — not a daemon, tmux, or persistent claude — with single-flight enforced by an atomic DB lease and no prod credentials in its environment.
-last_verified: 2026-08-09
+last_verified: 2026-09-14
 ---
 
 # ADR-0080: Mac-local launchd cron topology for the Discord bug/feature pipeline
@@ -99,3 +99,7 @@ cron on the trusted Mac, never in prod PHP.
   process liveness alone cannot establish health. It performs **no remediation** of any kind — no
   service restart, no lease reset, no re-queue, no `blocked_until` edit — by design: detection and
   alerting only, so a diagnostic run can never itself perturb the pipeline it is measuring.
+
+## Addendum — file-issues-only mode (2026-09-14)
+
+`bin/bug-pipeline-tick` gains a `BUG_PIPELINE_FILE_ISSUES_ONLY` flag (default empty = normal mode; set `1` to enable). When on, the driver files a GitHub Issue and replies to the GM's original Discord message for every incoming report, then transitions the row to a new `filed` terminal status — no autonomous hunting, no CI autofix, no feature-gathering. In-flight rows in `gathering`, `awaiting_ajay`, and `blocked` states are drained to `filed` on the next tick. The `bin/bug-pipeline-cron-setup` plist now emits a `BUG_PIPELINE_FILE_ISSUES_ONLY` `EnvironmentVariables` key (default empty) so the operator can enable the mode without rewriting the plist. Migration 177 adds the `filed` enum value and three idempotent backfill UPDATE statements that clear in-flight rows safely when the migration runs on an existing DB.

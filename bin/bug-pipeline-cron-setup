@@ -97,6 +97,10 @@ build_plist() {
 		<string>${BUG_PIPELINE_ISSUE_REPO}</string>
 		<key>BUG_PIPELINE_APPROVER_ID</key>
 		<string>${BUG_PIPELINE_APPROVER_ID}</string>
+		<!-- Set to 1 to enable file-issues-only mode: files GitHub Issues + replies to GMs
+		     instead of autonomous hunting/fixing. Default empty = normal mode. -->
+		<key>BUG_PIPELINE_FILE_ISSUES_ONLY</key>
+		<string>${BUG_PIPELINE_FILE_ISSUES_ONLY:-}</string>
 	</dict>
 	<key>StandardOutPath</key>
 	<string>${LOG_DIR}/launchd-stdout.log</string>
@@ -118,7 +122,7 @@ bootstrap_issue_tracking() {
 
   # Tracking-repo labels (area:* / root-cause:* are open vocabularies created on demand by #5b).
   local label
-  for label in bug enhancement severity:low severity:medium severity:high needs-info stalled needs-human; do
+  for label in bug enhancement severity:low severity:medium severity:high needs-info stalled needs-human gm-reported; do
     gh label create "$label" --repo "$BUG_PIPELINE_ISSUE_REPO" 2>/dev/null || true
   done
 

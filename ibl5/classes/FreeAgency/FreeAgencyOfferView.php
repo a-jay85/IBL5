@@ -15,11 +15,11 @@ use Team\Team;
  */
 class FreeAgencyOfferView
 {
-    private FreeAgencyFormComponents $formComponents;
+    private FreeAgencyFormView $formView;
 
-    public function __construct(FreeAgencyFormComponents $formComponents)
+    public function __construct(FreeAgencyFormView $formView)
     {
-        $this->formComponents = $formComponents;
+        $this->formView = $formView;
     }
 
     /**
@@ -47,7 +47,7 @@ class FreeAgencyOfferView
         // form generated its own. One shared token avoids this.
         $csrfToken = \Security\CsrfGuard::generateRawToken('free_agency');
         $csrfHtml = '<input type="hidden" name="_csrf_token" value="' . $csrfToken . '">';
-        $this->formComponents->setCsrfHtml($csrfHtml);
+        $this->formView->setCsrfHtml($csrfHtml);
 
         ob_start();
 
@@ -77,7 +77,7 @@ class FreeAgencyOfferView
     <div class="ibl-card__body">
         <div class="offer-player-info">
             <img src="<?= HtmlSanitizer::e(PlayerImageHelper::getImageUrl($player->getPlayerID())) ?>" alt="<?= HtmlSanitizer::e($player->getName() ?? '') ?>" class="offer-player-img">
-            <?= HtmlSanitizer::trusted(FreeAgencyFormComponents::renderPlayerRatings($player)) ?>
+            <?= HtmlSanitizer::trusted(FreeAgencyFormView::renderPlayerRatings($player)) ?>
         </div>
     </div>
 </div>
@@ -91,7 +91,7 @@ class FreeAgencyOfferView
         <div class="ibl-field-group">
             <span class="ibl-label">Player Demands (base, before team modifiers):</span>
             <div class="ibl-field-group__content">
-                <?= HtmlSanitizer::trusted($this->formComponents->renderDemandDisplay($demands)) ?>
+                <?= HtmlSanitizer::trusted($this->formView->renderDemandDisplay($demands)) ?>
             </div>
         </div>
 
@@ -100,7 +100,7 @@ class FreeAgencyOfferView
             <div class="ibl-field-group">
                 <span class="ibl-label">Your Custom Offer:</span>
                 <div class="ibl-field-group__content">
-                    <?= HtmlSanitizer::trusted($this->formComponents->renderOfferInputs($existingOffer, $raisePercentage)) ?>
+                    <?= HtmlSanitizer::trusted($this->formView->renderOfferInputs($existingOffer, $raisePercentage)) ?>
                 </div>
             </div>
 
@@ -167,10 +167,10 @@ class FreeAgencyOfferView
         ];
 
         ob_start();
-        echo HtmlSanitizer::trusted($this->formComponents->renderMaxContractButtons($maxSalaries, $birdYears));
-        echo HtmlSanitizer::trusted($this->formComponents->renderExceptionButtons('MLE'));
-        echo HtmlSanitizer::trusted($this->formComponents->renderExceptionButtons('LLE'));
-        echo HtmlSanitizer::trusted($this->formComponents->renderExceptionButtons('VET'));
+        echo HtmlSanitizer::trusted($this->formView->renderMaxContractButtons($maxSalaries, $birdYears));
+        echo HtmlSanitizer::trusted($this->formView->renderExceptionButtons('MLE'));
+        echo HtmlSanitizer::trusted($this->formView->renderExceptionButtons('LLE'));
+        echo HtmlSanitizer::trusted($this->formView->renderExceptionButtons('VET'));
         return (string) ob_get_clean();
     }
 

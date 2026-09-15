@@ -6,7 +6,7 @@ namespace FreeAgency;
 
 use Security\HtmlSanitizer;
 
-class FreeAgencyFormComponents
+class FreeAgencyFormView
 {
     private string $teamName;
     private \Player\Player $player;
@@ -115,8 +115,8 @@ class FreeAgencyFormComponents
     <?php for ($i = 1; $i <= 6; $i++): ?>
         <?php if ($demands["dem{$i}"] !== 0): ?>
         <div class="offer-salary-cell">
-            <div class="ibl-label ibl-label--sm">Yr <?= $i ?></div>
-            <div class="offer-salary-cell__value"><?= $demands["dem{$i}"] ?></div>
+            <div class="ibl-label ibl-label--sm">Yr <?= HtmlSanitizer::e($i) ?></div>
+            <div class="offer-salary-cell__value"><?= HtmlSanitizer::e($demands["dem{$i}"]) ?></div>
         </div>
         <?php endif; ?>
     <?php endfor; ?>
@@ -133,11 +133,11 @@ class FreeAgencyFormComponents
     {
         ob_start();
         ?>
-<div class="offer-salary-row offer-salary-row--inputs" data-raise-percentage="<?= $raisePercentage ?>">
+<div class="offer-salary-row offer-salary-row--inputs" data-raise-percentage="<?= HtmlSanitizer::e($raisePercentage) ?>">
     <?php for ($i = 1; $i <= 6; $i++): ?>
     <div class="offer-salary-cell">
-        <label for="offeryear<?= $i ?>" class="ibl-label ibl-label--sm">Yr <?= $i ?></label>
-        <input type="number" id="offeryear<?= $i ?>" class="ibl-input ibl-input--sm offer-salary-input" name="offeryear<?= $i ?>" value="<?= $prefills["offer{$i}"] !== 0 ? $prefills["offer{$i}"] : '' ?>" min="0" max="9999">
+        <label for="offeryear<?= HtmlSanitizer::e($i) ?>" class="ibl-label ibl-label--sm">Yr <?= HtmlSanitizer::e($i) ?></label>
+        <input type="number" id="offeryear<?= HtmlSanitizer::e($i) ?>" class="ibl-input ibl-input--sm offer-salary-input" name="offeryear<?= HtmlSanitizer::e($i) ?>" value="<?= HtmlSanitizer::e($prefills["offer{$i}"] !== 0 ? $prefills["offer{$i}"] : '') ?>" min="0" max="9999">
     </div>
     <?php endfor; ?>
 </div>
@@ -162,9 +162,9 @@ class FreeAgencyFormComponents
         ob_start();
         ?>
 <form name="FAOffer" method="post" action="modules.php?name=FreeAgency&pa=processoffer" class="ibl-form--inline">
-    <?= $this->csrfHtml ?>
-    <?= $this->renderHiddenFields($offers, $offerType) ?>
-    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary"<?= $testIdAttr ?>><?= (int) $offers[$finalYear - 1] ?></button>
+    <?= HtmlSanitizer::trusted($this->csrfHtml) // @phpstan-ignore ibl.trustedVariable (pre-generated CSRF hidden-input HTML set by the caller via setCsrfHtml(); no request or DB data interpolated) ?>
+    <?= HtmlSanitizer::trusted($this->renderHiddenFields($offers, $offerType)) ?>
+    <button type="submit" class="ibl-btn ibl-btn--sm ibl-btn--primary"<?= HtmlSanitizer::trusted($testIdAttr) // @phpstan-ignore ibl.trustedVariable ($testIdAttr is built above from HtmlSanitizer::e($testId) wrapped in a data-testid attribute; no unescaped data) ?>><?= (int) $offers[$finalYear - 1] ?></button>
 </form>
         <?php
         return (string) ob_get_clean();
@@ -184,13 +184,13 @@ class FreeAgencyFormComponents
         // Offer years
         for ($i = 0; $i < count($offers); $i++) {
             $yearNum = $i + 1;
-            echo "<input type=\"hidden\" name=\"offeryear{$yearNum}\" value=\"" . $offers[$i] . "\">\n";
+            echo "<input type=\"hidden\" name=\"offeryear" . HtmlSanitizer::e($yearNum) . "\" value=\"" . HtmlSanitizer::e($offers[$i]) . "\">\n";
         }
 
         // Essential form data - uses player properties
         echo "<input type=\"hidden\" name=\"teamname\" value=\"" . HtmlSanitizer::e($this->teamName) . "\">\n";
         echo "<input type=\"hidden\" name=\"playerID\" value=\"" . (int) $this->player->getPlayerID() . "\">\n";
-        echo "<input type=\"hidden\" name=\"offerType\" value=\"" . $offerType . "\">\n";
+        echo "<input type=\"hidden\" name=\"offerType\" value=\"" . HtmlSanitizer::e($offerType) . "\">\n";
 
         return (string) ob_get_clean();
     }
@@ -257,11 +257,11 @@ class FreeAgencyFormComponents
             ];
         }
 
-        echo $this->renderButtonRow(
+        echo HtmlSanitizer::trusted($this->renderButtonRow(
             'Mid-Level Exception (click the button that corresponds to the final year you wish to offer):',
             $contractOfferConfigs,
             'quick-offer-mle'
-        );
+        ));
     }
 
     /**
@@ -278,11 +278,11 @@ class FreeAgencyFormComponents
             ],
         ];
 
-        echo $this->renderButtonRow(
+        echo HtmlSanitizer::trusted($this->renderButtonRow(
             'Lower-Level Exception:',
             $contractOfferConfigs,
             'quick-offer-lle'
-        );
+        ));
     }
 
     /**
@@ -299,11 +299,11 @@ class FreeAgencyFormComponents
             ],
         ];
 
-        echo $this->renderButtonRow(
+        echo HtmlSanitizer::trusted($this->renderButtonRow(
             'Veterans Exception:',
             $contractOfferConfigs,
             'quick-offer-vetmin'
-        );
+        ));
     }
 
     /**
@@ -330,7 +330,7 @@ class FreeAgencyFormComponents
             if ($testId !== '' && !$isSingleButton) {
                 $testId .= '-yr' . ($index + 1);
             }
-            echo $this->renderOfferButtonForm($config['offers'], $finalYear, $offerType, $testId);
+            echo HtmlSanitizer::trusted($this->renderOfferButtonForm($config['offers'], $finalYear, $offerType, $testId));
             ?>
         <?php endforeach; ?>
     </div>

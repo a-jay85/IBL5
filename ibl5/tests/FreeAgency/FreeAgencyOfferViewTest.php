@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\FreeAgency;
 
-use FreeAgency\FreeAgencyFormComponents;
+use FreeAgency\FreeAgencyFormView;
 use FreeAgency\FreeAgencyOfferView;
 use PHPUnit\Framework\TestCase;
 use Player\Player;
@@ -57,8 +57,8 @@ class FreeAgencyOfferViewTest extends TestCase
         $this->team->name = 'TestTeam';
         $this->team->teamid = 1;
 
-        $formComponents = new FreeAgencyFormComponents('TestTeam', $this->player);
-        $this->view = new FreeAgencyOfferView($formComponents);
+        $formView = new FreeAgencyFormView('TestTeam', $this->player);
+        $this->view = new FreeAgencyOfferView($formView);
     }
 
     /**

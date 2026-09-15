@@ -118,8 +118,8 @@ class FreeAgencyController
             }
         }
 
-        $formComponents = new FreeAgencyFormComponents($team->name, $negotiationData['player']);
-        $negotiationView = new FreeAgencyOfferView($formComponents);
+        $formView = new FreeAgencyFormView($team->name, $negotiationData['player']);
+        $negotiationView = new FreeAgencyOfferView($formView);
         $responder = new \Api\Response\HtmlResponder();
         $responder->html($negotiationView->render($negotiationData, $error));
         $responder->html('<script src="jslib/offer-salary-hints.js"></script>');

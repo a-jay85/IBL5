@@ -29,7 +29,6 @@ final class BanEchoInNonViewClassesRule implements Rule
         'SplitStats.php',
         'JsonResponder.php',
         'HtmlResponder.php',
-        'FreeAgencyFormComponents.php',
         'PlayerSeasonTableRenderer.php',
         'Contracts.php',
         'GenerateSeasonAwardsStep.php',

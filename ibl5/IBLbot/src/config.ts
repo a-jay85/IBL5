@@ -23,4 +23,9 @@ export const config = {
     express: {
         port: parseInt(process.env['EXPRESS_PORT'] ?? '50000', 10),
     },
+    planReview: {
+        // Optional by design: unset or empty disables the plan-review feature.
+        // requireEnv() would throw here and crash-loop the prod bot (see Architectural trade-offs).
+        ownerDiscordId: process.env['PLAN_REVIEW_OWNER_DISCORD_ID'] ?? '',
+    },
 } as const;

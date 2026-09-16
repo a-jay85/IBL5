@@ -82,8 +82,10 @@ export DM_ALL
 DM_STUB="$TMP/discord-dm"
 cat > "$DM_STUB" <<'DM_EOF'
 #!/usr/bin/env bash
-# Captures the composed message, ignoring the `-` (stdin) argument the runner passes.
-tee -a "$DM_ALL" > "$DM_LOG"
+# Captures argv (first line "ARGV: <args>") then stdin (the message or JSON body).
+# The argv line lets assertions check --route for the review path; stdin carries
+# the plain message on the plain path and the JSON payload on the review path.
+{ printf 'ARGV: %s\n' "$*"; cat; } | tee -a "$DM_ALL" > "$DM_LOG"
 # $DM_FAIL emulates an undeliverable DM: the real discord-dm spools and exits 1.
 [ -n "${DM_FAIL:-}" ] && exit 1
 exit 0
@@ -948,6 +950,116 @@ want    "T-9: SEAM-TIER-MARKER reaches output" "$TPRE_OUT" "SEAM-TIER-MARKER"
 want    "T-9: mismatch message printed"         "$TPRE_OUT" "TIER MISMATCH"
 want_no "T-9: no runner written"                "$TPRE_OUT" "runner:"
 preflight_cleanup "$TPRE_OUT"
+
+echo "── Phase 7: review-DM button assignments ──"
+
+# Phase 7 assertion 1 (two sites): check-plan-FAILED outcomes emit a discard-only
+# button and no queue button.
+# Mutation guard: if DM_REVIEW_BUTTONS were set to "queue discard" here, or
+# derived from DM_PLAN (which is live at both FAILED sites), a Queue button would
+# ship on a plan check-plan just rejected — defeating ADR-0096's only-path property.
+
+# :535 — primary check-plan FAILED (one-line stub plan always fails check-plan)
+out=$(run_case "$P" "PLAN_FILE: $P")
+want "P7/1a :535 discard button reaches DM" "$(dm)" "plan_discard_demo-slug"
+want_no "P7/1a :535 no queue button in DM" "$(dm)" "plan_queue_"
+
+# :669 — recovery check-plan FAILED
+out=$(run_case_recovery "$PARTIAL_DRAFT" demo-slug)
+want "P7/1b :669 discard button reaches DM" "$(dm)" "plan_discard_demo-slug"
+want_no "P7/1b :669 no queue button in DM" "$(dm)" "plan_queue_"
+
+# Phase 7 assertion 2+3: :526 (auto-queue-refusal) emits both queue and discard
+# buttons, and the call carries --route.
+# Mutation guard for assertion 2: if assignments were hoisted to :514 (inherited
+# from the check-plan-PASSED arm), the auto-queue-refusal case silently loses its
+# buttons — and that is one of the two triggers this feature exists for.
+# Mutation guard for assertion 3: without --route, the raw JSON payload goes to
+# /discordDM and the user receives a JSON blob instead of interactive buttons.
+out=$(DISP=--queue QUEUE_FAIL=1 STUB_PLAN_SRC="$GOOD_PLAN" run_case "$P" "PLAN_FILE: $P")
+want "P7/2 :526 queue button in DM" "$(dm)" "plan_queue_demo-slug"
+want "P7/2 :526 discard button in DM" "$(dm)" "plan_discard_demo-slug"
+want "P7/3 :526 --route arg in DM call" "$(dm)" "--route"
+
+# Phase 7 assertion 4: a plan file whose basename starts with _ fails PLAN_SLUG_RE;
+# the stub receives the plain `-` path (no --route) and no custom_id appears.
+# Mutation guard: deleting the PLAN_SLUG_RE guard would ship a malformed custom_id
+# (e.g. plan_discard__bad-plan) that the bot would reject or mishandle.
+P_INVALID="$PLANS/_bad-plan.md"
+out=$(STUB_PLAN_SRC="$GOOD_PLAN" run_case "$P_INVALID" "PLAN_FILE: $P_INVALID")
+want_no "P7/4 invalid slug: no --route in DM call" "$(dm)" "--route"
+want_no "P7/4 invalid slug: no plan_queue_ in DM" "$(dm)" "plan_queue_"
+want_no "P7/4 invalid slug: no plan_discard_ in DM" "$(dm)" "plan_discard_"
+
+# Phase 7 assertion 5: PLAN_NOW_REVIEW_ROUTE — unset and empty both fall back to
+# the pinned default route (/discordPlanReviewDM), never an empty route.
+# Mutation guard: ${PLAN_NOW_REVIEW_ROUTE-...} (no colon) would let an exported-but-
+# empty value through as an empty REVIEW_ROUTE, posting to the bot root instead.
+
+DRY_UNSET=$(unset PLAN_NOW_REVIEW_ROUTE; PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" \
+    PLAN_NOW_PLANS_DIR="$PLANS" PLAN_NOW_DISCORD_DM="$DM_STUB" \
+    PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" "$PLAN_NOW" --implement "$PROMPT" 2>&1)
+RUNNER_UNSET=$(printf '%s\n' "$DRY_UNSET" | sed -n 's/^  runner: //p')
+want "P7/5a REVIEW_ROUTE unset: default in runner" \
+    "$(cat "$RUNNER_UNSET" 2>/dev/null)" "discordPlanReviewDM"
+preflight_cleanup "$DRY_UNSET"
+
+DRY_EMPTY=$(PLAN_NOW_REVIEW_ROUTE='' PLAN_NOW_DRY_RUN=1 PLAN_NOW_CLAUDE="$STUB" \
+    PLAN_NOW_PLANS_DIR="$PLANS" PLAN_NOW_DISCORD_DM="$DM_STUB" \
+    PLAN_NOW_AUTOMOUSE_QUEUE="$QUEUE_STUB" "$PLAN_NOW" --implement "$PROMPT" 2>&1)
+RUNNER_EMPTY=$(printf '%s\n' "$DRY_EMPTY" | sed -n 's/^  runner: //p')
+want "P7/5b REVIEW_ROUTE empty: default in runner (not empty)" \
+    "$(cat "$RUNNER_EMPTY" 2>/dev/null)" "discordPlanReviewDM"
+preflight_cleanup "$DRY_EMPTY"
+
+# Phase 7 assertion 6: excluded outcomes have no review buttons.
+# rc != 0 (:504): DM_REVIEW_BUTTONS stays empty — review path never fires.
+# already-queued (:522): same — no buttons on a plan the queue already holds.
+# Mutation guard: hoisting DM_REVIEW_*= above the rc check or up to :514 would
+# cause a review DM to fire where none should; a Discard press on an already-queued
+# plan would move it while the automouse queue still holds a reference to it.
+
+out=$(STUB_RC=1 run_case "$P" "PLAN_FILE: $P")
+want_no "P7/6a rc!=0 (:504): no --route in DM call" "$(dm)" "--route"
+want_no "P7/6a rc!=0 (:504): no plan_queue_ in DM" "$(dm)" "plan_queue_"
+want_no "P7/6a rc!=0 (:504): no plan_discard_ in DM" "$(dm)" "plan_discard_"
+
+out=$(DISP=--queue STUB_PLAN_SRC="$GOOD_PLAN" run_case "$P" "PLAN_FILE: $P")
+want_no "P7/6b already-queued (:522): no plan_queue_ in DM" "$(dm)" "plan_queue_"
+want_no "P7/6b already-queued (:522): no plan_discard_ in DM" "$(dm)" "plan_discard_"
+
+echo "── Phase 7+8: CI-wiring assertion (Verification Matrix row 23) ──"
+
+# A harness cannot prove its own non-execution: if the CI step drifts, the
+# seam harness never runs and a self-check inside it never fires. This assertion
+# lives here — independently wired in bin/test-plan-now — so it fires when the
+# seam step breaks.
+# Source: phase 8 plan requirement, seam harness = bin/test-plan-review-seam.
+SEAM_HARNESS="$ROOT/bin/test-plan-review-seam"
+TESTS_YML="$ROOT/.github/workflows/tests.yml"
+
+# Part 1: CI workflow still wires the seam harness.
+if grep -q 'test-plan-review-seam' "$TESTS_YML" 2>/dev/null; then
+    ok "CI: tests.yml invokes bin/test-plan-review-seam"
+else
+    fail "CI: tests.yml does NOT invoke bin/test-plan-review-seam"
+fi
+
+# Parts 2+3: seam harness source carries the completion token and no SKIP GATE.
+# Not executed here — executing a sibling harness from inside this one would double
+# CI time and couple the two harnesses; grep on the source is sufficient and safe.
+# The completion token has the form: plan-review-seam: N assertions
+if grep -q 'plan-review-seam:' "$SEAM_HARNESS" 2>/dev/null; then
+    ok "seam harness: completion token prefix 'plan-review-seam:' found in source"
+else
+    fail "seam harness: completion token prefix 'plan-review-seam:' NOT found in source"
+fi
+
+if ! grep -q 'SKIP GATE' "$SEAM_HARNESS" 2>/dev/null; then
+    ok "seam harness: no SKIP GATE marker in source"
+else
+    fail "seam harness: SKIP GATE marker found in source — harness may be disabled"
+fi
 
 echo "── the coda still tells the model where to put it ──"
 

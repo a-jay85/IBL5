@@ -180,7 +180,8 @@ def prose_lines(text: str):
         j = 1
         while j < n and lines[j].strip() != "---":
             j += 1
-        i = j + 1
+        # If no closing --- found, skip only the opening line so the body is still checked.
+        i = j + 1 if j < n else 1
     in_fence = None
     in_comment = False
     while i < n:
@@ -463,18 +464,23 @@ def main(argv: list[str]) -> int:
     chat = False
     quiet = False
     self_test = False
-    it = iter(argv)
-    for arg in it:
+    argv = list(argv)
+    idx = 0
+    while idx < len(argv):
+        arg = argv[idx]; idx += 1
         if arg.startswith("--since="):
             since = arg.split("=", 1)[1]
         elif arg == "--since":
-            since = next(it, None)
+            since = argv[idx] if idx < len(argv) else None
+            idx += 1
         elif arg == "--files":
-            files.extend(list(it))
+            while idx < len(argv) and not argv[idx].startswith("--"):
+                files.append(argv[idx]); idx += 1
         elif arg == "--stdin":
             stdin = True
         elif arg == "--file":
-            label = next(it, label)
+            label = argv[idx] if idx < len(argv) else label
+            idx += 1
         elif arg == "--chat":
             chat = True
         elif arg == "--quiet":

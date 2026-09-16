@@ -23,9 +23,9 @@ prd_fixture() {
 }
 
 prd_run() {
-    PRD_OUT="$(PLAN_REVIEW_DIGEST_MAX_CHARS="" "$PRD_BIN" "$@" 2>/tmp/prd_err_tmp)"
+    PRD_OUT="$(PLAN_REVIEW_DIGEST_MAX_CHARS="" "$PRD_BIN" "$@" 2>"$SANDBOX/prd_err")"
     PRD_RC=$?
-    PRD_ERR="$(cat /tmp/prd_err_tmp)"
+    PRD_ERR="$(cat "$SANDBOX/prd_err")"
 }
 
 prd_expect_eq() {
@@ -339,22 +339,22 @@ prd_err_has "unknown option" "unknown flag stderr says unknown option"
 prd_run --max-chars 900 "$NEITHER"
 prd_expect_eq "NEG space form exits 2" 2 "$PRD_RC"
 
-PRD_OUT="$(PLAN_REVIEW_DIGEST_MAX_CHARS="" "$PRD_BIN" --max-chars=abc "$NEITHER" 2>/tmp/prd_err_tmp)"; PRD_RC=$?; PRD_ERR="$(cat /tmp/prd_err_tmp)"
+PRD_OUT="$(PLAN_REVIEW_DIGEST_MAX_CHARS="" "$PRD_BIN" --max-chars=abc "$NEITHER" 2>"$SANDBOX/prd_err")"; PRD_RC=$?; PRD_ERR="$(cat "$SANDBOX/prd_err")"
 prd_expect_eq "NEG non-numeric flag exits 2" 2 "$PRD_RC"
 prd_err_has "positive integer" "non-numeric flag stderr mentions positive integer"
 
-PRD_OUT="$(PLAN_REVIEW_DIGEST_MAX_CHARS=xyz "$PRD_BIN" "$NEITHER" 2>/tmp/prd_err_tmp)"; PRD_RC=$?; PRD_ERR="$(cat /tmp/prd_err_tmp)"
+PRD_OUT="$(PLAN_REVIEW_DIGEST_MAX_CHARS=xyz "$PRD_BIN" "$NEITHER" 2>"$SANDBOX/prd_err")"; PRD_RC=$?; PRD_ERR="$(cat "$SANDBOX/prd_err")"
 prd_expect_eq "NEG non-numeric env exits 2" 2 "$PRD_RC"
 
 prd_run --max-chars=50 "$NEITHER"
 prd_expect_eq "NEG below minimum exits 2" 2 "$PRD_RC"
 prd_err_has ">= 200" "below-minimum stderr mentions >= 200"
 
-PRD_OUT="$(env -u PLAN_REVIEW_DIGEST_MAX_CHARS "$PRD_BIN" "$NEITHER" 2>/tmp/prd_err_tmp)"; PRD_RC=$?; PRD_ERR="$(cat /tmp/prd_err_tmp)"
+PRD_OUT="$(env -u PLAN_REVIEW_DIGEST_MAX_CHARS "$PRD_BIN" "$NEITHER" 2>"$SANDBOX/prd_err")"; PRD_RC=$?; PRD_ERR="$(cat "$SANDBOX/prd_err")"
 prd_expect_eq "NEG env unset exits 0" 0 "$PRD_RC"
 OUT_UNSET="$PRD_OUT"
 
-PRD_OUT="$(PLAN_REVIEW_DIGEST_MAX_CHARS="" "$PRD_BIN" "$NEITHER" 2>/tmp/prd_err_tmp)"; PRD_RC=$?; PRD_ERR="$(cat /tmp/prd_err_tmp)"
+PRD_OUT="$(PLAN_REVIEW_DIGEST_MAX_CHARS="" "$PRD_BIN" "$NEITHER" 2>"$SANDBOX/prd_err")"; PRD_RC=$?; PRD_ERR="$(cat "$SANDBOX/prd_err")"
 prd_expect_eq "NEG env empty exits 0" 0 "$PRD_RC"
 if [ "$PRD_OUT" = "$OUT_UNSET" ]; then
     prd_ok "env unset vs empty produce identical output"
@@ -362,7 +362,7 @@ else
     prd_fail "env unset vs empty should produce identical output"
 fi
 
-PRD_OUT="$(PLAN_REVIEW_DIGEST_MAX_CHARS=1500 "$PRD_BIN" --max-chars=400 "$NEITHER" 2>/tmp/prd_err_tmp)"; PRD_RC=$?; PRD_ERR="$(cat /tmp/prd_err_tmp)"
+PRD_OUT="$(PLAN_REVIEW_DIGEST_MAX_CHARS=1500 "$PRD_BIN" --max-chars=400 "$NEITHER" 2>"$SANDBOX/prd_err")"; PRD_RC=$?; PRD_ERR="$(cat "$SANDBOX/prd_err")"
 prd_expect_eq "NEG flag beats env exits 0" 0 "$PRD_RC"
 
 prd_run /nonexistent/plan.md
@@ -570,9 +570,9 @@ fi
 
 SEAM_BIN="$(cd "$(dirname "$0")" && pwd)/test-plan-review-seam"
 
-"$SEAM_BIN" > /tmp/seam_out 2>&1
+"$SEAM_BIN" > "$SANDBOX/seam_out" 2>&1
 prd_expect_eq "skip exits clean" 0 "$?"
-SEAM_OUT="$(cat /tmp/seam_out)"
+SEAM_OUT="$(cat "$SANDBOX/seam_out")"
 
 if printf '%s' "$SEAM_OUT" | grep -qE '^SKIP'; then
     prd_ok "skip names the unit: stdout begins with SKIP"

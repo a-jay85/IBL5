@@ -6,7 +6,7 @@
 # Usage:
 #   bin/backlog search <term>            gh issue list --search "<term>"
 #   bin/backlog open [<label>]           gh issue list --state open [--label <label>]
-#   bin/backlog new <label> <title>      gh issue create --label <label> --title "<title>"
+#   bin/backlog new <label> <title>      gh issue create --label <label> --title "<title>" --body ""
 #   bin/backlog close <n> <reason>       gh issue close <n> -c "<reason>"
 #
 # Flags (must precede subcommand):

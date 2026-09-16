@@ -33,7 +33,7 @@ want "--dry-run new: gh issue create" "$OUT" "gh issue create"
 want "--dry-run new: repo flag" "$OUT" "--repo a-jay85/IBL5-backlog"
 want "--dry-run new: label flag" "$OUT" "--label ci"
 # `gh issue create` aborts non-interactively unless --body is passed alongside
-# --title, so headless callers (automouse, /post-plan) need it present.
+# --title, so headless callers (/pr-ready Phase 6.5, /fix-and-prevent) need it present.
 want "--dry-run new: body flag present (headless-safe)" "$OUT" "--body"
 
 # Case 3: unknown subcommand exits non-zero

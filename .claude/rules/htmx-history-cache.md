@@ -78,4 +78,4 @@ gate) and why enforcement here is a rule doc plus review rather than a gate.
 
 ## PageCache & HTMX Response Headers
 
-**Non-boosted HTMX requests (`op=api` partials) must bypass PageCache.** The file-based cache stores only the HTML body — custom response headers (`HX-Push-Url`, `HX-Redirect`, `HX-Trigger`) are lost, causing `htmx` pushState to silently fail. The `$isHtmxPartial` guard in `ibl5/modules/modules.php` (example) handles this globally. Module `index.php` files that bypass `modules.php` must handle it themselves.
+**Non-boosted HTMX requests (`op=api` partials) must bypass PageCache.** The file-based cache stores only the HTML body — custom response headers (`HX-Push-Url`, `HX-Redirect`, `HX-Trigger`) are lost, causing `htmx` pushState to silently fail. The `$isHtmxPartial` guard in `ibl5/modules.php` handles this globally. Module `index.php` files that bypass `modules.php` must handle it themselves.

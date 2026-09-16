@@ -1,6 +1,6 @@
 ---
 description: /pr-ready runtime Phase 6.5 — fix every Phase 6 finding in-PR, commit, re-push, re-arm CI. Loaded by SKILL.md via git show at Phase 6.5.
-last_verified: 2026-09-08
+last_verified: 2026-09-16
 ---
 
 # /pr-ready runtime Phase 6.5 — in-PR remediation
@@ -29,7 +29,7 @@ Every Phase 6 finding gets fixed and its prevention filed, in this PR's existing
 
 4. **Reconcile the PR body Scope with the real diff, then commit — exactly one.** Step 2 already proved the tree carried nothing but this phase's own edits.
 
-   **Before committing**, run `git diff --numstat HEAD` and compare it against every explicit **file count, line count, or diff stat** written in the PR body's hand-authored Scope prose. Step 3's remediation routinely adds files and expands test cases past the plan's estimates, so a Scope written at Phase 4 is stale by default here. Any number the numstat contradicts gets corrected in the body via `gh pr edit` **in this step** — not deferred to Phase 7, which posts a comment and never touches the body. This is the 6d.4 "PR body vs. reality" check applied to this phase's own output; leaving it stale re-creates the exact blocking finding Phase 6 just cleared. The machine-generated `<!-- files-changed:begin -->` block is out of scope — Phase 5.9 owns it.
+   **Before committing**, run `git diff --numstat HEAD` and compare it against every explicit **file count, line count, or diff stat** written in the PR body's hand-authored Scope prose. Step 3's remediation routinely adds files and expands test cases past the plan's estimates, so a Scope written at Phase 4 is stale by default here. Any number the numstat contradicts gets corrected in the body via `gh pr edit` **in this step** — not deferred to Phase 7, which posts a comment and never touches the body. This is the 6d.4 "PR body vs. reality" check applied to this phase's own output; leaving it stale re-creates the exact blocking finding Phase 6 just cleared. Before writing the body: `Read .claude/skills/post-plan/_pr-body-claims.md` to apply the negative-claim re-check and the files-changed block rules. The machine-generated `<!-- files-changed:begin -->` block is out of scope — Phase 5.9 owns it.
 
    `git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/commit.sh > /tmp/pr-ready-commit-<N>.sh && test -s /tmp/pr-ready-commit-<N>.sh && bash /tmp/pr-ready-commit-<N>.sh <N> <slug>`
 

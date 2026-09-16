@@ -48,6 +48,16 @@ esac
 GUARD_EOF
 chmod +x "$TMP/stub-guard"
 
+# Symlink-aware: `-e` is false for a dangling symlink, so assert_absent would
+# pass on an un-reaped tombstone. This one also fails on a leftover dangler.
+assert_gone() {
+    local label=$1 path=$2
+    if [ -e "$path" ] || [ -L "$path" ]; then
+        echo "FAIL: $label — expected gone (incl. dangling symlink): $path"
+        FAILED=1
+    fi
+}
+
 run_heal() {
     NIGHTLY_DIR="$NDIR" PLANS_DIR="$PDIR" STALENESS_GUARD="$TMP/stub-guard" "$SCRIPT" "$@"
 }
@@ -146,6 +156,67 @@ assert_absent  "row6 attempts gone"         "$NDIR/skipped/plan-fresh-clean.md.a
 assert_absent  "row6 staleness gone"        "$NDIR/skipped/plan-fresh-clean.md.staleness"
 assert_present "row6 queued"                "$NDIR/queue/plan-fresh-clean.md"
 echo "ok: row6 — CLEANUP sidecars evicted"
+
+# ---------------------------------------------------------------------------
+# Row 7 — TOMBSTONE (real): plan deleted from PLANS_DIR leaves a dangling
+# symlink. Pre-fix, `[ -e "$f" ] || continue` skipped it silently forever.
+# ---------------------------------------------------------------------------
+setup
+ln -s "$PDIR/plan-deleted.md" "$NDIR/skipped/plan-deleted.md"   # target never created
+touch "$NDIR/skipped/plan-deleted.md.staleness"
+touch "$NDIR/skipped/plan-deleted.md.attempts"
+out=$(run_heal 2>&1)
+assert_gone "row7 dangling symlink reaped" "$NDIR/skipped/plan-deleted.md"
+assert_gone "row7 staleness reaped"        "$NDIR/skipped/plan-deleted.md.staleness"
+assert_gone "row7 attempts reaped"         "$NDIR/skipped/plan-deleted.md.attempts"
+assert_gone   "row7 not requeued"          "$NDIR/queue/plan-deleted.md"
+if ! echo "$out" | grep -q "reaped tombstone: plan-deleted.md"; then
+    echo "FAIL: row7 — expected 'reaped tombstone' in output, got: $out"
+    FAILED=1
+fi
+if ! echo "$out" | grep -q "1 tombstone(s) reaped"; then
+    echo "FAIL: row7 — expected tombstone count in summary, got: $out"
+    FAILED=1
+fi
+echo "ok: row7 — TOMBSTONE reaped"
+
+# ---------------------------------------------------------------------------
+# Row 8 — TOMBSTONE (dry-run): reported, nothing removed.
+# ---------------------------------------------------------------------------
+setup
+ln -s "$PDIR/plan-deleted-dry.md" "$NDIR/skipped/plan-deleted-dry.md"
+touch "$NDIR/skipped/plan-deleted-dry.md.staleness"
+out=$(run_heal --dry-run 2>&1)
+if [ ! -L "$NDIR/skipped/plan-deleted-dry.md" ]; then
+    echo "FAIL: row8 — dry-run must leave the dangling symlink in place"
+    FAILED=1
+fi
+assert_present "row8 marker still present" "$NDIR/skipped/plan-deleted-dry.md.staleness"
+if ! echo "$out" | grep -q "would reap tombstone: plan-deleted-dry.md"; then
+    echo "FAIL: row8 — expected 'would reap tombstone' in output, got: $out"
+    FAILED=1
+fi
+if ! echo "$out" | grep -q "1 tombstone(s) would be reaped"; then
+    echo "FAIL: row8 — expected tombstone count in dry-run summary, got: $out"
+    FAILED=1
+fi
+echo "ok: row8 — TOMBSTONE dry-run"
+
+# ---------------------------------------------------------------------------
+# Row 9 — TOMBSTONE (no staleness marker): a tombstone with no sidecar is
+# reaped regardless of skip reason — verifies the reap block fires before the
+# marker gate, not just when a .staleness file is present.
+# ---------------------------------------------------------------------------
+setup
+ln -s "$PDIR/plan-no-marker.md" "$NDIR/skipped/plan-no-marker.md"   # dangling, no .staleness
+out=$(run_heal 2>&1)
+assert_gone "row9 dangling symlink reaped" "$NDIR/skipped/plan-no-marker.md"
+assert_absent "row9 not requeued"          "$NDIR/queue/plan-no-marker.md"
+if ! echo "$out" | grep -q "reaped tombstone: plan-no-marker.md"; then
+    echo "FAIL: row9 — expected 'reaped tombstone' in output, got: $out"
+    FAILED=1
+fi
+echo "ok: row9 — TOMBSTONE reaped regardless of skip reason"
 
 # ---------------------------------------------------------------------------
 if [ "$FAILED" -ne 0 ]; then

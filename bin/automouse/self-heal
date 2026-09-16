@@ -6,8 +6,13 @@
 #   bin/automouse/self-heal           # requeue eligible plans
 #   bin/automouse/self-heal --dry-run # preview without acting
 #
-# Only plans carrying a <plan>.md.staleness sidecar marker are eligible —
-# ambiguity / poison-pill skips are never recovered (already-merged plans go to done/, not skipped/).
+# Only plans carrying a <plan>.md.staleness sidecar marker are eligible for
+# *recovery* — ambiguity / poison-pill skips are never requeued (already-merged
+# plans go to done/, not skipped/).
+#
+# Tombstone reaping is separate and runs BEFORE that marker gate: a skipped/
+# entry whose plan file left PLANS_DIR is dead regardless of why it was skipped,
+# so it is deleted, not recovered. Reaping never requeues anything.
 
 set -u
 
@@ -27,6 +32,7 @@ DRY_RUN=0
 
 healed=0
 still_stale=0
+tombstones=0
 healed_names_file="$(mktemp)"
 trap 'rm -f "$healed_names_file"' EXIT
 
@@ -90,10 +96,27 @@ if ! ls "$SKIPPED_DIR"/*.md >/dev/null 2>&1; then
 fi
 
 for f in "$SKIPPED_DIR"/*.md; do
-    [ -e "$f" ] || continue
+    [ -e "$f" ] || [ -L "$f" ] || continue        # no matches -> literal glob
 
     name="$(basename "$f")"
     marker="$SKIPPED_DIR/${name}.staleness"
+
+    # Tombstone reap: the plan file left PLANS_DIR (deleted, or renamed by a
+    # re-plan), leaving a dangling symlink here. `-e` dereferences, so the old
+    # bare `[ -e "$f" ] || continue` silently skipped these forever -- never
+    # healed, never counted as still-stale, never named in any output. Reap
+    # them, using the same sidecar list bin/automouse/queue evicts.
+    if [ -L "$f" ] && [ ! -e "$f" ]; then
+        if [ "$DRY_RUN" -eq 1 ]; then
+            echo "would reap tombstone: $name (plan no longer in $PLANS_DIR)"
+        else
+            rm -f "$f" "$marker" "$SKIPPED_DIR/${name}.attempts" \
+                  "$SKIPPED_DIR/${name}.failure" "$SKIPPED_DIR/${name}.cap-refunds"
+            echo "reaped tombstone: $name (plan no longer in $PLANS_DIR)"
+        fi
+        tombstones=$((tombstones + 1))
+        continue
+    fi
 
     # Core safety gate: only staleness-marked skips are eligible.
     [ -f "$marker" ] || continue
@@ -126,7 +149,7 @@ for f in "$SKIPPED_DIR"/*.md; do
 done
 
 if [ "$DRY_RUN" -eq 1 ]; then
-    echo "self-heal (dry-run): $healed would heal, $still_stale still stale. No changes made."
+    echo "self-heal (dry-run): $healed would heal, $still_stale still stale, $tombstones tombstone(s) would be reaped. No changes made."
     exit 0
 fi
 
@@ -144,5 +167,5 @@ if [ "$healed" -gt 0 ]; then
     } > "$report"
 fi
 
-echo "self-heal: $healed plan(s) recovered, $still_stale still stale."
+echo "self-heal: $healed plan(s) recovered, $still_stale still stale, $tombstones tombstone(s) reaped."
 exit 0

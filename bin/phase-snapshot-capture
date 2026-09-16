@@ -1,0 +1,185 @@
+#!/usr/bin/env bash
+# Usage: bin/phase-snapshot-capture
+# Captures one prod DB snapshot per season phase, on entry into that phase.
+# Runs ON the prod host (shipped + invoked by .github/workflows/db-backup.yml).
+# Env: SNAP_DIR REMOTE_DATABASE LEAGUE DUMPER RETAIN_SEASONS DRY_RUN
+#      PHASE_OVERRIDE SEASON_OVERRIDE (test seams)
+# The snapshot inherits bin/rehearsal-prod-dump's sampling: rows with
+# season_year < MAX(season_year)-1 are excluded from ibl_box_scores,
+# ibl_box_scores_teams, ibl_plr_snapshots, and ibl_plb_snapshots.
+# A phase snapshot is accurate for the current and previous season; older-season
+# comparisons may miss data in those four tables.
+set -euo pipefail
+
+SNAP_DIR="${SNAP_DIR:-$HOME/backups/db/phase-snapshots}"
+REMOTE_DATABASE="${REMOTE_DATABASE:-iblhoops_ibl5}"
+LEAGUE="${LEAGUE:-ibl}"
+DUMPER="${DUMPER:-$HOME/.phase-snapshot/rehearsal-prod-dump}"
+RETAIN_SEASONS="${RETAIN_SEASONS:-2}"
+DRY_RUN="${DRY_RUN:-0}"
+PHASE_OVERRIDE="${PHASE_OVERRIDE:-}"
+SEASON_OVERRIDE="${SEASON_OVERRIDE:-}"
+
+# Step 1: Defaults + guard
+mkdir -p "$SNAP_DIR"
+if git -C "$SNAP_DIR" rev-parse --show-toplevel >/dev/null 2>&1; then
+    echo "ERROR: SNAP_DIR '$SNAP_DIR' is inside a git work tree; snapshots must live outside the repo" >&2
+    exit 1
+fi
+
+# Step 2: Read phase + season
+if [ -n "$PHASE_OVERRIDE" ]; then
+    CURRENT_PHASE="$PHASE_OVERRIDE"
+    SEASON="${SEASON_OVERRIDE:-}"
+else
+    CURRENT_PHASE="$(mysql -N -e "SELECT value FROM \`ibl_settings\` WHERE setting_key = 'Current Season Phase' AND league = '$LEAGUE'" "$REMOTE_DATABASE")"
+    SEASON="$(mysql -N -e "SELECT value FROM \`ibl_settings\` WHERE setting_key = 'Current Season Ending Year' AND league = '$LEAGUE'" "$REMOTE_DATABASE")"
+fi
+
+if [ -z "$CURRENT_PHASE" ]; then
+    echo "ERROR: could not read current season phase from ibl_settings" >&2
+    exit 1
+fi
+if [ -z "$SEASON" ]; then
+    echo "ERROR: could not read current season ending year from ibl_settings" >&2
+    exit 1
+fi
+
+# Step 3: Slug — lowercase, spaces to hyphens, strip non-alnum-hyphen, collapse repeats
+PHASE_SLUG="$(printf '%s' "$CURRENT_PHASE" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | sed 's/[^a-z0-9-]//g' | sed 's/--*/-/g')"
+if [ -z "$PHASE_SLUG" ]; then
+    echo "ERROR: phase slug is empty after normalization (phase: '$CURRENT_PHASE')" >&2
+    exit 1
+fi
+
+# Step 4: Two idempotency gates
+LAST_PHASE_FILE="$SNAP_DIR/.last-phase"
+FINAL="$SNAP_DIR/${SEASON}-${PHASE_SLUG}.sql.gz"
+
+GATE1_OPEN=1
+if [ -f "$LAST_PHASE_FILE" ]; then
+    LAST_CONTENT="$(cat "$LAST_PHASE_FILE")"
+    if [ "$LAST_CONTENT" = "${SEASON}|${CURRENT_PHASE}" ]; then
+        GATE1_OPEN=0
+    fi
+fi
+
+GATE2_OPEN=1
+if [ -f "$FINAL" ]; then
+    GATE2_OPEN=0
+fi
+
+if [ "$GATE1_OPEN" = "0" ] || [ "$GATE2_OPEN" = "0" ]; then
+    echo "no capture needed: $SEASON $CURRENT_PHASE"
+    exit 0
+fi
+
+# Pre-compute retention victims, including the not-yet-written FINAL so the count is right
+TUPLES=""
+for f in "$SNAP_DIR"/*.sql.gz; do
+    [ -f "$f" ] || continue
+    bn="$(basename "$f")"
+    case "$bn" in
+        [0-9][0-9][0-9][0-9]-*.sql.gz)
+            s="${bn%%-*}"
+            rest="${bn%.sql.gz}"
+            g="${rest#*-}"
+            TUPLES="${TUPLES}${g} ${s} ${f}
+"
+            ;;
+    esac
+done
+TUPLES="${TUPLES}${PHASE_SLUG} ${SEASON} ${FINAL}
+"
+
+VICTIM_LIST=""
+if [ -n "$TUPLES" ]; then
+    VICTIM_LIST="$(printf '%s' "$TUPLES" | grep -v '^[[:space:]]*$' | sort -k1,1 -k2,2n | awk -v retain="$RETAIN_SEASONS" '
+        {
+            slug=$1; path=$3
+            if (slug != prev_slug) {
+                if (prev_slug != "") {
+                    for (i = 1; i <= n - retain; i++) print grp[i]
+                }
+                prev_slug=slug; n=0
+                delete grp
+            }
+            n++; grp[n]=path
+        }
+        END {
+            for (i = 1; i <= n - retain; i++) print grp[i]
+        }
+    ' 2>/dev/null || true)"
+    # Remove the not-yet-existing FINAL from victims (it doesn't exist until after capture)
+    if [ -n "$VICTIM_LIST" ]; then
+        VICTIM_LIST="$(printf '%s\n' "$VICTIM_LIST" | grep -v "^${FINAL}$" || true)"
+    fi
+fi
+
+# Step 8: DRY_RUN=1 short-circuits here — print verdict and planned actions, touch nothing
+if [ "$DRY_RUN" = "1" ]; then
+    echo "would capture: $FINAL"
+    if [ -n "$VICTIM_LIST" ]; then
+        echo "retention victims:"
+        while IFS= read -r v; do
+            [ -n "$v" ] && echo "  $v"
+        done <<< "$VICTIM_LIST"
+    else
+        echo "retention: no victims"
+    fi
+    exit 0
+fi
+
+# Step 5: Capture, tmp-first
+TMP="${FINAL}.tmp"
+trap 'rm -f "$TMP"' EXIT
+
+REMOTE_DATABASE="$REMOTE_DATABASE" bash "$DUMPER" | gzip -9 > "$TMP"
+
+if ! gunzip -t "$TMP" 2>/dev/null; then
+    echo "ERROR: gzip integrity check failed on captured snapshot" >&2
+    exit 1
+fi
+
+BYTE_SIZE="$(stat -c %s "$TMP" 2>/dev/null || stat -f %z "$TMP")"
+MIN_BYTES=1048576
+if [ "$BYTE_SIZE" -lt "$MIN_BYTES" ]; then
+    echo "ERROR: captured snapshot is only ${BYTE_SIZE} bytes (min ${MIN_BYTES}); dumper may have failed" >&2
+    exit 1
+fi
+
+mv "$TMP" "$FINAL"
+trap - EXIT
+
+# Step 6: Sidecar JSON, then .last-phase — ordering is load-bearing
+CAPTURED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+SHA256_RAW="$(shasum -a 256 "$FINAL" 2>/dev/null || sha256sum "$FINAL")"
+SHA256="$(printf '%s' "$SHA256_RAW" | awk '{print $1}')"
+
+SIDECAR="${FINAL%.sql.gz}.json"
+cat > "$SIDECAR" <<SIDECAR_EOF
+{
+  "season": "$SEASON",
+  "phase": "$CURRENT_PHASE",
+  "phase_slug": "$PHASE_SLUG",
+  "captured_at": "$CAPTURED_AT",
+  "bytes": $BYTE_SIZE,
+  "sha256": "$SHA256",
+  "source": "bin/rehearsal-prod-dump",
+  "sampling_note": "Rows with season_year < MAX(season_year)-1 are excluded from ibl_box_scores, ibl_box_scores_teams, ibl_plr_snapshots, and ibl_plb_snapshots. A phase snapshot is accurate for the current and previous season; older-season comparisons may miss data in those four tables."
+}
+SIDECAR_EOF
+
+# Write .last-phase LAST — after mv and sidecar (ordering is load-bearing: a mid-dump
+# failure must never permanently mark the phase captured)
+printf '%s|%s' "$SEASON" "$CURRENT_PHASE" > "$LAST_PHASE_FILE"
+
+# Step 7: Retention — delete oldest beyond RETAIN_SEASONS per slug
+if [ -n "$VICTIM_LIST" ]; then
+    while IFS= read -r f; do
+        [ -n "$f" ] || continue
+        rm -f "$f" "${f%.sql.gz}.json"
+    done <<< "$VICTIM_LIST"
+fi
+
+echo "captured: $FINAL ($BYTE_SIZE bytes)"

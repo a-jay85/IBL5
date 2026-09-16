@@ -1,0 +1,692 @@
+#!/usr/bin/env bash
+# bin/test-phase-snapshot-detect — harness for bin/phase-snapshot-capture detection,
+# retention, failure paths, pull script rejections, bin/db-sync-prod --snapshot flag,
+# and bin/wt-up parser conversion. Run: bin/test-phase-snapshot-detect (exit 0 = all pass)
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+FAILED=0
+ok()   { echo "ok: $1"; }
+fail() { echo "FAIL: $1 — $2"; FAILED=1; }
+
+CAPTURE="$SCRIPT_DIR/phase-snapshot-capture"
+
+# Good stub: base64 of random — barely compresses, gzip output clears 1 MiB floor
+GOOD_STUB="$TMP/stub-good"
+cat > "$GOOD_STUB" <<'STUB_EOF'
+#!/usr/bin/env bash
+dd if=/dev/urandom bs=1024 count=1600 2>/dev/null | base64
+STUB_EOF
+chmod +x "$GOOD_STUB"
+
+# Failing stub: emits bytes then exits 1 — tests that pipefail rejects a partial stream
+FAIL_STUB="$TMP/stub-fail"
+cat > "$FAIL_STUB" <<'STUB_EOF'
+#!/usr/bin/env bash
+dd if=/dev/urandom bs=1 count=200 2>/dev/null
+exit 1
+STUB_EOF
+chmod +x "$FAIL_STUB"
+
+# Small stub: exits 0 but emits < 1 MiB of data — tests undersize rejection
+SMALL_STUB="$TMP/stub-small"
+cat > "$SMALL_STUB" <<'STUB_EOF'
+#!/usr/bin/env bash
+echo "small dump"
+STUB_EOF
+chmod +x "$SMALL_STUB"
+
+# ---------------------------------------------------------------------------
+# Phase 1 / Phase 2 core cases
+# ---------------------------------------------------------------------------
+
+test_no_capture_when_phase_unchanged() {
+    local snaps="$TMP/snap1"
+    # First capture
+    SNAP_DIR="$snaps" PHASE_OVERRIDE="Regular Season" SEASON_OVERRIDE="2025" \
+        DUMPER="$GOOD_STUB" "$CAPTURE" >/dev/null 2>&1
+    local before
+    before="$(cat "$snaps/.last-phase")"
+    local count_before
+    count_before="$(find "$snaps" -name '*.sql.gz' | wc -l | tr -d ' ')"
+
+    # Second run — same phase — must skip
+    local out
+    out="$(SNAP_DIR="$snaps" PHASE_OVERRIDE="Regular Season" SEASON_OVERRIDE="2025" \
+        DUMPER="$GOOD_STUB" "$CAPTURE" 2>&1)"
+    if grep -qF 'no capture needed' <<< "$out"; then
+        ok "test_no_capture_when_phase_unchanged — skip printed"
+    else
+        fail "test_no_capture_when_phase_unchanged" "expected 'no capture needed', got: $out"
+    fi
+    local after
+    after="$(cat "$snaps/.last-phase")"
+    if [ "$before" = "$after" ]; then
+        ok "test_no_capture_when_phase_unchanged — .last-phase unchanged"
+    else
+        fail "test_no_capture_when_phase_unchanged" ".last-phase changed: '$before' → '$after'"
+    fi
+    local count_after
+    count_after="$(find "$snaps" -name '*.sql.gz' | wc -l | tr -d ' ')"
+    if [ "$count_before" = "$count_after" ]; then
+        ok "test_no_capture_when_phase_unchanged — no new .sql.gz"
+    else
+        fail "test_no_capture_when_phase_unchanged" "unexpected new .sql.gz file"
+    fi
+}
+
+test_capture_when_phase_changed() {
+    local snaps="$TMP/snap2"
+    mkdir -p "$snaps"
+    printf '2025|Old Phase' > "$snaps/.last-phase"
+
+    SNAP_DIR="$snaps" PHASE_OVERRIDE="Regular Season" SEASON_OVERRIDE="2025" \
+        DUMPER="$GOOD_STUB" "$CAPTURE" >/dev/null 2>&1
+
+    if [ -f "$snaps/2025-regular-season.sql.gz" ]; then
+        ok "test_capture_when_phase_changed — .sql.gz written"
+    else
+        fail "test_capture_when_phase_changed" "2025-regular-season.sql.gz not found"
+    fi
+    if [ -f "$snaps/2025-regular-season.json" ]; then
+        ok "test_capture_when_phase_changed — .json sidecar written"
+    else
+        fail "test_capture_when_phase_changed" "2025-regular-season.json not found"
+    fi
+    local last
+    last="$(cat "$snaps/.last-phase")"
+    if [ "$last" = "2025|Regular Season" ]; then
+        ok "test_capture_when_phase_changed — .last-phase updated"
+    else
+        fail "test_capture_when_phase_changed" ".last-phase is '$last'"
+    fi
+}
+
+test_capture_on_first_run_no_sidecar() {
+    local snaps="$TMP/snap3"
+    mkdir -p "$snaps"
+    # No .last-phase — gate 1 open on absence
+
+    SNAP_DIR="$snaps" PHASE_OVERRIDE="Playoffs" SEASON_OVERRIDE="2025" \
+        DUMPER="$GOOD_STUB" "$CAPTURE" >/dev/null 2>&1
+
+    if [ -f "$snaps/2025-playoffs.sql.gz" ]; then
+        ok "test_capture_on_first_run_no_sidecar — capture happened"
+    else
+        fail "test_capture_on_first_run_no_sidecar" "expected 2025-playoffs.sql.gz, not found"
+    fi
+}
+
+test_no_recapture_when_target_exists() {
+    local snaps="$TMP/snap4"
+    # First capture to create the .sql.gz
+    SNAP_DIR="$snaps" PHASE_OVERRIDE="Playoffs" SEASON_OVERRIDE="2025" \
+        DUMPER="$GOOD_STUB" "$CAPTURE" >/dev/null 2>&1
+
+    # Delete .last-phase — gate 1 opens, but gate 2 should hold (file exists)
+    rm -f "$snaps/.last-phase"
+
+    local out
+    out="$(SNAP_DIR="$snaps" PHASE_OVERRIDE="Playoffs" SEASON_OVERRIDE="2025" \
+        DUMPER="$GOOD_STUB" "$CAPTURE" 2>&1)"
+    if grep -qF 'no capture needed' <<< "$out"; then
+        ok "test_no_recapture_when_target_exists — gate 2 held"
+    else
+        fail "test_no_recapture_when_target_exists" "expected skip, got: $out"
+    fi
+}
+
+test_failed_dump_leaves_no_artifacts() {
+    local snaps="$TMP/snap5"
+    mkdir -p "$snaps"
+
+    local rc=0
+    SNAP_DIR="$snaps" PHASE_OVERRIDE="Regular Season" SEASON_OVERRIDE="2025" \
+        DUMPER="$FAIL_STUB" "$CAPTURE" >/dev/null 2>&1 || rc="$?"
+
+    if [ "$rc" -ne 0 ]; then
+        ok "test_failed_dump_leaves_no_artifacts — exits 1"
+    else
+        fail "test_failed_dump_leaves_no_artifacts" "expected non-zero exit, got 0"
+    fi
+    if [ ! -f "$snaps/2025-regular-season.sql.gz" ]; then
+        ok "test_failed_dump_leaves_no_artifacts — no .sql.gz left"
+    else
+        fail "test_failed_dump_leaves_no_artifacts" ".sql.gz unexpectedly present"
+    fi
+    if [ ! -f "$snaps/2025-regular-season.sql.gz.tmp" ]; then
+        ok "test_failed_dump_leaves_no_artifacts — no .tmp left"
+    else
+        fail "test_failed_dump_leaves_no_artifacts" ".tmp unexpectedly present"
+    fi
+    if [ ! -f "$snaps/.last-phase" ]; then
+        ok "test_failed_dump_leaves_no_artifacts — .last-phase not created"
+    else
+        fail "test_failed_dump_leaves_no_artifacts" ".last-phase unexpectedly present"
+    fi
+}
+
+test_undersize_dump_rejected() {
+    local snaps="$TMP/snap6"
+    mkdir -p "$snaps"
+
+    local rc=0
+    SNAP_DIR="$snaps" PHASE_OVERRIDE="Regular Season" SEASON_OVERRIDE="2025" \
+        DUMPER="$SMALL_STUB" "$CAPTURE" >/dev/null 2>&1 || rc="$?"
+
+    if [ "$rc" -ne 0 ]; then
+        ok "test_undersize_dump_rejected — exits 1"
+    else
+        fail "test_undersize_dump_rejected" "expected non-zero exit, got 0"
+    fi
+    if [ ! -f "$snaps/2025-regular-season.sql.gz" ]; then
+        ok "test_undersize_dump_rejected — .sql.gz absent"
+    else
+        fail "test_undersize_dump_rejected" ".sql.gz unexpectedly present"
+    fi
+}
+
+test_retention_keeps_newest_two_seasons_per_slug() {
+    local snaps="$TMP/snap7"
+    mkdir -p "$snaps"
+    # Pre-create 2023 and 2024 files (any content; retention uses filename only)
+    touch "$snaps/2023-regular-season.sql.gz" "$snaps/2023-regular-season.json"
+    touch "$snaps/2024-regular-season.sql.gz" "$snaps/2024-regular-season.json"
+    printf '2024|Old Phase' > "$snaps/.last-phase"
+
+    # Capture 2025 — retention should evict 2023
+    SNAP_DIR="$snaps" PHASE_OVERRIDE="Regular Season" SEASON_OVERRIDE="2025" \
+        RETAIN_SEASONS=2 DUMPER="$GOOD_STUB" "$CAPTURE" >/dev/null 2>&1
+
+    if [ ! -f "$snaps/2023-regular-season.sql.gz" ]; then
+        ok "test_retention_keeps_newest_two_seasons_per_slug — 2023 .gz evicted"
+    else
+        fail "test_retention_keeps_newest_two_seasons_per_slug" "2023 .gz not evicted"
+    fi
+    if [ ! -f "$snaps/2023-regular-season.json" ]; then
+        ok "test_retention_keeps_newest_two_seasons_per_slug — 2023 .json evicted"
+    else
+        fail "test_retention_keeps_newest_two_seasons_per_slug" "2023 .json not evicted (orphan left)"
+    fi
+    if [ -f "$snaps/2024-regular-season.sql.gz" ]; then
+        ok "test_retention_keeps_newest_two_seasons_per_slug — 2024 retained"
+    else
+        fail "test_retention_keeps_newest_two_seasons_per_slug" "2024 unexpectedly evicted"
+    fi
+    if [ -f "$snaps/2025-regular-season.sql.gz" ]; then
+        ok "test_retention_keeps_newest_two_seasons_per_slug — 2025 retained"
+    else
+        fail "test_retention_keeps_newest_two_seasons_per_slug" "2025 not present after capture"
+    fi
+}
+
+test_hyphenated_phase_slug_parses() {
+    # "Regular Season" → "regular-season" (not "regular" from a first-dash split)
+    local snaps="$TMP/snap8"
+    mkdir -p "$snaps"
+
+    SNAP_DIR="$snaps" PHASE_OVERRIDE="Regular Season" SEASON_OVERRIDE="2025" \
+        DUMPER="$GOOD_STUB" "$CAPTURE" >/dev/null 2>&1
+
+    if [ -f "$snaps/2025-regular-season.sql.gz" ]; then
+        ok "test_hyphenated_phase_slug_parses — correct filename with full slug"
+    else
+        # Check what was actually created
+        local actual
+        actual="$(find "$snaps" -name '*.sql.gz' | head -1)"
+        fail "test_hyphenated_phase_slug_parses" "expected 2025-regular-season.sql.gz, got: $actual"
+    fi
+}
+
+test_snap_dir_inside_git_worktree_rejected() {
+    local git_snaps="$TMP/git-snap"
+    mkdir -p "$git_snaps"
+    git init -q "$git_snaps"
+
+    local rc=0 out
+    out="$(SNAP_DIR="$git_snaps" PHASE_OVERRIDE="Playoffs" SEASON_OVERRIDE="2025" \
+        DUMPER="$GOOD_STUB" "$CAPTURE" 2>&1)" || rc="$?"
+
+    if [ "$rc" -ne 0 ]; then
+        ok "test_snap_dir_inside_git_worktree_rejected — exits 1"
+    else
+        fail "test_snap_dir_inside_git_worktree_rejected" "expected non-zero exit, got 0"
+    fi
+    if grep -qF 'inside a git work tree' <<< "$out"; then
+        ok "test_snap_dir_inside_git_worktree_rejected — informative error message"
+    else
+        fail "test_snap_dir_inside_git_worktree_rejected" "error message missing; got: $out"
+    fi
+    # No files should have been written
+    if [ -z "$(find "$git_snaps" -maxdepth 1 -name '*.sql.gz' -o -name '.last-phase' 2>/dev/null)" ]; then
+        ok "test_snap_dir_inside_git_worktree_rejected — no artifacts written"
+    else
+        fail "test_snap_dir_inside_git_worktree_rejected" "artifacts found after rejected run"
+    fi
+}
+
+test_dry_run_touches_nothing() {
+    local snaps="$TMP/snap10"
+    mkdir -p "$snaps"
+
+    local out
+    out="$(SNAP_DIR="$snaps" PHASE_OVERRIDE="Regular Season" SEASON_OVERRIDE="2025" \
+        DRY_RUN=1 DUMPER="$GOOD_STUB" "$CAPTURE" 2>&1)"
+
+    if grep -qF 'would capture:' <<< "$out"; then
+        ok "test_dry_run_touches_nothing — 'would capture:' printed"
+    else
+        fail "test_dry_run_touches_nothing" "expected 'would capture:', got: $out"
+    fi
+    if [ ! -f "$snaps/2025-regular-season.sql.gz" ]; then
+        ok "test_dry_run_touches_nothing — no .sql.gz created"
+    else
+        fail "test_dry_run_touches_nothing" ".sql.gz unexpectedly created in dry-run"
+    fi
+    if [ ! -f "$snaps/.last-phase" ]; then
+        ok "test_dry_run_touches_nothing — .last-phase not created"
+    else
+        fail "test_dry_run_touches_nothing" ".last-phase unexpectedly created in dry-run"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Phase 2 forced trigger: bin/wt-up parser anchor uniqueness
+# ---------------------------------------------------------------------------
+
+test_wt_up_parser_anchor_is_unique() {
+    local wt_up="$REPO_ROOT/bin/wt-up"
+
+    # Anchor must appear exactly once (after Phase 6 parser conversion)
+    local anchor_count
+    anchor_count="$(grep -cF 'while [ $# -gt 0 ]; do' "$wt_up" 2>/dev/null || echo 0)"
+    if [ "$anchor_count" -eq 1 ]; then
+        ok "test_wt_up_parser_anchor_is_unique — anchor unique (count=1)"
+    else
+        fail "test_wt_up_parser_anchor_is_unique" \
+            "expected 1 anchor 'while [ \$# -gt 0 ]; do', found $anchor_count"
+        return
+    fi
+
+    # Extract parser region and assert it contains the -*)  unknown-option arm
+    local region
+    region="$(awk '/while \[ \$# -gt 0 \]; do/,/^done/' "$wt_up")"
+    if grep -qF -- '-*)' <<< "$region"; then
+        ok "test_wt_up_parser_anchor_is_unique — -*)  arm present in extracted region"
+    else
+        fail "test_wt_up_parser_anchor_is_unique" "-*)  arm not found in extracted parser region"
+    fi
+
+    # Also assert --snapshot arm is present (post Phase 6)
+    if grep -qF -- '--snapshot' <<< "$region"; then
+        ok "test_wt_up_parser_anchor_is_unique — --snapshot arm present in extracted region"
+    else
+        fail "test_wt_up_parser_anchor_is_unique" "--snapshot arm not found in parser region"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Phase 4: bin/phase-snapshot-pull cases
+# ---------------------------------------------------------------------------
+
+test_pull_dry_run_exits_zero() {
+    local pull="$SCRIPT_DIR/phase-snapshot-pull"
+    if [ ! -x "$pull" ]; then
+        fail "test_pull_dry_run_exits_zero" "bin/phase-snapshot-pull not found or not executable"
+        return
+    fi
+    local rc=0 out
+    out="$(PROD_SSH_HOST=dummy.example "$pull" --dry-run 2>&1)" || rc="$?"
+    if [ "$rc" -eq 0 ]; then
+        ok "test_pull_dry_run_exits_zero — exits 0"
+    else
+        fail "test_pull_dry_run_exits_zero" "expected exit 0, got $rc; output: $out"
+    fi
+    if grep -qiF 'rsync' <<< "$out"; then
+        ok "test_pull_dry_run_exits_zero — rsync command printed"
+    else
+        fail "test_pull_dry_run_exits_zero" "rsync not mentioned in output: $out"
+    fi
+}
+
+test_pull_push_delete_rejected() {
+    local pull="$SCRIPT_DIR/phase-snapshot-pull"
+    if [ ! -x "$pull" ]; then
+        fail "test_pull_push_delete_rejected" "bin/phase-snapshot-pull not found"
+        return
+    fi
+    local rc=0
+    PROD_SSH_HOST=dummy.example "$pull" --push --delete >/dev/null 2>&1 || rc="$?"
+    if [ "$rc" -ne 0 ]; then
+        ok "test_pull_push_delete_rejected — exits 1"
+    else
+        fail "test_pull_push_delete_rejected" "expected non-zero exit, got 0"
+    fi
+}
+
+test_pull_bad_host_fails_loudly() {
+    local pull="$SCRIPT_DIR/phase-snapshot-pull"
+    if [ ! -x "$pull" ]; then
+        fail "test_pull_bad_host_fails_loudly" "bin/phase-snapshot-pull not found"
+        return
+    fi
+    local rc=0 out
+    # timeout guards against a hanging DNS lookup
+    out="$(timeout 20 sh -c 'PROD_SSH_HOST=nonexistent.invalid.example "$1" 2>&1' -- "$pull")" || rc="$?"
+    if [ "$rc" -ne 0 ]; then
+        ok "test_pull_bad_host_fails_loudly — exits non-zero"
+    else
+        fail "test_pull_bad_host_fails_loudly" "expected non-zero exit, got 0; output: $out"
+    fi
+}
+
+test_pull_destination_is_gitignored() {
+    if git -C "$REPO_ROOT" check-ignore -q "ibl5/backups/phase-snapshots" 2>/dev/null; then
+        ok "test_pull_destination_is_gitignored — ibl5/backups/phase-snapshots is gitignored"
+    else
+        fail "test_pull_destination_is_gitignored" \
+            "ibl5/backups/phase-snapshots is NOT gitignored (git check-ignore -q failed)"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Phase 5: bin/db-sync-prod --snapshot cases
+# ---------------------------------------------------------------------------
+
+test_db_sync_prod_rejects_missing_snapshot() {
+    local rc=0 out
+    out="$("$REPO_ROOT/bin/db-sync-prod" --snapshot /nonexistent-path.sql.gz 2>&1)" || rc="$?"
+    if [ "$rc" -ne 0 ]; then
+        ok "test_db_sync_prod_rejects_missing_snapshot — exits 1"
+    else
+        fail "test_db_sync_prod_rejects_missing_snapshot" "expected non-zero exit, got 0"
+    fi
+    if grep -qF '/nonexistent-path.sql.gz' <<< "$out"; then
+        ok "test_db_sync_prod_rejects_missing_snapshot — path named in message"
+    else
+        fail "test_db_sync_prod_rejects_missing_snapshot" "path not in output: $out"
+    fi
+}
+
+test_db_sync_prod_rejects_snapshot_without_value() {
+    local rc=0
+    "$REPO_ROOT/bin/db-sync-prod" --snapshot >/dev/null 2>&1 || rc="$?"
+    if [ "$rc" -ne 0 ]; then
+        ok "test_db_sync_prod_rejects_snapshot_without_value — exits 1"
+    else
+        fail "test_db_sync_prod_rejects_snapshot_without_value" "expected non-zero exit, got 0"
+    fi
+}
+
+test_db_sync_prod_rejects_unknown_option() {
+    local rc=0
+    "$REPO_ROOT/bin/db-sync-prod" --bogus-unknown-flag >/dev/null 2>&1 || rc="$?"
+    if [ "$rc" -ne 0 ]; then
+        ok "test_db_sync_prod_rejects_unknown_option — exits 1"
+    else
+        fail "test_db_sync_prod_rejects_unknown_option" "expected non-zero exit, got 0"
+    fi
+}
+
+test_db_sync_prod_print_plan_uses_gunzip() {
+    # Create a valid (minimal) gzipped file so validation passes
+    local snap_file="$TMP/test-snap.sql.gz"
+    printf '' | gzip > "$snap_file"
+
+    local rc=0 out
+    out="$("$REPO_ROOT/bin/db-sync-prod" test-wt --snapshot "$snap_file" --print-plan 2>&1)" || rc="$?"
+
+    if [ "$rc" -eq 0 ]; then
+        ok "test_db_sync_prod_print_plan_uses_gunzip — exits 0"
+    else
+        fail "test_db_sync_prod_print_plan_uses_gunzip" "expected exit 0, got $rc; output: $out"
+    fi
+    if grep -qF 'gunzip -c' <<< "$out"; then
+        ok "test_db_sync_prod_print_plan_uses_gunzip — output contains 'gunzip -c'"
+    else
+        fail "test_db_sync_prod_print_plan_uses_gunzip" \
+            "'gunzip -c' not in output (mutation: swapped for cat?): $out"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Phase 6: bin/wt-up parser conversion + --snapshot passthrough cases
+# ---------------------------------------------------------------------------
+
+test_wt_up_preserves_existing_flags() {
+    local wt_up="$REPO_ROOT/bin/wt-up"
+
+    # No args must print usage (exit 1)
+    local rc=0
+    "$wt_up" >/dev/null 2>&1 || rc="$?"
+    if [ "$rc" -ne 0 ]; then
+        ok "test_wt_up_preserves_existing_flags — no-args exits 1"
+    else
+        fail "test_wt_up_preserves_existing_flags" "expected non-zero exit for no-args, got 0"
+    fi
+
+    # Unknown option must exit 1
+    rc=0
+    "$wt_up" --totally-bogus-flag-xyz >/dev/null 2>&1 || rc="$?"
+    if [ "$rc" -ne 0 ]; then
+        ok "test_wt_up_preserves_existing_flags — --bogus exits 1"
+    else
+        fail "test_wt_up_preserves_existing_flags" "expected non-zero exit for --bogus, got 0"
+    fi
+}
+
+test_wt_up_rejects_snapshot_without_value() {
+    local rc=0
+    "$REPO_ROOT/bin/wt-up" foo --snapshot >/dev/null 2>&1 || rc="$?"
+    if [ "$rc" -ne 0 ]; then
+        ok "test_wt_up_rejects_snapshot_without_value — exits 1"
+    else
+        fail "test_wt_up_rejects_snapshot_without_value" "expected non-zero exit, got 0"
+    fi
+}
+
+test_wt_up_rejects_snapshot_with_mode_flag() {
+    local rc=0
+    "$REPO_ROOT/bin/wt-up" foo --snapshot x.sql.gz --prod >/dev/null 2>&1 || rc="$?"
+    if [ "$rc" -ne 0 ]; then
+        ok "test_wt_up_rejects_snapshot_with_mode_flag — exits 1"
+    else
+        fail "test_wt_up_rejects_snapshot_with_mode_flag" "expected non-zero exit for --snapshot+--prod"
+    fi
+}
+
+test_wt_up_passthrough_single_call_site() {
+    local wt_up="$REPO_ROOT/bin/wt-up"
+
+    # Exactly one invocation of db-sync-prod as an executable in bin/wt-up
+    local invoke_count
+    invoke_count="$(grep -cE '"?\$\{?REPO_ROOT\}?/bin/db-sync-prod"?' "$wt_up" 2>/dev/null || echo 0)"
+    if [ "$invoke_count" -eq 1 ]; then
+        ok "test_wt_up_passthrough_single_call_site — exactly one invocation"
+    else
+        fail "test_wt_up_passthrough_single_call_site" \
+            "expected 1 invocation of db-sync-prod, found $invoke_count"
+    fi
+
+    # That invocation carries --snapshot in its context (the arg array or conditional)
+    if grep -A5 '"$REPO_ROOT/bin/db-sync-prod"' "$wt_up" | grep -qF -- '--snapshot'; then
+        ok "test_wt_up_passthrough_single_call_site — --snapshot in passthrough context"
+    else
+        fail "test_wt_up_passthrough_single_call_site" \
+            "--snapshot not found in db-sync-prod invocation context"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Run all tests
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Phase 4: the REAL --snapshot load path
+#
+# Every other db-sync-prod --snapshot case above stops at argument parsing or at
+# --print-plan, which exits before any load happens. This case runs the actual
+# load against a throwaway container — the only way to catch the two defects
+# that shape hid: (a) snapshot mode still reaching for prod, and (b) the load
+# dropping the local-only tables PRESERVE_TABLES exists to protect.
+# ---------------------------------------------------------------------------
+test_db_sync_prod_snapshot_load_is_offline_and_preserves_local_tables() {
+    local label="db-sync-prod --snapshot load"
+    if ! docker info >/dev/null 2>&1; then
+        echo "skip: $label (docker unavailable)"
+        return 0
+    fi
+
+    # shellcheck source=/dev/null
+    source "$SCRIPT_DIR/lib/git-helpers.sh"
+    local wt_parent
+    wt_parent="$(worktrees_parent_dir "$REPO_ROOT")"
+
+    local tag="snaptest-$$"
+    local cname="ibl5-db-$tag"
+    local wt="$wt_parent/$tag"
+
+    snaptest_cleanup() {
+        docker rm -f "$cname" >/dev/null 2>&1 || true
+        rm -rf "$wt"
+    }
+    snaptest_cleanup
+
+    mkdir -p "$wt"
+    printf '%s' "$tag" > "$wt/.wt-slug"
+
+    if ! docker run -d --name "$cname" \
+            -e MARIADB_ROOT_PASSWORD=root \
+            -e MARIADB_DATABASE=iblhoops_ibl5 \
+            mariadb:10.11 >/dev/null 2>&1; then
+        fail "$label: throwaway container starts" "docker run failed"
+        snaptest_cleanup
+        return 0
+    fi
+
+    local i ready=0
+    for i in $(seq 1 90); do
+        if docker exec "$cname" mariadb -uroot -proot -e "SELECT 1" >/dev/null 2>&1; then
+            ready=1
+            break
+        fi
+        sleep 1
+    done
+    if [ "$ready" != "1" ]; then
+        fail "$label: throwaway container becomes ready" "no response after 90s"
+        snaptest_cleanup
+        return 0
+    fi
+
+    # Seed a local-only row prod does not have — the thing a sync must not destroy.
+    if ! docker exec "$cname" mariadb -uroot -proot iblhoops_ibl5 -e "
+            CREATE TABLE ibl_api_keys (id INT PRIMARY KEY, key_hash CHAR(64));
+            INSERT INTO ibl_api_keys VALUES (1, 'LOCAL-ONLY-KEY');
+        " >/dev/null 2>&1; then
+        fail "$label: seed local-only table" "CREATE/INSERT failed"
+        snaptest_cleanup
+        return 0
+    fi
+
+    # A real snapshot carries DROP/CREATE for EVERY prod table, local-only ones
+    # included — that is precisely why the load needs preserve protection.
+    local snap="$TMP/2026-heat.sql.gz"
+    {
+        echo "DROP TABLE IF EXISTS ibl_api_keys;"
+        echo "CREATE TABLE ibl_api_keys (id INT PRIMARY KEY, key_hash CHAR(64));"
+        echo "INSERT INTO ibl_api_keys VALUES (9, 'PROD-KEY');"
+        echo "DROP TABLE IF EXISTS ibl_team_info;"
+        echo "CREATE TABLE ibl_team_info (teamid INT PRIMARY KEY);"
+        echo "INSERT INTO ibl_team_info VALUES (7);"
+    } | gzip -9 > "$snap"
+
+    # Shim the host mariadb clients so ANY attempt to reach prod is loud and fatal.
+    # docker exec calls run the client INSIDE the container, so they are unaffected.
+    local shim="$TMP/shim-$tag"
+    mkdir -p "$shim"
+    local b
+    for b in mariadb mariadb-dump mysql mysqldump; do
+        cat > "$shim/$b" <<'SHIM_EOF'
+#!/usr/bin/env bash
+echo "PROD_CONTACT_ATTEMPTED: $(basename "$0")" >&2
+exit 127
+SHIM_EOF
+        chmod +x "$shim/$b"
+    done
+
+    local out rc=0
+    out="$(PATH="$shim:$PATH" "$SCRIPT_DIR/db-sync-prod" "$tag" --snapshot "$snap" 2>&1)" || rc=$?
+
+    if [ "$rc" = 0 ]; then
+        ok "$label: exits 0"
+    else
+        fail "$label: exits 0" "rc=$rc; last lines: $(printf '%s' "$out" | tail -6 | tr '\n' ' ')"
+    fi
+
+    if grep -qF 'PROD_CONTACT_ATTEMPTED' <<< "$out"; then
+        fail "$label: never contacts prod" "a host mariadb client was invoked"
+    else
+        ok "$label: never contacts prod"
+    fi
+
+    if grep -qF "Source: snapshot file" <<< "$out"; then
+        ok "$label: banner names the snapshot, not a prod host"
+    else
+        fail "$label: banner names the snapshot" "no 'Source: snapshot file' line in output"
+    fi
+
+    local preserved loaded
+    preserved="$(docker exec "$cname" mariadb -uroot -proot iblhoops_ibl5 -N -B \
+        -e "SELECT key_hash FROM ibl_api_keys" 2>/dev/null || echo TABLE_GONE)"
+    if [ "$preserved" = "LOCAL-ONLY-KEY" ]; then
+        ok "$label: local-only ibl_api_keys row survives"
+    else
+        fail "$label: local-only ibl_api_keys row survives" "got '$preserved', want 'LOCAL-ONLY-KEY'"
+    fi
+
+    loaded="$(docker exec "$cname" mariadb -uroot -proot iblhoops_ibl5 -N -B \
+        -e "SELECT teamid FROM ibl_team_info" 2>/dev/null || echo TABLE_GONE)"
+    if [ "$loaded" = "7" ]; then
+        ok "$label: snapshot rows actually landed"
+    else
+        fail "$label: snapshot rows actually landed" "ibl_team_info teamid='$loaded', want '7'"
+    fi
+
+    snaptest_cleanup
+}
+
+test_no_capture_when_phase_unchanged
+test_capture_when_phase_changed
+test_capture_on_first_run_no_sidecar
+test_no_recapture_when_target_exists
+test_failed_dump_leaves_no_artifacts
+test_undersize_dump_rejected
+test_retention_keeps_newest_two_seasons_per_slug
+test_hyphenated_phase_slug_parses
+test_snap_dir_inside_git_worktree_rejected
+test_dry_run_touches_nothing
+test_wt_up_parser_anchor_is_unique
+test_pull_dry_run_exits_zero
+test_pull_push_delete_rejected
+test_pull_bad_host_fails_loudly
+test_pull_destination_is_gitignored
+test_db_sync_prod_rejects_missing_snapshot
+test_db_sync_prod_rejects_snapshot_without_value
+test_db_sync_prod_rejects_unknown_option
+test_db_sync_prod_print_plan_uses_gunzip
+test_db_sync_prod_snapshot_load_is_offline_and_preserves_local_tables
+test_wt_up_preserves_existing_flags
+test_wt_up_rejects_snapshot_without_value
+test_wt_up_rejects_snapshot_with_mode_flag
+test_wt_up_passthrough_single_call_site
+
+if [ "$FAILED" -eq 0 ]; then
+    echo "all cases passed"
+else
+    echo "one or more cases FAILED"
+fi
+exit "$FAILED"

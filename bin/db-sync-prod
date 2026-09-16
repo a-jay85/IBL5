@@ -6,7 +6,7 @@
 # and bin/wt-up --prod (worktrees) both invoke it. Handles STORED GENERATED
 # tables like ibl_box_scores via dedicated --no-create-info passes.
 #
-# Usage: bin/db-sync-prod [worktree-name]
+# Usage: bin/db-sync-prod [worktree-name] [--snapshot <file.sql.gz>]
 #
 # Target resolution (in order):
 #   1. <worktree-name> argument → <WT_PARENT>/<name>/.wt-slug
@@ -26,54 +26,103 @@ source "$REPO_ROOT/bin/lib/db-helpers.sh"
 source "$REPO_ROOT/bin/lib/git-helpers.sh"
 WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
 
+WORKTREE_ARG=""
+SNAPSHOT=""
+PRINT_PLAN=false
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --snapshot)
+      if [ -z "${2:-}" ] || [ "${2#-}" != "${2}" ]; then
+        echo "--snapshot requires a file argument" >&2
+        exit 1
+      fi
+      SNAPSHOT="$2"; shift 2 ;;
+    --snapshot=*) SNAPSHOT="${1#*=}"; shift ;;
+    --print-plan) PRINT_PLAN=true; shift ;;
+    -*) echo "Unknown option: $1" >&2; exit 1 ;;
+    *) WORKTREE_ARG="$1"; shift ;;
+  esac
+done
+
+if [ -n "$SNAPSHOT" ]; then
+  if [ ! -f "$SNAPSHOT" ] || [ ! -r "$SNAPSHOT" ]; then
+    echo "ERROR: snapshot file not found or not readable: $SNAPSHOT" >&2
+    exit 1
+  fi
+  case "$SNAPSHOT" in
+    *.sql.gz) ;;
+    *) echo "ERROR: snapshot file must end in .sql.gz: $SNAPSHOT" >&2; exit 1 ;;
+  esac
+  if ! gunzip -t "$SNAPSHOT" 2>/dev/null; then
+    echo "ERROR: snapshot file failed gunzip integrity check: $SNAPSHOT" >&2
+    exit 1
+  fi
+fi
+
 # The mariadb client is keg-only under Homebrew (the formula is NOT linked into
 # /opt/homebrew/bin), so a non-login shell — e.g. the one bin/wt-up spawns — can
 # have it installed yet absent from PATH (`line NNN: mariadb: command not found`).
 # Prepend the known keg dirs (Apple Silicon + Intel prefixes) so the host client
 # resolves regardless of the invoking shell's PATH. Only prepend until found, so
 # an already-on-PATH client is respected.
-for _kegbin in \
-    /opt/homebrew/opt/mariadb/bin \
-    /opt/homebrew/opt/mysql-client/bin \
-    /opt/homebrew/opt/mysql/bin \
-    /usr/local/opt/mariadb/bin \
-    /usr/local/opt/mysql-client/bin; do
-    if ! command -v mariadb-dump >/dev/null 2>&1 && [ -x "$_kegbin/mariadb-dump" ]; then
-        PATH="$_kegbin:$PATH"
-    fi
-done
-unset _kegbin
-if ! command -v mariadb >/dev/null 2>&1 || ! command -v mariadb-dump >/dev/null 2>&1; then
-    echo "Error: mariadb client not found on PATH (need both 'mariadb' and 'mariadb-dump')." >&2
-    echo "  Install it:  brew install mariadb" >&2
-    echo "  It's keg-only — db-sync-prod adds /opt/homebrew/opt/mariadb/bin to PATH automatically once installed." >&2
-    exit 1
-fi
-
-WORKTREE_ARG="${1:-}"
-
-# Load .env for REMOTE_* creds.
-# When invoked from a worktree's bin/, REPO_ROOT is the worktree root, which
-# has no .env (only the main worktree does). Fall back to the main worktree
-# in that case so `bin/wt-up --prod` works from any CWD.
-ENV_FILE="$REPO_ROOT/.env"
-if [ ! -f "$ENV_FILE" ]; then
-    MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / {print $2; exit}')"
-    if [ -n "$MAIN_WT" ] && [ -f "$MAIN_WT/.env" ]; then
-        ENV_FILE="$MAIN_WT/.env"
-    else
-        echo "Error: $REPO_ROOT/.env not found — REMOTE_* credentials required." >&2
+# Skip this check for --snapshot (no remote dump needed) and --print-plan (no client needed).
+if [ -z "$SNAPSHOT" ] && ! $PRINT_PLAN; then
+    for _kegbin in \
+        /opt/homebrew/opt/mariadb/bin \
+        /opt/homebrew/opt/mysql-client/bin \
+        /opt/homebrew/opt/mysql/bin \
+        /usr/local/opt/mariadb/bin \
+        /usr/local/opt/mysql-client/bin; do
+        if ! command -v mariadb-dump >/dev/null 2>&1 && [ -x "$_kegbin/mariadb-dump" ]; then
+            PATH="$_kegbin:$PATH"
+        fi
+    done
+    unset _kegbin
+    if ! command -v mariadb >/dev/null 2>&1 || ! command -v mariadb-dump >/dev/null 2>&1; then
+        echo "Error: mariadb client not found on PATH (need both 'mariadb' and 'mariadb-dump')." >&2
+        echo "  Install it:  brew install mariadb" >&2
+        echo "  It's keg-only — db-sync-prod adds /opt/homebrew/opt/mariadb/bin to PATH automatically once installed." >&2
         exit 1
     fi
 fi
-set -a
-# shellcheck disable=SC1090
-source "$ENV_FILE"
-set +a
 
-if [ -z "${REMOTE_HOST:-}" ] || [ "$REMOTE_HOST" = "localhost" ] || [ "$REMOTE_HOST" = "127.0.0.1" ]; then
-    echo "Error: REMOTE_HOST must point to production (got: ${REMOTE_HOST:-<unset>})." >&2
-    exit 1
+# --print-plan: emit the pipeline shape without requiring a running container or .env.
+# Container name resolves from .wt-slug at runtime; shown here as a placeholder.
+if [ -n "$SNAPSHOT" ] && $PRINT_PLAN; then
+  if [ -n "$WORKTREE_ARG" ]; then
+    _plan_container="<resolved-from-${WORKTREE_ARG}/.wt-slug>"
+  else
+    _plan_container="ibl5-mariadb"
+  fi
+  echo "gunzip -c $SNAPSHOT | db_import_sql $_plan_container"
+  exit 0
+fi
+
+if [ -z "$SNAPSHOT" ]; then
+  # Load .env for REMOTE_* creds.
+  # When invoked from a worktree's bin/, REPO_ROOT is the worktree root, which
+  # has no .env (only the main worktree does). Fall back to the main worktree
+  # in that case so `bin/wt-up --prod` works from any CWD.
+  ENV_FILE="$REPO_ROOT/.env"
+  if [ ! -f "$ENV_FILE" ]; then
+      MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / {print $2; exit}')"
+      if [ -n "$MAIN_WT" ] && [ -f "$MAIN_WT/.env" ]; then
+          ENV_FILE="$MAIN_WT/.env"
+      else
+          echo "Error: $REPO_ROOT/.env not found — REMOTE_* credentials required." >&2
+          exit 1
+      fi
+  fi
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+
+  if [ -z "${REMOTE_HOST:-}" ] || [ "$REMOTE_HOST" = "localhost" ] || [ "$REMOTE_HOST" = "127.0.0.1" ]; then
+      echo "Error: REMOTE_HOST must point to production (got: ${REMOTE_HOST:-<unset>})." >&2
+      exit 1
+  fi
 fi
 
 REMOTE_PORT="${REMOTE_PORT:-3306}"
@@ -137,7 +186,11 @@ if ! docker ps --format '{{.Names}}' | grep -q "^${DB_CONTAINER}$"; then
 fi
 
 echo "=== DB Sync: Production → $DB_CONTAINER ==="
-echo "  Source: $REMOTE_HOST:$REMOTE_PORT/$REMOTE_DATABASE"
+if [ -n "$SNAPSHOT" ]; then
+    echo "  Source: snapshot file $SNAPSHOT (prod is never contacted)"
+else
+    echo "  Source: $REMOTE_HOST:$REMOTE_PORT/$REMOTE_DATABASE"
+fi
 echo "  Target: $DB_CONTAINER"
 [ -n "$WORKTREE_PATH" ] && echo "  Worktree: $WORKTREE_PATH"
 echo ""
@@ -172,22 +225,32 @@ PRESERVE_TABLES="ibl_api_keys ibl_bug_reports ibl_bug_report_attachments ibl_bug
 
 # Detect STORED GENERATED column tables — their data needs dedicated column-list
 # INSERTs (mariadb-dump emits those with --no-create-info) to avoid ERROR 1906.
-GENERATED_TABLES=$(remote_query "
-    SELECT DISTINCT table_name
-    FROM information_schema.columns
-    WHERE table_schema='$REMOTE_DATABASE'
-      AND extra LIKE '%GENERATED%'
-    ORDER BY table_name;
-")
+#
+# Both round trips are prod-only. A snapshot is a single self-contained stream
+# with no per-table passes to plan, and snapshot mode must never contact prod —
+# unguarded, these two calls abort the whole run under `set -e` on any machine
+# without a mariadb client or prod credentials, which is the normal case for the
+# worktree the flag exists to serve.
+GENERATED_TABLES=""
+ALL_TABLES=""
+if [ -z "$SNAPSHOT" ]; then
+    GENERATED_TABLES=$(remote_query "
+        SELECT DISTINCT table_name
+        FROM information_schema.columns
+        WHERE table_schema='$REMOTE_DATABASE'
+          AND extra LIKE '%GENERATED%'
+        ORDER BY table_name;
+    ")
 
-# Fetch real tables (not views) in one round trip
-ALL_TABLES=$(remote_query "
-    SELECT table_name
-    FROM information_schema.tables
-    WHERE table_schema='$REMOTE_DATABASE'
-      AND engine IS NOT NULL
-    ORDER BY table_name;
-")
+    # Fetch real tables (not views) in one round trip
+    ALL_TABLES=$(remote_query "
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema='$REMOTE_DATABASE'
+          AND engine IS NOT NULL
+        ORDER BY table_name;
+    ")
+fi
 
 # Preserve-if-EXISTS. Only skip a table that is already present locally; on a
 # fresh container nothing is skipped, so the prod dump still creates everything.
@@ -257,12 +320,18 @@ if [ -n "$PRESERVE_RE" ]; then
     GENERATED_TABLES="$_kept_gen"
 fi
 
-echo "Dumping prod → $DB_CONTAINER..."
+if [ -n "$SNAPSHOT" ]; then
+    echo "Loading snapshot → $DB_CONTAINER..."
+else
+    echo "Dumping prod → $DB_CONTAINER..."
+fi
 if [ -n "$GENERATED_TABLES" ]; then
     echo "  Generated-column tables:$(printf ' %s' $GENERATED_TABLES)"
 fi
 if [ -n "$PRESERVE_EXISTING" ]; then
     echo "  Preserved (local-only, not synced):$(printf ' %s' $PRESERVE_EXISTING)"
+elif [ -n "$SNAPSHOT" ]; then
+    echo "  Preserved: none — no local-only table exists yet; the snapshot creates them."
 else
     echo "  Preserved: none — no local-only table exists yet; the prod dump creates them."
 fi
@@ -288,37 +357,93 @@ TOTAL_STEPS=2
 [ -n "$GENERATED_TABLES" ] && TOTAL_STEPS=3
 STEP=0
 
-{
-    STEP=$((STEP + 1))
-    echo "  [$STEP/$TOTAL_STEPS] Schema (tables, views, triggers)..." >&2
-    # shellcheck disable=SC2086
-    remote_dump --triggers --no-data --max-statement-time="$SCHEMA_TIMEOUT" \
-        $IGNORE_ARGS "$REMOTE_DATABASE"
+if [ -n "$SNAPSHOT" ]; then
+  # Preserve local-only tables across a snapshot load. A snapshot is ONE
+  # self-contained stream carrying DROP/CREATE for every table, so the
+  # --ignore-table filter the prod path uses has no equivalent here: dump the
+  # local rows first, load the snapshot, then replay them. Without this the
+  # snapshot load re-opens the exact 2026-09-14 data-loss path (ADR-0080) that
+  # PRESERVE_TABLES above exists to close.
+  #
+  # mariadb-dump runs INSIDE the container, so this adds no host-client
+  # dependency and still never contacts prod.
+  PRESERVE_TMP=""
+  if [ -n "$PRESERVE_EXISTING" ]; then
+      PRESERVE_TMP="$(mktemp)"
+      # shellcheck disable=SC2086
+      if ! docker exec "$DB_CONTAINER" mariadb-dump -uroot -proot \
+              --single-transaction --skip-lock-tables \
+              iblhoops_ibl5 $PRESERVE_EXISTING \
+              > "$PRESERVE_TMP" 2> >(db_strip_warnings >&2); then
+          echo "ERROR: could not back up preserved tables before the snapshot load — aborting." >&2
+          echo "  Refusing to load: the snapshot would drop$(printf ' %s' $PRESERVE_EXISTING)." >&2
+          rm -f "$PRESERVE_TMP"
+          exit 1
+      fi
+      # Exit status alone is not enough: a dump that exits 0 having written
+      # nothing would let the snapshot's DROP TABLE through and then "restore"
+      # an empty file — the 2026-09-14 loss with an error-free log
+      # (.claude/rules/shell-fail-open-probe.md). Fail closed on empty.
+      if [ ! -s "$PRESERVE_TMP" ]; then
+          echo "ERROR: preserved-table backup is empty — refusing to load the snapshot." >&2
+          echo "  Would have dropped$(printf ' %s' $PRESERVE_EXISTING) with nothing to restore." >&2
+          rm -f "$PRESERVE_TMP"
+          exit 1
+      fi
+  fi
 
-    STEP=$((STEP + 1))
-    echo "  [$STEP/$TOTAL_STEPS] Table data..." >&2
-    # shellcheck disable=SC2086
-    remote_dump --no-create-info --skip-triggers --skip-add-locks \
-        "$REMOTE_DATABASE" $REGULAR_TABLES
+  gunzip -c "$SNAPSHOT" | db_import_sql "$DB_CONTAINER" || {
+      if [ -n "$PRESERVE_TMP" ] && [ -f "$PRESERVE_TMP" ]; then
+          printf 'ERROR: snapshot load failed. Preserved-tables backup retained at: %s\n' "$PRESERVE_TMP" >&2
+          printf '  The surviving state may be partial (--force runs all DROPs before returning).\n' >&2
+          printf '  Re-run the replay with: bin/db-query db_import_sql %s < %s\n' "$DB_CONTAINER" "$PRESERVE_TMP" >&2
+      fi
+      exit 1
+  }
 
-    if [ -n "$GENERATED_TABLES" ]; then
-        STEP=$((STEP + 1))
-        echo "  [$STEP/$TOTAL_STEPS] Generated-column table data..." >&2
-        # shellcheck disable=SC2086
-        remote_dump --no-create-info --skip-triggers --skip-add-locks \
-            "$REMOTE_DATABASE" $GENERATED_TABLES
-    fi
-} | db_import_sql "$DB_CONTAINER" || exit 1
+  if [ -n "$PRESERVE_TMP" ]; then
+      echo "  Restoring preserved local-only tables:$(printf ' %s' $PRESERVE_EXISTING)" >&2
+      db_import_sql "$DB_CONTAINER" < "$PRESERVE_TMP" || {
+          printf 'ERROR: replay of preserved-tables backup failed. The state may be partial.\n' >&2
+          printf '  Backup file retained at: %s\n' "$PRESERVE_TMP" >&2
+          printf '  Re-run the replay with: bin/db-query db_import_sql %s < %s\n' "$DB_CONTAINER" "$PRESERVE_TMP" >&2
+          exit 1
+      }
+      rm -f "$PRESERVE_TMP"
+  fi
+else
+  {
+      STEP=$((STEP + 1))
+      echo "  [$STEP/$TOTAL_STEPS] Schema (tables, views, triggers)..." >&2
+      # shellcheck disable=SC2086
+      remote_dump --triggers --no-data --max-statement-time="$SCHEMA_TIMEOUT" \
+          $IGNORE_ARGS "$REMOTE_DATABASE"
 
-# Routines pass: separate, time-bounded, non-fatal. --no-create-info/--no-data
-# emit neither DROP nor CREATE TABLE, so a stall or timeout here leaves the
-# already-loaded schema + data fully intact.
-echo "  Routines (stored procedures/functions)..." >&2
-if ! remote_dump --routines --no-create-info --no-data --skip-triggers \
-        --max-statement-time="$ROUTINES_TIMEOUT" "$REMOTE_DATABASE" \
-        | db_import_sql "$DB_CONTAINER"; then
-    echo "  WARNING: routines dump failed or timed out (prod mysql.proc may be" >&2
-    echo "           locked); schema + data loaded OK, routines skipped." >&2
+      STEP=$((STEP + 1))
+      echo "  [$STEP/$TOTAL_STEPS] Table data..." >&2
+      # shellcheck disable=SC2086
+      remote_dump --no-create-info --skip-triggers --skip-add-locks \
+          "$REMOTE_DATABASE" $REGULAR_TABLES
+
+      if [ -n "$GENERATED_TABLES" ]; then
+          STEP=$((STEP + 1))
+          echo "  [$STEP/$TOTAL_STEPS] Generated-column table data..." >&2
+          # shellcheck disable=SC2086
+          remote_dump --no-create-info --skip-triggers --skip-add-locks \
+              "$REMOTE_DATABASE" $GENERATED_TABLES
+      fi
+  } | db_import_sql "$DB_CONTAINER" || exit 1
+
+  # Routines pass: separate, time-bounded, non-fatal. --no-create-info/--no-data
+  # emit neither DROP nor CREATE TABLE, so a stall or timeout here leaves the
+  # already-loaded schema + data fully intact.
+  echo "  Routines (stored procedures/functions)..." >&2
+  if ! remote_dump --routines --no-create-info --no-data --skip-triggers \
+          --max-statement-time="$ROUTINES_TIMEOUT" "$REMOTE_DATABASE" \
+          | db_import_sql "$DB_CONTAINER"; then
+      echo "  WARNING: routines dump failed or timed out (prod mysql.proc may be" >&2
+      echo "           locked); schema + data loaded OK, routines skipped." >&2
+  fi
 fi
 
 echo ""

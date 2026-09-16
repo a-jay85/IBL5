@@ -232,6 +232,17 @@ while IFS= read -r token; do
             ;;
     esac
 
+    # Token-anchored (example) marker — exempts this specific token, not the
+    # whole line. Strict markdown form only: closing backtick immediately
+    # followed by " (example)". Plan bodies are markdown; loose comment-side
+    # tolerance would lose the token-scoping property this check exists to
+    # preserve (a sibling bare token on the same line would be silently exempted
+    # too, which is the true-positive hole the cue mechanism was designed to
+    # avoid).
+    if grep -qF -- "\`${token}\` (example)" "$SCAN_FILE"; then
+        continue
+    fi
+
     # Not on disk. Before flagging it stale, check whether the plan references
     # this token in a CREATION context — a file the plan itself creates is not a
     # poison-pill stale path. The guard catches renamed/moved/deleted paths, not

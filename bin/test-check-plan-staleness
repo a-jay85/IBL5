@@ -200,6 +200,32 @@ assert "never-existed-cue" 0 'The brief cites `bin/never-was-a-real-script`, whi
 # followed by some OTHER verb must still flag stale (exit 1).
 assert "does-not-other-verb-not-cue" 1 'Modify `ibl5/classes/DeletedButNotCoveredXyz.php`; the suite does not cover it.'
 
+# --- (example) marker (token-anchored suppression) ----------------------------
+# The (example) marker in strict markdown form — closing backtick immediately
+# followed by " (example)" — must exempt that specific token only, leaving bare
+# sibling tokens on the same line still subject to normal resolution.
+
+# (a) An (example)-marked missing path in in-scope prose must pass (exit 0).
+# Token must NOT exist on disk — use a name that provably never resolves, so this
+# case reaches and exercises the new (example) block rather than the on-disk resolver.
+assert "example-marked-missing" 0 'The guard is documented in `bin/definitely-not-a-real-script` (example) and nothing else.'
+
+# (b) Load-bearing true-positive guard: a single line carrying BOTH an
+# (example)-marked missing path AND a bare missing path must still flag the bare
+# one (exit 1). The STALE output must name the bare token, not the marked one.
+# This is the gate weakening's safety proof — if someone later "simplifies" the
+# token-anchored check back into the line-scoped alternation, this case goes red.
+assert "example-mixed-line" 1 $'Phase: `bin/missing-example-script` (example) documents the shape; `bin/another-missing-script` is the real dep.'
+
+# (c) A bare "(example)" not immediately adjacent to a closing backtick must NOT
+# suppress an unrelated missing token on the same line.
+assert "example-loose-no-suppress" 1 'See docs (example) and also `bin/yet-another-nonexistent-script`.'
+
+# (d) Real-world FP shape: an (example)-marked absent path in an in-scope Decisions
+# paragraph with NO other exempting cue on the line. The word "rejected" is deliberately
+# absent — it would trigger the pre-existing cue alternation and make the case vacuous.
+assert "example-rejected-design" 0 'Decisions: a separate `bin/test-plan-review-seam-contract` (example) was considered and an alternative path was chosen.'
+
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"
     exit 1

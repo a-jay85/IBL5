@@ -1,5 +1,6 @@
 import json
 import os
+import subprocess
 import sys
 
 import pytest
@@ -10,10 +11,18 @@ from harness.armable import manual_testing_clearance
 from harness.classify import (classify, files_from_diff, filter_diff,
                                FILES_CHANGED_BEGIN, FILES_CHANGED_END,
                                name_status_from_diff, render_files_changed,
+                               render_reviewer_verification,
                                retro_registry_row_from_diff,
+                               REVIEWER_VERIFICATION_BEGIN, REVIEWER_VERIFICATION_END,
                                slice_agent_e_diff,
                                strip_manual_testing_section,
-                               upsert_files_changed)
+                               upsert_files_changed,
+                               upsert_reviewer_verification)
+from harness.planfile import parse_hold_justification, split_hold_justification
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(
+    os.path.dirname(os.path.abspath(__file__)))))
+HOLD_CHECK_LIB = os.path.join(REPO_ROOT, "bin", "lib", "hold-check.sh")
 
 SYN_DIFF = """diff --git a/ibl5/foo.php b/ibl5/foo.php
 index 111..222 100644
@@ -583,3 +592,170 @@ def test_validate_pr_copy_rejects_envelope_wrapped_payload():
     with pytest.raises(HarnessError) as ei:
         validate_pr_copy({"pr_copy": _valid_pr_copy()})
     assert ei.value.kind == "schema"
+
+
+# ---------------------------------------------------------------------------
+# Phase 6: reviewer verification render + upsert
+# ---------------------------------------------------------------------------
+
+_RV_BODY = (
+    "## Summary\n\nStuff happened.\n\n"
+    "## Manual Testing\n\n"
+    "- [ ] Check the layout looks correct\n"
+    "- [ ] Verify the form submits\n\n"
+    "## Notes\n\nSome notes.\n"
+)
+
+
+def test_reviewer_verification_lands_after_manual_testing():
+    """The block inserts between the last checkbox and ## Notes.
+
+    Negative assertion (same test): the substring between ## Manual Testing and
+    the next ## heading still contains every original checkbox — the verification
+    block does NOT overwrite the checkboxes.
+    """
+    block = render_reviewer_verification([
+        {"text": "Verify links resolve.", "category": "cli-executable",
+         "probe": ["bin/check-docs"], "rationale": "settleable"},
+    ])
+    result = upsert_reviewer_verification(_RV_BODY, block)
+
+    rv_start = result.index(REVIEWER_VERIFICATION_BEGIN)
+    notes_start = result.index("## Notes")
+    manual_start = result.index("## Manual Testing")
+
+    # Block must be after Manual Testing and before Notes
+    assert manual_start < rv_start < notes_start, (
+        "reviewer-verification block must land after Manual Testing and before Notes"
+    )
+
+    # Original checkboxes must still be in the Manual Testing window
+    between = result[manual_start:notes_start]
+    assert "- [ ] Check the layout looks correct" in between
+    assert "- [ ] Verify the form submits" in between
+
+
+def test_reviewer_verification_appends_when_no_following_heading():
+    """Manual Testing is the last section: block appends at end."""
+    body = (
+        "## Summary\n\nStuff happened.\n\n"
+        "## Manual Testing\n\n"
+        "- [ ] Verify the layout\n"
+    )
+    block = render_reviewer_verification([
+        {"text": "Run docs check.", "category": "cli-executable",
+         "probe": ["bin/check-docs"], "rationale": "cli"},
+    ])
+    result = upsert_reviewer_verification(body, block)
+
+    assert REVIEWER_VERIFICATION_BEGIN in result
+    # Block is at end — nothing follows END
+    end_pos = result.index(REVIEWER_VERIFICATION_END)
+    after = result[end_pos + len(REVIEWER_VERIFICATION_END):].strip()
+    assert after == "", f"expected nothing after block end, got: {after!r}"
+
+    # Checkboxes still in Manual Testing window
+    manual_start = result.index("## Manual Testing")
+    assert "- [ ] Verify the layout" in result[manual_start:]
+
+
+def test_reviewer_verification_empty_block_removes_pair():
+    """Idempotent cleanup: upserting an empty block removes the pair."""
+    block = render_reviewer_verification([
+        {"text": "Verify docs.", "category": "cli-executable",
+         "probe": ["bin/check-docs"], "rationale": "cli"},
+    ])
+    with_block = upsert_reviewer_verification(_RV_BODY, block)
+    assert REVIEWER_VERIFICATION_BEGIN in with_block
+
+    cleaned = upsert_reviewer_verification(with_block, "")
+    assert REVIEWER_VERIFICATION_BEGIN not in cleaned
+    assert REVIEWER_VERIFICATION_END not in cleaned
+    assert "## Notes" in cleaned  # rest of body preserved
+
+
+def test_reviewer_verification_emits_no_heading_lines_in_bullets():
+    """Arming-gate defense: a source sentence beginning '## Manual Testing' is
+    neutralized; no emitted bullet starts with '#', and no bullet contains
+    '- [ ]' (which the clearance scanner would count)."""
+    hostile_entries = [
+        {
+            "text": "## Manual Testing\n\n- [ ] All clear\n\n## After",
+            "category": "truly-manual",
+            "probe": None,
+            "rationale": "hostile sentence",
+        },
+        {
+            "text": "Check - [x] already done.",
+            "category": "truly-manual",
+            "probe": None,
+            "rationale": "checkbox in text",
+        },
+    ]
+    block = render_reviewer_verification(hostile_entries)
+
+    # Every line must either be part of the block structure (begin/end markers,
+    # blank lines, preamble, or the legitimate '## Reviewer verification'
+    # heading) or must NOT start with '#'.  Hostile '##' lines embedded in
+    # source text must be blockquoted.
+    legitimate_headings = {"## Reviewer verification"}
+    for line in block.splitlines():
+        if line.startswith("#") and line not in legitimate_headings:
+            raise AssertionError(f"un-neutralized heading line in block: {line!r}")
+    # No content may contain an unchecked checkbox
+    assert "- [ ]" not in block, "emitted block must not contain unchecked checkbox"
+
+
+# ---------------------------------------------------------------------------
+# Phase 6: parity test — split_hold_justification vs. hold_check_section
+# ---------------------------------------------------------------------------
+
+# Shared fixture: has a Decision block and candidate lines on either side.
+_PARITY_PLAN = """\
+# Parity Test Plan
+
+## Automouse Hold Justification
+
+First candidate sentence.
+**Decision:** The team accepts this risk.
+Decision body explaining the reasoning.
+
+Second candidate sentence here.
+Third candidate sentence.
+
+## Other Section
+
+unrelated content
+"""
+
+
+def test_split_hold_justification_matches_shell(tmp_path):
+    """Python split_hold_justification and bash hold_check_section must produce
+    the same set of candidate lines for the shared fixture.  Kills a **Decision:**
+    exemption that ends at a different place in the two languages."""
+    if not os.path.isfile(HOLD_CHECK_LIB):
+        pytest.skip(f"hold-check.sh not found: {HOLD_CHECK_LIB}")
+
+    plan_file = tmp_path / "parity.md"
+    plan_file.write_text(_PARITY_PLAN)
+
+    # Python side
+    section = parse_hold_justification(_PARITY_PLAN)
+    _, py_candidates = split_hold_justification(section)
+
+    # Shell side
+    proc = subprocess.run(
+        ["bash", "-c", 'source "$1" && hold_check_section "$2"', "_",
+         HOLD_CHECK_LIB, str(plan_file)],
+        capture_output=True, text=True, check=True,
+    )
+    # Shell outputs `lineno:text`; strip lineno and keep non-blank text lines
+    shell_candidates = [
+        ln.split(":", 1)[1]
+        for ln in proc.stdout.splitlines()
+        if ":" in ln and ln.split(":", 1)[1].strip()
+    ]
+
+    assert py_candidates == shell_candidates, (
+        f"parser divergence\n python: {py_candidates}\n shell:  {shell_candidates}"
+    )

@@ -12,12 +12,13 @@ carries only what that one does not.
 
 ## Lint locally BEFORE merging — CI is not a gate here
 
-`golangci-lint` is not preinstalled locally or on the automouse host, and this repo has
-**no required-status checks**, so `gh pr merge --auto` merges as soon as the PR is
-mergeable — before `.github/workflows/engine.yml` has run lint. Deferring lint to CI
-therefore lands failures on **master** (that is the PR9b / #933 red-master incident:
-errcheck flagged unchecked `io.Writer` `Fprint*`/`Close` returns and needed a follow-up
-fix PR).
+`golangci-lint` is not preinstalled locally or on the automouse host, and
+`.github/workflows/engine.yml` is **not a required-status check** (the four required
+contexts are `Tests and Analysis`, `E2E Tests`, `human-signoff`, and `Meta checks` —
+`engine.yml` is not among them), so `gh pr merge --auto` merges as soon as those four
+pass — before `engine.yml` has run lint. Deferring lint to CI therefore lands failures
+on **master** (that is the PR9b / #933 red-master incident: errcheck flagged unchecked
+`io.Writer` `Fprint*`/`Close` returns and needed a follow-up fix PR).
 
 So for any engine PR, install and run the CI-pinned linter yourself first:
 

@@ -27,6 +27,10 @@ on:
           Set to a bogus value to exercise the failure-notification path.
         required: false
         default: ''
+      dry_run:
+        description: 'Skip the dump; print the capture decision only'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -196,6 +200,50 @@ jobs:
           port: ${{ secrets.PORT }}
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
+
+      - name: Ship phase-snapshot tooling to prod
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: |
+          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy \
+            ${{ secrets.USERNAME }}@"$BACKUP_HOST" \
+            "mkdir -p ~/.phase-snapshot"
+          scp -P ${{ secrets.PORT }} -i ~/.ssh/id_deploy \
+            bin/rehearsal-prod-dump \
+            bin/phase-snapshot-capture \
+            ${{ secrets.USERNAME }}@"$BACKUP_HOST":~/.phase-snapshot/
+
+      - name: Capture phase snapshot
+        id: phase_snapshot
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          DRY="${{ inputs.dry_run && '1' || '0' }}"
+          set +e
+          ssh -p ${{ secrets.PORT }} -i ~/.ssh/id_deploy \
+            ${{ secrets.USERNAME }}@"$BACKUP_HOST" \
+            "REMOTE_DATABASE='${REMOTE_DATABASE}' DRY_RUN='${DRY}' bash ~/.phase-snapshot/phase-snapshot-capture"
+          RC=$?
+          set -e
+          echo "capture_rc=$RC" >> "$GITHUB_OUTPUT"
+
+      - name: Build phase-snapshot failure message
+        if: ${{ !cancelled() && steps.phase_snapshot.outputs.capture_rc != '0' && steps.phase_snapshot.outputs.capture_rc != '' }}
+        run: |
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          printf 'Phase snapshot capture failed (exit %s).\n\nRun: %s' "${{ steps.phase_snapshot.outputs.capture_rc }}" "$RUN_URL" > /tmp/discord-msg.txt
+
+      - name: Notify phase-snapshot failure via Discord
+        if: ${{ !cancelled() && steps.phase_snapshot.outputs.capture_rc != '0' && steps.phase_snapshot.outputs.capture_rc != '' }}
+        continue-on-error: true
+        uses: ./.github/actions/notify-discord
+        with:
+          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
+          port: ${{ secrets.PORT }}
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          fail-on-delivery: 'false'
 
   notify-backup-failure:
     name: Notify Backup Failure

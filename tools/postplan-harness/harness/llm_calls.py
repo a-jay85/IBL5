@@ -121,8 +121,8 @@ def manual_recheck_prompt(rows: list, cls: "Classification") -> str:
         "When a row is runnable, provide the argv as a JSON list. The first element "
         "must match the allowlist: `pytest`, `grep`, or `bin/(check|test)-<name>` — "
         "no interpreters (bash, python3, sh, env, node), no absolute paths, no `..`, "
-        "no flags starting with -c/-e/--eval/--exec/-p/--plugin, and at most 8 "
-        "elements. When in doubt, return hold.\n\n"
+        "no flags starting with -c/-e/--eval/--exec/-p/--plugin, "
+        "and at most 8 elements. When in doubt, return hold.\n\n"
         f"CLASSIFICATION:\n{cls.summary()}\n\n"
         f"ROWS:\n{numbered}\n\n"
         'Return ONLY JSON: [{"n": 1, "hold": true}, {"n": 2, "probe": ["bin/test-x"]}].'

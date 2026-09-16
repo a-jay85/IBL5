@@ -6,7 +6,7 @@
 # Usage:
 #   bin/backlog search <term>            gh issue list --search "<term>"
 #   bin/backlog open [<label>]           gh issue list --state open [--label <label>]
-#   bin/backlog new <label> <title>      gh issue create --label <label> --title "<title>"
+#   bin/backlog new <label> <title>      gh issue create --label <label> --title "<title>" --body ""
 #   bin/backlog close <n> <reason>       gh issue close <n> -c "<reason>"
 #
 # Flags (must precede subcommand):
@@ -81,7 +81,10 @@ case "$CMD" in
         fi
         LABEL="$1"; shift
         TITLE="$*"
-        run gh issue create --repo "$REPO" --label "$LABEL" --title "$TITLE"
+        # --body is mandatory for a non-interactive `gh issue create`; without it
+        # gh aborts with "must provide `--title` and `--body`". The title carries the
+        # finding, so an empty body is the right default.
+        run gh issue create --repo "$REPO" --label "$LABEL" --title "$TITLE" --body ""
         ;;
     close)
         if [ $# -lt 2 ]; then

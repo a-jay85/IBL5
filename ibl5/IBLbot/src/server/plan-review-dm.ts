@@ -117,9 +117,15 @@ export function handleListDecisions(dir?: string) {
 }
 
 /**
- * `POST /planDecisions/ack` — `{ ids: string[] }`. Unknown ids are ignored so an
- * at-least-once drain replaying ids it already sent stays boring. Idempotency
- * itself lives in the store, not here.
+ * `POST /planDecisions/ack` — `{ ids: string[] }`. Unknown ids are ignored — no tombstone
+ * is written for them — so an at-least-once drain replaying ids it already sent stays
+ * boring. Idempotency itself lives in the store, not here.
+ *
+ * **`acked` is advisory, not proof.** It counts only tombstones newly written on this call.
+ * Three different outcomes all contribute 0 and the response cannot distinguish them: the id
+ * was already acked, the id was compacted away, the id never named a decision. A drain must
+ * therefore never gate success on `acked === ids.length`. The authoritative check that an id
+ * is drained is that a subsequent `GET /planDecisions` no longer lists it.
  */
 export function handleAckDecisions(dir?: string) {
     return (req: Request, res: Response): void => {

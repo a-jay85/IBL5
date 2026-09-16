@@ -149,8 +149,8 @@ export function appendDecision(
  *
  * Returns the number of new tombstones written. A return of 0 does NOT mean failure — it is
  * the normal result of an at-least-once drain replaying ids it already acked. Callers must
- * not read `acked === ids.length` as proof; see `handleAckDecisions` in plan-review-dm.ts
- * for the authoritative check.
+ * not read `acked === ids.length` as proof; see the `handleAckDecisions` docstring in
+ * plan-review-dm.ts for the authoritative check.
  *
  * Safe because iblbot is single-process (pm2 fork mode): the readRaw + appendFileSync
  * pair has no await between them, so the event loop cannot interleave a second ack call.

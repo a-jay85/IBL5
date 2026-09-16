@@ -1,9 +1,9 @@
 ---
-description: CSS architecture: all styles live in ibl5/design/components/; inline CSS is banned.
+description: CSS architecture: all styles live in ibl5/design/components/; inline CSS is banned. Includes extraction gotchas, orphan-CSS audit, and mobile responsive hiding.
 paths:
   - "**/design/**/*.css"
   - "**/*View.php"
-last_verified: 2026-08-11
+last_verified: 2026-09-16
 ---
 
 # CSS Architecture Reference
@@ -111,3 +111,22 @@ Before writing CSS/HTML, read the relevant `ibl5/design/components/` file — th
 3. New table markup — always `.ibl-data-table` + variants (see Table Patterns).
 4. Wrapper divs when Tailwind utilities on existing elements suffice.
 5. Inventing CSS from scratch — read existing component files first.
+
+## Extraction & Global-Selector Gotchas
+
+- **Never `@import` page-scoped CSS with unscoped global selectors into `design/input.css`.** `input.css` compiles into the global Tailwind bundle loaded on every page. Bare selectors (`table`, `td`, `th`, `body`, `h1`) from a standalone admin stylesheet break VR baselines sitewide. Load the stylesheet directly via `<link>` in that page's `<head>`, or wrap every selector with a page-scope class (`.block-fa-admin table { ... }`) before adding to the global bundle.
+- **Heading element promotions can silently pick up compound `element+class` selectors.** Before promoting `h3` → `h2`, run: `grep -rn 'h2\.ibl-title\|h2\.' ibl5/design/`. If the TARGET element has an `h2.ibl-title` rule but the source element does not, the promotion is not VR-neutral — 6% desktop diff, 14px height change. Use `aria-level="2"` on `h3` instead: axe sees level-2 in the ARIA tree; CSS sees the original `h3` element.
+- **Tailwind watcher env vars are no-ops.** `CHOKIDAR_USEPOLLING`, `CHOKIDAR_INTERVAL`, and `PARCEL_WATCHER_BACKEND` are not read by Tailwind v4's `@parcel/watcher`. Don't chase these for git-op CSS staleness — the git hook (`bin/rebuild-css-if-source-changed`, installed by `bin/install-git-hooks`) is the fix. See `css-auto-rebuild.md`.
+
+## Orphan-CSS Audit
+
+Source-token miss from `bin/check-orphan-css` is a **worklist, not a "dead" verdict**. A miss means only "the literal string isn't in source" — not that the rule is unused. Before removing any candidate:
+
+1. **Run `--crawl`** against a prod-seeded app (`http://main.localhost/ibl5/` or a `bin/db-sync-prod` worktree) — it drops candidates that render live (composed/state-gated classes, `txn-badge--N`, `--active` modifiers).
+2. **Open the emitting view**, not just grep snippets. For a descendant selector (`.parent .child`), trace BOTH hops — a live `.parent` does not make `.child` live.
+
+CSS removal is UI-touching → route through `/plan` with a crawl or VR diff that empirically proves the rule was dead.
+
+## Mobile-Only Scope
+
+When removing a UI element "on mobile" or "to save space," default to **responsive CSS hiding** rather than deleting render code — desktop keeps what mobile drops. Add `@media (max-width: 1023px) { .element { display: none; } }` or a Tailwind `hidden lg:block` class on the existing element. Confirm scope explicitly when the user's phrasing is ambiguous (mobile only, or desktop too?).

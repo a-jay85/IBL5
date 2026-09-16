@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 2 — resolve a rebase conflict, prove no work was lost, and arm the conflict hold. Loaded only when the Phase 2 rebase block prints STOP-AND-RESOLVE.
-last_verified: 2026-09-12
+last_verified: 2026-09-16
 paths:
   - .claude/skills/post-plan/SKILL.md
   - .claude/skills/pr-ready/_rebase-and-conflicts.md
@@ -182,7 +182,7 @@ Phase 6.5 renders this into the sticky PR comment.
 
 Proceed to Phase 2 step 3 (push) and step 4 (`gh pr create`). The PR body's files-changed
 block must reflect the post-resolution diff, and per
-`.claude/rules/pr-body-negative-claim-recheck.md` every residual / out-of-scope bullet is
+`.claude/skills/post-plan/_pr-body-claims.md` every residual / out-of-scope bullet is
 re-read against that diff before the PR is opened.
 
 ---

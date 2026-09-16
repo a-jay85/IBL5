@@ -1,11 +1,30 @@
 ---
-description: Re-check every "What is NOT in this PR" negative claim after a remediation commit lands a plan deliverable — always-loaded; governs PR body authorship.
-last_verified: 2026-09-05
+description: PR body authoring rules — version/baseline citations must name their source file; negative-claim bullets must be re-read after every commit.
+last_verified: 2026-09-16
 ---
 
-# PR Body Negative-Claim Re-check
+# PR Body Claims
 
-## Rule
+## Citation rule
+
+When a PR body states a **version string** (`v2 → v3`, `@v3`), a **numeric baseline**
+(`147 call sites`), or an **`X → Y` figure**, name the **authoritative source file**
+inline — e.g. ``147 → 134 call sites (per `ibl5/phpstan-baseline.neon`)``.
+
+Uncited claims silently stale. Trigger: L43 (2026-09-02, PR #2059).
+
+| Claim type | Citation form |
+|---|---|
+| Version string | ``(per `.github/workflows/security.yml` (example) line N)`` |
+| Numeric baseline | ``(per `ibl5/phpstan-baseline.neon`)`` |
+| `X → Y` figure | ``(per `ibl5/phpstan-baseline.neon` — N sites)`` |
+| ADR frozen section rewritten | See `.claude/rules/adr-append-only.md` |
+
+Governs the **claim** (citation present), not whether the figure is correct.
+Applies to human-authored and autonomous-loop PR bodies alike.
+**Headless:** applies — automouse/`/post-plan` PR bodies must include inline citations.
+
+## Negative-claim re-check rule
 
 A "What is NOT in this PR" bullet is a claim about the **final** diff, not about the diff as
 it stood when you wrote the body. Any commit that lands after the body is written can
@@ -24,19 +43,7 @@ Delete or rewrite any bullet the diff has overtaken. Do not leave it standing wi
 softening qualifier — a residual entry that is no longer residual misreports scope to
 reviewers and poisons the post-merge audit trail.
 
-## What triggered this rule
-
-dev-efficiency backlog finding E46, from Phase 6 review of PR #2077. That PR's body carried a
-"What is NOT in this PR" residual entry claiming the conversion "is not yet self-enforcing".
-The scoped enforcement test `ibl5/tests/Http/ControllerSuperglobalFreedomTest.php` had already
-landed in the same PR's remediation commit, so the enforcement the bullet said was absent was
-sitting in the diff being described.
-
-No existing gate checks a negative scope claim against the actual diff. `/pr-ready` Phase 6
-catches this class only when it fires on that specific check; this rule is the cheap
-always-on reminder that sits upstream of it.
-
-## Application
+Trigger: E46, PR #2077.
 
 | What just happened | What to do with the negative-claim list |
 |---|---|
@@ -44,8 +51,6 @@ always-on reminder that sits upstream of it.
 | Any commit pushed to an open PR | Re-read the list against the new diff before considering the push done |
 | Body written and no commit since | Nothing to do — the list still describes the diff it was written against |
 | A bullet is now only *partly* true | Rewrite it to name the residual precisely; never leave the original wording |
-
-## Calibration
 
 This rule governs the **claim**, not the scope. Deliberately leaving work out of a PR is
 fine and normal — say so accurately. The defect is a stale absence assertion, not a real one.

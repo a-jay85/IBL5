@@ -3,7 +3,7 @@ description: Lighthouse CI posts per-URL scores and deltas-vs-master as a sticky
 paths:
   - ".github/workflows/lighthouse*"
   - "ibl5/.lighthouserc.json"
-last_verified: 2026-08-02
+last_verified: 2026-09-16
 ---
 
 # Lighthouse PR Comments
@@ -59,3 +59,18 @@ A 🟡 marker is informational — investigate before merging.
   human-readable default for a bare local `autorun`.
 - Change thresholds: edit `ibl5/.lighthouserc.json` `assert.assertions`.
 - Changing the selection logic or thresholds (mechanical-enforcement surface) requires an ADR.
+
+## NO_FCP — Empty Module Bodies
+
+`NO_FCP ("The page did not paint any content")` means an audited URL returned HTTP 200 with a 0-byte body. An action-dispatch-only module whose `index.php` has no `default` case in its `switch ($pa)` / `switch ($op)` echoes nothing when the action param is absent → blank 200 → NO_FCP. The audit aborts on the first failure; alphabetical order means one blank module masks every module after it.
+
+**Diagnostic sweep** (run against main stack):
+```bash
+bin/lighthouse-audit-urls | while read -r url; do
+  sz=$(curl -s -o /dev/null -w '%{size_download}' "$url")
+  [ "$sz" -lt 500 ] && printf 'CHECK %6s  %s\n' "$sz" "$url"
+done
+```
+Re-check flagged URLs with `curl -s -D - -o /dev/null` and read the status line — a `302` redirect also shows 0 bytes but Lighthouse follows it (fine); only a dead `200` with empty body fails.
+
+**Fix:** add a `default:` arm that renders page chrome + a visible notice, or add both a `Cli\LighthouseUrls::SUB_PAGES` entry AND the module name to `Cli\LighthouseUrls::PARAM_REQUIRED_MODULES` in `ibl5/classes/Cli/LighthouseUrls.php`. Enforced by `bin/lighthouse-audit-urls --check`, the last step of `.github/actions/lighthouse-setup`.

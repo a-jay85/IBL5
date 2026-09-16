@@ -1,6 +1,6 @@
 ---
 description: The production smoke test distinguishes an INCONCLUSIVE result (prober blocked by the WAF, or a docs-only deploy) from a real FAILURE, so transient prober-side issues no longer trigger an auto-rollback of healthy production.
-last_verified: 2026-09-02
+last_verified: 2026-09-16
 ---
 
 # ADR-0038: Smoke "Inconclusive" State Gates Auto-Rollback
@@ -63,4 +63,4 @@ left unchanged as the decision-time record; both have since moved on:
 Both sentences had been overwritten in place by the nightly doc-freshness refresh
 (commit `71b15038f`, PR #1776), which erased the decision-time record; they were restored
 byte-for-byte on 2026-09-02 and the current state moved here instead. See
-`.claude/rules/doc-freshness.md` § Decision Records Are Append-Only.
+`.claude/rules/adr-append-only.md`.

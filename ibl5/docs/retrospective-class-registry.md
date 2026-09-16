@@ -63,6 +63,7 @@ not add backticks or markdown links to a row.
 | 2026-09-14 | #2220 | class: a shell existence probe uses || echo <default> to convert command failure into a benign "not found" value, silently enabling a destructive action (DROP TABLE) on a protected resource that is temporarily unreachable — the same data-loss path the surrounding code exists to close | routed to: Rung 4 - new rule doc .claude/rules/shell-fail-open-probe.md: when a shell probe's exit status determines whether a destructive action fires, never use || echo <default> to swallow failure; use an if ! / explicit exit block so an unreachable resource aborts rather than proceeds | prior: -- |
 | 2026-09-15 | #2231 | class: a plan prescribes verbatim regression test implementations for a behavior gate; the prescribed token paths resolve on disk or carry pre-existing cue words that match the old guard alternation, making the new test cases vacuous against the pre-fix state and providing no coverage of the new behavior | routed to: Rung 3 - forced-trigger row in .claude/review-shared/_plan-verification.md (Forced verification trigger): when a plan phase prescribes verbatim regression test implementations claimed to fail against the pre-fix guard, require empirical proof — run the prescribed cases against origin/master's guard and confirm the new cases exit 1 before verifying exit 0 against the patched guard | prior: -- |
 | 2026-09-16 | #2232 | class: a write function accepts externally-supplied IDs and appends state records without first verifying the IDs reference real entries in the same store, silently persisting orphaned records until the next compaction | routed to: Rung 3 - new forced-trigger row in .claude/review-shared/_plan-verification.md (section: Forced integration-verification trigger): any plan adding or modifying a function that writes records keyed to externally-supplied IDs must assert that unknown IDs are ignored and produce no write to the backing store | prior: -- |
+| 2026-09-16 | #2244 | class: a PR body Scope bullet carries a specific count of files or rules modified that overcounts the realized diff, because the count was written at plan-time before implementation finalized and was never re-verified against git diff --numstat before the body was committed | routed to: Rung 4 - addendum added to .claude/skills/post-plan/_pr-body-claims.md and .claude/skills/pr-ready/_phase65-remediation.md step 4 requiring a Read of _pr-body-claims.md before finalizing the body, making the count-re-check explicit in the write path; caught by Phase 5.5 fidelity reviewer as a 6d.4 finding | prior: -- |
 ```
 
 ---
@@ -464,16 +465,16 @@ Landing rung: **1** — extend the existing `ibl5/tests/Cli/PrArmableLibCliTest.
 
 **prevention_ladder:**
 
-- rung 0 — `.claude/rules/pr-body-negative-claim-recheck.md` exists and fires on negative-scope claims after every commit. It does not cover positive citations (row IDs, line numbers). Not covered for this class.
-- rung 1 — extend `pr-body-negative-claim-recheck.md`: add a parallel "positive-cite re-check" trigger that re-reads any `(see L<N>)` or `:NN` line citation in the body after any commit that renumbers rows or touches the cited file. Landing rung for the F1 sub-class.
+- rung 0 — `.claude/skills/post-plan/_pr-body-claims.md` carries the negative-claim re-check rule, loaded when `/post-plan` reads it (not always-loaded). It does not cover positive citations (row IDs, line numbers). Not covered for this class.
+- rung 1 — extend `_pr-body-claims.md`: add a parallel "positive-cite re-check" trigger that re-reads any `(see L<N>)` or `:NN` line citation in the body after any commit that renumbers rows or touches the cited file. Landing rung for the F1 sub-class.
 - rung 2 — a companion rule doc reminding authors to re-verify prose line citations after any commit that adds or removes lines in the cited region. Landing rung for the F2 sub-class (automated verification would require parsing arbitrary prose numbers, which is higher cost than a rule).
 - rung 3 — PHPStan rule: not applicable (shell and markdown, no PHP).
 - rung 4 — CI gate: a gate could scan PR body for `:<N>` patterns and cross-check against live file line counts, but false-positive risk on prose text is high and the cost exceeds the benefit for an infrequent class.
-- rung 5 — new hook: not warranted; `pr-body-negative-claim-recheck.md` is the natural host for extension.
+- rung 5 — new hook: not warranted; `.claude/skills/post-plan/_pr-body-claims.md` is the natural host for extension.
 
-Landing rung: **1** for backlog ID citations (extend `pr-body-negative-claim-recheck.md`); **2** for line-number citations (rule doc).
+Landing rung: **1** for backlog ID citations (extend `.claude/skills/post-plan/_pr-body-claims.md`); **2** for line-number citations (rule doc).
 
-**artifact destination:** `.claude/rules/pr-body-negative-claim-recheck.md` (extension); optionally a companion rule for line citations.
+**artifact destination:** `.claude/skills/post-plan/_pr-body-claims.md` (extension); optionally a companion rule for line citations.
 
 **provenance:** (discovered 2026-09-06 during /pr-ready Phase 6 review of #2083; second recurrence of F1 class on this same PR)
 
@@ -481,11 +482,11 @@ Landing rung: **1** for backlog ID citations (extend `pr-body-negative-claim-rec
 
 ---
 
-### L70 `pr-body-negative-claim-recheck.md` covers negative-claim-list re-reads but not Summary-prose re-reads when a post-review commit modifies a Summary-mentioned file
+### L70 `_pr-body-claims.md` covers negative-claim-list re-reads but not Summary-prose re-reads when a post-review commit modifies a Summary-mentioned file
 
 *(discovered 2026-09-05 during #2131)*
 
-**class:** A post-review commit that modifies a file already named in the PR body's `## Summary` section silently invalidates Summary-section prose without triggering a targeted re-read. The existing rule (`pr-body-negative-claim-recheck.md`) already re-reads the negative-claim list on every commit; the uncovered gap is Summary-section prose — nothing cross-references the Summary-mentioned file set to trigger a re-read there.
+**class:** A post-review commit that modifies a file already named in the PR body's `## Summary` section silently invalidates Summary-section prose without triggering a targeted re-read. The existing rule (`.claude/skills/post-plan/_pr-body-claims.md`) already re-reads the negative-claim list on every commit; the uncovered gap is Summary-section prose — nothing cross-references the Summary-mentioned file set to trigger a re-read there.
 
 **occurrence table:**
 
@@ -495,13 +496,13 @@ Landing rung: **1** for backlog ID citations (extend `pr-body-negative-claim-rec
 
 **prevention_ladder:**
 
-- rung 0 — `.claude/rules/pr-body-negative-claim-recheck.md` exists and fires on every commit, but it is a behavioral prompt only — it carries no parse of the Summary to derive a file-set trigger. Phase 6 catches this class at review time (as it did here), but not at commit-push time.
-- rung 1 — extend `pr-body-negative-claim-recheck.md` to add requirement (b): when a post-review commit modifies a file named in `## Summary`, the rule fires a targeted re-read of **Summary-section prose** (the negative-claim list is already covered by the existing rule). Landing rung.
+- rung 0 — `.claude/skills/post-plan/_pr-body-claims.md` carries the negative-claim re-check rule and loads when `/post-plan` reads it, but it carries no parse of the Summary to derive a file-set trigger. Phase 6 catches this class at review time (as it did here), but not at commit-push time.
+- rung 1 — extend `.claude/skills/post-plan/_pr-body-claims.md` to add requirement (b): when a post-review commit modifies a file named in `## Summary`, the rule fires a targeted re-read of **Summary-section prose** (the negative-claim list is already covered by the existing rule). Landing rung.
 - rung 2 — a separate rule doc is not warranted; requirement (b) belongs as a named clause in the existing rule.
 
-Landing rung: **1** (extend `pr-body-negative-claim-recheck.md` to add the Summary-file cross-reference trigger for Summary-prose re-reads as requirement (b)).
+Landing rung: **1** (extend `.claude/skills/post-plan/_pr-body-claims.md` to add the Summary-file cross-reference trigger for Summary-prose re-reads as requirement (b)).
 
-**artifact destination:** `.claude/rules/pr-body-negative-claim-recheck.md` (in-repo)
+**artifact destination:** `.claude/skills/post-plan/_pr-body-claims.md` (in-repo)
 
 **provenance:** (discovered 2026-09-05 during #2131)
 
@@ -519,7 +520,7 @@ Landing rung: **1** (extend `pr-body-negative-claim-recheck.md` to add the Summa
 
 | # | File:line | Same class? | Live? | Status |
 |---|-----------|-------------|-------|--------|
-| 1 | PR #2131 — `.claude/rules/pr-body-claims.md` shipped at ~1.2 KB against a plan recipe of ~4.5 KB; the `## What triggered this rule` section (both PR #2059 failure narratives) was dropped without declaration in the PR body | yes | yes | not fixed — filed |
+| 1 | PR #2131 — `.claude/skills/post-plan/_pr-body-claims.md` shipped at ~1.2 KB against a plan recipe of ~4.5 KB; the `## What triggered this rule` section (both PR #2059 failure narratives) was dropped without declaration in the PR body | yes | yes | not fixed — filed |
 
 **prevention_ladder:**
 - rung 0 — no existing gate compares shipped rule doc content against plan recipe content.
@@ -556,7 +557,7 @@ Landing rung: **2** — a rule doc under `.claude/rules/` requiring declared dev
 - rung 2 — a rule doc: "when filing a backlog entry, cite the PR number rather than a commit SHA; if a SHA is essential, confirm it is a reachable ancestor of HEAD at filing time." Cheaper and sufficient. Landing rung.
 - rungs 3–5 — not applicable; the surface is backlog authoring, not PHP code or CI.
 
-Landing rung: **2** — rule doc under `.claude/rules/` (or addendum to `.claude/rules/pr-body-claims.md` since both govern PR/backlog authoring quality).
+Landing rung: **2** — rule doc under `.claude/rules/` (or addendum to `.claude/skills/post-plan/_pr-body-claims.md` since both govern PR/backlog authoring quality).
 
 **artifact destination:** `.claude/rules/` (addendum or new file, in-repo)
 

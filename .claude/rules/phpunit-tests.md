@@ -1,7 +1,7 @@
 ---
-description: PHPUnit testing rules: output parsing, behavior-focused patterns.
+description: PHPUnit testing rules: output parsing, behavior-focused patterns, PHPStan test-neon suppressions, integration test seeding.
 paths: ibl5/tests/**/*.php
-last_verified: 2026-07-28
+last_verified: 2026-09-16
 ---
 
 # PHPUnit Testing Rules
@@ -165,3 +165,13 @@ Before considering ANY PHP task complete:
 4. If `OK, but there were issues!`, run `--display-all-issues` and FIX root causes (don't suppress).
 
 Use `--testsuite`/`--filter` only for fast feedback while debugging a specific failure — re-run the full suite once it passes.
+
+## PHPStan test-neon suppressions
+
+- **Always `self::createStub()`, never `$this->createStub()`.** `phpstan-tests.neon` flags `$this->createStub(Foo::class)` as a dynamic call to a static method. Use the static call form for all `TestCase` helpers. When agents generate test classes, audit ALL `$this->createStub(` occurrences and replace with `self::createStub(`. Same applies to `self::createMock()`.
+- **`assertInstanceOf(Iface::class, $result)` on an already-typed return value → "always true".** PHPStan flags this when the declared return type already IS the interface. Suppress with `// @phpstan-ignore-next-line (asserting return type as intentional contract test)` — do NOT remove the assertion (it pins the architecture) or baseline it.
+
+## Integration test FK constraints
+
+- **`ibl_box_scores` has a FK on `pid` → `ibl_plr(pid)`.** Any integration test that inserts box-score rows (directly or via `processAllStarGamesData`) must insert matching `ibl_plr` rows first. Call `$this->insertTestPlayer($pid, $name)` for every PID in the test dataset in `setUp`/`setUpGameState`.
+- **Tests checking a CI-seed-gated branch (e.g., all-star cutoff) must mock the gating query.** `Season::getLastBoxScoreDate()` reads `ibl_box_scores` with no year filter; CI seed has modern dates, so the gate never fires. Inject a mock `Season` stub (`createMock` not `createStub` — the latter triggers `staticMethod.dynamicCall` in PHPStan for Season's method). `BoxscoreProcessor` accepts `?Season $season = null` as a named constructor arg.

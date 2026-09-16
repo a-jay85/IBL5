@@ -1,6 +1,6 @@
 ---
-description: htmx snapshots the DOM into its history cache mid-request, so transient request-time DOM state gets frozen into Back navigation — how to avoid baking it in.
-last_verified: 2026-08-16
+description: htmx gotchas: DOM-snapshot ordering freezes transient state into Back navigation; HX-Redirect triggers full reload; PageCache strips response headers.
+last_verified: 2026-09-16
 paths:
   - "ibl5/jslib/**"
   - "ibl5/themes/**"
@@ -71,3 +71,11 @@ before asserting on the restored DOM.
 `ibl5/docs/decisions/0103-htmx-transient-dom-state-repair-on-history-restore.md` —
 the alternatives weighed (`beforeHistorySave`, a blanket re-enable, a mechanical
 gate) and why enforcement here is a rule doc plus review rather than a gate.
+
+## HX-Redirect & HX-Location
+
+**`HX-Redirect` triggers a full page reload**, not a boosted swap. htmx 2.0.8's handler does `window.location.href = url` — a full browser navigation that destroys DOM state. Nav-marker E2E tests (checking DOM persistence across actions) only work for **inline-rendering** forms (search, depth chart). Forms that redirect via `HtmxHelper::redirect()` (trading, waivers, free agency) do full reloads. `HX-Location` would preserve the SPA experience but is not currently used.
+
+## PageCache & HTMX Response Headers
+
+**Non-boosted HTMX requests (`op=api` partials) must bypass PageCache.** The file-based cache stores only the HTML body — custom response headers (`HX-Push-Url`, `HX-Redirect`, `HX-Trigger`) are lost, causing `htmx` pushState to silently fail. The `$isHtmxPartial` guard in `ibl5/modules.php` handles this globally. Module `index.php` files that bypass `modules.php` must handle it themselves.

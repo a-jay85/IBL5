@@ -527,8 +527,8 @@ _precheck_verdict() {
     set -e
     [ "$_vrc" -ne 0 ] && { echo ""; return 0; }
 
-    # The LAST sticky comment wins — the same rule merge-digest-notify.yml applies, and for
-    # the same reason: /pr-ready rewrites the comment across phases.
+    # The LAST sticky comment wins — the same rule .github/workflows/merge-digest-notify.yml
+    # applies, and for the same reason: /pr-ready rewrites the comment across phases.
     _vbody="$(jq -r '[.comments[]? | select((.body // "") | contains("<!-- pr-ready-verdict -->"))] | last | .body // ""' \
         "$RUNDIR/verdict-$_vn.json" 2>/dev/null || true)"
     [ -n "$_vbody" ] || { echo ""; return 0; }

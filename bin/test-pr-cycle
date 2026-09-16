@@ -93,8 +93,7 @@ mkshim ready
 mkshim triage
 mkshim dm
 
-# gh shim. `pr view N --json state --jq .state` replays state-N (default OPEN);
-# `pr view N --json title,url,comments` replays view-N.json (default an empty object).
+# gh shim. `pr view N --json state --jq .state` replays state-N (default OPEN).
 cat > "$BIN/gh" <<GH_EOF
 #!/usr/bin/env bash
 S="$SCRATCH"
@@ -104,11 +103,8 @@ for a in "\$@"; do case "\$a" in [0-9]*) num="\$a"; break ;; esac; done
 case "\$*" in
     *"--json state"*)
         if [[ -f "\$S/state-\$num" ]]; then cat "\$S/state-\$num"; else echo OPEN; fi ;;
-    *"--json title,url,comments"*)
-        if [[ -f "\$S/view-\$num.json" ]]; then cat "\$S/view-\$num.json"; else echo '{}'; fi ;;
     *"--json comments,headRefOid"*)
-        # The verdict pre-read. A dedicated file so a case can give the ledger digest and
-        # the verdict pre-read different bodies. \$S/gh-fail-verdict forces the non-zero
+        # The verdict pre-read. \$S/gh-fail-verdict forces the non-zero
         # exit the driver has to degrade through.
         [[ -f "\$S/gh-fail-verdict" ]] && exit 3
         if [[ -f "\$S/verdictview-\$num.json" ]]; then cat "\$S/verdictview-\$num.json"
@@ -217,31 +213,6 @@ triage_report() {  # $@ = "PR BUCKET ACTION" triples, one per argument
     done
 }
 
-# Bare (unbulleted) bold labels. This is the shape `.claude/skills/pr-ready/_phase7-verdict.md`
-# obliges the producer to emit, and the shape real verdict comments carry (PRs #2092, #2064,
-# #2084). The bulleted fixture this replaced silently exempted _digest_labels from the only
-# format it ever parses in production, which is why the suite stayed green while every live
-# ledger row read `digest: unavailable`. Case 15's `partial` variant keeps the bulleted form,
-# so the parser is still held to both.
-digest_comment() {  # no arguments; the fixture is fixed text
-    cat <<'DIG_EOF'
-<!-- pr-ready-verdict -->
-Verdict: green.
-
-### Merge digest
-**What changed:** the driver landed
-**Why:** because the loop was manual
-**Watch:** the ledger
-**Touches:** bin/pr-cycle
-**Machine-authored fixes:** none
-
----
-
-## Remediation
-Prose after a horizontal rule must not be folded onto the last label's value.
-DIG_EOF
-}
-
 # Two distinct 40-hex tree SHAs. TREE_A is "the tree /pr-ready reviewed"; TREE_B is any
 # other tree, used to stage the stale-verdict case.
 TREE_A="1111111111111111111111111111111111111111"
@@ -283,8 +254,7 @@ $line
 VC_EOF
 }
 
-# Stage a verdict for PR $1 across BOTH gh views the driver reads — the ledger digest
-# (`--json title,url,comments`) and the verdict pre-read (`--json comments,headRefOid`) —
+# Stage a verdict for PR $1 across the verdict pre-read (`--json comments,headRefOid`)
 # plus the head commit's tree lookup.
 #   $2 = reviewed-tree SHA recorded in the comment
 #   $3 = the head's ACTUAL tree (default: equal to $2, i.e. the verdict is current)
@@ -294,27 +264,17 @@ install_verdict() {
     local n="$1" rtree="$2" htree="${3:-$2}" line="${4:-**READY**}" body oid
     oid="deadbeefcafe$(printf '%028d' "$n")"
     body="$(verdict_comment "$rtree" "$line")"
-    printf '%s' "$(view_json "$n" "$body")" > "$SCRATCH/view-$n.json"
     printf '{"comments":[{"body":%s}],"headRefOid":"%s"}' \
         "$(printf '%s' "$body" | jq -Rs .)" "$oid" > "$SCRATCH/verdictview-$n.json"
     printf '%s\n' "$htree" > "$SCRATCH/tree-$oid"
 }
 
-view_json() {  # $1 = PR number, $2 = comment body (may be empty for the no-comments case)
-    if [[ -z "${2:-}" ]]; then
-        printf '{"title":"t%s","url":"https://x/%s","comments":[]}' "$1" "$1"
-    else
-        printf '{"title":"t%s","url":"https://x/%s","comments":[{"body":%s}]}' \
-            "$1" "$1" "$(printf '%s' "$2" | jq -Rs .)"
-    fi
-}
-
 reset_state() {
     rm -f "$SCRATCH"/*.argv "$SCRATCH"/attack-* "$SCRATCH"/ready-* "$SCRATCH"/triage-* \
-          "$SCRATCH"/dm-* "$SCRATCH"/state-* "$SCRATCH"/view-*.json \
+          "$SCRATCH"/dm-* "$SCRATCH"/state-* \
           "$SCRATCH"/verdictview-*.json "$SCRATCH"/tree-* "$SCRATCH"/gh-fail-verdict
-    rm -f "$SCRATCH/IBL5-merge-digest.md" "$SCRATCH/.ibl5-pr-cycle.stop"
-    rm -rf "$SCRATCH/verdicts" "/tmp/pr-cycle-$TSBASE"* 2>/dev/null
+    rm -f "$SCRATCH/.ibl5-pr-cycle.stop"
+    rm -rf "/tmp/pr-cycle-$TSBASE"* 2>/dev/null
     rm -f "/tmp/pr-cycle-$TSBASE"*.sh "/tmp/pr-cycle-$TSBASE"*.log 2>/dev/null
     rm -f "$SCRATCH/Library/LaunchAgents"/com.ibl5.pr-cycle-*.plist 2>/dev/null
     clear_live_labels
@@ -342,10 +302,7 @@ run_in() {
         PR_CYCLE_MAIN_CHECKOUT="${MAIN_OVERRIDE-$MAIN}" \
         PR_CYCLE_POLL_INTERVAL="${IVAL:-0}" \
         PR_CYCLE_POLL_CEILING="${CEIL:-0}" \
-        PR_CYCLE_LEDGER="${LEDGER-$SCRATCH/IBL5-merge-digest.md}" \
         PR_CYCLE_STOP_FILE="$SCRATCH/.ibl5-pr-cycle.stop" \
-        PR_CYCLE_NOW="2026-01-01T00:00:00Z" \
-        PR_CYCLE_VERDICT_DIR="${VERDICT_DIR:-$SCRATCH/verdicts}" \
         PR_CYCLE_TS="${TSPIN:-$TSBASE}" \
         "$DRIVER" "$@" 2>"$ERR")"
     RC=$?
@@ -360,8 +317,17 @@ state_calls() { grep -c -- '--json state' "$SCRATCH/gh.argv" || true; }
 # Count of triage invocations that actually ARM. The read-only pre-read shares this shim,
 # so a bare `calls triage` no longer distinguishes "did not arm" from "did not run".
 arm_calls() { grep -c -- '--arm' "$SCRATCH/triage.argv" 2>/dev/null || true; }
-ledger() { cat "$SCRATCH/IBL5-merge-digest.md" 2>/dev/null; }
-rows() { grep -c '^- \[ \] #' "$SCRATCH/IBL5-merge-digest.md" 2>/dev/null || echo 0; }
+# Confirmed-merge count for the run just made. The ledger file this used to read is gone;
+# `ledgered.txt` in the rundir is the same bookkeeping the driver counts $MERGES from, and
+# `reset_state` already clears /tmp/pr-cycle-$TSBASE* between cases. `_worker` creates the
+# file with `: >`, so "no file" is genuinely zero merges and not a masked error.
+merges() {
+    if [[ -f "/tmp/pr-cycle-$TSBASE/ledgered.txt" ]]; then
+        wc -l < "/tmp/pr-cycle-$TSBASE/ledgered.txt" | tr -d ' '
+    else
+        echo 0
+    fi
+}
 
 # ==========================================================================================
 # 1 — flag validation
@@ -480,7 +446,7 @@ run --worker
     || fail "ready argv 2: $(sed -n '2p' "$SCRATCH/ready.argv")"
 [[ "$(sed -n '3p' "$SCRATCH/ready.argv")" == "--pr 103 --jobs 1 --go --wait" ]] \
     || fail "ready argv 3: $(sed -n '3p' "$SCRATCH/ready.argv")"
-[[ "$(rows)" == "0" ]] || fail "non-armable run wrote $(rows) ledger rows, want 0"
+[[ "$(merges)" == "0" ]] || fail "non-armable run counted $(merges) merges, want 0"
 grep -qF 'queue drained' <<< "$OUT" || fail "drained run did not report draining"
 end_case "case 5/8 serial order and ready argv"
 
@@ -574,7 +540,7 @@ run --worker
 [[ $RC -eq 0 ]] || fail "non-armable run exit $RC, want 0"
 [[ "$(calls ready)" == "3" ]] || fail "run stopped early: $(calls ready) ready calls"
 [[ "$(calls gh)" == "0" ]] || fail "polled despite no ARMABLE row: $(calls gh) gh calls"
-[[ "$(rows)" == "0" ]] || fail "wrote $(rows) rows without an ARMABLE row"
+[[ "$(merges)" == "0" ]] || fail "counted $(merges) merges without an ARMABLE row"
 grep -qF 'absent' <<< "$OUT" || fail "a PR missing from the report was not reported as absent"
 end_case "case 11 non-armable and absent"
 
@@ -650,7 +616,6 @@ triage_report "101 ARMABLE merge" > "$SCRATCH/triage-out"
 # case counts still happens. Call 2 (the arm) falls back to the ARMABLE report above.
 triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out-1"
 echo MERGED > "$SCRATCH/state-101"
-view_json 101 "$(digest_comment)" > "$SCRATCH/view-101.json"
 run --worker --max-merges 1
 [[ $RC -eq 0 ]] || fail "capped run exit $RC, want 0"
 [[ "$(calls ready)" == "2" ]] || fail "capped run made $(calls ready) ready calls, want 2 (#101 + one rescue)"
@@ -732,10 +697,9 @@ triage_report "101 ARMABLE auto-merge armed" "102 NEEDS-WORK rebase" "103 NEEDS-
     > "$SCRATCH/triage-out"
 echo 1 > "$SCRATCH/triage-rc"
 echo MERGED > "$SCRATCH/state-101"
-printf '%s' "$(view_json 101 "$(digest_comment)")" > "$SCRATCH/view-101.json"
 run --worker
 [[ $RC -eq 0 ]] || fail "triage exit 1 should continue, got $RC"
-[[ "$(rows)" == "1" ]] || fail "triage exit 1 lost the merge row: $(rows)"
+[[ "$(merges)" == "1" ]] || fail "triage exit 1 lost the confirmed merge: $(merges)"
 end_case "case 12 triage exit codes"
 
 # ==========================================================================================
@@ -747,24 +711,11 @@ printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
 triage_report "101 ARMABLE auto-merge armed" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
     > "$SCRATCH/triage-out"
 echo MERGED > "$SCRATCH/state-101"
-printf '%s' "$(view_json 101 "$(digest_comment)")" > "$SCRATCH/view-101.json"
 run --worker
 [[ $RC -eq 0 ]] || fail "merge run exit $RC, want 0"
-[[ "$(rows)" == "1" ]] || fail "want 1 ledger row, got $(rows)"
-cat > "$SCRATCH/expected-row" <<'EXP_EOF'
-- [ ] #101 t101 — merged 2026-01-01T00:00:00Z — https://x/101
-  - **What changed:** the driver landed
-  - **Why:** because the loop was manual
-  - **Watch:** the ledger
-  - **Touches:** bin/pr-cycle
-  - **Machine-authored fixes:** none
-EXP_EOF
-ledger | grep -n '' >/dev/null
-ledger | tail -n 6 > "$SCRATCH/actual-row"
-diff -u "$SCRATCH/expected-row" "$SCRATCH/actual-row" >/dev/null \
-    || { fail "ledger row is not byte-identical"; diff -u "$SCRATCH/expected-row" "$SCRATCH/actual-row" >&2; }
+[[ "$(merges)" == "1" ]] || fail "want 1 confirmed merge, got $(merges)"
 grep -qF 'merged 1' <<< "$OUT" || fail "run summary did not report 1 merge"
-end_case "case 13 ledger row"
+end_case "case 13 confirmed merge is counted"
 
 # ==========================================================================================
 # 14 — OPEN to the ceiling and CLOSED both write no row; ceiling 0 polls exactly once
@@ -775,7 +726,7 @@ printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
 triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
 IVAL=30 CEIL=0 run --worker    # a second poll would sleep 30s; the run must not
 [[ $RC -eq 0 ]] || fail "ceiling hit should not halt, got $RC"
-[[ "$(rows)" == "0" ]] || fail "unconfirmed merge wrote $(rows) rows"
+[[ "$(merges)" == "0" ]] || fail "unconfirmed merge counted $(merges)"
 # 2 gh state calls: one poll, then one reconcile check. A retry loop would show more.
 [[ "$(state_calls)" == "2" ]] \
     || fail "want exactly 1 poll + 1 reconcile, got $(state_calls) state calls"
@@ -790,7 +741,7 @@ triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out-1"
 echo CLOSED > "$SCRATCH/state-101"
 run --worker
 [[ $RC -eq 0 ]] || fail "CLOSED should not halt, got $RC"
-[[ "$(rows)" == "0" ]] || fail "CLOSED wrote $(rows) rows"
+[[ "$(merges)" == "0" ]] || fail "CLOSED counted $(merges)"
 [[ "$(calls ready)" == "3" ]] || fail "CLOSED stopped the run early"
 end_case "case 14 unconfirmed merges"
 
@@ -805,53 +756,27 @@ for variant in nodigest nocomments partial; do
         > "$SCRATCH/triage-out"
     echo MERGED > "$SCRATCH/state-101"
     case "$variant" in
-        nodigest)   printf '%s' "$(view_json 101 '<!-- pr-ready-verdict -->
-Verdict: green. No digest block here.')" > "$SCRATCH/view-101.json" ;;
-        nocomments) printf '%s' "$(view_json 101 '')" > "$SCRATCH/view-101.json" ;;
-        partial)    printf '%s' "$(view_json 101 '<!-- pr-ready-verdict -->
+        nodigest)   VBODY='<!-- pr-ready-verdict -->
+Verdict: green. No digest block here.' ;;
+        nocomments) VBODY='' ;;
+        partial)    VBODY='<!-- pr-ready-verdict -->
 
 ### Merge digest
 - **What changed:** partial
 - **Why:** partial
 - **Watch:** partial
-- **Touches:** partial')" > "$SCRATCH/view-101.json" ;;
+- **Touches:** partial' ;;
     esac
+    # The comment body now reaches the driver through the verdict pre-read only -- the
+    # `--json title,url,comments` fetch _digest_row used is gone. headRefOid is left empty
+    # so no tree lookup fires; none of these bodies carries a `**Reviewed tree:**` line, so
+    # none of them authorises the pr-ready skip either way.
+    printf '{"comments":[{"body":%s}],"headRefOid":""}' "$(printf '%s' "$VBODY" | jq -Rs .)" \
+        > "$SCRATCH/verdictview-101.json"
     run --worker
-    [[ "$(rows)" == "1" ]] || fail "$variant: want 1 row, got $(rows)"
-    case "$variant" in
-        nodigest|nocomments)
-            ledger | grep -qF 'digest: unavailable' || fail "$variant: want 'digest: unavailable'" ;;
-        partial)
-            ledger | grep -qF '**Machine-authored fixes:** (missing)' \
-                || fail "partial: missing label not rendered as (missing)"
-            ledger | grep -qF '**Touches:** partial' || fail "partial: present label lost" ;;
-    esac
+    [[ "$(merges)" == "1" ]] || fail "$variant: want 1 merge, got $(merges)"
 done
-
-# 15d — verdict file on disk recovers the digest when no comment exists
-reset_state
-printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
-triage_report "101 ARMABLE armed" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
-    > "$SCRATCH/triage-out"
-echo MERGED > "$SCRATCH/state-101"
-printf '%s' "$(view_json 101 '')" > "$SCRATCH/view-101.json"
-mkdir -p "$SCRATCH/verdicts"
-cat > "$SCRATCH/verdicts/pr-ready-verdict-101.md" <<'VFILE_EOF'
-<!-- pr-ready-verdict -->
-Verdict: green.
-
-### Merge digest
-**What changed:** recovered change
-**Why:** recovered reason
-**Watch:** recovered watch
-**Touches:** bin/pr-cycle
-**Machine-authored fixes:** none
-VFILE_EOF
-VERDICT_DIR="$SCRATCH/verdicts" run --worker
-[[ "$(rows)" == "1" ]] || fail "verdict_file_recovery: want 1 row, got $(rows)"
-ledger | grep -qF '**What changed:** recovered change' \
-    || fail "verdict_file_recovery: recovered label not in ledger"
-ledger | grep -qF 'digest: unavailable' && fail "verdict_file_recovery: unavailable line still emitted"
+unset VBODY
 
 # 15e — no ready file and no verdict file → reason names triage-sweep arming
 reset_state
@@ -860,24 +785,8 @@ triage_report "101 ARMABLE armed" "102 ARMABLE armed" "103 NEEDS-WORK rebase" \
     > "$SCRATCH/triage-out"
 echo MERGED > "$SCRATCH/state-101"
 echo MERGED > "$SCRATCH/state-102"
-printf '%s' "$(view_json 101 "$(digest_comment)")" > "$SCRATCH/view-101.json"
-printf '%s' "$(view_json 102 '')" > "$SCRATCH/view-102.json"
 run --worker
-[[ "$(rows)" == "2" ]] || fail "no_ready: want 2 rows, got $(rows)"
-ledger | grep -qF 'no /pr-ready pass (armed by triage sweep)' \
-    || fail "no_ready: triage-sweep reason not found for unreadied #102"
-
-# 15f — ready file exists but no verdict comment and no verdict file → reason names /pr-ready
-reset_state
-printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
-triage_report "101 ARMABLE armed" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
-    > "$SCRATCH/triage-out"
-echo MERGED > "$SCRATCH/state-101"
-printf '%s' "$(view_json 101 '')" > "$SCRATCH/view-101.json"
-run --worker
-[[ "$(rows)" == "1" ]] || fail "ready_no_verdict: want 1 row, got $(rows)"
-ledger | grep -qF 'digest: unavailable — /pr-ready ran but posted no verdict comment' \
-    || fail "ready_no_verdict: /pr-ready reason string not found"
+[[ "$(merges)" == "2" ]] || fail "no_ready: want 2 merges, got $(merges)"
 
 end_case "case 15 degraded digests"
 
@@ -892,14 +801,11 @@ triage_report "101 ARMABLE armed" "102 ARMABLE armed" "103 NEEDS-WORK rebase" \
 triage_report "101 NEEDS-WORK rebase" > "$SCRATCH/triage-out-1"
 echo MERGED > "$SCRATCH/state-101"
 echo MERGED > "$SCRATCH/state-102"
-printf '%s' "$(view_json 101 "$(digest_comment)")" > "$SCRATCH/view-101.json"
-printf '%s' "$(view_json 102 "$(digest_comment)")" > "$SCRATCH/view-102.json"
 run --worker --max-merges 1
 [[ $RC -eq 0 ]] || fail "cap run exit $RC, want 0"
-# The cap stops further WORK; it never suppresses a row for an already-confirmed merge.
-[[ "$(rows)" == "2" ]] || fail "cap 1 with two confirmed merges: want 2 rows, got $(rows)"
+# The cap stops further WORK; it never uncounts an already-confirmed merge.
+[[ "$(merges)" == "2" ]] || fail "cap 1 with two confirmed merges: want 2, got $(merges)"
 [[ "$(calls ready)" == "1" ]] || fail "cap 1: want 1 ready call, got $(calls ready)"
-ledger | grep -qF '#102' || fail "a PR merged without being readied was not ledgered"
 grep -qF 'merge cap' <<< "$OUT" || fail "cap termination not reported"
 
 reset_state
@@ -914,10 +820,9 @@ triage_report "103 ARMABLE armed"     > "$SCRATCH/triage-out"
 echo MERGED > "$SCRATCH/state-101"
 echo MERGED > "$SCRATCH/state-102"
 echo MERGED > "$SCRATCH/state-103"
-for p in 101 102 103; do printf '%s' "$(view_json "$p" "$(digest_comment)")" > "$SCRATCH/view-$p.json"; done
 run --worker --max-merges 2
 [[ "$(calls ready)" == "2" ]] || fail "cap 2: want 2 ready calls, got $(calls ready)"
-[[ "$(rows)" == "2" ]] || fail "cap 2: want 2 ledger rows, got $(rows)"
+[[ "$(merges)" == "2" ]] || fail "cap 2: want 2 merges, got $(merges)"
 end_case "case 16/17 cap semantics"
 
 # ==========================================================================================
@@ -962,11 +867,10 @@ printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
 triage_report "101 ARMABLE armed" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
     > "$SCRATCH/triage-out"
 echo MERGED > "$SCRATCH/state-101"
-printf '%s' "$(view_json 101 "$(digest_comment)")" > "$SCRATCH/view-101.json"
 echo 1 > "$SCRATCH/dm-rc"
 run --worker
 [[ $RC -eq 0 ]] || fail "a failed DM changed the run exit status to $RC"
-[[ "$(rows)" == "1" ]] || fail "a failed DM cost a ledger row"
+[[ "$(merges)" == "1" ]] || fail "a failed DM cost a confirmed merge"
 end_case "case 19 end-of-run DM"
 
 # ==========================================================================================
@@ -982,7 +886,7 @@ BARE="$OUT"
 grep -qF -- '--go' "$SCRATCH/ready.argv" && fail "dry run passed --go to the ready tool"
 grep -qF -- '--arm' "$SCRATCH/triage.argv" && fail "dry run armed"
 grep -qF 'bootstrap' "$SCRATCH/launchctl.argv" && fail "dry run bootstrapped a job"
-[[ ! -e "$SCRATCH/IBL5-merge-digest.md" ]] || fail "dry run created the ledger"
+[[ "$(merges)" == "0" ]] || fail "dry run counted $(merges) merges"
 grep -qF 'next PR: #101' <<< "$BARE" || fail "dry run did not name the next PR"
 
 reset_state
@@ -1045,18 +949,9 @@ end_case "case 21/22/23 artifacts"
 # ==========================================================================================
 begin_case
 reset_state
-printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
-triage_report "101 ARMABLE armed" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
-    > "$SCRATCH/triage-out"
-echo MERGED > "$SCRATCH/state-101"
-printf '%s' "$(view_json 101 "$(digest_comment)")" > "$SCRATCH/view-101.json"
-LEDGER="" run --worker      # empty PR_CYCLE_LEDGER must fall back to $HOME/IBL5-merge-digest.md
-[[ "$(rows)" == "1" ]] || fail "empty PR_CYCLE_LEDGER did not fall back to the HOME default"
-
-reset_state
 MAIN_OVERRIDE="" run --worker   # empty checkout seam falls back to the real hardcoded path
 [[ $RC -eq 1 ]] || fail "empty PR_CYCLE_MAIN_CHECKOUT did not fall back to the pinned default"
-unset MAIN_OVERRIDE LEDGER
+unset MAIN_OVERRIDE
 end_case "case 24 empty seams"
 
 # ==========================================================================================
@@ -1252,7 +1147,11 @@ g_no_bucket_cond() {
 g_sleep_in_poll() {
     local start end bad
     start="$(grep -n '^_poll_merge()' "$1" | cut -d: -f1)"
-    end="$(grep -n '^_digest_labels()' "$1" | cut -d: -f1)"
+    # END anchor: the first function definition after _poll_merge. This was _digest_labels()
+    # until that parser moved to bin/digest-dm-build; _reconcile() is now the next one down.
+    # If a new function is ever inserted between the two, move this anchor with it -- a stale
+    # anchor makes the guard vacuous, not loud.
+    end="$(grep -n '^_reconcile()' "$1" | cut -d: -f1)"
     [[ -n "$start" && -n "$end" ]] || return 1
     bad="$(grep -nE '(^|[^A-Za-z_])sleep[[:space:]]' "$1" | cut -d: -f1 \
         | awk -v s="$start" -v e="$end" '$1 < s || $1 > e')"
@@ -1261,10 +1160,18 @@ g_sleep_in_poll() {
 g_cmd_prefix() {
     ! noncomment "$1" | grep -E '^[A-Z_]+_CMD=' | grep -qv '^PR_CYCLE_'
 }
+# The merge-digest DM is built by .github/workflows/merge-digest-notify.yml from the sticky
+# comment, not by this driver. If `--json title,url,comments` reappears here, a second digest
+# reader has grown back inside pr-cycle and the fixture surface deleted in this PR is needed
+# again -- fail loudly rather than let the two drift.
+g_no_digest_fetch() {
+    ! grep -q -- '--json title,url,comments' "$1"
+}
 # --only/--skip scope SELECTION, never ACCOUNTING. _pr_allowed must not appear anywhere
 # between _arm_and_classify and _report_dry_run — that span holds the arm call, the merge
-# poll, the ledger and the MERGES counter. Filtering there would uncap --max-merges (one
-# blanket --arm arms out-of-set PRs too) and drop ledger rows for PRs that really merged.
+# poll, the ledgered.txt bookkeeping and the MERGES counter. Filtering there would uncap
+# --max-merges (one blanket --arm arms out-of-set PRs too) and lose confirmed merges for PRs
+# that really merged.
 # Comment lines are BLANKED rather than deleted so the numbering still matches the file:
 # the driver's own explanatory comments in that span name _pr_allowed on purpose.
 g_scope_selection_only() {
@@ -1280,7 +1187,7 @@ g_scope_selection_only() {
 
 begin_case
 for g in g_no_merge g_no_armable_lib g_triage_pin g_one_arm g_no_bucket_cond \
-         g_sleep_in_poll g_cmd_prefix g_scope_selection_only; do
+         g_sleep_in_poll g_cmd_prefix g_no_digest_fetch g_scope_selection_only; do
     "$g" "$DRIVER" || fail "static guard $g fails against the real bin/pr-cycle"
 done
 # Guard 7 — both new files are executable and parse.
@@ -1310,6 +1217,8 @@ mutant; echo 'sleep 5' >> "$SCRATCH/mutant"
 g_sleep_in_poll "$SCRATCH/mutant" && fail "vacuous: g_sleep_in_poll passed a sleep outside _poll_merge"
 mutant; echo 'TRIAGE_CMD="${TRIAGE_CMD:-x}"' >> "$SCRATCH/mutant"
 g_cmd_prefix "$SCRATCH/mutant" && fail "vacuous: g_cmd_prefix passed an unprefixed *_CMD seam"
+mutant; echo '# --json title,url,comments' >> "$SCRATCH/mutant"
+g_no_digest_fetch "$SCRATCH/mutant" && fail "vacuous: g_no_digest_fetch passed a digest comment fetch"
 # Appending cannot test this one — the guard is region-scoped, so the mutation has to land
 # INSIDE _arm_and_classify. awk inserts the line right after the function header.
 awk '/^_arm_and_classify\(\) \{/ { print; print "    _pr_allowed \"$1\" || return 0"; next } { print }' \
@@ -1324,7 +1233,7 @@ end_case "case 26 guards are not vacuous"
 # 27a (Case A) — both conditions hold: ARMABLE, and a sticky verdict whose recorded
 # reviewed tree still equals the head's tree and whose verdict line reads READY. The
 # readying session is declined and the PR still proceeds through arming, polling and the
-# ledger. The same fixture serves the digest parser, so this also holds the ledger row.
+# merge count.
 begin_case
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
@@ -1338,7 +1247,7 @@ run --worker
 grep -qF '#101 — already ARMABLE with a current READY verdict, skipping pr-ready' <<< "$OUT" \
     || fail "ARMABLE+READY skip: the skip log line is missing"
 [[ "$(arm_calls)" == "1" ]] || fail "ARMABLE+READY skip: want 1 arm, got $(arm_calls)"
-[[ "$(rows)" == "1" ]] || fail "ARMABLE+READY skip: the skipped PR was not ledgered"
+[[ "$(merges)" == "1" ]] || fail "ARMABLE+READY skip: the skipped PR was not counted as merged"
 
 # 27b (Case B) — THE REGRESSION THIS CASE EXISTS FOR. ARMABLE with NO verdict comment at
 # all must still run pr-ready. This is the modal path, not a corner: ARMABLE is reachable
@@ -1505,9 +1414,12 @@ run --worker
 reset_state
 printf '%s' "$ATTACK_1PR" > "$SCRATCH/attack-out"
 triage_report "101 ARMABLE armed" > "$SCRATCH/triage-out"
-printf '%s' "$(view_json 101 "$(digest_comment)")" > "$SCRATCH/view-101.json"
+# A sticky verdict comment with NO `**Reviewed tree:**` contract line on line 1. Inlined
+# here because this is the last case that needs such a body; the shared digest fixture it
+# used to borrow now lives in bin/test-digest-dm-build.
 printf '{"comments":[{"body":%s}],"headRefOid":"%s"}' \
-    "$(digest_comment | jq -Rs .)" "deadbeefcafe$(printf '%028d' 101)" \
+    "$(printf '%s\n' '<!-- pr-ready-verdict -->' 'Verdict: green.' | jq -Rs .)" \
+    "deadbeefcafe$(printf '%028d' 101)" \
     > "$SCRATCH/verdictview-101.json"
 printf '%s\n' "$TREE_A" > "$SCRATCH/tree-deadbeefcafe$(printf '%028d' 101)"
 run --worker
@@ -1570,266 +1482,6 @@ else
     fail "workflow file not found at $WF"
 fi
 end_case "case 29 CI wiring"
-
-# ==========================================================================================
-# 30 — digest parser ignores Reviewed-tree line when placed above ### Merge digest
-# ==========================================================================================
-begin_case
-
-# Source _digest_labels directly for label-count and order checks.
-# Process substitution (. <(cmd)) does not reliably define functions on macOS bash;
-# write to a temp file and source that instead.
-_DIGEST_TMPF="$(mktemp)"
-sed -n '/^_digest_labels()/,/^}$/p' "$DRIVER" > "$_DIGEST_TMPF"
-# shellcheck disable=SC1090
-. "$_DIGEST_TMPF"
-rm -f "$_DIGEST_TMPF"
-unset _DIGEST_TMPF
-
-TREE_SHA="0000000000000000000000000000000000000000"
-
-# Fixture A: **Reviewed tree:** on line 1 (above ### Merge digest).
-# _digest_labels must return exactly 5 labels, in order, with no "Reviewed tree" entry.
-BODY_A="**Reviewed tree:** ${TREE_SHA}
-\`covers head abc123456789ab · master def456789abcde · written 2026-09-06T12:00Z\`
-
-Rebase: clean. CI: pass.
-
-### Merge digest
-**What changed:** the skip predicate landed
-**Why:** avoid re-running Phase 6 on unchanged tree
-**Watch:** carry-forward files
-**Touches:** .claude/skills/pr-ready/scripts
-**Machine-authored fixes:** none
-
-READY
-<!-- pr-ready-verdict -->"
-
-LABELS_A="$(printf '%s\n' "$BODY_A" | _digest_labels)"
-if [[ -n "$LABELS_A" ]]; then
-    COUNT_A="$(printf '%s\n' "$LABELS_A" | wc -l | tr -d ' ')"
-else
-    COUNT_A=0
-fi
-[[ "$COUNT_A" -eq 5 ]] || fail "fixture A: expected 5 labels, got $COUNT_A"
-
-ORDERED_A="$(printf '%s\n' "$LABELS_A" | awk -F'\t' '{print $1}' | tr '\n' ',')"
-[[ "$ORDERED_A" == "What changed,Why,Watch,Touches,Machine-authored fixes," ]] \
-    || fail "fixture A: label order wrong, got: $ORDERED_A"
-
-printf '%s\n' "$LABELS_A" | grep -qF 'Reviewed tree' \
-    && fail "fixture A: 'Reviewed tree' label leaked into digest parse — placement above heading is not invisible"
-
-# Also verify via the full harness: the ledger row must not contain "Reviewed tree".
-reset_state
-printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
-triage_report "101 ARMABLE armed" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
-    > "$SCRATCH/triage-out"
-echo MERGED > "$SCRATCH/state-101"
-printf '%s' "$(view_json 101 "$BODY_A")" > "$SCRATCH/view-101.json"
-run --worker
-[[ "$(rows)" == "1" ]] || fail "fixture A: want 1 ledger row, got $(rows)"
-ledger | grep -qF '**What changed:** the skip predicate landed' \
-    || fail "fixture A: What changed label not in ledger"
-ledger | grep -qF 'Reviewed tree' \
-    && fail "fixture A: 'Reviewed tree' appeared in ledger — placement above heading is not invisible"
-
-# Fixture B: **Reviewed tree:** moved inside ### Merge digest (below the heading).
-# _digest_labels must return 6 labels — proves "above the heading" is the specific
-# property keeping it invisible, not coincidence.
-BODY_B="\`covers head abc123456789ab · master def456789abcde · written 2026-09-06T12:00Z\`
-
-Rebase: clean. CI: pass.
-
-### Merge digest
-**Reviewed tree:** ${TREE_SHA}
-**What changed:** the skip predicate landed
-**Why:** avoid re-running Phase 6 on unchanged tree
-**Watch:** carry-forward files
-**Touches:** .claude/skills/pr-ready/scripts
-**Machine-authored fixes:** none
-
-READY
-<!-- pr-ready-verdict -->"
-
-LABELS_B="$(printf '%s\n' "$BODY_B" | _digest_labels)"
-if [[ -n "$LABELS_B" ]]; then
-    COUNT_B="$(printf '%s\n' "$LABELS_B" | wc -l | tr -d ' ')"
-else
-    COUNT_B=0
-fi
-[[ "$COUNT_B" -eq 6 ]] || fail "fixture B: expected 6 labels when tree line is inside digest block, got $COUNT_B"
-
-printf '%s\n' "$LABELS_B" | grep -qF 'Reviewed tree' \
-    || fail "fixture B: 'Reviewed tree' not parsed when placed inside digest block — placement is not load-bearing"
-
-end_case "digest-parser ignores Reviewed-tree line"
-
-# ==========================================================================================
-# 31 — digest round trip: a Phase 5.5 verdict file → digest.sh → sticky comment → ledger.
-#      Cases 14/15 assert the CONSUMER against hand-typed text. This one runs the real
-#      PRODUCER into the real consumer, because /post-plan is now a second producer feeding
-#      the same `### Merge digest` contract, and a hand-typed fixture cannot catch a producer
-#      that drifts. Two halves: real content, then a degraded verdict. Both must yield a row
-#      with five labels; only the VALUES differ. "Shape valid" and "content present" are
-#      different claims, and only asserting both distinguishes a working digest from a
-#      structurally perfect empty one.
-# ==========================================================================================
-begin_case
-DIGEST_SH="$SCRIPT_DIR/../.claude/skills/pr-ready/scripts/digest.sh"
-[[ -f "$DIGEST_SH" ]] || fail "digest.sh not found at $DIGEST_SH"
-
-FIXTURE_TREE="0123456789abcdef0123456789abcdef01234567"
-
-# The verdict-file shape Phase 5.5's reviewer writes: verdict word, findings prose, then
-# the `## DIGEST` section LAST (digest.sh reads the last occurrence of the heading).
-mk_verdict() {  # $1 = target path, $2 = "full" | "nodigest"
-    {
-        echo "READY"
-        echo
-        echo "## Findings"
-        echo "No blocking divergence from the plan."
-        if [[ "$2" == "full" ]]; then
-            echo
-            echo "## DIGEST"
-            echo "**What changed:** post-plan now runs the fidelity review inline"
-            echo "**Why:** every post-plan-merged PR should carry a merge digest"
-            echo "**Watch:** condition (12) blocks when the verdict file is missing"
-            echo "**Touches:** .claude/skills/post-plan/, tools/postplan-harness/"
-            echo "**Machine-authored fixes:** none"
-        fi
-    } > "$1"
-}
-
-# The sticky body exactly as Phase 5.5 composes it: `**Reviewed tree:**` BEFORE the heading
-# (inside the block it would become a sixth labelled line and break the five-line contract),
-# and the marker byte-identical and last.
-mk_sticky() {  # $1 = digest.sh output
-    printf '%s\n' \
-        "Verdict: READY" \
-        "" \
-        "**Reviewed tree:** $FIXTURE_TREE" \
-        "" \
-        "### Merge digest" \
-        "$1" \
-        "" \
-        "<!-- pr-ready-verdict -->"
-}
-
-# Lift the digest block back out of a composed body, mirroring _digest_labels' terminators.
-extract_digest_block() {
-    awk '
-        /^### Merge digest[[:space:]]*$/ { inb = 1; next }
-        inb && (/^#+ / || /^[[:space:]]*(---+|\*\*\*+|___+)[[:space:]]*$/ || /^<!--/) { exit }
-        inb && $0 != "" { print }
-    '
-}
-
-# ---- 31a: real content -------------------------------------------------------------------
-reset_state
-mk_verdict "$SCRATCH/verdict-101.md" full
-DIG_FULL="$(bash "$DIGEST_SH" "$SCRATCH/verdict-101.md")" \
-    || fail "31a: digest.sh exited non-zero on a well-formed verdict file"
-[[ "$(printf '%s\n' "$DIG_FULL" | wc -l | tr -d ' ')" == "5" ]] \
-    || fail "31a: digest.sh emitted $(printf '%s\n' "$DIG_FULL" | wc -l) lines, want 5"
-printf '%s\n' "$DIG_FULL" | grep -q 'unavailable —' \
-    && fail "31a: digest.sh degraded on a well-formed verdict file"
-
-BODY_FULL="$(mk_sticky "$DIG_FULL")"
-# Placement guard: the tree line must sit ABOVE the heading in the composed body.
-T_LINE="$(printf '%s\n' "$BODY_FULL" | grep -n '^\*\*Reviewed tree:\*\*' | cut -d: -f1)"
-H_LINE="$(printf '%s\n' "$BODY_FULL" | grep -n '^### Merge digest' | cut -d: -f1)"
-[[ -n "$T_LINE" && -n "$H_LINE" && "$T_LINE" -lt "$H_LINE" ]] \
-    || fail "31a: **Reviewed tree:** is not above the ### Merge digest heading"
-[[ "$(printf '%s\n' "$BODY_FULL" | tail -1)" == "<!-- pr-ready-verdict -->" ]] \
-    || fail "31a: marker is not the last line"
-
-printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
-triage_report "101 ARMABLE armed" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
-    > "$SCRATCH/triage-out"
-echo MERGED > "$SCRATCH/state-101"
-printf '%s' "$(view_json 101 "$BODY_FULL")" > "$SCRATCH/view-101.json"
-run --worker
-
-[[ "$(rows)" == "1" ]] || fail "31a: want 1 ledger row, got $(rows)"
-ledger | grep -qF 'digest: unavailable' && fail "31a: ledger degraded on a real digest"
-ledger | grep -qF '(missing)'            && fail "31a: ledger reported a missing label"
-ledger | grep -qF '**What changed:** post-plan now runs the fidelity review inline' \
-    || fail "31a: 'What changed' value did not survive to the ledger"
-ledger | grep -qF '**Why:** every post-plan-merged PR should carry a merge digest' \
-    || fail "31a: 'Why' value did not survive to the ledger"
-ledger | grep -qF '**Watch:** condition (12) blocks when the verdict file is missing' \
-    || fail "31a: 'Watch' value did not survive to the ledger"
-ledger | grep -qF '**Touches:** .claude/skills/post-plan/, tools/postplan-harness/' \
-    || fail "31a: 'Touches' value did not survive to the ledger"
-ledger | grep -qF '**Machine-authored fixes:** none' \
-    || fail "31a: 'Machine-authored fixes' value did not survive to the ledger"
-ledger | grep -qF 'Reviewed tree' && fail "31a: the tree line leaked into the digest block"
-
-# Closure: the block, lifted back out of the POSTED body, must still satisfy digest.sh's
-# own five-line contract. This is what makes the placement guard non-decorative — a
-# **Reviewed tree:** line inside the block makes this re-parse degrade.
-printf '## DIGEST\n%s\n' "$(printf '%s\n' "$BODY_FULL" | extract_digest_block)" \
-    > "$SCRATCH/reparse.md"
-RE="$(bash "$DIGEST_SH" "$SCRATCH/reparse.md")"
-printf '%s\n' "$RE" | grep -q 'unavailable —' \
-    && fail "31a: the posted digest block does not round-trip through digest.sh"
-
-# ---- 31b: degraded verdict, same shape, no content ----------------------------------------
-reset_state
-mk_verdict "$SCRATCH/verdict-101.md" nodigest
-DIG_DEG="$(bash "$DIGEST_SH" "$SCRATCH/verdict-101.md")" \
-    || fail "31b: digest.sh must exit 0 on a degraded verdict, not fail the caller"
-[[ "$(printf '%s\n' "$DIG_DEG" | wc -l | tr -d ' ')" == "5" ]] \
-    || fail "31b: degrade() emitted $(printf '%s\n' "$DIG_DEG" | wc -l) lines, want 5"
-[[ "$(printf '%s\n' "$DIG_DEG" | grep -c 'unavailable — ')" == "5" ]] \
-    || fail "31b: not every degraded line carries a reason"
-
-BODY_DEG="$(mk_sticky "$DIG_DEG")"
-printf '%s' "$ATTACK_3PR" > "$SCRATCH/attack-out"
-triage_report "101 ARMABLE armed" "102 NEEDS-WORK rebase" "103 NEEDS-WORK rebase" \
-    > "$SCRATCH/triage-out"
-echo MERGED > "$SCRATCH/state-101"
-printf '%s' "$(view_json 101 "$BODY_DEG")" > "$SCRATCH/view-101.json"
-run --worker
-
-[[ "$(rows)" == "1" ]] || fail "31b: want 1 ledger row, got $(rows)"
-# SHAPE valid: five labels parsed, so the row is NOT the whole-digest fallback...
-ledger | grep -qF 'digest: unavailable' \
-    && fail "31b: five labels parsed, so the row must not fall back to 'digest: unavailable'"
-ledger | grep -qF '(missing)' && fail "31b: degrade() must fill all five labels, not omit any"
-# ...but CONTENT absent: every one of the five values says so.
-for lab in "What changed" "Why" "Watch" "Touches" "Machine-authored fixes"; do
-    ledger | grep -qF "**$lab:** unavailable — " \
-        || fail "31b: '$lab' does not read as unavailable in the ledger"
-done
-end_case "case 31 digest round trip"
-
-begin_case
-# The three ways this seam has actually broken, each shown to trip case 30's assertions.
-reset_state
-mk_verdict "$SCRATCH/v.md" full
-
-# (a) A relabelled DIGEST line degrades ALL FIVE — digest.sh never half-succeeds.
-sed 's/^\*\*Why:\*\*/**Reason:**/' "$SCRATCH/v.md" > "$SCRATCH/v-relabel.md"
-[[ "$(bash "$DIGEST_SH" "$SCRATCH/v-relabel.md" | grep -c 'unavailable — ')" == "5" ]] \
-    || fail "vacuous: a wrong label did not degrade the whole digest"
-
-# (b) A sixth labelled line inside the block breaks the five-line contract on re-parse —
-#     which is exactly why **Reviewed tree:** is composed ABOVE the heading.
-{ bash "$DIGEST_SH" "$SCRATCH/v.md"; echo "**Reviewed tree:** $FIXTURE_TREE"; } \
-    > "$SCRATCH/six.txt"
-printf '## DIGEST\n%s\n' "$(cat "$SCRATCH/six.txt")" > "$SCRATCH/six.md"
-# Write to a file before grepping: grep -q exits on first match (SIGPIPE under pipefail).
-bash "$DIGEST_SH" "$SCRATCH/six.md" > "$SCRATCH/six-dg.txt"
-grep -q 'unavailable — ' "$SCRATCH/six-dg.txt" \
-    || fail "vacuous: a six-line digest block round-tripped clean"
-
-# (c) A bulleted producer would silently self-strip. _digest_labels tolerates it; the
-#     BARE form is what production emits, and case 30's fixture must stay bare.
-grep -qE '^\*\*What changed:\*\*' <(bash "$DIGEST_SH" "$SCRATCH/v.md") \
-    || fail "vacuous: digest.sh output is not bare-bold — case 30 no longer models production"
-end_case "case 32 digest round-trip guards are not vacuous"
 
 # --- summary --------------------------------------------------------------------------------
 if [[ $FAILED -eq 0 ]]; then

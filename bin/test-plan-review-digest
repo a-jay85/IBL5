@@ -509,10 +509,24 @@ fi
 for cap in 200 400 900 1500; do
     _out="$(PLAN_REVIEW_DIGEST_MAX_CHARS="" "$PRD_BIN" --max-chars="$cap" "$OVERSIZED" 2>/dev/null)"
     _second_to_last="$(printf '%s' "$_out" | tail -2 | head -1)"
-    if printf '%s' "$_second_to_last" | grep -qE '^    '; then
+    _third_to_last="$(printf '%s' "$_out" | tail -3 | head -1)"
+    # An orphan is a location line (4-space indent) whose row header (N. ...) is absent
+    if printf '%s' "$_second_to_last" | grep -qE '^    ' && \
+       ! printf '%s' "$_third_to_last" | grep -qE '^[0-9]+\.'; then
         prd_fail "NEG no orphan location line at cap $cap: found orphan: $_second_to_last"
     else
         prd_ok "NEG no orphan location line at cap $cap"
+    fi
+done
+
+# Regression guard: truncation must retain manual rows, not drop all of them
+for cap in 900 1500; do
+    _out="$(PLAN_REVIEW_DIGEST_MAX_CHARS="" "$PRD_BIN" --max-chars="$cap" "$OVERSIZED" 2>/dev/null)"
+    _row_count="$(printf '%s' "$_out" | grep -cE '^[0-9]+\.' || true)"
+    if [ "$_row_count" -ge 1 ]; then
+        prd_ok "NEG truncation retains rows at cap $cap: $_row_count row(s) kept"
+    else
+        prd_fail "NEG truncation retains rows at cap $cap: 0 rows retained (all dropped)"
     fi
 done
 

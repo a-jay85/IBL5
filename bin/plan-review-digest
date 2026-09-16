@@ -150,7 +150,6 @@ truncate_to_budget() {
                 if (line[keep] ~ /^    /) keep--
                 keep--
                 if (keep >= 1 && line[keep] ~ /^(HOLD|MANUAL CHECKS) /) keep--
-                if (keep >= 1 && line[keep] ~ /^    /) continue
                 ptr = sprintf("…%d more lines — full plan at %s", n - keep, path)
                 len = length(ptr)
                 for (i = 1; i <= keep; i++) len += length(line[i]) + 1

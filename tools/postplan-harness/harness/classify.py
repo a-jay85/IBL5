@@ -284,8 +284,8 @@ def render_reviewer_verification(discharged: list) -> str:
     if not discharged:
         return ""
     parts = [REVIEWER_VERIFICATION_BEGIN, "## Reviewer verification", ""]
-    parts.append("The following hold-justification sentences were classified as "
-                 "automatable by the harness.  Verify each before merging:")
+    parts.append("These claims came from the plan's hold justification and are settleable without you.")
+    parts.append("Each names its instrument; nothing here needs a human at the merge button.")
     parts.append("")
     for entry in discharged:
         cat = entry.get("category", "unknown")
@@ -298,15 +298,20 @@ def render_reviewer_verification(discharged: list) -> str:
             for ln in raw_text.splitlines()
         )
         probe = entry.get("probe")
+        rationale = entry.get("rationale", "")
         if cat == "cli-executable" and probe:
             rejection = _probe_validate(probe)
             if rejection is None:
                 probe_str = " ".join(probe)
-                bullet = f"- **{cat}** — {text}: `{probe_str}`"
+                bullet = f'- "{text}" — `{cat}`: `{probe_str}`'
+            elif rationale:
+                bullet = f'- "{text}" — `{cat}`: {rationale}'
             else:
-                bullet = f"- **{cat}** — {text}"
+                bullet = f'- "{text}" — `{cat}`'
+        elif rationale:
+            bullet = f'- "{text}" — `{cat}`: {rationale}'
         else:
-            bullet = f"- **{cat}** — {text}"
+            bullet = f'- "{text}" — `{cat}`'
         parts.append(bullet)
     parts.append(REVIEWER_VERIFICATION_END)
     return "\n".join(parts)

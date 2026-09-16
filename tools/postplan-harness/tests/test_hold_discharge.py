@@ -192,3 +192,28 @@ def test_disallowed_probe_is_dropped_not_rendered():
     )
     # The entry should still appear as a bullet (it's discharged, just no command)
     assert "Run the verification script." in block
+
+
+# ---------------------------------------------------------------------------
+# Test: reviewer-verification preamble matches the SKILL.md spec exactly
+# ---------------------------------------------------------------------------
+
+def test_reviewer_verification_preamble_matches_spec():
+    """The block preamble must say the sentences are settleable without human
+    action — the mirror-image of the plan's intent. 'Verify each before merging'
+    is the exact wrong message this change exists to remove."""
+    from harness.classify import render_reviewer_verification
+
+    discharged = [{"text": "Any sentence.", "category": "cli-executable",
+                   "probe": ["bin/check-docs"]}]
+    block = render_reviewer_verification(discharged)
+
+    assert "settleable without you" in block, (
+        "preamble must say the sentences are settleable without the reviewer"
+    )
+    assert "nothing here needs a human at the merge button" in block, (
+        "preamble must say no human action is needed at the merge button"
+    )
+    assert "Verify each before merging" not in block, (
+        "preamble must NOT tell the reviewer to verify each item before merging"
+    )

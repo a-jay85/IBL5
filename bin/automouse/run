@@ -1324,6 +1324,19 @@ if [ -z "${SINGLE_PLAN:-}" ]; then
     } || true
 fi
 
+# Plan-review drain: apply Discord button decisions (queue / discard) pressed
+# since the last run. Immediately before the queue loop so a plan queued from
+# Discord is enumerated in THIS run, not a full cycle later.
+# Non-fatal (|| true): the runner is under `set -euo pipefail` and the drain is a
+# convenience feature -- an unreachable bot must never abort the night.
+# Redirect to $LOG is load-bearing: the drain's quiet-404 branch is silent to
+# Discord and relies on that log line as its only tripwire.
+# Skipped in single-plan mode for the same reason as self-heal above: draining
+# would add unrelated plans and violate "leaves the rest of the queue untouched".
+if [ -z "${SINGLE_PLAN:-}" ]; then
+    "$REPO/bin/plan-review-drain" --drain >> "$LOG" 2>&1 || true
+fi
+
 while true; do
     # Check if queue has plans
     if ! ls "$QUEUE_DIR"/*.md &>/dev/null; then

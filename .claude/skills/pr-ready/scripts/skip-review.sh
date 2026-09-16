@@ -247,7 +247,7 @@ fi
 [ "$RECORDED_TREE" != "$CUR" ] && run "tree-changed"
 
 # Step 11: carry-forward extraction — precondition of SKIP.
-# Mirrors bin/pr-cycle's _digest_labels: start after `### Merge digest`, stop at next heading.
+# Mirrors bin/digest-dm-build's _digest_labels: start after `### Merge digest`, stop at next heading.
 DIGEST_BLOCK="$(printf '%s\n' "$BODY" | awk '
   { sub(/[[:space:]]*$/, "") }
   /^### Merge digest[[:space:]]*$/ { in_digest=1; next }

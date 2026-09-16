@@ -2409,8 +2409,8 @@ n_dig_count=$(grep -c '^### Merge digest' "$BODY" || true)
 
 # --- 28m: provenance line is the body's first line, above every heading ---
 # It must sit above the first `### ` heading, never in or after the digest block:
-# bin/pr-cycle's _digest_labels folds any line lacking a `**Label:**` prefix onto the
-# preceding label's value, so a provenance line inside that block corrupts the ledger row.
+# bin/digest-dm-build's _digest_labels folds any line lacking a `**Label:**` prefix onto the
+# preceding label's value, so a provenance line inside that block corrupts the digest parse.
 head -1 "$BODY" | grep -qE '^`covers head [0-9a-f]{12} [^ ]+ master [0-9a-f]{12} [^ ]+ written [0-9T:Z-]+`$' \
   || fail "28m: first body line is not the provenance line: $(head -1 "$BODY")"
 n_prov=$(grep -c '^`covers head ' "$BODY" || true)

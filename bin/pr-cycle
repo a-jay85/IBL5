@@ -53,20 +53,16 @@
 #                            0 disables the pr-ready skip. The skip needs BOTH: the ARMABLE
 #                            bucket AND a /pr-ready READY verdict over the head's current
 #                            tree. Default: 1 (enabled)
-#   PR_CYCLE_LEDGER          Merge digest ledger path.        Default: $HOME/IBL5-merge-digest.md
 #   PR_CYCLE_STOP_FILE       Stop file path.                  Default: $HOME/.ibl5-pr-cycle.stop
-#   PR_CYCLE_NOW             Pin the ledger timestamp (tests). Unset = current UTC time.
 #   PR_CYCLE_DRY_LAUNCH      With --go: emit runner + plist but skip launchctl bootstrap.
 #   PR_CYCLE_TS              Timestamp token for runner/log/plist paths (tests). Unset = date+PID at launch.
 #   PR_CYCLE_LOG             Detached-worker log path; set by --go, read by the worker. Derived from TS.
-#   PR_CYCLE_VERDICT_DIR     Directory for pr-ready-verdict-N.md files.  Default: /tmp
 #
 #   Every seam is PR_CYCLE_-prefixed on purpose. bin/pr-attack reads a bare PR_TRIAGE_CMD
 #   itself, and this script spawns the real bin/pr-attack as a child — an unprefixed export
 #   here would silently redirect that child's own triage calls too.
 #
 # Artifacts:
-#   $HOME/IBL5-merge-digest.md   one six-line ledger row per CONFIRMED merge
 #   $HOME/.ibl5-pr-cycle.stop    the interrupt; create it to halt a running worker
 #   /tmp/pr-cycle-<TS>.log       the detached worker's combined log (path printed by --go)
 #   /tmp/pr-cycle-<TS>.sh        the emitted runner
@@ -84,8 +80,10 @@
 #   * Arming is exactly one call to the triage tool, with no added flags. This script never
 #     judges eligibility, never widens a bucket, never relaxes a human sign-off, and never
 #     sources or reimplements the armable library.
-#   * A ledger row is written if and only if `gh pr view N --json state` reported MERGED.
-#     Not a green --wait, not a successful arm, not a CI conclusion.
+#   * A merge is counted if and only if `gh pr view N --json state` reported MERGED.
+#     Not a green --wait, not a successful arm, not a CI conclusion. The per-merge digest
+#     DM is no longer this script's job — .github/workflows/merge-digest-notify.yml fires
+#     on the merge event itself, so it also covers merges no live session witnessed.
 #   * The merge poll loop lives exclusively inside the detached worker, never in the parent.
 
 set -euo pipefail
@@ -121,11 +119,8 @@ PR_CYCLE_POLL_INTERVAL="${PR_CYCLE_POLL_INTERVAL:-60}"
 PR_CYCLE_POLL_CEILING="${PR_CYCLE_POLL_CEILING:-2700}"
 PR_CYCLE_RESCUE="${PR_CYCLE_RESCUE:-1}"
 PR_CYCLE_SKIP_READY_WHEN_ARMABLE="${PR_CYCLE_SKIP_READY_WHEN_ARMABLE:-1}"
-PR_CYCLE_LEDGER="${PR_CYCLE_LEDGER:-$HOME/IBL5-merge-digest.md}"
 PR_CYCLE_STOP_FILE="${PR_CYCLE_STOP_FILE:-$HOME/.ibl5-pr-cycle.stop}"
-PR_CYCLE_NOW="${PR_CYCLE_NOW:-}"
 PR_CYCLE_DRY_LAUNCH="${PR_CYCLE_DRY_LAUNCH:-}"
-PR_CYCLE_VERDICT_DIR="${PR_CYCLE_VERDICT_DIR:-/tmp}"
 
 # Print the usage header above: every comment line from the shebang to `set -euo pipefail`.
 usage() {
@@ -258,11 +253,6 @@ ACTION=""
 NEXT_PR=""
 ATTACK_NEEDS=""
 WARNED_ONLY=0
-
-_now() {
-    if [ -n "$PR_CYCLE_NOW" ]; then printf '%s' "$PR_CYCLE_NOW"
-    else date -u +%Y-%m-%dT%H:%M:%SZ; fi
-}
 
 # ==========================================================================================
 # Phase 2 — selection
@@ -537,8 +527,8 @@ _precheck_verdict() {
     set -e
     [ "$_vrc" -ne 0 ] && { echo ""; return 0; }
 
-    # The LAST sticky comment wins — the same rule _digest_row applies, and for the same
-    # reason: /pr-ready rewrites the comment across phases.
+    # The LAST sticky comment wins — the same rule .github/workflows/merge-digest-notify.yml
+    # applies, and for the same reason: /pr-ready rewrites the comment across phases.
     _vbody="$(jq -r '[.comments[]? | select((.body // "") | contains("<!-- pr-ready-verdict -->"))] | last | .body // ""' \
         "$RUNDIR/verdict-$_vn.json" 2>/dev/null || true)"
     [ -n "$_vbody" ] || { echo ""; return 0; }
@@ -775,97 +765,9 @@ _poll_merge() {
     done
 }
 
-# _digest_labels — fold a `### Merge digest` block into "<label>\t<one-line value>" records.
-# Values spanning several lines are folded so a ledger row is always exactly six lines.
-_digest_labels() {
-    # The squeeze happens INSIDE awk, at print time. A `| sed s/[[:space:]]\+/ /g` after
-    # this would also collapse the tab this function emits as its field separator, and
-    # every later `awk -F'\t'` lookup would silently find nothing.
-    awk '
-        function emit(l, v) {
-            gsub(/[[:space:]]+/, " ", v); sub(/^ /, "", v); sub(/ $/, "", v)
-            print l "\t" v
-        }
-        /^### Merge digest[[:space:]]*$/ { inblk = 1; next }
-        inblk && /^#+ / { exit }
-        # A horizontal rule ends the digest block just as a heading does. /pr-ready emits a
-        # `---` after the block and then keeps writing, and an HR is not a heading, so without
-        # this the rule and everything after it fall through to the continuation branch below
-        # and get folded onto the last label value. Live rows for PRs #2092 and #2084 both
-        # ended in a stray ` ---` this way.
-        inblk && /^[[:space:]]*(---+|\*\*\*+|___+)[[:space:]]*$/ { exit }
-        inblk {
-            line = $0
-            # The trailing [[:space:]]+ is load-bearing, not cosmetic. `*` is a list marker
-            # in the class AND the first byte of `**Label:**`, so a zero-or-more space would
-            # let a bare (unbulleted) production line self-strip to `*Label:** ...`, the
-            # match below would fail, and every label would vanish into `digest: unavailable`.
-            sub(/^[[:space:]]*[-*][[:space:]]+/, "", line)
-            if (match(line, /^\*\*[^*]+:\*\*/)) {
-                if (label != "") emit(label, val)
-                label = substr(line, 3, RLENGTH - 5)
-                val = substr(line, RLENGTH + 1)
-            } else if (label != "" && line ~ /[^[:space:]]/) {
-                val = val " " line
-            }
-        }
-        END { if (label != "") emit(label, val) }
-    '
-}
-
-# _digest_row N — emit the six-line ledger row for a CONFIRMED merge, on stdout.
-_digest_row() {
-    _n="$1"
-    "$PR_CYCLE_GH_CMD" pr view "$_n" --json title,url,comments > "$RUNDIR/view-$_n.json" 2>/dev/null || true
-
-    _title="$(jq -r '.title // ""' "$RUNDIR/view-$_n.json" 2>/dev/null || true)"
-    _url="$(jq -r '.url // ""' "$RUNDIR/view-$_n.json" 2>/dev/null || true)"
-
-    # The LAST sticky verdict comment wins — /pr-ready rewrites it across phases.
-    # `.comments[]?` plus the `// ""` fallbacks keep an empty array from erroring out
-    # and aborting the run under set -e.
-    _body="$(jq -r '[.comments[]? | select((.body // "") | contains("<!-- pr-ready-verdict -->"))] | last | .body // ""' \
-        "$RUNDIR/view-$_n.json" 2>/dev/null || true)"
-
-    printf -- '- [ ] #%s %s — merged %s — %s\n' "$_n" "$_title" "$(_now)" "$_url"
-
-    _labels="$(printf '%s\n' "$_body" | _digest_labels)"
-    if [ -z "$_labels" ]; then
-        # Best-effort recovery from the on-disk verdict file written by /pr-ready Phase 7.
-        # /tmp is cleared eventually; if the file is gone, fall through to unavailable.
-        _vfile="$PR_CYCLE_VERDICT_DIR/pr-ready-verdict-$_n.md"
-        if [ -f "$_vfile" ]; then
-            _labels="$(_digest_labels < "$_vfile")"
-        fi
-    fi
-    if [ -n "$_labels" ]; then
-        for _lab in "What changed" "Why" "Watch" "Touches" "Machine-authored fixes"; do
-            _val="$(printf '%s\n' "$_labels" | awk -F'\t' -v l="$_lab" '$1 == l { print $2; exit }')"
-            [ -n "$_val" ] || _val="(missing)"
-            printf '  - **%s:** %s\n' "$_lab" "$_val"
-        done
-        return 0
-    fi
-    # A confirmed merge is ALWAYS ledgered — §4.4. A missing or unparseable digest
-    # degrades the row's detail; it never suppresses the row.
-    if [ -f "$RUNDIR/ready-$_n.out" ]; then
-        printf '  - digest: unavailable — /pr-ready ran but posted no verdict comment\n'
-    else
-        printf '  - digest: unavailable — no /pr-ready pass (armed by triage sweep)\n'
-    fi
-}
-
-_ledger_init() {
-    if [ ! -e "$PR_CYCLE_LEDGER" ]; then
-        mkdir -p "$(dirname "$PR_CYCLE_LEDGER")"
-        {
-            printf '# IBL5 merge digest — written by bin/pr-cycle\n'
-            printf 'One row per confirmed merge. Tick the box once you have read the digest.\n\n'
-        } > "$PR_CYCLE_LEDGER"
-    fi
-}
-
-# _reconcile — ledger every merge this run caused, then recompute MERGES from the file.
+# _reconcile — record every merge this run caused in ledgered.txt, then recompute MERGES.
+# The per-merge digest DM is sent by .github/workflows/merge-digest-notify.yml, on the
+# merge event — not from here, which only runs while a session is alive.
 _reconcile() {
     [ -s "$RUNDIR/armed.txt" ] || { MERGES="$(wc -l < "$RUNDIR/ledgered.txt" | tr -d ' ')"; return 0; }
     # Bodyless subshell: a `while` after a pipe runs in a subshell in bash 3.2, so results
@@ -874,9 +776,6 @@ _reconcile() {
         [ -n "$_p" ] || continue
         grep -qxF "$_p" "$RUNDIR/ledgered.txt" 2>/dev/null && continue
         [ "$(_gh_state "$_p")" = "MERGED" ] || continue
-        _ledger_init
-        _digest_row "$_p" > "$RUNDIR/row-$_p.txt"
-        cat "$RUNDIR/row-$_p.txt" >> "$PR_CYCLE_LEDGER"
         echo "$_p" >> "$RUNDIR/ledgered.txt"
         echo "  ledgered #$_p (merge confirmed)"
     done
@@ -1008,8 +907,8 @@ _worker() {
 
     if [ -z "$NO_DM" ]; then
         _msg="pr-cycle finished — merged $MERGES, left for human $LEFT — $_reason
-log: ${PR_CYCLE_LOG:-<foreground>}   ledger: $PR_CYCLE_LEDGER"
-        # A failed notification must never change the run's exit status or the ledger.
+log: ${PR_CYCLE_LOG:-<foreground>}"
+        # A failed notification must never change the run's exit status.
         "$PR_CYCLE_DM_CMD" "$_msg" || true
     fi
 
@@ -1083,7 +982,6 @@ _report_dry_run() {
     elif [ -n "$SKIP" ]; then    echo "would use scope:      --skip $SKIP"
     else                         echo "would use scope:      every orderable PR"; fi
     echo "would use max-merges: $MAX_MERGES"
-    echo "would use ledger:     $PR_CYCLE_LEDGER"
     echo "would use stop file:  $PR_CYCLE_STOP_FILE"
     echo "would use rundir:     $RUNDIR"
     return 0
@@ -1131,8 +1029,9 @@ _launch() {
                   PR_CYCLE_DM_CMD PR_CYCLE_GH_CMD PR_CYCLE_MAIN_CHECKOUT \
                   PR_CYCLE_POLL_INTERVAL PR_CYCLE_POLL_CEILING \
                   PR_CYCLE_RESCUE PR_CYCLE_SKIP_READY_WHEN_ARMABLE \
-                  PR_CYCLE_LEDGER PR_CYCLE_STOP_FILE; do
+                  PR_CYCLE_STOP_FILE; do
             eval "_val=\${$_v}"
+            # shellcheck disable=SC2154  # _val is assigned by the eval above
             printf 'export %s=%q\n' "$_v" "$_val"
         done
         cat <<'RUNNER_EOF'

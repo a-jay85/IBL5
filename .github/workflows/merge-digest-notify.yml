@@ -1,0 +1,129 @@
+name: Merge digest notify
+
+# Fires on every merge, not only on merges a live session witnessed. That is the whole
+# point of this workflow: bin/pr-cycle only wrote a ledger row while a session happened to
+# be running, and auto-armed PRs merge hours after the session that armed them ended.
+#
+# The pull_request `closed` event carries `merged`, so a plain close (no merge) is filtered
+# in the job `if:` below rather than by a second API call.
+#
+# Load-bearing deployment note: unlike `pull_request_target`, a `pull_request` workflow IS
+# dispatched from the PR's own head, so a workflow added in a PR DOES run on that PR --
+# including on the `closed` event for that PR's own merge. Measured, not assumed:
+# `.github/workflows/pipeline-fixed-notify.yml` was added by PR #1355, which merged at
+# 2026-07-07T21:49:04Z; that workflow's earliest run is 2026-07-07T21:49:07Z on branch
+# `discord-pipeline-fixed-gh-action` (PR #1355's own head), event `pull_request`, three
+# seconds after its own merge, and the job body executed rather than skipping.
+#
+# So the PR that adds THIS file is expected to notify about its own merge, and that first
+# DM is the hold's verification step. The hold stands either way: if the self-merge run
+# does not materialise, the first real DM lands on the next merge and a human still
+# eyeballs it before the change is treated as done.
+#
+# The checkout below pins `ref:` to the DEFAULT branch instead of defaulting to `github.ref`.
+# Two reasons, both load-bearing:
+#   1. Correctness. `github.ref` on this event is `refs/pull/N/merge`, and that ref is
+#      DELETED once the PR merges -- listing the remote's `refs/pull/<merged-N>/*` returns
+#      only `/head`, while an open PR returns `/head` AND `/merge`. A bare checkout would
+#      be relying on undocumented fetch-by-orphaned-SHA behaviour, and its failure mode is
+#      a red run with no DM on EVERY merge.
+#   2. Semantics. The DM must be built by the parser that lives on the default branch, not
+#      by the copy inside the PR being announced -- otherwise a PR that edits
+#      bin/digest-dm-build gets announced by its own unreviewed parser.
+#
+# `repository.default_branch`, NOT `pull_request.base.ref`. They differ for a STACKED PR
+# (bin/wt-new --base <branch>), whose base is a feature branch rather than master. That
+# branch can predate this workflow entirely and so may not carry bin/digest-dm-build at
+# all, which would red the run at the builder step. The default branch always carries the
+# deployed parser, which is also the one reason (2) above asks for.
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: read          # actions/checkout
+  pull-requests: read     # `gh pr view --json comments` for the sticky verdict body
+
+concurrency:
+  group: merge-digest-notify-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  notify-merge-digest:
+    # `merged == true` filters plain closes. The head-repo equality test filters FORK PRs:
+    # a fork's `pull_request` event gets no secrets, so setup-ssh would write an empty
+    # ~/.ssh/id_deploy and notify-discord would run `ssh -p ""` and die on "Bad port"
+    # (observed: run 27378437919). With loud delivery failure armed below, that is a
+    # guaranteed red run on every fork merge, so the guard is executable, not advisory.
+    if: >-
+      github.event.pull_request.merged == true &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The DEFAULT branch, never the implicit `github.ref` and never `base.ref`.
+          # See the deployment note in this file's header: `github.ref` here is the
+          # post-merge-deleted `refs/pull/N/merge`, `base.ref` is a feature branch for a
+          # stacked PR, and only the default branch is guaranteed to carry the deployed
+          # copy of bin/digest-dm-build that must build the DM.
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Build merge-digest DM
+        env:
+          # Every event-controlled value travels as an environment variable and is consumed
+          # only as a quoted shell variable or a `jq --arg`. A PR title is attacker-supplied
+          # (anyone may open a PR), so `${{ github.event.pull_request.title }}` spliced into
+          # a `run:` body would be a shell-injection primitive. Never inline them here.
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          gh pr view "$PR_NUMBER" --json comments > /tmp/pr-comments.json
+
+          # The LAST comment carrying the sticky marker is the freshest verdict. /pr-ready
+          # edits its comment in place, but a re-opened or re-run PR can leave an older one
+          # above it, so `last` is the contract, not `first`.
+          # `// ""` makes "no sticky comment at all" an empty body rather than a jq error --
+          # the builder turns an empty body into the fallback message and still exits 0.
+          jq -r --arg marker '<!-- pr-ready-verdict -->' \
+             '[.comments[] | select(.body | contains($marker))] | last | .body // ""' \
+             /tmp/pr-comments.json > /tmp/verdict-body.md
+
+          # `bash bin/...` rather than `bin/...`: the exec bit on a brand-new script is one
+          # `git update-index` mistake away from missing, and that failure would surface only
+          # here, on master, after merge.
+          bash bin/digest-dm-build \
+            --pr-number "$PR_NUMBER" \
+            --title "$PR_TITLE" \
+            --url "$PR_URL" \
+            < /tmp/verdict-body.md \
+            > /tmp/discord-msg.txt
+
+          # Visible in the run log, and a cheap tripwire if the 2000-char budget ever slips.
+          printf 'message bytes: %s\n' "$(wc -c < /tmp/discord-msg.txt)"
+
+      - name: Setup SSH
+        uses: ./.github/actions/setup-ssh
+        with:
+          host: ${{ secrets.HOST }}
+          port: ${{ secrets.PORT }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+
+      - name: Send Discord DM
+        uses: ./.github/actions/notify-discord
+        with:
+          # message-file defaults to /tmp/discord-msg.txt -- the path written above.
+          discord-id: ${{ secrets.OWNER_DISCORD_ID }}
+          port: ${{ secrets.PORT }}
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          # A silently-dropped merge notification is indistinguishable from "nothing merged",
+          # which is the exact failure the ledger had. Fail the run instead.
+          fail-on-delivery: 'true'

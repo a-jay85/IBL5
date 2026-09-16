@@ -85,6 +85,37 @@ describe('decision-store — Phase 2', () => {
         expect(pending[0].id).toBe(rec.id);
     });
 
+    it('ackDecisions writes no tombstone for an unknown id and counts it as 0', () => {
+        const dir = tmpDir();
+        appendDecision({ slug: 'some-slug', action: 'queue', actor: '111' }, dir);
+
+        const file = path.join(dir, DECISIONS_FILE);
+        const before = fs.readFileSync(file, 'utf8');
+
+        // An id that never named a decision must leave the file byte-identical. readPending
+        // alone cannot catch a junk tombstone (it matches no decision, so nothing is
+        // filtered) — only the raw file proves no line was appended.
+        expect(ackDecisions(['00000000-0000-0000-0000-000000000000'], dir)).toBe(0);
+        expect(fs.readFileSync(file, 'utf8')).toBe(before);
+    });
+
+    it('ackDecisions acks the known ids in a batch and ignores the unknown ones', () => {
+        const dir = tmpDir();
+        const rec = appendDecision({ slug: 'real-slug', action: 'queue', actor: '111' }, dir);
+
+        // Mixed batch: one real id, two that name nothing. Only the real one counts.
+        expect(ackDecisions([rec.id, 'not-a-real-id', 'also-not-real'], dir)).toBe(1);
+        expect(readPending(dir)).toHaveLength(0);
+
+        const tombstones = fs
+            .readFileSync(path.join(dir, DECISIONS_FILE), 'utf8')
+            .split('\n')
+            .filter(l => l.trim() !== '')
+            .map(l => JSON.parse(l) as { kind: string })
+            .filter(r => r.kind === 'ack');
+        expect(tombstones).toHaveLength(1);
+    });
+
     it('truncated last line does not discard earlier records', () => {
         const dir = tmpDir();
         const rec = appendDecision({ slug: 'some-slug', action: 'queue', actor: '111' }, dir);

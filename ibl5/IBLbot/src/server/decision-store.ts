@@ -140,9 +140,17 @@ export function appendDecision(
 }
 
 /**
- * Appends ack tombstones for the given ids. Idempotent: acking an already-acked id
- * writes no second tombstone and does not count toward the return value.
- * Returns the number of new tombstones written (0 when all ids were already acked).
+ * Appends ack tombstones for the given ids. A tombstone is written only for an id that is
+ * present in the file as an unacked decision. Every other id — already acked, compacted
+ * away, or never a decision at all — is ignored: no line is written and it does not count
+ * toward the return value. Without that guard an arbitrary id posted to
+ * `POST /planDecisions/ack` appends a tombstone matching no decision, which nothing but a
+ * later compaction can clear.
+ *
+ * Returns the number of new tombstones written. A return of 0 does NOT mean failure — it is
+ * the normal result of an at-least-once drain replaying ids it already acked. Callers must
+ * not read `acked === ids.length` as proof; see `handleAckDecisions` in plan-review-dm.ts
+ * for the authoritative check.
  *
  * Safe because iblbot is single-process (pm2 fork mode): the readRaw + appendFileSync
  * pair has no await between them, so the event loop cannot interleave a second ack call.
@@ -150,14 +158,16 @@ export function appendDecision(
 export function ackDecisions(ids: string[], dir: string = DECISIONS_DIR): number {
     if (ids.length === 0) return 0;
 
-    // Read current acked ids once up front; new writes are appended, not interleaved
+    // Read the file once up front; new writes are appended, not interleaved
     // (single-process invariant — see ecosystem.config.cjs).
-    const { ackedIds: alreadyAcked } = readRaw(dir);
+    const { decisions, ackedIds: alreadyAcked } = readRaw(dir);
+    const knownIds = new Set(decisions.map(d => d.id));
 
     const file = path.join(dir, DECISIONS_FILE);
     let count = 0;
 
     for (const id of ids) {
+        if (!knownIds.has(id)) continue;      // unknown id: ignored, never tombstoned
         if (alreadyAcked.has(id)) continue;   // idempotent: no second tombstone
         const ack: AckRecord = {
             kind: 'ack',

@@ -22,16 +22,26 @@ Copy User ID in Developer Mode).
 
 ## Restart with the new env var
 
-pm2 caches the environment from the process's first start. A plain `pm2 restart iblbot`
-will **not** pick up the new variable — the bot will keep 503-ing from a correctly-provisioned
-box. The required flag is `--update-env`:
-
 ```bash
-pm2 restart iblbot --update-env
+pm2 restart iblbot
 ```
 
-This is the same flag `bin/iblbot-healthcheck:13-16` already passes on its unattended restart
-path, so a watchdog-triggered restart also picks up the variable.
+A plain restart is enough for the provisioning step above. `src/config.ts:1-3` calls
+`dotenv.config()` at import, and that re-reads the file from disk on **every** process start —
+including a plain restart. `ecosystem.config.cjs` declares no `env:` block, so pm2 never
+injects `PLAN_REVIEW_OWNER_DISCORD_ID` itself and the value dotenv reads is the one that lands.
+
+`--update-env` matters for a different case: `dotenv.config()` does **not** overwrite a key
+already present in the process environment. If pm2 has a value cached for a key from an earlier
+start, editing that key and plainly restarting leaves the stale value in place.
+
+| What changed | What to run |
+|---|---|
+| **Adding** a key pm2 has never seen (the provisioning step above) | `pm2 restart iblbot` |
+| **Changing** a key pm2 already has cached | `pm2 restart iblbot --update-env` |
+
+`--update-env` is never harmful, so pass it if unsure. `bin/iblbot-healthcheck:13-16` passes it
+on its unattended path, so a watchdog-triggered restart also picks the variable up.
 
 ## Decision sink
 

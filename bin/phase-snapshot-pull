@@ -17,7 +17,7 @@ REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 REMOTE_DIR="backups/db/phase-snapshots"
 DEST="${REPO_ROOT}/ibl5/backups/phase-snapshots"
 # cPanel prod host has no system rsync; a static binary lives in ~/bin/rsync.
-REMOTE_RSYNC="bin/rsync"
+REMOTE_RSYNC="${REMOTE_RSYNC:-bin/rsync}"
 
 DIRECTION="pull"
 DRY_RUN=false

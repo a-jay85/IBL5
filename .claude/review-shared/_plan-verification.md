@@ -1,6 +1,6 @@
 ---
 description: Requires plans to classify every verification step into the test-type taxonomy at plan-write time; no deferred manual items; E2E assertions must be seed- and DOM-grounded.
-last_verified: 2026-09-14
+last_verified: 2026-09-16
 ---
 
 # Plan Verification Matrix
@@ -168,6 +168,7 @@ If a plan matches a left-hand row, its Verification Matrix must carry a row asse
 | adds or modifies a worktree batch-sync script that executes git operations on working branches | asserts at least one scenario where the target branch has already-published commits (`git push` has occurred), and verifies that the script does not rewrite local commit history — the existing SHA survives as an ancestor after reconcile, or the strategy is explicitly merge-safe |
 | adds or modifies a hook or gate that computes a git diff range (`git log base..HEAD`, `git diff base..HEAD`, or similar) by deriving the base from repo state | asserts the **stacked-PR** scenario: when the branch has a declared base (via `git config branch.<name>.iblBase`) that differs from `origin/master`, the gate resolves the declared base and does not false-block changes that are present in both master and the declared base |
 | adds a `bin/test-*` shell harness that uses awk to delimit a code region | asserts the anchor is unique and on-target: copy the target file, inject a `continue`, `break`, or wrong-value at the exact insertion point the test is guarding, run the test against that copy, and confirm the test **fails** — proving the awk region is scanning the correct code region; unique comment strings (e.g., `# Terminal-disposition guard:`) are required as anchors; indent-level tokens (`fi`, `esac`, `done`, `}`) are forbidden as the primary anchor when the same token appears earlier in the file |
+| adds or modifies a function that accepts externally-supplied IDs and writes tombstone or state records keyed to those IDs | asserts that an unknown ID (one that exists in the caller's payload but has no matching record in the canonical store) produces **no write** to the backing file or database — assert the store byte-for-byte unchanged after the call with the unknown ID |
 
 Rows in this table are almost always `CLI-executable` — a one-shot command, not a test file. `bin/check-plan` gate `[V]` enforces that such a row's "Test file / location" cell is a single runnable shell command (escape any pipe as `\|`), and `/post-plan` Phase 5.0 executes every `post-impl` one, so keep each cell fast and read-only.
 

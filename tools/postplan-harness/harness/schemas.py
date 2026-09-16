@@ -10,6 +10,8 @@ from .state import Classification, HarnessError
 FINDING_KEYS = {"path", "line", "body"}
 MANUAL_CATEGORIES = {"cli-executable", "phpunit", "api-test", "e2e",
                      "visual-regression", "truly-manual"}
+HOLD_DISCHARGE_CATEGORIES = {"decision", "cli-executable", "phpunit", "api-test",
+                              "e2e", "visual-regression", "truly-manual"}
 COMMIT_TYPES = {"feat", "fix", "refactor", "perf", "test", "docs", "build", "ci", "chore"}
 
 
@@ -83,6 +85,46 @@ def validate_manual_recheck(data) -> None:
                 raise HarnessError("schema", f"recheck[{i}].probe must be a non-empty list")
             if not all(isinstance(s, str) for s in probe):
                 raise HarnessError("schema", f"recheck[{i}].probe elements must be strings")
+
+
+def validate_hold_discharge(data) -> None:
+    """[{n, category, probe?, rationale?}] — Mode B hold-sentence classifier output.
+
+    Each item requires int `n` and `category` in HOLD_DISCHARGE_CATEGORIES.
+    `probe` is a non-empty list of str and is required iff category == "cli-executable".
+    `decision` entries must carry no `probe` and no `test_hint`.
+    Rejects any category outside the closed set — a permissive validator here
+    would silently discharge a hallucinated category.
+    """
+    if not isinstance(data, list):
+        raise HarnessError("schema", "hold discharge must be a JSON array")
+    for i, item in enumerate(data):
+        if not isinstance(item, dict) or "n" not in item or "category" not in item:
+            raise HarnessError("schema", f"discharge[{i}] must have n and category")
+        if not isinstance(item["n"], int):
+            raise HarnessError("schema", f"discharge[{i}].n must be int")
+        cat = item["category"]
+        if cat not in HOLD_DISCHARGE_CATEGORIES:
+            raise HarnessError("schema", f"discharge[{i}].category {cat!r} not in allowed set")
+        has_probe = "probe" in item
+        has_hint = "test_hint" in item
+        is_cli = cat == "cli-executable"
+        is_decision = cat == "decision"
+        if is_decision and has_probe:
+            raise HarnessError("schema", f"discharge[{i}].decision must not have probe")
+        if is_decision and has_hint:
+            raise HarnessError("schema", f"discharge[{i}].decision must not have test_hint")
+        if is_cli and not has_probe:
+            raise HarnessError("schema", f"discharge[{i}].cli-executable must have probe")
+        if not is_cli and has_probe:
+            raise HarnessError("schema",
+                                f"discharge[{i}].probe forbidden for category {cat!r}")
+        if has_probe:
+            probe = item["probe"]
+            if not isinstance(probe, list) or not probe:
+                raise HarnessError("schema", f"discharge[{i}].probe must be non-empty list")
+            if not all(isinstance(s, str) for s in probe):
+                raise HarnessError("schema", f"discharge[{i}].probe elements must be strings")
 
 
 def validate_pr_copy(data) -> None:

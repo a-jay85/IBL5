@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-09-13
+last_verified: 2026-09-16
 ---
 
 # Post-Plan Orchestrator
@@ -337,6 +337,25 @@ Widening gate 3 is **not** the alternative fix: dry-run over the `~/claude-plans
 
 Launch a **single Sonnet 4.6 agent** (`subagent_type: "sonnet-4-6"`, omit `model`) with the QA-classification prompt in `.claude/skills/post-plan/_phase-6-manual-testing.md` (substitute the extracted steps from Step 1 and the changed-file list from Phase 4A). The prompt classifies each surviving manual step into CLI-executable / PHPUnit-replaceable / API-test-replaceable / E2E-replaceable / Visual-regression-replaceable / Truly-manual and returns a JSON array; the full prompt text + JSON schema live in that reference — Read it before spawning.
 
+### Step 2b: Classify the hold-justification sentences (Mode B)
+
+Runs only when the plan has a `## Automouse Hold Justification` section with prose outside its `**Decision:**` block. **Trigger — cheap, and usually skips:** source `bin/lib/hold-check.sh` and call `hold_check_section "$PLAN_FILE"`. That helper returns the hold section's body lines with the heading, the fenced blocks, and the `**Decision:**` block already removed — exactly the candidate set. **If it emits nothing, skip this step entirely: no spawn, no LLM call, paste as today.** A plan authored under the `.claude/skills/plan/SKILL.md` decision-vs-check rubric is decision-only and costs nothing here; the spawn is the price of a non-conforming plan.
+
+**The spawn.** One `Agent(subagent_type: "sonnet-4-6")` — omit `model`, per `.claude/rules/agent-tiering.md` § Sonnet 4.6 pins. Prompt = the verbatim contents of `.claude/skills/post-plan/_phase-6-manual-testing.md`, plus a caller message stating **Mode B** and the numbered sentences. Sentences are the helper's output lines, numbered 1..N in order — **do not sentence-split a line further.** Line granularity is what the skill path and the compiled harness can reproduce identically; a regex sentence splitter would diverge between bash and Python on exactly the abbreviations and version numbers these plans contain.
+
+**Consuming the JSON.** Partition by `category`:
+
+- `decision` → **residual**; stays in the `## Manual confirmation needed` block.
+- anything else → **discharged**; becomes a `## Reviewer verification` bullet.
+
+**Three unhappy paths, each handled explicitly:**
+
+1. **Spawn fails, returns unparseable JSON, or returns a different count than it was given.** Treat every sentence as `decision` and paste the original justification unchanged. Over-holding costs a human one extra sentence; under-holding deletes a judgment. **Never let a classifier error delete prose.**
+2. **Every sentence discharged and the section has no `**Decision:**` line — the residual is empty.** Do **not** emit an empty block, and do **not** omit the block. Fall back to pasting the original justification prose verbatim, and add one line to `## Reviewer verification` noting that the hold carries no stated decision (itself the signal the plan needs fixing). `upsert_manual_confirmation` treats an empty block as *remove*, so an unguarded empty residual would strip the hold notice off a PR that is still `auto_merge: false`.
+3. **A returned `probe` violates the allowlist.** Render the bullet without a command, citing the category and rationale instead. Never paste an unvetted command string into a PR body as something to run.
+
+This step **relocates** claims; it never executes them. Probe execution stays on the row path, which is built around `row.number`.
+
 ### Step 3: Execute findings
 
 Using the Sonnet agent's classifications:
@@ -362,7 +381,23 @@ echo "BODY_MARKERS_CAPTURED=$(grep -c . "$MARKERS_FILE" 2>/dev/null || echo 0)"
 cat "$MARKERS_FILE"
 ```
 
-   Apply: `gh pr edit --body "<updated>"` — and **re-emit every line the capture block printed, verbatim, each on its own line, at the TOP of the new body**, above the `## ` sections and **outside** the `<!-- files-changed:begin -->` / `<!-- files-changed:end -->` pair (anything between those markers is destroyed on the next regeneration, and `Depends-on:` must stay start-of-line-anchored for `pr_dep_holds`). Never paraphrase, re-wrap, or reconstruct a captured line — `bin/adr-check` and `bin/refactor-flag` enforce minimum reason lengths on their bypass comments, so a reconstruction can fail their check even when the intent survives. This `No manual testing needed` sentinel is exactly what **feeds Phase 6.5 condition (1)** (`pr_manual_testing_clearance`) to clear the manual-testing gate — if this write is skipped or reworded, condition (1) holds the PR for human review. Regenerate the `<!-- files-changed:begin -->` / `<!-- files-changed:end -->` block (Phase 2) as part of this same `gh pr edit --body` write — **one write on the normal path**, block refreshed last, so the manual-testing sentinel above and the block cannot fight over the body. The verify block below adds a **second, conditional** write only when a captured marker was actually dropped; when nothing was dropped it writes nothing, so the one-write property holds for every non-defective run. In the **same** `gh pr edit --body` write, surface the plan's hold justification: if the plan file has a `## Automouse Hold Justification` section (ignore one that appears only inside a fenced block), emit its prose into the body inside `<!-- manual-confirmation:begin -->` / `<!-- manual-confirmation:end -->` markers under a `## Manual confirmation needed` heading, replacing an existing marker pair in place rather than appending a second one. **If the plan has no such section, emit nothing — never an empty heading.** Two placement rules are load-bearing, not cosmetic: put the block **before** the `## Manual Testing` heading (`pr_manual_testing_clearance` scans from that heading to the next `## ` line, so a block after it truncates the window and flips a cleared PR to held), and prefix **every** line of the justification prose with `> ` (a justification that quotes `## Manual Testing` or a `- [x]` line would otherwise open a counterfeit clearance window).
+   Apply: `gh pr edit --body "<updated>"` — and **re-emit every line the capture block printed, verbatim, each on its own line, at the TOP of the new body**, above the `## ` sections and **outside** the `<!-- files-changed:begin -->` / `<!-- files-changed:end -->` pair (anything between those markers is destroyed on the next regeneration, and `Depends-on:` must stay start-of-line-anchored for `pr_dep_holds`). Never paraphrase, re-wrap, or reconstruct a captured line — `bin/adr-check` and `bin/refactor-flag` enforce minimum reason lengths on their bypass comments, so a reconstruction can fail their check even when the intent survives. This `No manual testing needed` sentinel is exactly what **feeds Phase 6.5 condition (1)** (`pr_manual_testing_clearance`) to clear the manual-testing gate — if this write is skipped or reworded, condition (1) holds the PR for human review. Regenerate the `<!-- files-changed:begin -->` / `<!-- files-changed:end -->` block (Phase 2) as part of this same `gh pr edit --body` write — **one write on the normal path**, block refreshed last, so the manual-testing sentinel above and the block cannot fight over the body. The verify block below adds a **second, conditional** write only when a captured marker was actually dropped; when nothing was dropped it writes nothing, so the one-write property holds for every non-defective run. In the **same** `gh pr edit --body` write, surface the plan's hold justification: if the plan file has a `## Automouse Hold Justification` section (ignore one that appears only inside a fenced block), emit its **residual** prose — the `**Decision:**` line plus every sentence the Step-2b classifier returned as `decision`, and nothing else; when Step 2b was skipped or fell back, the residual is the whole section, exactly as today — into the body inside `<!-- manual-confirmation:begin -->` / `<!-- manual-confirmation:end -->` markers under a `## Manual confirmation needed` heading, replacing an existing marker pair in place rather than appending a second one. **If the plan has no such section, emit nothing — never an empty heading.** Two placement rules are load-bearing, not cosmetic: put the block **before** the `## Manual Testing` heading (`pr_manual_testing_clearance` scans from that heading to the next `## ` line, so a block after it truncates the window and flips a cleared PR to held), and prefix **every** line of the justification prose with `> ` (a justification that quotes `## Manual Testing` or a `- [x]` line would otherwise open a counterfeit clearance window).
+   **In that same `gh pr edit --body` write, emit the discharged sentences as a `## Reviewer verification` section** inside `<!-- reviewer-verification:begin -->` / `<!-- reviewer-verification:end -->` markers, so a re-run replaces in place rather than appending a second copy (same discipline as the other two marker pairs). **Placement is an algorithm, not a description**, because "after `## Manual Testing`" is ambiguous in the dangerous direction: insert immediately **before the first `^#{2,6}\s*` heading that occurs strictly after the `## Manual Testing` heading**; if no such heading exists, append at end of body. That puts the section after the *whole* Manual Testing section, never between the heading and its checkboxes — inserting directly under the heading would truncate `pr_manual_testing_clearance`'s window to zero lines and hold every PR forever, a bug with no error message. Body shape:
+
+   ```
+   <!-- reviewer-verification:begin -->
+   ## Reviewer verification
+
+   These claims came from the plan's hold justification and are settleable without you.
+   Each names its instrument; nothing here needs a human at the merge button.
+
+   - "<source sentence>" — `cli-executable`: `bin/check-docs --since=origin/master`
+   - "<source sentence>" — `phpunit`: asserted by <matrix row / test file>
+   <!-- reviewer-verification:end -->
+   ```
+
+   Three content rules, each guarding a real failure: **no line may begin with `#`** (a heading inside the block moves the next-heading boundary on the following run and walks the section down the body one insert at a time); **no line may contain `- [ ]` or `- [x]`** (checkbox scanners elsewhere in the pipeline count those); and the block is **omitted entirely** when nothing was discharged, never emitted as a bare heading. This changes only what is written into the body — `pr_manual_testing_clearance`, Phase 6.5's arming conditions, and `bin/lib/pr-armable.sh` are not touched.
+
 5. **Verify markers survived (self-heal):** the write above is composed by an agent, so verify it mechanically rather than trusting it. Run:
 
 ```bash

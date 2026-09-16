@@ -301,6 +301,48 @@ def parse_hold_justification(content: str) -> str:
                     r"Automouse Hold Justification")[:4000]
 
 
+_DECISION_RE = re.compile(r"^ *\*\*Decision:\*\*")
+
+
+def split_hold_justification(text: str) -> tuple[str, list[str]]:
+    """Return (decision_block, candidate_lines) from a hold justification body.
+
+    decision_block: all lines from each `**Decision:**` line through its
+                    following blank line, joined as a string.  Mirrors
+                    hold_check_section's (d) rule exactly: the anchor is
+                    leading-SPACES only (not tabs), and `in_decision` re-arms
+                    on every `**Decision:**` line, not just the first.
+    candidate_lines: every other non-blank body line, in order.  These are
+                     the sentences the classifier may discharge.
+
+    Python mirror of bin/lib/hold-check.sh::hold_check_section — the
+    **Decision:** exemption ends at the next blank line (same as the shell),
+    not at end-of-section.  Fenced blocks are stripped first via _strip_fenced
+    so illustrative fences are excluded, matching parse_hold_justification's
+    dialect.
+    """
+    lines = _strip_fenced(text)
+    decision_parts: list[str] = []
+    candidate_lines: list[str] = []
+    in_decision = False
+    for line in lines:
+        if _DECISION_RE.match(line):
+            in_decision = True
+            decision_parts.append(line)
+            continue
+        if in_decision:
+            if line == "":
+                in_decision = False
+                decision_parts.append(line)
+            else:
+                decision_parts.append(line)
+            continue
+        if line.strip():
+            candidate_lines.append(line)
+    decision_block = "\n".join(decision_parts)
+    return decision_block, candidate_lines
+
+
 def _resolve_drift(slug: str, base_dir: str, entries: list[str], bare: str,
                    info: PlanInfo) -> str:
     """Prefix-drift fallback: `<prefix>-{slug}.md` when no `{slug}.md` exists.

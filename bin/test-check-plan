@@ -396,6 +396,105 @@ description: "gates passed mechanically, auto_merge: true stands"
 impl_model: sonnet
 ---'"$M"
 
+# ---------------------------------------------------------------------------
+# Gate H(b): hold-justification content — ask-shaped-sentence detection.
+# ---------------------------------------------------------------------------
+
+# Gate H(b): an ask-shaped sentence (actor-noun + directive-modal + discharge-verb)
+# in the hold justification section must flag (exit 1). This pins the motivating
+# defect (maint-2-13-freeagency-admin-split.md:1239) — the plain-English form
+# "A human must confirm X" is the exact sentence this gate rejects.
+assert_viol "gateHb-ask-shaped-sentence" 1 "[H]" '---
+auto_merge: false
+impl_model: sonnet
+---'"$M"'
+## Automouse Hold Justification
+
+**What the human merge confirms.** A human must confirm every class reference resolves under the new namespace.
+'
+
+# Gate H(b): a `**Decision:**` line carrying the same ask-shaped words is exempt —
+# the escape hatch. The author writes the irreducible judgment on a Decision line
+# (e.g. "accept an irreversible move") and the gate stays silent (exit 0).
+assert_viol "gateHb-decision-line-exempt" 0 "[H]" '---
+auto_merge: false
+impl_model: sonnet
+---'"$M"'
+## Automouse Hold Justification
+
+**Decision:** accept an irreversible namespace move on a surface where a human must confirm the blast radius.
+'
+
+# Gate H(b) NEGATIVE: the Decision block exemption is line-scoped — it runs from
+# the `**Decision:**` line through to the NEXT blank line. Content after the
+# blank line re-enters the checked zone. This fixture confirms a blank line
+# terminates the exemption: the post-blank ask-shaped sentence must still flag
+# (exit 1). A wrong implementation that treats the Decision line as a file-wide
+# switch would pass this test with exit 0 — then this fixture catches it.
+assert_viol "gateHb-decision-block-ends-at-blank-line" 1 "[H]" '---
+auto_merge: false
+impl_model: sonnet
+---'"$M"'
+## Automouse Hold Justification
+
+**Decision:** the irreversible namespace move is accepted.
+
+A reviewer must verify the counts agree.
+'
+
+# Gate H(b) FP-guard: perception/taste holds must NOT flag (exit 0).
+# The calibrated exclusion list covers lines where the discharge is irreducibly
+# a human judgment: "feel right", "accept the ergonomics", etc. Those words
+# appear in the exclusion patterns so the gate stays silent even when a line
+# also contains "reviewer" or "must".
+assert_viol "gateHb-perception-hold-passes" 0 "[H]" '---
+auto_merge: false
+impl_model: sonnet
+---'"$M"'
+## Automouse Hold Justification
+
+Intrinsic (gate 14a): does the drag-reorder flow feel right? A reviewer must accept the ergonomics before merge.
+'
+
+# Gate H(b) FP-guard: `can` is a capability modal, not a directive modal — the
+# positive patterns only match `must`, `should`, `needs to`, `need to`, `has to`.
+# A sentence where the reviewer CAN confirm something (= it is knowable from the
+# diff) is not asking a human to act; the gate must stay silent (exit 0).
+assert_viol "gateHb-capability-prose-passes" 0 "[H]" '---
+auto_merge: false
+impl_model: sonnet
+---'"$M"'
+## Automouse Hold Justification
+
+Intrinsic (gate 14b): a reviewer can confirm each authz verdict from the diff, but the verdicts themselves are distributed across it.
+'
+
+# Gate H(b) FP-guard: fenced code blocks are stripped before pattern matching.
+# A plan that DOCUMENTS an ask-shaped sentence as an example (e.g. "avoid writing
+# sentences like this") must NOT flag (exit 0) — this fixture ensures fencing works.
+assert_viol "gateHb-fenced-example-passes" 0 "[H]" '---
+auto_merge: false
+impl_model: sonnet
+---'"$M"'
+## Automouse Hold Justification
+
+Intrinsic (gate 14b): see below for what NOT to write.
+
+```
+A human must confirm every reference resolves.
+```
+'
+
+# Gate H(b) FP-guard: the gate is hold-scoped — it only runs when the plan declares
+# `auto_merge: false`. An armed plan (auto_merge absent = true) that happens to carry
+# an ask-shaped `## Automouse Hold Justification` section is never content-checked
+# (exit 0). No hold → no FM_HOLD → the elif branch is never reached.
+assert_viol "gateHb-no-hold-section-not-checked" 0 "[H]" "$FM$M"'
+## Automouse Hold Justification
+
+A human must confirm every class reference resolves under the new namespace.
+'
+
 # Gate H FP-guard: a plan that merely DOCUMENTS the `auto_merge: false` syntax in
 # its body (not in line-1 frontmatter) must NOT flag (exit 0).
 assert "gateH-body-mentions-syntax-only" 0 "$FM$M"'
@@ -2565,6 +2664,49 @@ Once implemented, frontmatter will declare:
 stop_condition: evidence-present
 evidence: bin/lib/plan-autonomy-contract
 '
+
+# gateHb-pattern-file-parity — bash reader and Python reader must see the same
+# positive-pattern count and exclusion-pattern count from hold-check-patterns.txt.
+# Counting the two classes separately is load-bearing: a single total would stay
+# equal if one reader mis-classified an `!` line as a positive, which would
+# silently disable the perception-hold exclusion guard while the count matched.
+# Portability assertion: pattern LINES (non-comment, non-blank) must stay inside
+# the intersection of POSIX ERE and Python `re` — no POSIX bracket classes
+# ([[:alnum:]], [[:space:]]) and no \b/\d/\s/\w. Comments are excluded from the
+# portability grep because the header deliberately documents those forms as
+# examples of what NOT to use; filtering them out prevents false positives there.
+PATFILE=bin/lib/hold-check-patterns.txt
+BASH_POS=$(grep -c -v -e '^[[:space:]]*$' -e '^[[:space:]]*#' -e '^!' "$PATFILE")
+BASH_EXC=$(grep -c '^!' "$PATFILE")
+PY=$(python3 - "$PATFILE" <<'PY'
+import sys
+pos = exc = 0
+for line in open(sys.argv[1], encoding="utf-8").read().splitlines():
+    s = line.strip()
+    if not s or s.startswith("#"):
+        continue
+    if s.startswith("!"):
+        exc += 1
+    else:
+        pos += 1
+print(f"{pos} {exc}")
+PY
+)
+_parity_failed=0
+if [ "$BASH_POS $BASH_EXC" != "$PY" ]; then
+    echo "FAIL: gateHb-pattern-file-parity — bash sees pos=$BASH_POS exc=$BASH_EXC, Python sees '$PY'"
+    FAILED=1; _parity_failed=1
+fi
+# Non-comment, non-blank pattern lines must use only the portable subset shared by
+# POSIX ERE (bash grep -E) and Python re. Comments are excluded because the header
+# deliberately shows [[:alnum:]], [[:space:]], \b, \d, \s, \w as negative examples.
+if grep -v -e '^[[:space:]]*$' -e '^[[:space:]]*#' "$PATFILE" | grep -qE '\[\[:[a-z]+:\]\]|\\[bdsw]'; then
+    echo "FAIL: gateHb-pattern-file-parity — pattern lines contain non-portable syntax (POSIX bracket class or \\b/\\d/\\s/\\w)"
+    FAILED=1; _parity_failed=1
+fi
+if [ "$_parity_failed" -eq 0 ]; then
+    echo "ok: gateHb-pattern-file-parity (bash pos=$BASH_POS exc=$BASH_EXC, Python='$PY')"
+fi
 
 # regex_canon_divergence — the three call sites must stay byte-identical.
 # Canon lives in bin/check-plan gate [D]; SKILL.md and _architect-contract.md

@@ -7,12 +7,15 @@ from __future__ import annotations
 
 import re
 
+from .adapters.probe import _validate as _probe_validate
 from .state import Classification
 
 FILES_CHANGED_BEGIN = "<!-- files-changed:begin -->"
 FILES_CHANGED_END = "<!-- files-changed:end -->"
 MANUAL_CONFIRMATION_BEGIN = "<!-- manual-confirmation:begin -->"
 MANUAL_CONFIRMATION_END = "<!-- manual-confirmation:end -->"
+REVIEWER_VERIFICATION_BEGIN = "<!-- reviewer-verification:begin -->"
+REVIEWER_VERIFICATION_END = "<!-- reviewer-verification:end -->"
 
 STRIP_RE = re.compile(r"(migrations/|composer\.lock|package-lock\.json|bun\.lock|__snapshots__/|\.snap$)")
 _PHP = re.compile(r"\.php$")
@@ -249,6 +252,105 @@ def upsert_manual_confirmation(body: str, block: str) -> str:
     m = _MANUAL_HEADING_RE.search(body)
     if m:
         return body[:m.start()] + block + "\n\n" + body[m.start():]
+    return body.rstrip() + "\n\n" + block + "\n"
+
+
+_CB_RE = re.compile(r"- \[( |x)\]", re.I)
+
+
+def _neutralize_checkboxes(text: str) -> str:
+    """Rewrite `- [ ]`/`- [x]` in source text to `- ( )`/`- (x)`.
+
+    Prevents reviewer-verification bullets from containing a real unchecked or
+    checked checkbox that the manual_testing_clearance scanner would count.
+    """
+    def _replace(m: re.Match) -> str:
+        return "- ( )" if m.group(1) == " " else "- (x)"
+    return _CB_RE.sub(_replace, text)
+
+
+def render_reviewer_verification(discharged: list) -> str:
+    """Marker-delimited `## Reviewer verification` block, or "" when empty.
+
+    Each discharged entry is a dict with keys `text`, `category`, and
+    optionally `probe` (list[str]) and `rationale` (str).  For cli-executable
+    entries the probe is included in the bullet only when it passes the probe
+    allowlist; an invalid probe is silently omitted rather than rendered.
+
+    No emitted line starts with `#` (headings are not injected by this block),
+    and source text containing `- [ ]` or `- [x]` is rewritten to `- ( )` /
+    `- (x)` so clearance scanners cannot be confused.
+    """
+    if not discharged:
+        return ""
+    parts = [REVIEWER_VERIFICATION_BEGIN, "## Reviewer verification", ""]
+    parts.append("These claims came from the plan's hold justification and are settleable without you.")
+    parts.append("Each names its instrument; nothing here needs a human at the merge button.")
+    parts.append("")
+    for entry in discharged:
+        cat = entry.get("category", "unknown")
+        raw_text = _neutralize_checkboxes(entry.get("text", ""))
+        # Arming-gate defense: neutralize any line in the text that starts with
+        # '#' so no emitted line can be misread as a markdown heading by the
+        # clearance scanners.
+        text = "\n".join(
+            ("> " + ln) if ln.startswith("#") else ln
+            for ln in raw_text.splitlines()
+        )
+        probe = entry.get("probe")
+        rationale = entry.get("rationale", "")
+        if cat == "cli-executable" and probe:
+            rejection = _probe_validate(probe)
+            if rejection is None:
+                probe_str = " ".join(probe)
+                bullet = f'- "{text}" — `{cat}`: `{probe_str}`'
+            elif rationale:
+                bullet = f'- "{text}" — `{cat}`: {rationale}'
+            else:
+                bullet = f'- "{text}" — `{cat}`'
+        elif rationale:
+            bullet = f'- "{text}" — `{cat}`: {rationale}'
+        else:
+            bullet = f'- "{text}" — `{cat}`'
+        parts.append(bullet)
+    parts.append(REVIEWER_VERIFICATION_END)
+    return "\n".join(parts)
+
+
+def upsert_reviewer_verification(body: str, block: str) -> str:
+    """Idempotent upsert, positioned after `## Manual Testing`.
+
+    Both markers present, BEGIN before END: replace BEGIN..END inclusive (empty
+    `block` therefore REMOVES the block). Neither present: insert immediately
+    before the first `^#{2,6}\\s*\\S` heading strictly after `## Manual Testing`
+    when one exists, else append at end. Exactly one marker, or END before
+    BEGIN: insert a fresh block by the same rule and leave the orphan.
+    Empty body: return `block`.
+    """
+    body = body or ""
+    if not body.strip():
+        return block
+
+    begin_idx = body.find(REVIEWER_VERIFICATION_BEGIN)
+    end_idx = body.find(REVIEWER_VERIFICATION_END)
+
+    if begin_idx != -1 and end_idx != -1 and begin_idx < end_idx:
+        after_end = end_idx + len(REVIEWER_VERIFICATION_END)
+        return body[:begin_idx] + block + body[after_end:]
+
+    # Neither both present and in order — insert after ## Manual Testing, or append.
+    if not block:
+        return body
+
+    manual_m = _MANUAL_HEADING_RE.search(body)
+    if manual_m:
+        rest = body[manual_m.end():]
+        next_m = re.search(r"^#{2,6}\s*\S", rest, re.M)
+        if next_m:
+            insert_at = manual_m.end() + next_m.start()
+            return body[:insert_at] + block + "\n\n" + body[insert_at:]
+        # No following heading — append at end
+        return body.rstrip() + "\n\n" + block + "\n"
     return body.rstrip() + "\n\n" + block + "\n"
 
 

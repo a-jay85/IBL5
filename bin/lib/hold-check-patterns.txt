@@ -1,0 +1,31 @@
+# bin/lib/hold-check-patterns.txt — ask-shaped-sentence patterns for the
+# `## Automouse Hold Justification` decision-vs-check split.
+#
+# READ BY TWO LANGUAGES. bin/check-plan gate H(b) reads this with
+# `while IFS= read -r pat` + `grep -iE`; harness/classify.py reads it with
+# `open(...).read().splitlines()` + `re.search(..., re.IGNORECASE)`.
+# bin/test-check-plan case `gateHb-pattern-file-parity` asserts the two
+# readers see the same counts, so the file MUST stay in the intersection
+# of POSIX ERE and Python `re`:
+#   - NO POSIX bracket classes ([[:alnum:]], [[:space:]]) — Python `re`
+#     reads those as literal character sets, silently changing the match.
+#   - NO \b, \d, \s, \w — BSD grep (macOS) does not accept them.
+#   - Use (^|[^A-Za-z0-9]) / ([^A-Za-z0-9]|$) for word edges, and a
+#     literal space inside [ ] where a separator is needed.
+#
+# LINE GRAMMAR
+#   blank or leading `#`  → ignored
+#   leading `!`           → EXCLUSION pattern (strip the `!`, then match)
+#   anything else         → POSITIVE ask-shaped pattern
+# A hold-justification line is a violation when it matches at least one
+# positive pattern and NO exclusion pattern. Matching is case-insensitive.
+#
+# CALIBRATION: see the plan's `## Corpus Dry-Run Calibration` section.
+# 661 plans in ~/claude-plans/, 27 hit lines across 26 plans (3.9%). The
+# exclusion list is what keeps perception/taste holds out: "does the drag
+# ergonomics feel right", "a reviewer eyeballs the gallery", "the human
+# accepts the irreversible push" must NEVER fire — those are decisions.
+
+(^|[^A-Za-z0-9])(human|reviewer|merger)[^.]{0,25}(must|should|needs to|need to|has to)[ ]+(also[ ]+|then[ ]+|independently[ ]+)?(confirm|verify|check|re-check|recheck|spot-check|ensure|validate)([^A-Za-z0-9]|$)
+^[ >#*_-]*(what|which)[ ]+(the[ ]+|a[ ]+)?(human|reviewer|merger)[^.]{0,40}(confirms|confirm|verifies|verify|checks|check|validates|validate|ensures|ensure)([^A-Za-z0-9]|$)
+!(^|[^A-Za-z0-9])(eyeball|eyeballs|look|looks|looking|feel|feels|taste|ratif|judge|judges|judgment|judgement|weigh|accept|accepts|decide|decides|read|reads|reading)([^A-Za-z0-9]|$)

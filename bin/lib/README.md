@@ -1,6 +1,6 @@
 ---
 description: Index of shared library files sourced by bin/ scripts.
-last_verified: 2026-09-10
+last_verified: 2026-09-16
 ---
 
 # bin/lib — Shared Library Files
@@ -15,6 +15,8 @@ Sourced (not executed directly) by scripts in `bin/` and `bin/automouse/`. Each 
 | `bug-pipeline-gh.sh` | Best-effort GitHub issue-tracking seam for the autonomous bug pipeline (§3f) |
 | `bug-pipeline-test-stubs.sh` | Shared stub scaffolding for `bin/test-bug-pipeline-*` harnesses |
 | `db-helpers.sh` | Shared database helper functions for Docker MariaDB interactions (password-warning suppression, exec wrappers, and `db_resolve_target` / `db_container_running` — the main-stack-vs-worktree-container routing used by `ibl5/bin/db-query`) |
+| `hold-check-patterns.txt` | Ask-shaped-sentence patterns for `## Automouse Hold Justification` sections; one pattern per line, read by both `bin/lib/hold-check.sh` (POSIX ERE via `grep -E`) and `harness/planfile.py` (Python `re`) — see the file header for the two-language portable subset |
+| `hold-check.sh` | Hold-section extraction and ask-shaped-sentence detection; sourced by `bin/check-plan` gate `[H]` and by `/post-plan` Phase 6's hold-sentence discharge step |
 | `docfix-dm.sh` | Compose the docs-refreshed Discord DM for a docfix PR; holds the numeric-input, OPEN-state, and `docs-stale-refresh-` head-ref guards lifted out of `docs-refreshed-notify.yml` so they are exercisable by `bin/test-docfix-run` |
 | `git-helpers.sh` | Shared git-layout helpers: canonical repo root resolution and related utilities |
 | `human-signoff-classifier.sh` | Single source of truth for the feature-PR human sign-off classifier (ADR-0062), sourced by both the workflow and its regression harness |

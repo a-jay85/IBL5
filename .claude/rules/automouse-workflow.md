@@ -91,16 +91,20 @@ stamp both. Diagnose with `stat -L`.
 
 ### Self-heal
 
-Before the startup archival block, `bin/automouse/run` freshens the local master checkout (a
-`git fetch` + `merge --ff-only`); this same refresh also runs at each plan boundary when plans
-remain queued (the between-plans master canary). Then it runs `bin/automouse/self-heal`. The self-heal script
-scans `skipped/` for plans carrying a `<plan>.md.staleness` sidecar marker — the signal that
-a plan was skipped specifically by the staleness gate, not for ambiguity / poison-pill
-(already-merged plans are not skipped at all — they land in `done/`). For each such plan, it re-runs `bin/check-plan-staleness` against the
-freshly-pulled master; if the guard now passes, `bin/automouse/queue` is invoked to requeue
-the plan (which also evicts the `.staleness` and `.attempts` sidecars). Use
-`bin/automouse/self-heal --dry-run` to preview what would be healed without acting. The step
-is non-fatal.
+Before the startup archival block, `bin/automouse/run` freshens local master (`git fetch` +
+`merge --ff-only`); the same refresh runs at each plan boundary while plans remain queued (the
+between-plans master canary). Then it runs `bin/automouse/self-heal`, a non-fatal step that
+scans `skipped/`:
+
+- **Heal** — a plan carrying a `<plan>.md.staleness` marker (skipped by the staleness gate, not
+  for ambiguity / poison-pill; already-merged plans land in `done/`) is re-checked with
+  `bin/check-plan-staleness`. If it passes, `bin/automouse/queue` requeues it and evicts its
+  sidecars.
+- **Reap** — a symlink whose plan file left `~/claude-plans` is deleted with its sidecars and
+  named in the output. Runs before the marker gate, so a dead entry is reaped whatever the
+  skip reason, and never requeues.
+
+`--dry-run` previews both without acting; the summary counts healed / still-stale / reaped.
 
 ## How It Works
 
@@ -171,7 +175,6 @@ Inline scalar form also works: `depends_on: 2099`.
 
 - A held plan stays in `queue/` with a `.depends-hold` sidecar and is skipped every pick cycle (zero attempt cost — the counter never increments).
 - `bin/automouse/self-heal` scans `queue/*.depends-hold` on every run and removes the sidecar when the dep is now `met`, re-enabling the plan for the next pick.
-- An orphan sidecar (plan left `queue/` via manual removal) is reaped by `self-heal`.
-- The `.depends-hold` sidecar is NOT touched by `bin/automouse/queue remove` — self-heal's orphan-reap is the cleanup path.
+- An orphan sidecar (plan left `queue/`) is reaped by `self-heal`. `bin/automouse/queue remove` never touches `.depends-hold`, so that reap is the only cleanup path.
 
 **Run-scoped dedup:** once a plan is held within a run, it is skipped for the rest of that run (space-padded `DEPENDS_HELD` string). When every plan in the queue is held, the run terminates cleanly rather than spinning.

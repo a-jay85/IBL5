@@ -1,6 +1,6 @@
 ---
 description: Schema reference and query patterns for IBL5 database work.
-last_verified: 2026-08-11
+last_verified: 2026-09-15
 ---
 
 # IBL5 Database Guide
@@ -74,6 +74,28 @@ Core data integrity constraints implemented:
 - Implement ETags using `updated_at` timestamps
 - Query database views instead of joining multiple tables
 - Follow REST best practices (see API_GUIDE.md)
+
+### Loading a Phase Snapshot Locally
+
+Phase snapshots capture the exact DB state at each season phase transition. To load one into a local worktree:
+
+1. **Pull snapshots from prod** (requires `PROD_SSH_HOST` in `.env` or environment):
+   ```bash
+   bin/phase-snapshot-pull
+   # Files land in ibl5/backups/phase-snapshots/
+   ```
+
+2. **Start a worktree from a snapshot** (skips live prod sync):
+   ```bash
+   bin/wt-up <slug> --snapshot ibl5/backups/phase-snapshots/<season>-<phase-slug>.sql.gz
+   ```
+
+3. **Load into an already-running worktree:**
+   ```bash
+   bin/db-sync-prod <slug> --snapshot ibl5/backups/phase-snapshots/<season>-<phase-slug>.sql.gz
+   ```
+
+`bin/db-sync-prod --snapshot` runs the same schema_migrations backfill and `bin/db-migrate` replay as a live prod sync, so worktree-local migrations are applied on top of the snapshot.
 
 ### For Refactoring Validation
 - **Always verify refactored code against production (iblhoops.net)**

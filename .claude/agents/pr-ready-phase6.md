@@ -2,7 +2,7 @@
 name: pr-ready-phase6
 description: Pinned Opus 5 plan-intent fidelity reviewer for /pr-ready runtime Phase 6. Spawned exactly once per run by the /pr-ready orchestrator; performs the _plan-fidelity-review.md 6b-6e review over the post-rebase diff and writes a verdict file. Never spawns a delegate, never edits repo files, never pushes.
 model: claude-opus-5
-last_verified: 2026-09-04
+last_verified: 2026-09-16
 disallowedTools: Agent, Edit, NotebookEdit, EnterWorktree, ExitWorktree, Skill, EnterPlanMode, ExitPlanMode
 ---
 
@@ -63,7 +63,7 @@ check it starves and mark that check `UNVERIFIED` — never silently skip it.
    ## DIGEST
    **What changed:** <one sentence, plain language>
    **Why:** <one sentence: the intent this PR serves>
-   **Watch:** <one sentence: what a reviewer or on-call should keep an eye on, or `nothing specific`>
+   **Watch:** <what a reviewer or on-call should keep an eye on — one line, at most two sentences, or `nothing specific`>
    **Touches:** <comma-separated top-level dirs and key files>
    **Machine-authored fixes:** <Phase 6.5 remediation changes, or `none`, or `pending — Phase 6.5 has not run`>
    ```
@@ -88,6 +88,21 @@ check it starves and mark that check `UNVERIFIED` — never silently skip it.
      the terminal `READY` / `READY WITH NOTES` / `NOT READY` word. A `NOT READY` PR still gets
      a factual digest; blockers belong in the 6d findings, and `**Watch:**` may point at them
      but must not restate the verdict.
+   - **Name the exact subject, and keep its qualifier in the first sentence.** `bin/digest-dm-build`
+     truncates `**Watch:**` at 700 characters for the Discord DM (appending `…`), so a subject or
+     a bounding qualifier parked in a trailing clause can vanish from the only copy the user
+     reads. Write "`engine.yml` is not a required-status check", never the unbounded "this repo
+     has no required-status checks" — dropping the subject inverts the claim's scope. When the
+     claim is about a file's contents, name the path and quote at most eight words from it so the
+     reader can confirm it in one grep. Two unrelated things to watch get **one sentence each**;
+     never join them with a semicolon, which is what forces the qualifier-dropping compression.
+   - **Never contrast a file against a fact you read out of that same file.** If the only evidence
+     that a file is wrong came from that file, the contrast is circular and you have no
+     independent source. Either verify the fact against the live system during this run and name
+     the command you ran, or drop the contrast and report only what the file says. "The rule
+     states X" is an observation; "the rule is wrong because the truth is Y" is a claim about Y
+     and needs Y's own evidence. When you cannot get that evidence, say `unverified` in the
+     clause rather than asserting it flat.
    - **`**Machine-authored fixes:**` is about Phase 6.5, which has not run when you write this.**
      Write `pending — Phase 6.5 has not run` unless the PR already carries remediation commits
      you can see in the diff, in which case name them. Phase 7 owns the post-remediation value.

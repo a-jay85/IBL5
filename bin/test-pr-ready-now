@@ -2431,7 +2431,16 @@ grep -qF '**Watch:**' "$f" || fail "28h: **Watch:** missing from pr-ready-phase6
 grep -qF '**Touches:**' "$f" || fail "28h: **Touches:** missing from pr-ready-phase6.md"
 grep -qF '**Machine-authored fixes:**' "$f" || fail "28h: **Machine-authored fixes:** missing from pr-ready-phase6.md"
 grep -qF 'and nothing after it' "$f" || fail "28h: 'and nothing after it' missing from pr-ready-phase6.md"
-grep -qE '^last_verified: 2026-09-04$' "$f" || fail "28h: last_verified not bumped to 2026-09-04 in pr-ready-phase6.md"
+# Floor, not an equality pin (matches 28j below): an exact date makes every later edit to
+# pr-ready-phase6.md fail this assertion for bumping the field the doc gate requires it to bump.
+lv=$(grep -m1 -oE '^last_verified: [0-9-]+' "$f" | cut -d' ' -f2); [[ "$lv" > "2026-09-03" ]] || fail "28h: last_verified not bumped in pr-ready-phase6.md (got $lv)"
+# Digest accuracy clauses: the qualifier-survives-truncation rule and the no-circular-contrast
+# rule. Both exist because a shipped Watch line dropped its subject ("engine.yml is not a
+# required check" -> "this repo has no required checks") and contrasted a file against a fact
+# read out of that same file.
+grep -qF 'keep its qualifier in the first sentence' "$f" || fail "28h: Watch qualifier-truncation clause missing from pr-ready-phase6.md"
+grep -qF 'Never contrast a file against a fact you read out of that same file' "$f" || fail "28h: circular-contrast clause missing from pr-ready-phase6.md"
+grep -qF 'at most two sentences' "$f" || fail "28h: Watch two-sentence allowance missing from pr-ready-phase6.md"
 
 # --- 28i: _plan-fidelity-review.md prose pins ---
 f="$PRD/_plan-fidelity-review.md"

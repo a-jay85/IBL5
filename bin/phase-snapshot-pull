@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+# Pull (or push) prod phase snapshots via rsync over SSH.
+# Remote: ~/backups/db/phase-snapshots/   Local: ibl5/backups/phase-snapshots/
+#
+# Usage:
+#   bin/phase-snapshot-pull              # PULL prod -> local (default)
+#   bin/phase-snapshot-pull --push       # PUSH local -> prod
+#   bin/phase-snapshot-pull --dry-run    # show what would transfer, move nothing
+#   bin/phase-snapshot-pull --delete     # mirror: delete dest files absent on source
+# ---
+# --push --delete is rejected: deleting prod snapshots from a laptop is never the intent.
+# PROD_SSH_HOST must be USER@HOST format (env var or .env).
+
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+REMOTE_DIR="backups/db/phase-snapshots"
+DEST="${REPO_ROOT}/ibl5/backups/phase-snapshots"
+# cPanel prod host has no system rsync; a static binary lives in ~/bin/rsync.
+REMOTE_RSYNC="bin/rsync"
+
+DIRECTION="pull"
+DRY_RUN=false
+DELETE=false
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --push) DIRECTION="push"; shift ;;
+    --dry-run) DRY_RUN=true; shift ;;
+    --delete) DELETE=true; shift ;;
+    -h|--help)
+      sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
+      exit 0 ;;
+    -*) echo "Unknown option: $1" >&2; exit 1 ;;
+    *) echo "Unexpected argument: $1" >&2; exit 1 ;;
+  esac
+done
+
+if $DELETE && [ "$DIRECTION" = "push" ]; then
+  echo "ERROR: --push --delete is rejected — never delete prod snapshots from a laptop." >&2
+  exit 1
+fi
+
+# Assert destination is gitignored — converts a future .gitignore regression into
+# an immediate failure rather than a 1.5 GB accidental commit.
+if ! git -C "$REPO_ROOT" check-ignore -q "$DEST" 2>/dev/null; then
+  echo "ERROR: $DEST is not gitignored — add ibl5/backups/ to .gitignore first." >&2
+  exit 1
+fi
+
+# Resolve SSH host: env var wins, then .env with worktree-to-main-checkout fallback.
+SSH_HOST="${PROD_SSH_HOST:-}"
+if [ -z "$SSH_HOST" ]; then
+  ENV_FILE="${REPO_ROOT}/.env"
+  if [ ! -f "$ENV_FILE" ]; then
+    GIT_ROOT="$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null | sed 's|/\.git$||')" || true
+    if [ -n "$GIT_ROOT" ] && [ -f "$GIT_ROOT/.env" ]; then
+      ENV_FILE="$GIT_ROOT/.env"
+    else
+      echo "FAILED: PROD_SSH_HOST not set and no .env found." >&2
+      exit 1
+    fi
+  fi
+  # shellcheck source=/dev/null
+  source "$ENV_FILE"
+  SSH_HOST="${PROD_SSH_HOST:-}"
+fi
+
+if [ -z "$SSH_HOST" ]; then
+  echo "FAILED: SSH host unset (set PROD_SSH_HOST in .env or environment)." >&2
+  exit 1
+fi
+
+RSYNC_FLAGS=(-a --partial --progress)
+[ -n "$REMOTE_RSYNC" ] && RSYNC_FLAGS+=(--rsync-path="$REMOTE_RSYNC")
+$DRY_RUN && RSYNC_FLAGS+=(--dry-run)
+$DELETE && RSYNC_FLAGS+=(--delete)
+
+REMOTE_SPEC="${SSH_HOST}:${REMOTE_DIR}/"
+LOCAL_SPEC="${DEST}/"
+
+if [ "$DIRECTION" = "pull" ]; then
+  SRC="$REMOTE_SPEC"
+  DST="$LOCAL_SPEC"
+  $DRY_RUN || mkdir -p "$DEST"
+else
+  SRC="$LOCAL_SPEC"
+  DST="$REMOTE_SPEC"
+  if [ ! -d "$DEST" ]; then
+    echo "FAILED: Local snapshots dir not found: $DEST" >&2
+    exit 1
+  fi
+fi
+
+LABEL=""
+$DRY_RUN && LABEL="$LABEL [dry-run]"
+$DELETE && LABEL="$LABEL [--delete]"
+echo "Syncing ($DIRECTION)${LABEL}:"
+echo "  from: $SRC"
+echo "    to: $DST"
+echo ""
+
+rsync "${RSYNC_FLAGS[@]}" -e "ssh" "$SRC" "$DST"

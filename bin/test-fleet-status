@@ -33,6 +33,9 @@
 #  18  with links forced, each printed file path is a hyperlink to its absolute
 #      location, the padding is unchanged once the escapes are stripped, and a
 #      runner slug with no queue file behind it is NOT linked
+#  19  a post-plan row names its audit.log, NOT the /tmp launchd log. Every job on
+#      this page is still running, which is precisely when the /tmp log is empty;
+#      a row with no audit.log yet still falls back to it
 #
 # Case 13 points FLEET_STATUS_AUTOMOUSE_PLIST at a fixture. Left defaulted it
 # would read the real plist on macOS and take the missing-file branch on CI —
@@ -247,6 +250,12 @@ Write an implementation plan.
 End your final message with the branch slug, with a `PLAN_FILE` line after it.
 PROMPT
 
+# The /tmp log for the audit-backed job. It EXISTS and is non-empty, so a row that
+# still printed it would look perfectly healthy — the assertion below has to name
+# the path and demand its absence, not merely check that something was printed.
+printf 'RESULT: not what a running row should send you to\n' \
+    > "$LOGS/post-plan-now-demo-slug-20260910-120000-4242.log"
+
 # Stub launchctl. Three labels covering the two residue shapes and one live job.
 # Column order matches the real `launchctl list`: PID, last-exit-status, label.
 #
@@ -262,6 +271,7 @@ cat <<'ROWS'
 -	0	com.ibl5.postplan-now-exited-slug-20260910-100000-1111
 -	-9	com.ibl5.postplan-now-killed-slug-20260910-110000-2222
 4242	0	com.ibl5.postplan-now-demo-slug-20260910-120000-4242
+4343	0	com.ibl5.postplan-now-noaudit-slug-20260910-130000-4343
 5151	0	com.ibl5.plan-now-20260910-171016-38521
 5252	0	com.ibl5.plan-now-20260910-174905-98101
 5353	0	com.ibl5.plan-now-20260910-090000-77000
@@ -468,8 +478,10 @@ assert_has "links: queue row links to the plan file" \
     "$OUTPUT_LINKS" '8;;file://[^ ]*queue/live-plan\.md[^ ]*live-plan\.md[^ ]* +in progress'
 assert_has "links: queued (unlocked) row links too" \
     "$OUTPUT_LINKS" '8;;file://[^ ]*queue/idle-plan\.md[^ ]*idle-plan\.md[^ ]* +queued'
-assert_has "links: launchd log path is a link" \
-    "$OUTPUT_LINKS" 'log: [^ ]*8;;file:///[^ ]*post-plan-now-demo-slug-20260910-120000-4242\.log'
+assert_has "links: post-plan audit path is a link" \
+    "$OUTPUT_LINKS" 'audit: [^ ]*8;;file:///[^ ]*live-demo-slug-20260910-120000-4242/audit\.log'
+assert_has "links: fallback /tmp log path is a link" \
+    "$OUTPUT_LINKS" 'log: [^ ]*8;;file:///[^ ]*post-plan-now-noaudit-slug-20260910-130000-4343\.log'
 assert_has "links: runner slug links to its queue file" \
     "$OUTPUT_LINKS" 'impl +[^ ]*8;;file://[^ ]*queue/live-plan\.md'
 
@@ -487,6 +499,24 @@ assert_has "links: stripped queue row keeps the plain column" \
     "$OUTPUT_STRIPPED" 'live-plan\.md {35}in progress'
 assert_has "links: plain queue row is the same column" \
     "$OUTPUT" 'live-plan\.md {35}in progress'
+
+# 19 — the audit.log swap. The point of the tool is a file you can open WHILE the
+# job runs, and only audit.log is written incrementally.
+assert_has   "log: post-plan row names its audit.log" \
+    "$OUTPUT" 'audit: .*/live-demo-slug-20260910-120000-4242/audit\.log'
+assert_lacks "log: post-plan row does NOT name the /tmp launchd log" \
+    "$OUTPUT" 'post-plan-now-demo-slug-20260910-120000-4242\.log'
+
+# Fallback. No harness directory exists for this label, so there is no incremental
+# file to offer and the /tmp log is the only thing there is.
+assert_has "log: post-plan row with no audit.log falls back to the /tmp log" \
+    "$OUTPUT" 'log: .*/post-plan-now-noaudit-slug-20260910-130000-4343\.log'
+assert_lacks "log: the fallback row claims no audit file" \
+    "$OUTPUT" 'audit: .*noaudit-slug'
+
+# Producers with no harness output at all keep the /tmp log, unlabelled-as-audit.
+assert_has "log: plan-now rows keep the /tmp log" \
+    "$OUTPUT" 'log: .*/plan-now-20260910-171016-38521\.log'
 
 # 9 — scope guard. bin/wt-status owns worktree/branch shipping state; this tool
 # reports processes. A re-added section would also make the default run shell out

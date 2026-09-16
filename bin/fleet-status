@@ -37,6 +37,16 @@
 # a true progress signal. Other producers get elapsed time plus their last log
 # line, which is honest about being coarse.
 #
+# AND THE ROW LINKS TO WHICHEVER OF THOSE IT READ. Every job on this page is by
+# construction still running, which is exactly the window where the /tmp log holds
+# nothing — offering it as the thing to open sent you to an empty file for the
+# whole run. So a post-plan row names `audit:` once out/<run>/audit.log exists,
+# and falls back to `log:` when it does not (the first seconds of a run, or a
+# skill-fallback run that never created the harness directory). The label names
+# the file, so the row never leaves you guessing which one you got. The /tmp log
+# is still the right file AFTER exit — its first line is the RESULT verdict — but
+# by then the job is gone from this page.
+#
 # Usage: bin/fleet-status [--watch [SECS]]
 #
 # --watch [SECS]   re-render every SECS seconds (default 15) until interrupted.
@@ -100,7 +110,7 @@ while [ $# -gt 0 ]; do
                 *) WATCH_SECS="$2"; shift ;;
             esac
             ;;
-        -h|--help) sed -n '4,58p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '4,68p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) printf 'fleet-status: unknown option %s\n' "$1" >&2; exit 2 ;;
     esac
     shift
@@ -268,7 +278,7 @@ pid_is_accounted_for() {
 
 render_launchd() {
     local count=0 line label pid status suffix producer log outdir progress
-    local ident ident_note slug
+    local ident ident_note slug audit
 
     section "LAUNCHD JOBS  (com.ibl5.*)"
 
@@ -284,7 +294,7 @@ render_launchd() {
         case "$pid" in ''|*[!0-9]*) continue ;; esac
 
         suffix="${label#com.ibl5.}"
-        producer="$suffix"; log=''; outdir=''; progress=''
+        producer="$suffix"; log=''; outdir=''; progress=''; audit=''
         ident="$suffix"; ident_note=''
 
         case "$suffix" in
@@ -313,7 +323,8 @@ render_launchd() {
         # mid-run phase signal; everything else falls back to the (flush-at-exit,
         # therefore usually empty) launchd log.
         if [ -n "$outdir" ] && [ -f "$outdir/audit.log" ]; then
-            progress="$(last_line "$outdir/audit.log" 64 '^\[[0-9:]+\] phase')"
+            audit="$outdir/audit.log"
+            progress="$(last_line "$audit" 64 '^\[[0-9:]+\] phase')"
         elif [ -n "$log" ]; then
             progress="$(last_line "$log" 64)"
         fi
@@ -326,8 +337,11 @@ render_launchd() {
         printf '      pid %-7s up %-8s last-exit-col %s\n' \
             "$pid" "$(human_age "$(pid_elapsed_secs "$pid")")" "$status"
         printf '      %s%s%s\n' "$DIM" "$progress" "$R"
-        [ -n "$log" ] && \
+        if [ -n "$audit" ]; then
+            printf '      %saudit: %s%s\n' "$DIM" "$(link_file "$audit")" "$R"
+        elif [ -n "$log" ]; then
             printf '      %slog: %s%s\n' "$DIM" "$(link_file "$log")" "$R"
+        fi
     done <<EOF
 $(launchctl list 2>/dev/null | grep 'com\.ibl5\.')
 EOF

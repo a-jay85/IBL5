@@ -754,10 +754,12 @@ log: $LOG"
 
     # Review-DM path: when a plan is actionable (buttons set, slug valid, jq
     # present), send with Queue/Discard buttons via the review route. Buttons and
-    # plan are set per outcome — never inherited — so check-plan-FAILED outcomes
-    # are structurally discard-only (a Queue button on a plan the gate rejected
-    # defeats ADR-0096's only-path property). Any failure falls through to the
-    # plain send so an undeliverable review DM is non-fatal, matching :731-735.
+    # plan are set per outcome — never inherited. The `buttons` array in the
+    # payload signals discard-only for check-plan-FAILED outcomes, but the bot
+    # handler currently ignores the field and always shows both buttons; the
+    # ADR-0096 gate holds because bin/plan-review-drain runs check-plan before
+    # any queue call. Any failure falls through to the plain send so an
+    # undeliverable review DM is non-fatal, matching :731-735.
     # A generation-time extraction that found nothing would leave PLAN_SLUG_RE
     # empty, and `grep -qE ""` matches every string — so an empty pattern must
     # disable the review path, never wave a slug through unvalidated.

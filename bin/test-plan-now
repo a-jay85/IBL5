@@ -953,21 +953,23 @@ preflight_cleanup "$TPRE_OUT"
 
 echo "── Phase 7: review-DM button assignments ──"
 
-# Phase 7 assertion 1 (two sites): check-plan-FAILED outcomes emit a discard-only
-# button and no queue button.
-# Mutation guard: if DM_REVIEW_BUTTONS were set to "queue discard" here, or
-# derived from DM_PLAN (which is live at both FAILED sites), a Queue button would
-# ship on a plan check-plan just rejected — defeating ADR-0096's only-path property.
+# Phase 7 assertion 1 (two sites): check-plan-FAILED outcomes send a payload with
+# plan_discard_ and no plan_queue_ custom_id (payload scope only). The bot currently
+# shows both buttons regardless — it ignores the buttons field; ADR-0096 is enforced
+# by bin/plan-review-drain's check-plan gate, not by the message content.
+# Mutation guard: if DM_REVIEW_BUTTONS were set to "queue discard" here, or derived
+# from DM_PLAN (which is live at both FAILED sites), the payload would carry
+# plan_queue_ for a plan check-plan just rejected — contradicting the intended signal.
 
 # :535 — primary check-plan FAILED (one-line stub plan always fails check-plan)
 out=$(run_case "$P" "PLAN_FILE: $P")
 want "P7/1a :535 discard button reaches DM" "$(dm)" "plan_discard_demo-slug"
-want_no "P7/1a :535 no queue button in DM" "$(dm)" "plan_queue_"
+want_no "P7/1a :535 no plan_queue_ in payload" "$(dm)" "plan_queue_"
 
 # :669 — recovery check-plan FAILED
 out=$(run_case_recovery "$PARTIAL_DRAFT" demo-slug)
 want "P7/1b :669 discard button reaches DM" "$(dm)" "plan_discard_demo-slug"
-want_no "P7/1b :669 no queue button in DM" "$(dm)" "plan_queue_"
+want_no "P7/1b :669 no plan_queue_ in payload" "$(dm)" "plan_queue_"
 
 # Phase 7 assertion 2+3: :526 (auto-queue-refusal) emits both queue and discard
 # buttons, and the call carries --route.

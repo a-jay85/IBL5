@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+# Usage: bin/digest-dm-build --pr-number N --title TITLE --url URL < verdict-body
+#   Reads a /pr-ready sticky verdict comment body on STDIN and writes a Discord-sized
+#   merge-digest DM to STDOUT. All three flags are required; an unknown or missing
+#   flag exits 2 with a message on stderr. A missing or unparseable digest is NOT an
+#   error: it degrades the message body and still exits 0.
+#
+# Consumed by .github/workflows/merge-digest-notify.yml, which pipes in the body of the
+# LAST comment carrying `<!-- pr-ready-verdict -->`.
+#
+# The `_digest_labels` awk below moved here out of bin/pr-cycle when the
+# ~/IBL5-merge-digest.md ledger was replaced by a per-merge DM. The `### Merge digest`
+# block shape it parses is a contract documented in
+# .claude/skills/pr-ready/_phase7-verdict.md: exactly five bold labels, and the block
+# ends at the next heading or horizontal rule.
+#
+# Budget: Discord caps a DM at 2000 characters and .github/actions/notify-discord does
+# NOT chunk -- the cap is the caller's responsibility, and this script is the caller.
+#   fixed scaffolding   ~70
+#   "#N: <title>"      <=100   (title truncated at 80)
+#   URL                 ~70
+#   What changed       <=1000
+#   Watch              <=700
+#                      ------
+#                      ~1940
+
+set -euo pipefail
+
+TITLE_MAX=80
+WHAT_MAX=1000
+WATCH_MAX=700
+
+# Truncation must be CHARACTER-wise, not byte-wise. Repo digests carry `·` (U+00B7) and
+# `…`; a byte-wise cut can split a UTF-8 sequence, and the invalid bytes then reach
+# `jq --arg` inside notify-discord. Bash's ${#v} and ${v:0:n} count characters only under
+# a UTF-8 locale, and the name differs by platform (ubuntu-latest normalises to `C.utf8`,
+# macOS ships `en_US.UTF-8`), so pick the first available rather than hardcoding one.
+# A `while` fed by a HERESTRING (not a pipe) so the loop body's assignments survive, and
+# so an early `return` cannot take SIGPIPE under pipefail
+# (.claude/rules/shell-pipefail-grep.md).
+_pick_utf8_locale() {
+    local _l
+    while IFS= read -r _l; do
+        case "$_l" in
+            C.UTF-8|C.utf8|en_US.UTF-8|en_US.utf8) printf '%s' "$_l"; return 0 ;;
+        esac
+    done <<< "$(locale -a 2>/dev/null || true)"
+    return 1
+}
+_LOC="$(_pick_utf8_locale || true)"
+if [ -n "$_LOC" ]; then
+    export LC_ALL="$_LOC"
+fi
+
+PR_NUMBER=""
+TITLE=""
+URL=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --pr-number) PR_NUMBER="${2-}"; shift 2 ;;
+        --title)     TITLE="${2-}";     shift 2 ;;
+        --url)       URL="${2-}";       shift 2 ;;
+        -h|--help)
+            sed -n '/^# Usage:/,/^#$/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        *)
+            printf 'digest-dm-build: unknown argument: %s\n' "$1" >&2
+            exit 2 ;;
+    esac
+done
+
+if [ -z "$PR_NUMBER" ] || [ -z "$TITLE" ] || [ -z "$URL" ]; then
+    printf 'digest-dm-build: --pr-number, --title and --url are all required\n' >&2
+    exit 2
+fi
+case "$PR_NUMBER" in
+    ''|*[!0-9]*)
+        printf 'digest-dm-build: --pr-number must be digits, got: %s\n' "$PR_NUMBER" >&2
+        exit 2 ;;
+esac
+
+# _digest_labels -- fold a `### Merge digest` block into "<label>\t<one-line value>" records.
+# Values spanning several lines are folded so each label yields exactly one record.
+_digest_labels() {
+    # The squeeze happens INSIDE awk, at print time. A `| sed s/[[:space:]]\+/ /g` after
+    # this would also collapse the tab this function emits as its field separator, and
+    # every later `awk -F'\t'` lookup would silently find nothing.
+    awk '
+        function emit(l, v) {
+            gsub(/[[:space:]]+/, " ", v); sub(/^ /, "", v); sub(/ $/, "", v)
+            print l "\t" v
+        }
+        /^### Merge digest[[:space:]]*$/ { inblk = 1; next }
+        inblk && /^#+ / { exit }
+        # A horizontal rule ends the digest block just as a heading does. /pr-ready emits a
+        # `---` after the block and then keeps writing, and an HR is not a heading, so without
+        # this the rule and everything after it fall through to the continuation branch below
+        # and get folded onto the last label value. Live rows for PRs #2092 and #2084 both
+        # ended in a stray ` ---` this way.
+        inblk && /^[[:space:]]*(---+|\*\*\*+|___+)[[:space:]]*$/ { exit }
+        inblk {
+            line = $0
+            # The trailing [[:space:]]+ is load-bearing, not cosmetic. `*` is a list marker
+            # in the class AND the first byte of `**Label:**`, so a zero-or-more space would
+            # let a bare (unbulleted) production line self-strip to `*Label:** ...`, the
+            # match below would fail, and every label would vanish into `digest: unavailable`.
+            sub(/^[[:space:]]*[-*][[:space:]]+/, "", line)
+            if (match(line, /^\*\*[^*]+:\*\*/)) {
+                if (label != "") emit(label, val)
+                label = substr(line, 3, RLENGTH - 5)
+                val = substr(line, RLENGTH + 1)
+            } else if (label != "" && line ~ /[^[:space:]]/) {
+                val = val " " line
+            }
+        }
+        END { if (label != "") emit(label, val) }
+    '
+}
+
+# _trunc MAX VALUE -- character-wise truncate, appending U+2026 only when a cut happened.
+# The ellipsis replaces the last kept character rather than extending past MAX, so the
+# returned string is never longer than MAX.
+_trunc() {
+    _m="$1"; _v="$2"
+    if [ "${#_v}" -le "$_m" ]; then
+        printf '%s' "$_v"
+        return 0
+    fi
+    printf '%s…' "${_v:0:$((_m - 1))}"
+}
+
+BODY="$(cat)"
+
+# Herestrings, never pipes: _digest_labels' awk `exit`s at the block terminator, and a
+# `printf ... | _digest_labels` would take SIGPIPE (141) under pipefail on a long body.
+LABELS="$(_digest_labels <<< "$BODY")"
+
+_label_value() {
+    awk -F'\t' -v l="$1" '$1 == l { print $2; exit }' <<< "$LABELS"
+}
+
+WHAT="$(_label_value 'What changed')"
+WATCH="$(_label_value 'Watch')"
+TITLE_T="$(_trunc "$TITLE_MAX" "$TITLE")"
+
+# A confirmed merge is ALWAYS announced. A missing or unparseable digest degrades the
+# message; it never suppresses it. (Same invariant bin/pr-cycle held for the ledger row.)
+if [ -z "$WHAT" ] && [ -z "$WATCH" ]; then
+    printf '**Merged #%s: %s**\n\n(No /pr-ready digest — armed by triage sweep or no review pass run.)\n\n%s\n' \
+        "$PR_NUMBER" "$TITLE_T" "$URL"
+    exit 0
+fi
+
+# One label present and the other absent is a malformed-but-present digest: name the gap
+# per field rather than discarding the half that parsed.
+[ -n "$WHAT" ]  || WHAT='(missing)'
+[ -n "$WATCH" ] || WATCH='(missing)'
+
+printf '**Merged #%s: %s**\n\n**What changed:** %s\n\n**Watch:** %s\n\n%s\n' \
+    "$PR_NUMBER" "$TITLE_T" \
+    "$(_trunc "$WHAT_MAX" "$WHAT")" \
+    "$(_trunc "$WATCH_MAX" "$WATCH")" \
+    "$URL"

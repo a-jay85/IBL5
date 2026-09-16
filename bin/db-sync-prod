@@ -99,26 +99,26 @@ if [ -n "$SNAPSHOT" ] && $PRINT_PLAN; then
   exit 0
 fi
 
-# Load .env for REMOTE_* creds.
-# When invoked from a worktree's bin/, REPO_ROOT is the worktree root, which
-# has no .env (only the main worktree does). Fall back to the main worktree
-# in that case so `bin/wt-up --prod` works from any CWD.
-ENV_FILE="$REPO_ROOT/.env"
-if [ ! -f "$ENV_FILE" ]; then
-    MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / {print $2; exit}')"
-    if [ -n "$MAIN_WT" ] && [ -f "$MAIN_WT/.env" ]; then
-        ENV_FILE="$MAIN_WT/.env"
-    else
-        echo "Error: $REPO_ROOT/.env not found — REMOTE_* credentials required." >&2
-        exit 1
-    fi
-fi
-set -a
-# shellcheck disable=SC1090
-source "$ENV_FILE"
-set +a
-
 if [ -z "$SNAPSHOT" ]; then
+  # Load .env for REMOTE_* creds.
+  # When invoked from a worktree's bin/, REPO_ROOT is the worktree root, which
+  # has no .env (only the main worktree does). Fall back to the main worktree
+  # in that case so `bin/wt-up --prod` works from any CWD.
+  ENV_FILE="$REPO_ROOT/.env"
+  if [ ! -f "$ENV_FILE" ]; then
+      MAIN_WT="$(git -C "$REPO_ROOT" worktree list --porcelain 2>/dev/null | awk '/^worktree / {print $2; exit}')"
+      if [ -n "$MAIN_WT" ] && [ -f "$MAIN_WT/.env" ]; then
+          ENV_FILE="$MAIN_WT/.env"
+      else
+          echo "Error: $REPO_ROOT/.env not found — REMOTE_* credentials required." >&2
+          exit 1
+      fi
+  fi
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+
   if [ -z "${REMOTE_HOST:-}" ] || [ "$REMOTE_HOST" = "localhost" ] || [ "$REMOTE_HOST" = "127.0.0.1" ]; then
       echo "Error: REMOTE_HOST must point to production (got: ${REMOTE_HOST:-<unset>})." >&2
       exit 1
@@ -392,11 +392,23 @@ if [ -n "$SNAPSHOT" ]; then
       fi
   fi
 
-  gunzip -c "$SNAPSHOT" | db_import_sql "$DB_CONTAINER" || { rm -f "$PRESERVE_TMP"; exit 1; }
+  gunzip -c "$SNAPSHOT" | db_import_sql "$DB_CONTAINER" || {
+      if [ -n "$PRESERVE_TMP" ] && [ -f "$PRESERVE_TMP" ]; then
+          printf 'ERROR: snapshot load failed. Preserved-tables backup retained at: %s\n' "$PRESERVE_TMP" >&2
+          printf '  The surviving state may be partial (--force runs all DROPs before returning).\n' >&2
+          printf '  Re-run the replay with: bin/db-query db_import_sql %s < %s\n' "$DB_CONTAINER" "$PRESERVE_TMP" >&2
+      fi
+      exit 1
+  }
 
   if [ -n "$PRESERVE_TMP" ]; then
       echo "  Restoring preserved local-only tables:$(printf ' %s' $PRESERVE_EXISTING)" >&2
-      db_import_sql "$DB_CONTAINER" < "$PRESERVE_TMP" || { rm -f "$PRESERVE_TMP"; exit 1; }
+      db_import_sql "$DB_CONTAINER" < "$PRESERVE_TMP" || {
+          printf 'ERROR: replay of preserved-tables backup failed. The state may be partial.\n' >&2
+          printf '  Backup file retained at: %s\n' "$PRESERVE_TMP" >&2
+          printf '  Re-run the replay with: bin/db-query db_import_sql %s < %s\n' "$DB_CONTAINER" "$PRESERVE_TMP" >&2
+          exit 1
+      }
       rm -f "$PRESERVE_TMP"
   fi
 else

@@ -276,7 +276,7 @@ rm -f ~/backups/db/phase-snapshots/.last-phase
 
 Then trigger `.github/workflows/db-backup.yml` via `workflow_dispatch` (leave `dry_run` unchecked). Removing `.last-phase` alone is safe: the capture rewrites it, and the per-file gate still prevents overwriting snapshots that already exist.
 
-**Loading a snapshot locally:** `bin/phase-snapshot-pull` copies snapshots to `ibl5/backups/phase-snapshots/`, then:
+**Loading a snapshot locally:** `bin/phase-snapshot-pull` copies snapshots to the gitignored ibl5/backups/phase-snapshots/ directory, then:
 
 ```bash
 bin/wt-up <worktree-name> --snapshot ibl5/backups/phase-snapshots/2026-regular-season.sql.gz

@@ -1001,3 +1001,106 @@ def test_force_flag_rejected_forms_fail_loudly(tmp_path):
                      dirty=_TEST_ONLY_DIRTY)
         assert r.returncode != 0, f"{args}: expected failure, got 0"
         assert "unknown argument" in r.stderr, f"{args}: got {r.stderr!r}"
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 CI-outcome resume clause + the exit-4 RESUME_SEG. See plan phase 7.
+# ---------------------------------------------------------------------------
+
+def _clause(run_dir, sha):
+    """Run the REAL shell function out of bin/post-plan-now, not a text match."""
+    script = ('eval "$(sed -n "/^postplan_ci_resume_clause()/,/^}/p" "$1")"; '
+              'postplan_ci_resume_clause "$2" "$3"')
+    return subprocess.run(["bash", "-c", script, "_", PPN, str(run_dir), sha],
+                          capture_output=True, text=True)
+
+def _ci_file(tmp_path, sha, status):
+    p = tmp_path / f"ci-{sha}.json"
+    # indent=2/sort_keys shape matters: the clause greps the status on its own line
+    p.write_text('{\n'
+                 '  "failed_checks": [\n    "build"\n  ],\n'
+                 '  "sha": "' + sha + '",\n'
+                 '  "status": "' + status + '"\n'
+                 '}\n')
+    return p
+
+def test_ci_clause_reports_success(tmp_path):
+    _ci_file(tmp_path, "aaa111", "success")
+    r = _clause(tmp_path, "aaa111")
+    assert r.returncode == 0, r.stderr
+    assert "SUCCESS" in r.stdout
+    assert "Do NOT run" in r.stdout
+
+def test_ci_clause_reports_failure_and_orders_fix_before_5_5(tmp_path):
+    _ci_file(tmp_path, "bbb222", "failure")
+    r = _clause(tmp_path, "bbb222")
+    assert r.returncode == 0, r.stderr
+    assert "FAILURE" in r.stdout
+    assert "BEFORE spawning the Phase 5.5 fidelity reviewer" in r.stdout
+
+def test_ci_clause_unknown_when_file_missing(tmp_path):
+    """Fail-open lands on "watch it yourself", never on a fabricated green."""
+    r = _clause(tmp_path, "ccc333")
+    assert r.returncode == 0, r.stderr
+    assert "unknown" in r.stdout
+    assert "SUCCESS" not in r.stdout
+
+def test_ci_clause_indeterminate_on_timeout_status(tmp_path):
+    """A watch that never settled is not a reusable verdict."""
+    _ci_file(tmp_path, "ddd444", "timeout")
+    r = _clause(tmp_path, "ddd444")
+    assert r.returncode == 0, r.stderr
+    assert "indeterminate" in r.stdout
+    assert "SUCCESS" not in r.stdout
+
+def test_ci_clause_exits_zero_on_garbage_file(tmp_path):
+    """A truncated or corrupt outcome file must not abort the resume command."""
+    (tmp_path / "ci-eee555.json").write_text("not json")
+    r = _clause(tmp_path, "eee555")
+    assert r.returncode == 0, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+    assert "SUCCESS" not in r.stdout
+    assert r.stdout.startswith("CI OUTCOME:")
+
+def _resume_seg(cmd):
+    m = re.search(r'(HARNESS_RUN_DIR="[^"]*" POSTPLAN_HEAD_SHA=.*?--name "[^"]*")',
+                  cmd, re.S)
+    assert m, "the exit-4 resume segment is no longer recognisable in $CMD"
+    return m.group(1)
+
+def test_resume_seg_exports_harness_run_dir(tmp_path):
+    """The resumed session needs the run dir to find ci-<sha>.json."""
+    cmd = _generate_cmd(tmp_path)
+    seg = _resume_seg(cmd)
+    run_dir = re.match(r'HARNESS_RUN_DIR="([^"]*)"', seg).group(1)
+    assert run_dir, "HARNESS_RUN_DIR is exported empty — the clause can never resolve"
+    assert "/out/live-" in run_dir
+
+def test_resume_seg_resolves_head_sha_far_side(tmp_path):
+    """The head SHA is read in the far-side shell, so a fix commit can't stale it."""
+    seg = _resume_seg(_generate_cmd(tmp_path))
+    assert "rev-parse HEAD)" in seg
+    assert re.search(r'POSTPLAN_HEAD_SHA="[0-9a-f]{40}"', seg) is None, \
+        "the head SHA was interpolated near-side"
+
+def test_resume_prompt_mentions_harness_run_dir_and_ordering(tmp_path):
+    """Phase 4.3: the resume prompt names the artifact and the fix-before-5.5 order."""
+    src = open(PPN).read()
+    m = re.search(r'^\s*(RESUME_PROMPT="(?:[^"\\]|\\.)*")$', src, re.M)
+    assert m, "RESUME_PROMPT assignment not found (or no longer a single line)"
+    prompt = m.group(1)
+    assert "HARNESS_RUN_DIR" in prompt
+    assert "ci-<head-sha>.json" in prompt
+    assert "run the Phase 7 CI fix loop FIRST" in prompt
+
+def test_resume_seg_far_side_command_parses(tmp_path):
+    """The only check that parses what /bin/bash -lc actually executes.
+
+    `bash -n bin/post-plan-now` validates the outer script and is blind to a
+    quoting slip inside this interpolated command string.
+    """
+    seg = _resume_seg(_generate_cmd(tmp_path))
+    stubs = ("postplan_ci_resume_clause() { printf 'CLAUSE'; }\n"
+             "caffeinate() { :; }\n")
+    r = subprocess.run(["bash", "-n", "-c", stubs + seg],
+                       capture_output=True, text=True)
+    assert r.returncode == 0, f"far-side command does not parse: {r.stderr!r}"

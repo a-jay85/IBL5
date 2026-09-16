@@ -1,0 +1,331 @@
+#!/usr/bin/env bash
+# test-digest-dm-build — contract harness for bin/digest-dm-build.
+#
+# Rehomed from bin/test-pr-cycle cases 30/31/32 when the ~/IBL5-merge-digest.md ledger
+# was replaced by a per-merge Discord DM. Those cases exist because the pr-cycle suite
+# once stayed green while every live ledger row read `digest: unavailable` — the parse
+# contract needs a producer-driven round trip, not just hand-written fixtures.
+#
+# Usage: bin/test-digest-dm-build
+#
+# No network, no gh, no Discord. Everything is stdin fixtures plus one real invocation
+# of .claude/skills/pr-ready/scripts/digest.sh (the producer).
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+DRIVER="$SCRIPT_DIR/digest-dm-build"
+PRODUCER="$ROOT/.claude/skills/pr-ready/scripts/digest.sh"
+
+SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/tddb.XXXXXX")"
+trap 'rm -rf "$SCRATCH"' EXIT
+
+# Same UTF-8 locale selection as the driver, so ${#v} counts characters here too.
+for _l in C.UTF-8 C.utf8 en_US.UTF-8 en_US.utf8; do
+    case "$(locale -a 2>/dev/null || true)" in
+        *"$_l"*) export LC_ALL="$_l"; break ;;
+    esac
+done
+
+PASS=0; FAILN=0; CASE=""
+begin_case() { CASE="$1"; }
+ok()   { PASS=$((PASS + 1)); }
+fail() { FAILN=$((FAILN + 1)); printf 'FAIL [%s] %s\n' "$CASE" "$1" >&2; }
+want() { case "$2" in *"$3"*) ok ;; *) fail "$1: expected to contain <<$3>>, got <<$2>>" ;; esac; }
+wantnot() { case "$2" in *"$3"*) fail "$1: expected NOT to contain <<$3>>" ;; *) ok ;; esac; }
+eq()   { [ "$2" = "$3" ] && ok || fail "$1: want <<$3>>, got <<$2>>"; }
+
+# run <stdin-file> [extra args...] -> OUT, RC
+run() {
+    local _in="$1"; shift
+    OUT="$(bash "$DRIVER" --pr-number 2200 --title 'Fix the thing' \
+            --url 'https://github.com/o/r/pull/2200' "$@" < "$_in" 2>"$SCRATCH/err")"
+    RC=$?
+    # Captured so a failing case can be debugged by inspecting $ERR interactively.
+    # shellcheck disable=SC2034
+    ERR="$(cat "$SCRATCH/err")"
+}
+
+[ -f "$DRIVER" ]   || { echo "STOP: no driver at $DRIVER" >&2; exit 1; }
+[ -f "$PRODUCER" ] || { echo "STOP: no producer at $PRODUCER" >&2; exit 1; }
+
+# ---------------------------------------------------------------------------
+# 1 — the production shape: bare-bold labels, as digest.sh emits them.
+# ---------------------------------------------------------------------------
+begin_case "1 bare-bold digest"
+cat > "$SCRATCH/f1" <<'FIX'
+**Reviewed tree:** 0123456789abcdef0123456789abcdef01234567
+`covers head aaaaaaaaaaaa · master bbbbbbbbbbbb · written 2026-09-15T00:00Z`
+
+### Rebase
+Rebased onto master, no conflicts.
+
+### Merge digest
+**What changed:** Replaced the ledger with a DM.
+**Why:** The ledger covered 11% of merges.
+**Watch:** The first real DM after merge.
+**Touches:** bin/pr-cycle, .github/workflows/
+**Machine-authored fixes:** none
+
+### Remediation
+Nothing.
+
+<!-- pr-ready-verdict -->
+FIX
+run "$SCRATCH/f1"
+eq "exit 0" "$RC" "0"
+want "header"       "$OUT" '**Merged #2200: Fix the thing**'
+want "what changed" "$OUT" '**What changed:** Replaced the ledger with a DM.'
+want "watch"        "$OUT" '**Watch:** The first real DM after merge.'
+want "url"          "$OUT" 'https://github.com/o/r/pull/2200'
+wantnot "no Why"        "$OUT" '**Why:**'
+wantnot "no Touches"    "$OUT" '**Touches:**'
+wantnot "no tree line"  "$OUT" 'Reviewed tree'
+wantnot "no provenance" "$OUT" 'covers head'
+
+# ---------------------------------------------------------------------------
+# 2 — bulleted labels parse identically (the ledger-era shape).
+# ---------------------------------------------------------------------------
+begin_case "2 bulleted digest"
+cat > "$SCRATCH/f2" <<'FIX'
+### Merge digest
+- **What changed:** Bulleted value.
+- **Watch:** Bulleted watch.
+FIX
+run "$SCRATCH/f2"
+want "bulleted what"  "$OUT" '**What changed:** Bulleted value.'
+want "bulleted watch" "$OUT" '**Watch:** Bulleted watch.'
+
+# ---------------------------------------------------------------------------
+# 3 — a horizontal rule terminates the block (PRs #2092/#2084 shipped ` ---`
+#     folded onto the last value before this branch existed).
+# ---------------------------------------------------------------------------
+begin_case "3 HR terminator"
+cat > "$SCRATCH/f3" <<'FIX'
+### Merge digest
+**What changed:** Value one.
+**Watch:** Value two.
+
+---
+
+Trailing prose that must never be folded in.
+FIX
+run "$SCRATCH/f3"
+eq "watch is clean" "$(printf '%s\n' "$OUT" | grep -c 'Trailing prose')" "0"
+want "watch intact"  "$OUT" '**Watch:** Value two.'
+wantnot "no stray HR" "$OUT" 'Value two. ---'
+
+# ---------------------------------------------------------------------------
+# 4 — a heading terminates the block.
+# ---------------------------------------------------------------------------
+begin_case "4 heading terminator"
+cat > "$SCRATCH/f4" <<'FIX'
+### Merge digest
+**What changed:** Value one.
+**Watch:** Value two.
+### Remediation
+Filed nothing.
+FIX
+run "$SCRATCH/f4"
+wantnot "remediation not folded" "$OUT" 'Filed nothing'
+
+# ---------------------------------------------------------------------------
+# 5 — multi-line values fold onto their label.
+# ---------------------------------------------------------------------------
+begin_case "5 continuation folding"
+cat > "$SCRATCH/f5" <<'FIX'
+### Merge digest
+**What changed:** First half
+  second half.
+**Watch:** Only line.
+FIX
+run "$SCRATCH/f5"
+want "folded" "$OUT" '**What changed:** First half second half.'
+
+# ---------------------------------------------------------------------------
+# 6 — degraded producer output still delivers.
+# ---------------------------------------------------------------------------
+begin_case "6 degraded digest"
+cat > "$SCRATCH/f6" <<'FIX'
+### Merge digest
+**What changed:** unavailable — no Phase 6 verdict file
+**Why:** unavailable — no Phase 6 verdict file
+**Watch:** unavailable — no Phase 6 verdict file
+**Touches:** unavailable — no Phase 6 verdict file
+**Machine-authored fixes:** unavailable — no Phase 6 verdict file
+FIX
+run "$SCRATCH/f6"
+eq "exit 0" "$RC" "0"
+want "degraded carried" "$OUT" '**What changed:** unavailable — no Phase 6 verdict file'
+wantnot "not the fallback" "$OUT" 'No /pr-ready digest'
+
+# ---------------------------------------------------------------------------
+# 7 — no digest block at all -> the fallback message, exit 0.
+# ---------------------------------------------------------------------------
+begin_case "7 no digest block"
+cat > "$SCRATCH/f7" <<'FIX'
+### Rebase
+Rebased.
+<!-- pr-ready-verdict -->
+FIX
+run "$SCRATCH/f7"
+eq "exit 0" "$RC" "0"
+want "fallback"  "$OUT" '(No /pr-ready digest — armed by triage sweep or no review pass run.)'
+want "header"    "$OUT" '**Merged #2200: Fix the thing**'
+want "url"       "$OUT" 'https://github.com/o/r/pull/2200'
+
+# ---------------------------------------------------------------------------
+# 8 — empty stdin (no sticky comment found at all) -> the same fallback.
+# ---------------------------------------------------------------------------
+begin_case "8 empty stdin"
+: > "$SCRATCH/f8"
+run "$SCRATCH/f8"
+eq "exit 0" "$RC" "0"
+want "fallback" "$OUT" '(No /pr-ready digest'
+
+# ---------------------------------------------------------------------------
+# 9 — one label present, the other absent -> name the gap, keep the half that parsed.
+# ---------------------------------------------------------------------------
+begin_case "9 half a digest"
+cat > "$SCRATCH/f9" <<'FIX'
+### Merge digest
+**Watch:** Only the watch line survived.
+FIX
+run "$SCRATCH/f9"
+want "gap named"  "$OUT" '**What changed:** (missing)'
+want "half kept"  "$OUT" '**Watch:** Only the watch line survived.'
+
+# ---------------------------------------------------------------------------
+# 10 — truncation: title, What changed, Watch. Character counts, not bytes.
+# ---------------------------------------------------------------------------
+begin_case "10 truncation"
+LONG_W="$(printf 'w%.0s' $(seq 1 1400))"
+LONG_T="$(printf 't%.0s' $(seq 1 900))"
+{
+    printf '### Merge digest\n'
+    printf '**What changed:** %s\n' "$LONG_W"
+    printf '**Watch:** %s\n' "$LONG_T"
+} > "$SCRATCH/f10"
+BIGTITLE="$(printf 'T%.0s' $(seq 1 200))"
+OUT="$(bash "$DRIVER" --pr-number 2200 --title "$BIGTITLE" \
+        --url 'https://github.com/o/r/pull/2200' < "$SCRATCH/f10")"
+_w="$(printf '%s\n' "$OUT" | sed -n 's/^\*\*What changed:\*\* //p')"
+_t="$(printf '%s\n' "$OUT" | sed -n 's/^\*\*Watch:\*\* //p')"
+_h="$(printf '%s\n' "$OUT" | sed -n 's/^\*\*Merged #2200: \(.*\)\*\*$/\1/p')"
+eq "what changed is 1000 chars" "${#_w}" "1000"
+eq "watch is 700 chars"         "${#_t}" "700"
+eq "title is 80 chars"          "${#_h}" "80"
+want "what changed elided" "$_w" '…'
+want "watch elided"        "$_t" '…'
+want "title elided"        "$_h" '…'
+eq "whole DM under the Discord cap" "$([ "${#OUT}" -lt 2000 ] && echo under || echo over)" "under"
+
+# ---------------------------------------------------------------------------
+# 11 — multibyte safety: a byte-wise cut here would split U+00B7 and hand
+#      notify-discord's `jq --arg` invalid UTF-8.
+# ---------------------------------------------------------------------------
+begin_case "11 multibyte truncation"
+DOTS="$(printf '·%.0s' $(seq 1 1200))"
+{
+    printf '### Merge digest\n'
+    printf '**What changed:** %s\n' "$DOTS"
+    printf '**Watch:** ok\n'
+} > "$SCRATCH/f11"
+run "$SCRATCH/f11"
+_m="$(printf '%s\n' "$OUT" | sed -n 's/^\*\*What changed:\*\* //p')"
+eq "1000 characters" "${#_m}" "1000"
+printf '%s' "$_m" | iconv -f UTF-8 -t UTF-8 >/dev/null 2>&1 \
+    && ok || fail "truncated value is not valid UTF-8"
+jq -n --arg m "$_m" '{content:{message:$m}}' >/dev/null 2>&1 \
+    && ok || fail "jq --arg rejected the truncated value"
+
+# ---------------------------------------------------------------------------
+# 12 — flag parsing: every rejected form fails loudly, never silently.
+# ---------------------------------------------------------------------------
+begin_case "12 rejected flag forms"
+OUT="$(bash "$DRIVER" --pr-number 1 --title t --url u --bogus x </dev/null 2>&1)"; RC=$?
+eq "unknown flag exits 2" "$RC" "2"
+want "unknown flag names itself" "$OUT" 'unknown argument: --bogus'
+
+OUT="$(bash "$DRIVER" --pr-number 1 --title t </dev/null 2>&1)"; RC=$?
+eq "missing --url exits 2" "$RC" "2"
+want "missing flag message" "$OUT" 'are all required'
+
+OUT="$(bash "$DRIVER" --pr-number abc --title t --url u </dev/null 2>&1)"; RC=$?
+eq "non-numeric --pr-number exits 2" "$RC" "2"
+want "non-numeric message" "$OUT" 'must be digits'
+
+OUT="$(bash "$DRIVER" --help 2>&1)"; RC=$?
+eq "--help exits 0" "$RC" "0"
+want "help shows usage" "$OUT" 'Usage: bin/digest-dm-build'
+
+# ---------------------------------------------------------------------------
+# 13 — REAL producer round trip. digest.sh emits the five lines; we paste them
+#      under the contract heading and re-parse. This is the case that would have
+#      caught the "every live row read `digest: unavailable`" regression.
+# ---------------------------------------------------------------------------
+begin_case "13 producer round trip"
+cat > "$SCRATCH/p6" <<'FIX'
+Phase 6 verdict prose that must not leak into the digest.
+
+## DIGEST
+**What changed:** Real producer value.
+**Why:** Real producer why.
+**Watch:** Real producer watch.
+**Touches:** bin/digest-dm-build
+**Machine-authored fixes:** none
+FIX
+LINES="$(bash "$PRODUCER" "$SCRATCH/p6")"
+eq "producer emitted five lines" "$(printf '%s\n' "$LINES" | wc -l | tr -d ' ')" "5"
+{ printf '### Merge digest\n'; printf '%s\n' "$LINES"; } > "$SCRATCH/f13"
+run "$SCRATCH/f13"
+want "round-trip what"  "$OUT" '**What changed:** Real producer value.'
+want "round-trip watch" "$OUT" '**Watch:** Real producer watch.'
+wantnot "no verdict prose" "$OUT" 'must not leak'
+
+begin_case "13b degraded producer round trip"
+: > "$SCRATCH/p6empty"
+LINES="$(bash "$PRODUCER" "$SCRATCH/p6empty")"
+{ printf '### Merge digest\n'; printf '%s\n' "$LINES"; } > "$SCRATCH/f13b"
+run "$SCRATCH/f13b"
+eq "exit 0" "$RC" "0"
+want "degrade reason reaches the DM" "$OUT" 'unavailable —'
+
+# ---------------------------------------------------------------------------
+# 14 — the guards above are not vacuous.
+# ---------------------------------------------------------------------------
+begin_case "14 guards are not vacuous"
+cat > "$SCRATCH/f14" <<'FIX'
+### Merge digest
+**Whatever changed:** Relabelled, must not match.
+**Watch:** still here
+FIX
+run "$SCRATCH/f14"
+want "relabelled degrades" "$OUT" '**What changed:** (missing)'
+
+cat > "$SCRATCH/f14b" <<'FIX'
+**What changed:** Above the heading, must never be seen.
+
+### Rebase
+Rebased.
+FIX
+run "$SCRATCH/f14b"
+want "above-heading ignored" "$OUT" '(No /pr-ready digest'
+
+# The producer really does emit bare-bold, not bulleted — case 2 must stay honest.
+begin_case "14c producer emits bare bold"
+printf '%s\n' "$LINES" | grep -q '^\*\*What changed:\*\*' \
+    && ok || fail "digest.sh no longer emits bare-bold labels; case 2 may be vacuous"
+
+# ---------------------------------------------------------------------------
+# 15 — CI actually runs this harness.
+# ---------------------------------------------------------------------------
+begin_case "15 CI wiring"
+WF="$ROOT/.github/workflows/tests.yml"
+[ -f "$WF" ] || fail "no tests.yml at $WF"
+eq "wired exactly once" "$(grep -c 'run: bin/test-digest-dm-build' "$WF")" "1"
+
+printf '\n%s case(s) passed, %s failed\n' "$PASS" "$FAILN"
+[ "$FAILN" -eq 0 ] || exit 1
+printf 'All %s cases passed\n' "$PASS"

@@ -209,11 +209,11 @@ Plan-fidelity verdict: <FIDELITY word> — <reviewer findings, REVIEW-COVERAGE: 
 <!-- pr-ready-verdict -->
 ```
 
-**`**Reviewed tree:**` and `**Re-reviewed tree:**` placement rule:** both bold-labelled lines must appear before the digest heading. `bin/pr-cycle`'s `_digest_labels` starts capturing at that heading and treats every `^\*\*[^*]+:\*\*` line inside that span as a label — a bold-labelled line placed inside the block becomes a sixth label and corrupts the ledger parse. Before the heading they are invisible to the parser. The five digest labels and their order are unchanged.
+**`**Reviewed tree:**` and `**Re-reviewed tree:**` placement rule:** both bold-labelled lines must appear before the digest heading. `bin/digest-dm-build`'s `_digest_labels` starts capturing at that heading and treats every `^\*\*[^*]+:\*\*` line inside that span as a label — a bold-labelled line placed inside the block becomes a sixth label and corrupts the digest parse. Before the heading they are invisible to the parser. The five digest labels and their order are unchanged.
 
 **Five digest labels — do not re-word, re-order, merge, or add a sixth line.** The labels in the given order are: `**What changed:**`, `**Why:**`, `**Watch:**`, `**Touches:**`, `**Machine-authored fixes:**`. If `/tmp/post-plan-digest-lines-<N>.txt` is absent or empty, emit the heading anyway with all five labels carrying `unavailable — digest script did not produce output`. The one permitted amendment is step 4 rule 3 (appending remediation SHA to `**Machine-authored fixes:**`).
 
-Both the HTML marker and the digest heading are byte-identical to `/pr-ready`'s and must not be renamed or reformatted. `bin/pr-cycle`'s `_digest_row` selects the **last** comment containing that HTML marker and feeds it to `_digest_labels`, which anchors on that exact heading. Renaming either silently degrades every ledger row to `digest: unavailable` while every test stays green.
+Both the HTML marker and the digest heading are byte-identical to `/pr-ready`'s and must not be renamed or reformatted. `.github/workflows/merge-digest-notify.yml` selects the **last** comment containing that HTML marker and pipes it into `bin/digest-dm-build`'s `_digest_labels`, which anchors on that exact heading. Renaming either silently degrades every DM to the fallback message while every test stays green.
 
 Post with the find-and-update-else-create shape from `bin/pr-canary-check` — grep its `STICKY_MARKER` constant and the `post_sticky()` below it rather than trusting a line number. Do **not** call `/pr-ready`'s `scripts/post-verdict.sh`: it is keyed to the `/tmp/pr-ready-verdict-<N>.md` namespace, and post-plan writing into that namespace would collide with a concurrent `/pr-ready` run on the same PR.
 

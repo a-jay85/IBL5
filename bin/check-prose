@@ -1,0 +1,503 @@
+#!/usr/bin/env python3
+"""check-prose: flag Claude-slop sentence shapes in prose.
+
+"Claude slop" is the set of sentence habits that mark text as machine-written:
+em-dash asides, "X, not Y" contrast framing, label-colon openers ("The fix:"),
+filler ("It's worth noting"), buzzwords ("seamless", "leveraging"), closing offers
+("Let me know if"). Policy and the full tell list: .claude/rules/prose-style.md.
+
+The gate is on-touch. In --since mode it scans only lines ADDED vs the base ref,
+so an untouched slop line never blocks a PR. Rewrite a paragraph and you own the
+whole paragraph.
+
+Modes:
+  bin/check-prose --since=<ref>        CI / PR mode: added lines of changed *.md
+  bin/check-prose --stdin [--file P]   hook mode: text on stdin, P for context
+  bin/check-prose --files P [P ...]    whole-file scan (sweeps, spot checks)
+  bin/check-prose --self-test          inline fixtures; exit 1 on any miss
+  --chat                               add the chat-only tells (openers/closers)
+  --quiet                              print nothing, exit status only
+
+Exit 0 = clean, 1 = tells found, 2 = usage error. An unreadable file is
+reported on stderr and skipped.
+
+Skipped as never-prose: YAML frontmatter, fenced code, inline code spans,
+HTML comments, blockquotes, URLs and link targets, table separator rows, and
+any line carrying the marker <!-- slop-ok -->.
+
+Hooks: ~/.claude/hooks/plan-gate-edit.sh (Check 5, Edit|Write on *.md) and
+~/.claude/hooks/prose-gate-stop.py (Stop, final chat message) both shell out to
+this script, so the pattern list lives in exactly one place.
+"""
+from __future__ import annotations
+
+import os
+import re
+import subprocess
+import sys
+from dataclasses import dataclass
+
+MARKER = "<!-- slop-ok -->"
+EXCLUDE_DIR_PARTS = ("/archive/", "-snapshots/", "/node_modules/", "/vendor/")
+
+
+@dataclass(frozen=True)
+class Tell:
+    name: str
+    regex: re.Pattern
+    fix: str
+    scope: str = "both"  # both | doc | chat
+
+
+def _t(name: str, pattern: str, fix: str, scope: str = "both", flags: int = re.I) -> Tell:
+    return Tell(name, re.compile(pattern, flags), fix, scope)
+
+
+# Order matters only for display. Keep every pattern high-precision: a false
+# positive here denies an Edit or forces a chat rewrite, and both cost a turn.
+TELLS: list[Tell] = [
+    _t(
+        "em-dash",
+        r"[\w)\]\"'`]\s?[—–]|[—–]\s?[\w(\[\"'`]",
+        "End the sentence and start a new one. For a bullet label use `**Label.** text` or `Label: text`.",
+        flags=0,
+    ),
+    _t(
+        "not-x-but-y",
+        r"\b(?:not|isn'?t|aren'?t|wasn'?t|weren'?t)\s+(?:just|merely|only|simply|so much)\b",
+        "Say what it is. Drop the 'not just X' half.",
+    ),
+    _t(
+        "comma-not",
+        r",\s+(?:not|never)\s+(?:a|an|the|to|for|by|from|of|in|on|with|about|because|just|your|its|their|our|my|his|her|one|some|every|any|as|if|when|via|through|after|before|at|that|this|these|those|it|them|[A-Za-z]+ing\b|[a-z]+ed\b)\b",
+        "Define by what it is. Keep only the true half; delete the ', not Y' tail.",
+    ),
+    _t(
+        "isnt-x-its-y",
+        r"\b(?:isn'?t|aren'?t|wasn'?t|weren'?t|is not|are not|it'?s not|that'?s not|doesn'?t mean|don'?t mean|is never|isn'?t about|not (?:just|only|merely|simply|about))\b[^.;:\n]{0,70}?[,;]\s*(?:it'?s|it is|they'?re|they are|that'?s|but|just)\b",
+        "Write only the half that is true.",
+    ),
+    _t(
+        "x-isnt-the-issue",
+        r"\b(?:isn'?t|is not|wasn'?t|aren'?t) the (?:issue|problem|point|question|goal|bottleneck|hard part|blocker|bug|cost|risk)\b",
+        "Name the real issue directly.",
+    ),
+    _t(
+        "not-because-but-because",
+        r"\bnot because\b.{0,90}?\bbut because\b",
+        "Give the real reason only.",
+    ),
+    _t(
+        "not-x-not-y-just-z",
+        r"(?:^|[.!?]\s+)Not (?:a |an |the |just |because )?\w[^.!?\n]{0,40}[.!?]\s+(?:Not|Just|Only) \w",
+        "Say the one thing it is.",
+        flags=0,
+    ),
+    _t(
+        "label-colon-opener",
+        r"^\s*(?:[-*+]\s+|\d+\.\s+)?(?:\*\*|__)?(?:The (?:problem|issue|fix|real fix|real (?:issue|problem|cost|question|win)|catch|kicker|upshot|takeaway|result|important part|key|short version|bottom line|good news|bad news|difference|answer|point|trick|gotcha)|Why (?:it|this|that) (?:happened|happens|matters|works|failed|broke|fired)|What (?:this|it|that|happened) (?:means|changed)|Bottom line|Here'?s (?:the|what|why|how|where)\b[^:\n]{0,40}|TL;?DR|In short|Long story short|Translation|Verdict|The (?:takeaway|lesson)|Net effect|Key (?:insight|point|takeaway))(?:\*\*|__)?\s*:",
+        "Delete the label. Say the thing.",
+    ),
+    _t(
+        "heres-the",
+        r"\bhere'?s the (?:thing|kicker|catch|rub|verdict|key|short version|problem|twist|part)\b",
+        "Cut it. Start with the sentence that follows.",
+    ),
+    _t(
+        "filler",
+        r"\b(?:it'?s worth noting|worth noting that|it'?s important to note|it is important to note|in other words|to put it (?:simply|another way|differently)|put simply|simply put|at its core|at the end of the day|in a nutshell|that said|that being said|needless to say|as you can see|it goes without saying|let'?s (?:dive|delve|unpack|break (?:this|it) down)|delv(?:e|es|ed|ing) into|think of (?:it|this|them) (?:as|like)|the key (?:insight|takeaway|point|difference) (?:is|here)|this is (?:exactly|precisely) (?:the|what|why|how|where)|which is (?:exactly|precisely) (?:the|what|why|how)|serves as an? |plays an? (?:crucial|key|vital|central|critical|pivotal) role|a testament to|underscores? the|the (?:beauty|elegance|power) of|it'?s (?:essential|crucial|vital|important) to|not to mention|in today'?s|when it comes to|in the world of)\b",
+        "Cut the phrase. The sentence stands without it.",
+    ),
+    _t(
+        "buzzword",
+        r"\b(?:crucial|seamless(?:ly)?|leverag(?:es|ed|ing)|streamlin(?:e|es|ed|ing)|elevat(?:e|es|ed|ing)|holistic(?:ally)?|pivotal|game-?changers?|nuanced|tapestry|realm|foster(?:s|ed|ing)?|cutting-edge|state-of-the-art|synerg\w*|paradigm|meticulous(?:ly)?|multifaceted|myriad|plethora|utiliz(?:e|es|ed|ing)|ever-evolving|delve)\b",
+        "Use the plain word (strong, works, use, careful, many).",
+    ),
+    _t(
+        "adverb-opener",
+        r"^\s*(?:[-*+]\s+)?(?:Essentially|Basically|Ultimately|Fundamentally|Interestingly|Notably|Crucially|Critically|Admittedly|Arguably|Importantly|Simply),",
+        "Delete the adverb.",
+    ),
+    _t(
+        "bold-sentence",
+        r"\*\*[^*\n]{45,}[.!?]\*\*",
+        "Unbold it. If it is the point, put it first.",
+        flags=0,
+    ),
+    _t(
+        "rhetorical-question",
+        r"^\s*(?:[-*+]\s+)?(?:Why|Why not|The (?:result|catch|problem|fix|upshot|cost|difference)|What (?:happened|changed|does (?:this|that) mean)|So what|Sound familiar)\?|\?\s+(?:Because|Yes|No|Simple|Nope|Exactly)\b",
+        "Say the answer without the question.",
+    ),
+    _t(
+        "triple-no",
+        r"\bno \w+, no \w+,? (?:and )?no \w+",
+        "Two items is fine. Drop the padding.",
+    ),
+    _t(
+        "quip-fragment",
+        r"(?:^|[.!?]\s+|[—–]\s*)(?:That'?s (?:it|all|the (?:point|whole point|fix|win|cost|gate working|deal))|Nothing (?:more|else|less)|Just that|Simple as that|Full stop|Period|Every time|Not anymore|Same (?:thing|here)|No exceptions|Done)\.\s*$",
+        "Drop the closing fragment. The previous sentence already said it.",
+    ),
+    _t(
+        "closing-offer",
+        r"\b(?:let me know if|feel free to|i hope this helps|hope (?:this|that) helps|happy to (?:help|assist|dig|expand|elaborate)|if you'?d like,? i can|want me to\b|shall i\b|would you like me to|don'?t hesitate)",
+        "Stop when the content stops. No offer.",
+    ),
+    _t(
+        "sycophant-opener",
+        r"^\s*(?:Great|Good|Excellent|Fantastic|Perfect) (?:question|point|catch|idea|call)\b|^\s*(?:Certainly|Absolutely|Sure thing|Of course)[!,.]",
+        "Delete it. Start with the answer.",
+    ),
+    _t(
+        "lets-opener",
+        r"^\s*(?:[-*+]\s+)?(?:Let['’]s|Let us|Let me)\b",
+        "State what the section does, without inviting the reader along.",
+        scope="doc",
+    ),
+]
+
+
+# ---------------------------------------------------------------------------
+# Prose extraction
+
+_FENCE = re.compile(r"^\s*(`{3,}|~{3,})")
+_TABLE_SEP = re.compile(r"^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$")
+_INLINE_CODE = re.compile(r"`[^`\n]*`")
+_QUOTED = re.compile(r'"[^"\n]{1,120}"')
+_LINK_TARGET = re.compile(r"\]\([^)]*\)")
+_URL = re.compile(r"https?://\S+")
+_HTML_COMMENT_ONE = re.compile(r"<!--.*?-->")
+
+
+def prose_lines(text: str):
+    """Yield (lineno, cleaned_line) for every line that can hold prose."""
+    lines = text.split("\n")
+    i = 0
+    n = len(lines)
+    if n and lines[0].strip() == "---":
+        # YAML frontmatter: skip to the closing fence.
+        j = 1
+        while j < n and lines[j].strip() != "---":
+            j += 1
+        i = j + 1
+    in_fence = None
+    in_comment = False
+    while i < n:
+        raw = lines[i]
+        lineno = i + 1
+        i += 1
+        m = _FENCE.match(raw)
+        if m:
+            tick = m.group(1)[0]
+            if in_fence is None:
+                in_fence = tick
+            elif in_fence == tick:
+                in_fence = None
+            continue
+        if in_fence is not None:
+            continue
+        if in_comment:
+            if "-->" in raw:
+                in_comment = False
+                raw = raw.split("-->", 1)[1]
+            else:
+                continue
+        if MARKER in raw:
+            continue
+        if raw.lstrip().startswith(">"):
+            continue
+        if _TABLE_SEP.match(raw):
+            continue
+        line = _HTML_COMMENT_ONE.sub("", raw)
+        if "<!--" in line:
+            in_comment = True
+            line = line.split("<!--", 1)[0]
+        line = _INLINE_CODE.sub("`code`", line)
+        line = _QUOTED.sub('"quoted"', line)
+        line = _LINK_TARGET.sub("]()", line)
+        line = _URL.sub("URL", line)
+        if not line.strip():
+            continue
+        yield lineno, line
+
+
+@dataclass(frozen=True)
+class Hit:
+    line: int
+    tell: Tell
+    snippet: str
+
+
+def scan_text(text: str, chat: bool = False, only_lines: set[int] | None = None) -> list[Hit]:
+    scope_ok = {"both", "chat"} if chat else {"both", "doc"}
+    hits: list[Hit] = []
+    for lineno, line in prose_lines(text):
+        if only_lines is not None and lineno not in only_lines:
+            continue
+        for tell in TELLS:
+            if tell.scope not in scope_ok:
+                continue
+            m = tell.regex.search(line)
+            if m:
+                start = max(0, m.start() - 25)
+                snippet = line[start : m.end() + 25].strip()
+                hits.append(Hit(lineno, tell, snippet))
+    return hits
+
+
+def format_hits(label: str, hits: list[Hit], limit: int = 12) -> str:
+    out = []
+    for h in hits[:limit]:
+        out.append(f"{label}:{h.line}: [{h.tell.name}] ...{h.snippet}...  FIX: {h.tell.fix}")
+    if len(hits) > limit:
+        out.append(f"{label}: plus {len(hits) - limit} more")
+    return "\n".join(out)
+
+
+# ---------------------------------------------------------------------------
+# Modes
+
+def _repo_root() -> str:
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "--show-toplevel"], text=True, stderr=subprocess.DEVNULL
+        ).strip()
+    except subprocess.CalledProcessError:
+        sys.exit("check-prose: not inside a git repository")
+
+
+def _excluded(path: str) -> bool:
+    p = "/" + path.replace(os.sep, "/")
+    return any(part in p for part in EXCLUDE_DIR_PARTS)
+
+
+_HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
+
+
+def added_lines_since(ref: str, root: str) -> dict[str, set[int]]:
+    """Map path -> set of line numbers added (or modified) vs `ref`."""
+    diff = subprocess.run(
+        ["git", "-C", root, "diff", "-U0", "--no-color", "--diff-filter=AM", ref, "--", "*.md"],
+        text=True,
+        capture_output=True,
+    )
+    if diff.returncode != 0:
+        sys.exit(f"check-prose: git diff failed: {diff.stderr.strip()}")
+    result: dict[str, set[int]] = {}
+    path = None
+    for line in diff.stdout.split("\n"):
+        if line.startswith("+++ b/"):
+            path = line[6:]
+            result.setdefault(path, set())
+            continue
+        if line.startswith("+++ /dev/null"):
+            path = None
+            continue
+        m = _HUNK.match(line)
+        if m and path is not None:
+            start = int(m.group(1))
+            count = int(m.group(2)) if m.group(2) is not None else 1
+            result[path].update(range(start, start + count))
+    return result
+
+
+def mode_since(ref: str, chat: bool, quiet: bool) -> int:
+    root = _repo_root()
+    total = 0
+    for path, lines in sorted(added_lines_since(ref, root).items()):
+        if _excluded(path) or not lines:
+            continue
+        full = os.path.join(root, path)
+        try:
+            with open(full, encoding="utf-8", errors="replace") as fh:
+                text = fh.read()
+        except OSError as e:
+            print(f"check-prose: skip {path}: {e}", file=sys.stderr)
+            continue
+        hits = scan_text(text, chat=chat, only_lines=lines)
+        if hits:
+            total += len(hits)
+            if not quiet:
+                print(format_hits(path, hits))
+    if total:
+        if not quiet:
+            print(
+                f"\ncheck-prose: {total} Claude-slop tell(s) on lines added vs {ref}. "
+                "Rewrite them per .claude/rules/prose-style.md. Verbatim quotes go in a code span "
+                f"or carry {MARKER} on the line."
+            )
+        return 1
+    if not quiet:
+        print(f"check-prose: clean (added lines vs {ref}).")
+    return 0
+
+
+def mode_files(paths: list[str], chat: bool, quiet: bool) -> int:
+    total = 0
+    for path in paths:
+        try:
+            with open(path, encoding="utf-8", errors="replace") as fh:
+                text = fh.read()
+        except OSError as e:
+            print(f"check-prose: skip {path}: {e}", file=sys.stderr)
+            continue
+        hits = scan_text(text, chat=chat)
+        total += len(hits)
+        if hits and not quiet:
+            print(format_hits(path, hits, limit=200))
+    return 1 if total else 0
+
+
+def mode_stdin(label: str, chat: bool, quiet: bool) -> int:
+    text = sys.stdin.read()
+    hits = scan_text(text, chat=chat)
+    if hits and not quiet:
+        print(format_hits(label, hits))
+    return 1 if hits else 0
+
+
+# ---------------------------------------------------------------------------
+# Self-test
+
+def _tells_in(text: str, chat: bool = False) -> set[str]:
+    return {h.tell.name for h in scan_text(text, chat=chat)}
+
+
+def mode_self_test() -> int:
+    positive = [
+        ("The gate fires — that's the point.", {"em-dash", "quip-fragment"}),
+        ("**Known blast radius** — you can name every file.", {"em-dash"}),
+        ("It's a nudge, not a block.", {"comma-not"}),
+        ("This isn't about speed, it's about correctness.", {"isnt-x-its-y"}),
+        ("The size isn't the issue here.", {"x-isnt-the-issue"}),
+        ("It's not just a linter, it's a policy.", {"not-x-but-y", "isnt-x-its-y"}),
+        ("We did it not because it was easy but because it was cheap.", {"not-because-but-because"}),
+        ("The fix: bump the cap.", {"label-colon-opener"}),
+        ("- **The real fix:** delete the flag.", {"label-colon-opener"}),
+        ("Why it matters: the cache binds first.", {"label-colon-opener"}),
+        ("TL;DR: ship it.", {"label-colon-opener"}),
+        ("Here's the thing about hooks.", {"heres-the"}),
+        ("It's worth noting that the cap is 16000.", {"filler"}),
+        ("Think of it as a tripwire.", {"filler"}),
+        ("This is a crucial, seamless pipeline.", {"buzzword"}),
+        ("We are leveraging the existing hook.", {"buzzword"}),
+        ("Essentially, the aggregate binds.", {"adverb-opener"}),
+        ("**This is the sentence that carries the whole argument of the doc.**", {"bold-sentence"}),
+        ("Why? Because the cache is cold.", {"rhetorical-question"}),
+        ("No hooks, no gates, no workflows.", {"triple-no"}),
+        ("Great question! The answer is yes.", {"sycophant-opener"}),
+        ("Let me know if you want the long version.", {"closing-offer"}),
+        ("Let's walk through the setup.", {"lets-opener"}),
+        ("Not a hook. Not a gate. Just a doc.", {"not-x-not-y-just-z"}),
+        ("Cache – then rebuild.", {"em-dash"}),
+    ]
+    negative = [
+        "Run `bin/check-docs --since=master` before pushing.",
+        "```\nfoo — bar, not baz\n```",
+        "| col | — |\n|-----|---|",
+        "**Why:** the cap binds first.",
+        "**How to apply:** read the plan.",
+        "> quoted: the fix — is here, not there",
+        "This line quotes a user verbatim — kept. <!-- slop-ok -->",
+        "Use --since rather than --files for PRs.",
+        "Result: 3 files changed.",
+        "See https://example.com/a—b for details.",
+        "Do not commit. Leave the tree dirty.",
+        "It is not a git repository.",
+        "The worktree is clean, so nothing to ship.",
+        "---\ndescription: a — b, not c\n---\nBody is clean.",
+        "<!-- a comment — with, not tells -->\nBody is clean.",
+        "It's only the resident files that count.",
+        "Why does the aggregate bind first? The per-file cap is looser.",
+        "This lets CI distinguish a genuine failure from a skip.",
+        "**Known secure / exempt patterns (do NOT flag):**",
+        "The estimate is robust to the RNG-stream shift.",
+        'Do not ask "want me to push and open the PR?" at the end.',
+    ]
+    chat_scope = [
+        ("Let's start with the hook.", True, False),  # (text, hits_in_doc, hits_in_chat)
+    ]
+    fails = 0
+    for text, expected in positive:
+        got = _tells_in(text, chat=True) | _tells_in(text, chat=False)
+        if not expected.issubset(got):
+            print(f"  FAIL (missed): {text!r}: expected {sorted(expected)}, got {sorted(got)}")
+            fails += 1
+    for text in negative:
+        got = _tells_in(text, chat=True) | _tells_in(text, chat=False)
+        if got:
+            print(f"  FAIL (false positive): {text!r}: got {sorted(got)}")
+            fails += 1
+    for text, doc_hit, chat_hit in chat_scope:
+        if bool(_tells_in(text, chat=False)) != doc_hit or bool(_tells_in(text, chat=True)) != chat_hit:
+            print(f"  FAIL (scope): {text!r}")
+            fails += 1
+    # Every tell needs a positive fixture, or a broken regex hides forever.
+    covered: set[str] = set()
+    for _, expected in positive:
+        covered |= expected
+    for tell in TELLS:
+        if tell.name not in covered:
+            print(f"  FAIL (uncovered tell): {tell.name} has no positive fixture")
+            fails += 1
+    parsed = _HUNK.match("@@ -10,0 +11,3 @@")
+    if not parsed or parsed.group(1) != "11" or parsed.group(2) != "3":
+        print("  FAIL: hunk header parse")
+        fails += 1
+    n = len(positive) + len(negative) + len(chat_scope) + 1
+    if fails:
+        print(f"check-prose --self-test: {fails} failure(s) of {n}")
+        return 1
+    print(f"check-prose --self-test: {n} cases passed, {len(TELLS)} tells covered")
+    return 0
+
+
+# ---------------------------------------------------------------------------
+
+def main(argv: list[str]) -> int:
+    since = None
+    files: list[str] = []
+    stdin = False
+    label = "stdin"
+    chat = False
+    quiet = False
+    self_test = False
+    it = iter(argv)
+    for arg in it:
+        if arg.startswith("--since="):
+            since = arg.split("=", 1)[1]
+        elif arg == "--since":
+            since = next(it, None)
+        elif arg == "--files":
+            files.extend(list(it))
+        elif arg == "--stdin":
+            stdin = True
+        elif arg == "--file":
+            label = next(it, label)
+        elif arg == "--chat":
+            chat = True
+        elif arg == "--quiet":
+            quiet = True
+        elif arg == "--self-test":
+            self_test = True
+        elif arg in ("-h", "--help"):
+            print(__doc__)
+            return 0
+        else:
+            print(f"check-prose: unknown argument {arg!r}", file=sys.stderr)
+            return 2
+    if self_test:
+        return mode_self_test()
+    if since:
+        return mode_since(since, chat, quiet)
+    if files:
+        return mode_files(files, chat, quiet)
+    if stdin:
+        return mode_stdin(label, chat, quiet)
+    print(__doc__, file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

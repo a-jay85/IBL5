@@ -127,6 +127,17 @@ jobs:
         if: ${{ !cancelled() && github.event_name == 'pull_request' }}
         run: bin/check-docs --since=${{ github.event.pull_request.base.sha }}
 
+      # --- prose-style gate: on-touch only. Scans the markdown LINES a PR adds
+      # for the AI-tell sentence shapes listed in .claude/rules/prose-style.md.
+      # Existing prose is never scanned, so an untouched file cannot block an
+      # unrelated PR. --self-test first: a broken regex is a silent false
+      # negative, so the fixtures run before the real scan. Hard gate. ---
+      - name: Run bin/check-prose (self-test + added lines)
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        run: |
+          bin/check-prose --self-test
+          bin/check-prose --since=${{ github.event.pull_request.base.sha }}
+
       # --- PR body shape gate: UNCONDITIONAL (no path filter). Must run on every
       # PR regardless of which files changed — a prose ## Manual Testing section
       # is invisible to pr_manual_testing_clearance in bin/lib/pr-armable.sh and

@@ -1,6 +1,6 @@
 ---
-description: Triage every non-trivial unit of work as ad-hoc vs /plan before starting; ad-hoc bar, ad-hoc safety mirror, Sonnet execution-routing, hard trigger (≥5 files), /plan-verdict routing (bin/plan-now, never inline), and calibration.
-last_verified: 2026-09-07
+description: Triage every non-trivial unit of work as ad-hoc vs /plan before starting; ad-hoc bar, ad-hoc safety mirror, Sonnet execution-routing, hard trigger (≥5 files, hook-enforced), /plan-verdict routing (hook-enforced to bin/plan-now), and calibration.
+last_verified: 2026-09-16
 ---
 
 # Work Triage Rule
@@ -47,13 +47,11 @@ Stay inline (Opus edits directly) only when: the edits are genuinely **entangled
 
 ### The hard trigger: ≥5 distinct files in one turn
 
-**The numeric rule: the fifth distinct repo file you edit on the main thread within one user turn is the handoff point.** Four files is a change; five is a sweep. Route the remainder to one `subagent_type: "sonnet-4-6"` sub-agent (omit `model`) before making that fifth edit — don't wait to be stopped.
-
-Enforced by `~/.claude/hooks/plan-gate-edit.sh` **§ Check 1**, which **denies** the Edit/Write — the gate cannot be read past, and its deny message carries the routing instruction and the escape hatch. Gate properties and self-test: `work-triage-detail.md` § Hard trigger.
+Hook-enforced by `~/.claude/hooks/plan-gate-edit.sh` § Check 1 — the deny message carries the routing instruction and escape hatch. Full gate properties and self-test: `work-triage-detail.md` § Hard trigger.
 
 ## Execution routing: a `/plan` verdict routes to `bin/plan-now`, never inline
 
-Never execute a `/plan` verdict as inline `Skill(plan)` — it burns the whole orchestrator through every `/plan` phase. Route via `/plan-prompt` → `bin/plan-now` (detached Sonnet 4.6); `~/.claude/hooks/plan-gate-skill.sh` denies it. Exemptions and escape hatch: `work-triage-detail.md` § `/plan` verdict routing.
+Hook-enforced by `~/.claude/hooks/plan-gate-skill.sh` — denies inline `Skill(plan)`. Exemptions and escape hatch: `work-triage-detail.md` § `/plan` verdict routing.
 
 ## Execution routing: repeat-polling is a spend bug
 

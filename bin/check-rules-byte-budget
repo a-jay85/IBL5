@@ -47,10 +47,12 @@ LAZY_MAX_BYTES="${RULES_LAZY_BUDGET:-16000}"
 # 2225 B of headroom catches unexpected growth without blocking legitimate companion
 # verbosity. Lower it as the lazy tier is curated; never raise it to accommodate growth.
 # 2026-09-05: raised from 16000 to 20000 to accommodate pr-body-negative-claim-recheck.md
-# (E46, rung 1 — 2994 B). Resident total now 20000 B across six files. Deliberate raise
-# for a new always-loaded rule within its per-file cap; not a bloat-creep override.
+# (E46, rung 1 — 2994 B). Resident total then 20000 B across six files.
+# 2026-09-16: lowered from 20000 to 16000 — pr-body-claims (1228 B) and
+# pr-body-negative-claim-recheck (2994 B) de-residented to
+# .claude/skills/post-plan/_pr-body-claims.md. Resident total now 15267 B across four files (per bin/check-rules-byte-budget, 2026-09-16).
 # Lower if any resident rule is de-residented; never raise to accommodate file growth.
-MAX_TOTAL="${RULES_TOTAL_BUDGET:-20000}"
+MAX_TOTAL="${RULES_TOTAL_BUDGET:-16000}"
 ROOT="$(git rev-parse --show-toplevel)"
 RULES_DIR="$ROOT/.claude/rules"
 # Allowlist: the ONLY top-level rules permitted to be always-loaded (path-unscoped).
@@ -59,9 +61,9 @@ RULES_DIR="$ROOT/.claude/rules"
 # 2026-07-25: worktree-hostname + linear-history-squash-merge de-residented behind
 # paths: globs; both keep a one-line trigger stub in workflow-continuity.md, which
 # names the scoped file so the payload stays one Read away. See Check 4 below.
-# 2026-09-05: pr-body-negative-claim-recheck added (E46, rung 1) — always-loaded authoring norm.
-# 2026-09-05: pr-body-claims added (L43, rung 2) — inline source citation norm for PR body figures.
-ALLOWLIST="agent-tiering auto-commit pr-body-claims pr-body-negative-claim-recheck work-triage workflow-continuity"
+# 2026-09-16: pr-body-claims + pr-body-negative-claim-recheck de-residented; rules merged
+# into .claude/skills/post-plan/_pr-body-claims.md, loaded when /post-plan reads it.
+ALLOWLIST="agent-tiering auto-commit work-triage workflow-continuity"
 
 # Shared by Check 3 and --report-mode — the single paths: parser. Prints one glob
 # per line for $1; prints nothing when the file has no paths: key. Handles BOTH

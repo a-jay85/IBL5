@@ -1,6 +1,6 @@
 ---
-description: Read-on-demand detail for work-triage — NO auto-attach trigger (its `paths:` entries are all out-of-repo and never match); Read it when work-triage.md cites it. Covers measurement context for the inline-Opus leak, ADR-0067 gateway framing, hard-trigger gate properties (sub-agent exemption, per-turn scoping, escape hatch, self-test), the cross-worktree straddle gate's four-rung remedy ladder, inline-vs-delegated criteria, safety-mirror backstop, repeat-polling spend rationale, and /plan-verdict routing gate properties and escape hatch.
-last_verified: 2026-09-08
+description: Read-on-demand detail for work-triage — NO auto-attach trigger (its `paths:` entries are all out-of-repo and never match); Read it when work-triage.md cites it. Covers measurement context for the inline-Opus leak, ADR-0067 gateway framing, the numeric hard-trigger rule and gate properties (sub-agent exemption, per-turn scoping, escape hatch, self-test), the /plan-verdict routing rationale and gate properties, the cross-worktree straddle gate's four-rung remedy ladder, inline-vs-delegated criteria, safety-mirror backstop, and repeat-polling spend rationale.
+last_verified: 2026-09-16
 paths:
   - "~/.claude/hooks/plan-gate-edit.sh"
   - "~/.claude/hooks/plan-gate-skill.sh"
@@ -19,6 +19,8 @@ The measured leak (2026-07-07): ~90% of Opus main-thread calls were mechanical; 
 The user should never have to ask "is this big enough for a `/plan`?" — that judgment is yours to volunteer. This is the **gateway** of the deployment funnel (ADR-0067): everything downstream flows from this call.
 
 ## Hard trigger
+
+**The numeric rule:** the fifth distinct repo file you edit on the main thread within one user turn is the handoff point. Four files is a change; five is a sweep. Route the remainder to one `subagent_type: "sonnet-4-6"` sub-agent (omit `model`) before making that fifth edit — don't wait to be stopped.
 
 ### Why a numeric rule
 
@@ -89,6 +91,8 @@ Either way the routing decision is **stated, not silent** — one line, like the
 The ≥5-file hard trigger in `work-triage.md` still names **one** sub-agent, and that is deliberate rather than a leftover: a file sweep is one coherent change whose edits must stay consistent with each other, so its parts are *dependent* and splitting them buys no wall-clock while risking divergence. Fan out across **independent** chunks, not within a single sweep.
 
 ## /plan verdict routing
+
+**The routing rule:** never execute a `/plan` verdict as inline `Skill(plan)` — it burns the whole orchestrator through every `/plan` phase. Route via `/plan-prompt` → `bin/plan-now` (detached Sonnet 4.6); `~/.claude/hooks/plan-gate-skill.sh` denies it.
 
 Why prose alone fails and a hook is required: on 2026-07-28, with `work-triage.md` fully resident, a `/plan` verdict on the `bin/wt-rebase` task was executed as an inline `Skill(plan)` call on Opus. It burned the orchestrator through all of Step 3 (one `plan-architect` spawn + section append) before being killed. A warning you can read past is not a control.
 

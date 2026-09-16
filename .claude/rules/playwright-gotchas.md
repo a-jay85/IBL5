@@ -1,7 +1,7 @@
 ---
-description: Playwright E2E gotchas learned in production — CSRF/session isolation, hx-boost waits, PRG waitForURL races, nav-form selector clashes, seed/test-state traps, CI shard load. Companion to playwright-tests.md.
+description: Playwright E2E gotchas: CSRF/session isolation, hx-boost waits, PRG races, hidden-element fill, axe a11y, URL-flip blast radius, global-table ownership, seed/test-state traps, CI shard load.
 paths: ibl5/tests/e2e/**/*.ts
-last_verified: 2026-09-05
+last_verified: 2026-09-16
 ---
 
 # Playwright E2E Gotchas
@@ -39,3 +39,32 @@ Hard-won pitfalls, each one broke a real PR. Core rules and templates: `playwrig
 - **Same-shard slow URLs need coordinated timeouts.** Two specs in one shard hitting `modules.php?name=Schedule` double the concurrent load, so adding tests to one makes the other time out. `grep -r "modules.php?name=<Module>" ibl5/tests/e2e/` for siblings, set the same `test.setTimeout(60000)` in each with a comment naming the other file, and use `gotoWithRetry` plus a container `toBeVisible()` before axe or assertions.
 - **"New regression or pre-existing?"** Before investigating, run the failing spec from the main checkout's `ibl5/` directory with `BASE_URL` pointed at the master Docker stack's hostname (`bun run test:e2e -- --project=chromium tests/e2e/flows/<spec>.spec.ts`). If it fails there too, it is not your regression.
 - **Sub-agents cannot run E2E.** A spawned agent gets its own worktree without the task worktree's Docker stack or `.env.test`, so auth setup fails on missing `IBL_TEST_USER`/`IBL_TEST_PASS`. Run `bin/wt-up --seed` and `bin/e2e-wt` as direct Bash calls from the parent session.
+
+## Forms — hidden elements & fill()
+
+- **`fill()`, `selectOption()`, `.check()` enforce visibility.** `display:none` or `visibility:hidden` on a form element causes "Element is not visible" after `actionTimeout` — not a silent skip. Before hiding a form element, grep specs for every `fill|selectOption|check|click` that targets it and rewrite each to drive the visible wrapper (stepper, toggle, slider) instead.
+- **CSS `input` selector includes `type="hidden"`.** `input, select, textarea` matches ALL inputs including hidden; `.first().toBeVisible()` can fail on the wrong element. Use `input:not([type="hidden"]), select, textarea` in visibility assertions. Forms with ONLY hidden inputs + `<button>` have no visible input at all — assert on the `<button>` instead.
+- **`fill()` silently truncates at `maxlength`.** No exception or warning. Check the View for `maxlength` before sizing test passwords (e.g., login form has `maxlength="20"`).
+
+## Multi-token CSRF & Discord CI trap
+
+- **Admin pages render a DebugMenu form before the module form.** `PageLayout::header()` emits a per-action CSRF token in the debug chrome; a bare first-token grep grabs the wrong one. Scope `fetchToken` to the form by name — slice body at `name="<formName>"` before matching `_csrf_token`. Standalone pages (single token) are safe.
+- **Discord webhook → HTTP 400 in CI.** `config/discord.config.example.php` (copied verbatim by CI) has placeholder URLs; `sendCurlPOST` throws on non-2xx (no-op only under `isPhpUnit()`). Fix at config layer: drop the `testing` key from the example so callers get `$webhooks['testing'] ?? null` → null → no-op. Code-level try/catch guards trip the 100% Infection MSI gate on changed lines in `classes/`.
+
+## Shared global-table ownership
+
+- **One `mode:'serial'` spec owns each global DB table.** Adding any spec file can newly co-locate two global-table mutators in one shard → race under `fullyParallel`. `bin/check-e2e-fa-offers-owner` (E2E Hygiene Gate) enforces a single serial owner for FA-offer mutation. Validate with per-shard `--list` check, not `--repeat-each`.
+- **Never share `auth-isolated` fixture between a mutating spec and a state-assertion spec.** Real form submissions leave DB rows mutated; a spec asserting "all-clear" on the same team then fails. Add a dedicated isolated team to `ibl5/tests/e2e/fixtures/ci-seed.sql` with a matching `auth-<purpose>.ts` fixture.
+
+## Seed grounding & blast radius
+
+- **`--grep` skips the setup project → DB never seeds → 500.** `--grep` filters out setup dependencies. Scope by project + path instead: `bin/e2e-wt <slug> --project=mutators ibl5/tests/e2e/<spec>.spec.ts`.
+- **"0 failed" proves nothing unless the spec appears under `passed` by name.** A large `did not run` bucket hides specs that never executed.
+- **URL-flip blast radius needs a TypeScript grep.** E2E specs use CSS attribute selectors (`[href*="boxscore"]`); a PHP-only grep misses them entirely. Add: `grep -rn 'href\*=' ibl5/tests/e2e/` alongside the PHP grep when auditing a URL format change.
+- **`ON DUPLICATE KEY UPDATE` must reset ALL mutable state columns.** If a seed row has a nullable state column (`read_at`, `completed_at`) and the UPDATE clause only resets immutable columns, a test-mutated value survives reseed and fails the second run.
+
+## Accessibility (axe)
+
+- **`empty-table-header` requires visible text, not `aria-label`.** axe-core's rule checks `has-visible-text` only; `aria-label` on an empty `<th>` does NOT satisfy it. Use `<span class="sr-only">Label</span>` inside the `<th>`. `.sr-only` is in `ibl5/design/base.css`.
+- **`sorttable.js` adds `role="columnheader"` to every `<th>`**, so all headers in sortable tables trigger the rule even without explicit role attributes.
+- **Heading element promotions (`h3`→`h2`) can silently pick up compound selectors.** Run `grep -rn 'h[0-9]\.ibl-title' ibl5/design/` before any heading promotion — if the TARGET element has a compound `h2.ibl-title` selector but the source does not, the promotion is not VR-neutral. Use `aria-level="2"` on `h3` instead.

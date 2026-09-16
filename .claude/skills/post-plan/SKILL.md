@@ -174,7 +174,7 @@ fi
 ```
 
 3. push
-4. **If no PR exists for the current branch:** create one with `gh pr create`.
+4. **If no PR exists for the current branch:** create one with `gh pr create`. Read `.claude/skills/post-plan/_pr-body-claims.md` and apply it before writing the body.
 
    > **Files-changed block:** the PR body must carry a machine-generated scope block, so the hand-written Scope prose can never silently disagree with the diff. Build it from `git diff --name-status origin/master...HEAD` and include it in the body at creation, delimited exactly by `<!-- files-changed:begin -->` / `<!-- files-changed:end -->`, one `- \`<status>\` \`<path>\`` bullet per file. On any later body write (including Phase 6 below), regenerate the block and **replace what sits between the two markers** rather than appending a second copy; if only one marker is present, append a fresh block and leave the orphan alone. Generated data cannot drift — the prose Scope line then carries *why*, not *what*.
 

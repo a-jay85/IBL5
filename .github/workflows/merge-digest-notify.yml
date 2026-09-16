@@ -8,12 +8,17 @@ name: Merge digest notify
 # in the job `if:` below rather than by a second API call.
 #
 # Load-bearing deployment note: unlike `pull_request_target`, a `pull_request` workflow IS
-# dispatched from the PR's own head, so a workflow added in a PR does run on that PR. The
-# 744 recorded runs of `.github/workflows/pipeline-fixed-notify.yml` are this same `closed`
-# trigger firing across merges. The PR that adds THIS file therefore very likely notifies
-# about its own merge, and that first DM is the hold's verification step. The hold stands
-# either way: if the self-merge run does not materialise, the first real DM lands on the
-# next merge and a human still eyeballs it before the change is treated as done.
+# dispatched from the PR's own head, so a workflow added in a PR DOES run on that PR --
+# including on the `closed` event for that PR's own merge. Measured, not assumed:
+# `.github/workflows/pipeline-fixed-notify.yml` was added by PR #1355, which merged at
+# 2026-07-07T21:49:04Z; that workflow's earliest run is 2026-07-07T21:49:07Z on branch
+# `discord-pipeline-fixed-gh-action` (PR #1355's own head), event `pull_request`, three
+# seconds after its own merge, and the job body executed rather than skipping.
+#
+# So the PR that adds THIS file is expected to notify about its own merge, and that first
+# DM is the hold's verification step. The hold stands either way: if the self-merge run
+# does not materialise, the first real DM lands on the next merge and a human still
+# eyeballs it before the change is treated as done.
 #
 # The checkout below pins `ref:` to the BASE branch instead of defaulting to `github.ref`.
 # Two reasons, both load-bearing:

@@ -26,6 +26,11 @@
 #   --host <ssh-host>  ssh target (default: $DISCORD_DM_SSH_HOST, else iblhoops.net)
 #   --quiet            no per-attempt chatter on stderr (failures still print)
 #   --no-fallback      skip the macOS notification + spool on total failure
+#   --route <path>     POST to <path> instead of /discordDM. Space form only.
+#   --raw              the payload is already a complete JSON body: send it
+#                      verbatim, with no {content:{...}} envelope, no recipient
+#                      and no chunking/truncation. Implies a caller that knows
+#                      the route's schema. Requires --route.
 #   --chunk            split an over-cap message into ordered messages instead of
 #                      truncating it. Opt-in: the short verdict pings sent by
 #                      bin/plan-now and bin/watch-automouse-plan want truncation,
@@ -44,6 +49,8 @@ ATTEMPTS=6
 QUIET=0
 FALLBACK=1
 CHUNK=0
+ROUTE="/discordDM"
+RAW=0
 # Transport seam: tests point this at a stub. Production always uses the real ssh.
 SSH_BIN="${DISCORD_DM_SSH_BIN:-ssh}"
 SPOOL="${DISCORD_DM_SPOOL:-$HOME/.claude/discord-dm-spool.log}"
@@ -63,7 +70,9 @@ while [ $# -gt 0 ]; do
         --quiet)       QUIET=1; shift ;;
         --no-fallback) FALLBACK=0; shift ;;
         --chunk)       CHUNK=1; shift ;;
-        -h|--help)     sed -n '2,36p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        --route)       ROUTE="${2:-}"; shift 2 ;;
+        --raw)         RAW=1; shift ;;
+        -h|--help)     sed -n '2,40p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         -)             MSG=$(cat); shift ;;
         --)            shift; MSG="$*"; break ;;
         -*)            echo "discord-dm: unknown option $1" >&2; exit 2 ;;
@@ -73,10 +82,32 @@ done
 
 [ -n "$MSG" ] || { echo "discord-dm: empty message (pass an argument or '-' for stdin)" >&2; exit 2; }
 
-if [ -z "$TO" ] && [ -f "$ID_FILE" ]; then
+# $ROUTE is interpolated into the command string handed to ssh, so it is a shell
+# injection surface, not a cosmetic field. Whitelist the whole string rather than
+# blacklisting metacharacters: a leading '/' plus letters, digits, '_', '-' and
+# further '/'. Anything else — a space, a quote, '$', ';', '&' — is rejected here
+# and never reaches the remote leg.
+case "$ROUTE" in
+    /*) : ;;
+    *)  echo "discord-dm: --route must begin with '/' (got '$ROUTE')" >&2; exit 2 ;;
+esac
+case "$ROUTE" in
+    *[!A-Za-z0-9_/-]*) echo "discord-dm: --route may only contain letters, digits, '_', '-' and '/' (got '$ROUTE')" >&2; exit 2 ;;
+esac
+
+if [ "$RAW" = 1 ]; then
+    # --raw hands the caller the whole body, so this script no longer knows the
+    # schema and cannot build a default route's envelope. Requiring --route keeps
+    # a raw body from being POSTed at /discordDM, which would 400 confusingly.
+    [ "$ROUTE" != "/discordDM" ] || { echo "discord-dm: --raw requires --route" >&2; exit 2; }
+    [ "$CHUNK" = 0 ] || { echo "discord-dm: --raw and --chunk are mutually exclusive" >&2; exit 2; }
+    jq -e . >/dev/null 2>&1 <<< "$MSG" || { echo "discord-dm: --raw payload is not valid JSON" >&2; exit 2; }
+fi
+
+if [ "$RAW" = 0 ] && [ -z "$TO" ] && [ -f "$ID_FILE" ]; then
     TO=$(tr -dc '0-9' < "$ID_FILE")
 fi
-if [ -z "$TO" ]; then
+if [ "$RAW" = 0 ] && [ -z "$TO" ]; then
     cat >&2 <<EOF
 discord-dm: no recipient. Set one of:
   --to <snowflake>          per-call
@@ -122,7 +153,11 @@ chunk_message() { # text
     done
 }
 
-if [ "$CHUNK" = 1 ]; then
+if [ "$RAW" = 1 ]; then
+    # A raw body is a JSON document. Cutting it at 1900 chars would ship invalid
+    # JSON, so the cap does not apply; the route's own handler owns the limit.
+    CHUNKS=("$MSG")
+elif [ "$CHUNK" = 1 ]; then
     chunk_message "$MSG"
 else
     # Unchanged default: leave room for the truncation marker and send one message.
@@ -136,7 +171,7 @@ fi
 # from the log alone; `-f` is deliberately absent (it hides the very status we
 # want). curl's own rc distinguishes "connection refused" (7) from an HTTP error.
 REMOTE_CMD="curl -s -m 20 -w '\nHTTP=%{http_code}' \
--X POST http://localhost:${BOT_PORT}/discordDM \
+-X POST http://localhost:${BOT_PORT}${ROUTE} \
 -H 'Content-Type: application/json' -d @-; printf ' curl_rc=%s\n' \"\$?\""
 
 http=""
@@ -148,11 +183,15 @@ LAST_ATTEMPTS=0
 # restarts per chunk.
 send_one() { # message
     local msg="$1" payload out ssh_rc curl_rc n=1
-    # Snowflakes are 64-bit and MUST stay JSON strings end-to-end — jq --arg keeps
-    # them strings; interpolating into a JSON literal would round-trip them through a
-    # double and corrupt the low digits.
-    payload=$(jq -n --arg id "$TO" --arg msg "$msg" \
-        '{content: {receivingUserDiscordID: $id, message: $msg}}') || exit 2
+    if [ "$RAW" = 1 ]; then
+        payload="$msg"
+    else
+        # Snowflakes are 64-bit and MUST stay JSON strings end-to-end — jq --arg keeps
+        # them strings; interpolating into a JSON literal would round-trip them through a
+        # double and corrupt the low digits.
+        payload=$(jq -n --arg id "$TO" --arg msg "$msg" \
+            '{content: {receivingUserDiscordID: $id, message: $msg}}') || exit 2
+    fi
     while [ "$n" -le "$ATTEMPTS" ]; do
         LAST_ATTEMPTS="$n"
         out=$(printf '%s' "$payload" | "$SSH_BIN" -o BatchMode=yes -o ConnectTimeout=10 \

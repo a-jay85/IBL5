@@ -2,7 +2,7 @@
 description: Localhost browsing is logged-out by default; set an `_auto_login=1` cookie to auto-authenticate via DEV_AUTO_LOGIN. Identity matrix for all test layers.
 last_verified: 2026-09-16
 paths:
-  - "ibl5/tests/**"
+  - "ibl5/**"
   - ".github/workflows/e2e-tests.yml"
 ---
 

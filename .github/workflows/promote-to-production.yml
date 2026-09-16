@@ -151,14 +151,20 @@ jobs:
           if [ "$OUTCOME" = "promoted" ]; then
             # Discord renders masked links ([text](url)) in bot-authored messages,
             # so the short SHA and any trailing (#NNNN) are clickable in place.
+            # Every URL here is wrapped in <> — that is Discord's embed-suppression
+            # syntax, and it works inside a masked link too ([text](<url>)). Without
+            # it each link auto-expands into a preview card and a 3-line promote DM
+            # renders as a screenful. The <> are NOT stray shell redirects; they are
+            # inside single-quoted printf formats and a sed replacement, never
+            # interpreted by bash. Keep them on any URL added below.
             SUBJECT="$(git log -1 --format=%s "$PROMOTE_SHA" || true)"
             SUBJECT="$(printf '%s' "$SUBJECT" \
-              | sed -E "s@\(#([0-9]+)\)@([#\1]($SERVER_URL/$REPO/pull/\1))@g")"
+              | sed -E "s@\(#([0-9]+)\)@([#\1](<$SERVER_URL/$REPO/pull/\1>))@g")"
             {
-              printf 'Auto-promoted master to production: [%s](%s)\n' \
+              printf 'Auto-promoted master to production: [%s](<%s>)\n' \
                      "${PROMOTE_SHA:0:11}" "$SERVER_URL/$REPO/commit/$PROMOTE_SHA"
               printf '%s\n' "$SUBJECT"
-              printf 'Deploy: %s\n' "${DEPLOY_URL:-$CHECKS_URL}"
+              printf 'Deploy: <%s>\n' "${DEPLOY_URL:-$CHECKS_URL}"
             } > /tmp/discord-msg.txt
           else
             {
@@ -166,7 +172,7 @@ jobs:
                      "${OUTCOME:-hard-error}" "${PROMOTE_SHA:0:11}"
               printf 'production was NOT modified. Nothing was force-pushed.\n'
               printf 'Promote by hand with bin/merge-master-to-prod, or pause with\n'
-              printf 'gh variable set AUTO_PROMOTE_PAUSED --body 1\n\n%s\n' "$RUN_URL"
+              printf 'gh variable set AUTO_PROMOTE_PAUSED --body 1\n\n<%s>\n' "$RUN_URL"
             } > /tmp/discord-msg.txt
           fi
 
@@ -214,7 +220,7 @@ jobs:
             printf 'Auto-promotion is PAUSED (AUTO_PROMOTE_PAUSED=1).\n\n'
             printf 'master %s was NOT promoted to production.\n\n' "${PROMOTE_SHA:0:11}"
             printf 'Resume: gh variable delete AUTO_PROMOTE_PAUSED\n'
-            printf 'Ship by hand meanwhile: bin/merge-master-to-prod\n\n%s\n' "$RUN_URL"
+            printf 'Ship by hand meanwhile: bin/merge-master-to-prod\n\n<%s>\n' "$RUN_URL"
           } > /tmp/discord-msg.txt
 
       - name: Send Discord DM

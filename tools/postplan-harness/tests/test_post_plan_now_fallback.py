@@ -350,7 +350,12 @@ def test_generated_cmd_carries_two_distinct_claude_invocations(tmp_path):
 def test_generated_cmd_resume_prompt_is_single_quoted(tmp_path):
     """Free-form text must cross the /bin/bash -lc boundary inside single quotes."""
     cmd = _generate_cmd(tmp_path)
-    m = re.search(r"caffeinate -s claude -p ('.*?RESUMING at Phase 5\.5.*?') --dangerously", cmd, re.S)
+    # The prompt is now embedded inside `-p "$(printf '%s %s' <prompt> <ci-clause>)"`
+    # (the CI clause is rendered far-side), but it must still cross the boundary as a
+    # single-quoted token — that is the property this test guards.
+    m = re.search(r"caffeinate -s claude -p \"\$\(printf '%s %s' "
+                  r"('.*?RESUMING at Phase 5\.5.*?') \"\$\(postplan_ci_resume_clause",
+                  cmd, re.S)
     assert m, "resume prompt is not single-quoted at the embed site"
     assert '\\"' not in m.group(1)
 

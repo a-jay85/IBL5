@@ -297,6 +297,11 @@ Emit `PHASE5_VERIFY_STATUS` ∈ {`pass`, `fail`, `skipped`}: `pass` = at least o
 
 ## Phase 5.5: Plan-intent fidelity review & merge digest
 
+**Ordering:** when Phase 7.0 above reported `"status": "failure"` for the current head, run the
+Phase 7 fix loop **before** this phase. The fidelity reviewer must read the tree that will merge,
+not a tree with known-red CI. Phase 5.5 has no dependency on Phase 7 having run, so this reorder
+is safe; every other phase keeps its existing order.
+
 Phase 5.0 asserts the implementation's tests pass and planned tests are present — the structural question. Phase 5.5 asks the semantic question Phase 5.0 structurally cannot: does the implementation do what the plan *intended*, not merely what its tests assert?
 
 **You MUST Read `.claude/skills/post-plan/_phase-5.5-fidelity.md` and follow it in order — do not proceed to Phase 6 without it.**
@@ -537,6 +542,28 @@ fi
 
 0. **Early-exit on merged PR:** Before any polling, run `gh pr view <pr> --json state --jq '.state'`. If `MERGED`, skip the rest of Phase 7 and continue at Phase 8 — the auto-merge armed in Phase 6.5 has already fired (required checks were already green) and watching CI to completion adds nothing but wall-clock burn. This is the load-bearing optimization that keeps the automouse loop from burning a full watch timeout on an already-shipped PR.
 1. **Wait for checks to register:** Poll `gh pr checks <pr> --json name,state 2>/dev/null | jq 'length'` up to 4 times with 15s waits. If count stays 0, warn user and continue to Phase 8.
+**7.0 — Reuse the harness's background CI result (skip the watch when it applies).**
+The compiled harness starts a `gh pr checks --watch --fail-fast` the moment it pushes in
+Phase 2 and records the result per head SHA. When `$HARNESS_RUN_DIR` is set, read it before
+watching anything:
+
+```bash
+SHA=$(git rev-parse HEAD)
+OUT="${HARNESS_RUN_DIR:-}/ci-$SHA.json"
+if [ -n "${HARNESS_RUN_DIR:-}" ] && [ -f "$OUT" ]; then cat "$OUT"; else echo "NO-BACKGROUND-RESULT"; fi
+```
+
+- `"status": "success"` and the file's `"sha"` equals `$SHA` → **CI is green for this head. Skip
+  the `gh pr checks --watch` call entirely** and go straight to the Phase 7 exit criteria.
+- `"status": "failure"` → **do not watch.** The `failed_checks` list and `evidence` are the CI
+  failure; enter the existing fix loop now (see `_phase-7-ci-monitoring.md`).
+- Anything else — file absent, `NO-BACKGROUND-RESULT`, a different `"sha"`, or
+  `"status": "timeout"` / `"indeterminate"` → **run the normal watch below.** A non-terminal
+  status means the harness never learned the answer; it is never evidence of green.
+- **After any fix commit the head SHA changes**, so this short-circuit stops applying and the
+  normal watch below governs the new SHA. Re-read `$OUT` with the *new* `$SHA` only if the
+  harness wrote one for it.
+
 2. **Block until CI settles:** `gh pr checks <pr> --watch --fail-fast --interval 20` (Bash timeout 1200000 = 20 min cap — leaves a ~40-min cushion under `MAX_PP_SECS=3600` for Phase 5.0 conformance + Phases 8-11 cleanup). The gh CLI handles the polling and exit logic itself; do not re-implement it in jq. Exit codes: `0` = all checks passed, `8` = at least one failed, other = transport error.
 3. **If exit 0** → Phase 8. (Mid-watch merge detection was intentionally dropped: `gh pr checks --watch` exits as soon as the last check settles, so the only window auto-merge could fire inside the watch is the ~5–30s between final-check-pass and auto-merge action — not worth a hand-rolled poll loop. Step 0 already covers the case where the PR merged before Phase 7 started.)
 3.5. **BEHIND re-rebase (green path only, before Phase 8):** master may have moved while step 2 was waiting on CI. Probe it strictly — a re-rebase and force-push is destructive, so this only fires where BEHIND actually blocks the merge:

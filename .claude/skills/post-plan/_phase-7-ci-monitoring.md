@@ -1,6 +1,19 @@
+---
+description: /post-plan Phase 7 — the Opus-escalation procedure for CI fixes, the BEHIND re-rebase loop, and the harness background-CI-outcome short-circuit.
+last_verified: 2026-09-16
+---
+
 # Phase 7 — CI Monitoring (post-plan reference)
 
 Purpose: the Opus-escalation procedure for Phase 7 CI fixes.
+
+**Outcome already known.** If `$HARNESS_RUN_DIR/ci-<head-sha>.json` exists for the current head
+(SKILL.md Phase 7.0), its `failed_checks` and `evidence` replace the first `gh pr checks --watch`
+call — start the escalation procedure below from its failure list instead of re-measuring. The
+escalation procedure itself, the BEHIND re-rebase loop, and the MERGED early exit are unchanged
+and still apply to every re-watch after a fix commit.
+
+Headless safety is preserved: reading the file is a foreground `cat`, not a background job.
 
    **Escalate to Opus when out of depth.** Failures in the Opus row of agent-tiering — failing-check `name` matching `mutation|MSI|engine|golden|migration` (case-insensitive), or any FK-ordering / cross-track failure you can't localize from the log in one read. Triggers: category match → Opus on attempt 1; otherwise Sonnet does attempts 1–2, Opus takes attempt 3 instead of giving up.
 

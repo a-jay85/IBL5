@@ -17,7 +17,7 @@ macOS ships BSD `date`; Linux CI ships GNU `date`. Arithmetic date flags differ:
 | `date -d '7 days ago'` | `date -v-7d` |
 | `date --date='...'` | no `--date` flag |
 
-**Fix:** use the `_date_ago <N> <unit>` helper in `bin/automouse/run` — it detects the platform and emits a portable timestamp. Never write raw `date -d` or `date -v` in scripts that run on both.
+**Fix:** use the `_date_ago <N>` helper in `bin/automouse/run` (N = number of days; days are hardcoded) — it detects the platform and emits a portable timestamp. Never write raw `date -d` or `date -v` in scripts that run on both.
 
 ## SSH commands must be single-line strings
 

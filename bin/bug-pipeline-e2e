@@ -99,7 +99,7 @@ expect 'thread_id string-equals snowflake' '1234567890123456792' \
     "$(q "SELECT thread_id FROM ibl_bug_reports WHERE id='$ID'")"
 
 # Step 6.3 — One real tick claims it into `hunting`
-(source /tmp/bug-pipeline-test-env.sh && timeout 300 "$REPO_ROOT/bin/bug-pipeline-tick")
+(source /tmp/bug-pipeline-test-env.sh && BUG_PIPELINE_PLAN_REVIEW_DRAIN_ENABLED=0 timeout 300 "$REPO_ROOT/bin/bug-pipeline-tick")
 expect 'status=hunting' 'hunting' \
     "$(q "SELECT status FROM ibl_bug_reports WHERE id='$ID'")"
 expect 'lease_owner IS NOT NULL' '1' \

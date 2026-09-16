@@ -616,6 +616,35 @@ seam_case_runner_hook() {
     fi
 }
 
+# ── Phase 6b — the bin/bug-pipeline-tick hook ────────────────────────────────
+# The 180s poller is the SECOND drain caller: bin/automouse/run alone leaves a
+# Discord button press unapplied until its 03:00 calendar tick. Static assertions
+# for the same reason as Phase 6 — running the real tick drives a live pipeline.
+seam_case_tick_hook() {
+    local tick src drain_ln preflight_ln
+    tick="$HERE/bug-pipeline-tick"
+    if [ ! -f "$tick" ]; then
+        seam_fail "tick hook: bin/bug-pipeline-tick not found"
+        return
+    fi
+    src="$(cat "$tick")"
+
+    want "tick hook: the drain is invoked" "$src" 'plan-review-drain}" --drain'
+    want "tick hook: failure is non-fatal" "$src" '--drain 2>&1 || true'
+    want "tick hook: kill switch present" "$src" 'BUG_PIPELINE_PLAN_REVIEW_DRAIN_ENABLED:-1'
+
+    # The drain needs no $CLAUDE_BIN, so a missing agent binary (which makes the
+    # preflight `return 1`) must not also silence Discord plan review.
+    # Anchor on the invocation (not the prose comment) so a move below preflight fails.
+    drain_ln="$(grep -n 'plan-review-drain}" --drain' "$tick" | head -1 | cut -d: -f1)"
+    preflight_ln="$(grep -n 'not found on PATH' "$tick" | head -1 | cut -d: -f1)"
+    if [ -n "$drain_ln" ] && [ -n "$preflight_ln" ] && [ "$drain_ln" -lt "$preflight_ln" ]; then
+        seam_ok "tick hook: the drain runs BEFORE the \$CLAUDE_BIN preflight (line $drain_ln < $preflight_ln)"
+    else
+        seam_fail "tick hook: the drain must precede the \$CLAUDE_BIN preflight (drain=$drain_ln preflight=$preflight_ln)"
+    fi
+}
+
 # ── Phase 8 — end-to-end + idempotence ───────────────────────────────────────
 seam_case_queue_end_to_end() {
     reset_drain_state
@@ -671,6 +700,7 @@ seam_case_quiet_404
 seam_case_failure_buckets
 seam_case_force_ack_dm_is_actionable
 seam_case_runner_hook
+seam_case_tick_hook
 seam_case_queue_end_to_end
 
 # Completion token. A harness that asserts nothing reads as passing, so the count

@@ -2,21 +2,71 @@
 # shellcheck disable=SC2317,SC2329
 # bin/test-plan-review-seam — end-to-end acceptance test for the plan-review program.
 # Landed skipped in discord-plan-review-1-digest; un-skipped by discord-plan-review-3-drain.
+#
+# Everything here runs against stubs: a stub `ssh` that replays canned curl output,
+# a stub `bin/check-plan`, a stub `bin/automouse/queue`, and a stub `bin/discord-dm`.
+# No bot, no tunnel, no network, no credentials — safe for CI.
+
+# ===== BEGIN RESOLVED BOT CONTRACT (Phase 1) =====
+#   REVIEW_DM_ROUTE:      /discordPlanReviewDM
+#   DECISIONS_GET_ROUTE:  /planDecisions
+#   ACK_ROUTE:            /planDecisions/ack
+#   ACK_VERB:             POST
+#   LOOPBACK_BIND:        127.0.0.1:config.express.port
+#   REVIEW_DM_BODY:       { slug, digest }
+#   DECISIONS_RESPONSE:   object wrapping array; fields: decisions[].id, decisions[].slug, decisions[].action, decisions[].actor, decisions[].ts
+#   ACK_BODY:             { ids: string[] }  (echoes back the id field as an array)
+#   PLAN_SLUG_RE:         PLAN_SLUG_RE = /^[a-z0-9][a-z0-9-]{0,79}$/
+# ===== END RESOLVED BOT CONTRACT (Phase 1) =====
 
 set -u
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
-# ── SKIP GATE — delete this whole block in discord-plan-review-3-drain ───────
-# This harness covers units 1, 2, and 3 of the discord-plan-review program. It is
-# wired into CI here on purpose: a SKIP line every run keeps the open obligation
-# visible and gives the quarterly meta-tooling cull the disposition signal it needs
-# to distinguish "temporarily skipped" from "dead". Unit 3 (discord-plan-review-3-drain)
-# un-skips this test by deleting the SKIP GATE block and replacing the three stubs below.
-echo "SKIP bin/test-plan-review-seam — the plan-review seam is not closed yet; discord-plan-review-3-drain un-skips this test by deleting the SKIP GATE block."
-exit 0
-# ── END SKIP GATE ────────────────────────────────────────────────────────────
-# shellcheck disable=SC2317,SC2329
+# ── CONTRACT-DRIFT CHECK ──────────────────────────────────────────────────────
+# Verifies that every route string, response field name, and PLAN_SLUG_RE export
+# the drain depends on still exists in the serving sources. Runs off the
+# checked-in TypeScript — no bot, no tunnel, no credentials needed (CI-safe).
+seam_case_contract_drift() {
+    local express_file dm_file express_src dm_src missing token
+    express_file="$HERE/../ibl5/IBLbot/src/server/express.ts"
+    dm_file="$HERE/../ibl5/IBLbot/src/server/plan-review-dm.ts"
+    missing=0
+
+    if [ ! -f "$express_file" ]; then
+        seam_fail "contract-drift: express.ts not found at $express_file"
+        return
+    fi
+    if [ ! -f "$dm_file" ]; then
+        seam_fail "contract-drift: plan-review-dm.ts not found at $dm_file"
+        return
+    fi
+
+    express_src="$(cat "$express_file")"
+    dm_src="$(cat "$dm_file")"
+
+    # Route strings — must exist in express.ts.  Use the TS-quoted form so that
+    # checking '/planDecisions' does not false-match inside '/planDecisions/ack'.
+    for token in "'/discordPlanReviewDM'" "'/planDecisions'" "'/planDecisions/ack'"; do
+        if ! grep -qF -- "$token" <<< "$express_src"; then
+            seam_fail "contract-drift: route $token absent from express.ts"
+            missing=$(( missing + 1 ))
+        fi
+    done
+
+    # Response field names the drain consumes + ack body field — must exist in plan-review-dm.ts
+    for token in 'decisions' 'slug' 'action' 'ids' 'PLAN_SLUG_RE'; do
+        if ! grep -qF -- "$token" <<< "$dm_src"; then
+            seam_fail "contract-drift: token '$token' absent from plan-review-dm.ts"
+            missing=$(( missing + 1 ))
+        fi
+    done
+
+    if [ "$missing" -eq 0 ]; then
+        seam_ok "contract-drift: all route strings, field names, and PLAN_SLUG_RE verified"
+    fi
+}
+# ── END CONTRACT-DRIFT CHECK ──────────────────────────────────────────────────
 
 PASS=0
 FAIL=0
@@ -25,6 +75,24 @@ trap 'rm -rf "$SANDBOX"' EXIT
 
 seam_ok()   { PASS=$(( PASS + 1 )); printf 'ok  %s\n' "$1"; }
 seam_fail() { FAIL=$(( FAIL + 1 )); printf 'FAIL %s\n' "$1"; }
+
+# Assert $2 contains $3; label with $1.
+want() {
+    if grep -qF -- "$3" <<< "$2"; then
+        seam_ok "$1"
+    else
+        seam_fail "$1 (missing: $3)"
+    fi
+}
+
+# Assert $2 does NOT contain $3.
+want_not() {
+    if grep -qF -- "$3" <<< "$2"; then
+        seam_fail "$1 (unexpectedly present: $3)"
+    else
+        seam_ok "$1"
+    fi
+}
 
 PLAN="$SANDBOX/seam-fixture.md"
 cat > "$PLAN" <<'FIXTURE'
@@ -40,6 +108,23 @@ This plan requires human review before auto-merging.
 | --- | --- | --- | --- | --- |
 | 1 | Confirm the feature looks right on mobile | Truly-manual | post-impl | vr: screenshots/mobile.png |
 FIXTURE
+
+# The one sentence that must survive inside the awk-delimited hold region. Named
+# once so the pristine assertion and the defect-injection mutation cannot drift.
+HOLD_SENTENCE='This plan requires human review before auto-merging.'
+
+# Extract the HOLD region from a digest: the lines after the `HOLD — ` banner, up
+# to (but not including) the `MANUAL CHECKS — ` banner or end of output. The
+# defect-injection case below proves this range is on-target rather than matching
+# an empty span — an awk range that silently matches nothing passes every
+# assertion built on it.
+hold_region() {
+    awk '
+        /^HOLD — / { inside = 1; next }
+        /^MANUAL CHECKS — / { inside = 0 }
+        inside { print }
+    '
+}
 
 seam_case_digest_produced() {
     local out rc
@@ -64,26 +149,533 @@ seam_case_digest_produced() {
     fi
 }
 
-seam_case_single_dm() {
-    # unit 2 fills this in: stub bin/discord-dm on PATH and assert one invocation
-    # carrying the tail pointer
-    seam_fail "unimplemented — discord-plan-review-3-drain"
+# ── fixture-intact row (matrix 24) + awk-region on-target proof (matrix 25) ───
+# Leg 1: on the pristine fixture the awk region is NON-EMPTY and carries the hold
+#        sentence. An always-empty range fails here.
+# Leg 2: rename the canonical hold heading on a COPY — this is exactly what a
+#        gate-side rename in bin/check-plan would do — and the region goes empty.
+# Leg 3: mutate the hold BODY inside the region on a COPY; the region stays
+#        non-empty but the content assertion fails, so the range is on-target and
+#        not merely "any non-empty text".
+seam_case_fixture_intact_and_region_on_target() {
+    local region copy_a copy_b region_a region_b
+
+    region="$("$HERE/plan-review-digest" "$PLAN" 2>/dev/null | hold_region)"
+    if [ -n "$region" ]; then
+        seam_ok "awk region on-target: hold region is non-empty on the pristine fixture"
+    else
+        seam_fail "awk region on-target: hold region is EMPTY on the pristine fixture (range matches nothing)"
+    fi
+    want "fixture intact: hold region carries the hold sentence" "$region" "$HOLD_SENTENCE"
+
+    copy_a="$SANDBOX/fixture-heading-renamed.md"
+    sed 's/^## Automouse Hold Justification$/## Automouse Hold Rationale/' "$PLAN" > "$copy_a"
+    region_a="$("$HERE/plan-review-digest" "$copy_a" 2>/dev/null | hold_region)"
+    if [ -z "$region_a" ]; then
+        seam_ok "fixture intact: renaming the canonical hold heading empties the hold region"
+    else
+        seam_fail "fixture intact: heading rename should emit no hold entry (got: $region_a)"
+    fi
+
+    copy_b="$SANDBOX/fixture-body-defect.md"
+    sed "s/^$HOLD_SENTENCE\$/Injected defect inside the delimited region./" "$PLAN" > "$copy_b"
+    region_b="$("$HERE/plan-review-digest" "$copy_b" 2>/dev/null | hold_region)"
+    if [ -n "$region_b" ] && ! grep -qF -- "$HOLD_SENTENCE" <<< "$region_b"; then
+        seam_ok "awk region on-target: a defect injected INSIDE the region is seen (region non-empty, content changed)"
+    else
+        seam_fail "awk region on-target: injected defect not detected inside the region"
+    fi
 }
 
-seam_case_decision_recorded() {
-    # unit 3 fills this in: simulate approve and hold, assert distinguishable records
-    seam_fail "unimplemented — discord-plan-review-3-drain"
+# ── drain test scaffolding ───────────────────────────────────────────────────
+DRAIN="$HERE/plan-review-drain"
+STUBS="$SANDBOX/stubs"
+REPO_STUB="$SANDBOX/repo"
+PLANS="$SANDBOX/plans"
+STATE="$SANDBOX/attempts.tsv"
+
+export SSH_CALLS="$SANDBOX/ssh-calls.log"
+export QUEUE_CALLS="$SANDBOX/queue-calls.log"
+export DM_CALLS="$SANDBOX/dm-calls.log"
+export RESP_GET="$SANDBOX/resp-get.txt"
+export RESP_ACK="$SANDBOX/resp-ack.txt"
+
+mkdir -p "$STUBS" "$REPO_STUB/bin/automouse" "$PLANS"
+
+# Stub ssh. The drain invokes it as
+#   ssh -o BatchMode=yes -o ConnectTimeout=10 HOST '<curl one-liner>'
+# so the remote command is the LAST argument. Replays a canned response file
+# chosen by the route inside that command; an unknown route yields a 404, which is
+# what a bot not serving the drain routes really returns.
+cat > "$STUBS/ssh" <<'SSHSTUB'
+#!/usr/bin/env bash
+cmd=""
+for a in "$@"; do cmd="$a"; done
+body="$(cat)"
+{
+    printf 'CALL %s\n' "$cmd"
+    printf 'BODY %s\n' "$body"
+} >> "$SSH_CALLS"
+case "$cmd" in
+    *planDecisions/ack*) rf="$RESP_ACK" ;;
+    *planDecisions*)     rf="$RESP_GET" ;;
+    *)                   rf="" ;;
+esac
+if [ -n "$rf" ] && [ -f "$rf" ]; then
+    cat "$rf"
+else
+    printf '\nHTTP=404 curl_rc=0\n'
+fi
+SSHSTUB
+
+cat > "$REPO_STUB/bin/check-plan" <<'CPSTUB'
+#!/usr/bin/env bash
+if grep -qF 'CHECKPLAN-FAILS' "$1" 2>/dev/null; then
+    printf 'check-plan: FAILED — fixture is marked CHECKPLAN-FAILS\n'
+    exit 1
+fi
+exit 0
+CPSTUB
+
+cat > "$REPO_STUB/bin/automouse/queue" <<'QSTUB'
+#!/usr/bin/env bash
+printf '%s\n' "$1" >> "$QUEUE_CALLS"
+case "$1" in *queuefail*) exit 1 ;; esac
+exit 0
+QSTUB
+
+cat > "$REPO_STUB/bin/discord-dm" <<'DMSTUB'
+#!/usr/bin/env bash
+{ printf 'DM '; cat; printf '\n--\n'; } >> "$DM_CALLS"
+DMSTUB
+
+chmod +x "$STUBS/ssh" "$REPO_STUB/bin/check-plan" "$REPO_STUB/bin/automouse/queue" "$REPO_STUB/bin/discord-dm"
+
+# Canned curl output: body, then the `-w` status line, then curl's own rc — the
+# exact three-part shape bin/plan-review-drain's remote() parses back out.
+set_get() { printf '%s\nHTTP=%s curl_rc=%s\n' "$1" "${2:-200}" "${3:-0}" > "$RESP_GET"; }
+set_ack() { printf '%s\nHTTP=%s curl_rc=%s\n' "$1" "${2:-200}" "${3:-0}" > "$RESP_ACK"; }
+
+DRAIN_OUT=""
+DRAIN_RC=0
+run_drain() {
+    : > "$SSH_CALLS"
+    : > "$QUEUE_CALLS"
+    : > "$DM_CALLS"
+    DRAIN_OUT="$(
+        PLAN_REVIEW_SSH_BIN="$STUBS/ssh" \
+        PLAN_REVIEW_SSH_HOST=stub-host \
+        PLAN_REVIEW_PORT=50000 \
+        PLAN_REVIEW_REPO="$REPO_STUB" \
+        PLAN_REVIEW_DISCORD_DM="$REPO_STUB/bin/discord-dm" \
+        PLAN_REVIEW_STATE="$STATE" \
+        PLANS_DIR="$PLANS" \
+        NIGHTLY_DIR="$SANDBOX/nightly" \
+        "$DRAIN" "$@" 2>&1
+    )"
+    DRAIN_RC=$?
 }
 
-seam_case_decision_drained() {
-    # unit 3 fills this in: run the drain point and assert a second drain is a no-op
-    seam_fail "unimplemented — discord-plan-review-3-drain"
+reset_drain_state() {
+    rm -f "$STATE"
+    rm -rf "$PLANS"
+    mkdir -p "$PLANS"
+    printf '# ok plan\n' > "$PLANS/valid-plan.md"
+    set_get '{"decisions":[]}'
+    set_ack '{"acked":0}'
 }
 
+ack_body()   { grep '^BODY ' "$SSH_CALLS" | tail -1; }
+ack_called() { grep -q 'planDecisions/ack' "$SSH_CALLS"; }
+
+# ── Phase 3 — transport, flags, decision loop ────────────────────────────────
+seam_case_flags() {
+    reset_drain_state
+
+    run_drain
+    [ "$DRAIN_RC" -ne 0 ] \
+        && seam_ok "flags: a bare invocation is not a pass (exit $DRAIN_RC)" \
+        || seam_fail "flags: a bare invocation must not default to a destructive pass"
+    want "flags: bare invocation says which flag to pass" "$DRAIN_OUT" "--drain"
+
+    run_drain --drain=1
+    [ "$DRAIN_RC" = 2 ] \
+        && seam_ok "flags: --flag=value is rejected (exit 2)" \
+        || seam_fail "flags: --flag=value must be rejected (got $DRAIN_RC)"
+    want "flags: the rejection names the space form" "$DRAIN_OUT" "space form"
+
+    run_drain --bogus
+    [ "$DRAIN_RC" = 2 ] \
+        && seam_ok "flags: an unrecognised token is fatal (exit 2)" \
+        || seam_fail "flags: an unrecognised token must be fatal (got $DRAIN_RC)"
+
+    run_drain --drain
+    [ "$DRAIN_RC" = 0 ] \
+        && seam_ok "flags: --drain parses and exits 0 on an empty sink" \
+        || seam_fail "flags: --drain should exit 0 on an empty sink (got $DRAIN_RC)"
+}
+
+seam_case_empty_list() {
+    reset_drain_state
+    set_get '{"decisions":[]}'
+    run_drain --drain
+    want "empty sink: logged as a clean no-op" "$DRAIN_OUT" "no pending decisions"
+    if ack_called; then
+        seam_fail "empty sink: must not POST an ack"
+    else
+        seam_ok "empty sink: no ack POST"
+    fi
+    if [ -s "$DM_CALLS" ]; then
+        seam_fail "empty sink: must send no DM (a nightly 'nothing to do' trains the signal away)"
+    else
+        seam_ok "empty sink: no DM"
+    fi
+}
+
+seam_case_same_slug_dedupe() {
+    reset_drain_state
+    set_get '{"decisions":[{"id":"d1","slug":"valid-plan","action":"queue","actor":"u","ts":"t"},{"id":"d2","slug":"valid-plan","action":"discard","actor":"u","ts":"t"}]}'
+    run_drain --drain
+    want "same-slug dedupe: the second record is skipped, first wins" "$DRAIN_OUT" "duplicate decision for slug 'valid-plan'"
+    if [ "$(grep -c . "$QUEUE_CALLS")" = 1 ]; then
+        seam_ok "same-slug dedupe: exactly one apply ran"
+    else
+        seam_fail "same-slug dedupe: expected 1 queue call, got $(grep -c . "$QUEUE_CALLS")"
+    fi
+    local body; body="$(ack_body)"
+    want "same-slug dedupe: the winner is acked" "$body" '"d1"'
+    want "same-slug dedupe: the skipped duplicate is acked too" "$body" '"d2"'
+    if [ -f "$PLANS/valid-plan.md" ]; then
+        seam_ok "same-slug dedupe: the contradictory discard never moved the plan"
+    else
+        seam_fail "same-slug dedupe: the second (discard) decision was applied — both decisions ran"
+    fi
+}
+
+seam_case_dry_run() {
+    reset_drain_state
+    set_get '{"decisions":[{"id":"d1","slug":"valid-plan","action":"queue","actor":"u","ts":"t"}]}'
+    run_drain --dry-run
+    [ "$DRAIN_RC" = 0 ] \
+        && seam_ok "--dry-run: exit 0" \
+        || seam_fail "--dry-run: expected exit 0, got $DRAIN_RC"
+    want "--dry-run: reports what it would do" "$DRAIN_OUT" "would queue: valid-plan"
+    if [ -s "$QUEUE_CALLS" ]; then
+        seam_fail "--dry-run: must not invoke bin/automouse/queue"
+    else
+        seam_ok "--dry-run: no queue invocation"
+    fi
+    if ack_called; then
+        seam_fail "--dry-run: must not ack"
+    else
+        seam_ok "--dry-run: no ack POST"
+    fi
+    if [ -f "$PLANS/valid-plan.md" ]; then
+        seam_ok "--dry-run: no file moved"
+    else
+        seam_fail "--dry-run: the plan file moved"
+    fi
+}
+
+# ── Phase 4 — the slug trust boundary ────────────────────────────────────────
+# Every rejection is asserted on BOTH halves: dropped loudly AND still acked.
+# Without the ack one hostile record wedges every future pass forever.
+reject_case() { # label json-slug expected-rule
+    local label="$1" jslug="$2" rule="$3" body
+    reset_drain_state
+    set_get "{\"decisions\":[{\"id\":\"bad1\",\"slug\":$jslug,\"action\":\"queue\",\"actor\":\"u\",\"ts\":\"t\"}]}"
+    run_drain --drain
+    want "$label: dropped loudly" "$DRAIN_OUT" "REJECTED"
+    want "$label: names the rule that rejected it" "$DRAIN_OUT" "$rule"
+    body="$(ack_body)"
+    want "$label: still acked" "$body" '"bad1"'
+    if [ -s "$QUEUE_CALLS" ]; then
+        seam_fail "$label: bin/automouse/queue was invoked with a rejected slug"
+    else
+        seam_ok "$label: no command line was ever built from the rejected slug"
+    fi
+}
+
+seam_case_trust_boundary() {
+    reject_case "traversal slug"      '"../evil"'      "contains '/'"
+    reject_case "dot-dot slug"        '"..evil"'       "contains '..'"
+    reject_case "absolute-path slug"  '"/etc/passwd"'  "contains '/'"
+    reject_case "leading-dash slug"   '"-rf"'          "begins with '-'"
+    reject_case "leading-dot slug"    '".hidden"'      "begins with '.'"
+    reject_case "empty slug"          '""'             "empty slug"
+
+    # A slug naming no plan file: shape is fine, existence is not.
+    reset_drain_state
+    set_get '{"decisions":[{"id":"nf1","slug":"no-such-plan","action":"queue","actor":"u","ts":"t"}]}'
+    run_drain --drain
+    want "missing plan file: dropped loudly" "$DRAIN_OUT" "no regular plan file"
+    want "missing plan file: still acked" "$(ack_body)" '"nf1"'
+
+    # An unknown verb is unactionable in exactly the same way.
+    reset_drain_state
+    set_get '{"decisions":[{"id":"uv1","slug":"valid-plan","action":"detonate","actor":"u","ts":"t"}]}'
+    run_drain --drain
+    want "unknown verb: dropped loudly" "$DRAIN_OUT" "unknown action verb 'detonate'"
+    want "unknown verb: still acked" "$(ack_body)" '"uv1"'
+    if [ -s "$QUEUE_CALLS" ]; then
+        seam_fail "unknown verb: something was applied"
+    else
+        seam_ok "unknown verb: nothing applied"
+    fi
+
+    # A newline inside a slug must never forge a log line. jq's @tsv escapes the
+    # newline, so the hostile text survives only as part of the single REJECTED
+    # line — never as a standalone line that reads like the drain's own output.
+    # The assertion is therefore line-ANCHORED: "does the payload appear at the
+    # start of a line of its own", not "does the text appear anywhere".
+    reset_drain_state
+    set_get '{"decisions":[{"id":"nl1","slug":"a\nplan-review-drain: queued '"'"'pwned'"'"'","action":"queue","actor":"u","ts":"t"}]}'
+    run_drain --drain
+    if grep -q "^plan-review-drain: queued 'pwned'" <<< "$DRAIN_OUT"; then
+        seam_fail "newline slug: a forged log line was emitted"
+    else
+        seam_ok "newline slug: no forged log line (the newline never reaches the log unescaped)"
+    fi
+    want "newline slug: dropped loudly" "$DRAIN_OUT" "REJECTED"
+    want "newline slug: still acked" "$(ack_body)" '"nl1"'
+
+    # POSITIVE CONTROL — the guard rejects attacks, not real slugs.
+    reset_drain_state
+    printf '# ok\n' > "$PLANS/a-real-hyphenated-slug.md"
+    set_get '{"decisions":[{"id":"ok1","slug":"a-real-hyphenated-slug","action":"queue","actor":"u","ts":"t"}]}'
+    run_drain --drain
+    want "valid hyphenated slug: queued" "$(cat "$QUEUE_CALLS")" "a-real-hyphenated-slug"
+    want "valid hyphenated slug: acked" "$(ack_body)" '"ok1"'
+    want_not "valid hyphenated slug: not rejected" "$DRAIN_OUT" "REJECTED"
+}
+
+# ── Phase 5 — applying a decision ────────────────────────────────────────────
+seam_case_checkplan_gates_the_queue() {
+    reset_drain_state
+    printf '# bad plan\nCHECKPLAN-FAILS\n' > "$PLANS/bad-plan.md"
+    set_get '{"decisions":[{"id":"cp1","slug":"bad-plan","action":"queue","actor":"u","ts":"t"}]}'
+    run_drain --drain
+    if [ -s "$QUEUE_CALLS" ]; then
+        seam_fail "ADR-0096: a check-plan FAILED plan reached bin/automouse/queue"
+    else
+        seam_ok "ADR-0096: check-plan runs FIRST and a FAILED plan never reaches the queue"
+    fi
+    want "ADR-0096: the refusal is logged" "$DRAIN_OUT" "check-plan FAILED for 'bad-plan'"
+    want "ADR-0096: the record is acked (unactionable)" "$(ack_body)" '"cp1"'
+    want "ADR-0096: the DM names the slug" "$(cat "$DM_CALLS")" "bad-plan"
+    want "ADR-0096: the DM carries the check-plan verdict" "$(cat "$DM_CALLS")" "check-plan: FAILED"
+}
+
+seam_case_discard_moves() {
+    reset_drain_state
+    printf '# doomed\n' > "$PLANS/doomed-plan.md"
+    set_get '{"decisions":[{"id":"dc1","slug":"doomed-plan","action":"discard","actor":"u","ts":"t"}]}'
+    run_drain --drain
+    if [ -d "$PLANS/discarded" ]; then
+        seam_ok "discard: the discarded/ directory is created on demand"
+    else
+        seam_fail "discard: discarded/ was not created"
+    fi
+    if [ -f "$PLANS/discarded/doomed-plan.md" ] && [ ! -e "$PLANS/doomed-plan.md" ]; then
+        seam_ok "discard: the plan is MOVED, not deleted"
+    else
+        seam_fail "discard: the plan was not moved into discarded/"
+    fi
+    want "discard: acked" "$(ack_body)" '"dc1"'
+
+    # `mv -n` never clobbers: a name collision is a loud FAILED apply, not a
+    # silent overwrite of a previously discarded plan.
+    reset_drain_state
+    mkdir -p "$PLANS/discarded"
+    printf '# the FIRST discarded one\n' > "$PLANS/discarded/collide.md"
+    printf '# the second one\n' > "$PLANS/collide.md"
+    set_get '{"decisions":[{"id":"cl1","slug":"collide","action":"discard","actor":"u","ts":"t"}]}'
+    run_drain --drain
+    want "discard: a name collision is loud" "$DRAIN_OUT" "refusing to clobber"
+    if grep -qF 'the FIRST discarded one' "$PLANS/discarded/collide.md"; then
+        seam_ok "discard: the previously discarded plan was not clobbered"
+    else
+        seam_fail "discard: mv clobbered an existing discarded plan"
+    fi
+    if [ -f "$PLANS/collide.md" ]; then
+        seam_ok "discard: a failed apply leaves the source plan in place"
+    else
+        seam_fail "discard: the source plan vanished on a failed apply"
+    fi
+    if ack_called; then
+        seam_fail "discard: a failed apply must not be acked on the first pass"
+    else
+        seam_ok "discard: a failed apply is not acked (it rides the bounded ladder)"
+    fi
+    want "discard: the failed apply burns exactly one attempt" "$(cat "$STATE" 2>/dev/null)" "cl1"
+}
+
+seam_case_quiet_404() {
+    reset_drain_state
+    rm -f "$RESP_GET"          # unknown route ⇒ the stub answers 404
+    run_drain --drain
+    [ "$DRAIN_RC" = 0 ] \
+        && seam_ok "404 on a drain route: exit 0" \
+        || seam_fail "404 on a drain route: expected exit 0, got $DRAIN_RC"
+    want "404 on a drain route: the reason is written to the log every time" "$DRAIN_OUT" "not serving the drain routes"
+    if [ -s "$DM_CALLS" ]; then
+        seam_fail "404 on a drain route: must be silent to Discord"
+    else
+        seam_ok "404 on a drain route: silent to Discord, loud to the log"
+    fi
+    if [ -f "$STATE" ]; then
+        seam_fail "404 on a drain route: an attempt was consumed"
+    else
+        seam_ok "404 on a drain route: no attempt consumed"
+    fi
+}
+
+seam_case_failure_buckets() {
+    # 5xx / rc 7 / rc 28 are environmental: REFUND, never burn.
+    local code
+    for code in "500 0" "000 7" "000 28"; do
+        set -- $code
+        reset_drain_state
+        set_get '{"decisions":[{"id":"rf1","slug":"no-such-plan","action":"queue","actor":"u","ts":"t"}]}'
+        set_ack '' "$1" "$2"
+        run_drain --drain
+        want "ack http=$1 curl_rc=$2: refunded, not burned" "$DRAIN_OUT" "REFUNDED"
+        if [ -f "$STATE" ] && grep -q 'rf1' "$STATE"; then
+            seam_fail "ack http=$1 curl_rc=$2: an environmental failure burned an attempt"
+        else
+            seam_ok "ack http=$1 curl_rc=$2: no attempt consumed"
+        fi
+    done
+
+    # 400 and 403: the bot parsed us and refused. Burn exactly one.
+    for code in 400 403; do
+        reset_drain_state
+        set_get '{"decisions":[{"id":"bn1","slug":"no-such-plan","action":"queue","actor":"u","ts":"t"}]}'
+        set_ack '{"error":"nope"}' "$code" 0
+        run_drain --drain
+        want "ack http=$code: the refusal is loud" "$DRAIN_OUT" "refused"
+        if grep -q "^bn1	1$" "$STATE" 2>/dev/null; then
+            seam_ok "ack http=$code: burns exactly one attempt"
+        else
+            seam_fail "ack http=$code: expected the ledger to read 'bn1<TAB>1', got: $(cat "$STATE" 2>/dev/null)"
+        fi
+    done
+}
+
+seam_case_force_ack_dm_is_actionable() {
+    # Pre-seed the ledger at MAX_ATTEMPTS-1 so the next failed apply fires the
+    # ladder. A real user decision is being dropped here, so the DM must be
+    # ACTIONABLE — not merely loud.
+    reset_drain_state
+    mkdir -p "$PLANS/discarded"
+    printf '# first\n' > "$PLANS/discarded/give-up.md"
+    printf '# second\n' > "$PLANS/give-up.md"
+    printf 'fa1\t2\n' > "$STATE"
+    set_get '{"decisions":[{"id":"fa1","slug":"give-up","action":"discard","actor":"u","ts":"t"}]}'
+    run_drain --drain
+
+    local dm; dm="$(cat "$DM_CALLS")"
+    want "force-ack DM: names the slug"            "$dm" "give-up"
+    want "force-ack DM: names the action chosen"   "$dm" "you pressed: discard"
+    want "force-ack DM: gives the manual command"  "$dm" "mv $PLANS/give-up.md $PLANS/discarded/"
+    want "force-ack: the ledger records FORCED"    "$(cat "$STATE")" "FORCED"
+
+    # A FORCED record is never retried and never re-DM'd.
+    run_drain --drain
+    want "force-ack: a FORCED record is skipped on later passes" "$DRAIN_OUT" "already force-acked"
+    if [ -s "$DM_CALLS" ]; then
+        seam_fail "force-ack: a FORCED record re-sent the give-up DM"
+    else
+        seam_ok "force-ack: no repeat DM for a FORCED record"
+    fi
+}
+
+# ── Phase 6 — the bin/automouse/run hook ─────────────────────────────────────
+# Static assertions against the runner source: running the real runner would fire
+# a whole automouse night.
+seam_case_runner_hook() {
+    local runner src drain_ln loop_ln
+    runner="$HERE/automouse/run"
+    if [ ! -f "$runner" ]; then
+        seam_fail "runner hook: bin/automouse/run not found"
+        return
+    fi
+    src="$(cat "$runner")"
+
+    want "runner hook: the drain is invoked" "$src" 'bin/plan-review-drain" --drain'
+    want "runner hook: failure is non-fatal under set -euo pipefail" "$src" '--drain >> "$LOG" 2>&1 || true'
+    want "runner hook: output is redirected to \$LOG (the quiet-404 tripwire)" "$src" '>> "$LOG" 2>&1'
+    want "runner hook: skipped in single-plan mode" "$src" 'if [ -z "${SINGLE_PLAN:-}" ]; then'
+
+    drain_ln="$(grep -n 'bin/plan-review-drain' "$runner" | head -1 | cut -d: -f1)"
+    loop_ln="$(grep -n '^while true; do' "$runner" | head -1 | cut -d: -f1)"
+    if [ -n "$drain_ln" ] && [ -n "$loop_ln" ] && [ "$drain_ln" -lt "$loop_ln" ]; then
+        seam_ok "runner hook: the drain runs BEFORE the queue loop (line $drain_ln < $loop_ln)"
+    else
+        seam_fail "runner hook: the drain must precede the queue loop (drain=$drain_ln loop=$loop_ln)"
+    fi
+}
+
+# ── Phase 8 — end-to-end + idempotence ───────────────────────────────────────
+seam_case_queue_end_to_end() {
+    reset_drain_state
+    printf '# good\n' > "$PLANS/end-to-end.md"
+    set_get '{"decisions":[{"id":"e2e","slug":"end-to-end","action":"queue","actor":"u","ts":"t"}]}'
+    run_drain --drain
+    [ "$DRAIN_RC" = 0 ] \
+        && seam_ok "queue end-to-end: exit 0" \
+        || seam_fail "queue end-to-end: expected exit 0, got $DRAIN_RC"
+    want "queue end-to-end: bin/automouse/queue got the slug" "$(cat "$QUEUE_CALLS")" "end-to-end"
+    want "queue end-to-end: logged" "$DRAIN_OUT" "queued 'end-to-end'"
+    want "queue end-to-end: acked" "$(ack_body)" '"e2e"'
+    if grep -q 'end-to-end' "$STATE" 2>/dev/null; then
+        seam_fail "queue end-to-end: a successful record left a ledger entry behind"
+    else
+        seam_ok "queue end-to-end: the ledger is cleared on success"
+    fi
+
+    # A second drain over already-acked decisions is a no-op: the sink no longer
+    # lists them, so nothing is applied and nothing is acked.
+    set_get '{"decisions":[]}'
+    run_drain --drain
+    [ "$DRAIN_RC" = 0 ] \
+        && seam_ok "second drain: exit 0" \
+        || seam_fail "second drain: expected exit 0, got $DRAIN_RC"
+    if [ -s "$QUEUE_CALLS" ]; then
+        seam_fail "second drain: re-applied an already-acked decision"
+    else
+        seam_ok "second drain over acked decisions is a no-op"
+    fi
+    if ack_called; then
+        seam_fail "second drain: acked again"
+    else
+        seam_ok "second drain: no ack POST"
+    fi
+}
+
+if ! command -v jq > /dev/null 2>&1; then
+    seam_fail "jq is not on PATH — bin/plan-review-drain cannot parse the decision sink without it"
+fi
+
+seam_case_contract_drift
 seam_case_digest_produced
-seam_case_single_dm
-seam_case_decision_recorded
-seam_case_decision_drained
+seam_case_fixture_intact_and_region_on_target
+seam_case_flags
+seam_case_empty_list
+seam_case_same_slug_dedupe
+seam_case_dry_run
+seam_case_trust_boundary
+seam_case_checkplan_gates_the_queue
+seam_case_discard_moves
+seam_case_quiet_404
+seam_case_failure_buckets
+seam_case_force_ack_dm_is_actionable
+seam_case_runner_hook
+seam_case_queue_end_to_end
 
-printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
-[ "$FAIL" -eq 0 ]
+# Completion token. A harness that asserts nothing reads as passing, so the count
+# is printed and an independently wired harness (bin/test-plan-now) asserts it is
+# nonzero. If a future edit reintroduces an early `exit 0`, this line is missing.
+printf '\nplan-review-seam: %d assertions\n' "$(( PASS + FAIL ))"
+printf '%d passed, %d failed\n' "$PASS" "$FAIL"
+[ "$FAIL" -eq 0 ] && [ "$(( PASS + FAIL ))" -gt 0 ]

@@ -271,13 +271,38 @@ PENDING_META=""  # id<TAB>slug<TAB>action for records whose apply FAILED
 mark_ack() { ACK_IDS="$ACK_IDS$1"$'\n'; }
 mark_pending() { PENDING_META="$PENDING_META$1"$'\t'"$2"$'\t'"$3"$'\n'; }
 
-while IFS=$'\t' read -r id slug action; do
+while IFS= read -r record_line; do
+    [ -n "$record_line" ] || continue
+    # Split on TAB by hand rather than with `IFS=$'\t' read -r id slug action`.
+    # Tab is an IFS *whitespace* character, so `read` collapses a run of tabs into
+    # one delimiter: an empty middle field (a record whose slug is "") would shift
+    # `action` into `slug` and leave `action` empty, and the record would then be
+    # judged on the wrong values entirely. jq's @tsv escapes any tab inside a value,
+    # so the field count here is always exactly three.
+    id="${record_line%%$'\t'*}"
+    rest="${record_line#*$'\t'}"
+    slug="${rest%%$'\t'*}"
+    action="${rest#*$'\t'}"
     [ -n "$id" ] || continue
 
     # Given up on in an earlier pass — never retried, never re-DM'd.
     if [ "$(attempts_for "$id")" = FORCED ]; then
         log "record $id was already force-acked in an earlier pass — skipping"
         mark_ack "$id"
+        continue
+    fi
+
+    # --- trust boundary: shape FIRST, then dedupe, then existence ---
+    # Shape runs before everything that consumes the value — including the dedupe
+    # grep — so no unvalidated remote string is ever used as a pattern or a path.
+    violation=$(slug_shape_violation "$slug")
+    if [ -n "$violation" ]; then
+        # Loud: names the rejected value AND the specific rule, so a genuine bug is
+        # diagnosable and an attack is visible. Still ACKED — without the ack one
+        # hostile write to the sink wedges every future pass forever, which is a
+        # denial of service on the whole feature.
+        log "REJECTED slug from remote: $(printf '%q' "$slug") — rule: $violation (record $id, action $action)"
+        [ "$DRY_RUN" = 1 ] || mark_ack "$id"
         continue
     fi
 
@@ -295,18 +320,6 @@ while IFS=$'\t' read -r id slug action; do
         continue
     fi
     SEEN_SLUGS="$SEEN_SLUGS$slug"$'\n'
-
-    # --- trust boundary: shape FIRST, then existence ---
-    violation=$(slug_shape_violation "$slug")
-    if [ -n "$violation" ]; then
-        # Loud: names the rejected value AND the specific rule, so a genuine bug is
-        # diagnosable and an attack is visible. Still ACKED — without the ack one
-        # hostile write to the sink wedges every future pass forever, which is a
-        # denial of service on the whole feature.
-        log "REJECTED slug from remote: $(printf '%q' "$slug") — rule: $violation (record $id, action $action)"
-        [ "$DRY_RUN" = 1 ] || mark_ack "$id"
-        continue
-    fi
 
     PLAN_PATH="$PLANS_DIR/$slug.md"
     if [ ! -f "$PLAN_PATH" ]; then
@@ -436,7 +449,13 @@ if grep -q . <<< "$ACK_IDS"; then
 fi
 
 # Records whose local apply failed ride the same bounded ladder.
-while IFS=$'\t' read -r id slug action; do
+while IFS= read -r pending_line; do
+    [ -n "$pending_line" ] || continue
+    # Hand-split for the same reason as the decision loop above.
+    id="${pending_line%%$'\t'*}"
+    rest="${pending_line#*$'\t'}"
+    slug="${rest%%$'\t'*}"
+    action="${rest#*$'\t'}"
     [ -n "$id" ] || continue
     n=$(attempts_for "$id")
     case "$n" in '' | *[!0-9]*) n=0 ;; esac

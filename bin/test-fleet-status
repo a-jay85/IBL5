@@ -21,6 +21,16 @@
 #   9  no worktree/branch section — this tool reports processes only
 #  10  a `claude -p` descending from a job already listed is NOT re-counted,
 #      while one with no job above it (an orphan) IS shown
+#  13  the queue header carries automouse's next fire, read from the plist
+#  14  plist present but the label NOT loaded -> no time printed (a disarmed
+#      job has no next run; the plist alone is residue, same hazard as 1/2)
+#  15  no plist at all -> header still renders, just without the time
+#  16  a 00:00 schedule rolls to tomorrow on every possible clock, which is the
+#      only way to pin the day-bump (and its GNU `date -d` fallback) on CI
+#
+# Case 13 points FLEET_STATUS_AUTOMOUSE_PLIST at a fixture. Left defaulted it
+# would read the real plist on macOS and take the missing-file branch on CI —
+# behavior diverging by platform, the exact thing this harness stubs away.
 #
 # Everything runs against a scratch fixture tree under mktemp plus a stub
 # launchctl on PATH, so no real job, process, or worktree is touched. The one
@@ -233,6 +243,12 @@ PROMPT
 
 # Stub launchctl. Three labels covering the two residue shapes and one live job.
 # Column order matches the real `launchctl list`: PID, last-exit-status, label.
+#
+# The com.ibl5.automouse row is appended separately and suppressed by
+# STUB_NO_AUTOMOUSE, which is how case 14 stages a disarmed job. Its PID column
+# is "-" on purpose: the recurring automouse label is loaded-but-idle almost all
+# the time, so the launchd section correctly hides it while automouse_next_run
+# still counts it as scheduled.
 cat > "$STUBBIN/launchctl" <<LAUNCHCTL
 #!/bin/sh
 [ "\$1" = "list" ] || exit 1
@@ -245,8 +261,40 @@ cat <<'ROWS'
 5353	0	com.ibl5.plan-now-20260910-090000-77000
 99999	0	com.apple.something.unrelated
 ROWS
+[ -n "\${STUB_NO_AUTOMOUSE:-}" ] || printf -- '-\t0\tcom.ibl5.automouse\n'
 LAUNCHCTL
 chmod +x "$STUBBIN/launchctl"
+
+# Fixture plist. 04:30 rather than the real 03:00 so a passing assertion cannot
+# be coming from the installed plist by accident.
+PLIST="$TMP/com.ibl5.automouse.plist"
+cat > "$PLIST" <<'PLIST_EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.ibl5.automouse</string>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key>
+		<integer>4</integer>
+		<key>Minute</key>
+		<integer>30</integer>
+	</dict>
+</dict>
+</plist>
+PLIST_EOF
+
+# Midnight fixture for case 16. 00:00 is the one time that takes the roll-to-
+# tomorrow branch no matter when the suite runs — at_min is 0, and no clock makes
+# now_min < 0. Case 13's 04:30 covers the same-day branch, but only when the
+# suite happens to run before 04:30; that is acceptable there (macOS `date -v+1d`
+# is exercised constantly in normal use) and not here, because the tomorrow
+# branch falls through to GNU `date -d`, the one line a mac never reaches.
+PLIST_MIDNIGHT="$TMP/com.ibl5.automouse.midnight.plist"
+sed 's|<integer>4</integer>|<integer>0</integer>|; s|<integer>30</integer>|<integer>0</integer>|' \
+    "$PLIST" > "$PLIST_MIDNIGHT"
 
 # ── run ────────────────────────────────────────────────────────────────────────
 
@@ -257,9 +305,40 @@ OUTPUT="$(
     FLEET_STATUS_AUTOMOUSE_DIR="$AM" \
     FLEET_STATUS_HARNESS_OUT="$OUT" \
     FLEET_STATUS_LOG_DIR="$LOGS" \
+    FLEET_STATUS_AUTOMOUSE_PLIST="$PLIST" \
     "$FLEET" 2>&1
 )"
 RC=$?
+
+# Cases 14 and 15 need their own renders: the plist gate's two negative branches
+# are properties of a whole run, so one capture cannot hold them alongside 13.
+OUTPUT_UNLOADED="$(
+    PATH="$STUBBIN:$PATH" \
+    FLEET_STATUS_AUTOMOUSE_DIR="$AM" \
+    FLEET_STATUS_HARNESS_OUT="$OUT" \
+    FLEET_STATUS_LOG_DIR="$LOGS" \
+    FLEET_STATUS_AUTOMOUSE_PLIST="$PLIST" \
+    STUB_NO_AUTOMOUSE=1 \
+    "$FLEET" 2>&1
+)"
+
+OUTPUT_NOPLIST="$(
+    PATH="$STUBBIN:$PATH" \
+    FLEET_STATUS_AUTOMOUSE_DIR="$AM" \
+    FLEET_STATUS_HARNESS_OUT="$OUT" \
+    FLEET_STATUS_LOG_DIR="$LOGS" \
+    FLEET_STATUS_AUTOMOUSE_PLIST="$TMP/no-such-plist.plist" \
+    "$FLEET" 2>&1
+)"
+
+OUTPUT_MIDNIGHT="$(
+    PATH="$STUBBIN:$PATH" \
+    FLEET_STATUS_AUTOMOUSE_DIR="$AM" \
+    FLEET_STATUS_HARNESS_OUT="$OUT" \
+    FLEET_STATUS_LOG_DIR="$LOGS" \
+    FLEET_STATUS_AUTOMOUSE_PLIST="$PLIST_MIDNIGHT" \
+    "$FLEET" 2>&1
+)"
 
 if [ "$RC" -eq 0 ]; then pass "exits 0"; else fail "exits 0 (got $RC)"; fi
 
@@ -306,6 +385,35 @@ assert_has "automouse: attempts surfaced"     "$OUTPUT" 'attempt 2'
 assert_has "automouse: lock dir marks runner locked" "$OUTPUT" 'locked'
 assert_has "queue: lock dir marks plan in progress"  "$OUTPUT" 'live-plan\.md +in progress'
 assert_has "queue: unlocked plan reads queued"       "$OUTPUT" 'idle-plan\.md +queued'
+
+# 13 — the schedule comes off the plist. Asserted as a SHAPE plus the fixture's
+# own 04:30, never a literal date: the day rolls depending on what time of day
+# the suite runs, and pinning one would make this fail every afternoon.
+assert_has "queue: header carries the next automouse run" \
+    "$OUTPUT" 'AUTOMOUSE QUEUE.*next run [A-Z][a-z]{2} [0-9]{4}-[0-9]{2}-[0-9]{2} 04:30'
+# The old header said "(waiting + in progress)", which the per-row labels below
+# already say. Pin the removal so it does not drift back in.
+assert_lacks "queue: header does not restate the row labels" \
+    "$OUTPUT" 'waiting \+ in progress'
+
+# 14 — plist on disk, label NOT loaded (the disarm-tonight shape). The plist is
+# residue here; printing its time would promise a drain that never comes.
+assert_has   "queue: unloaded automouse still renders the header" \
+    "$OUTPUT_UNLOADED" 'AUTOMOUSE QUEUE'
+assert_lacks "queue: unloaded automouse prints no next run" \
+    "$OUTPUT_UNLOADED" 'next run'
+
+# 15 — no plist at all. Fail-soft: the section must survive losing its schedule.
+assert_has   "queue: missing plist still renders the header" \
+    "$OUTPUT_NOPLIST" 'AUTOMOUSE QUEUE'
+assert_lacks "queue: missing plist prints no next run" \
+    "$OUTPUT_NOPLIST" 'next run'
+
+# 16 — a 00:00 schedule always rolls to tomorrow, so this pins the day-bump
+# unconditionally. If the GNU `date -d` fallback breaks on CI, $day comes back
+# empty, automouse_next_run bails, and this assert is what catches it.
+assert_has "queue: a 00:00 schedule rolls to the next day" \
+    "$OUTPUT_MIDNIGHT" 'AUTOMOUSE QUEUE.*next run [A-Z][a-z]{2} [0-9]{4}-[0-9]{2}-[0-9]{2} 00:00'
 
 # 6b — lock-dir slug resolution for documented forms (no .md / no plan arg).
 assert_has "automouse: nodotmd runner shown"         "$OUTPUT" "pid $NODOTMD_PID "

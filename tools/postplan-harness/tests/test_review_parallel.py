@@ -105,26 +105,30 @@ def _make_canned(findings_by_agent=None):
 
 
 def test_agents_overlap_in_time():
-    """Total wall time must be < sum of individual agent sleeps → they ran concurrently."""
+    """Phase 4 review agents run concurrently — verified by overlapping time windows."""
     ledger = UsageLedger()
     canned = _make_canned()
     llm = _SleepingLlm(ledger, canned, sleep=AGENT_SLEEP)
     gh = _NullGh()
 
-    cls = _php_cls()
-    t0 = time.monotonic()
-    ReviewPhase(llm, gh).run({}, cls, PlanInfo())
-    elapsed = time.monotonic() - t0
+    ReviewPhase(llm, gh).run({}, _php_cls(), PlanInfo())
 
     # Three agents ran (A, B, security); D gate is off.
     review_calls = [entry for entry in llm.log if entry[0] in
                     ("review-agent-a", "review-agent-b", "security-audit")]
     assert len(review_calls) == 3, f"expected 3 review agent calls, got {review_calls}"
 
-    sum_individual = AGENT_SLEEP * len(review_calls)
-    assert elapsed < sum_individual, (
-        f"elapsed {elapsed:.3f}s >= sum of sleeps {sum_individual:.3f}s — "
-        "agents did not run concurrently"
+    # Assert overlap directly from recorded (start, end) pairs — not from total elapsed
+    # time, which is fragile on a contended CI runner where thread-startup jitter can
+    # push elapsed past AGENT_SLEEP * len(calls).
+    overlaps = sum(
+        1 for i, (_, _, s1, e1) in enumerate(review_calls)
+        for _, _, s2, e2 in review_calls[i + 1:]
+        if s1 < e2 and s2 < e1
+    )
+    assert overlaps > 0, (
+        f"no two agents ran concurrently — "
+        f"{[(p, f'{s:.3f}-{e:.3f}') for p, _, s, e in review_calls]}"
     )
 
 
@@ -182,13 +186,6 @@ def test_findings_from_all_agents_are_returned():
             return data
         return llm.call(purpose, model, prompt, validate, max_retries, normalizer)
 
-    class _HybridLlm:
-        def call(self, *a, **kw):
-            return _scoring_llm_call(*a, **kw)
-
-    hybrid = _HybridLlm()
-    # Use the sleeping llm for agents, hybrid for scoring
-    # Simplest: wrap into one adapter
     class _ComboLlm:
         def call(self_, purpose, model, prompt, validate, max_retries=1, normalizer=None):
             if purpose == "score-findings":
@@ -240,8 +237,6 @@ def test_raw_files_written_for_every_agent(tmp_path):
 
 def test_degraded_agent_does_not_block_others():
     """An llm-invalid-output from one agent must not suppress the other agents' findings."""
-    from harness.state import HarnessError
-
     ledger = UsageLedger()
     gh = _NullGh()
 
@@ -266,6 +261,38 @@ def test_degraded_agent_does_not_block_others():
     # B and security must still have been called
     assert "review-agent-b" in llm.calls
     assert "security-audit" in llm.calls
+
+
+def test_all_four_agents_preserve_submission_order():
+    """With agent D enabled, findings appear in A → B → D → security order."""
+    ledger = UsageLedger()
+    findings_by_agent = {
+        "A": [{"path": "ibl5/a.php", "line": 1, "body": "a"}],
+        "B": [{"path": "ibl5/b.php", "line": 2, "body": "b"}],
+        "D": [{"path": "ibl5/d.php", "line": 3, "body": "d"}],
+        "security": [{"path": "ibl5/s.php", "line": 4, "body": "s"}],
+    }
+    canned = _make_canned(findings_by_agent)
+    gh = _NullGh()
+    base_llm = _SleepingLlm(ledger, canned, sleep=0)
+
+    class _ComboLlm:
+        def call(self_, purpose, model, prompt, validate, max_retries=1, normalizer=None):
+            if purpose == "score-findings":
+                data = [{"n": i + 1, "score": 90} for i in range(4)]
+                validate(data)
+                ledger.add(LlmCallRecord(purpose=purpose, model="sleep:haiku"))
+                return data
+            return base_llm.call(purpose, model, prompt, validate, max_retries, normalizer)
+
+    surviving, _, _, _ = ReviewPhase(_ComboLlm(), gh).run(
+        {"number": 1, "headRefOid": "abc"}, _php_cls(has_e2e_specs=True), PlanInfo()
+    )
+
+    agents = [f.agent for f in surviving]
+    assert agents.index("A") < agents.index("B"), f"A before B; got {agents}"
+    assert agents.index("B") < agents.index("D"), f"B before D; got {agents}"
+    assert agents.index("D") < agents.index("security"), f"D before security; got {agents}"
 
 
 def test_terminal_error_propagates():

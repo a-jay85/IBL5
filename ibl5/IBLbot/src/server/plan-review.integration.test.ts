@@ -32,6 +32,7 @@ import { handlePlanReviewButton } from '../interactions/plan-review-buttons.js';
 
 let server: Server;
 let port: number;
+let bindAddr: string;
 let tmp: string;
 let sendSpy: ReturnType<typeof vi.fn>;
 
@@ -57,6 +58,7 @@ beforeAll(async () => {
         throw new Error('Unexpected server address: ' + String(addr));
     }
     port = addr.port;
+    bindAddr = addr.address;
 });
 
 afterAll(async () => {
@@ -147,5 +149,78 @@ describe('plan-review end-to-end round trip', () => {
         expect(emptyRes.status).toBe(200);
         const emptyBody = await emptyRes.json() as unknown;
         expect(emptyBody).toEqual({ decisions: [] });
+    });
+
+    // Row 27 — the listener must bind 127.0.0.1, not 0.0.0.0
+    it('server address is 127.0.0.1 (not exposed to LAN)', () => {
+        expect(bindAddr).toBe('127.0.0.1');
+    });
+
+    // Row 27 (second half) / Row 21 integration — non-owner press leaves sink byte-identical
+    it('non-owner press writes nothing and leaves sink unchanged', async () => {
+        const sinkPath = path.join(tmp, 'plan-decisions.jsonl');
+        const before = fs.existsSync(sinkPath) ? fs.readFileSync(sinkPath) : null;
+
+        await handlePlanReviewButton({
+            customId: 'plan_queue_nonowner-plan',
+            user: { id: 'SOMEONE_ELSE' },
+            reply: vi.fn(async () => undefined),
+            deferUpdate: vi.fn(async () => undefined),
+            editReply: vi.fn(async () => undefined),
+        } as never, tmp);
+
+        const after = fs.existsSync(sinkPath) ? fs.readFileSync(sinkPath) : null;
+        if (before === null) {
+            expect(after).toBeNull();
+        } else {
+            expect(after!.equals(before)).toBe(true);
+        }
+    });
+
+    // Row 26 dedup half — second owner press for same slug leaves exactly one record
+    it('second owner press for one slug adds no record', async () => {
+        await postJson('/discordPlanReviewDM', { slug: 'dedup-plan', digest: 'x' });
+        const customId = 'plan_queue_dedup-plan';
+
+        await handlePlanReviewButton({
+            customId,
+            user: { id: OWNER },
+            reply: vi.fn(async () => undefined),
+            deferUpdate: vi.fn(async () => undefined),
+            editReply: vi.fn(async () => undefined),
+        } as never, tmp);
+
+        const sinkPath = path.join(tmp, 'plan-decisions.jsonl');
+        const afterFirst = fs.readFileSync(sinkPath, 'utf8');
+
+        const replySecond = vi.fn(async () => undefined);
+        await handlePlanReviewButton({
+            customId,
+            user: { id: OWNER },
+            reply: replySecond,
+            deferUpdate: vi.fn(async () => undefined),
+            editReply: vi.fn(async () => undefined),
+        } as never, tmp);
+
+        const afterSecond = fs.readFileSync(sinkPath, 'utf8');
+        const records = afterSecond.split('\n').filter(Boolean)
+            .map((l) => JSON.parse(l) as { kind: string; slug: string })
+            .filter((r) => r.kind === 'decision' && r.slug === 'dedup-plan');
+        expect(records).toHaveLength(1);
+        expect(afterSecond).toBe(afterFirst);
+        expect(replySecond).toHaveBeenCalledTimes(1);
+    });
+
+    // Row 28 — path-traversal slug yields 400 with no DM and no file outside tmpdir
+    it('POST slug "../../etc/passwd" → 400, no DM, no file outside tmpdir', async () => {
+        const preSendCount = sendSpy.mock.calls.length;
+        const res = await postJson('/discordPlanReviewDM', { slug: '../../etc/passwd', digest: 'x' });
+        expect(res.status).toBe(400);
+        expect(sendSpy.mock.calls.length).toBe(preSendCount);
+
+        // Confirm no file was written above the tmp directory
+        const parentEntries = fs.readdirSync(path.dirname(tmp));
+        const leakedFile = parentEntries.find((e) => e.includes('passwd'));
+        expect(leakedFile).toBeUndefined();
     });
 });

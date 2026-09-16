@@ -2,8 +2,8 @@
 
 The plan-review feature sends a Discord DM to the owner with **Queue** / **Discard** buttons
 when `POST /discordPlanReviewDM` is called by the plan drain script. Decisions are written to
-`data/decisions.jsonl` (a sibling of `dist/`, created on first write) and drained by
-`POST /planDecisions/ack`.
+`data/plan-decisions.jsonl` (a sibling of `dist/`, created on first write). Read pending
+decisions with `GET /planDecisions`; drain with `POST /planDecisions/ack`.
 
 ## One-time provisioning (after first deploy)
 
@@ -35,8 +35,8 @@ path, so a watchdog-triggered restart also picks up the variable.
 
 ## Decision sink
 
-Decisions are appended to `data/decisions.jsonl` in the IBLbot working directory
-(`/home/iblhoops/public_html/ibl5/IBLbot/data/decisions.jsonl`). The directory is created
+Decisions are appended to `data/plan-decisions.jsonl` in the IBLbot working directory
+(`/home/iblhoops/public_html/ibl5/IBLbot/data/plan-decisions.jsonl`). The directory is created
 automatically with the correct owner on the first button press — do **not** pre-create it as
 root; a root-owned `data/` causes `EACCES` on every press with no operator watching.
 
@@ -49,7 +49,7 @@ The sink is a sibling of `dist/` so that a `dist/`-only deploy never clobbers it
 curl -s http://127.0.0.1:50000/planDecisions
 ```
 
-Returns the current pending JSONL as plain text. Useful when the drain script hasn't run yet
+Returns pending decisions as JSON `{"decisions":[…]}` — each object has `id`, `slug`, `action`, `actor`, `ts`. Useful when the drain script hasn't run yet
 or you want to confirm a button press landed.
 
 ## Recovery
@@ -57,7 +57,7 @@ or you want to confirm a button press landed.
 **An unacked decision is never deleted, so a failed drain loses nothing — re-run it.**
 
 If the drain (`POST /planDecisions/ack`) fails mid-flight (network error, process restart,
-etc.), the unacked decisions remain in `data/decisions.jsonl` exactly as they were. Re-run
+etc.), the unacked decisions remain in `data/plan-decisions.jsonl` exactly as they were. Re-run
 the drain and it will process them. There is no deduplication concern: each decision record
 carries its plan slug and the `appendDecision` writer guards against duplicate slugs
 (`DecisionExistsError`).

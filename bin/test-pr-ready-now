@@ -2274,6 +2274,9 @@ end_case e22-e23-prevention-prose-pins
 #   28g: assembled-body ordering — ### Merge digest sits between fidelity and remediation,
 #        <!-- pr-ready-verdict --> is the last line
 #   28h–k: prose pins for the four edited files (DIGEST contract, labels, last_verified)
+#   28n–28s: continuation-line fold coverage — six-physical-line digests with wrapped values
+#     now parse; a stray labelled sixth line and an over-cap appendix still degrade;
+#     MAX_PHYSICAL=10 is the cap boundary that arm 28s pins as inclusive (≤, not <).
 # The placeholder uses an em dash (U+2014) — not a hyphen. A hyphen here fails 28b.
 begin_case pr-ready-merge-digest-shape
 
@@ -2470,6 +2473,107 @@ out=$(bash "$D" "$FIX" 2>&1); rc=$?
 [[ $rc -eq 0 ]] || fail "28l: rc=$rc (expected 0) — trailing-space heading degraded"
 [[ $(printf '%s\n' "$out" | wc -l | tr -d ' ') -eq 5 ]] || fail "28l: expected 5 lines, got $(printf '%s\n' "$out" | wc -l | tr -d ' ')"
 grep -qF 'unavailable' <<<"$out" && fail "28l: trailing-space heading produced unavailable placeholder: $out" || true
+
+# --- 28n: #2218 shape — 6 physical lines, one continuation, tolerates ---
+FIX="$DG/n.md"
+printf '%s\n' '## DIGEST' \
+  '**What changed:** Tolerate wrapped continuation lines in the digest parser.' \
+  '**Why:** The Phase 6 reviewer wrapped one label onto a second physical line,' \
+  'which the parser counted as a sixth record and degraded the whole digest.' \
+  '**Watch:** Nothing user-facing; dev tooling only.' \
+  '**Touches:** .claude/skills/pr-ready/scripts/digest.sh, bin/test-pr-ready-now' \
+  '**Machine-authored fixes:** none' \
+  > "$FIX"
+out=$(bash "$D" "$FIX" 2>&1); rc=$?
+[[ $rc -eq 0 ]] || fail "28n: rc=$rc (expected 0)"
+[[ $(printf '%s\n' "$out" | wc -l | tr -d ' ') -eq 5 ]] || fail "28n: expected 5 lines, got $(printf '%s\n' "$out" | wc -l | tr -d ' ')"
+for i in 0 1 2 3 4; do
+  line=$(printf '%s\n' "$out" | sed -n "$((i+1))p")
+  [[ "$line" == "${LABELS[$i]}"* ]] || fail "28n: line $((i+1)) does not start with ${LABELS[$i]}"
+done
+grep -qF 'unavailable' <<<"$out" && fail "28n: placeholder emitted for a valid wrapped digest"
+grep -qF '**Why:** The Phase 6 reviewer wrapped one label onto a second physical line, which the parser counted as a sixth record and degraded the whole digest.' <<<"$out" || fail "28n: joined **Why:** value not found — fold did not attach both halves"
+line3=$(printf '%s\n' "$out" | sed -n '3p')
+[[ "$line3" == '**Watch:** Nothing user-facing; dev tooling only.' ]] || fail "28n: output line 3 is not the unmodified **Watch:** line — fold cascaded: $line3"
+
+# --- 28o: stray 6th line that is a label still degrades ---
+FIX="$DG/o.md"
+printf '%s\n' '## DIGEST' '**What changed:** Something.' '**Why:** Reasons.' \
+  '**Watch:** nothing specific.' '**Touches:** bin/.' '**Machine-authored fixes:** none.' \
+  '**What changed:** duplicate line.' > "$FIX"
+out=$(bash "$D" "$FIX" 2>&1); rc=$?
+[[ $rc -eq 0 ]] || fail "28o: rc=$rc (expected 0)"
+[[ $(printf '%s\n' "$out" | wc -l | tr -d ' ') -eq 5 ]] || fail "28o: expected 5 lines, got $(printf '%s\n' "$out" | wc -l | tr -d ' ')"
+for i in 0 1 2 3 4; do
+  line=$(printf '%s\n' "$out" | sed -n "$((i+1))p")
+  [[ "$line" == "${LABELS[$i]} unavailable"* ]] || fail "28o: line $((i+1)) not a placeholder: $line"
+done
+grep -qF 'malformed' <<<"$out" || fail "28o: degrade reason does not contain 'malformed'"
+grep -qF 'duplicate line' <<<"$out" && fail "28o: stray label content leaked into output"
+
+# --- 28p: 7 physical lines, two continuations, both tolerated ---
+FIX="$DG/p.md"
+printf '%s\n' '## DIGEST' \
+  '**What changed:** Added a fold step to the digest parser and six new harness' \
+  'arms covering wrapped values.' '**Why:** Reasons.' '**Watch:** nothing specific.' \
+  '**Touches:** .claude/skills/pr-ready/scripts/digest.sh and' 'bin/test-pr-ready-now.' \
+  '**Machine-authored fixes:** none.' > "$FIX"
+out=$(bash "$D" "$FIX" 2>&1); rc=$?
+[[ $rc -eq 0 ]] || fail "28p: rc=$rc (expected 0)"
+[[ $(printf '%s\n' "$out" | wc -l | tr -d ' ') -eq 5 ]] || fail "28p: expected 5 lines, got $(printf '%s\n' "$out" | wc -l | tr -d ' ')"
+for i in 0 1 2 3 4; do
+  line=$(printf '%s\n' "$out" | sed -n "$((i+1))p")
+  [[ "$line" == "${LABELS[$i]}"* ]] || fail "28p: line $((i+1)) does not start with ${LABELS[$i]}"
+done
+grep -qF 'unavailable' <<<"$out" && fail "28p: placeholder emitted for a valid two-continuation digest"
+grep -qF '**What changed:** Added a fold step to the digest parser and six new harness arms covering wrapped values.' <<<"$out" || fail "28p: first joined sentence not found"
+grep -qF '**Touches:** .claude/skills/pr-ready/scripts/digest.sh and bin/test-pr-ready-now.' <<<"$out" || fail "28p: second joined sentence not found"
+
+# --- 28q: over physical-line cap (11 physical) degrades, appendix not published ---
+FIX="$DG/q.md"
+printf '%s\n' '## DIGEST' '**What changed:** Something.' '**Why:** Reasons.' \
+  '**Watch:** nothing specific.' '**Touches:** bin/.' '**Machine-authored fixes:** none.' > "$FIX"
+for i in 1 2 3 4 5 6; do printf 'Appendix paragraph %s.\n' "$i" >> "$FIX"; done
+out=$(bash "$D" "$FIX" 2>&1); rc=$?
+[[ $rc -eq 0 ]] || fail "28q: rc=$rc (expected 0)"
+[[ $(printf '%s\n' "$out" | wc -l | tr -d ' ') -eq 5 ]] || fail "28q: expected 5 lines, got $(printf '%s\n' "$out" | wc -l | tr -d ' ')"
+for i in 0 1 2 3 4; do
+  line=$(printf '%s\n' "$out" | sed -n "$((i+1))p")
+  [[ "$line" == "${LABELS[$i]} unavailable"* ]] || fail "28q: line $((i+1)) not a placeholder: $line"
+done
+grep -qF 'physical lines' <<<"$out" || fail "28q: degrade reason does not contain 'physical lines'"
+grep -qF 'Appendix' <<<"$out" && fail "28q: appendix content leaked into output"
+
+# --- 28r: indented continuation normalizes; pre-label noise dropped ---
+FIX="$DG/r.md"
+printf '%s\n' '## DIGEST' 'Reviewer preamble.' '**What changed:** Something.' \
+  '**Why:** Reasons.' '**Watch:** first half' '  second half' '**Touches:** bin/.' \
+  '**Machine-authored fixes:** none.' > "$FIX"
+out=$(bash "$D" "$FIX" 2>&1); rc=$?
+[[ $rc -eq 0 ]] || fail "28r: rc=$rc (expected 0)"
+[[ $(printf '%s\n' "$out" | wc -l | tr -d ' ') -eq 5 ]] || fail "28r: expected 5 lines, got $(printf '%s\n' "$out" | wc -l | tr -d ' ')"
+for i in 0 1 2 3 4; do
+  line=$(printf '%s\n' "$out" | sed -n "$((i+1))p")
+  [[ "$line" == "${LABELS[$i]}"* ]] || fail "28r: line $((i+1)) does not start with ${LABELS[$i]}"
+done
+grep -qF 'unavailable' <<<"$out" && fail "28r: placeholder emitted for a valid digest with preamble"
+grep -qF '**Watch:** first half second half' <<<"$out" || fail "28r: indented continuation not normalized to single space at seam"
+grep -qF 'Reviewer preamble' <<<"$out" && fail "28r: pre-label noise leaked into output"
+
+# --- 28s: boundary — exactly 10 physical lines still tolerates ---
+FIX="$DG/s.md"
+printf '%s\n' '## DIGEST' '**What changed:** alpha' 'one' '**Why:** beta' 'two' \
+  '**Watch:** gamma' 'three' '**Touches:** delta' 'four' \
+  '**Machine-authored fixes:** epsilon' 'five' > "$FIX"
+out=$(bash "$D" "$FIX" 2>&1); rc=$?
+[[ $rc -eq 0 ]] || fail "28s: rc=$rc (expected 0)"
+[[ $(printf '%s\n' "$out" | wc -l | tr -d ' ') -eq 5 ]] || fail "28s: expected 5 lines, got $(printf '%s\n' "$out" | wc -l | tr -d ' ')"
+for i in 0 1 2 3 4; do
+  line=$(printf '%s\n' "$out" | sed -n "$((i+1))p")
+  [[ "$line" == "${LABELS[$i]}"* ]] || fail "28s: line $((i+1)) does not start with ${LABELS[$i]}"
+done
+grep -qF 'unavailable' <<<"$out" && fail "28s: placeholder emitted at the cap boundary (10 physical lines)"
+grep -qF '**Machine-authored fixes:** epsilon five' <<<"$out" || fail "28s: last record fold not present — cap boundary not inclusive"
 
 end_case pr-ready-merge-digest-shape
 # === Marker-parse and prose-pin cases (skill slice, 28–38) ===============================

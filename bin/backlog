@@ -81,7 +81,10 @@ case "$CMD" in
         fi
         LABEL="$1"; shift
         TITLE="$*"
-        run gh issue create --repo "$REPO" --label "$LABEL" --title "$TITLE"
+        # --body is mandatory for a non-interactive `gh issue create`; without it
+        # gh aborts with "must provide `--title` and `--body`". The title carries the
+        # finding, so an empty body is the right default.
+        run gh issue create --repo "$REPO" --label "$LABEL" --title "$TITLE" --body ""
         ;;
     close)
         if [ $# -lt 2 ]; then

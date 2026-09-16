@@ -5,3 +5,4 @@ dist/
 .env.bugbot.test
 config.json
 logs/
+data/

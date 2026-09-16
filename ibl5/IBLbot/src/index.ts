@@ -3,6 +3,7 @@ import { config } from './config.js';
 import { commands } from './commands/index.js';
 import { startExpressServer } from './server/express.js';
 import { handleTradeButton } from './interactions/trade-buttons.js';
+import { handlePlanReviewButton } from './interactions/plan-review-buttons.js';
 
 const client = new Client({
     intents: [GatewayIntentBits.Guilds],
@@ -44,6 +45,12 @@ client.on(Events.InteractionCreate, async interaction => {
                 await handleTradeButton(interaction);
             } catch (error) {
                 console.error(`Trade button error for ${interaction.customId}:`, error);
+            }
+        } else if (interaction.customId.startsWith('plan_')) {
+            try {
+                await handlePlanReviewButton(interaction);
+            } catch (error) {
+                console.error(`Plan review button error for ${interaction.customId}:`, error);
             }
         }
     } else if (interaction.isAutocomplete()) {

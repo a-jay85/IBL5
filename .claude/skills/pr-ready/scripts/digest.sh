@@ -80,13 +80,40 @@ BODY="$(awk '
 
 [ -n "$BODY" ] || degrade "DIGEST section is empty (expected 5 labelled lines, found 0)"
 
+# A Phase 6 reviewer sometimes wraps one label's value onto a second physical line.
+# awk hands us every non-blank line as its own record, so a wrap used to read as a
+# sixth line and degrade a digest whose five labels were all present and in order.
+# Fold any line that does not open with one of the five labels into the record above
+# it; cap total physical lines so an appended prose appendix still degrades rather
+# than being published verbatim as digest content.
+MAX_PHYSICAL=10
+
 n=0
+phys=0
 LINES=()
 while IFS= read -r line; do
-  LINES[$n]="$line"
-  n=$((n + 1))
+  phys=$((phys + 1))
+  is_label=0
+  for lbl in "${LABELS[@]}"; do
+    if [ "${line:0:${#lbl}}" = "$lbl" ]; then
+      is_label=1
+      break
+    fi
+  done
+  if [ "$is_label" -eq 1 ]; then
+    LINES[$n]="$line"
+    n=$((n + 1))
+  elif [ "$n" -gt 0 ]; then
+    # Continuation of the label above: normalize leading indentation to one space.
+    while [ "${line:0:1}" = " " ] || [ "${line:0:1}" = $'\t' ]; do
+      line="${line:1}"
+    done
+    LINES[$((n - 1))]="${LINES[$((n - 1))]} $line"
+  fi
+  # is_label=0 with n=0 is pre-label noise ahead of the first label: dropped.
 done <<< "$BODY"
 
+[ "$phys" -le "$MAX_PHYSICAL" ] || degrade "DIGEST section malformed (expected 5 labelled lines, found $phys physical lines)"
 [ "$n" -eq 5 ] || degrade "DIGEST section malformed (expected 5 labelled lines, found $n)"
 
 i=0

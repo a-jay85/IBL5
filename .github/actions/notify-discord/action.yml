@@ -41,8 +41,10 @@ runs:
       run: |
         MSG=$(cat "$MSG_FILE")
 
+        # Owner DMs suppress Discord's auto link-preview embed; rich-embed DM routes
+        # (/discordTradeDM, /discordPlanReviewDM) are separate endpoints and unaffected.
         PAYLOAD=$(jq -n --arg id "$OWNER_DISCORD_ID" --arg msg "$MSG" \
-          '{content: {receivingUserDiscordID: $id, message: $msg}}')
+          '{content: {receivingUserDiscordID: $id, message: $msg, suppressEmbeds: true}}')
 
         if [ "$FAIL_ON_DELIVERY" = "true" ]; then
           # Fail loud: curl -f (non-2xx → exit 22), no `|| echo` swallow — a delivery

@@ -1,6 +1,6 @@
 import express from 'express';
 import type { Server } from 'http';
-import type { Client } from 'discord.js';
+import { MessageFlags, type Client } from 'discord.js';
 import { config } from '../config.js';
 import { handleTradeDM } from './trade-dm.js';
 import { handlePlanReviewDM, handleListDecisions, handleAckDecisions } from './plan-review-dm.js';
@@ -16,14 +16,21 @@ export function startExpressServer(client: Client, dir?: string): Server {
     app.use(express.json());
 
     app.post('/discordDM', (req, res) => {
-        const { receivingUserDiscordID, message } = req.body?.content ?? {};
+        // `suppressEmbeds` is declared by the caller (e.g. the notify-discord action)
+        // to suppress Discord's auto link-preview cards in owner DMs. GM-bound rich-embed
+        // DMs routed through /discordTradeDM and /discordPlanReviewDM are never affected.
+        const { receivingUserDiscordID, message, suppressEmbeds } = req.body?.content ?? {};
 
         if (!receivingUserDiscordID || !message) {
             res.status(400).send('Missing receivingUserDiscordID or message');
             return;
         }
 
-        client.users.send(receivingUserDiscordID, message)
+        const payload = suppressEmbeds === true
+            ? { content: message, flags: MessageFlags.SuppressEmbeds }
+            : message;
+
+        client.users.send(receivingUserDiscordID, payload)
             .then(() => {
                 console.log(`DM sent to ${receivingUserDiscordID}`);
                 res.send('Discord DM sent!');

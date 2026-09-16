@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import threading
 import time
 from dataclasses import dataclass, field, asdict
 from enum import Enum
@@ -198,8 +199,12 @@ class UsageLedger:
     started_at: float = field(default_factory=time.time)
     finished_at: Optional[float] = None
 
+    def __post_init__(self):
+        self._lock = threading.Lock()
+
     def add(self, rec: LlmCallRecord) -> None:
-        self.calls.append(rec)
+        with self._lock:
+            self.calls.append(rec)
 
     def totals(self) -> dict:
         return {

@@ -12,6 +12,7 @@ originals; agents here cannot read repo files, so the checklists are inlined).
 """
 from __future__ import annotations
 
+import concurrent.futures
 import re
 
 from .state import Classification, Finding, HarnessError, PlanInfo
@@ -198,31 +199,50 @@ class ReviewPhase:
         findings: list[Finding] = []
         degraded_agents: list[str] = []
 
-        def collect(agent: str, source: str, purpose: str, model: str, prompt: str):
-            try:
-                data = self.llm.call(purpose, model, prompt, schemas.validate_findings,
-                                     normalizer=schemas.unwrap_findings_envelope)
-            except HarnessError as e:
-                if e.kind != "llm-invalid-output":
-                    raise                      # llm-fixture-missing, gh, etc. stay terminal
-                degraded_agents.append(purpose)
-                return
-            for f in data:
-                findings.append(Finding(source=source, agent=agent, path=f["path"],
-                                        line=f["line"], body=f["body"]))
-
+        # Build the list of independent agent tasks (preserved submission order so that
+        # finding indices are deterministic for the scorer's n=1..N mapping).
+        tasks: list[tuple[str, str, str, str, str]] = []
         if gates["A"]:
-            collect("A", "code-review", "review-agent-a", "sonnet", agent_a_prompt(meta, cls, plan))
+            tasks.append(("A", "code-review", "review-agent-a", "sonnet",
+                          agent_a_prompt(meta, cls, plan)))
         if gates["B"]:
-            collect("B", "code-review", "review-agent-b", "sonnet",
-                    agent_b_prompt(meta, cls, gates["B_history"], gates["B_comments"]))
+            tasks.append(("B", "code-review", "review-agent-b", "sonnet",
+                          agent_b_prompt(meta, cls, gates["B_history"], gates["B_comments"])))
         # Agent C (previous-PR feedback) requires live gh search — replay serves
         # recorded "no prior feedback"; a live variant would add a gh-read adapter.
         if gates["D"]:
-            collect("D", "code-review", "review-agent-d", "sonnet", agent_d_prompt(meta, cls))
+            tasks.append(("D", "code-review", "review-agent-d", "sonnet",
+                          agent_d_prompt(meta, cls)))
         if gates["security"]:
-            collect("security", "security-audit", "security-audit", "haiku",
-                    security_prompt(meta, cls, plan))
+            tasks.append(("security", "security-audit", "security-audit", "haiku",
+                          security_prompt(meta, cls, plan)))
+
+        def _call_agent(task: tuple[str, str, str, str, str]):
+            agent, source, purpose, model, prompt = task
+            try:
+                data = self.llm.call(purpose, model, prompt, schemas.validate_findings,
+                                     normalizer=schemas.unwrap_findings_envelope)
+                return (agent, source, purpose, data, None)
+            except HarnessError as e:
+                if e.kind != "llm-invalid-output":
+                    raise                      # llm-fixture-missing, gh, etc. stay terminal
+                return (agent, source, purpose, [], purpose)  # degraded
+
+        # Run all independent agents concurrently; futures list preserves submission order.
+        max_workers = max(len(tasks), 1)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(_call_agent, task) for task in tasks]
+            # f.result() re-raises any terminal exception from _call_agent
+            results = [f.result() for f in futures]
+
+        # Aggregate in stable submission order (A → B → D → security).
+        for agent, source, purpose, data, degraded_purpose in results:
+            if degraded_purpose is not None:
+                degraded_agents.append(degraded_purpose)
+            else:
+                for f in data:
+                    findings.append(Finding(source=source, agent=agent, path=f["path"],
+                                            line=f["line"], body=f["body"]))
 
         if findings:
             scores = self.llm.call("score-findings", "haiku", scoring_prompt(findings),

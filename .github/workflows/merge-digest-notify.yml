@@ -7,10 +7,24 @@ name: Merge digest notify
 # The pull_request `closed` event carries `merged`, so a plain close (no merge) is filtered
 # in the job `if:` below rather than by a second API call.
 #
-# Load-bearing deployment note: a `pull_request` workflow is dispatched from the version of
-# the file on the DEFAULT branch, not from the PR's own head. The first real DM is therefore
-# only possible after this PR merges onto master; the PR that adds this file will not notify
-# about its own merge. That is why the plan holds auto_merge.
+# Load-bearing deployment note: unlike `pull_request_target`, a `pull_request` workflow IS
+# dispatched from the PR's own head, so a workflow added in a PR does run on that PR. The
+# 744 recorded runs of `.github/workflows/pipeline-fixed-notify.yml` are this same `closed`
+# trigger firing across merges. The PR that adds THIS file therefore very likely notifies
+# about its own merge, and that first DM is the hold's verification step. The hold stands
+# either way: if the self-merge run does not materialise, the first real DM lands on the
+# next merge and a human still eyeballs it before the change is treated as done.
+#
+# The checkout below pins `ref:` to the BASE branch instead of defaulting to `github.ref`.
+# Two reasons, both load-bearing:
+#   1. Correctness. `github.ref` on this event is `refs/pull/N/merge`, and that ref is
+#      DELETED once the PR merges -- listing the remote's `refs/pull/<merged-N>/*` returns
+#      only `/head`, while an open PR returns `/head` AND `/merge`. A bare checkout would
+#      be relying on undocumented fetch-by-orphaned-SHA behaviour, and its failure mode is
+#      a red run with no DM on EVERY merge.
+#   2. Semantics. The DM must be built by the parser that lives on the default branch, not
+#      by the copy inside the PR being announced -- otherwise a PR that edits
+#      bin/digest-dm-build gets announced by its own unreviewed parser.
 
 on:
   pull_request:
@@ -39,6 +53,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The branch this PR merged INTO (`master`), never the default `github.ref`.
+          # See the deployment note in this file's header: `github.ref` here is the
+          # post-merge-deleted `refs/pull/N/merge`, and master's copy of the parser is
+          # the one that must build the DM.
+          ref: ${{ github.event.pull_request.base.ref }}
 
       - name: Build merge-digest DM
         env:

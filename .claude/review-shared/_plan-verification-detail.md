@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _plan-verification.md — why each forced trigger exists, the incidents behind them, the worked pre-prod exercise-path catalogue, and the non-compliant counter-examples. Read only when editing the verification rules; the plan-architect never reads it.
-last_verified: 2026-09-14
+last_verified: 2026-09-16
 ---
 
 # _plan-verification Detail
@@ -14,6 +14,17 @@ The matrix format — one row per verification item, columns pinned to test-type
 ### Why each integration trigger exists
 
 Each row in the `## Forced integration-verification trigger` table was added from a post-merge finding — a shape of change that was repeatedly mis-verified by developers who understood the feature but wrote coverage at the wrong abstraction level. The rows name the right-hand assertion type (the actual network URL, the generated unit file) rather than repeating the wrong-level mistake.
+
+**Per-row rationale.** The "why" clauses moved out of the rules-file table, whose operative assertions stand alone without them:
+
+- **Importer reading a generated repo-relative path** — a negation line in `.gitignore` force-tracks the file, so the deploy `git reset` clobbers live content with stale committed data.
+- **Importer writing to a secondary/audit table** — checking the secondary table alone does not prove the flag propagated; the primary table's flag column is the canonical one.
+- **Detection check behind a fail-open guard** — a check nested inside a fail-open guard silently skips when data is unavailable, so unconditional detection paths must be shown unaffected.
+- **`proc_open` call site** — an unread stderr pipe deadlocks the child once the OS buffer fills.
+- **`echo`/log string pinned by a numeric-token `grep`** — a token-only pin cannot detect a behavioral lie in the wording (a-jay85/IBL5-backlog#144, PR #2135).
+- **Port guard piping `lsof` to a pattern filter** — the `lsof` column header never matches a process name, so it always trips the "occupied by other process" branch when header-stripping is absent.
+- **`bin/test-*` awk region delimiter** — the mutation run is what proves the awk region is scanning the correct code region.
+- **htmx `beforeRequest`/`afterRequest` DOM mutation** (§ Forced E2E triggers, not this table) — the mutation is serialized into the htmx history cache between the before-request event and the swap; browser Back restores the request-time snapshot, making it permanent unless a `historyRestore` handler repairs it. Full mechanism: `.claude/rules/htmx-history-cache.md`.
 
 ### Why E2E assertions must be seed- and DOM-grounded
 

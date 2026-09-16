@@ -3,7 +3,7 @@
 The sleeping LLM adapter records wall-clock timestamps and thread IDs for every
 call.  After run() returns we assert:
 
-- Total elapsed is well below the sum of individual sleeps (proving overlap).
+- Two agents' (start, end) windows overlap (proving concurrency).
 - Every expected agent's ledger entry is present.
 - Every expected agent's result findings are present and correct.
 - File-system raw-dumps (via out_dir) are written for every agent.

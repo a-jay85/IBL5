@@ -12,6 +12,20 @@ name: Production DB Backup
 # Failure notification reuses the IBLbot Discord-DM pattern from main.yml /
 # smoke-prod.yml. The notify job always uses the real secrets.HOST so that a
 # forced-bad backup host (dispatch input) still delivers the alert.
+#
+# WHY THE DUMP RUNS SERVER-SIDE OVER SSH: production MySQL is not reachable
+# directly from GitHub-hosted runners. It is firewalled to allowlisted IPs (a dev
+# laptop connecting with the .env REMOTE_* creds), so no runner can open a client
+# connection to it. Any CI job that needs prod data must SSH to the prod host and
+# run mariadb-dump there, authenticating with the host's local socket / .my.cnf,
+# then stream or scp the output back — the shape this workflow uses below
+# (secrets.PRIVATE_KEY -> ~/.ssh/id_deploy, then ssh -p $PORT -i ~/.ssh/id_deploy).
+# That needs only the existing HOST / PORT / USERNAME / PRIVATE_KEY secrets; the
+# repo's unreferenced DB_HOST / DB_USER / DB_PASS / DB_NAME secrets are NOT a
+# prod-DB path and adding DB-credential secrets would not help.
+#
+# Same constraint drives the Deploy Rehearsal prod-clone gate (ADR-0059,
+# bin/rehearsal-prod-dump).
 
 on:
   schedule:

@@ -1,7 +1,7 @@
 ---
 description: HTML View class standards: output buffering, HtmlSanitizer::e(), and structural conventions.
 paths: "**/*View.php"
-last_verified: 2026-07-27
+last_verified: 2026-09-16
 ---
 
 # View Rendering Rules
@@ -23,6 +23,8 @@ These rules fire in CI and PostToolUse — violating them blocks the PR before r
 | `BanDeprecatedHtmlTagsRule` | `ibl.deprecatedHtmlTag` | `<b>`, `<i>`, `<center>`, `<font>`, `<u>` in PHP string literals |
 
 Use semantic replacements: `<strong>`, `<em>`, `text-align: center` via CSS class, CSS font properties. When you need a new visual pattern, create a CSS class under `ibl5/design/components/` — do NOT work around the rule with a whitelist exception unless the helper is genuinely HTML-safe (see `RequireEscapedOutputRule::SAFE_STATIC_CALLS`).
+
+**Moving the escape boundary INTO a helper requires a caller sweep.** When a helper starts calling `HtmlSanitizer::e()` itself, every caller that was pre-escaping its argument now double-encodes (`O'Brien` renders as `O&#039;Brien`); `RequireEscapedOutputRule` trusts the helper from the outside and cannot see it. Grep `HtmlSanitizer::e\|htmlspecialchars` across `ibl5/classes/` and check each call site before committing — PR #1106 internalized escaping in `renderPlayerCell`, updated one caller, and missed `SplitStats` and `PeriodAverages`.
 
 For dynamic per-element values (team colors, widths), use CSS custom properties on a container: `style="--team-color-primary: #$color1;"` — the `style="--` prefix is whitelisted.
 
@@ -46,6 +48,8 @@ public function renderSection(array $data): string
 Delegate to UI helpers instead of building markup inline:
 - `UI\TableStyles` — team-colored styling (row backgrounds, hover effects, CSS custom properties)
 - `UI\TeamCellHelper` — team name cells with consistent formatting
+
+**CSRF hidden inputs are `name="_csrf_token"` — with the underscore.** `CsrfGuard::getSubmittedToken()` reads `$_POST['_csrf_token']`, so a View that renders `generateRawToken()` under `name="csrf_token"` makes every write silently CSRF-reject with nothing logged (PR #1074). Copy `TradingView.php` or `FreeAgencyOfferView.php`; the E2E `readCsrfToken()` helper must use the same name.
 
 ## CSS reuse
 

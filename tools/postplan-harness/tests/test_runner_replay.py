@@ -2,6 +2,7 @@ import json
 import os
 import sys
 import tempfile
+import types
 
 import pytest
 
@@ -10,7 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import runner
 from harness.adapters.llm import FixtureLlm, extract_json
 from harness.state import HarnessError, TerminalState, UsageLedger
-from harness import schemas
+from harness import ciwatch, schemas
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -440,3 +441,178 @@ def test_phase6_one_hold_stays_held():
         assert "No manual testing needed" not in body
         checkboxes = [ln for ln in body.splitlines() if ln.strip().startswith("- [ ]")]
         assert len(checkboxes) == 1
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 background CI watch — replay cases (a)–(e). See plan phase 6.3.
+# ---------------------------------------------------------------------------
+
+
+class _LiveShapedGit(runner.ReplayGit):
+    """ReplayGit plus the two methods runner.run only calls when live=True.
+
+    head() deliberately returns a different value than commit_all(), so case (b)
+    proves the background watch is keyed on the POST-rebase head SHA.
+    """
+
+    POST_REBASE_SHA = "postrebase0000000000000000000000000000ab"
+
+    def rebase_onto(self, base="origin/master"):
+        return
+
+    def head(self):
+        return self.POST_REBASE_SHA
+
+
+class _FakePopen:
+    """gh pr checks stand-in for the live-shaped run: always green, never spawns."""
+
+    def __init__(self, *a, **k):
+        self.returncode = 0
+
+    def communicate(self, timeout=None):
+        return "", ""
+
+    def poll(self):
+        return self.returncode
+
+    def terminate(self):
+        return
+
+    def kill(self):
+        return
+
+    def wait(self, timeout=None):
+        return self.returncode
+
+
+def _run_live_shaped(monkeypatch, out, canned_extra=None):
+    """Replay fixtures driven down the live-shaped arm of runner.run.
+
+    mode="replay" keeps git/gh fake (no network, no pushes) while live=True turns
+    on exactly the branches this plan touches: the Phase 2 watch start, the
+    Phase 7 reuse, and the reap in the finally.
+    """
+    from harness.adapters.probe import FixtureProbe
+
+    monkeypatch.setattr(runner, "ReplayGit", _LiveShapedGit)
+    canned = dict(CANNED)
+    if canned_extra:
+        canned.update(canned_extra)
+    llm = FixtureLlm(UsageLedger(), canned)
+    return runner.run(_INLINE_FIXTURE, out, llm, mode="replay", headless=True,
+                      live=True, probe=FixtureProbe(_INLINE_FIXTURE))
+
+
+def _ci_files(out):
+    return [f for f in os.listdir(out) if f.startswith("ci-") and f.endswith(".json")]
+
+
+def test_replay_starts_no_background_watch(monkeypatch, tmp_path):
+    """(a) A plain replay run never touches CI: no watch, no outcome file."""
+    started = []
+    monkeypatch.setattr(ciwatch, "start_background_watch",
+                        lambda *a, **k: started.append(a))
+
+    out = str(tmp_path / "out")
+    from harness.adapters.probe import FixtureProbe
+    llm = FixtureLlm(UsageLedger(), CANNED)
+    runner.run(_INLINE_FIXTURE, out, llm, mode="replay", headless=True,
+               probe=FixtureProbe(_INLINE_FIXTURE))
+
+    assert started == [], "a replay run started a background CI watch"
+    assert _ci_files(out) == []
+
+
+def test_live_push_starts_background_watch_with_head_sha(monkeypatch, tmp_path):
+    """(b) The watch is keyed on the post-rebase head, not the pre-rebase commit."""
+    seen = []
+    monkeypatch.setattr(ciwatch, "start_background_watch",
+                        lambda w, pr, sha, out_dir, **k: seen.append((pr, sha, out_dir)))
+    monkeypatch.setattr(ciwatch, "watch_live",
+                        lambda *a, **k: ciwatch.CiOutcome(0, [], "stub watch_live"))
+
+    out = str(tmp_path / "out")
+    _run_live_shaped(monkeypatch, out)
+
+    assert len(seen) == 1, f"expected exactly one background watch, got {len(seen)}"
+    pr, sha, out_dir = seen[0]
+    assert pr == _INLINE_FIXTURE["pr_number"]
+    assert sha == _LiveShapedGit.POST_REBASE_SHA
+    assert not sha.startswith("replay-sha-"), "keyed on the pre-rebase commit SHA"
+    assert out_dir == out
+
+
+def test_phase7_reuses_background_outcome(monkeypatch, tmp_path):
+    """(c) A terminal outcome for this head makes Phase 7 a lookup, not a watch."""
+    out = tmp_path / "out"
+    out.mkdir()
+    sha = _LiveShapedGit.POST_REBASE_SHA
+    (out / f"ci-{sha}.json").write_text(json.dumps({
+        "sha": sha, "pr": _INLINE_FIXTURE["pr_number"], "status": "success",
+        "exit_code": 0, "failed_checks": [], "probe": [],
+        "evidence": "seeded", "started": 0.0, "finished": 1.0,
+    }, indent=2, sort_keys=True))
+
+    monkeypatch.setattr(ciwatch, "start_background_watch", lambda *a, **k: None)
+
+    def boom(*a, **k):
+        raise AssertionError("watch_live ran despite a reusable outcome on disk")
+
+    monkeypatch.setattr(ciwatch, "watch_live", boom)
+
+    res = _run_live_shaped(monkeypatch, str(out))
+    assert res.ci_outcome == "green"
+
+
+def test_background_watch_is_reaped_on_harness_error(monkeypatch, tmp_path):
+    """(d) A failure after the push still reaps the watcher and still reports."""
+    handle = types.SimpleNamespace(
+        path="/tmp/ci-sentinel.json", sha=_LiveShapedGit.POST_REBASE_SHA)
+    monkeypatch.setattr(ciwatch, "start_background_watch", lambda *a, **k: handle)
+    reaped = []
+    monkeypatch.setattr(ciwatch, "reap_background_watch",
+                        lambda bg, **k: reaped.append(bg))
+
+    class _ExplodingReviewPhase:
+        def __init__(self, llm, gh):
+            pass
+
+        def run(self, *a, **k):
+            raise HarnessError("forced-failure", "raised after the phase 2 push")
+
+    monkeypatch.setattr(runner, "ReviewPhase", _ExplodingReviewPhase)
+
+    out = str(tmp_path / "out")
+    res = _run_live_shaped(monkeypatch, out)
+
+    assert reaped == [handle], "the watcher was not reaped on the error path"
+    assert res.terminal == TerminalState.FAILED
+    assert res.error_kind == "forced-failure"
+    assert os.path.exists(os.path.join(out, "result.json"))
+
+
+def test_background_watch_is_reaped_on_normal_completion(monkeypatch, tmp_path):
+    """(e) The happy path reaps exactly once and leaves a settled outcome file.
+
+    Paired with (d): (e) alone still passes if the reap sits inside the try body,
+    so the pair is what pins it to the finally.
+    """
+    monkeypatch.setattr(ciwatch.subprocess, "Popen", _FakePopen)
+    reaped = []
+    real_reap = ciwatch.reap_background_watch
+
+    def counting_reap(bg, **k):
+        reaped.append(bg)
+        return real_reap(bg, **k)
+
+    monkeypatch.setattr(ciwatch, "reap_background_watch", counting_reap)
+
+    out = str(tmp_path / "out")
+    res = _run_live_shaped(monkeypatch, out)
+
+    assert len(reaped) == 1 and reaped[0] is not None
+    path = os.path.join(out, f"ci-{_LiveShapedGit.POST_REBASE_SHA}.json")
+    data = json.loads(open(path).read())
+    assert data["status"] in ("success", "failure", "timeout")
+    assert res.ci_outcome == "green"

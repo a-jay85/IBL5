@@ -338,7 +338,7 @@ fi
 # because it cannot run a repo-reading Opus reviewer (harness/review.py). Re-entering at
 # Phase 0 instead would re-run Phase 4 and post a SECOND code-review comment on the same
 # PR — the whole reason this is a separate prompt rather than the fallback one.
-RESUME_PROMPT="Invoke the /post-plan skill now on the current git branch, RESUMING at Phase 5.5 — do NOT start at Phase 0. The compiled post-plan harness has already run Phases 0 through 5 on this branch: the work is committed, the branch is rebased onto origin/master, it is pushed, the PR is open, and the Phase 4 code-review and Phase 5 conformance results are already posted. Do NOT repeat any of those phases and do NOT open a second PR — read the existing PR number with \`gh pr view --json number --jq '.number'\`. $RESUME_PLAN_CLAUSE Run Phase 5.5 (plan-intent fidelity review, verdict file, and the sticky verdict + Merge digest comment), then Phases 6 through 11 in order, including all thirteen of Phase 6.5's arm conditions. You MAY commit and push the remediation commit that Phase 5.5 itself calls for; that is the only writing this session does. No human is present: never ask questions or wait for input — make the safe choice and continue."
+RESUME_PROMPT="Invoke the /post-plan skill now on the current git branch, RESUMING at Phase 5.5 — do NOT start at Phase 0. The compiled post-plan harness has already run Phases 0 through 5 on this branch: the work is committed, the branch is rebased onto origin/master, it is pushed, the PR is open, and the Phase 4 code-review and Phase 5 conformance results are already posted. Do NOT repeat any of those phases and do NOT open a second PR — read the existing PR number with \`gh pr view --json number --jq '.number'\`. $RESUME_PLAN_CLAUSE \$HARNESS_RUN_DIR is exported to you and holds the harness run artifacts, including a background CI outcome file \`ci-<head-sha>.json\` for the head SHA the harness pushed. If the CI OUTCOME clause appended below says FAILURE, run the Phase 7 CI fix loop FIRST — fix, commit, push, re-watch the NEW head SHA — and only then run Phase 5.5, so the fidelity reviewer reviews the fixed tree. If it says SUCCESS for the current head SHA, skip the Phase 7 watch for that SHA entirely. Otherwise run Phase 5.5 (plan-intent fidelity review, verdict file, and the sticky verdict + Merge digest comment), then Phases 6 through 11 in order, including all thirteen of Phase 6.5's arm conditions. You MAY commit and push the remediation commit that Phase 5.5 itself calls for; that is the only writing this session does. No human is present: never ask questions or wait for input — make the safe choice and continue."
 
 # Compiled-harness engine (see header). The launchd job runs the harness, captures its exit code,
 # and escalates to the skill session ONLY when should_fallback permits it. Exit 3 (rebase-conflict
@@ -350,10 +350,36 @@ RESUME_PROMPT="Invoke the /post-plan skill now on the current git branch, RESUMI
 # MAIN-CHECKOUT absolute path — never $ROOT/tools/... — per ADR-0092: a worktree's own
 # harness copy is the one this run is changing, and must not judge its own change.
 HARNESS="${HARNESS:-/Users/ajaynicolas/GitHub/IBL5/tools/postplan-harness}"
+# Rendered INSIDE the far-side resume gate, after the harness has exited 4, so the
+# background CI outcome file written by harness/ciwatch.py already exists. Emitted
+# into $RESUME_PROMPT as a sentence the resume session acts on at Phase 7.
+# Fail-open by design: a missing/garbled file yields the "unknown" clause, and the
+# skill then runs its own `gh pr checks --watch` exactly as it does today.
+postplan_ci_resume_clause() {
+    local run_dir="$1" sha="$2" f
+    [ -n "$run_dir" ] && [ -n "$sha" ] || { printf '%s' "CI OUTCOME: unknown (no harness run dir)."; return 0; }
+    f="$run_dir/ci-$sha.json"
+    if [ ! -f "$f" ]; then
+        printf 'CI OUTCOME: unknown — no background result at %s; watch CI yourself at Phase 7.' "$f"
+        return 0
+    fi
+    if grep -q '"status": "success"' "$f"; then
+        printf 'CI OUTCOME: SUCCESS for head %s, already measured by the harness (%s). Do NOT run `gh pr checks --watch` again for this SHA.' "$sha" "$f"
+        return 0
+    fi
+    if grep -q '"status": "failure"' "$f"; then
+        printf 'CI OUTCOME: FAILURE for head %s (%s). Failing checks: %s. Run the Phase 7 fix loop FIRST, BEFORE spawning the Phase 5.5 fidelity reviewer.' \
+            "$sha" "$f" "$(grep -oE '"[^"]+"' "$f" | sed -n '/^"/p' | tr '\n' ' ' | cut -c1-300)"
+        return 0
+    fi
+    printf 'CI OUTCOME: indeterminate for head %s (%s) — the background watch did not settle; watch CI yourself at Phase 7.' "$sha" "$f"
+}
+
 BADGE_FN="$(declare -f pr_sticky_find pr_sticky_upsert pr_sticky_delete \
     postplan_badge_body postplan_badge_banner_body postplan_badge_label_live \
     postplan_badge_pr_number postplan_badge_existing_label \
-    post_status_badge conclude_status_badge postplan_sweep_stale_badge || true); "
+    post_status_badge conclude_status_badge postplan_sweep_stale_badge \
+    postplan_ci_resume_clause || true); "
 FALLBACK_FN=""
 HARNESS_SEG=""
 HARNESS_RUN_DIR=""
@@ -374,7 +400,7 @@ if [ "${POST_PLAN_SKILL:-0}" != "1" ] && [ -x "$HARNESS/run" ]; then
     # its $PPID is new, so the /tmp/...-$PPID defaults in Phase 6.5 condition (3) would
     # find nothing and block every clean harness run. Scoped to THIS branch on purpose —
     # the should_fallback branch below runs its own Phase 5.0 and must keep the defaults.
-    RESUME_SEG="DONE_MARK=\"$HARNESS_RUN_DIR/conformance-done\" BRIDGE=\"$HARNESS_RUN_DIR/missing-tests\" HARNESS_RUN_DIR=\"$HARNESS_RUN_DIR\" CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p $(shq "$RESUME_PROMPT") --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name \"$LABEL\""
+    RESUME_SEG="DONE_MARK=\"$HARNESS_RUN_DIR/conformance-done\" BRIDGE=\"$HARNESS_RUN_DIR/missing-tests\" HARNESS_RUN_DIR=\"$HARNESS_RUN_DIR\" POSTPLAN_HEAD_SHA=\"\$(git -C $(shq "$ROOT") rev-parse HEAD)\" CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p \"\$(printf '%s %s' $(shq "$RESUME_PROMPT") \"\$(postplan_ci_resume_clause $(shq "$HARNESS_RUN_DIR") \"\$(git -C $(shq "$ROOT") rev-parse HEAD)\")\")\" --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name \"$LABEL\""
     GATE_OPEN="if [ \"\$rc\" = 4 ]; then ${RESUME_SEG}; elif should_fallback \"\$rc\"; then "
     GATE_CLOSE="; elif [ \"\$rc\" = 3 ]; then echo \"post-plan-now: harness exited 3 (rebase-conflict fail-closed sentinel). SKIPPING the /post-plan skill fallback; a human must resolve the stacked-branch rebase conflict, then re-run bin/post-plan-now. See $LOG.\"; fi"
     ENGINE="compiled post-plan harness (fails CLOSED on rebase conflict; falls back to the skill on other failures; on exit 4 it resumes the skill at Phase 5.5 for the fidelity review + merge digest)"

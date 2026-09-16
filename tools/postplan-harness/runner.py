@@ -210,6 +210,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         f"matrix={plan.has_matrix} critical_files={len(plan.critical_files)} "
         f"slug_drift={plan.slug_drift or '-'} plan_source={plan.plan_source or '-'}")
 
+    bg_ci = None       # background CI watch handle; reaped in the finally below
+
     try:
         # ---- Phase 2/3: ship + classify -------------------------------
         if mode != "replay":
@@ -260,6 +262,11 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             pr = gh.pr_create(copy["title"], create_body, "master")
             log(f"phase2: pr_create intent recorded (title={copy['title']!r})")
         res.pr_number = pr
+        if live and pr and sha:
+            bg_ci = ciwatch.start_background_watch(worktree, pr, sha, out_dir)
+            if bg_ci is not None:
+                log(f"phase2: background CI watch started for {sha[:8]} "
+                    f"-> {os.path.basename(bg_ci.path)}")
         _post_status_badge(gh, pr)
         meta = gh.pr_meta() or {"number": pr, "title": copy["title"], "body": copy["summary_md"]}
 
@@ -391,8 +398,11 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             outcome = (ciwatch.CiOutcome(fx_ci["exit"], fx_ci.get("failed", []))
                        if fx_ci else ciwatch.derive_from_trace((fixture or {}).get("ci")))
         elif live and pr:
-            log("phase7: watching CI (gh pr checks --watch)…")
-            outcome = ciwatch.watch_live(worktree, pr)
+            if bg_ci is not None and bg_ci.sha == sha:
+                log(f"phase7: reusing background CI watch for {sha[:8]}")
+            else:
+                log("phase7: watching CI (gh pr checks --watch)…")
+            outcome = ciwatch.watch_or_reuse(worktree, pr, sha, out_dir, bg_ci)
         else:
             outcome = ciwatch.CiOutcome(-1, [], "isolated mode: no live PR, CI not watched")
         res.ci_outcome = {0: "green", 8: "failed"}.get(outcome.exit_code, "indeterminate")
@@ -418,6 +428,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         res.error = f"{e.kind}: {e.detail}"
         res.error_kind = e.kind
         log(f"FAILED: {res.error}")
+    finally:
+        ciwatch.reap_background_watch(bg_ci)
     return _finish(res, out_dir)
 
 

@@ -245,6 +245,52 @@ def test_clean_run_still_arms(tmp_path):
     assert any(a["action"] == "pr_merge_auto" for a in acts)
 
 
+def test_conformance_handoff_clean_run_writes_empty_bridge(tmp_path):
+    out = str(tmp_path / "out")
+    res = runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    assert res.unresolved_conformance == []
+    assert os.path.exists(os.path.join(out, runner.CONFORMANCE_DONE_NAME))
+    bridge = os.path.join(out, runner.CONFORMANCE_BRIDGE_NAME)
+    assert os.path.exists(bridge)
+    # Phase 6.5 condition (3) tests the bridge with `[ -s "$BRIDGE" ]`. A
+    # newline-only file is 1 byte and reads as "unresolved items exist".
+    assert os.path.getsize(bridge) == 0
+
+
+def test_conformance_handoff_lists_unresolved_items(tmp_path, monkeypatch):
+    out = str(tmp_path / "out")
+    items = [
+        "MISSING: ibl5/tests/Http/FooTest.php (matrix planned a test the diff never wrote)",
+        "MISSING-FILE: bin/check-plan (plan Critical File never appeared in the diff)",
+    ]
+    monkeypatch.setattr(runner.conformance, "check", lambda *a, **k: list(items))
+    res = runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    assert os.path.exists(os.path.join(out, runner.CONFORMANCE_DONE_NAME))
+    with open(os.path.join(out, runner.CONFORMANCE_BRIDGE_NAME)) as fh:
+        lines = fh.read().splitlines()
+    assert lines == items
+    assert lines == res.unresolved_conformance
+
+
+def test_conformance_handoff_absent_when_phase5_never_ran(tmp_path):
+    out = str(tmp_path / "out")
+    res = runner.run(_fixture(diff=""), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    assert res.terminal == TerminalState.NOTHING_TO_SHIP
+    assert os.path.exists(os.path.join(out, "result.json"))
+    assert not os.path.exists(os.path.join(out, runner.CONFORMANCE_DONE_NAME))
+    assert not os.path.exists(os.path.join(out, runner.CONFORMANCE_BRIDGE_NAME))
+
+
+def test_conformance_handoff_absent_when_conformance_raises(tmp_path, monkeypatch):
+    out = str(tmp_path / "out")
+    def boom(*a, **k):
+        raise HarnessError("conformance-failed", "synthetic")
+    monkeypatch.setattr(runner.conformance, "check", boom)
+    res = runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    assert res.terminal == TerminalState.FAILED
+    assert not os.path.exists(os.path.join(out, runner.CONFORMANCE_DONE_NAME))
+
+
 def _actions(out):
     p = os.path.join(out, "actions.jsonl")
     if not os.path.exists(p):

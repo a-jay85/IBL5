@@ -32,7 +32,7 @@ use BugPipeline\BugReportRepository;
 /** The exact §3a status ENUM allow-list (migration 153). */
 const VALID_STATUSES = [
     'queued', 'awaiting_info', 'hunting', 'blocked', 'pr_open', 'fixed',
-    'needs_human', 'parked_idle', 'gathering', 'awaiting_ajay', 'planned', 'dropped',
+    'needs_human', 'parked_idle', 'gathering', 'awaiting_ajay', 'planned', 'dropped', 'filed',
 ];
 const VALID_CLASSES = ['bug', 'feature', 'not_a_thing'];
 

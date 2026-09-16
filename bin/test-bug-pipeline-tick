@@ -430,6 +430,57 @@ else
     bpt_fail "P7f: epoch_of on garbage — out=[$_utc_p7f_out] rc=$_utc_p7f_rc err=[$_utc_p7f_err]"
 fi
 
+# ── BUG_PIPELINE_FILE_ISSUES_ONLY=1 — hunt/ci-autofix skipped, drain fires ────
+# maybe_hunt must be skipped: a classified queued row must NOT trigger a hunt.
+bpt_reset
+bpt_set_actionable '[{"id":50,"status":"queued","class":null,"original_text":"x","thread_id":null,"issue_number":null}]'
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true,"issue_title":"Box score wrong","severity":"medium"}'
+BUG_PIPELINE_FILE_ISSUES_ONLY=1 bpt_run
+bpt_expect_eq "flag-on tick exits 0" 0 "$BPT_RC"
+bpt_log_has   "$STUB" transition.log "filed"   "flag-on queued bug → filed via classify"
+bpt_log_lacks "$STUB" calls.log     "CLAIM_NEXT" "flag-on skips maybe_hunt (no claim-next)"
+
+# drain: gathering row → filed (not drive_feature_row)
+bpt_reset
+bpt_set_actionable '[{"id":51,"status":"gathering","class":"feature","original_text":"y","thread_id":"880000000000000001","issue_number":null,"last_gm_reply_at":null,"last_processed_at":null}]'
+BUG_PIPELINE_FILE_ISSUES_ONLY=1 bpt_run
+bpt_expect_eq "flag-on gathering exits 0" 0 "$BPT_RC"
+bpt_log_has   "$STUB" transition.log "filed"    "flag-on gathering → filed"
+bpt_log_lacks "$STUB" calls.log     "CLAUDE"    "flag-on gathering spawns no claude"
+
+# drain: awaiting_ajay row → filed (not drive_feature_row)
+bpt_reset
+bpt_set_actionable '[{"id":52,"status":"awaiting_ajay","class":"feature","original_text":"z","thread_id":"880000000000000002","issue_number":null,"approval_message_id":null}]'
+BUG_PIPELINE_FILE_ISSUES_ONLY=1 bpt_run
+bpt_expect_eq "flag-on awaiting_ajay exits 0" 0 "$BPT_RC"
+bpt_log_has   "$STUB" transition.log "filed"    "flag-on awaiting_ajay → filed"
+bpt_log_lacks "$STUB" calls.log     "CLAUDE"    "flag-on awaiting_ajay spawns no claude"
+
+# drain: blocked row → filed (not resume_blocked_hunt)
+bpt_reset
+bpt_set_actionable '[{"id":53,"status":"blocked","class":"bug","original_text":"w","thread_id":null,"issue_number":null,"blocked_until":null}]'
+BUG_PIPELINE_FILE_ISSUES_ONLY=1 bpt_run
+bpt_expect_eq "flag-on blocked exits 0" 0 "$BPT_RC"
+bpt_log_has   "$STUB" transition.log "filed"    "flag-on blocked → filed"
+bpt_log_lacks "$STUB" calls.log     "CLAIM_NEXT" "flag-on blocked skips resume_blocked_hunt"
+
+# flag-on + CI_AUTOFIX_ENABLED=1: no gh pr list, no autofix spawn
+bpt_reset
+bpt_set_actionable '[{"id":54,"status":"queued","class":null,"original_text":"x","thread_id":null,"issue_number":null}]'
+bpt_set_claude_result '{"class":"bug","bug_has_enough_info":true,"issue_title":"CI test","severity":"low"}'
+BUG_PIPELINE_FILE_ISSUES_ONLY=1 BUG_PIPELINE_CI_AUTOFIX_ENABLED=1 bpt_run
+bpt_expect_eq "flag-on+ci-autofix exits 0" 0 "$BPT_RC"
+bpt_log_has   "$STUB" transition.log "filed"     "flag-on+ci-autofix still files the row"
+bpt_log_lacks "$STUB" gh.log         "pr list"   "flag-on+ci-autofix: no gh pr list (no autofix)"
+bpt_log_lacks "$STUB" calls.log      "CLAIM_NEXT" "flag-on+ci-autofix: no hunt spawn"
+
+# reversibility: gathering row with flag UNSET → feature path, never filed
+bpt_reset
+bpt_set_actionable '[{"id":55,"status":"gathering","class":"feature","original_text":"y","thread_id":"880000000000000001","issue_number":null,"last_gm_reply_at":null,"last_processed_at":null}]'
+bpt_run
+bpt_expect_eq "flag-off gathering exits 0" 0 "$BPT_RC"
+bpt_log_lacks "$STUB" transition.log "filed"  "flag-off gathering never reaches filed"
+
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"
 exit "$FAILED"

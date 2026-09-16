@@ -1,6 +1,6 @@
 ---
 description: Why the bug-pipeline hunter runs injection-exposed with no ship authority in a credential-starved worktree, and the trusted cron alone opens a held PR.
-last_verified: 2026-09-10
+last_verified: 2026-09-14
 ---
 
 # ADR-0081: Hunter trust-split & credential-starved env sandbox
@@ -40,3 +40,7 @@ Builds directly on ADR-0080 (the mac-local cron topology and the classifier that
 - `bin/bug-pipeline-hunter-prompt` — untrusted-data framing and the no-push/`gh`/PR hard limits.
 - `bin/test-bug-pipeline-hunt` — the security test exercising real `git push` under the scrubbed env.
 - `ibl5/docs/decisions/0080-mac-local-discord-bug-pipeline-cron-topology.md` — the pipeline this extends.
+
+## Addendum — file-issues-only mode bypasses the hunter (2026-09-14)
+
+When `BUG_PIPELINE_FILE_ISSUES_ONLY=1`, the tick's `maybe_hunt` call is gated by `! file_issues_only` and is never reached — the driver goes straight to the active-conversations enumerator and files issues instead. The trust-split design is unchanged; the flag simply means the hunter path is never entered for the duration the flag is on.

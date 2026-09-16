@@ -95,7 +95,7 @@ bpgh_ensure_issue() {
     local url
     if url="$("$GH_BIN" issue create --repo "$BUG_PIPELINE_ISSUE_REPO" \
             --title "$title" --body "$body" \
-            --label "$class_label" --label "severity:$sev" 2>/dev/null)"; then
+            --label "$class_label" --label "severity:$sev" --label "gm-reported" 2>/dev/null)"; then
         # gh prints the issue URL; the trailing path segment is the number.
         printf '%s\n' "${url##*/}"
     else

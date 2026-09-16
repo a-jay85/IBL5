@@ -260,6 +260,7 @@ SH
     export BUG_PIPELINE_SCRIPTS_DIR="$STUB/scripts"
     export BUG_PIPELINE_PLANS_DIR="$STUB/plans"
     export BUG_PIPELINE_ISSUE_REPO="test/bugs-fake"
+    export BUG_PIPELINE_FILE_ISSUES_ONLY=''  # normal mode; per-case tests set to 1
     export BUG_PIPELINE_APPROVER_ID="770000000000000007"
     export BUG_PIPELINE_IDLE_SECS=100
     export BUG_PIPELINE_BACKOFF_SECS=100
@@ -310,7 +311,8 @@ bpt_reset() {
     unset GH_FAIL STUB_THREAD_ID STUB_MESSAGE_ID STUB_ISSUE_NUMBER WT_NEW_FAIL STUB_CREATE_THREAD_FAIL \
           CLAIM_NEXT_RC LIST_ACTIVE_RC \
           STUB_MERGE_STATE STUB_MERGEABLE STUB_PR_VIEW_FAIL \
-          STUB_DM_RC STUB_POST_THREAD_FAIL
+          STUB_DM_RC STUB_POST_THREAD_FAIL \
+          BUG_PIPELINE_FILE_ISSUES_ONLY STUB_REPLY_FAIL
 }
 
 bpt_set_actionable()  { printf '%s' "$1" > "$STUB/actionable.json"; }

@@ -100,6 +100,9 @@ cron on the trusted Mac, never in prod PHP.
   service restart, no lease reset, no re-queue, no `blocked_until` edit — by design: detection and
   alerting only, so a diagnostic run can never itself perturb the pipeline it is measuring.
 
+## Addendum — file-issues-only mode (2026-09-14)
+
+`bin/bug-pipeline-tick` gains a `BUG_PIPELINE_FILE_ISSUES_ONLY` flag (default empty = normal mode; set `1` to enable). When on, the driver files a GitHub Issue and replies to the GM's original Discord message for every incoming report, then transitions the row to a new `filed` terminal status — no autonomous hunting, no CI autofix, no feature-gathering. In-flight rows in `gathering`, `awaiting_ajay`, and `blocked` states are drained to `filed` on the next tick. The `bin/bug-pipeline-cron-setup` plist now emits a `BUG_PIPELINE_FILE_ISSUES_ONLY` `EnvironmentVariables` key (default empty) so the operator can enable the mode without rewriting the plist. Migration 177 adds the `filed` enum value and three idempotent backfill UPDATE statements that clear in-flight rows safely when the migration runs on an existing DB.
 ## Addendum — a third health signal, and local-only tables survive a prod sync (2026-09-14)
 
 Two gaps this ADR's topology left open both fired at once on 2026-09-14, and both are now closed.

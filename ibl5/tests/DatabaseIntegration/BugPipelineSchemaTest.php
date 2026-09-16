@@ -188,7 +188,7 @@ final class BugPipelineSchemaTest extends DatabaseTestCase
         $row = $stmt->get_result()->fetch_assoc();
         self::assertNotNull($row, 'ibl_bug_reports.status column not found');
         self::assertSame(
-            "enum('queued','awaiting_info','hunting','blocked','pr_open','fixed','needs_human','parked_idle','gathering','awaiting_ajay','planned','dropped')",
+            "enum('queued','awaiting_info','hunting','blocked','pr_open','fixed','needs_human','parked_idle','gathering','awaiting_ajay','planned','dropped','filed')",
             $row['COLUMN_TYPE'],
             'ibl_bug_reports.status enum set must match exactly (missing/extra/misspelled value fails here)'
         );

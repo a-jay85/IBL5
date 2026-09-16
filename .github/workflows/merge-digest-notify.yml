@@ -20,7 +20,7 @@ name: Merge digest notify
 # does not materialise, the first real DM lands on the next merge and a human still
 # eyeballs it before the change is treated as done.
 #
-# The checkout below pins `ref:` to the BASE branch instead of defaulting to `github.ref`.
+# The checkout below pins `ref:` to the DEFAULT branch instead of defaulting to `github.ref`.
 # Two reasons, both load-bearing:
 #   1. Correctness. `github.ref` on this event is `refs/pull/N/merge`, and that ref is
 #      DELETED once the PR merges -- listing the remote's `refs/pull/<merged-N>/*` returns
@@ -30,6 +30,12 @@ name: Merge digest notify
 #   2. Semantics. The DM must be built by the parser that lives on the default branch, not
 #      by the copy inside the PR being announced -- otherwise a PR that edits
 #      bin/digest-dm-build gets announced by its own unreviewed parser.
+#
+# `repository.default_branch`, NOT `pull_request.base.ref`. They differ for a STACKED PR
+# (bin/wt-new --base <branch>), whose base is a feature branch rather than master. That
+# branch can predate this workflow entirely and so may not carry bin/digest-dm-build at
+# all, which would red the run at the builder step. The default branch always carries the
+# deployed parser, which is also the one reason (2) above asks for.
 
 on:
   pull_request:
@@ -59,11 +65,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # The branch this PR merged INTO (`master`), never the default `github.ref`.
+          # The DEFAULT branch, never the implicit `github.ref` and never `base.ref`.
           # See the deployment note in this file's header: `github.ref` here is the
-          # post-merge-deleted `refs/pull/N/merge`, and master's copy of the parser is
-          # the one that must build the DM.
-          ref: ${{ github.event.pull_request.base.ref }}
+          # post-merge-deleted `refs/pull/N/merge`, `base.ref` is a feature branch for a
+          # stacked PR, and only the default branch is guaranteed to carry the deployed
+          # copy of bin/digest-dm-build that must build the DM.
+          ref: ${{ github.event.repository.default_branch }}
 
       - name: Build merge-digest DM
         env:

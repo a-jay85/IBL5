@@ -1242,5 +1242,27 @@ AFTER64="$(cat "$PLAN_V54")"
   && ok "(64) veronly: re-run on armed plan is rc 0 and plan is byte-identical (idempotent)" \
   || bad "(64) veronly: idempotency re-run"
 
+# Case 65: hold section with hold-check sub-lines and verification matrix heading → matrix survives
+SB2="$(build_veronly_repo)"
+R="$SB2/repo"
+PLAN_V="$SB2/home/claude-plans/$VR_SLUG.md"
+printf '%s\n' 'last_verified: 2026-01-01' > "$R/ibl5/docs/x.md"
+git -C "$R" commit -qam "reseed base" >/dev/null 2>&1
+git -C "$R" branch -f "$VR_SLUG" master
+git -C "$R" checkout -q "$VR_SLUG"
+printf '%s\n' '---' 'auto_merge: false' '---' '' '# Stale-docs auto-refresh' \
+    '' '## Automouse Hold Justification' '' '**Category:** test' \
+    '**Decision:** verifying range' '**Discharged by matrix rows:** 39, 43' \
+    '' '## Verification Matrix' \
+    > "$PLAN_V"
+printf '%s\n' 'last_verified: 2026-09-16' > "$R/ibl5/docs/x.md"
+( cd "$R" && HOME="$SB2/home" DOCFIX_BASE_REF=master \
+    "$REAL_VERONLY" "$VR_SLUG" >/dev/null 2>&1 ) && VRC=0 || VRC=$?
+{ [ "$VRC" -eq 0 ] \
+    && grep -q '## Verification Matrix' "$PLAN_V" \
+    && ! grep -q '## Automouse Hold Justification' "$PLAN_V"; } \
+  && ok "(65) veronly: hold section with hold-check sub-lines deletes correctly, matrix survives (rc 0)" \
+  || bad "(65) veronly: hold-check sub-lines and matrix range"
+
 if [ "$FAILED" -eq 0 ]; then echo "All docfix-run checks passed."; else echo "Some docfix-run checks FAILED."; fi
 exit "$FAILED"

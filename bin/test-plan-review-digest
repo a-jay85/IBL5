@@ -1,0 +1,638 @@
+#!/usr/bin/env bash
+# bin/test-plan-review-digest — harness for bin/plan-review-digest
+# Run: bin/test-plan-review-digest  (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+PASS=0
+FAIL=0
+PRD_OUT="" PRD_ERR="" PRD_RC=0
+SANDBOX=""
+PRD_BIN=""
+
+prd_setup() {
+    PRD_BIN="$(cd "$(dirname "$0")" && pwd)/plan-review-digest"
+    SANDBOX="$(mktemp -d)"
+    trap 'rm -rf "$SANDBOX"' EXIT
+}
+
+prd_fixture() {
+    local name="$1"
+    cat > "$SANDBOX/$name.md"
+    echo "$SANDBOX/$name.md"
+}
+
+prd_run() {
+    PRD_OUT="$(PLAN_REVIEW_DIGEST_MAX_CHARS="" "$PRD_BIN" "$@" 2>"$SANDBOX/prd_err")"
+    PRD_RC=$?
+    PRD_ERR="$(cat "$SANDBOX/prd_err")"
+}
+
+prd_expect_eq() {
+    local label="$1" expected="$2" actual="$3"
+    if [ "$actual" = "$expected" ]; then
+        prd_ok "$label"
+    else
+        prd_fail "$label (expected '$expected', got '$actual')"
+    fi
+}
+
+prd_out_has() {
+    if printf '%s' "$PRD_OUT" | grep -qF "$1"; then
+        prd_ok "$2"
+    else
+        prd_fail "$2 (expected in stdout: $1)"
+    fi
+}
+
+prd_out_lacks() {
+    if printf '%s' "$PRD_OUT" | grep -qF "$1"; then
+        prd_fail "$2 (unexpected in stdout: $1)"
+    else
+        prd_ok "$2"
+    fi
+}
+
+prd_err_has() {
+    if printf '%s' "$PRD_ERR" | grep -qF "$1"; then
+        prd_ok "$2"
+    else
+        prd_fail "$2 (expected in stderr: $1)"
+    fi
+}
+
+prd_ok()   { PASS=$(( PASS + 1 )); printf 'ok  %s\n' "$1"; }
+prd_fail() { FAIL=$(( FAIL + 1 )); printf 'FAIL %s\n' "$1"; }
+
+prd_setup
+
+# ── FIXTURES ──────────────────────────────────────────────────────────────────
+
+HOLD_AND_MANUAL="$(prd_fixture hold-and-manual <<'EOF'
+# Test plan
+
+## Approach
+Some approach text.
+
+## Automouse Hold Justification
+This plan needs human review because it touches auth.
+
+### Why it matters
+It can break logins.
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | Check dashboard renders | CLI-executable | post-impl | `bin/test-foo` |
+| 2 | Visually confirm the login page looks right | Truly-manual | post-impl | `vr: screenshots/login.png` |
+
+## Out of Scope
+Nothing.
+EOF
+)"
+
+HOLD_SUBHEADS="$(prd_fixture hold-subheads <<'EOF'
+# Test plan
+
+## Automouse Hold Justification
+Main hold text.
+
+### Sub-section
+Sub-section text goes here.
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | Something automated | CLI-executable | post-impl | `bin/test-x` |
+EOF
+)"
+
+HOLD_ONLY="$(prd_fixture hold-only <<'EOF'
+# Test plan
+
+## Automouse Hold Justification
+This plan has a hold but no manual rows.
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | Something automated | CLI-executable | post-impl | `bin/test-x` |
+EOF
+)"
+
+MANUAL_ONLY="$(prd_fixture manual-only <<'EOF'
+# Test plan with no hold
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | Confirm the result looks good | Truly-manual | post-impl | `vr: screenshots/result.png` |
+| 2 | Automated check | CLI-executable | post-impl | `bin/test-x` |
+EOF
+)"
+
+NEITHER="$(prd_fixture neither <<'EOF'
+# Test plan with neither
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | Something automated | CLI-executable | post-impl | `bin/test-x` |
+EOF
+)"
+
+FENCED_DECOY="$(prd_fixture fenced-decoy <<'EOF'
+# Test plan
+
+## Approach
+Here is an example:
+
+```markdown
+## Automouse Hold Justification
+This is inside a fence and should be ignored.
+```
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | Something automated | CLI-executable | post-impl | `bin/test-x` |
+EOF
+)"
+
+NESTED_FENCE="$(prd_fixture nested-fence <<'EOF'
+# Test plan
+
+## Approach
+Outer fence:
+
+```bash
+some code
+~~~
+nested fence block content that must not leak
+~~~
+more outer code
+```
+
+## Automouse Hold Justification
+Real hold body here.
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | Something automated | CLI-executable | post-impl | `bin/test-x` |
+EOF
+)"
+
+EMPTY_HOLD="$(prd_fixture empty-hold <<'EOF'
+# Test plan
+
+## Automouse Hold Justification
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | Something automated | CLI-executable | post-impl | `bin/test-x` |
+EOF
+)"
+
+LOWERCASE_HOLD="$(prd_fixture lowercase-hold <<'EOF'
+# Test plan
+
+## automouse hold justification
+Hold body in lowercase heading plan.
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | Something automated | CLI-executable | post-impl | `bin/test-x` |
+EOF
+)"
+
+FOREIGN_TABLE="$(prd_fixture foreign-table <<'EOF'
+# Test plan
+
+## Architectural trade-offs
+
+| Decision | Chosen | Rejected |
+|---|---|---|
+| Method | Fast | Truly-manual approach |
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | Something automated | CLI-executable | post-impl | `bin/test-x` |
+EOF
+)"
+
+TYPE_CELL_NEG="$(prd_fixture type-cell-neg <<'EOF'
+# Test plan
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | This row replaces the truly-manual check from the old process | CLI-executable | post-impl | `bin/test-x` |
+| 2 | The real manual check | Truly-manual | post-impl | `screenshots/x.png` |
+EOF
+)"
+
+ESCAPED_PIPE="$(prd_fixture escaped-pipe <<'EOF'
+# Test plan
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | Check A \| B works correctly | Truly-manual | post-impl | `screenshots/result.png` |
+EOF
+)"
+
+SIX_COL="$(prd_fixture six-col <<'EOF'
+# Test plan
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location | PR |
+|---|---|---|---|---|---|
+| 1 | Visually confirm the button | Truly-manual | post-impl | `screenshots/btn.png` | #123 |
+EOF
+)"
+
+EMPTY_LOC="$(prd_fixture empty-loc <<'EOF'
+# Test plan
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | Row with empty location | Truly-manual | post-impl | |
+EOF
+)"
+
+# Build an oversized fixture: a hold section plus 40 manual rows
+{
+    printf '# Oversized plan\n\n'
+    printf '## Automouse Hold Justification\n'
+    printf 'Hold justification line.\n\n'
+    printf '## Verification Matrix\n\n'
+    printf '| # | What to verify | Test type | Timing | Test file / location |\n'
+    printf '|---|---|---|---|---|\n'
+    for i in $(seq 1 40); do
+        # shellcheck disable=SC2016
+        printf '| %d | Manually inspect the result of step %d closely for visual issues | Truly-manual | post-impl | `screenshots/step%d.png` |\n' "$i" "$i" "$i"
+    done
+} | prd_fixture oversized > /dev/null
+OVERSIZED="$SANDBOX/oversized.md"
+
+SEPARATOR_ROW="$(prd_fixture separator-row <<'EOF'
+# Test plan
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | Manual check | Truly-manual | post-impl | `screenshots/x.png` |
+|---|---|---|---|---|
+EOF
+)"
+
+FENCED_MATRIX="$(prd_fixture fenced-matrix <<'EOF'
+# Test plan
+
+## Approach
+Example:
+
+```
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | Fenced manual row | Truly-manual | post-impl | `screenshots/fenced.png` |
+```
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| 1 | Automated check | CLI-executable | post-impl | `bin/test-x` |
+EOF
+)"
+
+# ── Phase 1: CLI contract ─────────────────────────────────────────────────────
+
+prd_run --help
+prd_expect_eq "help exits 0" 0 "$PRD_RC"
+prd_err_has "default 1500" "help mentions default 1500"
+
+prd_run --maxchars=900 "$NEITHER"
+prd_expect_eq "NEG unknown flag exits 2" 2 "$PRD_RC"
+prd_err_has "unknown option" "unknown flag stderr says unknown option"
+
+prd_run --max-chars 900 "$NEITHER"
+prd_expect_eq "NEG space form exits 2" 2 "$PRD_RC"
+
+PRD_OUT="$(PLAN_REVIEW_DIGEST_MAX_CHARS="" "$PRD_BIN" --max-chars=abc "$NEITHER" 2>"$SANDBOX/prd_err")"; PRD_RC=$?; PRD_ERR="$(cat "$SANDBOX/prd_err")"
+prd_expect_eq "NEG non-numeric flag exits 2" 2 "$PRD_RC"
+prd_err_has "positive integer" "non-numeric flag stderr mentions positive integer"
+
+PRD_OUT="$(PLAN_REVIEW_DIGEST_MAX_CHARS=xyz "$PRD_BIN" "$NEITHER" 2>"$SANDBOX/prd_err")"; PRD_RC=$?; PRD_ERR="$(cat "$SANDBOX/prd_err")"
+prd_expect_eq "NEG non-numeric env exits 2" 2 "$PRD_RC"
+
+prd_run --max-chars=50 "$NEITHER"
+prd_expect_eq "NEG below minimum exits 2" 2 "$PRD_RC"
+prd_err_has ">= 200" "below-minimum stderr mentions >= 200"
+
+PRD_OUT="$(env -u PLAN_REVIEW_DIGEST_MAX_CHARS "$PRD_BIN" "$NEITHER" 2>"$SANDBOX/prd_err")"; PRD_RC=$?; PRD_ERR="$(cat "$SANDBOX/prd_err")"
+prd_expect_eq "NEG env unset exits 0" 0 "$PRD_RC"
+OUT_UNSET="$PRD_OUT"
+
+PRD_OUT="$(PLAN_REVIEW_DIGEST_MAX_CHARS="" "$PRD_BIN" "$NEITHER" 2>"$SANDBOX/prd_err")"; PRD_RC=$?; PRD_ERR="$(cat "$SANDBOX/prd_err")"
+prd_expect_eq "NEG env empty exits 0" 0 "$PRD_RC"
+if [ "$PRD_OUT" = "$OUT_UNSET" ]; then
+    prd_ok "env unset vs empty produce identical output"
+else
+    prd_fail "env unset vs empty should produce identical output"
+fi
+
+PRD_OUT="$(PLAN_REVIEW_DIGEST_MAX_CHARS=1500 "$PRD_BIN" --max-chars=400 "$NEITHER" 2>"$SANDBOX/prd_err")"; PRD_RC=$?; PRD_ERR="$(cat "$SANDBOX/prd_err")"
+prd_expect_eq "NEG flag beats env exits 0" 0 "$PRD_RC"
+
+prd_run /nonexistent/plan.md
+prd_expect_eq "NEG missing file exits 1" 1 "$PRD_RC"
+prd_err_has "cannot read plan file" "missing file stderr message"
+
+prd_run
+prd_expect_eq "NEG no argument exits 2" 2 "$PRD_RC"
+prd_err_has "no plan file given" "no argument stderr message"
+
+# ── Phase 2: hold extraction ─────────────────────────────────────────────────
+
+prd_run "$HOLD_AND_MANUAL"
+prd_expect_eq "hold present exits 0" 0 "$PRD_RC"
+prd_out_has "HOLD —" "hold present: stdout contains HOLD —"
+prd_out_has "human review because" "hold present: stdout contains hold body"
+
+prd_run "$HOLD_SUBHEADS"
+prd_out_has "Sub-section text goes here." "hold with subheads: subhead content present"
+
+prd_run "$HOLD_SUBHEADS"
+prd_out_lacks "## Verification Matrix" "section boundary: later heading absent"
+
+prd_run "$FENCED_DECOY"
+prd_expect_eq "NEG fenced decoy exits 0" 0 "$PRD_RC"
+prd_out_lacks "HOLD —" "fenced decoy: HOLD — absent"
+prd_out_has "No judgement needed" "fenced decoy: nothing-needed line present"
+
+prd_run "$NESTED_FENCE"
+prd_out_has "Real hold body here." "nested fence: real hold found"
+prd_out_lacks "nested fence block content" "nested fence: nested block contents absent"
+
+prd_run "$EMPTY_HOLD"
+prd_out_lacks "HOLD —" "NEG empty hold body: no HOLD —"
+prd_out_has "No judgement needed" "NEG empty hold body: nothing-needed line"
+
+prd_run "$NEITHER"
+prd_expect_eq "NEG no hold at all exits 0" 0 "$PRD_RC"
+prd_out_has "No judgement needed" "NEG no hold: nothing-needed line"
+
+prd_run "$LOWERCASE_HOLD"
+prd_out_has "HOLD —" "case-insensitive heading: matched"
+prd_out_has "Hold body in lowercase" "case-insensitive heading: body present"
+
+# ── Phase 3: manual row extraction ───────────────────────────────────────────
+
+prd_run "$HOLD_AND_MANUAL"
+prd_out_has "HOLD —" "hold+manual: HOLD — present"
+prd_out_has "MANUAL CHECKS —" "hold+manual: MANUAL CHECKS — present"
+prd_out_has "2." "hold+manual: row 2 present"
+prd_out_has "screenshots/login.png" "hold+manual: location present"
+
+prd_run "$MANUAL_ONLY"
+prd_expect_eq "manual only exits 0" 0 "$PRD_RC"
+prd_out_has "MANUAL CHECKS —" "manual only: MANUAL CHECKS present"
+prd_out_lacks "HOLD —" "manual only: HOLD — absent"
+
+prd_run "$TYPE_CELL_NEG"
+prd_out_lacks "replaces the truly-manual" "NEG type-cell: CLI row with truly-manual text absent"
+prd_out_has "MANUAL CHECKS —" "NEG type-cell: real manual row present"
+
+prd_run "$HOLD_ONLY"
+prd_out_lacks "MANUAL CHECKS —" "NEG hold only: no MANUAL CHECKS header"
+
+prd_run "$SEPARATOR_ROW"
+_sep_lines="$(printf '%s' "$PRD_OUT" | grep -c '^---' || true)"
+if [ "$_sep_lines" -eq 0 ]; then
+    prd_ok "NEG separator row: no --- lines in output"
+else
+    prd_fail "NEG separator row: --- appeared in output"
+fi
+
+prd_run "$FOREIGN_TABLE"
+prd_out_lacks "Truly-manual approach" "NEG foreign table: comparison table row absent"
+
+prd_run "$FENCED_MATRIX"
+prd_out_lacks "Fenced manual row" "NEG fenced matrix: fenced example matrix absent"
+
+prd_run "$EMPTY_LOC"
+prd_out_lacks "Row with empty location" "NEG empty location: skipped row absent"
+
+prd_run "$ESCAPED_PIPE"
+prd_out_has "A | B" "escaped pipe: literal | in output"
+prd_out_lacks 'A \| B' "escaped pipe: cell not cut at escaped pipe"
+
+prd_run "$SIX_COL"
+prd_out_has "Visually confirm the button" "six-column variant: row parsed"
+
+# ── Phase 4: sizing and truncation ────────────────────────────────────────────
+
+prd_run "$HOLD_AND_MANUAL"
+prd_out_lacks "…" "under budget: no tail pointer"
+_chars="$(printf '%s' "$PRD_OUT" | wc -m | tr -d ' ')"
+if [ "$_chars" -lt 1500 ]; then
+    prd_ok "under budget: wc -m < 1500"
+else
+    prd_fail "under budget: wc -m >= 1500 (got $_chars)"
+fi
+
+prd_run "$OVERSIZED"
+_chars="$(printf '%s' "$PRD_OUT" | wc -m | tr -d ' ')"
+if [ "$_chars" -le 1500 ]; then
+    prd_ok "oversized truncates: wc -m <= 1500"
+else
+    prd_fail "oversized truncates: wc -m > 1500 (got $_chars)"
+fi
+_last="$(printf '%s' "$PRD_OUT" | tail -1)"
+if printf '%s' "$_last" | grep -qE '^…[0-9]+ more lines — full plan at ' && \
+   printf '%s' "$_last" | grep -qF "$OVERSIZED"; then
+    prd_ok "oversized truncates: last line is tail pointer"
+else
+    prd_fail "oversized truncates: last line should be tail pointer, got: $_last"
+fi
+
+PREFIX="$(printf '%0.s=' $(seq 1 400))"  # 400 = chars
+_combined="$(printf '%s\n%s' "$PREFIX" "$PRD_OUT")"
+_total="$(printf '%s' "$_combined" | wc -m | tr -d ' ')"
+if [ "$_total" -le 1900 ]; then
+    prd_ok "NEG discord-dm headroom: 400-char prefix + digest <= 1900"
+else
+    prd_fail "NEG discord-dm headroom: 400-char prefix + digest > 1900 (got $_total)"
+fi
+_last_full="$(printf '%s' "$PRD_OUT" | tail -1)"
+if printf '%s' "$_last_full" | grep -qE '^…[0-9]+ more lines — full plan at'; then
+    prd_ok "NEG discord-dm headroom: pointer still last line after prefix"
+else
+    prd_fail "NEG discord-dm headroom: pointer should still be last line"
+fi
+
+prd_run --max-chars=200 "$OVERSIZED"
+_chars="$(printf '%s' "$PRD_OUT" | wc -m | tr -d ' ')"
+if [ "$_chars" -le 200 ]; then
+    prd_ok "NEG pointer survives tiny cap: wc -m <= 200"
+else
+    prd_fail "NEG pointer survives tiny cap: wc -m > 200 (got $_chars)"
+fi
+_last="$(printf '%s' "$PRD_OUT" | tail -1)"
+if printf '%s' "$_last" | grep -qE '^…[0-9]+ more lines — full plan at'; then
+    prd_ok "NEG pointer survives tiny cap: pointer is last line"
+else
+    prd_fail "NEG pointer survives tiny cap: pointer not last line, got: $_last"
+fi
+
+for cap in 200 400 900 1500; do
+    _out="$(PLAN_REVIEW_DIGEST_MAX_CHARS="" "$PRD_BIN" --max-chars="$cap" "$OVERSIZED" 2>/dev/null)"
+    _second_to_last="$(printf '%s' "$_out" | tail -2 | head -1)"
+    _third_to_last="$(printf '%s' "$_out" | tail -3 | head -1)"
+    # An orphan is a location line (4-space indent) whose row header (N. ...) is absent
+    if printf '%s' "$_second_to_last" | grep -qE '^    ' && \
+       ! printf '%s' "$_third_to_last" | grep -qE '^[0-9]+\.'; then
+        prd_fail "NEG no orphan location line at cap $cap: found orphan: $_second_to_last"
+    else
+        prd_ok "NEG no orphan location line at cap $cap"
+    fi
+done
+
+# Regression guard: truncation must retain manual rows, not drop all of them
+for cap in 900 1500; do
+    _out="$(PLAN_REVIEW_DIGEST_MAX_CHARS="" "$PRD_BIN" --max-chars="$cap" "$OVERSIZED" 2>/dev/null)"
+    _row_count="$(printf '%s' "$_out" | grep -cE '^[0-9]+\.' || true)"
+    if [ "$_row_count" -ge 1 ]; then
+        prd_ok "NEG truncation retains rows at cap $cap: $_row_count row(s) kept"
+    else
+        prd_fail "NEG truncation retains rows at cap $cap: 0 rows retained (all dropped)"
+    fi
+done
+
+# oversized with only hold lines (no manual rows to show MANUAL CHECKS dangling)
+{
+    printf '# Test\n\n## Automouse Hold Justification\n'
+    for i in $(seq 1 100); do printf 'Hold line %d.\n' "$i"; done
+    printf '\n## Verification Matrix\n\n'
+    printf '| # | What to verify | Test type | Timing | Test file / location |\n'
+    printf '|---|---|---|---|---|\n'
+    # shellcheck disable=SC2016
+    printf '| 1 | Automated | CLI-executable | post-impl | `bin/test-x` |\n'
+} | prd_fixture oversized-hold-only > /dev/null
+OH_FIXTURE="$SANDBOX/oversized-hold-only.md"
+# Find a cap low enough to truncate
+_oh_out="$(PLAN_REVIEW_DIGEST_MAX_CHARS="" "$PRD_BIN" --max-chars=300 "$OH_FIXTURE" 2>/dev/null)"
+if printf '%s' "$_oh_out" | grep -qF "MANUAL CHECKS —"; then
+    prd_fail "NEG no empty section header: MANUAL CHECKS dangling after truncation"
+else
+    prd_ok "NEG no empty section header: MANUAL CHECKS absent"
+fi
+
+prd_run "$HOLD_ONLY"
+prd_out_lacks "…" "NEG pointer only when truncated: no pointer on under-budget"
+
+# Sandbox file (outside ~/claude-plans/) truncation path
+{
+    printf '# Test\n\n## Automouse Hold Justification\n'
+    for i in $(seq 1 100); do printf 'Hold line %d.\n' "$i"; done
+} | prd_fixture truthful-path > /dev/null
+TP_FIXTURE="$SANDBOX/truthful-path.md"
+_tp_out="$(PLAN_REVIEW_DIGEST_MAX_CHARS="" "$PRD_BIN" --max-chars=300 "$TP_FIXTURE" 2>/dev/null)"
+_tp_last="$(printf '%s' "$_tp_out" | tail -1)"
+# shellcheck disable=SC2088
+if printf '%s' "$_tp_last" | grep -qF '~/claude-plans/'; then
+    prd_fail "NEG truthful path: pointer shows ~/claude-plans/ for sandbox file"
+elif printf '%s' "$_tp_last" | grep -qF "$SANDBOX"; then
+    prd_ok "NEG truthful path: pointer names the sandbox path"
+else
+    prd_fail "NEG truthful path: pointer not found: $_tp_last"
+fi
+
+_in_lines="$("$PRD_BIN" --max-chars=100000 "$OVERSIZED" 2>/dev/null | awk 'END{print NR}')"
+_prd_out_full="$("$PRD_BIN" "$OVERSIZED" 2>/dev/null)"
+_pointer_n="$(printf '%s' "$_prd_out_full" | tail -1 | grep -oE '^…[0-9]+' | tr -d '…')"
+_content_lines="$(printf '%s' "$_prd_out_full" | grep -c '' || true)"
+_content_lines=$(( _content_lines - 1 ))  # subtract the pointer line
+if [ -n "$_pointer_n" ] && [ "$(( _content_lines + _pointer_n ))" -eq "$_in_lines" ]; then
+    prd_ok "count is honest: N + content lines == input lines"
+else
+    prd_fail "count is honest: N=$_pointer_n content=$_content_lines total=$_in_lines"
+fi
+
+# ── Phase 5: seam harness structural contract ─────────────────────────────────
+
+SEAM_BIN="$(cd "$(dirname "$0")" && pwd)/test-plan-review-seam"
+
+"$SEAM_BIN" > "$SANDBOX/seam_out" 2>&1
+prd_expect_eq "skip exits clean" 0 "$?"
+SEAM_OUT="$(cat "$SANDBOX/seam_out")"
+
+if printf '%s' "$SEAM_OUT" | grep -qE '^SKIP'; then
+    prd_ok "skip names the unit: stdout begins with SKIP"
+else
+    prd_fail "skip names the unit: stdout should begin with SKIP"
+fi
+if printf '%s' "$SEAM_OUT" | grep -qF "discord-plan-review-3-drain"; then
+    prd_ok "skip names the unit: discord-plan-review-3-drain present"
+else
+    prd_fail "skip names the unit: discord-plan-review-3-drain not found in output"
+fi
+
+_skip_gate_count="$(grep -c '# ── SKIP GATE' "$SEAM_BIN" 2>/dev/null || true)"
+if [ "$_skip_gate_count" -eq 1 ]; then
+    prd_ok "NEG markers unique: SKIP GATE appears exactly once"
+else
+    prd_fail "NEG markers unique: SKIP GATE count = $_skip_gate_count (expected 1)"
+fi
+
+_end_gate_count="$(grep -c '# ── END SKIP GATE' "$SEAM_BIN" 2>/dev/null || true)"
+if [ "$_end_gate_count" -eq 1 ]; then
+    prd_ok "NEG markers unique: END SKIP GATE appears exactly once"
+else
+    prd_fail "NEG markers unique: END SKIP GATE count = $_end_gate_count (expected 1)"
+fi
+
+_stub_count="$(grep -c 'seam_fail "unimplemented' "$SEAM_BIN" 2>/dev/null || true)"
+if [ "$_stub_count" -eq 3 ]; then
+    prd_ok "NEG stubs fail loudly: 3 unimplemented stubs present"
+else
+    prd_fail "NEG stubs fail loudly: stub count = $_stub_count (expected 3)"
+fi
+
+if grep -qiE 'Truly.manual' "$SEAM_BIN" 2>/dev/null && grep -qiE 'Automouse Hold Justification' "$SEAM_BIN" 2>/dev/null; then
+    prd_ok "NEG fixture intact: Truly-manual and hold heading present"
+else
+    prd_fail "NEG fixture intact: fixture missing required content"
+fi
+
+if [ -x "$SEAM_BIN" ]; then
+    prd_ok "NEG executable: seam harness has executable bit"
+else
+    prd_fail "NEG executable: seam harness missing executable bit"
+fi
+
+# ── Summary ───────────────────────────────────────────────────────────────────
+
+printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
+[ "$FAIL" -eq 0 ]

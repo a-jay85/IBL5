@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+# shellcheck disable=SC2317,SC2329
+# bin/test-plan-review-seam — end-to-end acceptance test for the plan-review program.
+# Landed skipped in discord-plan-review-1-digest; un-skipped by discord-plan-review-3-drain.
+
+set -u
+
+HERE="$(cd "$(dirname "$0")" && pwd)"
+
+# ── SKIP GATE — delete this whole block in discord-plan-review-3-drain ───────
+# This harness covers units 1, 2, and 3 of the discord-plan-review program. It is
+# wired into CI here on purpose: a SKIP line every run keeps the open obligation
+# visible and gives the quarterly meta-tooling cull the disposition signal it needs
+# to distinguish "temporarily skipped" from "dead". Unit 3 (discord-plan-review-3-drain)
+# un-skips this test by deleting the SKIP GATE block and replacing the three stubs below.
+echo "SKIP bin/test-plan-review-seam — the plan-review seam is not closed yet; discord-plan-review-3-drain un-skips this test by deleting the SKIP GATE block."
+exit 0
+# ── END SKIP GATE ────────────────────────────────────────────────────────────
+# shellcheck disable=SC2317,SC2329
+
+PASS=0
+FAIL=0
+SANDBOX="$(mktemp -d)"
+trap 'rm -rf "$SANDBOX"' EXIT
+
+seam_ok()   { PASS=$(( PASS + 1 )); printf 'ok  %s\n' "$1"; }
+seam_fail() { FAIL=$(( FAIL + 1 )); printf 'FAIL %s\n' "$1"; }
+
+PLAN="$SANDBOX/seam-fixture.md"
+cat > "$PLAN" <<'FIXTURE'
+# Seam fixture plan
+
+## Automouse Hold Justification
+This plan requires human review before auto-merging.
+
+## Verification Matrix
+
+| # | What to verify | Test type | Timing | Test file / location |
+|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
+| 1 | Confirm the feature looks right on mobile | Truly-manual | post-impl | vr: screenshots/mobile.png |
+FIXTURE
+
+seam_case_digest_produced() {
+    local out rc
+    out="$("$HERE/plan-review-digest" "$PLAN" 2>/dev/null)"
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+        seam_fail "digest produced: plan-review-digest exited $rc"
+        return
+    fi
+    seam_ok "digest produced: exit 0"
+    if printf '%s' "$out" | grep -qF "HOLD —"; then
+        seam_ok "digest produced: output contains HOLD —"
+    else
+        seam_fail "digest produced: output should contain HOLD —"
+    fi
+    local chars
+    chars="$(printf '%s' "$out" | wc -m | tr -d ' ')"
+    if [ "$chars" -le 1500 ]; then
+        seam_ok "digest produced: output <= 1500 chars"
+    else
+        seam_fail "digest produced: output > 1500 chars (got $chars)"
+    fi
+}
+
+seam_case_single_dm() {
+    # unit 2 fills this in: stub bin/discord-dm on PATH and assert one invocation
+    # carrying the tail pointer
+    seam_fail "unimplemented — discord-plan-review-3-drain"
+}
+
+seam_case_decision_recorded() {
+    # unit 3 fills this in: simulate approve and hold, assert distinguishable records
+    seam_fail "unimplemented — discord-plan-review-3-drain"
+}
+
+seam_case_decision_drained() {
+    # unit 3 fills this in: run the drain point and assert a second drain is a no-op
+    seam_fail "unimplemented — discord-plan-review-3-drain"
+}
+
+seam_case_digest_produced
+seam_case_single_dm
+seam_case_decision_recorded
+seam_case_decision_drained
+
+printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
+[ "$FAIL" -eq 0 ]

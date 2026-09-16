@@ -1038,6 +1038,10 @@ jobs:
         run: ibl5/bin/test-db-sync-now
       - name: bin/test-architect-contract-split
         run: bin/test-architect-contract-split
+      - name: bin/test-plan-review-digest
+        run: bin/test-plan-review-digest
+      - name: bin/test-plan-review-seam
+        run: bin/test-plan-review-seam
 
   gate:
     name: Tests and Analysis

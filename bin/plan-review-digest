@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+# bin/plan-review-digest — read-only filter: emits the hold-justification body and
+# Truly-manual Verification Matrix rows from a plan file to stdout, sized to one
+# Discord message. Nothing is written, no state is mutated.
+
+set -u
+
+DEFAULT_MAX_CHARS=1500  # 1900 (bin/discord-dm CAP) minus 400 reserved for a caller prefix
+MIN_MAX_CHARS=200
+
+usage() {
+    cat >&2 <<'EOF'
+Usage: bin/plan-review-digest [--max-chars=N] <plan-file>
+
+Reads a plan at <plan-file> and emits to stdout only the content requiring
+human judgement: the ## Automouse Hold Justification body and any Truly-manual
+Verification Matrix rows.
+
+Options:
+  --max-chars=N   Override the character budget (default 1500, minimum 200).
+                  Also reads PLAN_REVIEW_DIGEST_MAX_CHARS env var (flag wins).
+  --help, -h      Show this message and exit 0.
+
+Exit codes: 0 success, 1 runtime error, 2 usage error.
+EOF
+}
+
+die_usage() { printf 'plan-review-digest: %s\n' "$1" >&2; exit 2; }
+die_run()   { printf 'plan-review-digest: %s\n' "$1" >&2; exit 1; }
+
+PLAN_FILE=""
+CAP_FLAG=""
+
+for arg in "$@"; do
+    case "$arg" in
+        --max-chars=*)
+            CAP_FLAG="${arg#--max-chars=}"
+            ;;
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        -*)
+            die_usage "unknown option '$arg' (did you mean --max-chars=N?)"
+            ;;
+        *)
+            if [ -z "$PLAN_FILE" ]; then
+                PLAN_FILE="$arg"
+            else
+                die_usage "unexpected extra argument '$arg'"
+            fi
+            ;;
+    esac
+done
+
+[ -n "$PLAN_FILE" ] || die_usage "no plan file given"
+[ -r "$PLAN_FILE" ] || die_run "cannot read plan file: $PLAN_FILE"
+
+MAX_CHARS="$DEFAULT_MAX_CHARS"
+resolve_cap() {
+    local raw
+    if [ -n "$CAP_FLAG" ]; then
+        raw="$CAP_FLAG"
+    elif [ -n "${PLAN_REVIEW_DIGEST_MAX_CHARS:-}" ]; then
+        raw="${PLAN_REVIEW_DIGEST_MAX_CHARS:-}"
+    else
+        return 0
+    fi
+    case "$raw" in
+        ''|*[!0-9]*) die_usage "--max-chars must be a positive integer, got '$raw'" ;;
+    esac
+    [ "$raw" -ge "$MIN_MAX_CHARS" ] || die_usage "--max-chars must be >= $MIN_MAX_CHARS, got '$raw'"
+    MAX_CHARS="$raw"
+}
+resolve_cap
+
+NOTHING_LINE='No judgement needed — this plan has no hold justification and no truly-manual verification rows.'
+
+# --- fence-aware plan body --------------------------------------------------
+strip_fences() {
+    awk '
+        /^[[:space:]]*(```+|~~~+)/ {
+            if (match($0, /^[[:space:]]*(```+|~~~+)/)) {
+                m = substr($0, RSTART, RLENGTH)
+                sub(/^[[:space:]]+/, "", m)
+                c = substr(m, 1, 1)
+                if (!inf) { inf = 1; open_c = c; print ""; next }
+                else if (c == open_c) { inf = 0; print ""; next }
+            }
+        }
+        inf  { print ""; next }
+        { print }
+    ' "$1"
+}
+
+# --- extraction -------------------------------------------------------------
+extract_hold_section() {
+    awk '
+        tolower($0) ~ /^##[[:space:]]+automouse hold justification[[:space:]]*$/ { inh = 1; next }
+        inh && /^##[[:space:]]/ { exit }
+        inh { print }
+    ' | sed -e '/./,$!d' | awk '
+        { line[NR] = $0 }
+        /[^[:space:]]/ { last = NR }
+        END { for (i = 1; i <= last; i++) print line[i] }
+    '
+}
+
+extract_manual_rows() {
+    awk '
+        function trim(x) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", x); return x }
+        BEGIN { SEN = "\001" }
+        /\|[[:space:]]*[Ww]hat to verify[[:space:]]*\|/ { inm = 1; next }
+        inm && !/^[[:space:]]*\|/ { inm = 0; next }
+        !inm { next }
+        {
+            if ($0 !~ /[^ \t|:-]/) next
+            s = $0; gsub(/\\\|/, SEN, s); n = split(s, c, "|"); if (n < 6) next
+            num = trim(c[2]); what = trim(c[3]); type = trim(c[4]); when = trim(c[5]); loc = trim(c[6])
+            if (loc == "") next
+            if (tolower(type) !~ /truly[- ]manual/) next
+            gsub(SEN, "|", what); gsub(SEN, "|", loc)
+            sub(/^`/, "", loc); sub(/`$/, "", loc)
+            printf "%s. %s  [%s]\n    %s\n", num, what, when, loc
+        }
+    '
+}
+
+# --- assembly and sizing ----------------------------------------------------
+display_plan_path() {
+    case "$1" in
+        "$HOME"/claude-plans/*)
+            printf '%s/claude-plans/%s' '~' "${1##*/}"
+            ;;
+        *)
+            printf '%s' "$1"
+            ;;
+    esac
+}
+
+truncate_to_budget() {
+    awk -v max="$1" -v path="$2" '
+        { line[NR] = $0 }
+        END {
+            n = NR; total = 0
+            for (i = 1; i <= n; i++) total += length(line[i]) + 1
+            if (total - 1 <= max) { for (i = 1; i <= n; i++) print line[i]; exit }
+            keep = n
+            while (keep > 1) {
+                if (line[keep] ~ /^    /) keep--
+                keep--
+                if (keep >= 1 && line[keep] ~ /^(HOLD|MANUAL CHECKS) /) keep--
+                ptr = sprintf("…%d more lines — full plan at %s", n - keep, path)
+                len = length(ptr)
+                for (i = 1; i <= keep; i++) len += length(line[i]) + 1
+                if (len <= max) { for (i = 1; i <= keep; i++) print line[i]; print ptr; exit }
+            }
+            ptr = sprintf("…%d more lines — full plan at %s", n - 1, path)
+            avail = max - length(ptr) - 1; if (avail < 1) avail = 1
+            print substr(line[1], 1, avail); print ptr
+        }
+    '
+}
+
+assemble_digest() {
+    local masked hold rows body
+    masked="$(strip_fences "$1")"
+    hold="$(printf '%s\n' "$masked" | extract_hold_section)"
+    rows="$(printf '%s\n' "$masked" | extract_manual_rows)"
+    if [ -z "$hold" ] && [ -z "$rows" ]; then
+        printf '%s\n' "$NOTHING_LINE"
+        return 0
+    fi
+    body=""
+    if [ -n "$hold" ]; then
+        body="HOLD — why this plan is not auto-merging:
+$hold"
+    fi
+    if [ -n "$rows" ]; then
+        if [ -n "$body" ]; then
+            body="$body
+
+MANUAL CHECKS — rows only a human can run:
+$rows"
+        else
+            body="MANUAL CHECKS — rows only a human can run:
+$rows"
+        fi
+    fi
+    printf '%s\n' "$body" | truncate_to_budget "$2" "$(display_plan_path "$1")"
+}
+
+assemble_digest "$PLAN_FILE" "$MAX_CHARS"
+exit 0

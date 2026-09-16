@@ -282,6 +282,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             + (f" (fidelity degraded: {unavailable} unavailable)" if unavailable else ""))
         unresolved = conformance.check(plan, files, diff, phase5_status=phase5)
         res.unresolved_conformance = unresolved
+        _write_conformance_handoff(out_dir, unresolved)
         log(f"phase5.0 conformance: {unresolved or 'clean'}")
 
         # ---- Phase 6: manual-testing clearance ------------------------
@@ -418,6 +419,32 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         res.error_kind = e.kind
         log(f"FAILED: {res.error}")
     return _finish(res, out_dir)
+
+
+# Phase 5.0 handoff to the resumed skill session (rc=4). Run-dir-keyed, NOT
+# $PPID-keyed: the reader is a different process whose PID does not exist yet
+# at write time, so no /tmp/...-$PPID name the harness could pick would be the
+# one that process looks under. bin/post-plan-now passes these two paths to the
+# resume `claude -p` as DONE_MARK / BRIDGE. Both names are read back by
+# tests/test_post_plan_now_fallback.py, which is what keeps the two sides in sync.
+CONFORMANCE_DONE_NAME = "conformance-done"
+CONFORMANCE_BRIDGE_NAME = "missing-tests"
+
+
+def _write_conformance_handoff(out_dir: str, unresolved: list[str]) -> None:
+    """Publish the Phase 5.0 verdict into the run dir.
+
+    The marker's EXISTENCE is the signal that Phase 5.0 reached its end; the
+    bridge carries the items. The bridge is written unconditionally and is
+    EMPTY (zero bytes) when clean, because /post-plan Phase 6.5 condition (3)
+    tests it with `[ -s "$BRIDGE" ]` — a single stray newline there reads as
+    "unresolved items exist" and reproduces the exact spurious hold this
+    mechanism exists to remove. Build the payload per-item, never with
+    "\\n".join(...) + "\\n".
+    """
+    open(os.path.join(out_dir, CONFORMANCE_DONE_NAME), "w").close()
+    with open(os.path.join(out_dir, CONFORMANCE_BRIDGE_NAME), "w") as fh:
+        fh.write("".join(f"{item}\n" for item in unresolved))
 
 
 def _finish(res: RunResult, out_dir: str) -> RunResult:

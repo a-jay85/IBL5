@@ -452,6 +452,88 @@ def test_plan_override_reaches_the_python_harness_in_live_mode():
     assert "--live${PLAN_ARG}" in seg
 
 
+def _runner_module():
+    """Import tools/postplan-harness/runner.py the way test_skill_block_matches_resolver
+    imports harness.planfile. runner.py's CLI sits behind `if __name__ == "__main__":`
+    (runner.py:580), so importing it executes no argparse and touches no run dir."""
+    import sys as _sys
+    _sys.path.insert(0, os.path.join(REPO, "tools", "postplan-harness"))
+    import runner
+    return runner
+
+
+def test_resume_command_carries_the_run_dir_conformance_handoff(tmp_path):
+    """The rc=4 resume session must be told where the harness left its Phase 5.0 verdict.
+
+    Without this prefix the resumed session's $PPID is brand new, the
+    /tmp/post-plan-conformance-done-$PPID default in Phase 6.5 condition (3) resolves to
+    a path nobody wrote, and EVERY clean harness run prints
+    'BLOCKED: Phase 5.0 conformance never reached its end'.
+    """
+    runner = _runner_module()
+    cmd = _generate_cmd(tmp_path)
+    m_done = re.search(r'DONE_MARK="([^"]+)"', cmd)
+    m_bridge = re.search(r'BRIDGE="([^"]+)"', cmd)
+    assert m_done, f"generated command carries no DONE_MARK= assignment:\n{cmd!r}"
+    assert m_bridge, f"generated command carries no BRIDGE= assignment:\n{cmd!r}"
+    assert os.path.basename(m_done.group(1)) == runner.CONFORMANCE_DONE_NAME
+    assert os.path.basename(m_bridge.group(1)) == runner.CONFORMANCE_BRIDGE_NAME
+
+
+def test_conformance_handoff_is_scoped_to_the_rc4_arm(tmp_path):
+    """Negative/scoping path — the assertion this phase exists for.
+
+    The sibling `should_fallback` arm launches a FRESH /post-plan skill session from
+    Phase 0, which runs its own Phase 5.0 and must read its own $PPID-keyed files. If
+    DONE_MARK/BRIDGE leak onto that arm — via `export`, via an assignment hoisted above
+    `if [ "$rc" = 4 ]`, or via the same prefix pasted onto the fallback $PROMPT — that
+    session reads the FAILED harness run's stale marker and arms on a partial verdict.
+    That is strictly worse than the spurious hold this PR removes, and nothing else in
+    the suite would notice.
+    """
+    cmd = _generate_cmd(tmp_path)
+    assert cmd.count("DONE_MARK=") == 1, "handoff vars must appear exactly once (no export, no second arm)"
+    assert cmd.count("BRIDGE=") == 1
+    assert "export DONE_MARK" not in cmd
+    assert "export BRIDGE" not in cmd
+
+    i4 = cmd.index('if [ "$rc" = 4 ]; then')
+    ifb = cmd.index('elif should_fallback "$rc"; then')
+    assert i4 < cmd.index("DONE_MARK=") < ifb, "DONE_MARK= must sit inside the rc=4 arm"
+    assert i4 < cmd.index("BRIDGE=") < ifb, "BRIDGE= must sit inside the rc=4 arm"
+
+
+def test_handoff_paths_point_at_the_same_dir_the_harness_writes(tmp_path):
+    """Name-sync is necessary but not sufficient: the two paths must also resolve to the
+    run dir the harness was actually given as --out. If they name the right files under
+    the WRONG directory, every assertion above still passes and the resumed session still
+    finds nothing."""
+    cmd = _generate_cmd(tmp_path)
+    done = re.search(r'DONE_MARK="([^"]+)"', cmd).group(1)
+    bridge = re.search(r'BRIDGE="([^"]+)"', cmd).group(1)
+    run_dir = os.path.dirname(done)
+    assert os.path.dirname(bridge) == run_dir, "marker and bridge must share one run dir"
+    assert os.path.isabs(run_dir), f"run dir must be absolute in the generated command: {run_dir!r}"
+    # The harness segment embeds the same dir as its --out argument, so the literal must
+    # occur at least twice: once for --out, once for the handoff prefix.
+    assert cmd.count(run_dir) >= 2, \
+        f"handoff dir {run_dir!r} is not the dir handed to the harness as --out:\n{cmd!r}"
+
+
+def test_harness_run_dir_artifacts_are_gitignored():
+    """Boundary: the two new files live in the run dir, so they must never be committable.
+    Asserted behaviorally via git, not just by reading the line, because an ignore rule can
+    be overridden later by a negation pattern further down the file."""
+    gi = [l.strip() for l in open(os.path.join(REPO, ".gitignore")).read().splitlines()]
+    assert "tools/postplan-harness/out/" in gi
+
+    runner = _runner_module()
+    for name in (runner.CONFORMANCE_DONE_NAME, runner.CONFORMANCE_BRIDGE_NAME):
+        rel = f"tools/postplan-harness/out/live-probe-ts/{name}"
+        r = subprocess.run(["git", "check-ignore", "-q", rel], cwd=REPO)
+        assert r.returncode == 0, f"{rel} is NOT gitignored (git check-ignore rc={r.returncode})"
+
+
 # ---------------------------------------------------------------------------
 # Rows 1-7: --foreground mode (Verification Matrix, Phase 5)
 # ---------------------------------------------------------------------------

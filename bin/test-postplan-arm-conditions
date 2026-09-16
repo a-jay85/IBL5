@@ -96,11 +96,39 @@ run_isolated() {
         bash -c "$1" 2>&1
 }
 
-# run_cond3 <block> <marker: yes|no> <bridge: absent|empty|items> — condition (3)
-# reads /tmp state rather than gh, so it gets its own runner: the block's
-# $DONE_MARK/$BRIDGE defaults are overridden to point into $BASE_TMP.
+# harness_handoff_names — echo "<done-basename> <bridge-basename>" exactly as
+# bin/post-plan-now spells them in its rc=4 RESUME_SEG. DERIVED, never hardcoded:
+# this is the shell half of the cross-language name binding whose Python half is
+# tools/postplan-harness/tests/test_post_plan_now_fallback.py. Hardcoding the two
+# names here would let a rename pass this suite while breaking the live handoff.
+harness_handoff_names() {
+    local seg d b
+    seg="$(grep -m1 'RESUME_SEG=' "$REPO_ROOT/bin/post-plan-now")"
+    d="$(grep -m1 -oE 'DONE_MARK=\\"\$HARNESS_RUN_DIR/[A-Za-z0-9._-]+' <<< "$seg")"
+    b="$(grep -m1 -oE 'BRIDGE=\\"\$HARNESS_RUN_DIR/[A-Za-z0-9._-]+' <<< "$seg")"
+    printf '%s %s\n' "${d##*/}" "${b##*/}"
+}
+
+# run_cond3 <block> <marker: yes|no> <bridge: absent|empty|items|fileitems> [style: flat|rundir]
+# — condition (3) reads file state rather than gh, so it gets its own runner: the
+# block's $DONE_MARK/$BRIDGE defaults are overridden to point into $BASE_TMP.
+# style=flat (default) uses arbitrary names; style=rundir reproduces the compiled
+# harness's run dir, using the basenames bin/post-plan-now actually passes.
 run_cond3() {
     local mark="$BASE_TMP/done-marker" bridge="$BASE_TMP/bridge"
+    if [ "${4:-flat}" = "rundir" ]; then
+        local dn bn rd
+        read -r dn bn <<< "$(harness_handoff_names)"
+        if [ -z "$dn" ] || [ -z "$bn" ]; then
+            echo "FAIL: run_cond3 rundir — could not derive handoff basenames from bin/post-plan-now"
+            FAILED=1
+            return 1
+        fi
+        rd="$BASE_TMP/live-slug-ts"
+        mkdir -p "$rd"
+        mark="$rd/$dn"
+        bridge="$rd/$bn"
+    fi
     rm -f "$mark" "$bridge"
     [ "$2" = "yes" ] && touch "$mark"
     case "$3" in
@@ -378,6 +406,39 @@ expect_block "(3) marker + absent bridge -> NONE (5.0 skipped, plan-blind)" NONE
 # arming exactly as a MISSING: test item does. Requirement 5.
 expect_block "(3) marker + unresolved MISSING-FILE -> BLOCK" BLOCK \
     "$(run_cond3 "$B3" yes fileitems)"
+
+# --- condition (3) on the COMPILED-HARNESS path (run-dir-keyed handoff) ---
+# Same block, same three states, but driven through the real filenames
+# bin/post-plan-now passes as DONE_MARK/BRIDGE on the rc=4 arm. These names are
+# derived from bin/post-plan-now, so a rename on either side fails here.
+
+# State 1 — indeterminate: the harness never reached the end of Phase 5.0 (crash in
+# phases 1-4, or conformance.check() itself raised), so runner.py wrote no marker.
+# Fail-closed is CORRECT here and must never be "fixed" into a pass.
+expect_block "(3) harness: no conformance-done -> BLOCK (indeterminate, fail-closed)" BLOCK \
+    "$(run_cond3 "$B3" no empty rundir)"
+
+# State 2 — unresolved items: marker present, bridge non-empty.
+out_h2="$(run_cond3 "$B3" yes items rundir)"
+expect_block "(3) harness: marker + unresolved items -> BLOCK" BLOCK "$out_h2"
+if grep -qF 'MISSING: ibl5/tests/FooTest.php' <<< "$out_h2"; then
+    echo "ok: (3) harness: blocker report cats the bridge contents"
+else
+    echo "FAIL: (3) harness: blocker report omitted the bridge contents — got: '$out_h2'"
+    FAILED=1
+fi
+
+# State 3 — clean: marker present, bridge ZERO BYTES. This is the dominant harness
+# outcome and the whole point of the PR; if it BLOCKs, nothing ever arms.
+expect_block "(3) harness: marker + zero-byte bridge -> NONE (5.0 ran clean)" NONE \
+    "$(run_cond3 "$B3" yes empty rundir)"
+
+# Boundary — the run dir itself does not exist (harness died before os.makedirs, or a
+# stale --out path reached the resumed session). $DONE_MARK's PARENT is missing, so
+# `[ ! -f "$DONE_MARK" ]` must still resolve cleanly to indeterminate, not error out.
+expect_block "(3) harness: run dir absent -> BLOCK (indeterminate)" BLOCK \
+    "$(DONE_MARK="$BASE_TMP/no-such-run-dir/conformance-done" \
+       BRIDGE="$BASE_TMP/no-such-run-dir/missing-tests" bash -c "$B3" 2>&1)"
 
 # --- Critical Files parser: structural + three-way behavioral agreement -----
 B50="$(extract_block '# Reuses /tmp/post-plan-changed-' "$P5_SKILL")"

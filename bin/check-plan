@@ -273,6 +273,11 @@ fi
 # shellcheck source=bin/lib/critical-files.sh
 source "$SCRIPT_DIR/lib/critical-files.sh"
 
+# shellcheck source=lib/hold-check.sh
+if [ -r "$SCRIPT_DIR/lib/hold-check.sh" ]; then
+    . "$SCRIPT_DIR/lib/hold-check.sh"
+fi
+
 # Debug seam: print the canonical parse and stop. This is the observable
 # surface bin/test-postplan-arm-conditions feeds into the three-way parser
 # agreement test — without it check-plan's parse is only visible indirectly,
@@ -673,9 +678,26 @@ done < <(awk '
     inf                          { print }
 ' "$PLAN_FILE")
 
+# Gate H(b): hold-justification content — first content judgment this gate makes.
+# Three things a future reader needs:
+#   (a) gate H(a) checks frontmatter shape; gate H checks section presence; gate H(b)
+#       is the content check — the first content judgment, and deliberately narrow: only
+#       ask-shaped sentences (actor-noun + directive-modal + discharge-verb patterns).
+#   (b) a `**Decision:**` block is exempt by construction — that is what makes the gate
+#       fixable rather than merely punitive: the author moves the observable check into
+#       the Verification Matrix and writes the irreducible human judgment on a Decision
+#       line, which this gate then ignores.
+#   (c) patterns live in bin/lib/hold-check-patterns.txt because harness/classify.py
+#       reads the same file; the parity test in bin/test-check-plan keeps them from
+#       drifting between the two languages.
 if [ "$FM_HOLD" -eq 1 ]; then
     if ! grep -qiE '^##[[:space:]]+Automouse Hold Justification[[:space:]]*$' "$PLAN_FILE"; then
         viol "[H] plan declares auto_merge: false but has no '## Automouse Hold Justification' section (Step 4.5 — record why the hold is reducible-confirmed or intrinsic)"
+    elif command -v hold_check_violations >/dev/null 2>&1; then
+        while IFS= read -r hb_hit; do
+            [ -n "$hb_hit" ] || continue
+            viol "[H] hold justification asks the human to run a check an agent can run (line ${hb_hit%%:*}): ${hb_hit#*:} — move the observable check into the Verification Matrix and keep only the irreducible judgment, on a '**Decision:**' line. See /plan Step 4.5 'Record the outcome'."
+        done < <(hold_check_violations "$PLAN_FILE")
     fi
 fi
 

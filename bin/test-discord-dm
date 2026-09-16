@@ -317,6 +317,81 @@ else
     fail "edge: message differs — got '${MSGS[0]}'"
 fi
 
+# -- Phase 2: --route / --raw seam (Verification Matrix rows 2-5) -------------
+# A second stub: records the remote command string (argv) as well as the body,
+# because the route lives in the command, not in the payload.
+SSH_ARGV="$TMP/ssh-argv"
+cat > "$SSH_ARGV" <<'STUB_EOF'
+#!/bin/bash
+# The remote command is the LAST argument ssh is given.
+for a in "$@"; do last="$a"; done
+printf 'CMD: %s\n' "$last" >> "$DM_CAPTURE"
+printf 'BODY: ' >> "$DM_CAPTURE"
+cat >> "$DM_CAPTURE"
+printf '\n' >> "$DM_CAPTURE"
+printf '\nHTTP=200 curl_rc=0\n'
+STUB_EOF
+chmod +x "$SSH_ARGV"
+
+R_CAP="$TMP/route-cap.txt"
+run_route() { # ...args  -- captures R_OUT / R_RC, resets R_CAP
+    : > "$R_CAP"
+    R_OUT=$(DM_CAPTURE="$R_CAP" DISCORD_DM_SSH_BIN="$SSH_ARGV" \
+        DISCORD_DM_TO="$FAKE_TO" DISCORD_DM_SPOOL="$SPOOL" \
+        "$DM" --quiet --no-fallback --attempts 1 "$@" 2>&1)
+    R_RC=$?
+}
+want()     { if grep -qF -- "$3" <<< "$2"; then ok "$1"; else fail "$1 -- missing '$3'"; fi }
+want_not() { if grep -qF -- "$3" <<< "$2"; then fail "$1 -- unexpected '$3'"; else ok "$1"; fi }
+
+printf '\n-- Phase 2: --route / --raw --\n'
+
+# Row 2: --route retargets the POST; the default route is untouched without it.
+run_route "plain message"
+want "default route: POSTs /discordDM" "$(cat "$R_CAP")" "http://localhost:50000/discordDM"
+want "default route: keeps the content envelope" "$(cat "$R_CAP")" "receivingUserDiscordID"
+
+run_route --route /discordPlanReviewDM --raw - <<< '{"slug":"demo-plan","digest":"hi"}'
+[ "$R_RC" = 0 ] && ok "raw+route: exit 0" || fail "raw+route: exit $R_RC (expected 0)"
+want "row 2: --route retargets the POST" "$(cat "$R_CAP")" "http://localhost:50000/discordPlanReviewDM"
+
+# Row 3: --raw sends the body verbatim -- no envelope, no recipient field.
+want     "row 3: raw body is sent verbatim" "$(cat "$R_CAP")" '{"slug":"demo-plan","digest":"hi"}'
+want_not "row 3: raw body carries no envelope" "$(cat "$R_CAP")" "receivingUserDiscordID"
+
+# Row 4: the route is a shell-injection surface -- reject before the remote leg.
+for bad in '/dm; touch /tmp/pwned' '/dm$(id)' '/dm with space' 'discordDM' '/dm`id`' "/dm'x'"; do
+    run_route --route "$bad" --raw - <<< '{"a":1}'
+    if [ "$R_RC" = 2 ]; then ok "row 4: rejects route '$bad'"; else fail "row 4: route '$bad' gave exit $R_RC (expected 2)"; fi
+    if [ -s "$R_CAP" ]; then fail "row 4: route '$bad' reached the remote leg"; else ok "row 4: route '$bad' never reached ssh"; fi
+done
+
+# Flag form is the SPACE form; --flag=value must not be silently accepted.
+run_route --route=/discordPlanReviewDM --raw - <<< '{"a":1}'
+[ "$R_RC" = 2 ] && ok "row 4: --route=value is rejected" || fail "row 4: --route=value gave exit $R_RC (expected 2)"
+
+# Row 5: --raw guards -- needs a route, refuses --chunk, requires valid JSON.
+run_route --raw - <<< '{"a":1}'
+[ "$R_RC" = 2 ] && ok "row 5: --raw without --route is rejected" || fail "row 5: --raw without --route gave exit $R_RC"
+
+run_route --route /discordPlanReviewDM --chunk --raw - <<< '{"a":1}'
+[ "$R_RC" = 2 ] && ok "row 5: --raw with --chunk is rejected" || fail "row 5: --raw with --chunk gave exit $R_RC"
+
+run_route --route /discordPlanReviewDM --raw - <<< 'not json at all'
+[ "$R_RC" = 2 ] && ok "row 5: --raw rejects a non-JSON body" || fail "row 5: non-JSON body gave exit $R_RC"
+
+# Row 5: a raw body over the 1900-char cap must NOT be truncated -- truncating a
+# JSON document ships invalid JSON to a route that will 400 on it.
+BIG_DIGEST=$(printf 'x%.0s' $(seq 1 2500))
+run_route --route /discordPlanReviewDM --raw - <<< "{\"slug\":\"demo-plan\",\"digest\":\"$BIG_DIGEST\"}"
+[ "$R_RC" = 0 ] && ok "row 5: over-cap raw body still sends" || fail "row 5: over-cap raw body gave exit $R_RC"
+want_not "row 5: over-cap raw body is not truncated" "$(cat "$R_CAP")" "(truncated)"
+if sed -n 's/^BODY: //p' "$R_CAP" | jq -e . >/dev/null 2>&1; then
+    ok "row 5: over-cap raw body is still valid JSON"
+else
+    fail "row 5: over-cap raw body arrived as invalid JSON"
+fi
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 printf '\n'
 if [ "$FAILS" -eq 0 ]; then

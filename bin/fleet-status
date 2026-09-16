@@ -41,13 +41,13 @@
 #
 # --watch [SECS]   re-render every SECS seconds (default 15) until interrupted.
 #
-# CLICKABLE PATHS. Every file this page names — each run's log, each queued plan,
-# and the plan a live runner is on — is emitted as an OSC 8 terminal hyperlink, so
-# it opens on click in iTerm2/WezTerm/Ghostty/VS Code. Terminals without OSC 8
+# CLICKABLE PATHS. File paths this page names — each run's log, each queued plan,
+# and the plan a live runner is on — are emitted as OSC 8 terminal hyperlinks, so
+# they open on click in iTerm2/WezTerm/Ghostty/VS Code. Terminals without OSC 8
 # ignore the sequence and show the same text. Links are TTY-gated: piped or
 # captured output stays byte-for-byte plain, which is what keeps the page
-# greppable (and what stops every assertion in bin/test-fleet-status from having
-# to know about escapes).
+# greppable (and stops every assertion in bin/test-fleet-status from needing to
+# know about escapes). Runner slugs with no queue file stay unlinked.
 #
 # SCOPE. Processes only. Worktree/branch shipping state is bin/wt-status's job and
 # is deliberately not mirrored here — the two answer different questions and a

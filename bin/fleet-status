@@ -41,6 +41,14 @@
 #
 # --watch [SECS]   re-render every SECS seconds (default 15) until interrupted.
 #
+# CLICKABLE PATHS. Every file this page names — each run's log, each queued plan,
+# and the plan a live runner is on — is emitted as an OSC 8 terminal hyperlink, so
+# it opens on click in iTerm2/WezTerm/Ghostty/VS Code. Terminals without OSC 8
+# ignore the sequence and show the same text. Links are TTY-gated: piped or
+# captured output stays byte-for-byte plain, which is what keeps the page
+# greppable (and what stops every assertion in bin/test-fleet-status from having
+# to know about escapes).
+#
 # SCOPE. Processes only. Worktree/branch shipping state is bin/wt-status's job and
 # is deliberately not mirrored here — the two answer different questions and a
 # copy would just be a second place to keep correct.
@@ -92,7 +100,7 @@ while [ $# -gt 0 ]; do
                 *) WATCH_SECS="$2"; shift ;;
             esac
             ;;
-        -h|--help) sed -n '4,50p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '4,58p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) printf 'fleet-status: unknown option %s\n' "$1" >&2; exit 2 ;;
     esac
     shift
@@ -101,11 +109,45 @@ done
 if [ -t 1 ]; then
     B=$(printf '\033[1m'); DIM=$(printf '\033[2m'); R=$(printf '\033[0m')
     GRN=$(printf '\033[32m'); YEL=$(printf '\033[33m')
+    LINKS=1
 else
     B=''; DIM=''; R=''; GRN=''; YEL=''
+    LINKS=0
 fi
 
+# Links arm SEPARATELY from colour, and the override touches only $LINKS. Folding
+# them together would make bin/test-fleet-status's forced-link capture carry SGR
+# bytes between fields, and the column regexes it asserts on ('live-plan\.md
+# +in progress') would stop matching — the harness would then be testing a
+# differently-rendered page than the one it pins.
+[ -n "${FLEET_STATUS_FORCE_LINKS:-}" ] && LINKS=1
+
 # ── helpers ────────────────────────────────────────────────────────────────────
+
+# link_file <path> [text] — print TEXT as an OSC 8 hyperlink to file://<path>.
+#
+# OSC 8 is ESC ] 8 ;; URI ST  TEXT  ESC ] 8 ;; ST. It is what lets a row display
+# the short name a human reads ("live-plan.md") while the click target is the
+# absolute path, which a bare printed path cannot do.
+#
+# THREE FAIL-SOFT GATES, each returning plain text rather than a broken link:
+#   not a TTY   escapes would corrupt a pipe, a capture or a grep.
+#   relative    file:// has no notion of cwd, so a relative path yields a link
+#               that silently opens the wrong thing — worse than no link.
+#   empty       nothing to point at.
+# Spaces are percent-encoded because a raw space ends the URI; no other encoding
+# is done deliberately — these paths are /tmp and $HOME names, and a general URL
+# encoder is bulk this reporting tool has no use for.
+link_file() {
+    local path="${1:-}" text="${2:-}" enc
+    [ -z "$text" ] && text="$path"
+    if [ "$LINKS" -eq 0 ] || [ -z "$path" ]; then printf '%s' "$text"; return; fi
+    case "$path" in /*) ;; *) printf '%s' "$text"; return ;; esac
+    enc="$(printf '%s' "$path" | sed 's/ /%20/g')"
+    # shellcheck disable=SC1003  # '\033\\' is ESC + a literal backslash: the ST
+    # that terminates an OSC sequence. Not an escaped quote.
+    printf '\033]8;;file://%s\033\\%s\033]8;;\033\\' "$enc" "$text"
+}
 
 # Human-readable age from a seconds count: 45s / 12m / 3h04m / 2d01h.
 human_age() {
@@ -284,7 +326,8 @@ render_launchd() {
         printf '      pid %-7s up %-8s last-exit-col %s\n' \
             "$pid" "$(human_age "$(pid_elapsed_secs "$pid")")" "$status"
         printf '      %s%s%s\n' "$DIM" "$progress" "$R"
-        [ -n "$log" ] && printf '      %slog: %s%s\n' "$DIM" "$log" "$R"
+        [ -n "$log" ] && \
+            printf '      %slog: %s%s\n' "$DIM" "$(link_file "$log")" "$R"
     done <<EOF
 $(launchctl list 2>/dev/null | grep 'com\.ibl5\.')
 EOF
@@ -301,7 +344,7 @@ EOF
 # aliveness is checkable without trusting the file's existence at all.
 
 render_automouse() {
-    local count=0 stale=0 hb base rest pid phase now hb_ts hb_age slug lock attempts slug_ld slug_lb
+    local count=0 stale=0 hb base rest pid phase now hb_ts hb_age slug lock attempts slug_ld slug_lb slug_disp
 
     section "AUTOMOUSE RUNNERS"
 
@@ -354,9 +397,16 @@ render_automouse() {
         [ -f "$AUTOMOUSE_DIR/queue/$slug.md.attempts" ] && \
             attempts=" · attempt $(tr -dc '0-9' < "$AUTOMOUSE_DIR/queue/$slug.md.attempts" 2>/dev/null)"
 
+        # Gated on the file existing: $slug here can be the '(unknown plan)'
+        # sentinel or a command-line scrape, and a link to a path that is not
+        # there opens an error dialog instead of doing nothing.
+        slug_disp="$slug"
+        { [ -f "$AUTOMOUSE_DIR/queue/$slug.md" ] || [ -L "$AUTOMOUSE_DIR/queue/$slug.md" ]; } && \
+            slug_disp="$(link_file "$AUTOMOUSE_DIR/queue/$slug.md" "$slug")"
+
         count=$(( count + 1 ))
         track_pid "$pid"
-        printf '  %s●%s %-10s %s%s%s\n' "$GRN" "$R" "$phase" "$B" "$slug" "$R"
+        printf '  %s●%s %-10s %s%s%s\n' "$GRN" "$R" "$phase" "$B" "$slug_disp" "$R"
         printf '      pid %-7s up %-8s last activity %s ago%s%s\n' \
             "$pid" "$(human_age "$(pid_elapsed_secs "$pid")")" "$(human_age "$hb_age")" "$lock" "$attempts"
     done
@@ -432,7 +482,7 @@ automouse_next_run() {
 }
 
 render_queue() {
-    local count=0 f base next
+    local count=0 f base next pad
 
     next="$(automouse_next_run)"
     if [ -n "$next" ]; then
@@ -447,11 +497,18 @@ render_queue() {
         { [ -f "$f" ] || [ -L "$f" ]; } || continue
         base="$(basename "$f")"
         count=$(( count + 1 ))
+        # Pad OUTSIDE the link. A %-46s over the wrapped string counts the escape
+        # bytes as width — the column collapses — and the clickable region would
+        # swallow the run of spaces up to the next column.
+        pad=''
+        [ "${#base}" -lt 46 ] && pad="$(printf '%*s' $(( 46 - ${#base} )) '')"
         # `-e`, not `-f`: mkdir-based locks are directories (see render_automouse).
         if [ -e "$AUTOMOUSE_DIR/queue/$base.lock" ]; then
-            printf '  %s▶%s %-46s %sin progress%s\n' "$YEL" "$R" "$base" "$DIM" "$R"
+            printf '  %s▶%s %s%s %sin progress%s\n' \
+                "$YEL" "$R" "$(link_file "$f" "$base")" "$pad" "$DIM" "$R"
         else
-            printf '  %s·%s %-46s %squeued%s\n' "$DIM" "$R" "$base" "$DIM" "$R"
+            printf '  %s·%s %s%s %squeued%s\n' \
+                "$DIM" "$R" "$(link_file "$f" "$base")" "$pad" "$DIM" "$R"
         fi
     done
 

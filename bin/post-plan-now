@@ -370,7 +370,11 @@ if [ "${POST_PLAN_SKILL:-0}" != "1" ] && [ -x "$HARNESS/run" ]; then
     # exists to avoid. should_fallback itself is unchanged — rc=4 simply never reaches it.
     # $RESUME_PROMPT is shq()-quoted for the far-side `/bin/bash -lc` parse exactly like
     # $PROMPT below; it carries backticks and a single-quoted --jq argument.
-    RESUME_SEG="CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p $(shq "$RESUME_PROMPT") --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name \"$LABEL\""
+    # DONE_MARK/BRIDGE hand the harness's own Phase 5.0 verdict to the resumed session:
+    # its $PPID is new, so the /tmp/...-$PPID defaults in Phase 6.5 condition (3) would
+    # find nothing and block every clean harness run. Scoped to THIS branch on purpose —
+    # the should_fallback branch below runs its own Phase 5.0 and must keep the defaults.
+    RESUME_SEG="DONE_MARK=\"$HARNESS_RUN_DIR/conformance-done\" BRIDGE=\"$HARNESS_RUN_DIR/missing-tests\" HARNESS_RUN_DIR=\"$HARNESS_RUN_DIR\" CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p $(shq "$RESUME_PROMPT") --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name \"$LABEL\""
     GATE_OPEN="if [ \"\$rc\" = 4 ]; then ${RESUME_SEG}; elif should_fallback \"\$rc\"; then "
     GATE_CLOSE="; elif [ \"\$rc\" = 3 ]; then echo \"post-plan-now: harness exited 3 (rebase-conflict fail-closed sentinel). SKIPPING the /post-plan skill fallback; a human must resolve the stacked-branch rebase conflict, then re-run bin/post-plan-now. See $LOG.\"; fi"
     ENGINE="compiled post-plan harness (fails CLOSED on rebase conflict; falls back to the skill on other failures; on exit 4 it resumes the skill at Phase 5.5 for the fidelity review + merge digest)"

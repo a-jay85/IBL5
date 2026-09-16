@@ -77,6 +77,7 @@ _common_dir="$(git -C "$SCRIPT_DIR" rev-parse --path-format=absolute --git-commo
 AUTOMOUSE_DIR="${FLEET_STATUS_AUTOMOUSE_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse}"
 HARNESS_OUT="${FLEET_STATUS_HARNESS_OUT:-$MAIN_CHECKOUT/tools/postplan-harness/out}"
 LOG_DIR="${FLEET_STATUS_LOG_DIR:-/tmp}"
+AUTOMOUSE_PLIST="${FLEET_STATUS_AUTOMOUSE_PLIST:-$HOME/Library/LaunchAgents/com.ibl5.automouse.plist}"
 
 WATCH=0
 WATCH_SECS=15
@@ -367,10 +368,80 @@ render_automouse() {
 
 # ── section 3: queue ───────────────────────────────────────────────────────────
 
-render_queue() {
-    local count=0 f base
+# Wall-clock of automouse's next scheduled fire, e.g. "next run Wed 2026-09-16
+# 03:00". Empty on anything unexpected — the header degrades to the bare title
+# rather than print a guess.
+#
+# TWO SOURCES, BOTH REQUIRED, for the reason every other row here is a
+# conjunction. The plist is the schedule of record (bin/automouse/run rewrites it
+# in burst mode, so a hardcoded 03:00 would go stale), but a plist on disk is
+# residue exactly like a heartbeat file: `launchctl bootout` — what
+# `bin/automouse/run disarm-tonight` does — leaves it sitting there fully
+# populated. Printing its time for an unloaded label would advertise a queue
+# drain that will never happen. So: plist for WHEN, loaded label for WHETHER.
+#
+# Parsed with sed rather than plutil — which is what the sibling reader,
+# bin/automouse/run's daily_fire_hhmm(), uses — so this path behaves identically
+# under CI's ubuntu runner, where plutil does not exist and the fixture would
+# otherwise exercise a different branch there than it does locally. Cost of that
+# choice: a binary-format plist parses to nothing and the suffix disappears,
+# which fails soft and is the right direction. A StartCalendarInterval holding an
+# ARRAY of intervals has no single fire time and is likewise refused, exactly as
+# daily_fire_hhmm() refuses it — the `<array>` in bin/automouse/run's one-shot
+# template is ProgramArguments, so no plist this repo writes takes that shape.
+automouse_next_run() {
+    local loaded flat sci h m now_min at_min day
+    [ -f "$AUTOMOUSE_PLIST" ] || return 0
 
-    section "AUTOMOUSE QUEUE  (waiting + in progress)"
+    # Anchored — com.ibl5.automouse-morning-digest is a different job. Not
+    # `grep -q`: it exits early and SIGPIPEs the writer, which reports 141 on a
+    # SUCCESSFUL match under pipefail (.claude/rules/shell-pipefail-grep.md).
+    loaded="$(launchctl list 2>/dev/null | grep 'com\.ibl5\.automouse$')"
+    [ -n "$loaded" ] || return 0
+
+    flat="$(tr -d ' \t\r\n' < "$AUTOMOUSE_PLIST" 2>/dev/null)"
+    sci="${flat#*<key>StartCalendarInterval</key><dict>}"
+    [ "$sci" = "$flat" ] && return 0
+    sci="${sci%%</dict>*}"
+
+    h="$(printf '%s' "$sci" | sed -n 's|.*<key>Hour</key><integer>\([0-9]*\)</integer>.*|\1|p')"
+    m="$(printf '%s' "$sci" | sed -n 's|.*<key>Minute</key><integer>\([0-9]*\)</integer>.*|\1|p')"
+    # Validate the digits, never sed's exit status: a missing key yields an empty
+    # capture, and a malformed one must not reach the header.
+    case "$h" in ''|*[!0-9]*) return 0 ;; esac
+    case "$m" in ''|*[!0-9]*) return 0 ;; esac
+    [ $(( 10#$h )) -le 23 ] || return 0
+    [ $(( 10#$m )) -le 59 ] || return 0
+
+    # 10# again — `date +%H` is zero-padded and $((08)) is an octal error.
+    now_min=$(( 10#$(date +%H) * 60 + 10#$(date +%M) ))
+    at_min=$(( 10#$h * 60 + 10#$m ))
+    if [ "$now_min" -lt "$at_min" ]; then
+        day="$(date +'%a %Y-%m-%d')"
+    else
+        # A calendar day-field bump, NOT epoch + 86400: StartCalendarInterval is
+        # wall-clock, so across a DST boundary the two disagree by an hour and
+        # only this form matches what launchd will actually do. BSD first, GNU
+        # (CI) second.
+        day="$(date -v+1d +'%a %Y-%m-%d' 2>/dev/null)"
+        [ -z "$day" ] && day="$(date -d '+1 day' +'%a %Y-%m-%d' 2>/dev/null)"
+    fi
+    [ -n "$day" ] || return 0
+
+    printf 'next run %s %02d:%02d' "$day" "$(( 10#$h ))" "$(( 10#$m ))"
+}
+
+render_queue() {
+    local count=0 f base next
+
+    next="$(automouse_next_run)"
+    if [ -n "$next" ]; then
+        # $R$DIM inside the argument: section() bolds whatever it is handed, and
+        # the schedule is secondary to the title.
+        section "AUTOMOUSE QUEUE$R$DIM  ·  $next$R"
+    else
+        section "AUTOMOUSE QUEUE"
+    fi
 
     for f in "$AUTOMOUSE_DIR"/queue/*.md; do
         { [ -f "$f" ] || [ -L "$f" ]; } || continue

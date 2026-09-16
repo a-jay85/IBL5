@@ -347,5 +347,13 @@ bpt_set_gh_run_log() { printf '%s\n' "$1" > "$STUB/gh-run-list.out"; printf '%s\
 bpt_count() { local got; got="$(grep -c . "$3" 2>/dev/null)"; bpt_expect_eq "$1" "$2" "${got:-0}"; }
 
 # bpt_run — run the real driver; sets BPT_RC.
+# BUG_PIPELINE_PLAN_REVIEW_DRAIN_ENABLED=0 keeps the harness hermetic: the driver's
+# plan-review drain hook ssh's to the production bot, and $PATH here still carries the
+# real `ssh` (the stub dir is PREPENDED, not substituted). Without the kill switch every
+# bpt_run would reach the network. The hook itself is asserted by bin/test-plan-review-seam
+# (seam_case_tick_hook), and the drain's own behaviour by that suite's other cases.
 # shellcheck disable=SC2034
-bpt_run() { "$BPT_DRIVER" > "$STUB/tick.out" 2>&1; BPT_RC=$?; }
+bpt_run() {
+    BUG_PIPELINE_PLAN_REVIEW_DRAIN_ENABLED=0 "$BPT_DRIVER" > "$STUB/tick.out" 2>&1
+    BPT_RC=$?
+}

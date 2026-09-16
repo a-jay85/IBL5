@@ -1528,6 +1528,27 @@ main() {
     mkdir -p "$(dirname "$TICK_HEARTBEAT")" 2>/dev/null || true
     date '+%s' > "$TICK_HEARTBEAT" 2>/dev/null || true
 
+    # ── Plan-review drain (ADR-0096 path unchanged) ───────────────────────────
+    # Applies Discord Queue/Discard button presses. bin/automouse/run fires the
+    # same drain, but only at its 03:00 calendar tick — so a button pressed in the
+    # morning sat unapplied for up to ~19h, and a press the drain REFUSES (a plan
+    # that fails bin/check-plan) sent its explanatory DM a day late. This 180s
+    # poller is a second CALLER, never a second path to the queue: the gate lives
+    # inside the drain (bin/plan-review-drain runs the real bin/check-plan before
+    # any queue call), so both callers go through it.
+    #
+    # Placed BEFORE the $CLAUDE_BIN preflight below on purpose: the drain spawns
+    # zero agents and needs no `claude`, so a broken agent install must not also
+    # silence Discord plan review. Cost-safe for the same reason — an empty sink
+    # is one ssh + one curl and exits.
+    #
+    # Non-fatal (`|| true`) and stream-merged (`2>&1`) to match bin/automouse/run:
+    # the drain logs to stderr, and its quiet-404 branch is silent to Discord and
+    # relies on that log line as its only tripwire.
+    if [ "${BUG_PIPELINE_PLAN_REVIEW_DRAIN_ENABLED:-1}" = "1" ]; then
+        "${BUG_PIPELINE_PLAN_REVIEW_DRAIN:-$SCRIPT_DIR/plan-review-drain}" --drain 2>&1 || true
+    fi
+
     # Preflight: the agent binary must actually resolve, BEFORE any row is claimed.
     # An unresolvable $CLAUDE_BIN makes `timeout` exit 127, and nothing downstream
     # reads that as environmental: claude_env_error only matches usage/rate-limit

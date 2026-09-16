@@ -1,0 +1,473 @@
+#!/bin/bash
+#
+# plan-review-drain — apply Discord plan-review button decisions.
+#
+# Unit 3 of the plan-review program. `bin/plan-now` sends a button-bearing review
+# DM whenever it leaves a plan unqueued (Phase 7); the IBLbot records the press in
+# an on-disk decision sink (unit 2, PR #2229); this script drains that sink over
+# the existing ssh tunnel and applies each decision on the Mac.
+#
+# It is invoked by bin/automouse/run immediately before the queue loop, so a plan
+# queued from Discord is enumerated in the SAME run rather than a cycle later.
+# There is no new launchd job and no new transport: the ssh + curl + jq recipe is
+# the one bin/discord-dm has been using in production.
+#
+# Usage:
+#   bin/plan-review-drain --drain      apply every pending decision
+#   bin/plan-review-drain --dry-run    report what WOULD be applied; change nothing
+#
+# Neither flag ⇒ usage and a non-zero exit. A bare invocation must never default
+# to a destructive pass.
+#
+# Flag form is SPACE form (`--flag value`), matching every flag in bin/discord-dm.
+# `--flag=value` is rejected rather than silently parsed as valueless.
+#
+# Env seams (all have production defaults; the tests override them):
+#   PLAN_REVIEW_SSH_HOST   ssh host the bot runs on           (default iblhoops.net)
+#   PLAN_REVIEW_PORT       bot's loopback port                (default 50000)
+#   PLAN_REVIEW_SSH_BIN    ssh binary — tests point at a stub (default ssh)
+#   PLANS_DIR              where plan files live              (default ~/claude-plans)
+#   NIGHTLY_DIR            automouse state root
+#   PLAN_REVIEW_REPO       repo root, for bin/check-plan + bin/automouse/queue
+#   PLAN_REVIEW_DISCORD_DM the DM sender                      (default $REPO/bin/discord-dm)
+#   PLAN_REVIEW_STATE      per-record attempt ledger
+#
+# The bot contract below is pinned from the serving source and asserted against it
+# by bin/test-plan-review-seam's contract-drift check. A wrong-but-plausible route
+# returns 404, and to send_one()'s retry logic a 4xx is a permanent failure that is
+# logged and dropped — the feature would be dead in prod with a green test suite.
+# Source of truth: ibl5/IBLbot/src/server/express.ts (route registrations, the
+# 127.0.0.1 bind) and ibl5/IBLbot/src/server/plan-review-dm.ts (handlers).
+
+set -uo pipefail
+
+# ── the pinned bot contract ──────────────────────────────────────────────────
+# ===== BEGIN RESOLVED BOT CONTRACT (Phase 1) =====
+#   REVIEW_DM_ROUTE:      /discordPlanReviewDM     (POST, express.ts:38)
+#   DECISIONS_GET_ROUTE:  /planDecisions           (GET,  express.ts:39)
+#   ACK_ROUTE:            /planDecisions/ack       (POST, express.ts:40)
+#   ACK_VERB:             POST
+#   LOOPBACK_BIND:        127.0.0.1:<config.express.port>   (express.ts:46)
+#   REVIEW_DM_BODY:       { slug, digest }         (handlePlanReviewDM)
+#   DECISIONS_RESPONSE:   object wrapping an array —
+#                         { decisions: [ { id, slug, action, actor, ts } ] }
+#                         (handleListDecisions); record identity is `id`
+#   ACK_BODY:             { ids: [ <id>, ... ] } -> { acked: <n> }  (handleAckDecisions)
+#   PLAN_SLUG_RE:         export const PLAN_SLUG_RE = /^[a-z0-9][a-z0-9-]{0,79}$/
+# ===== END RESOLVED BOT CONTRACT (Phase 1) =====
+DECISIONS_ROUTE="/planDecisions"
+ACK_ROUTE="/planDecisions/ack"
+
+SSH_HOST="${PLAN_REVIEW_SSH_HOST:-iblhoops.net}"
+BOT_PORT="${PLAN_REVIEW_PORT:-50000}"
+SSH_BIN="${PLAN_REVIEW_SSH_BIN:-ssh}"
+: "${PLANS_DIR:=$HOME/claude-plans}"
+: "${NIGHTLY_DIR:=$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse}"
+REPO="${PLAN_REVIEW_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+DISCORD_DM="${PLAN_REVIEW_DISCORD_DM:-$REPO/bin/discord-dm}"
+STATE_FILE="${PLAN_REVIEW_STATE:-$NIGHTLY_DIR/plan-review-attempts.tsv}"
+DISCARD_DIR="$PLANS_DIR/discarded"
+
+# Mirrors the poison-pill convention in bin/automouse/run: a record that fails
+# three genuine attempts is given up on rather than retried forever.
+MAX_ATTEMPTS=3
+
+DRY_RUN=0
+DRAIN=0
+
+log() { printf 'plan-review-drain: %s\n' "$*" >&2; }
+plan() { printf '%s\n' "$*"; }
+
+usage() {
+    sed -n '3,22p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+# ── flag parse ───────────────────────────────────────────────────────────────
+# No positional-message convention to preserve here (unlike bin/discord-dm, whose
+# catch-all arm deliberately turns an unrecognised token into the message body),
+# so an unrecognised token is unconditionally fatal.
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --drain)    DRAIN=1; shift ;;
+        --dry-run)  DRY_RUN=1; shift ;;
+        -h|--help)  usage; exit 0 ;;
+        --*=*)      log "unknown option $1 (flags take the space form: --flag value)"; exit 2 ;;
+        *)          log "unknown argument: $1"; exit 2 ;;
+    esac
+done
+
+if [ "$DRAIN" = 0 ] && [ "$DRY_RUN" = 0 ]; then
+    usage >&2
+    log "refusing to run: pass --drain to apply, or --dry-run to preview"
+    exit 2
+fi
+
+command -v jq >/dev/null 2>&1 || {
+    log "jq not found on PATH — cannot parse the decision sink"
+    exit 2
+}
+
+# ── transport ────────────────────────────────────────────────────────────────
+# Same recipe as bin/discord-dm:137-160. `-w` appends the status so a failure is
+# diagnosable from the log alone; `-f` is deliberately absent because it hides the
+# very status we need. curl's own rc stays DISTINCT from the HTTP status: rc 7
+# (refused) / rc 28 (timeout) / 5xx all mean "could not reach the bot" and refund
+# the attempt, while a 4xx means the bot understood and refused, and burns one.
+HTTP=""
+CURL_RC=""
+BODY=""
+
+remote() { # verb route  [POST body on stdin]
+    local verb="$1" route="$2" cmd out
+    if [ "$verb" = GET ]; then
+        cmd="curl -s -m 20 -w '\nHTTP=%{http_code}' http://localhost:${BOT_PORT}${route}; printf ' curl_rc=%s\n' \"\$?\""
+        out=$("$SSH_BIN" -o BatchMode=yes -o ConnectTimeout=10 "$SSH_HOST" "$cmd" 2>&1)
+    else
+        cmd="curl -s -m 20 -w '\nHTTP=%{http_code}' -X POST http://localhost:${BOT_PORT}${route} -H 'Content-Type: application/json' -d @-; printf ' curl_rc=%s\n' \"\$?\""
+        out=$(cat | "$SSH_BIN" -o BatchMode=yes -o ConnectTimeout=10 "$SSH_HOST" "$cmd" 2>&1)
+    fi
+    HTTP=$(sed -n 's/.*HTTP=\([0-9][0-9]*\).*/\1/p' <<< "$out" | tail -1)
+    CURL_RC=$(sed -n 's/.*curl_rc=\([0-9][0-9]*\).*/\1/p' <<< "$out" | tail -1)
+    BODY=$(sed '/HTTP=[0-9]/d' <<< "$out")
+    [ "$HTTP" = "200" ]
+}
+
+# Classify the last remote() outcome. Three buckets, not two — see the plan's
+# "failure discrimination" note.
+#   unreachable : rc 7 / rc 28 / 5xx   -> environmental; REFUND the attempt
+#   notserving  : 404 on a drain route -> bot half not serving these routes right
+#                 now (lagging deploy, restart, rollback). Quiet, exit 0, no
+#                 attempt consumed. This branch is scoped to the two DRAIN routes
+#                 only; a 404 on /discordDM stays loud inside bin/discord-dm.
+#   refused     : 400 / 403 / any other 4xx -> we sent something wrong; BURN one
+classify() {
+    case "${CURL_RC:-}" in
+        7|28) echo unreachable; return ;;
+    esac
+    case "${HTTP:-}" in
+        5??)  echo unreachable ;;
+        404)  echo notserving ;;
+        4??)  echo refused ;;
+        200)  echo ok ;;
+        *)    echo unreachable ;;
+    esac
+}
+
+# ── the slug trust boundary ──────────────────────────────────────────────────
+# The slug arrives from a REMOTE endpoint and is then used two ways: interpolated
+# into a path under $PLANS_DIR, and passed as an argument to bin/automouse/queue.
+# Both are injection sinks. Shape is checked on the RAW string BEFORE it is
+# concatenated into any path — a check that builds the path first has already lost.
+# A `case` statement, not a regex: bash-3.2-safe and total.
+#
+# Echoes the name of the rule that rejected the value, or nothing when it passes.
+slug_shape_violation() { # slug
+    local s="$1"
+    [ -n "$s" ] || { echo "empty slug"; return; }
+    case "$s" in
+        # `/` and `..` are the traversal PAIR and neither alone is sufficient: `..`
+        # with no slash still escapes once a later component is appended, and a
+        # bare `/` reaches a sibling tree.
+        */*)  echo "contains '/'"; return ;;
+        *..*) echo "contains '..'"; return ;;
+        # Not a traversal at all — argument injection. `bin/automouse/queue -rf`
+        # parses the slug as a FLAG rather than a plan name.
+        -*)   echo "begins with '-'"; return ;;
+        .*)   echo "begins with '.'"; return ;;
+    esac
+    # A newline inside a slug forges an extra line in any log or line-oriented
+    # file the value later reaches.
+    case "$s" in
+        *[![:print:]]*) echo "contains a control character"; return ;;
+    esac
+}
+
+# ── attempt ledger ───────────────────────────────────────────────────────────
+# `id<TAB>count`, or `id<TAB>FORCED` once the ladder has fired and we have given
+# up on the record. Kept tiny and rewritten whole.
+attempts_for() { # id
+    [ -f "$STATE_FILE" ] || { echo 0; return; }
+    local v
+    v=$(awk -F'\t' -v k="$1" '$1==k {print $2}' "$STATE_FILE" | tail -1)
+    echo "${v:-0}"
+}
+
+set_attempts() { # id value
+    local tmp
+    mkdir -p "$(dirname "$STATE_FILE")" 2>/dev/null
+    tmp=$(mktemp "${TMPDIR:-/tmp}/plan-review-state.XXXXXX") || return 1
+    if [ -f "$STATE_FILE" ]; then
+        awk -F'\t' -v k="$1" '$1!=k' "$STATE_FILE" > "$tmp"
+    fi
+    printf '%s\t%s\n' "$1" "$2" >> "$tmp"
+    mv -f "$tmp" "$STATE_FILE"
+}
+
+clear_attempts() { # id
+    [ -f "$STATE_FILE" ] || return 0
+    local tmp
+    tmp=$(mktemp "${TMPDIR:-/tmp}/plan-review-state.XXXXXX") || return 1
+    awk -F'\t' -v k="$1" '$1!=k' "$STATE_FILE" > "$tmp"
+    mv -f "$tmp" "$STATE_FILE"
+}
+
+# ── DMs ──────────────────────────────────────────────────────────────────────
+dm() { # message
+    [ -x "$DISCORD_DM" ] || { log "cannot DM — $DISCORD_DM is not executable"; return 1; }
+    printf '%s' "$1" | "$DISCORD_DM" - >/dev/null 2>&1 || log "DM send failed (non-fatal)"
+}
+
+# When the ladder fires, a real user decision is being discarded, so the DM must be
+# ACTIONABLE, not merely loud: the slug, the action they chose (they pressed a
+# button some time ago and will not remember which), and the exact command to
+# finish it by hand.
+force_ack_dm() { # slug action
+    local slug="$1" action="$2" cmd
+    case "$action" in
+        queue)   cmd="bin/automouse/queue $slug" ;;
+        discard) cmd="mv $PLANS_DIR/$slug.md $DISCARD_DIR/" ;;
+        *)       cmd="(no manual equivalent for action '$action')" ;;
+    esac
+    dm "plan-review-drain gave up on a Discord decision after $MAX_ATTEMPTS attempts.
+slug: $slug
+you pressed: $action
+finish it by hand: $cmd"
+}
+
+# ── read the pending decisions ───────────────────────────────────────────────
+if ! remote GET "$DECISIONS_ROUTE" < /dev/null; then
+    case "$(classify)" in
+        notserving)
+            # Quiet to Discord, loud to the log. Accepted cost, stated in the plan:
+            # if the bot half is reverted the drain 404s forever and this line is
+            # the only tripwire — so it is written EVERY time, and is greppable.
+            log "GET $DECISIONS_ROUTE returned 404 — the bot is not serving the drain routes right now (lagging or failed deploy, restart, or rollback). Skipping this pass; no attempt consumed."
+            exit 0
+            ;;
+        unreachable)
+            log "GET $DECISIONS_ROUTE unreachable (curl_rc=${CURL_RC:-?} http=${HTTP:-none}) — environmental; no attempt consumed."
+            exit 0
+            ;;
+        *)
+            log "GET $DECISIONS_ROUTE refused (http=${HTTP:-none}) — the bot parsed the request and rejected it."
+            exit 1
+            ;;
+    esac
+fi
+
+RECORDS=$(jq -r '.decisions[]? | [.id, .slug, .action] | @tsv' <<< "$BODY" 2>/dev/null)
+if [ -z "$RECORDS" ]; then
+    # An empty pass is a clean no-op. NO DM: this runs on every automouse tick, and
+    # a nightly "nothing to do" DM trains the signal away.
+    log "no pending decisions"
+    exit 0
+fi
+
+# ── the decision loop ────────────────────────────────────────────────────────
+SEEN_SLUGS=""
+ACK_IDS=""       # acked this pass
+PENDING_META=""  # id<TAB>slug<TAB>action for records whose apply FAILED
+
+mark_ack() { ACK_IDS="$ACK_IDS$1"$'\n'; }
+mark_pending() { PENDING_META="$PENDING_META$1"$'\t'"$2"$'\t'"$3"$'\n'; }
+
+while IFS= read -r record_line; do
+    [ -n "$record_line" ] || continue
+    # Split on TAB by hand rather than with `IFS=$'\t' read -r id slug action`.
+    # Tab is an IFS *whitespace* character, so `read` collapses a run of tabs into
+    # one delimiter: an empty middle field (a record whose slug is "") would shift
+    # `action` into `slug` and leave `action` empty, and the record would then be
+    # judged on the wrong values entirely. jq's @tsv escapes any tab inside a value,
+    # so the field count here is always exactly three.
+    id="${record_line%%$'\t'*}"
+    rest="${record_line#*$'\t'}"
+    slug="${rest%%$'\t'*}"
+    action="${rest#*$'\t'}"
+    [ -n "$id" ] || continue
+
+    # Given up on in an earlier pass — never retried, never re-DM'd.
+    if [ "$(attempts_for "$id")" = FORCED ]; then
+        log "record $id was already force-acked in an earlier pass — skipping"
+        mark_ack "$id"
+        continue
+    fi
+
+    # --- trust boundary: shape FIRST, then dedupe, then existence ---
+    # Shape runs before everything that consumes the value — including the dedupe
+    # grep — so no unvalidated remote string is ever used as a pattern or a path.
+    violation=$(slug_shape_violation "$slug")
+    if [ -n "$violation" ]; then
+        # Loud: names the rejected value AND the specific rule, so a genuine bug is
+        # diagnosable and an attack is visible. Still ACKED — without the ack one
+        # hostile write to the sink wedges every future pass forever, which is a
+        # denial of service on the whole feature.
+        log "REJECTED slug from remote: $(printf '%q' "$slug") — rule: $violation (record $id, action $action)"
+        [ "$DRY_RUN" = 1 ] || mark_ack "$id"
+        continue
+    fi
+
+    # Per-pass slug dedupe: the first decision for a slug wins, later ones are
+    # skipped and acked. NOT redundant with unit 2's store-side hasDecision(slug)
+    # guard, which is the real invariant: the guard lives in the bot and this drain
+    # lives on the Mac, and they deploy and restart independently, so a bot that is
+    # mid-restart, rolled back, or serving an older build can still hand one pass
+    # two records for one slug — which without this filter applies two
+    # contradictory decisions to one plan. This filter cannot see across passes and
+    # is never the primary defense. Keep both; delete neither.
+    if grep -qxF -- "$slug" <<< "$SEEN_SLUGS"; then
+        log "duplicate decision for slug '$slug' in this pass — first one wins; skipping record $id"
+        mark_ack "$id"
+        continue
+    fi
+    SEEN_SLUGS="$SEEN_SLUGS$slug"$'\n'
+
+    PLAN_PATH="$PLANS_DIR/$slug.md"
+    if [ ! -f "$PLAN_PATH" ]; then
+        log "REJECTED slug '$slug' — no regular plan file at $PLAN_PATH (record $id, action $action)"
+        [ "$DRY_RUN" = 1 ] || mark_ack "$id"
+        continue
+    fi
+
+    case "$action" in
+        queue | discard) ;;
+        *)
+            log "REJECTED record $id — unknown action verb '$action' for slug '$slug'"
+            [ "$DRY_RUN" = 1 ] || mark_ack "$id"
+            continue
+            ;;
+    esac
+
+    if [ "$DRY_RUN" = 1 ]; then
+        plan "would $action: $slug ($PLAN_PATH)"
+        continue
+    fi
+
+    # --- apply ---
+    if [ "$action" = queue ]; then
+        # ADR-0096: bin/plan-now:515-517 documents its check-plan arm as the ONLY
+        # path to the queue. A Discord button reaching the queue around it would be
+        # a second path and a gate weakening, so the REAL bin/check-plan runs first.
+        if ! verdict=$("$REPO/bin/check-plan" "$PLAN_PATH" 2>&1); then
+            log "check-plan FAILED for '$slug' — not queueing (ADR-0096). Record is unactionable; acking."
+            dm "plan-review-drain refused a Queue press: \`$slug\` fails bin/check-plan, so it is not queueable.
+
+$(tail -20 <<< "$verdict")"
+            mark_ack "$id"
+            continue
+        fi
+        if NIGHTLY_DIR="$NIGHTLY_DIR" PLANS_DIR="$PLANS_DIR" \
+            "$REPO/bin/automouse/queue" "$slug" > /dev/null 2>&1; then
+            log "queued '$slug' from a Discord decision (record $id)"
+            mark_ack "$id"
+        else
+            log "FAILED to queue '$slug' via bin/automouse/queue (record $id) — not acking this pass"
+            mark_pending "$id" "$slug" "$action"
+        fi
+        continue
+    fi
+
+    # discard: MOVED, not deleted and not marked. A move is reversible by hand and
+    # is the only destructive operation in this unit; `-n` means an existing file of
+    # the same name is never clobbered.
+    mkdir -p "$DISCARD_DIR"
+    if [ -e "$DISCARD_DIR/$slug.md" ]; then
+        log "FAILED to discard '$slug' — $DISCARD_DIR/$slug.md already exists; refusing to clobber a previously discarded plan (record $id)"
+        mark_pending "$id" "$slug" "$action"
+        continue
+    fi
+    if mv -n "$PLAN_PATH" "$DISCARD_DIR/$slug.md" 2> /dev/null && [ ! -e "$PLAN_PATH" ]; then
+        log "discarded '$slug' -> $DISCARD_DIR/$slug.md (record $id)"
+        mark_ack "$id"
+    else
+        log "FAILED to discard '$slug' (record $id) — not acking this pass"
+        mark_pending "$id" "$slug" "$action"
+    fi
+done <<< "$RECORDS"
+
+# ── dry-run stops here: nothing applied, nothing acked ───────────────────────
+if [ "$DRY_RUN" = 1 ]; then
+    log "dry run — nothing applied, nothing acked"
+    exit 0
+fi
+
+# ── the ack ladder ───────────────────────────────────────────────────────────
+# Records that could not be acted on are acked on the FIRST pass: retrying cannot
+# help, the record will never become valid, and leaving it unacked wedges the
+# drain. Records whose apply failed are NOT acked, but are bounded by MAX_ATTEMPTS.
+if grep -q . <<< "$ACK_IDS"; then
+    ACK_PAYLOAD=$(jq -R -s -c 'split("\n") | map(select(length > 0)) | {ids: .}' <<< "$ACK_IDS")
+    if remote POST "$ACK_ROUTE" <<< "$ACK_PAYLOAD"; then
+        # `acked` in the response is ADVISORY — never gate on it. It counts only
+        # tombstones newly written on that call, and "already acked", "compacted
+        # away" and "never named a decision" all contribute 0 indistinguishably, so
+        # an at-least-once drain replaying ids it already sent gets acked:0 on a
+        # fully successful pass. The authoritative check that a record is drained is
+        # a subsequent GET no longer listing its id. Contract: the doc comment on
+        # handleAckDecisions in ibl5/IBLbot/src/server/plan-review-dm.ts.
+        log "acked $(grep -c . <<< "$ACK_IDS") record(s)"
+        while IFS= read -r id; do
+            [ -n "$id" ] && clear_attempts "$id"
+        done <<< "$ACK_IDS"
+    else
+        case "$(classify)" in
+            notserving)
+                log "POST $ACK_ROUTE returned 404 — the bot is not serving the drain routes right now (lagging or failed deploy, restart, or rollback). No attempt consumed."
+                exit 0
+                ;;
+            unreachable)
+                # Refund: borrowed from bin/automouse/run:894's refund_attempt(),
+                # which exists to give back the attempt consumed by an environmental
+                # failure. Without it, one hour of prod downtime burns all three
+                # attempts on EVERY pending decision and force-acks them all —
+                # discarding real button presses for a reason that had nothing to do
+                # with the record.
+                log "POST $ACK_ROUTE unreachable (curl_rc=${CURL_RC:-?} http=${HTTP:-none}) — environmental; attempt REFUNDED."
+                exit 0
+                ;;
+            *)
+                log "POST $ACK_ROUTE refused (http=${HTTP:-none}) — the bot parsed the request and rejected it; burning one attempt per record."
+                while IFS= read -r id; do
+                    [ -n "$id" ] || continue
+                    n=$(attempts_for "$id")
+                    case "$n" in '' | *[!0-9]*) n=0 ;; esac
+                    n=$((n + 1))
+                    if [ "$n" -ge "$MAX_ATTEMPTS" ]; then
+                        meta=$(awk -F'\t' -v k="$id" '$1==k {print $2"\t"$3}' <<< "$PENDING_META" | tail -1)
+                        fslug=$(cut -f1 <<< "$meta")
+                        faction=$(cut -f2 <<< "$meta")
+                        log "force-acking record $id after $n failed passes"
+                        force_ack_dm "${fslug:-$id}" "${faction:-unknown}"
+                        set_attempts "$id" FORCED
+                    else
+                        set_attempts "$id" "$n"
+                    fi
+                done <<< "$ACK_IDS"
+                exit 0
+                ;;
+        esac
+    fi
+fi
+
+# Records whose local apply failed ride the same bounded ladder.
+while IFS= read -r pending_line; do
+    [ -n "$pending_line" ] || continue
+    # Hand-split for the same reason as the decision loop above.
+    id="${pending_line%%$'\t'*}"
+    rest="${pending_line#*$'\t'}"
+    slug="${rest%%$'\t'*}"
+    action="${rest#*$'\t'}"
+    [ -n "$id" ] || continue
+    n=$(attempts_for "$id")
+    case "$n" in '' | *[!0-9]*) n=0 ;; esac
+    n=$((n + 1))
+    if [ "$n" -ge "$MAX_ATTEMPTS" ]; then
+        log "force-acking record $id ('$slug', $action) after $n failed passes"
+        force_ack_dm "$slug" "$action"
+        set_attempts "$id" FORCED
+    else
+        log "record $id ('$slug', $action) failed to apply — attempt $n/$MAX_ATTEMPTS; will retry next pass"
+        set_attempts "$id" "$n"
+    fi
+done <<< "$PENDING_META"
+
+exit 0

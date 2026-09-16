@@ -585,39 +585,34 @@ fi
 SEAM_BIN="$(cd "$(dirname "$0")" && pwd)/test-plan-review-seam"
 
 "$SEAM_BIN" > "$SANDBOX/seam_out" 2>&1
-prd_expect_eq "skip exits clean" 0 "$?"
+prd_expect_eq "seam exits clean" 0 "$?"
 SEAM_OUT="$(cat "$SANDBOX/seam_out")"
 
-if printf '%s' "$SEAM_OUT" | grep -qE '^SKIP'; then
-    prd_ok "skip names the unit: stdout begins with SKIP"
+if grep -qF "plan-review-seam:" <<< "$SEAM_OUT"; then
+    prd_ok "seam runs fully: completion token present"
 else
-    prd_fail "skip names the unit: stdout should begin with SKIP"
-fi
-if printf '%s' "$SEAM_OUT" | grep -qF "discord-plan-review-3-drain"; then
-    prd_ok "skip names the unit: discord-plan-review-3-drain present"
-else
-    prd_fail "skip names the unit: discord-plan-review-3-drain not found in output"
+    prd_fail "seam runs fully: completion token (plan-review-seam:) missing"
 fi
 
 _skip_gate_count="$(grep -c '# ── SKIP GATE' "$SEAM_BIN" 2>/dev/null || true)"
-if [ "$_skip_gate_count" -eq 1 ]; then
-    prd_ok "NEG markers unique: SKIP GATE appears exactly once"
+if [ "$_skip_gate_count" -eq 0 ]; then
+    prd_ok "NEG markers absent: SKIP GATE removed (seam runs fully)"
 else
-    prd_fail "NEG markers unique: SKIP GATE count = $_skip_gate_count (expected 1)"
+    prd_fail "NEG markers absent: SKIP GATE count = $_skip_gate_count (expected 0)"
 fi
 
 _end_gate_count="$(grep -c '# ── END SKIP GATE' "$SEAM_BIN" 2>/dev/null || true)"
-if [ "$_end_gate_count" -eq 1 ]; then
-    prd_ok "NEG markers unique: END SKIP GATE appears exactly once"
+if [ "$_end_gate_count" -eq 0 ]; then
+    prd_ok "NEG markers absent: END SKIP GATE removed (seam runs fully)"
 else
-    prd_fail "NEG markers unique: END SKIP GATE count = $_end_gate_count (expected 1)"
+    prd_fail "NEG markers absent: END SKIP GATE count = $_end_gate_count (expected 0)"
 fi
 
 _stub_count="$(grep -c 'seam_fail "unimplemented' "$SEAM_BIN" 2>/dev/null || true)"
-if [ "$_stub_count" -eq 3 ]; then
-    prd_ok "NEG stubs fail loudly: 3 unimplemented stubs present"
+if [ "$_stub_count" -eq 0 ]; then
+    prd_ok "NEG stubs absent: all stubs implemented"
 else
-    prd_fail "NEG stubs fail loudly: stub count = $_stub_count (expected 3)"
+    prd_fail "NEG stubs absent: stub count = $_stub_count (expected 0)"
 fi
 
 if grep -qiE 'Truly.manual' "$SEAM_BIN" 2>/dev/null && grep -qiE 'Automouse Hold Justification' "$SEAM_BIN" 2>/dev/null; then

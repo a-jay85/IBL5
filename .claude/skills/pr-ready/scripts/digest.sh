@@ -103,14 +103,19 @@ while IFS= read -r line; do
   if [ "$is_label" -eq 1 ]; then
     LINES[$n]="$line"
     n=$((n + 1))
+  elif [ "${line:0:2}" = "**" ]; then
+    # Bold-prefixed but not a known label: treat as a distinct record so that a
+    # sixth bold line (e.g. **Reviewed tree:**) still degrades the digest.
+    LINES[$n]="$line"
+    n=$((n + 1))
   elif [ "$n" -gt 0 ]; then
-    # Continuation of the label above: normalize leading indentation to one space.
+    # Plain continuation: fold into the record above, normalizing indentation.
     while [ "${line:0:1}" = " " ] || [ "${line:0:1}" = $'\t' ]; do
       line="${line:1}"
     done
     LINES[$((n - 1))]="${LINES[$((n - 1))]} $line"
   fi
-  # is_label=0 with n=0 is pre-label noise ahead of the first label: dropped.
+  # is_label=0, not bold, n=0: pre-label noise — dropped.
 done <<< "$BODY"
 
 [ "$phys" -le "$MAX_PHYSICAL" ] || degrade "DIGEST section malformed (expected 5 labelled lines, found $phys physical lines)"

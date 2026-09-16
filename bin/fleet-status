@@ -375,7 +375,7 @@ render_automouse() {
 # TWO SOURCES, BOTH REQUIRED, for the reason every other row here is a
 # conjunction. The plist is the schedule of record (bin/automouse/run rewrites it
 # in burst mode, so a hardcoded 03:00 would go stale), but a plist on disk is
-# residue exactly like a heartbeat file: `launchctl unload` — what
+# residue exactly like a heartbeat file: `launchctl bootout` — what
 # `bin/automouse/run disarm-tonight` does — leaves it sitting there fully
 # populated. Printing its time for an unloaded label would advertise a queue
 # drain that will never happen. So: plist for WHEN, loaded label for WHETHER.

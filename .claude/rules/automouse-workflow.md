@@ -1,6 +1,6 @@
 ---
 description: Automouse autonomous workflow (formerly "nightly") — launchd fires claude -p on a recurring schedule, running two context-isolated agents per plan (implementation + post-plan) with time guards and incremental checkpoints.
-last_verified: 2026-09-13
+last_verified: 2026-09-16
 paths: "bin/automouse/**"
 ---
 
@@ -22,7 +22,7 @@ A headless `claude -p` process runs on a recurring schedule via macOS `launchd`.
 | Schedule a one-shot run | `bin/automouse/run schedule "2026-05-28 20:00 PDT"` (self-cleaning launchd agent; TZ optional) |
 | Run one plan (one-off, foreground) | `bin/automouse/run plan <slug>` (impl + post-plan for exactly one named plan, then stops; auto-queues if absent, leaves the rest of the queue untouched) |
 | Pause tonight's run (auto re-enables) | `bin/automouse/run disarm-tonight` (re-arms the existing plist ~1 h after the skipped run; the manual `launchctl unload` row below stays off until re-armed by hand) |
-| Pause until a given time | `bin/automouse/run disarm-until "2026-08-20 09:00 PDT"` (re-arms the existing plist at the given time; the manual `launchctl unload` row below stays off until re-armed by hand) |
+| Pause until a given time | `bin/automouse/run disarm-until "2026-08-20 09:00 PDT"` (re-arms the existing plist at the given time; same `launchctl unload` caveat as above) |
 | Disable the automouse job | `launchctl unload ~/Library/LaunchAgents/com.ibl5.automouse.plist` |
 | Re-enable the automouse job | `launchctl load ~/Library/LaunchAgents/com.ibl5.automouse.plist` |
 | Force-trigger now | `launchctl start com.ibl5.automouse` |
@@ -34,15 +34,15 @@ A headless `claude -p` process runs on a recurring schedule via macOS `launchd`.
 
 ### Disarm ordering and safety
 
-`disarm-tonight` and `disarm-until` follow an arm-before-disarm sequence: the one-shot re-arm launchd agent is bootstrapped and verified **before** the recurring job is unloaded, so if arming fails the pipeline keeps running and nothing is interrupted. Both subcommands refuse to act while a run is in flight (booting out the recurring job would SIGTERM the active process). After a successful disarm, a breadcrumb is written to `~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/.disarmed-until` (epoch, human-readable re-arm time, re-arm agent label, and requester), so `cat` on that file immediately answers "why is automouse off?". Repeated disarms clear any prior `com.ibl5.automouse-rearm-*` agents first so disarms never stack; one-shot agents from `run schedule` are deliberately left alone.
+`disarm-tonight` and `disarm-until` follow an arm-before-disarm sequence: the one-shot re-arm launchd agent is bootstrapped and verified **before** the recurring job is unloaded, so if arming fails the pipeline keeps running and nothing is interrupted. Both subcommands refuse to act while a run is in flight (booting out the recurring job would SIGTERM the active process). After a successful disarm, a breadcrumb is written to `~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/.disarmed-until` (epoch, re-arm time, re-arm agent label, requester), so `cat` on it answers "why is automouse off?". Repeated disarms clear any prior `com.ibl5.automouse-rearm-*` agents first so disarms never stack; one-shot agents from `run schedule` are deliberately left alone.
 
 ## Directory Layout
 
 ```
 ~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/
   queue/    symlinks to ~/claude-plans/*.md (oldest mtime runs first; queuing and
-            requeuing stamp the new entry to the BACK, so a plan authored weeks ago
-            still enters last — only `queue reorder` changes relative order)
+            requeuing stamp the new entry to the BACK — only `queue reorder`
+            changes relative order)
   done/     symlinks moved here after successful execution, or when the impl agent
             detects the plan is already merged (its work shipped under a prior PR)
   skipped/  symlinks moved here when skipped (ambiguity/errors/poison-pill);
@@ -84,6 +84,10 @@ entry untouched for more than `NIGHTLY_ARCHIVE_AGE_DAYS` (default **7**) into a 
 (`done/`, `skipped/`) are judged on their *own* mtime — the disposition date — and their
 absolute targets keep resolving after the move. `queue/` (pending work) and `handoff/`
 (transient) are never touched. The step is non-fatal: an archival error never aborts the run.
+
+**macOS sorts by the symlink TARGET's mtime** — BSD `ls -1tr` dereferences operands, so
+order follows the plan file in `~/claude-plans/`; GNU `ls` does not. `queue`/`queue reorder`
+stamp both. Diagnose with `stat -L`.
 
 ### Self-heal
 

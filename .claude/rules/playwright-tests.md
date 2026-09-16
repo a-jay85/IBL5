@@ -1,7 +1,7 @@
 ---
 description: Playwright E2E testing rules, Docker requirements, and actionability pitfalls.
 paths: ibl5/tests/e2e/**/*.ts
-last_verified: 2026-09-05
+last_verified: 2026-09-16
 ---
 
 # Playwright E2E Testing Rules
@@ -211,4 +211,8 @@ E2E runs in `.github/workflows/e2e-tests.yml`:
 
 **Add a module:** one `VrRow` in `VR_MANIFEST` (set `viewports`/`states`/`htmxTabs`), then run with `--update-snapshots` to generate the baseline PNG.
 
+**Running VR locally needs its own config.** `playwright.config.ts` excludes the spec (`testIgnore: [… /visual-regression/ …]`), so a plain `bunx playwright test` never runs it. Use `cd ibl5 && bunx playwright test --config=playwright.visual.config.ts`, against a `bin/wt-up <name> --seed` stack — baselines built from dev data mismatch CI wholesale.
+
 **Coverage:** `bin/check-vr-coverage` reports rows missing dimensions; new gaps fail CI (exit 1), existing gaps in `ibl5/tests/e2e/vr-coverage-baseline.json` are advisory. `bin/check-vr-coverage --update-baseline` acknowledges current gaps.
+
+**Baseline regen via the `update-baselines` label — add the label AFTER creating the PR.** `.github/workflows/e2e-tests.yml` bypasses its path filter only when `github.event.action == 'labeled'`. A PR created *with* the label fires `opened`, the path filter finds no source change, Visual Regression is skipped entirely, and the regen never runs. So never `gh pr create --label update-baselines` — create the PR, then add the label as a separate action (or remove and re-add it). Prefer this CI flow over local `--update-snapshots`; baselines must come from the CI seed.

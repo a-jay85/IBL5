@@ -25,6 +25,23 @@
 # Exit codes: 0 = all tokens resolve (or none), 1 = stale (unresolved tokens
 # printed as "STALE: <token>"), 2 = usage error / plan file missing.
 #
+# TRIAGING A NON-ZERO EXIT — it is not automatically a poison pill. Two known
+# false-positive shapes account for most flagged tokens; verify each one on disk
+# before skipping the plan:
+#
+#   a. Multi-line "Create:" lists. The creation cue must be on the SAME line as
+#      the token (see the same-line logic below). The standard /plan shape puts
+#      the cue in a `**Action.** Create:` heading and the new files in bullets
+#      underneath, so every net-new file trips a false STALE.
+#   b. Mis-typed prefixes on files that DO exist — e.g. a plan writing
+#      `ibl5/.github/actions/setup-docker-e2e/action.yml` (example) when the real
+#      path is repo-root `.github/actions/setup-docker-e2e/action.yml`.
+#
+# A genuine skip is a token that is truly renamed, moved, or deleted. Confirmed
+# on gm-01-notification-inbox (2026-06-13): 8 flagged tokens, all false
+# positives, the plan shipped fine. Do NOT patch this guard mid-run — it lives in
+# the main checkout's bin/ on master, which the worktree rule forbids editing.
+#
 # Bash 3.2 / macOS compatible: no mapfile, no declare -A; temp files collect
 # tokens. The `shell=bash` directive above keeps shellcheck's SC3xxx
 # (sh-dialect) warnings from firing on the intentional bashisms.

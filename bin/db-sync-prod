@@ -186,7 +186,11 @@ if ! docker ps --format '{{.Names}}' | grep -q "^${DB_CONTAINER}$"; then
 fi
 
 echo "=== DB Sync: Production → $DB_CONTAINER ==="
-echo "  Source: $REMOTE_HOST:$REMOTE_PORT/$REMOTE_DATABASE"
+if [ -n "$SNAPSHOT" ]; then
+    echo "  Source: snapshot file $SNAPSHOT (prod is never contacted)"
+else
+    echo "  Source: $REMOTE_HOST:$REMOTE_PORT/$REMOTE_DATABASE"
+fi
 echo "  Target: $DB_CONTAINER"
 [ -n "$WORKTREE_PATH" ] && echo "  Worktree: $WORKTREE_PATH"
 echo ""
@@ -221,22 +225,32 @@ PRESERVE_TABLES="ibl_api_keys ibl_bug_reports ibl_bug_report_attachments ibl_bug
 
 # Detect STORED GENERATED column tables — their data needs dedicated column-list
 # INSERTs (mariadb-dump emits those with --no-create-info) to avoid ERROR 1906.
-GENERATED_TABLES=$(remote_query "
-    SELECT DISTINCT table_name
-    FROM information_schema.columns
-    WHERE table_schema='$REMOTE_DATABASE'
-      AND extra LIKE '%GENERATED%'
-    ORDER BY table_name;
-")
+#
+# Both round trips are prod-only. A snapshot is a single self-contained stream
+# with no per-table passes to plan, and snapshot mode must never contact prod —
+# unguarded, these two calls abort the whole run under `set -e` on any machine
+# without a mariadb client or prod credentials, which is the normal case for the
+# worktree the flag exists to serve.
+GENERATED_TABLES=""
+ALL_TABLES=""
+if [ -z "$SNAPSHOT" ]; then
+    GENERATED_TABLES=$(remote_query "
+        SELECT DISTINCT table_name
+        FROM information_schema.columns
+        WHERE table_schema='$REMOTE_DATABASE'
+          AND extra LIKE '%GENERATED%'
+        ORDER BY table_name;
+    ")
 
-# Fetch real tables (not views) in one round trip
-ALL_TABLES=$(remote_query "
-    SELECT table_name
-    FROM information_schema.tables
-    WHERE table_schema='$REMOTE_DATABASE'
-      AND engine IS NOT NULL
-    ORDER BY table_name;
-")
+    # Fetch real tables (not views) in one round trip
+    ALL_TABLES=$(remote_query "
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema='$REMOTE_DATABASE'
+          AND engine IS NOT NULL
+        ORDER BY table_name;
+    ")
+fi
 
 # Preserve-if-EXISTS. Only skip a table that is already present locally; on a
 # fresh container nothing is skipped, so the prod dump still creates everything.
@@ -306,12 +320,18 @@ if [ -n "$PRESERVE_RE" ]; then
     GENERATED_TABLES="$_kept_gen"
 fi
 
-echo "Dumping prod → $DB_CONTAINER..."
+if [ -n "$SNAPSHOT" ]; then
+    echo "Loading snapshot → $DB_CONTAINER..."
+else
+    echo "Dumping prod → $DB_CONTAINER..."
+fi
 if [ -n "$GENERATED_TABLES" ]; then
     echo "  Generated-column tables:$(printf ' %s' $GENERATED_TABLES)"
 fi
 if [ -n "$PRESERVE_EXISTING" ]; then
     echo "  Preserved (local-only, not synced):$(printf ' %s' $PRESERVE_EXISTING)"
+elif [ -n "$SNAPSHOT" ]; then
+    echo "  Preserved: none — no local-only table exists yet; the snapshot creates them."
 else
     echo "  Preserved: none — no local-only table exists yet; the prod dump creates them."
 fi
@@ -338,7 +358,47 @@ TOTAL_STEPS=2
 STEP=0
 
 if [ -n "$SNAPSHOT" ]; then
-  gunzip -c "$SNAPSHOT" | db_import_sql "$DB_CONTAINER" || exit 1
+  # Preserve local-only tables across a snapshot load. A snapshot is ONE
+  # self-contained stream carrying DROP/CREATE for every table, so the
+  # --ignore-table filter the prod path uses has no equivalent here: dump the
+  # local rows first, load the snapshot, then replay them. Without this the
+  # snapshot load re-opens the exact 2026-09-14 data-loss path (ADR-0080) that
+  # PRESERVE_TABLES above exists to close.
+  #
+  # mariadb-dump runs INSIDE the container, so this adds no host-client
+  # dependency and still never contacts prod.
+  PRESERVE_TMP=""
+  if [ -n "$PRESERVE_EXISTING" ]; then
+      PRESERVE_TMP="$(mktemp)"
+      # shellcheck disable=SC2086
+      if ! docker exec "$DB_CONTAINER" mariadb-dump -uroot -proot \
+              --single-transaction --skip-lock-tables \
+              iblhoops_ibl5 $PRESERVE_EXISTING \
+              > "$PRESERVE_TMP" 2> >(db_strip_warnings >&2); then
+          echo "ERROR: could not back up preserved tables before the snapshot load — aborting." >&2
+          echo "  Refusing to load: the snapshot would drop$(printf ' %s' $PRESERVE_EXISTING)." >&2
+          rm -f "$PRESERVE_TMP"
+          exit 1
+      fi
+      # Exit status alone is not enough: a dump that exits 0 having written
+      # nothing would let the snapshot's DROP TABLE through and then "restore"
+      # an empty file — the 2026-09-14 loss with an error-free log
+      # (.claude/rules/shell-fail-open-probe.md). Fail closed on empty.
+      if [ ! -s "$PRESERVE_TMP" ]; then
+          echo "ERROR: preserved-table backup is empty — refusing to load the snapshot." >&2
+          echo "  Would have dropped$(printf ' %s' $PRESERVE_EXISTING) with nothing to restore." >&2
+          rm -f "$PRESERVE_TMP"
+          exit 1
+      fi
+  fi
+
+  gunzip -c "$SNAPSHOT" | db_import_sql "$DB_CONTAINER" || { rm -f "$PRESERVE_TMP"; exit 1; }
+
+  if [ -n "$PRESERVE_TMP" ]; then
+      echo "  Restoring preserved local-only tables:$(printf ' %s' $PRESERVE_EXISTING)" >&2
+      db_import_sql "$DB_CONTAINER" < "$PRESERVE_TMP" || { rm -f "$PRESERVE_TMP"; exit 1; }
+      rm -f "$PRESERVE_TMP"
+  fi
 else
   {
       STEP=$((STEP + 1))

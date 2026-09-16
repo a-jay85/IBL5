@@ -266,6 +266,24 @@ A phase snapshot is a DB snapshot captured automatically at each season phase en
 
 **Force a dry-run:** Trigger `.github/workflows/db-backup.yml` via `workflow_dispatch` with `dry_run: true` to see what would be captured without writing any files.
 
+**Force a re-capture:** Two gates in `bin/phase-snapshot-capture` stop a repeat capture, and BOTH must be opened or the next run still skips. Deleting only the `.sql.gz` is not enough — `.last-phase` still says the phase was captured. On the prod box:
+
+```bash
+rm -f ~/backups/db/phase-snapshots/2026-regular-season.sql.gz \
+      ~/backups/db/phase-snapshots/2026-regular-season.json
+rm -f ~/backups/db/phase-snapshots/.last-phase
+```
+
+Then trigger `.github/workflows/db-backup.yml` via `workflow_dispatch` (leave `dry_run` unchecked). Removing `.last-phase` alone is safe: the capture rewrites it, and the per-file gate still prevents overwriting snapshots that already exist.
+
+**Loading a snapshot locally:** `bin/phase-snapshot-pull` copies snapshots to `ibl5/backups/phase-snapshots/`, then:
+
+```bash
+bin/wt-up <worktree-name> --snapshot ibl5/backups/phase-snapshots/2026-regular-season.sql.gz
+```
+
+Snapshot mode never contacts production — it needs no prod credentials and no local `mariadb` client. It preserves the same local-only tables a `--prod` sync does (`ibl_api_keys` and the bug-pipeline tables), so re-loading a snapshot into an existing container will not destroy the local bug-bot's API key. Preservation is preserve-**if-exists**: on a brand-new container those tables do not exist yet, so they are created from the snapshot and the local bug-bot still needs its key minted.
+
 **Sampling blind spot:** The snapshot inherits `bin/rehearsal-prod-dump`'s sampling: rows with `season_year < MAX(season_year)-1` are excluded from `ibl_box_scores`, `ibl_box_scores_teams`, `ibl_plr_snapshots`, and `ibl_plb_snapshots`. A phase snapshot is accurate for the current and previous season; older-season comparisons may miss data in those four tables.
 
 ---

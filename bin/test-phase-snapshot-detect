@@ -525,6 +525,140 @@ test_wt_up_passthrough_single_call_site() {
 # Run all tests
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Phase 4: the REAL --snapshot load path
+#
+# Every other db-sync-prod --snapshot case above stops at argument parsing or at
+# --print-plan, which exits before any load happens. This case runs the actual
+# load against a throwaway container — the only way to catch the two defects
+# that shape hid: (a) snapshot mode still reaching for prod, and (b) the load
+# dropping the local-only tables PRESERVE_TABLES exists to protect.
+# ---------------------------------------------------------------------------
+test_db_sync_prod_snapshot_load_is_offline_and_preserves_local_tables() {
+    local label="db-sync-prod --snapshot load"
+    if ! docker info >/dev/null 2>&1; then
+        echo "skip: $label (docker unavailable)"
+        return 0
+    fi
+
+    # shellcheck source=/dev/null
+    source "$SCRIPT_DIR/lib/git-helpers.sh"
+    local wt_parent
+    wt_parent="$(worktrees_parent_dir "$REPO_ROOT")"
+
+    local tag="snaptest-$$"
+    local cname="ibl5-db-$tag"
+    local wt="$wt_parent/$tag"
+
+    snaptest_cleanup() {
+        docker rm -f "$cname" >/dev/null 2>&1 || true
+        rm -rf "$wt"
+    }
+    snaptest_cleanup
+
+    mkdir -p "$wt"
+    printf '%s' "$tag" > "$wt/.wt-slug"
+
+    if ! docker run -d --name "$cname" \
+            -e MARIADB_ROOT_PASSWORD=root \
+            -e MARIADB_DATABASE=iblhoops_ibl5 \
+            mariadb:10.11 >/dev/null 2>&1; then
+        fail "$label: throwaway container starts" "docker run failed"
+        snaptest_cleanup
+        return 0
+    fi
+
+    local i ready=0
+    for i in $(seq 1 90); do
+        if docker exec "$cname" mariadb -uroot -proot -e "SELECT 1" >/dev/null 2>&1; then
+            ready=1
+            break
+        fi
+        sleep 1
+    done
+    if [ "$ready" != "1" ]; then
+        fail "$label: throwaway container becomes ready" "no response after 90s"
+        snaptest_cleanup
+        return 0
+    fi
+
+    # Seed a local-only row prod does not have — the thing a sync must not destroy.
+    if ! docker exec "$cname" mariadb -uroot -proot iblhoops_ibl5 -e "
+            CREATE TABLE ibl_api_keys (id INT PRIMARY KEY, key_hash CHAR(64));
+            INSERT INTO ibl_api_keys VALUES (1, 'LOCAL-ONLY-KEY');
+        " >/dev/null 2>&1; then
+        fail "$label: seed local-only table" "CREATE/INSERT failed"
+        snaptest_cleanup
+        return 0
+    fi
+
+    # A real snapshot carries DROP/CREATE for EVERY prod table, local-only ones
+    # included — that is precisely why the load needs preserve protection.
+    local snap="$TMP/2026-heat.sql.gz"
+    {
+        echo "DROP TABLE IF EXISTS ibl_api_keys;"
+        echo "CREATE TABLE ibl_api_keys (id INT PRIMARY KEY, key_hash CHAR(64));"
+        echo "INSERT INTO ibl_api_keys VALUES (9, 'PROD-KEY');"
+        echo "DROP TABLE IF EXISTS ibl_team_info;"
+        echo "CREATE TABLE ibl_team_info (teamid INT PRIMARY KEY);"
+        echo "INSERT INTO ibl_team_info VALUES (7);"
+    } | gzip -9 > "$snap"
+
+    # Shim the host mariadb clients so ANY attempt to reach prod is loud and fatal.
+    # docker exec calls run the client INSIDE the container, so they are unaffected.
+    local shim="$TMP/shim-$tag"
+    mkdir -p "$shim"
+    local b
+    for b in mariadb mariadb-dump mysql mysqldump; do
+        cat > "$shim/$b" <<'SHIM_EOF'
+#!/usr/bin/env bash
+echo "PROD_CONTACT_ATTEMPTED: $(basename "$0")" >&2
+exit 127
+SHIM_EOF
+        chmod +x "$shim/$b"
+    done
+
+    local out rc=0
+    out="$(PATH="$shim:$PATH" "$SCRIPT_DIR/db-sync-prod" "$tag" --snapshot "$snap" 2>&1)" || rc=$?
+
+    if [ "$rc" = 0 ]; then
+        ok "$label: exits 0"
+    else
+        fail "$label: exits 0" "rc=$rc; last lines: $(printf '%s' "$out" | tail -6 | tr '\n' ' ')"
+    fi
+
+    if grep -qF 'PROD_CONTACT_ATTEMPTED' <<< "$out"; then
+        fail "$label: never contacts prod" "a host mariadb client was invoked"
+    else
+        ok "$label: never contacts prod"
+    fi
+
+    if grep -qF "Source: snapshot file" <<< "$out"; then
+        ok "$label: banner names the snapshot, not a prod host"
+    else
+        fail "$label: banner names the snapshot" "no 'Source: snapshot file' line in output"
+    fi
+
+    local preserved loaded
+    preserved="$(docker exec "$cname" mariadb -uroot -proot iblhoops_ibl5 -N -B \
+        -e "SELECT key_hash FROM ibl_api_keys" 2>/dev/null || echo TABLE_GONE)"
+    if [ "$preserved" = "LOCAL-ONLY-KEY" ]; then
+        ok "$label: local-only ibl_api_keys row survives"
+    else
+        fail "$label: local-only ibl_api_keys row survives" "got '$preserved', want 'LOCAL-ONLY-KEY'"
+    fi
+
+    loaded="$(docker exec "$cname" mariadb -uroot -proot iblhoops_ibl5 -N -B \
+        -e "SELECT teamid FROM ibl_team_info" 2>/dev/null || echo TABLE_GONE)"
+    if [ "$loaded" = "7" ]; then
+        ok "$label: snapshot rows actually landed"
+    else
+        fail "$label: snapshot rows actually landed" "ibl_team_info teamid='$loaded', want '7'"
+    fi
+
+    snaptest_cleanup
+}
+
 test_no_capture_when_phase_unchanged
 test_capture_when_phase_changed
 test_capture_on_first_run_no_sidecar
@@ -544,6 +678,7 @@ test_db_sync_prod_rejects_missing_snapshot
 test_db_sync_prod_rejects_snapshot_without_value
 test_db_sync_prod_rejects_unknown_option
 test_db_sync_prod_print_plan_uses_gunzip
+test_db_sync_prod_snapshot_load_is_offline_and_preserves_local_tables
 test_wt_up_preserves_existing_flags
 test_wt_up_rejects_snapshot_without_value
 test_wt_up_rejects_snapshot_with_mode_flag

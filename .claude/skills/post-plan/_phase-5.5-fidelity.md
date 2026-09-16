@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 5.5 — plan-intent fidelity review (one Opus reviewer spawn, plus one bounded re-review after remediation), verdict parse, remediation, and sticky merge-digest comment.
-last_verified: 2026-09-13
+last_verified: 2026-09-16
 ---
 
 # /post-plan Phase 5.5 — Plan-intent fidelity review & merge digest
@@ -113,11 +113,26 @@ The last line of the sticky comment, immediately above the `<!-- pr-ready-verdic
 | `READY WITH NOTES` | every `Mode: in-PR` finding fixed | `READY WITH NOTES — all notes remediated in <sha>; reviewer verdict covers tree <REVIEWED_TREE>, not the post-remediation head` |
 | `READY WITH NOTES` | something left unfixed | `READY WITH NOTES — <what remains, named>; remediated the rest in <sha>` |
 | `NOT READY` | all fixed; step 4b re-review returned `READY` or `READY WITH NOTES` | `READY (re-review) — findings remediated in <sha> and re-reviewed clean on tree <tree>; condition (12) arms on the next /post-plan Phase 6.5 run` |
-| `NOT READY` | all fixed; step 4b re-review returned `NOT READY` | `NOT READY (re-review) — remediation in <sha> did not clear the reviewer; remediate the re-review's findings and re-run /post-plan` |
-| `NOT READY` | all fixed; step 4b skipped (`auto_merge: false`) | `NOT READY — findings remediated in <sha>; the plan declares auto_merge: false, so a human merger reviews this PR and no re-review was spawned` |
-| `NOT READY` | something left unfixed | `NOT READY — <what remains, named>; remediated the rest in <sha>` |
+| `NOT READY` | all fixed; step 4b re-review returned `NOT READY` | `NOT READY (re-review) — <what the re-review still blocks on, named>; remediate and re-run /post-plan` |
+| `NOT READY` | all fixed; step 4b skipped (`auto_merge: false`) | `NOT READY — held for your final review` |
+| `NOT READY` | something left unfixed | `NOT READY — <what remains, named>` |
 
-The three rows that replace the old "all fixed" row say what the second reviewer found, or say plainly that the author's `auto_merge: false` is the reason no second reviewer ran. A run that fixed everything now reports exactly what happened next (PR #2192 prompted the original split; the same "don't mis-report the reason for the hold" principle governs all three). The hold itself is unchanged for the `NOT READY (re-review)` and `NOT READY — findings remediated` rows — condition (12) still reads the frozen `FIDELITY` word from the verdict file, never this line. The `READY (re-review)` line signals the fidelity hold is cleared, but **does not mean the PR is armed** — Phase 6.5 has not run yet, and conditions (1)-(11) and (13) may still hold it.
+**A `NOT READY` line carries action items only.** Its suffix names what the reader must still
+do to reach `READY` — nothing else. Remediation the run already completed is **not** an action
+item and never appears there: work that is done is evidence *for* readiness, so narrating it
+under a blocking word reads as a contradiction and buries the one thing the reader has to act
+on. The remediation `<sha>` is not lost — step 4 point 3 above already appends it to the
+`**Machine-authored fixes:**` digest label, which is where a reader looks for what the run
+changed. Likewise, `auto_merge: false` needs no explanation of the mechanism: the action item
+is simply `held for your final review`. `READY`-prefixed rows are unaffected — on a passing
+verdict the extra context is doing real work.
+
+This does not relax PR #2192's lesson ("don't mis-report the reason for the hold") — terse is
+not mis-reported; each `NOT READY` row still states its own true reason, just only that. The
+hold itself is unchanged for both `NOT READY` remediated rows — condition (12) still reads the
+frozen `FIDELITY` word from the verdict file, never this line. The `READY (re-review)` line
+signals the fidelity hold is cleared, but **does not mean the PR is armed** — Phase 6.5 has not
+run yet, and conditions (1)-(11) and (13) may still hold it.
 
 Skip this step entirely when `FIDELITY=READY`.
 

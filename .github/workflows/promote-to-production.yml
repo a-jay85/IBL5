@@ -220,7 +220,7 @@ jobs:
             printf 'Auto-promotion is PAUSED (AUTO_PROMOTE_PAUSED=1).\n\n'
             printf 'master %s was NOT promoted to production.\n\n' "${PROMOTE_SHA:0:11}"
             printf 'Resume: gh variable delete AUTO_PROMOTE_PAUSED\n'
-            printf 'Ship by hand meanwhile: bin/merge-master-to-prod\n\n%s\n' "$RUN_URL"
+            printf 'Ship by hand meanwhile: bin/merge-master-to-prod\n\n<%s>\n' "$RUN_URL"
           } > /tmp/discord-msg.txt
 
       - name: Send Discord DM

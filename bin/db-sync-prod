@@ -84,6 +84,17 @@ if [ -n "$SNAPSHOT" ]; then
   fi
 fi
 
+# --print-plan: emit the load command without requiring a running container or .env.
+if [ -n "$SNAPSHOT" ] && $PRINT_PLAN; then
+  if [ -n "$WORKTREE_ARG" ]; then
+    _plan_container="ibl5-db-$WORKTREE_ARG"
+  else
+    _plan_container="ibl5-mariadb"
+  fi
+  echo "gunzip -c $SNAPSHOT | db_import_sql $_plan_container"
+  exit 0
+fi
+
 # Load .env for REMOTE_* creds.
 # When invoked from a worktree's bin/, REPO_ROOT is the worktree root, which
 # has no .env (only the main worktree does). Fall back to the main worktree
@@ -323,10 +334,6 @@ TOTAL_STEPS=2
 STEP=0
 
 if [ -n "$SNAPSHOT" ]; then
-  if $PRINT_PLAN; then
-    echo "gunzip -c $SNAPSHOT | db_import_sql $DB_CONTAINER"
-    exit 0
-  fi
   gunzip -c "$SNAPSHOT" | db_import_sql "$DB_CONTAINER" || exit 1
 else
   {

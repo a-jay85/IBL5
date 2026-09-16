@@ -237,6 +237,7 @@ if [ "$PROD_DB" = true ] || [ -n "$SNAPSHOT_FILE" ]; then
         DB_SYNC_ARGS=("$WORKTREE_NAME")
     fi
     if ! "$REPO_ROOT/bin/db-sync-prod" "${DB_SYNC_ARGS[@]}"; then
+        # DB_SYNC_ARGS includes --snapshot "$SNAPSHOT_FILE" when a snapshot is set
         echo "Error: db-sync-prod failed. The worktree is up but the database may be empty." >&2
         echo "  Fix REMOTE_* creds in $REPO_ROOT/.env and re-run: bin/db-sync-prod $WORKTREE_NAME" >&2
         echo "  Or rerun wt-up with --seed (ci fixtures) or --no-data (schema only)." >&2

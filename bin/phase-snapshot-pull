@@ -100,4 +100,4 @@ echo "  from: $SRC"
 echo "    to: $DST"
 echo ""
 
-rsync "${RSYNC_FLAGS[@]}" -e "ssh" "$SRC" "$DST"
+rsync "${RSYNC_FLAGS[@]}" -e "ssh" "$SRC" "$DST" || $DRY_RUN

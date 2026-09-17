@@ -51,6 +51,8 @@ set -u
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 FLEET="$SCRIPT_DIR/fleet-status"
+# shellcheck source=bin/lib/session-id.sh
+. "$SCRIPT_DIR/lib/session-id.sh"
 TMP="$(mktemp -d)"
 
 SPAWNED_PIDS=""
@@ -275,6 +277,10 @@ cat <<'ROWS'
 5151	0	com.ibl5.plan-now-20260910-171016-38521
 5252	0	com.ibl5.plan-now-20260910-174905-98101
 5353	0	com.ibl5.plan-now-20260910-090000-77000
+6001	0	com.ibl5.plan-now-20260910-200000-60001
+6002	0	com.ibl5.plan-now-20260910-200000-60002
+6003	0	com.ibl5.plan-now-20260910-200000-60003
+6004	0	com.ibl5.plan-now-20260910-200000-60004
 99999	0	com.apple.something.unrelated
 ROWS
 [ -n "\${STUB_NO_AUTOMOUSE:-}" ] || printf -- '-\t0\tcom.ibl5.automouse\n'
@@ -312,53 +318,101 @@ PLIST_MIDNIGHT="$TMP/com.ibl5.automouse.midnight.plist"
 sed 's|<integer>4</integer>|<integer>0</integer>|; s|<integer>30</integer>|<integer>0</integer>|' \
     "$PLIST" > "$PLIST_MIDNIGHT"
 
+# Transcript root for Phase 6 transcript fixture cases.
+TX="$TMP/projects"; SLUG="-Users-somebody-GitHub-IBL5"; mkdir -p "$TX/$SLUG"
+
+plant_tx() {
+    local dest="$TX/$SLUG/$1"; shift
+    mkdir -p "$(dirname "$dest")"
+    # Line 1 is a valid NON-assistant record. An earlier draft planted a JSON
+    # fragment here to stand in for the mid-record cut `tail -c` used to make;
+    # transcript_tail takes no byte window any more, so there is no cut left to
+    # simulate. What needs proving now is that the type filter drops everything
+    # that is not an assistant record -- if it ever leaked, this text renders.
+    printf '%s\n' '{"type":"user","message":{"content":[{"type":"text","text":"USER RECORD MUST NOT RENDER"}]}}' > "$dest"
+    printf '%s\n' "$@" >> "$dest"
+}
+tx_text() { printf '{"type":"assistant","message":{"content":[{"type":"text","text":"%s"}]}}' "$1"; }
+tx_tool() { printf '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"%s","input":{"%s":"%s"}}]}}' "$1" "$2" "$3"; }
+plant_sidecar() { printf '%s\n' "$2" > "$LOGS/$1.session"; }
+
+# Case 1: sidecar + full transcript (text then tool, proving independent extraction).
+plant_sidecar plan-now-20260910-171016-38521 'aaaaaaaa-1111-2222-3333-444444444444'
+plant_tx "aaaaaaaa-1111-2222-3333-444444444444.jsonl" \
+    "$(tx_text 'Phase 4 — rebasing onto master')" \
+    "$(tx_tool Bash command 'git rebase origin/master')"
+
+# Case 3: sidecar exists but uuid has no matching transcript anywhere.
+plant_sidecar plan-now-20260910-090000-77000 'bbbbbbbb-1111-2222-3333-444444444444'
+
+# Case 4: dead job (PID '-') — sidecar + transcript exist on disk but the
+# liveness continue fires before the transcript block is reached.
+plant_sidecar post-plan-now-exited-slug-20260910-100000-1111 'ffffffff-1111-2222-3333-444444444444'
+plant_tx "ffffffff-1111-2222-3333-444444444444.jsonl" \
+    "$(tx_text 'RESIDUE SHOULD NEVER RENDER')"
+
+# Case 5: decoy transcript + malformed sidecars — the decoy must NOT render.
+plant_tx "cccccccc-1111-2222-3333-444444444444.jsonl" "$(tx_text 'DECOY TRANSCRIPT')"
+plant_sidecar plan-now-20260910-200000-60001 '*'
+plant_sidecar plan-now-20260910-200000-60002 'AAAAAAAA-1111-2222-3333-444444444444'
+
+# Case 6: parent transcript + newer subagent transcript; the subagent must win.
+plant_tx "dddddddd-1111-2222-3333-444444444444.jsonl" "$(tx_text 'pre-spawn text')"
+plant_tx "dddddddd-1111-2222-3333-444444444444/subagents/agent-aaa.jsonl" \
+    "$(tx_text 'inside the architect')"
+touch "$TX/$SLUG/dddddddd-1111-2222-3333-444444444444/subagents/agent-aaa.jsonl"
+plant_sidecar plan-now-20260910-200000-60003 'dddddddd-1111-2222-3333-444444444444'
+
+# Case 9: thinking record + tool only, no text block (startup window).
+plant_tx "eeeeeeee-1111-2222-3333-444444444444.jsonl" \
+    '{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"thinking"}]}}' \
+    "$(tx_tool Read file_path '/Users/somebody/GitHub/IBL5/ibl5/classes/Foo.php')"
+plant_sidecar plan-now-20260910-200000-60004 'eeeeeeee-1111-2222-3333-444444444444'
+
 # ── run ────────────────────────────────────────────────────────────────────────
 
 printf 'test-fleet-status\n'
 
-OUTPUT="$(
-    PATH="$STUBBIN:$PATH" \
-    FLEET_STATUS_AUTOMOUSE_DIR="$AM" \
-    FLEET_STATUS_HARNESS_OUT="$OUT" \
-    FLEET_STATUS_LOG_DIR="$LOGS" \
-    FLEET_STATUS_AUTOMOUSE_PLIST="$PLIST" \
-    "$FLEET" 2>&1
-)"
-RC=$?
+# Run bin/fleet-status against the fixture tree. Any NAME=VALUE pairs passed as
+# arguments are layered over the defaults via env, so env-seam cases below can
+# unset or empty a var without a second copy of this block.
+# -u NAME suppresses that default (env cannot unset-then-reset the same var).
+run_fleet() {
+    local _jq_arg=(FLEET_STATUS_JQ=jq)
+    local _tx_arg=(FLEET_STATUS_TRANSCRIPT_ROOT="$TX")
+    local _extra=()
+    while [ $# -gt 0 ]; do
+        if [ "$1" = "-u" ] && [ $# -gt 1 ]; then
+            case "$2" in
+                FLEET_STATUS_JQ)              _jq_arg=() ;;
+                FLEET_STATUS_TRANSCRIPT_ROOT) _tx_arg=() ;;
+            esac
+            shift 2
+        else
+            _extra+=("$1"); shift
+        fi
+    done
+    env PATH="$STUBBIN:$PATH" \
+        FLEET_STATUS_AUTOMOUSE_DIR="$AM" \
+        FLEET_STATUS_HARNESS_OUT="$OUT" \
+        FLEET_STATUS_LOG_DIR="$LOGS" \
+        "${_tx_arg[@]+"${_tx_arg[@]}"}" \
+        "${_jq_arg[@]+"${_jq_arg[@]}"}" \
+        FLEET_STATUS_AUTOMOUSE_PLIST="$PLIST" \
+        "${_extra[@]+"${_extra[@]}"}" "$FLEET" 2>&1
+}
+
+OUTPUT="$(run_fleet)"; RC=$?
 
 # Cases 14 and 15 need their own renders: the plist gate's two negative branches
 # are properties of a whole run, so one capture cannot hold them alongside 13.
-OUTPUT_UNLOADED="$(
-    PATH="$STUBBIN:$PATH" \
-    FLEET_STATUS_AUTOMOUSE_DIR="$AM" \
-    FLEET_STATUS_HARNESS_OUT="$OUT" \
-    FLEET_STATUS_LOG_DIR="$LOGS" \
-    FLEET_STATUS_AUTOMOUSE_PLIST="$PLIST" \
-    STUB_NO_AUTOMOUSE=1 \
-    "$FLEET" 2>&1
-)"
-
-OUTPUT_NOPLIST="$(
-    PATH="$STUBBIN:$PATH" \
-    FLEET_STATUS_AUTOMOUSE_DIR="$AM" \
-    FLEET_STATUS_HARNESS_OUT="$OUT" \
-    FLEET_STATUS_LOG_DIR="$LOGS" \
-    FLEET_STATUS_AUTOMOUSE_PLIST="$TMP/no-such-plist.plist" \
-    "$FLEET" 2>&1
-)"
+OUTPUT_UNLOADED="$(run_fleet STUB_NO_AUTOMOUSE=1)"
+OUTPUT_NOPLIST="$(run_fleet FLEET_STATUS_AUTOMOUSE_PLIST="$TMP/no-such-plist.plist")"
 
 # Case 18. FLEET_STATUS_FORCE_LINKS arms ONLY the hyperlinks, never colour, so this
 # capture differs from $OUTPUT in exactly one dimension and a failure here names
 # the escape rather than some SGR byte that drifted in with it.
-OUTPUT_LINKS="$(
-    PATH="$STUBBIN:$PATH" \
-    FLEET_STATUS_AUTOMOUSE_DIR="$AM" \
-    FLEET_STATUS_HARNESS_OUT="$OUT" \
-    FLEET_STATUS_LOG_DIR="$LOGS" \
-    FLEET_STATUS_AUTOMOUSE_PLIST="$PLIST" \
-    FLEET_STATUS_FORCE_LINKS=1 \
-    "$FLEET" 2>&1
-)"
+OUTPUT_LINKS="$(run_fleet FLEET_STATUS_FORCE_LINKS=1)"
 
 # The same page with every OSC 8 sequence removed. Padding is emitted OUTSIDE the
 # link precisely so this is byte-identical to the plain render's columns; the
@@ -366,14 +420,7 @@ OUTPUT_LINKS="$(
 # wrapped string, where the escape bytes count as width and the column collapses.
 OUTPUT_STRIPPED="$(printf '%s\n' "$OUTPUT_LINKS" | perl -pe 's/\e\]8;;[^\e]*\e\\//g')"
 
-OUTPUT_MIDNIGHT="$(
-    PATH="$STUBBIN:$PATH" \
-    FLEET_STATUS_AUTOMOUSE_DIR="$AM" \
-    FLEET_STATUS_HARNESS_OUT="$OUT" \
-    FLEET_STATUS_LOG_DIR="$LOGS" \
-    FLEET_STATUS_AUTOMOUSE_PLIST="$PLIST_MIDNIGHT" \
-    "$FLEET" 2>&1
-)"
+OUTPUT_MIDNIGHT="$(run_fleet FLEET_STATUS_AUTOMOUSE_PLIST="$PLIST_MIDNIGHT")"
 
 if [ "$RC" -eq 0 ]; then pass "exits 0"; else fail "exits 0 (got $RC)"; fi
 
@@ -537,6 +584,125 @@ assert_has "--help starts at the title line"  "$HELP" '^bin/fleet-status — one
 assert_has "--help reaches the usage block"   "$HELP" 'Usage: bin/fleet-status'
 assert_has "--help reaches the final line"    "$HELP" 'not a failure\.$'
 assert_lacks "--help stops before the code"   "$HELP" 'SCRIPT_DIR='
+
+# === transcript fixture cases (Phase 6) ===
+
+# Case 1 — both lines render.
+assert_has "transcript: assistant text renders" "$OUTPUT" 'Phase 4 — rebasing onto master'
+assert_has "transcript: tool line renders"      "$OUTPUT" '↳ Bash: git rebase origin/master'
+
+# Case 2 — missing sidecar: placeholder renders, no tool line leaks.
+ROW_98101="$(printf '%s\n' "$OUTPUT" | grep -A 4 '98101')"
+assert_has   "no-sidecar: placeholder renders"     "$ROW_98101" 'no output yet'
+assert_lacks "no-sidecar: no tool line without it" "$ROW_98101" '↳'
+
+# Case 3 — missing transcript: uuid must not leak into output.
+assert_lacks "transcript: unresolved uuid never leaks into output" "$OUTPUT" 'bbbbbbbb-1111'
+
+# Case 4 — dead job: stale transcript must not render.
+assert_lacks "transcript: dead row's transcript is not rendered" "$OUTPUT" 'RESIDUE SHOULD NEVER RENDER'
+
+# Case 5 — malformed sidecar rejected before the glob.
+assert_lacks "transcript: '*' sidecar does not glob-expand"     "$OUTPUT" 'DECOY TRANSCRIPT'
+assert_lacks "transcript: uppercase uuid sidecar is rejected"   "$OUTPUT" 'AAAAAAAA-1111'
+
+# Case 5c — non-assistant records are filtered out, not merely out-ranked. Every
+# plant_tx fixture carries a user record as its first line; none may reach the page.
+assert_lacks "transcript: non-assistant records never render" "$OUTPUT" 'USER RECORD MUST NOT RENDER'
+
+# Case 6 — newer subagent transcript wins.
+assert_has   "transcript: newer subagent transcript wins" "$OUTPUT" 'inside the architect'
+assert_lacks "transcript: stale parent transcript loses"  "$OUTPUT" 'pre-spawn text'
+
+# Case 7 — jq unavailable: graceful degradation, exits 0.
+OUT_NOJQ="$(run_fleet FLEET_STATUS_JQ=/nonexistent/jq)"; RC_NOJQ=$?
+[ "$RC_NOJQ" -eq 0 ] && pass "no-jq: still exits 0" || fail "no-jq: exits 0 (got $RC_NOJQ)"
+assert_has   "no-jq: falls back to the placeholder" "$OUT_NOJQ" 'no output yet'
+assert_lacks "no-jq: renders no transcript text"    "$OUT_NOJQ" 'Phase 4 — rebasing onto master'
+assert_lacks "no-jq: renders no tool line"          "$OUT_NOJQ" '↳'
+
+# Case 8a — FLEET_STATUS_TRANSCRIPT_ROOT unset: default path applies, fixture invisible.
+OUT_UNSET="$(run_fleet -u FLEET_STATUS_TRANSCRIPT_ROOT)"
+assert_lacks "root unset: fixture transcript not read" "$OUT_UNSET" 'Phase 4 — rebasing onto master'
+
+# Case 8b — FLEET_STATUS_TRANSCRIPT_ROOT empty: must not scan from '/', must finish fast.
+T0=$(date +%s)
+OUT_EMPTY="$(run_fleet FLEET_STATUS_TRANSCRIPT_ROOT=)"
+T1=$(date +%s)
+assert_lacks "root empty: fixture transcript not read"  "$OUT_EMPTY" 'Phase 4 — rebasing onto master'
+assert_lacks "root empty: no filesystem-root scan"      "$OUT_EMPTY" 'Permission denied'
+if [ "$(( T1 - T0 ))" -lt 5 ]; then pass "root empty: completes under 5s"
+else fail "root empty: completes under 5s (took $(( T1 - T0 ))s)"; fi
+
+# Case 8c — FLEET_STATUS_JQ unset: real jq resolves, transcript text renders.
+OUT_JQ_UNSET="$(run_fleet -u FLEET_STATUS_JQ)"
+assert_has "jq unset: real jq resolves, transcript renders" "$OUT_JQ_UNSET" 'Phase 4 — rebasing onto master'
+
+# Case 8d — FLEET_STATUS_JQ empty: command -v '' fails, placeholder, exits 0.
+OUT_JQ_EMPTY="$(run_fleet FLEET_STATUS_JQ=)"; RC_JQ_EMPTY=$?
+[ "$RC_JQ_EMPTY" -eq 0 ] && pass "jq empty: still exits 0" || fail "jq empty: exits 0 (got $RC_JQ_EMPTY)"
+assert_has "jq empty: falls back to the placeholder" "$OUT_JQ_EMPTY" 'no output yet'
+
+# Case 9 — startup window: working line + tool, no text block.
+assert_has "startup: placeholder-free working line" "$OUTPUT" 'working — no assistant text yet'
+assert_has "startup: tool line still renders"       "$OUTPUT" '↳ Read: '
+assert_has "startup: path left-clipped to its tail" "$OUTPUT" 'classes/Foo\.php'
+
+# Case 10 — session-id.sh self-check (library sourced at top of this script).
+is_session_id 'a1b2c3d4-1234-5678-abcd-ef1234567890' \
+    && pass "is_session_id: accepts canonical lowercase uuid" \
+    || fail "is_session_id: accepts canonical lowercase uuid"
+for _bad in 'A1B2C3D4-1234-5678-ABCD-EF1234567890' '*' '../../etc/passwd' '' \
+            'a1b2c3d4-1234-5678-abcd-ef12345678901'; do
+    if is_session_id "$_bad"; then
+        fail "is_session_id: rejects [$_bad]"
+    else
+        pass "is_session_id: rejects [$_bad]"
+    fi
+done
+_minted="$(mint_session_id)"
+is_session_id "$_minted" \
+    && pass "mint_session_id: output passes is_session_id" \
+    || fail "mint_session_id: output passes is_session_id (got [$_minted])"
+_upper_stub="$STUBBIN/uuidgen"
+printf '#!/bin/sh\nprintf "%%s\\n" "A1B2C3D4-1234-5678-ABCD-EF1234567890"\n' > "$_upper_stub"
+chmod +x "$_upper_stub"
+_minted_up="$(PATH="$STUBBIN:$PATH"; . "$SCRIPT_DIR/lib/session-id.sh"; mint_session_id)"
+is_session_id "$_minted_up" \
+    && pass "mint_session_id: uppercase uuidgen is lowercased" \
+    || fail "mint_session_id: uppercase uuidgen is lowercased (got [$_minted_up])"
+rm -f "$_upper_stub"
+_sp="$(session_sidecar_path /tmp/x-1.log)"
+[ "$_sp" = "/tmp/x-1.session" ] \
+    && pass "session_sidecar_path: .log -> .session" \
+    || fail "session_sidecar_path: .log -> .session (got [$_sp])"
+_sp2="$(session_sidecar_path /tmp/x-1.out)"
+[ "$_sp2" = "/tmp/x-1.out.session" ] \
+    && pass "session_sidecar_path: .out -> .out.session (wrong shape documented)" \
+    || fail "session_sidecar_path: .out -> .out.session (got [$_sp2])"
+_ws_target="$TMP/ws-test.session"
+rm -f "$_ws_target"
+write_session_sidecar "$TMP/ws-test.log" 'a1b2c3d4-1234-5678-abcd-ef1234567890'
+_ws_content="$(cat "$_ws_target" 2>/dev/null)"
+[ "$_ws_content" = 'a1b2c3d4-1234-5678-abcd-ef1234567890' ] \
+    && pass "write_session_sidecar: writes uuid + newline" \
+    || fail "write_session_sidecar: writes uuid + newline (got [$_ws_content])"
+rm -f "$_ws_target"
+write_session_sidecar "$TMP/ws-test.log" 'not-a-uuid' \
+    && fail "write_session_sidecar: rejects invalid uuid" \
+    || pass "write_session_sidecar: rejects invalid uuid"
+[ ! -e "$_ws_target" ] \
+    && pass "write_session_sidecar: no file written on invalid uuid" \
+    || fail "write_session_sidecar: no file written on invalid uuid"
+
+# Case 11 — --help window intact: line count must not have changed. 46 while this
+# branch was off master; the rebase onto master picked up 18 more help lines that
+# this branch never wrote, and the § PROGRESS rewrite is line-for-line even.
+HELP_LINES_BASELINE=64
+HELP_LINES="$(printf '%s\n' "$HELP" | wc -l | tr -d ' ')"
+[ "$HELP_LINES" -eq "$HELP_LINES_BASELINE" ] \
+    && pass "--help line count unchanged" \
+    || fail "--help line count unchanged (expected $HELP_LINES_BASELINE, got $HELP_LINES)"
 
 printf '\n'
 if [ "$FAILED" -eq 0 ]; then

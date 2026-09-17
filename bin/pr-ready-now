@@ -104,6 +104,7 @@ ROOT="$(dirname "$GIT_COMMON")"
     echo "ERROR: $ROOT does not look like the IBL5 checkout (no .claude/skills/pr-ready/SKILL.md)" >&2
     exit 1
 }
+. "$SCRIPT_DIR/lib/session-id.sh"
 
 # --- defaults ----------------------------------------------------------------------------
 GO=0
@@ -618,6 +619,14 @@ fire_pr() {
     # tool, not the user position, so `claude -p "/pr-ready N"` resolves the slash command.
     printf '/pr-ready %s\n' "$PR" > "$PROMPT"
 
+    # After the stale sweep above, deliberately: /tmp/pr-ready-now-<PR>.session matches
+    # its glob, and clearing the PREVIOUS run's sidecar is the behavior we want. Writing
+    # before the sweep would delete this run's own sidecar.
+    local SESSION_ID
+    SESSION_ID=$(mint_session_id) || { echo "pr-ready-now: could not mint a session uuid." >&2; return 1; }
+    write_session_sidecar "$LOG" "$SESSION_ID" \
+        || { echo "pr-ready-now: could not write the session sidecar next to $LOG." >&2; return 1; }
+
     # Header is shell-quoted once via %q; the body is a quoted heredoc emitted verbatim,
     # so nothing in it expands twice.
     {   printf '#!/usr/bin/env bash\n'
@@ -629,6 +638,7 @@ fire_pr() {
         printf 'MODEL=%q\n'      "$MODEL"
         printf 'EFFORT=%q\n'     "$EFFORT"
         printf 'CLAUDE_BIN=%q\n' "$CLAUDE_BIN"
+        printf 'SESSION_ID=%q\n' "$SESSION_ID"
         printf 'PR=%q\n'         "$PR"
         printf 'NOTIFY=%q\n'     "$NOTIFY"
         printf 'MARKER=%q\n'     "/tmp/pr-ready-marker-${PR}.txt"
@@ -641,7 +651,7 @@ RC=0
 CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 \
     caffeinate -s timeout 5400 "$CLAUDE_BIN" -p "$(cat "$PROMPT")" \
     --dangerously-skip-permissions \
-    --model "$MODEL" --effort "$EFFORT" \
+    --model "$MODEL" --session-id "$SESSION_ID" --effort "$EFFORT" \
     --name "$LABEL" > "$LOG" 2>&1 || RC=$?
 ELAPSED=$(( $(date +%s) - STARTED ))
 notify() {

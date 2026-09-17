@@ -239,6 +239,27 @@ OUT="/tmp/plan-now-$TS.out"     # claude's own transcript, kept separate from $L
                                 # it. Delete it in the runner if that ever becomes a cost.
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 
+# The session uuid this run's `claude -p` is pinned to, plus the sidecar that lets
+# bin/fleet-status find the transcript mid-run. Minted HERE and not in the runner:
+# the sidecar has to be on disk before launchctl bootstrap returns, or fleet-status
+# can see a live label with no sidecar. Derived from $LOG (launchd's StandardOutPath),
+# never $OUT — fleet-status resolves the row's log from the label, so only
+# ${LOG%.log}.session is findable.
+# Source the library beside THIS script, never under $ROOT. $ROOT comes from
+# `git rev-parse --show-toplevel` of the CALLER's cwd, so running bin/plan-now
+# from a different worktree sends the source at that other worktree's bin/lib/
+# and the script dies before it mints anything. Found by the Phase 7e smoke:
+# `cd ../h2h-records-polish && <this worktree>/bin/plan-now ...` failed with
+# "bin/lib/session-id.sh: No such file or directory" under the $ROOT form.
+# shellcheck source=bin/lib/session-id.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib/session-id.sh"
+SESSION_ID=$(mint_session_id) || {
+    echo "plan-now: could not mint a session uuid — no uuidgen, no /proc uuid, no python3." >&2
+    exit 1
+}
+write_session_sidecar "$LOG" "$SESSION_ID" \
+    || { echo "plan-now: could not write the session sidecar next to $LOG." >&2; exit 1; }
+
 # Own a private copy: the caller's mktemp block may be cleaned up long before
 # launchd gets around to running the job.
 if [ -e "$PROMPT" ]; then
@@ -328,6 +349,7 @@ REVIEW_ROUTE_DEFAULT=$(grep -oE "'/discordPlanReviewDM'" \
     printf 'MODEL=%q\n'      "$MODEL"
     printf 'LABEL=%q\n'      "$LABEL"
     printf 'PLIST=%q\n'      "$PLIST"
+    printf 'SESSION_ID=%q\n' "$SESSION_ID"
     printf 'DISPOSITION=%q\n' "$DISPOSITION"
     printf 'LOG=%q\n'         "$LOG"
     printf 'NOTIFY=%q\n'         "$NOTIFY"
@@ -474,6 +496,7 @@ CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
     timeout "$RUN_TIMEOUT" "$CLAUDE_BIN" -p "$(cat "$PROMPT")" \
     --dangerously-skip-permissions \
     --model "$MODEL" \
+    --session-id "$SESSION_ID" \
     --effort high \
     --name "$LABEL" > "$OUT" 2>&1
 rc=$?

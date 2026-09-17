@@ -229,10 +229,33 @@ if [[ -f "$P1" ]]; then
     # The runner must start in the MAIN checkout, never a worktree.
     grep -q '<key>WorkingDirectory</key><string>[^<]*</string>' "$P1" \
         || fail "plist has no WorkingDirectory key"
+    # Phase 1g row 6: sidecar exists and runner preamble carries matching SESSION_ID.
+    _runner1901="/tmp/pr-ready-now-runner-1901.sh"
+    _sidecar1901="/tmp/pr-ready-now-1901.session"
+    [ -f "$_sidecar1901" ] || fail "pr-ready-now left no .session sidecar at $_sidecar1901"
+    _sid1901=$(< "$_sidecar1901")
+    grep -qF "SESSION_ID=$_sid1901" "$_runner1901" \
+        || fail "runner-1901 preamble lacks SESSION_ID=$_sid1901 — sidecar and runner uuid differ"
 else
     fail "no plist to inspect for shape"
 fi
 end_case plist-shape
+
+# --- case 6.5: session re-fire — sidecar holds SECOND uuid, not first (sweep-ordering) ----
+begin_case
+clean_slots
+_pre_sidecar_exists="$([ -f /tmp/pr-ready-now-1901.session ] && echo yes || echo no)"
+_refire_out=$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" PR_READY_NOW_DRY_RUN=1 run_driver --go --jobs 3 2>&1 || true)
+_post_sidecar_exists="$([ -f /tmp/pr-ready-now-1901.session ] && echo yes || echo no)"
+_uuid_fire1=$(cat /tmp/pr-ready-now-1901.session 2>/dev/null || true)
+[ -n "$_uuid_fire1" ] || fail "first fire produced no .session sidecar (pre=$_pre_sidecar_exists post=$_post_sidecar_exists output=$_refire_out)"
+clean_slots
+PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" PR_READY_NOW_DRY_RUN=1 run_driver --go --jobs 3 >/dev/null 2>&1
+_uuid_fire2=$(cat /tmp/pr-ready-now-1901.session 2>/dev/null || true)
+[ -n "$_uuid_fire2" ] || fail "second fire: .session sidecar missing after re-fire"
+[ "$_uuid_fire1" != "$_uuid_fire2" ] \
+    || fail "sweep-ordering bug: sidecar still holds first uuid after re-fire: $_uuid_fire1"
+end_case session-refire
 
 # --- case 7: env seams -------------------------------------------------------------------
 begin_case

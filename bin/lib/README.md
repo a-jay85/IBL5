@@ -21,6 +21,7 @@ Sourced (not executed directly) by scripts in `bin/` and `bin/automouse/`. Each 
 | `git-helpers.sh` | Shared git-layout helpers: canonical repo root resolution and related utilities |
 | `human-signoff-classifier.sh` | Single source of truth for the feature-PR human sign-off classifier (ADR-0062), sourced by both the workflow and its regression harness |
 | `pr-sticky.sh` | Canonical find-by-HTML-marker sticky PR comment helpers (upsert / delete); sourced by `bin/pr-canary-check`, `bin/check-pr-collisions`, and `bin/post-plan-now` |
+| `session-id.sh` | Mint, validate and persist the `claude -p --session-id` uuid for detached headless runs; writes the `${LOG%.log}.session` sidecar that `bin/fleet-status` reads to locate a live run's transcript. Sourced by `bin/plan-now`, `bin/pr-ready-now`, `bin/docfix-run`, `bin/post-plan-now` and `bin/fleet-status` |
 | `plan-autonomy-contract` | Shared `stop_condition:` / `evidence:` frontmatter validator; invoked by `bin/check-plan` gate `[K]` and the `/post-plan` Phase 5.0d skill path |
 | `plan-model-tier` | Validate a raw `impl_model:` value against the accepted whitelist and classify it (`absent`/`opus-tier`/`sonnet-tier`/`haiku-tier`); shared by `plan-impl-model` and `plan-model-consistency` |
 | `plan-impl-model` | Resolve the automouse impl-agent model for a given plan file; rejects any value outside the `plan-model-tier` whitelist (exit 1, one line on stderr) instead of defaulting to Opus |

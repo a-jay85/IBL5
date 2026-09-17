@@ -1134,7 +1134,8 @@ def test_guard_refuses_when_a_run_is_in_flight(tmp_path):
     assert r.returncode == 6
     assert "already in flight" in r.stdout
     plist_dir = tmp_path / "home" / "Library" / "LaunchAgents"
-    plists = list(plist_dir.glob("com.ibl5.postplan-now-wt-feature-*.plist")) if plist_dir.exists() else []
+    assert plist_dir.exists(), f"plist dir missing -- the glob below would be vacuous: {plist_dir}"
+    plists = list(plist_dir.glob("com.ibl5.postplan-now-wt-feature-*.plist"))
     assert len(plists) == 0, "guard must not submit a plist when refusing"
 
 
@@ -1177,7 +1178,6 @@ def test_inflight_label_matching_is_anchored(tmp_path):
 
 
 def test_gate_denial_fails_closed_then_allows_a_refire(tmp_path):
-    import re
     # Leg 1 -- job A: the harness dies on a local gate denial (rc=3, fail-closed).
     r = _run_foreground(tmp_path, 3, with_claude_stub=True)
     assert r.returncode == 3

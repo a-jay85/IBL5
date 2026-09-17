@@ -30,9 +30,9 @@
 #  17  NO OSC 8 escape reaches a non-TTY capture. This is the pin the other ~40
 #      assertions rest on: links are on by default on a terminal, so a leak into
 #      piped output breaks every column regex here at once
-#  18  with links forced, each printed file path is a hyperlink to its absolute
-#      location, the padding is unchanged once the escapes are stripped, and a
-#      runner slug with no queue file behind it is NOT linked
+#  18  with links forced, each printed file path is a vscode://file hyperlink to
+#      its absolute location, the padding is unchanged once the escapes are
+#      stripped, and a runner slug with no queue file behind it is NOT linked
 #  19  a post-plan row names its audit.log, NOT the /tmp launchd log. Every job on
 #      this page is still running, which is precisely when the /tmp log is empty;
 #      a row with no audit.log yet still falls back to it
@@ -519,18 +519,24 @@ assert_has "loose: a true orphan IS shown" "$OUTPUT" "pid $ORPHAN_PID "
 # introducer; matching it needs no ESC byte in the pattern.
 assert_lacks "links: no OSC 8 escapes in a non-tty capture" "$OUTPUT" '\]8;;'
 
-# 18 — the three printed file references become links. Patterns use `[^ ]*` to
-# hop the ESC bytes rather than embedding them, since no URI here contains a space.
+# 18 — the printed file references become links, every one of them under the
+# vscode://file scheme so the click opens an editor. Patterns use `[^ ]*` to hop
+# the ESC bytes rather than embedding them, since no URI here contains a space.
 assert_has "links: queue row links to the plan file" \
-    "$OUTPUT_LINKS" '8;;file://[^ ]*queue/live-plan\.md[^ ]*live-plan\.md[^ ]* +in progress'
+    "$OUTPUT_LINKS" '8;;vscode://file[^ ]*queue/live-plan\.md[^ ]*live-plan\.md[^ ]* +in progress'
 assert_has "links: queued (unlocked) row links too" \
-    "$OUTPUT_LINKS" '8;;file://[^ ]*queue/idle-plan\.md[^ ]*idle-plan\.md[^ ]* +queued'
+    "$OUTPUT_LINKS" '8;;vscode://file[^ ]*queue/idle-plan\.md[^ ]*idle-plan\.md[^ ]* +queued'
+# The scheme swap itself. A file:// URI anywhere on the page means some call site
+# was missed, and the whole point is that a click never reaches the OS file-type
+# association. One assertion covers every link at once.
+assert_lacks "links: no path is left on the file:// handler" \
+    "$OUTPUT_LINKS" '8;;file://'
 assert_has "links: post-plan audit path is a link" \
-    "$OUTPUT_LINKS" 'audit: [^ ]*8;;file:///[^ ]*live-demo-slug-20260910-120000-4242/audit\.log'
+    "$OUTPUT_LINKS" 'audit: [^ ]*8;;vscode://file/[^ ]*live-demo-slug-20260910-120000-4242/audit\.log'
 assert_has "links: fallback /tmp log path is a link" \
-    "$OUTPUT_LINKS" 'log: [^ ]*8;;file:///[^ ]*post-plan-now-noaudit-slug-20260910-130000-4343\.log'
+    "$OUTPUT_LINKS" 'log: [^ ]*8;;vscode://file/[^ ]*post-plan-now-noaudit-slug-20260910-130000-4343\.log'
 assert_has "links: runner slug links to its queue file" \
-    "$OUTPUT_LINKS" 'impl +[^ ]*8;;file://[^ ]*queue/live-plan\.md'
+    "$OUTPUT_LINKS" 'impl +[^ ]*8;;vscode://file[^ ]*queue/live-plan\.md'
 
 # The existence gate. nodotmd-plan resolves a slug (via its lock dir) but has no
 # queue/*.md file, so linking it would open an error dialog. Nothing else on the
@@ -538,7 +544,7 @@ assert_has "links: runner slug links to its queue file" \
 assert_has   "links: slug with no queue file is still shown" \
     "$OUTPUT_LINKS" 'impl +[^ ]*nodotmd-plan'
 assert_lacks "links: slug with no queue file is NOT linked" \
-    "$OUTPUT_LINKS" '8;;file://[^ ]*queue/nodotmd-plan\.md'
+    "$OUTPUT_LINKS" '8;;vscode://file[^ ]*queue/nodotmd-plan\.md'
 
 # Alignment survives. The literal run length is asserted on BOTH renders, so the
 # pad-outside-the-link rule is pinned rather than merely "some spaces are there".
@@ -697,8 +703,11 @@ write_session_sidecar "$TMP/ws-test.log" 'not-a-uuid' \
 
 # Case 11 — --help window intact: line count must not have changed. 46 while this
 # branch was off master; the rebase onto master picked up 18 more help lines that
-# this branch never wrote, and the § PROGRESS rewrite is line-for-line even.
-HELP_LINES_BASELINE=64
+# this branch never wrote, and the § PROGRESS rewrite is line-for-line even. 75
+# once the VS Code and tmux paragraphs landed and the sed window in fleet-status
+# grew to match — that window is a hardcoded line range, so a paragraph added to
+# the header silently pushes the tail of --help off the end unless both move.
+HELP_LINES_BASELINE=75
 HELP_LINES="$(printf '%s\n' "$HELP" | wc -l | tr -d ' ')"
 [ "$HELP_LINES" -eq "$HELP_LINES_BASELINE" ] \
     && pass "--help line count unchanged" \

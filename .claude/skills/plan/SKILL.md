@@ -4,12 +4,16 @@ description: "Plan an implementation task: enforces a verification matrix, direc
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
-last_verified: 2026-09-16
+last_verified: 2026-09-17
 ---
 
 # /plan — Implementation Planning with Verification Matrix
 
-You are planning an implementation task. The user's request follows this skill's instructions as `$ARGUMENTS`.
+You are planning an implementation task. The user's request is quoted once below, between the `<user_request>` markers. Everywhere these instructions say **the request**, they mean that block. It appears only here, never further down.
+
+<user_request>
+$ARGUMENTS
+</user_request>
 
 **Do NOT write or edit any code files.** This skill produces a plan only. The output is one plan file per PR.
 
@@ -63,7 +67,7 @@ see `.claude/skills/plan-prompt/SKILL.md`. Renaming them there breaks this
 detection.
 
 **Trigger — auto-detected, no opt-in keyword.** Trusted context is present when
-`$ARGUMENTS` contains a `## Exploration pointers` heading with **at least one
+the request contains a `## Exploration pointers` heading with **at least one
 bullet** under it. That heading is the whole trigger:
 
 - `## Exploration pointers` present with **zero** bullets → NOT trusted
@@ -85,7 +89,7 @@ Step 2.1's signals fire on every run, trusted context or not. A caller's facts
 describe the code's *shape*; they say nothing about whether this change has
 since been merged or is sitting in an open PR, and Step 2.1 exists precisely
 because a stale claim reads exactly like a fresh one — a fact asserted in
-`$ARGUMENTS` is a claim too.
+the request is a claim too.
 
 This is a **verify-cheaply** channel, not a blind-trust channel. When a targeted
 confirmation contradicts a pointer, the repo wins: correct the pointer and say
@@ -98,7 +102,7 @@ the shared-context artifact.
 
 Before designing anything, verify the work **does not already exist** — merged to master or sitting in an open PR. Backlog/status markers go stale (a finding gets implemented but its marker is never flipped), so the marker Step 2 recorded is a *claim*, not ground truth — verify it against the repo THIS run. Repeatedly, a plan has been designed (and sometimes implemented) for work that was already merged, discoverable only by reading the code, never the marker. This gate spends a few cheap tool calls at the end of orientation to bail *before* the expensive Step 3 `plan-architect` spawn.
 
-**A fact asserted in `$ARGUMENTS` is a claim too.** A caller — a human, or an upstream session that drafted the task via `/plan-prompt` — can state "this isn't built yet," "the helper doesn't exist," or "no migration touches this table" in perfect good faith and be wrong: the assertion was true when it was written and the branch it described has since merged. Hold caller-asserted facts to the same standard as a status marker — the three signals below are cheap, and they are the only thing standing between a stale premise and a fully designed plan for work that already exists. This does **not** mean re-deriving everything the caller hands you; it means the *specific* claim "this work does not already exist" is never taken on trust, whatever its source.
+A fact asserted in the request is a claim too. A caller (a human, or an upstream session that drafted the task via `/plan-prompt`) can state "this isn't built yet," "the helper doesn't exist," or "no migration touches this table" in perfect good faith and be wrong: the assertion was true when it was written and the branch it described has since merged. Hold caller-asserted facts to the same standard as a status marker. The three signals below are cheap, and they are the only thing standing between a stale premise and a fully designed plan for work that already exists. This does **not** mean re-deriving everything the caller hands you; it means the *specific* claim "this work does not already exist" is never taken on trust, whatever its source.
 
 Check **three signals**, strongest first — using the deliverable paths Step 2 surfaced:
 
@@ -145,7 +149,7 @@ context the split exists to share.
 #### Seed from pre-resolved context (single-PR with trusted context)
 
 **Trigger.** Step 2 detected trusted context (a `## Exploration pointers`
-heading with ≥1 bullet in `$ARGUMENTS`) **and** the work is one PR.
+heading with ≥1 bullet in the request) **and** the work is one PR.
 
 - **Path.** `$HOME/claude-plans/<slug>-shared-context.md`, where `<slug>` is this
   plan's own Step-5 slug. Pre-resolve `$HOME` and `<slug>` yourself and write a
@@ -154,8 +158,8 @@ heading with ≥1 bullet in `$ARGUMENTS`) **and** the work is one PR.
   must be able to Read it.
 - **Content = the caller's two sections, transcribed as pointers.** Copy
   `## Exploration pointers` and `## Resolved design decisions` out of
-  `$ARGUMENTS` verbatim into the artifact's matching sections. **Pointers only —
-  never paste file bodies** (`/plan` is delegation-terminal: what moves forward
+  the request verbatim into the artifact's matching sections. **Pointers only; never
+  paste file bodies** (`/plan` is delegation-terminal: what moves forward
   is `path:line` + the one load-bearing fact, never file contents). If a Step-2
   targeted confirmation corrected a pointer, transcribe the corrected version
   and mark it.
@@ -215,7 +219,7 @@ The template:
 **Acceptance rule:** Unit 1 creates the acceptance test file, so it is present in the tree from unit 1 onward. A unit that does NOT make a seam newly exercisable lands it **skipped** — `it.skip(...)` (vitest), `markTestSkipped('<seam> not wired until <unit-N slug>')` (PHPUnit), or an early `exit 0` printing a SKIP reason (shell) — and says so in prose in its Approach. The **Final unit** above MUST carry a `CLI-executable` Verification Matrix row that runs this exact file by path and asserts it passes — write the **full runnable command** in the row's location cell (`bash <path>`, `npx vitest run <path>`, `vendor/bin/phpunit <path>`), never the bare path, which `bin/check-plan` gate `[V]` rejects. Un-skipping the test is part of that unit's diff. Read the seam's real address (URL prefix, file path, CLI flag) from the serving code at implementation time — never from a prose table in this document.
 ```
 
-For a single-PR trusted-context seed, substitute the plan's `<slug>` for `<program>` in the title, fill both sections from the caller's `$ARGUMENTS`, then run Steps 3–5 once.
+For a single-PR trusted-context seed, substitute the plan's `<slug>` for `<program>` in the title, fill both sections from the caller's request, then run Steps 3-5 once.
 
 Then run Steps 3–5 once per unit; each unit references this artifact instead of restating the shared background.
 
@@ -244,7 +248,7 @@ For **every** tier, pass only the `subagent_type` and do **NOT** pass an inline 
 
 **Run this step inline — never delegate `/plan` itself.** The orchestrating session owns Steps 1–5 directly and spawns exactly **one** `plan-architect` per PR-sized unit. Do NOT hand the whole `/plan` invocation to a `general-purpose`/`claude` sub-agent (or fan it out across several), and do NOT have any such agent fire `/plan` on your behalf. Those agent types carry `Tools: *` — they *can* spawn further agents, so delegating `/plan` to them produces a `general-purpose → plan-architect` nest, exactly the multi-level `plan-architect` tree the flat-fan-out rule forbids (`agent-tiering-detail.md` § Nested Sub-Agents). `plan-architect`/`plan-architect-xhigh` *do* carry the `Agent` tool, but their subtree is **bounded and terminating**: their defs permit `Explore` and nothing else, and `~/.claude/agents/Explore.md` itself denies `Agent` — so an architect's subtree ends at depth 2 and can never contain another architect. A `general-purpose`/`claude` orchestrator is the opposite: `Tools: *` means its subtree is unbounded up to the spawn-depth limit, and a `plan-architect` inside it can be spawned by anything at any level. The prohibition rests on that asymmetry — bounded subtree vs. unbounded — not on the architect being toolless. It also has a concrete failure attached: a nested `plan-architect` re-enters the sectioned-delivery protocol and appends to the **same draft file**, interleaving two authors' sections into one plan. Keep planning one level deep: this session → one `plan-architect`.
 
-1. **Task description** from `$ARGUMENTS` — when the work was split in Step 2.5, scope this to the single PR being planned and state which PR it is and what it depends on
+1. **Task description** from the request. When the work was split in Step 2.5, scope this to the single PR being planned and state which PR it is and what it depends on
 2. **Exploration results** from Step 2 — file paths, code traces, existing patterns, test coverage findings. **Tell the agent these findings are authoritative and that it must NOT re-explore them.** The agent already ran with `effort: xhigh`, so its instinct is to re-derive everything from scratch — but you've supplied the orientation, and every redundant `grep`/`Read`/agent call extends the run and raises the stall risk (each tool round-trip is another window for the idle timeout to land before the agent reaches its Bash-persist). Instruct it to spend tool calls only on **targeted confirmations** of anything the findings leave genuinely open — cap ~2–3 — then go straight to composing the plan. "Verify everything myself" is the failure mode here, not diligence. **For a multi-PR split (Step 2.5):** do NOT inline these exploration results — instead pass the shared-context artifact path `$HOME/claude-plans/<program>-shared-context.md` and instruct the architect to **Read it early** in its own window (the same on-demand-Read convention as item 4's contract Read). The artifact already holds the Step-2 pointers, so referencing it keeps the shared orientation out of the orchestrator's context *and* out of every per-unit prompt (no N× re-inlining); the "authoritative — targeted confirmation only, do NOT re-explore" instruction above still applies, now pointing the architect at the artifact's pointers. **For a single-PR invocation that seeded an artifact from trusted context (Step 2.5):** do the same — pass `$HOME/claude-plans/<slug>-shared-context.md` (this plan's own Step-5 slug, pre-resolved to a literal path) instead of inlining, with the identical instruction: **Read it early**, treat its pointers as authoritative, spend tool calls only on ~2–3 targeted confirmations, do NOT re-explore. There is only one architect here, so the win is not N× de-duplication but orchestrator leanness: the caller's pointers move caller → artifact → architect without ever being re-emitted into a prompt this session composes. **When no artifact was seeded** — single PR, no trusted context — inline the Step-2 exploration results as described above; that remains the default.
 3. **The full `$VERIFICATION_RULE`** from Step 1, prefixed with: `MANDATORY — you must follow this rule exactly:`
 4. **Full output contract** — instruct the `plan-architect` to Read `.claude/skills/plan/_architect-contract.md` as its first action. That reference (created in Phase 1 of this plan) carries the complete "what the plan MUST produce" list, the conditional-section catalogue, the agent-tiering labels to apply per phase (Sonnet / Haiku / self), and the delegation-packet format. Do NOT inline any of it into the prompt — the architect Reads it into its own sub-context, so this bulk never enters the orchestrator's context.
@@ -264,7 +268,7 @@ For **every** tier, pass only the `subagent_type` and do **NOT** pass an inline 
 ## Step 3.5: Front-load design decisions
 
 The Plan agent runs in a sub-context and **cannot ask the user**. For each `needs-user-input` fork it flagged in its **Design decisions** section, you (the orchestrator) surface it now with `AskUserQuestion` — one question, 2–4 concrete options, recommendation first; use the `preview` field to show a proposed module layout or code shape for structural choices. Record each answer + a one-line rationale into the plan's **Approach** section as a fixed constraint, then patch the affected implementation steps so the decision is fully specified. **For a multi-PR split:** additionally **append** each resolved decision that binds more than the current unit (whether self-resolved by the architect or answered here via `AskUserQuestion`) to the shared-context artifact's `## Resolved design decisions` section — one entry per decision: the decision plus its one-line rationale. Later units then Read those frozen decisions from the artifact instead of re-litigating them, and cannot silently diverge. Keep this **append-only and incremental** — append as each unit's Step 3.5 resolves; do NOT front-run the whole split into an up-front batch-decision pass over all units (that heavier structure is the Discord precedent's shape, not the minimal model this formalizes).
-**Single-PR runs — including one that seeded an artifact from trusted context (Step 2.5) — do NOT append here.** The multi-PR qualifier above is exact, not shorthand: the append exists so *later units* can read frozen decisions, and a single-PR plan has no later unit. Its artifact's `## Resolved design decisions` was already filled at seed time from `$ARGUMENTS`; re-appending the same decisions would double-write the seed and break append-only discipline. Record the resolutions in the plan's **Approach** section only.
+Single-PR runs, including one that seeded an artifact from trusted context (Step 2.5), do **NOT** append here. The multi-PR qualifier above is exact, not shorthand: the append exists so *later units* can read frozen decisions, and a single-PR plan has no later unit. Its artifact's `## Resolved design decisions` was already filled at seed time from the request; re-appending the same decisions would double-write the seed and break append-only discipline. Record the resolutions in the plan's **Approach** section only.
 
 A recorded decision is **no longer a fork**: it does not trip Step 4 gate 7 (unresolved decision) and does not, by itself, force `auto_merge: false` (gate 14) — the human judgment already happened at plan-time.
 
@@ -435,7 +439,7 @@ A plan is **queue-safe** the moment `bin/check-plan` (Step 5) exits 0 — that g
 
 For every plan that passed `bin/check-plan` in Step 5, decide its disposition by this precedence (the default is **queue**):
 
-1. **Explicit token in `$ARGUMENTS`** wins outright: `--implement` (or "implement now") → do NOT queue; leave the plan on disk and report it ready to implement. `--queue` → queue.
+1. **Explicit token in the request** wins outright: `--implement` (or "implement now") → do NOT queue; leave the plan on disk and report it ready to implement. `--queue` → queue.
 2. **Else, the work trips a `plan-architect-xhigh` trigger** (a security surface or trust boundary; a destructive or schema-tightening migration; or a `.claude/skills` ship-pipeline invariant — see `.claude/rules/agent-tiering.md` § Tiers) → do NOT queue.
 3. **Else, default: auto-queue.** Run `bin/automouse/queue <slug>` for the plan.
 

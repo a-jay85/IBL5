@@ -23,6 +23,9 @@ from harness import statefile
 from harness.adapters.llm import FixtureLlm
 from harness.state import HarnessError, RunResult, TerminalState, UsageLedger
 
+# Replay runs reach fidelity's procedure lookup; see tests/conftest.py.
+pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # ---------------------------------------------------------------------------

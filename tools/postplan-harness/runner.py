@@ -514,8 +514,11 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
 # PID the harness could pick would be the one another process looks under. Phase 8
 # removed the rc=4 resume, so no skill session reads these today; they stay as the
 # run's audit trail and as the shape the skill-path block in
-# _phase-6.5-arm-auto-merge.md mirrors. Both names are read back by
-# tests/test_post_plan_now_fallback.py, which is what keeps the two sides in sync.
+# _phase-6.5-arm-auto-merge.md mirrors. Two suites read these names back rather than
+# hardcoding them, and that is what keeps every side in sync: the Python half in
+# tests/test_post_plan_now_fallback.py and the shell half in
+# bin/test-postplan-arm-conditions (harness_handoff_names). Renaming a constant here
+# without updating both greps breaks them loudly, which is the intent.
 CONFORMANCE_DONE_NAME = "conformance-done"
 CONFORMANCE_BRIDGE_NAME = "missing-tests"
 

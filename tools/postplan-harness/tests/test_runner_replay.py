@@ -17,6 +17,9 @@ from harness import ciwatch, schemas
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# Replay runs reach fidelity's procedure lookup; see tests/conftest.py.
+pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")
+
 
 def load(slug):
     path = os.path.join(ROOT, "fixtures/scenarios", slug, "fixture.json")

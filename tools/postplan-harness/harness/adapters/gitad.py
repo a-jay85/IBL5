@@ -86,7 +86,27 @@ class LiveGit:
         self._run("add", "-A")
         if not self._run("diff", "--cached", "--name-only").strip():
             return ""
-        self._run("commit", "-m", message)
+        # A rejected `git commit` is a GATE, not a transient git error. _run's
+        # _LOCAL_GATE_MARKERS sniff catches the gates whose wording it enumerates, but
+        # bin/pre-commit-hook's gofmt leg ("gofmt: unformatted Go files") and its
+        # check-docs leg ("Fix the above doc issues before committing.") match none of
+        # them -- those rejections still type "git", exit 1, and launch the ~1M-token
+        # skill fallback on a tree only a human can fix. On the COMMIT path the return
+        # code alone is sufficient signal: no blind /post-plan re-run satisfies a hook
+        # that just said no, so there is no message left to enumerate. Kind stays
+        # "local-gate" so it lands in runner._FAIL_CLOSED_KINDS and exits 3 -- no new
+        # exit code to thread through should_fallback, GATE_CLOSE or the automouse
+        # ledger arm, all of which already admit 3. Same direct-subprocess shape as
+        # rebase_onto() below; no abort step, because a rejected commit leaves no
+        # partial state. BOTH streams are captured: the hook writes its reason to
+        # whichever it likes, so rebase_onto's `stderr or stdout` would discard the one
+        # line that names the gate.
+        proc = subprocess.run(["git", "-C", self.worktree, "commit", "-m", message],
+                              capture_output=True, text=True, errors="replace")
+        if proc.returncode != 0:
+            detail = "\n".join(s for s in (proc.stderr.strip(), proc.stdout.strip()) if s)
+            raise HarnessError("local-gate",
+                               detail[:800] or f"git commit exited {proc.returncode}")
         return self._run("rev-parse", "HEAD").strip()
 
     def head(self) -> str:

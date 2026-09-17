@@ -3,6 +3,15 @@ import os, pathlib, re, shlex, shutil, subprocess
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 PPN = os.path.join(REPO, "bin", "post-plan-now")
 
+_LAUNCHCTL_LIVE = (
+    '#!/bin/sh\n'
+    'printf "%s\\t%s\\t%s\\n" 12345 0 com.ibl5.postplan-now-wt-feature-20260916-144924-99\n'
+)
+_LAUNCHCTL_OTHER_SLUG = (
+    '#!/bin/sh\n'
+    'printf "%s\\t%s\\t%s\\n" 12345 0 com.ibl5.postplan-now-wt-feature-extra-20260916-144924-99\n'
+)
+
 def _fb(code):
     r = subprocess.run(
         ["bash", "-c", f'source "{PPN}" >/dev/null 2>&1; should_fallback {code}; echo $?'],
@@ -293,7 +302,7 @@ def _guard_block():
     assert len(inner) == 2, f"expected exactly one guard block end, got {len(inner) - 1}"
     return (START + inner[0] + END).strip()
 
-def _run_ppn(tmp_path, args=(), extra_env=None, dirty=None):
+def _run_ppn(tmp_path, args=(), extra_env=None, dirty=None, launchctl_stub=None):
     """Run bin/post-plan-now with launchctl + gh stubbed and HOME redirected.
 
     Returns the raw CompletedProcess — the guard tests need the return code, which
@@ -305,7 +314,7 @@ def _run_ppn(tmp_path, args=(), extra_env=None, dirty=None):
     home = tmp_path / "home"
     (home / "Library" / "LaunchAgents").mkdir(parents=True)
     shim = tmp_path / "shim"; shim.mkdir()
-    (shim / "launchctl").write_text("#!/bin/sh\nexit 0\n")
+    (shim / "launchctl").write_text(launchctl_stub or "#!/bin/sh\nexit 0\n")
     (shim / "launchctl").chmod(0o755)
     (shim / "gh").write_text(
         '#!/bin/sh\nif [ -n "${FAKE_PR_NUMBER:-}" ]; then echo "$FAKE_PR_NUMBER"; fi\nexit 0\n')
@@ -1074,6 +1083,20 @@ def test_exit3_message_is_shell_safe_and_names_both_causes():
     assert "gate denial" in body and "rebase conflict" in body
 
 
+def test_badge_banner_rc3_names_both_fail_closed_causes():
+    """The PR badge must not blame a rebase for a gate denial.
+
+    Exit 3 carries two kinds since #2259; a banner naming only one sends the operator
+    to the wrong recovery.
+    """
+    src = open(PPN).read()
+    line = [l for l in src.splitlines() if l.strip().startswith("3) printf")]
+    assert len(line) == 1, f"expected one rc=3 banner arm, got {len(line)}"
+    body = line[0]
+    assert "gate denial" in body and "rebase conflict" in body
+    assert "`" not in body and "$(" not in body, "banner body is re-parsed via declare -f"
+
+
 def test_mint_failure_aborts_before_bootstrap(tmp_path):
     """Stub uuidgen and python3 to fail: post-plan-now must exit non-zero and write no plist.
 
@@ -1104,3 +1127,68 @@ def test_mint_failure_aborts_before_bootstrap(tmp_path):
     assert "session uuid" in r.stderr, f"stderr should name the uuid; got {r.stderr!r}"
     plists = list((home / "Library" / "LaunchAgents").glob("*.plist"))
     assert len(plists) == 0, f"plist written despite mint failure: {plists}"
+
+
+def test_guard_refuses_when_a_run_is_in_flight(tmp_path):
+    r = _run_ppn(tmp_path, launchctl_stub=_LAUNCHCTL_LIVE)
+    assert r.returncode == 6
+    assert "already in flight" in r.stdout
+    plist_dir = tmp_path / "home" / "Library" / "LaunchAgents"
+    assert plist_dir.exists(), f"plist dir missing -- the glob below would be vacuous: {plist_dir}"
+    plists = list(plist_dir.glob("com.ibl5.postplan-now-wt-feature-*.plist"))
+    assert len(plists) == 0, "guard must not submit a plist when refusing"
+
+
+def test_guard_allows_when_no_run_is_in_flight(tmp_path):
+    r = _run_ppn(tmp_path)
+    assert r.returncode != 6
+    assert "already in flight" not in r.stdout
+
+
+def test_guard_force_flag_overrides_inflight_refusal(tmp_path):
+    r = _run_ppn(tmp_path, args=("--force",), launchctl_stub=_LAUNCHCTL_LIVE)
+    assert r.returncode != 6
+    assert "already in flight" not in r.stdout
+
+
+def test_guard_slug_prefix_does_not_match_a_longer_slug(tmp_path):
+    r = _run_ppn(tmp_path, launchctl_stub=_LAUNCHCTL_OTHER_SLUG)
+    assert r.returncode != 6
+
+
+def test_inflight_label_matching_is_anchored(tmp_path):
+    shim = tmp_path / "bin"; shim.mkdir()
+    lc = shim / "lc"
+    lc.write_text(
+        '#!/bin/sh\n'
+        'printf "%s\\t%s\\t%s\\n" 1 0 com.ibl5.postplan-now-slug-extra-20260916-144924-7\n'
+        'printf "%s\\t%s\\t%s\\n" 2 0 com.ibl5.postplan-now-slug-20260916-144924-7\n'
+        'printf "%s\\t%s\\t%s\\n" 3 0 com.ibl5.postplan-now-slug-notatimestamp\n'
+    )
+    lc.chmod(0o755)
+    def call(want):
+        return subprocess.run(
+            ["bash", "-c",
+             f'export LAUNCHCTL_CMD={lc}; source "{PPN}" >/dev/null 2>&1; postplan_inflight_label "{want}"'],
+            capture_output=True, text=True).stdout.strip()
+    assert call("slug") == "com.ibl5.postplan-now-slug-20260916-144924-7"
+    assert call("slug-extra") == "com.ibl5.postplan-now-slug-extra-20260916-144924-7"
+    assert call("nosuch") == ""
+    assert call("") == ""
+
+
+def test_gate_denial_fails_closed_then_allows_a_refire(tmp_path):
+    # Leg 1 -- job A: the harness dies on a local gate denial (rc=3, fail-closed).
+    r = _run_foreground(tmp_path, 3, with_claude_stub=True)
+    assert r.returncode == 3
+    assert re.search(
+        r"^post-plan-now: postplan-rc=3 harness-rc=3 harness-run-dir=\S+$",
+        r.stdout, re.M), r.stdout
+    assert "fail-closed sentinel" in r.stdout
+    assert not (tmp_path / "claude-log.txt").exists(), \
+        "rc=3 must NOT spawn a /post-plan skill session"
+    # Leg 2 -- job B at 14:49:24: job A is gone, so its label is gone, so a re-fire is
+    # ALLOWED. A guard that refuses here is a failed implementation, not a stricter one.
+    r2 = _run_ppn(tmp_path / "leg2")  # default launchctl stub: silent, no live job
+    assert r2.returncode != 6, r2.stdout
+    assert "already in flight" not in r2.stdout

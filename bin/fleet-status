@@ -627,7 +627,14 @@ render_queue() {
         section "AUTOMOUSE QUEUE"
     fi
 
-    for f in "$AUTOMOUSE_DIR"/queue/*.md; do
+    # Rows are in QUEUE order, not alphabetical: `ls -1tr` is byte-for-byte the
+    # same command bin/automouse/run's claim_next_plan() picks with, so row 1 is
+    # genuinely the plan that runs next. Copying the command rather than
+    # reimplementing it with stat+sort is deliberate — queue entries are symlinks
+    # into ~/claude-plans/, and `ls -t` vs. a stat pipeline can disagree on
+    # whether that mtime is the link's or the target's. 2>/dev/null covers the
+    # empty queue, where the glob stays literal.
+    while IFS= read -r f; do
         { [ -f "$f" ] || [ -L "$f" ]; } || continue
         base="$(basename "$f")"
         count=$(( count + 1 ))
@@ -637,14 +644,18 @@ render_queue() {
         pad=''
         [ "${#base}" -lt 46 ] && pad="$(printf '%*s' $(( 46 - ${#base} )) '')"
         # `-e`, not `-f`: mkdir-based locks are directories (see render_automouse).
+        # An in-flight plan shows ▶ in place of its number but still consumes one,
+        # so the numbers stay queue POSITIONS instead of renumbering around it.
+        # Both markers occupy the same 3 columns, which keeps the name column
+        # straight whether the queue is 9 plans long or 90.
         if [ -e "$AUTOMOUSE_DIR/queue/$base.lock" ]; then
-            printf '  %s▶%s %s%s %sin progress%s\n' \
+            printf '  %s  ▶%s %s%s %sin progress%s\n' \
                 "$YEL" "$R" "$(link_file "$f" "$base")" "$pad" "$DIM" "$R"
         else
-            printf '  %s·%s %s%s %squeued%s\n' \
-                "$DIM" "$R" "$(link_file "$f" "$base")" "$pad" "$DIM" "$R"
+            printf '  %s%2d.%s %s%s %squeued%s\n' \
+                "$DIM" "$count" "$R" "$(link_file "$f" "$base")" "$pad" "$DIM" "$R"
         fi
-    done
+    done < <(ls -1tr "$AUTOMOUSE_DIR"/queue/*.md 2>/dev/null)
 
     [ "$count" -eq 0 ] && note "empty"
     return 0

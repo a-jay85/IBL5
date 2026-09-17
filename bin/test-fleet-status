@@ -216,6 +216,14 @@ printf '%s\n' "$NOW"        > "$AM/.heartbeat-$NIGHTLY_PID-postplan"
 # the primary lock-dir slug-resolution path works for all three live runners.
 printf 'plan\n' > "$AM/queue/live-plan.md"
 printf 'plan\n' > "$AM/queue/idle-plan.md"
+# Stamp the mtimes apart, live-plan OLDER. render_queue orders by `ls -1tr`
+# (oldest first, same as claim_next_plan), so this puts live-plan at position 1 —
+# the REVERSE of alphabetical, which is the only way the order assertion below
+# can fail loudly if the glob ever comes back. Left to creation order the two
+# stamps land in the same second, and a sub-second tie falls back to name, which
+# BSD and GNU ls break in opposite directions.
+touch -t 202601010001 "$AM/queue/live-plan.md"
+touch -t 202601010002 "$AM/queue/idle-plan.md"
 mkdir -p "$AM/queue/live-plan.md.lock"
 printf '%s\n' "$LIVE_AUTOMOUSE_PID" > "$AM/queue/live-plan.md.lock/pid"
 printf '2\n' > "$AM/queue/live-plan.md.attempts"
@@ -467,6 +475,24 @@ assert_has "automouse: attempts surfaced"     "$OUTPUT" 'attempt 2'
 assert_has "automouse: lock dir marks runner locked" "$OUTPUT" 'locked'
 assert_has "queue: lock dir marks plan in progress"  "$OUTPUT" 'live-plan\.md +in progress'
 assert_has "queue: unlocked plan reads queued"       "$OUTPUT" 'idle-plan\.md +queued'
+
+# 7b — queue ORDER, not alphabetical. live-plan is stamped older, so it leads;
+# alphabetically idle-plan would. Collapsed to one line because assert_has runs
+# grep -E, which cannot see across lines.
+QUEUE_ORDER="$(grep -E '(live|idle)-plan\.md +(queued|in progress)' <<< "$OUTPUT" \
+    | sed -E 's/.*(live|idle)-plan\.md.*/\1/' | tr '\n' ' ')"
+assert_has "queue: rows follow queue order, not the alphabet" \
+    "$QUEUE_ORDER" '^live idle '
+
+# 7c — numbered rows, and an in-flight plan CONSUMES its number rather than
+# renumbering around it: live-plan holds position 1 behind the arrow, so the
+# queued row below it must read 2, not 1.
+assert_has "queue: queued row is numbered by queue position" \
+    "$OUTPUT" '^ +2\. +idle-plan\.md'
+assert_lacks "queue: in-flight plan does not give its number away" \
+    "$OUTPUT" '^ +1\. +idle-plan\.md'
+assert_lacks "queue: bullets are gone" \
+    "$OUTPUT" '^ +· +(live|idle)-plan'
 
 # 13 — the schedule comes off the plist. Asserted as a SHAPE plus the fixture's
 # own 04:30, never a literal date: the day rolls depending on what time of day

@@ -402,7 +402,6 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             inputs.llm_safety_holds = verdict["holds"]
         decision = evaluate(inputs)
         res.arm = decision
-        res.fidelity_pending = bool(live and any(c.number == 12 for c in decision.holds))
         for c in decision.conditions:
             if c.warning:
                 log(f"phase6.5 WARNING ({c.name}): {c.warning}")
@@ -510,11 +509,12 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
     return _finish(res, out_dir)
 
 
-# Phase 5.0 handoff to the resumed skill session (rc=4). Run-dir-keyed, NOT
-# $PPID-keyed: the reader is a different process whose PID does not exist yet
-# at write time, so no /tmp/...-$PPID name the harness could pick would be the
-# one that process looks under. bin/post-plan-now passes these two paths to the
-# resume `claude -p` as DONE_MARK / BRIDGE. Both names are read back by
+# Phase 5.0's two conformance signals, written into the run dir beside result.json.
+# Run-dir-keyed, NOT $PPID-keyed: the skill path spells them /tmp/...-$PPID, and no
+# PID the harness could pick would be the one another process looks under. Phase 8
+# removed the rc=4 resume, so no skill session reads these today; they stay as the
+# run's audit trail and as the shape the skill-path block in
+# _phase-6.5-arm-auto-merge.md mirrors. Both names are read back by
 # tests/test_post_plan_now_fallback.py, which is what keeps the two sides in sync.
 CONFORMANCE_DONE_NAME = "conformance-done"
 CONFORMANCE_BRIDGE_NAME = "missing-tests"
@@ -573,6 +573,12 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
             sha = fidelity.remediate(llm, git, out_dir, worktree or ".", packet,
                                      fidelity.verdict_path(pr), master_sha, log=log)
         except HarnessError as e:
+            # A failed push is not "remediation unavailable". The remediation commit exists
+            # locally and the remote does not have it, so the tree a re-reviewer would judge
+            # is not the tree CI ran. Propagate to the top-level FAILED handler: the run
+            # exits 1 and bin/post-plan-now re-runs the full /post-plan skill.
+            if e.kind == "push-failed":
+                raise
             log(f"phase5.5 remediation: unavailable ({e.kind}) - verdict 1 stands")
             sha = None
         if sha:
@@ -648,29 +654,15 @@ def _finish(res: RunResult, out_dir: str) -> RunResult:
 
 def exit_code_for(res: RunResult) -> int:
     """Process exit code from a terminal RunResult.
-    4 = harness phases complete, plan-fidelity review still owed: bin/post-plan-now
-        re-enters the /post-plan skill at Phase 5.5 for the review, digest and arming.
-        DEGRADED runs are excluded from this handoff -- see the ordering note below.
     3 = rebase-conflict fail-closed sentinel: bin/post-plan-now MUST NOT escalate to
         the /post-plan skill session; a human resolves the stacked-branch rebase.
-    1 = any other typed failure.  0 = success / nothing-to-ship / degraded (PR shipped + held)."""
+    1 = any other typed failure: bin/post-plan-now re-runs the full /post-plan skill.
+    0 = shipped (armed or held), nothing to ship, or degraded.
+    There is no 4: the harness owns Phase 5.5, and the launcher has no resume arm."""
     if res.terminal == TerminalState.FAILED and res.error_kind == "rebase-conflict":
         return 3
-    # DEGRADED is checked BEFORE fidelity_pending, and the order is load-bearing.
-    # A live degraded run is *also* fidelity_pending (condition (12) always holds
-    # live), so fidelity-first would route every degraded run into a resumed skill
-    # session at Phase 5.5. That session re-evaluates all fourteen arm conditions
-    # from scratch, and nothing carries the degradation across: the skill's
-    # condition (9) is an LLM enumeration over the realized diff, and it has no
-    # knowledge of an unparseable review agent. Fidelity-first would therefore let
-    # the skill ARM auto-merge on a PR whose review never parsed -- defeating the
-    # "hold" half of degrade-and-hold. Returning 0 keeps the PR open, held by the
-    # harness's own condition (9), and awaiting a human. Pinned by
-    # tests/test_runner_exit_codes.py::test_degraded_beats_fidelity_pending.
     if res.terminal == TerminalState.DEGRADED:
-        return 0          # PR is open and held: nothing for the skill fallback to redo
-    if res.terminal != TerminalState.FAILED and res.fidelity_pending:
-        return 4
+        return 0          # PR open and held by (9); a skill re-run would re-review a PR a human must judge
     return 0 if res.terminal != TerminalState.FAILED else 1
 
 
@@ -720,10 +712,6 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
         return ("RESULT: post-plan BLOCKED — rebase conflict on a stacked branch, "
                 "human required; ERROR terminal=failed, no PR opened. "
                 "Resolve the rebase, then re-run bin/post-plan-now.")
-    if rc == 4:
-        return ("RESULT: post-plan harness phases complete — plan-fidelity review PENDING, "
-                f"auto-merge NOT armed{pr}. Resuming the /post-plan skill at Phase 5.5 for "
-                "the Opus fidelity review, the merge digest, and arming.")
     if res.terminal == TerminalState.FAILED:
         return (f"RESULT: post-plan FAILED — ERROR terminal=failed "
                 f"kind={res.error_kind or 'unknown'}: "

@@ -217,28 +217,17 @@ def test_scored_findings_empty_when_no_findings():
     assert blob["scored_findings"] == []
 
 
-def test_rc4_line_names_pending_and_unarmed():
-    r = RunResult(terminal=TerminalState.SHIPPED_HELD, pr_number=123,
-                  fidelity_pending=True)
-    line = runner.verdict_line(r, 4, "https://github.com/o/r/pull")
-    assert line.startswith("RESULT:")
-    assert "\n" not in line
-    assert "PENDING" in line and "NOT armed" in line and "Phase 5.5" in line
-    assert "PR #123" in line and "pull/123" in line
-
-
-def test_rc4_does_not_claim_failure():
-    """A handoff must not trip a watcher's FAILED/ERROR filter."""
-    r = RunResult(terminal=TerminalState.SHIPPED_HELD, pr_number=123,
-                  fidelity_pending=True)
-    line = runner.verdict_line(r, 4)
-    assert "FAILED" not in line and "ERROR" not in line
-
-
-def test_rc3_wording_survives_fidelity_pending():
-    r = RunResult(terminal=TerminalState.FAILED, error_kind="rebase-conflict",
-                  fidelity_pending=True)
+def test_rc3_wording_names_rebase_conflict():
+    r = RunResult(terminal=TerminalState.FAILED, error_kind="rebase-conflict")
     assert "rebase conflict" in runner.verdict_line(r, 3)
+
+
+def test_rc4_has_no_resume_wording():
+    """rc=4 no longer has a resume arm; the verdict must not mention Phase 5.5 or Resuming."""
+    r = RunResult(terminal=TerminalState.SHIPPED_HELD, pr_number=123, arm=_arm(False))
+    line = runner.verdict_line(r, 4)
+    assert "Phase 5.5" not in line
+    assert "Resuming" not in line
 
 
 def test_live_runs_never_synthesise_a_fidelity_verdict():

@@ -1,6 +1,6 @@
 ---
 description: Ship the compiled post-plan harness in-repo under tools/postplan-harness/ with a dedicated Python CI workflow, a main-checkout path pin, and real-data dirs gitignored.
-last_verified: 2026-07-23
+last_verified: 2026-09-16
 ---
 # 92. Post-plan harness in-repo with dedicated Python CI
 
@@ -48,3 +48,27 @@ a regression gate.
 - The two suites named `*_live.py` are in fact hermetic (a shimmed `gh` on `PATH`, a temp
   `git init` repo) and are `--ignore`d in CI only as a conservative scope decision, not
   because they need live credentials. Broadening CI to run them is a cheap follow-up.
+
+## Addendum — harness-owned Phase 5.5 and the 0/1/3 exit contract (2026-09-16) <!-- slop-ok -->
+
+Decision 3 pins the main-checkout harness and describes the `[ -x "$HARNESS/run" ]`
+fallthrough. The harness has since taken over the phases the skill used to own, which changed
+the launcher's handoff shape. None of the sections above describe that shape, so it is recorded
+here.
+
+**Original.** The harness had one LLM adapter call site, a `claude -p --max-turns 1 --tools ""`
+call in a neutral temp cwd. An agent there cannot read the repo, so the harness could not run
+Phase 5.5's plan-intent fidelity review. It held arming condition (12) and exited **4**, and
+`bin/post-plan-now` re-entered the `/post-plan` skill **at Phase 5.5** to finish the run.
+
+**Today.** The same `ClaudeCli` adapter carries a second call site with tools enabled, pinned to
+Opus 5, with `cwd` set to the worktree (`harness/fidelity.py`). The harness runs the review
+itself, posts the sticky `<!-- pr-ready-verdict -->` comment and the merge digest, and makes the
+arming decision. Process exit codes are **0**, **1** and **3** only. Exit 4 and the partial-run
+resume arm in `bin/post-plan-now` are deleted. A harness failure outside exit 3 re-runs the
+**full** skill from Phase 0. Exit 3 (rebase conflict) still suppresses the fallback and leaves
+the branch for a human.
+
+**Unchanged.** The main-checkout pin, the `POST_PLAN_SKILL=1` rollback, and the
+`[ -x "$HARNESS/run" ]` fallthrough all behave as Decision 3 describes. The toolless bounded
+call sites keep `--max-turns 1`.

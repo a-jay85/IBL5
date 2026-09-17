@@ -609,6 +609,36 @@ def test_replay_a_failed_sticky_post_does_not_change_arming(tmp_path, sticky_tmp
     assert [a["action"] for a in _actions(out)].count("pr_merge_auto") == 1
 
 
+def test_fidelity_push_failure_exits_1_for_full_fallback(tmp_path, sticky_tmp, monkeypatch):
+    """A push-failed HarnessError from the remediation commit propagates as rc=1.
+
+    The harness now re-raises push-failed out of _run_fidelity so the top-level handler
+    sets terminal=FAILED; the launcher has no resume arm, so rc=4 is gone and any
+    non-0/3 exit goes to the full /post-plan skill fallback.
+    """
+    pr = sticky_tmp(7110)
+    _orig_push = runner.ReplayGit.push
+
+    def _push(self):
+        if (self.commit_messages
+                and self.commit_messages[-1].startswith("chore: address Phase 5.5")):
+            raise HarnessError("push-failed", "remote rejected")
+        return _orig_push(self)
+
+    monkeypatch.setattr(runner.ReplayGit, "push", _push)
+
+    res, out = _sticky_run(tmp_path, pr, {
+        "plan-fidelity-review": [_verdict_doc("NOT READY")],
+        "fidelity-remediation": ["edits made"],
+    })
+
+    assert res.terminal is TerminalState.FAILED
+    assert res.error_kind == "push-failed"
+    assert runner.exit_code_for(res) == 1
+    assert not any(a["action"] == "pr_merge_auto" for a in _actions(out))
+    assert "RESULT: post-plan FAILED" in runner.verdict_line(res, 1)
+
+
 def test_sticky_bodies_are_gitignored():
     """LiveGh writes the body under the run dir; it must never show up as a repo change."""
     proc = subprocess.run(

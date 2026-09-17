@@ -122,6 +122,7 @@ def test_remediation_model_has_no_push_authority(tmp_path, git_shim):
 # --- re-review bounds ---------------------------------------------------------
 
 def test_re_review_skipped_when_plan_holds_auto_merge(tmp_path, git_shim):
+    """Characterization pin. Phase 2 inverts this: auto_merge_false no longer skips re-review."""
     llm = FixtureLlm(UsageLedger(), {"plan-fidelity-re-review": "NOT READY\n"})
     got = fidelity.re_review(llm, _git(dirty=False), str(tmp_path), str(tmp_path),
                              _plan(auto_merge_false=True), "deadbeef", "body", 77,

@@ -50,6 +50,12 @@ def test_terminal_line_rows(v1, err, sha, v2, tree2, amf, expected):
     assert fidelity.terminal_line(v1, err, sha, v2, tree2, amf) == expected
 
 
+def test_auto_merge_false_currently_shadows_the_re_review_rows():
+    """Characterization. Phase 3 removes row 5; this assertion changes with it."""
+    assert fidelity.terminal_line("NOT READY", None, "abc1234", "READY", TREE, True) == (
+        "NOT READY — held for your final review")
+
+
 @pytest.mark.parametrize("sha", [None, "abc1234"])
 @pytest.mark.parametrize("v2", [None, "READY", "READY WITH NOTES", "NOT READY"])
 @pytest.mark.parametrize("amf", [True, False])

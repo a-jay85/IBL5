@@ -147,4 +147,4 @@ Format each packet as a fenced block within the plan:
 - **Report back:** a one-line summary only
 ````
 
-**`Rules:` — when to fill it.** Never list an always-on rule (no `paths:` frontmatter key) — those load verbatim into every sub-agent. List a **path-scoped** rule only when the delegate's work depends on it and the packet's own file edits would not match its globs. Omit the field entirely otherwise. `_architect-contract-detail.md` § Rules field — worked examples. <!-- slop-ok -->
+**When to fill the `Rules:` field.** Never list an always-on rule (no `paths:` frontmatter key). Those load verbatim into every sub-agent. List a **path-scoped** rule only when the delegate's work depends on it and the packet's own file edits would not match its globs. Omit the field entirely otherwise. `_architect-contract-detail.md` § Rules field: worked examples.

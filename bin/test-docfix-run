@@ -546,9 +546,19 @@ if [ -n "$PLIST_F20" ]; then
         # com.ibl5.docfix-*.plist also matches the long-lived com.ibl5.docfix-poll (so the
         # check would lint the poller and pass while testing nothing), and a real docfix-run
         # plist rm -f's itself when its job exits, leaving the glob no correct file to find.
-        plutil -lint "$PLIST_F20" >/dev/null 2>&1 \
-          && ok "(20.2) plist hygiene: plutil -lint passes after uuid interpolation" \
-          || bad "(20.2) plist hygiene: plutil -lint rejects the plist the uuid was interpolated into"
+        # plutil is macOS-only, so fall back to python3 xml.etree (present on macOS and
+        # the ubuntu-latest runner) exactly as case 22/plan15 below does. Without the
+        # fallback this sub-check fails on CI because the binary is absent.
+        if command -v plutil >/dev/null 2>&1; then
+            plist_lint20() { plutil -lint "$1" >/dev/null 2>&1; }
+            LINTER20="plutil -lint"
+        else
+            plist_lint20() { python3 -c "import sys, xml.etree.ElementTree as ET; ET.parse(sys.argv[1])" "$1" >/dev/null 2>&1; }
+            LINTER20="python3 xml.etree"
+        fi
+        plist_lint20 "$PLIST_F20" \
+          && ok "(20.2) plist hygiene: $LINTER20 passes after uuid interpolation" \
+          || bad "(20.2) plist hygiene: $LINTER20 rejects the plist the uuid was interpolated into"
     else
         bad "(20) prompt-fidelity: could not extract claude -p argument from plist"
     fi

@@ -121,41 +121,46 @@ def test_remediation_model_has_no_push_authority(tmp_path, git_shim):
 
 # --- re-review bounds ---------------------------------------------------------
 
-def test_re_review_skipped_when_plan_holds_auto_merge(tmp_path, git_shim):
-    """Characterization pin. Phase 2 inverts this: auto_merge_false no longer skips re-review."""
-    llm = FixtureLlm(UsageLedger(), {"plan-fidelity-re-review": "NOT READY\n"})
-    got = fidelity.re_review(llm, _git(dirty=False), str(tmp_path), str(tmp_path),
-                             _plan(auto_merge_false=True), "deadbeef", "body", 77,
-                             "sha123", _verdict(tmp_path, "NOT READY"))
-    assert got == (None, None)
-    assert llm.tooled_argvs == []
+def test_re_review_runs_even_when_plan_holds_auto_merge(tmp_path, git_shim):
+    """auto_merge_false no longer skips re-review."""
+    llm = FixtureLlm(UsageLedger(), {"plan-fidelity-re-review-2": "NOT READY\n"})
+    path2 = fidelity.verdict_path("77-2")
+    try:
+        got = fidelity.re_review(llm, _git(dirty=False), str(tmp_path), str(tmp_path),
+                                 _plan(auto_merge_false=True), "deadbeef", "body", 77,
+                                 "sha123", _verdict(tmp_path, "NOT READY"))
+        assert got[0] == "NOT READY"
+        assert len(llm.tooled_argvs) == 1
+    finally:
+        if os.path.exists(path2):
+            os.unlink(path2)
 
 
 def test_re_review_skipped_without_a_remediation(tmp_path, git_shim):
-    llm = FixtureLlm(UsageLedger(), {"plan-fidelity-re-review": "READY\n"})
+    llm = FixtureLlm(UsageLedger(), {"plan-fidelity-re-review-2": "READY\n"})
     got = fidelity.re_review(llm, _git(dirty=False), str(tmp_path), str(tmp_path),
                              _plan(), "deadbeef", "body", 78, None,
                              _verdict(tmp_path, "NOT READY"))
-    assert got == (None, None)
+    assert got == (None, None, None)
     assert llm.tooled_argvs == []
 
 
 def test_re_review_is_one_shot_even_when_still_not_ready(tmp_path, git_shim):
     llm = FixtureLlm(UsageLedger(), {
         "fidelity-remediation": "edited",
-        "plan-fidelity-re-review": "checks\n\nNOT READY\n\n## DIGEST\nd\n",
+        "plan-fidelity-re-review-2": "checks\n\nNOT READY\n\n## DIGEST\nd\n",
     })
     git = _git(dirty=False)
     v1 = _verdict(tmp_path, "NOT READY")
     sha = fidelity.remediate(llm, git, str(tmp_path), str(tmp_path), _packet(tmp_path),
                              v1, "deadbeef")
-    verdict_2, tree_2 = fidelity.re_review(llm, git, str(tmp_path), str(tmp_path),
-                                           _plan(), "deadbeef", "body", 79, sha, v1)
+    verdict_2, tree_2, _path2 = fidelity.re_review(llm, git, str(tmp_path), str(tmp_path),
+                                                   _plan(), "deadbeef", "body", 79, sha, v1)
     path2 = fidelity.verdict_path("79-2")
     try:
         assert verdict_2 == "NOT READY"
         # exactly ONE reviewer call for the whole run, never a loop back into remediation
-        reviews = [p for p, _ in llm.tooled_argvs if p == "plan-fidelity-re-review"]
+        reviews = [p for p, _ in llm.tooled_argvs if p == "plan-fidelity-re-review-2"]
         assert len(reviews) == 1
         # verdict 1 is never overwritten
         assert "NOT READY" in open(v1).read()
@@ -168,15 +173,15 @@ def test_re_review_is_one_shot_even_when_still_not_ready(tmp_path, git_shim):
 def test_re_review_records_the_post_push_tree(tmp_path, git_shim):
     llm = FixtureLlm(UsageLedger(), {
         "fidelity-remediation": "edited",
-        "plan-fidelity-re-review": "READY\n",
+        "plan-fidelity-re-review-2": "READY\n",
     })
     git = _git(dirty=False)
     assert git.head_tree() == TREE_1                   # pre-remediation
     v1 = _verdict(tmp_path, "NOT READY")
     sha = fidelity.remediate(llm, git, str(tmp_path), str(tmp_path), _packet(tmp_path),
                              v1, "deadbeef")
-    verdict_2, tree_2 = fidelity.re_review(llm, git, str(tmp_path), str(tmp_path),
-                                           _plan(), "deadbeef", "body", 80, sha, v1)
+    verdict_2, tree_2, _ = fidelity.re_review(llm, git, str(tmp_path), str(tmp_path),
+                                              _plan(), "deadbeef", "body", 80, sha, v1)
     path2 = fidelity.verdict_path("80-2")
     try:
         assert verdict_2 == "READY"
@@ -194,12 +199,12 @@ def test_re_review_degrades_to_verdict_1_on_adapter_failure(tmp_path, git_shim):
     got = fidelity.re_review(_Raising(UsageLedger(), {}), _git(dirty=False), str(tmp_path),
                              str(tmp_path), _plan(), "deadbeef", "body", 81, "sha",
                              _verdict(tmp_path, "NOT READY"))
-    assert got == (None, None)
+    assert got == (None, None, None)
     assert not os.path.exists(fidelity.verdict_path("81-2"))
 
 
 def test_re_review_packet_is_separate_from_the_first(tmp_path, git_shim):
-    llm = FixtureLlm(UsageLedger(), {"plan-fidelity-re-review": "READY\n"})
+    llm = FixtureLlm(UsageLedger(), {"plan-fidelity-re-review-2": "READY\n"})
     out = tmp_path / "out"
     out.mkdir()
     first = fidelity.build_packet(str(out), "deadbeef", TREE_1, _plan(), "d", "b", 82,

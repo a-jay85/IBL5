@@ -24,49 +24,44 @@ TREE = "c" * 40
 
 # --- terminal_line ------------------------------------------------------------
 
-@pytest.mark.parametrize("v1,err,sha,v2,tree2,amf,expected", [
-    (None, "llm-tooled-empty", None, None, None, False,
+@pytest.mark.parametrize("v1,err,sha,v2,tree2,rounds,expected", [
+    (None, "llm-tooled-empty", None, None, None, 0,
      "NOT READY — plan-fidelity review produced no verdict (llm-tooled-empty); "
      "re-run /post-plan"),
-    ("READY", None, None, None, None, False, "READY"),
-    ("READY WITH NOTES", None, None, None, None, False,
+    ("READY", None, None, None, None, 0, "READY"),
+    ("READY WITH NOTES", None, None, None, None, 0,
      "READY WITH NOTES — notes left for the merging reviewer; the compiled harness "
      "remediates only NOT READY"),
-    ("NOT READY", None, None, None, None, False,
+    ("NOT READY", None, None, None, None, 0,
      "NOT READY — the blocking findings listed above remain; remediate and "
      "re-run /post-plan"),
-    ("NOT READY", None, "abc1234", None, None, True,
-     "NOT READY — held for your final review"),
-    ("NOT READY", None, "abc1234", None, None, False,
+    ("NOT READY", None, "abc1234", None, None, 0,
      "NOT READY — re-review produced no verdict; re-run /post-plan"),
-    ("NOT READY", None, "abc1234", "READY", TREE, False,
+    ("NOT READY", None, "abc1234", "READY", TREE, 0,
      f"READY (re-review) — findings remediated in abc1234 and re-reviewed clean on "
      f"tree {TREE}"),
-    ("NOT READY", None, "abc1234", "NOT READY", TREE, False,
+    ("NOT READY", None, "abc1234", "NOT READY", TREE, 1,
      "NOT READY (re-review) — the re-review's blocking findings remain; remediate and "
      "re-run /post-plan"),
+    ("NOT READY", None, "abc1234", "NOT READY", TREE, 3,
+     "NOT READY (re-review) — 3 remediation rounds ran and "
+     "the re-review's blocking findings remain; remediate and re-run /post-plan"),
 ])
-def test_terminal_line_rows(v1, err, sha, v2, tree2, amf, expected):
-    assert fidelity.terminal_line(v1, err, sha, v2, tree2, amf) == expected
-
-
-def test_auto_merge_false_currently_shadows_the_re_review_rows():
-    """Characterization. Phase 3 removes row 5; this assertion changes with it."""
-    assert fidelity.terminal_line("NOT READY", None, "abc1234", "READY", TREE, True) == (
-        "NOT READY — held for your final review")
+def test_terminal_line_rows(v1, err, sha, v2, tree2, rounds, expected):
+    assert fidelity.terminal_line(v1, err, sha, v2, tree2, rounds) == expected
 
 
 @pytest.mark.parametrize("sha", [None, "abc1234"])
 @pytest.mark.parametrize("v2", [None, "READY", "READY WITH NOTES", "NOT READY"])
-@pytest.mark.parametrize("amf", [True, False])
-def test_indeterminate_verdict_never_reads_as_ready(sha, v2, amf):
+@pytest.mark.parametrize("rounds", [0, 1, 3])
+def test_indeterminate_verdict_never_reads_as_ready(sha, v2, rounds):
     """A missing verdict is not a passing one. No v1=None combination may say READY."""
-    line = fidelity.terminal_line(None, "llm-tooled-cli", sha, v2, TREE, amf)
+    line = fidelity.terminal_line(None, "llm-tooled-cli", sha, v2, TREE, rounds)
     assert not line.startswith("READY")
 
 
 def test_unrecorded_tree_is_named_not_blank():
-    line = fidelity.terminal_line("NOT READY", None, "abc1234", "READY", None, False)
+    line = fidelity.terminal_line("NOT READY", None, "abc1234", "READY", None, 1)
     assert line.endswith("on tree unrecorded")
 
 

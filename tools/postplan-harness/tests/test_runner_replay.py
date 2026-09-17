@@ -549,7 +549,7 @@ def test_replay_b_remediated_then_clean_says_so_and_arms(tmp_path, sticky_tmp):
     res, out = _sticky_run(tmp_path, pr, {
         "plan-fidelity-review": [_verdict_doc("NOT READY")],
         "fidelity-remediation": ["edits made"],
-        "plan-fidelity-re-review": [_verdict_doc("READY")],
+        "plan-fidelity-re-review-2": [_verdict_doc("READY")],
     })
     assert res.terminal == TerminalState.SHIPPED_ARMED
     body = _sticky_body(out)
@@ -564,7 +564,7 @@ def test_replay_c_failing_re_review_holds_and_never_arms(tmp_path, sticky_tmp):
     res, out = _sticky_run(tmp_path, pr, {
         "plan-fidelity-review": [_verdict_doc("NOT READY")],
         "fidelity-remediation": ["edits made"],
-        "plan-fidelity-re-review": [_verdict_doc("NOT READY")],
+        "plan-fidelity-re-review-2": [_verdict_doc("NOT READY")],
     })
     assert res.terminal == TerminalState.SHIPPED_HELD
     assert not any(a["action"] == "pr_merge_auto" for a in _actions(out))
@@ -580,7 +580,7 @@ def test_replay_d_prose_after_the_tree_falls_back_to_verdict_1(tmp_path, sticky_
     res, out = _sticky_run(tmp_path, pr, {
         "plan-fidelity-review": [_verdict_doc("NOT READY")],
         "fidelity-remediation": ["edits made"],
-        "plan-fidelity-re-review": [
+        "plan-fidelity-re-review-2": [
             _verdict_doc("READY", f"REVIEWED_TREE={REPLAY_TREE_2} after the rebase")],
     })
     assert res.terminal == TerminalState.SHIPPED_HELD
@@ -595,7 +595,7 @@ def test_replay_e_a_moved_head_makes_verdict_2_stale(tmp_path, sticky_tmp):
     res, out = _sticky_run(tmp_path, pr, {
         "plan-fidelity-review": [_verdict_doc("NOT READY")],
         "fidelity-remediation": ["edits made"],
-        "plan-fidelity-re-review": [_verdict_doc("READY")],
+        "plan-fidelity-re-review-2": [_verdict_doc("READY")],
     }, current_tree="f" * 40)
     assert res.terminal == TerminalState.SHIPPED_HELD
     assert 12 in {c.number for c in res.arm.holds}
@@ -618,7 +618,7 @@ def test_replay_f_phase7_keys_ci_on_the_remediation_commit(tmp_path, sticky_tmp,
     res, _ = _sticky_run(tmp_path, pr, {
         "plan-fidelity-review": [_verdict_doc("NOT READY")],
         "fidelity-remediation": ["edits made"],
-        "plan-fidelity-re-review": [_verdict_doc("READY")],
+        "plan-fidelity-re-review-2": [_verdict_doc("READY")],
     })
     assert res.fidelity["remediation_sha"] == "replay-sha-2"
     assert res.ci_head == "replay-sha-2"

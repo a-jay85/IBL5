@@ -276,20 +276,17 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
 
 def re_review(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
               pr_body: str, pr_number: int | str, remediation_sha: str | None,
-              verdict1_path: str, phase4b_ran: bool = False,
-              log=None) -> tuple[str | None, str | None]:
-    """Exactly one second review, after a remediation push. Returns (verdict_2, tree_2).
+              verdict1_path: str, phase4b_ran: bool = False, *,
+              round_num: int = 1,
+              log=None) -> tuple[str | None, str | None, str | None]:
+    """One review per remediation round. Returns (verdict, reviewed_tree, verdict_path).
 
-    Never loops. A failure here is "no re-review happened": verdict 1 stands and
-    condition (12) decides on it.
+    A failure here is "no re-review happened" for this round: the prior verdict stands
+    and the loop stops.
     """
     log = log or _noop_log
     if not remediation_sha:
-        return None, None
-    if getattr(plan, "auto_merge_false", False):
-        # A human merges this PR, so a second Opus verdict changes no outcome.
-        log("phase5.5: re-review skipped - plan carries auto_merge: false")
-        return None, None
+        return None, None, None
 
     # regenerated AFTER the push, so the diff carries the remediation commit
     diff = gitad.diff_vs_base()
@@ -303,28 +300,30 @@ def re_review(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
     try:
         packet = build_packet(out_dir, master_sha, gitad.head_tree(), plan, diff,
                               pr_body, pr_number, phase4b_ran, worktree=worktree,
-                              packet_name="fidelity-packet-2", extra_context=extra)
+                              packet_name=f"fidelity-packet-{round_num + 1}",
+                              extra_context=extra)
         text = llm.call_tooled(
-            "plan-fidelity-re-review", "opus", _pointer_prompt(packet, pr_number),
+            f"plan-fidelity-re-review-{round_num + 1}", "opus",
+            _pointer_prompt(packet, pr_number),
             cwd=worktree, agent="pr-ready-phase6",
             allowed_tools=REVIEW_ALLOWED_TOOLS, denied_tools=REVIEW_DENIED_TOOLS,
             add_dirs=(packet,), append_system_prompt=OVERRIDE,
         )
     except HarnessError as e:
         log(f"phase5.5: re-review unavailable ({e.kind}) - verdict 1 stands")
-        return None, None
+        return None, None, None
 
-    path2 = verdict_path(f"{pr_number}-2")
+    path2 = verdict_path(f"{pr_number}-{round_num + 1}")
     try:
         with open(path2, "w") as fh:
             fh.write(text if text.endswith("\n") else text + "\n")
     except OSError:
-        return None, None
+        return None, None, None
     # the tree is read after the push, so the recorded tree is the one the reviewer saw
     record_reviewed_tree(path2, gitad.head_tree())
     # read back from the file, never the in-memory value: a reviewer-written line with
     # prose after the hash must yield None here exactly as the skill's parser does
-    return parse_verdict(path2), read_reviewed_tree(path2)
+    return parse_verdict(path2), read_reviewed_tree(path2), path2
 
 
 # --- Phase 5: sticky verdict comment composers -------------------------------
@@ -346,6 +345,7 @@ DIGEST_SCRIPT_PATHS = (
 )
 
 DIGEST_UNAVAILABLE = "digest script did not produce output"
+MAX_FIDELITY_ROUNDS = 3  # round 1 is the historical single remediation
 STICKY_MARKER = "<!-- pr-ready-verdict -->"
 MERGE_DIGEST_HEADING = "### Merge digest"
 EXCERPT_LIMIT = 30000
@@ -389,7 +389,7 @@ def findings_excerpt(path: str, verdict_present: bool) -> str:
     return text
 
 
-def terminal_line(v1, error_kind, remediation_sha, v2, tree_2, auto_merge_false) -> str:
+def terminal_line(v1, error_kind, remediation_sha, v2, tree_2, rounds_completed) -> str:
     """The last prose line of the sticky comment. First matching row wins.
 
     An indeterminate verdict 1 (None) never yields a READY prefix — a missing verdict is
@@ -406,13 +406,14 @@ def terminal_line(v1, error_kind, remediation_sha, v2, tree_2, auto_merge_false)
     if not remediation_sha:
         return ("NOT READY — the blocking findings listed above remain; "
                 "remediate and re-run /post-plan")
-    if auto_merge_false:
-        return "NOT READY — held for your final review"
     if v2 is None:
         return "NOT READY — re-review produced no verdict; re-run /post-plan"
     if v2 in ("READY", "READY WITH NOTES"):
         return (f"READY (re-review) — findings remediated in {remediation_sha} and "
                 f"re-reviewed clean on tree {tree_2 or 'unrecorded'}")
+    if rounds_completed > 1:
+        return (f"NOT READY (re-review) — {rounds_completed} remediation rounds ran and "
+                "the re-review's blocking findings remain; remediate and re-run /post-plan")
     return ("NOT READY (re-review) — the re-review's blocking findings remain; "
             "remediate and re-run /post-plan")
 

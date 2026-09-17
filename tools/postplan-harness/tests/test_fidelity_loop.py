@@ -105,36 +105,41 @@ def _cleanup(*suffixes):
             os.unlink(p)
 
 
-def test_baseline_not_ready_runs_exactly_one_remediation_and_one_re_review(tmp_path, git_shim):
-    """Phase 4 flips these counts to 3 and 3 in the bounded loop."""
+def test_bounded_loop_runs_up_to_three_rounds(tmp_path, git_shim):
+    """All three rounds exhaust the loop; each runs one remediation and one re-review."""
     canned = {
         "plan-fidelity-review": "6d checks\n\nNOT READY\n",
         "fidelity-remediation": "edited",
-        "plan-fidelity-re-review": "NOT READY\n",
+        "plan-fidelity-re-review-2": "NOT READY\n",
+        "plan-fidelity-re-review-3": "NOT READY\n",
+        "plan-fidelity-re-review-4": "NOT READY\n",
     }
     try:
         _, rmed, rrev = _drive(tmp_path, canned)
-        assert rmed == 1
-        assert rrev == 1
+        assert rmed == 3
+        assert rrev == 3
     finally:
-        _cleanup(99, "99-2")
+        _cleanup(99, "99-2", "99-3", "99-4")
 
 
-def test_baseline_fidelity_keys(tmp_path, git_shim):
-    """Phase 4 only adds keys; widened, never rewritten, proving aliases survived."""
+def test_fidelity_dict_has_full_schema_after_loop(tmp_path, git_shim):
+    """All keys present after an exhausted loop, including rounds aliases."""
     canned = {
         "plan-fidelity-review": "6d checks\n\nNOT READY\n",
         "fidelity-remediation": "edited",
-        "plan-fidelity-re-review": "NOT READY\n",
+        "plan-fidelity-re-review-2": "NOT READY\n",
+        "plan-fidelity-re-review-3": "NOT READY\n",
+        "plan-fidelity-re-review-4": "NOT READY\n",
     }
     try:
         res, _, _ = _drive(tmp_path, canned)
         assert set(res.fidelity) == {
             "verdict_1", "error_kind", "reviewed_tree", "verdict_path",
             "remediation_sha", "verdict_2", "reviewed_tree_2",
+            "rounds", "rounds_completed", "backlog_issue_numbers",
         }
     finally:
-        _cleanup(99, "99-2")
+        _cleanup(99, "99-2", "99-3", "99-4")
 
 
 def test_baseline_push_failed_propagates(tmp_path, git_shim):

@@ -7,6 +7,20 @@ import subprocess
 
 from ..state import HarnessError
 
+# Local gate denials (bin/pre-commit-hook, bin/pre-push-adr-hook) are deterministic:
+# re-running the FULL /post-plan skill hits the identical hook and cannot clear it
+# without a human writing an ADR, refreshing a doc, or trimming a rule file. A distinct
+# kind lets exit_code_for() emit the fail-closed 3 sentinel, so bin/post-plan-now skips
+# the ~1M-token skill fallback instead of burning it on a guaranteed re-denial.
+# Markers are the hooks' own output: bin/pre-push-adr-hook's prefix, the two guidance
+# lines bin/pre-commit-hook echoes, and bin/check-rules-byte-budget's summary line.
+_LOCAL_GATE_MARKERS = (
+    "pre-push-adr-hook:",
+    "One or more checks failed:",
+    "Bump last_verified",
+    "Trim the rule(s) above",
+)
+
 
 class LiveGit:
     def __init__(self, worktree: str, push_remote: str | None = None):
@@ -17,6 +31,14 @@ class LiveGit:
         proc = subprocess.run(["git", "-C", self.worktree, *args],
                               capture_output=True, text=True, errors="replace")
         if check and proc.returncode != 0:
+            # Scan BOTH streams: bin/pre-commit-hook runs its checks with `2>&1` and
+            # echoes guidance to stdout, so stderr-only detection misses every
+            # commit-path denial. The generic "git" branch keeps its stderr-only
+            # shape unchanged.
+            blob = f"{proc.stdout}\n{proc.stderr}"
+            if any(m in blob for m in _LOCAL_GATE_MARKERS):
+                detail = "\n".join(s for s in (proc.stderr.strip(), proc.stdout.strip()) if s)
+                raise HarnessError("local-gate", f"git {' '.join(args)}: {detail[:600]}")
             raise HarnessError("git", f"git {' '.join(args)}: {proc.stderr.strip()[:400]}")
         return proc.stdout
 

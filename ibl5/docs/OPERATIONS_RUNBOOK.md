@@ -417,6 +417,7 @@ php ibl5/bin/validate-schema   # config in ibl5/config/schema-assertions.php
 | Production host, port, user | GitHub Actions secrets `HOST`, `PORT`, `USERNAME`, and the Dependabot secrets of the same names | Duplicated for the same reason as `PRIVATE_KEY`. |
 | Discord notification target | GitHub Actions secret `OWNER_DISCORD_ID` | Snowflake ID for DM delivery |
 | CI PAT (auto-revert push) | GitHub Actions secret `CI_PAT`, and the Dependabot secret of the same name | Scoped to push `production` branch. Duplicated because `dependabot-auto-merge.yml` fires on Dependabot's `pull_request`, and that run resolves `secrets.CI_PAT` from the Dependabot store. |
+| E2E test login | GitHub Actions secrets `IBL_TEST_USER`, `IBL_TEST_PASS`, and the Dependabot secrets of the same names | Credentials Playwright's `auth.setup.ts` logs in with. Duplicated because `e2e-tests.yml` runs on `pull_request`, and a Dependabot PR's run reads the Dependabot store. Both fall back to non-secret literals when unset, so a missing secret surfaces as a login failure in `auth.setup.ts` while the job still runs. |
 
 ### Rotation procedure
 

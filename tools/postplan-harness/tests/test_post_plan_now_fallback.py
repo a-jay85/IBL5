@@ -1061,6 +1061,19 @@ def test_skill_only_leg_also_carries_a_session_id(tmp_path):
     assert len(matches) == 1, f"expected one --session-id in skill-only cmd, got {matches}"
 
 
+def test_exit3_message_is_shell_safe_and_names_both_causes():
+    """GATE_CLOSE is re-parsed by /bin/bash -lc on the far side of the launchd plist:
+    a backtick or $( ) there silently mangles the message (see the file's own comments).
+    It must also no longer claim rebase conflict is the only cause of exit 3."""
+    src = open(PPN).read()
+    line = [l for l in src.splitlines() if l.strip().startswith("GATE_CLOSE=\"; elif")]
+    assert len(line) == 1, f"expected one populated GATE_CLOSE, got {len(line)}"
+    body = line[0]
+    assert "`" not in body, "backtick in GATE_CLOSE survives to a second shell parse"
+    assert "$(" not in body, "command substitution in GATE_CLOSE"
+    assert "gate denial" in body and "rebase conflict" in body
+
+
 def test_mint_failure_aborts_before_bootstrap(tmp_path):
     """Stub uuidgen and python3 to fail: post-plan-now must exit non-zero and write no plist.
 

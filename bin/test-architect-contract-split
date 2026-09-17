@@ -13,7 +13,8 @@
 #   1. No-loss    : every baseline token survives in rules ∪ detail
 #   2. Residency  : every operative token (bold/gate/fenced) survives in rules file specifically
 #   3. Orphans    : every Why: _…-detail.md § <heading> pointer in rules resolves
-#   4. Size caps  : _architect-contract.md ≤ 28672 B, _plan-verification.md ≤ 21504 B
+#   4. Size caps  : _architect-contract.md ≤ 27648 B, _plan-verification.md ≤ 21504 B
+#   5. Read budget: every plan-architect def carries the no-re-read bounds (check_read_budget)
 #                   (only enforced when the detail file exists — skipped on the un-split tree)
 #
 # Run: bin/test-architect-contract-split              (exit 0 = pass, 1 = rule missing)
@@ -415,6 +416,55 @@ VERIFICATION_DETAIL="$REPO_ROOT/.claude/review-shared/_plan-verification-detail.
 
 validate_allowlists
 
+# -- Assertion 5: read-budget bounds are resident in every architect def -----
+# The bounds must live in the AGENT DEFS, not only in _architect-contract.md: a def is
+# always resident in the architect's system prompt, whereas the contract is a Read that a
+# mid-plan compaction drops. Losing the bound is what causes the next compaction.
+check_read_budget() {
+  printf '\n=== read budget ===\n'
+  local def defs=(plan-architect plan-architect-xhigh plan-architect-sonnet)
+  local -a probes=(
+    '## Your read budget'
+    '_architect-contract.md` exactly once'
+    'Never Read a `*-detail.md` companion'
+    'Never Read `$DRAFT`'
+    'Never Read the same file twice'
+  )
+  local probe path missing
+  for def in "${defs[@]}"; do
+    path="$REPO_ROOT/.claude/agents/$def.md"
+    if [[ ! -f "$path" ]]; then
+      printf 'FAIL [read budget]: missing agent def %s\n' "$path"
+      FAILED=$((FAILED + 1)); continue
+    fi
+    missing=0
+    for probe in "${probes[@]}"; do
+      if ! grep -qF -- "$probe" "$path"; then
+        printf 'FAIL [read budget]: %s.md is missing bound: %s\n' "$def" "$probe"
+        FAILED=$((FAILED + 1)); missing=1
+      fi
+    done
+    [[ "$missing" -eq 0 ]] && printf '%s.md: all %d bounds present\n' "$def" "${#probes[@]}"
+  done
+
+  # The detail files claim the architect never reads them. Keep that claim honest:
+  # no architect def may instruct a Read of either companion.
+  for def in "${defs[@]}"; do
+    path="$REPO_ROOT/.claude/agents/$def.md"
+    [[ -f "$path" ]] || continue
+    if grep -qE 'Read [^.]*_(architect-contract|plan-verification)-detail\.md' "$path"; then
+      printf 'FAIL [read budget]: %s.md instructs a Read of a *-detail.md companion\n' "$def"
+      FAILED=$((FAILED + 1))
+    fi
+  done
+
+  # SKILL.md Step 3 must hand the architect the once-only instruction.
+  if ! grep -qF 'exactly once, as its first action' "$REPO_ROOT/.claude/skills/plan/SKILL.md"; then
+    printf 'FAIL [read budget]: SKILL.md Step 3 no longer says the contract is Read exactly once\n'
+    FAILED=$((FAILED + 1))
+  fi
+}
+
 if [[ "$MODE" == selftest ]]; then
   run_selftest
 else
@@ -423,8 +473,10 @@ else
     "$CONTRACT_RULES" \
     "$CONTRACT_DETAIL" \
     "architect-contract" \
-    28672 \
+    27648 \
     true
+
+  check_read_budget
 
   # Cap is 21504 (21 KB), not the plan's 19456 (19 KB). The plan's movable-rationale
   # inventory was right: "## Required format" measures 11197 B in

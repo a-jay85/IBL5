@@ -162,3 +162,27 @@ A discharge never replaces a defense — the **Security** bullet (SQL prepared s
 For a phase that is **genuinely verbose or parallelizable**, delegate the **whole phase loop including its own verify/regen/fixup** — the sub-agent's tool output then accumulates in *its* context and returns as one summary, keeping the orchestrator's per-turn context flat. The win is **context localization** (the orchestrator stops re-reading a growing transcript every turn) — not a flat cost-percentage. Reserve packets for phases whose moved work clearly exceeds a sub-agent's fixed startup (~15K tokens); a packet for one tiny edit costs more than it saves, so keep small phases inline.
 
 This does **not** regress the ~15K economics: tiny sub-tier phases still stay inline because a sub-agent's fixed startup exceeds the work a one/two-edit phase moves. The rule changes only that such a phase is now *labeled* `(inline — …)` instead of left bare — zero new delegation is forced, only an explicit decision. The force applies solely to below-run-model phases whose moved work *already* clears ~15K, which the doctrine *already* says should be packets; the rule makes that latent "should" mechanically enforced.
+
+## Self-apply the Automouse Hold Challenge
+
+### Why the hold challenge is self-applied
+
+The orchestrator re-runs this challenge at Step 4.5, so an architect who skips it is not saved by that backstop. It merely catches the miss one step later, after the whole plan is already composed around a hold that did not need to exist. Applying it at authoring time is what makes the dissolved hold cheap: the mechanizing phase is written alongside the work it verifies, rather than bolted on once the phase list is frozen.
+
+The pressure runs one way only. A *reducible* hold (one a buildable check would dissolve) is a defect, because it spends a human's attention on something a test could have settled. An *intrinsic* hold is the system working: subjective taste, an irreducible security surface, an irreversible change, or a change to the merge machinery that would otherwise gate its own merge. Talking an intrinsic hold into arming is a safety regression. The correct response is to name its category and leave it held.
+
+The final clause (that every settleable sentence of a justification is an unwritten matrix row) exists because hold justifications drift into instructions. A justification that tells the human to go run something has not identified an irreducible judgment; it has deferred an observable claim. `bin/check-plan` gate `[H]` catches the ask-shaped phrasing, but the gate is a narrow pattern check and passing it is the floor.
+
+## Delegation packets: the `Rules:` field
+
+### Rules field: worked examples
+
+Always-on `.claude/rules/*.md` files (those with no `paths:` frontmatter key) load verbatim into every sub-agent, so listing one wastes the packet's budget and teaches the impl agent that the field is decorative.
+
+A **path-scoped** rule belongs in the field when the delegate depends on it but the packet's own file edits would not match its globs:
+
+- `linear-history-squash-merge.md` for a phase that rebases a stacked branch whose parent already merged.
+- `worktree-hostname.md` for a phase that curls the app or drives a browser against the worktree stack.
+- A `*-detail.md` companion whose parent rule the phase must apply in full rather than in summary.
+
+Omit the field entirely when the phase needs nothing beyond the always-on set. An empty `Rules:` line is worse than no line: it reads as "I considered this and found nothing", which is indistinguishable from "I did not consider it".

@@ -26,6 +26,17 @@ A single self-contained implementation plan for exactly one unit of work, consis
 - **Right-size the work.** One plan equals one pull request. If the task genuinely spans independent concerns or a refactor that must land before the feature using it, say so plainly rather than bundling.
 - **Tier the labor.** Where the project's injected guidance asks you to label each phase's executing tier, do so — the tiering decision belongs in the plan, decided now, not at execution time.
 
+## Your read budget
+
+Your context is the scarcest thing in this run. Compacting mid-plan costs you the contract text and the exploration findings you were given, and a plan composed after that loss is worse than one composed before it. Four bounds hold for the whole run:
+
+- **Read `.claude/skills/plan/_architect-contract.md` exactly once**, as your first action. You keep one context across every turn of the sectioned delivery, so the contract you read on turn 1 is still in front of you on the last turn. Re-Reading it re-pays ~7K tokens for text you already hold.
+- **Never Read a `*-detail.md` companion.** `_architect-contract-detail.md` and `_plan-verification-detail.md` are edit-time rationale for whoever maintains those rules. Each `§` pointer names where a maintainer looks, never where you look. The operative rule is always stated in full on the pointer's own line.
+- **Never Read `$DRAFT`.** You authored every section in it, and it grows each turn, so re-reading it costs quadratically and tells you nothing new. Your only permitted draft access is the phase-count `grep -c` / `awk` in the contract's **Phase count is binding** block. That call returns a count. `Read`, `cat`, `sed -n`, `head`, and `tail` over `$DRAFT` are all out.
+- **Never Read the same file twice.** The orchestrator's exploration findings are authoritative; confirm at most 2-3 specific points and compose.
+
+If you notice you are about to break one of these, the honest move is to write the section with what you have and name the residual unknown in the plan.
+
 ## How you deliver
 
 - Your plan is delivered **section by section, on the orchestrator's cadence** — never as one big final message. Your only file-writing channel is Bash (a `cat >>` heredoc); `Write`/`Edit`/`NotebookEdit` are disallowed, and the draft file is not a source file, so appending to it is allowed and expected.

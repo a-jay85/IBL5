@@ -1,10 +1,10 @@
 ---
-description: Read-on-demand only (no auto-attach trigger) — explains why /post-plan Phase 6.5 condition (9) may run on Sonnet rather than Opus: it is bounded hold-enumeration against a named trigger list, not open-ended diff-triage. Includes the tripwire for when to revisit. Parent agent-tiering-detail.md points here for readers who reach the bounded-checklist rationale.
-last_verified: 2026-08-08
+description: Read-on-demand only (no auto-attach trigger) — explains why /post-plan Phase 6.5 condition (9) may run on Sonnet rather than Opus: it is bounded hold-enumeration against a named trigger list, not open-ended diff-triage. Includes the tripwire for when to revisit. The always-loaded agent-tiering.md names this file in the Opus row, so it stays one Read away from every session.
+last_verified: 2026-09-17
 paths: ".claude/rules/agent-tiering-bounded-checklist.md"
 ---
 
-Read-on-demand companion to `agent-tiering.md` § Tiers (Opus row, "open-ended diff-triage") and `agent-tiering-detail.md`. Nothing here auto-attaches: `agent-tiering-detail.md` § Nested Sub-Agents points here, and that file attaches whenever `.claude/skills/**/*.md` is in play — which is exactly the context (`/post-plan` reading `_phase-6.5-arm-auto-merge.md`) where this rationale is needed.
+Read-on-demand companion to `agent-tiering.md` § Tiers (Opus row, "open-ended diff-triage"). Nothing here auto-attaches, and nothing needs to: the always-loaded `agent-tiering.md` names this file directly in the Opus row, so the payload is one Read away from every session. That includes `/post-plan` reading `_phase-6.5-arm-auto-merge.md`, where this rationale is needed. It used to arrive via `agent-tiering-detail.md`, whose `.claude/skills/**/*.md` glob was removed 2026-09-17 on measured attach cost; the resident pointer is the reachability guarantee now, and `bin/check-rules-byte-budget` Check 4 enforces it.
 
 ## Bounded-checklist diff-triage (post-plan exception)
 

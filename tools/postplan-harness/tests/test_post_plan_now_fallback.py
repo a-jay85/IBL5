@@ -333,38 +333,24 @@ def _generate_cmd(tmp_path, extra_env=None):
     cmd = re.search(r"<string>(export PATH=.*?)</string>", body, re.S).group(1)
     return cmd.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
 
-def test_generated_cmd_tests_rc4_before_should_fallback(tmp_path):
+def test_generated_cmd_has_no_rc4_arm(tmp_path):
     cmd = _generate_cmd(tmp_path)
-    i4 = cmd.index('if [ "$rc" = 4 ]; then')
-    ifb = cmd.index('elif should_fallback "$rc"; then')
-    i3 = cmd.index('elif [ "$rc" = 3 ]; then')
-    assert i4 < ifb < i3, "rc=4 must be tested before should_fallback, and rc=3 last"
+    assert '[ "$rc" = 4 ]' not in cmd, "rc=4 arm must be gone after the full-port"
+    assert cmd.index('if should_fallback "$rc"; then') < cmd.index('elif [ "$rc" = 3 ]; then')
 
-def test_generated_cmd_carries_two_distinct_claude_invocations(tmp_path):
+def test_generated_cmd_carries_one_claude_invocation(tmp_path):
     cmd = _generate_cmd(tmp_path)
-    assert cmd.count("caffeinate -s claude -p ") == 2
-    assert "RESUMING at Phase 5.5" in cmd            # the rc=4 prompt
-    assert "then execute every phase" in cmd         # the untouched fallback prompt
-    assert cmd.index("RESUMING at Phase 5.5") < cmd.index("then execute every phase")
+    assert cmd.count("caffeinate -s claude -p ") == 1
+    assert "RESUMING at Phase 5.5" not in cmd
+    assert "then execute every phase" in cmd
 
-def test_generated_cmd_resume_prompt_is_single_quoted(tmp_path):
-    """Free-form text must cross the /bin/bash -lc boundary inside single quotes."""
-    cmd = _generate_cmd(tmp_path)
-    # The prompt is now embedded inside `-p "$(printf '%s %s' <prompt> <ci-clause>)"`
-    # (the CI clause is rendered far-side), but it must still cross the boundary as a
-    # single-quoted token — that is the property this test guards.
-    m = re.search(r"caffeinate -s claude -p \"\$\(printf '%s %s' "
-                  r"('.*?RESUMING at Phase 5\.5.*?') \"\$\(postplan_ci_resume_clause",
-                  cmd, re.S)
-    assert m, "resume prompt is not single-quoted at the embed site"
-    assert '\\"' not in m.group(1)
 
 def test_gate_selects_the_right_arm_per_rc(tmp_path):
-    """Branch selection, exercised on the GENERATED chain with the claude calls stubbed.
+    """Branch selection, exercised on the GENERATED chain with the claude call stubbed.
 
-    Only the two `caffeinate -s claude … --name "…"` spans are replaced (with echo
-    markers) and the harness segment with a literal rc; every condition under test —
-    `[ "$rc" = 4 ]`, `should_fallback "$rc"`, `[ "$rc" = 3 ]` — is the generated text.
+    The single `caffeinate -s claude … --name "…"` span is replaced (with an echo
+    marker) and the harness segment with a literal rc; every condition under test —
+    `should_fallback "$rc"`, `[ "$rc" = 3 ]` — is the generated text.
     """
     cmd = _generate_cmd(tmp_path)
     gate = cmd.split("rc=$?; ", 1)[1].split("; }; pp_rc=", 1)[0]
@@ -373,9 +359,9 @@ def test_gate_selects_the_right_arm_per_rc(tmp_path):
         seen.append(1)
         return f'echo "RAN-{len(seen)}"'
     gate = re.sub(r'CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0.*?--name "[^"]*"', _stub, gate)
-    assert len(seen) == 2
+    assert len(seen) == 1
 
-    for rc, expect in ((4, "RAN-1"), (1, "RAN-2"), (2, "RAN-2"),
+    for rc, expect in ((4, "RAN-1"), (1, "RAN-1"), (2, "RAN-1"),
                        (0, None), (3, None)):
         r = subprocess.run(
             ["bash", "-c", f'source "{PPN}" >/dev/null 2>&1; rc={rc}; {gate}'],
@@ -388,34 +374,19 @@ def test_gate_selects_the_right_arm_per_rc(tmp_path):
         if rc == 3:
             assert "fail-closed sentinel" in r.stdout, "rc=3 lost its notice"
 
-def test_resume_prompt_reaches_the_model_intact():
-    """Round-trip the real literal: it carries backticks AND a single-quoted --jq arg."""
-    src = open(PPN).read()
-    m = re.search(r'^\s*(RESUME_PROMPT="(?:[^"\\]|\\.)*")$', src, re.M)
-    assert m, "RESUME_PROMPT assignment not found (or no longer a single line)"
-    script = (f'source "{PPN}" >/dev/null 2>&1\n'
-              'RESUME_PLAN_CLAUSE="CLAUSE"\n'
-              f'{m.group(1)}\n'
-              'q=$(shq "$RESUME_PROMPT")\nbash -c "printf %s $q"\n')
-    r = _bash(script)
-    assert r.stderr == "", f"far-side shell wrote to stderr: {r.stderr!r}"
-    assert "`gh pr view --json number --jq '.number'`" in r.stdout
-    assert "RESUMING at Phase 5.5" in r.stdout
-    assert "never ask questions" in r.stdout
 
 def test_prompt_assignment_count_is_still_two():
-    """RESUME_PROMPT must not be mistaken for a third PROMPT site, and the two real
-    PROMPT sites must keep their order (index 1 is the plan-blind one)."""
+    """The two real PROMPT sites must keep their order (index 1 is the plan-blind one)."""
     src = open(PPN).read()
     prompts = re.findall(r'^\s*(PROMPT="(?:[^"\\]|\\.)*")$', src, re.M)
     assert len(prompts) == 2, f"expected exactly two PROMPT= sites, got {len(prompts)}"
     assert "<slug>-N.md" in prompts[1]
-    assert len(re.findall(r'^\s*RESUME_PROMPT="', src, re.M)) == 1
+    assert not re.search(r'^\s*RESUME_(PROMPT|PLAN_CLAUSE)=', src, re.M)
 
 def test_should_fallback_body_unchanged():
     src = open(PPN).read()
     assert 'should_fallback() { case "$1" in 0|3) return 1 ;; *) return 0 ;; esac; }' in src
-    assert _fb(4) == "0"     # unchanged: 4 still "escalates" — the rc=4 arm intercepts first
+    assert _fb(4) == "0"     # 4 escalates to the full skill like any other non-0/3 code
 
 def test_bare_invocation_cmd_has_no_plan_slug_export(tmp_path):
     """Bare invocation (no --pr) must not inject PLAN_SLUG into $CMD."""
@@ -467,62 +438,6 @@ def _runner_module():
     return runner
 
 
-def test_resume_command_carries_the_run_dir_conformance_handoff(tmp_path):
-    """The rc=4 resume session must be told where the harness left its Phase 5.0 verdict.
-
-    Without this prefix the resumed session's $PPID is brand new, the
-    /tmp/post-plan-conformance-done-$PPID default in Phase 6.5 condition (3) resolves to
-    a path nobody wrote, and EVERY clean harness run prints
-    'BLOCKED: Phase 5.0 conformance never reached its end'.
-    """
-    runner = _runner_module()
-    cmd = _generate_cmd(tmp_path)
-    m_done = re.search(r'DONE_MARK="([^"]+)"', cmd)
-    m_bridge = re.search(r'BRIDGE="([^"]+)"', cmd)
-    assert m_done, f"generated command carries no DONE_MARK= assignment:\n{cmd!r}"
-    assert m_bridge, f"generated command carries no BRIDGE= assignment:\n{cmd!r}"
-    assert os.path.basename(m_done.group(1)) == runner.CONFORMANCE_DONE_NAME
-    assert os.path.basename(m_bridge.group(1)) == runner.CONFORMANCE_BRIDGE_NAME
-
-
-def test_conformance_handoff_is_scoped_to_the_rc4_arm(tmp_path):
-    """Negative/scoping path — the assertion this phase exists for.
-
-    The sibling `should_fallback` arm launches a FRESH /post-plan skill session from
-    Phase 0, which runs its own Phase 5.0 and must read its own $PPID-keyed files. If
-    DONE_MARK/BRIDGE leak onto that arm — via `export`, via an assignment hoisted above
-    `if [ "$rc" = 4 ]`, or via the same prefix pasted onto the fallback $PROMPT — that
-    session reads the FAILED harness run's stale marker and arms on a partial verdict.
-    That is strictly worse than the spurious hold this PR removes, and nothing else in
-    the suite would notice.
-    """
-    cmd = _generate_cmd(tmp_path)
-    assert cmd.count("DONE_MARK=") == 1, "handoff vars must appear exactly once (no export, no second arm)"
-    assert cmd.count("BRIDGE=") == 1
-    assert "export DONE_MARK" not in cmd
-    assert "export BRIDGE" not in cmd
-
-    i4 = cmd.index('if [ "$rc" = 4 ]; then')
-    ifb = cmd.index('elif should_fallback "$rc"; then')
-    assert i4 < cmd.index("DONE_MARK=") < ifb, "DONE_MARK= must sit inside the rc=4 arm"
-    assert i4 < cmd.index("BRIDGE=") < ifb, "BRIDGE= must sit inside the rc=4 arm"
-
-
-def test_handoff_paths_point_at_the_same_dir_the_harness_writes(tmp_path):
-    """Name-sync is necessary but not sufficient: the two paths must also resolve to the
-    run dir the harness was actually given as --out. If they name the right files under
-    the WRONG directory, every assertion above still passes and the resumed session still
-    finds nothing."""
-    cmd = _generate_cmd(tmp_path)
-    done = re.search(r'DONE_MARK="([^"]+)"', cmd).group(1)
-    bridge = re.search(r'BRIDGE="([^"]+)"', cmd).group(1)
-    run_dir = os.path.dirname(done)
-    assert os.path.dirname(bridge) == run_dir, "marker and bridge must share one run dir"
-    assert os.path.isabs(run_dir), f"run dir must be absolute in the generated command: {run_dir!r}"
-    # The harness segment embeds the same dir as its --out argument, so the literal must
-    # occur at least twice: once for --out, once for the handoff prefix.
-    assert cmd.count(run_dir) >= 2, \
-        f"handoff dir {run_dir!r} is not the dir handed to the harness as --out:\n{cmd!r}"
 
 
 def test_harness_run_dir_artifacts_are_gitignored():
@@ -669,8 +584,16 @@ def test_foreground_exit1_falls_back(tmp_path):
         f"fallback prompt not found in claude args:\n{log_text!r}"
 
 
-def test_foreground_exit4_resumes_phase_55(tmp_path):
-    """Row 7: harness exit 4 → RESUME_PROMPT fires (not full restart); marker carries harness-rc=4."""
+def test_foreground_exit0_launches_no_claude(tmp_path):
+    """Row 8: harness exit 0 → success; claude must NOT be invoked."""
+    r = _run_foreground(tmp_path, 0, with_claude_stub=True)
+    assert r.returncode == 0
+    assert not (tmp_path / "claude-log.txt").exists(), \
+        "claude must not be invoked on harness-rc=0"
+
+
+def test_foreground_exit4_takes_full_fallback_not_resume(tmp_path):
+    """Row 7: harness exit 4 → full skill fallback (same as rc=1); marker carries harness-rc=4."""
     r = _run_foreground(tmp_path, 4, with_claude_stub=True)
     assert re.search(
         r'^post-plan-now: postplan-rc=\d+ harness-rc=4 harness-run-dir=\S+$',
@@ -679,10 +602,10 @@ def test_foreground_exit4_resumes_phase_55(tmp_path):
     claude_log = tmp_path / "claude-log.txt"
     assert claude_log.exists(), "claude stub must have been invoked for rc=4"
     log_text = claude_log.read_text()
-    assert "RESUMING at Phase 5.5" in log_text, \
-        f"resume prompt not found in claude args:\n{log_text!r}"
-    assert "then execute every phase" not in log_text, \
-        "rc=4 must fire RESUME_PROMPT, not the full-restart fallback prompt"
+    assert "then execute every phase" in log_text, \
+        f"full fallback prompt not found in claude args:\n{log_text!r}"
+    assert "RESUMING at Phase 5.5" not in log_text, \
+        "rc=4 must take the full fallback, not the old RESUME_PROMPT"
 
 # --pr flag tests
 # ---------------------------------------------------------------------------
@@ -1004,7 +927,8 @@ def test_force_flag_rejected_forms_fail_loudly(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Phase 4 CI-outcome resume clause + the exit-4 RESUME_SEG. See plan phase 7.
+# Phase 4 CI-outcome resume clause. Phase 8 removed its only call site with the
+# exit-4 resume; the function and these tests stay for the skill-fallback arm.
 # ---------------------------------------------------------------------------
 
 def _clause(run_dir, sha):
@@ -1061,46 +985,3 @@ def test_ci_clause_exits_zero_on_garbage_file(tmp_path):
     assert "SUCCESS" not in r.stdout
     assert r.stdout.startswith("CI OUTCOME:")
 
-def _resume_seg(cmd):
-    m = re.search(r'(HARNESS_RUN_DIR="[^"]*" POSTPLAN_HEAD_SHA=.*?--name "[^"]*")',
-                  cmd, re.S)
-    assert m, "the exit-4 resume segment is no longer recognisable in $CMD"
-    return m.group(1)
-
-def test_resume_seg_exports_harness_run_dir(tmp_path):
-    """The resumed session needs the run dir to find ci-<sha>.json."""
-    cmd = _generate_cmd(tmp_path)
-    seg = _resume_seg(cmd)
-    run_dir = re.match(r'HARNESS_RUN_DIR="([^"]*)"', seg).group(1)
-    assert run_dir, "HARNESS_RUN_DIR is exported empty — the clause can never resolve"
-    assert "/out/live-" in run_dir
-
-def test_resume_seg_resolves_head_sha_far_side(tmp_path):
-    """The head SHA is read in the far-side shell, so a fix commit can't stale it."""
-    seg = _resume_seg(_generate_cmd(tmp_path))
-    assert "rev-parse HEAD)" in seg
-    assert re.search(r'POSTPLAN_HEAD_SHA="[0-9a-f]{40}"', seg) is None, \
-        "the head SHA was interpolated near-side"
-
-def test_resume_prompt_mentions_harness_run_dir_and_ordering(tmp_path):
-    """Phase 4.3: the resume prompt names the artifact and the fix-before-5.5 order."""
-    src = open(PPN).read()
-    m = re.search(r'^\s*(RESUME_PROMPT="(?:[^"\\]|\\.)*")$', src, re.M)
-    assert m, "RESUME_PROMPT assignment not found (or no longer a single line)"
-    prompt = m.group(1)
-    assert "HARNESS_RUN_DIR" in prompt
-    assert "ci-<head-sha>.json" in prompt
-    assert "run the Phase 7 CI fix loop FIRST" in prompt
-
-def test_resume_seg_far_side_command_parses(tmp_path):
-    """The only check that parses what /bin/bash -lc actually executes.
-
-    `bash -n bin/post-plan-now` validates the outer script and is blind to a
-    quoting slip inside this interpolated command string.
-    """
-    seg = _resume_seg(_generate_cmd(tmp_path))
-    stubs = ("postplan_ci_resume_clause() { printf 'CLAUSE'; }\n"
-             "caffeinate() { :; }\n")
-    r = subprocess.run(["bash", "-n", "-c", stubs + seg],
-                       capture_output=True, text=True)
-    assert r.returncode == 0, f"far-side command does not parse: {r.stderr!r}"

@@ -96,31 +96,34 @@ run_isolated() {
         bash -c "$1" 2>&1
 }
 
-# harness_handoff_names — echo "<done-basename> <bridge-basename>" exactly as
-# bin/post-plan-now spells them in its rc=4 RESUME_SEG. DERIVED, never hardcoded:
-# this is the shell half of the cross-language name binding whose Python half is
+# harness_handoff_names — echo "<done-basename> <bridge-basename>" exactly as the
+# compiled harness spells them in its run dir. DERIVED, never hardcoded: this is the
+# shell half of the cross-language name binding whose Python half is
 # tools/postplan-harness/tests/test_post_plan_now_fallback.py. Hardcoding the two
-# names here would let a rename pass this suite while breaking the live handoff.
+# names here would let a rename pass this suite while breaking the live contract.
+# Source moved in Phase 8: bin/post-plan-now's rc=4 RESUME_SEG spelled them until the
+# resume arm was deleted, and runner.py's two constants are now the only spelling.
 harness_handoff_names() {
-    local seg d b
-    seg="$(grep -m1 'RESUME_SEG=' "$REPO_ROOT/bin/post-plan-now")"
-    d="$(grep -m1 -oE 'DONE_MARK=\\"\$HARNESS_RUN_DIR/[A-Za-z0-9._-]+' <<< "$seg")"
-    b="$(grep -m1 -oE 'BRIDGE=\\"\$HARNESS_RUN_DIR/[A-Za-z0-9._-]+' <<< "$seg")"
-    printf '%s %s\n' "${d##*/}" "${b##*/}"
+    local d b
+    d="$(grep -m1 -oE 'CONFORMANCE_DONE_NAME = "[A-Za-z0-9._-]+' \
+         "$REPO_ROOT/tools/postplan-harness/runner.py")"
+    b="$(grep -m1 -oE 'CONFORMANCE_BRIDGE_NAME = "[A-Za-z0-9._-]+' \
+         "$REPO_ROOT/tools/postplan-harness/runner.py")"
+    printf '%s %s\n' "${d##*\"}" "${b##*\"}"
 }
 
 # run_cond3 <block> <marker: yes|no> <bridge: absent|empty|items|fileitems> [style: flat|rundir]
 # — condition (3) reads file state rather than gh, so it gets its own runner: the
 # block's $DONE_MARK/$BRIDGE defaults are overridden to point into $BASE_TMP.
 # style=flat (default) uses arbitrary names; style=rundir reproduces the compiled
-# harness's run dir, using the basenames bin/post-plan-now actually passes.
+# harness's run dir, using the basenames runner.py actually writes.
 run_cond3() {
     local mark="$BASE_TMP/done-marker" bridge="$BASE_TMP/bridge"
     if [ "${4:-flat}" = "rundir" ]; then
         local dn bn rd
         read -r dn bn <<< "$(harness_handoff_names)"
         if [ -z "$dn" ] || [ -z "$bn" ]; then
-            echo "FAIL: run_cond3 rundir — could not derive handoff basenames from bin/post-plan-now"
+            echo "FAIL: run_cond3 rundir — could not derive handoff basenames from tools/postplan-harness/runner.py"
             FAILED=1
             return 1
         fi
@@ -409,8 +412,8 @@ expect_block "(3) marker + unresolved MISSING-FILE -> BLOCK" BLOCK \
 
 # --- condition (3) on the COMPILED-HARNESS path (run-dir-keyed handoff) ---
 # Same block, same three states, but driven through the real filenames
-# bin/post-plan-now passes as DONE_MARK/BRIDGE on the rc=4 arm. These names are
-# derived from bin/post-plan-now, so a rename on either side fails here.
+# runner.py writes into its own run dir. These names are derived from runner.py,
+# so a rename on either side fails here.
 
 # State 1 — indeterminate: the harness never reached the end of Phase 5.0 (crash in
 # phases 1-4, or conformance.check() itself raised), so runner.py wrote no marker.

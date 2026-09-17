@@ -1,8 +1,9 @@
-"""Phase 6.5 — the twelve ported arming conditions as pure, typed functions.
+"""Phase 6.5 — the fourteen ported arming conditions as pure, typed functions.
 
-The numbers track the SKILL's condition numbers, not this list's position, so the
-set is deliberately {1..10, 12, 13} with gaps: condition (11) (unresolved
-review-thread findings) reads the GitHub review-thread API and stays skill-only.
+The numbers track the SKILL's condition numbers, not this list's position. The set is
+now {1..14} with no gaps: condition (11) shells out to
+`bin/lib/pr-armable.sh::pr_unresolved_findings_hold` for unresolved review-thread
+findings, and condition (14) reads the run-local conflict-resolved flag.
 
 Faithful port of .claude/skills/post-plan/_phase-6.5-arm-auto-merge.md +
 bin/lib/pr-armable.sh. Historically each condition was a separate model-driven
@@ -12,6 +13,8 @@ Fail-closed: any indeterminate input BLOCKS (a false HOLD costs one manual
 merge; a false ARM ships unreviewed code).
 """
 from __future__ import annotations
+
+import os
 
 import re
 from dataclasses import dataclass, field
@@ -101,6 +104,29 @@ class ArmInputs:
     fidelity_verdict: Optional[str] = None    # Phase 5.5 verdict word; None = never ran (blocks)
     degraded_agents: list[str] = field(default_factory=list)   # unparseable review agents
     plan_slug_drift: str = ""                 # plan adopted by slug drift -> hold
+    unresolved_findings: Optional[list[str]] = None   # None = never consulted -> BLOCKS
+    fidelity_verdict_2: Optional[str] = None          # re-review verdict word
+    fidelity_tree_2: Optional[str] = None             # REVIEWED_TREE read off verdict 2
+    current_tree: str = ""                            # git rev-parse HEAD^{tree}
+    conflict_resolved: Optional[bool] = None          # None = never consulted -> BLOCKS
+
+
+def select_fidelity_verdict(v1, v2, tree2, current_tree):
+    """Skill parity: verdict 2 is tree-gated, verdict 1 is NOT.
+
+    Verdict 1 is deliberately not tree-gated. Phase 6 commits between 5.5 and 6.5 on the
+    ordinary path, so gating it would newly block every PR that arms today. A verdict 2
+    whose REVIEWED_TREE is absent or mismatched is stale and falls back to verdict 1.
+    """
+    if v2 and tree2 and tree2 == current_tree:
+        return v2, "verdict-2"
+    return v1, "verdict-1"
+
+
+def conflict_flag_path(branch: str, tmp_dir: str = "/tmp") -> str:
+    """The Python spelling of the skill's `rev-parse --abbrev-ref HEAD | tr '/:' '--'` key."""
+    return os.path.join(tmp_dir,
+                        "postplan-conflict-resolved-" + branch.translate(str.maketrans("/:", "--")))
 
 
 def evaluate(inp: ArmInputs) -> ArmDecision:
@@ -160,9 +186,24 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     cs.append(ConditionResult(10, "pipeline-authored-floor", pipe,
                               "pipeline-authored label present" if pipe else ""))
 
-    # Condition (13) — NOT (11). The number tracks the skill's condition number, not
-    # this list's position: (11) is the skill-only unresolved-review-thread condition
-    # and (12) is plan-intent fidelity. Do not renumber this to 11 or 12.
+    # Condition (11) — unresolved review-thread findings scored >= 80. The shell-out
+    # lives in adapters/ghad.py::unresolved_findings; this grades its output.
+    uf = inp.unresolved_findings
+    if uf is None:
+        r = "unresolved review-thread state not consulted — fail-closed"
+    elif "unresolved-findings-api-error" in uf:
+        r = "cannot verify review-thread state (GitHub API error) — fail-closed"
+    elif "unresolved-findings-cap" in uf:
+        r = "review-thread list hit the 100-thread page cap — fail-closed"
+    elif uf:
+        r = f"{len(uf)} unresolved review finding(s) scored >= 80: " + " ".join(uf)
+    else:
+        r = ""
+    cs.append(ConditionResult(11, "unresolved-scored-findings", bool(r), r))
+
+    # Condition (13). The number tracks the skill's condition number, not this list's
+    # position: (11) now lives directly above and (12) is plan-intent fidelity. Do not
+    # renumber this to 11 or 12.
     cs.append(ConditionResult(13, "plan-slug-drift", bool(inp.plan_slug_drift),
                               f"plan '{inp.plan_slug_drift}' adopted by slug drift — "
                               "confirm it is this branch's plan"
@@ -176,16 +217,24 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     # (11). Do not renumber this to 11.
     # Fail-closed and additive: this can only add a hold. `None` means Phase 5.5 never
     # ran, which is indeterminate, not clean.
-    fid = (inp.fidelity_verdict or "").strip()
+    selected, source = select_fidelity_verdict(inp.fidelity_verdict, inp.fidelity_verdict_2,
+                                               inp.fidelity_tree_2, inp.current_tree)
+    fid = (selected or "").strip()
     fid_ok = fid in ("READY", "READY WITH NOTES")
     cs.append(ConditionResult(12, "plan-fidelity-verdict", not fid_ok,
-                              f"fidelity verdict={inp.fidelity_verdict!r}; need READY or READY WITH NOTES"
+                              f"fidelity verdict={selected!r} (source: {source}); "
+                              "need READY or READY WITH NOTES"
                               if not fid_ok else ""))
 
-    # Condition (14) — conflict auto-resolved this run — is absent here because it is
-    # VACUOUS in the harness, not merely unported. adapters/gitad.py::rebase_onto raises
-    # HarnessError("rebase-conflict", ...) after `git rebase --abort`, so a conflicted
-    # rebase FAILS the run (runner.py maps it to exit 3) and never reaches evaluate().
-    # The harness never auto-resolves a conflict, so there is nothing for (14) to observe.
-    # Do not add a (14) ConditionResult: test_condition_set_is_skill_numbered pins the set.
+    # Condition (14) — this BRANCH carries a /post-plan auto-resolved rebase conflict.
+    # The flag outlives the run that wrote it: SKILL.md Phase 2 creates it and nothing
+    # ever deletes it, so an earlier skill run on this branch still holds here.
+    if inp.conflict_resolved is None:
+        r = "conflict-resolved flag not consulted — fail-closed"
+    elif inp.conflict_resolved:
+        r = "this branch carries a /post-plan auto-resolved rebase conflict — a human reads the resolution"
+    else:
+        r = ""
+    cs.append(ConditionResult(14, "conflict-auto-resolved", bool(r), r))
+
     return ArmDecision(armed=not any(c.blocked for c in cs), conditions=cs)

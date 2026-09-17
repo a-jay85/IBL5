@@ -1,3 +1,4 @@
+import dataclasses
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import runner
@@ -22,36 +23,18 @@ def test_success_and_nothing_to_ship_exit_0():
     assert runner.exit_code_for(_res(TerminalState.SHIPPED_HELD)) == 0
     assert runner.exit_code_for(_res(TerminalState.NOTHING_TO_SHIP)) == 0
 
-def test_fidelity_pending_returns_4():
-    assert runner.exit_code_for(
-        _res(TerminalState.SHIPPED_HELD, fidelity_pending=True)) == 4
-
-
-def test_rebase_conflict_beats_fidelity_pending():
-    """Exit 3's sentinel semantics are untouched: a conflict is 3, never 4."""
-    assert runner.exit_code_for(
-        _res(TerminalState.FAILED, "rebase-conflict", fidelity_pending=True)) == 3
-
-
-def test_failed_run_never_returns_4():
-    assert runner.exit_code_for(
-        _res(TerminalState.FAILED, "push-disabled", fidelity_pending=True)) == 1
-
-
-def test_existing_codes_unchanged_without_fidelity_pending():
-    for t in (TerminalState.SHIPPED_ARMED, TerminalState.SHIPPED_HELD,
-              TerminalState.NOTHING_TO_SHIP):
-        assert runner.exit_code_for(_res(t)) == 0
-
 def test_degraded_exits_zero():                 # no /post-plan skill fallback on a shipped+held PR
     assert runner.exit_code_for(_res(TerminalState.DEGRADED)) == 0
 
 def test_degraded_does_not_shadow_rebase_sentinel():   # negative: ordering, not a duplicate
     assert runner.exit_code_for(_res(TerminalState.FAILED, "rebase-conflict")) == 3
 
-def test_degraded_beats_fidelity_pending():
-    """A live degraded run is ALSO fidelity_pending (condition (12) always holds live).
-    Exit 0, not 4: the resumed skill session re-arms from scratch and cannot see the
-    degradation, so handing it off would arm auto-merge on an unreviewed PR."""
-    assert runner.exit_code_for(
-        _res(TerminalState.DEGRADED, fidelity_pending=True)) == 0
+def test_exit_code_is_never_4():
+    """The harness owns Phase 5.5; the launcher has no resume arm, so rc=4 is gone."""
+    for terminal in TerminalState:
+        for error_kind in (None, "rebase-conflict", "push-failed",
+                           "fidelity-procedure-missing"):
+            assert runner.exit_code_for(_res(terminal, error_kind=error_kind)) in {0, 1, 3}
+
+def test_runresult_has_no_fidelity_pending():
+    assert "fidelity_pending" not in {f.name for f in dataclasses.fields(RunResult)}

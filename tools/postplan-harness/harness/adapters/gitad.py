@@ -178,9 +178,8 @@ class LiveGit:
         the single decision about exit 3."""
         branch = self.branch()
         key = branch.replace("/", "-")
-        master_sha = self._run("rev-parse", "origin/master").strip()
 
-        # Step 2: iblBase
+        # Step 2: iblBase (early return before any network/expensive call)
         ibl_base = self.branch_base()
         if ibl_base is None:
             return StackedRebaseResult(False, "no branch.<name>.iblBase recorded; not a known stacked branch")
@@ -194,6 +193,9 @@ class LiveGit:
         if not pre_patch.strip():
             return StackedRebaseResult(False, "pre-rebase diff vs iblBase is empty")
         Path(f"/tmp/pr-ready-diff-pre-{key}.patch").write_text(pre_patch)
+
+        # Pin master_sha once so a concurrent fetch cannot split the proof across two bases
+        master_sha = self._run("rev-parse", "origin/master").strip()
 
         # Step 5: extract proof and guard scripts by pinned git show
         lostwork_path = Path(f"/tmp/postplan-lostwork-{key}.sh")

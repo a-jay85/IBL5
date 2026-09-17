@@ -695,8 +695,10 @@ write_session_sidecar "$TMP/ws-test.log" 'not-a-uuid' \
     && pass "write_session_sidecar: no file written on invalid uuid" \
     || fail "write_session_sidecar: no file written on invalid uuid"
 
-# Case 11 — --help window intact: line count must not have changed.
-HELP_LINES_BASELINE=46
+# Case 11 — --help window intact: line count must not have changed. 46 while this
+# branch was off master; the rebase onto master picked up 18 more help lines that
+# this branch never wrote, and the § PROGRESS rewrite is line-for-line even.
+HELP_LINES_BASELINE=64
 HELP_LINES="$(printf '%s\n' "$HELP" | wc -l | tr -d ' ')"
 [ "$HELP_LINES" -eq "$HELP_LINES_BASELINE" ] \
     && pass "--help line count unchanged" \

@@ -527,6 +527,28 @@ if [ -n "$PLIST_F20" ]; then
             && printf '%s' "$ROUND_TRIP20" | grep -qF '`bin/check-docs --staleness-report`'; } \
           && ok "(20) prompt-fidelity: backticks survive bash second-parse (no stderr; literal text present)" \
           || bad "(20) prompt-fidelity: backticks corrupted at bash second parse"
+        # Sub-check 20.1: --session-id appears in the raw plist as a bare (unquoted,
+        # unescaped) UUID — [0-9a-f-] only so shq() must NOT wrap it in single-quotes.
+        grep -qE -- '--session-id [0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' "$PLIST_F20" \
+          && ok "(20.1) session-id: uuid is bare and unescaped in the plist" \
+          || bad "(20.1) session-id: --session-id missing or UUID is quoted/XML-escaped in plist"
+        # Sub-check 20.1 sidecar: docfix-run writes a .session sidecar whose content
+        # equals the UUID embedded in the plist command line.
+        UUID20=$(printf '%s' "$CMD_LINE20" | grep -oE '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}' | head -1)
+        LOG20=$(grep -A1 'StandardOutPath' "$PLIST_F20" | grep '<string>' | sed 's/.*<string>\(.*\)<\/string>.*/\1/')
+        SIDECAR20="${LOG20%.log}.session"
+        { [ -n "$UUID20" ] && [ -f "$SIDECAR20" ] && [ "$(cat "$SIDECAR20")" = "$UUID20" ]; } \
+          && ok "(20.1) session-id: sidecar exists and uuid matches plist" \
+          || bad "(20.1) session-id: sidecar missing or uuid mismatch (uuid=${UUID20:-<none>} sidecar=${SIDECAR20:-<none>})"
+        # Sub-check 20.2: interpolating the uuid leaves the plist valid XML. This is the
+        # forced-trigger assertion for "changes a launchd plist", and it runs against the
+        # plist THIS sandbox just emitted. Never glob ~/Library/LaunchAgents for it:
+        # com.ibl5.docfix-*.plist also matches the long-lived com.ibl5.docfix-poll (so the
+        # check would lint the poller and pass while testing nothing), and a real docfix-run
+        # plist rm -f's itself when its job exits, leaving the glob no correct file to find.
+        plutil -lint "$PLIST_F20" >/dev/null 2>&1 \
+          && ok "(20.2) plist hygiene: plutil -lint passes after uuid interpolation" \
+          || bad "(20.2) plist hygiene: plutil -lint rejects the plist the uuid was interpolated into"
     else
         bad "(20) prompt-fidelity: could not extract claude -p argument from plist"
     fi

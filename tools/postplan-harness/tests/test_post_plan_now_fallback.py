@@ -230,6 +230,8 @@ def _fixture_repo(tmp_path, dirty_default=True, dirty=None):
     (repo / "bin" / "lib").mkdir(parents=True)
     shutil.copy(os.path.join(REPO, "bin", "lib", "git-helpers.sh"),
                 str(repo / "bin" / "lib" / "git-helpers.sh"))
+    shutil.copy(os.path.join(REPO, "bin", "lib", "session-id.sh"),
+                str(repo / "bin" / "lib" / "session-id.sh"))
     (repo / "f.txt").write_text("one\n")
     for rel in (dirty or {}):
         p = repo / rel
@@ -985,3 +987,107 @@ def test_ci_clause_exits_zero_on_garbage_file(tmp_path):
     assert "SUCCESS" not in r.stdout
     assert r.stdout.startswith("CI OUTCOME:")
 
+# --- Phase 2: session-id sidecar tests ---------------------------------------------------
+
+def _plist_log_path(tmp_path):
+    """Return the log path embedded in the generated plist's StandardOutPath."""
+    home = tmp_path / "home"
+    plists = list((home / "Library" / "LaunchAgents").glob("*.plist"))
+    assert len(plists) == 1, f"expected one plist, got {plists}"
+    body = plists[0].read_text()
+    m = re.search(r"<key>StandardOutPath</key>\s*<string>(.*?)</string>", body, re.S)
+    assert m, "StandardOutPath not found in plist"
+    return m.group(1).replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+
+
+def test_generated_cmd_pins_exactly_one_session_id(tmp_path):
+    """The harness arm's claude -p leg carries exactly one --session-id.
+
+    Phase 8 removed the rc=4 resume leg, so $CMD now holds a single invocation.
+    Exactly-one is the assertion that matters: a second uuid appearing here would
+    mean a leg came back untracked, leaving the sidecar pointing at the wrong
+    transcript.
+    """
+    cmd = _generate_cmd(tmp_path)
+    matches = re.findall(r"--session-id '([0-9a-f-]{36})'", cmd)
+    assert len(matches) == 1, f"expected 1 --session-id occurrence, got {matches}"
+
+
+def test_session_id_matches_the_sidecar(tmp_path):
+    """The uuid in $CMD must match the sidecar written next to the log."""
+    cmd = _generate_cmd(tmp_path)
+    matches = re.findall(r"--session-id '([0-9a-f-]{36})'", cmd)
+    assert matches, "no --session-id found in cmd"
+    uuid = matches[0]
+
+    log_path = _plist_log_path(tmp_path)
+    sidecar = pathlib.Path(log_path[:-4] + ".session")
+    try:
+        assert sidecar.exists(), f"sidecar not found at {sidecar}"
+        assert sidecar.read_text() == f"{uuid}\n", \
+            f"sidecar content {sidecar.read_text()!r} != {uuid!r}"
+    finally:
+        sidecar.unlink(missing_ok=True)
+
+
+def test_session_id_is_lowercase_canonical(tmp_path):
+    """The uuid must be lowercase — macOS uuidgen emits uppercase, which is_session_id rejects.
+
+    Explicitly assert uuid == uuid.lower(): an uppercase uuid passing the shq wrapper
+    would reach the plist fine but be rejected by the consumer's is_session_id gate,
+    silently producing a live run that shows permanently blank progress.
+    """
+    cmd = _generate_cmd(tmp_path)
+    matches = re.findall(r"--session-id '([0-9a-f-]{36})'", cmd)
+    assert matches, "no --session-id found in cmd"
+    uuid = matches[0]
+    assert re.match(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', uuid), \
+        f"uuid {uuid!r} is not lowercase canonical"
+    assert uuid == uuid.lower(), f"uuid {uuid!r} is not lowercase"
+
+
+def test_skill_only_leg_also_carries_a_session_id(tmp_path):
+    """POST_PLAN_SKILL=1: GATE_OPEN/GATE_CLOSE are empty, exactly one caffeinate invocation,
+    and it still carries --session-id.
+
+    This is the arm with no harness — an edit that only touches the harness gate would
+    leave the skill-only path bare, and it is the arm that runs on every machine where
+    tools/postplan-harness/run is not executable.
+    """
+    cmd = _generate_cmd(tmp_path, extra_env={"POST_PLAN_SKILL": "1"})
+    assert cmd.count("caffeinate -s claude -p ") == 1, \
+        "POST_PLAN_SKILL=1 should produce exactly one caffeinate invocation"
+    matches = re.findall(r"--session-id '([0-9a-f-]{36})'", cmd)
+    assert len(matches) == 1, f"expected one --session-id in skill-only cmd, got {matches}"
+
+
+def test_mint_failure_aborts_before_bootstrap(tmp_path):
+    """Stub uuidgen and python3 to fail: post-plan-now must exit non-zero and write no plist.
+
+    The plist-count assertion is the load-bearing one: a version that warns and continues
+    would still exit non-zero on some other path while having fired a progressless run.
+    """
+    home = tmp_path / "home"
+    shim = tmp_path / "shim"; shim.mkdir()
+    (shim / "launchctl").write_text("#!/bin/sh\nexit 0\n")
+    (shim / "launchctl").chmod(0o755)
+    (shim / "gh").write_text("#!/bin/sh\nexit 0\n")
+    (shim / "gh").chmod(0o755)
+    (shim / "uuidgen").write_text("#!/bin/sh\nexit 1\n")
+    (shim / "uuidgen").chmod(0o755)
+    (shim / "python3").write_text("#!/bin/sh\nexit 1\n")
+    (shim / "python3").chmod(0o755)
+    harness = tmp_path / "fake-harness"; harness.mkdir()
+    (harness / "run").write_text("#!/bin/sh\nexit 0\n")
+    (harness / "run").chmod(0o755)
+
+    env = dict(os.environ, HOME=str(home), HARNESS=str(harness),
+               PATH=f"{shim}:{os.environ['PATH']}")
+    env.pop("POST_PLAN_SKILL", None)
+    repo = _fixture_repo(tmp_path)
+    r = subprocess.run(["bash", PPN], cwd=repo, env=env, capture_output=True, text=True)
+
+    assert r.returncode != 0, f"expected non-zero exit, got 0 (stderr: {r.stderr!r})"
+    assert "session uuid" in r.stderr, f"stderr should name the uuid; got {r.stderr!r}"
+    plists = list((home / "Library" / "LaunchAgents").glob("*.plist"))
+    assert len(plists) == 0, f"plist written despite mint failure: {plists}"

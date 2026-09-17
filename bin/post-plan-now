@@ -240,6 +240,13 @@ esac
 # SKILL.md, so this assertion is the ONLY enforcement on the primary engine path.
 # shellcheck source=bin/lib/git-helpers.sh
 . "$ROOT/bin/lib/git-helpers.sh"
+# Beside THIS script, not under $ROOT. $ROOT is the CALLER's toplevel, so the
+# $ROOT form dies whenever post-plan-now is invoked by absolute path from a
+# different worktree. Same defect bin/plan-now carried; found by the Phase 7e
+# smoke. The git-helpers.sh line above keeps $ROOT deliberately -- it predates
+# this feature and is_in_worktree is meant to judge the caller's tree.
+# shellcheck source=bin/lib/session-id.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib/session-id.sh"
 if ! is_in_worktree "$ROOT"; then
     echo "post-plan-now: refusing to run in the main checkout ($ROOT) — ADR-0062." >&2
     echo "  cd into the branch's worktree (or use --pr <n>) and re-run." >&2
@@ -315,6 +322,18 @@ STARTED=$(date '+%Y-%m-%d %H:%M:%S %Z')
 LOG="/tmp/post-plan-now-$SAFE_SLUG-$TS.log"
 LABEL="com.ibl5.postplan-now-$SAFE_SLUG-$TS"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+# ONE session uuid for this run. $CMD below carries a single `claude -p` invocation
+# since the harness absorbed Phase 5.5 and the rc=4 resume leg was removed, so one
+# uuid is all there is to pin. Minted here, before the plist is
+# written, so the sidecar is on disk before `launchctl bootstrap` can make the label
+# visible to bin/fleet-status. Path comes from session_sidecar_path, not string
+# surgery: the label says `postplan-now-`, the log says `post-plan-now-`.
+SESSION_ID=$(mint_session_id) || {
+    echo "post-plan-now: could not mint a session uuid — no uuidgen, no /proc uuid, no python3." >&2
+    exit 1
+}
+write_session_sidecar "$LOG" "$SESSION_ID" \
+    || { echo "post-plan-now: could not write the session sidecar next to $LOG." >&2; exit 1; }
 
 if [ -n "$PLAN_OVERRIDE" ]; then
     PROMPT="Invoke the /post-plan skill now on the current git branch. Use this exact plan file for Phase 1: $PLAN_OVERRIDE — do NOT derive the plan from the branch slug. Then execute every phase. No human is present: never ask questions or wait for input — make the safe choice and continue."
@@ -427,7 +446,7 @@ fi
 PLAN_SLUG_SEG=""
 [ -n "${PR_NUM:-}" ] && PLAN_SLUG_SEG="export PLAN_SLUG=$(shq "$PLAN_SLUG"); "
 
-CMD="export PATH=\"/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH\"; ${PLAN_SLUG_SEG}export POSTPLAN_LABEL=$(shq "$LABEL") POSTPLAN_STARTED=$(shq "$STARTED") POSTPLAN_BADGE_MARKER=$(shq "$POSTPLAN_BADGE_MARKER"); ${BADGE_FN}POSTPLAN_BADGE_BODY=\"\$(postplan_badge_body \"\$POSTPLAN_LABEL\" \"\$POSTPLAN_STARTED\")\"; export POSTPLAN_BADGE_BODY; trap 'conclude_status_badge \"\${pp_rc:-1}\"' EXIT INT TERM HUP; cd \"$ROOT\" && { postplan_sweep_stale_badge \"\$(postplan_badge_pr_number)\"; ${FALLBACK_FN}${HARNESS_SEG}${GATE_OPEN}CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p $(shq "$PROMPT") --dangerously-skip-permissions --model claude-sonnet-4-6 --effort high --name \"$LABEL\"${GATE_CLOSE}; }; pp_rc=\$?; if [ \"\${rc:-0}\" = 3 ]; then pp_rc=3; fi; ${CMD_TAIL}"
+CMD="export PATH=\"/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH\"; ${PLAN_SLUG_SEG}export POSTPLAN_LABEL=$(shq "$LABEL") POSTPLAN_STARTED=$(shq "$STARTED") POSTPLAN_BADGE_MARKER=$(shq "$POSTPLAN_BADGE_MARKER"); ${BADGE_FN}POSTPLAN_BADGE_BODY=\"\$(postplan_badge_body \"\$POSTPLAN_LABEL\" \"\$POSTPLAN_STARTED\")\"; export POSTPLAN_BADGE_BODY; trap 'conclude_status_badge \"\${pp_rc:-1}\"' EXIT INT TERM HUP; cd \"$ROOT\" && { postplan_sweep_stale_badge \"\$(postplan_badge_pr_number)\"; ${FALLBACK_FN}${HARNESS_SEG}${GATE_OPEN}CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p $(shq "$PROMPT") --dangerously-skip-permissions --model claude-sonnet-4-6 --session-id $(shq "$SESSION_ID") --effort high --name \"$LABEL\"${GATE_CLOSE}; }; pp_rc=\$?; if [ \"\${rc:-0}\" = 3 ]; then pp_rc=3; fi; ${CMD_TAIL}"
 
 if [ "$FOREGROUND" -eq 1 ]; then
     echo "post-plan-now: foreground mode on branch '$SLUG' — engine: $ENGINE"

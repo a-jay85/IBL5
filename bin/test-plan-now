@@ -626,6 +626,40 @@ prompt2=$(printf '%s\n' "$dry2" | sed -n 's/^  prompt: //p')
 [ "$prompt1" != "$prompt2" ] \
     || fail "both DRY_RUN invocations produced identical prompt paths — TS collision: $prompt1"
 
+# Phase 1g row 5: sidecar uuid matches runner SESSION_ID, two runs mint different uuids.
+runner1=$(printf '%s\n' "$dry1" | sed -n 's/^  runner: //p')
+runner2=$(printf '%s\n' "$dry2" | sed -n 's/^  runner: //p')
+sidecar1="${runner1%.sh}.session"
+sidecar2="${runner2%.sh}.session"
+[ -f "$sidecar1" ] || fail "first DRY_RUN left no .session sidecar at $sidecar1"
+[ -f "$sidecar2" ] || fail "second DRY_RUN left no .session sidecar at $sidecar2"
+sid1=$(< "$sidecar1")
+sid2=$(< "$sidecar2")
+grep -qF "SESSION_ID=$sid1" "$runner1" \
+    || fail "runner1 preamble lacks SESSION_ID=$sid1 — sidecar and runner uuid differ"
+grep -qF "SESSION_ID=$sid2" "$runner2" \
+    || fail "runner2 preamble lacks SESSION_ID=$sid2 — sidecar and runner uuid differ"
+[ "$sid1" != "$sid2" ] \
+    || fail "both DRY_RUN runs minted the same session uuid — TS collision: $sid1"
+rm -f "$runner1" "$sidecar1" "$runner2" "$sidecar2"
+
+# Every producer must source lib/session-id.sh from its OWN directory, never via a
+# $ROOT derived from `git rev-parse --show-toplevel`. The $ROOT form looks correct
+# from a normal invocation and dies only when the script is called by absolute path
+# with a foreign cwd -- bin/plan-now and bin/post-plan-now both shipped that way and
+# the failure surfaced solely in a live smoke, which is far too late and far too
+# expensive a place to catch it. Static, so it costs nothing and covers all four.
+for _producer in plan-now post-plan-now pr-ready-now docfix-run; do
+    _p="$ROOT/bin/$_producer"
+    if grep -qE '^\s*\.\s+"\$(ROOT|[A-Z_]*ROOT)[^"]*/lib/session-id\.sh"' "$_p"; then
+        fail "bin/$_producer sources lib/session-id.sh via a cwd-derived root — breaks under a foreign cwd"
+    elif grep -q 'BASH_SOURCE\[0\].*lib/session-id\.sh\|SCRIPT_DIR/lib/session-id\.sh' "$_p"; then
+        ok "bin/$_producer sources lib/session-id.sh from its own directory"
+    else
+        fail "bin/$_producer has no recognisable lib/session-id.sh source line"
+    fi
+done
+
 echo "── pre-flight duplicate gate ──"
 
 # Start from a clean slate.  The DM section may have left plan files in $PLANS

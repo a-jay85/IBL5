@@ -30,12 +30,12 @@
 # ancestry and drops anything descending from a PID already printed, which leaves
 # it empty on a healthy fleet and turns it into an orphan detector.
 #
-# PROGRESS. The /tmp/<label>.log files are near-useless mid-run: a headless
-# `claude -p` buffers its output and flushes at exit (see bin/watch-run's header).
-# The compiled post-plan harness, however, appends a timestamped phase line to
-# out/<run>/audit.log as it goes, so for post-plan runs the last audit.log line is
-# a true progress signal. Other producers get elapsed time plus their last log
-# line, which is honest about being coarse.
+# PROGRESS. Each producer mints a session uuid, passes `claude --session-id` and
+# writes it to /tmp/<label>.session. The SDK streams that run's transcript to
+# ~/.claude/projects/*/<uuid>.jsonl LIVE, so the last assistant line and the last
+# tool call now render mid-run. Liveness is unchanged: the row is still gated on a
+# numeric launchd PID, so a surviving transcript can never speak for a dead job.
+# post-plan rows have no sidecar — out/<run>/audit.log stays their only signal.
 #
 # AND THE ROW LINKS TO WHICHEVER OF THOSE IT READ. Every job on this page is by
 # construction still running, which is exactly the window where the /tmp log holds
@@ -95,7 +95,11 @@ _common_dir="$(git -C "$SCRIPT_DIR" rev-parse --path-format=absolute --git-commo
 AUTOMOUSE_DIR="${FLEET_STATUS_AUTOMOUSE_DIR:-$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse}"
 HARNESS_OUT="${FLEET_STATUS_HARNESS_OUT:-$MAIN_CHECKOUT/tools/postplan-harness/out}"
 LOG_DIR="${FLEET_STATUS_LOG_DIR:-/tmp}"
+TRANSCRIPT_ROOT="${FLEET_STATUS_TRANSCRIPT_ROOT:-$HOME/.claude/projects}"
+JQ_BIN="${FLEET_STATUS_JQ:-jq}"
 AUTOMOUSE_PLIST="${FLEET_STATUS_AUTOMOUSE_PLIST:-$HOME/Library/LaunchAgents/com.ibl5.automouse.plist}"
+# shellcheck source=bin/lib/session-id.sh
+. "$SCRIPT_DIR/lib/session-id.sh"
 
 WATCH=0
 WATCH_SECS=15
@@ -197,6 +201,21 @@ pid_alive_matching() {
     ps -o command= -p "$pid" 2>/dev/null | grep -q "$pattern"
 }
 
+# Clip a one-line field to $2 columns. $3 = "left" keeps the TAIL of the value and
+# marks the cut with a leading ellipsis — right-clipping a path yields
+# "/Users/ajaynicolas/GitHub/IBL5/ibl5/cla…", which identifies nothing. The
+# discriminating end of a path is its last component; of prose, its first.
+clip_field() {
+    local v="$1" max="${2:-72}" side="${3:-right}"
+    v="$(printf '%s' "$v" | tr -s '[:space:]' ' ')"
+    [ "${#v}" -le "$max" ] && { printf '%s' "$v"; return 0; }
+    if [ "$side" = left ]; then
+        printf '…%s' "$(printf '%s' "$v" | cut -c "$(( ${#v} - max + 2 ))-")"
+    else
+        printf '%s…' "$(printf '%s' "$v" | cut -c "1-$max")"
+    fi
+}
+
 # Last non-empty line of a file, whitespace-squeezed and clipped to one row.
 # When $3 is a grep pattern, the last line MATCHING it wins, falling back to the
 # plain last line when nothing matches. The harness's audit.log ends with
@@ -211,11 +230,71 @@ last_line() {
     [ -z "$line" ] && \
         line="$(grep -v '^[[:space:]]*$' "$f" 2>/dev/null | tail -n 1 | tr -s '[:space:]' ' ')"
     [ -z "$line" ] && return 1
-    if [ "${#line}" -gt "$max" ]; then
-        printf '%s…' "$(printf '%s' "$line" | cut -c "1-$max")"
-    else
-        printf '%s' "$line"
-    fi
+    clip_field "$line" "$max"
+}
+
+have_jq() { command -v "$JQ_BIN" >/dev/null 2>&1; }
+
+# Resolve a run's live transcript from its log path, or return 1.
+#
+# Two terms in the glob. The plain one is the run's own transcript. The
+# subagents/ one covers the case this feature exists for: while a /plan run's
+# architect sub-agent is working, the PARENT transcript is silent for that
+# agent's entire runtime — minutes of a frozen row, which is exactly the freeze
+# the placeholder used to show. `ls -t` picks whichever is genuinely newest, so
+# the row tracks the sub-agent while it runs and the parent again afterwards.
+# This EXTENDS shared-context decision 4 (glob, take the single hit) rather than
+# contradicting it: still a glob keyed on the uuid, still no cwd-slug arithmetic.
+session_transcript() {
+    local log="$1" sc uuid hit
+    sc="$(session_sidecar_path "$log")"
+    [ -f "$sc" ] || return 1
+    uuid="$(head -n 1 "$sc" | tr -d '[:space:]')"
+    is_session_id "$uuid" || return 1     # never let an unvalidated value reach a glob
+    [ -d "$TRANSCRIPT_ROOT" ] || return 1
+    hit="$(ls -t "$TRANSCRIPT_ROOT"/*/"$uuid".jsonl \
+                 "$TRANSCRIPT_ROOT"/*/"$uuid"/subagents/agent-*.jsonl 2>/dev/null | head -n 1)"
+    [ -n "$hit" ] && [ -f "$hit" ] || return 1
+    printf '%s' "$hit"
+}
+
+# Transcripts reach 1+ MB, and the records this reader wants are a tiny minority
+# of them.
+#
+# A BYTE WINDOW DOES NOT WORK HERE, which the Phase 7 live smoke is what caught. A
+# single `attachment` record routinely exceeds 64 KB -- 81624 bytes observed in a
+# real plan-now transcript -- so `tail -c 65536` can land entirely INSIDE one. The
+# fragment gets dropped and only the metadata records after it survive, leaving the
+# assistant records just before it permanently invisible. The row then shows the
+# placeholder for the whole run, which is the exact failure this feature exists to
+# remove. Fixtures never caught it because fixture records are a few hundred bytes.
+#
+# Filter by record type instead. grep emits whole lines, so there is no mid-record
+# fragment to drop, and jq only ever parses the handful of records that can
+# contribute to the output.
+#
+# The pattern is the VALUE `"assistant"`, not `"type":"assistant"`: a key-order
+# change upstream would silently empty the page under the tighter pattern, and a
+# silent empty is indistinguishable from an idle run. Matching the value cannot
+# miss. Over-matching is harmless -- every consumer below re-filters on
+# `.type=="assistant"`, so a stray record costs one jq parse and nothing else.
+transcript_tail() { grep '"assistant"' "$1" 2>/dev/null | tail -n 60; }
+
+transcript_phase() {
+    have_jq || return 1
+    transcript_tail "$1" | "$JQ_BIN" -R -r '
+        fromjson? | select(.type=="assistant")
+        | .message.content[]? | select(.type=="text") | .text
+        | split("\n")[0] | select(length > 0)' 2>/dev/null | tail -n 1
+}
+
+transcript_tool() {
+    have_jq || return 1
+    transcript_tail "$1" | "$JQ_BIN" -R -r '
+        fromjson? | select(.type=="assistant")
+        | .message.content[]? | select(.type=="tool_use")
+        | [.name, (.input.command // .input.description // .input.file_path
+                   // .input.pattern // .input.path // "")] | @tsv' 2>/dev/null | tail -n 1
 }
 
 # The branch slug a plan-now run is working on.
@@ -278,7 +357,7 @@ pid_is_accounted_for() {
 
 render_launchd() {
     local count=0 line label pid status suffix producer log outdir progress
-    local ident ident_note slug audit
+    local ident ident_note slug audit progress_tool tf ph tl tool_name tool_tgt
 
     section "LAUNCHD JOBS  (com.ibl5.*)"
 
@@ -294,7 +373,7 @@ render_launchd() {
         case "$pid" in ''|*[!0-9]*) continue ;; esac
 
         suffix="${label#com.ibl5.}"
-        producer="$suffix"; log=''; outdir=''; progress=''; audit=''
+        producer="$suffix"; log=''; outdir=''; progress=''; audit=''; progress_tool=''
         ident="$suffix"; ident_note=''
 
         case "$suffix" in
@@ -328,7 +407,32 @@ render_launchd() {
         elif [ -n "$log" ]; then
             progress="$(last_line "$log" 64)"
         fi
-        [ -z "$progress" ] && progress="(no output yet — headless runs flush at exit)"
+        # Last resort: the run's own live transcript. `claude` streams JSONL as it
+        # works, so this is the only mid-run signal for a producer that has no
+        # audit.log. Gated on $log because the sidecar path derives from it.
+        if [ -z "$progress" ] && [ -n "$log" ]; then
+            tf="$(session_transcript "$log")" || tf=''
+            if [ -n "$tf" ]; then
+                ph="$(transcript_phase "$tf")" || ph=''
+                tl="$(transcript_tool  "$tf")" || tl=''
+                if [ -n "$tl" ]; then
+                    tool_name="$(printf '%s' "$tl" | cut -f1)"
+                    tool_tgt="$(printf  '%s' "$tl" | cut -f2-)"
+                    if [ -n "$tool_tgt" ]; then
+                        progress_tool="↳ $tool_name: $(clip_field "$tool_tgt" 52 left)"
+                    else
+                        progress_tool="↳ $tool_name"
+                    fi
+                fi
+                [ -n "$ph" ] && progress="$(clip_field "$ph" 64)"
+                [ -z "$progress" ] && [ -n "$progress_tool" ] && \
+                    progress="(working — no assistant text yet)"
+            fi
+        fi
+        if [ -z "$progress" ]; then
+            progress="(no output yet — headless runs flush at exit)"
+            progress_tool=''
+        fi
 
         count=$(( count + 1 ))
         track_pid "$pid"
@@ -337,6 +441,7 @@ render_launchd() {
         printf '      pid %-7s up %-8s last-exit-col %s\n' \
             "$pid" "$(human_age "$(pid_elapsed_secs "$pid")")" "$status"
         printf '      %s%s%s\n' "$DIM" "$progress" "$R"
+        [ -n "$progress_tool" ] && printf '      %s%s%s\n' "$DIM" "$progress_tool" "$R"
         if [ -n "$audit" ]; then
             printf '      %saudit: %s%s\n' "$DIM" "$(link_file "$audit")" "$R"
         elif [ -n "$log" ]; then

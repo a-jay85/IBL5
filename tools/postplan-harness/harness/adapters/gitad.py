@@ -70,6 +70,11 @@ class LiveGit:
     def head(self) -> str:
         return self._run("rev-parse", "HEAD").strip()
 
+    def head_tree(self) -> str:
+        # a TREE sha, not a commit sha: condition (12) compares trees so a no-op
+        # commit (rebase, empty amend) does not invalidate a still-valid review
+        return self._run("rev-parse", "HEAD^{tree}").strip()
+
     def fetch_base(self, base: str = "origin/master") -> None:
         """Freshen the base ref so diff/classification and the later rebase see
         the real remote tip, not a stale local origin/master."""
@@ -103,6 +108,7 @@ class ReplayGit:
     def __init__(self, fixture: dict):
         self.fx = fixture
         self.commit_messages: list[str] = []
+        self.pushes = 0
 
     def branch(self) -> str:
         return self.fx.get("slug", "unknown-branch")
@@ -111,7 +117,8 @@ class ReplayGit:
         return
 
     def is_dirty(self) -> bool:
-        return bool(self.fx.get("worktree_diff"))
+        # the Phase 2 commit leaves the replay tree clean, as it does live
+        return bool(self.fx.get("worktree_diff")) and not self.commit_messages
 
     def diff_vs_base(self, base: str = "origin/master") -> str:
         return self.fx.get("diff") or self.fx.get("worktree_diff") or ""
@@ -131,5 +138,17 @@ class ReplayGit:
         self.commit_messages.append(message)
         return "replay-sha-" + self.fx.get("slug", "x")[:12]
 
-    def push(self) -> None:  # replay: recorded as a no-op; ghad records PR intents
+    def head(self) -> str:
+        return self.fx.get("head_sha") or ""
+
+    def head_tree(self) -> str:
+        trees = self.fx.get("head_trees")
+        if trees:
+            return trees[min(len(self.commit_messages), len(trees) - 1)]
+        # no fixture trees: synthesise one that advances with each replay commit, so a
+        # replay commit invalidates a prior review exactly as a live commit does
+        return format(len(self.commit_messages), "040x")
+
+    def push(self) -> None:  # replay: recorded as a count; ghad records PR intents
+        self.pushes += 1
         return

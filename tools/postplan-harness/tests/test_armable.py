@@ -21,7 +21,8 @@ def inputs(**kw):
     base = dict(pr_body=BODY_CLEARED, pr_title="chore: x", pr_labels=[],
                 classification=Classification(), findings=[], unresolved_conformance=[],
                 phase5_status="pass", plan_auto_merge_false=False, headless=True,
-                dep_state_lookup=lambda n: "MERGED", fidelity_verdict="READY")
+                dep_state_lookup=lambda n: "MERGED", fidelity_verdict="READY",
+                unresolved_findings=[], conflict_resolved=False)
     base.update(kw)
     return ArmInputs(**base)
 
@@ -136,11 +137,11 @@ def test_fidelity_default_is_fail_closed():
 
 
 def test_condition_set_is_skill_numbered():
-    """The set is deliberately {1..10, 12, 13} with gaps: the numbers track the
-    SKILL's condition numbers, not this list's position. (11) (unresolved
-    review-thread findings) reads the GitHub API and stays skill-only."""
+    """The set is {1..14} with no gaps. The numbers track the SKILL's condition numbers,
+    not this list's position: (11) shells out to bin/lib/pr-armable.sh for unresolved
+    review-thread findings and (14) reads the conflict-resolved flag."""
     nums = sorted(c.number for c in evaluate(inputs()).conditions)
-    assert nums == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13]
+    assert nums == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
 
 
 def test_fidelity_is_additive_and_releases_nothing():
@@ -195,22 +196,10 @@ def test_armable_unmet_contract_blocks_arming():
     assert d2.armed
 
 
-def test_condition_14_is_absent_and_the_reason_is_recorded():
-    """(14) must not appear in evaluate()'s condition set, AND the reason must be
-    recorded as a comment in armable.py so the absence is documented, not silent."""
-    nums = [c.number for c in evaluate(inputs()).conditions]
-    assert 14 not in nums
-    # Read armable.py off disk to verify the vacuity reason is recorded there.
-    src = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                       "..", "harness", "armable.py")
-    text = open(src).read()
-    assert "Condition (14)" in text, "armable.py must name condition (14) in a comment"
-    assert "rebase-conflict" in text, "armable.py must cite rebase-conflict as the vacuity reason"
-
-
 def test_rebase_conflict_fails_the_run_before_evaluate():
     """A conflicted rebase raises HarnessError('rebase-conflict') and aborts before
-    evaluate() is ever reached — proving (14) has nothing to observe in the harness."""
+    evaluate() is ever reached, so THIS run never auto-resolves. Condition (14) covers
+    the other case: a flag an EARLIER skill run left on the same branch."""
     import shutil
     d = tempfile.mkdtemp(prefix="postplan-arm-test-")
     try:

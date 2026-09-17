@@ -6,7 +6,7 @@ typed intent record to <out>/actions.jsonl. Reads are served from fixtures
 (replay) or recorded local state (isolated).
 
 LiveGh is the installed mode (README §Installation, approved 2026-07-16): it
-executes exactly the seven allowlisted mutations via `gh` — there is no generic
+executes exactly the eight allowlisted mutations via `gh` — there is no generic
 "run a gh command" escape hatch — and still appends every executed action to
 actions.jsonl (executed=true) so the audit trail survives the install.
 """
@@ -19,14 +19,21 @@ import subprocess
 import tempfile
 import time
 
+from pathlib import Path
+
 from ..state import HarnessError
+
+# bin/lib/pr-sticky.sh in the harness's own checkout. Not under pr-ready/,
+# so no either-location lookup applies.
+STICKY_LIB = Path(__file__).resolve().parents[4] / "bin" / "lib" / "pr-sticky.sh"
 
 POSTPLAN_BADGE_MARKER = "<!-- postplan-status -->"
 
 
 class RecordingGh:
     MUTATIONS = ("pr_create", "pr_comment", "pr_review_findings", "pr_edit_body",
-                 "pr_merge_auto", "label_add", "pr_status_badge")
+                 "pr_merge_auto", "label_add", "pr_status_badge",
+                 "pr_sticky_verdict")
 
     def __init__(self, out_dir: str, fixture: dict | None = None):
         self.out_dir = out_dir
@@ -45,12 +52,21 @@ class RecordingGh:
         self.record("pr_create", title=title, body=body[:8000], base=base)
         return int(self.fixture.get("pr_number") or 0)
 
+    def unresolved_findings(self, pr: int) -> list[str]:
+        return []
+
     def pr_edit_body(self, pr: int, body: str) -> None:
         self._body_override = body
         self.record("pr_edit_body", pr=pr, body=body[:8000])
 
     def pr_merge_auto(self, pr: int) -> None:
         self.record("pr_merge_auto", pr=pr, args="--squash --auto")
+
+    def pr_sticky_verdict(self, pr: int, body: str) -> str:
+        # Deliberately UNTRUNCATED: replay tests read the terminal line and the marker,
+        # both of which sit at the very end of the body.
+        self.record("pr_sticky_verdict", pr=pr, body=body)
+        return str(self.fixture.get("sticky_comment_id", "replay-sticky"))
 
     def post_review_findings(self, pr: int, head_sha: str, title: str, findings: list) -> None:
         self.record("pr_review_findings", pr=pr, head_sha=head_sha, title=title,
@@ -103,7 +119,7 @@ class RecordingGh:
 
 
 class LiveGh(RecordingGh):
-    """Installed live adapter. Each of the seven MUTATIONS maps to one fixed `gh`
+    """Installed live adapter. Each of the eight MUTATIONS maps to one fixed `gh`
     invocation built inside its method — the allowlist IS the method set.
     Reads come from live `gh pr view` state. Merge deliberately omits
     --delete-branch: in a multi-worktree clone it errors benignly, and a parent
@@ -145,6 +161,23 @@ class LiveGh(RecordingGh):
                     pr=int(m.group(1)))
         return int(m.group(1))
 
+    def unresolved_findings(self, pr: int) -> list[str]:
+        """Condition (11) — unresolved review threads scored >= 80.
+
+        GH_CMD and REPO_SLUG are deliberately unset: bin/lib/pr-armable.sh defaults them
+        to `gh` and the repo slug. Any failure returns the API-error sentinel, matching
+        the shell's own contract — a GitHub outage must never arm a PR.
+        """
+        from .llm import _run_reaped
+        argv = ["bash", "-c", 'source "$(git rev-parse --show-toplevel)/bin/lib/pr-armable.sh"; pr_unresolved_findings_hold "$1"', "_", str(pr)]
+        try:
+            proc = _run_reaped(argv, None, 120, self.worktree, None)
+        except Exception:
+            return ["unresolved-findings-api-error"]
+        if proc.returncode != 0:
+            return ["unresolved-findings-api-error"]
+        return proc.stdout.split()
+
     def pr_edit_body(self, pr: int, body: str) -> None:
         self._gh("pr", "edit", str(pr), "--body", body)
         self._body_override = body
@@ -153,6 +186,33 @@ class LiveGh(RecordingGh):
     def pr_merge_auto(self, pr: int) -> None:
         self._gh("pr", "merge", str(pr), "--squash", "--auto")
         self.record("pr_merge_auto", pr=pr, args="--squash --auto")
+
+    def pr_sticky_verdict(self, pr: int, body: str) -> str:
+        """Upsert the Phase 5.5 sticky verdict comment, then read its id back.
+
+        Sourced from the harness's OWN checkout, which bin/post-plan-now pins to the main
+        checkout (ADR-0092), so a branch cannot alter the helper that posts its own verdict.
+        GH_CMD is stripped so a leaked stub never stands in for real `gh`. Never raises: a
+        failed post degrades to an empty id and arming is deliberately unchanged by it.
+        """
+        from .llm import _run_reaped
+        path = os.path.join(self.out_dir, f"sticky-verdict-{pr}.md")
+        with open(path, "w") as fh:
+            fh.write(body)
+        cid = ""
+        env = {k: v for k, v in os.environ.items() if k != "GH_CMD"}
+        if STICKY_LIB.exists():
+            argv = ["bash", "-c", 'source "$1"; pr_sticky_upsert "$2" "$3" "$(cat "$4")"; pr_sticky_find "$2" "$3"', "_", str(STICKY_LIB), str(pr),
+                    "<!-- pr-ready-verdict -->", path]
+            try:
+                proc = _run_reaped(argv, None, self.timeout, self.worktree, env)
+                out = (proc.stdout or "").strip()
+                if re.match(r"^[0-9]+$", out):
+                    cid = out
+            except (subprocess.TimeoutExpired, OSError):
+                cid = ""
+        self.record("pr_sticky_verdict", pr=pr, comment_id=cid, body=body)
+        return cid
 
     def label_add(self, pr: int, label: str) -> None:
         self._gh("pr", "edit", str(pr), "--add-label", label)

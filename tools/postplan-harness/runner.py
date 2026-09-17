@@ -2,8 +2,9 @@
 """Compiled post-plan runner — the phase sequencer.
 
 Code owns: sequencing, classification, conformance, verification aggregation,
-all twelve ported arming conditions (numbered 1–12; the skill's condition (11), unresolved
-review-thread findings, stays skill-only — the harness's 11 is master's plan-slug-drift hold),
+all fourteen arming conditions, numbered 1–14 as in the skill ((11) unresolved review-thread
+findings via bin/lib/pr-armable.sh, (12) the Phase 5.5 plan-fidelity verdict, (13) the
+plan-slug-drift hold, (14) the conflict-resolved flag), the Phase 5.5 sticky verdict comment,
 CI-watch interpretation, terminal states,
 side-effect gating, and the audit log. Bounded LLM calls own: PR copy, review/security
 judgment, finding scoring, plan-blind manual-step classification, the add-only
@@ -14,10 +15,10 @@ Modes:
                      are recorded intents (out/actions.jsonl), never executed.
   isolated         — live git worktree + live verify, gh mutations record-only.
   isolated --live  — the INSTALLED mode (approved 2026-07-16): push to origin,
-                     execute the six allowlisted gh mutations (still audited to
-                     actions.jsonl), watch CI. Phase 10 preview and Phase 9
-                     memory WRITES stay on the interactive side — Phase 9 here
-                     records an intent only.
+                     execute the eight allowlisted gh mutations (still audited to
+                     actions.jsonl), watch CI. Phase 9 records a memory-save
+                     intent only (no memory or registry write); Phase 10 is a
+                     logged skip; Phase 11 removes the LLM adapter's temp cwd.
 """
 from __future__ import annotations
 
@@ -31,8 +32,9 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from harness import ciwatch, conformance, llm_calls, manual_rows, schemas
-from harness.armable import ArmInputs, evaluate, manual_testing_clearance
+from harness import ciwatch, conformance, fidelity, llm_calls, manual_rows, schemas, statefile
+from harness.armable import (ArmInputs, conflict_flag_path, evaluate,
+                             manual_testing_clearance, select_fidelity_verdict)
 from harness.classify import (classify, files_from_diff, modified_files_from_diff,
                               render_files_changed, render_manual_confirmation,
                               render_reviewer_verification, strip_manual_testing_section,
@@ -178,7 +180,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         worktree: str | None = None, headless: bool = True,
         plans_dir: str | None = None, live: bool = False,
         explicit_path: str | None = None,
-        probe=None) -> RunResult:
+        probe=None, state_dir: str | None = None) -> RunResult:
     os.makedirs(out_dir, exist_ok=True)
     ledger = llm.ledger
     audit: list[str] = []
@@ -206,6 +208,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
 
     res = RunResult(terminal=TerminalState.FAILED, slug=slug, plan=plan,
                     ledger=ledger, audit=audit)
+    state = statefile.StateFile(os.path.join(_state_dir(out_dir, live, state_dir), statefile.safe_slug(slug) + ".json"), slug, git, out_dir, log)
     log(f"phase1 plan: found={plan.found} auto_merge_false={plan.auto_merge_false} "
         f"matrix={plan.has_matrix} critical_files={len(plan.critical_files)} "
         f"slug_drift={plan.slug_drift or '-'} plan_source={plan.plan_source or '-'}")
@@ -244,10 +247,15 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             log("phase2: stripped model-authored Manual Testing section from PR copy")
         copy["commit_subject"] = schemas.coerce_commit_subject(copy["commit_subject"], cls)
         sha = git.commit_all(f"{copy['commit_subject']}\n\n{copy['summary_md']}")
+        rebase_line = f"REBASE=not run ({mode} mode)"
         if live:
+            pre_rebase = git.head()
             git.rebase_onto()      # pre-push policy: branch must sit on origin/master
             sha = git.head()
             log("phase2: rebased onto origin/master")
+            # the skill's two success spellings, verbatim
+            rebase_line = ("REBASE=clean (HEAD already contains origin/master)"
+                           if sha == pre_rebase else "REBASE=rebased onto origin/master")
         try:
             git.push()
         except HarnessError as e:
@@ -262,6 +270,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             pr = gh.pr_create(copy["title"], create_body, "master")
             log(f"phase2: pr_create intent recorded (title={copy['title']!r})")
         res.pr_number = pr
+        state.checkpoint("pr-open", res)
         if live and pr and sha:
             bg_ci = ciwatch.start_background_watch(worktree, pr, sha, out_dir)
             if bg_ci is not None:
@@ -275,6 +284,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         res.findings = findings
         res.scored_findings = scored
         res.degraded_agents = degraded_agents
+        state.checkpoint("review", res, review_gates=gates, reviewed_head=meta.get("headRefOid") or "")
         log(f"phase4 gates={ {k: v for k, v in gates.items()} } findings: raw={len(scored)} surviving={len(findings)} scores={[s['score'] for s in scored]}")
         if degraded_agents:
             log(f"phase4 DEGRADED: unparseable review output from {', '.join(degraded_agents)}")
@@ -348,6 +358,15 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         body = upsert_files_changed(body, render_files_changed(diff))
         gh.pr_edit_body(pr, body)
 
+        # ---- Phase 5.5: plan-intent fidelity review --------------------
+        # Pinned BEFORE the call: condition (12) compares the tree the reviewer saw
+        # against HEAD at arming time, so capturing it after would always match.
+        master_sha = _master_sha(worktree)
+        reviewed_tree = git.head_tree()
+        fidelity_verdict, fidelity_error = _run_fidelity(
+            llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_sha,
+            reviewed_tree, live, log, res)
+
         # ---- Phase 6.5: arming ----------------------------------------
         inputs = ArmInputs(
             pr_body=gh.pr_body() or body, pr_title=meta.get("title", copy["title"]),
@@ -355,14 +374,25 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             unresolved_conformance=unresolved, phase5_status=phase5,
             plan_auto_merge_false=plan.auto_merge_false, headless=headless,
             dep_state_lookup=lambda n: gh.pr_state(n),
-            # Live runs cannot execute the repo-reading Opus fidelity reviewer (see
-            # harness/review.py): the verdict is None, condition (12) holds, and rc=4
-            # hands off to the skill at Phase 5.5. Replay/isolated runs touch no real
-            # PR, so they carry a synthetic READY and existing fixtures stay green.
-            fidelity_verdict=None if live else "READY",
+            # Phase 5.5 above produced these. None means INDETERMINATE (the reviewer
+            # degraded or was not run), which holds condition (12) — it is never
+            # silently promoted to a verdict word.
+            # verdict 1, deliberately NOT the collapsed return value: select_fidelity_verdict
+            # is what combines the two, and it tree-gates verdict 2. Passing the collapsed
+            # value here would let an untethered verdict 2 satisfy condition (12) on its own.
+            fidelity_verdict=res.fidelity.get("verdict_1"),
+            fidelity_verdict_2=res.fidelity.get("verdict_2"),
+            fidelity_tree_2=res.fidelity.get("reviewed_tree_2"),
+            current_tree=git.head_tree(),   # read here, after every commit this run makes
+            unresolved_findings=gh.unresolved_findings(pr) if live else [],
+            conflict_resolved=(os.path.exists(conflict_flag_path(git.branch())) if live
+                               else bool((fixture or {}).get("conflict_resolved", False))),
             degraded_agents=degraded_agents,
             plan_slug_drift=plan.slug_drift,
         )
+        if not live and (fixture or {}).get("current_tree"):
+            # replay-only seam, the checks_outcome pattern: live mode never reads it
+            inputs.current_tree = fixture["current_tree"]
         preview = evaluate(inputs)
         if not preview.holds:
             # only spend the add-only safety verdict when deterministic checks pass
@@ -379,8 +409,44 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         log("phase6.5: " + ("ARMED" if decision.armed else
                             "HELD — " + "; ".join(f"({c.number}) {c.reason or c.name}"
                                                   for c in decision.holds)))
+        fid = res.fidelity or {}
+        fid["selected"], fid["selected_source"] = select_fidelity_verdict(
+            inputs.fidelity_verdict, inputs.fidelity_verdict_2,
+            inputs.fidelity_tree_2, inputs.current_tree)
+        res.fidelity = fid
+        state.checkpoint("fidelity", res)
+        if pr:
+            # Posted BEFORE arming on purpose: `--auto` merges immediately when the checks
+            # are already green, and merge-digest-notify.yml reads the last marker comment
+            # at merge time. A comment posted after the merge would arrive too late.
+            vpath = fid.get("verdict_path") or fidelity.verdict_path(pr)
+            digest = fidelity.digest_lines(worktree, master_sha, vpath, out_dir,
+                                           fid.get("verdict_1") is not None)
+            rsha = fid.get("remediation_sha")
+            ci_line = ("CI: local verification "
+                       f"{getattr(res.phase5, 'value', res.phase5)}; "
+                       "GitHub checks are watched after this comment")
+            if rsha:
+                ci_line += f"; remediation commit {rsha} is inside that watch"
+            sticky = fidelity.compose_sticky(
+                rebase_line, ci_line, fid, decision, digest,
+                fidelity.findings_excerpt(vpath),
+                fidelity.terminal_line(fid.get("verdict_1"), fid.get("error_kind"), rsha,
+                                       fid.get("verdict_2"), fid.get("reviewed_tree_2"),
+                                       plan.auto_merge_false))
+            try:
+                cid = gh.pr_sticky_verdict(pr, sticky)
+            except (HarnessError, OSError, subprocess.SubprocessError):
+                cid = ""
+            res.sticky_comment_id = cid or None
+            if not cid:
+                # Arming is deliberately UNCHANGED by a failed post: the skill's own post is
+                # `|| true`, and a new hold here would change condition semantics.
+                res.sticky_error = "sticky-post-failed"
+                log("phase6.5: sticky verdict comment not confirmed")
         if decision.armed:
             gh.pr_merge_auto(pr)
+        state.checkpoint("arm", res)
 
         if degraded_agents:
             current = gh.pr_body() or body
@@ -413,22 +479,33 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                         TerminalState.SHIPPED_ARMED if decision.armed
                         else TerminalState.SHIPPED_HELD)
 
-        # ---- Phase 9: retrospective (bounded) ---------------------------
-        retro = llm.call("retrospective", "haiku",
-                         llm_calls.retrospective_prompt(slug, res.terminal.value, decision,
-                                                        len(findings), phase5),
-                         schemas.validate_retrospective)
+        # ---- Phase 9: retrospective (bounded, record-only) -------------
+        # Never fatal: the PR is open and arming has executed, so FAILED here would
+        # hand an armed PR to the full skill fallback.
+        try:
+            retro = llm.call("retrospective", "haiku",
+                             llm_calls.retrospective_prompt(slug, res.terminal.value, decision,
+                                                            len(findings), phase5, res.fidelity),
+                             schemas.validate_retrospective)
+        except HarnessError as e:
+            retro = {"save": False, "error": e.kind}
+            log(f"phase9: retrospective unavailable ({e.kind}) — terminal unchanged")
         res.retrospective = retro
         if retro.get("save"):
             log(f"phase9: memory-save intent recorded: {retro.get('name')}")
-        else:
+        elif not retro.get("error"):
             log("phase9: no durable lesson — nothing saved")
+
+        # ---- Phase 10: preview environment ------------------------------
+        log("phase10: preview environment skipped — headless harness")
     except HarnessError as e:
         res.terminal = TerminalState.FAILED
         res.error = f"{e.kind}: {e.detail}"
         res.error_kind = e.kind
         log(f"FAILED: {res.error}")
     finally:
+        state.checkpoint("terminal", res)
+        _phase11_cleanup(llm, log)
         ciwatch.reap_background_watch(bg_ci)
     return _finish(res, out_dir)
 
@@ -441,6 +518,78 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
 # tests/test_post_plan_now_fallback.py, which is what keeps the two sides in sync.
 CONFORMANCE_DONE_NAME = "conformance-done"
 CONFORMANCE_BRIDGE_NAME = "missing-tests"
+
+
+def _master_sha(worktree: str | None) -> str:
+    if not worktree:
+        return "origin/master"
+    proc = subprocess.run(["git", "-C", worktree, "rev-parse", "origin/master"],
+                          capture_output=True, text=True)
+    return proc.stdout.strip() or "origin/master"
+
+
+def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_sha,
+                  reviewed_tree, live, log, res):
+    """Phase 5.5. Returns (verdict_word_or_None, error_kind_or_'').
+
+    Replay fixtures that carry no canned `plan-fidelity-review` keep the historical
+    synthetic READY, so the pre-Phase-5.5 trace corpus stays green; a fixture opts into
+    the real path simply by canning that purpose.
+    """
+    canned = getattr(llm, "canned", None)
+    if not live and isinstance(canned, dict) and "plan-fidelity-review" not in canned:
+        log("phase5.5 fidelity: replay fixture carries no verdict - synthetic READY")
+        res.fidelity = {"verdict_1": "READY", "error_kind": None,
+                        "reviewed_tree": reviewed_tree,
+                        "verdict_path": fidelity.verdict_path(pr),
+                        "remediation_sha": None, "verdict_2": None,
+                        "reviewed_tree_2": None}
+        return "READY", ""
+    try:
+        packet = fidelity.build_packet(
+            out_dir, master_sha, reviewed_tree, plan, diff, body, pr,
+            phase4b_ran=False, worktree=worktree or ".")
+    except HarnessError as e:
+        log(f"phase5.5 fidelity: packet failed ({e.kind}) - verdict indeterminate")
+        res.fidelity = {"verdict_1": None, "error_kind": e.kind,
+                        "reviewed_tree": reviewed_tree,
+                        "verdict_path": fidelity.verdict_path(pr),
+                        "remediation_sha": None, "verdict_2": None,
+                        "reviewed_tree_2": None}
+        return None, e.kind
+    verdict, err = fidelity.review(llm, out_dir, worktree or ".", packet, pr,
+                                   reviewed_tree=reviewed_tree)
+    log(f"phase5.5 fidelity: verdict={verdict or 'INDETERMINATE'}"
+        + (f" error={err}" if err else "") + f" reviewed_tree={reviewed_tree[:12]}")
+    res.fidelity = {"verdict_1": verdict, "error_kind": err or None,
+                    "reviewed_tree": reviewed_tree,
+                    "verdict_path": fidelity.verdict_path(pr),
+                    "remediation_sha": None, "verdict_2": None,
+                    "reviewed_tree_2": None}
+    if verdict == "NOT READY":
+        # exactly one remediation and one re-review per run - a boolean sequence here,
+        # never a loop
+        try:
+            sha = fidelity.remediate(llm, git, out_dir, worktree or ".", packet,
+                                     fidelity.verdict_path(pr), master_sha, log=log)
+        except HarnessError as e:
+            log(f"phase5.5 remediation: unavailable ({e.kind}) - verdict 1 stands")
+            sha = None
+        if sha:
+            body = upsert_files_changed(body, render_files_changed(git.diff_vs_base()))
+            gh.pr_edit_body(pr, body)
+            verdict_2, tree_2 = fidelity.re_review(
+                llm, git, out_dir, worktree or ".", plan, master_sha, body, pr, sha,
+                fidelity.verdict_path(pr), log=log)
+            res.fidelity.update({"remediation_sha": str(sha), "verdict_2": verdict_2})
+            res.fidelity["reviewed_tree_2"] = tree_2
+            if verdict_2 and tree_2:
+                # condition (12) must compare against the tree the SECOND reviewer saw
+                res.fidelity["reviewed_tree"] = tree_2
+            if verdict_2:
+                log(f"phase5.5 re-review: verdict={verdict_2} tree={(tree_2 or '')[:12]}")
+                return verdict_2, ""
+    return verdict, err
 
 
 def _write_conformance_handoff(out_dir: str, unresolved: list[str]) -> None:
@@ -457,6 +606,34 @@ def _write_conformance_handoff(out_dir: str, unresolved: list[str]) -> None:
     open(os.path.join(out_dir, CONFORMANCE_DONE_NAME), "w").close()
     with open(os.path.join(out_dir, CONFORMANCE_BRIDGE_NAME), "w") as fh:
         fh.write("".join(f"{item}\n" for item in unresolved))
+
+
+def _phase11_cleanup(llm, log) -> None:
+    """Phase 11: remove the harness's own scratch. Never raises; never kills by pattern."""
+    close = getattr(llm, "close", None)
+    if close is None:
+        log("phase11: no adapter scratch to remove")
+        return
+    try:
+        close()
+        log("phase11: LLM adapter temp cwd removed")
+    except Exception as e:  # cleanup must never change the terminal state
+        log(f"phase11: cleanup error ignored: {e!r}")
+
+
+def _state_dir(out_dir: str, live: bool, override) -> str:
+    """Return the directory in which per-slug state files are written.
+
+    live runs use the harness's own out/state because bin/post-plan-now pins
+    HARNESS to the main checkout, so every worktree's live run shares one record
+    per slug; every other run writes under its own out_dir so a test or dry run
+    can never overwrite a real PR's record.
+    """
+    if override is not None:
+        return override
+    if live:
+        return os.path.join(os.path.dirname(os.path.abspath(__file__)), "out", "state")
+    return os.path.join(out_dir, "state")
 
 
 def _finish(res: RunResult, out_dir: str) -> RunResult:

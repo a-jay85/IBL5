@@ -241,8 +241,11 @@ def test_rc3_wording_survives_fidelity_pending():
     assert "rebase conflict" in runner.verdict_line(r, 3)
 
 
-def test_live_runs_pass_no_fidelity_verdict():
+def test_live_runs_never_synthesise_a_fidelity_verdict():
+    """A live run's verdict must come from Phase 5.5, never from a literal."""
     import pathlib
     src = (pathlib.Path(__file__).resolve().parents[1] / "runner.py").read_text()
-    assert 'fidelity_verdict=None if live else "READY"' in src, \
-        "a live harness run must carry no fidelity verdict, or it can arm unreviewed"
+    assert 'fidelity_verdict=res.fidelity.get("verdict_1"),' in src, \
+        "arming must read the Phase 5.5 verdict, not a literal"
+    assert 'else "READY"' not in src, "no hardcoded READY may reach arming"
+    assert 'fidelity_verdict="READY"' not in src

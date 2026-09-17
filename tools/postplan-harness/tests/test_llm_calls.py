@@ -3,7 +3,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from harness.llm_calls import pr_copy_prompt
+from harness.llm_calls import pr_copy_prompt, retrospective_prompt
 from harness.state import Classification, PlanInfo
 
 _REAL_REGISTRY_ROW = (
@@ -49,3 +49,12 @@ def test_pr_copy_prompt_contains_manual_testing_prohibition():
     prompt = pr_copy_prompt("some-slug", _cls(""), PlanInfo(), "")
     assert '## Manual Testing' in prompt
     assert "corrupts the arming gate" in prompt
+
+
+def test_retrospective_prompt_carries_fidelity_outcome():
+    fidelity = {"verdict_1": "NOT READY", "verdict_2": "READY", "remediation_sha": "abc"}
+    prompt = retrospective_prompt("my-slug", "shipped-armed", None, 0, None, fidelity)
+    assert "fidelity=NOT READY->READY remediated=True" in prompt
+
+    prompt_none = retrospective_prompt("my-slug", "shipped-armed", None, 0, None, None)
+    assert "fidelity=none" in prompt_none

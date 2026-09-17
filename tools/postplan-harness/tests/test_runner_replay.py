@@ -1,5 +1,7 @@
+import glob
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import types
@@ -246,6 +248,25 @@ def test_clean_run_still_arms(tmp_path):
     assert any(a["action"] == "pr_merge_auto" for a in acts)
 
 
+def test_conflict_resolved_fixture_holds_condition_14(tmp_path):
+    """4f replay hold — a branch carrying an auto-resolved rebase conflict never arms.
+
+    Every other input is the clean fixture that arms in test_clean_run_still_arms, so the
+    only thing separating the two runs is the conflict-resolved flag.
+    """
+    out = str(tmp_path / "out")
+    res = runner.run(_fixture(conflict_resolved=True), out,
+                     FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    assert res.terminal == TerminalState.SHIPPED_HELD
+    assert 14 in {c.number for c in res.arm.holds}
+    assert not any(a["action"] == "pr_merge_auto" for a in _actions(out))
+    with open(os.path.join(out, "result.json")) as fh:
+        blob = json.load(fh)
+    c14 = [c for c in blob["arm"]["conditions"] if c["number"] == 14][0]
+    assert c14["blocked"] is True
+    assert "auto-resolved rebase conflict" in c14["reason"]
+
+
 def test_conformance_handoff_clean_run_writes_empty_bridge(tmp_path):
     out = str(tmp_path / "out")
     res = runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
@@ -443,6 +464,237 @@ def test_phase6_one_hold_stays_held():
         assert len(checkboxes) == 1
 
 
+# --- Phase 5: the sticky verdict comment, end to end -------------------------
+
+class ScriptedToolLlm(FixtureLlm):
+    """FixtureLlm whose tooled calls follow a script: one reply per purpose, in order.
+
+    `review()` and `re_review()` both go through `call_tooled`, so a per-purpose list is
+    what lets one run hand back verdict 1 and then a different verdict 2.
+    """
+    def __init__(self, ledger, canned, scripts):
+        super().__init__(ledger, dict(canned))
+        self.scripts = {k: list(v) for k, v in scripts.items()}
+
+    def call_tooled(self, purpose, model, prompt, **kw):
+        queue = self.scripts.get(purpose)
+        if queue:
+            self.canned[purpose] = queue.pop(0)
+        return super().call_tooled(purpose, model, prompt, **kw)
+
+
+def _verdict_doc(word, tree_line=None, notes="Check 3: the diff matches the plan."):
+    doc = f"## 6d checks\n\n{notes}\n\n{word}\n"
+    if tree_line:
+        doc += tree_line + "\n"
+    return doc + "\n## DIGEST\n\n**What changed:** a synthetic replay change\n"
+
+
+REPLAY_TREE_2 = format(2, "040x")   # ReplayGit.head_tree after the phase-2 + remediation commits
+
+
+@pytest.fixture
+def sticky_tmp():
+    """Yields a fresh pr number and removes the /tmp verdict files it leaves behind."""
+    used = []
+
+    def _next(n):
+        used.append(n)
+        return n
+
+    yield _next
+    for n in used:
+        for path in glob.glob(f"/tmp/post-plan-fidelity-*-{n}*"):
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+
+
+def _sticky_run(tmp_path, pr, scripts, **over):
+    out = str(tmp_path / f"out{pr}")
+    canned = dict(CANNED)
+    canned["plan-fidelity-review"] = ""       # opts the fixture into the real Phase 5.5 path
+    llm = ScriptedToolLlm(UsageLedger(), canned, scripts)
+    fx = _fixture(pr_number=pr, **over)
+    fx["pr_meta"] = dict(fx["pr_meta"], number=pr)
+    res = runner.run(fx, out, llm, mode="replay")
+    return res, out
+
+
+def _sticky_body(out):
+    posts = [a for a in _actions(out) if a["action"] == "pr_sticky_verdict"]
+    assert len(posts) == 1, posts
+    return posts[0]["body"]
+
+
+def test_replay_a_clean_run_posts_the_sticky_then_arms(tmp_path, sticky_tmp):
+    """(a) The comment is posted BEFORE `--auto`, because `--auto` can merge instantly."""
+    pr = sticky_tmp(7101)
+    res, out = _sticky_run(tmp_path, pr,
+                           {"plan-fidelity-review": [_verdict_doc("READY")]})
+    assert res.terminal == TerminalState.SHIPPED_ARMED
+    acts = [a["action"] for a in _actions(out)]
+    assert acts.count("pr_merge_auto") == 1
+    assert acts.index("pr_sticky_verdict") < acts.index("pr_merge_auto")
+    assert _sticky_body(out).splitlines()[-1] == "<!-- pr-ready-verdict -->"
+
+
+def test_replay_b_remediated_then_clean_says_so_and_arms(tmp_path, sticky_tmp):
+    pr = sticky_tmp(7102)
+    res, out = _sticky_run(tmp_path, pr, {
+        "plan-fidelity-review": [_verdict_doc("NOT READY")],
+        "fidelity-remediation": ["edits made"],
+        "plan-fidelity-re-review": [_verdict_doc("READY")],
+    })
+    assert res.terminal == TerminalState.SHIPPED_ARMED
+    body = _sticky_body(out)
+    assert body.splitlines()[-2].startswith("READY (re-review)")
+    with open(os.path.join(out, "result.json")) as fh:
+        blob = json.load(fh)
+    assert blob["fidelity"]["selected_source"] == "verdict-2"
+
+
+def test_replay_c_failing_re_review_holds_and_never_arms(tmp_path, sticky_tmp):
+    pr = sticky_tmp(7103)
+    res, out = _sticky_run(tmp_path, pr, {
+        "plan-fidelity-review": [_verdict_doc("NOT READY")],
+        "fidelity-remediation": ["edits made"],
+        "plan-fidelity-re-review": [_verdict_doc("NOT READY")],
+    })
+    assert res.terminal == TerminalState.SHIPPED_HELD
+    assert not any(a["action"] == "pr_merge_auto" for a in _actions(out))
+    body = _sticky_body(out)
+    assert "NOT READY (re-review)" in body
+    assert "- (12) plan-fidelity-verdict" in body
+
+
+def test_replay_d_prose_after_the_tree_falls_back_to_verdict_1(tmp_path, sticky_tmp):
+    """The parser is anchored, so a trailing word makes the tree unreadable — and a
+    verdict 2 with no readable tree is stale, never a pass."""
+    pr = sticky_tmp(7104)
+    res, out = _sticky_run(tmp_path, pr, {
+        "plan-fidelity-review": [_verdict_doc("NOT READY")],
+        "fidelity-remediation": ["edits made"],
+        "plan-fidelity-re-review": [
+            _verdict_doc("READY", f"REVIEWED_TREE={REPLAY_TREE_2} after the rebase")],
+    })
+    assert res.terminal == TerminalState.SHIPPED_HELD
+    assert 12 in {c.number for c in res.arm.holds}
+    with open(os.path.join(out, "result.json")) as fh:
+        blob = json.load(fh)
+    assert blob["fidelity"]["selected_source"] == "verdict-1"
+
+
+def test_replay_e_a_moved_head_makes_verdict_2_stale(tmp_path, sticky_tmp):
+    pr = sticky_tmp(7105)
+    res, out = _sticky_run(tmp_path, pr, {
+        "plan-fidelity-review": [_verdict_doc("NOT READY")],
+        "fidelity-remediation": ["edits made"],
+        "plan-fidelity-re-review": [_verdict_doc("READY")],
+    }, current_tree="f" * 40)
+    assert res.terminal == TerminalState.SHIPPED_HELD
+    assert 12 in {c.number for c in res.arm.holds}
+
+
+def test_replay_a_failed_sticky_post_does_not_change_arming(tmp_path, sticky_tmp):
+    """The skill's own post is `|| true`. A new hold here would change what arming means."""
+    pr = sticky_tmp(7106)
+    res, out = _sticky_run(tmp_path, pr,
+                           {"plan-fidelity-review": [_verdict_doc("READY")]},
+                           sticky_comment_id="")
+    assert res.sticky_error == "sticky-post-failed"
+    assert res.sticky_comment_id is None
+    assert res.terminal == TerminalState.SHIPPED_ARMED
+    assert [a["action"] for a in _actions(out)].count("pr_merge_auto") == 1
+
+
+def test_sticky_bodies_are_gitignored():
+    """LiveGh writes the body under the run dir; it must never show up as a repo change."""
+    proc = subprocess.run(
+        ["git", "check-ignore", "-q", "tools/postplan-harness/out/run/sticky-verdict-1.md"],
+        cwd=os.path.join(ROOT, "..", ".."),
+    )
+    assert proc.returncode == 0
+
+
+# ---------------------------------------------------------------------------
+# Phase 9 / 10 / 11 tests
+# ---------------------------------------------------------------------------
+
+def test_retrospective_failure_keeps_armed_terminal(tmp_path, sticky_tmp):
+    """Phase 9 HarnessError is non-fatal: terminal stays shipped-armed."""
+    pr = sticky_tmp(7107)
+    out = str(tmp_path / f"out{pr}")
+    canned = {k: v for k, v in CANNED.items() if k != "retrospective"}
+    canned["plan-fidelity-review"] = ""
+    llm = ScriptedToolLlm(UsageLedger(), canned,
+                          {"plan-fidelity-review": [_verdict_doc("READY")]})
+    fx = _fixture(pr_number=pr)
+    fx["pr_meta"] = dict(fx["pr_meta"], number=pr)
+    res = runner.run(fx, out, llm, mode="replay")
+
+    assert res.terminal == TerminalState.SHIPPED_ARMED
+    acts = _actions(out)
+    assert [a["action"] for a in acts].count("pr_merge_auto") == 1
+    assert runner.exit_code_for(res) == 0
+    with open(os.path.join(out, "result.json")) as fh:
+        blob = json.load(fh)
+    assert blob["retrospective"] == {"save": False, "error": "llm-fixture-missing"}
+
+
+def test_phase10_and_11_logged(tmp_path, sticky_tmp):
+    """Phase 10 log line follows Phase 9; Phase 11 logs even on a failed run."""
+    # (a) clean run
+    pr = sticky_tmp(7108)
+    res, out = _sticky_run(tmp_path, pr,
+                           {"plan-fidelity-review": [_verdict_doc("READY")]})
+    with open(os.path.join(out, "audit.log")) as fh:
+        log_lines = fh.read().splitlines()
+
+    phase9_idx = next(i for i, l in enumerate(log_lines) if "phase9:" in l)
+    phase10_idx = next(i for i, l in enumerate(log_lines)
+                       if "phase10: preview environment skipped" in l)
+    phase11_idx = next(i for i, l in enumerate(log_lines)
+                       if "phase11: no adapter scratch to remove" in l)
+    assert phase9_idx < phase10_idx < phase11_idx
+
+    # Failed run: pr-copy missing causes HarnessError -> FAILED terminal
+    pr2 = sticky_tmp(7109)
+    out2 = str(tmp_path / f"out{pr2}")
+    canned_no_copy = {k: v for k, v in CANNED.items() if k != "pr-copy"}
+    canned_no_copy["plan-fidelity-review"] = ""
+    llm2 = ScriptedToolLlm(UsageLedger(), canned_no_copy, {})
+    fx2 = _fixture(pr_number=pr2)
+    fx2["pr_meta"] = dict(fx2["pr_meta"], number=pr2)
+    res2 = runner.run(fx2, out2, llm2, mode="replay")
+    assert res2.terminal == TerminalState.FAILED
+    with open(os.path.join(out2, "audit.log")) as fh:
+        log2 = fh.read()
+    assert "phase11: no adapter scratch to remove" in log2
+
+
+def test_phase11_cleanup_error_ignored(tmp_path, sticky_tmp):
+    """close() raising must not change the terminal state."""
+    pr = sticky_tmp(7110)
+    out = str(tmp_path / f"out{pr}")
+
+    class BoomLlm(ScriptedToolLlm):
+        def close(self):
+            raise RuntimeError("boom")
+
+    canned = dict(CANNED)
+    canned["plan-fidelity-review"] = ""
+    llm = BoomLlm(UsageLedger(), canned,
+                  {"plan-fidelity-review": [_verdict_doc("READY")]})
+    fx = _fixture(pr_number=pr)
+    fx["pr_meta"] = dict(fx["pr_meta"], number=pr)
+    res = runner.run(fx, out, llm, mode="replay")
+
+    assert res.terminal == TerminalState.SHIPPED_ARMED
+    with open(os.path.join(out, "audit.log")) as fh:
+        log = fh.read()
+    assert "phase11: cleanup error ignored" in log
 # ---------------------------------------------------------------------------
 # Phase 2 background CI watch — replay cases (a)–(e). See plan phase 6.3.
 # ---------------------------------------------------------------------------
@@ -469,8 +721,17 @@ class _FakePopen:
 
     def __init__(self, *a, **k):
         self.returncode = 0
+        self.args = a[0] if a else []
 
-    def communicate(self, timeout=None):
+    # Phase 5 posts the sticky verdict through subprocess.run, which uses Popen as a
+    # context manager. Without these the fake stands in only for the direct Popen calls.
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def communicate(self, input=None, timeout=None):
         return "", ""
 
     def poll(self):

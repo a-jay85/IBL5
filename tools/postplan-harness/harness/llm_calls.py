@@ -176,16 +176,18 @@ def hold_discharge_prompt(sentences: list[str]) -> str:
 
 
 def retrospective_prompt(slug: str, terminal: str, arm: ArmDecision | None,
-                         findings_n: int, phase5: str | None) -> str:
+                         findings_n: int, phase5: str | None, fidelity: dict | None = None) -> str:
     """Phase 9 — one bounded call replaces the open-ended reflection turn."""
     holds = "; ".join(c.reason or c.name for c in (arm.holds if arm else []))
+    fid = (f"{fidelity.get('verdict_1') or 'none'}->{fidelity.get('verdict_2') or '-'} "
+           f"remediated={bool(fidelity.get('remediation_sha'))}") if fidelity else "none"
     return (
         "Post-plan retrospective. Decide whether this run produced a durable, "
         "non-obvious lesson worth saving as a memory (most runs do NOT — routine "
         "shipping is not a lesson). Save only preventive process knowledge that would "
         "change a FUTURE run before it starts.\n\n"
         f"RUN: branch={slug} terminal={terminal} phase5={phase5} "
-        f"surviving_findings={findings_n} holds=[{holds}]\n\n"
+        f"surviving_findings={findings_n} holds=[{holds}] fidelity={fid}\n\n"
         'Return ONLY JSON: {"save": false} or {"save": true, "name": '
         '"<kebab-slug>", "body": "<the lesson, <=120 words>"}.'
     )

@@ -363,9 +363,14 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # against HEAD at arming time, so capturing it after would always match.
         master_sha = _master_sha(worktree)
         reviewed_tree = git.head_tree()
-        fidelity_verdict, fidelity_error = _run_fidelity(
-            llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_sha,
-            reviewed_tree, live, log, res)
+        _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_sha,
+                      reviewed_tree, live, log, res)
+        # A remediation commit moved the head. Phase 7 must watch CI for THAT commit:
+        # keyed on the Phase-2 sha, the background watch would be reused, res.ci_outcome
+        # would describe a commit that is no longer the PR head, and the sticky line
+        # "remediation commit … is inside that watch" would be false.
+        if res.fidelity.get("remediation_sha"):
+            sha = res.fidelity["remediation_sha"]
 
         # ---- Phase 6.5: arming ----------------------------------------
         inputs = ArmInputs(
@@ -458,6 +463,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 gh.pr_edit_body(pr, current + note)
 
         # ---- Phase 7/8: CI watch + confirm -----------------------------
+        res.ci_head = sha or None
         if mode == "replay":
             fx_ci = (fixture or {}).get("checks_outcome")
             outcome = (ciwatch.CiOutcome(fx_ci["exit"], fx_ci.get("failed", []))

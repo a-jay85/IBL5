@@ -600,6 +600,37 @@ def test_replay_e_a_moved_head_makes_verdict_2_stale(tmp_path, sticky_tmp):
     assert 12 in {c.number for c in res.arm.holds}
 
 
+class _TwoShaGit(runner.ReplayGit):
+    """commit_all hands back a distinct sha per commit, so the remediation commit can
+    be told apart from the Phase-2 one (ReplayGit returns the same sha for both)."""
+
+    def commit_all(self, message):
+        super().commit_all(message)
+        return f"replay-sha-{len(self.commit_messages)}"
+
+
+def test_replay_f_phase7_keys_ci_on_the_remediation_commit(tmp_path, sticky_tmp, monkeypatch):
+    """After a Phase 5.5 remediation commit, Phase 7's CI head is that commit — the
+    Phase-2 sha is no longer the PR head, so a watch keyed on it reports the wrong tree."""
+    monkeypatch.setattr(runner, "ReplayGit", _TwoShaGit)
+    pr = sticky_tmp(7106)
+    res, _ = _sticky_run(tmp_path, pr, {
+        "plan-fidelity-review": [_verdict_doc("NOT READY")],
+        "fidelity-remediation": ["edits made"],
+        "plan-fidelity-re-review": [_verdict_doc("READY")],
+    })
+    assert res.fidelity["remediation_sha"] == "replay-sha-2"
+    assert res.ci_head == "replay-sha-2"
+
+
+def test_replay_g_phase7_keeps_the_phase2_commit_without_remediation(tmp_path, sticky_tmp, monkeypatch):
+    monkeypatch.setattr(runner, "ReplayGit", _TwoShaGit)
+    pr = sticky_tmp(7107)
+    res, _ = _sticky_run(tmp_path, pr, {"plan-fidelity-review": [_verdict_doc("READY")]})
+    assert res.fidelity.get("remediation_sha") is None
+    assert res.ci_head == "replay-sha-1"
+
+
 def test_replay_a_failed_sticky_post_does_not_change_arming(tmp_path, sticky_tmp):
     """The skill's own post is `|| true`. A new hold here would change what arming means."""
     pr = sticky_tmp(7106)

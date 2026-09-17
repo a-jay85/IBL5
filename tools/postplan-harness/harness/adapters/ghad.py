@@ -26,6 +26,9 @@ from ..state import HarnessError
 # bin/lib/pr-sticky.sh in the harness's own checkout. Not under pr-ready/,
 # so no either-location lookup applies.
 STICKY_LIB = Path(__file__).resolve().parents[4] / "bin" / "lib" / "pr-sticky.sh"
+# bin/lib/pr-armable.sh, pinned the same way: condition (11) must never read the helper
+# from the worktree it is judging, or a branch could edit it to clear its own hold.
+ARMABLE_LIB = Path(__file__).resolve().parents[4] / "bin" / "lib" / "pr-armable.sh"
 
 POSTPLAN_BADGE_MARKER = "<!-- postplan-status -->"
 
@@ -171,9 +174,17 @@ class LiveGh(RecordingGh):
         fabricated GitHub state. Same strip pr_sticky_verdict does below. Any failure
         returns the API-error sentinel, matching the shell's own contract — a GitHub
         outage must never arm a PR.
+
+        The helper is sourced from the harness's OWN checkout (ARMABLE_LIB), which
+        bin/post-plan-now pins to the main checkout (ADR-0092) — the same pin
+        pr_sticky_verdict uses. A worktree-relative source would read the branch's copy,
+        and a branch that edits bin/lib/pr-armable.sh could clear condition (11) on itself.
         """
         from .llm import _run_reaped
-        argv = ["bash", "-c", 'source "$(git rev-parse --show-toplevel)/bin/lib/pr-armable.sh"; pr_unresolved_findings_hold "$1"', "_", str(pr)]
+        if not ARMABLE_LIB.exists():
+            return ["unresolved-findings-api-error"]
+        argv = ["bash", "-c", 'source "$1"; pr_unresolved_findings_hold "$2"', "_",
+                str(ARMABLE_LIB), str(pr)]
         env = {k: v for k, v in os.environ.items() if k not in ("GH_CMD", "REPO_SLUG")}
         try:
             proc = _run_reaped(argv, None, 120, self.worktree, env)

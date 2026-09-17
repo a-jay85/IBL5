@@ -13,6 +13,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import fidelity
+from harness.adapters import ghad
 from harness.adapters.ghad import LiveGh, RecordingGh
 from harness.armable import (ArmInputs, conflict_flag_path, evaluate,
                              select_fidelity_verdict)
@@ -119,18 +120,42 @@ def test_conditions_11_and_12_are_additive():
 
 # --- condition (11) shell-out fail-closed ------------------------------------
 
-def _gh_shim(tmp_path, monkeypatch, body):
+def _gh_shim(tmp_path, monkeypatch, body, worktree_body=None):
+    """LiveGh over tmp_path as the worktree, with the harness's pr-armable.sh under
+    tmp_path/harness (ARMABLE_LIB) and the worktree's copy under tmp_path/bin/lib.
+
+    Two files on purpose: the worktree copy is the one a branch under review can edit,
+    so a `git` shim reporting tmp_path as the toplevel is left on PATH — the pre-pin
+    source line would land on the worktree copy and the pin test would catch it.
+    """
+    harness_lib = tmp_path / "harness" / "bin" / "lib"
+    harness_lib.mkdir(parents=True, exist_ok=True)
+    (harness_lib / "pr-armable.sh").write_text(body)
+    monkeypatch.setattr(ghad, "ARMABLE_LIB", harness_lib / "pr-armable.sh")
     bindir = tmp_path / "bin"
     bindir.mkdir(exist_ok=True)
     lib = bindir / "lib"
     lib.mkdir(parents=True, exist_ok=True)
-    (lib / "pr-armable.sh").write_text(body)
+    (lib / "pr-armable.sh").write_text(worktree_body if worktree_body is not None else body)
     # a `git` that reports this tmp dir as the repo toplevel
     g = bindir / "git"
     g.write_text(f'#!/usr/bin/env bash\nprintf %s "{tmp_path}"\n')
     g.chmod(g.stat().st_mode | stat.S_IEXEC)
     monkeypatch.setenv("PATH", f"{bindir}:{os.environ['PATH']}")
     return LiveGh(str(tmp_path), str(tmp_path), "demo")
+
+
+def test_unresolved_findings_reads_the_harness_copy_not_the_worktree_copy(tmp_path, monkeypatch):
+    """A branch that edits bin/lib/pr-armable.sh must not clear condition (11) on itself.
+
+    The worktree copy answers "no unresolved findings"; the harness's pinned copy (the
+    main checkout under bin/post-plan-now, ADR-0092) still reports the hold, and the
+    hold is what the adapter returns. Same pin pr_sticky_verdict already has.
+    """
+    gh = _gh_shim(tmp_path, monkeypatch,
+                  "pr_unresolved_findings_hold() { echo 'thread:95'; }\n",
+                  worktree_body="pr_unresolved_findings_hold() { :; }\n")
+    assert gh.unresolved_findings(42) == ["thread:95"]
 
 
 def test_unresolved_findings_fail_closed_on_nonzero_exit(tmp_path, monkeypatch):
@@ -140,7 +165,7 @@ def test_unresolved_findings_fail_closed_on_nonzero_exit(tmp_path, monkeypatch):
 
 def test_unresolved_findings_fail_closed_when_the_lib_is_missing(tmp_path, monkeypatch):
     gh = _gh_shim(tmp_path, monkeypatch, "")
-    os.unlink(os.path.join(str(tmp_path), "bin", "lib", "pr-armable.sh"))
+    os.unlink(str(ghad.ARMABLE_LIB))
     assert gh.unresolved_findings(42) == ["unresolved-findings-api-error"]
 
 
@@ -164,9 +189,8 @@ def test_unresolved_findings_fail_closed_on_timeout(tmp_path, monkeypatch):
     """A hung `gh` must not arm. The production bound is 120 s; 1 s here proves the path."""
     from harness.adapters.llm import _run_reaped
     _gh_shim(tmp_path, monkeypatch, "pr_unresolved_findings_hold() { sleep 30; }\n")
-    argv = ["bash", "-c",
-            'source "$(git rev-parse --show-toplevel)/bin/lib/pr-armable.sh"; '
-            'pr_unresolved_findings_hold "$1"', "_", "42"]
+    argv = ["bash", "-c", 'source "$1"; pr_unresolved_findings_hold "$2"', "_",
+            str(ghad.ARMABLE_LIB), "42"]
     try:
         _run_reaped(argv, None, 1, str(tmp_path), None)
         pytest.fail("the shim should have timed out")

@@ -230,6 +230,7 @@ class RunResult:
     findings: list[Finding] = field(default_factory=list)
     arm: Optional[ArmDecision] = None
     ci_outcome: str = ""
+    ci_head: Optional[str] = None  # commit ci_outcome is for: the remediation sha when Phase 5.5 made one
     final_pr_state: str = ""
     retrospective: Optional[dict] = None
     error: Optional[str] = None

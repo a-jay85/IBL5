@@ -144,6 +144,22 @@ def test_unresolved_findings_fail_closed_when_the_lib_is_missing(tmp_path, monke
     assert gh.unresolved_findings(42) == ["unresolved-findings-api-error"]
 
 
+def test_unresolved_findings_strips_a_leaked_gh_cmd(tmp_path, monkeypatch):
+    """A stub left in the parent env must never answer condition (11) for real `gh`.
+
+    Every other branch of unresolved_findings fails CLOSED. This is the one path that
+    fails OPEN: passing env=None inherited GH_CMD/REPO_SLUG, so a stub returning a
+    well-formed empty thread list graded as "no unresolved findings" and armed the PR
+    on fabricated GitHub state. The shim echoes what the child actually saw, so the
+    assertion fails with the inherited env restored.
+    """
+    monkeypatch.setenv("GH_CMD", str(tmp_path / "leaked-stub"))
+    monkeypatch.setenv("REPO_SLUG", "leaked/slug")
+    gh = _gh_shim(tmp_path, monkeypatch, 'pr_unresolved_findings_hold() { '
+                  'echo "gh=${GH_CMD:-unset}"; echo "slug=${REPO_SLUG:-unset}"; }\n')
+    assert gh.unresolved_findings(42) == ["gh=unset", "slug=unset"]
+
+
 def test_unresolved_findings_fail_closed_on_timeout(tmp_path, monkeypatch):
     """A hung `gh` must not arm. The production bound is 120 s; 1 s here proves the path."""
     from harness.adapters.llm import _run_reaped

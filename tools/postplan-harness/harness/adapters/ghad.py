@@ -164,14 +164,19 @@ class LiveGh(RecordingGh):
     def unresolved_findings(self, pr: int) -> list[str]:
         """Condition (11) — unresolved review threads scored >= 80.
 
-        GH_CMD and REPO_SLUG are deliberately unset: bin/lib/pr-armable.sh defaults them
-        to `gh` and the repo slug. Any failure returns the API-error sentinel, matching
-        the shell's own contract — a GitHub outage must never arm a PR.
+        GH_CMD and REPO_SLUG are STRIPPED from the child env so bin/lib/pr-armable.sh
+        falls back to its own defaults (`gh` and the repo slug). env=None would INHERIT
+        them: a leaked stub answering the condition-(11) GraphQL query with a well-formed
+        empty thread list reads as "no unresolved findings", and arming then proceeds on
+        fabricated GitHub state. Same strip pr_sticky_verdict does below. Any failure
+        returns the API-error sentinel, matching the shell's own contract — a GitHub
+        outage must never arm a PR.
         """
         from .llm import _run_reaped
         argv = ["bash", "-c", 'source "$(git rev-parse --show-toplevel)/bin/lib/pr-armable.sh"; pr_unresolved_findings_hold "$1"', "_", str(pr)]
+        env = {k: v for k, v in os.environ.items() if k not in ("GH_CMD", "REPO_SLUG")}
         try:
-            proc = _run_reaped(argv, None, 120, self.worktree, None)
+            proc = _run_reaped(argv, None, 120, self.worktree, env)
         except Exception:
             return ["unresolved-findings-api-error"]
         if proc.returncode != 0:

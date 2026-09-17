@@ -592,9 +592,6 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                 fidelity.verdict_path(pr), log=log)
             res.fidelity.update({"remediation_sha": str(sha), "verdict_2": verdict_2})
             res.fidelity["reviewed_tree_2"] = tree_2
-            if verdict_2 and tree_2:
-                # condition (12) must compare against the tree the SECOND reviewer saw
-                res.fidelity["reviewed_tree"] = tree_2
             if verdict_2:
                 log(f"phase5.5 re-review: verdict={verdict_2} tree={(tree_2 or '')[:12]}")
                 return verdict_2, ""

@@ -216,6 +216,13 @@ def test_state_held_run_still_records(tmp_path, _st_sticky):
     assert doc["terminal"] == "shipped-held"
     assert 12 in doc["arm"]["holds"]
 
+    # Each verdict keeps its own tree. compose_sticky prints reviewed_tree as
+    # **Reviewed tree:** and reviewed_tree_2 as **Re-reviewed tree:**; collapsing
+    # the first onto the second drops verdict 1's tree from the merge digest.
+    # Condition (12) reads reviewed_tree_2 only (runner.py fidelity_tree_2), so
+    # nothing downstream wants them equal.
+    assert doc["fidelity"]["reviewed_tree"] != doc["fidelity"]["reviewed_tree_2"]
+
     # Mutation: placing arm inside `if decision.armed:` would omit it for held runs.
     assert "arm" in [p["phase"] for p in doc["phases"]]
 

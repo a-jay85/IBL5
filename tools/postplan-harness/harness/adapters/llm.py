@@ -109,7 +109,13 @@ def _tooled_argv(model, *, agent, allowed_tools, denied_tools, add_dirs,
 
 
 class ClaudeCli:
-    """Live adapter: claude -p, single turn, no tools, neutral cwd."""
+    """Live adapter for `claude -p`, with two call paths that differ on every axis.
+
+    `call` is the cheap one: single turn, no tools, neutral temp cwd. `call_tooled` is
+    the expensive one: up to TOOLED_MAX_TURNS turns, an explicit --tools allowlist, and
+    cwd set to the worktree under review. Read the method you are calling before
+    assuming which set of constraints applies.
+    """
 
     def __init__(self, ledger: UsageLedger, workdir: str | None = None,
                  out_dir: str | None = None):

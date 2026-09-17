@@ -238,3 +238,75 @@ def test_live_runs_never_synthesise_a_fidelity_verdict():
         "arming must read the Phase 5.5 verdict, not a literal"
     assert 'else "READY"' not in src, "no hardcoded READY may reach arming"
     assert 'fidelity_verdict="READY"' not in src
+
+
+# ---------------------------------------------------------------------------
+# rc==3 branching by error_kind
+# ---------------------------------------------------------------------------
+
+def test_local_gate_does_not_mention_rebase():
+    """A local-gate block must not tell the human to resolve a rebase."""
+    r = _res(TerminalState.FAILED, error_kind="local-gate",
+             error="check-docs: last_verified not bumped in foo.md")
+    line = runner.verdict_line(r, 3)
+    assert "rebase" not in line.lower()
+
+
+def test_local_gate_carries_error_detail():
+    """The gate detail (the failing gate's own output) must appear in the verdict."""
+    r = _res(TerminalState.FAILED, error_kind="local-gate",
+             error="check-docs: last_verified not bumped in foo.md")
+    line = runner.verdict_line(r, 3)
+    assert "check-docs" in line
+
+
+def test_local_gate_is_single_line():
+    r = _res(TerminalState.FAILED, error_kind="local-gate",
+             error="check-docs: last_verified not bumped in foo.md")
+    line = runner.verdict_line(r, 3)
+    assert "\n" not in line
+
+
+def test_local_gate_contains_result_and_error():
+    r = _res(TerminalState.FAILED, error_kind="local-gate",
+             error="check-docs: last_verified not bumped in foo.md")
+    line = runner.verdict_line(r, 3)
+    assert "RESULT:" in line
+    assert "ERROR" in line
+
+
+def test_rebase_conflict_verbatim():
+    """The rebase-conflict message must be unchanged from before the fix."""
+    r = _res(TerminalState.FAILED, error_kind="rebase-conflict")
+    line = runner.verdict_line(r, 3)
+    assert line == ("RESULT: post-plan BLOCKED — rebase conflict on a stacked branch, "
+                    "human required; ERROR terminal=failed, no PR opened. "
+                    "Resolve the rebase, then re-run bin/post-plan-now.")
+
+
+def test_rebase_conflict_is_single_line():
+    r = _res(TerminalState.FAILED, error_kind="rebase-conflict")
+    line = runner.verdict_line(r, 3)
+    assert "\n" not in line
+
+
+def test_rc3_unknown_error_kind_produces_verdict():
+    """An unknown/None error_kind with rc==3 must not fall through silently."""
+    r = _res(TerminalState.FAILED, error_kind=None)
+    line = runner.verdict_line(r, 3)
+    assert line.startswith("RESULT:")
+    assert "ERROR" in line
+
+
+def test_rc3_unknown_error_kind_names_both_causes():
+    """The fallback must name both fail-closed causes so the human knows where to look."""
+    r = _res(TerminalState.FAILED, error_kind=None)
+    line = runner.verdict_line(r, 3)
+    assert "rebase" in line.lower()
+    assert "local-gate" in line or "local gate" in line.lower()
+
+
+def test_rc3_unknown_error_kind_is_single_line():
+    r = _res(TerminalState.FAILED, error_kind=None)
+    line = runner.verdict_line(r, 3)
+    assert "\n" not in line

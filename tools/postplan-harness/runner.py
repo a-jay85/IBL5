@@ -748,9 +748,19 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
             pr += f" {pull_base}/{res.pr_number}"
 
     if rc == 3:
-        return ("RESULT: post-plan BLOCKED — rebase conflict on a stacked branch, "
-                "human required; ERROR terminal=failed, no PR opened. "
-                "Resolve the rebase, then re-run bin/post-plan-now.")
+        if res.error_kind == "rebase-conflict":
+            return ("RESULT: post-plan BLOCKED — rebase conflict on a stacked branch, "
+                    "human required; ERROR terminal=failed, no PR opened. "
+                    "Resolve the rebase, then re-run bin/post-plan-now.")
+        if res.error_kind == "local-gate":
+            detail = _flat(res.error) or "see gate output"
+            return (f"RESULT: post-plan BLOCKED — local pre-commit/pre-push gate denied "
+                    f"the commit; ERROR terminal=failed, no PR opened. {detail} "
+                    "Clear the gate then re-run bin/post-plan-now.")
+        # Unknown or None error_kind — name both possible causes so the human knows where to look
+        return ("RESULT: post-plan BLOCKED — rc=3 (rebase-conflict or local-gate), "
+                "cause unknown; ERROR terminal=failed, no PR opened. "
+                "Resolve the rebase or clear the local gate, then re-run bin/post-plan-now.")
     if res.terminal == TerminalState.FAILED:
         return (f"RESULT: post-plan FAILED — ERROR terminal=failed "
                 f"kind={res.error_kind or 'unknown'}: "

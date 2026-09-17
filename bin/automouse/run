@@ -507,6 +507,10 @@ MIN_VIABLE_SECS=60   # a real impl/postplan never finishes (pass OR fail) under 
                      # plan failure: stop the night, don't burn the queue to skipped/.
 
 HANDOFF_DIR="$NIGHTLY_DIR/handoff"
+# Conventional bin/wt-new layout: a sibling IBL5-worktrees/ next to $REPO
+# (bin/lib/git-helpers.sh worktrees_parent_dir). Used to derive a plan's
+# worktree from its slug when the handoff JSON cannot supply the path.
+WORKTREES_ROOT="${WORKTREES_ROOT:-$(dirname "$REPO")/IBL5-worktrees}"
 mkdir -p "$LOG_DIR" "$QUEUE_DIR" "$HANDOFF_DIR"
 
 # One-off single-plan mode: bin/automouse/run plan <slug>
@@ -984,6 +988,43 @@ automouse_branch_for_plan() {
     fi
     [ -n "$branch" ] && [ "$branch" != "null" ] || branch=$slug
     printf '%s\n' "$branch"
+}
+
+# Resolve the worktree root for a plan. Prefers the handoff JSON's "worktree" field
+# (the path bin/automouse/prompt-impl Step 7 tells the impl agent to write); falls
+# back to the conventional $WORKTREES_ROOT/<slug> layout when the handoff is absent,
+# unreadable, malformed, carries no worktree key, or names a path that is no longer a
+# directory. Prints the resolved path and returns 0; prints nothing and returns 1 when
+# neither candidate exists on disk.
+#
+# The loop already knows the slug, so the handoff's path is an OPTIONAL OVERRIDE, not
+# the only source of truth. Locking that: on 2026-09-17 an impl agent wrote a handoff in
+# its own invented schema (branch/status/tests/commits/...) with no "worktree" key. Step 7's
+# verification only runs `python3 -m json.tool`, so the syntax-valid wrong-schema file
+# passed, and the postplan phase then skipped a verified-clean 8-file tree, refunded the
+# attempt and stopped the night. Deriving from the slug removes the dependency on an LLM
+# writing back a path the loop can compute.
+#
+# The fallback logs to $LOG deliberately — a silent recovery would hide the producer-side
+# schema bug that this function only papers over.
+automouse_worktree_for_plan() {
+    local plan_name=$1 slug=$2 handoff wt="" derived
+    handoff="$HANDOFF_DIR/${plan_name}.json"
+    if [ -f "$handoff" ]; then
+        wt=$(jq -r '.worktree // empty' "$handoff" 2>/dev/null) || wt=""
+    fi
+    if [ -n "$wt" ] && [ "$wt" != "null" ] && [ -d "$wt" ]; then
+        printf '%s\n' "$wt"
+        return 0
+    fi
+    derived="$WORKTREES_ROOT/$slug"
+    if [ -d "$derived" ]; then
+        printf '[%s] %s postplan: handoff has no usable .worktree — derived %s from slug\n' \
+            "$(date +%H:%M:%S)" "$slug" "$derived" >> "$LOG"
+        printf '%s\n' "$derived"
+        return 0
+    fi
+    return 1
 }
 
 # Loop-side terminal disposition: the branch has an OPEN or MERGED PR, so this plan
@@ -1731,11 +1772,10 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # checkout's post-plan-now, matching append_cost_row's pricer resolution. HARNESS is
         # deliberately NOT exported — post-plan-now's own default pins the MAIN checkout
         # (ADR-0092) and a worktree harness must never judge its own change.
-        PP_WORKTREE=""
-        [ -f "$HANDOFF_FILE" ] && PP_WORKTREE=$(jq -r '.worktree // empty' "$HANDOFF_FILE" 2>/dev/null)
-        if [ -z "$PP_WORKTREE" ] || [ ! -d "$PP_WORKTREE" ]; then
-            printf '[%s] %s postplan: no usable worktree in %s — skipping\n' \
-                "$(date +%H:%M:%S)" "$PLAN_SLUG" "$HANDOFF_FILE" >> "$LOG"
+        PP_WORKTREE=$(automouse_worktree_for_plan "$PLAN_NAME" "$PLAN_SLUG") || PP_WORKTREE=""
+        if [ -z "$PP_WORKTREE" ]; then
+            printf '[%s] %s postplan: no usable worktree — %s has none and %s/%s does not exist — skipping\n' \
+                "$(date +%H:%M:%S)" "$PLAN_SLUG" "$HANDOFF_FILE" "$WORKTREES_ROOT" "$PLAN_SLUG" >> "$LOG"
             PP_STATUS=1
         else
             CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \

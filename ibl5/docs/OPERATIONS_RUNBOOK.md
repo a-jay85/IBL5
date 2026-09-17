@@ -1,6 +1,6 @@
 ---
 description: Production operations runbook — deploy, rollback, DB restore, sim-file recovery, logs, and running the app without the Claude Code harness.
-last_verified: 2026-09-15
+last_verified: 2026-09-17
 ---
 
 # IBL5 Operations Runbook
@@ -413,17 +413,17 @@ php ibl5/bin/validate-schema   # config in ibl5/config/schema-assertions.php
 | Logging (Discord webhook) | `ibl5/config/logging.config.php` | Untracked. Template: `ibl5/config/logging.config.example.php` |
 | Discord bot config | `ibl5/config/discord.config.php` | Untracked. Template: `ibl5/config/discord.config.example.php` |
 | Mail (SMTP) | `ibl5/config/mail.config.php` | Untracked. Template: `ibl5/config/mail.config.example.php` |
-| Deploy SSH key | GitHub Actions secret `PRIVATE_KEY` | Private key; public key installed on prod box's `authorized_keys` |
-| Production host, port, user | GitHub Actions secrets `HOST`, `PORT`, `USERNAME` | |
+| Deploy SSH key | GitHub Actions secret `PRIVATE_KEY`, and the Dependabot secret of the same name | Private key; public key installed on prod box's `authorized_keys`. Duplicated because `deploy-rehearsal.yml` and `merge-digest-notify.yml` run on `pull_request`, and a Dependabot PR's run reads the Dependabot store. |
+| Production host, port, user | GitHub Actions secrets `HOST`, `PORT`, `USERNAME`, and the Dependabot secrets of the same names | Duplicated for the same reason as `PRIVATE_KEY`. |
 | Discord notification target | GitHub Actions secret `OWNER_DISCORD_ID` | Snowflake ID for DM delivery |
-| CI PAT (auto-revert push) | GitHub Actions secret `CI_PAT` | Scoped to push `production` branch |
+| CI PAT (auto-revert push) | GitHub Actions secret `CI_PAT`, and the Dependabot secret of the same name | Scoped to push `production` branch. Duplicated because `dependabot-auto-merge.yml` fires on Dependabot's `pull_request`, and that run resolves `secrets.CI_PAT` from the Dependabot store. |
 
 ### Rotation procedure
 
-1. **DB password** — update on the MariaDB host, then update `ibl5/config.php` on the production box. No redeploy needed; `config.php` is read at runtime.
-2. **Deploy SSH key** — generate a new key pair (`ssh-keygen -t ed25519`), add the public key to `authorized_keys` on the production box, update the `PRIVATE_KEY` GitHub Actions secret, then remove the old public key.
-3. **Discord webhook** — regenerate in Discord server settings, update `ibl5/config/logging.config.php` on the production box.
-4. **CI PAT** — generate a new token in GitHub (scoped to `contents: write` for this repo), update `CI_PAT` secret in GitHub Actions settings, then revoke the old token.
+1. **DB password.** Update on the MariaDB host, then update `ibl5/config.php` on the production box. No redeploy needed; `config.php` is read at runtime.
+2. **Deploy SSH key.** Generate a new key pair (`ssh-keygen -t ed25519`), add the public key to `authorized_keys` on the production box, update the `PRIVATE_KEY` secret in **both** the GitHub Actions and Dependabot stores, then remove the old public key.
+3. **Discord webhook.** Regenerate in Discord server settings, update `ibl5/config/logging.config.php` on the production box.
+4. **CI PAT.** Generate a new token in GitHub (scoped to `contents: write` for this repo), update the `CI_PAT` secret in **both** the GitHub Actions and Dependabot stores, then revoke the old token. Skipping the Dependabot copy leaves every Dependabot PR arming auto-merge with a revoked token, and the run still reports success.
 
 All config files are `.gitignore`d — never commit them. See the `.example` templates for the expected structure.
 

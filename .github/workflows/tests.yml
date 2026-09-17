@@ -687,6 +687,8 @@ jobs:
         run: bin/test-automouse-impl-cap-timeout
       - name: Run automouse postplan terminal-disposition regression test
         run: bin/test-automouse-postplan-disposition
+      - name: Run automouse postplan worktree-resolution regression test
+        run: bin/test-automouse-postplan-worktree
 
   update-baselines:
     name: Update coverage & PHPStan baselines

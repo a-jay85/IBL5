@@ -53,11 +53,16 @@ assert_contains() {
 # ---------------------------------------------------------------------------
 
 # shellcheck disable=SC2034  # PP_BLOCK, ENV_ERR_FN read via eval
-PP_BLOCK=$(awk '/^        PP_WORKTREE=""/,/^        fi$/' "$REPO_ROOT/bin/automouse/run")
+PP_BLOCK=$(awk '/^        PP_WORKTREE=\$\(automouse_worktree_for_plan/,/^        fi$/' "$REPO_ROOT/bin/automouse/run")
 ENV_ERR_FN=$(awk '/^phase_env_error\(\)/,/^}/' "$REPO_ROOT/bin/automouse/run")
+# The PP block now resolves the worktree through a helper (handoff .worktree is an
+# optional override over the $WORKTREES_ROOT/<slug> derivation). Extract it too, or
+# the eval'd block below dies on `command not found`.
+WT_FN=$(awk '/^automouse_worktree_for_plan\(\) \{/,/^\}/' "$REPO_ROOT/bin/automouse/run")
+eval "$WT_FN"
 
 # Sanity: confirm extraction captured the right block before evaling anything.
-assert_contains "$PP_BLOCK" 'PP_WORKTREE=""' "PP block starts with PP_WORKTREE initialisation"
+assert_contains "$PP_BLOCK" 'PP_WORKTREE=$(automouse_worktree_for_plan' "PP block starts with the worktree resolution"
 assert_contains "$PP_BLOCK" '--foreground'   "PP block invokes --foreground"
 
 eval "$ENV_ERR_FN"
@@ -75,7 +80,10 @@ echo "-- row 8: postplan block cd's into worktree and runs post-plan-now --foreg
 S8=$(mktemp -d)
 mkdir -p "$S8/run-dir/bin" "$S8/worktree" "$S8/plans"
 LOG="$S8/log"; : > "$LOG"
-HANDOFF_FILE="$S8/handoff.json"
+HANDOFF_DIR="$S8"
+HANDOFF_FILE="$HANDOFF_DIR/test-plan.md.json"
+# No $WORKTREES_ROOT/<slug> on disk, so this row exercises the handoff-override path.
+WORKTREES_ROOT="$S8/no-such-worktrees-root"
 PLANS_DIR="$S8/plans"
 PLAN_NAME="test-plan.md"
 PLAN_SLUG="test-plan"
@@ -108,6 +116,31 @@ assert_contains "$(cat "$STUB_RECORD")" "--plan"        "row 8: --plan passed to
 assert_contains "$(cat "$STUB_RECORD")" "$PLANS_DIR/$PLAN_NAME" \
                                                         "row 8: absolute plan path in args"
 
+# ---------------------------------------------------------------------------
+# Row 8b: END-TO-END for the 2026-09-17 defect. A handoff carrying no .worktree
+# at all must still reach post-plan-now, cd'd into $WORKTREES_ROOT/<slug>.
+#
+# Row 8 above pins $WORKTREES_ROOT at a nonexistent path on purpose, so it only
+# exercises the handoff-override branch. This row is the composition the live bug
+# broke: agent writes a wrong-schema handoff, loop derives the tree from the slug,
+# post-plan-now runs anyway.
+# ---------------------------------------------------------------------------
+WORKTREES_ROOT="$S8/wt"
+mkdir -p "$WORKTREES_ROOT/$PLAN_SLUG"
+printf '{"branch": "%s", "status": "verified-clean"}\n' "$PLAN_SLUG" > "$HANDOFF_FILE"
+: > "$STUB_RECORD"
+: > "$LOG"
+
+PP_STATUS=0
+eval "$PP_BLOCK"
+
+assert_eq "$PP_STATUS" "0"                              "row 8b: PP_STATUS=0 when the tree is derived from the slug"
+assert_contains "$(cat "$STUB_RECORD")" "STUB-PWD: $WORKTREES_ROOT/$PLAN_SLUG" \
+                                                        "row 8b: cd'd into the slug-derived worktree"
+assert_contains "$(cat "$STUB_RECORD")" "--foreground"  "row 8b: --foreground still passed"
+assert_contains "$(cat "$LOG")" "handoff has no usable .worktree" \
+                                                        "row 8b: the derive path logs loudly"
+
 rm -rf "$S8"
 
 echo
@@ -120,7 +153,10 @@ for SCENARIO in "no-handoff" "empty-worktree" "missing-worktree-dir"; do
     S9=$(mktemp -d)
     mkdir -p "$S9/run-dir/bin" "$S9/plans"
     LOG="$S9/log"; : > "$LOG"
-    HANDOFF_FILE="$S9/handoff.json"
+    HANDOFF_DIR="$S9"
+    HANDOFF_FILE="$HANDOFF_DIR/test-plan.md.json"
+    # Neither source resolves: no handoff path AND no $WORKTREES_ROOT/<slug> on disk.
+    WORKTREES_ROOT="$S9/no-such-worktrees-root"
     PLANS_DIR="$S9/plans"
     PLAN_NAME="test-plan.md"
     PLAN_SLUG="test-plan"
@@ -164,7 +200,9 @@ echo "-- row 10: api error: 429 on stub stderr triggers phase_env_error --"
 S10=$(mktemp -d)
 mkdir -p "$S10/run-dir/bin" "$S10/worktree" "$S10/plans"
 LOG="$S10/log"; : > "$LOG"
-HANDOFF_FILE="$S10/handoff.json"
+HANDOFF_DIR="$S10"
+HANDOFF_FILE="$HANDOFF_DIR/test-plan.md.json"
+WORKTREES_ROOT="$S10/no-such-worktrees-root"
 PLANS_DIR="$S10/plans"
 PLAN_NAME="test-plan.md"
 # shellcheck disable=SC2034  # read by the eval'd PP block extracted from bin/automouse/run

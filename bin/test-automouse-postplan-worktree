@@ -1,0 +1,226 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-automouse-postplan-worktree — regression test for the postplan-phase
+# worktree resolution (automouse_worktree_for_plan) and its call site in
+# bin/automouse/run.
+#
+# The defect this locks (observed 2026-09-17 13:16): the impl agent for
+# postplan-fidelity-remediation-loop wrote its handoff in a self-invented schema —
+# {branch,status,tests,doc_check,arm_conditions,commits,dirty_files,phases_complete} —
+# with no "worktree" key. prompt-impl Step 7's verification only runs
+# `python3 -m json.tool`, so a syntax-valid wrong-schema file passed. The postplan
+# phase read `.worktree`, got empty, logged "no usable worktree ... skipping", and
+# set PP_STATUS=1. The sub-minute exit then tripped the environmental breaker, which
+# refunded the attempt and stopped the night — stranding a verified-clean tree with
+# 8 dirty files and two pushed commits.
+#
+# The load-bearing property: the handoff's .worktree is an OPTIONAL OVERRIDE. The loop
+# knows PLAN_SLUG, so it can always derive $WORKTREES_ROOT/<slug> itself. A handoff that
+# omits, misspells, or stales the path must never strand a worktree that exists on disk.
+#
+# Second property (case c1): the fallback is LOUD. A silent recovery would hide the
+# producer-side schema bug, so the derive path must write a line to $LOG.
+#
+# The function is EXTRACTED from bin/automouse/run rather than copied, so the test can
+# never drift from the implementation. It reads only its positional args and the
+# harness-settable globals HANDOFF_DIR, WORKTREES_ROOT, LOG.
+#
+# Run: bin/test-automouse-postplan-worktree (exit 0 = all pass, 1 = a case failed)
+
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+RUNNER="$SCRIPT_DIR/automouse/run"
+FAILED=0
+
+if [ ! -f "$RUNNER" ]; then
+    echo "FAIL: cannot find $RUNNER"
+    exit 1
+fi
+
+# --- Extract the function from the runner ---------------------------------
+# Same awk idiom as the rest of the family: from the column-0 definition line to
+# the first lone column-0 }.
+extract_fn() {
+    awk -v fn="$1" '
+        $0 ~ "^" fn "\\(\\) \\{" { capture = 1 }
+        capture { print }
+        capture && /^\}/ { exit }
+    ' "$RUNNER"
+}
+
+FN_SRC="$(extract_fn automouse_worktree_for_plan)"
+if [ -z "$FN_SRC" ]; then
+    echo "FAIL: could not extract automouse_worktree_for_plan from $RUNNER"
+    exit 1
+fi
+eval "$FN_SRC"
+
+# --- Harness --------------------------------------------------------------
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+HANDOFF_DIR="$TMP/handoff"
+WORKTREES_ROOT="$TMP/IBL5-worktrees"
+LOG="$TMP/run.log"
+mkdir -p "$HANDOFF_DIR" "$WORKTREES_ROOT"
+: > "$LOG"
+
+pass() { printf 'PASS: %s\n' "$1"; }
+fail() { printf 'FAIL: %s\n' "$1"; FAILED=1; }
+
+check_eq() {
+    local label=$1 want=$2 got=$3
+    if [ "$want" = "$got" ]; then
+        pass "$label"
+    else
+        fail "$label — want [$want], got [$got]"
+    fi
+}
+
+reset_state() {
+    rm -rf "$HANDOFF_DIR" "$WORKTREES_ROOT"
+    mkdir -p "$HANDOFF_DIR" "$WORKTREES_ROOT"
+    : > "$LOG"
+}
+
+# ==========================================================================
+# Group a — resolution precedence
+# ==========================================================================
+
+# a1: a well-formed handoff whose .worktree exists wins, and does NOT log a fallback.
+reset_state
+mkdir -p "$WORKTREES_ROOT/alpha" "$TMP/elsewhere/alpha"
+cat > "$HANDOFF_DIR/alpha.md.json" <<JSON
+{"slug":"alpha","worktree":"$TMP/elsewhere/alpha","branch":"alpha"}
+JSON
+GOT="$(automouse_worktree_for_plan alpha.md alpha)"
+check_eq "a1 handoff .worktree wins when it exists" "$TMP/elsewhere/alpha" "$GOT"
+if grep -q 'derived' "$LOG"; then
+    fail "a1 must not log a fallback when the handoff path is usable"
+else
+    pass "a1 no fallback log on the happy path"
+fi
+
+# a2: THE LIVE DEFECT — verbatim replay of the 2026-09-17 handoff schema.
+reset_state
+mkdir -p "$WORKTREES_ROOT/postplan-fidelity-remediation-loop"
+cat > "$HANDOFF_DIR/postplan-fidelity-remediation-loop.md.json" <<'JSON'
+{
+  "branch": "postplan-fidelity-remediation-loop",
+  "status": "verified-clean",
+  "tests": "578 passed, 7 skipped",
+  "doc_check": "passed",
+  "arm_conditions": "passed",
+  "commits": ["3ed1a96e1", "abf700e42"],
+  "dirty_files": 8,
+  "phases_complete": "1-10"
+}
+JSON
+GOT="$(automouse_worktree_for_plan postplan-fidelity-remediation-loop.md postplan-fidelity-remediation-loop)"
+check_eq "a2 agent-invented schema (no .worktree) derives from slug" \
+    "$WORKTREES_ROOT/postplan-fidelity-remediation-loop" "$GOT"
+
+# a3: no handoff file at all, derived tree exists.
+reset_state
+mkdir -p "$WORKTREES_ROOT/gamma"
+GOT="$(automouse_worktree_for_plan gamma.md gamma)"
+check_eq "a3 absent handoff derives from slug" "$WORKTREES_ROOT/gamma" "$GOT"
+
+# a4: handoff names a worktree that has since been removed — derived wins.
+reset_state
+mkdir -p "$WORKTREES_ROOT/delta"
+cat > "$HANDOFF_DIR/delta.md.json" <<JSON
+{"worktree":"$TMP/removed-long-ago","branch":"delta"}
+JSON
+GOT="$(automouse_worktree_for_plan delta.md delta)"
+check_eq "a4 stale .worktree path falls back to slug" "$WORKTREES_ROOT/delta" "$GOT"
+
+# a5: malformed JSON — jq fails, derived wins.
+reset_state
+mkdir -p "$WORKTREES_ROOT/epsilon"
+printf '{ this is not json' > "$HANDOFF_DIR/epsilon.md.json"
+GOT="$(automouse_worktree_for_plan epsilon.md epsilon)"
+check_eq "a5 malformed handoff falls back to slug" "$WORKTREES_ROOT/epsilon" "$GOT"
+
+# a6: explicit JSON null for .worktree — treated as absent.
+reset_state
+mkdir -p "$WORKTREES_ROOT/zeta"
+printf '{"worktree":null,"branch":"zeta"}' > "$HANDOFF_DIR/zeta.md.json"
+GOT="$(automouse_worktree_for_plan zeta.md zeta)"
+check_eq "a6 null .worktree falls back to slug" "$WORKTREES_ROOT/zeta" "$GOT"
+
+# ==========================================================================
+# Group b — genuine no-worktree case still fails closed
+# ==========================================================================
+
+# b1: neither the handoff path nor the derived path exists — return 1, print nothing.
+reset_state
+printf '{"worktree":"%s/nope"}' "$TMP" > "$HANDOFF_DIR/eta.md.json"
+GOT="$(automouse_worktree_for_plan eta.md eta)"
+RC=$?
+if [ "$RC" -eq 0 ]; then
+    fail "b1 must return non-zero when no worktree exists (got rc=$RC)"
+else
+    pass "b1 returns non-zero when no worktree exists"
+fi
+check_eq "b1 prints nothing when no worktree exists" "" "$GOT"
+
+# b2: a file (not a directory) at the derived path is not a worktree.
+reset_state
+: > "$WORKTREES_ROOT/theta"
+if automouse_worktree_for_plan theta.md theta >/dev/null 2>&1; then
+    fail "b2 a plain file at the derived path must not resolve"
+else
+    pass "b2 a plain file at the derived path does not resolve"
+fi
+
+# ==========================================================================
+# Group c — the fallback is loud
+# ==========================================================================
+
+# c1: the derive path writes a line to $LOG naming the slug and the derived path.
+reset_state
+mkdir -p "$WORKTREES_ROOT/iota"
+printf '{"branch":"iota"}' > "$HANDOFF_DIR/iota.md.json"
+automouse_worktree_for_plan iota.md iota >/dev/null
+if grep -q "iota postplan: handoff has no usable .worktree" "$LOG" \
+   && grep -q "$WORKTREES_ROOT/iota" "$LOG"; then
+    pass "c1 fallback logs the slug and the derived path"
+else
+    fail "c1 fallback must log the slug and the derived path (log: $(cat "$LOG"))"
+fi
+
+# ==========================================================================
+# Group d — static assertions against the runner source
+# ==========================================================================
+
+# d1: the postplan call site goes through the helper, not a raw jq read. A future
+# refactor that reintroduces `jq -r '.worktree'` at the call site reinstates the defect.
+if grep -q 'PP_WORKTREE=$(automouse_worktree_for_plan "$PLAN_NAME" "$PLAN_SLUG")' "$RUNNER"; then
+    pass "d1 postplan call site uses automouse_worktree_for_plan"
+else
+    fail "d1 postplan call site must call automouse_worktree_for_plan"
+fi
+if grep -q "PP_WORKTREE=\$(jq -r '.worktree" "$RUNNER"; then
+    fail "d1 postplan call site must not read .worktree directly with jq"
+else
+    pass "d1 no raw jq .worktree read at the postplan call site"
+fi
+
+# d2: WORKTREES_ROOT is defined and overridable, so the derivation is not hardcoded
+# to one machine layout and this test can point it at a tmpdir.
+if grep -q 'WORKTREES_ROOT="${WORKTREES_ROOT:-' "$RUNNER"; then
+    pass "d2 WORKTREES_ROOT is defined with an env override"
+else
+    fail "d2 WORKTREES_ROOT must be defined with an env override"
+fi
+
+# ==========================================================================
+if [ "$FAILED" -eq 0 ]; then
+    echo "All automouse postplan-worktree cases passed."
+else
+    echo "One or more automouse postplan-worktree cases FAILED."
+fi
+exit "$FAILED"

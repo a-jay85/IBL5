@@ -1,6 +1,7 @@
 import glob
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -941,3 +942,101 @@ def test_background_watch_is_reaped_on_normal_completion(monkeypatch, tmp_path):
     data = json.loads(open(path).read())
     assert data["status"] in ("success", "failure", "timeout")
     assert res.ci_outcome == "green"
+
+
+# ---------------------------------------------------------------------------
+# audit.log as a LIVE progress signal. bin/fleet-status reads this file to render
+# a harness row mid-run; before it was written incrementally, every harness row
+# showed "(no output yet — headless runs flush at exit)" for the whole run,
+# because the other two sources fleet-status tries are both empty on this engine
+# (the harness prints nothing until exit, and its bounded `claude -p` calls carry
+# no --session-id for the transcript glob to key on).
+# ---------------------------------------------------------------------------
+
+
+class _AuditSnoopLlm(ScriptedToolLlm):
+    """Snapshots audit.log ON DISK at the first LLM call, i.e. while run() is mid-flight.
+
+    Reading the file after run() returns would pass even with the old exit-time-only
+    write, so the assertion has to happen from inside the run. An LLM call is the
+    hook because it is the only harness seam a test can occupy mid-phase.
+    """
+
+    def __init__(self, ledger, canned, scripts, audit_path):
+        super().__init__(ledger, canned, scripts)
+        self._audit_path = audit_path
+        self.snapshot = None
+
+    def _snap(self):
+        if self.snapshot is not None:
+            return
+        try:
+            with open(self._audit_path) as fh:
+                self.snapshot = fh.read()
+        except OSError:
+            self.snapshot = ""
+
+    def call(self, purpose, model, prompt, *a, **kw):
+        self._snap()
+        return super().call(purpose, model, prompt, *a, **kw)
+
+    def call_tooled(self, purpose, model, prompt, **kw):
+        self._snap()
+        return super().call_tooled(purpose, model, prompt, **kw)
+
+
+def _snoop_run(tmp_path, pr, scripts, **over):
+    """_sticky_run with an LLM that captures the on-disk audit.log mid-run."""
+    out = str(tmp_path / f"out{pr}")
+    canned = dict(CANNED)
+    canned["plan-fidelity-review"] = ""
+    llm = _AuditSnoopLlm(UsageLedger(), canned, scripts,
+                         os.path.join(out, "audit.log"))
+    fx = _fixture(pr_number=pr, **over)
+    fx["pr_meta"] = dict(fx["pr_meta"], number=pr)
+    res = runner.run(fx, out, llm, mode="replay")
+    return res, out, llm
+
+
+def test_audit_log_is_populated_mid_run(tmp_path, sticky_tmp):
+    """audit.log carries phase lines BEFORE the run ends — the whole point of the mirror."""
+    pr = sticky_tmp(7130)
+    res, out, llm = _snoop_run(tmp_path, pr,
+                               {"plan-fidelity-review": [_verdict_doc("READY")]})
+    assert llm.snapshot is not None, "the run made no LLM call, so nothing was sampled"
+    assert "phase1 plan:" in llm.snapshot, llm.snapshot
+    # The sampled text must match the format bin/fleet-status greps for: `[HH:MM:SS] phase…`
+    first = llm.snapshot.splitlines()[0]
+    assert re.match(r"^\[\d{2}:\d{2}:\d{2}\] phase", first), first
+
+
+def test_audit_log_final_bytes_unchanged_by_the_mirror(tmp_path, sticky_tmp):
+    """_finish still rewrites the file whole; the live append must not double or reorder it."""
+    pr = sticky_tmp(7131)
+    res, out, _ = _snoop_run(tmp_path, pr,
+                             {"plan-fidelity-review": [_verdict_doc("READY")]})
+    with open(os.path.join(out, "audit.log")) as fh:
+        on_disk = fh.read()
+    assert on_disk == "\n".join(res.audit) + "\n"
+
+
+def test_audit_log_truncated_for_a_reused_out_dir(tmp_path, sticky_tmp):
+    """A stale tail read as live progress is worse than the placeholder — so truncate."""
+    pr = sticky_tmp(7132)
+    out = str(tmp_path / f"out{pr}")
+    os.makedirs(out, exist_ok=True)
+    with open(os.path.join(out, "audit.log"), "w") as fh:
+        fh.write("[00:00:00] phase9: LEFTOVER FROM A PREVIOUS RUN\n")
+
+    canned = dict(CANNED)
+    canned["plan-fidelity-review"] = ""
+    llm = _AuditSnoopLlm(UsageLedger(), canned,
+                         {"plan-fidelity-review": [_verdict_doc("READY")]},
+                         os.path.join(out, "audit.log"))
+    fx = _fixture(pr_number=pr)
+    fx["pr_meta"] = dict(fx["pr_meta"], number=pr)
+    runner.run(fx, out, llm, mode="replay")
+
+    assert "LEFTOVER" not in (llm.snapshot or ""), llm.snapshot
+    with open(os.path.join(out, "audit.log")) as fh:
+        assert "LEFTOVER" not in fh.read()

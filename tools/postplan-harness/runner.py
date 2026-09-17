@@ -658,14 +658,21 @@ def _finish(res: RunResult, out_dir: str) -> RunResult:
     return res
 
 
+# Both are deterministic walls a full skill re-run cannot climb — see exit_code_for.
+_FAIL_CLOSED_KINDS = ("rebase-conflict", "local-gate")
+
+
 def exit_code_for(res: RunResult) -> int:
     """Process exit code from a terminal RunResult.
-    3 = rebase-conflict fail-closed sentinel: bin/post-plan-now MUST NOT escalate to
-        the /post-plan skill session; a human resolves the stacked-branch rebase.
+    3 = fail-closed sentinel: bin/post-plan-now MUST NOT escalate to the /post-plan
+        skill session. Two kinds land here. `rebase-conflict` — a stacked-branch
+        rebase a human must judge. `local-gate` — a pre-commit/pre-push hook denial
+        (ADR trigger, stale doc, rules byte budget). Both are deterministic, so the
+        ~1M-token skill re-run would hit the identical wall and buy nothing.
     1 = any other typed failure: bin/post-plan-now re-runs the full /post-plan skill.
     0 = shipped (armed or held), nothing to ship, or degraded.
     There is no 4: the harness owns Phase 5.5, and the launcher has no resume arm."""
-    if res.terminal == TerminalState.FAILED and res.error_kind == "rebase-conflict":
+    if res.terminal == TerminalState.FAILED and res.error_kind in _FAIL_CLOSED_KINDS:
         return 3
     if res.terminal == TerminalState.DEGRADED:
         return 0          # PR open and held by (9); a skill re-run would re-review a PR a human must judge

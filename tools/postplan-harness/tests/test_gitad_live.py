@@ -7,6 +7,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+import harness.adapters.gitad as gitad
 from harness.adapters.gitad import LiveGit
 from harness.state import HarnessError
 
@@ -141,6 +142,44 @@ def test_push_after_rebase_uses_force_with_lease(repo):
 
     # push() must succeed (--force-with-lease handles the diverged remote)
     g.push()  # raises HarnessError("git", ...) if plain push, passes if --force-with-lease
+
+
+def _fake_proc(returncode, stdout="", stderr=""):
+    class P:
+        pass
+    p = P()
+    p.returncode, p.stdout, p.stderr = returncode, stdout, stderr
+    return p
+
+
+def test_push_gate_denial_is_kind_local_gate(monkeypatch):
+    """pre-push-adr-hook denial must not be a generic 'git' failure: the kind is what
+    drives the fail-closed exit 3 that skips the ~1M-token skill fallback."""
+    monkeypatch.setattr(gitad.subprocess, "run", lambda *a, **k: _fake_proc(
+        1, stderr="pre-push-adr-hook: a decision-trigger surface is being pushed without an ADR."))
+    with pytest.raises(HarnessError) as e:
+        LiveGit("/tmp", push_remote="origin").push()
+    assert e.value.kind == "local-gate"
+
+
+def test_commit_gate_denial_on_stdout_is_detected(monkeypatch):
+    """bin/pre-commit-hook runs its checks with 2>&1 and echoes to STDOUT, so
+    stderr-only detection would miss every commit-path denial."""
+    monkeypatch.setattr(gitad.subprocess, "run", lambda *a, **k: _fake_proc(
+        1, stdout="FAIL  .claude/rules/x.md  16374 bytes  cap 16000\nOne or more checks failed:\n"))
+    with pytest.raises(HarnessError) as e:
+        LiveGit("/tmp")._run("commit", "-m", "x")
+    assert e.value.kind == "local-gate"
+    assert "One or more checks failed" in e.value.detail
+
+
+def test_ordinary_git_failure_stays_kind_git(monkeypatch):
+    """Negative path: transient/real git errors must still fall back to the skill."""
+    monkeypatch.setattr(gitad.subprocess, "run", lambda *a, **k: _fake_proc(
+        1, stderr="fatal: could not read from remote repository"))
+    with pytest.raises(HarnessError) as e:
+        LiveGit("/tmp")._run("fetch", "origin")
+    assert e.value.kind == "git"
 
 
 def test_diff_vs_base_non_utf8_bytes(repo):

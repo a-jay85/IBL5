@@ -116,14 +116,14 @@ harness_handoff_names() {
 # — condition (3) reads file state rather than gh, so it gets its own runner: the
 # block's $DONE_MARK/$BRIDGE defaults are overridden to point into $BASE_TMP.
 # style=flat (default) uses arbitrary names; style=rundir reproduces the compiled
-# harness's run dir, using the basenames bin/post-plan-now actually passes.
+# harness's run dir, using the basenames runner.py actually writes.
 run_cond3() {
     local mark="$BASE_TMP/done-marker" bridge="$BASE_TMP/bridge"
     if [ "${4:-flat}" = "rundir" ]; then
         local dn bn rd
         read -r dn bn <<< "$(harness_handoff_names)"
         if [ -z "$dn" ] || [ -z "$bn" ]; then
-            echo "FAIL: run_cond3 rundir — could not derive handoff basenames from bin/post-plan-now"
+            echo "FAIL: run_cond3 rundir — could not derive handoff basenames from tools/postplan-harness/runner.py"
             FAILED=1
             return 1
         fi
@@ -412,8 +412,8 @@ expect_block "(3) marker + unresolved MISSING-FILE -> BLOCK" BLOCK \
 
 # --- condition (3) on the COMPILED-HARNESS path (run-dir-keyed handoff) ---
 # Same block, same three states, but driven through the real filenames
-# bin/post-plan-now passes as DONE_MARK/BRIDGE on the rc=4 arm. These names are
-# derived from bin/post-plan-now, so a rename on either side fails here.
+# runner.py writes into its own run dir. These names are derived from runner.py,
+# so a rename on either side fails here.
 
 # State 1 — indeterminate: the harness never reached the end of Phase 5.0 (crash in
 # phases 1-4, or conformance.check() itself raised), so runner.py wrote no marker.

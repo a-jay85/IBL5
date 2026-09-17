@@ -35,7 +35,7 @@
 # ~/.claude/projects/*/<uuid>.jsonl LIVE, so the last assistant line and the last
 # tool call now render mid-run. Liveness is unchanged: the row is still gated on a
 # numeric launchd PID, so a surviving transcript can never speak for a dead job.
-# post-plan rows have no sidecar — out/<run>/audit.log stays their only signal.
+# post-plan rows carry a sidecar too; audit.log takes precedence once it exists.
 #
 # AND THE ROW LINKS TO WHICHEVER OF THOSE IT READ. Every job on this page is by
 # construction still running, which is exactly the window where the /tmp log holds

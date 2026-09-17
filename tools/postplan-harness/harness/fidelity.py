@@ -353,13 +353,20 @@ EXCERPT_LIMIT = 30000
 _MERGE_DIGEST_HEADING_RE = re.compile(r"^#{1,6}[ \t]+Merge digest")
 
 
-def findings_excerpt(path: str) -> str:
+def findings_excerpt(path: str, verdict_present: bool) -> str:
     """The reviewer's findings, quoted safely into the sticky comment.
 
     Two escapes are load-bearing: the marker must stay unique (bin/digest-dm-build and the
     skill both find the comment by its LAST marker) and `### Merge digest` must occur once
     (the DM parser starts its label scan at the first one it sees).
+
+    `verdict_present=False` short-circuits, the same gate digest_lines takes and for the
+    same reason: verdict_path() is a stable /tmp path that is never deleted, and every
+    indeterminate branch of _run_fidelity still records it. Without the gate a degraded
+    re-run quotes the PREVIOUS run's findings under a "verdict missing" terminal line.
     """
+    if not verdict_present:
+        return ""
     try:
         with open(path) as fh:
             raw = fh.read()

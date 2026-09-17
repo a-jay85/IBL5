@@ -429,7 +429,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 ci_line += f"; remediation commit {rsha} is inside that watch"
             sticky = fidelity.compose_sticky(
                 rebase_line, ci_line, fid, decision, digest,
-                fidelity.findings_excerpt(vpath),
+                fidelity.findings_excerpt(vpath, fid.get("verdict_1") is not None),
                 fidelity.terminal_line(fid.get("verdict_1"), fid.get("error_kind"), rsha,
                                        fid.get("verdict_2"), fid.get("reviewed_tree_2"),
                                        plan.auto_merge_false))

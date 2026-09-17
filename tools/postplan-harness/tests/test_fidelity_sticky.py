@@ -67,17 +67,30 @@ def test_unrecorded_tree_is_named_not_blank():
 # --- findings_excerpt ---------------------------------------------------------
 
 def test_excerpt_of_a_missing_or_empty_file_is_empty(tmp_path):
-    assert fidelity.findings_excerpt(str(tmp_path / "nope.md")) == ""
+    assert fidelity.findings_excerpt(str(tmp_path / "nope.md"), True) == ""
     p = tmp_path / "empty.md"
     p.write_text("\n \n")
-    assert fidelity.findings_excerpt(str(p)) == ""
+    assert fidelity.findings_excerpt(str(p), True) == ""
+
+
+def test_excerpt_is_empty_when_this_run_produced_no_verdict(tmp_path):
+    """The same gate digest_lines takes, for the same stale-/tmp-file reason.
+
+    verdict_path() is stable per PR and never deleted, and every indeterminate branch of
+    _run_fidelity still records it. Ungated, a degraded re-run quotes the PREVIOUS run's
+    findings underneath a terminal line that says the verdict is missing.
+    """
+    p = tmp_path / "v.md"
+    p.write_text("NOT READY\nstale finding from an earlier run\n")
+    assert fidelity.findings_excerpt(str(p), False) == ""
+    assert "stale finding" in fidelity.findings_excerpt(str(p), True)
 
 
 def test_excerpt_cuts_at_digest_and_drops_the_tree_line(tmp_path):
     p = tmp_path / "v.md"
     p.write_text("READY\nREVIEWED_TREE=" + TREE + "\nfinding one\n"
                  "## DIGEST\n**What changed:** secret\n")
-    ex = fidelity.findings_excerpt(str(p))
+    ex = fidelity.findings_excerpt(str(p), True)
     assert "finding one" in ex
     assert "REVIEWED_TREE" not in ex
     assert "secret" not in ex and "## DIGEST" not in ex
@@ -87,7 +100,7 @@ def test_excerpt_escapes_the_marker_and_the_heading(tmp_path):
     p = tmp_path / "v.md"
     p.write_text("NOT READY\nthe PR body already carries <!-- pr-ready-verdict -->\n"
                  "### Merge digest\n**What changed:** quoted\n")
-    ex = fidelity.findings_excerpt(str(p))
+    ex = fidelity.findings_excerpt(str(p), True)
     assert fidelity.STICKY_MARKER not in ex
     assert "<!-- pr-ready-verdict (quoted) -->" in ex
     assert "\\### Merge digest" in ex
@@ -96,7 +109,7 @@ def test_excerpt_escapes_the_marker_and_the_heading(tmp_path):
 def test_excerpt_truncates(tmp_path):
     p = tmp_path / "v.md"
     p.write_text("x" * 40000)
-    ex = fidelity.findings_excerpt(str(p))
+    ex = fidelity.findings_excerpt(str(p), True)
     assert ex.endswith("… (truncated)")
     assert len(ex) < 40000
 
@@ -143,7 +156,7 @@ def test_a_hostile_excerpt_cannot_duplicate_the_marker_or_heading(tmp_path):
     p = tmp_path / "v.md"
     p.write_text("NOT READY\n### Merge digest\n**Watch:** injected\n"
                  + fidelity.STICKY_MARKER + "\n")
-    body = _sticky(excerpt=fidelity.findings_excerpt(str(p)))
+    body = _sticky(excerpt=fidelity.findings_excerpt(str(p), True))
     assert body.count(fidelity.STICKY_MARKER) == 1
     assert body.count("\n" + fidelity.MERGE_DIGEST_HEADING + "\n") == 1
 

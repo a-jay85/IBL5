@@ -6,7 +6,7 @@ Purpose: the criteria and verdict shape for the semantic judgment this skill exi
 
 **6b. Inputs.** Gather all five before judging anything:
 
-1. The plan file read in runtime Phase 1 (`~/claude-plans/<branch>.md`). This input is never missing: `SKILL.md` Phase 1.1 hard-stops the run when the plan is absent. If you have reached this phase without it, the run skipped a `STOP:` — say so and emit `NOT READY`; do not substitute the PR body.
+1. The plan file at the path your prompt names (`~/claude-plans/<branch>.md`). **Runtime Phase 1.1 confirms it exists and indexes it, but never reads the body, so you gather this input yourself** by the index-then-range procedure in `.claude/agents/pr-ready-phase6.md` § *Gathering the plan file*: `bin/plan-index` first, then `sed -n 'START,ENDp'` per section. That index is the authoritative phase roster check 1 below is accountable to. No implementation phase may go unread. This input is never missing: `SKILL.md` Phase 1.1 hard-stops the run when the plan is absent. If you have reached this phase without it, the run skipped a `STOP:`. Say so and emit `NOT READY`; do not substitute the PR body.
 2. The full **post-rebase** diff — `gh pr diff <N>`, or `git diff origin/master...HEAD` locally.
 3. The PR body.
 4. The list of conflict-resolved paths recorded in runtime Phase 3.

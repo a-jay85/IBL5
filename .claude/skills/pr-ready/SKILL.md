@@ -7,7 +7,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-09-10
+last_verified: 2026-09-17
 ---
 <!-- `model: claude-sonnet-4-6` IS DELIBERATE — DO NOT REMOVE IT, and never write
      `model: sonnet` (that alias resolves to Sonnet 5). User-authorized 2026-08-26,
@@ -142,11 +142,19 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
 
 **Phase 1 — plan, master pin, protection, prior-review probe.**
 
-1. **Read the plan.** Run `git rev-parse --abbrev-ref HEAD` bare, then `Read` `~/claude-plans/<branch>.md` with the printed branch name substituted. The path is deterministic — resolve it, never search for it. If it does not exist, print loudly
+1. **Plan existence gate.** Confirm the plan is on disk and index it. Never read its body here. Run `git rev-parse --abbrev-ref HEAD` bare, then, with the printed branch name substituted:
+
+   ```bash
+   test -f ~/claude-plans/<branch>.md && bin/plan-index ~/claude-plans/<branch>.md
+   ```
+
+   The path is deterministic. Resolve it, never search for it. If the file does not exist, print loudly
 
    `STOP: no plan at ~/claude-plans/<branch>.md. /pr-ready's Phase 6 judges implementation against the plan's stated intent; without the plan there is nothing to judge against. Re-run once the plan file is restored, or run /pr-review instead for a plain code review.`
 
-   and stop. Do **not** fall back to the PR body for plan intent — the PR body is one of the things Phase 6 audits.
+   and stop. Do **not** fall back to the PR body for plan intent. The PR body is one of the things Phase 6 audits.
+
+   **Why the index rather than a `Read`.** Plans run 58 to 320 KB (15 to 80K tokens), and this session is the Sonnet 4.6 orchestrator. The only consumer of plan *content* is the Phase 6 reviewer, and Phase 6 hands that reviewer the plan **path**. A whole-file `Read` here spends a large slice of the window on text this session never uses. `bin/plan-index` prints the section index for a few hundred bytes; record it as run notes so Phase 6's spawn prompt can cite the phase count. An exit code of `2` (no `## ` sections) does **not** trip the `STOP:` above, because the file exists and existence is the whole of what this gate asserts; note the malformed shape and continue. The `cf_parse_section` call in the diff-bounds block below reads the plan **inside a shell**, so it costs no context and stays exactly as written.
 
 2. `git fetch origin`. Nothing in this skill ever runs a bare `git rebase` against `origin/master`; see the `--onto` recipe in the Phase 2 include.
 

@@ -41,12 +41,10 @@ make a single edit. Read it in two moves instead.
 **Move 1 — index the sections. Run this and keep the output:**
 
 ```bash
-wc -l "$PLAN_PATH"
-grep -n '^## ' "$PLAN_PATH"
+bin/plan-index "$PLAN_PATH"
 ```
 
-That gives you every section title with its start line. A section runs from its own line
-number to one less than the next section's line number (the last section runs to `wc -l`).
+It prints one tab-separated `<start>\t<end>\t<title>` record per `## ` section and a final `TOTAL-LINES\t<n>` record, so the ranges are precomputed.
 
 **Move 2 — read only what you need, one `sed` range at a time:**
 
@@ -75,7 +73,7 @@ Worked example — on a 4,022-line plan, the governing sections above total ~22K
 tokens) and the largest single phase is ~53KB (~13K tokens), so the peak is ~19K tokens
 against ~81K for reading the file whole.
 
-If `grep -n '^## '` returns nothing, the plan has no `## ` sections; only then fall back
+If `bin/plan-index` exits with code 2, the plan has no `## ` sections; only then fall back
 to reading the file whole, and note it in your handoff.
 
 ## Step 1.5: Prior Failure Report (escalated final retry only)

@@ -1,0 +1,140 @@
+#!/usr/bin/env bash
+# bin/test-plan-index — unit tests for bin/plan-index.
+#
+# Run: bin/test-plan-index
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PLAN_INDEX="$SCRIPT_DIR/plan-index"
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+PASS=0
+FAIL=0
+
+check() {
+    local name="$1" expected="$2" actual="$3"
+    if [ "$expected" = "$actual" ]; then
+        PASS=$((PASS + 1))
+        echo "  ok   $name"
+    else
+        FAIL=$((FAIL + 1))
+        echo "  FAIL $name"
+        echo "       expected: [$expected]"
+        echo "       actual:   [$actual]"
+    fi
+}
+
+echo "test-plan-index"
+
+# --- 1. Basic sectioning: preamble, ranges, TOTAL-LINES -----------------------
+cat > "$TMP/basic.md" <<'EOF'
+---
+auto_merge: true
+---
+# A plan
+
+## Approach
+alpha
+beta
+
+## Phase 1: do a thing
+gamma
+
+## Critical Files
+delta
+EOF
+OUT="$($PLAN_INDEX "$TMP/basic.md")"
+check "preamble range" "$(printf '1\t5\t(preamble)')" "$(echo "$OUT" | sed -n '1p')"
+check "first section range" "$(printf '6\t9\tApproach')" "$(echo "$OUT" | sed -n '2p')"
+check "middle section range" "$(printf '10\t12\tPhase 1: do a thing')" "$(echo "$OUT" | sed -n '3p')"
+check "last section runs to EOF" "$(printf '13\t14\tCritical Files')" "$(echo "$OUT" | sed -n '4p')"
+check "total lines" "$(printf 'TOTAL-LINES\t14')" "$(echo "$OUT" | tail -1)"
+check "no extra records" "5" "$(echo "$OUT" | wc -l | tr -d ' ')"
+
+# --- 2. Ranges actually reconstruct the file ---------------------------------
+# Every line must be covered exactly once by the printed ranges, in order.
+RECON="$($PLAN_INDEX "$TMP/basic.md" | grep -v '^TOTAL-LINES' \
+        | while IFS=$'\t' read -r s e _; do sed -n "${s},${e}p" "$TMP/basic.md"; done)"
+check "ranges reconstruct file byte-for-byte" "$(cat "$TMP/basic.md")" "$RECON"
+
+# --- 3. No preamble record when line 1 is a heading ---------------------------
+printf '## Only\nx\n' > "$TMP/nopre.md"
+check "no preamble record when file opens on a heading" \
+    "$(printf '1\t2\tOnly')" "$($PLAN_INDEX "$TMP/nopre.md" | sed -n '1p')"
+
+# --- 4. Fenced `## ` is not indexed -------------------------------------------
+cat > "$TMP/fenced.md" <<'EOF'
+# Title
+
+## Real One
+```bash
+## not a heading
+echo hi
+```
+still in Real One
+
+## Real Two
+done
+EOF
+OUT="$($PLAN_INDEX "$TMP/fenced.md")"
+check "fenced ## is skipped" "2" "$(echo "$OUT" | grep -c '	Real ')"
+check "fenced ## does not split the section" \
+    "$(printf '3\t9\tReal One')" "$(echo "$OUT" | grep '	Real One$')"
+
+# --- 5. Width-aware fences: a 3-backtick fence nested in a 4-backtick one ------
+# A width-blind toggle closes on the inner fence and would index the `## ` below it.
+cat > "$TMP/nested.md" <<'EOF'
+# Title
+
+## Wrapper
+````markdown
+```bash
+echo x
+```
+## phantom heading inside the outer fence
+````
+tail of Wrapper
+
+## Genuine
+y
+EOF
+OUT="$($PLAN_INDEX "$TMP/nested.md")"
+check "nested fence does not leak a phantom heading" "0" "$(echo "$OUT" | grep -c 'phantom')"
+check "width-aware fence keeps outer section whole" \
+    "$(printf '3\t11\tWrapper')" "$(echo "$OUT" | grep '	Wrapper$')"
+
+# --- 6. Exit code 2 and stderr when there are no `## ` sections ----------------
+printf '# Just a title\nno sections here\n' > "$TMP/nosections.md"
+OUT="$($PLAN_INDEX "$TMP/nosections.md" 2>"$TMP/err")"; RC=$?
+check "no-sections exit code is 2" "2" "$RC"
+check "no-sections prints nothing on stdout" "" "$OUT"
+check "no-sections advises reading whole" "1" "$(grep -c 'read it whole' "$TMP/err")"
+
+# --- 7. Missing file is exit 1, not a silent empty index ----------------------
+$PLAN_INDEX "$TMP/does-not-exist.md" >/dev/null 2>&1; RC=$?
+check "missing file exit code is 1" "1" "$RC"
+
+# --- 8. Usage error is exit 1 -------------------------------------------------
+$PLAN_INDEX >/dev/null 2>&1; RC=$?
+check "no-argument exit code is 1" "1" "$RC"
+
+# --- 9. Symlinked plan resolves to the real file (automouse queue shape) ------
+ln -sf "$TMP/basic.md" "$TMP/link.md"
+check "symlink resolves to the real file" \
+    "$($PLAN_INDEX "$TMP/basic.md")" "$($PLAN_INDEX "$TMP/link.md")"
+
+# --- 10. `###` subheadings are not indexed as sections ------------------------
+cat > "$TMP/sub.md" <<'EOF'
+## Phase 1
+### Delegate
+packet body
+## Phase 2
+x
+EOF
+check "### is not indexed" "2" "$($PLAN_INDEX "$TMP/sub.md" | grep -c '	Phase ')"
+
+echo
+echo "passed: $PASS  failed: $FAIL"
+[ "$FAIL" -eq 0 ]

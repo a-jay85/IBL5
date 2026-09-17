@@ -43,6 +43,44 @@ context) and the Phase 4B probe evidence (`scripts/4b-probe.sh` prints to stdout
 file). If either literal is absent from your prompt, say so in the verdict under the 6d
 check it starves and mark that check `UNVERIFIED` — never silently skip it.
 
+### Gathering the plan file: index first, then read by range
+
+Never `Read` the plan whole. Plans run 58 to 320 KB, so a whole-file read can consume most
+of your window before you have looked at a single line of the diff, and a compaction
+mid-review is how a phase gets dropped from 6d check 1. Two moves instead.
+
+**Move 1, mandatory and never skipped:**
+
+```bash
+bin/plan-index <plan-path>
+```
+
+It prints one `<start>` `<end>` `<title>` record per `## ` section, tab-separated, then a
+final `TOTAL-LINES` record. This index is what makes 6d check 1 accountable: it is the
+authoritative roster of the plan's phases, so **every** phase record it prints must appear
+in your verdict, either as a matched change or as a named finding. A phase you did not read
+is not a phase you may pass. On exit code `2` (no `## ` sections) fall back to reading the
+file whole and say so in the verdict under `procedure-source:`.
+
+**Move 2, read by range:**
+
+```bash
+sed -n 'START,ENDp' <plan-path>
+```
+
+Read `(preamble)` plus `## Approach`, `## Design Decisions`, `## Critical Files`,
+`## Verification Matrix`, `## Required Test Methods`, `## Out of Scope` and `## Scope guard`
+up front, because they govern every check. Then read the phase bodies **one at a time**,
+finishing each phase's 6d check 1 and check 2 judgment before pulling the next. Never hold
+two phase bodies at once, and never re-read a phase you have already judged.
+
+**What you may skip, and it is only this:** `## PR Checklist`, `## Architectural trade-offs`,
+`## Automouse Hold Justification`, evidence tables and correction logs. Those are written for
+the human reading the PR. **No implementation phase is ever skippable** under any budget
+pressure. If the window is genuinely too tight to read every phase, emit `NOT READY` naming
+the phases you could not reach. A `READY` inferred from the phases you did reach is a defect
+in this review.
+
 ## Output contract
 
 1. **Write** the full verdict to the absolute path your prompt names

@@ -275,6 +275,12 @@ def test_local_gate_contains_result_and_error():
     assert "ERROR" in line
 
 
+def test_local_gate_empty_error_falls_back_to_generic():
+    r = _res(TerminalState.FAILED, error_kind="local-gate", error="")
+    line = runner.verdict_line(r, 3)
+    assert "see gate output" in line
+
+
 def test_rebase_conflict_verbatim():
     """The rebase-conflict message must be unchanged from before the fix."""
     r = _res(TerminalState.FAILED, error_kind="rebase-conflict")

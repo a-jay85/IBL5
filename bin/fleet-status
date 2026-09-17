@@ -53,11 +53,22 @@
 #
 # CLICKABLE PATHS. File paths this page names — each run's log, each queued plan,
 # and the plan a live runner is on — are emitted as OSC 8 terminal hyperlinks, so
-# they open on click in iTerm2/WezTerm/Ghostty/VS Code. Terminals without OSC 8
-# ignore the sequence and show the same text. Links are TTY-gated: piped or
+# they open on click in iTerm2/WezTerm/Ghostty. Terminals without OSC 8 ignore
+# the sequence and show the same text. Links are TTY-gated: piped or
 # captured output stays byte-for-byte plain, which is what keeps the page
 # greppable (and stops every assertion in bin/test-fleet-status from needing to
 # know about escapes). Runner slugs with no queue file stay unlinked.
+#
+# THEY OPEN IN VS CODE. Every one of those URIs is vscode://file<abs path>, so a
+# click lands in an editor for both a plan and a log, rather than in whatever the
+# OS has registered for .md and .log. A link opens on CMD-click.
+#
+# UNDER TMUX, TWO THINGS HAVE TO BE TRUE or the click dies silently and the page
+# looks like plain text. tmux forwards OSC 8 only when the OUTER terminal is
+# declared to support it, so ~/.tmux.conf needs a line naming that terminal:
+# `set -as terminal-features ",xterm-ghostty:hyperlinks"`. And with `mouse on`,
+# tmux grabs the click before the terminal sees it, so hold SHIFT as well:
+# CMD-SHIFT-click bypasses mouse reporting and reaches the link.
 #
 # SCOPE. Processes only. Worktree/branch shipping state is bin/wt-status's job and
 # is deliberately not mirrored here — the two answer different questions and a
@@ -114,7 +125,7 @@ while [ $# -gt 0 ]; do
                 *) WATCH_SECS="$2"; shift ;;
             esac
             ;;
-        -h|--help) sed -n '4,68p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '4,79p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) printf 'fleet-status: unknown option %s\n' "$1" >&2; exit 2 ;;
     esac
     shift
@@ -138,7 +149,11 @@ fi
 
 # ── helpers ────────────────────────────────────────────────────────────────────
 
-# link_file <path> [text] — print TEXT as an OSC 8 hyperlink to file://<path>.
+# link_file <path> [text] — print TEXT as an OSC 8 hyperlink that opens <path>
+# in VS Code. The URI is vscode://file<path>: the scheme's own handler, so the
+# click bypasses the OS file-type association entirely. One scheme for every
+# path on the page — every one of them is a plan or a log, and both are text a
+# human is about to read.
 #
 # OSC 8 is ESC ] 8 ;; URI ST  TEXT  ESC ] 8 ;; ST. It is what lets a row display
 # the short name a human reads ("live-plan.md") while the click target is the
@@ -146,7 +161,7 @@ fi
 #
 # THREE FAIL-SOFT GATES, each returning plain text rather than a broken link:
 #   not a TTY   escapes would corrupt a pipe, a capture or a grep.
-#   relative    file:// has no notion of cwd, so a relative path yields a link
+#   relative    the URI has no notion of cwd, so a relative path yields a link
 #               that silently opens the wrong thing — worse than no link.
 #   empty       nothing to point at.
 # Spaces are percent-encoded because a raw space ends the URI; no other encoding
@@ -160,7 +175,7 @@ link_file() {
     enc="$(printf '%s' "$path" | sed 's/ /%20/g')"
     # shellcheck disable=SC1003  # '\033\\' is ESC + a literal backslash: the ST
     # that terminates an OSC sequence. Not an escaped quote.
-    printf '\033]8;;file://%s\033\\%s\033]8;;\033\\' "$enc" "$text"
+    printf '\033]8;;vscode://file%s\033\\%s\033]8;;\033\\' "$enc" "$text"
 }
 
 # Human-readable age from a seconds count: 45s / 12m / 3h04m / 2d01h.

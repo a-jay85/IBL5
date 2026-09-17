@@ -1,8 +1,7 @@
 ---
-description: Read-on-demand detail for agent-tiering — the skip-vs-spawn heuristic, flat-fan-out (nested sub-agent) rationale, boundary keys on task type, orchestrator context economics (delegate-don't-dismiss, split-don't-self-clear), the measured evidence behind the offload-`/plan`-by-default rule, and per-tier prompt style. Fable approval gate moved to `agent-tiering-fable-gate.md`; bounded-checklist diff-triage rationale moved to `agent-tiering-bounded-checklist.md`. Loads only when editing workflow orchestration defs.
-last_verified: 2026-09-08
+description: Read-on-demand detail for agent-tiering — the skip-vs-spawn heuristic, flat-fan-out (nested sub-agent) rationale, boundary keys on task type, orchestrator context economics (delegate-don't-dismiss, split-don't-self-clear), the measured evidence behind the offload-`/plan`-by-default rule, and per-tier prompt style. Fable approval gate moved to `agent-tiering-fable-gate.md`; bounded-checklist diff-triage rationale moved to `agent-tiering-bounded-checklist.md`. Attaches only on `.claude/agents/*.md`; elsewhere Read-on-demand, cited by name from the resident agent-tiering.md. Skills glob dropped 2026-09-17 on measured attach cost.
+last_verified: 2026-09-17
 paths:
-  - ".claude/skills/**/*.md"
   - ".claude/agents/*.md"
 ---
 

@@ -1133,7 +1133,7 @@ def test_guard_refuses_when_a_run_is_in_flight(tmp_path):
     r = _run_ppn(tmp_path, launchctl_stub=_LAUNCHCTL_LIVE)
     assert r.returncode == 6
     assert "already in flight" in r.stdout
-    plist_dir = tmp_path / "Library" / "LaunchAgents"
+    plist_dir = tmp_path / "home" / "Library" / "LaunchAgents"
     plists = list(plist_dir.glob("com.ibl5.postplan-now-wt-feature-*.plist")) if plist_dir.exists() else []
     assert len(plists) == 0, "guard must not submit a plist when refusing"
 

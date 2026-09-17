@@ -1,0 +1,88 @@
+#!/bin/bash
+# bin/check-skill-arguments — CI gate: a SKILL.md may reference `$ARGUMENTS` only
+# ONCE, unless its extra uses are on this file's allowlist.
+#
+# Why: the harness substitutes the caller's full invocation text into EVERY
+# `$ARGUMENTS` occurrence in a SKILL.md before injecting it. A 14 KB request in a
+# skill with 10 occurrences is 126 KB of pure duplicate — measured on real
+# transcripts, `/plan` injected 216 KB where the skill body itself is 86 KB, with
+# the request pasted 10 times. Nothing else caps this: check-rules-byte-budget
+# scopes to .claude/rules/ and measures the file on disk, not the injected size,
+# so a skill's substitution blowup is invisible to it.
+#
+# The fix pattern: quote the request ONCE in a `<user_request>` block near the
+# top, and refer back to it as "the request" everywhere else.
+#
+# Allowlist: an occurrence is legitimate past the first only when the literal
+# text must be interpolated at that point — e.g. a shell command that consumes
+# the argument. Add the file with its exact expected count and a reason.
+#
+# Extend-before-add (meta-tooling-bar.md): distinct trigger (injected-size
+# duplication in .claude/skills/) vs. bin/check-rules-byte-budget (on-disk size of
+# .claude/rules/) and bin/check-claude-dir-placement (where a skill file lives).
+# Neither can host this without straining its single responsibility. ~75 lines bash.
+#
+# Usage:
+#   bin/check-skill-arguments              gate mode — exit 1 on any violation
+#   bin/check-skill-arguments --self-test  verify the gate catches a violation
+set -eu
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+# path<TAB>allowed-count<TAB>reason
+ALLOWLIST=$(cat <<'ALLOW'
+.claude/skills/pr-wt/SKILL.md	2	step 2 runs `bin/pr-wt-resolve $ARGUMENTS` — the shell command needs the literal value
+ALLOW
+)
+
+allowed_for() {
+  printf '%s\n' "$ALLOWLIST" | awk -F'\t' -v f="$1" '$1==f {print $2; found=1} END {if (!found) print 1}'
+}
+
+scan() {
+  # $1 = tree to scan. Prints "path<TAB>count" for every offending SKILL.md.
+  # Any .claude/skills in the tree, not just the repo-root one: a misplaced skill
+  # (the ibl5/.claude/... case bin/check-claude-dir-placement exists for) still
+  # carries the duplication, and should be reported rather than silently skipped.
+  find "$1" \
+      \( -name .git -o -name node_modules -o -name vendor \) -prune -o \
+      -path '*/.claude/skills/*' -name 'SKILL.md' -type f -print 2>/dev/null \
+    | sort | while read -r f; do
+    rel="${f#"$1"/}"
+    # -o prints one match per line; grep -c would collapse same-line repeats.
+    n=$(grep -o -F '$ARGUMENTS' "$f" 2>/dev/null | wc -l | tr -d ' ')
+    [ "$n" -le "$(allowed_for "$rel")" ] || printf '%s\t%s\n' "$rel" "$n"
+  done
+}
+
+if [ "${1:-}" = "--self-test" ]; then
+  tmp=$(mktemp -d)
+  trap 'rm -rf "$tmp"' EXIT
+  mkdir -p "$tmp/.claude/skills/fake"
+  printf 'a $ARGUMENTS b\n$ARGUMENTS\n' > "$tmp/.claude/skills/fake/SKILL.md"
+  out=$(scan "$tmp")
+  case "$out" in
+    *".claude/skills/fake/SKILL.md	2"*) ;;
+    *) echo "check-skill-arguments --self-test: FAILED to flag a 2-occurrence skill (got: '$out')" >&2; exit 1 ;;
+  esac
+  printf 'only one $ARGUMENTS here\n' > "$tmp/.claude/skills/fake/SKILL.md"
+  out=$(scan "$tmp")
+  [ -z "$out" ] || { echo "check-skill-arguments --self-test: false positive on a 1-occurrence skill ('$out')" >&2; exit 1; }
+  echo "check-skill-arguments --self-test: OK"
+  exit 0
+fi
+
+offenders=$(scan "$ROOT")
+if [ -n "$offenders" ]; then
+  echo "check-skill-arguments: SKILL.md files repeat \$ARGUMENTS past their allowed count:" >&2
+  printf '%s\n' "$offenders" | awk -F'\t' '{printf "  %s — %s occurrences\n", $1, $2}' >&2
+  echo "" >&2
+  echo "The harness pastes the caller's FULL invocation text into every occurrence, so each" >&2
+  echo "extra one duplicates the whole request into the skill's injected body." >&2
+  echo "Fix: quote the request once near the top in a <user_request> block and refer to it" >&2
+  echo "as \"the request\" elsewhere (see .claude/skills/plan/SKILL.md)." >&2
+  echo "If an occurrence genuinely needs the literal value interpolated there (a shell" >&2
+  echo "command consuming it), add the file to ALLOWLIST in this script with a reason." >&2
+  exit 1
+fi
+exit 0

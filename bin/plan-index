@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# bin/plan-index — print a plan file's section index so a caller can read it by line range.
+#
+# Plans run 58-320 KB (15-80K tokens). Reading one end-to-end burns a large slice of a
+# model's context window before any work happens. This prints every `## ` section with its
+# start and end line, so a caller reads only the sections it needs via `sed -n 'START,ENDp'`.
+#
+# The two-move protocol this serves is documented in `bin/automouse/prompt-impl` Step 1,
+# which established it; this script is its single executable home so the line arithmetic
+# cannot drift between call sites (same rationale as bin/lib/plan-resolve.sh).
+#
+# Usage:
+#   bin/plan-index <plan-path>
+#
+# Output — one record per line, tab-separated, in file order:
+#   <start>	<end>	<section title>
+# followed by a final line:
+#   TOTAL-LINES	<n>
+#
+# A section runs from its own `## ` line to one less than the next `## ` line; the last
+# section runs to EOF. Lines before the first `## ` (frontmatter, title, any context-budget
+# marker) are reported as the synthetic section `(preamble)` starting at line 1 — always
+# read that one, it governs the whole file.
+#
+# Exit codes:
+#   0  index printed
+#   1  usage error, or the file does not exist / is not readable
+#   2  the file has no `## ` sections — the caller falls back to reading it whole, and says so
+#
+# Fenced code blocks: a fenced block can contain a line starting with `## `, which would
+# index a phantom section. Fence tracking is width-aware (this repo wraps 3-backtick blocks
+# in 4-backtick ones, and per CommonMark a closing fence must be at least as long as its
+# opener), matching the same rule in post-plan's _phase-5-final-verification.md.
+
+set -euo pipefail
+
+if [ "$#" -ne 1 ] || [ "${1:-}" = "-h" ] || [ "${1:-}" = "--help" ]; then
+    sed -n '2,32p' "$0" | sed 's/^#\{1,\} \{0,1\}//'
+    exit 1
+fi
+
+PLAN_PATH="$1"
+# Resolve a symlink so the line numbers refer to the real file (automouse symlinks plans
+# into its queue by branch slug).
+PLAN_PATH="$(readlink -f "$PLAN_PATH" 2>/dev/null || echo "$PLAN_PATH")"
+
+if [ ! -f "$PLAN_PATH" ] || [ ! -r "$PLAN_PATH" ]; then
+    echo "plan-index: not a readable file: $1" >&2
+    exit 1
+fi
+
+set +e
+awk '
+BEGIN { fence = 0; fence_ch = ""; n = 0 }
+{
+    line = $0
+    # Width-aware fence tracking: an opening fence records its own length and char; only a
+    # fence of the same char and at least that long closes it. Guards against a `## ` line
+    # inside a nested code block being indexed as a real section.
+    if (match(line, /^[ \t]*(```|~~~)/)) {
+        marker = line
+        sub(/^[ \t]*/, "", marker)
+        ch = substr(marker, 1, 1)
+        len = 0
+        while (substr(marker, len + 1, 1) == ch) len++
+        if (fence == 0) { fence = len; fence_ch = ch }
+        else if (ch == fence_ch && len >= fence) { fence = 0; fence_ch = "" }
+        next
+    }
+    if (fence == 0 && line ~ /^## /) {
+        title = line
+        sub(/^## /, "", title)
+        n++
+        start[n] = NR
+        name[n] = title
+    }
+}
+END {
+    total = NR
+    if (n == 0) exit 2
+    # Preamble: everything before the first `## ` heading (frontmatter, title, markers).
+    if (start[1] > 1) printf "1\t%d\t(preamble)\n", start[1] - 1
+    for (i = 1; i <= n; i++) {
+        end = (i < n) ? start[i + 1] - 1 : total
+        printf "%d\t%d\t%s\n", start[i], end, name[i]
+    }
+    printf "TOTAL-LINES\t%d\n", total
+}
+' "$PLAN_PATH"
+rc=$?
+set -e
+
+if [ "$rc" -eq 2 ]; then
+    echo "plan-index: no '## ' sections in $PLAN_PATH — read it whole and say so" >&2
+fi
+exit "$rc"

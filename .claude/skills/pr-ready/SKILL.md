@@ -7,7 +7,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-09-10
+last_verified: 2026-09-17
 ---
 <!-- `model: claude-sonnet-4-6` IS DELIBERATE — DO NOT REMOVE IT, and never write
      `model: sonnet` (that alias resolves to Sonnet 5). User-authorized 2026-08-26,
@@ -142,11 +142,11 @@ This skill adds **semantic** judgment the existing pipeline does not cover. `/po
 
 **Phase 1 — plan, master pin, protection, prior-review probe.**
 
-1. **Read the plan.** Run `git rev-parse --abbrev-ref HEAD` bare, then `Read` `~/claude-plans/<branch>.md` with the printed branch name substituted. The path is deterministic — resolve it, never search for it. If it does not exist, print loudly
+1. **Plan existence gate.** Index the plan; never read its body. Run `git rev-parse --abbrev-ref HEAD` bare, then `bin/plan-index ~/claude-plans/<branch>.md` with the printed branch name substituted. The path is deterministic. Resolve it, never search for it. If it does not exist (rc 1), print loudly
 
    `STOP: no plan at ~/claude-plans/<branch>.md. /pr-ready's Phase 6 judges implementation against the plan's stated intent; without the plan there is nothing to judge against. Re-run once the plan file is restored, or run /pr-review instead for a plain code review.`
 
-   and stop. Do **not** fall back to the PR body for plan intent — the PR body is one of the things Phase 6 audits.
+   and stop. Do **not** fall back to the PR body for plan intent. The PR body is one of the things Phase 6 audits. An rc of `2` (no `## ` sections) does **not** trip that stop; existence is all this gate asserts. Keep the index as run notes for Phase 6's spawn prompt. The `cf_parse_section` call below reads the plan inside a shell, so it stays as written.
 
 2. `git fetch origin`. Nothing in this skill ever runs a bare `git rebase` against `origin/master`; see the `--onto` recipe in the Phase 2 include.
 

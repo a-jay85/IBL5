@@ -1,6 +1,6 @@
 ---
 description: All work happens in a worktree (never the main checkout); where plans live (~/claude-plans/<branch-slug>.md, outside the repo); worktree setup (hostname stub → worktree-hostname.md, squash-merge stub → linear-history-squash-merge.md); and post-plan handoff triggers. Engine internals: workflow-continuity-detail.md.
-last_verified: 2026-07-25
+last_verified: 2026-09-17
 ---
 
 # Workflow Continuity Rule
@@ -22,6 +22,8 @@ ls ~/claude-plans/"$(git rev-parse --abbrev-ref HEAD)".md
 ```
 
 This is exactly how `bin/post-plan-now` resolves the plan for a branch. `~/claude-plans/` is the single source of truth — no other directory holds plan files.
+
+**Never `Read` a plan whole** (58-320 KB = 15-80K tokens). Index it, then read by range: `bin/plan-index <path>` prints each `## ` section's start/end line; `sed -n 'START,ENDp'` the ones you need.
 
 ## Worktree Setup
 

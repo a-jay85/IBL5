@@ -185,8 +185,34 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
     ledger = llm.ledger
     audit: list[str] = []
 
+    # audit.log is the ONLY mid-run progress signal bin/fleet-status can read for a
+    # harness run. The other two sources it tries both come up empty here: the harness
+    # prints nothing until exit (so the /tmp log tails to nothing), and its bounded
+    # `claude -p` calls carry no --session-id, so the transcript glob keyed on the
+    # producer's sidecar uuid never resolves. Without this mirror every harness row
+    # shows the "no output yet" placeholder for the whole run.
+    #
+    # _finish still rewrites the file whole at exit. This is a live mirror of the same
+    # lines in the same format, not a second one -- the final bytes are unchanged, which
+    # is what keeps the existing audit.log assertions valid. Truncated here so a reused
+    # out_dir can never serve the previous run's tail as this run's progress.
+    audit_path: str | None = os.path.join(out_dir, "audit.log")
+    try:
+        open(audit_path, "w").close()
+    except OSError:
+        audit_path = None
+
     def log(msg: str) -> None:
-        audit.append(f"[{time.strftime('%H:%M:%S')}] {msg}")
+        line = f"[{time.strftime('%H:%M:%S')}] {msg}"
+        audit.append(line)
+        if audit_path is None:
+            return
+        # A progress mirror must never be able to fail a run.
+        try:
+            with open(audit_path, "a") as fh:
+                fh.write(line + "\n")
+        except OSError:
+            pass
 
     if mode == "replay":
         assert fixture is not None

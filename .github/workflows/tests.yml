@@ -858,6 +858,15 @@ jobs:
       # the skill is simply never available (PR #1831 shipped /pr-attack dead).
       - name: Check skill/agent defs live in repo-root .claude
         run: bin/check-claude-dir-placement
+      # skill-arguments: the harness substitutes the caller's FULL invocation text
+      # into EVERY `$ARGUMENTS` occurrence in a SKILL.md. /plan carried 10 of them,
+      # so a 14 KB request was pasted 10 times — 216 KB injected against an 86 KB
+      # skill body. check-rules-byte-budget cannot see this (wrong tree, and it
+      # measures the file on disk, not the injected size). Backlog: token-spend.
+      - name: Check SKILL.md files quote $ARGUMENTS once
+        run: |
+          bin/check-skill-arguments --self-test
+          bin/check-skill-arguments
       # shallow-fetch guard: a shallow fetch inside repo tooling is safe on a CI
       # runner but silently CREATES .git/shallow in a full local clone, grafting
       # origin/<base> to one commit. merge-base then returns nothing and the next

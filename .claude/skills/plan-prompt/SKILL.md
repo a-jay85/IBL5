@@ -1,7 +1,7 @@
 ---
 name: plan-prompt
 description: "Draft a /plan prompt distilled from the current conversation — ground-truth pointers, already-measured evidence, scope, constraints, verification, and the Step-3 architect tier — then, unless the Step-1.5 size triage says the work clears the ad-hoc bar, fire it as a detached headless Sonnet 4.6 run via bin/plan-now. Use after a design discussion when the planning run should be offloaded off the expensive session."
-last_verified: 2026-09-15
+last_verified: 2026-09-17
 ---
 
 # Draft a `/plan` handoff prompt and fire it headless
@@ -31,7 +31,11 @@ this skill removes.
 
 ## Step 1 — Decide what to plan
 
-`$ARGUMENTS` has three shapes:
+The user's invocation text is quoted once below, between the `<user_request>` markers; these instructions call it **the request**. It has three shapes:
+
+<user_request>
+$ARGUMENTS
+</user_request>
 
 | Argument | Meaning |
 |---|---|
@@ -104,8 +108,8 @@ fences) only in the draft-only case where you do print it.
    (Step 0) — a bare path is fine; do not open files now to sharpen a pointer into a
    `path:line`. This is the load-bearing section: it is what lets a cheap orchestrator
    reach the same understanding this conversation did. When a fresh `/plan` session sees
-   this section in `$ARGUMENTS`, it treats the pointers as trusted — cheap confirmation
-   only, no re-exploration (`.claude/skills/plan/SKILL.md` § Step 2 trusted-context
+   this section in the prompt you draft, it treats the pointers as trusted. Cheap
+   confirmation only, no re-exploration (`.claude/skills/plan/SKILL.md` § Step 2 trusted-context
    detection). Emit the heading **verbatim**: that exact string is the detection trigger.
 
 2. **`## Resolved design decisions`** — the conclusions this conversation produced:

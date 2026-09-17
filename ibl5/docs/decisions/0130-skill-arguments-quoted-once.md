@@ -18,7 +18,7 @@ A `SKILL.md` references `$ARGUMENTS` exactly once. The single occurrence is quot
 
 ## Alternatives Considered
 
-- **Remove every `$ARGUMENTS` and let the harness append the raw request.** Rejected because: the injected block's tail shows no separate copy, so the skill would lose the request entirely.
+- **Drop the token entirely.** This assumes the harness appends the raw request on its own. Rejected because: the injected block's tail shows no separate copy, so the skill would lose the request entirely.
 - **Leave the duplication and rely on compaction.** Rejected because: compaction is lossy and costs a full re-read, and the waste recurs on every invocation of the skill.
 - **Extend `bin/check-rules-byte-budget` to cover skills.** Rejected because: it measures on-disk bytes under `.claude/rules/`, a different trigger and a different tree, so hosting this would strain its single responsibility.
 - **A convention documented in prose only.** Rejected because: the duplication is invisible in review, and the repo prefers an executable gate over remembered discipline.

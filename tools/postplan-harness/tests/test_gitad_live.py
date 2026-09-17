@@ -201,3 +201,60 @@ def test_diff_vs_base_non_utf8_bytes(repo):
     result = g.diff_vs_base(base="HEAD~1")
     assert isinstance(result, str), "diff_vs_base must return str, not raise"
     assert "�" in result, "U+FFFD replacement character must appear for byte 0x9e"
+
+
+def _install_reject_hook(repo, body):
+    """Write an executable pre-commit hook into the THROWAWAY fixture repo only."""
+    hooks = os.path.join(repo, ".git", "hooks")
+    os.makedirs(hooks, exist_ok=True)
+    hook = os.path.join(hooks, "pre-commit")
+    assert hook.startswith(tempfile.gettempdir()), f"refusing to write a hook at {hook}"
+    with open(hook, "w") as fh:
+        fh.write(body)
+    os.chmod(hook, 0o755)
+    return hook
+
+
+def test_commit_rejected_by_an_unenumerated_hook_message_is_local_gate(repo):
+    """THE Phase 1 defect: a hook message absent from _LOCAL_GATE_MARKERS is still a gate.
+
+    `gofmt: unformatted Go files` is bin/pre-commit-hook's real wording and matches none
+    of the four markers, so on master this commit types "git" -> exit 1 -> the 16-minute
+    zombie skill session. The hook below lives in the THROWAWAY fixture repo.
+    """
+    _install_reject_hook(repo, "#!/bin/sh\n"
+                               "echo 'gofmt: unformatted Go files (run gofmt -w):'\n"
+                               "exit 1\n")
+    g = LiveGit(repo)
+    with open(os.path.join(repo, "b.txt"), "w") as fh:
+        fh.write("blocked\n")
+    with pytest.raises(HarnessError) as ei:
+        g.commit_all("chore: should be rejected")
+    assert ei.value.kind == "local-gate", f"kind was {ei.value.kind!r}"
+    assert "gofmt" in ei.value.detail, "the gate's own reason must survive"
+
+
+def test_commit_gate_detail_is_never_empty(repo):
+    """Negative path -- a silent hook still produces a non-empty detail.
+
+    A hook that prints nothing (an `exit 1` and no output) would give an empty
+    stderr AND stdout; without the synthesized fallback, verdict_line would print
+    `kind=local-gate: no detail` and the operator would have nothing to act on.
+    """
+    _install_reject_hook(repo, "#!/bin/sh\nexit 1\n")
+    g = LiveGit(repo)
+    with open(os.path.join(repo, "c.txt"), "w") as fh:
+        fh.write("silent\n")
+    with pytest.raises(HarnessError) as ei:
+        g.commit_all("chore: silently rejected")
+    assert ei.value.kind == "local-gate"
+    assert ei.value.detail.strip(), "detail must never be empty"
+
+
+def test_commit_all_still_returns_a_sha_when_no_hook_rejects(repo):
+    """Preserve-current-behaviour -- the happy path is unchanged by the retyping."""
+    g = LiveGit(repo)
+    with open(os.path.join(repo, "d.txt"), "w") as fh:
+        fh.write("ok\n")
+    sha = g.commit_all("chore: accepted")
+    assert len(sha) == 40, f"expected a full sha, got {sha!r}"

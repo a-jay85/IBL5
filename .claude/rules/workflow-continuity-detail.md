@@ -33,6 +33,12 @@ branch; it survives you closing Claude Code. Engine selection:
   or `bin/pre-push-adr-hook` refusal: missing ADR, stale doc, rules byte budget). Both are
   deterministic, so a skill re-run would hit the same wall; the run DMs you and stops for a human.
 
+On the commit path that detection is structural: any non-zero `git commit` is treated as a
+gate denial, so a hook message nobody enumerated in `_LOCAL_GATE_MARKERS` is still caught.
+`bin/post-plan-now` additionally exits **6** from its own in-flight duplicate-run guard.
+That code is caller-side and has no harness meaning: it refuses to start a second
+supervised run for a slug whose launchd job is still loaded, and `--force` bypasses it.
+
 ## What `--auto` adds
 
 `--auto` adds exactly one safety gate; a bare `bin/post-plan-now` skips it, because running it by

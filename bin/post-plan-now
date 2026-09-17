@@ -97,7 +97,7 @@ postplan_badge_banner_body() {   # <rc> <label> <started>
     printf '**post-plan did not finish cleanly** (exit %s)\n\n' "$rc"
     printf 'Started %s.\n' "${started:-unknown}"
     case "$rc" in
-        3) printf 'The harness bailed on a rebase conflict and deliberately did not fall back.\n' ;;
+        3) printf 'The harness hit a fail-closed wall — a rebase conflict, or a local pre-commit/pre-push gate denial — and deliberately did not fall back. The RESULT line in the log names which.\n' ;;
         *) printf 'The run ended abnormally — check the log under `/tmp/post-plan-now-*.log`.\n' ;;
     esac
     printf '\nRe-run with `bin/post-plan-now --auto` once the cause is addressed.\n'
@@ -108,6 +108,27 @@ postplan_badge_label_live() {   # <label> -> 0 when launchd still knows it
     local label="$1"
     [ -n "$label" ] || return 1
     "${LAUNCHCTL_CMD:-launchctl}" list "$label" >/dev/null 2>&1
+}
+
+# Enumerates loaded launchd jobs and echoes the label of a live post-plan-now run for
+# $1 (a SAFE_SLUG), or nothing. Unlike postplan_badge_label_live (a point lookup on one
+# known label), this matches by slug: the caller cannot know the peer's timestamp or PID.
+# The glob is fully anchored -- the literal "-" after the slug must be followed by
+# YYYYmmdd-HHMMSS-<pid>, so slug "foo" can never match a job for slug "foo-bar".
+# Process substitution, not a pipe: piping into an early-exiting reader SIGPIPEs the
+# writer to 141 under `set -o pipefail` (.claude/rules/shell-pipefail-grep.md).
+postplan_inflight_label() {
+  local want="$1" _pid _status label
+  [ -n "$want" ] || return 0
+  while IFS=$'\t' read -r _pid _status label; do
+    case "$label" in
+      com.ibl5.postplan-now-"$want"-[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]-[0-9]*)
+        printf '%s\n' "$label"
+        return 0
+        ;;
+    esac
+  done < <("${LAUNCHCTL_CMD:-launchctl}" list 2>/dev/null || true)
+  return 0
 }
 
 postplan_badge_pr_number() {
@@ -282,6 +303,23 @@ if [ "$AUTO" -eq 1 ]; then
     fi
 fi
 
+# In-flight duplicate-run guard. The launchd job for this slug is still loaded, so a peer
+# post-plan-now is mid-flight; a second one would race it on the same worktree, the same
+# branch and the same PR badge. Exit 6 (the caller-side namespace; see the exit-code table
+# in the ENGINE comment) rather than 0, so bin/bug-pipeline-tick and any other caller sees
+# a refusal instead of a silent skip. FORCE bypasses it: after a fixable failure a human
+# (or the incident's legitimate 14:49:24 re-fire) must be able to re-fire immediately, and
+# a job whose process is already gone leaves no label to match, so the common re-fire case
+# is not even a bypass -- it is an allow.
+if [ "${FORCE:-0}" -eq 0 ]; then
+  INFLIGHT_LABEL=$(postplan_inflight_label "$SAFE_SLUG")
+  if [ -n "$INFLIGHT_LABEL" ]; then
+    echo "post-plan-now: a post-plan run for '$SLUG' is already in flight ($INFLIGHT_LABEL)."
+    echo "post-plan-now: refusing to start a second one. Wait for it, or re-run with --force."
+    exit 6
+  fi
+fi
+
 # Nothing to ship? Clean tree AND no commits ahead of origin/master.
 if git diff --quiet && git diff --cached --quiet \
    && [ -z "$(git log --oneline origin/master..HEAD 2>/dev/null)" ]; then
@@ -343,9 +381,12 @@ else
 fi
 
 # Compiled-harness engine (see header). The launchd job runs the harness, captures its exit code,
-# and escalates to the skill session ONLY when should_fallback permits it. Exit 3 (rebase-conflict
-# fail-closed sentinel from runner.py exit_code_for) is NOT a fallback trigger: it stops for a
-# human instead of escalating to a --dangerously-skip-permissions skill session on an unreviewed tree.
+# and escalates to the skill session ONLY when should_fallback permits it. Exit 3 (the fail-closed
+# sentinel from runner.py exit_code_for -- a rebase conflict OR a local gate denial) is NOT a
+# fallback trigger: it stops for a human instead of escalating to a
+# --dangerously-skip-permissions skill session on an unreviewed tree. Exit 6 is a DIFFERENT
+# namespace: it is this script's own in-flight duplicate-run refusal, raised before any harness
+# runs, and it never comes from runner.py.
 # Overridable ONLY so tools/postplan-harness/tests/test_post_plan_now_fallback.py can
 # point the engine-selection branch at a stub and assert the generated $CMD in CI, where
 # this absolute path does not exist. Production never sets it. The default must stay the

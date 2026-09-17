@@ -234,7 +234,7 @@ class RunResult:
     final_pr_state: str = ""
     retrospective: Optional[dict] = None
     error: Optional[str] = None
-    error_kind: Optional[str] = None   # stable HarnessError.kind of a FAILED run (e.g. "rebase-conflict")
+    error_kind: Optional[str] = None   # stable HarnessError.kind of a FAILED run ("rebase-conflict", "local-gate", "git", "push-disabled")
     sticky_comment_id: Optional[str] = None  # numeric id read back after the upsert; None = unconfirmed
     sticky_error: Optional[str] = None       # "sticky-post-failed" when the read-back found no comment
     # Phase 5.5 record: verdict_1 / verdict_2 / remediation_sha / reviewed_tree / error.

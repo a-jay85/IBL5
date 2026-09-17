@@ -316,3 +316,26 @@ def test_rc3_unknown_error_kind_is_single_line():
     r = _res(TerminalState.FAILED, error_kind=None)
     line = runner.verdict_line(r, 3)
     assert "\n" not in line
+
+
+def test_rc3_local_gate_wording_names_the_gate_not_the_rebase():
+    """The misdirection fix: a gate denial must not be told to resolve a rebase.
+
+    bin/post-plan-now's GATE_CLOSE points the operator at this line for the cause, so a
+    wrong noun here sends them to a branch with nothing to rebase.
+    """
+    r = RunResult(terminal=TerminalState.FAILED, error_kind="local-gate",
+                  error="check-docs: body changed but last_verified not bumped")
+    line = runner.verdict_line(r, 3)
+    assert "gate" in line
+    assert "rebase" not in line, line
+    assert "no PR opened" in line
+    assert "re-run bin/post-plan-now" in line
+    assert "last_verified" in line, "the gate's own reason must reach the operator"
+
+
+def test_rc3_verdict_stays_one_line_for_a_multiline_gate_detail():
+    """A watcher reads the verdict with head -1; a hook's multi-line output must be flattened."""
+    r = RunResult(terminal=TerminalState.FAILED, error_kind="local-gate",
+                  error="FAIL a.md 16374 bytes\nOne or more checks failed:\nTrim the rule(s) above")
+    assert "\n" not in runner.verdict_line(r, 3)

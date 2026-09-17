@@ -106,8 +106,9 @@ class LiveGit:
 
     def rebase_onto(self, base: str = "origin/master") -> None:
         """Repo pre-push policy (pre-push-adr-hook) rejects branches not rebased
-        onto origin/master. Conflict → abort, restore the tree, typed failure
-        (fail closed: the skill fallback owns conflict judgment)."""
+        onto origin/master. Conflict → abort, restore the tree, typed failure.
+        Fail closed: exit_code_for() maps this to exit 3, which bin/post-plan-now
+        refuses to escalate to the skill fallback — a human owns conflict judgment."""
         proc = subprocess.run(["git", "-C", self.worktree, "rebase", base],
                               capture_output=True, text=True, errors="replace")
         if proc.returncode != 0:

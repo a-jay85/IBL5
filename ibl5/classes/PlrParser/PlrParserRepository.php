@@ -390,6 +390,39 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
     }
 
     /**
+     * @see PlrParserRepositoryInterface::promotePriorSeasonSnapshots()
+     */
+    public function promotePriorSeasonSnapshots(int $priorYear): int
+    {
+        $columns   = self::SNAPSHOT_COLUMNS;
+        $columns[] = 'created_at';
+        $quoted    = array_map(static fn (string $c): string => '`' . $c . '`', $columns);
+        $colList = implode(', ', $quoted);
+        $selectList = implode(', ', array_map(
+            static fn (string $c): string => $c === 'snapshot_phase'
+                ? "'end-of-season'"
+                : 'src.`' . $c . '`',
+            $columns,
+        ));
+
+        $query = "INSERT IGNORE INTO `ibl_plr_snapshots` ({$colList})
+            SELECT {$selectList}
+            FROM (
+                SELECT s.*
+                FROM `ibl_plr_snapshots` s
+                LEFT JOIN `ibl_plr_snapshots` e
+                       ON e.pid = s.pid
+                      AND e.season_year = s.season_year
+                      AND e.snapshot_phase = 'end-of-season'
+                WHERE s.season_year = ?
+                  AND s.snapshot_phase = 'mid-season'
+                  AND e.id IS NULL
+            ) AS src";
+
+        return $this->execute($query, 'i', $priorYear);
+    }
+
+    /**
      * Column names for ibl_plr_snapshots upsert, in insertion order.
      *
      * @var list<string>

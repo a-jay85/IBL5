@@ -28,8 +28,10 @@ $processor  = new LeagueControlPanel\LeagueControlPanelProcessor($repository, $a
 $view       = new LeagueControlPanel\LeagueControlPanelView();
 $csvExporter = new LeagueControlPanel\ActivePlayersCsvExporter($repository);
 
-// GET ?export=active_players → write CSV to temp dir, reply with its download URL (JSON)
-if (($_GET['export'] ?? null) === 'active_players') {
+// POST export=active_players → write CSV to temp dir, reply with its download URL (JSON).
+// Writes a file, so it is POST + CSRF like every other LCP action; the reply carries a
+// fresh token because tokens are single-use and the button can be clicked again.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['export'] ?? null) === 'active_players') {
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store');
 
@@ -39,18 +41,28 @@ if (($_GET['export'] ?? null) === 'active_players') {
         exit;
     }
 
+    if (!\Security\CsrfGuard::validateSubmittedToken('lcp_export_active_players')) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Invalid or expired form submission. Please reload and try again.']);
+        exit;
+    }
+
     try {
         $filename = $csvExporter->export(new \DateTimeImmutable());
     } catch (\RuntimeException $e) {
         \Logging\LoggerFactory::getChannel('admin')->error('active_players_csv_export_failed', ['error' => $e->getMessage()]);
         http_response_code(500);
-        echo json_encode(['error' => 'Export failed. Please try again.']);
+        echo json_encode([
+            'error' => 'Export failed. Please try again.',
+            'csrfToken' => \Security\CsrfGuard::generateRawToken('lcp_export_active_players'),
+        ]);
         exit;
     }
 
     echo json_encode([
         'filename' => $filename,
         'url' => 'leagueControlPanel.php?download=' . rawurlencode($filename),
+        'csrfToken' => \Security\CsrfGuard::generateRawToken('lcp_export_active_players'),
     ]);
     exit;
 }

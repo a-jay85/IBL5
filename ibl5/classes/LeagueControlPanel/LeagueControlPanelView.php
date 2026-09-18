@@ -356,7 +356,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         ob_start();
         ?>
 <div class="lcp-control-row" id="lcp-active-players-export">
-    <button type="button" class="ibl-btn ibl-btn--secondary ibl-btn--sm" data-export-url="leagueControlPanel.php?export=active_players">Export .csv of all non-retired players</button>
+    <button type="button" class="ibl-btn ibl-btn--secondary ibl-btn--sm" data-export="active_players" data-csrf-token="<?= HtmlSanitizer::e(\Security\CsrfGuard::generateRawToken('lcp_export_active_players')) ?>">Export .csv of all non-retired players</button>
     <span class="updater-step__spinner" hidden></span>
     <span class="lcp-export-result"></span>
 </div>
@@ -372,9 +372,16 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
         spinner.hidden = false;
         result.textContent = '';
 
-        fetch(button.dataset.exportUrl, {credentials: 'same-origin', headers: {'Accept': 'application/json'}})
+        var body = new FormData();
+        body.append('export', button.dataset.export);
+        body.append('_csrf_token', button.dataset.csrfToken);
+
+        fetch('leagueControlPanel.php', {method: 'POST', body: body, credentials: 'same-origin', headers: {'Accept': 'application/json'}})
             .then(function (response) {
                 return response.json().then(function (data) {
+                    if (data.csrfToken) {
+                        button.dataset.csrfToken = data.csrfToken;
+                    }
                     if (!response.ok || !data.url) {
                         throw new Error(data.error || 'Export failed.');
                     }

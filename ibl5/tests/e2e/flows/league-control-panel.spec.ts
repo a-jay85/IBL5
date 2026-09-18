@@ -135,10 +135,11 @@ test.describe('LeagueControlPanel — Update Tradition', () => {
   });
 });
 
-// Active Players CSV Export — tests the two GET handlers added in this PR.
+// Active Players CSV Export — tests the POST export handler and GET download handler.
 // The export handler checks 'Current Season Phase' via repository->getSetting(),
 // which reads from ibl_settings in the DB (not the cookie override), so phase
 // must be changed via the LCP form, exactly like the Finals MVP tests above.
+// The phase check runs before the CSRF check, so the 409 case needs no token.
 // The download handler is phase-agnostic; it only requires valid admin auth.
 
 test.describe('LeagueControlPanel — Active Players CSV Export endpoints', () => {
@@ -155,10 +156,11 @@ test.describe('LeagueControlPanel — Active Players CSV Export endpoints', () =
       page.locator('button[value="set_season_phase"]').click(),
     ]);
 
-    const response = await page.goto('leagueControlPanel.php?export=active_players');
-    expect(response?.status()).toBe(409);
-    const text = response ? await response.text() : '{}';
-    const json = JSON.parse(text) as { error?: string };
+    const response = await page.request.post('leagueControlPanel.php', {
+      form: { export: 'active_players' },
+    });
+    expect(response.status()).toBe(409);
+    const json = (await response.json()) as { error?: string };
     expect(json.error).toContain('Free Agency');
 
     await page.goto('leagueControlPanel.php');
@@ -169,16 +171,42 @@ test.describe('LeagueControlPanel — Active Players CSV Export endpoints', () =
     ]);
   });
 
-  test('export endpoint returns 200 with JSON download URL during Free Agency', async ({
-    page,
-  }) => {
-    const response = await page.goto('leagueControlPanel.php?export=active_players');
-    expect(response?.status()).toBe(200);
-    const text = response ? await response.text() : '{}';
-    const json = JSON.parse(text) as { filename?: string; url?: string };
+  test('export endpoint returns 403 without a CSRF token', async ({ page }) => {
+    const response = await page.request.post('leagueControlPanel.php', {
+      form: { export: 'active_players' },
+    });
+    expect(response.status()).toBe(403);
+  });
+
+  test('export endpoint rejects GET', async ({ page }) => {
+    const response = await page.request.get('leagueControlPanel.php?export=active_players');
+    expect(response.headers()['content-type'] ?? '').not.toContain('application/json');
+  });
+
+  test('export button returns JSON download URL during Free Agency', async ({ page }) => {
+    await page.goto('leagueControlPanel.php');
+    const [response] = await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes('leagueControlPanel.php') && r.request().method() === 'POST',
+      ),
+      page.locator('#lcp-active-players-export button').click(),
+    ]);
+    expect(response.status()).toBe(200);
+    const json = (await response.json()) as { filename?: string; url?: string };
     expect(typeof json.filename).toBe('string');
     expect(json.url).toContain('download=');
     exportedFilename = json.filename ?? '';
+
+    // Tokens are single-use: a second click only works if the reply's fresh token was stored.
+    const button = page.locator('#lcp-active-players-export button');
+    await expect(button).toBeEnabled();
+    const [second] = await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes('leagueControlPanel.php') && r.request().method() === 'POST',
+      ),
+      button.click(),
+    ]);
+    expect(second.status()).toBe(200);
   });
 
   test('download endpoint streams CSV for a valid export filename', async ({

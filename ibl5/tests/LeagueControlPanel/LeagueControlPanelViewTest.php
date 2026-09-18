@@ -187,7 +187,8 @@ class LeagueControlPanelViewTest extends TestCase
         ]);
 
         $this->assertStringContainsString('Export .csv of all non-retired players', $html);
-        $this->assertMatchesRegularExpression('/<button type="button"[^>]*data-export-url="leagueControlPanel\.php\?export=active_players"/', $html);
+        $this->assertMatchesRegularExpression('/<button type="button"[^>]*data-export="active_players" data-csrf-token="[0-9a-f]{64}"/', $html);
+        $this->assertStringContainsString("method: 'POST'", $html);
     }
 
     public function testPreseasonShowsActivePlayersExportButton(): void
@@ -196,7 +197,7 @@ class LeagueControlPanelViewTest extends TestCase
             'panelData' => self::createPanelData(['phase' => 'Preseason']),
         ]);
 
-        $this->assertStringContainsString('data-export-url="leagueControlPanel.php?export=active_players"', $html);
+        $this->assertStringContainsString('data-export="active_players"', $html);
     }
 
     public function testActivePlayersExportButtonHiddenOutsidePreseasonAndFreeAgency(): void
@@ -206,7 +207,7 @@ class LeagueControlPanelViewTest extends TestCase
                 'panelData' => self::createPanelData(['phase' => $phase]),
             ]);
 
-            $this->assertStringNotContainsString('export=active_players', $html, $phase);
+            $this->assertStringNotContainsString('data-export="active_players"', $html, $phase);
         }
     }
 

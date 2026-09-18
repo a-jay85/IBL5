@@ -32,29 +32,47 @@ AUTOMATIC_ZERO_NOTE = (
     "not modify."
 )
 
-OUTPUT_CONTRACT = (
-    "\n\nReturn ONLY a JSON array of findings: "
-    '[{"path": "repo/relative/file.php", "line": 123, "body": "what and why"}]. '
-    "line is a single anchor line on the new-file side of the diff. Return [] if "
-    "no issues survive scrutiny. No prose outside the JSON."
+OUTPUT_CONTRACT_EXAMPLE = (
+    '[{"path": "ibl5/classes/TeamRepository.php", "line": 88, '
+    '"body": "fetchAll() on ibl_box_scores is unbounded and this table grows every sim; '
+    'add a LIMIT or filter by season."}]'
 )
+
+_CONTRACT_BODY = (
+    "Return ONLY a JSON array of findings: "
+    '[{"path": "repo/relative/file.php", "line": 123, "body": "what and why"}]. '
+    "Every finding carries exactly these three lowercase keys. Do NOT emit any other "
+    'key: no "category", no "severity", no "symbol", no "file", no "detail". '
+    "Do NOT wrap the array in an object and do NOT group findings under per-topic keys; "
+    "one flat array covers the whole review. "
+    "line is a single anchor line on the new-file side of the diff; use 0 when the "
+    "finding is about the file as a whole and has no single anchor line. "
+    "Return [] if no issues survive scrutiny. No prose outside the JSON, no markdown "
+    "headings, no explanation before or after.\n"
+    "A complete valid reply with one finding looks exactly like this:\n"
+    + OUTPUT_CONTRACT_EXAMPLE
+)
+
+OUTPUT_CONTRACT_HEAD = "OUTPUT CONTRACT (restated at the end of this prompt):\n" + _CONTRACT_BODY + "\n\n"
+
+OUTPUT_CONTRACT = "\n\nOUTPUT CONTRACT (as stated at the top):\n" + _CONTRACT_BODY
 
 
 def agent_a_prompt(meta: dict, cls: Classification, plan: PlanInfo) -> str:
-    sections = ["Section 1 — Architectural fitness: Repository/Service/View split, "
+    sections = ["Look for architectural-fitness problems: Repository/Service/View split, "
                 "SQL literals consistent with the baseline schema, native-type "
                 "comparisons (=== 0 vs === '0') correct for column types, refactors "
                 "preserve tested behavior, clean PR scope (no drive-by changes)."]
     if not cls.migration_only:
         sections.append(
-            "Section 2 — Bug detection (production-impact only): bind_param type-char "
+            "Look for production-impact bugs: bind_param type-char "
             "swaps; native-type mismatch (=== '0' on INT columns like tid/retired/hasMLE); "
             "contract-year cy1-vs-cy2 confusion; COUNT(*) on ibl_box_scores without "
             "gameMIN > 0; related-row writes without transactional(); free-agent tid "
             "compared as string. Skip stylistic issues and linter-catchable problems.")
     if cls.has_php:
         sections.append(
-            "Section 3 — DB performance (measurable only): unbounded fetchAll() on "
+            "Look for measurable DB-performance problems: unbounded fetchAll() on "
             "growing tables (ibl_box_scores, ibl_players, ibl_transactions); N+1 "
             "query loops (fetch inside foreach/while); ORDER BY/WHERE on unindexed "
             "columns; redundant repeat queries; unindexed JOINs.")
@@ -63,7 +81,8 @@ def agent_a_prompt(meta: dict, cls: Classification, plan: PlanInfo) -> str:
         reuse = ("\n\nPLANNED REUSE (flag any step that hand-rolled logic the plan "
                  "directed to reuse):\n" + plan.reuse_section)
     return (
-        "You are a Senior PHP Architect and Staff Engineer reviewing a PR for "
+        OUTPUT_CONTRACT_HEAD
+        + "You are a Senior PHP Architect and Staff Engineer reviewing a PR for "
         "architectural fitness, correctness bugs, and database performance.\n\n"
         + AUTOMATIC_ZERO_NOTE + "\n\n" + "\n\n".join(sections) + reuse
         + f"\n\nPR: #{meta.get('number')} {meta.get('title', '')}\n"
@@ -75,16 +94,17 @@ def agent_a_prompt(meta: dict, cls: Classification, plan: PlanInfo) -> str:
 def agent_b_prompt(meta: dict, cls: Classification, run_history: bool, run_comments: bool) -> str:
     parts = []
     if run_history:
-        parts.append("Section 1 — Regression risk: for the PHP files with the most "
+        parts.append("Look for regression risk: for the PHP files with the most "
                      "changed lines, does the change risk re-introducing a bug the "
                      "file's structure suggests was fixed (guard clauses, boundary "
                      "checks, type casts being removed)?")
     if run_comments:
-        parts.append("Section 2 — Code comments: does the change comply with guidance "
+        parts.append("Look for code-comment compliance problems: does the change comply with guidance "
                      "in code comments visible in the diff's @@ context windows? Flag "
                      "changes that contradict an adjacent comment's stated constraint.")
     return (
-        "You are a Senior Software Engineer reviewing regression risk and in-code "
+        OUTPUT_CONTRACT_HEAD
+        + "You are a Senior Software Engineer reviewing regression risk and in-code "
         "guidance compliance.\n\n" + AUTOMATIC_ZERO_NOTE + "\n\n" + "\n\n".join(parts)
         + f"\n\nPR: #{meta.get('number')} {meta.get('title', '')}\n"
         + "\n\nDIFF:\n" + cls.filtered_diff + OUTPUT_CONTRACT
@@ -94,7 +114,8 @@ def agent_b_prompt(meta: dict, cls: Classification, run_history: bool, run_comme
 def agent_d_prompt(meta: dict, cls: Classification) -> str:
     spec_diff, prod_diff = slice_spec_diffs(cls.filtered_diff, cls.e2e_spec_modules)
     return (
-        "You are a Senior QA Engineer reviewing Playwright E2E specs for assertion "
+        OUTPUT_CONTRACT_HEAD
+        + "You are a Senior QA Engineer reviewing Playwright E2E specs for assertion "
         "quality. Lint-enforced rules (missing await, force:true, waitForTimeout, "
         "networkidle) are out of scope.\n\nFlag these named anti-patterns only:\n"
         "1. Same-page-success-only: a happy-path submission test asserting a success "
@@ -135,7 +156,8 @@ def security_prompt(meta: dict, cls: Classification, plan: PlanInfo) -> str:
                       "the diff, and flag any state-changing surface the plan did not "
                       "anticipate):\n" + plan.security_section)
     return (
-        "You are a Senior Application Security Engineer auditing a PHP diff. Focus on "
+        OUTPUT_CONTRACT_HEAD
+        + "You are a Senior Application Security Engineer auditing a PHP diff. Focus on "
         "exploitable vulnerabilities, not theoretical risks; consider strict_types, the "
         "prepared-statement repository pattern (BaseMysqliRepository fetchOne/fetchAll/"
         "execute are parameterized), CsrfGuard, ApiKeyAuthenticator, is_user/is_admin "

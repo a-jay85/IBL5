@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 
@@ -6,8 +7,8 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness.adapters.llm import extract_json
-from harness.state import HarnessError
-from harness import schemas
+from harness.state import Classification, HarnessError, PlanInfo
+from harness import review, schemas
 
 FIXTURES = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fixtures")
 
@@ -101,3 +102,56 @@ def test_null_line_is_not_coerced():
 def test_canonical_key_wins_over_alias():
     data = [{"path": "a.py", "file": "b.py", "line": 7, "body": "B", "detail": "D"}]
     assert schemas.unwrap_findings_envelope(data) == [{"path": "a.py", "line": 7, "body": "B"}]
+
+
+# --- the prompt output contract ---
+
+
+def _prompts():
+    cls = Classification(files=["ibl5/classes/A.php"], has_php=True,
+                         filtered_diff="diff --git a/ibl5/classes/A.php b/ibl5/classes/A.php\n"
+                                       "@@ -1 +1 @@\n+$x = 1;\n")
+    meta, plan = {"number": 1, "title": "t"}, PlanInfo()
+    return {
+        "a": review.agent_a_prompt(meta, cls, plan),
+        "b": review.agent_b_prompt(meta, cls, True, True),
+        "d": review.agent_d_prompt(meta, cls),
+        "security": review.security_prompt(meta, cls, plan),
+    }
+
+
+BUILDERS = ["a", "b", "d", "security"]
+
+
+@pytest.mark.parametrize("builder", BUILDERS)
+def test_contract_is_first_text_in_every_prompt(builder):
+    assert _prompts()[builder].startswith("OUTPUT CONTRACT")
+
+
+@pytest.mark.parametrize("builder", BUILDERS)
+def test_contract_is_also_last_text_in_every_prompt(builder):
+    assert _prompts()[builder].rstrip().endswith(review.OUTPUT_CONTRACT_EXAMPLE)
+
+
+@pytest.mark.parametrize("builder", BUILDERS)
+def test_contract_appears_exactly_twice(builder):
+    assert _prompts()[builder].count("Return ONLY a JSON array of findings") == 2
+
+
+@pytest.mark.parametrize("builder", BUILDERS)
+def test_no_section_label_survives(builder):
+    prompt = _prompts()[builder]
+    for n in (1, 2, 3):
+        assert f"Section {n} —" not in prompt
+
+
+def test_contract_example_validates():
+    example = json.loads(review.OUTPUT_CONTRACT_EXAMPLE)
+    schemas.validate_findings(example)
+    assert schemas.unwrap_findings_envelope(example) == example
+
+
+def test_contract_forbids_the_observed_wrong_keys():
+    for key in ("category", "severity", "symbol", "detail"):
+        assert f'"{key}"' in review.OUTPUT_CONTRACT_HEAD
+    assert "one flat array" in review.OUTPUT_CONTRACT_HEAD

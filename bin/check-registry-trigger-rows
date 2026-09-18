@@ -1,0 +1,173 @@
+#!/usr/bin/env bash
+# Contract: a registry row that cites an anchor: key asserts the named trigger phrase
+# exists in the named section of _plan-verification.md.
+# Exit codes: 0 = pass, 1 = a claim is unsatisfied or an input is unreadable,
+#             2 = usage error.
+# There is no bypass marker — a row claiming a trigger row that does not exist is
+# never intentional.
+set -euo pipefail
+
+REGISTRY=""
+VERIFICATION=""
+SELF_TEST=0
+
+usage() {
+    echo "Usage: $0 [--registry <path>] [--verification <path>] [--self-test] [--help]"
+    echo "  --registry <path>      Path to retrospective-class-registry.md"
+    echo "  --verification <path>  Path to _plan-verification.md"
+    echo "  --self-test            Run parser self-tests and exit"
+    echo "  --help                 Show this message"
+    echo "Exit: 0=pass 1=claim unsatisfied or unreadable input 2=usage error"
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --registry)
+            if [[ $# -lt 2 || "$2" == --* ]]; then
+                echo "ERROR: --registry requires a value" >&2
+                exit 2
+            fi
+            REGISTRY="$2"; shift 2 ;;
+        --verification)
+            if [[ $# -lt 2 || "$2" == --* ]]; then
+                echo "ERROR: --verification requires a value" >&2
+                exit 2
+            fi
+            VERIFICATION="$2"; shift 2 ;;
+        --self-test)
+            SELF_TEST=1; shift ;;
+        --help)
+            usage; exit 0 ;;
+        --registry=*|--verification=*)
+            echo "ERROR: use space form (--registry <path>), not = form" >&2
+            exit 2 ;;
+        *)
+            echo "ERROR: unknown flag: $1" >&2
+            exit 2 ;;
+    esac
+done
+
+if [[ "$SELF_TEST" -eq 1 ]]; then
+    FAIL=0
+
+    # Case: normal anchor extraction from a row with parenthesised tail
+    line="| 2026-09-16 | #2039 | class: foo | routed to: Rung 3 (section: Forced integration-verification trigger, anchor: \"adds or modifies an awk filter in a skill or bin/ file\"): any plan adding or modifying (excluded content absent from output) something, foo |"
+    rest="${line#*, anchor: \"}"
+    anchor="${rest%%\"*}"
+    head_part="${line%%, anchor: \"*}"
+    section="${head_part##*(section: }"
+    if [[ "$anchor" != 'adds or modifies an awk filter in a skill or bin/ file' ]]; then
+        echo "SELF-TEST FAIL: anchor extraction with parenthesised tail: got '$anchor'" >&2
+        FAIL=1
+    fi
+    if [[ "$section" != 'Forced integration-verification trigger' ]]; then
+        echo "SELF-TEST FAIL: section extraction: got '$section'" >&2
+        FAIL=1
+    fi
+
+    # Case: empty anchor
+    line2="| 2026-09-16 | #9999 | class: foo | routed to: (section: Some Section, anchor: \"\"): text |"
+    rest2="${line2#*, anchor: \"}"
+    anchor2="${rest2%%\"*}"
+    if [[ -n "$anchor2" ]]; then
+        echo "SELF-TEST FAIL: empty anchor should be empty string, got '$anchor2'" >&2
+        FAIL=1
+    fi
+
+    # Case: absent (section: — head_part should equal line
+    line3="| 2026-09-16 | #9999 | class: foo | routed to: Rung 3, anchor: \"some phrase\"): text |"
+    head_part3="${line3%%, anchor: \"*}"
+    section3="${head_part3##*(section: }"
+    if [[ "$section3" != "$head_part3" ]]; then
+        # section3 changed means (section: was found — that's wrong
+        echo "SELF-TEST FAIL: absent (section: should leave section unchanged, got '$section3'" >&2
+        FAIL=1
+    fi
+
+    if [[ "$FAIL" -eq 0 ]]; then
+        echo "Self-test passed (3 parser cases)"
+        exit 0
+    else
+        exit 1
+    fi
+fi
+
+# Resolve defaults from repo root
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+if [[ -z "$REGISTRY" ]]; then
+    REGISTRY="$REPO_ROOT/ibl5/docs/retrospective-class-registry.md"
+fi
+if [[ -z "$VERIFICATION" ]]; then
+    VERIFICATION="$REPO_ROOT/.claude/review-shared/_plan-verification.md"
+fi
+
+# Fail closed on I/O
+if [[ ! -r "$REGISTRY" ]]; then
+    echo "ERROR: registry file not readable: $REGISTRY" >&2
+    exit 1
+fi
+if [[ ! -r "$VERIFICATION" ]]; then
+    echo "ERROR: verification file not readable: $VERIFICATION" >&2
+    exit 1
+fi
+
+verified_count=0
+
+while IFS= read -r line; do
+    # Only process lines containing anchor: "
+    if [[ "$line" != *'anchor: "'* ]]; then
+        continue
+    fi
+
+    # Extract row ID
+    row_id=""
+    if [[ "$line" =~ \#([0-9]+) ]]; then
+        row_id="#${BASH_REMATCH[1]}"
+    fi
+
+    # Parse anchor with shortest-match parameter expansion
+    rest="${line#*, anchor: \"}"
+    anchor="${rest%%\"*}"
+    head_part="${line%%, anchor: \"*}"
+    section="${head_part##*(section: }"
+
+    # Validate parse results
+    if [[ -z "$anchor" ]]; then
+        echo "ERROR: row $row_id has empty anchor" >&2
+        exit 1
+    fi
+    if [[ "$head_part" == "$line" ]]; then
+        echo "ERROR: row $row_id has anchor: but no (section: present" >&2
+        exit 1
+    fi
+
+    # Extract the named section from the verification file
+    body="$(awk -v sec="## $section" '
+        $0 == sec { inside=1; next }
+        /^## / { inside=0 }
+        inside { print }
+    ' "$VERIFICATION")"
+
+    if [[ -z "$body" ]]; then
+        echo "ERROR: row $row_id — section '## $section' not found or empty in $VERIFICATION" >&2
+        exit 1
+    fi
+
+    # Test membership — herestring, not pipe, to honour pipefail
+    if ! grep -qF -- "$anchor" <<< "$body"; then
+        echo "ERROR: row $row_id — anchor phrase not found in section '## $section':" >&2
+        echo "  anchor: $anchor" >&2
+        exit 1
+    fi
+
+    verified_count=$((verified_count + 1))
+done < "$REGISTRY"
+
+# Vacuity guard
+if [[ "$verified_count" -eq 0 ]]; then
+    echo "ERROR: no anchored rows found in $REGISTRY — parser may be broken" >&2
+    exit 1
+fi
+
+echo "OK: $verified_count anchored row(s) verified"
+exit 0

@@ -467,7 +467,9 @@ MAX_ATTEMPTS=3     # per-plan retry cap within one night (covers impl + postplan
 FAILURE_TAIL_LINES=200
 FAILURE_TAIL_BYTES=20000
 MAX_IMPL_SECS=3600   # per-phase cap: impl gets at most 1h
-MAX_PP_SECS=3600     # per-phase cap: post-plan gets at most 1h
+MAX_PP_SECS=5400     # per-phase cap: post-plan gets at most 1h30m. Post-plan is the
+                     # phase that actually exhausts its wall: 2 of the 4 post-plan
+                     # phases on 2026-09-16 were hard-killed at the cap (exit 137).
 # Wall-clock cap-timeout classifier (see impl_cap_timeout below). The tolerance
 # absorbs process startup/teardown skew around `timeout`; it must stay SMALL —
 # a large value would forgive ordinary failures, which is exactly the
@@ -475,9 +477,11 @@ MAX_PP_SECS=3600     # per-phase cap: post-plan gets at most 1h
 CAP_TIMEOUT_TOLERANCE_SECS=30
 CAP_REFUND_LIMIT=2   # max wall-clock refunds per plan; the 3rd cap-timeout burns
                      # a real attempt so MAX_ATTEMPTS still retires a hopeless plan
-LOCK_TTL_SECS=9000   # max a single plan legitimately holds its claim lock
-                     # (impl 1h + postplan 1h + overhead); a lock older than this
-                     # whose owner PID is gone is presumed crashed and stolen.
+LOCK_TTL_SECS=10800  # max a single plan legitimately holds its claim lock
+                     # (impl 1h + postplan 1.5h + 30m overhead); a lock older than
+                     # this whose owner PID is gone is presumed crashed and stolen.
+                     # INVARIANT: LOCK_TTL_SECS >= MAX_IMPL_SECS + MAX_PP_SECS + 1800.
+                     # Locked by bin/test-automouse-postplan-disposition group t.
 STALL_KILL_SECS=1800 # kill phase if no stream events for 30 minutes.
                      # Was 600. The Agent/Task tool is now ASYNCHRONOUS: it returns
                      # "Async agent launched successfully" immediately and the parent
@@ -1752,7 +1756,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # bin/lib/automouse-stream-filter.sh writes the heartbeat file, and that needs
         # --output-format stream-json, which post-plan-now's $CMD never emits. The watcher
         # short-circuits on `[ ! -f "$hb_file" ]`, so it costs one idle sleep loop. The live
-        # bound here is `timeout "$REMAINING_SECS"` (MAX_PP_SECS, 3600). Kept deliberately.
+        # bound here is `timeout "$REMAINING_SECS"` (MAX_PP_SECS, 5400). Kept deliberately.
         run_heartbeat_watcher "$HEARTBEAT_FILE" "$LOG" "postplan" "$CMDPID_FILE" "$PLAN_SLUG" &
         WATCHER_PID=$!
 

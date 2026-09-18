@@ -271,7 +271,7 @@ updates in place on re-run.
 
 ---
 
-### (b-clean) — rendered when first line is exactly `CONFLICT-REVIEW=CLEAN`
+### (b-clean) — rendered when first line is exactly `CONFLICT-REVIEW=CLEAN` <!-- slop-ok -->
 
 ````markdown
 <!-- post-plan-conflict-hold -->
@@ -299,7 +299,7 @@ _Posted by `/post-plan`. Updated in place on re-run._
 
 ---
 
-### (b-held) — rendered on every other outcome
+### (b-held) — rendered on every other outcome <!-- slop-ok -->
 
 ````markdown
 <!-- post-plan-conflict-hold -->

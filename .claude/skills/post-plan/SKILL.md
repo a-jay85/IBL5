@@ -515,7 +515,7 @@ rather than stacked.
 # FIRST LINE is exactly CONFLICT-REVIEW=CLEAN, at a path keyed to the branch slug AND the
 # current HEAD sha. The .ok suffix names the artifact slot, never the outcome: a
 # CONFLICT-REVIEW=FOUND-PROBLEM verdict is written to this same path, so rewriting this as
-# test -f "$CONFLICT_VERDICT" would arm auto-merge on a negative review.
+# an existence-only check would arm auto-merge on a negative review.
 # CONFLICT_FLAG, CONFLICT_VERDICT_DIR and CONFLICT_VERDICT_KEY are overridable only so
 # bin/test-postplan-arm-conditions can point this block at fixture paths; production leaves
 # them unset and takes the defaults. The HEAD sha is deliberately NOT seam-overridable, so a

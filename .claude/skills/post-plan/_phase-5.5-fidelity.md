@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 5.5 — plan-intent fidelity review (one Opus reviewer spawn, plus one bounded re-review after remediation), verdict parse, remediation, and sticky merge-digest comment.
-last_verified: 2026-09-16
+last_verified: 2026-09-17
 ---
 
 # /post-plan Phase 5.5 — Plan-intent fidelity review & merge digest
@@ -168,6 +168,25 @@ On `RE_REVIEW=spawn`, spawn **one** reviewer: `subagent_type: "pr-ready-phase6"`
 
 After the reviewer returns, re-run step 3's parse against the `-2` path to get the second verdict word, then run step 3b's record block against the `-2` path so verdict 2 also carries `REVIEWED_TREE=`. Both must run **after** step 4's push, so the recorded tree is the tree the reviewer saw.
 
+**Findings hand-off.** Verdict 2's `## FINDINGS` body is what the digest renders, so extract it into `V2_FINDINGS` in the same step that recorded the tree. The block is self-contained, because each skill bash block runs in its own shell (`.claude/rules/shell-portability.md` § Skill inline bash), so it re-derives the `-2` path instead of inheriting a variable. Every degrade path leaves `V2_FINDINGS` empty: step 4b's failure-path contract below treats that as "no re-review happened".
+
+```bash
+# phase 5.8 findings render — extract verdict 2's FINDINGS body for the digest
+VERDICT_2_FILE="/tmp/post-plan-fidelity-verdict-<N>-2.md"   # <N> = step 1's $PR_NUM
+V2_FINDINGS=""
+if [ -f "$VERDICT_2_FILE" ]; then
+    V2_FINDINGS=$(awk '
+        /^## FINDINGS/ {found=1; next}
+        found && /^## / {exit}
+        found {print}
+    ' "$VERDICT_2_FILE" 2>/dev/null)
+    # whitespace-only body counts as absent
+    printf '%s\n' "$V2_FINDINGS" | grep -q '[^[:space:]]' || V2_FINDINGS=""
+fi
+printf 'V2_FINDINGS_PRESENT=%s\n' "$([ -n "$V2_FINDINGS" ] && echo yes || echo no)"
+[ -n "$V2_FINDINGS" ] && printf '%s\n%s\n' '--- V2_FINDINGS ---' "$V2_FINDINGS"
+```
+
 **Failure paths:** if the re-review writes no file, or writes one with no parseable verdict word, treat it as "no re-review happened" — verdict 1 stands, condition (12) blocks on verdict 1's word, and the terminal line is the fully-remediated `NOT READY` row. Never re-spawn a third time to retry.
 
 ## Step 5 — Materialise the digest lines
@@ -196,6 +215,8 @@ Plan-fidelity verdict: <FIDELITY word> — <reviewer findings, REVIEW-COVERAGE: 
 **Reviewed tree:** <REVIEWED_TREE from step 1>
 **Re-reviewed tree:** <tree from step 4b, and the re-review's verdict word — omit this line entirely when step 4b did not run>
 
+<findings slot — when `$V2_FINDINGS` (extracted in step 4b) is non-empty, emit a blank line, then its content pasted VERBATIM (no condensing, no re-wording, no re-ordering), then a blank line, before the `### Merge digest` heading below. When `$V2_FINDINGS` is empty, or step 4b did not run, emit nothing here and leave the single blank line above `### Merge digest` exactly as it is.>
+
 ### Merge digest
 **What changed:** <paste line 1 from /tmp/post-plan-digest-lines-<N>.txt>
 **Why:** <paste line 2 from /tmp/post-plan-digest-lines-<N>.txt>
@@ -210,6 +231,8 @@ Plan-fidelity verdict: <FIDELITY word> — <reviewer findings, REVIEW-COVERAGE: 
 ```
 
 **`**Reviewed tree:**` and `**Re-reviewed tree:**` placement rule:** both bold-labelled lines must appear before the digest heading. `bin/digest-dm-build`'s `_digest_labels` starts capturing at that heading and treats every `^\*\*[^*]+:\*\*` line inside that span as a label — a bold-labelled line placed inside the block becomes a sixth label and corrupts the digest parse. Before the heading they are invisible to the parser. The five digest labels and their order are unchanged.
+
+**Findings slot placement:** the same rule governs `$V2_FINDINGS`. When it is non-empty, insert a blank line, then `$V2_FINDINGS` verbatim, then a blank line, between the `**Re-reviewed tree:**` line and the `### Merge digest` heading. Place it above that heading only. Re-review findings routinely carry their own `####` sub-headings and `**Finding N:**` bold labels: below the heading a `#+ ` line truncates the digest block and a bold label becomes a sixth digest label, either of which corrupts `bin/digest-dm-build`'s parse. Above the heading the parser never sees them, so the findings text needs no escaping, no re-wrapping, and no label stripping.
 
 **Five digest labels — do not re-word, re-order, merge, or add a sixth line.** The labels in the given order are: `**What changed:**`, `**Why:**`, `**Watch:**`, `**Touches:**`, `**Machine-authored fixes:**`. If `/tmp/post-plan-digest-lines-<N>.txt` is absent or empty, emit the heading anyway with all five labels carrying `unavailable — digest script did not produce output`. The one permitted amendment is step 4 rule 3 (appending remediation SHA to `**Machine-authored fixes:**`).
 

@@ -1175,6 +1175,46 @@ write_env_stop_report() {
     } > "$reports_dir/$(date +%Y-%m-%d)-env-stop-$slug.md"
 }
 
+# Post-plan was wall-killed before the Phase 5.5 fidelity review ran. The plan stays
+# in queue/ because the caller simply does not call dispose_plan_done; this function's
+# whole job is to make that hold LOUD. The DM is the signal — a report file alone is
+# not one, because nobody reads reports/ unprompted, which is exactly how PRs #2216,
+# #2235, #2238 and #2239 were filed to done/ unnoticed.
+#
+# Never fails the run: discord-dm exit 1 means "undeliverable, spooled", and a spooled
+# DM must not turn a hold into a loop abort. --attempts 3 bounds the retry window at
+# ~45s of backoff instead of discord-dm's ~5m15s default, because this call sits on
+# the synchronous plan loop.
+notify_postplan_hold() {
+    local plan=$1 slug=$2 pr_url=$3 dur=$4 budget=$5 status=$6
+    local reports_dir="$NIGHTLY_DIR/reports" report harness_dir msg
+    mkdir -p "$reports_dir"
+    report="$reports_dir/$(date +%Y-%m-%d)-postplan-hold-$slug.md"
+
+    # Diagnostic only, never load-bearing: the newest harness run dir for this slug,
+    # so the report points at the transcript and at result.json when the harness got
+    # far enough to write one. Absence is itself informative and must not abort.
+    harness_dir=$(ls -dt "$SELF_DIR/../../tools/postplan-harness/out/live-$slug-"* 2>/dev/null | head -1) || harness_dir=""
+
+    msg=$(printf 'Automouse HELD "%s" — post-plan hit the %ss wall-clock cap (exit %s after %ss) before the Phase 5.5 fidelity review ran.\n\nPR: %s\nThe PR is OPEN and UNREVIEWED. The plan was NOT moved to done/ — it stays in queue/ and post-plan re-runs next pass.\nHarness run dir: %s\nReport: %s\n' \
+        "$slug" "$budget" "$status" "$dur" "$pr_url" "${harness_dir:-none found}" "$report")
+
+    {
+        printf 'Automouse HELD "%s" — post-plan cap-timeout before Phase 5.5.\n\n' "$slug"
+        printf -- '- PR: %s (OPEN, unreviewed)\n' "$pr_url"
+        printf -- '- Post-plan ran %ss against a %ss cap and exited %s.\n' "$dur" "$budget" "$status"
+        printf -- '- No Phase 5.5 fidelity verdict file was written during this phase.\n'
+        printf -- '- Disposition: HELD in queue/ — dispose_plan_done was deliberately skipped.\n'
+        printf -- '- Harness run dir: %s\n' "${harness_dir:-none found}"
+        printf '\nNext pass re-runs post-plan only: the handoff file is still present, so impl is skipped.\n'
+    } > "$report"
+
+    printf '%s' "$msg" | "$SELF_DIR/../discord-dm" - --attempts 3 --quiet \
+        || echo "Postplan hold DM undeliverable (spooled) for $slug." >> "$LOG"
+
+    echo "Postplan cap-timeout HOLD: PR OPEN ($pr_url) — kept $plan in queue/, DM sent." >> "$LOG"
+}
+
 # write_canary_park_report <signal> <detail>
 # Dated report written when the between-plans canary parks the queue. Separate
 # from write_env_stop_report(): at a plan boundary there is no "current plan",
@@ -1806,6 +1846,13 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
 
         PP_STATUS=0
         PP_START=$(date +%s)
+        # Freshness reference for the Phase 5.5 verdict-file probe run after this
+        # phase. A bash `-nt` test against a real file is used instead of
+        # `find -newermt @<epoch>`: BSD find (macOS, where automouse runs) and GNU
+        # find (Linux, where CI runs the test) disagree on @epoch parsing, and
+        # `stat` has no portable mtime flag. A marker file behaves identically on
+        # both. Empty on mktemp failure — the probe fails closed on that.
+        PP_START_MARKER=$(mktemp -t automouse-pp-start) || PP_START_MARKER=""
         # Same background-task ceiling as the impl phase above — /post-plan spawns
         # review/E2E sub-agents, which are asynchronous too. The skill's own "drain
         # every background shell before ending your turn" rule is unchanged and still
@@ -1877,10 +1924,50 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         if [ -e "$NEXT_PLAN" ]; then
             PP_BRANCH=$(automouse_branch_for_plan "$PLAN_NAME" "$PLAN_SLUG")
             if PP_PR=$(automouse_pr_state "$PP_BRANCH"); then
-                dispose_plan_done "$PLAN_NAME" "$PLAN_SLUG" \
-                    "${PP_PR%% *}" "${PP_PR#* }" post-postplan
+                PP_PR_STATE="${PP_PR%% *}"
+                PP_PR_URL="${PP_PR#* }"
+                PP_PR_NUM="${PP_PR_URL##*/}"
+                # Postplan cap-timeout hold: post-plan was hard-killed at its
+                # wall-clock cap AND no Phase 5.5 fidelity verdict was written during
+                # this phase, so the plan-intent review never ran and the PR is
+                # unreviewed. Filing it to done/ here is the silent-disposal defect.
+                PP_CAP=0
+                postplan_cap_timeout "$PP_STATUS" "$PP_DUR" "$REMAINING_SECS" && PP_CAP=1
+                # Newest verdict wins. Phase 5.5 writes `-<N>.md` on first review and an
+                # ADDITIONAL `-<N>-2.md` on re-review — it never rewrites verdict 1
+                # (`.claude/skills/post-plan/_phase-5.5-fidelity.md` lines 27 and 150). A
+                # re-reviewed PR can therefore carry a stale base file beside a fresh `-2`;
+                # testing the base name alone would hold a run whose review demonstrably ran.
+                PP_VERDICT_NEWEST=$(ls -t \
+                    "/tmp/post-plan-fidelity-verdict-$PP_PR_NUM.md" \
+                    /tmp/post-plan-fidelity-verdict-"$PP_PR_NUM"-*.md 2>/dev/null | head -1)
+                # Fail-closed: 1 means "treat as reviewed", i.e. today's behaviour.
+                # It only drops to 0 when we hold a usable freshness reference AND
+                # no verdict for this PR is newer than this phase's start marker.
+                PP_VERDICT_FRESH=1
+                case "$PP_PR_NUM" in
+                    ''|*[!0-9]*) ;;
+                    *)
+                        if [ -n "$PP_START_MARKER" ] && [ -e "$PP_START_MARKER" ] \
+                           && { [ -z "$PP_VERDICT_NEWEST" ] \
+                                || [ ! "$PP_VERDICT_NEWEST" -nt "$PP_START_MARKER" ]; }; then
+                            PP_VERDICT_FRESH=0
+                        fi
+                        ;;
+                esac
+                if should_hold_postplan_disposal "$PP_CAP" "$PP_PR_STATE" "$PP_VERDICT_FRESH"; then
+                    notify_postplan_hold "$PLAN_NAME" "$PLAN_SLUG" "$PP_PR_URL" \
+                        "$PP_DUR" "$REMAINING_SECS" "$PP_STATUS"
+                else
+                    dispose_plan_done "$PLAN_NAME" "$PLAN_SLUG" \
+                        "$PP_PR_STATE" "$PP_PR_URL" post-postplan
+                fi
             fi
         fi
+        rm -f "$PP_START_MARKER"
+        # (Known, accepted: this line is not reached when the environmental-breaker arm is
+        # taken, so one empty mktemp file leaks into /tmp per env stop. Cheaper than
+        # duplicating the cleanup into an arm that never set the variable.)
     fi
 
     # If the plan moved out of queue/ (to done/ or skipped/), clean up its attempt file and failure report

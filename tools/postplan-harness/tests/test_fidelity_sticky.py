@@ -313,6 +313,43 @@ def test_digest_uses_the_scripts_own_degrade_lines_verbatim(tmp_path, monkeypatc
     assert out[0] == "**What changed:** unavailable — DIGEST section is empty"
 
 
+# --- compose_sticky new lines (rows 16, 17) -----------------------------------
+
+def test_rounds_line():
+    """**Remediation rounds:** absent for 0 or 1 round, present for 2+."""
+    assert "**Remediation rounds:**" not in _sticky()
+    one = _sticky(fid={"rounds": [{"remediation_sha": "abc1234", "verdict": "NOT READY"}]})
+    assert "**Remediation rounds:**" not in one
+    two = _sticky(fid={
+        "rounds": [
+            {"remediation_sha": "abc1234ab", "verdict": "NOT READY"},
+            {"remediation_sha": "def5678de", "verdict": "READY"},
+        ]
+    })
+    assert "**Remediation rounds:**" in two
+    assert "abc1234ab" in two
+    assert "def5678de" in two
+
+
+def test_sticky_ordering_and_marker():
+    """New sticky lines sit above ### Merge digest; marker is last; labels belong
+    to the digest section only (not used as round/backlog line prefixes)."""
+    body = _sticky(fid={
+        "rounds": [
+            {"remediation_sha": "abc1234ab", "verdict": "NOT READY"},
+            {"remediation_sha": "def5678de", "verdict": "READY"},
+        ],
+        "backlog_issue_numbers": [101, 102],
+    })
+    h = body.index(fidelity.MERGE_DIGEST_HEADING)
+    r = body.index("**Remediation rounds:**")
+    b = body.index("**Backlog issues filed:**")
+    assert r < h and b < h
+    assert body.endswith(fidelity.STICKY_MARKER + "\n")
+    for lbl in fidelity.LABELS:
+        assert body.index(lbl) > h
+
+
 def test_digest_reads_the_real_script_in_replay_mode(tmp_path):
     """worktree=None reads the checkout on disk — no git, no shim."""
     v = tmp_path / "v.md"

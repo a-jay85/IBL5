@@ -565,6 +565,8 @@ def test_replay_c_failing_re_review_holds_and_never_arms(tmp_path, sticky_tmp):
         "plan-fidelity-review": [_verdict_doc("NOT READY")],
         "fidelity-remediation": ["edits made"],
         "plan-fidelity-re-review-2": [_verdict_doc("NOT READY")],
+        "plan-fidelity-re-review-3": [_verdict_doc("NOT READY")],
+        "plan-fidelity-re-review-4": [_verdict_doc("NOT READY")],
     })
     assert res.terminal == TerminalState.SHIPPED_HELD
     assert not any(a["action"] == "pr_merge_auto" for a in _actions(out))

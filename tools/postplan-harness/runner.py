@@ -742,12 +742,6 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                     "reviewed_tree_2": None,
                     "rounds": [], "rounds_completed": 0,
                     "backlog_issue_numbers": []}
-    if verdict == "READY WITH NOTES":
-        vpath = fidelity.verdict_path(pr)
-        notes = fidelity.extract_notes(llm, vpath, log=log)
-        nums = fidelity.file_note_issues(gh, notes, pr, _read_text(vpath), log=log)
-        res.fidelity["backlog_issue_numbers"] = nums
-        log(f"phase5.5 notes: {len(notes)} extracted, {len(nums)} backlog issues filed")
     rounds = []
     current_verdict_path = fidelity.verdict_path(pr)
     final_verdict, final_err = verdict, err
@@ -774,17 +768,22 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         res.fidelity["rounds"] = rounds
         res.fidelity["rounds_completed"] = len(rounds)
         res.fidelity["remediation_sha"] = str(sha)
-        if v_n is not None:
-            res.fidelity["verdict_2"] = v_n
-            res.fidelity["reviewed_tree_2"] = tree_n
+        res.fidelity["verdict_2"] = v_n
+        res.fidelity["reviewed_tree_2"] = tree_n
         log(f"phase5.5 round {round_num}: sha={str(sha)[:12]} "
             f"verdict={v_n or 'INDETERMINATE'} tree={(tree_n or '')[:12]}")
         if v_n is None:
             break
         final_verdict, final_err = v_n, ""
-        if v_n != "NOT READY":
-            break
         current_verdict_path = path_n
+    # Notes come from whichever review produced the final verdict: the initial one or
+    # a re-review round. current_verdict_path tracks that review's verdict file.
+    if final_verdict == "READY WITH NOTES":
+        notes = fidelity.extract_notes(llm, current_verdict_path, log=log)
+        nums = fidelity.file_note_issues(gh, notes, pr, _read_text(current_verdict_path),
+                                         log=log)
+        res.fidelity["backlog_issue_numbers"] = nums
+        log(f"phase5.5 notes: {len(notes)} extracted, {len(nums)} backlog issues filed")
     return final_verdict, final_err
 
 

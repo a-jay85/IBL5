@@ -1,10 +1,9 @@
-import { test, expect } from '../fixtures/base';
+import { test, expect } from '../fixtures/public';
 import { assertNoPhpErrors } from '../helpers/php-errors';
-import { publicStorageState } from '../helpers/public-storage-state';
 import { assertColumnSorts } from '../helpers/sortable-table-page';
+import { withPhases, CONTRACT_BOUNDARY_PHASES } from '../fixtures/phase';
 
 // Cap Space — public page.
-test.use({ storageState: publicStorageState() });
 
 test.describe('Cap Space flow', () => {
   test.beforeEach(async ({ page }) => {
@@ -20,26 +19,10 @@ test.describe('Cap Space flow', () => {
     await expect(table).toBeVisible();
   });
 
-  test('table has expected salary columns', async ({ page }) => {
-    const table = page.locator('.sticky-table').first();
-    await expect(table).toBeVisible();
-    const headerText = await table.locator('thead').textContent();
-    expect(headerText).toContain('Team');
-  });
-
   test('team rows have data-team-id attributes', async ({ page }) => {
     const teamRows = page.locator('tr[data-team-id]');
     const count = await teamRows.count();
     expect(count).toBeGreaterThanOrEqual(28);
-  });
-
-  test('MLE/LLE status indicators are present', async ({ page }) => {
-    const table = page.locator('.sticky-table').first();
-    await expect(table).toBeVisible();
-    const headerText = await table.locator('thead').textContent();
-    // Should contain MLE and LLE columns
-    expect(headerText).toContain('MLE');
-    expect(headerText).toContain('LLE');
   });
 
   test('sticky scroll wrapper exists for wide table', async ({ page }) => {
@@ -56,7 +39,28 @@ test.describe('Cap Space flow', () => {
     });
   });
 
-  test('no PHP errors', async ({ page }) => {
-    await assertNoPhpErrors(page, 'on Cap Space page');
-  });
+  withPhases(CONTRACT_BOUNDARY_PHASES, () => {
+    test('table has expected salary columns', async ({ page }) => {
+      await page.goto('modules.php?name=CapSpace');
+      const table = page.locator('.sticky-table').first();
+      await expect(table).toBeVisible();
+      const headerText = await table.locator('thead').textContent();
+      expect(headerText).toContain('Team');
+    });
+
+    test('MLE/LLE status indicators are present', async ({ page }) => {
+      await page.goto('modules.php?name=CapSpace');
+      const table = page.locator('.sticky-table').first();
+      await expect(table).toBeVisible();
+      const headerText = await table.locator('thead').textContent();
+      // Should contain MLE and LLE columns
+      expect(headerText).toContain('MLE');
+      expect(headerText).toContain('LLE');
+    });
+
+    test('no PHP errors', async ({ page }) => {
+      await page.goto('modules.php?name=CapSpace');
+      await assertNoPhpErrors(page, 'on Cap Space page');
+    });
+  }, { test });
 });

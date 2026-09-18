@@ -281,6 +281,48 @@ def test_local_gate_empty_error_falls_back_to_generic():
     assert "see gate output" in line
 
 
+
+def _local_gate_res(error):
+    return _res(TerminalState.FAILED, error_kind="local-gate", error=error)
+
+
+def test_verdict_names_the_adr_class_and_its_remedy():
+    line = runner.verdict_line(_local_gate_res(
+        "local-gate: pre-push-adr-hook: a decision-trigger surface is being pushed "
+        "without an ADR."), 3, "")
+    assert "[class=adr]" in line and "Write the ADR" in line
+
+
+def test_verdict_names_the_byte_budget_class_and_says_there_is_no_fix_flag():
+    line = runner.verdict_line(_local_gate_res(
+        "local-gate: FAIL  .claude/rules/x.md  16374 bytes  cap 16000\n"
+        "Trim the rule(s) above (or move detail into a path-scoped *-detail.md"), 3, "")
+    assert "[class=byte-budget]" in line and "no --fix flag" in line
+    assert "Write the ADR" not in line
+
+
+def test_verdict_byte_budget_survives_a_300_char_prefix():
+    """Regression pin: _flat() truncates at 300 and the guidance line comes last.
+    Classifying on _flat(res.error) instead of res.error makes this row fail."""
+    padded = "local-gate: " + ("FAIL  .claude/rules/pad.md  16374 bytes  cap 16000\n" * 8)
+    assert len(padded) > 300
+    line = runner.verdict_line(_local_gate_res(
+        padded + "Trim the rule(s) above (or move detail into a path-scoped"), 3, "")
+    assert "[class=byte-budget]" in line
+
+
+def test_verdict_doc_staleness_says_auto_remediation_already_ran():
+    line = runner.verdict_line(_local_gate_res(
+        "local-gate: Bump last_verified on the doc(s) above"), 3, "")
+    assert "[class=doc-staleness]" in line and "Auto-remediation ran" in line
+
+
+def test_verdict_unknown_class_keeps_the_original_tail():
+    """Negative path: an unclassifiable denial must not gain a fabricated remedy."""
+    line = runner.verdict_line(_local_gate_res("local-gate: Author identity unknown"), 3, "")
+    assert "[class=unknown]" in line
+    assert line.rstrip().endswith("Clear the gate then re-run bin/post-plan-now.")
+
 def test_rebase_conflict_verbatim():
     """The rebase-conflict message must be unchanged from before the fix."""
     r = _res(TerminalState.FAILED, error_kind="rebase-conflict")

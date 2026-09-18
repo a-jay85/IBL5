@@ -44,7 +44,7 @@ from harness.planfile import locate_plan, split_hold_justification
 from harness.review import ReviewPhase
 from harness.state import (HarnessError, RunResult, TerminalState, UsageLedger)
 from harness.adapters.ghad import LiveGh, RecordingGh
-from harness.adapters.gitad import LiveGit, ReplayGit
+from harness.adapters.gitad import LiveGit, ReplayGit, classify_local_gate_denial
 from harness.adapters.llm import ClaudeCli, FixtureLlm
 from harness.adapters.probe import FixtureProbe, LiveProbe
 from harness.adapters.verify import LiveVerify, ReplayVerify, aggregate
@@ -272,7 +272,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             copy["summary_md"] = summary
             log("phase2: stripped model-authored Manual Testing section from PR copy")
         copy["commit_subject"] = schemas.coerce_commit_subject(copy["commit_subject"], cls)
-        sha = git.commit_all(f"{copy['commit_subject']}\n\n{copy['summary_md']}")
+        sha = _commit_with_gate_remediation(
+            git, worktree, f"{copy['commit_subject']}\n\n{copy['summary_md']}", log)
         rebase_line = f"REBASE=not run ({mode} mode)"
         if live:
             pre_rebase = git.head()
@@ -585,6 +586,103 @@ CONFORMANCE_DONE_NAME = "conformance-done"
 CONFORMANCE_BRIDGE_NAME = "missing-tests"
 
 
+# --- Phase 2 local-gate remediation ------------------------------------------
+# One denial class is mechanical: bin/pre-commit-hook rejecting a commit because a
+# touched doc's last_verified was not bumped. In a harness run the agent already made
+# that edit as part of implementing a plan and simply omitted the stamp, so bumping it
+# is completing the on-touch rule, not certifying unread content. Every other class
+# stays fail-closed on exit 3.
+_DOC_FIX_SCRIPT = "bin/check-docs"
+_DOC_FIX_FLAG = "--fix-dates"
+_REMEDIATION_NOTE = "Auto-remediated: bumped last_verified for on-touch docs"
+
+
+def _doc_gate_base(worktree: str) -> str:
+    """The base bin/pre-commit-hook hands to check-docs, derived identically.
+
+    bin/pre-commit-hook:54 --
+        doc_base=$(git merge-base HEAD origin/master 2>/dev/null) || doc_base=""
+    Deriving it the same way is what makes the fix and the gate read ONE changed set;
+    a hardcoded "origin/master" would be a second, independently-drifting base.
+    An empty result means the hook skips its doc gate entirely (fetch-less clone), so
+    it also means there is nothing here to remediate.
+    """
+    proc = subprocess.run(["git", "-C", worktree, "merge-base", "HEAD", "origin/master"],
+                          capture_output=True, text=True, errors="replace")
+    return proc.stdout.strip() if proc.returncode == 0 else ""
+
+
+def _remediate_doc_staleness(worktree: str, git, log) -> int:
+    """Run the on-touch date bump the hook asked for, stage it, return how many docs
+    moved. Returns 0 when nothing changed and -1 when remediation could not run."""
+    base = _doc_gate_base(worktree)
+    if not base:
+        log("phase2: cannot remediate doc-staleness - no merge-base with origin/master")
+        return -1
+    argv = [os.path.join(worktree, _DOC_FIX_SCRIPT), _DOC_FIX_FLAG, f"--since={base}"]
+    try:
+        proc = subprocess.run(argv, cwd=worktree, capture_output=True,
+                              text=True, errors="replace")
+    except OSError as exc:
+        log(f"phase2: cannot remediate doc-staleness - {_DOC_FIX_SCRIPT}: {exc}")
+        return -1
+    # A non-zero exit is NOT fatal: --fix-dates still reports findings it cannot fix
+    # (a dead reference, a future date). The retried commit is the authority on
+    # whether the gate cleared, so count what moved and let the hook decide.
+    # run() called git.stage_all() before commit_all, so the tree was clean against
+    # the index; every path --fix-dates rewrote is now an UNSTAGED change. That is an
+    # exact count with no parsing of the script's prose.
+    out = subprocess.run(["git", "-C", worktree, "diff", "--name-only", "--", "*.md"],
+                         capture_output=True, text=True, errors="replace").stdout
+    n = len([p for p in out.splitlines() if p.strip()])
+    if n == 0:
+        log(f"phase2: {_DOC_FIX_SCRIPT} {_DOC_FIX_FLAG} bumped nothing "
+            f"(exit {proc.returncode}) - failing closed")
+        return 0
+    git.stage_all()
+    log(f"phase2: auto-remediated doc-staleness - bumped last_verified in {n} docs "
+        f"(base: {base[:12]})")
+    return n
+
+
+def _commit_with_gate_remediation(git, worktree: str | None, message: str, log) -> str:
+    """Phase 2 commit with ONE bounded auto-remediation of the mechanical gate class.
+
+    Only "doc-staleness" is remediable. "byte-budget" (bin/check-rules-byte-budget has
+    no --fix flag; trimming prose is human judgment), "adr", and "unknown" all re-raise
+    unchanged and land on exit 3 via _FAIL_CLOSED_KINDS.
+
+    Bounded at exactly one retry: a second local-gate denial re-raises the ORIGINAL
+    error, so res.error names the gate that actually blocked and nothing loops.
+
+    ADR denials are structurally outside this wrapper -- bin/pre-push-adr-hook is a
+    PUSH hook and run() calls git.push() well after commit_all(). The "adr" arm here is
+    defence in depth against a locally-installed pre-commit variant, not the protection.
+    """
+    try:
+        return git.commit_all(message)
+    except HarnessError as e:
+        if e.kind != "local-gate":
+            raise
+        gate_class = classify_local_gate_denial(e.detail or "")
+        log(f"phase2: local-gate denial classified as {gate_class}")
+        # Guard on worktree, never on `live`: isolated mode builds a real LiveGit with
+        # real commits while live is False, and that is the mode this path is
+        # exercised end-to-end in. Replay mode passes worktree=None.
+        if gate_class != "doc-staleness" or not worktree:
+            raise
+        if _remediate_doc_staleness(worktree, git, log) <= 0:
+            raise
+        try:
+            return git.commit_all(f"{message}\n\n{_REMEDIATION_NOTE}")
+        except HarnessError as e2:
+            if e2.kind != "local-gate":
+                raise
+            log("phase2: doc-staleness remediation did not clear the gate "
+                f"(retry denial: {(e2.detail or '')[:200]}) - failing closed")
+            raise e from None
+
+
 def _master_sha(worktree: str | None) -> str:
     if not worktree:
         return "origin/master"
@@ -717,6 +815,20 @@ def _finish(res: RunResult, out_dir: str) -> RunResult:
 # Both are deterministic walls a full skill re-run cannot climb — see exit_code_for.
 _FAIL_CLOSED_KINDS = ("rebase-conflict", "local-gate")
 
+# Per-class remedy for a local-gate denial. Every arm is still exit 3 -- naming the
+# class only shortens the human's search, it never changes the verdict. "doc-staleness"
+# reaching verdict_line at all means the one bounded auto-remediation already ran and
+# the gate still said no.
+_GATE_REMEDY = {
+    "adr": "Write the ADR for the decision-trigger surface, then re-run bin/post-plan-now.",
+    "byte-budget": ("The .claude/rules byte budget is over cap and check-rules-byte-budget "
+                    "has no --fix flag: trim a rule (or move detail into a path-scoped "
+                    "*-detail.md companion), then re-run bin/post-plan-now."),
+    "doc-staleness": ("Auto-remediation ran and the gate still denied the commit: bump "
+                      "last_verified by hand, then re-run bin/post-plan-now."),
+    "unknown": "Clear the gate then re-run bin/post-plan-now.",
+}
+
 
 def exit_code_for(res: RunResult) -> int:
     """Process exit code from a terminal RunResult.
@@ -784,9 +896,14 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
                     "Resolve the rebase, then re-run bin/post-plan-now.")
         if res.error_kind == "local-gate":
             detail = _flat(res.error) or "see gate output"
+            # Classify on the FULL res.error, never on `detail`: _flat truncates at 300
+            # chars and the hooks echo their guidance line LAST, so classifying the
+            # flattened form would silently degrade a long byte-budget denial to
+            # "unknown" and print the wrong remedy.
+            gate_class = classify_local_gate_denial(res.error or "")
             return (f"RESULT: post-plan BLOCKED — local pre-commit/pre-push gate denied "
-                    f"the commit; ERROR terminal=failed, no PR opened. {detail} "
-                    "Clear the gate then re-run bin/post-plan-now.")
+                    f"the commit [class={gate_class}]; ERROR terminal=failed, no PR "
+                    f"opened. {detail} {_GATE_REMEDY[gate_class]}")
         # Unknown or None error_kind — name both possible causes so the human knows where to look
         return ("RESULT: post-plan BLOCKED — rc=3 (rebase-conflict or local-gate), "
                 "cause unknown; ERROR terminal=failed, no PR opened. "

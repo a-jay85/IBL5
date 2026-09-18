@@ -190,6 +190,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <div class="lcp-control-row">
         <button type="submit" name="action" value="reset_mles_lles" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Reset All MLEs/LLEs</button>
     </div>
+    <?= HtmlSanitizer::trusted($this->renderActivePlayersExport()) ?>
 <?php endif; ?>
 </section>
         <?php
@@ -335,12 +336,82 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <div class="lcp-control-row">
         <a href="/ibl5/import-demands.php">Free Agency Demands CSV Uploader</a>
     </div>
+    <?= HtmlSanitizer::trusted($this->renderActivePlayersExport()) ?>
     <?= HtmlSanitizer::trusted($this->renderFaNotificationsSelect($panelData)) ?>
     <?= HtmlSanitizer::trusted($this->renderWaiversSelect($panelData)) ?>
     <div class="lcp-control-row">
         <button type="submit" name="action" value="set_waivers_to_free_agents" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Set all players on waivers to Free Agents and reset their Bird years</button>
     </div>
 </section>
+        <?php
+        return (string) ob_get_clean();
+    }
+
+    /**
+     * Export button: fetches the CSV URL, triggers the download, then swaps
+     * the spinner for a link so the admin can grab another copy.
+     */
+    private function renderActivePlayersExport(): string
+    {
+        ob_start();
+        ?>
+<div class="lcp-control-row" id="lcp-active-players-export">
+    <button type="button" class="ibl-btn ibl-btn--secondary ibl-btn--sm" data-export="active_players" data-csrf-token="<?= HtmlSanitizer::e(\Security\CsrfGuard::generateRawToken('lcp_export_active_players')) ?>">Export .csv of all non-retired players</button>
+    <span class="updater-step__spinner" hidden></span>
+    <span class="lcp-export-result"></span>
+</div>
+<script>
+(function () {
+    var row = document.getElementById('lcp-active-players-export');
+    var button = row.querySelector('button');
+    var spinner = row.querySelector('.updater-step__spinner');
+    var result = row.querySelector('.lcp-export-result');
+
+    button.addEventListener('click', function () {
+        button.disabled = true;
+        spinner.hidden = false;
+        result.textContent = '';
+
+        var body = new FormData();
+        body.append('export', button.dataset.export);
+        body.append('_csrf_token', button.dataset.csrfToken);
+
+        fetch('leagueControlPanel.php', {method: 'POST', body: body, credentials: 'same-origin', headers: {'Accept': 'application/json'}})
+            .then(function (response) {
+                return response.json().then(function (data) {
+                    if (data.csrfToken) {
+                        button.dataset.csrfToken = data.csrfToken;
+                    }
+                    if (!response.ok || !data.url) {
+                        throw new Error(data.error || 'Export failed.');
+                    }
+                    return data;
+                });
+            })
+            .then(function (data) {
+                var download = document.createElement('a');
+                download.href = data.url;
+                download.download = data.filename;
+                document.body.appendChild(download);
+                download.click();
+                download.remove();
+
+                var link = document.createElement('a');
+                link.href = data.url;
+                link.download = data.filename;
+                link.textContent = data.filename;
+                result.appendChild(link);
+            })
+            .catch(function (error) {
+                result.textContent = error.message || 'Export failed.';
+            })
+            .finally(function () {
+                spinner.hidden = true;
+                button.disabled = false;
+            });
+    });
+})();
+</script>
         <?php
         return (string) ob_get_clean();
     }

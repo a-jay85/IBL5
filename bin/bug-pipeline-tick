@@ -49,10 +49,16 @@ PLAN_TIMEOUT="${BUG_PIPELINE_PLAN_TIMEOUT:-1800}"
 CLASSIFY_PROMPT_FILE="${BUG_PIPELINE_CLASSIFY_PROMPT:-$SCRIPT_DIR/bug-pipeline-classify-prompt}"
 GATHER_PROMPT_FILE="${BUG_PIPELINE_GATHER_PROMPT:-$SCRIPT_DIR/bug-pipeline-gather-prompt}"
 
-# Posted in-channel when a report classifies as not_a_thing. A FIXED literal, like
-# the /prMerged "Fixed!" precedent: GM text is never interpolated into a message the
-# bot echoes back to Discord — that is the injection surface this constant closes.
-DROP_REPLY_TEXT="Thanks for the note! I didn't read this as a bug report or a feature request, so I'm not queueing it up. If I got that wrong, edit your message and I'll take another look."
+# Posted in-channel when a report classifies as roster_error: a player's ratings, contract,
+# or team assignment being wrong in the league data. Those values live in the JSB files, so
+# the commissioner owns the fix and this pipeline files no GitHub Issue for them.
+#
+# A FIXED literal, like the /prMerged "Fixed!" precedent: GM text is never interpolated into
+# a message the bot echoes back to Discord — that is the injection surface this constant
+# closes. The <#id> form is Discord's channel mention; it renders as a clickable
+# #roster-errors link and pings nobody.
+ROSTER_ERRORS_CHANNEL_ID="${BUG_PIPELINE_ROSTER_ERRORS_CHANNEL_ID:-1119361576856715367}"
+ROSTER_ERROR_REPLY_TEXT="Thanks for flagging this! This one looks like a roster-data issue (ratings, contract, or team assignment) rather than a website bug. Those live in the league files, so the commissioner handles them. Please repost it in <#${ROSTER_ERRORS_CHANNEL_ID}> and it'll get sorted there."
 
 # Posted in the bug's thread when a hunt escalates AND the human was genuinely reached AND a
 # concrete remedy exists (§ decision 6). A FIXED literal: no hunter text, no GM text — nothing
@@ -268,7 +274,7 @@ park_blocked() { # id status
 }
 
 # ── The classifier Sonnet call (locked-down: schema-constrained, tool-starved) ──
-CLASSIFY_SCHEMA='{"type":"object","additionalProperties":false,"required":["class"],"properties":{"class":{"enum":["bug","feature","not_a_thing"]},"bug_has_enough_info":{"type":"boolean"},"feature_is_regression":{"type":"boolean"},"clarifying_question":{"type":"string"},"issue_title":{"type":"string","maxLength":70},"severity":{"enum":["low","medium","high"]}}}'
+CLASSIFY_SCHEMA='{"type":"object","additionalProperties":false,"required":["class"],"properties":{"class":{"enum":["bug","feature","not_a_thing","roster_error"]},"bug_has_enough_info":{"type":"boolean"},"feature_is_regression":{"type":"boolean"},"clarifying_question":{"type":"string"},"issue_title":{"type":"string","maxLength":70},"severity":{"enum":["low","medium","high"]}}}'
 GATHER_SCHEMA='{"type":"object","additionalProperties":false,"required":["enough_info"],"properties":{"enough_info":{"type":"boolean"},"next_question":{"type":"string"},"scope_estimate":{"enum":["single_pr","multi_pr"]}}}'
 
 # run_structured_call <prompt> <schema> ; sets CJ_RC, CJ_OUT (raw envelope), CJ_ERR
@@ -413,7 +419,7 @@ classify_row() { # row_json
     # (3) whitelist the class — anything off-list → safe fallback (never a spurious drop).
     local class; class="$(printf '%s' "$result" | jq -r '.class // empty' 2>/dev/null)"
     case "$class" in
-        bug|feature|not_a_thing) ;;
+        bug|feature|not_a_thing|roster_error) ;;
         *) log "classify $id: off-whitelist class '$class' — safe fallback, row unchanged"; return 0 ;;
     esac
 
@@ -448,15 +454,36 @@ classify_row() { # row_json
     fi
 
     # ── §3e routing — NO `hunting` anywhere ──────────────────────────────────
-    # Transition FIRST — it is load-bearing, the reply is cosmetic, so a failing
+    # Transition FIRST — it is load-bearing and any reply is cosmetic, so a failing
     # reply must never be able to strand the row. Dedup is structural: a `dropped`
     # row is outside listActiveConversations(), so classify_row cannot re-fire on it;
-    # a later edit that revives it to queued/class=NULL earns exactly one NEW reply.
+    # a later edit that revives it to queued/class=NULL earns exactly one NEW pass.
+    #
+    # not_a_thing drops SILENTLY. "Fixed!", "Thanks!" and the rest of the channel chatter
+    # are the bulk of this class, and a bot that answers every one of them is noise in a
+    # channel GMs actually read. A dropped row is invisible to the enumerator either way, so
+    # the reply bought nothing the transition had not already done. A GM who was genuinely
+    # misread can still recover by editing the message, which revives the row for a fresh
+    # classify pass — but nothing tells them so now, which is the accepted cost of silence.
     if [ "$class" = "not_a_thing" ]; then
-        if cli transition "$id" dropped --class=not_a_thing $clear_opt >/dev/null; then
-            log "classify $id: not_a_thing → dropped (replied)"
-            bot_reply_to_message "$msg_id" "$DROP_REPLY_TEXT" \
-                >/dev/null || log "classify $id: drop reply failed (continuing)"
+        cli transition "$id" dropped --class=not_a_thing $clear_opt >/dev/null \
+            && log "classify $id: not_a_thing → dropped (silent)"
+        return 0
+    fi
+
+    # roster_error is terminal like not_a_thing — dropped, no thread, no GitHub Issue —
+    # but it DOES reply. The redirect is the whole point of the class: the GM has a real
+    # problem and needs to be told where it gets fixed, which is the opposite of the
+    # chatter case above, where silence is the feature. Placement is load-bearing — this
+    # MUST sit above the file_issues_only block below, because file_and_close_row
+    # calls bpgh_ensure_issue unconditionally and would file an Issue for a roster report
+    # whenever BUG_PIPELINE_FILE_ISSUES_ONLY=1. The issue-minting block further up already
+    # skips this class (it tests bug/feature only), so no issue exists to clean up here.
+    if [ "$class" = "roster_error" ]; then
+        if cli transition "$id" dropped --class=roster_error $clear_opt >/dev/null; then
+            log "classify $id: roster_error → dropped (redirected to #roster-errors)"
+            bot_reply_to_message "$msg_id" "$ROSTER_ERROR_REPLY_TEXT" \
+                >/dev/null || log "classify $id: roster_error reply failed (continuing)"
         fi
         return 0
     fi

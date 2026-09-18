@@ -64,15 +64,23 @@ if [ "$MODE" = "up" ]; then
     [ -n "${APPROVER:-}" ] || { echo "BUG_PIPELINE_APPROVER_ID unset or empty in $SECRETS" >&2; exit 1; }
     case "${APPROVER}" in REPLACE_WITH_*) echo "BUG_PIPELINE_APPROVER_ID is still the template placeholder in $SECRETS" >&2; exit 1;; esac
 
-    # Step 2.3 — Create scratch DB and load migrations 153 + 158 via bin/db-migrate.
+    # Step 2.3 — Create scratch DB and load the bug-pipeline migrations via bin/db-migrate.
     # db-migrate globs every *.sql in a dir, so we point it at a staging dir holding
-    # only these two — that gives us schema_migrations tracking + skip-if-applied.
+    # only these — that gives us schema_migrations tracking + skip-if-applied.
+    #
+    # This list is HAND-MAINTAINED: every migration that touches ibl_bug_reports or
+    # ibl_bug_report_attachments must be added here, or the scratch DB keeps an older
+    # schema than production and the E2E silently tests the wrong thing. 177 widens the
+    # status enum with 'filed'; 178 widens the class enum with 'roster_error'. Without
+    # them a transition to either value is rejected (strict mode) or truncated to ''.
     db_exec "$DB_CONTAINER" mariadb -u root -proot -e \
         "CREATE DATABASE IF NOT EXISTS \`$SCRATCH_DB\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
     STAGE="$(mktemp -d)"; trap 'rm -rf "$STAGE"' EXIT
     cp "$REPO_ROOT/ibl5/migrations/153_create_bug_pipeline_tables.sql" \
-       "$REPO_ROOT/ibl5/migrations/158_create_bug_report_attachments.sql" "$STAGE/"
+       "$REPO_ROOT/ibl5/migrations/158_create_bug_report_attachments.sql" \
+       "$REPO_ROOT/ibl5/migrations/177_add_filed_status_to_bug_reports.sql" \
+       "$REPO_ROOT/ibl5/migrations/178_add_roster_error_class_to_bug_reports.sql" "$STAGE/"
     "$REPO_ROOT/bin/db-migrate" "$DB_CONTAINER" "$STAGE" "$SCRATCH_DB"
 
     # Step 2.4 — Write claude / gh / wt-new / post-plan-now stubs.

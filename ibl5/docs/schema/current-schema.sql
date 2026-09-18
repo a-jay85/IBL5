@@ -812,7 +812,7 @@ CREATE TABLE `ibl_bug_reports` (
   `original_message_id` bigint(20) unsigned NOT NULL,
   `original_text` text NOT NULL,
   `thread_id` bigint(20) unsigned DEFAULT NULL,
-  `class` enum('bug','feature','not_a_thing') DEFAULT NULL,
+  `class` enum('bug','feature','not_a_thing','roster_error') DEFAULT NULL,
   `status` enum('queued','awaiting_info','hunting','blocked','pr_open','fixed','needs_human','parked_idle','gathering','awaiting_ajay','planned','dropped','filed') NOT NULL DEFAULT 'queued',
   `lease_owner` varchar(64) DEFAULT NULL,
   `lease_expires` datetime DEFAULT NULL,

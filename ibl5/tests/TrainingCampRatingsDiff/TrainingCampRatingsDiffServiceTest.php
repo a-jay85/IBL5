@@ -19,12 +19,14 @@ class TrainingCampRatingsDiffServiceTest extends TestCase
     protected function setUp(): void
     {
         $this->stubRepo = self::createStub(TrainingCampRatingsDiffRepositoryInterface::class);
-        $this->service  = new TrainingCampRatingsDiffService($this->stubRepo);
+        $this->service  = new TrainingCampRatingsDiffService($this->stubRepo, 2009);
     }
 
-    private function buildService(?TrainingCampRatingsDiffRepositoryInterface $repo = null): TrainingCampRatingsDiffService
-    {
-        return new TrainingCampRatingsDiffService($repo ?? $this->stubRepo);
+    private function buildService(
+        ?TrainingCampRatingsDiffRepositoryInterface $repo = null,
+        int $currentSeasonEndingYear = 2009,
+    ): TrainingCampRatingsDiffService {
+        return new TrainingCampRatingsDiffService($repo ?? $this->stubRepo, $currentSeasonEndingYear);
     }
 
     // ---------------------------------------------------------------------------
@@ -68,9 +70,9 @@ class TrainingCampRatingsDiffServiceTest extends TestCase
     // getDiffs() — empty / null baseline
     // ---------------------------------------------------------------------------
 
-    public function test_it_returns_empty_array_when_no_end_of_season_snapshot_exists(): void
+    public function test_it_returns_empty_array_when_no_snapshot_phase_exists(): void
     {
-        $this->stubRepo->method('getLatestEndOfSeasonYear')->willReturn(null);
+        $this->stubRepo->method('getBaselinePhase')->willReturn(null);
 
         $result = $this->service->getDiffs();
 
@@ -81,25 +83,28 @@ class TrainingCampRatingsDiffServiceTest extends TestCase
     // getDiffs() — year resolution
     // ---------------------------------------------------------------------------
 
-    public function test_it_resolves_baseline_year_from_repository_when_override_is_null(): void
+    public function test_it_resolves_baseline_year_from_current_season_minus_one_when_override_is_null(): void
     {
+        // currentSeasonEndingYear = 2009 → baseline year = 2008.
+        // getDiffRows receiving 2008 proves the year was computed as endingYear − 1.
         $mockRepo = $this->createMock(TrainingCampRatingsDiffRepositoryInterface::class);
-        $mockRepo->method('getLatestEndOfSeasonYear')->willReturn(2025);
+        $mockRepo->method('getBaselinePhase')->willReturn('end-of-season');
         $mockRepo->expects($this->once())
             ->method('getDiffRows')
-            ->with(2025, null)
+            ->with(2008, 'end-of-season', null)
             ->willReturn([]);
 
-        $service = $this->buildService($mockRepo);
+        $service = $this->buildService($mockRepo, 2009);
         $service->getDiffs(null);
     }
 
     public function test_it_uses_override_year_when_provided(): void
     {
         $mockRepo = $this->createMock(TrainingCampRatingsDiffRepositoryInterface::class);
+        $mockRepo->method('getBaselinePhase')->willReturn('end-of-season');
         $mockRepo->expects($this->once())
             ->method('getDiffRows')
-            ->with(2020, null)
+            ->with(2020, 'end-of-season', null)
             ->willReturn([]);
 
         $service = $this->buildService($mockRepo);
@@ -109,14 +114,59 @@ class TrainingCampRatingsDiffServiceTest extends TestCase
     public function test_it_passes_filter_tid_through_to_repository(): void
     {
         $mockRepo = $this->createMock(TrainingCampRatingsDiffRepositoryInterface::class);
-        $mockRepo->method('getLatestEndOfSeasonYear')->willReturn(2025);
+        $mockRepo->method('getBaselinePhase')->willReturn('end-of-season');
         $mockRepo->expects($this->once())
             ->method('getDiffRows')
-            ->with(2025, 7)
+            ->with(2008, 'end-of-season', 7)
             ->willReturn([]);
 
-        $service = $this->buildService($mockRepo);
+        $service = $this->buildService($mockRepo, 2009);
         $service->getDiffs(null, 7);
+    }
+
+    // ---------------------------------------------------------------------------
+    // getDiffs() — phase resolution
+    // ---------------------------------------------------------------------------
+
+    public function test_it_uses_mid_season_phase_when_end_of_season_is_missing(): void
+    {
+        $mockRepo = $this->createMock(TrainingCampRatingsDiffRepositoryInterface::class);
+        $mockRepo->method('getBaselinePhase')->willReturn('mid-season');
+        $mockRepo->expects($this->once())
+            ->method('getDiffRows')
+            ->with(2008, 'mid-season', null)
+            ->willReturn([]);
+
+        $service = $this->buildService($mockRepo, 2009);
+        $service->getDiffs(null);
+    }
+
+    public function test_it_returns_empty_when_phase_is_null_for_baseline_year(): void
+    {
+        $mockRepo = $this->createMock(TrainingCampRatingsDiffRepositoryInterface::class);
+        $mockRepo->method('getBaselinePhase')->willReturn(null);
+        $mockRepo->expects($this->never())->method('getDiffRows');
+
+        $service = $this->buildService($mockRepo, 2009);
+        $result  = $service->getDiffs(null);
+
+        self::assertSame([], $result);
+    }
+
+    public function test_it_uses_override_year_as_is_and_resolves_its_phase(): void
+    {
+        $mockRepo = $this->createMock(TrainingCampRatingsDiffRepositoryInterface::class);
+        $mockRepo->expects($this->once())
+            ->method('getBaselinePhase')
+            ->with(2022)
+            ->willReturn('end-of-season');
+        $mockRepo->expects($this->once())
+            ->method('getDiffRows')
+            ->with(2022, 'end-of-season', null)
+            ->willReturn([]);
+
+        $service = $this->buildService($mockRepo, 2009);
+        $service->getDiffs(2022);
     }
 
     // ---------------------------------------------------------------------------
@@ -128,7 +178,7 @@ class TrainingCampRatingsDiffServiceTest extends TestCase
         // Each field: after = 50+i, before = 40+i → delta = 10 for every field
         $dbRow = $this->buildDbRow(isNew: false);
 
-        $this->stubRepo->method('getLatestEndOfSeasonYear')->willReturn(2025);
+        $this->stubRepo->method('getBaselinePhase')->willReturn('end-of-season');
         $this->stubRepo->method('getDiffRows')->willReturn([$dbRow]);
 
         $rows = $this->service->getDiffs();
@@ -217,7 +267,7 @@ class TrainingCampRatingsDiffServiceTest extends TestCase
             }
         }
 
-        $this->stubRepo->method('getLatestEndOfSeasonYear')->willReturn(2025);
+        $this->stubRepo->method('getBaselinePhase')->willReturn('end-of-season');
         $this->stubRepo->method('getDiffRows')->willReturn([$rowA, $rowB, $rowC, $rowD]);
 
         $rows = $this->service->getDiffs();
@@ -244,7 +294,7 @@ class TrainingCampRatingsDiffServiceTest extends TestCase
         $real2['oo'] = 80; $real2['s_oo'] = 50; // delta = 30
         $rookie = $this->buildDbRow(3, 'Rookie Player', isNew: true);
 
-        $this->stubRepo->method('getLatestEndOfSeasonYear')->willReturn(2025);
+        $this->stubRepo->method('getBaselinePhase')->willReturn('end-of-season');
         $this->stubRepo->method('getDiffRows')->willReturn([$real1, $real2, $rookie]);
 
         $rows = $this->service->getDiffs();
@@ -281,7 +331,7 @@ class TrainingCampRatingsDiffServiceTest extends TestCase
             $row['s_' . $field] = 50;
         }
 
-        $this->stubRepo->method('getLatestEndOfSeasonYear')->willReturn(2025);
+        $this->stubRepo->method('getBaselinePhase')->willReturn('end-of-season');
         $this->stubRepo->method('getDiffRows')->willReturn([$row]);
 
         $rows = $this->service->getDiffs();
@@ -296,15 +346,30 @@ class TrainingCampRatingsDiffServiceTest extends TestCase
     // getBaselineYear()
     // ---------------------------------------------------------------------------
 
-    public function test_get_baseline_year_returns_override_when_provided_else_repository_value(): void
+    public function test_get_baseline_year_returns_override_when_provided_and_phase_exists(): void
     {
-        $this->stubRepo->method('getLatestEndOfSeasonYear')->willReturn(2025);
+        $this->stubRepo->method('getBaselinePhase')->willReturn('end-of-season');
         $service = $this->buildService();
 
-        // With override: ignores repository
+        // With override: uses the override year (2019), phase is non-null → returns 2019
         self::assertSame(2019, $service->getBaselineYear(2019));
+    }
 
-        // Without override: uses repository
-        self::assertSame(2025, $service->getBaselineYear(null));
+    public function test_get_baseline_year_returns_current_minus_one_when_no_override(): void
+    {
+        $this->stubRepo->method('getBaselinePhase')->willReturn('end-of-season');
+        $service = $this->buildService(currentSeasonEndingYear: 2009);
+
+        // No override: currentSeasonEndingYear − 1 = 2008, phase non-null → returns 2008
+        self::assertSame(2008, $service->getBaselineYear(null));
+    }
+
+    public function test_get_baseline_year_returns_null_when_phase_is_null(): void
+    {
+        $this->stubRepo->method('getBaselinePhase')->willReturn(null);
+        $service = $this->buildService(currentSeasonEndingYear: 2009);
+
+        self::assertNull($service->getBaselineYear(null));
+        self::assertNull($service->getBaselineYear(2022));
     }
 }

@@ -17,51 +17,76 @@ class TrainingCampRatingsDiffRepositoryTest extends TestCase
         $this->mockDb = new MockDatabase();
     }
 
-    public function testGetLatestEndOfSeasonYearReturnsNullWhenNoSnapshotsExist(): void
+    // ---------------------------------------------------------------------------
+    // getBaselinePhase()
+    // ---------------------------------------------------------------------------
+
+    public function testGetBaselinePhaseReturnsNullWhenNoSnapshotsExist(): void
     {
-        $this->mockDb->onQuery('MAX\(season_year\)', [['y' => null]]);
+        $this->mockDb->onQuery('SELECT snapshot_phase FROM', []);
         $repository = new TrainingCampRatingsDiffRepository($this->mockDb);
 
-        $result = $repository->getLatestEndOfSeasonYear();
+        $result = $repository->getBaselinePhase(2024);
 
         self::assertNull($result);
     }
 
-    public function testGetLatestEndOfSeasonYearReturnsMaxYearFromSnapshots(): void
+    public function testGetBaselinePhaseReturnsEndOfSeasonWhenAvailable(): void
     {
-        $this->mockDb->onQuery('MAX\(season_year\)', [['y' => 2025]]);
+        $this->mockDb->onQuery('SELECT snapshot_phase FROM', [['snapshot_phase' => 'end-of-season']]);
         $repository = new TrainingCampRatingsDiffRepository($this->mockDb);
 
-        $result = $repository->getLatestEndOfSeasonYear();
+        $result = $repository->getBaselinePhase(2024);
 
-        self::assertSame(2025, $result);
+        self::assertSame('end-of-season', $result);
     }
 
-    public function testGetLatestEndOfSeasonYearCoercesStringNumericToInt(): void
+    public function testGetBaselinePhaseReturnsMidSeasonWhenOnlyMidSeasonAvailable(): void
     {
-        // MariaDB typically returns ints natively, but older drivers may yield strings
-        $this->mockDb->onQuery('MAX\(season_year\)', [['y' => '2024']]);
+        $this->mockDb->onQuery('SELECT snapshot_phase FROM', [['snapshot_phase' => 'mid-season']]);
         $repository = new TrainingCampRatingsDiffRepository($this->mockDb);
 
-        $result = $repository->getLatestEndOfSeasonYear();
+        $result = $repository->getBaselinePhase(2024);
 
-        self::assertSame(2024, $result);
+        self::assertSame('mid-season', $result);
     }
+
+    public function testGetBaselinePhaseReturnsNullForNullSnapshotPhaseColumn(): void
+    {
+        $this->mockDb->onQuery('SELECT snapshot_phase FROM', [['snapshot_phase' => null]]);
+        $repository = new TrainingCampRatingsDiffRepository($this->mockDb);
+
+        $result = $repository->getBaselinePhase(2024);
+
+        self::assertNull($result);
+    }
+
+    // ---------------------------------------------------------------------------
+    // getDiffRows()
+    // ---------------------------------------------------------------------------
 
     public function testGetDiffRowsQueriesLiveAndSnapshotTables(): void
     {
         $this->mockDb->setMockData([]);
         $repository = new TrainingCampRatingsDiffRepository($this->mockDb);
 
-        $repository->getDiffRows(2024);
+        $repository->getDiffRows(2024, 'end-of-season');
 
         $queries = $this->mockDb->getExecutedQueries();
         self::assertNotEmpty($queries);
         $combined = implode("\n", $queries);
         self::assertStringContainsString('ibl_plr', $combined);
         self::assertStringContainsString('ibl_plr_snapshots', $combined);
+        // MockPreparedStatement substitutes bound params; both year and phase must appear
+        self::assertStringContainsString('2024', $combined);
         self::assertStringContainsString('end-of-season', $combined);
         self::assertStringContainsString('retired = 0', $combined);
+        // Verify ordering: season_year param appears before snapshot_phase param in the joined ON clause
+        $joinPos   = strpos($combined, 'season_year');
+        $phasePos  = strpos($combined, 'snapshot_phase');
+        self::assertNotFalse($joinPos);
+        self::assertNotFalse($phasePos);
+        self::assertLessThan($phasePos, $joinPos, 'season_year bind must precede snapshot_phase bind in ON clause');
     }
 
     public function testGetDiffRowsAppliesFilterTidWhenSet(): void
@@ -69,7 +94,7 @@ class TrainingCampRatingsDiffRepositoryTest extends TestCase
         $this->mockDb->setMockData([]);
         $repository = new TrainingCampRatingsDiffRepository($this->mockDb);
 
-        $repository->getDiffRows(2024, 7);
+        $repository->getDiffRows(2024, 'end-of-season', 7);
 
         $queries = $this->mockDb->getExecutedQueries();
         $combined = implode("\n", $queries);
@@ -84,7 +109,7 @@ class TrainingCampRatingsDiffRepositoryTest extends TestCase
         $this->mockDb->setMockData([$row]);
         $repository = new TrainingCampRatingsDiffRepository($this->mockDb);
 
-        $result = $repository->getDiffRows(2024);
+        $result = $repository->getDiffRows(2024, 'end-of-season');
 
         self::assertCount(1, $result);
         self::assertSame('Test Player', $result[0]['name']);

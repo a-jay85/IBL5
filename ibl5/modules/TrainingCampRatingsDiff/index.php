@@ -29,8 +29,9 @@ if (isset($_GET['status']) && is_string($_GET['status']) && in_array($_GET['stat
     $filterStatus = $_GET['status'];
 }
 
+$season     = new \Season\Season($mysqli_db);
 $repository = new TrainingCampRatingsDiffRepository($mysqli_db);
-$service    = new TrainingCampRatingsDiffService($repository);
+$service    = new TrainingCampRatingsDiffService($repository, $season->endingYear);
 $view       = new TrainingCampRatingsDiffView();
 
 $baselineYear = $service->getBaselineYear($overrideYear);

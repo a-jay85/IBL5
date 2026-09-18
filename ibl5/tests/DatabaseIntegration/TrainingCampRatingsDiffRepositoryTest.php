@@ -12,8 +12,7 @@ use TrainingCampRatingsDiff\TrainingCampRatingsDiffRepository;
  *
  * NOTE: This file lives in tests/DatabaseIntegration/ (NOT tests/TrainingCampRatingsDiff/)
  * to follow the project convention — real-DB tests are excluded from the default
- * PHPUnit suite and run explicitly via:
- *   vendor/bin/phpunit tests/DatabaseIntegration/TrainingCampRatingsDiffRepositoryTest.php
+ * PHPUnit suite and run explicitly via bin/db-test-up <slug>.
  *
  * The #[Group('database')] attribute on DatabaseTestCase prevents accidental
  * inclusion in the normal test run (which lacks DB_HOST / DB_USER / DB_PASS / DB_NAME).
@@ -75,44 +74,46 @@ class TrainingCampRatingsDiffRepositoryTest extends DatabaseTestCase
     }
 
     // ---------------------------------------------------------------------------
-    // getLatestEndOfSeasonYear()
+    // getBaselinePhase()
     // ---------------------------------------------------------------------------
 
-    public function test_it_returns_null_when_no_end_of_season_snapshots_exist(): void
+    public function test_it_returns_null_when_no_snapshots_exist_for_year(): void
     {
-        // Ensure the ibl_plr_snapshots table has no end-of-season rows for this transaction
-        $this->db->query("DELETE FROM ibl_plr_snapshots WHERE snapshot_phase = 'end-of-season'");
-
-        $result = $this->repo->getLatestEndOfSeasonYear();
+        // Use year 8888 — reserved for "no data" assertions (database-access rule)
+        $result = $this->repo->getBaselinePhase(8888);
 
         self::assertNull($result);
     }
 
-    public function test_it_returns_max_season_year_for_end_of_season_snapshots(): void
+    public function test_it_returns_end_of_season_when_end_of_season_rows_exist(): void
     {
-        // Use very high PIDs to avoid FK conflicts with real data
         $this->insertTestPlayer(200_000_001, 'Player One', ['teamid' => 1, 'retired' => 0]);
+        $this->insertSnapshot(200_000_001, 8100, 'end-of-season');
+
+        $result = $this->repo->getBaselinePhase(8100);
+
+        self::assertSame('end-of-season', $result);
+    }
+
+    public function test_it_returns_mid_season_when_only_mid_season_rows_exist(): void
+    {
         $this->insertTestPlayer(200_000_002, 'Player Two', ['teamid' => 1, 'retired' => 0]);
+        $this->insertSnapshot(200_000_002, 8101, 'mid-season');
+
+        $result = $this->repo->getBaselinePhase(8101);
+
+        self::assertSame('mid-season', $result);
+    }
+
+    public function test_it_returns_end_of_season_when_both_phases_exist_for_year(): void
+    {
         $this->insertTestPlayer(200_000_003, 'Player Three', ['teamid' => 1, 'retired' => 0]);
+        $this->insertSnapshot(200_000_003, 8102, 'end-of-season');
+        $this->insertSnapshot(200_000_003, 8102, 'mid-season');
 
-        $this->insertSnapshot(200_000_001, 2023);
-        $this->insertSnapshot(200_000_002, 2025);  // highest end-of-season year
-        $this->insertSnapshot(200_000_003, 2024);
+        $result = $this->repo->getBaselinePhase(8102);
 
-        // Also insert a non-end-of-season snapshot with a higher year — should be ignored
-        $this->insertRow('ibl_plr_snapshots', [
-            'pid'            => 200_000_001,
-            'name'           => 'Player One',
-            'season_year'    => 2026,
-            'snapshot_phase' => 'training-camp',
-            'source_archive' => 'test.plr',
-            'teamid'            => 1,
-            'pos'            => 'PG',
-        ]);
-
-        $result = $this->repo->getLatestEndOfSeasonYear();
-
-        self::assertSame(2025, $result);
+        self::assertSame('end-of-season', $result);
     }
 
     // ---------------------------------------------------------------------------
@@ -132,7 +133,7 @@ class TrainingCampRatingsDiffRepositoryTest extends DatabaseTestCase
         $this->insertTestPlayer(200_000_012, 'Player Charlie', ['teamid' => 1, 'retired' => 1, 'oo' => 80]);
         $this->insertSnapshot(200_000_012, 2025);
 
-        $rows = $this->repo->getDiffRows(2025);
+        $rows = $this->repo->getDiffRows(2025, 'end-of-season');
 
         // Only A and B are returned (not retired Player C)
         $pids = array_column($rows, 'pid');
@@ -163,6 +164,50 @@ class TrainingCampRatingsDiffRepositoryTest extends DatabaseTestCase
         self::assertNull($rowB['s_oo'], 'Player Beta should have null s_oo (no snapshot)');
     }
 
+    public function test_it_does_not_join_mid_season_row_when_end_of_season_phase_specified(): void
+    {
+        $this->insertTestPlayer(200_000_013, 'Player Delta', ['teamid' => 1, 'retired' => 0]);
+        // Insert only a mid-season snapshot for this player
+        $this->insertSnapshot(200_000_013, 2025, 'mid-season');
+
+        // Query with 'end-of-season' phase — should LEFT JOIN miss (s_oo = null)
+        $rows = $this->repo->getDiffRows(2025, 'end-of-season');
+
+        $pids = array_column($rows, 'pid');
+        self::assertContains(200_000_013, $pids);
+
+        $row = null;
+        foreach ($rows as $r) {
+            if ($r['pid'] === 200_000_013) {
+                $row = $r;
+                break;
+            }
+        }
+        self::assertNotNull($row);
+        self::assertNull($row['s_oo'], 'mid-season snapshot must not match end-of-season query');
+    }
+
+    public function test_it_joins_mid_season_row_when_mid_season_phase_specified(): void
+    {
+        $this->insertTestPlayer(200_000_014, 'Player Epsilon', ['teamid' => 1, 'retired' => 0]);
+        $this->insertSnapshot(200_000_014, 2025, 'mid-season');
+
+        $rows = $this->repo->getDiffRows(2025, 'mid-season');
+
+        $pids = array_column($rows, 'pid');
+        self::assertContains(200_000_014, $pids);
+
+        $row = null;
+        foreach ($rows as $r) {
+            if ($r['pid'] === 200_000_014) {
+                $row = $r;
+                break;
+            }
+        }
+        self::assertNotNull($row);
+        self::assertNotNull($row['s_oo'], 'mid-season snapshot must be joined when phase = mid-season');
+    }
+
     public function test_it_applies_filter_tid_when_set(): void
     {
         // Insert players on two different teams
@@ -171,7 +216,7 @@ class TrainingCampRatingsDiffRepositoryTest extends DatabaseTestCase
         $this->insertSnapshot(200_000_020, 2025);
         $this->insertSnapshot(200_000_021, 2025);
 
-        $rows = $this->repo->getDiffRows(2025, 1);
+        $rows = $this->repo->getDiffRows(2025, 'end-of-season', 1);
 
         $pids = array_column($rows, 'pid');
         self::assertContains(200_000_020, $pids, 'teamid=1 player should be included');

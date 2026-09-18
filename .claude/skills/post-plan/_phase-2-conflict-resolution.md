@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 2 — resolve a rebase conflict, prove no work was lost, and arm the conflict hold. Loaded only when the Phase 2 rebase block prints STOP-AND-RESOLVE.
-last_verified: 2026-09-16
+last_verified: 2026-09-17
 paths:
   - .claude/skills/post-plan/SKILL.md
   - .claude/skills/pr-ready/_rebase-and-conflicts.md
@@ -148,8 +148,14 @@ Reviewer note on the /tmp namespace: the pre-side patch is written as
 pr-ready-diff-pre-<KEY>.patch on purpose. That prefix is hardcoded inside lostwork.sh and
 cannot be parameterized without editing /pr-ready, which is out of scope here; and <KEY> is a
 non-numeric branch slug, so it can never collide with the PR-number keys a concurrent
-/pr-ready run uses. This is NOT the PR-number-keyed verdict namespace that
+/pr-ready run uses. This is NOT the PR-number-keyed verdict namespace that <!-- slop-ok -->
 _phase-5.5-fidelity.md warns post-plan away from.
+
+The conflict-resolution verdict is written to
+/tmp/postplan-conflict-verdict-<KEY>-<POST_RESOLUTION_SHA>.ok, keyed by branch slug plus
+commit sha. It never uses a PR number, so it cannot collide with the /tmp/pr-ready-verdict-
+namespace a concurrent /pr-ready run owns. The /pr-ready scripts/post-verdict.sh script is
+never called for this artifact.
 -->
 
 ## Step 7 — Confirm the hold flag, and write the resolution manifest
@@ -167,7 +173,14 @@ What *is* written here, after `TREE-EQUIVALENT`, is the manifest the announcemen
 ```bash
 git diff --name-only <MASTER_SHA>...HEAD > /tmp/postplan-conflict-files-<KEY>.txt
 test -s /tmp/postplan-conflict-files-<KEY>.txt && echo "CONFLICT-MANIFEST=written"
+echo "POST_RESOLUTION_SHA=$(git rev-parse HEAD)"
 ```
+
+The value printed as `POST_RESOLUTION_SHA=<sha>` is recorded once and substituted as the literal `<POST_RESOLUTION_SHA>` in step 7.5 and in the Phase 7 re-arm gate. Shell variables do not survive block boundaries, so it is never re-derived in a later block of this file.
+
+The sha names the tree the resolution produced. If commits land after this point, the verdict written in step 7.5 no longer covers `HEAD`, and Phase 6.5 condition (14) holds. This matches the "covering the current `HEAD` tree" property condition (12) already requires of the Phase 5.5 fidelity verdict: a tree that was not reviewed does not inherit a clearance.
+
+If `git rev-parse HEAD` fails or prints nothing, the orchestrator has no literal to substitute. Step 7.5 must then halt with a `STOP:` line rather than writing to a path containing an empty sha component.
 
 Then, with the **`Write` tool** (not a heredoc — the resolved-path list and descriptions come
 from run notes, and a `mktemp` variable does not survive between blocks), write
@@ -178,7 +191,57 @@ from run notes, and a `mktemp` variable does not survive between blocks), write
 
 Phase 6.5 renders this into the sticky PR comment.
 
-## Step 8 — Return to `SKILL.md`
+## Step 7.5 — Review the resolution, and write the verdict <!-- slop-ok -->
+
+**Preconditions.** All three must hold before spawning the reviewer:
+
+- `TREE-EQUIVALENT` was printed in step 6.
+- `CONFLICT-MANIFEST=written` was printed in step 7.
+- `POST_RESOLUTION_SHA` is a non-empty sha string from step 7.
+
+If any precondition is missing, halt with a `STOP:` line and do not spawn.
+
+The lost-work proof in step 6 answers whether anything was dropped. This step answers a separate question: whether the resolution that survived is semantically correct.
+
+Spawn exactly one sub-agent: `subagent_type: "sonnet-4-6"`, `model` omitted (the in-repo def pins Sonnet 4.6), `run_in_background: false`. One spawn, no retry loop.
+
+The reviewer's inputs are limited to:
+
+- `/tmp/postplan-conflict-files-<KEY>.txt`: the manifest of resolved paths.
+- `/tmp/postplan-conflict-resolution-<KEY>.md`: the descriptions written in step 7.
+- The conflicted hunks in each listed path.
+
+The reviewer reads only these three sources. Phase 4 reviews the full PR diff and runs later; this step is scoped to the conflict resolution only.
+
+The reviewer answers one question per resolved path: did the three-way merge keep the intent of both sides? Name a finding when:
+
+- A resolution picked one side's version over a behavioral change the other side made to the same code.
+- A resolution merged two edits into a state neither side would accept.
+- A `COLLAPSE-GUARD: WARN` entry from step 3 is not explained by the manifest.
+
+The reviewer writes the verdict with the `Write` tool to:
+
+```
+/tmp/postplan-conflict-verdict-<KEY>-<POST_RESOLUTION_SHA>.ok
+```
+
+Line 1 must be exactly `CONFLICT-REVIEW=CLEAN` or `CONFLICT-REVIEW=FOUND-PROBLEM`, bare: no leading marker, no trailing prose. Condition (14) in `SKILL.md` compares line 1 by exact string equality, so `CONFLICT-REVIEW=CLEAN (all paths)` reads as not-clean and holds.
+
+A `FOUND-PROBLEM` verdict is written to the same `.ok` path. The `.ok` suffix names the artifact slot; the first line carries the verdict. A future editor reaching for `test -f` on this path would fail open on a negative review: read line 1.
+
+### Findings from the conflict-resolution review
+
+For a clean verdict: one bullet per reviewed path confirming the resolution kept both sides' intent.
+
+For `FOUND-PROBLEM`: a `## Findings` list, each entry naming the path and what the resolution lost.
+
+After the sub-agent returns, print `CONFLICT-REVIEW=CLEAN` or `CONFLICT-REVIEW=FOUND-PROBLEM` into the run log and carry the findings forward for the Phase 6.5 step 0 sticky render.
+
+On `FOUND-PROBLEM`: continue into step 8 and open the PR. Phase 6.5 condition (14) blocks, and the sticky comment renders the held branch with the findings. Do not re-resolve, do not re-spawn, do not edit the verdict file.
+
+If the sub-agent returns without writing the file, or writes an unreadable one, print `CONFLICT-REVIEW=ABSENT` and continue. Absence holds; no recovery is attempted.
+
+## Step 8 — Return to `SKILL.md` <!-- slop-ok -->
 
 Proceed to Phase 2 step 3 (push) and step 4 (`gh pr create`). The PR body's files-changed
 block must reflect the post-resolution diff, and per

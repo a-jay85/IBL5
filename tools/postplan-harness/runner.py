@@ -815,6 +815,20 @@ def _finish(res: RunResult, out_dir: str) -> RunResult:
 # Both are deterministic walls a full skill re-run cannot climb — see exit_code_for.
 _FAIL_CLOSED_KINDS = ("rebase-conflict", "local-gate")
 
+# Per-class remedy for a local-gate denial. Every arm is still exit 3 -- naming the
+# class only shortens the human's search, it never changes the verdict. "doc-staleness"
+# reaching verdict_line at all means the one bounded auto-remediation already ran and
+# the gate still said no.
+_GATE_REMEDY = {
+    "adr": "Write the ADR for the decision-trigger surface, then re-run bin/post-plan-now.",
+    "byte-budget": ("The .claude/rules byte budget is over cap and check-rules-byte-budget "
+                    "has no --fix flag: trim a rule (or move detail into a path-scoped "
+                    "*-detail.md companion), then re-run bin/post-plan-now."),
+    "doc-staleness": ("Auto-remediation ran and the gate still denied the commit: bump "
+                      "last_verified by hand, then re-run bin/post-plan-now."),
+    "unknown": "Clear the gate then re-run bin/post-plan-now.",
+}
+
 
 def exit_code_for(res: RunResult) -> int:
     """Process exit code from a terminal RunResult.
@@ -882,9 +896,14 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
                     "Resolve the rebase, then re-run bin/post-plan-now.")
         if res.error_kind == "local-gate":
             detail = _flat(res.error) or "see gate output"
+            # Classify on the FULL res.error, never on `detail`: _flat truncates at 300
+            # chars and the hooks echo their guidance line LAST, so classifying the
+            # flattened form would silently degrade a long byte-budget denial to
+            # "unknown" and print the wrong remedy.
+            gate_class = classify_local_gate_denial(res.error or "")
             return (f"RESULT: post-plan BLOCKED — local pre-commit/pre-push gate denied "
-                    f"the commit; ERROR terminal=failed, no PR opened. {detail} "
-                    "Clear the gate then re-run bin/post-plan-now.")
+                    f"the commit [class={gate_class}]; ERROR terminal=failed, no PR "
+                    f"opened. {detail} {_GATE_REMEDY[gate_class]}")
         # Unknown or None error_kind — name both possible causes so the human knows where to look
         return ("RESULT: post-plan BLOCKED — rc=3 (rebase-conflict or local-gate), "
                 "cause unknown; ERROR terminal=failed, no PR opened. "

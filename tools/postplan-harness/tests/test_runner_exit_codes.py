@@ -192,3 +192,16 @@ def test_run_commits_through_the_remediation_wrapper():
     assert "_commit_with_gate_remediation(" in src
     assert "sha = git.commit_all(" not in src        # the old call site is gone
     assert 'upsert_files_changed(copy["summary_md"]' in src   # PR body still unmutated
+
+
+@pytest.mark.parametrize("detail", [
+    "local-gate: pre-push-adr-hook: ...",
+    "local-gate: Trim the rule(s) above (or move detail into a path-scoped",
+    "local-gate: Bump last_verified on the doc(s) above",
+    "local-gate: Author identity unknown",
+])
+def test_every_local_gate_subclass_still_exits_3(detail):
+    """Sub-classing must not downgrade any arm to 1 - a 1 re-arms the ~1M-token
+    /post-plan skill fallback against a hook that already said no."""
+    assert runner.exit_code_for(
+        _res(TerminalState.FAILED, "local-gate", error=detail)) == 3

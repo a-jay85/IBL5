@@ -3219,8 +3219,9 @@ printf '%s\n' "**Watch:** Phase 6.5 cannot confirm the write-then-read path on t
 [[ -z "$("$CDP" "$SCRATCH/watch-good.txt")" ]] || fail "cdp: Watch rewrite flagged (false positive)"
 
 # (c) Must-PASS false-positive fixtures — one per tokenizing exclusion.
-# fp-backtick: backtick span strips its periods, so no false sentence boundary.
-printf '%s\n' "**Touches:** Run \`bin/digest-dm-build\` to build the DM. It caps Watch at 700 characters." > "$SCRATCH/fp-backtick.txt"
+# fp-backtick: the 21-token span keeps the sentence at 5 words with the strip;
+# removing the strip pushes the count to 26 (SENTENCE_TOO_LONG) — turns this fixture red.
+printf '%s\n' "**Touches:** Run \`bin/digest-dm-build one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen sixteen seventeen eighteen nineteen twenty\` to build the DM." > "$SCRATCH/fp-backtick.txt"
 [[ -z "$("$CDP" "$SCRATCH/fp-backtick.txt")" ]] || fail "cdp: backtick path with period flagged"
 
 # fp-version: period in version number v2.12.2 is not a boundary.

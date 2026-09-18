@@ -229,12 +229,16 @@ auto_merge: false
 ---
 # Idle plan title
 PLAN
-# No H1, so the title falls back to the quoted frontmatter `title:`.
+# No H1, so the title falls back to the quoted frontmatter `title:`. The
+# `# shellcheck` line sits inside a code fence, so it must not count as an H1.
 cat > "$AM/queue/fm-title-plan.md" <<'PLAN'
 ---
 title: "Quoted fallback title"
 ---
 body
+```bash
+# shellcheck shell=bash
+```
 PLAN
 touch -t 202601010003 "$AM/queue/fm-title-plan.md"
 # Stamp the mtimes apart, live-plan OLDER. render_queue orders by `ls -1tr`

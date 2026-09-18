@@ -104,10 +104,12 @@ show_queue() {
         name=$(basename "$f")
         if [ -e "$f" ]; then
             # Extract frontmatter values (between first pair of --- markers).
+            # Title = first H1 outside frontmatter and code fences, so a
+            # `# shellcheck` line inside a ```bash block is never picked.
             # || true: awk/grep under set -e + pipefail; keep going on any error.
             impl_model=$(awk '/^---/{if(++n==1)next;exit} n==1&&/^impl_model:/{print $2}' "$f" 2>/dev/null) || true
             auto_merge=$(awk '/^---/{if(++n==1)next;exit} n==1&&/^auto_merge:/{print $2}' "$f" 2>/dev/null) || true
-            title=$(grep -m1 '^# ' "$f" 2>/dev/null | sed 's/^# //') || true
+            title=$(awk 'NR==1&&/^---/{fm=1;next} fm{if(/^---/)fm=0;next} /^ ? ? ?(```|~~~)/{fence=!fence;next} !fence&&/^# /{sub(/^# /,"");print;exit}' "$f" 2>/dev/null) || true
             [ -z "$title" ] && title=$(awk '/^---/{if(++n==1)next;exit} n==1&&/^title:/{sub(/^title:[[:space:]]*/,""); gsub(/^["\x27]|["\x27]$/,""); print; exit}' "$f" 2>/dev/null) || true
         else
             impl_model="" auto_merge="" title="(BROKEN LINK -> $(readlink "$f"))"

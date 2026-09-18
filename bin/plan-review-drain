@@ -52,7 +52,7 @@ set -uo pipefail
 #   DECISIONS_RESPONSE:   object wrapping an array —
 #                         { decisions: [ { id, slug, action, actor, ts } ] }
 #                         (handleListDecisions); record identity is `id`
-#   ACK_BODY:             { ids: [ <id>, ... ] } -> { acked: <n> }  (handleAckDecisions)
+#   ACK_BODY:             { ids: string[], outcomes?: { [id: string]: "queued"|"discarded"|"refused"|"rejected" } }  (handleAckDecisions)
 #   PLAN_SLUG_RE:         export const PLAN_SLUG_RE = /^[a-z0-9][a-z0-9-]{0,79}$/
 # ===== END RESOLVED BOT CONTRACT (Phase 1) =====
 DECISIONS_ROUTE="/planDecisions"
@@ -266,9 +266,16 @@ fi
 # ── the decision loop ────────────────────────────────────────────────────────
 SEEN_SLUGS=""
 ACK_IDS=""       # acked this pass
+OUTCOME_IDS=""   # id<TAB>outcome for acked records that have a terminal outcome
 PENDING_META=""  # id<TAB>slug<TAB>action for records whose apply FAILED
 
-mark_ack() { ACK_IDS="$ACK_IDS$1"$'\n'; }
+# $2 is the outcome the bot will show in the DM: queued|discarded|refused|rejected.
+# Optional — a call with no $2 acks the record and leaves its DM untouched.
+mark_ack() {
+    ACK_IDS="$ACK_IDS$1"$'\n'
+    [ -n "${2:-}" ] && OUTCOME_IDS="$OUTCOME_IDS$1"$'\t'"$2"$'\n'
+    return 0
+}
 mark_pending() { PENDING_META="$PENDING_META$1"$'\t'"$2"$'\t'"$3"$'\n'; }
 
 while IFS= read -r record_line; do
@@ -288,7 +295,7 @@ while IFS= read -r record_line; do
     # Given up on in an earlier pass — never retried, never re-DM'd.
     if [ "$(attempts_for "$id")" = FORCED ]; then
         log "record $id was already force-acked in an earlier pass — skipping"
-        mark_ack "$id"
+        mark_ack "$id" rejected
         continue
     fi
 
@@ -302,7 +309,7 @@ while IFS= read -r record_line; do
         # hostile write to the sink wedges every future pass forever, which is a
         # denial of service on the whole feature.
         log "REJECTED slug from remote: $(printf '%q' "$slug") — rule: $violation (record $id, action $action)"
-        [ "$DRY_RUN" = 1 ] || mark_ack "$id"
+        [ "$DRY_RUN" = 1 ] || mark_ack "$id" rejected
         continue
     fi
 
@@ -316,7 +323,7 @@ while IFS= read -r record_line; do
     # is never the primary defense. Keep both; delete neither.
     if grep -qxF -- "$slug" <<< "$SEEN_SLUGS"; then
         log "duplicate decision for slug '$slug' in this pass — first one wins; skipping record $id"
-        mark_ack "$id"
+        mark_ack "$id" rejected
         continue
     fi
     SEEN_SLUGS="$SEEN_SLUGS$slug"$'\n'
@@ -324,7 +331,7 @@ while IFS= read -r record_line; do
     PLAN_PATH="$PLANS_DIR/$slug.md"
     if [ ! -f "$PLAN_PATH" ]; then
         log "REJECTED slug '$slug' — no regular plan file at $PLAN_PATH (record $id, action $action)"
-        [ "$DRY_RUN" = 1 ] || mark_ack "$id"
+        [ "$DRY_RUN" = 1 ] || mark_ack "$id" rejected
         continue
     fi
 
@@ -332,7 +339,7 @@ while IFS= read -r record_line; do
         queue | discard) ;;
         *)
             log "REJECTED record $id — unknown action verb '$action' for slug '$slug'"
-            [ "$DRY_RUN" = 1 ] || mark_ack "$id"
+            [ "$DRY_RUN" = 1 ] || mark_ack "$id" rejected
             continue
             ;;
     esac
@@ -352,13 +359,13 @@ while IFS= read -r record_line; do
             dm "plan-review-drain refused a Queue press: \`$slug\` fails bin/check-plan, so it is not queueable.
 
 $(tail -20 <<< "$verdict")"
-            mark_ack "$id"
+            mark_ack "$id" refused
             continue
         fi
         if NIGHTLY_DIR="$NIGHTLY_DIR" PLANS_DIR="$PLANS_DIR" \
             "$REPO/bin/automouse/queue" "$slug" > /dev/null 2>&1; then
             log "queued '$slug' from a Discord decision (record $id)"
-            mark_ack "$id"
+            mark_ack "$id" queued
         else
             log "FAILED to queue '$slug' via bin/automouse/queue (record $id) — not acking this pass"
             mark_pending "$id" "$slug" "$action"
@@ -377,7 +384,7 @@ $(tail -20 <<< "$verdict")"
     fi
     if mv -n "$PLAN_PATH" "$DISCARD_DIR/$slug.md" 2> /dev/null && [ ! -e "$PLAN_PATH" ]; then
         log "discarded '$slug' -> $DISCARD_DIR/$slug.md (record $id)"
-        mark_ack "$id"
+        mark_ack "$id" discarded
     else
         log "FAILED to discard '$slug' (record $id) — not acking this pass"
         mark_pending "$id" "$slug" "$action"
@@ -395,7 +402,18 @@ fi
 # help, the record will never become valid, and leaving it unacked wedges the
 # drain. Records whose apply failed are NOT acked, but are bounded by MAX_ATTEMPTS.
 if grep -q . <<< "$ACK_IDS"; then
-    ACK_PAYLOAD=$(jq -R -s -c 'split("\n") | map(select(length > 0)) | {ids: .}' <<< "$ACK_IDS")
+    ACK_PAYLOAD=$(
+        jq -c -n \
+            --arg ids_raw      "$ACK_IDS" \
+            --arg outcomes_tsv "$OUTCOME_IDS" \
+            '{
+                ids: ($ids_raw | split("\n") | map(select(length > 0))),
+                outcomes: ($outcomes_tsv
+                           | split("\n") | map(select(length > 0))
+                           | map(split("\t") | {(.[0]): .[1]})
+                           | add // {})
+            }'
+    )
     if remote POST "$ACK_ROUTE" <<< "$ACK_PAYLOAD"; then
         # `acked` in the response is ADVISORY — never gate on it. It counts only
         # tombstones newly written on that call, and "already acked", "compacted

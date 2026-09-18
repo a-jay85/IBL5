@@ -9,6 +9,9 @@ export type PlanDecision = {
     action: 'queue' | 'discard';
     actor: string;
     ts: string;
+    // DM coordinates used by the ack-edit and the stale sweeper, absent on records written before this change
+    channelId?: string;
+    messageId?: string;
 };
 
 type AckRecord = {
@@ -107,7 +110,7 @@ export function hasDecision(slug: string, dir: string = DECISIONS_DIR): PlanDeci
  * iblbot runs single-process (fork mode, no cluster).
  */
 export function appendDecision(
-    input: { slug: string; action: 'queue' | 'discard'; actor: string },
+    input: { slug: string; action: 'queue' | 'discard'; actor: string; channelId?: string; messageId?: string },
     dir: string = DECISIONS_DIR,
 ): PlanDecision {
     const existing = hasDecision(input.slug, dir);
@@ -124,6 +127,9 @@ export function appendDecision(
         action: input.action,
         actor: input.actor,
         ts: new Date().toISOString(),
+        ...(input.channelId && input.messageId
+            ? { channelId: input.channelId, messageId: input.messageId }
+            : {}),
     };
 
     const line = JSON.stringify(decision) + '\n';

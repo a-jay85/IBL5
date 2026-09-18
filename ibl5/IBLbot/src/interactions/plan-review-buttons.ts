@@ -62,7 +62,13 @@ export async function handlePlanReviewButton(interaction: ButtonInteraction, dir
     // is already durable and the drain still finds it. The reverse order shows
     // the owner a confirmation for a record no drain will ever see.
     try {
-        appendDecision({ slug, action, actor: interaction.user.id }, dir);
+        appendDecision({
+            slug,
+            action,
+            actor: interaction.user.id,
+            channelId: interaction.message?.channelId,
+            messageId: interaction.message?.id,
+        }, dir);
     } catch (error) {
         console.error(`Failed to record plan decision (${action} ${slug}):`, error);
         try {

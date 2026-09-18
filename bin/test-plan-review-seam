@@ -15,7 +15,7 @@
 #   LOOPBACK_BIND:        127.0.0.1:config.express.port
 #   REVIEW_DM_BODY:       { slug, digest }
 #   DECISIONS_RESPONSE:   object wrapping array; fields: decisions[].id, decisions[].slug, decisions[].action, decisions[].actor, decisions[].ts
-#   ACK_BODY:             { ids: string[] }  (echoes back the id field as an array)
+#   ACK_BODY:             { ids: string[], outcomes?: { [id: string]: "queued"|"discarded"|"refused"|"rejected" } }  (handleAckDecisions)
 #   PLAN_SLUG_RE:         PLAN_SLUG_RE = /^[a-z0-9][a-z0-9-]{0,79}$/
 # ===== END RESOLVED BOT CONTRACT (Phase 1) =====
 
@@ -55,7 +55,7 @@ seam_case_contract_drift() {
     done
 
     # Response field names the drain consumes + ack body field — must exist in plan-review-dm.ts
-    for token in 'decisions' 'slug' 'action' 'ids' 'PLAN_SLUG_RE'; do
+    for token in 'decisions' 'slug' 'action' 'ids' 'outcomes' 'PLAN_SLUG_RE'; do
         if ! grep -qF -- "$token" <<< "$dm_src"; then
             seam_fail "contract-drift: token '$token' absent from plan-review-dm.ts"
             missing=$(( missing + 1 ))
@@ -682,6 +682,69 @@ seam_case_queue_end_to_end() {
     fi
 }
 
+seam_case_ack_outcomes() {
+    # Test queue success → "queued" in outcomes
+    reset_drain_state
+    printf '# ok\n' > "$PLANS/ack-queue.md"
+    set_get '{"decisions":[{"id":"ao1","slug":"ack-queue","action":"queue","actor":"u","ts":"t"}]}'
+    run_drain --drain
+    local body; body="$(ack_body)"
+    want "ack outcomes: queue success → \"queued\" in outcomes" "$body" '"ao1":"queued"'
+
+    # Test discard success → "discarded" in outcomes
+    reset_drain_state
+    printf '# ok\n' > "$PLANS/ack-discard.md"
+    set_get '{"decisions":[{"id":"ao2","slug":"ack-discard","action":"discard","actor":"u","ts":"t"}]}'
+    run_drain --drain
+    body="$(ack_body)"
+    want "ack outcomes: discard success → \"discarded\" in outcomes" "$body" '"ao2":"discarded"'
+
+    # Test check-plan failure → "refused" in outcomes (refusal DM still goes out)
+    reset_drain_state
+    printf '# bad\nCHECKPLAN-FAILS\n' > "$PLANS/ack-refuse.md"
+    set_get '{"decisions":[{"id":"ao3","slug":"ack-refuse","action":"queue","actor":"u","ts":"t"}]}'
+    run_drain --drain
+    body="$(ack_body)"
+    want "ack outcomes: check-plan failure → \"refused\" in outcomes" "$body" '"ao3":"refused"'
+    want "ack outcomes: refusal DM still sent" "$(cat "$DM_CALLS")" "ack-refuse"
+
+    # Test shape violation → "rejected" in outcomes
+    reset_drain_state
+    set_get '{"decisions":[{"id":"ao4","slug":"../evil","action":"queue","actor":"u","ts":"t"}]}'
+    run_drain --drain
+    body="$(ack_body)"
+    want "ack outcomes: shape violation → \"rejected\" in outcomes" "$body" '"ao4":"rejected"'
+
+    # Test payload parses as valid JSON with both ids and outcomes keys
+    reset_drain_state
+    printf '# ok\n' > "$PLANS/ack-json.md"
+    set_get '{"decisions":[{"id":"ao5","slug":"ack-json","action":"queue","actor":"u","ts":"t"}]}'
+    run_drain --drain
+    body="$(ack_body)"
+    # Strip the "BODY " prefix and parse the JSON
+    local json_body; json_body="${body#BODY }"
+    if jq -e '.ids and (.outcomes | type == "object")' <<< "$json_body" > /dev/null 2>&1; then
+        seam_ok "ack outcomes: payload has both ids and outcomes keys as valid JSON"
+    else
+        seam_fail "ack outcomes: payload missing ids or outcomes key (got: $json_body)"
+    fi
+
+    # Test FORCED-earlier-skip: burn a record via set_ack '' 400 first pass, then on second pass assert "rejected"
+    reset_drain_state
+    printf '# ok\n' > "$PLANS/ack-forced.md"
+    set_get '{"decisions":[{"id":"ao6","slug":"ack-forced","action":"queue","actor":"u","ts":"t"}]}'
+    # First pass: ack POST returns 400 (bot refuses), burns one attempt
+    set_ack '{"error":"nope"}' 400 0
+    run_drain --drain
+    # Pre-seed the ledger to FORCED state directly to simulate MAX_ATTEMPTS exhausted
+    printf 'ao6\tFORCED\n' > "$STATE"
+    # Second pass: the record is still listed (bot still has it), drain sees FORCED → marks rejected
+    set_ack '{"acked":1}' 200 0
+    run_drain --drain
+    body="$(ack_body)"
+    want "ack outcomes: FORCED-earlier-skip → \"rejected\" in outcomes on second pass" "$body" '"ao6":"rejected"'
+}
+
 if ! command -v jq > /dev/null 2>&1; then
     seam_fail "jq is not on PATH — bin/plan-review-drain cannot parse the decision sink without it"
 fi
@@ -702,6 +765,7 @@ seam_case_force_ack_dm_is_actionable
 seam_case_runner_hook
 seam_case_tick_hook
 seam_case_queue_end_to_end
+seam_case_ack_outcomes
 
 # Completion token. A harness that asserts nothing reads as passing, so the count
 # is printed and an independently wired harness (bin/test-plan-now) asserts it is

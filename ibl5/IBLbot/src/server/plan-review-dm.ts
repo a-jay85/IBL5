@@ -53,6 +53,33 @@ export function buildPlanReviewRow(slug: string, disabled = false): ActionRowBui
     );
 }
 
+export const PLAN_OUTCOMES = ['queued', 'discarded', 'refused', 'rejected'] as const;
+export type PlanOutcome = (typeof PLAN_OUTCOMES)[number];
+
+export const OUTCOME_TEXT: Record<PlanOutcome, string> = {
+    queued: '✅ queued',
+    discarded: '🗑️ discarded',
+    refused: '❌ refused — fails bin/check-plan (see separate DM)',
+    rejected: '⚠️ drain rejected this decision — check the drain log',
+};
+
+/**
+ * Re-fetch and edit a DM the bot sent earlier. Uses the owner-DM path
+ * (users.fetch -> createDM -> messages.fetch) to rebuild the channel from scratch.
+ */
+export async function editPlanReviewDM(
+    client: Client,
+    userId: string,
+    messageId: string,
+    slug: string,
+    content: string,
+): Promise<void> {
+    const user = await client.users.fetch(userId);
+    const dm = await user.createDM();
+    const message = await dm.messages.fetch(messageId);
+    await message.edit({ content, components: [buildPlanReviewRow(slug, true)] });
+}
+
 export function handlePlanReviewDM(client: Client) {
     return (req: Request, res: Response): void => {
         const payload = req.body as { slug?: unknown; digest?: unknown } | undefined;
@@ -116,10 +143,21 @@ export function handleListDecisions(dir?: string) {
     };
 }
 
+function parseOutcomes(raw: unknown): Record<string, PlanOutcome> | null {
+    if (raw === undefined) return {};
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null;
+    for (const value of Object.values(raw as Record<string, unknown>)) {
+        if (typeof value !== 'string' || !(PLAN_OUTCOMES as readonly string[]).includes(value)) {
+            return null;
+        }
+    }
+    return raw as Record<string, PlanOutcome>;
+}
+
 /**
- * `POST /planDecisions/ack` — `{ ids: string[] }`. Unknown ids are ignored — no tombstone
- * is written for them — so an at-least-once drain replaying ids it already sent stays
- * boring. Idempotency itself lives in the store, not here.
+ * `POST /planDecisions/ack` — `{ ids: string[], outcomes?: { [id: string]: "queued"|"discarded"|"refused"|"rejected" } }`.
+ * Unknown ids are ignored — no tombstone is written for them — so an at-least-once drain
+ * replaying ids it already sent stays boring. Idempotency itself lives in the store, not here.
  *
  * **`acked` is advisory, not proof.** It counts only tombstones newly written on this call.
  * Three different outcomes all contribute 0 and the response cannot distinguish them: the id
@@ -127,7 +165,7 @@ export function handleListDecisions(dir?: string) {
  * therefore never gate success on `acked === ids.length`. The authoritative check that an id
  * is drained is that a subsequent `GET /planDecisions` no longer lists it.
  */
-export function handleAckDecisions(dir?: string) {
+export function handleAckDecisions(client: Client, dir?: string) {
     return (req: Request, res: Response): void => {
         const ids = (req.body as { ids?: unknown } | undefined)?.ids;
 
@@ -136,6 +174,26 @@ export function handleAckDecisions(dir?: string) {
             return;
         }
 
-        res.json({ acked: ackDecisions(ids as string[], dir) });
+        const outcomes = parseOutcomes((req.body as { outcomes?: unknown } | undefined)?.outcomes);
+        if (outcomes === null) {
+            res.status(400).json({ error: 'outcomes must be an object mapping id to queued|discarded|refused|rejected' });
+            return;
+        }
+
+        // SNAPSHOT BEFORE ACK: capture the pending records so we can find messageId after tombstoning
+        const byId = new Map(readPending(dir).map(d => [d.id, d]));
+
+        const acked = ackDecisions(ids as string[], dir);
+        res.json({ acked });
+
+        // Fire DM edits detached — never delay the response
+        for (const [id, outcome] of Object.entries(outcomes)) {
+            const decision = byId.get(id);
+            if (!decision?.messageId) continue;
+            void editPlanReviewDM(client, decision.actor, decision.messageId, decision.slug, OUTCOME_TEXT[outcome])
+                .catch((error: unknown) => {
+                    console.error(`Failed to edit plan review DM for ${decision.slug} (${id}):`, error);
+                });
+        }
     };
 }

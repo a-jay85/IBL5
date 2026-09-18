@@ -463,7 +463,7 @@ auto_merge: false
 
 ## Step 5.5: Auto-queue queue-safe plans
 
-A plan is **queue-safe** the moment **both** `bin/check-plan` and `bin/check-plan-staleness` (Step 5) exit 0 — those gates already enforce no unresolved decisions, no `DECIDE`/`TBD`/`subject to…` tokens, resolved decision-triggers, and resolved reuse targets, so a passing plan is fully specified for unattended automouse execution. Queue-safety is **independent of `auto_merge`**: a plan held for human merge (`auto_merge: false`) is still safe to *implement* autonomously — only its merge waits (Phase 6.5 condition (7)).
+A plan is **queue-safe** the moment **both** `bin/check-plan` and `bin/check-plan-staleness` (Step 5) exit 0. Those gates already enforce no unresolved decisions, no `DECIDE`/`TBD`/`subject to…` tokens, resolved decision-triggers, and resolved reuse targets, so a passing plan is fully specified for unattended automouse execution. Queue-safety is **independent of `auto_merge`**: a plan held for human merge (`auto_merge: false`) is still safe to *implement* autonomously. Only its merge waits (Phase 6.5 condition (7)).
 
 For every plan that passed `bin/check-plan` in Step 5, decide its disposition by this precedence (the default is **queue**):
 

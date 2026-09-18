@@ -1252,8 +1252,9 @@ else
     echo "ok: 5.8c quiet: only blank lines between re-reviewed tree and ### Merge digest"
 fi
 
-# Case 3 — degrade: absent -2 file; block exits 0 and composed body is byte-identical
-# to the pre-change template composed with an empty slot
+# Case 3 — degrade: absent -2 file; composed body is byte-identical to the
+# pre-change template composed with an empty slot (the block's exit status is
+# not asserted: it ends non-zero by design and run_findings swallows it)
 out3="$(run_findings "$B58F" absent spawn)"
 body3="$(compose_fixture_body "$RR_LINE" "$out3")"
 body3_ref="$(compose_fixture_body "$RR_LINE" "")"
@@ -1265,18 +1266,20 @@ else
 fi
 
 # Case 4 — skip: structural guard that the findings-render fence sits AFTER the
-# RE_REVIEW=spawn line in _phase-5.5-fidelity.md.  That placement is what confines
-# the render block to the spawn path; if it drifted above RE_REVIEW=spawn, skip-mode
-# runs would also render.  Behavioral testing is not needed: on skip, no second
+# RE_REVIEW=spawn line and BEFORE the Step 5 heading in _phase-5.5-fidelity.md.
+# That placement is what confines the render block to the spawn path; if it
+# drifted above RE_REVIEW=spawn or out of Step 4b, skip-mode runs would also render.  Behavioral testing is not needed: on skip, no second
 # reviewer runs, so FIDELITY_VERDICT_FILE_2 is never written and the block is never
 # reached.
 _spawn_lineno="$(grep -n 'RE_REVIEW=spawn' "$P55_SKILL" | head -1 | cut -d: -f1)"
 _fence_lineno="$(grep -n '# phase 5.8 findings render' "$P55_SKILL" | head -1 | cut -d: -f1)"
-if [ -n "$_spawn_lineno" ] && [ -n "$_fence_lineno" ] \
-        && [ "$_fence_lineno" -gt "$_spawn_lineno" ]; then
-    echo "ok: 5.8c skip: findings-render fence is after RE_REVIEW=spawn line (structural guard)"
+_step5_lineno="$(grep -n '^## Step 5' "$P55_SKILL" | head -1 | cut -d: -f1)"
+if [ -n "$_spawn_lineno" ] && [ -n "$_fence_lineno" ] && [ -n "$_step5_lineno" ] \
+        && [ "$_fence_lineno" -gt "$_spawn_lineno" ] \
+        && [ "$_fence_lineno" -lt "$_step5_lineno" ]; then
+    echo "ok: 5.8c skip: findings-render fence is inside the RE_REVIEW=spawn branch of Step 4b (structural guard)"
 else
-    echo "FAIL: 5.8c skip: findings-render fence is NOT after RE_REVIEW=spawn (fence=$_fence_lineno spawn=$_spawn_lineno)"
+    echo "FAIL: 5.8c skip: findings-render fence is NOT between RE_REVIEW=spawn and ## Step 5 (fence=$_fence_lineno spawn=$_spawn_lineno step5=$_step5_lineno)"
     FAILED=1
 fi
 

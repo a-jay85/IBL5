@@ -343,7 +343,7 @@ section() { printf '\n%s%s%s\n' "$B" "$1" "$R"; }
 note()    { printf '  %s%s%s\n' "$DIM" "$1" "$R"; }
 
 # PIDs already accounted for by an earlier section. Space-delimited (Bash 3.2 has
-# no associative arrays). Populated by render_launchd and render_automouse;
+# no associative arrays). Populated by render_launchd and render_runner_detail;
 # consumed by render_loose, which must therefore run last.
 TRACKED_PIDS=" "
 track_pid() { TRACKED_PIDS="$TRACKED_PIDS$1 "; }
@@ -470,87 +470,107 @@ EOF
     return 0
 }
 
-# ── section 2: automouse runners ───────────────────────────────────────────────
+# ── automouse runner helpers (rendered inside the queue section) ──────────────
 #
 # bin/automouse/run writes .heartbeat-<pid>-<phase> and .cmdpid-<pid>-<phase> per
 # active phase, and removes them on normal exit (cleanup_watcher EXIT trap). They
 # survive only a SIGKILL'd or stall-killed runner. The PID is in the filename, so
 # aliveness is checkable without trusting the file's existence at all.
+#
+# A runner has no section of its own. Its details print under the queue row of the
+# plan it is working on, so the plan and the job driving it read as one block.
 
-render_automouse() {
-    local count=0 stale=0 hb base rest pid phase now hb_ts hb_age slug lock attempts slug_ld slug_lb slug_disp
-
-    section "AUTOMOUSE RUNNERS"
-
-    now="$(date +%s)"
-    for hb in "$AUTOMOUSE_DIR"/.heartbeat-*; do
-        [ -f "$hb" ] || continue
-        base="$(basename "$hb")"
-        rest="${base#.heartbeat-}"
-        pid="${rest%%-*}"
-        phase="${rest#*-}"
-
-        if ! pid_alive_matching "$pid" 'automouse'; then
-            stale=$(( stale + 1 ))
-            continue
-        fi
-
-        hb_ts="$(tr -dc '0-9' < "$hb" 2>/dev/null)"
-        case "$hb_ts" in
-            ''|*[!0-9]*) hb_age='' ;;
-            *) hb_age="$(( now - hb_ts ))" ;;
-        esac
-
-        # Which plan this runner is on: the lock directory that bin/automouse/run
-        # writes a pid file into is authoritative for both nightly (no-arg queue-
-        # draining) and one-off (plan <slug>) invocations. Fallback: command-line
-        # scrape, which only matches the undocumented explicit .md invocation form.
-        slug=''
-        for slug_ld in "$AUTOMOUSE_DIR/queue/"*.lock; do
-            [ -d "$slug_ld" ] || continue
-            [ -f "$slug_ld/pid" ] || continue
-            if [ "$(tr -dc '0-9' < "$slug_ld/pid" 2>/dev/null)" = "$pid" ]; then
-                slug_lb="$(basename "$slug_ld")"
-                slug="${slug_lb%.lock}"
-                slug="${slug%.md}"
-                break
-            fi
-        done
-        if [ -z "$slug" ]; then
-            slug="$(ps -o command= -p "$pid" 2>/dev/null \
-                | sed -n 's/.*automouse\/run plan \([^ ]*\)\.md.*/\1/p' \
-                | head -n 1)"
-        fi
-        [ -z "$slug" ] && slug='(unknown plan)'
-
-        # Locks are DIRECTORIES — bin/automouse/run takes them with mkdir, which
-        # is the atomic-create primitive. `-f` silently never matches.
-        lock=''
-        [ -e "$AUTOMOUSE_DIR/queue/$slug.md.lock" ] && lock=' · locked'
-        attempts=''
-        [ -f "$AUTOMOUSE_DIR/queue/$slug.md.attempts" ] && \
-            attempts=" · attempt $(tr -dc '0-9' < "$AUTOMOUSE_DIR/queue/$slug.md.attempts" 2>/dev/null)"
-
-        # Gated on the file existing: $slug here can be the '(unknown plan)'
-        # sentinel or a command-line scrape, and a link to a path that is not
-        # there opens an error dialog instead of doing nothing.
-        slug_disp="$slug"
-        { [ -f "$AUTOMOUSE_DIR/queue/$slug.md" ] || [ -L "$AUTOMOUSE_DIR/queue/$slug.md" ]; } && \
-            slug_disp="$(link_file "$AUTOMOUSE_DIR/queue/$slug.md" "$slug")"
-
-        count=$(( count + 1 ))
-        track_pid "$pid"
-        printf '  %s●%s %-10s %s%s%s\n' "$GRN" "$R" "$phase" "$B" "$slug_disp" "$R"
-        printf '      pid %-7s up %-8s last activity %s ago%s%s\n' \
-            "$pid" "$(human_age "$(pid_elapsed_secs "$pid")")" "$(human_age "$hb_age")" "$lock" "$attempts"
+# The first heartbeat file for a PID, or nothing. Callers validate the PID first
+# (pid_alive_matching rejects non-digits), so the glob never sees a stray value.
+# A runner writes one phase at a time. If a leaked -impl file sits beside a live
+# -postplan one, the glob's alphabetical order shows impl.
+runner_heartbeat() {
+    local hb
+    for hb in "$AUTOMOUSE_DIR/.heartbeat-$1-"*; do
+        [ -f "$hb" ] && { printf '%s' "$hb"; return 0; }
     done
-
-    [ "$count" -eq 0 ] && note "none running"
-    [ "$stale" -gt 0 ] && note "$stale stale heartbeat file(s) from dead runs — ignored"
-    return 0
+    return 1
 }
 
-# ── section 3: queue ───────────────────────────────────────────────────────────
+# The PID of a LIVE runner holding queue/<name>.lock, or nothing. Locks are
+# DIRECTORIES — bin/automouse/run takes them with mkdir, the atomic-create
+# primitive — so `-f` would silently never match.
+queue_lock_runner() {
+    local pf="$AUTOMOUSE_DIR/queue/$1.lock/pid" pid
+    [ -f "$pf" ] || return 1
+    pid="$(tr -dc '0-9' < "$pf" 2>/dev/null)"
+    pid_alive_matching "$pid" 'automouse' || return 1
+    printf '%s' "$pid"
+}
+
+# impl_model, auto_merge and title of a queued plan, tab-separated. The awk is
+# bin/automouse/queue's show_queue() verbatim, defaults included, so the two
+# queue views can never disagree about a plan.
+plan_meta() {
+    local f="$1" impl_model='' auto_merge='' title=''
+    if [ -e "$f" ]; then
+        impl_model=$(awk '/^---/{if(++n==1)next;exit} n==1&&/^impl_model:/{print $2}' "$f" 2>/dev/null) || true
+        auto_merge=$(awk '/^---/{if(++n==1)next;exit} n==1&&/^auto_merge:/{print $2}' "$f" 2>/dev/null) || true
+        title=$(grep -m1 '^# ' "$f" 2>/dev/null | sed 's/^# //') || true
+        [ -z "$title" ] && title=$(awk '/^---/{if(++n==1)next;exit} n==1&&/^title:/{sub(/^title:[[:space:]]*/,""); gsub(/^["\x27]|["\x27]$/,""); print; exit}' "$f" 2>/dev/null) || true
+    else
+        title="(BROKEN LINK -> $(readlink "$f"))"
+    fi
+    printf '%s\t%s\t%s' "${impl_model:-opus}" "${auto_merge:-true}" "$title"
+}
+
+# The launchd-style detail block for one live runner: phase, pid, age, then the
+# best progress line and a link to the file it came from.
+#
+# PROGRESS SOURCES. The post-plan phase runs bin/post-plan-now --foreground,
+# which writes its harness audit.log under $HARNESS_OUT/live-<slug>-<ts>/ — the
+# same place a launchd post-plan row reads. The impl phase logs one
+# `<slug>/impl tool: …` line per tool call to the automouse day log. That log is
+# named for the day the RUN started, so a run past midnight keeps writing
+# yesterday's file: take the newest dated log, never today's by name. The
+# ????-??-??.log glob keeps launchd-rearm.log out.
+render_runner_detail() {
+    local pid="$1" slug="$2" hb="$3" phase now hb_ts hb_age attempts safe d audit='' log progress=''
+
+    phase="$(basename "$hb")"; phase="${phase#.heartbeat-}"; phase="${phase#*-}"
+    now="$(date +%s)"
+    hb_ts="$(tr -dc '0-9' < "$hb" 2>/dev/null)"
+    case "$hb_ts" in
+        ''|*[!0-9]*) hb_age='' ;;
+        *) hb_age="$(( now - hb_ts ))" ;;
+    esac
+    attempts=''
+    [ -f "$AUTOMOUSE_DIR/queue/$slug.md.attempts" ] && \
+        attempts=" · attempt $(tr -dc '0-9' < "$AUTOMOUSE_DIR/queue/$slug.md.attempts" 2>/dev/null)"
+
+    if [ "$phase" = postplan ]; then
+        safe="$(printf '%s' "$slug" | tr -cs 'A-Za-z0-9._-' '-')"
+        d="$(ls -td "$HARNESS_OUT/live-$safe-"*/ 2>/dev/null | head -n 1)"
+        if [ -n "$d" ] && [ -f "${d%/}/audit.log" ]; then
+            audit="${d%/}/audit.log"
+            progress="$(last_line "$audit" 64 '^\[[0-9:]+\] phase')"
+        fi
+    fi
+    log="$(ls -t "$AUTOMOUSE_DIR"/logs/????-??-??.log 2>/dev/null | head -n 1)"
+    if [ -z "$progress" ] && [ -n "$log" ]; then
+        progress="$(grep -F " $slug/$phase " "$log" 2>/dev/null | tail -n 1)"
+        [ -n "$progress" ] && progress="$(clip_field "$progress" 64)"
+    fi
+    [ -z "$progress" ] && progress="(no activity logged yet)"
+
+    track_pid "$pid"
+    printf '      %s●%s %-8s pid %-7s up %-8s last activity %s ago%s\n' \
+        "$GRN" "$R" "$phase" "$pid" "$(human_age "$(pid_elapsed_secs "$pid")")" \
+        "$(human_age "$hb_age")" "$attempts"
+    printf '      %s%s%s\n' "$DIM" "$progress" "$R"
+    if [ -n "$audit" ]; then
+        printf '      %saudit: %s%s\n' "$DIM" "$(link_file "$audit")" "$R"
+    elif [ -n "$log" ]; then
+        printf '      %slog: %s%s\n' "$DIM" "$(link_file "$log")" "$R"
+    fi
+}
+
+# ── section 2: queue ───────────────────────────────────────────────────────────
 
 # Wall-clock of automouse's next scheduled fire, e.g. "next run Wed 2026-09-16
 # 03:00". Empty on anything unexpected — the header degrades to the bare title
@@ -616,7 +636,8 @@ automouse_next_run() {
 }
 
 render_queue() {
-    local count=0 f base next pad
+    local count=0 shown=0 stale=0 f base next pad hb rest pid slug slug_ld slug_lb
+    local claimed=' ' queue_list meta model merge title
 
     next="$(automouse_next_run)"
     if [ -n "$next" ]; then
@@ -634,34 +655,99 @@ render_queue() {
     # into ~/claude-plans/, and `ls -t` vs. a stat pipeline can disagree on
     # whether that mtime is the link's or the target's. 2>/dev/null covers the
     # empty queue, where the glob stays literal.
+    queue_list="$(ls -1tr "$AUTOMOUSE_DIR"/queue/*.md 2>/dev/null)"
+
+    # Pass 1: which live runners already belong to a queued plan. Their details
+    # print under that plan's row below, so the heartbeat sweep must skip them.
     while IFS= read -r f; do
+        [ -n "$f" ] || continue
+        pid="$(queue_lock_runner "$(basename "$f")")" && claimed="$claimed$pid "
+    done <<EOF_Q
+$queue_list
+EOF_Q
+
+    printf '  %s%3s %-44s %-17s %-6s %-11s %s%s\n' \
+        "$DIM" '#' 'PLAN' 'MODEL' 'MERGE' 'STATUS' 'TITLE' "$R"
+
+    # Pass 2: every heartbeat NOT claimed above. A dead or reused PID is residue
+    # and only counted. A live one is a runner on a plan that is not in queue/
+    # (its lock dir outlived the .md, or a one-off run), so it leads the section
+    # with its own row rather than vanishing.
+    for hb in "$AUTOMOUSE_DIR"/.heartbeat-*; do
+        [ -f "$hb" ] || continue
+        rest="$(basename "$hb")"; rest="${rest#.heartbeat-}"
+        pid="${rest%%-*}"
+        case "$claimed" in *" $pid "*) continue ;; esac
+        if ! pid_alive_matching "$pid" 'automouse'; then
+            stale=$(( stale + 1 ))
+            continue
+        fi
+        # Slug: the lock directory holding this PID is authoritative for both
+        # queue-draining and one-off (plan <slug>) invocations. Fallback: command-
+        # line scrape, which only matches the explicit .md invocation form.
+        slug=''
+        for slug_ld in "$AUTOMOUSE_DIR/queue/"*.lock; do
+            [ -f "$slug_ld/pid" ] || continue
+            if [ "$(tr -dc '0-9' < "$slug_ld/pid" 2>/dev/null)" = "$pid" ]; then
+                slug_lb="$(basename "$slug_ld")"
+                slug="${slug_lb%.lock}"; slug="${slug%.md}"
+                break
+            fi
+        done
+        if [ -z "$slug" ]; then
+            slug="$(ps -o command= -p "$pid" 2>/dev/null \
+                | sed -n 's/.*automouse\/run plan \([^ ]*\)\.md.*/\1/p' \
+                | head -n 1)"
+        fi
+        [ -z "$slug" ] && slug='(unknown plan)'
+        shown=$(( shown + 1 ))
+        printf '  %s  ▶%s %-44s %-17s %-6s %s%-11s%s %s(not in queue)%s\n' \
+            "$YEL" "$R" "$slug" '-' '-' "$YEL" 'running' "$R" "$DIM" "$R"
+        render_runner_detail "$pid" "$slug" "$hb"
+    done
+
+    while IFS= read -r f; do
+        [ -n "$f" ] || continue
         { [ -f "$f" ] || [ -L "$f" ]; } || continue
         base="$(basename "$f")"
         count=$(( count + 1 ))
-        # Pad OUTSIDE the link. A %-46s over the wrapped string counts the escape
+        meta="$(plan_meta "$f")"
+        model="$(printf '%s' "$meta" | cut -f1)"
+        merge="$(printf '%s' "$meta" | cut -f2)"
+        title="$(clip_field "$(printf '%s' "$meta" | cut -f3-)" 50)"
+        # Pad OUTSIDE the link. A %-44s over the wrapped string counts the escape
         # bytes as width — the column collapses — and the clickable region would
         # swallow the run of spaces up to the next column.
         pad=''
-        [ "${#base}" -lt 46 ] && pad="$(printf '%*s' $(( 46 - ${#base} )) '')"
-        # `-e`, not `-f`: mkdir-based locks are directories (see render_automouse).
-        # An in-flight plan shows ▶ in place of its number but still consumes one,
-        # so the numbers stay queue POSITIONS instead of renumbering around it.
-        # Both markers occupy the same 3 columns, which keeps the name column
-        # straight whether the queue is 9 plans long or 90.
+        [ "${#base}" -lt 44 ] && pad="$(printf '%*s' $(( 44 - ${#base} )) '')"
+        # `-e`, not `-f`: mkdir-based locks are directories. An in-flight plan
+        # shows ▶ in place of its number but still consumes one, so the numbers
+        # stay queue POSITIONS instead of renumbering around it. Both markers
+        # occupy the same 3 columns, which keeps the name column straight whether
+        # the queue is 9 plans long or 90.
         if [ -e "$AUTOMOUSE_DIR/queue/$base.lock" ]; then
-            printf '  %s  ▶%s %s%s %sin progress%s\n' \
-                "$YEL" "$R" "$(link_file "$f" "$base")" "$pad" "$DIM" "$R"
+            printf '  %s  ▶%s %s%s %-17s %-6s %s%-11s%s %s\n' \
+                "$YEL" "$R" "$(link_file "$f" "$base")" "$pad" "$model" "$merge" \
+                "$YEL" 'in progress' "$R" "$title"
+            # Details only for a LIVE runner. A SIGKILLed one leaves the lock dir
+            # with a dead PID: the row still reads in progress, with nothing under it.
+            pid="$(queue_lock_runner "$base")" && hb="$(runner_heartbeat "$pid")" && \
+                render_runner_detail "$pid" "${base%.md}" "$hb"
         else
-            printf '  %s%2d.%s %s%s %squeued%s\n' \
-                "$DIM" "$count" "$R" "$(link_file "$f" "$base")" "$pad" "$DIM" "$R"
+            printf '  %s%2d.%s %s%s %-17s %-6s %s%-11s%s %s\n' \
+                "$DIM" "$count" "$R" "$(link_file "$f" "$base")" "$pad" "$model" "$merge" \
+                "$DIM" 'queued' "$R" "$title"
         fi
-    done < <(ls -1tr "$AUTOMOUSE_DIR"/queue/*.md 2>/dev/null)
+    done <<EOF_Q
+$queue_list
+EOF_Q
 
-    [ "$count" -eq 0 ] && note "empty"
+    [ "$count" -eq 0 ] && [ "$shown" -eq 0 ] && note "empty"
+    [ "$stale" -gt 0 ] && note "$stale stale heartbeat file(s) from dead runs — ignored"
     return 0
 }
 
-# ── section 4: unaccounted headless sessions ───────────────────────────────────
+# ── section 3: unaccounted headless sessions ───────────────────────────────────
 #
 # Headless `claude -p` processes with NO job above them — an orphan detector.
 #
@@ -704,7 +790,6 @@ EOF
 render_all() {
     printf '%sFLEET STATUS%s  %s%s%s\n' "$B" "$R" "$DIM" "$(date '+%Y-%m-%d %H:%M:%S %Z')" "$R"
     render_launchd
-    render_automouse
     render_queue
     render_loose
     printf '\n'

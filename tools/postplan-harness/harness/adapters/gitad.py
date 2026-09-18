@@ -23,6 +23,35 @@ _LOCAL_GATE_MARKERS = (
     "Trim the rule(s) above",
 )
 
+# Sub-classes of a local-gate denial, in SAFETY order (not frequency order). Only
+# "doc-staleness" is mechanically remediable, so a blob that also names the ADR hook
+# or the rules byte budget must resolve to the class a human has to clear. Each
+# discriminator is a member of _LOCAL_GATE_MARKERS above: this reuses the hook
+# protocol already declared there and adds no new hook/harness contract.
+_GATE_CLASSES = (
+    ("adr", "pre-push-adr-hook:"),
+    ("byte-budget", "Trim the rule(s) above"),
+    ("doc-staleness", "Bump last_verified"),
+)
+
+
+def classify_local_gate_denial(detail: str) -> str:
+    """Sub-classify a HarnessError("local-gate", detail) by which hook denied it.
+
+    Returns "adr", "byte-budget", "doc-staleness", or "unknown".
+
+    "One or more checks failed:" is deliberately NOT a discriminator. It is a generic
+    summary line that names no remediable cause, and bin/pre-commit-hook's other
+    failure arms ("Fix the above doc issues before committing.", the gofmt arm) carry
+    no marker at all -- commit_all() raises "local-gate" on ANY non-zero commit exit,
+    so those reach here too and must land in "unknown", which is fail-closed.
+    """
+    blob = detail or ""
+    for name, marker in _GATE_CLASSES:
+        if marker in blob:
+            return name
+    return "unknown"
+
 
 @dataclass(frozen=True)
 class StackedRebaseResult:

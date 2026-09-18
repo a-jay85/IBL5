@@ -182,6 +182,64 @@ def test_ordinary_git_failure_stays_kind_git(monkeypatch):
     assert e.value.kind == "git"
 
 
+_DOC_STALE_DETAIL = (
+    ".claude/rules/example.md: body changed but last_verified not bumped (still 2026-09-01)\n"
+    "\n"
+    "Bump last_verified on the doc(s) above (and confirm the content is\n"
+    "still accurate) before committing."
+)
+_BYTE_BUDGET_DETAIL = (
+    "FAIL  .claude/rules/x.md  16374 bytes  cap 16000\n"
+    "One or more checks failed:\n"
+    "\n"
+    "Trim the rule(s) above (or move detail into a path-scoped *-detail.md\n"
+    "companion) before committing."
+)
+_ADR_DETAIL = "pre-push-adr-hook: a decision-trigger surface is being pushed without an ADR."
+
+
+def test_classify_names_each_hook_class():
+    assert gitad.classify_local_gate_denial(_ADR_DETAIL) == "adr"
+    assert gitad.classify_local_gate_denial(_BYTE_BUDGET_DETAIL) == "byte-budget"
+    assert gitad.classify_local_gate_denial(_DOC_STALE_DETAIL) == "doc-staleness"
+
+
+@pytest.mark.parametrize("detail", [
+    "",
+    "One or more checks failed:\n",                     # generic summary, no cause named
+    "Fix the above doc issues before committing.",      # check-docs --no-staleness arm
+    "gofmt: unformatted Go files (run gofmt -w):\nmain.go",
+    "Author identity unknown\n\n*** Please tell me who you are.",
+    "nothing to commit, working tree clean",
+])
+def test_classify_unrecognised_denials_are_unknown(detail):
+    """Fail-closed default. commit_all() raises local-gate on ANY non-zero commit
+    exit, so non-hook git failures arrive here and must NOT reach remediation."""
+    assert gitad.classify_local_gate_denial(detail) == "unknown"
+
+
+def test_classify_precedence_is_fail_closed():
+    """A blob naming two classes resolves to the one a human must clear."""
+    assert gitad.classify_local_gate_denial(_DOC_STALE_DETAIL + "\n" + _ADR_DETAIL) == "adr"
+    assert gitad.classify_local_gate_denial(
+        _DOC_STALE_DETAIL + "\n" + _BYTE_BUDGET_DETAIL) == "byte-budget"
+
+
+def test_class_discriminators_are_declared_hook_markers():
+    """Structural pin: classification reuses the hook protocol already enumerated in
+    _LOCAL_GATE_MARKERS. Inventing a new discriminator string fails this."""
+    for _name, marker in gitad._GATE_CLASSES:
+        assert marker in gitad._LOCAL_GATE_MARKERS
+
+
+def test_classify_degrades_to_unknown_when_marker_is_truncated_away():
+    """commit_all truncates at [:800] and the guidance line comes last. Losing it
+    must yield the fail-closed 'unknown', never a remediable class."""
+    long_blob = ("FAIL  .claude/rules/pad.md  16374 bytes  cap 16000\n" * 40)[:800]
+    assert "Trim the rule(s) above" not in long_blob
+    assert gitad.classify_local_gate_denial(long_blob) == "unknown"
+
+
 def test_diff_vs_base_non_utf8_bytes(repo):
     """Regression pin for UnicodeDecodeError: a file containing byte 0x9e must
     produce a str result (with U+FFFD replacements), not raise.

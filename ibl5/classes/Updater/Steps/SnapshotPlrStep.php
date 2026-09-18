@@ -18,6 +18,10 @@ use Updater\StepResult;
  * determined, 'mid-season' otherwise. This replaces the PLR snapshot logic
  * that was previously inside EndOfSeasonImportStep, adding mid-season support.
  *
+ * During the Playoffs phase it also writes a 'playoffs' snapshot. Offseason runs
+ * keep overwriting the season's 'mid-season' row, so 'playoffs' is the last
+ * snapshot of the season that nothing overwrites later.
+ *
  * IBL-only — Olympics league does not use this step.
  */
 final class SnapshotPlrStep implements PipelineStepInterface
@@ -27,6 +31,7 @@ final class SnapshotPlrStep implements PipelineStepInterface
         private readonly JsbImportRepositoryInterface $jsbRepo,
         private readonly int $seasonEndingYear,
         private readonly JsbSourceResolverInterface $sourceResolver,
+        private readonly string $seasonPhase,
     ) {
     }
 
@@ -42,21 +47,30 @@ final class SnapshotPlrStep implements PipelineStepInterface
             return StepResult::skipped($this->getLabel(), 'PLR file not found');
         }
 
-        $phase = $this->jsbRepo->hasChampionForSeason($this->seasonEndingYear)
-            ? 'end-of-season'
-            : 'mid-season';
+        $phases = [
+            $this->jsbRepo->hasChampionForSeason($this->seasonEndingYear)
+                ? 'end-of-season'
+                : 'mid-season',
+        ];
+        if ($this->seasonPhase === 'Playoffs') {
+            $phases[] = 'playoffs';
+        }
 
-        $result = $this->plrService->processPlrDataForYear(
-            $data,
-            $this->seasonEndingYear,
-            PlrImportMode::Snapshot,
-            $phase,
-            'current-season',
-        );
+        $details = [];
+        foreach ($phases as $phase) {
+            $result = $this->plrService->processPlrDataForYear(
+                $data,
+                $this->seasonEndingYear,
+                PlrImportMode::Snapshot,
+                $phase,
+                'current-season',
+            );
+            $details[] = $phase . ': ' . $result->summary();
+        }
 
         return StepResult::success(
             $this->getLabel(),
-            $phase . ': ' . $result->summary(),
+            implode('; ', $details),
         );
     }
 }

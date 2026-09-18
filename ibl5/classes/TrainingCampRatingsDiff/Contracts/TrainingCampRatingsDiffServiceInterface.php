@@ -19,8 +19,9 @@ interface TrainingCampRatingsDiffServiceInterface
      * sorted lastname ASC.
      *
      * Baseline year is $overrideYear if provided, else currentSeasonEndingYear − 1.
-     * Baseline phase for that year is resolved via the repository (end-of-season →
-     * mid-season → null). Returns an empty array when no baseline phase is found.
+     * Baseline phase for that year is resolved via the repository (latest playoffs
+     * snapshot → end-of-season → mid-season → null). Returns an empty array when no
+     * baseline phase is found.
      *
      * @return list<RatingRow>
      */

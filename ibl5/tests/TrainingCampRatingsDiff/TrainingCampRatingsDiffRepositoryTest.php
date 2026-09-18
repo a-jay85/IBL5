@@ -23,7 +23,7 @@ class TrainingCampRatingsDiffRepositoryTest extends TestCase
 
     public function testGetBaselinePhaseReturnsNullWhenNoSnapshotsExist(): void
     {
-        $this->mockDb->onQuery('SELECT snapshot_phase FROM', []);
+        $this->mockDb->onQuery('AS phase_rank', []);
         $repository = new TrainingCampRatingsDiffRepository($this->mockDb);
 
         $result = $repository->getBaselinePhase(2024);
@@ -33,7 +33,7 @@ class TrainingCampRatingsDiffRepositoryTest extends TestCase
 
     public function testGetBaselinePhaseReturnsEndOfSeasonWhenAvailable(): void
     {
-        $this->mockDb->onQuery('SELECT snapshot_phase FROM', [['snapshot_phase' => 'end-of-season']]);
+        $this->mockDb->onQuery('AS phase_rank', [['snapshot_phase' => 'end-of-season']]);
         $repository = new TrainingCampRatingsDiffRepository($this->mockDb);
 
         $result = $repository->getBaselinePhase(2024);
@@ -43,7 +43,7 @@ class TrainingCampRatingsDiffRepositoryTest extends TestCase
 
     public function testGetBaselinePhaseReturnsMidSeasonWhenOnlyMidSeasonAvailable(): void
     {
-        $this->mockDb->onQuery('SELECT snapshot_phase FROM', [['snapshot_phase' => 'mid-season']]);
+        $this->mockDb->onQuery('AS phase_rank', [['snapshot_phase' => 'mid-season']]);
         $repository = new TrainingCampRatingsDiffRepository($this->mockDb);
 
         $result = $repository->getBaselinePhase(2024);
@@ -53,7 +53,7 @@ class TrainingCampRatingsDiffRepositoryTest extends TestCase
 
     public function testGetBaselinePhaseReturnsNullForNullSnapshotPhaseColumn(): void
     {
-        $this->mockDb->onQuery('SELECT snapshot_phase FROM', [['snapshot_phase' => null]]);
+        $this->mockDb->onQuery('AS phase_rank', [['snapshot_phase' => null]]);
         $repository = new TrainingCampRatingsDiffRepository($this->mockDb);
 
         $result = $repository->getBaselinePhase(2024);

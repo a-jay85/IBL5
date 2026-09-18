@@ -10,8 +10,8 @@ use TrainingCampRatingsDiff\Contracts\TrainingCampRatingsDiffRepositoryInterface
  * TrainingCampRatingsDiffService — computes per-player rating deltas against a prior-season snapshot.
  *
  * Baseline year: $overrideYear if supplied, else currentSeasonEndingYear − 1.
- * Baseline phase for that year: 'end-of-season' if rows exist, else 'mid-season' if rows
- * exist, else null (no baseline). Never falls back to a different year.
+ * Baseline phase for that year: the latest playoffs snapshot, else 'end-of-season',
+ * else 'mid-season', else null (no baseline). Never falls back to a different year.
  *
  * Column name notes (migration 113):
  *   - `do`  → r_drive_off (drive offense rating)

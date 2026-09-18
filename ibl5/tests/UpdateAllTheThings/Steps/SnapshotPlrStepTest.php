@@ -35,6 +35,7 @@ class SnapshotPlrStepTest extends TestCase
             $this->stubJsbRepo,
             2026,
             $this->stubResolver,
+            'Regular Season',
         );
     }
 
@@ -74,7 +75,7 @@ class SnapshotPlrStepTest extends TestCase
             )
             ->willReturn($plrResult);
 
-        $step = new SnapshotPlrStep($mockPlrService, $this->stubJsbRepo, 2026, $this->stubResolver);
+        $step = new SnapshotPlrStep($mockPlrService, $this->stubJsbRepo, 2026, $this->stubResolver, 'Regular Season');
         $result = $step->execute();
 
         $this->assertTrue($result->success);
@@ -102,11 +103,36 @@ class SnapshotPlrStepTest extends TestCase
             )
             ->willReturn($plrResult);
 
-        $step = new SnapshotPlrStep($mockPlrService, $this->stubJsbRepo, 2026, $this->stubResolver);
+        $step = new SnapshotPlrStep($mockPlrService, $this->stubJsbRepo, 2026, $this->stubResolver, 'Regular Season');
         $result = $step->execute();
 
         $this->assertTrue($result->success);
         $this->assertStringContainsString('mid-season', $result->detail);
+    }
+
+    public function testAlsoWritesPlayoffsSnapshotDuringPlayoffs(): void
+    {
+        $this->stubResolver->method('getContents')->willReturn('plr-bytes');
+        $this->stubJsbRepo->method('hasChampionForSeason')->willReturn(false);
+
+        /** @var list<?string> $phases */
+        $phases = [];
+        /** @var PlrParserServiceInterface&\PHPUnit\Framework\MockObject\MockObject */
+        $mockPlrService = $this->createMock(PlrParserServiceInterface::class);
+        $mockPlrService->expects($this->exactly(2))
+            ->method('processPlrDataForYear')
+            ->willReturnCallback(static function (string $data, int $year, PlrImportMode $mode, ?string $phase) use (&$phases): PlrParseResult {
+                $phases[] = $phase;
+                return new PlrParseResult();
+            });
+
+        $step = new SnapshotPlrStep($mockPlrService, $this->stubJsbRepo, 2026, $this->stubResolver, 'Playoffs');
+        $result = $step->execute();
+
+        $this->assertTrue($result->success);
+        $this->assertSame(['mid-season', 'playoffs'], $phases);
+        $this->assertStringContainsString('mid-season: ', $result->detail);
+        $this->assertStringContainsString('; playoffs: ', $result->detail);
     }
 
     public function testReturnsSuccessWithResultSummary(): void

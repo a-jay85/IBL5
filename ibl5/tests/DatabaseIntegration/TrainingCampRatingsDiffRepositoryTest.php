@@ -116,6 +116,33 @@ class TrainingCampRatingsDiffRepositoryTest extends DatabaseTestCase
         self::assertSame('end-of-season', $result);
     }
 
+    public function test_it_prefers_playoffs_over_end_of_season(): void
+    {
+        $this->insertTestPlayer(200_000_004, 'Player Four', ['teamid' => 1, 'retired' => 0]);
+        $this->insertSnapshot(200_000_004, 8103, 'end-of-season');
+        $this->insertSnapshot(200_000_004, 8103, 'playoffs');
+        $this->insertSnapshot(200_000_004, 8103, 'mid-season');
+
+        $result = $this->repo->getBaselinePhase(8103);
+
+        self::assertSame('playoffs', $result);
+    }
+
+    public function test_it_prefers_the_latest_archive_playoffs_round(): void
+    {
+        $this->insertTestPlayer(200_000_005, 'Player Five', ['teamid' => 1, 'retired' => 0]);
+        $this->insertSnapshot(200_000_005, 8104, 'playoffs-rd1-gm4-7');
+        $this->insertSnapshot(200_000_005, 8104, 'finals');
+        $this->insertSnapshot(200_000_005, 8104, 'conf-finals-gm1-3');
+        $this->insertSnapshot(200_000_005, 8104, 'end-of-season');
+        $this->insertSnapshot(200_000_005, 8105, 'playoffs-rd1-gm4-7');
+        $this->insertSnapshot(200_000_005, 8105, 'conf-finals-gm1-3');
+        $this->insertSnapshot(200_000_005, 8105, 'playoffs-rd2-gm4-7');
+
+        self::assertSame('finals', $this->repo->getBaselinePhase(8104));
+        self::assertSame('conf-finals-gm1-3', $this->repo->getBaselinePhase(8105));
+    }
+
     // ---------------------------------------------------------------------------
     // getDiffRows()
     // ---------------------------------------------------------------------------

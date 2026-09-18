@@ -12,9 +12,10 @@ interface TrainingCampRatingsDiffRepositoryInterface
     /**
      * Returns the snapshot phase to use as the baseline for the given season year.
      *
-     * Returns 'end-of-season' if any snapshot rows exist for (year, 'end-of-season').
-     * Returns 'mid-season'   if no end-of-season rows exist but mid-season rows do.
-     * Returns null           if neither phase has rows for that year.
+     * Prefers the latest playoffs snapshot ('finals', 'playoffs', then the conf-finals
+     * and playoffs-rd* archive phases, latest round first). Falls back to
+     * 'end-of-season', then 'mid-season'. Returns null if none of those phases has
+     * rows for that year.
      *
      * Never falls back to a different year.
      */

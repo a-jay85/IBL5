@@ -600,14 +600,29 @@ if [ "$ALL" = true ]; then
             [ -z "$project" ] && continue
             # Skip main stack
             [ "$project" = "ibl5" ] && continue
-            # Only process worktree projects (ibl5-* prefix)
-            [[ "$project" == ibl5-* ]] || continue
 
-            slug="${project#ibl5-}"
-
-            # Check if slug matches any active worktree
-            if echo "$active_slugs" | tr ' ' '\n' | grep -qx "$slug" 2>/dev/null; then
-                continue
+            # Process ibl5-* worktree stacks; also catch non-prefixed projects whose
+            # compose working_dir is under WT_PARENT but no longer exists on disk
+            # (e.g. a CI compose file run from inside a worktree without -p).
+            if [[ "$project" == ibl5-* ]]; then
+                slug="${project#ibl5-}"
+                # Skip if slug belongs to an active worktree
+                if echo "$active_slugs" | tr ' ' '\n' | grep -qx "$slug" 2>/dev/null; then
+                    continue
+                fi
+            else
+                # Non-ibl5-* project: only sweep if it was an orphaned IBL5 worktree stack.
+                # Read working_dir from one container in the project; skip if the path
+                # is not under WT_PARENT or still exists on disk.
+                _wd=$(docker ps -a \
+                    --filter "label=com.docker.compose.project=$project" \
+                    --format '{{.Label "com.docker.compose.project.working_dir"}}' \
+                    | head -1)
+                if [[ "$_wd" == "$WT_PARENT/"* ]] && [ ! -d "$_wd" ]; then
+                    :  # ex-IBL5 worktree stack, directory gone — proceed to teardown
+                else
+                    continue
+                fi
             fi
 
             if [ "$DRY_RUN" = true ]; then
@@ -734,7 +749,43 @@ if [ "$ALL" = true ]; then
             --filter dangling=true \
             --filter label=com.docker.volume.anonymous)
 
-        # Fifth pass: reclaim unused build cache. Deliberately NOT `-a`:
+        # Fifth pass: sweep stopped containers with no compose-project label
+        # older than STALE_CONTAINER_DAYS days. These are hand-run containers
+        # (e.g. docker run alpine/socat ...) that outlived their worktree.
+        # C3: never running (status filter). C4: any compose label skips (covers ibl5).
+        # C5: dry-run non-destructive. C6: explicit-ID removal only.
+        STALE_CONTAINER_DAYS=30
+        _cutoff=$(date -v-${STALE_CONTAINER_DAYS}d +%s 2>/dev/null \
+            || date -d "${STALE_CONTAINER_DAYS} days ago" +%s)
+        while IFS= read -r _line; do
+            _proj="${_line%%$'\t'*}"
+            _rest="${_line#*$'\t'}"
+            _cid="${_rest%%$'\t'*}"
+            _cname="${_rest#*$'\t'}"
+            [ -n "$_proj" ] && continue    # has compose-project label — skip (covers C4)
+            [ -z "$_cid" ] && continue
+            _created=$(docker inspect --format '{{.Created}}' "$_cid" 2>/dev/null)
+            [ -z "$_created" ] && continue
+            # Cross-platform epoch: macOS date -j first, Linux date -d fallback
+            _epoch=$(date -j -f '%Y-%m-%dT%H:%M:%S' "${_created%%.*}" +%s 2>/dev/null \
+                || date -d "$_created" +%s 2>/dev/null)
+            [ -z "$_epoch" ] && continue
+            [ "$_epoch" -gt "$_cutoff" ] && continue    # too recent
+            if [ "$DRY_RUN" = true ]; then
+                echo "  WOULD remove stale unlabeled container: $_cname"
+            else
+                echo "  Removing stale unlabeled container: $_cname..."
+                docker rm "$_cid" 2>/dev/null || true
+            fi
+            CLEANED=$((CLEANED + 1))
+        done < <(docker ps -a \
+            --filter 'status=created' \
+            --filter 'status=exited' \
+            --filter 'status=dead' \
+            --no-trunc \
+            --format $'{{.Label "com.docker.compose.project"}}\t{{.ID}}\t{{.Names}}')
+
+        # Sixth pass: reclaim unused build cache. Deliberately NOT `-a`:
         # plain `prune` drops only cache not referenced by an existing image,
         # leaving warm layers so the next bin/wt-up stays fast. `-a` would
         # nuke everything and make the next worktree build slow from scratch.

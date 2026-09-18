@@ -501,6 +501,19 @@ want    "a failing adopted plan reports an attempt" "$out" "RESULT degraded (rec
 want    "a failing adopted plan is not queued"      "$out" "NOT queued"
 want_no "leg B claims no draft it never had"        "$out" "The draft is kept at"
 
+# ── staleness gate: check-plan can pass on a plan whose paths are dead ─────────
+# The guard's other callers live inside the automouse implementation run, which a
+# queued plan reaches only AFTER queueing — so the job must refuse it here.
+STALE_PLAN="$TMP/stale.plan.md"
+cp "$GOOD_PLAN" "$STALE_PLAN"
+printf '\nThe sweep also touches `ibl5/classes/AbsentPlanNowPath.php` in passing.\n' \
+    >> "$STALE_PLAN"
+
+out=$(STUB_PLAN_SRC="$STALE_PLAN" DISP=--queue run_case "$P" "PLAN_FILE: $P")
+want    "a stale-path plan is named in the log"   "$out" "check-plan-staleness FAILED"
+want    "a stale-path plan is not queued"         "$out" "NOT queued"
+want_no "a stale-path plan never reaches queue"   "$out" "queued for automouse"
+
 echo "── the finish DM: every terminal outcome pings, and says what to do next ──"
 
 # The reason this section exists: `claude -p` does not stream, so $LOG is empty

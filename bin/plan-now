@@ -276,7 +276,7 @@ cp "$PROMPT_SRC" "$PROMPT"
 # inside the run would bypass that gate. The two lines differ only in what the plan
 # author needs to know about where the plan lands.
 if [ "$DISPOSITION" = "queue" ]; then
-    DISPOSITION_LINE="Disposition: **--queue** (the default). Write the plan and stop — do NOT run \`bin/automouse/queue\` yourself. This job queues it for automouse automatically, but ONLY if you exit cleanly AND \`bin/check-plan\` passes on your plan. So a plan that does not pass simply never runs: fix everything \`check-plan\` reports before you finish. Automouse will implement this plan unattended and open its PR — write it to be executed, not to be skimmed."
+    DISPOSITION_LINE="Disposition: **--queue** (the default). Write the plan and stop — do NOT run \`bin/automouse/queue\` yourself. This job queues it for automouse automatically, but ONLY if you exit cleanly AND both \`bin/check-plan\` and \`bin/check-plan-staleness\` pass on your plan. So a plan that does not pass simply never runs: fix everything they report before you finish — a \`STALE:\` token means the plan cites a path that does not exist on master. Automouse will implement this plan unattended and open its PR — write it to be executed, not to be skimmed."
 else
     DISPOSITION_LINE="Disposition: **--implement**. Write the plan and stop — do NOT run \`bin/automouse/queue\`. The plan stays on disk at \`~/claude-plans/<slug>.md\` and a human reviews it before it implements."
 fi
@@ -313,8 +313,10 @@ conflicting default in the skill):**
   the plan's Approach section**, and set \`auto_merge: false\` in the line-1
   frontmatter. \`auto_merge: false\` requires an \`## Automouse Hold Justification\`
   section naming the unresolved fork, or \`bin/check-plan\` gate [H] fails.
-- Before finishing, run \`bin/check-plan ~/claude-plans/<slug>.md\` and fix
-  everything it reports. This job re-runs it after you exit and logs the verdict.
+- Before finishing, run \`bin/check-plan ~/claude-plans/<slug>.md\` and then
+  \`bin/check-plan-staleness\` on the same file, and fix everything they report.
+  This job re-runs both after you exit and logs the verdict; a plan that fails
+  either one is never queued. Step 5 of the skill has the remediation table.
 - **Run every sub-agent in the FOREGROUND.** Never spawn the plan-architect (or any
   other \`Agent\`) with \`run_in_background: true\`, and never start a long task, end
   your turn, and expect to collect it afterwards. Under \`claude -p\` there is no
@@ -358,6 +360,7 @@ REVIEW_ROUTE_DEFAULT=$(grep -oE "'/discordPlanReviewDM'" \
     printf 'NOTIFY=%q\n'         "$NOTIFY"
     printf 'TIER_OVERRIDE=%q\n'  "${TIER_OK_REASON:-}"
     printf 'CHECK_PLAN=%q\n' "$ROOT/bin/check-plan"
+    printf 'CHECK_PLAN_STALENESS=%q\n' "$ROOT/bin/check-plan-staleness"
     # PLAN_NOW_CLAUDE / PLAN_NOW_AUTOMOUSE_QUEUE / PLAN_NOW_DISCORD_DM let a smoke
     # test stub the model call, the queue call and the DM, and so exercise the
     # detection + check-plan + notify half of the runner (same shape as
@@ -554,7 +557,16 @@ elif [ -n "$plan" ]; then
         # an unidentifiable plan, a FAILED check-plan — falls through to a human
         # instead, which is what makes queue-by-default tolerable (ADR-0096).
         if [ "$DISPOSITION" = "queue" ]; then
-            if "$AUTOMOUSE_QUEUE" "$plan"; then
+            # check-plan does not check path liveness. A plan citing a path that does
+            # not exist on master poison-pills the automouse run: all three nightly
+            # attempts are spent before a human sees it. The guard's STALE: lines go
+            # to this log deliberately. Exit 2 (usage/path error) is treated as a
+            # failure too — fail safe, leave it for a human.
+            if ! "$CHECK_PLAN_STALENESS" "$plan"; then
+                echo "plan-now: WARNING — check-plan passed but check-plan-staleness FAILED; the plan cites a path that does not exist on master. On disk, NOT queued."
+                DM_ICON="⚠️"; DM_VERDICT="ok — check-plan PASSED, but check-plan-staleness FAILED"
+                DM_NEXT="NOT queued, needs you"
+            elif "$AUTOMOUSE_QUEUE" "$plan"; then
                 echo "plan-now: queued for automouse — it will implement this plan and open its PR."
                 echo "plan-now: to pull it back out: bin/automouse/queue remove $(basename "${plan%.md}")"
                 DM_NEXT="queued for automouse"
@@ -694,7 +706,11 @@ else
                 rm -f "$recovery_source"
             fi
             if [ "$DISPOSITION" = "queue" ]; then
-                if "$AUTOMOUSE_QUEUE" "$recovered"; then
+                if ! "$CHECK_PLAN_STALENESS" "$recovered"; then
+                    echo "plan-now: WARNING — check-plan passed but check-plan-staleness FAILED; the recovered plan cites a path that does not exist on master. On disk, NOT queued."
+                    DM_VERDICT="degraded (recovered) — check-plan PASSED, but check-plan-staleness FAILED"
+                    DM_NEXT="NOT queued, needs you"
+                elif "$AUTOMOUSE_QUEUE" "$recovered"; then
                     echo "plan-now: queued for automouse (recovered plan) — it will implement this plan and open its PR."
                     echo "plan-now: to pull it back out: bin/automouse/queue remove $(basename "${recovered%.md}")"
                     DM_NEXT="queued for automouse"

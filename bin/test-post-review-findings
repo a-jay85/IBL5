@@ -254,6 +254,37 @@ assert_jq       "case3: review count 1"  '.comments | length == 1'   "$REVIEW_OU
 assert_jq       "case3: inline line 12"  '.comments[0].line == 12'   "$REVIEW_OUT"
 assert_contains "case3: fallback Bug Off" "$COMMENT_OUT" "Bug Off"
 
+# ── case 3b: line-less finding (line 0) → file-level fallback comment ─────────
+# A whole-file finding carries the line:0 sentinel.  GitHub rejects line 0 on the
+# reviews endpoint, so it must never reach $REVIEW_OUT; it must land in the
+# fallback comment WITH its file name, which the reader needs to act on it.
+reset_outputs
+f3b="$BASE_TMP/f3b.json"
+printf '[{"path":"classes/Whole.php","line":0,"body":"Bug Whole — file-level","score":88}]' > "$f3b"
+post_review_findings 42 deadbeefcafe "Code review" "$f3b"
+
+assert_absent   "case3b: no review POST"      "$REVIEW_OUT"
+assert_contains "case3b: heading"             "$COMMENT_OUT" "### Code review"
+assert_contains "case3b: names the file"      "$COMMENT_OUT" "classes/Whole.php"
+assert_contains "case3b: body present"        "$COMMENT_OUT" "Bug Whole"
+assert_contains "case3b: score marker 88"     "$COMMENT_OUT" "<!-- score: 88 -->"
+assert_contains "case3b: whole-file group"    "$COMMENT_OUT" "Whole-file findings"
+assert_not_contains "case3b: no line-0 anchor" "$COMMENT_OUT" "classes/Whole.php:0"
+
+# ── case 3c: mixed — on-diff, out-of-diff, and file-level in one call ─────────
+reset_outputs
+f3c="$BASE_TMP/f3c.json"
+printf '[{"path":"classes/Foo.php","line":12,"body":"Bug On","score":80},{"path":"classes/Foo.php","line":999,"body":"Bug Far","score":81},{"path":"classes/Whole.php","line":0,"body":"Bug Whole","score":82}]' > "$f3c"
+post_review_findings 42 deadbeefcafe "Code review" "$f3c"
+
+assert_jq       "case3c: review count 1"   '.comments | length == 1'                "$REVIEW_OUT"
+assert_jq       "case3c: inline line 12"   '.comments[0].line == 12'                "$REVIEW_OUT"
+assert_jq       "case3c: no zero anchor"   'all(.comments[]; .line != 0)'           "$REVIEW_OUT"
+assert_contains "case3c: fallback count 2" "$COMMENT_OUT" "Found 2 issue(s)"
+assert_contains "case3c: file-level named" "$COMMENT_OUT" "classes/Whole.php"
+assert_contains "case3c: out-of-diff anchor" "$COMMENT_OUT" "classes/Foo.php:999"
+assert_not_contains "case3c: on-diff not duplicated" "$COMMENT_OUT" "Bug On"
+
 # ── case 4: no-issues path ───────────────────────────────────────────────────
 # Expect: $COMMENT_OUT with heading + body + footer; $REVIEW_OUT absent.
 reset_outputs

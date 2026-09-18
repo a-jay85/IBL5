@@ -264,7 +264,7 @@ try {
     // IBL-only: snapshot player stats + refresh materialized ibl_hist table
     if (!$isOlympics) {
         $updaterService->addStep(new Updater\Steps\SnapshotPlrStep(
-            $plrService, $jsbRepo, $season->endingYear, $sourceResolver,
+            $plrService, $jsbRepo, $season->endingYear, $sourceResolver, $season->phase,
         ));
         $updaterService->addStep(new Updater\Steps\RefreshIblHistStep($mysqli_db));
         $updaterService->addStep(new Updater\Steps\QueueSimSummaryStep(

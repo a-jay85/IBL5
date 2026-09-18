@@ -19,14 +19,27 @@ class TrainingCampRatingsDiffRepository extends BaseMysqliRepository implements 
 {
     /**
      * @see TrainingCampRatingsDiffRepositoryInterface::getBaselinePhase()
+     *
+     * The FIELD() list is the preference order: the latest playoffs snapshot first,
+     * then the end-of-season and mid-season fallbacks. 'end-of-season' ranks below
+     * the playoffs phases because it can hold offseason/preseason ratings. The
+     * archive-named phases come from bulk imports; 'playoffs' comes from the live
+     * updater (SnapshotPlrStep) or a bulk import of {season}_{NN}_playoffs archives.
      */
     public function getBaselinePhase(int $seasonYear): ?string
     {
         $row = $this->fetchOne(
-            "SELECT snapshot_phase FROM `ibl_plr_snapshots`
+            "SELECT snapshot_phase,
+                    FIELD(snapshot_phase,
+                          'finals', 'playoffs',
+                          'conf-finals-gm4-7', 'conf-finals-gm1-3',
+                          'playoffs-rd2-gm4-7', 'playoffs-rd2-gm1-3',
+                          'playoffs-rd1-gm4-7', 'playoffs-rd1-gm1-3',
+                          'end-of-season', 'mid-season') AS phase_rank
+               FROM `ibl_plr_snapshots`
               WHERE season_year = ?
-                AND snapshot_phase IN ('end-of-season','mid-season')
-              ORDER BY snapshot_phase = 'end-of-season' DESC
+             HAVING phase_rank > 0
+              ORDER BY phase_rank
               LIMIT 1",
             'i',
             $seasonYear,

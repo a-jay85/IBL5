@@ -83,8 +83,10 @@
     --accent-800: var(--color-accent-800);
     --success-400: var(--color-success-400);
     --success-700: var(--color-success-700);
+    --success-900: var(--color-success-900);
     --error-400: var(--color-error-400);
     --error-700: var(--color-error-700);
+    --error-900: var(--color-error-900);
 
     /* Discord brand */
     --discord: var(--color-discord);

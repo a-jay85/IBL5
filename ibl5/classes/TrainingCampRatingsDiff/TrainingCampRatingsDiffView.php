@@ -59,7 +59,7 @@ class TrainingCampRatingsDiffView implements TrainingCampRatingsDiffViewInterfac
         if ($baselineYear === null || $rows === []) {
             return '<div class="ratings-diff-page">'
                 . '<h1 class="ibl-title">Training Camp Ratings Diff</h1>'
-                . '<div class="ibl-card"><p>No prior-season baseline found. This page is meaningful after at least one <code>end-of-season</code> snapshot has been captured.</p></div></div>';
+                . '<div class="ibl-card"><p>No prior-season baseline found. This page is meaningful after a playoffs or end-of-season snapshot has been captured for last season.</p></div></div>';
         }
 
         return '<div class="ratings-diff-page">'
@@ -87,7 +87,7 @@ class TrainingCampRatingsDiffView implements TrainingCampRatingsDiffViewInterfac
             }
         }
 
-        $html  = '<p>Live player ratings vs their end-of-season ratings from '
+        $html  = '<p>Live player ratings vs their last playoffs ratings from '
             . HtmlSanitizer::e($baselineYear)
             . '. Sorted by largest single rating change.</p>';
         $html .= $this->renderStatusFilter($filterStatus);

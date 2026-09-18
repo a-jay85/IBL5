@@ -15,11 +15,17 @@
     font-size: var(--text-sm);
     font-weight: 600;
   }
+  /* The 900 steps, not 600: .delta sits inside .rating-cell--up/--down, whose tint
+     alpha (--di) is set per-cell by TrainingCampRatingsDiffView::intensityStyle()
+     and reaches 0.40. At that alpha --success-600 measures 2.06:1 and --error-600
+     2.55:1 against the tinted cell — both below the WCAG AA 4.5:1 floor for normal
+     text. The 900 steps hold 5.71:1 / 5.30:1 at the worst alpha over both the white
+     and --gray-50 row stripes. */
   .ratings-diff-table .delta-up {
-    color: var(--success-600);
+    color: var(--success-900);
   }
   .ratings-diff-table .delta-down {
-    color: var(--error-600);
+    color: var(--error-900);
   }
   .ratings-diff-table .delta-zero {
     color: var(--gray-500);

@@ -219,7 +219,7 @@ export const VR_MANIFEST: VrRow[] = [
     viewports: ['desktop', 'mobile'] },
   { name: 'training-camp-ratings-diff', auth: 'auth', url: 'modules.php?name=TrainingCampRatingsDiff',
     anchor: '.ratings-diff-page', viewports: ['desktop', 'mobile'],
-    notes: 'Admin-only; renders empty state unless ratings snapshot exists.' },
+    notes: 'Admin-only; renders the diff table against the CI seed 2025 finals snapshot.' },
   { name: 'voting', auth: 'auth', url: 'modules.php?name=Voting',
     anchor: '.voting-form-container', viewports: ['desktop', 'mobile'],
     states: [

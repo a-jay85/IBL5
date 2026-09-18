@@ -361,7 +361,7 @@ abstract class PipelineIntegrationTestCase extends DatabaseTestCase
         ));
 
         $service->addStep(new Steps\SnapshotPlrStep(
-            $plrService, $jsbRepo, $season->endingYear, $jsbFileResolver,
+            $plrService, $jsbRepo, $season->endingYear, $jsbFileResolver, $season->phase,
         ));
 
         $service->addStep(new Steps\RefreshIblHistStep($this->db));

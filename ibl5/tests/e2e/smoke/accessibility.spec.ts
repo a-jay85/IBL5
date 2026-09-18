@@ -54,6 +54,11 @@ const KNOWN_FAILING: Record<string, Set<string>> = {
     'gm contact list',
     'draft',
     'next sim',
+    // TrainingCampRatingsDiff renders team-color cells via TeamCellHelper. The page's own
+    // .delta contrast is FIXED in design/components/ratings-diff.css (900 steps), not
+    // allowlisted — the residue here is the same DB-configured team-color debt as
+    // 'league starters' / 'season leaderboards' above.
+    'training camp ratings diff',
     // Legacy admin page — PHP-Nuke palette debt. See a-jay85/IBL5-backlog (label: a11y).
     'league control panel',
   ]),

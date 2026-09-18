@@ -10,8 +10,8 @@ use TrainingCampRatingsDiff\Contracts\TrainingCampRatingsDiffRepositoryInterface
  * TrainingCampRatingsDiffService — computes per-player rating deltas against a prior-season snapshot.
  *
  * Baseline year: $overrideYear if supplied, else currentSeasonEndingYear − 1.
- * Baseline phase for that year: 'end-of-season' if rows exist, else 'mid-season' if rows
- * exist, else null (no baseline). Never falls back to a different year.
+ * Baseline phase for that year: the latest playoffs snapshot, else 'end-of-season',
+ * else 'mid-season', else null (no baseline). Never falls back to a different year.
  *
  * Column name notes (migration 113):
  *   - `do`  → r_drive_off (drive offense rating)
@@ -74,10 +74,18 @@ class TrainingCampRatingsDiffService implements Contracts\TrainingCampRatingsDif
             if ($a->sumAbsDelta !== $b->sumAbsDelta) {
                 return $b->sumAbsDelta - $a->sumAbsDelta;
             }
-            return strcmp($a->name, $b->name);
+            $byName = strcmp($a->name, $b->name);
+
+            return $byName !== 0 ? $byName : $a->pid <=> $b->pid;
         });
 
-        usort($newRows, static fn (RatingRow $a, RatingRow $b): int => strcmp($a->name, $b->name));
+        // pid breaks name ties so row order is a total order — the visual-regression
+        // baseline for this page would otherwise shift whenever two players share a name.
+        usort($newRows, static function (RatingRow $a, RatingRow $b): int {
+            $byName = strcmp($a->name, $b->name);
+
+            return $byName !== 0 ? $byName : $a->pid <=> $b->pid;
+        });
 
         return array_values(array_merge($realRows, $newRows));
     }

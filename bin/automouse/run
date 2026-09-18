@@ -1063,6 +1063,22 @@ dispose_plan_done() {
     echo "Loop-side disposition ($site): PR $pr_state ($pr_url) — moved $plan_name to done/." >> "$LOG"
 }
 
+# Print the newest Phase 5.5 fidelity verdict file for PR $1 (empty when none exist).
+# Newest wins: Phase 5.5 writes `-<N>.md` on first review and an ADDITIONAL `-<N>-2.md`
+# on re-review; it never rewrites verdict 1
+# (`.claude/skills/post-plan/_phase-5.5-fidelity.md` lines 27 and 150). A re-reviewed PR
+# can carry a stale base file beside a fresh `-2`, so the base name alone is not enough.
+#
+# Always returns 0. `ls` exits non-zero whenever one of its patterns matches nothing
+# (the usual case: a base file and no `-2`), and under the runner's `set -euo pipefail`
+# that failure inside `VAR=$(…)` killed the whole run silently (2026-09-18 00:34, 01:30).
+# $2 overrides the directory for tests.
+postplan_newest_verdict() {
+    local pr_num=$1 dir=${2:-/tmp}
+    ls -t "$dir/post-plan-fidelity-verdict-$pr_num.md" \
+        "$dir"/post-plan-fidelity-verdict-"$pr_num"-*.md 2>/dev/null | head -1 || true
+}
+
 # Was this phase killed by the per-phase wall clock (the `timeout` cap)?
 #
 # Narrow by construction. The exit status alone proves nothing: 143 is ALSO the
@@ -1933,14 +1949,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
                 # unreviewed. Filing it to done/ here is the silent-disposal defect.
                 PP_CAP=0
                 postplan_cap_timeout "$PP_STATUS" "$PP_DUR" "$REMAINING_SECS" && PP_CAP=1
-                # Newest verdict wins. Phase 5.5 writes `-<N>.md` on first review and an
-                # ADDITIONAL `-<N>-2.md` on re-review — it never rewrites verdict 1
-                # (`.claude/skills/post-plan/_phase-5.5-fidelity.md` lines 27 and 150). A
-                # re-reviewed PR can therefore carry a stale base file beside a fresh `-2`;
-                # testing the base name alone would hold a run whose review demonstrably ran.
-                PP_VERDICT_NEWEST=$(ls -t \
-                    "/tmp/post-plan-fidelity-verdict-$PP_PR_NUM.md" \
-                    /tmp/post-plan-fidelity-verdict-"$PP_PR_NUM"-*.md 2>/dev/null | head -1)
+                PP_VERDICT_NEWEST=$(postplan_newest_verdict "$PP_PR_NUM")
                 # Fail-closed: 1 means "treat as reviewed", i.e. today's behaviour.
                 # It only drops to 0 when we hold a usable freshness reference AND
                 # no verdict for this PR is newer than this phase's start marker.

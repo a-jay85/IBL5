@@ -356,6 +356,25 @@ def test_generated_cmd_carries_one_claude_invocation(tmp_path):
     assert "then execute every phase" in cmd
 
 
+def _rc3_gate(tmp_path, log_text=""):
+    """The generated gate chain with the claude call stubbed and $LOG repointed
+    at a fixture this test controls. Returns (gate_source, fixture_path)."""
+    cmd = _generate_cmd(tmp_path)
+    gate = cmd.split("rc=$?; ", 1)[1].split("; }; pp_rc=", 1)[0]
+    gate = re.sub(r'CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0.*?--name "[^"]*"',
+                  'echo "RAN-SKILL"', gate)
+    real_log = re.search(r"grep -m1 '\^RESULT:' \"([^\"]+)\"", gate).group(1)
+    fixture = tmp_path / "harness-run.log"
+    fixture.write_text(log_text)
+    gate = gate.replace(real_log, str(fixture))   # rewrites the grep AND the "See ..." suffix
+    return gate, fixture
+
+def _run_gate(gate, rc=3):
+    return subprocess.run(
+        ["bash", "-c", f'source "{PPN}" >/dev/null 2>&1; rc={rc}; {gate}'],
+        capture_output=True, text=True)
+
+
 def test_gate_selects_the_right_arm_per_rc(tmp_path):
     """Branch selection, exercised on the GENERATED chain with the claude call stubbed.
 
@@ -384,6 +403,117 @@ def test_gate_selects_the_right_arm_per_rc(tmp_path):
             assert "RAN-" not in r.stdout, f"rc={rc} must launch no session: {r.stdout!r}"
         if rc == 3:
             assert "fail-closed sentinel" in r.stdout, "rc=3 lost its notice"
+
+
+def test_generated_cmd_captures_the_harness_result_line(tmp_path):
+    cmd = _generate_cmd(tmp_path)
+    assert "HARNESS_RESULT=$(grep -m1 '^RESULT:'" in cmd
+    assert "HARNESS_RESULT=${HARNESS_RESULT:0:1400}" in cmd
+    assert (cmd.index("rc=$?; ") < cmd.index("HARNESS_RESULT=$(grep")
+            < cmd.index('if should_fallback "$rc"; then'))
+
+
+def test_skill_only_cmd_has_no_harness_result_capture(tmp_path):
+    cmd = _generate_cmd(tmp_path, extra_env={"POST_PLAN_SKILL": "1"})
+    # HARNESS_RESULT appears in the serialised badge function body in all paths;
+    # the negative path is that the *capture command* (POST_HARNESS_SEG) is absent.
+    assert "HARNESS_RESULT=$(grep" not in cmd
+
+
+_ADR_HOOK_RESULT_LINE = (
+    'RESULT: post-plan BLOCKED — local pre-commit/pre-push gate denied the commit;'
+    ' ERROR terminal=failed, no PR opened.'
+    ' local-gate: git push --force-with-lease origin HEAD:'
+    ' pre-push-adr-hook: a decision-trigger surface is being pushed without an ADR.'
+    ' Resolve with ONE of:'
+    ' 1. Add an ADR under ibl5/docs/decisions/ (run: bin/next-adr "kebab-title").'
+    ' 2. Add a bypass marker to a commit message on this branch (reason >=15 c…'
+    ' Clear the gate then re-run bin/post-plan-now.'
+)
+
+
+def test_exit3_message_names_the_specific_gate_denial(tmp_path):
+    gate, fixture = _rc3_gate(tmp_path, _ADR_HOOK_RESULT_LINE + "\n")
+    r = _run_gate(gate)
+    assert r.returncode == 0, r.stderr
+    assert "pre-push-adr-hook" in r.stdout
+    assert "bin/next-adr" in r.stdout
+    assert "fail-closed sentinel" in r.stdout
+    assert f"See {fixture}." in r.stdout
+    assert "RAN-" not in r.stdout
+
+
+def test_exit3_result_line_is_inert_data_not_shell(tmp_path):
+    # Use non-overlapping sentinel tokens so count() checks prove no execution.
+    # (PWNED / PWNED2 would overlap: "PWNED" appears in both, giving count == 2
+    # even when no command ran.)
+    log_text = 'RESULT: gate denied: run bin/next-adr "kebab-title" $(echo INJECT1) `echo INJECT2`\n'
+    gate, fixture = _rc3_gate(tmp_path, log_text)
+    r = _run_gate(gate)
+    assert r.returncode == 0, r.stderr
+    assert '$(echo INJECT1)' in r.stdout
+    assert '`echo INJECT2`' in r.stdout
+    assert r.stdout.count("INJECT1") == 1
+    assert r.stdout.count("INJECT2") == 1
+
+
+def test_exit3_message_falls_back_when_no_result_line(tmp_path):
+    for i, log_text in enumerate(["", "harness: starting\nharness: done\n"]):
+        sub = tmp_path / str(i)
+        sub.mkdir()
+        gate, fixture = _rc3_gate(sub, log_text)
+        r = _run_gate(gate)
+        assert r.returncode == 0, f"case {i}: {r.stderr!r}"
+        assert "rebase conflict" in r.stdout, f"case {i}: {r.stdout!r}"
+        assert "gate denial" in r.stdout, f"case {i}: {r.stdout!r}"
+        assert "fail-closed sentinel" in r.stdout, f"case {i}: {r.stdout!r}"
+        assert "Cause: ." not in r.stdout, f"case {i}: {r.stdout!r}"
+
+
+def test_exit3_message_stays_under_the_discord_cap_worst_case(tmp_path):
+    gate, fixture = _rc3_gate(tmp_path, "RESULT: " + "x" * 2000 + "\n")
+    r = _run_gate(gate)
+    assert r.returncode == 0, r.stderr
+    msg = r.stdout.rstrip("\n")
+    assert "x" * 1300 in msg and "x" * 1450 not in msg      # the 1400 cap fired
+    slug = re.search(r"on branch (.*?)\. SKIPPING", gate).group(1)
+    fixed = len(msg) - 1400 - len(slug) - len(str(fixture))
+    WORST_SLUG, WORST_LOG = 80, 120
+    assert fixed + 1400 + WORST_SLUG + WORST_LOG < 1900, (
+        "assembled rc=3 msg can exceed bin/discord-dm's 1900-char cap; "
+        f"fixed={fixed}")
+
+
+def test_badge_banner_rc3_carries_the_captured_result():
+    r = subprocess.run(["bash", "-c",
+        f'source "{PPN}" >/dev/null 2>&1; '
+        'HARNESS_RESULT="RESULT: pre-push-adr-hook denied the push"; '
+        'postplan_badge_banner_body 3 lbl "some time"'],
+        capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    assert "pre-push-adr-hook denied the push" in r.stdout
+
+
+def test_badge_banner_rc3_percent_is_safe_and_falls_back():
+    # (a) percent characters in RESULT must not cause printf format-string confusion
+    r = subprocess.run(["bash", "-c",
+        f'source "{PPN}" >/dev/null 2>&1; '
+        "HARNESS_RESULT='RESULT: 100% of gates %s %d denied'; "
+        'postplan_badge_banner_body 3 lbl "some time"'],
+        capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    assert "100% of gates %s %d denied" in r.stdout
+    assert "(null)" not in r.stdout
+
+    # (b) HARNESS_RESULT unset → fallback text names both causes
+    r2 = subprocess.run(["bash", "-c",
+        f'source "{PPN}" >/dev/null 2>&1; '
+        'unset HARNESS_RESULT; '
+        'postplan_badge_banner_body 3 lbl "some time"'],
+        capture_output=True, text=True)
+    assert r2.returncode == 0, r2.stderr
+    assert "rebase conflict" in r2.stdout
+    assert "gate denial" in r2.stdout
 
 
 def test_prompt_assignment_count_is_still_two():
@@ -1095,6 +1225,25 @@ def test_badge_banner_rc3_names_both_fail_closed_causes():
     body = line[0]
     assert "gate denial" in body and "rebase conflict" in body
     assert "`" not in body and "$(" not in body, "banner body is re-parsed via declare -f"
+
+
+def test_exit3_dm_and_echo_send_the_same_single_string():
+    """Pins the single-string invariant: echo and discord-dm both receive the same $msg,
+    assigned exactly once. Tests 3-6 rely on stdout as a valid proxy for the DM text."""
+    src = open(PPN).read()
+    line = [l for l in src.splitlines() if l.strip().startswith("GATE_CLOSE=\"; elif")]
+    assert len(line) == 1, f"expected one populated GATE_CLOSE, got {len(line)}"
+    body = line[0]
+    assert 'echo \\"\\$msg\\"' in body
+    assert '--quiet --attempts 2 \\"\\$msg\\"' in body
+    assert body.count("msg=") == 1
+
+
+def test_generated_cmd_is_syntactically_valid_bash(tmp_path):
+    cmd = _generate_cmd(tmp_path)
+    path = tmp_path / "cmd.sh"
+    path.write_text(cmd)
+    assert subprocess.run(["bash", "-n", str(path)]).returncode == 0
 
 
 def test_mint_failure_aborts_before_bootstrap(tmp_path):

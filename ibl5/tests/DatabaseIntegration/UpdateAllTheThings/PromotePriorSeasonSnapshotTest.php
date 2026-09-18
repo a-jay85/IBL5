@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\DatabaseIntegration\UpdateAllTheThings;
 
 use PHPUnit\Framework\Attributes\Group;
+use PlrParser\PlrParserRepository;
 use Tests\DatabaseIntegration\DatabaseTestCase;
 
 /**
@@ -142,5 +143,173 @@ class PromotePriorSeasonSnapshotTest extends DatabaseTestCase
         self::assertNotNull($row);
 
         return (int) $row['cnt'];
+    }
+
+    // ── Integration tests for promotePriorSeasonSnapshots() ───────────────
+
+    public function testPromotesMidSeasonRowsToEndOfSeason(): void
+    {
+        $this->seedSnapshot(202000001, 2008, 'mid-season');
+        $this->seedSnapshot(202000002, 2008, 'mid-season');
+        $this->seedSnapshot(202000003, 2008, 'mid-season');
+
+        $promoted = (new PlrParserRepository($this->db))->promotePriorSeasonSnapshots(2008);
+
+        self::assertSame(3, $promoted);
+        self::assertSame(3, $this->countSnapshotRows(2008, 'end-of-season'));
+        self::assertSame(3, $this->countSnapshotRows(2008, 'mid-season'));
+    }
+
+    public function testIsIdempotentAcrossRepeatedRuns(): void
+    {
+        $this->seedSnapshot(202000004, 2008, 'mid-season');
+        $this->seedSnapshot(202000005, 2008, 'mid-season');
+        $this->seedSnapshot(202000006, 2008, 'mid-season');
+
+        $repo = new PlrParserRepository($this->db);
+        $first  = $repo->promotePriorSeasonSnapshots(2008);
+        $second = $repo->promotePriorSeasonSnapshots(2008);
+
+        self::assertSame(3, $first);
+        self::assertSame(0, $second);
+        self::assertSame(3, $this->countSnapshotRows(2008, 'end-of-season'));
+    }
+
+    public function testNeverOverwritesAnExistingEndOfSeasonRow(): void
+    {
+        $this->seedSnapshot(202000007, 2008, 'end-of-season', ['ordinal' => 999]);
+        $this->seedSnapshot(202000007, 2008, 'mid-season');
+
+        $promoted = (new PlrParserRepository($this->db))->promotePriorSeasonSnapshots(2008);
+
+        self::assertSame(0, $promoted);
+
+        $stmt = $this->db->prepare(
+            'SELECT ordinal FROM ibl_plr_snapshots WHERE pid = ? AND season_year = ? AND snapshot_phase = ?'
+        );
+        self::assertNotFalse($stmt);
+        $pid   = 202000007;
+        $year  = 2008;
+        $phase = 'end-of-season';
+        $stmt->bind_param('iis', $pid, $year, $phase);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        self::assertNotNull($row);
+        self::assertSame(999, (int) $row['ordinal']);
+    }
+
+    public function testCopiesCreatedAtFromTheSourceRow(): void
+    {
+        $this->seedSnapshot(202000008, 2008, 'mid-season', ['created_at' => '2026-01-15 10:00:00']);
+
+        (new PlrParserRepository($this->db))->promotePriorSeasonSnapshots(2008);
+
+        $stmt = $this->db->prepare(
+            'SELECT created_at FROM ibl_plr_snapshots WHERE pid = ? AND season_year = ? AND snapshot_phase = ?'
+        );
+        self::assertNotFalse($stmt);
+        $pid   = 202000008;
+        $year  = 2008;
+        $phase = 'end-of-season';
+        $stmt->bind_param('iis', $pid, $year, $phase);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        self::assertNotNull($row);
+        self::assertSame('2026-01-15 10:00:00', $row['created_at']);
+    }
+
+    public function testDoesNotTouchOtherSeasons(): void
+    {
+        $this->seedSnapshot(202000009, 2007, 'mid-season');
+        $this->seedSnapshot(202000010, 2008, 'mid-season');
+        $this->seedSnapshot(202000011, 2009, 'mid-season');
+
+        (new PlrParserRepository($this->db))->promotePriorSeasonSnapshots(2008);
+
+        $stmt = $this->db->prepare(
+            "SELECT COUNT(*) AS cnt FROM ibl_plr_snapshots WHERE snapshot_phase = 'end-of-season' AND season_year != ?"
+        );
+        self::assertNotFalse($stmt);
+        $year = 2008;
+        $stmt->bind_param('i', $year);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        self::assertNotNull($row);
+        self::assertSame(0, (int) $row['cnt']);
+    }
+
+    public function testPromotedRowWinsTheIblHistRanking(): void
+    {
+        $this->seedSnapshot(202000012, 2008, 'mid-season', ['stats_gm' => 82, 'ordinal' => 50]);
+
+        (new PlrParserRepository($this->db))->promotePriorSeasonSnapshots(2008);
+
+        $stmt = $this->db->prepare(
+            "SELECT snap.snapshot_phase FROM (
+                SELECT s.*,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY s.pid, s.season_year
+                        ORDER BY
+                            s.stats_gm DESC,
+                            CASE s.snapshot_phase
+                                WHEN 'end-of-season'       THEN  1
+                                WHEN 'finals'              THEN  2
+                                WHEN 'post-heat'           THEN  3
+                                WHEN 'heat-finals'         THEN  4
+                                WHEN 'heat-end'            THEN  5
+                                WHEN 'playoffs-rd2-gm4-7'  THEN  6
+                                WHEN 'playoffs-rd2-gm1-3'  THEN  7
+                                WHEN 'playoffs-rd1-gm4-7'  THEN  8
+                                WHEN 'playoffs-rd1-gm1-3'  THEN  9
+                                WHEN 'conf-finals-gm4-7'   THEN 10
+                                WHEN 'conf-finals-gm1-3'   THEN 11
+                                WHEN 'heat-wb'             THEN 12
+                                WHEN 'heat-lb'             THEN 13
+                                ELSE 99
+                            END ASC,
+                            s.id DESC
+                    ) AS rn
+                FROM ibl_plr_snapshots s
+                WHERE s.stats_gm > 0
+                  AND s.pid = ?
+                  AND s.season_year = ?
+            ) snap
+            WHERE rn = 1"
+        );
+        self::assertNotFalse($stmt);
+        $pid  = 202000012;
+        $year = 2008;
+        $stmt->bind_param('ii', $pid, $year);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        self::assertNotNull($row);
+        self::assertSame('end-of-season', $row['snapshot_phase']);
+    }
+
+    // ── Helpers (integration tests) ───────────────────────────────────────
+
+    /**
+     * @param array<string, mixed> $overrides
+     */
+    private function seedSnapshot(int $pid, int $year, string $phase, array $overrides = []): void
+    {
+        $this->insertRow('ibl_plr_snapshots', array_merge([
+            'pid'            => $pid,
+            'name'           => 'Test Player',
+            'season_year'    => $year,
+            'snapshot_phase' => $phase,
+            'source_archive' => 'test',
+            'pos'            => 'PG',
+            'stats_gm'       => 1,
+            'ordinal'        => 1,
+        ], $overrides));
     }
 }

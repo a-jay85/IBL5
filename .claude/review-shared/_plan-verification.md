@@ -55,7 +55,7 @@ Each implementation phase that changes behavior must have a corresponding row (o
 
 | # | Environment | How to reach it | What it exercises |
 |---|-------------|-----------------|-------------------|
-| 1 | **Worktree Docker stack** | `<slug>.localhost` under `/ibl5/` — see `.claude/rules/worktree-hostname.md` | Anything the running app does: rendered pages, HTMX swaps, endpoints, DB state |
+| 1 | **Worktree Docker stack** | `<slug>.localhost` under `/ibl5/` (see `.claude/rules/worktree-hostname.md`) | Anything the running app does: rendered pages, HTMX swaps, endpoints, DB state |
 | 2 | **CI** | ubuntu runners on `pull_request`, seeded from `ibl5/tests/e2e/fixtures/ci-seed.sql` | PHPUnit, API-tests, E2E, every `bin/check-*` gate |
 | 3 | **`.github/workflows/deploy-rehearsal.yml`** | already runs on `pull_request` (ADR-0059) | Pending migrations dry-run against a **clone of production** |
 
@@ -77,7 +77,7 @@ A plan whose Verification Matrix carries **≥1 PHPUnit row** MUST also carry a 
 - `test_required_methods_ignores_fenced_example`
 ```
 
-- **The name must match the shipped declaration exactly.** Write the bare method name — no class prefix, no `()`, no `::`.
+- **Exact names.** Write the bare method name exactly as shipped. Leave out any class prefix, `()`, or `::`.
 - **Fenced examples do not count.** Both parsers strip fenced blocks before reading the section, so an illustrative list inside a fence yields zero entries.
 - **Escape hatch.** When every PHPUnit row genuinely names no new method, write `<!-- no-test-methods: <reason ≥15 chars> -->` instead. `bin/check-plan` gate `[M]` accepts the section or the marker.
 
@@ -105,7 +105,7 @@ Any E2E verification-matrix row that asserts a **seed-** or **DOM-dependent** va
 The source must be one of:
 
 - A specific row or count from `ibl5/tests/e2e/fixtures/ci-seed.sql` (cite the table and the rows that produce the expected value), or
-- The rendered form DOM, fetched live from the worktree stack: `curl --cookie "_auto_login=1" http://<slug>.localhost/ibl5/modules.php?name=X` (cite the element the assertion targets). The `_auto_login=1` cookie is required — localhost is logged-out by default (see `.claude/rules/browser-login.md`).
+- The rendered form DOM, fetched live from the worktree stack: `curl --cookie "_auto_login=1" http://<slug>.localhost/ibl5/modules.php?name=X` (cite the element the assertion targets). The `_auto_login=1` cookie is required because localhost is logged-out by default (see `.claude/rules/browser-login.md`).
 
 - **Sort direction is not "ascending by default."** `ibl5/jslib/sorttable.js` sorts **descending** on first click. See memory `reference_sorttable_descending_first`.
 - **Seed cardinality is small.** Counts must be grounded in what the CI seed actually contains. See memory `feedback_e2e_seed_grounding`.

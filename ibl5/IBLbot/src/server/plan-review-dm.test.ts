@@ -52,6 +52,36 @@ function clientWithSend(impl: () => Promise<unknown> = async () => undefined): {
     return { client: { users: { send } } as unknown as Client, send };
 }
 
+/**
+ * Build a client double that supports both users.send (for plan DMs) and the
+ * users.fetch → createDM → messages.fetch → edit chain used by editPlanReviewDM.
+ */
+function clientWithFetch(opts: {
+    sendImpl?: () => Promise<unknown>;
+    editImpl?: () => Promise<unknown>;
+    fetchImpl?: () => Promise<unknown>;
+} = {}): {
+    client: Client;
+    send: ReturnType<typeof vi.fn>;
+    fetch: ReturnType<typeof vi.fn>;
+    edit: ReturnType<typeof vi.fn>;
+} {
+    const edit = vi.fn(opts.editImpl ?? (async () => undefined));
+    const msgFetch = vi.fn(async () => ({ edit }));
+    const createDM = vi.fn(async () => ({ messages: { fetch: msgFetch } }));
+    const fetch = vi.fn(opts.fetchImpl ?? (async () => ({ createDM })));
+    const send = vi.fn(opts.sendImpl ?? (async () => undefined));
+    const client = { users: { send, fetch } } as unknown as Client;
+    return { client, send, fetch, edit };
+}
+
+/** Flush microtasks so detached void promises resolve before assertions. */
+async function flushDetached(ticks = 5): Promise<void> {
+    for (let i = 0; i < ticks; i++) {
+        await new Promise((r) => { setImmediate(r); });
+    }
+}
+
 /** Mount the real route table and drive one route, flushing the handler's promise chain. */
 async function invoke(
     method: 'post' | 'get',
@@ -65,9 +95,8 @@ async function invoke(
     const res = makeRes();
     void method;
     await h.routes[route]!({ body }, res);
-    // The DM handler resolves through client.users.send(...).then(...)
-    await new Promise((r) => { setImmediate(r); });
-    await new Promise((r) => { setImmediate(r); });
+    // Flush detached void promises (used by ack DM edits and the DM send chain)
+    await flushDetached();
     return res;
 }
 
@@ -294,5 +323,94 @@ describe('POST /planDecisions/ack', () => {
         }
 
         expect(sinkBytes(tmp)).toBe(before);
+    });
+});
+
+describe('POST /planDecisions/ack — Phase 2 outcome edits', () => {
+    it('Row 5: ack with outcomes edits the message to ✅ queued with buttons disabled', async () => {
+        const d = appendDecision({ slug: 'plan-row5', action: 'queue', actor: 'ACTOR', channelId: 'C', messageId: 'M' }, tmp);
+        const { client, edit } = clientWithFetch();
+
+        const res = await invoke('post', '/planDecisions/ack', { ids: [d.id], outcomes: { [d.id]: 'queued' } }, client, tmp);
+
+        expect(res.statusCode).toBe(200);
+        expect(res.body).toMatchObject({ acked: 1 });
+
+        // Flush more ticks — editPlanReviewDM is 4 async hops deep
+        await flushDetached(10);
+
+        expect(edit).toHaveBeenCalledTimes(1);
+        const editCall = edit.mock.calls[0]![0] as { content: string; components: unknown[] };
+        expect(editCall.content).toBe('✅ queued');
+        expect(editCall.components).toHaveLength(1);
+    });
+
+    it('Row 6: snapshot is taken BEFORE ackDecisions — tombstoned record still has its DM edited', async () => {
+        // Only one record in the store; ack tombstones it, yet edit must still fire
+        const d = appendDecision({ slug: 'plan-row6', action: 'queue', actor: 'ACTOR', channelId: 'C', messageId: 'M6' }, tmp);
+        const { client, edit } = clientWithFetch();
+
+        const res = await invoke('post', '/planDecisions/ack', { ids: [d.id], outcomes: { [d.id]: 'discarded' } }, client, tmp);
+        await flushDetached(10);
+
+        expect(res.statusCode).toBe(200);
+        // Record is gone from pending
+        expect(readPending(tmp)).toHaveLength(0);
+        // But the edit still fired with the correct content
+        expect(edit).toHaveBeenCalledTimes(1);
+        const editCall = edit.mock.calls[0]![0] as { content: string };
+        expect(editCall.content).toBe('🗑️ discarded');
+    });
+
+    it('Row 7: outcomes that is array, null, or has invalid value → 400, zero tombstones, zero edits', async () => {
+        const d = appendDecision({ slug: 'plan-row7', action: 'queue', actor: 'ACTOR', channelId: 'C', messageId: 'M7' }, tmp);
+        const before = sinkBytes(tmp);
+        const { client, edit } = clientWithFetch();
+
+        for (const outcomes of [[], null, { [d.id]: 'invalid-value' }, { [d.id]: 42 }]) {
+            const res = await invoke('post', '/planDecisions/ack', { ids: [d.id], outcomes }, client, tmp);
+            expect(res.statusCode, JSON.stringify(outcomes)).toBe(400);
+        }
+
+        expect(sinkBytes(tmp)).toBe(before);
+        expect(readPending(tmp)).toHaveLength(1);
+        await flushDetached(10);
+        expect(edit).not.toHaveBeenCalled();
+    });
+
+    it('Row 8: bare {ids} body acks normally and calls users.fetch zero times (back-compat)', async () => {
+        const d = appendDecision({ slug: 'plan-row8', action: 'queue', actor: 'ACTOR', channelId: 'C', messageId: 'M8' }, tmp);
+        const { client, fetch } = clientWithFetch();
+
+        const res = await invoke('post', '/planDecisions/ack', { ids: [d.id] }, client, tmp);
+        await flushDetached(10);
+
+        expect(res.statusCode).toBe(200);
+        expect(res.body).toMatchObject({ acked: 1 });
+        expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('Row 9: an edit that rejects still returns 200 with tombstone written, no unhandled rejection', async () => {
+        const d = appendDecision({ slug: 'plan-row9', action: 'queue', actor: 'ACTOR', channelId: 'C', messageId: 'M9' }, tmp);
+        const { client } = clientWithFetch({ fetchImpl: async () => { throw new Error('discord down'); } });
+
+        const res = await invoke('post', '/planDecisions/ack', { ids: [d.id], outcomes: { [d.id]: 'queued' } }, client, tmp);
+        await flushDetached(10);
+
+        expect(res.statusCode).toBe(200);
+        expect(res.body).toMatchObject({ acked: 1 });
+        // The record is tombstoned even though the edit failed
+        expect(readPending(tmp)).toHaveLength(0);
+    });
+
+    it('Row 10: outcome id naming no pending record is ignored — no fetch, no throw, still 200', async () => {
+        appendDecision({ slug: 'plan-row10', action: 'queue', actor: 'ACTOR' }, tmp);
+        const { client, fetch } = clientWithFetch();
+
+        const res = await invoke('post', '/planDecisions/ack', { ids: [], outcomes: { 'no-such-id': 'queued' } }, client, tmp);
+        await flushDetached(10);
+
+        expect(res.statusCode).toBe(200);
+        expect(fetch).not.toHaveBeenCalled();
     });
 });

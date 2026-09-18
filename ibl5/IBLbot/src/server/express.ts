@@ -44,7 +44,7 @@ export function startExpressServer(client: Client, dir?: string): Server {
     app.post('/discordTradeDM', handleTradeDM(client));
     app.post('/discordPlanReviewDM', handlePlanReviewDM(client));
     app.get('/planDecisions', handleListDecisions(dir));
-    app.post('/planDecisions/ack', handleAckDecisions(dir));
+    app.post('/planDecisions/ack', handleAckDecisions(client, dir));
 
     app.get('/', (_req, res) => {
         res.send('ok');

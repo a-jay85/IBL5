@@ -4,15 +4,20 @@ import { commands } from './commands/index.js';
 import { startExpressServer } from './server/express.js';
 import { handleTradeButton } from './interactions/trade-buttons.js';
 import { handlePlanReviewButton } from './interactions/plan-review-buttons.js';
+import { startStaleSweeper } from './server/stale-decision-sweeper.js';
+
+let sweepHandle: NodeJS.Timeout | undefined;
 
 const client = new Client({
     intents: [GatewayIntentBits.Guilds],
-}); 
+});
 
 // Bot ready
 client.once(Events.ClientReady, c => {
     console.log(`Ready! Logged in as ${c.user.tag}`);
     console.log(`Serving ${commands.size} slash commands`);
+    sweepHandle = startStaleSweeper(client);
+    console.log('Stale plan-decision sweeper started');
 });
 
 // Slash command handler
@@ -70,3 +75,13 @@ client.login(config.discord.token);
 
 // Start Express server for /discordDM endpoint
 startExpressServer(client);
+
+// No shutdown handlers existed before the sweeper. The interval is the only thing
+// that keeps the event loop alive past a signal, so it is the only thing torn down
+// here; pm2 owns the rest of the process lifecycle.
+for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+    process.on(signal, () => {
+        if (sweepHandle) clearInterval(sweepHandle);
+        process.exit(0);
+    });
+}

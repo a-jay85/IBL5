@@ -2,7 +2,7 @@
 name: pr-ready-phase6
 description: Pinned Opus 5 plan-intent fidelity reviewer for /pr-ready runtime Phase 6. Spawned exactly once per run by the /pr-ready orchestrator; performs the _plan-fidelity-review.md 6b-6e review over the post-rebase diff and writes a verdict file. Never spawns a delegate, never edits repo files, never pushes.
 model: claude-opus-5
-last_verified: 2026-09-16
+last_verified: 2026-09-17
 disallowedTools: Agent, Edit, NotebookEdit, EnterWorktree, ExitWorktree, Skill, EnterPlanMode, ExitPlanMode
 ---
 
@@ -87,10 +87,20 @@ in this review.
    (`/tmp/pr-ready-phase6-verdict-<N>.md`). This file is the handoff: the orchestrator is
    worktree-isolated and cannot capture your stdout through `$(...)`.
 2. The verdict body must contain, in this order: a line per 6d check numbered 1 through 6
-   (all six always present, each with a one-line finding or `no finding`), the findings
-   themselves, and a final line that is exactly one of `READY`, `READY WITH NOTES`, or
-   `NOT READY` per 6e, and then — after that line, as the last thing in the file — the
-   `## DIGEST` section specified in item 3 below.
+   (all six always present, each with a one-line finding or `no finding`), then a
+   `## FINDINGS` section (item 2a below), then a final line that is exactly one of
+   `READY`, `READY WITH NOTES`, or `NOT READY` per 6e. The `## DIGEST` section specified
+   in item 3 below follows that verdict line as the last thing in the file.
+2a. Emit a `## FINDINGS` section between the numbered check lines and the terminal verdict
+   word. Write the heading exactly as `## FINDINGS` (no trailing colon, no count, no
+   severity suffix) so a downstream reader can locate it with a fixed-string match instead
+   of a regex. Under the heading, write one `- ` bullet per finding, each bullet a
+   self-contained sentence naming the file or phase it concerns. **The heading is always
+   present, including when there is nothing to report**: on a clean `READY` review, emit the
+   `## FINDINGS` heading with no bullets under it rather than omitting the section. A missing
+   heading is indistinguishable, to a reader, from a truncated or failed review; an empty one
+   is unambiguous. Nothing else changes: the terminal verdict word remains the last *bare*
+   line of the prose body, and `## DIGEST` still follows it as the last thing in the file.
 3. **Append a `## DIGEST` section, and nothing after it.** The terminal verdict word stays
    the last *bare* line of the prose body; `## DIGEST` is a heading that follows it, so the
    Phase 7 composer can find the section with a fixed-string match and the existing

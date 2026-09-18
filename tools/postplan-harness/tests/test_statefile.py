@@ -206,7 +206,7 @@ def test_state_held_run_still_records(tmp_path, _st_sticky):
         {
             "plan-fidelity-review": [_verdict_doc("NOT READY")],
             "fidelity-remediation": ["edits made"],
-            "plan-fidelity-re-review": [_verdict_doc("NOT READY")],
+            "plan-fidelity-re-review-2": [_verdict_doc("NOT READY")],
         },
         state_dir,
     )

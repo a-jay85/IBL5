@@ -2,6 +2,7 @@ import { test, expect } from '../fixtures/auth';
 import { test as publicTest, expect as publicExpect } from '../fixtures/public';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { offerForm } from '../helpers/free-agency';
+import { withPhases } from '../fixtures/phase';
 
 // Free Agency E2E tests — read-only rendering and validation.
 // Seed data provides 3 free agent players:
@@ -19,10 +20,10 @@ import { offerForm } from '../helpers/free-agency';
 // The `offerForm` locator helper is shared via helpers/free-agency.ts.
 
 test.describe('Free Agency -- main page', () => {
-  test.beforeEach(async ({ appState, page }) => {
-    await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
-    await page.goto('modules.php?name=FreeAgency');
-  });
+  withPhases(['Free Agency'], () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto('modules.php?name=FreeAgency');
+    });
 
   test('main page loads with four table sections', async ({ page }) => {
     // Table headers include team name prefix, e.g. "Metros Players Under Contract"
@@ -148,14 +149,15 @@ test.describe('Free Agency -- main page', () => {
   test('no PHP errors on main page', async ({ page }) => {
     await assertNoPhpErrors(page, 'on Free Agency main page');
   });
+  });
 });
 
 test.describe('Free Agency -- negotiation page', () => {
-  test.beforeEach(async ({ appState, page }) => {
-    await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
-    // Navigate to negotiate page for FA Center (pid=11, pure free agent)
-    await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
-  });
+  withPhases(['Free Agency'], () => {
+    test.beforeEach(async ({ page }) => {
+      // Navigate to negotiate page for FA Center (pid=11, pure free agent)
+      await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
+    });
 
   test('player info card shows ratings', async ({ page }) => {
     await expect(page.locator('.ibl-card__title').first()).toContainText('Contract Negotiation');
@@ -203,6 +205,7 @@ test.describe('Free Agency -- negotiation page', () => {
   test('no PHP errors on negotiation page', async ({ page }) => {
     await assertNoPhpErrors(page, 'on negotiation page');
   });
+  });
 });
 
 // NOTE: the "Bird Rights negotiation" and "validation errors" blocks moved to
@@ -212,26 +215,28 @@ test.describe('Free Agency -- negotiation page', () => {
 // file. See its header for the full rationale.
 
 test.describe('Free Agency -- wrong season phase', () => {
-  test('page renders without PHP errors in non-FA phase', async ({ appState, page }) => {
-    await appState({ 'Current Season Phase': 'Regular Season', 'Current Season Ending Year': '2026' });
-    await page.goto('modules.php?name=FreeAgency');
-    await assertNoPhpErrors(page, 'in non-FA phase');
+  withPhases(['Regular Season'], (phase) => {
+    test('page renders without PHP errors in non-FA phase', async ({ page }) => {
+      await page.goto('modules.php?name=FreeAgency');
+      await assertNoPhpErrors(page, `in non-FA phase (${phase})`);
+    });
   });
 });
 
 publicTest.describe('Free Agency -- unauthenticated access', () => {
-  publicTest('redirects to login page', async ({ appState, page }) => {
-    await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
-    await page.goto('modules.php?name=FreeAgency');
-    // Unauthenticated users are redirected to YourAccount (login) module
-    await page.waitForURL(/name=YourAccount/);
-    await publicExpect(page.locator('#login-username'), 'YourAccount login form must render after redirect').toBeVisible();
-  });
+  withPhases(['Free Agency'], () => {
+    publicTest('redirects to login page', async ({ page }) => {
+      await page.goto('modules.php?name=FreeAgency');
+      // Unauthenticated users are redirected to YourAccount (login) module
+      await page.waitForURL(/name=YourAccount/);
+      await publicExpect(page.locator('#login-username'), 'YourAccount login form must render after redirect').toBeVisible();
+    });
+  }, { test: publicTest });
 });
 
 test.describe('Free Agency -- per-view JS loaders (backlog 11.16)', () => {
-  test('offer-salary-hints: Y2 placeholder updates when Y1 value is entered', async ({ page, appState }) => {
-    await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
+  withPhases(['Free Agency'], () => {
+  test('offer-salary-hints: Y2 placeholder updates when Y1 value is entered', async ({ page }) => {
     await page.goto('modules.php?name=FreeAgency&pa=negotiate&pid=11');
     const container = page.locator('.offer-salary-row--inputs[data-raise-percentage]').first();
     await expect(container).toBeVisible();
@@ -245,8 +250,7 @@ test.describe('Free Agency -- per-view JS loaders (backlog 11.16)', () => {
     expect(Number(hint)).toBeGreaterThan(0);
   });
 
-  test('contract-hint: JS sets inline width on hidden link after page load', async ({ page, appState }) => {
-    await appState({ 'Current Season Phase': 'Free Agency', 'Current Season Ending Year': '2026' });
+  test('contract-hint: JS sets inline width on hidden link after page load', async ({ page }) => {
     await page.goto('modules.php?name=FreeAgency');
     // .contract-hint-link is display:none by CSS (revealed on hover only); check the DOM attachment
     // and that contract-hint.js ran by reading the inline style.width it sets.
@@ -257,5 +261,6 @@ test.describe('Free Agency -- per-view JS loaders (backlog 11.16)', () => {
     });
     expect(width).toMatch(/^\d+(\.\d+)?px$/);
     expect(parseFloat(width)).toBeGreaterThan(0);
+  });
   });
 });

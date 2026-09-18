@@ -135,6 +135,77 @@ test.describe('LeagueControlPanel — Update Tradition', () => {
   });
 });
 
+// Active Players CSV Export — tests the two GET handlers added in this PR.
+// The export handler checks 'Current Season Phase' via repository->getSetting(),
+// which reads from ibl_settings in the DB (not the cookie override), so phase
+// must be changed via the LCP form, exactly like the Finals MVP tests above.
+// The download handler is phase-agnostic; it only requires valid admin auth.
+
+test.describe('LeagueControlPanel — Active Players CSV Export endpoints', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  let exportedFilename = '';
+
+  test('export endpoint returns 409 outside Free Agency', async ({ page }) => {
+    await page.goto('leagueControlPanel.php');
+    await assertNoPhpErrors(page, 'on LCP before export-phase test');
+    await page.locator('select[name="SeasonPhase"]').selectOption('Playoffs');
+    await Promise.all([
+      page.waitForURL(/success=/),
+      page.locator('button[value="set_season_phase"]').click(),
+    ]);
+
+    const response = await page.goto('leagueControlPanel.php?export=active_players');
+    expect(response?.status()).toBe(409);
+    const text = response ? await response.text() : '{}';
+    const json = JSON.parse(text) as { error?: string };
+    expect(json.error).toContain('Free Agency');
+
+    await page.goto('leagueControlPanel.php');
+    await page.locator('select[name="SeasonPhase"]').selectOption('Free Agency');
+    await Promise.all([
+      page.waitForURL(/success=/),
+      page.locator('button[value="set_season_phase"]').click(),
+    ]);
+  });
+
+  test('export endpoint returns 200 with JSON download URL during Free Agency', async ({
+    page,
+  }) => {
+    const response = await page.goto('leagueControlPanel.php?export=active_players');
+    expect(response?.status()).toBe(200);
+    const text = response ? await response.text() : '{}';
+    const json = JSON.parse(text) as { filename?: string; url?: string };
+    expect(typeof json.filename).toBe('string');
+    expect(json.url).toContain('download=');
+    exportedFilename = json.filename ?? '';
+  });
+
+  test('download endpoint streams CSV for a valid export filename', async ({
+    page,
+  }) => {
+    expect(exportedFilename).not.toBe('');
+    const [dlResponse] = await Promise.all([
+      page.waitForResponse(
+        r =>
+          r.url().includes('leagueControlPanel.php') && r.url().includes('download='),
+      ),
+      page
+        .goto(`leagueControlPanel.php?download=${encodeURIComponent(exportedFilename)}`)
+        .catch(() => null),
+    ]);
+    expect(dlResponse.status()).toBe(200);
+    expect(dlResponse.headers()['content-type']).toContain('text/csv');
+  });
+
+  test('download endpoint returns 404 for a path-traversal filename', async ({
+    page,
+  }) => {
+    const response = await page.goto('leagueControlPanel.php?download=..%2Fetc%2Fpasswd');
+    expect(response?.status()).toBe(404);
+  });
+});
+
 // Generate Season Awards — tests the button visibility and error path.
 // The LCP reads phase from the DB directly (not cookie overrides), so
 // phase must be set via form submission. CI uses a fresh DB per run;

@@ -422,10 +422,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         reviewed_tree = git.head_tree()
         _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_sha,
                       reviewed_tree, live, log, res)
-        # A remediation commit moved the head. Phase 7 must watch CI for THAT commit:
-        # keyed on the Phase-2 sha, the background watch would be reused, res.ci_outcome
-        # would describe a commit that is no longer the PR head, and the sticky line
-        # "remediation commit … is inside that watch" would be false.
+        # A remediation loop moved the head, up to MAX_FIDELITY_ROUNDS times. Phase 7
+        # must watch CI for the last commit, which is what remediation_sha aliases after
+        # the loop.
         if res.fidelity.get("remediation_sha"):
             sha = res.fidelity["remediation_sha"]
 
@@ -494,7 +493,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 fidelity.findings_excerpt(vpath, fid.get("verdict_1") is not None),
                 fidelity.terminal_line(fid.get("verdict_1"), fid.get("error_kind"), rsha,
                                        fid.get("verdict_2"), fid.get("reviewed_tree_2"),
-                                       plan.auto_merge_false))
+                                       fid.get("rounds_completed", 0)))
             try:
                 cid = gh.pr_sticky_verdict(pr, sticky)
             except (HarnessError, OSError, subprocess.SubprocessError):
@@ -691,6 +690,14 @@ def _master_sha(worktree: str | None) -> str:
     return proc.stdout.strip() or "origin/master"
 
 
+def _read_text(path: str) -> str:
+    try:
+        with open(path) as fh:
+            return fh.read()
+    except OSError:
+        return ""
+
+
 def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_sha,
                   reviewed_tree, live, log, res):
     """Phase 5.5. Returns (verdict_word_or_None, error_kind_or_'').
@@ -706,7 +713,9 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         "reviewed_tree": reviewed_tree,
                         "verdict_path": fidelity.verdict_path(pr),
                         "remediation_sha": None, "verdict_2": None,
-                        "reviewed_tree_2": None}
+                        "reviewed_tree_2": None,
+                        "rounds": [], "rounds_completed": 0,
+                        "backlog_issue_numbers": []}
         return "READY", ""
     try:
         packet = fidelity.build_packet(
@@ -718,7 +727,9 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         "reviewed_tree": reviewed_tree,
                         "verdict_path": fidelity.verdict_path(pr),
                         "remediation_sha": None, "verdict_2": None,
-                        "reviewed_tree_2": None}
+                        "reviewed_tree_2": None,
+                        "rounds": [], "rounds_completed": 0,
+                        "backlog_issue_numbers": []}
         return None, e.kind
     verdict, err = fidelity.review(llm, out_dir, worktree or ".", packet, pr,
                                    reviewed_tree=reviewed_tree)
@@ -728,34 +739,52 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                     "reviewed_tree": reviewed_tree,
                     "verdict_path": fidelity.verdict_path(pr),
                     "remediation_sha": None, "verdict_2": None,
-                    "reviewed_tree_2": None}
-    if verdict == "NOT READY":
-        # exactly one remediation and one re-review per run - a boolean sequence here,
-        # never a loop
+                    "reviewed_tree_2": None,
+                    "rounds": [], "rounds_completed": 0,
+                    "backlog_issue_numbers": []}
+    rounds = []
+    current_verdict_path = fidelity.verdict_path(pr)
+    final_verdict, final_err = verdict, err
+    for round_num in range(1, fidelity.MAX_FIDELITY_ROUNDS + 1):
+        if final_verdict != "NOT READY":
+            break
         try:
             sha = fidelity.remediate(llm, git, out_dir, worktree or ".", packet,
-                                     fidelity.verdict_path(pr), master_sha, log=log)
+                                     current_verdict_path, master_sha, log=log)
         except HarnessError as e:
-            # A failed push is not "remediation unavailable". The remediation commit exists
-            # locally and the remote does not have it, so the tree a re-reviewer would judge
-            # is not the tree CI ran. Propagate to the top-level FAILED handler: the run
-            # exits 1 and bin/post-plan-now re-runs the full /post-plan skill.
             if e.kind == "push-failed":
                 raise
-            log(f"phase5.5 remediation: unavailable ({e.kind}) - verdict 1 stands")
+            log(f"phase5.5 round {round_num}: remediation unavailable ({e.kind})")
             sha = None
-        if sha:
-            body = upsert_files_changed(body, render_files_changed(git.diff_vs_base()))
-            gh.pr_edit_body(pr, body)
-            verdict_2, tree_2 = fidelity.re_review(
-                llm, git, out_dir, worktree or ".", plan, master_sha, body, pr, sha,
-                fidelity.verdict_path(pr), log=log)
-            res.fidelity.update({"remediation_sha": str(sha), "verdict_2": verdict_2})
-            res.fidelity["reviewed_tree_2"] = tree_2
-            if verdict_2:
-                log(f"phase5.5 re-review: verdict={verdict_2} tree={(tree_2 or '')[:12]}")
-                return verdict_2, ""
-    return verdict, err
+        if not sha:
+            break
+        body = upsert_files_changed(body, render_files_changed(git.diff_vs_base()))
+        gh.pr_edit_body(pr, body)
+        v_n, tree_n, path_n = fidelity.re_review(
+            llm, git, out_dir, worktree or ".", plan, master_sha, body, pr, sha,
+            current_verdict_path, round_num=round_num, log=log)
+        rounds.append({"remediation_sha": str(sha), "verdict": v_n,
+                       "reviewed_tree": tree_n, "verdict_path": path_n})
+        res.fidelity["rounds"] = rounds
+        res.fidelity["rounds_completed"] = len(rounds)
+        res.fidelity["remediation_sha"] = str(sha)
+        res.fidelity["verdict_2"] = v_n
+        res.fidelity["reviewed_tree_2"] = tree_n
+        log(f"phase5.5 round {round_num}: sha={str(sha)[:12]} "
+            f"verdict={v_n or 'INDETERMINATE'} tree={(tree_n or '')[:12]}")
+        if v_n is None:
+            break
+        final_verdict, final_err = v_n, ""
+        current_verdict_path = path_n
+    # Notes come from whichever review produced the final verdict: the initial one or
+    # a re-review round. current_verdict_path tracks that review's verdict file.
+    if final_verdict == "READY WITH NOTES":
+        notes = fidelity.extract_notes(llm, current_verdict_path, log=log)
+        nums = fidelity.file_note_issues(gh, notes, pr, _read_text(current_verdict_path),
+                                         log=log)
+        res.fidelity["backlog_issue_numbers"] = nums
+        log(f"phase5.5 notes: {len(notes)} extracted, {len(nums)} backlog issues filed")
+    return final_verdict, final_err
 
 
 def _write_conformance_handoff(out_dir: str, unresolved: list[str]) -> None:

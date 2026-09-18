@@ -15,6 +15,7 @@ import subprocess
 import time
 
 from .state import HarnessError
+from . import llm_calls
 
 # Anchored and multiline: a verdict word must own its whole line. Longest alternative
 # first so "READY WITH NOTES" is never truncated to "READY".
@@ -276,20 +277,17 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
 
 def re_review(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
               pr_body: str, pr_number: int | str, remediation_sha: str | None,
-              verdict1_path: str, phase4b_ran: bool = False,
-              log=None) -> tuple[str | None, str | None]:
-    """Exactly one second review, after a remediation push. Returns (verdict_2, tree_2).
+              verdict1_path: str, phase4b_ran: bool = False, *,
+              round_num: int = 1,
+              log=None) -> tuple[str | None, str | None, str | None]:
+    """One review per remediation round. Returns (verdict, reviewed_tree, verdict_path).
 
-    Never loops. A failure here is "no re-review happened": verdict 1 stands and
-    condition (12) decides on it.
+    A failure here is "no re-review happened" for this round: the prior verdict stands
+    and the loop stops.
     """
     log = log or _noop_log
     if not remediation_sha:
-        return None, None
-    if getattr(plan, "auto_merge_false", False):
-        # A human merges this PR, so a second Opus verdict changes no outcome.
-        log("phase5.5: re-review skipped - plan carries auto_merge: false")
-        return None, None
+        return None, None, None
 
     # regenerated AFTER the push, so the diff carries the remediation commit
     diff = gitad.diff_vs_base()
@@ -303,28 +301,93 @@ def re_review(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
     try:
         packet = build_packet(out_dir, master_sha, gitad.head_tree(), plan, diff,
                               pr_body, pr_number, phase4b_ran, worktree=worktree,
-                              packet_name="fidelity-packet-2", extra_context=extra)
+                              packet_name=f"fidelity-packet-{round_num + 1}",
+                              extra_context=extra)
         text = llm.call_tooled(
-            "plan-fidelity-re-review", "opus", _pointer_prompt(packet, pr_number),
+            f"plan-fidelity-re-review-{round_num + 1}", "opus",
+            _pointer_prompt(packet, pr_number),
             cwd=worktree, agent="pr-ready-phase6",
             allowed_tools=REVIEW_ALLOWED_TOOLS, denied_tools=REVIEW_DENIED_TOOLS,
             add_dirs=(packet,), append_system_prompt=OVERRIDE,
         )
     except HarnessError as e:
         log(f"phase5.5: re-review unavailable ({e.kind}) - verdict 1 stands")
-        return None, None
+        return None, None, None
 
-    path2 = verdict_path(f"{pr_number}-2")
+    path2 = verdict_path(f"{pr_number}-{round_num + 1}")
     try:
         with open(path2, "w") as fh:
             fh.write(text if text.endswith("\n") else text + "\n")
     except OSError:
-        return None, None
+        return None, None, None
     # the tree is read after the push, so the recorded tree is the one the reviewer saw
     record_reviewed_tree(path2, gitad.head_tree())
     # read back from the file, never the in-memory value: a reviewer-written line with
     # prose after the hash must yield None here exactly as the skill's parser does
-    return parse_verdict(path2), read_reviewed_tree(path2)
+    return parse_verdict(path2), read_reviewed_tree(path2), path2
+
+
+def _norm_title(t: str) -> str:
+    """Lowercase, strip non-alphanumeric-or-space, collapse spaces, first 60 chars."""
+    t = t.lower()
+    t = re.sub(r"[^a-z0-9 ]", "", t)
+    t = re.sub(r" +", " ", t).strip()
+    return t[:60]
+
+
+def extract_notes(llm, verdict_path: str, log=None) -> list[dict]:
+    """Extract non-blocking notes from a READY WITH NOTES verdict."""
+    log = log or _noop_log
+    try:
+        with open(verdict_path) as fh:
+            text = fh.read()
+    except OSError:
+        return []
+    try:
+        raw = llm.call("fidelity-notes", "haiku",
+                       llm_calls.fidelity_notes_prompt(text),
+                       validate=lambda r: isinstance(r, list))
+        if not isinstance(raw, list):
+            return []
+        return [d for d in raw if isinstance(d, dict)
+                and d.get("title") and d.get("detail")]
+    except HarnessError:
+        return []
+
+
+def file_note_issues(gh, notes: list[dict], pr_number: int,
+                     verdict_text: str, log=None) -> list[int]:
+    """File deduped backlog issues for READY WITH NOTES notes."""
+    log = log or _noop_log
+    if not notes:
+        return []
+    try:
+        existing = gh.issue_titles("maintenance")
+    except (HarnessError, OSError):
+        existing = []
+    seen = {_norm_title(t) for t in existing}
+    nums = []
+    excerpt = verdict_text[:200]
+    if len(verdict_text) > 200:
+        excerpt += "…"
+    pr_link = f"https://github.com/a-jay85/IBL5/pull/{pr_number}"
+    for note in notes:
+        title = note.get("title", "")
+        detail = note.get("detail", "")
+        key = _norm_title(title)
+        if key in seen:
+            log(f"phase5.5 notes: skipping duplicate '{title[:50]}'")
+            continue
+        body = f"{pr_link}\n\n{detail}\n\n{excerpt}"
+        try:
+            n = gh.issue_create(title, body, "maintenance")
+            if n is not None:
+                nums.append(n)
+                seen.add(key)
+                log(f"phase5.5 notes: filed issue #{n} '{title[:50]}'")
+        except (HarnessError, OSError) as exc:
+            log(f"phase5.5 notes: issue_create failed ({exc})")
+    return nums
 
 
 # --- Phase 5: sticky verdict comment composers -------------------------------
@@ -346,6 +409,7 @@ DIGEST_SCRIPT_PATHS = (
 )
 
 DIGEST_UNAVAILABLE = "digest script did not produce output"
+MAX_FIDELITY_ROUNDS = 3  # round 1 is the historical single remediation
 STICKY_MARKER = "<!-- pr-ready-verdict -->"
 MERGE_DIGEST_HEADING = "### Merge digest"
 EXCERPT_LIMIT = 30000
@@ -389,7 +453,7 @@ def findings_excerpt(path: str, verdict_present: bool) -> str:
     return text
 
 
-def terminal_line(v1, error_kind, remediation_sha, v2, tree_2, auto_merge_false) -> str:
+def terminal_line(v1, error_kind, remediation_sha, v2, tree_2, rounds_completed) -> str:
     """The last prose line of the sticky comment. First matching row wins.
 
     An indeterminate verdict 1 (None) never yields a READY prefix — a missing verdict is
@@ -406,13 +470,14 @@ def terminal_line(v1, error_kind, remediation_sha, v2, tree_2, auto_merge_false)
     if not remediation_sha:
         return ("NOT READY — the blocking findings listed above remain; "
                 "remediate and re-run /post-plan")
-    if auto_merge_false:
-        return "NOT READY — held for your final review"
     if v2 is None:
         return "NOT READY — re-review produced no verdict; re-run /post-plan"
     if v2 in ("READY", "READY WITH NOTES"):
         return (f"READY (re-review) — findings remediated in {remediation_sha} and "
                 f"re-reviewed clean on tree {tree_2 or 'unrecorded'}")
+    if rounds_completed > 1:
+        return (f"NOT READY (re-review) — {rounds_completed} remediation rounds ran and "
+                "the re-review's blocking findings remain; remediate and re-run /post-plan")
     return ("NOT READY (re-review) — the re-review's blocking findings remain; "
             "remediate and re-run /post-plan")
 
@@ -436,6 +501,15 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
     if fid.get("verdict_2") is not None:
         out.append(f"**Re-reviewed tree:** {fid.get('reviewed_tree_2') or 'unrecorded'} "
                    f"({fid.get('verdict_2')})")
+    rounds = fid.get("rounds") or []
+    if len(rounds) > 1:
+        out.append("**Remediation rounds:** " + ", ".join(
+            f"{i + 1}. {(r.get('remediation_sha') or '')[:12]} "
+            f"→ {r.get('verdict') or 'INDETERMINATE'}"
+            for i, r in enumerate(rounds)))
+    nums = fid.get("backlog_issue_numbers") or []
+    if nums:
+        out.append("**Backlog issues filed:** " + ", ".join(f"#{n}" for n in nums))
 
     out.append("")
     if decision is not None and getattr(decision, "armed", False):

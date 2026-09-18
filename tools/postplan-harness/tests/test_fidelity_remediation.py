@@ -9,12 +9,17 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import fidelity
+from harness.adapters.ghad import RecordingGh
 from harness.adapters.gitad import ReplayGit
 from harness.adapters.llm import FixtureLlm
-from harness.state import HarnessError, UsageLedger
+from harness.state import HarnessError, RunResult, TerminalState, UsageLedger
+
+import runner
 
 TREE_1 = "a" * 40
 TREE_2 = "b" * 40
+TREE_3 = "c" * 40
+TREE_4 = "d" * 40
 
 GIT_SHIM = """#!/usr/bin/env bash
 if [ "$1" = "show" ]; then
@@ -121,40 +126,46 @@ def test_remediation_model_has_no_push_authority(tmp_path, git_shim):
 
 # --- re-review bounds ---------------------------------------------------------
 
-def test_re_review_skipped_when_plan_holds_auto_merge(tmp_path, git_shim):
-    llm = FixtureLlm(UsageLedger(), {"plan-fidelity-re-review": "NOT READY\n"})
-    got = fidelity.re_review(llm, _git(dirty=False), str(tmp_path), str(tmp_path),
-                             _plan(auto_merge_false=True), "deadbeef", "body", 77,
-                             "sha123", _verdict(tmp_path, "NOT READY"))
-    assert got == (None, None)
-    assert llm.tooled_argvs == []
+def test_re_review_runs_even_when_plan_holds_auto_merge(tmp_path, git_shim):
+    """auto_merge_false no longer skips re-review."""
+    llm = FixtureLlm(UsageLedger(), {"plan-fidelity-re-review-2": "NOT READY\n"})
+    path2 = fidelity.verdict_path("77-2")
+    try:
+        got = fidelity.re_review(llm, _git(dirty=False), str(tmp_path), str(tmp_path),
+                                 _plan(auto_merge_false=True), "deadbeef", "body", 77,
+                                 "sha123", _verdict(tmp_path, "NOT READY"))
+        assert got[0] == "NOT READY"
+        assert len(llm.tooled_argvs) == 1
+    finally:
+        if os.path.exists(path2):
+            os.unlink(path2)
 
 
 def test_re_review_skipped_without_a_remediation(tmp_path, git_shim):
-    llm = FixtureLlm(UsageLedger(), {"plan-fidelity-re-review": "READY\n"})
+    llm = FixtureLlm(UsageLedger(), {"plan-fidelity-re-review-2": "READY\n"})
     got = fidelity.re_review(llm, _git(dirty=False), str(tmp_path), str(tmp_path),
                              _plan(), "deadbeef", "body", 78, None,
                              _verdict(tmp_path, "NOT READY"))
-    assert got == (None, None)
+    assert got == (None, None, None)
     assert llm.tooled_argvs == []
 
 
 def test_re_review_is_one_shot_even_when_still_not_ready(tmp_path, git_shim):
     llm = FixtureLlm(UsageLedger(), {
         "fidelity-remediation": "edited",
-        "plan-fidelity-re-review": "checks\n\nNOT READY\n\n## DIGEST\nd\n",
+        "plan-fidelity-re-review-2": "checks\n\nNOT READY\n\n## DIGEST\nd\n",
     })
     git = _git(dirty=False)
     v1 = _verdict(tmp_path, "NOT READY")
     sha = fidelity.remediate(llm, git, str(tmp_path), str(tmp_path), _packet(tmp_path),
                              v1, "deadbeef")
-    verdict_2, tree_2 = fidelity.re_review(llm, git, str(tmp_path), str(tmp_path),
-                                           _plan(), "deadbeef", "body", 79, sha, v1)
+    verdict_2, tree_2, _path2 = fidelity.re_review(llm, git, str(tmp_path), str(tmp_path),
+                                                   _plan(), "deadbeef", "body", 79, sha, v1)
     path2 = fidelity.verdict_path("79-2")
     try:
         assert verdict_2 == "NOT READY"
         # exactly ONE reviewer call for the whole run, never a loop back into remediation
-        reviews = [p for p, _ in llm.tooled_argvs if p == "plan-fidelity-re-review"]
+        reviews = [p for p, _ in llm.tooled_argvs if p == "plan-fidelity-re-review-2"]
         assert len(reviews) == 1
         # verdict 1 is never overwritten
         assert "NOT READY" in open(v1).read()
@@ -167,15 +178,15 @@ def test_re_review_is_one_shot_even_when_still_not_ready(tmp_path, git_shim):
 def test_re_review_records_the_post_push_tree(tmp_path, git_shim):
     llm = FixtureLlm(UsageLedger(), {
         "fidelity-remediation": "edited",
-        "plan-fidelity-re-review": "READY\n",
+        "plan-fidelity-re-review-2": "READY\n",
     })
     git = _git(dirty=False)
     assert git.head_tree() == TREE_1                   # pre-remediation
     v1 = _verdict(tmp_path, "NOT READY")
     sha = fidelity.remediate(llm, git, str(tmp_path), str(tmp_path), _packet(tmp_path),
                              v1, "deadbeef")
-    verdict_2, tree_2 = fidelity.re_review(llm, git, str(tmp_path), str(tmp_path),
-                                           _plan(), "deadbeef", "body", 80, sha, v1)
+    verdict_2, tree_2, _ = fidelity.re_review(llm, git, str(tmp_path), str(tmp_path),
+                                              _plan(), "deadbeef", "body", 80, sha, v1)
     path2 = fidelity.verdict_path("80-2")
     try:
         assert verdict_2 == "READY"
@@ -193,12 +204,12 @@ def test_re_review_degrades_to_verdict_1_on_adapter_failure(tmp_path, git_shim):
     got = fidelity.re_review(_Raising(UsageLedger(), {}), _git(dirty=False), str(tmp_path),
                              str(tmp_path), _plan(), "deadbeef", "body", 81, "sha",
                              _verdict(tmp_path, "NOT READY"))
-    assert got == (None, None)
+    assert got == (None, None, None)
     assert not os.path.exists(fidelity.verdict_path("81-2"))
 
 
 def test_re_review_packet_is_separate_from_the_first(tmp_path, git_shim):
-    llm = FixtureLlm(UsageLedger(), {"plan-fidelity-re-review": "READY\n"})
+    llm = FixtureLlm(UsageLedger(), {"plan-fidelity-re-review-2": "READY\n"})
     out = tmp_path / "out"
     out.mkdir()
     first = fidelity.build_packet(str(out), "deadbeef", TREE_1, _plan(), "d", "b", 82,
@@ -215,3 +226,437 @@ def test_re_review_packet_is_separate_from_the_first(tmp_path, git_shim):
     finally:
         if os.path.exists(path2):
             os.unlink(path2)
+
+
+# --- multi-round fixture tests ------------------------------------------------
+
+def test_re_review_round_2_uses_different_purpose(tmp_path, git_shim):
+    """round_num=2 uses purpose plan-fidelity-re-review-3."""
+    llm = FixtureLlm(UsageLedger(), {"plan-fidelity-re-review-3": "READY\n"})
+    path3 = fidelity.verdict_path("83-3")
+    try:
+        got = fidelity.re_review(llm, _git(dirty=False), str(tmp_path), str(tmp_path),
+                                 _plan(), "deadbeef", "body", 83, "sha123",
+                                 _verdict(tmp_path, "NOT READY"), round_num=2)
+        assert got[0] == "READY"
+        purposes = [p for p, _ in llm.tooled_argvs]
+        assert purposes == ["plan-fidelity-re-review-3"]
+    finally:
+        if os.path.exists(path3):
+            os.unlink(path3)
+
+
+def test_re_review_round_3_uses_different_purpose(tmp_path, git_shim):
+    """round_num=3 uses purpose plan-fidelity-re-review-4."""
+    llm = FixtureLlm(UsageLedger(), {"plan-fidelity-re-review-4": "NOT READY\n"})
+    path4 = fidelity.verdict_path("84-4")
+    try:
+        got = fidelity.re_review(llm, _git(dirty=False), str(tmp_path), str(tmp_path),
+                                 _plan(), "deadbeef", "body", 84, "sha123",
+                                 _verdict(tmp_path, "NOT READY"), round_num=3)
+        assert got[0] == "NOT READY"
+    finally:
+        if os.path.exists(path4):
+            os.unlink(path4)
+
+
+def test_extract_notes_returns_list_from_llm(tmp_path):
+    """extract_notes calls llm with purpose fidelity-notes and returns the list."""
+    notes_fixture = [{"title": "Add index", "detail": "The users table needs an index on email."}]
+    llm = FixtureLlm(UsageLedger(), {"fidelity-notes": notes_fixture})
+    vpath = _verdict(tmp_path, "READY WITH NOTES")
+    result = fidelity.extract_notes(llm, vpath)
+    assert result == notes_fixture
+
+
+def test_extract_notes_returns_empty_on_llm_failure(tmp_path):
+    """extract_notes returns [] when llm raises HarnessError."""
+    from harness.state import HarnessError as _HE
+
+    class _Raising(FixtureLlm):
+        def call(self, purpose, model, prompt, validate, **kw):
+            raise _HE("llm-fixture-missing", purpose)
+
+    vpath = _verdict(tmp_path, "READY WITH NOTES")
+    assert fidelity.extract_notes(_Raising(UsageLedger(), {}), vpath) == []
+
+
+def test_extract_notes_returns_empty_on_missing_file(tmp_path):
+    assert fidelity.extract_notes(
+        FixtureLlm(UsageLedger(), {}), str(tmp_path / "nope.md")) == []
+
+
+def test_file_note_issues_dedupes_by_normalized_title(tmp_path):
+    """Two notes with near-identical titles file only one issue."""
+    gh = RecordingGh(str(tmp_path))
+    notes = [
+        {"title": "Add index on email", "detail": "Needs an index."},
+        {"title": "Add Index On Email!", "detail": "Same thing."},
+    ]
+    nums = fidelity.file_note_issues(gh, notes, 99, "verdict text")
+    assert len(nums) == 1
+    acts = [a for a in gh.actions() if a["action"] == "issue_create"]
+    assert len(acts) == 1
+
+
+def test_file_note_issues_skips_existing_titles(tmp_path):
+    """A note whose normalized title is already in issue_titles() is skipped."""
+
+    class _Gh(RecordingGh):
+        def issue_titles(self, label):
+            return ["Add index on email"]
+
+    gh = _Gh(str(tmp_path))
+    notes = [{"title": "Add index on email", "detail": "Needs an index."}]
+    nums = fidelity.file_note_issues(gh, notes, 99, "verdict")
+    assert nums == []
+    assert not [a for a in gh.actions() if a["action"] == "issue_create"]
+
+
+# --- _run_fidelity loop helpers -----------------------------------------------
+
+class _CountingGit(ReplayGit):
+    """Returns a distinct sha per commit so rounds are distinguishable."""
+    def commit_all(self, message):
+        super().commit_all(message)
+        return f"round-sha-{len(self.commit_messages)}"
+
+
+def _counting_git():
+    return _CountingGit({"slug": "demo", "worktree_diff": "",
+                         "diff": "diff --git a/x b/x\n",
+                         "head_trees": [TREE_1, TREE_2, TREE_3, TREE_4]})
+
+
+class _Res:
+    def __init__(self):
+        self.fidelity = {}
+
+
+def _cleanup(*suffixes):
+    for s in suffixes:
+        p = fidelity.verdict_path(s)
+        if os.path.exists(p):
+            os.unlink(p)
+
+
+# --- _run_fidelity loop tests -------------------------------------------------
+
+def test_round2_ready(tmp_path, git_shim):
+    """Round 2 re-review returns READY: verdict_2='READY', rounds_completed=1,
+    terminal_line starts 'READY (re-review)'."""
+    canned = {
+        "plan-fidelity-review": "6d checks\n\nNOT READY\n",
+        "fidelity-remediation": "edited",
+        "plan-fidelity-re-review-2": "READY\n",
+    }
+    llm = FixtureLlm(UsageLedger(), canned)
+    gh = RecordingGh(str(tmp_path))
+    res = _Res()
+    try:
+        runner._run_fidelity(
+            llm, str(tmp_path), str(tmp_path), _counting_git(), gh, _plan(),
+            "diff", "body", 991, "dead" * 10, TREE_1, False, lambda m: None, res,
+        )
+        assert res.fidelity["verdict_2"] == "READY"
+        assert res.fidelity["rounds_completed"] == 1
+        tl = fidelity.terminal_line(
+            res.fidelity.get("verdict_1"),
+            res.fidelity.get("error_kind"),
+            res.fidelity.get("remediation_sha"),
+            res.fidelity.get("verdict_2"),
+            res.fidelity.get("reviewed_tree_2"),
+            res.fidelity.get("rounds_completed", 0),
+        )
+        assert tl.startswith("READY (re-review)")
+    finally:
+        _cleanup(991, "991-2")
+
+
+def test_round2_no_verdict_overwrites_last_round_fields(tmp_path, git_shim):
+    """Round 1 re-review NOT READY, round 2 re-review produces no verdict: the
+    last-round fields describe round 2 (no stale round-1 verdict or tree)."""
+    canned = {
+        "plan-fidelity-review": "6d checks\n\nNOT READY\n",
+        "fidelity-remediation": "edited",
+        "plan-fidelity-re-review-2": "NOT READY\n",
+    }
+    llm = FixtureLlm(UsageLedger(), canned)
+    gh = RecordingGh(str(tmp_path))
+    res = _Res()
+    try:
+        runner._run_fidelity(
+            llm, str(tmp_path), str(tmp_path), _counting_git(), gh, _plan(),
+            "diff", "body", 9910, "dead" * 10, TREE_1, False, lambda m: None, res,
+        )
+        assert res.fidelity["rounds_completed"] == 2
+        assert res.fidelity["remediation_sha"] == "round-sha-2"
+        assert res.fidelity["verdict_2"] is None
+        assert res.fidelity["reviewed_tree_2"] is None
+        tl = fidelity.terminal_line(
+            res.fidelity["verdict_1"], res.fidelity["error_kind"],
+            res.fidelity["remediation_sha"], res.fidelity["verdict_2"],
+            res.fidelity["reviewed_tree_2"], res.fidelity["rounds_completed"],
+        )
+        assert tl == "NOT READY — re-review produced no verdict; re-run /post-plan"
+    finally:
+        _cleanup(9910, "9910-2", "9910-3")
+
+
+def test_remediate_none_stops(tmp_path, git_shim):
+    """Round 2 remediate returns None (dirty tree): loop stops, rounds_completed==1,
+    no plan-fidelity-re-review-3 call made."""
+    canned = {
+        "plan-fidelity-review": "6d checks\n\nNOT READY\n",
+        "fidelity-remediation": "edited",
+        "plan-fidelity-re-review-2": "NOT READY\n",
+    }
+
+    class _DirtyAfterFirstCommit(_CountingGit):
+        def is_dirty(self):
+            return len(self.commit_messages) >= 1
+
+    llm = FixtureLlm(UsageLedger(), canned)
+    gh = RecordingGh(str(tmp_path))
+    res = _Res()
+    try:
+        runner._run_fidelity(
+            llm, str(tmp_path), str(tmp_path), _DirtyAfterFirstCommit({
+                "slug": "demo", "worktree_diff": "",
+                "diff": "diff --git a/x b/x\n",
+                "head_trees": [TREE_1, TREE_2, TREE_3, TREE_4],
+            }), gh, _plan(),
+            "diff", "body", 992, "dead" * 10, TREE_1, False, lambda m: None, res,
+        )
+        assert res.fidelity["rounds_completed"] == 1
+        purposes = [p for p, _ in llm.tooled_argvs]
+        assert "plan-fidelity-re-review-3" not in purposes
+    finally:
+        _cleanup(992, "992-2")
+
+
+def test_push_failed_propagates(tmp_path, git_shim):
+    """HarnessError('push-failed') on round 2 push propagates out of _run_fidelity."""
+    canned = {
+        "plan-fidelity-review": "6d checks\n\nNOT READY\n",
+        "fidelity-remediation": "edited",
+        "plan-fidelity-re-review-2": "NOT READY\n",
+    }
+
+    class _PushFailOnRound2(_CountingGit):
+        def push(self):
+            if len(self.commit_messages) >= 2:
+                raise HarnessError("push-failed", "remote rejected")
+            super().push()
+
+    llm = FixtureLlm(UsageLedger(), canned)
+    gh = RecordingGh(str(tmp_path))
+    res = _Res()
+    try:
+        with pytest.raises(HarnessError) as exc:
+            runner._run_fidelity(
+                llm, str(tmp_path), str(tmp_path), _PushFailOnRound2({
+                    "slug": "demo", "worktree_diff": "",
+                    "diff": "diff --git a/x b/x\n",
+                    "head_trees": [TREE_1, TREE_2, TREE_3, TREE_4],
+                }), gh, _plan(),
+                "diff", "body", 993, "dead" * 10, TREE_1, False, lambda m: None, res,
+            )
+        assert exc.value.kind == "push-failed"
+        failed_res = RunResult(terminal=TerminalState.FAILED, error_kind="push-failed")
+        assert runner.exit_code_for(failed_res) == 1
+    finally:
+        _cleanup(993, "993-2")
+
+
+def test_auto_merge_false_still_loops(tmp_path, git_shim):
+    """auto_merge_false=True does not skip remediation rounds."""
+    canned = {
+        "plan-fidelity-review": "6d checks\n\nNOT READY\n",
+        "fidelity-remediation": "edited",
+        "plan-fidelity-re-review-2": "READY\n",
+    }
+    llm = FixtureLlm(UsageLedger(), canned)
+    gh = RecordingGh(str(tmp_path))
+    res = _Res()
+    try:
+        runner._run_fidelity(
+            llm, str(tmp_path), str(tmp_path), _counting_git(), gh,
+            _plan(auto_merge_false=True),
+            "diff", "body", 994, "dead" * 10, TREE_1, False, lambda m: None, res,
+        )
+        assert res.fidelity.get("rounds_completed", 0) >= 1
+        purposes = [p for p, _ in llm.tooled_argvs]
+        assert "plan-fidelity-re-review-2" in purposes
+    finally:
+        _cleanup(994, "994-2")
+
+
+def test_notes_end_to_end(tmp_path, git_shim):
+    """READY WITH NOTES: no remediation rounds, notes filed as backlog issues."""
+    notes_fixture = [
+        {"title": "Add index on email", "detail": "Needs an index."},
+        {"title": "Cache expensive query", "detail": "Use Redis."},
+    ]
+    canned = {
+        "plan-fidelity-review": "6d checks\n\nREADY WITH NOTES\n",
+        "fidelity-notes": notes_fixture,
+    }
+    llm = FixtureLlm(UsageLedger(), canned)
+    gh = RecordingGh(str(tmp_path))
+    res = _Res()
+    try:
+        runner._run_fidelity(
+            llm, str(tmp_path), str(tmp_path), _counting_git(), gh, _plan(),
+            "diff", "body", 995, "dead" * 10, TREE_1, False, lambda m: None, res,
+        )
+        assert res.fidelity.get("rounds_completed", 0) == 0
+        assert res.fidelity.get("remediation_sha") is None
+        nums = res.fidelity.get("backlog_issue_numbers") or []
+        assert len(nums) == 2
+        creates = [a for a in gh.actions() if a["action"] == "issue_create"]
+        assert len(creates) == 2
+        sticky = fidelity.compose_sticky(
+            "", "", res.fidelity, None, [], "", fidelity.terminal_line(
+                res.fidelity.get("verdict_1"),
+                res.fidelity.get("error_kind"),
+                res.fidelity.get("remediation_sha"),
+                res.fidelity.get("verdict_2"),
+                res.fidelity.get("reviewed_tree_2"),
+                res.fidelity.get("rounds_completed", 0),
+            ),
+        )
+        assert "**Backlog issues filed:** #" in sticky
+    finally:
+        _cleanup(995)
+
+
+def test_notes_from_re_review_round_are_filed(tmp_path, git_shim):
+    """Round 1 NOT READY, round 2 re-review READY WITH NOTES: the re-review's notes
+    are extracted from ITS verdict file and filed as backlog issues."""
+    notes_fixture = [{"title": "Log the issue_titles fallback", "detail": "Warn."}]
+    canned = {
+        "plan-fidelity-review": "6d checks\n\nNOT READY\n",
+        "fidelity-remediation": "edited",
+        "plan-fidelity-re-review-2": "notes body\n\nREADY WITH NOTES\n",
+        "fidelity-notes": notes_fixture,
+    }
+    llm = FixtureLlm(UsageLedger(), canned)
+    gh = RecordingGh(str(tmp_path))
+    res = _Res()
+    try:
+        verdict, _ = runner._run_fidelity(
+            llm, str(tmp_path), str(tmp_path), _counting_git(), gh, _plan(),
+            "diff", "body", 9950, "dead" * 10, TREE_1, False, lambda m: None, res,
+        )
+        assert verdict == "READY WITH NOTES"
+        assert res.fidelity["verdict_1"] == "NOT READY"
+        assert res.fidelity["rounds_completed"] == 1
+        assert len(res.fidelity["backlog_issue_numbers"]) == 1
+        creates = [a for a in gh.actions() if a["action"] == "issue_create"]
+        assert len(creates) == 1
+    finally:
+        _cleanup(9950, "9950-2")
+
+
+def test_notes_dedupe_run_twice(tmp_path, git_shim):
+    """When the note title already exists in issue_titles, no new issue is created.
+    Also: two notes differing only in case/punctuation collapse to one issue."""
+    notes_fixture = [{"title": "Add index on email", "detail": "Needs an index."}]
+    canned = {
+        "plan-fidelity-review": "6d checks\n\nREADY WITH NOTES\n",
+        "fidelity-notes": notes_fixture,
+    }
+
+    class _SeededGh(RecordingGh):
+        def issue_titles(self, label):
+            return ["Add index on email"]
+
+    llm = FixtureLlm(UsageLedger(), canned)
+    gh = _SeededGh(str(tmp_path))
+    res = _Res()
+    try:
+        runner._run_fidelity(
+            llm, str(tmp_path), str(tmp_path), _counting_git(), gh, _plan(),
+            "diff", "body", 996, "dead" * 10, TREE_1, False, lambda m: None, res,
+        )
+        nums = res.fidelity.get("backlog_issue_numbers") or []
+        assert nums == []
+        creates = [a for a in gh.actions() if a["action"] == "issue_create"]
+        assert creates == []
+    finally:
+        _cleanup(996)
+
+    # Two notes differing only by case and trailing punctuation collapse to one issue.
+    notes_case = [
+        {"title": "Add index on email", "detail": "First."},
+        {"title": "ADD INDEX ON EMAIL!", "detail": "Same."},
+    ]
+    gh2 = RecordingGh(str(tmp_path))
+    nums2 = fidelity.file_note_issues(gh2, notes_case, 9960, "verdict")
+    assert len(nums2) == 1
+    creates2 = [a for a in gh2.actions() if a["action"] == "issue_create"]
+    assert len(creates2) == 1
+
+
+def test_verdict_path_threading(tmp_path, git_shim):
+    """Each remediation round receives the previous round's verdict path."""
+    pr = 997
+    captured = []
+    _orig = fidelity.remediate
+
+    def _spy(llm, gitad, out_dir, worktree, packet_dir, verdict1_path, master_sha, log=None):
+        captured.append(verdict1_path)
+        return _orig(llm, gitad, out_dir, worktree, packet_dir, verdict1_path, master_sha, log)
+
+    mp = git_shim  # git_shim returns monkeypatch
+    mp.setattr(fidelity, "remediate", _spy)
+
+    canned = {
+        "plan-fidelity-review": "6d checks\n\nNOT READY\n",
+        "fidelity-remediation": "edited",
+        "plan-fidelity-re-review-2": "NOT READY\n",
+        "plan-fidelity-re-review-3": "NOT READY\n",
+        "plan-fidelity-re-review-4": "NOT READY\n",
+    }
+    llm = FixtureLlm(UsageLedger(), canned)
+    gh = RecordingGh(str(tmp_path))
+    res = _Res()
+    try:
+        runner._run_fidelity(
+            llm, str(tmp_path), str(tmp_path), _CountingGit({
+                "slug": "demo", "worktree_diff": "",
+                "diff": "diff --git a/x b/x\n",
+                "head_trees": [TREE_1, TREE_2, TREE_3, TREE_4],
+            }), gh, _plan(),
+            "diff", "body", pr, "dead" * 10, TREE_1, False, lambda m: None, res,
+        )
+        assert captured == [
+            fidelity.verdict_path(pr),
+            fidelity.verdict_path(f"{pr}-2"),
+            fidelity.verdict_path(f"{pr}-3"),
+        ]
+    finally:
+        _cleanup(pr, f"{pr}-2", f"{pr}-3", f"{pr}-4")
+
+
+def test_file_note_issues_continues_after_failed_create(tmp_path):
+    """A failed issue_create does not abort remaining notes."""
+    from harness.state import HarnessError as _HE
+
+    calls = [0]
+
+    class _FailFirst(RecordingGh):
+        def issue_create(self, title, body, label):
+            calls[0] += 1
+            if calls[0] == 1:
+                raise _HE("gh", "first failed")
+            return super().issue_create(title, body, label)
+
+    gh = _FailFirst(str(tmp_path))
+    notes = [
+        {"title": "First note", "detail": "Detail one."},
+        {"title": "Second note", "detail": "Detail two."},
+    ]
+    nums = fidelity.file_note_issues(gh, notes, 99, "verdict")
+    assert len(nums) == 1

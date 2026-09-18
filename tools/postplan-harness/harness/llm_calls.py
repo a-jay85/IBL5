@@ -175,6 +175,19 @@ def hold_discharge_prompt(sentences: list[str]) -> str:
     )
 
 
+def fidelity_notes_prompt(verdict_text: str) -> str:
+    """Phase 5.5 — extract non-blocking notes from a READY WITH NOTES verdict for backlog filing."""
+    return (
+        "Extract the non-blocking notes from this plan-fidelity verdict.\n\n"
+        "Return a JSON array of objects with:\n"
+        "  - \"title\": imperative sentence, under 70 characters\n"
+        "  - \"detail\": one sentence describing the note\n\n"
+        "Cover only the notes, not blocking findings. Return [] if there are none.\n\n"
+        f"VERDICT:\n{verdict_text[:8000]}\n\n"
+        'Return ONLY JSON: [{"title": "...", "detail": "..."}] or [].'
+    )
+
+
 def retrospective_prompt(slug: str, terminal: str, arm: ArmDecision | None,
                          findings_n: int, phase5: str | None, fidelity: dict | None = None) -> str:
     """Phase 9 — one bounded call replaces the open-ended reflection turn."""

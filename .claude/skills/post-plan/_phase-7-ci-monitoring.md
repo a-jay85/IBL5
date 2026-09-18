@@ -168,8 +168,8 @@ disarmed, posts the hold, and routes the PR to a human. The held sticky comment 
 "this needs re-review" signal.
 
 A conflict-free re-rebase that runs after a Phase 2 conflict already cleared clean force-pushes
-a new HEAD. The Phase 2 verdict no longer covers that tree, so the step 6.1 gate does not
-re-arm. That terminal state is a disarmed, correct, held PR, identical to what the unconditional
-hold produced, so the residual is never worse than current behavior. No verdict is copied forward
-to the new sha; carrying a review across a rewrite is the thing the fail-closed keying exists
-to prevent.
+a new HEAD. The step 6.1 re-arm gate fires: the verdict file is keyed to the recorded
+`<POST_RESOLUTION_SHA>` literal, so it still exists and reads CLEAN after the subsequent
+conflict-free re-rebase. That is the same `TREE-EQUIVALENT` outcome described above: the
+branch's contributed content is unchanged and only the base moved. Re-arming on that tree is
+consistent with the no-re-run policy above.

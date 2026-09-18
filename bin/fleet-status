@@ -179,14 +179,26 @@ link_file() {
 }
 
 # The tail of a pid line: `  audit` linked to the audit.log when there is one,
-# else `  log` linked to the log, else nothing. The word is the whole reference —
-# the path lives only in the link, so a non-TTY capture shows the bare word.
+# else `  log` linked to the log, else nothing. In a terminal the word IS the
+# reference — the path lives only in the link, which is the whole compaction win.
+#
+# But link_file fails soft to bare text on a pipe, a capture or a relative path,
+# and a lone `audit` then names no file at all. A captured run is how an agent
+# reads this page, so that case falls back to the pre-compaction `audit: <path>`
+# form. Detected by comparing link_file's output to the word it was handed,
+# which covers all three of its gates rather than re-testing one of them here.
 log_word() {
+    local path label rendered
     if [ -n "${1:-}" ]; then
-        printf '  %s%s%s' "$DIM" "$(link_file "$1" audit)" "$R"
+        path="$1"; label='audit'
     elif [ -n "${2:-}" ]; then
-        printf '  %s%s%s' "$DIM" "$(link_file "$2" log)" "$R"
+        path="$2"; label='log'
+    else
+        return 0
     fi
+    rendered="$(link_file "$path" "$label")"
+    [ "$rendered" = "$label" ] && rendered="$label: $path"
+    printf '  %s%s%s' "$DIM" "$rendered" "$R"
 }
 
 # Human-readable age from a seconds count: 45s / 12m / 3h04m / 2d01h.

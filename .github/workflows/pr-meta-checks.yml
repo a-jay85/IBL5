@@ -149,6 +149,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bin/check-pr-manual-testing --pr "${{ github.event.pull_request.number }}"
 
+      - name: Run bin/check-registry-trigger-rows
+        if: ${{ !cancelled() }}
+        run: bin/check-registry-trigger-rows
+
       # --- Hard gates (path-gated): a non-zero exit fails the job, same as the
       # former standalone workflows. `!cancelled()` makes each report
       # independently of an earlier step's failure (no sequential masking). ---

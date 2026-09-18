@@ -51,15 +51,15 @@ Each implementation phase that changes behavior must have a corresponding row (o
 
 ### Pre-prod exercise paths
 
-**Operative definition — "pre-prod" is not an abstraction here.** There is no staging web environment in this repo. Pre-prod is exactly these three reachable environments, and a verification item is **pre-prod-exercisable** if and only if it can be run on at least one of them:
+**Operative definition.** There is no staging web environment in this repo. Pre-prod is exactly these three reachable environments; an item is **pre-prod-exercisable** iff it runs on at least one:
 
 | # | Environment | How to reach it | What it exercises |
 |---|-------------|-----------------|-------------------|
-| 1 | **Worktree Docker stack** | `<slug>.localhost` under `/ibl5/`; slug = `basename "$(git rev-parse --show-toplevel)"` — see `.claude/rules/worktree-hostname.md` | Anything the running app does: rendered pages, HTMX swaps, endpoints, DB state — and any script's body invoked by hand rather than on its schedule |
-| 2 | **CI** | ubuntu runners on `pull_request`, seeded from `ibl5/tests/e2e/fixtures/ci-seed.sql` | PHPUnit, API-tests, E2E, every `bin/check-*` gate — and, via `workflow_dispatch` / `workflow_call`, a new workflow's own body run from the PR branch before it is ever a merge-triggered job |
-| 3 | **`.github/workflows/deploy-rehearsal.yml`** | already runs on `pull_request` (ADR-0059) | Pending migrations dry-run against a **clone of production** — the worked precedent that "needs prod" is usually "needs prod-*shaped* data" |
+| 1 | **Worktree Docker stack** | `<slug>.localhost` under `/ibl5/` (see `.claude/rules/worktree-hostname.md`) | Anything the running app does: rendered pages, HTMX swaps, endpoints, DB state |
+| 2 | **CI** | ubuntu runners on `pull_request`, seeded from `ibl5/tests/e2e/fixtures/ci-seed.sql` | PHPUnit, API-tests, E2E, every `bin/check-*` gate |
+| 3 | **`.github/workflows/deploy-rehearsal.yml`** | already runs on `pull_request` (ADR-0059) | Pending migrations dry-run against a **clone of production** |
 
-"Exercisable on one of these three" is checkable prose; "testable pre-prod" is not. Cite the number.
+Cite the environment number, not "testable pre-prod".
 
 Why: _plan-verification-detail.md § Pre-prod exercise paths — worked catalogue
 
@@ -77,9 +77,9 @@ A plan whose Verification Matrix carries **≥1 PHPUnit row** MUST also carry a 
 - `test_required_methods_ignores_fenced_example`
 ```
 
-- **The name must match the shipped declaration exactly.** Write the bare method name — no class prefix, no `()`, no `::`. Phase 5.0 greps the diff body for `function <name>` or `def <name>`.
-- **Fenced examples do not count.** Both parsers strip fenced blocks before reading the section (`bin/lib/critical-files.sh` for bash, `harness/planfile.py`'s `_strip_fenced` for python), so an illustrative list inside a fence yields zero entries.
-- **Escape hatch.** When every PHPUnit row genuinely names no new method (e.g. it re-runs an existing suite as a characterization check), write `<!-- no-test-methods: <reason ≥15 chars> -->` instead. `bin/check-plan` gate `[M]` accepts the section or the marker.
+- **The name must match the shipped declaration exactly.** Write the bare method name. Leave out any class prefix, `()`, or `::`. <!-- slop-ok -->
+- **Fenced examples do not count.** Both parsers strip fenced blocks before reading the section, so an illustrative list inside a fence yields zero entries.
+- **Escape hatch.** When every PHPUnit row genuinely names no new method, write `<!-- no-test-methods: <reason ≥15 chars> -->` instead. `bin/check-plan` gate `[M]` accepts the section or the marker.
 
 ## Forced E2E triggers
 
@@ -105,7 +105,7 @@ Any E2E verification-matrix row that asserts a **seed-** or **DOM-dependent** va
 The source must be one of:
 
 - A specific row or count from `ibl5/tests/e2e/fixtures/ci-seed.sql` (cite the table and the rows that produce the expected value), or
-- The rendered form DOM, fetched live from the worktree stack: `curl --cookie "_auto_login=1" http://<slug>.localhost/ibl5/modules.php?name=X` (cite the element the assertion targets). The `_auto_login=1` cookie opts into dev auto-login — localhost is logged-out by default, so an auth-gated form returns the login page without it (see `.claude/rules/browser-login.md`).
+- The rendered form DOM, fetched live from the worktree stack: `curl --cookie "_auto_login=1" http://<slug>.localhost/ibl5/modules.php?name=X` (cite the element the assertion targets). The `_auto_login=1` cookie is required because localhost is logged-out by default (see `.claude/rules/browser-login.md`).
 
 - **Sort direction is not "ascending by default."** `ibl5/jslib/sorttable.js` sorts **descending** on first click. See memory `reference_sorttable_descending_first`.
 - **Seed cardinality is small.** Counts must be grounded in what the CI seed actually contains. See memory `feedback_e2e_seed_grounding`.
@@ -156,6 +156,8 @@ If a plan matches a left-hand row, its Verification Matrix must carry a row asse
 | adds or modifies an escape path in a CI check gate that calls a git-range helper (`git log base..HEAD` or similar) | asserts the **empty-range** case: when no commits exist in the range (first commit on branch), the gate passes or fails gracefully without the escape path becoming permanently unreachable |
 | adds or modifies an enqueue or requeue path in bin/automouse/queue | asserts that a plan file with an ancient mtime is placed AFTER all incumbents — ordering must be by insertion time, not by the plan file's authoring mtime; both symlink lstat mtime (GNU ls sort key) and target mtime (BSD ls sort key) must be strictly newer than the newest incumbent |
 | removes or modifies an importer or upsert path that was writing an incorrect value to a column (fixing ongoing data corruption) | asserts that either (a) a compensating backfill migration ships in the same PR and is verified post-impl, or (b) the plan's Scope section explicitly states that already-corrupted rows are out of scope and names a follow-up plan or ticket |
+| adds or modifies an awk filter in a skill or bin/ file | carries a CLI-executable smoke test that verifies both the negative path (excluded content is absent from output) and the positive path (non-excluded content is present in output) |
+| introduces a find -regex pattern claiming cross-platform portability between macOS and Ubuntu | carries a CI-run verification row demonstrating the regex matches on the Ubuntu runner, OR uses bash-level character-class and length filtering instead of find interval expressions |
 | introduces or modifies a loop whose upper bound is sourced from user-controlled input (`$_GET`, request params) | asserts that an over-horizon input is **rejected before the loop begins** — a PHPUnit test showing that a maliciously large bound (e.g., `999999`) returns an empty or neutral result without iterating |
 | adds or modifies salary-comparison or cap-enforcement logic in a service | asserts **both** the in-season path (`Season::advancesContractYears()=false`, `current_salary` basis) and the offseason path (`advancesContractYears()=true`, `next_year_salary` basis): verify the salary-lookup column actually changes between paths and that the cap outcome (accept/reject) is correct on each |
 | relaxes a fail-closed guard on a store or import path (changes an error or rejection into a warning or no-op) | asserts that either (a) the compensating resolution path that prevents orphaned rows ships in the same PR and is verified post-impl, or (b) the plan's Scope section explicitly states that orphan accumulation is accepted and names a follow-up plan to address it |

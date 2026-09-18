@@ -1059,6 +1059,8 @@ jobs:
         run: bin/test-plan-review-digest
       - name: bin/test-plan-review-seam
         run: bin/test-plan-review-seam
+      - name: bin/test-check-registry-trigger-rows
+        run: bin/test-check-registry-trigger-rows
 
   gate:
     name: Tests and Analysis

@@ -183,6 +183,86 @@ run_p55() {
     PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" \
         FIDELITY_VERDICT_FILE="$vf" bash -c "$1" 2>&1
 }
+# run_findings <block> <fixture-kind|absent> <spawn|skip> — run the Phase 5.8
+# findings-render block in its own shell.  Writes the -2 fixture (when kind !=
+# absent) to $BASE_TMP/findings-verdict-2.md via mk_verdict_fixture.  Substitutes
+# the block's hardcoded VERDICT_2_FILE= assignment with a $BASE_TMP-scoped path so
+# no /tmp verdict-path collision is possible.  spawn + real fixture: block sees the
+# file.  skip or absent: block sees a nonexistent path (non-tautological when kind
+# != absent because the fixture still exists on disk, just not at the block's path).
+# Exports FIDELITY_VERDICT_FILE_2 (unset when kind=absent) and RE_REVIEW for seam
+# completeness.  Always exits 0 so callers can use $() capture freely.
+run_findings() {
+    local blk="$1" kind="$2" mode="$3"
+    local vf2="$BASE_TMP/findings-verdict-2.md"
+    local vf2_none="$BASE_TMP/findings-verdict-2-none.md"
+    mk_verdict_fixture "$kind" "$vf2"
+    local sub_path
+    if [ "$mode" = "spawn" ] && [ "$kind" != "absent" ]; then
+        sub_path="$vf2"
+    else
+        sub_path="$vf2_none"
+    fi
+    local exec_blk
+    exec_blk="$(printf '%s' "$blk" | sed 's|VERDICT_2_FILE="[^"]*"|VERDICT_2_FILE="'"$sub_path"'"|')"
+    if [ "$kind" = "absent" ]; then
+        bash -c "$exec_blk" 2>&1 || true
+    else
+        FIDELITY_VERDICT_FILE_2="$vf2" RE_REVIEW="$mode" bash -c "$exec_blk" 2>&1 || true
+    fi
+}
+# compose_fixture_body <re-reviewed-line|""> <raw-run-findings-output> — emit the
+# Step-6 sticky-comment body template with distinguishable sentinel values for the
+# five digest labels.  Extracts findings content from the second arg (lines after
+# the '--- V2_FINDINGS ---' marker produced by the render block); embeds them in
+# template order before ### Merge digest.  When the second arg carries no
+# '--- V2_FINDINGS ---' marker the findings slot is omitted entirely.
+compose_fixture_body() {
+    local rr_line="$1" raw_slot="$2"
+    local slot=""
+    if grep -q '^--- V2_FINDINGS ---$' <<< "$raw_slot"; then
+        slot="$(awk '/^--- V2_FINDINGS ---$/{found=1;next} found{print}' <<< "$raw_slot")"
+    fi
+    printf 'Plan-fidelity verdict: READY — synthetic test body.\n'
+    printf '\n'
+    printf '**Reviewed tree:** deadbeef0000\n'
+    [ -n "$rr_line" ] && printf '%s\n' "$rr_line"
+    if [ -n "$slot" ]; then
+        printf '\n'
+        printf '%s\n' "$slot"
+        printf '\n'
+    fi
+    printf '\n'
+    printf '### Merge digest\n'
+    printf '**What changed:** WC-VAL\n'
+    printf '**Why:** WHY-VAL\n'
+    printf '**Watch:** WATCH-VAL\n'
+    printf '**Touches:** TOUCH-VAL\n'
+    printf '**Machine-authored fixes:** MAF-VAL\n'
+    printf '\n'
+    printf '%s\n' '---'
+    printf '\n'
+    printf 'Remediation: none.\n'
+    printf '\n'
+    printf ': READY — synthetic terminal line.\n'
+    printf '<!-- pr-ready-verdict -->\n'
+}
+# Binding loop: assert each composer token still appears in $P55_SKILL so the
+# fixture cannot silently drift from the live template (same shape as the
+# 'REVIEWED_TREE=' / 'Re-reviewed tree:' prose loop above).
+for _cft in \
+    '**What changed:**' \
+    '**Why:**' \
+    '**Watch:**' \
+    '**Touches:**' \
+    '**Machine-authored fixes:**' \
+    '### Merge digest' \
+    '**Re-reviewed tree:**'; do
+    grep -qF "$_cft" "$P55_SKILL" || {
+        echo "FAIL: compose_fixture_body binding — '$_cft' no longer in $P55_SKILL; update composer to match"
+        FAILED=1
+    }
+done
 expect_fidelity() {
     if printf '%s' "$3" | grep -qxF "FIDELITY=$2"; then
         echo "ok: $1"
@@ -354,8 +434,10 @@ mk_verdict_fixture() {
         notes)       printf 'Findings: two advisory notes.\n\nREADY WITH NOTES\n\n## DIGEST\n**What changed:** x\n' > "$2" ;;
         notready)    printf 'Findings: intent gap on phase 3.\n\nNOT READY\n\n## DIGEST\n**What changed:** x\n' > "$2" ;;
         noverdict)   printf 'Findings: prose only, reviewer never emitted a verdict word.\n\n## DIGEST\n**What changed:** x\n' > "$2" ;;
-        digestready) printf 'Findings: intent gap.\n\nNOT READY\n\n## DIGEST\n**What changed:** the READY gate\n' > "$2" ;;
-        empty)       : > "$2" ;;
+        digestready)    printf 'Findings: intent gap.\n\nNOT READY\n\n## DIGEST\n**What changed:** the READY gate\n' > "$2" ;;
+        findings)       printf 'READY\n\n## FINDINGS\n\nXYZZY-FINDING-SENTINEL\n\nSome finding detail.\n\n## DIGEST\n**What changed:** x\n' > "$2" ;;
+        findingsempty)  printf 'READY\n\n## FINDINGS\n\n## DIGEST\n**What changed:** x\n' > "$2" ;;
+        empty)          : > "$2" ;;
         absent)      ;;
     esac
 }
@@ -372,6 +454,14 @@ BMC="$(extract_block '# phase 6 body-marker capture' "$P25_SKILL")"
 BMV="$(extract_block '# phase 6 body-marker verify'  "$P25_SKILL")"
 B12="$(extract_block '# condition (12)')"
 B55="$(extract_block '# phase 5.5 verdict parse' "$P55_SKILL")"
+# The findings-render block added in Phase 2. The literal marker is the ONLY binding
+# between the spec and this suite: if Phase 2's fence carries a different first-line
+# comment, change the FENCE to match this string — never the other way round.
+B58F="$(extract_block '# phase 5.8 findings render' "$P55_SKILL")"
+if [ -z "$B58F" ]; then
+    echo "FAIL: no block matching '# phase 5.8 findings render' in $P55_SKILL — marker drifted"
+    FAILED=1
+fi
 BREB="$(extract_block '# phase 2 rebase' "$P25_SKILL")"
 
 # --- structural: every predicate-using block must source the lib itself ---
@@ -1109,6 +1199,131 @@ if printf '%s' "$B12" | grep -vE '^[[:space:]]*#' | grep -qE '\$\$|\$PPID'; then
     FAILED=1
 else
     echo "ok: condition (12) verdict path is not PID-keyed"
+fi
+
+# --- §5.8c findings render: extraction + composition cases ----------------
+
+# Extract _digest_labels from bin/digest-dm-build (the expect_mss idiom: anchor on
+# the function's own 'name() {' .. '}' lines and eval it, so case 5 can assert on
+# the parser's records directly without the DM budget truncating them).
+# Trade-off: extracting the function rather than parsing the DM text catches a sixth
+# label displacing **Touches:** — parsing the DM cannot detect that defect.
+_DL_FN="$(sed -n '/^_digest_labels() {/,/^}/p' "$REPO_ROOT/bin/digest-dm-build")"
+if [ -z "$_DL_FN" ]; then
+    echo "FAIL: 5.8c setup — _digest_labels() not found in bin/digest-dm-build"
+    FAILED=1
+fi
+# shellcheck disable=SC2091
+eval "$_DL_FN"
+
+RR_LINE="**Re-reviewed tree:** cafebabe0001 (READY)"
+
+# Case 1 — findings render: XYZZY-FINDING-SENTINEL present and before ### Merge digest
+out1="$(run_findings "$B58F" findings spawn)"
+body1="$(compose_fixture_body "$RR_LINE" "$out1")"
+sentinel_lineno="$(grep -n 'XYZZY-FINDING-SENTINEL' <<< "$body1" | head -1 | cut -d: -f1)"
+digest_lineno="$(grep -n '^### Merge digest$' <<< "$body1" | head -1 | cut -d: -f1)"
+if grep -qF 'XYZZY-FINDING-SENTINEL' <<< "$body1" \
+        && [ -n "$sentinel_lineno" ] && [ -n "$digest_lineno" ] \
+        && [ "$sentinel_lineno" -lt "$digest_lineno" ]; then
+    echo "ok: 5.8c findings render: sentinel present and before ### Merge digest"
+else
+    echo "FAIL: 5.8c findings render: sentinel missing or not before ### Merge digest (sentinel=$sentinel_lineno digest=$digest_lineno)"
+    FAILED=1
+fi
+
+# Case 2 — quiet: findingsempty produces an empty slot and only blank lines between
+# **Re-reviewed tree:** and ### Merge digest
+out2="$(run_findings "$B58F" findingsempty spawn)"
+body2="$(compose_fixture_body "$RR_LINE" "$out2")"
+if grep -q '^--- V2_FINDINGS ---$' <<< "$out2"; then
+    echo "FAIL: 5.8c quiet: block emitted findings for a whitespace-only body"
+    FAILED=1
+else
+    echo "ok: 5.8c quiet: rendered slot is empty (V2_FINDINGS_PRESENT=no)"
+fi
+between2="$(awk '/^\*\*Re-reviewed tree:\*\*/{found=1;next} found && /^### Merge digest/{exit} found{print}' <<< "$body2")"
+if grep -q '[^[:space:]]' <<< "$between2"; then
+    echo "FAIL: 5.8c quiet: non-blank content between **Re-reviewed tree:** and ### Merge digest: '$between2'"
+    FAILED=1
+else
+    echo "ok: 5.8c quiet: only blank lines between re-reviewed tree and ### Merge digest"
+fi
+
+# Case 3 — degrade: absent -2 file; block exits 0 and composed body is byte-identical
+# to the pre-change template composed with an empty slot
+out3="$(run_findings "$B58F" absent spawn)"
+body3="$(compose_fixture_body "$RR_LINE" "$out3")"
+body3_ref="$(compose_fixture_body "$RR_LINE" "")"
+if [ "$body3" = "$body3_ref" ]; then
+    echo "ok: 5.8c degrade: absent file produces body byte-identical to empty-slot template"
+else
+    echo "FAIL: 5.8c degrade: body differs from empty-slot template"
+    FAILED=1
+fi
+
+# Case 4 — skip: fixture IS present on disk but mode=skip; assert slot empty and
+# composed body contains neither **Re-reviewed tree:** nor the sentinel.
+# Writing the fixture on the skip path is deliberate — it is what makes this
+# case non-tautological.
+out4="$(run_findings "$B58F" findings skip)"
+body4="$(compose_fixture_body "" "$out4")"
+if grep -qF '**Re-reviewed tree:**' <<< "$body4"; then
+    echo "FAIL: 5.8c skip: **Re-reviewed tree:** present in skip body"
+    FAILED=1
+elif grep -qF 'XYZZY-FINDING-SENTINEL' <<< "$body4"; then
+    echo "FAIL: 5.8c skip: XYZZY-FINDING-SENTINEL present in skip body (fixture leaked)"
+    FAILED=1
+else
+    echo "ok: 5.8c skip: slot empty and no re-reviewed line in composed body"
+fi
+
+# Case 5 — digest-parse regression: feed case 1's body to extracted _digest_labels;
+# assert exactly five records and each label's value equals its sentinel; then run
+# bin/digest-dm-build end-to-end on the same body and assert exit 0.
+if [ -n "$_DL_FN" ]; then
+    dl_out="$(_digest_labels <<< "$body1")"
+    dl_count="$(awk -F'\t' 'NF>=2{c++} END{print c+0}' <<< "$dl_out")"
+    if [ "$dl_count" -eq 5 ]; then
+        echo "ok: 5.8c digest-parse: _digest_labels yields exactly 5 records"
+    else
+        echo "FAIL: 5.8c digest-parse: _digest_labels yielded $dl_count records (expected 5)"
+        FAILED=1
+    fi
+    for _lv_pair in \
+        'What changed:WC-VAL' \
+        'Why:WHY-VAL' \
+        'Watch:WATCH-VAL' \
+        'Touches:TOUCH-VAL' \
+        'Machine-authored fixes:MAF-VAL'; do
+        _lbl="${_lv_pair%%:*}"; _want="${_lv_pair#*:}"
+        _got="$(awk -F'\t' -v l="$_lbl" '$1 == l { print $2; exit }' <<< "$dl_out")"
+        if [ "$_got" = "$_want" ]; then
+            echo "ok: 5.8c digest-parse: label '$_lbl' = '$_want'"
+        else
+            echo "FAIL: 5.8c digest-parse: label '$_lbl' expected '$_want', got '$_got'"
+            FAILED=1
+        fi
+    done
+    if printf '%s\n' "$body1" | "$REPO_ROOT/bin/digest-dm-build" \
+            --pr-number 9999 --title t --url u > /dev/null 2>&1; then
+        echo "ok: 5.8c digest-parse: bin/digest-dm-build exits 0 on composed body"
+    else
+        echo "FAIL: 5.8c digest-parse: bin/digest-dm-build non-zero on composed body"
+        FAILED=1
+    fi
+fi
+
+# 4f: no fixture writes /tmp/post-plan-fidelity-verdict-<digit> paths outside
+# DEFAULT_VF.  Pattern uses a bracketed char-class so the source line for the
+# _VPATH_PAT assignment does not contain '/tmp/...' + digit and cannot self-match.
+_VPATH_PAT='post-plan-fidelity-verdict-[0-9]'
+_vpath_hits="$(grep -c "/tmp/${_VPATH_PAT}" "$SCRIPT_DIR/test-postplan-arm-conditions" || true)"
+if [ "$_vpath_hits" -eq 1 ]; then
+    echo "ok: 5.8c fixture hygiene: no /tmp verdict paths with digit outside DEFAULT_VF"
+else
+    echo "FAIL: 5.8c fixture hygiene: $_vpath_hits lines contain /tmp/post-plan-fidelity-verdict-<digit> (expected only the DEFAULT_VF line)"
+    FAILED=1
 fi
 
 # --- §5.7 drift guards: path stem + parse agreement across phases ------------------

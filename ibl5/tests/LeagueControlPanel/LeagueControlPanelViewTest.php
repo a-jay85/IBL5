@@ -190,9 +190,18 @@ class LeagueControlPanelViewTest extends TestCase
         $this->assertMatchesRegularExpression('/<button type="button"[^>]*data-export-url="leagueControlPanel\.php\?export=active_players"/', $html);
     }
 
-    public function testActivePlayersExportButtonHiddenOutsideFreeAgency(): void
+    public function testPreseasonShowsActivePlayersExportButton(): void
     {
-        foreach (['Preseason', 'HEAT', 'Regular Season', 'Playoffs', 'Draft'] as $phase) {
+        $html = $this->renderWithDefaults([
+            'panelData' => self::createPanelData(['phase' => 'Preseason']),
+        ]);
+
+        $this->assertStringContainsString('data-export-url="leagueControlPanel.php?export=active_players"', $html);
+    }
+
+    public function testActivePlayersExportButtonHiddenOutsidePreseasonAndFreeAgency(): void
+    {
+        foreach (['HEAT', 'Regular Season', 'Playoffs', 'Draft'] as $phase) {
             $html = $this->renderWithDefaults([
                 'panelData' => self::createPanelData(['phase' => $phase]),
             ]);

@@ -190,6 +190,7 @@ class LeagueControlPanelView implements LeagueControlPanelViewInterface
     <div class="lcp-control-row">
         <button type="submit" name="action" value="reset_mles_lles" class="ibl-btn ibl-btn--secondary ibl-btn--sm">Reset All MLEs/LLEs</button>
     </div>
+    <?= HtmlSanitizer::trusted($this->renderActivePlayersExport()) ?>
 <?php endif; ?>
 </section>
         <?php

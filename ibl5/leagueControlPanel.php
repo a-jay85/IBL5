@@ -33,9 +33,9 @@ if (($_GET['export'] ?? null) === 'active_players') {
     header('Content-Type: application/json; charset=utf-8');
     header('Cache-Control: no-store');
 
-    if ($currentLeague !== 'ibl' || $repository->getSetting('Current Season Phase') !== 'Free Agency') {
+    if ($currentLeague !== 'ibl' || !in_array($repository->getSetting('Current Season Phase'), ['Preseason', 'Free Agency'], true)) {
         http_response_code(409);
-        echo json_encode(['error' => 'This export is only available during Free Agency.']);
+        echo json_encode(['error' => 'This export is only available during Preseason and Free Agency.']);
         exit;
     }
 

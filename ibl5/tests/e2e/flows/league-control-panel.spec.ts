@@ -146,7 +146,7 @@ test.describe('LeagueControlPanel — Active Players CSV Export endpoints', () =
 
   let exportedFilename = '';
 
-  test('export endpoint returns 409 outside Free Agency', async ({ page }) => {
+  test('export endpoint returns 409 outside Preseason and Free Agency', async ({ page }) => {
     await page.goto('leagueControlPanel.php');
     await assertNoPhpErrors(page, 'on LCP before export-phase test');
     await page.locator('select[name="SeasonPhase"]').selectOption('Playoffs');

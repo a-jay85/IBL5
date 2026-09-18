@@ -300,7 +300,10 @@ conflicting default in the skill):**
   the only placement that works**: this job runs you under \`claude -p\`, which emits
   only your final assistant message, so a marker printed at any earlier point is
   discarded before this job can read it. Printing it earlier as well is harmless —
-  the last occurrence wins — but never a substitute.
+  the last occurrence wins — but never a substitute. This overrides the skill's
+  Step 5.5 and Step 6: skip the queue step, write the Step 6 report, then end with
+  this line. Runs that followed Step 6 ended on a queue-status sentence
+  ("Queued at position N", "Automouse will pick it up") and lost the line.
 - **No human is present.** Never call \`AskUserQuestion\`, never pause for input,
   never end a turn waiting for an answer. The forks a human could answer were
   already resolved by the session that drafted this prompt; they appear above as

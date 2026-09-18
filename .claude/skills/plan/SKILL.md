@@ -4,7 +4,7 @@ description: "Plan an implementation task: enforces a verification matrix, direc
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
-last_verified: 2026-09-17
+last_verified: 2026-09-18
 ---
 
 # /plan — Implementation Planning with Verification Matrix
@@ -447,6 +447,8 @@ When the work was split into multiple PRs (Step 2.5), queue **every** queue-safe
 
 Report which plans were queued (and which were left for in-session implementation) in Step 6.
 
+**Under `CLAUDE_HEADLESS=1` (a `bin/plan-now` run), skip this step.** Never run `bin/automouse/queue` yourself. The job queues the plan after its own `bin/check-plan` verdict.
+
 ## Step 6: Report
 
 Tell the user:
@@ -459,3 +461,5 @@ Tell the user:
 - Whether any post-merge follow-up was mechanized (the merge-triggered watcher and what it runs on merge), or "no post-merge follow-up"
 - For a multi-PR split: the PR sequence and dependency order (which lands first, what each stacks on)
 - Whether each plan is ready for implementation or has open questions
+
+**Headless final line.** Under `CLAUDE_HEADLESS=1`, the report's last line is `PLAN_FILE: <absolute path>`, on its own with nothing after it. Report the disposition as "`bin/plan-now` queues it", since this run did not queue it. A report that ends on queue state ("Queued at position 11", "Automouse will pick it up") with no `PLAN_FILE:` line is the known failure. `bin/plan-now` then reports `RESULT degraded (recovered)` or `RESULT unconfirmed`.

@@ -2454,6 +2454,16 @@ grep -qF '**Watch:**' "$f" || fail "28h: **Watch:** missing from pr-ready-phase6
 grep -qF '**Touches:**' "$f" || fail "28h: **Touches:** missing from pr-ready-phase6.md"
 grep -qF '**Machine-authored fixes:**' "$f" || fail "28h: **Machine-authored fixes:** missing from pr-ready-phase6.md"
 grep -qF 'and nothing after it' "$f" || fail "28h: 'and nothing after it' missing from pr-ready-phase6.md"
+# Voice-contract wiring: the on-demand Read and the rewrite-once self-check. Both are prose
+# instructions with no runtime signal, so a clause pin is the only mechanical proof they survive.
+grep -qF '.claude/review-shared/_prose-voice-contract.md' "$f" \
+    || fail "28h: voice-contract Read instruction missing from pr-ready-phase6.md"
+grep -qF 'bin/check-digest-prose' "$f" \
+    || fail "28h: rewrite-once linter invocation missing from pr-ready-phase6.md"
+grep -qF 'rewrite **that line once**' "$f" \
+    || fail "28h: rewrite-once discipline clause missing from pr-ready-phase6.md"
+grep -qF '.claude/skills/review-shared/' "$f" \
+    && fail "28h: pr-ready-phase6.md cites the non-existent .claude/skills/review-shared/ path"
 # Floor, not an equality pin (matches 28j below): an exact date makes every later edit to
 # pr-ready-phase6.md fail this assertion for bumping the field the doc gate requires it to bump.
 lv=$(grep -m1 -oE '^last_verified: [0-9-]+' "$f" | cut -d' ' -f2); [[ "$lv" > "2026-09-03" ]] || fail "28h: last_verified not bumped in pr-ready-phase6.md (got $lv)"
@@ -2497,6 +2507,15 @@ lv=$(grep -m1 -oE '^last_verified: [0-9-]+' "$f" | cut -d' ' -f2); [[ "$lv" > "2
 grep -qF 'covers head <sha>' "$f" || fail "28k: provenance line missing from SKILL.md Phase 7 stub"
 n_ends_in_one=$(grep -c 'the file ends in one' "$f" || true)
 [[ $n_ends_in_one -eq 0 ]] || fail "28k: 'the file ends in one' still present in SKILL.md — stale claim not removed"
+
+# --- 28t: .claude/skills/post-plan/SKILL.md voice-contract wiring -------------------------
+f=".claude/skills/post-plan/SKILL.md"
+grep -qF '.claude/review-shared/_prose-voice-contract.md' "$f" \
+    || fail "28t: voice-contract Read instruction missing from post-plan SKILL.md"
+n_cdp=$(grep -cF 'bin/check-digest-prose' "$f" || true)
+[[ $n_cdp -ge 4 ]] || fail "28t: expected >=4 bin/check-digest-prose call sites in post-plan SKILL.md, got $n_cdp"
+grep -qF '.claude/skills/review-shared/' "$f" \
+    && fail "28t: post-plan SKILL.md cites the non-existent .claude/skills/review-shared/ path"
 
 # --- 28l: trailing space on ## DIGEST heading is normalised, not degraded ---
 FIX="$DG/l.md"
@@ -3168,6 +3187,62 @@ grep -qF '#### Code review' ".claude/skills/post-plan/_phase-4-review-audit.md" 
 grep -qF '**Reviewed tree:**' ".claude/skills/pr-ready/_phase7-verdict.md" \
     || fail "_phase7-verdict.md missing Reviewed-tree contract line (skip-review.sh match target)"
 end_case "skip-review-delta-row 30"
+
+# --- case: bin/check-digest-prose voice linter -------------------------------------------
+begin_case
+CDP="$SCRIPT_DIR/check-digest-prose"
+[[ -x "$CDP" ]] || fail "check-digest-prose missing or not executable"
+
+# (a) Must-FAIL fixtures — both verbatim samples from the voice contract.
+# Assert the NAMED rule, not just "some output" — ensures a deleted rule makes the test fail.
+printf '%s\n' "**What changed:** The automated post-plan pipeline now hands its own already-computed 'final checks passed' result across to the follow-up session that decides whether a PR can merge unattended, instead of leaving that session to look for a result nobody wrote." > "$SCRATCH/wc-bad.txt"
+out=$("$CDP" "$SCRATCH/wc-bad.txt")
+grep -qF 'SENTENCE_TOO_LONG'   <<<"$out" || fail "cdp: What-changed sample not flagged SENTENCE_TOO_LONG"
+grep -qF 'DEFINE_BY_NEGATION'  <<<"$out" || fail "cdp: What-changed sample not flagged DEFINE_BY_NEGATION"
+
+printf '%s\n' "**Watch:** The joined write-then-read path cannot execute on this branch because the launcher pins the main-checkout copy of the tooling, so the first real-world confirmation is the next automated run after this lands — and the fail-closed direction (no result written means still blocked) is the property to re-confirm there." > "$SCRATCH/watch-bad.txt"
+out=$("$CDP" "$SCRATCH/watch-bad.txt")
+grep -qF 'SENTENCE_TOO_LONG'   <<<"$out" || fail "cdp: Watch sample not flagged SENTENCE_TOO_LONG"
+grep -qF 'PASSIVE_NOMINALIZED' <<<"$out" || fail "cdp: Watch sample not flagged PASSIVE_NOMINALIZED"
+# NOTE: the Watch sample has exactly ONE em-dash, so MULTIPLE_EMDASH correctly does NOT fire.
+# Test the two-em-dash rule separately:
+printf '%s\n' "**Watch:** Phase 6.5 holds the PR — the result file is absent — and the next run writes it." > "$SCRATCH/emdash-bad.txt"
+"$CDP" "$SCRATCH/emdash-bad.txt" | grep -qF 'MULTIPLE_EMDASH' || fail "cdp: two-em-dash line not flagged MULTIPLE_EMDASH"
+
+# (b) Must-PASS fixtures — assert EMPTY output (exit 0 is unconditional so proves nothing here).
+printf '%s\n' "**What changed:** /post-plan now writes its final-checks result to the file Phase 6.5 reads. Phase 6.5 previously found no result there and held the PR." > "$SCRATCH/wc-good.txt"
+[[ -z "$("$CDP" "$SCRATCH/wc-good.txt")" ]] || fail "cdp: What-changed rewrite flagged (false positive)"
+
+# Watch rewrite contains bare "cannot" — guard on rule 5's narrow shape: widening
+# PASSIVE_NOMINALIZED to catch any "cannot" turns this green fixture red.
+printf '%s\n' "**Watch:** Phase 6.5 cannot confirm the write-then-read path on this branch. The next automated run confirms it. Re-check the fail-closed direction there." > "$SCRATCH/watch-good.txt"
+[[ -z "$("$CDP" "$SCRATCH/watch-good.txt")" ]] || fail "cdp: Watch rewrite flagged (false positive)"
+
+# (c) Must-PASS false-positive fixtures — one per tokenizing exclusion.
+# fp-backtick: backtick span strips its periods, so no false sentence boundary.
+printf '%s\n' "**Touches:** Run \`bin/digest-dm-build\` to build the DM. It caps Watch at 700 characters." > "$SCRATCH/fp-backtick.txt"
+[[ -z "$("$CDP" "$SCRATCH/fp-backtick.txt")" ]] || fail "cdp: backtick path with period flagged"
+
+# fp-version: period in version number v2.12.2 is not a boundary.
+printf '%s\n' "**What changed:** The runner now pins v2.12.2. The old pin drifted." > "$SCRATCH/fp-version.txt"
+[[ -z "$("$CDP" "$SCRATCH/fp-version.txt")" ]] || fail "cdp: version number v2.12.2 flagged"
+
+# fp-abbrev: e.g. abbreviation period is not a boundary.
+printf '%s\n' "**Why:** Use a codebase name, e.g. Phase 6.5, not a relative clause. That keeps the line short." > "$SCRATCH/fp-abbrev.txt"
+[[ -z "$("$CDP" "$SCRATCH/fp-abbrev.txt")" ]] || fail "cdp: e.g. abbreviation flagged"
+
+# (d) Exit-0 proof and stdin seam.
+"$CDP" "$SCRATCH/wc-bad.txt" >/dev/null 2>&1; rc=$?
+[[ $rc -eq 0 ]] || fail "cdp: exited $rc on a violating file — must always exit 0"
+"$CDP" < "$SCRATCH/wc-bad.txt" | grep -qF 'SENTENCE_TOO_LONG' || fail "cdp: stdin seam did not flag the violating sample"
+"$CDP" < "$SCRATCH/wc-bad.txt" >/dev/null 2>&1; rc=$?
+[[ $rc -eq 0 ]] || fail "cdp: exited $rc on violating stdin — must always exit 0"
+: | "$CDP" >/dev/null 2>&1; rc=$?
+[[ $rc -eq 0 ]] || fail "cdp: exited $rc on empty stdin"
+[[ -z "$(: | "$CDP")" ]] || fail "cdp: emitted output on empty stdin"
+"$CDP" "$SCRATCH/does-not-exist.txt" >/dev/null 2>&1; rc=$?
+[[ $rc -eq 0 ]] || fail "cdp: exited $rc on a missing file path — must always exit 0"
+end_case "check-digest-prose voice linter"
 
 # --- verdict -----------------------------------------------------------------------------
 if [[ $FAILED -ne 0 ]]; then

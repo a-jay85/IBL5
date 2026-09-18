@@ -56,6 +56,25 @@ def test_matrix_and_critical_files():
     assert cf[1][0] == "ibl5/schema.sql" and cf[1][2]  # "(read-only reference)" -> exempt
 
 
+def test_matrix_rejects_package_name_and_url_phantoms():
+    """Two live rows from the plan corpus. e2e-phase-matrix's row named the npm
+    package `@playwright/test` and its `lint:e2e` command tripped the E2E type match,
+    so conformance reported the package missing from every diff. The other row's
+    Behavior cell held a URL ahead of the real test path. Only the first backticked
+    candidate is ever considered, so that row now plans nothing instead of a phantom."""
+    content = (
+        "## Verification Matrix\n\n"
+        "| # | Behavior | Test type | When | Test |\n"
+        "|---|---|---|---|---|\n"
+        "| 8 | `fixtures/phase.ts` uses no value import of `@playwright/test` "
+        "| CLI-executable | post-impl | `cd ibl5 && bun run lint:e2e` |\n"
+        "| 13 | **NEG** `original_url` `https://evil.test/x` rejected | PHPUnit | post-impl "
+        "| `ibl5/tests/BugPipeline/AttachmentInputValidatorTest.php` — NEW |\n"
+    )
+    planned, _ = parse_matrix(content)
+    assert planned == []
+
+
 def test_matrix_ignores_fenced_rows():
     """A matrix row inside a fenced block is illustration, not a declaration.
 

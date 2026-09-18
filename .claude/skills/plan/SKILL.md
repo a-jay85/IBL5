@@ -408,6 +408,34 @@ bin/check-plan "$PLAN_PATH"
 
 It enforces the deterministic gates from Step 4 (matrix present, no false manuals, no `DECIDE`/`TBD`/`subject to …` tokens, no unresolved decision-trigger surface, reuse targets resolve, context budget, pre-prod exercise path). A non-zero exit prints each violation prefixed by its gate (`[1]`/`[3]`/`[7]`/`[8]`/`[13]`/`[B]`/`[H]`/`[R]`/`[C]`/`[T]`/`[S]`/`[P]`); resolve each and re-run. `[W]` (sweep-verb) also prints, but is **advisory and non-blocking** — it is emitted as a warning and never affects the exit code, so a `[W]` line alongside a clean exit is expected, not a violation you must clear. Do not leave a plan written until `bin/check-plan` passes. A `[C]` (context-budget) violation is resolved by **returning to Step 2.5 and splitting the plan into stacked PR-sized units** — reach for a `context-budget:` justification marker only when the size is illusory (e.g. the length is mostly fenced reference material or delegation-packet recipes and the actual phase count is small).
 
+### Staleness sweep (required)
+
+`bin/check-plan` does not check that the paths a plan cites actually exist. Run the staleness guard on the same file:
+
+```bash
+bin/check-plan-staleness "$PLAN_PATH"
+```
+
+Exit 0 → continue. Exit 2 → path/usage error; fix the argument and re-run. Exit 1 → it prints one `STALE: <token>` line per unresolved path: remediate the plan and re-run, at most 3 attempts. Do this here and not later because the guard's other callers run *inside* the automouse implementation session, which a queued plan reaches only after it is queued. A dead token there costs all three nightly attempts, and you are the only actor holding the design context that separates a typo from a path this plan creates.
+
+**Put the cue on the token's own physical line.** The guard tests `grep -F <token> … | grep -E <cues>` line by line, and plans hard-wrap, so a cue that opens the sentence one line above does not count. Find the token's line and place the cue adjacent to its backtick span:
+
+```
+`ibl5/classes/Module/ModuleAccessControl.php` (example) (moved from `ibl5/classes/ModuleAccessControl.php` (example))
+```
+
+| What the token actually is | Repair |
+|---|---|
+| A typo (the path exists at a different name) | Correct the path. No cue needed; a live path never flags. |
+| Created, moved or renamed by this plan | Add a same-line cue from `_architect-contract.md` § safe positions: `— NEW`, `Create`, `Write`, `moved from`, `→`. |
+| Cited only as an alternative this plan rejected | Move the line under a non-dependency heading (`## Out of Scope`, `## Non-Goals`, `## Rejected`, `## Alternatives`). |
+| Illustrative path, never real | Append `(example)` after the closing backtick (`bin/check-docs` convention). |
+| A path you cannot resolve to anything | Escalate (see below). |
+
+A `>` blockquote is **not** a safe position; quoted prose is scanned exactly like body prose. A fenced code block is.
+
+**Escalation.** After 3 attempts, or immediately for a token with no resolvable target: stop remediating and do not loop further. Never delete the plan. Leave the plan file on disk, add `auto_merge: false` to the line-1 frontmatter, write an `## Automouse Hold Justification` entry naming each unresolved `STALE:` token and why it could not be resolved, and skip Step 5.5. The plan is written for a human to pick up.
+
 ### Declaring the implementation model (required)
 
 The automouse implementation agent's model is selectable per-plan via a line-1 YAML frontmatter field, and **every plan with a Verification Matrix must declare one** — `bin/check-plan` gate `[13]` (via `bin/lib/plan-model-consistency`) rejects an absent marker; there is no Opus-by-omission default. When **every** behavior-changing step has at least one Verification-Matrix row that is objectively machine-checkable and fails on a wrong edit (PHPStan green, PHPUnit/CLI assertion, baseline regen, identical test count, green-green characterization), prepend this block as the **very first lines** of the plan file:
@@ -435,14 +463,15 @@ auto_merge: false
 
 ## Step 5.5: Auto-queue queue-safe plans
 
-A plan is **queue-safe** the moment `bin/check-plan` (Step 5) exits 0 — that gate already enforces no unresolved decisions, no `DECIDE`/`TBD`/`subject to…` tokens, resolved decision-triggers, and resolved reuse targets, so a passing plan is fully specified for unattended automouse execution. Queue-safety is **independent of `auto_merge`**: a plan held for human merge (`auto_merge: false`) is still safe to *implement* autonomously — only its merge waits (Phase 6.5 condition (7)).
+A plan is **queue-safe** the moment **both** `bin/check-plan` and `bin/check-plan-staleness` (Step 5) exit 0 — those gates already enforce no unresolved decisions, no `DECIDE`/`TBD`/`subject to…` tokens, resolved decision-triggers, and resolved reuse targets, so a passing plan is fully specified for unattended automouse execution. Queue-safety is **independent of `auto_merge`**: a plan held for human merge (`auto_merge: false`) is still safe to *implement* autonomously — only its merge waits (Phase 6.5 condition (7)).
 
 For every plan that passed `bin/check-plan` in Step 5, decide its disposition by this precedence (the default is **queue**):
 
 1. **Explicit token in the request** wins outright: `--implement` (or "implement now") → do NOT queue; leave the plan on disk and report it ready to implement. `--queue` → queue.
-2. **Else, default: auto-queue.** Run `bin/automouse/queue <slug>` for the plan.
+2. **Else, the Step 5 staleness sweep never cleared** (`bin/check-plan-staleness` still exits 1 after the 3-attempt cap, so the plan carries `auto_merge: false` and an `## Automouse Hold Justification` naming the unresolved `STALE:` token) → do NOT queue. A dead path token spends all three of automouse's nightly attempts before a human sees it; leaving the plan on disk costs one review instead.
+3. **Else, default: auto-queue.** Run `bin/automouse/queue <slug>` for the plan.
 
-When the work was split into multiple PRs (Step 2.5), queue **every** queue-safe unit, running `bin/automouse/queue <slug>` once per plan in dependency order (the order they must merge). A plan that did not pass `bin/check-plan` is never queued — fix it first.
+When the work was split into multiple PRs (Step 2.5), queue **every** queue-safe unit, running `bin/automouse/queue <slug>` once per plan in dependency order (the order they must merge). A plan that did not pass `bin/check-plan` **or** `bin/check-plan-staleness` is never queued; fix it first.
 
 Report which plans were queued (and which were left for in-session implementation) in Step 6.
 

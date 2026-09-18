@@ -84,11 +84,10 @@ check 1 "Real repo files pass" 0 \
 make_verification "$TMPDIR_FIXTURES/v2.md"
 make_registry_with_anchor "$TMPDIR_FIXTURES/r2.md" "Forced integration-verification trigger" "phrase that does not exist anywhere" "#1111"
 actual_exit=0
-"$GATE" --registry "$TMPDIR_FIXTURES/r2.md" --verification "$TMPDIR_FIXTURES/v2.md" 2>&1 | grep -q '#1111' || true
 out=$("$GATE" --registry "$TMPDIR_FIXTURES/r2.md" --verification "$TMPDIR_FIXTURES/v2.md" 2>&1 || true)
 actual_exit=0
 "$GATE" --registry "$TMPDIR_FIXTURES/r2.md" --verification "$TMPDIR_FIXTURES/v2.md" >/dev/null 2>&1 || actual_exit=$?
-if [[ "$actual_exit" -eq 1 ]] && echo "$out" | grep -q '#1111'; then
+if [[ "$actual_exit" -eq 1 ]] && grep -q '#1111' <<< "$out"; then
     pass "Case 2 — anchor absent exits 1 and names row ID"
 else
     fail "Case 2 — anchor absent exits 1 and names row ID (exit=$actual_exit, rowid_in_msg=$(echo "$out" | grep -c '#1111' || echo 0))"

@@ -82,6 +82,25 @@ def _run_reaped(argv, stdin_text, timeout, cwd, env):
             pass
 
 
+# Tools that let a session persist a file. A tooled call granted none of them cannot
+# satisfy ~/.claude/hooks/subagent-persist-gate.py, which then blocks the stop and
+# forces an extra "I have no Write tool" turn. That forced turn REPLACES the envelope's
+# `result`, so a fidelity reviewer's verdict document was lost behind the complaint.
+PERSIST_TOOLS = ("Write", "Edit", "NotebookEdit", "Bash")
+
+
+def _tooled_env(allowed_tools, denied_tools) -> dict:
+    """Subprocess env for a tooled call. Write-less calls opt out of the persist gate."""
+    env = {**os.environ, "CLAUDE_HEADLESS": "1"}
+    usable = set(allowed_tools) - set(denied_tools or ())
+    if usable.isdisjoint(PERSIST_TOOLS):
+        env["PERSIST_GATE_SKIP"] = "1"
+    else:
+        # never inherit a skip from the parent onto a call that can write
+        env.pop("PERSIST_GATE_SKIP", None)
+    return env
+
+
 def _tooled_argv(model, *, agent, allowed_tools, denied_tools, add_dirs,
                  append_system_prompt, setting_sources, max_turns) -> list[str]:
     """Pure argv builder so replay can record a live run's exact command line."""
@@ -224,7 +243,7 @@ class ClaudeCli:
         for attempt in range(max_retries + 1):
             try:
                 proc = _run_reaped(argv, prompt, timeout, cwd,
-                                   {**os.environ, "CLAUDE_HEADLESS": "1"})
+                                   _tooled_env(allowed_tools, denied_tools))
             except subprocess.TimeoutExpired:
                 last_err = f"tooled call exceeded {timeout}s wall clock"
                 rec.retries = attempt

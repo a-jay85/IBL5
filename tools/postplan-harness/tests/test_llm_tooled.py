@@ -19,12 +19,22 @@ from harness.adapters.llm import (
     ClaudeCli,
     FixtureLlm,
     _tooled_argv,
+    _tooled_env,
+)
+from harness.fidelity import (
+    REMEDIATION_ALLOWED_TOOLS,
+    REMEDIATION_DENIED_TOOLS,
+    REVIEW_ALLOWED_TOOLS,
+    REVIEW_DENIED_TOOLS,
 )
 from harness.state import HarnessError, UsageLedger
 
 # Fake `claude`: logs its argv, then emits whatever CLAUDE_SHIM_REPLY holds.
 SHIM = """#!/usr/bin/env bash
 printf '%s\\n' "$*" >> "$CLAUDE_SHIM_LOG"
+if [ -n "${CLAUDE_SHIM_ENV_LOG:-}" ]; then
+  printf '%s\\n' "${PERSIST_GATE_SKIP:-unset}" >> "$CLAUDE_SHIM_ENV_LOG"
+fi
 cat > /dev/null
 if [ -n "${CLAUDE_SHIM_SPAWN_PID_FILE:-}" ]; then
   bash -c 'echo $$ > "$1"; exec sleep 60' _ "$CLAUDE_SHIM_SPAWN_PID_FILE" &
@@ -96,6 +106,46 @@ def test_tooled_argv_uses_model_when_no_agent():
     assert argv[argv.index("--model") + 1] == "claude-opus-5"
     assert "--agent" not in argv
     assert argv[argv.index("--append-system-prompt") + 1] == "extra"
+
+
+# --- persist-gate opt-out ----------------------------------------------------
+# A write-less session cannot satisfy ~/.claude/hooks/subagent-persist-gate.py. When
+# the gate blocked the fidelity reviewer's stop, its forced "no Write tool" reply
+# replaced the verdict in the envelope `result` (PR #2297).
+
+def test_write_less_review_skips_persist_gate():
+    env = _tooled_env(REVIEW_ALLOWED_TOOLS, REVIEW_DENIED_TOOLS)
+    assert env["PERSIST_GATE_SKIP"] == "1"
+    assert env["CLAUDE_HEADLESS"] == "1"
+
+
+def test_writing_remediation_keeps_persist_gate(monkeypatch):
+    monkeypatch.setenv("PERSIST_GATE_SKIP", "1")   # never inherited onto a writer
+    env = _tooled_env(REMEDIATION_ALLOWED_TOOLS, REMEDIATION_DENIED_TOOLS)
+    assert "PERSIST_GATE_SKIP" not in env
+
+
+@pytest.mark.parametrize("allowed,denied,skips", [
+    (("Read", "Bash"), ("Agent",), False),     # Bash can redirect to a file
+    (("Read", "Bash"), ("Bash",), True),       # denied wins over allowed
+    (("Read", "Edit"), (), False),
+    (("Read",), None, True),
+])
+def test_persist_gate_skip_tracks_usable_write_tools(allowed, denied, skips):
+    assert ("PERSIST_GATE_SKIP" in _tooled_env(allowed, denied)) is skips
+
+
+def test_skip_reaches_the_cli_subprocess(shim, tmp_path, monkeypatch):
+    env_log = tmp_path / "env.log"
+    monkeypatch.setenv("CLAUDE_SHIM_ENV_LOG", str(env_log))
+    monkeypatch.delenv("PERSIST_GATE_SKIP", raising=False)
+    cli = _cli(tmp_path)
+    cli.call_tooled("r", "opus", "p", cwd=str(tmp_path),
+                    allowed_tools=REVIEW_ALLOWED_TOOLS, denied_tools=REVIEW_DENIED_TOOLS)
+    cli.call_tooled("m", "sonnet", "p", cwd=str(tmp_path),
+                    allowed_tools=REMEDIATION_ALLOWED_TOOLS,
+                    denied_tools=REMEDIATION_DENIED_TOOLS)
+    assert env_log.read_text().splitlines() == ["1", "unset"]
 
 
 # --- empty allowlist is a rejected form --------------------------------------

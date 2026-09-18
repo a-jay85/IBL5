@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-09-16
+last_verified: 2026-09-17
 ---
 
 # Post-Plan Orchestrator
@@ -449,7 +449,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 11. Unresolved scored finding — no unresolved GitHub review thread carries a `<!-- score: N -->` marker with N >= 80. Live-state counterpart to (2), which is run-local.
 12. Plan-intent fidelity — Phase 5.5 produced a verdict of `READY` or `READY WITH NOTES` **covering the current `HEAD` tree** — either the first reviewer's verdict, or the bounded second-review verdict Phase 5.5 writes after remediation.
 13. Plan-slug drift — the plan was located by drift (`<prefix>-<slug>.md`) rather than the exact branch-slug path; adoption is a guess, so auto-merge is held until a human confirms the plan is this branch's plan.
-14. **No conflict auto-resolved this run** — the Phase 2 rebase did not conflict, or if it did, the flag file written by its `STOP-AND-RESOLVE` arm is absent. A run that auto-resolved a conflict carries lines no structured review has seen; it ships the PR but never arms auto-merge, and announces the hold on the PR itself (Phase 6.5 sticky step). Fail-closed: the flag existing blocks, its absence clears.
+14. **No unreviewed conflict this run.** The Phase 2 rebase did not conflict, or it did and `_phase-2-conflict-resolution.md` step 7.5 wrote a verdict whose first line is exactly `CONFLICT-REVIEW=CLEAN` at the path keyed to this branch slug and the current `HEAD` sha. Fail-closed: the flag existing blocks, and only that exact verdict clears it. A missing, empty, negative, or stale-sha verdict blocks.
 
 **These conditions only ever HOLD, never RELEASE.** They are an AND-of-not-blocked set: every condition can *add* a block; none can clear another's. Conditions (7)–(9) are **additive brakes on top of** the deterministic floors (1)–(6), the pipeline-authored floor (10), and the independent `human-signoff` required GitHub check — they exist to catch what those miss, never to override them. post-plan **always runs and opens the PR**; these conditions decide only whether auto-merge *arms*. A held PR stays open for a human to merge.
 
@@ -507,16 +507,35 @@ rather than stacked.
 
 **Fail-closed default:** if any condition is indeterminate, errors, or you are unsure, treat it as **BLOCKED** and do NOT arm. A false HOLD costs one manual human merge; a false ARM ships unreviewed code — only under-holding is dangerous.
 
-**Condition (14) — conflict auto-resolved this run.** Run-local, inline here (not in the shared predicate — the flag lives in `/tmp` and no cross-PR consumer can see it):
+**Condition (14) — run-local, inline here (not in the shared predicate — the flag lives in `/tmp` and no cross-PR consumer can see it):** <!-- slop-ok -->
 
 ```bash
 # phase 6.5 condition 14: a rebase conflict auto-resolved by this run holds auto-merge.
-# CONFLICT_FLAG is overridable only so bin/test-postplan-arm-conditions can point this
-# block at a fixture path; production leaves it unset and takes the default.
+# The hold clears only when _phase-2-conflict-resolution.md step 7.5 wrote a verdict whose
+# FIRST LINE is exactly CONFLICT-REVIEW=CLEAN, at a path keyed to the branch slug AND the
+# current HEAD sha. The .ok suffix names the artifact slot, never the outcome: a
+# CONFLICT-REVIEW=FOUND-PROBLEM verdict is written to this same path, so rewriting this as
+# test -f "$CONFLICT_VERDICT" would arm auto-merge on a negative review.
+# CONFLICT_FLAG, CONFLICT_VERDICT_DIR and CONFLICT_VERDICT_KEY are overridable only so
+# bin/test-postplan-arm-conditions can point this block at fixture paths; production leaves
+# them unset and takes the defaults. The HEAD sha is deliberately NOT seam-overridable, so a
+# verdict written for an older tree can never clear the hold for the tree being merged.
 CONFLICT_FLAG="${CONFLICT_FLAG:-/tmp/postplan-conflict-resolved-$(git rev-parse --abbrev-ref HEAD | tr '/:' '--')}"
+CONFLICT_VERDICT_DIR="${CONFLICT_VERDICT_DIR:-/tmp}"
+CONFLICT_VERDICT_KEY="${CONFLICT_VERDICT_KEY:-$(git rev-parse --abbrev-ref HEAD | tr '/:' '--')}"
+CONFLICT_VERDICT="$CONFLICT_VERDICT_DIR/postplan-conflict-verdict-$CONFLICT_VERDICT_KEY-$(git rev-parse HEAD).ok"
 if [ -e "$CONFLICT_FLAG" ]; then
-  echo "COND14=blocked"
-  echo "HOLD: auto-merge NOT armed — this /post-plan run auto-resolved a rebase conflict. Conflict-resolved lines are code no structured review has seen, so condition (14) refuses to arm. The lost-work proof passed (TREE-EQUIVALENT), so nothing was dropped — this PR is correct, it just needs a human merge. The hold and the resolved files are posted on the PR under the post-plan-conflict-hold sticky comment. Review those files and merge by hand; do not re-run /post-plan to clear this."
+  VERDICT_LINE=""
+  if [ -r "$CONFLICT_VERDICT" ]; then
+    read -r VERDICT_LINE < "$CONFLICT_VERDICT" || VERDICT_LINE=""
+  fi
+  if [ "$VERDICT_LINE" = "CONFLICT-REVIEW=CLEAN" ]; then
+    echo "COND14=clear"
+    echo "CONFLICT-REVIEW=CLEAN: the conflict resolution was reviewed for this HEAD tree, so condition (14) does not hold. The lost-work proof passed (TREE-EQUIVALENT) and every other arming condition still applies."
+  else
+    echo "COND14=blocked"
+    echo "HOLD: auto-merge NOT armed — Phase 6.5 condition (14) holds. This /post-plan run auto-resolved a rebase conflict, and the conflict-resolution review did not clear it for the current HEAD tree. The lost-work proof passed (TREE-EQUIVALENT), so nothing was dropped, but the resolution is unreviewed, was reported as a problem, or was reviewed against an older tree. Read the sticky conflict comment on the PR for the file list and any findings, then review those files and merge by hand; do not re-run /post-plan to clear this."
+  fi
 else
   echo "COND14=clear"
 fi

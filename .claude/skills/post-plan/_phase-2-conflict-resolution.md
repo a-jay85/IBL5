@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 2 — resolve a rebase conflict, prove no work was lost, and arm the conflict hold. Loaded only when the Phase 2 rebase block prints STOP-AND-RESOLVE.
-last_verified: 2026-09-16
+last_verified: 2026-09-17
 paths:
   - .claude/skills/post-plan/SKILL.md
   - .claude/skills/pr-ready/_rebase-and-conflicts.md
@@ -167,7 +167,19 @@ What *is* written here, after `TREE-EQUIVALENT`, is the manifest the announcemen
 ```bash
 git diff --name-only <MASTER_SHA>...HEAD > /tmp/postplan-conflict-files-<KEY>.txt
 test -s /tmp/postplan-conflict-files-<KEY>.txt && echo "CONFLICT-MANIFEST=written"
+echo "POST_RESOLUTION_SHA=$(git rev-parse HEAD)"
 ```
+
+The value printed as `POST_RESOLUTION_SHA=<sha>` is recorded once and substituted as the
+literal `<POST_RESOLUTION_SHA>` in step 7.5 and in the Phase 7 re-arm gate. It is never
+re-derived in a later block of this file, because a shell variable does not survive the block
+boundary. The sha names the tree the resolution produced. If commits land after this point
+(a Phase 5 remediation commit, say), the verdict written in step 7.5 no longer covers `HEAD`,
+and Phase 6.5 condition (14) holds. That is the same "covering the current `HEAD` tree"
+property condition (12) already requires of the Phase 5.5 fidelity verdict, and it is the
+fail-closed reading: a tree nobody reviewed does not inherit a clearance. If `git rev-parse HEAD`
+fails or prints nothing, the orchestrator has no literal to substitute. Step 7.5 must then halt
+with a `STOP:` line rather than writing to a path containing an empty sha component.
 
 Then, with the **`Write` tool** (not a heredoc — the resolved-path list and descriptions come
 from run notes, and a `mktemp` variable does not survive between blocks), write
@@ -178,7 +190,60 @@ from run notes, and a `mktemp` variable does not survive between blocks), write
 
 Phase 6.5 renders this into the sticky PR comment.
 
-## Step 8 — Return to `SKILL.md`
+## Step 7.5 — Review the resolution, and write the verdict <!-- slop-ok -->
+
+**Preconditions.** All three must be present before spawning the reviewer. Any one missing halts
+with a `STOP:` line. `TREE-EQUIVALENT` must have printed in step 6. `CONFLICT-MANIFEST=written`
+must have printed in step 7. `POST_RESOLUTION_SHA` must be non-empty (printed in step 7). The
+lost-work proof answers whether anything was dropped; this step answers the different question
+of whether the resolution that survived is semantically correct.
+
+Spawn exactly one sub-agent, `subagent_type: "sonnet-4-6"`, `model` omitted so the in-repo
+`.claude/agents/sonnet-4-6.md` pin wins. One spawn, no retry loop. `run_in_background: false`.
+
+**Scope (hard bound in the reviewer prompt).** Read only the paths listed in
+`/tmp/postplan-conflict-files-<KEY>.txt`, the descriptions in
+`/tmp/postplan-conflict-resolution-<KEY>.md`, and the conflicted hunks in those paths. Never
+review the whole PR diff. Phase 4 owns that and runs later.
+
+**The one question the reviewer answers.** For each resolved path: did the three-way resolution
+keep the intent of both sides, or did it silently drop a side's semantics while staying
+tree-equivalent in bytes? Name a finding when a resolution picked one side over a change the
+other side made to the same behavior, when a resolution merged two edits into a state neither
+side would accept, or when a `COLLAPSE-GUARD: WARN` from step 3 is unexplained by the manifest.
+
+**Output artifact.** Write with the `Write` tool to
+`/tmp/postplan-conflict-verdict-<KEY>-<POST_RESOLUTION_SHA>.ok`:
+
+- **Line 1 is exactly one of** `CONFLICT-REVIEW=CLEAN` or `CONFLICT-REVIEW=FOUND-PROBLEM`, bare,
+  with no leading marker, no trailing prose, and no bold. Consumers compare line 1 by exact
+  string equality, so `CONFLICT-REVIEW=CLEAN (all paths)` reads as not-clean and holds. This is
+  the same failure the `REVIEWED_TREE` parser hit when prose followed the token.
+- Remaining lines: one bullet per reviewed path for a clean verdict, or a `## Findings` list for
+  `FOUND-PROBLEM`, each finding naming the path and what the resolution lost.
+
+The `.ok` suffix names the artifact slot. The outcome is on line 1. A `FOUND-PROBLEM` verdict is
+written to the same path. A `test -f` on this path would arm auto-merge on a negative review.
+Consumers read line 1.
+
+After the sub-agent returns, print `CONFLICT-REVIEW=CLEAN` or `CONFLICT-REVIEW=FOUND-PROBLEM`
+into the run log and carry the findings text forward for the Phase 6.5 step 0 sticky render.
+
+**On `FOUND-PROBLEM`: hold, no retry.** Continue into step 8 and open the PR exactly as today.
+Phase 6.5 condition (14) blocks, and the sticky comment renders the held branch from the
+appendix with the findings. Do not re-resolve, do not re-spawn, do not edit the verdict file
+to clear it.
+
+If the sub-agent returns without writing the file, or writes an unreadable one, print
+`CONFLICT-REVIEW=ABSENT` and continue. Absence holds, so no recovery is needed.
+
+<!-- The /tmp/postplan-conflict-verdict-<KEY>-<POST_RESOLUTION_SHA>.ok artifact is keyed by
+branch slug plus commit sha, never by PR number, so it cannot collide with the
+/tmp/pr-ready-verdict- namespace a concurrent /pr-ready run owns. /pr-ready's
+scripts/post-verdict.sh is never called for it. A reviewer that writes the file but stalls
+before writing line 1 leaves a zero-byte file; Phase 5 treats a zero-byte file as a hold. -->
+
+## Step 8 — Return to `SKILL.md` <!-- slop-ok -->
 
 Proceed to Phase 2 step 3 (push) and step 4 (`gh pr create`). The PR body's files-changed
 block must reflect the post-resolution diff, and per
@@ -193,6 +258,49 @@ Phase 6.5 step 0 renders this into `/tmp/post-plan-conflict-comment-<KEY>.md` wi
 tool and posts it under the marker `<!-- post-plan-conflict-hold -->`. The wording is
 maintained **here only**; `SKILL.md` points at this appendix rather than carrying a copy.
 
+The comment body is selected by reading the verdict file
+`/tmp/postplan-conflict-verdict-<KEY>-<POST_RESOLUTION_SHA>.ok` and comparing its first line to
+the exact string `CONFLICT-REVIEW=CLEAN`. A match renders **(b-clean)**. Every other outcome
+renders **(b-held)**: a missing file, an empty file, a first line carrying anything else, and a
+first line that merely starts with the token. The `.ok` suffix signals the artifact slot. A
+`FOUND-PROBLEM` verdict lives at the same path. First-line equality is the only selector.
+
+Both renders share sections **(a)** and **(c)** unchanged. Only the heading and section **(b)**
+differ. Both live inside the single `<!-- post-plan-conflict-hold -->` marker so `post_sticky()`
+updates in place on re-run.
+
+---
+
+### (b-clean) — rendered when first line is exactly `CONFLICT-REVIEW=CLEAN`
+
+````markdown
+<!-- post-plan-conflict-hold -->
+## Rebase conflict auto-resolved, then reviewed clean
+
+**(a) What happened.** Rebasing this branch onto `master` conflicted. `/post-plan` resolved
+the conflict automatically (three-way, per `.claude/skills/pr-ready/_rebase-and-conflicts.md` §2e)
+and proved no work was lost: `lostwork.sh` reported **TREE-EQUIVALENT** against the pre-rebase
+diff, which is a precondition for the push that produced this PR.
+
+**(b) Review outcome.** A dedicated conflict-resolution review read every path in the manifest
+and found no dropped semantics. The lost-work proof passed (`TREE-EQUIVALENT`), so nothing was
+silently dropped in bytes either. Auto-merge is armed. The PR still has to clear every other
+Phase 6.5 condition and CI before it merges.
+
+**(c) Files the resolution touched.**
+
+<one bullet per path from /tmp/postplan-conflict-resolution-<KEY>.md, each with the
+one-line description of which side the resolution took and why>
+
+<COLLAPSE-GUARD: WARN line from step 3, if any>
+
+_Posted by `/post-plan`. Updated in place on re-run._
+````
+
+---
+
+### (b-held) — rendered on every other outcome
+
 ````markdown
 <!-- post-plan-conflict-hold -->
 ## Auto-merge held — this run auto-resolved a rebase conflict
@@ -206,6 +314,12 @@ diff, which is a precondition for the push that produced this PR.
 `/post-plan` Phase 6.5 condition (14) therefore refuses to arm auto-merge on this PR. This is
 the gate working as designed, not a failure — **merge it by hand after reviewing the files below.**
 
+### Findings from the conflict-resolution review
+
+<when verdict was CONFLICT-REVIEW=FOUND-PROBLEM: paste the ## Findings body from the verdict
+file here. When the verdict was absent, empty, or unparseable: the review did not produce a
+readable verdict. The hold is the fail-closed default rather than a specific finding.>
+
 **(c) Files the resolution touched.**
 
 <one bullet per path from /tmp/postplan-conflict-resolution-<KEY>.md, each with the
@@ -217,7 +331,10 @@ _Posted by `/post-plan`. Updated in place on re-run._
 ````
 
 The "merge it by hand" sentence is load-bearing: a held PR with no stated remedy reads as a
-bug, and the stated remedy is what turns the hold into a one-line human action.
+bug, and the stated remedy is what turns the hold into a one-line human action. A `FOUND-PROBLEM`
+verdict whose body has no `## Findings` heading still renders (b-held), with the findings
+subsection stating that the reviewer reported a problem without an itemized list.
 
 When the Phase 7 CI-watch re-rebase loop is what hit the conflict, add one line to section (a)
-naming that loop as the trigger. Same marker, same comment — no second mechanism.
+naming that loop as the trigger. The branch rendered is chosen by the rule above. Same marker,
+same comment.

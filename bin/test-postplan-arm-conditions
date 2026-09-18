@@ -1311,8 +1311,25 @@ if [ -z "$B14" ]; then
     echo "FAIL: §5.9c — no block matching '# phase 6.5 condition 14' in $P25_SKILL"
     FAILED=1
 else
+    # The awk region is delimited by one anchor comment. Two anchors and
+    # extract_block silently returns the wrong span, so every §5.9c
+    # assertion below would pass against text that never runs.
+    ANCHOR_N="$(grep -cF '# phase 6.5 condition 14' "$P25_SKILL")"
+    if [ "$ANCHOR_N" != "1" ]; then
+        echo "FAIL: §5.9c — anchor '# phase 6.5 condition 14' appears $ANCHOR_N times in $P25_SKILL"
+        FAILED=1
+    fi
     have "§5.9c: CONFLICT_FLAG seam keeps its default" "$B14" 'CONFLICT_FLAG:-/tmp/postplan-conflict-resolved-'
     lacks "§5.9c: condition (14) never arms auto-merge itself" "$B14" 'gh pr merge'
+
+    # Characterization (pre-impl): this group runs with NO verdict file anywhere
+    # under the scratch root. Phase 5 makes that precondition load-bearing —
+    # this is matrix case 2 (conflict + no verdict → HOLDS).
+    VC="$(find "$BASE_TMP" -name 'postplan-conflict-verdict-*' 2>/dev/null | wc -l | tr -d ' ')"
+    if [ "$VC" != "0" ]; then
+        echo "FAIL: §5.9c — scratch root holds $VC verdict file(s); the hold case is vacuous"
+        FAILED=1
+    fi
 
     # Flag present -> hold, with the full remedy wording. A HOLD line that does not
     # say what the human should do reads as a bug report, not a gate.
@@ -1478,10 +1495,11 @@ have "§5.9k: SKILL.md counts fourteen conditions"        "$P25_TXT" '**All four
 have "§5.9k: the run-only enumeration ends /(13)/(14)"   "$P25_TXT" '(2)/(3)/(4)/(7)/(9)/(12)/(13)/(14)'
 have "§5.9k: the shared-predicate list is unchanged"     "$P25_TXT" '(1)/(5)/(6)/(8)/(10)/(11)'
 
-# The resolution file runs headless: a spawn handed work past the turn boundary is
-# unrecoverable under `claude -p`, and §2b of the /pr-ready guide is exactly that shape.
-lacks "§5.9k: the resolution file spawns no sub-agent"   "$CRES_TXT" 'subagent_type'
-lacks "§5.9k: the resolution file calls no Agent()"      "$CRES_TXT" 'Agent('
+# Step 7.5 intentionally spawns a single Sonnet reviewer to write the conflict-verdict file.
+# The spawn must be scoped to that step and use the pinned subagent_type (never a bare Agent call).
+have  "§5.9k: the resolution file has a step 7.5 verdict section"    "$CRES_TXT" '## Step 7.5'
+have  "§5.9k: step 7.5 uses the pinned reviewer subagent_type"       "$CRES_TXT" 'subagent_type: "sonnet-4-6"'
+lacks "§5.9k: the resolution file calls no Agent()"                  "$CRES_TXT" 'Agent('
 # The flag is written at conflict DETECTION in SKILL.md, never here — writing it after a
 # successful proof would invert the fail-closed property (a run that dies mid-resolution
 # would find no flag and could arm).

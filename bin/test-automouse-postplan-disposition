@@ -47,7 +47,8 @@ extract_fn() {
     ' "$RUNNER"
 }
 
-for fn in automouse_pr_state automouse_branch_for_plan dispose_plan_done; do
+for fn in automouse_pr_state automouse_branch_for_plan dispose_plan_done \
+          postplan_cap_timeout should_hold_postplan_disposal notify_postplan_hold; do
     FN_SRC="$(extract_fn "$fn")"
     if [ -z "$FN_SRC" ]; then
         echo "FAIL: could not extract $fn from $RUNNER"
@@ -474,6 +475,278 @@ else
     echo "FAIL: e4-breaker-unchanged — phase_env_error=$e4_breaker_err refund_attempt=$e4_refund"
     FAILED=1
 fi
+
+# e5: call-site ordering — classify < predicate < hold-or-dispose
+e5_result=$(awk '
+    /postplan_cap_timeout "\$PP_STATUS"/ { cap=NR }
+    /should_hold_postplan_disposal "\$PP_CAP"/ { pred=NR }
+    /notify_postplan_hold "\$PLAN_NAME"/ { hold=NR }
+    /dispose_plan_done "\$PLAN_NAME" "\$PLAN_SLUG"/ { disp=NR }
+    END { if (cap>0 && pred>0 && hold>0 && disp>0 && cap<pred && pred<hold && hold<disp) print "OK"
+          else print "ORDER-FAIL cap="cap" pred="pred" hold="hold" disp="disp }
+' "$RUNNER")
+if [ "$e5_result" = "OK" ]; then
+    echo "ok: e5-call-site-ordering"
+else
+    echo "FAIL: e5-call-site-ordering — $e5_result"
+    FAILED=1
+fi
+
+# e6: call site uses REMAINING_SECS as the budget argument
+if grep -cF 'postplan_cap_timeout "$PP_STATUS" "$PP_DUR" "$REMAINING_SECS"' "$RUNNER" | grep -qx 1; then
+    echo "ok: e6-call-site-uses-remaining-secs"
+else
+    echo "FAIL: e6-call-site-uses-remaining-secs — count=$(grep -cF 'postplan_cap_timeout "$PP_STATUS" "$PP_DUR" "$REMAINING_SECS"' "$RUNNER")"
+    FAILED=1
+fi
+
+# e7: call site does NOT use MAX_PP_SECS as the budget argument
+if grep -cF 'postplan_cap_timeout "$PP_STATUS" "$PP_DUR" "$MAX_PP_SECS"' "$RUNNER" | grep -qx 0; then
+    echo "ok: e7-call-site-not-max-pp-secs"
+else
+    echo "FAIL: e7-call-site-not-max-pp-secs — static cap re-used as budget"
+    FAILED=1
+fi
+
+# e8: discord-dm invoked via SELF_DIR, never hard-coded
+e8_self=$(grep -cF '"$SELF_DIR/../discord-dm"' "$RUNNER" || true)
+e8_hard=$(grep -cF 'bin/discord-dm' "$RUNNER" || true)
+if [ "$e8_self" -eq 1 ] && [ "$e8_hard" -eq 0 ]; then
+    echo "ok: e8-discord-dm-path-relative"
+else
+    echo "FAIL: e8-discord-dm-path-relative — self_dir_count=$e8_self hard_count=$e8_hard"
+    FAILED=1
+fi
+
+# e9: dispose_plan_done call count unchanged (claim-time call site not disturbed)
+e9_count=$(grep -cF 'dispose_plan_done "$PLAN_NAME" "$PLAN_SLUG"' "$RUNNER" || true)
+if [ "$e9_count" -eq 2 ]; then
+    echo "ok: e9-dispose-plan-done-count-unchanged"
+else
+    echo "FAIL: e9-dispose-plan-done-count-unchanged — count=$e9_count (expected 2)"
+    FAILED=1
+fi
+
+# e10: impl_cap_timeout does not accept 137 (the new postplan function is not a refactor of it)
+e10_137=$(grep -c '\[ "$status" -eq 137 \]' "$RUNNER" || true)
+e10_impl_body=$(extract_fn impl_cap_timeout)
+if [ "$e10_137" -eq 1 ] && ! printf '%s\n' "$e10_impl_body" | grep -q '137'; then
+    echo "ok: e10-impl-cap-timeout-no-137"
+else
+    echo "FAIL: e10-impl-cap-timeout-no-137 — 137-count=$e10_137 impl-body-has-137=$(printf '%s\n' "$e10_impl_body" | grep -c '137')"
+    FAILED=1
+fi
+
+# e11: re-review glob present in runner
+if grep -cF 'post-plan-fidelity-verdict-"$PP_PR_NUM"-*.md' "$RUNNER" | grep -qx 1; then
+    echo "ok: e11-re-review-glob-present"
+else
+    echo "FAIL: e11-re-review-glob-present — count=$(grep -cF 'post-plan-fidelity-verdict-"$PP_PR_NUM"-*.md' "$RUNNER")"
+    FAILED=1
+fi
+
+# e2 augmented assertions: the anchor region must contain both dispose_plan_done and
+# should_hold_postplan_disposal (e2a: non-empty region; e2b: dispose present; e2c: hold present)
+e2a_region=$(awk '
+    /# Terminal-disposition: the environmental breaker/ { in_region=1; next }
+    in_region && /^        fi$/ { exit }
+    in_region { print }
+' "$RUNNER")
+if [ -n "$e2a_region" ]; then
+    echo "ok: e2a-anchor-region-non-empty"
+else
+    echo "FAIL: e2a-anchor-region-non-empty — comment anchor not found or region empty"
+    FAILED=1
+fi
+if printf '%s\n' "$e2a_region" | grep -qF 'dispose_plan_done'; then
+    echo "ok: e2b-region-contains-dispose"
+else
+    echo "FAIL: e2b-region-contains-dispose — dispose_plan_done not in anchor region"
+    FAILED=1
+fi
+if printf '%s\n' "$e2a_region" | grep -qF 'should_hold_postplan_disposal'; then
+    echo "ok: e2c-region-contains-hold-predicate"
+else
+    echo "FAIL: e2c-region-contains-hold-predicate — should_hold_postplan_disposal not in anchor region"
+    FAILED=1
+fi
+
+# ---------------------------------------------------------------------------
+# Group t — budget invariant (static, reads constants from runner)
+# ---------------------------------------------------------------------------
+
+t_impl=$(awk -F'[= ]' '/^MAX_IMPL_SECS=/{print $2; exit}' "$RUNNER")
+t_pp=$(awk -F'[= ]'   '/^MAX_PP_SECS=/{print $2; exit}'   "$RUNNER")
+t_lock=$(awk -F'[= ]' '/^LOCK_TTL_SECS=/{print $2; exit}' "$RUNNER")
+
+# t3: all three parsed non-empty and numeric
+if [ -n "$t_impl" ] && [ -n "$t_pp" ] && [ -n "$t_lock" ] \
+   && printf '%s\n' "$t_impl" | grep -qE '^[0-9]+$' \
+   && printf '%s\n' "$t_pp"   | grep -qE '^[0-9]+$' \
+   && printf '%s\n' "$t_lock" | grep -qE '^[0-9]+$'; then
+    echo "ok: t3-constants-parsed"
+else
+    echo "FAIL: t3-constants-parsed — impl='$t_impl' pp='$t_pp' lock='$t_lock'"
+    FAILED=1
+fi
+
+# t1: lock TTL covers both phase caps plus 30m overhead
+if [ "$t_lock" -ge $(( t_impl + t_pp + 1800 )) ]; then
+    echo "ok: t1-lock-ttl-covers-both-caps"
+else
+    echo "FAIL: t1-lock-ttl-covers-both-caps — lock=$t_lock impl=$t_impl pp=$t_pp needed=$(( t_impl + t_pp + 1800 ))"
+    FAILED=1
+fi
+
+# t2: post-plan cap raised to 5400
+if [ "$t_pp" -eq 5400 ]; then
+    echo "ok: t2-pp-cap-is-5400"
+else
+    echo "FAIL: t2-pp-cap-is-5400 — got $t_pp"
+    FAILED=1
+fi
+
+# ---------------------------------------------------------------------------
+# Group k — postplan_cap_timeout and should_hold_postplan_disposal (dynamic)
+# ---------------------------------------------------------------------------
+
+CAP_TIMEOUT_TOLERANCE_SECS=$(awk -F'[= ]' '/^CAP_TIMEOUT_TOLERANCE_SECS=/{print $2; exit}' "$RUNNER")
+
+# k1–k3: true for 137, 124, 143 at the wall
+if postplan_cap_timeout 137 5400 5400; then echo "ok: k1-status-137-true"
+else echo "FAIL: k1-status-137-true"; FAILED=1; fi
+
+if postplan_cap_timeout 124 5400 5400; then echo "ok: k2-status-124-true"
+else echo "FAIL: k2-status-124-true"; FAILED=1; fi
+
+if postplan_cap_timeout 143 5400 5400; then echo "ok: k3-status-143-true"
+else echo "FAIL: k3-status-143-true"; FAILED=1; fi
+
+# k4: exactly at the tolerance boundary
+if postplan_cap_timeout 137 $(( 5400 - CAP_TIMEOUT_TOLERANCE_SECS )) 5400; then
+    echo "ok: k4-tolerance-boundary-true"
+else
+    echo "FAIL: k4-tolerance-boundary-true — tolerance=$CAP_TIMEOUT_TOLERANCE_SECS"
+    FAILED=1
+fi
+
+# k5: one second inside tolerance — false
+if ! postplan_cap_timeout 137 $(( 5400 - CAP_TIMEOUT_TOLERANCE_SECS - 1 )) 5400; then
+    echo "ok: k5-one-sec-inside-false"
+else
+    echo "FAIL: k5-one-sec-inside-false"
+    FAILED=1
+fi
+
+# k6: ordinary failure at the wall — false
+if ! postplan_cap_timeout 1 5400 5400; then echo "ok: k6-status-1-false"
+else echo "FAIL: k6-status-1-false"; FAILED=1; fi
+
+# k7: clean exit — false
+if ! postplan_cap_timeout 0 5400 5400; then echo "ok: k7-status-0-false"
+else echo "FAIL: k7-status-0-false"; FAILED=1; fi
+
+# k8: real PR #2239 numbers — true
+if postplan_cap_timeout 137 3159 3146; then echo "ok: k8-pr2239-remaining-secs-true"
+else echo "FAIL: k8-pr2239-remaining-secs-true"; FAILED=1; fi
+
+# k9: same run against MAX_PP_SECS — false (proves why REMAINING_SECS is required)
+if ! postplan_cap_timeout 137 3159 3600; then echo "ok: k9-pr2239-max-pp-secs-false"
+else echo "FAIL: k9-pr2239-max-pp-secs-false"; FAILED=1; fi
+
+# k10: hold direction — cap + OPEN + no verdict
+if should_hold_postplan_disposal 1 OPEN 0; then echo "ok: k10-hold-direction-true"
+else echo "FAIL: k10-hold-direction-true"; FAILED=1; fi
+
+# k11: review ran — dispose as today
+if ! should_hold_postplan_disposal 1 OPEN 1; then echo "ok: k11-review-ran-false"
+else echo "FAIL: k11-review-ran-false"; FAILED=1; fi
+
+# k12: MERGED — shipped, never hold
+if ! should_hold_postplan_disposal 1 MERGED 0; then echo "ok: k12-merged-false"
+else echo "FAIL: k12-merged-false"; FAILED=1; fi
+
+# k13: no cap-timeout
+if ! should_hold_postplan_disposal 0 OPEN 0; then echo "ok: k13-no-cap-timeout-false"
+else echo "FAIL: k13-no-cap-timeout-false"; FAILED=1; fi
+
+# k14: CLOSED — only OPEN qualifies
+if ! should_hold_postplan_disposal 1 CLOSED 0; then echo "ok: k14-closed-false"
+else echo "FAIL: k14-closed-false"; FAILED=1; fi
+
+# ---------------------------------------------------------------------------
+# Group h — notify_postplan_hold with stubbed discord-dm
+# ---------------------------------------------------------------------------
+
+H=$(mktemp -d)
+mkdir -p "$H/bin/automouse" "$H/nightly/reports" "$H/nightly/queue"
+: > "$H/nightly/queue/my-slug.md"
+DM_CALLS="$H/dm-calls.txt"
+H_LOG="$H/run.log"
+cat > "$H/bin/discord-dm" << 'STUB'
+#!/usr/bin/env bash
+{ printf 'ARGV: %s\n' "$*"; printf 'STDIN: '; cat; printf '\n'; } >> "$DM_CALLS"
+exit "${DM_STUB_RC:-0}"
+STUB
+chmod +x "$H/bin/discord-dm"
+export DM_CALLS
+trap 'rm -rf "$H"' EXIT
+
+# Call with SELF_DIR pointing at the stub dir
+SELF_DIR="$H/bin/automouse"
+NIGHTLY_DIR="$H/nightly"
+LOG="$H_LOG"
+
+notify_postplan_hold "p.md" "my-slug" "https://github.com/a-jay85/IBL5/pull/2999" \
+    "3159" "3146" "137"
+
+# h1: DM was called
+if [ -s "$DM_CALLS" ]; then echo "ok: h1-dm-was-called"
+else echo "FAIL: h1-dm-was-called"; FAILED=1; fi
+
+# h2: DM body contains the PR URL
+if grep -qF 'https://github.com/a-jay85/IBL5/pull/2999' "$DM_CALLS"; then
+    echo "ok: h2-dm-contains-pr-url"
+else
+    echo "FAIL: h2-dm-contains-pr-url"
+    FAILED=1
+fi
+
+# h3: DM body contains the slug
+if grep -qF 'my-slug' "$DM_CALLS"; then echo "ok: h3-dm-contains-slug"
+else echo "FAIL: h3-dm-contains-slug"; FAILED=1; fi
+
+# h4: --attempts 3 is present (loop-blocking bound)
+if grep -q 'ARGV:.*--attempts 3' "$DM_CALLS"; then echo "ok: h4-attempts-3"
+else echo "FAIL: h4-attempts-3 — $(cat "$DM_CALLS")"; FAILED=1; fi
+
+# h5: report file exists and names the PR URL
+h5_report="$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-postplan-hold-my-slug.md"
+if [ -f "$h5_report" ] && grep -qF 'https://github.com/a-jay85/IBL5/pull/2999' "$h5_report"; then
+    echo "ok: h5-report-exists-with-url"
+else
+    echo "FAIL: h5-report-exists-with-url — file=$([ -f "$h5_report" ] && echo present || echo absent)"
+    FAILED=1
+fi
+
+# h6: log line has full wording
+if grep -qF 'Postplan cap-timeout HOLD: PR OPEN' "$H_LOG"; then echo "ok: h6-log-wording"
+else echo "FAIL: h6-log-wording — $(cat "$H_LOG" 2>/dev/null)"; FAILED=1; fi
+
+# h7: undeliverable DM still returns 0 and logs spool line
+rm -f "$DM_CALLS"
+DM_STUB_RC=1 notify_postplan_hold "p.md" "my-slug" "https://github.com/a-jay85/IBL5/pull/2999" \
+    "3159" "3146" "137"; h7_rc=$?
+if [ "$h7_rc" -eq 0 ] && grep -qF 'Postplan hold DM undeliverable (spooled)' "$H_LOG"; then
+    echo "ok: h7-undeliverable-dm-returns-0"
+else
+    echo "FAIL: h7-undeliverable-dm-returns-0 — rc=$h7_rc log=$(tail -3 "$H_LOG")"
+    FAILED=1
+fi
+
+# h8: queue file untouched — notify_postplan_hold never moves a symlink
+if [ -f "$H/nightly/queue/my-slug.md" ]; then echo "ok: h8-queue-untouched"
+else echo "FAIL: h8-queue-untouched"; FAILED=1; fi
 
 # ---------------------------------------------------------------------------
 # Group s — bin/automouse/prompt-postplan prose (Phase 6), static

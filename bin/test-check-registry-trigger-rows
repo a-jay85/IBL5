@@ -1,0 +1,310 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+GATE="$SCRIPT_DIR/check-registry-trigger-rows"
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+REAL_REGISTRY="$REPO_ROOT/ibl5/docs/retrospective-class-registry.md"
+REAL_VERIFICATION="$REPO_ROOT/.claude/review-shared/_plan-verification.md"
+
+PASS=0
+FAIL=0
+
+pass() { echo "PASS: $1"; PASS=$((PASS + 1)); }
+fail() { echo "FAIL: $1"; FAIL=$((FAIL + 1)); }
+
+check() {
+    local case_num="$1"
+    local desc="$2"
+    local expected_exit="$3"
+    shift 3
+    local actual_exit=0
+    "$GATE" "$@" >/dev/null 2>&1 || actual_exit=$?
+    if [[ "$actual_exit" -eq "$expected_exit" ]]; then
+        pass "Case $case_num — $desc"
+    else
+        fail "Case $case_num — $desc (expected exit $expected_exit, got $actual_exit)"
+    fi
+}
+
+TMPDIR_FIXTURES="$(mktemp -d)"
+trap 'rm -rf "$TMPDIR_FIXTURES"' EXIT
+
+make_verification() {
+    local path="$1"
+    cat > "$path" << 'VEOF'
+---
+description: test fixture
+last_verified: 2026-09-18
+---
+
+# Plan Verification Matrix
+
+## Forced integration-verification trigger
+
+| If the plan... | it MUST carry a row that... |
+|---|---|
+| asserts it is gitignored | carries some assertion |
+| New POST/form endpoint | is in E2E section only, not here |
+
+## Forced E2E triggers
+
+| Trigger pattern | Why PHPUnit is insufficient |
+|---|---|
+| New POST/form endpoint | Form submission only |
+
+## Hot-file thresholds
+
+Some content here.
+VEOF
+}
+
+make_registry_with_anchor() {
+    local path="$1"
+    local section="$2"
+    local anchor="$3"
+    local row_id="${4:-#9999}"
+    cat > "$path" << REOF
+---
+description: test registry
+last_verified: 2026-09-18
+---
+
+| Date | ID | Class | Routing |
+|------|-----|-------|---------|
+| 2026-09-18 | $row_id | class: test | routed to: Rung 3 (section: $section, anchor: "$anchor"): some text |
+REOF
+}
+
+# Case 1: Real repo files, no flags — exit 0
+check 1 "Real repo files pass" 0 \
+    --registry "$REAL_REGISTRY" --verification "$REAL_VERIFICATION"
+
+# Case 2: Anchor phrase absent from named section — exit 1, message names row ID
+make_verification "$TMPDIR_FIXTURES/v2.md"
+make_registry_with_anchor "$TMPDIR_FIXTURES/r2.md" "Forced integration-verification trigger" "phrase that does not exist anywhere" "#1111"
+actual_exit=0
+out=$("$GATE" --registry "$TMPDIR_FIXTURES/r2.md" --verification "$TMPDIR_FIXTURES/v2.md" 2>&1 || true)
+actual_exit=0
+"$GATE" --registry "$TMPDIR_FIXTURES/r2.md" --verification "$TMPDIR_FIXTURES/v2.md" >/dev/null 2>&1 || actual_exit=$?
+if [[ "$actual_exit" -eq 1 ]] && grep -q '#1111' <<< "$out"; then
+    pass "Case 2 — anchor absent exits 1 and names row ID"
+else
+    fail "Case 2 — anchor absent exits 1 and names row ID (exit=$actual_exit, rowid_in_msg=$(echo "$out" | grep -c '#1111' || echo 0))"
+fi
+
+# Case 3: section: names a heading absent from verification file — exit 1
+make_verification "$TMPDIR_FIXTURES/v3.md"
+make_registry_with_anchor "$TMPDIR_FIXTURES/r3.md" "Nonexistent Section Heading" "some anchor"
+check 3 "absent section name exits 1" 1 \
+    --registry "$TMPDIR_FIXTURES/r3.md" --verification "$TMPDIR_FIXTURES/v3.md"
+
+# Case 4: Row has anchor: but no (section:  — exit 1
+cat > "$TMPDIR_FIXTURES/r4.md" << 'REOF'
+---
+description: test
+last_verified: 2026-09-18
+---
+
+| Date | ID | Class | Routing |
+|------|-----|-------|---------|
+| 2026-09-18 | #4444 | class: test | routed to: Rung 3, anchor: "some anchor"): text |
+REOF
+make_verification "$TMPDIR_FIXTURES/v4.md"
+check 4 "anchor without (section: exits 1" 1 \
+    --registry "$TMPDIR_FIXTURES/r4.md" --verification "$TMPDIR_FIXTURES/v4.md"
+
+# Case 5: Empty anchor — anchor: "" — exit 1
+cat > "$TMPDIR_FIXTURES/r5.md" << 'REOF'
+---
+description: test
+last_verified: 2026-09-18
+---
+
+| Date | ID | Class | Routing |
+|------|-----|-------|---------|
+| 2026-09-18 | #5555 | class: test | routed to: Rung 3 (section: Forced integration-verification trigger, anchor: ""): text |
+REOF
+make_verification "$TMPDIR_FIXTURES/v5.md"
+check 5 "empty anchor exits 1" 1 \
+    --registry "$TMPDIR_FIXTURES/r5.md" --verification "$TMPDIR_FIXTURES/v5.md"
+
+# Case 6: Registry with zero anchored rows — vacuity guard — exit 1
+cat > "$TMPDIR_FIXTURES/r6.md" << 'REOF'
+---
+description: test
+last_verified: 2026-09-18
+---
+
+| Date | ID | Class | Routing |
+|------|-----|-------|---------|
+| 2026-09-18 | #6666 | class: test | routed to: Rung 2 (section: Some Section): text |
+REOF
+make_verification "$TMPDIR_FIXTURES/v6.md"
+check 6 "zero anchored rows exits 1 (vacuity guard)" 1 \
+    --registry "$TMPDIR_FIXTURES/r6.md" --verification "$TMPDIR_FIXTURES/v6.md"
+
+# Case 7: Legacy rows without anchor: alongside one valid anchored row — exit 0
+cat > "$TMPDIR_FIXTURES/r7.md" << 'REOF'
+---
+description: test
+last_verified: 2026-09-18
+---
+
+| Date | ID | Class | Routing |
+|------|-----|-------|---------|
+| 2026-09-17 | #7770 | class: legacy | routed to: Rung 2 (section: Some Section): legacy |
+| 2026-09-17 | #7771 | class: legacy | routed to: Rung 1 — no anchor |
+| 2026-09-18 | #7772 | class: test | routed to: Rung 3 (section: Forced integration-verification trigger, anchor: "asserts it is gitignored"): text |
+REOF
+make_verification "$TMPDIR_FIXTURES/v7.md"
+check 7 "legacy rows ignored, one valid row passes" 0 \
+    --registry "$TMPDIR_FIXTURES/r7.md" --verification "$TMPDIR_FIXTURES/v7.md"
+
+# Case 8: --registry points at nonexistent file — exit 1
+check 8 "--registry nonexistent exits 1" 1 \
+    --registry /nonexistent/file.md --verification "$REAL_VERIFICATION"
+
+# Case 9: --verification points at nonexistent file — exit 1
+check 9 "--verification nonexistent exits 1" 1 \
+    --registry "$REAL_REGISTRY" --verification /nonexistent/file.md
+
+# Case 10: Verification file exists but is unreadable chmod 000 — exit 1
+make_verification "$TMPDIR_FIXTURES/v10.md"
+make_registry_with_anchor "$TMPDIR_FIXTURES/r10.md" "Forced integration-verification trigger" "asserts it is gitignored"
+chmod 000 "$TMPDIR_FIXTURES/v10.md"
+check 10 "unreadable verification file exits 1" 1 \
+    --registry "$TMPDIR_FIXTURES/r10.md" --verification "$TMPDIR_FIXTURES/v10.md"
+chmod 644 "$TMPDIR_FIXTURES/v10.md"
+
+# Case 11: Unknown flag --bogus — exit 2
+check 11 "unknown flag exits 2" 2 \
+    --bogus
+
+# Case 12: =form --registry=<path> — exit 2
+check 12 "=form rejected exits 2" 2 \
+    "--registry=$REAL_REGISTRY"
+
+# Case 13: --registry with no following value — exit 2
+check 13 "--registry with missing value exits 2" 2 \
+    --registry
+
+# Case 14: --help — exit 0
+check 14 "--help exits 0" 0 \
+    --help
+
+# Case 15: awk negative path — anchor text lives only in E2E section, not integration — exit 1
+cat > "$TMPDIR_FIXTURES/v15.md" << 'VEOF'
+---
+description: test fixture
+last_verified: 2026-09-18
+---
+
+# Plan Verification Matrix
+
+## Forced integration-verification trigger
+
+| If the plan... | it MUST carry a row that... |
+|---|---|
+| asserts it is gitignored | carries some assertion |
+
+## Forced E2E triggers
+
+| Trigger pattern | Why PHPUnit is insufficient |
+|---|---|
+| New POST/form endpoint | Form submission only |
+
+## Hot-file thresholds
+
+End.
+VEOF
+make_registry_with_anchor "$TMPDIR_FIXTURES/r15.md" "Forced integration-verification trigger" "New POST/form endpoint"
+check 15 "awk negative path: E2E-only phrase not found in integration section" 1 \
+    --registry "$TMPDIR_FIXTURES/r15.md" --verification "$TMPDIR_FIXTURES/v15.md"
+
+# Case 16: awk positive path — anchor text inside the named section — exit 0
+make_verification "$TMPDIR_FIXTURES/v16.md"
+make_registry_with_anchor "$TMPDIR_FIXTURES/r16.md" "Forced integration-verification trigger" "asserts it is gitignored"
+check 16 "awk positive path: phrase inside section passes" 0 \
+    --registry "$TMPDIR_FIXTURES/r16.md" --verification "$TMPDIR_FIXTURES/v16.md"
+
+# Case 17: Parenthesised tail — row text after parenthetical contains (...) and commas — exit 0
+cat > "$TMPDIR_FIXTURES/r17.md" << 'REOF'
+---
+description: test
+last_verified: 2026-09-18
+---
+
+| Date | ID | Class | Routing |
+|------|-----|-------|---------|
+| 2026-09-18 | #2039 | class: foo | routed to: Rung 3 (section: Forced integration-verification trigger, anchor: "asserts it is gitignored"): any plan (excluded content absent from output) must carry a row, foo, bar |
+REOF
+make_verification "$TMPDIR_FIXTURES/v17.md"
+check 17 "parenthesised tail parsed correctly (shortest-match)" 0 \
+    --registry "$TMPDIR_FIXTURES/r17.md" --verification "$TMPDIR_FIXTURES/v17.md"
+
+# Case 18: Duplicate heading — anchor only in second block — exit 0
+cat > "$TMPDIR_FIXTURES/v18.md" << 'EOF'
+---
+description: test fixture
+last_verified: 2026-09-18
+---
+
+# Plan Verification Matrix
+
+## Same Heading
+
+Content block one here.
+
+## Some Other Heading
+
+Other stuff.
+
+## Same Heading
+
+unique phrase only in second block.
+
+## Hot-file thresholds
+
+End content.
+EOF
+make_registry_with_anchor "$TMPDIR_FIXTURES/r18.md" "Same Heading" "unique phrase only in second block"
+check 18 "duplicate heading: anchor in second block found via union" 0 \
+    --registry "$TMPDIR_FIXTURES/r18.md" --verification "$TMPDIR_FIXTURES/v18.md"
+
+# Case 19: ### subsection — anchor under ### Sub inside ## Section — exit 0
+cat > "$TMPDIR_FIXTURES/v19.md" << 'EOF'
+---
+description: test fixture
+last_verified: 2026-09-18
+---
+
+# Plan Verification Matrix
+
+## Target Section
+
+### Sub
+
+anchor phrase lives here in subsection.
+
+## Another Section
+
+End.
+EOF
+make_registry_with_anchor "$TMPDIR_FIXTURES/r19.md" "Target Section" "anchor phrase lives here in subsection"
+check 19 "### subsection stays inside parent ## section" 0 \
+    --registry "$TMPDIR_FIXTURES/r19.md" --verification "$TMPDIR_FIXTURES/v19.md"
+
+# Case 20: Mutation proof — synthetic row with nonexistent anchor fails
+cp "$REAL_REGISTRY" "$TMPDIR_FIXTURES/r20.md"
+# Inject a synthetic row with a nonexistent anchor
+echo "| 2026-09-18 | #9999 | class: synthetic | routed to: Rung 3 (section: Forced integration-verification trigger, anchor: \"nonexistent trigger text xyz\"): prior: -- |" >> "$TMPDIR_FIXTURES/r20.md"
+check 20 "mutation proof: synthetic unsatisfied claim exits 1" 1 \
+    --registry "$TMPDIR_FIXTURES/r20.md" --verification "$REAL_VERIFICATION"
+
+echo ""
+echo "Results: $PASS passed, $FAIL failed"
+if [[ "$FAIL" -gt 0 ]]; then
+    exit 1
+fi
+exit 0

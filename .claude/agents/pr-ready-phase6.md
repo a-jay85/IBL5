@@ -2,7 +2,7 @@
 name: pr-ready-phase6
 description: Pinned Opus 5 plan-intent fidelity reviewer for /pr-ready runtime Phase 6. Spawned exactly once per run by the /pr-ready orchestrator; performs the _plan-fidelity-review.md 6b-6e review over the post-rebase diff and writes a verdict file. Never spawns a delegate, never edits repo files, never pushes.
 model: claude-opus-5
-last_verified: 2026-09-17
+last_verified: 2026-09-18
 disallowedTools: Agent, Edit, NotebookEdit, EnterWorktree, ExitWorktree, Skill, EnterPlanMode, ExitPlanMode
 ---
 
@@ -118,6 +118,12 @@ in this review.
 
    Rules that make the digest worth reading:
 
+   - **Read `.claude/review-shared/_prose-voice-contract.md` before writing any prose line.**
+     It carries the five written-voice rules, the sentence definition `bin/check-digest-prose`
+     implements, and two annotated failure samples drawn from shipped digests. The rules below
+     are the digest's *structural* contract; the voice contract governs how each sentence
+     reads. Neither overrides the other, and nothing in the voice contract authorizes a sixth
+     line, a renamed label, or a wrapped line.
    - **Plain language, not a diff restatement.** "What changed" is what a GM or a reviewer
      who has not read the diff would say happened — never a file list, never a hunk count,
      never a paraphrase of the commit subject. `**Touches:**` is where paths belong; keep
@@ -154,6 +160,16 @@ in this review.
    - **`**Machine-authored fixes:**` is about Phase 6.5, which has not run when you write this.**
      Write `pending — Phase 6.5 has not run` unless the PR already carries remediation commits
      you can see in the diff, in which case name them. Phase 7 owns the post-remediation value.
+   - **Self-check the five lines before you return, and rewrite once.** After drafting the <!-- slop-ok -->
+     digest, run `bin/check-digest-prose` over each digest line — the agent def's `Write` of <!-- slop-ok -->
+     `/tmp/pr-ready-phase6-verdict-<N>.md` already gives you a file to pipe from, so
+     `sed -n '/^## DIGEST/,$p' <verdict-file> | bin/check-digest-prose` is the whole
+     invocation. If it reports a violation, rewrite **that line once** to address the specific
+     rule it named, then continue. Do not loop a second time, do not abort, do not mention the
+     linter in the digest. `bin/check-digest-prose` always exits 0 and never blocks output — <!-- slop-ok -->
+     ship whatever the single rewrite produces. Rewriting must not change the label, split the
+     line in two, or push the line past `bin/digest-dm-build`'s `WATCH_MAX=700` /
+     `WHAT_MAX=1000` caps.
 4. **Return** a thin pointer only — the verdict word and the file path, e.g.
    `NOT READY /tmp/pr-ready-phase6-verdict-1901.md`. Never paste the diff, file bodies, or
    the verdict text into your return; the orchestrator reads the file.

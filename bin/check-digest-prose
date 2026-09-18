@@ -1,0 +1,167 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/check-digest-prose — Advisory voice linter for machine-authored merge-digest lines
+# and PR-body prose. Reports; never blocks.
+#
+# Contract: .claude/review-shared/_prose-voice-contract.md
+#
+# Input:
+#   bin/check-digest-prose            Read prose from stdin.
+#   bin/check-digest-prose <path>     Read prose from a file.
+#
+# Output: one line per violation —
+#   LINE <N>: [<RULE NAME>] <offending excerpt>
+#
+# Exit code: ALWAYS 0. A violation never changes exit status. This script must never
+# become a blocking gate, a required status check, or a Phase 6.5 arming condition.
+#
+# Rules mechanized (see contract for full five-rule set):
+#   SENTENCE_TOO_LONG    Contract rule 1 — max 25 words per sentence
+#   MULTIPLE_EMDASH      Contract rule 4 — at most one em-dash per line
+#   DEFINE_BY_NEGATION   Contract rule 3 — no trailing instead-of / rather-than clause
+#   PASSIVE_NOMINALIZED  Contract rule 5 — active voice, concrete actor
+#
+# Rule 2 (Name the component) is NOT mechanized by design — no regex can decide whether
+# a noun phrase has a codebase name. Wiring a guessing heuristic would produce noise the
+# author learns to ignore. It remains author-side guidance only.
+
+set -uo pipefail
+trap 'exit 0' EXIT
+
+usage() { cat <<'EOF'
+Usage: bin/check-digest-prose [<file>] [--help|-h]
+
+Reports written-voice violations in machine-authored digest / PR-body prose.
+Reads <file> when given, otherwise stdin. ALWAYS exits 0 — advisory only.
+
+Rules checked: SENTENCE_TOO_LONG, MULTIPLE_EMDASH, DEFINE_BY_NEGATION,
+PASSIVE_NOMINALIZED. See .claude/review-shared/_prose-voice-contract.md.
+EOF
+}
+
+INPUT_FILE=""
+for arg in "$@"; do
+  case "$arg" in
+    --help|-h) usage; exit 0 ;;
+    *) INPUT_FILE="$arg" ;;
+  esac
+done
+
+if [[ -n "$INPUT_FILE" ]]; then
+  if [[ ! -f "$INPUT_FILE" ]]; then
+    echo "bin/check-digest-prose: no such file: $INPUT_FILE" >&2
+    exit 0
+  fi
+fi
+
+# Process each line through awk, which handles all four rules.
+# awk is the portable engine (shell-portability.md).
+awk '
+BEGIN {
+  WORD_LIMIT = 25
+  EMDASH = "\342\200\224"  # UTF-8 for U+2014 —
+}
+
+{
+  lineno = NR
+  original = $0
+
+  # --- Preprocessing: strip markdown emphasis and backtick spans ---
+
+  # Strip leading **Label:** prefix (digest lines open with **Label:**)
+  stripped = original
+  sub(/^\*\*[^:]+:\*\* */, "", stripped)
+
+  # Strip remaining **...** and __...__ emphasis markers
+  while (match(stripped, /\*\*[^*]*\*\*/)) {
+    stripped = substr(stripped, 1, RSTART-1) " " substr(stripped, RSTART+RLENGTH)
+  }
+  while (match(stripped, /__[^_]*__/)) {
+    stripped = substr(stripped, 1, RSTART-1) " " substr(stripped, RSTART+RLENGTH)
+  }
+  # Strip standalone * and _ emphasis markers
+  gsub(/\*/, " ", stripped)
+  gsub(/_/, " ", stripped)
+
+  # Strip backtick spans (including delimiters) — BEFORE period boundary work.
+  # Backtick spans contribute zero words and contain no sentence boundaries.
+  while (match(stripped, /`[^`]*`/)) {
+    stripped = substr(stripped, 1, RSTART-1) substr(stripped, RSTART+RLENGTH)
+  }
+
+  # --- Rule MULTIPLE_EMDASH ---
+  # Count U+2014 em-dashes and space-delimited " -- " proxies.
+  # Space-delimited requirement guards against --flag-names (most already stripped
+  # by the backtick pass, but unbackticked cases must not fire).
+  emdash_count = 0
+  tmp = stripped
+  while (match(tmp, EMDASH)) {
+    emdash_count++
+    tmp = substr(tmp, RSTART+length(EMDASH))
+  }
+  tmp = stripped
+  while (match(tmp, / -- /)) {
+    emdash_count++
+    tmp = substr(tmp, RSTART+4)
+  }
+  if (emdash_count >= 2) {
+    excerpt = substr(original, 1, 70)
+    print "LINE " lineno ": [MULTIPLE_EMDASH] " excerpt
+  }
+
+  # --- Rule DEFINE_BY_NEGATION ---
+  # Trailing clause opening with "instead of" or "rather than" after a comma.
+  if (match(stripped, /,[[:space:]]+(instead of|rather than)[^.]*\.?[[:space:]]*$/)) {
+    excerpt = substr(original, 1, 70)
+    print "LINE " lineno ": [DEFINE_BY_NEGATION] " excerpt
+  }
+
+  # --- Rule PASSIVE_NOMINALIZED ---
+  # Pattern 1: "the X cannot/can not/could not execute/run/complete/happen/occur"
+  if (match(tolower(stripped), /the [a-z][a-z -]* (cannot|can not|could not) (execute|run|complete|happen|occur)/)) {
+    excerpt = substr(original, 1, 70)
+    print "LINE " lineno ": [PASSIVE_NOMINALIZED] " excerpt
+  }
+  # Pattern 2: "the X confirmation/execution/invocation/verification/completion is"
+  if (match(tolower(stripped), /the [a-z][a-z -]* (confirmation|execution|invocation|verification|completion) is/)) {
+    excerpt = substr(original, 1, 70)
+    print "LINE " lineno ": [PASSIVE_NOMINALIZED] " excerpt
+  }
+
+  # --- Rule SENTENCE_TOO_LONG ---
+  # Two-pass placeholder substitution for non-boundary periods, then split.
+  work = stripped
+
+  # Pass 1: replace non-boundary periods with sentinel \001
+  # Non-boundary: period followed by digit
+  gsub(/\.([0-9])/, "\001\\1", work)
+  # Non-boundary: abbreviations e.g. i.e. etc. vs. (case-insensitive as whole tokens)
+  gsub(/[Ee]\.[Gg]\./, "\001g\001", work)
+  gsub(/[Ii]\.[Ee]\./, "\001e\001", work)
+  gsub(/[Ee][Tt][Cc]\./, "etc\001", work)
+  gsub(/[Vv][Ss]\./, "vs\001", work)
+
+  # Pass 2: split on remaining boundary periods (period + space or end)
+  # Split into sentences
+  n = split(work, sentences, /\. +|\.$/)
+  for (i = 1; i <= n; i++) {
+    s = sentences[i]
+    # Restore sentinels to periods
+    gsub(/\001/, ".", s)
+    # Count words (whitespace-delimited tokens)
+    nwords = split(s, words, /[[:space:]]+/)
+    # Discard empty "sentences" (trailing split artifact)
+    nonempty = 0
+    for (w = 1; w <= nwords; w++) {
+      if (words[w] != "") nonempty++
+    }
+    if (nonempty > WORD_LIMIT) {
+      excerpt = substr(original, 1, 60)
+      print "LINE " lineno ": [SENTENCE_TOO_LONG] (" nonempty " words) " excerpt "..."
+    }
+  }
+}
+' "${INPUT_FILE:-/dev/stdin}"
+
+exit 0

@@ -1,6 +1,6 @@
 ---
 description: Automouse autonomous workflow (formerly "nightly") — launchd fires claude -p on a recurring schedule, running two context-isolated agents per plan (implementation + post-plan) with time guards and incremental checkpoints.
-last_verified: 2026-09-16
+last_verified: 2026-09-17
 paths: "bin/automouse/**"
 ---
 
@@ -34,7 +34,7 @@ A headless `claude -p` process runs on a recurring schedule via macOS `launchd`.
 
 ### Disarm ordering and safety
 
-`disarm-tonight` and `disarm-until` follow an arm-before-disarm sequence: the one-shot re-arm launchd agent is bootstrapped and verified **before** the recurring job is unloaded, so if arming fails the pipeline keeps running and nothing is interrupted. Both subcommands refuse to act while a run is in flight (booting out the recurring job would SIGTERM the active process). After a successful disarm, a breadcrumb is written to `~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/.disarmed-until` (epoch, re-arm time, re-arm agent label, requester), so `cat` on it answers "why is automouse off?". Repeated disarms clear any prior `com.ibl5.automouse-rearm-*` agents first so disarms never stack; one-shot agents from `run schedule` are deliberately left alone.
+Arm-before-disarm: `disarm-tonight` and `disarm-until` bootstrap the re-arm launchd agent before unloading the recurring job (failure keeps the pipeline running). Both refuse to act while a run is in flight. Breadcrumb: `~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse/.disarmed-until`. Repeated disarms evict prior `com.ibl5.automouse-rearm-*` agents first.
 
 ## Directory Layout
 
@@ -114,7 +114,7 @@ scans `skipped/`:
    - **Implementation agent** (`bin/automouse/prompt-impl`): creates worktree, implements the plan, makes checkpoint commits, writes a handoff file. Model per-plan via `impl_model:` (six values: `sonnet`/`claude-sonnet-4-6` → Sonnet, `haiku`/`claude-haiku-4-5` → Haiku, `opus`/`claude-opus-5` or absent → Opus; validated by `bin/lib/plan-impl-model`; other values rejected before the counter). Declare `sonnet` for uniformly-mechanical plans only. Post-plan runs `bin/post-plan-now` (Sonnet `/post-plan` fallback).
    - **Post-plan** (`bin/post-plan-now --foreground`, run in the handoff's worktree): runs `/post-plan` (code review, security audit, PR, CI monitoring, auto-merge), writes the completion report
 4. **Guards:** The loop stops when the queue is empty or ~4h45m have elapsed. Plans that fail 3 times (after genuine, full-length attempts) are moved to `skipped/` as poison pills.
-   - **Environmental failures stop the run cleanly instead of skipping.** A usage/rate limit, auth error, or any transient that kills an agent refunds the attempt and breaks the loop, leaving the **entire queue intact** to resume next run — so one dead-budget run cannot grind every queued plan into `skipped/`. Each stop writes a `YYYY-MM-DD-env-stop-<slug>.md` report. The watchdog stall threshold is **30 min, not 10**, because an asynchronous `Agent` delegate emits nothing on the parent's stream while it works — for the delegate's whole runtime a healthy impl is indistinguishable from a wedged one. A deliberate impl disposition (to `done/` or `skipped/`) is an **outcome, not a transient**, so the loop continues. A wall-clock cap-timeout is refunded too, but only a bounded number of times per plan, and does not break the loop. Exact signatures, thresholds and refund limits: `should_impl_env_stop()`, `impl_cap_timeout()`, `should_refund_cap_timeout()` — locked by `bin/test-automouse-env-breaker` and `bin/test-automouse-impl-cap-timeout`.
+   - Environmental failures stop the run cleanly. A usage/rate limit, auth error, or any transient that kills an agent refunds the attempt and breaks the loop, leaving the **entire queue intact** to resume next run. One dead-budget run cannot grind every queued plan into `skipped/`. Each stop writes a `YYYY-MM-DD-env-stop-<slug>.md` report. The watchdog stall threshold is **30 min, not 10**, because an asynchronous `Agent` delegate emits nothing on the parent's stream while it works. For the delegate's whole runtime a healthy impl is indistinguishable from a wedged one. A deliberate impl disposition (to `done/` or `skipped/`) is an outcome; the loop continues. A wall-clock cap-timeout is refunded too, but only a bounded number of times per plan, and does not break the loop. Exact signatures, thresholds and refund limits: `should_impl_env_stop()`, `impl_cap_timeout()`, `should_refund_cap_timeout()`. Locked by `bin/test-automouse-env-breaker` and `bin/test-automouse-impl-cap-timeout`. Post-plan uses `postplan_cap_timeout()` (classifies 124/137/143 against `REMAINING_SECS`) and `should_hold_postplan_disposal()`: a cap-killed OPEN PR whose Phase 5.5 verdict predates the run is held in `queue/`; `notify_postplan_hold()` DMs the PR URL. Locked by `bin/test-automouse-postplan-disposition`.
 5. **After a run:** Check `gh pr list` for new PRs, read reports for details
 
 ## Headless Mode

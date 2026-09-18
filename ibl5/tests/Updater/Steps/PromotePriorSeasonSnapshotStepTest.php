@@ -76,14 +76,16 @@ class PromotePriorSeasonSnapshotStepTest extends TestCase
         $stubJsbRepo->method('hasChampionForSeason')
             ->willReturnCallback(static fn (int $year): bool => $year === 2009);
 
-        /** @var PlrParserRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
-        $stubSnapshotRepo = self::createStub(PlrParserRepositoryInterface::class);
+        /** @var PlrParserRepositoryInterface&\PHPUnit\Framework\MockObject\MockObject */
+        $mockSnapshotRepo = self::createMock(PlrParserRepositoryInterface::class);
+        $mockSnapshotRepo->expects($this->never())
+            ->method('promotePriorSeasonSnapshots');
 
-        $step = new PromotePriorSeasonSnapshotStep($stubSnapshotRepo, $stubJsbRepo, 2009);
+        $step = new PromotePriorSeasonSnapshotStep($mockSnapshotRepo, $stubJsbRepo, 2009);
         $result = $step->execute();
 
         // priorYear = 2009 - 1 = 2008, which has no champion; step must skip
         $this->assertTrue($result->success);
-        $this->assertStringContainsString('2008', $result->detail);
+        $this->assertStringContainsString('No champion', $result->detail);
     }
 }

@@ -294,6 +294,106 @@ class PromotePriorSeasonSnapshotTest extends DatabaseTestCase
         self::assertSame('end-of-season', $row['snapshot_phase']);
     }
 
+    public function testEndOfSeasonWinsOverHigherIdMidSeasonOnEqualStatsGm(): void
+    {
+        // end-of-season inserted first → lower auto-increment id than the mid-season row below.
+        // id DESC alone would pick mid-season; phase rank must break the tie instead.
+        $this->seedSnapshot(202099901, 2008, 'end-of-season', ['stats_gm' => 82]);
+        $this->seedSnapshot(202099901, 2008, 'mid-season',    ['stats_gm' => 82]);
+
+        $stmt = $this->db->prepare(
+            "SELECT snap.snapshot_phase FROM (
+                SELECT s.*,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY s.pid, s.season_year
+                        ORDER BY
+                            s.stats_gm DESC,
+                            CASE s.snapshot_phase
+                                WHEN 'end-of-season'       THEN  1
+                                WHEN 'finals'              THEN  2
+                                WHEN 'post-heat'           THEN  3
+                                WHEN 'heat-finals'         THEN  4
+                                WHEN 'heat-end'            THEN  5
+                                WHEN 'playoffs-rd2-gm4-7'  THEN  6
+                                WHEN 'playoffs-rd2-gm1-3'  THEN  7
+                                WHEN 'playoffs-rd1-gm4-7'  THEN  8
+                                WHEN 'playoffs-rd1-gm1-3'  THEN  9
+                                WHEN 'conf-finals-gm4-7'   THEN 10
+                                WHEN 'conf-finals-gm1-3'   THEN 11
+                                WHEN 'heat-wb'             THEN 12
+                                WHEN 'heat-lb'             THEN 13
+                                ELSE 99
+                            END ASC,
+                            s.id DESC
+                    ) AS rn
+                FROM ibl_plr_snapshots s
+                WHERE s.stats_gm > 0
+                  AND s.pid = ?
+                  AND s.season_year = ?
+            ) snap
+            WHERE rn = 1"
+        );
+        self::assertNotFalse($stmt);
+        $pid  = 202099901;
+        $year = 2008;
+        $stmt->bind_param('ii', $pid, $year);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        self::assertNotNull($row);
+        self::assertSame('end-of-season', $row['snapshot_phase']);
+    }
+
+    public function testHigherStatsGmMidSeasonWinsOverLowerStatsGmEndOfSeason(): void
+    {
+        $this->seedSnapshot(202099902, 2008, 'mid-season',    ['stats_gm' => 82]);
+        $this->seedSnapshot(202099902, 2008, 'end-of-season', ['stats_gm' => 40]);
+
+        $stmt = $this->db->prepare(
+            "SELECT snap.snapshot_phase FROM (
+                SELECT s.*,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY s.pid, s.season_year
+                        ORDER BY
+                            s.stats_gm DESC,
+                            CASE s.snapshot_phase
+                                WHEN 'end-of-season'       THEN  1
+                                WHEN 'finals'              THEN  2
+                                WHEN 'post-heat'           THEN  3
+                                WHEN 'heat-finals'         THEN  4
+                                WHEN 'heat-end'            THEN  5
+                                WHEN 'playoffs-rd2-gm4-7'  THEN  6
+                                WHEN 'playoffs-rd2-gm1-3'  THEN  7
+                                WHEN 'playoffs-rd1-gm4-7'  THEN  8
+                                WHEN 'playoffs-rd1-gm1-3'  THEN  9
+                                WHEN 'conf-finals-gm4-7'   THEN 10
+                                WHEN 'conf-finals-gm1-3'   THEN 11
+                                WHEN 'heat-wb'             THEN 12
+                                WHEN 'heat-lb'             THEN 13
+                                ELSE 99
+                            END ASC,
+                            s.id DESC
+                    ) AS rn
+                FROM ibl_plr_snapshots s
+                WHERE s.stats_gm > 0
+                  AND s.pid = ?
+                  AND s.season_year = ?
+            ) snap
+            WHERE rn = 1"
+        );
+        self::assertNotFalse($stmt);
+        $pid  = 202099902;
+        $year = 2008;
+        $stmt->bind_param('ii', $pid, $year);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        self::assertNotNull($row);
+        self::assertSame('mid-season', $row['snapshot_phase']);
+    }
+
     // ── Helpers (integration tests) ───────────────────────────────────────
 
     /**

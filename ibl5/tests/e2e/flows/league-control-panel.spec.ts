@@ -185,15 +185,9 @@ test.describe('LeagueControlPanel — Active Players CSV Export endpoints', () =
     page,
   }) => {
     expect(exportedFilename).not.toBe('');
-    const [dlResponse] = await Promise.all([
-      page.waitForResponse(
-        r =>
-          r.url().includes('leagueControlPanel.php') && r.url().includes('download='),
-      ),
-      page
-        .goto(`leagueControlPanel.php?download=${encodeURIComponent(exportedFilename)}`)
-        .catch(() => null),
-    ]);
+    const dlResponse = await page.request.get(
+      `leagueControlPanel.php?download=${encodeURIComponent(exportedFilename)}`,
+    );
     expect(dlResponse.status()).toBe(200);
     expect(dlResponse.headers()['content-type']).toContain('text/csv');
   });

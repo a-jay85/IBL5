@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 2 — resolve a rebase conflict, prove no work was lost, and arm the conflict hold. Loaded only when the Phase 2 rebase block prints STOP-AND-RESOLVE.
-last_verified: 2026-09-17
+last_verified: 2026-09-18
 paths:
   - .claude/skills/post-plan/SKILL.md
   - .claude/skills/pr-ready/_rebase-and-conflicts.md
@@ -256,6 +256,36 @@ Phase 6.5 step 0 renders this into `/tmp/post-plan-conflict-comment-<KEY>.md` wi
 tool and posts it under the marker `<!-- post-plan-conflict-hold -->`. The wording is
 maintained **here only**; `SKILL.md` points at this appendix rather than carrying a copy.
 
+To select which render to post, read the first line of `/tmp/postplan-conflict-verdict-<KEY>-<POST_RESOLUTION_SHA>.ok` and compare it to the exact string `CONFLICT-REVIEW=CLEAN`. A match selects branch **(b-clean)** below. Every other outcome selects **(b-held)**: a missing file, an empty file, a first line carrying anything else, and a first line that merely starts with the token are all held outcomes. The `.ok` suffix does not indicate a clean verdict; the same path holds a `FOUND-PROBLEM` verdict when the reviewer found a problem.
+
+**Branch (b-clean).** Render when line 1 is exactly `CONFLICT-REVIEW=CLEAN`:
+
+````markdown
+<!-- post-plan-conflict-hold -->
+## Rebase conflict auto-resolved, then reviewed clean
+
+**(a) What happened.** Rebasing this branch onto `master` conflicted. `/post-plan` resolved
+the conflict automatically (three-way, per `.claude/skills/pr-ready/_rebase-and-conflicts.md` §2e)
+and proved no work was lost: `lostwork.sh` reported **TREE-EQUIVALENT** against the pre-rebase
+diff, which is a precondition for the push that produced this PR.
+
+**(b) Review result.** A dedicated conflict-resolution review read every path in the resolution
+manifest and found no dropped semantics on either side. The lost-work proof also passed
+(`TREE-EQUIVALENT`), so nothing was silently dropped in bytes. Auto-merge is armed. The PR still
+has to clear every other Phase 6.5 condition and CI before it merges.
+
+**(c) Files the resolution touched.**
+
+<one bullet per path from /tmp/postplan-conflict-resolution-<KEY>.md, each with the
+one-line description of which side the resolution took and why>
+
+<COLLAPSE-GUARD: WARN line from step 3, if any>
+
+_Posted by `/post-plan`. Updated in place on re-run._
+````
+
+**Branch (b-held).** Render on every other outcome (missing file, empty file, non-CLEAN first line):
+
 ````markdown
 <!-- post-plan-conflict-hold -->
 ## Auto-merge held — this run auto-resolved a rebase conflict
@@ -275,6 +305,12 @@ the gate working as designed, not a failure — **merge it by hand after reviewi
 one-line description of which side the resolution took and why>
 
 <COLLAPSE-GUARD: WARN line from step 3, if any>
+
+### Findings from the conflict-resolution review
+
+<when the verdict was FOUND-PROBLEM, paste the ## Findings body from the verdict file here;
+when the verdict was absent, empty, or unparseable, write: the review did not produce a
+readable verdict; the hold is the fail-closed default rather than a specific finding>
 
 _Posted by `/post-plan`. Updated in place on re-run._
 ````

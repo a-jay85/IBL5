@@ -1,6 +1,6 @@
 ---
 description: /post-plan Phase 7 — the Opus-escalation procedure for CI fixes, the BEHIND re-rebase loop, and the harness background-CI-outcome short-circuit.
-last_verified: 2026-09-16
+last_verified: 2026-09-18
 ---
 
 # Phase 7 — CI Monitoring (post-plan reference)
@@ -104,14 +104,20 @@ re-invocation, so a turn that ends with work still running is a stall-kill.
 7. **Re-probe.** `gh pr view <N> --json mergeStateStatus --jq .mergeStateStatus`. Not `BEHIND`
    ⇒ leave the loop. Still `BEHIND` ⇒ next iteration, up to the bound.
 
-### On loop exit without a conflict
+### On loop exit
 
-Re-arm **only if both** hold: `/tmp/postplan-automerge-was-<KEY>.txt` reads `armed`, **and** the
-conflict flag `/tmp/postplan-conflict-resolved-<KEY>` is still absent.
+Re-arm only if the prior arm state reads `armed`, **and** either the conflict flag is absent or step 7.5's verdict for `<POST_RESOLUTION_SHA>` reads clean.
 
 ```bash
+# phase 7 re-arm gate: restore the pre-loop arm state, and only when this run had no
+# conflict or step 7.5 cleared the resolution for <POST_RESOLUTION_SHA>.
+CONFLICT_OK=no
+if [ -r /tmp/postplan-conflict-verdict-<KEY>-<POST_RESOLUTION_SHA>.ok ]; then
+  read -r VL < /tmp/postplan-conflict-verdict-<KEY>-<POST_RESOLUTION_SHA>.ok || VL=""
+  [ "$VL" = "CONFLICT-REVIEW=CLEAN" ] && CONFLICT_OK=yes
+fi
 test "$(cat /tmp/postplan-automerge-was-<KEY>.txt)" = armed \
-  && ! test -e /tmp/postplan-conflict-resolved-<KEY> \
+  && { ! test -e /tmp/postplan-conflict-resolved-<KEY> || [ "$CONFLICT_OK" = yes ]; } \
   && gh pr merge <N> --squash --auto
 ```
 
@@ -135,17 +141,20 @@ to prevent.
 An iteration whose rebase printed `REBASE=conflict` has already had its arm write
 `/tmp/postplan-conflict-resolved-<KEY>` (the Phase 2 block does this at detection time). Then:
 
-1. Enter `.claude/skills/post-plan/_phase-2-conflict-resolution.md` exactly as at Phase 2 — same
-   `--onto` recipe, same three-way resolution, same `lostwork.sh` gate. `TREE-EQUIVALENT` remains
-   the precondition for the force-push.
-2. Auto-merge **stays disarmed**. It was disarmed in step 2 of this iteration, and the re-arm
-   above is gated on the conflict flag being absent, so it cannot come back. Condition (14)
-   cannot help here — Phase 6.5 already ran. This is the second entry point into the hold, and
-   it is enforced by the re-arm gate rather than by a condition evaluation.
+1. Enter `.claude/skills/post-plan/_phase-2-conflict-resolution.md` exactly as at Phase 2, now
+   including step 7's `POST_RESOLUTION_SHA` capture and step 7.5's review. Record the sha step 7
+   printed as this iteration's `<POST_RESOLUTION_SHA>` literal before running the step 6.1
+   re-arm block. The `--onto` recipe, three-way resolution, and `lostwork.sh` gate are unchanged.
+   `TREE-EQUIVALENT` remains the precondition for the force-push.
+2. Auto-merge stays disarmed unless step 7.5 cleared the resolution for `<POST_RESOLUTION_SHA>`
+   and step 1 of this iteration recorded `armed`. Condition (14) cannot help here; Phase 6.5
+   already ran. This is the second entry point into the hold, and it is enforced by the step 6.1
+   re-arm gate rather than by a condition evaluation.
 3. Post the sticky comment through the **same** `<!-- post-plan-conflict-hold -->` marker
    (Phase 6.5 step 0), adding one line naming the CI-watch re-rebase as the trigger.
    `post_sticky()` updates in place, so a PR that conflicted at both Phase 2 and Phase 7 ends
    with one comment, not two.
+   The branch the sticky renders follows the rule in the conflict-resolution appendix.
 4. Leave the loop and continue to Phase 8. The PR is correct and held — that is the intended
    terminal state.
 
@@ -157,3 +166,10 @@ is re-run** — no re-review, no re-fidelity, no re-conformance. A re-rebase tha
 invalidates both verdicts, and the loop does not try to re-run them either; it leaves auto-merge
 disarmed, posts the hold, and routes the PR to a human. The held sticky comment carries the
 "this needs re-review" signal.
+
+A conflict-free re-rebase that runs after a Phase 2 conflict already cleared clean force-pushes
+a new HEAD. The Phase 2 verdict no longer covers that tree, so the step 6.1 gate does not
+re-arm. That terminal state is a disarmed, correct, held PR, identical to what the unconditional
+hold produced, so the residual is never worse than current behavior. No verdict is copied forward
+to the new sha; carrying a review across a rewrite is the thing the fail-closed keying exists
+to prevent.

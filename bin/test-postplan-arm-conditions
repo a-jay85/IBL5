@@ -26,6 +26,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SKILL="$REPO_ROOT/.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md"
 P25_SKILL="$REPO_ROOT/.claude/skills/post-plan/SKILL.md"
+PP7="$REPO_ROOT/.claude/skills/post-plan/_phase-7-ci-monitoring.md"
 P55_SKILL="$REPO_ROOT/.claude/skills/post-plan/_phase-5.5-fidelity.md"
 P5_SKILL="$REPO_ROOT/.claude/skills/post-plan/_phase-5-final-verification.md"
 PLAN_SKILL="$REPO_ROOT/.claude/skills/plan/SKILL.md"
@@ -1551,10 +1552,15 @@ else
         FAILED=1
     fi
 
+    VDIR="$BASE_TMP/verdicts"; mkdir -p "$VDIR"
+    VKEY="cond14-fixture"
+    HS="$(git rev-parse HEAD)"
+    VOK="$VDIR/postplan-conflict-verdict-$VKEY-$HS.ok"
+
     # Flag present -> hold, with the full remedy wording. A HOLD line that does not
     # say what the human should do reads as a bug report, not a gate.
     F14="$BASE_TMP/cond14-present"; : > "$F14"
-    O14="$(CONFLICT_FLAG="$F14" bash -c "$B14" 2>&1)"
+    O14="$(CONFLICT_FLAG="$F14" CONFLICT_VERDICT_DIR="$VDIR" CONFLICT_VERDICT_KEY="$VKEY" bash -c "$B14" 2>&1)"
     have "§5.9c: flag present -> COND14=blocked"            "$O14" 'COND14=blocked'
     have "§5.9c: HOLD names the condition"                  "$O14" 'condition (14)'
     have "§5.9c: HOLD says the lost-work proof passed"      "$O14" 'TREE-EQUIVALENT'
@@ -1565,14 +1571,44 @@ else
     # NEGATIVE, and the highest-value case in the set: an inverted `[ ! -e ]` would
     # hold EVERY clean run and stall the whole merge pipeline while every other
     # assertion here stayed green.
-    O14C="$(CONFLICT_FLAG="$BASE_TMP/cond14-absent" bash -c "$B14" 2>&1)"
+    O14C="$(CONFLICT_FLAG="$BASE_TMP/cond14-absent" CONFLICT_VERDICT_DIR="$VDIR" CONFLICT_VERDICT_KEY="$VKEY" bash -c "$B14" 2>&1)"
     have  "§5.9c: no flag -> COND14=clear"        "$O14C" 'COND14=clear'
     lacks "§5.9c: a clean run emits no HOLD line" "$O14C" 'HOLD:'
 
     # Same block, a second unrelated tmp root: proves nothing leaks between runs.
     ALT_TMP="$(mktemp -d "$BASE_TMP/alt-XXXXXX")"
-    O14D="$(CONFLICT_FLAG="$ALT_TMP/cond14-absent" bash -c "$B14" 2>&1)"
+    O14D="$(CONFLICT_FLAG="$ALT_TMP/cond14-absent" CONFLICT_VERDICT_DIR="$VDIR" CONFLICT_VERDICT_KEY="$VKEY" bash -c "$B14" 2>&1)"
     have "§5.9c: clear verdict is not sticky across tmp roots" "$O14D" 'COND14=clear'
+
+    run14() { CONFLICT_FLAG="$1" CONFLICT_VERDICT_DIR="$VDIR" CONFLICT_VERDICT_KEY="$VKEY" bash -c "$B14" 2>&1; }
+
+    printf 'CONFLICT-REVIEW=CLEAN\n' > "$VOK"
+    OK1="$(run14 "$F14")"
+    have  "§5.9c: clean verdict for this HEAD -> COND14=clear" "$OK1" 'COND14=clear'
+    lacks "§5.9c: a cleared conflict emits no HOLD line"       "$OK1" 'HOLD:'
+
+    : > "$VOK"
+    have "§5.9c: empty verdict -> blocked"       "$(run14 "$F14")" 'COND14=blocked'
+
+    printf 'CONFLICT-REVIEW=CLEANISH\nCONFLICT-REVIEW=CLEAN\n' > "$VOK"
+    have "§5.9c: superstring verdict -> blocked" "$(run14 "$F14")" 'COND14=blocked'
+
+    printf 'CONFLICT-REVIEW=FOUND-PROBLEM\n## Findings\n- x\n' > "$VOK"
+    have "§5.9c: negative verdict -> blocked"    "$(run14 "$F14")" 'COND14=blocked'
+
+    rm -f "$VOK"
+    printf 'CONFLICT-REVIEW=CLEAN\n' > "$VDIR/postplan-conflict-verdict-$VKEY-deadbeefdeadbeefdeadbeefdeadbeefdeadbeef.ok"
+    have "§5.9c: verdict keyed to a stale sha -> blocked" "$(run14 "$F14")" 'COND14=blocked'
+
+    printf 'CONFLICT-REVIEW=FOUND-PROBLEM\n' > "$VOK"
+    have "§5.9c: no flag -> clear even with a negative verdict" "$(run14 "$BASE_TMP/cond14-absent")" 'COND14=clear'
+    rm -f "$VOK"
+
+    have  "§5.9c: verdict dir seam keeps its default"          "$B14" 'CONFLICT_VERDICT_DIR:-/tmp'
+    have  "§5.9c: the HEAD sha is not seam-overridable"        "$B14" '.ok"'
+    have  "§5.9c: line 1 is compared by exact equality"        "$B14" '"$VERDICT_LINE" = "CONFLICT-REVIEW=CLEAN"'
+    lacks "§5.9c: no pattern match replaces the equality test" "$B14" 'grep'
+    lacks "§5.9c: existence alone never clears the hold"       "$B14" 'test -f "$CONFLICT_VERDICT"'
 fi
 
 # §5.9d Phase 6.5 step 0 announcement guard.
@@ -1742,6 +1778,36 @@ have  "§5.9l: reference doc has a (14) entry"               "$ARM_TXT" '**(14)'
 have  "§5.9l: (14) entry names the conflict flag path"      "$ARM_TXT" '/tmp/postplan-conflict-resolved-'
 have  "§5.9l: (14) entry records the shared-predicate why"  "$ARM_TXT" 'not in the shared predicate'
 lacks "§5.9l: (14) entry adds no per-condition bash block"  "$ARM_TXT" 'CONFLICT_FLAG='
+
+# §5.9e Phase 7 re-arm gate: the BEHIND loop's re-arm block must know the verdict path
+# and require an exact match, just as condition (14) does.
+A7="$(grep -cF '# phase 7 re-arm gate' "$PP7")"
+if [ "$A7" != "1" ]; then
+    echo "FAIL: §5.9e — anchor '# phase 7 re-arm gate' appears $A7 times in $PP7"
+    FAILED=1
+fi
+B7="$(extract_block '# phase 7 re-arm gate' "$PP7")"
+if [ -z "$B7" ]; then
+    echo "FAIL: §5.9e — no block matching '# phase 7 re-arm gate' in $PP7"
+    FAILED=1
+else
+    have  "§5.9e: re-arm names the HEAD-keyed verdict path"  "$B7" 'postplan-conflict-verdict-<KEY>-<POST_RESOLUTION_SHA>.ok'
+    have  "§5.9e: re-arm still requires the prior arm state" "$B7" '= armed'
+    have  "§5.9e: re-arm still ends in the arming command"   "$B7" 'gh pr merge <N> --squash --auto'
+    have  "§5.9e: re-arm compares line 1 by exact equality"  "$B7" '"$VL" = "CONFLICT-REVIEW=CLEAN"'
+    lacks "§5.9e: no command substitution for the sha"       "$B7" 'git rev-parse'
+fi
+
+# §5.9f independence: clearing condition (14) must not clear any other condition.
+# VDIR, VKEY, and VOK are already defined from §5.9c above.
+printf 'CONFLICT-REVIEW=CLEAN\n' > "$VOK"
+export CONFLICT_VERDICT_DIR="$VDIR" CONFLICT_VERDICT_KEY="$VKEY"
+expect_block "§5.9f: a clean verdict does not clear the feat: floor" BLOCK \
+    "$(run_isolated "$B8" '{"title":"feat: shiny","labels":[]}' '' '')"
+expect_block "§5.9f: a clean verdict does not clear the stacked-PR hold" BLOCK \
+    "$(run_isolated "$B6" '{"body":"x\nDepends-on: #1100"}' '' '')"
+unset CONFLICT_VERDICT_DIR CONFLICT_VERDICT_KEY
+rm -f "$VOK"
 
 if [ "$FAILED" -eq 0 ]; then
     echo "All post-plan block checks passed."

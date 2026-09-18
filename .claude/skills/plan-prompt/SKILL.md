@@ -1,7 +1,7 @@
 ---
 name: plan-prompt
 description: "Draft a /plan prompt distilled from the current conversation — ground-truth pointers, already-measured evidence, scope, constraints, verification, and the Step-3 architect tier — then, unless the Step-1.5 size triage says the work clears the ad-hoc bar, fire it as a detached headless Sonnet 4.6 run via bin/plan-now. Use after a design discussion when the planning run should be offloaded off the expensive session."
-last_verified: 2026-09-17
+last_verified: 2026-09-18
 ---
 
 # Draft a `/plan` handoff prompt and fire it headless
@@ -195,9 +195,8 @@ things with an obvious answer is the failure mode on the other side.
 `bin/plan-now` appends a coda telling the run to never ask, and to record + hold
 (`auto_merge: false`) any fork that survives anyway. That coda is the backstop, not
 the plan: a fork you could have resolved here costs a held PR. And a fork you *did*
-resolve, but with low confidence, is not a Step 5 disposition trigger — it means you
-have not finished this step: reopen it with `AskUserQuestion` now rather than carrying
-the uncertainty into an `--implement` run.
+resolve, but with low confidence, means you have not finished this step. Reopen it
+with `AskUserQuestion` now, while the human is still in the room to answer.
 
 ## Step 5 — Fire, then report
 
@@ -236,21 +235,20 @@ step 3.
    survives closing Claude Code), then runs `bin/check-plan` on the produced plan and
    logs the verdict. Report the log path it prints; don't poll it.
 
-   **Default disposition is `--queue`** — matching `/plan`'s own default. The fired run
-   goes design → plan → implementation → PR without a human in the loop, so the block
-   you just composed is the last human-authored input to a shipped PR. The gate is
-   `bin/plan-now`'s own, not the model's: it queues only when the run **exits clean**
-   *and* the plan is **identified by its `PLAN_FILE:` line** *and* **`bin/check-plan`
-   passes**. A degraded run lands on disk for a human instead. Reach for
-   `--implement` **if and only if** the work triggers `plan-architect-xhigh` — the same
-   trigger list Step 4 names above, authoritative in `.claude/rules/agent-tiering.md` §
-   Tiers. That is a blast-radius test, not a size-or-novelty one: those triggers mark
-   the changes whose bad outcome you cannot take back, and only those are worth a human
-   reading the plan before it implements. Everything else queues safely because
-   `/post-plan` always opens the PR, Phase 6.5's arming conditions only ever *hold*, and
-   a `feat:` title stays held by the commit-type floor and the `human-signoff` required
-   check regardless — so a wrong queue call costs a PR you read at review time instead
-   of at plan time.
+   **Default disposition is `--queue`.** It matches `/plan`'s own default. The fired
+   run goes design → plan → implementation → PR without a human in the loop, so the
+   block you just composed is the last human-authored input to a shipped PR. The gate
+   belongs to `bin/plan-now` itself: it queues only when the run **exits clean** *and*
+   the plan is **identified by its `PLAN_FILE:` line** *and* **`bin/check-plan`
+   passes**. A degraded run lands on disk for a human instead.
+
+   Pass `--implement` only when the user asked, in this conversation, to read the plan
+   before it implements. Nothing about the work itself selects it. The Step 4 tier
+   triggers route the architect and have no bearing on disposition. Everything else
+   queues safely because `/post-plan` always opens the PR, Phase 6.5's arming
+   conditions only ever *hold*, and a `feat:` title stays held by the commit-type floor
+   and the `human-signoff` required check regardless. A wrong queue call costs a PR you
+   read at review time.
 
    Because the plan will be *executed*, not skimmed: Step 4.5's fork pre-resolution and
    the Step-3 tier directive are what stand between this block and a wrong PR.
@@ -260,7 +258,7 @@ step 3.
    bases on `master`, so none of them waits on a branch that does not exist:
 
    ```bash
-   for f in "$f1" "$f2" "$f3"; do bin/plan-now --implement "$f"; done
+   for f in "$f1" "$f2" "$f3"; do bin/plan-now "$f"; done
    ```
 
    No spacing between the calls is needed. Each `bin/plan-now` is its own process and

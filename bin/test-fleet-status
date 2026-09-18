@@ -39,8 +39,9 @@
 #  20  a live runner's details (phase, pid, last progress, log link) print right
 #      under its queue row, and a queued plan gets none. A runner whose plan has
 #      no queue file gets its own row at the top of the queue
-#  21  queue rows carry MODEL / MERGE / TITLE from the plan's frontmatter, with
-#      bin/automouse/queue's defaults (opus / true) when there is none
+#  21  queue rows carry MODEL / MERGE from the plan's frontmatter, with
+#      bin/automouse/queue's defaults (opus / true) when there is none, and the
+#      plan's title on its own indented line under the row
 #
 # Case 13 points FLEET_STATUS_AUTOMOUSE_PLIST at a fixture. Left defaulted it
 # would read the real plist on macOS and take the missing-file branch on CI —
@@ -522,13 +523,19 @@ assert_has "queue: unlocked plan reads queued" \
 # 21 — MODEL / MERGE / TITLE. The bare plan gets bin/automouse/queue's defaults;
 # the frontmatter plan gets its own values and its H1.
 assert_has "queue: header row names every column" \
-    "$OUTPUT" '# PLAN +MODEL +MERGE +STATUS +TITLE'
+    "$OUTPUT" '# PLAN +MODEL +MERGE +STATUS$'
 assert_has "queue: bare plan shows the default model and merge" \
     "$OUTPUT" 'live-plan\.md +opus +true +in progress'
-assert_has "queue: frontmatter model, merge and title are read" \
-    "$OUTPUT" 'idle-plan\.md +sonnet +false +queued +Idle plan title'
+assert_has "queue: frontmatter model and merge are read" \
+    "$OUTPUT" 'idle-plan\.md +sonnet +false +queued$'
+# The title is the indented line right under its row. Joined to one line because
+# assert_has runs grep -E, which cannot see across lines.
+assert_has "queue: title sits on its own line under the row" \
+    "$(grep -EA1 'idle-plan\.md +sonnet' <<< "$OUTPUT" | tr '\n' ' ')" \
+    'queued +Idle plan title $'
 assert_has "queue: no H1 falls back to the unquoted frontmatter title" \
-    "$OUTPUT" 'fm-title-plan\.md +opus +true +queued +Quoted fallback title$'
+    "$(grep -EA1 'fm-title-plan\.md +opus' <<< "$OUTPUT" | tr '\n' ' ')" \
+    'queued +Quoted fallback title $'
 
 # 20 — a runner's details sit directly UNDER its plan row. Joined to one line
 # because assert_has runs grep -E, which cannot see across lines.
@@ -537,13 +544,13 @@ assert_has "queue: live runner's phase and pid follow its plan row" \
     "$LIVE_BLOCK" "in progress *● impl +pid $LIVE_AUTOMOUSE_PID "
 assert_has "queue: impl progress is the runner's own last tool call" \
     "$LIVE_BLOCK" 'live-plan/impl tool: Bash \(#28, turn 28\)'
-assert_has "queue: impl detail links the automouse day log" \
-    "$LIVE_BLOCK" 'log: .*/automouse/logs/2026-09-10\.log'
+assert_has "queue: impl detail ends its pid line in the day-log word" \
+    "$LIVE_BLOCK" "pid $LIVE_AUTOMOUSE_PID .*attempt 2  log "
 assert_lacks "queue: rearm log is never read as the day log" \
     "$OUTPUT" 'REARM-NOISE'
-IDLE_NEXT="$(grep -EA1 'idle-plan\.md +sonnet' <<< "$OUTPUT" | tail -n 1)"
+IDLE_NEXT="$(grep -EA2 'idle-plan\.md +sonnet' <<< "$OUTPUT" | tail -n 2)"
 assert_lacks "queue: a queued plan has no details under it" \
-    "$IDLE_NEXT" '●|pid |log: '
+    "$IDLE_NEXT" '●|pid | log$'
 
 # 7b — queue ORDER, not alphabetical. live-plan is stamped older, so it leads;
 # alphabetically idle-plan would. Collapsed to one line because assert_has runs
@@ -608,8 +615,10 @@ assert_has "automouse: out-of-queue runner details follow its row" \
 NIGHTLY_BLOCK="$(grep -EA3 'nightly-plan +-' <<< "$OUTPUT" | tr '\n' ' ')"
 assert_has "automouse: post-plan runner reads its audit.log phase line" \
     "$NIGHTLY_BLOCK" "● postplan +pid $NIGHTLY_PID .*phase2: committing the tree"
+assert_has "automouse: post-plan runner's pid line ends in audit" \
+    "$NIGHTLY_BLOCK" "pid $NIGHTLY_PID .*attempt 3  audit "
 assert_has "automouse: post-plan runner links its audit.log" \
-    "$NIGHTLY_BLOCK" 'audit: .*/live-nightly-plan-20260910-140000-99/audit\.log'
+    "$OUTPUT_LINKS" '8;;vscode://file/[^ ]*live-nightly-plan-20260910-140000-99/audit\.log[^ ]*audit'
 assert_lacks "automouse: post-plan outputs trailer is not progress" \
     "$OUTPUT" 'nightly/trailer/not/progress'
 # Every runner now lives inside the queue section. The old section is gone.
@@ -642,12 +651,15 @@ assert_has "links: queued (unlocked) row links too" \
 # association. One assertion covers every link at once.
 assert_lacks "links: no path is left on the file:// handler" \
     "$OUTPUT_LINKS" '8;;file://'
-assert_has "links: post-plan audit path is a link" \
-    "$OUTPUT_LINKS" 'audit: [^ ]*8;;vscode://file/[^ ]*live-demo-slug-20260910-120000-4242/audit\.log'
-assert_has "links: fallback /tmp log path is a link" \
-    "$OUTPUT_LINKS" 'log: [^ ]*8;;vscode://file/[^ ]*post-plan-now-noaudit-slug-20260910-130000-4343\.log'
+# The word is the link text; the path lives only in the URI.
+assert_has "links: post-plan audit word links its audit.log" \
+    "$OUTPUT_LINKS" 'last-exit-col 0  [^ ]*8;;vscode://file/[^ ]*live-demo-slug-20260910-120000-4242/audit\.log[^ ]*audit'
+assert_has "links: fallback log word links the /tmp log" \
+    "$OUTPUT_LINKS" 'last-exit-col 0  [^ ]*8;;vscode://file/[^ ]*post-plan-now-noaudit-slug-20260910-130000-4343\.log[^ ]*log'
 assert_has "links: runner detail links the automouse day log" \
-    "$OUTPUT_LINKS" 'log: [^ ]*8;;vscode://file/[^ ]*automouse/logs/2026-09-10\.log'
+    "$OUTPUT_LINKS" 'attempt 2  [^ ]*8;;vscode://file/[^ ]*automouse/logs/2026-09-10\.log[^ ]*log'
+assert_lacks "links: no .log path is printed as visible text" \
+    "$OUTPUT_STRIPPED" '\.log'
 
 # The existence gate. nodotmd-plan resolves a slug (via its lock dir) but has no
 # queue/*.md file, so linking it would open an error dialog. Nothing else on the
@@ -667,20 +679,20 @@ assert_has "links: plain queue row is the same column" \
 # 19 — the audit.log swap. The point of the tool is a file you can open WHILE the
 # job runs, and only audit.log is written incrementally.
 assert_has   "log: post-plan row names its audit.log" \
-    "$OUTPUT" 'audit: .*/live-demo-slug-20260910-120000-4242/audit\.log'
+    "$OUTPUT_LINKS" 'vscode://file/[^ ]*live-demo-slug-20260910-120000-4242/audit\.log'
 assert_lacks "log: post-plan row does NOT name the /tmp launchd log" \
-    "$OUTPUT" 'post-plan-now-demo-slug-20260910-120000-4242\.log'
+    "$OUTPUT_LINKS" 'post-plan-now-demo-slug-20260910-120000-4242\.log'
 
 # Fallback. No harness directory exists for this label, so there is no incremental
 # file to offer and the /tmp log is the only thing there is.
 assert_has "log: post-plan row with no audit.log falls back to the /tmp log" \
-    "$OUTPUT" 'log: .*/post-plan-now-noaudit-slug-20260910-130000-4343\.log'
+    "$OUTPUT_LINKS" 'vscode://file/[^ ]*post-plan-now-noaudit-slug-20260910-130000-4343\.log'
 assert_lacks "log: the fallback row claims no audit file" \
-    "$OUTPUT" 'audit: .*noaudit-slug'
+    "$(grep -A1 'noaudit-slug' <<< "$OUTPUT" | tr '\n' ' ')" '  audit '
 
 # Producers with no harness output at all keep the /tmp log, unlabelled-as-audit.
 assert_has "log: plan-now rows keep the /tmp log" \
-    "$OUTPUT" 'log: .*/plan-now-20260910-171016-38521\.log'
+    "$OUTPUT_LINKS" 'vscode://file/[^ ]*plan-now-20260910-171016-38521\.log'
 
 # 9 — scope guard. bin/wt-status owns worktree/branch shipping state; this tool
 # reports processes. A re-added section would also make the default run shell out

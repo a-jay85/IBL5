@@ -182,3 +182,13 @@ def test_remediation_flags_exist_in_the_real_check_docs():
         src = fh.read()
     assert runner._DOC_FIX_FLAG in src and "--since=" in src
     assert os.path.exists(os.path.join(_ROOT, runner._DOC_FIX_SCRIPT))
+
+
+def test_run_commits_through_the_remediation_wrapper():
+    """Pin the wiring: reverting runner.py:275 to a bare git.commit_all() leaves every
+    Phase 2 unit test green, so assert the call site by source inspection."""
+    src = open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                            "runner.py")).read()
+    assert "_commit_with_gate_remediation(" in src
+    assert "sha = git.commit_all(" not in src        # the old call site is gone
+    assert 'upsert_files_changed(copy["summary_md"]' in src   # PR body still unmutated

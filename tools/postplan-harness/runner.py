@@ -272,7 +272,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             copy["summary_md"] = summary
             log("phase2: stripped model-authored Manual Testing section from PR copy")
         copy["commit_subject"] = schemas.coerce_commit_subject(copy["commit_subject"], cls)
-        sha = git.commit_all(f"{copy['commit_subject']}\n\n{copy['summary_md']}")
+        sha = _commit_with_gate_remediation(
+            git, worktree, f"{copy['commit_subject']}\n\n{copy['summary_md']}", log)
         rebase_line = f"REBASE=not run ({mode} mode)"
         if live:
             pre_rebase = git.head()

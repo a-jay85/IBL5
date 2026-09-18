@@ -32,6 +32,10 @@ regexes = [
   # logged — deliberately fake, never a real credential.
   '''hunter2_sentinel_xyz''',
 
+  # Verdict-file key fixture in bin/test-postplan-arm-conditions (a filename
+  # fragment, not a credential; the VKEY name trips generic-api-key).
+  '''VKEY="cond14-fixture"''',
+
   # Sequential placeholder Discord snowflake IDs in test fixtures
   # (tests/Discord/*, tests/Team/TeamViewTest.php).
   '''123456789012345678''',

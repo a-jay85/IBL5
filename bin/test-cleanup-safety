@@ -73,6 +73,37 @@ exit 0
 GH
 chmod +x "$STUBBIN/gh"
 
+cat > "$STUBBIN/docker" << 'DOCKERSTUB'
+#!/usr/bin/env bash
+# Stub docker for cleanup safety tests.
+# TSV fixture rows (tab-separated):
+#   project  <name>                             — compose project names (pass-1 stream)
+#   workdir  <project>  <path>                 — working_dir for hole-1 check
+#   unlabeled  <compose-label>  <id>  <name>   — pass-5 stream row (label may be empty)
+#   created  <id>  <iso8601>                   — docker inspect Created value
+#   image    <name>                             — orphaned image name
+#   vol      <name>                             — orphaned volume name
+[ -z "$DOCKER_FIXTURE" ] && exit 0
+args="$*"
+if [[ "$args" == *'com.docker.compose.project.working_dir'* ]]; then
+    project=$(printf '%s' "$args" | grep -oE 'project=[^"[:space:]]+' | tail -1 | cut -d= -f2)
+    awk -F'\t' -v k="workdir" -v p="$project" '$1==k && $2==p {print $3}' "$DOCKER_FIXTURE"
+elif [[ "$args" == *'com.docker.compose.project'* && "$args" == *'status=created'* ]]; then
+    awk -F'\t' '$1=="unlabeled" {printf "%s\t%s\t%s\n",$2,$3,$4}' "$DOCKER_FIXTURE"
+elif [[ "$args" == *'com.docker.compose.project'* ]]; then
+    awk -F'\t' '$1=="project" {print $2}' "$DOCKER_FIXTURE"
+elif [[ "$args" == *inspect* && "$args" == *Created* ]]; then
+    for _cid; do true; done
+    awk -F'\t' -v k="created" -v c="$_cid" '$1==k && $2==c {print $3}' "$DOCKER_FIXTURE"
+elif [[ "$args" == *images* ]]; then
+    awk -F'\t' '$1=="image" {print $2}' "$DOCKER_FIXTURE"
+elif [[ "$args" == *'volume ls'* ]]; then
+    awk -F'\t' '$1=="vol" {print $2}' "$DOCKER_FIXTURE"
+fi
+exit 0
+DOCKERSTUB
+chmod +x "$STUBBIN/docker"
+
 pass()     { echo "ok: $1"; }
 failcase() { echo "FAIL: $1"; FAILED=1; }
 
@@ -165,6 +196,13 @@ run_cleanup() {
 run_cleanup_gh() {
     local main="$1" fx="$2"; shift 2
     ( cd "$main" && GH_FIXTURE="$fx" PATH="$STUBBIN:$PATH" "$CLEANUP" --all --dry-run "$@" 2>&1 )
+}
+
+# run_cleanup_docker <main> <fixture-file> [flags...] — like run_cleanup but
+# with a docker fixture; sets DOCKER_FIXTURE so the stub returns canned output.
+run_cleanup_docker() {
+    local main="$1" fx="$2"; shift 2
+    ( cd "$main" && DOCKER_FIXTURE="$fx" PATH="$STUBBIN:$PATH" "$CLEANUP" --all --dry-run "$@" 2>&1 )
 }
 
 # ----------------------------------------------------------------------------
@@ -666,6 +704,73 @@ assert_match  "record-fn-exists"                'UNRESOLVED_ROWS='             "
 assert_absent "report-block-never-deletes"      'branch -D|should_delete=true' "$report_block"
 assert_absent "record-fn-never-deletes"         'branch -D|should_delete=true' "$rec_fn"
 assert_absent "report-block-not-dry-run-gated"  'DRY_RUN'                      "$report_block"
+
+# ----------------------------------------------------------------------------
+# Hole 1: non-ibl5-* compose project whose working_dir is under WT_PARENT
+# and no longer exists on disk is swept (ex-IBL5 worktree stack).
+# ----------------------------------------------------------------------------
+e="$(new_env)"
+_wt_parent="$(worktrees_parent_dir "$(git -C "$e" worktree list --porcelain | head -1 | sed 's/^worktree //')")"
+_orphan_wd="$_wt_parent/bug-pipeline-image-capture"
+# _orphan_wd must NOT exist on disk (orphan signal)
+_fx_hole1="$TMP/docker-hole1.tsv"
+printf 'project\tbug-pipeline-image-capture\n' > "$_fx_hole1"
+printf 'workdir\tbug-pipeline-image-capture\t%s\n' "$_orphan_wd" >> "$_fx_hole1"
+out="$(run_cleanup_docker "$e" "$_fx_hole1")"
+assert_match "hole1-ex-worktree-project-caught" \
+    'WOULD tear down Docker: bug-pipeline-image-capture' "$out"
+
+# Negative: project whose working_dir is NOT under WT_PARENT is skipped.
+_fx_hole1_neg="$TMP/docker-hole1-neg.tsv"
+printf 'project\tunrelated-project\n' > "$_fx_hole1_neg"
+printf 'workdir\tunrelated-project\t/usr/local/other/project\n' >> "$_fx_hole1_neg"
+out="$(run_cleanup_docker "$e" "$_fx_hole1_neg")"
+assert_absent "hole1-unrelated-project-spared" \
+    'WOULD tear down Docker: unrelated-project' "$out"
+
+# Negative: project whose working_dir is under WT_PARENT but still EXISTS
+# on disk is skipped (live stack, not an orphan).
+_live_wd="$_wt_parent/live-project"
+mkdir -p "$_live_wd"
+_fx_hole1_live="$TMP/docker-hole1-live.tsv"
+printf 'project\tlive-project\n' > "$_fx_hole1_live"
+printf 'workdir\tlive-project\t%s\n' "$_live_wd" >> "$_fx_hole1_live"
+out="$(run_cleanup_docker "$e" "$_fx_hole1_live")"
+assert_absent "hole1-live-project-spared" \
+    'WOULD tear down Docker: live-project' "$out"
+rm -rf "$_live_wd"
+
+# ----------------------------------------------------------------------------
+# Hole 2: stopped containers with no compose-project label older than
+# STALE_CONTAINER_DAYS are swept; recent or running ones are spared.
+# ----------------------------------------------------------------------------
+
+# Stale unlabeled container (created 2026-07-01, well beyond 30 days as of test run)
+_fx_hole2_stale="$TMP/docker-hole2-stale.tsv"
+printf 'unlabeled\t\tabc123def456abc1\torphan-sim\n' > "$_fx_hole2_stale"
+printf 'created\tabc123def456abc1\t2026-07-01T00:00:00.000000000Z\n' >> "$_fx_hole2_stale"
+out="$(run_cleanup_docker "$e" "$_fx_hole2_stale")"
+assert_match "hole2-stale-unlabeled-caught" \
+    'WOULD remove stale unlabeled container: orphan-sim' "$out"
+
+# Recent unlabeled container (created 1 day ago) is spared.
+_recent_ts="$(date -v-1d '+%Y-%m-%dT%H:%M:%S.000000000Z' 2>/dev/null \
+    || date -d '1 day ago' '+%Y-%m-%dT%H:%M:%S.000000000Z')"
+_fx_hole2_recent="$TMP/docker-hole2-recent.tsv"
+printf 'unlabeled\t\tdef456abc123def4\trecent-orphan\n' > "$_fx_hole2_recent"
+printf 'created\tdef456abc123def4\t%s\n' "$_recent_ts" >> "$_fx_hole2_recent"
+out="$(run_cleanup_docker "$e" "$_fx_hole2_recent")"
+assert_absent "hole2-recent-unlabeled-spared" \
+    'WOULD remove stale unlabeled container: recent-orphan' "$out"
+
+# Container with compose label "ibl5" (main stack member) is spared — label
+# is non-empty so pass 5 skips it via [ -n "$_proj" ] && continue.
+_fx_hole2_labeled="$TMP/docker-hole2-labeled.tsv"
+printf 'unlabeled\tibl5\tghi789abc123ghi7\tibl5-mariadb\n' > "$_fx_hole2_labeled"
+printf 'created\tghi789abc123ghi7\t2026-07-01T00:00:00.000000000Z\n' >> "$_fx_hole2_labeled"
+out="$(run_cleanup_docker "$e" "$_fx_hole2_labeled")"
+assert_absent "hole2-ibl5-labeled-container-spared" \
+    'WOULD remove stale unlabeled container: ibl5-mariadb' "$out"
 
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"

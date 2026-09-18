@@ -1,0 +1,355 @@
+import glob
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import uuid
+
+import pytest
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from harness.adapters.gitad import LiveGit
+from harness.state import HarnessError
+
+_REPO_ROOT = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
+_LOSTWORK = os.path.join(
+    _REPO_ROOT, ".claude", "skills", "pr-ready", "scripts", "lostwork.sh"
+)
+_COLLAPSE = os.path.join(
+    _REPO_ROOT, ".claude", "skills", "pr-ready", "scripts", "collapse-guard.sh"
+)
+
+
+def _sh(d, *args, check=True):
+    env = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": "t",
+        "GIT_AUTHOR_EMAIL": "t@t",
+        "GIT_COMMITTER_NAME": "t",
+        "GIT_COMMITTER_EMAIL": "t@t",
+    }
+    return subprocess.run(
+        ["git", "-C", d, *args], check=check, capture_output=True, text=True, env=env
+    )
+
+
+def _rev(d, ref):
+    return subprocess.run(
+        ["git", "-C", d, "rev-parse", ref],
+        check=True, capture_output=True, text=True,
+    ).stdout.strip()
+
+
+def _make_squash_repo(
+    suffix=None,
+    feature_branch=None,
+    include_lostwork=True,
+    lostwork_script=None,
+    include_collapse_guard=True,
+):
+    """Build a squash-trap fixture. Returns (d, parent_tip, master_sha, key, branch)."""
+    if suffix is None:
+        suffix = uuid.uuid4().hex[:8]
+    if feature_branch is None:
+        feature_branch = f"feature-{suffix}"
+    key = feature_branch.replace("/", "-")
+
+    d = tempfile.mkdtemp(prefix="postplan-sq-test-")
+
+    subprocess.run(["git", "init", "-b", "master", d], check=True, capture_output=True)
+    _sh(d, "config", "user.email", "t@t")
+    _sh(d, "config", "user.name", "t")
+
+    # Step 1: base commit
+    open(os.path.join(d, "a.txt"), "w").write("base\n")
+    _sh(d, "add", "-A")
+    _sh(d, "commit", "-m", "base")
+
+    # Step 2: commit real scripts so git show <master_sha>:<path> exercises them
+    scripts_dir = os.path.join(d, ".claude", "skills", "pr-ready", "scripts")
+    os.makedirs(scripts_dir, exist_ok=True)
+    if include_lostwork:
+        if lostwork_script is not None:
+            open(os.path.join(scripts_dir, "lostwork.sh"), "w").write(lostwork_script)
+        else:
+            shutil.copy(_LOSTWORK, os.path.join(scripts_dir, "lostwork.sh"))
+    if include_collapse_guard:
+        shutil.copy(_COLLAPSE, os.path.join(scripts_dir, "collapse-guard.sh"))
+    _sh(d, "add", "-A")
+    _sh(d, "commit", "-m", "chore: proof scripts")
+
+    # Step 3: parent branch with two commits so the squash-trap fires.
+    # P1 adds parent.txt at "step1"; P2 rewrites it to "step2".
+    # The squash nets parent.txt="step2", but replaying P1 against that
+    # squash sees base=<absent>, ours="step2", theirs="step1" -> ADD/ADD conflict.
+    _sh(d, "checkout", "-b", "parent")
+    open(os.path.join(d, "parent.txt"), "w").write("step1\n")
+    _sh(d, "add", "-A")
+    _sh(d, "commit", "-m", "feat: parent step1")
+    open(os.path.join(d, "parent.txt"), "w").write("step2\n")
+    _sh(d, "add", "-A")
+    _sh(d, "commit", "-m", "feat: parent step2")
+    parent_tip = _rev(d, "HEAD")
+
+    # Step 4: squash merge parent into master
+    _sh(d, "checkout", "master")
+    _sh(d, "merge", "--squash", "parent")
+    _sh(d, "commit", "-m", "squash: parent")
+    master_sha = _rev(d, "HEAD")
+
+    # Step 5: feature branch from parent_tip
+    _sh(d, "checkout", "-b", feature_branch, parent_tip)
+    open(os.path.join(d, "feature.txt"), "w").write("feature content\n")
+    _sh(d, "add", "-A")
+    _sh(d, "commit", "-m", "feat: feature work")
+
+    # Step 6: wire origin/master ref and iblBase config
+    _sh(d, "update-ref", "refs/remotes/origin/master", master_sha)
+    _sh(d, "config", f"branch.{feature_branch}.iblBase", parent_tip)
+
+    # Step 7: ensure HEAD is on the feature branch
+    _sh(d, "checkout", feature_branch)
+    return d, parent_tip, master_sha, key, feature_branch
+
+
+def _cleanup_tmp(key):
+    """Remove /tmp files written by the resolver and the proof scripts."""
+    safe = key  # key already has / replaced by -
+    patterns = [
+        f"/tmp/postplan-conflict-files-{key}.txt",
+        f"/tmp/postplan-conflict-resolution-{key}.md",
+        f"/tmp/postplan-lostwork-{key}.sh",
+        f"/tmp/postplan-collapse-guard-{key}.sh",
+        f"/tmp/pr-ready-diff-pre-{key}.patch",
+        f"/tmp/pr-ready-diff-post-{key}.patch",
+        f"/tmp/pr-ready-numstat-pre-{key}.txt",
+        f"/tmp/pr-ready-numstat-post-{key}.txt",
+        f"/tmp/pr-ready-collapse-guard-{key}-{safe}.meta",
+    ]
+    for p in patterns:
+        if os.path.exists(p):
+            os.unlink(p)
+
+
+@pytest.fixture()
+def squash_repo():
+    d, parent_tip, master_sha, key, branch = _make_squash_repo()
+    yield d, parent_tip, master_sha, key, branch
+    _cleanup_tmp(key)
+    shutil.rmtree(d, ignore_errors=True)
+
+
+def test_plain_rebase_conflicts_on_the_squash_fixture(squash_repo):
+    """Characterization: plain rebase_onto raises rebase-conflict and leaves a clean tree."""
+    d, parent_tip, master_sha, key, branch = squash_repo
+    g = LiveGit(d)
+    with pytest.raises(HarnessError) as exc:
+        g.rebase_onto()
+    assert exc.value.kind == "rebase-conflict"
+    assert not g.is_dirty()
+    assert not os.path.exists(os.path.join(d, ".git", "rebase-merge"))
+    assert not os.path.exists(os.path.join(d, ".git", "rebase-apply"))
+
+
+def test_stacked_conflict_auto_resolves_and_proves_tree_equivalent(squash_repo):
+    """Happy path: resolved=True, base_sha == parent_tip, only the feature commit above master."""
+    d, parent_tip, master_sha, key, branch = squash_repo
+    g = LiveGit(d)
+    pre_head = g.head()
+    result = g.autoresolve_stacked_rebase()
+    assert result.resolved is True
+    assert result.reason == ""
+    assert result.base_sha == parent_tip
+    assert len(result.post_resolution_sha) == 40
+    assert result.post_resolution_sha != pre_head
+    log_out = _sh(d, "log", "--format=%s", "origin/master..HEAD").stdout.strip()
+    assert log_out == "feat: feature work"
+
+
+def test_pre_side_patch_is_captured_against_ibl_base(squash_repo):
+    """Pre-side patch uses iblBase, not origin/master, so TREE-EQUIVALENT does not false-diverge."""
+    d, parent_tip, master_sha, key, branch = squash_repo
+    g = LiveGit(d)
+    # Capture expected pre-side before autoresolve moves HEAD
+    expected_pre = subprocess.run(
+        ["git", "-C", d, "diff", f"{parent_tip}...HEAD"],
+        capture_output=True, text=True, check=True,
+    ).stdout
+    result = g.autoresolve_stacked_rebase()
+    assert result.resolved is True
+    pre_patch_path = f"/tmp/pr-ready-diff-pre-{key}.patch"
+    assert os.path.exists(pre_patch_path)
+    assert open(pre_patch_path).read() == expected_pre
+
+
+def test_resolution_keeps_both_sides_of_the_tree(squash_repo):
+    """After resolution, a.txt, parent.txt and feature.txt all exist with expected contents."""
+    d, parent_tip, master_sha, key, branch = squash_repo
+    g = LiveGit(d)
+    g.autoresolve_stacked_rebase()
+    assert open(os.path.join(d, "a.txt")).read() == "base\n"
+    assert open(os.path.join(d, "parent.txt")).read() == "step2\n"
+    assert open(os.path.join(d, "feature.txt")).read() == "feature content\n"
+
+
+def test_diverged_proof_declines_and_writes_no_manifest():
+    """A proof that outputs TREE DIVERGED and exits 0 is still a decline -- the gate is conjunctive."""
+    DIVERGED_STUB = (
+        "#!/usr/bin/env bash\n"
+        "echo 'TREE DIVERGED -- inspect before pushing'\n"
+        "exit 0\n"
+    )
+    d, parent_tip, master_sha, key, branch = _make_squash_repo(lostwork_script=DIVERGED_STUB)
+    manifest = f"/tmp/postplan-conflict-files-{key}.txt"
+    if os.path.exists(manifest):
+        os.unlink(manifest)
+    try:
+        result = LiveGit(d).autoresolve_stacked_rebase()
+        assert result.resolved is False
+        assert "TREE DIVERGED" in result.reason
+        assert not os.path.exists(manifest)
+    finally:
+        _cleanup_tmp(key)
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def test_missing_proof_script_declines():
+    """If lostwork.sh is absent from master, the resolver declines loudly."""
+    d, parent_tip, master_sha, key, branch = _make_squash_repo(include_lostwork=False)
+    manifest = f"/tmp/postplan-conflict-files-{key}.txt"
+    notes = f"/tmp/postplan-conflict-resolution-{key}.md"
+    for p in (manifest, notes):
+        if os.path.exists(p):
+            os.unlink(p)
+    try:
+        result = LiveGit(d).autoresolve_stacked_rebase()
+        assert result.resolved is False
+        assert not os.path.exists(manifest)
+        assert not os.path.exists(notes)
+    finally:
+        _cleanup_tmp(key)
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def test_onto_rebase_that_still_conflicts_declines_and_leaves_history_untouched():
+    """A genuine content conflict after --onto: declined, history untouched, tree clean."""
+    d, parent_tip, master_sha, key, branch = _make_squash_repo()
+    try:
+        g = LiveGit(d)
+        pre_head = g.head()
+        # Add a conflicting commit on master: feature.txt with different content
+        _sh(d, "checkout", "master")
+        open(os.path.join(d, "feature.txt"), "w").write("master version\n")
+        _sh(d, "add", "-A")
+        _sh(d, "commit", "-m", "chore: conflict seed")
+        new_master = _rev(d, "HEAD")
+        _sh(d, "update-ref", "refs/remotes/origin/master", new_master)
+        _sh(d, "checkout", branch)
+        result = g.autoresolve_stacked_rebase()
+        assert result.resolved is False
+        assert "still conflicts" in result.reason
+        assert g.head() == pre_head
+        assert not g.is_dirty()
+        assert not os.path.exists(os.path.join(d, ".git", "rebase-merge"))
+    finally:
+        _cleanup_tmp(key)
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def test_tmp_state_shape_matches_what_the_reviewer_reads():
+    """Branch with / in name: paths use safe key, manifest is exactly ['feature.txt']."""
+    suffix = uuid.uuid4().hex[:8]
+    feature_branch = f"feat/stacked-thing-{suffix}"
+    d, parent_tip, master_sha, key, branch = _make_squash_repo(
+        suffix=suffix, feature_branch=feature_branch
+    )
+    try:
+        result = LiveGit(d).autoresolve_stacked_rebase()
+        assert result.resolved is True
+        expected_key = feature_branch.replace("/", "-")
+        assert result.manifest_path == f"/tmp/postplan-conflict-files-{expected_key}.txt"
+        assert result.notes_path == f"/tmp/postplan-conflict-resolution-{expected_key}.md"
+        assert os.path.exists(result.manifest_path)
+        assert os.path.exists(result.notes_path)
+        manifest_lines = open(result.manifest_path).read().strip().splitlines()
+        assert manifest_lines == ["feature.txt"]
+        notes_body = open(result.notes_path).read()
+        assert parent_tip in notes_body
+        assert "TREE-EQUIVALENT" in notes_body
+    finally:
+        _cleanup_tmp(key)
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def test_tmp_templates_match_the_skill_engine():
+    """The /tmp path templates in gitad.py are byte-identical to those in _phase-2-conflict-resolution.md."""
+    gitad_path = os.path.join(
+        _REPO_ROOT, "tools", "postplan-harness", "harness", "adapters", "gitad.py"
+    )
+    skill_path = os.path.join(
+        _REPO_ROOT, ".claude", "skills", "post-plan", "_phase-2-conflict-resolution.md"
+    )
+    gitad_content = open(gitad_path).read()
+    skill_content = open(skill_path).read()
+    # Extract /tmp/postplan-conflict-* prefix strings (everything before {key} or <KEY>)
+    gitad_files_prefix = re.search(r'(/tmp/postplan-conflict-files-)', gitad_content)
+    gitad_notes_prefix = re.search(r'(/tmp/postplan-conflict-resolution-)', gitad_content)
+    skill_files_prefix = re.search(r'(/tmp/postplan-conflict-files-)', skill_content)
+    skill_notes_prefix = re.search(r'(/tmp/postplan-conflict-resolution-)', skill_content)
+    assert gitad_files_prefix is not None, "gitad.py missing /tmp/postplan-conflict-files- template"
+    assert gitad_notes_prefix is not None, "gitad.py missing /tmp/postplan-conflict-resolution- template"
+    assert skill_files_prefix is not None, "_phase-2-conflict-resolution.md missing files template"
+    assert skill_notes_prefix is not None, "_phase-2-conflict-resolution.md missing notes template"
+    assert gitad_files_prefix.group(1) == skill_files_prefix.group(1)
+    assert gitad_notes_prefix.group(1) == skill_notes_prefix.group(1)
+
+
+def test_collapse_guard_warn_is_carried_into_the_notes():
+    """COLLAPSE-GUARD: WARN reaches collapse_warn and the notes body; absent on a clean run."""
+    d, parent_tip, master_sha, key, branch = _make_squash_repo()
+    try:
+        # First pass: no prior rewrite in reflog -> warn empty
+        result1 = LiveGit(d).autoresolve_stacked_rebase()
+        assert result1.resolved is True
+        assert result1.collapse_warn == ""
+        assert "COLLAPSE-GUARD" not in open(result1.notes_path).read()
+
+        # Set up WARN: create a second feature branch, add a commit, reset it, so
+        # the reflog has a "reset:" rewrite entry with a partially-lost prior tip.
+        suffix2 = uuid.uuid4().hex[:8]
+        branch2 = f"feature-warn-{suffix2}"
+        key2 = branch2.replace("/", "-")
+        _cleanup_tmp(key2)
+        # Branch from parent_tip (still has the squash trap since origin/master unchanged)
+        _sh(d, "checkout", "-b", branch2, parent_tip)
+        open(os.path.join(d, "feature.txt"), "w").write("feature content\n")
+        _sh(d, "add", "-A")
+        _sh(d, "commit", "-m", "feat: feature work")
+        # Second commit adds extra.txt only (does NOT modify feature.txt)
+        open(os.path.join(d, "extra.txt"), "w").write("extra\n")
+        _sh(d, "add", "-A")
+        _sh(d, "commit", "-m", "feat: add extra")
+        # Reset to first commit: "reset:" in reflog; extra.txt lost, feature.txt survives -> WARN
+        _sh(d, "reset", "--hard", "HEAD^")
+        _sh(d, "config", f"branch.{branch2}.iblBase", parent_tip)
+        result2 = LiveGit(d).autoresolve_stacked_rebase()
+        assert result2.resolved is True
+        assert "COLLAPSE-GUARD: WARN" in result2.collapse_warn
+        assert "COLLAPSE-GUARD" in open(result2.notes_path).read()
+    finally:
+        _cleanup_tmp(key)
+        shutil.rmtree(d, ignore_errors=True)
+        for p in glob.glob("/tmp/postplan-conflict-*feature-warn-*.txt"):
+            os.unlink(p)
+        for p in glob.glob("/tmp/postplan-conflict-*feature-warn-*.md"):
+            os.unlink(p)
+        for p in glob.glob("/tmp/pr-ready-*feature-warn-*"):
+            os.unlink(p)
+        for p in glob.glob("/tmp/postplan-*feature-warn-*"):
+            if os.path.exists(p):
+                os.unlink(p)

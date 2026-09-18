@@ -276,12 +276,42 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         rebase_line = f"REBASE=not run ({mode} mode)"
         if live:
             pre_rebase = git.head()
-            git.rebase_onto()      # pre-push policy: branch must sit on origin/master
+            conflict_resolved = None
+            try:
+                git.rebase_onto()  # pre-push policy: branch must sit on origin/master
+            except HarnessError as e:
+                if e.kind != "rebase-conflict":
+                    raise
+                # DETECTION-TIME flag: recorded before the resolution attempt begins, so a
+                # run that dies mid-resolution still leaves evidence that this run touched a
+                # conflict. Arming the flag only on success would invert the fail-closed
+                # property -- the same reason the skill sets it in its Phase 2 detection arm
+                # and merely confirms it in step 7.
+                log(f"phase2: CONFLICT_FLAG=set (rebase conflict detected on {git.branch()}) "
+                    "-- attempting stacked --onto auto-resolution")
+                conflict_resolved = git.autoresolve_stacked_rebase()
+                if not conflict_resolved.resolved:
+                    log(f"phase2: conflict auto-resolution declined -- {conflict_resolved.reason}")
+                    raise HarnessError(
+                        "rebase-conflict",
+                        f"{e.detail} | auto-resolve declined: {conflict_resolved.reason}",
+                    ) from e
+                log("phase2: conflict auto-resolved via --onto "
+                    f"{conflict_resolved.base_sha[:8]}; TREE-EQUIVALENT proved; "
+                    f"manifest={conflict_resolved.manifest_path} "
+                    f"notes={conflict_resolved.notes_path} "
+                    f"POST_RESOLUTION_SHA={conflict_resolved.post_resolution_sha}")
+                if conflict_resolved.collapse_warn:
+                    log(f"phase2: {conflict_resolved.collapse_warn}")
             sha = git.head()
-            log("phase2: rebased onto origin/master")
-            # the skill's two success spellings, verbatim
-            rebase_line = ("REBASE=clean (HEAD already contains origin/master)"
-                           if sha == pre_rebase else "REBASE=rebased onto origin/master")
+            if conflict_resolved is not None:
+                rebase_line = ("REBASE=conflict auto-resolved via --onto; TREE-EQUIVALENT; "
+                               f"manifest={conflict_resolved.manifest_path}")
+            else:
+                log("phase2: rebased onto origin/master")
+                # the skill's two success spellings, verbatim
+                rebase_line = ("REBASE=clean (HEAD already contains origin/master)"
+                               if sha == pre_rebase else "REBASE=rebased onto origin/master")
         try:
             git.push()
         except HarnessError as e:

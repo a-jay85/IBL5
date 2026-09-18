@@ -1,4 +1,5 @@
 import dataclasses
+import inspect
 import os, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import runner
@@ -42,3 +43,37 @@ def test_exit_code_is_never_4():
 
 def test_runresult_has_no_fidelity_pending():
     assert "fidelity_pending" not in {f.name for f in dataclasses.fields(RunResult)}
+
+
+def test_rebase_conflict_after_declined_autoresolve_still_exits_3():
+    """Phase 3 re-raises with kind="rebase-conflict" so exit_code_for still returns 3."""
+    assert runner.exit_code_for(_res(TerminalState.FAILED, "rebase-conflict")) == 3
+
+
+def test_phase2_conflict_arm_guards_on_kind_and_logs_before_resolving():
+    """Detection-time flag must be logged before the resolution attempt (fail-closed ordering)."""
+    src = inspect.getsource(runner)
+    # Slice the region between `pre_rebase = git.head()` and `git.push()`
+    start = src.index("pre_rebase = git.head()")
+    end = src.index("git.push()", start)
+    region = src[start:end]
+    assert 'if e.kind != "rebase-conflict"' in region
+    assert "CONFLICT_FLAG=set" in region
+    assert "autoresolve_stacked_rebase(" in region
+    assert region.index("CONFLICT_FLAG=set") < region.index("autoresolve_stacked_rebase(")
+
+
+def test_local_gate_is_not_intercepted_by_the_conflict_arm():
+    """The new conflict arm must not swallow local-gate denials."""
+    src = inspect.getsource(runner)
+    start = src.index("pre_rebase = git.head()")
+    end = src.index("git.push()", start)
+    region = src[start:end]
+    assert "local-gate" not in region
+
+
+def test_runresult_has_no_conflict_fields():
+    """RunResult gains no new field — checkpoint schema unchanged."""
+    field_names = {f.name for f in dataclasses.fields(RunResult)}
+    assert "conflict_flag" not in field_names
+    assert "conflict_resolved" not in field_names

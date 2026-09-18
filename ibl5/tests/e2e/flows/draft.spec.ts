@@ -1,20 +1,17 @@
 import { test, expect } from '../fixtures/auth';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { resetDraftPick } from '../helpers/cleanup';
+import { withPhases } from '../fixtures/phase';
 
 // Draft flow — authenticated tests with state control.
 // Serial: describe blocks share ibl_settings state and must not run in parallel.
 test.describe.configure({ mode: 'serial' });
 
 test.describe('Draft board: renders', () => {
-  test.beforeEach(async ({ appState, page }) => {
-    await appState({
-      'Current Season Phase': 'Draft',
-      'Show Draft Link': 'On',
-      'Current Season Ending Year': '2026',
+  withPhases(['Draft'], () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto('modules.php?name=Draft');
     });
-    await page.goto('modules.php?name=Draft');
-  });
 
   test('draft board loads with player table', async ({ page }) => {
     // Draft table should be visible with sortable class
@@ -99,19 +96,16 @@ test.describe('Draft board: renders', () => {
   test('no PHP errors on draft board', async ({ page }) => {
     await assertNoPhpErrors(page, 'on Draft board');
   });
+  }, { extraState: { 'Show Draft Link': 'On' } });
 });
 
 test.describe('Draft selection: submission', () => {
+  withPhases(['Draft'], () => {
   test.afterAll(async ({ request }) => {
     await resetDraftPick(request, 1, 1, 2026);
   });
 
-  test('successful draft selection', async ({ appState, page }) => {
-    await appState({
-      'Current Season Phase': 'Draft',
-      'Show Draft Link': 'On',
-      'Current Season Ending Year': '2026',
-    });
+  test('successful draft selection', async ({ page }) => {
     await page.goto('modules.php?name=Draft');
 
     // Select the first undrafted player — CI seed: Metros own pick 1
@@ -139,12 +133,7 @@ test.describe('Draft selection: submission', () => {
     await expect(page.locator('.draft-error')).toHaveCount(0);
   });
 
-  test('validation: no player selected', async ({ appState, page }) => {
-    await appState({
-      'Current Season Phase': 'Draft',
-      'Show Draft Link': 'On',
-      'Current Season Ending Year': '2026',
-    });
+  test('validation: no player selected', async ({ page }) => {
     await page.goto('modules.php?name=Draft');
 
     // Submit without selecting a player — CI seed: Metros own pick 1
@@ -164,25 +153,22 @@ test.describe('Draft selection: submission', () => {
       { timeout: 10000 },
     );
   });
+  }, { extraState: { 'Show Draft Link': 'On' } });
 });
 
 test.describe('Draft: phase gating', () => {
   // Note: Admin users bypass ModuleAccessControl, so the "hidden" test
   // only verifies that the Show Draft Link override still shows the table.
 
-  test('draft accessible via Show Draft Link override', async ({
-    appState,
-    page,
-  }) => {
-    await appState({
-      'Current Season Phase': 'Free Agency',
-      'Show Draft Link': 'On',
-      'Current Season Ending Year': '2026',
-    });
-    await page.goto('modules.php?name=Draft');
+  withPhases(['Free Agency'], () => {
+    test('draft accessible via Show Draft Link override', async ({
+      page,
+    }) => {
+      await page.goto('modules.php?name=Draft');
 
-    // Draft table should load even outside Draft phase
-    const table = page.locator('table.draft-table');
-    await expect(table).toBeVisible();
-  });
+      // Draft table should load even outside Draft phase
+      const table = page.locator('table.draft-table');
+      await expect(table).toBeVisible();
+    });
+  }, { extraState: { 'Show Draft Link': 'On' } });
 });

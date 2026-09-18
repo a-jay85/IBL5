@@ -1,7 +1,7 @@
 ---
 description: Playwright E2E testing rules, Docker requirements, and actionability pitfalls.
 paths: ibl5/tests/e2e/**/*.ts
-last_verified: 2026-09-16
+last_verified: 2026-09-18
 ---
 
 # Playwright E2E Testing Rules
@@ -126,11 +126,15 @@ await expect(sel.locator('option').first()).toBeVisible();   // ❌ <option> nev
 
 ## State Control for Phase-Dependent Tests
 
-Tests depending on app state (season phase, trading open, trivia mode…) **set the state they need** rather than detecting-and-skipping, via the `test-state.php` endpoint (gated by `E2E_TESTING=1`). Authenticated → `appState` from `../fixtures/auth`; public → `appState` from `../fixtures/public` (cookie-based, no DB races). Both auto-restore after each test.
+Tests depending on app state (season phase, trading open, trivia mode…) **set the state they need** rather than detecting-and-skipping, via the `test-state.php` endpoint (gated by `E2E_TESTING=1`). Authenticated → `appState` from `../fixtures/auth`; public → `appState` from `../fixtures/public` (cookie-based, no DB races). Both auto-restore: the cookie is BrowserContext-scoped, so no teardown hook exists.
 
 **WARNING:** Never use `setState()` from `helpers/test-state` in a test — it writes the DB directly and races with parallel workers. Always use the `appState` fixture.
 
 **Allowlisted settings:** `Current Season Phase`, `Current Season Ending Year`, `Allow Trades`, `Allow Waiver Moves`, `Show Draft Link`, `Trivia Mode`, `ASG Voting`, `EOY Voting`, `Free Agency Notifications`. Always include `'Current Season Ending Year': '2026'` when tests depend on CI seed data.
+
+### Running one spec across several phases
+
+`withPhases` (`ibl5/tests/e2e/fixtures/phase.ts`) makes one `describe` per phase, set in `beforeEach` via `appState` with `'Current Season Ending Year': '2026'`. Options: `{ test: publicTest }` for the public fixture, `{ extraState: {...} }` for extra settings. It multiplies its tests by `phases.length`; prefer `CONTRACT_BOUNDARY_PHASES` or single-phase blocks. Assert phase-sensitive content; module gates are unprovable here. Example: `ibl5/tests/e2e/smoke/phase-helper.spec.ts`.
 
 **Serial mode:** Prefer splitting a spec into read-only (`smoke/`/`flows/`) and submission (`flows/*-submission.spec.ts`) files over file-level `test.describe.configure({ mode: 'serial' })`. Use serial only within one `describe` where tests genuinely share state. Canonical: `voting.spec.ts` / `voting-submission.spec.ts`. When asserting AJAX-updated DOM values inside a serial suite, capture the pre-action value first and assert the *change*, not an absolute value — earlier specs in a serial suite mutate shared state, so an absolute expectation is order-dependent and will flake.
 
@@ -162,7 +166,7 @@ Tests depending on app state (season phase, trading open, trivia mode…) **set 
 
 ## Mandatory: No Skips, No Silent Passes
 
-DON'Ts 10–14 (the most common anti-patterns) are mechanically enforced by `bin/check-e2e-hygiene` (CI: the `e2e-hygiene` check in `.github/workflows/pr-meta-checks.yml`, consolidated from the former `e2e-hygiene.yml`). Exceptions go in `.e2e-hygiene-skip-allowlist` (file-level) or inline `// e2e-hygiene-allow: <reason >= 20 chars>`. The skip ban matches any aliased test object (e.g. `nonAdminTest.skip(`, `setup.skip(`), not just the literal `test.skip(`, so renaming the import is not an escape hatch. Banned forms:
+DON'Ts 10 through 14 (the most common anti-patterns) are mechanically enforced by `bin/check-e2e-hygiene` (CI: the `e2e-hygiene` check in `.github/workflows/pr-meta-checks.yml`, consolidated from the former `e2e-hygiene.yml`). Exceptions go in `.e2e-hygiene-skip-allowlist` (file-level) or inline `// e2e-hygiene-allow: <reason >= 20 chars>`. The skip ban matches any aliased test object (e.g. `nonAdminTest.skip(`, `setup.skip(`) as well as the literal `test.skip(`, so renaming the import is not an escape hatch. `test.fail()` stays allowed: Playwright fails it once it starts passing. Banned forms:
 
 ```typescript
 if (count === 0) { test.skip(true, 'No data'); return; }      // BANNED — hides failures

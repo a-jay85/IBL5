@@ -4,6 +4,7 @@ import { assertNoPhpErrors } from '../helpers/php-errors';
 import { gotoWithRetry } from '../helpers/navigation';
 import { navigateToTradeForm } from '../helpers/trading';
 import { clearTradeOffers, resetTradeOffers } from '../helpers/cleanup';
+import { withPhases, CONTRACT_BOUNDARY_PHASES } from '../fixtures/phase';
 
 // ---------------------------------------------------------------------------
 // Shared constants & helpers
@@ -443,65 +444,68 @@ test.describe('Trade offer form: roster preview interactions', () => {
 // ===========================================================================
 
 test.describe('Trade offer form: cap warnings', () => {
-  test.beforeEach(async ({ appState, page }) => {
-    await appState({ 'Allow Trades': 'Yes', 'Current Season Ending Year': '2026' });
-    await mockRosterPreviewApi(page);
-    await navigateToTradeForm(page);
-  });
-
-  test('no cap warnings when no players selected', async ({ page }) => {
-    const capWarningLogos = page.locator('.cap-warning-logo');
-    const capWarningBanners = page.locator('.cap-warning-banner');
-
-    await expect(capWarningLogos).toHaveCount(0);
-    await expect(capWarningBanners).toHaveCount(0);
-  });
-
-  test('cap warning classes appear when post-trade cap exceeds hard cap', async ({
-    page,
-  }) => {
-
-    // Inflate the user team's future salary so any incoming player pushes over the cap
-    await page.evaluate(() => {
-      const cfg = (window as Record<string, unknown>)
-        .IBL_TRADE_CONFIG as Record<string, unknown>;
-      // Set all future salary entries to 7500 (above hardCap of 7000)
-      const futureSalary = cfg.userFutureSalary as Record<number, number>;
-      for (const key of Object.keys(futureSalary)) {
-        futureSalary[Number(key)] = 7500;
-      }
+  withPhases(CONTRACT_BOUNDARY_PHASES, (phase) => {
+    test.beforeEach(async ({ page }) => {
+      await mockRosterPreviewApi(page);
+      await navigateToTradeForm(page);
     });
 
-    // Check a player on the partner side to trigger updateCapWarnings
-    const partnerRoster = page.locator('.trading-roster.team-table').nth(1);
-    const partnerCheckbox = partnerRoster
-      .locator('input[type="checkbox"]')
-      .first();
-    await expect(partnerCheckbox, 'trading roster checkbox must render for this team').toBeVisible();
-    await partnerCheckbox.check();
+    test('no cap warnings when no players selected', async ({ page }) => {
+      const capWarningLogos = page.locator('.cap-warning-logo');
+      const capWarningBanners = page.locator('.cap-warning-banner');
 
-    // Cap warning should appear on the user team's preview logo
-    const config = await page.evaluate(
-      () =>
-        (
-          (window as Record<string, unknown>).IBL_TRADE_CONFIG as Record<
-            string,
-            unknown
-          >
-        ).userTeamId,
-    );
+      await expect(capWarningLogos).toHaveCount(0);
+      await expect(capWarningBanners).toHaveCount(0);
+      await assertNoPhpErrors(page, `on trade offer form in ${phase}`);
+    });
 
-    const warningLogo = page.locator(
-      `.trade-roster-preview__logo[data-team-id="${config}"].cap-warning-logo`,
-    );
-    await expect(warningLogo).toBeVisible();
+    test('cap warning classes appear when post-trade cap exceeds hard cap', async ({
+      page,
+    }) => {
 
-    // Cap warning banner on the user team's roster details summary
-    const warningBanner = page.locator(
-      `.trading-roster-details:has(.trading-roster[data-team-id="${config}"]) .trading-roster-details__summary.cap-warning-banner`,
-    );
-    await expect(warningBanner).toBeVisible();
-  });
+      // Inflate the user team's future salary so any incoming player pushes over the cap
+      await page.evaluate(() => {
+        const cfg = (window as Record<string, unknown>)
+          .IBL_TRADE_CONFIG as Record<string, unknown>;
+        // Set all future salary entries to 7500 (above hardCap of 7000)
+        const futureSalary = cfg.userFutureSalary as Record<number, number>;
+        for (const key of Object.keys(futureSalary)) {
+          futureSalary[Number(key)] = 7500;
+        }
+      });
+
+      // Check a player on the partner side to trigger updateCapWarnings
+      const partnerRoster = page.locator('.trading-roster.team-table').nth(1);
+      const partnerCheckbox = partnerRoster
+        .locator('input[type="checkbox"]')
+        .first();
+      await expect(partnerCheckbox, 'trading roster checkbox must render for this team').toBeVisible();
+      await partnerCheckbox.check();
+
+      // Cap warning should appear on the user team's preview logo
+      const config = await page.evaluate(
+        () =>
+          (
+            (window as Record<string, unknown>).IBL_TRADE_CONFIG as Record<
+              string,
+              unknown
+            >
+          ).userTeamId,
+      );
+
+      const warningLogo = page.locator(
+        `.trade-roster-preview__logo[data-team-id="${config}"].cap-warning-logo`,
+      );
+      await expect(warningLogo).toBeVisible();
+
+      // Cap warning banner on the user team's roster details summary
+      const warningBanner = page.locator(
+        `.trading-roster-details:has(.trading-roster[data-team-id="${config}"]) .trading-roster-details__summary.cap-warning-banner`,
+      );
+      await expect(warningBanner).toBeVisible();
+      await assertNoPhpErrors(page, `on trade offer form with cap warnings in ${phase}`);
+    });
+  }, { extraState: { 'Allow Trades': 'Yes' } });
 });
 
 // ===========================================================================

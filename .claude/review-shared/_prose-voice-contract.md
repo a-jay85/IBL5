@@ -64,7 +64,7 @@ This is the normative definition `bin/check-digest-prose` implements. The linter
 
 1. **Strip backtick spans first.** Remove every `` `...` `` span (and its delimiters) before any boundary detection. Periods inside a path (`bin/check-digest-prose`, `ibl5/docs/decisions/0128-path-scoped-rules-over-memory.md`) or inside an inline code sample are not sentence boundaries. Stripping before splitting also means a backticked span contributes **zero** words to the 25-word count. A naive `wc -w` and the linter's count therefore differ when backtick spans are present.
 
-2. **A sentence boundary is a period followed by whitespace or end-of-line.** No `?`/`!` handling is required; digest and PR-body prose are declarative.
+2. **Boundaries.** A sentence boundary is a period followed by whitespace or end-of-line. No `?`/`!` handling is required; digest and PR-body prose are declarative.
 
 3. **Exclusions** — a period matching any of these is not a boundary: <!-- slop-ok -->
    - a period immediately followed by a **digit** — version numbers (`v2.12.2`, `1.2.3`, `Phase 6.5`) and decimal figures; <!-- slop-ok -->

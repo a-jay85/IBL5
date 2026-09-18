@@ -44,7 +44,7 @@ from harness.planfile import locate_plan, split_hold_justification
 from harness.review import ReviewPhase
 from harness.state import (HarnessError, RunResult, TerminalState, UsageLedger)
 from harness.adapters.ghad import LiveGh, RecordingGh
-from harness.adapters.gitad import LiveGit, ReplayGit, StackedRebaseResult
+from harness.adapters.gitad import LiveGit, ReplayGit
 from harness.adapters.llm import ClaudeCli, FixtureLlm
 from harness.adapters.probe import FixtureProbe, LiveProbe
 from harness.adapters.verify import LiveVerify, ReplayVerify, aggregate

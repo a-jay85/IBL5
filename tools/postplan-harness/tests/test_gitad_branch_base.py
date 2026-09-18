@@ -7,8 +7,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from harness.adapters.gitad import LiveGit, StackedRebaseResult
-from harness.state import HarnessError
+from harness.adapters.gitad import LiveGit
 
 
 @pytest.fixture()

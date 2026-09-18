@@ -11,7 +11,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from harness.adapters.gitad import LiveGit, StackedRebaseResult
+from harness.adapters.gitad import LiveGit
 from harness.state import HarnessError
 
 _REPO_ROOT = os.path.dirname(
@@ -339,11 +339,8 @@ def test_collapse_guard_warn_is_carried_into_the_notes():
         _sh(d, "config", f"branch.{branch2}.iblBase", parent_tip)
         result2 = LiveGit(d).autoresolve_stacked_rebase()
         assert result2.resolved is True
-        if result2.collapse_warn:
-            assert "COLLAPSE-GUARD: WARN" in result2.collapse_warn
-            assert "COLLAPSE-GUARD" in open(result2.notes_path).read()
-        # If WARN did not fire (guard spellings drifted), first-half assertion above
-        # already passed; note the drift in the PR body but don't fail.
+        assert "COLLAPSE-GUARD: WARN" in result2.collapse_warn
+        assert "COLLAPSE-GUARD" in open(result2.notes_path).read()
     finally:
         _cleanup_tmp(key)
         shutil.rmtree(d, ignore_errors=True)

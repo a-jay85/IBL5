@@ -1,7 +1,7 @@
 ---
 description: Playwright E2E testing rules, Docker requirements, and actionability pitfalls.
 paths: ibl5/tests/e2e/**/*.ts
-last_verified: 2026-09-16
+last_verified: 2026-09-18
 ---
 
 # Playwright E2E Testing Rules
@@ -117,13 +117,6 @@ await expect(page.locator('.trading-roster')).toHaveCount(2);
 expect(await page.locator('option').count()).toBeGreaterThanOrEqual(28);   // "at least N" has no web-first form — manual OK
 ```
 
-**Anti-patterns:**
-```typescript
-expect(await loc.count()).toBeGreaterThan(0);   // ❌ no retry → flaky in slow CI; use await expect(loc.first()).toBeVisible()
-expect(await loc.count()).toBe(1);              // ❌ use await expect(loc).toHaveCount(1)
-await expect(sel.locator('option').first()).toBeVisible();   // ❌ <option> never "visible"; use .toBeAttached()
-```
-
 ## State Control for Phase-Dependent Tests
 
 Tests depending on app state (season phase, trading open, trivia mode…) **set the state they need** rather than detecting-and-skipping, via the `test-state.php` endpoint (gated by `E2E_TESTING=1`). Authenticated → `appState` from `../fixtures/auth`; public → `appState` from `../fixtures/public` (cookie-based, no DB races). Both auto-restore after each test.
@@ -131,6 +124,29 @@ Tests depending on app state (season phase, trading open, trivia mode…) **set 
 **WARNING:** Never use `setState()` from `helpers/test-state` in a test — it writes the DB directly and races with parallel workers. Always use the `appState` fixture.
 
 **Allowlisted settings:** `Current Season Phase`, `Current Season Ending Year`, `Allow Trades`, `Allow Waiver Moves`, `Show Draft Link`, `Trivia Mode`, `ASG Voting`, `EOY Voting`, `Free Agency Notifications`. Always include `'Current Season Ending Year': '2026'` when tests depend on CI seed data.
+
+### Running one spec across several phases
+
+`withPhases` (`ibl5/tests/e2e/fixtures/phase.ts`) emits one `test.describe` per phase, sets it in `beforeEach` via `appState`, and always includes `'Current Season Ending Year': '2026'`. A tagged spec must not repeat that key. Pass `{ test: publicTest }` for a public block; `{ extraState: {...} }` for non-phase settings. The callback receives the active phase. Cookie-scoped, parallel-safe, no teardown hook; context disposal clears the phase on pass and fail.
+
+Use `CONTRACT_BOUNDARY_PHASES` for cap/salary/contract-year tests (one phase per side of `Season::advancesContractYears()` in `ibl5/classes/Season/Season.php`). Use two single-phase blocks for a phase-gated module: one asserting presence, one asserting `toHaveCount(0)`. Never `SEASON_PHASES` for a whole spec (`withPhases` multiplies tests by `phases.length`). `ibl5/tests/e2e/smoke/phase-helper.spec.ts` proves the isolation invariant.
+
+```typescript
+import { test } from '../fixtures/auth';
+import { withPhases, CONTRACT_BOUNDARY_PHASES } from '../fixtures/phase';
+
+test.describe('Cap warnings', () => {
+  withPhases(CONTRACT_BOUNDARY_PHASES, (phase) => {
+    test('cap indicators render', async ({ page }) => {
+      await page.goto('modules.php?name=CapSpace');
+      await expect(page.locator('.sticky-table').first()).toBeVisible();
+      await assertNoPhpErrors(page, `Cap Space in ${phase}`);
+    });
+  });
+});
+```
+
+Do not branch on phase inside a test. An `if (phase === ...) { } else { }` block is banned by DON'T #13 and `bin/check-e2e-hygiene`. Write two single-phase blocks.
 
 **Serial mode:** Prefer splitting a spec into read-only (`smoke/`/`flows/`) and submission (`flows/*-submission.spec.ts`) files over file-level `test.describe.configure({ mode: 'serial' })`. Use serial only within one `describe` where tests genuinely share state. Canonical: `voting.spec.ts` / `voting-submission.spec.ts`. When asserting AJAX-updated DOM values inside a serial suite, capture the pre-action value first and assert the *change*, not an absolute value — earlier specs in a serial suite mutate shared state, so an absolute expectation is order-dependent and will flake.
 
@@ -162,7 +178,7 @@ Tests depending on app state (season phase, trading open, trivia mode…) **set 
 
 ## Mandatory: No Skips, No Silent Passes
 
-DON'Ts 10–14 (the most common anti-patterns) are mechanically enforced by `bin/check-e2e-hygiene` (CI: the `e2e-hygiene` check in `.github/workflows/pr-meta-checks.yml`, consolidated from the former `e2e-hygiene.yml`). Exceptions go in `.e2e-hygiene-skip-allowlist` (file-level) or inline `// e2e-hygiene-allow: <reason >= 20 chars>`. The skip ban matches any aliased test object (e.g. `nonAdminTest.skip(`, `setup.skip(`), not just the literal `test.skip(`, so renaming the import is not an escape hatch. Banned forms:
+DON'Ts 10-14 (the most common anti-patterns) are mechanically enforced by `bin/check-e2e-hygiene` (CI: the `e2e-hygiene` check in `.github/workflows/pr-meta-checks.yml`, consolidated from the former `e2e-hygiene.yml`). Exceptions go in `.e2e-hygiene-skip-allowlist` (file-level) or inline `// e2e-hygiene-allow: <reason >= 20 chars>`. The skip ban covers aliased test objects (e.g. `nonAdminTest.skip(`, `setup.skip(`); renaming the import is not an escape hatch. `test.fail()` is not banned. It marks a test expected-to-fail; Playwright fails it if the test starts passing. Its one sanctioned use is `ibl5/tests/e2e/smoke/phase-helper.spec.ts`. Banned forms:
 
 ```typescript
 if (count === 0) { test.skip(true, 'No data'); return; }      // BANNED — hides failures
@@ -192,27 +208,14 @@ E2E runs in `.github/workflows/e2e-tests.yml`:
 - **Rebuild CSS after a branch switch** (see Prerequisites #3).
 - **Login/registration tests can trip auth throttling** (`auth_users_throttling` accumulates failures). If `auth.setup.ts` fails with "Too many login attempts": `DELETE FROM auth_users_throttling WHERE 1=1;`. CI is unaffected (fresh DB per run).
 
-## Completion Criteria
-
-1. Run the full suite: `cd ibl5 && bun run test:e2e`.
-2. All pass — no skips, no silent passes, no `.only`.
-3. Every smoke file includes PHP error-pattern checks.
-4. Public tests use empty storageState; authenticated tests import from `fixtures/auth`.
-
 ## Visual Regression Manifest
 
 `ibl5/tests/e2e/vr-manifest.ts` is the single source of truth for VR coverage; `visual-regression.spec.ts` consumes it — never add rows to the spec directly.
 
-**Filenames** are derived mechanically by `snapshotFilename()` (desktop suffix and `default` state are elided):
-```
-{name}.png · {name}-mobile.png · {name}-{state}.png · {name}-tab-{tab.key}.png
-{name}-{state}-mobile.png · {name}-tab-{tab.key}-mobile.png
-```
-
 **Add a module:** one `VrRow` in `VR_MANIFEST` (set `viewports`/`states`/`htmxTabs`), then run with `--update-snapshots` to generate the baseline PNG.
 
-**Running VR locally needs its own config.** `playwright.config.ts` excludes the spec (`testIgnore: [… /visual-regression/ …]`), so a plain `bunx playwright test` never runs it. Use `cd ibl5 && bunx playwright test --config=playwright.visual.config.ts`, against a `bin/wt-up <name> --seed` stack — baselines built from dev data mismatch CI wholesale.
+**Running VR locally:** `playwright.config.ts` excludes the spec, so use `cd ibl5 && bunx playwright test --config=playwright.visual.config.ts` against a `bin/wt-up <name> --seed` stack. Baselines built from dev data mismatch CI.
 
-**Coverage:** `bin/check-vr-coverage` reports rows missing dimensions; new gaps fail CI (exit 1), existing gaps in `ibl5/tests/e2e/vr-coverage-baseline.json` are advisory. `bin/check-vr-coverage --update-baseline` acknowledges current gaps.
+**Coverage:** `bin/check-vr-coverage` reports missing dimensions; new gaps fail CI. Existing gaps in `ibl5/tests/e2e/vr-coverage-baseline.json` are advisory (`--update-baseline` to acknowledge).
 
-**Baseline regen via the `update-baselines` label — add the label AFTER creating the PR.** `.github/workflows/e2e-tests.yml` bypasses its path filter only when `github.event.action == 'labeled'`. A PR created *with* the label fires `opened`, the path filter finds no source change, Visual Regression is skipped entirely, and the regen never runs. So never `gh pr create --label update-baselines` — create the PR, then add the label as a separate action (or remove and re-add it). Prefer this CI flow over local `--update-snapshots`; baselines must come from the CI seed.
+**Baseline regen via the `update-baselines` label.** Add the label AFTER creating the PR. A PR created with the label fires `opened`, skips the path filter, and the regen never runs. Create the PR first, then add the label.

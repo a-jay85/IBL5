@@ -444,7 +444,7 @@ test.describe('Trade offer form: roster preview interactions', () => {
 // ===========================================================================
 
 test.describe('Trade offer form: cap warnings', () => {
-  withPhases(CONTRACT_BOUNDARY_PHASES, () => {
+  withPhases(CONTRACT_BOUNDARY_PHASES, (phase) => {
     test.beforeEach(async ({ page }) => {
       await mockRosterPreviewApi(page);
       await navigateToTradeForm(page);
@@ -456,6 +456,7 @@ test.describe('Trade offer form: cap warnings', () => {
 
       await expect(capWarningLogos).toHaveCount(0);
       await expect(capWarningBanners).toHaveCount(0);
+      await assertNoPhpErrors(page, `on trade offer form in ${phase}`);
     });
 
     test('cap warning classes appear when post-trade cap exceeds hard cap', async ({
@@ -502,6 +503,7 @@ test.describe('Trade offer form: cap warnings', () => {
         `.trading-roster-details:has(.trading-roster[data-team-id="${config}"]) .trading-roster-details__summary.cap-warning-banner`,
       );
       await expect(warningBanner).toBeVisible();
+      await assertNoPhpErrors(page, `on trade offer form with cap warnings in ${phase}`);
     });
   }, { extraState: { 'Allow Trades': 'Yes' } });
 });

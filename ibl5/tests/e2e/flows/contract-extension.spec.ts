@@ -61,12 +61,31 @@ test.describe('Contract Extension flow', () => {
       await expect(banner).toBeVisible();
       await expect(banner).toContainText('Player response:');
     });
+
+    test('extension negotiate page contains player identity', async ({ page }) => {
+      await page.goto('modules.php?name=Player&pa=negotiate&pid=30');
+      await assertNoPhpErrors(page, 'on extension form (hidden fields)');
+
+      // Regular Season only. NegotiationOfferView::renderHeader() prints just the
+      // "Contract Extension" title, so the player name reaches the page via the
+      // offer form / eligibility message — both of which the Free Agency early
+      // return in NegotiationService::processNegotiation() skips.
+      const body = await page.locator('body').textContent();
+      expect(body).toContain('Extension Vet');
+    });
   });
 
   withPhases(['Free Agency'], () => {
     test('extension form blocked during free agency phase', async ({ page }) => {
       await page.goto('modules.php?name=Player&pa=negotiate&pid=30');
       await assertNoPhpErrors(page, 'on extension form during FA');
+
+      // Positive half: NegotiationValidator::validateFreeAgencyNotActive() makes
+      // processNegotiation() return early with this alert. Without it a blank PHP
+      // crash would read as "form absent" and satisfy the count check below.
+      await expect(page.locator('.ibl-alert--error')).toContainText(
+        'not available during free agency',
+      );
 
       // Should show an error or redirect — not the extension form
       const formInputs = page.locator('input[name^="offerYear"]');
@@ -76,15 +95,6 @@ test.describe('Contract Extension flow', () => {
   });
 
   withPhases(CONTRACT_BOUNDARY_PHASES, () => {
-    test('extension negotiate page contains player identity', async ({ page }) => {
-      await page.goto('modules.php?name=Player&pa=negotiate&pid=30');
-      await assertNoPhpErrors(page, 'on extension form (hidden fields)');
-
-      // Page header always shows the player name regardless of form rendering
-      const body = await page.locator('body').textContent();
-      expect(body).toContain('Extension Vet');
-    });
-
     test('team contracts page renders without errors', async ({ page }) => {
       await page.goto('modules.php?name=Team&op=team&teamid=1&display=contracts');
       await assertNoPhpErrors(page, 'on team contracts page');
@@ -98,9 +108,12 @@ test.describe('Contract Extension flow', () => {
       await page.goto('modules.php?name=Player&pa=negotiate&pid=30');
       await assertNoPhpErrors(page, 'on extension negotiate page');
 
-      // Verify the page rendered meaningful content (form or validation message)
-      const body = await page.locator('body').textContent();
-      expect(body).toContain('Extension Vet');
+      // Phase-invariant structure only. Every return path in
+      // NegotiationService::processNegotiation() wraps its output in
+      // .ibl-form-container and prepends renderHeader()'s title, on both sides of
+      // Season::advancesContractYears(). A wrong-basis fatal drops both.
+      await expect(page.locator('.ibl-form-container')).toBeVisible();
+      await expect(page.locator('h1.ibl-title')).toContainText('Contract Extension');
     });
 
     test('no PHP errors on extension-related pages', async ({ page }) => {

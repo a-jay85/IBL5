@@ -9,7 +9,7 @@ declare(strict_types=1);
  * Usage: php transition.php <id> <status> [opts]
  *   Positional: <id> (integer PK), <status> (one of the §3a status ENUM values).
  *   Value opts (all bound parameterized in the repo — zero SQL here):
- *     --class=<bug|feature|not_a_thing>   --pr=<int>   --issue=<int>
+ *     --class=<bug|feature|not_a_thing|roster_error>   --pr=<int>   --issue=<int>
  *     --thread-id=<snowflake-string>      --approval-message-id=<snowflake-string>
  *     --blocked-until="YYYY-MM-DD HH:MM:SS"   --attempts=<int>
  *   Flag opts:
@@ -34,7 +34,7 @@ const VALID_STATUSES = [
     'queued', 'awaiting_info', 'hunting', 'blocked', 'pr_open', 'fixed',
     'needs_human', 'parked_idle', 'gathering', 'awaiting_ajay', 'planned', 'dropped', 'filed',
 ];
-const VALID_CLASSES = ['bug', 'feature', 'not_a_thing'];
+const VALID_CLASSES = ['bug', 'feature', 'not_a_thing', 'roster_error'];
 
 /**
  * The exact option vocabularies from the usage block above. Anything else is a caller

@@ -254,8 +254,9 @@ export function startBugBotServer(client: Client): void {
 
     // POST /reply-to-message — { message_id, message } → { message_id: sent.id }
     // Replies IN-CHANNEL, unlike /post-to-thread (needs a thread_id) and /mention
-    // (posts into a thread). The not_a_thing drop has no thread to post into, so this
-    // is the only way the GM ever hears back. 10008 → 410; other failures → 500.
+    // (posts into a thread). The roster_error redirect has no thread to post into, so
+    // this is the only way that GM ever hears back. (The not_a_thing drop is silent by
+    // design and uses no reply at all.) 10008 → 410; other failures → 500.
     app.post('/reply-to-message', async (req, res) => {
         const { message_id, message } = req.body ?? {};
         if (!message_id || !message) {

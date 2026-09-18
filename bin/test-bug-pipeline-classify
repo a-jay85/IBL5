@@ -21,21 +21,62 @@ order_of() { grep -n "^$1" "$STUB/calls.log" 2>/dev/null | head -1 | cut -d: -f1
 # Only routing transitions carry --class=.
 order_of_routing() { grep -n "^TRANSITION .*--class=" "$STUB/calls.log" 2>/dev/null | head -1 | cut -d: -f1; }
 
-# ── not_a_thing → dropped, replied in-channel, still no thread ────────────────
+# ── not_a_thing → dropped SILENTLY: no reply, no thread ───────────────────
+# "Fixed!" / "Thanks!" chatter is the bulk of this class; answering each one is channel
+# noise. The transition is the entire job — a dropped row is already invisible to the
+# enumerator, so the reply added nothing.
 bpt_reset; bpt_set_actionable "$QUEUED"
 bpt_set_claude_result '{"class":"not_a_thing"}'
 bpt_run
-bpt_log_has  "$STUB" transition.log "dropped --class=not_a_thing" "not_a_thing → dropped"
-bpt_log_has  "$STUB" calls.log "REPLY_TO_MESSAGE" "not_a_thing replies in-channel"
+bpt_expect_eq "not_a_thing exits 0" 0 "$BPT_RC"
+bpt_log_has   "$STUB" transition.log "dropped --class=not_a_thing" "not_a_thing → dropped"
+bpt_log_lacks "$STUB" calls.log "REPLY_TO_MESSAGE" "not_a_thing posts NO in-channel reply"
 bpt_log_lacks "$STUB" calls.log "POST_TO_THREAD" "not_a_thing opens no thread"
+bpt_log_lacks "$STUB" calls.log "CREATE_THREAD" "not_a_thing creates no thread"
 
-# ── ★ NEGATIVE — the drop reply fails → the row is still dropped, tick exits 0 ─
-# The transition is load-bearing; the reply is cosmetic and must never strand the row.
+# ── ★ the reply seam is dead for not_a_thing — a failing bot cannot change the drop ─
+# STUB_REPLY_FAIL only bites a path that replies. Silence must make it a no-op, which is
+# what proves no reply call survives on this branch.
 bpt_reset; bpt_set_actionable "$QUEUED"
 bpt_set_claude_result '{"class":"not_a_thing"}'
 STUB_REPLY_FAIL=1 bpt_run
-bpt_expect_eq "reply failure still exits 0" 0 "$BPT_RC"
-bpt_log_has "$STUB" transition.log "dropped --class=not_a_thing" "reply failure does NOT block the drop transition"
+bpt_expect_eq "reply-seam failure still exits 0" 0 "$BPT_RC"
+bpt_log_has   "$STUB" transition.log "dropped --class=not_a_thing" "reply-seam failure does NOT block the drop transition"
+bpt_log_lacks "$STUB" calls.log "REPLY_TO_MESSAGE" "still no reply attempted under STUB_REPLY_FAIL"
+
+# ── roster_error → dropped, redirected in-channel, NO issue, NO thread ────────────
+# Ratings / contract / team-assignment complaints are JSB-file data the commissioner owns,
+# so the pipeline must file nothing and send the GM to #roster-errors.
+bpt_reset; bpt_set_actionable "$QUEUED"
+bpt_set_claude_result '{"class":"roster_error"}'
+bpt_run
+bpt_expect_eq "roster_error exits 0" 0 "$BPT_RC"
+bpt_log_has   "$STUB" transition.log "dropped --class=roster_error" "roster_error → dropped"
+bpt_log_has   "$STUB" calls.log "REPLY_TO_MESSAGE" "roster_error replies in-channel"
+bpt_log_has   "$STUB" curl.log "1119361576856715367" "roster_error reply mentions the #roster-errors channel"
+bpt_log_lacks "$STUB" calls.log "POST_TO_THREAD" "roster_error opens no thread"
+bpt_log_lacks "$STUB" calls.log "CREATE_THREAD" "roster_error creates no thread"
+bpt_file_absent "$STUB/gh.log" "roster_error mints no GitHub issue"
+
+# ── ★ roster_error under FILE_ISSUES_ONLY=1 — still files NOTHING ────────────────
+# Regression guard for branch placement: file_and_close_row calls bpgh_ensure_issue
+# unconditionally, so a roster_error return placed BELOW the file_issues_only block would
+# quietly mint an Issue here. This case is the only thing that catches that ordering slip.
+bpt_reset; bpt_set_actionable "$QUEUED"
+bpt_set_claude_result '{"class":"roster_error"}'
+BUG_PIPELINE_FILE_ISSUES_ONLY=1 bpt_run
+bpt_expect_eq "flag-on roster_error exits 0" 0 "$BPT_RC"
+bpt_log_has   "$STUB" transition.log "dropped --class=roster_error" "flag-on roster_error still dropped"
+bpt_log_lacks "$STUB" transition.log "filed" "flag-on roster_error is never filed"
+bpt_file_absent "$STUB/gh.log" "flag-on roster_error mints no GitHub issue"
+
+# ── ★ NEGATIVE — the roster_error redirect fails → the row is still dropped ──────
+# Same invariant as the not_a_thing case: the transition is load-bearing, the reply cosmetic.
+bpt_reset; bpt_set_actionable "$QUEUED"
+bpt_set_claude_result '{"class":"roster_error"}'
+STUB_REPLY_FAIL=1 bpt_run
+bpt_expect_eq "roster_error reply failure still exits 0" 0 "$BPT_RC"
+bpt_log_has "$STUB" transition.log "dropped --class=roster_error" "reply failure does NOT block the roster_error drop"
 
 # ── ★ source message deleted → dropped, with no issue, thread, or reply ───────
 bpt_reset; bpt_set_actionable "$QUEUED"
@@ -197,6 +238,57 @@ bpt_log_lacks "$STUB" transition.log "filed"           "GH_FAIL: row NOT transit
 grep -qF "no issue number" "$STUB/tick.out" \
     && bpt_ok "GH_FAIL: 'no issue number' logged" \
     || bpt_fail "GH_FAIL: 'no issue number' not found in tick.out"
+
+# ── ★ on-demand real-model smoke: the PROMPT actually separates the classes ─────
+# Everything above stubs the classifier, so it proves ROUTING and says nothing about
+# whether bin/bug-pipeline-classify-prompt returns the class the routing expects. This
+# block is the only check on the prompt itself — in particular that a roster complaint
+# ("Jokic's contract is wrong") does not land in `bug` and file an Issue, and that the
+# over-capture direction is clean too ("the standings page 500s" must stay `bug`).
+# Default-SKIP: it spends real inference, so CI never runs it. Opt in with
+# BUG_PIPELINE_CLASSIFY_LIVE=1 after any edit to the classify prompt.
+if [ "${BUG_PIPELINE_CLASSIFY_LIVE:-0}" != 1 ]; then
+    echo "SKIP live: on-demand classify-prompt smoke (set BUG_PIPELINE_CLASSIFY_LIVE=1 — spends real inference)"
+elif ! CLASSIFY_CLAUDE="$(command -v claude)" || [ -z "$CLASSIFY_CLAUDE" ]; then
+    echo "SKIP live: real 'claude' CLI not found on PATH"
+else
+    _TICK="$(cd "$(dirname "$0")" && pwd)/bug-pipeline-tick"
+    # Reuse the driver's own schema literal so the smoke can never drift from production.
+    _SCHEMA="$(sed -n "s/^CLASSIFY_SCHEMA='\(.*\)'$/\1/p" "$_TICK")"
+    _TMPL="$(cat "$(cd "$(dirname "$0")" && pwd)/bug-pipeline-classify-prompt")"
+    [ -n "$_SCHEMA" ] || bpt_fail "live: could not read CLASSIFY_SCHEMA out of $_TICK"
+
+    live_probe() { # expected report
+        local expect="$1" report="$2" p out res got
+        p="${_TMPL//\{\{original_text\}\}/$report}"
+        p="${p//\{\{transcript\}\}/(no replies yet)}"
+        p="${p//\{\{attachments_text\}\}/}"
+        out="$(timeout 120 "$CLASSIFY_CLAUDE" -p "$p" --model claude-sonnet-4-6 \
+            --output-format json --json-schema "$_SCHEMA" --allowedTools '' 2>/dev/null)"
+        # The exact two-step extraction bin/bug-pipeline-tick uses (envelope_result + .class).
+        res="$(printf '%s' "$out" | jq -rc 'if (.is_error // false) == true then empty else (.result // empty) end' 2>/dev/null)"
+        got="$(printf '%s' "$res" | jq -r '.class // "PARSE_FAIL"' 2>/dev/null)"
+        if [ "$got" = "$expect" ]; then
+            bpt_ok "live: $expect ← $report"
+        else
+            bpt_fail "live: want=$expect got=${got:-EMPTY} ← $report"
+        fi
+    }
+
+    # roster_error — ratings, contract, team assignment (the redirect cases).
+    live_probe roster_error "Jokic's contract on his player page shows 2 years left, it should be 4"
+    live_probe roster_error "my center's rebounding rating is way too low, he led the league last season"
+    live_probe roster_error "Player X is still showing on my roster even though I traded him last week"
+    live_probe roster_error "the ratings didn't update for my guys after the last sim"
+    # bug — a PAGE or a CALCULATION misbehaving. The over-capture guard.
+    live_probe bug          "the standings page 500s on load"
+    live_probe bug          "the box score totals don't add up, the team points don't match the player lines"
+    live_probe bug          "the trade screen won't let me submit, the button does nothing"
+    live_probe feature      "can we get a dark mode for the site"
+    # not_a_thing — the silent-drop class.
+    live_probe not_a_thing  "Fixed! thanks"
+    live_probe not_a_thing  "gm night is tonight right"
+fi
 
 echo "----"
 [ "$FAILED" -eq 0 ] && echo "ALL PASS" || echo "FAILURES"

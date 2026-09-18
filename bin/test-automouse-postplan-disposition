@@ -48,7 +48,8 @@ extract_fn() {
 }
 
 for fn in automouse_pr_state automouse_branch_for_plan dispose_plan_done \
-          postplan_cap_timeout should_hold_postplan_disposal notify_postplan_hold; do
+          postplan_cap_timeout should_hold_postplan_disposal notify_postplan_hold \
+          postplan_newest_verdict; do
     FN_SRC="$(extract_fn "$fn")"
     if [ -z "$FN_SRC" ]; then
         echo "FAIL: could not extract $fn from $RUNNER"
@@ -537,13 +538,67 @@ else
     FAILED=1
 fi
 
-# e11: re-review glob present in runner
-if grep -cF 'post-plan-fidelity-verdict-"$PP_PR_NUM"-*.md' "$RUNNER" | grep -qx 1; then
-    echo "ok: e11-re-review-glob-present"
+# e11: the call site reads the verdict through postplan_newest_verdict (group v tests it)
+if grep -cF 'PP_VERDICT_NEWEST=$(postplan_newest_verdict "$PP_PR_NUM")' "$RUNNER" | grep -qx 1; then
+    echo "ok: e11-verdict-probe-uses-helper"
 else
-    echo "FAIL: e11-re-review-glob-present — count=$(grep -cF 'post-plan-fidelity-verdict-"$PP_PR_NUM"-*.md' "$RUNNER")"
+    echo "FAIL: e11-verdict-probe-uses-helper — call site does not use postplan_newest_verdict"
     FAILED=1
 fi
+
+# ---------------------------------------------------------------------------
+# Group v — postplan_newest_verdict (dynamic, under the runner's set -euo pipefail)
+# ---------------------------------------------------------------------------
+# The defect: `ls` exits non-zero when one pattern matches nothing, and inside
+# `VAR=$(…)` under set -euo pipefail that killed the runner right after post-plan
+# (2026-09-18 00:34 and 01:30). Each case runs in a strict subshell and must reach
+# its final echo.
+
+V=$(mktemp -d)
+v_probe() {
+    ( set -euo pipefail; out=$(postplan_newest_verdict "$1" "$V"); echo "rc0:$out" )
+}
+
+# v1: base file only, no -2 — the crash case
+touch "$V/post-plan-fidelity-verdict-11.md"
+v1=$(v_probe 11)
+if [ "$v1" = "rc0:$V/post-plan-fidelity-verdict-11.md" ]; then
+    echo "ok: v1-base-only-survives-set-e"
+else
+    echo "FAIL: v1-base-only-survives-set-e — got '$v1'"
+    FAILED=1
+fi
+
+# v2: no verdict at all — empty, rc 0
+v2=$(v_probe 22)
+if [ "$v2" = "rc0:" ]; then
+    echo "ok: v2-none-empty"
+else
+    echo "FAIL: v2-none-empty — got '$v2'"
+    FAILED=1
+fi
+
+# v3: stale base + newer -2 — newest (-2) wins
+touch -t 202001010000 "$V/post-plan-fidelity-verdict-33.md"
+touch "$V/post-plan-fidelity-verdict-33-2.md"
+v3=$(v_probe 33)
+if [ "$v3" = "rc0:$V/post-plan-fidelity-verdict-33-2.md" ]; then
+    echo "ok: v3-re-review-newest-wins"
+else
+    echo "FAIL: v3-re-review-newest-wins — got '$v3'"
+    FAILED=1
+fi
+
+# v4: -2 only (no base) — also a one-pattern-misses case
+touch "$V/post-plan-fidelity-verdict-44-2.md"
+v4=$(v_probe 44)
+if [ "$v4" = "rc0:$V/post-plan-fidelity-verdict-44-2.md" ]; then
+    echo "ok: v4-re-review-only-survives-set-e"
+else
+    echo "FAIL: v4-re-review-only-survives-set-e — got '$v4'"
+    FAILED=1
+fi
+rm -rf "$V"
 
 # e2 augmented assertions: the anchor region must contain both dispose_plan_done and
 # should_hold_postplan_disposal (e2a: non-empty region; e2b: dispose present; e2c: hold present)

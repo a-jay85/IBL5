@@ -1,0 +1,56 @@
+## Code Review — PR #2253
+
+---
+
+### Section 2: Comment-constraint violations
+
+**Finding 1 — `ClaudeCli` class docstring contradicts the new call site**
+`tools/postplan-harness/harness/adapters/llm.py`
+
+The class-level docstring in the `@@` context window of the `_owns_workdir`/`close()` hunk says:
+
+```python
+class ClaudeCli:
+    """Live adapter: claude -p, single turn, no tools, neutral cwd."""
+```
+
+`call_tooled()`, added in this same diff, violates all three stated constraints: it uses `max_turns=60`, an explicit `--tools` allowlist, and `cwd=worktree` (the caller's repo, not a neutral temp dir). The module-level docstring six lines above *was* updated in this diff to distinguish toolless from tool-enabled call sites — the class docstring was not.
+
+---
+
+**Finding 2 — `reviewed_tree` overwrite comment names the wrong consumer**
+`tools/postplan-harness/runner.py`, inside `_run_fidelity`
+
+```python
+if verdict_2 and tree_2:
+    # condition (12) must compare against the tree the SECOND reviewer saw
+    res.fidelity["reviewed_tree"] = tree_2
+```
+
+The comment says this overwrite serves condition (12). But condition (12) reads `fidelity_tree_2`, wired from `res.fidelity.get("reviewed_tree_2")` — the key set on the line immediately above. The actual consumers of the overwritten `"reviewed_tree"` key are `compose_sticky` (the `**Reviewed tree:**` line) and the statefile. The effect is that the sticky comment shows the post-remediation tree for both "Reviewed tree" and "Re-reviewed tree," and the original tree of verdict 1 is discarded from the audit trail. The comment misdirects to the one consumer this assignment does *not* serve.
+
+---
+
+**Finding 3 — ledger records wrong model on agent path**
+`tools/postplan-harness/harness/adapters/llm.py`, `call_tooled`
+
+```python
+rec = LlmCallRecord(purpose=purpose, model=MODEL_MAP[model])
+```
+
+The comment in `_tooled_argv` (same diff, same function):
+
+```python
+# no --model: the agent def's own `model:` pin wins, mirroring the skill's spawn
+```
+
+When `agent` is set, the CLI call omits `--model`; the `model` parameter does not determine what runs. Recording `MODEL_MAP[model]` in the ledger is inaccurate on that path. Both the comment and the ledger write are new in this diff.
+
+---
+
+### Regression risk — test files not in diff
+
+Two deleted constructs name their pin tests explicitly in the removed comments:
+
+- `fidelity_pending` (`state.py`) was pinned by `tests/test_runner_exit_codes.py::test_degraded_beats_fidelity_pending`. That field is deleted entirely; the test file is not in this diff.
+- `CONFORMANCE_DONE_NAME`/`CONFORMANCE_BRIDGE_NAME` (retained in `runner.py`) still claim they are kept in sync by `tests/test_post_plan_now_fallback.py`. That test validated the rc=4 resume path that was removed; verify it was updated to reflect the current contract (audit-trail only, no resume session reads these paths).

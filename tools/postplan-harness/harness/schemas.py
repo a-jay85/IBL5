@@ -8,6 +8,10 @@ import re
 from .state import Classification, HarnessError
 
 FINDING_KEYS = {"path", "line", "body"}
+FINDING_ALIASES = (
+    ("path", ("file",)),
+    ("body", ("detail", "description", "message")),
+)
 MANUAL_CATEGORIES = {"cli-executable", "phpunit", "api-test", "e2e",
                      "visual-regression", "truly-manual"}
 HOLD_DISCHARGE_CATEGORIES = {"decision", "cli-executable", "phpunit", "api-test",
@@ -15,16 +19,61 @@ HOLD_DISCHARGE_CATEGORIES = {"decision", "cli-executable", "phpunit", "api-test"
 COMMIT_TYPES = {"feat", "fix", "refactor", "perf", "test", "docs", "build", "ci", "chore"}
 
 
-def unwrap_findings_envelope(data):
-    """Decoration layer: unwrap a {"findings": [...]} envelope; pass everything else through.
+def _normalize_finding(item):
+    """One finding dict -> exactly {path, line, body}. Anything non-dict passes through.
 
-    Tolerance lives here, never in validate_findings — a dict whose "findings" value is not a
-    list, or a dict with any other key, is returned unchanged so the strict validator still
-    rejects it. This is the only shape the layer knows how to unwrap.
+    Never raises. A shape this cannot repair is handed on for validate_findings to reject.
+    """
+    if not isinstance(item, dict):
+        return item
+    out = {}
+    for canonical, aliases in FINDING_ALIASES:
+        for key in (canonical,) + aliases:
+            if key in item:
+                out[canonical] = item[key]
+                break
+    if "line" in item:
+        out["line"] = item["line"]
+    elif out:
+        out["line"] = 0
+    return out
+
+
+def unwrap_findings_envelope(data):
+    """Decoration layer: reshape the evidenced reply shapes into a bare findings array.
+
+    Three tolerances, applied in this order:
+      1. {"findings": [...]}                -> the inner list (unchanged behavior).
+      2. a dict with TWO OR MORE keys whose values are ALL lists -> the concatenation of
+         those lists, in key order. This is the sectioned reply an agent emits when it
+         echoes the prompt's section headers as JSON keys.
+      3. every item of the resulting list -> exactly {path, line, body}, resolving the
+         aliases in FINDING_ALIASES and dropping every other key. A finding with no `line`
+         gets the int sentinel 0, which passes validate_findings and routes to a file-level
+         PR comment in bin/lib/post-review-findings.sh.
+
+    Tolerance lives here, never in validate_findings. What this deliberately does NOT repair:
+      * {} and any SINGLE-key dict other than {"findings": ...}. `findings` is the only
+        evidenced envelope key, so a lone other key is a wrong envelope, not a section list.
+        The two-key floor is what keeps {"not_findings": []} rejected, and it keeps {} from
+        flattening into [] -- an empty object must never read downstream as a clean review.
+      * a dict with any non-list value, e.g. {"findings": "none"}.
+      * a present-but-wrong `line`: "123", None and 12.5 stay as they are and are rejected.
+        Coercion there is unevidenced and would invent an anchor the model never gave.
+      * list items that are not dicts; they pass through to the strict validator.
+      * a finding carrying neither `path` nor `file`, or neither `body` nor any body alias.
+      * any alias outside FINDING_ALIASES (`filename`, `text`, `summary`, ...).
+    Everything in that list reaches the unchanged strict validator, raises HarnessError
+    "llm-invalid-output", and degrades the agent loudly through review.py's existing path.
     """
     if isinstance(data, dict) and isinstance(data.get("findings"), list):
-        return data["findings"]
-    return data
+        data = data["findings"]
+    elif (isinstance(data, dict) and len(data) >= 2
+          and all(isinstance(v, list) for v in data.values())):
+        data = [item for value in data.values() for item in value]
+    if not isinstance(data, list):
+        return data
+    return [_normalize_finding(item) for item in data]
 
 
 def validate_findings(data) -> None:

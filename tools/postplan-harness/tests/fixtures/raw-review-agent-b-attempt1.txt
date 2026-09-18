@@ -1,0 +1,13 @@
+```json
+{
+  "findings": [
+    {
+      "category": "comment-compliance",
+      "severity": "medium",
+      "file": "tools/postplan-harness/harness/adapters/llm.py",
+      "symbol": "ClaudeCli",
+      "detail": "The class docstring — '\"\"\"Live adapter: claude -p, single turn, no tools, neutral cwd.\"\"\"' — is unchanged context in the diff's @@ window. The PR's central addition, call_tooled(), contradicts all three prose constraints on the same class: TOOLED_MAX_TURNS=60 (not single turn), an explicit --tools allowlist (not no tools), and cwd=worktree (not neutral cwd). The docstring should be narrowed to describe only call() or updated to cover both call paths."
+    }
+  ]
+}
+```

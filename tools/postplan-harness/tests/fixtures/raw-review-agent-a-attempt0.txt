@@ -1,0 +1,92 @@
+## PR #2253 — Code Review
+
+### Scope note
+
+No PHP files changed. The PHP-specific checks — `bind_param` type chars, `tid`/`retired`/`hasMLE` native-type comparisons, `COUNT(*)` without `gameMIN > 0`, `transactional()` — are N/A. There is nothing for them to find here.
+
+---
+
+### Section 1 — Architectural fitness
+
+**Drive-by subsystem: `statefile.py` is a new, schema-versioned persistence layer not mentioned in the PR**
+
+The PR title and the ADR addendum cover harness-owned Phase 5.5 and the 0/1/3 exit contract. `statefile.py` ships a 172-line checkpointing system: per-slug JSON state files, schema versioning (`SCHEMA_VERSION = 1`), review-agent finding hashes, and a `StateFile` class that `runner.py` calls at four checkpoints. None of that appears in the title, the ADR addendum, or any docs change in this diff.
+
+This is a meaningful new persistence subsystem, not a helper for Phase 5.5. Under Section 1's clean-scope clause it belongs in a separate PR with its own ADR note.
+
+---
+
+### Section 2 — Production-impact bugs
+
+**[SECURITY — condition (11)] `LiveGh.unresolved_findings` sources `pr-armable.sh` from the worktree, not the pinned main checkout**
+
+`ghad.py`, `LiveGh.unresolved_findings`:
+
+```python
+argv = ["bash", "-c",
+        'source "$(git rev-parse --show-toplevel)/bin/lib/pr-armable.sh"; '
+        'pr_unresolved_findings_hold "$1"', "_", str(pr)]
+# ...
+proc = _run_reaped(argv, None, 120, self.worktree, None)
+```
+
+`git rev-parse --show-toplevel` runs in `self.worktree` — the worktree of the branch under review. A branch that patches `pr_unresolved_findings_hold` to emit nothing and return 0 clears condition (11) on its own PR.
+
+`pr_sticky_verdict`, twelve lines below in the same file, pins to the harness's own checkout for exactly this reason:
+
+```python
+STICKY_LIB = Path(__file__).resolve().parents[4] / "bin" / "lib" / "pr-sticky.sh"
+```
+
+Its comment: *"a branch cannot alter the helper that posts its own verdict."* The same threat applies to condition (11). Fix: export a `PR_ARMABLE_LIB` constant pinned like `STICKY_LIB` and source that path instead of the worktree-relative one.
+
+---
+
+**[Unverified sentinel — condition (11)] `"unresolved-findings-cap"` may be dead code**
+
+`armable.py`, condition (11) grader:
+
+```python
+elif "unresolved-findings-cap" in uf:
+    r = "review-thread list hit the 100-thread page cap — fail-closed"
+```
+
+The adapter returns `proc.stdout.split()`. The sentinel can only arrive if `pr_unresolved_findings_hold` in `bin/lib/pr-armable.sh` emits that exact token. No test in this PR verifies it does. If the shell helper silently returns 0 with no output when it hits the 100-thread cap, condition (11) passes when it should block. The fix is either a test that stubs the shell helper to emit the token, or confirmation from the shell side that the contract is upheld.
+
+---
+
+**[Sticky comment integrity] `reviewed_tree` is overwritten with `tree_2`, making the comment misleading**
+
+`runner.py`, `_run_fidelity`:
+
+```python
+if verdict_2 and tree_2:
+    # condition (12) must compare against the tree the SECOND reviewer saw
+    res.fidelity["reviewed_tree"] = tree_2
+```
+
+After a successful re-review, `compose_sticky` reads `fid.get("reviewed_tree")` for the "**Reviewed tree:**" line. That field now holds `tree_2`, so both "**Reviewed tree:**" and "**Re-reviewed tree:**" display the same hash. A human reading the sticky comment has no record of which tree verdict 1 actually reviewed.
+
+Arming is unaffected — `select_fidelity_verdict` takes `fidelity_tree_2` from the separate `reviewed_tree_2` field. But the audit trail is wrong: an overwritten `reviewed_tree` in the state file and in the sticky comment undermines the diagnostic value of both.
+
+Fix: keep the original tree in `reviewed_tree` and read `reviewed_tree_2` for the re-review display line.
+
+---
+
+**[Concurrent-write] Live `_state_dir` is last-writer-wins per slug**
+
+`runner.py`, `_state_dir`:
+
+```python
+if live:
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "out", "state")
+```
+
+All live runs on the same slug share one file. `os.replace` prevents torn writes, but two concurrent live runs on the same branch overwrite each other's checkpoints mid-flight. The session-start hook notes a second live session is active on this repo. Not a correctness bug for arming, but the state file's value as the run's audit trail is undermined in any concurrent scenario.
+
+---
+
+### Not findings
+
+- `_run_reaped` process-group cleanup: `finally` runs on both the success and timeout paths; the `ProcessLookupError` catch is correct. No zombie leak.
+- Style and documentation-only changes.

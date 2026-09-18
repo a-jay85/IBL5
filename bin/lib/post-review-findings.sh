@@ -1,6 +1,7 @@
 # Shared posting helper for code-review & security-audit findings — converts a
-# JSON findings array into either resolvable inline GitHub review threads (on-diff
-# lines) or a single fallback issue comment (out-of-diff lines).  Sourced by
+# JSON findings array into resolvable inline GitHub review threads (on-diff lines)
+# or a single fallback issue comment covering whole-file findings (line 0) and
+# findings on lines outside the diff.  Sourced by
 # /post-plan Phase 4D, /pr-review Step 7, and /security-audit Step 7.
 #
 # Usage: source "$(git rev-parse --show-toplevel)/bin/lib/post-review-findings.sh"
@@ -66,7 +67,8 @@ prf_diff_right_lines() {
 # post_review_findings PR_NUMBER HEAD_SHA REVIEW_TITLE FINDINGS_FILE
 #   Partitions findings by whether their path:line is present in the PR diff.
 #   On-diff  → one atomic batch review POST (resolvable inline threads).
-#   Out-of-diff → one fallback gh pr comment (nothing is dropped).
+#   File-level (line 0) or out-of-diff → one fallback gh pr comment naming the
+#     file for every entry (nothing is dropped, nothing is anchored by guess).
 #   Empty findings array → no-op.
 post_review_findings() {
     local pr="$1" head_sha="$2" title="$3" findings_file="$4"
@@ -95,18 +97,26 @@ post_review_findings() {
         | jq -R 'split("\t") | .[0]+":"+.[1]' \
         | jq -s '.' > "$lines_file"
 
-    # Partition: on-diff vs out-of-diff
-    local on_file="$tmp/on.json" off_file="$tmp/off.json"
+    # Partition: file-level (line 0 sentinel) vs on-diff vs out-of-diff.
+    # line 0 means "about the file as a whole, no anchor line" — the reviews
+    # endpoint rejects it, so it is excluded from the batch POST by construction
+    # rather than by relying on it missing the lineset.
+    local on_file="$tmp/on.json" off_file="$tmp/off.json" file_file="$tmp/filelevel.json"
+    local filelevel='((.line|type) == "number" and .line == 0)'
+    jq "[.[] | select($filelevel)]" "$findings_file" > "$file_file"
     jq --slurpfile lineset "$lines_file" \
-        '[.[] | select( (.path+":"+(.line|tostring)) as $k | $lineset[0] | index($k) != null )]' \
+        "[.[] | select($filelevel | not)
+              | select( (.path+\":\"+(.line|tostring)) as \$k | \$lineset[0] | index(\$k) != null )]" \
         "$findings_file" > "$on_file"
     jq --slurpfile lineset "$lines_file" \
-        '[.[] | select( (.path+":"+(.line|tostring)) as $k | $lineset[0] | index($k) == null )]' \
+        "[.[] | select($filelevel | not)
+              | select( (.path+\":\"+(.line|tostring)) as \$k | \$lineset[0] | index(\$k) == null )]" \
         "$findings_file" > "$off_file"
 
-    local on_count off_count
+    local on_count off_count file_count
     on_count=$(jq 'length' "$on_file")
     off_count=$(jq 'length' "$off_file")
+    file_count=$(jq 'length' "$file_file")
 
     # On-diff: batch review POST
     if [ "$on_count" -gt 0 ]; then
@@ -128,14 +138,25 @@ ${PRF_FOOTER}"
             --input "$payload_file"
     fi
 
-    # Out-of-diff: fallback comment
-    if [ "$off_count" -gt 0 ]; then
+    # Not inline-anchorable: one fallback comment covering file-level findings and
+    # findings whose line is outside the diff.  Every entry names its file.
+    if [ "$off_count" -gt 0 ] || [ "$file_count" -gt 0 ]; then
         local fallback_file="$tmp/fallback.txt"
+        local fallback_count=$((file_count + off_count))
         {
             printf '### %s\n\n' "$title"
-            printf 'Found %d issue(s) on lines not present in the diff:\n\n' "$off_count"
-            jq -r 'to_entries[] | "\(.key + 1). \(.value.body)\n\n<!-- score: \(.value.score) -->"' "$off_file"
-            printf '\n%s\n' "$PRF_FOOTER"
+            printf 'Found %d issue(s) that could not be anchored to a diff line:\n\n' "$fallback_count"
+            if [ "$file_count" -gt 0 ]; then
+                printf '**Whole-file findings**\n\n'
+                jq -r 'to_entries[] | "\(.key + 1). `\(.value.path)` — \(.value.body)\n\n<!-- score: \(.value.score) -->"' "$file_file"
+                printf '\n'
+            fi
+            if [ "$off_count" -gt 0 ]; then
+                printf '**Findings on lines not present in the diff**\n\n'
+                jq -r 'to_entries[] | "\(.key + 1). `\(.value.path):\(.value.line // "?")` — \(.value.body)\n\n<!-- score: \(.value.score) -->"' "$off_file"
+                printf '\n'
+            fi
+            printf '%s\n' "$PRF_FOOTER"
         } > "$fallback_file"
         "$GH_CMD" pr comment "$pr" --body-file "$fallback_file"
     fi

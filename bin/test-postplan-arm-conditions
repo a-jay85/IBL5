@@ -187,9 +187,11 @@ run_p55() {
 # findings-render block in its own shell.  Writes the -2 fixture (when kind !=
 # absent) to $BASE_TMP/findings-verdict-2.md via mk_verdict_fixture.  Substitutes
 # the block's hardcoded VERDICT_2_FILE= assignment with a $BASE_TMP-scoped path so
-# no /tmp verdict-path collision is possible.  spawn + real fixture: block sees the
-# file.  skip or absent: block sees a nonexistent path (non-tautological when kind
-# != absent because the fixture still exists on disk, just not at the block's path).
+# no /tmp verdict-path collision is possible.  spawn + real fixture (mode=spawn,
+# kind!=absent): block's VERDICT_2_FILE points to the fixture.  mode=skip or
+# kind=absent: block's VERDICT_2_FILE points to findings-verdict-2-none.md (never
+# written), so the block always sees a missing file on both paths — skip and absent
+# are behaviorally identical here.  Skip mode is guarded structurally (case 4).
 # Exports FIDELITY_VERDICT_FILE_2 (unset when kind=absent) and RE_REVIEW for seam
 # completeness.  Always exits 0 so callers can use $() capture freely.
 run_findings() {
@@ -1262,20 +1264,20 @@ else
     FAILED=1
 fi
 
-# Case 4 — skip: fixture IS present on disk but mode=skip; assert slot empty and
-# composed body contains neither **Re-reviewed tree:** nor the sentinel.
-# Writing the fixture on the skip path is deliberate — it is what makes this
-# case non-tautological.
-out4="$(run_findings "$B58F" findings skip)"
-body4="$(compose_fixture_body "" "$out4")"
-if grep -qF '**Re-reviewed tree:**' <<< "$body4"; then
-    echo "FAIL: 5.8c skip: **Re-reviewed tree:** present in skip body"
-    FAILED=1
-elif grep -qF 'XYZZY-FINDING-SENTINEL' <<< "$body4"; then
-    echo "FAIL: 5.8c skip: XYZZY-FINDING-SENTINEL present in skip body (fixture leaked)"
-    FAILED=1
+# Case 4 — skip: structural guard that the findings-render fence sits AFTER the
+# RE_REVIEW=spawn line in _phase-5.5-fidelity.md.  That placement is what confines
+# the render block to the spawn path; if it drifted above RE_REVIEW=spawn, skip-mode
+# runs would also render.  Behavioral testing is not needed: on skip, no second
+# reviewer runs, so FIDELITY_VERDICT_FILE_2 is never written and the block is never
+# reached.
+_spawn_lineno="$(grep -n 'RE_REVIEW=spawn' "$P55_SKILL" | head -1 | cut -d: -f1)"
+_fence_lineno="$(grep -n '# phase 5.8 findings render' "$P55_SKILL" | head -1 | cut -d: -f1)"
+if [ -n "$_spawn_lineno" ] && [ -n "$_fence_lineno" ] \
+        && [ "$_fence_lineno" -gt "$_spawn_lineno" ]; then
+    echo "ok: 5.8c skip: findings-render fence is after RE_REVIEW=spawn line (structural guard)"
 else
-    echo "ok: 5.8c skip: slot empty and no re-reviewed line in composed body"
+    echo "FAIL: 5.8c skip: findings-render fence is NOT after RE_REVIEW=spawn (fence=$_fence_lineno spawn=$_spawn_lineno)"
+    FAILED=1
 fi
 
 # Case 5 — digest-parse regression: feed case 1's body to extracted _digest_labels;

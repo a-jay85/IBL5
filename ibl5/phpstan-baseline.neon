@@ -3716,6 +3716,12 @@ parameters:
 			path: modules/TrainingCampRatingsDiff/index.php
 
 		-
+			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/TrainingCampRatingsDiff/index.php
+
+		-
 			rawMessage: 'Parameter #1 $db of class TrainingCampRatingsDiff\TrainingCampRatingsDiffRepository constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
@@ -4220,6 +4226,12 @@ parameters:
 			path: scripts/bug-pipeline/transition.php
 
 		-
+			rawMessage: 'getopt() call lacks an unknown-option guard. After calling getopt(), compare $argv against the accepted option list and call usage_error() / exit(1) on any unrecognized argument. Suppress with @phpstan-ignore ibl.unknownCliOption only after the guard is in place.'
+			identifier: ibl.unknownCliOption
+			count: 1
+			path: scripts/build-engine-bundle.php
+
+		-
 			rawMessage: Variable $argv might not be defined.
 			identifier: variable.undefined
 			count: 3
@@ -4644,6 +4656,12 @@ parameters:
 			identifier: variable.undefined
 			count: 1
 			path: scripts/reconstruct_2007_asg_boxscores.php
+
+		-
+			rawMessage: 'getopt() call lacks an unknown-option guard. After calling getopt(), compare $argv against the accepted option list and call usage_error() / exit(1) on any unrecognized argument. Suppress with @phpstan-ignore ibl.unknownCliOption only after the guard is in place.'
+			identifier: ibl.unknownCliOption
+			count: 1
+			path: scripts/runEngineShadow.php
 
 		-
 			rawMessage: PHPDoc tag @var above a function has no effect.
@@ -5316,15 +5334,3 @@ parameters:
 			identifier: encapsedStringPart.nonString
 			count: 6
 			path: themes/IBL/theme.php
-
-		-
-			rawMessage: 'getopt() call lacks an unknown-option guard. After calling getopt(), compare $argv against the accepted option list and call usage_error() / exit(1) on any unrecognized argument. Suppress with @phpstan-ignore ibl.unknownCliOption only after the guard is in place.'
-			identifier: ibl.unknownCliOption
-			count: 1
-			path: scripts/build-engine-bundle.php
-
-		-
-			rawMessage: 'getopt() call lacks an unknown-option guard. After calling getopt(), compare $argv against the accepted option list and call usage_error() / exit(1) on any unrecognized argument. Suppress with @phpstan-ignore ibl.unknownCliOption only after the guard is in place.'
-			identifier: ibl.unknownCliOption
-			count: 1
-			path: scripts/runEngineShadow.php

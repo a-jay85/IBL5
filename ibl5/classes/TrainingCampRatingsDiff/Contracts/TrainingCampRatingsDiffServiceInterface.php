@@ -18,16 +18,18 @@ interface TrainingCampRatingsDiffServiceInterface
      * then sumAbsDelta DESC, then lastname ASC. New players (no baseline) follow,
      * sorted lastname ASC.
      *
-     * Returns an empty array when no baseline year is resolvable.
+     * Baseline year is $overrideYear if provided, else currentSeasonEndingYear − 1.
+     * Baseline phase for that year is resolved via the repository (end-of-season →
+     * mid-season → null). Returns an empty array when no baseline phase is found.
      *
      * @return list<RatingRow>
      */
     public function getDiffs(?int $overrideYear = null, ?int $filterTid = null, string $filterStatus = ''): array;
 
     /**
-     * Returns the resolved baseline year (overrideYear if provided, else the
-     * latest end-of-season snapshot year from the repository). Returns null
-     * when no baseline is available and no override is given.
+     * Returns the resolved baseline year: $overrideYear if provided, else
+     * currentSeasonEndingYear − 1. Returns null when no snapshot phase exists
+     * for the resolved year (i.e. no usable baseline is available).
      */
     public function getBaselineYear(?int $overrideYear = null): ?int;
 }

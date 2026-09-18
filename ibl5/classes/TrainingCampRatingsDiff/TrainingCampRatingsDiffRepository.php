@@ -18,30 +18,26 @@ use TrainingCampRatingsDiff\Contracts\TrainingCampRatingsDiffRepositoryInterface
 class TrainingCampRatingsDiffRepository extends BaseMysqliRepository implements TrainingCampRatingsDiffRepositoryInterface
 {
     /**
-     * @see TrainingCampRatingsDiffRepositoryInterface::getLatestEndOfSeasonYear()
+     * @see TrainingCampRatingsDiffRepositoryInterface::getBaselinePhase()
      */
-    public function getLatestEndOfSeasonYear(): ?int
+    public function getBaselinePhase(int $seasonYear): ?string
     {
         $row = $this->fetchOne(
-            "SELECT MAX(season_year) AS y FROM `ibl_plr_snapshots` WHERE snapshot_phase = 'end-of-season'",
-            '',
+            "SELECT snapshot_phase FROM `ibl_plr_snapshots`
+              WHERE season_year = ?
+                AND snapshot_phase IN ('end-of-season','mid-season')
+              ORDER BY snapshot_phase = 'end-of-season' DESC
+              LIMIT 1",
+            'i',
+            $seasonYear,
         );
 
         if ($row === null) {
             return null;
         }
 
-        $y = $row['y'] ?? null;
-        if ($y === null) {
-            return null;
-        }
-        if (is_int($y)) {
-            return $y;
-        }
-        if (is_numeric($y)) {
-            return (int) $y;
-        }
-        return null;
+        $v = $row['snapshot_phase'] ?? null;
+        return is_string($v) ? $v : null;
     }
 
     /**
@@ -49,7 +45,7 @@ class TrainingCampRatingsDiffRepository extends BaseMysqliRepository implements 
      *
      * @return list<array<string, mixed>>
      */
-    public function getDiffRows(int $baselineYear, ?int $filterTid = null, string $filterStatus = ''): array
+    public function getDiffRows(int $baselineYear, string $baselinePhase, ?int $filterTid = null, string $filterStatus = ''): array
     {
         $sql = <<<'SQL'
 SELECT
@@ -72,7 +68,7 @@ LEFT JOIN `ibl_team_info` t ON t.teamid = p.teamid
 LEFT JOIN `ibl_plr_snapshots` s
        ON s.pid = p.pid
       AND s.season_year = ?
-      AND s.snapshot_phase = 'end-of-season'
+      AND s.snapshot_phase = ?
 WHERE p.retired = 0
 SQL;
 
@@ -85,10 +81,10 @@ SQL;
         if ($filterTid !== null) {
             $sql .= ' AND p.teamid = ?';
             $sql .= ' ORDER BY p.name';
-            return array_values($this->fetchAll($sql, 'ii', $baselineYear, $filterTid));
+            return array_values($this->fetchAll($sql, 'isi', $baselineYear, $baselinePhase, $filterTid));
         }
 
         $sql .= ' ORDER BY p.name';
-        return array_values($this->fetchAll($sql, 'i', $baselineYear));
+        return array_values($this->fetchAll($sql, 'is', $baselineYear, $baselinePhase));
     }
 }

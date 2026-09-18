@@ -7,7 +7,11 @@ namespace TrainingCampRatingsDiff;
 use TrainingCampRatingsDiff\Contracts\TrainingCampRatingsDiffRepositoryInterface;
 
 /**
- * TrainingCampRatingsDiffService — computes per-player rating deltas against the latest end-of-season snapshot.
+ * TrainingCampRatingsDiffService — computes per-player rating deltas against a prior-season snapshot.
+ *
+ * Baseline year: $overrideYear if supplied, else currentSeasonEndingYear − 1.
+ * Baseline phase for that year: 'end-of-season' if rows exist, else 'mid-season' if rows
+ * exist, else null (no baseline). Never falls back to a different year.
  *
  * Column name notes (migration 113):
  *   - `do`  → r_drive_off (drive offense rating)
@@ -30,6 +34,7 @@ class TrainingCampRatingsDiffService implements Contracts\TrainingCampRatingsDif
 
     public function __construct(
         private readonly TrainingCampRatingsDiffRepositoryInterface $repository,
+        private readonly int $currentSeasonEndingYear,
     ) {
     }
 
@@ -40,12 +45,13 @@ class TrainingCampRatingsDiffService implements Contracts\TrainingCampRatingsDif
      */
     public function getDiffs(?int $overrideYear = null, ?int $filterTid = null, string $filterStatus = ''): array
     {
-        $baselineYear = $overrideYear ?? $this->repository->getLatestEndOfSeasonYear();
-        if ($baselineYear === null) {
+        $baselineYear  = $overrideYear ?? ($this->currentSeasonEndingYear - 1);
+        $baselinePhase = $this->repository->getBaselinePhase($baselineYear);
+        if ($baselinePhase === null) {
             return [];
         }
 
-        $dbRows = $this->repository->getDiffRows($baselineYear, $filterTid, $filterStatus);
+        $dbRows = $this->repository->getDiffRows($baselineYear, $baselinePhase, $filterTid, $filterStatus);
 
         /** @var list<RatingRow> $realRows */
         $realRows = [];
@@ -81,7 +87,9 @@ class TrainingCampRatingsDiffService implements Contracts\TrainingCampRatingsDif
      */
     public function getBaselineYear(?int $overrideYear = null): ?int
     {
-        return $overrideYear ?? $this->repository->getLatestEndOfSeasonYear();
+        $year  = $overrideYear ?? ($this->currentSeasonEndingYear - 1);
+        $phase = $this->repository->getBaselinePhase($year);
+        return $phase !== null ? $year : null;
     }
 
     /**

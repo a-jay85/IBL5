@@ -16,6 +16,8 @@ args="$*"
 echo "${args//$'\\n'/\\\\n}" >> "$GH_SHIM_LOG"
 case "$1 $2" in
   "pr create") echo "https://github.com/o/r/pull/123" ;;
+  "issue create") echo "https://github.com/a-jay85/IBL5-backlog/issues/456" ;;
+  "issue list") echo '[{"title":"existing issue"}]' ;;
   "pr view")
     if [ "$3" = "--json" ] || [ "$4" = "--json" ]; then
       case "$*" in
@@ -171,3 +173,20 @@ def test_sticky_body_is_written_to_the_run_dir(shim, tmp_path):
     gh = LiveGh(str(out), str(tmp_path), "my-branch")
     gh.pr_sticky_verdict(123, _sticky_body())
     assert (out / "sticky-verdict-123.md").read_text() == _sticky_body()
+
+
+def test_issue_create_parses_number_and_records_argv(shim, tmp_path):
+    gh = LiveGh(str(tmp_path / "out"), str(tmp_path), "my-branch")
+    n = gh.issue_create("Add index on email", "PR link\n\nDetail.", "maintenance")
+    assert n == 456
+    log = calls(shim)
+    assert any("--repo a-jay85/IBL5-backlog" in c and "--label maintenance" in c
+               and "--body" in c for c in log)
+    acts = [a for a in gh.actions() if a["action"] == "issue_create"]
+    assert acts[0]["executed"] is True and acts[0]["issue"] == 456
+
+
+def test_issue_titles_returns_title_list(shim, tmp_path):
+    gh = LiveGh(str(tmp_path / "out"), str(tmp_path), "my-branch")
+    titles = gh.issue_titles("maintenance")
+    assert titles == ["existing issue"]

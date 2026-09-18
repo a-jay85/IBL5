@@ -1,6 +1,6 @@
 ---
 description: /pr-ready runtime Phase 6.5 — fix every Phase 6 finding in-PR, commit, re-push, re-arm CI. Loaded by SKILL.md via git show at Phase 6.5.
-last_verified: 2026-09-16
+last_verified: 2026-09-17
 ---
 
 # /pr-ready runtime Phase 6.5 — in-PR remediation
@@ -13,7 +13,7 @@ Read at runtime via `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase65-reme
 
 **Phase 6.5 — Remediation.**
 
-Every Phase 6 finding gets fixed and its prevention filed, in this PR's existing worktree. This is the one amendment to the stop-at-verdict invariant; everything that invariant still forbids stays forbidden.
+Every Phase 6 finding gets fixed and its prevention filed, in this PR's existing worktree. This is the one amendment to the stop-at-verdict invariant; everything that invariant still forbids stays forbidden. The compiled post-plan harness loops this procedure up to three remediation rounds per run; this skill path stays single-shot.
 
 1. **Load the shared procedure.** `git show <MASTER_SHA>:.claude/skills/fix-and-prevent/_remediation.md` — same pin, same reason as the Phase 2 and Phase 6 includes (the `git show` include invariant in `SKILL.md`). Declared fallback, per the include-fallback clause: if `git show` fails and the file is genuinely present in this worktree, `Read` it by path and record `include-source: worktree (pin predates skill)` in the verdict. If neither source yields it, print `STOP: cannot load _remediation.md from <MASTER_SHA> or from the worktree` and stop.
 

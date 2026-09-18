@@ -690,6 +690,14 @@ def _master_sha(worktree: str | None) -> str:
     return proc.stdout.strip() or "origin/master"
 
 
+def _read_text(path: str) -> str:
+    try:
+        with open(path) as fh:
+            return fh.read()
+    except OSError:
+        return ""
+
+
 def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_sha,
                   reviewed_tree, live, log, res):
     """Phase 5.5. Returns (verdict_word_or_None, error_kind_or_'').
@@ -734,6 +742,12 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                     "reviewed_tree_2": None,
                     "rounds": [], "rounds_completed": 0,
                     "backlog_issue_numbers": []}
+    if verdict == "READY WITH NOTES":
+        vpath = fidelity.verdict_path(pr)
+        notes = fidelity.extract_notes(llm, vpath, log=log)
+        nums = fidelity.file_note_issues(gh, notes, pr, _read_text(vpath), log=log)
+        res.fidelity["backlog_issue_numbers"] = nums
+        log(f"phase5.5 notes: {len(notes)} extracted, {len(nums)} backlog issues filed")
     rounds = []
     current_verdict_path = fidelity.verdict_path(pr)
     final_verdict, final_err = verdict, err

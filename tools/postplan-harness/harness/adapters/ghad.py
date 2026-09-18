@@ -36,7 +36,7 @@ POSTPLAN_BADGE_MARKER = "<!-- postplan-status -->"
 class RecordingGh:
     MUTATIONS = ("pr_create", "pr_comment", "pr_review_findings", "pr_edit_body",
                  "pr_merge_auto", "label_add", "pr_status_badge",
-                 "pr_sticky_verdict")
+                 "pr_sticky_verdict", "issue_create")
 
     def __init__(self, out_dir: str, fixture: dict | None = None):
         self.out_dir = out_dir
@@ -81,6 +81,14 @@ class RecordingGh:
 
     def pr_status_badge(self, pr: int, body: str) -> None:
         self.record("pr_status_badge", pr=pr, body=body[:4000])
+
+    def issue_create(self, title: str, body: str, label: str) -> int | None:
+        existing = sum(1 for a in self.actions() if a.get("action") == "issue_create")
+        self.record("issue_create", title=title, label=label)
+        return existing + 1
+
+    def issue_titles(self, label: str) -> list[str]:
+        return []
 
     # -- reads (fixture-backed) ------------------------------------------
     def pr_exists(self) -> bool:
@@ -233,6 +241,25 @@ class LiveGh(RecordingGh):
     def label_add(self, pr: int, label: str) -> None:
         self._gh("pr", "edit", str(pr), "--add-label", label)
         self.record("label_add", pr=pr, label=label)
+
+    def issue_create(self, title: str, body: str, label: str) -> int | None:
+        out = self._gh("issue", "create", "--repo", "a-jay85/IBL5-backlog",
+                       "--label", label, "--title", title, "--body", body)
+        m = re.search(r"/issues/(\d+)", out)
+        if not m:
+            raise HarnessError("gh", f"issue create returned no issue URL: {out[:200]}")
+        n = int(m.group(1))
+        self.record("issue_create", title=title, label=label, issue=n)
+        return n
+
+    def issue_titles(self, label: str) -> list[str]:
+        try:
+            out = self._gh("issue", "list", "--repo", "a-jay85/IBL5-backlog",
+                           "--state", "all", "--limit", "200", "--json", "title")
+            items = json.loads(out)
+            return [i.get("title", "") for i in items if i.get("title")]
+        except (HarnessError, json.JSONDecodeError):
+            return []
 
     def post_review_findings(self, pr: int, head_sha: str, title: str, findings: list) -> None:
         payload = {"commit_id": head_sha, "event": "COMMENT", "body": title,

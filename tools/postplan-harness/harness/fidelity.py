@@ -15,6 +15,7 @@ import subprocess
 import time
 
 from .state import HarnessError
+from . import llm_calls
 
 # Anchored and multiline: a verdict word must own its whole line. Longest alternative
 # first so "READY WITH NOTES" is never truncated to "READY".
@@ -326,6 +327,69 @@ def re_review(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
     return parse_verdict(path2), read_reviewed_tree(path2), path2
 
 
+def _norm_title(t: str) -> str:
+    """Lowercase, strip non-alphanumeric-or-space, collapse spaces, first 60 chars."""
+    t = t.lower()
+    t = re.sub(r"[^a-z0-9 ]", "", t)
+    t = re.sub(r" +", " ", t).strip()
+    return t[:60]
+
+
+def extract_notes(llm, verdict_path: str, log=None) -> list[dict]:
+    """Extract non-blocking notes from a READY WITH NOTES verdict."""
+    log = log or _noop_log
+    try:
+        with open(verdict_path) as fh:
+            text = fh.read()
+    except OSError:
+        return []
+    try:
+        raw = llm.call("fidelity-notes", "haiku",
+                       llm_calls.fidelity_notes_prompt(text),
+                       validate=lambda r: isinstance(r, list))
+        if not isinstance(raw, list):
+            return []
+        return [d for d in raw if isinstance(d, dict)
+                and d.get("title") and d.get("detail")]
+    except HarnessError:
+        return []
+
+
+def file_note_issues(gh, notes: list[dict], pr_number: int,
+                     verdict_text: str, log=None) -> list[int]:
+    """File deduped backlog issues for READY WITH NOTES notes."""
+    log = log or _noop_log
+    if not notes:
+        return []
+    try:
+        existing = gh.issue_titles("maintenance")
+    except (HarnessError, OSError):
+        existing = []
+    seen = {_norm_title(t) for t in existing}
+    nums = []
+    excerpt = verdict_text[:200]
+    if len(verdict_text) > 200:
+        excerpt += "…"
+    pr_link = f"https://github.com/a-jay85/IBL5/pull/{pr_number}"
+    for note in notes:
+        title = note.get("title", "")
+        detail = note.get("detail", "")
+        key = _norm_title(title)
+        if key in seen:
+            log(f"phase5.5 notes: skipping duplicate '{title[:50]}'")
+            continue
+        body = f"{pr_link}\n\n{detail}\n\n{excerpt}"
+        try:
+            n = gh.issue_create(title, body, "maintenance")
+            if n is not None:
+                nums.append(n)
+                seen.add(key)
+                log(f"phase5.5 notes: filed issue #{n} '{title[:50]}'")
+        except (HarnessError, OSError) as exc:
+            log(f"phase5.5 notes: issue_create failed ({exc})")
+    return nums
+
+
 # --- Phase 5: sticky verdict comment composers -------------------------------
 
 # Byte-for-byte from .claude/skills/pr-ready/scripts/digest.sh. bin/digest-dm-build
@@ -437,6 +501,15 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
     if fid.get("verdict_2") is not None:
         out.append(f"**Re-reviewed tree:** {fid.get('reviewed_tree_2') or 'unrecorded'} "
                    f"({fid.get('verdict_2')})")
+    rounds = fid.get("rounds") or []
+    if len(rounds) > 1:
+        out.append("**Remediation rounds:** " + ", ".join(
+            f"{i + 1}. {(r.get('remediation_sha') or '')[:12]} "
+            f"→ {r.get('verdict') or 'INDETERMINATE'}"
+            for i, r in enumerate(rounds)))
+    nums = fid.get("backlog_issue_numbers") or []
+    if nums:
+        out.append("**Backlog issues filed:** " + ", ".join(f"#{n}" for n in nums))
 
     out.append("")
     if decision is not None and getattr(decision, "armed", False):

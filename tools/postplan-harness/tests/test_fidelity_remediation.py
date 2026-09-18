@@ -9,6 +9,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import fidelity
+from harness.adapters.ghad import RecordingGh
 from harness.adapters.gitad import ReplayGit
 from harness.adapters.llm import FixtureLlm
 from harness.state import HarnessError, UsageLedger
@@ -221,3 +222,110 @@ def test_re_review_packet_is_separate_from_the_first(tmp_path, git_shim):
     finally:
         if os.path.exists(path2):
             os.unlink(path2)
+
+
+# --- multi-round fixture tests ------------------------------------------------
+
+def test_re_review_round_2_uses_different_purpose(tmp_path, git_shim):
+    """round_num=2 uses purpose plan-fidelity-re-review-3."""
+    llm = FixtureLlm(UsageLedger(), {"plan-fidelity-re-review-3": "READY\n"})
+    path3 = fidelity.verdict_path("83-3")
+    try:
+        got = fidelity.re_review(llm, _git(dirty=False), str(tmp_path), str(tmp_path),
+                                 _plan(), "deadbeef", "body", 83, "sha123",
+                                 _verdict(tmp_path, "NOT READY"), round_num=2)
+        assert got[0] == "READY"
+        purposes = [p for p, _ in llm.tooled_argvs]
+        assert purposes == ["plan-fidelity-re-review-3"]
+    finally:
+        if os.path.exists(path3):
+            os.unlink(path3)
+
+
+def test_re_review_round_3_uses_different_purpose(tmp_path, git_shim):
+    """round_num=3 uses purpose plan-fidelity-re-review-4."""
+    llm = FixtureLlm(UsageLedger(), {"plan-fidelity-re-review-4": "NOT READY\n"})
+    path4 = fidelity.verdict_path("84-4")
+    try:
+        got = fidelity.re_review(llm, _git(dirty=False), str(tmp_path), str(tmp_path),
+                                 _plan(), "deadbeef", "body", 84, "sha123",
+                                 _verdict(tmp_path, "NOT READY"), round_num=3)
+        assert got[0] == "NOT READY"
+    finally:
+        if os.path.exists(path4):
+            os.unlink(path4)
+
+
+def test_extract_notes_returns_list_from_llm(tmp_path):
+    """extract_notes calls llm with purpose fidelity-notes and returns the list."""
+    notes_fixture = [{"title": "Add index", "detail": "The users table needs an index on email."}]
+    llm = FixtureLlm(UsageLedger(), {"fidelity-notes": notes_fixture})
+    vpath = _verdict(tmp_path, "READY WITH NOTES")
+    result = fidelity.extract_notes(llm, vpath)
+    assert result == notes_fixture
+
+
+def test_extract_notes_returns_empty_on_llm_failure(tmp_path):
+    """extract_notes returns [] when llm raises HarnessError."""
+    from harness.state import HarnessError as _HE
+
+    class _Raising(FixtureLlm):
+        def call(self, purpose, model, prompt, validate, **kw):
+            raise _HE("llm-fixture-missing", purpose)
+
+    vpath = _verdict(tmp_path, "READY WITH NOTES")
+    assert fidelity.extract_notes(_Raising(UsageLedger(), {}), vpath) == []
+
+
+def test_extract_notes_returns_empty_on_missing_file(tmp_path):
+    assert fidelity.extract_notes(
+        FixtureLlm(UsageLedger(), {}), str(tmp_path / "nope.md")) == []
+
+
+def test_file_note_issues_dedupes_by_normalized_title(tmp_path):
+    """Two notes with near-identical titles file only one issue."""
+    gh = RecordingGh(str(tmp_path))
+    notes = [
+        {"title": "Add index on email", "detail": "Needs an index."},
+        {"title": "Add Index On Email!", "detail": "Same thing."},
+    ]
+    nums = fidelity.file_note_issues(gh, notes, 99, "verdict text")
+    assert len(nums) == 1
+    acts = [a for a in gh.actions() if a["action"] == "issue_create"]
+    assert len(acts) == 1
+
+
+def test_file_note_issues_skips_existing_titles(tmp_path):
+    """A note whose normalized title is already in issue_titles() is skipped."""
+
+    class _Gh(RecordingGh):
+        def issue_titles(self, label):
+            return ["Add index on email"]
+
+    gh = _Gh(str(tmp_path))
+    notes = [{"title": "Add index on email", "detail": "Needs an index."}]
+    nums = fidelity.file_note_issues(gh, notes, 99, "verdict")
+    assert nums == []
+    assert not [a for a in gh.actions() if a["action"] == "issue_create"]
+
+
+def test_file_note_issues_continues_after_failed_create(tmp_path):
+    """A failed issue_create does not abort remaining notes."""
+    from harness.state import HarnessError as _HE
+
+    calls = [0]
+
+    class _FailFirst(RecordingGh):
+        def issue_create(self, title, body, label):
+            calls[0] += 1
+            if calls[0] == 1:
+                raise _HE("gh", "first failed")
+            return super().issue_create(title, body, label)
+
+    gh = _FailFirst(str(tmp_path))
+    notes = [
+        {"title": "First note", "detail": "Detail one."},
+        {"title": "Second note", "detail": "Detail two."},
+    ]
+    nums = fidelity.file_note_issues(gh, notes, 99, "verdict")
+    assert len(nums) == 1

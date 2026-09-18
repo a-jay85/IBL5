@@ -1078,6 +1078,50 @@ impl_cap_timeout() {
     [ "$dur" -ge $(( budget - CAP_TIMEOUT_TOLERANCE_SECS )) ]
 }
 
+# Was the POST-PLAN phase killed by its per-phase wall clock (the `timeout` cap)?
+#
+# Same duration discriminator as impl_cap_timeout above — the exit status alone
+# proves nothing, because 143 is ALSO an ordinary exit here. One deliberate
+# difference: this accepts 137 as well as 143 and 124. Both real post-plan
+# wall-kills observed on 2026-09-16 (PRs #2238 and #2239, see that day's automouse
+# log) exited 137 — `timeout` escalates to SIGKILL when the post-plan process tree
+# does not die on the TERM, and the loop sees 137, not 124 or 143.
+#
+# impl_cap_timeout is deliberately NOT changed to match: its 124/143 pair is locked
+# by bin/test-automouse-impl-cap-timeout and impl behaviour is out of scope here.
+#
+# `budget` MUST be the REMAINING_SECS actually handed to `timeout`, never
+# MAX_PP_SECS. On 2026-09-16 the #2239 post-plan ran 3159s against a REMAINING_SECS
+# of ~3146 (MAX_ELAPSED minus elapsed, the smaller of the two caps); testing against
+# MAX_PP_SECS would have missed that kill by more than 400s.
+postplan_cap_timeout() {
+    local status=$1 dur=$2 budget=$3
+    [ "$status" -eq 143 ] || [ "$status" -eq 124 ] || [ "$status" -eq 137 ] || return 1
+    [ "$dur" -ge $(( budget - CAP_TIMEOUT_TOLERANCE_SECS )) ]
+}
+
+# Should the loop HOLD this plan in queue/ instead of disposing it to done/?
+#
+# Narrow by construction — ALL THREE must hold:
+#   cap_timeout   1 iff postplan_cap_timeout said the phase was wall-killed
+#   pr_state      the state word from automouse_pr_state; only OPEN qualifies
+#   verdict_fresh 1 iff a Phase 5.5 fidelity verdict file for THIS PR was written
+#                 during THIS post-plan phase (probe lives at the call site)
+#
+# MERGED is excluded on purpose: a merged PR means the work shipped, so holding the
+# plan would re-run post-plan against a closed branch every pass for nothing.
+#
+# verdict_fresh=1 is the "review DID run" case, and it disposes exactly as today even
+# when the PR is still OPEN and unarmed. That is the preserve-behaviour constraint,
+# not an oversight — PRs #2238 and #2239 are that case, and the Phase 1 budget raise
+# is their fix, not this guard.
+should_hold_postplan_disposal() {
+    local cap_timeout=$1 pr_state=$2 verdict_fresh=$3
+    [ "$cap_timeout" -eq 1 ] || return 1
+    [ "$pr_state" = "OPEN" ] || return 1
+    [ "$verdict_fresh" -eq 0 ]
+}
+
 # Does this cap-timeout earn an attempt refund?
 #
 # Same boolean shape as should_impl_env_stop(): handoff=1 means the impl

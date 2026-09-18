@@ -40,10 +40,10 @@
 # AND THE ROW LINKS TO WHICHEVER OF THOSE IT READ. Every job on this page is by
 # construction still running, which is exactly the window where the /tmp log holds
 # nothing — offering it as the thing to open sent you to an empty file for the
-# whole run. So a post-plan row names `audit:` once out/<run>/audit.log exists,
-# and falls back to `log:` when it does not (the first seconds of a run, or a
-# skill-fallback run that never created the harness directory). The label names
-# the file, so the row never leaves you guessing which one you got. The /tmp log
+# whole run. So a post-plan row's pid line ends in `audit` once out/<run>/audit.log
+# exists, and falls back to `log` when it does not (the first seconds of a run, or a
+# skill-fallback run that never created the harness directory). The word is the
+# link and names the file, so you never guess which one you got. The /tmp log
 # is still the right file AFTER exit — its first line is the RESULT verdict — but
 # by then the job is gone from this page.
 #
@@ -176,6 +176,29 @@ link_file() {
     # shellcheck disable=SC1003  # '\033\\' is ESC + a literal backslash: the ST
     # that terminates an OSC sequence. Not an escaped quote.
     printf '\033]8;;vscode://file%s\033\\%s\033]8;;\033\\' "$enc" "$text"
+}
+
+# The tail of a pid line: `  audit` linked to the audit.log when there is one,
+# else `  log` linked to the log, else nothing. In a terminal the word IS the
+# reference — the path lives only in the link, which is the whole compaction win.
+#
+# But link_file fails soft to bare text on a pipe, a capture or a relative path,
+# and a lone `audit` then names no file at all. A captured run is how an agent
+# reads this page, so that case falls back to the pre-compaction `audit: <path>`
+# form. Detected by comparing link_file's output to the word it was handed,
+# which covers all three of its gates rather than re-testing one of them here.
+log_word() {
+    local path label rendered
+    if [ -n "${1:-}" ]; then
+        path="$1"; label='audit'
+    elif [ -n "${2:-}" ]; then
+        path="$2"; label='log'
+    else
+        return 0
+    fi
+    rendered="$(link_file "$path" "$label")"
+    [ "$rendered" = "$label" ] && rendered="$label: $path"
+    printf '  %s%s%s' "$DIM" "$rendered" "$R"
 }
 
 # Human-readable age from a seconds count: 45s / 12m / 3h04m / 2d01h.
@@ -453,15 +476,11 @@ render_launchd() {
         track_pid "$pid"
         printf '  %s●%s %-10s %s%s%s%s\n' \
             "$GRN" "$R" "$producer" "$B" "$ident" "$R" "$ident_note"
-        printf '      pid %-7s up %-8s last-exit-col %s\n' \
-            "$pid" "$(human_age "$(pid_elapsed_secs "$pid")")" "$status"
+        printf '      pid %-7s up %-8s last-exit-col %s%s\n' \
+            "$pid" "$(human_age "$(pid_elapsed_secs "$pid")")" "$status" \
+            "$(log_word "$audit" "$log")"
         printf '      %s%s%s\n' "$DIM" "$progress" "$R"
         [ -n "$progress_tool" ] && printf '      %s%s%s\n' "$DIM" "$progress_tool" "$R"
-        if [ -n "$audit" ]; then
-            printf '      %saudit: %s%s\n' "$DIM" "$(link_file "$audit")" "$R"
-        elif [ -n "$log" ]; then
-            printf '      %slog: %s%s\n' "$DIM" "$(link_file "$log")" "$R"
-        fi
     done <<EOF
 $(launchctl list 2>/dev/null | grep 'com\.ibl5\.')
 EOF
@@ -559,15 +578,10 @@ render_runner_detail() {
     [ -z "$progress" ] && progress="(no activity logged yet)"
 
     track_pid "$pid"
-    printf '      %s●%s %-8s pid %-7s up %-8s last activity %s ago%s\n' \
+    printf '      %s●%s %-8s pid %-7s up %-8s last activity %s ago%s%s\n' \
         "$GRN" "$R" "$phase" "$pid" "$(human_age "$(pid_elapsed_secs "$pid")")" \
-        "$(human_age "$hb_age")" "$attempts"
+        "$(human_age "$hb_age")" "$attempts" "$(log_word "$audit" "$log")"
     printf '      %s%s%s\n' "$DIM" "$progress" "$R"
-    if [ -n "$audit" ]; then
-        printf '      %saudit: %s%s\n' "$DIM" "$(link_file "$audit")" "$R"
-    elif [ -n "$log" ]; then
-        printf '      %slog: %s%s\n' "$DIM" "$(link_file "$log")" "$R"
-    fi
 }
 
 # ── section 2: queue ───────────────────────────────────────────────────────────
@@ -666,8 +680,8 @@ render_queue() {
 $queue_list
 EOF_Q
 
-    printf '  %s%3s %-44s %-17s %-6s %-11s %s%s\n' \
-        "$DIM" '#' 'PLAN' 'MODEL' 'MERGE' 'STATUS' 'TITLE' "$R"
+    printf '  %s%3s %-44s %-17s %-6s %s%s\n' \
+        "$DIM" '#' 'PLAN' 'MODEL' 'MERGE' 'STATUS' "$R"
 
     # Pass 2: every heartbeat NOT claimed above. A dead or reused PID is residue
     # and only counted. A live one is a runner on a plan that is not in queue/
@@ -701,7 +715,7 @@ EOF_Q
         fi
         [ -z "$slug" ] && slug='(unknown plan)'
         shown=$(( shown + 1 ))
-        printf '  %s  ▶%s %-44s %-17s %-6s %s%-11s%s %s(not in queue)%s\n' \
+        printf '  %s  ▶%s %-44s %-17s %-6s %s%s%s  %s(not in queue)%s\n' \
             "$YEL" "$R" "$slug" '-' '-' "$YEL" 'running' "$R" "$DIM" "$R"
         render_runner_detail "$pid" "$slug" "$hb"
     done
@@ -714,7 +728,9 @@ EOF_Q
         meta="$(plan_meta "$f")"
         model="$(printf '%s' "$meta" | cut -f1)"
         merge="$(printf '%s' "$meta" | cut -f2)"
-        title="$(clip_field "$(printf '%s' "$meta" | cut -f3-)" 50)"
+        # The title gets its own indented line under the row, so it can run far
+        # wider than a column could.
+        title="$(clip_field "$(printf '%s' "$meta" | cut -f3-)" 100)"
         # Pad OUTSIDE the link. A %-44s over the wrapped string counts the escape
         # bytes as width — the column collapses — and the clickable region would
         # swallow the run of spaces up to the next column.
@@ -726,17 +742,19 @@ EOF_Q
         # occupy the same 3 columns, which keeps the name column straight whether
         # the queue is 9 plans long or 90.
         if [ -e "$AUTOMOUSE_DIR/queue/$base.lock" ]; then
-            printf '  %s  ▶%s %s%s %-17s %-6s %s%-11s%s %s\n' \
+            printf '  %s  ▶%s %s%s %-17s %-6s %s%s%s\n' \
                 "$YEL" "$R" "$(link_file "$f" "$base")" "$pad" "$model" "$merge" \
-                "$YEL" 'in progress' "$R" "$title"
+                "$YEL" 'in progress' "$R"
+            [ -n "$title" ] && printf '      %s%s%s\n' "$DIM" "$title" "$R"
             # Details only for a LIVE runner. A SIGKILLed one leaves the lock dir
             # with a dead PID: the row still reads in progress, with nothing under it.
             pid="$(queue_lock_runner "$base")" && hb="$(runner_heartbeat "$pid")" && \
                 render_runner_detail "$pid" "${base%.md}" "$hb"
         else
-            printf '  %s%2d.%s %s%s %-17s %-6s %s%-11s%s %s\n' \
+            printf '  %s%2d.%s %s%s %-17s %-6s %s%s%s\n' \
                 "$DIM" "$count" "$R" "$(link_file "$f" "$base")" "$pad" "$model" "$merge" \
-                "$DIM" 'queued' "$R" "$title"
+                "$DIM" 'queued' "$R"
+            [ -n "$title" ] && printf '      %s%s%s\n' "$DIM" "$title" "$R"
         fi
     done <<EOF_Q
 $queue_list

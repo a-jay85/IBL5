@@ -75,3 +75,16 @@ Minimal section — specific counter-examples are embedded inline in the rules t
 ### HTTP response shape changes
 
 When an endpoint was already covered by E2E response-body assertions, those assertions become stale on the new shape; PHPUnit does not test the browser-observed response chain. The plan must audit all existing E2E tests asserting against that endpoint's response body and update any whose expected value depended on the old shape.
+
+### Required Test Methods — parser mechanics
+
+The `## Required Test Methods` requirement is enforced by a name-match, not a semantic one:
+`/post-plan` Phase 5.0 greps the diff body for `function <name>` or `def <name>`, so a
+declared method whose shipped name differs by a character reads as absent.
+
+Fenced examples are stripped before the grep runs — `bin/lib/critical-files.sh` performs the
+strip for bash callers, `harness/planfile.py`'s `_strip_fenced` for python callers. A method
+named only inside a fence therefore never counts as declared.
+
+A phase that ships no new test method needs no entry — for example, one that re-runs an
+existing suite as a characterization check.

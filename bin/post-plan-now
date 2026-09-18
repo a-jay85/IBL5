@@ -97,7 +97,7 @@ postplan_badge_banner_body() {   # <rc> <label> <started>
     printf '**post-plan did not finish cleanly** (exit %s)\n\n' "$rc"
     printf 'Started %s.\n' "${started:-unknown}"
     case "$rc" in
-        3) printf 'The harness hit a fail-closed wall — a rebase conflict, or a local pre-commit/pre-push gate denial — and deliberately did not fall back. The RESULT line in the log names which.\n' ;;
+        3) printf 'The harness hit a fail-closed wall and deliberately did not fall back. Cause: %s\n' "${HARNESS_RESULT:-a rebase conflict, or a local pre-commit/pre-push gate denial; the RESULT line in the log names which}" ;;
         *) printf 'The run ended abnormally — check the log under `/tmp/post-plan-now-*.log`.\n' ;;
     esac
     printf '\nRe-run with `bin/post-plan-now --auto` once the cause is addressed.\n'
@@ -428,6 +428,7 @@ FALLBACK_FN=""
 HARNESS_SEG=""
 HARNESS_RUN_DIR=""
 GATE_OPEN=""
+POST_HARNESS_SEG=""
 GATE_CLOSE=""
 ENGINE="Sonnet 4.6 /post-plan skill session"
 if [ "${POST_PLAN_SKILL:-0}" != "1" ] && [ -x "$HARNESS/run" ]; then
@@ -436,7 +437,14 @@ if [ "${POST_PLAN_SKILL:-0}" != "1" ] && [ -x "$HARNESS/run" ]; then
     HARNESS_RUN_DIR="$HARNESS/out/live-$SAFE_SLUG-$TS"
     HARNESS_SEG="CLAUDE_HEADLESS=1 caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG}; rc=\$?; "
     GATE_OPEN="if should_fallback \"\$rc\"; then "
-    GATE_CLOSE="; elif [ \"\$rc\" = 3 ]; then msg=\"post-plan-now: harness exited 3 (fail-closed sentinel) on branch $SLUG. SKIPPING the /post-plan skill fallback. A human must clear the cause named on the RESULT line above -- either a stacked-branch rebase conflict, or a local pre-commit/pre-push gate denial such as a missing ADR, a stale doc, or the rules byte budget -- then re-run bin/post-plan-now. See $LOG.\"; echo \"\$msg\"; \"$ROOT/bin/discord-dm\" --quiet --attempts 2 \"\$msg\" >/dev/null 2>&1 || true; fi"
+    # The harness has already exited and flushed by the time HARNESS_SEG's `rc=$?` runs,
+    # so $LOG holds its final RESULT: line. Bounded at capture, not at use: bash has no
+    # nested ${${V:-x}:0:N}, and truncate-then-default keeps an empty capture empty so
+    # the ${HARNESS_RESULT:-...} fallback in GATE_CLOSE still fires. At 1400, fixed text
+    # plus a worst-case $SLUG and $LOG stays under bin/discord-dm's 1900-char truncation
+    # point, so "See $LOG." survives.
+    POST_HARNESS_SEG="HARNESS_RESULT=\$(grep -m1 '^RESULT:' \"$LOG\" 2>/dev/null || true); HARNESS_RESULT=\${HARNESS_RESULT:0:1400}; "
+    GATE_CLOSE="; elif [ \"\$rc\" = 3 ]; then msg=\"post-plan-now: harness exited 3 (fail-closed sentinel) on branch $SLUG. SKIPPING the /post-plan skill fallback. Cause: \${HARNESS_RESULT:-the RESULT line above names it -- either a stacked-branch rebase conflict, or a local pre-commit/pre-push gate denial such as a missing ADR, a stale doc, or the rules byte budget}. A human must clear it, then re-run bin/post-plan-now. See $LOG.\"; echo \"\$msg\"; \"$ROOT/bin/discord-dm\" --quiet --attempts 2 \"\$msg\" >/dev/null 2>&1 || true; fi"
     ENGINE="compiled post-plan harness (fails CLOSED on a rebase conflict or a local gate denial; falls back to the skill on other failures)"
 fi
 
@@ -488,7 +496,7 @@ fi
 PLAN_SLUG_SEG=""
 [ -n "${PR_NUM:-}" ] && PLAN_SLUG_SEG="export PLAN_SLUG=$(shq "$PLAN_SLUG"); "
 
-CMD="export PATH=\"/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH\"; ${PLAN_SLUG_SEG}export POSTPLAN_LABEL=$(shq "$LABEL") POSTPLAN_STARTED=$(shq "$STARTED") POSTPLAN_BADGE_MARKER=$(shq "$POSTPLAN_BADGE_MARKER"); ${BADGE_FN}POSTPLAN_BADGE_BODY=\"\$(postplan_badge_body \"\$POSTPLAN_LABEL\" \"\$POSTPLAN_STARTED\")\"; export POSTPLAN_BADGE_BODY; trap 'conclude_status_badge \"\${pp_rc:-1}\"' EXIT INT TERM HUP; cd \"$ROOT\" && { postplan_sweep_stale_badge \"\$(postplan_badge_pr_number)\"; ${FALLBACK_FN}${HARNESS_SEG}${GATE_OPEN}CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p $(shq "$PROMPT") --dangerously-skip-permissions --model claude-sonnet-4-6 --session-id $(shq "$SESSION_ID") --effort high --name \"$LABEL\"${GATE_CLOSE}; }; pp_rc=\$?; if [ \"\${rc:-0}\" = 3 ]; then pp_rc=3; fi; ${CMD_TAIL}"
+CMD="export PATH=\"/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH\"; ${PLAN_SLUG_SEG}export POSTPLAN_LABEL=$(shq "$LABEL") POSTPLAN_STARTED=$(shq "$STARTED") POSTPLAN_BADGE_MARKER=$(shq "$POSTPLAN_BADGE_MARKER"); ${BADGE_FN}POSTPLAN_BADGE_BODY=\"\$(postplan_badge_body \"\$POSTPLAN_LABEL\" \"\$POSTPLAN_STARTED\")\"; export POSTPLAN_BADGE_BODY; trap 'conclude_status_badge \"\${pp_rc:-1}\"' EXIT INT TERM HUP; cd \"$ROOT\" && { postplan_sweep_stale_badge \"\$(postplan_badge_pr_number)\"; ${FALLBACK_FN}${HARNESS_SEG}${POST_HARNESS_SEG}${GATE_OPEN}CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p $(shq "$PROMPT") --dangerously-skip-permissions --model claude-sonnet-4-6 --session-id $(shq "$SESSION_ID") --effort high --name \"$LABEL\"${GATE_CLOSE}; }; pp_rc=\$?; if [ \"\${rc:-0}\" = 3 ]; then pp_rc=3; fi; ${CMD_TAIL}"
 
 if [ "$FOREGROUND" -eq 1 ]; then
     echo "post-plan-now: foreground mode on branch '$SLUG' — engine: $ENGINE"

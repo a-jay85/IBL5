@@ -1751,10 +1751,18 @@ have "§5.9k: SKILL.md counts fourteen conditions"        "$P25_TXT" '**All four
 have "§5.9k: the run-only enumeration ends /(13)/(14)"   "$P25_TXT" '(2)/(3)/(4)/(7)/(9)/(12)/(13)/(14)'
 have "§5.9k: the shared-predicate list is unchanged"     "$P25_TXT" '(1)/(5)/(6)/(8)/(10)/(11)'
 
-# Step 7.5 spawns exactly one Sonnet sub-agent with run_in_background: false —
-# the resolution file is loaded into an interactive /post-plan session, so this
-# spawn is safe. Headless (claude -p) runs must not use Agent(); that shape is
-# still blocked by the lacks check below.
+# Step 7.5 spawns exactly one Sonnet sub-agent with run_in_background: false.
+# The resolution file runs under claude -p (bin/post-plan-now:364, one session, not
+# interactive). A foreground spawn (run_in_background: false) completes within that
+# same turn; background spawns handed past the turn boundary are unrecoverable under
+# claude -p. Headless runs must not use Agent(); that shape is blocked below.
+CRES_SPAWN_N="$(grep -cF 'subagent_type' <<< "$CRES_TXT")"
+if [ "$CRES_SPAWN_N" -eq 1 ]; then
+    echo "ok: §5.9k: the resolution file spawns exactly one sub-agent"
+else
+    echo "FAIL: §5.9k — 'subagent_type' expected exactly 1 line in $CRES, got $CRES_SPAWN_N"
+    FAILED=1
+fi
 have  "§5.9k: the resolution file sub-agent spawn is foreground" "$CRES_TXT" 'run_in_background: false'
 lacks "§5.9k: the resolution file calls no Agent()"              "$CRES_TXT" 'Agent('
 # The flag is written at conflict DETECTION in SKILL.md, never here — writing it after a

@@ -148,7 +148,7 @@ Reviewer note on the /tmp namespace: the pre-side patch is written as
 pr-ready-diff-pre-<KEY>.patch on purpose. That prefix is hardcoded inside lostwork.sh and
 cannot be parameterized without editing /pr-ready, which is out of scope here; and <KEY> is a
 non-numeric branch slug, so it can never collide with the PR-number keys a concurrent
-/pr-ready run uses. This is NOT the PR-number-keyed verdict namespace that <!-- slop-ok -->
+/pr-ready run uses. This is NOT the PR-number-keyed verdict namespace that
 _phase-5.5-fidelity.md warns post-plan away from.
 
 The conflict-resolution verdict is written to
@@ -191,7 +191,7 @@ from run notes, and a `mktemp` variable does not survive between blocks), write
 
 Phase 6.5 renders this into the sticky PR comment.
 
-## Step 7.5 — Review the resolution, and write the verdict <!-- slop-ok -->
+## Step 7.5: Review the resolution and write the verdict
 
 **Preconditions.** All three must hold before spawning the reviewer:
 
@@ -241,7 +241,7 @@ On `FOUND-PROBLEM`: continue into step 8 and open the PR. Phase 6.5 condition (1
 
 If the sub-agent returns without writing the file, or writes an unreadable one, print `CONFLICT-REVIEW=ABSENT` and continue. Absence holds; no recovery is attempted.
 
-## Step 8 — Return to `SKILL.md` <!-- slop-ok -->
+## Step 8: Return to `SKILL.md`
 
 Proceed to Phase 2 step 3 (push) and step 4 (`gh pr create`). The PR body's files-changed
 block must reflect the post-resolution diff, and per

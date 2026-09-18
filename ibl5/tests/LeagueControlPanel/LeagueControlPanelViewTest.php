@@ -180,6 +180,27 @@ class LeagueControlPanelViewTest extends TestCase
         $this->assertStringContainsString('value="set_waivers_to_free_agents"', $html);
     }
 
+    public function testFreeAgencyShowsActivePlayersExportButton(): void
+    {
+        $html = $this->renderWithDefaults([
+            'panelData' => self::createPanelData(['phase' => 'Free Agency']),
+        ]);
+
+        $this->assertStringContainsString('Export .csv of all non-retired players', $html);
+        $this->assertMatchesRegularExpression('/<button type="button"[^>]*data-export-url="leagueControlPanel\.php\?export=active_players"/', $html);
+    }
+
+    public function testActivePlayersExportButtonHiddenOutsideFreeAgency(): void
+    {
+        foreach (['Preseason', 'HEAT', 'Regular Season', 'Playoffs', 'Draft'] as $phase) {
+            $html = $this->renderWithDefaults([
+                'panelData' => self::createPanelData(['phase' => $phase]),
+            ]);
+
+            $this->assertStringNotContainsString('export=active_players', $html, $phase);
+        }
+    }
+
     // --- Awards Controls ---
 
     public function testPlayoffsShowsGenerateAwardsButton(): void

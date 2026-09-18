@@ -376,4 +376,17 @@ class LeagueControlPanelRepository extends \BaseMysqliRepository implements Leag
         );
         return $row !== null ? $row['cnt'] : 0;
     }
+
+    /**
+     * @see LeagueControlPanelRepositoryInterface::getActivePlayerNames()
+     */
+    public function getActivePlayerNames(): array
+    {
+        /** @var list<array{name: string}> $rows */
+        $rows = $this->fetchAll(
+            "SELECT name FROM `ibl_plr` WHERE retired = 0 ORDER BY name ASC, pid ASC",
+            ""
+        );
+        return array_map(static fn (array $row): string => $row['name'], $rows);
+    }
 }

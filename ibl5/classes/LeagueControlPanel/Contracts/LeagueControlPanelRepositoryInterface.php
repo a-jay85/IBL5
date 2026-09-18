@@ -214,4 +214,11 @@ interface LeagueControlPanelRepositoryInterface
      * @return int Number of votes cast (eoy_vote != 'No Vote')
      */
     public function getEoyVotesCastCount(): int;
+
+    /**
+     * Get the names of all non-retired players, sorted A to Z.
+     *
+     * @return list<string>
+     */
+    public function getActivePlayerNames(): array;
 }

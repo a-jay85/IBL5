@@ -421,4 +421,21 @@ class LeagueControlPanelRepositoryTest extends DatabaseTestCase
 
         self::assertSame('On', $this->repo->getSetting('Show Draft Link'));
     }
+
+    public function testGetActivePlayerNamesExcludesRetiredAndSortsAToZ(): void
+    {
+        $this->insertTestPlayer(200000901, 'ZZZ LCP Active', ['retired' => 0]);
+        $this->insertTestPlayer(200000902, 'AAA LCP Active', ['retired' => 0]);
+        $this->insertTestPlayer(200000903, 'MMM LCP Retired', ['retired' => 1]);
+
+        $names = $this->repo->getActivePlayerNames();
+
+        self::assertContains('AAA LCP Active', $names);
+        self::assertContains('ZZZ LCP Active', $names);
+        self::assertNotContains('MMM LCP Retired', $names);
+        self::assertLessThan(
+            array_search('ZZZ LCP Active', $names, true),
+            array_search('AAA LCP Active', $names, true)
+        );
+    }
 }

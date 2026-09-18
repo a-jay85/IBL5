@@ -77,7 +77,7 @@ A plan whose Verification Matrix carries **≥1 PHPUnit row** MUST also carry a 
 - `test_required_methods_ignores_fenced_example`
 ```
 
-- **Exact names.** Write the bare method name exactly as shipped. Leave out any class prefix, `()`, or `::`.
+- **The name must match the shipped declaration exactly.** Write the bare method name. Leave out any class prefix, `()`, or `::`. <!-- slop-ok -->
 - **Fenced examples do not count.** Both parsers strip fenced blocks before reading the section, so an illustrative list inside a fence yields zero entries.
 - **Escape hatch.** When every PHPUnit row genuinely names no new method, write `<!-- no-test-methods: <reason ≥15 chars> -->` instead. `bin/check-plan` gate `[M]` accepts the section or the marker.
 

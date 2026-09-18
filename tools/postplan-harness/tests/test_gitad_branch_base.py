@@ -1,4 +1,5 @@
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -22,7 +23,8 @@ def repo():
     subprocess.run(["git", "-C", d, "config", "user.name", "t"], check=True, capture_output=True)
     open(os.path.join(d, "a.txt"), "w").write("base\n")
     sh("add", "-A"); sh("commit", "-m", "base")
-    return d
+    yield d
+    shutil.rmtree(d, ignore_errors=True)
 
 
 def test_branch_base_resolves_config_to_full_sha(repo):

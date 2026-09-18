@@ -118,16 +118,18 @@ def _section(content: str, heading_re: str) -> str:
 def _is_test_path(tok: str) -> bool:
     """True when `tok` looks like a file path rather than a shell command token.
 
-    Three observed phantom shapes this rejects:
+    Observed phantom shapes this rejects:
       - `npm test && npm run build` (shell metacharacter &)
       - `pytest -q tools/... ; echo ok` (shell metacharacter ; and leading flag -)
       - `$TEST_CMD tests/foo` (shell variable $)
+      - `@playwright/test` (scoped npm package name; no repo path starts with @)
+      - `https://evil.test/x` (URL)
     """
     if not tok or tok != tok.strip() or re.search(r"\s", tok):
         return False
-    if re.search(r"[&|;><$\\]", tok):
+    if re.search(r"[&|;><$\\]", tok) or "://" in tok:
         return False
-    if tok[0] in ("-", "'", '"', "$"):
+    if tok[0] in ("-", "'", '"', "$", "@"):
         return False
     if "/" not in tok:
         return False

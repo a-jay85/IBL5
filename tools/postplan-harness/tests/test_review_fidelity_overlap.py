@@ -4,10 +4,19 @@ from __future__ import annotations
 import os
 import threading
 
+import pytest
+
 import runner
 from harness.state import TerminalState, UsageLedger
 from test_runner_replay import (CANNED, ScriptedToolLlm, _fixture, _verdict_doc,  # noqa: F401
                                 sticky_tmp)
+
+# Phase 5.5 builds its packet by reading the procedure doc out of `origin/master`. Under
+# `actions/checkout` on a pull_request event that ref does not exist, so build_packet
+# raised fidelity-procedure-missing, Phase 5.5 returned before the review call, and the
+# overlap these tests assert never happened. The push-event runs on master do have the
+# ref, which is why only PR CI went red. Same opt-in as test_runner_replay.
+pytestmark = pytest.mark.usefixtures("stub_ambient_git_show")
 
 
 class _OverlapLlm(ScriptedToolLlm):
@@ -40,7 +49,11 @@ def _overlap_run(tmp_path, pr, scripts):
     llm = _OverlapLlm(UsageLedger(), canned, scripts)
     fx = _fixture(pr_number=pr)
     fx["pr_meta"] = dict(fx["pr_meta"], number=pr)
-    return runner.run(fx, out, llm, mode="replay"), out, llm
+    res = runner.run(fx, out, llm, mode="replay")
+    # Without this, a Phase 5.5 that bails before its review call reports the same bare
+    # `saw_overlap is False` as a genuine ordering regression.
+    assert "plan-fidelity-review" in llm.events, f"Phase 5.5 never ran: {llm.events}"
+    return res, out, llm
 
 
 def test_fidelity_review_overlaps_code_review(tmp_path, sticky_tmp):

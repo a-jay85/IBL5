@@ -353,3 +353,28 @@ def test_collapse_guard_warn_is_carried_into_the_notes():
         for p in glob.glob("/tmp/postplan-*feature-warn-*"):
             if os.path.exists(p):
                 os.unlink(p)
+
+
+def test_onto_conflict_declines_today():
+    """Characterization: --onto rebase that conflicts pins the exact reason prefix and leaves no rebase dir."""
+    d, parent_tip, master_sha, key, branch = _make_squash_repo()
+    try:
+        g = LiveGit(d)
+        pre_head = g.head()
+        # Plant a conflicting change on master so the --onto replay conflicts
+        _sh(d, "checkout", "master")
+        open(os.path.join(d, "feature.txt"), "w").write("master version\n")
+        _sh(d, "add", "-A")
+        _sh(d, "commit", "-m", "chore: conflict seed")
+        new_master = _rev(d, "HEAD")
+        _sh(d, "update-ref", "refs/remotes/origin/master", new_master)
+        _sh(d, "checkout", branch)
+        result = g.autoresolve_stacked_rebase()
+        assert result.resolved is False
+        assert result.reason.startswith("--onto rebase still conflicts:")
+        assert g.head() == pre_head
+        assert not os.path.exists(os.path.join(d, ".git", "rebase-merge"))
+        assert not os.path.exists(os.path.join(d, ".git", "rebase-apply"))
+    finally:
+        _cleanup_tmp(key)
+        shutil.rmtree(d, ignore_errors=True)

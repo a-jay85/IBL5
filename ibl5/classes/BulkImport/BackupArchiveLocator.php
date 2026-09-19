@@ -26,6 +26,22 @@ class BackupArchiveLocator implements BackupArchiveLocatorInterface
         'Free Agency' => 'offseason-postfa',
     ];
 
+    /**
+     * Reverse of PHASE_SLUG_MAP: archive-filename slug to Season::$phase name.
+     *
+     * Used by SeasonRolloverDetector when the .lge season_number field does not
+     * encode the phase (LgeFileParser maps only 1 and 2; everything else is 'Unknown').
+     *
+     * @return string|null The canonical phase name, or null when the slug is unrecognized
+     */
+    public static function phaseFromSlug(string $slug): ?string
+    {
+        $reverse = array_flip(self::PHASE_SLUG_MAP);
+        $key = strtolower(trim($slug));
+
+        return $reverse[$key] ?? null;
+    }
+
     /** De-duplication memo: prevents re-logging the same archive multiple times per run. */
     private ?string $lastLoggedSelection = null;
 

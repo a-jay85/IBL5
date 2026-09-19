@@ -38,11 +38,17 @@
 #                               #   touches no production files" guard (exit 5), which
 #                               #   otherwise points you at the cheaper
 #                               #   /commit-commands:commit-push-pr. Bare flag only.
+#   bin/post-plan-now --pr 123  # drive the worktree holding PR 123's head branch,
+#                               #   creating it with bin/wt-new --existing when no
+#                               #   worktree has that branch. Refuses a fork PR.
 #
 # Run from anywhere inside the target worktree.
 #
 # --pr <n> drives the worktree that has PR <n>'s head branch checked out, instead
-# of the current branch.  --pr selects the TREE; --plan selects the PLAN FILE.
+# of the current branch. When no worktree has that branch, --pr creates one via
+# bin/wt-new --existing; a fork PR is refused, because post-plan pushes to the head
+# branch and this repo has no such branch to push to.
+# --pr selects the TREE; --plan selects the PLAN FILE.
 # They are orthogonal and may be combined; --plan wins for the plan path only.
 # An ambient PLAN_FILE in the caller's environment does not reach the detached child
 # (launchd gives the job a minimal environment), so --pr needs no unset.
@@ -212,6 +218,16 @@ if [ -n "$PLAN_OVERRIDE" ]; then
     PLAN_OVERRIDE="$(cd "$(dirname "$PLAN_OVERRIDE")" && pwd)/$(basename "$PLAN_OVERRIDE")"
 fi
 
+# pr_worktree_root <main-root> <branch> — absolute path of the worktree that has <branch>
+# checked out, empty when none does. Branch-authoritative, not path arithmetic: slash-bearing
+# branch names are not single path components, and a renamed worktree directory no longer
+# matches its branch name.
+pr_worktree_root() {
+    git -C "$1" worktree list --porcelain | awk -v want="refs/heads/$2" '
+        /^worktree / { wt = substr($0, 10) }
+        /^branch /   { if (substr($0, 8) == want) { print wt; exit } }'
+}
+
 # --pr <n>: drive the worktree holding PR <n>'s head branch instead of the current branch.
 # This runs BEFORE ROOT/SLUG are computed on purpose — every downstream derivation
 # (ROOT, SLUG, SAFE_SLUG, PLAN_FILE, and the plist's own `cd "$ROOT"`) then points at the
@@ -230,17 +246,36 @@ if [ -n "$PR_NUM" ]; then
     # shellcheck source=bin/lib/git-helpers.sh
     . "$SELF_ROOT/bin/lib/git-helpers.sh"
     MAIN_ROOT="${POST_PLAN_MAIN_ROOT:-$(resolve_canonical_root "$SELF_ROOT")}"
-    # Branch-authoritative, not path arithmetic: slash-bearing branch names are not single
-    # path components, and a renamed worktree directory no longer matches its branch name.
-    WT_ROOT=$(git -C "$MAIN_ROOT" worktree list --porcelain | awk -v want="refs/heads/$PR_BRANCH" '
-        /^worktree / { wt = substr($0, 10) }
-        /^branch /   { if (substr($0, 8) == want) { print wt; exit } }') || true
+    WT_ROOT=$(pr_worktree_root "$MAIN_ROOT" "$PR_BRANCH") || true
     if [ -z "$WT_ROOT" ] || [ ! -d "$WT_ROOT" ]; then
-        echo "post-plan-now: PR #$PR_NUM is on branch '$PR_BRANCH', but no worktree has it checked out." >&2
-        echo "  Create one and re-run (never run post-plan from the main checkout — ADR-0062):" >&2
-        echo "    git -C '$MAIN_ROOT' fetch origin '$PR_BRANCH'" >&2
-        echo "    git -C '$MAIN_ROOT' worktree add '$(worktrees_parent_dir "$MAIN_ROOT")/$(basename "$PR_BRANCH")' '$PR_BRANCH'" >&2
-        exit 1
+        # No local worktree has this branch. Create one rather than bailing: post-plan must
+        # never run in the main checkout (ADR-0062), and bin/wt-new --existing is the repo's
+        # one supported way to materialize a worktree for an already-published branch.
+        IS_FORK=$(gh pr view "$PR_NUM" --json isCrossRepository --jq .isCrossRepository 2>/dev/null) || IS_FORK=""
+        if [ "$IS_FORK" = "true" ]; then
+            echo "post-plan-now: PR #$PR_NUM comes from a fork — '$PR_BRANCH' is not a branch of this repo." >&2
+            echo "  post-plan commits and pushes to the PR's head branch, which it cannot do on a fork." >&2
+            exit 1
+        fi
+        if [ -z "$IS_FORK" ]; then
+            echo "post-plan-now: could not determine whether PR #$PR_NUM is from a fork — refusing to create a worktree." >&2
+            exit 1
+        fi
+        # Same flattening as SAFE_SLUG below: a launchd label and the paths derived from it
+        # cannot contain '/', and IBL5-worktrees/<slug> must stay a single path component.
+        PR_WT_SLUG=$(printf '%s' "$PR_BRANCH" | tr -cs 'A-Za-z0-9._-' '-')
+        echo "post-plan-now: no worktree has '$PR_BRANCH' — creating '$PR_WT_SLUG' via bin/wt-new --existing." >&2
+        # Beside THIS script, not under $MAIN_ROOT: a --pr run fired from this feature's own
+        # worktree before it merges would otherwise pick master's wt-new, which has no
+        # --existing flag. Same reasoning as the session-id.sh source line further down.
+        SELF_BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+        "$SELF_BIN/wt-new" "$PR_WT_SLUG" --existing "$PR_BRANCH" >&2 \
+            || { echo "post-plan-now: bin/wt-new failed for branch '$PR_BRANCH' (slug '$PR_WT_SLUG')" >&2 ; exit 1; }
+        WT_ROOT=$(pr_worktree_root "$MAIN_ROOT" "$PR_BRANCH") || true
+        if [ -z "$WT_ROOT" ] || [ ! -d "$WT_ROOT" ]; then
+            echo "post-plan-now: bin/wt-new succeeded but no worktree has '$PR_BRANCH' checked out." >&2
+            exit 1
+        fi
     fi
     cd "$WT_ROOT" || { echo "post-plan-now: cannot cd to $WT_ROOT" >&2 ; exit 1; }
     PLAN_SLUG="$PR_BRANCH"

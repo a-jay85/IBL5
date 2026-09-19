@@ -162,6 +162,42 @@ jobs:
               - '.github/actions/**'
               - 'bin/lint-workflows'
 
+  # Content-hash memo (ADR-0131). Hashes the HEAD tree over .github/ci-memo/tests.paths;
+  # a hit means this exact input set already passed, so every heavy job below skips.
+  # Memoization is PR-only: push runs, re-runs, and dispatches bypass it, so master and
+  # update-baselines behave exactly as before. A failure here reds the gate (it is in
+  # gate.needs), so a broken memo can only cost a real run.
+  ci-memo-check:
+    name: CI Memo Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      hash: ${{ steps.key.outputs.hash }}
+      key: ${{ steps.key.outputs.key }}
+      hit: ${{ steps.lookup.outputs.cache-hit }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Compute memo key
+        id: key
+        env:
+          CI_MEMO_BYPASS: ${{ (github.event_name != 'pull_request' || github.run_attempt != '1') && 'not_pr_or_rerun' || '' }}
+        run: bin/ci-memo key tests
+      - name: Look up memo
+        id: lookup
+        if: steps.key.outputs.hash != ''
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .ci-memo-sentinel
+          key: ${{ steps.key.outputs.key }}
+      - name: Report memo result
+        env:
+          MEMO_HASH: ${{ steps.key.outputs.hash }}
+          MEMO_RESULT: ${{ steps.lookup.outputs.cache-hit == 'true' && 'hit' || 'miss' }}
+        run: bin/ci-memo report tests "$MEMO_HASH" "$MEMO_RESULT" .ci-memo-sentinel
+
   test:
     name: PHPUnit Tests
     needs: [changes]
@@ -1065,9 +1101,27 @@ jobs:
   gate:
     name: Tests and Analysis
     if: always()
-    needs: [changes, test, audit-php, audit-js, ibl5-ts-unit, iblbot, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, automouse-impl-model-test, update-baselines, regen-codebase-map, static-guards, harness-tests, pinact-check, actionlint]
+    needs: [changes, ci-memo-check, test, audit-php, audit-js, ibl5-ts-unit, iblbot, db-integration, phpstan, phpunit-hygiene, shellcheck, host-mariadb-guard, automouse-impl-model-test, update-baselines, regen-codebase-map, static-guards, harness-tests, pinact-check, actionlint]
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # The memo is written only here: after a clean aggregate, on a run that was a miss.
+    env:
+      MEMO_WRITE: ${{ !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && needs.ci-memo-check.outputs.hash != '' && needs.ci-memo-check.outputs.hit != 'true' }}
     steps:
       - run: exit 1
         if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+      - name: Checkout for memo record
+        if: env.MEMO_WRITE == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Write memo sentinel
+        if: env.MEMO_WRITE == 'true'
+        env:
+          MEMO_HASH: ${{ needs.ci-memo-check.outputs.hash }}
+        run: bin/ci-memo record tests "$MEMO_HASH" .ci-memo-sentinel
+      - name: Save CI memo
+        if: env.MEMO_WRITE == 'true'
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .ci-memo-sentinel
+          key: ${{ needs.ci-memo-check.outputs.key }}

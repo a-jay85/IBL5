@@ -29,6 +29,7 @@ MAX_PROMPT_BYTES = 120_000        # hard cap on any single call's input packet
 DEFAULT_TIMEOUT = 1500            # sonnet 4.6 thinks long on large diffs; observed >600s
 TOOLED_TIMEOUT = 2400             # a repo-reading reviewer needs many turns of tool I/O
 TOOLED_MAX_TURNS = 60             # NEVER 1: a tool-enabled call must be able to iterate
+ENVELOPE_ERROR_TEXT_CAP = 600     # bound result text in error details for diagnosis
 
 MODEL_MAP = {
     "haiku": "claude-haiku-4-5-20251001",
@@ -267,15 +268,20 @@ class ClaudeCli:
             rec.retries = attempt
             # Content failures are never re-asked: a reviewer that errored out mid-review
             # would only error again, and its partial text must not escape as a verdict.
-            if envelope.get("is_error"):
-                rec.ok = False
-                self.ledger.add(rec)
-                raise HarnessError("llm-tooled-error", f"{purpose}: envelope is_error")
             subtype = envelope.get("subtype")
-            if subtype not in (None, "success"):
+            if envelope.get("is_error") or subtype not in (None, "success"):
                 rec.ok = False
                 self.ledger.add(rec)
-                raise HarnessError("llm-tooled-error", f"{purpose}: subtype={subtype}")
+                # Name the cause. The bare "envelope is_error" string hid error_max_turns
+                # across three dead remediation rounds. `result` on an error envelope is
+                # the CLI's own explanation and is the only place the turn count or the
+                # denied tool appears, so carry a bounded slice of it.
+                why = " ".join(result_text.split())[:ENVELOPE_ERROR_TEXT_CAP]
+                raise HarnessError(
+                    "llm-tooled-error",
+                    f"{purpose}: envelope is_error={bool(envelope.get('is_error'))} "
+                    f"subtype={subtype or 'none'}"
+                    + (f" result={why!r}" if why else ""))
             if not result_text.strip():
                 rec.ok = False
                 self.ledger.add(rec)
@@ -324,5 +330,9 @@ class FixtureLlm:
             setting_sources=setting_sources, max_turns=max_turns)))
         if purpose not in self.canned:
             raise HarnessError("llm-fixture-missing", purpose)
+        val = self.canned[purpose]
+        if isinstance(val, dict) and "raise" in val:
+            spec = val["raise"]
+            raise HarnessError(spec["kind"], spec.get("detail", ""))
         self.ledger.add(LlmCallRecord(purpose=purpose, model=f"fixture:{model}"))
-        return self.canned[purpose]
+        return val

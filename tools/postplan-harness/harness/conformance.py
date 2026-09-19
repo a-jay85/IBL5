@@ -3,6 +3,7 @@ _phase-5-final-verification.md's two check loops."""
 from __future__ import annotations
 
 import re
+from pathlib import PurePosixPath
 
 from .state import PlanInfo
 
@@ -37,8 +38,45 @@ def _contract_items(plan: PlanInfo, changed_files: list[str],
     return items
 
 
+def _resolve(tok: str, changed_files: list[str]) -> str | None:
+    """The single changed path a plan token names, or None when 0 or 2+ candidates.
+
+    Two ordered tiers. Tier 1 is exact-or-path-suffix, which covers a plan that named
+    a repo-relative path while the diff carries a longer prefix (`tests/test_foo.py`
+    vs `tools/postplan-harness/tests/test_foo.py`). Tier 2 is a basename match whose
+    candidate set is the UNION of (a) matching file paths and (b) the DISTINCT ancestor
+    DIRECTORY paths whose own basename matches, which covers a directory the diff moved
+    under an extra component (`ibl5/tests/BulkImport/` vs `ibl5/tests/Unit/BulkImport/`).
+
+    Counting distinct DIRECTORIES in (b), never the files inside them, is the whole
+    point: three files under one matching directory is one candidate, so it resolves;
+    one file under each of two same-named directories is two candidates, so it does not.
+    The union needs no token-shape test, because a file path and a directory path are
+    never the same string, and any total of 2+ is ambiguous either way.
+    """
+    tok = tok.strip().strip("/")
+    if not tok:
+        return None
+    hits = [f for f in changed_files if f == tok or f.endswith("/" + tok)]
+    if len(hits) == 1:
+        return hits[0]
+    if hits:
+        return None
+    base = PurePosixPath(tok).name
+    cands: set[str] = set()
+    for f in changed_files:
+        p = PurePosixPath(f)
+        if p.name == base:
+            cands.add(str(p))
+        for parent in p.parents:
+            if parent.name == base:
+                cands.add(str(parent))
+    return cands.pop() if len(cands) == 1 else None
+
+
 def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
-          phase5_status: str | None = None) -> list[str]:
+          phase5_status: str | None = None,
+          resolutions: dict[str, str] | None = None) -> list[str]:
     """Returns unresolved `MISSING:` / `MISSING-FILE:` / `MISSING-METHOD:` /
     `UNMET-CONTRACT:` items (empty = clean).
 
@@ -52,21 +90,29 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
     diff_body defaults to "" (fail-open): a missed caller silently no-ops the
     MISSING-METHOD loop instead of raising TypeError mid-run and aborting a live
     /post-plan. See plan Architectural trade-offs § conformance.check fail-open.
+
+    resolutions, when a dict is passed, is filled with token -> actual path for
+    each token that matched by suffix or basename rather than exactly.
     """
     if not plan.found:
         return []
     items: list[str] = _contract_items(plan, changed_files, phase5_status)
     if not plan.has_matrix:
         return items
-    joined = "\n".join(changed_files)
     for t in plan.planned_test_paths:
-        if t not in joined:
+        hit = _resolve(t, changed_files)
+        if hit is None:
             items.append(f"MISSING: {t} (matrix planned a test the diff never wrote)")
+        elif resolutions is not None and hit != t:
+            resolutions[t] = hit
     for path, _annotation, exempt in plan.critical_files:
         if exempt:
             continue
-        if path not in joined:
+        hit = _resolve(path, changed_files)
+        if hit is None:
             items.append(f"MISSING-FILE: {path} (plan Critical File never appeared in the diff)")
+        elif resolutions is not None and hit != path:
+            resolutions[path] = hit
     if diff_body:
         for m in plan.required_test_methods:
             if not re.search(rf"(function|def)\s+{re.escape(m)}\b", diff_body):

@@ -14,6 +14,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness.adapters.llm import (
+    ENVELOPE_ERROR_TEXT_CAP,
     MODEL_MAP,
     TOOLED_MAX_TURNS,
     ClaudeCli,
@@ -190,7 +191,6 @@ def test_degraded_envelope_is_fail_closed(shim, tmp_path, monkeypatch, reply, ki
         _cli(tmp_path).call_tooled("fidelity", "opus", "p", cwd=str(tmp_path),
                                    allowed_tools=("Read",), max_retries=0)
     assert exc.value.kind == kind
-    assert "READY" not in str(exc.value.detail)
 
 
 def test_missing_usage_key_still_returns_text(shim, tmp_path, monkeypatch):
@@ -340,3 +340,67 @@ def test_retrospective_envelope_variation(shim, tmp_path, monkeypatch):
             "retrospective", "haiku", "p", schemas.validate_retrospective)
     assert exc.value.kind == "llm-invalid-output"
     assert _new_calls(b) == 2
+
+
+# --- Phase 4: envelope error detail (subtype + bounded result text) -------------
+
+def test_error_envelope_names_subtype_and_result(shim, tmp_path, monkeypatch):
+    """is_error envelope carries subtype and result text in HarnessError.detail."""
+    monkeypatch.setenv("CLAUDE_SHIM_REPLY", json.dumps({
+        "is_error": True, "subtype": "error_max_turns", "result": "hit limit",
+    }))
+    with pytest.raises(HarnessError) as exc:
+        _cli(tmp_path).call_tooled("fidelity", "opus", "p", cwd=str(tmp_path),
+                                   allowed_tools=("Read",), max_retries=0)
+    assert exc.value.kind == "llm-tooled-error"
+    assert "error_max_turns" in str(exc.value.detail)
+    assert "hit limit" in str(exc.value.detail)
+
+
+def test_error_envelope_without_subtype_still_raises(shim, tmp_path, monkeypatch):
+    """is_error without a subtype still raises with kind llm-tooled-error."""
+    monkeypatch.setenv("CLAUDE_SHIM_REPLY", json.dumps({"is_error": True}))
+    with pytest.raises(HarnessError) as exc:
+        _cli(tmp_path).call_tooled("fidelity", "opus", "p", cwd=str(tmp_path),
+                                   allowed_tools=("Read",), max_retries=0)
+    assert exc.value.kind == "llm-tooled-error"
+    assert "subtype=none" in str(exc.value.detail)
+    assert "result=" not in str(exc.value.detail)
+
+
+def test_nonsuccess_subtype_without_is_error_still_raises(shim, tmp_path, monkeypatch):
+    """A non-success subtype without is_error raises HarnessError."""
+    monkeypatch.setenv("CLAUDE_SHIM_REPLY", json.dumps({
+        "subtype": "error_during_execution", "result": "partial",
+    }))
+    with pytest.raises(HarnessError) as exc:
+        _cli(tmp_path).call_tooled("fidelity", "opus", "p", cwd=str(tmp_path),
+                                   allowed_tools=("Read",), max_retries=0)
+    assert exc.value.kind == "llm-tooled-error"
+    assert "error_during_execution" in str(exc.value.detail)
+
+
+def test_error_result_text_is_bounded(shim, tmp_path, monkeypatch):
+    """Result text in error detail is bounded by ENVELOPE_ERROR_TEXT_CAP."""
+    monkeypatch.setenv("CLAUDE_SHIM_REPLY", json.dumps({
+        "is_error": True, "result": "X" * 5_000,
+    }))
+    with pytest.raises(HarnessError) as exc:
+        _cli(tmp_path).call_tooled("fidelity", "opus", "p", cwd=str(tmp_path),
+                                   allowed_tools=("Read",), max_retries=0)
+    assert len(str(exc.value.detail)) < ENVELOPE_ERROR_TEXT_CAP + 200
+
+
+def test_error_envelope_records_ledger_once(shim, tmp_path, monkeypatch):
+    """Ledger is incremented exactly once even when an error envelope is raised."""
+    monkeypatch.setenv("CLAUDE_SHIM_REPLY", json.dumps({
+        "is_error": True, "subtype": "error_max_turns", "result": "hit limit",
+        "usage": {"input_tokens": 5, "output_tokens": 3},
+    }))
+    ledger = UsageLedger()
+    cli = ClaudeCli(ledger, workdir=str(tmp_path))
+    with pytest.raises(HarnessError):
+        cli.call_tooled("fidelity", "opus", "p", cwd=str(tmp_path),
+                        allowed_tools=("Read",), max_retries=0)
+    assert len(ledger.calls) == 1
+    assert ledger.calls[0].ok is False

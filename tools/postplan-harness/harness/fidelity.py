@@ -52,6 +52,14 @@ REMEDIATION_PATHS = (
 REMEDIATION_ALLOWED_TOOLS = ("Read", "Grep", "Glob", "Edit", "Write")
 REMEDIATION_DENIED_TOOLS = ("Bash", "Agent")
 
+# Inline diff budget for the remediation prompt. 40 KB is ~10K tokens: large enough
+# to carry every diff observed in the three round-two deaths (#2308 8 KB, #2310 14 KB,
+# #2315 22 KB) and small enough that the prompt stays well under the Sonnet context
+# ceiling with the procedure and verdict beside it. Past the cap the diff is truncated
+# with a marker, and the on-disk path is still listed for a targeted Read with
+# offset/limit.
+REMEDIATION_DIFF_INLINE_CAP = 40_000
+
 REMEDIATION_COMMIT_MSG = "chore: address Phase 5.5 plan-fidelity findings"
 
 OVERRIDE = (
@@ -230,6 +238,17 @@ def review(llm, out_dir: str, worktree: str, packet_dir: str,
     return parse_verdict(path), ""
 
 
+def _read_or_marker(path: str, marker: str) -> str:
+    """File text, or `marker` when it cannot be read. Never raises: the prompt must be
+    buildable even when a packet file is missing, because the agent can still act on
+    the parts that did load."""
+    try:
+        with open(path) as fh:
+            return fh.read()
+    except OSError:
+        return marker
+
+
 def _noop_log(_msg: str) -> None:
     return
 
@@ -262,13 +281,35 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
     with open(os.path.join(packet_dir, "remediation.md"), "w") as fh:
         fh.write(procedure)
 
+    verdict_text = _read_or_marker(verdict1_path, "(verdict unreadable)")
+    diff_text = _read_or_marker(os.path.join(packet_dir, "diff.patch"), "(diff unreadable)")
+    diff_note = ""
+    if len(diff_text) > REMEDIATION_DIFF_INLINE_CAP:
+        diff_text = diff_text[:REMEDIATION_DIFF_INLINE_CAP]
+        diff_note = (f"\n[diff truncated at {REMEDIATION_DIFF_INLINE_CAP} bytes; the full "
+                     f"patch is at {os.path.join(packet_dir, 'diff.patch')} - Read it with "
+                     "offset/limit if a finding points past this cut]\n")
     prompt = (
         "Remediate the blocking findings from the plan-intent fidelity review.\n\n"
-        f"  - {os.path.join(packet_dir, 'remediation.md')} - the remediation procedure; follow it\n"
-        f"  - {verdict1_path} - the verdict; its blocking findings are your work list\n"
-        f"  - {os.path.join(packet_dir, 'diff.patch')}     - the diff under review\n\n"
+        "Every input you need is INLINE below. Do not Read the packet paths first; they\n"
+        "are listed only so a finding that cites a line can be re-checked.\n\n"
         "Edit the worktree you are running in. You have no Bash and no Agent tool: do not\n"
         "try to commit, push, or delegate. The harness commits and pushes your edits.\n"
+        "When a file you must inspect is large, Read it with offset and limit rather\n"
+        "than whole; a whole-file Read of a large file is denied in this session.\n\n"
+        "=== REMEDIATION PROCEDURE (follow it exactly) ===\n"
+        f"{procedure}\n"
+        "=== END PROCEDURE ===\n\n"
+        "=== VERDICT (its blocking findings are your work list) ===\n"
+        f"{verdict_text}\n"
+        "=== END VERDICT ===\n\n"
+        "=== DIFF UNDER REVIEW ===\n"
+        f"{diff_text}{diff_note}"
+        "=== END DIFF ===\n\n"
+        "Reference paths (secondary; content is above):\n"
+        f"  - {os.path.join(packet_dir, 'remediation.md')}\n"
+        f"  - {verdict1_path}\n"
+        f"  - {os.path.join(packet_dir, 'diff.patch')}\n"
     )
     llm.call_tooled(
         "fidelity-remediation", "sonnet", prompt, cwd=worktree,

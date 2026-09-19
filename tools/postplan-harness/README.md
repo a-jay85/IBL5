@@ -21,10 +21,12 @@ Without `--live`, every would-be side effect remains a typed intent record.
 | Phase sequencing + terminal states | `pr-copy`: commit/PR title + summary (haiku). Skipped when the PR is open and the tree is clean |
 | Phase 3 diff classification (all flags) | `review-agent-a/b/d` — code review judgment (sonnet) |
 | Phase 5 verify aggregation | `security-audit` — security judgment (haiku) |
-| Phase 5.0 plan→test/file conformance | `score-findings` — rubric confidence scoring (haiku) |
+| Phase 5.0 plan→test/file conformance | `score-findings` — rubric confidence scoring (haiku) | <!-- slop-ok -->
 | All twelve ported arming conditions (numbered 1–12; the skill's condition (11), unresolved review-thread findings, stays skill-only — the harness's 11 is master's plan-slug-drift hold) | `safety-verdict` — condition (9), **add-only** holds (haiku) |
 | CI-watch interpretation | `manual-classify` — plan-blind manual-step triage (haiku) |
 | Side-effect gating + audit log | `retrospective` — save-a-lesson-or-not (haiku) |
+
+Phase 5.0 resolves each plan path by exact-or-suffix match, then by unique basename (a directory the diff moved under one extra component still resolves; two same-named candidates stay `MISSING`). It re-runs once after a Phase 5.5 remediation commit, so a fix-up that authors the planned file clears arming condition (3) in the same run.
 
 Every retained call: single turn, no tools, byte-capped input packet, JSON
 output validated by `harness/schemas.py`, one bounded retry, usage recorded.
@@ -38,7 +40,7 @@ run                       entry wrapper: replay | demo | isolated | test
 harness/
   classify.py             Phase 3 port (flags, filtered diff, module extraction)
   planfile.py             plan location + frontmatter/matrix/Critical-Files parsing
-  conformance.py          Phase 5.0 MISSING/MISSING-FILE detection
+  conformance.py          Phase 5.0 MISSING/MISSING-FILE detection (suffix + unique-basename resolver)
   armable.py              twelve ported arming conditions (numbered 1–12, no gap; the skill's condition (11), unresolved review-thread findings, stays skill-only)
   review.py               Phase 4 launch gates + bounded review/security/scoring calls
   ciwatch.py              Phase 7 outcome interpretation

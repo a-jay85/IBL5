@@ -31,6 +31,9 @@ STICKY_LIB = Path(__file__).resolve().parents[4] / "bin" / "lib" / "pr-sticky.sh
 ARMABLE_LIB = Path(__file__).resolve().parents[4] / "bin" / "lib" / "pr-armable.sh"
 
 POSTPLAN_BADGE_MARKER = "<!-- postplan-status -->"
+# Duplicated from fidelity.STICKY_MARKER on purpose: adapters must not import the core
+# phase modules. tests/test_fidelity_carryforward.py asserts the two stay equal.
+PR_STICKY_MARKER = "<!-- pr-ready-verdict -->"
 
 
 class RecordingGh:
@@ -57,6 +60,15 @@ class RecordingGh:
 
     def unresolved_findings(self, pr: int) -> list[str]:
         return []
+
+    def pr_sticky_body(self, pr: int) -> str | None:
+        """Prior Phase 5.5 sticky body from the replay fixture, or None.
+
+        A fixture that carries no `prior_sticky_body` key reads as "no prior sticky",
+        which declines carry-forward — so every pre-existing replay fixture keeps the
+        full-review path it has today, unchanged.
+        """
+        return self.fixture.get("prior_sticky_body")
 
     def pr_edit_body(self, pr: int, body: str) -> None:
         self._body_override = body
@@ -227,7 +239,7 @@ class LiveGh(RecordingGh):
         env = {k: v for k, v in os.environ.items() if k != "GH_CMD"}
         if STICKY_LIB.exists():
             argv = ["bash", "-c", 'source "$1"; pr_sticky_upsert "$2" "$3" "$(cat "$4")"; pr_sticky_find "$2" "$3"', "_", str(STICKY_LIB), str(pr),
-                    "<!-- pr-ready-verdict -->", path]
+                    PR_STICKY_MARKER, path]
             try:
                 proc = _run_reaped(argv, None, self.timeout, self.worktree, env)
                 out = (proc.stdout or "").strip()
@@ -237,6 +249,24 @@ class LiveGh(RecordingGh):
                 cid = ""
         self.record("pr_sticky_verdict", pr=pr, comment_id=cid, body=body)
         return cid
+
+    def pr_sticky_body(self, pr: int) -> str | None:
+        """The PR's current Phase 5.5 sticky comment body, or None.
+
+        Fail-closed on every degraded shape — a gh failure, unparseable JSON, zero
+        marked comments, or more than one. Returning None declines carry-forward and
+        the full Opus review runs, which is the pre-change behaviour.
+        """
+        try:
+            data = json.loads(self._gh("pr", "view", str(pr), "--json", "comments"))
+        except (HarnessError, ValueError, OSError):
+            return None
+        try:
+            bodies = [c.get("body") or "" for c in (data.get("comments") or [])
+                      if PR_STICKY_MARKER in (c.get("body") or "")]
+        except (AttributeError, TypeError):
+            return None
+        return bodies[0] if len(bodies) == 1 else None
 
     def label_add(self, pr: int, label: str) -> None:
         self._gh("pr", "edit", str(pr), "--add-label", label)

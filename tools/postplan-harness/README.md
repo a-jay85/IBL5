@@ -89,7 +89,8 @@ intent log — without touching GitHub.
 - **Human gates preserved.** `feat:` floor, `auto_merge: false`, golden-file
   and manual-testing holds all land in `SHIPPED_HELD` — exactly the PRs a
   human had to merge before.
-- **Degraded-review handling.** When a review agent's reply cannot be parsed, the harness records `degraded`, holds the PR, notes the failed agents on the PR body, and exits 0 — the PR is open and held for manual merge.
+- **Degraded-review handling.** When a review agent's reply cannot be parsed, the harness records `degraded`, holds the PR, notes the failed agents on the PR body, and exits 0. The PR is open and held for manual merge.
+- **Fail-closed review carry-forward.** Phase 5.5 reuses the prior verdict from the PR's sticky comment instead of re-spawning the pinned Opus reviewer, but only when all three arms hold: the sticky's `**Reviewed diff:**` equals the `git patch-id --verbatim` of the branch diff under review, its `**Plan hash:**` equals the sha256 of the current plan file, and its terminal line is a non-remediated `READY` or `READY WITH NOTES`. The patch-id survives a clean rebase onto a newer `master`; the HEAD tree does not. A missing sticky, an unparseable field, a changed diff, an edited plan, a plan-blind run, a `NOT READY`, or a verdict from a remediation round all decline and the full review runs. Arming condition (12) sees an identical input either way, so the carry-forward can only remove a spawn, never manufacture a verdict.
 
 ## Installation (executed 2026-07-16 with explicit approval)
 

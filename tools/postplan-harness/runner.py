@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import concurrent.futures
+import hashlib
 import json
 import os
 import re
@@ -532,7 +533,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 fidelity.findings_excerpt(vpath, fid.get("verdict_1") is not None),
                 fidelity.terminal_line(fid.get("verdict_1"), fid.get("error_kind"), rsha,
                                        fid.get("verdict_2"), fid.get("reviewed_tree_2"),
-                                       fid.get("rounds_completed", 0)))
+                                       fid.get("rounds_completed", 0)),
+                diff_id=fid.get("diff_id", ""), plan_hash=fid.get("plan_hash", ""))
             try:
                 cid = gh.pr_sticky_verdict(pr, sticky)
             except (HarnessError, OSError, subprocess.SubprocessError):
@@ -800,6 +802,23 @@ def _read_text(path: str) -> str:
         return ""
 
 
+def _plan_hash(plan) -> str:
+    """sha256 of the plan file's BYTES, or "" when there is no readable plan.
+
+    Bytes, not decoded text: reading in text mode applies universal-newline
+    translation, so a CRLF plan would hash differently from its own content and a
+    carry-forward would be declined for a plan nobody edited. "" is the plan-blind
+    value and always declines carry-forward.
+    """
+    if not getattr(plan, "found", False) or not getattr(plan, "path", ""):
+        return ""
+    try:
+        with open(plan.path, "rb") as fh:
+            return hashlib.sha256(fh.read()).hexdigest()
+    except OSError:
+        return ""
+
+
 def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_sha,
                   reviewed_tree, live, log, res, before_remediation=None):
     """Phase 5.5. Returns (verdict_word_or_None, error_kind_or_'').
@@ -811,6 +830,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
     synthetic READY, so the pre-Phase-5.5 trace corpus stays green; a fixture opts into
     the real path simply by canning that purpose.
     """
+    plan_hash = _plan_hash(plan)
+    diff_id = fidelity.diff_patch_id(diff)
     canned = getattr(llm, "canned", None)
     if not live and isinstance(canned, dict) and "plan-fidelity-review" not in canned:
         log("phase5.5 fidelity: replay fixture carries no verdict - synthetic READY")
@@ -820,8 +841,37 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         "remediation_sha": None, "verdict_2": None,
                         "reviewed_tree_2": None,
                         "rounds": [], "rounds_completed": 0,
-                        "backlog_issue_numbers": []}
+                        "backlog_issue_numbers": [],
+                        "diff_id": diff_id, "plan_hash": plan_hash}
         return "READY", ""
+    # Carry-forward: when the branch diff under review (by patch-id, so a clean rebase
+    # onto a moved master still matches) and the plan behind it are both unchanged from
+    # what the sticky already records a terminal verdict for, reuse that verdict instead
+    # of re-spawning the pinned Opus reviewer. Every degraded
+    # shape declines and the full review runs, so this can only ever remove a spawn,
+    # never manufacture a verdict. The sticky read is live-only; the replay
+    # short-circuit above requires `not live`, so the two paths never overlap.
+    prior_sticky = None
+    if live and pr:
+        try:
+            prior_sticky = gh.pr_sticky_body(pr)
+        except Exception:
+            prior_sticky = None
+    carried, decline_reason = fidelity.carry_forward_predicate(
+        prior_sticky, diff_id, plan_hash)
+    if carried:
+        log(f"phase5.5 fidelity: review: carried forward (patch-id {diff_id[:12]})")
+        res.fidelity = {"verdict_1": carried, "error_kind": None,
+                        "reviewed_tree": reviewed_tree,
+                        "verdict_path": fidelity.verdict_path(pr),
+                        "remediation_sha": None, "verdict_2": None,
+                        "reviewed_tree_2": None,
+                        "rounds": [], "rounds_completed": 0,
+                        "backlog_issue_numbers": [],
+                        "diff_id": diff_id, "plan_hash": plan_hash,
+                        "carried_forward": True}
+        return carried, ""
+    log(f"phase5.5 fidelity: review: full (carry-forward declined: {decline_reason})")
     try:
         packet = fidelity.build_packet(
             out_dir, master_sha, reviewed_tree, plan, diff, body, pr,
@@ -834,7 +884,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         "remediation_sha": None, "verdict_2": None,
                         "reviewed_tree_2": None,
                         "rounds": [], "rounds_completed": 0,
-                        "backlog_issue_numbers": []}
+                        "backlog_issue_numbers": [],
+                        "diff_id": diff_id, "plan_hash": plan_hash}
         return None, e.kind
     verdict, err = fidelity.review(llm, out_dir, worktree or ".", packet, pr,
                                    reviewed_tree=reviewed_tree)
@@ -846,7 +897,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                     "remediation_sha": None, "verdict_2": None,
                     "reviewed_tree_2": None,
                     "rounds": [], "rounds_completed": 0,
-                    "backlog_issue_numbers": []}
+                    "backlog_issue_numbers": [],
+                    "diff_id": diff_id, "plan_hash": plan_hash}
     rounds = []
     current_verdict_path = fidelity.verdict_path(pr)
     final_verdict, final_err = verdict, err

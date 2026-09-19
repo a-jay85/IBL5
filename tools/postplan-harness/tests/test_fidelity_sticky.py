@@ -142,7 +142,9 @@ def _sticky(**kw):
                           "**Watch:** a page", "**Touches:** a file",
                           "**Machine-authored fixes:** none"]),
         kw.pop("excerpt", "finding one"),
-        kw.pop("terminal", "READY"))
+        kw.pop("terminal", "READY"),
+        diff_id=kw.pop("diff_id", ""),
+        plan_hash=kw.pop("plan_hash", ""))
 
 
 def test_sticky_marker_is_last_and_unique():
@@ -360,3 +362,31 @@ def test_digest_reads_the_real_script_in_replay_mode(tmp_path):
     assert len(out) == 5
     for i, lbl in enumerate(fidelity.LABELS):
         assert out[i].startswith(lbl)
+
+
+def test_diff_and_plan_hash_lines_between_reviewed_tree_and_digest():
+    diff_id = "e" * 40
+    plan_hash = "c" * 64
+    body = _sticky(diff_id=diff_id, plan_hash=plan_hash)
+    assert f"**Reviewed diff:** {diff_id}" in body
+    assert f"**Plan hash:** {plan_hash}" in body
+    assert body.index("**Reviewed tree:**") < body.index("**Reviewed diff:**")
+    assert body.index("**Reviewed diff:**") < body.index("**Plan hash:**")
+    assert body.index("**Plan hash:**") < body.index(fidelity.MERGE_DIGEST_HEADING)
+    assert body.count(fidelity.MERGE_DIGEST_HEADING) == 1
+
+
+def test_diff_and_plan_hash_omitted_write_no_line():
+    body = _sticky()
+    assert "**Reviewed diff:**" not in body
+    assert "**Plan hash:**" not in body
+
+
+def test_carried_forward_line_present_only_when_flagged():
+    body_with = _sticky(fid={"carried_forward": True})
+    body_without = _sticky()
+    assert "**Carried forward:**" in body_with
+    assert body_with.index("**Carried forward:**") < body_with.index(fidelity.MERGE_DIGEST_HEADING)
+    assert "**Carried forward:**" not in body_without
+    assert body_with.rstrip().endswith(fidelity.STICKY_MARKER)
+    assert body_without.rstrip().endswith(fidelity.STICKY_MARKER)

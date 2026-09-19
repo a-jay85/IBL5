@@ -22,6 +22,7 @@ case "$1 $2" in
     if [ "$3" = "--json" ] || [ "$4" = "--json" ]; then
       case "$*" in
         *"-q .state"*) echo "MERGED" ;;
+        *"--json comments"*) echo '{"comments":[{"body":"<!-- pr-ready-verdict -->"}]}' ;;
         *) echo '{"number":123,"title":"chore: t","body":"b","headRefOid":"abc","labels":[{"name":"x"}],"state":"OPEN"}' ;;
       esac
     fi ;;
@@ -190,3 +191,15 @@ def test_issue_titles_returns_title_list(shim, tmp_path):
     gh = LiveGh(str(tmp_path / "out"), str(tmp_path), "my-branch")
     titles = gh.issue_titles("maintenance")
     assert titles == ["existing issue"]
+
+
+def test_pr_sticky_body_reads_the_marked_comment(shim, tmp_path):
+    """Uses the PATH shim to exercise the real _gh subprocess path.
+
+    The shim answers `gh pr view <n> --json comments` with a marked comment body.
+    """
+    from harness.adapters.ghad import PR_STICKY_MARKER
+    gh = LiveGh(str(tmp_path / "out"), str(tmp_path), "my-branch")
+    body = gh.pr_sticky_body(123)
+    assert body is not None
+    assert PR_STICKY_MARKER in body

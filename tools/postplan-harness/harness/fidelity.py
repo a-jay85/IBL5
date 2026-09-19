@@ -426,6 +426,15 @@ STICKY_MARKER = "<!-- pr-ready-verdict -->"
 MERGE_DIGEST_HEADING = "### Merge digest"
 EXCERPT_LIMIT = 30000
 
+# Sticky-comment field parsers for the Phase 5.5 carry-forward. Anchored and exact-width,
+# so a missing or decorated value never satisfies an arm. The diff field has its own label:
+# a patch-id is 40 hex like a tree sha, so parsing **Reviewed tree:** for it would
+# cross-match. Separate from REVIEWED_TREE_RE, which parses the verdict FILE's bare
+# `REVIEWED_TREE=<sha>` line and is unchanged by this PR.
+STICKY_REVIEWED_DIFF_RE = re.compile(r"^\*\*Reviewed diff:\*\* ([0-9a-f]{40})$", re.M)
+STICKY_PLAN_HASH_RE = re.compile(r"^\*\*Plan hash:\*\* ([0-9a-f]{64})$", re.M)
+CARRY_FORWARD_VERDICTS = ("READY", "READY WITH NOTES")
+
 _MERGE_DIGEST_HEADING_RE = re.compile(r"^#{1,6}[ \t]+Merge digest")
 
 
@@ -494,8 +503,95 @@ def terminal_line(v1, error_kind, remediation_sha, v2, tree_2, rounds_completed)
             "remediate and re-run /post-plan")
 
 
+def _sticky_prior_verdict(sticky_body: str) -> str | None:
+    """The carry-forwardable verdict word from a prior sticky's terminal line.
+
+    Prefix matching, never substring: terminal_line's READY WITH NOTES text ends with
+    "... the compiled harness remediates only NOT READY", so a `"NOT READY" in last`
+    test would reject a perfectly valid carry-forward. Order matters too — the longest
+    alternative is checked first, the same property VERDICT_RE encodes.
+
+    A remediated run is deliberately excluded. terminal_line emits "READY (re-review) —
+    ..." when a remediation round produced the passing verdict, and that verdict belongs
+    to the **Re-reviewed tree:** line, not to **Reviewed tree:**. Carrying it forward
+    against **Reviewed tree:** would compare the wrong pair, so it falls through to None
+    and the full review runs.
+    """
+    if not sticky_body or STICKY_MARKER not in sticky_body:
+        return None
+    head = sticky_body.rsplit(STICKY_MARKER, 1)[0]
+    lines = [ln.strip() for ln in head.splitlines() if ln.strip()]
+    if not lines:
+        return None
+    last = lines[-1]
+    if last == "READY":
+        return "READY"
+    if last.startswith("READY WITH NOTES"):
+        return "READY WITH NOTES"
+    return None
+
+
+def diff_patch_id(diff: str) -> str:
+    """`git patch-id --verbatim` of the diff under review, or "" when none can be computed.
+
+    Keys the carry-forward on the branch's own change. HEAD^{tree} moves on every rebase
+    onto a newer master; the patch-id does not, because it drops hunk line numbers and
+    `index` lines. --verbatim is mandatory: the default mode strips whitespace, so a
+    whitespace-only edit (a Python indentation change) would carry a stale verdict.
+    Binary, mode-only, and rename changes all move the id. git patch-id needs no
+    repository, so this runs from any cwd. "" always declines carry-forward.
+    """
+    if not diff or not diff.strip():
+        return ""
+    try:
+        proc = subprocess.run(["git", "patch-id", "--verbatim"], input=diff,
+                              capture_output=True, text=True, timeout=30)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return ""
+    lines = proc.stdout.splitlines()
+    if proc.returncode != 0 or len(lines) != 1:
+        return ""
+    pid = lines[0].split()[0] if lines[0].split() else ""
+    return pid if re.fullmatch(r"[0-9a-f]{40}", pid) else ""
+
+
+def carry_forward_predicate(sticky_body, diff_id: str,
+                            plan_hash: str) -> tuple[str | None, str]:
+    """Reuse a prior Phase 5.5 verdict, or decline. Returns (verdict, "") to skip the
+    reviewer spawn, (None, reason) to run the full review.
+
+    Fail-closed on every arm: a missing sticky, an unreadable field, a changed branch
+    diff, a changed plan, a plan-blind run, a NOT READY, and a remediated verdict all
+    decline. The only path that returns a verdict is an exact three-way match.
+
+    The HEAD tree is deliberately not an arm. The reviewer judges the diff, and a rebase
+    onto a moved master changes the tree while leaving the diff's patch-id intact.
+    """
+    if not sticky_body:
+        return None, "no-prior-sticky"
+    if not diff_id or not re.fullmatch(r"[0-9a-f]{40}", diff_id):
+        return None, "no-diff-id"
+    if not plan_hash or not re.fullmatch(r"[0-9a-f]{64}", plan_hash):
+        return None, "no-plan-hash"
+    m = STICKY_REVIEWED_DIFF_RE.search(sticky_body)
+    if not m:
+        return None, "no-prior-diff-id"
+    if m.group(1) != diff_id:
+        return None, "diff-changed"
+    h = STICKY_PLAN_HASH_RE.search(sticky_body)
+    if not h:
+        return None, "no-prior-plan-hash"
+    if h.group(1) != plan_hash:
+        return None, "plan-changed"
+    verdict = _sticky_prior_verdict(sticky_body)
+    if verdict not in CARRY_FORWARD_VERDICTS:
+        return None, "prior-verdict-not-terminal"
+    return verdict, ""
+
+
 def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
-                   digest: list, excerpt: str, terminal: str) -> str:
+                   digest: list, excerpt: str, terminal: str, *,
+                   diff_id: str = "", plan_hash: str = "") -> str:
     """The full sticky comment body, marker last.
 
     Ordering is a contract, not a style: every line the DM parser must NOT read as a digest
@@ -510,6 +606,13 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
 
     out.append("")
     out.append(f"**Reviewed tree:** {fid.get('reviewed_tree') or 'unrecorded'}")
+    if diff_id:
+        out.append(f"**Reviewed diff:** {diff_id}")
+    if plan_hash:
+        out.append(f"**Plan hash:** {plan_hash}")
+    if fid.get("carried_forward"):
+        out.append("**Carried forward:** prior review reused; branch diff (patch-id) and "
+                   "plan unchanged since the recorded verdict")
     if fid.get("verdict_2") is not None:
         out.append(f"**Re-reviewed tree:** {fid.get('reviewed_tree_2') or 'unrecorded'} "
                    f"({fid.get('verdict_2')})")

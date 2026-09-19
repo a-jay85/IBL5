@@ -226,6 +226,39 @@ def test_red_ci_check_reason_lists_names():
     assert "check-b" in c15.reason
 
 
+# ── Condition (14) — scenarios 4-7 ────────────────────────────────────────────
+
+def test_condition_14_auto_resolve_alone_blocked():
+    """Scenario 4: flag written (conflict_resolved=True), verdict absent -> blocked."""
+    d = evaluate(inputs(conflict_resolved=True))
+    assert not d.armed
+    assert any(c.number == 14 and c.blocked for c in d.conditions)
+
+
+def test_condition_14_clean_verdict_clears():
+    """Scenario 5: flag + CONFLICT-REVIEW=CLEAN -> condition (14) not blocked, arm passes."""
+    d = evaluate(inputs(conflict_resolved=True, conflict_verdict="CONFLICT-REVIEW=CLEAN"))
+    assert d.armed
+    assert not any(c.number == 14 and c.blocked for c in d.conditions)
+
+
+def test_condition_14_found_problem_holds():
+    """Scenario 6: FOUND-PROBLEM verdict -> blocked, verdict value appears in reason."""
+    d = evaluate(inputs(conflict_resolved=True,
+                        conflict_verdict="CONFLICT-REVIEW=FOUND-PROBLEM"))
+    assert not d.armed
+    c14 = next(c for c in d.conditions if c.number == 14)
+    assert c14.blocked
+    assert "FOUND-PROBLEM" in c14.reason
+
+
+def test_condition_14_no_auto_resolve_passes():
+    """Scenario 7: no flag (conflict_resolved=False) -> condition (14) not blocked."""
+    d = evaluate(inputs(conflict_resolved=False))
+    assert d.armed
+    assert not any(c.number == 14 and c.blocked for c in d.conditions)
+
+
 def test_rebase_conflict_fails_the_run_before_evaluate():
     """A conflicted rebase raises HarnessError('rebase-conflict') and aborts before
     evaluate() is ever reached, so THIS run never auto-resolves. Condition (14) covers

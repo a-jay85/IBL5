@@ -111,7 +111,7 @@ jobs:
 
   # Content-hash memo (ADR-0131). Hashes the HEAD tree over .github/ci-memo/e2e.paths
   # plus the registry manifest of php-apache:latest, the one floating input; an
-  # unreadable manifest folds DIGEST_UNAVAILABLE and forces a miss. Memoization is
+  # unreadable manifest yields empty hash= and key= so neither lookup nor save fires. Memoization is
   # PR-only: push runs, re-runs, dispatches, and `labeled` events bypass it. The
   # Visual Regression job (`e2e`) is never memo-gated: it publishes the per-SHA gallery
   # and regenerates baselines. A failure here reds the gate (it is in gate.needs).

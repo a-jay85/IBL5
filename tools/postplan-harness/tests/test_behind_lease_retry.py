@@ -230,13 +230,11 @@ def test_behind_ci_red_after_rebase(monkeypatch):
     assert outcome.exit_code == 8
 
 
-def test_behind_loop_skipped_when_held(monkeypatch):
-    """The call site guard (decision.armed) prevents entry when the PR is held."""
-    gh = FakeGh(states=["BEHIND"], strict=True)
-    decision = ArmDecision(armed=False)
-    # Verify the guard: if not armed, merge_state_status must never be called
-    assert not decision.armed
-    assert gh.reads == 0  # no reads without the call
+def test_behind_loop_skipped_when_held():
+    """_should_resolve_behind is False when armed=False; merge state is never read."""
+    outcome = CiOutcome(0, [])
+    assert not runner._should_resolve_behind(True, 1, ArmDecision(armed=False), outcome)
+    assert runner._should_resolve_behind(True, 1, ArmDecision(armed=True), outcome)
 
 
 def test_merge_state_read_failure_breaks_loop(tmp_path):
@@ -298,13 +296,11 @@ def test_verdict_behind_retry_cap():
 
 
 def test_retry_cap_beats_armed():
-    res = RunResult(
-        terminal=TerminalState.SHIPPED_HELD,
-        retry_cap="behind-retry-cap",
-        arm=ArmDecision(armed=True),
-        degraded_agents=[],
-    )
-    assert res.terminal == TerminalState.SHIPPED_HELD
+    """_compute_terminal returns SHIPPED_HELD when retry_cap is set, even when armed=True."""
+    res = RunResult(terminal=TerminalState.SHIPPED_ARMED, retry_cap="behind-retry-cap")
+    assert runner._compute_terminal(res, armed=True) == TerminalState.SHIPPED_HELD
+    res_no_cap = RunResult(terminal=TerminalState.SHIPPED_ARMED)
+    assert runner._compute_terminal(res_no_cap, armed=True) == TerminalState.SHIPPED_ARMED
 
 
 # ---------------------------------------------------------------------------

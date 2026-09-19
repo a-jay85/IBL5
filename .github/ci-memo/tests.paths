@@ -10,7 +10,6 @@ ibl5/bin
 :(glob)**/*.php
 :(glob)**/*.sql
 :(glob)ibl5/**/*.ts
-:(glob)ibl5/**/*.tsx
 ibl5/composer.json
 ibl5/composer.lock
 ibl5/package.json

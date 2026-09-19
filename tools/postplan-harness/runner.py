@@ -568,17 +568,14 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         res.final_pr_state = gh.pr_state() if (mode == "replay" or live) else "N/A"
         log(f"phase7 ci: exit={outcome.exit_code} failed={outcome.failed} ({outcome.evidence})")
 
-        if live and pr and decision.armed and outcome.exit_code == 0:
+        if _should_resolve_behind(live, pr, decision, outcome):
             sha, outcome = _resolve_behind(git, gh, log, res, worktree, pr, sha,
                                            outcome, out_dir)
             res.ci_head = sha or None
             res.ci_outcome = {0: "green", 8: "failed"}.get(outcome.exit_code,
                                                            "indeterminate")
 
-        res.terminal = (TerminalState.DEGRADED if res.degraded_agents else
-                        TerminalState.SHIPPED_HELD if res.retry_cap else
-                        TerminalState.SHIPPED_ARMED if decision.armed
-                        else TerminalState.SHIPPED_HELD)
+        res.terminal = _compute_terminal(res, decision.armed)
 
         # ---- Phase 9: retrospective (bounded, record-only) -------------
         # Never fatal: the PR is open and arming has executed, so FAILED here would
@@ -709,6 +706,22 @@ def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir):
             "disarming auto-merge")
         gh.pr_disable_auto_merge(pr)
     return sha, outcome
+
+
+def _should_resolve_behind(live: bool, pr, decision, outcome) -> bool:
+    """Call-site predicate for the Phase 7 BEHIND-resolution entry guard."""
+    return bool(live and pr and decision.armed and outcome.exit_code == 0)
+
+
+def _compute_terminal(res: RunResult, armed: bool) -> TerminalState:
+    """Resolve terminal state after Phase 7; retry_cap beats armed."""
+    if res.degraded_agents:
+        return TerminalState.DEGRADED
+    if res.retry_cap:
+        return TerminalState.SHIPPED_HELD
+    if armed:
+        return TerminalState.SHIPPED_ARMED
+    return TerminalState.SHIPPED_HELD
 
 
 # --- Phase 2 local-gate remediation ------------------------------------------

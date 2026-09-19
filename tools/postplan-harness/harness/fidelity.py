@@ -235,14 +235,20 @@ def _noop_log(_msg: str) -> None:
 
 
 def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
-              verdict1_path: str, master_sha: str, log=None) -> str | None:
+              verdict1_path: str, master_sha: str, log=None, *,
+              commit=None) -> str | None:
     """Fix the blocking findings behind a `NOT READY`. Returns the commit sha, or None.
 
     The model edits; the HARNESS commits and pushes. That split is not a convention —
     `Bash` is withheld from the model on both the allow and the deny side, so it has no
     path to a command at all.
+
+    `commit` is the message -> sha callable. runner passes its Phase 2 gate wrapper so a
+    doc-staleness denial gets the same one-shot last_verified bump here; it is injected
+    rather than imported because runner imports this module.
     """
     log = log or _noop_log
+    commit = commit or gitad.commit_all
     if parse_verdict(verdict1_path) != "NOT READY":
         return None
     if gitad.is_dirty():
@@ -269,7 +275,11 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
         allowed_tools=REMEDIATION_ALLOWED_TOOLS, denied_tools=REMEDIATION_DENIED_TOOLS,
         add_dirs=(packet_dir,),
     )
-    sha = gitad.commit_all(REMEDIATION_COMMIT_MSG)
+    sha = commit(REMEDIATION_COMMIT_MSG)
+    if not sha:
+        # commit_all returns "" when nothing was staged: the model made no edits.
+        log("phase5.5: remediation made no edits - nothing committed or pushed")
+        return None
     gitad.push()
     log(f"phase5.5: remediation committed {str(sha)[:12]} and pushed")
     return sha
@@ -297,6 +307,8 @@ def re_review(llm, gitad, out_dir: str, worktree: str, plan, master_sha: str,
         "\nThis is a RE-REVIEW. Read verdict 1 at the path above and confirm each of its\n"
         "blocking findings was addressed by the remediation commit. Report a new finding\n"
         "only if the remediation itself introduced one.\n"
+        "A last_verified date bump in a touched doc is the harness clearing the\n"
+        "doc-staleness commit hook, not a new finding.\n"
     )
     try:
         packet = build_packet(out_dir, master_sha, gitad.head_tree(), plan, diff,

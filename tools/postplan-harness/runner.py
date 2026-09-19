@@ -628,7 +628,8 @@ def _remediate_doc_staleness(worktree: str, git, log) -> int:
     # A non-zero exit is NOT fatal: --fix-dates still reports findings it cannot fix
     # (a dead reference, a future date). The retried commit is the authority on
     # whether the gate cleared, so count what moved and let the hook decide.
-    # run() called git.stage_all() before commit_all, so the tree was clean against
+    # run() called git.stage_all() before commit_all (Phase 5.5: commit_all's own
+    # `add -A` ran before the hook refused), so the tree was clean against
     # the index; every path --fix-dates rewrote is now an UNSTAGED change. That is an
     # exact count with no parsing of the script's prose.
     out = subprocess.run(["git", "-C", worktree, "diff", "--name-only", "--", "*.md"],
@@ -644,7 +645,8 @@ def _remediate_doc_staleness(worktree: str, git, log) -> int:
     return n
 
 
-def _commit_with_gate_remediation(git, worktree: str | None, message: str, log) -> str:
+def _commit_with_gate_remediation(git, worktree: str | None, message: str, log,
+                                  phase: str = "phase2") -> str:
     """Phase 2 commit with ONE bounded auto-remediation of the mechanical gate class.
 
     Only "doc-staleness" is remediable. "byte-budget" (bin/check-rules-byte-budget has
@@ -657,7 +659,13 @@ def _commit_with_gate_remediation(git, worktree: str | None, message: str, log) 
     ADR denials are structurally outside this wrapper -- bin/pre-push-adr-hook is a
     PUSH hook and run() calls git.push() well after commit_all(). The "adr" arm here is
     defence in depth against a locally-installed pre-commit variant, not the protection.
+
+    Phase 5.5 remediation commits through here too, with phase="phase5.5" so its log
+    lines don't read as Phase 2's.
     """
+    if phase != "phase2":
+        _log = log
+        log = lambda m: _log(m.replace("phase2:", f"{phase}:", 1))  # noqa: E731
     try:
         return git.commit_all(message)
     except HarnessError as e:
@@ -749,12 +757,20 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         if final_verdict != "NOT READY":
             break
         try:
-            sha = fidelity.remediate(llm, git, out_dir, worktree or ".", packet,
-                                     current_verdict_path, master_sha, log=log)
+            sha = fidelity.remediate(
+                llm, git, out_dir, worktree or ".", packet, current_verdict_path,
+                master_sha, log=log,
+                commit=lambda msg: _commit_with_gate_remediation(
+                    git, worktree, msg, log, phase="phase5.5"))
         except HarnessError as e:
             if e.kind == "push-failed":
                 raise
-            log(f"phase5.5 round {round_num}: remediation unavailable ({e.kind})")
+            # Keep the hook's own words: "local-gate" alone does not say which hook said no.
+            why = " ".join((e.detail or "").split())[:300]
+            gate = (f" class={classify_local_gate_denial(e.detail or '')}"
+                    if e.kind == "local-gate" else "")
+            log(f"phase5.5 round {round_num}: remediation unavailable ({e.kind}){gate}"
+                + (f" - {why}" if why else ""))
             sha = None
         if not sha:
             break

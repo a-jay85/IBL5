@@ -339,6 +339,23 @@ ROWS
 LAUNCHCTL
 chmod +x "$STUBBIN/launchctl"
 
+# osacompile stub for the reorder link. Real osacompile is macOS-only (CI is
+# Linux) and a real build writes an app bundle; the stub only creates the -o
+# directory and keeps the AppleScript it was handed, so case 18 can check what
+# the applet would run.
+cat > "$STUBBIN/osacompile" <<'OSACOMPILE'
+#!/bin/sh
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -o) out="$2"; shift 2 ;;
+        -e) src="$2"; shift 2 ;;
+        *) shift ;;
+    esac
+done
+mkdir -p "$out" && printf '%s\n' "$src" > "$out/script.txt"
+OSACOMPILE
+chmod +x "$STUBBIN/osacompile"
+
 # Fixture plist. 04:30 rather than the real 03:00 so a passing assertion cannot
 # be coming from the installed plist by accident.
 PLIST="$TMP/com.ibl5.automouse.plist"
@@ -451,6 +468,8 @@ run_fleet() {
         "${_tx_arg[@]+"${_tx_arg[@]}"}" \
         "${_jq_arg[@]+"${_jq_arg[@]}"}" \
         FLEET_STATUS_AUTOMOUSE_PLIST="$PLIST" \
+        FLEET_STATUS_REORDER_APP_DIR="$TMP/apps" \
+        FLEET_STATUS_OSACOMPILE="$STUBBIN/osacompile" \
         "${_extra[@]+"${_extra[@]}"}" "$FLEET" 2>&1
 }
 
@@ -470,6 +489,11 @@ OUTPUT_LINKS="$(run_fleet FLEET_STATUS_FORCE_LINKS=1)"
 # link precisely so this is byte-identical to the plain render's columns; the
 # stripped assertions below are what would catch a %-46s creeping back over a
 # wrapped string, where the escape bytes count as width and the column collapses.
+# The reorder link with no osacompile to build its applet, into an empty app dir.
+OUTPUT_NOOSA="$(run_fleet FLEET_STATUS_FORCE_LINKS=1 \
+    FLEET_STATUS_OSACOMPILE=/nonexistent/osacompile \
+    FLEET_STATUS_REORDER_APP_DIR="$TMP/apps-noosa")"
+
 OUTPUT_STRIPPED="$(printf '%s\n' "$OUTPUT_LINKS" | perl -pe 's/\e\]8;;[^\e]*\e\\//g')"
 
 OUTPUT_MIDNIGHT="$(run_fleet FLEET_STATUS_AUTOMOUSE_PLIST="$PLIST_MIDNIGHT")"
@@ -653,7 +677,18 @@ assert_has "links: queued (unlocked) row links too" \
 # was missed, and the whole point is that a click never reaches the OS file-type
 # association. One assertion covers every link at once.
 assert_lacks "links: no path is left on the file:// handler" \
-    "$OUTPUT_LINKS" '8;;file://'
+    "$OUTPUT_LINKS" '8;;file://[^ ]*\.(md|log)'
+# The one deliberate file:// link: `reorder` closes the queue header and points
+# at the applet, because opening an app bundle is how a click runs a command.
+assert_has "links: queue header ends in a reorder link to the applet" \
+    "$OUTPUT_LINKS" 'AUTOMOUSE QUEUE.*next run .*8;;file://[^ ]*/ibl5-queue-reorder\.app/[^ ]*reorder'
+assert_has "links: the applet starts queue-reorder-ui detached" \
+    "$(cat "$TMP/apps/ibl5-queue-reorder.app/script.txt" 2>/dev/null)" \
+    "^do shell script \".*nohup '[^']*/bin/automouse/queue-reorder-ui' .*&\"$"
+assert_lacks "links: no reorder link in a non-tty capture" \
+    "$OUTPUT" 'AUTOMOUSE QUEUE.*reorder'
+assert_lacks "links: no reorder link when osacompile is missing" \
+    "$OUTPUT_NOOSA" 'AUTOMOUSE QUEUE.*reorder'
 # The word is the link text; the path lives only in the URI.
 assert_has "links: post-plan audit word links its audit.log" \
     "$OUTPUT_LINKS" 'last-exit-col 0  [^ ]*8;;vscode://file/[^ ]*live-demo-slug-20260910-120000-4242/audit\.log[^ ]*audit'

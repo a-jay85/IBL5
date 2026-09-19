@@ -109,6 +109,16 @@ class LiveGit:
         # staged + unstaged, vs HEAD (what Phase 2 would commit)
         return self._run("diff", "HEAD")
 
+    def has_changes_to_commit(self) -> bool:
+        """True when the index differs from HEAD. Call after stage_all(); this is the
+        exact question commit_all() asks before it decides to return ""."""
+        return bool(self._run("diff", "--cached", "--name-only").strip())
+
+    def branch_head_subject(self, base: str = "origin/master") -> str:
+        """Subject of the newest commit this branch owns, or "" when HEAD is still the
+        base's commit. A dirty, never-committed worktree must not borrow master's subject."""
+        return self._run("log", "-1", "--format=%s", f"{self._merge_base(base)}..HEAD").strip()
+
     def changed_files(self, base: str = "origin/master") -> list[str]:
         vs_base = self._run("diff", "--name-only", self._merge_base(base)).strip()
         untracked = self._run("ls-files", "--others", "--exclude-standard").strip()
@@ -363,6 +373,13 @@ class ReplayGit:
 
     def working_diff(self) -> str:
         return self.fx.get("worktree_diff") or self.fx.get("diff") or ""
+
+    def has_changes_to_commit(self) -> bool:
+        # Historical fixtures all model a run that commits, so absent means True.
+        return not self.fx.get("clean_tree", False)
+
+    def branch_head_subject(self, base: str = "origin/master") -> str:
+        return self.fx.get("head_subject", "")
 
     def changed_files(self, base: str = "origin/master") -> list[str]:
         from ..classify import files_from_diff

@@ -18,7 +18,7 @@ Without `--live`, every would-be side effect remains a typed intent record.
 
 | Owned by code (deterministic) | Retained LLM calls (bounded, typed, validated) |
 |---|---|
-| Phase sequencing + terminal states | `pr-copy` — commit/PR title + summary (haiku) |
+| Phase sequencing + terminal states | `pr-copy`: commit/PR title + summary (haiku). Skipped when the PR is open and the tree is clean |
 | Phase 3 diff classification (all flags) | `review-agent-a/b/d` — code review judgment (sonnet) |
 | Phase 5 verify aggregation | `security-audit` — security judgment (haiku) |
 | Phase 5.0 plan→test/file conformance | `score-findings` — rubric confidence scoring (haiku) |

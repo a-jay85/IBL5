@@ -1,0 +1,21 @@
+# Input path set for the e2e-tests.yml memo (bin/ci-memo, ADR-0131).
+# One git pathspec per line. Superset of what bin/website-affecting counts as
+# website-side: all of ibl5/ and .github/ minus docs and markdown, plus the
+# Docker runtime and every bin/ script the e2e jobs call. The floating GHCR
+# image is folded in by bin/ci-memo itself.
+ibl5
+.github
+Dockerfile
+docker
+:(glob)docker-compose*.y*ml
+bin/ci-memo
+bin/website-affecting
+bin/lib
+bin/check-e2e-fixture-drift
+bin/check-playwright-pinning
+bin/playwright-image-tag
+bin/vr-build-gallery
+bin/vr-changed-coverage
+bin/vr-review-comment
+:(exclude)ibl5/docs
+:(exclude,glob)**/*.md

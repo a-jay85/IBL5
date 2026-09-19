@@ -809,6 +809,8 @@ expect_clearance "(1) unchecked box + sentinel in one window → HELD" "HELD" \
 # and not bin/check-pr-manual-testing's shape regex `- \[[ x]\]`.
 expect_clearance "(1) checked evidence box + sentinel → still CLEARED" "CLEARED" \
     "$(printf '## Manual Testing\n\nNo manual testing needed - all changes are covered by automated tests.\n\n- [x] bin/test-foo - all cases PASS\n')"
+expect_clearance "shell twin stays sentinel-only: all-ticked body is HELD (harness-only widening)" "HELD" \
+    "$(printf '## Manual Testing\n\n- [x] **Row 1** - executed\n')"
 expect_rc0 "rc0: pr_golden_hold, golden untouched" \
     "pr_golden_hold '[]'"
 expect_rc0 "rc0: pr_feat_hold, non-feat title" \

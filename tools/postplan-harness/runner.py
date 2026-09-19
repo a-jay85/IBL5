@@ -33,7 +33,8 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from harness import ciwatch, conformance, fidelity, llm_calls, manual_rows, schemas, statefile
+from harness import (ciwatch, conformance, fidelity, llm_calls, manual_rows,
+                     manual_testing, schemas, statefile)
 from harness.armable import (ArmInputs, conflict_flag_path, evaluate,
                              manual_testing_clearance, select_fidelity_verdict)
 from harness.classify import (classify, files_from_diff, modified_files_from_diff,
@@ -442,6 +443,24 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # the loop.
         if res.fidelity.get("remediation_sha"):
             sha = res.fidelity["remediation_sha"]
+
+        # ---- Phase 6.7: manual-testing execution ----------------------
+        # Runs after remediation so the probed tree is the tree that will merge,
+        # and before ArmInputs so a tick reaches condition (1) this run.
+        mt = manual_testing.run(
+            pr=pr, worktree=worktree, body=gh.pr_body() or body,
+            gh=gh, probe=probe, show_blob=manual_testing.show_blob_for(worktree),
+            master_sha=master_sha, head_tree=git.head_tree,
+            live=live, log=log,
+        )
+        if mt.ran:
+            res.manual_testing = mt.to_dict()
+        if not mt.ran:
+            log(f"phase6.7: skipped ({mt.skipped_reason})")
+        else:
+            log(f"phase6.7: bringup={mt.bringup} rows={len(mt.rows)} "
+                f"ticked={len(mt.ticked)} all_ticked={mt.all_ticked}"
+                + (f" errors={';'.join(mt.errors)}" if mt.errors else ""))
 
         # ---- Phase 6.5: arming ----------------------------------------
         # Condition (15): snapshot any checks already in the fail bucket before

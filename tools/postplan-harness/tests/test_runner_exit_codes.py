@@ -194,6 +194,51 @@ def test_run_commits_through_the_remediation_wrapper():
     assert 'upsert_files_changed(copy["summary_md"]' in src   # PR body still unmutated
 
 
+@pytest.mark.usefixtures("stub_ambient_git_show")
+def test_bringup_failure_leaves_exit_code_unchanged(monkeypatch, tmp_path):
+    """Row 20: a bring-up failure does not change terminal state or exit code."""
+    from harness.adapters.llm import FixtureLlm
+    from harness.state import UsageLedger
+    from harness.manual_testing import ManualTestingResult
+
+    def _failing_mt(**kwargs):
+        r = ManualTestingResult()
+        r.ran = True
+        r.bringup = "FAILED"
+        r.errors = ["bringup-stopped:FAILED"]
+        return r
+
+    monkeypatch.setattr(runner.manual_testing, "run", _failing_mt)
+
+    fx = {
+        "slug": "bringup-failure-test",
+        "diff": "diff --git a/ibl5/x.php b/ibl5/x.php\n+<?php echo 1;\n",
+        "pr_number": 9997,
+        "pr_meta": {"number": 9997, "title": "fix: synthetic",
+                    "body": "## Manual Testing\n\n- [ ] **Row 1** check something\n",
+                    "headRefOid": "deadbeef"},
+        "labels": [],
+        "final_state": "OPEN",
+        "checks_outcome": {"exit": 0, "failed": []},
+        "verify": {"phpunit": "OK (1 test)", "phpstan": "[OK] No errors"},
+        "plan_content": "# Synthetic plan\n\nBody.\n",
+    }
+    canned = {
+        "pr-copy": {"type": "chore", "title": "chore: bringup-failure-test",
+                    "commit_subject": "chore: test commit",
+                    "summary_md": "## Summary\n- x\n"},
+        "review-agent-a": [], "review-agent-b": [], "review-agent-d": [],
+        "security-audit": [],
+        "safety-verdict": {"holds": []},
+        "manual-classify": [],
+        "retrospective": {"save": False},
+    }
+    out = str(tmp_path / "out")
+    res = runner.run(fx, out, FixtureLlm(UsageLedger(), canned), mode="replay")
+    assert res.terminal != TerminalState.FAILED, res.error
+    assert runner.exit_code_for(res) == 0
+
+
 @pytest.mark.parametrize("detail", [
     "local-gate: pre-push-adr-hook: ...",
     "local-gate: Trim the rule(s) above (or move detail into a path-scoped",

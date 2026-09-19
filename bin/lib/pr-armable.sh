@@ -5,13 +5,14 @@
 #
 # Usage: source "$(dirname "$0")/lib/pr-armable.sh"
 #
-# Covers the six live-derivable conditions:
+# Covers the seven live-derivable conditions:
 #   (1) Manual-Testing clearance   -> pr_manual_testing_clearance <body>
 #   (5) golden-snapshot touch      -> pr_golden_hold <files_json>
 #   (6) Depends-on merge-order     -> pr_dep_holds <body>
 #   (8) feat: floor                -> pr_feat_hold <title> <labels_json>
 #   (10) pipeline-authored floor   -> pr_pipeline_authored_hold <labels_json> [head_ref]
 #   (11) unresolved scored finding -> pr_unresolved_findings_hold <pr_number>
+#   (15) already-red CI checks     -> pr_red_check_hold <pr_number>
 #
 # Conditions (2) review>=80, (3) MISSING-tests, (4) Phase-5 local verify, (7)
 # non-UI auto_merge:false, (9) realized-diff verdict are deliberately NOT here:
@@ -26,10 +27,11 @@
 # This file is SOURCED, not executed: no `set -euo pipefail` at file scope.
 #
 # Test seam: GH_CMD (default `gh`) is a single-token command (a path to a shim in
-# tests) invoked as `"$GH_CMD" pr view ...`. Only pr_dep_holds and
-# pr_unresolved_findings_hold touch it. REPO_SLUG (default `a-jay85/IBL5`) is the
-# second seam, consumed only by pr_unresolved_findings_hold's GraphQL call; it is
-# the same seam name bin/lib/post-review-findings.sh already uses.
+# tests) invoked as `"$GH_CMD" pr view ...` or `"$GH_CMD" pr checks ...`.
+# pr_dep_holds, pr_unresolved_findings_hold, and pr_red_check_hold all touch it.
+# REPO_SLUG (default `a-jay85/IBL5`) is the second seam, consumed only by
+# pr_unresolved_findings_hold's GraphQL call; it is the same seam name
+# bin/lib/post-review-findings.sh already uses.
 
 GH_CMD="${GH_CMD:-gh}"
 REPO_SLUG="${REPO_SLUG:-a-jay85/IBL5}"
@@ -279,5 +281,47 @@ pr_unresolved_findings_hold() {
     # (set -euo pipefail) on the first clear PR. Every predicate in this file must
     # return 0 on its clear path; pr_dep_holds violated that until 2026-08-22, so
     # treat a trailing bare `[ ... ] && cmd` in any predicate here as a live bug.
+    return 0
+}
+
+# pr_red_check_hold <pr_number>
+#   Phase 6.5 condition (15), already-red CI check floor. Echoes the name of each
+#   check that is already in gh's `fail` bucket on the PR's current head, minus
+#   `human-signoff` (which is red-by-design on every feat: PR and is reported by
+#   condition (8) instead). Echoes nothing when no qualifying failure is found.
+#
+#   FAIL-OPEN ON PENDING CHECKS: an empty result means "no failure proven at this
+#   moment", never "all checks are green". A check that has not yet reported is
+#   invisible to the probe and therefore clears (15). `gh pr checks` exit 8 with
+#   only pending rows still returns an empty list. Any `gh` error also returns
+#   nothing (fail-open), so a network hiccup at arm time does not block the merge.
+#
+#   Why (15) lives in this shared predicate while the run-local conflict-resolved
+#   hold does not: the conflict-resolved hold's evidence is a run-local flag in a
+#   /tmp directory keyed to the current branch, invisible to any other checkout.
+#   A red CI check is live-derivable for any PR number, so cross-PR consumers such
+#   as bin/pr-triage can call this predicate directly without run-local state.
+#
+#   EXIT 8 IS THE HOLD CASE, NOT AN ERROR: `gh pr checks` exits 8 precisely when a
+#   check is failing, which is the state this predicate exists to detect. Treating
+#   any non-zero rc as an error would make this function a no-op in production
+#   while still passing a shim-based test that exits 0. Accept 0 and 8; bail only
+#   on anything else (1 = no checks reported yet, 2+ = a real gh/auth failure).
+#   This mirrors `probe_failed_checks` in tools/postplan-harness/harness/ciwatch.py,
+#   which gates on `returncode not in (0, 8)` for the same reason.
+#
+#   REQUIRED trailing `return 0`: capturing output with `|| rc=$?` and returning 0
+#   on the clear path keeps this predicate from aborting a `set -euo pipefail`
+#   caller. Every predicate in this file must return 0 on its clear path.
+pr_red_check_hold() {
+    local pr="$1"
+    local raw rc=0
+    raw=$("$GH_CMD" pr checks "$pr" --json name,bucket 2>/dev/null) || rc=$?
+    # Fail-open on a genuine gh error; rc 8 carries the payload we want.
+    if [ "$rc" -ne 0 ] && [ "$rc" -ne 8 ]; then
+        return 0
+    fi
+    printf '%s' "$raw" | jq -r '.[] | select(.bucket == "fail") | select(.name != "human-signoff") | .name' \
+        2>/dev/null || true
     return 0
 }

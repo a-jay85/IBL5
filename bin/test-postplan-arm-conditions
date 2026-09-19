@@ -72,6 +72,18 @@ if [ "$1" = "pr" ] && [ "$2" = "edit" ]; then
   done
   exit 0
 fi
+if [ "$1" = "pr" ] && [ "$2" = "checks" ]; then
+  # gh pr checks <pr> --json name,bucket -> GH_CHECKS_FIXTURE contents, or exit 1 if unset/missing.
+  # pr_red_check_hold is fail-open on exit 1, so an unset fixture exercises the clear path.
+  [ -n "${GH_CHECKS_FIXTURE:-}" ] && [ -f "$GH_CHECKS_FIXTURE" ] || exit 1
+  cat "$GH_CHECKS_FIXTURE"
+  # REAL gh EXITS 8 WHEN ANY CHECK IS FAILING. The shim must model that or the
+  # (15) cases below pass against a predicate that is a no-op in production: a
+  # `return 0 on any non-zero rc` guard swallows exactly the red-check payload.
+  # Caught in review on the first cut of pr_red_check_hold; keep this arm.
+  grep -q '"bucket"[[:space:]]*:[[:space:]]*"fail"' "$GH_CHECKS_FIXTURE" && exit 8
+  exit 0
+fi
 exit 1
 SHIM
 chmod +x "$SHIMD/gh"
@@ -453,6 +465,7 @@ B8="$(extract_block '# condition (8)')"
 B10="$(extract_block '# condition (10)')"
 B7="$(extract_block '# condition (7)')"
 B13="$(extract_block '# condition (13)')"
+B15="$(extract_block '# condition (15)')"
 BMC="$(extract_block '# phase 6 body-marker capture' "$P25_SKILL")"
 BMV="$(extract_block '# phase 6 body-marker verify'  "$P25_SKILL")"
 B12="$(extract_block '# condition (12)')"
@@ -474,6 +487,7 @@ assert_self_contained '# condition (6)' "condition (6)"
 assert_self_contained '# condition (8)' "condition (8)"
 assert_self_contained '# condition (10)' "condition (10)"
 assert_self_contained '# condition (11)' "condition (11)"
+assert_self_contained '# condition (15)' "condition (15)"
 assert_block_sources '# condition (7)' "condition (7)" "plan-resolve.sh" "$SKILL"
 assert_block_sources '# condition (13)' "condition (13)" "plan-resolve.sh" "$SKILL"
 
@@ -718,6 +732,29 @@ rm -f "$c13_dir/myfeature.md" "$c13_dir/plan-myfeature.md"
 expect_block "(13) plan-blind -> NONE" NONE \
     "$(run_cond13 "$B13" "myfeature" "$c13_dir")"
 
+# condition (15) — already-red CI checks
+# run_cond15 <checks-json> — run the block with a GH_CHECKS_FIXTURE set to the given JSON.
+# GH_PR_FIXTURE must carry a number field for the PR_NUM derivation inside the block.
+run_cond15() {
+    local checks_f="$BASE_TMP/checks-c15-$$.json"
+    printf '%s' "$1" > "$checks_f"
+    printf '{"number":2100}' > "$BASE_TMP/fixture.json"
+    PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" \
+        GH_CHECKS_FIXTURE="$checks_f" bash -c "$B15" 2>&1
+}
+
+if [ -z "$B15" ]; then
+    echo "FAIL: no block matching '# condition (15)' in $SKILL — marker drifted"
+    FAILED=1
+else
+    expect_block "(15) red non-ignored check -> BLOCK" BLOCK \
+        "$(run_cond15 '[{"name":"pytest (stdlib harness)","bucket":"fail"}]')"
+    expect_block "(15) only human-signoff red -> NONE (ignored by design)" NONE \
+        "$(run_cond15 '[{"name":"human-signoff","bucket":"fail"}]')"
+    expect_block "(15) no red checks -> NONE" NONE \
+        "$(run_cond15 '[{"name":"pytest (stdlib harness)","bucket":"pass"}]')"
+fi
+
 # --- predicate exit-status invariant (the truncation bug) -------------------
 # The shim answers OPEN for #1100 and MERGED for every other number, so #1071 is
 # the merged predecessor that made pr_dep_holds return 1. `gh api graphql` is not
@@ -780,6 +817,8 @@ expect_rc0 "rc0: pr_pipeline_authored_hold, neither axis fires" \
     "pr_pipeline_authored_hold '[]' 'feature-x'"
 expect_rc0 "rc0: pr_unresolved_findings_hold, gh api unavailable (fail-closed path)" \
     "pr_unresolved_findings_hold 1234"
+expect_rc0 "rc0: pr_red_check_hold, gh checks unavailable (fail-open path)" \
+    "pr_red_check_hold 1234"
 
 # --- bin/pr-triage merge-state allowlist ------------------------------------
 # BEHIND is the case that shipped wrong: master's protection is strict (branches
@@ -1747,9 +1786,9 @@ done
 # §5.9k prose-level invariants the blocks cannot carry. These are the half-applied-edit
 # catches: a block can be perfect while the surrounding prose still claims twelve
 # conditions, still points at /pr-ready's marker, or still hands the rebase to a spawn.
-have "§5.9k: SKILL.md counts fourteen conditions"        "$P25_TXT" '**All fourteen conditions**'
+have "§5.9k: SKILL.md counts fifteen conditions"         "$P25_TXT" '**All fifteen conditions**'
 have "§5.9k: the run-only enumeration ends /(13)/(14)"   "$P25_TXT" '(2)/(3)/(4)/(7)/(9)/(12)/(13)/(14)'
-have "§5.9k: the shared-predicate list is unchanged"     "$P25_TXT" '(1)/(5)/(6)/(8)/(10)/(11)'
+have "§5.9k: the shared-predicate list carries (15)"     "$P25_TXT" '(1)/(5)/(6)/(8)/(10)/(11)/(15)'
 
 # Step 7.5 spawns exactly one Sonnet sub-agent with run_in_background: false.
 # The resolution file runs under claude -p (bin/post-plan-now:364, one session, not
@@ -1779,11 +1818,12 @@ else
     lacks "§5.9k: the announcement never reuses pr-fast-canary"  "$BANN2" 'pr-fast-canary'
     lacks "§5.9k: the announcement never reuses pr-ready-verdict" "$BANN2" 'pr-ready-verdict'
 fi
-# §5.9l: the Phase 6.5 reference doc carries the (14) entry that SKILL.md's
-# "All fourteen conditions" count promises, as prose pointing at SKILL.md's block.
+# §5.9l: the Phase 6.5 reference doc carries the (14) and (15) entries that
+# SKILL.md's "All fifteen conditions" count promises, as prose pointing at its block.
 ARM_TXT="$(cat "$SKILL")"
 have  "§5.9l: reference doc has a (14) entry"               "$ARM_TXT" '**(14)'
 have  "§5.9l: (14) entry names the conflict flag path"      "$ARM_TXT" '/tmp/postplan-conflict-resolved-'
+have  "§5.9l: reference doc has a (15) entry"               "$ARM_TXT" '**(15)'
 have  "§5.9l: (14) entry records the shared-predicate why"  "$ARM_TXT" 'not in the shared predicate'
 lacks "§5.9l: (14) entry adds no per-condition bash block"  "$ARM_TXT" 'CONFLICT_FLAG='
 

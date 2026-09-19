@@ -351,6 +351,26 @@ def test_conflict_resolved_fixture_holds_condition_14(tmp_path):
     assert "auto-resolved rebase conflict" in c14["reason"]
 
 
+def test_red_ci_checks_fixture_holds_condition_15(tmp_path):
+    """4g replay hold — already-red CI checks at arm time hold auto-merge.
+
+    Every other input is the clean fixture that arms in the baseline, so the only
+    thing separating the two runs is the red_ci_checks seam value.
+    """
+    out = str(tmp_path / "out")
+    res = runner.run(
+        _fixture(red_ci_checks=["pytest (stdlib harness)"]), out,
+        FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    assert res.terminal == TerminalState.SHIPPED_HELD
+    assert 15 in {c.number for c in res.arm.holds}
+    assert not any(a["action"] == "pr_merge_auto" for a in _actions(out))
+    with open(os.path.join(out, "result.json")) as fh:
+        blob = json.load(fh)
+    c15 = [c for c in blob["arm"]["conditions"] if c["number"] == 15][0]
+    assert c15["blocked"] is True
+    assert "pytest (stdlib harness)" in c15["reason"]
+
+
 def test_conformance_handoff_clean_run_writes_empty_bridge(tmp_path):
     out = str(tmp_path / "out")
     res = runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
@@ -949,6 +969,53 @@ def test_live_push_starts_background_watch_with_head_sha(monkeypatch, tmp_path):
     assert sha == _LiveShapedGit.POST_REBASE_SHA
     assert not sha.startswith("replay-sha-"), "keyed on the pre-rebase commit SHA"
     assert out_dir == out
+
+
+def _live_arm_c15(monkeypatch, tmp_path, probe_result, bg=None):
+    """Run the live-shaped arm and return condition (15)'s ConditionResult."""
+    monkeypatch.setattr(ciwatch, "start_background_watch", lambda *a, **k: bg)
+    monkeypatch.setattr(ciwatch, "watch_live",
+                        lambda *a, **k: ciwatch.CiOutcome(0, [], "stub watch_live"))
+    monkeypatch.setattr(ciwatch, "probe_failed_checks", lambda w, pr: list(probe_result))
+    monkeypatch.setattr(ciwatch, "reap_background_watch", lambda *a, **k: None)
+    res = _run_live_shaped(monkeypatch, str(tmp_path / "out"))
+    return [c for c in res.arm.conditions if c.number == 15][0]
+
+
+def test_live_probe_failure_holds_condition_15(monkeypatch, tmp_path):
+    """The live arm actually calls probe_failed_checks.
+
+    runner.py's condition-(15) block is inside `if live and pr:` and is wrapped in a
+    broad try/except that falls back to []. Every other test in this file runs
+    live=False, so without this case a typo in an attribute name would degrade the
+    condition to a silent no-op in production while the suite stayed green.
+    """
+    c15 = _live_arm_c15(monkeypatch, tmp_path, ["pytest (stdlib harness)"])
+    assert c15.blocked is True
+    assert "pytest (stdlib harness)" in c15.reason
+
+
+def test_live_probe_clean_clears_condition_15(monkeypatch, tmp_path):
+    """Negative control: an empty probe must not manufacture a hold."""
+    c15 = _live_arm_c15(monkeypatch, tmp_path, [])
+    assert c15.blocked is False
+
+
+def test_live_finished_background_watch_feeds_condition_15(monkeypatch, tmp_path):
+    """A background watch that already resolved to `failure` contributes its names.
+
+    Exercises the bg_ci.done / bg_ci.status / bg_ci.failed attribute reads, which the
+    bg=None cases above short-circuit past. A rename on any of the three raises inside
+    the try/except and silently clears the hold; this case fails instead.
+    """
+    bg = ciwatch.BackgroundWatch(sha="deadbeef", pr=_INLINE_FIXTURE["pr_number"],
+                                 worktree=".", path=str(tmp_path / "ci.json"),
+                                 started=0.0)
+    bg.status, bg.failed = "failure", ["E2E Tests"]
+    bg.done.set()
+    c15 = _live_arm_c15(monkeypatch, tmp_path, [], bg=bg)
+    assert c15.blocked is True
+    assert "E2E Tests" in c15.reason
 
 
 def test_phase7_reuses_background_outcome(monkeypatch, tmp_path):

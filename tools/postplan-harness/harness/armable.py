@@ -109,6 +109,7 @@ class ArmInputs:
     fidelity_tree_2: Optional[str] = None             # REVIEWED_TREE read off verdict 2
     current_tree: str = ""                            # git rev-parse HEAD^{tree}
     conflict_resolved: Optional[bool] = None          # None = never consulted -> BLOCKS
+    failed_checks: list[str] = field(default_factory=list)  # checks in gh's fail bucket at arm time
 
 
 def select_fidelity_verdict(v1, v2, tree2, current_tree):
@@ -236,5 +237,18 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     else:
         r = ""
     cs.append(ConditionResult(14, "conflict-auto-resolved", bool(r), r))
+
+    # Condition (15) — checks already in gh's `fail` bucket on the PR's current head.
+    # FAIL-OPEN ON PENDING CHECKS: `probe_failed_checks` returning [] means "no failure
+    # proven at arm time", never "all checks are green". A check that has not yet
+    # reported is invisible to the probe and therefore clears (15). This condition
+    # catches fast-failing checks that are already red when the arming decision runs —
+    # it does NOT wait for slow checks to settle (that is Phase 7's job). An empty
+    # `failed_checks` list is a deliberate pass-through, not a green signal: the only
+    # correct way to clear a real hold is to fix CI and re-run, never to assume
+    # absence of a probe result means success. Additive: can only ADD a hold, never
+    # release one.
+    cs.append(ConditionResult(15, "red-ci-check", bool(inp.failed_checks),
+                              ", ".join(inp.failed_checks)))
 
     return ArmDecision(armed=not any(c.blocked for c in cs), conditions=cs)

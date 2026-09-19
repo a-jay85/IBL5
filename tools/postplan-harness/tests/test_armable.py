@@ -137,11 +137,12 @@ def test_fidelity_default_is_fail_closed():
 
 
 def test_condition_set_is_skill_numbered():
-    """The set is {1..14} with no gaps. The numbers track the SKILL's condition numbers,
+    """The set is {1..15} with no gaps. The numbers track the SKILL's condition numbers,
     not this list's position: (11) shells out to bin/lib/pr-armable.sh for unresolved
-    review-thread findings and (14) reads the conflict-resolved flag."""
+    review-thread findings, (14) reads the conflict-resolved flag, and (15) checks for
+    already-red CI checks on the PR head at arm time."""
     nums = sorted(c.number for c in evaluate(inputs()).conditions)
-    assert nums == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+    assert nums == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
 
 
 def test_fidelity_is_additive_and_releases_nothing():
@@ -194,6 +195,33 @@ def test_armable_unmet_contract_blocks_arming():
     # phase5_status='skipped' with empty unresolved_conformance still arms (condition (4) not touched).
     d2 = evaluate(inputs(phase5_status="skipped", unresolved_conformance=[]))
     assert d2.armed
+
+
+# ---------------------------------------------------------------------------
+# Condition (15) — red-ci-check hold tests
+# ---------------------------------------------------------------------------
+
+def test_red_ci_check_blocks_arm():
+    """(15) non-empty failed_checks blocks arming."""
+    d = evaluate(inputs(failed_checks=["pytest (stdlib harness)"]))
+    assert not d.armed
+    assert any(c.number == 15 for c in d.holds)
+
+
+def test_red_ci_check_empty_does_not_block():
+    """(15) empty failed_checks (fail-open on pending) does not block."""
+    d = evaluate(inputs(failed_checks=[]))
+    assert d.armed
+    assert not any(c.number == 15 and c.blocked for c in d.conditions)
+
+
+def test_red_ci_check_reason_lists_names():
+    """(15) reason string joins all failing check names."""
+    d = evaluate(inputs(failed_checks=["check-a", "check-b"]))
+    c15 = next(c for c in d.conditions if c.number == 15)
+    assert c15.blocked
+    assert "check-a" in c15.reason
+    assert "check-b" in c15.reason
 
 
 def test_rebase_conflict_fails_the_run_before_evaluate():

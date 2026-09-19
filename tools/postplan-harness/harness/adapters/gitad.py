@@ -357,6 +357,7 @@ class ReplayGit:
         self.fx = fixture
         self.commit_messages: list[str] = []
         self.pushes = 0
+        self.meta_checks_calls: list[tuple[str, int]] = []
 
     def branch(self) -> str:
         return self.fx.get("slug", "unknown-branch")

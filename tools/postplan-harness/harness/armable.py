@@ -63,6 +63,20 @@ def manual_testing_clearance(body: str) -> str:
     return "HELD"
 
 
+def meta_checks_clearance(flag_path: str, post_pr_rc: int) -> str:
+    """Three-state clearance for condition (15): pre-push flag file or post-pr run.
+
+    Flag file checked first — a pre-push failure outranks a passing post-pr run.
+    """
+    if os.path.exists(flag_path):
+        return "HELD"
+    if post_pr_rc == 0:
+        return "CLEARED"
+    if post_pr_rc == 1:
+        return "HELD"
+    return "UNKNOWN"
+
+
 def dep_numbers(body: str) -> list[int]:
     """Anchored `Depends-on:` lines only (inline prose mentions ignored)."""
     nums: list[int] = []
@@ -108,7 +122,8 @@ class ArmInputs:
     fidelity_verdict_2: Optional[str] = None          # re-review verdict word
     fidelity_tree_2: Optional[str] = None             # REVIEWED_TREE read off verdict 2
     current_tree: str = ""                            # git rev-parse HEAD^{tree}
-    conflict_resolved: Optional[bool] = None          # None = never consulted -> BLOCKS
+    conflict_resolved: Optional[bool] = None
+    meta_checks_status: str = "CLEARED"          # None = never consulted -> BLOCKS
 
 
 def select_fidelity_verdict(v1, v2, tree2, current_tree):
@@ -236,5 +251,11 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     else:
         r = ""
     cs.append(ConditionResult(14, "conflict-auto-resolved", bool(r), r))
+
+    # Condition (15) — pre-push meta-check gate flag or post-pr run failure.
+    mc = inp.meta_checks_status
+    mc_blocked = mc != "CLEARED"
+    cs.append(ConditionResult(15, "meta-checks", mc_blocked,
+                              f"state={mc}" if mc_blocked else ""))
 
     return ArmDecision(armed=not any(c.blocked for c in cs), conditions=cs)

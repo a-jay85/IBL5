@@ -1,9 +1,11 @@
-"""Phase 6.5 — the fourteen ported arming conditions as pure, typed functions.
+"""Phase 6.5 — the sixteen ported arming conditions as pure, typed functions.
 
 The numbers track the SKILL's condition numbers, not this list's position. The set is
-now {1..14} with no gaps: condition (11) shells out to
+now {1..16} with no gaps: condition (11) shells out to
 `bin/lib/pr-armable.sh::pr_unresolved_findings_hold` for unresolved review-thread
-findings, and condition (14) reads the run-local conflict-resolved flag.
+findings, condition (14) reads the run-local conflict-resolved flag, condition (15)
+probes for already-red CI checks at arm time, and condition (16) checks the
+pre-push local meta-check gate.
 
 Faithful port of .claude/skills/post-plan/_phase-6.5-arm-auto-merge.md +
 bin/lib/pr-armable.sh. Historically each condition was a separate model-driven
@@ -63,6 +65,20 @@ def manual_testing_clearance(body: str) -> str:
     return "HELD"
 
 
+def meta_checks_clearance(flag_path: str, post_pr_rc: int) -> str:
+    """Three-state clearance for condition (16): pre-push flag file or post-pr run.
+
+    Flag file checked first — a pre-push failure outranks a passing post-pr run.
+    """
+    if os.path.exists(flag_path):
+        return "HELD"
+    if post_pr_rc == 0:
+        return "CLEARED"
+    if post_pr_rc == 1:
+        return "HELD"
+    return "UNKNOWN"
+
+
 def dep_numbers(body: str) -> list[int]:
     """Anchored `Depends-on:` lines only (inline prose mentions ignored)."""
     nums: list[int] = []
@@ -110,6 +126,7 @@ class ArmInputs:
     current_tree: str = ""                            # git rev-parse HEAD^{tree}
     conflict_resolved: Optional[bool] = None          # None = never consulted -> BLOCKS
     failed_checks: list[str] = field(default_factory=list)  # checks in gh's fail bucket at arm time
+    meta_checks_status: str = "CLEARED"               # pre-push meta-check gate; "HELD"/"UNKNOWN" blocks
 
 
 def select_fidelity_verdict(v1, v2, tree2, current_tree):
@@ -250,5 +267,11 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     # release one.
     cs.append(ConditionResult(15, "red-ci-check", bool(inp.failed_checks),
                               ", ".join(inp.failed_checks)))
+
+    # Condition (16) — pre-push meta-check gate flag or post-pr run failure.
+    mc = inp.meta_checks_status
+    mc_blocked = mc != "CLEARED"
+    cs.append(ConditionResult(16, "meta-checks", mc_blocked,
+                              f"state={mc}" if mc_blocked else ""))
 
     return ArmDecision(armed=not any(c.blocked for c in cs), conditions=cs)

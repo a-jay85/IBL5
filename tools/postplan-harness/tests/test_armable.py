@@ -137,12 +137,13 @@ def test_fidelity_default_is_fail_closed():
 
 
 def test_condition_set_is_skill_numbered():
-    """The set is {1..15} with no gaps. The numbers track the SKILL's condition numbers,
+    """The set is {1..16} with no gaps. The numbers track the SKILL's condition numbers,
     not this list's position: (11) shells out to bin/lib/pr-armable.sh for unresolved
-    review-thread findings, (14) reads the conflict-resolved flag, and (15) checks for
-    already-red CI checks on the PR head at arm time."""
+    review-thread findings, (14) reads the conflict-resolved flag, (15) checks for
+    already-red CI checks on the PR head at arm time, and (16) checks the pre-push
+    local meta-check gate."""
     nums = sorted(c.number for c in evaluate(inputs()).conditions)
-    assert nums == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    assert nums == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
 
 
 def test_fidelity_is_additive_and_releases_nothing():

@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-09-18
+last_verified: 2026-09-19
 ---
 
 # Post-Plan Orchestrator
@@ -170,6 +170,34 @@ else
   echo "REBASE=conflict"
   : > "$PPCAP_TMP/postplan-conflict-resolved-$PPCAP_KEY"
   echo "STOP-AND-RESOLVE: rebase onto $REBASE_BASE_REF conflicted. 'git rebase --abort' has restored the tree; nothing was pushed and the committed tree is untouched. Do not push from here. Go to .claude/skills/post-plan/_phase-2-conflict-resolution.md and follow it end to end: it re-runs the rebase in the --onto form, resolves three-way, and proves no work was lost before any push is allowed. Conflict-resolved lines are code no structured review has seen, so this run will hold auto-merge at Phase 6.5 condition (14) and announce that hold on the PR. If this branch was stacked on a now-merged parent, this is the squash trap — replay only your own commits with 'git rebase --onto origin/master <parent-tip-before-merge> <branch>' (.claude/rules/linear-history-squash-merge.md)."
+fi
+```
+
+2.5. Run the local meta-check gate before pushing.
+
+```bash
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+META_FLAG="/tmp/ibl5-meta-checks-prepush-${BRANCH//\//-}.failed"
+META_EXTRA=""
+[ -n "${BODY_FILE:-}" ] && META_EXTRA=" --body-file $BODY_FILE"
+MC_OUT=$(bin/run-meta-checks-local --stage pre-push --base origin/master$META_EXTRA 2>&1)
+MC_RC=$?
+if [ "$MC_RC" = 3 ]; then
+  echo "STOP: meta-checks cannot parse workflow filters; fix .github/workflows/pr-meta-checks.yml and re-run /post-plan."
+  exit 1
+fi
+if [ "$MC_RC" != 0 ]; then
+  bin/check-docs --fix-dates --since=origin/master 2>/dev/null; git add -u 2>/dev/null || true
+  git diff --cached --quiet || git commit --amend --no-edit
+  MC_OUT=$(bin/run-meta-checks-local --stage pre-push --base origin/master$META_EXTRA 2>&1)
+  MC_RC=$?
+fi
+if [ "$MC_RC" = 0 ]; then
+  rm -f "$META_FLAG"
+else
+  FAILED=$(grep 'META-CHECK-FAILED:' <<< "$MC_OUT" | sed 's/.*META-CHECK-FAILED: //' | tr '\n' ' ')
+  printf '%s\n' "${FAILED:-unknown}" > "$META_FLAG"
+  echo "META-CHECKS=failed (${FAILED:-unknown}) — pushing anyway; condition (16) will hold auto-merge"
 fi
 ```
 

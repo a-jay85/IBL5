@@ -59,8 +59,10 @@
 # should_fallback <rc> — decide whether to escalate to the /post-plan skill session after the
 # compiled harness exits with <rc>. Returns 0 (DO fall back) for a generic harness failure;
 # returns 1 (do NOT fall back) for success (0) and the fail-closed sentinel (3) emitted by
-# runner.py exit_code_for(). Two kinds reach exit 3: a stacked-branch rebase conflict, and
-# a local pre-commit/pre-push gate denial (missing ADR, stale doc, rules byte budget). Both
+# runner.py exit_code_for(). Two kinds reach exit 3: (1) a rebase conflict the auto-resolver
+# declined or could not certify (unresolvable conflict class, per-file round cap, or failed
+# TREE-EQUIVALENT proof; see ibl5/docs/decisions/0131-harness-conflict-autoresolve.md), and
+# (2) a local pre-commit/pre-push gate denial (missing ADR, stale doc, rules byte budget). Both
 # are deterministic walls a skill re-run cannot climb, so the fallback is suppressed entirely.
 # This function is embedded verbatim into the launchd plist below via `declare -f`, so the
 # tested logic here is exactly what runs there.

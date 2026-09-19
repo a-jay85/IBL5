@@ -16,6 +16,8 @@ from ..state import HarnessError
 # the ~1M-token skill fallback instead of burning it on a guaranteed re-denial.
 # Markers are the hooks' own output: bin/pre-push-adr-hook's prefix, the two guidance
 # lines bin/pre-commit-hook echoes, and bin/check-rules-byte-budget's summary line.
+_ZERO_SHA = "0" * 40
+
 _LOCAL_GATE_MARKERS = (
     "pre-push-adr-hook:",
     "One or more checks failed:",
@@ -33,6 +35,18 @@ _GATE_CLASSES = (
     ("byte-budget", "Trim the rule(s) above"),
     ("doc-staleness", "Bump last_verified"),
 )
+
+
+_STALE_LEASE_MARKERS = ("stale info", "stale-lease:", "cannot lock ref",
+                        "fetch first", "non-fast-forward")
+
+
+def is_stale_lease(err: "HarnessError") -> bool:
+    """True when a Phase-1 push-failed is a lease/fast-forward rejection a fetch+rebase
+    can clear. detached HEAD and lease read failures stay terminal."""
+    if err.kind != "push-failed":
+        return False
+    return any(m in (err.detail or "").lower() for m in _STALE_LEASE_MARKERS)
 
 
 def classify_local_gate_denial(detail: str) -> str:
@@ -83,6 +97,11 @@ class LiveGit:
                 raise HarnessError("local-gate", f"git {' '.join(args)}: {detail[:600]}")
             raise HarnessError("git", f"git {' '.join(args)}: {proc.stderr.strip()[:400]}")
         return proc.stdout
+
+    def _run_out(self, *args: str) -> tuple[int, str]:
+        proc = subprocess.run(["git", "-C", self.worktree, *args],
+                              capture_output=True, text=True, errors="replace")
+        return proc.returncode, f"{proc.stdout}\n{proc.stderr}".strip()
 
     def branch(self) -> str:
         return self._run("rev-parse", "--abbrev-ref", "HEAD").strip()
@@ -342,12 +361,57 @@ class LiveGit:
             collapse_warn=collapse_warn,
         )
 
+    def capture_lostwork_pre(self, key: str) -> bool:
+        """Pre-side capture for lostwork.sh. Must run BEFORE fetch/rebase."""
+        pre = self.diff_vs_base("origin/master")
+        if not pre.strip():
+            return False
+        Path(f"/tmp/pr-ready-diff-pre-{key}.patch").write_text(pre)
+        return True
+
+    def prove_lostwork(self, key: str) -> tuple[bool, str]:
+        master_sha = self._run("rev-parse", "origin/master").strip()
+        content = self._run(
+            "show", f"{master_sha}:.claude/skills/pr-ready/scripts/lostwork.sh",
+            check=False)
+        if not content.strip():
+            return False, "lostwork.sh not found at pinned master SHA"
+        script = Path(f"/tmp/postplan-lostwork-{key}.sh")
+        script.write_text(content)
+        script.chmod(0o755)
+        proc = subprocess.run(["bash", str(script), key],
+                              capture_output=True, text=True, errors="replace",
+                              cwd=self.worktree)
+        ok = "TREE-EQUIVALENT" in proc.stdout and proc.returncode == 0
+        return ok, (proc.stdout + proc.stderr).strip()[:400]
+
     def push(self) -> None:
         if not self.push_remote:
             raise HarnessError("push-disabled",
                                "no isolated push remote configured; live push requires install approval")
-        # --force-with-lease: rebase_onto() rewrites SHAs, making plain push fail non-fast-forward
-        self._run("push", "--force-with-lease", self.push_remote, "HEAD")
+        branch = self.branch()
+        if branch == "HEAD":
+            raise HarnessError("push-failed", "detached HEAD: refusing to push without a branch name")
+        remote = self.push_remote
+        lease = self._run("rev-parse", "--verify", "--quiet",
+                          f"refs/remotes/{remote}/{branch}", check=False).strip()
+        if not lease:
+            rc, out = self._run_out("ls-remote", remote, f"refs/heads/{branch}")
+            if rc != 0:
+                raise HarnessError("push-failed",
+                                   f"lease read failed for {remote}/{branch}: {out[:400]}")
+            if out.strip():
+                sha = out.strip().split()[0]
+                raise HarnessError("push-failed",
+                                   f"stale-lease: {remote} holds refs/heads/{branch} ({sha}) "
+                                   f"but this worktree has no refs/remotes/{remote}/{branch}")
+            lease = _ZERO_SHA
+        rc, out = self._run_out("push", f"--force-with-lease={branch}:{lease}",
+                                remote, f"HEAD:refs/heads/{branch}")
+        if rc != 0:
+            if any(m in out for m in _LOCAL_GATE_MARKERS):
+                raise HarnessError("local-gate", f"git push: {out[:600]}")
+            raise HarnessError("push-failed", out[:600])
 
 
 class ReplayGit:

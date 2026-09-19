@@ -23,6 +23,7 @@ Modes:
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import json
 import os
 import re
@@ -240,6 +241,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         f"slug_drift={plan.slug_drift or '-'} plan_source={plan.plan_source or '-'}")
 
     bg_ci = None       # background CI watch handle; reaped in the finally below
+    join_review = None # set once Phase 4 is launched; the finally below drains it
 
     try:
         # ---- Phase 2/3: ship + classify -------------------------------
@@ -328,19 +330,35 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         meta = gh.pr_meta() or {"number": pr, "title": copy["title"], "body": copy["summary_md"]}
 
         # ---- Phase 4: review + security (gated bounded calls) ---------
-        findings, gates, scored, degraded_agents = ReviewPhase(llm, gh).run(meta, cls, plan)
-        # A degraded pr-copy joins the same list: the PR then carries the "Review
-        # Unavailable" note, the terminal is DEGRADED, and arming is off — the title a
-        # human must sanity-check was never model-reviewed.
-        if copy_degraded:
-            degraded_agents = list(degraded_agents) + ["pr-copy"]
-        res.findings = findings
-        res.scored_findings = scored
-        res.degraded_agents = degraded_agents
-        state.checkpoint("review", res, review_gates=gates, reviewed_head=meta.get("headRefOid") or "")
-        log(f"phase4 gates={ {k: v for k, v in gates.items()} } findings: raw={len(scored)} surviving={len(findings)} scores={[s['score'] for s in scored]}")
-        if degraded_agents:
-            log(f"phase4 DEGRADED: unparseable review output from {', '.join(degraded_agents)}")
+        # Runs in the background under Phase 5 → 5.0 → 6 → the Phase 5.5 review call; none
+        # of those read Phase 4's output. Only the LLM calls and the PR posts run on the
+        # worker: log(), state.checkpoint() and the pr-copy degradation merge stay on
+        # this thread, in _join_review, so audit.log and the state file keep their serial
+        # order. The join happens before anything moves the head (fidelity remediation),
+        # so the review still posts against the head it read.
+        review_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+        review_future = review_pool.submit(ReviewPhase(llm, gh).run, meta, cls, plan)
+        review_pool.shutdown(wait=False)
+        review_joined = []
+
+        def _join_review() -> None:
+            if review_joined:
+                return
+            review_joined.append(True)
+            findings, gates, scored, degraded_agents = review_future.result()
+            # A degraded pr-copy joins the same list: the PR then carries the "Review
+            # Unavailable" note, the terminal is DEGRADED, and arming is off — the title a
+            # human must sanity-check was never model-reviewed.
+            if copy_degraded:
+                degraded_agents = list(degraded_agents) + ["pr-copy"]
+            res.findings = findings
+            res.scored_findings = scored
+            res.degraded_agents = degraded_agents
+            state.checkpoint("review", res, review_gates=gates, reviewed_head=meta.get("headRefOid") or "")
+            log(f"phase4 gates={ {k: v for k, v in gates.items()} } findings: raw={len(scored)} surviving={len(findings)} scores={[s['score'] for s in scored]}")
+            if degraded_agents:
+                log(f"phase4 DEGRADED: unparseable review output from {', '.join(degraded_agents)}")
+        join_review = _join_review
 
         # ---- Phase 5 + 5.0: verify + conformance -----------------------
         tracks = verifier.run(cls)
@@ -417,7 +435,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         master_sha = _master_sha(worktree)
         reviewed_tree = git.head_tree()
         _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_sha,
-                      reviewed_tree, live, log, res)
+                      reviewed_tree, live, log, res, before_remediation=_join_review)
+        _join_review()
         # A remediation loop moved the head, up to MAX_FIDELITY_ROUNDS times. Phase 7
         # must watch CI for the last commit, which is what remediation_sha aliases after
         # the loop.
@@ -427,7 +446,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # ---- Phase 6.5: arming ----------------------------------------
         inputs = ArmInputs(
             pr_body=gh.pr_body() or body, pr_title=meta.get("title", copy["title"]),
-            pr_labels=gh.pr_labels(), classification=cls, findings=findings,
+            pr_labels=gh.pr_labels(), classification=cls, findings=res.findings,
             unresolved_conformance=unresolved, phase5_status=phase5,
             plan_auto_merge_false=plan.auto_merge_false, headless=headless,
             dep_state_lookup=lambda n: gh.pr_state(n),
@@ -444,7 +463,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             unresolved_findings=gh.unresolved_findings(pr) if live else [],
             conflict_resolved=(os.path.exists(conflict_flag_path(git.branch())) if live
                                else bool((fixture or {}).get("conflict_resolved", False))),
-            degraded_agents=degraded_agents,
+            degraded_agents=res.degraded_agents,
             plan_slug_drift=plan.slug_drift,
         )
         if not live and (fixture or {}).get("current_tree"):
@@ -504,12 +523,12 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             gh.pr_merge_auto(pr)
         state.checkpoint("arm", res)
 
-        if degraded_agents:
+        if res.degraded_agents:
             current = gh.pr_body() or body
             if "## Review Unavailable" not in current:
                 note = ("\n\n## Review Unavailable\n\n"
                         "The compiled post-plan harness could not parse the reply from: "
-                        + ", ".join(degraded_agents)
+                        + ", ".join(res.degraded_agents)
                         + ". Those checks did not run; auto-merge was not armed. "
                           "Re-run the review or review this PR by hand before merging.\n")
                 gh.pr_edit_body(pr, current + note)
@@ -532,7 +551,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         res.final_pr_state = gh.pr_state() if (mode == "replay" or live) else "N/A"
         log(f"phase7 ci: exit={outcome.exit_code} failed={outcome.failed} ({outcome.evidence})")
 
-        res.terminal = (TerminalState.DEGRADED if degraded_agents else
+        res.terminal = (TerminalState.DEGRADED if res.degraded_agents else
                         TerminalState.SHIPPED_ARMED if decision.armed
                         else TerminalState.SHIPPED_HELD)
 
@@ -542,7 +561,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         try:
             retro = llm.call("retrospective", "haiku",
                              llm_calls.retrospective_prompt(slug, res.terminal.value, decision,
-                                                            len(findings), phase5, res.fidelity),
+                                                            len(res.findings), phase5, res.fidelity),
                              schemas.validate_retrospective)
         except HarnessError as e:
             retro = {"save": False, "error": e.kind}
@@ -561,6 +580,14 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         res.error_kind = e.kind
         log(f"FAILED: {res.error}")
     finally:
+        # A Phase 5-5.5 failure can land while the background review is still running.
+        # Wait for it so the review checkpoint lands as it did when Phase 4 ran first;
+        # its own error must not replace the one that ended the run.
+        if join_review is not None:
+            try:
+                join_review()
+            except Exception as e:  # noqa: BLE001
+                log(f"phase4: background review failed after the run failed ({e!r})")
         state.checkpoint("terminal", res)
         _phase11_cleanup(llm, log)
         ciwatch.reap_background_watch(bg_ci)
@@ -750,8 +777,11 @@ def _read_text(path: str) -> str:
 
 
 def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_sha,
-                  reviewed_tree, live, log, res):
+                  reviewed_tree, live, log, res, before_remediation=None):
     """Phase 5.5. Returns (verdict_word_or_None, error_kind_or_'').
+
+    `before_remediation` runs once, just before the first remediation commit, so the
+    background Phase 4 review finishes before the head moves.
 
     Replay fixtures that carry no canned `plan-fidelity-review` keep the historical
     synthetic READY, so the pre-Phase-5.5 trace corpus stays green; a fixture opts into
@@ -796,6 +826,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
     rounds = []
     current_verdict_path = fidelity.verdict_path(pr)
     final_verdict, final_err = verdict, err
+    if final_verdict == "NOT READY" and before_remediation is not None:
+        before_remediation()
     for round_num in range(1, fidelity.MAX_FIDELITY_ROUNDS + 1):
         if final_verdict != "NOT READY":
             break

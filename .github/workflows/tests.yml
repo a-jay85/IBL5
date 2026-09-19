@@ -200,8 +200,8 @@ jobs:
 
   test:
     name: PHPUnit Tests
-    needs: [changes]
-    if: needs.changes.outputs.src == 'true'
+    needs: [changes, ci-memo-check]
+    if: needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -281,8 +281,8 @@ jobs:
 
   audit-php:
     name: PHP Dependency Audit
-    needs: [changes]
-    if: needs.changes.outputs.src == 'true'
+    needs: [changes, ci-memo-check]
+    if: needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -302,8 +302,8 @@ jobs:
 
   audit-js:
     name: JS Dependency Audit (bun)
-    needs: [changes]
-    if: needs.changes.outputs.src == 'true' || needs.changes.outputs.jsdeps == 'true'
+    needs: [changes, ci-memo-check]
+    if: (needs.changes.outputs.src == 'true' || needs.changes.outputs.jsdeps == 'true') && needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -386,8 +386,8 @@ jobs:
 
   ibl5-ts-unit:
     name: IBL5 TS Unit Tests
-    needs: [changes]
-    if: needs.changes.outputs.ibl5ts == 'true'
+    needs: [changes, ci-memo-check]
+    if: needs.changes.outputs.ibl5ts == 'true' && needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -409,8 +409,8 @@ jobs:
 
   iblbot:
     name: IBLbot Type Check & Unit Tests
-    needs: [changes]
-    if: needs.changes.outputs.iblbot == 'true'
+    needs: [changes, ci-memo-check]
+    if: needs.changes.outputs.iblbot == 'true' && needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -442,8 +442,8 @@ jobs:
 
   db-integration:
     name: Database Integration Tests
-    needs: [changes]
-    if: needs.changes.outputs.src == 'true' || needs.changes.outputs.both == 'true'
+    needs: [changes, ci-memo-check]
+    if: (needs.changes.outputs.src == 'true' || needs.changes.outputs.both == 'true') && needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -487,8 +487,8 @@ jobs:
 
   phpstan:
     name: PHPStan Analysis
-    needs: [changes]
-    if: needs.changes.outputs.src == 'true'
+    needs: [changes, ci-memo-check]
+    if: needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -561,8 +561,8 @@ jobs:
 
   shellcheck:
     name: ShellCheck (bash 3.2 compat)
-    needs: [changes]
-    if: needs.changes.outputs.shell == 'true'
+    needs: [changes, ci-memo-check]
+    if: needs.changes.outputs.shell == 'true' && needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -936,8 +936,8 @@ jobs:
 
   harness-tests:
     name: Shell harness regression tests
-    needs: [changes]
-    if: needs.changes.outputs.shell == 'true' || needs.changes.outputs.both == 'true'
+    needs: [changes, ci-memo-check]
+    if: (needs.changes.outputs.shell == 'true' || needs.changes.outputs.both == 'true') && needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # Each harness builds its own throwaway git repos under mktemp, so the

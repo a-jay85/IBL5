@@ -1,0 +1,359 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-run-meta-checks-local — Fixture self-test + CI-parity drift assertion
+# for bin/run-meta-checks-local. Follows bin/test-check-docs style.
+#
+# Each behavioural case runs against a minimal fixture repo; the parity case
+# (case l) runs against the real workflow and runner on disk.
+
+set -euo pipefail
+
+PASS=0
+FAIL=0
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+RUNNER="$SCRIPT_DIR/run-meta-checks-local"
+REAL_WF="$SCRIPT_DIR/../.github/workflows/pr-meta-checks.yml"
+
+pass() { printf 'PASS: %s\n' "$1"; PASS=$((PASS + 1)); }
+fail() { printf 'FAIL: %s\n' "$1"; FAIL=$((FAIL + 1)); }
+want() {
+    local label="$1" text="$2" token="$3"
+    if printf '%s' "$text" | grep -qF -- "$token"; then
+        pass "$label"
+    else
+        fail "$label (token not found: $token)"
+        printf '  output: %s\n' "$text"
+    fi
+}
+absent() {
+    local label="$1" text="$2" token="$3"
+    if printf '%s' "$text" | grep -qF -- "$token"; then
+        fail "$label (token was present but should be absent: $token)"
+        printf '  output: %s\n' "$text"
+    else
+        pass "$label"
+    fi
+}
+
+# run_check: capture exit code and output without masking the code with || true.
+run_check() {
+    local _out
+    _out=$("$@" 2>&1) || true
+    printf '%s' "$_out"
+}
+run_check_rc() {
+    "$@" >/dev/null 2>&1
+    printf '%d' $?
+}
+run_check_both() {
+    # Usage: OUT=$(run_check_both cmd...); RC=$(...)
+    # Returns combined stdout+stderr; exit code stored in _LAST_RC.
+    _LAST_RC=0
+    _LAST_OUT=$("$@" 2>&1) || _LAST_RC=$?
+}
+
+# Fixture workflow with the same structure as the real one: comment line in
+# numbering filter and single-quoted globs.
+FIXTURE_WORKFLOW='on: pull_request
+jobs:
+  meta-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compute filters
+        uses: dorny/paths-filter@abc
+        with:
+          filters: |
+            adr:
+              - '"'"'ibl5/phpstan-rules/**'"'"'
+              - '"'"'.claude/rules/*.md'"'"'
+              - '"'"'bin/*'"'"'
+            numbering:
+              # Deliberately different from adr: covers decisions/ and migrations/
+              - '"'"'ibl5/docs/decisions/**'"'"'
+              - '"'"'ibl5/migrations/**'"'"'
+            refactor:
+              - '"'"'ibl5/classes/**'"'"'
+              - '"'"'ibl5/tests/**'"'"'
+            hotfiles:
+              - '"'"'ibl5/classes/**'"'"'
+            orphancss:
+              - '"'"'ibl5/design/**.css'"'"'
+            prcollisions:
+              - '"'"'ibl5/phpstan-baseline.neon'"'"'
+            e2ehygiene:
+              - '"'"'ibl5/tests/e2e/**'"'"'
+'
+
+# Fixture workflow with all filters matching everything (execution cases f-k).
+FIXTURE_WORKFLOW_ALL='on: pull_request
+jobs:
+  meta-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compute filters
+        uses: dorny/paths-filter@abc
+        with:
+          filters: |
+            adr:
+              - '"'"'**'"'"'
+            numbering:
+              - '"'"'**'"'"'
+            refactor:
+              - '"'"'**'"'"'
+            hotfiles:
+              - '"'"'**'"'"'
+            orphancss:
+              - '"'"'**'"'"'
+            prcollisions:
+              - '"'"'**'"'"'
+            e2ehygiene:
+              - '"'"'**'"'"'
+'
+
+# make_repo <workflow-content>: creates a minimal fixture git repo with stubs.
+make_repo() {
+    local wf_content="$1"
+    local repo
+    repo=$(mktemp -d)
+    git -C "$repo" init -q
+    git -C "$repo" config user.email "test@example.com"
+    git -C "$repo" config user.name "test"
+
+    mkdir -p "$repo/.github/workflows" "$repo/bin"
+    printf '%s' "$wf_content" > "$repo/.github/workflows/pr-meta-checks.yml"
+
+    # Stub every script the runner invokes. Each stub reads STUB_RC_<name>,
+    # defaulting to 0. Uses indirect expansion which bash 3.2 supports via ${!}.
+    for sname in check-docs check-prose check-pr-manual-testing \
+                 check-registry-trigger-rows check-numbering check-e2e-hygiene \
+                 check-e2e-fa-offers-owner check-e2e-mutator-isolation \
+                 check-hot-files check-orphan-css adr-check refactor-flag \
+                 check-pr-collisions; do
+        varname="STUB_RC_$(printf '%s' "$sname" | tr '-' '_')"
+        # Write stub using printf to avoid heredoc nesting issues.
+        printf '#!/bin/sh\n_varname="%s"\n_rc=$(eval "printf '"'"'%%s'"'"' \"\${${_varname}:-0}\"")\n[ "$_rc" != "0" ] && printf "stub %s failed\\n" >&2\nexit "$_rc"\n' \
+            "$varname" "$sname" > "$repo/bin/$sname"
+        chmod +x "$repo/bin/$sname"
+    done
+
+    # Copy the runner so it reads this repo's workflow and bin/.
+    cp "$RUNNER" "$repo/bin/run-meta-checks-local"
+
+    # Initial commit on master so git merge-base resolves.
+    printf 'fixture\n' > "$repo/.gitkeep"
+    git -C "$repo" add .
+    git -C "$repo" commit -q -m "initial"
+
+    printf '%s' "$repo"
+}
+
+get_base() { git -C "$1" rev-parse HEAD; }
+
+# ─── Case a: ibl5/classes/ change → refactor=true, adr=false ─────────────────
+REPO=$(make_repo "$FIXTURE_WORKFLOW")
+BASE=$(get_base "$REPO")
+mkdir -p "$REPO/ibl5/classes"
+printf 'php\n' > "$REPO/ibl5/classes/Foo.php"
+git -C "$REPO" add .
+git -C "$REPO" commit -q -m "add class"
+run_check_both "$REPO/bin/run-meta-checks-local" --self-test-hook "$REPO" --base "$BASE" --print-filters
+OUT="$_LAST_OUT"
+rm -rf "$REPO"
+want "case a: refactor=true for ibl5/classes/ change" "$OUT" "refactor=true"
+absent "case a: adr=false for ibl5/classes/ change" "$OUT" "adr=true"
+
+# ─── Case b: bin/lib/pr-armable.sh → adr=false (bin/* single-star boundary) ──
+REPO=$(make_repo "$FIXTURE_WORKFLOW")
+BASE=$(get_base "$REPO")
+mkdir -p "$REPO/bin/lib"
+printf 'x\n' > "$REPO/bin/lib/pr-armable.sh"
+git -C "$REPO" add .
+git -C "$REPO" commit -q -m "add nested bin file"
+run_check_both "$REPO/bin/run-meta-checks-local" --self-test-hook "$REPO" --base "$BASE" --print-filters
+OUT="$_LAST_OUT"
+rm -rf "$REPO"
+absent "case b: adr=false for bin/lib/ (bin/* does not cross slash)" "$OUT" "adr=true"
+
+# ─── Case c: deleted filters: | line → exit 3, error on stderr, no =true ─────
+REPO=$(make_repo "$FIXTURE_WORKFLOW")
+printf 'jobs:\n  meta-checks:\n    steps:\n      - name: foo\n        run: bin/check-docs\n' \
+    > "$REPO/.github/workflows/pr-meta-checks.yml"
+run_check_both "$REPO/bin/run-meta-checks-local" --self-test-hook "$REPO" --base HEAD --print-filters
+OUT="$_LAST_OUT"; RC="$_LAST_RC"
+rm -rf "$REPO"
+[ "$RC" -eq 3 ] && pass "case c: exit 3 on missing filters block" \
+                 || fail "case c: exit 3 on missing filters block (got $RC)"
+want "case c: error on stderr" "$OUT" "cannot parse filters block"
+absent "case c: no =true on stdout" "$OUT" "=true"
+
+# ─── Case d: unsupported ! glob → exit 3 ─────────────────────────────────────
+REPO=$(make_repo "$FIXTURE_WORKFLOW")
+# Append a negation glob to the adr filter.
+printf "\n              - '!ibl5/**'\n" >> "$REPO/.github/workflows/pr-meta-checks.yml"
+run_check_both "$REPO/bin/run-meta-checks-local" --self-test-hook "$REPO" --base HEAD --print-filters
+RC="$_LAST_RC"
+rm -rf "$REPO"
+[ "$RC" -eq 3 ] && pass "case d: exit 3 on unsupported ! glob" \
+                 || fail "case d: exit 3 on unsupported ! glob (got $RC)"
+
+# ─── Case e: no changes vs base → every filter false ─────────────────────────
+REPO=$(make_repo "$FIXTURE_WORKFLOW")
+BASE=$(get_base "$REPO")
+run_check_both "$REPO/bin/run-meta-checks-local" --self-test-hook "$REPO" --base "$BASE" --print-filters
+OUT="$_LAST_OUT"
+rm -rf "$REPO"
+absent "case e: adr=false when no changes" "$OUT" "adr=true"
+absent "case e: refactor=false when no changes" "$OUT" "refactor=true"
+absent "case e: numbering=false when no changes" "$OUT" "numbering=true"
+
+# ─── Case f: all stubs exit 0 → META-CHECKS: OK, exit 0 ─────────────────────
+REPO=$(make_repo "$FIXTURE_WORKFLOW_ALL")
+BASE=$(get_base "$REPO")
+printf 'x\n' > "$REPO/changed.txt"
+git -C "$REPO" add .
+git -C "$REPO" commit -q -m "add file"
+run_check_both "$REPO/bin/run-meta-checks-local" --self-test-hook "$REPO" --base "$BASE"
+OUT="$_LAST_OUT"; RC="$_LAST_RC"
+rm -rf "$REPO"
+[ "$RC" -eq 0 ] && pass "case f: exit 0 when all stubs pass" \
+                 || fail "case f: exit 0 when all stubs pass (got $RC)"
+want "case f: META-CHECKS: OK" "$OUT" "META-CHECKS: OK"
+
+# ─── Case g: check-docs stubs exit 1 → META-CHECK-FAILED, exit 1 ─────────────
+REPO=$(make_repo "$FIXTURE_WORKFLOW_ALL")
+BASE=$(get_base "$REPO")
+printf 'x\n' > "$REPO/changed.txt"
+git -C "$REPO" add .
+git -C "$REPO" commit -q -m "add file"
+run_check_both env STUB_RC_check_docs=1 \
+    "$REPO/bin/run-meta-checks-local" --self-test-hook "$REPO" --base "$BASE"
+OUT="$_LAST_OUT"; RC="$_LAST_RC"
+rm -rf "$REPO"
+[ "$RC" -eq 1 ] && pass "case g: exit 1 when check-docs stub fails" \
+                 || fail "case g: exit 1 when check-docs stub fails (got $RC)"
+want "case g: META-CHECK-FAILED: check-docs-since" "$OUT" "META-CHECK-FAILED: check-docs-since"
+
+# ─── Case h: --stage post-pr without --pr → exit 2, usage, no stub invoked ───
+REPO=$(make_repo "$FIXTURE_WORKFLOW_ALL")
+BASE=$(get_base "$REPO")
+run_check_both "$REPO/bin/run-meta-checks-local" \
+    --self-test-hook "$REPO" --base "$BASE" --stage post-pr
+OUT="$_LAST_OUT"; RC="$_LAST_RC"
+rm -rf "$REPO"
+[ "$RC" -eq 2 ] && pass "case h: exit 2 without --pr for post-pr stage" \
+                 || fail "case h: exit 2 without --pr for post-pr stage (got $RC)"
+want "case h: usage on stderr" "$OUT" "Usage:"
+absent "case h: no stub invoked before usage error" "$OUT" "PASS  check"
+
+# ─── Case i: two stubs fail → two META-CHECK-FAILED lines ────────────────────
+REPO=$(make_repo "$FIXTURE_WORKFLOW_ALL")
+BASE=$(get_base "$REPO")
+printf 'x\n' > "$REPO/changed.txt"
+git -C "$REPO" add .
+git -C "$REPO" commit -q -m "add file"
+run_check_both env STUB_RC_check_docs=1 STUB_RC_check_prose=1 \
+    "$REPO/bin/run-meta-checks-local" --self-test-hook "$REPO" --base "$BASE"
+OUT="$_LAST_OUT"
+rm -rf "$REPO"
+FAILED_LINES=$(printf '%s\n' "$OUT" | grep -c 'META-CHECK-FAILED:' || true)
+[ "$FAILED_LINES" -ge 2 ] \
+    && pass "case i: two META-CHECK-FAILED lines for two failures" \
+    || fail "case i: two META-CHECK-FAILED lines for two failures (got $FAILED_LINES)"
+
+# ─── Case j: only advisory stub fails → WARN present, exit 0 ────────────────
+REPO=$(make_repo "$FIXTURE_WORKFLOW_ALL")
+BASE=$(get_base "$REPO")
+printf 'x\n' > "$REPO/changed.txt"
+git -C "$REPO" add .
+git -C "$REPO" commit -q -m "add file"
+run_check_both env STUB_RC_check_hot_files=1 \
+    "$REPO/bin/run-meta-checks-local" --self-test-hook "$REPO" --base "$BASE"
+OUT="$_LAST_OUT"; RC="$_LAST_RC"
+rm -rf "$REPO"
+[ "$RC" -eq 0 ] && pass "case j: exit 0 when only advisory stub fails" \
+                 || fail "case j: exit 0 when only advisory stub fails (got $RC)"
+want "case j: WARN present for advisory failure" "$OUT" "WARN"
+
+# ─── Case k: post-pr hard failure writes FAILED: to state file ───────────────
+REPO=$(make_repo "$FIXTURE_WORKFLOW_ALL")
+BASE=$(get_base "$REPO")
+printf 'x\n' > "$REPO/changed.txt"
+git -C "$REPO" add .
+git -C "$REPO" commit -q -m "add file"
+TEST_PR="99999"
+STATUS_FILE="/tmp/ibl5-meta-checks-${TEST_PR}.status"
+rm -f "$STATUS_FILE"
+run_check_both env STUB_RC_check_pr_manual_testing=1 \
+    "$REPO/bin/run-meta-checks-local" --self-test-hook "$REPO" \
+    --base "$BASE" --stage post-pr --pr "$TEST_PR"
+rm -rf "$REPO"
+if [ -f "$STATUS_FILE" ]; then
+    if grep -qF 'FAILED:' "$STATUS_FILE"; then
+        pass "case k: post-pr hard failure writes FAILED: to state file"
+    else
+        fail "case k: state file exists but does not contain FAILED:"
+        printf '  contents: %s\n' "$(cat "$STATUS_FILE")"
+    fi
+    rm -f "$STATUS_FILE"
+else
+    fail "case k: state file not written at $STATUS_FILE"
+fi
+
+# ─── Case l: bidirectional CI-parity assertion ────────────────────────────────
+# Extract bin/<name> from the real workflow's run: blocks only (not comments).
+WF_SCRIPTS=$(python3 - "$REAL_WF" <<'PYEOF'
+import re, sys
+text = open(sys.argv[1]).read()
+scripts = set()
+in_run_block = False
+run_indent = None
+for line in text.splitlines():
+    stripped = line.lstrip()
+    if not stripped:
+        continue
+    indent = len(line) - len(stripped)
+    if re.match(r'run:\s*\|\s*$', stripped):
+        in_run_block = True
+        run_indent = indent
+        continue
+    if re.match(r'run:\s+', stripped):
+        m = re.search(r'\bbin/([a-z][a-z0-9-]+)', stripped)
+        if m:
+            scripts.add(m.group(1))
+        in_run_block = False
+        run_indent = None
+        continue
+    if in_run_block:
+        if indent <= run_indent:
+            in_run_block = False
+            run_indent = None
+        elif not stripped.startswith('#'):
+            for m in re.finditer(r'\bbin/([a-z][a-z0-9-]+)', stripped):
+                scripts.add(m.group(1))
+for s in sorted(scripts):
+    print(s)
+PYEOF
+)
+
+# Extract bin/<name> from the runner's $BIN/<name> invocations.
+RUNNER_SCRIPTS=$(grep -oE '\$BIN/[a-z][a-z0-9-]+' "$RUNNER" | sed 's|\$BIN/||' | sort -u)
+
+PARITY_OK=1
+while IFS= read -r name; do
+    if ! printf '%s\n' "$RUNNER_SCRIPTS" | grep -qF "$name"; then
+        fail "case l PARITY: workflow runs bin/$name but the local runner does not"
+        PARITY_OK=0
+    fi
+done <<< "$WF_SCRIPTS"
+while IFS= read -r name; do
+    if ! printf '%s\n' "$WF_SCRIPTS" | grep -qF "$name"; then
+        fail "case l PARITY: local runner runs bin/$name but the workflow does not"
+        PARITY_OK=0
+    fi
+done <<< "$RUNNER_SCRIPTS"
+[ "$PARITY_OK" -eq 1 ] && pass "case l: bidirectional CI-parity assertion passes"
+
+# ─── Results ─────────────────────────────────────────────────────────────────
+printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"
+[ "$FAIL" -eq 0 ]

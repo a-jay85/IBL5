@@ -913,6 +913,8 @@ jobs:
         run: bin/test-cleanup-safety
       - name: bin/test-check-pr-collisions
         run: bin/test-check-pr-collisions
+      - name: bin/test-run-meta-checks-local
+        run: bin/test-run-meta-checks-local
       - name: bin/test-check-pr-manual-testing
         run: bin/test-check-pr-manual-testing
       - name: bin/test-pr-overlap

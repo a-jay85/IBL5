@@ -7,6 +7,7 @@ namespace Tests\Updater\Steps;
 use JsbParser\Contracts\JsbImportRepositoryInterface;
 use PHPUnit\Framework\TestCase;
 use PlrParser\Contracts\PlrParserRepositoryInterface;
+use Updater\Contracts\PipelineStepInterface;
 use Updater\Steps\PromotePriorSeasonSnapshotStep;
 
 /**
@@ -14,6 +15,30 @@ use Updater\Steps\PromotePriorSeasonSnapshotStep;
  */
 class PromotePriorSeasonSnapshotStepTest extends TestCase
 {
+    public function testImplementsPipelineStepInterface(): void
+    {
+        // Checked through reflection so the assertion survives static analysis:
+        // PHPStan folds a direct assertInstanceOf on a concrete instance to a
+        // constant true (method.alreadyNarrowedType) and analyse:tests rejects it.
+        // This still fails if the `implements` clause is ever dropped.
+        $this->assertTrue(
+            (new \ReflectionClass(PromotePriorSeasonSnapshotStep::class))
+                ->implementsInterface(PipelineStepInterface::class)
+        );
+    }
+
+    public function testGetLabelReturnsExpectedLabel(): void
+    {
+        /** @var JsbImportRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
+        $stubJsbRepo = self::createStub(JsbImportRepositoryInterface::class);
+        /** @var PlrParserRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */
+        $stubSnapshotRepo = self::createStub(PlrParserRepositoryInterface::class);
+
+        $step = new PromotePriorSeasonSnapshotStep($stubSnapshotRepo, $stubJsbRepo, 2009);
+
+        $this->assertSame('Prior-season snapshot promotion', $step->getLabel());
+    }
+
     public function testPromotesWhenPriorSeasonHasChampion(): void
     {
         /** @var JsbImportRepositoryInterface&\PHPUnit\Framework\MockObject\Stub */

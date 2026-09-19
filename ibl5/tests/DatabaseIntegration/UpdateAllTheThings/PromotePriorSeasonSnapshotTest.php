@@ -7,13 +7,16 @@ namespace Tests\DatabaseIntegration\UpdateAllTheThings;
 use PHPUnit\Framework\Attributes\Group;
 use PlrParser\PlrParserRepository;
 use Tests\DatabaseIntegration\DatabaseTestCase;
+use Updater\Steps\RefreshIblHistStep;
 
 /**
- * Characterization tests for the promote-prior-season-snapshot feature.
+ * Database coverage for the promote-prior-season-snapshot feature.
  *
- * All tests assert the CURRENT (pre-implementation) state — they pass on
- * master before any production code changes and act as a baseline for
- * Phase 6 implementation work.
+ * The first five methods are Phase 1 characterization tests: they assert the
+ * pre-implementation state, pass on master, and act as the baseline. Everything
+ * below them is post-implementation — the Phase 5 promotion and idempotency
+ * tests, and the Phase 6 ranking fixtures that run RefreshIblHistStep's own
+ * SELECT_SQL against seeded rows.
  */
 #[Group('database')]
 class PromotePriorSeasonSnapshotTest extends DatabaseTestCase
@@ -296,102 +299,52 @@ class PromotePriorSeasonSnapshotTest extends DatabaseTestCase
 
     public function testEndOfSeasonWinsOverHigherIdMidSeasonOnEqualStatsGm(): void
     {
-        // end-of-season inserted first → lower auto-increment id than the mid-season row below.
-        // id DESC alone would pick mid-season; phase rank must break the tie instead.
-        $this->seedSnapshot(202099901, 2008, 'end-of-season', ['stats_gm' => 82]);
-        $this->seedSnapshot(202099901, 2008, 'mid-season',    ['stats_gm' => 82]);
+        // end-of-season inserted first -> lower auto-increment id than the mid-season row below.
+        // id DESC alone would pick mid-season; the phase rank must break the tie instead.
+        $this->seedSnapshot(202099901, 2008, 'end-of-season', ['stats_gm' => 82, 'stats_pts' => 111, 'phantom_games' => 0]);
+        $this->seedSnapshot(202099901, 2008, 'mid-season',    ['stats_gm' => 82, 'stats_pts' => 222, 'phantom_games' => 0]);
 
-        $stmt = $this->db->prepare(
-            "SELECT snap.snapshot_phase FROM (
-                SELECT s.*,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY s.pid, s.season_year
-                        ORDER BY
-                            s.stats_gm DESC,
-                            CASE s.snapshot_phase
-                                WHEN 'end-of-season'       THEN  1
-                                WHEN 'finals'              THEN  2
-                                WHEN 'post-heat'           THEN  3
-                                WHEN 'heat-finals'         THEN  4
-                                WHEN 'heat-end'            THEN  5
-                                WHEN 'playoffs-rd2-gm4-7'  THEN  6
-                                WHEN 'playoffs-rd2-gm1-3'  THEN  7
-                                WHEN 'playoffs-rd1-gm4-7'  THEN  8
-                                WHEN 'playoffs-rd1-gm1-3'  THEN  9
-                                WHEN 'conf-finals-gm4-7'   THEN 10
-                                WHEN 'conf-finals-gm1-3'   THEN 11
-                                WHEN 'heat-wb'             THEN 12
-                                WHEN 'heat-lb'             THEN 13
-                                ELSE 99
-                            END ASC,
-                            s.id DESC
-                    ) AS rn
-                FROM ibl_plr_snapshots s
-                WHERE s.stats_gm > 0
-                  AND s.pid = ?
-                  AND s.season_year = ?
-            ) snap
-            WHERE rn = 1"
-        );
-        self::assertNotFalse($stmt);
-        $pid  = 202099901;
-        $year = 2008;
-        $stmt->bind_param('ii', $pid, $year);
-        $stmt->execute();
-        $row = $stmt->get_result()->fetch_assoc();
-        $stmt->close();
+        $row = $this->rankedIblHistRowFor(202099901);
 
         self::assertNotNull($row);
-        self::assertSame('end-of-season', $row['snapshot_phase']);
+        self::assertSame(111, (int) $row['pts'], 'Phase rank must pick the end-of-season row despite its lower id.');
     }
 
     public function testHigherStatsGmMidSeasonWinsOverLowerStatsGmEndOfSeason(): void
     {
-        $this->seedSnapshot(202099902, 2008, 'mid-season',    ['stats_gm' => 82]);
-        $this->seedSnapshot(202099902, 2008, 'end-of-season', ['stats_gm' => 40]);
+        $this->seedSnapshot(202099902, 2008, 'mid-season',    ['stats_gm' => 82, 'stats_pts' => 222, 'phantom_games' => 0]);
+        $this->seedSnapshot(202099902, 2008, 'end-of-season', ['stats_gm' => 40, 'stats_pts' => 111, 'phantom_games' => 0]);
 
-        $stmt = $this->db->prepare(
-            "SELECT snap.snapshot_phase FROM (
-                SELECT s.*,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY s.pid, s.season_year
-                        ORDER BY
-                            s.stats_gm DESC,
-                            CASE s.snapshot_phase
-                                WHEN 'end-of-season'       THEN  1
-                                WHEN 'finals'              THEN  2
-                                WHEN 'post-heat'           THEN  3
-                                WHEN 'heat-finals'         THEN  4
-                                WHEN 'heat-end'            THEN  5
-                                WHEN 'playoffs-rd2-gm4-7'  THEN  6
-                                WHEN 'playoffs-rd2-gm1-3'  THEN  7
-                                WHEN 'playoffs-rd1-gm4-7'  THEN  8
-                                WHEN 'playoffs-rd1-gm1-3'  THEN  9
-                                WHEN 'conf-finals-gm4-7'   THEN 10
-                                WHEN 'conf-finals-gm1-3'   THEN 11
-                                WHEN 'heat-wb'             THEN 12
-                                WHEN 'heat-lb'             THEN 13
-                                ELSE 99
-                            END ASC,
-                            s.id DESC
-                    ) AS rn
-                FROM ibl_plr_snapshots s
-                WHERE s.stats_gm > 0
-                  AND s.pid = ?
-                  AND s.season_year = ?
-            ) snap
-            WHERE rn = 1"
-        );
-        self::assertNotFalse($stmt);
-        $pid  = 202099902;
-        $year = 2008;
-        $stmt->bind_param('ii', $pid, $year);
-        $stmt->execute();
-        $row = $stmt->get_result()->fetch_assoc();
-        $stmt->close();
+        $row = $this->rankedIblHistRowFor(202099902);
 
         self::assertNotNull($row);
-        self::assertSame('mid-season', $row['snapshot_phase']);
+        self::assertSame(222, (int) $row['pts'], 'stats_gm DESC must outrank the end-of-season phase bonus.');
+    }
+
+    /**
+     * Run the production ranking query — RefreshIblHistStep::SELECT_SQL, the exact
+     * string the step feeds into `INSERT INTO ibl_hist` — and return the single
+     * winning row for one pid. Reading the constant (rather than restating the SQL)
+     * is what binds these fixtures to production: a change to the phase-rank CASE
+     * expression fails them.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function rankedIblHistRowFor(int $pid): ?array
+    {
+        /** @var string $selectSql */
+        $selectSql = (new \ReflectionClassConstant(RefreshIblHistStep::class, 'SELECT_SQL'))->getValue();
+
+        $stmt = $this->db->prepare('SELECT q.* FROM (' . $selectSql . ') q WHERE q.pid = ?');
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('i', $pid);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $row = $result->fetch_assoc();
+        self::assertNull($result->fetch_assoc(), 'Ranking must collapse to exactly one row per (pid, season_year).');
+        $stmt->close();
+
+        return $row;
     }
 
     // ── Helpers (integration tests) ───────────────────────────────────────

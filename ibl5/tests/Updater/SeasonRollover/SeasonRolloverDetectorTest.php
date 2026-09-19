@@ -186,6 +186,7 @@ final class SeasonRolloverDetectorTest extends TestCase
             {
             }
 
+            // @phpstan-ignore return.unusedType (interface contract requires string|false; this stub always returns string)
             public function extractToString(string $archivePath, string $filename): string|false
             {
                 $this->calledWithPath = $archivePath;
@@ -194,6 +195,7 @@ final class SeasonRolloverDetectorTest extends TestCase
             }
 
             /** @return array{season: string, seq: int, phase: string, ending_year: int}|null */
+            // @phpstan-ignore return.unusedType (interface contract requires nullable; this stub always returns array)
             public function parseArchiveName(string $filename): ?array
             {
                 return ['season' => '26-27', 'seq' => 1, 'phase' => 'preseason', 'ending_year' => 2027];

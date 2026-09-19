@@ -127,6 +127,15 @@ class RecordingGh:
             return deps.get(str(pr), "UNKNOWN")
         return self.fixture.get("final_state") or "OPEN"
 
+    def branch_protection_strict(self) -> bool:
+        return bool((self.fixture or {}).get("protection_strict", False))
+
+    def merge_state_status(self, pr: int | None = None) -> str:
+        return str((self.fixture or {}).get("merge_state_status", "CLEAN"))
+
+    def pr_disable_auto_merge(self, pr: int) -> None:
+        self.record("pr_disable_auto_merge", pr=pr)
+
     def checks_outcome(self) -> dict:
         """Recorded terminal CI outcome: {"exit": 0|8, "failed": [names]}."""
         return dict(self.fixture.get("checks_outcome") or {"exit": 0, "failed": []})
@@ -340,6 +349,34 @@ class LiveGh(RecordingGh):
                 os.unlink(fname)
             except Exception:
                 pass
+
+    def branch_protection_strict(self) -> bool:
+        """Fail closed: an unreadable or null protection config is treated as strict."""
+        try:
+            out = self._gh("api", f"repos/{self._repo()}/branches/master",
+                           "--jq", ".protection.required_status_checks.strict")
+        except (HarnessError, OSError, subprocess.SubprocessError):
+            return True
+        val = (out or "").strip().lower()
+        if val in ("true", "false"):
+            return val == "true"
+        return True
+
+    def merge_state_status(self, pr: int | None = None) -> str:
+        """Fail open with "": an unreadable merge state must not trigger a rebase storm."""
+        try:
+            out = self._gh("pr", "view", str(pr or self.pr_number()),
+                           "--json", "mergeStateStatus", "--jq", ".mergeStateStatus")
+        except (HarnessError, OSError, subprocess.SubprocessError):
+            return ""
+        return (out or "").strip()
+
+    def pr_disable_auto_merge(self, pr: int) -> None:
+        try:
+            self._gh("pr", "merge", str(pr), "--disable-auto")
+        except (HarnessError, OSError, subprocess.SubprocessError):
+            pass
+        self.record("pr_disable_auto_merge", pr=pr)
 
     # -- reads (live) -----------------------------------------------------
     def _fetch_meta(self) -> dict:

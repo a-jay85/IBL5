@@ -49,7 +49,7 @@ from harness.planfile import locate_plan, split_hold_justification
 from harness.review import ReviewPhase
 from harness.state import (HarnessError, RunResult, TerminalState, UsageLedger)
 from harness.adapters.ghad import LiveGh, RecordingGh
-from harness.adapters.gitad import LiveGit, ReplayGit, classify_local_gate_denial
+from harness.adapters.gitad import LiveGit, ReplayGit, classify_local_gate_denial, is_stale_lease
 from harness.adapters.llm import ClaudeCli, FixtureLlm
 from harness.adapters.probe import FixtureProbe, LiveProbe
 from harness.adapters.verify import LiveVerify, ReplayVerify, aggregate
@@ -317,12 +317,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             git, worktree or "", "origin/master", log, live=live)
         if live:
             sha = git.head()  # refresh — remediation may have committed and moved HEAD
-        try:
-            git.push()
-        except HarnessError as e:
-            if e.kind != "push-disabled":
-                raise
-            log("phase2: push skipped — disabled outside an approved install")
+        pushed = _push_with_lease_retry(git, log, "phase2")
+        if pushed:
+            sha = pushed
         if gh.pr_exists():
             pr = gh.pr_number()
             log(f"phase2: PR #{pr} exists — updated head to {sha or '(clean)'}")
@@ -635,7 +632,15 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         res.final_pr_state = gh.pr_state() if (mode == "replay" or live) else "N/A"
         log(f"phase7 ci: exit={outcome.exit_code} failed={outcome.failed} ({outcome.evidence})")
 
+        if live and pr and decision.armed and outcome.exit_code == 0:
+            sha, outcome = _resolve_behind(git, gh, log, res, worktree, pr, sha,
+                                           outcome, out_dir)
+            res.ci_head = sha or None
+            res.ci_outcome = {0: "green", 8: "failed"}.get(outcome.exit_code,
+                                                           "indeterminate")
+
         res.terminal = (TerminalState.DEGRADED if res.degraded_agents else
+                        TerminalState.SHIPPED_HELD if res.retry_cap else
                         TerminalState.SHIPPED_ARMED if decision.armed
                         else TerminalState.SHIPPED_HELD)
 
@@ -690,6 +695,84 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
 # without updating both greps breaks them loudly, which is the intent.
 CONFORMANCE_DONE_NAME = "conformance-done"
 CONFORMANCE_BRIDGE_NAME = "missing-tests"
+
+
+# --- Bounded push-retry and BEHIND-resolution helpers ------------------------
+_MAX_PUSH_RETRIES = 3
+_MAX_BEHIND_RETRIES = 3
+
+
+def _retry_key(branch: str, attempt: int) -> str:
+    return re.sub(r"[^A-Za-z0-9._-]", "-", f"postplan-{branch}-r{attempt}")
+
+
+def _refresh_and_reprove(git, log, phase: str, attempt: int) -> None:
+    """Fetch remote tip, rebase, and re-prove no work was lost. Never pushes."""
+    key = _retry_key(git.branch(), attempt)
+    if not git.capture_lostwork_pre(key):
+        raise HarnessError("lostwork-unproved",
+                           f"{phase}: diff vs origin/master is empty before re-rebase")
+    git.fetch_base("origin/master")
+    git.rebase_onto("origin/master")
+    ok, evidence = git.prove_lostwork(key)
+    if not ok:
+        raise HarnessError("lostwork-unproved",
+                           f"{phase}: lost-work proof failed after re-rebase {attempt}: {evidence}")
+    log(f"{phase}: re-rebase {attempt} TREE-EQUIVALENT at {git.head()[:8]}")
+
+
+def _push_with_lease_retry(git, log, phase: str) -> str:
+    """Push with bounded stale-lease retry. Returns pushed HEAD sha, or "" when disabled.
+    Raises HarnessError("push-retry-cap") once the cap is spent."""
+    for attempt in range(1, _MAX_PUSH_RETRIES + 1):
+        try:
+            git.push()
+            return git.head()
+        except HarnessError as e:
+            if e.kind == "push-disabled":
+                log(f"{phase}: push skipped — disabled outside an approved install")
+                return ""
+            if not is_stale_lease(e):
+                raise
+            if attempt == _MAX_PUSH_RETRIES:
+                raise HarnessError(
+                    "push-retry-cap",
+                    f"{phase}: stale lease after {_MAX_PUSH_RETRIES} push attempts: "
+                    f"{(e.detail or '')[:300]}")
+            log(f"{phase}: stale lease (attempt {attempt}/{_MAX_PUSH_RETRIES}) — "
+                "refetch, re-rebase, re-prove")
+            _refresh_and_reprove(git, log, phase, attempt)
+    return ""  # unreachable
+
+
+def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir):
+    """Bounded BEHIND resolution. Returns (sha, outcome). Sets res.retry_cap and
+    disarms auto-merge when the cap is spent."""
+    strict = gh.branch_protection_strict()
+    for attempt in range(1, _MAX_BEHIND_RETRIES + 1):
+        mss = gh.merge_state_status(pr)
+        if mss != "BEHIND":
+            return sha, outcome
+        if not strict:
+            log("phase7: BEHIND but required checks are not strict — "
+                "leaving auto-merge armed")
+            return sha, outcome
+        log(f"phase7: BEHIND (re-rebase {attempt}/{_MAX_BEHIND_RETRIES})")
+        _refresh_and_reprove(git, log, "phase7", attempt)
+        sha = _push_with_lease_retry(git, log, "phase7") or git.head()
+        bg = ciwatch.start_background_watch(worktree, pr, sha, out_dir)
+        outcome = ciwatch.watch_or_reuse(worktree, pr, sha, out_dir, bg)
+        ciwatch.reap_background_watch(bg)
+        log(f"phase7 ci(re-rebase {attempt}): exit={outcome.exit_code} "
+            f"failed={outcome.failed}")
+        if outcome.exit_code != 0:
+            return sha, outcome
+    if gh.merge_state_status(pr) == "BEHIND":
+        res.retry_cap = "behind-retry-cap"
+        log(f"phase7: BEHIND cap hit after {_MAX_BEHIND_RETRIES} re-rebases — "
+            "disarming auto-merge")
+        gh.pr_disable_auto_merge(pr)
+    return sha, outcome
 
 
 # --- Phase 2 local-gate remediation ------------------------------------------
@@ -1239,6 +1322,13 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
         return ("RESULT: post-plan BLOCKED — rc=3 (rebase-conflict or local-gate), "
                 "cause unknown; ERROR terminal=failed, no PR opened. "
                 "Resolve the rebase or clear the local gate, then re-run bin/post-plan-now.")
+    if res.error_kind in ("push-retry-cap", "lostwork-unproved"):
+        cause = ("push retry cap reached (stale lease after 3 attempts)"
+                 if res.error_kind == "push-retry-cap"
+                 else "lost-work proof failed on re-rebase")
+        return (f"RESULT: post-plan BLOCKED — {cause}; ERROR terminal=failed "
+                f"kind={res.error_kind}{pr}. {_flat(res.error) or 'no detail'} "
+                "Re-run bin/post-plan-now.")
     if res.terminal == TerminalState.FAILED:
         return (f"RESULT: post-plan FAILED — ERROR terminal=failed "
                 f"kind={res.error_kind or 'unknown'}: "
@@ -1253,6 +1343,10 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
         tail += f" ci={res.ci_outcome}"
     if res.final_pr_state:
         tail += f" pr-state={res.final_pr_state}"
+    if res.retry_cap == "behind-retry-cap":
+        return ("RESULT: post-plan BLOCKED — BEHIND retry cap reached (branch still "
+                "behind master after 3 re-rebases); auto-merge disarmed, human "
+                f"merges{pr}{tail} findings={len(res.findings)}")
     return (f"RESULT: post-plan complete — terminal={res.terminal.value} "
             f"auto-merge={armed}{pr}{tail} findings={len(res.findings)}")
 

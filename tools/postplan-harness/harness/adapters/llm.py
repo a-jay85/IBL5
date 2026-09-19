@@ -29,6 +29,7 @@ MAX_PROMPT_BYTES = 120_000        # hard cap on any single call's input packet
 DEFAULT_TIMEOUT = 1500            # sonnet 4.6 thinks long on large diffs; observed >600s
 TOOLED_TIMEOUT = 2400             # a repo-reading reviewer needs many turns of tool I/O
 TOOLED_MAX_TURNS = 60             # NEVER 1: a tool-enabled call must be able to iterate
+ENVELOPE_ERROR_TEXT_CAP = 300     # bound result text in error details for diagnosis
 
 MODEL_MAP = {
     "haiku": "claude-haiku-4-5-20251001",
@@ -268,14 +269,21 @@ class ClaudeCli:
             # Content failures are never re-asked: a reviewer that errored out mid-review
             # would only error again, and its partial text must not escape as a verdict.
             if envelope.get("is_error"):
+                _subtype = envelope.get("subtype", "")
+                _result = result_text[:ENVELOPE_ERROR_TEXT_CAP]
                 rec.ok = False
                 self.ledger.add(rec)
-                raise HarnessError("llm-tooled-error", f"{purpose}: envelope is_error")
+                _detail = f"{purpose}: is_error"
+                if _subtype:
+                    _detail += f" subtype={_subtype}"
+                _detail += f" result={_result}"
+                raise HarnessError("llm-tooled-error", _detail)
             subtype = envelope.get("subtype")
             if subtype not in (None, "success"):
                 rec.ok = False
                 self.ledger.add(rec)
-                raise HarnessError("llm-tooled-error", f"{purpose}: subtype={subtype}")
+                raise HarnessError("llm-tooled-error",
+                                   f"{purpose}: subtype={subtype} result={result_text[:ENVELOPE_ERROR_TEXT_CAP]}")
             if not result_text.strip():
                 rec.ok = False
                 self.ledger.add(rec)

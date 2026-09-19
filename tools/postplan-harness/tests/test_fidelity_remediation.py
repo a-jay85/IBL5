@@ -742,3 +742,95 @@ def test_remediation_doc_staleness_denial_is_auto_bumped(tmp_path, git_shim):
         assert "phase5.5: local-gate denial classified as doc-staleness" in lines
     finally:
         _cleanup(989, "989-2")
+
+
+# --- Phase 3 prompt embedding tests -------------------------------------------
+
+class PromptCapturingLlm(FixtureLlm):
+    """FixtureLlm that also records the raw prompt text for each tooled call."""
+
+    def __init__(self, ledger, canned):
+        super().__init__(ledger, canned)
+        self.captured_prompts: dict[str, str] = {}
+
+    def call_tooled(self, purpose, model, prompt, **kw):
+        self.captured_prompts[purpose] = prompt
+        return super().call_tooled(purpose, model, prompt, **kw)
+
+
+def test_remediation_prompt_embeds_procedure_verdict_and_diff(tmp_path, git_shim):
+    """All three inputs — procedure, verdict, diff — appear inline in the prompt."""
+    packet_dir = _packet(tmp_path)
+    # Overwrite the default diff.patch with a sentinel line.
+    with open(os.path.join(packet_dir, "diff.patch"), "w") as fh:
+        fh.write("+SENTINEL_DIFF_LINE\n")
+    verdict_path = str(tmp_path / "verdict_embed.md")
+    with open(verdict_path, "w") as fh:
+        fh.write("6d checks\n\nNOT READY\n\nSENTINEL_FINDING\n\n## DIGEST\nstuff\n")
+    llm = PromptCapturingLlm(UsageLedger(), {"fidelity-remediation": "done"})
+    fidelity.remediate(llm, _git(dirty=False), str(tmp_path), str(tmp_path),
+                       packet_dir, verdict_path, "deadbeef")
+    prompt = llm.captured_prompts["fidelity-remediation"]
+    assert "PROCEDURE BODY" in prompt
+    assert "SENTINEL_FINDING" in prompt
+    assert "+SENTINEL_DIFF_LINE" in prompt
+    assert "=== END DIFF ===" in prompt
+
+
+def test_remediation_prompt_never_relies_on_packet_path_alone(tmp_path, git_shim):
+    """When a packet path appears in the prompt, its content is also inline."""
+    packet_dir = _packet(tmp_path)
+    with open(os.path.join(packet_dir, "diff.patch"), "w") as fh:
+        fh.write("+SENTINEL_DIFF_LINE\n")
+    verdict_path = str(tmp_path / "verdict_path.md")
+    with open(verdict_path, "w") as fh:
+        fh.write("6d checks\n\nNOT READY\n\n## DIGEST\nstuff\n")
+    llm = PromptCapturingLlm(UsageLedger(), {"fidelity-remediation": "done"})
+    fidelity.remediate(llm, _git(dirty=False), str(tmp_path), str(tmp_path),
+                       packet_dir, verdict_path, "deadbeef")
+    prompt = llm.captured_prompts["fidelity-remediation"]
+    # A packet path in the prompt means the content is also present inline.
+    if packet_dir in prompt:
+        assert "+SENTINEL_DIFF_LINE" in prompt
+
+
+def test_remediation_prompt_truncates_oversized_diff(tmp_path, git_shim):
+    """Diffs beyond REMEDIATION_DIFF_INLINE_CAP are truncated; tail content absent."""
+    packet_dir = _packet(tmp_path)
+    cap = fidelity.REMEDIATION_DIFF_INLINE_CAP
+    # Build a diff that is cap+5000 bytes; last 100 bytes contain TAIL_SENTINEL.
+    tail = ("TAIL_SENTINEL" * 8)[:100]
+    padding = "X" * (cap + 5000 - 100)
+    with open(os.path.join(packet_dir, "diff.patch"), "w") as fh:
+        fh.write(padding + tail)
+    verdict_path = _verdict(tmp_path, "NOT READY")
+    llm = PromptCapturingLlm(UsageLedger(), {"fidelity-remediation": "done"})
+    fidelity.remediate(llm, _git(dirty=False), str(tmp_path), str(tmp_path),
+                       packet_dir, verdict_path, "deadbeef")
+    prompt = llm.captured_prompts["fidelity-remediation"]
+    assert "TAIL_SENTINEL" not in prompt
+    assert "diff truncated at" in prompt
+    assert os.path.join(packet_dir, "diff.patch") in prompt
+
+
+def test_remediation_prompt_survives_unreadable_verdict(tmp_path, git_shim, monkeypatch):
+    """When the verdict file cannot be read, the marker appears and no exception is raised."""
+    packet_dir = _packet(tmp_path)
+    missing_verdict = str(tmp_path / "does_not_exist.md")
+    monkeypatch.setattr(fidelity, "parse_verdict", lambda _path: "NOT READY")
+    llm = PromptCapturingLlm(UsageLedger(), {"fidelity-remediation": "done"})
+    fidelity.remediate(llm, _git(dirty=False), str(tmp_path), str(tmp_path),
+                       packet_dir, missing_verdict, "deadbeef")
+    prompt = llm.captured_prompts["fidelity-remediation"]
+    assert "(verdict unreadable)" in prompt
+
+
+def test_remediation_prompt_mentions_offset_limit_read(tmp_path, git_shim):
+    """The prompt instructs the model to use offset and limit for large file reads."""
+    packet_dir = _packet(tmp_path)
+    verdict_path = _verdict(tmp_path, "NOT READY")
+    llm = PromptCapturingLlm(UsageLedger(), {"fidelity-remediation": "done"})
+    fidelity.remediate(llm, _git(dirty=False), str(tmp_path), str(tmp_path),
+                       packet_dir, verdict_path, "deadbeef")
+    prompt = llm.captured_prompts["fidelity-remediation"]
+    assert "offset and limit" in prompt

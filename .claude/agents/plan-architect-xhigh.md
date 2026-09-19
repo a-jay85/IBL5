@@ -1,8 +1,8 @@
 ---
 name: plan-architect-xhigh
-description: Software architect for high-stakes implementation plans — tasks touching a security surface, trust boundary (auth/authz-gated route), destructive migration, an executable-gate removal or weakening (the change lets an input a hook deny, a bin/check-* condition, or a Phase 6.5 arming condition previously rejected now pass), or a bootstrap hazard (the change rewrites the rule governing its own merge). Directory alone is never the trigger — prose edits that preserve the decision procedure, additive gates, and mechanism/plumbing changes are NOT triggers wherever they sit. Full trigger: /plan Step 3 check 1. Runs at xhigh effort. Use only as the Step-3 escalated planning agent invoked by /plan.
-model: opus
-effort: xhigh
+description: Software architect for high-stakes implementation plans — tasks touching a security surface, trust boundary (auth/authz-gated route), destructive migration, an executable-gate removal or weakening (the change lets an input a hook deny, a bin/check-* condition, or a Phase 6.5 arming condition previously rejected now pass), or a bootstrap hazard (the change rewrites the rule governing its own merge). Directory alone is never the trigger — prose edits that preserve the decision procedure, additive gates, and mechanism/plumbing changes are NOT triggers wherever they sit. Full trigger: /plan Step 3 check 1. Runs on Fable at high effort. Use only as the Step-3 escalated planning agent invoked by /plan.
+model: fable
+effort: high
 disallowedTools: ExitPlanMode, Edit, Write, NotebookEdit
 ---
 

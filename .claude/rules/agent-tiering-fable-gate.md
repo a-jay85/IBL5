@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand only (no auto-attach trigger) — Fable approval-gate procedure: surface a suggestion, AskUserQuestion gate before any Fable spawn, and the asm-level static-RE exception where Fable is the recommended tier. Parent agent-tiering.md:18 carries the resident stop-text; read this for the full procedure.
-last_verified: 2026-08-08
+last_verified: 2026-09-19
 paths: ".claude/rules/agent-tiering-fable-gate.md"
 ---
 
@@ -21,6 +21,10 @@ Read-on-demand companion to `agent-tiering.md` § Tiers (Fable row). Nothing her
 - **Recommendation**: a clear "I'd use Fable here" / "Opus is probably fine, flagging it" — not a neutral survey.
 
 Absent approval, proceed on Opus (or the correct lower tier) — flag and continue, don't block. Approval covers that one task; a new task re-triggers the gate. Because Fable is a last resort, any actual intent to run on Fable is itself a genuine fork — **always** use `AskUserQuestion` to get the explicit yes *before* selecting it; never proceed on Fable from an inline suggestion alone.
+
+### Exception: pinned agent defs
+
+An agent def whose frontmatter pins `model: fable` is a standing user yes. The user approved the pin when it merged, so spawning that def needs no fresh `AskUserQuestion`. Today that is `plan-architect-xhigh` at high effort (2026-09-19), selected by `/plan` Step 3 check 1. Adding a new Fable pin is itself a Fable request and goes through the gate above.
 
 ### Exception — asm-level static RE (JSB engine): Fable is the *recommended* tier, not merely last-resort
 

@@ -1189,3 +1189,148 @@ def test_audit_log_truncated_for_a_reused_out_dir(tmp_path, sticky_tmp):
     assert "LEFTOVER" not in (llm.snapshot or ""), llm.snapshot
     with open(os.path.join(out, "audit.log")) as fh:
         assert "LEFTOVER" not in fh.read()
+
+
+# ---------------------------------------------------------------------------
+# Phase 2c: Post-remediation conformance re-run
+# ---------------------------------------------------------------------------
+
+_PLAN_WITH_TEST_FOO = (
+    "# Synthetic conformance re-run test plan\n\n"
+    "## Verification Matrix\n\n"
+    "| # | What | Test type | Timing | Test file |\n"
+    "|---|------|-----------|--------|----------|\n"
+    "| 1 | foo passes | PHPUnit | post-impl | `tests/test_foo.py` |\n"
+)
+
+
+def _patch_fidelity_with_remediation(monkeypatch, remediation_sha=None):
+    """Monkeypatch _run_fidelity to set a READY verdict and optionally a remediation_sha."""
+    def _fake(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_sha,
+              reviewed_tree, live, log, res, before_remediation=None):
+        reviewed = reviewed_tree or "a" * 40
+        verdict_file = os.path.join(out_dir, "verdict.md")
+        with open(verdict_file, "w") as fh:
+            fh.write("READY\n")
+        rounds = ([] if not remediation_sha else
+                  [{"remediation_sha": remediation_sha, "verdict": "READY",
+                    "reviewed_tree": reviewed, "verdict_path": verdict_file}])
+        res.fidelity = {
+            "verdict_1": "READY",
+            "error_kind": None,
+            "reviewed_tree": reviewed,
+            "verdict_path": verdict_file,
+            "remediation_sha": remediation_sha,
+            "verdict_2": None,
+            "reviewed_tree_2": None,
+            "rounds": rounds,
+            "rounds_completed": len(rounds),
+            "backlog_issue_numbers": [],
+        }
+        return "READY", ""
+
+    monkeypatch.setattr(runner, "_run_fidelity", _fake)
+
+
+def _patch_two_call_git(monkeypatch, first_files, second_files):
+    """Make ReplayGit.changed_files() return first_files on call 1, second_files on call 2+.
+
+    Returns a list whose first element is the total call count so tests can assert on it.
+    """
+    call_count = [0]
+
+    class _TwoCallGit(runner.ReplayGit):
+        def changed_files(self, base="origin/master"):
+            call_count[0] += 1
+            return first_files if call_count[0] == 1 else second_files
+
+    monkeypatch.setattr(runner, "ReplayGit", _TwoCallGit)
+    return call_count
+
+
+def test_conformance_rerun_clears_hold_when_remediation_adds_planned_file(tmp_path, monkeypatch):
+    """Remediation adds planned file → second changed_files sees it → conformance clean.
+
+    Mutation caught: delete the re-run block and unresolved keeps the first-pass
+    MISSING item, so the empty-list assertion fails.
+    """
+    _patch_fidelity_with_remediation(monkeypatch, remediation_sha="fake-remediation-sha")
+    _patch_two_call_git(
+        monkeypatch,
+        first_files=["runner.py"],
+        second_files=["runner.py", "tools/postplan-harness/tests/test_foo.py"],
+    )
+    out = str(tmp_path / "out")
+    os.makedirs(out)
+    fx = _fixture(plan_content=_PLAN_WITH_TEST_FOO)
+    res = runner.run(fx, out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+
+    assert res.unresolved_conformance == []
+    bridge = os.path.join(out, runner.CONFORMANCE_BRIDGE_NAME)
+    assert os.path.exists(bridge) and os.path.getsize(bridge) == 0
+    assert "phase5.0 conformance (post-remediation): clean" in "\n".join(res.audit)
+
+
+def test_conformance_hold_stays_when_remediation_does_not_add_file(tmp_path, monkeypatch):
+    """Remediation commits an unrelated edit → MISSING survives, bridge non-empty.
+
+    Mutation caught: replace the re-run with `unresolved = []`.
+    """
+    _patch_fidelity_with_remediation(monkeypatch, remediation_sha="fake-remediation-sha")
+    _patch_two_call_git(
+        monkeypatch,
+        first_files=["runner.py"],
+        second_files=["runner.py"],
+    )
+    out = str(tmp_path / "out")
+    os.makedirs(out)
+    fx = _fixture(plan_content=_PLAN_WITH_TEST_FOO)
+    res = runner.run(fx, out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+
+    assert any("MISSING" in item and "test_foo.py" in item
+               for item in (res.unresolved_conformance or []))
+    bridge = os.path.join(out, runner.CONFORMANCE_BRIDGE_NAME)
+    assert os.path.exists(bridge) and os.path.getsize(bridge) > 0
+
+
+def test_conformance_not_rerun_without_remediation(tmp_path, monkeypatch):
+    """READY with no remediation_sha → changed_files() called exactly once.
+
+    Mutation caught: drop the `if res.fidelity.get('remediation_sha')` gate
+    and the call count becomes 2.
+    """
+    _patch_fidelity_with_remediation(monkeypatch, remediation_sha=None)
+    call_count = _patch_two_call_git(
+        monkeypatch,
+        first_files=["runner.py"],
+        second_files=["runner.py", "tools/postplan-harness/tests/test_foo.py"],
+    )
+    out = str(tmp_path / "out")
+    os.makedirs(out)
+    fx = _fixture(plan_content=_PLAN_WITH_TEST_FOO)
+    res = runner.run(fx, out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+
+    assert call_count[0] == 1, f"expected 1 changed_files call, got {call_count[0]}"
+    assert not any("post-remediation" in line for line in res.audit)
+
+
+def test_arm_inputs_see_post_remediation_conformance(tmp_path, monkeypatch):
+    """Condition (3) uses post-remediation result; hold not fired when remediation adds file.
+
+    Mutation caught: re-run conformance into a fresh local name without assigning back
+    to `unresolved`, so condition (3) still holds despite the planned file landing.
+    """
+    _patch_fidelity_with_remediation(monkeypatch, remediation_sha="fake-remediation-sha")
+    _patch_two_call_git(
+        monkeypatch,
+        first_files=["runner.py"],
+        second_files=["runner.py", "tools/postplan-harness/tests/test_foo.py"],
+    )
+    out = str(tmp_path / "out")
+    os.makedirs(out)
+    fx = _fixture(plan_content=_PLAN_WITH_TEST_FOO)
+    res = runner.run(fx, out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+
+    assert res.arm is not None
+    assert 3 not in {c.number for c in res.arm.holds}, \
+        "condition (3) must not hold when remediation added the planned file"

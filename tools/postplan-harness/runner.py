@@ -373,10 +373,13 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         log("phase5 tracks: " + ", ".join(f"{t.name}={t.status}" for t in tracks)
             + f" -> PHASE5_VERIFY_STATUS={phase5}"
             + (f" (fidelity degraded: {unavailable} unavailable)" if unavailable else ""))
-        unresolved = conformance.check(plan, files, diff, phase5_status=phase5)
+        resolutions: dict[str, str] = {}
+        unresolved = conformance.check(plan, files, diff, phase5_status=phase5,
+                                       resolutions=resolutions)
         res.unresolved_conformance = unresolved
         _write_conformance_handoff(out_dir, unresolved)
-        log(f"phase5.0 conformance: {unresolved or 'clean'}")
+        log(f"phase5.0 conformance: {unresolved or 'clean'}"
+            + (f" resolved={resolutions}" if resolutions else ""))
 
         # ---- Phase 6: manual-testing clearance ------------------------
         body = gh.pr_body() or meta.get("body", "")
@@ -447,6 +450,21 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # the loop.
         if res.fidelity.get("remediation_sha"):
             sha = res.fidelity["remediation_sha"]
+            # Phase 5.0 re-run: the loop above moved the head, so the diff the first
+            # pass saw is stale. A remediation that authored the planned file must
+            # clear condition (3) on the SAME run, or the hold never releases.
+            # Unconditional re-run is avoided on purpose: two extra git calls on every
+            # clean run buy nothing, and the gate is "did the tree change", not "did
+            # remediation run".
+            files = git.changed_files()
+            diff = git.diff_vs_base()
+            resolutions = {}
+            unresolved = conformance.check(plan, files, diff, phase5_status=phase5,
+                                           resolutions=resolutions)
+            res.unresolved_conformance = unresolved
+            _write_conformance_handoff(out_dir, unresolved)
+            log(f"phase5.0 conformance (post-remediation): {unresolved or 'clean'}"
+                + (f" resolved={resolutions}" if resolutions else ""))
 
         # ---- Phase 6.5: arming ----------------------------------------
         # Condition (15): snapshot any checks already in the fail bucket before

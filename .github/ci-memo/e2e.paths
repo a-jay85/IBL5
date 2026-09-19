@@ -13,7 +13,6 @@ bin/website-affecting
 bin/lib
 bin/check-e2e-fixture-drift
 bin/check-playwright-pinning
-bin/cml
 bin/parse-playwright-flakes
 bin/playwright-image-tag
 bin/run-migrations-ci

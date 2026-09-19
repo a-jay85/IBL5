@@ -205,12 +205,12 @@ class PromotePriorSeasonSnapshotTest extends DatabaseTestCase
 
     public function testCopiesCreatedAtFromTheSourceRow(): void
     {
-        $this->seedSnapshot(202000008, 2008, 'mid-season', ['created_at' => '2026-01-15 10:00:00']);
+        $this->seedSnapshot(202000008, 2008, 'mid-season', ['created_at' => '2026-01-15 10:00:00', 'phantom_games' => 7]);
 
         (new PlrParserRepository($this->db))->promotePriorSeasonSnapshots(2008);
 
         $stmt = $this->db->prepare(
-            'SELECT created_at FROM ibl_plr_snapshots WHERE pid = ? AND season_year = ? AND snapshot_phase = ?'
+            'SELECT created_at, phantom_games FROM ibl_plr_snapshots WHERE pid = ? AND season_year = ? AND snapshot_phase = ?'
         );
         self::assertNotFalse($stmt);
         $pid   = 202000008;
@@ -223,6 +223,7 @@ class PromotePriorSeasonSnapshotTest extends DatabaseTestCase
 
         self::assertNotNull($row);
         self::assertSame('2026-01-15 10:00:00', $row['created_at']);
+        self::assertSame(7, (int) $row['phantom_games']);
     }
 
     public function testDoesNotTouchOtherSeasons(): void
@@ -301,7 +302,7 @@ class PromotePriorSeasonSnapshotTest extends DatabaseTestCase
     {
         // end-of-season inserted first -> lower auto-increment id than the mid-season row below.
         // id DESC alone would pick mid-season; the phase rank must break the tie instead.
-        $this->seedSnapshot(202099901, 2008, 'end-of-season', ['stats_gm' => 82, 'stats_pts' => 111, 'phantom_games' => 0]);
+        $this->seedSnapshot(202099901, 2008, 'end-of-season', ['stats_gm' => 82, 'stats_pts' => 111, 'phantom_games' => 5]);
         $this->seedSnapshot(202099901, 2008, 'mid-season',    ['stats_gm' => 82, 'stats_pts' => 222, 'phantom_games' => 0]);
 
         $row = $this->rankedIblHistRowFor(202099901);
@@ -312,7 +313,7 @@ class PromotePriorSeasonSnapshotTest extends DatabaseTestCase
 
     public function testHigherStatsGmMidSeasonWinsOverLowerStatsGmEndOfSeason(): void
     {
-        $this->seedSnapshot(202099902, 2008, 'mid-season',    ['stats_gm' => 82, 'stats_pts' => 222, 'phantom_games' => 0]);
+        $this->seedSnapshot(202099902, 2008, 'mid-season',    ['stats_gm' => 82, 'stats_pts' => 222, 'phantom_games' => 5]);
         $this->seedSnapshot(202099902, 2008, 'end-of-season', ['stats_gm' => 40, 'stats_pts' => 111, 'phantom_games' => 0]);
 
         $row = $this->rankedIblHistRowFor(202099902);

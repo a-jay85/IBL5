@@ -446,7 +446,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
         // Depth chart
         'pg_depth', 'sg_depth', 'sf_depth', 'pf_depth', 'c_depth',
         // Season stats (regular season)
-        'stats_gs', 'stats_gm', 'stats_min', 'stats_fgm', 'stats_fga',
+        'stats_gs', 'stats_gm', 'phantom_games', 'stats_min', 'stats_fgm', 'stats_fga',
         'stats_ftm', 'stats_fta', 'stats_3gm', 'stats_3ga',
         'stats_orb', 'stats_drb', 'stats_ast', 'stats_stl', 'stats_tvr', 'stats_blk', 'stats_pf',
         'stats_reb', 'stats_pts',

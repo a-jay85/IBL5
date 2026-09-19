@@ -11,6 +11,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import fidelity
+from harness.adapters import ghad
 
 TREE = "a" * 40
 DIFF_ID = "e" * 40
@@ -155,3 +156,52 @@ def test_patch_id_blank_for_empty_diff():
     assert fidelity.diff_patch_id("") == ""
     assert fidelity.diff_patch_id("\n") == ""
     assert fidelity.diff_patch_id("not a diff\n") == ""
+
+
+# --- rows 12-15: adapter tests -----------------------------------------------
+
+def test_sticky_marker_constants_agree():
+    assert ghad.PR_STICKY_MARKER == fidelity.STICKY_MARKER
+
+
+def test_recording_gh_sticky_body_none_without_fixture(tmp_path):
+    from harness.adapters.ghad import RecordingGh
+    gh = RecordingGh(str(tmp_path))
+    assert gh.pr_sticky_body(99) is None
+    gh2 = RecordingGh(str(tmp_path), {"prior_sticky_body": "x"})
+    assert gh2.pr_sticky_body(99) == "x"
+
+
+def test_live_sticky_body_fail_closed(tmp_path):
+    from harness.adapters.ghad import LiveGh, PR_STICKY_MARKER
+    MARKED = f"hello {PR_STICKY_MARKER} world"
+
+    class PatchedLiveGh(LiveGh):
+        def __init__(self, response):
+            super().__init__(str(tmp_path), ".", "HEAD")
+            self._response = response
+
+        def _gh(self, *args, **kw):
+            from harness.state import HarnessError
+            if isinstance(self._response, Exception):
+                raise self._response
+            return self._response
+
+    from harness.state import HarnessError
+
+    # HarnessError → None
+    assert PatchedLiveGh(HarnessError("gh", "fail")).pr_sticky_body(1) is None
+    # non-JSON → None
+    assert PatchedLiveGh("not json").pr_sticky_body(1) is None
+    # empty comments → None
+    assert PatchedLiveGh('{"comments": []}').pr_sticky_body(1) is None
+    # null comments → None
+    assert PatchedLiveGh('{"comments": null}').pr_sticky_body(1) is None
+    # unrelated comment → None
+    assert PatchedLiveGh('{"comments": [{"body": "unrelated"}]}').pr_sticky_body(1) is None
+    # two marked comments → None (ambiguous)
+    two = f'{{"comments": [{{"body": "{MARKED}"}}, {{"body": "{MARKED}"}}]}}'
+    assert PatchedLiveGh(two).pr_sticky_body(1) is None
+    # exactly one marked comment → returns body
+    one = f'{{"comments": [{{"body": "{MARKED}"}}]}}'
+    assert PatchedLiveGh(one).pr_sticky_body(1) == MARKED

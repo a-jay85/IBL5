@@ -1,0 +1,21 @@
+# Input path set for the e2e-tests.yml memo (bin/ci-memo, ADR-0131).
+# One git pathspec per line. Conservative superset of the website-affecting
+# domain gate and the runtime filter. The floating GHCR image is folded in by
+# bin/ci-memo itself.
+.github/workflows/e2e-tests.yml
+.github/actions/setup-docker-e2e
+.github/ci-memo/e2e.paths
+bin/website-affecting
+bin/ci-memo
+:(glob)**/*.php
+:(glob)**/*.sql
+:(glob)ibl5/**/*.ts
+ibl5/tests/e2e
+ibl5/composer.json
+ibl5/composer.lock
+ibl5/package.json
+ibl5/bun.lock
+Dockerfile
+docker
+:(glob)docker-compose*.y*ml
+ibl5/migrations

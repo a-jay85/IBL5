@@ -246,6 +246,7 @@ class RunResult:
     ledger: Optional[UsageLedger] = None
     scored_findings: list[dict] = field(default_factory=list)
     manual_demotions: list[dict] = field(default_factory=list)
+    manual_testing: dict = field(default_factory=dict)  # Phase 6.7 record; popped when empty
     audit: list[str] = field(default_factory=list)
 
     def to_json(self) -> str:
@@ -263,4 +264,6 @@ class RunResult:
                 d["plan"].pop("slug_drift", None)
             if not d["plan"].get("plan_source"):
                 d["plan"].pop("plan_source", None)
+        if not self.manual_testing:
+            d.pop("manual_testing", None)   # keep existing replay goldens byte-identical
         return json.dumps(d, indent=1, default=str)

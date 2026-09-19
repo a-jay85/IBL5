@@ -109,5 +109,16 @@ intent log — without touching GitHub.
 Known scope reductions vs the full skill (accepted at install): no backlog
 housekeeping (the skill's Phase 2.5 now fires on plan-blind PRs too via its
 Trigger C, so this gap widened — a harness run ships no housekeeping on ANY
-PR class), no worktree teardown, no E2E verify track (Docker stack), no
+PR class), no worktree teardown, no Playwright E2E spec track, no
 review Agent C (prior-PR feedback). The skill fallback retains all of them.
+
+Phase 6.7 (manual-testing execution) is no longer a scope reduction. The
+harness brings the worktree Docker stack up peer-safely, executes the
+machine-observable manual-testing rows (HTTP status and body assertions,
+plus allowlisted CLI commands), and ticks the rows that pass. Arming
+condition (1) can therefore clear headlessly. Perception rows are never
+ticked and keep condition (1) held. Bring-up is bounded at 120 seconds and
+each row at 30 seconds. Every failure mode leaves every box unticked. The
+stack is never torn down. Exercise the pass by hand with
+`python3 -m harness.manual_testing --pr <n> --worktree <path>`, which
+probes and reports without writing to the PR.

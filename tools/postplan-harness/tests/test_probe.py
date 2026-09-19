@@ -111,3 +111,36 @@ def test_fixture_probe_no_probes_key():
     p = FixtureProbe({})
     ok, detail = p.run(["pytest"])
     assert ok is False
+
+
+# ---------------------------------------------------------------------------
+# Phase 6b additions: allowed(), timeout kwarg, LiveProbe timeout message
+# ---------------------------------------------------------------------------
+
+from harness.adapters.probe import allowed
+
+
+def test_allowed_bin_test_accepted():
+    assert allowed(["bin/test-foo"]) is True
+
+
+def test_allowed_bash_rejected():
+    assert allowed(["bash", "-c", "x"]) is False
+
+
+def test_fixture_probe_accepts_timeout_kwarg():
+    p = FixtureProbe({"probes": {"bin/test-foo": True}})
+    ok, _ = p.run(["bin/test-foo"], timeout=30)
+    assert ok is True
+
+
+def test_live_probe_timeout_message_includes_value(monkeypatch):
+    """Timeout message includes the actual timeout value."""
+    import subprocess
+    def _fake_run(*a, **kw):
+        raise subprocess.TimeoutExpired(cmd=["bin/test-fake"], timeout=kw.get("timeout", 0))
+    monkeypatch.setattr(subprocess, "run", _fake_run)
+    p = LiveProbe()
+    ok, detail = p.run(["bin/test-fake"], timeout=5)
+    assert ok is False
+    assert "5s" in detail

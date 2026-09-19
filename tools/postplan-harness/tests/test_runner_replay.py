@@ -131,6 +131,86 @@ class DegradingLlm(FixtureLlm):
         return super().call(purpose, model, prompt, validate, max_retries, normalizer)
 
 
+def _capture_git(monkeypatch):
+    captured = []
+
+    class _CapturingReplayGit(runner.ReplayGit):
+        def __init__(self, fixture):
+            super().__init__(fixture)
+            captured.append(self)
+
+    monkeypatch.setattr(runner, "ReplayGit", _CapturingReplayGit)
+    return captured
+
+
+def test_clean_rerun_with_open_pr_skips_pr_copy():
+    """No pr-copy canned: calling it would raise llm-fixture-missing and fail the run."""
+    out = tempfile.mkdtemp()
+    canned = {k: v for k, v in CANNED.items() if k != "pr-copy"}
+    fx = _fixture(clean_tree=True, head_subject="feat: add widget")
+    fx["pr_meta"] = dict(fx["pr_meta"], title="feat: synthetic")
+    res = runner.run(fx, out, FixtureLlm(UsageLedger(), canned), mode="replay")
+    assert res.terminal != TerminalState.FAILED, res.error
+    assert "pr-copy" not in [c.purpose for c in res.ledger.calls]
+    assert "pr-copy skipped" in "\n".join(res.audit)
+    assert "stripped model-authored" not in "\n".join(res.audit)
+    # the live PR's feat: title still trips the human-signoff hold
+    assert 8 in {c.number for c in res.arm.holds}
+
+
+def test_clean_rerun_copy_carries_the_live_pr_title():
+    class _Gh:
+        def pr_exists(self): return True
+        def pr_title(self): return "feat: x"
+
+    class _Git:
+        def has_changes_to_commit(self): return False
+        def branch_head_subject(self): return "chore: last commit"
+
+    copy, degraded = runner._pr_copy(None, _Git(), _Gh(), None, "slug", None, None,
+                                     lambda m: None)
+    assert copy == {"title": "feat: x", "commit_subject": "chore: last commit",
+                    "summary_md": ""}
+    assert degraded is False      # a skip is not a degradation; it must not hold arming
+
+
+def test_dirty_rerun_with_open_pr_still_calls_pr_copy():
+    out = tempfile.mkdtemp()
+    res = runner.run(_fixture(), out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    assert "pr-copy" in [c.purpose for c in res.ledger.calls]
+
+
+def test_bad_pr_copy_json_falls_back_to_commit_subject(monkeypatch):
+    captured = _capture_git(monkeypatch)
+    out = tempfile.mkdtemp()
+    llm = DegradingLlm(UsageLedger(), CANNED, {"pr-copy"})
+    res = runner.run(_fixture(head_subject="fix: real subject"), out, llm, mode="replay")
+    assert captured[0].commit_messages[0].split("\n", 1)[0] == "fix: real subject"
+    assert "pr-copy DEGRADED" in "\n".join(res.audit)
+    # the run ships, but an unreviewed title never auto-merges
+    assert res.terminal == TerminalState.DEGRADED
+    assert "pr-copy" in res.degraded_agents
+    assert not res.arm.armed
+    assert "pr_merge_auto" not in [a["action"] for a in _actions(out)]
+
+
+def test_bad_pr_copy_json_without_subject_opens_feat_pr():
+    """No branch commit to borrow: the fallback title is feat:, so condition (8) holds."""
+    out = tempfile.mkdtemp()
+    llm = DegradingLlm(UsageLedger(), CANNED, {"pr-copy"})
+    res = runner.run(_fixture(pr_number=None, pr_meta=None), out, llm, mode="replay")
+    creates = [a for a in _actions(out) if a.get("action") == "pr_create"]
+    assert creates and creates[-1]["title"] == "feat: synthetic-degrade"
+    assert not res.arm.armed
+
+
+def test_other_pr_copy_errors_still_fail():
+    out = tempfile.mkdtemp()
+    llm = DegradingLlm(UsageLedger(), CANNED, {"pr-copy"}, kind="llm-timeout")
+    res = runner.run(_fixture(), out, llm, mode="replay")
+    assert res.terminal == TerminalState.FAILED
+
+
 def test_envelope_unwrap_reaches_findings():
     out = tempfile.mkdtemp()
     canned = dict(CANNED)

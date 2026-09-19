@@ -257,16 +257,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         res.classification = cls
         log("phase3 classify:\n" + cls.summary())
 
-        if fixture:
-            plan_excerpt = (fixture.get("plan_content") or "")[:4000]
-        elif plan.found and plan.path:
-            with open(plan.path) as fh:
-                plan_excerpt = fh.read()[:4000]
-        else:
-            plan_excerpt = ""
-        copy = llm.call("pr-copy", "haiku",
-                        llm_calls.pr_copy_prompt(slug, cls, plan, plan_excerpt),
-                        schemas.validate_pr_copy)
+        copy, copy_degraded = _pr_copy(llm, git, gh, fixture, slug, cls, plan, log)
         summary, stripped = strip_manual_testing_section(copy["summary_md"])
         if stripped:
             copy["summary_md"] = summary
@@ -338,6 +329,11 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
 
         # ---- Phase 4: review + security (gated bounded calls) ---------
         findings, gates, scored, degraded_agents = ReviewPhase(llm, gh).run(meta, cls, plan)
+        # A degraded pr-copy joins the same list: the PR then carries the "Review
+        # Unavailable" note, the terminal is DEGRADED, and arming is off — the title a
+        # human must sanity-check was never model-reviewed.
+        if copy_degraded:
+            degraded_agents = list(degraded_agents) + ["pr-copy"]
         res.findings = findings
         res.scored_findings = scored
         res.degraded_agents = degraded_agents
@@ -643,6 +639,53 @@ def _remediate_doc_staleness(worktree: str, git, log) -> int:
     log(f"phase2: auto-remediated doc-staleness - bumped last_verified in {n} docs "
         f"(base: {base[:12]})")
     return n
+
+
+def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log) -> tuple[dict, bool]:
+    """Phase 2 commit/PR copy: ({title, commit_subject, summary_md}, degraded).
+
+    Re-run with an open PR and nothing to commit: the Haiku call is skipped. Its title
+    and body would reach neither a commit (commit_all returns "" on a clean index) nor
+    the PR (pr_create is skipped when the PR exists). Condition (8) reads the title from
+    gh.pr_meta(), never from this dict. The skip path still returns the live title so a
+    later reader of copy["title"] cannot see a chore: title on a feat: PR. summary_md is
+    "" there: the live body already carries the runner's Manual Testing section, and
+    passing it back would log a false "stripped model-authored" line.
+
+    Unparseable model output ("llm-invalid-output") falls back to the branch's own
+    commit subject instead of failing the run, and returns degraded=True so the caller
+    holds arming: an unreviewed title is exactly the feat-vs-chore judgment condition
+    (8) depends on. Any other error kind still propagates.
+    """
+    if gh.pr_exists() and not git.has_changes_to_commit():
+        head_subject = git.branch_head_subject()
+        title = gh.pr_title() or head_subject or f"chore: {slug}"
+        log("phase2: PR exists and tree is clean — pr-copy skipped")
+        return {"title": title, "commit_subject": head_subject or title,
+                "summary_md": ""}, False
+    if fixture:
+        plan_excerpt = (fixture.get("plan_content") or "")[:4000]
+    elif plan.found and plan.path:
+        with open(plan.path) as fh:
+            plan_excerpt = fh.read()[:4000]
+    else:
+        plan_excerpt = ""
+    try:
+        return llm.call("pr-copy", "haiku",
+                        llm_calls.pr_copy_prompt(slug, cls, plan, plan_excerpt),
+                        schemas.validate_pr_copy), False
+    except HarnessError as e:
+        if e.kind != "llm-invalid-output":
+            raise
+        log(f"phase2: pr-copy DEGRADED ({(e.detail or '')[:200]}) — using commit subject")
+    subject = git.branch_head_subject()
+    if not re.match(r"^[a-z]+(\([^)]*\))?!?:", subject):
+        # No conventional subject to borrow. feat: is the fail-closed type: it trips the
+        # human-signoff hold, and coerce_commit_subject re-types docs/test/non-code diffs.
+        subject = f"feat: {subject or slug}"
+    subject = schemas.coerce_commit_subject(subject, cls)
+    return {"title": subject, "commit_subject": subject,
+            "summary_md": f"## Summary\n- {subject}\n"}, True
 
 
 def _commit_with_gate_remediation(git, worktree: str | None, message: str, log,

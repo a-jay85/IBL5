@@ -39,6 +39,21 @@ def test_dirty_commit_and_changed_files(repo):
     assert g.commit_all("noop") == ""      # nothing staged -> no empty commit
 
 
+def test_changes_to_commit_and_branch_head_subject(repo):
+    subprocess.run(["git", "-C", repo, "checkout", "-b", "feature"],
+                   check=True, capture_output=True)
+    g = LiveGit(repo)
+    g.stage_all()
+    assert not g.has_changes_to_commit()
+    assert g.branch_head_subject(base="master") == ""   # never borrows master's "base"
+    open(os.path.join(repo, "b.php"), "w").write("<?php\n")
+    g.stage_all()
+    assert g.has_changes_to_commit()
+    g.commit_all("fix: add b")
+    assert not g.has_changes_to_commit()
+    assert g.branch_head_subject(base="master") == "fix: add b"
+
+
 def test_dirty_tree_ships_from_merge_base(repo):
     """post-plan-now fires on a DIRTY worktree: uncommitted + untracked changes
     must appear in diff_vs_base, or every run is a false nothing-to-ship."""

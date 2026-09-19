@@ -13,9 +13,7 @@ bin/website-affecting
 bin/lib
 bin/check-e2e-fixture-drift
 bin/check-playwright-pinning
-bin/parse-playwright-flakes
 bin/playwright-image-tag
-bin/run-migrations-ci
 bin/vr-build-gallery
 bin/vr-changed-coverage
 bin/vr-review-comment

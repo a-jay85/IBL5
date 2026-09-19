@@ -728,8 +728,8 @@ jobs:
 
   update-baselines:
     name: Update coverage & PHPStan baselines
-    needs: [test, phpstan]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    needs: [test, phpstan, ci-memo-check]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:

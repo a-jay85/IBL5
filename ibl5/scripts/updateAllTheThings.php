@@ -130,11 +130,37 @@ try {
         $season->beginningYear = $seasonYearOverride - 1;
     }
 
+    $filePrefix = $leagueContext !== null ? $leagueContext->getFilePrefix() : 'IBL5';
+    $archiveExtractor = new BulkImport\ArchiveExtractor();
+    $backupLocator = new BulkImport\BackupArchiveLocator($archiveExtractor);
+
+    // Auto-detect a new season from the uploaded archive's .lge file.
+    // Skipped entirely for a historical-import override (the operator has already
+    // stated the season) and for Olympics (separate `league` row, different cadence).
+    if ($seasonYearOverride === null && !$isOlympics) {
+        $rolloverDetector = new Updater\SeasonRollover\SeasonRolloverDetector(
+            $backupLocator, $archiveExtractor, $basePath, $filePrefix,
+        );
+        $rolloverResult = $rolloverDetector->detect($season->beginningYear, $season->endingYear);
+
+        if ($rolloverResult->shouldWrite()) {
+            $rolloverApplier = new Updater\SeasonRollover\SeasonRolloverApplier(
+                new LeagueControlPanel\LeagueControlPanelRepository($mysqli_db, $leagueContext),
+            );
+            $rolloverApplier->apply($rolloverResult);
+
+            // Rebuild so every downstream step, backup dir and label reads the new season.
+            $season = new \Season\Season($mysqli_db);
+        }
+
+        echo $view->renderInitStatus(
+            'Season rollover: ' . (string) \Security\HtmlSanitizer::safeHtmlOutput($rolloverResult->reason)
+        );
+        flush();
+    }
+
     echo $view->renderInitStatus('Season initialized');
     flush();
-
-    $filePrefix = $leagueContext !== null ? $leagueContext->getFilePrefix() : 'IBL5';
-
 
     // --- Pipeline: register all steps and delegate to controller ---
     $updaterService = new Updater\UpdaterService();
@@ -157,8 +183,6 @@ try {
     $jsbService = new JsbParser\JsbImportService($jsbRepo, $jsbResolver);
 
     // Step 0: Extract JSB files from latest backup archive
-    $archiveExtractor = new BulkImport\ArchiveExtractor();
-    $backupLocator = new BulkImport\BackupArchiveLocator($archiveExtractor);
     // JsbSourceResolver reads .lge/.sch directly from archive (disk-fallback)
     $seasonLabel = BulkImport\BackupArchiveLocator::seasonLabel($season->beginningYear, $season->endingYear);
     $seasonBackupDir = $basePath . '/backups/' . ($isOlympics ? 'olympics/' : '') . $seasonLabel;

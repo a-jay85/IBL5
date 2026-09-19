@@ -21,7 +21,7 @@ Without `--live`, every would-be side effect remains a typed intent record.
 | Phase sequencing + terminal states | `pr-copy`: commit/PR title + summary (haiku). Skipped when the PR is open and the tree is clean |
 | Phase 3 diff classification (all flags) | `review-agent-a/b/d` — code review judgment (sonnet) |
 | Phase 5 verify aggregation | `security-audit` — security judgment (haiku) |
-| Phase 5.0 plan→test/file conformance (path-tolerant matching: suffix and basename tiers) | `score-findings` — rubric confidence scoring (haiku) | <!-- slop-ok -->
+| Phase 5.0 plan→test/file conformance | `score-findings` — rubric confidence scoring (haiku) | <!-- slop-ok -->
 | All twelve ported arming conditions (numbered 1–12; the skill's condition (11), unresolved review-thread findings, stays skill-only — the harness's 11 is master's plan-slug-drift hold) | `safety-verdict` — condition (9), **add-only** holds (haiku) |
 | CI-watch interpretation | `manual-classify` — plan-blind manual-step triage (haiku) |
 | Side-effect gating + audit log | `retrospective` — save-a-lesson-or-not (haiku) |

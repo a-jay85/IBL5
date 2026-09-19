@@ -56,6 +56,8 @@ def pr_copy_prompt(slug: str, cls: Classification, plan: PlanInfo, plan_excerpt:
         + '\n\nNEVER write a "## Manual Testing" heading or any manual-testing checklist '
         'inside summary_md. The runner owns that section and appends it after you; '
         'duplicating it corrupts the arming gate.'
+        + '\n\nA bare `#N` links to IBL5 PR/issue N. Cite a backlog issue as '
+        '`a-jay85/IBL5-backlog#N`, never as a bare `#N`.'
         + '\n\nReturn ONLY JSON with exactly these four keys: {"type": "chore", '
         '"title": "chore(scope): ...", "commit_subject": "chore(scope): ...", '
         '"summary_md": "## Summary\\n- ..."}.\n'

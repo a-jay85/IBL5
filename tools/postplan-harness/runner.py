@@ -36,7 +36,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from harness import ciwatch, conformance, fidelity, llm_calls, manual_rows, schemas, statefile
 from harness.armable import (ArmInputs, conflict_flag_path, evaluate,
                              manual_testing_clearance, select_fidelity_verdict)
-from harness.classify import (classify, files_from_diff, modified_files_from_diff,
+from harness.classify import (BACKLOG_REPO, classify, files_from_diff, modified_files_from_diff,
+                              qualify_backlog_refs,
                               render_files_changed, render_manual_confirmation,
                               render_reviewer_verification, strip_manual_testing_section,
                               upsert_files_changed, upsert_manual_confirmation,
@@ -264,6 +265,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         if stripped:
             copy["summary_md"] = summary
             log("phase2: stripped model-authored Manual Testing section from PR copy")
+        copy["summary_md"], qualified = qualify_backlog_refs(copy["summary_md"])
+        if qualified:
+            log(f"phase2: qualified {qualified} bare backlog ref(s) as {BACKLOG_REPO}#N")
         copy["commit_subject"] = schemas.coerce_commit_subject(copy["commit_subject"], cls)
         sha = _commit_with_gate_remediation(
             git, worktree, f"{copy['commit_subject']}\n\n{copy['summary_md']}", log)

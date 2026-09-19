@@ -344,6 +344,7 @@ def test_sticky_ordering_and_marker():
     h = body.index(fidelity.MERGE_DIGEST_HEADING)
     r = body.index("**Remediation rounds:**")
     b = body.index("**Backlog issues filed:**")
+    assert "a-jay85/IBL5-backlog#101, a-jay85/IBL5-backlog#102" in body
     assert r < h and b < h
     assert body.endswith(fidelity.STICKY_MARKER + "\n")
     for lbl in fidelity.LABELS:

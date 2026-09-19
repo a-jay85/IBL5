@@ -506,6 +506,32 @@ def strip_manual_testing_section(body: str) -> tuple[str, bool]:
     return new_body, True
 
 
+BACKLOG_REPO = "a-jay85/IBL5-backlog"
+
+# "backlog issue #160", "backlog items #12 and #13", "Backlog #7, #8". A bare `#N`
+# autolinks to IBL5's own PR/issue N, so backlog refs must carry the repo prefix.
+_BACKLOG_REF_RE = re.compile(
+    r"(\bbacklog(?:\s+(?:issues?|items?|entry|entries))?\s+)"
+    r"(#\d+(?:(?:\s*,\s*|\s*/\s*|,?\s+(?:and|or)\s+)#\d+)*)",
+    re.I,
+)
+
+
+def qualify_backlog_refs(body: str) -> tuple[str, int]:
+    """Rewrite bare `#N` refs that follow the word "backlog" to
+    `a-jay85/IBL5-backlog#N`. Returns `(new_body, refs_rewritten)`.
+    Already-qualified refs (`IBL5-backlog#N`) never match."""
+    count = 0
+
+    def _sub(m: re.Match) -> str:
+        nonlocal count
+        refs, n = re.subn(r"#(\d+)", rf"{BACKLOG_REPO}#\1", m.group(2))
+        count += n
+        return m.group(1) + refs
+
+    return _BACKLOG_REF_RE.sub(_sub, body or ""), count
+
+
 def slice_spec_diffs(filtered_diff: str, e2e_spec_modules: list[str]) -> tuple[str, str]:
     """Agent D pre-slice: (spec portion, production portion) of the diff."""
     spec_lines: list[str] = []

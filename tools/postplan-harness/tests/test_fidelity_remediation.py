@@ -526,7 +526,7 @@ def test_notes_end_to_end(tmp_path, git_shim):
                 res.fidelity.get("rounds_completed", 0),
             ),
         )
-        assert "**Backlog issues filed:** #" in sticky
+        assert "**Backlog issues filed:** a-jay85/IBL5-backlog#" in sticky
     finally:
         _cleanup(995)
 

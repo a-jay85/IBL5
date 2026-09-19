@@ -521,7 +521,8 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
             for i, r in enumerate(rounds)))
     nums = fid.get("backlog_issue_numbers") or []
     if nums:
-        out.append("**Backlog issues filed:** " + ", ".join(f"#{n}" for n in nums))
+        out.append("**Backlog issues filed:** " + ", ".join(
+            f"a-jay85/IBL5-backlog#{n}" for n in nums))
 
     out.append("")
     if decision is not None and getattr(decision, "armed", False):

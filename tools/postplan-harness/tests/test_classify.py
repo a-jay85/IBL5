@@ -10,7 +10,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from harness.armable import manual_testing_clearance
 from harness.classify import (classify, files_from_diff, filter_diff,
                                FILES_CHANGED_BEGIN, FILES_CHANGED_END,
-                               name_status_from_diff, render_files_changed,
+                               name_status_from_diff, qualify_backlog_refs,
+                               render_files_changed,
                                render_reviewer_verification,
                                retro_registry_row_from_diff,
                                REVIEWER_VERIFICATION_BEGIN, REVIEWER_VERIFICATION_END,
@@ -759,3 +760,15 @@ def test_split_hold_justification_matches_shell(tmp_path):
     assert py_candidates == shell_candidates, (
         f"parser divergence\n python: {py_candidates}\n shell:  {shell_candidates}"
     )
+
+
+@pytest.mark.parametrize("src,want,n", [
+    ("Closes harness half of backlog issue #160 (skill half landed in PR #2158).",
+     "Closes harness half of backlog issue a-jay85/IBL5-backlog#160 (skill half landed in PR #2158).", 1),
+    ("See backlog items #12 and #13.", "See backlog items a-jay85/IBL5-backlog#12 and a-jay85/IBL5-backlog#13.", 2),
+    ("Backlog #7, #8", "Backlog a-jay85/IBL5-backlog#7, a-jay85/IBL5-backlog#8", 2),
+    ("Filed a-jay85/IBL5-backlog#9 from backlog housekeeping.", "Filed a-jay85/IBL5-backlog#9 from backlog housekeeping.", 0),
+    ("Fixes #2311 and backlog", "Fixes #2311 and backlog", 0),
+])
+def test_qualify_backlog_refs(src, want, n):
+    assert qualify_backlog_refs(src) == (want, n)

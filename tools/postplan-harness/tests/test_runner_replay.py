@@ -47,6 +47,15 @@ def run_slug(slug, canned=CANNED):
     return res, out
 
 
+def test_replay_mode_skips_manual_testing_and_leaves_empty_dict():
+    """Row 19: replay run has skipped_reason 'replay-mode'; manual_testing stays absent from JSON."""
+    res, out = _run_inline()
+    assert res.manual_testing == {}
+    with open(os.path.join(out, "result.json")) as fh:
+        blob = json.load(fh)
+    assert "manual_testing" not in blob
+
+
 def test_docs_only_arms_no_review_calls():
     res, out = run_slug("backlog-l6-done")
     assert res.terminal == TerminalState.SHIPPED_ARMED

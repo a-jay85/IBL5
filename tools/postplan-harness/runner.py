@@ -481,7 +481,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             master_sha=master_sha, head_tree=git.head_tree,
             live=live, log=log,
         )
-        res.manual_testing = mt.to_dict()
+        if mt.ran:
+            res.manual_testing = mt.to_dict()
         if not mt.ran:
             log(f"phase6.7: skipped ({mt.skipped_reason})")
         else:

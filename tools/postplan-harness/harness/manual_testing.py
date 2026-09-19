@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Optional
 
+from harness.adapters import probe as probe_mod
+
 BRINGUP_SCRIPT_PATHS = (
     ".claude/review-shared/scripts/wt-bring-up.sh",
     ".claude/skills/pr-ready/scripts/wt-bring-up.sh",
@@ -201,14 +203,14 @@ def run_http_rows(
     return rows, ""
 
 
-def cli_argv(row_text: str, probe: object) -> Optional[list[str]]:
+def cli_argv(row_text: str) -> Optional[list[str]]:
     """Return the first allowlisted argv found in backtick spans, or None."""
     for span in _CMD_SPAN_RE.findall(row_text):
         try:
             argv = shlex.split(span)
         except ValueError:
             continue
-        if argv and hasattr(probe, "allowed") and probe.allowed(argv):
+        if argv and probe_mod.allowed(argv):
             return argv
     return None
 
@@ -223,7 +225,7 @@ def run_cli_rows(
     for row_id, row_text, already_ticked in pending:
         if already_ticked:
             continue
-        argv = cli_argv(row_text, probe)
+        argv = cli_argv(row_text)
         if argv is None:
             continue
         # Override guard: only proceed when absent or exactly SKIP-NOURL

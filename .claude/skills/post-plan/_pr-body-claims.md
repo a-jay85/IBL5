@@ -60,3 +60,9 @@ the literal string "What is NOT in this PR".
 
 **Headless:** applies — an automouse or `/post-plan` run authoring a PR body performs the same
 re-read; there is no human in the loop to catch the stale bullet later.
+
+## Backlog issue references
+
+A bare `#N` autolinks to IBL5's own PR or issue N. Backlog issues live in a different repo,
+so cite them as `a-jay85/IBL5-backlog#N`. Write `backlog issue a-jay85/IBL5-backlog#160`,
+never `backlog issue #160`. Use bare `#N` only for IBL5 PRs and issues.

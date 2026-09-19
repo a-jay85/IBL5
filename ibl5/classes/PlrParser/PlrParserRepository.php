@@ -394,8 +394,18 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
      */
     public function promotePriorSeasonSnapshots(int $priorYear): int
     {
-        $columns   = self::SNAPSHOT_COLUMNS;
-        $columns[] = 'created_at';
+        // Promotion copies more columns than upsertSnapshot() writes. SNAPSHOT_COLUMNS is
+        // the parser's write set: upsertSnapshot() reads $data[$col] for each entry, so a
+        // column the parser never produces cannot live there. phantom_games and created_at
+        // both exist on the row and must survive the copy, so they are appended here only.
+        // Each append is guarded: were either later added to SNAPSHOT_COLUMNS, an
+        // unconditional append would name it twice and the INSERT would error.
+        $columns = self::SNAPSHOT_COLUMNS;
+        foreach (['phantom_games', 'created_at'] as $extraColumn) {
+            if (!in_array($extraColumn, $columns, true)) {
+                $columns[] = $extraColumn;
+            }
+        }
         $quoted    = array_map(static fn (string $c): string => '`' . $c . '`', $columns);
         $colList = implode(', ', $quoted);
         $selectList = implode(', ', array_map(
@@ -446,7 +456,7 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
         // Depth chart
         'pg_depth', 'sg_depth', 'sf_depth', 'pf_depth', 'c_depth',
         // Season stats (regular season)
-        'stats_gs', 'stats_gm', 'phantom_games', 'stats_min', 'stats_fgm', 'stats_fga',
+        'stats_gs', 'stats_gm', 'stats_min', 'stats_fgm', 'stats_fga',
         'stats_ftm', 'stats_fta', 'stats_3gm', 'stats_3ga',
         'stats_orb', 'stats_drb', 'stats_ast', 'stats_stl', 'stats_tvr', 'stats_blk', 'stats_pf',
         'stats_reb', 'stats_pts',

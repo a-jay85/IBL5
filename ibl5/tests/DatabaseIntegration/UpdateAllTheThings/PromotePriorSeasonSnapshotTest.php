@@ -226,6 +226,42 @@ class PromotePriorSeasonSnapshotTest extends DatabaseTestCase
         self::assertSame(7, (int) $row['phantom_games']);
     }
 
+    public function testCopiesEveryNonIdentityColumnVerbatim(): void
+    {
+        // The column-by-column guard: a column missing from the promotion's SELECT
+        // list silently resets to its table default on the promoted row. Asserting
+        // one column at a time cannot see that; comparing the full row can.
+        // phantom_games is seeded non-zero on purpose — it was the column the
+        // promotion dropped, and this is the assertion that a source value survives.
+        $this->seedSnapshot(202000013, 2008, 'mid-season', [
+            'stats_gm'      => 77,
+            'phantom_games' => 7,
+            'stats_pts'     => 1234,
+            'talent'        => 61,
+            'salary_yr1'    => 9500,
+            'created_at'    => '2026-01-15 10:00:00',
+        ]);
+
+        (new PlrParserRepository($this->db))->promotePriorSeasonSnapshots(2008);
+
+        $source   = $this->fetchSnapshotRow(202000013, 2008, 'mid-season');
+        $promoted = $this->fetchSnapshotRow(202000013, 2008, 'end-of-season');
+        self::assertNotNull($source);
+        self::assertNotNull($promoted);
+
+        unset($source['id'], $source['snapshot_phase'], $promoted['id'], $promoted['snapshot_phase']);
+        self::assertSame($source, $promoted, 'Every column except id and snapshot_phase must copy verbatim.');
+    }
+
+    public function testReturnsZeroWhenNoMidSeasonRowsExist(): void
+    {
+        $this->seedSnapshot(202000014, 2007, 'mid-season');
+
+        $promoted = (new PlrParserRepository($this->db))->promotePriorSeasonSnapshots(2008);
+
+        self::assertSame(0, $promoted);
+    }
+
     public function testDoesNotTouchOtherSeasons(): void
     {
         $this->seedSnapshot(202000009, 2007, 'mid-season');
@@ -328,6 +364,30 @@ class PromotePriorSeasonSnapshotTest extends DatabaseTestCase
      * winning row for one pid. Reading the constant (rather than restating the SQL)
      * is what binds these fixtures to production: a change to the phase-rank CASE
      * expression fails them.
+     *
+     * @return array<string, mixed>|null
+     */
+    /**
+     * Fetch one whole snapshot row so a test can compare every column at once.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function fetchSnapshotRow(int $pid, int $year, string $phase): ?array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT * FROM ibl_plr_snapshots WHERE pid = ? AND season_year = ? AND snapshot_phase = ?'
+        );
+        self::assertNotFalse($stmt);
+        $stmt->bind_param('iis', $pid, $year, $phase);
+        $stmt->execute();
+        $row = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        return $row;
+    }
+
+    /**
+     * Run the production ranking SELECT and return the single surviving row for one pid.
      *
      * @return array<string, mixed>|null
      */

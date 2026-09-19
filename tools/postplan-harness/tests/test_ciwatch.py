@@ -234,8 +234,8 @@ def test_background_watch_success_writes_outcome_file(monkeypatch, tmp_path):
     assert data["sha"] == "aaa111"
     assert data["failed_checks"] == []
     assert data["exit_code"] == 0
-    # --fail-fast belongs to the background invocation only
-    assert "--fail-fast" in constructed[0]
+    # no --fail-fast: it would stop at human-signoff on every feat: PR
+    assert "--fail-fast" not in constructed[0]
 
 
 def test_background_watch_failure_records_failed_checks_and_probe(monkeypatch, tmp_path):
@@ -543,3 +543,128 @@ def test_audit_rounds_three_round_loop_emits_one_per_round(tmp_path, monkeypatch
         assert len(round_lines) == 3
     finally:
         _cleanup(9802, "9802-2", "9802-3", "9802-4")
+
+
+# ---- human-signoff is red by design, never a CI failure ---------------------
+
+def test_probe_ignores_human_signoff(monkeypatch):
+    """A red human-signoff alone must not short-circuit watch_live."""
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(list(cmd))
+        if "--watch" in cmd:
+            return P(8, "human-signoff\tfail\t5s\nbuild\tpass\t3m\n", "")
+        return P(8, '[{"name":"human-signoff","state":"FAILURE","bucket":"fail"},'
+                    '{"name":"build","state":"PENDING","bucket":"pending"}]', "")
+
+    monkeypatch.setattr(ciwatch.subprocess, "run", fake_run)
+    monkeypatch.setattr(ciwatch.time, "sleep", lambda s: None)
+
+    out = ciwatch.watch_live(".", 1)
+
+    assert out.exit_code == 0
+    assert out.failed == []
+    assert "human-signoff" in out.evidence
+    assert any("--watch" in c for c in calls), "probe short-circuited on human-signoff"
+
+
+def test_watch_live_reports_real_failures_beside_human_signoff(monkeypatch):
+    """A real red check still fails; human-signoff is dropped from the list."""
+    def fake_run(cmd, **kwargs):
+        if "--watch" in cmd:
+            return P(8, "human-signoff\tfail\t5s\nbuild\tfail\t3m\n", "")
+        return P(8, '[{"name":"human-signoff","state":"FAILURE","bucket":"fail"}]', "")
+
+    monkeypatch.setattr(ciwatch.subprocess, "run", fake_run)
+    monkeypatch.setattr(ciwatch.time, "sleep", lambda s: None)
+
+    out = ciwatch.watch_live(".", 1)
+
+    assert out.exit_code == 8
+    assert out.failed == ["build"]
+
+
+def test_watch_live_probe_overrides_ignored_only_parse(monkeypatch):
+    """A real red check the fail-row parse missed still wins over the ignore list."""
+    def fake_run(cmd, **kwargs):
+        if "--watch" in cmd:
+            # tab-less output: _parse_fail_lines sees only the human-signoff row
+            return P(8, "human-signoff\tfail\t5s\nbuild fail 3m\n", "")
+        return P(8, '[{"name":"build","state":"FAILURE","bucket":"fail"}]', "")
+
+    monkeypatch.setattr(ciwatch.subprocess, "run", fake_run)
+    monkeypatch.setattr(ciwatch.time, "sleep", lambda s: None)
+
+    # first probe call (pre-watch) must report nothing, the post-watch one must
+    calls = {"n": 0}
+    real_probe = ciwatch.probe_failed_checks
+
+    def probe(w, pr, timeout=60):
+        calls["n"] += 1
+        return [] if calls["n"] == 1 else real_probe(w, pr, timeout)
+
+    monkeypatch.setattr(ciwatch, "probe_failed_checks", probe)
+
+    out = ciwatch.watch_live(".", 1)
+
+    assert out.exit_code == 8
+    assert out.failed == ["build"]
+
+
+def test_background_watch_human_signoff_only_probes_before_calling_it_green(monkeypatch, tmp_path):
+    """The ignored-only path still runs the probe; a real red there wins."""
+    monkeypatch.setattr(ciwatch, "probe_failed_checks", lambda w, pr: ["build"])
+    monkeypatch.setattr(
+        ciwatch.subprocess, "Popen",
+        _scripted_popen([FakePopen(8, out="human-signoff\tfail\t5s\n")], []))
+
+    bg = ciwatch.start_background_watch("/wt", 42, "fff666", str(tmp_path),
+                                        timeout=30, settle_tries=3, settle_wait=0)
+    bg.done.wait(10)
+    ciwatch.reap_background_watch(bg)
+
+    data = json.loads((tmp_path / "ci-fff666.json").read_text())
+    assert data["status"] == "failure"
+    assert data["failed_checks"] == ["build"]
+
+
+def test_background_watch_human_signoff_only_is_success(monkeypatch, tmp_path):
+    monkeypatch.setattr(ciwatch, "probe_failed_checks", lambda w, pr: [])
+    monkeypatch.setattr(
+        ciwatch.subprocess, "Popen",
+        _scripted_popen([FakePopen(8, out="human-signoff\tfail\t5s\nbuild\tpass\t3m\n")], []))
+
+    bg = ciwatch.start_background_watch("/wt", 42, "ddd444", str(tmp_path),
+                                        timeout=30, settle_tries=3, settle_wait=0)
+    bg.done.wait(10)
+    ciwatch.reap_background_watch(bg)
+
+    data = json.loads((tmp_path / "ci-ddd444.json").read_text())
+    assert data["status"] == "success"
+    assert data["failed_checks"] == []
+
+
+def test_background_watch_unparsed_exit_8_stays_failure(monkeypatch, tmp_path):
+    """Exit 8 with no parseable fail rows is never turned into a pass."""
+    monkeypatch.setattr(ciwatch, "probe_failed_checks", lambda w, pr: [])
+    monkeypatch.setattr(ciwatch.subprocess, "Popen",
+                        _scripted_popen([FakePopen(8, out="")], []))
+
+    bg = ciwatch.start_background_watch("/wt", 42, "eee555", str(tmp_path),
+                                        timeout=30, settle_tries=3, settle_wait=0)
+    bg.done.wait(10)
+    ciwatch.reap_background_watch(bg)
+
+    data = json.loads((tmp_path / "ci-eee555.json").read_text())
+    assert data["status"] == "failure"
+
+
+def test_derive_from_trace_ignores_human_signoff():
+    only = '[{"name":"human-signoff","state":"FAILURE"},{"name":"build","state":"SUCCESS"}]'
+    both = '[{"name":"human-signoff","state":"FAILURE"},{"name":"build","state":"FAILURE"}]'
+    assert ciwatch.derive_from_trace({"snapshots": [only]}).exit_code == 0
+    got = ciwatch.derive_from_trace({"snapshots": [both]})
+    assert got.exit_code == 8 and got.failed == ["build"]
+    # unparseable FAILURE text still fails closed
+    assert ciwatch.derive_from_trace({"watch_tail": '"state": "FAILURE" …'}).exit_code == 8

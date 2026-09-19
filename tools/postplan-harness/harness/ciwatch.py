@@ -18,6 +18,41 @@ FAIL_STATE = re.compile(r'"state"\s*:\s*"FAILURE"')
 FAIL_TEXT = re.compile(r"\bfail(ing|ed)?\b", re.I)
 PASS_TEXT = re.compile(r"\ball checks (have )?pass|successful\b", re.I)
 
+# Checks that are red by design and say nothing about the code. `human-signoff`
+# (ADR-0062) fails every feat: PR until a human applies the `human-approved`
+# label; armable.py already reports that as a hold. Counting it here made every
+# feat: run report "CI failed" before any real check had settled. GitHub's
+# required-check rule still blocks the merge; this only stops the CI verdict
+# from claiming a code failure.
+IGNORED_CHECKS = frozenset({"human-signoff"})
+
+
+def real_failures(names: list[str]) -> list[str]:
+    """Failed check names minus the by-design ones in IGNORED_CHECKS."""
+    return sorted({n for n in names if n not in IGNORED_CHECKS})
+
+
+def _parse_fail_lines(out: str) -> list[str]:
+    """Names in the `fail` column of `gh pr checks` tab-separated output."""
+    failed = []
+    for line in (out or "").splitlines():
+        cols = line.split("\t")
+        if len(cols) >= 2 and cols[1].strip() == "fail":
+            failed.append(cols[0].strip())
+    return failed
+
+
+def _json_failures(s: str) -> list[str] | None:
+    """FAILURE-state names in a recorded `--json` snapshot; None if unparseable."""
+    try:
+        rows = json.loads(s[s.index("["):s.rindex("]") + 1])
+    except (ValueError, json.JSONDecodeError):
+        return None
+    if not isinstance(rows, list):
+        return None
+    return [r.get("name", "?") for r in rows
+            if isinstance(r, dict) and r.get("state") == "FAILURE"]
+
 
 @dataclass
 class CiOutcome:
@@ -64,23 +99,19 @@ def derive_from_trace(ci: dict | None) -> CiOutcome:
     tail = ci.get("watch_tail") or ""
     failed: list[str] = []
     saw_failure = False
-    for s in snaps:
-        if not isinstance(s, str):
+    for s in [*snaps, tail]:
+        if not isinstance(s, str) or not FAIL_STATE.search(s):
             continue
-        if FAIL_STATE.search(s):
+        names = _json_failures(s)
+        if names is None:             # unparseable FAILURE text: count it, fail-closed
             saw_failure = True
-            try:
-                for row in json.loads(s[s.index("["):s.rindex("]") + 1]):
-                    if row.get("state") == "FAILURE":
-                        failed.append(row.get("name", "?"))
-            except (ValueError, json.JSONDecodeError):
-                pass
-    if isinstance(tail, str) and FAIL_STATE.search(tail):
-        saw_failure = True
+        elif real_failures(names):
+            saw_failure = True
+            failed.extend(real_failures(names))
     if saw_failure:
         return CiOutcome(8, sorted(set(failed)), "recorded FAILURE check states")
     if snaps or tail:
-        return CiOutcome(0, [], "recorded checks with no FAILURE states")
+        return CiOutcome(0, [], "recorded checks with no code-failing FAILURE states")
     return CiOutcome(-1, [], "no CI watch output recorded in trace")
 
 
@@ -92,6 +123,8 @@ def probe_failed_checks(worktree: str, pr: int, timeout: int = 60) -> list[str]:
     failure to run, exit, or parse returns [] so the caller falls through to the
     blocking watch. An empty list means "no failure proven", never "green" — this
     function can only ever ADD a failure verdict, never manufacture a pass.
+    IGNORED_CHECKS names are dropped, so a PR whose only red check is
+    `human-signoff` falls through to the watch instead of short-circuiting.
     """
     try:
         proc = subprocess.run(
@@ -107,8 +140,8 @@ def probe_failed_checks(worktree: str, pr: int, timeout: int = 60) -> list[str]:
         return []
     if not isinstance(rows, list):
         return []
-    return sorted({str(r.get("name") or "?") for r in rows
-                   if isinstance(r, dict) and r.get("bucket") == "fail"})
+    return real_failures([str(r.get("name") or "?") for r in rows
+                          if isinstance(r, dict) and r.get("bucket") == "fail"])
 
 
 def _write_outcome(bg: BackgroundWatch, status: str, failed: list[str],
@@ -148,8 +181,10 @@ def _watch_thread(bg: BackgroundWatch, timeout: int,
         if remaining <= 0:
             break
         try:
+            # No --fail-fast: human-signoff goes red within seconds on every
+            # feat: PR, so fail-fast would stop there and never see real checks.
             proc = subprocess.Popen(
-                ["gh", "pr", "checks", str(bg.pr), "--watch", "--fail-fast"],
+                ["gh", "pr", "checks", str(bg.pr), "--watch"],
                 cwd=bg.worktree, stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE, text=True)
         except OSError as e:
@@ -168,18 +203,23 @@ def _watch_thread(bg: BackgroundWatch, timeout: int,
         if bg.stop.is_set():
             break
         if proc.returncode == 0:
-            _write_outcome(bg, "success", [],
-                           "gh pr checks --watch --fail-fast exit 0")
+            _write_outcome(bg, "success", [], "gh pr checks --watch exit 0")
             return
         if proc.returncode == 8:
-            failed = []
-            for line in (out or "").splitlines():
-                cols = line.split("\t")
-                if len(cols) >= 2 and cols[1].strip() == "fail":
-                    failed.append(cols[0].strip())
+            parsed = _parse_fail_lines(out)
+            # The probe runs on EVERY exit 8, including the ignored-only case: a
+            # text parse must never be the sole basis for a green verdict, because
+            # SKILL.md Phase 7.0 skips the real watch entirely on "success".
             probe = probe_failed_checks(bg.worktree, bg.pr)
-            _write_outcome(bg, "failure", failed + probe,
-                           "gh pr checks --watch --fail-fast exit 8", probe=probe)
+            failed = real_failures(parsed) + probe
+            if parsed and not failed:
+                _write_outcome(bg, "success", [],
+                               "gh pr checks --watch exit 8, only ignored checks "
+                               "failed: " + ", ".join(sorted(set(parsed))),
+                               probe=probe)
+                return
+            _write_outcome(bg, "failure", failed,
+                           "gh pr checks --watch exit 8", probe=probe)
             return
         last_rc, last_stderr = str(proc.returncode), (err or "").strip()[:200]
         if time.time() >= deadline or bg.stop.wait(settle_wait):
@@ -304,12 +344,18 @@ def watch_live(worktree: str, pr: int, timeout: int = 5400,
         if proc.returncode == 0:
             return CiOutcome(0, [], "gh pr checks --watch exit 0")
         if proc.returncode == 8:
-            failed = []
-            for line in proc.stdout.splitlines():
-                cols = line.split("\t")
-                if len(cols) >= 2 and cols[1].strip() == "fail":
-                    failed.append(cols[0].strip())
-            return CiOutcome(8, sorted(set(failed)), "gh pr checks --watch exit 8")
+            parsed = _parse_fail_lines(proc.stdout)
+            failed = real_failures(parsed)
+            if parsed and not failed:
+                # Corroborate with a fresh --json probe: the pre-watch probe ran
+                # before these checks settled, so it cannot stand in for one here.
+                probe = probe_failed_checks(worktree, pr)
+                if not probe:
+                    return CiOutcome(0, [], "gh pr checks --watch exit 8, only ignored "
+                                            "checks failed: "
+                                            + ", ".join(sorted(set(parsed))))
+                failed = probe
+            return CiOutcome(8, failed, "gh pr checks --watch exit 8")
         # any other exit is treated as "checks not settled yet" (right after pr
         # create, gh exits 1 — sometimes with EMPTY stderr — until checks
         # register), so retry until the settle budget runs out

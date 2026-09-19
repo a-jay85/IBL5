@@ -23,7 +23,7 @@
 # The scope names the manifest (<manifest-dir>/<scope>.paths) and is the job
 # identity folded into the digest. Scope "e2e" also folds the registry digest
 # of the prebuilt GHCR php-apache image. When that digest cannot be read the
-# literal DIGEST_UNAVAILABLE is folded instead, which forces a miss.
+# script prints empty hash= and key=, so neither lookup nor save fires.
 #
 # Environment (all optional):
 #   CI_MEMO_REPO          repo to hash (default: the repo containing cwd)
@@ -209,6 +209,13 @@ if [[ "$SCOPE" == "e2e" ]]; then
     if manifest_json="$(bash -c "$digest_cmd" 2>/dev/null)" && [[ -n "$manifest_json" ]]; then
         image_digest="$(printf '%s' "$manifest_json" | git hash-object --stdin)" \
             || image_digest="DIGEST_UNAVAILABLE"
+    fi
+    if [[ "$image_digest" == "DIGEST_UNAVAILABLE" ]]; then
+        printf 'hash=\nkey=\n'
+        if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+            printf 'hash=\nkey=\n' >> "$GITHUB_OUTPUT"
+        fi
+        exit 0
     fi
     EXTRAS+=("ghcr_image_manifest=$image_digest")
 fi

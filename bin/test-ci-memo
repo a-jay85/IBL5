@@ -251,14 +251,14 @@ fi
 # =========================================================================
 if should_run digest-unavailable-miss; then
     r="$TMP/digest-repo"; mk_repo "$r"
-    # Key with CI_MEMO_DIGEST_CMD=false → bash -c "false" fails → DIGEST_UNAVAILABLE folded
+    # Key with CI_MEMO_DIGEST_CMD=false → bash -c "false" fails → empty hash= and key= printed
     d_rc1=0
     d_out1=$(CI_MEMO_REPO="$r" CI_MEMO_MANIFEST_DIR="$r/ci-memo" \
              GITHUB_OUTPUT="" GITHUB_STEP_SUMMARY="" \
              CI_MEMO_DIGEST_CMD=false \
              "$MEMO" key e2e 2>/dev/null) || d_rc1=$?
     k_unavail=$(printf '%s' "$d_out1" | grep '^key=' | sed 's/^key=//')
-    # Key with a stub digest → different hash
+    # Key with a stub digest → real hash
     d_rc2=0
     d_out2=$(CI_MEMO_REPO="$r" CI_MEMO_MANIFEST_DIR="$r/ci-memo" \
              GITHUB_OUTPUT="" GITHUB_STEP_SUMMARY="" \
@@ -269,10 +269,10 @@ if should_run digest-unavailable-miss; then
         fail "digest-unavailable-miss: ci-memo key (DIGEST_CMD=false) exited $d_rc1"
     elif [[ $d_rc2 -ne 0 ]]; then
         fail "digest-unavailable-miss: ci-memo key (stub digest) exited $d_rc2"
-    elif [[ -z "$k_unavail" || -z "$k_stub" ]]; then
-        fail "digest-unavailable-miss: one or both keys empty (unavail='$k_unavail' stub='$k_stub')"
-    elif [[ "$k_unavail" == "$k_stub" ]]; then
-        fail "digest-unavailable-miss: keys are equal — DIGEST_UNAVAILABLE not embedded"
+    elif [[ -n "$k_unavail" ]]; then
+        fail "digest-unavailable-miss: expected empty key on DIGEST_UNAVAILABLE, got '$k_unavail'"
+    elif [[ -z "$k_stub" ]]; then
+        fail "digest-unavailable-miss: stub-digest key is empty"
     else
         pass "digest-unavailable-miss"
     fi

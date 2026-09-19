@@ -22,7 +22,7 @@ On a `pull_request` run HEAD is the PR-into-base merge commit, so master's side 
 
 Input sets are static manifests at `.github/ci-memo/tests.paths` and `.github/ci-memo/e2e.paths`, one git pathspec per line. Each is a superset of the change detection for the jobs it covers. The tests manifest widens the dorny globs to whole directories and adds all of `.github` and `ibl5/tests`. The e2e manifest takes all of `ibl5` and `.github` minus docs and markdown, the Docker runtime, and every `bin/` script the e2e jobs call, because `bin/website-affecting` treats almost everything outside its deny set as website-side. Every non-exclude pathspec must match at least one file at HEAD or the script exits 3. That guard stops a renamed input from silently dropping out of the key.
 
-The e2e key also folds the registry manifest of `ghcr.io/a-jay85/ibl5/php-apache:latest`, read with `docker manifest inspect` (metadata only, no pull). That tag is rebuilt by master merges the PR never touched. When the manifest cannot be read the script folds the literal `DIGEST_UNAVAILABLE`, which forces a miss.
+The e2e key also folds the registry manifest of `ghcr.io/a-jay85/ibl5/php-apache:latest`, read with `docker manifest inspect` (metadata only, no pull). That tag is rebuilt by master merges the PR never touched. When the manifest cannot be read the script prints empty `hash=` and `key=`, so neither lookup nor save fires.
 
 A `ci-memo-check` job in each workflow computes the key, restores the sentinel with `actions/cache/restore`, and publishes `hit`. Every heavy job carries `ci-memo-check` in `needs:` and `needs.ci-memo-check.outputs.hit != 'true'` in `if:`. The aggregator `gate` job saves the sentinel after its existing `exit 1` step, only when no need failed or was cancelled, the key is non-empty, and the run was a miss. The save step is `continue-on-error: true`.
 
@@ -37,7 +37,7 @@ Memoization is PR-only. Push runs, re-runs (`run_attempt > 1`), and dispatches s
 
 ## Consequences
 
-- Positive: a rebase that moves master only outside both input sets finishes the two required contexts in the time of the memo check plus the small unmemoized jobs.
+- Positive: `Tests and Analysis` finishes in the time of the memo check plus the small unmemoized jobs when a rebase moves master only outside the tests input set. `E2E Tests` saves the shard, mutator, and API-E2E runner time on a hit while Visual Regression still runs.
 - Positive: every failure direction falls toward a real run. A broken key step fails `ci-memo-check`, which sits in both gates' `needs:`, so it reds the required context. An unreadable image manifest or a cache-service error only costs a real run.
 - Positive: the downstream-consumer invariant holds. A job that needs a memo-gated job carries the same memo clause, so nothing runs against a missing artifact. `bin/test-ci-memo --case gate-topology` asserts this over both workflow files.
 - Negative: the manifests are a second list to keep in step with the dorny filters. `bin/test-ci-memo --case manifest-coverage` fails when a memoized dorny glob matches a file the manifest does not.

@@ -184,7 +184,7 @@ Trading -> Auth BaseMysqliRepository Discord EventLog League Player Repositories
 TrainingCampRatingsDiff -> BaseMysqliRepository Player Security UI
 TransactionHistory -> Security
 UI -> League Player Season Security Team
-Updater -> BasketballStats Boxscore BulkImport Discord JsbParser League LeagueConfig PageLayout PlrParser SavedDepthChart Season Security Standings Utilities
+Updater -> BasketballStats Boxscore BulkImport Discord JsbParser League LeagueConfig LeagueControlPanel PageLayout PlrParser SavedDepthChart Season Security Settings Standings Utilities
 Utilities -> Security
 Voting -> League Player Season Security
 Waivers -> Auth BaseMysqliRepository Discord EventLog Http League Player Repositories Season Team UI Validation

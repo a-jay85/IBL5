@@ -109,6 +109,7 @@ class ArmInputs:
     fidelity_tree_2: Optional[str] = None             # REVIEWED_TREE read off verdict 2
     current_tree: str = ""                            # git rev-parse HEAD^{tree}
     conflict_resolved: Optional[bool] = None          # None = never consulted -> BLOCKS
+    conflict_verdict: Optional[str] = None            # verdict-file line 1; None = ABSENT -> HOLDS
     failed_checks: list[str] = field(default_factory=list)  # checks in gh's fail bucket at arm time
 
 
@@ -128,6 +129,20 @@ def conflict_flag_path(branch: str, tmp_dir: str = "/tmp") -> str:
     """The Python spelling of the skill's `rev-parse --abbrev-ref HEAD | tr '/:' '--'` key."""
     return os.path.join(tmp_dir,
                         "postplan-conflict-resolved-" + branch.translate(str.maketrans("/:", "--")))
+
+
+def conflict_verdict_for(branch: str, tmp_dir: str = "/tmp") -> Optional[str]:
+    """Read the SHA sidecar then the verdict file; return line 1 stripped, or None on any failure."""
+    key = branch.translate(str.maketrans("/:", "--"))
+    sidecar = os.path.join(tmp_dir, f"postplan-conflict-sha-{key}.txt")
+    try:
+        sha = open(sidecar).read().strip()
+        if not sha:
+            return None
+        verdict_file = os.path.join(tmp_dir, f"postplan-conflict-verdict-{key}-{sha}.ok")
+        return open(verdict_file).readline().rstrip() or None
+    except OSError:
+        return None
 
 
 def evaluate(inp: ArmInputs) -> ArmDecision:
@@ -230,10 +245,18 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     # Condition (14) — this BRANCH carries a /post-plan auto-resolved rebase conflict.
     # The flag outlives the run that wrote it: SKILL.md Phase 2 creates it and nothing
     # ever deletes it, so an earlier skill run on this branch still holds here.
+    # Clearing path: flag True + verdict exactly "CONFLICT-REVIEW=CLEAN". Every other
+    # state — flag None, flag True with ABSENT/FOUND-PROBLEM/None verdict — holds.
     if inp.conflict_resolved is None:
         r = "conflict-resolved flag not consulted — fail-closed"
     elif inp.conflict_resolved:
-        r = "this branch carries a /post-plan auto-resolved rebase conflict — a human reads the resolution"
+        verdict = inp.conflict_verdict
+        if verdict == "CONFLICT-REVIEW=CLEAN":
+            r = ""
+        else:
+            observed = repr(verdict) if verdict is not None else "ABSENT"
+            r = (f"this branch carries a /post-plan auto-resolved rebase conflict — "
+                 f"conflict-review verdict={observed}; need CONFLICT-REVIEW=CLEAN")
     else:
         r = ""
     cs.append(ConditionResult(14, "conflict-auto-resolved", bool(r), r))

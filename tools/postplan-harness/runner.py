@@ -34,7 +34,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from harness import ciwatch, conformance, fidelity, llm_calls, manual_rows, schemas, statefile
-from harness.armable import (ArmInputs, conflict_flag_path, evaluate,
+from harness.armable import (ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, select_fidelity_verdict)
 from harness.classify import (classify, files_from_diff, modified_files_from_diff,
                               render_files_changed, render_manual_confirmation,
@@ -299,8 +299,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                     log(f"phase2: {conflict_resolved.collapse_warn}")
             sha = git.head()
             if conflict_resolved is not None:
+                auto_files = (f"; auto-resolved conflict in {', '.join(conflict_resolved.resolved_files)}"
+                              if conflict_resolved.resolved_files else "")
                 rebase_line = ("REBASE=conflict auto-resolved via --onto; TREE-EQUIVALENT; "
-                               f"manifest={conflict_resolved.manifest_path}")
+                               f"manifest={conflict_resolved.manifest_path}{auto_files}")
             else:
                 log("phase2: rebased onto origin/master")
                 # the skill's two success spellings, verbatim
@@ -479,6 +481,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             unresolved_findings=gh.unresolved_findings(pr) if live else [],
             conflict_resolved=(os.path.exists(conflict_flag_path(git.branch())) if live
                                else bool((fixture or {}).get("conflict_resolved", False))),
+            conflict_verdict=(conflict_verdict_for(git.branch()) if live
+                              else (fixture or {}).get("conflict_verdict")),
             degraded_agents=res.degraded_agents,
             plan_slug_drift=plan.slug_drift,
             failed_checks=_failed_checks,
@@ -1062,6 +1066,15 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
         tail += f" ci={res.ci_outcome}"
     if res.final_pr_state:
         tail += f" pr-state={res.final_pr_state}"
+    # Surface auto-resolved files when present
+    autoresolved_file = f"/tmp/postplan-conflict-files-{res.slug}-autoresolved.txt"
+    if os.path.exists(autoresolved_file):
+        try:
+            files = [l.strip() for l in open(autoresolved_file).read().splitlines() if l.strip()]
+            if files:
+                tail += f" auto-resolved conflict in {', '.join(files)}"
+        except OSError:
+            pass
     return (f"RESULT: post-plan complete — terminal={res.terminal.value} "
             f"auto-merge={armed}{pr}{tail} findings={len(res.findings)}")
 

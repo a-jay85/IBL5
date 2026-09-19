@@ -1,0 +1,244 @@
+#!/usr/bin/env bash
+# Tests that bin/post-plan-now --pr creates a worktree via bin/wt-new --existing
+# when no worktree has the PR's head branch, reuses an existing one, refuses fork
+# PRs, and maps slash-bearing branch names to hostname-safe slugs.
+#
+# Five cases, exit 0 iff all pass.
+set -euo pipefail
+
+# ---- environment --------------------------------------------------------
+TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
+ORIGIN="$TMP/origin.git"
+MAIN="$TMP/IBL5"         # named IBL5 so worktrees_parent_dir() derives IBL5-worktrees
+WT_PARENT="$TMP/IBL5-worktrees"
+SHIMS="$TMP/shims"; mkdir -p "$SHIMS"
+export PATH="$SHIMS:$PATH"
+WTNEW_LOG="$TMP/wtnew.log"
+LAUNCHCTL_LOG="$TMP/launchctl.log"
+export WTNEW_LOG LAUNCHCTL_LOG
+
+# ---- pass/fail counters -------------------------------------------------
+PASS=0; FAIL=0
+pass() { echo "PASS: $1"; PASS=$((PASS+1)); }
+fail() { echo "FAIL: $1"; FAIL=$((FAIL+1)); }
+
+# ---- scratch git repo setup ---------------------------------------------
+git init --bare -b master "$ORIGIN" >/dev/null 2>&1
+
+mkdir -p "$MAIN"
+git -C "$MAIN" init -b master >/dev/null 2>&1
+git -C "$MAIN" config user.email "test@example.com"
+git -C "$MAIN" config user.name "Test"
+git -C "$MAIN" remote add origin "file://$ORIGIN"
+
+# Populate master: commit bin/lib/git-helpers.sh so worktrees have it
+# (post-plan-now sources $ROOT/bin/lib/git-helpers.sh from within the worktree).
+# ibl5/config.php must be non-empty for materialize_worktree_config ([ -s ] check).
+mkdir -p "$MAIN/bin/lib" "$MAIN/ibl5/themes/IBL/style"
+cp "$REPO/bin/lib/git-helpers.sh" "$MAIN/bin/lib/git-helpers.sh"
+printf '<?php // test config\n' > "$MAIN/ibl5/config.php"
+printf 'placeholder\n' > "$MAIN/ibl5/themes/IBL/style/style.css"
+git -C "$MAIN" add .
+git -C "$MAIN" commit --quiet -m "init"
+git -C "$MAIN" push --quiet origin master
+
+# feat-x: based on master plus one commit; keep local branch for case 1 pre-creation
+git -C "$MAIN" checkout -b feat-x >/dev/null 2>&1
+printf 'feat\n' > "$MAIN/feat.txt"
+git -C "$MAIN" add feat.txt
+git -C "$MAIN" commit --quiet -m "feat-x"
+git -C "$MAIN" push --quiet origin feat-x
+FEAT_X_SHA="$(git -C "$ORIGIN" rev-parse refs/heads/feat-x)"
+git -C "$MAIN" checkout master >/dev/null 2>&1
+
+# dependabot/npm-and-yarn/foo: push to origin, delete local (wt-new uses --track path)
+git -C "$MAIN" checkout -b "dependabot/npm-and-yarn/foo" >/dev/null 2>&1
+printf 'dep\n' > "$MAIN/dep.txt"
+git -C "$MAIN" add dep.txt
+git -C "$MAIN" commit --quiet -m "dependabot"
+git -C "$MAIN" push --quiet origin "dependabot/npm-and-yarn/foo"
+git -C "$MAIN" checkout master >/dev/null 2>&1
+git -C "$MAIN" branch -D "dependabot/npm-and-yarn/foo" >/dev/null 2>&1
+
+mkdir -p "$WT_PARENT" "$TMP/Library/LaunchAgents"
+
+# ---- shims --------------------------------------------------------------
+# gh: serves GH_PR_JSON; applies --jq filter via real jq
+cat > "$SHIMS/gh" << 'SHIM_EOF'
+#!/usr/bin/env bash
+jq_filter=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --jq) jq_filter="$2"; shift 2 ;;
+        *)    shift ;;
+    esac
+done
+[ -n "${GH_PR_JSON:-}" ] || exit 1
+if [ -n "$jq_filter" ]; then
+    jq -r "$jq_filter" <<< "$GH_PR_JSON"
+else
+    printf '%s\n' "$GH_PR_JSON"
+fi
+SHIM_EOF
+chmod +x "$SHIMS/gh"
+
+# launchctl: log argv and exit 0 (prevents real launchd interaction)
+cat > "$SHIMS/launchctl" << 'SHIM_EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${LAUNCHCTL_LOG:-/dev/null}"
+exit 0
+SHIM_EOF
+chmod +x "$SHIMS/launchctl"
+
+# wt-new spy wrapper: logs argv to WTNEW_LOG then execs the real copy.
+# Installed at MAIN/bin/wt-new so POST_PLAN_SELF_BIN=$MAIN/bin finds it.
+# The real copy (wt-new-real) has SCRIPT_ROOT=$MAIN so REPO_ROOT=$MAIN and
+# WT_PARENT=$TMP/IBL5-worktrees — isolated from the live IBL5-worktrees dir.
+cp "$REPO/bin/wt-new" "$MAIN/bin/wt-new-real"
+chmod +x "$MAIN/bin/wt-new-real"
+cat > "$MAIN/bin/wt-new" << 'SHIM_EOF'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${WTNEW_LOG:-/dev/null}"
+exec "$(dirname "$0")/wt-new-real" "$@"
+SHIM_EOF
+chmod +x "$MAIN/bin/wt-new"
+cp "$MAIN/bin/wt-new" "$SHIMS/wt-new"
+
+# ---- run_ppn helper -----------------------------------------------------
+# Runs post-plan-now --pr <n> with test overrides; sets RC and ERR.
+RC=0; ERR=""
+run_ppn() {
+    local pr_num="$1"
+    RC=0; ERR=""
+    set +e
+    ERR="$(POST_PLAN_MAIN_ROOT="$MAIN" POST_PLAN_SELF_BIN="$MAIN/bin" \
+           HOME="$TMP" \
+           "$REPO/bin/post-plan-now" --pr "$pr_num" 2>&1 >/dev/null)"
+    RC=$?
+    set -e
+}
+
+# ==========================================================================
+# Case 1 — existing worktree is reused
+# ==========================================================================
+export GH_PR_JSON='{"headRefName":"feat-x","isCrossRepository":false}'
+# Pre-create the worktree (local feat-x branch exists from setup above)
+git -C "$MAIN" worktree add "$WT_PARENT/feat-x" feat-x >/dev/null 2>&1
+rm -f "$WTNEW_LOG"
+
+run_ppn 101
+
+FAIL_BEFORE=$FAIL
+if [ -s "$WTNEW_LOG" ]; then
+    fail "reuse: wt-new was called unexpectedly"
+fi
+if grep -qF -- "wt-new" <<< "${ERR:-}"; then
+    fail "reuse: stderr mentions wt-new"
+fi
+if grep -qF -- "no worktree has '" <<< "${ERR:-}"; then
+    fail "reuse: stderr mentions worktree-not-found message"
+fi
+[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "reuse: existing worktree is not re-created"
+
+# Remove case 1 worktree so case 2 finds no existing one
+rm -rf "$WT_PARENT/feat-x"
+git -C "$MAIN" worktree prune >/dev/null 2>&1
+
+# ==========================================================================
+# Case 2 — missing worktree is created on the right branch at the origin tip
+# ==========================================================================
+export GH_PR_JSON='{"headRefName":"feat-x","isCrossRepository":false}'
+rm -f "$WTNEW_LOG"
+
+run_ppn 102
+
+FAIL_BEFORE=$FAIL
+if [ -d "$WT_PARENT/feat-x" ]; then
+    ACTUAL_BRANCH="$(git -C "$WT_PARENT/feat-x" rev-parse --abbrev-ref HEAD 2>/dev/null || echo error)"
+    ACTUAL_SHA="$(git -C "$WT_PARENT/feat-x" rev-parse HEAD 2>/dev/null || echo error)"
+    if [ "$ACTUAL_BRANCH" != "feat-x" ]; then
+        fail "create: checked-out branch is '$ACTUAL_BRANCH', expected feat-x"
+    fi
+    if [ "$ACTUAL_SHA" != "$FEAT_X_SHA" ]; then
+        fail "create: HEAD is $ACTUAL_SHA, expected origin tip $FEAT_X_SHA"
+    fi
+else
+    fail "create: $WT_PARENT/feat-x was not created"
+fi
+[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "create: missing worktree is created for the PR head branch"
+
+# ==========================================================================
+# Case 3 — a fork PR is refused
+# ==========================================================================
+export GH_PR_JSON='{"headRefName":"patch-1","isCrossRepository":true}'
+rm -f "$WTNEW_LOG"
+
+run_ppn 103
+
+FAIL_BEFORE=$FAIL
+if [ "$RC" -ne 1 ]; then
+    fail "fork PR: expected RC=1, got $RC"
+fi
+if ! grep -qF -- "fork" <<< "${ERR:-}"; then
+    fail "fork PR: expected 'fork' in stderr (got: $ERR)"
+fi
+if [ -s "$WTNEW_LOG" ]; then
+    fail "fork PR: wt-new was called unexpectedly"
+fi
+if [ -d "$WT_PARENT/patch-1" ]; then
+    fail "fork PR: worktree was created despite fork guard"
+fi
+[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "fork PR is refused with a specific message"
+
+# ==========================================================================
+# Case 4 — slash branch maps to a hostname-safe slug
+# ==========================================================================
+export GH_PR_JSON='{"headRefName":"dependabot/npm-and-yarn/foo","isCrossRepository":false}'
+rm -f "$WTNEW_LOG"
+
+run_ppn 104
+
+FAIL_BEFORE=$FAIL
+SLUG_ARG=""
+if [ -f "$WTNEW_LOG" ]; then
+    SLUG_ARG="$(awk 'NR==1{print $1; exit}' "$WTNEW_LOG")"
+fi
+if [ "$SLUG_ARG" != "dependabot-npm-and-yarn-foo" ]; then
+    fail "slash branch: wt-new first arg was '$SLUG_ARG', expected 'dependabot-npm-and-yarn-foo'"
+fi
+if ! [ -d "$WT_PARENT/dependabot-npm-and-yarn-foo" ]; then
+    fail "slash branch: $WT_PARENT/dependabot-npm-and-yarn-foo was not created"
+else
+    ACTUAL_BRANCH4="$(git -C "$WT_PARENT/dependabot-npm-and-yarn-foo" rev-parse --abbrev-ref HEAD 2>/dev/null || echo error)"
+    if [ "$ACTUAL_BRANCH4" != "dependabot/npm-and-yarn/foo" ]; then
+        fail "slash branch: checked-out branch is '$ACTUAL_BRANCH4', expected 'dependabot/npm-and-yarn/foo'"
+    fi
+fi
+[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "slash branch maps to a hostname-safe slug"
+
+# ==========================================================================
+# Case 5 — bin/wt-new --existing with no value is rejected
+# ==========================================================================
+ERR5=""
+RC5=0
+set +e
+ERR5="$("$REPO/bin/wt-new" --existing 2>&1)"
+RC5=$?
+set -e
+
+FAIL_BEFORE=$FAIL
+if [ "$RC5" -eq 0 ]; then
+    fail "wt-new --existing with no value: expected non-zero RC but got 0"
+fi
+if ! grep -qF -- "Error: --existing requires a branch name" <<< "${ERR5:-}"; then
+    fail "wt-new --existing with no value: expected error message not found (got: $ERR5)"
+fi
+[ "$FAIL" -eq "$FAIL_BEFORE" ] && pass "wt-new --existing with no value exits with usage"
+
+# ==========================================================================
+# Summary
+# ==========================================================================
+echo ""
+echo "Results: $PASS passed, $FAIL failed"
+[ "$FAIL" -eq 0 ]

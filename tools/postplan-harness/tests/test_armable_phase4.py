@@ -215,14 +215,18 @@ def test_fake_gh_reports_no_unresolved_findings(tmp_path):
 
 # --- condition (14) -----------------------------------------------------------
 
-@pytest.mark.parametrize("flag,blocked,fragment", [
-    (None, True, "conflict-resolved flag not consulted — fail-closed"),
-    (True, True, "this branch carries a /post-plan auto-resolved rebase conflict — "
-                 "a human reads the resolution"),
-    (False, False, ""),
+@pytest.mark.parametrize("flag,verdict,blocked,fragment", [
+    (None, None, True, "conflict-resolved flag not consulted — fail-closed"),
+    (True, None, True, "this branch carries a /post-plan auto-resolved rebase conflict — "
+                       "conflict-review verdict=ABSENT; need CONFLICT-REVIEW=CLEAN"),
+    (True, "CONFLICT-REVIEW=FOUND-PROBLEM", True,
+     "this branch carries a /post-plan auto-resolved rebase conflict — "
+     "conflict-review verdict='CONFLICT-REVIEW=FOUND-PROBLEM'; need CONFLICT-REVIEW=CLEAN"),
+    (True, "CONFLICT-REVIEW=CLEAN", False, ""),
+    (False, None, False, ""),
 ])
-def test_condition_14_outcomes(flag, blocked, fragment):
-    d = evaluate(inputs(conflict_resolved=flag))
+def test_condition_14_outcomes(flag, verdict, blocked, fragment):
+    d = evaluate(inputs(conflict_resolved=flag, conflict_verdict=verdict))
     c14 = [c for c in d.conditions if c.number == 14][0]
     assert c14.blocked is blocked
     assert c14.reason == fragment

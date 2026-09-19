@@ -111,3 +111,11 @@ housekeeping (the skill's Phase 2.5 now fires on plan-blind PRs too via its
 Trigger C, so this gap widened — a harness run ships no housekeeping on ANY
 PR class), no worktree teardown, no E2E verify track (Docker stack), no
 review Agent C (prior-PR feedback). The skill fallback retains all of them.
+
+## Exit codes
+
+| rc | Meaning |
+|----|---------|
+| 0 | Success: PR opened, held for a manual gate, or already merged. |
+| 1 | Generic harness failure. `bin/post-plan-now` falls back to the Sonnet `/post-plan` skill session. |
+| 3 | Fail-closed sentinel. No skill fallback fires. Two causes: (a) a rebase conflict the auto-resolver declined or could not certify; the harness classifies the conflict, attempts bounded per-file resolution, then requires the TREE-EQUIVALENT proof; rc=3 is returned when any of those refuses; (b) a local pre-commit/pre-push gate denial (missing ADR, stale doc, rules byte budget). A successful auto-resolution holds auto-merge at condition (14) until a `CONFLICT-REVIEW=CLEAN` verdict from the read-only reviewer clears it. See `ibl5/docs/decisions/0131-harness-conflict-autoresolve.md` for the full decision. |

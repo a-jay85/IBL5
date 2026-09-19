@@ -3,9 +3,11 @@ push only to an explicitly provided remote, e.g. a local bare repo in isolated
 mode). ReplayGit serves recorded point-in-time state."""
 from __future__ import annotations
 
+import os
 import subprocess
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Optional
 
 from ..state import HarnessError
 
@@ -62,12 +64,16 @@ class StackedRebaseResult:
     manifest_path: str = ""
     notes_path: str = ""
     collapse_warn: str = ""
+    auto_resolved: bool = False
+    resolved_files: tuple = ()
 
 
 class LiveGit:
-    def __init__(self, worktree: str, push_remote: str | None = None):
+    def __init__(self, worktree: str, push_remote: str | None = None, llm=None):
         self.worktree = worktree
         self.push_remote = push_remote  # None = pushing disabled (typed failure)
+        self.llm = llm
+        self.last_conflict_resolution: Optional["StackedRebaseResult"] = None
 
     def _run(self, *args: str, check: bool = True) -> str:
         proc = subprocess.run(["git", "-C", self.worktree, *args],
@@ -198,18 +204,193 @@ class LiveGit:
                              check=False).strip()
         return resolved or None
 
+    def _load_lostwork(self, master_sha: str, key: str) -> Optional[Path]:
+        """Load lostwork.sh from a pinned master SHA. Returns the path, or None if absent."""
+        lostwork_path = Path(f"/tmp/postplan-lostwork-{key}.sh")
+        lostwork_content = self._run(
+            "show", f"{master_sha}:.claude/skills/pr-ready/scripts/lostwork.sh",
+            check=False,
+        )
+        if not lostwork_content.strip():
+            return None
+        lostwork_path.write_text(lostwork_content)
+        lostwork_path.chmod(0o755)
+        return lostwork_path
+
+    def _prove_tree_equivalent(self, lostwork_path: Path, key: str) -> tuple[bool, str]:
+        """Run the TREE-EQUIVALENT proof. Gate is conjunctive: stdout AND rc==0.
+        A diverged tree exits 0 with TREE DIVERGED — weakening to either operator alone
+        would silently admit lost work."""
+        proof_proc = subprocess.run(
+            ["bash", str(lostwork_path), key],
+            capture_output=True, text=True, errors="replace",
+            cwd=self.worktree,
+        )
+        proof_out = proof_proc.stdout
+        if not ("TREE-EQUIVALENT" in proof_out and proof_proc.returncode == 0):
+            return False, f"tree proof failed: {proof_out.strip()[:400]}"
+        return True, proof_out
+
+    def _record_resolution(
+        self,
+        key: str,
+        branch: str,
+        master_sha: str,
+        resolved_files: tuple,
+        collapse_warn: str = "",
+        proof_out: str = "",
+        base_sha: str = "",
+    ) -> tuple[str, str]:
+        """Write manifest, notes, condition-(14) flag, and run the conflict reviewer.
+        Returns (manifest_path, notes_path)."""
+        from ..armable import conflict_flag_path
+        from ..conflict import review_resolution
+
+        manifest_content = self._run("diff", "--name-only", f"{master_sha}...HEAD")
+        if not manifest_content.strip():
+            raise HarnessError("rebase-conflict",
+                               "post-resolution diff is empty; nothing to ship")
+        manifest_path = f"/tmp/postplan-conflict-files-{key}.txt"
+        Path(manifest_path).write_text(manifest_content)
+
+        if resolved_files:
+            autoresolved_path = f"/tmp/postplan-conflict-files-{key}-autoresolved.txt"
+            Path(autoresolved_path).write_text("\n".join(resolved_files) + "\n")
+
+        if resolved_files:
+            res_list = ", ".join(resolved_files)
+            notes_header = (
+                f"Resolution: auto-resolved conflict in {res_list} via per-file "
+                f"three-way merge onto `{master_sha}`"
+                + (f" from `{base_sha}`" if base_sha else "")
+                + ".\n\n"
+            )
+        else:
+            notes_header = (
+                f"Resolution: mechanical `--onto` replay onto `{master_sha}`"
+                + (f" from `{base_sha}`" if base_sha else "")
+                + " with no per-hunk content merge.\n\n"
+            )
+        file_list = "\n".join(f"- {f}" for f in manifest_content.strip().splitlines())
+        notes = (
+            f"# Conflict resolution — {branch}\n\n"
+            f"{notes_header}"
+            f"## Changed files\n\n{file_list}\n\n"
+            f"## Proof\n\nTREE-EQUIVALENT\n"
+        )
+        if collapse_warn:
+            notes += f"\n## Collapse guard\n\n{collapse_warn}\n"
+        notes_path = f"/tmp/postplan-conflict-resolution-{key}.md"
+        Path(notes_path).write_text(notes)
+
+        # Write condition-(14) flag BEFORE the reviewer so the hold precedes any review
+        Path(conflict_flag_path(branch)).touch()
+
+        if self.llm is not None and resolved_files:
+            review_resolution(
+                self.llm, self._run,
+                worktree=self.worktree, key=key,
+                resolved_files=resolved_files, proof_out=proof_out,
+            )
+
+        return manifest_path, notes_path
+
     def rebase_onto(self, base: str = "origin/master") -> None:
         """Repo pre-push policy (pre-push-adr-hook) rejects branches not rebased
-        onto origin/master. Conflict → abort, restore the tree, typed failure.
+        onto origin/master. Conflict → attempt auto-resolution; if that fails or is
+        not applicable, abort, restore the tree, and raise HarnessError.
         Fail closed: exit_code_for() maps this to exit 3, which bin/post-plan-now
-        refuses to escalate to the skill fallback — a human owns conflict judgment."""
+        refuses to escalate to the skill fallback."""
+        from ..conflict import (
+            abort_and_restore, inventory_conflicts, purge_verdict_artifacts, resolve_all,
+        )
+
+        branch = self.branch()
+        key = branch.replace("/", "-")
+        master_sha = self._run("rev-parse", base).strip()
+
+        pre_rebase_sha = self._run("rev-parse", "HEAD").strip()
+        pre_patch = self._run("diff", f"{master_sha}...HEAD")
+        if pre_patch.strip():
+            Path(f"/tmp/pr-ready-diff-pre-{key}.patch").write_text(pre_patch)
+
+        purge_verdict_artifacts(key)
+
         proc = subprocess.run(["git", "-C", self.worktree, "rebase", base],
                               capture_output=True, text=True, errors="replace")
         if proc.returncode != 0:
-            subprocess.run(["git", "-C", self.worktree, "rebase", "--abort"],
-                           capture_output=True, text=True, errors="replace")
-            raise HarnessError("rebase-conflict",
-                               (proc.stderr or proc.stdout).strip()[:400])
+            conflict_detail = (proc.stderr or proc.stdout).strip()[:400]
+
+            if self.llm is None or not pre_patch.strip():
+                # No LLM or no pre-patch: immediate abort-and-restore (today's behavior)
+                subprocess.run(["git", "-C", self.worktree, "rebase", "--abort"],
+                               capture_output=True, text=True, errors="replace")
+                raise HarnessError("rebase-conflict", conflict_detail)
+
+            try:
+                inventory = inventory_conflicts(self._run)
+                if inventory.unresolvable_reason:
+                    abort_and_restore(self._run, worktree=self.worktree,
+                                      pre_rebase_sha=pre_rebase_sha,
+                                      reason=inventory.unresolvable_reason)
+
+                resolve_result = resolve_all(self.llm, self._run, worktree=self.worktree,
+                                            key=key, inventory=inventory)
+                if not resolve_result.success:
+                    abort_and_restore(self._run, worktree=self.worktree,
+                                      pre_rebase_sha=pre_rebase_sha,
+                                      reason=resolve_result.reason)
+
+                env = {**os.environ, "GIT_EDITOR": "true"}
+                cont_proc = subprocess.run(
+                    ["git", "-C", self.worktree, "rebase", "--continue"],
+                    capture_output=True, text=True, errors="replace", env=env,
+                )
+                if cont_proc.returncode != 0:
+                    abort_and_restore(self._run, worktree=self.worktree,
+                                      pre_rebase_sha=pre_rebase_sha,
+                                      reason=f"rebase --continue failed: {(cont_proc.stderr or cont_proc.stdout).strip()[:400]}")
+
+                # Whole-tree marker sweep
+                sweep = self._run("grep", "-rn", "-E", "^(<{7}|={7}|>{7})",
+                                  "--", ".", check=False)
+                if sweep.strip():
+                    abort_and_restore(self._run, worktree=self.worktree,
+                                      pre_rebase_sha=pre_rebase_sha,
+                                      reason=f"conflict markers survive after resolution: {sweep.strip()[:200]}")
+
+                lostwork_path = self._load_lostwork(master_sha, key)
+                if lostwork_path is None:
+                    abort_and_restore(self._run, worktree=self.worktree,
+                                      pre_rebase_sha=pre_rebase_sha,
+                                      reason="lostwork.sh not found at pinned master SHA")
+
+                proof_ok, proof_out = self._prove_tree_equivalent(lostwork_path, key)
+                if not proof_ok:
+                    abort_and_restore(self._run, worktree=self.worktree,
+                                      pre_rebase_sha=pre_rebase_sha,
+                                      reason=proof_out)
+
+                manifest_path, notes_path = self._record_resolution(
+                    key, branch, master_sha, resolve_result.resolved_files,
+                    proof_out=proof_out,
+                )
+
+                self.last_conflict_resolution = StackedRebaseResult(
+                    resolved=True, reason="",
+                    post_resolution_sha=self.head(),
+                    base_sha=master_sha,
+                    manifest_path=manifest_path,
+                    notes_path=notes_path,
+                    auto_resolved=True,
+                    resolved_files=resolve_result.resolved_files,
+                )
+            except HarnessError:
+                raise
+            except Exception as exc:
+                abort_and_restore(self._run, worktree=self.worktree,
+                                  pre_rebase_sha=pre_rebase_sha,
+                                  reason=f"unexpected error during auto-resolve: {exc}")
 
     def autoresolve_stacked_rebase(self) -> "StackedRebaseResult":
         """Resolve a squash-trap stacked-branch conflict via `git rebase --onto`.
@@ -237,18 +418,11 @@ class LiveGit:
         master_sha = self._run("rev-parse", "origin/master").strip()
 
         # Step 5: extract proof and guard scripts by pinned git show
-        lostwork_path = Path(f"/tmp/postplan-lostwork-{key}.sh")
-        collapse_guard_path = Path(f"/tmp/postplan-collapse-guard-{key}.sh")
-
-        lostwork_content = self._run(
-            "show", f"{master_sha}:.claude/skills/pr-ready/scripts/lostwork.sh",
-            check=False,
-        )
-        if not lostwork_content.strip():
+        lostwork_path = self._load_lostwork(master_sha, key)
+        if lostwork_path is None:
             return StackedRebaseResult(False, "lostwork.sh not found at pinned master SHA")
-        lostwork_path.write_text(lostwork_content)
-        lostwork_path.chmod(0o755)
 
+        collapse_guard_path = Path(f"/tmp/postplan-collapse-guard-{key}.sh")
         collapse_content = self._run(
             "show", f"{master_sha}:.claude/skills/pr-ready/scripts/collapse-guard.sh",
             check=False,
@@ -285,53 +459,96 @@ class LiveGit:
             )
 
         # Step 7: the --onto rebase (direct subprocess, same shape as rebase_onto)
+        from ..conflict import (
+            abort_and_restore, inventory_conflicts, purge_verdict_artifacts, resolve_all,
+        )
+
+        pre_rebase_sha = self._run("rev-parse", "HEAD").strip()
+        purge_verdict_artifacts(key)
+
         rebase_proc = subprocess.run(
             ["git", "-C", self.worktree, "rebase", "--onto", master_sha, ibl_base, branch],
             capture_output=True, text=True, errors="replace",
         )
+        auto_resolved_files: tuple = ()
         if rebase_proc.returncode != 0:
-            subprocess.run(
-                ["git", "-C", self.worktree, "rebase", "--abort"],
-                capture_output=True, text=True, errors="replace",
-            )
-            return StackedRebaseResult(
-                False,
-                f"--onto rebase still conflicts: {(rebase_proc.stderr or rebase_proc.stdout).strip()[:400]}",
-            )
+            if self.llm is None:
+                # No LLM: immediate decline, today's behavior
+                subprocess.run(
+                    ["git", "-C", self.worktree, "rebase", "--abort"],
+                    capture_output=True, text=True, errors="replace",
+                )
+                return StackedRebaseResult(
+                    False,
+                    f"--onto rebase still conflicts: {(rebase_proc.stderr or rebase_proc.stdout).strip()[:400]}",
+                )
+
+            try:
+                inventory = inventory_conflicts(self._run)
+                if inventory.unresolvable_reason:
+                    abort_and_restore(self._run, worktree=self.worktree,
+                                      pre_rebase_sha=pre_rebase_sha,
+                                      reason=inventory.unresolvable_reason)
+
+                resolve_result = resolve_all(self.llm, self._run, worktree=self.worktree,
+                                            key=key, inventory=inventory)
+                if not resolve_result.success:
+                    abort_and_restore(self._run, worktree=self.worktree,
+                                      pre_rebase_sha=pre_rebase_sha,
+                                      reason=resolve_result.reason)
+
+                env = {**os.environ, "GIT_EDITOR": "true"}
+                cont_proc = subprocess.run(
+                    ["git", "-C", self.worktree, "rebase", "--continue"],
+                    capture_output=True, text=True, errors="replace", env=env,
+                )
+                if cont_proc.returncode != 0:
+                    abort_and_restore(self._run, worktree=self.worktree,
+                                      pre_rebase_sha=pre_rebase_sha,
+                                      reason=f"rebase --continue failed: {(cont_proc.stderr or cont_proc.stdout).strip()[:400]}")
+
+                # Whole-tree marker sweep
+                sweep = self._run("grep", "-rn", "-E", "^(<{7}|={7}|>{7})",
+                                  "--", ".", check=False)
+                if sweep.strip():
+                    abort_and_restore(self._run, worktree=self.worktree,
+                                      pre_rebase_sha=pre_rebase_sha,
+                                      reason=f"conflict markers survive after resolution: {sweep.strip()[:200]}")
+
+                auto_resolved_files = resolve_result.resolved_files
+            except HarnessError:
+                raise
+            except Exception as exc:
+                abort_and_restore(self._run, worktree=self.worktree,
+                                  pre_rebase_sha=pre_rebase_sha,
+                                  reason=f"unexpected error during auto-resolve: {exc}")
 
         # Step 8: TREE-EQUIVALENT proof — gate is conjunctive (stdout contains
         # TREE-EQUIVALENT AND rc == 0), because a diverged tree exits 0 with TREE DIVERGED
-        proof_proc = subprocess.run(
-            ["bash", str(lostwork_path), key],
-            capture_output=True, text=True, errors="replace",
-            cwd=self.worktree,
-        )
-        proof_out = proof_proc.stdout
-        if not ("TREE-EQUIVALENT" in proof_out and proof_proc.returncode == 0):
-            return StackedRebaseResult(False, f"tree proof failed: {proof_out.strip()[:400]}")
+        proof_ok, proof_out = self._prove_tree_equivalent(lostwork_path, key)
+        if not proof_ok:
+            if auto_resolved_files:
+                # Failed after auto-resolution: abort_and_restore
+                abort_and_restore(self._run, worktree=self.worktree,
+                                  pre_rebase_sha=pre_rebase_sha,
+                                  reason=proof_out)
+            return StackedRebaseResult(False, proof_out)
 
-        # Step 9: manifest — file list changed vs master after the replay
-        manifest_content = self._run("diff", "--name-only", f"{master_sha}...HEAD")
-        if not manifest_content.strip():
-            return StackedRebaseResult(False, "post-resolution diff is empty; nothing to ship")
-        manifest_path = f"/tmp/postplan-conflict-files-{key}.txt"
-        Path(manifest_path).write_text(manifest_content)
+        # Step 9: manifest + notes + flag + reviewer via _record_resolution
+        try:
+            manifest_path, notes_path = self._record_resolution(
+                key, branch, master_sha, auto_resolved_files,
+                collapse_warn=collapse_warn, proof_out=proof_out, base_sha=ibl_base,
+            )
+        except HarnessError:
+            raise
+        except Exception as exc:
+            if auto_resolved_files:
+                abort_and_restore(self._run, worktree=self.worktree,
+                                  pre_rebase_sha=pre_rebase_sha,
+                                  reason=str(exc))
+            raise HarnessError("rebase-conflict", str(exc))
 
-        # Step 10: resolution notes
-        file_list = "\n".join(f"- {f}" for f in manifest_content.strip().splitlines())
-        notes = (
-            f"# Conflict resolution — {branch}\n\n"
-            f"Resolution: mechanical `--onto` replay onto `{master_sha}` from `{ibl_base}` "
-            f"with no per-hunk content merge.\n\n"
-            f"## Changed files\n\n{file_list}\n\n"
-            f"## Proof\n\nTREE-EQUIVALENT\n"
-        )
-        if collapse_warn:
-            notes += f"\n## Collapse guard\n\n{collapse_warn}\n"
-        notes_path = f"/tmp/postplan-conflict-resolution-{key}.md"
-        Path(notes_path).write_text(notes)
-
-        # Step 11: success
         return StackedRebaseResult(
             resolved=True,
             reason="",
@@ -340,6 +557,8 @@ class LiveGit:
             manifest_path=manifest_path,
             notes_path=notes_path,
             collapse_warn=collapse_warn,
+            auto_resolved=bool(auto_resolved_files),
+            resolved_files=auto_resolved_files,
         )
 
     def push(self) -> None:

@@ -776,6 +776,30 @@ def test_fidelity_push_failure_exits_1_for_full_fallback(tmp_path, sticky_tmp, m
     assert "RESULT: post-plan FAILED" in runner.verdict_line(res, 1)
 
 
+def test_dead_remediation_round_log_names_subtype(tmp_path, sticky_tmp):
+    """Phase 6a — when call_tooled raises on fidelity-remediation, the runner logs the subtype.
+
+    The detail string Phase 4 now produces is fed through the runner's 300-char why-collapse
+    and must survive intact (it is 83 chars). Mutation: shrink [:300] to [:40] and the subtype
+    falls off the logged line; or revert Phase 4 and the canned detail is the only place the
+    subtype appears, which the adapter test already catches.
+    """
+    pr = sticky_tmp(7120)
+    detail = ("fidelity-remediation: envelope is_error=True subtype=error_max_turns "
+              "result='Reached max turns (60)'")
+    res, out = _sticky_run(tmp_path, pr, {
+        "plan-fidelity-review": [_verdict_doc("NOT READY")],
+        "fidelity-remediation": [{"raise": {"kind": "llm-tooled-error", "detail": detail}}],
+    })
+    with open(os.path.join(out, "audit.log")) as fh:
+        log_lines = fh.read().splitlines()
+    assert any(
+        "phase5.5 round 1: remediation unavailable (llm-tooled-error)" in l
+        and "subtype=error_max_turns" in l
+        for l in log_lines
+    ), f"expected dead-round log line with subtype; log:\n" + "\n".join(log_lines)
+
+
 def test_sticky_bodies_are_gitignored():
     """LiveGh writes the body under the run dir; it must never show up as a repo change."""
     proc = subprocess.run(

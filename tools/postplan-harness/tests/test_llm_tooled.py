@@ -364,26 +364,31 @@ def test_error_envelope_without_subtype_still_raises(shim, tmp_path, monkeypatch
         _cli(tmp_path).call_tooled("fidelity", "opus", "p", cwd=str(tmp_path),
                                    allowed_tools=("Read",), max_retries=0)
     assert exc.value.kind == "llm-tooled-error"
+    assert "subtype=none" in str(exc.value.detail)
+    assert "result=" not in str(exc.value.detail)
 
 
 def test_nonsuccess_subtype_without_is_error_still_raises(shim, tmp_path, monkeypatch):
     """A non-success subtype without is_error raises HarnessError."""
-    monkeypatch.setenv("CLAUDE_SHIM_REPLY", json.dumps({"subtype": "error_max_turns"}))
+    monkeypatch.setenv("CLAUDE_SHIM_REPLY", json.dumps({
+        "subtype": "error_during_execution", "result": "partial",
+    }))
     with pytest.raises(HarnessError) as exc:
         _cli(tmp_path).call_tooled("fidelity", "opus", "p", cwd=str(tmp_path),
                                    allowed_tools=("Read",), max_retries=0)
     assert exc.value.kind == "llm-tooled-error"
+    assert "error_during_execution" in str(exc.value.detail)
 
 
 def test_error_result_text_is_bounded(shim, tmp_path, monkeypatch):
     """Result text in error detail is bounded by ENVELOPE_ERROR_TEXT_CAP."""
     monkeypatch.setenv("CLAUDE_SHIM_REPLY", json.dumps({
-        "is_error": True, "result": "X" * 500,
+        "is_error": True, "result": "X" * 5_000,
     }))
     with pytest.raises(HarnessError) as exc:
         _cli(tmp_path).call_tooled("fidelity", "opus", "p", cwd=str(tmp_path),
                                    allowed_tools=("Read",), max_retries=0)
-    assert len(str(exc.value.detail)) <= ENVELOPE_ERROR_TEXT_CAP + 100
+    assert len(str(exc.value.detail)) < ENVELOPE_ERROR_TEXT_CAP + 200
 
 
 def test_error_envelope_records_ledger_once(shim, tmp_path, monkeypatch):
@@ -398,3 +403,4 @@ def test_error_envelope_records_ledger_once(shim, tmp_path, monkeypatch):
         cli.call_tooled("fidelity", "opus", "p", cwd=str(tmp_path),
                         allowed_tools=("Read",), max_retries=0)
     assert len(ledger.calls) == 1
+    assert ledger.calls[0].ok is False

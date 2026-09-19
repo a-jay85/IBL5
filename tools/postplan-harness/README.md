@@ -26,6 +26,8 @@ Without `--live`, every would-be side effect remains a typed intent record.
 | CI-watch interpretation | `manual-classify` — plan-blind manual-step triage (haiku) |
 | Side-effect gating + audit log | `retrospective` — save-a-lesson-or-not (haiku) |
 
+Phase 5.0 resolves each plan path by exact-or-suffix match, then by unique basename (a directory the diff moved under one extra component still resolves; two same-named candidates stay `MISSING`). It re-runs once after a Phase 5.5 remediation commit, so a fix-up that authors the planned file clears arming condition (3) in the same run.
+
 Every retained call: single turn, no tools, byte-capped input packet, JSON
 output validated by `harness/schemas.py`, one bounded retry, usage recorded.
 Invalid output is a typed failure — never silently accepted.
@@ -38,7 +40,7 @@ run                       entry wrapper: replay | demo | isolated | test
 harness/
   classify.py             Phase 3 port (flags, filtered diff, module extraction)
   planfile.py             plan location + frontmatter/matrix/Critical-Files parsing
-  conformance.py          Phase 5.0 MISSING/MISSING-FILE detection
+  conformance.py          Phase 5.0 MISSING/MISSING-FILE detection (suffix + unique-basename resolver)
   armable.py              twelve ported arming conditions (numbered 1–12, no gap; the skill's condition (11), unresolved review-thread findings, stays skill-only)
   review.py               Phase 4 launch gates + bounded review/security/scoring calls
   ciwatch.py              Phase 7 outcome interpretation

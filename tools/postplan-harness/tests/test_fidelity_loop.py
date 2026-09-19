@@ -137,6 +137,7 @@ def test_fidelity_dict_has_full_schema_after_loop(tmp_path, git_shim):
             "verdict_1", "error_kind", "reviewed_tree", "verdict_path",
             "remediation_sha", "verdict_2", "reviewed_tree_2",
             "rounds", "rounds_completed", "backlog_issue_numbers",
+            "diff_id", "plan_hash",
         }
     finally:
         _cleanup(99, "99-2", "99-3", "99-4")

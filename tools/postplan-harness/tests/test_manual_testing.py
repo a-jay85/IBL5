@@ -7,7 +7,7 @@ import pytest
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness import manual_testing as mt
-from harness.adapters.probe import FixtureProbe, allowed as probe_allowed
+from harness.adapters.probe import FixtureProbe
 from harness import armable
 
 SHA = "abc123"
@@ -22,14 +22,6 @@ class FakeGh:
         b = self.bodies[min(self.calls, len(self.bodies) - 1)]
         self.calls += 1
         return b
-
-
-class _ProbeWithAllowed:
-    def allowed(self, argv):
-        return probe_allowed(argv)
-
-    def run(self, argv, timeout=120):
-        return True, "ok"
 
 
 # ---------------------------------------------------------------------------
@@ -113,7 +105,7 @@ def _base_run_kwargs(monkeypatch, show=None, extra_body=None):
     return dict(
         pr=1, worktree="/fake/worktree", body=body,
         gh=FakeGh([body, body, body]),
-        probe=_ProbeWithAllowed(),
+        probe=FixtureProbe({}),
         show_blob=show,
         master_sha=SHA,
         head_tree=lambda: "tree1",
@@ -127,7 +119,7 @@ def test_docker_not_on_path(monkeypatch):
         pr=1, worktree="/fake/worktree",
         body=BODY_ONE_ROW,
         gh=FakeGh([BODY_ONE_ROW]),
-        probe=_ProbeWithAllowed(),
+        probe=FixtureProbe({}),
         show_blob=_make_scripts_show(),
         master_sha=SHA,
         head_tree=lambda: "tree1",
@@ -153,7 +145,7 @@ def test_docker_daemon_unreachable(monkeypatch):
         pr=1, worktree="/fake/worktree",
         body=BODY_ONE_ROW,
         gh=FakeGh([BODY_ONE_ROW]),
-        probe=_ProbeWithAllowed(),
+        probe=FixtureProbe({}),
         show_blob=_make_scripts_show(),
         master_sha=SHA,
         head_tree=lambda: "tree1",
@@ -174,7 +166,7 @@ def test_docker_probe_timeout(monkeypatch):
         pr=1, worktree="/fake/worktree",
         body=BODY_ONE_ROW,
         gh=FakeGh([BODY_ONE_ROW]),
-        probe=_ProbeWithAllowed(),
+        probe=FixtureProbe({}),
         show_blob=_make_scripts_show(),
         master_sha=SHA,
         head_tree=lambda: "tree1",
@@ -235,37 +227,51 @@ from pathlib import Path as _Path
 _FAKE_PATH = _Path("/tmp/fake-script.sh")
 
 
-def test_bringup_up(monkeypatch):
+def test_bringup_states_up(monkeypatch):
     monkeypatch.setattr(mt, "_run_script", _fake_script_up)
     result = mt.bring_up(_FAKE_PATH, 1, "slug", "/worktree")
     assert result == "UP"
 
 
-def test_bringup_already_up(monkeypatch):
+def test_bringup_states_already_up(monkeypatch):
     monkeypatch.setattr(mt, "_run_script", _fake_script_already_up)
     result = mt.bring_up(_FAKE_PATH, 1, "slug", "/worktree")
     assert result == "ALREADY-UP"
 
 
-def test_bringup_skip_peer_dirty(monkeypatch):
+def test_bringup_states_skip_peer_dirty(monkeypatch):
     monkeypatch.setattr(mt, "_run_script", _fake_script_skip_peer_dirty)
     result = mt.bring_up(_FAKE_PATH, 1, "slug", "/worktree")
     assert result == "SKIP-peer-dirty"
 
 
-def test_bringup_not_ready(monkeypatch):
+def test_bringup_states_not_ready(monkeypatch):
     monkeypatch.setattr(mt, "_run_script", _fake_script_not_ready)
     result = mt.bring_up(_FAKE_PATH, 1, "slug", "/worktree")
     assert result == "NOT-READY"
 
 
-def test_bringup_no_sentinel(monkeypatch):
+def test_bringup_states_failed(monkeypatch):
+    monkeypatch.setattr(mt, "_run_script",
+                        lambda *a, **kw: (0, "BRINGUP: FAILED\nBRINGUP-COMPLETE\n", ""))
+    result = mt.bring_up(_FAKE_PATH, 1, "slug", "/worktree")
+    assert result == "FAILED"
+
+
+def test_bringup_states_timeout(monkeypatch):
+    monkeypatch.setattr(mt, "_run_script",
+                        lambda *a, **kw: (-1, "", "timeout"))
+    result = mt.bring_up(_FAKE_PATH, 1, "slug", "/worktree")
+    assert result == "bringup-timeout"
+
+
+def test_bringup_incomplete_no_sentinel(monkeypatch):
     monkeypatch.setattr(mt, "_run_script", _fake_script_no_sentinel)
     result = mt.bring_up(_FAKE_PATH, 1, "slug", "/worktree")
     assert result == "incomplete"
 
 
-def test_bringup_stops_without_running_executors(monkeypatch):
+def test_bringup_states_not_ready_stops_executors(monkeypatch):
     # bringup returns NOT-READY → no rows should run
     script_calls = []
 
@@ -280,6 +286,25 @@ def test_bringup_stops_without_running_executors(monkeypatch):
     result = mt.run(**_base_run_kwargs(monkeypatch, extra_body=BODY_ONE_ROW))
     assert result.rows == []
     assert result.ticked == []
+
+
+def test_bringup_failure_stops_pass(monkeypatch):
+    def fake_run(path, args, timeout_s, cwd=None):
+        name = str(path)
+        if "bring-up" in name or "wt-bring" in name:
+            return 0, "BRINGUP: FAILED\nBRINGUP-COMPLETE\n", ""
+        return 0, "", ""
+
+    monkeypatch.setattr(mt, "_run_script", fake_run)
+    monkeypatch.setattr(mt, "docker_available", lambda: (True, ""))
+    monkeypatch.setattr(mt, "resolve_slug", lambda w: ("harness-manual-rows-execute", ""))
+
+    result = mt.run(**_base_run_kwargs(monkeypatch, extra_body=BODY_ONE_ROW))
+    assert result.ran is True
+    assert result.rows == []
+    assert result.ticked == []
+    assert result.all_ticked is False
+    assert "bringup-stopped:FAILED" in result.errors
 
 
 # ---------------------------------------------------------------------------
@@ -321,17 +346,17 @@ def test_rows_timeout(monkeypatch):
 # ---------------------------------------------------------------------------
 
 def test_cli_argv_rejected():
-    result = mt.cli_argv("run `rm -rf /tmp/x` then check", _ProbeWithAllowed())
+    result = mt.cli_argv("run `rm -rf /tmp/x` then check")
     assert result is None
 
 
 def test_cli_argv_accepted():
-    result = mt.cli_argv("`pytest tools/postplan-harness/tests`", _ProbeWithAllowed())
+    result = mt.cli_argv("`pytest tools/postplan-harness/tests`")
     assert result == ["pytest", "tools/postplan-harness/tests"]
 
 
 def test_cli_argv_no_backticks():
-    result = mt.cli_argv("no backticks here", _ProbeWithAllowed())
+    result = mt.cli_argv("no backticks here")
     assert result is None
 
 
@@ -363,7 +388,7 @@ def test_override_guard_skip_human(monkeypatch):
     result = mt.run(
         pr=1, worktree="/fake/worktree", body=body,
         gh=FakeGh([body, body]),
-        probe=_ProbeWithAllowed(),
+        probe=FixtureProbe({}),
         show_blob=_make_scripts_show(),
         master_sha=SHA, head_tree=lambda: "tree1",
         live=True, log=lambda s: None,
@@ -407,26 +432,27 @@ def test_mixed_body(monkeypatch):
     monkeypatch.setattr(mt, "docker_available", lambda: (True, ""))
     monkeypatch.setattr(mt, "resolve_slug", lambda w: ("harness-manual-rows-execute", ""))
 
-    # CLI probe: Row 1 passes (SKIP-NOURL → eligible for CLI)
-    class _CliProbe:
-        def allowed(self, argv):
-            return probe_allowed(argv)
-
-        def run(self, argv, timeout=120):
-            if argv[0] == "bin/test-postplan-arm-conditions":
-                return True, "all PASS"
-            return False, "not found"
+    rows_file = mt.ROWS_TMPFILE.format(pr=1)
+    try:
+        import os as _os
+        _os.unlink(rows_file)
+    except FileNotFoundError:
+        pass
 
     result = mt.run(
         pr=1, worktree="/fake/worktree", body=body,
         gh=FakeGh([post_body]),
-        probe=_CliProbe(),
+        probe=FixtureProbe({"probes": {"bin/test-postplan-arm-conditions": True}}),
         show_blob=_make_scripts_show(),
         master_sha=SHA, head_tree=lambda: "tree1",
         live=True, log=lambda s: None,
     )
     assert result.ticked == ["Row 1"]
     assert result.all_ticked is False
+    assert armable.all_rows_ticked(post_body) is False
+    with open(rows_file) as _f:
+        assert _f.read().strip() == "ROW Row 1 PASS"
+    _os.unlink(rows_file)
 
 
 # ---------------------------------------------------------------------------
@@ -522,7 +548,7 @@ def test_tick_unconfirmed(monkeypatch):
     result = mt.run(
         pr=1, worktree="/fake/worktree", body=body,
         gh=FakeGh([body, body, body]),
-        probe=_ProbeWithAllowed(),
+        probe=FixtureProbe({}),
         show_blob=_make_scripts_show(),
         master_sha=SHA, head_tree=lambda: "tree1",
         live=True, log=lambda s: None,
@@ -561,7 +587,7 @@ def test_tree_gate(monkeypatch):
     result = mt.run(
         pr=1, worktree="/fake/worktree", body=BODY_ONE_ROW,
         gh=FakeGh([BODY_ONE_ROW, BODY_ONE_ROW]),
-        probe=_ProbeWithAllowed(),
+        probe=FixtureProbe({}),
         show_blob=_make_scripts_show(),
         master_sha=SHA, head_tree=_head_tree,
         live=True, log=lambda s: None,
@@ -573,6 +599,20 @@ def test_tree_gate(monkeypatch):
 # ---------------------------------------------------------------------------
 # test_no_exception_escapes
 # ---------------------------------------------------------------------------
+
+def test_replay_mode_skips(monkeypatch):
+    result = mt.run(
+        pr=1, worktree="/fake/worktree",
+        body=BODY_ONE_ROW,
+        gh=FakeGh([BODY_ONE_ROW]),
+        probe=FixtureProbe({}),
+        show_blob=_make_scripts_show(),
+        master_sha=SHA, head_tree=lambda: "tree1",
+        live=False, log=lambda s: None,
+    )
+    assert result.skipped_reason == "replay-mode"
+    assert result.ran is False
+
 
 def test_no_exception_escapes(monkeypatch):
     monkeypatch.setattr(mt, "docker_available", lambda: (True, ""))

@@ -154,7 +154,7 @@ try {
         }
 
         echo $view->renderInitStatus(
-            'Season rollover: ' . (string) \Security\HtmlSanitizer::safeHtmlOutput($rolloverResult->reason)
+            'Season rollover: ' . \Security\HtmlSanitizer::safeHtmlOutput($rolloverResult->reason)
         );
         flush();
     }

@@ -4804,7 +4804,7 @@ parameters:
 		-
 			rawMessage: 'Parameter #1 $db of class LeagueControlPanel\LeagueControlPanelRepository constructor expects mysqli, mixed given.'
 			identifier: argument.type
-			count: 1
+			count: 2
 			path: scripts/updateAllTheThings.php
 
 		-
@@ -4822,7 +4822,7 @@ parameters:
 		-
 			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
 			identifier: argument.type
-			count: 1
+			count: 2
 			path: scripts/updateAllTheThings.php
 
 		-

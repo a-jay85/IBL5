@@ -426,6 +426,15 @@ STICKY_MARKER = "<!-- pr-ready-verdict -->"
 MERGE_DIGEST_HEADING = "### Merge digest"
 EXCERPT_LIMIT = 30000
 
+# Sticky-comment field parsers for the Phase 5.5 carry-forward. Anchored and exact-width,
+# so a missing or decorated value never satisfies an arm. The diff field has its own label:
+# a patch-id is 40 hex like a tree sha, so parsing **Reviewed tree:** for it would
+# cross-match. Separate from REVIEWED_TREE_RE, which parses the verdict FILE's bare
+# `REVIEWED_TREE=<sha>` line and is unchanged by this PR.
+STICKY_REVIEWED_DIFF_RE = re.compile(r"^\*\*Reviewed diff:\*\* ([0-9a-f]{40})$", re.M)
+STICKY_PLAN_HASH_RE = re.compile(r"^\*\*Plan hash:\*\* ([0-9a-f]{64})$", re.M)
+CARRY_FORWARD_VERDICTS = ("READY", "READY WITH NOTES")
+
 _MERGE_DIGEST_HEADING_RE = re.compile(r"^#{1,6}[ \t]+Merge digest")
 
 
@@ -495,7 +504,8 @@ def terminal_line(v1, error_kind, remediation_sha, v2, tree_2, rounds_completed)
 
 
 def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
-                   digest: list, excerpt: str, terminal: str) -> str:
+                   digest: list, excerpt: str, terminal: str, *,
+                   diff_id: str = "", plan_hash: str = "") -> str:
     """The full sticky comment body, marker last.
 
     Ordering is a contract, not a style: every line the DM parser must NOT read as a digest
@@ -510,6 +520,13 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
 
     out.append("")
     out.append(f"**Reviewed tree:** {fid.get('reviewed_tree') or 'unrecorded'}")
+    if diff_id:
+        out.append(f"**Reviewed diff:** {diff_id}")
+    if plan_hash:
+        out.append(f"**Plan hash:** {plan_hash}")
+    if fid.get("carried_forward"):
+        out.append("**Carried forward:** prior review reused; branch diff (patch-id) and "
+                   "plan unchanged since the recorded verdict")
     if fid.get("verdict_2") is not None:
         out.append(f"**Re-reviewed tree:** {fid.get('reviewed_tree_2') or 'unrecorded'} "
                    f"({fid.get('verdict_2')})")

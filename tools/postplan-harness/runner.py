@@ -532,7 +532,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 fidelity.findings_excerpt(vpath, fid.get("verdict_1") is not None),
                 fidelity.terminal_line(fid.get("verdict_1"), fid.get("error_kind"), rsha,
                                        fid.get("verdict_2"), fid.get("reviewed_tree_2"),
-                                       fid.get("rounds_completed", 0)))
+                                       fid.get("rounds_completed", 0)),
+                diff_id=fid.get("diff_id", ""), plan_hash=fid.get("plan_hash", ""))
             try:
                 cid = gh.pr_sticky_verdict(pr, sticky)
             except (HarnessError, OSError, subprocess.SubprocessError):

@@ -341,18 +341,82 @@ RUNNER_SCRIPTS=$(grep -oE '\$BIN/[a-z][a-z0-9-]+' "$RUNNER" | sed 's|\$BIN/||' |
 
 PARITY_OK=1
 while IFS= read -r name; do
-    if ! printf '%s\n' "$RUNNER_SCRIPTS" | grep -qF "$name"; then
+    if ! grep -qxF -- "$name" <<< "$RUNNER_SCRIPTS"; then
         fail "case l PARITY: workflow runs bin/$name but the local runner does not"
         PARITY_OK=0
     fi
 done <<< "$WF_SCRIPTS"
 while IFS= read -r name; do
-    if ! printf '%s\n' "$WF_SCRIPTS" | grep -qF "$name"; then
+    if ! grep -qxF -- "$name" <<< "$WF_SCRIPTS"; then
         fail "case l PARITY: local runner runs bin/$name but the workflow does not"
         PARITY_OK=0
     fi
 done <<< "$RUNNER_SCRIPTS"
-[ "$PARITY_OK" -eq 1 ] && pass "case l: bidirectional CI-parity assertion passes"
+if [ "$PARITY_OK" -eq 1 ]; then pass "case l: bidirectional script-name parity passes"; fi
+
+# Step 4: bidirectional filter-name parity.
+# Workflow filter names intentionally not referenced in the runner (empty -- no known divergences).
+WF_FILTER_ALLOWLIST=""
+
+WF_FILTERS=$(python3 - "$REAL_WF" <<'PYEOF'
+import re, sys
+text = open(sys.argv[1]).read()
+lines = text.splitlines()
+filters_idx = None
+filters_indent = None
+for i, line in enumerate(lines):
+    m = re.match(r'^(\s*)filters:\s*\|\s*$', line)
+    if m:
+        filters_idx = i
+        filters_indent = len(m.group(1))
+        break
+if filters_idx is None:
+    sys.exit(1)
+block = []
+for line in lines[filters_idx + 1:]:
+    if not line.strip():
+        continue
+    if len(line) - len(line.lstrip()) <= filters_indent:
+        break
+    block.append(line)
+if not block:
+    sys.exit(1)
+min_indent = min(len(l) - len(l.lstrip()) for l in block)
+for line in block:
+    m_key = re.match(r'^(\w[\w-]*):\s*$', line[min_indent:])
+    if m_key:
+        print(m_key.group(1))
+PYEOF
+)
+
+# Extract filter names from the runner: third arg to run_filtered_step, and
+# literal args to _fmap (excludes the $filter variable call in the function body).
+RUNNER_FILTERS=$(
+    {
+        grep -E '^[[:space:]]+run_filtered_step' "$RUNNER" | awk '{gsub(/"/, "", $4); print $4}' || true
+        grep -oE '\$\(_fmap [a-z][a-z0-9-]+\)' "$RUNNER" | sed 's/\$(_fmap //; s/)//' || true
+    } | sort -u
+)
+
+FILTER_PARITY_OK=1
+while IFS= read -r fname; do
+    [ -z "$fname" ] && continue
+    if [ -n "$WF_FILTER_ALLOWLIST" ] && grep -qxF -- "$fname" <<< "$WF_FILTER_ALLOWLIST"; then
+        continue
+    fi
+    if ! grep -qxF -- "$fname" <<< "$RUNNER_FILTERS"; then
+        fail "case l PARITY: filter $fname in workflow but not referenced in runner"
+        FILTER_PARITY_OK=0
+    fi
+done <<< "$WF_FILTERS"
+while IFS= read -r fname; do
+    [ -z "$fname" ] && continue
+    if ! grep -qxF -- "$fname" <<< "$WF_FILTERS"; then
+        fail "case l PARITY: filter $fname referenced in runner but not in workflow"
+        FILTER_PARITY_OK=0
+    fi
+done <<< "$RUNNER_FILTERS"
+if [ "$FILTER_PARITY_OK" -eq 1 ]; then pass "case l: filter-name bidirectional parity passes"; fi
 
 # ─── Results ─────────────────────────────────────────────────────────────────
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"

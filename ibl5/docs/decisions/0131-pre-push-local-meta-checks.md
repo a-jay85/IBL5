@@ -24,6 +24,8 @@ The extend-before-add bar in `.claude/rules/meta-tooling-bar.md` was evaluated. 
 
 (4) A failing local run pushes anyway so the PR exists and CI shows the same red. Auto-merge is not armed. The failing check names are written to a flag file that the Phase 6.5 arming condition reads.
 
+(5) `check-pr-manual-testing` runs in the pre-push stage only when a caller passes `--body-file`. Neither the harness nor the skill engine supplies one. The check runs as a hard gate in the post-pr stage (row 16).
+
 ## Alternatives Considered
 
 Shared filter file: extract the globs into a shared filters YAML and have both CI and the local runner read it. Rejected because this edits the one workflow whose failure this change exists to prevent, and a wrong extraction breaks CI for every PR in flight. Runtime parsing leaves CI byte-identical and moves all risk into the new script, where a bidirectional parity assertion in `bin/test-run-meta-checks-local` catches drift.

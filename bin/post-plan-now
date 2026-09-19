@@ -53,7 +53,8 @@
 # An ambient PLAN_FILE in the caller's environment does not reach the detached child
 # (launchd gives the job a minimal environment), so --pr needs no unset.
 # POST_PLAN_MAIN_ROOT is a test-only override of the resolved main-checkout path.
-# Production never sets it.
+# POST_PLAN_SELF_BIN is a test-only override of the bin/ dir used to find wt-new.
+# Production never sets either.
 
 # should_fallback <rc> — decide whether to escalate to the /post-plan skill session after the
 # compiled harness exits with <rc>. Returns 0 (DO fall back) for a generic harness failure;
@@ -268,7 +269,7 @@ if [ -n "$PR_NUM" ]; then
         # Beside THIS script, not under $MAIN_ROOT: a --pr run fired from this feature's own
         # worktree before it merges would otherwise pick master's wt-new, which has no
         # --existing flag. Same reasoning as the session-id.sh source line further down.
-        SELF_BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+        SELF_BIN="${POST_PLAN_SELF_BIN:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)}"
         "$SELF_BIN/wt-new" "$PR_WT_SLUG" --existing "$PR_BRANCH" >&2 \
             || { echo "post-plan-now: bin/wt-new failed for branch '$PR_BRANCH' (slug '$PR_WT_SLUG')" >&2 ; exit 1; }
         WT_ROOT=$(pr_worktree_root "$MAIN_ROOT" "$PR_BRANCH") || true

@@ -923,6 +923,8 @@ jobs:
         run: bin/test-pr-ready-now
       - name: bin/test-plan-index
         run: bin/test-plan-index
+      - name: bin/test-post-plan-now-pr-creates-worktree
+        run: bin/test-post-plan-now-pr-creates-worktree
       - name: bin/test-pr-ready-skip
         run: bin/test-pr-ready-skip
       - name: bin/test-pr-cycle

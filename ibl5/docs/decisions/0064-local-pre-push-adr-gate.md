@@ -1,6 +1,6 @@
 ---
 description: Local pre-push hook that front-runs the CI ADR decision-trigger gate, catching missing-ADR triggers before the round-trip to CI.
-last_verified: 2026-07-19
+last_verified: 2026-09-19
 ---
 
 # ADR-0064: Local pre-push ADR decision-trigger gate

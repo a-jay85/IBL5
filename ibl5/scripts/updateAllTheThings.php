@@ -266,6 +266,9 @@ try {
         $updaterService->addStep(new Updater\Steps\SnapshotPlrStep(
             $plrService, $jsbRepo, $season->endingYear, $sourceResolver, $season->phase,
         ));
+        $updaterService->addStep(new Updater\Steps\PromotePriorSeasonSnapshotStep(
+            $plrRepo, $jsbRepo, $season->endingYear,
+        ));
         $updaterService->addStep(new Updater\Steps\RefreshIblHistStep($mysqli_db));
         $updaterService->addStep(new Updater\Steps\QueueSimSummaryStep(
             new \SimRecap\SimSummaryRepository($mysqli_db),

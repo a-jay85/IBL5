@@ -24,4 +24,12 @@ interface PlrParserRepositoryInterface
      * @return int Number of affected rows
      */
     public function upsertSnapshot(array $data): int;
+
+    /**
+     * Promote a finished season's 'mid-season' snapshots to 'end-of-season'.
+     *
+     * @param int $priorYear Season ending year of the finished season
+     * @return int Rows promoted (0 when already promoted or nothing to copy)
+     */
+    public function promotePriorSeasonSnapshots(int $priorYear): int;
 }

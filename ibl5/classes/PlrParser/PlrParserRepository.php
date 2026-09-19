@@ -390,6 +390,49 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
     }
 
     /**
+     * @see PlrParserRepositoryInterface::promotePriorSeasonSnapshots()
+     */
+    public function promotePriorSeasonSnapshots(int $priorYear): int
+    {
+        // Promotion copies more columns than upsertSnapshot() writes. SNAPSHOT_COLUMNS is
+        // the parser's write set: upsertSnapshot() reads $data[$col] for each entry, so a
+        // column the parser never produces cannot live there. phantom_games and created_at
+        // both exist on the row and must survive the copy, so they are appended here only.
+        // Each append is guarded: were either later added to SNAPSHOT_COLUMNS, an
+        // unconditional append would name it twice and the INSERT would error.
+        $columns = self::SNAPSHOT_COLUMNS;
+        foreach (['phantom_games', 'created_at'] as $extraColumn) {
+            if (!in_array($extraColumn, $columns, true)) {
+                $columns[] = $extraColumn;
+            }
+        }
+        $quoted    = array_map(static fn (string $c): string => '`' . $c . '`', $columns);
+        $colList = implode(', ', $quoted);
+        $selectList = implode(', ', array_map(
+            static fn (string $c): string => $c === 'snapshot_phase'
+                ? "'end-of-season'"
+                : 'src.`' . $c . '`',
+            $columns,
+        ));
+
+        $query = "INSERT IGNORE INTO `ibl_plr_snapshots` ({$colList})
+            SELECT {$selectList}
+            FROM (
+                SELECT s.*
+                FROM `ibl_plr_snapshots` s
+                LEFT JOIN `ibl_plr_snapshots` e
+                       ON e.pid = s.pid
+                      AND e.season_year = s.season_year
+                      AND e.snapshot_phase = 'end-of-season'
+                WHERE s.season_year = ?
+                  AND s.snapshot_phase = 'mid-season'
+                  AND e.id IS NULL
+            ) AS src";
+
+        return $this->execute($query, 'i', $priorYear);
+    }
+
+    /**
      * Column names for ibl_plr_snapshots upsert, in insertion order.
      *
      * @var list<string>

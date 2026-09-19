@@ -331,3 +331,126 @@ def test_commit_all_still_returns_a_sha_when_no_hook_rejects(repo):
         fh.write("ok\n")
     sha = g.commit_all("chore: accepted")
     assert len(sha) == 40, f"expected a full sha, got {sha!r}"
+
+
+# ---------------------------------------------------------------------------
+# Phase 1: real-git push() contract tests
+# ---------------------------------------------------------------------------
+
+def _git_env():
+    return {**os.environ,
+            "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+            "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"}
+
+
+def test_push_uses_origin_tip_lease_when_remote_has_branch(tmp_path):
+    """After initial push, subsequent push() uses the remote tip sha as the
+    --force-with-lease value, not the zero sha used for first-push."""
+    worktree = tmp_path / "wt"
+    bare = tmp_path / "bare"
+    worktree.mkdir(); bare.mkdir()
+    env = _git_env()
+
+    def sh(*args):
+        subprocess.run(list(args), check=True, capture_output=True, env=env)
+
+    sh("git", "init", "-b", "my-branch", str(worktree))
+    sh("git", "-C", str(worktree), "config", "user.email", "t@t")
+    sh("git", "-C", str(worktree), "config", "user.name", "t")
+    (worktree / "f.txt").write_text("hello\n")
+    sh("git", "-C", str(worktree), "add", "-A")
+    sh("git", "-C", str(worktree), "commit", "-m", "init")
+    sh("git", "init", "--bare", str(bare))
+    sh("git", "-C", str(worktree), "remote", "add", "origin", str(bare))
+    sh("git", "-C", str(worktree), "push", "origin", "my-branch")
+
+    origin_tip = subprocess.run(
+        ["git", "-C", str(worktree), "rev-parse", "refs/remotes/origin/my-branch"],
+        capture_output=True, text=True,
+    ).stdout.strip()
+    assert origin_tip, "push must set tracking ref refs/remotes/origin/my-branch"
+
+    g = LiveGit(str(worktree), push_remote="origin")
+    recorded = []
+    orig = g._run_out
+
+    def spy(*args):
+        recorded.append(args)
+        return orig(*args)
+
+    g._run_out = spy
+    g.push()
+
+    push_calls = [a for a in recorded if a and a[0] == "push"]
+    assert push_calls, "no push argv recorded"
+    argv = push_calls[0]
+    assert any(f"--force-with-lease=my-branch:{origin_tip}" in str(a) for a in argv), \
+        f"expected --force-with-lease=my-branch:{origin_tip} in argv, got: {argv}"
+    assert any("HEAD:refs/heads/my-branch" in str(a) for a in argv), \
+        f"expected HEAD:refs/heads/my-branch in argv, got: {argv}"
+
+
+def test_push_raises_stale_lease_when_remote_holds_untracked_branch(tmp_path):
+    """push() raises push-failed with 'stale-lease:' when the remote has the branch
+    but the worktree has no refs/remotes tracking ref — the shape is_stale_lease() keys on."""
+    bare = tmp_path / "bare"
+    worktree = tmp_path / "wt"
+    seeder = tmp_path / "seed"
+    bare.mkdir(); worktree.mkdir(); seeder.mkdir()
+    env = _git_env()
+
+    def sh(*args):
+        subprocess.run(list(args), check=True, capture_output=True, env=env)
+
+    sh("git", "init", "--bare", str(bare))
+    sh("git", "init", "-b", "my-branch", str(seeder))
+    sh("git", "-C", str(seeder), "config", "user.email", "t@t")
+    sh("git", "-C", str(seeder), "config", "user.name", "t")
+    (seeder / "f.txt").write_text("seed\n")
+    sh("git", "-C", str(seeder), "add", "-A")
+    sh("git", "-C", str(seeder), "commit", "-m", "seed")
+    sh("git", "-C", str(seeder), "remote", "add", "origin", str(bare))
+    sh("git", "-C", str(seeder), "push", "origin", "my-branch")
+
+    sh("git", "init", "-b", "my-branch", str(worktree))
+    sh("git", "-C", str(worktree), "config", "user.email", "t@t")
+    sh("git", "-C", str(worktree), "config", "user.name", "t")
+    (worktree / "local.txt").write_text("local\n")
+    sh("git", "-C", str(worktree), "add", "-A")
+    sh("git", "-C", str(worktree), "commit", "-m", "local")
+    sh("git", "-C", str(worktree), "remote", "add", "origin", str(bare))
+    # Intentionally no fetch: refs/remotes/origin/my-branch does not exist locally
+
+    g = LiveGit(str(worktree), push_remote="origin")
+    with pytest.raises(HarnessError) as exc_info:
+        g.push()
+    assert exc_info.value.kind == "push-failed"
+    assert "stale-lease:" in exc_info.value.detail
+
+
+def test_push_raises_push_failed_in_detached_head(tmp_path):
+    """push() refuses to push from a detached HEAD state."""
+    worktree = tmp_path / "wt"
+    worktree.mkdir()
+    env = _git_env()
+
+    def sh(*args):
+        subprocess.run(list(args), check=True, capture_output=True, env=env)
+
+    sh("git", "init", "-b", "main", str(worktree))
+    sh("git", "-C", str(worktree), "config", "user.email", "t@t")
+    sh("git", "-C", str(worktree), "config", "user.name", "t")
+    (worktree / "f.txt").write_text("x\n")
+    sh("git", "-C", str(worktree), "add", "-A")
+    sh("git", "-C", str(worktree), "commit", "-m", "init")
+    head_sha = subprocess.run(
+        ["git", "-C", str(worktree), "rev-parse", "HEAD"],
+        capture_output=True, text=True,
+    ).stdout.strip()
+    sh("git", "-C", str(worktree), "checkout", "--detach", head_sha)
+
+    g = LiveGit(str(worktree), push_remote="origin")
+    with pytest.raises(HarnessError) as exc_info:
+        g.push()
+    assert exc_info.value.kind == "push-failed"
+    assert "detached HEAD" in exc_info.value.detail

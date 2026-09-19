@@ -234,9 +234,10 @@ class RunResult:
     final_pr_state: str = ""
     retrospective: Optional[dict] = None
     error: Optional[str] = None
-    error_kind: Optional[str] = None   # stable HarnessError.kind of a FAILED run ("rebase-conflict", "local-gate", "git", "push-disabled")
+    error_kind: Optional[str] = None   # stable HarnessError.kind of a FAILED run ("rebase-conflict", "local-gate", "git", "push-disabled", "push-retry-cap", "lostwork-unproved")
     sticky_comment_id: Optional[str] = None  # numeric id read back after the upsert; None = unconfirmed
     sticky_error: Optional[str] = None       # "sticky-post-failed" when the read-back found no comment
+    retry_cap: Optional[str] = None  # "push-retry-cap" | "behind-retry-cap" when a bounded loop spent its cap
     # Phase 5.5 record: verdict_2 / reviewed_tree_2 / remediation_sha alias the last
     # remediation round; rounds (list of per-round dicts) / rounds_completed /
     # backlog_issue_numbers carry the full history.

@@ -564,8 +564,8 @@ jobs:
 
   api-e2e:
     name: API E2E Tests (Vitest)
-    needs: [changes]
-    if: needs.changes.outputs.src == 'true'
+    needs: [changes, ci-memo-check]
+    if: needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -623,8 +623,8 @@ jobs:
     # Name interpolates the matrix context so GitHub omits its auto-appended
     # "(1, 1)" suffix; the suffix only reappears (as "(N/M)") if ever re-sharded.
     name: E2E Tests${{ matrix.total-shards == 1 && '' || format(' ({0}/{1})', matrix.shard-index, matrix.total-shards) }}
-    needs: [changes]
-    if: needs.changes.outputs.src == 'true'
+    needs: [changes, ci-memo-check]
+    if: needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -758,8 +758,8 @@ jobs:
 
   e2e-mutators:
     name: E2E Mutators (non-sharded, dedicated DB)
-    needs: [changes]
-    if: needs.changes.outputs.src == 'true'
+    needs: [changes, ci-memo-check]
+    if: needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -865,8 +865,8 @@ jobs:
 
   merge-reports:
     name: Merge E2E Reports
-    needs: [changes, e2e, e2e-shards, e2e-mutators, api-e2e]
-    if: always() && needs.changes.outputs.src == 'true'
+    needs: [changes, ci-memo-check, e2e, e2e-shards, e2e-mutators, api-e2e]
+    if: always() && (needs.changes.outputs.src == 'true') && needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

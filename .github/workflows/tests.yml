@@ -1097,6 +1097,8 @@ jobs:
         run: bin/test-plan-review-seam
       - name: bin/test-check-registry-trigger-rows
         run: bin/test-check-registry-trigger-rows
+      - name: bin/test-ci-memo
+        run: bin/test-ci-memo
 
   gate:
     name: Tests and Analysis

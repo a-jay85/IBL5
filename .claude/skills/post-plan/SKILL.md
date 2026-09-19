@@ -438,7 +438,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 
 **Already merged?** If `gh pr view --json state --jq '.state'` returns `MERGED`, there is nothing to arm — skip to Phase 7 (which will early-exit).
 
-**All fourteen conditions** must be true — an AND-of-not-blocked set (any one can HOLD; none can RELEASE another):
+**All fifteen conditions** must be true. It is an AND-of-not-blocked set (any one can HOLD; none can RELEASE another):
 
 1. Manual testing cleared — the PR body carries the `No manual testing needed` sentinel Phase 6 writes.
 2. No review/audit finding scored `>= 80` (scored in Phase 4).
@@ -454,6 +454,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 12. Plan-intent fidelity — Phase 5.5 produced a verdict of `READY` or `READY WITH NOTES` **covering the current `HEAD` tree** — either the first reviewer's verdict, or the bounded second-review verdict Phase 5.5 writes after remediation.
 13. Plan-slug drift — the plan was located by drift (`<prefix>-<slug>.md`) rather than the exact branch-slug path; adoption is a guess, so auto-merge is held until a human confirms the plan is this branch's plan.
 14. **No unreviewed conflict this run.** The Phase 2 rebase did not conflict, or it did and `_phase-2-conflict-resolution.md` step 7.5 wrote a verdict whose first line is exactly `CONFLICT-REVIEW=CLEAN` at the path keyed to this branch slug and the current `HEAD` sha. Fail-closed: the flag existing blocks, and only that exact verdict clears it. A missing, empty, negative, or stale-sha verdict blocks.
+15. **No already-red CI check.** No check on the PR's current head sits in `gh`'s `fail` bucket, excluding `human-signoff` (red by design on every `feat:` PR, and already covered by condition (8)). This closes the gap that merged #2304: a check outside master's required-status-checks list can be red without blocking the queued merge, so nothing downstream of arming would have caught it. Fail-OPEN on pending checks, unlike its fail-closed neighbours: an empty probe result means "no failure proven at arm time", never "all checks are green", so a check that has not yet reported clears this condition.
 
 **These conditions only ever HOLD, never RELEASE.** They are an AND-of-not-blocked set: every condition can *add* a block; none can clear another's. Conditions (7)–(9) are **additive brakes on top of** the deterministic floors (1)–(6), the pipeline-authored floor (10), and the independent `human-signoff` required GitHub check — they exist to catch what those miss, never to override them. post-plan **always runs and opens the PR**; these conditions decide only whether auto-merge *arms*. A held PR stays open for a human to merge.
 
@@ -503,7 +504,7 @@ The Phase 7 re-rebase loop can hit a *second* conflict after auto-merge is alrea
 path disarms and posts through this same marker, so the existing comment is updated in place
 rather than stacked.
 
-**Conditions (1)/(5)/(6)/(8)/(10)/(11) come from the shared predicate `bin/lib/pr-armable.sh`** — the single source of truth also used by `bin/pr-triage`, so the live-readable arming judgment has **one executable home** and cannot drift between consumers (hand-re-derived divergence is exactly what mis-armed #1163/#1188). The run-only conditions (2)/(3)/(4)/(7)/(9)/(12)/(13)/(14) stay inline below — they read post-plan-run-local state (`/tmp`, the local plan file, the realized diff) that no cross-PR consumer can see, so they cannot move into the shared predicate.
+Conditions (1)/(5)/(6)/(8)/(10)/(11)/(15) come from the shared predicate `bin/lib/pr-armable.sh`. That is the single source of truth, also used by `bin/pr-triage`, so the live-readable arming judgment has **one executable home** and cannot drift between consumers (hand-re-derived divergence is exactly what mis-armed #1163/#1188). The run-only conditions (2)/(3)/(4)/(7)/(9)/(12)/(13)/(14) stay inline below. They read post-plan-run-local state (`/tmp`, the local plan file, the realized diff) that no cross-PR consumer can see, so they cannot move into the shared predicate.
 
 **Each condition block is SELF-CONTAINED** — it `source`s the predicate and fetches its own inputs in-block, exactly as condition (7) re-derives `$PLAN_FILE` and the original (6)/(8) ran their own `gh pr view`. **Do not** hoist the `source` or a shared `PR_JSON` into a preamble block: a sourced function or a shell variable does not survive into a separately-executed block (only exported env vars like `$CLAUDE_HEADLESS` do), and a missing `source` would make `pr_feat_hold` a no-op — **failing OPEN, auto-arming a `feat:` PR**. Each block re-`source`ing the lib is idempotent and cheap. Every block extracts gh output with `gh ... --jq` (gh does the decode — no `echo`/`printf` round-trip needed); when a block must round-trip a multi-field `PR_JSON` it uses `printf '%s'` (never `echo`, whose zsh `\n` expansion corrupts jq's parse).
 

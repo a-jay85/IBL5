@@ -2,9 +2,9 @@
 """Compiled post-plan runner — the phase sequencer.
 
 Code owns: sequencing, classification, conformance, verification aggregation,
-all fourteen arming conditions, numbered 1–14 as in the skill ((11) unresolved review-thread
+all fifteen arming conditions, numbered 1–15 as in the skill ((11) unresolved review-thread
 findings via bin/lib/pr-armable.sh, (12) the Phase 5.5 plan-fidelity verdict, (13) the
-plan-slug-drift hold, (14) the conflict-resolved flag), the Phase 5.5 sticky verdict comment,
+plan-slug-drift hold, (14) the conflict-resolved flag, (15) already-red CI checks), the Phase 5.5 sticky verdict comment,
 CI-watch interpretation, terminal states,
 side-effect gating, and the audit log. Bounded LLM calls own: PR copy, review/security
 judgment, finding scoring, plan-blind manual-step classification, the add-only
@@ -444,6 +444,22 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             sha = res.fidelity["remediation_sha"]
 
         # ---- Phase 6.5: arming ----------------------------------------
+        # Condition (15): snapshot any checks already in the fail bucket before
+        # arming. Fail-open: any exception falls back to [] so the run continues.
+        # bg_ci.failed is only populated once _write_outcome fires (usually after
+        # Phase 7 has already started), so it is typically empty at arm time; the
+        # fresh probe is therefore always run in addition to the background result.
+        _failed_checks: list[str] = []
+        if live and pr:
+            try:
+                _bg_failed = (list(bg_ci.failed)
+                              if bg_ci is not None and bg_ci.done.is_set()
+                              and bg_ci.status == "failure"
+                              else [])
+                _probe_failed = ciwatch.probe_failed_checks(worktree, pr)
+                _failed_checks = sorted(set(_bg_failed + _probe_failed))
+            except Exception as _e:
+                log(f"phase6.5: red-ci-check probe error — {_e}")
         inputs = ArmInputs(
             pr_body=gh.pr_body() or body, pr_title=meta.get("title", copy["title"]),
             pr_labels=gh.pr_labels(), classification=cls, findings=res.findings,
@@ -465,10 +481,14 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                                else bool((fixture or {}).get("conflict_resolved", False))),
             degraded_agents=res.degraded_agents,
             plan_slug_drift=plan.slug_drift,
+            failed_checks=_failed_checks,
         )
         if not live and (fixture or {}).get("current_tree"):
             # replay-only seam, the checks_outcome pattern: live mode never reads it
             inputs.current_tree = fixture["current_tree"]
+        if not live and (fixture or {}).get("red_ci_checks") is not None:
+            # replay-only seam for condition (15): live mode never reads this path
+            inputs.failed_checks = sorted(set((fixture or {}).get("red_ci_checks") or []))
         preview = evaluate(inputs)
         if not preview.holds:
             # only spend the add-only safety verdict when deterministic checks pass

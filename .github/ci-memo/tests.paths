@@ -1,12 +1,13 @@
 # Input path set for the tests.yml memo (bin/ci-memo, ADR-0131).
 # One git pathspec per line. Superset of every dorny filter that gates a
-# memoized job, plus the workflow, its composite action, and this file.
-.github/workflows/tests.yml
-.github/actions/setup-php-env
-.github/ci-memo/tests.paths
+# memoized job, widened to whole directories so a new file inside one is
+# covered without a manifest edit. .github is in wholesale because the
+# harness tests read workflow files and .github/scripts.
+.github
 bin
 ibl5/bin
 .claude
+ibl5/tests
 :(glob)**/*.php
 :(glob)**/*.sql
 :(glob)ibl5/**/*.ts

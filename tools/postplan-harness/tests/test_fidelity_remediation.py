@@ -605,9 +605,11 @@ def test_verdict_path_threading(tmp_path, git_shim):
     captured = []
     _orig = fidelity.remediate
 
-    def _spy(llm, gitad, out_dir, worktree, packet_dir, verdict1_path, master_sha, log=None):
+    def _spy(llm, gitad, out_dir, worktree, packet_dir, verdict1_path, master_sha, log=None,
+             **kw):
         captured.append(verdict1_path)
-        return _orig(llm, gitad, out_dir, worktree, packet_dir, verdict1_path, master_sha, log)
+        return _orig(llm, gitad, out_dir, worktree, packet_dir, verdict1_path, master_sha, log,
+                     **kw)
 
     mp = git_shim  # git_shim returns monkeypatch
     mp.setattr(fidelity, "remediate", _spy)
@@ -660,3 +662,83 @@ def test_file_note_issues_continues_after_failed_create(tmp_path):
     ]
     nums = fidelity.file_note_issues(gh, notes, 99, "verdict")
     assert len(nums) == 1
+
+
+# --- remediation commit path ----------------------------------------------------
+
+class _EmptyCommitGit(_CountingGit):
+    """commit_all's "nothing staged" answer: the model made no edits."""
+    def commit_all(self, message):
+        return ""
+
+
+def test_remediation_with_no_edits_skips_push_and_commit_log(tmp_path, git_shim):
+    llm = FixtureLlm(UsageLedger(), {"fidelity-remediation": "no changes"})
+    git = _EmptyCommitGit({"slug": "demo", "worktree_diff": ""})
+    lines = []
+    sha = fidelity.remediate(llm, git, str(tmp_path), str(tmp_path), _packet(tmp_path),
+                             _verdict(tmp_path, "NOT READY"), "deadbeef", log=lines.append)
+    assert sha is None
+    assert git.pushes == 0
+    assert not any("remediation committed" in m for m in lines)
+    assert any("made no edits" in m for m in lines)
+
+
+class _GateDeniedGit(_CountingGit):
+    """The first `denials` commits raise local-gate with `detail`; later ones succeed."""
+    def __init__(self, fx, detail, denials=1):
+        super().__init__(fx)
+        self.detail, self.denials, self.attempts = detail, denials, []
+
+    def commit_all(self, message):
+        self.attempts.append(message)
+        if len(self.attempts) <= self.denials:
+            raise HarnessError("local-gate", self.detail)
+        return super().commit_all(message)
+
+
+def _gate_fx():
+    return {"slug": "demo", "worktree_diff": "", "diff": "diff --git a/x b/x\n",
+            "head_trees": [TREE_1, TREE_2, TREE_3, TREE_4]}
+
+
+def test_remediation_gate_denial_logs_the_hook_message(tmp_path, git_shim):
+    canned = {"plan-fidelity-review": "6d checks\n\nNOT READY\n",
+              "fidelity-remediation": "edited"}
+    git = _GateDeniedGit(_gate_fx(), "check-docs: stale ref in foo.md\n"
+                         "Fix the above doc issues before committing.", denials=9)
+    lines = []
+    res = _Res()
+    try:
+        runner._run_fidelity(
+            FixtureLlm(UsageLedger(), canned), str(tmp_path), str(tmp_path), git,
+            RecordingGh(str(tmp_path)), _plan(), "diff", "body", 990, "dead" * 10,
+            TREE_1, False, lines.append, res)
+        line = next(m for m in lines if "remediation unavailable" in m)
+        assert "(local-gate) class=unknown" in line
+        assert "stale ref in foo.md Fix the above doc issues" in line   # newlines collapsed
+        assert git.pushes == 0 and res.fidelity["rounds_completed"] == 0
+    finally:
+        _cleanup(990)
+
+
+def test_remediation_doc_staleness_denial_is_auto_bumped(tmp_path, git_shim):
+    canned = {"plan-fidelity-review": "6d checks\n\nNOT READY\n",
+              "fidelity-remediation": "edited",
+              "plan-fidelity-re-review-2": "READY\n"}
+    git = _GateDeniedGit(_gate_fx(), "docs/x.md is stale. Bump last_verified", denials=1)
+    git_shim.setattr(runner, "_remediate_doc_staleness", lambda w, g, l: 2)
+    lines = []
+    res = _Res()
+    try:
+        runner._run_fidelity(
+            FixtureLlm(UsageLedger(), canned), str(tmp_path), str(tmp_path), git,
+            RecordingGh(str(tmp_path)), _plan(), "diff", "body", 989, "dead" * 10,
+            TREE_1, False, lines.append, res)
+        assert len(git.attempts) == 2
+        assert git.attempts[1].endswith(runner._REMEDIATION_NOTE)
+        assert git.pushes == 1 and res.fidelity["rounds_completed"] == 1
+        assert res.fidelity["verdict_2"] == "READY"
+        assert "phase5.5: local-gate denial classified as doc-staleness" in lines
+    finally:
+        _cleanup(989, "989-2")

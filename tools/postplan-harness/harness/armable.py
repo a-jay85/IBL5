@@ -29,6 +29,12 @@ GOLDEN_PATH = "engine/internal/sim/testdata/golden.json"
 SENTINEL_RE = re.compile(r"^\s*No manual testing needed", re.IGNORECASE)
 DEP_LINE = re.compile(r"^\s*depends-on:", re.IGNORECASE)
 
+# The harness's own row shape, shared with manual_rows.render_rows
+# (`- [ ] **Row {n}** — …`), manual-rows.sh's `^\- \[[ x]\] \*\*` filter, and
+# tick-rows.sh's `- [ ] **<id>**` substitution. Deliberately NOT "any - [x]":
+# unrelated ticked bullets appear in real bodies and must not clear the gate.
+ROW_CHECKBOX_RE = re.compile(r"^- \[([ x])\] \*\*[^*]+\*\*")
+
 # Condition (9) deterministic hold-trigger surface (the enumerable subset; the
 # bounded LLM verdict may ADD holds on top — never release one).
 DESTRUCTIVE_SQL = re.compile(
@@ -37,15 +43,8 @@ DESTRUCTIVE_SQL = re.compile(
 )
 
 
-def manual_testing_clearance(body: str) -> str:
-    """pr_manual_testing_clearance port: CLEARED / HELD / UNKNOWN.
-
-    Scan window: from `^## Manual Testing` to the next `^## ` line. Any body
-    section the runner appends must therefore either sit BEFORE this heading or
-    emit no `^#`-anchored line; classify.upsert_manual_confirmation does the
-    former and classify._neutralize_headings the latter. Pinned by
-    tests/test_hold_justification.py.
-    """
+def _manual_section(body: str) -> list[str] | None:
+    """Extract lines in the `## Manual Testing` window. Returns None when the heading is absent."""
     lines = (body or "").splitlines()
     section: list[str] = []
     in_sec = False
@@ -58,6 +57,21 @@ def manual_testing_clearance(body: str) -> str:
         if in_sec:
             section.append(l)
     if not in_sec:
+        return None
+    return section
+
+
+def manual_testing_clearance(body: str) -> str:
+    """pr_manual_testing_clearance port: CLEARED / HELD / UNKNOWN.
+
+    Scan window: from `^## Manual Testing` to the next `^## ` line. Any body
+    section the runner appends must therefore either sit BEFORE this heading or
+    emit no `^#`-anchored line; classify.upsert_manual_confirmation does the
+    former and classify._neutralize_headings the latter. Pinned by
+    tests/test_hold_justification.py.
+    """
+    section = _manual_section(body)
+    if section is None:
         return "UNKNOWN"
     for l in section:
         if SENTINEL_RE.match(l):
@@ -77,6 +91,16 @@ def meta_checks_clearance(flag_path: str, post_pr_rc: int) -> str:
     if post_pr_rc == 1:
         return "HELD"
     return "UNKNOWN"
+
+
+def all_rows_ticked(body: str) -> bool:
+    """True only when the Manual Testing window holds at least one harness-shaped
+    checkbox row and every one of them is ticked."""
+    section = _manual_section(body)
+    if section is None:
+        return False
+    marks = [m.group(1) for m in (ROW_CHECKBOX_RE.match(l) for l in section) if m]
+    return bool(marks) and all(c == "x" for c in marks)
 
 
 def dep_numbers(body: str) -> list[int]:
@@ -151,8 +175,13 @@ def evaluate(inp: ArmInputs) -> ArmDecision:
     cs: list[ConditionResult] = []
 
     clearance = manual_testing_clearance(inp.pr_body)
-    cs.append(ConditionResult(1, "manual-testing-clearance", clearance != "CLEARED",
-                              f"state={clearance}" if clearance != "CLEARED" else ""))
+    # Widened for the harness's deterministic tick pass: a section whose every
+    # harness-shaped row is ticked clears, alongside the sentinel. Gated on HELD
+    # so UNKNOWN (no `## Manual Testing` heading at all) still holds.
+    ticked_clear = clearance == "HELD" and all_rows_ticked(inp.pr_body)
+    cond1_held = clearance != "CLEARED" and not ticked_clear
+    cs.append(ConditionResult(1, "manual-testing-clearance", cond1_held,
+                              f"state={clearance}" if cond1_held else ""))
 
     high = [f for f in inp.findings if (f.score or 0) >= 80]
     cs.append(ConditionResult(2, "review-finding>=80", bool(high),

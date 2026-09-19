@@ -48,6 +48,11 @@ def _validate(argv: list[str]) -> Optional[str]:
     return None
 
 
+def allowed(argv: list[str]) -> bool:
+    """True when argv passes the same allowlist LiveProbe.run enforces."""
+    return _validate(argv) is None
+
+
 _SCRUBBED_KEYS = {"PYTHONPATH", "PYTHONSTARTUP", "BASH_ENV", "ENV"}
 _KEPT_KEYS = {"PATH", "HOME", "LANG", "PYTHONHASHSEED"}
 
@@ -63,7 +68,7 @@ class LiveProbe:
     def __init__(self, repo_root: Optional[str] = None):
         self.repo_root = repo_root
 
-    def run(self, argv: list[str]) -> tuple[bool, str]:
+    def run(self, argv: list[str], timeout: int = 120) -> tuple[bool, str]:
         """Return (success, detail). Never raises — any exception is caught."""
         reason = _validate(argv)
         if reason:
@@ -73,7 +78,7 @@ class LiveProbe:
                 argv,
                 cwd=self.repo_root,
                 shell=False,
-                timeout=120,
+                timeout=timeout,
                 capture_output=True,
                 text=True,
                 env=_clean_env(),
@@ -81,7 +86,7 @@ class LiveProbe:
             tail = (proc.stderr or "")[-400:]
             return proc.returncode == 0, tail
         except subprocess.TimeoutExpired:
-            return False, "timeout after 120s"
+            return False, f"timeout after {timeout}s"
         except Exception as exc:  # noqa: BLE001
             return False, str(exc)
 
@@ -97,7 +102,7 @@ class FixtureProbe:
     def __init__(self, fixture: dict):
         self._table: dict[str, bool] = fixture.get("probes") or {}
 
-    def run(self, argv: list[str]) -> tuple[bool, str]:
+    def run(self, argv: list[str], timeout: int = 120) -> tuple[bool, str]:
         key = " ".join(argv)
         if key not in self._table:
             return False, "no recorded probe"

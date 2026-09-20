@@ -93,6 +93,27 @@ _FINDING_BULLET_RE = re.compile(r"^\s*(?:[-*]|\d+[.)])\s+\S")
 _WORK_LIST_OPEN = "=== WORK LIST (each item names the arming hold it clears) ==="
 _WORK_LIST_CLOSE = "=== END WORK LIST ==="
 
+# A fixer round must never edit the machinery that decides what arms. The prompt says
+# so advisorily; this tuple is the enforcement, checked against the round's own commit
+# between commit and push so a violating commit stays local.
+GATE_OWNING_PREFIXES = (
+    ".claude/rules/",
+    ".github/workflows/",
+    "bin/check-",
+    "tools/postplan-harness/harness/armable.py",
+)
+GATE_EDIT_DENY_TEXT = (
+    "NEVER edit these gate-owning paths: .claude/rules/**, .github/workflows/**, "
+    "bin/check-*, tools/postplan-harness/harness/armable.py. A commit touching one "
+    "is discarded and ends remediation."
+)
+
+
+def denied_gate_edits(paths) -> list[str]:
+    """The subset of `paths` that lies under a gate-owning prefix."""
+    return [p for p in (paths or [])
+            if any(str(p).startswith(prefix) for prefix in GATE_OWNING_PREFIXES)]
+
 
 def _verdict_findings(verdict_path: str) -> list[str]:
     """Hold (12): the blocking findings under a NOT READY verdict, one per bullet.
@@ -386,7 +407,9 @@ def _noop_log(_msg: str) -> None:
 
 def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
               verdict1_path: str, master_sha: str, log=None, *,
-              commit=None, push=None, pr_number: int | str | None = None) -> str | None:
+              commit=None, push=None, pr_number: int | str | None = None,
+              model: str = "sonnet", work_list: list[dict] | None = None,
+              outcome: dict | None = None) -> str | None:
     """Fix the blocking findings behind a `NOT READY`. Returns the commit sha, or None.
 
     The model edits worktree files and may fix PR-body findings via `gh pr edit`. The
@@ -401,16 +424,36 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
     `push` is the no-arg push callable, injected for the same reason. runner passes its
     retrying push so a master that moved during the review gets a fetch + clean rebase
     before the push instead of a bare `gitad.push()` that the pre-push hook refuses.
+
+    `model` is the alias `call_tooled` validates against its own allowlist; the runner
+    escalates it across rounds. `work_list` is the tagged union of machine-fixable
+    arming holds; omitted, it falls back to the verdict findings alone. `outcome` is an
+    out-dict the runner reads for the round record -- the return stays `str | None` so
+    no existing call site changes.
     """
     log = log or _noop_log
     commit = commit or gitad.commit_all
     push = push or gitad.push
+
+    def _out(reason: str) -> None:
+        if outcome is not None:
+            outcome["reason"] = reason
+            outcome["model"] = model
     if parse_verdict(verdict1_path) != "NOT READY":
+        _out("not-blocking")
         return None
     if gitad.is_dirty():
         # _phase65-remediation.md's own precondition: a single commit_all on a dirty tree
         # would sweep unrelated edits into the remediation commit.
         log("phase5.5: remediation skipped - dirty worktree")
+        _out("dirty-worktree")
+        return None
+    if work_list is None:
+        work_list = build_work_list(verdict1_path, [], [], [])
+    if not work_list:
+        # Nothing to hand the fixer. Spawning one anyway is a guaranteed no-edit round.
+        log("phase5.5: remediation skipped - empty work list")
+        _out("empty-work-list")
         return None
 
     procedure = _find_procedure(worktree, master_sha, REMEDIATION_PATHS,
@@ -439,12 +482,14 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
         "The harness commits and pushes your worktree edits after you finish."
         f"{pr_note}\n"
         "No Agent tool: do not delegate.\n"
+        f"{GATE_EDIT_DENY_TEXT}\n"
         "When a file you must inspect is large, Read it with offset and limit rather\n"
         "than whole; a whole-file Read of a large file is denied in this session.\n\n"
         "=== REMEDIATION PROCEDURE (follow it exactly) ===\n"
         f"{procedure}\n"
         "=== END PROCEDURE ===\n\n"
-        "=== VERDICT (its blocking findings are your work list) ===\n"
+        f"{render_work_list(work_list)}\n"
+        "=== VERDICT ===\n"
         f"{verdict_text}\n"
         "=== END VERDICT ===\n\n"
         "=== DIFF UNDER REVIEW ===\n"
@@ -456,7 +501,7 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
         f"  - {os.path.join(packet_dir, 'diff.patch')}\n"
     )
     llm.call_tooled(
-        "fidelity-remediation", "sonnet", prompt, cwd=worktree,
+        "fidelity-remediation", model, prompt, cwd=worktree,
         allowed_tools=REMEDIATION_ALLOWED_TOOLS, denied_tools=REMEDIATION_DENIED_TOOLS,
         add_dirs=(packet_dir,),
     )
@@ -464,7 +509,18 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
     if not sha:
         # commit_all returns "" when nothing was staged: the model made no edits.
         log("phase5.5: remediation made no edits - nothing committed or pushed")
+        _out("no-edits")
         return None
+    # Between commit and push on purpose. Checking after the push would need a
+    # force-push to undo; checking before the commit would need a working-tree diff and
+    # a reset. A denied commit stays local, which is the same state the other terminal
+    # kinds already leave behind.
+    hits = denied_gate_edits(gitad.changed_files(f"{sha}^"))
+    if hits:
+        log(f"phase5.5: remediation touched gate-owning paths ({', '.join(hits)}) "
+            "- commit left local, remediation ends")
+        _out("gate-path-edit")
+        raise HarnessError("gate-path-edit", ", ".join(hits))
     pushed = push()
     if pushed:
         # A stale-base recovery inside `push` rebased the commit onto the fresh master,
@@ -474,6 +530,7 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
         # commit sha, which IS HEAD when nothing rebased.
         sha = pushed
     log(f"phase5.5: remediation committed {str(sha)[:12]} and pushed")
+    _out("committed")
     return sha
 
 

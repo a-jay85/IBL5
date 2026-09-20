@@ -178,15 +178,41 @@ def hold_discharge_prompt(sentences: list[str]) -> str:
 
 
 def fidelity_notes_prompt(verdict_text: str) -> str:
-    """Phase 5.5 — extract non-blocking notes from a READY WITH NOTES verdict for backlog filing."""
+    """Phase 5.5 — extract non-blocking notes from a READY WITH NOTES verdict for backlog filing.
+
+    Notes are typed so `fidelity.extract_notes` can keep only `followup`. The reviewer
+    writes for whoever merges the PR, so most of what it calls a note is consumed at the
+    merge button and is dead weight in the backlog afterwards — deviations it already
+    blessed, PR-copy nits, and its own bookkeeping. Measured 2026-09-19: of the 156
+    issues filed since PR #2275, about two thirds were one of those three.
+    """
     return (
         "Extract the non-blocking notes from this plan-fidelity verdict.\n\n"
+        "These become backlog issues read weeks after the PR merges, so file a note ONLY "
+        "when it names a concrete code change that is still worth doing then.\n\n"
+        "Type every note you find with \"kind\":\n"
+        "  followup          — names a specific code change still worth making after this "
+        "PR merges: a bug, a missing or self-satisfying test, a fragile assertion, an "
+        "unhandled case.\n"
+        "  plan-deviation-ok — the code differs from the plan and the reviewer already "
+        "settled it (\"better\", \"a better route\", \"harmless\", \"cosmetic\", \"fine\", "
+        "\"not a finding\", \"correct, not a miss\"). Nothing is left to do.\n"
+        "  pr-copy           — about the PR title, body, summary, digest, manual-testing "
+        "section or commit message wording. Moot once the PR merges.\n"
+        "  process           — the reviewer narrating its own review: which checks it ran "
+        "or could not run, queueing another review, a missing plan, restating that "
+        "something is consistent or matches.\n\n"
         "Return a JSON array of objects with:\n"
         "  - \"title\": imperative sentence, under 70 characters\n"
-        "  - \"detail\": one sentence describing the note\n\n"
+        "  - \"detail\": one sentence describing the note\n"
+        "  - \"kind\": one of the four above\n\n"
+        "Only `followup` is filed; the rest are discarded. When torn, do NOT call it "
+        "`followup` — a dropped note costs nothing, a wrongly filed one is noise a human "
+        "triages by hand. A note that only describes a difference, naming no remaining "
+        "work, is never `followup`.\n\n"
         "Cover only the notes, not blocking findings. Return [] if there are none.\n\n"
         f"VERDICT:\n{verdict_text[:8000]}\n\n"
-        'Return ONLY JSON: [{"title": "...", "detail": "..."}] or [].'
+        'Return ONLY JSON: [{"title": "...", "detail": "...", "kind": "followup"}] or [].'
     )
 
 

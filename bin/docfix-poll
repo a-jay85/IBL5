@@ -4,14 +4,16 @@
 # Replaces the deleted `docfix` job in doc-freshness-audit.yml: GitHub schedules
 # nothing on this Mac (no self-hosted runner is registered — the public-repo runner
 # security constraint, stated in ADR-0086, makes that permanently unsafe). Instead,
-# launchd drives this poller from the owner's Mac at 09:17 local daily.
+# launchd drives this poller from the owner's Mac daily at 00:00 UTC, aligning the
+# poll with the UTC day boundary that bin/check-docs decides staleness on and with
+# the doc-freshness-audit cron.
 #
 # Install AFTER this PR lands on master: the launchd Program points at the MAIN
 # checkout's copy of this file, so a pre-merge install silently runs a stale version.
 #
 # Usage:
 #   bin/docfix-poll                    # nightly poll (run by launchd)
-#   bin/docfix-poll --install-schedule   # install the 09:17 launchd job (post-merge)
+#   bin/docfix-poll --install-schedule   # install the 00:00 UTC launchd job (post-merge)
 #   bin/docfix-poll --uninstall-schedule # remove the launchd job (rollback)
 #   bin/docfix-poll --print-schedule     # emit plist to stdout — test seam, no side effect
 #   bin/docfix-poll --health-report [ISSUE_NUM]  # print 3 key=value lines; always exits 0
@@ -69,6 +71,15 @@ LOG_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/docfix-poll/logs"
 
 # Single source of truth for the plist — shared by --print-schedule and
 # --install-schedule, so the MAIN-checkout derivation is exercised by tests.
+#
+# Hour 17 local = 00:00 UTC while the Mac is on PDT (UTC-7). launchd evaluates
+# StartCalendarInterval in SYSTEM LOCAL TIME and has no UTC mode — an
+# EnvironmentVariables TZ key does not reach the scheduler — so under PST (UTC-8)
+# this fires at 01:00 UTC instead. That drift is harmless BY CONSTRUCTION: the poll's
+# input is bin/check-docs --staleness-report, which resolves staleness on UTC DAY
+# boundaries, so 00:00 and 01:00 on the same UTC day yield an identical stale set.
+# Do not add a marker-file "first run per UTC day" guard for the one-hour skew; it
+# buys nothing and adds persistent state plus a --force escape hatch.
 build_plist() {
     cat <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -82,9 +93,9 @@ build_plist() {
 	<key>StartCalendarInterval</key>
 	<dict>
 		<key>Hour</key>
-		<integer>9</integer>
-		<key>Minute</key>
 		<integer>17</integer>
+		<key>Minute</key>
+		<integer>0</integer>
 	</dict>
 	<key>WorkingDirectory</key>
 	<string>${MAIN}</string>
@@ -121,7 +132,7 @@ if [ -n "$SCHEDULE_ACTION" ] && [ "$SCHEDULE_ACTION" != "health" ]; then
                 echo "FAILED: ${PLIST_LABEL} did not load." >&2
                 exit 1
             fi
-            echo "Installed ${PLIST_LABEL} (daily 09:17 local). Program: $PROGRAM"
+            echo "Installed ${PLIST_LABEL} (daily 17:00 local = 00:00 UTC). Program: $PROGRAM"
             ;;
         uninstall)
             launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true
@@ -461,7 +472,7 @@ while IFS= read -r branch; do
                 echo "docfix-poll: leaving '$branch' — reflog age unavailable; see --health-report." >&2
             elif [ "$age_s" -gt 14400 ] && [ -z "$on_origin" ]; then
                 # Local-only, no PR, older than 4h — wedged, not in flight. Runs start
-                # at 09:17 EDT and finish in <60 min; the inter-poll gap is ~24h, so 4h
+                # at 00:00 UTC and finish in <60 min; the inter-poll gap is ~24h, so 4h
                 # is safely above the in-flight window and safely below the gap.
                 echo "docfix-poll: wedged branch '$branch' detected (age ${age_s}s, no origin ref, no PR). Salvaging."
                 salvage_wedged_branch "$branch" \

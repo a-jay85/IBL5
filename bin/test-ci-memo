@@ -484,6 +484,47 @@ if should_run gate-topology; then
         fi
     done
 
+    # --- Assertion 5: an empty key fires neither lookup nor save ---
+    # bin/ci-memo prints empty hash=/key= on bypass and on an unreadable GHCR
+    # manifest. Both consumers must guard on it, or a run with no key restores
+    # (or writes) the cache default. Asserted here because no unit case can see
+    # the workflow side of "neither lookup nor save fires".
+    for wf in "$WF_TESTS" "$WF_E2E"; do
+        wfn=$(basename "$wf")
+        # 5a: the cache/restore step inside ci-memo-check carries the hash guard
+        if awk '
+            /^  ci-memo-check:/{in_job=1; next}
+            /^  [a-zA-Z]/ && in_job { in_job=0 }
+            in_job && /^      - /{
+                if (step_restore && !step_guard) bad=1
+                step_restore=0; step_guard=0
+            }
+            in_job && /if: steps\.key\.outputs\.hash != .{2}/ { step_guard=1 }
+            in_job && /actions\/cache\/restore/               { step_restore=1 }
+            END {
+                if (step_restore && !step_guard) bad=1
+                exit bad
+            }
+        ' "$wf"; then
+            pass "gate-topology[5a]: $wfn memo lookup guarded on non-empty hash"
+        else
+            fail "gate-topology[5a]: $wfn memo lookup missing the non-empty-hash guard"
+            gt_fail=1
+        fi
+        # 5b: the gate's MEMO_WRITE expression carries the same guard
+        if awk '
+            /^  gate:/{in_gate=1; next}
+            /^  [a-zA-Z]/ && in_gate { in_gate=0 }
+            in_gate && /MEMO_WRITE:/ && /needs\.ci-memo-check\.outputs\.hash != .{2}/ { found=1; exit }
+            END { exit !found }
+        ' "$wf"; then
+            pass "gate-topology[5b]: $wfn gate MEMO_WRITE guarded on non-empty hash"
+        else
+            fail "gate-topology[5b]: $wfn gate MEMO_WRITE missing the non-empty-hash guard"
+            gt_fail=1
+        fi
+    done
+
     [[ $gt_fail -eq 0 ]] || true  # individual pass/fail already recorded
 fi
 
@@ -595,5 +636,11 @@ fi
 # Summary
 # =========================================================================
 echo ""
+# A --case typo used to select zero cases and exit 0, so a CI step naming a
+# renamed case would pass while asserting nothing.
+if [[ -n "$ONLY_CASE" && $((PASS + FAIL)) -eq 0 ]]; then
+    echo "FAIL: unknown --case name: $ONLY_CASE (zero cases ran)" >&2
+    exit 2
+fi
 echo "Results: $PASS passed, $FAIL failed"
 [[ $FAIL -eq 0 ]] || exit 1

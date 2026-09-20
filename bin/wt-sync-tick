@@ -14,10 +14,14 @@
 # resets --hard, never creates or deletes worktrees. Fast-forward only.
 # See ADR-0106 for the design rationale.
 #
-# Usage: bin/wt-sync-tick [--dry-run] [--force] [--help]
-#   --dry-run   Report what it would do; change nothing.
-#   --force     Bypass the HID-idle presence gate (for testing).
-#   --help      Print this header comment.
+# Usage: bin/wt-sync-tick [--dry-run] [--force] [--help] [--only <path>]
+#   --dry-run         Report what it would do; change nothing.
+#   --force           Bypass the HID-idle presence gate (for testing).
+#   --help            Print this header comment.
+# ---
+#   --only <path>     On-demand mode: sync exactly one worktree at <path>.
+#                     Bypasses the HID-idle and in-use gates; never takes the
+#                     fleet lock. Prints a single verdict token on stdout.
 
 set -u
 
@@ -48,15 +52,19 @@ log() { printf '[%s] %s\n' "$(date '+%Y-%m-%dT%H:%M:%S')" "$*"; }
 # ── Arg parsing ───────────────────────────────────────────────────────────────
 DRY_RUN=false
 FORCE=false
-for arg in "$@"; do
-    case "$arg" in
-        --dry-run) DRY_RUN=true ;;
-        --force)   FORCE=true ;;
+ONLY_PATH=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --dry-run) DRY_RUN=true; shift ;;
+        --force)   FORCE=true;   shift ;;
+        --only)
+            [ $# -ge 2 ] || { log "--only requires a worktree path" >&2; exit 2; }
+            ONLY_PATH="$2"; shift 2 ;;
+        --only=*)  ONLY_PATH="${1#--only=}"; shift ;;
         --help)
             awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"
-            exit 0
-            ;;
-        -*) log "Unknown option: $arg" >&2; exit 1 ;;
+            exit 0 ;;
+        *) log "Unknown option: $1" >&2; exit 1 ;;
     esac
 done
 
@@ -64,6 +72,19 @@ done
 if [ "$WT_SYNC_ENABLED" = "0" ]; then
     log "WT_SYNC_ENABLED=0 — exiting"
     exit 0
+fi
+
+# ── Lock path (needed by both on-demand and fleet modes) ─────────────────────
+# Own namespace: wt-sync/ — must NOT collide with bug-pipeline's lock/ledger.
+mkdir -p "$WT_SYNC_LOCK_DIR" 2>/dev/null || true
+LOCK_FILE="$WT_SYNC_LOCK_DIR/wt-sync.lock"
+
+# ── On-demand single-worktree mode (--only) ──────────────────────────────────
+# Bypasses the HID presence gate and the in-use gate by design: the caller IS
+# the operator opening this worktree. Never acquires the fleet lock. See ADR-0133.
+if [ -n "$ONLY_PATH" ]; then
+    on_demand_sync "$ONLY_PATH"
+    exit $?
 fi
 
 # ── Presence gate (HID idle) ──────────────────────────────────────────────────
@@ -95,10 +116,6 @@ if [ "$FORCE" = false ]; then
 fi
 
 # ── Single-flight lock ────────────────────────────────────────────────────────
-# Own namespace: wt-sync/ — must NOT collide with bug-pipeline's lock/ledger.
-mkdir -p "$WT_SYNC_LOCK_DIR" 2>/dev/null || true
-LOCK_FILE="$WT_SYNC_LOCK_DIR/wt-sync.lock"
-
 acquire_lock() {
     if [ -f "$LOCK_FILE" ]; then
         local existing_pid

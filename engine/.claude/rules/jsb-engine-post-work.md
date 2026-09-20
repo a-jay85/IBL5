@@ -44,13 +44,13 @@ Prefer the highest-|Delta| ABOVE-NOISE stand-in as the next lever. A lever the t
 ## Content-anchored citations into jsb-native/ docs
 
 Citations into `jsb-native/` docs (especially `00_MASTER_REFERENCE.md`) must use a
-grep-able unique token — `§ Heading`, a distinctive string like `+0xDD0`, or an explicit
+grep-able unique token: `§ Heading`, a distinctive string like `+0xDD0`, or an explicit
 `grep -n '<phrase>'` command. Never use `path:line` anchors.
 
 `jsb-native/` is git-excluded from IBL5 (ADR-0105). Edits land on disk with no diff and no
 attribution, so line numbers shift invisibly. Empirical basis (2026-07-29): PR #1740's
 stat showed only `jsb-native-backlog.md | 181 +++-`; the concurrent master-ref edits
-shifted the four line anchors in `jsb-j7-param-recovery.md` by 18–38 lines each. The
+shifted the four line anchors in `jsb-j7-param-recovery.md` by between 18 and 38 lines each. The
 same plan's grep-anchored citations did not drift.
 
 **Prefer:** `§ Section heading`, `FUN_004d7a40`, `CEngine +0x68A8`,

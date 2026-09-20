@@ -1,9 +1,9 @@
 ---
 description: The harness attempts auto-resolution of ordinary rebase conflicts behind a class gate, a bounded per-file resolver, and a conjunctive TREE-EQUIVALENT proof; condition (14) holds auto-merge until a reviewer issues a CONFLICT-REVIEW=CLEAN verdict.
-last_verified: 2026-09-18
+last_verified: 2026-09-20
 ---
 
-# ADR-0133: Harness conflict auto-resolution behind a proof gate
+# ADR-0134: Harness conflict auto-resolution behind a proof gate
 
 **Status:** Accepted
 **Date:** 2026-09-18

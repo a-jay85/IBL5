@@ -858,6 +858,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         "verdict_path": fidelity.verdict_path(pr),
                         "remediation_sha": None, "verdict_2": None,
                         "reviewed_tree_2": None,
+                        "findings_round": 0,
                         "rounds": [], "rounds_completed": 0,
                         "backlog_issue_numbers": [],
                         "diff_id": diff_id, "plan_hash": plan_hash}
@@ -884,6 +885,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         "verdict_path": fidelity.verdict_path(pr),
                         "remediation_sha": None, "verdict_2": None,
                         "reviewed_tree_2": None,
+                        "findings_round": 0,
                         "rounds": [], "rounds_completed": 0,
                         "backlog_issue_numbers": [],
                         "diff_id": diff_id, "plan_hash": plan_hash,
@@ -901,6 +903,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         "verdict_path": fidelity.verdict_path(pr),
                         "remediation_sha": None, "verdict_2": None,
                         "reviewed_tree_2": None,
+                        "findings_round": 0,
                         "rounds": [], "rounds_completed": 0,
                         "backlog_issue_numbers": [],
                         "diff_id": diff_id, "plan_hash": plan_hash}
@@ -914,6 +917,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                     "verdict_path": fidelity.verdict_path(pr),
                     "remediation_sha": None, "verdict_2": None,
                     "reviewed_tree_2": None,
+                    "findings_round": 0,
                     "rounds": [], "rounds_completed": 0,
                     "backlog_issue_numbers": [],
                     "diff_id": diff_id, "plan_hash": plan_hash}
@@ -961,6 +965,13 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
             break
         final_verdict, final_err = v_n, ""
         current_verdict_path = path_n
+        # The sticky quotes its findings and builds its merge digest from
+        # fid["verdict_path"], so it has to move with current_verdict_path. Both advance
+        # BELOW the indeterminate break, which is what keeps an empty re-review file from
+        # becoming the source. Left pinned to verdict 1, the comment lists findings this
+        # round already cleared, under a **Re-reviewed tree:** line that contradicts them.
+        res.fidelity["verdict_path"] = path_n
+        res.fidelity["findings_round"] = round_num
     # Notes come from whichever review produced the final verdict: the initial one or
     # a re-review round. current_verdict_path tracks that review's verdict file.
     if final_verdict == "READY WITH NOTES":

@@ -200,6 +200,56 @@ def test_missing_verdict_names_the_error_kind():
     assert "(no verdict file: llm-tooled-empty)" in body
 
 
+def test_header_names_the_round_the_findings_came_from():
+    """With a graded remediation round, the header labels the re-review, not verdict 1.
+
+    Verdict 1 stays NOT READY forever; only the re-review reflects the remediated tree.
+    Labelling the excerpt with verdict 1 while quoting the re-review is the contradiction
+    this line exists to prevent.
+    """
+    body = _sticky(fid={"verdict_1": "NOT READY", "remediation_sha": "abc1234",
+                        "verdict_2": "READY WITH NOTES", "reviewed_tree_2": TREE,
+                        "findings_round": 2,
+                        "rounds": [{"remediation_sha": "dead123", "verdict": "NOT READY"},
+                                   {"remediation_sha": "abc1234",
+                                    "verdict": "READY WITH NOTES"}]})
+    assert ("Plan-fidelity verdict: READY WITH NOTES (re-review after remediation "
+            "round 2) — reviewer findings follow") in body
+    assert "Plan-fidelity verdict: NOT READY —" not in body
+    assert ("Remediation: commit abc1234 closed remediation round 2. The findings above "
+            "come from the re-review that graded it.") in body
+
+
+def test_header_falls_back_to_verdict_1_without_a_graded_round():
+    """findings_round 0 — and a fid that predates the key — both read verdict 1."""
+    for fid in ({"verdict_1": "NOT READY", "findings_round": 0}, {"verdict_1": "NOT READY"}):
+        body = _sticky(fid=fid)
+        assert "Plan-fidelity verdict: NOT READY — reviewer findings follow" in body
+        assert "re-review after remediation round" not in body
+
+
+def test_an_out_of_range_findings_round_falls_back_rather_than_raising():
+    """A truncated `rounds` list must not IndexError the whole comment away."""
+    body = _sticky(fid={"verdict_1": "NOT READY", "findings_round": 3, "rounds": []})
+    assert "Plan-fidelity verdict: NOT READY — reviewer findings follow" in body
+
+
+def test_the_remediation_sentence_names_the_graded_commit():
+    """A trailing ungraded round moves remediation_sha past the round that was graded.
+
+    remediation_sha has to stay the last commit the harness authored — Phase 7 watches CI
+    for it. The sentence pairs a commit with the re-review that read it, so it reads the
+    sha out of the graded round instead.
+    """
+    body = _sticky(fid={"verdict_1": "NOT READY", "remediation_sha": "bbb2222",
+                        "verdict_2": None, "findings_round": 1,
+                        "rounds": [{"remediation_sha": "aaa1111", "verdict": "NOT READY"},
+                                   {"remediation_sha": "bbb2222", "verdict": None}]})
+    assert ("Remediation: commit aaa1111 closed remediation round 1. The findings above "
+            "come from the re-review that graded it.") in body
+    assert "commit bbb2222 closed" not in body
+
+
 # --- the DM parser round-trip -------------------------------------------------
 
 def _dm_labels(body):
@@ -362,6 +412,23 @@ def test_digest_reads_the_real_script_in_replay_mode(tmp_path):
     assert len(out) == 5
     for i, lbl in enumerate(fidelity.LABELS):
         assert out[i].startswith(lbl)
+
+
+def test_digest_drops_the_appended_reviewed_tree_line(tmp_path):
+    """The REVIEWED_TREE record sits below ## DIGEST in every real verdict file.
+
+    digest.sh folds it into the fifth label, so without the strip the merge DM ships
+    `**Machine-authored fixes:** none REVIEWED_TREE=<40 hex>`.
+    """
+    tree = "9" * 40
+    v = tmp_path / "v.md"
+    v.write_text("READY\n\n## DIGEST\n**What changed:** x\n**Why:** y\n**Watch:** z\n"
+                 "**Touches:** t\n**Machine-authored fixes:** none\n"
+                 f"REVIEWED_TREE={tree}\n")
+    out = fidelity.digest_lines(None, "deadbeef", str(v), str(tmp_path), True)
+    assert len(out) == 5
+    assert out[4] == "**Machine-authored fixes:** none"
+    assert not any("REVIEWED_TREE" in ln for ln in out)
 
 
 def test_diff_and_plan_hash_lines_between_reviewed_tree_and_digest():

@@ -3,7 +3,7 @@ description: The harness attempts auto-resolution of ordinary rebase conflicts b
 last_verified: 2026-09-18
 ---
 
-# ADR-0131: Harness conflict auto-resolution behind a proof gate
+# ADR-0133: Harness conflict auto-resolution behind a proof gate
 
 **Status:** Accepted
 **Date:** 2026-09-18

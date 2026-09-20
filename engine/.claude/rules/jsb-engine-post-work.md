@@ -1,6 +1,6 @@
 ---
 description: After JSB engine work ships, file and close findings in a-jay85/IBL5-backlog (label: jsb-native) — GitHub Issues are the single source of truth; git is the authority for merged-PR hashes.
-last_verified: 2026-09-08
+last_verified: 2026-09-20
 ---
 
 # JSB Engine Post-Work Checklist

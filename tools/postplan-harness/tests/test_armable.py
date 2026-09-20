@@ -9,7 +9,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from harness.adapters.gitad import LiveGit
 from harness.armable import (ArmInputs, SENTINEL_RE, dep_numbers, evaluate, feat_hold,
-                             manual_testing_clearance)
+                             manual_testing_clearance, all_rows_ticked)
+from harness.classify import _neutralize_checkboxes
 from harness.manual_rows import ManualRow, _assert_no_sentinel, render_rows
 from harness.state import Classification, Finding, HarnessError
 
@@ -283,3 +284,85 @@ def test_rebase_conflict_fails_the_run_before_evaluate():
                 "git rebase --abort did not run: .git/%s still present" % state_dir)
     finally:
         shutil.rmtree(d, ignore_errors=True)
+
+
+# Phase 4a characterization — pin today's behavior before the widening edit.
+# Rows 27 and 28 in the Verification Matrix.
+
+_BODY_ALL_TICKED = "## Manual Testing\n\n- [x] **Row 1** — a\n"
+_BODY_BARE_BULLET = "## Manual Testing\n\n- [x] bin/test-foo - all cases PASS\n"
+
+
+def test_all_ticked_characterization():
+    """manual_testing_clearance returns HELD for an all-ticked harness body (no sentinel),
+    but evaluate() does NOT block condition (1) — the ticked_clear path clears it."""
+    assert manual_testing_clearance(_BODY_ALL_TICKED) == "HELD"
+    result = evaluate(inputs(pr_body=_BODY_ALL_TICKED))
+    cond1 = next(c for c in result.conditions if c.number == 1)
+    assert not cond1.blocked, "post-widening: condition (1) must be cleared for all-ticked body"
+
+
+def test_bare_bullet_characterization():
+    """A ticked bullet with no **id** span returns HELD — must survive Phase 4c unchanged."""
+    assert manual_testing_clearance(_BODY_BARE_BULLET) == "HELD"
+
+
+# Phase 4c post-widening tests — Verification Matrix rows 14–18.
+
+def test_all_ticked_clears():
+    """evaluate() condition (1) is NOT blocked when every harness-shaped row is ticked."""
+    body = "## Manual Testing\n\n- [x] **Row 1** — a\n- [x] **Row 2** — b\n"
+    result = evaluate(inputs(pr_body=body))
+    cond1 = next(c for c in result.conditions if c.number == 1)
+    assert not cond1.blocked
+    assert all_rows_ticked(body)
+
+
+def test_one_unticked_holds():
+    """One surviving unticked row keeps condition (1) blocked."""
+    body = "## Manual Testing\n\n- [x] **Row 1** — a\n- [ ] **Row 2** — b\n"
+    result = evaluate(inputs(pr_body=body))
+    cond1 = next(c for c in result.conditions if c.number == 1)
+    assert cond1.blocked
+    assert not all_rows_ticked(body)
+
+
+def test_unknown_holds():
+    """A body with no ## Manual Testing heading stays UNKNOWN and blocks condition (1)."""
+    body = "## Summary\nno manual section\n"
+    assert manual_testing_clearance(body) == "UNKNOWN"
+    assert not all_rows_ticked(body)
+    result = evaluate(inputs(pr_body=body))
+    cond1 = next(c for c in result.conditions if c.number == 1)
+    assert cond1.blocked
+
+
+def test_empty_section_holds():
+    """An empty section and a prose-only section both block condition (1)."""
+    for body in (
+        "## Manual Testing\n\n## Next\n",
+        "## Manual Testing\n\nSome prose here\n",
+    ):
+        assert not all_rows_ticked(body)
+        result = evaluate(inputs(pr_body=body))
+        cond1 = next(c for c in result.conditions if c.number == 1)
+        assert cond1.blocked
+
+
+def test_narrow_row_shape():
+    """A bare - [x] bin/test-foo bullet and a neutralized reviewer-verification bullet
+    do not flip all_rows_ticked, and condition (1) stays blocked for both."""
+    # bare ticked bullet with no **id** span
+    assert not all_rows_ticked(_BODY_BARE_BULLET)
+    cond1 = next(c for c in evaluate(inputs(pr_body=_BODY_BARE_BULLET)).conditions
+                 if c.number == 1)
+    assert cond1.blocked
+    # Neutralized bullet: run the real classify transform instead of hand-writing the
+    # `- (x)` form, so a change to _neutralize_checkboxes' output shape fails here
+    # rather than leaving the predicate silently untested.
+    neutralized = _neutralize_checkboxes("## Manual Testing\n\n- [x] **Row 1** — a\n")
+    assert "- (x) **Row 1**" in neutralized
+    assert not all_rows_ticked(neutralized)
+    cond1 = next(c for c in evaluate(inputs(pr_body=neutralized)).conditions
+                 if c.number == 1)
+    assert cond1.blocked

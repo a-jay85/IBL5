@@ -1680,6 +1680,30 @@ while true; do
             echo "[$(date +%H:%M:%S)] ESCALATING impl model $BASE_MODEL -> $IMPL_MODEL (final attempt $(( ATTEMPTS + 1 ))/$MAX_ATTEMPTS) for $PLAN_NAME" >> "$LOG"
         fi
         echo "[$(date +%H:%M:%S)] impl model: $IMPL_MODEL for $PLAN_NAME" >> "$LOG"
+        # Resume path: sync the existing worktree before handing it to an agent
+        # (ADR-0133). A fresh run has no worktree yet, so this is a no-op there.
+        IMPL_WT=$(automouse_worktree_for_plan "$PLAN_NAME" "$PLAN_SLUG") || IMPL_WT=""
+        if [ -n "$IMPL_WT" ] && [ -d "$IMPL_WT" ]; then
+            WT_VERDICT="$("$REPO/bin/wt-sync-tick" --only "$IMPL_WT" 2>/dev/null || true)"
+            printf '[%s] %s wt-sync --only: %s\n' \
+                "$(date +%H:%M:%S)" "$PLAN_SLUG" "${WT_VERDICT:-<none>}" >> "$LOG"
+            case "$WT_VERDICT" in
+                DIVERGED-CONFLICT|DIVERGED-DIRTY)
+                    printf '[%s] %s SKIPPING: worktree needs manual resolution (%s)\n' \
+                        "$(date +%H:%M:%S)" "$PLAN_SLUG" "$WT_VERDICT" >> "$LOG"
+                    SLUG=$(basename "$PLAN_SLUG")
+                    mkdir -p "$NIGHTLY_DIR/reports"
+                    {
+                        printf 'Plan "%s" skipped: worktree needs manual resolution (%s).\n\n' \
+                            "$SLUG" "$WT_VERDICT"
+                        printf 'Resolve conflicts in %s, then requeue.\n' "$IMPL_WT"
+                    } > "$NIGHTLY_DIR/reports/$(date +%Y-%m-%d)-skipped-$SLUG.md"
+                    rm -rf "$CURRENT_LOCK" 2>/dev/null || true
+                    CURRENT_LOCK=""
+                    continue ;;
+            esac
+        fi
+
         # Assemble the impl prompt. On the escalated final retry ONLY, append a
         # second trailing context line (PRIOR_FAILURE_REPORT=<path>) in the same
         # style as PLAN_FILE — report-if-present, decoupled from the escalation

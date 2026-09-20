@@ -113,8 +113,11 @@ jobs:
   # plus the registry manifest of php-apache:latest, the one floating input; an
   # unreadable manifest yields empty hash= and key= so neither lookup nor save fires. Memoization is
   # PR-only: push runs, re-runs, dispatches, and `labeled` events bypass it. The
-  # Visual Regression job (`e2e`) is never memo-gated: it publishes the per-SHA gallery
-  # and regenerates baselines. A failure here reds the gate (it is in gate.needs).
+  # Visual Regression job (`e2e`) skips on a hit ONLY through its `src` arm; the
+  # `baseline` arm (update-baselines label) runs unconditionally, and a `labeled`
+  # run is bypassed anyway. On a hit the per-SHA gallery is not published and the
+  # sticky VR comment keeps pointing at the prior SHA (ADR-0131 addendum). A
+  # failure here reds the gate (it is in gate.needs).
   ci-memo-check:
     name: E2E Memo Check
     runs-on: ubuntu-latest
@@ -162,8 +165,8 @@ jobs:
 
   e2e:
     name: Visual Regression
-    needs: [changes]
-    if: needs.changes.outputs.src == 'true' || needs.changes.outputs.baseline == 'true'
+    needs: [changes, ci-memo-check]
+    if: (needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true') || needs.changes.outputs.baseline == 'true'
     runs-on: ubuntu-latest
     # 30 min (was 20) — full-page matrix over 49 modules is ~4-6x the
     # wall-clock of the prior 13 element crops.

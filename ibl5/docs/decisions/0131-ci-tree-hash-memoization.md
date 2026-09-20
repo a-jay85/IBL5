@@ -1,6 +1,6 @@
 ---
-description: Heavy jobs in the two required CI contexts skip when the HEAD tree over a declared input path set already passed, keyed by `bin/ci-memo` and stored in `actions/cache`.
-last_verified: 2026-09-18
+description: Heavy jobs in the two required CI contexts, plus the Visual Regression and Lighthouse PR jobs, skip when the HEAD tree over a declared input path set already passed, keyed by `bin/ci-memo` and stored in `actions/cache`.
+last_verified: 2026-09-19
 ---
 
 # ADR-0131: CI tree-hash memoization of heavy jobs
@@ -54,3 +54,23 @@ The key carries a `-v1-` segment and the digest stream starts with `ci-memo/v1`.
 - `bin/test-ci-memo` for the harness, including the topology and coverage cases.
 - `.github/ci-memo/tests.paths` and `.github/ci-memo/e2e.paths` for the input sets.
 - `.github/workflows/tests.yml` and `.github/workflows/e2e-tests.yml`, the `ci-memo-check` and `gate` jobs.
+
+## Addendum (2026-09-19): Visual Regression and the Lighthouse PR audit are memo-gated
+
+The Decision above says the Visual Regression job (`e2e`) is never memo-gated. That sentence is reversed as of 2026-09-19. The reasoning that a hit means the identical tree already passed the whole `E2E Tests` context applies to the gallery too: re-rendering identical pages produces an identical gallery and identical Lighthouse scores.
+
+What changed:
+
+- `e2e` (Visual Regression) in `.github/workflows/e2e-tests.yml` now lists `ci-memo-check` in `needs`, and its condition reads `(src == 'true' && hit != 'true') || baseline == 'true'`. The memo skip applies only through the `src` arm. The `baseline` arm (the `update-baselines` label) is unchanged, and a `labeled` event computes an empty key in any case.
+- `.github/workflows/lighthouse.yml` gained its own `ci-memo-check` job under the scope `lighthouse`. It reuses `.github/ci-memo/e2e.paths` through `--manifest`, and the digest folds `job=lighthouse`, so the key never collides with the e2e key. `bin/ci-memo` folds the php-apache image digest for this scope as well, since `lighthouse-setup` boots the same image. The memo is saved at the end of the `lighthouse` job, guarded on the audit step's `conclusion == 'success'` and on a non-empty hash. A failed audit never saves.
+
+Accepted consequences:
+
+- On a Visual Regression hit the per-SHA `visual-review` gallery is absent for that SHA and the sticky VR comment keeps pointing at the prior SHA's gallery.
+- On a Lighthouse hit the prior sticky `lighthouse-comment` stays in place.
+- The Lighthouse key does not fold the master baseline artifact. That artifact changes on master pushes, and identical tree content yields identical page performance whatever baseline it is diffed against. Lighthouse is not a required context, so a stale delta blocks nothing.
+- The `gate` job is unchanged. A `skipped` `e2e` is neither `failure` nor `cancelled`, and `MEMO_WRITE` still refuses to re-save on a hit.
+
+Unchanged from the Decision: PR-only scope, the bypass on re-runs, pushes, dispatches and `labeled` events, the empty key on an unreadable image manifest, and the rejection of `DIGEST_UNAVAILABLE` as a key input.
+
+Guarded by `bin/test-ci-memo`: case `lighthouse-scope-fold`, gate-topology assertions 6 through 8, case `gate-topology-mutants`, and `manifest-coverage[vr]` / `manifest-coverage[lighthouse]`.

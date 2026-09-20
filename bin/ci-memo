@@ -21,8 +21,9 @@
 #          also appended to $GITHUB_STEP_SUMMARY when that is set
 #
 # The scope names the manifest (<manifest-dir>/<scope>.paths) and is the job
-# identity folded into the digest. Scope "e2e" also folds the registry digest
-# of the prebuilt GHCR php-apache image. When that digest cannot be read the
+# identity folded into the digest. Scopes "e2e" and "lighthouse" also fold the
+# registry digest of the prebuilt GHCR php-apache image (lighthouse.yml passes
+# --manifest to reuse e2e.paths). When that digest cannot be read the
 # script prints empty hash= and key=, so neither lookup nor save fires.
 #
 # Environment (all optional):
@@ -203,7 +204,10 @@ done
 
 BODY="$(list_head "${PATHSPECS[@]}" 2>/dev/null | sort -u)" || fail 4 "git ls-files failed"
 
-if [[ "$SCOPE" == "e2e" ]]; then
+# Scopes whose job boots the prebuilt GHCR php-apache image. Both e2e-tests.yml
+# and lighthouse.yml start it through .github/actions/setup-docker-e2e, so the
+# image digest is a real input to both keys.
+if [[ "$SCOPE" == "e2e" || "$SCOPE" == "lighthouse" ]]; then
     digest_cmd="${CI_MEMO_DIGEST_CMD:-docker manifest inspect $GHCR_IMAGE}"
     image_digest="DIGEST_UNAVAILABLE"
     if manifest_json="$(bash -c "$digest_cmd" 2>/dev/null)" && [[ -n "$manifest_json" ]]; then

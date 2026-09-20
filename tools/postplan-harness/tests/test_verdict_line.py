@@ -381,3 +381,21 @@ def test_rc3_verdict_stays_one_line_for_a_multiline_gate_detail():
     r = RunResult(terminal=TerminalState.FAILED, error_kind="local-gate",
                   error="FAIL a.md 16374 bytes\nOne or more checks failed:\nTrim the rule(s) above")
     assert "\n" not in runner.verdict_line(r, 3)
+
+
+def test_autoresolved_files_surfaced(tmp_path):
+    """verdict_line includes auto-resolved filenames when the /tmp sidecar file exists."""
+    slug = "autoresolved-surfaced-test"
+    autoresolved_path = f"/tmp/postplan-conflict-files-{slug}-autoresolved.txt"
+    try:
+        with open(autoresolved_path, "w") as fh:
+            fh.write("harness/conflict.py\nharness/adapters/gitad.py\n")
+        r = _res(TerminalState.SHIPPED_ARMED, pr_number=99, arm=_arm(True))
+        r.slug = slug
+        line = runner.verdict_line(r, 0)
+        assert "auto-resolved conflict in" in line
+        assert "harness/conflict.py" in line
+        assert "harness/adapters/gitad.py" in line
+    finally:
+        if os.path.exists(autoresolved_path):
+            os.unlink(autoresolved_path)

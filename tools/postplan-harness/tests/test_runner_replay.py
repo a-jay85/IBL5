@@ -360,6 +360,25 @@ def test_conflict_resolved_fixture_holds_condition_14(tmp_path):
     assert "auto-resolved rebase conflict" in c14["reason"]
 
 
+def test_conflict_verdict_fixture(tmp_path):
+    """A CONFLICT-REVIEW=CLEAN verdict alongside the conflict flag clears condition 14.
+
+    Pairs with test_conflict_resolved_fixture_holds_condition_14: same inputs except
+    conflict_verdict is set, so condition (14) clears and the run arms.
+    """
+    out = str(tmp_path / "out")
+    res = runner.run(
+        _fixture(conflict_resolved=True, conflict_verdict="CONFLICT-REVIEW=CLEAN"),
+        out, FixtureLlm(UsageLedger(), CANNED), mode="replay")
+    assert res.terminal == TerminalState.SHIPPED_ARMED
+    assert 14 not in {c.number for c in res.arm.holds}
+    assert any(a["action"] == "pr_merge_auto" for a in _actions(out))
+    with open(os.path.join(out, "result.json")) as fh:
+        blob = json.load(fh)
+    c14 = [c for c in blob["arm"]["conditions"] if c["number"] == 14][0]
+    assert c14["blocked"] is False
+
+
 def test_red_ci_checks_fixture_holds_condition_15(tmp_path):
     """4g replay hold — already-red CI checks at arm time hold auto-merge.
 

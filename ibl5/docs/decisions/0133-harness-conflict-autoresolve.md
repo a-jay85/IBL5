@@ -37,7 +37,7 @@ Auto-resolvable: ordinary three-way text conflicts where all three stages are pr
 
 ## Flag lifecycle
 
-The condition-(14) flag is written after the proof passes and before the reviewer runs. Every auto-resolved branch therefore passes through a held state at arming. The flag is never deleted: a prior `/post-plan` skill run's hold survives into future runs on the same branch.
+The condition-(14) flag is written only when at least one file was model-resolved (i.e. `resolved_files` is non-empty). The mechanical `--onto` replay that produces an equivalent tree without any model edits does not write the flag. When the flag is written, it is written before the reviewer runs, so auto-resolution alone can never arm. The flag is never deleted: a prior `/post-plan` skill run's hold survives into future runs on the same branch.
 
 The one clearing path: a verdict file whose first line is exactly `CONFLICT-REVIEW=CLEAN`, keyed to the post-resolution SHA via a sidecar file. An absent, malformed, or `FOUND-PROBLEM` verdict leaves condition (14) held. The verdict file is SHA-keyed and stale on any subsequent commit; the sidecar (not SHA-keyed) is purged at rebase-attempt entry so a stale CLEAN verdict from a prior run cannot clear a fresh hold.
 
@@ -46,7 +46,7 @@ The one clearing path: a verdict file whose first line is exactly `CONFLICT-REVI
 - rc=3 still suppresses the skill fallback. Auto-resolution ran inside the harness, so escalating to a skill session would re-attempt something the harness just declined to certify.
 - The proof gate stays conjunctive. A diverged tree exits 0 while printing `TREE DIVERGED`; accepting rc=0 alone would admit it.
 - The resolver writes only to files in the conflict set. It cannot push, cannot touch unrelated files, and cannot spawn subagents.
-- Auto-resolution alone never arms auto-merge. The flag holds condition (14) until the read-only reviewer issues a CLEAN verdict, so a human reads every auto-resolved conflict before it merges.
+- Auto-resolution alone never arms auto-merge. The flag holds condition (14) until the read-only reviewer issues a CLEAN verdict.
 
 ## Residual risk and backstop
 

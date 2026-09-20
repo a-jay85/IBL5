@@ -323,8 +323,11 @@ class LiveGit:
         notes_path = f"/tmp/postplan-conflict-resolution-{key}.md"
         Path(notes_path).write_text(notes)
 
-        # Write condition-(14) flag BEFORE the reviewer so the hold precedes any review
-        Path(conflict_flag_path(branch)).touch()
+        # Write condition-(14) flag only when a model actually touched files.
+        # The mechanical --onto replay (resolved_files=()) proves TREE-EQUIVALENT without
+        # any model work, so no review is needed and the hold should not fire.
+        if resolved_files:
+            Path(conflict_flag_path(branch)).touch()
 
         if self.llm is not None and resolved_files:
             review_resolution(

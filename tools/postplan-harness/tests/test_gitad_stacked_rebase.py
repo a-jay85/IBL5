@@ -642,3 +642,69 @@ def test_autoresolve_llm_unresolvable_migration():
         assert not os.path.exists(os.path.join(d, ".git", "rebase-merge"))
     finally:
         _cleanup_full(key, branch, d)
+
+
+def test_proof_gate_is_conjunctive():
+    """rc≠0 with TREE-EQUIVALENT in stdout is still a decline — gate requires BOTH rc=0 AND stdout."""
+    EQUIV_BUT_FAILING = (
+        "#!/usr/bin/env bash\n"
+        "echo 'TREE-EQUIVALENT'\n"
+        "exit 1\n"
+    )
+    d, parent_tip, master_sha, key, branch = _make_squash_repo(lostwork_script=EQUIV_BUT_FAILING)
+    manifest = f"/tmp/postplan-conflict-files-{key}.txt"
+    if os.path.exists(manifest):
+        os.unlink(manifest)
+    try:
+        result = LiveGit(d).autoresolve_stacked_rebase()
+        assert result.resolved is False
+        assert "tree proof failed" in result.reason
+        assert not os.path.exists(manifest)
+    finally:
+        _cleanup_tmp(key)
+        shutil.rmtree(d, ignore_errors=True)
+
+
+def test_simple_path_pre_patch(squash_repo):
+    """rebase_onto() captures the pre-patch before aborting on conflict."""
+    d, parent_tip, master_sha, key, branch = squash_repo
+    patch_path = f"/tmp/pr-ready-diff-pre-{key}.patch"
+    if os.path.exists(patch_path):
+        os.unlink(patch_path)
+    g = LiveGit(d)
+    with pytest.raises(HarnessError) as exc:
+        g.rebase_onto()
+    assert exc.value.kind == "rebase-conflict"
+    assert os.path.exists(patch_path), "pre-patch was not written before abort"
+    assert "feature.txt" in open(patch_path).read()
+
+
+def test_whole_tree_sweep_live():
+    """Whole-tree sweep aborts+restores when a committed file outside the conflict set has markers."""
+    env = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+        "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t",
+    }
+    d, parent_tip, master_sha, key, branch = _make_modify_conflict_repo(
+        lostwork_script=_LOSTWORK_EQUIV
+    )
+    # Plant a conflict marker in a committed file that is outside the conflict set.
+    outside_path = os.path.join(d, "outside.txt")
+    with open(outside_path, "w") as fh:
+        fh.write("<<<<<<< HEAD\npre-existing marker\n")
+    subprocess.run(["git", "-C", d, "add", "outside.txt"],
+                   check=True, capture_output=True, env=env)
+    subprocess.run(["git", "-C", d, "commit", "--amend", "--no-edit"],
+                   check=True, capture_output=True, env=env)
+    pre_head = _rev(d, "HEAD")
+    llm = _WritingLlm(d, "feature.txt", content="merged content\n")
+    try:
+        with pytest.raises(HarnessError) as exc:
+            LiveGit(d, llm=llm).autoresolve_stacked_rebase()
+        assert exc.value.kind == "rebase-conflict"
+        assert "conflict markers survive" in exc.value.detail
+        assert _rev(d, "HEAD") == pre_head
+        assert not os.path.exists(os.path.join(d, ".git", "rebase-merge"))
+    finally:
+        _cleanup_full(key, branch, d)

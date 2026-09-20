@@ -49,7 +49,8 @@ from harness.planfile import locate_plan, split_hold_justification
 from harness.review import ReviewPhase
 from harness.state import (HarnessError, RunResult, TerminalState, UsageLedger)
 from harness.adapters.ghad import LiveGh, RecordingGh
-from harness.adapters.gitad import LiveGit, ReplayGit, classify_local_gate_denial, is_stale_lease
+from harness.adapters.gitad import (LiveGit, ReplayGit, classify_local_gate_denial,
+                                    is_stale_base, is_stale_lease)
 from harness.adapters.llm import ClaudeCli, FixtureLlm
 from harness.adapters.probe import FixtureProbe, LiveProbe
 from harness.adapters.verify import LiveVerify, ReplayVerify, aggregate
@@ -719,8 +720,14 @@ def _refresh_and_reprove(git, log, phase: str, attempt: int) -> None:
 
 
 def _push_with_lease_retry(git, log, phase: str) -> str:
-    """Push with bounded stale-lease retry. Returns pushed HEAD sha, or "" when disabled.
-    Raises HarnessError("push-retry-cap") once the cap is spent."""
+    """Push with bounded stale-lease / stale-base retry. Returns pushed HEAD sha, or ""
+    when disabled. Raises HarnessError("push-retry-cap") once the cap is spent.
+
+    Two rejections get the same fetch + clean-rebase + lost-work-proof recovery: a
+    stale lease (origin/<branch> moved) and a stale base (bin/pre-push-adr-hook refusing
+    because origin/master moved and HEAD no longer contains it). Phase 5.5 is where the
+    second one lands: the Phase 2 rebase is 20-40 minutes old by the time the
+    remediation commit pushes. Any other denial re-raises unchanged."""
     for attempt in range(1, _MAX_PUSH_RETRIES + 1):
         try:
             git.push()
@@ -729,14 +736,18 @@ def _push_with_lease_retry(git, log, phase: str) -> str:
             if e.kind == "push-disabled":
                 log(f"{phase}: push skipped — disabled outside an approved install")
                 return ""
-            if not is_stale_lease(e):
+            if is_stale_lease(e):
+                why = "stale lease"
+            elif is_stale_base(e):
+                why = "stale base (HEAD no longer contains origin/master)"
+            else:
                 raise
             if attempt == _MAX_PUSH_RETRIES:
                 raise HarnessError(
                     "push-retry-cap",
-                    f"{phase}: stale lease after {_MAX_PUSH_RETRIES} push attempts: "
+                    f"{phase}: {why} after {_MAX_PUSH_RETRIES} push attempts: "
                     f"{(e.detail or '')[:300]}")
-            log(f"{phase}: stale lease (attempt {attempt}/{_MAX_PUSH_RETRIES}) — "
+            log(f"{phase}: {why} (attempt {attempt}/{_MAX_PUSH_RETRIES}) — "
                 "refetch, re-rebase, re-prove")
             _refresh_and_reprove(git, log, phase, attempt)
     return ""  # unreachable
@@ -1130,12 +1141,17 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
     for round_num in range(1, fidelity.MAX_FIDELITY_ROUNDS + 1):
         if final_verdict != "NOT READY":
             break
+        head_before = git.head()
         try:
             sha = fidelity.remediate(
                 llm, git, out_dir, worktree or ".", packet, current_verdict_path,
                 master_sha, log=log,
                 commit=lambda msg: _commit_with_gate_remediation(
                     git, worktree, msg, log, phase="phase5.5"),
+                # The same retrying push Phase 2 and Phase 7 use, so a master that moved
+                # during the review + fix span gets one clean rebase per attempt instead
+                # of ending the loop on the hook's "does not contain origin/master".
+                push=lambda: _push_with_lease_retry(git, log, "phase5.5"),
                 pr_number=pr)
         except HarnessError as e:
             if e.kind == "push-failed":
@@ -1144,8 +1160,19 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
             why = " ".join((e.detail or "").split())[:300]
             gate = (f" class={classify_local_gate_denial(e.detail or '')}"
                     if e.kind == "local-gate" else "")
+            # A rebase conflict or a spent retry cap lands here AFTER the commit: the fix
+            # exists locally and origin never saw it. Say so, so the human (or the next
+            # run, whose Phase 2 rebases and pushes whatever HEAD carries) knows the
+            # work is not lost. Neither kind ends the run — the PR is open and held.
+            local = ""
+            try:
+                if git.head() != head_before:
+                    local = (f" - remediation commit {git.head()[:12]} is LOCAL and "
+                             "unpushed; the next bin/post-plan-now run ships it")
+            except Exception:  # noqa: BLE001 - diagnostics must never mask the denial
+                pass
             log(f"phase5.5 round {round_num}: remediation unavailable ({e.kind}){gate}"
-                + (f" - {why}" if why else ""))
+                + (f" - {why}" if why else "") + local)
             sha = None
         if not sha:
             break
@@ -1247,6 +1274,9 @@ _FAIL_CLOSED_KINDS = ("rebase-conflict", "local-gate")
 # reaching verdict_line at all means the one bounded auto-remediation already ran and
 # the gate still said no.
 _GATE_REMEDY = {
+    "stale-base": ("origin/master moved and the bounded refetch + re-rebase did not catch "
+                   "up: run `git fetch origin master && git rebase origin/master`, then "
+                   "re-run bin/post-plan-now."),
     "adr": "Write the ADR for the decision-trigger surface, then re-run bin/post-plan-now.",
     "byte-budget": ("The .claude/rules byte budget is over cap and check-rules-byte-budget "
                     "has no --fix flag: trim a rule (or move detail into a path-scoped "

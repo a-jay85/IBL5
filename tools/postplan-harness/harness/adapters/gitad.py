@@ -14,23 +14,35 @@ from ..state import HarnessError
 # without a human writing an ADR, refreshing a doc, or trimming a rule file. A distinct
 # kind lets exit_code_for() emit the fail-closed 3 sentinel, so bin/post-plan-now skips
 # the ~1M-token skill fallback instead of burning it on a guaranteed re-denial.
-# Markers are the hooks' own output: bin/pre-push-adr-hook's prefix, the two guidance
-# lines bin/pre-commit-hook echoes, and bin/check-rules-byte-budget's summary line.
+# Markers are the hooks' own output: bin/pre-push-adr-hook's prefix and its base-check
+# line, the two guidance lines bin/pre-commit-hook echoes, and
+# bin/check-rules-byte-budget's summary line.
 _ZERO_SHA = "0" * 40
+
+# bin/pre-push-adr-hook's FIRST arm: the branch does not contain origin/master. It fires
+# before the ADR check and shares the hook's prefix, so without its own discriminator it
+# reads as an ADR denial -- which is exactly how PR #2314's remediation push was
+# misfiled (2026-09-20): master moved during the 35-minute review + fix span, the hook
+# said "does not contain origin/master", the harness logged class=adr and gave up.
+_STALE_BASE_MARKER = "does not contain origin/master"
 
 _LOCAL_GATE_MARKERS = (
     "pre-push-adr-hook:",
+    _STALE_BASE_MARKER,
     "One or more checks failed:",
     "Bump last_verified",
     "Trim the rule(s) above",
 )
 
 # Sub-classes of a local-gate denial, in SAFETY order (not frequency order). Only
-# "doc-staleness" is mechanically remediable, so a blob that also names the ADR hook
-# or the rules byte budget must resolve to the class a human has to clear. Each
-# discriminator is a member of _LOCAL_GATE_MARKERS above: this reuses the hook
+# "stale-base" and "doc-staleness" are mechanically remediable. "stale-base" sits first
+# because its message ALSO carries the ADR hook's prefix, and the ADR arm never runs
+# when the base check fails, so the blob cannot mean both. Everything else must
+# resolve to the class a human has to clear. Each discriminator is a member of
+# _LOCAL_GATE_MARKERS above or the hook's own base-check wording: this reuses the hook
 # protocol already declared there and adds no new hook/harness contract.
 _GATE_CLASSES = (
+    ("stale-base", _STALE_BASE_MARKER),
     ("adr", "pre-push-adr-hook:"),
     ("byte-budget", "Trim the rule(s) above"),
     ("doc-staleness", "Bump last_verified"),
@@ -49,10 +61,19 @@ def is_stale_lease(err: "HarnessError") -> bool:
     return any(m in (err.detail or "").lower() for m in _STALE_LEASE_MARKERS)
 
 
+def is_stale_base(err: "HarnessError") -> bool:
+    """True when a local-gate denial is bin/pre-push-adr-hook's base check: HEAD does not
+    contain origin/master. A fetch + clean rebase clears it, the same recovery a stale
+    lease gets. The hook's ADR arm is a different denial and stays terminal."""
+    if err.kind != "local-gate":
+        return False
+    return _STALE_BASE_MARKER in (err.detail or "")
+
+
 def classify_local_gate_denial(detail: str) -> str:
     """Sub-classify a HarnessError("local-gate", detail) by which hook denied it.
 
-    Returns "adr", "byte-budget", "doc-staleness", or "unknown".
+    Returns "stale-base", "adr", "byte-budget", "doc-staleness", or "unknown".
 
     "One or more checks failed:" is deliberately NOT a discriminator. It is a generic
     summary line that names no remediable cause, and bin/pre-commit-hook's other

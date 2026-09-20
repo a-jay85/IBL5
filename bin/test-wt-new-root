@@ -208,6 +208,115 @@ assert_match "unknown flag prints usage to stderr" "Unknown option" "$OUT3B"
 if [ "$RC3B" -ne 0 ]; then pass "unknown flag exits non-zero"; else
     failcase "unknown flag exits non-zero — expected non-zero, got 0"; fi
 
+echo "== case 4: --existing, no local ref — creates worktree with origin tip"
+# new_env_base_branch has feature-a locally at F1 and origin/feature-a at F2.
+# Delete the local ref so only origin/feature-a remains.
+ENV4="$(new_env_base_branch)"
+ORIGIN_FEATURE_A_TIP4="$(sha "$ENV4/IBL5" origin/feature-a)"
+git_q -C "$ENV4/IBL5" branch -D feature-a >/dev/null 2>&1
+OUT4="$("$ENV4/IBL5/bin/wt-new" --existing feature-a 2>&1)"
+assert_match "case 4: output mentions origin/feature-a" "origin/feature-a" "$OUT4"
+if [ -d "$ENV4/IBL5-worktrees/feature-a" ]; then
+    pass "case 4: IBL5-worktrees/feature-a exists"
+else
+    failcase "case 4: IBL5-worktrees/feature-a missing"
+fi
+assert_eq "case 4: worktree HEAD is at origin tip" \
+    "$ORIGIN_FEATURE_A_TIP4" "$(sha "$ENV4/IBL5-worktrees/feature-a" HEAD)"
+# --track should set upstream
+UPSTREAM4="$(git -C "$ENV4/IBL5-worktrees/feature-a" rev-parse --abbrev-ref '@{upstream}' 2>/dev/null)" && true
+assert_eq "case 4: upstream is origin/feature-a" "origin/feature-a" "$UPSTREAM4"
+IBLBASE4="$(git -C "$ENV4/IBL5-worktrees/feature-a" config "branch.feature-a.iblBase" 2>/dev/null)" && true
+assert_eq "case 4: iblBase recorded as master" "master" "$IBLBASE4"
+MASTER_TIP4="$(sha "$ENV4/IBL5" master)"
+assert_eq "case 4: master untouched" "$(sha "$ENV4/IBL5" master)" "$MASTER_TIP4"
+
+echo "== case 5: --existing, stale local ref — fast-forwarded to origin tip"
+ENV5="$(new_env_base_branch)"
+ORIGIN_TIP5="$(sha "$ENV5/IBL5" origin/feature-a)"
+OUT5="$("$ENV5/IBL5/bin/wt-new" --existing feature-a 2>&1)"
+assert_match "case 5: output mentions origin/feature-a" "origin/feature-a" "$OUT5"
+if [ -d "$ENV5/IBL5-worktrees/feature-a" ]; then
+    pass "case 5: worktree dir exists"
+else
+    failcase "case 5: worktree dir missing"
+fi
+assert_eq "case 5: local feature-a fast-forwarded to origin" \
+    "$ORIGIN_TIP5" "$(sha "$ENV5/IBL5" feature-a)"
+assert_absent "case 5: no fast-forward abort message" "Not possible to fast-forward" "$OUT5"
+
+echo "== case 6: --existing with optional positional + --base"
+ENV6="$(new_env_base_branch)"
+OUT6="$("$ENV6/IBL5/bin/wt-new" --existing feature-a wt-alias --base feature-a 2>&1)"
+assert_match "case 6: output mentions origin/feature-a" "origin/feature-a" "$OUT6"
+if [ -d "$ENV6/IBL5-worktrees/wt-alias" ]; then
+    pass "case 6: IBL5-worktrees/wt-alias exists"
+else
+    failcase "case 6: IBL5-worktrees/wt-alias missing"
+fi
+if [ -d "$ENV6/IBL5-worktrees/feature-a" ]; then
+    failcase "case 6: IBL5-worktrees/feature-a should NOT exist"
+else
+    pass "case 6: IBL5-worktrees/feature-a does not exist (correct)"
+fi
+CHECKEDOUT6="$(git -C "$ENV6/IBL5-worktrees/wt-alias" rev-parse --abbrev-ref HEAD 2>/dev/null)" && true
+assert_eq "case 6: checked out branch is feature-a" "feature-a" "$CHECKEDOUT6"
+IBLBASE6="$(git -C "$ENV6/IBL5-worktrees/wt-alias" config "branch.feature-a.iblBase" 2>/dev/null)" && true
+assert_eq "case 6: iblBase recorded as feature-a" "feature-a" "$IBLBASE6"
+
+echo "== case 7: --existing with absent branch"
+ENV7="$(new_env_base_branch)"
+OUT7="$("$ENV7/IBL5/bin/wt-new" --existing no-such-branch 2>&1)" && RC7=$? || RC7=$?
+if [ "$RC7" -ne 0 ]; then pass "case 7: exits non-zero"; else
+    failcase "case 7: exits non-zero — expected non-zero, got 0"; fi
+assert_match "case 7: stderr names no such branch on origin" "no such branch on origin" "$OUT7"
+if [ -d "$ENV7/IBL5-worktrees/no-such-branch" ]; then
+    failcase "case 7: IBL5-worktrees/no-such-branch must not exist"
+else
+    pass "case 7: no worktree dir created"
+fi
+
+echo "== case 8: --existing with branch already checked out elsewhere"
+# new_env has the 'feature' branch live in IBL5-worktrees/feature
+ENV8="$(new_env)"
+OUT8="$("$ENV8/IBL5/bin/wt-new" --existing feature dup 2>&1)" && RC8=$? || RC8=$?
+if [ "$RC8" -ne 0 ]; then pass "case 8: exits non-zero"; else
+    failcase "case 8: exits non-zero — expected non-zero, got 0"; fi
+assert_match "case 8: stderr names already checked out at" "already checked out at" "$OUT8"
+assert_match "case 8: stderr contains the existing path" "IBL5-worktrees/feature" "$OUT8"
+if [ -d "$ENV8/IBL5-worktrees/dup" ]; then
+    failcase "case 8: IBL5-worktrees/dup must not exist"
+else
+    pass "case 8: no dup worktree created"
+fi
+
+echo "== case 9: --existing with diverged local ref"
+ENV9="$(new_env_base_branch)"
+# Add a local-only commit on feature-a so it has commits not on origin
+git_q -C "$ENV9/IBL5" checkout -q feature-a >/dev/null 2>&1
+echo "local-only" > "$ENV9/IBL5/local-only.txt"
+git_q -C "$ENV9/IBL5" add -A >/dev/null 2>&1
+git_q -C "$ENV9/IBL5" commit -qm "local-only" >/dev/null 2>&1
+git_q -C "$ENV9/IBL5" checkout -q master >/dev/null 2>&1
+SHA_BEFORE9="$(sha "$ENV9/IBL5" feature-a)"
+OUT9="$("$ENV9/IBL5/bin/wt-new" --existing feature-a 2>&1)" && RC9=$? || RC9=$?
+if [ "$RC9" -ne 0 ]; then pass "case 9: exits non-zero"; else
+    failcase "case 9: exits non-zero — expected non-zero, got 0"; fi
+assert_match "case 9: stderr names commits not on origin" "commits not on origin/feature-a" "$OUT9"
+assert_eq "case 9: local feature-a ref unchanged" "$SHA_BEFORE9" "$(sha "$ENV9/IBL5" feature-a)"
+if [ -d "$ENV9/IBL5-worktrees/feature-a" ]; then
+    failcase "case 9: no worktree dir should be created"
+else
+    pass "case 9: no worktree dir created"
+fi
+
+echo "== case 10: --existing with no value"
+OUT10="$("$ENV7/IBL5/bin/wt-new" --existing 2>&1)" && RC10=$? || RC10=$?
+if [ "$RC10" -ne 0 ]; then pass "case 10: exits non-zero"; else
+    failcase "case 10: exits non-zero — expected non-zero, got 0"; fi
+assert_match "case 10: error names requires a branch name" "requires a branch name" "$OUT10"
+assert_absent "case 10: no unbound variable crash" "unbound variable" "$OUT10"
+
 echo "----"
 if [ "$FAILED" -eq 0 ]; then echo "ALL PASS"; else echo "FAILURES"; fi
 exit "$FAILED"

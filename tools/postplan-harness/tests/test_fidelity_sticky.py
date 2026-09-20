@@ -5,6 +5,7 @@ the /pr-ready skill's own sticky finder), so the assertions here are about byte-
 not prose.
 """
 import os
+import re
 import stat
 import subprocess
 import sys
@@ -144,7 +145,67 @@ def _sticky(**kw):
         kw.pop("excerpt", "finding one"),
         kw.pop("terminal", "READY"),
         diff_id=kw.pop("diff_id", ""),
-        plan_hash=kw.pop("plan_hash", ""))
+        plan_hash=kw.pop("plan_hash", ""),
+        posted_at=kw.pop("posted_at", ""))
+
+
+def _digest_labels(body: str) -> dict:
+    """The label -> value map bin/digest-dm-build's `_digest_labels` awk produces.
+
+    A port, not a mock: it mirrors the awk's block start, its two exit tokens, its bullet
+    strip, its label match and its continuation fold. The whole point of the test below is
+    that a line placed after the digest rows gets FOLDED into the last label, so a mock
+    that skipped the fold would assert nothing.
+    """
+    inblk = False
+    label, val, out = "", "", {}
+    for line in body.splitlines():
+        if not inblk:
+            if line.rstrip() == "### Merge digest":
+                inblk = True
+            continue
+        if re.match(r"^#+ ", line):
+            break
+        if re.match(r"^\s*(---+|\*\*\*+|___+)\s*$", line):
+            break
+        stripped = re.sub(r"^\s*[-*]\s+", "", line)
+        m = re.match(r"^\*\*[^*]+:\*\*", stripped)
+        if m:
+            if label:
+                out[label] = val.strip()
+            # awk's substr(line, 3, RLENGTH - 5) drops the leading `**` and the trailing
+            # `:**`, so the colon is not part of the key.
+            label = m.group(0)[2:-3]
+            val = stripped[m.end():]
+        elif label and line.strip():
+            val += " " + line
+    if label:
+        out[label] = val.strip()
+    return out
+
+
+def test_digest_block_ends_before_the_verdict_tail():
+    """The HR after the digest rows is what keeps the tail out of the Discord DM.
+
+    Without it `_digest_labels` folds the posted-at line, the terminal verdict line and
+    the sticky marker into `**Machine-authored fixes:**`, and the DM ships all three.
+    """
+    body = _sticky(posted_at="2026-09-19 22:20:00 PDT",
+                   terminal="NOT READY — the blocking findings listed above remain")
+    labels = _digest_labels(body)
+    assert list(labels) == ["What changed", "Why", "Watch", "Touches",
+                            "Machine-authored fixes"]
+    assert labels["Machine-authored fixes"] == "none"
+    for leaked in ("Verdict posted", "NOT READY", "pr-ready-verdict"):
+        assert leaked not in labels["Machine-authored fixes"]
+
+
+def test_digest_block_ends_before_the_tail_with_a_remediation_note():
+    """Same contract on the branch that emits a remediation note below the digest."""
+    body = _sticky(posted_at="2026-09-19 22:20:00 PDT",
+                   fid={"remediation_sha": "abc123def456"})
+    labels = _digest_labels(body)
+    assert "Remediation: commit" not in labels["Machine-authored fixes"]
 
 
 def test_sticky_marker_is_last_and_unique():
@@ -457,3 +518,101 @@ def test_carried_forward_line_present_only_when_flagged():
     assert "**Carried forward:**" not in body_without
     assert body_with.rstrip().endswith(fidelity.STICKY_MARKER)
     assert body_without.rstrip().endswith(fidelity.STICKY_MARKER)
+
+
+# --- posted_at / timestamp tests -----------------------------------------------
+
+TS = "2026-09-19 21:51:18 PDT"
+
+
+def _sticky_ts(**kw):
+    """Like _sticky() but with posted_at=TS set."""
+    fid = {"verdict_1": "READY", "error_kind": None, "reviewed_tree": TREE,
+           "remediation_sha": None, "verdict_2": None, "reviewed_tree_2": None}
+    fid.update(kw.pop("fid", {}))
+    return fidelity.compose_sticky(
+        kw.pop("rebase_line", "REBASE=clean (HEAD already contains origin/master)"),
+        kw.pop("ci_line", "CI: local verification pass; GitHub checks are watched "
+                          "after this comment"),
+        fid, kw.pop("decision", _decision()),
+        kw.pop("digest", ["**What changed:** a thing", "**Why:** a reason",
+                          "**Watch:** a page", "**Touches:** a file",
+                          "**Machine-authored fixes:** none"]),
+        kw.pop("excerpt", "finding one"),
+        kw.pop("terminal", "READY"),
+        posted_at=TS)
+
+
+def test_posted_at_empty_produces_no_timestamp_anywhere():
+    """With posted_at='', the output is byte-identical to the legacy shape."""
+    body = _sticky()
+    assert TS not in body
+    assert "LATEST VERDICT" not in body
+    assert "posted" not in body
+    assert "*Verdict posted" not in body
+
+
+def test_banner_names_same_verdict_word_as_verdict_line_verdict1_path():
+    """Top banner and Plan-fidelity verdict: line carry the same verdict word."""
+    body = _sticky_ts(fid={"verdict_1": "NOT READY"}, terminal="NOT READY — reason")
+    lines = body.splitlines()
+    assert lines[0] == f"**LATEST VERDICT: NOT READY** — posted {TS}"
+    assert any("Plan-fidelity verdict: NOT READY" in l for l in lines)
+
+
+def test_banner_names_same_verdict_word_as_verdict_line_rereview_path():
+    """Re-review path: banner uses the round's verdict, matching the Plan-fidelity line."""
+    body = _sticky_ts(
+        fid={"verdict_1": "NOT READY", "findings_round": 2,
+             "rounds": [{"remediation_sha": "dead123", "verdict": "NOT READY"},
+                        {"remediation_sha": "abc1234", "verdict": "READY WITH NOTES"}]},
+        terminal="READY WITH NOTES")
+    lines = body.splitlines()
+    assert lines[0] == f"**LATEST VERDICT: READY WITH NOTES** — posted {TS}"
+    assert any("Plan-fidelity verdict: READY WITH NOTES" in l and TS in l for l in lines)
+
+
+def test_posted_at_appears_in_banner_verdict_line_and_above_terminal():
+    body = _sticky_ts()
+    assert f"**LATEST VERDICT: READY** — posted {TS}" in body
+    assert f"Plan-fidelity verdict: READY — posted {TS} — reviewer findings follow" in body
+    lines = body.splitlines()
+    marker_idx = lines.index(fidelity.STICKY_MARKER)
+    # *Verdict posted ...* is immediately above the terminal line
+    assert lines[marker_idx - 1] == "READY"
+    assert lines[marker_idx - 2] == f"*Verdict posted {TS}.*"
+
+
+def test_last_non_empty_line_before_marker_is_terminal_with_posted_at():
+    """The carry-forward contract: last non-empty line before marker stays the terminal."""
+    body = _sticky_ts(terminal="READY")
+    head = body.rsplit(fidelity.STICKY_MARKER, 1)[0]
+    non_empty = [ln.strip() for ln in head.splitlines() if ln.strip()]
+    assert non_empty[-1] == "READY"
+
+
+def test_sticky_prior_verdict_still_reads_ready_when_posted_at_set():
+    """Regression: _sticky_prior_verdict must not be fooled by the top banner or italic line."""
+    body = _sticky_ts(terminal="READY")
+    assert fidelity._sticky_prior_verdict(body) == "READY"
+
+
+def test_sticky_prior_verdict_reads_ready_with_notes_when_posted_at_set():
+    body = _sticky_ts(terminal="READY WITH NOTES — all notes remediated")
+    assert fidelity._sticky_prior_verdict(body) == "READY WITH NOTES"
+
+
+# --- REMEDIATION_ALLOWED/DENIED constants ---
+
+def test_remediation_bash_in_allowed_tools():
+    assert "Bash" in fidelity.REMEDIATION_ALLOWED_TOOLS
+
+
+def test_remediation_denied_tools_contain_write_and_merge_verbs():
+    denied = fidelity.REMEDIATION_DENIED_TOOLS
+    assert "Bash(git push:*)" in denied
+    assert "Bash(git commit:*)" in denied
+    assert "Bash(gh pr merge:*)" in denied
+    assert "Bash(gh pr review:*)" in denied
+    assert "Bash(gh api:*)" in denied
+    assert "Agent" in denied

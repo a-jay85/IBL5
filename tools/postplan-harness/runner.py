@@ -552,7 +552,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 fidelity.terminal_line(fid.get("verdict_1"), fid.get("error_kind"), rsha,
                                        fid.get("verdict_2"), fid.get("reviewed_tree_2"),
                                        fid.get("rounds_completed", 0)),
-                diff_id=fid.get("diff_id", ""), plan_hash=fid.get("plan_hash", ""))
+                diff_id=fid.get("diff_id", ""), plan_hash=fid.get("plan_hash", ""),
+                posted_at=time.strftime("%Y-%m-%d %H:%M:%S %Z"))
             try:
                 cid = gh.pr_sticky_verdict(pr, sticky)
             except (HarnessError, OSError, subprocess.SubprocessError):
@@ -934,7 +935,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                 llm, git, out_dir, worktree or ".", packet, current_verdict_path,
                 master_sha, log=log,
                 commit=lambda msg: _commit_with_gate_remediation(
-                    git, worktree, msg, log, phase="phase5.5"))
+                    git, worktree, msg, log, phase="phase5.5"),
+                pr_number=pr)
         except HarnessError as e:
             if e.kind == "push-failed":
                 raise

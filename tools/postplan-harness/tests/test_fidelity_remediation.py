@@ -115,8 +115,13 @@ def test_remediation_model_has_no_push_authority(tmp_path, git_shim):
     assert purpose == "fidelity-remediation"
     allowed = argv[argv.index("--tools") + 1].split(",")
     denied = argv[argv.index("--disallowedTools") + 1].split(",")
-    assert "Bash" not in allowed and "Agent" not in allowed
-    assert "Bash" in denied and "Agent" in denied
+    # Bash is now allowed for read-only inspection and gh pr edit; scoped denies
+    # prevent push/commit/merge/review/api. Agent remains denied entirely.
+    assert "Bash" in allowed and "Agent" not in allowed
+    assert "Agent" in denied
+    assert "Bash(git push:*)" in denied and "Bash(git commit:*)" in denied
+    assert "Bash(gh pr merge:*)" in denied and "Bash(gh pr review:*)" in denied
+    assert "Bash(gh api:*)" in denied
     assert "Edit" in allowed and "Write" in allowed
     assert "--agent" not in argv                      # Sonnet tier: MODEL_MAP supplies the pin
     # the HARNESS committed and pushed, after the model call

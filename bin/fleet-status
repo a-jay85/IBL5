@@ -59,9 +59,9 @@
 # greppable (and stops every assertion in bin/test-fleet-status from needing to
 # know about escapes). Runner slugs with no queue file stay unlinked.
 #
-# THEY OPEN IN VS CODE. Every one of those URIs is vscode://file<abs path>, so a
-# click lands in an editor for both a plan and a log, rather than in whatever the
-# OS has registered for .md and .log. A link opens on CMD-click.
+# THEY OPEN IN VS CODE. Every path URI is vscode://file<abs path>, so a plan or a
+# log lands in an editor, not the OS's .md/.log app. The one other link, `reorder`
+# on the queue header, opens an applet that starts the reorder UI. CMD-click.
 #
 # UNDER TMUX, TWO THINGS HAVE TO BE TRUE or the click dies silently and the page
 # looks like plain text. tmux forwards OSC 8 only when the OUTER terminal is
@@ -109,6 +109,8 @@ LOG_DIR="${FLEET_STATUS_LOG_DIR:-/tmp}"
 TRANSCRIPT_ROOT="${FLEET_STATUS_TRANSCRIPT_ROOT:-$HOME/.claude/projects}"
 JQ_BIN="${FLEET_STATUS_JQ:-jq}"
 AUTOMOUSE_PLIST="${FLEET_STATUS_AUTOMOUSE_PLIST:-$HOME/Library/LaunchAgents/com.ibl5.automouse.plist}"
+REORDER_APP_DIR="${FLEET_STATUS_REORDER_APP_DIR:-$HOME/Library/Caches/ibl5}"
+OSACOMPILE_BIN="${FLEET_STATUS_OSACOMPILE:-osacompile}"
 # shellcheck source=bin/lib/session-id.sh
 . "$SCRIPT_DIR/lib/session-id.sh"
 
@@ -199,6 +201,52 @@ log_word() {
     rendered="$(link_file "$path" "$label")"
     [ "$rendered" = "$label" ] && rendered="$label: $path"
     printf '  %s%s%s' "$DIM" "$rendered" "$R"
+}
+
+# reorder_link — print a `reorder` OSC 8 link that starts
+# bin/automouse/queue-reorder-ui, or nothing at all.
+#
+# A LINK CANNOT RUN A COMMAND. OSC 8 carries a URI and the terminal hands it to
+# the OS, which only opens things. What it CAN open is an app bundle, and
+# launching one runs it. So the link is file://<a tiny AppleScript applet> whose
+# only statement is a `do shell script` that starts the launcher detached. The
+# launcher then picks a port, starts its server and opens the browser itself. No
+# Terminal window, no URL-scheme registration.
+#
+# The applet is built here with osacompile on first need and cached outside the
+# repo. It is rebuilt only when the command it would carry changes, which is
+# tracked by a stamp file holding that command. The target is the MAIN
+# checkout's launcher, because a worktree path dies with the worktree while the
+# cached applet lives on.
+#
+# do shell script runs with a bare /usr/bin:/bin PATH, and the launcher needs
+# php, so the Homebrew prefixes go first. Its output goes to a fixed /tmp log.
+#
+# FAIL-SOFT: no link when links are off (a pipe or a capture has nothing to
+# click), when osacompile is missing (Linux CI), when a path would break the
+# AppleScript string, or when the build fails.
+reorder_link() {
+    [ "$LINKS" -eq 1 ] || return 0
+    local target="$MAIN_CHECKOUT/bin/automouse/queue-reorder-ui"
+    local app="$REORDER_APP_DIR/ibl5-queue-reorder.app"
+    local stamp="$REORDER_APP_DIR/ibl5-queue-reorder.cmd"
+    local cmd tmp
+    case "$target$REORDER_APP_DIR" in *\'*|*\"*|*\\*) return 0 ;; esac
+    cmd="PATH=/opt/homebrew/bin:/usr/local/bin:\$PATH nohup '$target' >/tmp/ibl5-queue-reorder-ui.log 2>&1 &"
+    if [ ! -d "$app" ] || [ "$(cat "$stamp" 2>/dev/null)" != "$cmd" ]; then
+        command -v "$OSACOMPILE_BIN" >/dev/null 2>&1 || return 0
+        mkdir -p "$REORDER_APP_DIR" 2>/dev/null || return 0
+        tmp="$REORDER_APP_DIR/.build-$$.app"
+        rm -rf "$tmp"
+        "$OSACOMPILE_BIN" -o "$tmp" -e "do shell script \"$cmd\"" >/dev/null 2>&1 \
+            || { rm -rf "$tmp"; return 0; }
+        rm -rf "$app" && mv "$tmp" "$app" || return 0
+        printf '%s' "$cmd" > "$stamp"
+    fi
+    # Trailing slash: an .app is a directory, and file:// directory URIs end in one.
+    # shellcheck disable=SC1003  # '\033\\' is the OSC ST, as in link_file.
+    printf '\033]8;;file://%s/\033\\%s\033]8;;\033\\' \
+        "$(printf '%s' "$app" | sed 's/ /%20/g')" 'reorder'
 }
 
 # Human-readable age from a seconds count: 45s / 12m / 3h04m / 2d01h.
@@ -651,15 +699,23 @@ automouse_next_run() {
 
 render_queue() {
     local count=0 shown=0 stale=0 f base next pad hb rest pid slug slug_ld slug_lb
-    local claimed=' ' queue_list meta model merge title
+    local claimed=' ' queue_list meta model merge title reorder
 
     next="$(automouse_next_run)"
+    # The reorder link closes the header, and only when there is a queue to
+    # reorder: on an empty one the launcher just prints "Queue empty" and exits,
+    # so a click would do nothing visible.
+    reorder=''
+    if ls "$AUTOMOUSE_DIR"/queue/*.md >/dev/null 2>&1; then
+        reorder="$(reorder_link)"
+        [ -n "$reorder" ] && reorder="$R$DIM  ·  $reorder$R"
+    fi
     if [ -n "$next" ]; then
         # $R$DIM inside the argument: section() bolds whatever it is handed, and
         # the schedule is secondary to the title.
-        section "AUTOMOUSE QUEUE$R$DIM  ·  $next$R"
+        section "AUTOMOUSE QUEUE$R$DIM  ·  $next$R$reorder"
     else
-        section "AUTOMOUSE QUEUE"
+        section "AUTOMOUSE QUEUE$reorder"
     fi
 
     # Rows are in QUEUE order, not alphabetical: `ls -1tr` is byte-for-byte the

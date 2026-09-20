@@ -9,6 +9,7 @@ with prose.
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
@@ -75,6 +76,122 @@ REMEDIATION_DENIED_TOOLS = (
 REMEDIATION_DIFF_INLINE_CAP = 40_000
 
 REMEDIATION_COMMIT_MSG = "chore: address Phase 5.5 plan-fidelity findings"
+
+# Arming-condition numbers whose machine-fixable work the Phase 5.5 fixer is fed, in
+# the order they are rendered into the packet. (12) is the fidelity verdict itself;
+# (3) plan-named files the conformance pass could not find; (16) failing meta-checks;
+# (2) review findings at or above the same score floor armable uses.
+HOLD_SOURCES = ("12", "3", "16", "2")
+HIGH_SCORE_FLOOR = 80                  # same floor as armable condition (2)
+HOLD_LABELS = {
+    "12": "plan-fidelity verdict",
+    "3": "plan-named file missing",
+    "16": "meta-check failed",
+    "2": "review finding scored >= 80",
+}
+_FINDING_BULLET_RE = re.compile(r"^\s*(?:[-*]|\d+[.)])\s+\S")
+_WORK_LIST_OPEN = "=== WORK LIST (each item names the arming hold it clears) ==="
+_WORK_LIST_CLOSE = "=== END WORK LIST ==="
+
+
+def _verdict_findings(verdict_path: str) -> list[str]:
+    """Hold (12): the blocking findings under a NOT READY verdict, one per bullet.
+
+    A verdict that is not NOT READY contributes nothing -- the loop only ever fixes a
+    verdict it is still held on. A NOT READY verdict whose findings are prose rather
+    than bullets contributes its whole pre-digest body, so a shape the bullet regex
+    does not recognise is never silently dropped.
+    """
+    if parse_verdict(verdict_path) != "NOT READY":
+        return []
+    text = _read_or_marker(verdict_path, "")
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if line.strip() == DIGEST_CUT:
+            lines = lines[:i]
+            break
+    last_word = -1
+    for i, line in enumerate(lines):
+        if VERDICT_RE.match(line):
+            last_word = i
+    body = lines[last_word + 1:]
+    bullets = [ln.strip() for ln in body if _FINDING_BULLET_RE.match(ln)]
+    if bullets:
+        return bullets
+    whole = "\n".join(body).strip()
+    return [whole] if whole else []
+
+
+def _render_finding(f: dict) -> str:
+    """Hold (2) item text. review.py emits path/line/score/body_head; an unexpected
+    shape is dumped rather than crashed on."""
+    try:
+        return (f"{f['path']}:{f['line']} score={f['score']} {f['body_head']}")
+    except (KeyError, TypeError):
+        return json.dumps(f, sort_keys=True, default=str)
+
+
+def build_work_list(verdict_path: str,
+                    unresolved_conformance=None,
+                    meta_check_failures=None,
+                    scored_findings=None) -> list[dict]:
+    """The union of every machine-fixable arming hold, each item tagged with its hold.
+
+    Built from inputs the runner already holds upstream of Phase 5.5, never from
+    `armable.evaluate` -- that decision is made once, below the loop.
+    """
+    items: list[dict] = []
+    for text in _verdict_findings(verdict_path):
+        items.append({"hold": "12", "text": text})
+    # UNMET-CONTRACT entries are deliberately excluded: they name evidence the plan
+    # declared, and a fixer that "adds" such evidence is the fabrication conformance
+    # exists to catch.
+    for entry in (unresolved_conformance or []):
+        if str(entry).startswith("MISSING"):
+            items.append({"hold": "3", "text": str(entry)})
+    for fail in (meta_check_failures or []):
+        items.append({"hold": "16",
+                      "text": f"{fail.get('name', 'unknown')}\n{fail.get('output', '')}"})
+    for f in (scored_findings or []):
+        try:
+            score = int(f.get("score") or 0)
+        except (AttributeError, TypeError, ValueError):
+            score = 0
+        if score >= HIGH_SCORE_FLOOR:
+            items.append({"hold": "2", "text": _render_finding(f)})
+    ordered: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for hold in HOLD_SOURCES:
+        for item in items:
+            key = (item["hold"], item["text"])
+            if item["hold"] == hold and key not in seen:
+                seen.add(key)
+                ordered.append(item)
+    return ordered
+
+
+def work_list_sizes(items) -> dict[str, int]:
+    """Per-hold counts with every key present, which is what result.json records."""
+    sizes = {hold: 0 for hold in HOLD_SOURCES}
+    for item in (items or []):
+        hold = item.get("hold")
+        if hold in sizes:
+            sizes[hold] += 1
+    return sizes
+
+
+def render_work_list(items) -> str:
+    """The prompt block. An empty list still renders both fences, so the packet shape
+    does not change depending on how many holds happen to be live."""
+    lines = [_WORK_LIST_OPEN]
+    if not items:
+        lines.append("(empty)")
+    for item in items:
+        label = HOLD_LABELS.get(item["hold"], "unknown hold")
+        lines.append(f"[hold {item['hold']} \u2014 {label}] {item['text']}")
+    lines.append(_WORK_LIST_CLOSE)
+    return "\n".join(lines) + "\n"
+
 
 OVERRIDE = (
     "TOOL-BUDGET OVERRIDE for this invocation. You have NO `Write` tool and NO `Bash` "

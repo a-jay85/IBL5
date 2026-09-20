@@ -227,10 +227,10 @@ SCHED="$(IBL5_MAIN="$SB" HOME="$SB/home" PATH="$SB/shim:$PATH" \
 # bare `grep -q '<integer>17</integer>'` passes for a transposed Hour=0/Minute=17
 # plist (23:00 local, not 00:00 UTC), which is the likeliest way to get this wrong.
 { echo "$SCHED" | grep -q 'StartCalendarInterval' \
-    && echo "$SCHED" | grep -A1 '<key>Hour</key>' | grep -qF '<integer>17</integer>' \
-    && echo "$SCHED" | grep -A1 '<key>Minute</key>' | grep -qF '<integer>0</integer>' \
+    && echo "$SCHED" | grep -A1 '<key>Hour</key>' | grep -qF '<integer>21</integer>' \
+    && echo "$SCHED" | grep -A1 '<key>Minute</key>' | grep -qF '<integer>5</integer>' \
     && echo "$SCHED" | grep -qF "<string>$SB/bin/docfix-poll</string>"; } \
-  && ok "(9) --print-schedule emits Hour 17 / Minute 0 (00:00 UTC) and MAIN-checkout Program" \
+  && ok "(9) --print-schedule emits Hour 21 / Minute 5 (04:05 UTC) and MAIN-checkout Program" \
   || bad "(9) --print-schedule"
 
 # --- Case 10: --install-schedule / --uninstall-schedule -----------------------

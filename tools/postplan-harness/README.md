@@ -19,12 +19,15 @@ Without `--live`, every would-be side effect remains a typed intent record.
 | Owned by code (deterministic) | Retained LLM calls (bounded, typed, validated) |
 |---|---|
 | Phase sequencing + terminal states | `pr-copy`: commit/PR title + summary (haiku). Skipped when the PR is open and the tree is clean |
+| Phase 2 pre-push meta-check gate (rebase → gate → push) | none; remediation is mechanical |
 | Phase 3 diff classification (all flags) | `review-agent-a/b/d` — code review judgment (sonnet) |
 | Phase 5 verify aggregation | `security-audit` — security judgment (haiku) |
 | Phase 5.0 plan→test/file conformance | `score-findings` — rubric confidence scoring (haiku) |
 | All twelve ported arming conditions (numbered 1–12; the skill's condition (11), unresolved review-thread findings, stays skill-only — the harness's 11 is master's plan-slug-drift hold) | `safety-verdict` — condition (9), **add-only** holds (haiku) |
 | CI-watch interpretation | `manual-classify` — plan-blind manual-step triage (haiku) |
 | Side-effect gating + audit log | `retrospective` — save-a-lesson-or-not (haiku) |
+
+Phase 2 rebases the branch onto origin/master, runs the local meta-check gate, then pushes to origin.
 
 Phase 5.0 resolves each plan path by exact-or-suffix match, then by unique basename (a directory the diff moved under one extra component still resolves; two same-named candidates stay `MISSING`). It re-runs once after a Phase 5.5 remediation commit, so a fix-up that authors the planned file clears arming condition (3) in the same run.
 

@@ -36,7 +36,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from harness import ciwatch, conformance, fidelity, llm_calls, manual_rows, schemas, statefile
 from harness.armable import (ArmInputs, conflict_flag_path, evaluate,
-                             manual_testing_clearance, select_fidelity_verdict)
+                             manual_testing_clearance, meta_checks_clearance,
+                             select_fidelity_verdict)
 from harness.classify import (BACKLOG_REPO, classify, files_from_diff, modified_files_from_diff,
                               qualify_backlog_refs,
                               render_files_changed, render_manual_confirmation,
@@ -311,6 +312,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 # the skill's two success spellings, verbatim
                 rebase_line = ("REBASE=clean (HEAD already contains origin/master)"
                                if sha == pre_rebase else "REBASE=rebased onto origin/master")
+        res.meta_checks_ok = run_meta_checks_local(
+            git, worktree or "", "origin/master", log, live=live)
+        if live:
+            sha = git.head()  # refresh — remediation may have committed and moved HEAD
         try:
             git.push()
         except HarnessError as e:
@@ -483,6 +488,20 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 _failed_checks = sorted(set(_bg_failed + _probe_failed))
             except Exception as _e:
                 log(f"phase6.5: red-ci-check probe error — {_e}")
+        # condition (16) inputs: pre-push flag and post-pr run
+        _mc_branch_slug = git.branch().replace("/", "-")
+        _mc_flag = f"/tmp/ibl5-meta-checks-prepush-{_mc_branch_slug}.failed"
+        if live and pr:
+            _mc_argv = [os.path.join(worktree or "", "bin", "run-meta-checks-local"),
+                        "--stage", "post-pr", "--pr", str(pr)]
+            try:
+                _mc_proc = subprocess.run(_mc_argv, cwd=worktree, capture_output=True, text=True)
+                _mc_post_rc = _mc_proc.returncode
+            except OSError:
+                _mc_post_rc = 2
+        else:
+            _mc_post_rc = int((fixture or {}).get("meta_checks_post_rc", 0))
+        _mc_status = meta_checks_clearance(_mc_flag, _mc_post_rc)
         inputs = ArmInputs(
             pr_body=gh.pr_body() or body, pr_title=meta.get("title", copy["title"]),
             pr_labels=gh.pr_labels(), classification=cls, findings=res.findings,
@@ -505,6 +524,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             degraded_agents=res.degraded_agents,
             plan_slug_drift=plan.slug_drift,
             failed_checks=_failed_checks,
+            meta_checks_status=_mc_status,
         )
         if not live and (fixture or {}).get("current_tree"):
             # replay-only seam, the checks_outcome pattern: live mode never reads it
@@ -758,6 +778,71 @@ def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log) -> tuple[dict, bool]:
     subject = schemas.coerce_commit_subject(subject, cls)
     return {"title": subject, "commit_subject": subject,
             "summary_md": f"## Summary\n- {subject}\n"}, True
+
+
+def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=True) -> bool:
+    if os.environ.get("PRE_PUSH_META_CHECKS_SKIP") == "1":
+        log("phase2: meta-checks SKIPPED (PRE_PUSH_META_CHECKS_SKIP=1)")
+        return True
+    calls = getattr(git, "meta_checks_calls", None)
+    if calls is not None:
+        calls.append(("pre-push", git.pushes if hasattr(git, "pushes") else -1))
+    if not live:
+        return True
+    if not repo_root:
+        # No worktree path to run the gate from. Without this guard subprocess.run
+        # raises FileNotFoundError out of chdir(""), aborting Phase 2 before the push.
+        log("phase2: meta-checks SKIPPED (no worktree path)")
+        return True
+    runner = os.path.join(repo_root, "bin", "run-meta-checks-local")
+    argv = [runner, "--stage", "pre-push", "--base", base]
+    if body_file:
+        argv += ["--body-file", body_file]
+    branch_slug = git.branch().replace("/", "-")
+    flag = f"/tmp/ibl5-meta-checks-prepush-{branch_slug}.failed"
+    result = subprocess.run(argv, cwd=repo_root, capture_output=True, text=True)
+    last_result = result
+    rc = result.returncode
+    if rc == 3:
+        raise HarnessError("local-gate",
+                           f"meta-checks filter-parse failure: {(result.stderr or '').strip()[:200]}")
+    if rc == 0:
+        try:
+            os.unlink(flag)
+        except FileNotFoundError:
+            pass
+        return True
+    # rc == 1: one bounded fix attempt
+    # os.path.exists (not isdir) because .git is a regular file in bin/wt-new worktrees
+    worktree = repo_root if os.path.exists(os.path.join(repo_root, ".git")) else None
+    if worktree and _remediate_doc_staleness(worktree, git, log) > 0:
+        git.commit_all(f"chore: auto-remediate doc staleness\n\n{_REMEDIATION_NOTE}")
+        result2 = subprocess.run(argv, cwd=repo_root, capture_output=True, text=True)
+        last_result = result2
+        rc2 = result2.returncode
+        if rc2 == 3:
+            raise HarnessError("local-gate",
+                               f"meta-checks filter-parse failure: {(result2.stderr or '').strip()[:200]}")
+        if rc2 == 0:
+            try:
+                os.unlink(flag)
+            except FileNotFoundError:
+                pass
+            return True
+    # Still failing: write flag file and push anyway
+    output = (last_result.stdout or "").strip()
+    failed_names = " ".join(
+        line.split("META-CHECK-FAILED:", 1)[1].strip()
+        for line in output.splitlines()
+        if line.startswith("META-CHECK-FAILED:")
+    ) or "unknown"
+    try:
+        with open(flag, "w") as fh:
+            fh.write(failed_names + "\n")
+    except OSError:
+        pass
+    log(f"phase2: META-CHECKS FAILED ({failed_names}) — pushing anyway, auto-merge will not arm")
+    return False
 
 
 def _commit_with_gate_remediation(git, worktree: str | None, message: str, log,

@@ -1,0 +1,398 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/run-meta-checks-local — Run CI's hard-gate meta checks locally before post-plan push.
+#
+# Derives path filters at runtime by parsing .github/workflows/pr-meta-checks.yml.
+# Never copies globs into this script; a drifted copy would fail open silently.
+#
+# Exit codes:
+#   0  all hard gates passed
+#   1  one or more hard gates failed
+#   2  usage error
+#   3  could not parse the workflow filters (fail-closed)
+
+set -uo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+usage() {
+    cat <<'EOF'
+Usage: bin/run-meta-checks-local [--base <sha>] [--pr <n>] [--body-file <path>]
+                                 [--stage pre-push|post-pr] [--print-filters]
+                                 [--self-test-hook <dir>] [--help|-h]
+
+  --base <sha>            Base commit to diff against. Default: merge-base with origin/master.
+  --pr <n>                PR number. Required for --stage post-pr.
+  --body-file <p>         Planned PR body for check-pr-manual-testing before a PR exists.
+  --stage <s>             pre-push (default) or post-pr. Selects which step subset runs.
+  --print-filters         Print <filter>=true|false per filter and changed-path count, then exit 0.
+  --self-test-hook <dir>  Override repo root for workflow YAML and bin/ scripts (test seam).
+  --help, -h              Show this message.
+
+Exit: 0 all hard gates passed  1 one or more hard gates failed
+      2 usage error  3 could not parse workflow filters (fail-closed)
+EOF
+}
+
+BASE=""
+PR=""
+BODY_FILE=""
+STAGE="pre-push"
+PRINT_FILTERS=0
+HOOK_ROOT=""
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --base)
+            if [ $# -lt 2 ]; then echo "Error: --base requires a value" >&2; usage >&2; exit 2; fi
+            BASE="$2"; shift 2 ;;
+        --pr)
+            if [ $# -lt 2 ]; then echo "Error: --pr requires a value" >&2; usage >&2; exit 2; fi
+            PR="$2"; shift 2 ;;
+        --body-file)
+            if [ $# -lt 2 ]; then echo "Error: --body-file requires a path" >&2; usage >&2; exit 2; fi
+            BODY_FILE="$2"; shift 2 ;;
+        --stage)
+            if [ $# -lt 2 ]; then echo "Error: --stage requires a value" >&2; usage >&2; exit 2; fi
+            STAGE="$2"; shift 2
+            if [ "$STAGE" != "pre-push" ] && [ "$STAGE" != "post-pr" ]; then
+                echo "Error: --stage must be pre-push or post-pr" >&2; usage >&2; exit 2
+            fi ;;
+        --print-filters)
+            PRINT_FILTERS=1; shift ;;
+        --self-test-hook)
+            if [ $# -lt 2 ]; then echo "Error: --self-test-hook requires a directory" >&2; usage >&2; exit 2; fi
+            HOOK_ROOT="$2"; shift 2 ;;
+        --help|-h)
+            usage; exit 0 ;;
+        *)
+            echo "Error: unknown option: $1" >&2; usage >&2; exit 2 ;;
+    esac
+done
+
+if [ "$STAGE" = "post-pr" ] && [ -z "$PR" ]; then
+    echo "Error: --stage post-pr requires --pr <n>" >&2
+    usage >&2
+    exit 2
+fi
+
+ROOT="${HOOK_ROOT:-$REPO_ROOT}"
+WORKFLOW="$ROOT/.github/workflows/pr-meta-checks.yml"
+
+# Base resolution — best-effort fetch so offline runs still work.
+if [ -z "$BASE" ]; then
+    git -C "$ROOT" fetch --quiet origin master 2>/dev/null || true
+    BASE=$(git -C "$ROOT" merge-base origin/master HEAD 2>/dev/null) \
+        || BASE=$(git -C "$ROOT" merge-base master HEAD 2>/dev/null) \
+        || { echo "run-meta-checks-local: cannot resolve a base commit" >&2; exit 3; }
+fi
+
+# Changed-path set: committed range + unstaged + staged (matches bin/check-docs --since).
+CHANGED=$(
+    { git -C "$ROOT" diff --name-only --diff-filter=ACMRT "$BASE"...HEAD
+      git -C "$ROOT" diff --name-only --diff-filter=ACMRT HEAD
+      git -C "$ROOT" diff --name-only --diff-filter=ACMRT --cached
+    } | sort -u
+)
+CHANGED_COUNT=$(printf '%s\n' "$CHANGED" | { grep -c . || true; } 2>/dev/null)
+
+# ─── Runtime filter parser ────────────────────────────────────────────────────
+# Parses the filters: | block from the workflow YAML at runtime (single source).
+# Outputs one <filter><TAB><matched> line per filter name, where matched is
+# "true" or "false". Exits 3 on any parse failure (fail-closed).
+# Rejects !-negation and {brace} expansion with exit 3 rather than mis-translating.
+# Takes two args: workflow_path and changed_paths_file.
+_parse_and_match_filters() {
+    python3 - "$WORKFLOW" "$1" <<'PYEOF'
+import sys, re
+
+workflow_path = sys.argv[1]
+changed_file  = sys.argv[2]
+try:
+    text = open(workflow_path).read()
+except Exception as e:
+    print(f"run-meta-checks-local: cannot read {workflow_path}: {e}", file=sys.stderr)
+    sys.exit(3)
+
+lines = text.splitlines()
+
+# Locate "filters: |" line and record its indentation level.
+filters_idx = None
+filters_indent = None
+for i, line in enumerate(lines):
+    m = re.match(r'^(\s*)filters:\s*\|\s*$', line)
+    if m:
+        filters_idx = i
+        filters_indent = len(m.group(1))
+        break
+
+if filters_idx is None:
+    print("run-meta-checks-local: cannot parse filters block in .github/workflows/pr-meta-checks.yml",
+          file=sys.stderr)
+    sys.exit(3)
+
+# Consume following lines while blank or indented more than filters_indent.
+block_lines = []
+for line in lines[filters_idx + 1:]:
+    if line == '' or line.strip() == '':
+        block_lines.append(line)
+        continue
+    indent = len(line) - len(line.lstrip())
+    if indent > filters_indent:
+        block_lines.append(line)
+    else:
+        break
+
+non_blank = [l for l in block_lines if l.strip()]
+if not non_blank:
+    print("run-meta-checks-local: cannot parse filters block in .github/workflows/pr-meta-checks.yml",
+          file=sys.stderr)
+    sys.exit(3)
+
+# Strip the common leading indent from the block.
+min_indent = min(len(l) - len(l.lstrip()) for l in non_blank)
+normalized = [l[min_indent:] if l.strip() else '' for l in block_lines]
+
+# Parse filter keys and glob lists.
+# A line starting with # is a comment (skip). Everything else must match a
+# key line or a glob line; anything else is a parse anomaly and exits 3.
+filters = {}
+current = None
+for line in normalized:
+    if not line.strip():
+        continue
+    if line.lstrip().startswith('#'):
+        continue
+    m_key = re.match(r'^(\w[\w-]*):\s*$', line)
+    if m_key:
+        current = m_key.group(1)
+        filters[current] = []
+        continue
+    m_glob = re.match(r"""^\s*-\s*(?:'([^']*)'|"([^"]*)"|(\S+))\s*$""", line)
+    if m_glob:
+        if current is None:
+            print("run-meta-checks-local: cannot parse filters block in .github/workflows/pr-meta-checks.yml",
+                  file=sys.stderr)
+            sys.exit(3)
+        glob = m_glob.group(1) or m_glob.group(2) or m_glob.group(3)
+        # Reject unsupported glob features so drift is loud, not silent.
+        if glob.startswith('!') or '{' in glob:
+            print(f"run-meta-checks-local: unsupported glob pattern '{glob}' in filters block",
+                  file=sys.stderr)
+            sys.exit(3)
+        filters[current].append(glob)
+        continue
+    # Unrecognised line — parse anomaly.
+    print("run-meta-checks-local: cannot parse filters block in .github/workflows/pr-meta-checks.yml",
+          file=sys.stderr)
+    sys.exit(3)
+
+if not filters:
+    print("run-meta-checks-local: cannot parse filters block in .github/workflows/pr-meta-checks.yml",
+          file=sys.stderr)
+    sys.exit(3)
+
+# Translate picomatch globs to Python regexes.
+# ** crosses directory separators; * does not; ?  matches one non-slash char.
+def to_regex(glob):
+    out, i = [], 0
+    while i < len(glob):
+        if glob.startswith('**/', i):
+            out.append('(?:.*/)?'); i += 3
+        elif glob.startswith('**', i):
+            out.append('.*'); i += 2
+        elif glob[i] == '*':
+            out.append('[^/]*'); i += 1
+        elif glob[i] == '?':
+            out.append('[^/]'); i += 1
+        else:
+            out.append(re.escape(glob[i])); i += 1
+    return re.compile('^' + ''.join(out) + '$')
+
+with open(changed_file) as cf:
+    changed_paths = [l for l in cf.read().splitlines() if l]
+
+for fname, globs in filters.items():
+    patterns = [to_regex(g) for g in globs]
+    matched = any(any(p.match(path) for p in patterns) for path in changed_paths)
+    print(f"{fname}\t{'true' if matched else 'false'}")
+PYEOF
+}
+
+# Run the parser, writing changed paths to a temp file so the heredoc does not
+# steal stdin from the python3 invocation inside the function.
+_CHANGED_FILE=$(mktemp)
+printf '%s\n' "$CHANGED" > "$_CHANGED_FILE"
+FILTER_OUTPUT=$(_parse_and_match_filters "$_CHANGED_FILE")
+FILTER_RC=$?
+rm -f "$_CHANGED_FILE"
+if [ "$FILTER_RC" -ne 0 ]; then
+    exit 3
+fi
+
+# Filter names may contain characters that are invalid in a shell identifier
+# (the filters-block key grammar admits hyphens), so both the setter and the
+# getter map a name through the same sanitizer before touching FMAP_*.
+_fkey() { printf '%s' "$1" | tr -c '[:alnum:]' '_'; }
+
+# Build per-filter verdict map (bash 3.2 compatible; no declare -A).
+# Sets FMAP_<sanitized-name>=true|false for each filter name.
+while IFS=$'\t' read -r _fname _fval; do
+    _fk=$(_fkey "$_fname")
+    eval "FMAP_${_fk}=${_fval}"
+done <<< "$FILTER_OUTPUT"
+
+_fmap() { local _k; _k=$(_fkey "$1"); eval "printf '%s' \"\${FMAP_${_k}:-false}\""; }
+
+# ─── --print-filters diagnostic mode ─────────────────────────────────────────
+if [ "$PRINT_FILTERS" = 1 ]; then
+    while IFS=$'\t' read -r fname fval; do
+        printf '%s=%s\n' "$fname" "$fval"
+    done <<< "$FILTER_OUTPUT"
+    printf 'changed-paths=%s\n' "$CHANGED_COUNT"
+    exit 0
+fi
+
+# ─── Step execution ───────────────────────────────────────────────────────────
+FAILED=""
+WARNED=""
+DEFERRED=""
+SKIP_COUNT=0
+HARD_RUN=0
+
+# run_step: always returns 0; accumulates FAILED or WARNED. Never set -e here.
+run_step() {
+    local name="$1" gate="$2"; shift 2
+    local out rc
+    out=$("$@" 2>&1); rc=$?
+    if [ "$rc" -eq 0 ]; then
+        printf 'PASS  %s\n' "$name"
+        [ "$gate" = "hard" ] && HARD_RUN=$((HARD_RUN + 1))
+        return 0
+    fi
+    if [ "$gate" = "advisory" ]; then
+        printf 'WARN  %s (advisory, not blocking)\n' "$name"
+        printf '%s\n' "$out" | tail -40
+        WARNED="$WARNED $name"
+        return 0
+    fi
+    printf 'FAIL  %s\n' "$name"
+    printf '%s\n' "$out" | tail -60
+    FAILED="$FAILED $name"
+    HARD_RUN=$((HARD_RUN + 1))
+    return 0
+}
+
+# run_filtered_step: skips when filter is false; otherwise delegates to run_step.
+run_filtered_step() {
+    local name="$1" gate="$2" filter="$3"; shift 3
+    if [ "$(_fmap "$filter")" = "false" ]; then
+        printf 'SKIP  %s (filter %s=false)\n' "$name" "$filter"
+        SKIP_COUNT=$((SKIP_COUNT + 1))
+        return 0
+    fi
+    run_step "$name" "$gate" "$@"
+}
+
+BIN="$ROOT/bin"
+
+# ─── Pre-push step table ──────────────────────────────────────────────────────
+if [ "$STAGE" = "pre-push" ]; then
+    # Unconditional hard gates (rows 1-6)
+    run_step "check-docs-self-test"          hard "$BIN/check-docs" --self-test
+    run_step "check-docs-no-staleness"       hard "$BIN/check-docs" --no-staleness
+    run_step "check-docs-since"              hard "$BIN/check-docs" "--since=$BASE"
+    run_step "check-prose-self-test"         hard "$BIN/check-prose" --self-test
+    run_step "check-prose-since"             hard "$BIN/check-prose" "--since=$BASE"
+    run_step "check-registry-trigger-rows"   hard "$BIN/check-registry-trigger-rows"
+
+    # Row 7: pre-push form of manual-testing check
+    if [ -n "$BODY_FILE" ]; then
+        run_step "check-pr-manual-testing" hard "$BIN/check-pr-manual-testing" --body-file "$BODY_FILE"
+    else
+        printf 'SKIP  check-pr-manual-testing (no --body-file)\n'
+        SKIP_COUNT=$((SKIP_COUNT + 1))
+    fi
+
+    # Filtered hard gates (rows 8-11)
+    run_filtered_step "check-numbering"            hard "numbering" "$BIN/check-numbering" "--since=$BASE"
+    run_filtered_step "check-e2e-hygiene"          hard "e2ehygiene" "$BIN/check-e2e-hygiene" --pr
+    run_filtered_step "check-e2e-fa-offers-owner"  hard "e2ehygiene" "$BIN/check-e2e-fa-offers-owner"
+    run_filtered_step "check-e2e-mutator-isolation" hard "e2ehygiene" "$BIN/check-e2e-mutator-isolation"
+
+    # Advisory path-gated (rows 12-13)
+    run_filtered_step "check-hot-files"  advisory "hotfiles" "$BIN/check-hot-files" --pr
+    run_filtered_step "check-orphan-css" advisory "orphancss" "$BIN/check-orphan-css"
+
+    # Rows 14-15: advisory pre-push (hard post-pr); deferred when no PR number.
+    if [ "$(_fmap adr)" = "true" ]; then
+        if [ -n "$PR" ]; then
+            run_step "adr-check" advisory "$BIN/adr-check" --pr "--base=$BASE"
+        else
+            printf 'DEFER adr-check (deferred to post-pr for PR bypass check)\n'
+            DEFERRED="$DEFERRED adr-check"
+        fi
+    else
+        printf 'SKIP  adr-check (filter adr=false)\n'
+        SKIP_COUNT=$((SKIP_COUNT + 1))
+    fi
+    if [ "$(_fmap refactor)" = "true" ]; then
+        if [ -n "$PR" ]; then
+            run_step "refactor-flag" advisory "$BIN/refactor-flag" --pr
+        else
+            printf 'DEFER refactor-flag (deferred to post-pr for PR bypass check)\n'
+            DEFERRED="$DEFERRED refactor-flag"
+        fi
+    else
+        printf 'SKIP  refactor-flag (filter refactor=false)\n'
+        SKIP_COUNT=$((SKIP_COUNT + 1))
+    fi
+fi
+
+# ─── Post-pr step table ───────────────────────────────────────────────────────
+if [ "$STAGE" = "post-pr" ]; then
+    # Row 16: live PR body check (hard)
+    run_step "check-pr-manual-testing" hard "$BIN/check-pr-manual-testing" --pr "$PR"
+
+    # Row 17: advisory collision check
+    run_filtered_step "check-pr-collisions" advisory "prcollisions" "$BIN/check-pr-collisions" --pr "$PR"
+
+    # Rows 14-15: hard in post-pr stage
+    if [ "$(_fmap adr)" = "true" ]; then
+        run_step "adr-check" hard "$BIN/adr-check" --pr "--base=$BASE"
+    else
+        printf 'SKIP  adr-check (filter adr=false)\n'
+        SKIP_COUNT=$((SKIP_COUNT + 1))
+    fi
+    if [ "$(_fmap refactor)" = "true" ]; then
+        run_step "refactor-flag" hard "$BIN/refactor-flag" --pr
+    else
+        printf 'SKIP  refactor-flag (filter refactor=false)\n'
+        SKIP_COUNT=$((SKIP_COUNT + 1))
+    fi
+
+    # Write state file for the Phase 6.5 arming condition to read.
+    printf '%s\n' "${FAILED:+FAILED:${FAILED# }}" > "/tmp/ibl5-meta-checks-${PR}.status"
+fi
+
+# ─── Summary ─────────────────────────────────────────────────────────────────
+for name in $FAILED; do
+    printf 'META-CHECK-FAILED: %s\n' "$name"
+done
+for name in $DEFERRED; do
+    printf 'META-CHECK-DEFERRED: %s\n' "$name"
+done
+
+FAILED_COUNT=$(echo $FAILED | wc -w | tr -d ' ')
+WARNED_COUNT=$(echo $WARNED | wc -w | tr -d ' ')
+DEFER_COUNT=$(echo $DEFERRED | wc -w | tr -d ' ')
+
+STATUS="OK"
+RC=0
+if [ -n "$FAILED" ]; then STATUS="FAILED"; RC=1; fi
+
+printf 'META-CHECKS: %s stage=%s hard=%s failed=%s warn=%s skip=%s defer=%s\n' \
+    "$STATUS" "$STAGE" "$HARD_RUN" "$FAILED_COUNT" "$WARNED_COUNT" "$SKIP_COUNT" "$DEFER_COUNT"
+
+exit $RC

@@ -797,6 +797,49 @@ else
 fi
 rm -f "$_TICK_LOCK31"
 
+# ── Hook wrapper tests ────────────────────────────────────────────────────────
+HOOK="$SCRIPT_DIR/hooks/wt-sync-session-start.sh"
+# Create a synthetic git env with a linked worktree and a fake tick.
+MAIN_HOOK="$(new_env)"
+WT_HOOK="$(add_worktree "$MAIN_HOOK" "wt-hooktest" current)"
+mkdir -p "$MAIN_HOOK/bin"
+# Fake tick: ignores args, always emits CURRENT (tests hook routing, not tick logic).
+cat > "$MAIN_HOOK/bin/wt-sync-tick" <<'SH'
+#!/bin/sh
+echo "CURRENT"
+SH
+chmod +x "$MAIN_HOOK/bin/wt-sync-tick"
+
+# Row 1: linked worktree → verdict printed
+HOOK_OUT1="$(CLAUDE_PROJECT_DIR="$WT_HOOK" PATH="$STUBBIN:$PATH" bash "$HOOK" 2>/dev/null || true)"
+assert_match "hook: linked worktree yields wt-sync verdict" "^wt-sync: " "$HOOK_OUT1"
+HOOK_ST1=0
+CLAUDE_PROJECT_DIR="$WT_HOOK" PATH="$STUBBIN:$PATH" bash "$HOOK" >/dev/null 2>/dev/null || HOOK_ST1=$?
+assert_eq "hook: linked worktree exits 0" "0" "$HOOK_ST1"
+
+# Row 2: main checkout → silent
+HOOK_OUT2="$(CLAUDE_PROJECT_DIR="$MAIN_HOOK" PATH="$STUBBIN:$PATH" bash "$HOOK" 2>/dev/null || true)"
+assert_eq "hook: main checkout is silent" "" "$HOOK_OUT2"
+HOOK_ST2=0
+CLAUDE_PROJECT_DIR="$MAIN_HOOK" PATH="$STUBBIN:$PATH" bash "$HOOK" >/dev/null 2>/dev/null || HOOK_ST2=$?
+assert_eq "hook: main checkout exits 0" "0" "$HOOK_ST2"
+
+# Row 3a: non-git directory → silent, exit 0
+HOOK_OUT3a="$(CLAUDE_PROJECT_DIR="$TMP" PATH="$STUBBIN:$PATH" bash "$HOOK" 2>/dev/null || true)"
+assert_eq "hook: non-git dir is silent" "" "$HOOK_OUT3a"
+HOOK_ST3a=0
+CLAUDE_PROJECT_DIR="$TMP" PATH="$STUBBIN:$PATH" bash "$HOOK" >/dev/null 2>/dev/null || HOOK_ST3a=$?
+assert_eq "hook: non-git dir exits 0" "0" "$HOOK_ST3a"
+
+# Row 3b: tick not executable → silent, exit 0
+chmod 0644 "$MAIN_HOOK/bin/wt-sync-tick"
+HOOK_OUT3b="$(CLAUDE_PROJECT_DIR="$WT_HOOK" PATH="$STUBBIN:$PATH" bash "$HOOK" 2>/dev/null || true)"
+assert_eq "hook: non-executable tick is silent" "" "$HOOK_OUT3b"
+HOOK_ST3b=0
+CLAUDE_PROJECT_DIR="$WT_HOOK" PATH="$STUBBIN:$PATH" bash "$HOOK" >/dev/null 2>/dev/null || HOOK_ST3b=$?
+assert_eq "hook: non-executable tick exits 0" "0" "$HOOK_ST3b"
+chmod +x "$MAIN_HOOK/bin/wt-sync-tick"   # restore
+
 # ── Source-level anti-pattern row ─────────────────────────────────────────────
 if grep -nE '(reset[[:space:]]+--hard|[[:space:]]stash[[:space:]]|[[:space:]]rebase[[:space:]]|push[[:space:]]+origin|git[[:space:]].*--force)' "$TICK" | grep -vE '^[0-9]+:[[:space:]]*#'; then
     failcase "source-level: wt-sync-tick contains a forbidden git write verb"

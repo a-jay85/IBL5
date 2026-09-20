@@ -40,6 +40,7 @@ Memoization is PR-only. Push runs, re-runs (`run_attempt > 1`), and dispatches s
 - Positive: `Tests and Analysis` finishes in the time of the memo check plus the small unmemoized jobs when a rebase moves master only outside the tests input set. `E2E Tests` saves the shard, mutator, and API-E2E runner time on a hit while Visual Regression still runs.
 - Positive: every failure direction falls toward a real run. A broken key step fails `ci-memo-check`, which sits in both gates' `needs:`, so it reds the required context. An unreadable image manifest or a cache-service error only costs a real run.
 - Positive: the downstream-consumer invariant holds. A job that needs a memo-gated job carries the same memo clause, so nothing runs against a missing artifact. `bin/test-ci-memo --case gate-topology` asserts this over both workflow files.
+- Positive: the two scopes are independent. A file in `bin` that no e2e job reads moves the tests key and leaves the e2e key alone, so a tests-side failure never forces the e2e suite to re-run.
 - Negative: the manifests are a second list to keep in step with the dorny filters. `bin/test-ci-memo --case manifest-coverage` fails when a memoized dorny glob matches a file the manifest does not.
 - Negative: a job whose outcome depends on a file outside its manifest can be skipped wrongly. Over-inclusion is the safe direction, so widen the manifest when in doubt.
 

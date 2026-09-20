@@ -13,6 +13,17 @@ from harness import armable
 SHA = "abc123"
 
 
+@pytest.fixture(autouse=True)
+def _isolated_rows_file(monkeypatch, tmp_path):
+    """Redirect the tick input file into tmp_path for every test in this module.
+
+    run() calls append_cli_passes unconditionally, so without this each test would
+    create or append to the live /tmp/pr-ready-manual-rows-<pr>.txt a real harness
+    run reads.
+    """
+    monkeypatch.setattr(mt, "ROWS_TMPFILE", str(tmp_path / "pr-ready-manual-rows-{pr}.txt"))
+
+
 class FakeGh:
     def __init__(self, bodies):
         self.bodies = list(bodies)
@@ -199,6 +210,27 @@ def test_pending_rows():
 
 
 # ---------------------------------------------------------------------------
+# resolve_slug
+# ---------------------------------------------------------------------------
+
+def test_resolve_slug_accepts_a_worktree_under_the_root(monkeypatch, tmp_path):
+    # tmp_path stands in for WORKTREES_ROOT so the case does not depend on which
+    # worktrees happen to exist on this machine.
+    (tmp_path / "some-slug").mkdir()
+    monkeypatch.setattr(mt, "WORKTREES_ROOT", str(tmp_path))
+    slug, err = mt.resolve_slug(str(tmp_path / "some-slug"))
+    assert slug == "some-slug"
+    assert err == ""
+
+
+def test_resolve_slug_rejects_path_outside_worktrees_root(monkeypatch, tmp_path):
+    monkeypatch.setattr(mt, "WORKTREES_ROOT", str(tmp_path))
+    slug, err = mt.resolve_slug("/tmp/nope")
+    assert slug == ""
+    assert err == "worktree-not-under-worktrees-root"
+
+
+# ---------------------------------------------------------------------------
 # bring_up
 # ---------------------------------------------------------------------------
 
@@ -299,12 +331,16 @@ def test_bringup_failure_stops_pass(monkeypatch):
     monkeypatch.setattr(mt, "docker_available", lambda: (True, ""))
     monkeypatch.setattr(mt, "resolve_slug", lambda w: ("harness-manual-rows-execute", ""))
 
-    result = mt.run(**_base_run_kwargs(monkeypatch, extra_body=BODY_ONE_ROW))
+    kwargs = _base_run_kwargs(monkeypatch, extra_body=BODY_ONE_ROW)
+    gh = kwargs["gh"]
+    result = mt.run(**kwargs)
     assert result.ran is True
     assert result.rows == []
     assert result.ticked == []
     assert result.all_ticked is False
     assert "bringup-stopped:FAILED" in result.errors
+    # No confirm re-fetch: a stopped pass must not reach any gh call.
+    assert gh.calls == 0
 
 
 # ---------------------------------------------------------------------------
@@ -433,11 +469,6 @@ def test_mixed_body(monkeypatch):
     monkeypatch.setattr(mt, "resolve_slug", lambda w: ("harness-manual-rows-execute", ""))
 
     rows_file = mt.ROWS_TMPFILE.format(pr=1)
-    try:
-        import os as _os
-        _os.unlink(rows_file)
-    except FileNotFoundError:
-        pass
 
     result = mt.run(
         pr=1, worktree="/fake/worktree", body=body,
@@ -452,7 +483,6 @@ def test_mixed_body(monkeypatch):
     assert armable.all_rows_ticked(post_body) is False
     with open(rows_file) as _f:
         assert _f.read().strip() == "ROW Row 1 PASS"
-    _os.unlink(rows_file)
 
 
 # ---------------------------------------------------------------------------

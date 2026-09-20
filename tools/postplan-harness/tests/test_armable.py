@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from harness.adapters.gitad import LiveGit
 from harness.armable import (ArmInputs, SENTINEL_RE, dep_numbers, evaluate, feat_hold,
                              manual_testing_clearance, all_rows_ticked)
+from harness.classify import _neutralize_checkboxes
 from harness.manual_rows import ManualRow, _assert_no_sentinel, render_rows
 from harness.state import Classification, Finding, HarnessError
 
@@ -350,9 +351,18 @@ def test_empty_section_holds():
 
 def test_narrow_row_shape():
     """A bare - [x] bin/test-foo bullet and a neutralized reviewer-verification bullet
-    do not flip all_rows_ticked."""
+    do not flip all_rows_ticked, and condition (1) stays blocked for both."""
     # bare ticked bullet with no **id** span
     assert not all_rows_ticked(_BODY_BARE_BULLET)
-    # neutralized bullet: - (x) **Row 1** (classify._neutralize_checkboxes output)
-    neutralized = "## Manual Testing\n\n- (x) **Row 1** — a\n"
+    cond1 = next(c for c in evaluate(inputs(pr_body=_BODY_BARE_BULLET)).conditions
+                 if c.number == 1)
+    assert cond1.blocked
+    # Neutralized bullet: run the real classify transform instead of hand-writing the
+    # `- (x)` form, so a change to _neutralize_checkboxes' output shape fails here
+    # rather than leaving the predicate silently untested.
+    neutralized = _neutralize_checkboxes("## Manual Testing\n\n- [x] **Row 1** — a\n")
+    assert "- (x) **Row 1**" in neutralized
     assert not all_rows_ticked(neutralized)
+    cond1 = next(c for c in evaluate(inputs(pr_body=neutralized)).conditions
+                 if c.number == 1)
+    assert cond1.blocked

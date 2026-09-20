@@ -224,6 +224,7 @@ class RunResult:
     slug: str = ""
     pr_number: Optional[int] = None
     meta_checks_ok: bool = True
+    meta_check_failures: list[dict] = field(default_factory=list)  # [{"name", "output"}] from the pre-push run
     classification: Optional[Classification] = None
     plan: Optional[PlanInfo] = None
     phase5: Optional[str] = None

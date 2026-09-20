@@ -317,7 +317,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 rebase_line = ("REBASE=clean (HEAD already contains origin/master)"
                                if sha == pre_rebase else "REBASE=rebased onto origin/master")
         res.meta_checks_ok = run_meta_checks_local(
-            git, worktree or "", "origin/master", log, live=live)
+            git, worktree or "", "origin/master", log, live=live,
+            failures_out=res.meta_check_failures)
         if live:
             sha = git.head()  # refresh — remediation may have committed and moved HEAD
         pushed = _push_with_adr_draft(git, log, "phase2", llm=llm, worktree=worktree,
@@ -701,6 +702,7 @@ CONFORMANCE_BRIDGE_NAME = "missing-tests"
 
 
 # --- Bounded push-retry and BEHIND-resolution helpers ------------------------
+META_CHECK_OUTPUT_CAP = 6_000
 _MAX_PUSH_RETRIES = 3
 _MAX_BEHIND_RETRIES = 3
 
@@ -958,7 +960,8 @@ def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log) -> tuple[dict, bool]:
             "summary_md": f"## Summary\n- {subject}\n"}, True
 
 
-def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=True) -> bool:
+def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=True,
+                         failures_out: list | None = None) -> bool:
     if os.environ.get("PRE_PUSH_META_CHECKS_SKIP") == "1":
         log("phase2: meta-checks SKIPPED (PRE_PUSH_META_CHECKS_SKIP=1)")
         return True
@@ -1009,11 +1012,15 @@ def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=Tru
             return True
     # Still failing: write flag file and push anyway
     output = (last_result.stdout or "").strip()
-    failed_names = " ".join(
-        line.split("META-CHECK-FAILED:", 1)[1].strip()
-        for line in output.splitlines()
-        if line.startswith("META-CHECK-FAILED:")
-    ) or "unknown"
+    names = [line.split("META-CHECK-FAILED:", 1)[1].strip()
+             for line in output.splitlines()
+             if line.startswith("META-CHECK-FAILED:")]
+    failed_names = " ".join(names) or "unknown"
+    if failures_out is not None:
+        # bin/run-meta-checks-local prints one interleaved stream, so every failing
+        # name carries the same tail excerpt -- the same thing a human reads.
+        excerpt = output[-META_CHECK_OUTPUT_CAP:]
+        failures_out.extend({"name": n, "output": excerpt} for n in (names or ["unknown"]))
     try:
         with open(flag, "w") as fh:
             fh.write(failed_names + "\n")

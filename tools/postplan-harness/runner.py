@@ -314,7 +314,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                                if sha == pre_rebase else "REBASE=rebased onto origin/master")
         res.meta_checks_ok = run_meta_checks_local(
             git, worktree or "", "origin/master", log, live=live)
-        sha = git.head()  # refresh — remediation may have committed and moved HEAD
+        if live:
+            sha = git.head()  # refresh — remediation may have committed and moved HEAD
         try:
             git.push()
         except HarnessError as e:

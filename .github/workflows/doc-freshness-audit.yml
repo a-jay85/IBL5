@@ -3,8 +3,9 @@ name: Doc Freshness Audit
 on:
   # Nightly at 00:00 UTC, the start of the UTC day that bin/check-docs decides
   # staleness on. On the hour (cache-dependencies.yml precedent) rather than the
-  # off-minute convention: ADR-0081 measured this scheduler's multi-hour drift as
-  # GitHub-side, so the minute choice does not reach it.
+  # off-minute convention: ADR-0081-scheduled-branch-update-for-armed-behind-prs
+  # measured this scheduler's multi-hour drift as GitHub-side, so the minute
+  # choice does not reach it.
   schedule:
     - cron: '0 0 * * *'
   workflow_dispatch: {}

@@ -1598,10 +1598,10 @@ $root = repoRoot();
 // `date.timezone`. Every last_verified value is parsed in UTC to match
 // (stalenessAgeDays, checkFile), so both sides of every comparison sit at UTC
 // midnight. A mixed-zone pair reads a doc dated UTC-today as future-dated on a
-// box configured for a negative-offset zone; the repo's own php.ini is UTC and
-// CI runners are UTC, so only an explicit pin makes that unreachable.
-// The nightly audit (.github/workflows/doc-freshness-audit.yml) fires at 00:00
-// UTC, the start of the day this clock reads.
+// box configured for a negative-offset zone; `date.timezone` is unset so PHP
+// defaults to UTC, but only an explicit pin makes that unreachable.
+// The nightly Doc Freshness Audit workflow fires at 00:00 UTC, the start of the
+// day this clock reads.
 // localToday() deliberately stays on the OS-local clock — it is the *write*
 // clock for --fix-dates and the no-commit fallback, never a freshness
 // comparison. See localToday().

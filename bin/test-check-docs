@@ -19,6 +19,7 @@ label_absent()  { ! echo "$1" | grep -qF 'skill DRAFT= command-substitution'; }
 
 pass() { echo "PASS: $1"; ((PASS++)) || true; }
 fail() { echo "FAIL: $1"; ((FAIL++)) || true; }
+skip() { echo "SKIP: $1"; }
 
 make_repo() {
     local repo
@@ -202,8 +203,8 @@ fi
 # offset, midnight-local is 07:00 UTC, so a doc dated UTC-today reads as
 # "last_verified in the future" and the gate false-fails.
 #
-# `php -d date.timezone=...` is the only way to exercise this: the repo's php.ini
-# is UTC and CI runners are UTC, so the mixed-zone path is unreachable naturally.
+# `php -d date.timezone=...` is the only way to exercise this: `date.timezone`
+# is unset so PHP defaults to UTC, and the mixed-zone path is unreachable naturally.
 # These invoke the checker through `php -d` rather than its `#!/usr/bin/env php`
 # shebang, because the -d override has to sit on the interpreter invocation.
 
@@ -212,18 +213,28 @@ future_absent()  { ! echo "$1" | grep -qF 'in the future'; }
 
 UTC_TODAY=$(php -r 'echo (new DateTimeImmutable("now", new DateTimeZone("UTC")))->format("Y-m-d");')
 UTC_TOMORROW=$(php -r 'echo (new DateTimeImmutable("+1 day", new DateTimeZone("UTC")))->format("Y-m-d");')
+LA_TODAY=$(php -r 'echo (new DateTimeImmutable("now", new DateTimeZone("America/Los_Angeles")))->format("Y-m-d");')
 
 # ── Test 7: a doc dated UTC-today is not future-dated under a negative-offset tz
+#
+# This test only discriminates fixed from unfixed code when the UTC calendar date
+# is ahead of the LA calendar date (00:00–06:59 UTC under PDT/PST). Outside that
+# window both fixed and unfixed code agree on the date and the test is vacuous.
+# Skip rather than vacuously pass so the gap is visible in CI output.
 
-REPO=$(make_repo)
-write_doc "$REPO" "$UTC_TODAY" "Body."
-OUT=$(cd "$REPO" && php -d date.timezone=America/Los_Angeles bin/check-docs --no-staleness 2>&1) || true
-rm -rf "$REPO"
-if future_absent "$OUT"; then
-    pass "UTC clock: last_verified == UTC today passes under a PDT php timezone"
+if [ "$UTC_TODAY" = "$LA_TODAY" ]; then
+    skip "UTC clock: UTC and LA share calendar date — test only fires 00:00–07:00 UTC"
 else
-    fail "UTC clock: last_verified == UTC today should pass under a PDT php timezone"
-    echo "  output: $OUT"
+    REPO=$(make_repo)
+    write_doc "$REPO" "$UTC_TODAY" "Body."
+    OUT=$(cd "$REPO" && php -d date.timezone=America/Los_Angeles bin/check-docs --no-staleness 2>&1) || true
+    rm -rf "$REPO"
+    if future_absent "$OUT"; then
+        pass "UTC clock: last_verified == UTC today passes under a PDT php timezone"
+    else
+        fail "UTC clock: last_verified == UTC today should pass under a PDT php timezone"
+        echo "  output: $OUT"
+    fi
 fi
 
 # ── Test 8: the UTC clock stays tight — a genuinely future date still fails ───
@@ -237,6 +248,29 @@ if future_present "$OUT"; then
 else
     fail "UTC clock: last_verified one UTC day ahead should still fail as future-dated"
     echo "  output: $OUT"
+fi
+
+# ── Test 9: stalenessAgeDays UTC pin — exact age under a negative-offset tz ──
+#
+# stalenessAgeDays() parses last_verified with an explicit UTC timezone. Without
+# the pin, createFromFormat() uses the ambient timezone: under America/Los_Angeles
+# a date parsed at LA midnight lands at 07:00 UTC, not 00:00 UTC. Against a $today
+# anchored at UTC midnight the diff is 89d17h rather than 90d exactly, and
+# (int)->days truncates to 89. The assertion age_days==90 catches that truncation
+# at every hour of the day — no 00:00–07:00 UTC window required.
+
+STALE_DATE=$(php -r 'echo (new DateTimeImmutable("-90 days", new DateTimeZone("UTC")))->format("Y-m-d");')
+
+REPO=$(make_repo)
+write_doc "$REPO" "$STALE_DATE" "Body."
+REPORT=$(cd "$REPO" && php -d date.timezone=America/Los_Angeles bin/check-docs --staleness-report 2>&1) || true
+rm -rf "$REPO"
+AGE=$(php -r 'echo json_decode(file_get_contents("php://stdin"), true)[0]["age_days"] ?? "none";' <<< "$REPORT")
+if [ "$AGE" = "90" ]; then
+    pass "UTC clock: stalenessAgeDays reports age_days 90 for a 90-day-old doc under PDT"
+else
+    fail "UTC clock: stalenessAgeDays should report age_days 90, got $AGE"
+    echo "  report: $REPORT"
 fi
 
 # ── Results ───────────────────────────────────────────────────────────────────

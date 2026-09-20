@@ -389,7 +389,13 @@ def _norm_title(t: str) -> str:
 
 
 def extract_notes(llm, verdict_path: str, log=None) -> list[dict]:
-    """Extract non-blocking notes from a READY WITH NOTES verdict."""
+    """Extract the filable non-blocking notes from a READY WITH NOTES verdict.
+
+    Only `kind == "followup"` survives — a note that names code work outliving the
+    merge. Anything else (a blessed plan deviation, a PR-copy nit, the reviewer's own
+    bookkeeping) is dropped, including a missing or unrecognized kind: dropping is
+    fail-closed and matches how this function already handles an LLM failure.
+    """
     log = log or _noop_log
     try:
         with open(verdict_path) as fh:
@@ -402,8 +408,13 @@ def extract_notes(llm, verdict_path: str, log=None) -> list[dict]:
                        validate=lambda r: isinstance(r, list))
         if not isinstance(raw, list):
             return []
-        return [d for d in raw if isinstance(d, dict)
-                and d.get("title") and d.get("detail")]
+        kept = [d for d in raw if isinstance(d, dict)
+                and d.get("title") and d.get("detail")
+                and d.get("kind") == "followup"]
+        dropped = len([d for d in raw if isinstance(d, dict)]) - len(kept)
+        if dropped:
+            log(f"phase5.5 notes: dropped {dropped} non-followup note(s)")
+        return kept
     except HarnessError:
         return []
 

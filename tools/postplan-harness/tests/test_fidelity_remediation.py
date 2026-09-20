@@ -8,7 +8,7 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from harness import fidelity
+from harness import fidelity, llm_calls
 from harness.adapters.ghad import RecordingGh
 from harness.adapters.gitad import ReplayGit
 from harness.adapters.llm import FixtureLlm
@@ -262,11 +262,40 @@ def test_re_review_round_3_uses_different_purpose(tmp_path, git_shim):
 
 def test_extract_notes_returns_list_from_llm(tmp_path):
     """extract_notes calls llm with purpose fidelity-notes and returns the list."""
-    notes_fixture = [{"title": "Add index", "detail": "The users table needs an index on email."}]
+    notes_fixture = [{"title": "Add index", "detail": "The users table needs an index on email.",
+                      "kind": "followup"}]
     llm = FixtureLlm(UsageLedger(), {"fidelity-notes": notes_fixture})
     vpath = _verdict(tmp_path, "READY WITH NOTES")
     result = fidelity.extract_notes(llm, vpath)
     assert result == notes_fixture
+
+
+def test_extract_notes_keeps_only_followup_kind(tmp_path):
+    """The three junk kinds — and an absent kind — are dropped; only followup files."""
+    notes_fixture = [
+        {"title": "Assert the parsed value, not itself", "kind": "followup",
+         "detail": "The new test compares a value to itself, so it cannot fail."},
+        {"title": "Accept the phpstan-baseline count increase", "kind": "plan-deviation-ok",
+         "detail": "Placement differs from the plan by a better route."},
+        {"title": "Change the PR title from feat to chore", "kind": "pr-copy",
+         "detail": "The diff is dev tooling, invisible to a GM."},
+        {"title": "Queue the Phase 4B review", "kind": "process",
+         "detail": "Check 4b was worked explicitly and does not fire."},
+        {"title": "Untyped note from an older verdict", "detail": "No kind field at all."},
+    ]
+    llm = FixtureLlm(UsageLedger(), {"fidelity-notes": notes_fixture})
+    result = fidelity.extract_notes(llm, _verdict(tmp_path, "READY WITH NOTES"))
+    assert [n["title"] for n in result] == ["Assert the parsed value, not itself"]
+
+
+def test_fidelity_notes_prompt_types_notes_and_drops_when_torn():
+    """The prompt names all four kinds and tells Haiku which way to fall when unsure."""
+    prompt = llm_calls.fidelity_notes_prompt("READY WITH NOTES\n\n### Note 1 — cosmetic")
+    for kind in ("followup", "plan-deviation-ok", "pr-copy", "process"):
+        assert kind in prompt
+    assert "still worth doing" in prompt
+    assert "do NOT call it" in prompt          # the drop-when-torn instruction
+    assert '"kind": "followup"' in prompt      # the shape Haiku must return
 
 
 def test_extract_notes_returns_empty_on_llm_failure(tmp_path):
@@ -495,8 +524,8 @@ def test_auto_merge_false_still_loops(tmp_path, git_shim):
 def test_notes_end_to_end(tmp_path, git_shim):
     """READY WITH NOTES: no remediation rounds, notes filed as backlog issues."""
     notes_fixture = [
-        {"title": "Add index on email", "detail": "Needs an index."},
-        {"title": "Cache expensive query", "detail": "Use Redis."},
+        {"title": "Add index on email", "detail": "Needs an index.", "kind": "followup"},
+        {"title": "Cache expensive query", "detail": "Use Redis.", "kind": "followup"},
     ]
     canned = {
         "plan-fidelity-review": "6d checks\n\nREADY WITH NOTES\n",
@@ -534,7 +563,8 @@ def test_notes_end_to_end(tmp_path, git_shim):
 def test_notes_from_re_review_round_are_filed(tmp_path, git_shim):
     """Round 1 NOT READY, round 2 re-review READY WITH NOTES: the re-review's notes
     are extracted from ITS verdict file and filed as backlog issues."""
-    notes_fixture = [{"title": "Log the issue_titles fallback", "detail": "Warn."}]
+    notes_fixture = [{"title": "Log the issue_titles fallback", "detail": "Warn.",
+                      "kind": "followup"}]
     canned = {
         "plan-fidelity-review": "6d checks\n\nNOT READY\n",
         "fidelity-remediation": "edited",

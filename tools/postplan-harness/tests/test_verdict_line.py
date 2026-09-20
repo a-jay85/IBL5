@@ -399,3 +399,23 @@ def test_autoresolved_files_surfaced(tmp_path):
     finally:
         if os.path.exists(autoresolved_path):
             os.unlink(autoresolved_path)
+
+
+def test_behind_retry_cap_line_carries_autoresolved_files():
+    """The BEHIND-cap BLOCKED line embeds `tail`, so an auto-resolved conflict must
+    still reach the operator on the blocked path — not only the complete path."""
+    slug = "behind-cap-autoresolved-test"
+    autoresolved_path = f"/tmp/postplan-conflict-files-{slug}-autoresolved.txt"
+    try:
+        with open(autoresolved_path, "w") as fh:
+            fh.write("harness/conflict.py\n")
+        r = _res(TerminalState.SHIPPED_HELD, pr_number=77, ci_outcome="green",
+                 retry_cap="behind-retry-cap", arm=_arm(False))
+        r.slug = slug
+        line = runner.verdict_line(r, 0)
+        assert "BEHIND retry cap reached" in line
+        assert "auto-resolved conflict in harness/conflict.py" in line
+        assert "\n" not in line
+    finally:
+        if os.path.exists(autoresolved_path):
+            os.unlink(autoresolved_path)

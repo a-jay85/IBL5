@@ -45,12 +45,26 @@ REMEDIATION_PATHS = (
     ".claude/review-shared/_phase65-remediation.md",
 )
 
-# The remediation model edits files and nothing else. `Bash` absent from the allowlist AND
-# present in the deny list is the enforcement of "the model never pushes": with no command
-# execution it cannot reach the VCS, even if a settings file carries a Bash allow rule. The
-# harness commits and pushes afterwards.
-REMEDIATION_ALLOWED_TOOLS = ("Read", "Grep", "Glob", "Edit", "Write")
-REMEDIATION_DENIED_TOOLS = ("Bash", "Agent")
+# The remediation agent may read files, edit the worktree, and fix PR-body findings with
+# `gh pr edit`. It needs Bash for that last one: PR-body findings live on GitHub, not in
+# the worktree, and the old no-Bash budget left the agent unable to act on them at all
+# (PR #2308 round 3 — both blocking findings were body text, and the agent committed
+# nothing). The harness still commits and pushes worktree edits after the agent exits.
+#
+# Read the deny list as a denylist, not a sandbox. The allow side is bare `Bash`, so
+# anything not named below is reachable; these five cover the escape routes that matter
+# for "never pushes, never arms a merge". Claude Code matches deny patterns on the
+# command prefix, so a compound command could slip past one. The prompt instruction in
+# `remediate()` is the contract; this list is the guardrail under it.
+REMEDIATION_ALLOWED_TOOLS = ("Read", "Grep", "Glob", "Edit", "Write", "Bash")
+REMEDIATION_DENIED_TOOLS = (
+    "Agent",
+    "Bash(git push:*)",
+    "Bash(git commit:*)",
+    "Bash(gh pr merge:*)",
+    "Bash(gh pr review:*)",
+    "Bash(gh api:*)",
+)
 
 # Inline diff budget for the remediation prompt. 40 KB is ~10K tokens: large enough
 # to carry every diff observed in the three round-two deaths (#2308 8 KB, #2310 14 KB,
@@ -255,12 +269,13 @@ def _noop_log(_msg: str) -> None:
 
 def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
               verdict1_path: str, master_sha: str, log=None, *,
-              commit=None) -> str | None:
+              commit=None, pr_number: int | str | None = None) -> str | None:
     """Fix the blocking findings behind a `NOT READY`. Returns the commit sha, or None.
 
-    The model edits; the HARNESS commits and pushes. That split is not a convention —
-    `Bash` is withheld from the model on both the allow and the deny side, so it has no
-    path to a command at all.
+    The model edits worktree files and may fix PR-body findings via `gh pr edit`. The
+    HARNESS commits and pushes worktree edits. `git push`, `git commit`, `gh pr merge`,
+    `gh pr review` and `gh api` are denied; that denylist is a guardrail rather than a
+    sandbox, and the prompt states the contract it guards.
 
     `commit` is the message -> sha callable. runner passes its Phase 2 gate wrapper so a
     doc-staleness denial gets the same one-shot last_verified bump here; it is injected
@@ -289,12 +304,19 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
         diff_note = (f"\n[diff truncated at {REMEDIATION_DIFF_INLINE_CAP} bytes; the full "
                      f"patch is at {os.path.join(packet_dir, 'diff.patch')} - Read it with "
                      "offset/limit if a finding points past this cut]\n")
+    pr_note = (f"\nPR body findings: when a blocking finding is about the PR body, "
+               f"fix it with `gh pr edit {pr_number} --body-file <path>`.\n"
+               if pr_number is not None else "")
     prompt = (
         "Remediate the blocking findings from the plan-intent fidelity review.\n\n"
         "Every input you need is INLINE below. Do not Read the packet paths first; they\n"
         "are listed only so a finding that cites a line can be re-checked.\n\n"
-        "Edit the worktree you are running in. You have no Bash and no Agent tool: do not\n"
-        "try to commit, push, or delegate. The harness commits and pushes your edits.\n"
+        "Edit the worktree you are running in. You HAVE Bash for read-only inspection\n"
+        "and for `gh pr edit`. The following Bash commands are DENIED and must not be\n"
+        "attempted: `git push`, `git commit`, `gh pr merge`, `gh pr review`, `gh api`.\n"
+        "The harness commits and pushes your worktree edits after you finish."
+        f"{pr_note}\n"
+        "No Agent tool: do not delegate.\n"
         "When a file you must inspect is large, Read it with offset and limit rather\n"
         "than whole; a whole-file Read of a large file is denied in this session.\n\n"
         "=== REMEDIATION PROCEDURE (follow it exactly) ===\n"
@@ -650,14 +672,18 @@ def carry_forward_predicate(sticky_body, diff_id: str,
 
 def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
                    digest: list, excerpt: str, terminal: str, *,
-                   diff_id: str = "", plan_hash: str = "") -> str:
+                   diff_id: str = "", plan_hash: str = "",
+                   posted_at: str = "") -> str:
     """The full sticky comment body, marker last.
 
     Ordering is a contract, not a style: every line the DM parser must NOT read as a digest
     label sits ABOVE `### Merge digest`, and the marker is the final line.
+
+    `posted_at` — when non-empty, adds a top banner, timestamps the verdict line, and adds
+    an italic timestamp line immediately above the terminal line. When empty, the output is
+    identical to the pre-timestamp shape so existing callers are unaffected.
     """
     fid = fid or {}
-    out = [rebase_line, ci_line, ""]
 
     # `findings_round` names which review the excerpt below was quoted from: 0 for
     # verdict 1, otherwise the 1-based remediation round whose re-review produced it.
@@ -667,11 +693,24 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
     rounds = fid.get("rounds") or []
     findings_round = fid.get("findings_round") or 0
     if findings_round and findings_round <= len(rounds):
-        shown = rounds[findings_round - 1].get("verdict")
-        out.append(f"Plan-fidelity verdict: {shown or 'missing'} (re-review after "
-                   f"remediation round {findings_round}) — reviewer findings follow")
+        verdict_word = rounds[findings_round - 1].get("verdict") or "missing"
     else:
-        out.append(f"Plan-fidelity verdict: {fid.get('verdict_1') or 'missing'} — "
+        verdict_word = fid.get("verdict_1") or "missing"
+
+    out = []
+    if posted_at:
+        out.append(f"**LATEST VERDICT: {verdict_word}** — posted {posted_at}")
+        out.append("")
+    out.extend([rebase_line, ci_line, ""])
+
+    # The timestamp is inserted before "reviewer findings follow" so the line reads:
+    # "Plan-fidelity verdict: NOT READY — posted <ts> — reviewer findings follow"
+    ts_mid = f"posted {posted_at} — " if posted_at else ""
+    if findings_round and findings_round <= len(rounds):
+        out.append(f"Plan-fidelity verdict: {verdict_word} (re-review after "
+                   f"remediation round {findings_round}) — {ts_mid}reviewer findings follow")
+    else:
+        out.append(f"Plan-fidelity verdict: {verdict_word} — {ts_mid}"
                    "reviewer findings follow")
     out.append(excerpt if excerpt else f"(no verdict file: {fid.get('error_kind')})")
 
@@ -717,6 +756,15 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
         rows[4] = rows[4] + f" (post-plan remediation: {sha})"
     out.extend(rows)
 
+    # The digest block must END here. `_digest_labels` in bin/digest-dm-build folds every
+    # later non-label, non-blank line into the LAST label's value until it hits a heading
+    # or a horizontal rule, so without this terminator the remediation note, the posted-at
+    # line, the terminal verdict line and the marker all land inside the Discord DM's
+    # `**Machine-authored fixes:**` value. The awk already treats `---` as an end-of-block
+    # token for exactly this reason, and /pr-ready emits the same one after its digest.
+    out.append("")
+    out.append("---")
+
     if sha:
         out.append("")
         if findings_round:
@@ -734,6 +782,8 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
                        "findings above are verdict 1's.")
 
     out.append("")
+    if posted_at:
+        out.append(f"*Verdict posted {posted_at}.*")
     out.append(terminal)
     out.append(STICKY_MARKER)
     return "\n".join(out) + "\n"

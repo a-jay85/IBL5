@@ -45,14 +45,60 @@ jobs:
             echo "src=false" >> "$GITHUB_OUTPUT"
           fi
 
+  # Content-hash memo (ADR-0131 addendum). Same input set as the e2e memo
+  # (--manifest reuses .github/ci-memo/e2e.paths) under its own `lighthouse`
+  # scope, so the key never collides with the e2e key. bin/ci-memo folds the
+  # php-apache image digest for this scope too; an unreadable manifest yields
+  # empty hash= and key= so neither lookup nor save fires. PR-only: re-runs and
+  # non-PR events bypass it. The audit is not a required context, so a skip
+  # weakens no merge gate.
+  ci-memo-check:
+    name: Lighthouse Memo Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      hash: ${{ steps.key.outputs.hash }}
+      key: ${{ steps.key.outputs.key }}
+      hit: ${{ steps.lookup.outputs.cache-hit }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Authenticate to GHCR
+        continue-on-error: true
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+          GHCR_USER: ${{ github.actor }}
+        run: echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+      - name: Compute memo key
+        id: key
+        env:
+          CI_MEMO_BYPASS: ${{ (github.event_name != 'pull_request' || github.run_attempt != '1') && 'not_pr_or_rerun' || '' }}
+        run: bin/ci-memo key lighthouse --manifest .github/ci-memo/e2e.paths
+      - name: Look up memo
+        id: lookup
+        if: steps.key.outputs.hash != ''
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .ci-memo-sentinel
+          key: ${{ steps.key.outputs.key }}
+      - name: Report memo result
+        env:
+          MEMO_HASH: ${{ steps.key.outputs.hash }}
+          MEMO_RESULT: ${{ steps.lookup.outputs.cache-hit == 'true' && 'hit' || 'miss' }}
+        run: bin/ci-memo report lighthouse "$MEMO_HASH" "$MEMO_RESULT" .ci-memo-sentinel
+
   lighthouse:
     name: Performance Audit
-    needs: [changes]
-    if: |
-      always() &&
-      needs.changes.outputs.src == 'true'
+    needs: [changes, ci-memo-check]
+    if: always() && needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    # Written only at the end of this job, after the audit step succeeded, on a
+    # run that was a miss. Empty hash (bypass or unreadable manifest) => no save.
+    env:
+      MEMO_WRITE: ${{ needs.ci-memo-check.outputs.hash != '' && needs.ci-memo-check.outputs.hit != 'true' }}
 
     steps:
       # fetch-depth: 0 is load-bearing — the URL-selection step below diffs
@@ -65,6 +111,7 @@ jobs:
 
       # --- Lighthouse ---
       - name: Run Lighthouse CI
+        id: lhci
         working-directory: ibl5
         run: |
           # Feed the changed-path list in explicitly rather than letting the
@@ -139,6 +186,23 @@ jobs:
         with:
           header: lighthouse-comment
           path: ibl5/.lighthouseci/comment.md
+
+      # --- CI memo (ADR-0131 addendum) ---
+      # A step `if:` with no status function gets success() ANDed in, so a
+      # failure in any earlier step, and the audit step in particular, skips
+      # both memo steps. A failed run never saves a memo.
+      - name: Write memo sentinel
+        if: steps.lhci.conclusion == 'success' && env.MEMO_WRITE == 'true'
+        env:
+          MEMO_HASH: ${{ needs.ci-memo-check.outputs.hash }}
+        run: bin/ci-memo record lighthouse "$MEMO_HASH" .ci-memo-sentinel
+      - name: Save CI memo
+        if: steps.lhci.conclusion == 'success' && env.MEMO_WRITE == 'true'
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .ci-memo-sentinel
+          key: ${{ needs.ci-memo-check.outputs.key }}
 
       # --- Cleanup ---
       - name: Teardown

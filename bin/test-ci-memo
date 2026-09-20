@@ -21,6 +21,7 @@ MEMO="$SCRIPT_DIR/ci-memo"
 REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 WF_TESTS="$REPO_ROOT/.github/workflows/tests.yml"
 WF_E2E="$REPO_ROOT/.github/workflows/e2e-tests.yml"
+WF_LH="$REPO_ROOT/.github/workflows/lighthouse.yml"
 
 PASS=0; FAIL=0
 ONLY_CASE=""
@@ -39,6 +40,39 @@ trap 'rm -rf "$TMP"' EXIT
 pass() { echo "PASS: $1"; PASS=$((PASS+1)); }
 fail() { echo "FAIL: $1"; FAIL=$((FAIL+1)); }
 should_run() { [[ -z "$ONLY_CASE" || "$ONLY_CASE" == "$1" ]]; }
+
+# ---- gate-topology assertion functions (reused by gate-topology-mutants) -
+vr_if_shape() {
+    awk '
+        /^  e2e:/{in_job=1; next}
+        /^  [a-zA-Z]/ && in_job { in_job=0 }
+        in_job && /^    if: \(needs\.changes\.outputs\.src == .true. && needs\.ci-memo-check\.outputs\.hit != .true.\) \|\| needs\.changes\.outputs\.baseline == .true.$/ { found=1; exit }
+        END { exit !found }
+    ' "$1"
+}
+
+lh_job_gate() {
+    awk '
+        /^  lighthouse:/{in_job=1; next}
+        /^  [a-zA-Z]/ && in_job { in_job=0 }
+        in_job && /^    needs:.*ci-memo-check/ { n=1 }
+        in_job && /^    if: .*needs\.ci-memo-check\.outputs\.hit != .true./ { c=1 }
+        END { exit !(n && c) }
+    ' "$1"
+}
+
+lh_save_guard() {
+    awk '
+        /^  lighthouse:/{in_job=1; next}
+        /^  [a-zA-Z]/ && in_job { in_job=0 }
+        in_job && /MEMO_WRITE:/ && /outputs\.hash != .{2}/ && /outputs\.hit != .true./ { mw=1 }
+        in_job && /^      - /{ if (save) { if (ok && coe) valid_save=1; else bad=1 }; save=0; ok=0; coe=0 }
+        in_job && /actions\/cache\/save/ { save=1 }
+        in_job && /^        if: steps\.lhci\.conclusion == .success. && env\.MEMO_WRITE == .true.$/ { ok=1 }
+        in_job && /continue-on-error: true/ { coe=1 }
+        END { if (save) { if (ok && coe) valid_save=1; else bad=1 }; exit (bad || !mw || !valid_save) }
+    ' "$1"
+}
 
 # ---- temp git repo helper -----------------------------------------------
 mk_repo() {
@@ -279,6 +313,36 @@ if should_run digest-unavailable-miss; then
 fi
 
 # =========================================================================
+# Case: lighthouse-scope-fold
+if should_run lighthouse-scope-fold; then
+    r="$TMP/lh-repo"; mk_repo "$r"
+    lh_env=(CI_MEMO_REPO="$r" CI_MEMO_MANIFEST_DIR="$r/ci-memo" GITHUB_OUTPUT="" GITHUB_STEP_SUMMARY="")
+    k_lh_unavail=$(env "${lh_env[@]}" CI_MEMO_DIGEST_CMD=false \
+        "$MEMO" key lighthouse --manifest "$r/ci-memo/e2e.paths" 2>/dev/null | grep '^key=' | sed 's/^key=//')
+    k_lh_stub=$(env "${lh_env[@]}" CI_MEMO_DIGEST_CMD='echo stub-manifest' \
+        "$MEMO" key lighthouse --manifest "$r/ci-memo/e2e.paths" 2>/dev/null | grep '^hash=')
+    k_e2e_stub=$(env "${lh_env[@]}" CI_MEMO_DIGEST_CMD='echo stub-manifest' \
+        "$MEMO" key e2e 2>/dev/null | grep '^hash=')
+    k_tests=$(env "${lh_env[@]}" CI_MEMO_DIGEST_CMD=false \
+        "$MEMO" key tests 2>/dev/null | grep '^key=' | sed 's/^key=//')
+    p_lh=$(env "${lh_env[@]}" "$MEMO" paths lighthouse --manifest "$r/ci-memo/e2e.paths" 2>/dev/null)
+    p_e2e=$(env "${lh_env[@]}" "$MEMO" paths e2e 2>/dev/null)
+    if [[ -n "$k_lh_unavail" ]]; then
+        fail "lighthouse-scope-fold: unreadable manifest must yield empty key, got '$k_lh_unavail'"
+    elif [[ -z "$k_lh_stub" || -z "$k_e2e_stub" ]]; then
+        fail "lighthouse-scope-fold: stub-digest hash is empty (lh='$k_lh_stub' e2e='$k_e2e_stub')"
+    elif [[ "$k_lh_stub" == "$k_e2e_stub" ]]; then
+        fail "lighthouse-scope-fold: lighthouse and e2e keys collide on the same tree"
+    elif [[ -z "$k_tests" ]]; then
+        fail "lighthouse-scope-fold: tests scope must NOT fold the image digest (key went empty)"
+    elif [[ "$p_lh" != "$p_e2e" ]]; then
+        fail "lighthouse-scope-fold: --manifest e2e.paths must list the same pathspecs as scope e2e"
+    else
+        pass "lighthouse-scope-fold"
+    fi
+fi
+
+# =========================================================================
 # Case: manifest-coverage
 # Asserts: every path literal in the memoized dorny filter blocks of each
 # real workflow is covered by the matching scope's manifest.
@@ -371,11 +435,53 @@ if should_run manifest-coverage; then
     check_coverage tests "$WF_TESTS" "both|src|shell|ibl5ts|iblbot|jsdeps"
     check_coverage e2e   "$WF_E2E"   "runtime"
 
+    # check_literal_refs <scope> <mset-file> <path>...: each path must be a
+    # tracked file/dir whose files all appear in the manifest set.
+    check_literal_refs() {
+        local scope="$1" mset="$2"; shift 2
+        local ok=1
+        for p in "$@"; do
+            local files
+            files=$(git -C "$REPO_ROOT" ls-files -- "$p" 2>/dev/null)
+            if [[ -z "$files" ]]; then
+                fail "manifest-coverage[$scope]: '$p' matches no tracked files"
+                cov_fail=1; ok=0; continue
+            fi
+            while IFS= read -r f; do
+                if ! grep -qxF "$f" "$mset"; then
+                    fail "manifest-coverage[$scope]: '$f' not in $scope manifest"
+                    cov_fail=1; ok=0
+                fi
+            done <<< "$files"
+        done
+        [[ $ok -eq 1 ]] && pass "manifest-coverage[$scope]"
+    }
+
+    # Build the e2e manifest set once (reused for vr and lighthouse checks)
+    e2e_manifest_file="$TMP/mset-e2e"
+    env CI_MEMO_REPO="$REPO_ROOT" CI_MEMO_MANIFEST_DIR="$REPO_ROOT/.github/ci-memo" \
+        "$MEMO" paths e2e 2>/dev/null \
+        | xargs git -C "$REPO_ROOT" ls-files -- 2>/dev/null > "$e2e_manifest_file"
+
+    # VR-specific inputs (the Visual Regression job now shares the e2e memo)
+    check_literal_refs vr  "$e2e_manifest_file" bin/vr-build-gallery bin/vr-changed-coverage bin/vr-review-comment \
+        'ibl5/tests/e2e/**-snapshots/*'
+    # Lighthouse inputs: every local action lighthouse.yml `uses:`, plus its config and URL map
+    lh_actions=$(awk '/uses: \.\//{ sub(/.*uses: \.\//,""); sub(/[[:space:]].*$/,""); print }' "$WF_LH" | sort -u)
+    if [[ -z "$lh_actions" ]]; then
+        fail "manifest-coverage[lighthouse]: no local actions extracted"
+        cov_fail=1
+    else
+        # shellcheck disable=SC2086
+        check_literal_refs lighthouse "$e2e_manifest_file" $lh_actions .github/actions/setup-docker-e2e \
+            ibl5/.lighthouserc.json ibl5/classes/Cli/LighthouseUrls.php
+    fi
+
     [[ $cov_fail -eq 0 ]] || true  # per-scope passes/fails already recorded
 fi
 
 # =========================================================================
-# Case: gate-topology (four awk assertions over both workflow files)
+# Case: gate-topology (awk assertions over the three memoized workflow files)
 # =========================================================================
 if should_run gate-topology; then
     gt_fail=0
@@ -397,7 +503,7 @@ if should_run gate-topology; then
     done
 
     # --- Assertion 2: every job with ci-memo-check.outputs.hit in if: also has ci-memo-check in needs: ---
-    for wf in "$WF_TESTS" "$WF_E2E"; do
+    for wf in "$WF_TESTS" "$WF_E2E" "$WF_LH"; do
         wfn=$(basename "$wf")
         violations=$(awk '
             /^  [a-zA-Z][a-zA-Z0-9_-]*:/{
@@ -420,7 +526,7 @@ if should_run gate-topology; then
     done
 
     # --- Assertion 3: every non-exempt job that needs a memo-gated job also has the memo clause ---
-    for wf in "$WF_TESTS" "$WF_E2E"; do
+    for wf in "$WF_TESTS" "$WF_E2E" "$WF_LH"; do
         wfn=$(basename "$wf")
         # Pass 1: collect memo-gated job ids (jobs whose if: has the memo clause)
         memo_pat=$(awk '
@@ -430,7 +536,7 @@ if should_run gate-topology; then
         # Pass 2: for each non-exempt job that needs a memo-gated job, verify it also has the clause
         violations=$(awk -v memo_pat="$memo_pat" '
             BEGIN {
-                exempt["gate"]=1; exempt["e2e"]=1
+                exempt["gate"]=1
                 n=split(memo_pat, mja, "|")
                 for (i=1;i<=n;i++) memo_jobs[mja[i]]=1
             }
@@ -489,9 +595,9 @@ if should_run gate-topology; then
     # manifest. Both consumers must guard on it, or a run with no key restores
     # (or writes) the cache default. Asserted here because no unit case can see
     # the workflow side of "neither lookup nor save fires".
-    for wf in "$WF_TESTS" "$WF_E2E"; do
+    # 5a: the cache/restore step inside ci-memo-check carries the hash guard
+    for wf in "$WF_TESTS" "$WF_E2E" "$WF_LH"; do
         wfn=$(basename "$wf")
-        # 5a: the cache/restore step inside ci-memo-check carries the hash guard
         if awk '
             /^  ci-memo-check:/{in_job=1; next}
             /^  [a-zA-Z]/ && in_job { in_job=0 }
@@ -511,7 +617,10 @@ if should_run gate-topology; then
             fail "gate-topology[5a]: $wfn memo lookup missing the non-empty-hash guard"
             gt_fail=1
         fi
-        # 5b: the gate's MEMO_WRITE expression carries the same guard
+    done
+    # 5b: the gate's MEMO_WRITE expression carries the same guard (gate job only — lighthouse.yml has no gate)
+    for wf in "$WF_TESTS" "$WF_E2E"; do
+        wfn=$(basename "$wf")
         if awk '
             /^  gate:/{in_gate=1; next}
             /^  [a-zA-Z]/ && in_gate { in_gate=0 }
@@ -525,7 +634,51 @@ if should_run gate-topology; then
         fi
     done
 
+    # --- Assertion 6: the VR job memo-gates ONLY its src arm; the baseline arm stays bare ---
+    if vr_if_shape "$WF_E2E"; then pass "gate-topology[6]: e2e-tests.yml VR if gates only the src arm"
+    else fail "gate-topology[6]: e2e-tests.yml VR if is not '(src && !hit) || baseline'"; gt_fail=1; fi
+
+    # --- Assertion 7: lighthouse job needs ci-memo-check AND its single-line if carries the clause ---
+    if lh_job_gate "$WF_LH"; then pass "gate-topology[7]: lighthouse.yml lighthouse job needs + if carry the memo"
+    else fail "gate-topology[7]: lighthouse.yml lighthouse job missing needs or memo clause"; gt_fail=1; fi
+
+    # --- Assertion 8: lighthouse save fires only on audit success, never on always(), and is guarded ---
+    if lh_save_guard "$WF_LH"; then pass "gate-topology[8]: lighthouse.yml memo save is success-only, hash-guarded, continue-on-error"
+    else fail "gate-topology[8]: lighthouse.yml memo save guard is wrong or missing"; gt_fail=1; fi
+
     [[ $gt_fail -eq 0 ]] || true  # individual pass/fail already recorded
+fi
+
+# =========================================================================
+# Case: gate-topology-mutants
+# =========================================================================
+if should_run gate-topology-mutants; then
+    m="$TMP/mutants"; mkdir -p "$m"
+    # 6a: memo clause moved outside the parentheses (baseline arm gated)
+    sed "s|(needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true') || needs.changes.outputs.baseline == 'true'|(needs.changes.outputs.src == 'true' || needs.changes.outputs.baseline == 'true') \&\& needs.ci-memo-check.outputs.hit != 'true'|" "$WF_E2E" > "$m/e2e-6a.yml"
+    # 6b: memo clause deleted entirely
+    sed "s| \&\& needs.ci-memo-check.outputs.hit != 'true')|)|" "$WF_E2E" > "$m/e2e-6b.yml"
+    # 7: ci-memo-check dropped from lighthouse needs
+    sed 's|^    needs: \[changes, ci-memo-check\]|    needs: [changes]|' "$WF_LH" > "$m/lh-7.yml"
+    # 8a: save guard replaced by always()
+    sed "s|if: steps.lhci.conclusion == 'success' \&\& env.MEMO_WRITE == 'true'|if: always()|" "$WF_LH" > "$m/lh-8a.yml"
+    # 8b: hash guard stripped from MEMO_WRITE
+    sed "s|needs.ci-memo-check.outputs.hash != '' \&\& ||" "$WF_LH" > "$m/lh-8b.yml"
+    # 8c: continue-on-error removed from the save step
+    awk '/- name: Save CI memo/{skip=1} skip && /continue-on-error: true/{skip=0; next} {print}' "$WF_LH" > "$m/lh-8c.yml"
+    mt_check() {
+        if "$2" "$3"; then fail "gate-topology-mutants[$1]: assertion passed on mutant"; else pass "gate-topology-mutants[$1]"; fi
+    }
+    for f in e2e-6a e2e-6b lh-7 lh-8a lh-8b lh-8c; do
+        src="$WF_E2E"; [[ $f == lh-* ]] && src="$WF_LH"
+        cmp -s "$m/$f.yml" "$src" && fail "gate-topology-mutants[$f]: mutant identical to source (anchor missed)"
+    done
+    mt_check 6a vr_if_shape  "$m/e2e-6a.yml"
+    mt_check 6b vr_if_shape  "$m/e2e-6b.yml"
+    mt_check 7  lh_job_gate  "$m/lh-7.yml"
+    mt_check 8a lh_save_guard "$m/lh-8a.yml"
+    mt_check 8b lh_save_guard "$m/lh-8b.yml"
+    mt_check 8c lh_save_guard "$m/lh-8c.yml"
 fi
 
 # =========================================================================

@@ -1,6 +1,6 @@
 ---
 description: J24 gate-1 code-7 arming-share band re-denominated from the all-era 209.2 poss/g convention to the recent-era box-score 216.58 poss/g the engine actually sims (05-08 rosters). Overturns the standing "-0.57pp NO-GO vs floor 12.94" as a pure DENOMINATION ARTIFACT — the numerator was recent-era markers/g (27.13) over an all-era denominator (209.2). Re-denominated, master's convention-FREE 12.37% code-7 share lands INSIDE the between-season drift band [11.97, 12.54]. Records two judgment calls (denominator = 216.58, rejecting PBP ~226/g and all-era 209.2; band = between-season drift per ADR-0049, not a tight pooled SEM) and the ~0.05pp SEM caveat: verdict is WITHIN-NOISE, NOT a clean GO (master -0.05pp under the tightest era-matched 2-season CI floor ~12.42). Unblocks the OPEN J13-3 cut-over ADR, which makes the final go/no-go call. Documentation/log-only band re-spec — NO engine sim change.
-last_verified: 2026-07-21
+last_verified: 2026-09-20
 ---
 
 # ADR-0088: J24 gate-1 code-7 arming-share band — recent-era re-denomination (216.58 poss/g)

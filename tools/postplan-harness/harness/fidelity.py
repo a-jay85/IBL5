@@ -478,6 +478,13 @@ CARRY_FORWARD_VERDICTS = ("READY", "READY WITH NOTES")
 
 _MERGE_DIGEST_HEADING_RE = re.compile(r"^#{1,6}[ \t]+Merge digest")
 
+# `record_reviewed_tree` appends `REVIEWED_TREE=<sha>` BELOW the verdict file's `## DIGEST`
+# section, and digest.sh folds any non-label line into the record above it — so the hash
+# rides out on the fifth digest label and into the merge DM. Stripped here rather than in
+# digest.sh, which /pr-ready runs too and whose label list is asserted byte-identical
+# against skip-review.sh. findings_excerpt drops the same line for the same reason.
+_REVIEWED_TREE_TAIL_RE = re.compile(r"[ \t]*REVIEWED_TREE=[0-9a-f]{40}[ \t]*$")
+
 
 def findings_excerpt(path: str, verdict_present: bool) -> str:
     """The reviewer's findings, quoted safely into the sticky comment.
@@ -641,8 +648,20 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
     fid = fid or {}
     out = [rebase_line, ci_line, ""]
 
-    out.append(f"Plan-fidelity verdict: {fid.get('verdict_1') or 'missing'} — "
-               "reviewer findings follow")
+    # `findings_round` names which review the excerpt below was quoted from: 0 for
+    # verdict 1, otherwise the 1-based remediation round whose re-review produced it.
+    # The runner sets it in the same statement that advances fid["verdict_path"], so
+    # the label and the quoted text can never name different reviews. Its verdict word
+    # is looked up out of `rounds` rather than re-derived, for the same reason.
+    rounds = fid.get("rounds") or []
+    findings_round = fid.get("findings_round") or 0
+    if findings_round and findings_round <= len(rounds):
+        shown = rounds[findings_round - 1].get("verdict")
+        out.append(f"Plan-fidelity verdict: {shown or 'missing'} (re-review after "
+                   f"remediation round {findings_round}) — reviewer findings follow")
+    else:
+        out.append(f"Plan-fidelity verdict: {fid.get('verdict_1') or 'missing'} — "
+                   "reviewer findings follow")
     out.append(excerpt if excerpt else f"(no verdict file: {fid.get('error_kind')})")
 
     out.append("")
@@ -657,7 +676,6 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
     if fid.get("verdict_2") is not None:
         out.append(f"**Re-reviewed tree:** {fid.get('reviewed_tree_2') or 'unrecorded'} "
                    f"({fid.get('verdict_2')})")
-    rounds = fid.get("rounds") or []
     if len(rounds) > 1:
         out.append("**Remediation rounds:** " + ", ".join(
             f"{i + 1}. {(r.get('remediation_sha') or '')[:12]} "
@@ -690,8 +708,19 @@ def compose_sticky(rebase_line: str, ci_line: str, fid: dict, decision,
 
     if sha:
         out.append("")
-        out.append(f"Remediation: commit {sha} addresses the verdict-1 NOT READY findings; "
-                   "the re-review result is on the Re-reviewed tree line.")
+        if findings_round:
+            # NOT `sha`: remediation_sha is the LAST commit the harness authored, which
+            # Phase 7 needs for the CI watch. A trailing ungraded round moves it past the
+            # round the excerpt came from, and naming it here would pair a commit with a
+            # re-review that never saw it.
+            graded_sha = rounds[findings_round - 1].get("remediation_sha") or sha
+            out.append(f"Remediation: commit {graded_sha} closed remediation round "
+                       f"{findings_round}. The findings above come from the re-review "
+                       "that graded it.")
+        else:
+            out.append(f"Remediation: commit {sha} addresses the verdict-1 NOT READY "
+                       "findings. Every re-review round was indeterminate, so the "
+                       "findings above are verdict 1's.")
 
     out.append("")
     out.append(terminal)
@@ -752,5 +781,6 @@ def digest_lines(worktree, master_sha: str, verdict_path: str, out_dir: str,
         if not lines[i].startswith(lbl):
             return _digest_degraded()
     # digest.sh's own `<label> unavailable — <reason>` degrades pass this shape test and are
-    # used verbatim, exactly as the skill pastes them.
-    return lines
+    # used verbatim, exactly as the skill pastes them. The tree-line strip runs AFTER the
+    # shape test, so a label reduced to just its label still degrades the same way.
+    return [_REVIEWED_TREE_TAIL_RE.sub("", ln) for ln in lines]

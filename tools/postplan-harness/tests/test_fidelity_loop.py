@@ -136,8 +136,8 @@ def test_fidelity_dict_has_full_schema_after_loop(tmp_path, git_shim):
         assert set(res.fidelity) == {
             "verdict_1", "error_kind", "reviewed_tree", "verdict_path",
             "remediation_sha", "verdict_2", "reviewed_tree_2",
-            "rounds", "rounds_completed", "backlog_issue_numbers",
-            "diff_id", "plan_hash",
+            "findings_round", "rounds", "rounds_completed",
+            "backlog_issue_numbers", "diff_id", "plan_hash",
         }
     finally:
         _cleanup(99, "99-2", "99-3", "99-4")
@@ -176,5 +176,61 @@ def test_baseline_remediate_none_leaves_verdict_1_standing(tmp_path, git_shim):
         assert res.fidelity["verdict_1"] == "NOT READY"
         assert res.fidelity["remediation_sha"] is None
         assert rrev == 0
+    finally:
+        _cleanup(99)
+
+
+def test_verdict_path_follows_the_last_determinate_round(tmp_path, git_shim):
+    """The sticky's findings source tracks the newest re-review, not verdict 1.
+
+    This is the stale-findings regression: the loop used to advance only a local, so the
+    posted comment quoted verdict 1's findings after three rounds had re-graded them.
+    """
+    canned = {
+        "plan-fidelity-review": "6d checks\n\nNOT READY\n",
+        "fidelity-remediation": "edited",
+        "plan-fidelity-re-review-2": "NOT READY\n",
+        "plan-fidelity-re-review-3": "NOT READY\n",
+        "plan-fidelity-re-review-4": "NOT READY\n",
+    }
+    try:
+        res, _, _ = _drive(tmp_path, canned)
+        assert res.fidelity["findings_round"] == 3
+        assert res.fidelity["verdict_path"] == fidelity.verdict_path("99-4")
+        assert res.fidelity["rounds"][2]["verdict_path"] == fidelity.verdict_path("99-4")
+    finally:
+        _cleanup(99, "99-2", "99-3", "99-4")
+
+
+def test_an_indeterminate_round_leaves_the_source_on_the_last_graded_one(tmp_path,
+                                                                        git_shim):
+    """A re-review with no verdict word never becomes the findings source.
+
+    Its file exists (re_review writes before parsing), so an unguarded advance would
+    quote a document that carries no verdict at all.
+    """
+    canned = {
+        "plan-fidelity-review": "6d checks\n\nNOT READY\n",
+        "fidelity-remediation": "edited",
+        "plan-fidelity-re-review-2": "NOT READY\n",
+        "plan-fidelity-re-review-3": "the reviewer degraded and wrote no verdict word\n",
+    }
+    try:
+        res, _, _ = _drive(tmp_path, canned)
+        assert res.fidelity["rounds_completed"] == 2
+        assert res.fidelity["verdict_2"] is None
+        assert res.fidelity["findings_round"] == 1
+        assert res.fidelity["verdict_path"] == fidelity.verdict_path("99-2")
+    finally:
+        _cleanup(99, "99-2", "99-3")
+
+
+def test_no_remediation_leaves_the_source_on_verdict_1(tmp_path, git_shim):
+    """Round 0 is the unremediated state: verdict 1's path, and findings_round 0."""
+    canned = {"plan-fidelity-review": "6d checks\n\nNOT READY\n"}
+    try:
+        res, _, _ = _drive(tmp_path, canned, git_obj=_git(dirty=True))
+        assert res.fidelity["findings_round"] == 0
+        assert res.fidelity["verdict_path"] == fidelity.verdict_path(99)
     finally:
         _cleanup(99)

@@ -12,7 +12,7 @@
 #
 # NEVER pushes, never force-pushes, never calls gh, never rebases, never
 # resets --hard, never creates or deletes worktrees. Fast-forward only.
-# See ADR-0106 for the design rationale.
+# See ADR-0106 and ADR-0133 for the design rationale.
 #
 # Usage: bin/wt-sync-tick [--dry-run] [--force] [--help] [--only <path>]
 #   --dry-run         Report what it would do; change nothing.

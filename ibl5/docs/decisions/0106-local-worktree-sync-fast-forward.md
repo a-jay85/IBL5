@@ -1,6 +1,6 @@
 ---
 description: Local worktree sync driver — fast-forward-only, HID-idle-gated, straggler-logging.
-last_verified: 2026-08-20
+last_verified: 2026-09-20
 ---
 
 # ADR-0106: Local Worktree Sync via Fast-Forward Only
@@ -50,3 +50,11 @@ Lock/log namespacing is `wt-sync/` under `~/.claude/projects/-Users-ajaynicolas-
 - `bin/bug-pipeline-cron-setup` — launchd installer pattern this mirrors
 - `.github/workflows/update-behind-prs.yml` — the cloud counterpart that keeps `origin/<branch>` current (PR #1924)
 - `ibl5/docs/decisions/0046-worktrees-outside-repo.md` — worktree layout this driver navigates
+
+## Extended by
+
+ADR-0133 (`ibl5/docs/decisions/0133-on-demand-worktree-sync.md`) adds a `--only <path>` on-demand
+mode to `bin/wt-sync-tick`. On-demand mode bypasses the HID-idle and in-use gates, waits up to 3 s
+for the fleet lock without acquiring it, and permits exactly one write this ADR forbids: a
+`git merge origin/<branch>` when the worktree is diverged and clean of uncommitted and untracked
+changes. All other entries on the never-list above are unchanged in both modes.

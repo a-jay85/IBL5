@@ -314,6 +314,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                                if sha == pre_rebase else "REBASE=rebased onto origin/master")
         res.meta_checks_ok = run_meta_checks_local(
             git, worktree or "", "origin/master", log, live=live)
+        sha = git.head()  # refresh — remediation may have committed and moved HEAD
         try:
             git.push()
         except HarnessError as e:
@@ -811,8 +812,10 @@ def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=Tru
             pass
         return True
     # rc == 1: one bounded fix attempt
-    worktree = repo_root if os.path.isdir(os.path.join(repo_root, ".git")) else None
+    # os.path.exists (not isdir) because .git is a regular file in bin/wt-new worktrees
+    worktree = repo_root if os.path.exists(os.path.join(repo_root, ".git")) else None
     if worktree and _remediate_doc_staleness(worktree, git, log) > 0:
+        git.commit_all(f"chore: auto-remediate doc staleness\n\n{_REMEDIATION_NOTE}")
         result2 = subprocess.run(argv, cwd=repo_root, capture_output=True, text=True)
         last_result = result2
         rc2 = result2.returncode

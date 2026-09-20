@@ -139,8 +139,7 @@ def test_row16_negative_flag_file(tmp_path):
         )
 
     with mock.patch.object(r.subprocess, "run", fake_run), \
-         mock.patch.object(r, "_remediate_doc_staleness", return_value=0), \
-         mock.patch("os.path.isdir", return_value=True):
+         mock.patch.object(r, "_remediate_doc_staleness", return_value=0):
         result = run_meta_checks_local(
             git, str(tmp_path), "origin/master", lambda m: None, live=True)
 
@@ -200,10 +199,13 @@ def test_row18_bypass(monkeypatch):
         fake_run.assert_not_called()
 
 
-def test_row18_bounded_attempt():
-    """Stub failing then passing: result True, runner called exactly twice."""
+def test_row18_bounded_attempt(tmp_path):
+    """Stub failing then passing: result True, runner called exactly twice, commit recorded."""
     run_meta_checks_local, _ = _load()
     git = ReplayGit({"slug": "test/branch"})
+
+    # Simulate a bin/wt-new worktree where .git is a file, not a directory.
+    (tmp_path / ".git").write_text("gitdir: /fake/.git/worktrees/test-branch\n")
 
     import unittest.mock as mock
     import runner as r
@@ -220,13 +222,13 @@ def test_row18_bounded_attempt():
         )
 
     with mock.patch.object(r.subprocess, "run", fake_run), \
-         mock.patch.object(r, "_remediate_doc_staleness", return_value=1), \
-         mock.patch("os.path.isdir", return_value=True):
+         mock.patch.object(r, "_remediate_doc_staleness", return_value=1):
         result = run_meta_checks_local(
-            git, "/fake/root", "origin/master", lambda m: None, live=True)
+            git, str(tmp_path), "origin/master", lambda m: None, live=True)
 
     assert result is True
-    assert call_count[0] == 2, f"expected 2 calls, got {call_count[0]}"
+    assert call_count[0] == 2, f"expected 2 subprocess calls, got {call_count[0]}"
+    assert git.commit_messages, "bounded attempt must commit the staged date bumps"
 
 
 # ---------------------------------------------------------------------------

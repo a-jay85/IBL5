@@ -1,0 +1,646 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-ci-memo — regression harness for bin/ci-memo (ADR-0131).
+#
+# Builds throwaway git repos under mktemp -d, points CI_MEMO_REPO and
+# CI_MEMO_MANIFEST_DIR at them, and uses a plain directory as a stand-in for
+# actions/cache (one file per key).  Each fixture case exercises the same
+# three-step sequence the workflow runs:
+#   1. bin/ci-memo key <scope>      → produce hash= / key=
+#   2. look the key up in the fake cache dir
+#   3. on a simulated job success: bin/ci-memo record + copy sentinel to cache
+#
+# Run: bin/test-ci-memo [--case <name>]   (exit 0 = all pass, 1 = any failed)
+
+set -u
+unset GITHUB_OUTPUT GITHUB_STEP_SUMMARY 2>/dev/null || true
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+MEMO="$SCRIPT_DIR/ci-memo"
+REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
+WF_TESTS="$REPO_ROOT/.github/workflows/tests.yml"
+WF_E2E="$REPO_ROOT/.github/workflows/e2e-tests.yml"
+
+PASS=0; FAIL=0
+ONLY_CASE=""
+
+case "${1:-}" in
+    --case)
+        [[ $# -ge 2 ]] || { echo "usage: bin/test-ci-memo [--case <name>]" >&2; exit 2; }
+        ONLY_CASE="$2" ;;
+    "") ;;
+    *) echo "usage: bin/test-ci-memo [--case <name>]" >&2; exit 2 ;;
+esac
+
+TMP="$(mktemp -d)"
+trap 'rm -rf "$TMP"' EXIT
+
+pass() { echo "PASS: $1"; PASS=$((PASS+1)); }
+fail() { echo "FAIL: $1"; FAIL=$((FAIL+1)); }
+should_run() { [[ -z "$ONLY_CASE" || "$ONLY_CASE" == "$1" ]]; }
+
+# ---- temp git repo helper -----------------------------------------------
+mk_repo() {
+    # mk_repo <dir>  — init repo with a committed fixture (src/app.php, out.txt)
+    local d="$1"
+    mkdir -p "$d/src" "$d/ci-memo"
+    git init -q "$d"
+    git -C "$d" config user.email test@example.com
+    git -C "$d" config user.name  "test"
+    git -C "$d" config commit.gpgsign false
+    printf 'hello\n'  > "$d/src/app.php"
+    printf 'other\n'  > "$d/out.txt"
+    printf 'readme\n' > "$d/README.md"
+    git -C "$d" add src/app.php out.txt README.md
+    git -C "$d" commit -qm "init"
+    # manifests: tests scope → in-set = src/app.php; e2e scope → wider
+    printf 'src/app.php\n'             > "$d/ci-memo/tests.paths"
+    printf 'src/app.php\nout.txt\nREADME.md\n' > "$d/ci-memo/e2e.paths"
+}
+
+# Run bin/ci-memo key and capture hash= / key= into globals MEMO_HASH MEMO_KEY
+# Returns the exit code of ci-memo.
+run_key() {  # <repo> <manifest_dir> <scope>
+    local repo="$1" mdir="$2" scope="$3"
+    local out rc=0
+    out=$(CI_MEMO_REPO="$repo" CI_MEMO_MANIFEST_DIR="$mdir" \
+          GITHUB_OUTPUT="" GITHUB_STEP_SUMMARY="" \
+          "$MEMO" key "$scope" 2>/dev/null) || rc=$?
+    MEMO_HASH=$(printf '%s' "$out" | grep '^hash=' | sed 's/^hash=//')
+    MEMO_KEY=$(printf '%s'  "$out" | grep '^key='  | sed 's/^key=//')
+    return "$rc"
+}
+
+# ---- Case state shared between first-miss and identical-hit -------------
+_shared_repo="$TMP/shared-repo"
+_shared_cache="$TMP/shared-cache"
+_shared_hash=""
+_shared_key=""
+MEMO_HASH=""; MEMO_KEY=""
+
+# =========================================================================
+# Case: first-miss
+# =========================================================================
+if should_run first-miss; then
+    mk_repo "$_shared_repo"
+    mkdir -p "$_shared_cache"
+    if ! run_key "$_shared_repo" "$_shared_repo/ci-memo" tests; then
+        fail "first-miss: ci-memo key exited non-zero"
+    else
+        _shared_hash="$MEMO_HASH"; _shared_key="$MEMO_KEY"
+        if [[ -f "$_shared_cache/$_shared_key" ]]; then
+            fail "first-miss: expected cache miss but key file already exists"
+        else
+            # Simulate success: record + save to fake cache
+            sentinel="$TMP/sentinel-shared"
+            GITHUB_RUN_ID=42 CI_MEMO_REPO="$_shared_repo" \
+                "$MEMO" record tests "$_shared_hash" "$sentinel"
+            cp "$sentinel" "$_shared_cache/$_shared_key"
+            if [[ -f "$_shared_cache/$_shared_key" ]]; then
+                pass "first-miss"
+            else
+                fail "first-miss: key file not written to cache after record"
+            fi
+        fi
+    fi
+fi
+
+# =========================================================================
+# Case: identical-hit
+# =========================================================================
+if should_run identical-hit; then
+    # Ensure shared state is populated (re-run first-miss if running standalone)
+    if [[ -z "$_shared_hash" || ! -d "$_shared_repo" ]]; then
+        mk_repo "$_shared_repo"
+        mkdir -p "$_shared_cache"
+        if ! run_key "$_shared_repo" "$_shared_repo/ci-memo" tests; then
+            fail "identical-hit: could not compute initial key"
+        else
+            _shared_hash="$MEMO_HASH"; _shared_key="$MEMO_KEY"
+            sentinel="$TMP/sentinel-shared"
+            GITHUB_RUN_ID=42 CI_MEMO_REPO="$_shared_repo" \
+                "$MEMO" record tests "$_shared_hash" "$sentinel"
+            cp "$sentinel" "$_shared_cache/$_shared_key"
+        fi
+    fi
+    # Second run with unchanged tree
+    if ! run_key "$_shared_repo" "$_shared_repo/ci-memo" tests; then
+        fail "identical-hit: ci-memo key failed on second run"
+    else
+        if [[ "$MEMO_HASH" != "$_shared_hash" ]]; then
+            fail "identical-hit: hash changed on unchanged tree ($MEMO_HASH != $_shared_hash)"
+        elif [[ ! -f "$_shared_cache/$MEMO_KEY" ]]; then
+            fail "identical-hit: expected cache hit but key file absent"
+        else
+            sentinel="$TMP/sentinel-hit"
+            cp "$_shared_cache/$MEMO_KEY" "$sentinel"
+            report_out=$("$MEMO" report tests "$MEMO_HASH" hit "$sentinel" 2>/dev/null)
+            if grep -q "CI_MEMO tests hit hash=$MEMO_HASH" <<< "$report_out" &&
+               grep -q "run_id=42" <<< "$report_out"; then
+                pass "identical-hit"
+            else
+                fail "identical-hit: report output missing expected fields: $report_out"
+            fi
+        fi
+    fi
+fi
+
+# =========================================================================
+# Case: in-set-edit-miss
+# =========================================================================
+if should_run in-set-edit-miss; then
+    r="$TMP/inset-repo"; c="$TMP/inset-cache"
+    mk_repo "$r"; mkdir -p "$c"
+    run_key "$r" "$r/ci-memo" tests
+    h1="$MEMO_HASH"; k1="$MEMO_KEY"
+    # Seed the cache so a hit would be possible
+    s0="$TMP/sentinel-inset0"
+    GITHUB_RUN_ID=1 CI_MEMO_REPO="$r" "$MEMO" record tests "$h1" "$s0"
+    cp "$s0" "$c/$k1"
+    # Commit an edit to a file that is IN the manifest (src/app.php)
+    printf 'changed\n' > "$r/src/app.php"
+    git -C "$r" add src/app.php
+    git -C "$r" commit -qm "edit in-set file"
+    run_key "$r" "$r/ci-memo" tests
+    h2="$MEMO_HASH"; k2="$MEMO_KEY"
+    if [[ "$h2" == "$h1" ]]; then
+        fail "in-set-edit-miss: hash unchanged after in-set file edit"
+    elif [[ -f "$c/$k2" ]]; then
+        fail "in-set-edit-miss: expected cache miss but key present in cache"
+    else
+        pass "in-set-edit-miss"
+    fi
+fi
+
+# =========================================================================
+# Case: out-of-set-edit-hit
+# =========================================================================
+if should_run out-of-set-edit-hit; then
+    r="$TMP/outset-repo"; c="$TMP/outset-cache"
+    mk_repo "$r"; mkdir -p "$c"
+    run_key "$r" "$r/ci-memo" tests
+    h1="$MEMO_HASH"; k1="$MEMO_KEY"
+    # Seed the cache
+    s0="$TMP/sentinel-outset0"
+    GITHUB_RUN_ID=1 CI_MEMO_REPO="$r" "$MEMO" record tests "$h1" "$s0"
+    cp "$s0" "$c/$k1"
+    # Commit an edit to out.txt which is NOT in the tests manifest
+    printf 'changed\n' > "$r/out.txt"
+    git -C "$r" add out.txt
+    git -C "$r" commit -qm "edit out-of-set file"
+    run_key "$r" "$r/ci-memo" tests
+    h2="$MEMO_HASH"
+    if [[ "$h2" != "$h1" ]]; then
+        fail "out-of-set-edit-hit: hash changed after out-of-set file edit ($h2 != $h1)"
+    elif [[ ! -f "$c/$MEMO_KEY" ]]; then
+        fail "out-of-set-edit-hit: expected cache hit but key absent"
+    else
+        pass "out-of-set-edit-hit"
+    fi
+fi
+
+# =========================================================================
+# Case: failed-job-no-record
+# =========================================================================
+if should_run failed-job-no-record; then
+    r="$TMP/failed-repo"; c="$TMP/failed-cache"
+    mk_repo "$r"; mkdir -p "$c"
+    run_key "$r" "$r/ci-memo" tests
+    h="$MEMO_HASH"; k="$MEMO_KEY"
+    # Simulate non-zero job exit: guard the record+copy on job_rc==0
+    job_rc=1   # simulated failure
+    if [[ $job_rc -eq 0 ]]; then
+        sentinel="$TMP/sentinel-failed"
+        GITHUB_RUN_ID=99 CI_MEMO_REPO="$r" "$MEMO" record tests "$h" "$sentinel"
+        cp "$sentinel" "$c/$k"
+    fi
+    # Assert: key file absent because record was skipped
+    if [[ -f "$c/$k" ]]; then
+        fail "failed-job-no-record: key file exists in cache despite simulated failure"
+    else
+        pass "failed-job-no-record"
+    fi
+fi
+
+# =========================================================================
+# Case: run-attempt-bypass
+# =========================================================================
+if should_run run-attempt-bypass; then
+    r="$TMP/bypass-repo"; mk_repo "$r"
+    local_hash="" local_key="" bp_rc=0
+    bp_out=$(CI_MEMO_REPO="$r" CI_MEMO_MANIFEST_DIR="$r/ci-memo" \
+             GITHUB_OUTPUT="" GITHUB_STEP_SUMMARY="" \
+             CI_MEMO_BYPASS=run_attempt \
+             "$MEMO" key tests 2>/dev/null) || bp_rc=$?
+    local_hash=$(printf '%s' "$bp_out" | grep '^hash=' | sed 's/^hash=//')
+    local_key=$(printf '%s'  "$bp_out" | grep '^key='  | sed 's/^key=//')
+    if [[ $bp_rc -ne 0 ]]; then
+        fail "run-attempt-bypass: ci-memo key exited $bp_rc"
+    elif [[ -n "$local_hash" ]]; then
+        fail "run-attempt-bypass: hash= should be empty but got '$local_hash'"
+    elif [[ -n "$local_key" ]]; then
+        fail "run-attempt-bypass: key= should be empty but got '$local_key'"
+    else
+        pass "run-attempt-bypass"
+    fi
+fi
+
+# =========================================================================
+# Case: digest-unavailable-miss
+# =========================================================================
+if should_run digest-unavailable-miss; then
+    r="$TMP/digest-repo"; mk_repo "$r"
+    # Key with CI_MEMO_DIGEST_CMD=false → bash -c "false" fails → empty hash= and key= printed
+    d_rc1=0
+    d_out1=$(CI_MEMO_REPO="$r" CI_MEMO_MANIFEST_DIR="$r/ci-memo" \
+             GITHUB_OUTPUT="" GITHUB_STEP_SUMMARY="" \
+             CI_MEMO_DIGEST_CMD=false \
+             "$MEMO" key e2e 2>/dev/null) || d_rc1=$?
+    k_unavail=$(printf '%s' "$d_out1" | grep '^key=' | sed 's/^key=//')
+    # Key with a stub digest → real hash
+    d_rc2=0
+    d_out2=$(CI_MEMO_REPO="$r" CI_MEMO_MANIFEST_DIR="$r/ci-memo" \
+             GITHUB_OUTPUT="" GITHUB_STEP_SUMMARY="" \
+             CI_MEMO_DIGEST_CMD='echo stub-manifest' \
+             "$MEMO" key e2e 2>/dev/null) || d_rc2=$?
+    k_stub=$(printf '%s' "$d_out2" | grep '^key=' | sed 's/^key=//')
+    if [[ $d_rc1 -ne 0 ]]; then
+        fail "digest-unavailable-miss: ci-memo key (DIGEST_CMD=false) exited $d_rc1"
+    elif [[ $d_rc2 -ne 0 ]]; then
+        fail "digest-unavailable-miss: ci-memo key (stub digest) exited $d_rc2"
+    elif [[ -n "$k_unavail" ]]; then
+        fail "digest-unavailable-miss: expected empty key on DIGEST_UNAVAILABLE, got '$k_unavail'"
+    elif [[ -z "$k_stub" ]]; then
+        fail "digest-unavailable-miss: stub-digest key is empty"
+    else
+        pass "digest-unavailable-miss"
+    fi
+fi
+
+# =========================================================================
+# Case: manifest-coverage
+# Asserts: every path literal in the memoized dorny filter blocks of each
+# real workflow is covered by the matching scope's manifest.
+# =========================================================================
+if should_run manifest-coverage; then
+    cov_fail=0
+
+    # check_coverage <scope> <workflow_file> <block_names_pipe_sep>
+    # Extracts path literals from the named blocks in the dorny filters section
+    # of <workflow_file>, converts to git pathspecs, and verifies every matched
+    # file at HEAD is also in the manifest set for <scope>.
+    check_coverage() {
+        local scope="$1" wf="$2" blocks="$3"
+        # Build the manifest file set
+        local mset_file="$TMP/mset-$scope"
+        CI_MEMO_REPO="$REPO_ROOT" CI_MEMO_MANIFEST_DIR="$REPO_ROOT/.github/ci-memo" \
+            "$MEMO" paths "$scope" | \
+            (cd "$REPO_ROOT" && xargs git ls-files --) \
+            | sort -u > "$mset_file" 2>/dev/null || {
+            fail "manifest-coverage[$scope]: could not build manifest file set"; cov_fail=1; return
+        }
+
+        # Extract path literals from the named dorny filter blocks
+        local literals
+        literals=$(awk -v blocks="$blocks" '
+            BEGIN { split(blocks, ba, "|"); for (i in ba) allowed[ba[i]]=1 }
+            # Detect entry into the filters: | heredoc
+            /filters: [|]/ { in_filters=1; next }
+            # Skip blank lines within the block so iblbot:/jsdeps: are not lost
+            in_filters && /^[[:space:]]*$/ { next }
+            # Exit the filters block when indentation drops back to step level
+            in_filters && !/^[[:space:]][[:space:]]/ { in_filters=0 }
+            in_filters {
+                line=$0; gsub(/^ +/, "", line)
+                # Block header: word followed by colon only
+                if (line ~ /^[a-z][a-zA-Z0-9_-]*:$/) {
+                    cur=line; sub(/:$/, "", cur)
+                    active=(cur in allowed)
+                    next
+                }
+                # Path literal inside an active block
+                if (active && line ~ /^- '"'"'/) {
+                    pat=line; sub(/^- '"'"'/, "", pat); sub(/'"'"'.*$/, "", pat); print pat
+                }
+            }
+        ' "$wf")
+
+        if [[ -z "$literals" ]]; then
+            fail "manifest-coverage[$scope]: no path literals extracted from $wf"; cov_fail=1; return
+        fi
+
+        local any_checked=0 cov_ok=1
+        while IFS= read -r pat; do
+            # Convert dorny pattern to a git pathspec
+            local gspec
+            if [[ "$pat" == *"*"* ]]; then
+                # **.ext → :(glob)**/*.ext  (per ADR-0131 manifest-coverage spec)
+                if [[ "$pat" =~ ^\*\*\. ]]; then
+                    ext="${pat#\*\*.}"
+                    gspec=":(glob)**/*.$ext"
+                else
+                    gspec=":(glob)$pat"
+                fi
+            else
+                gspec="$pat"
+            fi
+            # Expand to actual files at HEAD
+            local files
+            files=$(cd "$REPO_ROOT" && git ls-files -- "$gspec" 2>/dev/null || true)
+            if [[ -z "$files" ]]; then
+                echo "NOTE: manifest-coverage[$scope]: '$pat' matches no files at HEAD — skipped"
+                continue
+            fi
+            any_checked=1
+            while IFS= read -r f; do
+                if ! grep -qxF "$f" "$mset_file"; then
+                    fail "manifest-coverage[$scope]: '$f' (from dorny pattern '$pat') not in $scope manifest"
+                    cov_fail=1; cov_ok=0
+                fi
+            done <<< "$files"
+        done <<< "$literals"
+
+        if [[ $any_checked -eq 0 ]]; then
+            fail "manifest-coverage[$scope]: all patterns matched zero files — check awk parser"; cov_fail=1
+        elif [[ $cov_ok -eq 1 ]]; then
+            pass "manifest-coverage[$scope]"
+        fi
+    }
+
+    check_coverage tests "$WF_TESTS" "both|src|shell|ibl5ts|iblbot|jsdeps"
+    check_coverage e2e   "$WF_E2E"   "runtime"
+
+    [[ $cov_fail -eq 0 ]] || true  # per-scope passes/fails already recorded
+fi
+
+# =========================================================================
+# Case: gate-topology (four awk assertions over both workflow files)
+# =========================================================================
+if should_run gate-topology; then
+    gt_fail=0
+
+    # --- Assertion 1: ci-memo-check in gate job's needs ---
+    for wf in "$WF_TESTS" "$WF_E2E"; do
+        wfn=$(basename "$wf")
+        if awk '
+            /^  gate:/{in_gate=1; next}
+            /^  [a-zA-Z]/ && in_gate { in_gate=0 }
+            in_gate && /needs:.*ci-memo-check/ { found=1; exit }
+            END { exit !found }
+        ' "$wf"; then
+            pass "gate-topology[1]: $wfn gate.needs includes ci-memo-check"
+        else
+            fail "gate-topology[1]: $wfn gate.needs missing ci-memo-check"
+            gt_fail=1
+        fi
+    done
+
+    # --- Assertion 2: every job with ci-memo-check.outputs.hit in if: also has ci-memo-check in needs: ---
+    for wf in "$WF_TESTS" "$WF_E2E"; do
+        wfn=$(basename "$wf")
+        violations=$(awk '
+            /^  [a-zA-Z][a-zA-Z0-9_-]*:/{
+                if (has_if && !has_needs) print "VIOLATION: " cur_job
+                cur_job=substr($0,3); sub(/:.*$/, "", cur_job)
+                has_if=0; has_needs=0
+            }
+            /^    needs:.*ci-memo-check/ { has_needs=1 }
+            /^    if:.*ci-memo-check.outputs.hit/ { has_if=1 }
+            END {
+                if (has_if && !has_needs) print "VIOLATION: " cur_job
+            }
+        ' "$wf")
+        if [[ -z "$violations" ]]; then
+            pass "gate-topology[2]: $wfn all memo-if jobs have ci-memo-check in needs"
+        else
+            fail "gate-topology[2]: $wfn — $violations"
+            gt_fail=1
+        fi
+    done
+
+    # --- Assertion 3: every non-exempt job that needs a memo-gated job also has the memo clause ---
+    for wf in "$WF_TESTS" "$WF_E2E"; do
+        wfn=$(basename "$wf")
+        # Pass 1: collect memo-gated job ids (jobs whose if: has the memo clause)
+        memo_pat=$(awk '
+            /^  [a-zA-Z][a-zA-Z0-9_-]*:/ { j=substr($0,3); sub(/:.*$/,"",j) }
+            /ci-memo-check.outputs.hit != .true./ { print j }
+        ' "$wf" | sort -u | tr '\n' '|' | sed 's/|$//')
+        # Pass 2: for each non-exempt job that needs a memo-gated job, verify it also has the clause
+        violations=$(awk -v memo_pat="$memo_pat" '
+            BEGIN {
+                exempt["gate"]=1; exempt["e2e"]=1
+                n=split(memo_pat, mja, "|")
+                for (i=1;i<=n;i++) memo_jobs[mja[i]]=1
+            }
+            /^  [a-zA-Z][a-zA-Z0-9_-]*:/{
+                if (cur!="" && !(cur in exempt) && needs_memo && !has_clause)
+                    print "VIOLATION: " cur
+                cur=substr($0,3); sub(/:.*$/,"",cur)
+                needs_memo=0; has_clause=0
+            }
+            /^    needs:/{
+                # Normalise delimiters for exact-word matching
+                nline=$0; gsub(/[\[\],]/," ",nline)
+                for (j in memo_jobs)
+                    if (index(nline," "j" ") > 0) needs_memo=1
+            }
+            /ci-memo-check.outputs.hit != .true./ { has_clause=1 }
+            END {
+                if (cur!="" && !(cur in exempt) && needs_memo && !has_clause)
+                    print "VIOLATION: " cur
+            }
+        ' "$wf")
+        if [[ -z "$violations" ]]; then
+            pass "gate-topology[3]: $wfn all non-exempt memo-dep jobs carry memo clause"
+        else
+            fail "gate-topology[3]: $wfn — $violations"
+            gt_fail=1
+        fi
+    done
+
+    # --- Assertion 4: gate job's actions/cache/save step carries continue-on-error: true ---
+    for wf in "$WF_TESTS" "$WF_E2E"; do
+        wfn=$(basename "$wf")
+        if awk '
+            /^  gate:/{in_gate=1; next}
+            /^  [a-zA-Z]/ && in_gate { in_gate=0 }
+            in_gate && /^      - /{
+                if (step_save && !step_coe) bad=1
+                step_save=0; step_coe=0
+            }
+            in_gate && /continue-on-error: true/ { step_coe=1 }
+            in_gate && /actions\/cache\/save/    { step_save=1 }
+            END {
+                if (step_save && !step_coe) bad=1
+                exit bad
+            }
+        ' "$wf"; then
+            pass "gate-topology[4]: $wfn gate cache/save has continue-on-error: true"
+        else
+            fail "gate-topology[4]: $wfn gate cache/save missing continue-on-error: true"
+            gt_fail=1
+        fi
+    done
+
+    # --- Assertion 5: an empty key fires neither lookup nor save ---
+    # bin/ci-memo prints empty hash=/key= on bypass and on an unreadable GHCR
+    # manifest. Both consumers must guard on it, or a run with no key restores
+    # (or writes) the cache default. Asserted here because no unit case can see
+    # the workflow side of "neither lookup nor save fires".
+    for wf in "$WF_TESTS" "$WF_E2E"; do
+        wfn=$(basename "$wf")
+        # 5a: the cache/restore step inside ci-memo-check carries the hash guard
+        if awk '
+            /^  ci-memo-check:/{in_job=1; next}
+            /^  [a-zA-Z]/ && in_job { in_job=0 }
+            in_job && /^      - /{
+                if (step_restore && !step_guard) bad=1
+                step_restore=0; step_guard=0
+            }
+            in_job && /if: steps\.key\.outputs\.hash != .{2}/ { step_guard=1 }
+            in_job && /actions\/cache\/restore/               { step_restore=1 }
+            END {
+                if (step_restore && !step_guard) bad=1
+                exit bad
+            }
+        ' "$wf"; then
+            pass "gate-topology[5a]: $wfn memo lookup guarded on non-empty hash"
+        else
+            fail "gate-topology[5a]: $wfn memo lookup missing the non-empty-hash guard"
+            gt_fail=1
+        fi
+        # 5b: the gate's MEMO_WRITE expression carries the same guard
+        if awk '
+            /^  gate:/{in_gate=1; next}
+            /^  [a-zA-Z]/ && in_gate { in_gate=0 }
+            in_gate && /MEMO_WRITE:/ && /needs\.ci-memo-check\.outputs\.hash != .{2}/ { found=1; exit }
+            END { exit !found }
+        ' "$wf"; then
+            pass "gate-topology[5b]: $wfn gate MEMO_WRITE guarded on non-empty hash"
+        else
+            fail "gate-topology[5b]: $wfn gate MEMO_WRITE missing the non-empty-hash guard"
+            gt_fail=1
+        fi
+    done
+
+    [[ $gt_fail -eq 0 ]] || true  # individual pass/fail already recorded
+fi
+
+# =========================================================================
+# Case: zero-match-guard
+# =========================================================================
+if should_run zero-match-guard; then
+    r="$TMP/zeromatch-repo"; mk_repo "$r"
+    # Create a manifest with a pathspec that matches nothing at HEAD
+    printf 'nonexistent-path.php\n' > "$r/ci-memo/tests.paths"
+    stdout=""
+    rc=0
+    stdout=$(CI_MEMO_REPO="$r" CI_MEMO_MANIFEST_DIR="$r/ci-memo" \
+             GITHUB_OUTPUT="" GITHUB_STEP_SUMMARY="" \
+             "$MEMO" key tests 2>/dev/null) || rc=$?
+    if [[ $rc -ne 3 ]]; then
+        fail "zero-match-guard: expected exit 3, got $rc"
+    elif [[ -n "$stdout" ]]; then
+        fail "zero-match-guard: expected empty stdout but got: $stdout"
+    else
+        pass "zero-match-guard"
+    fi
+fi
+
+# =========================================================================
+# Case: usage-error-loud
+# =========================================================================
+if should_run usage-error-loud; then
+    ue_fail=0
+    r="$TMP/ue-repo"; mk_repo "$r"
+
+    # Unknown flag → exit 2
+    rc=0
+    CI_MEMO_REPO="$r" CI_MEMO_MANIFEST_DIR="$r/ci-memo" \
+        GITHUB_OUTPUT="" GITHUB_STEP_SUMMARY="" \
+        "$MEMO" key tests --unknownflag >/dev/null 2>&1 || rc=$?
+    if [[ $rc -ne 2 ]]; then
+        fail "usage-error-loud[unknown-flag]: expected exit 2, got $rc"; ue_fail=1
+    else
+        pass "usage-error-loud[unknown-flag]"
+    fi
+
+    # Unknown flag with --fail-open → exit 2 (not downgraded)
+    rc=0
+    CI_MEMO_REPO="$r" CI_MEMO_MANIFEST_DIR="$r/ci-memo" \
+        GITHUB_OUTPUT="" GITHUB_STEP_SUMMARY="" \
+        "$MEMO" key tests --fail-open --unknownflag >/dev/null 2>&1 || rc=$?
+    if [[ $rc -ne 2 ]]; then
+        fail "usage-error-loud[unknown-flag+fail-open]: expected exit 2, got $rc"; ue_fail=1
+    else
+        pass "usage-error-loud[unknown-flag+fail-open]"
+    fi
+
+    # Unknown subcommand → exit 2
+    rc=0
+    "$MEMO" unknowncmd tests >/dev/null 2>&1 || rc=$?
+    if [[ $rc -ne 2 ]]; then
+        fail "usage-error-loud[unknown-subcmd]: expected exit 2, got $rc"; ue_fail=1
+    else
+        pass "usage-error-loud[unknown-subcmd]"
+    fi
+
+    [[ $ue_fail -eq 0 ]] || true
+fi
+
+# =========================================================================
+# Case: fail-open-degraded
+# =========================================================================
+if should_run fail-open-degraded; then
+    fo_fail=0
+
+    # exit-3 (zero-match) + --fail-open → empty stdout, exit 0
+    r="$TMP/fo-repo"; mk_repo "$r"
+    printf 'nonexistent-file.php\n' > "$r/ci-memo/tests.paths"
+    stdout=""
+    rc=0
+    stdout=$(CI_MEMO_REPO="$r" CI_MEMO_MANIFEST_DIR="$r/ci-memo" \
+             GITHUB_OUTPUT="" GITHUB_STEP_SUMMARY="" \
+             "$MEMO" key tests --fail-open 2>/dev/null) || rc=$?
+    if [[ $rc -ne 0 ]]; then
+        fail "fail-open-degraded[exit-3]: expected exit 0 with --fail-open, got $rc"; fo_fail=1
+    elif [[ -n "$stdout" ]]; then
+        fail "fail-open-degraded[exit-3]: expected empty stdout but got: $stdout"; fo_fail=1
+    else
+        pass "fail-open-degraded[exit-3]"
+    fi
+
+    # exit-4 (not a git repo) + --fail-open → empty stdout, exit 0
+    notgit="$TMP/not-a-git-dir"
+    mkdir -p "$notgit/ci-memo"
+    printf 'README.md\n' > "$notgit/ci-memo/tests.paths"
+    stdout=""
+    rc=0
+    stdout=$(CI_MEMO_REPO="$notgit" CI_MEMO_MANIFEST_DIR="$notgit/ci-memo" \
+             GITHUB_OUTPUT="" GITHUB_STEP_SUMMARY="" \
+             "$MEMO" key tests --fail-open 2>/dev/null) || rc=$?
+    if [[ $rc -ne 0 ]]; then
+        fail "fail-open-degraded[exit-4]: expected exit 0 with --fail-open, got $rc"; fo_fail=1
+    elif [[ -n "$stdout" ]]; then
+        fail "fail-open-degraded[exit-4]: expected empty stdout but got: $stdout"; fo_fail=1
+    else
+        pass "fail-open-degraded[exit-4]"
+    fi
+
+    [[ $fo_fail -eq 0 ]] || true
+fi
+
+# =========================================================================
+# Summary
+# =========================================================================
+echo ""
+# A --case typo used to select zero cases and exit 0, so a CI step naming a
+# renamed case would pass while asserting nothing.
+if [[ -n "$ONLY_CASE" && $((PASS + FAIL)) -eq 0 ]]; then
+    echo "FAIL: unknown --case name: $ONLY_CASE (zero cases ran)" >&2
+    exit 2
+fi
+echo "Results: $PASS passed, $FAIL failed"
+[[ $FAIL -eq 0 ]] || exit 1

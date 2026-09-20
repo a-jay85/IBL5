@@ -109,6 +109,49 @@ jobs:
               - 'docker/opcache.ini'
               - 'docker/entrypoint.sh'
 
+  # Content-hash memo (ADR-0131). Hashes the HEAD tree over .github/ci-memo/e2e.paths
+  # plus the registry manifest of php-apache:latest, the one floating input; an
+  # unreadable manifest yields empty hash= and key= so neither lookup nor save fires. Memoization is
+  # PR-only: push runs, re-runs, dispatches, and `labeled` events bypass it. The
+  # Visual Regression job (`e2e`) is never memo-gated: it publishes the per-SHA gallery
+  # and regenerates baselines. A failure here reds the gate (it is in gate.needs).
+  ci-memo-check:
+    name: E2E Memo Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      hash: ${{ steps.key.outputs.hash }}
+      key: ${{ steps.key.outputs.key }}
+      hit: ${{ steps.lookup.outputs.cache-hit }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Authenticate to GHCR
+        continue-on-error: true
+        env:
+          GHCR_TOKEN: ${{ github.token }}
+          GHCR_USER: ${{ github.actor }}
+        run: echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+      - name: Compute memo key
+        id: key
+        env:
+          CI_MEMO_BYPASS: ${{ (github.event_name != 'pull_request' || github.run_attempt != '1' || github.event.action == 'labeled') && 'not_pr_rerun_or_labeled' || '' }}
+        run: bin/ci-memo key e2e
+      - name: Look up memo
+        id: lookup
+        if: steps.key.outputs.hash != ''
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .ci-memo-sentinel
+          key: ${{ steps.key.outputs.key }}
+      - name: Report memo result
+        env:
+          MEMO_HASH: ${{ steps.key.outputs.hash }}
+          MEMO_RESULT: ${{ steps.lookup.outputs.cache-hit == 'true' && 'hit' || 'miss' }}
+        run: bin/ci-memo report e2e "$MEMO_HASH" "$MEMO_RESULT" .ci-memo-sentinel
+
   playwright-version-drift:
     name: Playwright version drift guard
     runs-on: ubuntu-latest
@@ -521,8 +564,8 @@ jobs:
 
   api-e2e:
     name: API E2E Tests (Vitest)
-    needs: [changes]
-    if: needs.changes.outputs.src == 'true'
+    needs: [changes, ci-memo-check]
+    if: needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -580,8 +623,8 @@ jobs:
     # Name interpolates the matrix context so GitHub omits its auto-appended
     # "(1, 1)" suffix; the suffix only reappears (as "(N/M)") if ever re-sharded.
     name: E2E Tests${{ matrix.total-shards == 1 && '' || format(' ({0}/{1})', matrix.shard-index, matrix.total-shards) }}
-    needs: [changes]
-    if: needs.changes.outputs.src == 'true'
+    needs: [changes, ci-memo-check]
+    if: needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -715,8 +758,8 @@ jobs:
 
   e2e-mutators:
     name: E2E Mutators (non-sharded, dedicated DB)
-    needs: [changes]
-    if: needs.changes.outputs.src == 'true'
+    needs: [changes, ci-memo-check]
+    if: needs.changes.outputs.src == 'true' && needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -822,8 +865,8 @@ jobs:
 
   merge-reports:
     name: Merge E2E Reports
-    needs: [changes, e2e, e2e-shards, e2e-mutators, api-e2e]
-    if: always() && needs.changes.outputs.src == 'true'
+    needs: [changes, ci-memo-check, e2e, e2e-shards, e2e-mutators, api-e2e]
+    if: always() && (needs.changes.outputs.src == 'true') && needs.ci-memo-check.outputs.hit != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -982,11 +1025,29 @@ jobs:
   gate:
     name: E2E Tests
     if: always()
-    needs: [changes, e2e, api-e2e, e2e-shards, e2e-mutators]
+    needs: [changes, ci-memo-check, e2e, api-e2e, e2e-shards, e2e-mutators]
     runs-on: ubuntu-latest
+    # The memo is written only here: after a clean aggregate, on a run that was a miss.
+    env:
+      MEMO_WRITE: ${{ !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') && needs.ci-memo-check.outputs.hash != '' && needs.ci-memo-check.outputs.hit != 'true' }}
     steps:
       - run: exit 1
         if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+      - name: Checkout for memo record
+        if: env.MEMO_WRITE == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Write memo sentinel
+        if: env.MEMO_WRITE == 'true'
+        env:
+          MEMO_HASH: ${{ needs.ci-memo-check.outputs.hash }}
+        run: bin/ci-memo record e2e "$MEMO_HASH" .ci-memo-sentinel
+      - name: Save CI memo
+        if: env.MEMO_WRITE == 'true'
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .ci-memo-sentinel
+          key: ${{ needs.ci-memo-check.outputs.key }}
 
   # Retention/cleanup for the per-SHA visual-review reports on gh-pages. Runs on
   # pushes to master (not on PRs, so it is NOT part of the `gate` required check).

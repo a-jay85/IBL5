@@ -1,0 +1,248 @@
+#!/usr/bin/env bash
+# ci-memo: content-hash memoization key for the heavy CI jobs (ADR-0131).
+#
+# The key is a digest of every tracked file matched by a declared input path
+# set, read from the HEAD tree (never the working tree). On a pull_request run
+# HEAD is the PR-into-base merge commit, so a master move inside the set moves
+# the key and a master move outside it does not.
+#
+# Usage:
+#   bin/ci-memo hash   <scope> [--manifest P] [--extra k=v]... [--fail-open]
+#       -> 40-hex digest on stdout
+#   bin/ci-memo key    <scope> [--manifest P] [--extra k=v]... [--fail-open]
+#       -> "hash=<hex>" and "key=ci-memo-<scope>-v1-<hex>" on stdout, and the
+#          same two lines appended to $GITHUB_OUTPUT when that is set
+#   bin/ci-memo paths  <scope> [--manifest P]
+#       -> the manifest's pathspecs, one per line, comments stripped
+#   bin/ci-memo record <scope> <hash> <sentinel-file>
+#       -> writes the sentinel stored under the key after a clean run
+#   bin/ci-memo report <scope> <hash> <hit|miss> <sentinel-file>
+#       -> prints the greppable "CI_MEMO <scope> <hit|miss> hash=..." line,
+#          also appended to $GITHUB_STEP_SUMMARY when that is set
+#
+# The scope names the manifest (<manifest-dir>/<scope>.paths) and is the job
+# identity folded into the digest. Scope "e2e" also folds the registry digest
+# of the prebuilt GHCR php-apache image. When that digest cannot be read the
+# script prints empty hash= and key=, so neither lookup nor save fires.
+#
+# Environment (all optional):
+#   CI_MEMO_REPO          repo to hash (default: the repo containing cwd)
+#   CI_MEMO_MANIFEST_DIR  manifest directory (default: .github/ci-memo)
+#   CI_MEMO_BYPASS        non-empty => key prints empty hash= and key=
+#                         (set by the workflows on re-runs, dispatch, labeled)
+#   CI_MEMO_DIGEST_CMD    command printing the image manifest (tests stub it)
+#
+# Exit codes:
+#   0  success
+#   2  usage error (never downgraded by --fail-open)
+#   3  a manifest pathspec matched nothing at HEAD
+#   4  not a git repo, unreadable manifest, or a git plumbing failure
+# --fail-open turns 3 and 4 into: empty stdout, "ci-memo: DEGRADED: ..." on
+# stderr, exit 0. The caller reads an empty hash as a forced miss.
+set -euo pipefail
+export LC_ALL=C
+
+FORMAT_VERSION="v1"
+GHCR_IMAGE="ghcr.io/a-jay85/ibl5/php-apache:latest"
+
+usage() {
+    sed -n '9,24p' "$0" | sed 's/^# \{0,1\}//' >&2
+    exit 2
+}
+
+die_usage() {
+    echo "ci-memo: $1" >&2
+    usage
+}
+
+FAIL_OPEN=0
+fail() {
+    # fail <code> <message>
+    if [[ "$FAIL_OPEN" == "1" ]]; then
+        echo "ci-memo: DEGRADED: $2" >&2
+        exit 0
+    fi
+    echo "ci-memo: $2" >&2
+    exit "$1"
+}
+
+[[ $# -ge 1 ]] || die_usage "missing subcommand"
+SUBCMD="$1"; shift
+case "$SUBCMD" in
+    hash|key|paths|record|report) ;;
+    -h|--help) usage ;;
+    *) die_usage "unknown subcommand: $SUBCMD" ;;
+esac
+
+[[ $# -ge 1 && "$1" != --* ]] || die_usage "$SUBCMD requires a <scope>"
+SCOPE="$1"; shift
+[[ "$SCOPE" =~ ^[a-z0-9][a-z0-9-]*$ ]] || die_usage "invalid scope: $SCOPE"
+
+MANIFEST=""
+EXTRAS=()
+POSITIONAL=()
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --manifest)
+            [[ $# -ge 2 ]] || die_usage "--manifest requires a value"
+            MANIFEST="$2"; shift 2 ;;
+        --extra)
+            [[ $# -ge 2 && "$2" == *=* ]] || die_usage "--extra requires k=v"
+            EXTRAS+=("$2"); shift 2 ;;
+        --fail-open)
+            FAIL_OPEN=1; shift ;;
+        --*)
+            die_usage "unknown flag: $1" ;;
+        *)
+            POSITIONAL+=("$1"); shift ;;
+    esac
+done
+
+case "$SUBCMD" in
+    hash|key|paths)
+        [[ ${#POSITIONAL[@]} -eq 0 ]] || die_usage "$SUBCMD takes no extra arguments" ;;
+    record)
+        [[ ${#POSITIONAL[@]} -eq 2 ]] || die_usage "record needs <hash> <sentinel-file>" ;;
+    report)
+        [[ ${#POSITIONAL[@]} -eq 3 ]] || die_usage "report needs <hash> <hit|miss> <sentinel-file>"
+        [[ "${POSITIONAL[1]}" == "hit" || "${POSITIONAL[1]}" == "miss" ]] \
+            || die_usage "report result must be hit or miss" ;;
+esac
+
+# ---------------------------------------------------------------- record/report
+if [[ "$SUBCMD" == "record" ]]; then
+    hash="${POSITIONAL[0]}"
+    sentinel="${POSITIONAL[1]}"
+    [[ "$hash" =~ ^[0-9a-f]{40}$ ]] || die_usage "record needs a 40-hex hash"
+    {
+        echo "scope=$SCOPE"
+        echo "hash=$hash"
+        echo "run_id=${GITHUB_RUN_ID:-local}"
+        echo "sha=${GITHUB_SHA:-$(git rev-parse HEAD 2>/dev/null || echo unknown)}"
+        echo "recorded_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    } > "$sentinel"
+    exit 0
+fi
+
+if [[ "$SUBCMD" == "report" ]]; then
+    hash="${POSITIONAL[0]}"
+    result="${POSITIONAL[1]}"
+    sentinel="${POSITIONAL[2]}"
+    if [[ -z "$hash" ]]; then
+        line="CI_MEMO $SCOPE bypass hash= (memo disabled for this run)"
+    elif [[ "$result" == "hit" ]]; then
+        from_run="unknown"
+        from_sha="unknown"
+        if [[ -f "$sentinel" ]]; then
+            from_run="$(sed -n 's/^run_id=//p' "$sentinel" | head -n1)"
+            from_sha="$(sed -n 's/^sha=//p' "$sentinel" | head -n1)"
+        fi
+        line="CI_MEMO $SCOPE hit hash=$hash run_id=${from_run:-unknown} sha=${from_sha:-unknown}"
+    else
+        line="CI_MEMO $SCOPE miss hash=$hash"
+    fi
+    echo "$line"
+    if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+        echo "$line" >> "$GITHUB_STEP_SUMMARY"
+    fi
+    exit 0
+fi
+
+# ------------------------------------------------------------- hash/key/paths
+if [[ -n "${CI_MEMO_REPO:-}" ]]; then
+    cd "$CI_MEMO_REPO" 2>/dev/null || fail 4 "CI_MEMO_REPO is not a directory: $CI_MEMO_REPO"
+fi
+TOPLEVEL="$(git rev-parse --show-toplevel 2>/dev/null)" || fail 4 "not inside a git repository"
+cd "$TOPLEVEL"
+
+if [[ -z "$MANIFEST" ]]; then
+    MANIFEST="${CI_MEMO_MANIFEST_DIR:-$TOPLEVEL/.github/ci-memo}/$SCOPE.paths"
+fi
+[[ -r "$MANIFEST" ]] || fail 4 "manifest not readable: $MANIFEST"
+
+PATHSPECS=()
+while IFS= read -r line || [[ -n "$line" ]]; do
+    line="${line%$'\r'}"
+    trimmed="${line#"${line%%[![:space:]]*}"}"
+    trimmed="${trimmed%"${trimmed##*[![:space:]]}"}"
+    [[ -z "$trimmed" || "$trimmed" == \#* ]] && continue
+    PATHSPECS+=("$trimmed")
+done < "$MANIFEST"
+[[ ${#PATHSPECS[@]} -gt 0 ]] || fail 4 "manifest has no pathspecs: $MANIFEST"
+
+if [[ "$SUBCMD" == "paths" ]]; then
+    printf '%s\n' "${PATHSPECS[@]}"
+    exit 0
+fi
+
+if [[ "$SUBCMD" == "key" && -n "${CI_MEMO_BYPASS:-}" ]]; then
+    echo "ci-memo: bypass ($CI_MEMO_BYPASS): memo disabled for this run" >&2
+    printf 'hash=\nkey=\n'
+    if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+        printf 'hash=\nkey=\n' >> "$GITHUB_OUTPUT"
+    fi
+    exit 0
+fi
+
+# git ls-tree matches pathspecs by literal prefix only (no wildcards, no
+# :(glob) magic), so read HEAD into a throwaway index and list that instead.
+# The working tree and the real index are never consulted.
+TMP_INDEX="$(mktemp "${TMPDIR:-/tmp}/ci-memo-index.XXXXXX")"
+trap 'rm -f "$TMP_INDEX"' EXIT
+rm -f "$TMP_INDEX"
+GIT_INDEX_FILE="$TMP_INDEX" git read-tree HEAD 2>/dev/null || fail 4 "git read-tree HEAD failed"
+
+list_head() {
+    GIT_INDEX_FILE="$TMP_INDEX" git ls-files -s -- "$@"
+}
+
+for p in "${PATHSPECS[@]}"; do
+    out="$(list_head "$p" 2>/dev/null)" || fail 4 "git ls-files failed on pathspec: $p"
+    [[ -n "$out" ]] || fail 3 "pathspec matches nothing at HEAD: $p"
+done
+
+BODY="$(list_head "${PATHSPECS[@]}" 2>/dev/null | sort -u)" || fail 4 "git ls-files failed"
+
+if [[ "$SCOPE" == "e2e" ]]; then
+    digest_cmd="${CI_MEMO_DIGEST_CMD:-docker manifest inspect $GHCR_IMAGE}"
+    image_digest="DIGEST_UNAVAILABLE"
+    if manifest_json="$(bash -c "$digest_cmd" 2>/dev/null)" && [[ -n "$manifest_json" ]]; then
+        image_digest="$(printf '%s' "$manifest_json" | git hash-object --stdin)" \
+            || image_digest="DIGEST_UNAVAILABLE"
+    fi
+    if [[ "$image_digest" == "DIGEST_UNAVAILABLE" ]]; then
+        printf 'hash=\nkey=\n'
+        if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+            printf 'hash=\nkey=\n' >> "$GITHUB_OUTPUT"
+        fi
+        exit 0
+    fi
+    EXTRAS+=("ghcr_image_manifest=$image_digest")
+fi
+
+EXTRA_BLOCK=""
+if [[ ${#EXTRAS[@]} -gt 0 ]]; then
+    EXTRA_BLOCK="$(printf 'extra=%s\n' "${EXTRAS[@]}" | sort)"
+fi
+
+DIGEST="$(
+    {
+        echo "ci-memo/$FORMAT_VERSION"
+        echo "job=$SCOPE"
+        [[ -n "$EXTRA_BLOCK" ]] && printf '%s\n' "$EXTRA_BLOCK"
+        echo "---"
+        printf '%s\n' "$BODY"
+    } | git hash-object --stdin
+)" || fail 4 "git hash-object failed"
+[[ "$DIGEST" =~ ^[0-9a-f]{40,64}$ ]] || fail 4 "unexpected digest: $DIGEST"
+
+if [[ "$SUBCMD" == "hash" ]]; then
+    echo "$DIGEST"
+    exit 0
+fi
+
+KEY="ci-memo-$SCOPE-$FORMAT_VERSION-$DIGEST"
+printf 'hash=%s\nkey=%s\n' "$DIGEST" "$KEY"
+if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
+    printf 'hash=%s\nkey=%s\n' "$DIGEST" "$KEY" >> "$GITHUB_OUTPUT"
+fi

@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-09-07
+last_verified: 2026-09-18
 ---
 
 # IBL5 Architecture Decision Records
@@ -52,6 +52,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0120](0120-meta-checks-required-and-skip-observable.md) | "Meta checks" required, and adr-filter skips made observable | Accepted | Promotes the "Meta checks" context to a required status check on `master` via the branch-protection API post-merge, and adds an else-branch to the `adr` paths-filter so a skipped adr-check is stated in the job log instead of being indistinguishable from a pass. |
 | [0121](0121-backlog-migration-to-github-issues.md) | Backlog migration to GitHub Issues | Accepted | Project work tracking moves from 21 `merge=union` markdown backlog files to one Issue per item in the private repo `a-jay85/IBL5-backlog`, area-as-label and legacy ID as title prefix, retiring the duplicate-ID and archive-transition gates that only existed to make file-shaped tracking survive concurrent appends. |
 | [0112](0112-auto-promote-master-to-production.md) | Auto-promote master to production on green CI | Accepted | `workflow_run` promoter fast-forwards `master` to `production` when the SHA is all-green; paused by the `AUTO_PROMOTE_PAUSED` repo variable, pushed FF-only with `CI_PAT`, announced by Discord DM. |
+| [0131](0131-ci-tree-hash-memoization.md) | CI tree-hash memoization of heavy jobs | Accepted | Heavy jobs in `Tests and Analysis` and `E2E Tests` skip when the HEAD tree over a declared input path set already passed; key from `bin/ci-memo`, sentinel in `actions/cache`, written only by a clean `gate`; PR-only, with the GHCR image manifest folded into the e2e key. |
 
 ## When an ADR is Required
 

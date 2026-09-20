@@ -433,7 +433,7 @@ function stalenessAgeDays(?string $lv, \DateTimeImmutable $today): ?int
     if ($lv === null || preg_match('/^\d{4}-\d{2}-\d{2}$/', $lv) !== 1) {
         return null;
     }
-    $verified = \DateTimeImmutable::createFromFormat('!Y-m-d', $lv);
+    $verified = \DateTimeImmutable::createFromFormat('!Y-m-d', $lv, new \DateTimeZone('UTC'));
     if ($verified === false || $verified > $today) {
         return null;
     }
@@ -465,7 +465,7 @@ function checkFile(string $path, string $repoRoot, \DateTimeImmutable $today, bo
         if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $lv) !== 1) {
             $issues[] = sprintf('`last_verified` not ISO date: %s', $lv);
         } else {
-            $verified = \DateTimeImmutable::createFromFormat('!Y-m-d', $lv);
+            $verified = \DateTimeImmutable::createFromFormat('!Y-m-d', $lv, new \DateTimeZone('UTC'));
             if ($verified === false) {
                 $issues[] = sprintf('`last_verified` unparseable: %s', $lv);
             } elseif ($verified > $today) {
@@ -1593,7 +1593,19 @@ foreach (array_slice($argv, 1) as $arg) {
 }
 
 $root = repoRoot();
-$today = new \DateTimeImmutable('today');
+// Freshness — staleness age and the future-date check — is decided on the UTC
+// calendar day, pinned explicitly so the verdict does not follow the ambient
+// `date.timezone`. Every last_verified value is parsed in UTC to match
+// (stalenessAgeDays, checkFile), so both sides of every comparison sit at UTC
+// midnight. A mixed-zone pair reads a doc dated UTC-today as future-dated on a
+// box configured for a negative-offset zone; the repo's own php.ini is UTC and
+// CI runners are UTC, so only an explicit pin makes that unreachable.
+// The nightly audit (.github/workflows/doc-freshness-audit.yml) fires at 00:00
+// UTC, the start of the day this clock reads.
+// localToday() deliberately stays on the OS-local clock — it is the *write*
+// clock for --fix-dates and the no-commit fallback, never a freshness
+// comparison. See localToday().
+$today = new \DateTimeImmutable('today', new \DateTimeZone('UTC'));
 
 // Report mode short-circuits: emit the stale-doc and dead-glob list as JSON and exit 0
 // regardless of whether any doc is stale. It is a report, not a gate — the

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 #
-# bin/wt-sync-tick — poll-only fast-forward driver for local worktrees (ADR-0104).
+# bin/wt-sync-tick — poll-only fast-forward driver for local worktrees (ADR-0106).
 #
 # Fired every 900s by the launchd LaunchAgent installed by bin/wt-sync-cron-setup.
 # On an idle tick with nothing to sync it exits 0 having run ZERO git write
@@ -12,7 +12,7 @@
 #
 # NEVER pushes, never force-pushes, never calls gh, never rebases, never
 # resets --hard, never creates or deletes worktrees. Fast-forward only.
-# See ADR-0104 for the design rationale.
+# See ADR-0106 for the design rationale.
 #
 # Usage: bin/wt-sync-tick [--dry-run] [--force] [--help]
 #   --dry-run   Report what it would do; change nothing.

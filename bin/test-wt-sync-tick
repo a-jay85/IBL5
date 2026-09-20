@@ -80,6 +80,7 @@ _TICK_LOG="$TMP/default-run/wt-sync.log"
 _TICK_LOCKD="$TMP/default-run/lock"
 mkdir -p "$_TICK_LOCKD" "$(dirname "$_TICK_LOG")"
 
+# shellcheck disable=SC2329,SC2034
 run_tick() {
     ST=0
     OUT="$(PATH="$STUBBIN:$PATH" \
@@ -209,14 +210,13 @@ run_with_repo() {
         extra_env+=("$1"); shift
     done
     [ "${1:-}" = "--" ] && shift
-    ST=0
     OUT="$(env PATH="$STUBBIN:$PATH" WT_SYNC_IOREG="$STUBBIN/ioreg" \
                WT_SYNC_REPO_ROOT="$main" \
                WT_SYNC_LOG="$log" \
                WT_SYNC_LOCK_DIR="$lockd" \
                WT_SYNC_ENABLED=1 \
                "${extra_env[@]+"${extra_env[@]}"}" \
-               "$TICK" "$@" 2>&1)" || ST=$?
+               "$TICK" "$@" 2>&1)" || true
 }
 
 # ── Check 0: source-level safety grep ────────────────────────────────────────
@@ -448,6 +448,15 @@ if grep -qE '^[^#]*[^/"]\bioreg -c' "$TICK"; then
     failcase "source-level: wt-sync-tick calls bare 'ioreg' (PATH-dependent)"
 else
     pass "source-level: ioreg invoked via \$WT_SYNC_IOREG, not a bare PATH lookup"
+fi
+
+# ── Test 16: source-level — header cites the real ADR for this script ────────
+if grep -q 'ADR-0104' "$TICK"; then
+    failcase "source-level: wt-sync-tick header cites ADR-0104 (no such ADR file)"
+elif grep -q 'ADR-0106' "$TICK"; then
+    pass "source-level: wt-sync-tick header cites ADR-0106"
+else
+    failcase "source-level: wt-sync-tick header cites no ADR at all"
 fi
 
 # ── Final report ──────────────────────────────────────────────────────────────

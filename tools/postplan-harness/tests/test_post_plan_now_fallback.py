@@ -790,9 +790,19 @@ def test_pr_flag_unresolvable_branch_errors(tmp_path):
     assert "could not resolve a head branch" in r.stderr
 
 
-def test_pr_flag_rejects_a_branch_with_no_worktree(tmp_path):
-    """gh resolves branch, but no worktree has it checked out."""
+def test_pr_flag_refuses_to_create_when_fork_status_is_indeterminate(tmp_path):
+    """No worktree has the branch, and the fork probe returns nothing → refuse to create.
+
+    post-plan-now creates the missing worktree via `bin/wt-new --existing`, but only
+    once it has confirmed the PR is not from a fork. `_gh_stub` answers headRefName
+    and nothing else, so `isCrossRepository` comes back empty: the create path must
+    bail rather than guess. Deleting the `[ -z "$IS_FORK" ]` arm invokes wt-new and
+    fails the worktree-count assertion below.
+    """
     main_root, _ = _fixture_worktree(tmp_path, "some-branch")
+    before = subprocess.run(["git", "worktree", "list", "--porcelain"],
+                            cwd=str(main_root), capture_output=True, text=True,
+                            check=True).stdout
     stub_dir = tmp_path / "stub-bin"
     stub_dir.mkdir()
     _gh_stub(stub_dir, "orphan-branch")
@@ -802,8 +812,48 @@ def test_pr_flag_rejects_a_branch_with_no_worktree(tmp_path):
     r = subprocess.run(["bash", PPN, "--pr", "7"],
                        capture_output=True, text=True,
                        cwd=str(main_root), env=env)
-    assert r.returncode == 1
-    assert "no worktree has it checked out" in r.stderr
+    assert r.returncode == 1, r.stderr
+    assert "could not determine whether PR #7 is from a fork" in r.stderr, r.stderr
+    after = subprocess.run(["git", "worktree", "list", "--porcelain"],
+                           cwd=str(main_root), capture_output=True, text=True,
+                           check=True).stdout
+    assert after == before, f"worktree created despite indeterminate fork status:\n{after}"
+
+
+def test_pr_flag_refuses_a_fork_pr(tmp_path):
+    """The branch has no worktree and the PR is from a fork → refuse, create nothing.
+
+    post-plan commits and pushes to the PR head branch, which it cannot do on a fork.
+    Deleting the `[ "$IS_FORK" = "true" ]` arm lets wt-new run and fails this test.
+    """
+    main_root, _ = _fixture_worktree(tmp_path, "some-branch")
+    before = subprocess.run(["git", "worktree", "list", "--porcelain"],
+                            cwd=str(main_root), capture_output=True, text=True,
+                            check=True).stdout
+    stub_dir = tmp_path / "stub-bin"
+    stub_dir.mkdir()
+    stub = stub_dir / "gh"
+    stub.write_text(
+        "#!/bin/sh\n"
+        "case \"$*\" in\n"
+        "  *isCrossRepository*) printf 'true\\n' ; exit 0 ;;\n"
+        "  *headRefName*) printf 'orphan-branch\\n' ; exit 0 ;;\n"
+        "  *) exit 0 ;;\n"
+        "esac\n"
+    )
+    stub.chmod(0o755)
+    env = dict(os.environ,
+               PATH=f"{stub_dir}:{os.environ['PATH']}",
+               POST_PLAN_MAIN_ROOT=str(main_root))
+    r = subprocess.run(["bash", PPN, "--pr", "7"],
+                       capture_output=True, text=True,
+                       cwd=str(main_root), env=env)
+    assert r.returncode == 1, r.stderr
+    assert "comes from a fork" in r.stderr, r.stderr
+    after = subprocess.run(["git", "worktree", "list", "--porcelain"],
+                           cwd=str(main_root), capture_output=True, text=True,
+                           check=True).stdout
+    assert after == before, f"worktree created for a fork PR:\n{after}"
 
 
 def test_pr_flag_targets_the_matching_worktree_and_exports_plan_slug(tmp_path):

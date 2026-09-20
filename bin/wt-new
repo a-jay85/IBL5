@@ -3,6 +3,7 @@
 # No Docker setup; use bin/wt-up if you need a browser preview.
 #
 # Usage: bin/wt-new <name> [--base <branch>]
+#        bin/wt-new --existing <branch> [<name>] [--base <parent-branch>]
 
 set -euo pipefail
 
@@ -18,12 +19,24 @@ WT_PARENT="$(worktrees_parent_dir "$REPO_ROOT")"
 MAIN_IBL5="$REPO_ROOT/ibl5"
 NAME=""
 BASE_BRANCH="master"
+EXISTING_BRANCH=""
+BRANCH_NAME=""   # the branch actually checked out; == $NAME in default mode
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --base)
             BASE_BRANCH="$2"
+            shift 2
+            ;;
+        --existing)
+            # Arity guard: bare `--existing` would hit `$2` under `set -u` and die with
+            # "unbound variable", which reads as a wt-new bug rather than a usage error.
+            if [ $# -lt 2 ] || [[ "$2" == -* ]]; then
+                echo "Error: --existing requires a branch name" >&2
+                exit 1
+            fi
+            EXISTING_BRANCH="$2"
             shift 2
             ;;
         -*)
@@ -38,11 +51,20 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# Under --existing the positional name is optional. Branch names may contain "/"
+# (feat/foo); the worktree parent dir is flat, so flatten it. This is exactly the
+# slug-vs-branch divergence bin/pr-wt-resolve:41 already accounts for by matching
+# on the porcelain `branch` field rather than the directory name.
+if [ -z "$NAME" ] && [ -n "$EXISTING_BRANCH" ]; then
+    NAME="${EXISTING_BRANCH//\//-}"
+fi
+
 if [ -z "$NAME" ]; then
     echo "Usage: bin/wt-new <name> [--base <branch>]" >&2
     echo "" >&2
     echo "Creates a git worktree outside the repo (sibling IBL5-worktrees/<name>) with symlinks and CSS." >&2
     echo "Does NOT start Docker — use bin/wt-up <name> for browser preview." >&2
+    echo "  --existing <branch>  check out an existing origin branch instead of cutting a new one." >&2
     exit 1
 fi
 
@@ -54,33 +76,88 @@ if [ -d "$WT_ROOT" ]; then
     exit 1
 fi
 
-# Sync local $BASE_BRANCH with origin before branching — avoids forking from a stale tip.
-echo "Fetching origin/$BASE_BRANCH..."
-if git -C "$REPO_ROOT" fetch origin "$BASE_BRANCH" --quiet 2>/dev/null; then
-    BEHIND=$(git -C "$REPO_ROOT" rev-list --count "$BASE_BRANCH..origin/$BASE_BRANCH" 2>/dev/null || echo 0)
-    if [ "$BEHIND" -gt 0 ]; then
-        echo "Fast-forwarding local $BASE_BRANCH ($BEHIND commit(s) behind origin)..."
-        CHECKED_OUT="$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null)"
-        if [ "$CHECKED_OUT" = "$BASE_BRANCH" ]; then
-            # BASE_BRANCH is checked out in the main checkout — git refuses to fetch
-            # into a checked-out ref, so merge --ff-only is the only safe path here.
-            git -C "$REPO_ROOT" merge --ff-only "origin/$BASE_BRANCH" --quiet
-        else
-            # BASE_BRANCH is NOT checked out — use fetch refspec to fast-forward the
-            # local ref directly without needing it to be checked out.
-            git -C "$REPO_ROOT" fetch origin "$BASE_BRANCH:$BASE_BRANCH" --quiet
+if [ -n "$EXISTING_BRANCH" ]; then
+    BRANCH_NAME="$EXISTING_BRANCH"
+
+    # Guard first, before any ref is touched: `git worktree add` on a branch that is
+    # already checked out fails with "is already used by worktree at ...", but only
+    # AFTER the fetch has run. Name the offending path ourselves and exit clean.
+    # awk form lifted from bin/pr-wt-resolve — match the porcelain `branch` field.
+    EXISTING_WT="$(git -C "$REPO_ROOT" worktree list --porcelain \
+        | awk -v b="refs/heads/$EXISTING_BRANCH" '
+            /^worktree / { p = substr($0, 10) }
+            /^branch /   { if (substr($0, 8) == b) { print p; exit } }')"
+    if [ -n "$EXISTING_WT" ]; then
+        echo "Error: branch '$EXISTING_BRANCH' is already checked out at $EXISTING_WT" >&2
+        exit 1
+    fi
+
+    # Fail-closed: unlike the base-branch sync below, an unreachable origin is NOT
+    # survivable here — there is no local branch to fall back to in the common case,
+    # and silently creating an empty/stale worktree is worse than exiting.
+    echo "Fetching origin/$EXISTING_BRANCH..."
+    if ! git -C "$REPO_ROOT" fetch origin "$EXISTING_BRANCH" --quiet 2>/dev/null; then
+        echo "Error: could not fetch origin/$EXISTING_BRANCH — no such branch on origin, or origin unreachable." >&2
+        exit 1
+    fi
+    if ! git -C "$REPO_ROOT" rev-parse --verify --quiet "refs/remotes/origin/$EXISTING_BRANCH" >/dev/null; then
+        echo "Error: origin/$EXISTING_BRANCH does not exist after fetch." >&2
+        exit 1
+    fi
+
+    echo "Creating worktree '$NAME' from origin/$EXISTING_BRANCH..."
+    if git -C "$REPO_ROOT" rev-parse --verify --quiet "refs/heads/$EXISTING_BRANCH" >/dev/null; then
+        # A local ref exists and (per the guard above) is checked out nowhere.
+        # Refuse to move it if it carries commits origin has not seen — that is
+        # unpushed local work, not a stale copy.
+        if ! git -C "$REPO_ROOT" merge-base --is-ancestor \
+                "refs/heads/$EXISTING_BRANCH" "refs/remotes/origin/$EXISTING_BRANCH"; then
+            echo "Error: local branch '$EXISTING_BRANCH' has commits not on origin/$EXISTING_BRANCH." >&2
+            echo "       Refusing to fast-forward it. Inspect or delete the local ref first." >&2
+            exit 1
         fi
+        # Refspec fetch fast-forwards a NON-checked-out ref in place — the same
+        # mechanism the base-branch sync uses at its `else` branch. No-op if current.
+        git -C "$REPO_ROOT" fetch origin "$EXISTING_BRANCH:$EXISTING_BRANCH" --quiet
+        git -C "$REPO_ROOT" worktree add "$WT_ROOT" "$EXISTING_BRANCH"
+    else
+        # No local ref: create it tracking origin. --track (unlike the default arm,
+        # which deliberately creates branches with no upstream) is correct here —
+        # the branch has a real remote counterpart and will be pushed back to it.
+        git -C "$REPO_ROOT" worktree add --track -b "$EXISTING_BRANCH" \
+            "$WT_ROOT" "origin/$EXISTING_BRANCH"
     fi
 else
-    echo "Warning: could not reach origin; creating worktree from local $BASE_BRANCH." >&2
+    BRANCH_NAME="$NAME"
+    # Sync local $BASE_BRANCH with origin before branching — avoids forking from a stale tip.
+    echo "Fetching origin/$BASE_BRANCH..."
+    if git -C "$REPO_ROOT" fetch origin "$BASE_BRANCH" --quiet 2>/dev/null; then
+        BEHIND=$(git -C "$REPO_ROOT" rev-list --count "$BASE_BRANCH..origin/$BASE_BRANCH" 2>/dev/null || echo 0)
+        if [ "$BEHIND" -gt 0 ]; then
+            echo "Fast-forwarding local $BASE_BRANCH ($BEHIND commit(s) behind origin)..."
+            CHECKED_OUT="$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null)"
+            if [ "$CHECKED_OUT" = "$BASE_BRANCH" ]; then
+                # BASE_BRANCH is checked out in the main checkout — git refuses to fetch
+                # into a checked-out ref, so merge --ff-only is the only safe path here.
+                git -C "$REPO_ROOT" merge --ff-only "origin/$BASE_BRANCH" --quiet
+            else
+                # BASE_BRANCH is NOT checked out — use fetch refspec to fast-forward the
+                # local ref directly without needing it to be checked out.
+                git -C "$REPO_ROOT" fetch origin "$BASE_BRANCH:$BASE_BRANCH" --quiet
+            fi
+        fi
+    else
+        echo "Warning: could not reach origin; creating worktree from local $BASE_BRANCH." >&2
+    fi
+
+    # Create worktree + branch in one step
+    echo "Creating worktree '$NAME' from $BASE_BRANCH..."
+    git -C "$REPO_ROOT" worktree add "$WT_ROOT" -b "$NAME" "$BASE_BRANCH"
 fi
 
-# Create worktree + branch in one step
-echo "Creating worktree '$NAME' from $BASE_BRANCH..."
-git -C "$REPO_ROOT" worktree add "$WT_ROOT" -b "$NAME" "$BASE_BRANCH"
 # Persist the base so the pre-push ADR gate and bin/wt-rebase can later resolve this
 # branch's real parent instead of assuming origin/master (see ADR-0117).
-git -C "$WT_ROOT" config "branch.$NAME.iblBase" "$BASE_BRANCH"
+git -C "$WT_ROOT" config "branch.$BRANCH_NAME.iblBase" "$BASE_BRANCH"
 
 # config.php: real copy, NOT a symlink. A symlink's absolute host target
 # (/Users/.../IBL5/ibl5/config.php) doesn't resolve inside the worktree's Docker
@@ -118,7 +195,11 @@ echo "  Worktree ready!"
 echo "================================================"
 echo ""
 echo "  Path:    $WT_IBL5"
-echo "  Branch:  $NAME (based on $BASE_BRANCH)"
+if [ -n "$EXISTING_BRANCH" ]; then
+    echo "  Branch:  $BRANCH_NAME (existing, tracking origin/$BRANCH_NAME; parent recorded as $BASE_BRANCH)"
+else
+    echo "  Branch:  $BRANCH_NAME (based on $BASE_BRANCH)"
+fi
 echo "  cd $WT_IBL5"
 echo ""
 echo "  Need browser preview? Run: bin/wt-up $NAME"

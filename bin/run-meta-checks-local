@@ -231,13 +231,19 @@ if [ "$FILTER_RC" -ne 0 ]; then
     exit 3
 fi
 
+# Filter names may contain characters that are invalid in a shell identifier
+# (the filters-block key grammar admits hyphens), so both the setter and the
+# getter map a name through the same sanitizer before touching FMAP_*.
+_fkey() { printf '%s' "$1" | tr -c '[:alnum:]' '_'; }
+
 # Build per-filter verdict map (bash 3.2 compatible; no declare -A).
-# Sets FMAP_<name>=true|false for each filter name.
+# Sets FMAP_<sanitized-name>=true|false for each filter name.
 while IFS=$'\t' read -r _fname _fval; do
-    eval "FMAP_${_fname}=${_fval}"
+    _fk=$(_fkey "$_fname")
+    eval "FMAP_${_fk}=${_fval}"
 done <<< "$FILTER_OUTPUT"
 
-_fmap() { eval "printf '%s' \"\${FMAP_${1}:-false}\""; }
+_fmap() { local _k; _k=$(_fkey "$1"); eval "printf '%s' \"\${FMAP_${_k}:-false}\""; }
 
 # ─── --print-filters diagnostic mode ─────────────────────────────────────────
 if [ "$PRINT_FILTERS" = 1 ]; then

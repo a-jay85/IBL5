@@ -3,39 +3,14 @@ from __future__ import annotations
 
 import os
 import sys
+import tempfile
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+import runner as _runner_mod
 from harness.adapters.gitad import ReplayGit
-from harness.state import HarnessError
-
-
-# ---------------------------------------------------------------------------
-# Minimal stub of run_meta_checks_local for unit tests
-# ---------------------------------------------------------------------------
-
-def _make_runner(exit_sequence: list[int]):
-    """Return a run_meta_checks_local that returns each rc in sequence."""
-    calls: list[list[str]] = []
-    seq = list(exit_sequence)
-
-    class FakeResult:
-        def __init__(self, rc):
-            self.returncode = rc
-            self.stdout = "META-CHECK-FAILED: check-docs-since\n" if rc == 1 else ""
-            self.stderr = "filter parse error" if rc == 3 else ""
-
-    import runner as _runner_mod
-    import unittest.mock as mock
-
-    original = _runner_mod.subprocess.run
-
-    def fake_run(argv, **kwargs):
-        calls.append(argv)
-        rc = seq.pop(0) if seq else 0
-        return FakeResult(rc)
-
-    return fake_run, calls
+from harness.adapters.llm import FixtureLlm
+from harness.state import HarnessError, UsageLedger
 
 
 def _load():
@@ -65,6 +40,81 @@ def test_row15_ordering():
     assert stage == "pre-push"
     assert push_count == 0, f"gate ran after push (count={push_count})"
     assert git.pushes == 0  # push hasn't happened yet — caller does it
+
+
+def test_row15_ordering_through_run(monkeypatch, stub_ambient_git_show):
+    """Row 15 (run-level): gate fires before push when verified through runner.run()."""
+    captured = []
+
+    class _CapturingGit(_runner_mod.ReplayGit):
+        def __init__(self, fixture):
+            super().__init__(fixture)
+            captured.append(self)
+
+    monkeypatch.setattr(_runner_mod, "ReplayGit", _CapturingGit)
+
+    fx = {
+        "slug": "meta-checks-ordering-test",
+        "diff": "diff --git a/ibl5/x.php b/ibl5/x.php\n+<?php echo 1;\n",
+        "pr_number": 8888,
+        "pr_meta": {"number": 8888, "title": "chore: ordering test",
+                    "body": "## Manual Testing\n\nNo manual testing needed\n",
+                    "headRefOid": "deadbeef"},
+        "labels": [],
+        "final_state": "OPEN",
+        "checks_outcome": {"exit": 0, "failed": []},
+        "verify": {"phpunit": None, "phpstan": None, "go": None},
+        "plan_content": "# Test plan\n\nNo matrix.\n",
+    }
+    canned = {
+        "pr-copy": {"type": "chore", "title": "chore: ordering test",
+                    "commit_subject": "chore: ordering test commit",
+                    "summary_md": "## Summary\n- x\n"},
+        "review-agent-a": [], "review-agent-b": [], "review-agent-d": [],
+        "security-audit": [],
+        "safety-verdict": {"holds": []},
+        "manual-classify": [],
+        "retrospective": {"save": False},
+    }
+    out = tempfile.mkdtemp(prefix="postplan-test-ordering-")
+    llm = FixtureLlm(UsageLedger(), canned)
+    _runner_mod.run(fx, out, llm, mode="replay", headless=True)
+
+    assert len(captured) == 1
+    git = captured[0]
+    assert git.meta_checks_calls == [("pre-push", 0)], (
+        f"gate did not record pre-push at push_count=0: {git.meta_checks_calls}"
+    )
+    assert git.pushes == 1, f"push did not happen after gate: pushes={git.pushes}"
+
+
+# ---------------------------------------------------------------------------
+# Regression guard (no matrix row): empty repo_root must not crash Phase 2
+# ---------------------------------------------------------------------------
+
+def test_empty_repo_root_skips_without_shelling_out():
+    """A live call with no worktree path skips instead of raising FileNotFoundError.
+
+    subprocess.run(cwd="") raises FileNotFoundError from chdir(""), which would abort
+    Phase 2 before the push on every code path that has no worktree to offer.
+    """
+    run_meta_checks_local, _ = _load()
+    git = ReplayGit({"slug": "test/branch"})
+    logged = []
+
+    import unittest.mock as mock
+    import runner as r
+
+    with mock.patch.object(r.subprocess, "run") as fake_run:
+        result = run_meta_checks_local(
+            git, "", "origin/master", logged.append, live=True)
+
+    assert result is True
+    fake_run.assert_not_called()
+    assert any("SKIPPED (no worktree path)" in m for m in logged), logged
+    # Ordering is still recorded, so row 15's proof survives the skip.
+    assert git.meta_checks_calls == [("pre-push", 0)]
+    assert git.pushes == 0
 
 
 # ---------------------------------------------------------------------------
@@ -103,6 +153,8 @@ def test_row16_negative_flag_file(tmp_path):
         os.unlink(flag)
     except FileNotFoundError:
         pass
+    # run_meta_checks_local itself never pushes — the caller (runner.run) does.
+    assert git.pushes == 0
 
 
 # ---------------------------------------------------------------------------

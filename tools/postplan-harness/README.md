@@ -27,6 +27,8 @@ Without `--live`, every would-be side effect remains a typed intent record.
 | CI-watch interpretation | `manual-classify` — plan-blind manual-step triage (haiku) |
 | Side-effect gating + audit log | `retrospective` — save-a-lesson-or-not (haiku) |
 
+Phase 2 rebases the branch onto origin/master, runs the local meta-check gate, then pushes to origin.
+
 Phase 5.0 resolves each plan path by exact-or-suffix match, then by unique basename (a directory the diff moved under one extra component still resolves; two same-named candidates stay `MISSING`). It re-runs once after a Phase 5.5 remediation commit, so a fix-up that authors the planned file clears arming condition (3) in the same run.
 
 Every retained call: single turn, no tools, byte-capped input packet, JSON

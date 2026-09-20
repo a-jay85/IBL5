@@ -173,24 +173,22 @@ else
 fi
 ```
 
-2.5. Run the local meta-check gate before pushing.
+2.5. Run the local meta-check gate before pushing. Pass no `--body-file`: the PR body does not exist yet at this point in Phase 2, so `check-pr-manual-testing` skips here and runs as a hard gate in the post-pr stage instead (ADR-0132 decision clause 5).
 
 ```bash
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
 META_FLAG="/tmp/ibl5-meta-checks-prepush-${BRANCH//\//-}.failed"
-META_EXTRA=""
-[ -n "${BODY_FILE:-}" ] && META_EXTRA=" --body-file $BODY_FILE"
-MC_OUT=$(bin/run-meta-checks-local --stage pre-push --base origin/master$META_EXTRA 2>&1)
+MC_OUT=$(bin/run-meta-checks-local --stage pre-push --base origin/master 2>&1)
 MC_RC=$?
+if [ "$MC_RC" != 0 ] && [ "$MC_RC" != 3 ]; then
+  bin/check-docs --fix-dates --since=origin/master 2>/dev/null; git add -u 2>/dev/null || true
+  git diff --cached --quiet || git commit --amend --no-edit
+  MC_OUT=$(bin/run-meta-checks-local --stage pre-push --base origin/master 2>&1)
+  MC_RC=$?
+fi
 if [ "$MC_RC" = 3 ]; then
   echo "STOP: meta-checks cannot parse workflow filters; fix .github/workflows/pr-meta-checks.yml and re-run /post-plan."
   exit 1
-fi
-if [ "$MC_RC" != 0 ]; then
-  bin/check-docs --fix-dates --since=origin/master 2>/dev/null; git add -u 2>/dev/null || true
-  git diff --cached --quiet || git commit --amend --no-edit
-  MC_OUT=$(bin/run-meta-checks-local --stage pre-push --base origin/master$META_EXTRA 2>&1)
-  MC_RC=$?
 fi
 if [ "$MC_RC" = 0 ]; then
   rm -f "$META_FLAG"

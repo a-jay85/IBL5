@@ -1,9 +1,9 @@
 ---
 description: Before every post-plan push, `bin/run-meta-checks-local` runs CI's hard-gate checks locally, deriving path filters at runtime from the workflow YAML; a failing run pushes anyway but withholds auto-merge.
-last_verified: 2026-09-18
+last_verified: 2026-09-19
 ---
 
-# ADR-0131: Pre-push local meta-check gate
+# ADR-0132: Pre-push local meta-check gate
 
 **Status:** Accepted
 **Date:** 2026-09-18
@@ -24,7 +24,9 @@ The extend-before-add bar in `.claude/rules/meta-tooling-bar.md` was evaluated. 
 
 (4) A failing local run pushes anyway so the PR exists and CI shows the same red. Auto-merge is not armed. The failing check names are written to a flag file that the Phase 6.5 arming condition reads.
 
-(5) `check-pr-manual-testing` runs in the pre-push stage only when a caller passes `--body-file`. Neither the harness nor the skill engine supplies one. The check runs as a hard gate in the post-pr stage (row 16).
+(5) `check-pr-manual-testing` runs in the pre-push stage only when a caller passes `--body-file`, and neither engine supplies one. The `--body-file` seam stays in place as a test seam and for a future caller that composes a body before the push. Two facts make a pre-push run of this check worthless today. The harness strips any `## Manual Testing` section out of the model-authored copy before the push (`strip_manual_testing_section` in `tools/postplan-harness/harness/classify.py` drops the section unconditionally), so the body the harness would hand over can only pass. The live body of an already-open PR is rewritten later in the same run by the post-commit body write, so gating on it would hold auto-merge over drift the run is about to repair. The check therefore runs once, as a hard gate in the post-pr stage against the real PR number.
+
+(6) The gate has two bypass paths. `PRE_PUSH_META_CHECKS_SKIP=1` is an operator escape hatch for a run that must push past a known-bad local gate. An empty worktree path skips as well, because there is no directory to run the scripts from; a live post-plan run always has one, so this arm is reachable only from a caller that has no worktree to offer. Both arms log the skip, and neither writes the flag file, so Phase 6.5 falls back to its own post-pr run for clearance.
 
 ## Alternatives Considered
 
@@ -52,4 +54,4 @@ Pure-Python runner: every step the orchestrator runs is an existing shell script
 - `.github/workflows/pr-meta-checks.yml` (the workflow this gate mirrors locally)
 - `tools/postplan-harness/runner.py` (harness integration, Phase 5)
 - `.claude/skills/post-plan/SKILL.md` (skill integration, Phase 6)
-- `.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md` (condition 15, Phase 7)
+- `.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md` (condition 16, Phase 7)

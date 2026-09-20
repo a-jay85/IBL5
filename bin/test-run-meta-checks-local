@@ -13,7 +13,9 @@ PASS=0
 FAIL=0
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RUNNER="$SCRIPT_DIR/run-meta-checks-local"
-REAL_WF="$SCRIPT_DIR/../.github/workflows/pr-meta-checks.yml"
+# Test seam: point case l at a scratch workflow copy to exercise matrix row 14
+# (a CI step the local runner does not mirror must trip the parity assertion).
+REAL_WF="${META_CHECKS_WF:-$SCRIPT_DIR/../.github/workflows/pr-meta-checks.yml}"
 
 pass() { printf 'PASS: %s\n' "$1"; PASS=$((PASS + 1)); }
 fail() { printf 'FAIL: %s\n' "$1"; FAIL=$((FAIL + 1)); }
@@ -36,16 +38,6 @@ absent() {
     fi
 }
 
-# run_check: capture exit code and output without masking the code with || true.
-run_check() {
-    local _out
-    _out=$("$@" 2>&1) || true
-    printf '%s' "$_out"
-}
-run_check_rc() {
-    "$@" >/dev/null 2>&1
-    printf '%d' $?
-}
 run_check_both() {
     # Usage: OUT=$(run_check_both cmd...); RC=$(...)
     # Returns combined stdout+stderr; exit code stored in _LAST_RC.

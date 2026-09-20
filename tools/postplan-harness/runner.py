@@ -787,18 +787,24 @@ def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=Tru
         calls.append(("pre-push", git.pushes if hasattr(git, "pushes") else -1))
     if not live:
         return True
+    if not repo_root:
+        # No worktree path to run the gate from. Without this guard subprocess.run
+        # raises FileNotFoundError out of chdir(""), aborting Phase 2 before the push.
+        log("phase2: meta-checks SKIPPED (no worktree path)")
+        return True
     runner = os.path.join(repo_root, "bin", "run-meta-checks-local")
     argv = [runner, "--stage", "pre-push", "--base", base]
     if body_file:
         argv += ["--body-file", body_file]
+    branch_slug = git.branch().replace("/", "-")
+    flag = f"/tmp/ibl5-meta-checks-prepush-{branch_slug}.failed"
     result = subprocess.run(argv, cwd=repo_root, capture_output=True, text=True)
+    last_result = result
     rc = result.returncode
     if rc == 3:
         raise HarnessError("local-gate",
                            f"meta-checks filter-parse failure: {(result.stderr or '').strip()[:200]}")
     if rc == 0:
-        branch_slug = git.branch().replace("/", "-")
-        flag = f"/tmp/ibl5-meta-checks-prepush-{branch_slug}.failed"
         try:
             os.unlink(flag)
         except FileNotFoundError:
@@ -808,24 +814,24 @@ def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=Tru
     worktree = repo_root if os.path.isdir(os.path.join(repo_root, ".git")) else None
     if worktree and _remediate_doc_staleness(worktree, git, log) > 0:
         result2 = subprocess.run(argv, cwd=repo_root, capture_output=True, text=True)
+        last_result = result2
         rc2 = result2.returncode
+        if rc2 == 3:
+            raise HarnessError("local-gate",
+                               f"meta-checks filter-parse failure: {(result2.stderr or '').strip()[:200]}")
         if rc2 == 0:
-            branch_slug = git.branch().replace("/", "-")
-            flag = f"/tmp/ibl5-meta-checks-prepush-{branch_slug}.failed"
             try:
                 os.unlink(flag)
             except FileNotFoundError:
                 pass
             return True
     # Still failing: write flag file and push anyway
-    output = (result.stdout or "").strip()
+    output = (last_result.stdout or "").strip()
     failed_names = " ".join(
         line.split("META-CHECK-FAILED:", 1)[1].strip()
         for line in output.splitlines()
         if line.startswith("META-CHECK-FAILED:")
     ) or "unknown"
-    branch_slug = git.branch().replace("/", "-")
-    flag = f"/tmp/ibl5-meta-checks-prepush-{branch_slug}.failed"
     try:
         with open(flag, "w") as fh:
             fh.write(failed_names + "\n")

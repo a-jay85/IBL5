@@ -142,6 +142,20 @@ test.describe('Sortable table functionality', () => {
     // used to skip re-attachment, leaving cached sort state visible but
     // columns unclickable until a full refresh.
     test('sortable re-attaches click handlers after browser back', async ({ page }) => {
+      // Record htmx's history events so the test can wait on them instead of
+      // racing them (same witness pattern as voting-submission.spec.ts).
+      await page.addInitScript(() => {
+        const w = window as unknown as Record<string, unknown>;
+        w.__iblPushedIntoHistory = false;
+        w.__iblHistoryRestored = false;
+        document.addEventListener('htmx:pushedIntoHistory', () => {
+          w.__iblPushedIntoHistory = true;
+        });
+        document.addEventListener('htmx:historyRestore', () => {
+          w.__iblHistoryRestored = true;
+        });
+      });
+
       await page.goto('modules.php?name=Standings');
       const firstTable = page.locator('table.sortable').first();
       await expect(firstTable).toHaveAttribute('data-sorttable', 'true');
@@ -154,16 +168,36 @@ test.describe('Sortable table functionality', () => {
       // Navigate to another page via a boosted link so HTMX caches
       // Standings into history state.
       const boostedLink = page.locator('#site-content a[href*="modules.php?name="]').first();
-      const [, ] = await Promise.all([
-        page.waitForResponse(
-          resp => resp.url().includes('modules.php') && resp.request().method() === 'GET',
-        ),
-        boostedLink.click(),
-      ]);
+      await boostedLink.click();
+
+      // The response arriving is too early: htmx pushes the new URL only after
+      // the swap. Going back before that push pops past Standings to the blank
+      // page the browser opened on, where no table ever appears.
+      await expect
+        .poll(
+          () =>
+            page.evaluate(
+              () => (window as unknown as Record<string, unknown>).__iblPushedIntoHistory,
+            ),
+          { message: 'htmx must push the boosted page into history before going back' },
+        )
+        .toBe(true);
 
       // Browser back — triggers htmx:historyRestore (NOT htmx:afterSwap).
       await page.goBack();
-      await expect(page.locator('table.sortable').first()).toBeVisible({ timeout: 15000 });
+
+      // The cached table is visible before htmx:historyRestore re-attaches its
+      // listeners, so wait for the event itself before clicking.
+      await expect
+        .poll(
+          () =>
+            page.evaluate(
+              () => (window as unknown as Record<string, unknown>).__iblHistoryRestored,
+            ),
+          { message: 'Standings must be restored from the htmx history cache' },
+        )
+        .toBe(true);
+      await expect(page.locator('table.sortable').first()).toBeVisible();
 
       // Verify a DIFFERENT column now responds to clicks. Before the fix,
       // the init guard skipped re-attachment and this click was a no-op.

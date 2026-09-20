@@ -847,6 +847,23 @@ else
     pass "source-level: no reset --hard / stash / rebase / push in the tick"
 fi
 
+# ── cron-setup hook flags ─────────────────────────────────────────────────────
+HOOK_JSON="$("$CRON_SETUP" --print-hook 2>&1)"
+if printf '%s\n' "$HOOK_JSON" | python3 -c \
+    'import json,sys; d=json.load(sys.stdin); assert d["hooks"][0]["command"].endswith("wt-sync-session-start.sh")' \
+    2>/dev/null; then
+    pass "cron-setup: --print-hook emits valid JSON with correct command"
+else
+    failcase "cron-setup: --print-hook JSON invalid or command wrong (got: $HOOK_JSON)"
+fi
+INVALID_ST=0
+INVALID_OUT="$("$CRON_SETUP" --invalid-flag 2>&1)" || INVALID_ST=$?
+if [ "$INVALID_ST" -ne 0 ] && printf '%s\n' "$INVALID_OUT" | grep -q "Unknown option"; then
+    pass "cron-setup: --invalid-flag exits non-zero with Unknown option"
+else
+    failcase "cron-setup: --invalid-flag did not exit non-zero or missing 'Unknown option' (got: $INVALID_OUT)"
+fi
+
 # ── Final report ──────────────────────────────────────────────────────────────
 echo ""
 if [ "$FAILED" -eq 0 ]; then

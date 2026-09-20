@@ -80,6 +80,7 @@ _TICK_LOG="$TMP/default-run/wt-sync.log"
 _TICK_LOCKD="$TMP/default-run/lock"
 mkdir -p "$_TICK_LOCKD" "$(dirname "$_TICK_LOG")"
 
+# shellcheck disable=SC2329,SC2034
 run_tick() {
     ST=0
     OUT="$(PATH="$STUBBIN:$PATH" \
@@ -88,6 +89,16 @@ run_tick() {
            WT_SYNC_LOCK_DIR="$_TICK_LOCKD" \
            WT_SYNC_ENABLED=1 \
            "$TICK" "$@" 2>&1)" || ST=$?
+}
+
+run_only() {   # <wt-path> [extra args...] — sets ONLY_OUT, ONLY_ERR, ONLY_ST
+    local wt="$1"; shift
+    ONLY_ST=0
+    ONLY_ERR="$TMP/only.err.$$"
+    ONLY_OUT="$(PATH="$STUBBIN:$PATH" WT_SYNC_IOREG="$STUBBIN/ioreg" \
+                WT_SYNC_LOG="$_TICK_LOG" WT_SYNC_LOCK_DIR="$_TICK_LOCKD" \
+                WT_SYNC_ENABLED=1 \
+                "$TICK" --only "$wt" "$@" 2>"$ONLY_ERR")" || ONLY_ST=$?
 }
 
 # ── Synthetic git environment factory ────────────────────────────────────────
@@ -193,6 +204,138 @@ add_worktree() {
             # Place the conflicting file as UNTRACKED in the worktree
             printf 'from-local\n' > "$wt/would-conflict.txt"
             ;;
+        behind-dirty-clean)
+            # Behind by a commit to a.txt; local uncommitted edit to b.txt (non-overlapping).
+            # git --ff-only succeeds; expected verdict SYNCED 1, b.txt edit preserved.
+            printf '%s\n' "$name" > "$main/$name.txt"
+            git -C "$main" add "$name.txt"
+            git -C "$main" commit -qm "$name initial"
+            git -C "$main" push -q origin "$name"
+            git -C "$main" checkout -q master
+            git -C "$main" worktree add -q "$wt" "$name"
+            local orig_bdc; orig_bdc="$(git -C "$main" remote get-url origin)"
+            local clone_bdc; clone_bdc="$(mktemp -d "$TMP/clone_bdc.XXXXXX")"
+            git clone -q "$orig_bdc" "$clone_bdc" 2>/dev/null
+            git -C "$clone_bdc" config user.email t@example.com
+            git -C "$clone_bdc" config user.name tester
+            git -C "$clone_bdc" config commit.gpgsign false
+            git -C "$clone_bdc" checkout -q "$name"
+            printf 'from-origin\n' > "$clone_bdc/a.txt"
+            git -C "$clone_bdc" add a.txt
+            git -C "$clone_bdc" commit -qm "origin adds a.txt"
+            git -C "$clone_bdc" push -q origin "$name"
+            git -C "$main" fetch -q origin
+            # Local edit to b.txt (different file — non-overlapping)
+            printf 'local-dirty\n' > "$wt/b.txt"
+            ;;
+        behind-dirty-overlap)
+            # Behind by a commit to a.txt; local uncommitted edit to a.txt (overlapping).
+            # git --ff-only refuses; expected verdict BEHIND-DIRTY.
+            printf '%s\n' "$name" > "$main/$name.txt"
+            git -C "$main" add "$name.txt"
+            git -C "$main" commit -qm "$name initial"
+            # Seed a.txt on origin
+            printf 'base\n' > "$main/a.txt"
+            git -C "$main" add a.txt
+            git -C "$main" commit -qm "add a.txt"
+            git -C "$main" push -q origin "$name"
+            git -C "$main" checkout -q master
+            git -C "$main" worktree add -q "$wt" "$name"
+            local orig_bdo; orig_bdo="$(git -C "$main" remote get-url origin)"
+            local clone_bdo; clone_bdo="$(mktemp -d "$TMP/clone_bdo.XXXXXX")"
+            git clone -q "$orig_bdo" "$clone_bdo" 2>/dev/null
+            git -C "$clone_bdo" config user.email t@example.com
+            git -C "$clone_bdo" config user.name tester
+            git -C "$clone_bdo" config commit.gpgsign false
+            git -C "$clone_bdo" checkout -q "$name"
+            printf 'from-origin\n' > "$clone_bdo/a.txt"
+            git -C "$clone_bdo" add a.txt
+            git -C "$clone_bdo" commit -qm "origin changes a.txt"
+            git -C "$clone_bdo" push -q origin "$name"
+            git -C "$main" fetch -q origin
+            # Local edit to a.txt (same file — overlapping)
+            printf 'local-dirty\n' > "$wt/a.txt"
+            ;;
+        behind-untracked-collide)
+            # Behind by a commit that adds new.txt; untracked new.txt already present.
+            # git --ff-only refuses; expected verdict BEHIND-DIRTY.
+            printf '%s\n' "$name" > "$main/$name.txt"
+            git -C "$main" add "$name.txt"
+            git -C "$main" commit -qm "$name initial"
+            git -C "$main" push -q origin "$name"
+            git -C "$main" checkout -q master
+            git -C "$main" worktree add -q "$wt" "$name"
+            local orig_buc; orig_buc="$(git -C "$main" remote get-url origin)"
+            local clone_buc; clone_buc="$(mktemp -d "$TMP/clone_buc.XXXXXX")"
+            git clone -q "$orig_buc" "$clone_buc" 2>/dev/null
+            git -C "$clone_buc" config user.email t@example.com
+            git -C "$clone_buc" config user.name tester
+            git -C "$clone_buc" config commit.gpgsign false
+            git -C "$clone_buc" checkout -q "$name"
+            printf 'from-origin\n' > "$clone_buc/new.txt"
+            git -C "$clone_buc" add new.txt
+            git -C "$clone_buc" commit -qm "origin adds new.txt"
+            git -C "$clone_buc" push -q origin "$name"
+            git -C "$main" fetch -q origin
+            # Untracked new.txt already in the worktree
+            printf 'local-untracked\n' > "$wt/new.txt"
+            ;;
+        diverged)
+            # Both local and origin have new commits (non-conflicting files).
+            # Clean tree; expected verdict MERGED.
+            printf '%s\n' "$name" > "$main/$name.txt"
+            git -C "$main" add "$name.txt"
+            git -C "$main" commit -qm "$name initial"
+            git -C "$main" push -q origin "$name"
+            git -C "$main" checkout -q master
+            git -C "$main" worktree add -q "$wt" "$name"
+            # Local commit in the worktree (non-conflicting file)
+            printf 'local-commit\n' > "$wt/local.txt"
+            git -C "$wt" add local.txt
+            git -C "$wt" -c user.email=t@example.com -c user.name=tester \
+                -c commit.gpgsign=false commit -qm "local commit"
+            # Advance origin with a non-conflicting commit
+            local orig_div; orig_div="$(git -C "$main" remote get-url origin)"
+            local clone_div; clone_div="$(mktemp -d "$TMP/clone_div.XXXXXX")"
+            git clone -q "$orig_div" "$clone_div" 2>/dev/null
+            git -C "$clone_div" config user.email t@example.com
+            git -C "$clone_div" config user.name tester
+            git -C "$clone_div" config commit.gpgsign false
+            git -C "$clone_div" checkout -q "$name"
+            printf 'origin-commit\n' > "$clone_div/origin.txt"
+            git -C "$clone_div" add origin.txt
+            git -C "$clone_div" commit -qm "origin commit"
+            git -C "$clone_div" push -q origin "$name"
+            git -C "$wt" fetch origin "$name" -q
+            ;;
+        diverged-conflict)
+            # Both local and origin have new commits that touch the same file.
+            # Clean tree; expected verdict DIVERGED-CONFLICT.
+            printf '%s\n' "$name" > "$main/$name.txt"
+            git -C "$main" add "$name.txt"
+            git -C "$main" commit -qm "$name initial"
+            git -C "$main" push -q origin "$name"
+            git -C "$main" checkout -q master
+            git -C "$main" worktree add -q "$wt" "$name"
+            # Local commit touching conflict.txt
+            printf 'local-version\n' > "$wt/conflict.txt"
+            git -C "$wt" add conflict.txt
+            git -C "$wt" -c user.email=t@example.com -c user.name=tester \
+                -c commit.gpgsign=false commit -qm "local conflict.txt"
+            # Advance origin with a conflicting commit on the same file
+            local orig_dc; orig_dc="$(git -C "$main" remote get-url origin)"
+            local clone_dc; clone_dc="$(mktemp -d "$TMP/clone_dc.XXXXXX")"
+            git clone -q "$orig_dc" "$clone_dc" 2>/dev/null
+            git -C "$clone_dc" config user.email t@example.com
+            git -C "$clone_dc" config user.name tester
+            git -C "$clone_dc" config commit.gpgsign false
+            git -C "$clone_dc" checkout -q "$name"
+            printf 'origin-version\n' > "$clone_dc/conflict.txt"
+            git -C "$clone_dc" add conflict.txt
+            git -C "$clone_dc" commit -qm "origin conflict.txt"
+            git -C "$clone_dc" push -q origin "$name"
+            git -C "$wt" fetch origin "$name" -q
+            ;;
     esac
     echo "$wt"
 }
@@ -209,14 +352,13 @@ run_with_repo() {
         extra_env+=("$1"); shift
     done
     [ "${1:-}" = "--" ] && shift
-    ST=0
     OUT="$(env PATH="$STUBBIN:$PATH" WT_SYNC_IOREG="$STUBBIN/ioreg" \
                WT_SYNC_REPO_ROOT="$main" \
                WT_SYNC_LOG="$log" \
                WT_SYNC_LOCK_DIR="$lockd" \
                WT_SYNC_ENABLED=1 \
                "${extra_env[@]+"${extra_env[@]}"}" \
-               "$TICK" "$@" 2>&1)" || ST=$?
+               "$TICK" "$@" 2>&1)" || true
 }
 
 # ── Check 0: source-level safety grep ────────────────────────────────────────
@@ -448,6 +590,278 @@ if grep -qE '^[^#]*[^/"]\bioreg -c' "$TICK"; then
     failcase "source-level: wt-sync-tick calls bare 'ioreg' (PATH-dependent)"
 else
     pass "source-level: ioreg invoked via \$WT_SYNC_IOREG, not a bare PATH lookup"
+fi
+
+# ── Test 16: source-level — header cites the real ADR for this script ────────
+if grep -q 'ADR-0104' "$TICK"; then
+    failcase "source-level: wt-sync-tick header cites ADR-0104 (no such ADR file)"
+elif grep -q 'ADR-0106' "$TICK"; then
+    pass "source-level: wt-sync-tick header cites ADR-0106"
+else
+    failcase "source-level: wt-sync-tick header cites no ADR at all"
+fi
+
+# ── Test 17: only: CURRENT ────────────────────────────────────────────────────
+MAIN17="$(new_env)"
+WT17="$(add_worktree "$MAIN17" "wt-current17" current)"
+run_only "$WT17"
+assert_eq "only: CURRENT stdout"  "CURRENT" "$ONLY_OUT"
+assert_eq "only: CURRENT exit 0"  "0"       "$ONLY_ST"
+
+# ── Test 18: only: SYNCED on clean behind ─────────────────────────────────────
+MAIN18="$(new_env)"
+WT18="$(add_worktree "$MAIN18" "wt-behind18" behind)"
+HEAD18_BEFORE="$(git -C "$WT18" rev-parse HEAD)"
+run_only "$WT18"
+HEAD18_AFTER="$(git -C "$WT18" rev-parse HEAD)"
+assert_eq "only: SYNCED stdout"       "SYNCED 1" "$ONLY_OUT"
+if [ "$HEAD18_AFTER" != "$HEAD18_BEFORE" ]; then
+    pass "only: SYNCED HEAD advanced"
+else
+    failcase "only: SYNCED HEAD did not advance"
+fi
+
+# ── Test 19: only: SYNCED with non-overlapping dirty edit ─────────────────────
+MAIN19="$(new_env)"
+WT19="$(add_worktree "$MAIN19" "wt-bdc19" behind-dirty-clean)"
+BTXT19="$(cat "$WT19/b.txt")"
+run_only "$WT19"
+assert_eq "only: SYNCED dirty-clean stdout" "SYNCED 1" "$ONLY_OUT"
+assert_eq "only: SYNCED dirty-clean b.txt preserved" "$BTXT19" "$(cat "$WT19/b.txt")"
+
+# ── Test 20: only: BEHIND-DIRTY on overlapping edit ───────────────────────────
+MAIN20="$(new_env)"
+WT20="$(add_worktree "$MAIN20" "wt-bdo20" behind-dirty-overlap)"
+HEAD20_BEFORE="$(git -C "$WT20" rev-parse HEAD)"
+run_only "$WT20"
+HEAD20_AFTER="$(git -C "$WT20" rev-parse HEAD)"
+assert_eq "only: BEHIND-DIRTY overlap stdout"       "BEHIND-DIRTY" "$ONLY_OUT"
+assert_eq "only: BEHIND-DIRTY overlap HEAD unchanged" "$HEAD20_BEFORE" "$HEAD20_AFTER"
+
+# ── Test 21: only: BEHIND-DIRTY on untracked collision ────────────────────────
+MAIN21="$(new_env)"
+WT21="$(add_worktree "$MAIN21" "wt-buc21" behind-untracked-collide)"
+NEW21_CONTENT="$(cat "$WT21/new.txt")"
+run_only "$WT21"
+assert_eq "only: BEHIND-DIRTY untracked stdout"            "BEHIND-DIRTY" "$ONLY_OUT"
+assert_eq "only: BEHIND-DIRTY untracked file intact" "$NEW21_CONTENT" "$(cat "$WT21/new.txt")"
+
+# ── Test 22: only: MERGED on diverged clean ───────────────────────────────────
+MAIN22="$(new_env)"
+WT22="$(add_worktree "$MAIN22" "wt-div22" diverged)"
+BRANCH22="$(git -C "$WT22" branch --show-current)"
+run_only "$WT22"
+assert_eq "only: MERGED stdout" "MERGED" "$ONLY_OUT"
+ANCESTOR_COUNT22="$(git -C "$WT22" rev-list --count HEAD ^"origin/$BRANCH22")"
+if [ "${ANCESTOR_COUNT22:-0}" -gt 1 ]; then
+    pass "only: MERGED HEAD has local+merge commits"
+else
+    failcase "only: MERGED HEAD count wrong (got ${ANCESTOR_COUNT22:-0}, want >1)"
+fi
+if git -C "$WT22" merge-base --is-ancestor "origin/$BRANCH22" HEAD 2>/dev/null; then
+    pass "only: MERGED origin tip is ancestor of HEAD"
+else
+    failcase "only: MERGED origin tip is not ancestor of HEAD"
+fi
+
+# ── Test 23: only: DIVERGED-CONFLICT aborts ───────────────────────────────────
+MAIN23="$(new_env)"
+WT23="$(add_worktree "$MAIN23" "wt-dc23" diverged-conflict)"
+HEAD23_BEFORE="$(git -C "$WT23" rev-parse HEAD)"
+run_only "$WT23"
+HEAD23_AFTER="$(git -C "$WT23" rev-parse HEAD)"
+assert_eq "only: DIVERGED-CONFLICT stdout"          "DIVERGED-CONFLICT" "$ONLY_OUT"
+assert_eq "only: DIVERGED-CONFLICT HEAD unchanged"  "$HEAD23_BEFORE"    "$HEAD23_AFTER"
+STATUS23="$(git -C "$WT23" status --porcelain 2>/dev/null)"
+if echo "$STATUS23" | grep -q '^UU'; then
+    failcase "only: DIVERGED-CONFLICT left a conflicted index (merge --abort missing)"
+else
+    pass "only: DIVERGED-CONFLICT no UU entry in status"
+fi
+
+# ── Test 24: only: DIVERGED-DIRTY attempts nothing ────────────────────────────
+MAIN24="$(new_env)"
+WT24="$(add_worktree "$MAIN24" "wt-dd24" diverged)"
+HEAD24_BEFORE="$(git -C "$WT24" rev-parse HEAD)"
+printf 'dirty\n' >> "$WT24/local.txt"
+run_only "$WT24"
+HEAD24_AFTER="$(git -C "$WT24" rev-parse HEAD)"
+assert_eq "only: DIVERGED-DIRTY stdout"          "DIVERGED-DIRTY" "$ONLY_OUT"
+assert_eq "only: DIVERGED-DIRTY HEAD unchanged"  "$HEAD24_BEFORE" "$HEAD24_AFTER"
+assert_match "only: DIVERGED-DIRTY edit intact" "dirty" "$(cat "$WT24/local.txt")"
+
+# ── Test 25: only: AHEAD-ONLY ─────────────────────────────────────────────────
+MAIN25="$(new_env)"
+WT25="$(add_worktree "$MAIN25" "wt-ahead25" ahead)"
+HEAD25_BEFORE="$(git -C "$WT25" rev-parse HEAD)"
+run_only "$WT25"
+HEAD25_AFTER="$(git -C "$WT25" rev-parse HEAD)"
+assert_eq "only: AHEAD-ONLY stdout"          "AHEAD-ONLY" "$ONLY_OUT"
+assert_eq "only: AHEAD-ONLY HEAD unchanged"  "$HEAD25_BEFORE" "$HEAD25_AFTER"
+
+# ── Test 26: only: NO-REMOTE on local-only branch ─────────────────────────────
+MAIN26="$(new_env)"
+# Create a worktree on a branch that was never pushed
+WT26_BRANCH="wt-local26"
+WT26_DIR="$MAIN26/worktrees/$WT26_BRANCH"
+mkdir -p "$(dirname "$WT26_DIR")"
+git -C "$MAIN26" worktree add -q -b "$WT26_BRANCH" "$WT26_DIR" master
+run_only "$WT26_DIR"
+assert_eq "only: NO-REMOTE stdout"  "NO-REMOTE" "$ONLY_OUT"
+assert_eq "only: NO-REMOTE exit 0"  "0"         "$ONLY_ST"
+
+# ── Test 27: only: FETCH-FAILED under fetch timeout ───────────────────────────
+MAIN27="$(new_env)"
+WT27="$(add_worktree "$MAIN27" "wt-ff27" current)"
+STUBBIN27="$TMP/stubbin27"
+mkdir -p "$STUBBIN27"
+cp "$STUBBIN/ioreg" "$STUBBIN27/ioreg"
+cp "$STUBBIN/lsof" "$STUBBIN27/lsof"
+# Capture real git path before STUBBIN swap — STUBBIN only has ioreg/lsof, not git.
+REAL_GIT27="$(command -v git)"
+cat > "$STUBBIN27/git" <<SH
+#!/bin/sh
+for _a; do
+    case "\$_a" in fetch) sleep 30; exit 0;; esac
+done
+exec "$REAL_GIT27" "\$@"
+SH
+chmod +x "$STUBBIN27/git"
+STUBBIN_SAVE27="$STUBBIN"
+STUBBIN="$STUBBIN27"
+ONLY_ST=0; ONLY_ERR="$TMP/only27.err"
+ONLY_OUT="$(WT_SYNC_FETCH_TIMEOUT=1 PATH="$STUBBIN:$PATH" \
+            WT_SYNC_IOREG="$STUBBIN/ioreg" \
+            WT_SYNC_LOG="$_TICK_LOG" WT_SYNC_LOCK_DIR="$_TICK_LOCKD" \
+            WT_SYNC_ENABLED=1 \
+            "$TICK" --only "$WT27" 2>"$ONLY_ERR")" || ONLY_ST=$?
+STUBBIN="$STUBBIN_SAVE27"
+assert_eq "only: FETCH-FAILED stdout"  "FETCH-FAILED" "$ONLY_OUT"
+assert_eq "only: FETCH-FAILED exit 0"  "0"            "$ONLY_ST"
+
+# ── Test 28: only: idle gate bypassed ─────────────────────────────────────────
+MAIN28="$(new_env)"
+WT28="$(add_worktree "$MAIN28" "wt-idle28" current)"
+# STUB_IOREG_LINE=0 means operator present (idle 0s < 600s threshold)
+STUB_IOREG_LINE="HIDIdleTime = 0" run_only "$WT28"
+if [ -n "$ONLY_OUT" ]; then
+    pass "only: idle gate bypassed — verdict emitted ($ONLY_OUT)"
+else
+    failcase "only: idle gate not bypassed — no verdict emitted"
+fi
+
+# ── Test 29: only: in-use gate bypassed ───────────────────────────────────────
+MAIN29="$(new_env)"
+WT29="$(add_worktree "$MAIN29" "wt-inuse29" current)"
+WT29_REAL="$(cd "$WT29" && pwd -P)"
+STUB_LSOF_LINE="lsof    999 user   3   DIR   $WT29_REAL" run_only "$WT29"
+if [ -n "$ONLY_OUT" ]; then
+    pass "only: in-use gate bypassed — verdict emitted ($ONLY_OUT)"
+else
+    failcase "only: in-use gate not bypassed — no verdict emitted"
+fi
+
+# ── Test 30: only: main checkout refused; --only with no value exits 2 ────────
+MAIN30="$(new_env)"
+ONLY_ST30=0
+ONLY_OUT30="$(PATH="$STUBBIN:$PATH" WT_SYNC_IOREG="$STUBBIN/ioreg" \
+              WT_SYNC_LOG="$_TICK_LOG" WT_SYNC_LOCK_DIR="$_TICK_LOCKD" \
+              WT_SYNC_ENABLED=1 \
+              "$TICK" --only "$MAIN30" 2>"$TMP/only30.err")" || ONLY_ST30=$?
+assert_eq "only: main checkout stdout empty"  ""  "$ONLY_OUT30"
+assert_eq "only: main checkout exits 2"       "2" "$ONLY_ST30"
+assert_match "only: main checkout stderr"  "main checkout" "$(cat "$TMP/only30.err")"
+# Folded: --only with no value exits 2 and does not hang
+ONLY_ST30b=0
+timeout 5 "$TICK" --only 2>/dev/null; ONLY_ST30b=$? || true
+assert_eq "only: no-value exits 2"  "2" "$ONLY_ST30b"
+
+# ── Test 31: only: lock is waited on, never taken ─────────────────────────────
+MAIN31="$(new_env)"
+WT31="$(add_worktree "$MAIN31" "wt-lock31" current)"
+# Write a live PID into the lock file to simulate a running fleet tick
+_TICK_LOCK31="$_TICK_LOCKD/wt-sync.lock"
+printf '%d\n' "$$" > "$_TICK_LOCK31"
+WT_SYNC_ONDEMAND_LOCK_WAIT=2 run_only "$WT31"
+if [ -n "$ONLY_OUT" ]; then
+    pass "only: lock waited — verdict still emitted ($ONLY_OUT)"
+else
+    failcase "only: lock wait blocked verdict entirely"
+fi
+# Assert the lock was never overwritten (it must still hold our shell PID)
+if [ -f "$_TICK_LOCK31" ]; then
+    LOCK_PID31="$(cat "$_TICK_LOCK31" 2>/dev/null || true)"
+    assert_eq "only: lock file holds original PID (never taken)" "$$" "$LOCK_PID31"
+else
+    failcase "only: lock file was removed by on-demand mode (must not take the lock)"
+fi
+rm -f "$_TICK_LOCK31"
+
+# ── Hook wrapper tests ────────────────────────────────────────────────────────
+HOOK="$SCRIPT_DIR/hooks/wt-sync-session-start.sh"
+# Create a synthetic git env with a linked worktree and a fake tick.
+MAIN_HOOK="$(new_env)"
+WT_HOOK="$(add_worktree "$MAIN_HOOK" "wt-hooktest" current)"
+mkdir -p "$MAIN_HOOK/bin"
+# Fake tick: ignores args, always emits CURRENT (tests hook routing, not tick logic).
+cat > "$MAIN_HOOK/bin/wt-sync-tick" <<'SH'
+#!/bin/sh
+echo "CURRENT"
+SH
+chmod +x "$MAIN_HOOK/bin/wt-sync-tick"
+
+# Row 1: linked worktree → verdict printed
+HOOK_OUT1="$(CLAUDE_PROJECT_DIR="$WT_HOOK" PATH="$STUBBIN:$PATH" bash "$HOOK" 2>/dev/null || true)"
+assert_match "hook: linked worktree yields wt-sync verdict" "^wt-sync: " "$HOOK_OUT1"
+HOOK_ST1=0
+CLAUDE_PROJECT_DIR="$WT_HOOK" PATH="$STUBBIN:$PATH" bash "$HOOK" >/dev/null 2>/dev/null || HOOK_ST1=$?
+assert_eq "hook: linked worktree exits 0" "0" "$HOOK_ST1"
+
+# Row 2: main checkout → silent
+HOOK_OUT2="$(CLAUDE_PROJECT_DIR="$MAIN_HOOK" PATH="$STUBBIN:$PATH" bash "$HOOK" 2>/dev/null || true)"
+assert_eq "hook: main checkout is silent" "" "$HOOK_OUT2"
+HOOK_ST2=0
+CLAUDE_PROJECT_DIR="$MAIN_HOOK" PATH="$STUBBIN:$PATH" bash "$HOOK" >/dev/null 2>/dev/null || HOOK_ST2=$?
+assert_eq "hook: main checkout exits 0" "0" "$HOOK_ST2"
+
+# Row 3a: non-git directory → silent, exit 0
+HOOK_OUT3a="$(CLAUDE_PROJECT_DIR="$TMP" PATH="$STUBBIN:$PATH" bash "$HOOK" 2>/dev/null || true)"
+assert_eq "hook: non-git dir is silent" "" "$HOOK_OUT3a"
+HOOK_ST3a=0
+CLAUDE_PROJECT_DIR="$TMP" PATH="$STUBBIN:$PATH" bash "$HOOK" >/dev/null 2>/dev/null || HOOK_ST3a=$?
+assert_eq "hook: non-git dir exits 0" "0" "$HOOK_ST3a"
+
+# Row 3b: tick not executable → silent, exit 0
+chmod 0644 "$MAIN_HOOK/bin/wt-sync-tick"
+HOOK_OUT3b="$(CLAUDE_PROJECT_DIR="$WT_HOOK" PATH="$STUBBIN:$PATH" bash "$HOOK" 2>/dev/null || true)"
+assert_eq "hook: non-executable tick is silent" "" "$HOOK_OUT3b"
+HOOK_ST3b=0
+CLAUDE_PROJECT_DIR="$WT_HOOK" PATH="$STUBBIN:$PATH" bash "$HOOK" >/dev/null 2>/dev/null || HOOK_ST3b=$?
+assert_eq "hook: non-executable tick exits 0" "0" "$HOOK_ST3b"
+chmod +x "$MAIN_HOOK/bin/wt-sync-tick"   # restore
+
+# ── Source-level anti-pattern row ─────────────────────────────────────────────
+if grep -nE '(reset[[:space:]]+--hard|[[:space:]]stash[[:space:]]|[[:space:]]rebase[[:space:]]|push[[:space:]]+origin|git[[:space:]].*--force)' "$TICK" | grep -vE '^[0-9]+:[[:space:]]*#'; then
+    failcase "source-level: wt-sync-tick contains a forbidden git write verb"
+else
+    pass "source-level: no reset --hard / stash / rebase / push in the tick"
+fi
+
+# ── cron-setup hook flags ─────────────────────────────────────────────────────
+HOOK_JSON="$("$CRON_SETUP" --print-hook 2>&1)"
+if printf '%s\n' "$HOOK_JSON" | python3 -c \
+    'import json,sys; d=json.load(sys.stdin); assert d["hooks"][0]["command"].endswith("wt-sync-session-start.sh")' \
+    2>/dev/null; then
+    pass "cron-setup: --print-hook emits valid JSON with correct command"
+else
+    failcase "cron-setup: --print-hook JSON invalid or command wrong (got: $HOOK_JSON)"
+fi
+INVALID_ST=0
+INVALID_OUT="$("$CRON_SETUP" --invalid-flag 2>&1)" || INVALID_ST=$?
+if [ "$INVALID_ST" -ne 0 ] && printf '%s\n' "$INVALID_OUT" | grep -q "Unknown option"; then
+    pass "cron-setup: --invalid-flag exits non-zero with Unknown option"
+else
+    failcase "cron-setup: --invalid-flag did not exit non-zero or missing 'Unknown option' (got: $INVALID_OUT)"
 fi
 
 # ── Final report ──────────────────────────────────────────────────────────────

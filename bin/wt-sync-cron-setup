@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# One-time setup for the local worktree fast-forward sync cron (ADR-0104).
+# One-time setup for the local worktree fast-forward sync cron (ADR-0106).
 #
 # Installs a Mac-local launchd LaunchAgent (com.ibl5.wt-sync) that fires
 # the poll-only bash driver bin/wt-sync-tick every 900s via StartInterval —
@@ -15,6 +15,10 @@
 #   bin/wt-sync-cron-setup --print-schedule      # emit the plist to stdout (no side effect)
 #   bin/wt-sync-cron-setup --install-schedule    # install + load the LaunchAgent
 #   bin/wt-sync-cron-setup --uninstall-schedule  # unload + remove the LaunchAgent
+# ---
+#   bin/wt-sync-cron-setup --print-hook          # emit the SessionStart hook entry to stdout
+#   bin/wt-sync-cron-setup --install-hook        # symlink hook + register in ~/.claude/settings.json
+#   bin/wt-sync-cron-setup --uninstall-hook      # remove symlink + deregister from settings.json
 
 set -euo pipefail
 
@@ -23,9 +27,12 @@ ACTION=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --install-schedule)   ACTION="install";   shift ;;
-    --uninstall-schedule) ACTION="uninstall"; shift ;;
-    --print-schedule)     ACTION="print";     shift ;;
+    --install-schedule)   ACTION="install";        shift ;;
+    --uninstall-schedule) ACTION="uninstall";      shift ;;
+    --print-schedule)     ACTION="print";          shift ;;
+    --install-hook)       ACTION="install-hook";   shift ;;
+    --uninstall-hook)     ACTION="uninstall-hook"; shift ;;
+    --print-hook)         ACTION="print-hook";     shift ;;
     -h|--help) awk 'NR==1{next} /^#/{sub(/^# ?/,"");print;next} {exit}' "$0"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
@@ -44,6 +51,10 @@ PLIST_LABEL="com.ibl5.wt-sync"
 PLIST_PATH="$HOME/Library/LaunchAgents/${PLIST_LABEL}.plist"
 LOG_DIR="$HOME/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/wt-sync"
 PROGRAM="$MAIN_WT/bin/wt-sync-tick"
+
+HOOK_SRC="$MAIN_WT/bin/hooks/wt-sync-session-start.sh"
+HOOK_LINK="$HOME/.claude/hooks/wt-sync-session-start.sh"
+SETTINGS="$HOME/.claude/settings.json"
 
 # Single source of truth for the plist — used by both --print-schedule and
 # --install-schedule, so the MAIN-checkout derivation is exercised by tests.
@@ -86,6 +97,12 @@ build_plist() {
 PLIST
 }
 
+build_hook_entry() {
+  cat <<JSON
+{"hooks": [{"type": "command", "command": "${HOOK_LINK}", "timeout": 15}]}
+JSON
+}
+
 case "$ACTION" in
   print)
     build_plist
@@ -101,5 +118,61 @@ case "$ACTION" in
     launchctl bootout "gui/$(id -u)/${PLIST_LABEL}" 2>/dev/null || true  # idempotent
     rm -f "$PLIST_PATH"                                                   # idempotent
     echo "Uninstalled ${PLIST_LABEL}."
+    ;;
+  print-hook)
+    build_hook_entry
+    ;;
+  install-hook)
+    [ -x "$HOOK_SRC" ] || { echo "Missing or non-executable: $HOOK_SRC" >&2; exit 1; }
+    mkdir -p "$HOME/.claude/hooks"
+    ln -sfn "$HOOK_SRC" "$HOOK_LINK"          # idempotent; re-points a stale link
+    python3 - "$SETTINGS" "$HOOK_LINK" <<'PY'
+import json, os, shutil, sys
+path, cmd = sys.argv[1], sys.argv[2]
+data = json.load(open(path)) if os.path.exists(path) else {}
+groups = data.setdefault("hooks", {}).setdefault("SessionStart", [])
+if any(h.get("command") == cmd for g in groups for h in g.get("hooks", [])):
+    print("already registered"); raise SystemExit(0)
+groups.append({"hooks": [{"type": "command", "command": cmd, "timeout": 15}]})
+if os.path.exists(path):
+    shutil.copyfile(path, path + ".bak")
+tmp = path + ".tmp"
+with open(tmp, "w") as fh:
+    json.dump(data, fh, indent=2)
+    fh.write("\n")
+os.replace(tmp, path)
+print("registered")
+PY
+    echo "Installed hook symlink: $HOOK_LINK -> $HOOK_SRC"
+    ;;
+  uninstall-hook)
+    rm -f "$HOOK_LINK"                        # idempotent
+    python3 - "$SETTINGS" "$HOOK_LINK" <<'PY'
+import json, os, shutil, sys
+path, cmd = sys.argv[1], sys.argv[2]
+if not os.path.exists(path):
+    print("not registered"); raise SystemExit(0)
+data = json.load(open(path))
+groups = data.get("hooks", {}).get("SessionStart", [])
+new_groups = []
+for g in groups:
+    new_hooks = [h for h in g.get("hooks", []) if h.get("command") != cmd]
+    if new_hooks:
+        new_groups.append({"hooks": new_hooks})
+if new_groups == groups:
+    print("not registered"); raise SystemExit(0)
+if new_groups:
+    data["hooks"]["SessionStart"] = new_groups
+elif "SessionStart" in data.get("hooks", {}):
+    del data["hooks"]["SessionStart"]
+shutil.copyfile(path, path + ".bak")
+tmp = path + ".tmp"
+with open(tmp, "w") as fh:
+    json.dump(data, fh, indent=2)
+    fh.write("\n")
+os.replace(tmp, path)
+print("unregistered")
+PY
+    echo "Uninstalled hook symlink and deregistered from settings.json."
     ;;
 esac

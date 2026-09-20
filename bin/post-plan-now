@@ -496,6 +496,18 @@ fi
 PLAN_SLUG_SEG=""
 [ -n "${PR_NUM:-}" ] && PLAN_SLUG_SEG="export PLAN_SLUG=$(shq "$PLAN_SLUG"); "
 
+# Sync this worktree before post-plan reads its diff (ADR-0133). A worktree that
+# diverged while the impl ran would otherwise be reviewed against a stale base.
+PP_VERDICT="$("$ROOT/bin/wt-sync-tick" --only "$ROOT" 2>/dev/null || true)"
+case "$PP_VERDICT" in
+    DIVERGED-CONFLICT|DIVERGED-DIRTY)
+        echo "post-plan-now: worktree '$SLUG' needs manual resolution ($PP_VERDICT)." >&2
+        echo "post-plan-now: resolve, then re-run. Nothing was changed." >&2
+        exit 1 ;;
+    "") : ;;
+    *) echo "post-plan-now: wt-sync --only: $PP_VERDICT" ;;
+esac
+
 CMD="export PATH=\"/usr/local/bin:/opt/homebrew/bin:\$HOME/.bun/bin:\$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:\$PATH\"; ${PLAN_SLUG_SEG}export POSTPLAN_LABEL=$(shq "$LABEL") POSTPLAN_STARTED=$(shq "$STARTED") POSTPLAN_BADGE_MARKER=$(shq "$POSTPLAN_BADGE_MARKER"); ${BADGE_FN}POSTPLAN_BADGE_BODY=\"\$(postplan_badge_body \"\$POSTPLAN_LABEL\" \"\$POSTPLAN_STARTED\")\"; export POSTPLAN_BADGE_BODY; trap 'conclude_status_badge \"\${pp_rc:-1}\"' EXIT INT TERM HUP; cd \"$ROOT\" && { postplan_sweep_stale_badge \"\$(postplan_badge_pr_number)\"; ${FALLBACK_FN}${HARNESS_SEG}${POST_HARNESS_SEG}${GATE_OPEN}CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 caffeinate -s claude -p $(shq "$PROMPT") --dangerously-skip-permissions --model claude-sonnet-4-6 --session-id $(shq "$SESSION_ID") --effort high --name \"$LABEL\"${GATE_CLOSE}; }; pp_rc=\$?; if [ \"\${rc:-0}\" = 3 ]; then pp_rc=3; fi; ${CMD_TAIL}"
 
 if [ "$FOREGROUND" -eq 1 ]; then

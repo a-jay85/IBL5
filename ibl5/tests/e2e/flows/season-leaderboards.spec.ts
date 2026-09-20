@@ -1,5 +1,16 @@
 import { test, expect } from '../fixtures/public';
 import { assertNoPhpErrors } from '../helpers/php-errors';
+import type { Page } from '@playwright/test';
+
+// The filter form sits inside hx-boost, so a submit swaps content in place
+// instead of navigating. Wait for the POST response, then let the retrying
+// assertions in each test cover the gap between response and DOM swap.
+async function submitFilters(page: Page): Promise<void> {
+  await Promise.all([
+    page.waitForResponse((r) => r.url().includes('SeasonLeaderboards') && r.request().method() === 'POST'),
+    page.locator('.ibl-filter-form__submit').click(),
+  ]);
+}
 
 // Season Leaderboards — public, no authentication required.
 // ---- Season Leaderboards: trivia off (normal) ----
@@ -49,57 +60,47 @@ test.describe('Season Leaderboards flow', () => {
     const defaultSortedText = await table.locator('th.sorted-col').first().textContent();
 
     await page.locator('select[name="sortby"]').selectOption('REB');
-    await page.locator('.ibl-filter-form__submit').click();
+    await submitFilters(page);
 
-    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
-
-    const newSortedText = await page.locator('.ibl-data-table').first().locator('th.sorted-col').first().textContent();
-    expect(newSortedText).not.toBe(defaultSortedText);
+    const sortedCol = page.locator('.ibl-data-table').first().locator('th.sorted-col').first();
+    await expect(sortedCol).toBeVisible();
+    await expect(sortedCol).not.toHaveText(defaultSortedText ?? '');
   });
 
   test('filtering by team shows only that team players', async ({ page }) => {
     const teamSelect = page.locator('select[name="team"]');
     await teamSelect.selectOption('2');
-    await page.locator('.ibl-filter-form__submit').click();
+    await submitFilters(page);
 
-    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
-
-    const teamRows = page.locator('.ibl-data-table').first().locator('tbody tr[data-team-id]');
-    await expect(teamRows.first()).toBeVisible();
-
-    const rowCount = await teamRows.count();
-    for (let i = 0; i < rowCount; i++) {
-      expect(await teamRows.nth(i).getAttribute('data-team-id')).toBe('2');
-    }
+    const table = page.locator('.ibl-data-table').first();
+    await expect(table.locator('tbody tr[data-team-id]:not([data-team-id="2"])')).toHaveCount(0);
+    await expect(table.locator('tbody tr[data-team-id="2"]').first()).toBeVisible();
   });
 
   test('year filter reduces row count', async ({ page }) => {
-    await page.locator('select[name="year"]').selectOption('2026');
-    await page.locator('.ibl-filter-form__submit').click();
+    const rows = page.locator('.ibl-data-table tbody tr');
 
-    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
-    const rows2026 = page.locator('.ibl-data-table tbody tr');
-    await expect(rows2026.first()).toBeVisible();
-    const count2026 = await rows2026.count();
-    expect(count2026).toBeGreaterThanOrEqual(5);
+    await page.locator('select[name="year"]').selectOption('2026');
+    await submitFilters(page);
+
+    await expect(rows.first()).toBeVisible();
+    await expect.poll(() => rows.count()).toBeGreaterThanOrEqual(5);
+    const count2026 = await rows.count();
 
     await page.locator('select[name="year"]').selectOption('2025');
-    await page.locator('.ibl-filter-form__submit').click();
+    await submitFilters(page);
 
-    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
-    const rows2025 = page.locator('.ibl-data-table tbody tr');
-    await expect(rows2025.first()).toBeVisible();
-    expect(await rows2025.count()).toBeLessThan(count2026);
+    await expect.poll(() => rows.count()).toBeLessThan(count2026);
+    await expect(rows.first()).toBeVisible();
   });
 
   test('limit input controls row count', async ({ page }) => {
     await page.locator('input[name="limit"]').fill('5');
-    await page.locator('.ibl-filter-form__submit').click();
-
-    await expect(page.locator('.ibl-data-table').first()).toBeVisible();
+    await submitFilters(page);
 
     const rows = page.locator('.ibl-data-table').first().locator('tbody tr');
-    expect(await rows.count()).toBeLessThanOrEqual(5);
+    await expect.poll(() => rows.count()).toBeLessThanOrEqual(5);
+    await expect(rows.first()).toBeVisible();
   });
 
   test('no PHP errors on season leaderboards', async ({ page }) => {

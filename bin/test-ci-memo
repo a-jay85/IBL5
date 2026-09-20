@@ -191,7 +191,7 @@ if should_run out-of-set-edit-hit; then
     git -C "$r" commit -qm "edit out-of-set file"
     run_key "$r" "$r/ci-memo" tests
     h2="$MEMO_HASH"
-    if [[ "$h2" == "$h1" ]]; then
+    if [[ "$h2" != "$h1" ]]; then
         fail "out-of-set-edit-hit: hash changed after out-of-set file edit ($h2 != $h1)"
     elif [[ ! -f "$c/$MEMO_KEY" ]]; then
         fail "out-of-set-edit-hit: expected cache hit but key absent"

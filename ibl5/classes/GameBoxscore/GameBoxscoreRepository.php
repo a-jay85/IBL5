@@ -48,7 +48,7 @@ class GameBoxscoreRepository extends \BaseMysqliRepository implements GameBoxsco
             FROM `ibl_box_scores_teams` game
             LEFT JOIN `ibl_team_info` home ON game.home_teamid    = home.teamid
             LEFT JOIN `ibl_team_info` away ON game.visitor_teamid = away.teamid
-            WHERE DATE(game.game_date) = ? AND game.game_of_that_day = ?
+            WHERE game.game_date = ? AND game.game_of_that_day = ?
             LIMIT 1";
 
         /** @var array<string, int|float|string|null>|null */
@@ -85,7 +85,7 @@ class GameBoxscoreRepository extends \BaseMysqliRepository implements GameBoxsco
                 bp.calc_points    AS pts
             FROM `ibl_box_scores` bp
             LEFT JOIN `ibl_plr` plr ON bp.pid = plr.pid
-            WHERE DATE(bp.game_date) = ? AND bp.game_of_that_day = ? AND bp.teamid IN (?, ?)
+            WHERE bp.game_date = ? AND bp.game_of_that_day = ? AND bp.teamid IN (?, ?)
             ORDER BY bp.teamid = ? DESC, bp.game_min DESC, bp.pid ASC";
 
         /** @var list<array<string, int|float|string|null>> */

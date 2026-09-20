@@ -269,7 +269,7 @@ def _noop_log(_msg: str) -> None:
 
 def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
               verdict1_path: str, master_sha: str, log=None, *,
-              commit=None, pr_number: int | str | None = None) -> str | None:
+              commit=None, push=None, pr_number: int | str | None = None) -> str | None:
     """Fix the blocking findings behind a `NOT READY`. Returns the commit sha, or None.
 
     The model edits worktree files and may fix PR-body findings via `gh pr edit`. The
@@ -280,9 +280,14 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
     `commit` is the message -> sha callable. runner passes its Phase 2 gate wrapper so a
     doc-staleness denial gets the same one-shot last_verified bump here; it is injected
     rather than imported because runner imports this module.
+
+    `push` is the no-arg push callable, injected for the same reason. runner passes its
+    retrying push so a master that moved during the review gets a fetch + clean rebase
+    before the push instead of a bare `gitad.push()` that the pre-push hook refuses.
     """
     log = log or _noop_log
     commit = commit or gitad.commit_all
+    push = push or gitad.push
     if parse_verdict(verdict1_path) != "NOT READY":
         return None
     if gitad.is_dirty():
@@ -343,7 +348,14 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
         # commit_all returns "" when nothing was staged: the model made no edits.
         log("phase5.5: remediation made no edits - nothing committed or pushed")
         return None
-    gitad.push()
+    pushed = push()
+    if pushed:
+        # A stale-base recovery inside `push` rebased the commit onto the fresh master,
+        # so the sha `commit` returned no longer names HEAD. Phase 7 watches CI on this
+        # value and re_review records it, so it has to be the sha origin now holds. A
+        # bare `gitad.push()` returns None and a disabled push returns "": both keep the
+        # commit sha, which IS HEAD when nothing rebased.
+        sha = pushed
     log(f"phase5.5: remediation committed {str(sha)[:12]} and pushed")
     return sha
 

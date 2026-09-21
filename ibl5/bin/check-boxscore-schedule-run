@@ -102,7 +102,7 @@ foreach ($args as $arg) {
 // missing-boxscore findings can never raise this path's exit code.
 if ($duplicatesOnly) {
     $dupRepo = new \Boxscore\BoxscoreRepository($mysqli_db);
-    $dupRows = $dupRepo->findDuplicateTripleGames($season, 1);
+    $dupRows = $dupRepo->findDuplicateTripleGames($season);
 
     $scope = $season === null ? 'all seasons' : "season {$season}";
     foreach ($dupRows as $dupRow) {
@@ -117,11 +117,11 @@ if ($duplicatesOnly) {
     }
 
     if ($dupRows === []) {
-        printf("No duplicate regular-season boxscores found (%s).\n", $scope);
+        printf("No duplicate boxscores found across all game types (%s).\n", $scope);
         exit(0);
     }
 
-    printf("%d duplicate regular-season matchup(s) found (%s).\n", count($dupRows), $scope);
+    printf("%d duplicate matchup(s) found across all game types (%s).\n", count($dupRows), $scope);
     exit(1);
 }
 

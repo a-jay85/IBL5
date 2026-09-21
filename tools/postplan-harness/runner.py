@@ -1308,7 +1308,10 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                 current_verdict_path, round_num=round_num, log=log)
             if v_n is not None:
                 break
-            rec["retries"] += 1
+            # Count the extra attempt, never the first one, so retries stays the
+            # number of re-runs and matches the fixer-side counter.
+            if rr_attempt < _MAX_ROUND_RETRIES:
+                rec["retries"] += 1
             log(f"phase5.5 round {round_num}: re-review indeterminate "
                 f"(attempt {rr_attempt + 1}/{_MAX_ROUND_RETRIES + 1})")
         rec.update({"remediation_sha": str(sha), "verdict": v_n,

@@ -74,9 +74,11 @@ final class ScheduleReconciliationAudit
         // Duplicate-triple direction: same (date, visitor, home) at >1 gotd (error).
         // This is a raw-table invariant — it compares ibl_box_scores_teams against
         // itself and never consults ibl_schedule, so the fail-open guard above must
-        // not gate it. Scoped to game_type = 1 so playoff and HEAT games, which
-        // legitimately repeat a matchup on one date, are not flagged.
-        foreach ($this->repository->findDuplicateTripleGames($seasonYear, 1) as $row) {
+        // not gate it. Unscoped across game types: the league never plays the same
+        // matchup twice on one date in any game type, so a repeated triple in a
+        // playoff or HEAT month is a double-entered schedule row simmed twice,
+        // exactly the 1993-06-04 case (ADR-0109, amended).
+        foreach ($this->repository->findDuplicateTripleGames($seasonYear) as $row) {
             $findings[] = new AuditFinding(
                 AuditFinding::KIND_DUPLICATE_TRIPLE,
                 AuditFinding::SEVERITY_ERROR,

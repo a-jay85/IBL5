@@ -1,12 +1,14 @@
 ---
-description: ibl_team_win_loss keys on the (date, visitor, home) matchup triple with min(game_of_that_day) as the canonical row, so a duplicate boxscore is invisible in the view by design; the duplicate invariant therefore lives on the raw ibl_box_scores_teams table, runs unconditionally, and is scoped to game_type = 1.
-last_verified: 2026-08-29
+description: ibl_team_win_loss keys on the (date, visitor, home) matchup triple with min(game_of_that_day) as the canonical row, so a duplicate boxscore is invisible in the view by design; the duplicate invariant therefore lives on the raw ibl_box_scores_teams table, runs unconditionally, and covers every game type.
+last_verified: 2026-09-20
 ---
 
 # ADR-0109: Matchup-Triple Dedup Key for `ibl_team_win_loss`, and a Raw-Table Duplicate Invariant
 
 **Status:** Accepted
 **Date:** 2026-08-29
+
+**Amended 2026-09-20 (scope).** The game_type = 1 scope is removed. The league never plays one matchup twice on a single date in any game type. The 1993-06-04 Warriors at Sonics pair that motivated the scope was a double-entered schedule row simmed twice; the copy at game_of_that_day 1 is a phantom and is deleted by a later migration. The duplicate-triple check now runs across all game types.
 
 ## Context
 

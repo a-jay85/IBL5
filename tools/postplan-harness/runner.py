@@ -231,7 +231,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         plan = locate_plan(slug, content_override=fixture.get("plan_content") or None)
     else:
         assert worktree
-        git = LiveGit(worktree, push_remote="origin" if live else None)
+        git = LiveGit(worktree, push_remote="origin" if live else None, llm=llm)
         slug = git.branch()
         gh = LiveGh(out_dir, worktree, slug) if live else RecordingGh(out_dir)
         verifier = LiveVerify(worktree)

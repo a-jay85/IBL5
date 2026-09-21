@@ -317,7 +317,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 rebase_line = ("REBASE=clean (HEAD already contains origin/master)"
                                if sha == pre_rebase else "REBASE=rebased onto origin/master")
         res.meta_checks_ok = run_meta_checks_local(
-            git, worktree or "", "origin/master", log, live=live)
+            git, worktree or "", "origin/master", log, live=live,
+            failures_out=res.meta_check_failures)
         if live:
             sha = git.head()  # refresh — remediation may have committed and moved HEAD
         pushed = _push_with_adr_draft(git, log, "phase2", llm=llm, worktree=worktree,
@@ -450,7 +451,10 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         master_sha = _master_sha(worktree)
         reviewed_tree = git.head_tree()
         _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_sha,
-                      reviewed_tree, live, log, res, before_remediation=_join_review)
+                      reviewed_tree, live, log, res, before_remediation=_join_review,
+                      unresolved_conformance=res.unresolved_conformance,
+                      meta_check_failures=res.meta_check_failures,
+                      scored_findings=res.scored_findings)
         _join_review()
         # A remediation loop moved the head, up to MAX_FIDELITY_ROUNDS times. Phase 7
         # must watch CI for the last commit, which is what remediation_sha aliases after
@@ -701,7 +705,26 @@ CONFORMANCE_BRIDGE_NAME = "missing-tests"
 
 
 # --- Bounded push-retry and BEHIND-resolution helpers ------------------------
+META_CHECK_OUTPUT_CAP = 6_000
 _MAX_PUSH_RETRIES = 3
+
+# A round failure is transient when running the same round again could plausibly
+# succeed: the CLI died, the model returned nothing usable, or it made no edits.
+# Everything else -- a rebase conflict, a spent push cap, a denied local gate, an edit
+# to a gate-owning path -- is terminal by the complement rule, because a retry changes
+# nothing about it. A failed push keeps its own raise and never reaches the taxonomy.
+_TRANSIENT_ROUND_KINDS = ("llm-invalid-output", "llm-tooled-cli", "llm-tooled-empty")
+_TRANSIENT_ROUND_REASONS = ("no-edits",)
+_MAX_ROUND_RETRIES = 1
+
+
+def _round_model(round_num: int) -> str:
+    """Sonnet fixes round 1; a round that did not clear the verdict escalates to Opus.
+
+    Escalation is across rounds, never across retries: a flaky CLI call is not worth
+    an Opus spawn.
+    """
+    return "sonnet" if round_num == 1 else "opus"
 _MAX_BEHIND_RETRIES = 3
 
 
@@ -958,7 +981,8 @@ def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log) -> tuple[dict, bool]:
             "summary_md": f"## Summary\n- {subject}\n"}, True
 
 
-def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=True) -> bool:
+def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=True,
+                         failures_out: list | None = None) -> bool:
     if os.environ.get("PRE_PUSH_META_CHECKS_SKIP") == "1":
         log("phase2: meta-checks SKIPPED (PRE_PUSH_META_CHECKS_SKIP=1)")
         return True
@@ -1009,11 +1033,15 @@ def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=Tru
             return True
     # Still failing: write flag file and push anyway
     output = (last_result.stdout or "").strip()
-    failed_names = " ".join(
-        line.split("META-CHECK-FAILED:", 1)[1].strip()
-        for line in output.splitlines()
-        if line.startswith("META-CHECK-FAILED:")
-    ) or "unknown"
+    names = [line.split("META-CHECK-FAILED:", 1)[1].strip()
+             for line in output.splitlines()
+             if line.startswith("META-CHECK-FAILED:")]
+    failed_names = " ".join(names) or "unknown"
+    if failures_out is not None:
+        # bin/run-meta-checks-local prints one interleaved stream, so every failing
+        # name carries the same tail excerpt -- the same thing a human reads.
+        excerpt = output[-META_CHECK_OUTPUT_CAP:]
+        failures_out.extend({"name": n, "output": excerpt} for n in (names or ["unknown"]))
     try:
         with open(flag, "w") as fh:
             fh.write(failed_names + "\n")
@@ -1102,7 +1130,8 @@ def _plan_hash(plan) -> str:
 
 
 def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_sha,
-                  reviewed_tree, live, log, res, before_remediation=None):
+                  reviewed_tree, live, log, res, before_remediation=None,
+                  unresolved_conformance=(), meta_check_failures=(), scored_findings=()):
     """Phase 5.5. Returns (verdict_word_or_None, error_kind_or_'').
 
     `before_remediation` runs once, just before the first remediation commit, so the
@@ -1125,7 +1154,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         "findings_round": 0,
                         "rounds": [], "rounds_completed": 0,
                         "backlog_issue_numbers": [],
-                        "diff_id": diff_id, "plan_hash": plan_hash}
+                        "diff_id": diff_id, "plan_hash": plan_hash, "models": []}
         return "READY", ""
     # Carry-forward: when the branch diff under review (by patch-id, so a clean rebase
     # onto a moved master still matches) and the plan behind it are both unchanged from
@@ -1152,7 +1181,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         "findings_round": 0,
                         "rounds": [], "rounds_completed": 0,
                         "backlog_issue_numbers": [],
-                        "diff_id": diff_id, "plan_hash": plan_hash,
+                        "diff_id": diff_id, "plan_hash": plan_hash, "models": [],
                         "carried_forward": True}
         return carried, ""
     log(f"phase5.5 fidelity: review: full (carry-forward declined: {decline_reason})")
@@ -1170,7 +1199,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         "findings_round": 0,
                         "rounds": [], "rounds_completed": 0,
                         "backlog_issue_numbers": [],
-                        "diff_id": diff_id, "plan_hash": plan_hash}
+                        "diff_id": diff_id, "plan_hash": plan_hash, "models": []}
         return None, e.kind
     verdict, err = fidelity.review(llm, out_dir, worktree or ".", packet, pr,
                                    reviewed_tree=reviewed_tree)
@@ -1194,58 +1223,109 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         if final_verdict != "NOT READY":
             break
         head_before = git.head()
-        try:
-            sha = fidelity.remediate(
-                llm, git, out_dir, worktree or ".", packet, current_verdict_path,
-                master_sha, log=log,
-                commit=lambda msg: _commit_with_gate_remediation(
-                    git, worktree, msg, log, phase="phase5.5"),
-                # The same retrying push Phase 2 and Phase 7 use, so a master that moved
-                # during the review + fix span gets one clean rebase per attempt instead
-                # of ending the loop on the hook's "does not contain origin/master".
-                push=lambda: _push_with_adr_draft(git, log, "phase5.5", llm=llm,
-                                                  worktree=worktree, out_dir=out_dir,
-                                                  res=res),
-                pr_number=pr)
-        except HarnessError as e:
-            if e.kind == "push-failed":
-                raise
-            # Keep the hook's own words: "local-gate" alone does not say which hook said no.
-            why = " ".join((e.detail or "").split())[:300]
-            gate = (f" class={classify_local_gate_denial(e.detail or '')}"
-                    if e.kind == "local-gate" else "")
-            # A rebase conflict or a spent retry cap lands here AFTER the commit: the fix
-            # exists locally and origin never saw it. Say so, so the human (or the next
-            # run, whose Phase 2 rebases and pushes whatever HEAD carries) knows the
-            # work is not lost. Neither kind ends the run — the PR is open and held.
-            local = ""
+        model = _round_model(round_num)
+        work = fidelity.build_work_list(current_verdict_path, unresolved_conformance,
+                                        meta_check_failures,
+                                        getattr(res, "scored_findings", ()) or scored_findings)
+        rec = {"round": round_num, "model": model,
+               "work_list_sizes": fidelity.work_list_sizes(work),
+               "retries": 0, "outcome": None, "remediation_sha": None,
+               "verdict": None, "reviewed_tree": None, "verdict_path": None}
+        log(f"phase5.5 round {round_num}: model={model} work={rec['work_list_sizes']}")
+        sha, terminal = None, False
+        # The retry lives INSIDE the iteration, so a retry can never advance round_num
+        # and the fixer spawn count stays bounded at 2 * MAX_FIDELITY_ROUNDS.
+        for attempt in range(_MAX_ROUND_RETRIES + 1):
+            outcome: dict = {}
             try:
-                if git.head() != head_before:
-                    local = (f" - remediation commit {git.head()[:12]} is LOCAL and "
-                             "unpushed; the next bin/post-plan-now run ships it")
-            except Exception:  # noqa: BLE001 - diagnostics must never mask the denial
-                pass
-            log(f"phase5.5 round {round_num}: remediation unavailable ({e.kind}){gate}"
-                + (f" - {why}" if why else "") + local
-                + (f" - drafted ADR {res.adr_path} is committed locally"
-                   if res.adr_path else ""))
-            sha = None
-        if not sha:
+                sha = fidelity.remediate(
+                    llm, git, out_dir, worktree or ".", packet, current_verdict_path,
+                    master_sha, log=log,
+                    commit=lambda msg: _commit_with_gate_remediation(
+                        git, worktree, msg, log, phase="phase5.5"),
+                    # The same retrying push Phase 2 and Phase 7 use, so a master that
+                    # moved during the review + fix span gets one clean rebase per
+                    # attempt instead of ending the loop on the hook's
+                    # "does not contain origin/master".
+                    push=lambda: _push_with_adr_draft(git, log, "phase5.5", llm=llm,
+                                                      worktree=worktree, out_dir=out_dir,
+                                                      res=res),
+                    pr_number=pr, model=model, work_list=work, outcome=outcome)
+            except HarnessError as e:
+                if e.kind == "push-failed":
+                    raise
+                # Keep the hook's own words: "local-gate" alone does not say which hook
+                # said no.
+                why = " ".join((e.detail or "").split())[:300]
+                gate = (f" class={classify_local_gate_denial(e.detail or '')}"
+                        if e.kind == "local-gate" else "")
+                # A rebase conflict, a spent retry cap or a gate-path edit lands here
+                # AFTER the commit: the fix exists locally and origin never saw it. Say
+                # so, so the human (or the next run, whose Phase 2 rebases and pushes
+                # whatever HEAD carries) knows the work is not lost. None of these kinds
+                # ends the run — the PR is open and held.
+                local = ""
+                try:
+                    if git.head() != head_before:
+                        local = (f" - remediation commit {git.head()[:12]} is LOCAL and "
+                                 "unpushed; the next bin/post-plan-now run ships it")
+                except Exception:  # noqa: BLE001 - diagnostics must never mask the denial
+                    pass
+                log(f"phase5.5 round {round_num} attempt {attempt + 1}: remediation "
+                    f"unavailable ({e.kind}){gate}"
+                    + (f" - {why}" if why else "") + local
+                    + (f" - drafted ADR {res.adr_path} is committed locally"
+                       if res.adr_path else ""))
+                if e.kind in _TRANSIENT_ROUND_KINDS and attempt < _MAX_ROUND_RETRIES:
+                    rec["retries"] += 1
+                    continue
+                rec["outcome"] = e.kind
+                terminal = e.kind not in _TRANSIENT_ROUND_KINDS
+                break
+            if sha:
+                rec["outcome"] = "committed"
+                break
+            reason = outcome.get("reason", "none")
+            if reason in _TRANSIENT_ROUND_REASONS and attempt < _MAX_ROUND_RETRIES:
+                rec["retries"] += 1
+                continue
+            rec["outcome"] = reason
+            terminal = reason not in _TRANSIENT_ROUND_REASONS
             break
+        rounds.append(rec)
+        res.fidelity["rounds"] = rounds
+        if terminal:
+            break
+        if not sha:
+            # Transient budget spent. The next round runs the stronger model under the
+            # same cap; it does not extend it.
+            continue
         body = upsert_files_changed(body, render_files_changed(git.diff_vs_base()))
         gh.pr_edit_body(pr, body)
-        v_n, tree_n, path_n = fidelity.re_review(
-            llm, git, out_dir, worktree or ".", plan, master_sha, body, pr, sha,
-            current_verdict_path, round_num=round_num, log=log)
-        rounds.append({"remediation_sha": str(sha), "verdict": v_n,
-                       "reviewed_tree": tree_n, "verdict_path": path_n})
-        res.fidelity["rounds"] = rounds
-        res.fidelity["rounds_completed"] = len(rounds)
+        v_n = tree_n = path_n = None
+        for rr_attempt in range(_MAX_ROUND_RETRIES + 1):
+            v_n, tree_n, path_n = fidelity.re_review(
+                llm, git, out_dir, worktree or ".", plan, master_sha, body, pr, sha,
+                current_verdict_path, round_num=round_num, log=log)
+            if v_n is not None:
+                break
+            # Count the extra attempt, never the first one, so retries stays the
+            # number of re-runs and matches the fixer-side counter.
+            if rr_attempt < _MAX_ROUND_RETRIES:
+                rec["retries"] += 1
+            log(f"phase5.5 round {round_num}: re-review indeterminate "
+                f"(attempt {rr_attempt + 1}/{_MAX_ROUND_RETRIES + 1})")
+        rec.update({"remediation_sha": str(sha), "verdict": v_n,
+                    "reviewed_tree": tree_n, "verdict_path": path_n})
+        if v_n is None:
+            rec["outcome"] = "re-review-indeterminate"
+        res.fidelity["rounds_completed"] = sum(1 for r in rounds if r["remediation_sha"])
         res.fidelity["remediation_sha"] = str(sha)
         res.fidelity["verdict_2"] = v_n
         res.fidelity["reviewed_tree_2"] = tree_n
-        log(f"phase5.5 round {round_num}: sha={str(sha)[:12]} "
-            f"verdict={v_n or 'INDETERMINATE'} tree={(tree_n or '')[:12]}")
+        log(f"phase5.5 round {round_num}: model={model} retries={rec['retries']} "
+            f"outcome={rec['outcome']} sha={str(sha)[:12]} "
+            f"verdict={v_n or 'INDETERMINATE'}")
         if v_n is None:
             break
         final_verdict, final_err = v_n, ""
@@ -1257,6 +1337,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         # round already cleared, under a **Re-reviewed tree:** line that contradicts them.
         res.fidelity["verdict_path"] = path_n
         res.fidelity["findings_round"] = round_num
+    res.fidelity["models"] = [r["model"] for r in rounds]
     # Notes come from whichever review produced the final verdict: the initial one or
     # a re-review round. current_verdict_path tracks that review's verdict file.
     if final_verdict == "READY WITH NOTES":

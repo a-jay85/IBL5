@@ -405,3 +405,27 @@ def test_narrow_row_shape():
     cond1 = next(c for c in evaluate(inputs(pr_body=neutralized)).conditions
                  if c.number == 1)
     assert cond1.blocked
+
+
+def test_feat_pr_with_clean_remediation_loop_still_holds():
+    """A Phase 5.5 loop that cleared every machine hold never clears the feat: floor.
+
+    This plan never edits armable.py, so the only way this row fails is a later diff
+    weakening feat_hold.
+    """
+    d = evaluate(inputs(pr_title="feat: add thing", fidelity_verdict="READY",
+                        unresolved_conformance=[], findings=[],
+                        plan_auto_merge_false=False))
+    assert d.armed is False
+    c8 = next(c for c in d.holds if c.number == 8)
+    assert c8.blocked is True
+    assert c8.reason == "feat: PR awaiting human-signoff"
+
+
+def test_auto_merge_false_plan_with_clean_loop_still_holds():
+    """Same clean loop, and a plan that asked not to auto-merge still holds on (7)."""
+    d = evaluate(inputs(pr_title="fix: x", fidelity_verdict="READY",
+                        unresolved_conformance=[], findings=[],
+                        plan_auto_merge_false=True))
+    assert d.armed is False
+    assert any(c.number == 7 for c in d.holds)

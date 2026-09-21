@@ -45,9 +45,14 @@ def _plan(auto_merge_false=False):
     return types.SimpleNamespace(found=False, path="", auto_merge_false=auto_merge_false)
 
 
-def _verdict(tmp_path, word):
+def _verdict(tmp_path, word, body="- finding one\n"):
+    """A verdict shaped like a real one: the word, then its findings, then the digest.
+
+    The findings body matters since Phase 3 -- a NOT READY verdict whose work list is
+    empty is skipped rather than handed to a fixer with nothing to do.
+    """
     p = tmp_path / "verdict.md"
-    p.write_text(f"6d checks\n\n{word}\n\n## DIGEST\nstuff\n")
+    p.write_text(f"6d checks\n\n{word}\n\n{body}\n## DIGEST\nstuff\n")
     return str(p)
 
 
@@ -430,6 +435,10 @@ def test_round2_no_verdict_overwrites_last_round_fields(tmp_path, git_shim):
         assert res.fidelity["remediation_sha"] == "round-sha-2"
         assert res.fidelity["verdict_2"] is None
         assert res.fidelity["reviewed_tree_2"] is None
+        # Round 2 is the indeterminate one, so it spends its single re-review retry.
+        assert res.fidelity["rounds"][1]["retries"] == 1
+        assert res.fidelity["rounds"][1]["outcome"] == "re-review-indeterminate"
+        assert res.fidelity["rounds"][0]["retries"] == 0
         tl = fidelity.terminal_line(
             res.fidelity["verdict_1"], res.fidelity["error_kind"],
             res.fidelity["remediation_sha"], res.fidelity["verdict_2"],
@@ -468,6 +477,11 @@ def test_remediate_none_stops(tmp_path, git_shim):
         assert res.fidelity["rounds_completed"] == 1
         purposes = [p for p, _ in llm.tooled_argvs]
         assert "plan-fidelity-re-review-3" not in purposes
+        # A dirty tree is terminal, not transient: the round spends no retry and the
+        # fixer is never spawned a second time for it.
+        assert res.fidelity["rounds"][1]["outcome"] == "dirty-worktree"
+        assert res.fidelity["rounds"][1]["retries"] == 0
+        assert len(res.fidelity["rounds"]) == 2
     finally:
         _cleanup(992, "992-2")
 
@@ -822,7 +836,7 @@ def test_remediation_prompt_never_relies_on_packet_path_alone(tmp_path, git_shim
         fh.write("+SENTINEL_DIFF_LINE\n")
     verdict_path = str(tmp_path / "verdict_path.md")
     with open(verdict_path, "w") as fh:
-        fh.write("6d checks\n\nNOT READY\n\n## DIGEST\nstuff\n")
+        fh.write("6d checks\n\nNOT READY\n\n- finding one\n\n## DIGEST\nstuff\n")
     llm = PromptCapturingLlm(UsageLedger(), {"fidelity-remediation": "done"})
     fidelity.remediate(llm, _git(dirty=False), str(tmp_path), str(tmp_path),
                        packet_dir, verdict_path, "deadbeef")
@@ -858,7 +872,8 @@ def test_remediation_prompt_survives_unreadable_verdict(tmp_path, git_shim, monk
     monkeypatch.setattr(fidelity, "parse_verdict", lambda _path: "NOT READY")
     llm = PromptCapturingLlm(UsageLedger(), {"fidelity-remediation": "done"})
     fidelity.remediate(llm, _git(dirty=False), str(tmp_path), str(tmp_path),
-                       packet_dir, missing_verdict, "deadbeef")
+                       packet_dir, missing_verdict, "deadbeef",
+                       work_list=[{"hold": "12", "text": "finding one"}])
     prompt = llm.captured_prompts["fidelity-remediation"]
     assert "(verdict unreadable)" in prompt
 
@@ -872,3 +887,114 @@ def test_remediation_prompt_mentions_offset_limit_read(tmp_path, git_shim):
                        packet_dir, verdict_path, "deadbeef")
     prompt = llm.captured_prompts["fidelity-remediation"]
     assert "offset and limit" in prompt
+
+
+# --- Phase 5.5 round inputs: model, tagged work list, gate-path deny, outcome ---
+
+
+class _GateEditGit(ReplayGit):
+    """ReplayGit whose remediation commit touches the paths the round names."""
+
+    def __init__(self, fixture, touched):
+        super().__init__(fixture)
+        self._touched = touched
+
+    def changed_files(self, base="origin/master"):
+        return list(self._touched)
+
+
+def _round_git(touched, dirty=False):
+    return _GateEditGit(
+        {"slug": "demo",
+         "worktree_diff": "diff --git a/x b/x\n" if dirty else "",
+         "diff": "diff --git a/x b/x\n", "head_trees": [TREE_1, TREE_2]},
+        touched)
+
+
+def test_remediate_forwards_model_alias(tmp_path, git_shim):
+    """The round's model reaches call_tooled, which is what puts it in the CLI argv."""
+    llm = FixtureLlm(UsageLedger(), {"fidelity-remediation": "done"})
+    fidelity.remediate(llm, _round_git(["ibl5/x.php"]), str(tmp_path), str(tmp_path),
+                       _packet(tmp_path), _verdict(tmp_path, "NOT READY"), "deadbeef",
+                       model="opus")
+    purpose, argv = llm.tooled_argvs[-1]
+    assert purpose == "fidelity-remediation"
+    assert "claude-opus-5" in argv
+
+
+def test_remediate_prompt_carries_tagged_work_list_and_deny_text(tmp_path, git_shim):
+    """Every hold is labelled in the prompt, and the gate-path deny is stated."""
+    work_list = [{"hold": "12", "text": "finding one"},
+                 {"hold": "3", "text": "MISSING: a.php (plan named it)"},
+                 {"hold": "16", "text": "check-docs\nFAIL"},
+                 {"hold": "2", "text": "b.php:4 score=90 bad"}]
+    llm = PromptCapturingLlm(UsageLedger(), {"fidelity-remediation": "done"})
+    fidelity.remediate(llm, _round_git(["ibl5/x.php"]), str(tmp_path), str(tmp_path),
+                       _packet(tmp_path), _verdict(tmp_path, "NOT READY"), "deadbeef",
+                       work_list=work_list)
+    prompt = llm.captured_prompts["fidelity-remediation"]
+    for hold in fidelity.HOLD_SOURCES:
+        assert f"[hold {hold} — " in prompt
+    assert "NEVER edit these gate-owning paths" in prompt
+
+
+def test_gate_path_edit_raises_before_push(tmp_path, git_shim):
+    """A commit touching a gate-owning path never reaches origin."""
+    gitad_double = _round_git([".claude/rules/x.md", "ibl5/ok.php"])
+    llm = FixtureLlm(UsageLedger(), {"fidelity-remediation": "done"})
+    outcome: dict = {}
+    with pytest.raises(HarnessError) as ei:
+        fidelity.remediate(llm, gitad_double, str(tmp_path), str(tmp_path),
+                           _packet(tmp_path), _verdict(tmp_path, "NOT READY"),
+                           "deadbeef", outcome=outcome)
+    assert ei.value.kind == "gate-path-edit"
+    assert ".claude/rules/x.md" in (ei.value.detail or "")
+    assert gitad_double.pushes == 0
+    assert outcome["reason"] == "gate-path-edit"
+
+
+def test_non_gate_edit_still_pushes(tmp_path, git_shim):
+    gitad_double = _round_git(["ibl5/x.php"])
+    llm = FixtureLlm(UsageLedger(), {"fidelity-remediation": "done"})
+    outcome: dict = {}
+    sha = fidelity.remediate(llm, gitad_double, str(tmp_path), str(tmp_path),
+                             _packet(tmp_path), _verdict(tmp_path, "NOT READY"),
+                             "deadbeef", outcome=outcome)
+    assert sha
+    assert gitad_double.pushes == 1
+    assert outcome == {"reason": "committed", "model": "sonnet"}
+
+
+def test_gate_owning_prefixes_cover_armable_and_rules():
+    assert fidelity.denied_gate_edits(
+        [".claude/rules/a.md", ".github/workflows/x.yml", "bin/check-plan",
+         "tools/postplan-harness/harness/armable.py", "ibl5/ok.php"]) == [
+        ".claude/rules/a.md", ".github/workflows/x.yml", "bin/check-plan",
+        "tools/postplan-harness/harness/armable.py"]
+
+
+def test_outcome_reports_no_edits(tmp_path, git_shim):
+    """commit_all returning "" is the model having made no edits."""
+    gitad_double = _round_git(["ibl5/x.php"])
+    llm = FixtureLlm(UsageLedger(), {"fidelity-remediation": "done"})
+    outcome: dict = {}
+    sha = fidelity.remediate(llm, gitad_double, str(tmp_path), str(tmp_path),
+                             _packet(tmp_path), _verdict(tmp_path, "NOT READY"),
+                             "deadbeef", commit=lambda _m: "", outcome=outcome)
+    assert sha is None
+    assert outcome["reason"] == "no-edits"
+    assert gitad_double.pushes == 0
+
+
+def test_outcome_reports_empty_work_list_and_never_spawns(tmp_path, git_shim):
+    """An empty union is a no-op round, not a fixer with nothing to do."""
+    gitad_double = _round_git(["ibl5/x.php"])
+    llm = FixtureLlm(UsageLedger(), {"fidelity-remediation": "done"})
+    outcome: dict = {}
+    sha = fidelity.remediate(llm, gitad_double, str(tmp_path), str(tmp_path),
+                             _packet(tmp_path), _verdict(tmp_path, "NOT READY"),
+                             "deadbeef", work_list=[], outcome=outcome)
+    assert sha is None
+    assert outcome["reason"] == "empty-work-list"
+    assert llm.tooled_argvs == []
+    assert gitad_double.pushes == 0

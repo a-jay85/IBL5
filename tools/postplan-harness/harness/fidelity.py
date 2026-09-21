@@ -9,6 +9,7 @@ with prose.
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
@@ -75,6 +76,144 @@ REMEDIATION_DENIED_TOOLS = (
 REMEDIATION_DIFF_INLINE_CAP = 40_000
 
 REMEDIATION_COMMIT_MSG = "chore: address Phase 5.5 plan-fidelity findings"
+
+# Arming-condition numbers whose machine-fixable work the Phase 5.5 fixer is fed, in
+# the order they are rendered into the packet. (12) is the fidelity verdict itself;
+# (3) plan-named files the conformance pass could not find; (16) failing meta-checks;
+# (2) review findings at or above the same score floor armable uses.
+HOLD_SOURCES = ("12", "3", "16", "2")
+HIGH_SCORE_FLOOR = 80                  # same floor as armable condition (2)
+HOLD_LABELS = {
+    "12": "plan-fidelity verdict",
+    "3": "plan-named file missing",
+    "16": "meta-check failed",
+    "2": "review finding scored >= 80",
+}
+_FINDING_BULLET_RE = re.compile(r"^\s*(?:[-*]|\d+[.)])\s+\S")
+_WORK_LIST_OPEN = "=== WORK LIST (each item names the arming hold it clears) ==="
+_WORK_LIST_CLOSE = "=== END WORK LIST ==="
+
+# A fixer round must never edit the machinery that decides what arms. The prompt says
+# so advisorily; this tuple is the enforcement, checked against the round's own commit
+# between commit and push so a violating commit stays local.
+GATE_OWNING_PREFIXES = (
+    ".claude/rules/",
+    ".github/workflows/",
+    "bin/check-",
+    "tools/postplan-harness/harness/armable.py",
+)
+GATE_EDIT_DENY_TEXT = (
+    "NEVER edit these gate-owning paths: .claude/rules/**, .github/workflows/**, "
+    "bin/check-*, tools/postplan-harness/harness/armable.py. A commit touching one "
+    "is discarded and ends remediation."
+)
+
+
+def denied_gate_edits(paths) -> list[str]:
+    """The subset of `paths` that lies under a gate-owning prefix."""
+    return [p for p in (paths or [])
+            if any(str(p).startswith(prefix) for prefix in GATE_OWNING_PREFIXES)]
+
+
+def _verdict_findings(verdict_path: str) -> list[str]:
+    """Hold (12): the blocking findings under a NOT READY verdict, one per bullet.
+
+    A verdict that is not NOT READY contributes nothing -- the loop only ever fixes a
+    verdict it is still held on. A NOT READY verdict whose findings are prose rather
+    than bullets contributes its whole pre-digest body, so a shape the bullet regex
+    does not recognise is never silently dropped.
+
+    The body is everything ABOVE the digest cut bar the verdict word lines themselves.
+    A real verdict states its 6d checks and their findings first and puts the 6e word
+    last, so reading only below the word would make every real verdict contribute
+    nothing and skip a remediation the loop is held on.
+    """
+    if parse_verdict(verdict_path) != "NOT READY":
+        return []
+    text = _read_or_marker(verdict_path, "")
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if line.strip() == DIGEST_CUT:
+            lines = lines[:i]
+            break
+    body = [ln for ln in lines if not VERDICT_RE.match(ln)]
+    bullets = [ln.strip() for ln in body if _FINDING_BULLET_RE.match(ln)]
+    if bullets:
+        return bullets
+    whole = "\n".join(body).strip()
+    return [whole] if whole else []
+
+
+def _render_finding(f: dict) -> str:
+    """Hold (2) item text. review.py emits path/line/score/body_head; an unexpected
+    shape is dumped rather than crashed on."""
+    try:
+        return (f"{f['path']}:{f['line']} score={f['score']} {f['body_head']}")
+    except (KeyError, TypeError):
+        return json.dumps(f, sort_keys=True, default=str)
+
+
+def build_work_list(verdict_path: str,
+                    unresolved_conformance=None,
+                    meta_check_failures=None,
+                    scored_findings=None) -> list[dict]:
+    """The union of every machine-fixable arming hold, each item tagged with its hold.
+
+    Built from inputs the runner already holds upstream of Phase 5.5, never from
+    `armable.evaluate` -- that decision is made once, below the loop.
+    """
+    items: list[dict] = []
+    for text in _verdict_findings(verdict_path):
+        items.append({"hold": "12", "text": text})
+    # UNMET-CONTRACT entries are deliberately excluded: they name evidence the plan
+    # declared, and a fixer that "adds" such evidence is the fabrication conformance
+    # exists to catch.
+    for entry in (unresolved_conformance or []):
+        if str(entry).startswith("MISSING"):
+            items.append({"hold": "3", "text": str(entry)})
+    for fail in (meta_check_failures or []):
+        items.append({"hold": "16",
+                      "text": f"{fail.get('name', 'unknown')}\n{fail.get('output', '')}"})
+    for f in (scored_findings or []):
+        try:
+            score = int(f.get("score") or 0)
+        except (AttributeError, TypeError, ValueError):
+            score = 0
+        if score >= HIGH_SCORE_FLOOR:
+            items.append({"hold": "2", "text": _render_finding(f)})
+    ordered: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for hold in HOLD_SOURCES:
+        for item in items:
+            key = (item["hold"], item["text"])
+            if item["hold"] == hold and key not in seen:
+                seen.add(key)
+                ordered.append(item)
+    return ordered
+
+
+def work_list_sizes(items) -> dict[str, int]:
+    """Per-hold counts with every key present, which is what result.json records."""
+    sizes = {hold: 0 for hold in HOLD_SOURCES}
+    for item in (items or []):
+        hold = item.get("hold")
+        if hold in sizes:
+            sizes[hold] += 1
+    return sizes
+
+
+def render_work_list(items) -> str:
+    """The prompt block. An empty list still renders both fences, so the packet shape
+    does not change depending on how many holds happen to be live."""
+    lines = [_WORK_LIST_OPEN]
+    if not items:
+        lines.append("(empty)")
+    for item in items:
+        label = HOLD_LABELS.get(item["hold"], "unknown hold")
+        lines.append(f"[hold {item['hold']} \u2014 {label}] {item['text']}")
+    lines.append(_WORK_LIST_CLOSE)
+    return "\n".join(lines) + "\n"
+
 
 OVERRIDE = (
     "TOOL-BUDGET OVERRIDE for this invocation. You have NO `Write` tool and NO `Bash` "
@@ -269,7 +408,9 @@ def _noop_log(_msg: str) -> None:
 
 def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
               verdict1_path: str, master_sha: str, log=None, *,
-              commit=None, push=None, pr_number: int | str | None = None) -> str | None:
+              commit=None, push=None, pr_number: int | str | None = None,
+              model: str = "sonnet", work_list: list[dict] | None = None,
+              outcome: dict | None = None) -> str | None:
     """Fix the blocking findings behind a `NOT READY`. Returns the commit sha, or None.
 
     The model edits worktree files and may fix PR-body findings via `gh pr edit`. The
@@ -284,16 +425,36 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
     `push` is the no-arg push callable, injected for the same reason. runner passes its
     retrying push so a master that moved during the review gets a fetch + clean rebase
     before the push instead of a bare `gitad.push()` that the pre-push hook refuses.
+
+    `model` is the alias `call_tooled` validates against its own allowlist; the runner
+    escalates it across rounds. `work_list` is the tagged union of machine-fixable
+    arming holds; omitted, it falls back to the verdict findings alone. `outcome` is an
+    out-dict the runner reads for the round record -- the return stays `str | None` so
+    no existing call site changes.
     """
     log = log or _noop_log
     commit = commit or gitad.commit_all
     push = push or gitad.push
+
+    def _out(reason: str) -> None:
+        if outcome is not None:
+            outcome["reason"] = reason
+            outcome["model"] = model
     if parse_verdict(verdict1_path) != "NOT READY":
+        _out("not-blocking")
         return None
     if gitad.is_dirty():
         # _phase65-remediation.md's own precondition: a single commit_all on a dirty tree
         # would sweep unrelated edits into the remediation commit.
         log("phase5.5: remediation skipped - dirty worktree")
+        _out("dirty-worktree")
+        return None
+    if work_list is None:
+        work_list = build_work_list(verdict1_path, [], [], [])
+    if not work_list:
+        # Nothing to hand the fixer. Spawning one anyway is a guaranteed no-edit round.
+        log("phase5.5: remediation skipped - empty work list")
+        _out("empty-work-list")
         return None
 
     procedure = _find_procedure(worktree, master_sha, REMEDIATION_PATHS,
@@ -322,12 +483,14 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
         "The harness commits and pushes your worktree edits after you finish."
         f"{pr_note}\n"
         "No Agent tool: do not delegate.\n"
+        f"{GATE_EDIT_DENY_TEXT}\n"
         "When a file you must inspect is large, Read it with offset and limit rather\n"
         "than whole; a whole-file Read of a large file is denied in this session.\n\n"
         "=== REMEDIATION PROCEDURE (follow it exactly) ===\n"
         f"{procedure}\n"
         "=== END PROCEDURE ===\n\n"
-        "=== VERDICT (its blocking findings are your work list) ===\n"
+        f"{render_work_list(work_list)}\n"
+        "=== VERDICT ===\n"
         f"{verdict_text}\n"
         "=== END VERDICT ===\n\n"
         "=== DIFF UNDER REVIEW ===\n"
@@ -339,7 +502,7 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
         f"  - {os.path.join(packet_dir, 'diff.patch')}\n"
     )
     llm.call_tooled(
-        "fidelity-remediation", "sonnet", prompt, cwd=worktree,
+        "fidelity-remediation", model, prompt, cwd=worktree,
         allowed_tools=REMEDIATION_ALLOWED_TOOLS, denied_tools=REMEDIATION_DENIED_TOOLS,
         add_dirs=(packet_dir,),
     )
@@ -347,7 +510,18 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
     if not sha:
         # commit_all returns "" when nothing was staged: the model made no edits.
         log("phase5.5: remediation made no edits - nothing committed or pushed")
+        _out("no-edits")
         return None
+    # Between commit and push on purpose. Checking after the push would need a
+    # force-push to undo; checking before the commit would need a working-tree diff and
+    # a reset. A denied commit stays local, which is the same state the other terminal
+    # kinds already leave behind.
+    hits = denied_gate_edits(gitad.changed_files(f"{sha}^"))
+    if hits:
+        log(f"phase5.5: remediation touched gate-owning paths ({', '.join(hits)}) "
+            "- commit left local, remediation ends")
+        _out("gate-path-edit")
+        raise HarnessError("gate-path-edit", ", ".join(hits))
     pushed = push()
     if pushed:
         # A stale-base recovery inside `push` rebased the commit onto the fresh master,
@@ -357,6 +531,7 @@ def remediate(llm, gitad, out_dir: str, worktree: str, packet_dir: str,
         # commit sha, which IS HEAD when nothing rebased.
         sha = pushed
     log(f"phase5.5: remediation committed {str(sha)[:12]} and pushed")
+    _out("committed")
     return sha
 
 

@@ -7,6 +7,9 @@ tests pin the capture on all four paths plus the reset on a clean rebase.
 The fixtures are self-contained: each builds a throwaway repo in a tempdir and wires
 `refs/remotes/origin/master` with `update-ref`, the same idiom
 `tests/test_gitad_stacked_rebase.py` uses, so no bare remote is needed.
+(The plan's ``## Critical Files`` named ``tests/test_gitad_onto_guard.py`` as the fixture
+source; that file does not exist, so ``test_gitad_stacked_rebase.py`` — same ``update-ref``
+idiom — was used instead. The substitution is sound.)
 """
 
 import os

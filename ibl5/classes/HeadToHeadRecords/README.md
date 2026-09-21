@@ -1,6 +1,6 @@
 ---
 description: Head-to-head win/loss matrix across franchises, teams, and GMs for any game phase and scope.
-last_verified: 2026-09-20
+last_verified: 2026-09-21
 ---
 
 # HeadToHeadRecords Module
@@ -28,8 +28,9 @@ HeadToHeadRecords/
 - **GM match via owner_name.** The `gms` dimension matches the logged-in user by looking up
   `owner_name` from `ibl_team_info` rather than by username, avoiding the GM-match bug present
   in earlier drafts.
-- **Cache migration 180.** The DatabaseCache table is seeded by migration 180; the module is
-  served from cache after the first warm-up or after `RefreshHeadToHeadRecordsStep` runs.
+- **Migration 180.** Migration 180 creates the `ibl_franchise_era_branding` table, which stores
+  color and identity overrides for retired franchise eras. The module reads from the shared
+  DatabaseCache table, populated on first warm-up or when `RefreshHeadToHeadRecordsStep` runs.
 - **CSS contract.** The view emits only class names styled by
   `ibl5/design/components/head-to-head-records.css`: `h2h-matrix-wrap`, `h2h-matrix`,
   `h2h-row-label`, `h2h-winning`, `h2h-losing`, `h2h-tied`, `h2h-self`, `h2h-user-row`,

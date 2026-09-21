@@ -21,7 +21,7 @@ class RefreshHeadToHeadRecordsStepTest extends TestCase
         );
     }
 
-    public function testGetLabelReturnsExpectedLabel(): void
+    public function testLabelNamesTheCache(): void
     {
         $stub = self::createStub(\mysqli::class);
 
@@ -31,7 +31,7 @@ class RefreshHeadToHeadRecordsStepTest extends TestCase
         );
     }
 
-    public function testExecuteReturnsFailureWhenDatabaseThrows(): void
+    public function testReturnsFailureWhenRebuildThrows(): void
     {
         $stub = self::createStub(\mysqli::class);
         $stub->method('prepare')->willThrowException(new \RuntimeException('DB connection lost'));

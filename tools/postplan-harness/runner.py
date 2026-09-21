@@ -1154,7 +1154,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         "findings_round": 0,
                         "rounds": [], "rounds_completed": 0,
                         "backlog_issue_numbers": [],
-                        "diff_id": diff_id, "plan_hash": plan_hash}
+                        "diff_id": diff_id, "plan_hash": plan_hash, "models": []}
         return "READY", ""
     # Carry-forward: when the branch diff under review (by patch-id, so a clean rebase
     # onto a moved master still matches) and the plan behind it are both unchanged from
@@ -1181,7 +1181,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         "findings_round": 0,
                         "rounds": [], "rounds_completed": 0,
                         "backlog_issue_numbers": [],
-                        "diff_id": diff_id, "plan_hash": plan_hash,
+                        "diff_id": diff_id, "plan_hash": plan_hash, "models": [],
                         "carried_forward": True}
         return carried, ""
     log(f"phase5.5 fidelity: review: full (carry-forward declined: {decline_reason})")
@@ -1199,7 +1199,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                         "findings_round": 0,
                         "rounds": [], "rounds_completed": 0,
                         "backlog_issue_numbers": [],
-                        "diff_id": diff_id, "plan_hash": plan_hash}
+                        "diff_id": diff_id, "plan_hash": plan_hash, "models": []}
         return None, e.kind
     verdict, err = fidelity.review(llm, out_dir, worktree or ".", packet, pr,
                                    reviewed_tree=reviewed_tree)

@@ -117,6 +117,20 @@ class RecordingGh:
             return self._body_override
         return (self.fixture.get("pr_meta") or {}).get("body") or self.fixture.get("body", "")
 
+    def pr_body_fresh(self) -> str:
+        """Read the body as GitHub currently holds it, ignoring our own last write.
+
+        pr_body() short-circuits on _body_override, which every pr_edit_body sets and
+        nothing clears — so a caller that runs downstream of a harness write gets the
+        harness's own copy back, never the live one. Any body edit a remediation agent
+        made with a raw `gh pr edit` subprocess (fidelity.py) bypasses the adapter, so
+        the override cannot know about it. Clearing the override is what makes the read
+        genuinely fresh; the replay adapter then answers from the fixture, which stands
+        in for GitHub exactly as it does on a first read.
+        """
+        self._body_override = None
+        return self.pr_body()
+
     def pr_labels(self) -> list[str]:
         labels = self.fixture.get("labels") or []
         return [l["name"] if isinstance(l, dict) else str(l) for l in labels]
@@ -405,6 +419,16 @@ class LiveGh(RecordingGh):
         if self._body_override is not None:
             return self._body_override
         return self._fetch_meta().get("body", "")
+
+    def pr_body_fresh(self) -> str:
+        """Re-issue `gh pr view` for the body, discarding both caches first.
+
+        _meta must be cleared as well as _body_override: dropping only the override
+        would fall through to a _fetch_meta() whose cached dict predates the write,
+        which is stale in a different way. See RecordingGh.pr_body_fresh.
+        """
+        self._meta = None
+        return super().pr_body_fresh()
 
     def pr_labels(self) -> list[str]:
         return [l.get("name", "") for l in self._fetch_meta().get("labels") or []]

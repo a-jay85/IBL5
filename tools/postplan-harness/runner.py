@@ -1300,7 +1300,10 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
             # Transient budget spent. The next round runs the stronger model under the
             # same cap; it does not extend it.
             continue
-        live_body = gh.pr_body() or body
+        # pr_body_fresh, never pr_body: the Phase 4 write at runner.py:446 leaves
+        # _body_override set, so pr_body() here would hand back the harness's own copy
+        # and silently overwrite whatever the remediation agent edited on GitHub.
+        live_body = gh.pr_body_fresh() or body
         body = upsert_files_changed(live_body, render_files_changed(git.diff_vs_base()))
         gh.pr_edit_body(pr, body)
         v_n = tree_n = path_n = None

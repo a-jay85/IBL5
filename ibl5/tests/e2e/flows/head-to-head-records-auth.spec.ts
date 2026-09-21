@@ -26,14 +26,16 @@ test.describe('Head-to-Head Records — logged-in user', () => {
     await applyDimension(page, 'franchises');
 
     // Exactly one row carries h2h-user-row: the logged-in user's franchise.
-    await expect(page.locator('th.h2h-user-row')).toHaveCount(1);
+    await expect(page.locator('tr.h2h-user-row')).toHaveCount(1);
+    // The same franchise's column header carries h2h-user-col.
+    await expect(page.locator('.h2h-matrix thead th.h2h-user-col')).toHaveCount(1);
   });
 
   test('own GM row is highlighted with h2h-user-row', async ({ page }) => {
     await page.goto('modules.php?name=HeadToHeadRecords');
     await applyDimension(page, 'gms');
 
-    const userRow = page.locator('th.h2h-user-row');
+    const userRow = page.locator('tr.h2h-user-row');
     await expect(userRow).toHaveCount(1);
     await expect(userRow).toHaveText(/GM TestUser/);
   });

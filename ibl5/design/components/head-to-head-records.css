@@ -1,178 +1,184 @@
 @layer components {
-    .h2h-matrix td,
-    .h2h-matrix th {
-        padding: 4px 6px;
-        font-size: 0.85rem;
-        white-space: nowrap;
-    }
 
-    .h2h-winning {
-        background-color: #88ff88;
-        position: relative;
-    }
+/* ==========================================================================
+   Head-to-Head Records matrix (.h2h-matrix)
 
-    .h2h-losing {
-        background-color: #ff8888;
-        position: relative;
-    }
+   Built on the shared sticky-table pattern (tables.css Pattern 3a):
+     .sticky-scroll-wrapper.page-sticky > .sticky-scroll-container
+       > table.ibl-data-table.sticky-table.h2h-matrix
+   Row labels reuse .sticky-col + .ibl-team-cell--colored, record cells reuse
+   .series-record-cell (free-agency.css), header logos reuse .series-logo-img.
+   Only the matrix-specific bits live here.
+   ========================================================================== */
 
-    .h2h-tied {
-        background-color: #bbbbbb;
-        position: relative;
-    }
-
-    /* Touch tooltip: hidden by default, revealed by JS adding h2h-tip-open. */
-    .h2h-winning::after,
-    .h2h-losing::after,
-    .h2h-tied::after {
-        content: attr(title);
-        display: none;
-        position: absolute;
-        bottom: 100%;
-        left: 50%;
-        transform: translateX(-50%);
-        background: #333;
-        color: #fff;
-        padding: 2px 6px;
-        border-radius: 3px;
-        font-size: 0.75rem;
-        white-space: nowrap;
-        pointer-events: none;
-        z-index: 10;
-    }
-
-    .h2h-diag {
-        background-color: #666666;
-    }
-
-    .h2h-empty {
-        color: #999;
-    }
-
-    .h2h-row-label {
-        font-weight: normal;
-        text-align: left;
-        min-width: 100px;
-    }
-
-    /* Team-colored row labels (matches the legacy SeriesRecords Y-axis look).
-       Colors are supplied per-element via --h2h-row-bg / --h2h-row-fg custom
-       properties set in the View. */
-    .h2h-row-label--colored {
-        background-color: var(--h2h-row-bg);
-    }
-
-    .h2h-row-label--colored .ibl-team-cell__name {
-        color: var(--h2h-row-fg);
-    }
-
-    .h2h-row-label--colored .ibl-team-cell__name:hover {
-        opacity: 0.85;
-    }
-
-    .h2h-gm-header {
-        display: inline-block;
-        writing-mode: vertical-rl;
-        text-orientation: sideways;
-        transform: rotate(180deg);
-        max-height: 100px;
-        overflow: hidden;
-        font-size: 0.75rem;
-        white-space: nowrap;
-    }
-
-    .h2h-gm-col-header {
-        display: inline-flex;
-        flex-direction: column;
-        align-items: center;
-    }
-
-    .h2h-gm-col-logo {
-        margin-top: 4px;
-        flex-shrink: 0;
-        width: 28px;
-        height: 28px;
-        object-fit: contain;
-    }
-
-    .h2h-matrix th:has(.h2h-gm-col-header) {
-        vertical-align: bottom;
-        height: 1px;
-    }
-
-    .h2h-matrix th:has(.h2h-gm-col-header) .h2h-gm-col-header {
-        height: 100%;
-        justify-content: flex-end;
-    }
-
-    .h2h-empty-state {
-        padding: 2rem;
-        text-align: center;
-        color: #666;
-    }
-
-    .h2h-matrix td {
-        position: relative;
-    }
-}
-
-/* --- Module contract classes emitted by HeadToHeadRecordsView --- */
-
-.h2h-matrix-wrap {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    max-width: 100%;
-}
-
-.h2h-matrix {
-    border-collapse: collapse;
-    position: relative;
-}
-
-.h2h-matrix thead th {
-    position: sticky;
-    top: 0;
-    z-index: 2;
-    background: #fff;
-}
-
-.h2h-matrix .h2h-row-label {
-    position: sticky;
-    left: 0;
-    z-index: 1;
-    background: var(--h2h-row-bg, #fff);
-    color: var(--h2h-row-fg, #000);
-    text-align: left;
+/* Tight cells so a 28+ column grid fits like the legacy page */
+.h2h-matrix th,
+.h2h-matrix td {
+    padding: 0.2rem 0.3rem;
+    font-size: 0.85rem;
     white-space: nowrap;
 }
 
-.h2h-matrix thead th:first-child {
-    z-index: 3;
+.ibl-data-table.h2h-matrix .h2h-row-label {
+    padding-block: 0.15rem;
 }
 
-.h2h-self {
-    background: #d9d9d9;
+.h2h-row-label small {
+    font-weight: 400;
+    opacity: 0.8;
 }
 
-.h2h-user-row {
+/* Corner cell: reading-direction hint (arrows point at columns, up at rows) */
+.h2h-matrix .h2h-corner {
+    vertical-align: bottom;
+    line-height: 1.1;
+}
+
+.h2h-corner__cols,
+.h2h-corner__vs,
+.h2h-corner__rows {
+    display: block;
+}
+
+.h2h-corner__cols {
+    text-align: right;
+}
+
+.h2h-corner__vs {
+    text-align: center;
+}
+
+.h2h-corner__rows {
+    text-align: left;
+}
+
+/* Column headers: logo only unless the View detects duplicate logos
+   (GMs, or team eras that share one); bottom-aligned either way */
+.h2h-matrix .h2h-col-header {
+    vertical-align: bottom;
+    text-align: center;
+}
+
+.h2h-matrix .series-logo-img {
+    display: block;
+    margin: 0 auto;
+    width: 40px;
+    height: 40px;
+}
+
+/* Labeled variant (GMs): name reads top-to-bottom above the logo,
+   capped so every column stays the same width and height */
+.h2h-col-header__text {
+    display: block;
+    writing-mode: vertical-rl;
+    margin: 0 auto 0.35rem;
+    max-height: 9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.75rem;
+    line-height: 1;
+    letter-spacing: 0.03em;
+}
+
+/* Record cells: colour via the shared --series-cell-bg custom property */
+.h2h-winning {
+    --series-cell-bg: #88ff88;
+}
+
+.h2h-losing {
+    --series-cell-bg: #ff8888;
+}
+
+.h2h-tied {
+    --series-cell-bg: #bbbbbb;
+}
+
+/* Never met: keep the zebra background, mute the text */
+.ibl-data-table .h2h-unplayed {
+    --series-cell-bg: transparent;
+    color: var(--gray-400);
+}
+
+.h2h-matrix .h2h-self {
+    background-color: var(--gray-200);
+}
+
+/* Hover crosshair: darken the hovered row (CSS) and column (JS adds
+   h2h-col-hover). An overlay gradient works on top of any cell colour,
+   which a plain background-color swap could not. */
+.h2h-matrix tbody tr:hover td,
+.h2h-matrix .h2h-col-hover {
+    background-image: linear-gradient(rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.12));
+}
+
+.h2h-matrix thead th.h2h-col-hover {
+    background-image: linear-gradient(rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.18));
+}
+
+/* Logged-in user's own row and column: bold plus an accent bar */
+.h2h-matrix .h2h-user-row td,
+.h2h-matrix .h2h-user-col {
     font-weight: 700;
 }
 
+.h2h-matrix .h2h-user-row td.sticky-col {
+    box-shadow: inset 4px 0 0 var(--accent-500), var(--shadow-sticky-col);
+}
+
+.h2h-matrix thead th.h2h-user-col {
+    box-shadow: inset 0 -4px 0 var(--accent-500);
+}
+
+/* Touch tooltip: hidden by default, revealed by JS adding h2h-tip-open */
+.h2h-matrix .series-record-cell {
+    position: relative;
+}
+
+.h2h-matrix .series-record-cell::after {
+    content: attr(title);
+    display: none;
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--navy-900);
+    color: white;
+    padding: 2px 6px;
+    border-radius: var(--radius-md);
+    font-size: 0.75rem;
+    font-weight: 400;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.h2h-matrix .series-record-cell.h2h-tip-open::after {
+    display: block;
+}
+
+/* Filter form: inline fields, centered above the matrix */
 .h2h-filter {
     display: flex;
     flex-wrap: wrap;
-    gap: 0.75rem;
-    align-items: center;
-    margin-bottom: 0.75rem;
+    justify-content: center;
+    align-items: flex-end;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
 }
 
-.h2h-filter label {
-    display: inline-flex;
+.h2h-filter__field {
+    display: flex;
     flex-direction: column;
-    font-size: 0.8rem;
 }
 
-.h2h-tip-open::after {
-    display: block;
-    opacity: 1;
+.h2h-filter__field .ibl-label {
+    margin-bottom: var(--space-1);
 }
+
+.h2h-filter .ibl-select {
+    width: auto;
+    font-size: 1rem;
+    padding: var(--space-1) var(--space-2);
+}
+
+} /* end @layer components */

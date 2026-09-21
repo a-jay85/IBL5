@@ -45,10 +45,10 @@ class HeadToHeadRecordsViewTest extends TestCase
      * @param array<string, array<string, array{wins: int, losses: int}>> $records
      * @return array{dimension: string, phase: string, scope: string, axis: list<array{key: string, franchise_id: int, label: string, sublabel: string, color1: string, color2: string, logo: string}>, records: array<string, array<string, array{wins: int, losses: int}>>}
      */
-    private function makePayload(array $axis = [], array $records = []): array
+    private function makePayload(array $axis = [], array $records = [], string $dimension = 'franchises'): array
     {
         return [
-            'dimension' => 'franchises',
+            'dimension' => $dimension,
             'phase'     => 'regular',
             'scope'     => 'current',
             'axis'      => $axis,
@@ -56,55 +56,188 @@ class HeadToHeadRecordsViewTest extends TestCase
         ];
     }
 
+    /**
+     * A two-entry payload where the first entry has one game so it stays visible.
+     *
+     * @param array<string, mixed> $firstOverrides
+     * @return array{dimension: string, phase: string, scope: string, axis: list<array{key: string, franchise_id: int, label: string, sublabel: string, color1: string, color2: string, logo: string}>, records: array<string, array<string, array{wins: int, losses: int}>>}
+     */
+    private function makePlayedPayload(array $firstOverrides = [], string $dimension = 'franchises'): array
+    {
+        $a = $this->makeEntry($firstOverrides);
+        $b = $this->makeEntry(['key' => 'lakers', 'franchise_id' => 2, 'label' => 'Lakers', 'logo' => 'lakers.png']);
+
+        return $this->makePayload(
+            [$a, $b],
+            [
+                $a['key'] => ['lakers' => ['wins' => 1, 'losses' => 0]],
+                'lakers'  => [$a['key'] => ['wins' => 0, 'losses' => 1]],
+            ],
+            $dimension,
+        );
+    }
+
     // ---------------------------------------------------------------------------
     // Row label tests
     // ---------------------------------------------------------------------------
 
-    public function testRowLabelRendersColorCustomProperties(): void
+    public function testRowLabelRendersTeamCellColorCustomProperties(): void
     {
-        $entry   = $this->makeEntry(['color1' => '00653A', 'color2' => 'FFFFFF']);
-        $payload = $this->makePayload([$entry]);
+        $payload = $this->makePlayedPayload(['color1' => '00653A', 'color2' => 'FFFFFF']);
         $html    = $this->view->renderMatrix($payload, []);
 
-        self::assertStringContainsString('--h2h-row-bg:#00653A', $html);
-        self::assertStringContainsString('--h2h-row-fg:#FFFFFF', $html);
+        self::assertStringContainsString('--team-cell-bg: #00653A', $html);
+        self::assertStringContainsString('--team-cell-color: #FFFFFF', $html);
+        self::assertStringContainsString('class="sticky-col h2h-row-label ibl-team-cell--colored"', $html);
     }
 
-    public function testRowLabelWithoutColorsHasNoStyleAttribute(): void
+    public function testRowLabelWithoutColorsHasNoStyleAttributeAndNoColoredModifier(): void
     {
-        $entry   = $this->makeEntry(['color1' => '', 'color2' => '']);
-        $payload = $this->makePayload([$entry]);
+        $payload = $this->makePlayedPayload(['color1' => '', 'color2' => '']);
         $html    = $this->view->renderMatrix($payload, []);
 
-        self::assertStringNotContainsString('style=', $html);
+        // The first row (no colours) must not carry a style attribute.
+        $firstRow = (string) strstr($html, '<tbody><tr>');
+        $firstRow = (string) strstr($firstRow, '</tr>', true);
+        self::assertStringNotContainsString('style=', $firstRow);
+        self::assertStringNotContainsString('ibl-team-cell--colored', $firstRow);
+        self::assertStringContainsString('class="sticky-col h2h-row-label"', $firstRow);
+    }
+
+    public function testTeamAxisRowLabelLinksToTeamPageButGmAxisDoesNot(): void
+    {
+        $teams = $this->view->renderMatrix($this->makePlayedPayload([], 'teams'), []);
+        $gms   = $this->view->renderMatrix($this->makePlayedPayload([], 'gms'), []);
+
+        self::assertStringContainsString('href="modules.php?name=Team&amp;op=team&amp;teamid=1"', $teams);
+        self::assertStringNotContainsString('href="modules.php?name=Team', $gms);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Table shell: sticky pattern + corner cell
+    // ---------------------------------------------------------------------------
+
+    public function testMatrixUsesSharedStickyTablePattern(): void
+    {
+        $html = $this->view->renderMatrix($this->makePlayedPayload(), []);
+
+        self::assertStringContainsString('<div class="sticky-scroll-wrapper page-sticky"><div class="sticky-scroll-container">', $html);
+        self::assertStringContainsString('<table class="ibl-data-table sticky-table h2h-matrix">', $html);
+        self::assertStringContainsString('<th class="sticky-col sticky-corner h2h-corner">', $html);
+        self::assertStringContainsString('&rarr;&rarr;', $html);
+        self::assertStringContainsString('&uarr;', $html);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Column headers
+    // ---------------------------------------------------------------------------
+
+    public function testColumnHeadersAreLogoOnlyWhenLogosAreUnique(): void
+    {
+        $html = $this->view->renderMatrix($this->makePlayedPayload(), []);
+
+        self::assertStringNotContainsString('h2h-col-header__text', $html);
+        self::assertStringContainsString('class="series-logo-img" alt="Celtics (2020-present)"', $html);
+        self::assertStringContainsString('<th class="h2h-col-header" title="Celtics (2020-present)">', $html);
+    }
+
+    public function testColumnHeadersGainRotatedTextWhenTwoEntriesShareALogo(): void
+    {
+        $a = $this->makeEntry(['key' => 'nj',  'franchise_id' => 4, 'label' => 'New Jersey Nets', 'logo' => 'nets.png']);
+        $b = $this->makeEntry(['key' => 'bkn', 'franchise_id' => 4, 'label' => 'Brooklyn Nets',   'logo' => 'nets.png']);
+        $payload = $this->makePayload([$a, $b], ['nj' => ['bkn' => ['wins' => 2, 'losses' => 1]]], 'teams');
+
+        $html = $this->view->renderMatrix($payload, []);
+
+        self::assertStringContainsString('<th class="h2h-col-header h2h-col-header--labeled" title="New Jersey Nets (2020-present)">', $html);
+        self::assertStringContainsString('<span class="h2h-col-header__text">New Jersey Nets</span>', $html);
+        self::assertStringContainsString('<span class="h2h-col-header__text">Brooklyn Nets</span>', $html);
+        // With text present the logo is decorative.
+        self::assertStringContainsString('class="series-logo-img" alt=""', $html);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Hidden 0-0 participants
+    // ---------------------------------------------------------------------------
+
+    public function testEntriesWithNoGamesAreHiddenFromRowsAndColumns(): void
+    {
+        $a = $this->makeEntry(['key' => 'a', 'franchise_id' => 1, 'label' => 'Alpha', 'logo' => 'a.png']);
+        $b = $this->makeEntry(['key' => 'b', 'franchise_id' => 2, 'label' => 'Bravo', 'logo' => 'b.png']);
+        $c = $this->makeEntry(['key' => 'c', 'franchise_id' => 3, 'label' => 'NeverPlayed', 'logo' => 'c.png']);
+
+        $records = [
+            'a' => ['b' => ['wins' => 3, 'losses' => 1], 'c' => ['wins' => 0, 'losses' => 0]],
+            'b' => ['a' => ['wins' => 1, 'losses' => 3], 'c' => ['wins' => 0, 'losses' => 0]],
+            'c' => ['a' => ['wins' => 0, 'losses' => 0], 'b' => ['wins' => 0, 'losses' => 0]],
+        ];
+        $html = $this->view->renderMatrix($this->makePayload([$a, $b, $c], $records), []);
+
+        self::assertStringNotContainsString('NeverPlayed', $html);
+        self::assertSame(2, substr_count($html, '<th class="h2h-col-header"'));
+        self::assertSame(2, substr_count($html, 'h2h-row-label'));
+    }
+
+    public function testEntryWithGamesOnlyInAColumnStaysVisible(): void
+    {
+        // Records are stored per row; 'b' has no row of its own but appears in a's row.
+        $a = $this->makeEntry(['key' => 'a', 'franchise_id' => 1, 'label' => 'Alpha', 'logo' => 'a.png']);
+        $b = $this->makeEntry(['key' => 'b', 'franchise_id' => 2, 'label' => 'Bravo', 'logo' => 'b.png']);
+
+        $html = $this->view->renderMatrix(
+            $this->makePayload([$a, $b], ['a' => ['b' => ['wins' => 0, 'losses' => 2]]]),
+            [],
+        );
+
+        self::assertStringContainsString('Bravo', $html);
+        self::assertSame(2, substr_count($html, 'h2h-row-label'));
+    }
+
+    public function testAllZeroPayloadRendersEmptyState(): void
+    {
+        $a = $this->makeEntry(['key' => 'a', 'franchise_id' => 1]);
+        $b = $this->makeEntry(['key' => 'b', 'franchise_id' => 2]);
+
+        $html = $this->view->renderMatrix($this->makePayload([$a, $b], []), []);
+
+        self::assertStringContainsString('table-empty-message', $html);
+        self::assertStringNotContainsString('<table', $html);
     }
 
     // ---------------------------------------------------------------------------
     // Diagonal / self cell
     // ---------------------------------------------------------------------------
 
-    public function testDiagonalCellIsSkipped(): void
+    public function testDiagonalCellIsBlankAndMarkedSelf(): void
     {
-        $entry   = $this->makeEntry();
-        $payload = $this->makePayload([$entry]);
-        $html    = $this->view->renderMatrix($payload, []);
+        $html = $this->view->renderMatrix($this->makePlayedPayload(), []);
 
-        self::assertStringContainsString('h2h-self', $html);
-        // The self cell must contain no record text
         self::assertMatchesRegularExpression('/<td class="h2h-self"><\/td>/', $html);
     }
 
     // ---------------------------------------------------------------------------
-    // User-match row
+    // User-match row and column
     // ---------------------------------------------------------------------------
 
-    public function testUserMatchRowIsBold(): void
+    public function testUserMatchMarksRowAndColumn(): void
     {
-        $entry   = $this->makeEntry(['key' => 'celtics']);
-        $payload = $this->makePayload([$entry]);
-        $html    = $this->view->renderMatrix($payload, ['celtics']);
+        $html = $this->view->renderMatrix($this->makePlayedPayload(['key' => 'celtics']), ['celtics']);
 
-        self::assertStringContainsString('h2h-user-row', $html);
+        self::assertStringContainsString('<tr class="h2h-user-row">', $html);
+        self::assertSame(1, substr_count($html, '<tr class="h2h-user-row">'));
+        // Header for the user's column and the record cell in the other row both carry h2h-user-col.
+        self::assertStringContainsString('<th class="h2h-col-header h2h-user-col"', $html);
+        self::assertStringContainsString('h2h-losing h2h-user-col', $html);
+        // The user's own diagonal cell is also in the user column.
+        self::assertStringContainsString('<td class="h2h-self h2h-user-col"></td>', $html);
+    }
+
+    public function testAnonymousUserGetsNoUserMarkers(): void
+    {
+        $html = $this->view->renderMatrix($this->makePlayedPayload(), []);
+
+        self::assertStringNotContainsString('h2h-user-row', $html);
+        self::assertStringNotContainsString('h2h-user-col', $html);
     }
 
     // ---------------------------------------------------------------------------
@@ -114,7 +247,7 @@ class HeadToHeadRecordsViewTest extends TestCase
     public function testCellTitleCarriesWinPercentage(): void
     {
         $a = $this->makeEntry(['key' => 'celtics', 'franchise_id' => 1]);
-        $b = $this->makeEntry(['key' => 'lakers',  'franchise_id' => 2, 'label' => 'Lakers']);
+        $b = $this->makeEntry(['key' => 'lakers',  'franchise_id' => 2, 'label' => 'Lakers', 'logo' => 'lakers.png']);
 
         $records = ['celtics' => ['lakers' => ['wins' => 3, 'losses' => 1]]];
         $payload = $this->makePayload([$a, $b], $records);
@@ -125,19 +258,24 @@ class HeadToHeadRecordsViewTest extends TestCase
     }
 
     // ---------------------------------------------------------------------------
-    // Absent matchup
+    // Absent matchup among visible participants
     // ---------------------------------------------------------------------------
 
-    public function testAbsentMatchupRendersZeroZeroTied(): void
+    public function testAbsentMatchupRendersMutedZeroZero(): void
     {
-        $a = $this->makeEntry(['key' => 'celtics', 'franchise_id' => 1]);
-        $b = $this->makeEntry(['key' => 'lakers',  'franchise_id' => 2, 'label' => 'Lakers']);
+        $a = $this->makeEntry(['key' => 'a', 'franchise_id' => 1, 'label' => 'A', 'logo' => 'a.png']);
+        $b = $this->makeEntry(['key' => 'b', 'franchise_id' => 2, 'label' => 'B', 'logo' => 'b.png']);
+        $c = $this->makeEntry(['key' => 'c', 'franchise_id' => 3, 'label' => 'C', 'logo' => 'c.png']);
 
-        $payload = $this->makePayload([$a, $b], []);
-        $html    = $this->view->renderMatrix($payload, []);
+        $records = [
+            'a' => ['b' => ['wins' => 1, 'losses' => 0]],
+            'b' => ['a' => ['wins' => 0, 'losses' => 1], 'c' => ['wins' => 2, 'losses' => 0]],
+            'c' => ['b' => ['wins' => 0, 'losses' => 2]],
+        ];
+        $html = $this->view->renderMatrix($this->makePayload([$a, $b, $c], $records), []);
 
-        self::assertStringContainsString('h2h-tied', $html);
-        self::assertStringContainsString('>0-0<', $html);
+        // a vs c never met: tied colour class plus the muted unplayed modifier.
+        self::assertStringContainsString('<td class="series-record-cell h2h-tied h2h-unplayed" title="0-0 (0%)">0-0</td>', $html);
     }
 
     // ---------------------------------------------------------------------------
@@ -146,9 +284,9 @@ class HeadToHeadRecordsViewTest extends TestCase
 
     public function testWinningLosingTiedClassesFollowRecord(): void
     {
-        $a = $this->makeEntry(['key' => 'a', 'franchise_id' => 1, 'label' => 'A']);
-        $b = $this->makeEntry(['key' => 'b', 'franchise_id' => 2, 'label' => 'B']);
-        $c = $this->makeEntry(['key' => 'c', 'franchise_id' => 3, 'label' => 'C']);
+        $a = $this->makeEntry(['key' => 'a', 'franchise_id' => 1, 'label' => 'A', 'logo' => 'a.png']);
+        $b = $this->makeEntry(['key' => 'b', 'franchise_id' => 2, 'label' => 'B', 'logo' => 'b.png']);
+        $c = $this->makeEntry(['key' => 'c', 'franchise_id' => 3, 'label' => 'C', 'logo' => 'c.png']);
 
         $records = [
             'a' => [
@@ -167,9 +305,10 @@ class HeadToHeadRecordsViewTest extends TestCase
         $payload = $this->makePayload([$a, $b, $c], $records);
         $html    = $this->view->renderMatrix($payload, []);
 
-        self::assertStringContainsString('h2h-winning', $html);
-        self::assertStringContainsString('h2h-losing', $html);
-        self::assertStringContainsString('h2h-tied', $html);
+        self::assertStringContainsString('<td class="series-record-cell h2h-winning" title="5-2 (71%)">5-2</td>', $html);
+        self::assertStringContainsString('<td class="series-record-cell h2h-losing" title="2-5 (29%)">2-5</td>', $html);
+        self::assertStringContainsString('<td class="series-record-cell h2h-tied" title="3-3 (50%)">3-3</td>', $html);
+        self::assertStringNotContainsString('h2h-unplayed', $html);
     }
 
     // ---------------------------------------------------------------------------
@@ -181,7 +320,7 @@ class HeadToHeadRecordsViewTest extends TestCase
         $payload = $this->makePayload([]);
         $html    = $this->view->renderMatrix($payload, []);
 
-        self::assertStringContainsString('h2h-empty', $html);
+        self::assertStringContainsString('table-empty-message', $html);
         self::assertStringNotContainsString('<table', $html);
     }
 
@@ -198,18 +337,36 @@ class HeadToHeadRecordsViewTest extends TestCase
         self::assertStringContainsString('value="all" selected', $html);
     }
 
+    public function testFilterFormUsesSharedFormClasses(): void
+    {
+        $html = $this->view->renderFilterForm('franchises', 'all', 'current');
+
+        self::assertStringContainsString('<form method="post" action="modules.php?name=HeadToHeadRecords" class="h2h-filter">', $html);
+        self::assertStringContainsString('<select name="dimension" class="ibl-select">', $html);
+        self::assertStringContainsString('<span class="ibl-label ibl-label--sm">Dimension</span>', $html);
+        self::assertStringContainsString('<button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--sm">Filter</button>', $html);
+    }
+
     // ---------------------------------------------------------------------------
     // XSS / escaping
     // ---------------------------------------------------------------------------
 
     public function testLabelsAreHtmlEscaped(): void
     {
-        $entry   = $this->makeEntry(['label' => '<script>alert(1)</script>', 'color1' => '']);
-        $payload = $this->makePayload([$entry]);
+        $payload = $this->makePlayedPayload(['label' => '<script>alert(1)</script>', 'color1' => '']);
         $html    = $this->view->renderMatrix($payload, []);
 
         self::assertStringNotContainsString('<script>alert(1)</script>', $html);
         self::assertStringContainsString('&lt;script&gt;', $html);
+    }
+
+    public function testLogoFileNameIsHtmlEscaped(): void
+    {
+        $payload = $this->makePlayedPayload(['logo' => 'x" onerror="alert(1)']);
+        $html    = $this->view->renderMatrix($payload, []);
+
+        self::assertStringNotContainsString('onerror="alert(1)', $html);
+        self::assertStringContainsString('images/logo/x&quot; onerror=&quot;alert(1)', $html);
     }
 
     // ---------------------------------------------------------------------------
@@ -218,11 +375,23 @@ class HeadToHeadRecordsViewTest extends TestCase
 
     public function testInvalidColorCollapsesToBlack(): void
     {
-        $entry   = $this->makeEntry(['color1' => 'INVALID', 'color2' => 'ALSOINVALID']);
-        $payload = $this->makePayload([$entry]);
+        $payload = $this->makePlayedPayload(['color1' => 'INVALID', 'color2' => 'ALSOINVALID']);
         $html    = $this->view->renderMatrix($payload, []);
 
         // TableStyles::sanitizeColor returns '000000' for invalid colors
-        self::assertStringContainsString('--h2h-row-bg:#000000', $html);
+        self::assertStringContainsString('--team-cell-bg: #000000', $html);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Inline script
+    // ---------------------------------------------------------------------------
+
+    public function testScriptWiresTooltipColumnHoverAndAutoSubmit(): void
+    {
+        $html = $this->view->renderTapTooltipScript();
+
+        self::assertStringContainsString('h2h-tip-open', $html);
+        self::assertStringContainsString('h2h-col-hover', $html);
+        self::assertStringContainsString('form.h2h-filter', $html);
     }
 }

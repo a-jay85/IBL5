@@ -70,9 +70,26 @@ test.describe('Head-to-Head Records flow', () => {
     // ibl_franchise_era_branding row. No live team is named Hornets, so this label
     // identifies the era row unambiguously and its colour must come from the
     // branding table rather than from ibl_team_info.
-    const hornetsRow = page.locator('th.h2h-row-label', { hasText: 'Hornets' });
+    const hornetsRow = page.locator('td.h2h-row-label', { hasText: 'Hornets' });
     await expect(hornetsRow).toHaveCount(1);
-    await expect(hornetsRow).toHaveAttribute('style', /--h2h-row-bg:\s*#00788C/i);
+    await expect(hornetsRow).toHaveAttribute('style', /--team-cell-bg:\s*#00788C/i);
+  });
+
+  test('participants with no games are hidden from the matrix', async ({ page }) => {
+    // Only franchises 1, 2, 3, 5, 10 and 12 carry seeded box scores. Every other
+    // franchise is 0-0 across its whole row and column, so the View drops it.
+    await applyFilters(page, 'franchises', 'all', 'all');
+
+    const rows = page.locator('.h2h-matrix tbody tr');
+    expect(await rows.count()).toBe(6);
+    expect(await page.locator('.h2h-matrix thead th.h2h-col-header').count()).toBe(6);
+  });
+
+  test('the corner cell carries the reading-direction arrows', async ({ page }) => {
+    const corner = page.locator('.h2h-matrix th.sticky-corner');
+    await expect(corner).toHaveCount(1);
+    await expect(corner.locator('.h2h-corner__cols')).toHaveText('\u2192\u2192');
+    await expect(corner.locator('.h2h-corner__rows')).toHaveText('\u2191');
   });
 
   test('the diagonal cell is blank and marked h2h-self', async ({ page }) => {

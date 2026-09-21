@@ -170,8 +170,36 @@ def test_no_edits_twice_moves_to_round_two_on_opus(tmp_path, git_shim):
         assert rounds[1]["model"] == "opus"
         assert [m for _p, m in _fixer_calls(llm)] == ["sonnet", "sonnet", "opus"]
         assert res.fidelity["models"] == ["sonnet", "opus"]
+        assert res.fidelity["rounds_completed"] == 1
     finally:
         _cleanup(9302, "9302-2")
+
+
+def test_divergent_live_body_alone_is_not_a_body_only_round(tmp_path, git_shim):
+    """A live body that merely differs from the harness's copy is not agent work.
+
+    Pins the comparison semantics Phase 3 introduces: before-attempt vs after-attempt,
+    never live-body vs the `body` parameter. RecordingGh with no fixture answers
+    pr_body() with "" while callers pass a non-empty `body`, so a parameter-based
+    comparison reports a phantom body-only round on every empty remediation.
+    """
+    gh = RecordingGh(str(tmp_path), fixture={"body": "live-and-static", "pr_number": 9403})
+    git = _counting_git(commit_returns=[""])
+    llm = _ScriptedLlm(UsageLedger(), {
+        "plan-fidelity-review": [NOT_READY],
+        "fidelity-remediation": ["looked, changed nothing"],
+    })
+    res = _Res()
+    try:
+        runner._run_fidelity(llm, str(tmp_path), str(tmp_path), git, gh, _plan(),
+                             "diff", "harness-copy-of-body", 9403, "dead" * 10,
+                             TREE_1, False, lambda _m: None, res)
+        rounds = res.fidelity["rounds"]
+        assert res.fidelity["rounds_completed"] == 0
+        assert all(r["outcome"] == "no-edits" for r in rounds)
+        assert res.fidelity["verdict_2"] is None
+    finally:
+        _cleanup(9403, "9403-2")
 
 
 # --- terminal kinds break after one call --------------------------------------

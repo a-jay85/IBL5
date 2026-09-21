@@ -39,7 +39,8 @@ from harness import (adr_draft, ciwatch, conformance, fidelity, llm_calls, manua
 from harness.armable import (ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance,
                              select_fidelity_verdict)
-from harness.classify import (BACKLOG_REPO, classify, files_from_diff, modified_files_from_diff,
+from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_END,
+                              classify, files_from_diff, modified_files_from_diff,
                               qualify_backlog_refs,
                               render_files_changed, render_manual_confirmation,
                               render_reviewer_verification, strip_manual_testing_section,
@@ -717,6 +718,31 @@ _TRANSIENT_ROUND_KINDS = ("llm-invalid-output", "llm-tooled-cli", "llm-tooled-em
 _TRANSIENT_ROUND_REASONS = ("no-edits",)
 _MAX_ROUND_RETRIES = 1
 
+# A body-only round: the fixer answered the finding in the PR body with its own raw
+# `gh pr edit` and committed nothing. That is real work, so it takes a truthy stand-in
+# sha and flows through the same re-review path a committed round does. Neither string
+# below belongs in _TRANSIENT_ROUND_REASONS -- re-running the same fixer against a
+# finding it has already answered in the body just re-answers it.
+BODY_ONLY_SHA = "body-only"
+BODY_FETCH_FAILED_REASON = "body-fetch-failed"
+
+
+def _body_signature(body: str | None) -> str:
+    """The comparable part of a PR body: everything outside the files-changed block.
+
+    Phase 5.5 rewrites <!-- files-changed:begin -->..<!-- files-changed:end --> on every
+    round, so that block churns whenever the diff grows and says nothing about whether
+    the fixer touched the body. Strip it, then strip surrounding whitespace; what is
+    left is the prose a human or an agent wrote. An unbalanced marker pair is left
+    intact rather than guessed at -- the same bounds check upsert_files_changed uses.
+    """
+    text = body or ""
+    begin = text.find(FILES_CHANGED_BEGIN)
+    end = text.find(FILES_CHANGED_END)
+    if begin != -1 and end != -1 and end > begin:
+        text = text[:begin] + text[end + len(FILES_CHANGED_END):]
+    return text.strip()
+
 
 def _round_model(round_num: int) -> str:
     """Sonnet fixes round 1; a round that did not clear the verdict escalates to Opus.
@@ -1237,6 +1263,13 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         # and the fixer spawn count stays bounded at 2 * MAX_FIDELITY_ROUNDS.
         for attempt in range(_MAX_ROUND_RETRIES + 1):
             outcome: dict = {}
+            # Snapshot BEFORE the fixer runs, and compare against a second read after
+            # it: the fixer edits the body with its own `gh pr edit` subprocess, so the
+            # adapter never sees the write. Comparing the live body against this
+            # function's `body` parameter instead would report a body-only round on
+            # every PR whose body was edited by anything else since Phase 4 wrote it.
+            raw_before = gh.pr_body_fresh()
+            sig_before = _body_signature(raw_before)
             try:
                 sha = fidelity.remediate(
                     llm, git, out_dir, worktree or ".", packet, current_verdict_path,
@@ -1285,6 +1318,24 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
             if sha:
                 rec["outcome"] = "committed"
                 break
+            raw_after = gh.pr_body_fresh()
+            if raw_before and not raw_after:
+                # `gh pr view` failures are swallowed by LiveGh._fetch_meta(), which
+                # returns {} and so hands back "". A body that was non-empty and now
+                # reads empty is therefore a failed fetch or a wiped body -- never a
+                # fix worth re-reviewing. Fail loud and stop the run for a human.
+                log(f"phase5.5 round {round_num}: PR body read back empty after "
+                    f"remediation (was {len(raw_before)} chars) - treating as a failed "
+                    f"fetch, not a body edit")
+                rec["outcome"] = BODY_FETCH_FAILED_REASON
+                terminal = True
+                break
+            if raw_before and _body_signature(raw_after) != sig_before:
+                log(f"phase5.5 round {round_num}: body-only fix detected "
+                    f"(no commit; PR body changed)")
+                sha = BODY_ONLY_SHA
+                rec["outcome"] = BODY_ONLY_SHA
+                break
             reason = outcome.get("reason", "none")
             if reason in _TRANSIENT_ROUND_REASONS and attempt < _MAX_ROUND_RETRIES:
                 rec["retries"] += 1
@@ -1306,6 +1357,12 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         live_body = gh.pr_body_fresh() or body
         body = upsert_files_changed(live_body, render_files_changed(git.diff_vs_base()))
         gh.pr_edit_body(pr, body)
+        # sha is either a real commit sha or BODY_ONLY_SHA. fidelity.re_review()'s only
+        # test of it is `if not remediation_sha: return None, None, None`, so a non-empty
+        # sentinel passes unchanged and the re-review runs against the same diff plus the
+        # edited body. Its context block then reads "REMEDIATION_COMMIT: body-only",
+        # which is the accurate label for a round that produced no commit. This is why
+        # fidelity.re_review() needs no signature change.
         v_n = tree_n = path_n = None
         for rr_attempt in range(_MAX_ROUND_RETRIES + 1):
             v_n, tree_n, path_n = fidelity.re_review(
@@ -1323,6 +1380,9 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                     "reviewed_tree": tree_n, "verdict_path": path_n})
         if v_n is None:
             rec["outcome"] = "re-review-indeterminate"
+        # Truthiness, never sha-shape: a body-only round records BODY_ONLY_SHA here and
+        # counts, because a round that cleared a finding is a completed round whether the
+        # fix landed in the tree or in the PR body.
         res.fidelity["rounds_completed"] = sum(1 for r in rounds if r["remediation_sha"])
         res.fidelity["remediation_sha"] = str(sha)
         res.fidelity["verdict_2"] = v_n

@@ -42,7 +42,7 @@ Modes:
 Options:
   --season=YYYY      Season ending year. Defaults to the current operating season.
   --phase=<phase>    Season phase for --replay date decoding (default: operating phase).
-  --duplicates-only  Report only duplicate regular-season matchups, across every
+  --duplicates-only  Report only duplicate matchups (any game type), across every
                      season unless --season is given. Exits 1 on a duplicate,
                      0 otherwise; orphan and missing findings are not queried.
   --json             Emit machine-readable JSON instead of text.

@@ -187,7 +187,7 @@ jobs:
       - name: Setup PHP environment
         uses: ./.github/actions/setup-php-env
 
-      - name: Assert no duplicate regular-season boxscores in the restored dump
+      - name: Assert no duplicate boxscores in the restored dump
         run: php ibl5/bin/check-boxscore-schedule-run --duplicates-only
 
       - name: Run full boxscore/schedule audit (warn-only)

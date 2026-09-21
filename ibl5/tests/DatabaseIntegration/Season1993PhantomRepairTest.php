@@ -877,12 +877,12 @@ final class Season1993PhantomRepairTest extends DatabaseTestCase
 
     public function testBackupMigrationRelaxesGeneratedColumns(): void
     {
-        // Migration 181 uses CREATE TABLE IF NOT EXISTS + ALTER TABLE MODIFY (idempotent).
+        // Migration 180 uses CREATE TABLE IF NOT EXISTS + ALTER TABLE MODIFY (idempotent).
         // Applying it to a DB that already has the backup tables is a no-op at the data
         // level and merely re-asserts the column type, which is safe to repeat.
         $sql = file_get_contents(dirname(__DIR__, 2) . '/migrations/180_create_season1993_phantom_backup_tables.sql');
-        self::assertIsString($sql, 'Migration 181 SQL file must be readable');
-        self::assertTrue($this->db->multi_query($sql), 'Migration 181 must execute without error: ' . $this->db->error);
+        self::assertIsString($sql, 'Migration 180 SQL file must be readable');
+        self::assertTrue($this->db->multi_query($sql), 'Migration 180 must execute without error: ' . $this->db->error);
         while ($this->db->more_results()) {
             $this->db->next_result();
         }

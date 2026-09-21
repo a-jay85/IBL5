@@ -48,6 +48,19 @@ class NavigationMenuBuilderTest extends TestCase
         $this->assertArrayHasKey('Community', $menus);
     }
 
+    public function testStatsMenuLinksToHeadToHeadRecords(): void
+    {
+        $builder = new NavigationMenuBuilder($this->createConfig());
+        $menus = $builder->getMenuStructure();
+
+        $urls = array_column($menus['Stats']['links'], 'url', 'label');
+
+        $this->assertArrayHasKey('Head-to-Head Records', $urls);
+        $this->assertSame('modules.php?name=HeadToHeadRecords', $urls['Head-to-Head Records']);
+        $this->assertArrayNotHasKey('Series Records', $urls);
+        $this->assertNotContains('modules.php?name=SeriesRecords', $urls);
+    }
+
     public function testMenuStructureHasIconsAndLinks(): void
     {
         $builder = new NavigationMenuBuilder($this->createConfig());

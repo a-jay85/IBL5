@@ -49,6 +49,14 @@ final class ModuleRegistryTest extends TestCase
         }
     }
 
+    public function testHeadToHeadRecordsIsRegisteredAndSeriesRecordsIsNot(): void
+    {
+        self::assertTrue(ModuleRegistry::isValid('HeadToHeadRecords'));
+        self::assertFalse(ModuleRegistry::isValid('SeriesRecords'));
+        self::assertContains('HeadToHeadRecords', ModuleRegistry::getAllModules());
+        self::assertNotContains('SeriesRecords', ModuleRegistry::getAllModules());
+    }
+
     public function testEveryModuleDirectoryIsRegistered(): void
     {
         $modulesDir = __DIR__ . '/../../modules';

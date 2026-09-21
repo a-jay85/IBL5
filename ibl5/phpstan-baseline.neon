@@ -709,12 +709,6 @@ parameters:
 			path: classes/SeasonLeaderboards/SeasonLeaderboardsRepository.php
 
 		-
-			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "opponent" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
-			identifier: ibl.orderByMissingTiebreaker
-			count: 1
-			path: classes/SeriesRecords/SeriesRecordsRepository.php
-
-		-
 			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
 			identifier: ibl.orderByMissingTiebreaker
 			count: 1
@@ -3318,30 +3312,6 @@ parameters:
 			identifier: variable.undefined
 			count: 2
 			path: modules/SeasonLeaderboards/index.php
-
-		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/SeriesRecords/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Repositories\TeamIdentityRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/SeriesRecords/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class SeriesRecords\SeriesRecordsRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/SeriesRecords/index.php
-
-		-
-			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/SeriesRecords/index.php
 
 		-
 			rawMessage: 'Cannot call method isOlympics() on mixed.'

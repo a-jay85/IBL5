@@ -73,7 +73,7 @@ No CSRF token is applied. The endpoint is read-only, idempotent, and public. An 
 
 ### Cache
 
-A `CachedHeadToHeadRecordsRepository` decorator holds one `DatabaseCache` key per filter combination: `h2h_records:{dimension}:{phase}:{scope}`, 24 keys (2 scopes × 3 dimensions × 4 phases), TTL 86400s. A page view reads exactly one key. Keys are warmed by `ibl5/bin/warm-cache`, rebuilt on demand by a dedicated CLI beside it, and refreshed after every import by `RefreshHeadToHeadRecordsStep`.
+A `CachedHeadToHeadRecordsRepository` decorator holds one `DatabaseCache` key per filter combination: `h2h_records:{dimension}:{phase}:{scope}`, 24 keys (2 scopes × 3 dimensions × 4 phases), TTL 86400s. A page view reads exactly one key. Keys are warmed by `ibl5/bin/warm-cache`, rebuilt on demand by `ibl5/bin/rebuild-h2h-records-cache`, and refreshed after every import by `RefreshHeadToHeadRecordsStep`.
 
 One blob was rejected because every page load would deserialize all 24 matrices. On-demand computation was rejected because it runs several CTE-joined queries against the full box-score table per public page view. The `current`-scope keys carry no season year: the Updater step rebuilds them after each import, so a stale key at season rollover self-heals within one import.
 
@@ -81,4 +81,4 @@ One blob was rejected because every page load would deserialize all 24 matrices.
 
 - Era colors are hand-seeded. A future rebrand needs a new migration row in `ibl_franchise_era_branding`.
 - The `current`-scope cache keys are season-agnostic by design, so correctness at rollover depends on `RefreshHeadToHeadRecordsStep` staying in the Updater pipeline.
-- `ibl5/classes/SeriesRecords/`, `ibl5/modules/SeriesRecords/`, and `ibl5/tests/SeriesRecords/` are deleted. `vw_series_records` stays, because Standings still reads it.
+- The whole `SeriesRecords` namespace is deleted: its classes, its module entry point, and its test directory. The `vw_series_records` view stays, because Standings still reads it.

@@ -259,22 +259,14 @@ class StandingsRepository extends \BaseMysqliRepository implements StandingsRepo
      */
     public function getSeriesRecords(): array
     {
-        $rows = $this->fetchAll(
+        // (self, opponent) is the view's composite key, so the pair is already a
+        // unique sort; there is no LIMIT here and no row can tie.
+        /** @var list<SeriesRecordRow> */
+        return $this->fetchAll(
+            // @phpstan-ignore ibl.orderByMissingTiebreaker
             "SELECT self, opponent, wins, losses FROM vw_series_records ORDER BY self, opponent",
             ""
         );
-
-        /** @var list<SeriesRecordRow> $result */
-        $result = [];
-        foreach ($rows as $row) {
-            $result[] = [
-                'self' => (int) $row['self'],
-                'opponent' => (int) $row['opponent'],
-                'wins' => (int) $row['wins'],
-                'losses' => (int) $row['losses'],
-            ];
-        }
-        return $result;
     }
 
     /**

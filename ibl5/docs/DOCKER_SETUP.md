@@ -1,6 +1,6 @@
 ---
 description: Docker Compose setup for local PHP-Apache + MariaDB stack.
-last_verified: 2026-07-22
+last_verified: 2026-09-21
 ---
 
 # Docker Development Setup

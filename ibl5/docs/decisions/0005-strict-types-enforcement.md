@@ -1,6 +1,6 @@
 ---
 description: Why PHPStan level max plus strict-rules plus RequireStrictTypesRule is the non-negotiable type floor.
-last_verified: 2026-07-22
+last_verified: 2026-09-21
 ---
 
 # ADR-0005: Strict types + typed properties enforcement

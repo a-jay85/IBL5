@@ -1,6 +1,6 @@
 ---
 description: Deploy rehearsal workflow gates production deploys by dry-running composer --no-dev, migrations, and schema validation against a prod-cloned disposable MariaDB before SSH steps touch prod.
-last_verified: 2026-07-22
+last_verified: 2026-09-21
 ---
 
 # ADR-0023: Deploy Rehearsal Pre-Flight Gate

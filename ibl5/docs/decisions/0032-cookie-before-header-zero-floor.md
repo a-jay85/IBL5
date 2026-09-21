@@ -1,6 +1,6 @@
 ---
 description: Zero-floor ratchet for ibl.cookieBeforeHeader PHPStan rule, preventing baseline regression in cleaned controllers
-last_verified: 2026-07-22
+last_verified: 2026-09-21
 ---
 
 # ADR-0032: Zero-Floor Ratchet for `ibl.cookieBeforeHeader`

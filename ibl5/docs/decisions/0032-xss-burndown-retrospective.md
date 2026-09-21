@@ -1,6 +1,6 @@
 ---
 description: Retrospective ADR documenting the complete XSS burndown across Plans A, B, and C — 315 baseline suppressions eliminated, 17 view files now in zero-floor.
-last_verified: 2026-07-22
+last_verified: 2026-09-21
 ---
 
 # ADR-0032: XSS Burndown Retrospective
@@ -22,6 +22,10 @@ The `phpstan-baseline.neon` file now contains zero `ibl.unescapedOutput` entries
 ## Decision
 
 All view files actively rendering user-controlled data are in `ZERO_FLOOR_FILES`. New views must be authored with `HtmlSanitizer::e()` from line one. Baseline suppression is no longer an option for the listed files.
+
+## Addendum — Zero-floor file count (2026-09-21) <!-- slop-ok -->
+
+The original figure in `## Context` is "17 files" with "11 remaining views (Plan C)". As of 2026-09-21, `RequireEscapedOutputRule::ZERO_FLOOR_FILES` contains 18 entries. `Standings` is represented by two files (`Standings/StandingsRowView.php` and `Standings/StandingsView.php`), making Plan C 12 files rather than 11. The 5 Navigation (Plan A) and 1 SeasonLeaderboards (Plan B) entries are unchanged.
 
 ## Consequences
 

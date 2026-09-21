@@ -34,7 +34,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from harness import (ciwatch, conformance, fidelity, llm_calls, manual_rows,
+from harness import (adr_draft, ciwatch, conformance, fidelity, llm_calls, manual_rows,
                      manual_testing, schemas, statefile)
 from harness.armable import (ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance,
@@ -320,7 +320,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             git, worktree or "", "origin/master", log, live=live)
         if live:
             sha = git.head()  # refresh — remediation may have committed and moved HEAD
-        pushed = _push_with_lease_retry(git, log, "phase2")
+        pushed = _push_with_adr_draft(git, log, "phase2", llm=llm, worktree=worktree,
+                                      out_dir=out_dir, res=res)
         if pushed:
             sha = pushed
         if gh.pr_exists():
@@ -757,6 +758,53 @@ def _push_with_lease_retry(git, log, phase: str) -> str:
     return ""  # unreachable
 
 
+def _push_with_adr_draft(git, log, phase: str, *, llm, worktree, out_dir, res) -> str:
+    """One-shot ADR draft around _push_with_lease_retry. Stale-lease and stale-base
+    retries happen INSIDE the inner helper; this wrapper only ever sees a denial that
+    survived them, so it can never draft on a stale base and the two cannot loop.
+    Exactly one draft per run (res.adr_drafted). Every drafter failure re-raises the
+    ORIGINAL local-gate error so the run still exits 3 (never 1: a skill re-run would
+    hit the same hook)."""
+    try:
+        return _push_with_lease_retry(git, log, phase)
+    except HarnessError as e:
+        if e.kind != "local-gate" or not worktree:
+            raise
+        if classify_local_gate_denial(e.detail or "") != "adr":
+            raise
+        if res.adr_drafted:
+            log(f"{phase}: ADR denial after this run's one draft ({res.adr_path}) "
+                "- failing closed")
+            raise
+        log(f"{phase}: local-gate denial classified as adr - drafting ADR "
+            f"(model={adr_draft.MODEL_MAP[adr_draft.ADR_DRAFT_MODEL]})")
+        plan_path = res.plan.path if (res.plan and res.plan.found) else None
+        try:
+            drafted = adr_draft.draft(llm, git, worktree, out_dir, log,
+                                      phase=phase, plan_path=plan_path)
+        except HarnessError as e2:
+            if e2.kind == "adr-draft-gate" and "|" in (e2.detail or ""):
+                # committed, then adr-check still failed: record the path for the DM
+                rel, sha, _ = e2.detail.split("|", 2)
+                res.adr_drafted, res.adr_path = True, rel
+                res.adr_draft_model = adr_draft.MODEL_MAP[adr_draft.ADR_DRAFT_MODEL]
+            log(f"{phase}: ADR draft failed ({e2.kind}): {(e2.detail or '')[:300]} "
+                "- failing closed")
+            raise e from e2
+        res.adr_drafted, res.adr_path, res.adr_draft_model = (
+            True, drafted.path, drafted.model)
+        log(f"{phase}: ADR drafted at {drafted.path} model={drafted.model} "
+            f"commit={drafted.sha[:12]} - re-pushing once")
+        try:
+            return _push_with_lease_retry(git, log, phase)
+        except HarnessError as e3:
+            if e3.kind == "local-gate":
+                log(f"{phase}: hook still denied after the ADR draft "
+                    f"(class={classify_local_gate_denial(e3.detail or '')}) - "
+                    f"{drafted.path} stays committed locally; failing closed")
+            raise
+
+
 def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir):
     """Bounded BEHIND resolution. Returns (sha, outcome). Sets res.retry_cap and
     disarms auto-merge when the cap is spent."""
@@ -1155,7 +1203,9 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                 # The same retrying push Phase 2 and Phase 7 use, so a master that moved
                 # during the review + fix span gets one clean rebase per attempt instead
                 # of ending the loop on the hook's "does not contain origin/master".
-                push=lambda: _push_with_lease_retry(git, log, "phase5.5"),
+                push=lambda: _push_with_adr_draft(git, log, "phase5.5", llm=llm,
+                                                  worktree=worktree, out_dir=out_dir,
+                                                  res=res),
                 pr_number=pr)
         except HarnessError as e:
             if e.kind == "push-failed":
@@ -1176,7 +1226,9 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
             except Exception:  # noqa: BLE001 - diagnostics must never mask the denial
                 pass
             log(f"phase5.5 round {round_num}: remediation unavailable ({e.kind}){gate}"
-                + (f" - {why}" if why else "") + local)
+                + (f" - {why}" if why else "") + local
+                + (f" - drafted ADR {res.adr_path} is committed locally"
+                   if res.adr_path else ""))
             sha = None
         if not sha:
             break
@@ -1281,7 +1333,9 @@ _GATE_REMEDY = {
     "stale-base": ("origin/master moved and the bounded refetch + re-rebase did not catch "
                    "up: run `git fetch origin master && git rebase origin/master`, then "
                    "re-run bin/post-plan-now."),
-    "adr": "Write the ADR for the decision-trigger surface, then re-run bin/post-plan-now.",
+    "adr": ("The harness's one ADR draft attempt did not clear the hook: write or fix "
+            "the ADR for the decision-trigger surface by hand, then re-run "
+            "bin/post-plan-now."),
     "byte-budget": ("The .claude/rules byte budget is over cap and check-rules-byte-budget "
                     "has no --fix flag: trim a rule (or move detail into a path-scoped "
                     "*-detail.md companion), then re-run bin/post-plan-now."),
@@ -1362,9 +1416,12 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
             # flattened form would silently degrade a long byte-budget denial to
             # "unknown" and print the wrong remedy.
             gate_class = classify_local_gate_denial(res.error or "")
+            drafted = (f" The harness drafted {res.adr_path} ({res.adr_draft_model}) "
+                       "and the hook still denied; the draft is committed locally on "
+                       "the branch for review." if res.adr_drafted else "")
             return (f"RESULT: post-plan BLOCKED — local pre-commit/pre-push gate denied "
                     f"the commit [class={gate_class}]; ERROR terminal=failed, no PR "
-                    f"opened. {detail} {_GATE_REMEDY[gate_class]}")
+                    f"opened. {detail}{drafted} {_GATE_REMEDY[gate_class]}")
         # Unknown or None error_kind — name both possible causes so the human knows where to look
         return ("RESULT: post-plan BLOCKED — rc=3 (rebase-conflict or local-gate), "
                 "cause unknown; ERROR terminal=failed, no PR opened. "

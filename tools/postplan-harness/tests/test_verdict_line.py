@@ -290,7 +290,8 @@ def test_verdict_names_the_adr_class_and_its_remedy():
     line = runner.verdict_line(_local_gate_res(
         "local-gate: pre-push-adr-hook: a decision-trigger surface is being pushed "
         "without an ADR."), 3, "")
-    assert "[class=adr]" in line and "Write the ADR" in line
+    assert "[class=adr]" in line
+    assert "one ADR draft attempt did not clear the hook" in line
 
 
 def test_verdict_names_the_byte_budget_class_and_says_there_is_no_fix_flag():

@@ -1,0 +1,171 @@
+@layer components {
+    .h2h-table td,
+    .h2h-table th {
+        padding: 4px 6px;
+        font-size: 0.85rem;
+        white-space: nowrap;
+    }
+
+    .h2h-winning {
+        background-color: #88ff88;
+    }
+
+    .h2h-losing {
+        background-color: #ff8888;
+    }
+
+    .h2h-tied {
+        background-color: #bbbbbb;
+    }
+
+    .h2h-diag {
+        background-color: #666666;
+    }
+
+    .h2h-empty {
+        color: #999;
+    }
+
+    .h2h-row-label {
+        font-weight: normal;
+        text-align: left;
+        min-width: 100px;
+    }
+
+    /* Team-colored row labels (matches the legacy SeriesRecords Y-axis look).
+       Colors are supplied per-element via --h2h-row-bg / --h2h-row-fg custom
+       properties set in the View. */
+    .h2h-row-label--colored {
+        background-color: var(--h2h-row-bg);
+    }
+
+    .h2h-row-label--colored .ibl-team-cell__name {
+        color: var(--h2h-row-fg);
+    }
+
+    .h2h-row-label--colored .ibl-team-cell__name:hover {
+        opacity: 0.85;
+    }
+
+    .h2h-gm-header {
+        display: inline-block;
+        writing-mode: vertical-rl;
+        text-orientation: sideways;
+        transform: rotate(180deg);
+        max-height: 100px;
+        overflow: hidden;
+        font-size: 0.75rem;
+        white-space: nowrap;
+    }
+
+    .h2h-gm-col-header {
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .h2h-gm-col-logo {
+        margin-top: 4px;
+        flex-shrink: 0;
+        width: 28px;
+        height: 28px;
+        object-fit: contain;
+    }
+
+    .h2h-table th:has(.h2h-gm-col-header) {
+        vertical-align: bottom;
+        height: 1px;
+    }
+
+    .h2h-table th:has(.h2h-gm-col-header) .h2h-gm-col-header {
+        height: 100%;
+        justify-content: flex-end;
+    }
+
+    .h2h-empty-state {
+        padding: 2rem;
+        text-align: center;
+        color: #666;
+    }
+
+    .h2h-tooltip {
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #333;
+        color: #fff;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 0.75rem;
+        white-space: nowrap;
+        pointer-events: none;
+        z-index: 10;
+    }
+
+    .h2h-table td {
+        position: relative;
+    }
+}
+
+/* --- Module contract classes emitted by HeadToHeadRecordsView --- */
+
+.h2h-matrix-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+}
+
+.h2h-matrix {
+    border-collapse: collapse;
+    position: relative;
+}
+
+.h2h-matrix thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #fff;
+}
+
+.h2h-matrix .h2h-row-label {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--h2h-row-bg, #fff);
+    color: var(--h2h-row-fg, #000);
+    text-align: left;
+    white-space: nowrap;
+}
+
+.h2h-matrix thead th:first-child {
+    z-index: 3;
+}
+
+.h2h-self {
+    background: #d9d9d9;
+}
+
+.h2h-user-row {
+    font-weight: 700;
+}
+
+.h2h-filter {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.h2h-filter label {
+    display: inline-flex;
+    flex-direction: column;
+    font-size: 0.8rem;
+}
+
+.h2h-tip-open .h2h-tooltip,
+.h2h-tip-open::after {
+    display: block;
+    opacity: 1;
+}

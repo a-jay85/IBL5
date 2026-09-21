@@ -1,6 +1,6 @@
 ---
 description: The harness attempts auto-resolution of ordinary rebase conflicts behind a class gate, a bounded per-file resolver, and a conjunctive TREE-EQUIVALENT proof; condition (14) holds auto-merge until a reviewer issues a CONFLICT-REVIEW=CLEAN verdict.
-last_verified: 2026-09-20
+last_verified: 2026-09-21
 ---
 
 # ADR-0134: Harness conflict auto-resolution behind a proof gate
@@ -71,3 +71,11 @@ A CLEAN verdict is a model judgment. The backstop is three properties: the revie
 - `tools/postplan-harness/harness/armable.py`: condition (14) truth table, `conflict_flag_path`, `conflict_verdict_for`.
 - `bin/post-plan-now`: rc=3 cause comment; fallback suppression logic unchanged.
 - `.claude/rules/linear-history-squash-merge.md`: the squash trap that motivates this change.
+
+## Addendum: conflict evidence survives the abort
+
+A fail-closed exit 3 used to name no files. Both rebase methods abort before `inventory_conflicts()` runs on the LLM-less path, and the abort clears the unmerged index entries, so the conflicted set was gone by the time the `HarnessError` was built. The `h2h-records-finish` run on 2026-09-21 is the worked example: the audit log records that the plain rebase failed and says nothing about which paths conflicted.
+
+Both rebase methods now snapshot the unmerged path set with `diff --name-only --diff-filter=U` **before** any `--abort`, store it on `LiveGit.last_conflict_files`, and the runner writes it to `audit.log` as `phase2: conflicted paths (plain rebase) = ...` and `phase2: conflicted paths (--onto) = ...`. On the two LLM-less paths the list is also appended to the raised detail or the decline reason, because no other channel exists there. The snapshot is independent of `inventory_conflicts()`, which returns `files=()` whenever it classifies a conflict as unresolvable, which is precisely when the operator most needs the list.
+
+This is diagnosis plumbing. No decision changes, no decline becomes a success, and the fail-closed contract is unchanged.

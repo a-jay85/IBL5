@@ -218,7 +218,7 @@ INSERT INTO ibl_franchise_seasons (franchise_id, season_year, season_ending_year
 INSERT INTO ibl_franchise_seasons (franchise_id, season_year, season_ending_year, team_city, team_name) VALUES
   (10, 2023, 2024, 'Charlotte',    'Hornets');
 
--- Retired franchise branding (ADR-0136). Migration 180 ships these same rows, but it
+-- Retired franchise branding (ADR-0136). Migration 182 ships these same rows, but it
 -- runs against an empty ibl_team_info (CI applies migrations *before* importing this
 -- seed), so its INSERT IGNORE is silently rejected by fk_era_franchise. Re-insert them
 -- here, after ibl_team_info is populated, so the era-branding join has data.

@@ -112,7 +112,7 @@ class HeadToHeadRecordsRepositoryTest extends DatabaseTestCase
         $this->insertRow('ibl_box_scores_teams', array_merge($commonCols, ['name' => 'Supersonics']));
         $this->insertRow('ibl_box_scores_teams', array_merge($commonCols, ['name' => 'Spurs']));
 
-        // Seed the era branding rows that migration 180 plants in production.
+        // Seed the era branding rows that migration 182 plants in production.
         // The migration's INSERT IGNORE may have been skipped in the test DB when
         // ibl_team_info wasn't yet populated (FK ordering), so we insert them here
         // inside the transaction (rolls back with the rest of the test fixture).
@@ -317,7 +317,7 @@ class HeadToHeadRecordsRepositoryTest extends DatabaseTestCase
     {
         $payload = $this->repo->buildTeamsMatrix('regular', 'current');
 
-        // Seattle Supersonics era: color1='00653A', color2='FFC200' per migration 180.
+        // Seattle Supersonics era: color1='00653A', color2='FFC200' per migration 182.
         $seattleEntry = null;
         foreach ($payload['axis'] as $entry) {
             if ($entry['key'] === '22|Seattle|Supersonics') {

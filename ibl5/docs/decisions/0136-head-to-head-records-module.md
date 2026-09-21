@@ -35,7 +35,7 @@ Every matrix is built from a de-duplicated game base: `MIN(id)` grouped by `(gam
 
 ### `ibl_franchise_era_branding`
 
-Retired identities need colors that `ibl_team_info` no longer carries. Migration 180 adds a six-column table (`id`, `franchise_id`, `team_city`, `team_name`, `color1`, `color2`) with a UNIQUE era key and an FK to `ibl_team_info.teamid`, seeded with six retired eras.
+Retired identities need colors that `ibl_team_info` no longer carries. Migration 182 adds a six-column table (`id`, `franchise_id`, `team_city`, `team_name`, `color1`, `color2`) with a UNIQUE era key and an FK to `ibl_team_info.teamid`, seeded with six retired eras.
 
 A 25-column clone of `ibl_team_info` was rejected. The matrix needs colors and nothing else; a clone would duplicate arena, owner, and finance columns that have no per-era meaning and would drift from `ibl_team_info` on every rebrand. Logos stay on disk and are found by `LogoResolver`, so the table holds no file paths.
 

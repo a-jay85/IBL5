@@ -1,4 +1,4 @@
--- 180: slim branding table for retired franchise identities (ADR-0136).
+-- 182: slim branding table for retired franchise identities (ADR-0136).
 -- One row per (franchise_id, team_city, team_name) era whose identity no
 -- longer matches ibl_team_info. Current identities are NOT stored here.
 CREATE TABLE IF NOT EXISTS `ibl_franchise_era_branding` (

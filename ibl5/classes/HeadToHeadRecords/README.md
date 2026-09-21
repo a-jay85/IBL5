@@ -28,7 +28,7 @@ HeadToHeadRecords/
 - **GM match via owner_name.** The `gms` dimension matches the logged-in user by looking up
   `owner_name` from `ibl_team_info` rather than by username, avoiding the GM-match bug present
   in earlier drafts.
-- **Migration 180.** Migration 180 creates the `ibl_franchise_era_branding` table, which stores
+- **Migration 182.** Migration 182 creates the `ibl_franchise_era_branding` table, which stores
   color and identity overrides for retired franchise eras. The module reads from the shared
   DatabaseCache table, populated on first warm-up or when `RefreshHeadToHeadRecordsStep` runs.
 - **CSS contract.** The view emits only class names styled by

@@ -122,6 +122,11 @@ def _verdict_findings(verdict_path: str) -> list[str]:
     verdict it is still held on. A NOT READY verdict whose findings are prose rather
     than bullets contributes its whole pre-digest body, so a shape the bullet regex
     does not recognise is never silently dropped.
+
+    The body is everything ABOVE the digest cut bar the verdict word lines themselves.
+    A real verdict states its 6d checks and their findings first and puts the 6e word
+    last, so reading only below the word would make every real verdict contribute
+    nothing and skip a remediation the loop is held on.
     """
     if parse_verdict(verdict_path) != "NOT READY":
         return []
@@ -131,11 +136,7 @@ def _verdict_findings(verdict_path: str) -> list[str]:
         if line.strip() == DIGEST_CUT:
             lines = lines[:i]
             break
-    last_word = -1
-    for i, line in enumerate(lines):
-        if VERDICT_RE.match(line):
-            last_word = i
-    body = lines[last_word + 1:]
+    body = [ln for ln in lines if not VERDICT_RE.match(ln)]
     bullets = [ln.strip() for ln in body if _FINDING_BULLET_RE.match(ln)]
     if bullets:
         return bullets

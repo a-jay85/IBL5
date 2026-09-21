@@ -539,7 +539,9 @@ def test_audit_rounds_three_round_loop_emits_one_per_round(tmp_path, monkeypatch
             llm, str(tmp_path), str(tmp_path), git, gh, _plan(),
             "diff", "body", 9802, "dead" * 10, TREE_1, False, logged.append, res,
         )
-        round_lines = [l for l in logged if "phase5.5 round " in l]
+        # One outcome line per round. Each round also logs its model and work-list
+        # sizes before the fixer runs, so filter on the outcome line specifically.
+        round_lines = [l for l in logged if "phase5.5 round " in l and "outcome=" in l]
         assert len(round_lines) == 3
     finally:
         _cleanup(9802, "9802-2", "9802-3", "9802-4")

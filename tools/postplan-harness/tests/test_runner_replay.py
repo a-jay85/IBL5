@@ -822,7 +822,7 @@ def test_dead_remediation_round_log_names_subtype(tmp_path, sticky_tmp):
     with open(os.path.join(out, "audit.log")) as fh:
         log_lines = fh.read().splitlines()
     assert any(
-        "phase5.5 round 1: remediation unavailable (llm-tooled-error)" in l
+        "phase5.5 round 1 attempt 1: remediation unavailable (llm-tooled-error)" in l
         and "subtype=error_max_turns" in l
         for l in log_lines
     ), f"expected dead-round log line with subtype; log:\n" + "\n".join(log_lines)
@@ -1259,7 +1259,7 @@ _PLAN_WITH_TEST_FOO = (
 def _patch_fidelity_with_remediation(monkeypatch, remediation_sha=None):
     """Monkeypatch _run_fidelity to set a READY verdict and optionally a remediation_sha."""
     def _fake(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_sha,
-              reviewed_tree, live, log, res, before_remediation=None):
+              reviewed_tree, live, log, res, before_remediation=None, **_kw):
         reviewed = reviewed_tree or "a" * 40
         verdict_file = os.path.join(out_dir, "verdict.md")
         with open(verdict_file, "w") as fh:

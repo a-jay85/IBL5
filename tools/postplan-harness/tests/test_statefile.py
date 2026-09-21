@@ -39,6 +39,7 @@ CANNED = {
         "commit_subject": "chore: replay commit",
         "summary_md": "## Summary\n- x\n",
     },
+    "body-check": {"corrected_body": "## Summary\n- x\n", "findings": []},
     "review-agent-a": [],
     "review-agent-b": [],
     "review-agent-d": [],

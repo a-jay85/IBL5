@@ -142,6 +142,52 @@ def name_status_from_diff(diff_text: str) -> list[tuple[str, str]]:
     return out
 
 
+def name_status_text(diff_text: str) -> str:
+    """Tab-separated status/path rows from unified diff, compatible with git --name-status."""
+    pairs = name_status_from_diff(diff_text)
+    if not pairs:
+        return ""
+    return "\n".join(f"{status}\t{path}" for status, path in pairs)
+
+
+def numstat_text(diff_text: str) -> str:
+    """Tab-separated added/deleted/path rows from unified diff, compatible with git --numstat.
+
+    Binary files emit '-\t-\tpath'.
+    """
+    lines = diff_text.splitlines()
+    result: list[str] = []
+    current_path: str | None = None
+    added = deleted = 0
+    is_binary = False
+
+    def flush() -> None:
+        if current_path is None:
+            return
+        if is_binary:
+            result.append(f"-\t-\t{current_path}")
+        else:
+            result.append(f"{added}\t{deleted}\t{current_path}")
+
+    for line in lines:
+        if line.startswith("diff --git "):
+            flush()
+            # Extract b-side path: "diff --git a/X b/Y" → Y
+            parts = line.split(" b/", 1)
+            current_path = parts[1] if len(parts) > 1 else line.split()[-1]
+            added = deleted = 0
+            is_binary = False
+        elif line.startswith("Binary files") and "differ" in line:
+            is_binary = True
+        elif line.startswith("+") and not line.startswith("+++"):
+            added += 1
+        elif line.startswith("-") and not line.startswith("---"):
+            deleted += 1
+
+    flush()
+    return "\n".join(result)
+
+
 def render_files_changed(diff_text: str) -> str:
     """Marker-delimited files-changed block derived from diff text.
 

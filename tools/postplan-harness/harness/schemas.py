@@ -195,6 +195,19 @@ def validate_pr_copy(data) -> None:
         raise HarnessError("schema", "commit_subject must start with its conventional-commit type")
 
 
+def validate_body_check(data) -> None:
+    """{corrected_body, findings} — PR-body-vs-diff verification."""
+    if not isinstance(data, dict):
+        raise HarnessError("schema", "body check must be a JSON object")
+    if "corrected_body" not in data or not isinstance(data["corrected_body"], str):
+        raise HarnessError("schema", "body check missing string field 'corrected_body'")
+    if "findings" not in data or not isinstance(data["findings"], list):
+        raise HarnessError("schema", "body check findings must be a JSON array")
+    for i, item in enumerate(data["findings"]):
+        if not isinstance(item, str):
+            raise HarnessError("schema", f"body check finding[{i}] must be a string")
+
+
 def coerce_commit_subject(subject: str, cls: Classification) -> str:
     """Decoration layer: re-type a commit subject against what the diff actually contains.
 

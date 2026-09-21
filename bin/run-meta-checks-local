@@ -30,6 +30,11 @@ Usage: bin/run-meta-checks-local [--base <sha>] [--pr <n>] [--body-file <path>]
   --self-test-hook <dir>  Override repo root for workflow YAML and bin/ scripts (test seam).
   --help, -h              Show this message.
 
+Environment:
+  META_CHECKS_ADVISORY_TIMEOUT  Seconds before an advisory step is abandoned
+                               (default 120). Hard gates are never timed out.
+                               Ignored when neither gtimeout nor timeout exists.
+
 Exit: 0 all hard gates passed  1 one or more hard gates failed
       2 usage error  3 could not parse workflow filters (fail-closed)
 EOF
@@ -254,6 +259,19 @@ if [ "$PRINT_FILTERS" = 1 ]; then
     exit 0
 fi
 
+# ─── Advisory step timeout ────────────────────────────────────────────────────
+# An advisory check is non-blocking by contract, so one that hangs must not hold
+# the whole run hostage -- a stalled advisory step is a worse outcome than a
+# missing advisory opinion. Hard gates are deliberately left unguarded: silently
+# converting a hard gate into a timeout would be a gate weakening.
+#
+# macOS ships neither `timeout` nor `gtimeout` by default. When neither resolves,
+# advisory steps run unguarded, exactly as they did before this wrapper existed.
+# META_CHECKS_TIMEOUT_BIN is a test seam -- setting it to the empty string forces
+# the unresolved path (note `-` not `:-`, so an explicit empty value wins).
+TIMEOUT_BIN="${META_CHECKS_TIMEOUT_BIN-$(command -v gtimeout || command -v timeout || true)}"
+ADVISORY_TIMEOUT="${META_CHECKS_ADVISORY_TIMEOUT:-120}"
+
 # ─── Step execution ───────────────────────────────────────────────────────────
 FAILED=""
 WARNED=""
@@ -265,14 +283,32 @@ HARD_RUN=0
 run_step() {
     local name="$1" gate="$2"; shift 2
     local out rc
-    out=$("$@" 2>&1); rc=$?
+    if [ "$gate" = "advisory" ] && [ -n "$TIMEOUT_BIN" ]; then
+        # -k: SIGKILL 10s after the SIGTERM, so a check that traps or ignores
+        # TERM still cannot hold the run.
+        # A child the check backgrounded may outlive the signal; measured, the
+        # command substitution still returns at the deadline rather than
+        # blocking on the pipe that child inherited, so the run proceeds.
+        out=$("$TIMEOUT_BIN" -k 10 "$ADVISORY_TIMEOUT" "$@" 2>&1); rc=$?
+    else
+        out=$("$@" 2>&1); rc=$?
+    fi
     if [ "$rc" -eq 0 ]; then
         printf 'PASS  %s\n' "$name"
         [ "$gate" = "hard" ] && HARD_RUN=$((HARD_RUN + 1))
         return 0
     fi
     if [ "$gate" = "advisory" ]; then
-        printf 'WARN  %s (advisory, not blocking)\n' "$name"
+        # 124 is timeout(1)'s exit code for "the command hit the deadline";
+        # 137 is 128+SIGKILL, what -k reports when TERM was ignored.
+        # Distinguished from a real advisory failure because an empty WARN body
+        # otherwise reads as a check that ran and simply printed nothing.
+        if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
+            printf 'WARN  %s (advisory, not blocking) -- timed out after %ss\n' \
+                "$name" "$ADVISORY_TIMEOUT"
+        else
+            printf 'WARN  %s (advisory, not blocking)\n' "$name"
+        fi
         printf '%s\n' "$out" | tail -40
         WARNED="$WARNED $name"
         return 0

@@ -122,10 +122,13 @@ make_repo() {
                  check-e2e-fa-offers-owner check-e2e-mutator-isolation \
                  check-hot-files check-orphan-css adr-check refactor-flag \
                  check-pr-collisions; do
-        varname="STUB_RC_$(printf '%s' "$sname" | tr '-' '_')"
+        base="$(printf '%s' "$sname" | tr '-' '_')"
         # Write stub using printf to avoid heredoc nesting issues.
-        printf '#!/bin/sh\n_varname="%s"\n_rc=$(eval "printf '"'"'%%s'"'"' \"\${${_varname}:-0}\"")\n[ "$_rc" != "0" ] && printf "stub %s failed\\n" >&2\nexit "$_rc"\n' \
-            "$varname" "$sname" > "$repo/bin/$sname"
+        # STUB_SLEEP_<name> (seconds, default 0) stalls the stub before it
+        # exits STUB_RC_<name> (default 0) -- the seam the advisory-timeout
+        # cases use to simulate a hung check.
+        printf '#!/bin/sh\n_sleep="${STUB_SLEEP_%s:-0}"\n[ "$_sleep" != "0" ] && sleep "$_sleep"\n_rc="${STUB_RC_%s:-0}"\n[ "$_rc" != "0" ] && printf "stub %s failed\\n" >&2\nexit "$_rc"\n' \
+            "$base" "$base" "$sname" > "$repo/bin/$sname"
         chmod +x "$repo/bin/$sname"
     done
 
@@ -409,6 +412,50 @@ while IFS= read -r fname; do
     fi
 done <<< "$RUNNER_FILTERS"
 if [ "$FILTER_PARITY_OK" -eq 1 ]; then pass "case l: filter-name bidirectional parity passes"; fi
+
+# ─── Case m: advisory step past the timeout → WARN, exit 0, no stall ────────
+# The stub sleeps 30s against a 1s budget: the assertion that matters is the
+# elapsed time, because a WARN alone would also appear if the runner had
+# patiently waited out the full sleep.
+if [ -n "$(command -v gtimeout || command -v timeout || true)" ]; then
+    REPO=$(make_repo "$FIXTURE_WORKFLOW_ALL")
+    BASE=$(get_base "$REPO")
+    printf 'x\n' > "$REPO/changed.txt"
+    git -C "$REPO" add .
+    git -C "$REPO" commit -q -m "add file"
+    M_START=$(date +%s)
+    run_check_both env STUB_SLEEP_check_hot_files=30 META_CHECKS_ADVISORY_TIMEOUT=1 \
+        "$REPO/bin/run-meta-checks-local" --self-test-hook "$REPO" --base "$BASE"
+    M_ELAPSED=$(( $(date +%s) - M_START ))
+    OUT="$_LAST_OUT"; RC="$_LAST_RC"
+    rm -rf "$REPO"
+    [ "$RC" -eq 0 ] && pass "case m: exit 0 when an advisory step times out" \
+                     || fail "case m: exit 0 when an advisory step times out (got $RC)"
+    want "case m: WARN names the timeout" "$OUT" "timed out after 1s"
+    want "case m: WARN keeps the advisory wording" "$OUT" "advisory, not blocking"
+    if [ "$M_ELAPSED" -lt 20 ]; then
+        pass "case m: run abandoned the 30s stub (${M_ELAPSED}s elapsed)"
+    else
+        fail "case m: run waited out the 30s stub (${M_ELAPSED}s elapsed)"
+    fi
+else
+    printf 'SKIP: case m (no gtimeout/timeout on PATH)\n'
+fi
+
+# ─── Case n: no timeout binary → advisory step runs unguarded, no crash ─────
+REPO=$(make_repo "$FIXTURE_WORKFLOW_ALL")
+BASE=$(get_base "$REPO")
+printf 'x\n' > "$REPO/changed.txt"
+git -C "$REPO" add .
+git -C "$REPO" commit -q -m "add file"
+run_check_both env META_CHECKS_TIMEOUT_BIN= STUB_RC_check_hot_files=1 \
+    "$REPO/bin/run-meta-checks-local" --self-test-hook "$REPO" --base "$BASE"
+OUT="$_LAST_OUT"; RC="$_LAST_RC"
+rm -rf "$REPO"
+[ "$RC" -eq 0 ] && pass "case n: exit 0 with no timeout binary resolved" \
+                 || fail "case n: exit 0 with no timeout binary resolved (got $RC)"
+want "case n: advisory step still ran unguarded" "$OUT" "WARN  check-hot-files"
+absent "case n: no timeout wording when unguarded" "$OUT" "timed out after"
 
 # ─── Results ─────────────────────────────────────────────────────────────────
 printf '\n%d passed, %d failed\n' "$PASS" "$FAIL"

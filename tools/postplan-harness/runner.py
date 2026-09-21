@@ -39,7 +39,8 @@ from harness import (adr_draft, ciwatch, conformance, fidelity, llm_calls, manua
 from harness.armable import (ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance,
                              select_fidelity_verdict)
-from harness.classify import (BACKLOG_REPO, classify, files_from_diff, modified_files_from_diff,
+from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_END,
+                              classify, files_from_diff, modified_files_from_diff,
                               qualify_backlog_refs,
                               render_files_changed, render_manual_confirmation,
                               render_reviewer_verification, strip_manual_testing_section,
@@ -716,6 +717,31 @@ _MAX_PUSH_RETRIES = 3
 _TRANSIENT_ROUND_KINDS = ("llm-invalid-output", "llm-tooled-cli", "llm-tooled-empty")
 _TRANSIENT_ROUND_REASONS = ("no-edits",)
 _MAX_ROUND_RETRIES = 1
+
+# A body-only round: the fixer answered the finding in the PR body with its own raw
+# `gh pr edit` and committed nothing. That is real work, so it takes a truthy stand-in
+# sha and flows through the same re-review path a committed round does. Neither string
+# below belongs in _TRANSIENT_ROUND_REASONS -- re-running the same fixer against a
+# finding it has already answered in the body just re-answers it.
+BODY_ONLY_SHA = "body-only"
+BODY_FETCH_FAILED_REASON = "body-fetch-failed"
+
+
+def _body_signature(body: str | None) -> str:
+    """The comparable part of a PR body: everything outside the files-changed block.
+
+    Phase 5.5 rewrites <!-- files-changed:begin -->..<!-- files-changed:end --> on every
+    round, so that block churns whenever the diff grows and says nothing about whether
+    the fixer touched the body. Strip it, then strip surrounding whitespace; what is
+    left is the prose a human or an agent wrote. An unbalanced marker pair is left
+    intact rather than guessed at -- the same bounds check upsert_files_changed uses.
+    """
+    text = body or ""
+    begin = text.find(FILES_CHANGED_BEGIN)
+    end = text.find(FILES_CHANGED_END)
+    if begin != -1 and end != -1 and end > begin:
+        text = text[:begin] + text[end + len(FILES_CHANGED_END):]
+    return text.strip()
 
 
 def _round_model(round_num: int) -> str:

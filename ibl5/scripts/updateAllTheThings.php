@@ -251,11 +251,10 @@ try {
         $boxscoreProcessor, $boxscoreView, $sourceResolver,
     ));
 
-    /** @phpstan-ignore argument.type */
-    $updaterService->addStep(new Updater\Steps\RefreshHeadToHeadRecordsStep($mysqli_db));
-
-    // IBL-only: All-Star games don't exist in Olympics
+    // IBL-only: Head-to-Head Records, All-Star games, and related steps don't apply to Olympics
     if (!$isOlympics) {
+        /** @phpstan-ignore argument.type */
+        $updaterService->addStep(new Updater\Steps\RefreshHeadToHeadRecordsStep($mysqli_db));
         $updaterService->addStep(new Updater\Steps\ProcessAllStarGamesStep(
             $boxscoreProcessor, $boxscoreRepo, $boxscoreView, $sourceResolver,
         ));

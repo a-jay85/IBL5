@@ -205,12 +205,12 @@ class PromotePriorSeasonSnapshotTest extends DatabaseTestCase
 
     public function testCopiesCreatedAtFromTheSourceRow(): void
     {
-        $this->seedSnapshot(202000008, 2008, 'mid-season', ['created_at' => '2026-01-15 10:00:00', 'phantom_games' => 7]);
+        $this->seedSnapshot(202000008, 2008, 'mid-season', ['created_at' => '2026-01-15 10:00:00', 'phantom_games' => 7, 'po_phantom_games' => 1]);
 
         (new PlrParserRepository($this->db))->promotePriorSeasonSnapshots(2008);
 
         $stmt = $this->db->prepare(
-            'SELECT created_at, phantom_games FROM ibl_plr_snapshots WHERE pid = ? AND season_year = ? AND snapshot_phase = ?'
+            'SELECT created_at, phantom_games, po_phantom_games FROM ibl_plr_snapshots WHERE pid = ? AND season_year = ? AND snapshot_phase = ?'
         );
         self::assertNotFalse($stmt);
         $pid   = 202000008;
@@ -224,6 +224,7 @@ class PromotePriorSeasonSnapshotTest extends DatabaseTestCase
         self::assertNotNull($row);
         self::assertSame('2026-01-15 10:00:00', $row['created_at']);
         self::assertSame(7, (int) $row['phantom_games']);
+        self::assertSame(1, (int) $row['po_phantom_games']);
     }
 
     public function testCopiesEveryNonIdentityColumnVerbatim(): void
@@ -234,12 +235,13 @@ class PromotePriorSeasonSnapshotTest extends DatabaseTestCase
         // phantom_games is seeded non-zero on purpose — it was the column the
         // promotion dropped, and this is the assertion that a source value survives.
         $this->seedSnapshot(202000013, 2008, 'mid-season', [
-            'stats_gm'      => 77,
-            'phantom_games' => 7,
-            'stats_pts'     => 1234,
-            'talent'        => 61,
-            'salary_yr1'    => 9500,
-            'created_at'    => '2026-01-15 10:00:00',
+            'stats_gm'        => 77,
+            'phantom_games'   => 7,
+            'po_phantom_games' => 1,
+            'stats_pts'       => 1234,
+            'talent'          => 61,
+            'salary_yr1'      => 9500,
+            'created_at'      => '2026-01-15 10:00:00',
         ]);
 
         (new PlrParserRepository($this->db))->promotePriorSeasonSnapshots(2008);

@@ -195,6 +195,31 @@ class ScheduleReconciliationAuditTest extends DatabaseTestCase
         self::assertStringContainsString('4', $finding->detail);
     }
 
+    /**
+     * Playoff-month duplicate triples are phantoms, not legitimate repeats (ADR-0109 amendment).
+     */
+    public function testDuplicateTripleInPlayoffMonthIsReported(): void
+    {
+        // 2008-06-05: month 6 → game_type = 2 (playoffs)
+        $this->insertScheduleRow(2008, '2008-06-05', 3, 105, 7, 98);
+
+        // Two boxscore rows for the same triple at gotd=1 and gotd=4.
+        $this->insertTeamBoxscoreRow('2008-06-05', 'Metros', 1, 3, 7);
+        $this->insertTeamBoxscoreRow('2008-06-05', 'Metros', 4, 3, 7);
+
+        $report = $this->audit->run(2008);
+
+        $dupes = array_filter(
+            $report->findings,
+            static fn (AuditFinding $f): bool => $f->kind === AuditFinding::KIND_DUPLICATE_TRIPLE
+        );
+        self::assertCount(1, $dupes, 'Expected exactly one duplicate-triple finding for a June date');
+        $finding = array_values($dupes)[0];
+        self::assertSame(AuditFinding::SEVERITY_ERROR, $finding->severity);
+        self::assertStringContainsString('1', $finding->detail);
+        self::assertStringContainsString('4', $finding->detail);
+    }
+
     // ── Anti-regression: quadruple-header game_of_that_day ──────────────────
 
     /**

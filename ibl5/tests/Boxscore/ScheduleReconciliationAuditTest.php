@@ -49,7 +49,13 @@ final class ScheduleReconciliationAuditTest extends TestCase
 
             public function fetchScheduledGameIndex(int $seasonYear): array { return $this->scheduleIndex; }
             public function findOrphanBoxscoreGames(int $seasonYear): array { return $this->orphans; }
-            public function findDuplicateTripleGames(?int $seasonYear = null, ?int $gameType = null): array { return $this->duplicates; }
+            public function findDuplicateTripleGames(?int $seasonYear = null, ?int $gameType = null): array
+            {
+                if ($gameType !== null) {
+                    throw new \LogicException('audit must query duplicate triples unscoped by game type');
+                }
+                return $this->duplicates;
+            }
             public function findScheduledGamesWithoutBoxscores(int $seasonYear): array { return $this->missing; }
 
             // Unused methods — throw to catch accidental calls

@@ -396,12 +396,12 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
     {
         // Promotion copies more columns than upsertSnapshot() writes. SNAPSHOT_COLUMNS is
         // the parser's write set: upsertSnapshot() reads $data[$col] for each entry, so a
-        // column the parser never produces cannot live there. phantom_games and created_at
-        // both exist on the row and must survive the copy, so they are appended here only.
-        // Each append is guarded: were either later added to SNAPSHOT_COLUMNS, an
+        // column the parser never produces cannot live there. phantom_games, po_phantom_games,
+        // and created_at all exist on the row and must survive the copy, so they are appended
+        // here only. Each append is guarded: were any later added to SNAPSHOT_COLUMNS, an
         // unconditional append would name it twice and the INSERT would error.
         $columns = self::SNAPSHOT_COLUMNS;
-        foreach (['phantom_games', 'created_at'] as $extraColumn) {
+        foreach (['phantom_games', 'po_phantom_games', 'created_at'] as $extraColumn) {
             if (!in_array($extraColumn, $columns, true)) {
                 $columns[] = $extraColumn;
             }

@@ -333,6 +333,18 @@ def test_rebase_conflict_verbatim():
                     "Resolve the rebase, then re-run bin/post-plan-now.")
 
 
+def test_rebase_conflict_line_unchanged():
+    """Row 34: the auto-resolve work must not perturb the exit-3 RESULT string.
+    Pinned as a literal so any reword of the blocked arm fails here."""
+    r = _res(TerminalState.FAILED, error_kind="rebase-conflict")
+    line = runner.verdict_line(r, 3)
+    assert line == ("RESULT: post-plan BLOCKED — rebase conflict on a stacked branch, "
+                    "human required; ERROR terminal=failed, no PR opened. "
+                    "Resolve the rebase, then re-run bin/post-plan-now.")
+    assert "auto-resolved" not in line
+    assert "CONFLICT-REVIEW" not in line
+
+
 def test_rebase_conflict_is_single_line():
     r = _res(TerminalState.FAILED, error_kind="rebase-conflict")
     line = runner.verdict_line(r, 3)
@@ -382,3 +394,41 @@ def test_rc3_verdict_stays_one_line_for_a_multiline_gate_detail():
     r = RunResult(terminal=TerminalState.FAILED, error_kind="local-gate",
                   error="FAIL a.md 16374 bytes\nOne or more checks failed:\nTrim the rule(s) above")
     assert "\n" not in runner.verdict_line(r, 3)
+
+
+def test_autoresolved_files_surfaced(tmp_path):
+    """verdict_line includes auto-resolved filenames when the /tmp sidecar file exists."""
+    slug = "autoresolved-surfaced-test"
+    autoresolved_path = f"/tmp/postplan-conflict-files-{slug}-autoresolved.txt"
+    try:
+        with open(autoresolved_path, "w") as fh:
+            fh.write("harness/conflict.py\nharness/adapters/gitad.py\n")
+        r = _res(TerminalState.SHIPPED_ARMED, pr_number=99, arm=_arm(True))
+        r.slug = slug
+        line = runner.verdict_line(r, 0)
+        assert "auto-resolved conflict in" in line
+        assert "harness/conflict.py" in line
+        assert "harness/adapters/gitad.py" in line
+    finally:
+        if os.path.exists(autoresolved_path):
+            os.unlink(autoresolved_path)
+
+
+def test_behind_retry_cap_line_carries_autoresolved_files():
+    """The BEHIND-cap BLOCKED line embeds `tail`, so an auto-resolved conflict must
+    still reach the operator on the blocked path — not only the complete path."""
+    slug = "behind-cap-autoresolved-test"
+    autoresolved_path = f"/tmp/postplan-conflict-files-{slug}-autoresolved.txt"
+    try:
+        with open(autoresolved_path, "w") as fh:
+            fh.write("harness/conflict.py\n")
+        r = _res(TerminalState.SHIPPED_HELD, pr_number=77, ci_outcome="green",
+                 retry_cap="behind-retry-cap", arm=_arm(False))
+        r.slug = slug
+        line = runner.verdict_line(r, 0)
+        assert "BEHIND retry cap reached" in line
+        assert "auto-resolved conflict in harness/conflict.py" in line
+        assert "\n" not in line
+    finally:
+        if os.path.exists(autoresolved_path):
+            os.unlink(autoresolved_path)

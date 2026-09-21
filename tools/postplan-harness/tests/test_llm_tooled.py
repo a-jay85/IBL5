@@ -166,6 +166,15 @@ def test_fixture_empty_allowlist_rejected():
     assert exc.value.kind == "llm-tooled-no-tools"
 
 
+def test_tooled_call_refuses_empty_allowlist(shim, tmp_path):
+    """Characterization: call_tooled(allowed_tools=()) raises HarnessError(llm-tooled-no-tools) — resolver depends on this invariant."""
+    with pytest.raises(HarnessError) as exc:
+        _cli(tmp_path).call_tooled("conflict-resolve:a.py", "sonnet", "p",
+                                   cwd=str(tmp_path), allowed_tools=())
+    assert exc.value.kind == "llm-tooled-no-tools"
+    assert shim.read_text() == ""          # zero CLI invocations
+
+
 # --- toolless regression ------------------------------------------------------
 
 def test_toolless_call_still_single_turn_no_tools(shim, tmp_path, monkeypatch):

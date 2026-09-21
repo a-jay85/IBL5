@@ -10,15 +10,21 @@ declare(strict_types=1);
  * @see \HeadToHeadRecords\HeadToHeadRecordsController For filter logic
  */
 
-if (!preg_match('/modules\.php/i', $_SERVER['PHP_SELF'])) {
+$phpSelf = is_string($_SERVER['PHP_SELF']) ? $_SERVER['PHP_SELF'] : '';
+if (preg_match('/modules\.php/i', $phpSelf) === 0) {
     die("You can't access this file directly...");
 }
 
 global $mysqli_db, $user, $leagueContext;
+/** @var \mysqli $mysqli_db */
+/** @var object|null $user */
+/** @var \League\LeagueContext|null $leagueContext */
 
 $season      = new \Season\Season($mysqli_db, $leagueContext);
 $logoResolver = new \HeadToHeadRecords\LogoResolver();
-$imageRoot   = $_SERVER['DOCUMENT_ROOT'] . '/ibl5/images/logo';
+/** @var string $docRoot */
+$docRoot   = $_SERVER['DOCUMENT_ROOT'];
+$imageRoot = $docRoot . '/ibl5/images/logo';
 
 $innerRepo = new \HeadToHeadRecords\HeadToHeadRecordsRepository(
     $mysqli_db,

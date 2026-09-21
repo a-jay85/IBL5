@@ -79,7 +79,9 @@ class HeadToHeadRecordsController
      */
     public function main(): void
     {
-        $f = $this->resolveFilters($_POST);
+        /** @var array<string, mixed> $post */
+        $post = $_POST;
+        $f = $this->resolveFilters($post);
 
         $payload = match ($f['dimension']) {
             'franchises' => $this->repo->buildFranchisesMatrix($f['phase'], $f['scope']),
@@ -88,6 +90,7 @@ class HeadToHeadRecordsController
             default      => $this->repo->buildFranchisesMatrix($f['phase'], $f['scope']),
         };
 
+        // @phpstan-ignore ibl.echoInNonView
         echo $this->view->renderFilterForm($f['dimension'], $f['phase'], $f['scope'])
             . $this->view->renderMatrix($payload, $this->resolveUserMatchKeys($f['dimension'], $payload))
             . $this->view->renderTapTooltipScript();
@@ -145,7 +148,7 @@ class HeadToHeadRecordsController
      */
     protected function lookupOwnerName(int $teamid): ?string
     {
-        $stmt = $this->db->prepare('SELECT owner_name FROM ibl_team_info WHERE teamid = ?');
+        $stmt = $this->db->prepare('SELECT owner_name FROM `ibl_team_info` WHERE teamid = ?');
         if ($stmt === false) {
             return null;
         }

@@ -88,3 +88,13 @@ def test_manual_testing_section_numbers_are_never_rewritten():
     result = correct_body_numbers(body, _NAME_STATUS, _NUMSTAT)
     assert "2 files changed" in result
     assert "3 files changed" not in result
+
+
+def test_body_number_facts_extracts_all_fields():
+    facts = body_number_facts(_NAME_STATUS, _NUMSTAT)
+    assert isinstance(facts, BodyNumberFacts)
+    assert facts.files_changed == 3
+    assert facts.lines_added == 125
+    assert facts.lines_deleted == 32
+    assert facts.migration_numbers == ("047",)
+    assert facts.adr_numbers == ("0131",)

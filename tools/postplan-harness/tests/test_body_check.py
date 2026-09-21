@@ -102,12 +102,17 @@ def test_body_check_skipped_when_pr_copy_degraded():
 
 
 def test_body_check_uses_pr_body_fresh_on_clean_rerun():
-    """On the pr-copy skip path, _body_check must call pr_body_fresh(), not pr_body() directly."""
-    fresh_calls = []
+    """On the pr-copy skip path, _body_check must call pr_body_fresh() exactly once and
+    must not call pr_body() before pr_body_fresh() (row 22 mutation guard)."""
+    body_reads: list[str] = []
 
     class _TrackingGh(runner.RecordingGh):
+        def pr_body(self) -> str:
+            body_reads.append("direct")
+            return super().pr_body()
+
         def pr_body_fresh(self):
-            fresh_calls.append(1)
+            body_reads.append("fresh")
             self._body_override = None
             return (self.fixture.get("pr_meta") or {}).get("body") or ""
 
@@ -124,17 +129,29 @@ def test_body_check_uses_pr_body_fresh_on_clean_rerun():
         runner.RecordingGh = orig_gh
 
     assert res.terminal != TerminalState.FAILED, res.error
-    assert len(fresh_calls) >= 1, "pr_body_fresh() was not called"
+    assert body_reads.count("fresh") == 1, (
+        f"pr_body_fresh() must be called exactly once, got {body_reads.count('fresh')}")
+    assert body_reads[0] == "fresh", (
+        "_body_check must call pr_body_fresh() not pr_body(); "
+        f"first body read was {body_reads[0]!r}")
 
 
 def test_body_check_does_not_edit_live_body_on_skip_path():
-    """On the clean-tree rerun, summary_md stays '' so body-check correction is not written back."""
+    """On the clean-tree rerun, summary_md stays '' so body-check correction is not
+    written back. Checks: (a) sentinel absent from pr_edit_body and (b) the commit
+    message body is empty — both required to catch the row 23 named mutation."""
     sentinel = "99-files-changed-sentinel"
+    commit_messages_log: list[str] = []
 
     class _TrackingGh(runner.RecordingGh):
         def pr_body_fresh(self):
             self._body_override = None
             return "## Summary\n- 1 file changed\n"
+
+    class _TrackingGit(runner.ReplayGit):
+        def commit_all(self, message: str) -> str:
+            commit_messages_log.append(message)
+            return super().commit_all(message)
 
     out = tempfile.mkdtemp()
     canned_with_correction = dict(CANNED)
@@ -147,18 +164,27 @@ def test_body_check_does_not_edit_live_body_on_skip_path():
     fx["pr_meta"] = dict(fx["pr_meta"], title="feat: widget")
 
     orig_gh = runner.RecordingGh
+    orig_git = runner.ReplayGit
     try:
         runner.RecordingGh = _TrackingGh
+        runner.ReplayGit = _TrackingGit
         res = runner.run(fx, out, FixtureLlm(UsageLedger(), canned_no_copy), mode="replay")
     finally:
         runner.RecordingGh = orig_gh
+        runner.ReplayGit = orig_git
 
     assert res.terminal != TerminalState.FAILED, res.error
-    # The sentinel from corrected_body must NOT appear in any pr_edit_body action
+    # (a) sentinel must NOT appear in any pr_edit_body action
     for act in _actions(out):
         if act.get("action") == "pr_edit_body":
             assert sentinel not in act.get("body", ""), (
                 f"sentinel leaked into pr_edit_body: {act.get('body', '')[:200]!r}")
+    # (b) commit message body must be empty — summary_md stayed ""
+    assert commit_messages_log, "commit_all was never called"
+    msg_body = (commit_messages_log[0].split("\n\n", 1)[1]
+                if "\n\n" in commit_messages_log[0] else "")
+    assert not msg_body.strip(), (
+        f"commit message body is not empty — summary_md was written back: {msg_body[:100]!r}")
 
 
 def test_body_check_degradation_joins_degraded_agents_and_holds_arming():

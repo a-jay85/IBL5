@@ -3,7 +3,7 @@ description: Replace SeriesRecords with a Teams/Franchises/GMs head-to-head matr
 last_verified: 2026-09-20
 ---
 
-# ADR-0134: Head-to-Head Records Module
+# ADR-0136: Head-to-Head Records Module
 
 **Status:** Accepted
 **Date:** 2026-09-20

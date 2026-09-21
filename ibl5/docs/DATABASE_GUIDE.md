@@ -19,7 +19,7 @@ last_verified: 2026-09-20
 ### Key Tables
 - **Players:** `ibl_plr` (main), `ibl_hist` (VIEW over `ibl_plr_snapshots`)
 - **Teams:** `ibl_team_info`, `ibl_standings`
-- **Retired franchise identities:** `ibl_franchise_era_branding` (`id`, `franchise_id`, `team_city`, `team_name`, `color1`, `color2`); UNIQUE on the era triple, FK `franchise_id` → `ibl_team_info.teamid` ON DELETE CASCADE. Holds colors for identities `ibl_team_info` no longer carries, such as the Seattle Supersonics. Seeded by migration 180 and read by the HeadToHeadRecords `teams` and `gms` matrices (ADR-0134).
+- **Retired franchise identities:** `ibl_franchise_era_branding` (`id`, `franchise_id`, `team_city`, `team_name`, `color1`, `color2`); UNIQUE on the era triple, FK `franchise_id` → `ibl_team_info.teamid` ON DELETE CASCADE. Holds colors for identities `ibl_team_info` no longer carries, such as the Seattle Supersonics. Seeded by migration 180 and read by the HeadToHeadRecords `teams` and `gms` matrices (ADR-0136).
 - **Games:** `ibl_schedule`, `ibl_box_scores`, `ibl_box_scores_teams`
 - **Contracts:** `ibl_fa_offers`, `ibl_trade_*` tables
 - **Draft:** `ibl_draft`, `ibl_draft_picks`

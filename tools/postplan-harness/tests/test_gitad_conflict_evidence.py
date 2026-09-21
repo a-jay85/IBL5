@@ -55,9 +55,7 @@ def _sha(d, ref="HEAD"):
 
 
 def _commit(d, path, body, message):
-    full = os.path.join(d, path)
-    os.makedirs(os.path.dirname(full), exist_ok=True) if os.path.dirname(path) else None
-    open(full, "w").write(body)
+    open(os.path.join(d, path), "w").write(body)
     sh(d, "add", "-A")
     sh(d, "commit", "-m", message)
     return _sha(d)
@@ -102,7 +100,6 @@ def test_llm_less_abort_names_conflicted_paths(repo_with_origin):
     detail ends in 'conflicted: ?' and last_conflict_files == ().
     """
     d = repo_with_origin
-    a = _sha(d)
     _commit(d, "x.txt", "shared\n", "X0")
     sh(d, "update-ref", "refs/remotes/origin/master", _sha(d))
     x0 = _sha(d)
@@ -118,7 +115,6 @@ def test_llm_less_abort_names_conflicted_paths(repo_with_origin):
     assert g.last_conflict_files == ("x.txt",)
     assert _sha(d) == f1
     assert _no_rebase_in_progress(d)
-    assert a  # base commit existed; keeps the fixture shape explicit
 
 
 def test_llm_path_snapshot_survives_unresolvable_inventory(repo_with_origin):
@@ -139,8 +135,12 @@ def test_llm_path_snapshot_survives_unresolvable_inventory(repo_with_origin):
     _publish_as_origin_master(d, x0, "x.txt", "shared\nmore\n", "T1")
 
     g = LiveGit(d, llm=object())          # sentinel: any .call() would raise AttributeError
-    with pytest.raises(HarnessError):
+    with pytest.raises(HarnessError) as ei:
         g.rebase_onto("origin/master")
+    # Discriminates the branch taken: abort_and_restore reasons are left suffix-free by
+    # design, so an unsuffixed detail proves this went through the LLM path, not the
+    # LLM-less one (which raises the same kind with a populated snapshot).
+    assert " | conflicted: " not in ei.value.detail
     assert g.last_conflict_files == ("x.txt",)
     assert _no_rebase_in_progress(d)
 

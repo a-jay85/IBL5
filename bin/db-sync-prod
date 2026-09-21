@@ -6,7 +6,10 @@
 # and bin/wt-up --prod (worktrees) both invoke it. Handles STORED GENERATED
 # tables like ibl_box_scores via dedicated --no-create-info passes.
 #
-# Usage: bin/db-sync-prod [worktree-name] [--snapshot <file.sql.gz>]
+# Usage: bin/db-sync-prod [worktree-name] [--snapshot <file.sql.gz> [--print-plan]]
+#
+# --print-plan is NOT a dry run for the prod path — it only prints the snapshot
+# load pipeline, so it requires --snapshot. See .claude/rules/db-sync-prod-dry-run.md
 #
 # Target resolution (in order):
 #   1. <worktree-name> argument → <WT_PARENT>/<name>/.wt-slug
@@ -44,6 +47,16 @@ while [ $# -gt 0 ]; do
     *) WORKTREE_ARG="$1"; shift ;;
   esac
 done
+
+# --print-plan plans the snapshot load and nothing else; the prod path has no dry
+# run. Bare --print-plan used to be accepted and silently ignored, so an invocation
+# that reads as a preview ran the real destructive sync (and, because the preflight
+# below also keys on PRINT_PLAN, ran it without the mariadb keg-path fix).
+if $PRINT_PLAN && [ -z "$SNAPSHOT" ]; then
+  echo "ERROR: --print-plan requires --snapshot <file.sql.gz>." >&2
+  echo "  There is no dry run for the prod sync path — without --snapshot this would have run the real sync." >&2
+  exit 1
+fi
 
 if [ -n "$SNAPSHOT" ]; then
   if [ ! -f "$SNAPSHOT" ] || [ ! -r "$SNAPSHOT" ]; then

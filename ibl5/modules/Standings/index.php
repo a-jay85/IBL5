@@ -33,8 +33,7 @@ if ($leagueContext !== null && $leagueContext->isOlympics()) {
     $realTeamIds = \League\OlympicsTeamFilter::getRealTeamIds($mysqli_db);
     $view = new Standings\OlympicsStandingsView($repository, $season->endingYear, $realTeamIds);
 } else {
-    $seriesRecordsService = new SeriesRecords\SeriesRecordsService();
-    $view = new Standings\StandingsView($repository, $season->endingYear, $seriesRecordsService);
+    $view = new Standings\StandingsView($repository, $season->endingYear);
 }
 
 // Render and output the standings

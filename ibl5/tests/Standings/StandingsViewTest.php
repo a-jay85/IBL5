@@ -6,7 +6,6 @@ namespace Tests\Standings;
 
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
-use SeriesRecords\SeriesRecordsService;
 use Standings\StandingsRepository;
 use Standings\StandingsView;
 use Standings\Contracts\StandingsRepositoryInterface;
@@ -29,7 +28,7 @@ class StandingsViewTest extends TestCase
     {
         $this->mockRepository = $this->createMock(StandingsRepositoryInterface::class);
         $this->mockRepository->method('getSeriesRecords')->willReturn([]);
-        $this->view = new StandingsView($this->mockRepository, 2025, new SeriesRecordsService());
+        $this->view = new StandingsView($this->mockRepository, 2025);
     }
 
     /**
@@ -728,6 +727,28 @@ class StandingsViewTest extends TestCase
         return $mock;
     }
 
+    public function testRenderRegionWithNoSeriesRecordsAppliesNoH2hTiebreak(): void
+    {
+        // Same tied pair as the H2H test, but the repository returns no series
+        // records at all. The inlined buildSeriesMatrix() must produce an empty
+        // matrix and the view must fall back to SQL order without raising a
+        // notice on the missing [self][opponent] lookup.
+        $teamData = [
+            $this->makeTeamData(['teamid' => 11, 'team_name' => 'Lakers', 'wins' => 40, 'gamesBack' => '5.0']),
+            $this->makeTeamData(['teamid' => 10, 'team_name' => 'Grizzlies', 'wins' => 40, 'gamesBack' => '5.0']),
+        ];
+
+        $mock = $this->createMockWithH2H($teamData, []);
+        $view = new StandingsView($mock, 2025);
+        $result = $view->renderRegion('Western');
+
+        $lakersPos = strpos($result, 'Lakers');
+        $grizzPos = strpos($result, 'Grizzlies');
+        $this->assertIsInt($lakersPos);
+        $this->assertIsInt($grizzPos);
+        $this->assertLessThan($grizzPos, $lakersPos, 'With no series records the SQL order must be preserved');
+    }
+
     public function testTwoTeamH2HTiebreakerSortsWinnerFirst(): void
     {
         // Grizzlies (teamid=10) and Lakers (teamid=11) tied on GB/clinch/wins
@@ -743,7 +764,7 @@ class StandingsViewTest extends TestCase
         ];
 
         $mock = $this->createMockWithH2H($teamData, $seriesRecords);
-        $view = new StandingsView($mock, 2025, new SeriesRecordsService());
+        $view = new StandingsView($mock, 2025);
         $result = $view->renderRegion('Western');
 
         // Grizzlies (3-2 H2H) should appear before Lakers (2-3 H2H)
@@ -776,7 +797,7 @@ class StandingsViewTest extends TestCase
         ];
 
         $mock = $this->createMockWithH2H($teamData, $seriesRecords);
-        $view = new StandingsView($mock, 2025, new SeriesRecordsService());
+        $view = new StandingsView($mock, 2025);
         $result = $view->renderRegion('Midwest');
 
         // Mavericks (6-3, .667) > Warriors (4-3, .571) > Jazz (2-6, .250)
@@ -804,7 +825,7 @@ class StandingsViewTest extends TestCase
         ];
 
         $mock = $this->createMockWithH2H($teamData, $seriesRecords);
-        $view = new StandingsView($mock, 2025, new SeriesRecordsService());
+        $view = new StandingsView($mock, 2025);
         $result = $view->renderRegion('Eastern');
 
         // TeamA should still be first despite worse H2H (different GB)
@@ -829,7 +850,7 @@ class StandingsViewTest extends TestCase
         ];
 
         $mock = $this->createMockWithH2H($teamData, $seriesRecords);
-        $view = new StandingsView($mock, 2025, new SeriesRecordsService());
+        $view = new StandingsView($mock, 2025);
         $result = $view->renderRegion('Eastern');
 
         // Both have equal H2H (.500), so original order preserved
@@ -877,7 +898,7 @@ class StandingsViewTest extends TestCase
         ];
 
         $mock = $this->createMockWithH2H($teamData, $seriesRecords);
-        $view = new StandingsView($mock, 2025, new SeriesRecordsService());
+        $view = new StandingsView($mock, 2025);
         $result = $view->renderRegion('Atlantic');
 
         $winnerPos = strpos($result, 'Winner');

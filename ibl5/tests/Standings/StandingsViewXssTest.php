@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Standings;
 
 use PHPUnit\Framework\TestCase;
-use SeriesRecords\Contracts\SeriesRecordsServiceInterface;
 use Standings\Contracts\StandingsRepositoryInterface;
 use Standings\StandingsView;
 
@@ -54,10 +53,7 @@ final class StandingsViewXssTest extends TestCase
         $stubRepo->method('getAllPythagoreanStats')->willReturn([]);
         $stubRepo->method('getSeriesRecords')->willReturn([]);
 
-        $stubSeriesService = self::createStub(SeriesRecordsServiceInterface::class);
-        $stubSeriesService->method('buildSeriesMatrix')->willReturn([]);
-
-        $view = new StandingsView($stubRepo, 2025, $stubSeriesService);
+        $view = new StandingsView($stubRepo, 2025);
         $html = $view->renderRegion('Eastern');
 
         $this->assertStringContainsString($escaped, $html);

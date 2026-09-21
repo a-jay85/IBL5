@@ -175,7 +175,7 @@ Security -> Clock
 SeriesRecords -> League Repositories Security UI
 Settings -> Season
 SimRecap -> JsbParser LastSimRecap League PageLayout Security
-Standings -> League Security SeriesRecords UI
+Standings -> League Security UI
 Team -> Auth BasketballStats Discord Http League Player Repositories Season Security Trading UI
 TeamOffDefStats -> BasketballStats League Security UI
 TeamSchedule -> BasketballStats League LeagueSchedule Season Security Team

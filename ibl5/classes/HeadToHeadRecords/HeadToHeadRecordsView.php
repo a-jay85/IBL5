@@ -43,7 +43,8 @@ final class HeadToHeadRecordsView
             'all'     => 'All-Time',
         ];
 
-        $out  = '<form method="post" action="modules.php?name=HeadToHeadRecords" class="h2h-filter">';
+        $out  = '<h1 class="ibl-title">Head-to-Head Records</h1>';
+        $out .= '<form method="post" action="modules.php?name=HeadToHeadRecords" class="h2h-filter">';
         $out .= $this->renderSelect('dimension', 'Dimension', $dimOpts, $dimension);
         $out .= $this->renderSelect('phase', 'Phase', $phaseOpts, $phase);
         $out .= $this->renderSelect('scope', 'Scope', $scopeOpts, $scope);
@@ -89,7 +90,8 @@ final class HeadToHeadRecordsView
         $out  = '<div class="h2h-matrix-wrap">';
         $out .= '<table class="h2h-matrix ibl-data-table">';
         $out .= '<thead><tr>';
-        $out .= '<th></th>';
+        // Corner cell: empty to sighted readers, labelled for screen readers.
+        $out .= '<th><span class="sr-only">Team</span></th>';
         foreach ($axis as $entry) {
             $out .= $this->renderColumnHeader($entry);
         }

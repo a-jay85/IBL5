@@ -13,17 +13,31 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from harness.adapters.gitad import LiveGit
 from harness.conflict import (
     MAX_RESOLVE_ROUNDS,
     ConflictInventory,
     ConflictResolutionResult,
     abort_and_restore,
+    inventory_conflicts,
     purge_verdict_artifacts,
     resolve_all,
     resolve_one,
     review_resolution,
 )
 from harness.state import HarnessError
+
+_REPO_ROOT = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+)
+_COLLAPSE = os.path.join(
+    _REPO_ROOT, ".claude", "skills", "pr-ready", "scripts", "collapse-guard.sh"
+)
+_LOSTWORK_EQUIV = (
+    "#!/usr/bin/env bash\n"
+    "echo 'TREE-EQUIVALENT'\n"
+    "exit 0\n"
+)
 
 
 # ── Stub helpers ──────────────────────────────────────────────────────────────
@@ -77,6 +91,26 @@ class _StubRun:
         if first in ("rebase", "reset"):
             return ""
         return ""
+
+
+class _WritingLlm:
+    """Stub LLM that writes fixed content to a pre-configured path on resolve calls."""
+    def __init__(self, worktree: str, resolve_path: str, *,
+                 content: str = "merged content\n",
+                 review_reply: str = "CONFLICT-REVIEW=CLEAN\n"):
+        self.calls: list[dict] = []
+        self._full_path = os.path.join(worktree, resolve_path)
+        self._content = content
+        self._review_reply = review_reply
+
+    def call_tooled(self, purpose, model, prompt, *, cwd, allowed_tools,
+                    denied_tools=(), add_dirs=(), max_turns=None, **_):
+        self.calls.append({"purpose": purpose})
+        if purpose == "conflict-review":
+            return self._review_reply
+        with open(self._full_path, "w") as fh:
+            fh.write(self._content)
+        return "RESOLVED"
 
 
 def _make_temp_file(worktree: str, path: str, content: str) -> None:
@@ -212,6 +246,132 @@ def _start_conflicting_rebase(d):
                    capture_output=True, text=True, env=env)  # expected rc!=0
 
 
+def _sh_rev(d, ref):
+    return subprocess.run(["git", "-C", d, "rev-parse", ref],
+                          check=True, capture_output=True, text=True).stdout.strip()
+
+
+def _make_migration_conflict_repo():
+    """Temp repo with a rebase conflict on a SQL migration file.
+    Returns (d, pre_sha, branch).
+    """
+    d = tempfile.mkdtemp(prefix="conflict-migration-test-")
+    subprocess.run(["git", "init", "-b", "master", d], check=True, capture_output=True)
+    _sh(d, "config", "user.email", "t@t")
+    _sh(d, "config", "user.name", "t")
+
+    # Base commit: just a.txt
+    open(os.path.join(d, "a.txt"), "w").write("base\n")
+    _sh(d, "add", "-A")
+    _sh(d, "commit", "-m", "base")
+
+    # Feature branch: add ibl5/migrations/0001_x.sql
+    _sh(d, "checkout", "-b", "feat")
+    os.makedirs(os.path.join(d, "ibl5", "migrations"), exist_ok=True)
+    open(os.path.join(d, "ibl5", "migrations", "0001_x.sql"), "w").write(
+        "-- feature schema\n"
+    )
+    _sh(d, "add", "-A")
+    _sh(d, "commit", "-m", "feat: add migration")
+    pre_sha = _sh_rev(d, "HEAD")
+
+    # Master: add same migration file with different content (add-add conflict)
+    _sh(d, "checkout", "master")
+    os.makedirs(os.path.join(d, "ibl5", "migrations"), exist_ok=True)
+    open(os.path.join(d, "ibl5", "migrations", "0001_x.sql"), "w").write(
+        "-- master schema\n"
+    )
+    _sh(d, "add", "-A")
+    _sh(d, "commit", "-m", "master: add migration")
+    _sh(d, "update-ref", "refs/remotes/origin/master", _sh_rev(d, "HEAD"))
+    _sh(d, "checkout", "feat")
+    return d, pre_sha, "feat"
+
+
+def _make_marker_planted_repo():
+    """Squash-trap fixture where outside.txt has a committed conflict marker.
+
+    feature.txt is the actual conflicted file; outside.txt is committed with a
+    `<<<<<<< HEAD` marker line already in it. After auto-resolution and
+    `rebase --continue`, the whole-tree sweep fires on the committed marker.
+    Returns (d, key, branch).
+    """
+    suffix = uuid.uuid4().hex[:8]
+    branch = f"feature-mp-{suffix}"
+    key = branch
+
+    d = tempfile.mkdtemp(prefix="postplan-mp-test-")
+    subprocess.run(["git", "init", "-b", "master", d], check=True, capture_output=True)
+    _sh(d, "config", "user.email", "t@t")
+    _sh(d, "config", "user.name", "t")
+
+    # Base: feature.txt and outside.txt
+    open(os.path.join(d, "feature.txt"), "w").write("base content\n")
+    open(os.path.join(d, "outside.txt"), "w").write("normal\n")
+    _sh(d, "add", "-A")
+    _sh(d, "commit", "-m", "base")
+
+    # Proof scripts committed to master
+    scripts_dir = os.path.join(d, ".claude", "skills", "pr-ready", "scripts")
+    os.makedirs(scripts_dir, exist_ok=True)
+    open(os.path.join(scripts_dir, "lostwork.sh"), "w").write(_LOSTWORK_EQUIV)
+    shutil.copy(_COLLAPSE, os.path.join(scripts_dir, "collapse-guard.sh"))
+    _sh(d, "add", "-A")
+    _sh(d, "commit", "-m", "chore: proof scripts")
+
+    # Parent branch (squash-trap setup)
+    _sh(d, "checkout", "-b", "parent")
+    open(os.path.join(d, "parent.txt"), "w").write("step\n")
+    _sh(d, "add", "-A")
+    _sh(d, "commit", "-m", "feat: parent step")
+    parent_tip = _sh_rev(d, "HEAD")
+
+    # Squash merge parent; add conflict seed on master
+    _sh(d, "checkout", "master")
+    _sh(d, "merge", "--squash", "parent")
+    _sh(d, "commit", "-m", "squash: parent")
+    open(os.path.join(d, "feature.txt"), "w").write("master version\n")
+    _sh(d, "add", "-A")
+    _sh(d, "commit", "-m", "chore: master version of feature")
+    master_sha = _sh_rev(d, "HEAD")
+    _sh(d, "update-ref", "refs/remotes/origin/master", master_sha)
+
+    # Feature branch from parent_tip: modifies feature.txt AND commits a marker in outside.txt
+    _sh(d, "checkout", "-b", branch, parent_tip)
+    open(os.path.join(d, "feature.txt"), "w").write("feature version\n")
+    open(os.path.join(d, "outside.txt"), "w").write("<<<<<<< HEAD\npre-existing marker\n")
+    _sh(d, "add", "-A")
+    _sh(d, "commit", "-m", "feat: feature work with planted marker")
+    _sh(d, "config", f"branch.{branch}.iblBase", parent_tip)
+
+    return d, key, branch
+
+
+def _cleanup_marker_repo(key: str, branch: str, d: str) -> None:
+    from harness.armable import conflict_flag_path as _cfp
+    from harness.conflict import purge_verdict_artifacts
+    purge_verdict_artifacts(key)
+    flag = _cfp(branch)
+    if os.path.exists(flag):
+        os.unlink(flag)
+    for dpath in [
+        f"/tmp/postplan-conflict-review-{key}",
+        f"/tmp/postplan-conflict-stages-{key}",
+    ]:
+        if os.path.exists(dpath):
+            shutil.rmtree(dpath, ignore_errors=True)
+    for extra in [
+        f"/tmp/postplan-conflict-files-{key}-autoresolved.txt",
+        f"/tmp/postplan-conflict-files-{key}.txt",
+        f"/tmp/pr-ready-diff-pre-{key}.patch",
+        f"/tmp/postplan-lostwork-{key}.sh",
+    ]:
+        if os.path.exists(extra):
+            os.unlink(extra)
+    if d and os.path.exists(d):
+        shutil.rmtree(d, ignore_errors=True)
+
+
 def test_proof_failure_restores():
     """Proof failure restores pre_rebase_sha, leaves no rebase-merge dir."""
     d, pre_sha, branch = _make_conflict_repo()
@@ -245,28 +405,60 @@ def test_round_cap_restores():
         shutil.rmtree(d, ignore_errors=True)
 
 
-def test_unresolvable_class_restores(tmp_path):
-    """Migration file never reaches call_tooled — zero calls asserted."""
+def test_unresolvable_class_restores():
+    """Matrix row 18: a migration file in the conflict set raises and restores with zero LLM calls.
+
+    The class gate in classify() fires before any model sees the file.
+    """
+    d, pre_sha, branch = _make_migration_conflict_repo()
     llm = _StubLlm([])
-    # When inventory.files is empty, resolve_all returns success immediately
-    inventory = ConflictInventory(files=(), unresolvable_reason="migration file: x.sql")
-    result = resolve_all(llm, _StubRun(str(tmp_path)),
-                         worktree=str(tmp_path), key="k", inventory=inventory)
-    assert result.success is True  # no files to resolve
-    assert len(llm.calls) == 0
+    try:
+        _start_conflicting_rebase(d)
+        run = _live_run(d)
+
+        inventory = inventory_conflicts(run)
+        assert inventory.unresolvable_reason is not None
+        assert inventory.unresolvable_reason.startswith("migration file:")
+
+        # gitad.py's branch verbatim: the class gate aborts BEFORE resolve_all is
+        # ever reached, so the resolve_all call below is unreachable and the
+        # zero-calls assertion is earned rather than vacuous.
+        with pytest.raises(HarnessError) as exc:
+            if inventory.unresolvable_reason:
+                abort_and_restore(run, worktree=d, pre_rebase_sha=pre_sha,
+                                  reason=inventory.unresolvable_reason)
+            resolve_all(llm, run, worktree=d, key="k", inventory=inventory)
+        assert exc.value.kind == "rebase-conflict"
+        assert _sh(d, "rev-parse", "HEAD").stdout.strip() == pre_sha
+        assert _sh(d, "status", "--porcelain").stdout.strip() == ""
+        assert not os.path.exists(os.path.join(d, ".git", "rebase-merge"))
+        assert len(llm.calls) == 0
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
 
 
-def test_tree_marker_sweep(tmp_path):
-    """Marker outside inventory.files (blast-radius violation) fails the round."""
-    worktree = str(tmp_path)
-    path = "app/foo.py"
-    _make_temp_file(worktree, path, "resolved\n")
+def test_tree_marker_sweep():
+    """Matrix row 19: a marker planted outside inventory.files aborts and restores.
 
-    run = _StubRun(worktree, porcelain_before="",
-                   porcelain_after=" M app/outside.py\n")
-    llm = _StubLlm(["RESOLVED"] * MAX_RESOLVE_ROUNDS)
-    success, _ = resolve_one(llm, run, worktree=worktree, key="test-key", path=path)
-    assert success is False
+    A `<<<<<<< HEAD` line in a COMMITTED file that is not in the conflict set must
+    cause abort_and_restore() after rebase --continue, not silently pass.
+    """
+    d, key, branch = _make_marker_planted_repo()
+    pre_head = subprocess.run(
+        ["git", "-C", d, "rev-parse", "HEAD"],
+        check=True, capture_output=True, text=True,
+    ).stdout.strip()
+    llm = _WritingLlm(d, "feature.txt", content="merged content\n")
+    try:
+        with pytest.raises(HarnessError) as exc:
+            LiveGit(d, llm=llm).autoresolve_stacked_rebase()
+        assert exc.value.kind == "rebase-conflict"
+        assert "conflict markers survive" in exc.value.detail
+        assert _sh_rev(d, "HEAD") == pre_head
+        assert _sh(d, "status", "--porcelain").stdout.strip() == ""
+        assert not os.path.exists(os.path.join(d, ".git", "rebase-merge"))
+    finally:
+        _cleanup_marker_repo(key, branch, d)
 
 
 # ── Phase 5f: verdict tests ────────────────────────────────────────────────────

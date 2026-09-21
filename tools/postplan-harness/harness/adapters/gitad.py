@@ -345,7 +345,8 @@ class LiveGit:
         Fail closed: exit_code_for() maps this to exit 3, which bin/post-plan-now
         refuses to escalate to the skill fallback."""
         from ..conflict import (
-            abort_and_restore, inventory_conflicts, purge_verdict_artifacts, resolve_all,
+            abort_and_restore, assert_text_only, inventory_conflicts,
+            purge_verdict_artifacts, resolve_all,
         )
 
         branch = self.branch()
@@ -394,13 +395,25 @@ class LiveGit:
                                       pre_rebase_sha=pre_rebase_sha,
                                       reason=f"rebase --continue failed: {(cont_proc.stderr or cont_proc.stdout).strip()[:400]}")
 
-                # Whole-tree marker sweep
-                sweep = self._run("grep", "-rn", "-E", "^(<{7}|={7}|>{7})",
-                                  "--", ".", check=False)
-                if sweep.strip():
+                # Whole-tree marker sweep. git grep exits 0 on a match, 1 on no match,
+                # and >=2 on its own failure, so branch on rc: reading stdout alone would
+                # let a rejected argv pass as "no markers found".
+                sweep_rc, sweep_out = self._run_out(
+                    "grep", "-n", "-E", "^(<{7}|={7}|>{7})", "HEAD", "--", ".")
+                if sweep_rc == 0:
                     abort_and_restore(self._run, worktree=self.worktree,
                                       pre_rebase_sha=pre_rebase_sha,
-                                      reason=f"conflict markers survive after resolution: {sweep.strip()[:200]}")
+                                      reason=f"conflict markers survive after resolution: {sweep_out.strip()[:200]}")
+                if sweep_rc != 1:
+                    abort_and_restore(self._run, worktree=self.worktree,
+                                      pre_rebase_sha=pre_rebase_sha,
+                                      reason=f"marker sweep failed rc={sweep_rc}: {sweep_out.strip()[:200]}")
+
+                text_reason = assert_text_only(self.worktree, inventory.files)
+                if text_reason:
+                    abort_and_restore(self._run, worktree=self.worktree,
+                                      pre_rebase_sha=pre_rebase_sha,
+                                      reason=text_reason)
 
                 lostwork_path = self._load_lostwork(master_sha, key)
                 if lostwork_path is None:
@@ -414,10 +427,18 @@ class LiveGit:
                                       pre_rebase_sha=pre_rebase_sha,
                                       reason=proof_out)
 
-                manifest_path, notes_path = self._record_resolution(
-                    key, branch, master_sha, resolve_result.resolved_files,
-                    proof_out=proof_out,
-                )
+                try:
+                    manifest_path, notes_path = self._record_resolution(
+                        key, branch, master_sha, resolve_result.resolved_files,
+                        proof_out=proof_out,
+                    )
+                except HarnessError as exc:
+                    # Phase 3c: a HarnessError from _record_resolution (empty post-resolution
+                    # diff) must restore too — the outer `except HarnessError: raise` exists
+                    # only so abort_and_restore's own raise is not re-restored.
+                    abort_and_restore(self._run, worktree=self.worktree,
+                                      pre_rebase_sha=pre_rebase_sha,
+                                      reason=exc.detail)
 
                 self.last_conflict_resolution = StackedRebaseResult(
                     resolved=True, reason="",
@@ -503,7 +524,8 @@ class LiveGit:
 
         # Step 7: the --onto rebase (direct subprocess, same shape as rebase_onto)
         from ..conflict import (
-            abort_and_restore, inventory_conflicts, purge_verdict_artifacts, resolve_all,
+            abort_and_restore, assert_text_only, inventory_conflicts,
+            purge_verdict_artifacts, resolve_all,
         )
 
         pre_rebase_sha = self._run("rev-parse", "HEAD").strip()
@@ -550,13 +572,25 @@ class LiveGit:
                                       pre_rebase_sha=pre_rebase_sha,
                                       reason=f"rebase --continue failed: {(cont_proc.stderr or cont_proc.stdout).strip()[:400]}")
 
-                # Whole-tree marker sweep
-                sweep = self._run("grep", "-rn", "-E", "^(<{7}|={7}|>{7})",
-                                  "--", ".", check=False)
-                if sweep.strip():
+                # Whole-tree marker sweep. git grep exits 0 on a match, 1 on no match,
+                # and >=2 on its own failure, so branch on rc: reading stdout alone would
+                # let a rejected argv pass as "no markers found".
+                sweep_rc, sweep_out = self._run_out(
+                    "grep", "-n", "-E", "^(<{7}|={7}|>{7})", "HEAD", "--", ".")
+                if sweep_rc == 0:
                     abort_and_restore(self._run, worktree=self.worktree,
                                       pre_rebase_sha=pre_rebase_sha,
-                                      reason=f"conflict markers survive after resolution: {sweep.strip()[:200]}")
+                                      reason=f"conflict markers survive after resolution: {sweep_out.strip()[:200]}")
+                if sweep_rc != 1:
+                    abort_and_restore(self._run, worktree=self.worktree,
+                                      pre_rebase_sha=pre_rebase_sha,
+                                      reason=f"marker sweep failed rc={sweep_rc}: {sweep_out.strip()[:200]}")
+
+                text_reason = assert_text_only(self.worktree, inventory.files)
+                if text_reason:
+                    abort_and_restore(self._run, worktree=self.worktree,
+                                      pre_rebase_sha=pre_rebase_sha,
+                                      reason=text_reason)
 
                 auto_resolved_files = resolve_result.resolved_files
             except HarnessError:
@@ -583,7 +617,11 @@ class LiveGit:
                 key, branch, master_sha, auto_resolved_files,
                 collapse_warn=collapse_warn, proof_out=proof_out, base_sha=ibl_base,
             )
-        except HarnessError:
+        except HarnessError as exc:
+            if auto_resolved_files:
+                abort_and_restore(self._run, worktree=self.worktree,
+                                  pre_rebase_sha=pre_rebase_sha,
+                                  reason=exc.detail)
             raise
         except Exception as exc:
             if auto_resolved_files:

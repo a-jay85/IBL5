@@ -486,6 +486,53 @@ def _make_modify_conflict_repo(lostwork_script: str = None):
     return d, parent_tip, master_sha, key, branch
 
 
+def _make_simple_conflict_repo(lostwork_script: str = None):
+    """Plain modify/modify conflict against origin/master, with no squash trap.
+
+    rebase_onto() runs `git rebase origin/master`, so the squash-trap fixtures replay
+    the already-squashed parent commits and hit the class gate on a delete/add pair
+    before the resolver is reached. This fixture leaves feature.txt as the only
+    conflicted path, with all three stages present so classify() allows resolution.
+    Returns (d, base_sha, master_sha, key, branch).
+    """
+    suffix = uuid.uuid4().hex[:8]
+    branch = f"feature-sc-{suffix}"
+    key = branch  # no / or :
+
+    d = tempfile.mkdtemp(prefix="postplan-sc-test-")
+    subprocess.run(["git", "init", "-b", "master", d], check=True, capture_output=True)
+    _sh(d, "config", "user.email", "t@t")
+    _sh(d, "config", "user.name", "t")
+
+    open(os.path.join(d, "a.txt"), "w").write("base\n")
+    open(os.path.join(d, "feature.txt"), "w").write("base content\n")
+    _sh(d, "add", "-A")
+    _sh(d, "commit", "-m", "base")
+
+    scripts_dir = os.path.join(d, ".claude", "skills", "pr-ready", "scripts")
+    os.makedirs(scripts_dir, exist_ok=True)
+    open(os.path.join(scripts_dir, "lostwork.sh"), "w").write(
+        lostwork_script or _LOSTWORK_EQUIV
+    )
+    shutil.copy(_COLLAPSE, os.path.join(scripts_dir, "collapse-guard.sh"))
+    _sh(d, "add", "-A")
+    _sh(d, "commit", "-m", "chore: proof scripts")
+    base_sha = _rev(d, "HEAD")
+
+    open(os.path.join(d, "feature.txt"), "w").write("master version\n")
+    _sh(d, "add", "-A")
+    _sh(d, "commit", "-m", "chore: master version of feature")
+    master_sha = _rev(d, "HEAD")
+    _sh(d, "update-ref", "refs/remotes/origin/master", master_sha)
+
+    _sh(d, "checkout", "-b", branch, base_sha)
+    open(os.path.join(d, "feature.txt"), "w").write("feature version\n")
+    _sh(d, "add", "-A")
+    _sh(d, "commit", "-m", "feat: feature work")
+
+    return d, base_sha, master_sha, key, branch
+
+
 def _make_migration_conflict_repo():
     """Minimal repo with an add-add conflict on a SQL migration file.
 
@@ -664,6 +711,21 @@ def test_proof_gate_is_conjunctive():
         _cleanup_tmp(key)
         shutil.rmtree(d, ignore_errors=True)
 
+    # Row 20's second arm: rc 0 with TREE DIVERGED in stdout is also a decline.
+    # This is the arm a non-conjunctive gate would wrongly admit, since rc says pass.
+    d2, _, _, key2, _ = _make_squash_repo(lostwork_script=_LOSTWORK_DIVERGED)
+    manifest2 = f"/tmp/postplan-conflict-files-{key2}.txt"
+    if os.path.exists(manifest2):
+        os.unlink(manifest2)
+    try:
+        result2 = LiveGit(d2).autoresolve_stacked_rebase()
+        assert result2.resolved is False
+        assert "tree proof failed" in result2.reason
+        assert not os.path.exists(manifest2)
+    finally:
+        _cleanup_tmp(key2)
+        shutil.rmtree(d2, ignore_errors=True)
+
 
 def test_simple_path_pre_patch(squash_repo):
     """rebase_onto() captures the pre-patch before aborting on conflict."""
@@ -705,6 +767,98 @@ def test_whole_tree_sweep_live():
         assert exc.value.kind == "rebase-conflict"
         assert "conflict markers survive" in exc.value.detail
         assert _rev(d, "HEAD") == pre_head
+        assert not os.path.exists(os.path.join(d, ".git", "rebase-merge"))
+    finally:
+        _cleanup_full(key, branch, d)
+
+
+def test_marker_sweep_rc_failure_fails_closed(monkeypatch):
+    """A marker sweep that fails with rc >= 2 must abort and restore, not pass.
+
+    Mutation it catches: read the sweep through `self._run(..., check=False)`, which
+    returns stdout and discards the return code. A rejected argv writes to stderr, so
+    stdout is empty and the gate passes vacuously with markers unexamined.
+    """
+    d, parent_tip, master_sha, key, branch = _make_modify_conflict_repo(
+        lostwork_script=_LOSTWORK_EQUIV
+    )
+    pre_head = _rev(d, "HEAD")
+    llm = _WritingLlm(d, "feature.txt", content="merged content\n")
+
+    real_run_out = LiveGit._run_out
+
+    def patched_run_out(self, *args):
+        # Only intercept the grep sweep call (identified by "grep" and "HEAD" in args)
+        if args[0] == "grep" and "HEAD" in args:
+            return (129, "error: unknown option")
+        return real_run_out(self, *args)
+
+    monkeypatch.setattr(LiveGit, "_run_out", patched_run_out)
+
+    try:
+        with pytest.raises(HarnessError) as exc:
+            LiveGit(d, llm=llm).autoresolve_stacked_rebase()
+        assert exc.value.kind == "rebase-conflict"
+        assert "marker sweep failed rc=129" in exc.value.detail
+        assert _rev(d, "HEAD") == pre_head
+    finally:
+        _cleanup_full(key, branch, d)
+
+
+def test_rebase_onto_autoresolve_happy_path():
+    """rebase_onto()'s auto-resolve branch runs end to end when an LLM is present.
+
+    Every other auto-resolve test drives autoresolve_stacked_rebase(), so without this
+    the sweep triage, the UTF-8 assertion and the _record_resolution restore wrap that
+    rebase_onto() also carries would ship unexercised.
+    """
+    d, base_sha, master_sha, key, branch = _make_simple_conflict_repo(
+        lostwork_script=_LOSTWORK_EQUIV
+    )
+    from harness.armable import conflict_flag_path
+    llm = _WritingLlm(d, "feature.txt", content="merged content\n")
+    try:
+        g = LiveGit(d, llm=llm)
+        g.rebase_onto()
+        assert g.last_conflict_resolution is not None
+        assert g.last_conflict_resolution.auto_resolved is True
+        assert "feature.txt" in g.last_conflict_resolution.resolved_files
+        assert os.path.exists(conflict_flag_path(branch))
+        assert _rev(d, "HEAD") != base_sha
+        assert _sh(d, "status", "--porcelain").stdout.strip() == ""
+    finally:
+        _cleanup_full(key, branch, d)
+
+
+def test_rebase_onto_marker_sweep_rc_failure_fails_closed(monkeypatch):
+    """rebase_onto()'s sweep must fail closed on rc >= 2, the same as the stacked path.
+
+    Mutation it catches: read the sweep through `self._run(..., check=False)`, which
+    returns stdout and discards the return code. A rejected argv writes to stderr, so
+    stdout is empty and the gate passes vacuously with markers unexamined.
+    """
+    d, base_sha, master_sha, key, branch = _make_simple_conflict_repo(
+        lostwork_script=_LOSTWORK_EQUIV
+    )
+    pre_head = _rev(d, "HEAD")
+    llm = _WritingLlm(d, "feature.txt", content="merged content\n")
+
+    real_run_out = LiveGit._run_out
+
+    def patched_run_out(self, *args):
+        if args[0] == "grep" and "HEAD" in args:
+            return (129, "error: unknown option")
+        return real_run_out(self, *args)
+
+    monkeypatch.setattr(LiveGit, "_run_out", patched_run_out)
+
+    try:
+        with pytest.raises(HarnessError) as exc:
+            LiveGit(d, llm=llm).rebase_onto()
+        assert exc.value.kind == "rebase-conflict"
+        assert "marker sweep failed rc=129" in exc.value.detail
+        assert _rev(d, "HEAD") == pre_head
+        assert _sh(d, "status", "--porcelain").stdout.strip() == ""
         assert not os.path.exists(os.path.join(d, ".git", "rebase-merge"))
     finally:
         _cleanup_full(key, branch, d)

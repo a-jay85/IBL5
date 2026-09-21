@@ -332,6 +332,18 @@ def test_rebase_conflict_verbatim():
                     "Resolve the rebase, then re-run bin/post-plan-now.")
 
 
+def test_rebase_conflict_line_unchanged():
+    """Row 34: the auto-resolve work must not perturb the exit-3 RESULT string.
+    Pinned as a literal so any reword of the blocked arm fails here."""
+    r = _res(TerminalState.FAILED, error_kind="rebase-conflict")
+    line = runner.verdict_line(r, 3)
+    assert line == ("RESULT: post-plan BLOCKED — rebase conflict on a stacked branch, "
+                    "human required; ERROR terminal=failed, no PR opened. "
+                    "Resolve the rebase, then re-run bin/post-plan-now.")
+    assert "auto-resolved" not in line
+    assert "CONFLICT-REVIEW" not in line
+
+
 def test_rebase_conflict_is_single_line():
     r = _res(TerminalState.FAILED, error_kind="rebase-conflict")
     line = runner.verdict_line(r, 3)

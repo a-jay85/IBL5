@@ -233,6 +233,22 @@ def abort_and_restore(
     raise HarnessError("rebase-conflict", reason)
 
 
+def assert_text_only(worktree: str, paths) -> Optional[str]:
+    """Plan Phase 3d step 2: every resolved path must decode as UTF-8 after
+    `rebase --continue`. A binary payload that slipped past the class gate cannot
+    have been three-way merged as text. Returns a reason string on the first
+    non-decodable path, or None when every path decodes."""
+    for rel in paths:
+        full = Path(worktree) / rel
+        if not full.exists():
+            continue
+        try:
+            full.read_bytes().decode("utf-8")
+        except UnicodeDecodeError as exc:
+            return f"non-UTF-8 content after resolution in {rel}: {exc}"
+    return None
+
+
 def review_resolution(
     llm,
     run: Callable[..., str],

@@ -228,21 +228,21 @@ def test_red_ci_check_reason_lists_names():
 
 # ── Condition (14) — scenarios 4-7 ────────────────────────────────────────────
 
-def test_condition_14_auto_resolve_alone_blocked():
+def test_cond14_flag_without_verdict_blocks():
     """Scenario 4: flag written (conflict_resolved=True), verdict absent -> blocked."""
     d = evaluate(inputs(conflict_resolved=True))
     assert not d.armed
     assert any(c.number == 14 and c.blocked for c in d.conditions)
 
 
-def test_condition_14_clean_verdict_clears():
+def test_cond14_clean_verdict_clears():
     """Scenario 5: flag + CONFLICT-REVIEW=CLEAN -> condition (14) not blocked, arm passes."""
     d = evaluate(inputs(conflict_resolved=True, conflict_verdict="CONFLICT-REVIEW=CLEAN"))
     assert d.armed
     assert not any(c.number == 14 and c.blocked for c in d.conditions)
 
 
-def test_condition_14_found_problem_holds():
+def test_cond14_found_problem_blocks():
     """Scenario 6: FOUND-PROBLEM verdict -> blocked, verdict value appears in reason."""
     d = evaluate(inputs(conflict_resolved=True,
                         conflict_verdict="CONFLICT-REVIEW=FOUND-PROBLEM"))
@@ -252,11 +252,17 @@ def test_condition_14_found_problem_holds():
     assert "FOUND-PROBLEM" in c14.reason
 
 
-def test_condition_14_no_auto_resolve_passes():
+def test_cond14_no_autoresolve():
     """Scenario 7: no flag (conflict_resolved=False) -> condition (14) not blocked."""
     d = evaluate(inputs(conflict_resolved=False))
     assert d.armed
     assert not any(c.number == 14 and c.blocked for c in d.conditions)
+
+    # Row 31 second arm: a None flag means the flag was never consulted, which must
+    # fail closed rather than read as "no auto-resolve".
+    d_none = evaluate(inputs(conflict_resolved=None))
+    assert not d_none.armed
+    assert any(c.number == 14 and c.blocked for c in d_none.conditions)
 
 
 def test_rebase_conflict_fails_the_run_before_evaluate():

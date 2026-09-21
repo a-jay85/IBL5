@@ -112,7 +112,7 @@ def _make_modify_conflict_repo():
     return d, key, branch
 
 
-def test_live_conflict_resolution_uses_call_tooled():
+def test_live_resolve_and_review():
     """Real call_tooled path: Claude resolves a simple modify/modify conflict end-to-end.
 
     Asserts only the observable contract: resolved=True, auto_resolved=True,

@@ -34,7 +34,7 @@ HeadToHeadRecords/
 - **CSS contract.** The view emits only class names styled by
   `ibl5/design/components/head-to-head-records.css`: `h2h-matrix-wrap`, `h2h-matrix`,
   `h2h-row-label`, `h2h-winning`, `h2h-losing`, `h2h-tied`, `h2h-self`, `h2h-user-row`,
-  `h2h-empty`, `h2h-filter`, `h2h-tip-open`, `h2h-tooltip`.
+  `h2h-empty`, `h2h-filter`, `h2h-tip-open`.
 
 ## Filter defaults
 

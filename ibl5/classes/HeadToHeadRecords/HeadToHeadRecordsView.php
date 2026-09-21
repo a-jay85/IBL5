@@ -204,7 +204,7 @@ final class HeadToHeadRecordsView
 
     /**
      * Return a small inline script that toggles h2h-tip-open on touch tap,
-     * revealing the h2h-tooltip for devices without hover.
+     * revealing the cell's title text for devices without hover.
      */
     public function renderTapTooltipScript(): string
     {

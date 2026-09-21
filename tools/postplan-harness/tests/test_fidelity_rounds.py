@@ -365,3 +365,33 @@ def test_replay_pr2314_round_one_completes(tmp_path, git_shim):
         assert len(_fixer_calls(llm)) == 1
     finally:
         _cleanup(9314, "9314-2")
+
+
+def test_scored_findings_reach_work_list_via_before_remediation(tmp_path, git_shim):
+    """Hold (2) items must come from res.scored_findings set by before_remediation.
+
+    before_remediation runs before the loop; the fix reads res.scored_findings inside
+    the loop rather than the call-site binding, which was still empty at that point.
+    """
+    high_score_finding = {"score": 85, "path": "x.py", "line": 1, "body_head": "bad"}
+    llm = _ScriptedLlm(UsageLedger(), {
+        "plan-fidelity-review": ["6d checks\n\n- finding one\n\nNOT READY\n"],
+        "fidelity-remediation": ["edited"],
+        "plan-fidelity-re-review-2": ["READY\n"],
+    })
+    res = _Res()
+
+    def _set_scored():
+        res.scored_findings = [high_score_finding]
+
+    try:
+        runner._run_fidelity(
+            llm, str(tmp_path), str(tmp_path), _counting_git(),
+            RecordingGh(str(tmp_path)), _plan(),
+            "diff", "body", 9315, "dead" * 10, TREE_1, False,
+            lambda _m: None, res,
+            before_remediation=_set_scored,
+        )
+        assert res.fidelity["rounds"][0]["work_list_sizes"]["2"] == 1
+    finally:
+        _cleanup(9315, "9315-2")

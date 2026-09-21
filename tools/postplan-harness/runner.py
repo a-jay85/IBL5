@@ -1225,7 +1225,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         head_before = git.head()
         model = _round_model(round_num)
         work = fidelity.build_work_list(current_verdict_path, unresolved_conformance,
-                                        meta_check_failures, scored_findings)
+                                        meta_check_failures,
+                                        getattr(res, "scored_findings", ()) or scored_findings)
         rec = {"round": round_num, "model": model,
                "work_list_sizes": fidelity.work_list_sizes(work),
                "retries": 0, "outcome": None, "remediation_sha": None,

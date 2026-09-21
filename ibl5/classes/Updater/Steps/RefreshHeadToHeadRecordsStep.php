@@ -30,11 +30,13 @@ final class RefreshHeadToHeadRecordsStep implements PipelineStepInterface
     public function execute(): StepResult
     {
         try {
-            $docRoot = $_SERVER['DOCUMENT_ROOT'] ?? '';
+            // dirname(__DIR__, 3) ascends from classes/Updater/Steps → classes/Updater
+            // → classes → ibl5 root; the logo directory lives under ibl5/images/logo.
+            $ibl5Root = dirname(__DIR__, 3);
             $innerH2hRepo = new \HeadToHeadRecords\HeadToHeadRecordsRepository(
                 $this->db,
                 null,
-                fn (int $id, string $n): string => (new \HeadToHeadRecords\LogoResolver())->resolve($id, $n, $docRoot . '/ibl5/images/logo'),
+                fn (int $id, string $n): string => (new \HeadToHeadRecords\LogoResolver())->resolve($id, $n, $ibl5Root . '/images/logo'),
             );
             $cachedH2hRepo = new \HeadToHeadRecords\CachedHeadToHeadRecordsRepository(
                 $innerH2hRepo,

@@ -432,6 +432,25 @@ test_db_sync_prod_rejects_unknown_option() {
     fi
 }
 
+test_db_sync_prod_rejects_print_plan_without_snapshot() {
+    # --print-plan only plans a snapshot load; the prod path has no dry run. Bare
+    # --print-plan was once accepted and ignored, so it ran the real sync.
+    local rc=0 out
+    out="$("$REPO_ROOT/bin/db-sync-prod" --print-plan 2>&1)" || rc="$?"
+    if [ "$rc" -eq 1 ]; then
+        ok "test_db_sync_prod_rejects_print_plan_without_snapshot — exits 1"
+    else
+        fail "test_db_sync_prod_rejects_print_plan_without_snapshot" \
+            "expected exit 1, got $rc; output: $out"
+    fi
+    if grep -qF -- '--print-plan requires --snapshot' <<< "$out"; then
+        ok "test_db_sync_prod_rejects_print_plan_without_snapshot — message names --snapshot"
+    else
+        fail "test_db_sync_prod_rejects_print_plan_without_snapshot" \
+            "expected the message to name --snapshot; output: $out"
+    fi
+}
+
 test_db_sync_prod_print_plan_uses_gunzip() {
     # Create a valid (minimal) gzipped file so validation passes
     local snap_file="$TMP/test-snap.sql.gz"
@@ -677,6 +696,7 @@ test_pull_destination_is_gitignored
 test_db_sync_prod_rejects_missing_snapshot
 test_db_sync_prod_rejects_snapshot_without_value
 test_db_sync_prod_rejects_unknown_option
+test_db_sync_prod_rejects_print_plan_without_snapshot
 test_db_sync_prod_print_plan_uses_gunzip
 test_db_sync_prod_snapshot_load_is_offline_and_preserves_local_tables
 test_wt_up_preserves_existing_flags

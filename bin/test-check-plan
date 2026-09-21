@@ -856,6 +856,7 @@ assert "gateT-packet-resolves" 0 "$TFM$M"'
 - **Tier:** Sonnet
 - **Scope:** ibl5/foo.php
 - **Recipe:** apply the change
+no-assertions: fixture exercises gate T, not assertion binding
 - **Self-verify:** composer run analyse
 - **Report back:** one line
 ````
@@ -919,6 +920,7 @@ Bare, un-acted-on.
 - **Tier:** Sonnet
 - **Scope:** ibl5/bar.php
 - **Recipe:** do it
+no-assertions: fixture exercises gate T, not assertion binding
 - **Self-verify:** composer run analyse
 - **Report back:** one line
 ````
@@ -958,6 +960,7 @@ assert "gateT-nested-fence-packet-ok" 0 "$TFM$M"'
 ```
 git mv a b
 ```
+no-assertions: fixture exercises gate T, not assertion binding
 - **Self-verify:** composer run analyse
 - **Report back:** one line
 ````
@@ -1012,6 +1015,7 @@ Anchor: the change lands at the report block.
 - **Tier:** Sonnet
 - **Scope:** bin/check-plan
 - **Recipe:** insert the gate
+no-assertions: fixture exercises gate S, not assertion binding
 - **Self-verify:** bin/test-check-plan
 - **Report back:** one line
 ````
@@ -1029,6 +1033,7 @@ Anchor: the change lands at the report block.
 - **Tier:** Sonnet
 - **Scope:** bin/check-plan
 - **Recipe:** insert the gate
+no-assertions: fixture exercises gate S, not assertion binding
 - **Report back:** one line
 ````
 '
@@ -1057,6 +1062,7 @@ sonnet-recipe: mechanical gate edit; recipe completeness cleared deliberately.
 ### Delegate — Phase 1
 - **Tier:** Sonnet
 - **Recipe:** do it
+no-assertions: fixture exercises gate S, not assertion binding
 - **Report back:** one line
 ````
 '
@@ -1087,6 +1093,7 @@ Anchor: change lands at the report block.
 ```
 sed -i s/a/b/ file.txt
 ```
+no-assertions: fixture exercises gate S, not assertion binding
 - **Self-verify:** bin/test-check-plan
 - **Report back:** one line
 ````
@@ -1097,6 +1104,121 @@ sed -i s/a/b/ file.txt
 assert "gateS-anchor-word-boundary-flags" 1 "$FM$M"'
 ## Phase 1 — edit the widget
 The baseline 1 approach handles this; see guideline 5 for reference.
+'
+
+# ---------------------------------------------------------------------------
+# Gate E: Delegation-packet assertion binding (all plans).
+# ---------------------------------------------------------------------------
+# (E1) A packet with Scope/Recipe/Self-verify/Report-back but NO **Assertions:**
+# exits 1, prefixed [E]. Anchor + Self-verify ensure no gate S co-fire; Sonnet
+# tier inside the fenced packet does not flag gate T (packet resolves it).
+assert "gateE-missing-assertions-flags" 1 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (E2) A packet whose **Assertions:** block lists four backticked tokens but
+# **Self-verify:** names only the first flags 3 times (exit 1).
+assert "gateE-unchecked-assertion-flags" 1 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+- **Assertions:**
+  - `testAlpha`
+  - `testBeta`
+  - `testGamma`
+  - `testDelta`
+- **Self-verify:** bin/phpunit --filter testAlpha
+- **Report back:** one line
+````
+'
+
+# (E3) Same four tokens, all named in **Self-verify:** — no violation (exit 0).
+assert "gateE-all-assertions-checked-ok" 0 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+- **Assertions:**
+  - `testAlpha`
+  - `testBeta`
+  - `testGamma`
+  - `testDelta`
+- **Self-verify:** bin/phpunit --filter testAlpha testBeta testGamma testDelta
+- **Report back:** one line
+````
+'
+
+# (E4) A `no-assertions:` line inside the packet clears gate E entirely (exit 0).
+assert "gateE-no-assertions-marker-clears" 0 "$FM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+no-assertions: mechanical rename, no matrix rows
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (E5) Gate E is NOT impl_model-gated: an OPUS plan with a packet missing
+# **Assertions:** still exits 1. Proves gate E runs for all plans.
+assert "gateE-opus-plan-still-gated" 1 "$TFM$M"'
+## Phase 1 — add the feature
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:** insert the gate
+- **Self-verify:** bin/test-check-plan
+- **Report back:** one line
+````
+'
+
+# (E6) A packet whose **Recipe:** holds a nested 3-backtick fence, with
+# **Assertions:** and **Self-verify:** placed AFTER the nested fence, passes
+# (exit 0). Proves the shared scanner honours nt >= fence_len correctly.
+assert "gateE-nested-fence-ok" 0 "$FM$M"'
+## Phase 1 — edit the report block
+Anchor: change lands at the report block.
+
+````
+### Delegate — Phase 1
+- **Tier:** Sonnet
+- **Scope:** bin/check-plan
+- **Recipe:**
+```
+sed -i s/a/b/ file.txt
+```
+- **Assertions:**
+  - `testAlpha`
+- **Self-verify:** bin/phpunit --filter testAlpha
+- **Report back:** one line
+````
 '
 
 # ---------------------------------------------------------------------------
@@ -1694,6 +1816,7 @@ _body="$FM
 - **Tier:** Haiku
 - **Scope:** \`src/Service/OldService.php\` — rename legacyHelper to newHelper
 - **Recipe:** sed replacement on one file
+no-assertions: fixture exercises gate W, not assertion binding
 - **Self-verify:** grep confirms zero remaining old name
 - **Report back:** one-line summary
 
@@ -2157,7 +2280,28 @@ for _n_slug in \
     autoresearch-oreb-arming-share-lever retire-rebase-prs-workflow; do
     _n_pf="$HOME/claude-plans/$_n_slug.md"
     [ -f "$_n_pf" ] || continue
-    if ! "$GUARD" "$_n_pf" >/dev/null 2>&1; then
+    # These are real, already-merged plans, pinned as a gate-N false-positive
+    # corpus. [E] (packet assertion binding) is a legitimate TRUE positive on
+    # any plan authored before that field existed, so drop [E] lines before
+    # judging. Never silence [E] by editing the corpus plans themselves — that
+    # mutates historical artifacts and disarms the gate on them permanently.
+    _n_out="$("$GUARD" "$_n_pf" 2>&1)"; _n_rc=$?
+    # Exit code stays PRIMARY. The line filter only ever DOWNGRADES a non-zero
+    # exit, and only when the failure is provably all-[E]. Read ONLY the
+    # violations block: [W] advisories and the [N] coverage line print on a
+    # clean run too, so a bare '^\[' match would flag passing plans.
+    _n_other="$(printf '%s\n' "$_n_out" | awk '
+        /^check-plan: violations in /{v=1; next}
+        /^check-plan: /{v=0}
+        v && /^\[/ && !/^\[E\]/ {print}')"
+    _n_evio="$(printf '%s\n' "$_n_out" | awk '
+        /^check-plan: violations in /{v=1; next}
+        /^check-plan: /{v=0}
+        v && /^\[E\]/ {print}' | head -1)"
+    # Downgrade ONLY when: non-zero exit, zero non-[E] violation lines, and at
+    # least one [E] line actually explains the failure. A non-zero exit with no
+    # visible violation line still fails loudly instead of passing silently.
+    if [ "$_n_rc" -ne 0 ] && { [ -n "$_n_other" ] || [ -z "$_n_evio" ]; }; then
         echo "FAIL: n_corpus — $_n_slug failed (gate N false positive)"
         _n_corpus_pass=0; FAILED=1
     fi

@@ -233,6 +233,8 @@ When a plan phase carries a `### Delegate` packet, do NOT implement that phase i
 - **Sonnet** → `subagent_type: "automouse-delegate"` (byte-match the def's `name:`) and **omit the `model` param**. The def (`.claude/agents/automouse-delegate.md`) pins `claude-sonnet-4-6`; passing `model: "sonnet"` resolves to Sonnet 5 and overrides the pin, spending ~30% more of the weekly token budget on identical work.
 - **Haiku** → `subagent_type: "general-purpose"` with `model: "haiku"`. No def is needed — the `haiku` alias already resolves to the only Haiku. The packet is self-verifying — the sub-agent runs the packet's self-verify command before returning — and CI plus post-plan review remain the backstop. This keeps your own context flat across the run; inlining a verbose packet's tool output defeats its purpose.
 
+The packet's `**Assertions:**` list is binding on the sub-agent. A returned summary that reports fewer assertions checked than the packet lists is a phase failure to re-run, not a pass.
+
 **Delegates are asynchronous — the Agent call does NOT return the sub-agent's work.** It returns immediately with `Async agent launched successfully … working in the background` and an agent id. That string is a *launch receipt*, never a result and never a summary. What you do with it:
 
 - **You WILL be re-invoked** by a task notification carrying the delegate's report when it finishes. Ending your turn with delegates still in flight is the correct, expected way to wait — it is not a stop, and the runner is configured to wait indefinitely for them (`CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0` in `bin/automouse/run`).

@@ -13,7 +13,7 @@
 #   1. No-loss    : every baseline token survives in rules ∪ detail
 #   2. Residency  : every operative token (bold/gate/fenced) survives in rules file specifically
 #   3. Orphans    : every Why: _…-detail.md § <heading> pointer in rules resolves
-#   4. Size caps  : _architect-contract.md ≤ 27648 B, _plan-verification.md ≤ 21504 B
+#   4. Size caps  : _architect-contract.md ≤ 29696 B (raised from 27648 in PR #2346), _plan-verification.md ≤ 21504 B
 #   5. Read budget: every plan-architect def carries the no-re-read bounds (check_read_budget)
 #                   (only enforced when the detail file exists — skipped on the un-split tree)
 #
@@ -45,6 +45,7 @@ esac
 # EXPECTED_ABSENT: baseline tokens deliberately deleted; exempt from no-loss assertion.
 EXPECTED_ABSENT=(
   "Backlog / tracking-doc status update	replaced by the \"Backlog / GitHub Issue close\" bullet when ADR-0121 retired the in-repo markdown backlog corpus; there is no tracking doc row left to flip"
+  "### Delegate — <phase name>	packet format updated: gate E (assertion binding) added Assertions field and expanded Self-verify field; old format intentionally superseded (PR #2346)"
 )
 
 # Format: "token<TAB>detail-file-path<TAB>reason"
@@ -473,7 +474,7 @@ else
     "$CONTRACT_RULES" \
     "$CONTRACT_DETAIL" \
     "architect-contract" \
-    27648 \
+    29696 \
     true
 
   check_read_budget

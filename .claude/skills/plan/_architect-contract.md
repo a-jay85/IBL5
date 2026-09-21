@@ -143,8 +143,11 @@ Format each packet as a fenced block within the plan:
 - **Scope:** which files, what change
 - **Rules:** (optional) `.claude/rules/` files this packet's sub-agent must Read first — name any **path-scoped** rule the phase depends on; always-on rules load automatically and need no entry
 - **Recipe:** the exact commands / edits to run
-- **Self-verify:** the command the sub-agent runs *before returning* (e.g. `composer run analyse`, expected test count, green-green) — the packet owns its own verification
+- **Assertions:** every property this phase's Verification Matrix rows assert, pasted verbatim — one backticked test-method name or matrix-row property per list item
+- **Self-verify:** the command the sub-agent runs *before returning*, naming **every** token listed under `Assertions:` and **executing** each one (e.g. `vendor/bin/phpunit --filter 'testA|testB' path/to/Test.php`, expected test count, green-green) — the packet owns its own verification. A `grep` for the token names satisfies gate `[E]` mechanically and verifies nothing; see the paragraph below the block
 - **Report back:** a one-line summary only
 ````
+
+The `Assertions:` field is the packet's copy of the plan's assertion list. Paste every property the phase's Verification Matrix rows assert. A sub-agent sees only the packet, so a property that stays in the matrix and never reaches the packet is a property the sub-agent will not ship. Two past PRs were blocked by a delegate that tested one property where the plan wrote four. `bin/check-plan` gate `[E]` requires the field, and requires every backticked token in it to appear literally in the packet's `**Self-verify:**`. Name the test methods and run them. A source grep for the property name is green from birth and stays green through the exact regression it pins (§ mutation statement above), so it does not count. A phase with no matrix rows of its own, such as a mechanical rename verified only by `composer run analyse`, carries `no-assertions: <reason>` inside the packet instead.
 
 **When to fill the `Rules:` field.** Never list an always-on rule (no `paths:` frontmatter key). Those load verbatim into every sub-agent. List a **path-scoped** rule only when the delegate's work depends on it and the packet's own file edits would not match its globs. Omit the field entirely otherwise. `_architect-contract-detail.md` § Rules field: worked examples.

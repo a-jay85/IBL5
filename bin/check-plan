@@ -149,6 +149,18 @@
 #                              check, not per-phase verbatim matching. A
 #                              `sonnet-recipe:` marker clears the whole gate,
 #                              mirroring no-adr: / context-budget:.
+#   E  Delegation-packet assertion binding — every ### Delegate packet must
+#                              carry an **Assertions:** field (paste the
+#                              phase's Verification Matrix assertions
+#                              verbatim) AND every backtick-quoted token in
+#                              that field must appear literally as a substring
+#                              in the packet's **Self-verify:** block. A
+#                              `no-assertions: <reason>` line inside the
+#                              packet clears BOTH sub-checks for that packet
+#                              (mirrors no-adr: / context-budget:). Runs for
+#                              ALL plans (not impl_model-gated, unlike gate S).
+#                              Two past PRs were blocked because a delegate
+#                              tested one property where the plan wrote four.
 #   P  Pre-prod exercise path — a plan that DECLARES a scheduled/daemon
 #                              artifact (bin/<x>-tick, bin/<x>-cron-setup, a
 #                              *.plist) must carry a verification-matrix ROW
@@ -1102,6 +1114,80 @@ done < <(awk -v run_rank="$RUN_RANK" '
 ' "$PLAN_FILE")
 
 # ---------------------------------------------------------------------------
+# packet_scan — shared fence-aware ### Delegate packet scanner.
+# Emits violation lines prefixed [S] or [E] for gates S and E respectively.
+# Takes: $1 = plan file. Callers filter by prefix.
+# There is exactly ONE copy of the fence_ticks / infence / fence_len /
+# nested-fence logic in this file; both gate S and gate E share it here.
+# ---------------------------------------------------------------------------
+packet_scan() {
+    local _pf="$1"
+    awk -v q="'" '
+        function fence_ticks(s,   t) {
+            if (match(s, /^[ \t]*`+/)) {
+                t = substr(s, RSTART, RLENGTH); gsub(/[^`]/, "", t); return length(t)
+            }
+            return 0
+        }
+        function check_and_report(   s, tok) {
+            if (!in_packet) return
+            if (!has_sv)
+                print "[S] delegation packet " q pname q " lacks a **Self-verify:** line (required for impl_model: sonnet plans)"
+            if (!has_no_assertions) {
+                if (!has_assertions)
+                    print "[E] delegation packet " q pname q " lacks an **Assertions:** field (paste the phase" q "s Verification Matrix assertions verbatim, or add a " q "no-assertions: <reason>" q " line)"
+                else {
+                    s = assert_text
+                    while (match(s, /`[^`]+`/)) {
+                        tok = substr(s, RSTART + 1, RLENGTH - 2)
+                        if (index(sv_text, tok) == 0)
+                            print "[E] delegation packet " q pname q ": assertion " q tok q " is never named in **Self-verify:** (the self-verify must exercise every listed assertion)"
+                        s = substr(s, RSTART + RLENGTH)
+                    }
+                }
+            }
+        }
+        function reset_packet() {
+            in_packet=0; has_sv=0; has_assertions=0; has_no_assertions=0
+            pname=""; assert_text=""; sv_text=""; in_block=""
+        }
+        BEGIN { infence=0; fence_len=0; in_packet=0; has_sv=0; has_assertions=0
+                has_no_assertions=0; pname=""; assert_text=""; sv_text=""; in_block="" }
+        {
+            if ($0 ~ /^[ \t]*###[ \t]+Delegate/) {
+                check_and_report()
+                reset_packet()
+                in_packet=1; pname=$0
+                sub(/^[ \t]*###[ \t]+Delegate[^A-Za-z0-9]*/, "", pname)
+                if (pname == "") pname = "(unnamed)"
+            }
+            if (in_packet) {
+                if ($0 ~ /no-assertions:/) has_no_assertions=1
+                if ($0 ~ /\*\*Self-verify:\*\*/) { has_sv=1; in_block="sv" }
+                if ($0 ~ /\*\*Assertions:\*\*/) { has_assertions=1; in_block="assertions" }
+                if ($0 ~ /^[ \t]*[-*][ \t]*\*\*[A-Za-z]/) {
+                    if ($0 !~ /\*\*Assertions:\*\*/ && $0 !~ /\*\*Self-verify:\*\*/)
+                        in_block="other"
+                }
+                if (in_block == "assertions") assert_text = assert_text " " $0
+                else if (in_block == "sv") sv_text = sv_text " " $0
+            }
+            nt = fence_ticks($0)
+            if (infence) {
+                if (nt >= fence_len && $0 ~ /^[ \t]*`+[ \t]*$/) {
+                    infence=0; fence_len=0
+                    check_and_report()
+                    reset_packet()
+                }
+                next
+            }
+            if (nt >= 3) { infence=1; fence_len=nt; next }
+        }
+        END { check_and_report() }
+    ' "$_pf"
+}
+
+# ---------------------------------------------------------------------------
 # Gate S: Sonnet-recipe completeness (impl_model: sonnet plans only).
 # ---------------------------------------------------------------------------
 # gate 13 checks a Sonnet plan is machine-executable in principle; gate S checks
@@ -1109,47 +1195,17 @@ done < <(awk -v run_rank="$RUN_RANK" '
 # **Self-verify:** line, and (2) the plan body carries an edit-anchor signal
 # (Phase 2). A `sonnet-recipe:` marker anywhere clears the whole gate (mirrors
 # no-adr: / context-budget:). $RUN_MODEL was resolved above for gate T; reuse it.
+#
+# Run packet_scan once; gates S and E both consume the cached output.
+_PACKET_SCAN="$(packet_scan "$PLAN_FILE")"
+
 case "$RUN_MODEL" in
     *sonnet*)
         if ! grep -qF 'sonnet-recipe:' "$PLAN_FILE"; then
             # Sub-check 1: every ### Delegate packet needs a **Self-verify:** line.
             while IFS= read -r sviol; do
                 [ -n "$sviol" ] && viol "$sviol"
-            done < <(awk -v q="'" '
-                function fence_ticks(s,   t) {
-                    if (match(s, /^[ \t]*`+/)) {
-                        t = substr(s, RSTART, RLENGTH); gsub(/[^`]/, "", t); return length(t)
-                    }
-                    return 0
-                }
-                function report(   msg) {
-                    if (in_packet && !has_sv) {
-                        msg = "[S] delegation packet " q pname q " lacks a **Self-verify:** line (required for impl_model: sonnet plans)"
-                        print msg
-                    }
-                }
-                BEGIN { infence=0; fence_len=0; in_packet=0; has_sv=0; pname="" }
-                {
-                    # Delegate heading lives INSIDE the 4-backtick fence; match raw.
-                    if ($0 ~ /^[ \t]*###[ \t]+Delegate/) {
-                        report()          # a prior unterminated packet, if any
-                        in_packet=1; has_sv=0; pname=$0
-                        sub(/^[ \t]*###[ \t]+Delegate[^A-Za-z0-9]*/, "", pname)
-                        if (pname == "") pname = "(unnamed)"
-                    }
-                    if (in_packet && $0 ~ /\*\*Self-verify:\*\*/) has_sv=1
-                    nt = fence_ticks($0)
-                    if (infence) {
-                        if (nt >= fence_len && $0 ~ /^[ \t]*`+[ \t]*$/) {
-                            infence=0; fence_len=0
-                            report(); in_packet=0; has_sv=0; pname=""
-                        }
-                        next
-                    }
-                    if (nt >= 3) { infence=1; fence_len=nt; next }
-                }
-                END { report() }
-            ' "$PLAN_FILE")
+            done < <(printf '%s\n' "$_PACKET_SCAN" | grep '^\[S\]')
             # Sub-check 2: a phased Sonnet plan must carry >=1 edit-anchor signal.
             # $CB_PHASES was counted by gate C (line ~424) with the shared
             # #{2,3} Step/Phase detector — reuse it, do not recount. A plan with
@@ -1163,6 +1219,18 @@ case "$RUN_MODEL" in
         fi
         ;;
 esac
+
+# ---------------------------------------------------------------------------
+# Gate E: Delegation-packet assertion binding (all plans, not impl_model-gated).
+# ---------------------------------------------------------------------------
+# Every ### Delegate packet must (a) carry an **Assertions:** field and
+# (b) name every backtick-quoted token from that field somewhere in the
+# packet's **Self-verify:** block. A `no-assertions: <reason>` line anywhere
+# inside the packet clears BOTH sub-checks for that packet. Uses the
+# _PACKET_SCAN cache populated above.
+while IFS= read -r eviol; do
+    [ -n "$eviol" ] && viol "$eviol"
+done < <(printf '%s\n' "$_PACKET_SCAN" | grep '^\[E\]')
 
 # ---------------------------------------------------------------------------
 # Gate P: Pre-prod exercise path for a declared deploy-dependent artifact.

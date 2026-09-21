@@ -39,6 +39,12 @@ final class Season1993PhantomRepairTest extends DatabaseTestCase
     /**
      * First PID for phantom player rows (24 total: 200001993–200002016).
      * Uses 9-digit values (ibl_plr.pid is INT, max ~2.1 billion).
+     *
+     * Deliberate deviation from the plan's Phase 3 band of 200001993000–200001993099:
+     * those are 12-digit values, which overflow an INT column and could not be
+     * inserted at all. This narrower band preserves what the plan actually wanted
+     * — a dedicated test-only pid range carrying test-1993- uuids, disjoint from
+     * live data. Backlog: a-jay85/IBL5-backlog#935.
      */
     private const PHANTOM_PID_START = 200001993;
 

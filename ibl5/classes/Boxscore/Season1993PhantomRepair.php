@@ -366,7 +366,19 @@ final class Season1993PhantomRepair
 
     // ------------------------------------------------------------- plumbing
 
-    /** Runs a four-placeholder coordinate statement; returns affected rows. */
+    /**
+     * Runs a four-placeholder coordinate statement; returns affected rows.
+     *
+     * No bindAndExecute() helper here, though the plan's Phase 2 recipe named one.
+     * This method, selectScalars() and phantomPlayerIdRange() each bind and execute
+     * inline instead. The invariant that helper existed to protect still holds by
+     * construction: every coordinate statement in this class binds the same four
+     * columns in the same order -- game_date, visitor_teamid, home_teamid,
+     * game_of_that_day -- so no query can address a coordinate wider than the
+     * phantom. A shared helper would need a third signature anyway, since the
+     * id-range query returns two columns where the scalar queries return one.
+     * Backlog: a-jay85/IBL5-backlog#935.
+     */
     private function execCoordinate(string $sql, int $visitorTeamid, int $homeTeamid): int
     {
         $stmt = $this->db->prepare($sql);

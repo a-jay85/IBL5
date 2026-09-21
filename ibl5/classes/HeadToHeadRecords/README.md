@@ -1,0 +1,57 @@
+---
+description: Head-to-head win/loss matrix across franchises, teams, and GMs for any game phase and scope.
+last_verified: 2026-09-20
+---
+
+# HeadToHeadRecords Module
+
+Displays a head-to-head win/loss matrix showing how every franchise, team era, or GM has fared
+against every other across selectable phases (HEAT, Regular Season, Playoffs, All) and scopes
+(Current Season, All-Time).
+
+## Architecture
+
+```
+HeadToHeadRecords/
+├── Contracts/
+│   └── HeadToHeadRecordsRepositoryInterface.php  # Data contract (MatrixPayload shape)
+├── HeadToHeadRecordsRepository.php               # SQL query builder + matrix assembly
+├── CachedHeadToHeadRecordsRepository.php         # 24-hour DatabaseCache decorator
+├── LogoResolver.php                              # Logo file resolution with fallback chain
+├── HeadToHeadRecordsController.php              # Filter resolution + main() orchestration
+└── HeadToHeadRecordsView.php                    # HTML rendering (form + matrix table)
+```
+
+## Key design decisions
+
+- **No login gate.** The matrix is public; logged-in users get their own row/column highlighted.
+- **GM match via owner_name.** The `gms` dimension matches the logged-in user by looking up
+  `owner_name` from `ibl_team_info` rather than by username, avoiding the GM-match bug present
+  in earlier drafts.
+- **Cache migration 180.** The DatabaseCache table is seeded by migration 180; the module is
+  served from cache after the first warm-up or after `RefreshHeadToHeadRecordsStep` runs.
+- **CSS contract.** The view emits only class names styled by
+  `ibl5/design/components/head-to-head-records.css`: `h2h-matrix-wrap`, `h2h-matrix`,
+  `h2h-row-label`, `h2h-winning`, `h2h-losing`, `h2h-tied`, `h2h-self`, `h2h-user-row`,
+  `h2h-empty`, `h2h-filter`, `h2h-tip-open`, `h2h-tooltip`.
+
+## Filter defaults
+
+| Filter    | Default                                          |
+|-----------|--------------------------------------------------|
+| dimension | `franchises`                                     |
+| phase     | Mapped from `Season::$phase` via `SEASON_PHASE_TO_FILTER`; falls back to `all` |
+| scope     | `current`                                        |
+
+## Data flow
+
+```
+modules/HeadToHeadRecords/index.php
+  -> HeadToHeadRecordsController::main()
+       -> resolveFilters($_POST)
+       -> CachedHeadToHeadRecordsRepository::build{Franchises|Teams|Gms}Matrix()
+            -> HeadToHeadRecordsRepository (on cache miss)
+       -> HeadToHeadRecordsView::renderFilterForm()
+       -> HeadToHeadRecordsView::renderMatrix()
+       -> HeadToHeadRecordsView::renderTapTooltipScript()
+```

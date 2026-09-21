@@ -292,9 +292,13 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 # and merely confirms it in step 7.
                 log(f"phase2: CONFLICT_FLAG=set (rebase conflict detected on {git.branch()}) "
                     "-- attempting stacked --onto auto-resolution")
+                plain_conflicted = getattr(git, "last_conflict_files", ())
+                log(f"phase2: conflicted paths (plain rebase) = {', '.join(plain_conflicted) or '-'}")
                 conflict_resolved = git.autoresolve_stacked_rebase()
                 if not conflict_resolved.resolved:
                     log(f"phase2: conflict auto-resolution declined -- {conflict_resolved.reason}")
+                    onto_conflicted = getattr(git, "last_conflict_files", ())
+                    log(f"phase2: conflicted paths (--onto) = {', '.join(onto_conflicted) or '-'}")
                     raise HarnessError(
                         "rebase-conflict",
                         f"{e.detail} | auto-resolve declined: {conflict_resolved.reason}",

@@ -223,13 +223,15 @@ class LiveGit:
             self._run("fetch", remote, ref)
 
     def branch_base(self, branch: str | None = None) -> str | None:
-        """Stacked-branch parent tip SHA, recorded by bin/wt-new as
-        `git config branch.<name>.iblBase`. master is squash/rebase-merged, so once
-        the parent merges its SHAs never appear in origin/master and merge-base cannot
-        recover this value; the config entry is the only record. Returns None when the
-        key is unset (an ordinary non-stacked branch) or when the recorded SHA no
-        longer resolves to a commit in this worktree (pruned or rewritten history).
-        None is the caller's signal that no auto-resolution is possible."""
+        """Resolved tip SHA of the base recorded by bin/wt-new as
+        `git config branch.<name>.iblBase`. wt-new stores the base branch NAME (`master`
+        for an ordinary worktree, the parent's name under --base), so every wt-new branch
+        carries the key; a bare SHA is accepted too. The name resolves against this
+        worktree's LOCAL refs via rev-parse, so `master` here is local master, which the
+        harness never fetches. Returns None when the key is unset or the value no longer
+        resolves to a commit (pruned or rewritten history). A non-None return does NOT mean
+        the branch is stacked: autoresolve_stacked_rebase() applies the squash-trap guard
+        (recorded base must not already be contained in origin/master) before using it."""
         name = branch or self.branch()
         if not name or name == "HEAD":
             return None
@@ -478,8 +480,38 @@ class LiveGit:
             return StackedRebaseResult(False, "pre-rebase diff vs iblBase is empty")
         Path(f"/tmp/pr-ready-diff-pre-{key}.patch").write_text(pre_patch)
 
-        # Pin master_sha once so a concurrent fetch cannot split the proof across two bases
+        # Pin master_sha once so a concurrent fetch cannot split the proof across two
+        # bases. The squash-trap guard below and the --onto target read this same SHA.
         master_sha = self._run("rev-parse", "origin/master").strip()
+
+        # Step 4b: squash-trap guard. bin/wt-new records a branch NAME (literally `master`
+        # for an ordinary worktree), so every wt-new branch carries the key. `--onto` is
+        # correct only when the recorded parent's commits are ABSENT from origin/master
+        # (squash-merged parent). When the recorded base is already an ancestor of
+        # origin/master the range `<base>..<branch>` includes trunk commits and --onto
+        # replays them a second time (h2h-records-finish 2026-09-21: 22 picks vs 5 for the
+        # plain rebase that rebase_onto() already ran). Decline; plain rebase was the
+        # correct operation and its failure is the real conflict.
+        #
+        # Placed after the dirty-tree and empty-diff declines, not before them, so those
+        # two keep their existing precedence -- test_gitad_branch_base.py's dirty-tree
+        # fixture has no origin remote and would raise on the pin instead of declining.
+        recorded = self._run("config", "--get", f"branch.{branch}.iblBase",
+                             check=False).strip()
+        anc_rc, anc_out = self._run_out("merge-base", "--is-ancestor", ibl_base, master_sha)
+        if anc_rc == 0:
+            return StackedRebaseResult(
+                False,
+                f"recorded iblBase '{recorded}' ({ibl_base[:8]}) is already contained in "
+                "origin/master; not a squash-trap stacked branch, so --onto would replay "
+                "trunk commits. The plain rebase against origin/master is the real conflict.",
+            )
+        if anc_rc != 1:
+            return StackedRebaseResult(
+                False,
+                f"could not determine whether iblBase '{recorded}' ({ibl_base[:8]}) is "
+                f"contained in origin/master (merge-base rc={anc_rc}: {anc_out.strip()[:200]})",
+            )
 
         # Step 5: extract proof and guard scripts by pinned git show
         lostwork_path = self._load_lostwork(master_sha, key)

@@ -180,6 +180,7 @@ class HeadToHeadRecordsRepositoryTest extends DatabaseTestCase
             'franchises' => $this->repo->buildFranchisesMatrix($phase, $scope),
             'teams'      => $this->repo->buildTeamsMatrix($phase, $scope),
             'gms'        => $this->repo->buildGmsMatrix($phase, $scope),
+            default      => throw new \InvalidArgumentException("Unhandled dimension: {$dimension}"),
         };
 
         $total = 0;
@@ -458,6 +459,7 @@ class HeadToHeadRecordsRepositoryTest extends DatabaseTestCase
             'regular'  => '= 1',
             'playoffs' => '= 2',
             'all'      => 'IN (1, 2, 3)',
+            default    => throw new \InvalidArgumentException("Unhandled phase: {$phase}"),
         };
         $scopeFilter = $scope === 'current' ? ' AND b.season_year = 1901' : '';
 

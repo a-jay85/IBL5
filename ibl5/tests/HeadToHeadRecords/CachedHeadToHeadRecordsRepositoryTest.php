@@ -100,7 +100,7 @@ final class CachedHeadToHeadRecordsRepositoryTest extends TestCase
     {
         $cache = new H2hInMemoryCache();
 
-        $inner = $this->createStub(HeadToHeadRecordsRepositoryInterface::class);
+        $inner = self::createStub(HeadToHeadRecordsRepositoryInterface::class);
         $inner->method('buildFranchisesMatrix')->willReturn($this->minimalPayload('franchises'));
         $inner->method('buildTeamsMatrix')->willReturn($this->minimalPayload('teams'));
         $inner->method('buildGmsMatrix')->willReturn($this->minimalPayload('gms'));

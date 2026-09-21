@@ -29,15 +29,15 @@ class HeadToHeadRecordsViewTest extends TestCase
      */
     private function makeEntry(array $overrides = []): array
     {
-        return array_merge([
-            'key'          => 'celtics',
-            'franchise_id' => 1,
-            'label'        => 'Celtics',
-            'sublabel'     => '2020-present',
-            'color1'       => '00653A',
-            'color2'       => 'FFFFFF',
-            'logo'         => 'celtics.png',
-        ], $overrides);
+        return [
+            'key'          => (string) ($overrides['key']          ?? 'celtics'),
+            'franchise_id' => (int)    ($overrides['franchise_id'] ?? 1),
+            'label'        => (string) ($overrides['label']        ?? 'Celtics'),
+            'sublabel'     => (string) ($overrides['sublabel']     ?? '2020-present'),
+            'color1'       => (string) ($overrides['color1']       ?? '00653A'),
+            'color2'       => (string) ($overrides['color2']       ?? 'FFFFFF'),
+            'logo'         => (string) ($overrides['logo']         ?? 'celtics.png'),
+        ];
     }
 
     /**

@@ -34,19 +34,19 @@ test.describe('Head-to-Head Records flow', () => {
 
   test('anonymous visitor sees the filter form and the matrix', async ({ page }) => {
     await expect(page.locator('form.h2h-filter')).toBeVisible();
-    await expect(page.locator('.h2h-matrix').or(page.locator('.h2h-empty')).first()).toBeVisible();
+    await expect(page.locator('.h2h-matrix')).toBeVisible();
     await assertNoPhpErrors(page, 'on Head-to-Head Records page');
   });
 
+  // The CI seed carries games in all three game_type buckets (HEAT, regular, playoffs)
+  // and ibl_gm_tenures rows for every franchise that plays one, so every
+  // dimension × phase combination below renders a populated matrix.
   for (const dimension of DIMENSIONS) {
     for (const phase of PHASES) {
       test(`matrix renders for ${dimension} / ${phase}`, async ({ page }) => {
         await applyFilters(page, dimension, phase, 'all');
 
-        // A filter with no games is a legitimate outcome on a thin CI seed.
-        if (await page.locator('.h2h-empty').isVisible().catch(() => false)) {
-          return;
-        }
+        await expect(page.locator('.h2h-matrix')).toBeVisible();
 
         const rows = page.locator('.h2h-matrix tbody tr');
         expect(await rows.count()).toBeGreaterThanOrEqual(2);
@@ -65,19 +65,18 @@ test.describe('Head-to-Head Records flow', () => {
   test('retired era row carries its seeded branding colors', async ({ page }) => {
     await applyFilters(page, 'teams', 'all', 'all');
 
-    const sonicsRow = page.locator('th.h2h-row-label', { hasText: 'Supersonics' }).first();
-    if ((await sonicsRow.count()) === 0) {
-      test.skip(true, 'Seed carries no Supersonics-era games');
-      return;
-    }
-    await expect(sonicsRow).toHaveAttribute('style', /--h2h-row-bg:\s*#00653A/i);
+    // Franchise 10 is the San Antonio Spurs today; the CI seed gives it a retired
+    // "Charlotte Hornets" era in ibl_franchise_seasons plus the matching
+    // ibl_franchise_era_branding row. No live team is named Hornets, so this label
+    // identifies the era row unambiguously and its colour must come from the
+    // branding table rather than from ibl_team_info.
+    const hornetsRow = page.locator('th.h2h-row-label', { hasText: 'Hornets' });
+    await expect(hornetsRow).toHaveCount(1);
+    await expect(hornetsRow).toHaveAttribute('style', /--h2h-row-bg:\s*#00788C/i);
   });
 
   test('the diagonal cell is blank and marked h2h-self', async ({ page }) => {
-    if (await page.locator('.h2h-empty').isVisible().catch(() => false)) {
-      test.skip(true, 'No matrix rendered for the default filter');
-      return;
-    }
+    await expect(page.locator('.h2h-matrix')).toBeVisible();
 
     const diagonal = page.locator('.h2h-matrix tbody tr').first().locator('td.h2h-self').first();
     await expect(diagonal).toHaveCount(1);

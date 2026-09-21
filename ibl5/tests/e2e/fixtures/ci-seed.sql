@@ -211,6 +211,45 @@ INSERT INTO ibl_franchise_seasons (franchise_id, season_year, season_ending_year
   ( 1, 2023, 2024, 'New York',     'Metros'),
   ( 2, 2023, 2024, 'Los Angeles',  'Stars');
 
+-- Retired-era franchise identity. Franchise 10 is currently the San Antonio Spurs
+-- (see ibl_team_info above), so this row's city/name differ from the live identity
+-- and the HeadToHeadRecords `teams` axis must colour it from
+-- ibl_franchise_era_branding rather than ibl_team_info.
+INSERT INTO ibl_franchise_seasons (franchise_id, season_year, season_ending_year, team_city, team_name) VALUES
+  (10, 2023, 2024, 'Charlotte',    'Hornets');
+
+-- Retired franchise branding (ADR-0136). Migration 180 ships these same rows, but it
+-- runs against an empty ibl_team_info (CI applies migrations *before* importing this
+-- seed), so its INSERT IGNORE is silently rejected by fk_era_franchise. Re-insert them
+-- here, after ibl_team_info is populated, so the era-branding join has data.
+INSERT INTO ibl_franchise_era_branding (franchise_id, team_city, team_name, color1, color2) VALUES
+  ( 4, 'Brooklyn',      'Nets',        '000000', 'FFFFFF'),
+  (10, 'Charlotte',     'Hornets',     '00788C', '1D1160'),
+  (16, 'Oklahoma City', 'Thunder',     '007AC1', 'EF6F31'),
+  (16, 'Las Vegas',     'Thunder',     '1C1C1C', 'F5C518'),
+  (17, 'San Antonio',   'Spurs',       'C4CED4', '000000'),
+  (22, 'Seattle',       'Supersonics', '00653A', 'FFC200');
+
+-- GM tenures for every franchise that carries seeded box scores (1, 2, 3, 5, 12).
+-- The HeadToHeadRecords `gms` axis maps each game's franchise to the GM whose tenure
+-- spans that game's season_year, so without these rows the gms matrix is empty.
+-- end_season_year NULL = current tenure, which covers the seed's 2026 games.
+--
+-- gm_display_name must equal ibl_team_info.owner_name for the same franchise:
+-- HeadToHeadRecordsController::resolveUserMatchKeys() highlights the logged-in
+-- user's gms row by looking up owner_name and matching it against the axis key.
+-- Franchise 1 therefore uses 'GM TestUser' (its seeded owner_name), not the CI
+-- test account's username — that arrives from a repo secret and would not be
+-- stable across environments. trg_gm_tenure_track adds a second, later-starting
+-- tenure for franchise 1 when CI assigns gm_username; the gms lookup orders by
+-- start_season_year then id, so the row below still wins.
+INSERT INTO ibl_gm_tenures (franchise_id, gm_display_name, start_season_year, end_season_year, is_mid_season_start, is_mid_season_end) VALUES
+  ( 1, 'GM TestUser',  2020, NULL, 0, 0),
+  ( 2, 'GM Stars',     2020, NULL, 0, 0),
+  ( 3, 'GM Cougars',   2020, NULL, 0, 0),
+  ( 5, 'GM Minutemen', 2020, NULL, 0, 0),
+  (12, 'GM Royals',    2020, NULL, 0, 0);
+
 -- ============================================================
 -- Players
 --   pid=1,2: active on Metros (tid=1) for Compare Players + trading
@@ -1497,6 +1536,30 @@ INSERT INTO ibl_box_scores_teams (game_date, visitor_teamid, home_teamid, game_o
   ('2026-06-05', 1, 2, 1, 'Stars',
    24, 50, 12, 16, 9, 24, 6, 24, 18, 5, 15, 4, 20,
    25, 23, 26, 24, 22, 24, 23, 22)
+ON DUPLICATE KEY UPDATE game_2gm=VALUES(game_2gm), game_2ga=VALUES(game_2ga),
+  game_ftm=VALUES(game_ftm), game_fta=VALUES(game_fta), game_3gm=VALUES(game_3gm),
+  game_3ga=VALUES(game_3ga), game_orb=VALUES(game_orb), game_drb=VALUES(game_drb),
+  game_ast=VALUES(game_ast), game_stl=VALUES(game_stl), game_tov=VALUES(game_tov),
+  game_blk=VALUES(game_blk), game_pf=VALUES(game_pf),
+  visitor_q1_points=VALUES(visitor_q1_points), visitor_q2_points=VALUES(visitor_q2_points),
+  visitor_q3_points=VALUES(visitor_q3_points), visitor_q4_points=VALUES(visitor_q4_points),
+  home_q1_points=VALUES(home_q1_points), home_q2_points=VALUES(home_q2_points),
+  home_q3_points=VALUES(home_q3_points), home_q4_points=VALUES(home_q4_points);
+
+-- HEAT pair: 2025-10-18 (October -> game_type=3, season_year=2026), Metros vs Stars.
+-- Gives the HeadToHeadRecords `heat` phase filter real data to match; without it the
+-- heat matrix is empty for every dimension.
+INSERT INTO ibl_box_scores_teams (game_date, visitor_teamid, home_teamid, game_of_that_day, name,
+  game_2gm, game_2ga, game_ftm, game_fta, game_3gm, game_3ga,
+  game_orb, game_drb, game_ast, game_stl, game_tov, game_blk, game_pf,
+  visitor_q1_points, visitor_q2_points, visitor_q3_points, visitor_q4_points,
+  home_q1_points, home_q2_points, home_q3_points, home_q4_points) VALUES
+  ('2025-10-18', 1, 2, 1, 'Metros',
+   27, 54, 16, 20, 10, 26, 9, 26, 22, 8, 11, 5, 16,
+   24, 26, 25, 27, 23, 25, 24, 26),
+  ('2025-10-18', 1, 2, 1, 'Stars',
+   25, 53, 14, 19, 8, 23, 7, 25, 19, 6, 13, 4, 18,
+   24, 26, 25, 27, 23, 25, 24, 26)
 ON DUPLICATE KEY UPDATE game_2gm=VALUES(game_2gm), game_2ga=VALUES(game_2ga),
   game_ftm=VALUES(game_ftm), game_fta=VALUES(game_fta), game_3gm=VALUES(game_3gm),
   game_3ga=VALUES(game_3ga), game_orb=VALUES(game_orb), game_drb=VALUES(game_drb),

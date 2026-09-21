@@ -33,7 +33,8 @@ Options:
   --self-test          Build throwaway fixtures and test filter logic; exit.
                        Tests both directions: referenced class not flagged,
                        absent class flagged, boundary correctness (alert not
-                       matched by alert-error). Offline -- no app needed.
+                       spared by alert-error, live not spared by live_class).
+                       Offline -- no app needed.
   --help, -h           Show this message.
 
 Self-test:
@@ -54,18 +55,39 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-# ── Source-filter helper ─────────────────────────────────────────────────────
-# Returns 0 if class appears (bounded) in any .php/.js/.twig/.tpl/.html file
-# under SEARCH_DIR, excluding vendor/, node_modules/, design/ subdirs.
-class_in_source() {
-    local cls="$1"
-    local search_dir="$2"
-    grep -rlqE \
-        "(^|[^A-Za-z0-9_-])${cls}([^A-Za-z0-9_-]|\$)" \
+# ── Source-token set builder ─────────────────────────────────────────────────
+# Emits every maximal [A-Za-z0-9_-] run in the source corpus under search_dir,
+# sorted unique, one per line.
+#
+# This set is exactly what the old per-class regex
+#   (^|[^A-Za-z0-9_-])cls([^A-Za-z0-9_-]|$)
+# tested for: that regex says "cls is a maximal class-character run", and -oE
+# emits every such run. Membership in this set is therefore the same predicate
+# -- one tree walk total, instead of one walk per candidate class.
+#
+# -a treats every corpus file as text. Without it grep prints
+# "Binary file X matches" instead of tokens for any file it deems binary,
+# silently losing real references and inventing orphan candidates.
+source_tokens() {
+    local search_dir="$1"
+    LC_ALL=C grep -rhoaE '[A-Za-z0-9_-]+' \
         --include='*.php' --include='*.js' --include='*.twig' \
         --include='*.tpl' --include='*.html' \
         --exclude-dir=vendor --exclude-dir=node_modules --exclude-dir=design \
-        "$search_dir" 2>/dev/null
+        "$search_dir" 2>/dev/null \
+        | LC_ALL=C sort -u \
+        || true
+}
+
+# Echoes the lines of candidates_file absent from tokens_file, order preserved.
+# grep -Fxv is fixed-string whole-line inverted matching, so neither file needs
+# a particular sort order or collation -- unlike comm, which would silently
+# mis-pair if the two sides were sorted under different locales.
+# `|| true` because grep exits 1 on no output, which under `set -e` would abort
+# the script precisely when the repo is clean (zero candidates remain).
+classes_not_in_source() {
+    local candidates_file="$1" tokens_file="$2"
+    grep -Fxv -f "$tokens_file" "$candidates_file" || true
 }
 
 # ── URL derivation helper ────────────────────────────────────────────────────
@@ -116,7 +138,7 @@ parse_routes_file() {
 
 # ── CSS definition locator ───────────────────────────────────────────────────
 # Echoes the first file:line where .cls is defined in css_dir/**/*.css.
-# Uses the same right-boundary as class_in_source so ".alert" is not
+# Uses the same right-boundary as source_tokens so ".alert" is not
 # located via ".alert-error". Degrades to "(source unknown)" on no match.
 css_definition_location() {
     local cls="$1"
@@ -163,11 +185,10 @@ PHPEOF
         | sed 's/^\.//' \
         | sort -u >"$candidates_file"
 
-    while read -r cls; do
-        if ! class_in_source "$cls" "$src_dir"; then
-            echo "$cls" >>"$residue_file"
-        fi
-    done <"$candidates_file"
+    local src_tokens
+    src_tokens=$(mktemp)
+    source_tokens "$src_dir" >"$src_tokens"
+    classes_not_in_source "$candidates_file" "$src_tokens" >"$residue_file"
 
     if grep -qx "live-class" "$residue_file" 2>/dev/null; then
         echo "FAIL: live-class should NOT be flagged but was" >&2
@@ -197,17 +218,41 @@ PHPEOF
         | sed 's/^\.//' \
         | sort -u >"$boundary_cands"
 
-    while read -r cls; do
-        if ! class_in_source "$cls" "$src_dir"; then
-            echo "$cls" >>"$boundary_residue"
-        fi
-    done <"$boundary_cands"
+    source_tokens "$src_dir" >"$src_tokens"
+    classes_not_in_source "$boundary_cands" "$src_tokens" >"$boundary_residue"
 
     if ! grep -qx "alert" "$boundary_residue" 2>/dev/null; then
         echo "FAIL: boundary test -- 'alert' not matched by 'alert-error' should be flagged" >&2
         pass=0
     else
         echo "PASS: boundary test -- 'alert' not spared by 'alert-error'"
+    fi
+
+    # Underscore-boundary test: '_' is a class character, so the CSS class
+    # .live must NOT be spared by the source token live_class. This is the
+    # property the one-pass token set inherits from the retired per-class
+    # regex, and the reason the two are equivalent rather than merely similar.
+    local usc_css="$fixture_dir/underscore.css"
+    local usc_src="$src_dir/underscore.php"
+    printf '.live { color: red; }\n' >"$usc_css"
+    printf '<?php $live_class = "x"; ?>\n' >"$usc_src"
+
+    local usc_cands usc_residue
+    usc_cands=$(mktemp)
+    usc_residue=$(mktemp)
+
+    grep -oE '\.[A-Za-z_][A-Za-z0-9_-]*' "$usc_css" \
+        | sed 's/^\.//' \
+        | sort -u >"$usc_cands"
+
+    source_tokens "$src_dir" >"$src_tokens"
+    classes_not_in_source "$usc_cands" "$src_tokens" >"$usc_residue"
+
+    if ! grep -qx "live" "$usc_residue" 2>/dev/null; then
+        echo "FAIL: underscore boundary -- 'live' not spared by 'live_class' should be flagged" >&2
+        pass=0
+    else
+        echo "PASS: underscore boundary -- 'live' not spared by 'live_class'"
     fi
 
     # ── Row 2: derive_base_url ───────────────────────────────────────────────
@@ -338,7 +383,8 @@ PHPEOF
     fi
 
     rm -rf "$fixture_dir" "$candidates_file" "$residue_file" \
-        "$boundary_cands" "$boundary_residue" 2>/dev/null || true
+        "$boundary_cands" "$boundary_residue" "$src_tokens" \
+        "$usc_cands" "$usc_residue" 2>/dev/null || true
 
     if [ "$pass" = "1" ]; then
         echo "PASS: all self-test assertions OK"
@@ -385,11 +431,9 @@ echo "  Excluded: vendor/, node_modules/, design/"
 echo ""
 
 RESIDUE=$(mktemp)
-while read -r cls; do
-    if ! class_in_source "$cls" "$ROOT/ibl5"; then
-        echo "$cls" >>"$RESIDUE"
-    fi
-done <"$CANDIDATES"
+SOURCE_TOKENS=$(mktemp)
+source_tokens "$ROOT/ibl5" >"$SOURCE_TOKENS"
+classes_not_in_source "$CANDIDATES" "$SOURCE_TOKENS" >"$RESIDUE"
 
 source_filtered=$(wc -l <"$RESIDUE" | tr -d ' ')
 removed=$((total_classes - source_filtered))
@@ -482,7 +526,7 @@ else
 fi
 
 # ── Cleanup ───────────────────────────────────────────────────────────────────
-rm -f "$CANDIDATES" "$RESIDUE" "$LIVE_TOKENS" 2>/dev/null || true
+rm -f "$CANDIDATES" "$RESIDUE" "$LIVE_TOKENS" "$SOURCE_TOKENS" 2>/dev/null || true
 
 # ── Step 5: Exit policy ───────────────────────────────────────────────────────
 # Advisory: exits 0 by default; --strict exits 1 when candidates remain.

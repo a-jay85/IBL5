@@ -1570,20 +1570,24 @@ ON DUPLICATE KEY UPDATE game_2gm=VALUES(game_2gm), game_2ga=VALUES(game_2ga),
   home_q1_points=VALUES(home_q1_points), home_q2_points=VALUES(home_q2_points),
   home_q3_points=VALUES(home_q3_points), home_q4_points=VALUES(home_q4_points);
 
--- Retired-era pair: 2024-02-14 (February -> game_type=1, season_year=2024),
+-- Retired-era pair: 2023-10-14 (October -> game_type=3 HEAT, season_year=2024),
 -- Metros(visitor=1) at Hornets(home=10). Both franchises carry a 2023-2024 row in
 -- ibl_franchise_seasons, so the HeadToHeadRecords `teams` axis resolves this game to
 -- the retired "Charlotte Hornets" era. The View hides any era with no games, so
 -- without this pair the Hornets branding row would never render.
+-- It is a HEAT game on purpose: `ibl_team_win_loss` (a view over this table) counts
+-- only game_type=1, and the LeagueControlPanel tradition update aborts on any
+-- completed season that is not exactly 82 games. A regular-season date here would
+-- give Metros and Spurs a 1-game 2024 season and break that mutator test.
 INSERT INTO ibl_box_scores_teams (game_date, visitor_teamid, home_teamid, game_of_that_day, name,
   game_2gm, game_2ga, game_ftm, game_fta, game_3gm, game_3ga,
   game_orb, game_drb, game_ast, game_stl, game_tov, game_blk, game_pf,
   visitor_q1_points, visitor_q2_points, visitor_q3_points, visitor_q4_points,
   home_q1_points, home_q2_points, home_q3_points, home_q4_points) VALUES
-  ('2024-02-14', 1, 10, 1, 'Metros',
+  ('2023-10-14', 1, 10, 1, 'Metros',
    27, 54, 16, 20, 10, 26, 9, 26, 20, 8, 12, 5, 17,
    24, 25, 23, 24, 26, 25, 27, 24),
-  ('2024-02-14', 1, 10, 1, 'Hornets',
+  ('2023-10-14', 1, 10, 1, 'Hornets',
    29, 56, 17, 21, 11, 27, 10, 28, 23, 7, 11, 4, 16,
    24, 25, 23, 24, 26, 25, 27, 24)
 ON DUPLICATE KEY UPDATE game_2gm=VALUES(game_2gm), game_2ga=VALUES(game_2ga),

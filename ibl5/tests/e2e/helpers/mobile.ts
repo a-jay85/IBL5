@@ -20,13 +20,14 @@ export async function assertNoHorizontalOverflow(page: Page, context?: string): 
 }
 
 /**
- * Assert that responsive-tables.js has wrapped at least one table in a scroll container.
+ * Assert that at least one table sits in a scroll container: either the
+ * responsive-tables.js wrapper or a server-rendered Pattern 3 sticky wrapper.
  * Uses toBeAttached() instead of toBeVisible() — scroll containers may be hidden inside overflow parents.
  */
 export async function assertScrollWrappersPresent(page: Page, context?: string): Promise<void> {
   await expect(
-    page.locator('.table-scroll-container').first(),
-    `No .table-scroll-container found${context ? ` ${context}` : ''}`,
+    page.locator('.table-scroll-container, .sticky-scroll-wrapper').first(),
+    `No .table-scroll-container or .sticky-scroll-wrapper found${context ? ` ${context}` : ''}`,
   ).toBeAttached();
 }
 

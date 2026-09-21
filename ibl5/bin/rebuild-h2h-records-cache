@@ -1,0 +1,44 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+if (php_sapi_name() !== 'cli') {
+    http_response_code(403);
+    exit('This script must be run from the command line.');
+}
+
+set_time_limit(0);
+
+$docRoot = dirname(__DIR__, 2);
+$_SERVER['DOCUMENT_ROOT'] = $docRoot;
+$serverName = in_array('--production', $argv, true) ? 'iblhoops.net' : 'localhost';
+$_SERVER['SERVER_NAME'] = $serverName;
+require $docRoot . '/ibl5/vendor/autoload.php';
+include $docRoot . '/ibl5/config.php';
+include $docRoot . '/ibl5/db/db.php';
+
+\Discord\Discord::init($serverName);
+
+/** @var \mysqli $mysqli_db */
+
+try {
+    $innerH2hRepo = new \HeadToHeadRecords\HeadToHeadRecordsRepository(
+        $mysqli_db,
+        null,
+        fn (int $id, string $n): string => (new \HeadToHeadRecords\LogoResolver())->resolve($id, $n, $docRoot . '/ibl5/images/logo'),
+    );
+    $cachedH2hRepo = new \HeadToHeadRecords\CachedHeadToHeadRecordsRepository(
+        $innerH2hRepo,
+        new \Cache\DatabaseCache($mysqli_db),
+    );
+    $cachedH2hRepo->rebuildCache();
+} catch (\Throwable $e) {
+    try {
+        \Discord\Discord::sendDM('283183467804491776', 'rebuild-h2h-records-cache failed: ' . $e->getMessage());
+    } catch (\Throwable) {
+        // DM delivery failed; fall through to stderr
+    }
+    fwrite(STDERR, 'rebuild-h2h-records-cache failed: ' . $e->getMessage() . "\n");
+    exit(1);
+}

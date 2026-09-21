@@ -253,6 +253,7 @@ try {
 
     // IBL-only: All-Star games don't exist in Olympics
     if (!$isOlympics) {
+        $updaterService->addStep(new Updater\Steps\RefreshHeadToHeadRecordsStep($mysqli_db));
         $updaterService->addStep(new Updater\Steps\ProcessAllStarGamesStep(
             $boxscoreProcessor, $boxscoreRepo, $boxscoreView, $sourceResolver,
         ));

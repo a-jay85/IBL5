@@ -435,6 +435,10 @@ def test_round2_no_verdict_overwrites_last_round_fields(tmp_path, git_shim):
         assert res.fidelity["remediation_sha"] == "round-sha-2"
         assert res.fidelity["verdict_2"] is None
         assert res.fidelity["reviewed_tree_2"] is None
+        # Round 2 is the indeterminate one, so it spends its single re-review retry.
+        assert res.fidelity["rounds"][1]["retries"] == 1
+        assert res.fidelity["rounds"][1]["outcome"] == "re-review-indeterminate"
+        assert res.fidelity["rounds"][0]["retries"] == 0
         tl = fidelity.terminal_line(
             res.fidelity["verdict_1"], res.fidelity["error_kind"],
             res.fidelity["remediation_sha"], res.fidelity["verdict_2"],
@@ -473,6 +477,11 @@ def test_remediate_none_stops(tmp_path, git_shim):
         assert res.fidelity["rounds_completed"] == 1
         purposes = [p for p, _ in llm.tooled_argvs]
         assert "plan-fidelity-re-review-3" not in purposes
+        # A dirty tree is terminal, not transient: the round spends no retry and the
+        # fixer is never spawned a second time for it.
+        assert res.fidelity["rounds"][1]["outcome"] == "dirty-worktree"
+        assert res.fidelity["rounds"][1]["retries"] == 0
+        assert len(res.fidelity["rounds"]) == 2
     finally:
         _cleanup(992, "992-2")
 

@@ -998,3 +998,125 @@ def test_outcome_reports_empty_work_list_and_never_spawns(tmp_path, git_shim):
     assert outcome["reason"] == "empty-work-list"
     assert llm.tooled_argvs == []
     assert gitad_double.pushes == 0
+
+
+# --- stale PR body regression (Phase 5.5 remediation loop) -------------------
+
+def test_rereview_uses_live_pr_body_not_stale_harness_copy(tmp_path, git_shim):
+    """pr_edit_body receives the live GitHub body (AGENT_SENTINEL), not the stale harness copy.
+
+    The gh.pr_edit_body call below is the precondition, not the assertion: it is the
+    literal call runner.py:446 makes before _run_fidelity is entered, and its only
+    observable effect is leaving _body_override set. Seeding it here is what makes the
+    test able to tell a working fix from an inert one — with plain gh.pr_body() at the
+    top of the loop the override wins and the harness body ships, so this test goes red
+    on pr_body_fresh() -> pr_body(), not merely on deleting the line.
+    """
+    AGENT_SENTINEL = "AGENT_EDITED_SENTINEL_kq7z"
+    canned = {
+        "plan-fidelity-review": "6d checks\n\nNOT READY\n",
+        "fidelity-remediation": "edited",
+        "plan-fidelity-re-review-2": "READY\n",
+    }
+    gh = RecordingGh(str(tmp_path), fixture={"body": AGENT_SENTINEL, "pr_number": 9971})
+    gh.pr_edit_body(9971, "stale-harness-body")      # == runner.py:446
+    res = _Res()
+    try:
+        runner._run_fidelity(
+            FixtureLlm(UsageLedger(), canned), str(tmp_path), str(tmp_path),
+            _counting_git(), gh, _plan(), "diff", "stale-harness-body",
+            9971, "dead" * 10, TREE_1, False, lambda m: None, res,
+        )
+        assert res.fidelity["rounds_completed"] == 1
+        # [0] is the seeded runner.py:446 write; the loop's own write is the last one.
+        edit_calls = [a for a in gh.actions() if a["action"] == "pr_edit_body"]
+        assert len(edit_calls) == 2
+        assert AGENT_SENTINEL in edit_calls[-1]["body"]
+        assert "stale-harness-body" not in edit_calls[-1]["body"]
+    finally:
+        _cleanup(9971, "9971-2")
+
+
+def test_rereview_issues_exactly_one_pr_edit_body_call(tmp_path, git_shim):
+    """The remediation loop calls pr_edit_body exactly once per round."""
+    canned = {
+        "plan-fidelity-review": "6d checks\n\nNOT READY\n",
+        "fidelity-remediation": "edited",
+        "plan-fidelity-re-review-2": "READY\n",
+    }
+    gh = RecordingGh(str(tmp_path), fixture={"pr_number": 9981})
+    res = _Res()
+    try:
+        runner._run_fidelity(
+            FixtureLlm(UsageLedger(), canned), str(tmp_path), str(tmp_path),
+            _counting_git(), gh, _plan(), "diff", "body",
+            9981, "dead" * 10, TREE_1, False, lambda m: None, res,
+        )
+        assert res.fidelity["rounds_completed"] == 1
+        edit_calls = [a for a in gh.actions() if a["action"] == "pr_edit_body"]
+        assert len(edit_calls) == 1
+    finally:
+        _cleanup(9981, "9981-2")
+
+
+def test_rereview_pr_body_fallback_to_harness_when_empty(tmp_path, git_shim):
+    """When the live body reads empty, the harness body is used via the 'or body' fallback.
+    Fails if the 'or body' branch is removed from runner.py:1306."""
+    HARNESS_SENTINEL = "HARNESS_FALLBACK_SENTINEL_m3nv"
+    canned = {
+        "plan-fidelity-review": "6d checks\n\nNOT READY\n",
+        "fidelity-remediation": "edited",
+        "plan-fidelity-re-review-2": "READY\n",
+    }
+    gh = RecordingGh(str(tmp_path), fixture={"pr_number": 9991})
+    res = _Res()
+    try:
+        runner._run_fidelity(
+            FixtureLlm(UsageLedger(), canned), str(tmp_path), str(tmp_path),
+            _counting_git(), gh, _plan(), "diff", HARNESS_SENTINEL,
+            9991, "dead" * 10, TREE_1, False, lambda m: None, res,
+        )
+        assert res.fidelity["rounds_completed"] == 1
+        edit_calls = [a for a in gh.actions() if a["action"] == "pr_edit_body"]
+        assert len(edit_calls) >= 1
+        assert HARNESS_SENTINEL in edit_calls[0]["body"]
+    finally:
+        _cleanup(9991, "9991-2")
+
+
+def test_pr_body_fresh_discards_the_harness_last_write(tmp_path):
+    """RecordingGh.pr_body_fresh ignores _body_override; pr_body still honours it."""
+    gh = RecordingGh(str(tmp_path), fixture={"body": "live-body", "pr_number": 7})
+    gh.pr_edit_body(7, "harness-write")
+    assert gh.pr_body() == "harness-write"
+    assert gh.pr_body_fresh() == "live-body"
+
+
+def test_live_gh_pr_body_fresh_refetches_after_an_edit(tmp_path, monkeypatch):
+    """LiveGh.pr_body_fresh re-issues `gh pr view` instead of replaying either cache.
+
+    Covers the live path the replay adapter cannot: pr_body() after pr_edit_body must
+    stay on the override, and pr_body_fresh() must drop both _body_override and _meta
+    so the next read reaches GitHub.
+    """
+    from harness.adapters.ghad import LiveGh
+    import json as _json
+
+    gh = LiveGh(str(tmp_path), str(tmp_path), "some-branch")
+    views = []
+
+    def fake_gh(*args, input_text=None):
+        if args[:2] == ("pr", "view"):
+            views.append(args)
+            return _json.dumps({"number": 7, "title": "t", "body": f"live-{len(views)}",
+                                "headRefOid": "abc", "labels": [], "state": "OPEN"})
+        return ""
+
+    monkeypatch.setattr(gh, "_gh", fake_gh)
+
+    assert gh.pr_body() == "live-1"
+    gh.pr_edit_body(7, "harness-write")
+    assert gh.pr_body() == "harness-write"
+    assert len(views) == 1                       # served from the override, no refetch
+    assert gh.pr_body_fresh() == "live-2"
+    assert len(views) == 2

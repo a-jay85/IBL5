@@ -17,7 +17,7 @@ if (preg_match('/modules\.php/i', $phpSelf) === 0) {
 
 global $mysqli_db, $user, $leagueContext;
 /** @var \mysqli $mysqli_db */
-/** @var object|null $user */
+/** @var mixed $user */
 /** @var \League\LeagueContext|null $leagueContext */
 
 $season      = new \Season\Season($mysqli_db, $leagueContext);
@@ -37,11 +37,34 @@ $repo = new \HeadToHeadRecords\CachedHeadToHeadRecordsRepository(
     new \Cache\DatabaseCache($mysqli_db)
 );
 
+// $user is the raw PHP-Nuke cookie string, not an object. Decode it to the
+// username, then resolve that GM's teamid so the matrix can highlight their row.
+// Anonymous visitors get a bare object with no teamid and no highlight.
+$nukeCompat  = new \Utilities\NukeCompat();
+$currentUser = new stdClass();
+if ($nukeCompat->isUser($user)) {
+    $decoded  = $nukeCompat->cookieDecode($user);
+    $username = is_string($decoded[1] ?? null) ? $decoded[1] : '';
+    $stmt = $username !== ''
+        ? $mysqli_db->prepare('SELECT teamid FROM `ibl_team_info` WHERE gm_username = ? LIMIT 1')
+        : false;
+    if ($stmt !== false) {
+        $stmt->bind_param('s', $username);
+        $stmt->execute();
+        $stmt->bind_result($gmTeamId);
+        $fetched = $stmt->fetch();
+        $stmt->close();
+        if ($fetched === true && is_numeric($gmTeamId)) {
+            $currentUser->teamid = (int) $gmTeamId;
+        }
+    }
+}
+
 $controller = new \HeadToHeadRecords\HeadToHeadRecordsController(
     $repo,
     new \HeadToHeadRecords\HeadToHeadRecordsView(),
     $season,
-    $user ?? new stdClass(),
+    $currentUser,
     $mysqli_db
 );
 

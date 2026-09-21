@@ -1,6 +1,6 @@
 ---
 description: ADR for Lighthouse PR sticky comments with per-URL scores and deltas vs master baseline
-last_verified: 2026-07-22
+last_verified: 2026-09-21
 ---
 
 # ADR-0022: Lighthouse PR Comments

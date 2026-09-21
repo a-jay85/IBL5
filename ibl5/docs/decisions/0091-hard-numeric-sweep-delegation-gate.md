@@ -1,6 +1,6 @@
 ---
 description: Batched main-thread edits are capped at a hard numeric ≥5-distinct-repo-files-per-turn limit, enforced by a PreToolUse deny rather than a warning.
-last_verified: 2026-07-22
+last_verified: 2026-09-21
 ---
 
 # ADR-0091: Hard numeric sweep-delegation gate (≥5 repo files per turn)

@@ -1,6 +1,6 @@
 ---
 description: Per-column matching strictness in check-column-rename-sweep to eliminate bareword false positives for common English / SQL-reserved words.
-last_verified: 2026-07-22
+last_verified: 2026-09-21
 ---
 
 # ADR-0071: Column-rename sweep matching precision (denylist design)

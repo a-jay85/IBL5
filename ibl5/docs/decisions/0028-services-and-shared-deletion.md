@@ -1,6 +1,6 @@
 ---
 description: ADR recording deletion of Services/ and Shared/ catch-all namespaces
-last_verified: 2026-07-22
+last_verified: 2026-09-21
 ---
 
 # ADR-0028: Delete Services/ and Shared/ Namespaces

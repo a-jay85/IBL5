@@ -1,6 +1,6 @@
 ---
 description: Zero-floor ratchet mechanism for RequireEscapedOutputRule prevents XSS regression in cleaned files.
-last_verified: 2026-07-22
+last_verified: 2026-09-21
 ---
 
 # ADR-0031: XSS Zero-Floor Ratchet

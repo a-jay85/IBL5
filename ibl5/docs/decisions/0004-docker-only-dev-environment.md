@@ -1,6 +1,6 @@
 ---
 description: Why IBL5 local dev is Docker-only, with MAMP sunset and native PHP stacks rejected.
-last_verified: 2026-07-22
+last_verified: 2026-09-21
 ---
 
 # ADR-0004: Docker-only development environment

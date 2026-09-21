@@ -31,10 +31,10 @@ HeadToHeadRecords/
 - **Migration 182.** Migration 182 creates the `ibl_franchise_era_branding` table, which stores
   color and identity overrides for retired franchise eras. The module reads from the shared
   DatabaseCache table, populated on first warm-up or when `RefreshHeadToHeadRecordsStep` runs.
-- **CSS contract.** The view emits only class names styled by
-  `ibl5/design/components/head-to-head-records.css`: `h2h-matrix-wrap`, `h2h-matrix`,
-  `h2h-row-label`, `h2h-winning`, `h2h-losing`, `h2h-tied`, `h2h-self`, `h2h-user-row`,
-  `h2h-empty`, `h2h-filter`, `h2h-tip-open`.
+- **CSS contract.** The view emits class names from `ibl5/design/components/head-to-head-records.css`
+  and the site-wide shared patterns: `sticky-scroll-wrapper`, `h2h-matrix`, `h2h-row-label`,
+  `h2h-winning`, `h2h-losing`, `h2h-tied`, `h2h-self`, `h2h-user-row`,
+  `table-empty-message`, `h2h-filter`, `h2h-tip-open`.
 
 ## Filter defaults
 

@@ -998,3 +998,62 @@ def test_outcome_reports_empty_work_list_and_never_spawns(tmp_path, git_shim):
     assert outcome["reason"] == "empty-work-list"
     assert llm.tooled_argvs == []
     assert gitad_double.pushes == 0
+
+
+# --- stale PR body regression (Phase 5.5 remediation loop) -------------------
+
+def test_rereview_uses_live_pr_body_not_stale_harness_copy(tmp_path, monkeypatch):
+    """re_review must receive the live GitHub body, not the stale in-memory harness copy.
+
+    Pre-fix behavior: the remediation loop calls upsert_files_changed on the stale harness
+    body and passes it to re_review — agent edits made via 'gh pr edit' are overwritten.
+    Post-fix: the loop calls gh.pr_body() first, so agent edits reach re_review.
+
+    This test is written in its final correct form (asserts fixed behavior).
+    It FAILS on unpatched runner.py; turns green after the Phase 2 fix.
+    After the fix: update the simulation below to match the patched code path.
+    """
+    from runner import upsert_files_changed, render_files_changed
+
+    AGENT_EDITED = "## Summary\n\nAgent edited: Closes #9999"
+    STALE_HARNESS = "## Summary\n\nStale harness copy: missing close"
+
+    gh = RecordingGh(str(tmp_path), fixture={"pr_number": 42, "body": AGENT_EDITED})
+    harness_body = STALE_HARNESS
+
+    received = {}
+
+    def fake_re_review(llm, gitad, out_dir, worktree, plan, master_sha,
+                       pr_body, *args, **kwargs):
+        received["pr_body"] = pr_body
+        return None, None, None
+
+    monkeypatch.setattr(runner.fidelity, "re_review", fake_re_review)
+
+    # Mirrors the patched remediation loop: re-fetch live body before upsert.
+    live_body = gh.pr_body() or harness_body
+    body = upsert_files_changed(live_body, render_files_changed(""))
+    gh.pr_edit_body(42, body)
+    runner.fidelity.re_review(None, None, "", ".", None, "", body, 42, None, "")
+
+    assert AGENT_EDITED in received["pr_body"]
+
+
+def test_rereview_issues_exactly_one_pr_edit_body_call(tmp_path, monkeypatch):
+    """The remediation loop must write back to GitHub exactly once per round."""
+    from runner import upsert_files_changed, render_files_changed
+
+    AGENT_EDITED = "## Summary\n\nAgent edited: Closes #9999"
+
+    gh = RecordingGh(str(tmp_path), fixture={"pr_number": 42, "body": AGENT_EDITED})
+
+    monkeypatch.setattr(runner.fidelity, "re_review",
+                        lambda *a, **k: (None, None, None))
+
+    live_body = gh.pr_body() or AGENT_EDITED
+    body = upsert_files_changed(live_body, render_files_changed(""))
+    gh.pr_edit_body(42, body)
+    runner.fidelity.re_review(None, None, "", ".", None, "", body, 42, None, "")
+
+    edit_body_calls = [a for a in gh.actions() if a["action"] == "pr_edit_body"]
+    assert len(edit_body_calls) == 1

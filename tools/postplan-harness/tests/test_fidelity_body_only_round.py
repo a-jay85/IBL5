@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import runner
 from harness import fidelity
 from harness.adapters.ghad import RecordingGh
+from harness.adapters.llm import FixtureLlm
 from harness.classify import FILES_CHANGED_BEGIN, FILES_CHANGED_END
 from harness.state import UsageLedger
 
@@ -147,3 +148,129 @@ def test_terminal_line_names_the_body_only_remediation():
     result = fidelity.terminal_line("NOT READY", None, "body-only", "READY", TREE_2, 1)
     assert result.startswith("READY (re-review)")
     assert "body-only" in result
+
+
+# ---------------------------------------------------------------------------
+# End-to-end regression tests (matrix rows 9-13)
+# ---------------------------------------------------------------------------
+
+_BEFORE_PROSE = "## Summary\n\nOriginal finding answer.\n\n" + _BLOCK_V1 + "\n"
+_AFTER_PROSE = "## Summary\n\nOriginal finding answer.\n\nAdded context.\n\n" + _BLOCK_V1 + "\n"
+_SAME_BODY = "## Summary\n\nSame prose throughout.\n\n" + _BLOCK_V1 + "\n"
+_BEFORE_FC = "## Prose\n\n" + BEGIN + "\n- old_file.py\n" + END + "\n"
+_AFTER_FC = "## Prose\n\n" + BEGIN + "\n- new_file.py\n" + END + "\n"
+
+
+def test_body_only_fix_clears_the_verdict_end_to_end(tmp_path, git_shim):
+    gh = _BodySeqGh(str(tmp_path),
+                    [_BEFORE_PROSE, _AFTER_PROSE, _AFTER_PROSE],
+                    fixture={"pr_number": 9932})
+    git = _counting_git(commit_returns=[""])
+    llm = FixtureLlm(UsageLedger(), {
+        "plan-fidelity-review": NOT_READY,
+        "fidelity-remediation": "answered in the body",
+        "plan-fidelity-re-review-2": "READY\n",
+    })
+    res = _Res()
+    try:
+        runner._run_fidelity(llm, str(tmp_path), str(tmp_path), git, gh, _plan(),
+                             "diff", "original-body", 9932, "dead" * 10, TREE_1, False,
+                             lambda _m: None, res)
+        assert res.fidelity["verdict_2"] == "READY"
+        assert res.fidelity["rounds_completed"] == 1
+        assert len(res.fidelity["rounds"]) == 1
+        assert gh.fresh_calls == 3
+        tl = fidelity.terminal_line(
+            res.fidelity["verdict_1"], res.fidelity.get("error_kind"),
+            res.fidelity["remediation_sha"], res.fidelity["verdict_2"],
+            res.fidelity["reviewed_tree_2"], res.fidelity["rounds_completed"])
+        assert tl.startswith("READY (re-review)")
+    finally:
+        _cleanup(9932, "9932-2")
+
+
+def test_unchanged_body_and_no_commit_still_retries(tmp_path, git_shim):
+    gh = _BodySeqGh(str(tmp_path), [_SAME_BODY],
+                    fixture={"pr_number": 9933})
+    git = _counting_git(commit_returns=[""])
+    llm = FixtureLlm(UsageLedger(), {
+        "plan-fidelity-review": NOT_READY,
+        "fidelity-remediation": "looked, changed nothing",
+    })
+    res = _Res()
+    try:
+        runner._run_fidelity(llm, str(tmp_path), str(tmp_path), git, gh, _plan(),
+                             "diff", "original-body", 9933, "dead" * 10, TREE_1, False,
+                             lambda _m: None, res)
+        rounds = res.fidelity["rounds"]
+        assert rounds[0]["outcome"] == "no-edits"
+        assert rounds[0]["retries"] == 1
+        assert res.fidelity["rounds_completed"] == 0
+        assert res.fidelity["verdict_2"] is None
+    finally:
+        _cleanup(9933, "9933-2")
+
+
+def test_committed_round_ignores_the_body_entirely(tmp_path, git_shim):
+    gh = _BodySeqGh(str(tmp_path),
+                    [_BEFORE_PROSE, _AFTER_PROSE, _AFTER_PROSE],
+                    fixture={"pr_number": 9934})
+    git = _counting_git(commit_returns=["round-sha-1"])
+    llm = FixtureLlm(UsageLedger(), {
+        "plan-fidelity-review": NOT_READY,
+        "fidelity-remediation": "committed a fix",
+        "plan-fidelity-re-review-2": "READY\n",
+    })
+    res = _Res()
+    try:
+        runner._run_fidelity(llm, str(tmp_path), str(tmp_path), git, gh, _plan(),
+                             "diff", "original-body", 9934, "dead" * 10, TREE_1, False,
+                             lambda _m: None, res)
+        rounds = res.fidelity["rounds"]
+        assert rounds[0]["outcome"] == "committed"
+        assert rounds[0]["remediation_sha"] == "round-sha-1"
+        assert gh.fresh_calls == 2
+    finally:
+        _cleanup(9934, "9934-2")
+
+
+def test_files_changed_block_churn_is_not_a_body_change(tmp_path, git_shim):
+    gh = _BodySeqGh(str(tmp_path), [_BEFORE_FC, _AFTER_FC, _AFTER_FC],
+                    fixture={"pr_number": 9935})
+    git = _counting_git(commit_returns=[""])
+    llm = FixtureLlm(UsageLedger(), {
+        "plan-fidelity-review": NOT_READY,
+        "fidelity-remediation": "no prose change",
+    })
+    res = _Res()
+    try:
+        runner._run_fidelity(llm, str(tmp_path), str(tmp_path), git, gh, _plan(),
+                             "diff", "original-body", 9935, "dead" * 10, TREE_1, False,
+                             lambda _m: None, res)
+        assert res.fidelity["rounds"][0]["outcome"] == "no-edits"
+        assert res.fidelity["rounds_completed"] == 0
+    finally:
+        _cleanup(9935, "9935-2")
+
+
+def test_empty_body_read_back_is_terminal_not_a_body_fix(tmp_path, git_shim):
+    gh = _BodySeqGh(str(tmp_path), ["BEFORE body prose", ""],
+                    fixture={"pr_number": 9936})
+    git = _counting_git(commit_returns=[""])
+    llm = FixtureLlm(UsageLedger(), {
+        "plan-fidelity-review": NOT_READY,
+        "fidelity-remediation": "looked around",
+    })
+    res = _Res()
+    logged = []
+    try:
+        runner._run_fidelity(llm, str(tmp_path), str(tmp_path), git, gh, _plan(),
+                             "diff", "original-body", 9936, "dead" * 10, TREE_1, False,
+                             logged.append, res)
+        assert res.fidelity["rounds"][0]["outcome"] == "body-fetch-failed"
+        assert res.fidelity["rounds_completed"] == 0
+        assert res.fidelity["verdict_2"] is None
+        assert len(res.fidelity["rounds"]) == 1
+        assert any("read back empty after remediation" in m for m in logged)
+    finally:
+        _cleanup(9936, "9936-2")

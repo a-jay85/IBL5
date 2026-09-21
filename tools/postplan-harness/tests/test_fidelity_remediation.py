@@ -365,6 +365,9 @@ def _counting_git():
 class _Res:
     def __init__(self):
         self.fidelity = {}
+        self.adr_drafted = False
+        self.adr_path = None
+        self.adr_draft_model = None
 
 
 def _cleanup(*suffixes):

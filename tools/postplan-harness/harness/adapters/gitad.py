@@ -30,6 +30,7 @@ _STALE_BASE_MARKER = "does not contain origin/master"
 
 _LOCAL_GATE_MARKERS = (
     "pre-push-adr-hook:",
+    "pre-commit-adr-gate:",
     _STALE_BASE_MARKER,
     "One or more checks failed:",
     "Bump last_verified",
@@ -46,6 +47,7 @@ _LOCAL_GATE_MARKERS = (
 _GATE_CLASSES = (
     ("stale-base", _STALE_BASE_MARKER),
     ("adr", "pre-push-adr-hook:"),
+    ("adr", "pre-commit-adr-gate:"),
     ("byte-budget", "Trim the rule(s) above"),
     ("doc-staleness", "Bump last_verified"),
 )

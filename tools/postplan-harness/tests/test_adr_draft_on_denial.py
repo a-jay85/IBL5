@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
 import shutil
 import stat
 import subprocess
@@ -1260,3 +1261,536 @@ def test_end_to_end_real_git_denying_hook_drafts_and_pushes(
         capture_output=True, text=True, check=True,
     ).stdout
     assert "0134-wt-slug.md" in tree_files
+
+
+# ===========================================================================
+# Tests: runner._commit_with_adr_draft() (commit-site ADR gate)
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# Helpers for commit-site tests
+# ---------------------------------------------------------------------------
+
+
+def _make_commit_site_adr_check(call2_rc=0):
+    """Return (handler, calls_list) for the 3-call commit-site adr-check sequence.
+
+    | call | caller                 | returns                                    |
+    |------|------------------------|--------------------------------------------|
+    |  0   | commit_gate()          | (1, body with no SURFACES_MARKER)          |
+    |  1   | probe inside draft()   | (1, body WITH SURFACES_MARKER)             |
+    |  2   | post-draft re-validate | (call2_rc, "")                             |
+    """
+    calls = []
+
+    def _handler(worktree, rel, *args, stdin=""):
+        idx = len(calls)
+        calls.append((args, stdin))
+        if idx == 0:
+            return (1, "pre-commit-adr-gate: decision trigger detected")
+        if idx == 1:
+            return (
+                1,
+                "Decision-trigger surfaces detected:\n"
+                "  - [new-tool-script] bin/x - new bin/ helper\n"
+                "FAIL: ADR required",
+            )
+        return (call2_rc, "")
+
+    return _handler, calls
+
+
+def _build_mini_repo(root, name):
+    """Build a minimal git repo at root/name with the same shape as the repo fixture."""
+    wt = root / name
+    wt.mkdir()
+    subprocess.run(["git", "init", str(wt)], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(wt), "symbolic-ref", "HEAD",
+                    "refs/heads/master"], check=True)
+    subprocess.run(["git", "-C", str(wt), "config", "user.email",
+                    "test@example.com"], check=True)
+    subprocess.run(["git", "-C", str(wt), "config", "user.name", "Test"], check=True)
+    adr_dir = wt / "ibl5" / "docs" / "decisions"
+    adr_dir.mkdir(parents=True)
+    shutil.copy(_TEMPLATE_SRC, str(adr_dir / "0000-template.md"))
+    for n in ("0131-a.md", "0132-b.md", "0133-c.md"):
+        (adr_dir / n).write_text(f"# {n}\nstub\n")
+    (wt / "bin").mkdir()
+    (wt / "bin" / ".keep").write_text("")
+    subprocess.run(["git", "-C", str(wt), "add", "-A"], check=True)
+    subprocess.run(["git", "-C", str(wt), "commit", "-m", "init"],
+                   check=True, capture_output=True)
+    origin = root / f"{name}.git"
+    subprocess.run(["git", "init", "--bare", str(origin)],
+                   check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(wt), "remote", "add", "origin", str(origin)],
+                   check=True)
+    subprocess.run(["git", "-C", str(wt), "push", "origin", "master"],
+                   check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(wt), "checkout", "-b", "wt-slug"],
+                   check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(wt), "update-ref",
+                    "refs/remotes/origin/master", "master"], check=True)
+    return wt, LiveGit(str(wt), push_remote="origin")
+
+
+# ---------------------------------------------------------------------------
+# Commit-site golden path
+# ---------------------------------------------------------------------------
+
+
+def test_commit_site_draft_lands_in_phase2_commit(repo, tmp_path, monkeypatch):
+    """Commit-site gate denies, draft stages the ADR (commit=False); exactly one
+    commit_all call is made for the whole phase, with the PR subject (not
+    ADR_COMMIT_MSG), and the ADR path is already in the index at that moment."""
+    wt = repo["wt"]
+    git = repo["git"]
+    out_dir = str(tmp_path / "out")
+
+    handler, _ = _make_commit_site_adr_check()
+    fake_scripts(monkeypatch, overrides={"adr-check": handler})
+
+    # Intercept commit_all to record staged files and message at call time
+    commit_calls = []
+    staged_at_commit = []
+    _real_commit_all = git.commit_all
+
+    def _tracking_commit_all(message):
+        result = subprocess.run(
+            ["git", "-C", str(wt), "diff", "--cached", "--name-only"],
+            capture_output=True, text=True,
+        )
+        staged_at_commit.append(result.stdout.strip().splitlines())
+        commit_calls.append(message)
+        return _real_commit_all(message)
+
+    git.commit_all = _tracking_commit_all
+
+    res = RunResult(terminal=TerminalState.FAILED)
+
+    runner._commit_with_adr_draft(
+        git, _noop_log, "phase2",
+        llm=WritingLlm(lambda rel: valid_adr("0134")),
+        worktree=str(wt), out_dir=out_dir, res=res,
+    )
+
+    # _commit_with_adr_draft must not commit (draft runs with commit=False)
+    assert commit_calls == [], \
+        "ADR must be staged, not committed, inside _commit_with_adr_draft"
+
+    # The ADR is already in the index before the Phase 2 commit
+    staged_before = subprocess.run(
+        ["git", "-C", str(wt), "diff", "--cached", "--name-only"],
+        capture_output=True, text=True,
+    ).stdout.strip().splitlines()
+    assert res.adr_path in staged_before
+
+    # Simulate the single Phase 2 commit (_commit_with_gate_remediation would make)
+    pr_subject = "chore: implement new decision-trigger tool"
+    git.commit_all(pr_subject)
+
+    # Exactly one call, with the PR subject, not the ADR_COMMIT_MSG
+    assert len(commit_calls) == 1
+    assert commit_calls[0] == pr_subject
+    assert "docs: add ADR" not in commit_calls[0]
+
+    # ADR path was staged at the moment of that call
+    assert res.adr_path in staged_at_commit[0]
+
+    # RunResult fields
+    assert res.adr_drafted is True
+    assert res.adr_path is not None
+    assert res.adr_draft_model is not None
+
+
+# ---------------------------------------------------------------------------
+# Commit-site draft failure
+# ---------------------------------------------------------------------------
+
+
+def test_commit_site_draft_failure_reraises_original_denial(tmp_path, monkeypatch):
+    """adr_draft.draft raising adr-draft-invalid is wrapped in the synthesised
+    local-gate denial; classify_local_gate_denial reads 'adr'; exit code = 3."""
+    monkeypatch.setattr(
+        adr_draft, "commit_gate",
+        lambda wt, base="origin/master": (1, "adr gate denied"),
+    )
+    monkeypatch.setattr(
+        adr_draft, "draft",
+        lambda *a, **k: (_ for _ in ()).throw(
+            HarnessError("adr-draft-invalid",
+                         "first body line is not the harness attribution")
+        ),
+    )
+
+    res = RunResult(terminal=TerminalState.FAILED)
+
+    with pytest.raises(HarnessError) as exc_info:
+        runner._commit_with_adr_draft(
+            FakeGit(), _noop_log, "phase2",
+            llm=None, worktree="/fake/wt", out_dir=str(tmp_path), res=res,
+        )
+
+    exc = exc_info.value
+    assert exc.kind == "local-gate"
+    assert "pre-commit-adr-gate:" in (exc.detail or "")
+    assert classify_local_gate_denial(exc.detail or "") == "adr"
+
+    res.error_kind = exc.kind
+    res.error = f"{exc.kind}: {exc.detail}"
+    assert runner.exit_code_for(res) == 3
+
+
+# ---------------------------------------------------------------------------
+# Commit-site revalidation failure: sha is empty in stage-only mode
+# ---------------------------------------------------------------------------
+
+
+def test_commit_site_revalidation_failure_records_path_with_empty_sha(
+        repo, tmp_path, monkeypatch):
+    """When post-draft adr-check still fails the inner adr-draft-gate detail has
+    {rel}|| (sha='' because commit=False); res.adr_path recorded; outer = local-gate;
+    exit code = 3."""
+    wt = repo["wt"]
+    git = repo["git"]
+    out_dir = str(tmp_path / "out")
+    rel = "ibl5/docs/decisions/0134-wt-slug.md"
+
+    handler, _ = _make_commit_site_adr_check(call2_rc=1)
+    fake_scripts(monkeypatch, overrides={"adr-check": handler})
+
+    res = RunResult(terminal=TerminalState.FAILED)
+
+    with pytest.raises(HarnessError) as exc_info:
+        runner._commit_with_adr_draft(
+            git, _noop_log, "phase2",
+            llm=WritingLlm(lambda r: valid_adr("0134")),
+            worktree=str(wt), out_dir=out_dir, res=res,
+        )
+
+    exc = exc_info.value
+    assert exc.kind == "local-gate"
+    assert "pre-commit-adr-gate:" in (exc.detail or "")
+
+    # Inner exception: sha is "" because commit=False, separator pair is adjacent
+    inner = exc.__cause__
+    assert inner is not None and inner.kind == "adr-draft-gate"
+    assert (inner.detail or "").startswith(f"{rel}||adr-check still fails: ")
+
+    # Path recorded despite no commit
+    assert res.adr_path == rel
+
+    res.error_kind = exc.kind
+    res.error = f"{exc.kind}: {exc.detail}"
+    assert runner.exit_code_for(res) == 3
+
+
+# ---------------------------------------------------------------------------
+# One-draft-per-run guard across commit and push sites
+# ---------------------------------------------------------------------------
+
+
+def test_one_opus_call_per_run_across_commit_and_push_sites(
+        repo, tmp_path, monkeypatch):
+    """Commit-site draft consumes the one-draft token; the phase-5.5 push-site guard
+    short-circuits without a second LLM call; total call_tooled count = 1."""
+    wt = repo["wt"]
+    git = repo["git"]
+    out_dir = str(tmp_path / "out")
+
+    handler, _ = _make_commit_site_adr_check()
+    fake_scripts(monkeypatch, overrides={"adr-check": handler})
+
+    llm = WritingLlm(lambda rel: valid_adr("0134"))
+    res = RunResult(terminal=TerminalState.FAILED)
+
+    # Commit site: one LLM call, res.adr_drafted set to True
+    runner._commit_with_adr_draft(
+        git, _noop_log, "phase2",
+        llm=llm, worktree=str(wt), out_dir=out_dir, res=res,
+    )
+    assert res.adr_drafted is True
+    assert len(llm.calls) == 1
+
+    # Push site: guard fires before attempting a second draft
+    adr_denial = HarnessError("local-gate", _ADR_TEXT)
+    push_git = FakeGit(push_errors=[adr_denial])
+    logged = []
+
+    with pytest.raises(HarnessError):
+        runner._push_with_adr_draft(
+            push_git, logged.append, "phase5.5",
+            llm=llm, worktree=str(wt), out_dir=out_dir, res=res,
+        )
+
+    assert len(llm.calls) == 1, "second LLM call must not happen"
+    assert any("after this run's one draft" in line for line in logged)
+
+
+# ---------------------------------------------------------------------------
+# Commit gate pass: drafter never entered
+# ---------------------------------------------------------------------------
+
+
+def test_commit_gate_pass_skips_drafter(tmp_path, monkeypatch):
+    """commit_gate returning rc=0 means no ADR needed; drafter and LLM never called."""
+    monkeypatch.setattr(
+        adr_draft, "commit_gate",
+        lambda wt, base="origin/master": (0, ""),
+    )
+    draft_calls = []
+    monkeypatch.setattr(
+        adr_draft, "draft",
+        lambda *a, **k: draft_calls.append(1),
+    )
+    llm = WritingLlm(lambda rel: valid_adr("0134"))
+    res = RunResult(terminal=TerminalState.FAILED)
+
+    runner._commit_with_adr_draft(
+        FakeGit(), _noop_log, "phase2",
+        llm=llm, worktree="/fake/wt", out_dir=str(tmp_path), res=res,
+    )
+
+    assert not llm.calls, "LLM must not be called when commit gate passes"
+    assert not draft_calls, "draft must not be called when commit gate passes"
+    assert res.adr_drafted is False
+
+
+# ---------------------------------------------------------------------------
+# No-op when worktree is None (replay shape)
+# ---------------------------------------------------------------------------
+
+
+def test_commit_site_noop_without_worktree(tmp_path, monkeypatch):
+    """worktree=None (replay shape): returns immediately without touching adr-check."""
+    run_script_calls = []
+
+    def _sentinel(*a, **k):
+        run_script_calls.append(a)
+        return (0, "")
+
+    monkeypatch.setattr(adr_draft, "_run_script", _sentinel)
+    res = RunResult(terminal=TerminalState.FAILED)
+
+    runner._commit_with_adr_draft(
+        FakeGit(), _noop_log, "phase2",
+        llm=None, worktree=None, out_dir=str(tmp_path), res=res,
+    )
+
+    assert not run_script_calls, "adr-check must not run when worktree is None"
+    assert res.adr_drafted is False
+
+
+# ---------------------------------------------------------------------------
+# commit_gate stdin and args
+# ---------------------------------------------------------------------------
+
+
+def test_commit_gate_pipes_branch_commit_messages(repo, monkeypatch):
+    """commit_gate passes git log --format=%B as stdin; empty base..HEAD passes ''."""
+    wt = repo["wt"]
+
+    recorded = []
+
+    def _recording(wt_path, rel, *args, stdin=""):
+        recorded.append({"rel": rel, "args": args, "stdin": stdin})
+        return (1, "FAIL")
+
+    monkeypatch.setattr(adr_draft, "_run_script", _recording)
+
+    # Part 1: empty range (wt-slug at origin/master, no new commits) -> stdin = ""
+    adr_draft.commit_gate(str(wt))
+
+    assert len(recorded) == 1, "gate must evaluate even on an empty range"
+    assert recorded[0]["stdin"] == ""
+
+    # Part 2: add a commit so the range is non-empty
+    recorded.clear()
+    (wt / "bin" / "z").write_text("#!/bin/bash\necho decision\n")
+    subprocess.run(["git", "-C", str(wt), "add", "-A"], check=True)
+    subprocess.run(
+        ["git", "-C", str(wt), "commit", "-m", "add bin/z: decision trigger"],
+        check=True, capture_output=True,
+    )
+
+    adr_draft.commit_gate(str(wt))
+
+    assert len(recorded) == 1
+    call = recorded[0]
+    assert (call["rel"],) + call["args"] == (
+        "bin/adr-check", "--commit", "--bypass-from-stdin", "--base=origin/master",
+    )
+    assert "add bin/z: decision trigger" in call["stdin"]
+
+
+# ---------------------------------------------------------------------------
+# check-docs gate skipped at commit site, present at push site
+# ---------------------------------------------------------------------------
+
+
+def test_commit_site_skips_check_docs_since_gate(tmp_path, monkeypatch):
+    """draft(check_mode='commit') omits check-docs; draft(check_mode='pr') includes it."""
+
+    def _run_and_collect(wt_str, git, out_dir_str, mode):
+        gate_calls = []
+        adr_check_idx = [0]
+
+        def _dispatch(wt_path, rel, *args, stdin=""):
+            name = os.path.basename(rel)
+            gate_calls.append(name)
+            if name == "adr-check":
+                idx = adr_check_idx[0]
+                adr_check_idx[0] += 1
+                if idx == 0:
+                    return (
+                        1,
+                        "Decision-trigger surfaces detected:\n"
+                        "  - [new-tool-script] bin/x\nFAIL: ADR required",
+                    )
+                return (0, "")
+            if name == "next-adr":
+                slug = args[0] if args else "wt-slug"
+                decisions = os.path.join(wt_path, "ibl5", "docs", "decisions")
+                dest = os.path.join(decisions, f"0134-{slug}.md")
+                shutil.copy(os.path.join(decisions, "0000-template.md"), dest)
+                return (0, dest)
+            return (0, "")
+
+        monkeypatch.setattr(adr_draft, "_run_script", _dispatch)
+        adr_draft.draft(
+            WritingLlm(lambda rel: valid_adr("0134")),
+            git, wt_str, out_dir_str, _noop_log,
+            phase="phase2", today="2026-09-20", check_mode=mode,
+        )
+        return gate_calls
+
+    wt_c, git_c = _build_mini_repo(tmp_path, "commit-mode")
+    commit_gates = _run_and_collect(
+        str(wt_c), git_c, str(tmp_path / "out-commit"), "commit",
+    )
+    assert "check-numbering" in commit_gates
+    assert "check-prose" in commit_gates
+    assert "check-docs" not in commit_gates, \
+        "check-docs must be skipped in commit mode"
+
+    wt_p, git_p = _build_mini_repo(tmp_path, "pr-mode")
+    pr_gates = _run_and_collect(
+        str(wt_p), git_p, str(tmp_path / "out-pr"), "pr",
+    )
+    assert "check-numbering" in pr_gates
+    assert "check-prose" in pr_gates
+    assert "check-docs" in pr_gates, \
+        "check-docs must be called in pr mode"
+
+
+# ---------------------------------------------------------------------------
+# Stray check: baseline filtering
+# ---------------------------------------------------------------------------
+
+
+def test_stray_check_ignores_the_runs_own_staged_work(repo, tmp_path, monkeypatch):
+    """Paths staged before the drafter runs (same porcelain code after) are not strays;
+    draft() succeeds and _discard is never called."""
+    wt = repo["wt"]
+    git = repo["git"]
+    out_dir = str(tmp_path / "out")
+
+    # Stage several run files to populate the pre-draft baseline
+    (wt / "bin" / "run-tool.sh").write_text("#!/bin/bash\necho run\n")
+    (wt / "bin" / "run-config.json").write_text('{"v": 1}')
+    subprocess.run(["git", "-C", str(wt), "add", "-A"], check=True)
+    # Leave uncommitted: baseline status "A " for each
+
+    discard_calls = []
+    _orig_discard = adr_draft._discard
+
+    def _tracking_discard(*a, **k):
+        discard_calls.append(k.get("strays", ()))
+        _orig_discard(*a, **k)
+
+    monkeypatch.setattr(adr_draft, "_discard", _tracking_discard)
+    fake_scripts(monkeypatch)
+
+    result = adr_draft.draft(
+        WritingLlm(lambda rel: valid_adr("0134")),
+        git, str(wt), out_dir, _noop_log,
+        phase="phase2", today="2026-09-20",
+    )
+
+    assert result.path.endswith("0134-wt-slug.md")
+    assert not discard_calls, \
+        "_discard must not be called when all extra paths are in the baseline"
+
+
+def test_stray_check_reverts_only_paths_absent_from_baseline(repo, tmp_path, monkeypatch):
+    """_discard receives only paths absent from the pre-draft baseline; no baseline path
+    is included, preventing a work-destroying revert of the run's own staged output."""
+    wt = repo["wt"]
+    git = repo["git"]
+    out_dir = str(tmp_path / "out")
+
+    # Stage one baseline file before the draft runs
+    (wt / "bin" / "harness-output.log").write_text("run log\n")
+    subprocess.run(["git", "-C", str(wt), "add", "-A"], check=True)
+
+    discard_calls = []
+    _orig_discard = adr_draft._discard
+
+    def _tracking_discard(wt_path, rel, out_dir_path, log, phase, reason, strays=()):
+        discard_calls.append(list(strays))
+        _orig_discard(wt_path, rel, out_dir_path, log, phase, reason, strays=strays)
+
+    monkeypatch.setattr(adr_draft, "_discard", _tracking_discard)
+
+    def _evil_content(rel):
+        # Side-effect: write a source file outside the decisions directory
+        os.makedirs(os.path.join(str(wt), "src"), exist_ok=True)
+        with open(os.path.join(str(wt), "src", "evil.py"), "w") as fh:
+            fh.write("# injected by drafter\n")
+        return valid_adr("0134")
+
+    fake_scripts(monkeypatch)
+
+    with pytest.raises(HarnessError) as exc_info:
+        adr_draft.draft(
+            WritingLlm(_evil_content),
+            git, str(wt), out_dir, _noop_log,
+            phase="phase2", today="2026-09-20",
+        )
+
+    assert exc_info.value.kind == "adr-draft-scope"
+    assert discard_calls, "_discard must be called"
+    strays_received = discard_calls[0]
+    # git reports an untracked new directory as "src/" (directory-level), not the
+    # individual file — either form proves the stray was detected.
+    assert any(s.startswith("src") for s in strays_received), \
+        f"expected src/evil.py stray but got {strays_received}"
+    assert "bin/harness-output.log" not in strays_received
+
+
+# ---------------------------------------------------------------------------
+# classify_local_gate_denial: pre-commit marker
+# ---------------------------------------------------------------------------
+
+
+def test_classify_local_gate_denial_reads_pre_commit_marker():
+    """Both pre-commit-adr-gate: and pre-push-adr-hook: classify as 'adr'."""
+    assert (
+        classify_local_gate_denial("phase2: pre-commit-adr-gate: bin/x added") == "adr"
+    )
+    assert (
+        classify_local_gate_denial(
+            "git push: pre-push-adr-hook: a decision-trigger surface"
+        ) == "adr"
+    )
+
+
+def test_stage_all_precedes_the_commit_site_draft():
+    """_commit_with_adr_draft reads the INDEX via `adr-check --commit`, so _run()
+    must stage before calling it. If the stage_all() call ever moves below the
+    draft call, the gate sees an empty index, returns 0, and the ADR is never
+    drafted -- the exact case deliverable 3 exists for."""
+    src = (pathlib.Path(runner.__file__)).read_text()
+    stage = src.index("            git.stage_all()")
+    draft = src.index("        _commit_with_adr_draft(git, log, \"phase2\"")
+    assert stage < draft, "git.stage_all() must run before _commit_with_adr_draft"

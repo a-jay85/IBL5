@@ -50,13 +50,19 @@ new_repo() {
     cp "$SCRIPT_DIR/adr-check" "$REPO/bin/adr-check"
     cp "$SCRIPT_DIR/pre-push-adr-hook" "$REPO/bin/pre-push-adr-hook"
     cp "$SCRIPT_DIR/lib/branch-base.sh" "$REPO/bin/lib/branch-base.sh"
-    chmod +x "$REPO/bin/adr-check" "$REPO/bin/pre-push-adr-hook"
+    cp "$SCRIPT_DIR/pre-commit-hook" "$REPO/bin/pre-commit-hook"
+    cp "$SCRIPT_DIR/lib/shell-scripts.sh" "$REPO/bin/lib/shell-scripts.sh"
+    chmod +x "$REPO/bin/adr-check" "$REPO/bin/pre-push-adr-hook" \
+             "$REPO/bin/pre-commit-hook" "$REPO/bin/lib/shell-scripts.sh"
     git -C "$REPO" init -q
     git -C "$REPO" config user.email test@example.com
     git -C "$REPO" config user.name "test"
     git -C "$REPO" config commit.gpgsign false
     echo base > "$REPO/README.md"
-    git -C "$REPO" add README.md          # NOT bin/* — keep the bin copies untracked
+    mkdir -p "$REPO/ibl5"
+    printf '{\n  "require": {\n    "vendor/base": "^1.0"\n  }\n}\n' \
+        > "$REPO/ibl5/composer.json"
+    git -C "$REPO" add README.md ibl5/composer.json   # NOT bin/* — keep the bin copies untracked
     git -C "$REPO" commit -qm base
     if [ "$1" -eq 1 ]; then
         git -C "$REPO" update-ref refs/remotes/origin/master "$(git -C "$REPO" rev-parse HEAD)"
@@ -331,12 +337,229 @@ run_adr_check; expect "adrcheck-misplaced-rules-prefix-no-trigger" 0 $?
 WF="$SCRIPT_DIR/../.github/workflows/pr-meta-checks.yml"
 SKIP_IF="$(grep -A3 -F -e '- name: adr-check skipped' "$WF" 2>/dev/null | grep -m1 -F 'if:' || true)"
 
-[ -f "$WF" ]; ok_check "skip-observability-workflow-file-present" $?
+[ -f "$WF" ] && ok_check "skip-observability-workflow-file-present" 0 \
+    || ok_check "skip-observability-workflow-file-present" 1
 grep -qF 'adr-check skipped' "$WF" 2>/dev/null; ok_check "skip-observability-else-branch-exists" $?
 grep -qF 'adr-check skipped: no decision-trigger paths in diff' "$WF" 2>/dev/null; ok_check "skip-observability-message-exact" $?
 echo "$SKIP_IF" | grep -qF "steps.filter.outputs.adr != 'true'"; ok_check "skip-observability-if-is-filter-complement" $?
 echo "$SKIP_IF" | grep -qF "github.event_name == 'pull_request'"; ok_check "skip-observability-if-guards-pull-request" $?
 echo "$SKIP_IF" | grep -qF '!cancelled()'; ok_check "skip-observability-if-runs-when-job-red" $?
+
+# ============================================================
+# Phase 3 — bin/adr-check --commit and pre-commit-hook cases
+# ============================================================
+
+# --- additional helpers ---
+
+# stage_bin_trigger — write a 60-line shebang script and stage it (no commit).
+stage_bin_trigger() {
+    printf '#!/usr/bin/env bash\n' > "$REPO/bin/foo"
+    i=1
+    while [ "$i" -le 60 ]; do
+        echo "# line $i" >> "$REPO/bin/foo"
+        i=$((i + 1))
+    done
+    git -C "$REPO" add bin/foo
+}
+
+# stage_no_trigger — stage a plain .txt file (no trigger surface, no commit).
+stage_no_trigger() {
+    echo "notes" > "$REPO/notes.txt"
+    git -C "$REPO" add notes.txt
+}
+
+# stage_adr — create ADR file and stage it (no commit).
+stage_adr() {
+    mkdir -p "$REPO/ibl5/docs/decisions"
+    echo "# Decision record" > "$REPO/ibl5/docs/decisions/0042-test-decision.md"
+    git -C "$REPO" add ibl5/docs/decisions/0042-test-decision.md
+}
+
+# commit_adr — create ADR file, stage, and commit.
+commit_adr() {
+    mkdir -p "$REPO/ibl5/docs/decisions"
+    echo "# Decision record" > "$REPO/ibl5/docs/decisions/0042-test-decision.md"
+    git -C "$REPO" add ibl5/docs/decisions/0042-test-decision.md
+    git -C "$REPO" commit -qm "docs: add ADR-0042"
+}
+
+# stage_trigger <kind> — stage exactly one trigger file of the given kind (no commit).
+stage_trigger() {
+    case "$1" in
+        phpstan)
+            mkdir -p "$REPO/ibl5/phpstan-rules"
+            echo '<?php class NoFooRule {}' > "$REPO/ibl5/phpstan-rules/NoFooRule.php"
+            git -C "$REPO" add ibl5/phpstan-rules/NoFooRule.php
+            ;;
+        rule)
+            mkdir -p "$REPO/.claude/rules"
+            echo "# rule" > "$REPO/.claude/rules/foo.md"
+            git -C "$REPO" add .claude/rules/foo.md
+            ;;
+        workflow)
+            mkdir -p "$REPO/.github/workflows"
+            echo "on: push" > "$REPO/.github/workflows/foo.yml"
+            git -C "$REPO" add .github/workflows/foo.yml
+            ;;
+        migration)
+            mkdir -p "$REPO/ibl5/migrations"
+            printf 'DROP TABLE foo;\n' > "$REPO/ibl5/migrations/2026_01_01_drop.sql"
+            git -C "$REPO" add ibl5/migrations/2026_01_01_drop.sql
+            ;;
+        script)
+            stage_bin_trigger
+            ;;
+        dependency)
+            printf '{\n  "require": {\n    "vendor/base": "^1.0",\n    "vendor/pkg": "^1.0"\n  }\n}\n' \
+                > "$REPO/ibl5/composer.json"
+            git -C "$REPO" add ibl5/composer.json
+            ;;
+        *)
+            echo "stage_trigger: unknown kind: $1" >&2
+            return 1
+            ;;
+    esac
+}
+
+# run_adr_check_commit — pipe branch commit messages into adr-check --commit.
+run_adr_check_commit() {
+    git -C "$REPO" log --format=%B \
+        "$(git -C "$REPO" merge-base HEAD origin/master 2>/dev/null)..HEAD" 2>/dev/null \
+        | (cd "$REPO" && ./bin/adr-check --commit --bypass-from-stdin >/dev/null 2>&1)
+}
+
+# run_adr_check_commit_stdin <body> — pipe an explicit body instead.
+run_adr_check_commit_stdin() {
+    printf '%s' "$1" \
+        | (cd "$REPO" && ./bin/adr-check --commit --bypass-from-stdin >/dev/null 2>&1)
+}
+
+# run_pre_commit_hook — run the pre-commit hook; capture all output to .hookout.
+run_pre_commit_hook() {
+    (cd "$REPO" && ./bin/pre-commit-hook >"$REPO/.hookout" 2>&1)
+}
+
+# --- adr-check --commit mode cases ---
+
+# trigger staged alongside an ADR in the same staged set → pass
+new_repo 1; stage_bin_trigger; stage_adr
+run_adr_check_commit; expect "commit-trigger-and-adr-same-staged-set" 0 $?
+
+# trigger staged; ADR was committed in an earlier commit on this branch → pass (regression)
+new_repo 1; commit_adr; stage_bin_trigger
+run_adr_check_commit; expect "commit-trigger-staged-adr-in-earlier-commit" 0 $?
+
+# trigger staged with no ADR anywhere → fail
+new_repo 1; stage_bin_trigger
+run_adr_check_commit; expect "commit-trigger-staged-no-adr" 1 $?
+
+# each of the six trigger kinds staged with no ADR → fail
+new_repo 1; stage_trigger phpstan
+run_adr_check_commit; expect "commit-trigger-phpstan-no-adr" 1 $?
+
+new_repo 1; stage_trigger rule
+run_adr_check_commit; expect "commit-trigger-rule-no-adr" 1 $?
+
+new_repo 1; stage_trigger workflow
+run_adr_check_commit; expect "commit-trigger-workflow-no-adr" 1 $?
+
+new_repo 1; stage_trigger migration
+run_adr_check_commit; expect "commit-trigger-migration-no-adr" 1 $?
+
+new_repo 1; stage_trigger script
+run_adr_check_commit; expect "commit-trigger-script-no-adr" 1 $?
+
+new_repo 1; stage_trigger dependency
+run_adr_check_commit; expect "commit-trigger-dependency-no-adr" 1 $?
+
+# script trigger staged with ADR → pass
+new_repo 1; stage_trigger script; stage_adr
+run_adr_check_commit; expect "commit-trigger-script-with-adr" 0 $?
+
+# migration trigger staged with ADR → pass
+new_repo 1; stage_trigger migration; stage_adr
+run_adr_check_commit; expect "commit-trigger-migration-with-adr" 0 $?
+
+# bypass marker long enough → pass
+new_repo 1; stage_bin_trigger
+run_adr_check_commit_stdin '<!-- no-adr: this reason is definitely long enough -->'
+expect "commit-bypass-long-enough" 0 $?
+
+# bypass marker too short → fail
+new_repo 1; stage_bin_trigger
+run_adr_check_commit_stdin '<!-- no-adr: too short -->'
+expect "commit-bypass-too-short" 1 $?
+
+# no trigger → pass
+new_repo 1; add_no_trigger
+run_adr_check_commit; expect "commit-no-trigger-clean" 0 $?
+
+# empty commit range: HEAD == origin/master, trigger staged but not committed.
+# merge-base..HEAD range is empty so bypass body is empty; diff still sees staged trigger.
+new_repo 1; stage_bin_trigger
+run_adr_check_commit; expect "commit-empty-range-first-commit" 1 $?
+_erf_out=$(cd "$REPO" && ./bin/adr-check --commit --bypass-from-stdin </dev/null 2>/dev/null)
+[ -n "$_erf_out" ] && ok_check "commit-empty-range-first-commit-output" 0 \
+    || ok_check "commit-empty-range-first-commit-output" 1
+
+# twin: same empty range, no-trigger file staged only → pass
+new_repo 1; stage_no_trigger
+run_adr_check_commit; expect "commit-empty-range-no-trigger" 0 $?
+
+# no origin/master → degrade open (exit 0) with a diagnostic message
+new_repo 0; stage_bin_trigger
+_nod_out=$(cd "$REPO" && ./bin/adr-check --commit --bypass-from-stdin </dev/null 2>/dev/null)
+_nod_exit=$?
+expect "commit-no-origin-master-degrades-open" 0 "$_nod_exit"
+grep -qF 'cannot resolve a merge-base' <<< "$_nod_out"
+ok_check "commit-no-origin-master-degrades-open-msg" $?
+
+# stacked: feature branches from parent (which has the ADR committed); merge-base against
+# origin/master is the initial commit, so the diff window covers parent's ADR → pass.
+new_repo 1
+git -C "$REPO" checkout -qb parent
+commit_adr
+git -C "$REPO" checkout -qb feature
+git -C "$REPO" config branch.feature.iblBase parent
+stage_bin_trigger
+run_adr_check_commit; expect "commit-stacked-base-resolves-to-origin-master" 0 $?
+
+# stacked: parent has a tool commit but no ADR; feature also has no ADR → fail.
+new_repo 1
+git -C "$REPO" checkout -qb parent
+add_bin_trigger "parent work"
+git -C "$REPO" checkout -qb feature
+git -C "$REPO" config branch.feature.iblBase parent
+stage_bin_trigger
+run_adr_check_commit; expect "commit-stacked-base-no-adr-anywhere" 1 $?
+
+# --base=origin/master accepted for --commit (not a usage error, but trigger fires → exit 1)
+new_repo 1; stage_bin_trigger
+(cd "$REPO" && ./bin/adr-check --commit --base=origin/master </dev/null >/dev/null 2>&1)
+expect "commit-base-flag-accepted" 1 $?
+
+# --base= rejected for --staged (usage error → exit 2)
+(cd "$REPO" && ./bin/adr-check --staged --base=origin/master </dev/null >/dev/null 2>&1)
+expect "staged-base-flag-rejected" 2 $?
+
+# --- pre-commit-hook cases ---
+
+# trigger staged with no ADR → hook denies and prints the marker
+new_repo 1; stage_bin_trigger
+run_pre_commit_hook; expect "hook-trigger-staged-no-adr-denies" 1 $?
+grep -qF 'pre-commit-adr-gate:' "$REPO/.hookout"; ok_check "hook-trigger-staged-no-adr-denies-marker" $?
+
+# ADR committed earlier, trigger staged → hook passes
+new_repo 1; commit_adr; stage_bin_trigger
+run_pre_commit_hook; expect "hook-trigger-staged-adr-earlier-commit-passes" 0 $?
+
+# no origin/master → ADR gate block skipped → hook passes
+new_repo 0; stage_bin_trigger
+run_pre_commit_hook; expect "hook-no-origin-master-degrades-open" 0 $?
+
+# no trigger staged → hook passes
+new_repo 1; stage_no_trigger
+run_pre_commit_hook; expect "hook-no-trigger-passes" 0 $?
 
 if [ "$FAILED" -ne 0 ]; then
     echo "RESULT: FAILED"

@@ -240,7 +240,7 @@ class RunResult:
     sticky_comment_id: Optional[str] = None  # numeric id read back after the upsert; None = unconfirmed
     sticky_error: Optional[str] = None       # "sticky-post-failed" when the read-back found no comment
     retry_cap: Optional[str] = None  # "push-retry-cap" | "behind-retry-cap" when a bounded loop spent its cap
-    adr_drafted: bool = False               # Phase 2/5.5: harness drafted a missing ADR on a pre-push-adr-hook denial
+    adr_drafted: bool = False               # Phase 2 commit gate (or the 5.5 push backstop): harness drafted a missing ADR
     adr_path: Optional[str] = None          # repo-relative path of the drafted ADR; set even when the re-push was denied
     adr_draft_model: Optional[str] = None   # MODEL_MAP id the drafter ran on
     # Phase 5.5 record: verdict_2 / reviewed_tree_2 / remediation_sha alias the last

@@ -85,19 +85,30 @@ def _slug_for(branch: str) -> str:
     return slug or "harness-drafted-adr"
 
 
-def _stray_paths(worktree: str, allowed: set[str]) -> list[str]:
+def _status_map(worktree: str) -> dict[str, str]:
+    """path -> porcelain status code."""
     _, out = _git(worktree, "status", "--porcelain")
-    paths = []
+    m: dict[str, str] = {}
     for line in out.splitlines():
         if len(line) < 4:
             continue
-        path = line[3:].strip()
+        code, path = line[:2], line[3:].strip()
         if " -> " in path:               # a rename reports "old -> new"
             path = path.split(" -> ", 1)[1]
         path = path.strip('"')
-        if path and path not in allowed:
-            paths.append(path)
-    return sorted(set(paths))
+        if path:
+            m[path] = code
+    return m
+
+
+def _stray_paths(worktree: str, allowed: set[str],
+                 baseline: dict[str, str] | None = None) -> list[str]:
+    """Paths the drafter touched outside its allocation. `baseline` is the porcelain
+    snapshot taken BEFORE the model ran: a path already dirty then, with an unchanged
+    status code now, is the run's own staged work and not a stray."""
+    base = baseline or {}
+    return sorted({p for p, code in _status_map(worktree).items()
+                   if p not in allowed and base.get(p) != code})
 
 
 def _discard(worktree: str, rel: str, out_dir: str, log, phase: str, reason: str,
@@ -285,22 +296,38 @@ def fix_numbering_collision(worktree: str, git, rel: str, log, phase: str) -> st
     return new_rel
 
 
+def _adr_check_args(check_mode: str, base: str) -> tuple[str, ...]:
+    """--pr at the push site; --commit at the pre-commit site, where the trigger is
+    staged and not yet committed. --base is accepted by both modes."""
+    return ("bin/adr-check", f"--{check_mode}", "--bypass-from-stdin", f"--base={base}")
+
+
 def _doc_base(worktree: str, base: str) -> str:
     """The base bin/pre-commit-hook hands to check-docs, derived identically."""
     rc, out = _git(worktree, "merge-base", "HEAD", "origin/master")
     return out.strip() if rc == 0 and out.strip() else base
 
 
+def commit_gate(worktree: str, base: str = "origin/master") -> tuple[int, str]:
+    """Run the pre-commit ADR gate exactly as bin/pre-commit-hook runs it: --commit
+    scoping, with this branch's commit messages as the bypass body. _doc_base is the
+    shared `git merge-base HEAD <base>` resolver, not a docs-only helper."""
+    rc, body = _git(worktree, "log", "--format=%B",
+                    f"{_doc_base(worktree, base)}..HEAD")
+    return _run_script(worktree, *_adr_check_args("commit", base),
+                       stdin=body if rc == 0 else "")
+
+
 def draft(llm, git, worktree: str, out_dir: str, log, *, phase: str = "phase2",
           plan_path: str | None = None, base: str = "origin/master",
-          today: str | None = None) -> AdrDraftResult:
+          today: str | None = None, check_mode: str = "pr",
+          commit: bool = True) -> AdrDraftResult:
     """Draft, validate, gate and commit one ADR. Every failure raises."""
     today = today or datetime.date.today().isoformat()
 
     # Empty stdin is the form bin/pre-push-adr-hook uses minus the commit blob, so no
     # `gh` call happens.
-    rc, surfaces = _run_script(worktree, "bin/adr-check", "--pr", "--bypass-from-stdin",
-                               f"--base={base}", stdin="")
+    rc, surfaces = _run_script(worktree, *_adr_check_args(check_mode, base), stdin="")
     if rc == 0:
         raise HarnessError("adr-draft-nothing", "bin/adr-check reports no missing ADR")
     if _SURFACES_MARKER not in surfaces:
@@ -320,6 +347,7 @@ def draft(llm, git, worktree: str, out_dir: str, log, *, phase: str = "phase2",
     rel = fix_numbering_collision(worktree, git, rel, log, phase)
     number = os.path.basename(rel)[:4]
 
+    baseline = _status_map(worktree)
     prompt = build_prompt(worktree, rel, number, surfaces,
                           git.diff_vs_base(base), plan_path, today)
     try:
@@ -338,12 +366,17 @@ def draft(llm, git, worktree: str, out_dir: str, log, *, phase: str = "phase2",
         _discard(worktree, rel, out_dir, log, phase, "invalid draft")
         raise HarnessError("adr-draft-invalid", "; ".join(problems)[:400])
 
-    strays = _stray_paths(worktree, {rel, ADR_INDEX})
+    strays = _stray_paths(worktree, {rel, ADR_INDEX}, baseline)
     if strays:
         # This keeps a Write-enabled model from editing a frozen ADR
         # (.claude/rules/adr-append-only.md) or any source file.
+        #
+        # Revert only paths that were CLEAN before the drafter ran. A path already in
+        # the baseline is the run's own staged work; `git checkout --` on it would
+        # roll that work back to HEAD. Report it, never revert it.
+        new_strays = [p for p in strays if p not in baseline]
         _discard(worktree, rel, out_dir, log, phase, "wrote outside its allocated path",
-                 strays=strays)
+                 strays=new_strays)
         raise HarnessError("adr-draft-scope",
                            ("drafter touched: " + ", ".join(strays))[:400])
 
@@ -351,29 +384,41 @@ def draft(llm, git, worktree: str, out_dir: str, log, *, phase: str = "phase2",
     # bin/check-numbering --since diffs <sha>...HEAD, which cannot see an uncommitted
     # file. The index is where the new ADR sits before the commit.
     git.stage_all()
-    for name, args in (("check-numbering", ("bin/check-numbering", "--staged")),
-                       ("check-docs", ("bin/check-docs",
-                                       f"--since={_doc_base(worktree, base)}")),
-                       ("check-prose", ("bin/check-prose", "--files", rel))):
+    gates = [("check-numbering", ("bin/check-numbering", "--staged")),
+             ("check-prose", ("bin/check-prose", "--files", rel))]
+    if check_mode == "commit":
+        # The pre-commit site hands check-docs --since to
+        # _commit_with_gate_remediation's doc-staleness arm, which runs next and can
+        # actually remediate. Running it here would discard a sound ADR over an
+        # unbumped last_verified elsewhere in the run's own diff. The ADR's own
+        # frontmatter is already checked by validate_adr_text, and the pre-commit
+        # hook's check-docs --no-staleness block still sees the file.
+        log(f"{phase}: pre-commit site - deferring check-docs --since to the "
+            "commit-gate remediation arm")
+    else:
+        gates.insert(1, ("check-docs",
+                         ("bin/check-docs", f"--since={_doc_base(worktree, base)}")))
+    for name, args in gates:
         grc, gout = _run_script(worktree, *args)
         if grc != 0:
             _discard(worktree, rel, out_dir, log, phase, f"{name} failed")
             raise HarnessError("adr-draft-gate", f"{name}: {gout.strip()[:300]}")
 
-    try:
-        sha = git.commit_all(ADR_COMMIT_MSG.format(number=number, slug=slug))
-    except HarnessError:
-        _discard(worktree, rel, out_dir, log, phase, "commit refused")
-        raise
+    sha = ""
+    if commit:
+        try:
+            sha = git.commit_all(ADR_COMMIT_MSG.format(number=number, slug=slug))
+        except HarnessError:
+            _discard(worktree, rel, out_dir, log, phase, "commit refused")
+            raise
 
-    rc, out = _run_script(worktree, "bin/adr-check", "--pr", "--bypass-from-stdin",
-                          f"--base={base}", stdin="")
+    rc, out = _run_script(worktree, *_adr_check_args(check_mode, base), stdin="")
     if rc != 0:
-        # The commit stays. This is the "drafted file left committed locally" case, and
-        # the caller parses rel out of the detail so the DM names it.
+        # commit=True: the commit stays. commit=False: the ADR stays STAGED. Either
+        # way the caller parses rel out of the detail so the DM names it.
         raise HarnessError("adr-draft-gate",
                            f"{rel}|{sha}|adr-check still fails: {out.strip()[:300]}")
 
     log(f"{phase}: ADR drafted at {rel} model={MODEL_MAP[ADR_DRAFT_MODEL]} "
-        f"commit={sha[:12]}")
+        + (f"commit={sha[:12]}" if sha else "staged for the pending commit"))
     return AdrDraftResult(rel, number, MODEL_MAP[ADR_DRAFT_MODEL], sha)

@@ -281,6 +281,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             copy["summary_md"] = check["corrected_body"]
             for f in check.get("findings", []):
                 log(f"phase2 body-check finding: {f}")
+        _commit_with_adr_draft(git, log, "phase2", llm=llm, worktree=worktree,
+                               out_dir=out_dir, res=res)
         sha = _commit_with_gate_remediation(
             git, worktree, f"{copy['commit_subject']}\n\n{copy['summary_md']}", log)
         rebase_line = f"REBASE=not run ({mode} mode)"
@@ -818,6 +820,48 @@ def _push_with_lease_retry(git, log, phase: str) -> str:
                 "refetch, re-rebase, re-prove")
             _refresh_and_reprove(git, log, phase, attempt)
     return ""  # unreachable
+
+
+def _commit_with_adr_draft(git, log, phase: str, *, llm, worktree, out_dir, res) -> None:
+    """One-shot ADR draft at the COMMIT site, run before commit_all() so the drafted
+    ADR lands IN the Phase 2 commit. Stale-base retries are a push-time concept and
+    cannot reach here at all: nothing has been pushed yet and no lease exists, which
+    is the same structural guarantee _push_with_adr_draft gets from sitting outside
+    _push_with_lease_retry. Exactly one draft per run (res.adr_drafted). Every drafter
+    failure re-raises the ORIGINAL gate denial so the run still exits 3, never 1."""
+    if not worktree:
+        return
+    rc, out = adr_draft.commit_gate(worktree)
+    if rc == 0:
+        return
+    # Synthesised to carry the hook's marker, so classify_local_gate_denial() reads
+    # "adr" on it exactly as it would on the real bin/pre-commit-hook denial.
+    denial = HarnessError("local-gate",
+                          f"{phase}: pre-commit-adr-gate: {out.strip()[:300]}")
+    if res.adr_drafted:
+        log(f"{phase}: ADR denial after this run's one draft ({res.adr_path}) "
+            "- failing closed")
+        raise denial
+    log(f"{phase}: pre-commit ADR gate denied - drafting ADR "
+        f"(model={adr_draft.MODEL_MAP[adr_draft.ADR_DRAFT_MODEL]})")
+    plan_path = res.plan.path if (res.plan and res.plan.found) else None
+    try:
+        drafted = adr_draft.draft(llm, git, worktree, out_dir, log, phase=phase,
+                                  plan_path=plan_path, check_mode="commit",
+                                  commit=False)
+    except HarnessError as e2:
+        if e2.kind == "adr-draft-gate" and "|" in (e2.detail or ""):
+            # staged, then adr-check still failed: record the path for the DM
+            rel, _sha, _ = e2.detail.split("|", 2)
+            res.adr_drafted, res.adr_path = True, rel
+            res.adr_draft_model = adr_draft.MODEL_MAP[adr_draft.ADR_DRAFT_MODEL]
+        log(f"{phase}: ADR draft failed ({e2.kind}): {(e2.detail or '')[:300]} "
+            "- failing closed")
+        raise denial from e2
+    res.adr_drafted, res.adr_path, res.adr_draft_model = (
+        True, drafted.path, drafted.model)
+    log(f"{phase}: ADR drafted at {drafted.path} model={drafted.model} "
+        "- staged into the pending Phase 2 commit")
 
 
 def _push_with_adr_draft(git, log, phase: str, *, llm, worktree, out_dir, res) -> str:

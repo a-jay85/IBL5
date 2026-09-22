@@ -21,13 +21,13 @@ fi
 
 case "$1" in
   "")                       echo "absent"      ;;
-  opus|claude-opus-5)       echo "opus-tier"   ;;
+  opus|claude-opus-5-5)       echo "opus-tier"   ;;
   sonnet|claude-sonnet-4-6) echo "sonnet-tier" ;;
   haiku|claude-haiku-4-5)   echo "haiku-tier"  ;;
   fable|claude-fable-*|claude-fable)
       echo "impl_model: $1 is not selectable — Fable is never spawned without asking the user first (see .claude/rules/agent-tiering.md § Fable)"
       exit 1 ;;
   *)
-      echo "impl_model: $1 is not a recognized model — use one of: opus, sonnet, haiku, claude-opus-5, claude-sonnet-4-6, claude-haiku-4-5"
+      echo "impl_model: $1 is not a recognized model — use one of: opus, sonnet, haiku, claude-opus-5-5, claude-sonnet-4-6, claude-haiku-4-5"
       exit 1 ;;
 esac

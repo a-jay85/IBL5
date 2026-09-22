@@ -7,7 +7,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-09-17
+last_verified: 2026-09-22
 ---
 <!-- `model: claude-sonnet-4-6` IS DELIBERATE — DO NOT REMOVE IT, and never write
      `model: sonnet` (that alias resolves to Sonnet 5). User-authorized 2026-08-26,
@@ -217,7 +217,7 @@ Run `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase59-files-changed.md` �
 
 **Phase 6 — plan-intent fidelity review.**
 
-This phase does not run on the orchestrator. It runs **once** in the pinned Opus 5 def
+This phase does not run on the orchestrator. It runs **once** in the pinned Opus 5.5 def
 `.claude/agents/pr-ready-phase6.md`, which loads the procedure from the same master pin
 the Phase 2 include uses (`git show` invariant above) and applies its own declared
 fallback. User-authorized 2026-08-26; the Invariants block records the same change.
@@ -325,7 +325,7 @@ fallback. User-authorized 2026-08-26; the Invariants block records the same chan
 
 5. **Carry the verdict forward verbatim.** Phase 7's body keeps its existing
    plan-fidelity section; paste the agent's verdict text into it, plus a
-   `phase6-agent: pr-ready-phase6 (claude-opus-5)` line so the tier that judged this PR
+   `phase6-agent: pr-ready-phase6 (claude-opus-5-5)` line so the tier that judged this PR
    is on the record.
    Do **not** paste the `## DIGEST` section into that verdict text: Phase 7 extracts it
    with `.claude/skills/pr-ready/scripts/digest.sh` and posts it as its own

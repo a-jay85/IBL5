@@ -11,7 +11,7 @@
 #   --pr N[,N...] Explicit PR numbers; bypasses the open/non-draft selector.
 #   --model M     Model for the fired sessions (default: claude-sonnet-4-6 — see below).
 #                 Opus judgment lives in the Phase 6 agent def, not in this default;
-#                 pass --model claude-opus-5 to put the whole run back on Opus.
+#                 pass --model claude-opus-5-5 to put the whole run back on Opus.
 #   --dry-run     Explicit alias for the default. Useful in scripts that want intent stated.
 #   --help, -h    Print this usage and exit 0.
 #   --pr-attack FILE  Read ranked PR list from a /pr-attack output file; selects top --top-n.
@@ -113,7 +113,7 @@ EXPLICIT_PRS=()
 # Orchestrator tier for /pr-ready's mechanical phases. No longer corresponds to
 # bin/bug-pipeline-tick or bin/lib/plan-impl-model: this driver's Opus judgment is pinned
 # inside .claude/agents/pr-ready-phase6.md, so the session model no longer sets the review
-# tier. Revert lever: --model claude-opus-5.
+# tier. Revert lever: --model claude-opus-5-5.
 MODEL="claude-sonnet-4-6"
 EFFORT=high
 PR_ATTACK_FILE=""

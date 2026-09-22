@@ -1836,8 +1836,8 @@ grep -qF 'DO NOT ADD ONE' "$SCRIPT_DIR/../.claude/skills/pr-ready/SKILL.md" \
 # 21b: reviewer def exists, is Opus-pinned, cannot nest a delegate
 test -f "$SCRIPT_DIR/../.claude/agents/pr-ready-phase6.md" \
   || fail "21b: pr-ready-phase6.md missing"
-grep -qx 'model: claude-opus-5' "$SCRIPT_DIR/../.claude/agents/pr-ready-phase6.md" \
-  || fail "21b: pr-ready-phase6.md not pinned to claude-opus-5"
+grep -qx 'model: claude-opus-5-5' "$SCRIPT_DIR/../.claude/agents/pr-ready-phase6.md" \
+  || fail "21b: pr-ready-phase6.md not pinned to claude-opus-5-5"
 grep -q '^disallowedTools:.*Agent' "$SCRIPT_DIR/../.claude/agents/pr-ready-phase6.md" \
   || fail "21b: pr-ready-phase6.md does not disallow Agent"
 # 21c: Phase 6 spawn site carries no model: override — asserted over the whole
@@ -1877,12 +1877,12 @@ grep -qF 'It is NEVER delegated' "$SCRIPT_DIR/../.claude/skills/pr-ready/_plan-f
   && fail "21e: old 6a text still present"
 grep -qF 'This review runs on the orchestrator' "$SCRIPT_DIR/../.claude/skills/pr-ready/_plan-fidelity-review.md" \
   && fail "21e: old 6a text still present (orchestrator form)"
-grep -qF 'pinned Opus 5 def' "$SCRIPT_DIR/../.claude/skills/pr-ready/_plan-fidelity-review.md" \
+grep -qF 'pinned Opus 5.5 def' "$SCRIPT_DIR/../.claude/skills/pr-ready/_plan-fidelity-review.md" \
   || fail "21e: new 6a text missing"
 grep -qF 'Spawning any sub-agent for this phase is a defect' "$SCRIPT_DIR/../.claude/skills/pr-ready/SKILL.md" \
   && fail "21e: superseded never-delegate clause still in SKILL.md"
 # 21f: driver default and revert lever — behavioral, over the EMITTED runner.
-# The static `grep -q -- '--model claude-opus-5'` this replaces matched comment prose only
+# The static `grep -q -- '--model claude-opus-5-5'` this replaces matched comment prose only
 # (bin/pr-ready-now lines 14 and 112), so it kept passing with the entire --model parsing arm
 # deleted — the plan's own named rollback lever had no test at all. The `grep -qx` on the
 # assignment is KEPT: it is what gives the mutation check teeth on the default's source text.
@@ -1899,11 +1899,11 @@ test -s "$R"    || fail "21f: default dry-run emitted no runner at $R"
 grep -qx 'MODEL=claude-sonnet-4-6' "$R" \
   || fail "21f: default runner MODEL is not claude-sonnet-4-6"
 clean_slots; rm -f "$R"
-out="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" PR_READY_NOW_DRY_RUN=1 run_driver --go --jobs 3 --model claude-opus-5 2>&1)"; rc=$?
+out="$(PR_READY_NOW_PR_JSON="$SCRATCH/two-open.json" PR_READY_NOW_DRY_RUN=1 run_driver --go --jobs 3 --model claude-opus-5-5 2>&1)"; rc=$?
 [[ $rc -eq 0 ]] || fail "21f: --model dry-run exited $rc, want 0 (out: $out)"
 test -s "$R"    || fail "21f: --model dry-run emitted no runner at $R"
-grep -qx 'MODEL=claude-opus-5' "$R" \
-  || fail "21f: --model claude-opus-5 did not override the default — the revert lever is broken"
+grep -qx 'MODEL=claude-opus-5-5' "$R" \
+  || fail "21f: --model claude-opus-5-5 did not override the default — the revert lever is broken"
 # 21g: the verdict path is cleared BEFORE the spawn. Ordering is the whole property — an
 # rm -f sitting after the Agent( call would still leave step 2's `test -s` satisfiable by a
 # prior run's file for the same PR, which is the stale-verdict hole this closes. Both line

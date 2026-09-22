@@ -34,7 +34,7 @@ ENVELOPE_ERROR_TEXT_CAP = 600     # bound result text in error details for diagn
 MODEL_MAP = {
     "haiku": "claude-haiku-4-5-20251001",
     "sonnet": "claude-sonnet-4-6",     # matches the historical review-agent tier
-    "opus": "claude-opus-5",
+    "opus": "claude-opus-5-5",
 }
 
 # Explicit allowlist, NOT MODEL_MAP.get(model, model) pass-through: a typo or `fable`

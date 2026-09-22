@@ -27,6 +27,7 @@ import sys
 # price_expiry: 2026-08-31  # sonnet-5 intro pricing ends
 PRICE = {
     "opus":     (5.00, 25.00, 0.50,  6.25, 10.00),
+    "opus-5-5": (4.00, 20.00, 0.20,  5.00,  8.00),  # in/out/read verified 2026-09-22; writes derived (1.25x, 2x)
     "sonnet":   (3.00, 15.00, 0.30,  3.75,  6.00),
     "sonnet-5": (2.00, 10.00, 0.20,  2.50,  4.00),
     "haiku":    (1.00,  5.00, 0.10,  1.25,  2.00),

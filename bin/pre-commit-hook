@@ -73,3 +73,19 @@ if git diff --cached --name-only | grep -qE '^\.claude/rules/.*\.md$'; then
         exit 1
     fi
 fi
+
+# Run shellcheck on staged shell scripts.
+# CI enforces this check across the full corpus; the pre-commit hook covers only staged files.
+# Skip silently if shellcheck is not installed locally.
+if command -v shellcheck >/dev/null 2>&1; then
+    staged_shell=$(git diff --cached --name-only | "$REPO_ROOT/bin/lib/shell-scripts.sh" --filter \
+        | while IFS= read -r f; do [ -e "$f" ] && printf '%s\n' "$f"; done)
+    if [ -n "$staged_shell" ]; then
+        if ! echo "$staged_shell" | xargs shellcheck --severity=warning --shell=bash \
+               --exclude=SC2034,SC1090,SC2207 2>&1; then
+            echo ""
+            echo "Fix the shellcheck warning(s) above before committing."
+            exit 1
+        fi
+    fi
+fi

@@ -58,6 +58,16 @@ class LiveVerify:
             tracks.append(TrackResult("go", "pass" if rc1 == 0 and rc2 == 0 else "fail", o1 + o2))
         else:
             tracks.append(TrackResult("go", "skipped"))
+        if cls.has_shell:
+            rc, out = self._sh(
+                "bin/lib/shell-scripts.sh --full"
+                " | xargs shellcheck --severity=warning --shell=bash"
+                " --exclude=SC2034,SC1090,SC2207 2>&1 | tail -n 20",
+                self.worktree
+            )
+            tracks.append(TrackResult("shellcheck", "pass" if rc == 0 else "fail", out))
+        else:
+            tracks.append(TrackResult("shellcheck", "skipped"))
         # E2E track intentionally NOT run in the isolated prototype (needs the
         # project Docker stack); labeled unavailable so aggregation stays honest.
         tracks.append(TrackResult("e2e", "unavailable", "isolated mode: E2E requires wt Docker stack"))
@@ -73,6 +83,8 @@ GO_OK = re.compile(r"^ok\s|\bPASS\b|coverage", re.M)
 E2E_FAIL = re.compile(r"\b\d+ failed\b|Error:|timed out", re.I)
 E2E_OK = re.compile(r"\b\d+ passed\b", re.I)
 E2E_NONE = re.compile(r"No E2E tests map|^\s*$")
+SHELLCHECK_OK = re.compile(r"Checking \d+ shell scripts")
+SHELLCHECK_FAIL = re.compile(r"In .+ line \d+:|SC\d+")
 
 
 def _judge(name: str, text: str | None, ok_re: re.Pattern, fail_re: re.Pattern,
@@ -97,6 +109,7 @@ class ReplayVerify:
             _judge("phpunit", self.v.get("phpunit"), PHPUNIT_OK, PHPUNIT_FAIL, cls.has_php),
             _judge("phpstan", self.v.get("phpstan"), PHPSTAN_OK, PHPSTAN_FAIL, cls.has_php),
             _judge("go", self.v.get("go"), GO_OK, GO_FAIL, cls.has_go),
+            _judge("shellcheck", self.v.get("shellcheck"), SHELLCHECK_OK, SHELLCHECK_FAIL, cls.has_shell),
         ]
         e2e_txt = self.v.get("e2e") or self.v.get("e2e_map")
         if e2e_txt and E2E_NONE.search(e2e_txt.strip()[:80]) and "passed" not in e2e_txt:

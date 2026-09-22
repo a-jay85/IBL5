@@ -4,7 +4,7 @@ description: "Plan an implementation task: enforces a verification matrix, direc
 disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
-last_verified: 2026-09-18
+last_verified: 2026-09-21
 ---
 
 # /plan — Implementation Planning with Verification Matrix
@@ -308,6 +308,8 @@ After receiving the Plan agent's output, check these gates yourself — do NOT d
     - **Split the behavior — the move that dissolves most of these holds.** A plan may claim the intrinsic exception for the scheduling / reachability slice **only**, and must still build the pre-prod path for the logic slice. "The daemon can't run on my laptop" is a claim about *registration*, not about the code the daemon runs.
 
     A plan that keeps an intrinsic slice must carry a literal `pre-prod-exception:` marker and a `## Pre-prod Exception Justification` section with one line per exception naming its category (scheduling / reachability / credential) and why no pre-prod path exists. `bin/check-plan` gate `[P]` enforces the marker and the section's presence; the *validity* of each entry is your judgment, exactly as with gate `[H]`. This gate never licenses dropping a forced UI/UX row — a taste judgment is always exercisable on the worktree stack, so it can never be intrinsic (see the anti-abuse guard in `_plan-verification.md` § Pre-prod exercise paths). Satisfying gate 16 also never re-arms a gate-14 hold: coverage and hold are independent verdicts.
+
+17. **New `bin/` script exercise path.** When a plan adds a new `bin/` script, the Verification Matrix must carry at least one row that invokes the script under `set -euo pipefail` from a launchd-like empty environment (`PATH=/usr/bin:/bin`, no `HOME`, no `USER`, no repo-local vars). Rationale: shellcheck is static and cannot catch dead code under `set -e` or SIGPIPE (exit 141) from an `awk exit` producer under `pipefail`. These are the two highest-value runtime shell defects in this repo. See `bin/test-sigpipe-grep-q-guard` as the existing mechanism proof. This gate is a judgment call and is not scripted: detecting "plan adds a new bin/ script" from `## Critical Files` is feasible, but pattern-matching "row runs it under an empty env" is error-prone.
 
 If validation fails on any gate, fix the matrix yourself rather than re-running the Plan agent.
 

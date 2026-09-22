@@ -41,7 +41,7 @@ FULL_SUITE_MODULES="Navigation PageLayout UI Utilities Bootstrap League Module S
 
 # --- Temp file for collecting test paths (avoids bash 3.2 associative array limitation) ---
 TEST_COLLECTOR=$(mktemp)
-trap "rm -f $TEST_COLLECTOR" EXIT
+trap 'rm -f "$TEST_COLLECTOR"' EXIT
 
 # --- Alias map function: class name → spec base name (for known mismatches) ---
 alias_for_module() {

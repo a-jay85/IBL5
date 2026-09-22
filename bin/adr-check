@@ -37,9 +37,13 @@ Modes:
   --staged           Scan staged changes via `git diff --cached`. Default.
   --pr               Scan the current PR against its base ref (default: origin/master).
                      Fetches the PR body via `gh pr view` for bypass marker detection.
-  --base=<ref>       Override the base ref for --pr. CI supplies
+  --commit           Scan the pre-commit view: everything committed on this branch
+                     since `git merge-base HEAD <base>`, UNION the index. An ADR
+                     committed earlier on the branch satisfies a trigger staged now.
+                     Exits 0 with a skip line when no merge-base resolves.
+  --base=<ref>       Override the base ref for --pr / --commit. CI supplies
                      github.event.pull_request.base.sha; the local hook supplies its
-                     resolved base. Requires --pr; rejected in --staged mode.
+                     resolved base. Requires --pr or --commit; rejected in --staged mode.
 
 Options:
   --bypass-from-stdin   Read the PR body from stdin (for local testing).
@@ -66,24 +70,50 @@ function adrBaseRef(?string $set = null): string
     return $base;
 }
 
-function gitDiffRange(string $mode): string
+function adrCommitBase(): string
 {
-    return $mode === 'pr' ? adrBaseRef() . '...HEAD' : '--cached';
+    static $resolved = null;
+    if ($resolved === null) {
+        [$lines, $exit] = runCmd('git merge-base HEAD ' . escapeshellarg(adrBaseRef()));
+        $resolved = ($exit === 0 && isset($lines[0])) ? trim($lines[0]) : '';
+    }
+    return $resolved;
+}
+
+/**
+ * The git-diff argument vector for a mode. A LIST, because commit mode needs two
+ * tokens: `git diff --cached <merge-base>` is "everything committed on this branch
+ * since the branch point, UNION the index".
+ *
+ * @return list<string>
+ */
+function gitDiffRange(string $mode): array
+{
+    if ($mode === 'pr') {
+        return [adrBaseRef() . '...HEAD'];
+    }
+    if ($mode === 'commit') {
+        return ['--cached', adrCommitBase()];
+    }
+    return ['--cached'];
+}
+
+function gitDiffArgs(string $mode): string
+{
+    return implode(' ', array_map('escapeshellarg', gitDiffRange($mode)));
 }
 
 /** @return list<string> */
 function diffNames(string $mode, string $filter): array
 {
-    $range = gitDiffRange($mode);
-    [$lines] = runCmd(sprintf('git diff %s --name-only --diff-filter=%s', escapeshellarg($range), escapeshellarg($filter)));
+    [$lines] = runCmd(sprintf('git diff %s --name-only --diff-filter=%s', gitDiffArgs($mode), escapeshellarg($filter)));
     return array_values(array_filter($lines, static fn (string $line): bool => $line !== ''));
 }
 
 /** @return list<string> */
 function diffAddedLines(string $mode, string $file): array
 {
-    $range = gitDiffRange($mode);
-    [$lines] = runCmd(sprintf('git diff %s -- %s', escapeshellarg($range), escapeshellarg($file)));
+    [$lines] = runCmd(sprintf('git diff %s -- %s', gitDiffArgs($mode), escapeshellarg($file)));
     $added = [];
     foreach ($lines as $line) {
         if (str_starts_with($line, '+') && !str_starts_with($line, '+++')) {
@@ -96,8 +126,7 @@ function diffAddedLines(string $mode, string $file): array
 /** @return list<string> */
 function diffRemovedLines(string $mode, string $file): array
 {
-    $range = gitDiffRange($mode);
-    [$lines] = runCmd(sprintf('git diff %s -- %s', escapeshellarg($range), escapeshellarg($file)));
+    [$lines] = runCmd(sprintf('git diff %s -- %s', gitDiffArgs($mode), escapeshellarg($file)));
     $removed = [];
     foreach ($lines as $line) {
         if (str_starts_with($line, '-') && !str_starts_with($line, '---')) {
@@ -268,6 +297,9 @@ foreach (array_slice($argv, 1) as $arg) {
         case '--pr':
             $opts['mode'] = 'pr';
             break;
+        case '--commit':
+            $opts['mode'] = 'commit';
+            break;
         case '--bypass-from-stdin':
             $opts['bypass_from_stdin'] = true;
             break;
@@ -283,8 +315,8 @@ foreach (array_slice($argv, 1) as $arg) {
     }
 }
 if ($baseArg !== null) {
-    if ($opts['mode'] !== 'pr') {
-        fwrite(STDERR, "--base is only valid with --pr\n");
+    if ($opts['mode'] === 'staged') {
+        fwrite(STDERR, "--base is only valid with --pr or --commit\n");
         exit(2);
     }
     if (!preg_match('#^[A-Za-z0-9][A-Za-z0-9._/-]*$#', $baseArg)
@@ -293,6 +325,12 @@ if ($baseArg !== null) {
         exit(2);
     }
     adrBaseRef($baseArg);
+}
+
+if ($opts['mode'] === 'commit' && adrCommitBase() === '') {
+    echo "Commit mode: cannot resolve a merge-base against " . adrBaseRef()
+       . "; skipping the ADR check.\n";
+    exit(0);
 }
 
 $triggers = detectTriggers($opts['mode']);

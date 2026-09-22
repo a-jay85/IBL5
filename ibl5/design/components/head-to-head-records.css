@@ -110,6 +110,11 @@
     display: block;
     writing-mode: vertical-rl;
     transform: rotate(180deg);
+    /* In vertical-rl the block axis runs right-to-left, so a full-width box
+       parks its line against the right edge; rotate(180deg) then throws it to
+       the left, off the logo's centre. Shrinking to the line's own width lets
+       margin auto centre it over the logo. */
+    width: fit-content;
     margin: 0 auto 0.35rem;
     max-height: 9rem;
     overflow: hidden;

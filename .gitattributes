@@ -2,6 +2,16 @@ ibl5/migrations/*.sql linguist-generated=true
 docker/entrypoint.sh text eol=lf
 bin/* text eol=lf
 
+# PHPStan copies docblock text (e.g. @deprecated descriptions) into error messages,
+# and baseline `rawMessage` entries match those messages byte-for-byte. A CRLF
+# docblock leaks `\r` into the message on some runs, so the baseline entry reports
+# ignore.unmatched next to the error it should suppress (themes/IBL/theme.php →
+# NewsController.php, 18 CI failures Aug–Sep 2026). ibl5/bin/ holds extensionless PHP
+# scripts that PHPStan also analyses. The PHPStan CI job fails on any CRLF file in
+# either set that slips past these rules.
+*.php text eol=lf
+ibl5/bin/* text eol=lf
+
 # ADR index rows are append-only; union merge keeps both sides of a concurrent
 # append instead of raising a rebase conflict. Duplicate rows that union can
 # produce from a non-append edit are caught by bin/check-numbering.

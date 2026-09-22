@@ -524,6 +524,10 @@ jobs:
     # Accepted cost: the first run after each nightly `[auto]` baseline commit gets a
     # fully cold cache (~40s each for analyse and analyse:tests) on master and on every
     # open PR. That is the price of not replaying a poisoned cache.
+    #
+    # The NewsController.php OpenTable/CloseTable ignore.unmatched failures (Aug–Sep
+    # 2026, including ones after this key change) came from a CRLF docblock, not from
+    # this cache. See the CRLF step below.
     - name: Cache PHPStan result cache
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
@@ -533,6 +537,20 @@ jobs:
         key: phpstan-v3-${{ hashFiles('ibl5/phpstan-baseline.neon', 'ibl5/phpstan-tests-baseline.neon') }}-${{ hashFiles('ibl5/phpstan.neon', 'ibl5/phpstan-tests.neon', 'ibl5/phpstan-rules/**') }}
         restore-keys: |
           phpstan-v3-${{ hashFiles('ibl5/phpstan-baseline.neon', 'ibl5/phpstan-tests-baseline.neon') }}-
+
+    # Baseline `rawMessage` entries match error text byte-for-byte, and PHPStan copies
+    # docblock text into messages. A CRLF docblock leaks `\r` into the message on some
+    # runs, which fails as ignore.unmatched next to the very error the baseline expects.
+    # .gitattributes forces LF for *.php and ibl5/bin/* (extensionless PHP scripts);
+    # this step catches files that bypass it.
+    - name: Reject CRLF line endings in PHP files
+      run: |
+        bad=$(git ls-files --eol -- '*.php' 'ibl5/bin/*' | awk '$1 ~ /^i\/(crlf|mixed)$/ {print $NF}')
+        if [ -n "$bad" ]; then
+          echo "::error::PHP files with CRLF line endings (PHPStan baseline messages go flaky). Fix: git add --renormalize -- '*.php' 'ibl5/bin/*'"
+          echo "$bad"
+          exit 1
+        fi
 
     - name: Run PHPStan
       working-directory: ibl5

@@ -4868,7 +4868,7 @@ parameters:
 			path: scripts/updateAllTheThings.php
 
 		-
-			rawMessage: Binary operation "." between "</div>\r\n        …" and mixed results in an error.
+			rawMessage: Binary operation "." between "</div>\n        …" and mixed results in an error.
 			identifier: binaryOp.invalid
 			count: 1
 			path: themes/IBL/theme.php

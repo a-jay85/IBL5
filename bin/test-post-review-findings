@@ -438,6 +438,11 @@ pr_unresolved_findings_hold 42 > "$out14"
 assert_contains "case14: unresolved scored 85 emitted" "$out14" "unresolved-finding:85"
 assert_not_contains "case14: resolved 90 excluded" "$out14" "unresolved-finding:90"
 assert_not_contains "case14: unscored thread excluded" "$out14" "unresolved-finding:333"
+if [ "$(grep -c '^unresolved-finding:-$' "$out14")" -eq 2 ]; then
+    ok "case14: unscored 333 and comment-less ghost each emit unresolved-finding:-"
+else
+    fail "case14: expected 2 '-' lines (333 + ghost), got: $(tr '\n' ' ' < "$out14")"
+fi
 
 # ── case 15: two unresolved threads scored 92 and 80 ─────────────────────────
 fix15="$BASE_TMP/threads15.json"
@@ -454,7 +459,7 @@ assert_contains "case15: score-92 emitted" "$out15" "unresolved-finding:92"
 assert_contains "case15: score-80 emitted (boundary >= 80)" "$out15" "unresolved-finding:80"
 GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
 
-# ── case 16: one unresolved scored 79 — below threshold → empty ──────────────
+# ── case 16: one unresolved scored 79 — below the old floor, now holds ───────
 fix16="$BASE_TMP/threads16.json"
 cat > "$fix16" <<'THREADS16'
 {"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
@@ -464,10 +469,10 @@ THREADS16
 GH_THREADS_FIXTURE="$fix16"
 out16="$BASE_TMP/case16.txt"
 pr_unresolved_findings_hold 42 > "$out16"
-if [ ! -s "$out16" ]; then
-    ok "case16: score-79 below threshold → empty output"
+if [ "$(cat "$out16")" = "unresolved-finding:79" ]; then
+    ok "case16: score 79 emits unresolved-finding:79 (widened 2026-09)"
 else
-    fail "case16: expected empty for score 79, got: $(cat "$out16")"
+    fail "case16: expected 'unresolved-finding:79', got: $(tr '\n' ' ' < "$out16")"
 fi
 GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
 
@@ -489,7 +494,7 @@ else
 fi
 GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
 
-# ── case 18: only unscored human threads → empty ──────────────────────────────
+# ── case 18: only unscored human threads → hold on each ───────────────────────
 fix18="$BASE_TMP/threads18.json"
 cat > "$fix18" <<'THREADS18'
 {"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
@@ -500,10 +505,10 @@ THREADS18
 GH_THREADS_FIXTURE="$fix18"
 out18="$BASE_TMP/case18.txt"
 pr_unresolved_findings_hold 42 > "$out18"
-if [ ! -s "$out18" ]; then
-    ok "case18: only unscored human threads → empty output"
+if [ "$(grep -c '^unresolved-finding:-$' "$out18")" -eq 2 ] && [ "$(wc -l < "$out18")" -eq 2 ]; then
+    ok "case18: two unscored unresolved threads → two unresolved-finding:- lines (widened 2026-09)"
 else
-    fail "case18: expected empty for unscored threads, got: $(cat "$out18")"
+    fail "case18: expected exactly two 'unresolved-finding:-', got: $(tr '\n' ' ' < "$out18")"
 fi
 GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
 
@@ -873,6 +878,52 @@ if [ "$(jq -r '.commentId' "$DEF_OUT" | tr '\n' ' ')" = "111 " ]; then
 else
     fail "trust-default: got $(jq -r '.commentId' "$DEF_OUT" | tr '\n' ' ')"
 fi
+
+# ── hold-1: score 50 (below the old floor) now holds with its score ───────────
+fixH1="$BASE_TMP/threads-hold1.json"
+cat > "$fixH1" <<'H1'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
+  {"isResolved":false,"isOutdated":false,"comments":{"nodes":[{"databaseId":801,"body":"Minor\n\n<!-- score: 50 -->"}]}}
+]}}}}}
+H1
+GH_THREADS_FIXTURE="$fixH1"; outH1="$BASE_TMP/hold1.txt"
+pr_unresolved_findings_hold 42 > "$outH1"
+[ "$(cat "$outH1")" = "unresolved-finding:50" ] \
+    && ok "hold-1: score 50 emits unresolved-finding:50" \
+    || fail "hold-1: got '$(cat "$outH1")'"
+
+# ── hold-2: unresolved + isOutdated → holds (never actioned, still blocks) ────
+fixH2="$BASE_TMP/threads-hold2.json"
+cat > "$fixH2" <<'H2'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
+  {"isResolved":false,"isOutdated":true,"comments":{"nodes":[{"databaseId":802,"body":"Stale anchor","author":{"login":"a-jay85","__typename":"User"}}]}}
+]}}}}}
+H2
+GH_THREADS_FIXTURE="$fixH2"; outH2="$BASE_TMP/hold2.txt"
+pr_unresolved_findings_hold 42 > "$outH2"
+[ "$(cat "$outH2")" = "unresolved-finding:-" ] \
+    && ok "hold-2: outdated unresolved thread emits unresolved-finding:-" \
+    || fail "hold-2: got '$(cat "$outH2")'"
+
+# ── hold-3: trusted author does NOT exempt the hold ───────────────────────────
+fixH3="$BASE_TMP/threads-hold3.json"
+cat > "$fixH3" <<'H3'
+{"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
+  {"isResolved":false,"isOutdated":false,"comments":{"nodes":[{"databaseId":803,"body":"From a bot","author":{"login":"claude[bot]","__typename":"Bot"}}]}},
+  {"isResolved":true,"isOutdated":false,"comments":{"nodes":[{"databaseId":804,"body":"Resolved\n\n<!-- score: 100 -->"}]}}
+]}}}}}
+H3
+GH_THREADS_FIXTURE="$fixH3"; outH3="$BASE_TMP/hold3.txt"
+pr_unresolved_findings_hold 42 > "$outH3"
+[ "$(cat "$outH3")" = "unresolved-finding:-" ] \
+    && ok "hold-3: bot-authored unresolved holds; resolved score-100 does not" \
+    || fail "hold-3: got '$(tr '\n' ' ' < "$outH3")'"
+
+# ── hold-4: rc stays 0 under set -e when every thread holds ───────────────────
+( set -euo pipefail; GH_THREADS_FIXTURE="$fixH3"; source "$LIB_ARM"; pr_unresolved_findings_hold 42 >/dev/null ) \
+    && ok "hold-4: predicate returns 0 with findings present" \
+    || fail "hold-4: non-zero exit with findings present"
+GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
 
 # ── summary ───────────────────────────────────────────────────────────────────
 if [ "$FAILED" -eq 0 ]; then

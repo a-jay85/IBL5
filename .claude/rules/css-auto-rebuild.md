@@ -1,7 +1,7 @@
 ---
 description: Tailwind CSS is auto-rebuilt by the ibl5-tailwind container (on save) and by git hooks (after rebase/checkout/merge); manual builds are a last resort.
 paths: "**/*.css"
-last_verified: 2026-09-01
+last_verified: 2026-09-22
 ---
 
 # CSS Auto-Rebuild (Tailwind)
@@ -11,7 +11,7 @@ The `ibl5-tailwind` Docker container runs `@tailwindcss/cli --watch=always` cont
 ## Two auto-rebuild paths (you should never need a manual build)
 
 1. **Editor save → watcher.** The container's `--watch` reacts to the fsevent; compiled output is ready within ~1s. Just reload.
-2. **Git op → hook.** Editor saves propagate, but git BULK file replacement (rebase / checkout / merge / pull rewriting a `design/**` source via rename) is **not reliably delivered** to `@parcel/watcher` through the macOS→Docker bind mount — so the compiled CSS silently goes stale. `bin/install-git-hooks` injects `bin/rebuild-css-if-source-changed` into **post-checkout, post-merge, post-rewrite** to heal that: it is mtime-gated (no-op when the output is already fresh) and backgrounded (git returns at once), rebuilding on the host (`bunx`) with a `docker exec` fallback. `bin/wt-new`/`bin/wt-up` build once at create/up; the hooks cover every git op after that.
+2. **Git op → hook.** Editor saves propagate, but git BULK file replacement (rebase / checkout / merge / pull rewriting a `design/**` source via rename) is **not reliably delivered** to `@parcel/watcher` through the macOS→Docker bind mount. The compiled CSS then silently goes stale. `bin/install-git-hooks` injects `bin/rebuild-css-if-source-changed` into **post-checkout, post-merge, post-rewrite** to heal that: it is mtime-gated (no-op when the output is already fresh) and backgrounded (git returns at once), rebuilding on the host (`bunx`) with a `docker exec` fallback. After rebuilding it restarts that checkout's watcher container. The watcher missed the same events, so it still holds the old sources in memory, and its next save-triggered rebuild would overwrite the fresh output with them. That clobbered output is newer than every source, so the mtime gate would skip from then on. `bin/wt-new`/`bin/wt-up` build once at create/up; the hooks cover every git op after that.
 
 ## Rules
 

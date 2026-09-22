@@ -10,7 +10,9 @@
 # file via rename) is not reliably delivered to @parcel/watcher through the
 # macOS→Docker bind mount — so the compiled `themes/IBL/style/style.css` silently
 # goes stale relative to `design/**`. `bin/wt-new`/`bin/wt-up` build it once at
-# worktree create/up; this heals the gap for every git op AFTER that.
+# worktree create/up; this heals the gap for every git op AFTER that. After a
+# rebuild it also restarts the checkout's watcher, which missed the same events
+# and would otherwise overwrite the fresh output from its stale in-memory sources.
 #
 # Wired (via bin/install-git-hooks) into post-checkout, post-merge, and
 # post-rewrite — the git ops that bulk-rewrite the working tree. Safe to call
@@ -55,6 +57,26 @@ fi
             echo "$(date): css rebuilt in $container" >> "$LOG"
         else
             echo "$(date): css rebuild FAILED — no host bunx and no usable tailwind container ($slug)" >> "$LOG"
+        fi
+    fi
+
+    # Restart this checkout's watcher so it re-reads design/** from disk. It missed
+    # the git op's events, so its in-memory copy of the sources is stale. Left
+    # running, its next save-triggered rebuild writes that stale copy over the fresh
+    # output above, and the result is newer than every source, so the mtime gate
+    # then skips on every later git op. Only the watcher whose bind mount is THIS
+    # checkout: the main checkout (git dir == common dir) owns ibl5-tailwind.
+    if [ "$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-dir)" = \
+         "$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir)" ]; then
+        watcher="ibl5-tailwind"
+    else
+        watcher="ibl5-tailwind-$slug"
+    fi
+    if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "$watcher"; then
+        if docker restart "$watcher" >> "$LOG" 2>&1; then
+            echo "$(date): restarted $watcher to drop its stale source graph" >> "$LOG"
+        else
+            echo "$(date): restart of $watcher FAILED" >> "$LOG"
         fi
     fi
 ) &

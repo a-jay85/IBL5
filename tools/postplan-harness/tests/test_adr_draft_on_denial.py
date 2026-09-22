@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import pathlib
 import shutil
 import stat
 import subprocess
@@ -1782,3 +1783,14 @@ def test_classify_local_gate_denial_reads_pre_commit_marker():
             "git push: pre-push-adr-hook: a decision-trigger surface"
         ) == "adr"
     )
+
+
+def test_stage_all_precedes_the_commit_site_draft():
+    """_commit_with_adr_draft reads the INDEX via `adr-check --commit`, so _run()
+    must stage before calling it. If the stage_all() call ever moves below the
+    draft call, the gate sees an empty index, returns 0, and the ADR is never
+    drafted -- the exact case deliverable 3 exists for."""
+    src = (pathlib.Path(runner.__file__)).read_text()
+    stage = src.index("            git.stage_all()")
+    draft = src.index("        _commit_with_adr_draft(git, log, \"phase2\"")
+    assert stage < draft, "git.stage_all() must run before _commit_with_adr_draft"

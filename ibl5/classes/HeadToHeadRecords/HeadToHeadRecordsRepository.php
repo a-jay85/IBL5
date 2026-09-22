@@ -28,11 +28,9 @@ class HeadToHeadRecordsRepository implements HeadToHeadRecordsRepositoryInterfac
     /** @var \Closure(int, string): string */
     private \Closure $logoResolver;
 
-    private ?int $resolvedSeasonYear = null;
-
     public function __construct(
         private readonly \mysqli $db,
-        private readonly ?int $currentSeasonYear = null,
+        private readonly int $currentSeasonYear,
         ?\Closure $logoResolver = null,
     ) {
         $this->logoResolver = $logoResolver ?? static fn (int $id, string $teamName) => "new{$id}.png";
@@ -136,12 +134,12 @@ GROUP BY s.franchise_id, s.team_city, s.team_name, o.franchise_id, o.team_city, 
 
         $scopeAxisFilter = '';
         if ($scope === 'current') {
-            $scopeAxisFilter = ' AND fs.season_ending_year = ' . $this->resolveCurrentSeasonYear();
+            $scopeAxisFilter = ' AND fs.season_ending_year = ' . $this->currentSeasonYear;
         }
 
         $axisSQL = sprintf(
             'SELECT DISTINCT fs.franchise_id, fs.team_city, fs.team_name,
-                    MIN(fs.season_year) AS first_season,
+                    MIN(fs.season_ending_year) AS first_season,
                     CASE WHEN ti.team_city = fs.team_city AND ti.team_name = fs.team_name
                          THEN ti.color1 ELSE COALESCE(eb.color1, \'\') END AS color1,
                     CASE WHEN ti.team_city = fs.team_city AND ti.team_name = fs.team_name
@@ -156,7 +154,7 @@ GROUP BY s.franchise_id, s.team_city, s.team_name, o.franchise_id, o.team_city, 
              GROUP BY fs.franchise_id, fs.team_city, fs.team_name,
                       ti.team_city, ti.team_name, ti.color1, ti.color2,
                       eb.color1, eb.color2
-             ORDER BY fs.franchise_id, MIN(fs.season_year)',
+             ORDER BY fs.franchise_id, MIN(fs.season_ending_year)',
             $maxTid,
             $scopeAxisFilter,
         );
@@ -305,23 +303,8 @@ perspectives AS (
     {
         return match ($scope) {
             'all'     => '',
-            'current' => 'AND b.season_year = ' . $this->resolveCurrentSeasonYear(),
+            'current' => 'AND b.season_year = ' . $this->currentSeasonYear,
         };
-    }
-
-    private function resolveCurrentSeasonYear(): int
-    {
-        if ($this->currentSeasonYear !== null) {
-            return $this->currentSeasonYear;
-        }
-        if ($this->resolvedSeasonYear !== null) {
-            return $this->resolvedSeasonYear;
-        }
-        $rows = $this->fetchRows(
-            'SELECT MAX(season_year) AS max_year FROM `ibl_box_scores_teams` WHERE game_type IN (1, 2, 3)',
-        );
-        $this->resolvedSeasonYear = self::intFromMixed($rows[0]['max_year'] ?? null);
-        return $this->resolvedSeasonYear;
     }
 
     /**
@@ -489,7 +472,7 @@ perspectives AS (
     public function currentSeasonHasGames(): bool
     {
         $maxTid = League::MAX_REAL_TEAMID;
-        $year   = $this->resolveCurrentSeasonYear();
+        $year   = $this->currentSeasonYear;
 
         $sql = sprintf(
             'SELECT EXISTS(

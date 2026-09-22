@@ -237,6 +237,22 @@ class HeadToHeadRecordsControllerTest extends TestCase
         self::assertSame(['7'], $keys);
     }
 
+    public function testFranchisesUserMatchAcceptsNumericStringTeamId(): void
+    {
+        $season = $this->makeSeasonWithPhase('Regular Season');
+        /** @var HeadToHeadRecordsRepositoryInterface&MockObject $repo */
+        $repo = $this->createMock(HeadToHeadRecordsRepositoryInterface::class);
+
+        $user = new \stdClass();
+        $user->teamid = '7';
+
+        $ctrl    = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, $user, self::createStub(\mysqli::class));
+        $payload = $this->makePayload([]);
+        $keys    = $ctrl->resolveUserMatchKeys('franchises', $payload);
+
+        self::assertSame(['7'], $keys);
+    }
+
     // ---------------------------------------------------------------------------
     // resolveUserMatchKeys — teams dimension
     // ---------------------------------------------------------------------------

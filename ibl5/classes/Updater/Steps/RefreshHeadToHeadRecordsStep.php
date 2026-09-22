@@ -35,7 +35,7 @@ final class RefreshHeadToHeadRecordsStep implements PipelineStepInterface
             $ibl5Root = dirname(__DIR__, 3);
             $innerH2hRepo = new \HeadToHeadRecords\HeadToHeadRecordsRepository(
                 $this->db,
-                null,
+                (new \Season\Season($this->db))->endingYear,
                 fn (int $id, string $n): string => (new \HeadToHeadRecords\LogoResolver())->resolve($id, $n, $ibl5Root . '/images/logo'),
             );
             $cachedH2hRepo = new \HeadToHeadRecords\CachedHeadToHeadRecordsRepository(

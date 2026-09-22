@@ -172,6 +172,9 @@ class HeadToHeadRecordsController
             return 0;
         }
         $tid = $this->user->teamid;
+        if (is_string($tid) && ctype_digit($tid)) {
+            $tid = (int) $tid;
+        }
         return (is_int($tid) && $tid > 0) ? $tid : 0;
     }
 }

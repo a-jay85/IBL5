@@ -27,7 +27,7 @@ include $docRoot . '/ibl5/db/db.php';
 try {
     $innerH2hRepo = new \HeadToHeadRecords\HeadToHeadRecordsRepository(
         $mysqli_db,
-        null,
+        (new \Season\Season($mysqli_db))->endingYear,
         fn (int $id, string $n): string => (new \HeadToHeadRecords\LogoResolver())->resolve($id, $n, $docRoot . '/ibl5/images/logo'),
     );
     $cachedH2hRepo = new \HeadToHeadRecords\CachedHeadToHeadRecordsRepository(

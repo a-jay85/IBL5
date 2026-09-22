@@ -455,7 +455,7 @@ EMPTY_GOLDEN;
             'error' => '',
         ];
 
-        /** @var array{query: string, type: string, topic: int, category: int, author: string, days: int, min: int, offset: int, topicText: string, topics: list<array{topicId: int, topicText: string}>, categories: list<array{catId: int, title: string}>, authors: list<string>, results: list<mixed>|null, hasMore: bool, articleComm: bool, error: string} */
+        /** @var array{query: string, type: string, topic: int, category: int, author: string, days: int, preset: string, min: int, offset: int, topicText: string, topics: list<array{topicId: int, topicText: string}>, categories: list<array{catId: int, title: string}>, authors: list<string>, results: list<mixed>|null, hasMore: bool, articleComm: bool, error: string} */
         return array_merge($defaults, $overrides);
     }
 }

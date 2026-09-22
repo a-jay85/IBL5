@@ -13,7 +13,8 @@ namespace Topics\Contracts;
  *     topics: list<array{topicId: int, topicText: string}>,
  *     categories: list<array{catId: int, title: string}>,
  *     authors: list<string>,
- *     articleComm: bool
+ *     articleComm: bool,
+ *     preset?: string
  * }
  */
 interface TopicsViewInterface

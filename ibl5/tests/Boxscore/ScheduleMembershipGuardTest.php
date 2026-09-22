@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Boxscore;
 
 use Boxscore\Boxscore;
+use Boxscore\Contracts\BoxscoreRepositoryInterface;
 use Boxscore\RejectedGame;
 use Boxscore\ScheduleMembershipGuard;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -103,6 +104,187 @@ class ScheduleMembershipGuardTest extends TestCase
             'Preseason month 9 on 2007-09-20'  => ['2007-09-20', 9],
             'Olympics month 8 on 2008-08-05'   => ['2008-08-05', 8],
         ];
+    }
+
+    #[DataProvider('enabledGuardOffScheduleMonthProvider')]
+    public function testAcceptsOffScheduleMonthsWhenScheduleIsEnabled(
+        string $gameDate,
+    ): void {
+        // Rule-3 pin: a NON-empty index keeps rule 1 from masking rule 3.
+        // The index holds one unrelated regular-season triple; the game's triple is absent,
+        // so only the off-schedule-month exemption can accept it.
+        $scheduleIndex = ['2008-01-10' => [2 => [1 => true]]];
+        $guard = new ScheduleMembershipGuard(2008, $scheduleIndex, []);
+        $game = $this->makeBoxscore($gameDate, 3, 7, 1);
+
+        $this->assertTrue($guard->isEnabled());
+        $this->assertNull($guard->evaluate($game));
+    }
+
+    /** @return array<string, array{string}> */
+    public static function enabledGuardOffScheduleMonthProvider(): array
+    {
+        return [
+            'HEAT month 10'      => ['2007-10-15'],
+            'Preseason month 9'  => ['2007-09-20'],
+            'Olympics month 8'   => ['2008-08-05'],
+        ];
+    }
+
+    public function testRejectsAbsentTripleInNovemberWhenScheduleIsEnabled(): void
+    {
+        // Boundary pin: month 11 is the first month OUTSIDE OFF_SCHEDULE_MONTHS.
+        // An absent Nov triple must reject with the existing reason. Phase 2 must not
+        // route non-9/10 months to the new preseason reason.
+        $scheduleIndex = ['2008-01-10' => [2 => [1 => true]]];
+        $guard = new ScheduleMembershipGuard(2008, $scheduleIndex, []);
+        $result = $guard->evaluate($this->makeBoxscore('2007-11-20', 3, 7, 1));
+
+        $this->assertInstanceOf(RejectedGame::class, $result);
+        $this->assertSame(RejectedGame::REASON_NOT_IN_SCHEDULE, $result->reason);
+    }
+
+    // -------------------------------------------------------------------------
+    // Phase 2: phase-aware tests
+    // -------------------------------------------------------------------------
+
+    #[DataProvider('preseasonShiftedMonthProvider')]
+    public function testRejectsPreseasonShiftedMonthAbsentFromSchedule(string $gameDate): void
+    {
+        $scheduleIndex = ['2008-01-10' => [2 => [1 => true]]];
+        $guard = new ScheduleMembershipGuard(2008, $scheduleIndex, [], 'Preseason');
+        $result = $guard->evaluate($this->makeBoxscore($gameDate, 3, 7, 1));
+
+        $this->assertInstanceOf(RejectedGame::class, $result);
+        $this->assertSame(RejectedGame::REASON_PRESEASON_SHIFT_NOT_IN_SCHEDULE, $result->reason);
+        $this->assertSame($gameDate, $result->gameDate);
+    }
+
+    /** @return array<string, array{string}> */
+    public static function preseasonShiftedMonthProvider(): array
+    {
+        return [
+            'Sep (shifted Nov)' => ['2007-09-20'],
+            'Oct (shifted Dec)' => ['2007-10-15'],
+        ];
+    }
+
+    public function testAcceptsPreseasonShiftedMonthPresentInSchedule(): void
+    {
+        $scheduleIndex = ['2007-09-20' => [3 => [7 => true]]];
+        $guard = new ScheduleMembershipGuard(2008, $scheduleIndex, [], 'Preseason');
+        $result = $guard->evaluate($this->makeBoxscore('2007-09-20', 3, 7, 1));
+
+        $this->assertNull($result);
+    }
+
+    public function testAcceptsOlympicsMonthDuringPreseasonImport(): void
+    {
+        $scheduleIndex = ['2008-01-10' => [2 => [1 => true]]];
+        $guard = new ScheduleMembershipGuard(2008, $scheduleIndex, [], 'Preseason');
+        $result = $guard->evaluate($this->makeBoxscore('2008-08-05', 3, 7, 1));
+
+        $this->assertNull($result);
+    }
+
+    #[DataProvider('nonPreseasonPhaseOffScheduleProvider')]
+    public function testAcceptsOffScheduleMonthsForNonPreseasonPhases(string $phase, string $gameDate): void
+    {
+        $scheduleIndex = ['2008-01-10' => [2 => [1 => true]]];
+        $guard = new ScheduleMembershipGuard(2008, $scheduleIndex, [], $phase);
+        $result = $guard->evaluate($this->makeBoxscore($gameDate, 3, 7, 1));
+
+        $this->assertNull($result);
+    }
+
+    /** @return array<string, array{string, string}> */
+    public static function nonPreseasonPhaseOffScheduleProvider(): array
+    {
+        return [
+            'HEAT Oct'                  => ['HEAT', '2007-10-15'],
+            'Regular Season Oct'        => ['Regular Season', '2007-10-15'],
+            'Regular Season/Playoffs Sep' => ['Regular Season/Playoffs', '2007-09-20'],
+            'Playoffs Sep'              => ['Playoffs', '2007-09-20'],
+            'phase-less Sep'            => ['', '2007-09-20'],
+        ];
+    }
+
+    public function testKeepsNotInScheduleReasonForNovemberDuringPreseasonImport(): void
+    {
+        $scheduleIndex = ['2008-01-10' => [2 => [1 => true]]];
+        $guard = new ScheduleMembershipGuard(2008, $scheduleIndex, [], 'Preseason');
+        $result = $guard->evaluate($this->makeBoxscore('2007-11-20', 3, 7, 1));
+
+        $this->assertInstanceOf(RejectedGame::class, $result);
+        $this->assertSame(RejectedGame::REASON_NOT_IN_SCHEDULE, $result->reason);
+    }
+
+    public function testKeepsDuplicateTripleReasonDuringPreseasonImport(): void
+    {
+        $scheduleIndex  = ['2007-09-20' => [3 => [7 => true]]];
+        $gotdIndex      = ['2007-09-20' => [3 => [7 => [1]]]];
+        $guard = new ScheduleMembershipGuard(2008, $scheduleIndex, $gotdIndex, 'Preseason');
+        $result = $guard->evaluate($this->makeBoxscore('2007-09-20', 3, 7, 2));
+
+        $this->assertInstanceOf(RejectedGame::class, $result);
+        $this->assertSame(RejectedGame::REASON_DUPLICATE_TRIPLE, $result->reason);
+    }
+
+    #[DataProvider('exemptionByPhaseProvider')]
+    public function testExemptsOffScheduleMonthByPhase(string $phase, int $month, bool $expected): void
+    {
+        $scheduleIndex = ['2008-01-10' => [2 => [1 => true]]];
+        $guard = new ScheduleMembershipGuard(2008, $scheduleIndex, [], $phase);
+
+        $this->assertSame($expected, $guard->exemptsOffScheduleMonth($month));
+    }
+
+    /** @return array<string, array{string, int, bool}> */
+    public static function exemptionByPhaseProvider(): array
+    {
+        return [
+            'Preseason month 8 (Olympics)'   => ['Preseason', 8, true],
+            'Preseason month 9'              => ['Preseason', 9, false],
+            'Preseason month 10'             => ['Preseason', 10, false],
+            'Preseason month 11'             => ['Preseason', 11, false],
+            'HEAT month 9'                   => ['HEAT', 9, true],
+            'HEAT month 10'                  => ['HEAT', 10, true],
+            'phase-less month 9'             => ['', 9, true],
+            'Regular Season month 10'        => ['Regular Season', 10, true],
+            'phase-less month 7'             => ['', 7, false],
+        ];
+    }
+
+    public function testFromRepositoryThreadsImportPhase(): void
+    {
+        $repo = self::createStub(BoxscoreRepositoryInterface::class);
+        $repo->method('fetchScheduledGameIndex')->willReturn(['2008-01-10' => [2 => [1 => true]]]);
+        $repo->method('fetchBoxscoreGameOfThatDayIndex')->willReturn([]);
+
+        $result = ScheduleMembershipGuard::fromRepository($repo, 2008, 'Preseason')
+            ->evaluate($this->makeBoxscore('2007-09-20', 3, 7, 1));
+
+        $this->assertInstanceOf(RejectedGame::class, $result);
+        $this->assertSame(RejectedGame::REASON_PRESEASON_SHIFT_NOT_IN_SCHEDULE, $result->reason);
+    }
+
+    public function testRejectReasonConstantsFitScheduleGuardRejectsColumn(): void
+    {
+        $reflection = new \ReflectionClass(RejectedGame::class);
+        $reasonConstants = array_filter(
+            $reflection->getConstants(),
+            static fn (string $name): bool => str_starts_with($name, 'REASON_'),
+            ARRAY_FILTER_USE_KEY,
+        );
+
+        $this->assertNotEmpty($reasonConstants);
+        foreach ($reasonConstants as $name => $value) {
+            $this->assertLessThanOrEqual(
+                32,
+                strlen((string) $value),
+                "RejectedGame::$name value exceeds VARCHAR(32): '$value'",
+            );
+        }
     }
 
     public function testAcceptsRepeatImportOfSameQuadruple(): void

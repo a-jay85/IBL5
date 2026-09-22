@@ -59,6 +59,19 @@ try {
 
     echo "Record Holders cache warmed\n";
 
+    // --- Head-to-Head Records ---
+
+    echo "\nWarming Head-to-Head Records cache...\n";
+
+    $innerH2hRepo = new \HeadToHeadRecords\HeadToHeadRecordsRepository(
+        $mysqli_db,
+        (new \Season\Season($mysqli_db))->endingYear,
+        fn (int $id, string $n): string => (new \HeadToHeadRecords\LogoResolver())->resolve($id, $n, $docRoot . '/ibl5/images/logo'),
+    );
+    $cachedH2hRepo = new \HeadToHeadRecords\CachedHeadToHeadRecordsRepository($innerH2hRepo, $dbCache);
+    $h2hKeys = $cachedH2hRepo->rebuildCache();
+    echo "Head-to-Head Records cache warmed ({$h2hKeys} keys)\n";
+
     // --- Done ---
 
     echo "\nAll caches warmed successfully at " . date('Y-m-d H:i:s') . "\n";

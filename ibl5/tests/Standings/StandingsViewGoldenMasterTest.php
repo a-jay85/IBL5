@@ -6,7 +6,6 @@ namespace Tests\Standings;
 
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
-use SeriesRecords\SeriesRecordsService;
 use Standings\StandingsRowView;
 use Standings\StandingsView;
 use Standings\Contracts\StandingsRepositoryInterface;
@@ -250,7 +249,7 @@ class StandingsViewGoldenMasterTest extends TestCase
             static fn (string $region): array => $region === 'Eastern' ? $regionEasternRows : []
         );
 
-        return new StandingsView($repo, 2025, new SeriesRecordsService());
+        return new StandingsView($repo, 2025);
     }
 
     /**

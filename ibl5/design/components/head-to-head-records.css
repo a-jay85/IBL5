@@ -1,0 +1,232 @@
+@layer components {
+
+/* ==========================================================================
+   Head-to-Head Records matrix (.h2h-matrix)
+
+   Built on the shared sticky-table pattern (tables.css Pattern 3a):
+     .sticky-scroll-wrapper.page-sticky > .sticky-scroll-container
+       > table.ibl-data-table.sticky-table.h2h-matrix
+   Row labels reuse .sticky-col + .ibl-team-cell--colored, record cells reuse
+   .series-record-cell (free-agency.css), header logos reuse .series-logo-img.
+   Only the matrix-specific bits live here.
+   ========================================================================== */
+
+/* Every column the same width: the width of the widest record ("125-118"), or the
+   40px logo, whichever is larger. The View emits --h2h-col-chars (longest record
+   string) and --h2h-col-count (number of columns). 0.45rem per character undershoots
+   — a digit in the 0.85rem cell font measures 7.97px, so the coefficient must be at
+   least 0.5rem (8px) for an all-digit record to fit; the 0.6rem padding is then pure
+   slack. Records up to 6 characters never reach the logo floor, so the character term
+   only takes over at 7+. The explicit table width is required — table-layout: fixed
+   with width: auto shrink-to-fits and hands the columns back uneven widths. No ch
+   units: ch resolves against whichever element reads the var, so the table and its
+   cells would disagree. */
+.h2h-matrix {
+    --h2h-col-width: max(calc(40px + 0.6rem), calc(var(--h2h-col-chars) * 0.5rem + 0.6rem));
+    --h2h-corner-width: 11rem;
+
+    table-layout: fixed;
+    width: calc(var(--h2h-corner-width) + (var(--h2h-col-count) * var(--h2h-col-width)));
+}
+
+.h2h-matrix thead th:not(.h2h-corner) {
+    width: var(--h2h-col-width);
+}
+
+/* Tight cells so a 28+ column grid fits like the legacy page */
+.h2h-matrix th,
+.h2h-matrix td {
+    padding: 0.2rem 0.3rem;
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+.ibl-data-table.h2h-matrix .h2h-row-label {
+    padding-block: 0.15rem;
+}
+
+.h2h-row-label small {
+    font-weight: 400;
+    opacity: 0.8;
+}
+
+/* The shared .ibl-team-cell--colored rule paints the label text in the team's
+   secondary colour, which on this page lands green-on-purple, blue-on-red and
+   pink-on-cyan. White reads on every primary. Scoped to the row-label cell so
+   standings, free agency, trading and the draft tables keep the team colour. */
+.h2h-matrix .h2h-row-label.ibl-team-cell--colored .ibl-team-cell__name {
+    color: #fff;
+}
+
+/* Corner cell: reading-direction hint (arrows point at columns, up at rows) */
+.h2h-matrix .h2h-corner {
+    vertical-align: bottom;
+    line-height: 1.1;
+    width: var(--h2h-corner-width);
+}
+
+.h2h-corner__cols,
+.h2h-corner__vs,
+.h2h-corner__rows {
+    display: block;
+}
+
+.h2h-corner__cols {
+    text-align: right;
+}
+
+.h2h-corner__vs {
+    text-align: center;
+}
+
+.h2h-corner__rows {
+    text-align: left;
+}
+
+/* Column headers: logo only unless the View detects duplicate logos
+   (GMs, or team eras that share one); bottom-aligned either way */
+.h2h-matrix .h2h-col-header {
+    vertical-align: bottom;
+    text-align: center;
+}
+
+/* The header anchor inherits the global link colour (navy 800) and disappears
+   into the dark header band. Entries with no team page have no anchor and read
+   white off the th, so the labelled row came out half legible. Force white. */
+.h2h-matrix .h2h-col-header a {
+    color: #fff;
+}
+
+.h2h-matrix .series-logo-img {
+    display: block;
+    margin: 0 auto;
+    width: 40px;
+    height: 40px;
+}
+
+/* Labeled variant (GMs): name reads bottom-to-top above the logo,
+   capped so every column stays the same width and height */
+.h2h-col-header__text {
+    /* Centred by the th's own text-align, NOT by margin auto. In vertical-rl
+       the left/right axis is the block axis, where auto margins compute to
+       zero (CSS Box 3 § 4.2) and the label lands hard against the column's
+       left edge. Firefox follows that; Blink centres anyway, so the bug only
+       showed in Firefox-family browsers. As an inline-block the label is laid
+       out in the th's own horizontal inline axis, so text-align: center
+       applies in both. vertical-align: bottom drops the baseline gap an
+       inline-block would otherwise add above the logo. */
+    display: inline-block;
+    vertical-align: bottom;
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    margin: 0 0 0.35rem;
+    max-height: 9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.75rem;
+    line-height: 1;
+    letter-spacing: 0.03em;
+}
+
+/* Record cells: colour via the shared --series-cell-bg custom property */
+.h2h-winning {
+    --series-cell-bg: #88ff88;
+}
+
+.h2h-losing {
+    --series-cell-bg: #ff8888;
+}
+
+.h2h-tied {
+    --series-cell-bg: #bbbbbb;
+}
+
+/* Never met: keep the zebra background, mute the text */
+.ibl-data-table .h2h-unplayed {
+    --series-cell-bg: transparent;
+    color: var(--gray-400);
+}
+
+.h2h-matrix .h2h-self {
+    background-color: var(--gray-200);
+}
+
+/* Hover crosshair: darken the hovered row (CSS) and column (JS adds
+   h2h-col-hover). An overlay gradient works on top of any cell colour,
+   which a plain background-color swap could not. */
+.h2h-matrix tbody tr:hover td,
+.h2h-matrix .h2h-col-hover {
+    background-image: linear-gradient(rgba(0, 0, 0, 0.12), rgba(0, 0, 0, 0.12));
+}
+
+.h2h-matrix thead th.h2h-col-hover {
+    background-image: linear-gradient(rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.18));
+}
+
+/* Logged-in user's own row and column: bold plus an accent bar */
+.h2h-matrix .h2h-user-row td,
+.h2h-matrix .h2h-user-col {
+    font-weight: 700;
+}
+
+.h2h-matrix .h2h-user-row td.sticky-col {
+    box-shadow: inset 4px 0 0 var(--accent-500), var(--shadow-sticky-col);
+}
+
+.h2h-matrix thead th.h2h-user-col {
+    box-shadow: inset 0 -4px 0 var(--accent-500);
+}
+
+/* Touch tooltip: hidden by default, revealed by JS adding h2h-tip-open */
+.h2h-matrix .series-record-cell {
+    position: relative;
+}
+
+.h2h-matrix .series-record-cell::after {
+    content: attr(title);
+    display: none;
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--navy-900);
+    color: white;
+    padding: 2px 6px;
+    border-radius: var(--radius-md);
+    font-size: 0.75rem;
+    font-weight: 400;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.h2h-matrix .series-record-cell.h2h-tip-open::after {
+    display: block;
+}
+
+/* Filter form: inline fields, centered above the matrix */
+.h2h-filter {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-end;
+    gap: var(--space-3);
+    margin-bottom: var(--space-4);
+}
+
+.h2h-filter__field {
+    display: flex;
+    flex-direction: column;
+}
+
+.h2h-filter__field .ibl-label {
+    margin-bottom: var(--space-1);
+}
+
+.h2h-filter .ibl-select {
+    width: auto;
+    font-size: 1rem;
+    padding: var(--space-1) var(--space-2);
+}
+
+} /* end @layer components */

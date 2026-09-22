@@ -968,3 +968,11 @@ After Phase 4 is complete, the next priority improvements are:
    - **Risk Level:** High (requires application code updates)
 
 See `../docs/DATABASE_GUIDE.md` for the developer database reference and `../docs/archive/DATABASE_OPTIMIZATION_GUIDE.md` for the historical optimization strategy.
+
+## Recent Feature Migrations
+
+Feature migrations add tables or seed data outside the optimization phases above.
+
+### 182_create_franchise_era_branding.sql
+
+Creates `ibl_franchise_era_branding`: a six-column table (`id`, `franchise_id`, `team_city`, `team_name`, `color1`, `color2`) for retired franchise color identities. Seeded with six historical eras whose colors no longer match `ibl_team_info`. Referenced by the HeadToHeadRecords module (ADR-0136).

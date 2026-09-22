@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Standings;
 
 use League\League;
-use SeriesRecords\Contracts\SeriesRecordsServiceInterface;
 use Standings\Contracts\StandingsRepositoryInterface;
 use Standings\Contracts\StandingsViewInterface;
 
@@ -19,6 +18,7 @@ use Standings\Contracts\StandingsViewInterface;
  * @phpstan-import-type BulkStandingsRow from StandingsRepositoryInterface
  * @phpstan-import-type StreakRow from StandingsRepositoryInterface
  * @phpstan-import-type PythagoreanStats from StandingsRepositoryInterface
+ * @phpstan-import-type SeriesRecordRow from StandingsRepositoryInterface
  *
  * @see StandingsViewInterface For the interface contract
  * @see StandingsRepository For data access
@@ -26,7 +26,6 @@ use Standings\Contracts\StandingsViewInterface;
 class StandingsView implements StandingsViewInterface
 {
     private StandingsRepositoryInterface $repository;
-    private SeriesRecordsServiceInterface $seriesRecordsService;
     private int $seasonYear;
 
     /** @var array<int, StreakRow>|null Pre-loaded streak data keyed by team ID */
@@ -46,16 +45,13 @@ class StandingsView implements StandingsViewInterface
      *
      * @param StandingsRepositoryInterface $repository Standings data repository
      * @param int $seasonYear Season ending year (e.g. 2025 for the 2024-25 season)
-     * @param SeriesRecordsServiceInterface $seriesRecordsService Series records service for H2H data
      */
     public function __construct(
         StandingsRepositoryInterface $repository,
-        int $seasonYear,
-        SeriesRecordsServiceInterface $seriesRecordsService
+        int $seasonYear
     ) {
         $this->repository = $repository;
         $this->seasonYear = $seasonYear;
-        $this->seriesRecordsService = $seriesRecordsService;
         $this->rowView = new StandingsRowView();
         $this->tiebreakerResolver = new StandingsTiebreakerResolver();
     }
@@ -111,7 +107,7 @@ class StandingsView implements StandingsViewInterface
             $this->allPythagoreanStats = $this->repository->getAllPythagoreanStats($this->seasonYear);
         }
         if ($this->seriesMatrix === null) {
-            $this->seriesMatrix = $this->seriesRecordsService->buildSeriesMatrix(
+            $this->seriesMatrix = $this->buildSeriesMatrix(
                 $this->repository->getSeriesRecords()
             );
         }
@@ -317,6 +313,33 @@ class StandingsView implements StandingsViewInterface
         }
 
         return $html;
+    }
+
+    /**
+     * Build an H2H series matrix from raw series record rows.
+     *
+     * @param list<SeriesRecordRow> $records
+     * @return array<int, array<int, array{wins: int, losses: int}>>
+     */
+    private function buildSeriesMatrix(array $records): array
+    {
+        $matrix = [];
+
+        foreach ($records as $record) {
+            $self = $record['self'];
+            $opponent = $record['opponent'];
+
+            if (!isset($matrix[$self])) {
+                $matrix[$self] = [];
+            }
+
+            $matrix[$self][$opponent] = [
+                'wins' => $record['wins'],
+                'losses' => $record['losses'],
+            ];
+        }
+
+        return $matrix;
     }
 
 }

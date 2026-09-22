@@ -119,7 +119,7 @@ DIFF
 # Four threads on PR 42, mirroring the real GraphQL shape:
 #   111 — UNRESOLVED, score 85, on-line     → must be listed, must be resolvable
 #   222 — RESOLVED,   score 90              → must NOT be listed
-#   333 — UNRESOLVED, no score marker (human-authored), line null (outdated)
+#   333 — UNRESOLVED, no score marker (human-authored), line null (outdated), author null (deleted account)
 #   ——— UNRESOLVED, comments.nodes EMPTY (sole comment deleted) → must not abort
 #       the whole query: `null | capture(...)` is a hard jq error, so the library
 #       guards with `// ""`.  Deleting this node hides that regression.
@@ -128,13 +128,13 @@ cat > "$GH_THREADS_FIXTURE" <<'THREADS'
 {"data":{"repository":{"pullRequest":{"reviewThreads":{"nodes":[
   {"id":"PRRT_open85","isResolved":false,"isOutdated":false,
    "path":"classes/Foo.php","line":12,
-   "comments":{"nodes":[{"databaseId":111,"body":"Bug X — first line\nmore detail\n\n<!-- score: 85 -->"}]}},
+   "comments":{"nodes":[{"databaseId":111,"body":"Bug X — first line\nmore detail\n\n<!-- score: 85 -->","author":{"login":"a-jay85","__typename":"User"}}]}},
   {"id":"PRRT_done90","isResolved":true,"isOutdated":false,
    "path":"classes/Foo.php","line":13,
-   "comments":{"nodes":[{"databaseId":222,"body":"Bug Y already handled\n\n<!-- score: 90 -->"}]}},
+   "comments":{"nodes":[{"databaseId":222,"body":"Bug Y already handled\n\n<!-- score: 90 -->","author":{"login":"claude[bot]","__typename":"Bot"}}]}},
   {"id":"PRRT_human","isResolved":false,"isOutdated":true,
    "path":"classes/Bar.php","line":null,
-   "comments":{"nodes":[{"databaseId":333,"body":"A human asked a question"}]}},
+   "comments":{"nodes":[{"databaseId":333,"body":"A human asked a question","author":null}]}},
   {"id":"PRRT_ghost","isResolved":false,"isOutdated":false,
    "path":null,"line":null,
    "comments":{"nodes":[]}}
@@ -754,6 +754,36 @@ if [ -z "$(awk -F'\t' 'NF != 4' "$PIN_B")" ] && [ -s "$PIN_B" ]; then
     ok "pin-B: every row has 4 columns"
 else
     fail "pin-B: column drift in list_open_review_findings"
+fi
+
+# ── pin-D: authorLogin / authorType come from the ROOT comment, null-safe ──────
+PIN_D="$BASE_TMP/pin-d.jsonl"
+prf_review_threads 42 > "$PIN_D"
+if jq -s -e '.[0].authorLogin == "a-jay85" and .[0].authorType == "User"
+             and .[1].authorLogin == "claude[bot]" and .[1].authorType == "Bot"' \
+      "$PIN_D" >/dev/null 2>&1; then
+    ok "pin-D: User and Bot authors projected from the first comment"
+else
+    fail "pin-D: author projection wrong: $(jq -c '{authorLogin,authorType}' "$PIN_D" | tr '\n' ' ')"
+fi
+if jq -s -e '.[2].authorLogin == "" and .[2].authorType == ""
+             and .[3].authorLogin == "" and .[3].authorType == ""' \
+      "$PIN_D" >/dev/null 2>&1; then
+    ok "pin-D: null author and comment-less thread both yield empty strings"
+else
+    fail "pin-D: null-author guard missing (would break list_trusted_open_threads)"
+fi
+if [ "$(wc -l < "$PIN_D")" -eq 4 ]; then
+    ok "pin-D: author field did not abort the ghost thread"
+else
+    fail "pin-D: expected 4 objects, got $(wc -l < "$PIN_D")"
+fi
+
+# ── pin-E: the GraphQL selection requests author { login __typename } ─────────
+if grep -qE 'comments\(first:1\) \{ nodes \{ databaseId body author \{ login __typename \} \} \}' "$LIB"; then
+    ok "pin-E: prf_review_threads query selects author.login and author.__typename"
+else
+    fail "pin-E: author selection missing from prf_review_threads GraphQL query"
 fi
 
 # ── summary ───────────────────────────────────────────────────────────────────

@@ -189,7 +189,12 @@ post_review_summary() {
 
 # prf_review_threads PR_NUMBER
 #   Emits one JSON object per review thread:
-#     {id, isResolved, isOutdated, path, line, commentId, score, body}
+#     {id, isResolved, isOutdated, path, line, commentId, score, body,
+#      authorLogin, authorType}
+#   `authorLogin` / `authorType` describe the FIRST comment's author (the thread
+#   root): GraphQL `author.login` and `author.__typename` (`User`, `Bot`, ...).
+#   Both are "" when the root comment or its author is gone. list_trusted_open_threads
+#   is the only consumer that keys on them; the trust rule lives there, not here.
 #   `commentId` is the REST databaseId of the thread's FIRST comment — the id the
 #   replies endpoint keys on.  `score` is parsed from the `<!-- score: N -->`
 #   marker post_review_findings embeds, or null for a human-authored thread.
@@ -209,7 +214,7 @@ prf_review_threads() {
               reviewThreads(first:100) {
                 nodes {
                   id isResolved isOutdated path line
-                  comments(first:1) { nodes { databaseId body } }
+                  comments(first:1) { nodes { databaseId body author { login __typename } } }
                 }
               }
             }
@@ -221,7 +226,9 @@ prf_review_threads() {
                  score: ((.comments.nodes[0].body // "")
                          | capture("<!-- score: (?<s>[0-9]+) -->") // null
                          | if . == null then null else (.s|tonumber) end),
-                 body: (.comments.nodes[0].body // "")}'
+                 body: (.comments.nodes[0].body // ""),
+                 authorLogin: (.comments.nodes[0].author.login // ""),
+                 authorType: (.comments.nodes[0].author.__typename // "")}'
 }
 
 # list_open_review_findings PR_NUMBER

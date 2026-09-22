@@ -107,15 +107,19 @@
 /* Labeled variant (GMs): name reads bottom-to-top above the logo,
    capped so every column stays the same width and height */
 .h2h-col-header__text {
-    display: block;
+    /* Centred by the th's own text-align, NOT by margin auto. In vertical-rl
+       the left/right axis is the block axis, where auto margins compute to
+       zero (CSS Box 3 § 4.2) and the label lands hard against the column's
+       left edge. Firefox follows that; Blink centres anyway, so the bug only
+       showed in Firefox-family browsers. As an inline-block the label is laid
+       out in the th's own horizontal inline axis, so text-align: center
+       applies in both. vertical-align: bottom drops the baseline gap an
+       inline-block would otherwise add above the logo. */
+    display: inline-block;
+    vertical-align: bottom;
     writing-mode: vertical-rl;
     transform: rotate(180deg);
-    /* In vertical-rl the block axis runs right-to-left, so a full-width box
-       parks its line against the right edge; rotate(180deg) then throws it to
-       the left, off the logo's centre. Shrinking to the line's own width lets
-       margin auto centre it over the logo. */
-    width: fit-content;
-    margin: 0 auto 0.35rem;
+    margin: 0 0 0.35rem;
     max-height: 9rem;
     overflow: hidden;
     text-overflow: ellipsis;

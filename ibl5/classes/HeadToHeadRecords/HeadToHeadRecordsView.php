@@ -335,7 +335,8 @@ final class HeadToHeadRecordsView
      *  - toggles h2h-tip-open on touch tap, revealing the cell's title text
      *    for devices without hover;
      *  - mirrors row hover onto the hovered column (crosshair);
-     *  - submits the filter form as soon as a select changes.
+     *  - submits the filter form as soon as a select changes, and removes the
+ *    Filter button since it is redundant once JavaScript is running.
      */
     public function renderTapTooltipScript(): string
     {
@@ -371,6 +372,8 @@ final class HeadToHeadRecordsView
 
     var form=document.querySelector("form.h2h-filter");
     if(form){
+        var btn=form.querySelector("button[type=submit]");
+        if(btn){btn.remove();}
         form.addEventListener("change",function(e){
             if(e.target&&e.target.tagName==="SELECT"){form.submit();}
         });

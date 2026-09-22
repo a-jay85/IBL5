@@ -481,6 +481,7 @@ class HeadToHeadRecordsViewTest extends TestCase
         self::assertStringContainsString('h2h-tip-open', $html);
         self::assertStringContainsString('h2h-col-hover', $html);
         self::assertStringContainsString('form.h2h-filter', $html);
+        self::assertStringContainsString('btn.remove()', $html);
     }
 
     // ---------------------------------------------------------------------------

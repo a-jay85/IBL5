@@ -925,6 +925,39 @@ pr_unresolved_findings_hold 42 > "$outH3"
     || fail "hold-4: non-zero exit with findings present"
 GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
 
+# ── p45: Phase 4.5 doc blocks exist once, parse, and sit in the right order ────
+P4DOC="$REPO_ROOT/.claude/skills/post-plan/_phase-4-review-audit.md"
+PPDOC="$REPO_ROOT/.claude/review-shared/_posting-procedure.md"
+p45_block() { awk -v m="$1" '$0==m{f=1} f&&/^```$/{exit} f' "$P4DOC"; }
+for m in '# phase 4.5 snapshot' '# phase 4.5 remediate' '# phase 4.5 commit-and-resolve'; do
+    [ "$(grep -cF "$m" "$P4DOC")" -eq 1 ] && ok "p45: marker '$m' once" || fail "p45: marker '$m' count != 1"
+    p45_block "$m" | bash -n 2>/dev/null && ok "p45: block '$m' parses" || fail "p45: block '$m' does not parse"
+done
+snap_ln=$(grep -nF '# phase 4.5 snapshot' "$P4DOC" | cut -d: -f1)
+post_ln=$(grep -nF 'post_review_findings "$PR" "$FULL_SHA" "Code review"' "$P4DOC" | head -1 | cut -d: -f1)
+[ "$snap_ln" -lt "$post_ln" ] && ok "p45: snapshot precedes the first posting call" \
+    || fail "p45: snapshot ($snap_ln) is not before the first post_review_findings ($post_ln)"
+for f in "$P4DOC" "$PPDOC"; do
+    assert_contains "p45: $(basename "$f") names list_trusted_open_threads" "$f" "list_trusted_open_threads"
+    assert_contains "p45: $(basename "$f") states the decline convention"  "$f" "Declined: "
+done
+assert_contains "p45: SKILL.md routes 4D -> 4.5 -> 5" "$REPO_ROOT/.claude/skills/post-plan/SKILL.md" "then 4.5, in order"
+
+# ── p45-filter: the remediate block honors the pre-4D snapshot ────────────────
+# Default fixture: 111 is trusted+open. Snapshot {111} → 1 work item; snapshot {999} → 0.
+run_p45_remediate() { # snapshot-ids-newline-separated
+    ( export PR=42; PPID_FAKE=$$; printf '%s\n' "$1" > "/tmp/post-plan-pre4d-thread-ids-$PPID_FAKE.txt"
+      p45_block '# phase 4.5 remediate' | sed "s/\$PPID/$PPID_FAKE/g" | bash
+      wc -l < "/tmp/post-plan-p45-work-$PPID_FAKE.jsonl" | tr -d ' '
+      rm -f /tmp/post-plan-pre4d-thread-ids-$PPID_FAKE.txt /tmp/post-plan-p45-*-$PPID_FAKE.jsonl )
+}
+[ "$(run_p45_remediate 111 | tail -1)" = "1" ] && ok "p45-filter: pre-existing 111 selected" \
+    || fail "p45-filter: expected 1 work item for snapshot {111}"
+[ "$(run_p45_remediate 999 | tail -1)" = "0" ] && ok "p45-filter: fresh thread (not in snapshot) skipped" \
+    || fail "p45-filter: expected 0 work items for snapshot {999}"
+[ "$(run_p45_remediate '' | tail -1)" = "0" ] && ok "p45-filter: empty snapshot acts on nothing" \
+    || fail "p45-filter: expected 0 work items for an empty snapshot"
+
 # ── summary ───────────────────────────────────────────────────────────────────
 if [ "$FAILED" -eq 0 ]; then
     echo "All post-review-findings checks passed."

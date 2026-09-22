@@ -255,13 +255,13 @@ class SearchViewTest extends TestCase
         ]);
 
         $expected = <<<'STORIES_GOLDEN'
-<div class="search-page"><h1 class="ibl-title">Search in All Topics</h1><form action="modules.php?name=Search" method="post" class="search-form"><div class="search-form__input-row"><div class="ibl-search search-form__search-bar"><svg class="ibl-search__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" name="query" class="ibl-search__input" value="basketball" placeholder="Search..."><button type="submit" class="ibl-search__btn">Search</button></div></div><div class="search-form__filters"><select name="topic" aria-label="Topic" class="search-form__select"><option value="">All Topics</option></select><select name="category" aria-label="Category" class="search-form__select"><option value="0">All Categories</option></select><select name="author" aria-label="Author" class="search-form__select"><option value="">All Authors</option></select><select name="days" aria-label="Date range" class="search-form__select"><option value="0" selected>All</option><option value="7">1 Week</option><option value="14">2 Weeks</option><option value="30">1 Month</option><option value="60">2 Months</option><option value="90">3 Months</option></select></div><div class="search-form__types"><span class="search-form__types-label">Search on</span><label class="search-form__type" for="search-type-stories">
+<div class="search-page"><h1 class="ibl-title">Search in All Topics</h1><form action="modules.php?name=Search" method="post" class="search-form"><div class="search-form__input-row"><div class="ibl-search search-form__search-bar"><svg class="ibl-search__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" name="query" class="ibl-search__input" value="basketball" placeholder="Search..."><button type="submit" class="ibl-search__btn">Search</button></div></div><div class="search-form__filters"><select name="topic" aria-label="Topic" class="search-form__select"><option value="">All Topics</option></select><select name="category" aria-label="Category" class="search-form__select"><option value="0">All Categories</option></select><select name="author" aria-label="Author" class="search-form__select"><option value="">All Authors</option></select><select name="days" aria-label="Date range" class="search-form__select"><option value="0" selected>All</option><option value="7">1 Week</option><option value="14">2 Weeks</option><option value="30">1 Month</option><option value="60">2 Months</option><option value="90">3 Months</option></select><select name="preset" aria-label="Preset" class="search-form__select"><option value="" selected>No Preset</option><option value="transactions">Transactions</option></select></div><div class="search-form__types"><span class="search-form__types-label">Search on</span><label class="search-form__type" for="search-type-stories">
             <input type="radio" name="type" value="stories" id="search-type-stories" checked>
             <span class="search-form__type-label">Stories</span>
         </label><label class="search-form__type" for="search-type-users">
             <input type="radio" name="type" value="users" id="search-type-users">
             <span class="search-form__type-label">Users</span>
-        </label></div></form><div class="search-results"><h3 class="search-results__heading">Search Results</h3><div class="search-results__list"><div class="search-result" style="--anim-delay: 0ms"><div class="search-result__header"><a href="modules.php?name=News&amp;file=article&amp;sid=1" class="search-result__title">Story One</a></div><div class="search-result__meta"><span class="search-result__meta-item">Contributed by reporter</span><span class="search-result__meta-item">Posted by admin on <time datetime="2023-11-14T22:13:20+00:00" class="local-time">Tuesday, November 14 @ 22:13 GMT</time></span><span class="search-result__meta-item">Topic: <a href="modules.php?name=Search&amp;query=&amp;topic=1">News</a></span><span class="search-result__meta-item">No comments</span></div></div><div class="search-result" style="--anim-delay: 40ms"><div class="search-result__header"><a href="modules.php?name=News&amp;file=article&amp;sid=2" class="search-result__title">Story Two</a></div><div class="search-result__meta"><span class="search-result__meta-item">Posted by editor on <time datetime="2023-11-14T22:13:20+00:00" class="local-time">Tuesday, November 14 @ 22:13 GMT</time></span><span class="search-result__meta-item">1 comment</span></div></div><div class="search-result" style="--anim-delay: 80ms"><div class="search-result__header"><a href="modules.php?name=News&amp;file=article&amp;sid=3" class="search-result__title">Story Three</a></div><div class="search-result__meta"><span class="search-result__meta-item">Contributed by contrib</span><span class="search-result__meta-item">Posted by writer on <time datetime="2023-11-14T22:13:20+00:00" class="local-time">Tuesday, November 14 @ 22:13 GMT</time></span><span class="search-result__meta-item">Topic: <a href="modules.php?name=Search&amp;query=&amp;topic=2">Sports</a></span><span class="search-result__meta-item">5 comments</span></div></div></div><div class="search-pagination"><a href="modules.php?name=Search&amp;author=&amp;topic=0&amp;min=10&amp;query=basketball&amp;type=stories&amp;category=0" class="search-pagination__link search-pagination__link--next">Next Matches &rarr;</a></div></div></div>
+        </label></div></form><div class="search-results"><h3 class="search-results__heading">Search Results</h3><div class="search-results__list"><div class="search-result" style="--anim-delay: 0ms"><div class="search-result__header"><a href="modules.php?name=News&amp;file=article&amp;sid=1" class="search-result__title">Story One</a></div><div class="search-result__meta"><span class="search-result__meta-item">Contributed by reporter</span><span class="search-result__meta-item">Posted by admin on <time datetime="2023-11-14T22:13:20+00:00" class="local-time">Tuesday, November 14 @ 22:13 GMT</time></span><span class="search-result__meta-item">Topic: <a href="modules.php?name=Search&amp;query=&amp;topic=1">News</a></span><span class="search-result__meta-item">No comments</span></div></div><div class="search-result" style="--anim-delay: 40ms"><div class="search-result__header"><a href="modules.php?name=News&amp;file=article&amp;sid=2" class="search-result__title">Story Two</a></div><div class="search-result__meta"><span class="search-result__meta-item">Posted by editor on <time datetime="2023-11-14T22:13:20+00:00" class="local-time">Tuesday, November 14 @ 22:13 GMT</time></span><span class="search-result__meta-item">1 comment</span></div></div><div class="search-result" style="--anim-delay: 80ms"><div class="search-result__header"><a href="modules.php?name=News&amp;file=article&amp;sid=3" class="search-result__title">Story Three</a></div><div class="search-result__meta"><span class="search-result__meta-item">Contributed by contrib</span><span class="search-result__meta-item">Posted by writer on <time datetime="2023-11-14T22:13:20+00:00" class="local-time">Tuesday, November 14 @ 22:13 GMT</time></span><span class="search-result__meta-item">Topic: <a href="modules.php?name=Search&amp;query=&amp;topic=2">Sports</a></span><span class="search-result__meta-item">5 comments</span></div></div></div><div class="search-pagination"><a href="modules.php?name=Search&amp;author=&amp;topic=0&amp;min=10&amp;query=basketball&amp;type=stories&amp;category=0&amp;preset=" class="search-pagination__link search-pagination__link--next">Next Matches &rarr;</a></div></div></div>
 STORIES_GOLDEN;
 
         $this->assertSame($expected, $this->view->render($data));
@@ -281,7 +281,7 @@ STORIES_GOLDEN;
         ]);
 
         $expected = <<<'COMMENTS_GOLDEN'
-<div class="search-page"><h1 class="ibl-title">Search in All Topics</h1><form action="modules.php?name=Search" method="post" class="search-form"><div class="search-form__input-row"><div class="ibl-search search-form__search-bar"><svg class="ibl-search__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" name="query" class="ibl-search__input" value="basketball" placeholder="Search..."><button type="submit" class="ibl-search__btn">Search</button></div></div><div class="search-form__filters"><select name="topic" aria-label="Topic" class="search-form__select"><option value="">All Topics</option></select><select name="category" aria-label="Category" class="search-form__select"><option value="0">All Categories</option></select><select name="author" aria-label="Author" class="search-form__select"><option value="">All Authors</option></select><select name="days" aria-label="Date range" class="search-form__select"><option value="0" selected>All</option><option value="7">1 Week</option><option value="14">2 Weeks</option><option value="30">1 Month</option><option value="60">2 Months</option><option value="90">3 Months</option></select></div><div class="search-form__types"><span class="search-form__types-label">Search on</span><label class="search-form__type" for="search-type-stories">
+<div class="search-page"><h1 class="ibl-title">Search in All Topics</h1><form action="modules.php?name=Search" method="post" class="search-form"><div class="search-form__input-row"><div class="ibl-search search-form__search-bar"><svg class="ibl-search__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" name="query" class="ibl-search__input" value="basketball" placeholder="Search..."><button type="submit" class="ibl-search__btn">Search</button></div></div><div class="search-form__filters"><select name="topic" aria-label="Topic" class="search-form__select"><option value="">All Topics</option></select><select name="category" aria-label="Category" class="search-form__select"><option value="0">All Categories</option></select><select name="author" aria-label="Author" class="search-form__select"><option value="">All Authors</option></select><select name="days" aria-label="Date range" class="search-form__select"><option value="0" selected>All</option><option value="7">1 Week</option><option value="14">2 Weeks</option><option value="30">1 Month</option><option value="60">2 Months</option><option value="90">3 Months</option></select><select name="preset" aria-label="Preset" class="search-form__select"><option value="" selected>No Preset</option><option value="transactions">Transactions</option></select></div><div class="search-form__types"><span class="search-form__types-label">Search on</span><label class="search-form__type" for="search-type-stories">
             <input type="radio" name="type" value="stories" id="search-type-stories">
             <span class="search-form__type-label">Stories</span>
         </label><label class="search-form__type" for="search-type-comments">
@@ -309,7 +309,7 @@ COMMENTS_GOLDEN;
         ]);
 
         $expected = <<<'USERS_GOLDEN'
-<div class="search-page"><h1 class="ibl-title">Search Users</h1><form action="modules.php?name=Search" method="post" class="search-form"><div class="search-form__input-row"><div class="ibl-search search-form__search-bar"><svg class="ibl-search__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" name="query" class="ibl-search__input" value="basketball" placeholder="Search..."><button type="submit" class="ibl-search__btn">Search</button></div></div><div class="search-form__filters"><select name="topic" aria-label="Topic" class="search-form__select"><option value="">All Topics</option></select><select name="category" aria-label="Category" class="search-form__select"><option value="0">All Categories</option></select><select name="author" aria-label="Author" class="search-form__select"><option value="">All Authors</option></select><select name="days" aria-label="Date range" class="search-form__select"><option value="0" selected>All</option><option value="7">1 Week</option><option value="14">2 Weeks</option><option value="30">1 Month</option><option value="60">2 Months</option><option value="90">3 Months</option></select></div><div class="search-form__types"><span class="search-form__types-label">Search on</span><label class="search-form__type" for="search-type-stories">
+<div class="search-page"><h1 class="ibl-title">Search Users</h1><form action="modules.php?name=Search" method="post" class="search-form"><div class="search-form__input-row"><div class="ibl-search search-form__search-bar"><svg class="ibl-search__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" name="query" class="ibl-search__input" value="basketball" placeholder="Search..."><button type="submit" class="ibl-search__btn">Search</button></div></div><div class="search-form__filters"><select name="topic" aria-label="Topic" class="search-form__select"><option value="">All Topics</option></select><select name="category" aria-label="Category" class="search-form__select"><option value="0">All Categories</option></select><select name="author" aria-label="Author" class="search-form__select"><option value="">All Authors</option></select><select name="days" aria-label="Date range" class="search-form__select"><option value="0" selected>All</option><option value="7">1 Week</option><option value="14">2 Weeks</option><option value="30">1 Month</option><option value="60">2 Months</option><option value="90">3 Months</option></select><select name="preset" aria-label="Preset" class="search-form__select"><option value="" selected>No Preset</option><option value="transactions">Transactions</option></select></div><div class="search-form__types"><span class="search-form__types-label">Search on</span><label class="search-form__type" for="search-type-stories">
             <input type="radio" name="type" value="stories" id="search-type-stories">
             <span class="search-form__type-label">Stories</span>
         </label><label class="search-form__type" for="search-type-users">
@@ -330,7 +330,7 @@ USERS_GOLDEN;
         ]);
 
         $expected = <<<'EMPTY_GOLDEN'
-<div class="search-page"><h1 class="ibl-title">Search in All Topics</h1><form action="modules.php?name=Search" method="post" class="search-form"><div class="search-form__input-row"><div class="ibl-search search-form__search-bar"><svg class="ibl-search__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" name="query" class="ibl-search__input" value="test" placeholder="Search..."><button type="submit" class="ibl-search__btn">Search</button></div></div><div class="search-form__filters"><select name="topic" aria-label="Topic" class="search-form__select"><option value="">All Topics</option></select><select name="category" aria-label="Category" class="search-form__select"><option value="0">All Categories</option></select><select name="author" aria-label="Author" class="search-form__select"><option value="">All Authors</option></select><select name="days" aria-label="Date range" class="search-form__select"><option value="0" selected>All</option><option value="7">1 Week</option><option value="14">2 Weeks</option><option value="30">1 Month</option><option value="60">2 Months</option><option value="90">3 Months</option></select></div><div class="search-form__types"><span class="search-form__types-label">Search on</span><label class="search-form__type" for="search-type-stories">
+<div class="search-page"><h1 class="ibl-title">Search in All Topics</h1><form action="modules.php?name=Search" method="post" class="search-form"><div class="search-form__input-row"><div class="ibl-search search-form__search-bar"><svg class="ibl-search__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" name="query" class="ibl-search__input" value="test" placeholder="Search..."><button type="submit" class="ibl-search__btn">Search</button></div></div><div class="search-form__filters"><select name="topic" aria-label="Topic" class="search-form__select"><option value="">All Topics</option></select><select name="category" aria-label="Category" class="search-form__select"><option value="0">All Categories</option></select><select name="author" aria-label="Author" class="search-form__select"><option value="">All Authors</option></select><select name="days" aria-label="Date range" class="search-form__select"><option value="0" selected>All</option><option value="7">1 Week</option><option value="14">2 Weeks</option><option value="30">1 Month</option><option value="60">2 Months</option><option value="90">3 Months</option></select><select name="preset" aria-label="Preset" class="search-form__select"><option value="" selected>No Preset</option><option value="transactions">Transactions</option></select></div><div class="search-form__types"><span class="search-form__types-label">Search on</span><label class="search-form__type" for="search-type-stories">
             <input type="radio" name="type" value="stories" id="search-type-stories" checked>
             <span class="search-form__type-label">Stories</span>
         </label><label class="search-form__type" for="search-type-users">
@@ -358,9 +358,80 @@ EMPTY_GOLDEN;
         $this->assertStringNotContainsString('<script>', $html);
     }
 
-    /**
+
+    public function testRenderShowsPresetSelectAfterDaysSelect(): void
+    {
+        $html = $this->view->render(self::createPageData());
+
+        $this->assertStringContainsString('name="preset"', $html);
+        $this->assertStringContainsString('value=""', $html);
+        $this->assertStringContainsString('value="transactions"', $html);
+        $this->assertGreaterThan(
+            strpos($html, 'name="days"'),
+            strpos($html, 'name="preset"')
+        );
+    }
+
+    public function testRenderMarksSelectedPreset(): void
+    {
+        $html = $this->view->render(self::createPageData(['preset' => 'transactions']));
+
+        $this->assertStringContainsString('<option value="transactions" selected>', $html);
+        $this->assertStringNotContainsString('<option value="" selected>', $html);
+    }
+
+    public function testRenderShowsResultsForPresetWithEmptyQuery(): void
+    {
+        $data = self::createPageData([
+            'query' => '',
+            'preset' => 'transactions',
+            'results' => [
+                ['sid' => 5, 'aid' => 'admin', 'informant' => '', 'title' => 'Trade Story', 'time' => 1700000000, 'comments' => 0, 'topicId' => 0, 'topicText' => ''],
+            ],
+        ]);
+
+        $html = $this->view->render($data);
+
+        $this->assertStringContainsString('search-results__heading', $html);
+        $this->assertStringContainsString('Trade Story', $html);
+    }
+
+    public function testRenderHidesResultsForEmptyQueryWithoutPreset(): void
+    {
+        $data = self::createPageData([
+            'query' => '',
+            'preset' => '',
+            'results' => [
+                ['sid' => 5, 'aid' => 'admin', 'informant' => '', 'title' => 'Trade Story', 'time' => 1700000000, 'comments' => 0, 'topicId' => 0, 'topicText' => ''],
+            ],
+        ]);
+
+        $html = $this->view->render($data);
+
+        $this->assertStringNotContainsString('search-results__heading', $html);
+    }
+
+    public function testPaginationLinksCarryPreset(): void
+    {
+        $data = self::createPageData([
+            'query' => 'test',
+            'preset' => 'transactions',
+            'results' => [
+                ['sid' => 1, 'aid' => 'admin', 'informant' => '', 'title' => 'Story', 'time' => 1700000000, 'comments' => 0, 'topicId' => 0, 'topicText' => ''],
+            ],
+            'hasMore' => true,
+            'min' => 10,
+            'offset' => 10,
+        ]);
+
+        $html = $this->view->render($data);
+
+        $this->assertStringContainsString('&amp;preset=transactions', $html);
+    }
+
+        /**
      * @param array<string, mixed> $overrides
-     * @return array{query: string, type: string, topic: int, category: int, author: string, days: int, min: int, offset: int, topicText: string, topics: list<array{topicId: int, topicText: string}>, categories: list<array{catId: int, title: string}>, authors: list<string>, results: list<mixed>|null, hasMore: bool, articleComm: bool, error: string}
+     * @return array{query: string, type: string, topic: int, category: int, author: string, days: int, preset: string, min: int, offset: int, topicText: string, topics: list<array{topicId: int, topicText: string}>, categories: list<array{catId: int, title: string}>, authors: list<string>, results: list<mixed>|null, hasMore: bool, articleComm: bool, error: string}
      */
     private static function createPageData(array $overrides = []): array
     {
@@ -371,6 +442,7 @@ EMPTY_GOLDEN;
             'category' => 0,
             'author' => '',
             'days' => 0,
+            'preset' => '',
             'min' => 0,
             'offset' => 0,
             'topicText' => '',

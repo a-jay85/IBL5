@@ -639,7 +639,7 @@ parameters:
 		-
 			rawMessage: 'HtmlSanitizer::trusted() received an argument that is not a string/numeric literal, an (int)/(float)/(bool) cast, or a $this->...() render call. trusted() bypasses XSS escaping (ADR-0002), so the argument must be provably safe HTML. If it is genuinely pre-sanitized, suppress with // @phpstan-ignore ibl.trustedVariable and a comment justifying why.'
 			identifier: ibl.trustedVariable
-			count: 67
+			count: 72
 			path: classes/Search/SearchView.php
 
 		-
@@ -3140,7 +3140,7 @@ parameters:
 			path: modules/Search/index.php
 
 		-
-			rawMessage: 'Parameter #1 $data of method Search\SearchView::render() expects array{query: string, type: string, topic: int, category: int, author: string, days: int, min: int, offset: int, ...}, array{query: string, type: string, topic: int, category: int, author: string, days: int, min: int, offset: 10, ...} given.'
+			rawMessage: 'Parameter #1 $data of method Search\SearchView::render() expects array{query: string, type: string, topic: int, category: int, author: string, days: int, preset: string, min: int, ...}, array{query: string, type: string, topic: int, category: int, author: string, days: int, preset: ''''|''transactions'', min: int, ...} given.'
 			identifier: argument.type
 			count: 1
 			path: modules/Search/index.php

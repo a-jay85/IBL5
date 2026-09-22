@@ -86,7 +86,7 @@ class SearchView implements SearchViewInterface
         $usersLabel = _SUSERS;
 
         ob_start();
-        ?><form action="modules.php?name=Search" method="post" class="search-form"><div class="search-form__input-row"><div class="ibl-search search-form__search-bar"><svg class="ibl-search__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" name="query" class="ibl-search__input" value="<?= HtmlSanitizer::trusted($query) ?>" placeholder="Search..."><button type="submit" class="ibl-search__btn"><?= HtmlSanitizer::trusted($safeSearch) ?></button></div></div><div class="search-form__filters"><?= HtmlSanitizer::trusted($this->renderTopicSelect($data['topics'], $data['topic'])) ?><?= HtmlSanitizer::trusted($this->renderCategorySelect($data['categories'], $data['category'])) ?><?= HtmlSanitizer::trusted($this->renderAuthorSelect($data['authors'], $data['author'])) ?><?= HtmlSanitizer::trusted($this->renderDaysSelect($data['days'])) ?></div><div class="search-form__types"><span class="search-form__types-label"><?= HtmlSanitizer::trusted($safeSearchOn) ?></span><?= HtmlSanitizer::trusted($this->renderTypeRadio('stories', $storiesLabel, $type)) ?><?php
+        ?><form action="modules.php?name=Search" method="post" class="search-form"><div class="search-form__input-row"><div class="ibl-search search-form__search-bar"><svg class="ibl-search__icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" name="query" class="ibl-search__input" value="<?= HtmlSanitizer::trusted($query) ?>" placeholder="Search..."><button type="submit" class="ibl-search__btn"><?= HtmlSanitizer::trusted($safeSearch) ?></button></div></div><div class="search-form__filters"><?= HtmlSanitizer::trusted($this->renderTopicSelect($data['topics'], $data['topic'])) ?><?= HtmlSanitizer::trusted($this->renderCategorySelect($data['categories'], $data['category'])) ?><?= HtmlSanitizer::trusted($this->renderAuthorSelect($data['authors'], $data['author'])) ?><?= HtmlSanitizer::trusted($this->renderDaysSelect($data['days'])) ?><?= HtmlSanitizer::trusted($this->renderPresetSelect($data['preset'])) ?></div><div class="search-form__types"><span class="search-form__types-label"><?= HtmlSanitizer::trusted($safeSearchOn) ?></span><?= HtmlSanitizer::trusted($this->renderTypeRadio('stories', $storiesLabel, $type)) ?><?php
         if ($data['articleComm']) {
             /** @var string $commentsLabel */
             $commentsLabel = _SCOMMENTS;
@@ -193,6 +193,26 @@ class SearchView implements SearchViewInterface
     }
 
     /**
+     * Render the preset filter select.
+     *
+     * Options come from the PRESET_OPTIONS constant, never from request input;
+     * $selectedPreset is only compared, never echoed.
+     */
+    private function renderPresetSelect(string $selectedPreset): string
+    {
+        ob_start();
+        ?><select name="preset" aria-label="Preset" class="search-form__select"><?php
+        foreach (SearchViewInterface::PRESET_OPTIONS as $value => $label) {
+            $selected = ($value === $selectedPreset) ? ' selected' : '';
+            $safeValue = HtmlSanitizer::safeHtmlOutput($value);
+            $safeLabel = HtmlSanitizer::safeHtmlOutput($label);
+            ?><option value="<?= HtmlSanitizer::trusted($safeValue) ?>"<?= HtmlSanitizer::trusted($selected) ?>><?= HtmlSanitizer::trusted($safeLabel) ?></option><?php
+        }
+        ?></select><?php
+        return (string) ob_get_clean();
+    }
+
+    /**
      * Render a search type radio button.
      */
     private function renderTypeRadio(string $value, string $label, string $selectedType): string
@@ -230,7 +250,7 @@ class SearchView implements SearchViewInterface
         $results = $data['results'];
         $type = $data['type'];
 
-        if ($results === null || $data['query'] === '') {
+        if ($results === null || ($data['query'] === '' && $data['preset'] === '')) {
             return '';
         }
 
@@ -392,6 +412,7 @@ class SearchView implements SearchViewInterface
         $query = urlencode($data['query']);
         $type = urlencode($data['type']);
         $author = urlencode($data['author']);
+        $preset = urlencode($data['preset']);
         $topic = $data['topic'];
         $category = $data['category'];
         $min = $data['min'];
@@ -409,12 +430,12 @@ class SearchView implements SearchViewInterface
         if ($hasPrev) {
             $prev = $min - $offset;
             $safePrevMatches = HtmlSanitizer::safeHtmlOutput(_PREVMATCHES);
-            ?><a href="modules.php?name=Search&amp;author=<?= HtmlSanitizer::trusted($author) ?>&amp;topic=<?= HtmlSanitizer::trusted((string) $topic) ?>&amp;min=<?= HtmlSanitizer::trusted((string) $prev) ?>&amp;query=<?= HtmlSanitizer::trusted($query) ?>&amp;type=<?= HtmlSanitizer::trusted($type) ?>&amp;category=<?= HtmlSanitizer::trusted((string) $category) ?>" class="search-pagination__link search-pagination__link--prev">&larr; <?= HtmlSanitizer::trusted($safePrevMatches) ?></a><?php
+            ?><a href="modules.php?name=Search&amp;author=<?= HtmlSanitizer::trusted($author) ?>&amp;topic=<?= HtmlSanitizer::trusted((string) $topic) ?>&amp;min=<?= HtmlSanitizer::trusted((string) $prev) ?>&amp;query=<?= HtmlSanitizer::trusted($query) ?>&amp;type=<?= HtmlSanitizer::trusted($type) ?>&amp;category=<?= HtmlSanitizer::trusted((string) $category) ?>&amp;preset=<?= HtmlSanitizer::trusted($preset) ?>" class="search-pagination__link search-pagination__link--prev">&larr; <?= HtmlSanitizer::trusted($safePrevMatches) ?></a><?php
         }
         if ($hasMore) {
             $next = $min + $offset;
             $safeNextMatches = HtmlSanitizer::safeHtmlOutput(_NEXTMATCHES);
-            ?><a href="modules.php?name=Search&amp;author=<?= HtmlSanitizer::trusted($author) ?>&amp;topic=<?= HtmlSanitizer::trusted((string) $topic) ?>&amp;min=<?= HtmlSanitizer::trusted((string) $next) ?>&amp;query=<?= HtmlSanitizer::trusted($query) ?>&amp;type=<?= HtmlSanitizer::trusted($type) ?>&amp;category=<?= HtmlSanitizer::trusted((string) $category) ?>" class="search-pagination__link search-pagination__link--next"><?= HtmlSanitizer::trusted($safeNextMatches) ?> &rarr;</a><?php
+            ?><a href="modules.php?name=Search&amp;author=<?= HtmlSanitizer::trusted($author) ?>&amp;topic=<?= HtmlSanitizer::trusted((string) $topic) ?>&amp;min=<?= HtmlSanitizer::trusted((string) $next) ?>&amp;query=<?= HtmlSanitizer::trusted($query) ?>&amp;type=<?= HtmlSanitizer::trusted($type) ?>&amp;category=<?= HtmlSanitizer::trusted((string) $category) ?>&amp;preset=<?= HtmlSanitizer::trusted($preset) ?>" class="search-pagination__link search-pagination__link--next"><?= HtmlSanitizer::trusted($safeNextMatches) ?> &rarr;</a><?php
         }
         ?></div><?php
         return (string) ob_get_clean();

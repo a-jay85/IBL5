@@ -1,6 +1,6 @@
 {
     "phpstan-baseline.neon": {
-        "argument.type": 363,
+        "argument.type": 360,
         "binaryOp.invalid": 19,
         "booleanAnd.leftNotBoolean": 1,
         "booleanAnd.rightNotBoolean": 1,
@@ -21,7 +21,7 @@
         "function.nameCase": 2,
         "function.strict": 1,
         "ibl.bannedAddslashes": 4,
-        "ibl.bannedNukeGlobal": 65,
+        "ibl.bannedNukeGlobal": 64,
         "ibl.castFunction": 1,
         "ibl.directHeader": 1,
         "ibl.directRepoInstantiation": 2,
@@ -29,7 +29,7 @@
         "ibl.echoInNonView": 1,
         "ibl.globalKeyword": 15,
         "ibl.hardcodedEnvString": 8,
-        "ibl.orderByMissingTiebreaker": 84,
+        "ibl.orderByMissingTiebreaker": 83,
         "ibl.sqlStringConcatenation": 33,
         "ibl.trustedVariable": 17,
         "ibl.unknownCliOption": 2,

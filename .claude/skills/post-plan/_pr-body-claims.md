@@ -1,6 +1,6 @@
 ---
 description: PR body authoring rules — version/baseline citations must name their source file; negative-claim bullets must be re-read after every commit.
-last_verified: 2026-09-16
+last_verified: 2026-09-21
 ---
 
 # PR Body Claims
@@ -66,3 +66,16 @@ re-read; there is no human in the loop to catch the stale bullet later.
 A bare `#N` autolinks to IBL5's own PR or issue N. Backlog issues live in a different repo,
 so cite them as `a-jay85/IBL5-backlog#N`. Write `backlog issue a-jay85/IBL5-backlog#160`,
 never `backlog issue #160`. Use bare `#N` only for IBL5 PRs and issues.
+
+## Declared scope
+
+A `## Declared scope` section lists `.claude/` paths this PR edits on purpose that the plan's `## Critical Files` section does not name. Phase 5.0's diff→plan conformance check reads this section and dismisses any path it finds there. One path per bullet, backticked or bare, repo-root-relative:
+
+```markdown
+## Declared scope
+
+- `.claude/rules/doc-freshness.md` (frontmatter bump forced by the on-touch rule)
+- `.claude/agents/sonnet-4-6.md` (tool list corrected while adjacent)
+```
+
+The extraction is section-bounded. It starts at the `## Declared scope` heading and stops at the next `## ` heading, so a `.claude/` path mentioned elsewhere in the PR body dismisses nothing. Write a reason on each bullet for the reviewer; the check reads only the path.

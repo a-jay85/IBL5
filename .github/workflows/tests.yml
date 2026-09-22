@@ -577,15 +577,7 @@ jobs:
         run: |
           set -e
           # Find shell scripts: files with .sh extension OR bash/sh shebang
-          mapfile -t scripts < <(
-            {
-              find bin ibl5/bin .claude/skills/pr-ready/scripts -type f -name '*.sh' 2>/dev/null || true
-              find bin ibl5/bin .claude/skills/pr-ready/scripts -type f -not -name '*.sh' 2>/dev/null \
-                | while read -r f; do
-                    head -c 40 "$f" 2>/dev/null | grep -qE '^#!(/usr)?/bin/(ba)?sh' && echo "$f"
-                  done
-            } | sort -u
-          )
+          mapfile -t scripts < <(bin/lib/shell-scripts.sh --full)
 
           if [ ${#scripts[@]} -eq 0 ]; then
             echo "No shell scripts found — nothing to check."
@@ -1023,6 +1015,8 @@ jobs:
         run: bin/test-docfix-run
       - name: bin/test-sigpipe-grep-q-guard
         run: bin/test-sigpipe-grep-q-guard
+      - name: bin/test-shell-scripts-lib
+        run: bin/test-shell-scripts-lib
       - name: bin/test-phase-snapshot-detect
         run: bin/test-phase-snapshot-detect
       - name: bin/test-docfix-poll

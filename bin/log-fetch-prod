@@ -91,6 +91,8 @@ DATE_TO=$(echo "$DATE_LIST" | awk '{print $1}')
 
 # Run aggregation server-side via SSH
 # shellcheck disable=SC2086
+# $FILE_LIST intentionally expands client-side; server receives the literal list
+# shellcheck disable=SC2087
 ssh $SSH_ARGS "$SSH_HOST" bash << REMOTE
   set -e
   cd www/ibl5/logs 2>/dev/null || cd ~/www/ibl5/logs 2>/dev/null || {

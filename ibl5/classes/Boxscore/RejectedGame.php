@@ -9,6 +9,13 @@ final readonly class RejectedGame
     public const REASON_NOT_IN_SCHEDULE  = 'not_in_schedule';
     public const REASON_DUPLICATE_TRIPLE = 'duplicate_triple';
 
+    /**
+     * A Preseason-phase import produced a Sep/Oct date (the -2 month shift in
+     * Boxscore::fillGameInfo()) whose triple is absent from the loaded schedule.
+     * Fits schedule_guard_rejects.reason VARCHAR(32) (31 chars).
+     */
+    public const REASON_PRESEASON_SHIFT_NOT_IN_SCHEDULE = 'preseason_shift_not_in_schedule';
+
     /** @param list<int> $storedGameOfThatDay */
     public function __construct(
         public string $gameDate,

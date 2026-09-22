@@ -625,6 +625,109 @@ else
     FAILED=1
 fi
 
+# --- Phase 5.0 diff->plan conformance: run_p50u helper + U1..U4 cases -------
+
+# run_p50u <block> <planfile> <changed-list-file> <PLAN_FOUND> <pr-body-json>
+# Sibling of run_p50 for the diff->plan block: that block additionally reads
+# $PLAN_FOUND and `gh pr view --json body`, and needs a NON-empty changed list.
+run_p50u() {
+    printf '%s' "$5" > "$BASE_TMP/u-fixture.json"
+    ( cd "$REPO_ROOT" && PATH="$SHIMD:$PATH" \
+        GH_PR_FIXTURE="$BASE_TMP/u-fixture.json" \
+        PLAN_FILE="$2" PLAN_FOUND="$4" CHANGED_SRC="$3" \
+        bash -c 'cp "$CHANGED_SRC" "/tmp/post-plan-changed-$PPID"
+'"$1"'
+rm -f "/tmp/post-plan-changed-$PPID"' 2>&1 )
+}
+UB="$(extract_block '# Diff→plan conformance' "$P5_SKILL")"
+
+assert_block_sources '# Diff→plan conformance' "phase 5.0 diff->plan" \
+    'bin/lib/critical-files.sh' "$P5_SKILL"
+_ub_no_comments="$(printf '%s\n' "$UB" | grep -v '^[[:space:]]*#')"
+if grep -qF 'cf_is_exempt' <<< "$_ub_no_comments"; then
+    echo "FAIL: diff->plan block filters on cf_is_exempt (polarity inversion)"; FAILED=1
+else
+    echo "ok: phase 5.0 diff->plan block does not call cf_is_exempt (polarity correct)"
+fi
+
+# Case U1 — both verdicts count as planned (MUST_APPEAR and EXEMPT both dismiss).
+_u1_plan="$BASE_TMP/u1-plan.md"
+_u1_changed="$BASE_TMP/u1-changed.txt"
+cat > "$_u1_plan" <<'U1PLANEOF'
+## Critical Files
+
+- `.claude/skills/post-plan/SKILL.md` — add paragraph
+- `.claude/rules/doc-freshness.md` (reference)
+U1PLANEOF
+printf '%s\n' \
+    '.claude/skills/post-plan/SKILL.md' \
+    '.claude/rules/doc-freshness.md' \
+    '.claude/rules/rogue.md' \
+    'ibl5/index.php' > "$_u1_changed"
+_u1_out="$(run_p50u "$UB" "$_u1_plan" "$_u1_changed" 'found' '{"body":"no scope section"}')"
+_u1_count="$(grep -c '^UNPLANNED-FILE:' <<< "$_u1_out")"
+if [ "$_u1_count" -eq 1 ] && grep -qF 'rogue.md' <<< "$_u1_out"; then
+    echo "ok: U1 both parse verdicts count as planned"
+else
+    echo "FAIL: U1 — expected 1 UNPLANNED-FILE: naming rogue.md, got: '$_u1_out'"
+    FAILED=1
+fi
+
+# Case U2 — plan-blind skip: PLAN_FOUND=none emits no findings.
+_u2_out="$(run_p50u "$UB" '/dev/null' "$_u1_changed" 'none' '{"body":"no scope section"}')"
+_u2_count="$(grep -c '^UNPLANNED-FILE:' <<< "$_u2_out" || true)"
+if [ "$_u2_count" -eq 0 ]; then
+    echo "ok: U2 plan-blind run emits no findings"
+else
+    echo "FAIL: U2 — expected 0 UNPLANNED-FILE: lines, got: '$_u2_out'"
+    FAILED=1
+fi
+
+# Case U3 — worktree-prefix normalization, both directions.
+_u3_plan="$BASE_TMP/u3-plan.md"
+_u3_changed="$BASE_TMP/u3-changed.txt"
+cat > "$_u3_plan" <<'U3PLANEOF'
+## Critical Files
+
+- `.claude/skills/post-plan/SKILL.md` — edit
+U3PLANEOF
+printf '%s\n' \
+    'IBL5-worktrees/some-wt/.claude/skills/post-plan/SKILL.md' \
+    'IBL5-worktrees/some-wt/.claude/rules/rogue.md' > "$_u3_changed"
+_u3_out="$(run_p50u "$UB" "$_u3_plan" "$_u3_changed" 'found' '{"body":"no scope section"}')"
+_u3_count="$(grep -c '^UNPLANNED-FILE:' <<< "$_u3_out")"
+if [ "$_u3_count" -eq 1 ] \
+        && grep -qF 'rogue.md' <<< "$_u3_out" \
+        && ! grep -qF 'IBL5-worktrees/' <<< "$_u3_out"; then
+    echo "ok: U3 worktree prefix normalized on both sides"
+else
+    echo "FAIL: U3 — expected 1 UNPLANNED-FILE: naming .claude/rules/rogue.md without IBL5-worktrees/, got: '$_u3_out'"
+    FAILED=1
+fi
+
+# Case U4 — '## Declared scope' dismissal is section-bounded.
+_u4_plan="$BASE_TMP/u4-plan.md"
+_u4_changed="$BASE_TMP/u4-changed.txt"
+cat > "$_u4_plan" <<'U4PLANEOF'
+## Critical Files
+
+- `ibl5/index.php` — edit
+U4PLANEOF
+printf '%s\n' \
+    '.claude/rules/declared.md' \
+    '.claude/rules/elsewhere.md' > "$_u4_changed"
+_u4_body='{"body":"## Declared scope\n\n- .claude/rules/declared.md (intended)\n\n## Other notes\n\n- .claude/rules/elsewhere.md\n"}'
+_u4_out="$(run_p50u "$UB" "$_u4_plan" "$_u4_changed" 'found' "$_u4_body")"
+_u4_count="$(grep -c '^UNPLANNED-FILE:' <<< "$_u4_out")"
+if [ "$_u4_count" -eq 1 ] \
+        && grep -qF 'elsewhere.md' <<< "$_u4_out" \
+        && ! grep -qF 'declared.md' <<< "$_u4_out"; then
+    echo "ok: U4 declared-scope dismissal is section-bounded"
+else
+    echo "FAIL: U4 — expected 1 UNPLANNED-FILE: naming elsewhere.md (declared.md absent); got: '$_u4_out'"
+    FAILED=1
+fi
+
 # ── Matrix extraction must skip fenced rows (feeds conditions (1) and (3)) ────
 # Same defect class as the decoy ## Critical Files heading above, on the other
 # Phase 5.0 parser: a plan documenting the matrix format carries scaffold rows

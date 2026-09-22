@@ -42,7 +42,7 @@ HeadToHeadRecords/
 |-----------|--------------------------------------------------|
 | dimension | `franchises`                                     |
 | phase     | Mapped from `Season::$phase` via `SEASON_PHASE_TO_FILTER`; falls back to `all` |
-| scope     | `current`                                        |
+| scope     | `current` when the current season has games (`currentSeasonHasGames()`); `all` otherwise |
 
 ## Data flow
 

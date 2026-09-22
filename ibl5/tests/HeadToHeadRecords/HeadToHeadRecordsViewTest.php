@@ -452,7 +452,8 @@ class HeadToHeadRecordsViewTest extends TestCase
         self::assertStringContainsString('<form method="post" action="modules.php?name=HeadToHeadRecords" class="h2h-filter">', $html);
         self::assertStringContainsString('<select name="dimension" class="ibl-select">', $html);
         self::assertStringContainsString('<span class="ibl-label ibl-label--sm">Dimension</span>', $html);
-        self::assertStringContainsString('<noscript><button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--sm">Filter</button></noscript>', $html);
+        self::assertStringContainsString('<button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--sm">Filter</button>', $html);
+        self::assertStringNotContainsString('<noscript>', $html);
     }
 
     // ---------------------------------------------------------------------------
@@ -501,5 +502,59 @@ class HeadToHeadRecordsViewTest extends TestCase
         self::assertStringContainsString('h2h-tip-open', $html);
         self::assertStringContainsString('h2h-col-hover', $html);
         self::assertStringContainsString('form.h2h-filter', $html);
+    }
+
+    // ---------------------------------------------------------------------------
+    // Plan-required method names (behavioral counterparts delivered under renamed names)
+    // ---------------------------------------------------------------------------
+
+    public function testRowLabelRendersColorCustomProperties(): void
+    {
+        $payload = $this->makePlayedPayload(['color1' => '00653A', 'color2' => 'FFFFFF']);
+        $html    = $this->view->renderMatrix($payload, []);
+
+        self::assertStringContainsString('--team-cell-bg: #00653A', $html);
+        self::assertStringContainsString('--team-cell-color: #FFFFFF', $html);
+    }
+
+    public function testRowLabelWithoutColorsHasNoStyleAttribute(): void
+    {
+        $payload  = $this->makePlayedPayload(['color1' => '', 'color2' => '']);
+        $html     = $this->view->renderMatrix($payload, []);
+        $firstRow = (string) strstr($html, '<tbody><tr>');
+        $firstRow = (string) strstr($firstRow, '</tr>', true);
+
+        self::assertStringNotContainsString('style=', $firstRow);
+    }
+
+    public function testDiagonalCellIsSkipped(): void
+    {
+        $html = $this->view->renderMatrix($this->makePlayedPayload(), []);
+
+        self::assertMatchesRegularExpression('/<td class="h2h-self"><\/td>/', $html);
+    }
+
+    public function testUserMatchRowIsBold(): void
+    {
+        $html = $this->view->renderMatrix($this->makePlayedPayload(['key' => 'celtics']), ['celtics']);
+
+        self::assertStringContainsString('<tr class="h2h-user-row">', $html);
+    }
+
+    public function testAbsentMatchupRendersZeroZeroTied(): void
+    {
+        $a = $this->makeEntry(['key' => 'a', 'franchise_id' => 1, 'label' => 'A', 'logo' => 'a.png']);
+        $b = $this->makeEntry(['key' => 'b', 'franchise_id' => 2, 'label' => 'B', 'logo' => 'b.png']);
+        $c = $this->makeEntry(['key' => 'c', 'franchise_id' => 3, 'label' => 'C', 'logo' => 'c.png']);
+
+        $records = [
+            'a' => ['b' => ['wins' => 1, 'losses' => 0]],
+            'b' => ['a' => ['wins' => 0, 'losses' => 1], 'c' => ['wins' => 1, 'losses' => 0]],
+            'c' => ['b' => ['wins' => 0, 'losses' => 1]],
+        ];
+        $html = $this->view->renderMatrix($this->makePayload([$a, $b, $c], $records), []);
+
+        self::assertStringContainsString('h2h-tied', $html);
+        self::assertStringContainsString('>0-0<', $html);
     }
 }

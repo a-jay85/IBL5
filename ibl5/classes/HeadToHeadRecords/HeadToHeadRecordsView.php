@@ -53,7 +53,7 @@ final class HeadToHeadRecordsView
         $out .= $this->renderSelect('dimension', 'Dimension', $dimOpts, $dimension);
         $out .= $this->renderSelect('phase', 'Phase', $phaseOpts, $phase);
         $out .= $this->renderSelect('scope', 'Scope', $scopeOpts, $scope);
-        $out .= '<noscript><button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--sm">Filter</button></noscript>';
+        $out .= '<button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--sm">Filter</button>';
         $out .= '</form>';
 
         return $out;

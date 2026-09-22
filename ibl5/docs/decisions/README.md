@@ -1,6 +1,6 @@
 ---
 description: Index of IBL5 Architecture Decision Records (ADRs). Source of truth for every load-bearing decision and its rationale.
-last_verified: 2026-09-18
+last_verified: 2026-09-21
 ---
 
 # IBL5 Architecture Decision Records
@@ -53,6 +53,7 @@ Every load-bearing decision in IBL5 is captured here as a numbered ADR so that f
 | [0121](0121-backlog-migration-to-github-issues.md) | Backlog migration to GitHub Issues | Accepted | Project work tracking moves from 21 `merge=union` markdown backlog files to one Issue per item in the private repo `a-jay85/IBL5-backlog`, area-as-label and legacy ID as title prefix, retiring the duplicate-ID and archive-transition gates that only existed to make file-shaped tracking survive concurrent appends. |
 | [0112](0112-auto-promote-master-to-production.md) | Auto-promote master to production on green CI | Accepted | `workflow_run` promoter fast-forwards `master` to `production` when the SHA is all-green; paused by the `AUTO_PROMOTE_PAUSED` repo variable, pushed FF-only with `CI_PAT`, announced by Discord DM. |
 | [0131](0131-ci-tree-hash-memoization.md) | CI tree-hash memoization of heavy jobs | Accepted | Heavy jobs in `Tests and Analysis` and `E2E Tests` skip when the HEAD tree over a declared input path set already passed; key from `bin/ci-memo`, sentinel in `actions/cache`, written only by a clean `gate`; PR-only, with the GHCR image manifest folded into the e2e key. |
+| [0138](0138-adr-draft-at-commit-site.md) | ADR auto-draft fires at the Phase 2 commit site | Accepted | `bin/adr-check` gains a `--commit` mode scoped to this branch's commits since the merge-base union the index; `bin/pre-commit-hook` runs it as a hard gate printing `pre-commit-adr-gate:`; the harness drafts a missing ADR before `commit_all()` and stages it into the Phase 2 commit, with the push-site arm kept as the Phase 5.5 backstop. |
 
 ## When an ADR is Required
 
@@ -71,6 +72,6 @@ The CI workflow `pr-meta-checks.yml` runs `bin/adr-check` (the `adr-check` step)
 
 - [`0000-template.md`](0000-template.md) — the Nygard template. Never edit in place.
 - [`bin/next-adr`](../../../bin/next-adr) — creates the next ADR file by number, copying the template and slugging the title.
-- [`bin/adr-check`](../../../bin/adr-check) — the CI gate (also usable locally with `--staged`).
+- [`bin/adr-check`](../../../bin/adr-check): the CI gate. Locally, `--staged` judges the index alone, and `--commit` judges the commit-time view: this branch's commits since the merge-base, union the index. `--commit` is the mode `bin/pre-commit-hook` runs on every commit.
 - [`bin/check-docs`](../../../bin/check-docs) — enforces frontmatter freshness on every ADR and verifies bidirectional `Supersedes` integrity.
 - [`.claude/rules/doc-freshness.md`](../../../.claude/rules/doc-freshness.md) — the frontmatter schema every ADR must satisfy.

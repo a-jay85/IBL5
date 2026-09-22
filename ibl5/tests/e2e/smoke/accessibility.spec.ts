@@ -163,7 +163,7 @@ const publicPages: Array<{ name: string; url: string }> = [
   { name: 'season highs', url: 'modules.php?name=SeasonHighs' },
   { name: 'head-to-head records', url: 'modules.php?name=HeadToHeadRecords' },
   { name: 'team off/def stats', url: 'modules.php?name=TeamOffDefStats' },
-  { name: 'transaction history', url: 'modules.php?name=TransactionHistory' },
+  { name: 'search transactions preset', url: 'modules.php?name=Search&preset=transactions' },
   { name: 'search', url: 'modules.php?name=Search' },
   { name: 'topics', url: 'modules.php?name=Topics' },
   { name: 'news index', url: 'modules.php?name=News' },

@@ -3695,24 +3695,6 @@ parameters:
 			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
 			identifier: ibl.bannedNukeGlobal
 			count: 1
-			path: modules/TransactionHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class TransactionHistory\TransactionHistoryRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/TransactionHistory/index.php
-
-		-
-			rawMessage: 'Parameter #1 $queryParams of method TransactionHistory\TransactionHistoryService::getPageData() expects array<string, string>, array<mixed> given.'
-			identifier: argument.type
-			count: 1
-			path: modules/TransactionHistory/index.php
-
-		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
 			path: modules/Voting/index.php
 
 		-

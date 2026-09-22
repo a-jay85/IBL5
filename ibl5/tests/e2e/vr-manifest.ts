@@ -142,9 +142,8 @@ export const VR_MANIFEST: VrRow[] = [
     anchor: '.ibl-data-table', viewports: ['desktop', 'mobile'] },
   { name: 'topics', auth: 'public', url: 'modules.php?name=Topics',
     anchor: '.topics-page', viewports: ['desktop', 'mobile'] },
-  { name: 'transaction-history', auth: 'public', url: 'modules.php?name=TransactionHistory',
-    anchor: '.ibl-data-table', extraMask: ['.transaction-row time'],
-    viewports: ['desktop', 'mobile'] },
+  { name: 'search-transactions-preset', auth: 'public', url: 'modules.php?name=Search&preset=transactions',
+    anchor: '.search-results', viewports: ['desktop', 'mobile'] },
   { name: 'your-account', auth: 'public', url: 'modules.php?name=YourAccount',
     anchor: '.auth-page', viewports: ['desktop', 'mobile'] },
 

@@ -285,7 +285,36 @@ If BOTH `$AHEAD` and `$DIRTY` are empty (no commits ahead of master, clean worki
 5. Do NOT write a handoff file.
 6. STOP.
 
-Otherwise (there are commits ahead or a dirty tree), proceed to Step 7.
+Otherwise (there are commits ahead or a dirty tree), proceed to Step 6.6.
+
+## Step 6.6: Pre-Handoff Conformance Check
+
+Run the Phase 5.0 conformance check now, before writing the handoff, to catch a dropped Critical File or matrix-declared test while you can still fix it.
+
+```bash
+MAIN_CHECKOUT=$(git worktree list --porcelain | awk '/^worktree /{print $2; exit}')
+HARNESS="$MAIN_CHECKOUT/tools/postplan-harness"
+CONF_ERR=$(mktemp -t conformance-err)
+CONF_OUT=$(PYTHONPATH="$HARNESS" python3 -m harness.conformance "$PLAN_PATH" "$(git rev-parse --show-toplevel)" 2>"$CONF_ERR")
+CONF_RC=$?
+printf '%s\n' "$CONF_OUT"
+```
+
+**Exit 0 (clean):** proceed to Step 7.
+
+**Exit 1 (unresolved items found):** the check printed one `MISSING:` or `MISSING-FILE:` line per unresolved item. Fix each one now:
+- `MISSING-FILE: <path>` means a Critical File listed in the plan was never written. Write it, checkpoint, and re-run the check.
+- `MISSING: <path>` means a matrix-declared test path was never written. Write it, checkpoint, and re-run the check.
+
+After fixing, re-run the block above and confirm exit 0 before proceeding to Step 7.
+
+**Budget-wall fallback:** if you are close to the time budget (roughly 90% elapsed) and cannot resolve all items in time, proceed to Step 7 ANYWAY. Write the handoff file and include an `"unresolved_conformance_items"` field listing each unresolved item string. Post-plan Phase 5.0 holds arming at condition (3) exactly as it does today. Do NOT use the Error Handling path; write the handoff.
+
+**Exit 2 (could not evaluate):** the harness seam was unavailable or the plan path was unreadable. Print the contents of `$CONF_ERR` and proceed to Step 7. Do NOT block.
+
+Every exit code from this step ends at Step 7. A conformance miss is not an implementation failure and never routes to the Error Handling path in Step 8.
+
+Then `rm -f "$CONF_ERR"` once the code has been read, so no scratch file survives the run.
 
 ## Step 7: Write Handoff File
 

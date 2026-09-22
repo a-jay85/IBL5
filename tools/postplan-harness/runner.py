@@ -34,13 +34,14 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from harness import (adr_draft, ciwatch, conformance, fidelity, llm_calls, manual_rows,
+from harness import (adr_draft, body_numbers, ciwatch, conformance, fidelity, llm_calls, manual_rows,
                      manual_testing, schemas, statefile)
 from harness.armable import (ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance,
                              select_fidelity_verdict)
 from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_END,
                               classify, files_from_diff, modified_files_from_diff,
+                              name_status_text, numstat_text,
                               qualify_backlog_refs,
                               render_files_changed, render_manual_confirmation,
                               render_reviewer_verification, strip_manual_testing_section,
@@ -274,6 +275,12 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         if qualified:
             log(f"phase2: qualified {qualified} bare backlog ref(s) as {BACKLOG_REPO}#N")
         copy["commit_subject"] = schemas.coerce_commit_subject(copy["commit_subject"], cls)
+        check, body_check_degraded = _body_check(
+            llm, git, gh, copy, copy_degraded, cls, log)
+        if copy["summary_md"] and check.get("corrected_body"):
+            copy["summary_md"] = check["corrected_body"]
+            for f in check.get("findings", []):
+                log(f"phase2 body-check finding: {f}")
         sha = _commit_with_gate_remediation(
             git, worktree, f"{copy['commit_subject']}\n\n{copy['summary_md']}", log)
         rebase_line = f"REBASE=not run ({mode} mode)"
@@ -369,6 +376,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             # human must sanity-check was never model-reviewed.
             if copy_degraded:
                 degraded_agents = list(degraded_agents) + ["pr-copy"]
+            if body_check_degraded:
+                degraded_agents = list(degraded_agents) + ["body-check"]
             res.findings = findings
             res.scored_findings = scored
             res.degraded_agents = degraded_agents
@@ -967,7 +976,7 @@ def _remediate_doc_staleness(worktree: str, git, log) -> int:
 def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log) -> tuple[dict, bool]:
     """Phase 2 commit/PR copy: ({title, commit_subject, summary_md}, degraded).
 
-    Re-run with an open PR and nothing to commit: the Haiku call is skipped. Its title
+    Re-run with an open PR and nothing to commit: the Sonnet call is skipped. Its title
     and body would reach neither a commit (commit_all returns "" on a clean index) nor
     the PR (pr_create is skipped when the PR exists). Condition (8) reads the title from
     gh.pr_meta(), never from this dict. The skip path still returns the live title so a
@@ -994,7 +1003,7 @@ def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log) -> tuple[dict, bool]:
     else:
         plan_excerpt = ""
     try:
-        return llm.call("pr-copy", "haiku",
+        return llm.call("pr-copy", "sonnet",
                         llm_calls.pr_copy_prompt(slug, cls, plan, plan_excerpt),
                         schemas.validate_pr_copy), False
     except HarnessError as e:
@@ -1009,6 +1018,52 @@ def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log) -> tuple[dict, bool]:
     subject = schemas.coerce_commit_subject(subject, cls)
     return {"title": subject, "commit_subject": subject,
             "summary_md": f"## Summary\n- {subject}\n"}, True
+
+
+def _body_check(llm, git, gh, copy, copy_degraded, cls, log) -> tuple[dict, bool]:
+    """Phase 2 body-vs-diff verification: (result, body_check_degraded).
+
+    Returns ({}, False) without calling the LLM when pr-copy was degraded (the
+    fallback body is a one-line stub with nothing to reconcile) or when the subject
+    text resolves to empty.  On a degraded model reply, returns the mechanically-
+    corrected body so number corrections survive the model failure.
+    """
+    if copy_degraded:
+        log("phase2: body-check skipped (pr-copy degraded)")
+        return {}, False
+
+    diff = git.diff_vs_base()
+    ns = name_status_text(diff)
+    nums = numstat_text(diff)
+
+    # Choose subject text: write-back path vs read-only path (clean-tree rerun)
+    if copy["summary_md"]:
+        subject = copy["summary_md"]
+    else:
+        subject = gh.pr_body_fresh() or ""
+    if not subject:
+        log("phase2: body-check skipped (empty body)")
+        return {}, False
+
+    # Mechanical pass — runs regardless of whether the LLM pass later degrades
+    mechanically_corrected = body_numbers.correct_body_numbers(subject, ns, nums)
+    if mechanically_corrected != subject:
+        log("phase2: body-check corrected numbers mechanically")
+
+    # LLM pass
+    try:
+        result = llm.call(
+            "body-check", "sonnet",
+            llm_calls.pr_body_check_prompt(
+                body_numbers.body_prose_for_check(mechanically_corrected), ns),
+            schemas.validate_body_check)
+        log(f"phase2: body-check findings: {len(result.get('findings', []))}")
+        return result, False
+    except HarnessError as e:
+        if e.kind not in ("llm-invalid-output", "llm-fixture-missing"):
+            raise
+        log(f"phase2: body-check DEGRADED ({(e.detail or '')[:200]})")
+        return {"corrected_body": mechanically_corrected, "findings": []}, True
 
 
 def run_meta_checks_local(git, repo_root, base, log, *, body_file=None, live=True,

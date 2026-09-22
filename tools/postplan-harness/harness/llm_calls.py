@@ -72,6 +72,49 @@ def pr_copy_prompt(slug: str, cls: Classification, plan: PlanInfo, plan_excerpt:
     )
 
 
+def pr_body_check_prompt(body: str, name_status: str) -> str:
+    """Body-vs-diff verification prompt. Carries check 4 / 4a verbatim from
+    _plan-fidelity-review.md so this call and Phase 6.5 cannot drift apart."""
+    return (
+        "check the PR body's **hand-written** claims (the Scope prose, tests added, "
+        "counts, \"no behavior change\") against the actual diff. A hand-written body "
+        "claim the diff contradicts is a **finding**, and it is **blocking**: it must be "
+        "corrected before the PR is endorsed as ready. "
+        "Never endorse readiness on the strength of the body alone. "
+        "**Exclude the machine-generated files-changed block** delimited by "
+        "`<!-- files-changed:begin -->` / `<!-- files-changed:end -->`: "
+        "`SKILL.md` runtime Phase 5.9 regenerates that block from "
+        "`git diff --name-status origin/master...HEAD` immediately before this phase, "
+        "so it is generated data reconciled by construction, not a claim — a drift there "
+        "is a Phase 5.9 defect, never a body finding, and reporting it is a false "
+        "`NOT READY`. "
+        "The block has already been removed from the text you are shown, so never "
+        "re-emit it.\n\n"
+        "**Named-constant volumes.** Within this same check, and **inheriting its "
+        "blocking verdict**: if the diff introduces or edits a class carrying a named "
+        "`EXPECTED` constant array — or any equivalent named-constant row count, deletion "
+        "count, or table list — read those constants out of the code and confirm every "
+        "volume, count, and table/suffix name in the PR body Summary agrees with them. "
+        "Body prose is authored before implementation and hand-patched during it, so "
+        "these are the numbers that silently rot (PR #2001 understated a deletion volume "
+        "~23x and named the wrong backup-table suffix; both survived to Phase 6). "
+        "Read the constant, do not trust the body's number. A disagreement is a blocking "
+        "finding, corrected in the body before the PR is endorsed ready.\n\n"
+        'The runner owns the "## Manual Testing" section. It has been removed from the '
+        "text you are shown. Never write a \"## Manual Testing\" heading and never emit "
+        "a manual-testing checklist in corrected_body.\n\n"
+        "The file list below is names-only and may be incomplete. If a file is absent "
+        "from the name-status list, do not flag claims about it as unsupported.\n\n"
+        "BODY PROSE:\n" + body[:40000]
+        + "\n\nNAME-STATUS:\n" + name_status[:20000]
+        + '\n\nReturn ONLY JSON with exactly these two keys: '
+        '{"corrected_body": "<the full revised body prose>", '
+        '"findings": ["<one sentence per disagreement you corrected>"]}. '
+        "When the body already agrees with the diff, return corrected_body unchanged "
+        "and findings as an empty array."
+    )
+
+
 def safety_verdict_prompt(cls: Classification, title: str, arm_preview: ArmDecision) -> str:
     """Condition (9) bounded verdict — may only ADD holds, never release one.
     Surface list from _phase-6.5-arm-auto-merge.md condition (9)."""

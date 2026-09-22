@@ -35,4 +35,13 @@ interface VotingBallotViewInterface
         string $phase,
         array $categories
     ): string;
+
+    /**
+     * Collapsed admin-only "Voting Results" block.
+     *
+     * @param string $resultsHtml Fully rendered output of
+     *        VotingResultsControllerInterface::render(); embedded as-is.
+     * @return string HTML output
+     */
+    public function renderResultsExpander(string $resultsHtml): string;
 }

@@ -59,6 +59,24 @@ class VotingBallotView implements VotingBallotViewInterface
     }
 
     /**
+     * @see VotingBallotViewInterface::renderResultsExpander()
+     *
+     * Mirrors renderCategoryHeader()'s markup rather than calling it: the hint is
+     * italicised, and that private method escapes its instruction argument.
+     */
+    public function renderResultsExpander(string $resultsHtml): string
+    {
+        $html = $this->renderShowHideScript('Results');
+        $html .= '<div class="voting-category" onclick="ShowAndHideResults()">';
+        $html .= '<h2 class="ibl-title voting-category-title">Voting Results</h2>';
+        $html .= '<p class="voting-category-instruction"><i>Tap/click to reveal/hide results.</i></p>';
+        $html .= '</div>';
+        $html .= '<div id="Results" style="display:none">' . $resultsHtml . '</div>';
+
+        return $html;
+    }
+
+    /**
      * Render JavaScript for show/hide toggle
      */
     private function renderShowHideScript(string $categoryCode): string

@@ -67,8 +67,10 @@ test.describe('API Keys flow', () => {
     await expect(page.getByText('public')).toBeVisible();
     await expect(page.getByText('60 requests/min')).toBeVisible();
 
-    // Player Export Guide link should be present
-    await expect(page.getByRole('link', { name: /Player Export Guide/i })).toBeVisible();
+    // The guide is folded into this page now, so the cross-module link is gone
+    // and the column-reference table renders below the key card instead.
+    await expect(page.getByRole('link', { name: /Player Export Guide/i })).toHaveCount(0);
+    await expect(page.getByText('Column Reference')).toBeVisible();
   });
 
   test('revoke key returns to no-key state', async ({ page }) => {

@@ -94,7 +94,7 @@ test.describe('Cross-module navigation', () => {
   });
 
   test('all-star appearances → click player → player page loads', async ({ page }) => {
-    await page.goto('modules.php?name=AllStarAppearances');
+    await page.goto('modules.php?name=RecordHolders&op=allstar');
     await assertNoPhpErrors(page, 'on All-Star Appearances');
 
     const playerLink = page.locator('.ibl-data-table a[href*="pid="]');

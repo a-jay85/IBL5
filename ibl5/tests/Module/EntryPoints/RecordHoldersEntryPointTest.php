@@ -32,4 +32,47 @@ class RecordHoldersEntryPointTest extends ModuleEntryPointTestCase
         $this->assertNotEmpty($output);
         $this->assertQueryExecuted('ibl_awards');
     }
+
+    public function testAllstarOpRendersFullAppearancesList(): void
+    {
+        $this->mockDb->setMockData([
+            ['name' => 'Test Player', 'pid' => 1, 'appearances' => 3],
+        ]);
+        $output = $this->runModule('RecordHolders', ['op' => 'allstar'], [], $this->dbGlobals());
+
+        $this->assertStringContainsString('<h1 class="ibl-title">All-Star Appearances</h1>', $output);
+        $this->assertStringContainsString('Test Player', $output);
+        $this->assertStringNotContainsString('Most All-Star Appearances', $output);
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('unknownOpProvider')]
+    public function testUnknownOpFallsBackToRecordHoldersView(string $op): void
+    {
+        $output = $this->runModule('RecordHolders', ['op' => $op], [], $this->dbGlobals());
+
+        $this->assertStringContainsString('Most All-Star Appearances', $output);
+        $this->assertStringNotContainsString('<h1 class="ibl-title">All-Star Appearances</h1>', $output);
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function unknownOpProvider(): array
+    {
+        return [
+            'uppercase ALLSTAR'    => ['ALLSTAR'],
+            'trailing space'       => ['allstar '],
+            'null byte'            => ["allstar\x00"],
+            'empty string'         => [''],
+            'path traversal'       => ['../allstar'],
+        ];
+    }
+
+    public function testArrayOpFallsBackToRecordHoldersView(): void
+    {
+        $output = $this->runModule('RecordHolders', ['op' => ['allstar']], [], $this->dbGlobals());
+
+        $this->assertStringContainsString('Most All-Star Appearances', $output);
+        $this->assertStringNotContainsString('<h1 class="ibl-title">All-Star Appearances</h1>', $output);
+    }
 }

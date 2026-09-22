@@ -33,7 +33,7 @@ const PAGES = [
   { name: 'franchise history', url: 'modules.php?name=FranchiseHistory', selector: '.ibl-data-table', hasWideTables: false },
   { name: 'activity tracker', url: 'modules.php?name=ActivityTracker', selector: '.ibl-data-table', hasWideTables: true },
   { name: 'record holders', url: 'modules.php?name=RecordHolders', selector: '.record-section', hasWideTables: false },
-  { name: 'all-star appearances', url: 'modules.php?name=AllStarAppearances', selector: '.ibl-data-table', hasWideTables: false },
+  { name: 'all-star appearances', url: 'modules.php?name=RecordHolders&op=allstar', selector: '.ibl-data-table', hasWideTables: false },
   { name: 'award history', url: 'modules.php?name=AwardHistory', selector: '.ibl-data-table', hasWideTables: false },
   { name: 'franchise record book', url: 'modules.php?name=FranchiseRecordBook', selector: '.ibl-data-table', hasWideTables: false },
   { name: 'team off/def stats', url: 'modules.php?name=TeamOffDefStats', selector: '.ibl-data-table', hasWideTables: true },

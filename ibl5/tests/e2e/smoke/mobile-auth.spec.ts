@@ -70,11 +70,14 @@ test.describe('Mobile authenticated page smoke tests', () => {
     await assertNoHorizontalOverflow(page, 'on gm contact list');
   });
 
-  test('voting results — no horizontal overflow on mobile', async ({ appState, page }) => {
+  // Results now render as an admin-only expander on the Voting page; the
+  // fixture user is that admin, so the expander is in the DOM here.
+  test('voting ballot — no horizontal overflow on mobile', async ({ appState, page }) => {
     await appState({ 'ASG Voting': 'Yes' });
-    await page.goto('modules.php?name=VotingResults');
-    await assertNoPhpErrors(page, 'on modules.php?name=VotingResults (mobile)');
+    await page.goto('modules.php?name=Voting');
+    await assertNoPhpErrors(page, 'on modules.php?name=Voting (mobile)');
     await expect(page.getByText('Sign In')).not.toBeVisible();
+    await page.locator('[onclick="ShowAndHideResults()"]').click();
     await assertNoHorizontalOverflow(page, 'on voting results');
   });
 

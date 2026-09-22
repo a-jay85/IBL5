@@ -1,0 +1,239 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-shell-scripts-lib — regression tests for bin/lib/shell-scripts.sh.
+#
+# Demonstrates that the old shebang regex missed #!/usr/bin/env bash scripts,
+# and verifies that the new helper discovers them correctly.
+#
+# Run: bin/test-shell-scripts-lib   (exit 0 = all pass, 1 = a case failed)
+set -u
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+HELPER="$SCRIPT_DIR/lib/shell-scripts.sh"
+FAILED=0
+
+pass() { echo "ok: $1"; }
+fail() { echo "FAIL: $1 — $2"; FAILED=1; }
+
+# ── fixtures ──────────────────────────────────────────────────────────────────
+
+TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$TMP_DIR"' EXIT
+
+ENV_BASH_FILE="$TMP_DIR/env_bash_script"
+printf '#!/usr/bin/env bash\necho hello\n' > "$ENV_BASH_FILE"
+
+ENV_SH_FILE="$TMP_DIR/env_sh_script"
+printf '#!/usr/bin/env sh\necho hello\n' > "$ENV_SH_FILE"
+
+CLASSIC_BASH_FILE="$TMP_DIR/classic_bash_script"
+printf '#!/bin/bash\necho hello\n' > "$CLASSIC_BASH_FILE"
+
+CLASSIC_SH_FILE="$TMP_DIR/classic_sh_script"
+printf '#!/bin/sh\necho hello\n' > "$CLASSIC_SH_FILE"
+
+PYTHON_FILE="$TMP_DIR/python_script"
+printf '#!/usr/bin/env python3\nprint("hello")\n' > "$PYTHON_FILE"
+
+PHP_FILE="$TMP_DIR/php_script"
+printf '#!/usr/bin/env php\n<?php echo "hello";\n' > "$PHP_FILE"
+
+# ── case 1: #!/usr/bin/env bash IS discovered by helper ──────────────────────
+out=$(printf '%s\n' "$ENV_BASH_FILE" | "$HELPER" --filter)
+if [ "$out" = "$ENV_BASH_FILE" ]; then
+    pass "case 1: #!/usr/bin/env bash fixture IS discovered"
+else
+    fail "case 1: #!/usr/bin/env bash fixture IS discovered" \
+         "expected '$ENV_BASH_FILE', got '$out'"
+fi
+
+# ── case 2: old regex FAILS on #!/usr/bin/env bash (demonstrates the blind spot)
+if printf '%s\n' "$ENV_BASH_FILE" | while IFS= read -r f; do
+       head -c 40 "$f" 2>/dev/null | grep -qE '^#!(/usr)?/bin/(ba)?sh' && echo "$f"
+   done | grep -q .; then
+    fail "case 2: old regex should MISS #!/usr/bin/env bash" \
+         "old regex matched it — the blind spot is closed but the demo is wrong"
+else
+    pass "case 2: old regex does NOT discover #!/usr/bin/env bash (blind spot confirmed)"
+fi
+
+# ── case 3: #!/usr/bin/env python3 NOT discovered ────────────────────────────
+out=$(printf '%s\n' "$PYTHON_FILE" | "$HELPER" --filter)
+if [ -z "$out" ]; then
+    pass "case 3: #!/usr/bin/env python3 NOT discovered"
+else
+    fail "case 3: #!/usr/bin/env python3 NOT discovered" \
+         "helper returned '$out'"
+fi
+
+# ── case 4: #!/usr/bin/env php NOT discovered ────────────────────────────────
+out=$(printf '%s\n' "$PHP_FILE" | "$HELPER" --filter)
+if [ -z "$out" ]; then
+    pass "case 4: #!/usr/bin/env php NOT discovered"
+else
+    fail "case 4: #!/usr/bin/env php NOT discovered" \
+         "helper returned '$out'"
+fi
+
+# ── case 5: #!/bin/bash and #!/bin/sh ARE discovered ─────────────────────────
+out=$(printf '%s\n%s\n' "$CLASSIC_BASH_FILE" "$CLASSIC_SH_FILE" | "$HELPER" --filter | wc -l | tr -d ' ')
+if [ "$out" = "2" ]; then
+    pass "case 5: #!/bin/bash and #!/bin/sh ARE discovered"
+else
+    fail "case 5: #!/bin/bash and #!/bin/sh ARE discovered" \
+         "expected 2 results, got $out"
+fi
+
+# ── case 6: #!/usr/bin/env sh IS discovered ──────────────────────────────────
+out=$(printf '%s\n' "$ENV_SH_FILE" | "$HELPER" --filter)
+if [ "$out" = "$ENV_SH_FILE" ]; then
+    pass "case 6: #!/usr/bin/env sh IS discovered"
+else
+    fail "case 6: #!/usr/bin/env sh IS discovered" \
+         "expected '$ENV_SH_FILE', got '$out'"
+fi
+
+# ── case 7: full-corpus count ────────────────────────────────────────────────
+# Both bin/lib/shell-scripts.sh and bin/test-shell-scripts-lib are new files in
+# this PR; baseline (pre-plan) was 256, post-plan count is 258.
+count=$("$HELPER" --full | wc -l | tr -d ' ')
+if [ "$count" = "258" ]; then
+    pass "case 7: full-corpus count is 258"
+else
+    fail "case 7: full-corpus count is 258" \
+         "got $count (expected 258 = 256 baseline + 2 new files from this PR)"
+fi
+
+# ── case 8: unknown flag exits non-zero and prints to stderr ─────────────────
+rc=0
+stderr_out=$("$HELPER" --bogus 2>&1 >/dev/null) || rc=$?
+if [ "$rc" -ne 0 ]; then
+    pass "case 8: --bogus exits non-zero ($rc)"
+else
+    fail "case 8: --bogus exits non-zero" "helper returned 0"
+fi
+if [ -n "$stderr_out" ]; then
+    pass "case 8b: --bogus prints to stderr"
+else
+    fail "case 8b: --bogus prints to stderr" "nothing on stderr"
+fi
+
+# ── case 9: bash 3.2 compat ──────────────────────────────────────────────────
+system_bash="/bin/bash"
+if [ -x "$system_bash" ]; then
+    compat_count=$(BASH="$system_bash" "$system_bash" "$HELPER" --full | wc -l | tr -d ' ')
+    if [ "$compat_count" = "258" ]; then
+        pass "case 9: bash 3.2 compat — count matches ($compat_count)"
+    else
+        fail "case 9: bash 3.2 compat" \
+             "got $compat_count under /bin/bash (expected 258)"
+    fi
+else
+    pass "case 9: /bin/bash not available — skipped"
+fi
+
+# ── case 10: filter mode with no shell inputs emits empty output, exits 0 ────
+rc=0
+out=$(printf '%s\n' "$PYTHON_FILE" "$PHP_FILE" | "$HELPER" --filter 2>&1) || rc=$?
+if [ "$rc" -eq 0 ] && [ -z "$out" ]; then
+    pass "case 10: filter with no shell inputs: empty output, exit 0"
+else
+    fail "case 10: filter with no shell inputs: empty output, exit 0" \
+         "rc=$rc, out='$out'"
+fi
+
+# ── pre-commit tests (cases 11-14) ───────────────────────────────────────────
+# Requires shellcheck installed locally. Skip gracefully if not available.
+if ! command -v shellcheck >/dev/null 2>&1; then
+    pass "case 11: pre-commit blocks staged defect — SKIPPED (shellcheck not installed)"
+    pass "case 12: pre-commit passes clean staged file — SKIPPED (shellcheck not installed)"
+    pass "case 13: pre-commit is fast — SKIPPED (shellcheck not installed)"
+    pass "case 14: pre-commit noop on non-shell staged — SKIPPED (shellcheck not installed)"
+else
+    # Set up a temp git repo mirroring the essential helper path so the hook
+    # can resolve "$REPO_ROOT/bin/lib/shell-scripts.sh" correctly when git
+    # rev-parse --show-toplevel returns the temp repo root.
+    TMP_REPO="$(mktemp -d)"
+    git init -q "$TMP_REPO"
+    git -C "$TMP_REPO" config user.email "test@test.com"
+    git -C "$TMP_REPO" config user.name "Test"
+    # Make an initial commit so HEAD exists
+    touch "$TMP_REPO/.gitkeep"
+    git -C "$TMP_REPO" add .gitkeep
+    git -C "$TMP_REPO" commit -q -m "init"
+    # Wire up the helper so the pre-commit hook can find it
+    mkdir -p "$TMP_REPO/bin/lib"
+    ln -sf "$REPO_ROOT/bin/lib/shell-scripts.sh" "$TMP_REPO/bin/lib/shell-scripts.sh"
+
+    # ── case 11: pre-commit blocks staged shell file with warning ────────────
+    DEFECT_FILE="$TMP_REPO/bad_script.sh"
+    printf '#!/bin/bash\nls | grep foo\n' > "$DEFECT_FILE"
+    git -C "$TMP_REPO" add "$DEFECT_FILE"
+    rc=0
+    (cd "$TMP_REPO" && "$REPO_ROOT/bin/pre-commit-hook" 2>&1) || rc=$?
+    if [ "$rc" -ne 0 ]; then
+        pass "case 11: pre-commit blocks staged shell file with SC2010 warning (exit $rc)"
+    else
+        fail "case 11: pre-commit blocks staged shell file with warning" \
+             "hook returned 0 — shellcheck block did not catch the defect"
+    fi
+    git -C "$TMP_REPO" reset -q HEAD
+
+    # ── case 12: pre-commit passes clean staged file ──────────────────────────
+    CLEAN_FILE="$TMP_REPO/clean_script.sh"
+    printf '#!/bin/bash\necho "hello"\n' > "$CLEAN_FILE"
+    git -C "$TMP_REPO" add "$CLEAN_FILE"
+    rc=0
+    (cd "$TMP_REPO" && "$REPO_ROOT/bin/pre-commit-hook" 2>&1) || rc=$?
+    if [ "$rc" -eq 0 ]; then
+        pass "case 12: pre-commit passes clean staged shell file"
+    else
+        fail "case 12: pre-commit passes clean staged shell file" \
+             "hook returned $rc"
+    fi
+    git -C "$TMP_REPO" reset -q HEAD
+
+    # ── case 13: pre-commit is fast (≤2s for 5 staged shell files) ───────────
+    for i in 1 2 3 4 5; do
+        printf '#!/bin/bash\necho "script %s"\n' "$i" > "$TMP_REPO/speed_${i}.sh"
+        git -C "$TMP_REPO" add "$TMP_REPO/speed_${i}.sh"
+    done
+    start_time=$(date +%s)
+    (cd "$TMP_REPO" && "$REPO_ROOT/bin/pre-commit-hook" 2>&1) || true
+    end_time=$(date +%s)
+    elapsed=$((end_time - start_time))
+    if [ "$elapsed" -le 2 ]; then
+        pass "case 13: pre-commit ran in ${elapsed}s (≤2s)"
+    else
+        fail "case 13: pre-commit is fast" "took ${elapsed}s (expected ≤2s)"
+    fi
+    git -C "$TMP_REPO" reset -q HEAD
+
+    # ── case 14: pre-commit is noop when only non-shell file staged ───────────
+    # Use .txt to avoid triggering the check-docs block (which needs real repo tools)
+    TXT_FILE="$TMP_REPO/notes.txt"
+    printf 'hello world\n' > "$TXT_FILE"
+    git -C "$TMP_REPO" add "$TXT_FILE"
+    rc=0
+    (cd "$TMP_REPO" && "$REPO_ROOT/bin/pre-commit-hook" 2>&1) || rc=$?
+    if [ "$rc" -eq 0 ]; then
+        pass "case 14: pre-commit noop when only non-shell file staged (exit 0)"
+    else
+        fail "case 14: pre-commit noop when only non-shell file staged" \
+             "hook returned $rc"
+    fi
+    git -C "$TMP_REPO" reset -q HEAD
+
+    rm -rf "$TMP_REPO"
+fi
+
+# ── summary ───────────────────────────────────────────────────────────────────
+
+if [ "$FAILED" -eq 0 ]; then
+    echo "all cases passed"
+else
+    echo "one or more cases FAILED"
+fi
+exit "$FAILED"

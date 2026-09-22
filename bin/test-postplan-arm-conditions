@@ -1155,7 +1155,7 @@ expect_block "(12) var unset -> default path keyed to the derived PR number -> N
 
 # set-but-empty: the colon form treats it as unset. Same outcome, deliberately.
 expect_block "(12) var set-but-empty behaves as unset (colon form) -> NONE" NONE \
-    "$(PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" FIDELITY_VERDICT_FILE= bash -c "$B12" 2>&1)"
+    "$(PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" FIDELITY_VERDICT_FILE='' bash -c "$B12" 2>&1)"
 
 rm -f "$DEFAULT_VF"
 out_unset_gone="$(PATH="$SHIMD:$PATH" GH_PR_FIXTURE="$BASE_TMP/fixture.json" bash -c "$B12" 2>&1)"

@@ -248,6 +248,44 @@ list_open_review_findings() {
                  | @tsv'
 }
 
+# list_trusted_open_threads PR_NUMBER
+#   One compact JSON object per review thread a pipeline run may ACT on
+#   (fix or decline). Same object shape as prf_review_threads. A thread qualifies
+#   only when ALL hold:
+#     isResolved == false          still open
+#     isOutdated == false          the anchored diff hunk still exists; an outdated
+#                                  thread may no longer apply, so it is never
+#                                  actioned (it still holds auto-merge via
+#                                  pr_unresolved_findings_hold)
+#     commentId != null            the root comment exists, so a reply can land
+#     trusted root author          authorLogin == "a-jay85"
+#                                  OR authorType == "Bot"
+#                                  OR authorLogin ends with "[bot]"
+#   Trust is structural (owner login, or GitHub's Bot type / suffix); there is no
+#   allowlist file. Only the ROOT comment's author counts; later replies never
+#   promote or demote a thread.
+#   CAP: inherits the 100-thread page from prf_review_threads. At exactly 100
+#   nodes the list is unknowable, so this prints nothing, writes a note to
+#   stderr, and returns 2. Callers treat rc 2 as "skip ingestion"; the hold
+#   predicate independently reports unresolved-findings-cap.
+#   Empty output means "nothing to action", never "safe to merge".
+list_trusted_open_threads() {
+    local pr="$1"
+    local all count
+    all=$(prf_review_threads "$pr") || return 1
+    count=$(printf '%s\n' "$all" | grep -c '^{')
+    if [ "$count" -ge 100 ]; then
+        echo "list_trusted_open_threads: PR #$pr hit the 100-thread page cap; skipping" >&2
+        return 2
+    fi
+    printf '%s\n' "$all" \
+        | jq -c 'select(.isResolved == false and .isOutdated == false
+                        and .commentId != null)
+                 | select(.authorLogin == "a-jay85"
+                          or .authorType == "Bot"
+                          or (.authorLogin | endswith("[bot]")))'
+}
+
 # resolve_review_finding PR_NUMBER COMMENT_ID BODY
 #   Dispositions one review finding: posts BODY as a threaded REPLY to
 #   COMMENT_ID, then marks the containing thread resolved.  BODY should say what

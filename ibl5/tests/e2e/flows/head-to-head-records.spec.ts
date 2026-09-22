@@ -9,7 +9,7 @@ test.use({ storageState: publicStorageState() });
 const DIMENSIONS = ['franchises', 'teams', 'gms'] as const;
 const PHASES = ['heat', 'regular', 'playoffs', 'all'] as const;
 
-/** Submit the filter form with the given selections and wait for the reload. */
+/** Apply the given filter selections, waiting for each auto-submit reload. */
 async function applyFilters(
   page: Page,
   dimension: string,
@@ -18,13 +18,20 @@ async function applyFilters(
 ): Promise<void> {
   const form = page.locator('form.h2h-filter');
   await expect(form).toBeVisible();
-  await form.locator('select[name="dimension"]').selectOption(dimension);
-  await form.locator('select[name="phase"]').selectOption(phase);
-  await form.locator('select[name="scope"]').selectOption(scope);
-  await Promise.all([
-    page.waitForLoadState('domcontentloaded'),
-    form.locator('button[type="submit"], input[type="submit"]').first().click(),
-  ]);
+  // The page script removes the submit button and auto-submits on each select
+  // change, so every changed select triggers its own reload.
+  for (const [name, value] of [
+    ['dimension', dimension],
+    ['phase', phase],
+    ['scope', scope],
+  ] as const) {
+    const select = page.locator(`form.h2h-filter select[name="${name}"]`);
+    if ((await select.inputValue()) === value) {
+      continue;
+    }
+    await Promise.all([page.waitForEvent('load'), select.selectOption(value)]);
+    await expect(select).toHaveValue(value);
+  }
 }
 
 test.describe('Head-to-Head Records flow', () => {

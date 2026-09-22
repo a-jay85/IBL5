@@ -7,17 +7,24 @@ import type { Page } from '@playwright/test';
 // The gms matrix keys the highlight on ibl_team_info.owner_name instead, which the
 // CI seed pins to 'GM TestUser' for teamid 1 and matches with an ibl_gm_tenures row.
 
-/** Select a dimension and submit the all-time / all-phases filter. */
+/** Select a dimension with the all-time / all-phases filter, waiting for each auto-submit reload. */
 async function applyDimension(page: Page, dimension: string): Promise<void> {
   const form = page.locator('form.h2h-filter');
   await expect(form).toBeVisible();
-  await form.locator('select[name="dimension"]').selectOption(dimension);
-  await form.locator('select[name="phase"]').selectOption('all');
-  await form.locator('select[name="scope"]').selectOption('all');
-  await Promise.all([
-    page.waitForLoadState('domcontentloaded'),
-    form.locator('button[type="submit"], input[type="submit"]').first().click(),
-  ]);
+  // The page script removes the submit button and auto-submits on each select
+  // change, so every changed select triggers its own reload.
+  for (const [name, value] of [
+    ['dimension', dimension],
+    ['phase', 'all'],
+    ['scope', 'all'],
+  ] as const) {
+    const select = page.locator(`form.h2h-filter select[name="${name}"]`);
+    if ((await select.inputValue()) === value) {
+      continue;
+    }
+    await Promise.all([page.waitForEvent('load'), select.selectOption(value)]);
+    await expect(select).toHaveValue(value);
+  }
 }
 
 test.describe('Head-to-Head Records — logged-in user', () => {

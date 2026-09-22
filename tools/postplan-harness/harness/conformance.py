@@ -2,7 +2,10 @@
 _phase-5-final-verification.md's two check loops."""
 from __future__ import annotations
 
+import os
 import re
+import subprocess
+import sys
 from pathlib import PurePosixPath
 
 from .state import PlanInfo
@@ -118,3 +121,105 @@ def check(plan: PlanInfo, changed_files: list[str], diff_body: str = "",
             if not re.search(rf"(function|def)\s+{re.escape(m)}\b", diff_body):
                 items.append(f"MISSING-METHOD: {m} (plan required a test method the diff never wrote)")
     return items
+
+
+def _git_lines(args: list[str], cwd: str) -> list[str]:
+    """Non-empty stdout lines from a read-only git command, [] on any failure.
+
+    Fail-open on purpose: a repo with no `origin/master` ref, or no commits at all,
+    must still let the seam report on the ranges that DO resolve rather than abort.
+    An empty union degrades to "nothing changed", which surfaces as MISSING items the
+    impl agent can see — never as a silent exit 0.
+    """
+    try:
+        proc = subprocess.run(["git", *args], cwd=cwd, capture_output=True,
+                              text=True, check=False)
+    except OSError:
+        return []
+    if proc.returncode != 0:
+        return []
+    return [ln.strip() for ln in proc.stdout.splitlines() if ln.strip()]
+
+
+def _changed_files(repo_root: str) -> list[str]:
+    """Order-preserving three-way union of the paths this branch has touched.
+
+    Committed (merge-base range) + uncommitted tracked + untracked-not-ignored.
+    The third arm is why a brand-new test file counts as PRESENT before its first
+    commit; `--exclude-standard` honors every gitignore source so build droppings
+    never enter the set.
+    """
+    seen: list[str] = []
+    for args in (["diff", "--name-only", "origin/master...HEAD"],
+                 ["diff", "--name-only", "HEAD"],
+                 ["ls-files", "--others", "--exclude-standard"]):
+        for path in _git_lines(args, repo_root):
+            if path not in seen:
+                seen.append(path)
+    return seen
+
+
+def main(argv: list[str] | None = None) -> int:
+    """One-shot Phase 5.0 conformance seam for impl-time pre-handoff checking.
+
+    usage: python3 -m harness.conformance <abs-plan-path> [repo-root]
+
+    Reports only `MISSING:` (a matrix-declared test path the diff never wrote) and
+    `MISSING-FILE:` (a non-exempt plan Critical File the diff never touched). Those
+    are the two items an implementation agent can still act on before it writes its
+    handoff. `MISSING-METHOD:` is skipped structurally by passing `diff_body=""`, and
+    `UNMET-CONTRACT:` items are filtered out because `phase5_status` is unknowable at
+    impl time and contract checking belongs to post-plan Phase 5.0.
+
+    Exit codes:
+      0  clean — no MISSING:/MISSING-FILE: items
+      1  items found — each printed to stdout, one per line
+      2  could not evaluate — bad usage, non-absolute or missing plan path,
+         unresolvable repo root, or `plan.found == False`
+    """
+    from .planfile import locate_plan  # local import keeps module-level cycle-free
+
+    args = argv if argv is not None else sys.argv[1:]
+    if not args or len(args) > 2:
+        print("usage: python3 -m harness.conformance <abs-plan-path> [repo-root]",
+              file=sys.stderr)
+        return 2
+    plan_path = args[0]
+    if not os.path.isabs(plan_path):
+        print(f"conformance: plan path must be absolute, got {plan_path!r}",
+              file=sys.stderr)
+        return 2
+    if not os.path.isfile(plan_path):
+        print(f"conformance: plan path does not exist: {plan_path}", file=sys.stderr)
+        return 2
+    if len(args) == 2 and args[1]:
+        repo_root = args[1]
+    else:
+        roots = _git_lines(["rev-parse", "--show-toplevel"], os.getcwd())
+        if not roots:
+            print("conformance: could not resolve repo root from cwd; "
+                  "pass it as the second argument", file=sys.stderr)
+            return 2
+        repo_root = roots[0]
+    if not os.path.isdir(repo_root):
+        print(f"conformance: repo root is not a directory: {repo_root}",
+              file=sys.stderr)
+        return 2
+    plan = locate_plan(slug=None, plans_dir=None, explicit_path=plan_path)
+    if not plan.found:
+        # The vacuous-pass guard. check() returns [] for an unfound plan, so
+        # falling through here would print nothing and exit 0 on an unreadable
+        # plan — a clean verdict nobody earned.
+        print(f"conformance: plan not readable as a plan file: {plan_path}",
+              file=sys.stderr)
+        return 2
+    raw = check(plan, _changed_files(repo_root), diff_body="", phase5_status=None)
+    items = [i for i in raw
+             if i.startswith("MISSING:") or i.startswith("MISSING-FILE:")]
+    for item in items:
+        print(item)
+    return 1 if items else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

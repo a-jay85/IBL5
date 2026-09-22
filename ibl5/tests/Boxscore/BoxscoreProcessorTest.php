@@ -912,7 +912,7 @@ class BoxscoreProcessorTest extends TestCase
         $seasonStub->lastSimEndDate = '';
 
         $processor = new TestableBoxscoreProcessor($mockDb, $repository, $seasonStub);
-        // HEAT phase: month 9 is still exempt
+        // HEAT phase: month 10 is still exempt
         $processor->guardOverride = new ScheduleMembershipGuard(2008, ['2008-01-10' => [2 => [1 => true]]], [], 'HEAT');
 
         $scoFile = $this->buildScoFileWithGames([

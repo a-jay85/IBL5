@@ -50,6 +50,14 @@
     opacity: 0.8;
 }
 
+/* The shared .ibl-team-cell--colored rule paints the label text in the team's
+   secondary colour, which on this page lands green-on-purple, blue-on-red and
+   pink-on-cyan. White reads on every primary. Scoped to the row-label cell so
+   standings, free agency, trading and the draft tables keep the team colour. */
+.h2h-matrix .h2h-row-label.ibl-team-cell--colored .ibl-team-cell__name {
+    color: #fff;
+}
+
 /* Corner cell: reading-direction hint (arrows point at columns, up at rows) */
 .h2h-matrix .h2h-corner {
     vertical-align: bottom;
@@ -82,6 +90,13 @@
     text-align: center;
 }
 
+/* The header anchor inherits the global link colour (navy 800) and disappears
+   into the dark header band. Entries with no team page have no anchor and read
+   white off the th, so the labelled row came out half legible. Force white. */
+.h2h-matrix .h2h-col-header a {
+    color: #fff;
+}
+
 .h2h-matrix .series-logo-img {
     display: block;
     margin: 0 auto;
@@ -89,16 +104,29 @@
     height: 40px;
 }
 
-/* Labeled variant (GMs): name reads bottom-to-top above the logo,
-   capped so every column stays the same width and height */
+/* Labeled variant (GMs, and team eras sharing a logo): name reads bottom-to-top
+   above the logo. writing-mode: vertical-rl turns the inline axis vertical, so
+   height is the inline size and text-align centres along the screen's vertical.
+
+   Without a floor the span shrink-wraps its own name, so every name sat flush
+   against the logo with all the slack at the far end — left-aligned, once you
+   read it in its own rotated direction. The View emits --h2h-label-chars (longest
+   label on this axis) and the floor turns it into one shared band that the longest
+   name fills and every shorter name centres inside.
+
+   A floor, not a fixed height: a name that outgrows the estimate grows the band
+   instead of being clipped, which only costs the shorter names their centring.
+   A fixed height plus centring would clip BOTH ends, and text-overflow only ever
+   draws an ellipsis at one. Overshoot is therefore the safe direction, and it
+   costs header height, so 0.4rem per character matches the widest label measured
+   ("Johnny McKeever", 15 characters, 96px, 6.4px each) rather than clearing it. */
 .h2h-col-header__text {
     display: block;
     writing-mode: vertical-rl;
     transform: rotate(180deg);
     margin: 0 auto 0.35rem;
-    max-height: 9rem;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    min-height: calc(var(--h2h-label-chars, 0) * 0.4rem);
+    text-align: center;
     font-size: 0.75rem;
     line-height: 1;
     letter-spacing: 0.03em;

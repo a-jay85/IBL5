@@ -104,29 +104,16 @@
     height: 40px;
 }
 
-/* Labeled variant (GMs, and team eras sharing a logo): name reads bottom-to-top
-   above the logo. writing-mode: vertical-rl turns the inline axis vertical, so
-   height is the inline size and text-align centres along the screen's vertical.
-
-   Without a floor the span shrink-wraps its own name, so every name sat flush
-   against the logo with all the slack at the far end — left-aligned, once you
-   read it in its own rotated direction. The View emits --h2h-label-chars (longest
-   label on this axis) and the floor turns it into one shared band that the longest
-   name fills and every shorter name centres inside.
-
-   A floor, not a fixed height: a name that outgrows the estimate grows the band
-   instead of being clipped, which only costs the shorter names their centring.
-   A fixed height plus centring would clip BOTH ends, and text-overflow only ever
-   draws an ellipsis at one. Overshoot is therefore the safe direction, and it
-   costs header height, so 0.4rem per character matches the widest label measured
-   ("Johnny McKeever", 15 characters, 96px, 6.4px each) rather than clearing it. */
+/* Labeled variant (GMs): name reads bottom-to-top above the logo,
+   capped so every column stays the same width and height */
 .h2h-col-header__text {
     display: block;
     writing-mode: vertical-rl;
     transform: rotate(180deg);
     margin: 0 auto 0.35rem;
-    min-height: calc(var(--h2h-label-chars, 0) * 0.4rem);
-    text-align: center;
+    max-height: 9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
     font-size: 0.75rem;
     line-height: 1;
     letter-spacing: 0.03em;

@@ -129,7 +129,7 @@ class HeadToHeadRecordsViewTest extends TestCase
 
         self::assertStringContainsString('<div class="sticky-scroll-wrapper page-sticky"><div class="sticky-scroll-container">', $html);
         self::assertStringContainsString('class="ibl-data-table sticky-table h2h-matrix"', $html);
-        self::assertStringContainsString('style="--h2h-col-chars: 3; --h2h-col-count: 2; --h2h-label-chars: 0;"', $html);
+        self::assertStringContainsString('style="--h2h-col-chars: 3; --h2h-col-count: 2;"', $html);
         self::assertStringContainsString('<th class="sticky-col sticky-corner h2h-corner">', $html);
         self::assertStringContainsString('&rarr;&rarr;', $html);
         self::assertStringContainsString('&uarr;', $html);
@@ -241,27 +241,6 @@ class HeadToHeadRecordsViewTest extends TestCase
         self::assertStringContainsString('<span class="h2h-col-header__text">Brooklyn Nets</span>', $html);
         // With text present the logo is decorative.
         self::assertStringContainsString('class="series-logo-img" alt=""', $html);
-    }
-
-    public function testLabelCharsTracksTheLongestHeaderLabel(): void
-    {
-        $a = $this->makeEntry(['key' => 'nj',  'franchise_id' => 4, 'label' => 'New Jersey Nets', 'logo' => 'nets.png']);
-        $b = $this->makeEntry(['key' => 'bkn', 'franchise_id' => 4, 'label' => 'Brooklyn Nets',   'logo' => 'nets.png']);
-        $payload = $this->makePayload([$a, $b], ['nj' => ['bkn' => ['wins' => 2, 'losses' => 1]]], 'teams');
-
-        $html = $this->view->renderMatrix($payload, []);
-
-        // "New Jersey Nets" is 15 characters; the rotated spans size their shared
-        // band off that so the shorter name centers inside it.
-        self::assertStringContainsString('--h2h-label-chars: 15;', $html);
-    }
-
-    public function testLabelCharsIsZeroWhenHeadersShowLogosOnly(): void
-    {
-        // Distinct logos mean no rotated text, so the band needs no floor.
-        $html = $this->view->renderMatrix($this->makePlayedPayload(), []);
-
-        self::assertStringContainsString('--h2h-label-chars: 0;', $html);
     }
 
     // ---------------------------------------------------------------------------

@@ -109,27 +109,13 @@ final class HeadToHeadRecordsView
             }
         }
 
-        // Longest header label, in characters. The labeled header spans are rotated,
-        // so this drives their minimum inline size and lets every shorter name center
-        // in a band the longest one defines. 0 when the axis shows logos only.
-        $maxLabelChars = 0;
-        if ($showHeaderText) {
-            foreach ($axis as $entry) {
-                $len = strlen($entry['label']);
-                if ($len > $maxLabelChars) {
-                    $maxLabelChars = $len;
-                }
-            }
-        }
-
         $out  = '<div class="sticky-scroll-wrapper page-sticky">';
         $out .= '<div class="sticky-scroll-container">';
         // CSS turns these two numbers into one shared column width and an explicit
         // table width. Without the explicit width, table-layout: fixed shrink-to-fits
         // and redistributes the columns unevenly.
         $out .= '<table class="ibl-data-table sticky-table h2h-matrix"'
-            . ' style="--h2h-col-chars: ' . $maxChars . '; --h2h-col-count: ' . count($axis)
-            . '; --h2h-label-chars: ' . $maxLabelChars . ';">';
+            . ' style="--h2h-col-chars: ' . $maxChars . '; --h2h-col-count: ' . count($axis) . ';">';
         $out .= '<thead><tr>';
         $out .= $this->renderCornerCell();
         foreach ($axis as $entry) {

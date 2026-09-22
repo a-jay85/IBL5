@@ -8,8 +8,9 @@
 # repo means the gate is editable from any worktree and travels with a clone,
 # instead of being a machine-local untracked hook one developer happens to have.
 #
-# Four independent blocks, each gated on what is staged. Only the codebase-map
-# regen is advisory; the rest fail the commit.
+# Six independent blocks. Only the codebase-map regen is advisory; the rest fail the
+# commit. The first five are gated on what is staged; the ADR gate is scoped to this
+# branch's commits UNION the index, so it runs whenever origin/master resolves.
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
@@ -87,5 +88,30 @@ if command -v shellcheck >/dev/null 2>&1; then
             echo "Fix the shellcheck warning(s) above before committing."
             exit 1
         fi
+    fi
+fi
+
+# Decision-trigger ADR gate. Scoped with bin/adr-check --commit, which reads this
+# branch's commits since the merge-base UNION the index -- never --cached alone, so
+# an ADR committed earlier on the branch satisfies a trigger staged now. That is the
+# "create the ADR first" workflow ibl5/docs/decisions/README.md documents, and a
+# --cached-only scope would reject it.
+#
+# Bypass body is the branch's own commit messages, the same composition
+# bin/pre-push-adr-hook pipes in. The message of the commit being made does not
+# exist yet at pre-commit time and bin/install-git-hooks installs no commit-msg hook,
+# so a deliberate bypass at this point uses git commit --no-verify, the same escape
+# hatch the gates above document.
+#
+# Skipped when origin/master is unresolvable, so a fetch-less clone still commits.
+adr_base=$(git merge-base HEAD origin/master 2>/dev/null) || adr_base=""
+if [ -n "$adr_base" ]; then
+    if ! git log --format=%B "$adr_base..HEAD" 2>/dev/null \
+        | "$REPO_ROOT/bin/adr-check" --commit --bypass-from-stdin 2>&1; then
+        echo ""
+        echo "pre-commit-adr-gate: write the ADR (bin/next-adr \"kebab-title\") and stage it,"
+        echo "or add a <!-- no-adr: reason at least 15 characters --> marker to a commit"
+        echo "message on this branch, before committing."
+        exit 1
     fi
 fi

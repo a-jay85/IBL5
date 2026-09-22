@@ -46,6 +46,7 @@ _LOCAL_GATE_MARKERS = (
 _GATE_CLASSES = (
     ("stale-base", _STALE_BASE_MARKER),
     ("adr", "pre-push-adr-hook:"),
+    ("adr", "pre-commit-adr-gate:"),
     ("byte-budget", "Trim the rule(s) above"),
     ("doc-staleness", "Bump last_verified"),
 )

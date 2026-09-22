@@ -144,12 +144,39 @@ class HeadToHeadRecordsRepositoryTest extends DatabaseTestCase
 
     public function testEraBrandingTableIsSeededWithSixRetiredEras(): void
     {
-        $stmt = $this->db->prepare('SELECT COUNT(*) AS cnt FROM ibl_franchise_era_branding');
+        // Remove setUp rows so this test exercises only what migration 182 seeds.
+        $this->db->query('DELETE FROM `ibl_franchise_era_branding`');
+
+        // Execute the migration's INSERT IGNORE verbatim.
+        $this->db->query(
+            "INSERT IGNORE INTO `ibl_franchise_era_branding`
+               (`franchise_id`, `team_city`, `team_name`, `color1`, `color2`) VALUES
+               (4,  'Brooklyn',      'Nets',        '000000', 'FFFFFF'),
+               (10, 'Charlotte',     'Hornets',     '00788C', '1D1160'),
+               (16, 'Oklahoma City', 'Thunder',     '007AC1', 'EF6F31'),
+               (16, 'Las Vegas',     'Thunder',     '1C1C1C', 'F5C518'),
+               (17, 'San Antonio',   'Spurs',       'C4CED4', '000000'),
+               (22, 'Seattle',       'Supersonics', '00653A', 'FFC200')",
+        );
+
+        $stmt = $this->db->prepare(
+            'SELECT franchise_id, team_city, team_name, color1, color2
+             FROM `ibl_franchise_era_branding` ORDER BY id',
+        );
         self::assertNotFalse($stmt);
         $stmt->execute();
-        $row = $stmt->get_result()->fetch_assoc();
+        $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
         $stmt->close();
-        self::assertSame(6, (int)($row['cnt'] ?? 0));
+
+        self::assertCount(6, $rows);
+        self::assertSame([
+            ['franchise_id' => '4',  'team_city' => 'Brooklyn',      'team_name' => 'Nets',        'color1' => '000000', 'color2' => 'FFFFFF'],
+            ['franchise_id' => '10', 'team_city' => 'Charlotte',     'team_name' => 'Hornets',     'color1' => '00788C', 'color2' => '1D1160'],
+            ['franchise_id' => '16', 'team_city' => 'Oklahoma City', 'team_name' => 'Thunder',     'color1' => '007AC1', 'color2' => 'EF6F31'],
+            ['franchise_id' => '16', 'team_city' => 'Las Vegas',     'team_name' => 'Thunder',     'color1' => '1C1C1C', 'color2' => 'F5C518'],
+            ['franchise_id' => '17', 'team_city' => 'San Antonio',   'team_name' => 'Spurs',       'color1' => 'C4CED4', 'color2' => '000000'],
+            ['franchise_id' => '22', 'team_city' => 'Seattle',       'team_name' => 'Supersonics', 'color1' => '00653A', 'color2' => 'FFC200'],
+        ], $rows);
     }
 
     // -------------------------------------------------------------------------

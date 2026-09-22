@@ -1,6 +1,6 @@
 ---
 description: Replace SeriesRecords with a Teams/Franchises/GMs head-to-head matrix, a slim retired-era branding table, and a 24-key cache.
-last_verified: 2026-09-20
+last_verified: 2026-09-22
 ---
 
 # ADR-0136: Head-to-Head Records Module
@@ -82,3 +82,12 @@ One blob was rejected because every page load would deserialize all 24 matrices.
 - Era colors are hand-seeded. A future rebrand needs a new migration row in `ibl_franchise_era_branding`.
 - The `current`-scope cache keys are season-agnostic by design, so correctness at rollover depends on `RefreshHeadToHeadRecordsStep` staying in the Updater pipeline.
 - The whole `SeriesRecords` namespace is deleted: its classes, its module entry point, and its test directory. The `vw_series_records` view stays, because Standings still reads it.
+
+## Addendum (2026-09-22): SQL sites outside the repository
+
+The `### Security surface` section above omits two SQL sites discovered during the Phase 6 plan-intent fidelity review.
+
+- `modules/HeadToHeadRecords/index.php` decodes the auth cookie via `NukeCompat::cookieDecode($user)` and runs `SELECT teamid FROM \`ibl_team_info\` WHERE gm_username = ? LIMIT 1` with the username bound as `s`. An empty username short-circuits before the prepare call.
+- `HeadToHeadRecordsController::lookupOwnerName()` runs `SELECT owner_name FROM \`ibl_team_info\` WHERE teamid = ?` with the teamid bound as `i`. The caller validates `teamid > 0` before dispatching.
+
+Both use `$this->db->prepare()` with `bind_param`. No user-controlled value is interpolated.

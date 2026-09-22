@@ -109,6 +109,10 @@ class LiveGit:
         self.push_remote = push_remote  # None = pushing disabled (typed failure)
         self.llm = llm
         self.last_conflict_resolution: Optional["StackedRebaseResult"] = None
+        # Unmerged paths captured at the moment a rebase stopped, BEFORE any abort clears
+        # the index. Reset at the start of each rebase method; read by runner.py for the
+        # audit log so a fail-closed exit 3 names the files that conflicted.
+        self.last_conflict_files: tuple[str, ...] = ()
 
     def _run(self, *args: str, check: bool = True) -> str:
         proc = subprocess.run(["git", "-C", self.worktree, *args],
@@ -129,6 +133,22 @@ class LiveGit:
         proc = subprocess.run(["git", "-C", self.worktree, *args],
                               capture_output=True, text=True, errors="replace")
         return proc.returncode, f"{proc.stdout}\n{proc.stderr}".strip()
+
+    def _snapshot_conflicted_paths(self) -> tuple[str, ...]:
+        """Record the unmerged paths of a stopped rebase on self.last_conflict_files.
+
+        Independent of conflict.inventory_conflicts(): that helper returns files=() when it
+        classifies a conflict unresolvable (delete/modify, binary), and this snapshot must
+        name the paths in exactly those cases. Never raises: a diagnostic must not mask the
+        rebase failure it is describing.
+        """
+        try:
+            out = self._run("diff", "--name-only", "--diff-filter=U", check=False)
+            files = tuple(sorted(p for p in out.splitlines() if p.strip()))
+        except Exception:
+            files = ()
+        self.last_conflict_files = files
+        return files
 
     def branch(self) -> str:
         return self._run("rev-parse", "--abbrev-ref", "HEAD").strip()
@@ -351,6 +371,7 @@ class LiveGit:
 
         branch = self.branch()
         key = branch.replace("/", "-")
+        self.last_conflict_files = ()
         master_sha = self._run("rev-parse", base).strip()
 
         pre_rebase_sha = self._run("rev-parse", "HEAD").strip()
@@ -366,12 +387,18 @@ class LiveGit:
             conflict_detail = (proc.stderr or proc.stdout).strip()[:400]
 
             if self.llm is None or not pre_patch.strip():
-                # No LLM or no pre-patch: immediate abort-and-restore (today's behavior)
+                # No LLM or no pre-patch: immediate abort-and-restore. Snapshot the
+                # unmerged set FIRST; the abort clears it.
+                files = self._snapshot_conflicted_paths()
                 subprocess.run(["git", "-C", self.worktree, "rebase", "--abort"],
                                capture_output=True, text=True, errors="replace")
-                raise HarnessError("rebase-conflict", conflict_detail)
+                raise HarnessError(
+                    "rebase-conflict",
+                    f"{conflict_detail} | conflicted: {', '.join(files) or '?'}",
+                )
 
             try:
+                self._snapshot_conflicted_paths()
                 inventory = inventory_conflicts(self._run)
                 if inventory.unresolvable_reason:
                     abort_and_restore(self._run, worktree=self.worktree,
@@ -462,6 +489,7 @@ class LiveGit:
         the single decision about exit 3."""
         branch = self.branch()
         key = branch.replace("/", "-")
+        self.last_conflict_files = ()
 
         # Step 2: iblBase (early return before any network/expensive call)
         ibl_base = self.branch_base()
@@ -538,17 +566,21 @@ class LiveGit:
         auto_resolved_files: tuple = ()
         if rebase_proc.returncode != 0:
             if self.llm is None:
-                # No LLM: immediate decline, today's behavior
+                # No LLM: immediate decline. Snapshot the unmerged set FIRST; the abort
+                # clears it.
+                files = self._snapshot_conflicted_paths()
                 subprocess.run(
                     ["git", "-C", self.worktree, "rebase", "--abort"],
                     capture_output=True, text=True, errors="replace",
                 )
                 return StackedRebaseResult(
                     False,
-                    f"--onto rebase still conflicts: {(rebase_proc.stderr or rebase_proc.stdout).strip()[:400]}",
+                    f"--onto rebase still conflicts: {(rebase_proc.stderr or rebase_proc.stdout).strip()[:400]}"
+                    f" | conflicted: {', '.join(files) or '?'}",
                 )
 
             try:
+                self._snapshot_conflicted_paths()
                 inventory = inventory_conflicts(self._run)
                 if inventory.unresolvable_reason:
                     abort_and_restore(self._run, worktree=self.worktree,

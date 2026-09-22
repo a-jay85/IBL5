@@ -1,3 +1,8 @@
+---
+description: Full Phase 5 how-to for plan-to-test, plan-to-file, and diff-to-plan conformance checks run during post-plan.
+last_verified: 2026-09-21
+---
+
 # Phase 5 — Final Verification (post-plan reference)
 
 Purpose: the full Phase 5 final-verification how-to (all prose steps + all bash blocks).
@@ -80,6 +85,47 @@ done
 
 For each `MISSING-FILE:`, the impl dropped a planned change. Either (a) make the change now — the plan's implementation steps describe it (this is the #923 remedy: finish the work), run any relevant check, and checkpoint (commit + push) — or (b) if the file was legitimately cut from scope, or is a reference the plan author forgot to annotate, note that in a PR comment. A `MISSING-FILE:` item is **resolved** by (a) or (b); otherwise **unresolved**.
 
+**Diff→plan conformance.** The check above runs plan→diff. This one runs diff→plan over the `.claude/` surface, and catches the opposite failure: an impl agent edits a skill, rule, or agent definition the plan never named, so a governance change ships that no reviewer signed up for. Five merge blockers were caught by hand this way before it was mechanized. A `.claude/` path in the diff is **planned** when it appears in the plan's `## Critical Files` section under either parse verdict. Both `MUST_APPEAR:` and `EXEMPT:` count as planned, because an entry annotated `(reference)` was still named by the plan author; filtering on `cf_is_exempt` here would invert the polarity and report every reference entry as unplanned. A path the plan never named is **declared** when the PR body carries a `## Declared scope` section listing it (format: `.claude/skills/post-plan/_pr-body-claims.md`). Everything else yields an `UNPLANNED-FILE:` item.
+
+```bash
+# Diff→plan conformance. Mirror of the plan→file check above, run in the
+# opposite direction and scoped to `.claude/`. Reuses /tmp/post-plan-changed-$PPID.
+# Source IN-BLOCK — this block runs in its own shell (pr-armable.sh discipline).
+if [ "${PLAN_FOUND:-none}" = "none" ]; then
+  : # no plan -> no planned paths -> nothing to compare against; skip entirely
+else
+  source "$(git rev-parse --show-toplevel)/bin/lib/critical-files.sh"
+  PLANNED="/tmp/post-plan-planned-claude-$PPID"
+  DECLARED="/tmp/post-plan-declared-scope-$PPID"
+  # BOTH verdicts are planned. Using cf_is_exempt here would invert the polarity.
+  cf_parse_section "$PLAN_FILE" \
+    | sed -E 's/^(MUST_APPEAR|EXEMPT)://' \
+    | sed -E 's#^IBL5-worktrees/[^/]*/##' \
+    | sort -u > "$PLANNED"
+  # Section-bounded extraction of the PR body's `## Declared scope` bullets.
+  # gh failing (no PR yet on a first run) leaves this empty, which is fail-closed.
+  gh pr view --json body --jq '.body' 2>/dev/null \
+    | awk '/^##[[:space:]]+Declared scope[[:space:]]*$/ {f=1; next}
+           /^##[[:space:]]/ {f=0}
+           f' > "$DECLARED"
+  sed -E 's#^IBL5-worktrees/[^/]*/##' "/tmp/post-plan-changed-$PPID" \
+    | grep -E '^\.claude/' | sort -u | while IFS= read -r D; do
+        grep -qxF "$D" "$PLANNED"  && continue
+        grep -qF  "$D" "$DECLARED" && continue
+        echo "UNPLANNED-FILE: $D (.claude/ path in the diff that no plan Critical File and no PR-body '## Declared scope' bullet accounts for)"
+      done
+  rm -f "$PLANNED" "$DECLARED"
+fi
+```
+
+Three shell details are load-bearing. `grep -qxF` against `$PLANNED` is a whole-line match so a planned `.claude/rules/a.md.bak` (example) cannot swallow a diff path `.claude/rules/a.md` (example); `grep -qF` against `$DECLARED` is a substring match because that file holds prose bullets. Both greps read a file rather than a pipe, which keeps them clear of the `set -o pipefail` plus `grep -q` SIGPIPE trap in `.claude/rules/shell-pipefail-grep.md`. The `IBL5-worktrees/[^/]*/` strip runs before the `^\.claude/` filter on the diff side; running it after would let a worktree-prefixed path fall out of the filter and vanish silently.
+
+For each `UNPLANNED-FILE:`, an edit landed on the governance surface outside the plan's declared blast radius. Resolve it one of three ways: (a) revert the edit when it was incidental scope creep; (b) add the path to the PR body's `## Declared scope` section and re-run `/post-plan`, when the edit is intended and the plan author did not foresee it; or (c) add the path to the plan's `## Critical Files` section, when the plan is still the live document. An item resolved by (a), (b) or (c) is **resolved**; anything else is **unresolved** and reaches the bridge at 5.0 END through the existing append step. Writing the bridge file inline here would be wrong, for the same reason it is wrong above: an item you then resolve would still block arming.
+
+On a first `/post-plan` run the PR does not exist yet, so `gh pr view` fails and the declared set is empty. That is fail-closed by design. Path (b) is a re-run clearance; a first run sees only the plan's own `## Critical Files` section, and path (c) works there.
+
+This check does not replace check 3 of the fidelity reviewer in `.claude/skills/pr-ready/_plan-fidelity-review.md`. That check reads intent across the whole diff at judgment level; this one is a mechanical path-set comparison scoped to `.claude/`. They run side by side.
+
 **Plan→method conformance.** The path check above proves the *file* landed; this confirms the plan's named methods landed. For each name the plan lists under `## Required Test Methods` (fenced examples stripped width-aware), grep the diff *body* — `git diff --name-only` cannot see declarations:
 
 ```bash
@@ -130,7 +176,7 @@ if [ "$PLAN_FOUND" != "none" ]; then
 fi
 ```
 
-At Phase 5.0 END, append each remaining **UNRESOLVED** `MISSING:`, `MISSING-FILE:`, `MISSING-METHOD:` and `UNMET-CONTRACT:` item (label + path-or-method-name + reason) to `/tmp/post-plan-missing-tests-$PPID`, one per line. Authored-green / implemented-and-checkpointed / cut-with-comment items are NOT written. This bridge file is consulted by the Phase 6.5 auto-merge gate.
+At Phase 5.0 END, append each remaining **UNRESOLVED** `MISSING:`, `MISSING-FILE:`, `UNPLANNED-FILE:`, `MISSING-METHOD:` and `UNMET-CONTRACT:` item (label + path-or-method-name + reason) to `/tmp/post-plan-missing-tests-$PPID`, one per line. Authored-green / implemented-and-checkpointed / cut-with-comment items are NOT written. This bridge file is consulted by the Phase 6.5 auto-merge gate.
 
 Then — **last action of Phase 5.0, after the appends above** — write the done-marker:
 

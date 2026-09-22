@@ -95,7 +95,7 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
 
         $messages[] = "Parsing .sco file for the {$operatingSeasonStartingYear}-{$operatingSeasonEndingYear} {$operatingSeasonPhase}...";
 
-        $scheduleGuard = $this->makeScheduleGuard($operatingSeasonEndingYear);
+        $scheduleGuard = $this->makeScheduleGuard($operatingSeasonEndingYear, $operatingSeasonPhase);
 
         if (strlen($data) < ScoFileParser::HEADER_OFFSET_BYTES) {
             return [
@@ -154,13 +154,13 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
             // is almost always also absent from the schedule index, so the guard rejects
             // it first. Tallying only accepted games would make this detector unreachable,
             // because an accepted game is in the index and therefore inside [min, max].
-            // Skip games that the guard exempts (All-Star/Rising Stars and off-schedule months)
+            // Skip games that the guard exempts (All-Star/Rising Stars, and off-schedule months as the guard rules for this import phase)
             // so we do not re-break the February All-Star import the Phase 3 whitelist protects.
             // ISO dates compare correctly with plain string operators; no DateTime construction.
             if ($window !== null
                 && !in_array($boxscoreGameInfo->visitor_teamid, ScheduleMembershipGuard::EXEMPT_TEAMIDS, true)
                 && !in_array($boxscoreGameInfo->home_teamid, ScheduleMembershipGuard::EXEMPT_TEAMIDS, true)
-                && !in_array((int) $boxscoreGameInfo->gameMonth, ScheduleMembershipGuard::OFF_SCHEDULE_MONTHS, true)
+                && !$scheduleGuard->exemptsOffScheduleMonth((int) $boxscoreGameInfo->gameMonth)
             ) {
                 $gameDate = $boxscoreGameInfo->gameDate;
                 if ($gameDate < $window[0] || $gameDate > $window[1]) {
@@ -327,9 +327,9 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
     /**
      * Factory for the schedule-membership guard — overridable in tests.
      */
-    protected function makeScheduleGuard(int $seasonEndingYear): ScheduleMembershipGuard
+    protected function makeScheduleGuard(int $seasonEndingYear, string $importPhase): ScheduleMembershipGuard
     {
-        return ScheduleMembershipGuard::fromRepository($this->repository, $seasonEndingYear);
+        return ScheduleMembershipGuard::fromRepository($this->repository, $seasonEndingYear, $importPhase);
     }
 
     /**

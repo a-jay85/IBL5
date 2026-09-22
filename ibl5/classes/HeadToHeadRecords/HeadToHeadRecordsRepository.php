@@ -78,13 +78,14 @@ GROUP BY self_id, opp_id';
             $city = is_string($row['team_city']) ? $row['team_city'] : '';
             $name = is_string($row['team_name']) ? $row['team_name'] : '';
             $axis[] = [
-                'key'          => (string)$tid,
-                'franchise_id' => $tid,
-                'label'        => $city . ' ' . $name,
-                'sublabel'     => '',
-                'color1'       => is_string($row['color1']) ? $row['color1'] : '',
-                'color2'       => is_string($row['color2']) ? $row['color2'] : '',
-                'logo'         => "new{$tid}.png",
+                'key'               => (string)$tid,
+                'franchise_id'      => $tid,
+                'label'             => $city . ' ' . $name,
+                'sublabel'          => '',
+                'color1'            => is_string($row['color1']) ? $row['color1'] : '',
+                'color2'            => is_string($row['color2']) ? $row['color2'] : '',
+                'logo'              => "new{$tid}.png",
+                'link_franchise_id' => $tid,
             ];
         }
 
@@ -168,13 +169,14 @@ GROUP BY s.franchise_id, s.team_city, s.team_name, o.franchise_id, o.team_city, 
             $name = is_string($row['team_name']) ? $row['team_name'] : '';
             $key  = "{$fid}|{$city}|{$name}";
             $axis[] = [
-                'key'          => $key,
-                'franchise_id' => $fid,
-                'label'        => $city . ' ' . $name,
-                'sublabel'     => '',
-                'color1'       => is_string($row['color1']) ? $row['color1'] : '',
-                'color2'       => is_string($row['color2']) ? $row['color2'] : '',
-                'logo'         => ($this->logoResolver)($fid, $name),
+                'key'               => $key,
+                'franchise_id'      => $fid,
+                'label'             => $city . ' ' . $name,
+                'sublabel'          => '',
+                'color1'            => is_string($row['color1']) ? $row['color1'] : '',
+                'color2'            => is_string($row['color2']) ? $row['color2'] : '',
+                'logo'              => ($this->logoResolver)($fid, $name),
+                'link_franchise_id' => $fid,
             ];
         }
 
@@ -467,17 +469,43 @@ perspectives AS (
             }
 
             $axis[] = [
-                'key'          => $gmName,
-                'franchise_id' => $fid,
-                'label'        => $gmName,
-                'sublabel'     => '',
-                'color1'       => $color1,
-                'color2'       => $color2,
-                'logo'         => $logo,
+                'key'               => $gmName,
+                'franchise_id'      => $fid,
+                'label'             => $gmName,
+                'sublabel'          => '',
+                'color1'            => $color1,
+                'color2'            => $color2,
+                'logo'              => $logo,
+                'link_franchise_id' => $tenure['end_season_year'] === null ? $fid : 0,
             ];
         }
 
         return $axis;
+    }
+
+    /**
+     * Return true when the current season already has at least one game in any phase.
+     */
+    public function currentSeasonHasGames(): bool
+    {
+        $maxTid = League::MAX_REAL_TEAMID;
+        $year   = $this->resolveCurrentSeasonYear();
+
+        $sql = sprintf(
+            'SELECT EXISTS(
+                SELECT 1 FROM `ibl_box_scores_teams`
+                WHERE game_type IN (1, 2, 3)
+                  AND visitor_teamid BETWEEN 1 AND %d
+                  AND home_teamid   BETWEEN 1 AND %d
+                  AND season_year = %d
+            ) AS has_games',
+            $maxTid,
+            $maxTid,
+            $year,
+        );
+
+        $rows = $this->fetchRows($sql);
+        return self::intFromMixed($rows[0]['has_games'] ?? 0) > 0;
     }
 
     /**

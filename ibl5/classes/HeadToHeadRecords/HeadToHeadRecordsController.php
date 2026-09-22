@@ -69,7 +69,9 @@ class HeadToHeadRecordsController
             : (self::SEASON_PHASE_TO_FILTER[$this->season->phase] ?? 'all');
 
         $v = $post['scope'] ?? null;
-        $scope = (is_string($v) && in_array($v, self::VALID_SCOPES, true)) ? $v : 'current';
+        $scope = (is_string($v) && in_array($v, self::VALID_SCOPES, true))
+            ? $v
+            : ($this->repo->currentSeasonHasGames() ? 'current' : 'all');
 
         return ['dimension' => $dimension, 'phase' => $phase, 'scope' => $scope];
     }

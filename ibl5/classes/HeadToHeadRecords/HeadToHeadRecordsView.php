@@ -53,7 +53,7 @@ final class HeadToHeadRecordsView
         $out .= $this->renderSelect('dimension', 'Dimension', $dimOpts, $dimension);
         $out .= $this->renderSelect('phase', 'Phase', $phaseOpts, $phase);
         $out .= $this->renderSelect('scope', 'Scope', $scopeOpts, $scope);
-        $out .= '<button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--sm">Filter</button>';
+        $out .= '<noscript><button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--sm">Filter</button></noscript>';
         $out .= '</form>';
 
         return $out;
@@ -97,12 +97,25 @@ final class HeadToHeadRecordsView
         // Header text only when a logo alone is ambiguous: every GM axis (GMs
         // share franchise logos) and any team axis where two eras reuse a logo.
         $showHeaderText = $this->hasDuplicateLogos($axis);
-        $isTeamAxis     = $payload['dimension'] !== 'gms';
         $userKeySet     = array_flip($userMatchKeys);
+
+        $maxChars = 3;
+        foreach ($payload['records'] as $rowMap) {
+            foreach ($rowMap as $record) {
+                $len = strlen($record['wins'] . '-' . $record['losses']);
+                if ($len > $maxChars) {
+                    $maxChars = $len;
+                }
+            }
+        }
 
         $out  = '<div class="sticky-scroll-wrapper page-sticky">';
         $out .= '<div class="sticky-scroll-container">';
-        $out .= '<table class="ibl-data-table sticky-table h2h-matrix">';
+        // CSS turns these two numbers into one shared column width and an explicit
+        // table width. Without the explicit width, table-layout: fixed shrink-to-fits
+        // and redistributes the columns unevenly.
+        $out .= '<table class="ibl-data-table sticky-table h2h-matrix"'
+            . ' style="--h2h-col-chars: ' . $maxChars . '; --h2h-col-count: ' . count($axis) . ';">';
         $out .= '<thead><tr>';
         $out .= $this->renderCornerCell();
         foreach ($axis as $entry) {
@@ -115,7 +128,7 @@ final class HeadToHeadRecordsView
             $rowKey    = $rowEntry['key'];
             $isUserRow = isset($userKeySet[$rowKey]);
             $out .= $isUserRow ? '<tr class="h2h-user-row">' : '<tr>';
-            $out .= $this->renderRowLabelCell($rowEntry, $isTeamAxis);
+            $out .= $this->renderRowLabelCell($rowEntry);
 
             foreach ($axis as $colEntry) {
                 $colKey    = $colEntry['key'];
@@ -237,6 +250,11 @@ final class HeadToHeadRecordsView
         $inner .= '<img src="' . $safeLogo . '" width="40" height="40" class="series-logo-img"'
             . ' alt="' . ($showText ? '' : $title) . '" loading="lazy">';
 
+        if ($entry['link_franchise_id'] > 0) {
+            $url   = TeamCellHelper::teamPageUrl($entry['link_franchise_id']);
+            $inner = '<a href="' . $url . '" aria-label="' . $title . '">' . $inner . '</a>';
+        }
+
         return '<th class="' . $classes . '" title="' . $title . '">' . $inner . '</th>';
     }
 
@@ -249,7 +267,7 @@ final class HeadToHeadRecordsView
      *
      * @param AxisEntry $entry
      */
-    private function renderRowLabelCell(array $entry, bool $linkToTeamPage): string
+    private function renderRowLabelCell(array $entry): string
     {
         $safeLabel = HtmlSanitizer::e($entry['label']);
         $safeSub   = HtmlSanitizer::e($entry['sublabel']);
@@ -273,8 +291,8 @@ final class HeadToHeadRecordsView
         }
         $inner .= '</span>';
 
-        if ($linkToTeamPage && $entry['franchise_id'] > 0) {
-            $inner = '<a href="' . TeamCellHelper::teamPageUrl($entry['franchise_id']) . '"'
+        if ($entry['link_franchise_id'] > 0) {
+            $inner = '<a href="' . TeamCellHelper::teamPageUrl($entry['link_franchise_id']) . '"'
                 . ' class="ibl-team-cell__name" aria-label="' . $title . '">' . $inner . '</a>';
         } else {
             $inner = '<span class="ibl-team-cell__name">' . $inner . '</span>';

@@ -11,6 +11,28 @@
    Only the matrix-specific bits live here.
    ========================================================================== */
 
+/* Every column the same width: the width of the widest record ("125-118"), or the
+   40px logo, whichever is larger. The View emits --h2h-col-chars (longest record
+   string) and --h2h-col-count (number of columns). 0.45rem per character undershoots
+   — a digit in the 0.85rem cell font measures 7.97px, so the coefficient must be at
+   least 0.5rem (8px) for an all-digit record to fit; the 0.6rem padding is then pure
+   slack. Records up to 6 characters never reach the logo floor, so the character term
+   only takes over at 7+. The explicit table width is required — table-layout: fixed
+   with width: auto shrink-to-fits and hands the columns back uneven widths. No ch
+   units: ch resolves against whichever element reads the var, so the table and its
+   cells would disagree. */
+.h2h-matrix {
+    --h2h-col-width: max(calc(40px + 0.6rem), calc(var(--h2h-col-chars) * 0.5rem + 0.6rem));
+    --h2h-corner-width: 11rem;
+
+    table-layout: fixed;
+    width: calc(var(--h2h-corner-width) + (var(--h2h-col-count) * var(--h2h-col-width)));
+}
+
+.h2h-matrix thead th:not(.h2h-corner) {
+    width: var(--h2h-col-width);
+}
+
 /* Tight cells so a 28+ column grid fits like the legacy page */
 .h2h-matrix th,
 .h2h-matrix td {
@@ -32,6 +54,7 @@
 .h2h-matrix .h2h-corner {
     vertical-align: bottom;
     line-height: 1.1;
+    width: var(--h2h-corner-width);
 }
 
 .h2h-corner__cols,
@@ -66,11 +89,12 @@
     height: 40px;
 }
 
-/* Labeled variant (GMs): name reads top-to-bottom above the logo,
+/* Labeled variant (GMs): name reads bottom-to-top above the logo,
    capped so every column stays the same width and height */
 .h2h-col-header__text {
     display: block;
     writing-mode: vertical-rl;
+    transform: rotate(180deg);
     margin: 0 auto 0.35rem;
     max-height: 9rem;
     overflow: hidden;

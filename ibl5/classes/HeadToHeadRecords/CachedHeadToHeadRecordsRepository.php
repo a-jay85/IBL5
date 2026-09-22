@@ -91,6 +91,14 @@ class CachedHeadToHeadRecordsRepository implements HeadToHeadRecordsRepositoryIn
     }
 
     /**
+     * Pass-through: no caching — this check is cheap and must reflect live DB state.
+     */
+    public function currentSeasonHasGames(): bool
+    {
+        return $this->inner->currentSeasonHasGames();
+    }
+
+    /**
      * Rebuild all 24 cache entries (2 scopes × 3 dimensions × 4 phases).
      *
      * Calls the inner repository for every dimension/phase/scope combination

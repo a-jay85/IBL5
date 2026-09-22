@@ -24,24 +24,25 @@ class HeadToHeadRecordsControllerTest extends TestCase
 
     /**
      * @param array<string, mixed> $overrides
-     * @return array{key: string, franchise_id: int, label: string, sublabel: string, color1: string, color2: string, logo: string}
+     * @return array{key: string, franchise_id: int, label: string, sublabel: string, color1: string, color2: string, logo: string, link_franchise_id: int}
      */
     private function makeEntry(array $overrides = []): array
     {
         return [
-            'key'          => (string) ($overrides['key']          ?? 'celtics'),
-            'franchise_id' => (int)    ($overrides['franchise_id'] ?? 1),
-            'label'        => (string) ($overrides['label']        ?? 'Celtics'),
-            'sublabel'     => (string) ($overrides['sublabel']     ?? ''),
-            'color1'       => (string) ($overrides['color1']       ?? ''),
-            'color2'       => (string) ($overrides['color2']       ?? ''),
-            'logo'         => (string) ($overrides['logo']         ?? ''),
+            'key'               => (string) ($overrides['key']               ?? 'celtics'),
+            'franchise_id'      => (int)    ($overrides['franchise_id']      ?? 1),
+            'label'             => (string) ($overrides['label']             ?? 'Celtics'),
+            'sublabel'          => (string) ($overrides['sublabel']          ?? ''),
+            'color1'            => (string) ($overrides['color1']            ?? ''),
+            'color2'            => (string) ($overrides['color2']            ?? ''),
+            'logo'              => (string) ($overrides['logo']              ?? ''),
+            'link_franchise_id' => (int)    ($overrides['link_franchise_id'] ?? 0),
         ];
     }
 
     /**
-     * @param list<array{key: string, franchise_id: int, label: string, sublabel: string, color1: string, color2: string, logo: string}> $axis
-     * @return array{dimension: string, phase: string, scope: string, axis: list<array{key: string, franchise_id: int, label: string, sublabel: string, color1: string, color2: string, logo: string}>, records: array<string, array<string, array{wins: int, losses: int}>>}
+     * @param list<array{key: string, franchise_id: int, label: string, sublabel: string, color1: string, color2: string, logo: string, link_franchise_id: int}> $axis
+     * @return array{dimension: string, phase: string, scope: string, axis: list<array{key: string, franchise_id: int, label: string, sublabel: string, color1: string, color2: string, logo: string, link_franchise_id: int}>, records: array<string, array<string, array{wins: int, losses: int}>>}
      */
     private function makePayload(array $axis = []): array
     {
@@ -110,6 +111,7 @@ class HeadToHeadRecordsControllerTest extends TestCase
         $season = $this->makeSeasonWithPhase('Regular Season');
         /** @var HeadToHeadRecordsRepositoryInterface&MockObject $repo */
         $repo = $this->createMock(HeadToHeadRecordsRepositoryInterface::class);
+        $repo->method('currentSeasonHasGames')->willReturn(true);
         $ctrl = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, new \stdClass(), self::createStub(\mysqli::class));
 
         $result = $ctrl->resolveFilters([
@@ -158,6 +160,7 @@ class HeadToHeadRecordsControllerTest extends TestCase
         $season = $this->makeSeasonWithPhase('HEAT');
         /** @var HeadToHeadRecordsRepositoryInterface&MockObject $repo */
         $repo = $this->createMock(HeadToHeadRecordsRepositoryInterface::class);
+        $repo->method('currentSeasonHasGames')->willReturn(true);
         $ctrl = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, new \stdClass(), self::createStub(\mysqli::class));
 
         // PHP type coercion edge-cases: pass an array instead of string
@@ -167,6 +170,50 @@ class HeadToHeadRecordsControllerTest extends TestCase
         ]);
 
         self::assertSame('franchises', $result['dimension']);
+        self::assertSame('current', $result['scope']);
+    }
+
+    // ---------------------------------------------------------------------------
+    // resolveFilters — scope default driven by currentSeasonHasGames()
+    // ---------------------------------------------------------------------------
+
+    public function testNoPostAndNoGamesScopeDefaultsToAll(): void
+    {
+        $season = $this->makeSeasonWithPhase('Regular Season');
+        /** @var HeadToHeadRecordsRepositoryInterface&MockObject $repo */
+        $repo = $this->createMock(HeadToHeadRecordsRepositoryInterface::class);
+        $repo->method('currentSeasonHasGames')->willReturn(false);
+        $ctrl = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, new \stdClass(), self::createStub(\mysqli::class));
+
+        $result = $ctrl->resolveFilters([]);
+
+        self::assertSame('all', $result['scope']);
+    }
+
+    public function testNoPostWithGamesScopeDefaultsToCurrent(): void
+    {
+        $season = $this->makeSeasonWithPhase('Regular Season');
+        /** @var HeadToHeadRecordsRepositoryInterface&MockObject $repo */
+        $repo = $this->createMock(HeadToHeadRecordsRepositoryInterface::class);
+        $repo->method('currentSeasonHasGames')->willReturn(true);
+        $ctrl = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, new \stdClass(), self::createStub(\mysqli::class));
+
+        $result = $ctrl->resolveFilters([]);
+
+        self::assertSame('current', $result['scope']);
+    }
+
+    public function testPostedCurrentScopeWinsEvenWhenNoGames(): void
+    {
+        $season = $this->makeSeasonWithPhase('Regular Season');
+        /** @var HeadToHeadRecordsRepositoryInterface&MockObject $repo */
+        $repo = $this->createMock(HeadToHeadRecordsRepositoryInterface::class);
+        // currentSeasonHasGames should NOT be called when scope is explicitly POSTed.
+        $repo->expects($this->never())->method('currentSeasonHasGames');
+        $ctrl = new HeadToHeadRecordsController($repo, new HeadToHeadRecordsView(), $season, new \stdClass(), self::createStub(\mysqli::class));
+
+        $result = $ctrl->resolveFilters(['scope' => 'current']);
+
         self::assertSame('current', $result['scope']);
     }
 

@@ -25,25 +25,26 @@ class HeadToHeadRecordsViewTest extends TestCase
 
     /**
      * @param array<string, mixed> $overrides
-     * @return array{key: string, franchise_id: int, label: string, sublabel: string, color1: string, color2: string, logo: string}
+     * @return array{key: string, franchise_id: int, label: string, sublabel: string, color1: string, color2: string, logo: string, link_franchise_id: int}
      */
     private function makeEntry(array $overrides = []): array
     {
         return [
-            'key'          => (string) ($overrides['key']          ?? 'celtics'),
-            'franchise_id' => (int)    ($overrides['franchise_id'] ?? 1),
-            'label'        => (string) ($overrides['label']        ?? 'Celtics'),
-            'sublabel'     => (string) ($overrides['sublabel']     ?? '2020-present'),
-            'color1'       => (string) ($overrides['color1']       ?? '00653A'),
-            'color2'       => (string) ($overrides['color2']       ?? 'FFFFFF'),
-            'logo'         => (string) ($overrides['logo']         ?? 'celtics.png'),
+            'key'               => (string) ($overrides['key']               ?? 'celtics'),
+            'franchise_id'      => (int)    ($overrides['franchise_id']      ?? 1),
+            'label'             => (string) ($overrides['label']             ?? 'Celtics'),
+            'sublabel'          => (string) ($overrides['sublabel']          ?? '2020-present'),
+            'color1'            => (string) ($overrides['color1']            ?? '00653A'),
+            'color2'            => (string) ($overrides['color2']            ?? 'FFFFFF'),
+            'logo'              => (string) ($overrides['logo']              ?? 'celtics.png'),
+            'link_franchise_id' => (int)    ($overrides['link_franchise_id'] ?? 0),
         ];
     }
 
     /**
-     * @param list<array{key: string, franchise_id: int, label: string, sublabel: string, color1: string, color2: string, logo: string}> $axis
+     * @param list<array{key: string, franchise_id: int, label: string, sublabel: string, color1: string, color2: string, logo: string, link_franchise_id: int}> $axis
      * @param array<string, array<string, array{wins: int, losses: int}>> $records
-     * @return array{dimension: string, phase: string, scope: string, axis: list<array{key: string, franchise_id: int, label: string, sublabel: string, color1: string, color2: string, logo: string}>, records: array<string, array<string, array{wins: int, losses: int}>>}
+     * @return array{dimension: string, phase: string, scope: string, axis: list<array{key: string, franchise_id: int, label: string, sublabel: string, color1: string, color2: string, logo: string, link_franchise_id: int}>, records: array<string, array<string, array{wins: int, losses: int}>>}
      */
     private function makePayload(array $axis = [], array $records = [], string $dimension = 'franchises'): array
     {
@@ -60,7 +61,7 @@ class HeadToHeadRecordsViewTest extends TestCase
      * A two-entry payload where the first entry has one game so it stays visible.
      *
      * @param array<string, mixed> $firstOverrides
-     * @return array{dimension: string, phase: string, scope: string, axis: list<array{key: string, franchise_id: int, label: string, sublabel: string, color1: string, color2: string, logo: string}>, records: array<string, array<string, array{wins: int, losses: int}>>}
+     * @return array{dimension: string, phase: string, scope: string, axis: list<array{key: string, franchise_id: int, label: string, sublabel: string, color1: string, color2: string, logo: string, link_franchise_id: int}>, records: array<string, array<string, array{wins: int, losses: int}>>}
      */
     private function makePlayedPayload(array $firstOverrides = [], string $dimension = 'franchises'): array
     {
@@ -104,13 +105,18 @@ class HeadToHeadRecordsViewTest extends TestCase
         self::assertStringContainsString('class="sticky-col h2h-row-label"', $firstRow);
     }
 
-    public function testTeamAxisRowLabelLinksToTeamPageButGmAxisDoesNot(): void
+    public function testRowLabelLinksWhenLinkFranchiseIdIsSet(): void
     {
-        $teams = $this->view->renderMatrix($this->makePlayedPayload([], 'teams'), []);
-        $gms   = $this->view->renderMatrix($this->makePlayedPayload([], 'gms'), []);
+        // link_franchise_id = 1 → row label cell should link to franchise 1's team page.
+        $html = $this->view->renderMatrix($this->makePlayedPayload(['link_franchise_id' => 1], 'franchises'), []);
+        self::assertStringContainsString('href="modules.php?name=Team&amp;op=team&amp;teamid=1"', $html);
+    }
 
-        self::assertStringContainsString('href="modules.php?name=Team&amp;op=team&amp;teamid=1"', $teams);
-        self::assertStringNotContainsString('href="modules.php?name=Team', $gms);
+    public function testRowLabelDoesNotLinkWhenLinkFranchiseIdIsZero(): void
+    {
+        // Default link_franchise_id = 0 → no link.
+        $html = $this->view->renderMatrix($this->makePlayedPayload([], 'gms'), []);
+        self::assertStringNotContainsString('href="modules.php?name=Team', $html);
     }
 
     // ---------------------------------------------------------------------------
@@ -122,10 +128,50 @@ class HeadToHeadRecordsViewTest extends TestCase
         $html = $this->view->renderMatrix($this->makePlayedPayload(), []);
 
         self::assertStringContainsString('<div class="sticky-scroll-wrapper page-sticky"><div class="sticky-scroll-container">', $html);
-        self::assertStringContainsString('<table class="ibl-data-table sticky-table h2h-matrix">', $html);
+        self::assertStringContainsString('class="ibl-data-table sticky-table h2h-matrix"', $html);
+        self::assertStringContainsString('style="--h2h-col-chars: 3; --h2h-col-count: 2;"', $html);
         self::assertStringContainsString('<th class="sticky-col sticky-corner h2h-corner">', $html);
         self::assertStringContainsString('&rarr;&rarr;', $html);
         self::assertStringContainsString('&uarr;', $html);
+    }
+
+    public function testColumnWidthCharsTracksTheLongestRecordString(): void
+    {
+        $a = $this->makeEntry();
+        $b = $this->makeEntry(['key' => 'lakers', 'franchise_id' => 2, 'label' => 'Lakers', 'logo' => 'lakers.png']);
+
+        // "125-118" is 7 characters, so every column must be sized for 7.
+        $html = $this->view->renderMatrix($this->makePayload(
+            [$a, $b],
+            [
+                'celtics' => ['lakers' => ['wins' => 125, 'losses' => 118]],
+                'lakers'  => ['celtics' => ['wins' => 118, 'losses' => 125]],
+            ],
+        ), []);
+
+        self::assertStringContainsString('--h2h-col-chars: 7;', $html);
+    }
+
+    public function testColumnWidthCharsNeverDropsBelowThree(): void
+    {
+        // Longest record here is "1-0" (3 chars); the floor keeps it at 3, not 1.
+        $html = $this->view->renderMatrix($this->makePlayedPayload(), []);
+
+        self::assertStringContainsString('--h2h-col-chars: 3;', $html);
+    }
+
+    public function testColumnWidthCountMatchesTheRenderedAxisSize(): void
+    {
+        $axis = [];
+        $records = [];
+        foreach (['a', 'b', 'c', 'd'] as $i => $key) {
+            $axis[] = $this->makeEntry(['key' => $key, 'franchise_id' => $i + 1, 'logo' => "{$key}.png"]);
+            $records[$key] = ['a' => ['wins' => 1, 'losses' => 1]];
+        }
+
+        $html = $this->view->renderMatrix($this->makePayload($axis, $records), []);
+
+        self::assertStringContainsString('--h2h-col-count: 4;', $html);
     }
 
     // ---------------------------------------------------------------------------
@@ -139,6 +185,47 @@ class HeadToHeadRecordsViewTest extends TestCase
         self::assertStringNotContainsString('h2h-col-header__text', $html);
         self::assertStringContainsString('class="series-logo-img" alt="Celtics (2020-present)"', $html);
         self::assertStringContainsString('<th class="h2h-col-header" title="Celtics (2020-present)">', $html);
+    }
+
+    public function testColumnHeaderLinksWhenLinkFranchiseIdIsSet(): void
+    {
+        // A franchise/team entry with link_franchise_id = 3 wraps the header in <a href="...">
+        $a = $this->makeEntry(['key' => 'a', 'franchise_id' => 3, 'label' => 'Alpha', 'logo' => 'a.png', 'link_franchise_id' => 3]);
+        $b = $this->makeEntry(['key' => 'b', 'franchise_id' => 4, 'label' => 'Bravo', 'logo' => 'b.png', 'link_franchise_id' => 4]);
+        $payload = $this->makePayload([$a, $b], ['a' => ['b' => ['wins' => 1, 'losses' => 0]]], 'franchises');
+
+        $html = $this->view->renderMatrix($payload, []);
+
+        self::assertStringContainsString('<a href="modules.php?name=Team&amp;op=team&amp;teamid=3" aria-label="Alpha (2020-present)">', $html);
+        self::assertStringContainsString('<a href="modules.php?name=Team&amp;op=team&amp;teamid=4" aria-label="Bravo (2020-present)">', $html);
+    }
+
+    public function testColumnHeaderDoesNotLinkWhenLinkFranchiseIdIsZero(): void
+    {
+        // GM axis entries with link_franchise_id = 0 must not produce a link in the header.
+        $html = $this->view->renderMatrix($this->makePlayedPayload([], 'gms'), []);
+
+        self::assertStringNotContainsString('<a href="modules.php?name=Team', $html);
+    }
+
+    public function testColumnHeaderLinksForActiveTenureGmEntryOnly(): void
+    {
+        // Active-tenure GM: link_franchise_id = 5.
+        $activGm = $this->makeEntry(['key' => 'ActiveGM', 'franchise_id' => 5, 'label' => 'ActiveGM', 'logo' => 'new5.png', 'link_franchise_id' => 5]);
+        // Retired GM: link_franchise_id = 0.
+        $retiredGm = $this->makeEntry(['key' => 'RetiredGM', 'franchise_id' => 6, 'label' => 'RetiredGM', 'logo' => 'new6.png', 'link_franchise_id' => 0]);
+        $payload = $this->makePayload(
+            [$activGm, $retiredGm],
+            ['ActiveGM' => ['RetiredGM' => ['wins' => 2, 'losses' => 1]], 'RetiredGM' => ['ActiveGM' => ['wins' => 1, 'losses' => 2]]],
+            'gms',
+        );
+
+        $html = $this->view->renderMatrix($payload, []);
+
+        // Column header for ActiveGM links to franchise 5 (sublabel '2020-present' is the default).
+        self::assertStringContainsString('<a href="modules.php?name=Team&amp;op=team&amp;teamid=5" aria-label="ActiveGM (2020-present)">', $html);
+        // Column header for RetiredGM does not link.
+        self::assertStringNotContainsString('teamid=6', $html);
     }
 
     public function testColumnHeadersGainRotatedTextWhenTwoEntriesShareALogo(): void
@@ -344,7 +431,7 @@ class HeadToHeadRecordsViewTest extends TestCase
         self::assertStringContainsString('<form method="post" action="modules.php?name=HeadToHeadRecords" class="h2h-filter">', $html);
         self::assertStringContainsString('<select name="dimension" class="ibl-select">', $html);
         self::assertStringContainsString('<span class="ibl-label ibl-label--sm">Dimension</span>', $html);
-        self::assertStringContainsString('<button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--sm">Filter</button>', $html);
+        self::assertStringContainsString('<noscript><button type="submit" class="ibl-btn ibl-btn--primary ibl-btn--sm">Filter</button></noscript>', $html);
     }
 
     // ---------------------------------------------------------------------------

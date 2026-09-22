@@ -283,6 +283,52 @@ class HeadToHeadRecordsRepositoryTest extends DatabaseTestCase
     }
 
     // -------------------------------------------------------------------------
+    // currentSeasonHasGames(): drives the Controller's scope default
+    // -------------------------------------------------------------------------
+
+    public function testCurrentSeasonHasGamesIsTrueWhenTheSeasonHasBoxScores(): void
+    {
+        // $this->repo is pinned to 1901, the year the fixture game was played.
+        self::assertTrue($this->repo->currentSeasonHasGames());
+    }
+
+    public function testCurrentSeasonHasGamesIsFalseForASeasonWithNoBoxScores(): void
+    {
+        // 1902 has no fixture rows and no real data.
+        $repo = new HeadToHeadRecordsRepository($this->db, 1902);
+
+        self::assertFalse($repo->currentSeasonHasGames());
+    }
+
+    // -------------------------------------------------------------------------
+    // GM link_franchise_id: active tenure links, retired does not
+    // -------------------------------------------------------------------------
+
+    public function testLinkFranchiseIdIsSetForActiveTenureGmAndZeroForRetired(): void
+    {
+        // scope='all' pulls GM names from ibl_gm_tenures so all three appear.
+        // H2HAlpha: best tenure has end_season_year=1901 (retired) → link_franchise_id = 0.
+        // H2HBeta:  best tenure has end_season_year=NULL (active) → link_franchise_id = 17.
+        // H2HGamma: best tenure has end_season_year=NULL (active) → link_franchise_id = 22.
+        $payload = $this->repo->buildGmsMatrix('regular', 'all');
+
+        $byName = [];
+        foreach ($payload['axis'] as $entry) {
+            if (in_array($entry['key'], ['H2HAlpha', 'H2HBeta', 'H2HGamma'], true)) {
+                $byName[$entry['key']] = $entry;
+            }
+        }
+
+        self::assertArrayHasKey('H2HAlpha', $byName, 'H2HAlpha must appear in axis');
+        self::assertArrayHasKey('H2HBeta',  $byName, 'H2HBeta must appear in axis');
+        self::assertArrayHasKey('H2HGamma', $byName, 'H2HGamma must appear in axis');
+
+        self::assertSame(0,  $byName['H2HAlpha']['link_franchise_id'], 'H2HAlpha is retired; link_franchise_id must be 0');
+        self::assertSame(17, $byName['H2HBeta']['link_franchise_id'],  'H2HBeta is active; link_franchise_id must equal franchise_id');
+        self::assertSame(22, $byName['H2HGamma']['link_franchise_id'], 'H2HGamma is active; link_franchise_id must equal franchise_id');
+    }
+
+    // -------------------------------------------------------------------------
     // Teams dimension
     // -------------------------------------------------------------------------
 

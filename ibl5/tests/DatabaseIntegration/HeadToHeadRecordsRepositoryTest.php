@@ -170,12 +170,12 @@ class HeadToHeadRecordsRepositoryTest extends DatabaseTestCase
 
         self::assertCount(6, $rows);
         self::assertSame([
-            ['franchise_id' => '4',  'team_city' => 'Brooklyn',      'team_name' => 'Nets',        'color1' => '000000', 'color2' => 'FFFFFF'],
-            ['franchise_id' => '10', 'team_city' => 'Charlotte',     'team_name' => 'Hornets',     'color1' => '00788C', 'color2' => '1D1160'],
-            ['franchise_id' => '16', 'team_city' => 'Oklahoma City', 'team_name' => 'Thunder',     'color1' => '007AC1', 'color2' => 'EF6F31'],
-            ['franchise_id' => '16', 'team_city' => 'Las Vegas',     'team_name' => 'Thunder',     'color1' => '1C1C1C', 'color2' => 'F5C518'],
-            ['franchise_id' => '17', 'team_city' => 'San Antonio',   'team_name' => 'Spurs',       'color1' => 'C4CED4', 'color2' => '000000'],
-            ['franchise_id' => '22', 'team_city' => 'Seattle',       'team_name' => 'Supersonics', 'color1' => '00653A', 'color2' => 'FFC200'],
+            ['franchise_id' => 4,  'team_city' => 'Brooklyn',      'team_name' => 'Nets',        'color1' => '000000', 'color2' => 'FFFFFF'],
+            ['franchise_id' => 10, 'team_city' => 'Charlotte',     'team_name' => 'Hornets',     'color1' => '00788C', 'color2' => '1D1160'],
+            ['franchise_id' => 16, 'team_city' => 'Oklahoma City', 'team_name' => 'Thunder',     'color1' => '007AC1', 'color2' => 'EF6F31'],
+            ['franchise_id' => 16, 'team_city' => 'Las Vegas',     'team_name' => 'Thunder',     'color1' => '1C1C1C', 'color2' => 'F5C518'],
+            ['franchise_id' => 17, 'team_city' => 'San Antonio',   'team_name' => 'Spurs',       'color1' => 'C4CED4', 'color2' => '000000'],
+            ['franchise_id' => 22, 'team_city' => 'Seattle',       'team_name' => 'Supersonics', 'color1' => '00653A', 'color2' => 'FFC200'],
         ], $rows);
     }
 

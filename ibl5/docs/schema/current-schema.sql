@@ -1173,6 +1173,21 @@ CREATE TABLE `ibl_fa_offers` (
   CONSTRAINT `fk_faoffer_tid` FOREIGN KEY (`teamid`) REFERENCES `ibl_team_info` (`teamid`) ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `ibl_franchise_era_branding`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `ibl_franchise_era_branding` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `franchise_id` int(11) NOT NULL,
+  `team_city` varchar(50) NOT NULL,
+  `team_name` varchar(50) NOT NULL,
+  `color1` varchar(6) NOT NULL DEFAULT '',
+  `color2` varchar(6) NOT NULL DEFAULT '',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_era` (`franchise_id`,`team_city`,`team_name`),
+  CONSTRAINT `fk_era_franchise` FOREIGN KEY (`franchise_id`) REFERENCES `ibl_team_info` (`teamid`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `ibl_franchise_seasons`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;

@@ -6,7 +6,7 @@ last_verified: 2026-09-18
 disallowedTools: Agent, Edit, NotebookEdit, EnterWorktree, ExitWorktree, Skill, EnterPlanMode, ExitPlanMode
 ---
 
-# /pr-ready runtime Phase 6 — plan-intent fidelity reviewer (Opus 5.5)
+# /pr-ready runtime Phase 6: plan-intent fidelity reviewer (Opus 5.5)
 
 You are the Opus-tier judgment step of a `/pr-ready` run whose orchestrator is Sonnet 4.6.
 The orchestrator handles the mechanical phases; you produce the single semantic deliverable:

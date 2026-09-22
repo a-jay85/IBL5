@@ -108,6 +108,17 @@ def test_condition_11_outcomes(uf, blocked, fragment):
     assert d.armed is not blocked
 
 
+def test_condition_11_holds_on_any_nonempty_list_regardless_of_format():
+    """Characterization: the grader never parses item format. An unscored
+    `unresolved-finding:-` or an unknown token still holds. Phase 5 changes the
+    reason text only; this pin does not read the reason."""
+    for uf in (["unresolved-finding:-"], ["thread:95"], ["anything"]):
+        d = evaluate(inputs(unresolved_findings=uf))
+        c11 = [c for c in d.conditions if c.number == 11][0]
+        assert c11.blocked is True
+        assert d.armed is False
+
+
 def test_conditions_11_and_12_are_additive():
     feat = inputs(pr_title="feat: shiny new GM power")
     assert _held(evaluate(feat)) == {8}

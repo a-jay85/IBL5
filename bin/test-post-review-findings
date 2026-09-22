@@ -722,6 +722,40 @@ else
     ok "case26: zsh not installed — skipped"
 fi
 
+# ── pin-A: prf_review_threads emits one object per thread with the 8 base keys ─
+# Characterization: Phase 2 ADDS authorLogin/authorType; every key here must
+# survive that edit unchanged (superset assertion, so the pin stays green-green).
+GH_THREADS_FIXTURE="$BASE_TMP/threads.json"
+PIN_A="$BASE_TMP/pin-a.jsonl"
+prf_review_threads 42 > "$PIN_A"
+if [ "$(wc -l < "$PIN_A")" -eq 4 ]; then
+    ok "pin-A: 4 thread objects from the 4-node fixture"
+else
+    fail "pin-A: expected 4 objects, got $(wc -l < "$PIN_A")"
+fi
+if jq -e 'has("id") and has("isResolved") and has("isOutdated") and has("path")
+          and has("line") and has("commentId") and has("score") and has("body")' \
+      "$PIN_A" >/dev/null 2>&1; then
+    ok "pin-A: every object carries the 8 base keys"
+else
+    fail "pin-A: a thread object lost a base key"
+fi
+if jq -s -e '.[0].score == 85 and .[2].score == null and .[3].commentId == null
+             and .[2].isOutdated == true' "$PIN_A" >/dev/null 2>&1; then
+    ok "pin-A: score parse, null score, ghost commentId, isOutdated preserved"
+else
+    fail "pin-A: per-thread derived fields drifted"
+fi
+
+# ── pin-B: list_open_review_findings TSV is exactly 4 tab-separated columns ───
+PIN_B="$BASE_TMP/pin-b.tsv"
+list_open_review_findings 42 > "$PIN_B"
+if [ -z "$(awk -F'\t' 'NF != 4' "$PIN_B")" ] && [ -s "$PIN_B" ]; then
+    ok "pin-B: every row has 4 columns"
+else
+    fail "pin-B: column drift in list_open_review_findings"
+fi
+
 # ── summary ───────────────────────────────────────────────────────────────────
 if [ "$FAILED" -eq 0 ]; then
     echo "All post-review-findings checks passed."

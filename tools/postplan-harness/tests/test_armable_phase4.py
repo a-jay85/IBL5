@@ -97,8 +97,13 @@ def test_reviewed_tree_with_trailing_prose_is_stale(tmp_path):
     (["unresolved-findings-cap"], True,
      "review-thread list hit the 100-thread page cap — fail-closed"),
     (["unresolved-finding:95", "unresolved-finding:80"], True,
-     "2 unresolved review finding(s) scored >= 80: "
+     "2 unresolved review thread(s) (2 scored, 0 unscored): "
      "unresolved-finding:95 unresolved-finding:80"),
+    (["unresolved-finding:-"], True,
+     "1 unresolved review thread(s) (0 scored, 1 unscored): unresolved-finding:-"),
+    (["unresolved-finding:50", "unresolved-finding:-"], True,
+     "2 unresolved review thread(s) (1 scored, 1 unscored): "
+     "unresolved-finding:50 unresolved-finding:-"),
 ])
 def test_condition_11_outcomes(uf, blocked, fragment):
     d = evaluate(inputs(unresolved_findings=uf))
@@ -117,6 +122,21 @@ def test_condition_11_holds_on_any_nonempty_list_regardless_of_format():
         c11 = [c for c in d.conditions if c.number == 11][0]
         assert c11.blocked is True
         assert d.armed is False
+
+
+def test_condition_11_name_reflects_the_widened_rule():
+    d = evaluate(inputs(unresolved_findings=["unresolved-finding:-"]))
+    c11 = [c for c in d.conditions if c.number == 11][0]
+    assert c11.name == "unresolved-review-threads"
+    assert ">= 80" not in c11.reason
+
+
+def test_condition_11_unscored_hold_is_additive_with_8():
+    both = inputs(pr_title="feat: shiny new GM power",
+                  unresolved_findings=["unresolved-finding:-"])
+    assert _held(evaluate(both)) >= {8, 11}
+    # clearing the thread list cannot release (8)
+    assert not evaluate(inputs(pr_title="feat: x", unresolved_findings=[])).armed
 
 
 def test_conditions_11_and_12_are_additive():

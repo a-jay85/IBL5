@@ -107,8 +107,8 @@ jobs:
               - '.github/workflows/human-signoff.yml'
               # review-shared runtime blocks trigger shellcheck + fleet harness tests.
               - '.claude/review-shared/**'
-              # Agent defs are asserted by bin/test-pr-ready-now's static case (the /pr-ready
-              # Phase 6 reviewer def), so an agent-def-only PR must run harness-tests too.
+              # Agent defs are asserted by bin/test-post-plan-fleet, bin/test-plan-tier-hint and
+              # bin/test-architect-contract-split, so an agent-def-only PR must run harness-tests too.
               - '.claude/agents/**'
               # bin/test-plan-tier-hint statically asserts the five copies of the
               # /plan Step 3 check-1 trigger still agree, so an edit to any of them

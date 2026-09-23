@@ -1,6 +1,6 @@
 ---
 description: Provides a PDO singleton connection for the delight-im/auth library.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # Database

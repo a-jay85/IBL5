@@ -1,6 +1,6 @@
 ---
 description: Player movement history display — trades, free agency signings, and waiver transactions across seasons.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # PlayerMovement

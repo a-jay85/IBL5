@@ -1,6 +1,6 @@
 ---
 description: Main site navigation bar (desktop and mobile) rendered via Repository/Service/View pattern with sub-views for teams, login, and menus.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # Navigation Module
@@ -57,4 +57,4 @@ echo $nav->render();
 
 ## Test Coverage
 
-50 tests across 8 test files covering menu conditionals, view rendering, repository queries, and orchestration.
+77 tests across 9 test files covering menu conditionals, view rendering, repository queries, and orchestration.

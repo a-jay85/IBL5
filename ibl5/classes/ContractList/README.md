@@ -1,6 +1,6 @@
 ---
 description: Displays current player contracts for a team.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # ContractList

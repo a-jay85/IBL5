@@ -1,6 +1,6 @@
 ---
 description: Utility classes for formatting Lighthouse performance audit results into CI/PR reports.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # Cli

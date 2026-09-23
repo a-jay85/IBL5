@@ -1,6 +1,6 @@
 ---
 description: Static header and footer rendering for legacy PHP-Nuke module pages.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # PageLayout

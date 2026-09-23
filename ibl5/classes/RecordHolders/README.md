@@ -1,6 +1,6 @@
 ---
 description: Tracks all-time IBL statistical records, detects record-breaking performances after each sim, and sends Discord notifications.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # RecordHolders

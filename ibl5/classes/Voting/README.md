@@ -1,6 +1,6 @@
 ---
 description: All-Star ballot submission and results display with duplicate-vote prevention.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # Voting

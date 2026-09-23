@@ -1,6 +1,6 @@
 ---
 description: Entity and repository for current season phase, dates, settings, and configuration; consumed by nearly every module.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # Season

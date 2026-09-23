@@ -1,6 +1,6 @@
 ---
 description: Miscellaneous cross-cutting utilities including HTMX detection, UUID generation, legacy PHP-Nuke compatibility, and URL building.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # Utilities

@@ -1,6 +1,6 @@
 ---
 description: Provides database-backed key-value caching and file-based full-page HTML caching.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # Cache

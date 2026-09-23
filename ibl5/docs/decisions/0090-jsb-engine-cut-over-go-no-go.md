@@ -1,6 +1,6 @@
 ---
 description: J13-3 go/no-go for JSB native-engine cut-over. Accepted — HOLD (corrected): the old all-era 12.94 floor is overturned as a denomination artifact (ADR-0088), but master DRBPushSharePct 12.37% sits inside the between-season drift band [11.97, 12.54] yet still −0.05pp under the era-matched 2-season CI floor ~12.42 (bootstrap CI [12.374, 12.698]) elected as the cut-over bar. Cut-over NOT authorized; re-open when gate-1 reaches ≥12.42% or the 2-season CI recalibrates to cover 12.37%. Records open non-blocking residuals, conceptual cut-over mechanism, and re-open criteria.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # ADR-0090: JSB native-engine cut-over — go/no-go

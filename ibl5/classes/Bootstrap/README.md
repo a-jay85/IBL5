@@ -1,11 +1,11 @@
 ---
 description: Wires up the application container and executes ordered bootstrap steps for web, API, and test environments.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # Bootstrap
 
-Provides the composition root for the application. `Application` orchestrates a sequence of `BootstrapStepInterface` implementations, each registered as a `*Bootstrap.php` step class (20+). `Container` is a lightweight service container with lazy factory support. Three factory classes select which steps to run per entry point: `WebApplicationFactory` for `ibl5/mainfile.php`, `ApiApplicationFactory` for `ibl5/api.php`, and `TestApplicationFactory` for test environments.
+Provides the composition root for the application. `Application` orchestrates a sequence of `BootstrapStepInterface` implementations, each registered as a `*Bootstrap.php` step class (19). `Container` is a lightweight service container with lazy factory support. Three factory classes select which steps to run per entry point: `WebApplicationFactory` for `ibl5/mainfile.php`, `ApiApplicationFactory` for `ibl5/api.php`, and `TestApplicationFactory` for test environments.
 
 | Class | Purpose |
 |-------|---------|
@@ -14,4 +14,4 @@ Provides the composition root for the application. `Application` orchestrates a 
 | `WebApplicationFactory` | Composition root for web requests |
 | `ApiApplicationFactory` | Composition root for API requests |
 | `TestApplicationFactory` | Composition root for test environments |
-| `*Bootstrap.php` (20+) | Individual steps that populate the container |
+| `*Bootstrap.php` (19) | Individual steps that populate the container |

@@ -1,6 +1,6 @@
 ---
 description: Displays league transaction history including trades, free agent signings, waiver claims, and releases.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # TransactionHistory

@@ -1,6 +1,6 @@
 ---
 description: Reusable UI utilities and components including alert rendering, team cells, HTMX-enhanced table controls, and player stats table helpers.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # UI

@@ -1,6 +1,6 @@
 ---
 description: Handles login, registration, password reset, and development/demo auth shortcuts.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # Auth

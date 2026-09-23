@@ -1,6 +1,6 @@
 ---
 description: Advanced multi-criteria player search with prepared-statement security, dynamic WHERE building, and PlayerData object results.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # PlayerDatabase Module
@@ -36,6 +36,11 @@ $stmt->bind_param($bindTypes, ...$bindParams);
 
 ```
 classes/PlayerDatabase/
+├── Contracts/
+│   ├── PlayerDatabaseRepositoryInterface.php
+│   ├── PlayerDatabaseServiceInterface.php
+│   ├── PlayerDatabaseValidatorInterface.php
+│   └── PlayerDatabaseViewInterface.php
 ├── PlayerDatabaseValidator.php   - Input validation & sanitization
 ├── PlayerDatabaseRepository.php  - Database queries (prepared statements)
 ├── PlayerDatabaseService.php     - Business logic & data processing

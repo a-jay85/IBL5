@@ -1,6 +1,6 @@
 ---
 description: Parse and write JSB simulation engine file formats for import/export between the DB and the engine.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # JsbParser

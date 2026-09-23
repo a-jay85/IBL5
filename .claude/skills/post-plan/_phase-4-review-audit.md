@@ -195,11 +195,11 @@ source "$(git rev-parse --show-toplevel)/bin/lib/post-review-findings.sh"
 ```bash
 # One object per surviving issue. path = repo-relative file (matches `+++ b/<path>`);
 # line = single anchor line on the new-file (RIGHT) side; body = <description>
-# (CLAUDE.md says "<rule>") followed by the full-SHA range link; score = Haiku score.
+# (<rule file> says "<rule>") followed by the full-SHA range link; score = Haiku score.
 # Do NOT add the heading or footer — the helper emits both.
 cat > /tmp/post-plan-cr-findings-$PPID.json <<'JSON'
 [ { "path": "ibl5/classes/Example.php", "line": 17,
-    "body": "<description> (CLAUDE.md says \"<rule>\")\n\n<full-SHA range link>",
+    "body": "<description> (<rule file> says \"<rule>\")\n\n<full-SHA range link>",
     "score": 85 } ]
 JSON
 post_review_findings "$PR" "$FULL_SHA" "Code review" "/tmp/post-plan-cr-findings-$PPID.json"

@@ -64,6 +64,14 @@ function negotiate($playerID)
 
 ```
 classes/Negotiation/
+├── Contracts/
+│   ├── ExtensionContractDemandCalculatorInterface.php
+│   ├── NegotiationOfferViewInterface.php
+│   ├── NegotiationRepositoryInterface.php
+│   ├── NegotiationServiceInterface.php
+│   └── NegotiationValidatorInterface.php
+├── Views/
+│   └── DemandsBreakdownView.php
 ├── ExtensionContractDemandCalculator.php (370 lines)
 │   └── Calculates contract demands based on player ratings
 ├── NegotiationRepository.php (230 lines)
@@ -268,7 +276,7 @@ This refactoring follows the same patterns as the Extension module refactoring (
 ### As a Developer:
 ```php
 // Calculate demands independently
-$calculator = new ExtensionContractDemandCalculator($db);
+$calculator = new ExtensionContractDemandCalculator($db, $salaryCapRepo);
 $demands = $calculator->calculateDemands($player, $teamFactors);
 
 // Validate eligibility independently
@@ -318,7 +326,7 @@ While comprehensive tests weren't created in this phase (to minimize changes), t
 ### Unit Tests:
 ```php
 // Test demand calculation
-$calculator = new ExtensionContractDemandCalculator($mockDb);
+$calculator = new ExtensionContractDemandCalculator($mockDb, $mockSalaryCapRepo);
 $demands = $calculator->calculateDemands($player, $teamFactors);
 $this->assertEquals(500, $demands['year1']);
 

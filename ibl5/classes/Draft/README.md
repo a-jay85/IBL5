@@ -25,9 +25,9 @@ Draft Module (Interface-Driven Architecture)
 │   ├── DraftServiceInterface
 │   └── DraftControllerInterface
 ├── Dto/
-│   ├── DraftBoardData
-│   └── DraftPick
+│   └── DraftBoardData
 └── Implementation Classes
+    ├── DraftPick
     ├── DraftRepository (implements DraftRepositoryInterface)
     ├── DraftValidator (implements DraftValidatorInterface)
     ├── DraftProcessor (implements DraftProcessorInterface)

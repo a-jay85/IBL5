@@ -992,6 +992,38 @@ class BoxscoreProcessorTest extends TestCase
         $this->assertSame(0, $result['outOfWindowGames']);
     }
 
+    public function testProcessScoDataSkipsBlankSlotsDuringPreseasonImport(): void
+    {
+        $mockDb = new MockDatabase();
+        $mockDb->setReturnTrue(true);
+        $mockDb->onQuery('(?s)SELECT.*ibl_box_scores_teams.*WHERE', []);
+        $repository = new BoxscoreRepository($mockDb);
+        $seasonStub = self::createStub(Season::class);
+        $seasonStub->lastSimEndDate = '';
+
+        $processor = new TestableBoxscoreProcessor($mockDb, $repository, $seasonStub);
+        $processor->scheduleIndexOverride = [
+            '2007-09-20' => [21 => [17 => true]],
+        ];
+
+        // One real game followed by two unused, all-space slots (decode to 2008-10-01, 1 @ 1)
+        $blankSlot = str_repeat(' ', ScoFileParser::RECORD_SIZE);
+        $scoFile = $this->buildScoFile([
+            $this->buildGameRecord($this->gameInfoLineForGame('2007-11-20', 1, 21, 17, 2008)),
+            $blankSlot,
+            $blankSlot,
+        ]);
+        $data = file_get_contents($scoFile);
+        $this->assertNotFalse($data);
+
+        $result = $processor->processScoData($data, 2008, 'Preseason', skipSimDates: true);
+
+        $this->assertSame(0, $result['gamesRejected']);
+        $this->assertSame([], $result['rejectedGames']);
+        $this->assertSame(1, $result['gamesInserted']);
+        $this->assertSame(0, $result['outOfWindowGames']);
+    }
+
     public function testProcessScoDataStillImportsHeatGamesAgainstRegularSeasonSchedule(): void
     {
         $mockDb = new MockDatabase();

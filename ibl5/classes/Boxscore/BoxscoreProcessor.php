@@ -147,6 +147,14 @@ class BoxscoreProcessor implements BoxscoreProcessorInterface
             $offset += ScoFileParser::RECORD_SIZE;
 
             $gameInfoLine = ScoFileParser::extractGameInfo($line);
+
+            // JSB pre-allocates every game slot; an unused one is all spaces. It decodes to
+            // "<season ending year>-10-01, team 1 @ team 1" and writes nothing, so it must not
+            // reach the guard or Detector B (a Preseason-phase import would reject every one).
+            if (trim($gameInfoLine) === '') {
+                continue;
+            }
+
             $boxscoreGameInfo = Boxscore::withGameInfoLine($gameInfoLine, $operatingSeasonEndingYear, $operatingSeasonPhase, $league);
 
             // Detector B: check this game's decoded date against the schedule window.

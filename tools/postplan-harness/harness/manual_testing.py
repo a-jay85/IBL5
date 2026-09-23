@@ -14,15 +14,12 @@ from harness.adapters import probe as probe_mod
 
 BRINGUP_SCRIPT_PATHS = (
     ".claude/review-shared/scripts/wt-bring-up.sh",
-    ".claude/skills/pr-ready/scripts/wt-bring-up.sh",
 )
 ROWS_SCRIPT_PATHS = (
     ".claude/review-shared/scripts/manual-rows.sh",
-    ".claude/skills/pr-ready/scripts/manual-rows.sh",
 )
 TICK_SCRIPT_PATHS = (
     ".claude/review-shared/scripts/tick-rows.sh",
-    ".claude/skills/pr-ready/scripts/tick-rows.sh",
 )
 
 WORKTREES_ROOT = "/Users/ajaynicolas/GitHub/IBL5-worktrees"

@@ -400,9 +400,9 @@ end_case "case 2 main-checkout guard"
 # ==========================================================================================
 begin_case
 reset_state
-set_live_labels "-	0	com.ibl5.pr-ready-now-20260101-000000"
+set_live_labels "-	0	com.ibl5.post-plan-fleet-20260101-000000"
 run --go
-[[ $RC -eq 1 ]] || fail "live pr-ready-now label: exit $RC, want 1"
+[[ $RC -eq 1 ]] || fail "live post-plan-fleet label: exit $RC, want 1"
 set_live_labels "-	0	com.ibl5.pr-cycle-20260101-000000"
 run --go
 [[ $RC -eq 1 ]] || fail "live pr-cycle label: exit $RC, want 1"
@@ -649,7 +649,7 @@ end_case "case 11e DIRTY-only; unset and empty seam both enable"
 begin_case
 reset_state
 printf '%s' "$ATTACK_EXCLUDED_ONLY" > "$SCRATCH/attack-out"
-set_live_labels "-	0	com.ibl5.pr-ready-now-201"
+set_live_labels "-	0	com.ibl5.post-plan-fleet-201"
 run --worker
 grep -qF -- '--pr 201' "$SCRATCH/ready.argv" && fail "rescued #201 while its launchd slot was live"
 grep -qF -- '--pr 202' <<< "$(sed -n 1p "$SCRATCH/ready.argv")" \
@@ -658,7 +658,7 @@ grep -qF 'slot is already live' <<< "$OUT" || fail "the slot skip was not logged
 clear_live_labels
 reset_state
 printf '%s' "$ATTACK_EXCLUDED_ONLY" > "$SCRATCH/attack-out"
-set_live_labels "-	0	com.ibl5.pr-ready-now-2011"     # longer label: must NOT match #201
+set_live_labels "-	0	com.ibl5.post-plan-fleet-2011"  # longer label: must NOT match #201
 run --worker
 grep -qF -- '--pr 201' "$SCRATCH/ready.argv" \
     || fail "an unanchored label match let #2011 veto the rescue of #201"
@@ -1473,11 +1473,11 @@ WF="$SCRIPT_DIR/../.github/workflows/tests.yml"
 if [[ -f "$WF" ]]; then
     [[ "$(grep -c 'run: bin/test-pr-cycle' "$WF")" == "1" ]] \
         || fail "tests.yml does not run bin/test-pr-cycle exactly once"
-    A="$(grep -n 'run: bin/test-pr-ready-now' "$WF" | head -1 | cut -d: -f1)"
+    A="$(grep -n 'run: bin/test-post-plan-fleet' "$WF" | head -1 | cut -d: -f1)"
     B="$(grep -n 'run: bin/test-pr-cycle' "$WF" | head -1 | cut -d: -f1)"
     C="$(grep -n 'run: bin/test-check-phpunit-hygiene' "$WF" | head -1 | cut -d: -f1)"
     [[ -n "$A" && -n "$B" && -n "$C" && "$A" -lt "$B" && "$B" -lt "$C" ]] \
-        || fail "bin/test-pr-cycle is not wired between pr-ready-now and phpunit-hygiene"
+        || fail "bin/test-pr-cycle is not wired between post-plan-fleet and phpunit-hygiene"
 else
     fail "workflow file not found at $WF"
 fi

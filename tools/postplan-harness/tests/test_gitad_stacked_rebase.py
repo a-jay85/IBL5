@@ -18,10 +18,10 @@ _REPO_ROOT = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 )
 _LOSTWORK = os.path.join(
-    _REPO_ROOT, ".claude", "skills", "pr-ready", "scripts", "lostwork.sh"
+    _REPO_ROOT, ".claude", "review-shared", "scripts", "lostwork.sh"
 )
 _COLLAPSE = os.path.join(
-    _REPO_ROOT, ".claude", "skills", "pr-ready", "scripts", "collapse-guard.sh"
+    _REPO_ROOT, ".claude", "review-shared", "scripts", "collapse-guard.sh"
 )
 
 
@@ -71,7 +71,7 @@ def _make_squash_repo(
     _sh(d, "commit", "-m", "base")
 
     # Step 2: commit real scripts so git show <master_sha>:<path> exercises them
-    scripts_dir = os.path.join(d, ".claude", "skills", "pr-ready", "scripts")
+    scripts_dir = os.path.join(d, ".claude", "review-shared", "scripts")
     os.makedirs(scripts_dir, exist_ok=True)
     if include_lostwork:
         if lostwork_script is not None:
@@ -447,7 +447,7 @@ def _make_modify_conflict_repo(lostwork_script: str = None):
     _sh(d, "commit", "-m", "base")
 
     # Proof scripts committed to master
-    scripts_dir = os.path.join(d, ".claude", "skills", "pr-ready", "scripts")
+    scripts_dir = os.path.join(d, ".claude", "review-shared", "scripts")
     os.makedirs(scripts_dir, exist_ok=True)
     open(os.path.join(scripts_dir, "lostwork.sh"), "w").write(
         lostwork_script or _LOSTWORK_EQUIV
@@ -509,7 +509,7 @@ def _make_simple_conflict_repo(lostwork_script: str = None):
     _sh(d, "add", "-A")
     _sh(d, "commit", "-m", "base")
 
-    scripts_dir = os.path.join(d, ".claude", "skills", "pr-ready", "scripts")
+    scripts_dir = os.path.join(d, ".claude", "review-shared", "scripts")
     os.makedirs(scripts_dir, exist_ok=True)
     open(os.path.join(scripts_dir, "lostwork.sh"), "w").write(
         lostwork_script or _LOSTWORK_EQUIV
@@ -557,7 +557,7 @@ def _make_migration_conflict_repo():
     base_sha = _rev(d, "HEAD")
 
     # Proof scripts
-    scripts_dir = os.path.join(d, ".claude", "skills", "pr-ready", "scripts")
+    scripts_dir = os.path.join(d, ".claude", "review-shared", "scripts")
     os.makedirs(scripts_dir, exist_ok=True)
     open(os.path.join(scripts_dir, "lostwork.sh"), "w").write(_LOSTWORK_EQUIV)
     shutil.copy(_COLLAPSE, os.path.join(scripts_dir, "collapse-guard.sh"))

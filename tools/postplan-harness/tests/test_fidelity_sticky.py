@@ -378,11 +378,9 @@ def test_digest_falls_back_to_review_shared(tmp_path, monkeypatch):
                    "**Touches:** real", "**Machine-authored fixes:** real"]
 
 
-def test_digest_prefers_the_pr_ready_path(tmp_path, monkeypatch):
+def test_digest_uses_review_shared_path(tmp_path, monkeypatch):
     _git_shim(tmp_path, monkeypatch,
-              {".claude/skills/pr-ready/scripts/digest.sh": FIVE,
-               ".claude/review-shared/scripts/digest.sh":
-                   "#!/usr/bin/env bash\nexit 1\n"})
+              {".claude/review-shared/scripts/digest.sh": FIVE})
     out = fidelity.digest_lines(str(tmp_path), "deadbeef", str(tmp_path / "v.md"),
                                 str(tmp_path), True)
     assert out[0] == "**What changed:** real"
@@ -395,13 +393,13 @@ def test_digest_degrades_when_neither_path_resolves(tmp_path, monkeypatch):
 
 
 def test_digest_degrades_on_the_wrong_line_count(tmp_path, monkeypatch):
-    _git_shim(tmp_path, monkeypatch, {".claude/skills/pr-ready/scripts/digest.sh": FOUR})
+    _git_shim(tmp_path, monkeypatch, {".claude/review-shared/scripts/digest.sh": FOUR})
     assert _degraded(fidelity.digest_lines(str(tmp_path), "deadbeef",
                                            str(tmp_path / "v.md"), str(tmp_path), True))
 
 
 def test_digest_degrades_on_a_nonzero_exit(tmp_path, monkeypatch):
-    _git_shim(tmp_path, monkeypatch, {".claude/skills/pr-ready/scripts/digest.sh":
+    _git_shim(tmp_path, monkeypatch, {".claude/review-shared/scripts/digest.sh":
                                       "#!/usr/bin/env bash\nexit 7\n"})
     assert _degraded(fidelity.digest_lines(str(tmp_path), "deadbeef",
                                            str(tmp_path / "v.md"), str(tmp_path), True))
@@ -409,7 +407,7 @@ def test_digest_degrades_on_a_nonzero_exit(tmp_path, monkeypatch):
 
 def test_no_verdict_means_no_script_runs_at_all(tmp_path, monkeypatch):
     """A stale /tmp verdict from an earlier run must never be digested into this comment."""
-    _git_shim(tmp_path, monkeypatch, {".claude/skills/pr-ready/scripts/digest.sh": FIVE})
+    _git_shim(tmp_path, monkeypatch, {".claude/review-shared/scripts/digest.sh": FIVE})
     assert _degraded(fidelity.digest_lines(str(tmp_path), "deadbeef",
                                            str(tmp_path / "v.md"), str(tmp_path), False))
     assert not os.path.exists(os.path.join(str(tmp_path), "fidelity-digest.sh"))
@@ -420,7 +418,7 @@ def test_digest_uses_the_scripts_own_degrade_lines_verbatim(tmp_path, monkeypatc
            "printf '%s unavailable — DIGEST section is empty\\n' "
            "'**What changed:**' '**Why:**' '**Watch:**' '**Touches:**' "
            "'**Machine-authored fixes:**'\n")
-    _git_shim(tmp_path, monkeypatch, {".claude/skills/pr-ready/scripts/digest.sh": own})
+    _git_shim(tmp_path, monkeypatch, {".claude/review-shared/scripts/digest.sh": own})
     out = fidelity.digest_lines(str(tmp_path), "deadbeef", str(tmp_path / "v.md"),
                                 str(tmp_path), True)
     assert out[0] == "**What changed:** unavailable — DIGEST section is empty"

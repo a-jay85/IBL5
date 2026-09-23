@@ -133,7 +133,6 @@ def git_shim(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("ok_path", [
-    ".claude/skills/pr-ready/_plan-fidelity-review.md",
     ".claude/review-shared/_plan-fidelity-review.md",
 ])
 def test_procedure_either_location(tmp_path, git_shim, ok_path):
@@ -158,7 +157,7 @@ def test_procedure_missing_from_both_locations(tmp_path, git_shim):
 # --- plan-blind ---------------------------------------------------------------
 
 def test_plan_blind_marker_never_synthesises_a_verdict(tmp_path, git_shim):
-    git_shim.setenv("GIT_SHIM_OK_PATH", ".claude/skills/pr-ready/_plan-fidelity-review.md")
+    git_shim.setenv("GIT_SHIM_OK_PATH", ".claude/review-shared/_plan-fidelity-review.md")
     out = tmp_path / "out"
     out.mkdir()
     packet = fidelity.build_packet(str(out), "deadbeef", TREE, _plan(found=False),
@@ -172,7 +171,7 @@ def test_plan_blind_marker_never_synthesises_a_verdict(tmp_path, git_shim):
 
 
 def test_packet_context_carries_the_reviewed_tree(tmp_path, git_shim):
-    git_shim.setenv("GIT_SHIM_OK_PATH", ".claude/skills/pr-ready/_plan-fidelity-review.md")
+    git_shim.setenv("GIT_SHIM_OK_PATH", ".claude/review-shared/_plan-fidelity-review.md")
     out = tmp_path / "out"
     out.mkdir()
     packet = fidelity.build_packet(str(out), "deadbeef", TREE, _plan(found=False),

@@ -6,8 +6,7 @@
 # Bash 3.2 / macOS compatible: no declare -A, no mapfile, no ${var,,}, no touch -d.
 # set -u safe: every expansion uses ${1:-} / ${2:-} defaults.
 # No set -e assumptions: each function returns a status the caller tests.
-# Sourced by bin/plan-now, bin/pr-ready-now, bin/docfix-run, bin/post-plan-now,
-# and bin/fleet-status.
+# Sourced by bin/plan-now, bin/docfix-run, bin/post-plan-now, and bin/fleet-status.
 
 # Regex stored unquoted so [[ =~ ]] treats it as an ERE, not a literal string
 # (Bash 3.2 compatibility: quoting the RHS of =~ makes it a literal match).

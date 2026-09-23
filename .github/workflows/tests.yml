@@ -88,7 +88,7 @@ jobs:
               - '.claude/skills/post-plan/SKILL.md'
               - '.claude/skills/post-plan/_phase-6.5-arm-auto-merge.md'
               - '.claude/skills/post-plan/_phase-5.5-fidelity.md'
-              - '.claude/skills/pr-ready/scripts/digest.sh'
+              - '.claude/review-shared/scripts/digest.sh'
               # bin/test-post-review-findings reads the Step 7 / Step 1 blocks here,
               # so a skill-only edit must run the harness job too.
               - '.claude/skills/pr-review/SKILL.md'
@@ -105,9 +105,8 @@ jobs:
               # bin/test-human-signoff-classifier guards the classifier lib that
               # human-signoff.yml sources, so a workflow-only edit must run it too.
               - '.github/workflows/human-signoff.yml'
-              # /pr-ready's runtime blocks are committed scripts, and bin/test-pr-ready-now
-              # case 16 asserts on SKILL.md, so both must trigger shellcheck + harness-tests.
-              - '.claude/skills/pr-ready/**'
+              # review-shared runtime blocks trigger shellcheck + fleet harness tests.
+              - '.claude/review-shared/**'
               # Agent defs are asserted by bin/test-pr-ready-now's static case (the /pr-ready
               # Phase 6 reviewer def), so an agent-def-only PR must run harness-tests too.
               - '.claude/agents/**'
@@ -967,14 +966,14 @@ jobs:
         run: bin/test-pr-overlap
       - name: bin/test-pr-attack
         run: bin/test-pr-attack
-      - name: bin/test-pr-ready-now
-        run: bin/test-pr-ready-now
+      - name: bin/test-post-plan-fleet
+        run: bin/test-post-plan-fleet
       - name: bin/test-plan-index
         run: bin/test-plan-index
       - name: bin/test-post-plan-now-pr-creates-worktree
         run: bin/test-post-plan-now-pr-creates-worktree
-      - name: bin/test-pr-ready-skip
-        run: bin/test-pr-ready-skip
+      - name: bin/test-review-shared-skip
+        run: bin/test-review-shared-skip
       - name: bin/test-pr-cycle
         run: bin/test-pr-cycle
       - name: bin/test-digest-dm-build

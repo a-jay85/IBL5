@@ -1,11 +1,11 @@
 ---
 description: /post-plan Phase 2 — resolve a rebase conflict, prove no work was lost, and arm the conflict hold. Loaded only when the Phase 2 rebase block prints STOP-AND-RESOLVE.
-last_verified: 2026-09-18
+last_verified: 2026-09-22
 paths:
   - .claude/skills/post-plan/SKILL.md
-  - .claude/skills/pr-ready/_rebase-and-conflicts.md
-  - .claude/skills/pr-ready/scripts/lostwork.sh
-  - .claude/skills/pr-ready/scripts/collapse-guard.sh
+  - .claude/review-shared/_rebase-and-conflicts.md
+  - .claude/review-shared/scripts/lostwork.sh
+  - .claude/review-shared/scripts/collapse-guard.sh
   - .claude/rules/linear-history-squash-merge.md
 ---
 
@@ -28,14 +28,14 @@ a worktree-scoped resolution block is the shape that silently runs against the w
 ## Step 1 — Load the guide and the two scripts by pinned SHA
 
 Reuse is by `git show`, never by copy (the pattern established in
-`.claude/skills/post-plan/_phase-5.5-fidelity.md`). `.claude/skills/pr-ready/_rebase-and-conflicts.md`
+`.claude/skills/post-plan/_phase-5.5-fidelity.md`). `.claude/review-shared/_rebase-and-conflicts.md`
 is present in only 1 of 34 worktrees, so a plain `Read` of the worktree path fails for
 essentially every run, while a pinned-SHA read always succeeds.
 
 ```bash
-git show <MASTER_SHA>:.claude/skills/pr-ready/_rebase-and-conflicts.md > /tmp/post-plan-rebase-guide-<KEY>.md \
-  && git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/lostwork.sh > /tmp/post-plan-lostwork-<KEY>.sh \
-  && git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/collapse-guard.sh > /tmp/post-plan-collapse-guard-<KEY>.sh \
+git show <MASTER_SHA>:.claude/review-shared/_rebase-and-conflicts.md > /tmp/post-plan-rebase-guide-<KEY>.md \
+  && git show <MASTER_SHA>:.claude/review-shared/scripts/lostwork.sh > /tmp/post-plan-lostwork-<KEY>.sh \
+  && git show <MASTER_SHA>:.claude/review-shared/scripts/collapse-guard.sh > /tmp/post-plan-collapse-guard-<KEY>.sh \
   && test -s /tmp/post-plan-rebase-guide-<KEY>.md \
   && test -s /tmp/post-plan-lostwork-<KEY>.sh \
   && test -s /tmp/post-plan-collapse-guard-<KEY>.sh \
@@ -154,8 +154,7 @@ _phase-5.5-fidelity.md warns post-plan away from.
 The conflict-resolution verdict is written to
 /tmp/postplan-conflict-verdict-<KEY>-<POST_RESOLUTION_SHA>.ok, keyed by branch slug plus
 commit sha. It never uses a PR number, so it cannot collide with the /tmp/pr-ready-verdict-
-namespace a concurrent /pr-ready run owns. The /pr-ready scripts/post-verdict.sh script is
-never called for this artifact.
+namespace a concurrent /pr-ready run owns.
 -->
 
 ## Step 7 — Confirm the hold flag, and write the resolution manifest
@@ -265,7 +264,7 @@ To select which render to post, read the first line of `/tmp/postplan-conflict-v
 ## Rebase conflict auto-resolved, then reviewed clean
 
 **(a) What happened.** Rebasing this branch onto `master` conflicted. `/post-plan` resolved
-the conflict automatically (three-way, per `.claude/skills/pr-ready/_rebase-and-conflicts.md` §2e)
+the conflict automatically (three-way, per `.claude/review-shared/_rebase-and-conflicts.md` §2e)
 and proved no work was lost: `lostwork.sh` reported **TREE-EQUIVALENT** against the pre-rebase
 diff, which is a precondition for the push that produced this PR.
 
@@ -291,7 +290,7 @@ _Posted by `/post-plan`. Updated in place on re-run._
 ## Auto-merge held — this run auto-resolved a rebase conflict
 
 **(a) What happened.** Rebasing this branch onto `master` conflicted. `/post-plan` resolved
-the conflict automatically (three-way, per `.claude/skills/pr-ready/_rebase-and-conflicts.md` §2e)
+the conflict automatically (three-way, per `.claude/review-shared/_rebase-and-conflicts.md` §2e)
 and proved no work was lost: `lostwork.sh` reported **TREE-EQUIVALENT** against the pre-rebase
 diff, which is a precondition for the push that produced this PR.
 

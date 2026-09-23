@@ -30,10 +30,10 @@ _REPO_ROOT = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 )
 _LOSTWORK = os.path.join(
-    _REPO_ROOT, ".claude", "skills", "pr-ready", "scripts", "lostwork.sh"
+    _REPO_ROOT, ".claude", "review-shared", "scripts", "lostwork.sh"
 )
 _COLLAPSE = os.path.join(
-    _REPO_ROOT, ".claude", "skills", "pr-ready", "scripts", "collapse-guard.sh"
+    _REPO_ROOT, ".claude", "review-shared", "scripts", "collapse-guard.sh"
 )
 
 
@@ -180,7 +180,7 @@ def _make_conflicting_squash_repo():
     sh(d, "config", "user.name", "t")
     _commit(d, "a.txt", "base\n", "base")
 
-    scripts_dir = os.path.join(d, ".claude", "skills", "pr-ready", "scripts")
+    scripts_dir = os.path.join(d, ".claude", "review-shared", "scripts")
     os.makedirs(scripts_dir, exist_ok=True)
     shutil.copy(_LOSTWORK, os.path.join(scripts_dir, "lostwork.sh"))
     shutil.copy(_COLLAPSE, os.path.join(scripts_dir, "collapse-guard.sh"))

@@ -1,6 +1,6 @@
 ---
 description: Ship the compiled post-plan harness in-repo under tools/postplan-harness/ with a dedicated Python CI workflow, a main-checkout path pin, and real-data dirs gitignored.
-last_verified: 2026-09-16
+last_verified: 2026-09-22
 ---
 # 92. Post-plan harness in-repo with dedicated Python CI
 
@@ -72,3 +72,5 @@ the branch for a human.
 **Unchanged.** The main-checkout pin, the `POST_PLAN_SKILL=1` rollback, and the
 `[ -x "$HARNESS/run" ]` fallthrough all behave as Decision 3 describes. The toolless bounded
 call sites keep `--max-turns 1`.
+
+**Superseded by:** ADR-0115 Addendum (2026-09-22). The /pr-ready skill it names is retired.

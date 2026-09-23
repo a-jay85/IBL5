@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 // Retired module: redirects to its new home. See Module\ModuleRedirect::TARGETS.
-if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
+if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 

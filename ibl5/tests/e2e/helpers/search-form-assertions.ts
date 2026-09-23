@@ -10,11 +10,12 @@ export async function assertSearchFormPresent(page: Page): Promise<void> {
 }
 
 /**
- * Assert filter dropdowns are present (topic, category, author, days).
+ * Assert filter dropdowns are present (topic, category, author, days, preset).
  */
 export async function assertFilterDropdownsPresent(page: Page): Promise<void> {
   const selects = page.locator('.search-form__select');
-  expect(await selects.count()).toBeGreaterThanOrEqual(3);
+  expect(await selects.count()).toBeGreaterThanOrEqual(5);
+  await expect(page.locator('select[name="preset"].search-form__select').first()).toBeVisible();
 }
 
 /**

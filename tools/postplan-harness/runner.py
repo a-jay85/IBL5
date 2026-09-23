@@ -352,11 +352,11 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         if live and pr and sha:
             bg_ci = ciwatch.start_background_watch(worktree, pr, sha, out_dir,
                                                    verify_head=True)
-            if bg_ci is not None and bg_ci.status == "diverged":
+            if bg_ci is not None and getattr(bg_ci, "status", "") == "diverged":
                 log(f"phase2: ERROR remote head {bg_ci.remote_sha[:8]} diverged from "
                     f"pushed {sha[:8]} with different content; failing closed")
                 raise HarnessError("remote-head-diverged", bg_ci.evidence)
-            if bg_ci is not None and bg_ci.sha != sha:
+            if bg_ci is not None and getattr(bg_ci, "sha", sha) != sha:
                 log(f"phase2: remote head moved to {bg_ci.sha[:8]} (tree-equivalent); "
                     "worktree synced, CI watch re-keyed")
                 sha = bg_ci.sha

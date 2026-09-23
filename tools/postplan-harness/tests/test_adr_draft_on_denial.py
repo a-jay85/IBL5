@@ -1135,7 +1135,7 @@ def test_phase55_push_site_calls_adr_wrapper(tmp_path, monkeypatch):
 
     push_calls = []
 
-    def _recorder(g, log, phase, *, llm, worktree, out_dir, res):
+    def _recorder(g, log, phase, *, llm, worktree, out_dir, res, pr=None):
         push_calls.append({"phase": phase, "res": res})
         return "recorded" + "0" * 33
 
@@ -1159,7 +1159,7 @@ def test_phase2_push_site_calls_adr_wrapper(monkeypatch, stub_ambient_git_show):
     """runner.run() replay mode passes 'phase2' and res= to _push_with_adr_draft."""
     push_calls = []
 
-    def _recorder(g, log, phase, *, llm, worktree, out_dir, res):
+    def _recorder(g, log, phase, *, llm, worktree, out_dir, res, pr=None):
         push_calls.append({"phase": phase, "res": res})
         return ""
 

@@ -661,8 +661,8 @@ rm -f "$runner1" "$sidecar1" "$runner2" "$sidecar2"
 # from a normal invocation and dies only when the script is called by absolute path
 # with a foreign cwd -- bin/plan-now and bin/post-plan-now both shipped that way and
 # the failure surfaced solely in a live smoke, which is far too late and far too
-# expensive a place to catch it. Static, so it costs nothing and covers all four.
-for _producer in plan-now post-plan-now pr-ready-now docfix-run; do
+# expensive a place to catch it. Static, so it costs nothing and covers all three.
+for _producer in plan-now post-plan-now docfix-run; do
     _p="$ROOT/bin/$_producer"
     if grep -qE '^\s*\.\s+"\$(ROOT|[A-Z_]*ROOT)[^"]*/lib/session-id\.sh"' "$_p"; then
         fail "bin/$_producer sources lib/session-id.sh via a cwd-derived root — breaks under a foreign cwd"

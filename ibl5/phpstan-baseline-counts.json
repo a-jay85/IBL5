@@ -1,7 +1,7 @@
 {
     "phpstan-baseline.neon": {
         "argument.type": 360,
-        "binaryOp.invalid": 19,
+        "binaryOp.invalid": 18,
         "booleanAnd.leftNotBoolean": 1,
         "booleanAnd.rightNotBoolean": 1,
         "booleanNot.alwaysTrue": 1,
@@ -35,7 +35,7 @@
         "ibl.unknownCliOption": 2,
         "identical.alwaysFalse": 1,
         "if.condNotBoolean": 6,
-        "method.nonObject": 38,
+        "method.nonObject": 37,
         "missingType.iterableValue": 1,
         "missingType.parameter": 28,
         "missingType.return": 18,

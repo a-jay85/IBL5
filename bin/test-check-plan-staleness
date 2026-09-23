@@ -181,7 +181,7 @@ assert "bq-under-oos-exempt" 0 $'## Out of Scope\n> The `bin/future-quoted-thing
 # the guard passes, and a path the plan says will never exist never resolves.
 
 # The exact real-world FP shape: backticked path + bold "does not exist".
-assert "does-not-exist-cue" 0 'The carve-out goes in `SKILL.md`, not a remediation include: `.claude/skills/pr-ready/_remediation.md` **does not exist** in that directory.'
+assert "does-not-exist-cue" 0 'The carve-out goes in `SKILL.md`, not a remediation include: `.claude/review-shared/_remediation.md` **does not exist** in that directory.'
 
 # Bold emphasis INSIDE the phrase (`does **not** exist`) must match too — a
 # plain-substring cue would miss it, which is how the **NEW** marker already

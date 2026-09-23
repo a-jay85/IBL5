@@ -61,23 +61,20 @@ def test_loader_review_shared_only():
 def test_loader_pr_ready_only():
     content = "#!/bin/bash\necho done\n"
     show = _make_show_blob({
-        f"{SHA}:.claude/skills/pr-ready/scripts/wt-bring-up.sh": content,
+        f"{SHA}:.claude/review-shared/scripts/wt-bring-up.sh": content,
     })
     path = mt._load_script(show, SHA, mt.BRINGUP_SCRIPT_PATHS, 100)
     assert path is not None
     assert path.exists()
 
 
-def test_loader_both_prefers_review_shared():
+def test_loader_review_shared_found():
     content_a = "#!/bin/bash\necho review-shared\n"
-    content_b = "#!/bin/bash\necho pr-ready\n"
     show = _make_show_blob({
         f"{SHA}:.claude/review-shared/scripts/wt-bring-up.sh": content_a,
-        f"{SHA}:.claude/skills/pr-ready/scripts/wt-bring-up.sh": content_b,
     })
     path = mt._load_script(show, SHA, mt.BRINGUP_SCRIPT_PATHS, 101)
     assert path is not None
-    # The review-shared path is first in BRINGUP_SCRIPT_PATHS, so it wins
     content = path.read_text()
     assert "review-shared" in content
 

@@ -1,18 +1,16 @@
 #!/usr/bin/env bash
-# pr-ready-now — fire one detached headless Claude session per open PR, each running /pr-ready <N>.
+# post-plan-fleet — fire one detached bin/post-plan-now --pr N --foreground session per open PR.
 #
 # Dry-run by default: prints the PRs it would process and exits. Nothing fires without --go.
 #
 # Usage:
-#   bin/pr-ready-now [--go] [--jobs N] [--pr N[,N...]] [--pr-attack FILE] [--top-n N] [--model M] [--dry-run] [--wait] [--no-dm] [--stop N[,N...]] [--stop-all] [--help]
+#   bin/post-plan-fleet [--go] [--jobs N] [--pr N[,N...]] [--pr-attack FILE] [--top-n N] [--dry-run] [--wait] [--no-dm] [--stop N[,N...]] [--stop-all] [--help]
 #
 #   --go          Actually fire. Without it the script only reports (default).
 #   --jobs N      Max concurrent sessions (default 5). Positive integer.
 #   --pr N[,N...] Explicit PR numbers; bypasses the open/non-draft selector.
-#   --model M     Model for the fired sessions (default: claude-sonnet-4-6 — see below).
-#                 Opus judgment lives in the Phase 6 agent def, not in this default;
-#                 pass --model claude-opus-5 to put the whole run back on Opus.
-#   --dry-run     Explicit alias for the default. Useful in scripts that want intent stated.
+#   --dry-run     Print the resolved per-PR invocation line and the generated plist XML for
+#                 each selected PR, then exit 0 without loading anything into launchd.
 #   --help, -h    Print this usage and exit 0.
 #   --pr-attack FILE  Read ranked PR list from a /pr-attack output file; selects top --top-n.
 #   --top-n N         How many top-ranked PRs to select (default 5). Positive integer.
@@ -31,45 +29,37 @@
 #                 The /tmp log is written either way; the DM is additive, never a replacement.
 #
 # Examples:
-#   bin/pr-ready-now                       # report what would run
-#   bin/pr-ready-now --go                  # fire all open non-draft PRs, 5 at a time
-#   bin/pr-ready-now --pr 1899,1900 --go   # fire exactly two
-#   bin/pr-ready-now --jobs 1 --go         # serialize
-#   bin/pr-ready-now --pr-attack ~/pr-attack.md --go         # fire top 5 from rank file
-#   bin/pr-ready-now --pr-attack ~/pr-attack.md --top-n 3 --go  # fire top 3
-#   bin/pr-ready-now --pr-attack ~/pr-attack.md --go --wait      # fire, then wait for all to finish
+#   bin/post-plan-fleet                       # report what would run
+#   bin/post-plan-fleet --go                  # fire all open non-draft PRs, 5 at a time
+#   bin/post-plan-fleet --pr 1899,1900 --go   # fire exactly two
+#   bin/post-plan-fleet --jobs 1 --go         # serialize
+#   bin/post-plan-fleet --pr-attack ~/pr-attack.md --go         # fire top 5 from rank file
+#   bin/post-plan-fleet --pr-attack ~/pr-attack.md --top-n 3 --go  # fire top 3
+#   bin/post-plan-fleet --pr-attack ~/pr-attack.md --go --wait      # fire, then wait for all to finish
 #
 # WARNING: Never run with --go from inside a worktree. The launched sessions must start from
-# the main checkout so /pr-ready Phase 0 resolves the target PR's own worktree correctly.
+# the main checkout so bin/post-plan-now resolves the target PR's own worktree correctly.
 # This script pins the main checkout itself (see ROOT below) rather than trusting $PWD, so
 # invoking it from a worktree is survivable — but do not rely on that; run it from
 # /Users/ajaynicolas/GitHub/IBL5.
 #
-# Env seams (used by bin/test-pr-ready-now):
-#   PR_READY_NOW_CLAUDE     Override the claude binary (stub for tests). Unset = auto-detect.
-#   PR_READY_NOW_DRY_RUN=1  With --go: emit runner + plist per PR but skip launchctl bootstrap.
-#   PR_READY_NOW_PR_JSON    Read selector JSON from this file instead of shelling to gh.
-#   PR_READY_NOW_GH_USER    Use this GitHub login instead of calling `gh api user`. Lets the
+# Env seams (used by bin/test-post-plan-fleet):
+#   POST_PLAN_FLEET_DRY_RUN=1  With --go: emit invocation + plist per PR but skip launchctl bootstrap.
+#   POST_PLAN_FLEET_PR_JSON    Read selector JSON from this file instead of shelling to gh.
+#   POST_PLAN_FLEET_GH_USER    Use this GitHub login instead of calling `gh api user`. Lets the
 #                           tests run on CI, which has no gh auth. Never set it by hand.
-#   PR_READY_NOW_MASTER_SHA Override the master SHA for the staleness gate. Unset or
+#   POST_PLAN_FLEET_MASTER_SHA Override the master SHA for the staleness gate. Unset or
 #                           empty = auto-detect via git rev-parse --short origin/master.
-#   PR_READY_NOW_WTL        Read the worktree listing from this file instead of shelling
+#   POST_PLAN_FLEET_WTL        Read the worktree listing from this file instead of shelling
 #                           to git worktree list. Unset or empty = auto-detect.
-#   PR_READY_NOW_DISCORD_DM Override the notifier binary (a recorder stub for tests).
+#   POST_PLAN_FLEET_DISCORD_DM Override the notifier binary (a recorder stub for tests).
 #                           Unset or empty = $ROOT/bin/discord-dm.
 #
 # Report output (written under --go only):
-#   $HOME/pr-firstpass-YYYY-MM-DD.md — one Markdown row per PR (fired or skipped),
-#   a Findings section (diffs from FINDING[...] markers in PR logs), and a Security notes section.
+#   $HOME/pr-firstpass-YYYY-MM-DD.md — one Markdown row per PR (fired or skipped).
 #   Same-day re-runs overwrite. The report path is printed as the last stdout line.
 #   Without --wait the sessions are still running when the report is written, so most
 #   status rows will read NOT READY (no log) — expected, not a defect.
-#
-# Findings marker contract (producer: /pr-ready, consumer: Phase 7):
-#   FINDING[<class>]: <one-line text>
-#   where <class> is one of: loop, ci, e2e, dev, a11y, a11y-contrast, maintenance,
-#   security. /pr-ready does not emit these yet; the Findings section will be empty
-# on a real run until it does.
 
 set -euo pipefail
 
@@ -79,8 +69,6 @@ set -euo pipefail
 # test harness's shim dir — must still win. The runner emitted below prepends instead,
 # because launchd hands it a minimal PATH with no caller preference to respect.
 export PATH="$PATH:/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin"
-
-CLAUDE_BIN="${PR_READY_NOW_CLAUDE:-$(command -v claude || true)}"
 
 # --- ROOT pin ----------------------------------------------------------------------------
 # Resolve the MAIN checkout, never the worktree we happen to be standing in.
@@ -100,40 +88,33 @@ ROOT="$(dirname "$GIT_COMMON")"
     echo "ERROR: cannot locate main checkout (ROOT=$ROOT)" >&2
     exit 1
 }
-[[ -f "$ROOT/.claude/skills/pr-ready/SKILL.md" ]] || {
-    echo "ERROR: $ROOT does not look like the IBL5 checkout (no .claude/skills/pr-ready/SKILL.md)" >&2
+[[ -f "$ROOT/bin/post-plan-now" ]] || {
+    echo "ERROR: $ROOT does not look like the IBL5 checkout (no bin/post-plan-now)" >&2
     exit 1
 }
-. "$SCRIPT_DIR/lib/session-id.sh"
 
 # --- defaults ----------------------------------------------------------------------------
 GO=0
 JOBS=5
 EXPLICIT_PRS=()
-# Orchestrator tier for /pr-ready's mechanical phases. No longer corresponds to
-# bin/bug-pipeline-tick or bin/lib/plan-impl-model: this driver's Opus judgment is pinned
-# inside .claude/agents/pr-ready-phase6.md, so the session model no longer sets the review
-# tier. Revert lever: --model claude-opus-5.
-MODEL="claude-sonnet-4-6"
-EFFORT=high
 PR_ATTACK_FILE=""
 TOP_N=5
 WAIT=0
 NOTIFY=1
 MODE=fire          # fire | stop | stop-all
 STOP_PRS=()
-SAW_DRY_RUN=0      # --dry-run only sets GO=0, which is indistinguishable from the default
+SAW_DRY_RUN=0
 # Single ceiling for BOTH bounded poll loops (wait_for_slot and the --wait block).
 # Two independent literals would drift; one constant cannot.
 CEILING_SECS=7200
 
 # --- flag parsing ------------------------------------------------------------------------
-usage() { sed -n '2,72p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
+usage() { sed -n '2,63p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --go)      GO=1; shift ;;
-        --dry-run) GO=0; SAW_DRY_RUN=1; shift ;;
+        --dry-run) GO=1; SAW_DRY_RUN=1; POST_PLAN_FLEET_DRY_RUN=1; shift ;;
         --jobs)
             [[ $# -ge 2 ]] || { echo "ERROR: --jobs requires a value" >&2; exit 1; }
             [[ "$2" =~ ^[1-9][0-9]*$ ]] || { echo "ERROR: --jobs must be a positive integer, got: $2" >&2; exit 1; }
@@ -152,9 +133,6 @@ while [[ $# -gt 0 ]]; do
                 EXPLICIT_PRS+=("$_p")
             done
             shift 2 ;;
-        --model)
-            [[ $# -ge 2 ]] || { echo "ERROR: --model requires a value" >&2; exit 1; }
-            MODEL="$2"; shift 2 ;;
         --stop)
             [[ "$MODE" != "stop-all" ]] || { echo "ERROR: --stop and --stop-all are mutually exclusive" >&2; exit 2; }
             [[ $# -ge 2 ]] || { echo "ERROR: --stop requires a value" >&2; exit 2; }
@@ -169,7 +147,7 @@ while [[ $# -gt 0 ]]; do
             MODE=stop-all; shift ;;
         -h|--help) usage; exit 0 ;;
         --) shift; break ;;
-        *) echo "ERROR: unknown flag: $1" >&2; usage >&2; exit 1 ;;
+        *) echo "ERROR: unknown flag: $1" >&2; usage >&2; exit 2 ;;
     esac
 done
 [[ $# -eq 0 ]] || { echo "ERROR: unexpected positional argument: $1" >&2; exit 1; }
@@ -197,7 +175,7 @@ fi
 # Fail closed by construction: only pgrep's "no match" (exit 1) proves death. A missing pgrep,
 # or an error exit (procps rejects BSD-only flags with exit 2), reads as ALIVE — so a slot is
 # never freed, and a live session is never killed, on the strength of a broken probe.
-# The pattern is END-ANCHORED: `name com.ibl5.pr-ready-now-1901` unanchored also matches PR
+# The pattern is END-ANCHORED: `name com.ibl5.post-plan-fleet-1901` unanchored also matches PR
 # 19011. `--name <label>` is the final argv element of caffeinate, timeout and claude alike.
 _label_alive() {
     local label="$1" rc=0
@@ -217,9 +195,9 @@ _label_alive() {
 # token) disappears. Kill by label, verify death, THEN release the slot — in that order.
 stop_one_pr() {
     local PR="$1"
-    local LABEL="com.ibl5.pr-ready-now-${PR}"
+    local LABEL="com.ibl5.post-plan-fleet-${PR}"
     local PLIST="$HOME/Library/LaunchAgents/${LABEL}.plist"
-    local LOG="/tmp/pr-ready-now-${PR}.log"
+    local LOG="/tmp/post-plan-fleet-${PR}.log"
     # End-anchored: `name ...-1901` (unanchored) also matches a LIVE session for PR 19011,
     # and on the kill path that means SIGKILLing the wrong run mid-publish.
     local PAT="name ${LABEL}$"
@@ -242,14 +220,14 @@ stop_one_pr() {
     done
 
     # Preserve the log for forensics under a name the NEXT fire's pre-clear will collect.
-    # It must be moved out of the glob's reach first: /tmp/pr-ready-now-<N>.log.aborted also
+    # It must be moved out of the glob's reach first: /tmp/post-plan-fleet-<N>.log.aborted also
     # matches /tmp/pr-ready-*-<N>.*, so a mv-then-rm would delete what it just preserved.
     if [[ -f "$LOG" ]]; then
         keep="$(mktemp /tmp/prn-keep.XXXXXX)"
         mv -f "$LOG" "$keep"
     fi
     rm -f "$PLIST"                             # release the slot — exactly once
-    rm -f /tmp/pr-ready-*-"${PR}".*            # clear this PR's /pr-ready scratch
+    rm -f /tmp/post-plan-fleet-*-"${PR}".*     # clear this PR's scratch
     if [[ -n "$keep" ]]; then
         mv -f "$keep" "${LOG}.aborted"
     fi
@@ -259,14 +237,14 @@ stop_one_pr() {
 
 stop_all() {
     local f label pr rc=0 found=0
-    for f in "$HOME/Library/LaunchAgents"/com.ibl5.pr-ready-now-*.plist; do
+    for f in "$HOME/Library/LaunchAgents"/com.ibl5.post-plan-fleet-*.plist; do
         [[ -e "$f" ]] || continue              # unmatched globs stay literal
         found=1
         label="$(basename "$f" .plist)"
         pr="${label##*-}"
         stop_one_pr "$pr" || rc=1              # aggregate: one stuck PR must not mask the rest
     done
-    [[ "$found" -eq 1 ]] || echo "no pr-ready-now slots held; nothing to stop"
+    [[ "$found" -eq 1 ]] || echo "no post-plan-fleet slots held; nothing to stop"
     return "$rc"
 }
 
@@ -279,13 +257,6 @@ if [[ "$MODE" != "fire" ]]; then
     fi
     exit "$_stop_rc"
 fi
-
-# Checked HERE, not at assignment time: the stop verbs are an emergency abort and must keep
-# working on a machine where the claude binary has moved. Only the firing path needs it.
-[[ -n "$CLAUDE_BIN" && -x "$CLAUDE_BIN" ]] || {
-    echo "ERROR: claude binary not found on PATH (set PR_READY_NOW_CLAUDE to override)" >&2
-    exit 1
-}
 
 # --- attack_sha: extract master SHA from a /pr-attack output file -----------------------
 # The Base: header has one of two forms:
@@ -350,7 +321,7 @@ write_report() {
     local attack_src="$1" master_sha="$2" fired_n="$3" skip_n="$4"
     local rdate rpath i s _sp _sr _sb _spre _smsg pr br pre st log
     if [[ -z "$master_sha" ]]; then
-        master_sha="${PR_READY_NOW_MASTER_SHA:-$(git -C "$ROOT" rev-parse --short origin/master 2>/dev/null || echo unknown)}"
+        master_sha="${POST_PLAN_FLEET_MASTER_SHA:-$(git -C "$ROOT" rev-parse --short origin/master 2>/dev/null || echo unknown)}"
     fi
     rdate="$(date +%F)"
     rpath="${HOME}/pr-firstpass-${rdate}.md"
@@ -366,7 +337,7 @@ write_report() {
                 pr="${FIRE_PRS[$i]}"
                 br="${FIRE_BRANCHES[$i]}"
                 pre="${FIRE_PRE[$i]}"
-                log="/tmp/pr-ready-now-${pr}.log"
+                log="/tmp/post-plan-fleet-${pr}.log"
                 st="$(derive_status "$log")"
                 printf '| %s | %s | %s | %s | %s |\n' "$pr" "$br" "$pre" "$st" "$log"
             done
@@ -402,7 +373,7 @@ if [[ -n "$PR_ATTACK_FILE" ]]; then
         echo "ERROR: --pr-attack file has no parseable 'Base: \`master\` @ <sha>' header: $PR_ATTACK_FILE" >&2
         exit 1
     }
-    _cur_sha="${PR_READY_NOW_MASTER_SHA:-$(git -C "$ROOT" rev-parse --short origin/master 2>/dev/null || echo unknown)}"
+    _cur_sha="${POST_PLAN_FLEET_MASTER_SHA:-$(git -C "$ROOT" rev-parse --short origin/master 2>/dev/null || echo unknown)}"
     _REPORT_MASTER_SHA="$_cur_sha"
     # Compare on the shorter of the two lengths so a 7-vs-8-char abbreviation is not a false STALE.
     _min="${#_old_sha}"; [[ "${#_cur_sha}" -lt "$_min" ]] && _min="${#_cur_sha}"
@@ -417,7 +388,7 @@ fi
 
 # --- gh identity -------------------------------------------------------------------------
 # Resolved, never hardcoded: the local-part of the git email is NOT the GitHub login.
-GH_USER="${PR_READY_NOW_GH_USER:-$(gh api user --jq .login 2>/dev/null || true)}"
+GH_USER="${POST_PLAN_FLEET_GH_USER:-$(gh api user --jq .login 2>/dev/null || true)}"
 [[ -n "$GH_USER" ]] || {
     echo "ERROR: gh api user failed — is gh authenticated? (run: gh auth status)" >&2
     exit 1
@@ -429,9 +400,9 @@ fi
 
 # --- selector ----------------------------------------------------------------------------
 pr_json() {
-    if [[ -n "${PR_READY_NOW_PR_JSON:-}" ]]; then
-        [[ -f "$PR_READY_NOW_PR_JSON" ]] || { echo "ERROR: PR_READY_NOW_PR_JSON not found: $PR_READY_NOW_PR_JSON" >&2; exit 1; }
-        cat "$PR_READY_NOW_PR_JSON"
+    if [[ -n "${POST_PLAN_FLEET_PR_JSON:-}" ]]; then
+        [[ -f "$POST_PLAN_FLEET_PR_JSON" ]] || { echo "ERROR: POST_PLAN_FLEET_PR_JSON not found: $POST_PLAN_FLEET_PR_JSON" >&2; exit 1; }
+        cat "$POST_PLAN_FLEET_PR_JSON"
     else
         gh pr list --state open --author "@me" --limit 100 \
             --json number,title,isDraft,headRefName,author
@@ -479,6 +450,11 @@ select_prs() {
 # return 1 = skip just this PR.
 validate_explicit() {
     local pr="$1" meta state draft author
+    # Skip the live gh call in dry-run mode (allows --dry-run --pr N with a fictional PR number).
+    if [[ "${POST_PLAN_FLEET_DRY_RUN:-}" == "1" ]]; then
+        echo "pr-$pr-dry-run"
+        return 0
+    fi
     meta="$(gh pr view "$pr" --json number,state,isDraft,headRefName,author 2>/dev/null)" || {
         echo "ERROR: PR #$pr not found (gh pr view failed)" >&2; return 2; }
     state="$(jq -r '.state' <<< "$meta")"
@@ -511,23 +487,23 @@ PR_LIST="$(select_prs)" || {
 LAUNCHCTL_LIST="$(launchctl list 2>/dev/null || true)"
 
 # Snapshot the worktree list ONCE, outside the per-PR loop (invariant across the run).
-# PR_READY_NOW_WTL: when set to a non-empty path, read the listing from that file (test
+# POST_PLAN_FLEET_WTL: when set to a non-empty path, read the listing from that file (test
 # seam); when unset or empty, shell to git worktree list. The :- form ensures an
 # empty value falls back to git rather than pointing at an empty listing that would
 # silently skip every PR (the single-dash form would honour the empty value as-is).
-_WTL="${PR_READY_NOW_WTL:-}"
+_WTL="${POST_PLAN_FLEET_WTL:-}"
 if [[ -z "$_WTL" ]]; then
-    _WTL="/tmp/pr-ready-now-wtl.txt"
+    _WTL="/tmp/post-plan-fleet-wtl.txt"
     git -C "$ROOT" worktree list > "$_WTL"
 else
-    [[ -f "$_WTL" ]] || { echo "ERROR: PR_READY_NOW_WTL not found: $_WTL" >&2; exit 1; }
+    [[ -f "$_WTL" ]] || { echo "ERROR: POST_PLAN_FLEET_WTL not found: $_WTL" >&2; exit 1; }
 fi
 
 while read -r pr; do
     [[ -n "$pr" ]] || continue
     # Anchored at end-of-line: the label carries no suffix, so an unanchored match
     # would let a live PR 1892 job suppress a fire for PR 189.
-    if grep -qE "com\.ibl5\.pr-ready-now-${pr}$" <<< "$LAUNCHCTL_LIST"; then
+    if grep -qE "com\.ibl5\.post-plan-fleet-${pr}$" <<< "$LAUNCHCTL_LIST"; then
         SKIP_LINES+=("$pr|-|—|already running — skipped"); continue
     fi
     if [[ ${#EXPLICIT_PRS[@]} -gt 0 ]]; then
@@ -547,7 +523,7 @@ while read -r pr; do
     else                                pre="—"
     fi
     if [[ -z "$w" ]]; then
-        SKIP_LINES+=("$pr|$branch|$pre|no worktree"); continue
+        [[ "${POST_PLAN_FLEET_DRY_RUN:-}" == "1" ]] || { SKIP_LINES+=("$pr|$branch|$pre|no worktree"); continue; }
     fi
     FIRE_PRS+=("$pr"); FIRE_BRANCHES+=("$branch"); FIRE_PRE+=("$pre")
 done <<< "$PR_LIST"
@@ -588,44 +564,26 @@ fi
 # process-local and do not survive the launchd boundary (defect class B1, 33280f865).
 fire_pr() {
     local PR="$1"
-    local LABEL="com.ibl5.pr-ready-now-${PR}"
+    local LABEL="com.ibl5.post-plan-fleet-${PR}"
     local PLIST="$HOME/Library/LaunchAgents/${LABEL}.plist"
-    local RUNNER="/tmp/pr-ready-now-runner-${PR}.sh"
-    local LOG="/tmp/pr-ready-now-${PR}.log"
-    local PROMPT="/tmp/pr-ready-now-prompt-${PR}.md"
-    mkdir -p "$(dirname "$PLIST")"   # lets bin/test-pr-ready-now drive this on Linux CI
+    local RUNNER="/tmp/post-plan-fleet-runner-${PR}.sh"
+    local LOG="/tmp/post-plan-fleet-${PR}.log"
+    mkdir -p "$(dirname "$PLIST")"   # lets bin/test-post-plan-fleet drive this on Linux CI
 
-    # A --stop that was itself interrupted can leave this PR's /pr-ready scratch behind, and a
-    # stale pr-ready-diff-pre-<N>.patch would be read as THIS run's baseline. Clear it — but
-    # only when the label is provably dead, so we can never delete a live run's working state.
-    # The glob is deliberately broad (a new /pr-ready scratch name is covered automatically);
-    # the driver's OWN three paths are excluded by name, because $PROMPT and $RUNNER are written
-    # just below and $LOG is read by the report phase — bin/test-pr-ready-now cases 21, 22 and 26
-    # pre-plant /tmp/pr-ready-now-<PR>.log for a PR they then fire.
-    # $LOG.aborted is deliberately NOT excluded: the previous abort's forensics are superseded
-    # the moment this PR is re-fired, and that is what bounds /tmp growth.
+    # Clear stale scratch from a previously interrupted --stop, but only when the label is
+    # provably dead. The driver's OWN two paths (LOG, RUNNER) are excluded by name; LOG is
+    # read by the report phase and pre-planted by test cases 21, 22 and 26.
+    # LOG.aborted is NOT excluded: the previous abort's forensics are superseded on re-fire.
     local _stale
     if ! _label_alive "$LABEL"; then
-        for _stale in /tmp/pr-ready-*-"${PR}".*; do
+        for _stale in /tmp/post-plan-fleet-*-"${PR}".* /tmp/post-plan-fleet-runner-"${PR}".sh; do
             [[ -e "$_stale" ]] || continue
             case "$_stale" in
-                "$LOG"|"$PROMPT"|"$RUNNER") continue ;;
+                "$LOG"|"$RUNNER") continue ;;
             esac
             rm -f "$_stale"
         done
     fi
-
-    # BQ1 probed YES on 2026-08-21: disable-model-invocation gates the in-session Skill
-    # tool, not the user position, so `claude -p "/pr-ready N"` resolves the slash command.
-    printf '/pr-ready %s\n' "$PR" > "$PROMPT"
-
-    # After the stale sweep above, deliberately: /tmp/pr-ready-now-<PR>.session matches
-    # its glob, and clearing the PREVIOUS run's sidecar is the behavior we want. Writing
-    # before the sweep would delete this run's own sidecar.
-    local SESSION_ID
-    SESSION_ID=$(mint_session_id) || { echo "pr-ready-now: could not mint a session uuid." >&2; return 1; }
-    write_session_sidecar "$LOG" "$SESSION_ID" \
-        || { echo "pr-ready-now: could not write the session sidecar next to $LOG." >&2; return 1; }
 
     # Header is shell-quoted once via %q; the body is a quoted heredoc emitted verbatim,
     # so nothing in it expands twice.
@@ -634,102 +592,62 @@ fire_pr() {
         printf 'LABEL=%q\n'      "$LABEL"
         printf 'PLIST=%q\n'      "$PLIST"
         printf 'LOG=%q\n'        "$LOG"
-        printf 'PROMPT=%q\n'     "$PROMPT"
-        printf 'MODEL=%q\n'      "$MODEL"
-        printf 'EFFORT=%q\n'     "$EFFORT"
-        printf 'CLAUDE_BIN=%q\n' "$CLAUDE_BIN"
-        printf 'SESSION_ID=%q\n' "$SESSION_ID"
         printf 'PR=%q\n'         "$PR"
         printf 'NOTIFY=%q\n'     "$NOTIFY"
-        printf 'MARKER=%q\n'     "/tmp/pr-ready-marker-${PR}.txt"
-        printf 'DISCORD_DM=%q\n' "${PR_READY_NOW_DISCORD_DM:-$ROOT/bin/discord-dm}"
+        printf 'DISCORD_DM=%q\n' "${POST_PLAN_FLEET_DISCORD_DM:-$ROOT/bin/discord-dm}"
         cat <<'RUNNER_EOF'
 export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/Applications/cmux.app/Contents/Resources/bin:$PATH"
 cd "$ROOT" || exit 1
 STARTED=$(date +%s)
 RC=0
-CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CLAUDE_HEADLESS=1 \
-    caffeinate -s timeout 5400 "$CLAUDE_BIN" -p "$(cat "$PROMPT")" \
-    --dangerously-skip-permissions \
-    --model "$MODEL" --session-id "$SESSION_ID" --effort "$EFFORT" \
-    --name "$LABEL" > "$LOG" 2>&1 || RC=$?
+"$ROOT/bin/post-plan-now" --pr "$PR" --foreground > "$LOG" 2>&1 || RC=$?
 ELAPSED=$(( $(date +%s) - STARTED ))
 notify() {
     [ "$NOTIFY" = 1 ] || return 0
     if [ ! -x "$DISCORD_DM" ]; then
-        echo "pr-ready-now: no executable discord-dm at $DISCORD_DM — not notifying."
+        echo "post-plan-fleet: no executable discord-dm at $DISCORD_DM — not notifying."
         return 0
     fi
     local DM_ICON="" DM_VERDICT="" DM_NEXT="" msg
-    local marker_line=""
-    if [ -f "$MARKER" ]; then
-        marker_line=$(grep -m1 'PR-READY-VERDICT-MARKER-V1|' "$MARKER" \
-            | sed 's/^[^P]*\(PR-READY-VERDICT-MARKER-V1|\)/\1/' \
-            | sed 's/[`* ]*$//')
+    local verdict=""
+    # Primary: find harness-run-dir from log and read result.json
+    local run_dir=""
+    run_dir=$(grep -m1 'harness-run-dir=' "$LOG" 2>/dev/null \
+        | grep -o 'harness-run-dir=[^[:space:]]*' | cut -d= -f2 || true)
+    if [ -n "$run_dir" ] && [ -f "$run_dir/result.json" ]; then
+        verdict=$(grep -m1 '"verdict_1"' "$run_dir/result.json" 2>/dev/null \
+            | sed 's/.*"verdict_1": *"\([^"]*\)".*/\1/;/^null$/d' || true)
     fi
-    if [ -z "$marker_line" ] && [ -f "$LOG" ]; then
-        marker_line=$(grep -m1 'PR-READY-VERDICT-MARKER-V1|' "$LOG" \
-            | sed 's/^[^P]*\(PR-READY-VERDICT-MARKER-V1|\)/\1/' \
-            | sed 's/[`* ]*$//')
-    fi
-    local marker_pr=""
-    marker_pr=$(printf '%s' "$marker_line" | grep -o 'pr=[^|]*' | cut -d= -f2)
-    if [ "$marker_pr" != "$PR" ]; then
-        marker_line=""
-    fi
-    if [ -n "$marker_line" ]; then
-        local v=""
-        v=$(printf '%s' "$marker_line" | grep -o 'verdict=[^|]*' | cut -d= -f2)
-        local url=""
-        url=$(printf '%s' "$marker_line" | grep -o 'url=[^|]*' | cut -d= -f2)
-        local holds=""
-        holds=$(printf '%s' "$marker_line" | grep -o 'holds=[^|]*' | sed 's/holds=//')
-        case "$v" in
-            READY)           DM_ICON="✅"; DM_VERDICT="READY";           DM_NEXT="merge when you're ready" ;;
-            READY-WITH-NOTES) DM_ICON="⚠️"; DM_VERDICT="READY WITH NOTES"; DM_NEXT="$holds" ;;
-            NOT-READY)       DM_ICON="❌"; DM_VERDICT="NOT READY";        DM_NEXT="read the verdict comment" ;;
-            *)               DM_ICON="❓"; DM_VERDICT="unconfirmed — no verdict marker"; DM_NEXT="read the log" ;;
+    # Fallback: derive from RESULT: line in log
+    if [ -z "$verdict" ] && [ -f "$LOG" ]; then
+        local result_line=""
+        result_line=$(grep -m1 '^RESULT:' "$LOG" 2>/dev/null || true)
+        case "$result_line" in
+            *"terminal=shipped-armed"*)  verdict="READY" ;;
+            *"terminal=shipped-held"*)   verdict="READY WITH NOTES" ;;
+            *"BLOCKED"*|*"FAILED"*)      verdict="NOT READY" ;;
         esac
-        msg="${DM_ICON} pr-ready-now: PR #${PR}
-RESULT ${DM_VERDICT}
-${ELAPSED}s · ${DM_NEXT}"
-        if [ -n "$url" ] && [ "$url" != "-" ]; then
-            msg="$msg
-$url"
-        fi
-    elif [ "$RC" = 124 ]; then
-        DM_ICON="⏱"; DM_VERDICT="TIMED OUT after 5400s"; DM_NEXT="re-fire, or read the log"
-        msg="${DM_ICON} pr-ready-now: PR #${PR}
-RESULT ${DM_VERDICT}
-${ELAPSED}s · ${DM_NEXT}"
-    elif [ "$RC" != 0 ]; then
-        DM_ICON="💥"; DM_VERDICT="runner exited rc=${RC}"; DM_NEXT="read the log"
-        msg="${DM_ICON} pr-ready-now: PR #${PR}
-RESULT ${DM_VERDICT}
-${ELAPSED}s · ${DM_NEXT}"
-    else
-        local stop_line=""
-        stop_line=$(grep -m1 '^[[:space:]>*_`-]*STOP:' "$LOG" 2>/dev/null || true)
-        if [ -n "$stop_line" ]; then
-            DM_ICON="🛑"; DM_VERDICT="STOPPED"
-            DM_NEXT=$(printf '%s' "$stop_line" | cut -c1-200)
-            msg="${DM_ICON} pr-ready-now: PR #${PR}
-RESULT ${DM_VERDICT}
-${ELAPSED}s · ${DM_NEXT}"
-        else
-            DM_ICON="❓"; DM_VERDICT="unconfirmed — no verdict marker"; DM_NEXT="read the log"
-            msg="${DM_ICON} pr-ready-now: PR #${PR}
-RESULT ${DM_VERDICT}
-${ELAPSED}s · ${DM_NEXT}"
-        fi
     fi
-    msg="$msg
+    case "$verdict" in
+        READY)             DM_ICON="✅"; DM_VERDICT="READY";           DM_NEXT="merge when you're ready" ;;
+        "READY WITH NOTES") DM_ICON="⚠️"; DM_VERDICT="READY WITH NOTES"; DM_NEXT="check the holds" ;;
+        "NOT READY")       DM_ICON="❌"; DM_VERDICT="NOT READY";        DM_NEXT="read the verdict comment" ;;
+        *)
+            if [ "$RC" != 0 ]; then
+                DM_ICON="💥"; DM_VERDICT="runner exited rc=${RC}"; DM_NEXT="read the log"
+            else
+                DM_ICON="❓"; DM_VERDICT="unconfirmed"; DM_NEXT="read the log"
+            fi ;;
+    esac
+    msg="${DM_ICON} post-plan-fleet: PR #${PR}
+RESULT ${DM_VERDICT}
+${ELAPSED}s · ${DM_NEXT}
 log: $LOG"
     if ! printf '%s' "$msg" | "$DISCORD_DM" -; then
-        echo "pr-ready-now: DM UNDELIVERED (spooled by discord-dm) — the verdict above stands."
+        echo "post-plan-fleet: DM UNDELIVERED (spooled by discord-dm) — the verdict above stands."
     fi
 }
-# Releasing the slot is the FIRST post-claude action: "plist present" == "job live"
+# Releasing the slot is the FIRST post-run action: "plist present" == "job live"
 # is what the concurrency cap counts.
 rm -f "$PLIST"
 # THEN notify, and only THEN bootout. The bootout command terminates this job, and
@@ -761,8 +679,9 @@ RUNNER_EOF
 </dict></plist>
 PLIST_EOF
 
-    if [[ -n "${PR_READY_NOW_DRY_RUN:-}" ]]; then
-        echo "DRY(plist) PR #${PR}: runner=${RUNNER} plist=${PLIST}"
+    if [[ -n "${POST_PLAN_FLEET_DRY_RUN:-}" ]]; then
+        echo "DRY(invocation) PR #${PR}: $ROOT/bin/post-plan-now --pr $PR --foreground"
+        cat "$PLIST"
         return 0
     fi
     launchctl bootout "gui/$(id -u)/${LABEL}" 2>/dev/null || true
@@ -778,7 +697,7 @@ PLIST_EOF
 # exist yet when the --stop path runs.
 live_slots() {
     local f n=0
-    for f in "$HOME/Library/LaunchAgents"/com.ibl5.pr-ready-now-*.plist; do
+    for f in "$HOME/Library/LaunchAgents"/com.ibl5.post-plan-fleet-*.plist; do
         # A non-matching glob stays literal, so -e is what distinguishes zero from one.
         if [[ -e "$f" ]]; then n=$((n + 1)); fi
     done
@@ -788,9 +707,9 @@ live_slots() {
 reap_stale() {   # plist on disk, no live label AND no live process = the job really died
     # Under the test seam nothing is ever bootstrapped, so every plist would look stale
     # and the reaper would eat the very output the cap is counting.
-    [[ -n "${PR_READY_NOW_DRY_RUN:-}" ]] && return 0
+    [[ -n "${POST_PLAN_FLEET_DRY_RUN:-}" ]] && return 0
     local f label
-    for f in "$HOME/Library/LaunchAgents"/com.ibl5.pr-ready-now-*.plist; do
+    for f in "$HOME/Library/LaunchAgents"/com.ibl5.post-plan-fleet-*.plist; do
         [[ -e "$f" ]] || continue
         label="$(basename "$f" .plist)"
         launchctl list "$label" >/dev/null 2>&1 && continue   # label still live → keep the slot
@@ -806,8 +725,8 @@ wait_for_slot() {
         echo "waiting for slot ($(live_slots)/$JOBS in flight)…"
         reap_stale
         [[ "$(live_slots)" -lt "$JOBS" ]] && break
-        if [[ -n "${PR_READY_NOW_DRY_RUN:-}" ]]; then
-            echo "cap reached under PR_READY_NOW_DRY_RUN — not sleeping; stopping here." >&2
+        if [[ -n "${POST_PLAN_FLEET_DRY_RUN:-}" ]]; then
+            echo "cap reached under POST_PLAN_FLEET_DRY_RUN — not sleeping; stopping here." >&2
             exit 0
         fi
         sleep 5; waited=$((waited + 5))
@@ -822,10 +741,10 @@ done
 
 # --- wait for completion -----------------------------------------------------------------
 # Active only when --wait and --go are both set. Polls live_slots() (plist count) until all
-# sessions finish. Under PR_READY_NOW_DRY_RUN=1 the block is skipped entirely: fire_pr
+# sessions finish. Under POST_PLAN_FLEET_DRY_RUN=1 the block is skipped entirely: fire_pr
 # leaves plists on disk under dry-run, and sleeping on them would hang indefinitely.
 if [[ "$WAIT" -eq 1 && "$GO" -eq 1 ]]; then
-    if [[ -z "${PR_READY_NOW_DRY_RUN:-}" ]]; then
+    if [[ -z "${POST_PLAN_FLEET_DRY_RUN:-}" ]]; then
         _wait_elapsed=0
         while :; do
             reap_stale

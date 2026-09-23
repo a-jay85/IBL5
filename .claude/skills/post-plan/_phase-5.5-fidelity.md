@@ -1,11 +1,11 @@
 ---
 description: /post-plan Phase 5.5 — plan-intent fidelity review (one Opus reviewer spawn, plus one bounded re-review after remediation), verdict parse, remediation, and sticky merge-digest comment.
-last_verified: 2026-09-17
+last_verified: 2026-09-22
 ---
 
 # /post-plan Phase 5.5 — Plan-intent fidelity review & merge digest
 
-Purpose: ask whether the implementation does what the plan *intended*, not merely what its tests assert — the semantic question Phase 5.0 structurally cannot answer. The fidelity criteria stay in `.claude/skills/pr-ready/_plan-fidelity-review.md`; the remediation procedure stays in `.claude/skills/pr-ready/_phase65-remediation.md`. This file sequences them and adds the post-plan-specific glue.
+Purpose: ask whether the implementation does what the plan *intended*. The semantic question Phase 5.0 structurally cannot answer. The fidelity criteria stay in `.claude/review-shared/_plan-fidelity-review.md`; the remediation procedure stays in `.claude/review-shared/_phase65-remediation.md`. This file sequences them and adds the post-plan-specific glue.
 
 `<MASTER_SHA>` and `<N>` below are **literals to substitute** with the values pinned in step 1 — a value captured in one Bash call does not survive into the next, and every `/post-plan` block runs in a fresh shell.
 
@@ -35,7 +35,7 @@ The prompt hands the def its five 6b inputs and the output path. Output path: `/
 Provide these seven inputs in the spawn prompt (items 1, 2, 6, 7 are post-plan-specific; items 3–5 are the `_plan-fidelity-review.md` contract inputs):
 
 1. **Output path** — `/tmp/post-plan-fidelity-verdict-<N>.md`. The def's output contract item 1 writes the verdict to the absolute path the prompt names.
-2. **`<MASTER_SHA>`** — the pinned value from step 1, so the def can `git show <MASTER_SHA>:.claude/skills/pr-ready/_plan-fidelity-review.md`. If the `Read`-by-worktree-path fallback fires instead, the def records `include-source: worktree (pin predates skill)` and step 6 surfaces that line in the sticky comment.
+2. **`<MASTER_SHA>`.** The pinned value from step 1, so the def can `git show <MASTER_SHA>:.claude/review-shared/_plan-fidelity-review.md`. If the `Read`-by-worktree-path fallback fires instead, the def records `include-source: worktree (pin predates skill)` and step 6 surfaces that line in the sticky comment.
 3. **Plan file** — the plan resolved in Phase 1 (`~/claude-plans/<branch>.md`). On a plan-blind run (`PLAN_FOUND=none`), declare input 1 absent and instruct the reviewer to state that plainly, mark 6d checks 1, 2 and 5 `not assessable — plan-blind run`, still perform checks 3, 4 and 6, and still emit one 6e verdict word plus the 6e(b) digest (taking `**Why:**` from the PR body, which 6e(b) permits). Do **not** skip the review and do **not** synthesise a `NOT READY` — either would block auto-merge on every ad-hoc PR, a behaviour regression.
 4. **Full post-rebase diff** — `gh pr diff <N>`. Phase 1's rebase already ran, so this diff is post-rebase by construction; say so in the prompt.
 5. **PR body** — `gh pr view <N> --json body`.
@@ -93,7 +93,7 @@ Appending a metadata line is **not** editing the verdict: the word, the findings
 
 ## Step 4 — Remediation on `READY WITH NOTES` (and `NOT READY`)
 
-Load the procedure in place: `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase65-remediation.md`. Run it as written — including its step 2 clean-tree precondition (`STOP: worktree dirty before remediation`), its fifth-file gate handoff to one `subagent_type: "sonnet-4-6"` delegate, its single `chore:` commit, and its push through `scripts/push.sh` (a bare `--force-with-lease` publishes nothing on a branch with no upstream).
+Load the procedure in place: `git show <MASTER_SHA>:.claude/review-shared/_phase65-remediation.md`. Run it as written. The procedure covers its step 2 clean-tree precondition (`STOP: worktree dirty before remediation`), its fifth-file gate handoff to one `subagent_type: "sonnet-4-6"` delegate, and its single `chore:` commit. The harness pushes after the agent exits.
 
 Three post-plan-specific rules on top — these are where a re-spawn would otherwise creep in:
 
@@ -194,7 +194,7 @@ printf 'V2_FINDINGS_PRESENT=%s\n' "$([ -n "$V2_FINDINGS" ] && echo yes || echo n
 Mirror `_phase7-verdict.md`'s chain exactly, pointed at post-plan's verdict path. `digest.sh` takes the verdict file as `$1`, so it works unchanged. The **trailing `cat` is load-bearing** — without it the five lines sit on disk and never enter context, so there is nothing to paste into the `Write` call in step 6. `digest.sh` exits 0 on every degrade path and prints five `unavailable — <reason>` lines rather than failing, so this chain never aborts the run.
 
 ```bash
-git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/digest.sh > /tmp/post-plan-digest-<N>.sh \
+git show <MASTER_SHA>:.claude/review-shared/scripts/digest.sh > /tmp/post-plan-digest-<N>.sh \
   && test -s /tmp/post-plan-digest-<N>.sh \
   && bash /tmp/post-plan-digest-<N>.sh /tmp/post-plan-fidelity-verdict-<N>.md > /tmp/post-plan-digest-lines-<N>.txt \
   && cat /tmp/post-plan-digest-lines-<N>.txt

@@ -617,7 +617,7 @@ done
 # here, because post_review_summary posts via `gh pr comment`. That is the PR #2182 false
 # `REVIEW-COVERAGE: NONE`. Assert the coupling functionally rather than by eye: pull the
 # regex out of the probe itself, then run it over output this lib really produced.
-PROBE_SH="$REPO_ROOT/.claude/skills/pr-ready/scripts/4b-probe.sh"
+PROBE_SH="$REPO_ROOT/.claude/review-shared/scripts/4b-probe.sh"
 ENVELOPE_RE=""
 if [ -r "$PROBE_SH" ]; then
     # The probe embeds the regex inside a jq string literal, so its backslashes are

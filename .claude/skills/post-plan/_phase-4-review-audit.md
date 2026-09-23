@@ -28,10 +28,10 @@ decide: `test -f "/tmp/postplan-conflict-resolved-$(git rev-parse --abbrev-ref H
 && echo conflicts || echo ""`.
 
 ```bash
-git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/skip-review.sh > /tmp/post-plan-skip-<N>.sh && test -s /tmp/post-plan-skip-<N>.sh && bash /tmp/post-plan-skip-<N>.sh --delta <N> "<CONFLICTS_FLAG>"
+git show <MASTER_SHA>:.claude/review-shared/scripts/skip-review.sh > /tmp/post-plan-skip-<N>.sh && test -s /tmp/post-plan-skip-<N>.sh && bash /tmp/post-plan-skip-<N>.sh --delta <N> "<CONFLICTS_FLAG>"
 ```
 
-The `<MASTER_SHA>` pin mirrors the live caller at `.claude/skills/pr-ready/SKILL.md:229` and is
+The `<MASTER_SHA>` pin mirrors the live caller at `.claude/review-shared/scripts/skip-review.sh` and is
 deliberate, not incidental: running the worktree copy would let a PR that edits `skip-review.sh`
 scope its own review with its own not-yet-reviewed delta code.
 
@@ -66,7 +66,7 @@ scoring must describe the PR, not the delta.
 A–E gate evaluates false. Do **not** return early and do **not** skip 4B. Still post a
 `#### Code review` heading, with a body stating that no changes have landed since the last reviewed
 tree, naming the `DELTA-BASE` SHA, and recording zero findings.
-`.claude/skills/pr-ready/scripts/4b-probe.sh` matches `^#{1,6} +Code review` to set
+`.claude/review-shared/scripts/4b-probe.sh` matches `^#{1,6} +Code review` to set
 `PHASE_4B_RAN`, so a silent 4B stalls the Phase 6.5 arming pass — this heading is load-bearing, not
 cosmetic. Phase 4D then scores it as an ordinary zero-finding review: `post_review_findings` 0,
 `post_review_summary` naming the empty delta, and the `prf_envelope_count` envelope still lands.
@@ -176,7 +176,7 @@ Otherwise launch a **single Haiku agent**, pass it the issues list plus the **Sc
 > alternative spelling of the calls below — the envelope the helper emits (`### Code review` /
 > `### Security audit` heading, `<details>` wrapper, `<!-- score: N -->` markers, `PRF_FOOTER`)
 > is **machine-parsed downstream** by three consumers:
-> `.claude/skills/pr-ready/scripts/4b-probe.sh` (matches `^#{1,6} +Code review` to set
+> `.claude/review-shared/scripts/4b-probe.sh` (matches `^#{1,6} +Code review` to set
 > `PHASE_4B_RAN`), `list_open_review_findings` / `resolve_review_finding` (read the score marker
 > and the inline threads to disposition findings), and the `unresolved-findings-hold` gate.
 > A hand-written comment performs a real review whose artifact is invisible to all three:

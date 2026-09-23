@@ -9,14 +9,14 @@
 # Usage: bin/test-digest-dm-build
 #
 # No network, no gh, no Discord. Everything is stdin fixtures plus one real invocation
-# of .claude/skills/pr-ready/scripts/digest.sh (the producer).
+# of .claude/review-shared/scripts/digest.sh (the producer).
 
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DRIVER="$SCRIPT_DIR/digest-dm-build"
-PRODUCER="$ROOT/.claude/skills/pr-ready/scripts/digest.sh"
+PRODUCER="$ROOT/.claude/review-shared/scripts/digest.sh"
 
 SCRATCH="$(mktemp -d "${TMPDIR:-/tmp}/tddb.XXXXXX")"
 trap 'rm -rf "$SCRATCH"' EXIT

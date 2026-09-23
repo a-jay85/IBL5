@@ -18,7 +18,7 @@ git rev-list --count <MASTER_SHA>..HEAD   # commit count drives the squash decis
 **Then record the pre-rebase tip.** This is the input to the Phase 1.4 prior-collapse guard on the *next* run, so it must be written after the pre-rebase diff and still before any history is rewritten:
 
 ```bash
-git show <MASTER_SHA>:.claude/skills/pr-ready/scripts/collapse-guard.sh > /tmp/pr-ready-collapse-<N>.sh && test -s /tmp/pr-ready-collapse-<N>.sh && bash /tmp/pr-ready-collapse-<N>.sh record <N> <BRANCH>
+git show <MASTER_SHA>:.claude/review-shared/scripts/collapse-guard.sh > /tmp/pr-ready-collapse-<N>.sh && test -s /tmp/pr-ready-collapse-<N>.sh && bash /tmp/pr-ready-collapse-<N>.sh record <N> <BRANCH>
 ```
 
 The recorded tip is a convenience, not a dependency: the guard's reflog arm works without it. If this command fails, note it and continue — a failed `record` is never a reason to stop a run.

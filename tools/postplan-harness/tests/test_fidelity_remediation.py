@@ -306,6 +306,7 @@ def test_fidelity_notes_prompt_types_notes_and_drops_when_torn():
     assert "still worth doing" in prompt
     assert "do NOT call it" in prompt          # the drop-when-torn instruction
     assert '"kind": "followup"' in prompt      # the shape Haiku must return
+    assert "name the file" in prompt           # detail must stand alone in the issue
 
 
 def test_extract_notes_returns_empty_on_llm_failure(tmp_path):
@@ -332,10 +333,26 @@ def test_file_note_issues_dedupes_by_normalized_title(tmp_path):
         {"title": "Add index on email", "detail": "Needs an index."},
         {"title": "Add Index On Email!", "detail": "Same thing."},
     ]
-    nums = fidelity.file_note_issues(gh, notes, 99, "verdict text")
+    nums = fidelity.file_note_issues(gh, notes, 99)
     assert len(nums) == 1
     acts = [a for a in gh.actions() if a["action"] == "issue_create"]
     assert len(acts) == 1
+
+
+def test_file_note_issues_body_is_link_plus_detail_only(tmp_path):
+    """The body is the PR link and the note's detail, with no verdict excerpt tail."""
+
+    bodies = []
+
+    class _Gh(RecordingGh):
+        def issue_create(self, title, body, label):
+            bodies.append(body)
+            return super().issue_create(title, body, label)
+
+    gh = _Gh(str(tmp_path))
+    detail = "harness/x.py asserts on the echo. Stub the DM and assert on its argument."
+    fidelity.file_note_issues(gh, [{"title": "Stub the DM", "detail": detail}], 99)
+    assert bodies == [f"https://github.com/a-jay85/IBL5/pull/99\n\n{detail}"]
 
 
 def test_file_note_issues_skips_existing_titles(tmp_path):
@@ -347,7 +364,7 @@ def test_file_note_issues_skips_existing_titles(tmp_path):
 
     gh = _Gh(str(tmp_path))
     notes = [{"title": "Add index on email", "detail": "Needs an index."}]
-    nums = fidelity.file_note_issues(gh, notes, 99, "verdict")
+    nums = fidelity.file_note_issues(gh, notes, 99)
     assert nums == []
     assert not [a for a in gh.actions() if a["action"] == "issue_create"]
 
@@ -645,7 +662,7 @@ def test_notes_dedupe_run_twice(tmp_path, git_shim):
         {"title": "ADD INDEX ON EMAIL!", "detail": "Same."},
     ]
     gh2 = RecordingGh(str(tmp_path))
-    nums2 = fidelity.file_note_issues(gh2, notes_case, 9960, "verdict")
+    nums2 = fidelity.file_note_issues(gh2, notes_case, 9960)
     assert len(nums2) == 1
     creates2 = [a for a in gh2.actions() if a["action"] == "issue_create"]
     assert len(creates2) == 1
@@ -712,7 +729,7 @@ def test_file_note_issues_continues_after_failed_create(tmp_path):
         {"title": "First note", "detail": "Detail one."},
         {"title": "Second note", "detail": "Detail two."},
     ]
-    nums = fidelity.file_note_issues(gh, notes, 99, "verdict")
+    nums = fidelity.file_note_issues(gh, notes, 99)
     assert len(nums) == 1
 
 

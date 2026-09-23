@@ -628,9 +628,14 @@ def extract_notes(llm, verdict_path: str, log=None) -> list[dict]:
         return []
 
 
-def file_note_issues(gh, notes: list[dict], pr_number: int,
-                     verdict_text: str, log=None) -> list[int]:
-    """File deduped backlog issues for READY WITH NOTES notes."""
+def file_note_issues(gh, notes: list[dict], pr_number: int, log=None) -> list[int]:
+    """File deduped backlog issues for READY WITH NOTES notes.
+
+    The body is the PR link plus the note's own detail. It carries no verdict excerpt:
+    the verdict opens with the reviewer's process narration, so a fixed-length cut of it
+    was always off-topic and ended mid-sentence. The full verdict is the PR's sticky
+    comment, one click from the link.
+    """
     log = log or _noop_log
     if not notes:
         return []
@@ -640,9 +645,6 @@ def file_note_issues(gh, notes: list[dict], pr_number: int,
         existing = []
     seen = {_norm_title(t) for t in existing}
     nums = []
-    excerpt = verdict_text[:200]
-    if len(verdict_text) > 200:
-        excerpt += "…"
     pr_link = f"https://github.com/a-jay85/IBL5/pull/{pr_number}"
     for note in notes:
         title = note.get("title", "")
@@ -651,7 +653,7 @@ def file_note_issues(gh, notes: list[dict], pr_number: int,
         if key in seen:
             log(f"phase5.5 notes: skipping duplicate '{title[:50]}'")
             continue
-        body = f"{pr_link}\n\n{detail}\n\n{excerpt}"
+        body = f"{pr_link}\n\n{detail}"
         try:
             n = gh.issue_create(title, body, "maintenance")
             if n is not None:

@@ -1309,14 +1309,6 @@ def _master_sha(worktree: str | None) -> str:
     return proc.stdout.strip() or "origin/master"
 
 
-def _read_text(path: str) -> str:
-    try:
-        with open(path) as fh:
-            return fh.read()
-    except OSError:
-        return ""
-
-
 def _plan_hash(plan) -> str:
     """sha256 of the plan file's BYTES, or "" when there is no readable plan.
 
@@ -1586,8 +1578,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
     # a re-review round. current_verdict_path tracks that review's verdict file.
     if final_verdict == "READY WITH NOTES":
         notes = fidelity.extract_notes(llm, current_verdict_path, log=log)
-        nums = fidelity.file_note_issues(gh, notes, pr, _read_text(current_verdict_path),
-                                         log=log)
+        nums = fidelity.file_note_issues(gh, notes, pr, log=log)
         res.fidelity["backlog_issue_numbers"] = nums
         log(f"phase5.5 notes: {len(notes)} extracted, {len(nums)} backlog issues filed")
     return final_verdict, final_err

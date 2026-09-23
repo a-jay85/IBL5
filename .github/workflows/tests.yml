@@ -867,6 +867,7 @@ jobs:
         run: bin/check-seed-id-uniqueness
       # config-example: CI copies config.php.example verbatim to config.php, so an
       # empty/zero placeholder becomes the CI test environment (PR #1008).
+      # Also pins the config.local.php contract (template shape, fail-closed require).
       - name: Check config.php.example placeholders
         working-directory: ibl5
         run: bin/check-config-example

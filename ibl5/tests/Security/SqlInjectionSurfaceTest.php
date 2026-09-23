@@ -50,9 +50,6 @@ class SqlInjectionSurfaceTest extends TestCase
         $hits = [];
         foreach (self::SCAN_ROOTS as $root) {
             $rootPath = $base . '/' . $root;
-            if (!is_dir($rootPath)) {
-                continue;
-            }
             $iterator = new \RecursiveIteratorIterator(
                 new \RecursiveDirectoryIterator($rootPath, \FilesystemIterator::SKIP_DOTS)
             );

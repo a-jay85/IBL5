@@ -96,14 +96,14 @@ else
 fi
 
 # ── case 7: full-corpus count ────────────────────────────────────────────────
-# Both bin/lib/shell-scripts.sh and bin/test-shell-scripts-lib are new files in
-# this PR; baseline (pre-plan) was 256, post-plan count is 258.
+# Baseline was 256; bin/lib/shell-scripts.sh and bin/test-shell-scripts-lib
+# added 2 (251); retiring .claude/skills/pr-ready removed 7 scripts (251).
 count=$("$HELPER" --full | wc -l | tr -d ' ')
-if [ "$count" = "258" ]; then
-    pass "case 7: full-corpus count is 258"
+if [ "$count" = "251" ]; then
+    pass "case 7: full-corpus count is 251"
 else
-    fail "case 7: full-corpus count is 258" \
-         "got $count (expected 258 = 256 baseline + 2 new files from this PR)"
+    fail "case 7: full-corpus count is 251" \
+         "got $count (expected 251)"
 fi
 
 # ── case 8: unknown flag exits non-zero and prints to stderr ─────────────────
@@ -124,11 +124,11 @@ fi
 system_bash="/bin/bash"
 if [ -x "$system_bash" ]; then
     compat_count=$(BASH="$system_bash" "$system_bash" "$HELPER" --full | wc -l | tr -d ' ')
-    if [ "$compat_count" = "258" ]; then
+    if [ "$compat_count" = "251" ]; then
         pass "case 9: bash 3.2 compat — count matches ($compat_count)"
     else
         fail "case 9: bash 3.2 compat" \
-             "got $compat_count under /bin/bash (expected 258)"
+             "got $compat_count under /bin/bash (expected 251)"
     fi
 else
     pass "case 9: /bin/bash not available — skipped"

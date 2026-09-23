@@ -612,7 +612,7 @@ run_heartbeat_watcher() {
 }
 
 # Map a Claude model id to its tier label for the cost roll-up. Prefix match so
-# a version bump (claude-opus-5 → claude-opus-5) keeps resolving; an unknown or
+# a version bump (claude-opus-5 → claude-opus-5-5) keeps resolving; an unknown or
 # empty id yields "?" rather than a blank cell.
 model_tier() {
     case "${1:-}" in
@@ -1555,7 +1555,7 @@ while true; do
     #   2. `set -euo pipefail` (:13) makes a bare `VAR=$(...)` a runner-wide abort.
     #   3. The `continue` below makes it structurally impossible for a bad value to
     #      reach bin/lib/automouse-escalate-model, whose final-attempt
-    #      `!= claude-opus-5` branch would silently escalate an empty BASE_MODEL.
+    #      `!= claude-opus-5-5` branch would silently escalate an empty BASE_MODEL.
     # On success stderr is empty (capture = model id); on failure stdout is empty
     # (capture = the one-line rejection message).
     if BASE_MODEL=$(bin/lib/plan-impl-model "$NEXT_PLAN" 2>&1); then
@@ -1571,7 +1571,7 @@ while true; do
         {
             printf 'Plan "%s" skipped: unusable `impl_model:` frontmatter. Needs human review.\n\n' "$SLUG"
             printf '%s\n\n' "$BASE_MODEL"
-            printf 'Fix the line-1 frontmatter to one of: opus, sonnet, haiku, claude-opus-5, claude-sonnet-4-6, claude-haiku-4-5 — then `bin/automouse/queue add %s`.\n' "$SLUG"
+            printf 'Fix the line-1 frontmatter to one of: opus, sonnet, haiku, claude-opus-5-5, claude-sonnet-4-6, claude-haiku-4-5 — then `bin/automouse/queue add %s`.\n' "$SLUG"
         } > "$REPORTS_DIR/$(date +%Y-%m-%d)-skipped-$SLUG.md"
         rm -rf "$CURRENT_LOCK" 2>/dev/null || true
         CURRENT_LOCK=""

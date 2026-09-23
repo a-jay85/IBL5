@@ -28,7 +28,7 @@ echo "PR_NUM=$PR_NUM MASTER_SHA=$MASTER_SHA REVIEWED_TREE=$REVIEWED_TREE"
 
 If anything was left unfixed, do **not** re-spawn — a reviewer looking at a tree that still carries a known finding buys nothing and costs an Opus turn.
 
-Spawn with `subagent_type: "pr-ready-phase6"` and **omit `model`** so the def's `model: claude-opus-5` pin wins. This must be an `Agent` spawn and not a `/pr-ready` invocation: this skill's frontmatter carries `disallowed-tools: [EnterPlanMode, ExitPlanMode, Skill]`, so `Skill` is not callable at all.
+Spawn with `subagent_type: "pr-ready-phase6"` and **omit `model`** so the def's `model: claude-opus-5-5` pin wins. This must be an `Agent` spawn and not a `/pr-ready` invocation: this skill's frontmatter carries `disallowed-tools: [EnterPlanMode, ExitPlanMode, Skill]`, so `Skill` is not callable at all.
 
 The prompt hands the def its five 6b inputs and the output path. Output path: `/tmp/post-plan-fidelity-verdict-<N>.md` (substitute `<N>` with the `$PR_NUM` value from step 1). Keyed to the PR number, never to a per-shell PID — every block is a fresh shell, so a PID-keyed path would be written by one block and unreadable by the next.
 
@@ -160,7 +160,7 @@ echo "RE_REVIEW=$([ "$AUTO_MERGE" = false ] && echo skip || echo spawn)"
 
 On `RE_REVIEW=skip`, do not spawn. The plan's author already decided a human merges this PR, so a second Opus verdict changes nothing that will happen to it. Terminal line for that case is the `auto_merge: false` row in the terminal-line recipe above.
 
-On `RE_REVIEW=spawn`, spawn **one** reviewer: `subagent_type: "pr-ready-phase6"`, **omit `model`** so the def's `model: claude-opus-5` pin wins. An `Agent` spawn, never a `/pr-ready` invocation — this skill's frontmatter carries `disallowed-tools: [EnterPlanMode, ExitPlanMode, Skill]`.
+On `RE_REVIEW=spawn`, spawn **one** reviewer: `subagent_type: "pr-ready-phase6"`, **omit `model`** so the def's `model: claude-opus-5-5` pin wins. Use an `Agent` spawn. This skill's frontmatter carries `disallowed-tools: [EnterPlanMode, ExitPlanMode, Skill]`.
 
 **Output path:** `/tmp/post-plan-fidelity-verdict-<N>-2.md` (substitute `<N>` = step 1's `$PR_NUM`). PR-number-keyed, never `$$`/`$PPID`-keyed — condition (12) reads it from a different shell. The `-2` suffix ensures verdict 2 can never overwrite verdict 1.
 

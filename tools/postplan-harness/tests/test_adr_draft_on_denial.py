@@ -915,7 +915,7 @@ def test_push_wrapper_drafts_once_and_repushes(tmp_path, monkeypatch):
     monkeypatch.setattr(
         runner.adr_draft, "draft",
         lambda *a, **k: adr_draft.AdrDraftResult(
-            "ibl5/docs/decisions/0134-x.md", "0134", "claude-opus-5", "b" * 40
+            "ibl5/docs/decisions/0134-x.md", "0134", "claude-opus-5-5", "b" * 40
         ),
     )
     res = RunResult(terminal=TerminalState.FAILED)
@@ -962,7 +962,7 @@ def test_push_wrapper_second_denial_exits_3_and_names_path(tmp_path, monkeypatch
     monkeypatch.setattr(
         runner.adr_draft, "draft",
         lambda *a, **k: adr_draft.AdrDraftResult(
-            "ibl5/docs/decisions/0134-x.md", "0134", "claude-opus-5", "b" * 40
+            "ibl5/docs/decisions/0134-x.md", "0134", "claude-opus-5-5", "b" * 40
         ),
     )
     res = RunResult(terminal=TerminalState.FAILED)

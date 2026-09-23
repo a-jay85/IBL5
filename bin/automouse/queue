@@ -334,7 +334,7 @@ IMPL_MODEL_RAW=$(awk '
 if IMPL_MODEL_TIER=$("$LIB_DIR/plan-model-tier" "$IMPL_MODEL_RAW"); then
     if [ "$IMPL_MODEL_TIER" = "absent" ]; then
         echo "Error: $FILENAME has no usable impl_model: marker:" >&2
-        echo "  impl_model: is missing or blank — add it to the plan's line-1 frontmatter (one of: opus, sonnet, haiku, claude-opus-5, claude-sonnet-4-6, claude-haiku-4-5)" >&2
+        echo "  impl_model: is missing or blank — add it to the plan's line-1 frontmatter (one of: opus, sonnet, haiku, claude-opus-5-5, claude-sonnet-4-6, claude-haiku-4-5)" >&2
         echo "Fix the plan's line-1 frontmatter, then requeue." >&2
         exit 1
     fi

@@ -919,7 +919,7 @@ def test_remediate_forwards_model_alias(tmp_path, git_shim):
                        model="opus")
     purpose, argv = llm.tooled_argvs[-1]
     assert purpose == "fidelity-remediation"
-    assert "claude-opus-5" in argv
+    assert "claude-opus-5-5" in argv
 
 
 def test_remediate_prompt_carries_tagged_work_list_and_deny_text(tmp_path, git_shim):

@@ -104,7 +104,7 @@ def test_tooled_argv_uses_model_when_no_agent():
         add_dirs=(), append_system_prompt="extra", setting_sources="user",
         max_turns=30,
     )
-    assert argv[argv.index("--model") + 1] == "claude-opus-5"
+    assert argv[argv.index("--model") + 1] == "claude-opus-5-5"
     assert "--agent" not in argv
     assert argv[argv.index("--append-system-prompt") + 1] == "extra"
 
@@ -237,7 +237,7 @@ def test_timeout_reaps_the_process_group(shim, tmp_path, monkeypatch):
 
 # --- model allowlist ----------------------------------------------------------
 
-@pytest.mark.parametrize("model", ["fable", "haiku", "claude-opus-5", "opuss"])
+@pytest.mark.parametrize("model", ["fable", "haiku", "claude-opus-5-5", "opuss"])
 def test_model_allowlist_rejects_without_launching(shim, tmp_path, model):
     with pytest.raises(HarnessError) as exc:
         _cli(tmp_path).call_tooled("fidelity", model, "p", cwd=str(tmp_path),
@@ -247,7 +247,7 @@ def test_model_allowlist_rejects_without_launching(shim, tmp_path, model):
 
 
 def test_opus_resolves_to_claude_opus_5():
-    assert MODEL_MAP["opus"] == "claude-opus-5"
+    assert MODEL_MAP["opus"] == "claude-opus-5-5"
 
 
 # --- ledger -------------------------------------------------------------------
@@ -263,7 +263,7 @@ def test_ledger_records_usage_and_duration(shim, tmp_path):
     assert rec.duration_ms == 4242
     assert rec.input_tokens == 11
     assert rec.output_tokens == 22
-    assert rec.model == "claude-opus-5"
+    assert rec.model == "claude-opus-5-5"
     assert rec.ok is True
 
 

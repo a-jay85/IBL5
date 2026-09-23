@@ -9,9 +9,9 @@
 # attempt now running (i.e. AFTER bin/automouse/run's pre-impl increment at
 # :647), and MAX_ATTEMPTS, echo exactly one model id for `claude -p --model`.
 #
-# Escalate (echo claude-opus-5) iff BOTH hold:
+# Escalate (echo claude-opus-5-5) iff BOTH hold:
 #   * this is the final attempt         — current_attempt >= max_attempts
-#   * the base model is not already Opus — base != claude-opus-5
+#   * the base model is not already Opus — base != claude-opus-5-5
 # Otherwise echo the base model unchanged. Malformed numeric input never
 # escalates (fail-safe to the declared tier), so a garbled counter cannot
 # spuriously burn an Opus run or escalate an early attempt. See ADR-0085.
@@ -28,7 +28,7 @@ MAX="${3:?Usage: automouse-escalate-model <base_model> <current_attempt> <max_at
 # or `opus` marker. There is no longer an unknown-value default: a rejected value
 # exits nonzero in plan-impl-model and bin/automouse/run disposes the plan before
 # reaching this helper, so BASE is always one of the three whitelisted model ids.
-OPUS="claude-opus-5"
+OPUS="claude-opus-5-5"
 
 # Non-numeric attempt or max → do NOT escalate (preserve the declared tier).
 case "$CUR" in *[!0-9]*|'') echo "$BASE"; exit 0 ;; esac

@@ -82,12 +82,12 @@ bpt_file_absent "$STUB/claude.sentinel" "r10: no hunter spawned on wt-new failur
 bpt_reset
 bpt_set_claim "$CLAIM"
 bpt_set_result_for claude-sonnet-4-6 '{"verdict":"escalate"}'
-bpt_set_result_for claude-opus-5   '{"verdict":"fixed"}'
+bpt_set_result_for claude-opus-5-5   '{"verdict":"fixed"}'
 bpt_hunt_dirty
 bpt_run
 bpt_count "r11: full ladder = 2 tiers" 2 "$STUB/hunt-models.log"
 order="$(tr '\n' ' ' < "$STUB/hunt-models.log")"
-bpt_expect_eq "r11: ladder order cheap→dear, Opus last" "claude-sonnet-4-6 claude-opus-5 " "$order"
+bpt_expect_eq "r11: ladder order cheap→dear, Opus last" "claude-sonnet-4-6 claude-opus-5-5 " "$order"
 bpt_log_lacks "$STUB" hunt-models.log "haiku" "r11: no Haiku tier in the ladder"
 
 # ── Row 12 — hunter-success ships; worktree is DIRTY (uncommitted) at handoff ──
@@ -220,7 +220,7 @@ bpt_log_lacks "$STUB" transition.log "--attempts=2" "r22: never reaches attempt 
 bpt_reset
 bpt_set_claim "$CLAIM"
 bpt_set_result_for claude-sonnet-4-6 '{"verdict":"escalate","terminal":false}'
-bpt_set_result_for claude-opus-5     '{"verdict":"escalate","terminal":true}'
+bpt_set_result_for claude-opus-5-5     '{"verdict":"escalate","terminal":true}'
 bpt_run
 bpt_count     "r22b: full 2-tier ladder ran" 2 "$STUB/hunt-models.log"
 bpt_log_has   "$STUB" transition.log "needs_human" "r22b: terminal at the last tier → needs_human"

@@ -86,7 +86,7 @@ Read at runtime via `git show <MASTER_SHA>:.claude/skills/pr-ready/_phase7-verdi
    | Hold predicates | **Refreshed** — `holds.sh` runs every cycle |
    | READY / NOT READY | **Carried verbatim** from the prior body |
 
-   **Required disclosure line — not optional.** On the skip path the plan-fidelity section must open with one line naming what did not happen: the verdict is carried forward from the recorded reviewed tree, Phase 6 was not re-run this cycle because the tree is unchanged, and the named tree SHA. A reader must never have to infer from the absence of a `phase6-agent:` line that no review ran. Correspondingly, the existing `phase6-agent: pr-ready-phase6 (claude-opus-5)` line is **omitted** on the skip path — claiming an agent ran when it did not is the precise failure this line prevents.
+   **Required disclosure line.** On the skip path the plan-fidelity section must open with one line naming what did not happen: the verdict is carried forward from the recorded reviewed tree, Phase 6 was not re-run this cycle because the tree is unchanged, and the named tree SHA. A reader must never have to infer from the absence of a `phase6-agent:` line that no review ran. Correspondingly, the existing `phase6-agent: pr-ready-phase6 (claude-opus-5-5)` line is **omitted** on the skip path. Claiming an agent ran when it did not is the precise failure this line prevents.
 
    **`### Merge digest` block — fixed shape.** Emit the literal heading `### Merge digest` on
    its own line, immediately after the plan-fidelity verdict section and immediately before the

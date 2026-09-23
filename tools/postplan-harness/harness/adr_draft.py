@@ -23,7 +23,7 @@ from .adapters.llm import MODEL_MAP
 from .state import HarnessError
 
 ADR_DRAFT_PURPOSE = "adr-draft"
-ADR_DRAFT_MODEL = "opus"                      # MODEL_MAP key; resolves to claude-opus-5
+ADR_DRAFT_MODEL = "opus"                      # MODEL_MAP key; resolves to claude-opus-5-5
 ADR_DRAFT_MAX_TURNS = 20
 ADR_DRAFT_ALLOWED_TOOLS = ("Read", "Grep", "Glob", "Write")
 ADR_DRAFT_DENIED_TOOLS = ("Bash", "Edit", "NotebookEdit", "Agent")

@@ -767,9 +767,9 @@ else
     echo "FAIL: gate13-haiku45-manual — expected 'Truly-manual row forbids impl_model: claude-haiku-4-5'"; FAILED=1
 fi
 
-# (i) Full-id claude-opus-5 with a Truly-manual row passes (exit 0) — mirrors (f).
+# (i) Full-id claude-opus-5-5 with a Truly-manual row passes (exit 0) — mirrors (f).
 assert "gate13-opus5-manual-ok" 0 '---
-impl_model: claude-opus-5
+impl_model: claude-opus-5-5
 ---'"$M_MANUAL"
 
 # (j) Unknown model values are rejected by the whitelist before the manual-row
@@ -979,7 +979,7 @@ _gT_body='
 
 Do the mechanical thing.
 '
-for _gT_pair in "opus:claude-opus-5" "sonnet:claude-sonnet-4-6" "haiku:claude-haiku-4-5"; do
+for _gT_pair in "opus:claude-opus-5-5" "sonnet:claude-sonnet-4-6" "haiku:claude-haiku-4-5"; do
     _gT_bare="${_gT_pair%%:*}"; _gT_full="${_gT_pair##*:}"
     _fb="$TMP/gateT-alias-${_gT_bare}.md"
     _ff="$TMP/gateT-alias-${_gT_full}.md"

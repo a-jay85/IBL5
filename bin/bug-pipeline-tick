@@ -116,7 +116,7 @@ file_and_close_row() { # row_json
 
 # ── Hunter seams (#5b) — all default to production; tests override ─────────────
 HUNT_PROMPT_FILE="${BUG_PIPELINE_HUNT_PROMPT:-$SCRIPT_DIR/bug-pipeline-hunter-prompt}"
-HUNT_MODELS="${BUG_PIPELINE_HUNT_MODELS:-claude-sonnet-4-6 claude-opus-5}"  # cheap→dear, Opus last; no Haiku tier
+HUNT_MODELS="${BUG_PIPELINE_HUNT_MODELS:-claude-sonnet-4-6 claude-opus-5-5}"  # cheap→dear, Opus last; no Haiku tier
 HUNTER_TIMEOUT_SECS="${BUG_PIPELINE_HUNTER_TIMEOUT:-1800}"
 HUNT_LOG="${BUG_PIPELINE_HUNT_LOG:-$HOME/.claude/logs/bug-pipeline-hunt.log}"
 # Liveness heartbeat: epoch of the last tick START (bin/bug-pipeline-check reads it).
@@ -141,7 +141,7 @@ CI_AUTOFIX_LOG="${BUG_PIPELINE_CI_AUTOFIX_LOG:-$HOME/.claude/logs/ci-autofix.log
 CI_AUTOFIX_LOCK="${BUG_PIPELINE_CI_AUTOFIX_LOCK:-$HOME/.claude/logs/ci-autofix.lock}"
 CI_AUTOFIX_TIMEOUT_SECS="${BUG_PIPELINE_CI_AUTOFIX_TIMEOUT:-1800}"
 CI_AUTOFIX_SONNET_MODEL="${BUG_PIPELINE_CI_AUTOFIX_SONNET_MODEL:-claude-sonnet-4-6}"
-CI_AUTOFIX_OPUS_MODEL="${BUG_PIPELINE_CI_AUTOFIX_OPUS_MODEL:-claude-opus-5}"
+CI_AUTOFIX_OPUS_MODEL="${BUG_PIPELINE_CI_AUTOFIX_OPUS_MODEL:-claude-opus-5-5}"
 CI_AUTOFIX_LOG_MAX_BYTES="${BUG_PIPELINE_CI_AUTOFIX_LOG_MAX_BYTES:-40000}"  # tail cap on the fetched CI job log
 CI_AUTOFIX_PROMPT_FILE="${BUG_PIPELINE_CI_AUTOFIX_PROMPT:-$SCRIPT_DIR/bug-pipeline-ci-autofix-prompt}"
 CI_AUTOFIX_WT_REPO="${BUG_PIPELINE_CI_AUTOFIX_WT_REPO:-$REPO_ROOT}"

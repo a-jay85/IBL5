@@ -9,7 +9,7 @@
 # a plan that merely *documents* the syntax cannot self-select a model.
 #
 # Accepted values are whitelisted by bin/lib/plan-model-tier: `opus`, `sonnet`,
-# `haiku` and their full ids `claude-opus-5`, `claude-sonnet-4-6`,
+# `haiku` and their full ids `claude-opus-5-5`, `claude-sonnet-4-6`,
 # `claude-haiku-4-5`. An ABSENT marker still resolves to the Opus default (the
 # ~103 marker-less corpus plans depend on it, as does check-plan gate [T]).
 # Anything else is REJECTED: one line on stderr, exit 1, nothing on stdout.
@@ -45,7 +45,7 @@ else
 fi
 
 case "$TIER" in
-  absent|opus-tier) echo "claude-opus-5"     ;;
+  absent|opus-tier) echo "claude-opus-5-5"     ;;
   sonnet-tier)      echo "claude-sonnet-4-6" ;;
   haiku-tier)       echo "claude-haiku-4-5"  ;;
 esac

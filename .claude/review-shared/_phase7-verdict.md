@@ -1,6 +1,6 @@
 ---
-description: /pr-ready runtime Phase 7 — arm-hold evaluation, provenance line, sticky verdict comment, machine-readable verdict marker, hard terminator. Loaded by SKILL.md via git show at Phase 7.
-last_verified: 2026-09-22
+description: Phase 7 arm-hold evaluation, provenance line, sticky verdict comment, and hard terminator. Loaded via git show at Phase 7.
+last_verified: 2026-09-23
 ---
 
 # /pr-ready runtime Phase 7 — holds, sticky verdict, terminator
@@ -99,8 +99,6 @@ Read at runtime via `git show <MASTER_SHA>:.claude/review-shared/_phase7-verdict
    required, an omitted block is not acceptable. `<!-- pr-ready-verdict -->` remains the last
    line of the body, after the READY / NOT READY line — the digest never displaces it.
 
-   **Then emit the machine-readable verdict marker — the last tool call before the STOP terminator.** The comment is posted; this publishes the same verdict in a form `bin/pr-ready-now` can read without parsing prose. Pick the token mechanically from the READY / NOT READY line just written — no judgment: `NOT-READY` if that line says NOT READY; `READY-WITH-NOTES` if it says READY **and** any hold predicate printed something other than `(clear)` or Phase 6.5 left anything `not fixed — filed`; `READY` otherwise.
-
-   It writes `/tmp/pr-ready-marker-<N>.txt` and prints one line beginning `PR-READY-VERDICT-MARKER-V1|`. **Your final message must end with that line, copied verbatim as its last line.** This is not decoration: `bin/pr-ready-now` runs this skill as `claude -p` in default text mode, which captures **only** your final assistant message into the log, so a marker printed only by the Bash step above reaches the file but never the log. The file is the primary channel and that last line is the fallback; emit both. Everything else you would normally say goes above it.
+   On the harness path, `tools/postplan-harness/harness/fidelity.py` `compose_sticky()` writes the sticky comment and reads this verdict token from the fidelity review output. On the skill-fallback path, post the comment directly in this step. Pick the verdict token from the READY / NOT READY line just written: `NOT-READY` if that line says NOT READY; `READY-WITH-NOTES` if it says READY and any hold predicate printed something other than `(clear)` or Phase 6.5 left anything `not fixed — filed`; `READY` otherwise.
 
 4. **STOP — hard terminator.** The run ends at the posted-or-updated comment. No merge. No auto-merge arming. No `/backlog` chain beyond the `gh issue create` call Phase 6.5 already made. No `/post-plan` chain. No worktree teardown. No second comment. The user reviews every PR deliberately.

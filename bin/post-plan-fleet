@@ -196,13 +196,17 @@ fi
 # Fail closed by construction: only pgrep's "no match" (exit 1) proves death. A missing pgrep,
 # or an error exit (procps rejects BSD-only flags with exit 2), reads as ALIVE — so a slot is
 # never freed, and a live session is never killed, on the strength of a broken probe.
-# The runner script path is END-ANCHORED by the .sh suffix: post-plan-fleet-runner-1901.sh
-# cannot match post-plan-fleet-runner-19011.sh without the terminal dot.
+# Two patterns cover the chain: (1) the runner bash (blocks while its child runs), (2) the
+# timeout child (argv contains "post-plan-now --pr <pr>"). Both are checked because a SIGTERM
+# sent to the runner bash does not propagate to timeout's subtree; the child pattern proves
+# the run is still live after the runner exits but timeout has not yet.
 _label_alive() {
     local label="$1" rc=0
     local pr="${label#com.ibl5.post-plan-fleet-}"
     command -v pgrep >/dev/null 2>&1 || return 0
     if pgrep -f "post-plan-fleet-runner-${pr}\.sh" >/dev/null 2>&1; then
+        return 0
+    elif pgrep -f "post-plan-now --pr ${pr}" >/dev/null 2>&1; then
         return 0
     else
         rc=$?      # must be read here: in a condition context set -e is suppressed
@@ -212,22 +216,28 @@ _label_alive() {
 }
 
 # --- stop path (L34) ---------------------------------------------------------------------
-# `launchctl bootout` unloads the label but does NOT kill the reparented caffeinate → timeout
-# → claude chain, so bootout alone leaves the run burning tokens while the plist (the slot
-# token) disappears. Kill by label, verify death, THEN release the slot — in that order.
+# `launchctl bootout` unloads the label but does NOT kill the timeout/bin/post-plan-now
+# child chain, so bootout alone leaves the run burning tokens while the plist (the slot
+# token) disappears. Kill both the runner and its timeout child, verify death, THEN release
+# the slot — in that order.
 stop_one_pr() {
     local PR="$1"
     local LABEL="com.ibl5.post-plan-fleet-${PR}"
     local PLIST="$HOME/Library/LaunchAgents/${LABEL}.plist"
     local LOG="/tmp/post-plan-fleet-${PR}.log"
     # End-anchored by .sh: runner-1901 (unanchored) also matches PR 19011 mid-publish.
+    # CHILD_PAT matches timeout's argv, which retains "post-plan-now --pr $PR" after
+    # bin/post-plan-now execs into /bin/bash; killing timeout brings down its subtree.
     local PAT="post-plan-fleet-runner-${PR}\.sh"
+    local CHILD_PAT="post-plan-now --pr ${PR}"
     local waited=0 keep=""
 
     launchctl bootout "gui/$(id -u)/${LABEL}" 2>/dev/null || true
     pkill -TERM -f "$PAT" 2>/dev/null || true
-    sleep 2                                    # grace: let claude flush its log and exit
+    pkill -TERM -f "$CHILD_PAT" 2>/dev/null || true
+    sleep 2                                    # grace: let the run flush its log and exit
     pkill -KILL -f "$PAT" 2>/dev/null || true
+    pkill -KILL -f "$CHILD_PAT" 2>/dev/null || true
 
     # Fail closed: the slot is released ONLY once nothing carries the label. If something
     # survives KILL we would rather over-count slots than hand a slot to a second session.

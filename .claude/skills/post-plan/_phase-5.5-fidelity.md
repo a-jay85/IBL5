@@ -93,7 +93,7 @@ Appending a metadata line is **not** editing the verdict: the word, the findings
 
 ## Step 4 — Remediation on `READY WITH NOTES` (and `NOT READY`)
 
-Load the procedure in place: `git show <MASTER_SHA>:.claude/review-shared/_phase65-remediation.md`. Run it as written, including its step 2 clean-tree precondition (`STOP: worktree dirty before remediation`), its fifth-file gate handoff to one `subagent_type: "sonnet-4-6"` delegate, its single `chore:` commit, and its push through `scripts/push.sh` (a bare `--force-with-lease` publishes nothing on a branch with no upstream).
+Load the procedure in place: `git show <MASTER_SHA>:.claude/review-shared/_phase65-remediation.md`. Run it as written, including its step 2 clean-tree precondition (`STOP: worktree dirty before remediation`) and its fifth-file gate handoff to one `subagent_type: "sonnet-4-6"` delegate. On the harness path, the harness commits and pushes after the phase exits. On the skill-fallback path, the `/post-plan` skill's own commit and push phases follow.
 
 Three post-plan-specific rules on top — these are where a re-spawn would otherwise creep in:
 

@@ -39,11 +39,8 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
         int $limit = 15,
         ?string $locationFilter = null
     ): array {
-        // Sanitize the stat name for use as column alias
-        $safeStatName = preg_replace('/[^a-zA-Z0-9_]/', '', $statName);
-        if ($safeStatName === null) {
-            $safeStatName = $statName;
-        }
+        $this->assertSafeStatExpression($statExpression);
+        $safeStatName = $this->sanitizeStatName($statName);
 
         // Build optional location filter (home/away) — column-to-column comparison, no extra bind params
         $locationCondition = match ($locationFilter) {
@@ -137,6 +134,7 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
         $params = [];
         $types = '';
         foreach ($stats as $statName => $statExpression) {
+            $this->assertSafeStatExpression($statExpression);
             if ($tableSuffix === '') {
                 $branches[] = "(SELECT ? AS stat_category, p.`pid`, p.`name`, p.`teamid`, t.`team_name` AS `teamname`,
                     t.`team_city`, t.`color1`, t.`color2`,
@@ -234,6 +232,46 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
             $entry['sortId'] = (int) $row['sort_id'];
         }
         return $entry;
+    }
+
+    /**
+     * Characters a stat expression may contain: column names in backticks,
+     * digits, parentheses, `+`, `*`, and whitespace. Everything else
+     * (quotes, `;`, `-`, `/`, `#`) fails closed.
+     */
+    private const STAT_EXPRESSION_PATTERN = '/^[A-Za-z0-9_`()+*\s]+$/';
+
+    /**
+     * Strip the stat name down to the characters legal in a column alias.
+     *
+     * Throws instead of falling back to the raw input: every production caller
+     * passes a SeasonHighsService class-constant key, so an empty result means
+     * a caller bug, not a value worth concatenating into SQL.
+     */
+    private function sanitizeStatName(string $statName): string
+    {
+        $safeStatName = preg_replace('/[^a-zA-Z0-9_]/', '', $statName);
+        if ($safeStatName === null || $safeStatName === '') {
+            throw new \InvalidArgumentException(
+                'Stat name must contain at least one of [a-zA-Z0-9_]: ' . $statName
+            );
+        }
+        return $safeStatName;
+    }
+
+    /**
+     * Fail closed on any stat expression outside the allowlist.
+     *
+     * The expression is a SQL fragment a prepared statement cannot parameterize,
+     * so it is checked before the query string is built.
+     */
+    private function assertSafeStatExpression(string $statExpression): void
+    {
+        if (preg_match(self::STAT_EXPRESSION_PATTERN, $statExpression) !== 1) {
+            throw new \InvalidArgumentException(
+                'Stat expression contains characters outside the allowlist: ' . $statExpression
+            );
+        }
     }
 
     /**

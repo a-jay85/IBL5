@@ -1,6 +1,6 @@
 ---
 description: Rationale for adding a gitleaks secret-scanning CI gate, scrubbing a rotated DB password, and hardening the demo-login token to fail closed.
-last_verified: 2026-09-08
+last_verified: 2026-09-23
 ---
 
 # ADR-0034: Secret-Scanning Gate
@@ -48,3 +48,37 @@ as the historical record of what was decided.
 - `ibl5/demo-login.php`, `ibl5/classes/Auth/DemoLoginGate.php`, `ibl5/tests/Auth/DemoLoginGateTest.php`
 - `ibl5/tests/e2e/security/demo-login-weak-token.spec.ts`
 - `ibl5/config.php.example`, `ibl5/docs/backlog/maintenance-backlog.md` (example) (findings 3.1, 3.2)
+
+## Addendum (2026-09-22): DB credentials moved to config.local.php
+
+This ADR left `config.php` untracked with the four DB credential variables
+read through `getenv()` fallbacks in `ibl5/config.php.example`. IBL5-backlog
+#179 closes the remaining gap: the production `config.php` still carried the
+credentials inline, and the `getenv()` fallback in the example meant a missing
+env var quietly produced a default password.
+
+Decision:
+
+- The four variables (`$dbhost`, `$dbuname`, `$dbpass`, `$dbname`) live only in
+  `config.local.php`, a gitignored file next to `config.php` (rule added to
+  `ibl5/.gitignore`). The tracked template is `ibl5/config.local.php.example`,
+  whose values are the docker-compose stack defaults.
+- `ibl5/config.php.example` no longer reads DB credentials from the environment.
+  It checks that `config.local.php` exists and dies with a message naming the
+  template when it does not. There is no fallback password.
+- `ibl5/bin/check-config-example` pins the contract in CI: the template's four
+  literals are non-empty, the example has no `getenv('DB_*')` credential read,
+  and a copy of the example without `config.local.php` exits non-zero.
+- CI writes `config.local.php` from each job's `DB_*` env in
+  `.github/actions/setup-php-env/action.yml` and at the two raw
+  `cp config.php.example config.php` sites in `.github/workflows/migration-safety.yml`
+  and `.github/workflows/deploy-rehearsal.yml`. Worktrees receive a copy from
+  `materialize_worktree_config_local()` in `bin/lib/git-helpers.sh`.
+- `config.php` stays untracked on production and in the main checkout. The
+  operator places `config.local.php` by hand and replaces the credential lines
+  in the production `config.php` with the require block from the example. The
+  production password is not rotated by this change.
+
+Consequence for the scanning gate: gitleaks now has one fewer plausible leak
+path, since the only tracked file that names `$dbpass` is the template with a
+Docker-default value. The allowlist in `.gitleaks.toml` is unchanged.

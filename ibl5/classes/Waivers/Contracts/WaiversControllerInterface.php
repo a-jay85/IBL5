@@ -22,15 +22,16 @@ interface WaiversControllerInterface
      * waiver operation. Should check if waivers are currently open before proceeding.
      * 
      * @param mixed $user Current user object (from PhpNuke authentication)
-     * @param string $action Action to perform ('add' or 'waive')
+     * Reads the display action from the injected HttpRequest (`request('action')`):
+     * `'add'` or `'waive'`; any missing, empty, or non-string value resolves to `'add'`.
      * @return void Renders appropriate view based on user state and action
-     * 
+     *
      * **Behaviors:**
      * - Renders login form if user is not authenticated
      * - Renders "waivers closed" message if season phase doesn't allow waivers
      * - Delegates to executeWaiverOperation() for authenticated users
      */
-    public function handleWaiverRequest($user, string $action): void;
+    public function handleWaiverRequest($user): void;
 
     /**
      * Executes waiver wire operations (add or drop)

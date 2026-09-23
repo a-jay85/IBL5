@@ -15,6 +15,9 @@ use Auth\Contracts\AuthServiceInterface;
 use Http\HttpRequest;
 use Waivers\WaiversController;
 
+/**
+ * @phpstan-import-type UserRow from \Repositories\Contracts\TeamIdentityRepositoryInterface
+ */
 class WaiversControllerTest extends TestCase
 {
     /**
@@ -27,6 +30,7 @@ class WaiversControllerTest extends TestCase
         ?AuthServiceInterface $authService = null,
         ?\Utilities\NukeCompat $nukeCompat = null,
         ?HttpRequest $request = null,
+        ?WaiversServiceInterface $service = null,
     ): WaiversController {
         if ($nukeCompat === null) {
             $nukeCompatStub = self::createStub(\Utilities\NukeCompat::class);
@@ -38,7 +42,7 @@ class WaiversControllerTest extends TestCase
         $seasonStub->method('areWaiversAllowed')->willReturn(true);
 
         return new WaiversController(
-            self::createStub(WaiversServiceInterface::class),
+            $service ?? self::createStub(WaiversServiceInterface::class),
             self::createStub(WaiversProcessorInterface::class),
             self::createStub(WaiversViewInterface::class),
             $teamIdentityRepo ?? self::createStub(TeamIdentityRepositoryInterface::class),
@@ -73,7 +77,7 @@ class WaiversControllerTest extends TestCase
             authService: $authServiceStub,
         );
 
-        $controller->handleWaiverRequest('gm', 'view');
+        $controller->handleWaiverRequest('gm');
     }
 
     public function testHandleWaiverRequestForwardsEmptyStringWhenAuthServiceHasNoUsername(): void
@@ -92,7 +96,7 @@ class WaiversControllerTest extends TestCase
             authService: $authServiceStub,
         );
 
-        $controller->handleWaiverRequest('gm', 'view');
+        $controller->handleWaiverRequest('gm');
     }
 
     public function testUnknownUsernameFallsBackToLoginBox(): void
@@ -109,6 +113,84 @@ class WaiversControllerTest extends TestCase
             nukeCompat: $nukeCompatMock,
         );
 
-        $controller->handleWaiverRequest('gm', 'view');
+        $controller->handleWaiverRequest('gm');
+    }
+
+    /**
+     * @return UserRow
+     */
+    private function userRow(string $username): array
+    {
+        return [
+            'user_id' => 0,
+            'username' => $username,
+            'user_email' => '',
+        ];
+    }
+
+    public function testHandleWaiverRequestPassesActionToWaiverFormData(): void
+    {
+        $teamIdentityRepoStub = self::createStub(TeamIdentityRepositoryInterface::class);
+        $teamIdentityRepoStub->method('getUserByUsername')->willReturn($this->userRow('gm'));
+
+        $authServiceStub = self::createStub(AuthServiceInterface::class);
+        $authServiceStub->method('getUsername')->willReturn('gm');
+
+        $serviceMock = $this->createMock(WaiversServiceInterface::class);
+        $serviceMock->expects($this->once())
+            ->method('getWaiverFormData')
+            ->with('gm', 'view')
+            ->willThrowException(new \RuntimeException('halt-before-render'));
+
+        $controller = $this->buildController(
+            teamIdentityRepo: $teamIdentityRepoStub,
+            authService: $authServiceStub,
+            request: new HttpRequest(request: ['action' => 'view']),
+            service: $serviceMock,
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/halt-before-render/');
+        $controller->handleWaiverRequest('gm');
+    }
+
+    /**
+     * @return array<string, array{mixed, string}>
+     */
+    public static function actionResolutionProvider(): array
+    {
+        return [
+            'missing action defaults to add'    => [null, 'add'],
+            'waive passes through'              => ['waive', 'waive'],
+            'empty string defaults to add'      => ['', 'add'],
+            'non-string (array) defaults to add' => [['waive'], 'add'],
+        ];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('actionResolutionProvider')]
+    public function testHandleWaiverRequestResolvesActionFromHttpRequest(mixed $rawAction, string $expected): void
+    {
+        $teamIdentityRepoStub = self::createStub(TeamIdentityRepositoryInterface::class);
+        $teamIdentityRepoStub->method('getUserByUsername')->willReturn($this->userRow('gm'));
+
+        $authServiceStub = self::createStub(AuthServiceInterface::class);
+        $authServiceStub->method('getUsername')->willReturn('gm');
+
+        $serviceMock = $this->createMock(WaiversServiceInterface::class);
+        $serviceMock->expects($this->once())
+            ->method('getWaiverFormData')
+            ->with('gm', $expected)
+            ->willThrowException(new \RuntimeException('halt-before-render'));
+
+        $requestData = $rawAction === null ? [] : ['action' => $rawAction];
+        $controller = $this->buildController(
+            teamIdentityRepo: $teamIdentityRepoStub,
+            authService: $authServiceStub,
+            request: new HttpRequest(request: $requestData),
+            service: $serviceMock,
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $controller->handleWaiverRequest('gm');
     }
 }

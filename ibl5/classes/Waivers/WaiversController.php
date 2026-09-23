@@ -94,7 +94,7 @@ class WaiversController implements WaiversControllerInterface
     /**
      * @see WaiversControllerInterface::handleWaiverRequest()
      */
-    public function handleWaiverRequest($user, string $action): void
+    public function handleWaiverRequest($user): void
     {
         if (!$this->nukeCompat->isUser($user)) {
             $this->nukeCompat->loginBox();
@@ -112,6 +112,8 @@ class WaiversController implements WaiversControllerInterface
         }
 
         $username = $this->authService->getUsername() ?? '';
+        $rawAction = $this->request->request('action');
+        $action = (is_string($rawAction) && $rawAction !== '') ? $rawAction : 'add';
         $this->executeWaiverOperation($username, $action);
     }
 

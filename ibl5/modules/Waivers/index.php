@@ -11,12 +11,6 @@ get_lang($module_name);
 
 global $mysqli_db, $user, $authService;
 
-// Legacy globals previously populated by ConfigBootstrap::extractRequestToGlobals().
-// PR2 narrowed that extraction to a 2-key allowlist (newlang, redirect), so module
-// inputs are now read from $_REQUEST explicitly here. Leave $action unset (null)
-// so the `$action ?? 'add'` fallback below still applies.
-$action = (is_string($_REQUEST['action'] ?? null) && $_REQUEST['action'] !== '') ? $_REQUEST['action'] : null;
-
 $pagetitle = "- Team Pages";
 
 cookiedecode($user);
@@ -34,4 +28,4 @@ $service = new Waivers\WaiversService($teamIdentityRepo, $processor, $view, $tea
 $nukeCompat = new Utilities\NukeCompat();
 $request = \Http\HttpRequest::fromGlobals();
 $controller = new Waivers\WaiversController($service, $processor, $view, $teamIdentityRepo, $salaryCapRepo, $nukeCompat, $mysqli_db, $authService, $request);
-$controller->handleWaiverRequest($user, $action ?? 'add');
+$controller->handleWaiverRequest($user);

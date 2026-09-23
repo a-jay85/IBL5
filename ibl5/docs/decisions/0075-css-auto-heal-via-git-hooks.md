@@ -1,6 +1,6 @@
 ---
 description: Git hooks (post-checkout/post-merge/post-rewrite) auto-heal stale compiled Tailwind CSS after bulk working-tree rewrites the watcher container misses.
-last_verified: 2026-09-01
+last_verified: 2026-09-22
 ---
 
 # ADR-0075: CSS auto-heal via git hooks
@@ -34,3 +34,9 @@ The `ibl5-tailwind[-<slug>]` container runs `@tailwindcss/cli --watch=always`, r
 - `bin/rebuild-css-if-source-changed`
 - `bin/install-git-hooks`
 - `.claude/rules/css-auto-rebuild.md`
+
+## Addendum: watcher restart after a heal (2026-09-22)
+
+The original decision assumed the watcher only misses git-op events and leaves the healed output alone. It does more harm than that. The watcher misses the same events the hook heals, so it keeps the pre-op `design/**` sources in memory. Its next save-triggered rebuild writes those stale sources over the healed output. The clobbered file is newer than every source, so the mtime gate reports it fresh on every later git op. On the `h2h-records-finish` worktree, a rebase added a new component stylesheet, and the hook built it correctly. A later event made the watcher rebuild without it, and the page lost all of that component's styling.
+
+`bin/rebuild-css-if-source-changed` now restarts the checkout's own watcher container after each rebuild. The main checkout maps to `ibl5-tailwind` and a worktree maps to `ibl5-tailwind-<slug>`. The restart re-reads the sources from disk, and it is skipped when that container is not running.

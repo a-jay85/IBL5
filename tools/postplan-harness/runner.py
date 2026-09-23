@@ -34,8 +34,8 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from harness import (adr_draft, body_numbers, ciwatch, conformance, fidelity, llm_calls, manual_rows,
-                     manual_testing, schemas, statefile)
+from harness import (adr_draft, body_numbers, ciwatch, conformance, fidelity, gitutil, llm_calls,
+                     manual_rows, manual_testing, schemas, statefile)
 from harness.armable import (ArmInputs, conflict_flag_path, conflict_verdict_for, evaluate,
                              manual_testing_clearance, meta_checks_clearance,
                              select_fidelity_verdict)
@@ -335,8 +335,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             failures_out=res.meta_check_failures)
         if live:
             sha = git.head()  # refresh — remediation may have committed and moved HEAD
+        pr_known = gh.pr_number() if (live and gh.pr_exists()) else None
         pushed = _push_with_adr_draft(git, log, "phase2", llm=llm, worktree=worktree,
-                                      out_dir=out_dir, res=res)
+                                      out_dir=out_dir, res=res, pr=pr_known)
         if pushed:
             sha = pushed
         if gh.pr_exists():
@@ -349,7 +350,16 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         res.pr_number = pr
         state.checkpoint("pr-open", res)
         if live and pr and sha:
-            bg_ci = ciwatch.start_background_watch(worktree, pr, sha, out_dir)
+            bg_ci = ciwatch.start_background_watch(worktree, pr, sha, out_dir,
+                                                   verify_head=True)
+            if bg_ci is not None and getattr(bg_ci, "status", "") == "diverged":
+                log(f"phase2: ERROR remote head {bg_ci.remote_sha[:8]} diverged from "
+                    f"pushed {sha[:8]} with different content; failing closed")
+                raise HarnessError("remote-head-diverged", bg_ci.evidence)
+            if bg_ci is not None and getattr(bg_ci, "sha", sha) != sha:
+                log(f"phase2: remote head moved to {bg_ci.sha[:8]} (tree-equivalent); "
+                    "worktree synced, CI watch re-keyed")
+                sha = bg_ci.sha
             if bg_ci is not None:
                 log(f"phase2: background CI watch started for {sha[:8]} "
                     f"-> {os.path.basename(bg_ci.path)}")
@@ -517,6 +527,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # bg_ci.failed is only populated once _write_outcome fires (usually after
         # Phase 7 has already started), so it is typically empty at arm time; the
         # fresh probe is therefore always run in addition to the background result.
+        if live and pr and sha and worktree and os.path.isdir(worktree):
+            sha, bg_ci = _reconcile_before_arm(git, log, gh, worktree, pr, sha,
+                                               bg_ci, out_dir)
         _failed_checks: list[str] = []
         if live and pr:
             try:
@@ -651,7 +664,15 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
                 log(f"phase7: reusing background CI watch for {sha[:8]}")
             else:
                 log("phase7: watching CI (gh pr checks --watch)…")
-            outcome = ciwatch.watch_or_reuse(worktree, pr, sha, out_dir, bg_ci)
+            outcome = ciwatch.watch_or_reuse(worktree, pr, sha, out_dir, bg_ci,
+                                             verify_head=True)
+            if outcome.diverged:
+                _fail_closed_on_divergence(gh, log, pr, "phase7", outcome.evidence,
+                                           disarm=True)
+            if outcome.head_sha and outcome.head_sha != sha:
+                log(f"phase7: CI re-keyed to remote head {outcome.head_sha[:8]}")
+                sha = outcome.head_sha
+                res.ci_head = sha
         else:
             outcome = ciwatch.CiOutcome(-1, [], "isolated mode: no live PR, CI not watched")
         res.ci_outcome = {0: "green", 8: "failed"}.get(outcome.exit_code, "indeterminate")
@@ -788,7 +809,8 @@ def _refresh_and_reprove(git, log, phase: str, attempt: int) -> None:
     log(f"{phase}: re-rebase {attempt} TREE-EQUIVALENT at {git.head()[:8]}")
 
 
-def _push_with_lease_retry(git, log, phase: str) -> str:
+def _push_with_lease_retry(git, log, phase: str, *, pr=None, worktree=None,
+                           gh_cmd=None, run_git=None) -> str:
     """Push with bounded stale-lease / stale-base retry. Returns pushed HEAD sha, or ""
     when disabled. Raises HarnessError("push-retry-cap") once the cap is spent.
 
@@ -797,6 +819,18 @@ def _push_with_lease_retry(git, log, phase: str) -> str:
     because origin/master moved and HEAD no longer contains it). Phase 5.5 is where the
     second one lands: the Phase 2 rebase is 20-40 minutes old by the time the
     remediation commit pushes. Any other denial re-raises unchanged."""
+    if pr and worktree:
+        branch = git.branch()
+        expected = gitutil.tracking_sha(branch, worktree, run_git=run_git)
+        if expected:
+            r = gitutil.reconcile_remote_head(pr, expected, git.head(), branch, worktree,
+                                              gh_cmd=gh_cmd, run_git=run_git)
+            if r.action == "diverged":
+                log(f"{phase}: ERROR {r.evidence}; refusing to push over it")
+                raise HarnessError("remote-head-diverged", f"{phase}: {r.evidence}")
+            if r.action == "synced":
+                log(f"{phase}: {r.evidence}; nothing to push")
+                return r.remote_sha
     for attempt in range(1, _MAX_PUSH_RETRIES + 1):
         try:
             git.push()
@@ -864,7 +898,8 @@ def _commit_with_adr_draft(git, log, phase: str, *, llm, worktree, out_dir, res)
         "- staged into the pending Phase 2 commit")
 
 
-def _push_with_adr_draft(git, log, phase: str, *, llm, worktree, out_dir, res) -> str:
+def _push_with_adr_draft(git, log, phase: str, *, llm, worktree, out_dir, res,
+                         pr=None) -> str:
     """One-shot ADR draft around _push_with_lease_retry. Stale-lease and stale-base
     retries happen INSIDE the inner helper; this wrapper only ever sees a denial that
     survived them, so it can never draft on a stale base and the two cannot loop.
@@ -872,7 +907,7 @@ def _push_with_adr_draft(git, log, phase: str, *, llm, worktree, out_dir, res) -
     ORIGINAL local-gate error so the run still exits 3 (never 1: a skill re-run would
     hit the same hook)."""
     try:
-        return _push_with_lease_retry(git, log, phase)
+        return _push_with_lease_retry(git, log, phase, pr=pr, worktree=worktree)
     except HarnessError as e:
         if e.kind != "local-gate" or not worktree:
             raise
@@ -902,13 +937,38 @@ def _push_with_adr_draft(git, log, phase: str, *, llm, worktree, out_dir, res) -
         log(f"{phase}: ADR drafted at {drafted.path} model={drafted.model} "
             f"commit={drafted.sha[:12]} - re-pushing once")
         try:
-            return _push_with_lease_retry(git, log, phase)
+            return _push_with_lease_retry(git, log, phase, pr=pr, worktree=worktree)
         except HarnessError as e3:
             if e3.kind == "local-gate":
                 log(f"{phase}: hook still denied after the ADR draft "
                     f"(class={classify_local_gate_denial(e3.detail or '')}) - "
                     f"{drafted.path} stays committed locally; failing closed")
             raise
+
+
+def _fail_closed_on_divergence(gh, log, pr, phase: str, evidence: str, *,
+                               disarm: bool) -> None:
+    """Remote PR head was rewritten with different content. Never push over it."""
+    if disarm and pr:
+        gh.pr_disable_auto_merge(pr)
+    log(f"{phase}: ERROR {evidence}; failing closed (remote-head-diverged)")
+    raise HarnessError("remote-head-diverged", f"{phase}: {evidence}")
+
+
+def _reconcile_before_arm(git, log, gh, worktree, pr, sha, bg_ci, out_dir, *,
+                          gh_cmd=None, run_git=None):
+    """Pre-arm remote-head check. Returns (sha, bg_ci); raises on divergence."""
+    r = gitutil.reconcile_remote_head(pr, sha, git.head(), git.branch(), worktree,
+                                      gh_cmd=gh_cmd, run_git=run_git)
+    if r.action == "diverged":
+        ciwatch.reap_background_watch(bg_ci)
+        _fail_closed_on_divergence(gh, log, pr, "phase6.5", r.evidence, disarm=False)
+    if r.action == "synced":
+        log(f"phase6.5: {r.evidence}; CI watch restarted on {r.remote_sha[:8]}")
+        ciwatch.reap_background_watch(bg_ci)
+        bg_ci = ciwatch.start_background_watch(worktree, pr, r.remote_sha, out_dir)
+        return r.remote_sha, bg_ci
+    return sha, bg_ci
 
 
 def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir):
@@ -924,10 +984,26 @@ def _resolve_behind(git, gh, log, res, worktree, pr, sha, outcome, out_dir):
                 "leaving auto-merge armed")
             return sha, outcome
         log(f"phase7: BEHIND (re-rebase {attempt}/{_MAX_BEHIND_RETRIES})")
+        if worktree and os.path.isdir(worktree):
+            r = gitutil.reconcile_remote_head(pr, sha, git.head(), git.branch(), worktree)
+            if r.action == "diverged":
+                _fail_closed_on_divergence(gh, log, pr, "phase7", r.evidence, disarm=True)
+            if r.action == "synced":
+                log(f"phase7: {r.evidence}")
+                sha = r.remote_sha
         _refresh_and_reprove(git, log, "phase7", attempt)
-        sha = _push_with_lease_retry(git, log, "phase7") or git.head()
-        bg = ciwatch.start_background_watch(worktree, pr, sha, out_dir)
-        outcome = ciwatch.watch_or_reuse(worktree, pr, sha, out_dir, bg)
+        sha = _push_with_lease_retry(git, log, "phase7", pr=pr,
+                                     worktree=worktree) or git.head()
+        _live_wt = bool(worktree and os.path.isdir(worktree))
+        bg = ciwatch.start_background_watch(worktree, pr, sha, out_dir,
+                                            **({'verify_head': True} if _live_wt else {}))
+        outcome = ciwatch.watch_or_reuse(worktree, pr, sha, out_dir, bg,
+                                         **({'verify_head': True} if _live_wt else {}))
+        if outcome.diverged:
+            ciwatch.reap_background_watch(bg)
+            _fail_closed_on_divergence(gh, log, pr, "phase7", outcome.evidence, disarm=True)
+        if outcome.head_sha:
+            sha = outcome.head_sha
         ciwatch.reap_background_watch(bg)
         log(f"phase7 ci(re-rebase {attempt}): exit={outcome.exit_code} "
             f"failed={outcome.failed}")
@@ -1385,7 +1461,8 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
                     # "does not contain origin/master".
                     push=lambda: _push_with_adr_draft(git, log, "phase5.5", llm=llm,
                                                       worktree=worktree, out_dir=out_dir,
-                                                      res=res),
+                                                      res=res,
+                                                      pr=(pr if isinstance(git, LiveGit) else None)),
                     pr_number=pr, model=model, work_list=work, outcome=outcome)
             except HarnessError as e:
                 if e.kind == "push-failed":
@@ -1570,8 +1647,8 @@ def _finish(res: RunResult, out_dir: str) -> RunResult:
     return res
 
 
-# Both are deterministic walls a full skill re-run cannot climb — see exit_code_for.
-_FAIL_CLOSED_KINDS = ("rebase-conflict", "local-gate")
+# All three are deterministic walls a full skill re-run cannot climb — see exit_code_for.
+_FAIL_CLOSED_KINDS = ("rebase-conflict", "local-gate", "remote-head-diverged")
 
 # Per-class remedy for a local-gate denial. Every arm is still exit 3 -- naming the
 # class only shortens the human's search, it never changes the verdict. "doc-staleness"
@@ -1596,10 +1673,12 @@ _GATE_REMEDY = {
 def exit_code_for(res: RunResult) -> int:
     """Process exit code from a terminal RunResult.
     3 = fail-closed sentinel: bin/post-plan-now MUST NOT escalate to the /post-plan
-        skill session. Two kinds land here. `rebase-conflict` — a stacked-branch
+        skill session. Three kinds land here. `rebase-conflict` — a stacked-branch
         rebase a human must judge. `local-gate` — a pre-commit/pre-push hook denial
-        (ADR trigger, stale doc, rules byte budget). Both are deterministic, so the
-        ~1M-token skill re-run would hit the identical wall and buy nothing.
+        (ADR trigger, stale doc, rules byte budget). `remote-head-diverged`: the PR
+        branch was rewritten on GitHub with content the harness did not produce; a
+        skill re-run would re-rebase and push over it. All three are deterministic,
+        so the ~1M-token skill re-run would hit the identical wall and buy nothing.
     1 = any other typed failure: bin/post-plan-now re-runs the full /post-plan skill.
     0 = shipped (armed or held), nothing to ship, or degraded.
     There is no 4: the harness owns Phase 5.5, and the launcher has no resume arm."""

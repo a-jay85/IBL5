@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-09-17
+last_verified: 2026-09-22
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -29,8 +29,9 @@ branch; it survives you closing Claude Code. Engine selection:
   verdict to arming condition (12). It exits **0**, **1** or **3** only. There is no exit 4 and
   no Phase-5.5 re-entry. Any harness failure outside exit 3 re-runs the **full** skill from
   Phase 0. Exit **3** is the fail-closed sentinel and suppresses the skill fallback entirely.
-  Two kinds reach it: a rebase conflict, and a **local gate denial** (a `bin/pre-commit-hook`
-  or `bin/pre-push-adr-hook` refusal: missing ADR, stale doc, rules byte budget). Both are
+  Three kinds reach it: a rebase conflict, a **diverged remote head** (the PR branch was
+  rewritten on GitHub with different content), and a **local gate denial** (a `bin/pre-commit-hook`
+  or `bin/pre-push-adr-hook` refusal: missing ADR, stale doc, rules byte budget). All three are
   deterministic, so a skill re-run would hit the same wall; the run DMs you and stops for a human.
 
 On the commit path that detection is structural: any non-zero `git commit` is treated as a

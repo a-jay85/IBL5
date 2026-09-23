@@ -293,6 +293,7 @@ final class Phantom2007BoxscoreRepairTest extends DatabaseTestCase
 
     public function testAssertPreconditionsProceedsWithSeededPhantoms(): void
     {
+        $this->cleanAll();
         $expected = $this->seedAll();
         $repair   = $this->makeRepair($expected);
 
@@ -321,6 +322,7 @@ final class Phantom2007BoxscoreRepairTest extends DatabaseTestCase
 
     public function testAbortsOnTeamCountMismatch(): void
     {
+        $this->cleanAll();
         $expected           = $this->seedAll();
         $expected['phantom_team_rows'] = 5;
         $repair             = $this->makeRepair($expected);
@@ -340,6 +342,7 @@ final class Phantom2007BoxscoreRepairTest extends DatabaseTestCase
 
     public function testAbortsOnPlayerCountMismatch(): void
     {
+        $this->cleanAll();
         $expected                       = $this->seedAll();
         $expected['phantom_player_rows'] = 3;
         $repair                         = $this->makeRepair($expected);
@@ -358,6 +361,7 @@ final class Phantom2007BoxscoreRepairTest extends DatabaseTestCase
 
     public function testAbortsWhenRecapReferencesPhantom(): void
     {
+        $this->cleanAll();
         $expected = $this->seedAll();
         $repair   = $this->makeRepair($expected);
 
@@ -421,13 +425,35 @@ final class Phantom2007BoxscoreRepairTest extends DatabaseTestCase
     {
         $this->cleanAll();
         $expected = $this->seedAll();
-        $repair   = $this->makeRepair($expected);
 
+        // Inflate G1p Sep team rows so calc_* values exceed tinyint range (255).
+        // Makes the smallint types in the teams backup table load-bearing: if migration
+        // 183 used tinyint for those columns, calc_rebounds/calc_fg_made would truncate.
+        $this->db->query(
+            "UPDATE ibl_box_scores_teams
+             SET game_2gm = 130, game_3gm = 130, game_orb = 130, game_drb = 130
+             WHERE game_date = '2007-09-10' AND visitor_teamid = 24 AND home_teamid = 22"
+        );
+
+        // Capture all phantom rows before delete (sorted by id for stable comparison).
+        $phantomTeamRows   = $this->allRows('ibl_box_scores_teams', ['2007-09-10', '2007-10-20']);
+        $phantomPlayerRows = $this->allRows('ibl_box_scores',       ['2007-09-10', '2007-10-20']);
+
+        // Confirm the inflated values actually exceed 255 so the fixture is meaningful.
+        self::assertGreaterThan(255, (int) $phantomTeamRows[0]['calc_rebounds']);
+
+        $repair = $this->makeRepair($expected);
         $result = $repair->runRepair(false);
 
         self::assertSame('proceed', $result['status']);
+
+        // Backup row counts.
         self::assertSame(4, $this->backupCount(Phantom2007BoxscoreRepair::TEAM_BACKUP_TABLE));
         self::assertSame(4, $this->backupCount(Phantom2007BoxscoreRepair::PLAYER_BACKUP_TABLE));
+
+        // Backup tables hold exactly the pre-delete rows: id-list and column-value fidelity.
+        self::assertSame($phantomTeamRows,   $this->allRows(Phantom2007BoxscoreRepair::TEAM_BACKUP_TABLE,   ['2007-09-10', '2007-10-20']));
+        self::assertSame($phantomPlayerRows, $this->allRows(Phantom2007BoxscoreRepair::PLAYER_BACKUP_TABLE, ['2007-09-10', '2007-10-20']));
     }
 
     public function testDryRunRollsBackEverything(): void
@@ -481,5 +507,28 @@ final class Phantom2007BoxscoreRepairTest extends DatabaseTestCase
         $result->free();
 
         return (int) ($row[0] ?? 0);
+    }
+
+    /**
+     * Returns all rows for the given dates from $table, ordered by id.
+     * Filtered to visitor/home teamids 22 and 24 (test data only).
+     *
+     * @param list<string> $dates Date literals — test-internal constants, not user input.
+     * @return list<array<string, string|null>>
+     */
+    private function allRows(string $table, array $dates): array
+    {
+        $inClause = implode(',', array_map(static fn(string $d): string => "'$d'", $dates));
+        $result   = $this->db->query(
+            "SELECT * FROM `$table`
+             WHERE game_date IN ($inClause)
+               AND visitor_teamid IN (22,24) AND home_teamid IN (22,24)
+             ORDER BY id"
+        );
+        self::assertNotFalse($result, 'allRows query failed on ' . $table);
+        /** @var list<array<string, string|null>> $rows */
+        $rows = $result->fetch_all(MYSQLI_ASSOC);
+        $result->free();
+        return $rows;
     }
 }

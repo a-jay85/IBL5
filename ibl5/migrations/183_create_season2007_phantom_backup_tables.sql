@@ -10,8 +10,9 @@
 -- fresh surrogate keys. Foreign keys are NOT copied by LIKE, which is what we want:
 -- a backup row must survive even if its parent row is gone.
 -- NOTE: LIKE copies the UNIQUE KEY uuid onto the player backup; harmless because the
--- 9,796 backed-up rows carry distinct uuids, and 184's precondition guard (backup
--- tables must be empty) makes a second population impossible.
+-- 9,796 backed-up rows carry distinct uuids. A second call to fillBackups() is safe:
+-- the NOT EXISTS (b.id = t.id) guard skips rows already backed up, and if the phantoms
+-- have been deleted, assertPreconditions() returns 'noop' before fillBackups() is called.
 
 CREATE TABLE IF NOT EXISTS ibl_box_scores_teams_season2007_phantom_backup LIKE ibl_box_scores_teams;
 CREATE TABLE IF NOT EXISTS ibl_box_scores_season2007_phantom_backup       LIKE ibl_box_scores;

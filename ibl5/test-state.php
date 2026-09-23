@@ -145,6 +145,7 @@ $knownActions = [
     'set-champion',
     'set-eoy-votes',
     'set-leaders-htm',
+    'set-player-name',
 ];
 
 // A named-but-unrecognised action is a client mistake, not a method mistake.
@@ -372,6 +373,40 @@ if ($method === 'DELETE' && $action === 'set-champion') {
         $stmt->close();
     }
     echo json_encode(['champion' => $present === 1 ? 'inserted' : 'removed']);
+    $db->close();
+    exit;
+}
+
+// DELETE ?action=set-player-name&pid=N&name=STR — rename one ibl_plr row so
+// E2E can plant a hostile name and assert the page escapes it
+// (flows/faprep-xss-escape.spec.ts). Returns the previous name so the caller
+// restores it in a finally block.
+if ($method === 'DELETE' && $action === 'set-player-name') {
+    $pid = (int)($_GET['pid'] ?? 0);
+    $name = (string)($_GET['name'] ?? '');
+    if ($pid < 1 || $name === '' || mb_strlen($name) > 64) {
+        http_response_code(400);
+        echo json_encode(['error' => 'set-player-name requires pid>=1 and a 1..64 char name']);
+        $db->close();
+        exit;
+    }
+    $stmt = $db->prepare('SELECT name FROM ibl_plr WHERE pid = ?');
+    $stmt->bind_param('i', $pid);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    $row = $res instanceof mysqli_result ? $res->fetch_assoc() : null;
+    $stmt->close();
+    if (!is_array($row)) {
+        http_response_code(404);
+        echo json_encode(['error' => 'set-player-name: no ibl_plr row for pid ' . $pid]);
+        $db->close();
+        exit;
+    }
+    $stmt = $db->prepare('UPDATE ibl_plr SET name = ? WHERE pid = ?');
+    $stmt->bind_param('si', $name, $pid);
+    $stmt->execute();
+    $stmt->close();
+    echo json_encode(['previous' => (string)$row['name'], 'applied' => $name]);
     $db->close();
     exit;
 }

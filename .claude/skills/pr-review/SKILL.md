@@ -6,7 +6,7 @@ name: pr-review
 description: Token-efficient code review for pull requests
 disable-model-invocation: true
 model: claude-sonnet-4-6
-last_verified: 2026-09-04
+last_verified: 2026-09-23
 ---
 
 Provide a code review for the given pull request. This command optimizes token usage by fetching the diff once and distributing only what each agent needs.
@@ -104,7 +104,7 @@ source "$(git rev-parse --show-toplevel)/bin/lib/post-review-findings.sh"
 ```json
 { "path": "repo/relative/path.php",
   "line": 17,
-  "body": "<description> (CLAUDE.md says \"<rule>\")\n\n<full-SHA range link>",
+  "body": "<description> (<rule file> says \"<rule>\")\n\n<full-SHA range link>",
   "score": 85 }
 ```
 - `path` is the repo-relative file path (matching `+++ b/<path>` in the diff).
@@ -133,12 +133,12 @@ See `.claude/review-shared/_posting-procedure.md` § Dispositioning open threads
 - Do not check build signal or attempt to build or typecheck the app. These will run separately.
 - Use `gh` to interact with GitHub, not web fetch.
 - Make a todo list first.
-- You must cite and link each bug (e.g. if referring to a CLAUDE.md, you must link it).
+- You must cite and link each bug (e.g. if referring to a project rule, you must link its `.claude/rules/*.md` file).
 
 ### Per-finding body format:
 
 ```
-<brief description of bug> (CLAUDE.md says "<...>")
+<brief description of bug> (<rule file> says "<...>")
 
 https://github.com/a-jay85/IBL5/blob/FULL_SHA/path/to/file.php#L13-L17
 ```

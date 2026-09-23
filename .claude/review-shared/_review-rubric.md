@@ -1,6 +1,6 @@
 ---
 description: Shared review rubric and false-positive filter used by /pr-review, /security-audit, and /post-plan.
-last_verified: 2026-05-23
+last_verified: 2026-09-23
 ---
 
 # Review Rubric and False-Positive Filter (shared)
@@ -20,13 +20,13 @@ When the parent command passes issues to the Haiku scoring agent, pass **this se
 
 Score each finding 0-100 using the rubric below:
 
-- **0** — False positive that doesn't survive light scrutiny, or a pre-existing issue, or caught by the **Automatic Zero** list below.
-- **25** — Suspicious but likely mitigated. Variable constrained elsewhere; pattern present but unexploitable in context.
-- **50** — Moderately confident. Pattern present but exploitation requires specific conditions that may not apply. Stylistic issue not explicitly called out in CLAUDE.md.
-- **75** — Highly confident. Double-checked and verified as a real issue that will happen in practice. Directly mentioned in CLAUDE.md or clearly present with no visible mitigation.
-- **100** — Absolutely certain. Direct user input flows to SQL / HTML / file / state-change with zero sanitization or validation.
+- **0**: False positive that doesn't survive light scrutiny, or a pre-existing issue, or caught by the **Automatic Zero** list below.
+- **25**: Suspicious but likely mitigated. Variable constrained elsewhere; pattern present but unexploitable in context.
+- **50**: Moderately confident. Pattern present but exploitation requires specific conditions that may not apply. Stylistic issue not explicitly called out in a project rule (`.claude/rules/*.md`).
+- **75**: Highly confident. Double-checked and verified as a real issue that will happen in practice. Directly stated in a project rule (`.claude/rules/*.md`) or clearly present with no visible mitigation.
+- **100**: Absolutely certain. Direct user input flows to SQL / HTML / file / state-change with zero sanitization or validation.
 
-For CLAUDE.md-cited issues: **verify the rule is actually stated in CLAUDE.md**. Do not invent rules.
+For rule-cited issues: **verify the rule is actually stated in the cited `.claude/rules/*.md` file**. Do not invent rules.
 
 Return ONLY valid JSON: `[{"n": 1, "score": 75}, {"n": 2, "score": 0}, ...]`
 
@@ -84,7 +84,7 @@ Apply after the Automatic Zero list.
 - GET-only read handlers — CSRF exempt
 - Pre-existing issues on lines the PR did not modify
 - Changes in functionality that are likely intentional or directly related to the broader change
-- Issues called out in CLAUDE.md but silenced by explicit opt-out comments (e.g. `// phpcs:ignore`, `@phpstan-ignore-next-line`)
+- Issues called out in a project rule but silenced by explicit opt-out comments (e.g. `// phpcs:ignore`, `@phpstan-ignore-next-line`)
 - `tests/e2e/smoke/**/*.ts` flagged for Section 2 generic-visibility assertions — smoke tests legitimately assert "page loads" via generic selectors; Agent D should already exempt these, but if one slips through it scores 0
 - Error-path tests (`test('...invalid...'/'...too few...'/'...duplicate...')`) flagged for missing POST-effect — they intentionally verify absence of effect
 - Helpers returning null/empty arrays as legitimate sentinels (`getOptional…`, `findIf…`) flagged for "missing assertion" — sentinel returns are by design

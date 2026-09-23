@@ -1,6 +1,6 @@
 ---
 description: Shared code-review agent definitions used by /pr-review and /post-plan.
-last_verified: 2026-07-20
+last_verified: 2026-09-23
 ---
 
 # Code Review Agents (shared definitions)
@@ -78,7 +78,7 @@ Only flag issues where the performance impact is measurable — not micro-optimi
 
 ### Output format
 
-Return issues with the specific CLAUDE.md subsection violated (or anti-pattern matched). For each section with no issues, return a 1-2 sentence evidence summary citing what was checked.
+Return one entry per issue: `file:line`, what is wrong, and a concrete input or state that makes it fail. For a rule violation, quote the rule and name its `.claude/rules/*.md` file (or the anti-pattern matched). If you cannot name a failing input or state, say so in the entry. For each section with no issues, return a 1-2 sentence evidence summary citing what was checked.
 
 ---
 
@@ -100,7 +100,7 @@ Check whether the PR changes comply with guidance in code comments visible in th
 
 ### Output format
 
-Return findings per section, or a 1-sentence evidence summary per section if no concerns found.
+Return findings per section, each with `file:line`, what is wrong, and the commit or code comment it conflicts with. If a section has no concerns, return a 1-sentence evidence summary for it.
 
 ---
 

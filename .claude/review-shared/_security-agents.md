@@ -1,6 +1,6 @@
 ---
 description: Shared security-audit agent definitions used by /security-audit and /post-plan.
-last_verified: 2026-05-21
+last_verified: 2026-09-23
 ---
 
 # Security Audit Agent (shared definition)
@@ -88,4 +88,4 @@ Check EACH pattern in the vulnerable and secure lists below against the diff. Fo
 
 ### Output format
 
-For each audited section: return findings with file:line citations, or a 1-2 sentence evidence summary citing the specific secure patterns observed. Do not return a bare "no issues."
+For each audited section: return findings with a `file:line` citation, what is wrong, and the concrete input that exploits it (what an attacker sends and what it reaches). If you cannot name one, say so in the finding. With no findings, return a 1-2 sentence evidence summary citing the specific secure patterns observed. Do not return a bare "no issues."

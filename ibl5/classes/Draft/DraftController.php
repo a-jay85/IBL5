@@ -116,6 +116,19 @@ class DraftController implements DraftControllerInterface
         $rawPick    = $post['draft_pick'] ?? null;
         $draftRound = is_numeric($rawRound) ? (int) $rawRound : 0;
         $draftPick  = is_numeric($rawPick) ? (int) $rawPick : 0;
+
+        // (4) Pick-slot ownership — the session team must currently own this slot.
+        // Slot -> origin team (ibl_draft.teamid) -> current owner (ibl_draft_picks.ownerofpick),
+        // so a traded pick is checked against the team holding it today.
+        $originTeamId = $this->repository->getOriginTeamIdForPick($draftRound, $draftPick);
+        if ($originTeamId === null) {
+            return $this->view->renderValidationError('That draft slot does not exist.');
+        }
+        $currentOwner = $this->repository->getCurrentOwnerOfDraftPick($this->season->endingYear, $draftRound, $originTeamId);
+        if ($currentOwner !== $sessionTeam) {
+            return $this->view->renderValidationError('You do not own this draft pick.');
+        }
+
         return $this->handleDraftSelection($teamName, $playerName, $draftRound, $draftPick);
     }
 

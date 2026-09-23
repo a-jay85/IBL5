@@ -254,4 +254,14 @@ interface DraftRepositoryInterface
      * @return string|null Team name of current draft pick owner, or null if not found
      */
     public function getCurrentOwnerOfDraftPick(int $draftYear, int $draftRound, int $teamIdOfDraftPickOrigin): ?string;
+
+    /**
+     * Resolve a draft slot to the team that originally owned it (ibl_draft.teamid).
+     * Feed the result into getCurrentOwnerOfDraftPick() to find who owns the slot today.
+     *
+     * @param int $draftRound Draft round number
+     * @param int $draftPick Pick number within the round
+     * @return int|null Origin team ID, or null when no ibl_draft row matches the slot
+     */
+    public function getOriginTeamIdForPick(int $draftRound, int $draftPick): ?int;
 }

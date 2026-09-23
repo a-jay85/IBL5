@@ -184,4 +184,23 @@ class DraftRepositoryTest extends DatabaseTestCase
 
         self::assertNull($result);
     }
+
+    // ── getOriginTeamIdForPick ──────────────────────────────────
+
+    public function testGetOriginTeamIdForPickReturnsTeamIdOfExactSlot(): void
+    {
+        // Two slots in the same round with different origin teams: the pick filter
+        // must select the second one, so a query that dropped `pick` (LIMIT 1 would
+        // then return the first row) fails this assertion.
+        $this->insertDraftRow(2099, 3, 4, 7, '', ['team' => 'Origin Seven', 'teamid' => 7]);
+        $this->insertDraftRow(2099, 3, 5, 8, '', ['team' => 'Origin Eight', 'teamid' => 8]);
+
+        self::assertSame(8, $this->repo->getOriginTeamIdForPick(3, 5));
+        self::assertSame(7, $this->repo->getOriginTeamIdForPick(3, 4));
+    }
+
+    public function testGetOriginTeamIdForPickReturnsNullForUnknownSlot(): void
+    {
+        self::assertNull($this->repo->getOriginTeamIdForPick(99, 99));
+    }
 }

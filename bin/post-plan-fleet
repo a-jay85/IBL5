@@ -113,7 +113,7 @@ STOP_PRS=()
 SAW_DRY_RUN=0
 # Single ceiling for BOTH bounded poll loops (wait_for_slot and the --wait block).
 # Two independent literals would drift; one constant cannot.
-CEILING_SECS=7200
+CEILING_SECS="${POST_PLAN_FLEET_CEILING:-7200}"
 
 # --- flag parsing ------------------------------------------------------------------------
 usage() { sed -n '2,72p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; }
@@ -196,12 +196,13 @@ fi
 # Fail closed by construction: only pgrep's "no match" (exit 1) proves death. A missing pgrep,
 # or an error exit (procps rejects BSD-only flags with exit 2), reads as ALIVE — so a slot is
 # never freed, and a live session is never killed, on the strength of a broken probe.
-# The pattern is END-ANCHORED: `name com.ibl5.post-plan-fleet-1901` unanchored also matches PR
-# 19011. `--name <label>` is the final argv element of caffeinate, timeout and claude alike.
+# The runner script path is END-ANCHORED by the .sh suffix: post-plan-fleet-runner-1901.sh
+# cannot match post-plan-fleet-runner-19011.sh without the terminal dot.
 _label_alive() {
     local label="$1" rc=0
+    local pr="${label#com.ibl5.post-plan-fleet-}"
     command -v pgrep >/dev/null 2>&1 || return 0
-    if pgrep -f "name ${label}$" >/dev/null 2>&1; then
+    if pgrep -f "post-plan-fleet-runner-${pr}\.sh" >/dev/null 2>&1; then
         return 0
     else
         rc=$?      # must be read here: in a condition context set -e is suppressed
@@ -219,9 +220,8 @@ stop_one_pr() {
     local LABEL="com.ibl5.post-plan-fleet-${PR}"
     local PLIST="$HOME/Library/LaunchAgents/${LABEL}.plist"
     local LOG="/tmp/post-plan-fleet-${PR}.log"
-    # End-anchored: `name ...-1901` (unanchored) also matches a LIVE session for PR 19011,
-    # and on the kill path that means SIGKILLing the wrong run mid-publish.
-    local PAT="name ${LABEL}$"
+    # End-anchored by .sh: runner-1901 (unanchored) also matches PR 19011 mid-publish.
+    local PAT="post-plan-fleet-runner-${PR}\.sh"
     local waited=0 keep=""
 
     launchctl bootout "gui/$(id -u)/${LABEL}" 2>/dev/null || true
@@ -587,10 +587,15 @@ fi
 fire_pr() {
     local PR="$1"
     local LABEL="com.ibl5.post-plan-fleet-${PR}"
-    local PLIST="$HOME/Library/LaunchAgents/${LABEL}.plist"
-    local RUNNER="/tmp/post-plan-fleet-runner-${PR}.sh"
-    local LOG="/tmp/post-plan-fleet-${PR}.log"
-    mkdir -p "$(dirname "$PLIST")"   # lets bin/test-post-plan-fleet drive this on Linux CI
+    local PLIST RUNNER LOG
+    RUNNER="/tmp/post-plan-fleet-runner-${PR}.sh"
+    LOG="/tmp/post-plan-fleet-${PR}.log"
+    if [[ "${POST_PLAN_FLEET_DRY_RUN:-0}" -eq 1 ]]; then
+        PLIST="/tmp/${LABEL}.plist"
+    else
+        PLIST="$HOME/Library/LaunchAgents/${LABEL}.plist"
+        mkdir -p "$(dirname "$PLIST")"
+    fi
 
     # Clear stale scratch from a previously interrupted --stop, but only when the label is
     # provably dead. The driver's OWN two paths (LOG, RUNNER) are excluded by name; LOG is
@@ -633,7 +638,7 @@ export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.bun/bin:$HOME/.local/bin:/A
 cd "$ROOT" || exit 1
 STARTED=$(date +%s)
 RC=0
-"$POST_PLAN_NOW_BIN" --pr "$PR" --foreground > "$LOG" 2>&1 || RC=$?
+timeout 5400 "$POST_PLAN_NOW_BIN" --pr "$PR" --foreground > "$LOG" 2>&1 || RC=$?
 ELAPSED=$(( $(date +%s) - STARTED ))
 notify() {
     [ "$NOTIFY" = 1 ] || return 0

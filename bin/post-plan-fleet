@@ -349,6 +349,7 @@ derive_status() {
 # master-sha may be empty; if so, auto-resolved here to avoid a git call on dry-run paths.
 # attack-src should be "—" when --pr-attack is not in use.
 write_report() {
+    [[ "${SAW_DRY_RUN:-0}" != "1" ]] || return 0
     local attack_src="$1" master_sha="$2" fired_n="$3" skip_n="$4"
     local rdate rpath i s _sp _sr _sb _spre _smsg pr br pre st log
     if [[ -z "$master_sha" ]]; then
@@ -740,6 +741,9 @@ PLIST_EOF
     if [[ -n "${POST_PLAN_FLEET_DRY_RUN:-}" ]]; then
         echo "DRY(invocation) PR #${PR}: $ROOT/bin/post-plan-now --pr $PR --foreground"
         cat "$PLIST"
+        # Remove the plist when invoked via --dry-run (CLI flag sets SAW_DRY_RUN).
+        # Tests that set POST_PLAN_FLEET_DRY_RUN=1 directly keep the plist for shape checks.
+        [[ "${SAW_DRY_RUN:-0}" == "1" ]] && rm -f "$PLIST"
         return 0
     fi
     launchctl bootout "gui/$(id -u)/${LABEL}" 2>/dev/null || true

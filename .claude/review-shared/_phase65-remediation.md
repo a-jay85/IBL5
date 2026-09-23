@@ -13,7 +13,7 @@ Read at runtime via `git show <MASTER_SHA>:.claude/review-shared/_phase65-remedi
 
 **Phase 6.5 Remediation.**
 
-Every Phase 6 finding gets fixed and its prevention filed, in this PR's existing worktree. This is the one amendment to the stop-at-verdict invariant; everything that invariant still forbids stays forbidden. The compiled post-plan harness loops this procedure up to three remediation rounds per run; this skill path stays single-shot.
+Every Phase 6 finding gets fixed and its prevention filed, in this PR's existing worktree. After the verdict is posted the run stops; the complete list of forbidden post-verdict actions is in step 4 of `_phase7-verdict.md`. The compiled post-plan harness loops this procedure up to three remediation rounds per run; this skill path stays single-shot.
 
 1. **Load the shared procedure.** `git show <MASTER_SHA>:.claude/skills/fix-and-prevent/_remediation.md`. Same pin as Phase 2 and Phase 6 (the `git show` include invariant in the orchestrator). Declared fallback, per the include-fallback clause: if `git show` fails and the file is genuinely present in this worktree, `Read` it by path and record `include-source: worktree (pin predates skill)` in the verdict. If neither source yields it, print `STOP: cannot load _remediation.md from <MASTER_SHA> or from the worktree` and stop.
 
@@ -22,10 +22,10 @@ Every Phase 6 finding gets fixed and its prevention filed, in this PR's existing
 3. **Remediate every finding.** For each Phase 6 finding (notes as well as blocking, across all six 6d classes) follow `_remediation.md` in **`Mode: in-PR`**. State that mode line out loud before its step 1; the procedure refuses to run without a declared mode. In-PR mode overrides `/fix-and-prevent`'s § Calibration "Out of scope" carve-outs: a finding too small to name a defect class still gets an entry, with `class: n/a — <reason>`. Never zero entries.
 "Never zero entries" binds the findings Phase 6 actually emitted. A Phase 5.9 outcome of `REPLACED`, `APPENDED` or `UNCHANGED` is a routine refresh. It produces no remediation entry, no backlog row, and no `last_verified:` bump. Only `AMBIGUOUS` reaches this phase, as the 6d.4 finding it is, and that one does get an entry.
 
-   - **Worktree:** this PR's existing one. One worktree per run.
+   - **Worktree:** this PR's existing one. Do not run `bin/wt-new`, do not create a second worktree, do not tear down the existing one.
    - **Backlog:** run `bin/backlog new <label> "<title>"` for each finding (the `gh issue create` wrapper; search before filing with `bin/backlog search`). Do not run the full `/backlog` chain. Consolidate findings sharing a surface into one issue.
-   - **Fifth-file gate.** `~/.claude/hooks/plan-gate-edit.sh` Check 1 denies the 5th distinct repo file edited on the main thread in one turn. When the Agent tool is available, route remaining fixes to one `subagent_type: "sonnet-4-6"` sub-agent (omit `model`). When the Agent tool is absent (harness context), apply the overflow rule instead.
-   - **Overflow rule.** Fix what is clearly in scope of this PR; file the remainder as backlog rows marked `not fixed — filed`; say so in the Phase 7 verdict. A `/pr-ready` run never expands into a sweep.
+   - **Fifth-file gate.** `~/.claude/hooks/plan-gate-edit.sh` Check 1 denies the 5th distinct repo file edited on the main thread in one turn. When the Agent tool is available, route remaining fixes to one `subagent_type: "sonnet-4-6"` sub-agent (omit `model`). Before spawning, state the delegate boundary: remaining code fixes and backlog-row appends only. The delegate does not commit, push, arm auto-merge, change worktrees, or spawn further delegates. When the Agent tool is absent (harness context), apply the overflow rule instead.
+   - **Overflow rule.** Fix what is clearly in scope of this PR; file the remainder as backlog rows marked `not fixed — filed`; say so in the Phase 7 verdict. A remediation run never expands into a sweep.
 
 4. **Scope reconciliation.** Step 2 already proved the tree carried nothing but this phase's own edits.
 
@@ -33,7 +33,7 @@ Every Phase 6 finding gets fixed and its prevention filed, in this PR's existing
 
    The harness commits and pushes after this phase exits. Use `gh pr edit` for any Scope number corrections confirmed above. Do not call `git commit` or `git push`.
 
-   The commit type is `chore:` per `.claude/rules/commit-conventions.md`. A fidelity remediation plus a backlog row is invisible to a league GM.
+   The commit type is `chore:` per `.claude/rules/commit-conventions.md`. A fidelity remediation plus a backlog row is invisible to a league GM. Never retitle a commit to route around a hold; classify by what the diff is.
 
 Then proceed to Phase 7, which posts the single verdict comment covering both the findings and this remediation.
 

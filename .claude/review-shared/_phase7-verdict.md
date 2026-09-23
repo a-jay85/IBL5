@@ -3,9 +3,9 @@ description: Phase 7 arm-hold evaluation, provenance line, sticky verdict commen
 last_verified: 2026-09-23
 ---
 
-# /pr-ready runtime Phase 7 — holds, sticky verdict, terminator
+# Phase 7 — holds, sticky verdict, terminator
 
-Purpose: the full Phase 7 procedure, lifted out of `SKILL.md` so it is resident only from the turn it loads.
+Purpose: the full Phase 7 procedure, loaded via `git show` from the orchestrator so it is resident only from the turn it loads.
 
 Read at runtime via `git show <MASTER_SHA>:.claude/review-shared/_phase7-verdict.md`.
 

@@ -2218,17 +2218,22 @@ end_case "check-digest-prose voice linter"
 
 # --- 6c.1: --dry-run prints the per-PR invocation and exits 0 ------------------------
 begin_case
-out="$(POST_PLAN_FLEET_ROOT="$SCRIPT_DIR/.." POST_PLAN_FLEET_GH_USER=a-jay85 \
+rm -f "$SCRATCH/pr-firstpass-$(date +%F).md"
+out="$(HOME="$SCRATCH" POST_PLAN_FLEET_ROOT="$SCRIPT_DIR/.." POST_PLAN_FLEET_GH_USER=a-jay85 \
     bin/post-plan-fleet --dry-run --pr 9999 2>&1)"; rc=$?
 [[ $rc -eq 0 ]] || fail "6c.1: --dry-run exited $rc, want 0 (out: $out)"
 grep -qF 'bin/post-plan-now --pr 9999 --foreground' <<< "$out" \
   || fail "6c.1: --dry-run output does not contain 'bin/post-plan-now --pr 9999 --foreground'"
+[[ ! -e "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-9999.plist" ]] \
+  || fail "6c.1: --dry-run left plist in LaunchAgents"
+[[ ! -e "$SCRATCH/pr-firstpass-$(date +%F).md" ]] \
+  || fail "6c.1: --dry-run wrote pr-firstpass report"
 end_case dry-run-prints-invocation
 
 # --- 6c.2: plist has expanded PATH, no literal $VAR, no empty <string></string> ------
 begin_case
 _plist_tmp="$SCRATCH/fleet-dry-plist.txt"
-POST_PLAN_FLEET_ROOT="$SCRIPT_DIR/.." POST_PLAN_FLEET_GH_USER=a-jay85 \
+HOME="$SCRATCH" POST_PLAN_FLEET_ROOT="$SCRIPT_DIR/.." POST_PLAN_FLEET_GH_USER=a-jay85 \
     bin/post-plan-fleet --dry-run --pr 9999 > "$_plist_tmp" 2>&1; rc=$?
 [[ $rc -eq 0 ]] || fail "6c.2: --dry-run exited $rc (see $_plist_tmp)"
 ! grep -qE '[$]HOME|[$][A-Z_]+|string></string' "$_plist_tmp" \
@@ -2257,7 +2262,7 @@ end_case result-unparseable-holds
 
 # --- 6c.5: --wait timeout prints 'TIMED OUT waiting for' on stderr and exits 0 ------
 begin_case
-out="$(POST_PLAN_FLEET_ROOT="$SCRIPT_DIR/.." POST_PLAN_FLEET_GH_USER=a-jay85 \
+out="$(HOME="$SCRATCH" POST_PLAN_FLEET_ROOT="$SCRIPT_DIR/.." POST_PLAN_FLEET_GH_USER=a-jay85 \
     bin/post-plan-fleet --dry-run --pr 9999 --wait --jobs 1 2>&1)"; rc=$?
 [[ $rc -eq 0 ]] || fail "6c.5: want exit 0 on dry-run with --wait, got $rc"
 # When no session is actually running, wait exits immediately. The TIMED OUT path

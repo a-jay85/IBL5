@@ -206,7 +206,7 @@ _label_alive() {
     command -v pgrep >/dev/null 2>&1 || return 0
     if pgrep -f "post-plan-fleet-runner-${pr}\.sh" >/dev/null 2>&1; then
         return 0
-    elif pgrep -f "post-plan-now --pr ${pr}" >/dev/null 2>&1; then
+    elif pgrep -f "post-plan-now --pr ${pr}( |$)" >/dev/null 2>&1; then
         return 0
     else
         rc=$?      # must be read here: in a condition context set -e is suppressed
@@ -229,7 +229,7 @@ stop_one_pr() {
     # CHILD_PAT matches timeout's argv, which retains "post-plan-now --pr $PR" after
     # bin/post-plan-now execs into /bin/bash; killing timeout brings down its subtree.
     local PAT="post-plan-fleet-runner-${PR}\.sh"
-    local CHILD_PAT="post-plan-now --pr ${PR}"
+    local CHILD_PAT="post-plan-now --pr ${PR}( |$)"
     local waited=0 keep=""
 
     launchctl bootout "gui/$(id -u)/${LABEL}" 2>/dev/null || true
@@ -600,12 +600,8 @@ fire_pr() {
     local PLIST RUNNER LOG
     RUNNER="/tmp/post-plan-fleet-runner-${PR}.sh"
     LOG="/tmp/post-plan-fleet-${PR}.log"
-    if [[ "${POST_PLAN_FLEET_DRY_RUN:-0}" -eq 1 ]]; then
-        PLIST="/tmp/${LABEL}.plist"
-    else
-        PLIST="$HOME/Library/LaunchAgents/${LABEL}.plist"
-        mkdir -p "$(dirname "$PLIST")"
-    fi
+    PLIST="$HOME/Library/LaunchAgents/${LABEL}.plist"
+    mkdir -p "$(dirname "$PLIST")"
 
     # Clear stale scratch from a previously interrupted --stop, but only when the label is
     # provably dead. The driver's OWN two paths (LOG, RUNNER) are excluded by name; LOG is

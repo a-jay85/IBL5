@@ -850,12 +850,12 @@ clean_slots
 mkdir -p "$SCRATCH/Library/LaunchAgents"
 : > "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-9001.plist"
 clear_live_labels
-( SLEEP_SECS=12 "$SLEEPER" --name com.ibl5.post-plan-fleet-9001 >/dev/null 2>&1 & )
+( SLEEP_SECS=12 "$SLEEPER" post-plan-now --pr 9001 --foreground >/dev/null 2>&1 & )
 sleep 0.5
-pgrep -f "name com.ibl5.post-plan-fleet-9001$" >/dev/null 2>&1 \
+pgrep -f "post-plan-now --pr 9001( |$)" >/dev/null 2>&1 \
     || fail "reap-respects-live-process: sleeper fixture never started"
 out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" run_driver --go --wait 2>&1)"; rc=$?
-pkill -f "name com.ibl5.post-plan-fleet-9001$" 2>/dev/null || true
+pkill -f "post-plan-now --pr 9001( |$)" 2>/dev/null || true
 [[ $rc -eq 0 ]] || fail "reap-respects-live-process: exit $rc (out: $out)"
 grep -qE 'waiting for [0-9]+ session' <<< "$out" \
     || fail "32a: reaped a slot whose process was alive — L34 has regressed (out: $out)"
@@ -930,13 +930,13 @@ mkdir -p "$SCRATCH/Library/LaunchAgents"
 printf 'stale baseline\n' > /tmp/post-plan-fleet-scratch-9002.patch
 printf 'partial run\n'    > /tmp/post-plan-fleet-9002.log
 TMP_LOGS+=("/tmp/post-plan-fleet-scratch-9002.patch" "/tmp/post-plan-fleet-9002.log" "/tmp/post-plan-fleet-9002.log.aborted")
-( SLEEP_SECS=120 "$SLEEPER" --name com.ibl5.post-plan-fleet-9002 >/dev/null 2>&1 & )
+( SLEEP_SECS=120 "$SLEEPER" post-plan-now --pr 9002 --foreground >/dev/null 2>&1 & )
 sleep 0.5
-pgrep -f "name com.ibl5.post-plan-fleet-9002$" >/dev/null 2>&1 \
+pgrep -f "post-plan-now --pr 9002( |$)" >/dev/null 2>&1 \
     || fail "stop-e2e: sleeper fixture never started — the case proves nothing"
 out="$(run_driver --stop 9002 2>&1)"; rc=$?
 [[ $rc -eq 0 ]] || fail "stop-e2e: exit $rc (out: $out)"
-pgrep -f "name com.ibl5.post-plan-fleet-9002$" >/dev/null 2>&1 \
+pgrep -f "post-plan-now --pr 9002( |$)" >/dev/null 2>&1 \
     && fail "stop-e2e: the process survived --stop (out: $out)"
 [[ ! -e "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-9002.plist" ]] \
     || fail "stop-e2e: plist not removed — the slot was never released"
@@ -944,7 +944,7 @@ pgrep -f "name com.ibl5.post-plan-fleet-9002$" >/dev/null 2>&1 \
 [[ ! -e /tmp/post-plan-fleet-scratch-9002.patch ]] || fail "stop-e2e: /pr-ready scratch not cleared"
 [[ -e /tmp/post-plan-fleet-9002.log.aborted ]] || fail "stop-e2e: log not preserved as .aborted"
 [[ ! -e /tmp/post-plan-fleet-9002.log ]] || fail "stop-e2e: original log left in place"
-pkill -f "name com.ibl5.post-plan-fleet-9002$" 2>/dev/null || true
+pkill -f "post-plan-now --pr 9002( |$)" 2>/dev/null || true
 clean_slots
 # fire_pr pre-clear: stale scratch for a DEAD label is cleared; a LIVE label's is preserved.
 printf 'stale\n' > /tmp/post-plan-fleet-scratch-1901.patch
@@ -954,12 +954,12 @@ clean_slots
 out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" POST_PLAN_FLEET_DRY_RUN=1 run_driver --go 2>&1)"
 [[ ! -e /tmp/post-plan-fleet-scratch-1901.patch ]] || fail "stop-e2e/pre-clear: stale scratch survived a fire"
 [[ -e /tmp/post-plan-fleet-scratch-11901.patch ]] || fail "stop-e2e/pre-clear: glob is not PR-anchored — it ate 11901"
-( SLEEP_SECS=30 "$SLEEPER" --name com.ibl5.post-plan-fleet-1902 >/dev/null 2>&1 & )
+( SLEEP_SECS=30 "$SLEEPER" post-plan-now --pr 1902 --foreground >/dev/null 2>&1 & )
 sleep 0.5
 printf 'live\n' > /tmp/post-plan-fleet-scratch-1902.patch
 TMP_LOGS+=("/tmp/post-plan-fleet-scratch-1902.patch")
 out="$(POST_PLAN_FLEET_PR_JSON="$SCRATCH/two-open.json" POST_PLAN_FLEET_DRY_RUN=1 run_driver --go 2>&1)"
-pkill -f "name com.ibl5.post-plan-fleet-1902$" 2>/dev/null || true
+pkill -f "post-plan-now --pr 1902( |$)" 2>/dev/null || true
 [[ -e /tmp/post-plan-fleet-scratch-1902.patch ]] \
     || fail "stop-e2e/pre-clear: deleted the scratch of a LIVE run"
 clean_slots
@@ -973,14 +973,14 @@ begin_case
 clean_slots
 mkdir -p "$SCRATCH/Library/LaunchAgents"
 : > "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-19002.plist"
-( SLEEP_SECS=60 "$SLEEPER" --name com.ibl5.post-plan-fleet-19002 >/dev/null 2>&1 & )
+( SLEEP_SECS=60 "$SLEEPER" post-plan-now --pr 19002 --foreground >/dev/null 2>&1 & )
 sleep 0.5
 out="$(run_driver --stop 9002 2>&1)"; rc=$?
-pgrep -f "name com.ibl5.post-plan-fleet-19002$" >/dev/null 2>&1 \
+pgrep -f "post-plan-now --pr 19002( |$)" >/dev/null 2>&1 \
     || fail "stop-label-anchor: --stop 9002 killed the live PR 19002 session (rc=$rc, out: $out)"
 [[ -e "$SCRATCH/Library/LaunchAgents/com.ibl5.post-plan-fleet-19002.plist" ]] \
     || fail "stop-label-anchor: --stop 9002 released PR 19002's slot"
-pkill -f "name com.ibl5.post-plan-fleet-19002$" 2>/dev/null || true
+pkill -f "post-plan-now --pr 19002( |$)" 2>/dev/null || true
 clean_slots
 end_case stop-label-anchor
 

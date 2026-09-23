@@ -1,6 +1,6 @@
 ---
 description: Monolog-based structured logging with Discord webhook alerts, PII redaction, and user context injection.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # Logging

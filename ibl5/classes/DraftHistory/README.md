@@ -1,6 +1,6 @@
 ---
 description: Displays historical draft picks for teams and players.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # DraftHistory

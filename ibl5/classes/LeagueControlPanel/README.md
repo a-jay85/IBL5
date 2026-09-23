@@ -1,6 +1,6 @@
 ---
 description: Admin control panel for managing season phases, league toggles, and system-wide settings via the leagueControlPanel.php entry point.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # LeagueControlPanel Module
@@ -15,6 +15,8 @@ Admin control panel for managing league settings, season phases, and system-wide
 | `LeagueControlPanelService` | Read-only panel data assembly for GET requests |
 | `LeagueControlPanelProcessor` | POST mutation dispatch with input validation |
 | `LeagueControlPanelView` | XSS-safe HTML rendering |
+| `AwardGenerationService` | Generates end-of-season awards |
+| `ActivePlayersCsvExporter` | Exports active player roster as CSV |
 
 ## Entry Point
 
@@ -41,4 +43,4 @@ Admin control panel for managing league settings, season phases, and system-wide
 
 ## Tests
 
-56 unit tests in `ibl5/tests/LeagueControlPanel/`.
+121 unit tests in `ibl5/tests/LeagueControlPanel/`.

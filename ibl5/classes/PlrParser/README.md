@@ -1,6 +1,6 @@
 ---
 description: Parses and writes the JSB simulation engine's .plr fixed-width player-record files.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # PlrParser

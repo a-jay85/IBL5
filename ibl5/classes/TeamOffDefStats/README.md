@@ -1,6 +1,6 @@
 ---
 description: League-wide team offensive and defensive statistics via a single bulk JOIN query replacing per-team N+1 calls.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # TeamOffDefStats Module

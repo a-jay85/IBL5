@@ -1,6 +1,6 @@
 ---
 description: Updater pipeline web entry point — triggered via the League Control Panel's "Update All The Things" button at scripts/updateAllTheThings.php.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # Updater

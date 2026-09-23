@@ -1,6 +1,6 @@
 ---
 description: Player awards history search and display following interface-driven Repository/Service/View architecture.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # AwardHistory Module

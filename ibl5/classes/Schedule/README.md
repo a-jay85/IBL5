@@ -1,6 +1,6 @@
 ---
 description: Page controller that composes the league and team schedule views into a unified schedule page.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # Schedule

@@ -1,6 +1,6 @@
 ---
 description: Summary display of the most recently completed simulation run.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # LastSimRecap

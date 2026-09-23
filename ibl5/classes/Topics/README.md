@@ -1,6 +1,6 @@
 ---
 description: Assembles the Topics page combining league discussion topics and news articles.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # Topics

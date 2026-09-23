@@ -1,6 +1,6 @@
 ---
 description: Use a sibling ibl5_test database for local PHPUnit --group database runs instead of destroying iblhoops_ibl5.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # ADR-0033: Non-Destructive Sibling Test Database

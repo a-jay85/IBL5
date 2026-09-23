@@ -1,6 +1,6 @@
 ---
 description: Runs the compiled native sim binary as a stdin/stdout transform, streaming game results as NDJSON.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # EngineRunner

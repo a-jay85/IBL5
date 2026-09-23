@@ -1,6 +1,6 @@
 ---
 description: Static utility classes for consistent basketball stat formatting (percentages, per-game averages, totals) and safe type conversion.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # BasketballStats Module - Basketball Statistics Formatting and Utilities
@@ -73,6 +73,37 @@ StatsFormatter::safeDivide($numerator, $denominator);
 // Example: safeDivide(10, 2) returns 5.0
 // Example: safeDivide(10, 0) returns 0 (safe)
 ```
+
+### SalaryConverter
+
+A static utility class for converting salary values between formats.
+
+**Location:** `/ibl5/classes/BasketballStats/SalaryConverter.php`  
+**Namespace:** `BasketballStats`
+
+### StrengthOfScheduleCalculator
+
+Calculates strength-of-schedule metrics from opponent win percentages.
+
+**Location:** `/ibl5/classes/BasketballStats/StrengthOfScheduleCalculator.php`  
+**Namespace:** `BasketballStats`
+
+### TeamStatsCalculator
+
+Aggregates and calculates team-level statistics from player data.
+
+**Location:** `/ibl5/classes/BasketballStats/TeamStatsCalculator.php`  
+**Namespace:** `BasketballStats`
+
+### Tables
+
+Stat table classes in `Tables/` for different stat-view formats:
+
+- `Per36Minutes.php`: per-36-minute normalizations
+- `PeriodAverages.php`: per-period average breakdowns
+- `SeasonAverages.php`: full-season per-game averages
+- `SeasonTotals.php`: full-season counting totals
+- `SplitStats.php`: situational / split-based stat views
 
 ### StatsSanitizer
 

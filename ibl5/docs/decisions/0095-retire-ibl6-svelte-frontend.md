@@ -1,6 +1,6 @@
 ---
 description: Retire the IBL6 SvelteKit frontend after porting its one page (the game boxscore) into IBL5 as a PHP module; the site stays server-rendered PHP with HTMX and there is no second frontend stack.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # ADR-0095: Retire the IBL6 SvelteKit frontend; the site stays PHP-rendered with HTMX

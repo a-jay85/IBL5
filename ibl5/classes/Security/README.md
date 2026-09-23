@@ -1,6 +1,6 @@
 ---
 description: Cross-cutting HTML sanitization and CSRF protection utilities used across all form-processing modules.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # Security

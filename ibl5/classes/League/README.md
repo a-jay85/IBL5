@@ -1,6 +1,6 @@
 ---
 description: Core league entity, multi-league context (IBL vs Olympics), and team filtering.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # League

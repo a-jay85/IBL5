@@ -1,13 +1,13 @@
 ---
 description: Contract negotiation demand calculation, eligibility validation, and offer rendering — refactored from a 382-line procedural function.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # Contract Negotiation Refactoring - Summary
 
 ## Overview
 
-The `ibl5/modules/Player/index.php` negotiate() function has been successfully refactored from a 382-line procedural function into a clean, maintainable, object-oriented architecture using 4 specialized classes following the Extension module refactoring pattern.
+The `ibl5/modules/Player/index.php` negotiate() function has been successfully refactored from a 382-line procedural function into a clean, maintainable, object-oriented architecture using 5 specialized classes following the Extension module refactoring pattern.
 
 ## Transformation
 
@@ -64,17 +64,19 @@ function negotiate($playerID)
 
 ```
 classes/Negotiation/
-├── NegotiationDemandCalculator.php (269 lines)
+├── ExtensionContractDemandCalculator.php (370 lines)
 │   └── Calculates contract demands based on player ratings
-├── NegotiationValidator.php (91 lines)
+├── NegotiationRepository.php (230 lines)
+│   └── Database access layer for negotiation data
+├── NegotiationValidator.php (93 lines)
 │   └── Validates eligibility using existing PlayerContractValidator
-├── NegotiationOfferView.php (207 lines)
+├── NegotiationOfferView.php (221 lines)
 │   └── Handles HTML rendering (presentation layer)
-└── NegotiationService.php (229 lines)
+└── NegotiationService.php (124 lines)
     └── Orchestrates the complete workflow
 ```
 
-### 1. NegotiationDemandCalculator.php
+### 1. ExtensionContractDemandCalculator.php
 
 **Responsibility**: Calculate contract demands based on player statistics
 
@@ -145,7 +147,7 @@ MAX_RAISE_PERCENTAGE = 0.1 // 10% max annual raise
 2. Validate free agency is not active
 3. Validate negotiation eligibility (delegates to NegotiationValidator)
 4. Get team factors for demand calculation
-5. Calculate contract demands (delegates to NegotiationDemandCalculator)
+5. Calculate contract demands (delegates to ExtensionContractDemandCalculator)
 6. Calculate available cap space
 7. Determine max first year salary based on experience
 8. Render negotiation form (delegates to NegotiationOfferView)
@@ -178,7 +180,7 @@ MAX_RAISE_PERCENTAGE = 0.1 // 10% max annual raise
 
 ### 3. Extensibility ✅
 - Easy to add new validation rules (just add methods to NegotiationValidator)
-- Easy to modify demand calculation (isolated in NegotiationDemandCalculator)
+- Easy to modify demand calculation (isolated in ExtensionContractDemandCalculator)
 - Easy to change presentation (isolated in NegotiationOfferView)
 - Can easily add new factors to modifier calculation
 
@@ -251,7 +253,7 @@ This refactoring follows the same patterns as the Extension module refactoring (
 | Original Lines | 310 | 382 |
 | Refactored Lines | 68 | 21 |
 | Reduction | 78% | 94.5% |
-| Classes Created | 4 | 4 |
+| Classes Created | 4 | 5 |
 | Processor Class | ✅ | ✅ |
 | Validator Class | ✅ | ✅ |
 | View Helper | ❌ (HTML in extension.php) | ✅ |
@@ -266,7 +268,7 @@ This refactoring follows the same patterns as the Extension module refactoring (
 ### As a Developer:
 ```php
 // Calculate demands independently
-$calculator = new NegotiationDemandCalculator($db);
+$calculator = new ExtensionContractDemandCalculator($db);
 $demands = $calculator->calculateDemands($player, $teamFactors);
 
 // Validate eligibility independently
@@ -316,7 +318,7 @@ While comprehensive tests weren't created in this phase (to minimize changes), t
 ### Unit Tests:
 ```php
 // Test demand calculation
-$calculator = new NegotiationDemandCalculator($mockDb);
+$calculator = new ExtensionContractDemandCalculator($mockDb);
 $demands = $calculator->calculateDemands($player, $teamFactors);
 $this->assertEquals(500, $demands['year1']);
 
@@ -342,11 +344,11 @@ $this->assertStringContainsString('Contract Demands', $output);
 | Metric | Before | After | Improvement |
 |--------|--------|-------|-------------|
 | Lines in negotiate() | 382 | 21 | -94.5% |
-| Number of classes | 0 | 4 | +4 |
+| Number of classes | 0 | 5 | +5 |
 | Unsafe stripslashes/check_html | 38 | 0 | -100% |
 | Direct DB queries | 25+ | 0 (uses Player) | -100% |
 | HTML mixed with logic | Yes | No | ✅ |
-| Reusable components | 0 | 4 | +4 |
+| Reusable components | 0 | 5 | +5 |
 | Code duplication | High | None | -100% |
 | Testability | None | Full | +100% |
 
@@ -363,6 +365,6 @@ The refactoring of the negotiate() function in `ibl5/modules/Player/index.php` h
 ✅ **Backward Compatible**: Works exactly as before for users  
 ✅ **Follows Patterns**: Consistent with Extension module refactoring  
 
-The transformation from 382 lines of procedural code to 21 lines using 4 well-designed classes demonstrates the power of object-oriented design and established refactoring patterns.
+The transformation from 382 lines of procedural code to 21 lines using 5 well-designed classes applies object-oriented design and established refactoring patterns.
 
 **Status**: ✅ Complete and ready for production

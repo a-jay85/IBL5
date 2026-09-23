@@ -1,6 +1,6 @@
 ---
 description: Depth chart submission form, validation, and database update for GM team management; positions and offensive sets simplified.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # Depth Chart Entry Module - Refactoring Documentation
@@ -114,6 +114,7 @@ ibl5/
 │       └── index.php (thin controller - 95 lines)
 ├── classes/
 │   └── DepthChartEntry/
+│       ├── DepthChartEntryApiHandler.php
 │       ├── DepthChartEntryController.php
 │       ├── DepthChartEntryProcessor.php
 │       ├── DepthChartEntryRepository.php

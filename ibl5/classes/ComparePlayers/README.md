@@ -1,6 +1,6 @@
 ---
 description: Side-by-side comparison of two players' ratings, current season stats, and career stats with jQuery UI autocomplete search.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # ComparePlayers Module
@@ -58,6 +58,10 @@ Allows users to select two players via autocomplete search and compare their:
 - Orchestrates repository calls
 - Returns structured comparison data
 
+**Controller** (`ComparePlayersController.php`)
+- Thin controller coordinating the comparison workflow
+- Handles request routing and response assembly
+
 **View** (`ComparePlayersView.php`)
 - HTML rendering with output buffering
 - XSS protection: all output escaped with htmlspecialchars()
@@ -69,6 +73,7 @@ All classes implement contracts in `Contracts/` subdirectory:
 - `ComparePlayersRepositoryInterface` - Database operations contract
 - `ComparePlayersServiceInterface` - Business logic contract
 - `ComparePlayersViewInterface` - View rendering contract
+- `ComparePlayersControllerInterface` - Controller workflow contract
 
 Each interface contains comprehensive PHPDoc documenting:
 - Method signatures with types

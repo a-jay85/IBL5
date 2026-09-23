@@ -1,6 +1,6 @@
 ---
 description: Admin page for viewing and updating league configuration, including JSB .lge file import.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # LeagueConfig

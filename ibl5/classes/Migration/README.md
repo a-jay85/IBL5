@@ -1,6 +1,6 @@
 ---
 description: Database migration runner, schema validator, and pending-migration tracking.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # Migration

@@ -1,6 +1,6 @@
 ---
 description: Displays current-season statistical leaderboards with a DatabaseCache-backed decorator for fast page loads.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # SeasonLeaderboards

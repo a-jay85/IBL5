@@ -1,6 +1,6 @@
 ---
 description: Franchise history display — championships, awards, and per-season records.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # FranchiseHistory

@@ -1,6 +1,6 @@
 ---
 description: Persists and retrieves GM-saved depth chart configurations via a JSON API.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # SavedDepthChart

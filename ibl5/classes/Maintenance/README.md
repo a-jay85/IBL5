@@ -1,6 +1,6 @@
 ---
 description: CI and maintenance utilities — test coverage checking, PHPStan baseline counting, and maintenance DB operations.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # Maintenance

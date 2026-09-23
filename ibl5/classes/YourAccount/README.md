@@ -1,6 +1,6 @@
 ---
 description: Account management workflows: registration, login, password reset, activation, and the GM account dashboard.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # YourAccount

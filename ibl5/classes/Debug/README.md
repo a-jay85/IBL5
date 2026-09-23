@@ -1,6 +1,6 @@
 ---
 description: Manages the debug overlay toggle and debug session state for admin use.
-last_verified: 2026-07-24
+last_verified: 2026-09-22
 ---
 
 # Debug

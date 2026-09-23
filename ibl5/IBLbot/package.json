@@ -21,7 +21,7 @@
     "express": "^5.2.1"
   },
   "overrides": {
-    "undici": "6.27.0"
+    "undici": "6.28.1"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",

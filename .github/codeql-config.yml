@@ -2,3 +2,6 @@ name: CodeQL config
 
 paths-ignore:
   - bin/check-vr-coverage
+  # Rendered-HTML test snapshots are fixtures, never served. CodeQL re-flags them
+  # (js/xss-through-dom) every time a snapshot changes.
+  - ibl5/tests/**/__snapshots__

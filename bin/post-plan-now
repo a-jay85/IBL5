@@ -474,15 +474,21 @@ if [ "${POST_PLAN_SKILL:-0}" != "1" ] && [ -x "$HARNESS/run" ]; then
     PLAN_ARG="${PLAN_OVERRIDE:+ --plan $(shq "$PLAN_OVERRIDE")}"
     HARNESS_RUN_DIR="$HARNESS/out/live-$SAFE_SLUG-$TS"
     HARNESS_SEG="CLAUDE_HEADLESS=1 caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG}; rc=\$?; "
+    # Foreground has no plist, so nothing points stdout at $LOG. Without the tee, $LOG
+    # never exists: the RESULT capture below comes back empty and the rc=3 message falls
+    # back to generic text plus a "See $LOG" pointing at a missing file. Foreground only:
+    # under launchd, stdout already IS $LOG, and a tee there would write every line twice.
+    [ "$FOREGROUND" -eq 1 ] \
+        && HARNESS_SEG="CLAUDE_HEADLESS=1 caffeinate -s \"$HARNESS/run\" isolated \"$ROOT\" \"$HARNESS_RUN_DIR\" --live${PLAN_ARG} 2>&1 | tee \"$LOG\"; rc=\${PIPESTATUS[0]}; "
     GATE_OPEN="if should_fallback \"\$rc\"; then "
-    # The harness has already exited and flushed by the time HARNESS_SEG's `rc=$?` runs,
+    # The harness has already exited and flushed by the time HARNESS_SEG's `rc=` runs,
     # so $LOG holds its final RESULT: line. Bounded at capture, not at use: bash has no
     # nested ${${V:-x}:0:N}, and truncate-then-default keeps an empty capture empty so
     # the ${HARNESS_RESULT:-...} fallback in GATE_CLOSE still fires. At 1400, fixed text
     # plus a worst-case $SLUG and $LOG stays under bin/discord-dm's 1900-char truncation
     # point, so "See $LOG." survives.
     POST_HARNESS_SEG="HARNESS_RESULT=\$(grep -m1 '^RESULT:' \"$LOG\" 2>/dev/null || true); HARNESS_RESULT=\${HARNESS_RESULT:0:1400}; "
-    GATE_CLOSE="; elif [ \"\$rc\" = 3 ]; then msg=\"post-plan-now: harness exited 3 (fail-closed sentinel) on branch $SLUG. SKIPPING the /post-plan skill fallback. Cause: \${HARNESS_RESULT:-the RESULT line above names it -- either a stacked-branch rebase conflict, or a local pre-commit/pre-push gate denial such as a missing ADR, a stale doc, or the rules byte budget}. A human must clear it, then re-run bin/post-plan-now. See $LOG.\"; echo \"\$msg\"; \"$ROOT/bin/discord-dm\" --quiet --attempts 2 \"\$msg\" >/dev/null 2>&1 || true; fi"
+    GATE_CLOSE="; elif [ \"\$rc\" = 3 ]; then msg=\"post-plan-now: harness exited 3 (fail-closed sentinel) on branch $SLUG. SKIPPING the /post-plan skill fallback. Cause: \${HARNESS_RESULT:-the RESULT line above names it -- either a rebase conflict, or a local pre-commit/pre-push gate denial such as a missing ADR, a stale doc, or the rules byte budget}. A human must clear it, then re-run bin/post-plan-now. See $LOG.\"; echo \"\$msg\"; \"$ROOT/bin/discord-dm\" --quiet --attempts 2 \"\$msg\" >/dev/null 2>&1 || true; fi"
     ENGINE="compiled post-plan harness (fails CLOSED on a rebase conflict or a local gate denial; falls back to the skill on other failures)"
 fi
 

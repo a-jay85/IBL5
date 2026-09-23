@@ -547,6 +547,44 @@ def test_bare_invocation_cmd_has_no_plan_slug_export(tmp_path):
     assert "PLAN_SLUG" not in cmd3, f"ambient PLAN_SLUG must not be injected on bare path; got {cmd3!r}"
 
 
+def test_foreground_exit3_message_quotes_the_harness_result(tmp_path):
+    """--foreground (the automouse path) runs with no plist, so nothing sent the harness's
+    stdout to $LOG. The RESULT capture then read a file that never existed, and the rc=3
+    DM said only "the RESULT line above names it" plus "See <missing file>". Runs the real
+    foreground chain end to end with a stub harness that exits 3."""
+    result = ("RESULT: post-plan BLOCKED — rebase conflict, human required; "
+              "rebase-conflict: incomplete merge stages: a/SKILL.md (stages [1, 2])")
+    home = tmp_path / "home"; home.mkdir()
+    shim = tmp_path / "shim"; shim.mkdir()
+    for name, body in (("launchctl", "exit 0"), ("gh", "exit 1"),
+                       ("caffeinate", 'shift; exec "$@"')):
+        (shim / name).write_text(f"#!/bin/sh\n{body}\n")
+        (shim / name).chmod(0o755)
+    harness = tmp_path / "fake-harness"; harness.mkdir()
+    (harness / "run").write_text(
+        f"#!/bin/sh\necho 'harness: starting'\necho '{result}'\nexit 3\n")
+    (harness / "run").chmod(0o755)
+    plan = tmp_path / "plan.md"; plan.write_text("# plan\n")
+    env = dict(os.environ, HOME=str(home), HARNESS=str(harness),
+               GH_CMD=str(shim / "gh"), PATH=f"{shim}:{os.environ['PATH']}")
+    env.pop("POST_PLAN_SKILL", None)
+    repo = _fixture_repo(tmp_path)
+    r = subprocess.run(["bash", PPN, "--foreground", "--plan", str(plan)], cwd=repo,
+                       env=env, capture_output=True, text=True, timeout=120)
+    log = re.search(r"See (/tmp/post-plan-now-\S+\.log)\.", r.stdout)
+    try:
+        assert r.returncode == 3, f"stdout={r.stdout!r} stderr={r.stderr!r}"
+        assert "fail-closed sentinel" in r.stdout
+        assert f"Cause: {result}." in r.stdout, r.stdout
+        assert "the RESULT line above names it" not in r.stdout
+        assert log, f"no 'See <log>.' pointer: {r.stdout!r}"
+        assert result in pathlib.Path(log.group(1)).read_text(), "the named log lacks RESULT"
+    finally:
+        if log:
+            for suffix in (".log", ".session"):
+                pathlib.Path(log.group(1)[:-4] + suffix).unlink(missing_ok=True)
+
+
 def test_harness_default_is_the_main_checkout(tmp_path):
     """ADR-0092: the seam must not become $ROOT/tools/postplan-harness."""
     src = open(PPN).read()

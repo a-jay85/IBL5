@@ -1733,9 +1733,13 @@ def verdict_line(res: RunResult, rc: int, pull_base: str = "") -> str:
 
     if rc == 3:
         if res.error_kind == "rebase-conflict":
-            return ("RESULT: post-plan BLOCKED — rebase conflict on a stacked branch, "
-                    "human required; ERROR terminal=failed, no PR opened. "
-                    "Resolve the rebase, then re-run bin/post-plan-now.")
+            # Name the conflicted path. Any branch can hit this arm (a plain branch whose
+            # file master edited and the branch deleted, too), so "stacked" would mislead.
+            detail = _flat(res.error)
+            detail = f" {detail}" if detail else ""
+            return ("RESULT: post-plan BLOCKED — rebase conflict, "
+                    "human required; ERROR terminal=failed, no PR opened."
+                    f"{detail} Resolve the rebase, then re-run bin/post-plan-now.")
         if res.error_kind == "local-gate":
             detail = _flat(res.error) or "see gate output"
             # Classify on the FULL res.error, never on `detail`: _flat truncates at 300

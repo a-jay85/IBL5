@@ -1,5 +1,6 @@
 import { test, expect } from '../fixtures/auth';
 import { test as nonAdminTest } from '../fixtures/auth-regular';
+import { test as anonTest } from '../fixtures/public';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { gotoWithRetry } from '../helpers/navigation';
 
@@ -52,6 +53,19 @@ nonAdminTest.describe('Voting Results expander — regular GM', () => {
     await expect(page.locator('h1').first()).toBeVisible();
 
     // The gate lives in VotingController::showBallot(). Dropping it fails here.
+    await expect(page.locator('text=Voting Results')).toHaveCount(0);
+    expect(await page.content()).not.toContain('ShowAndHideResults');
+  });
+});
+
+anonTest.describe('Voting Results — anonymous user', () => {
+  anonTest('shows login form and no results markup', async ({ page }) => {
+    await page.goto('modules.php?name=Voting');
+
+    // VotingController::main() calls loginBox() before showBallot() — auth gate.
+    await expect(page.locator('#login-username')).toBeVisible();
+
+    // Admin expander must never reach an unauthenticated request.
     await expect(page.locator('text=Voting Results')).toHaveCount(0);
     expect(await page.content()).not.toContain('ShowAndHideResults');
   });

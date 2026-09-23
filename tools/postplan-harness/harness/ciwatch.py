@@ -14,6 +14,8 @@ import threading
 import time
 from dataclasses import dataclass, field
 
+from harness import gitutil
+
 FAIL_STATE = re.compile(r'"state"\s*:\s*"FAILURE"')
 FAIL_TEXT = re.compile(r"\bfail(ing|ed)?\b", re.I)
 PASS_TEXT = re.compile(r"\ball checks (have )?pass|successful\b", re.I)
@@ -25,6 +27,41 @@ PASS_TEXT = re.compile(r"\ball checks (have )?pass|successful\b", re.I)
 # required-check rule still blocks the merge; this only stops the CI verdict
 # from claiming a code failure.
 IGNORED_CHECKS = frozenset({"human-signoff"})
+
+HEAD_CHECK_INTERVAL = 300  # seconds between head checks during the background watch
+
+
+class _HeadChanged(Exception):
+    """Raised by _communicate_watching_head when the remote head has moved mid-watch."""
+    def __init__(self, remote_sha: str):
+        self.remote_sha = remote_sha
+        super().__init__(remote_sha)
+
+
+def _communicate_watching_head(bg: "BackgroundWatch", proc, budget: float):
+    """communicate() wrapper that polls the remote head on a short interval."""
+    end = time.time() + budget
+    while True:
+        left = max(end - time.time(), 0.1)
+        chunk = min(HEAD_CHECK_INTERVAL, left) if bg.verify_head else left
+        try:
+            return proc.communicate(timeout=chunk)
+        except subprocess.TimeoutExpired:
+            if time.time() >= end or not bg.verify_head:
+                raise
+            ok, remote = gitutil.remote_head_matches(bg.pr, bg.sha, gh_cmd=bg.gh_cmd)
+            if not ok:
+                raise _HeadChanged(remote)
+
+
+def _head_moved(bg: "BackgroundWatch") -> str:
+    """Return the new remote sha if verify_head and remote head changed, else ""."""
+    if not bg.verify_head:
+        return ""
+    ok, remote = gitutil.remote_head_matches(bg.pr, bg.sha, gh_cmd=bg.gh_cmd)
+    if not ok:
+        return remote
+    return ""
 
 
 def real_failures(names: list[str]) -> list[str]:
@@ -59,6 +96,8 @@ class CiOutcome:
     exit_code: int                    # 0 green | 8 failures | -1 indeterminate
     failed: list[str] = field(default_factory=list)
     evidence: str = ""
+    head_sha: str = ""
+    diverged: bool = False
 
 
 CI_TERMINAL = ("success", "failure")     # statuses that may be reused at Phase 7
@@ -85,6 +124,9 @@ class BackgroundWatch:
     status: str = ""
     failed: list[str] = field(default_factory=list)
     evidence: str = ""
+    verify_head: bool = False
+    gh_cmd: "list[str] | None" = None
+    remote_sha: str = ""
 
 
 def derive_from_trace(ci: dict | None) -> CiOutcome:
@@ -193,12 +235,25 @@ def _watch_thread(bg: BackgroundWatch, timeout: int,
         with bg.lock:
             bg.proc = proc
         try:
-            out, err = proc.communicate(timeout=max(remaining, 60))
+            out, err = _communicate_watching_head(bg, proc, max(remaining, 60))
         except subprocess.TimeoutExpired:
             proc.kill()
             proc.communicate()
-            _write_outcome(bg, "timeout", [],
-                           f"background gh pr checks --watch exceeded {timeout}s")
+            moved = _head_moved(bg)
+            if moved:
+                bg.remote_sha = moved
+                _write_outcome(bg, "head-changed", [],
+                               f"timeout after remote head moved {bg.sha[:8]} -> {moved[:8]}")
+            else:
+                _write_outcome(bg, "timeout", [],
+                               f"background gh pr checks --watch exceeded {timeout}s")
+            return
+        except _HeadChanged as hc:
+            proc.kill()
+            proc.communicate()
+            bg.remote_sha = hc.remote_sha
+            _write_outcome(bg, "head-changed", [],
+                           f"remote head moved {bg.sha[:8]} -> {hc.remote_sha[:8]} mid-watch")
             return
         if bg.stop.is_set():
             break
@@ -224,19 +279,40 @@ def _watch_thread(bg: BackgroundWatch, timeout: int,
         last_rc, last_stderr = str(proc.returncode), (err or "").strip()[:200]
         if time.time() >= deadline or bg.stop.wait(settle_wait):
             break
-    _write_outcome(bg, "timeout", [],
-                   f"checks never settled; last gh exit {last_rc}: {last_stderr}")
+    moved = _head_moved(bg)
+    if moved:
+        bg.remote_sha = moved
+        _write_outcome(bg, "head-changed", [],
+                       f"timeout after remote head moved {bg.sha[:8]} -> {moved[:8]}")
+    else:
+        _write_outcome(bg, "timeout", [],
+                       f"checks never settled; last gh exit {last_rc}: {last_stderr}")
 
 
 def start_background_watch(worktree: str, pr: int | None, sha: str | None,
                            out_dir: str, timeout: int = 5400,
                            settle_tries: int = 10,
-                           settle_wait: int = 30) -> BackgroundWatch | None:
+                           settle_wait: int = 30, *,
+                           verify_head: bool = False,
+                           gh_cmd=None, run_git=None) -> BackgroundWatch | None:
     """Fire-and-forget CI watch for the just-pushed head. Never raises."""
     if not pr or not sha or not out_dir:
         return None                      # clean tree / no PR: nothing to key on
+    remote_sha = ""
+    if verify_head:
+        r = gitutil.reconcile_remote_head(pr, sha, sha, None, worktree,
+                                          gh_cmd=gh_cmd, run_git=run_git)
+        if r.action == "diverged":
+            bg = BackgroundWatch(sha=sha, pr=int(pr), worktree=worktree,
+                                 path=outcome_path(out_dir, sha), started=time.time(),
+                                 remote_sha=r.remote_sha)
+            _write_outcome(bg, "diverged", [], r.evidence)
+            return bg
+        if r.action == "synced":
+            sha, remote_sha = r.remote_sha, r.remote_sha
     bg = BackgroundWatch(sha=sha, pr=int(pr), worktree=worktree,
-                         path=outcome_path(out_dir, sha), started=time.time())
+                         path=outcome_path(out_dir, sha), started=time.time(),
+                         verify_head=verify_head, gh_cmd=gh_cmd, remote_sha=remote_sha)
     bg.thread = threading.Thread(target=_watch_thread,
                                  args=(bg, timeout, settle_tries, settle_wait),
                                  daemon=True, name=f"ciwatch-{sha[:8]}")
@@ -298,7 +374,9 @@ def read_outcome(out_dir: str, sha: str) -> CiOutcome | None:
 
 def watch_or_reuse(worktree: str, pr: int, sha: str | None, out_dir: str | None,
                    bg: "BackgroundWatch | None" = None, timeout: int = 5400,
-                   settle_tries: int = 10, settle_wait: int = 30) -> CiOutcome:
+                   settle_tries: int = 10, settle_wait: int = 30, *,
+                   verify_head: bool = False,
+                   gh_cmd=None, run_git=None) -> CiOutcome:
     """Phase 7 entry point: reuse the Phase-2 background watch when it applies.
 
     Ceiling contract: this function's total wall clock is bounded by `timeout`,
@@ -306,14 +384,47 @@ def watch_or_reuse(worktree: str, pr: int, sha: str | None, out_dir: str | None,
     background watch is DEDUCTED from the budget handed to the fallback.
     """
     started = time.time()
+
+    if verify_head and sha:
+        r = gitutil.reconcile_remote_head(pr, sha, sha, None, worktree,
+                                          gh_cmd=gh_cmd, run_git=run_git)
+        if r.action == "diverged":
+            return CiOutcome(-1, [], r.evidence, head_sha=r.remote_sha, diverged=True)
+        if r.action == "synced":
+            sha = r.remote_sha      # stale bg no longer matches; falls through to restart
+
     if sha and out_dir and bg is not None and bg.sha == sha and not bg.done.is_set():
         bg.done.wait(timeout=max(timeout - (time.time() - started), 0))
+
     got = read_outcome(out_dir or "", sha or "")
     if got is not None:
-        return got
+        return CiOutcome(got.exit_code, got.failed, got.evidence, head_sha=sha or "")
+
+    # One restart if the background watch timed out or detected a head change
+    if (verify_head and sha and out_dir and bg is not None
+            and bg.sha == sha and bg.status in ("head-changed", "timeout")):
+        r2 = gitutil.reconcile_remote_head(pr, sha, sha, None, worktree,
+                                           gh_cmd=gh_cmd, run_git=run_git)
+        if r2.action == "diverged":
+            return CiOutcome(-1, [], r2.evidence, head_sha=r2.remote_sha, diverged=True)
+        new_sha = r2.remote_sha if r2.remote_sha else sha
+        remaining2 = int(timeout - (time.time() - started))
+        bg2 = start_background_watch(worktree, pr, new_sha, out_dir,
+                                     timeout=max(remaining2, 60),
+                                     verify_head=True, gh_cmd=gh_cmd, run_git=run_git)
+        if bg2 is not None:
+            bg2.done.wait(timeout=max(remaining2, 0))
+            reap_background_watch(bg2)
+            got2 = read_outcome(out_dir, new_sha)
+            if got2 is not None:
+                return CiOutcome(got2.exit_code, got2.failed, got2.evidence,
+                                 head_sha=new_sha)
+
     remaining = int(timeout - (time.time() - started))
-    return watch_live(worktree, pr, timeout=max(remaining, 60),
-                      settle_tries=settle_tries, settle_wait=settle_wait)
+    outcome = watch_live(worktree, pr, timeout=max(remaining, 60),
+                         settle_tries=settle_tries, settle_wait=settle_wait)
+    return CiOutcome(outcome.exit_code, outcome.failed, outcome.evidence,
+                     head_sha=sha or "")
 
 
 def watch_live(worktree: str, pr: int, timeout: int = 5400,

@@ -12,8 +12,8 @@ if (empty($player)) {
     return;
 }
 
-// Use prepared statement to prevent SQL injection
-$searchTerm = '%' . $mysqli_db->real_escape_string($player) . '%';
+// Bound via prepared statement below; only LIKE metacharacters need escaping.
+$searchTerm = '%' . addcslashes($player, '\\%_') . '%';
 $query = "SELECT sid, title, time FROM nuke_stories WHERE hometext LIKE ? OR bodytext LIKE ? ORDER BY time DESC";
 $stmt = $mysqli_db->prepare($query);
 

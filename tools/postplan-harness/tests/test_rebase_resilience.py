@@ -32,7 +32,7 @@ def fake_gh(tmp_path, outputs, rc=0):
     """Write an executable script that appends one line per call and prints outputs[n]."""
     script = tmp_path / "gh"
     script.write_text(
-        f"#!/bin/sh\n"
+        f"#!/usr/bin/env bash\n"
         f"echo \"$@\" >> \"{tmp_path}/gh.calls\"\n"
         f"N=$(wc -l < \"{tmp_path}/gh.calls\" 2>/dev/null || echo 0)\n"
         f"N=$((N - 1))\n"

@@ -112,7 +112,7 @@ export const VR_MANIFEST: VrRow[] = [
   { name: 'record-holders', auth: 'public', url: 'modules.php?name=RecordHolders',
     anchor: '.record-section', viewports: ['desktop', 'mobile'] },
   { name: 'record-holders-see-all', auth: 'public', url: 'modules.php?name=RecordHolders',
-    anchor: 'a[href*="op=allstar"]',
+    anchor: '#site-content a[href*="op=allstar"]',
     notes: 'See-all link into the all-star sub-view, below the all-star block.' },
   { name: 'schedule', auth: 'public', url: 'modules.php?name=Schedule',
     anchor: '.schedule-header', extraMask: ['.schedule-today-highlight'],

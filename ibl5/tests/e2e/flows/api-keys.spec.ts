@@ -8,7 +8,7 @@ test.describe.configure({ mode: 'serial' });
 test.describe('API Keys flow', () => {
   test('page loads for authenticated user', async ({ page }) => {
     await page.goto('modules.php?name=ApiKeys');
-    await expect(page.locator('.ibl-card__title')).toContainText(/API Key/i);
+    await expect(page.locator('.ibl-card__title').first()).toContainText(/API Key/i);
     await assertNoPhpErrors(page, 'on ApiKeys page');
   });
 
@@ -37,7 +37,7 @@ test.describe('API Keys flow', () => {
     await page.getByRole('button', { name: /Generate API Key/i }).click();
 
     // Should see the key generated state
-    await expect(page.locator('.ibl-card__title')).toContainText(/Generated/i);
+    await expect(page.locator('.ibl-card__title').first()).toContainText(/Generated/i);
     await expect(page.getByText("won't be shown again")).toBeVisible();
 
     // The raw key input should contain an ibl_ prefixed key
@@ -61,7 +61,7 @@ test.describe('API Keys flow', () => {
     await expect(page.getByRole('button', { name: /Generate API Key/i })).not.toBeVisible();
 
     // Key prefix should be visible (ibl_ + 4 chars + ...)
-    await expect(page.locator('code')).toContainText(/^ibl_[0-9a-f]{4}\.\.\.$/);
+    await expect(page.locator('code').first()).toContainText(/^ibl_[0-9a-f]{4}\.\.\.$/);
 
     // Should show permission and rate limit info
     await expect(page.getByText('public')).toBeVisible();
@@ -92,7 +92,7 @@ test.describe('API Keys flow', () => {
     await page.getByRole('button', { name: /Generate API Key/i }).click();
 
     // Should see the new key
-    await expect(page.locator('.ibl-card__title')).toContainText(/Generated/i);
+    await expect(page.locator('.ibl-card__title').first()).toContainText(/Generated/i);
     const keyInput = page.locator('input.ibl-input[readonly]').first();
     const keyValue = await keyInput.inputValue();
     expect(keyValue).toMatch(/^ibl_[0-9a-f]{32}$/);
@@ -150,7 +150,7 @@ test.describe('API Keys direct POST submission', () => {
     expect(exactMatches?.length).toBe(1);
 
     await page.goto('modules.php?name=ApiKeys');
-    await expect(page.locator('code')).toContainText(
+    await expect(page.locator('code').first()).toContainText(
       rawKey.substring(0, 8) + '...',
     );
 
@@ -166,7 +166,7 @@ test.describe('API Keys direct POST submission', () => {
     });
     if (await generateBtn.isVisible({ timeout: 1000 }).catch(() => false)) { // e2e-hygiene-allow: setup precondition — generate if no active key exists
       await generateBtn.click();
-      await expect(page.locator('.ibl-card__title')).toContainText(
+      await expect(page.locator('.ibl-card__title').first()).toContainText(
         /Generated/i,
       );
     }

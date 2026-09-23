@@ -64,7 +64,7 @@ test.describe('All-Star Appearances flow', () => {
     await assertNoPhpErrors(page, 'on the RecordHolders landing page');
 
     await expect(
-      page.locator(`a[href="${SUB_VIEW_URL}"]`).first(),
+      page.locator(`#site-content a[href="${SUB_VIEW_URL}"]`).first(),
     ).toBeVisible();
   });
 });

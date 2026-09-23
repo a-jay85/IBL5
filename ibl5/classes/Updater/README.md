@@ -1,6 +1,6 @@
 ---
-description: Updater pipeline web entry point — triggered via the League Control Panel's "Update All The Things" button at scripts/updateAllTheThings.php.
-last_verified: 2026-09-22
+description: Updater pipeline web entry point (scripts/updateAllTheThings.php, run from the League Control Panel's "Update All The Things" button) and notes on its report-only steps.
+last_verified: 2026-09-23
 ---
 
 # Updater
@@ -25,6 +25,16 @@ Triggered by the **"Update All The Things"** button in the League Control Panel 
 - **Progressive HTML output** — streams progress via `flush()` as each Step completes.
 
 See the security comment block at the top of `scripts/updateAllTheThings.php` for the full rationale.
+
+## Steps
+
+The step list and its order live in `scripts/updateAllTheThings.php`. This section records steps whose output needs explaining.
+
+- `PlrRatingsCongruenceCheckStep` compares each player's 2GP, FTP, and 3GP ratings in the .plr file with the percentages from the player's real-life stat line. A player with at least 20 real-life attempts and a rating 3 or more points off gets a red `ERROR:` line in the update log. The pipeline still finishes, and the step never edits the .plr file.
+  - In Preseason and HEAT the line warns that the rating will be overwritten by the start of the Regular Season unless the real-life line is updated. Snapshot history shows the engine resets these ratings from the real-life line at that point.
+  - In Regular Season and Playoffs the line reports a standing disagreement between rating and real-life line.
+  - The step skips Draft and Free Agency, where ratings are mid-rollover and hundreds of players mismatch.
+  - The log lists at most 25 mismatches, then one line with the remaining count.
 
 ## No `modules/Updater/` and no CLI entry point
 

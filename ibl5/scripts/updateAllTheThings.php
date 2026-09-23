@@ -292,6 +292,9 @@ try {
         $updaterService->addStep(new Updater\Steps\SnapshotPlrStep(
             $plrService, $jsbRepo, $season->endingYear, $sourceResolver, $season->phase,
         ));
+        $updaterService->addStep(new Updater\Steps\PlrRatingsCongruenceCheckStep(
+            $sourceResolver, $season->phase,
+        ));
         $updaterService->addStep(new Updater\Steps\PromotePriorSeasonSnapshotStep(
             $plrRepo, $jsbRepo, $season->endingYear,
         ));

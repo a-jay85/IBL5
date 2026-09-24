@@ -1,0 +1,315 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+#
+# bin/test-automouse-measure-delegate-cost — known-answer fixture test for
+# bin/measure-delegate-cost.
+#
+# Run: bin/test-automouse-measure-delegate-cost  (exit 0 = all pass, 1 = failure)
+
+set -u
+
+REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+FAILED=0
+
+# assert_eq <actual> <expected> <label>
+assert_eq() {
+    if [ "$1" = "$2" ]; then
+        printf '  ok   %s (%s)\n' "$3" "$1"
+    else
+        printf '  FAIL %s: got %s, expected %s\n' "$3" "$1" "$2"
+        FAILED=1
+    fi
+}
+
+# jget <json-file> <dotted.key> -> prints the value
+jget() {
+    python3 -c 'import json,sys
+v=json.load(open(sys.argv[1]))
+for k in sys.argv[2].split("."): v=v[k]
+print(json.dumps(v) if isinstance(v,dict) else v)' "$1" "$2"
+}
+
+# assert_close <actual> <expected> <label>  (abs tolerance 1e-4)
+assert_close() {
+    if python3 -c 'import sys; sys.exit(0 if abs(float(sys.argv[1])-float(sys.argv[2]))<=1e-4 else 1)' "$1" "$2"; then
+        printf '  ok   %s (%s)\n' "$3" "$1"
+    else
+        printf '  FAIL %s: got %s, expected %s\n' "$3" "$1" "$2"
+        FAILED=1
+    fi
+}
+
+TMPROOT=$(mktemp -d)
+trap 'rm -rf "$TMPROOT"' EXIT
+
+# ---------------------------------------------------------------------------
+# Fixture generation — write all fixture dirs from a single Python block.
+# ---------------------------------------------------------------------------
+python3 - "$TMPROOT" <<'PY'
+import json, os, sys
+
+ROOT = sys.argv[1]
+
+def row(phase, model, tier, plan, session_id, cost, inp=0, out=0, cr=0, w5=0, w1=0, date="2026-09-20"):
+    return json.dumps({
+        "date": date,
+        "plan": plan,
+        "phase": phase,
+        "model": model,
+        "tier": tier,
+        "session_id": session_id,
+        "cost": cost,
+        "inp": inp,
+        "out": out,
+        "cr": cr,
+        "w5": w5,
+        "w1": w1,
+    })
+
+# Sonnet per-message rate: $15/M out => cost = out * 15/1e6
+# Opus-5-5 per-message rate: $20/M out => cost = out * 20/1e6
+
+# ---------------------------------------------------------------------------
+# Fixture A -- main distribution, filters, redo, completed, dedup, archive
+# ---------------------------------------------------------------------------
+os.makedirs(f"{ROOT}/A/logs", exist_ok=True)
+os.makedirs(f"{ROOT}/A/logs.archive", exist_ok=True)
+
+# Sonnet impl k=1..20 (k=1,2 share plan s-redo.md; k=3..20 use plan s-<k>.md)
+s_rows = []
+for k in range(1, 21):
+    plan = "s-redo.md" if k <= 2 else f"s-{k}.md"
+    cost = round(100000 * k * 15 / 1e6, 4)
+    s_rows.append(row("impl", "claude-sonnet-4-6", "Sonnet", plan, f"A-s{k}", cost,
+                       inp=0, out=100000*k, cr=0, w5=0, w1=0))
+
+# Opus impl k=1..20 (k=1..10 in logs/, k=11..20 in logs.archive/)
+o_rows = []
+for k in range(1, 21):
+    plan = f"o-{k}.md"
+    cost = round(100000 * k * 20 / 1e6, 4)
+    o_rows.append(row("impl", "claude-opus-5", "Opus", plan, f"A-o{k}", cost,
+                       inp=0, out=100000*k, cr=0, w5=0, w1=0,
+                       date="2026-09-20" if k <= 10 else "2026-09-01"))
+
+# Postplan rows: s-redo.md, s-3..s-10, o-1..o-5
+postplan_plans = ["s-redo.md"] + [f"s-{k}.md" for k in range(3, 11)] + [f"o-{k}.md" for k in range(1, 6)]
+pp_rows = [row("postplan", "claude-sonnet-4-6", "Sonnet", plan, f"A-pp{i}", 1.0)
+           for i, plan in enumerate(postplan_plans)]
+
+null_row = json.dumps({
+    "date": "2026-09-20", "plan": "s-null.md", "phase": "impl",
+    "model": "claude-sonnet-4-6", "tier": "Sonnet",
+    "session_id": "A-null", "cost": 0.5,
+    "inp": None, "out": None, "cr": None, "w5": None, "w1": None,
+})
+
+with open(f"{ROOT}/A/logs/2026-09-20.costs.jsonl", "w") as f:
+    for r in s_rows:
+        f.write(r + "\n")
+    for r in o_rows[:10]:   # Opus k=1..10
+        f.write(r + "\n")
+    for r in pp_rows:
+        f.write(r + "\n")
+    f.write(row("impl", "claude-haiku-4-5", "Haiku", "noise-haiku.md", "A-haiku", 0.1, out=10000000) + "\n")
+    f.write(row("planning", "claude-sonnet-4-6", "Sonnet", "noise-plan.md", "A-planning", 0.1, out=10000000) + "\n")
+    f.write(null_row + "\n")
+    f.write("not-json\n")
+    f.write(o_rows[10] + "\n")  # duplicate of Opus k=11 (original is in archive)
+
+with open(f"{ROOT}/A/logs.archive/2026-09-01.costs.jsonl", "w") as f:
+    for r in o_rows[10:]:   # Opus k=11..20 (k=11 appears once here)
+        f.write(r + "\n")
+
+# ---------------------------------------------------------------------------
+# Fixture B -- gap exactly 0.05 (sonnet $15.00, opus $15.75)
+# ---------------------------------------------------------------------------
+os.makedirs(f"{ROOT}/B/logs", exist_ok=True)
+with open(f"{ROOT}/B/logs/2026-09-20.costs.jsonl", "w") as f:
+    for k in range(1, 21):
+        f.write(row("impl", "claude-sonnet-4-6", "Sonnet", f"bs-{k}.md", f"B-s{k}",
+                    round(1000000 * 15 / 1e6, 4), out=1000000) + "\n")
+    for k in range(1, 21):
+        f.write(row("impl", "claude-opus-5", "Opus", f"bo-{k}.md", f"B-o{k}",
+                    round(787500 * 20 / 1e6, 4), out=787500) + "\n")
+
+# ---------------------------------------------------------------------------
+# Fixture C -- gap 0.050667 (sonnet $15.00, opus $15.76)
+# ---------------------------------------------------------------------------
+os.makedirs(f"{ROOT}/C/logs", exist_ok=True)
+with open(f"{ROOT}/C/logs/2026-09-20.costs.jsonl", "w") as f:
+    for k in range(1, 21):
+        f.write(row("impl", "claude-sonnet-4-6", "Sonnet", f"cs-{k}.md", f"C-s{k}",
+                    round(1000000 * 15 / 1e6, 4), out=1000000) + "\n")
+    for k in range(1, 21):
+        f.write(row("impl", "claude-opus-5", "Opus", f"co-{k}.md", f"C-o{k}",
+                    round(788000 * 20 / 1e6, 4), out=788000) + "\n")
+
+# ---------------------------------------------------------------------------
+# Fixture D -- per-field rate mapping
+# Sonnet: 3*1 + 15*2 + 0.3*3 + 3.75*4 + 6*5 = 78.9
+# Opus-5-5: 4*1 + 20*2 + 0.2*3 + 5*4 + 8*5 = 104.6
+# ---------------------------------------------------------------------------
+os.makedirs(f"{ROOT}/D/logs", exist_ok=True)
+with open(f"{ROOT}/D/logs/2026-09-20.costs.jsonl", "w") as f:
+    f.write(row("impl", "claude-sonnet-4-6", "Sonnet", "ds-1.md", "D-s1", 78.9,
+                inp=1000000, out=2000000, cr=3000000, w5=4000000, w1=5000000) + "\n")
+    f.write(row("impl", "claude-opus-5", "Opus", "do-1.md", "D-o1", 104.6,
+                inp=1000000, out=2000000, cr=3000000, w5=4000000, w1=5000000) + "\n")
+
+# ---------------------------------------------------------------------------
+# Fixture E -- opus-cheaper arm (sonnet $15, opus $14)
+# ---------------------------------------------------------------------------
+os.makedirs(f"{ROOT}/E/logs", exist_ok=True)
+with open(f"{ROOT}/E/logs/2026-09-20.costs.jsonl", "w") as f:
+    for k in range(1, 21):
+        f.write(row("impl", "claude-sonnet-4-6", "Sonnet", f"es-{k}.md", f"E-s{k}",
+                    round(1000000 * 15 / 1e6, 4), out=1000000) + "\n")
+    for k in range(1, 21):
+        f.write(row("impl", "claude-opus-5", "Opus", f"eo-{k}.md", f"E-o{k}",
+                    round(700000 * 20 / 1e6, 4), out=700000) + "\n")
+
+# ---------------------------------------------------------------------------
+# Fixture F -- n=19 sample floor (C with 19 Sonnet rows)
+# ---------------------------------------------------------------------------
+os.makedirs(f"{ROOT}/F/logs", exist_ok=True)
+with open(f"{ROOT}/F/logs/2026-09-20.costs.jsonl", "w") as f:
+    for k in range(1, 20):  # 19 Sonnet rows
+        f.write(row("impl", "claude-sonnet-4-6", "Sonnet", f"fs-{k}.md", f"F-s{k}",
+                    round(1000000 * 15 / 1e6, 4), out=1000000) + "\n")
+    for k in range(1, 21):
+        f.write(row("impl", "claude-opus-5", "Opus", f"fo-{k}.md", f"F-o{k}",
+                    round(788000 * 20 / 1e6, 4), out=788000) + "\n")
+
+print("Fixtures written OK")
+PY
+
+SCRIPT="$REPO_ROOT/bin/measure-delegate-cost"
+
+printf '\n=== case_main_distribution (Fixture A) ===\n'
+"$SCRIPT" --nightly-dir "$TMPROOT/A" --out "$TMPROOT/A/report.md" --json > "$TMPROOT/A/out.json" 2>/dev/null
+S_N=$(jget "$TMPROOT/A/out.json" "groups.Sonnet.n")
+O_N=$(jget "$TMPROOT/A/out.json" "groups.Opus.n")
+assert_eq "$S_N" "20" "Sonnet n=20"
+assert_eq "$O_N" "20" "Opus n=20"
+S_MED=$(jget "$TMPROOT/A/out.json" "groups.Sonnet.median")
+O_MED=$(jget "$TMPROOT/A/out.json" "groups.Opus.median")
+assert_close "$S_MED" "15.75" "Sonnet median=15.75"
+assert_close "$O_MED" "21.0" "Opus median=21.0"
+S_MEAN=$(jget "$TMPROOT/A/out.json" "groups.Sonnet.mean")
+assert_close "$S_MEAN" "15.75" "Sonnet mean=15.75"
+S_P25=$(jget "$TMPROOT/A/out.json" "groups.Sonnet.p25")
+S_P75=$(jget "$TMPROOT/A/out.json" "groups.Sonnet.p75")
+S_P90=$(jget "$TMPROOT/A/out.json" "groups.Sonnet.p90")
+assert_close "$S_P25" "8.625" "Sonnet p25=8.625"
+assert_close "$S_P75" "22.875" "Sonnet p75=22.875"
+assert_close "$S_P90" "27.15" "Sonnet p90=27.15"
+O_P25=$(jget "$TMPROOT/A/out.json" "groups.Opus.p25")
+O_P75=$(jget "$TMPROOT/A/out.json" "groups.Opus.p75")
+O_P90=$(jget "$TMPROOT/A/out.json" "groups.Opus.p90")
+assert_close "$O_P25" "11.5" "Opus p25=11.5"
+assert_close "$O_P75" "30.5" "Opus p75=30.5"
+assert_close "$O_P90" "36.2" "Opus p90=36.2"
+
+printf '\n=== case_filters_and_skips (Fixture A) ===\n'
+SKIP_NULL=$(jget "$TMPROOT/A/out.json" "skipped_null")
+SKIP_MAL=$(jget "$TMPROOT/A/out.json" "skipped_malformed")
+DUP_DROP=$(jget "$TMPROOT/A/out.json" "duplicates_dropped")
+assert_eq "$SKIP_NULL" "1" "skipped_null=1"
+assert_eq "$SKIP_MAL" "1" "skipped_malformed=1"
+assert_eq "$DUP_DROP" "1" "duplicates_dropped=1"
+
+printf '\n=== case_redo_and_completed (Fixture A) ===\n'
+S_PLANS=$(jget "$TMPROOT/A/out.json" "groups.Sonnet.plans")
+S_REDO=$(jget "$TMPROOT/A/out.json" "groups.Sonnet.redo_plans")
+S_RRATE=$(jget "$TMPROOT/A/out.json" "groups.Sonnet.redo_rate")
+S_SPP=$(jget "$TMPROOT/A/out.json" "groups.Sonnet.sessions_per_plan")
+S_CPL=$(jget "$TMPROOT/A/out.json" "groups.Sonnet.completed_plans")
+S_CPPM=$(jget "$TMPROOT/A/out.json" "groups.Sonnet.cost_per_completed_plan_median")
+assert_eq "$S_PLANS" "19" "Sonnet plans=19"
+assert_eq "$S_REDO" "1" "Sonnet redo_plans=1"
+assert_close "$S_RRATE" "0.0526" "Sonnet redo_rate=0.0526"
+assert_close "$S_SPP" "1.0526" "Sonnet sessions_per_plan=1.0526"
+assert_eq "$S_CPL" "9" "Sonnet completed_plans=9"
+assert_close "$S_CPPM" "9.0" "Sonnet cost_per_completed_plan_median=9.0"
+O_PLANS=$(jget "$TMPROOT/A/out.json" "groups.Opus.plans")
+O_REDO=$(jget "$TMPROOT/A/out.json" "groups.Opus.redo_plans")
+O_RRATE=$(jget "$TMPROOT/A/out.json" "groups.Opus.redo_rate")
+O_CPL=$(jget "$TMPROOT/A/out.json" "groups.Opus.completed_plans")
+O_CPPM=$(jget "$TMPROOT/A/out.json" "groups.Opus.cost_per_completed_plan_median")
+assert_eq "$O_PLANS" "20" "Opus plans=20"
+assert_eq "$O_REDO" "0" "Opus redo_plans=0"
+assert_close "$O_RRATE" "0.0" "Opus redo_rate=0.0"
+assert_eq "$O_CPL" "5" "Opus completed_plans=5"
+assert_close "$O_CPPM" "6.0" "Opus cost_per_completed_plan_median=6.0"
+
+printf '\n=== case_verdict_sonnet_cheaper (Fixture A) ===\n'
+A_VERDICT=$(jget "$TMPROOT/A/out.json" "verdict")
+A_GAP=$(jget "$TMPROOT/A/out.json" "gap")
+assert_eq "$A_VERDICT" "sonnet-cheaper" "verdict=sonnet-cheaper"
+assert_close "$A_GAP" "0.333333" "gap=0.333333"
+grep -qx 'verdict: sonnet-cheaper' "$TMPROOT/A/report.md" \
+    && printf '  ok   report.md contains bare verdict line\n' \
+    || { printf '  FAIL report.md missing bare verdict line\n'; FAILED=1; }
+
+printf '\n=== case_boundary_exact_5pct (Fixture B) ===\n'
+"$SCRIPT" --nightly-dir "$TMPROOT/B" --out "$TMPROOT/B/report.md" --json > "$TMPROOT/B/out.json" 2>/dev/null
+B_GAP=$(jget "$TMPROOT/B/out.json" "gap")
+B_VERDICT=$(jget "$TMPROOT/B/out.json" "verdict")
+assert_close "$B_GAP" "0.05" "B gap=0.05"
+assert_eq "$B_VERDICT" "cost-neutral" "B verdict=cost-neutral"
+
+printf '\n=== case_boundary_over_5pct (Fixture C) ===\n'
+"$SCRIPT" --nightly-dir "$TMPROOT/C" --out "$TMPROOT/C/report.md" --json > "$TMPROOT/C/out.json" 2>/dev/null
+C_GAP=$(jget "$TMPROOT/C/out.json" "gap")
+C_VERDICT=$(jget "$TMPROOT/C/out.json" "verdict")
+assert_close "$C_GAP" "0.050667" "C gap=0.050667"
+assert_eq "$C_VERDICT" "sonnet-cheaper" "C verdict=sonnet-cheaper"
+
+printf '\n=== case_rate_mapping (Fixture D) ===\n'
+"$SCRIPT" --nightly-dir "$TMPROOT/D" --out "$TMPROOT/D/report.md" --json > "$TMPROOT/D/out.json" 2>/dev/null
+D_S_MED=$(jget "$TMPROOT/D/out.json" "groups.Sonnet.median")
+D_O_MED=$(jget "$TMPROOT/D/out.json" "groups.Opus.median")
+D_SELFCHK=$(jget "$TMPROOT/D/out.json" "sonnet_self_check_median_rel_err")
+D_VERDICT=$(jget "$TMPROOT/D/out.json" "verdict")
+assert_close "$D_S_MED" "78.9" "D Sonnet median=78.9"
+assert_close "$D_O_MED" "104.6" "D Opus median=104.6"
+assert_close "$D_SELFCHK" "0.0" "D self_check=0.0"
+assert_eq "$D_VERDICT" "insufficient-sample" "D verdict=insufficient-sample (n=1 each)"
+
+printf '\n=== case_opus_cheaper (Fixture E) ===\n'
+"$SCRIPT" --nightly-dir "$TMPROOT/E" --out "$TMPROOT/E/report.md" --json > "$TMPROOT/E/out.json" 2>/dev/null
+E_GAP=$(jget "$TMPROOT/E/out.json" "gap")
+E_VERDICT=$(jget "$TMPROOT/E/out.json" "verdict")
+assert_close "$E_GAP" "-0.066667" "E gap=-0.066667"
+assert_eq "$E_VERDICT" "opus-cheaper" "E verdict=opus-cheaper"
+
+printf '\n=== case_min_sample_19 (Fixture F) ===\n'
+"$SCRIPT" --nightly-dir "$TMPROOT/F" --out "$TMPROOT/F/report.md" --json > "$TMPROOT/F/out.json" 2>/dev/null
+F_S_N=$(jget "$TMPROOT/F/out.json" "groups.Sonnet.n")
+F_VERDICT=$(jget "$TMPROOT/F/out.json" "verdict")
+assert_eq "$F_S_N" "19" "F Sonnet n=19"
+assert_eq "$F_VERDICT" "insufficient-sample" "F verdict=insufficient-sample"
+
+printf '\n=== case_empty_env (Fixture A, env -i) ===\n'
+ENV_VERDICT=$(env -i PATH=/usr/bin:/bin python3 "$SCRIPT" \
+    --nightly-dir "$TMPROOT/A" --out "$TMPROOT/A/report2.md" --json 2>/dev/null \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["verdict"])')
+assert_eq "$ENV_VERDICT" "sonnet-cheaper" "empty-env verdict=sonnet-cheaper"
+
+printf '\n=== case_missing_dir ===\n'
+MISS_RC=0
+MISS_ERR=$("$SCRIPT" --nightly-dir "$TMPROOT/nope" --out /dev/null 2>&1) || MISS_RC=$?
+assert_eq "$MISS_RC" "2" "missing-dir exit=2"
+grep -qi 'no ledger files' <<< "$MISS_ERR" \
+    && printf '  ok   missing-dir stderr contains "no ledger files"\n' \
+    || { printf '  FAIL missing-dir stderr missing "no ledger files": %s\n' "$MISS_ERR"; FAILED=1; }
+
+printf '\n'
+if [ "$FAILED" -eq 0 ]; then
+    printf 'PASS: bin/test-automouse-measure-delegate-cost\n'
+else
+    printf 'FAIL: bin/test-automouse-measure-delegate-cost (%d case(s) failed)\n' "$FAILED"
+fi
+
+exit "$FAILED"

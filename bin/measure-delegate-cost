@@ -1,0 +1,296 @@
+#!/usr/bin/env python3
+# <!-- no-adr: read-only measurement utility over the existing automouse cost ledger; no new architectural constraint -->
+import argparse
+import datetime
+import glob
+import importlib.util
+import json
+import os
+import statistics
+import sys
+from importlib.machinery import SourceFileLoader
+
+_PRICER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib", "automouse-pricer")
+_loader = SourceFileLoader("automouse_pricer", _PRICER)
+_spec = importlib.util.spec_from_loader("automouse_pricer", _loader)
+_mod = importlib.util.module_from_spec(_spec)
+_loader.exec_module(_mod)
+PRICE = _mod.PRICE
+
+RATE_KEY = {"Opus": "opus-5-5", "Sonnet": "sonnet"}
+TOKEN_FIELDS = ("inp", "out", "cr", "w5", "w1")
+
+for _k in RATE_KEY.values():
+    if _k not in PRICE:
+        print(f"pricer key missing: {_k}", file=sys.stderr)
+        sys.exit(2)
+
+MIN_N = 20
+NEUTRAL_BAND = 0.05
+
+
+def reprice(row, tier):
+    rate = PRICE[RATE_KEY[tier]]
+    return sum(row[f] * rate[i] for i, f in enumerate(TOKEN_FIELDS)) / 1_000_000
+
+
+def ingest(nightly_dir):
+    pattern_logs = os.path.join(nightly_dir, "logs", "*.costs.jsonl")
+    pattern_arch = os.path.join(nightly_dir, "logs.archive", "*.costs.jsonl")
+    files = sorted(glob.glob(pattern_logs)) + sorted(glob.glob(pattern_arch))
+
+    if not files:
+        print(f"no ledger files under {nightly_dir}", file=sys.stderr)
+        sys.exit(2)
+
+    seen = set()
+    completed = set()
+    groups = {"Sonnet": [], "Opus": []}
+    skipped_null = 0
+    skipped_malformed = 0
+    duplicates_dropped = 0
+
+    for path in files:
+        with open(path, encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError:
+                    skipped_malformed += 1
+                    continue
+                if not isinstance(row, dict):
+                    skipped_malformed += 1
+                    continue
+
+                key = json.dumps(row, sort_keys=True)
+                if key in seen:
+                    duplicates_dropped += 1
+                    continue
+                seen.add(key)
+
+                if row.get("phase") == "postplan":
+                    completed.add(row.get("plan"))
+
+                if row.get("phase") != "impl":
+                    continue
+                tier = row.get("tier")
+                if tier not in ("Opus", "Sonnet"):
+                    continue
+
+                valid = True
+                for f in TOKEN_FIELDS:
+                    v = row.get(f)
+                    if v is None or not isinstance(v, (int, float)):
+                        skipped_null += 1
+                        valid = False
+                        break
+                if not valid:
+                    continue
+
+                groups[tier].append({"row": row, "repriced": reprice(row, tier)})
+
+    return groups, completed, skipped_null, skipped_malformed, duplicates_dropped
+
+
+def group_stats(entries, completed):
+    costs = [e["repriced"] for e in entries]
+    n = len(costs)
+
+    if n == 0:
+        return {
+            "n": 0, "median": None, "mean": None,
+            "p25": None, "p75": None, "p90": None,
+            "plans": 0, "redo_plans": 0, "redo_rate": None,
+            "sessions_per_plan": None,
+            "completed_plans": 0, "cost_per_completed_plan_median": None,
+        }
+
+    median = round(statistics.median(costs), 4)
+    mean = round(statistics.mean(costs), 4)
+
+    if n >= 2:
+        q = statistics.quantiles(costs, n=100, method="inclusive")
+        p25 = round(q[24], 4)
+        p75 = round(q[74], 4)
+        p90 = round(q[89], 4)
+    else:
+        p25 = p75 = p90 = None
+
+    plan_sessions = {}
+    for e in entries:
+        p = e["row"].get("plan")
+        plan_sessions.setdefault(p, []).append(e["repriced"])
+
+    plans_count = len(plan_sessions)
+    redo_plans = sum(1 for v in plan_sessions.values() if len(v) > 1)
+    redo_rate = round(redo_plans / plans_count, 4) if plans_count else None
+    sessions_per_plan = round(n / plans_count, 4) if plans_count else None
+
+    completed_plan_keys = [p for p in plan_sessions if p in completed]
+    completed_plans_count = len(completed_plan_keys)
+    if completed_plan_keys:
+        plan_sums = [round(sum(plan_sessions[p]), 4) for p in completed_plan_keys]
+        cpp_median = round(statistics.median(plan_sums), 4)
+    else:
+        cpp_median = None
+
+    return {
+        "n": n,
+        "median": median,
+        "mean": mean,
+        "p25": p25,
+        "p75": p75,
+        "p90": p90,
+        "plans": plans_count,
+        "redo_plans": redo_plans,
+        "redo_rate": redo_rate,
+        "sessions_per_plan": sessions_per_plan,
+        "completed_plans": completed_plans_count,
+        "cost_per_completed_plan_median": cpp_median,
+    }
+
+
+def self_check(entries):
+    errs = []
+    for e in entries:
+        ledger_cost = e["row"].get("cost")
+        if not isinstance(ledger_cost, (int, float)) or ledger_cost <= 0:
+            continue
+        errs.append(abs(e["repriced"] - ledger_cost) / ledger_cost)
+    if not errs:
+        return None
+    return round(statistics.median(errs), 6)
+
+
+def compute_verdict(s_stats, o_stats):
+    if s_stats["n"] < MIN_N or o_stats["n"] < MIN_N:
+        s_med = s_stats["median"]
+        o_med = o_stats["median"]
+        if s_med is not None and o_med is not None:
+            gap = round(o_med / s_med - 1, 6)
+        else:
+            gap = None
+        return gap, "insufficient-sample"
+    s_med = s_stats["median"]
+    o_med = o_stats["median"]
+    gap = round(o_med / s_med - 1, 6)
+    if abs(gap) <= NEUTRAL_BAND:
+        return gap, "cost-neutral"
+    if gap > NEUTRAL_BAND:
+        return gap, "sonnet-cheaper"
+    return gap, "opus-cheaper"
+
+
+def build_report(s_stats, o_stats, gap, verd, skipped_null,
+                 skipped_malformed, duplicates_dropped, selfchk, generated):
+    lines = [
+        "# Delegate cost: Sonnet vs Opus (re-priced at opus-5-5)",
+        "",
+        f"Generated: {generated}",
+        "",
+        "| Tier | n | median | mean | p25 | p75 | p90 | plans | redo_plans | redo_rate"
+        " | sessions_per_plan | completed_plans | cost_per_completed_plan_median |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+
+    for label, stats in [("Sonnet", s_stats), ("Opus", o_stats)]:
+        r = stats
+        lines.append(
+            f"| {label} | {r['n']} | {r['median']} | {r['mean']} | "
+            f"{r['p25']} | {r['p75']} | {r['p90']} | {r['plans']} | "
+            f"{r['redo_plans']} | {r['redo_rate']} | {r['sessions_per_plan']} | "
+            f"{r['completed_plans']} | {r['cost_per_completed_plan_median']} |"
+        )
+
+    lines += [
+        "",
+        f"skipped_null: {skipped_null}",
+        f"skipped_malformed: {skipped_malformed}",
+        f"duplicates_dropped: {duplicates_dropped}",
+        "",
+        "## Caveats",
+        "",
+        "- Opus-tier rows of every model (including `claude-opus-4-8`) are re-priced at opus-5-5 rates.",
+        "- Opus plans skew harder (Truly-manual rows and security surfaces force `impl_model: opus`),"
+        " so this is an observational comparison and not an A/B test.",
+        "- An Opus session's token totals include any Sonnet delegates it spawned.",
+        "",
+        f"gap: {gap}",
+        f"verdict: {verd}",
+    ]
+    return "\n".join(lines)
+
+
+def main():
+    default_dir = os.path.expanduser(
+        "~/.claude/projects/-Users-ajaynicolas-GitHub-IBL5/automouse"
+    )
+
+    parser = argparse.ArgumentParser(
+        description="Measure Sonnet-delegate vs Opus-5.5 routing cost from the automouse ledger."
+    )
+    parser.add_argument(
+        "--nightly-dir", default=default_dir,
+        help="Path to the automouse nightly dir (default: %(default)s)"
+    )
+    parser.add_argument(
+        "--out", default=None,
+        help="Path for the Markdown report (default: <nightly-dir>/reports/<date>-delegate-cost.md)"
+    )
+    parser.add_argument(
+        "--json", action="store_true",
+        help="Print JSON to stdout instead of Markdown"
+    )
+    args = parser.parse_args()
+
+    nightly_dir = args.nightly_dir
+    generated = datetime.date.today().isoformat()
+
+    out_path = args.out
+    if out_path is None:
+        out_path = os.path.join(nightly_dir, "reports", f"{generated}-delegate-cost.md")
+
+    groups, completed, skipped_null, skipped_malformed, duplicates_dropped = ingest(nightly_dir)
+
+    s_entries = groups["Sonnet"]
+    o_entries = groups["Opus"]
+
+    s_stats = group_stats(s_entries, completed)
+    o_stats = group_stats(o_entries, completed)
+
+    selfchk = self_check(s_entries)
+    gap, verd = compute_verdict(s_stats, o_stats)
+
+    report_md = build_report(
+        s_stats, o_stats, gap, verd,
+        skipped_null, skipped_malformed, duplicates_dropped,
+        selfchk, generated
+    )
+
+    os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
+    with open(out_path, "w", encoding="utf-8") as fh:
+        fh.write(report_md + "\n")
+
+    result = {
+        "groups": {"Sonnet": s_stats, "Opus": o_stats},
+        "rates": RATE_KEY,
+        "skipped_null": skipped_null,
+        "skipped_malformed": skipped_malformed,
+        "duplicates_dropped": duplicates_dropped,
+        "gap": gap,
+        "verdict": verd,
+        "sonnet_self_check_median_rel_err": selfchk,
+        "generated": generated,
+    }
+
+    if args.json:
+        print(json.dumps(result))
+    else:
+        print(report_md)
+
+
+if __name__ == "__main__":
+    main()

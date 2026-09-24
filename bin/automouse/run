@@ -909,6 +909,46 @@ refund_attempt() {
     fi
 }
 
+# Disposition for a post-plan-now exit 3 (harness fail-closed sentinel: a rebase
+# conflict the auto-resolver refused, or a local pre-commit/pre-push gate denial;
+# see bin/post-plan-now's exit-code header). Retrying never clears either cause.
+# Parks the plan in skipped/, writes a report quoting the harness's own RESULT:
+# line, and returns normally so the loop continues with the next plan.
+# post-plan-now already DM'd on rc=3, so no second DM is sent here.
+# $HANDOFF_DIR/${plan_name}.json is removed: the worktree named by the handoff
+# is where a human must fix the cause. Args: plan_name plan_slug log_before.
+dispose_plan_postplan_blocked() {
+    local plan_name="$1" plan_slug="$2" log_before="$3"
+    local pp_seg_start pp_result_line reports_dir
+    pp_seg_start=$(( log_before + 1 ))
+    pp_result_line=$(sed -n "${pp_seg_start},\$p" "$LOG" 2>/dev/null | grep -m1 '^RESULT:' || true)
+    [ -n "$pp_result_line" ] \
+        || pp_result_line="(post-plan-now printed no RESULT: line — see the run log)"
+    printf '[%s] %s postplan terminal (rc=3) — moving to skipped/\n' \
+        "$(date +%H:%M:%S)" "$plan_slug" >> "$LOG"
+    mkdir -p "$NIGHTLY_DIR/skipped" "$NIGHTLY_DIR/reports"
+    mv -f "$NEXT_PLAN" "$NIGHTLY_DIR/skipped/"
+    touch -h -- "$NIGHTLY_DIR/skipped/${plan_name}" 2>/dev/null || true
+    rm -f "$ATTEMPT_FILE" "$FAILURE_FILE" "$CAP_REFUND_FILE" \
+          "$HANDOFF_DIR/${plan_name}.json"
+    reports_dir="$NIGHTLY_DIR/reports"
+    {
+        printf 'Plan "%s" skipped: post-plan-now exited 3 (harness fail-closed sentinel). A retry cannot clear this; a human must.\n\n' \
+            "$plan_slug"
+        printf '%s\n\n' "$pp_result_line"
+        printf 'Worktree: %s\n\n' "${PP_WORKTREE:-unknown}"
+        printf 'Clear the cause in that worktree, then re-run bin/post-plan-now there.\n\n'
+        printf '## Post-plan log tail\n\n```\n'
+        sed -n "${pp_seg_start},\$p" "$LOG" 2>/dev/null | tail -30
+        printf '\n```\n'
+    } > "$reports_dir/$(date +%Y-%m-%d)-skipped-${plan_slug}.md"
+    rm -f "${PP_START_MARKER:-}"
+    if [ -n "${CURRENT_LOCK:-}" ]; then
+        rm -rf "${CURRENT_LOCK}" 2>/dev/null || true
+        CURRENT_LOCK=""
+    fi
+}
+
 # Scan this phase's slice of the log for a known environmental-failure signature:
 # a Claude usage/rate limit or an Anthropic API auth error, in any phrasing these
 # surface in (the legacy single-string checks missed "weekly limit" and the plain
@@ -1935,14 +1975,21 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
 
         PP_DUR=$(( $(date +%s) - PP_START ))
 
+        # postplan-rc3-terminal: begin
+        PP_TERMINAL=0
+        if [ "$PP_STATUS" -eq 3 ]; then
+            PP_TERMINAL=1
+            dispose_plan_postplan_blocked "$PLAN_NAME" "$PLAN_SLUG" "$PP_LOG_BEFORE"
+        fi
+        # postplan-env-breaker: begin
         # Environmental-failure breaker (mirrors impl). A successful post-plan
         # removes the handoff (the agent moves the plan to done/ and deletes it),
         # so a handoff still present after a sub-minute exit means the agent never
         # ran — environmental. A known limit/auth signature stops regardless, so a
         # dead budget doesn't burn a postplan retry. Refund + stop; queue intact.
-        if phase_env_error "$PP_LOG_BEFORE" \
+        if [ "$PP_TERMINAL" -eq 0 ] && { phase_env_error "$PP_LOG_BEFORE" \
            || phase_stalled "$PP_LOG_BEFORE" \
-           || { [ -f "$HANDOFF_FILE" ] && [ "$PP_DUR" -lt "$MIN_VIABLE_SECS" ]; }; then
+           || { [ -f "$HANDOFF_FILE" ] && [ "$PP_DUR" -lt "$MIN_VIABLE_SECS" ]; }; }; then
             REASON="usage/rate limit, auth error, or transient"
             if phase_stalled "$PP_LOG_BEFORE"; then
                 REASON="phase stalled — no stream events for >$((STALL_KILL_SECS/60))min, force-killed"
@@ -1954,6 +2001,7 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             write_env_stop_report "$PLAN_NAME" postplan "$REASON" "$PP_LOG_BEFORE"
             break
         fi
+        # postplan-env-breaker: end
 
         # Terminal-disposition: the environmental breaker did not trip, so the
         # post-plan agent exited on its own terms. If it left the plan in queue/

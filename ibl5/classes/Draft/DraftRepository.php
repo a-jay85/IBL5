@@ -227,4 +227,20 @@ class DraftRepository extends \BaseMysqliRepository implements DraftRepositoryIn
 
         return $result !== null ? $result['ownerofpick'] : null;
     }
+
+    /**
+     * @see DraftRepositoryInterface::getOriginTeamIdForPick()
+     */
+    public function getOriginTeamIdForPick(int $draftRound, int $draftPick): ?int
+    {
+        /** @var array{teamid: int}|null $result */
+        $result = $this->fetchOne(
+            "SELECT teamid FROM `ibl_draft` WHERE round = ? AND pick = ? LIMIT 1",
+            "ii",
+            $draftRound,
+            $draftPick
+        );
+
+        return $result !== null ? $result['teamid'] : null;
+    }
 }

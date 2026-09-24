@@ -2372,15 +2372,18 @@ grep -qE '\[ -f.*result\.json' "$SCRIPT_DIR/../bin/post-plan-fleet" \
 # An absent result produces 'unconfirmed' (holds the PR, never emits READY).
 grep -qF 'unconfirmed' "$SCRIPT_DIR/../bin/post-plan-fleet" \
   || fail "6c.3 absent: 'unconfirmed' verdict absent — absent result not treated as a hold"
+# A null latest-round verdict must block the RESULT: fallback (never borrow a stale word).
+grep -qF '[ -z "$latest_unconfirmed" ]' "$SCRIPT_DIR/../bin/post-plan-fleet" \
+  || fail "6c.3 absent: RESULT fallback not gated on latest_unconfirmed — null verdict_2 would fall back"
 end_case result-absent-holds
 
 # --- 6c.4: unparseable result.json produces a hold (static assertion) --------------------
 begin_case
 # The verdict extraction must be guarded so a parse failure does not propagate non-zero.
-grep -qF '"verdict_1"' "$SCRIPT_DIR/../bin/post-plan-fleet" \
-  || fail "6c.4 unparseable: no verdict_1 extraction from result.json — parse missing entirely"
-grep -qF '|| true)' "$SCRIPT_DIR/../bin/post-plan-fleet" \
-  || fail "6c.4 unparseable: no '|| true' guard on the parse pipeline — malformed JSON would abort"
+grep -qF 'import json' "$SCRIPT_DIR/../bin/post-plan-fleet" \
+  || fail "6c.4 unparseable: no python3 json parse of result.json — parse missing entirely"
+grep -qF 'result.json" 2>/dev/null || true)' "$SCRIPT_DIR/../bin/post-plan-fleet" \
+  || fail "6c.4 unparseable: result.json parse not guarded by '|| true' — malformed JSON would abort"
 end_case result-unparseable-holds
 
 # --- 6c.5: --wait timeout prints 'TIMED OUT waiting for' on stderr and exits 0 ------

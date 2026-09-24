@@ -69,7 +69,7 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
         // Act - Save each player to database
         $allUpdateSucceeded = true;
         foreach ($result['playerData'] as $player) {
-            $updateResult = $this->repository->updatePlayerDepthChart($player['name'], $player);
+            $updateResult = $this->repository->updatePlayerDepthChart(42, 7, $player);
             if (!$updateResult) {
                 $allUpdateSucceeded = false;
             }
@@ -114,7 +114,7 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
         // Act
         $result = $this->processor->processSubmission($postData, 15);
         $playerData = $result['playerData'][0];
-        $updateResult = $this->repository->updatePlayerDepthChart($playerData['name'], $playerData);
+        $updateResult = $this->repository->updatePlayerDepthChart(42, 7, $playerData);
 
         // Assert - Processed values match what was submitted
         $this->assertSame('John Smith', $playerData['name']);
@@ -137,7 +137,7 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
         $this->assertQueryExecuted('UPDATE ibl_plr');
         $this->assertQueryExecuted('dc_pg_depth');
         $this->assertQueryExecuted('dc_of = 0');
-        $this->assertQueryExecuted("name = 'John Smith'");
+        $this->assertQueryExecuted('WHERE pid = ');
     }
 
     /**
@@ -154,10 +154,7 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
         // Act
         $result = $this->processor->processSubmission($postData, 15);
         $csv = $this->processor->generateCsvContent($result['playerData']);
-        $this->repository->updatePlayerDepthChart(
-            $result['playerData'][0]['name'],
-            $result['playerData'][0]
-        );
+        $this->repository->updatePlayerDepthChart(42, 7, $result['playerData'][0]);
 
         // Assert - CSV contains same values that went to database
         $this->assertStringContainsString('Test Player', $csv);
@@ -438,7 +435,7 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
         $this->mockDb->setAffectedRows(1);
 
         // Act
-        $result = $this->repository->updatePlayerDepthChart($playerName, $depthChartValues);
+        $result = $this->repository->updatePlayerDepthChart(42, 7, $depthChartValues);
 
         // Assert
         $this->assertTrue($result);
@@ -478,7 +475,7 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
         $this->mockDb->setAffectedRows(0); // No rows affected
 
         // Act
-        $result = $this->repository->updatePlayerDepthChart($playerName, $depthChartValues);
+        $result = $this->repository->updatePlayerDepthChart(42, 7, $depthChartValues);
 
         // Assert - Should still return true (successful execution, just no changes)
         $this->assertTrue($result);
@@ -493,16 +490,16 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
     {
         // Arrange
         $players = [
-            ['name' => 'Player 1', 'pg' => 1, 'sg' => 0, 'sf' => 0, 'pf' => 0, 'c' => 0, 'canPlayInGame' => 1, 'min' => 30, 'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0],
-            ['name' => 'Player 2', 'pg' => 0, 'sg' => 1, 'sf' => 0, 'pf' => 0, 'c' => 0, 'canPlayInGame' => 1, 'min' => 28, 'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0],
-            ['name' => 'Player 3', 'pg' => 0, 'sg' => 0, 'sf' => 1, 'pf' => 0, 'c' => 0, 'canPlayInGame' => 1, 'min' => 32, 'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0],
+            ['pid' => 1, 'name' => 'Player 1', 'pg' => 1, 'sg' => 0, 'sf' => 0, 'pf' => 0, 'c' => 0, 'canPlayInGame' => 1, 'min' => 30, 'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0],
+            ['pid' => 2, 'name' => 'Player 2', 'pg' => 0, 'sg' => 1, 'sf' => 0, 'pf' => 0, 'c' => 0, 'canPlayInGame' => 1, 'min' => 28, 'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0],
+            ['pid' => 3, 'name' => 'Player 3', 'pg' => 0, 'sg' => 0, 'sf' => 1, 'pf' => 0, 'c' => 0, 'canPlayInGame' => 1, 'min' => 32, 'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0],
         ];
         $this->mockDb->setAffectedRows(1);
 
         // Act
         $allSuccess = true;
         foreach ($players as $player) {
-            if (!$this->repository->updatePlayerDepthChart($player['name'], $player)) {
+            if (!$this->repository->updatePlayerDepthChart($player['pid'], 7, $player)) {
                 $allSuccess = false;
             }
         }
@@ -590,7 +587,7 @@ class DepthChartEntryWideUnitTest extends WideUnitTestCase
         // Act
         $result = $this->processor->processSubmission($postData, 15);
         $player = $result['playerData'][0];
-        $this->repository->updatePlayerDepthChart($player['name'], $player);
+        $this->repository->updatePlayerDepthChart(42, 7, $player);
 
         // Assert - Role fields always 0
         $this->assertSame(0, $player['of']);

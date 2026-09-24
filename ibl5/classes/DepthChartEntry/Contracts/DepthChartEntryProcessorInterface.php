@@ -10,7 +10,7 @@ namespace DepthChartEntry\Contracts;
  * Transforms raw POST data into structured player data and statistics,
  * including sanitization, validation bounds checking, and aggregation.
  *
- * @phpstan-type ProcessedPlayerData array{name: string, pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, df: int, oi: int, di: int, bh: int, injury: int}
+ * @phpstan-type ProcessedPlayerData array{pid: int, name: string, pg: int, sg: int, sf: int, pf: int, c: int, canPlayInGame: int, min: int, of: int, df: int, oi: int, di: int, bh: int, injury: int}
  * @phpstan-type ProcessedSubmission array{playerData: list<ProcessedPlayerData>, activePlayers: int, pos_1: int, pos_2: int, pos_3: int, pos_4: int, pos_5: int, hasStarterAtMultiplePositions: bool, nameOfProblemStarter: string}
  */
 interface DepthChartEntryProcessorInterface
@@ -32,6 +32,7 @@ interface DepthChartEntryProcessorInterface
      * columns (CSV 8-12) are dead storage in JSB — hardcoded to 0 in the output.
      *
      * **Sanitization Rules Applied:**
+     * - Player id (pid{n}): integer, 0 when absent or non-numeric; the handler rejects 0 against the roster
      * - Player names: trim whitespace, remove HTML tags via strip_tags()
      * - Depth values (pg-c): clamped to 0-5 range (lineup priority: 1=starter, 2-5=bench depth)
      * - Can Play In Game: normalized to 0 or 1

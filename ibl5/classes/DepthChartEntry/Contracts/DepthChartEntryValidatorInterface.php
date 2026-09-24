@@ -44,6 +44,23 @@ interface DepthChartEntryValidatorInterface
     public function validate(array $depthChartData, string $phase): bool;
 
     /**
+     * Validate that a submission covers the session team's roster exactly.
+     *
+     * Rejects (one error per category, offending pids listed in the message):
+     * - roster_foreign_pid:   a submitted pid that is not on the roster (includes pid 0)
+     * - roster_duplicate_pid: a pid submitted more than once
+     * - roster_missing_pid:   a roster pid absent from the submission
+     *
+     * Resets the error list first (same contract as validate()); read errors via
+     * getErrors() / getErrorMessagesHtml() before calling validate(), which resets again.
+     *
+     * @param list<int> $submittedPids pids extracted from POST rows, in form order
+     * @param list<int> $rosterPids    pids returned by getPlayersOnTeam() for the session team
+     * @return bool True only when the two sets are equal and the submission has no repeats
+     */
+    public function validateRoster(array $submittedPids, array $rosterPids): bool;
+
+    /**
      * Get all validation errors from the last validate() call
      * 
      * Returns array of error arrays, each containing:

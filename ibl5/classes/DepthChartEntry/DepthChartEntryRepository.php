@@ -44,7 +44,7 @@ class DepthChartEntryRepository extends \BaseMysqliRepository implements DepthCh
      * @see DepthChartEntryRepositoryInterface::updatePlayerDepthChart()
      * @param DepthChartValues $depthChartValues
      */
-    public function updatePlayerDepthChart(string $playerName, array $depthChartValues): bool
+    public function updatePlayerDepthChart(int $pid, int $teamid, array $depthChartValues): bool
     {
         $pg = $depthChartValues['pg'];
         $sg = $depthChartValues['sg'];
@@ -69,8 +69,8 @@ class DepthChartEntryRepository extends \BaseMysqliRepository implements DepthCh
                     dc_oi = 0,
                     dc_di = 0,
                     dc_bh = 0
-                WHERE name = ?",
-                "iiiiiiis",
+                WHERE pid = ? AND teamid = ?",
+                "iiiiiiiii",
                 $pg,
                 $sg,
                 $sf,
@@ -78,14 +78,15 @@ class DepthChartEntryRepository extends \BaseMysqliRepository implements DepthCh
                 $c,
                 $active,
                 $min,
-                $playerName
+                $pid,
+                $teamid
             );
 
             return true;
         } catch (\RuntimeException $e) {
             $this->channelLogger->error('updatePlayerDepthChart failed', [
                 'exception' => $e,
-                'context' => ['playerName' => $playerName],
+                'context' => ['pid' => $pid, 'teamid' => $teamid],
             ]);
             return false;
         }

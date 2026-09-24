@@ -78,7 +78,7 @@ class DepthChartEntryRepositoryTest extends TestCase
         // Set affected rows to 1 to simulate successful update
         $this->mockDb->setAffectedRows(1);
 
-        $result = $this->repository->updatePlayerDepthChart($playerName, $depthChartValues);
+        $result = $this->repository->updatePlayerDepthChart(42, 7, $depthChartValues);
 
         $this->assertTrue($result);
 
@@ -102,7 +102,7 @@ class DepthChartEntryRepositoryTest extends TestCase
         $this->assertStringContainsString('dc_oi = 0', $lastQuery);
         $this->assertStringContainsString('dc_di = 0', $lastQuery);
         $this->assertStringContainsString('dc_bh = 0', $lastQuery);
-        $this->assertStringContainsString("WHERE name = '$playerName'", $lastQuery);
+        $this->assertStringContainsString('WHERE pid = ', $lastQuery);
     }
 
     public function testUpdatePlayerDepthChartSucceedsEvenWhenNoRowsAffected(): void
@@ -128,7 +128,7 @@ class DepthChartEntryRepositoryTest extends TestCase
         // Set affected rows to 0 to simulate no change (values already match)
         $this->mockDb->setAffectedRows(0);
 
-        $result = $this->repository->updatePlayerDepthChart($playerName, $depthChartValues);
+        $result = $this->repository->updatePlayerDepthChart(42, 7, $depthChartValues);
 
         // This should return true because 0 affected rows means the player exists
         // but the values didn't change, which is not an error
@@ -154,8 +154,8 @@ class DepthChartEntryRepositoryTest extends TestCase
         ];
 
         $this->mockDb->setAffectedRows(1);
-        
-        $result = $this->repository->updatePlayerDepthChart($playerName, $depthChartValues);
+
+        $result = $this->repository->updatePlayerDepthChart(42, 7, $depthChartValues);
 
         $this->assertTrue($result);
     }
@@ -181,7 +181,7 @@ class DepthChartEntryRepositoryTest extends TestCase
 
         $this->mockDb->setAffectedRows(1);
 
-        $result = $this->repository->updatePlayerDepthChart($playerName, $depthChartValues);
+        $result = $this->repository->updatePlayerDepthChart(42, 7, $depthChartValues);
 
         $this->assertTrue($result);
 
@@ -193,6 +193,21 @@ class DepthChartEntryRepositoryTest extends TestCase
         $this->assertStringContainsString('dc_oi = 0', $lastQuery);
         $this->assertStringContainsString('dc_di = 0', $lastQuery);
         $this->assertStringContainsString('dc_bh = 0', $lastQuery);
+    }
+
+    public function testUpdatePlayerDepthChartKeysByPidAndTeamid(): void
+    {
+        $values = [
+            'pg' => 1, 'sg' => 2, 'sf' => 0, 'pf' => 0, 'c' => 0,
+            'canPlayInGame' => 1, 'min' => 20,
+            'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0,
+        ];
+        $this->repository->updatePlayerDepthChart(42, 7, $values);
+        $queries = $this->mockDb->getExecutedQueries();
+        $last = (string) end($queries);
+        $this->assertStringContainsString('WHERE pid = ', $last);
+        $this->assertStringContainsString('AND teamid = ', $last);
+        $this->assertStringNotContainsString('WHERE name', $last);
     }
 
     public function testUpdateTeamHistorySuccessfullyUpdatesTimestamps(): void
@@ -295,8 +310,8 @@ class DepthChartEntryRepositoryTest extends TestCase
         $this->assertCount(7, $boundFields, 'Should have 7 bound fields');
         $this->assertCount(5, $hardcodedColumns, 'Should have 5 hardcoded columns');
 
-        // The bind_param order: 7 integers + 1 string (player name) = "iiiiiiis"
-        $expectedBindParamTypes = 'iiiiiiis';
+        // The bind_param order: 7 integers (SET) + pid + teamid (WHERE) = "iiiiiiiii"
+        $expectedBindParamTypes = 'iiiiiiiii';
         $expectedBindParamValues = [
             $boundFields['pg'],             // position 1: dc_pg_depth
             $boundFields['sg'],             // position 2: dc_sg_depth
@@ -305,11 +320,12 @@ class DepthChartEntryRepositoryTest extends TestCase
             $boundFields['c'],              // position 5: dc_c_depth
             $boundFields['canPlayInGame'],  // position 6: dc_can_play_in_game
             $boundFields['min'],            // position 7: dc_minutes
-            'Test Player'                   // position 8: name (WHERE clause)
+            42,                             // position 8: pid (WHERE)
+            7,                              // position 9: teamid (WHERE)
         ];
 
-        $this->assertCount(8, $expectedBindParamValues, 'Should have 8 bind parameters (7 updates + 1 WHERE)');
-        $this->assertSame(8, strlen($expectedBindParamTypes), 'Bind param type string should have 8 characters');
+        $this->assertCount(9, $expectedBindParamValues, 'Should have 9 bind parameters (7 updates + pid + teamid WHERE)');
+        $this->assertSame(9, strlen($expectedBindParamTypes), 'Bind param type string should have 9 characters');
     }
 
     /**
@@ -335,7 +351,7 @@ class DepthChartEntryRepositoryTest extends TestCase
 
         $this->mockDb->setAffectedRows(1);
 
-        $result = $this->repository->updatePlayerDepthChart('Test Player', $depthChartValues);
+        $result = $this->repository->updatePlayerDepthChart(42, 7, $depthChartValues);
         $this->assertTrue($result);
 
         // Verify the SQL hardcodes role columns to 0
@@ -418,7 +434,7 @@ class DepthChartEntryRepositoryTest extends TestCase
             'of' => 0, 'df' => 0, 'oi' => 0, 'di' => 0, 'bh' => 0,
         ];
 
-        $result = $repo->updatePlayerDepthChart('Test Player', $depthChartValues);
+        $result = $repo->updatePlayerDepthChart(42, 7, $depthChartValues);
 
         $this->assertFalse($result);
         $this->assertTrue($handler->hasErrorThatContains('updatePlayerDepthChart failed'));

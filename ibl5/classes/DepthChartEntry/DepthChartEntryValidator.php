@@ -54,6 +54,53 @@ class DepthChartEntryValidator implements DepthChartEntryValidatorInterface
         return $this->errors === [];
     }
 
+    /**
+     * @see DepthChartEntryValidatorInterface::validateRoster()
+     * @param list<int> $submittedPids
+     * @param list<int> $rosterPids
+     */
+    public function validateRoster(array $submittedPids, array $rosterPids): bool
+    {
+        $this->errors = [];
+
+        $rosterSet = array_flip($rosterPids);
+        $submittedSet = array_flip($submittedPids);
+
+        $foreign = array_values(array_unique(array_filter(
+            $submittedPids,
+            static fn (int $pid): bool => !isset($rosterSet[$pid])
+        )));
+        $duplicates = array_values(array_unique(array_diff_key($submittedPids, array_unique($submittedPids))));
+        $missing = array_values(array_filter(
+            $rosterPids,
+            static fn (int $pid): bool => !isset($submittedSet[$pid])
+        ));
+
+        if ($foreign !== []) {
+            $this->errors[] = [
+                'type' => 'roster_foreign_pid',
+                'message' => 'Your submission includes a player who is not on your roster (pid: ' . implode(', ', $foreign) . ').',
+                'detail' => 'Reload the depth chart form so it lists only your current roster, then resubmit.',
+            ];
+        }
+        if ($duplicates !== []) {
+            $this->errors[] = [
+                'type' => 'roster_duplicate_pid',
+                'message' => 'A player appears more than once in your submission (pid: ' . implode(', ', $duplicates) . ').',
+                'detail' => 'Each roster player may appear only once. Reload the form and resubmit.',
+            ];
+        }
+        if ($missing !== []) {
+            $this->errors[] = [
+                'type' => 'roster_missing_pid',
+                'message' => 'Your submission is missing a roster player (pid: ' . implode(', ', $missing) . ').',
+                'detail' => 'Every player on your roster must be included, even when inactive. Reload the form and resubmit.',
+            ];
+        }
+
+        return $this->errors === [];
+    }
+
     private function validateActivePlayerCount(int $activePlayers, int $min, int $max): void
     {
         if ($activePlayers < $min) {

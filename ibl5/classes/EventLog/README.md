@@ -9,7 +9,7 @@ Single repository class (`EventLogRepository`) that writes request events to the
 
 ## Columns (migration 159)
 
-Four columns were added in migration 157:
+Four columns were added in migration 159:
 
 - **`session_id`** (`VARCHAR(64) NULL`) — SHA-256 hash of `session_id()`. **NOT the raw session token** — the hash is one-way and cannot be replayed. Rotates on login (`session_regenerate_id(true)` at `classes/Auth/AuthService.php`), so one visit spanning a login produces two distinct hashes. `NULL` when no PHP session is active. Do not treat this as a stable visit key.
 - **`http_status`** (`SMALLINT NULL`) — HTTP response code, captured at shutdown by `EventLogger::flush()`. `NULL` when the request died before shutdown or returned a code outside 100–599.

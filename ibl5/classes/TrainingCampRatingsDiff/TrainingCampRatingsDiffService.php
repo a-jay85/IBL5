@@ -101,6 +101,14 @@ class TrainingCampRatingsDiffService implements Contracts\TrainingCampRatingsDif
     }
 
     /**
+     * @see Contracts\TrainingCampRatingsDiffServiceInterface::getBaselinePhase()
+     */
+    public function getBaselinePhase(?int $overrideYear = null): ?string
+    {
+        return $this->repository->getBaselinePhase($overrideYear ?? ($this->currentSeasonEndingYear - 1));
+    }
+
+    /**
      * Builds a RatingRow from a raw DB row.
      *
      * @param array<string, mixed> $row

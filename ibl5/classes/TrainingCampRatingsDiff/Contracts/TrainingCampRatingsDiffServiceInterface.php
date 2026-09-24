@@ -33,4 +33,10 @@ interface TrainingCampRatingsDiffServiceInterface
      * for the resolved year (i.e. no usable baseline is available).
      */
     public function getBaselineYear(?int $overrideYear = null): ?int;
+
+    /**
+     * Returns the snapshot phase used as the baseline for the resolved year,
+     * or null when no usable baseline is available.
+     */
+    public function getBaselinePhase(?int $overrideYear = null): ?string;
 }

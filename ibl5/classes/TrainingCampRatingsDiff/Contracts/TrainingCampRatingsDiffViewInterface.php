@@ -15,8 +15,10 @@ interface TrainingCampRatingsDiffViewInterface
      * Renders the full ratings diff page content.
      *
      * When $baselineYear is null or $rows is empty, renders an empty-state block.
+     * $baselinePhase picks the intro text's baseline label (playoffs,
+     * end-of-season, or mid-season ratings).
      *
      * @param list<RatingRow> $rows
      */
-    public function render(?int $baselineYear, array $rows, string $filterStatus = ''): string;
+    public function render(?int $baselineYear, ?string $baselinePhase, array $rows, string $filterStatus = ''): string;
 }

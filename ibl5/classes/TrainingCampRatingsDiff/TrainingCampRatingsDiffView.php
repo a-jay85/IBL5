@@ -54,23 +54,23 @@ class TrainingCampRatingsDiffView implements TrainingCampRatingsDiffViewInterfac
      *
      * @param list<RatingRow> $rows
      */
-    public function render(?int $baselineYear, array $rows, string $filterStatus = ''): string
+    public function render(?int $baselineYear, ?string $baselinePhase, array $rows, string $filterStatus = ''): string
     {
         if ($baselineYear === null || $rows === []) {
             return '<div class="ratings-diff-page">'
                 . '<h1 class="ibl-title">Training Camp Ratings Diff</h1>'
-                . '<div class="ibl-card"><p>No prior-season baseline found. This page is meaningful after a playoffs or end-of-season snapshot has been captured for last season.</p></div></div>';
+                . '<div class="ibl-card"><p>No prior-season baseline found. This page is meaningful after a playoffs, end-of-season, or mid-season snapshot has been captured for last season.</p></div></div>';
         }
 
         return '<div class="ratings-diff-page">'
             . '<h1 class="ibl-title">Training Camp Ratings Diff</h1>'
-            . $this->renderTable($baselineYear, $rows, $filterStatus) . '</div>';
+            . $this->renderTable($baselineYear, $baselinePhase, $rows, $filterStatus) . '</div>';
     }
 
     /**
      * @param list<RatingRow> $rows
      */
-    private function renderTable(int $baselineYear, array $rows, string $filterStatus): string
+    private function renderTable(int $baselineYear, ?string $baselinePhase, array $rows, string $filterStatus): string
     {
         $totalCols = self::FIXED_COL_COUNT + count(TrainingCampRatingsDiffService::RATED_FIELDS);
 
@@ -87,7 +87,7 @@ class TrainingCampRatingsDiffView implements TrainingCampRatingsDiffViewInterfac
             }
         }
 
-        $html  = '<p>Live player ratings vs their last playoffs ratings from '
+        $html  = '<p>Live player ratings vs their ' . self::baselineLabel($baselinePhase) . ' from '
             . HtmlSanitizer::e($baselineYear)
             . '. Sorted by largest single rating change.</p>';
         $html .= $this->renderStatusFilter($filterStatus);
@@ -125,6 +125,20 @@ class TrainingCampRatingsDiffView implements TrainingCampRatingsDiffViewInterfac
         $html .= '</div></div>';
 
         return $html;
+    }
+
+    /**
+     * Intro-text label for the baseline snapshot phase. Every phase other than
+     * the two regular-season fallbacks is a playoffs phase (see
+     * TrainingCampRatingsDiffRepository::getBaselinePhase()).
+     */
+    private static function baselineLabel(?string $baselinePhase): string
+    {
+        return match ($baselinePhase) {
+            'end-of-season' => 'end-of-season ratings',
+            'mid-season'    => 'mid-season ratings',
+            default         => 'last playoffs ratings',
+        };
     }
 
     private function renderStatusFilter(string $filterStatus): string

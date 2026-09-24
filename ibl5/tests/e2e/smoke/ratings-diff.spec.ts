@@ -19,7 +19,7 @@ test.describe('TrainingCampRatingsDiff admin page', () => {
     await page.goto('modules.php?name=TrainingCampRatingsDiff');
     await assertNoPhpErrors(page, 'on modules.php?name=TrainingCampRatingsDiff');
     await expect(page.locator('.ratings-diff-table')).toBeVisible();
-    await expect(page.locator('.ratings-diff-page')).toContainText(/last playoffs ratings/i);
+    await expect(page.locator('.ratings-diff-page')).toContainText(/(last playoffs|end-of-season|mid-season) ratings/i);
   });
 
   test('renders empty-state block when the baseline year has no snapshots', async ({ page }) => {

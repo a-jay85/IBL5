@@ -578,6 +578,48 @@ def qualify_backlog_refs(body: str) -> tuple[str, int]:
     return _BACKLOG_REF_RE.sub(_sub, body or ""), count
 
 
+# GitHub closing keywords (docs: "Linking a pull request to an issue").
+_CLOSE_KW = r"(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)"
+BACKLOG_CLOSES_START = "<!-- backlog-closes:start -->"
+BACKLOG_CLOSES_END = "<!-- backlog-closes:end -->"
+_BACKLOG_CLOSES_BLOCK_RE = re.compile(
+    re.escape(BACKLOG_CLOSES_START) + r".*?" + re.escape(BACKLOG_CLOSES_END) + r"\n?",
+    re.S)
+
+
+def _closing_ref_re(n: int) -> re.Pattern:
+    """Matches a closing keyword + the qualified ref for backlog issue n.
+    `(?!\\d)` keeps #1 from matching inside #12."""
+    return re.compile(
+        rf"\b{_CLOSE_KW}\s*:?\s+({re.escape(BACKLOG_REPO)}#{n})(?!\d)", re.I)
+
+
+def normalize_backlog_closes(body: str, closes_issues: list[int],
+                             refs_issues: list[int]) -> str:
+    """Make the PR body close exactly the plan's closes-kind backlog issues.
+
+    Both lists empty (plan-blind run, or plan without `## Backlog issues`) =>
+    body returned unchanged. Otherwise: rebuild the marker block with a
+    `Closes a-jay85/IBL5-backlog#N` line for each closes-kind issue the body
+    does not already close, and strip any closing keyword in front of a
+    refs-kind issue. Idempotent; never writes a bare `#N`.
+    """
+    body = body or ""
+    if not closes_issues and not refs_issues:
+        return body
+    closes = list(dict.fromkeys(closes_issues))
+    closes_set = set(closes)
+    refs = [n for n in dict.fromkeys(refs_issues) if n not in closes_set]
+    out = _BACKLOG_CLOSES_BLOCK_RE.sub("", body).rstrip("\n")
+    for n in refs:
+        out = _closing_ref_re(n).sub(r"\1", out)
+    missing = [n for n in closes if not _closing_ref_re(n).search(out)]
+    if missing:
+        lines = "\n".join(f"Closes {BACKLOG_REPO}#{n}" for n in missing)
+        out = f"{out}\n\n{BACKLOG_CLOSES_START}\n{lines}\n{BACKLOG_CLOSES_END}"
+    return out + "\n"
+
+
 def slice_spec_diffs(filtered_diff: str, e2e_spec_modules: list[str]) -> tuple[str, str]:
     """Agent D pre-slice: (spec portion, production portion) of the diff."""
     spec_lines: list[str] = []

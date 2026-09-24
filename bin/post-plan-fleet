@@ -654,7 +654,7 @@ notify() {
         return 0
     fi
     local DM_ICON="" DM_VERDICT="" DM_NEXT="" msg stop_text=""
-    local verdict=""
+    local verdict="" parsed="" terminal="" latest_unconfirmed=""
     # STOP: lines take priority (same rule as derive_status)
     local stop_line=""
     stop_line=$(grep -m1 '^[[:space:]>*_`-]*STOP:' "$LOG" 2>/dev/null || true)
@@ -671,22 +671,44 @@ notify() {
         run_dir=$(grep -m1 'harness-run-dir=' "$LOG" 2>/dev/null \
             | grep -o 'harness-run-dir=[^[:space:]]*' | cut -d= -f2 || true)
         if [ -n "$run_dir" ] && [ -f "$run_dir/result.json" ]; then
-            verdict=$(grep -m1 '"verdict_1"' "$run_dir/result.json" 2>/dev/null \
-                | sed 's/.*"verdict_1": *"\([^"]*\)".*/\1/;/^null$/d' || true)
+            # Latest round wins: rounds non-empty -> verdict_2 (null = unconfirmed,
+            # never verdict_1). No rounds -> verdict_1 (null -> empty, falls through
+            # to the RESULT: line exactly as before). Any parse error -> empty.
+            parsed=$(python3 -c '
+import json, sys
+d = json.load(open(sys.argv[1]))
+f = d.get("fidelity") or {}
+if f.get("rounds"):
+    v = f.get("verdict_2")
+    v = "null" if v is None else v
+else:
+    v = f.get("verdict_1") or ""
+print("terminal=%s" % (d.get("terminal") or ""))
+print("verdict=%s" % v)
+' "$run_dir/result.json" 2>/dev/null || true)
+            terminal=$(printf '%s\n' "$parsed" | sed -n 's/^terminal=//p')
+            verdict=$(printf '%s\n' "$parsed" | sed -n 's/^verdict=//p')
+            if [ "$verdict" = null ]; then
+                verdict=""; latest_unconfirmed=1
+            fi
+            if [ "$verdict" = READY ] && [ "$terminal" = shipped-held ]; then
+                verdict="HELD"
+            fi
         fi
         # Fallback: derive from RESULT: line in log
-        if [ -z "$verdict" ] && [ -f "$LOG" ]; then
+        if [ -z "$verdict" ] && [ -z "$latest_unconfirmed" ] && [ -f "$LOG" ]; then
             local result_line=""
             result_line=$(grep -m1 '^RESULT:' "$LOG" 2>/dev/null || true)
             case "$result_line" in
                 *"terminal=shipped-armed"*)  verdict="READY" ;;
-                *"terminal=shipped-held"*)   verdict="READY WITH NOTES" ;;
+                *"terminal=shipped-held"*)   verdict="HELD" ;;
                 *"BLOCKED"*|*"FAILED"*)      verdict="NOT READY" ;;
             esac
         fi
     fi
     case "$verdict" in
         READY)              DM_ICON="✅"; DM_VERDICT="READY";           DM_NEXT="merge when you're ready" ;;
+        HELD)               DM_ICON="⏸";  DM_VERDICT="HELD";            DM_NEXT="check the holds" ;;
         "READY WITH NOTES") DM_ICON="⚠️"; DM_VERDICT="READY WITH NOTES"; DM_NEXT="check the holds" ;;
         "NOT READY")        DM_ICON="❌"; DM_VERDICT="NOT READY";        DM_NEXT="read the verdict comment" ;;
         STOPPED)            DM_ICON="🛑"; DM_VERDICT="STOPPED";          DM_NEXT="${stop_text:-read the log}" ;;

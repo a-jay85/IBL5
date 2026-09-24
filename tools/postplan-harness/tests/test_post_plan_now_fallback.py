@@ -1,4 +1,5 @@
-import os, pathlib, re, shlex, shutil, subprocess
+import glob, os, pathlib, re, shlex, shutil, subprocess
+import pytest
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 PPN = os.path.join(REPO, "bin", "post-plan-now")
@@ -11,6 +12,30 @@ _LAUNCHCTL_OTHER_SLUG = (
     '#!/bin/sh\n'
     'printf "%s\\t%s\\t%s\\n" 12345 0 com.ibl5.postplan-now-wt-feature-extra-20260916-144924-99\n'
 )
+
+_TMP_SIDECAR_GLOBS = [
+    "/tmp/postplan-lostwork-*.sh",
+    "/tmp/postplan-sidecar-*.json",
+]
+
+
+def _tmp_sidecars() -> set[str]:
+    found: set[str] = set()
+    for pattern in _TMP_SIDECAR_GLOBS:
+        found.update(glob.glob(pattern))
+    return found
+
+
+@pytest.fixture(autouse=True)
+def _reap_tmp_sidecars():
+    before = _tmp_sidecars()
+    yield
+    for path in _tmp_sidecars() - before:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
 
 def _fb(code):
     r = subprocess.run(

@@ -1,6 +1,7 @@
 """Tests for harness.manual_testing — Phase 6.7 execution logic."""
 import os
 import sys
+import types
 
 import pytest
 
@@ -33,6 +34,25 @@ class FakeGh:
         b = self.bodies[min(self.calls, len(self.bodies) - 1)]
         self.calls += 1
         return b
+
+    def pr_body_fresh(self):
+        return self.pr_body()
+
+
+class CachedFakeGh:
+    """LiveGh after runner.py:497 wrote the body: pr_body() serves the cached harness
+    copy, pr_body_fresh() reaches GitHub. Lets a test tell the two reads apart."""
+
+    def __init__(self, cached, fresh):
+        self.cached, self.fresh = cached, fresh
+        self.fresh_calls = 0
+
+    def pr_body(self):
+        return self.cached
+
+    def pr_body_fresh(self):
+        self.fresh_calls += 1
+        return self.fresh
 
 
 # ---------------------------------------------------------------------------
@@ -90,6 +110,7 @@ def test_loader_missing():
 # ---------------------------------------------------------------------------
 
 BODY_ONE_ROW = "## Manual Testing\n\n- [ ] **Row 1** — `bin/test-foo`\n"
+BODY_ONE_ROW_TICKED = BODY_ONE_ROW.replace("- [ ]", "- [x]")
 
 
 def _make_scripts_show():
@@ -556,7 +577,7 @@ def test_tick_skipped_on_zero_passes(monkeypatch):
 # test_tick_unconfirmed
 # ---------------------------------------------------------------------------
 
-def test_tick_unconfirmed(monkeypatch):
+def test_tick_unconfirmed_when_live_body_still_unticked(monkeypatch):
     body = BODY_ONE_ROW
 
     def fake_run(path, args, timeout_s, cwd=None):
@@ -571,10 +592,10 @@ def test_tick_unconfirmed(monkeypatch):
     monkeypatch.setattr(mt, "docker_available", lambda: (True, ""))
     monkeypatch.setattr(mt, "resolve_slug", lambda w: ("harness-manual-rows-execute", ""))
 
-    # gh.pr_body() after tick still returns unticked body
+    # GitHub still shows the row unticked after tick-rows.sh reported TICKED: 2
     result = mt.run(
         pr=1, worktree="/fake/worktree", body=body,
-        gh=FakeGh([body, body, body]),
+        gh=CachedFakeGh(cached=body, fresh=body),
         probe=FixtureProbe({}),
         show_blob=_make_scripts_show(),
         master_sha=SHA, head_tree=lambda: "tree1",
@@ -582,6 +603,7 @@ def test_tick_unconfirmed(monkeypatch):
     )
     assert result.all_ticked is False
     assert any(e.startswith("tick-unconfirmed:") for e in result.errors)
+    assert result.ticked == []
 
 
 # ---------------------------------------------------------------------------
@@ -624,6 +646,46 @@ def test_tree_gate(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# confirm() reads the live body
+# ---------------------------------------------------------------------------
+
+def test_confirm_sees_out_of_band_tick_via_fresh_read(monkeypatch):
+    def fake_run(path, args, timeout_s, cwd=None):
+        name = str(path)
+        if "bring-up" in name or "wt-bring" in name:
+            return 0, "BRINGUP: UP\nBRINGUP-COMPLETE\n", ""
+        if "tick" in name:
+            return 0, "TICKED: 1\nTICK-COMPLETE\n", ""
+        return 0, "ROW Row 1 PASS\nMANUAL-ROWS-COMPLETE\n", ""
+
+    monkeypatch.setattr(mt, "_run_script", fake_run)
+    kwargs = _base_run_kwargs(monkeypatch)
+    kwargs["gh"] = CachedFakeGh(cached=BODY_ONE_ROW, fresh=BODY_ONE_ROW_TICKED)
+    result = mt.run(**kwargs)
+    assert result.ticked == ["Row 1"]
+    assert result.all_ticked is True
+    assert not any(e.startswith("tick-unconfirmed:") for e in result.errors)
+
+
+def test_confirm_unit_reads_fresh_body_once():
+    gh = CachedFakeGh(cached=BODY_ONE_ROW, fresh=BODY_ONE_ROW_TICKED)
+    errors: list[str] = []
+    confirmed, all_ticked = mt.confirm(gh, ["Row 1"], errors)
+    assert confirmed == ["Row 1"]
+    assert all_ticked is True
+    assert errors == []
+    assert gh.fresh_calls == 1
+
+
+def test_confirm_empty_fresh_body_reports_empty_body():
+    gh = CachedFakeGh(cached=BODY_ONE_ROW, fresh="")
+    errors: list[str] = []
+    result = mt.confirm(gh, ["Row 1"], errors)
+    assert result == ([], False)
+    assert errors == ["tick-unconfirmed:empty-body"]
+
+
+# ---------------------------------------------------------------------------
 # test_no_exception_escapes
 # ---------------------------------------------------------------------------
 
@@ -649,3 +711,33 @@ def test_no_exception_escapes(monkeypatch):
     result = mt.run(**_base_run_kwargs(monkeypatch))
     assert isinstance(result, mt.ManualTestingResult)
     assert any(e.startswith("manual-testing-error:") for e in result.errors)
+
+
+# ---------------------------------------------------------------------------
+# _GhShim
+# ---------------------------------------------------------------------------
+
+def test_ghshim_pr_body_fresh_hits_gh_each_call(monkeypatch):
+    calls = []
+    outs = iter(["body-1\n", "body-2\n"])
+
+    def fake_run(argv, **kw):
+        calls.append(argv)
+        return types.SimpleNamespace(returncode=0, stdout=next(outs), stderr="")
+
+    monkeypatch.setattr(mt.subprocess, "run", fake_run)
+    shim = mt._GhShim(42)
+    assert shim.pr_body() == "body-1"
+    assert shim.pr_body_fresh() == "body-2"
+    assert len(calls) == 2
+    for argv in calls:
+        assert argv[:3] == ["gh", "pr", "view"]
+        assert "42" in argv
+
+
+def test_ghshim_pr_body_fresh_empty_on_gh_failure(monkeypatch):
+    monkeypatch.setattr(
+        mt.subprocess, "run",
+        lambda argv, **kw: types.SimpleNamespace(returncode=1, stdout="junk", stderr="boom"),
+    )
+    assert mt._GhShim(42).pr_body_fresh() == ""

@@ -14,8 +14,8 @@ _LAUNCHCTL_OTHER_SLUG = (
 )
 
 _TMP_SIDECAR_GLOBS = [
-    "/tmp/postplan-lostwork-*.sh",
-    "/tmp/postplan-sidecar-*.json",
+    "/tmp/post-plan-now-wt-feature-*.session",
+    "/tmp/post-plan-now-wt-feature-*.log",
 ]
 
 

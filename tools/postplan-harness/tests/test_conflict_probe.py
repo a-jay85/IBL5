@@ -141,7 +141,14 @@ def test_probe_clean_branch_reports_clean(tmp_path, dirty):
     g = LiveGit(str(wt))
     g.fetch_base()
     g.stage_all()
+    head0 = _rev(wt, "HEAD")
+    status0 = _git(wt, "status", "--porcelain").stdout
     assert g.predict_rebase_conflict() == ()
+    assert _rev(wt, "HEAD") == head0
+    assert _git(wt, "status", "--porcelain").stdout == status0
+    assert not (wt / ".git" / "rebase-merge").exists()
+    assert not (wt / ".git" / "rebase-apply").exists()
+    assert _git(wt, "stash", "list").stdout == ""
 
 
 def test_probe_bad_base_raises_git_kind_not_conflict(tmp_path):
@@ -165,9 +172,17 @@ _COPY = {"type": "chore", "title": "chore: probe", "commit_subject": "chore: pro
          "summary_md": "## Summary\n- x\n"}
 
 
-def _run_live(tmp_path, wt, monkeypatch, body_check, *, calls=None):
+def _run_live(tmp_path, wt, monkeypatch, body_check, *, calls=None, resolver=True):
     if calls is None:
         calls = {"pr_copy": 0}
+
+    if not resolver:
+        _Orig = runner.LiveGit
+        class _NullLlmGit(_Orig):
+            def __init__(self, *a, **kw):
+                super().__init__(*a, **kw)
+                self.llm = None
+        monkeypatch.setattr(runner, "LiveGit", _NullLlmGit)
 
     def fake_pr_copy(llm, git, gh, fixture, slug, cls, plan, log):
         calls["pr_copy"] += 1
@@ -190,20 +205,42 @@ def _run_live(tmp_path, wt, monkeypatch, body_check, *, calls=None):
 
 @pytest.mark.parametrize("dirty", [False, True])
 def test_runner_conflict_fails_closed_before_body_check(tmp_path, monkeypatch, dirty):
+    """Without an LLM resolver the probe gates: no body check, exit 3."""
     wt = _plain_scenario(tmp_path, conflict=True, dirty=dirty)
     head0 = _rev(wt, "HEAD")
 
     def spy(*a, **k):
-        raise AssertionError("_body_check must not run on a predicted conflict")
+        raise AssertionError("_body_check must not run without LLM resolver")
 
-    res, calls = _run_live(tmp_path, wt, monkeypatch, spy)
+    res, calls = _run_live(tmp_path, wt, monkeypatch, spy, resolver=False)
     assert res.terminal == TerminalState.FAILED
     assert res.error_kind == "rebase-conflict"
     assert "a.txt" in res.error
+    assert "merge-tree probe" in res.error
     assert runner.exit_code_for(res) == 3
     assert calls["pr_copy"] == 0
     assert any("conflicted paths (probe) = a.txt" in l for l in res.audit)
     assert _rev(wt, "HEAD") == head0
+
+
+def test_runner_conflict_advisory_with_llm_reaches_body_check(tmp_path, monkeypatch):
+    """When LLM resolver is active, a predicted conflict is advisory and body check runs."""
+    wt = _plain_scenario(tmp_path, conflict=True, dirty=True)
+    hits = []
+    calls = {"pr_copy": 0}
+
+    def spy(*a, **k):
+        hits.append(1)
+        raise _Stop()
+
+    with pytest.raises(_Stop):
+        _run_live(tmp_path, wt, monkeypatch, spy, calls=calls)
+
+    assert hits == [1]
+    assert calls["pr_copy"] == 1
+    audit_text = (tmp_path / "out" / "audit.log").read_text()
+    assert "merge-tree probe predicted" in audit_text
+    assert "stopping before body check" not in audit_text
 
 
 def test_runner_clean_branch_reaches_body_check(tmp_path, monkeypatch):
@@ -221,7 +258,7 @@ def test_runner_clean_branch_reaches_body_check(tmp_path, monkeypatch):
     assert hits == [1]
     assert calls["pr_copy"] == 1
     audit_text = (tmp_path / "out" / "audit.log").read_text()
-    assert "phase2 conflict-probe: predicted" not in audit_text
+    assert "merge-tree probe predicted" not in audit_text
 
 
 def test_runner_stacked_squash_parent_reaches_body_check(tmp_path, monkeypatch):

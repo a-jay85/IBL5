@@ -284,22 +284,17 @@ class LiveGit:
         paths = {p for p in proc.stdout.splitlines()[1:] if p.strip()}
         return tuple(sorted(paths))
 
-    def predict_rebase_conflict(self, base: str = "origin/master") -> None:
-        """Predict, without touching refs, index, or worktree, whether Phase 2's rebase onto
-        `base` will stop on a conflict. Called before the LLM body check, so a doomed run
-        exits 3 before spending that call.
+    def predict_rebase_conflict(self, base: str = "origin/master") -> tuple[str, ...]:
+        """Predict, without touching refs, index, or worktree, whether a rebase onto `base`
+        will stop on a conflict. Returns the conflicted paths as a sorted tuple, or () if clean.
 
-        Merges the INDEX tree (the staged, not-yet-committed shippable diff), not HEAD.
-        Mirrors runner.py's order: a plain merge-base probe first (git.rebase_onto()), then,
-        only when that conflicts and branch.<name>.iblBase is recorded, an iblBase probe
-        (autoresolve_stacked_rebase's --onto). Raises HarnessError("rebase-conflict") only
-        when every applicable probe conflicts, and sets self.last_conflict_files to the
-        paths from the last probe that ran. Raises HarnessError("git") on any git failure;
-        the caller treats that as "no prediction" and falls through.
+        Merges the INDEX tree (staged diff), not HEAD. Uses a plain merge-base probe first;
+        if that conflicts and branch.<name>.iblBase is set, retries with the iblBase.
+        Returns () unless every applicable probe conflicts.
 
-        Advisory only. merge-tree is a single 3-way merge and rebase replays commits one
-        at a time, so a clean prediction does not guarantee a clean rebase. The real
-        rebase_onto() still runs and stays authoritative."""
+        Raises HarnessError("git") on any git error; the caller treats that as "no prediction"
+        and falls through. Does not raise HarnessError("rebase-conflict") — gating on a
+        predicted conflict is the caller's responsibility."""
         self.last_conflict_files = ()
         tree = self._run("write-tree").strip()
         fork_point = self._run("merge-base", "HEAD", base).strip()
@@ -309,14 +304,12 @@ class LiveGit:
         conflicted = self._merge_tree_conflicts(fork_point, base, tree)
         if not conflicted:
             return ()
-        probes = f"merge-base {fork_point[:8]}"
         ibl_base = self.branch_base()
         if ibl_base is not None and ibl_base != fork_point:
             onto_conflicted = self._merge_tree_conflicts(ibl_base, base, tree)
             if not onto_conflicted:
                 return ()
             conflicted = onto_conflicted
-            probes += f" and iblBase {ibl_base[:8]}"
         self.last_conflict_files = conflicted
         return conflicted
 

@@ -46,6 +46,12 @@ class MockDatabase extends \mysqli
     private bool $returnTrue = true;
     /** @var list<string> */
     private array $executedQueries = [];
+
+    /** @var list<string> */
+    private array $preparedQueries = [];
+
+    /** @var list<mixed> */
+    private array $lastBoundParams = [];
     /**
      * Ordered log of SQL queries AND transaction lifecycle markers
      * (BEGIN/COMMIT/ROLLBACK), kept separate from $executedQueries so callers
@@ -427,6 +433,8 @@ class MockDatabase extends \mysqli
         $this->executedQueries = [];
         $this->operationLog = [];
         $this->insertCount = 0;
+        $this->preparedQueries = [];
+        $this->lastBoundParams = [];
     }
     
     public function sql_escape_string(string $string): string
@@ -484,6 +492,32 @@ class MockDatabase extends \mysqli
     #[\ReturnTypeWillChange]
     public function prepare(string $query): MockPreparedStatement
     {
+        $this->preparedQueries[] = $query;
+
         return new MockPreparedStatement($this, $query);
+    }
+
+    /**
+     * The SQL text handed to prepare(), before MockPreparedStatement substitutes
+     * bound values into it. Assert against this — not getExecutedQueries() — when
+     * the point is that a value never reached the SQL text.
+     *
+     * @return list<string>
+     */
+    public function getPreparedQueries(): array
+    {
+        return $this->preparedQueries;
+    }
+
+    /** @param list<mixed> $params */
+    public function recordBoundParams(array $params): void
+    {
+        $this->lastBoundParams = $params;
+    }
+
+    /** @return list<mixed> */
+    public function getLastBoundParams(): array
+    {
+        return $this->lastBoundParams;
     }
 }

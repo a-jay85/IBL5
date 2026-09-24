@@ -2489,12 +2489,6 @@ parameters:
 			path: modules/OneOnOneGame/index.php
 
 		-
-			rawMessage: Binary operation "." between '%%' and mixed results in an error.
-			identifier: binaryOp.invalid
-			count: 1
-			path: modules/Player/articles.php
-
-		-
 			rawMessage: Cannot access offset 'sid' on mixed.
 			identifier: offsetAccess.nonOffsetAccessible
 			count: 1
@@ -2544,12 +2538,6 @@ parameters:
 
 		-
 			rawMessage: 'Cannot call method prepare() on mixed.'
-			identifier: method.nonObject
-			count: 1
-			path: modules/Player/articles.php
-
-		-
-			rawMessage: 'Cannot call method real_escape_string() on mixed.'
 			identifier: method.nonObject
 			count: 1
 			path: modules/Player/articles.php

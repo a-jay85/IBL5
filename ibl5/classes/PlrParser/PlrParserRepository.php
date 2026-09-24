@@ -449,8 +449,9 @@ class PlrParserRepository extends \BaseMysqliRepository implements PlrParserRepo
 
         $byPid = [];
         foreach ($rows as $row) {
-            // @phpstan-ignore cast.int (pid column is always an integer; mysqli returns it as string)
-            $byPid[(int) $row['pid']] = $row;
+            if (is_numeric($row['pid'])) {
+                $byPid[(int) $row['pid']] = $row;
+            }
         }
 
         return $byPid;

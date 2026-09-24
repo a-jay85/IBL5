@@ -1355,12 +1355,6 @@ parameters:
 			path: modules/ActivityTracker/index.php
 
 		-
-			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/AllStarAppearances/index.php
-
-		-
 			rawMessage: 'Parameter #1 $db of class ApiKeys\ApiKeysRepository constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
@@ -3002,12 +2996,6 @@ parameters:
 			path: modules/PlayerDatabase/index.php
 
 		-
-			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/PlayerExportGuide/index.php
-
-		-
 			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
 			identifier: ibl.bannedNukeGlobal
 			count: 1
@@ -3768,12 +3756,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: modules/Voting/index.php
-
-		-
-			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/VotingResults/index.php
 
 		-
 			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'

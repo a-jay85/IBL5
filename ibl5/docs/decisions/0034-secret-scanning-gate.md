@@ -82,3 +82,13 @@ Decision:
 Consequence for the scanning gate: gitleaks now has one fewer plausible leak
 path, since the only tracked file that names `$dbpass` is the template with a
 Docker-default value. The allowlist in `.gitleaks.toml` is unchanged.
+
+## Addendum (2026-09-23): exit(1) correction in config.php.example
+
+The 2026-09-22 addendum states that "a copy of the example without
+`config.local.php` exits non-zero." The initial implementation used
+`die('string')`, which PHP exits with status 0 when passed a string. The code
+was corrected in the same PR: `config.php.example` now echoes the message and
+calls `exit(1)`, so CLI callers receive a non-zero status and the
+`ibl5/bin/check-config-example` gate passes. `echo` rather than `fwrite(STDERR, ...)`
+because the `STDERR` constant is undefined under web SAPIs.

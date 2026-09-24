@@ -77,7 +77,7 @@ jobs:
       # Backup host is overridable via dispatch input for failure testing.
       BACKUP_HOST: ${{ github.event.inputs.ssh_host_override || secrets.HOST }}
       REMOTE_DATABASE: iblhoops_ibl5
-      # config.php.example reads these four via getenv(); the duplicate-invariant
+      # CI writes config.local.php from these four env vars; the duplicate-invariant
       # step below needs them to reach the ephemeral MariaDB holding the restored
       # dump. DB_NAME repeats REMOTE_DATABASE's literal because YAML cannot
       # self-reference within one env: map.

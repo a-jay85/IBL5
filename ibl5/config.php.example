@@ -44,9 +44,13 @@ if (stristr(htmlentities($_SERVER['PHP_SELF']), "config.php")) {
 # missing file stops the request instead of connecting with a blank password.
 if (!is_file(__DIR__ . '/config.local.php')) {
     http_response_code(500);
-    die('config.local.php is missing. Copy config.local.php.example to '
+    # echo + exit(1), not die('...'): die() with a string exits 0, so CLI
+    # callers (cron, bin/ scripts) would see success. STDERR is undefined
+    # under web SAPIs, so echo is the portable channel.
+    echo 'config.local.php is missing. Copy config.local.php.example to '
         . 'config.local.php next to config.php and set $dbhost, $dbuname, '
-        . '$dbpass, $dbname.');
+        . '$dbpass, $dbname.' . PHP_EOL;
+    exit(1);
 }
 require_once __DIR__ . '/config.local.php';
 $prefix = "nuke";

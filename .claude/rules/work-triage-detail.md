@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for work-triage — NO auto-attach trigger (its `paths:` entries are all out-of-repo and never match); Read it when work-triage.md cites it. Covers measurement context for the inline-Opus leak, ADR-0067 gateway framing, the numeric hard-trigger rule and gate properties (sub-agent exemption, per-turn scoping, escape hatch, self-test), the /plan-verdict routing rationale and gate properties, the cross-worktree straddle gate's four-rung remedy ladder, inline-vs-delegated criteria, safety-mirror backstop, and repeat-polling spend rationale.
-last_verified: 2026-09-16
+last_verified: 2026-09-23
 paths:
   - "~/.claude/hooks/plan-gate-edit.sh"
   - "~/.claude/hooks/plan-gate-skill.sh"
@@ -86,7 +86,7 @@ Stay inline (Opus edits directly) only when:
 
 Either way the routing decision is **stated, not silent** — one line, like the triage verdict. The user should see which way it went and be able to override in the moment.
 
-**One delegate is a default, not a ceiling.** When the chunk splits cleanly into parts that do not depend on each other — separate modules, separate test files, a doc sweep alongside an unrelated script fix — issue the `Agent` calls in a single message so they run **concurrently** rather than chaining one delegate through them serially. The extra 17–23K per spawn is negligible (`agent-tiering-detail.md` § Fan out by independence: we sit ~2.5× below delegation break-even), and wall-clock is what the split actually buys.
+**One delegate is the default floor.** When the chunk splits cleanly into parts that do not depend on each other (separate modules, separate test files, a doc sweep beside an unrelated script fix), issue the `Agent` calls in a single message so they run **concurrently**. Chaining one delegate through them serially wastes wall-clock. Each spawn adds roughly 20K tokens of overhead, small next to the session it sits in. Measured 2026-09-23 by `bin/measure-delegate-cost` over 205 Sonnet and 88 Opus automouse impl sessions, with Opus re-priced at opus-5-5 rates: a Sonnet session costs $2.65 at p50 against $4.33 for Opus, and $3.26 against $5.23 per completed plan, and redo rates of 14.7% and 13.3%. Opus plans skew harder, so read this as observational evidence. [CORRECTED 2026-09-23: was "we sit ~2.5× below delegation break-even", a 2026-08-25 spawn-count figure from Opus 5 sessions in `agent-tiering-detail.md` § Fan out by independence.] Wall-clock is what the split buys.
 
 The ≥5-file hard trigger in `work-triage.md` still names **one** sub-agent, and that is deliberate rather than a leftover: a file sweep is one coherent change whose edits must stay consistent with each other, so its parts are *dependent* and splitting them buys no wall-clock while risking divergence. Fan out across **independent** chunks, not within a single sweep.
 

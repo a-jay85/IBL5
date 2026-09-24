@@ -510,9 +510,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         _join_review()
         # A remediation loop moved the head, up to MAX_FIDELITY_ROUNDS times. Phase 7
         # must watch CI for the last commit, which is what remediation_sha aliases after
-        # the loop.
-        if res.fidelity.get("remediation_sha"):
-            sha = res.fidelity["remediation_sha"]
+        # the loop. A body-only round moved no head, so it never replaces sha.
+        if rsha := _last_remediation_commit(res.fidelity):
+            sha = rsha
             # Phase 5.0 re-run: the loop above moved the head, so the diff the first
             # pass saw is stale. A remediation that authored the planned file must
             # clear condition (3) on the SAME run, or the hold never releases.
@@ -641,7 +641,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             vpath = fid.get("verdict_path") or fidelity.verdict_path(pr)
             digest = fidelity.digest_lines(worktree, master_sha, vpath, out_dir,
                                            fid.get("verdict_1") is not None)
-            rsha = fid.get("remediation_sha")
+            rsha = _last_remediation_commit(fid)
             ci_line = ("CI: local verification "
                        f"{getattr(res.phase5, 'value', res.phase5)}; "
                        "GitHub checks are watched after this comment")
@@ -650,7 +650,8 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             sticky = fidelity.compose_sticky(
                 rebase_line, ci_line, fid, decision, digest,
                 fidelity.findings_excerpt(vpath, fid.get("verdict_1") is not None),
-                fidelity.terminal_line(fid.get("verdict_1"), fid.get("error_kind"), rsha,
+                fidelity.terminal_line(fid.get("verdict_1"), fid.get("error_kind"),
+                                       fid.get("remediation_sha"),
                                        fid.get("verdict_2"), fid.get("reviewed_tree_2"),
                                        fid.get("rounds_completed", 0)),
                 diff_id=fid.get("diff_id", ""), plan_hash=fid.get("plan_hash", ""),
@@ -787,6 +788,24 @@ _MAX_ROUND_RETRIES = 1
 # finding it has already answered in the body just re-answers it.
 BODY_ONLY_SHA = "body-only"
 BODY_FETCH_FAILED_REASON = "body-fetch-failed"
+
+
+def _last_remediation_commit(fid: dict) -> str | None:
+    """The last commit a remediation round actually authored, or None.
+
+    fid["remediation_sha"] is a round label: it reads BODY_ONLY_SHA after a body-only
+    round. Anything that treats it as a git object -- the Phase 6.5 remote-head check,
+    the Phase 7 CI watch -- must use this instead, or it compares the PR head against
+    the literal string "body-only" and fails closed as remote-head-diverged.
+    """
+    sha = fid.get("remediation_sha")
+    if sha != BODY_ONLY_SHA:
+        return sha or None
+    for r in reversed(fid.get("rounds") or []):
+        s = r.get("remediation_sha")
+        if s and s != BODY_ONLY_SHA:
+            return s
+    return None
 
 
 def _body_signature(body: str | None) -> str:

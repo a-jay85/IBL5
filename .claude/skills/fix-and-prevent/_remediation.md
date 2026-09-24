@@ -27,6 +27,7 @@ Do not guess the mode from context.
 | Worktree | `bin/wt-new <slug>` per SKILL.md Step 0 | the PR's existing worktree; never `bin/wt-new` |
 | Which findings get treated | `/fix-and-prevent` § Calibration "Out of scope" applies | **overridden** — every Phase 6 finding, notes and blockers alike, across all six 6d classes |
 | Fix edits + backlog edits | yours | yours |
+| Nothing left to do (every row `fixed this pass`, ladder at rung 0 or no gate) | file the entry anyway (step 5) | record the entry in the verdict, file **no** issue (step 5) |
 | Commit / push | `bin/post-plan-now --auto` at SKILL.md Step 3 | the caller's Phase 6.5 commit + push steps |
 | Ends with | a PR opened by `/post-plan` | control returned to the caller |
 
@@ -75,8 +76,9 @@ Deterministic. Select by the defect class's surface:
 - Autonomous-loop or harness behavior → label: `loop-engineering`; command: `bin/backlog new loop-engineering "<title>"`
 
 **Consolidate.** When one invocation produces two or more findings sharing a
-surface, file ONE issue with a combined body, not N issues. Never
-file zero issues.
+surface, file ONE issue with a combined body, not N issues. In
+`Mode: standalone`, never file zero issues. `Mode: in-PR` files only what
+step 5 lets through.
 
 ## Step 4 — File the backlog issue
 
@@ -132,3 +134,12 @@ Taking the escape does **not** skip the entry. File it anyway, with:
 
 A silent skip is a failure of this procedure. The reasoned verdict is the
 deliverable.
+
+`Mode: in-PR` files an issue only when work outlives the PR. That means a
+`not fixed — filed` row in the step 2 table, or a ladder landing on rungs 1-5.
+When every row is `fixed this pass` and the ladder lands on rung 0 or
+`no gate warranted`, write the five fields into the Phase 7 verdict comment and
+run no `bin/backlog new`. The entry still exists on the PR, so this is not a
+silent skip. A backlog issue for work already done gets closed unread at the
+next triage. The 2026-09-24 triage closed dozens of them, with titles ending
+"fixed in 6.5 remediation" or "corrected in Phase 6.5".

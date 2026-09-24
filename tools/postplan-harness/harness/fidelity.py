@@ -595,6 +595,28 @@ def _norm_title(t: str) -> str:
     return t[:60]
 
 
+_ALREADY_DONE_RE = re.compile(
+    r"\b(?:fixed|corrected|remediated|addressed|resolved|recorded)\b[^.]{0,40}?"
+    r"\b(?:in|by|during)\s+(?:this pr|the pr|pr\s*#?\d+|(?:phase\s*)?6\.5|(?:the\s+)?remediation"
+    r"|(?:the\s+)?(?:pr\s+)?body)\b"
+    r"|\balready\s+(?:fixed|corrected|remediated|addressed|resolved)\b"
+    r"|\bverify before merge\b",
+    re.IGNORECASE)
+
+
+# "not fixed in this PR" / "wasn't yet corrected" names work still owed, so a negation
+# in the few words before the verb cancels the match.
+_NEGATED_RE = re.compile(r"(?:\bnot|\bnever|n't)(?:\s+\w+)?\s*$", re.IGNORECASE)
+
+
+def _says_already_done(text: str) -> bool:
+    """True when a note's own words say its work landed in the PR under review."""
+    for m in _ALREADY_DONE_RE.finditer(text):
+        if not _NEGATED_RE.search(text[max(0, m.start() - 20):m.start()]):
+            return True
+    return False
+
+
 def extract_notes(llm, verdict_path: str, log=None) -> list[dict]:
     """Extract the filable non-blocking notes from a READY WITH NOTES verdict.
 
@@ -602,6 +624,11 @@ def extract_notes(llm, verdict_path: str, log=None) -> list[dict]:
     merge. Anything else (a blessed plan deviation, a PR-copy nit, the reviewer's own
     bookkeeping) is dropped, including a missing or unrecognized kind: dropping is
     fail-closed and matches how this function already handles an LLM failure.
+
+    A `followup` whose own text says the work already happened is dropped too. Haiku
+    kept tagging those `followup` after the four-kind prompt shipped; the 2026-09-24
+    triage closed issues titled "... (fixed in PR #2381)" and "... corrected in Phase
+    6.5 remediation".
     """
     log = log or _noop_log
     try:
@@ -617,10 +644,11 @@ def extract_notes(llm, verdict_path: str, log=None) -> list[dict]:
             return []
         kept = [d for d in raw if isinstance(d, dict)
                 and d.get("title") and d.get("detail")
-                and d.get("kind") == "followup"]
+                and d.get("kind") == "followup"
+                and not _says_already_done(f"{d['title']} {d['detail']}")]
         dropped = len([d for d in raw if isinstance(d, dict)]) - len(kept)
         if dropped:
-            log(f"phase5.5 notes: dropped {dropped} non-followup note(s)")
+            log(f"phase5.5 notes: dropped {dropped} non-followup or already-done note(s)")
         return kept
     except HarnessError:
         return []

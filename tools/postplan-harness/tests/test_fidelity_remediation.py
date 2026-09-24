@@ -298,10 +298,37 @@ def test_extract_notes_keeps_only_followup_kind(tmp_path):
     assert [n["title"] for n in result] == ["Assert the parsed value, not itself"]
 
 
+def test_extract_notes_drops_followups_that_say_already_done(tmp_path):
+    """A followup whose own text says the PR already did the work never files."""
+    notes_fixture = [
+        {"title": "Add fable-5-1 key assertions (fixed in PR #2381)", "kind": "followup",
+         "detail": "bin/test-automouse-cost-rows lacks the key."},
+        {"title": "Assert sorted id-lists in backup tests", "kind": "followup",
+         "detail": "Row counts only. Fixed in 6.5 remediation, file as pattern."},
+        {"title": "Correct the robots.txt scope claim", "kind": "followup",
+         "detail": "The body over-stated it; corrected in Phase 6.5 remediation."},
+        {"title": "Check the VR baseline", "kind": "followup",
+         "detail": "The baseline swept in drift. Verify before merge."},
+        {"title": "Fix the off-by-one in RosterParser", "kind": "followup",
+         "detail": "RosterParser::parse() skips the last row. The PR fixed a sibling bug "
+                   "in DepthChart but this one remains."},
+        {"title": "Skip the last row correctly", "kind": "followup",
+         "detail": "Occurrence 2 was not fixed in this PR; RosterParser still skips it."},
+        {"title": "Guard the empty roster", "kind": "followup",
+         "detail": "This wasn't yet addressed by the remediation. Add the guard."},
+    ]
+    llm = FixtureLlm(UsageLedger(), {"fidelity-notes": notes_fixture})
+    result = fidelity.extract_notes(llm, _verdict(tmp_path, "READY WITH NOTES"))
+    assert [n["title"] for n in result] == ["Fix the off-by-one in RosterParser",
+                                            "Skip the last row correctly",
+                                            "Guard the empty roster"]
+
+
 def test_fidelity_notes_prompt_types_notes_and_drops_when_torn():
-    """The prompt names all four kinds and tells Haiku which way to fall when unsure."""
+    """The prompt names every kind and tells Haiku which way to fall when unsure."""
     prompt = llm_calls.fidelity_notes_prompt("READY WITH NOTES\n\n### Note 1 — cosmetic")
-    for kind in ("followup", "plan-deviation-ok", "pr-copy", "process"):
+    for kind in ("followup", "plan-deviation-ok", "pr-copy", "process",
+                 "done-in-pr", "plan-adherence", "nit"):
         assert kind in prompt
     assert "still worth doing" in prompt
     assert "do NOT call it" in prompt          # the drop-when-torn instruction

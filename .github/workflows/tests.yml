@@ -998,6 +998,8 @@ jobs:
         run: bin/test-automouse-stream-filter
       - name: bin/test-automouse-cost-rows
         run: bin/test-automouse-cost-rows
+      - name: bin/test-automouse-measure-delegate-cost
+        run: bin/test-automouse-measure-delegate-cost
       - name: bin/test-automouse-morning-digest
         run: bin/test-automouse-morning-digest
       - name: bin/test-automouse-postplan-engine

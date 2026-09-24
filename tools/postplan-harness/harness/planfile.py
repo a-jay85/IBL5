@@ -1,4 +1,4 @@
-"""Phase 1 — plan location + parsing (frontmatter, matrix, critical files).
+"""Phase 1 — plan location + parsing (frontmatter, matrix, critical files, backlog issues).
 
 Deterministic port of post-plan SKILL.md Phase 1, Phase 6.5 condition (7)'s
 frontmatter awk, and _phase-5-final-verification.md's matrix/Critical-Files parsing.
@@ -12,6 +12,7 @@ import re
 import sys
 
 from . import manual_rows
+from .classify import BACKLOG_REPO
 from .state import PlanInfo
 
 # Paren-scoped canonical exempt marker. MUST stay behaviorally identical to
@@ -272,6 +273,30 @@ def parse_critical_files(content: str) -> list[tuple]:
     return out
 
 
+_BACKLOG_LINE_RE = re.compile(
+    rf"^\s*[-*]\s+(closes|refs)\s+{re.escape(BACKLOG_REPO)}#(\d+)\b", re.I)
+
+
+def parse_backlog_issues(content: str) -> list[tuple]:
+    """[(kind, number)] from `## Backlog issues`. kind is "closes" or "refs".
+
+    Fenced blocks are stripped first so a grammar example inside a fence never
+    yields a phantom close. Bullets that do not match the grammar are skipped
+    silently; bin/check-plan rejects them at plan time. Deduped by number in
+    first-seen order; when one number appears as both kinds, "closes" wins.
+    """
+    section = _section("\n".join(_strip_fenced(content)), r"Backlog issues")
+    kinds: dict[int, str] = {}
+    for line in section.splitlines():
+        m = _BACKLOG_LINE_RE.match(line)
+        if not m:
+            continue
+        kind, num = m.group(1).lower(), int(m.group(2))
+        if kinds.get(num) != "closes":
+            kinds[num] = kind
+    return [(k, n) for n, k in kinds.items()]
+
+
 def parse_required_test_methods(content: str) -> list[str]:
     """List of bare method names from `## Required Test Methods` (fenced blocks stripped).
 
@@ -456,6 +481,7 @@ def locate_plan(slug: str, plans_dir: str | None = None, explicit_path: str | No
         info.planned_test_paths, info.truly_manual_rows = parse_matrix(content)
     info.critical_files = parse_critical_files(content)
     info.required_test_methods = parse_required_test_methods(content)
+    info.backlog_issues = parse_backlog_issues(content)
     if info.has_security:
         info.security_section = _section(content, "Security")[:4000]
     if info.has_reuse:

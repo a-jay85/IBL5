@@ -17,6 +17,17 @@ use Security\HtmlSanitizer;
 class ApiKeysView implements ApiKeysViewInterface
 {
     /**
+     * A ?key= URL lands in the web server's access log. Google Sheets IMPORTDATA
+     * cannot send headers, so the URL form stays supported; this tells the user.
+     */
+    private const URL_KEY_NOTICE = '<div class="ibl-alert ibl-alert--info mb-6">'
+        . '<strong>Your key is part of this URL.</strong> '
+        . 'The web server logs every URL it serves, so it records the key too. Only paste the formula into a sheet you trust. '
+        . 'Scripts and other tools should send the key in an <code>X-API-Key</code> header instead. '
+        . 'If the URL gets shared, revoke the key and generate a new one.'
+        . '</div>';
+
+    /**
      * @see ApiKeysViewInterface::renderNoKeyState()
      */
     public function renderNoKeyState(): string
@@ -68,6 +79,8 @@ class ApiKeysView implements ApiKeysViewInterface
             <p class="text-sm text-gray-600 mb-2">Paste this into any cell in Google Sheets to import the full player database:</p>
             <input type="text" class="ibl-input" value="=IMPORTDATA(&quot;<?= HtmlSanitizer::e($exportUrl) ?>&quot;)" readonly onclick="this.select()">
         </div>
+
+        <?= self::URL_KEY_NOTICE ?>
 
         <a href="modules.php?name=ApiKeys" class="ibl-btn ibl-btn--primary">Done</a>
     </div>
@@ -148,7 +161,8 @@ class ApiKeysView implements ApiKeysViewInterface
 
         <h3 class="mb-2">Manual Formula</h3>
         <p class="mb-4">If you already have your API key, paste this into a Google Sheets cell (replace <code>YOUR_KEY</code> with your actual key):</p>
-        <pre class="ibl-code-block mb-6">=IMPORTDATA("https://iblhoops.net/ibl5/api/v1/players/export?key=YOUR_KEY")</pre>
+        <pre class="ibl-code-block mb-4">=IMPORTDATA("https://iblhoops.net/ibl5/api/v1/players/export?key=YOUR_KEY")</pre>
+        <?= self::URL_KEY_NOTICE ?>
 
         <h3 class="mb-2">Column Reference</h3>
         <table class="ibl-data-table mb-6">

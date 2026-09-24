@@ -9,6 +9,16 @@
 [extend]
 useDefault = true
 
+# IBL5 API keys: "ibl_" + 32 hex chars (ApiKeys\ApiKeysService::generateKeyForUser()).
+# The default generic-api-key rule only catches one in a `key=` assignment. This
+# rule catches the bare token wherever it lands, e.g. a pasted access-log line or
+# a hardcoded Google Sheets URL.
+[[rules]]
+id = "ibl5-api-key"
+description = "IBL5 API key"
+regex = '''\bibl_[0-9a-f]{32}\b'''
+keywords = ["ibl_"]
+
 [allowlist]
 description = "Rotated/scrubbed credential, synthetic fixtures, placeholders, deleted-legacy history"
 

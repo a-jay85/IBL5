@@ -1,6 +1,6 @@
 ---
 description: All work happens in a worktree (never the main checkout); where plans live (~/claude-plans/<branch-slug>.md, outside the repo); worktree setup (hostname stub → worktree-hostname.md, squash-merge stub → linear-history-squash-merge.md); and post-plan handoff triggers. Engine internals: workflow-continuity-detail.md.
-last_verified: 2026-09-17
+last_verified: 2026-09-24
 ---
 
 # Workflow Continuity Rule
@@ -43,13 +43,15 @@ That worktree's Docker hostname is `<slug>.localhost`, where slug = `basename "$
 
 Never run `/post-plan` **inline** — it re-reads full implementation context every phase, so an inline run after a long session (especially Opus) costs several times a fresh run. Run it in a **fresh** session, cwd = this worktree.
 
-For **any** verified-complete unit of work in a worktree — plan-driven **or ad-hoc** — when it has verified clean and only the mechanical push + open-PR remains, that ship step needs **no** confirmation prompt. Do **not** ask "want me to push and open the PR?". The global "confirm before outward-facing actions" default is **durably overridden here**: shipping verified-complete worktree work is pre-authorized. Final action:
+**Plan-driven work** (session has a `/plan`): when verified clean, fire `bin/post-plan-now --auto` with no confirmation prompt. The "confirm before outward-facing actions" default is **durably overridden** for plan-driven work. Shipping is pre-authorized.
+
+**Ad-hoc work** (no plan): when verified clean, commit with `/commit-commands:commit` and stop. Do not fire post-plan or suggest shipping. Ships only when the user arms the branch (`touch "$(git rev-parse --absolute-git-dir)/postplan-ready"`) or tells you to ship. Never create the marker yourself. A skill ending in shipping (e.g. `/fix-and-prevent`, `/ship`) is the instruction. When armed or told, fire `bin/post-plan-now --auto` on the dirty tree:
 
 ```bash
 bin/post-plan-now --auto
 ```
 
-- **Do NOT commit first.** Leave the worktree **dirty** — `/post-plan` commits the uncommitted tree in Phase 2 and opens the PR. Committing here changes what it ships.
-- **Only fire when verification passed.** If implementation did **not** verify clean (failing tests, unresolved blocker, you stopped to ask the user something), do **not** fire — leave the worktree dirty and hand off in prose. Turn-end ≠ done; that judgment is yours.
+- **Do NOT commit first.** Leave the worktree **dirty**. `/post-plan` commits the uncommitted tree in Phase 2 and opens the PR. Committing here changes what it ships.
+- **Only fire when verification passed.** If implementation did **not** verify clean (failing tests, unresolved blocker, you stopped to ask the user something), do **not** fire. Leave the worktree dirty and hand off in prose. Turn-end is not done; that judgment is yours.
 
 Engine (harness vs. Sonnet skill fallback), what `--auto`'s skip gate does, plan-blind ad-hoc runs, and where auto-merge is armed: `.claude/rules/workflow-continuity-detail.md`.

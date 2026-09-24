@@ -253,6 +253,7 @@ class DepthChartEntryProcessorTest extends TestCase
     {
         $playerData = [
             [
+                'pid' => 0,
                 'name' => 'Player One',
                 'pg' => 1,
                 'sg' => 0,
@@ -364,6 +365,7 @@ class DepthChartEntryProcessorTest extends TestCase
     {
         $playerData = [
             [
+                'pid' => 0,
                 'name' => 'Player, Jr.',
                 'pg' => 1,
                 'sg' => 0,
@@ -495,6 +497,7 @@ class DepthChartEntryProcessorTest extends TestCase
     {
         $playerData = [
             [
+                'pid' => 0,
                 'name' => 'Player 1',
                 'pg' => 1,
                 'sg' => 0,
@@ -511,6 +514,7 @@ class DepthChartEntryProcessorTest extends TestCase
                 'injury' => 0,
             ],
             [
+                'pid' => 0,
                 'name' => 'Player 2',
                 'pg' => 0,
                 'sg' => 1,
@@ -690,6 +694,7 @@ class DepthChartEntryProcessorTest extends TestCase
     {
         $playerData = [
             [
+                'pid' => 0,
                 'name' => 'Test Player',
                 'pg' => 1,
                 'sg' => 2,
@@ -832,5 +837,47 @@ class DepthChartEntryProcessorTest extends TestCase
 
         $headerColumns = str_getcsv(explode("\n", $csv)[0], ',', '"', '');
         $this->assertSame('SF', $headerColumns[3]);
+    }
+
+    public function testIgnoresRowsBeyondMaxPlayers(): void
+    {
+        $postData = [];
+        for ($i = 1; $i <= 16; $i++) {
+            $postData["Name$i"] = "Player $i";
+            $postData["pg$i"] = '1';
+            $postData["sg$i"] = '0';
+            $postData["sf$i"] = '0';
+            $postData["pf$i"] = '0';
+            $postData["c$i"] = '0';
+            $postData["canPlayInGame$i"] = '1';
+            $postData["min$i"] = '20';
+            $postData["Injury$i"] = '0';
+        }
+        $result = $this->processor->processSubmission($postData, 15);
+        $this->assertCount(15, $result['playerData']);
+    }
+
+    public function testExtractsPidFromPost(): void
+    {
+        $postData = ['Name1' => 'A', 'pid1' => '4321', 'pg1' => '1', 'sg1' => '0', 'sf1' => '0', 'pf1' => '0', 'c1' => '0', 'canPlayInGame1' => '1', 'min1' => '20', 'Injury1' => '0'];
+        $result = $this->processor->processSubmission($postData, 15);
+        $this->assertSame(4321, $result['playerData'][0]['pid']);
+    }
+
+    public function testMissingOrNonNumericPidBecomesZero(): void
+    {
+        $postData = [
+            'Name1' => 'Player One',
+            'pg1' => '1', 'sg1' => '0', 'sf1' => '0', 'pf1' => '0', 'c1' => '0',
+            'canPlayInGame1' => '1', 'min1' => '20', 'Injury1' => '0',
+            // pid1 intentionally absent
+            'Name2' => 'Player Two',
+            'pid2' => 'abc',
+            'pg2' => '2', 'sg2' => '0', 'sf2' => '0', 'pf2' => '0', 'c2' => '0',
+            'canPlayInGame2' => '1', 'min2' => '20', 'Injury2' => '0',
+        ];
+        $result = $this->processor->processSubmission($postData, 15);
+        $this->assertSame(0, $result['playerData'][0]['pid']);
+        $this->assertSame(0, $result['playerData'][1]['pid']);
     }
 }

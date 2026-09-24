@@ -36,24 +36,14 @@ interface DepthChartEntryRepositoryInterface
     public function getPlayersOnTeam(int $teamid);
 
     /**
-     * Update a player's depth chart configuration across all positions
-     * 
-     * Updates all depth chart-related fields for a single player by name.
-     * Performs bulk update with 12 separate UPDATE statements, one per field.
-     * Returns success/failure status for all updates combined.
-     * 
-     * @param string $playerName Player name (used as lookup key in WHERE clause)
-     * @param DepthChartValues $depthChartValues Validated depth chart values
-     * 
-     * @return bool True if all 12 updates succeeded, false if any update failed
-     * 
-     * **Important Behaviors:**
-     * - Sanitizes player name via DatabaseService::escapeString() to prevent SQL injection
-     * - All numeric values converted to int before query construction
-     * - Returns false immediately on first query failure (transactional integrity)
-     * - Uses single-step string escaping (legacy mode - compatible with php-nuke db layer)
+     * Single prepared UPDATE ibl_plr keyed by pid AND teamid.
+     *
+     * @param int $pid Player id (WHERE clause key)
+     * @param int $teamid Session-derived team; a pid on another team matches no row
+     * @param DepthChartValues $depthChartValues
+     * @return bool True when the statement executed (0 affected rows still returns true)
      */
-    public function updatePlayerDepthChart(string $playerName, array $depthChartValues): bool;
+    public function updatePlayerDepthChart(int $pid, int $teamid, array $depthChartValues): bool;
 
     /**
      * Update team timestamps for depth chart submissions

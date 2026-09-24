@@ -250,4 +250,69 @@ class DepthChartEntryValidatorTest extends TestCase
         $this->assertSame('multiple_starting_positions', $errors[0]['type']);
         $this->assertStringContainsString('John Doe', $errors[0]['message']);
     }
+
+    public function testValidateRosterAcceptsExactMatchInAnyOrder(): void
+    {
+        $validator = new DepthChartEntryValidator();
+        $result = $validator->validateRoster([3, 1, 2], [1, 2, 3]);
+        $this->assertTrue($result);
+        $this->assertSame([], $validator->getErrors());
+    }
+
+    public function testValidateRosterRejectsForeignPid(): void
+    {
+        $validator = new DepthChartEntryValidator();
+        $result = $validator->validateRoster([1, 2, 999], [1, 2, 3]);
+        $this->assertFalse($result);
+        $types = array_column($validator->getErrors(), 'type');
+        $this->assertContains('roster_foreign_pid', $types);
+        $this->assertContains('roster_missing_pid', $types);
+        $foreignError = array_values(array_filter($validator->getErrors(), static fn (array $e): bool => $e['type'] === 'roster_foreign_pid'))[0];
+        $this->assertStringContainsString('999', $foreignError['message']);
+        $missingError = array_values(array_filter($validator->getErrors(), static fn (array $e): bool => $e['type'] === 'roster_missing_pid'))[0];
+        $this->assertStringContainsString('3', $missingError['message']);
+    }
+
+    public function testValidateRosterRejectsDuplicatePid(): void
+    {
+        $validator = new DepthChartEntryValidator();
+        $result = $validator->validateRoster([1, 1, 2], [1, 2, 3]);
+        $this->assertFalse($result);
+        $types = array_column($validator->getErrors(), 'type');
+        $this->assertContains('roster_duplicate_pid', $types);
+        $dupError = array_values(array_filter($validator->getErrors(), static fn (array $e): bool => $e['type'] === 'roster_duplicate_pid'))[0];
+        $this->assertStringEndsWith('(pid: 1).', $dupError['message']);
+    }
+
+    public function testValidateRosterRejectsOmittedRosterPid(): void
+    {
+        $validator = new DepthChartEntryValidator();
+        $result = $validator->validateRoster([1, 2], [1, 2, 3, 4]);
+        $this->assertFalse($result);
+        $types = array_column($validator->getErrors(), 'type');
+        $this->assertContains('roster_missing_pid', $types);
+        $this->assertNotContains('roster_foreign_pid', $types);
+        $missingError = array_values(array_filter($validator->getErrors(), static fn (array $e): bool => $e['type'] === 'roster_missing_pid'))[0];
+        $this->assertStringContainsString('3, 4', $missingError['message']);
+    }
+
+    public function testValidateRosterRejectsPidZeroAsForeign(): void
+    {
+        $validator = new DepthChartEntryValidator();
+        $result = $validator->validateRoster([0, 2, 3], [1, 2, 3]);
+        $this->assertFalse($result);
+        $types = array_column($validator->getErrors(), 'type');
+        $this->assertContains('roster_foreign_pid', $types);
+        $foreignError = array_values(array_filter($validator->getErrors(), static fn (array $e): bool => $e['type'] === 'roster_foreign_pid'))[0];
+        $this->assertStringContainsString('0', $foreignError['message']);
+    }
+
+    public function testValidateRosterErrorsRenderThroughHtml(): void
+    {
+        $validator = new DepthChartEntryValidator();
+        $validator->validateRoster([1, 2, 999], [1, 2, 3]);
+        $html = $validator->getErrorMessagesHtml();
+        $this->assertStringContainsString('not on your roster', $html);
+        $this->assertStringContainsString('<strong>', $html);
+    }
 }

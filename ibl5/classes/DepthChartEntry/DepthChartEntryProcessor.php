@@ -41,6 +41,7 @@ class DepthChartEntryProcessor implements DepthChartEntryProcessorInterface
             /** @var string $rawName */
             $rawName = $postData['Name' . $i];
             $player = [
+                'pid' => $this->extractIntValue($postData, 'pid' . $i),
                 'name' => $this->sanitizePlayerName($rawName),
                 'pg' => $this->sanitizeDepthValue($this->extractIntValue($postData, 'pg' . $i)),
                 'sg' => $this->sanitizeDepthValue($this->extractIntValue($postData, 'sg' . $i)),

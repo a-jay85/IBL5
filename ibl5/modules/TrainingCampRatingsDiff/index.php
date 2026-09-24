@@ -34,9 +34,10 @@ $repository = new TrainingCampRatingsDiffRepository($mysqli_db);
 $service    = new TrainingCampRatingsDiffService($repository, $season->endingYear);
 $view       = new TrainingCampRatingsDiffView();
 
-$baselineYear = $service->getBaselineYear($overrideYear);
+$baselineYear  = $service->getBaselineYear($overrideYear);
+$baselinePhase = $service->getBaselinePhase($overrideYear);
 $rows = $service->getDiffs($overrideYear, $filterTid, $filterStatus);
 
 PageLayout\PageLayout::header();
-echo $view->render($baselineYear, $rows, $filterStatus);
+echo $view->render($baselineYear, $baselinePhase, $rows, $filterStatus);
 PageLayout\PageLayout::footer();

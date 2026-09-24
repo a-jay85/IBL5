@@ -741,3 +741,37 @@ def test_ghshim_pr_body_fresh_empty_on_gh_failure(monkeypatch):
         lambda argv, **kw: types.SimpleNamespace(returncode=1, stdout="junk", stderr="boom"),
     )
     assert mt._GhShim(42).pr_body_fresh() == ""
+
+
+# ---------------------------------------------------------------------------
+# LiveGh seam: confirm() re-fetches after a harness write
+# ---------------------------------------------------------------------------
+
+def test_confirm_with_live_gh_refetches_after_harness_write(tmp_path, monkeypatch):
+    import json as _json
+    from harness.adapters.ghad import LiveGh
+
+    gh = LiveGh(str(tmp_path), str(tmp_path), "some-branch")
+    github = {"body": BODY_ONE_ROW}
+    views = []
+
+    def fake_gh(*args, input_text=None):
+        if args[:2] == ("pr", "view"):
+            views.append(args)
+            return _json.dumps({"number": 7, "title": "t", "body": github["body"],
+                                "headRefOid": "abc", "labels": [], "state": "OPEN"})
+        return ""
+
+    monkeypatch.setattr(gh, "_gh", fake_gh)
+
+    gh.pr_edit_body(7, BODY_ONE_ROW)          # runner.py:497 write, sets _body_override
+    github["body"] = BODY_ONE_ROW_TICKED      # tick-rows.sh out of band
+    errors: list[str] = []
+    confirmed, all_ticked = mt.confirm(gh, ["Row 1"], errors)
+    assert confirmed == ["Row 1"]
+    assert all_ticked is True
+    assert errors == []
+    assert len(views) == 1
+    # runner.py:585 and :674 call pr_body() next; served from refilled _meta, no extra view
+    assert "- [x] **Row 1**" in gh.pr_body()
+    assert len(views) == 1

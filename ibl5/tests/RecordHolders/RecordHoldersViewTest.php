@@ -598,6 +598,31 @@ final class RecordHoldersViewTest extends TestCase
      * renderCategoryTable extraction. Golden captured from pre-extraction
      * behavior; a single shared helper must reproduce it exactly.
      */
+    public function testAllStarBlockLinksToFullAppearancesList(): void
+    {
+        $records = $this->createMinimalRecords();
+        $records['allStarRecord'] = [
+            'name' => 'Mitch Richmond',
+            'pid' => 304,
+            'teams' => 'sac',
+            'teamTids' => '21',
+            'amount' => 6,
+            'years' => '1993, 1994',
+        ];
+
+        $html = $this->view->render($records);
+
+        $link = 'modules.php?name=RecordHolders&amp;op=allstar';
+        $this->assertStringContainsString($link, $html);
+        $this->assertSame(1, substr_count($html, $link));
+
+        $allStarHeadingOffset = strpos($html, 'Most All-Star Appearances');
+        $linkOffset = strpos($html, $link);
+        $this->assertNotFalse($allStarHeadingOffset);
+        $this->assertNotFalse($linkOffset);
+        $this->assertGreaterThan($allStarHeadingOffset, $linkOffset);
+    }
+
     public function testRenderGoldenOutputUnchanged(): void
     {
         $html = $this->view->render($this->createComprehensiveRecords());

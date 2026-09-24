@@ -64,7 +64,7 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
                     ['label' => 'Schedule', 'url' => 'modules.php?name=Schedule'],
                     ['label' => 'Injuries', 'url' => 'modules.php?name=Injuries'],
                     ['label' => 'Player Database', 'url' => 'modules.php?name=PlayerDatabase'],
-                    ['label' => 'Player Export', 'url' => 'modules.php?name=PlayerExportGuide'],
+                    ['label' => 'Player Export', 'url' => 'modules.php?name=ApiKeys'],
                     ['label' => 'Cap Space', 'url' => 'modules.php?name=CapSpace'],
                     $this->config->isDraftOrderFinalized
                         ? ($this->config->seasonPhase === 'Draft'
@@ -98,7 +98,7 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
                     ['label' => 'Award History', 'url' => 'modules.php?name=AwardHistory'],
                     ['label' => 'Record Holders', 'url' => 'modules.php?name=RecordHolders'],
                     ['label' => 'Franchise Record Book', 'url' => 'modules.php?name=FranchiseRecordBook'],
-                    ['label' => 'All-Star Appearances', 'url' => 'modules.php?name=AllStarAppearances'],
+                    ['label' => 'All-Star Appearances', 'url' => 'modules.php?name=RecordHolders&op=allstar'],
                     ['label' => 'Season Leaderboards', 'url' => 'modules.php?name=SeasonLeaderboards'],
                     ['label' => 'Career Leaderboards', 'url' => 'modules.php?name=CareerLeaderboards'],
                     ['label' => 'Season Archive', 'url' => 'modules.php?name=SeasonArchive'],
@@ -209,10 +209,6 @@ class NavigationMenuBuilder implements NavigationMenuBuilderInterface
             ['label' => 'Trading', 'url' => 'modules.php?name=Trading&op=reviewtrade'],
             ['label' => 'Voting', 'url' => 'modules.php?name=Voting'],
         ];
-
-        if ($this->config->isAdmin) {
-            $links[] = ['label' => 'Voting Results', 'url' => 'modules.php?name=VotingResults'];
-        }
 
         $links[] = ['label' => 'Draft History', 'url' => 'modules.php?name=DraftHistory&teamid=' . $teamId];
 

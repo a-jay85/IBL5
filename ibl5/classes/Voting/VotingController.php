@@ -17,6 +17,7 @@ class VotingController implements VotingControllerInterface
         private \Utilities\NukeCompat $nukeCompat,
         private \Auth\Contracts\AuthServiceInterface $authService,
         private \Repositories\Contracts\TeamIdentityRepositoryInterface $teamIdentityRepository,
+        private ?\Voting\Contracts\VotingResultsControllerInterface $resultsController = null,
     ) {}
 
     public function main(mixed $user): void
@@ -183,6 +184,9 @@ class VotingController implements VotingControllerInterface
             ? '<h1 class="ibl-title">All-Star Game Ballot</h1>'
             : '<h1 class="ibl-title">End-of-Year Awards Ballot</h1>');
         $responder->html($this->ballotView->renderBallotForm($formAction, $voterTeamName, $teamid, $season->phase, $categories));
+        if ($this->resultsController !== null && $this->authService->isAdmin()) {
+            $responder->html($this->ballotView->renderResultsExpander($this->resultsController->render()));
+        }
         \PageLayout\PageLayout::footer();
     }
 }

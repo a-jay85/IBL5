@@ -2,39 +2,10 @@
 
 declare(strict_types=1);
 
-use Voting\VotingRepository;
-use Voting\VotingResultsController;
-use Voting\VotingResultsService;
-use Voting\VotingResultsView;
-
-/************************************************************************/
-/* PHP-NUKE: Web Portal System                                          */
-/* ===========================                                          */
-/*                                                                      */
-/* Copyright (c) 2006 by Francisco Burzi                                */
-/* http://phpnuke.org                                                   */
-/*                                                                      */
-/* This program is free software. You can redistribute it and/or modify */
-/* it under the terms of the GNU General Public License as published by */
-/* the Free Software Foundation; either version 2 of the License.       */
-/************************************************************************/
-
-if (stripos($_SERVER['PHP_SELF'], "modules.php") === false) {
+// Retired module: redirects to its new home. See Module\ModuleRedirect::TARGETS.
+if (!defined('MODULE_FILE')) {
     die("You can't access this file directly...");
 }
 
-$module_name = basename(dirname(__FILE__));
-get_lang($module_name);
-
-PageLayout\PageLayout::header();
-
-global $mysqli_db;
-$season = new \Season\Season($mysqli_db);
-$repository = new VotingRepository($mysqli_db);
-$service = new VotingResultsService($repository);
-$renderer = new VotingResultsView();
-$controller = new VotingResultsController($service, $renderer, $season);
-
-echo $controller->render();
-
-PageLayout\PageLayout::footer();
+\Module\ModuleRedirect::send('VotingResults');
+return;

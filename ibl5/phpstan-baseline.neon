@@ -397,6 +397,12 @@ parameters:
 			path: classes/Migration/SchemaValidator.php
 
 		-
+			rawMessage: 'header() is banned outside Bootstrap classes, Responders, and HTMX ApiHandlers. Route response headers through a Responder (composed by the Controller/ApiHandler).'
+			identifier: ibl.directHeader
+			count: 1
+			path: classes/Module/ModuleRedirect.php
+
+		-
 			rawMessage: 'ORDER BY on rendered/LIMIT-cut output must end in a unique tiebreaker column (e.g. append ", pid ASC"); final sort term "team_city" is not a recognized-unique column. See ADR-0083. Acknowledge a genuine exception with // @phpstan-ignore ibl.orderByMissingTiebreaker.'
 			identifier: ibl.orderByMissingTiebreaker
 			count: 1
@@ -1289,6 +1295,18 @@ parameters:
 			path: classes/Updater/Steps/AutoSeedOlympicsTeamInfoStep.php
 
 		-
+			rawMessage: Deprecated HTML tag `<i>` found in string literal. Use <em> instead.
+			identifier: ibl.deprecatedHtmlTag
+			count: 1
+			path: classes/Voting/VotingBallotView.php
+
+		-
+			rawMessage: 'Inline `style="..."` attributes are banned in PHP. Move CSS to ibl5/design/components/. Exception: `style="--foo: ..."` CSS custom properties are allowed.'
+			identifier: ibl.inlineCss
+			count: 1
+			path: classes/Voting/VotingBallotView.php
+
+		-
 			rawMessage: 'SQL string concatenates a non-constant value. Concatenating a runtime value into query text risks SQL injection. Use bound parameters (?) for values, and a validated allowlist/match() for identifiers (table/column names).'
 			identifier: ibl.sqlStringConcatenation
 			count: 4
@@ -1335,18 +1353,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: modules/ActivityTracker/index.php
-
-		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/AllStarAppearances/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class AllStarAppearances\AllStarAppearancesRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/AllStarAppearances/index.php
 
 		-
 			rawMessage: 'Parameter #1 $db of class ApiKeys\ApiKeysRepository constructor expects mysqli, mixed given.'
@@ -2990,12 +2996,6 @@ parameters:
 			path: modules/PlayerDatabase/index.php
 
 		-
-			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/PlayerExportGuide/index.php
-
-		-
 			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
 			identifier: ibl.bannedNukeGlobal
 			count: 1
@@ -3046,6 +3046,12 @@ parameters:
 		-
 			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
 			identifier: ibl.bannedNukeGlobal
+			count: 1
+			path: modules/RecordHolders/index.php
+
+		-
+			rawMessage: 'Parameter #1 $db of class AllStarAppearances\AllStarAppearancesRepository constructor expects mysqli, mixed given.'
+			identifier: argument.type
 			count: 1
 			path: modules/RecordHolders/index.php
 
@@ -3716,6 +3722,12 @@ parameters:
 			path: modules/Voting/index.php
 
 		-
+			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
+			identifier: argument.type
+			count: 1
+			path: modules/Voting/index.php
+
+		-
 			rawMessage: 'Parameter #1 $db of class Voting\VotingBallotService constructor expects mysqli, mixed given.'
 			identifier: argument.type
 			count: 1
@@ -3744,30 +3756,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: modules/Voting/index.php
-
-		-
-			rawMessage: 'Direct get_lang() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'
-			identifier: ibl.bannedNukeGlobal
-			count: 1
-			path: modules/VotingResults/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Season\Season constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/VotingResults/index.php
-
-		-
-			rawMessage: 'Parameter #1 $db of class Voting\VotingRepository constructor expects mysqli, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/VotingResults/index.php
-
-		-
-			rawMessage: 'Parameter #1 $haystack of function stripos expects string, mixed given.'
-			identifier: argument.type
-			count: 1
-			path: modules/VotingResults/index.php
 
 		-
 			rawMessage: 'Direct cookiedecode() calls are banned. Use Utilities\NukeCompat adapter instead (injectable, mockable).'

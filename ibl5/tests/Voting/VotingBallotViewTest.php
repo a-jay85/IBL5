@@ -173,4 +173,27 @@ class VotingBallotViewTest extends TestCase
 
         $this->assertStringContainsString('ShowAndHideMVP', $html);
     }
+
+    public function testRenderResultsExpanderEmitsToggleAndHint(): void
+    {
+        $html = $this->view->renderResultsExpander('<p>RESULTS</p>');
+
+        $this->assertStringContainsString('ShowAndHideResults', $html);
+        $this->assertStringContainsString('Voting Results', $html);
+        $this->assertStringContainsString('<i>Tap/click to reveal/hide results.</i>', $html);
+        $this->assertStringContainsString('<p>RESULTS</p>', $html);
+    }
+
+    public function testRenderResultsExpanderStartsCollapsed(): void
+    {
+        $html = $this->view->renderResultsExpander('<p>RESULTS</p>');
+
+        // Same hidden-state convention the category candidate tables use.
+        $this->assertStringContainsString('id="Results" style="display:none"', $html);
+        $this->assertLessThan(
+            strpos($html, '<p>RESULTS</p>'),
+            strpos($html, 'id="Results"'),
+            'The results html belongs inside the collapsed container.'
+        );
+    }
 }

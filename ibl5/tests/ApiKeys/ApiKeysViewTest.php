@@ -96,7 +96,7 @@ class ApiKeysViewTest extends TestCase
         $this->assertStringContainsString('Never', $html);
     }
 
-    public function testRenderActiveKeyStateLinksToExportGuide(): void
+    public function testRenderActiveKeyStateHasNoRetiredGuideLink(): void
     {
         if (session_status() === PHP_SESSION_NONE) {
             session_start();
@@ -113,6 +113,22 @@ class ApiKeysViewTest extends TestCase
 
         $html = $this->view->renderActiveKeyState($keyStatus);
 
-        $this->assertStringContainsString('PlayerExportGuide', $html);
+        // The guide now renders below this card, so the old cross-module button is gone.
+        $this->assertStringNotContainsString('PlayerExportGuide', $html);
+    }
+
+    public function testRenderExportGuideContainsColumnReferenceTable(): void
+    {
+        $html = $this->view->renderExportGuide();
+
+        $this->assertStringContainsString('Column Reference', $html);
+        $this->assertStringContainsString('<table', $html);
+    }
+
+    public function testRenderExportGuideHasNoSelfLinkToApiKeys(): void
+    {
+        $html = $this->view->renderExportGuide();
+
+        $this->assertStringNotContainsString('name=ApiKeys', $html);
     }
 }

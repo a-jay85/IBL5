@@ -6,11 +6,14 @@ declare(strict_types=1);
  * Record_Holders Module - Display all-time IBL records
  *
  * Shows record holders for regular season, playoffs, H.E.A.T.,
- * and team records across all IBL history.
+ * and team records across all IBL history. With op=allstar, shows
+ * the full all-star appearances list.
  *
  * @see RecordHolders\RecordHoldersRepository For database queries
  * @see RecordHolders\RecordHoldersService For business logic
  * @see RecordHolders\RecordHoldersView For HTML rendering
+ * @see AllStarAppearances\AllStarAppearancesRepository For all-star queries
+ * @see AllStarAppearances\AllStarAppearancesView For all-star rendering
  */
 
 if (!defined('MODULE_FILE')) {
@@ -26,20 +29,26 @@ use RecordHolders\RecordHoldersView;
 $module_name = basename(dirname(__FILE__));
 get_lang($module_name);
 
-$pagetitle = '- Record Holders';
+$rawOp = $_GET['op'] ?? null;
+$op = (is_string($rawOp) && $rawOp === 'allstar') ? 'allstar' : 'records';
+
+$pagetitle = $op === 'allstar' ? '- All-Star Appearances' : '- Record Holders';
 
 global $mysqli_db, $leagueContext;
 
-$repository = new RecordHoldersRepository($mysqli_db, $leagueContext);
-$innerService = new RecordHoldersService($repository);
-$cache = new DatabaseCache($mysqli_db);
-$service = new CachedRecordHoldersService($innerService, $cache);
-$view = new RecordHoldersView();
-
-$records = $service->getAllRecords();
-
 PageLayout\PageLayout::header();
 
-echo $view->render($records);
+if ($op === 'allstar') {
+    $appearancesRepository = new \AllStarAppearances\AllStarAppearancesRepository($mysqli_db);
+    $appearancesView = new \AllStarAppearances\AllStarAppearancesView();
+    echo $appearancesView->render($appearancesRepository->getAllStarAppearances());
+} else {
+    $repository = new RecordHoldersRepository($mysqli_db, $leagueContext);
+    $innerService = new RecordHoldersService($repository);
+    $cache = new DatabaseCache($mysqli_db);
+    $service = new CachedRecordHoldersService($innerService, $cache);
+    $view = new RecordHoldersView();
+    echo $view->render($service->getAllRecords());
+}
 
 PageLayout\PageLayout::footer();

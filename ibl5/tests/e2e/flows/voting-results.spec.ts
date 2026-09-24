@@ -1,68 +1,84 @@
 import { test, expect } from '../fixtures/auth';
+import { test as nonAdminTest } from '../fixtures/auth-regular';
+import { test as anonTest } from '../fixtures/public';
 import { assertNoPhpErrors } from '../helpers/php-errors';
 import { gotoWithRetry } from '../helpers/navigation';
 
-// VotingResults — authenticated (needs appState for phase control).
+// Voting Results is no longer its own module. It renders as a collapsed,
+// admin-only expander on the Voting ballot page, and the old module URL
+// answers 302. See Module\ModuleRedirect::TARGETS.
 
-test.describe('Voting Results — Regular Season (ASG)', () => {
+test.describe('Voting Results expander — admin', () => {
   test.beforeEach(async ({ appState, page }) => {
     await appState({ 'Current Season Phase': 'Regular Season' });
-    await gotoWithRetry(page, 'modules.php?name=VotingResults');
+    await gotoWithRetry(page, 'modules.php?name=Voting');
   });
 
-  test('shows ASG category tables', async ({ page }) => {
-    await expect(page.locator('.voting-results-table').first()).toBeVisible();
-  });
-
-  test('has at least 4 ASG category titles', async ({ page }) => {
-    const titles = page.locator('.ibl-title');
-    expect(await titles.count()).toBeGreaterThanOrEqual(4);
-
-    // Should contain Eastern/Western conference category names
-    const allText = await titles.allTextContents();
-    const joined = allText.join(' ');
-    expect(joined).toMatch(/Eastern|Western/i);
-  });
-
-  test('tables have Player and Votes columns', async ({ page }) => {
-    const firstTable = page.locator('.voting-results-table').first();
-    const headers = firstTable.locator('thead th');
-    await expect(headers).toHaveCount(2);
-    await expect(headers.nth(0)).toContainText('Player');
-    await expect(headers.nth(1)).toContainText('Votes');
-  });
-
-  test('player cells have pid= links', async ({ page }) => {
+  test('expander header is visible and results start collapsed', async ({ page }) => {
     await expect(
-      page.locator('.voting-results-table a[href*="pid="]').first()
+      page.locator('.voting-category-title', { hasText: 'Voting Results' }),
     ).toBeVisible();
+    await expect(page.locator('#Results')).toBeHidden();
+  });
+
+  test('clicking the header reveals then hides the results', async ({ page }) => {
+    const header = page.locator('[onclick="ShowAndHideResults()"]');
+    const results = page.locator('#Results');
+
+    await header.click();
+    await expect(results).toBeVisible();
+
+    await header.click();
+    await expect(results).toBeHidden();
   });
 
   test('no PHP errors', async ({ page }) => {
-    await assertNoPhpErrors(page, 'on VotingResults Regular Season');
+    await assertNoPhpErrors(page, 'on Voting ballot with admin results expander');
   });
 });
 
-test.describe('Voting Results — Off-Season (EOY)', () => {
-  test.beforeEach(async ({ appState, page }) => {
-    await appState({ 'Current Season Phase': 'Off-Season' });
-    await gotoWithRetry(page, 'modules.php?name=VotingResults');
-  });
+nonAdminTest.describe('Voting Results expander — regular GM', () => {
+  // e2e-hygiene-allow: CI-config env gating — auth-regular.setup.ts also skips when IBL_TEST_USER_REGULAR is unset, so regular.json is absent or stale and these assertions would run against an unauthenticated session
+  nonAdminTest.skip(
+    !process.env.IBL_TEST_USER_REGULAR || !process.env.IBL_TEST_PASS_REGULAR,
+    'IBL_TEST_USER_REGULAR / IBL_TEST_PASS_REGULAR not set — regular.json is not freshly authenticated',
+  );
 
-  test('shows EOY award tables', async ({ page }) => {
-    const tables = page.locator('.voting-results-table');
-    expect(await tables.count()).toBeGreaterThanOrEqual(4);
-  });
+  nonAdminTest('ballot renders without any results expander', async ({ appState, page }) => {
+    await appState({ 'Current Season Phase': 'Regular Season' });
+    await page.goto('modules.php?name=Voting');
+    await assertNoPhpErrors(page, 'on Voting ballot as a regular GM');
 
-  test('EOY category titles include MVP and ROY', async ({ page }) => {
-    const titles = page.locator('.ibl-title');
-    const allText = await titles.allTextContents();
-    const joined = allText.join(' ');
-    expect(joined).toMatch(/Most Valuable Player/i);
-    expect(joined).toMatch(/Rookie of the Year/i);
-  });
+    // The ballot itself must still render, so an empty page cannot pass this.
+    await expect(page.locator('h1').first()).toBeVisible();
 
-  test('no PHP errors', async ({ page }) => {
-    await assertNoPhpErrors(page, 'on VotingResults Off-Season');
+    // The gate lives in VotingController::showBallot(). Dropping it fails here.
+    await expect(page.locator('text=Voting Results')).toHaveCount(0);
+    expect(await page.content()).not.toContain('ShowAndHideResults');
+  });
+});
+
+anonTest.describe('Voting Results — anonymous user', () => {
+  anonTest('shows login form and no results markup', async ({ page }) => {
+    await page.goto('modules.php?name=Voting');
+
+    // VotingController::main() calls loginBox() before showBallot() — auth gate.
+    await expect(page.locator('#login-username')).toBeVisible();
+
+    // Admin expander must never reach an unauthenticated request.
+    await expect(page.locator('text=Voting Results')).toHaveCount(0);
+    expect(await page.content()).not.toContain('ShowAndHideResults');
+  });
+});
+
+test.describe('Retired VotingResults module URL', () => {
+  test('answers 302 to the Voting page with an empty body', async ({ page }) => {
+    const response = await page.request.get('modules.php?name=VotingResults', {
+      maxRedirects: 0,
+    });
+
+    expect(response.status()).toBe(302);
+    expect(response.headers()['location']).toMatch(/name=Voting$/);
+    expect((await response.body()).length).toBe(0);
   });
 });

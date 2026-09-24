@@ -24,4 +24,10 @@ interface ApiKeysViewInterface
      * @param array{key_prefix: string, permission_level: string, rate_limit_tier: string, is_active: int, created_at: string, last_used_at: ?string} $keyStatus
      */
     public function renderActiveKeyState(array $keyStatus): string;
+
+    /**
+     * Render the static Player Export guide (moved from the retired PlayerExportGuide module).
+     * Rendered below every key-state card by ApiKeysController::handle().
+     */
+    public function renderExportGuide(): string;
 }

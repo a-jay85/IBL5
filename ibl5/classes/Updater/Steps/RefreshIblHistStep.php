@@ -136,6 +136,7 @@ FROM (
       ORDER BY
         s.stats_gm DESC,
         CASE s.snapshot_phase
+          WHEN 'playoffs'            THEN  0
           WHEN 'end-of-season'       THEN  1
           WHEN 'finals'              THEN  2
           WHEN 'post-heat'           THEN  3

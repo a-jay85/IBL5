@@ -250,7 +250,7 @@ printf '\n-- pricer: price staleness is loud --\n'
 
 # 20/21. Past price_expiry the pricer must WARN on stderr and flag price_stale,
 #        so a silently-wrong price table cannot survive a release cycle.
-stale_err=$(AUTOMOUSE_PRICER_TODAY=2026-09-01 "$PRICER" --session-id "$POST_SID" \
+stale_err=$(AUTOMOUSE_PRICER_TODAY=2027-01-01 "$PRICER" --session-id "$POST_SID" \
     --proj-dir "$FIXPROJ" 2>&1 >"$TMPROOT/stale.json")
 assert_eq "$(printf '%s' "$stale_err" | grep -c '^WARN:')" 1 "stale price table warns on stderr"
 assert_eq "$(pj "$TMPROOT/stale.json" price_stale)" "True" "stale price table sets price_stale"

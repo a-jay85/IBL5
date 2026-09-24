@@ -23,8 +23,8 @@ import os
 import sys
 
 # Prices in USD per 1M tokens, ordered (input, output, cache_read, write_5m, write_1h).
-# last_verified: 2026-08-18
-# price_expiry: 2026-08-31  # sonnet-5 intro pricing ends
+# last_verified: 2026-09-23
+# price_expiry: 2026-12-31  # quarterly re-verify against the claude-api skill models.md
 PRICE = {
     "opus":     (5.00, 25.00, 0.50,  6.25, 10.00),
     "opus-5-5": (4.00, 20.00, 0.20,  5.00,  8.00),  # in/out/read verified 2026-09-22; writes derived (1.25x, 2x)
@@ -32,9 +32,10 @@ PRICE = {
     "sonnet-5": (2.00, 10.00, 0.20,  2.50,  4.00),
     "haiku":    (1.00,  5.00, 0.10,  1.25,  2.00),
     "fable":   (10.00, 50.00, 1.00, 12.50, 20.00),
+    "fable-5-1": (10.00, 50.00, 0.25, 12.50, 20.00),  # cache read 0.025x base, verified 2026-09-23
 }
-PRICE_ASOF = "2026-08-18"
-PRICE_EXPIRY = "2026-08-31"
+PRICE_ASOF = "2026-09-23"
+PRICE_EXPIRY = "2026-12-31"
 
 # Output tokens assumed for a compaction summary when the post-boundary record is absent.
 DEFAULT_SUMMARY_OUT = 8000
@@ -60,7 +61,7 @@ def price_stale():
 def warn_if_stale():
     if price_stale():
         sys.stderr.write(
-            "WARN: price table last_verified %s; sonnet-5 intro pricing expired %s "
+            "WARN: price table last_verified %s; re-verify date %s passed "
             "— re-verify bin/lib/automouse-pricer\n" % (PRICE_ASOF, PRICE_EXPIRY)
         )
 

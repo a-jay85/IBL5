@@ -2,6 +2,7 @@ import copy
 import json
 import os
 import re
+import subprocess
 import sys
 import tempfile
 
@@ -12,6 +13,29 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from harness.classify import BACKLOG_CLOSES_START, backlog_closes_mismatch, normalize_backlog_closes, _closing_ref_re
 from harness.planfile import locate_plan, parse_backlog_issues
 from harness.state import PlanInfo
+
+# Repo root: tests/ -> harness/ parent -> tools/postplan-harness/ -> repo root
+_TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(_TESTS_DIR)))
+_CLAIMS_DOC = os.path.join(_REPO_ROOT, ".claude", "skills", "post-plan", "_pr-body-claims.md")
+
+
+def _snippet() -> str:
+    """Extract the bash snippet from _pr-body-claims.md between the marker comments."""
+    with open(_CLAIMS_DOC) as fh:
+        content = fh.read()
+    start = content.find("<!-- backlog-closes-snippet:start -->")
+    end = content.find("<!-- backlog-closes-snippet:end -->")
+    if start == -1 or end == -1:
+        return ""
+    block = content[start + len("<!-- backlog-closes-snippet:start -->"):end].strip()
+    lines = block.splitlines()
+    # strip the opening ```bash and closing ``` fence lines
+    if lines and lines[0].startswith("```"):
+        lines = lines[1:]
+    if lines and lines[-1].strip() == "```":
+        lines = lines[:-1]
+    return "\n".join(lines)
 
 REPO = "a-jay85/IBL5-backlog"
 
@@ -380,3 +404,56 @@ def test_replay_plan_blind_adds_no_closes():
                     last_body = a.get("body", "")
     assert last_body is not None
     assert "backlog-closes:start" not in last_body
+
+
+# ---------------------------------------------------------------------------
+# Phase 5: skill snippet tests
+# ---------------------------------------------------------------------------
+
+def test_skill_snippet_markers_present():
+    snippet = _snippet()
+    assert snippet, "snippet between markers is empty — markers may be missing or deleted"
+    assert "normalize_backlog_closes" in snippet
+
+
+def test_skill_snippet_matches_harness():
+    snippet = _snippet()
+    assert snippet
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".md", delete=False) as pf:
+        pf.write(
+            "# Test\n\n## Backlog issues\n\n"
+            "- closes a-jay85/IBL5-backlog#11 — x\n"
+            "- refs a-jay85/IBL5-backlog#12 — y\n"
+        )
+        plan_path = pf.name
+    original = "Summary\nFixes a-jay85/IBL5-backlog#12\n"
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as bf:
+        bf.write(original)
+        body_path = bf.name
+    try:
+        env = {**os.environ, "PLAN": plan_path, "BODY_FILE": body_path}
+        subprocess.run(["bash", "-c", snippet], cwd=_REPO_ROOT, env=env, check=True)
+        with open(body_path) as fh:
+            got = fh.read()
+        expected = normalize_backlog_closes(original, [11], [12])
+        assert got == expected
+    finally:
+        os.unlink(plan_path)
+        os.unlink(body_path)
+
+
+def test_skill_snippet_plan_blind_passthrough():
+    snippet = _snippet()
+    assert snippet
+    original = "x\nCloses a-jay85/IBL5-backlog#9"
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as bf:
+        bf.write(original)
+        body_path = bf.name
+    try:
+        env = {**os.environ, "PLAN": "/tmp/does-not-exist-plan.md", "BODY_FILE": body_path}
+        subprocess.run(["bash", "-c", snippet], cwd=_REPO_ROOT, env=env, check=True)
+        with open(body_path) as fh:
+            got = fh.read()
+        assert got == original
+    finally:
+        os.unlink(body_path)

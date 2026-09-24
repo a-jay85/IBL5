@@ -620,6 +620,23 @@ def normalize_backlog_closes(body: str, closes_issues: list[int],
     return out + "\n"
 
 
+def backlog_closes_mismatch(expected: list[int], base: str,
+                            refs: list[tuple[str, int]]) -> str:
+    """One log line comparing plan closes-kind issues with GitHub's
+    closingIssuesReferences. GitHub links closing keywords only for PRs whose
+    base is the default branch; a stacked PR is linked when GitHub retargets
+    it to master after its parent merges, so a non-master base is a SKIP."""
+    if base != "master":
+        return (f"phase2: backlog-closes self-check SKIP (base={base}; "
+                "GitHub links closing keywords after retarget to master)")
+    got = {n for repo, n in refs if repo.lower() == BACKLOG_REPO.lower()}
+    missing = sorted(set(expected) - got)
+    if missing:
+        return (f"phase2: WARN backlog-closes MISMATCH: GitHub will not close "
+                f"{', '.join(f'{BACKLOG_REPO}#{n}' for n in missing)}")
+    return f"phase2: backlog-closes self-check OK ({len(expected)} issue(s) linked)"
+
+
 def slice_spec_diffs(filtered_diff: str, e2e_spec_modules: list[str]) -> tuple[str, str]:
     """Agent D pre-slice: (spec portion, production portion) of the diff."""
     spec_lines: list[str] = []

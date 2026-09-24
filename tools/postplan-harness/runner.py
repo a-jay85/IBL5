@@ -40,8 +40,9 @@ from harness.armable import (ArmInputs, conflict_flag_path, conflict_verdict_for
                              manual_testing_clearance, meta_checks_clearance,
                              select_fidelity_verdict)
 from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_END,
-                              classify, files_from_diff, modified_files_from_diff,
-                              name_status_text, numstat_text,
+                              backlog_closes_mismatch, classify, files_from_diff,
+                              modified_files_from_diff,
+                              name_status_text, normalize_backlog_closes, numstat_text,
                               qualify_backlog_refs,
                               render_files_changed, render_manual_confirmation,
                               render_reviewer_verification, strip_manual_testing_section,
@@ -367,7 +368,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             pr = gh.pr_number()
             log(f"phase2: PR #{pr} exists — updated head to {sha or '(clean)'}")
         else:
-            create_body = upsert_files_changed(copy["summary_md"], render_files_changed(diff))
+            create_body = _apply_backlog_closes(upsert_files_changed(copy["summary_md"], render_files_changed(diff)), plan, log)
             pr = gh.pr_create(copy["title"], create_body, "master")
             log(f"phase2: pr_create intent recorded (title={copy['title']!r})")
         res.pr_number = pr
@@ -492,7 +493,9 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         # files-changed block is machine-generated: refresh it on every run so the
         # PR body's scope can't silently drift from the actual diff.
         body = upsert_files_changed(body, render_files_changed(diff))
+        body = _apply_backlog_closes(body, plan, log)
         gh.pr_edit_body(pr, body)
+        _check_backlog_closes(gh, pr, plan, log)
 
         # ---- Phase 5.5: plan-intent fidelity review --------------------
         # Pinned BEFORE the call: condition (12) compares the tree the reviewer saw
@@ -1163,6 +1166,34 @@ def _pr_copy(llm, git, gh, fixture, slug, cls, plan, log) -> tuple[dict, bool]:
             "summary_md": f"## Summary\n- {subject}\n"}, True
 
 
+def _apply_backlog_closes(body: str, plan, log) -> str:
+    """Normalize closing keywords from the plan's `## Backlog issues` section.
+    Plan-blind (plan.found False) or no section => both lists empty => passthrough."""
+    issues = plan.backlog_issues if (plan and plan.found) else []
+    closes = [n for k, n in issues if k == "closes"]
+    refs = [n for k, n in issues if k == "refs"]
+    new = normalize_backlog_closes(body, closes, refs)
+    if new != body:
+        log(f"phase2: backlog closes normalized (closes={closes} refs={refs})")
+    return new
+
+
+def _check_backlog_closes(gh, pr, plan, log) -> None:
+    """Lever-3 self-check: ask GitHub which issues this PR will close and log a
+    loud WARN on disagreement. Never raises; never blocks arming."""
+    closes = [n for k, n in (plan.backlog_issues if plan and plan.found else [])
+              if k == "closes"]
+    if not closes:
+        return
+    try:
+        base, refs = gh.pr_closing_refs(pr)
+    except Exception as e:
+        log(f"phase2: backlog-closes self-check skipped ({str(e)[:120]})")
+        return
+    msg = backlog_closes_mismatch(closes, base, refs)
+    log(msg)
+
+
 def _body_check(llm, git, gh, copy, copy_degraded, cls, log) -> tuple[dict, bool]:
     """Phase 2 body-vs-diff verification: (result, body_check_degraded).
 
@@ -1550,7 +1581,7 @@ def _run_fidelity(llm, out_dir, worktree, git, gh, plan, diff, body, pr, master_
         # _body_override set, so pr_body() here would hand back the harness's own copy
         # and silently overwrite whatever the remediation agent edited on GitHub.
         live_body = gh.pr_body_fresh() or body
-        body = upsert_files_changed(live_body, render_files_changed(git.diff_vs_base()))
+        body = _apply_backlog_closes(upsert_files_changed(live_body, render_files_changed(git.diff_vs_base())), plan, log)
         gh.pr_edit_body(pr, body)
         # sha is either a real commit sha or BODY_ONLY_SHA. fidelity.re_review()'s only
         # test of it is `if not remediation_sha: return None, None, None`, so a non-empty

@@ -1356,6 +1356,52 @@ grep -q 'RESULT HELD' "$_DM_CAPTURE" \
     || fail "dm-malformed-result-json-falls-back: grep-scraped verdict_1 leaked from malformed JSON"
 end_case dm-malformed-result-json-falls-back
 
+# --- case 53: dm-held-fallback ------------------------------------------------------------
+# The RESULT: line fallback (no harness-run-dir in the log) maps terminal=shipped-held to
+# HELD. Case 52 exercises this incidentally (malformed JSON); this case exercises it
+# directly (no result.json path emitted at all).
+begin_case
+clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+_cs53="$SCRATCH/.local/bin/dm-cs-53"
+printf '#!/usr/bin/env bash\nprintf "RESULT: terminal=shipped-held\n"\n' > "$_cs53"
+chmod +x "$_cs53"
+POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
+    POST_PLAN_FLEET_DISCORD_DM="$_DM_STUB" POST_PLAN_FLEET_CLAUDE="$_cs53" \
+    run_dm_driver --go >/dev/null 2>&1
+HOME="$SCRATCH" bash "$_DM_RUNNER" >/dev/null 2>&1 || true
+[[ -f "$_DM_CAPTURE" ]] || fail "dm-held-fallback: no DM sent"
+grep -q 'RESULT HELD' "$_DM_CAPTURE" \
+    || fail "dm-held-fallback: fallback did not map shipped-held to HELD ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+! grep -q 'READY WITH NOTES' "$_DM_CAPTURE" \
+    || fail "dm-held-fallback: old READY WITH NOTES mapping leaked through"
+end_case dm-held-fallback
+
+# --- case 54: dm-held-not-ready-unchanged ------------------------------------------------
+# HELD must not suppress a failing verdict. terminal=shipped-held with verdict_1=NOT READY
+# must report NOT READY, not HELD.
+begin_case
+clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+_cs54_dir="$SCRATCH/harness-run-54"; mkdir -p "$_cs54_dir"
+printf '%s\n' '{"terminal":"shipped-held","fidelity":{"verdict_1":"NOT READY","verdict_2":null,"rounds":[],"reviewed_tree_2":null,"error_kind":null,"remediation_sha":null}}' \
+    > "$_cs54_dir/result.json"
+_cs54="$SCRATCH/.local/bin/dm-cs-54"
+cat > "$_cs54" <<STUB
+#!/usr/bin/env bash
+printf 'harness-run-dir=$_cs54_dir\n'
+printf 'RESULT: terminal=shipped-held\n'
+STUB
+chmod +x "$_cs54"
+POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
+    POST_PLAN_FLEET_DISCORD_DM="$_DM_STUB" POST_PLAN_FLEET_CLAUDE="$_cs54" \
+    run_dm_driver --go >/dev/null 2>&1
+HOME="$SCRATCH" bash "$_DM_RUNNER" >/dev/null 2>&1 || true
+[[ -f "$_DM_CAPTURE" ]] || fail "dm-held-not-ready-unchanged: no DM sent"
+grep -q 'RESULT NOT READY' "$_DM_CAPTURE" \
+    || fail "dm-held-not-ready-unchanged: held+NOT READY did not report NOT READY ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+! grep -q 'RESULT HELD' "$_DM_CAPTURE" \
+    || fail "dm-held-not-ready-unchanged: HELD suppressed a failing verdict"
+end_case dm-held-not-ready-unchanged
+
 
 # --- Phase 9: push-form proof against a local bare origin ---------------------------------
 # The Phase 2 fix replaces /pr-ready step 3's bare `--force-with-lease` with an explicit

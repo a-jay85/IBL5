@@ -1,12 +1,16 @@
 """Remote-head reconciliation primitives for the post-plan harness.
 
-Three pure-git/gh helpers plus one composite decision function, reconcile_remote_head,
+Four pure-git/gh helpers plus one composite decision function, reconcile_remote_head,
 that returns match | synced | diverged. Every guarded site calls that one function so
 the decision tree exists once.
+
+content_equivalent answers "same tree"; patch_series_equivalent answers "same patch series
+rebased onto newer master". Both must fail closed.
 """
 from __future__ import annotations
 
 import logging
+import re
 import subprocess
 import time
 from dataclasses import dataclass
@@ -79,8 +83,84 @@ def content_equivalent(local_sha, remote_sha, worktree, *, run_git=None) -> bool
         return False
 
 
+# One pairing line of `git range-diff` output: "<n>:  <sha> <marker> <n>:  <sha> <subject>".
+# Interdiff body lines under a "!" pairing are indented and never match.
+_RANGE_DIFF_LINE = re.compile(r"^\s*(\d+|-):\s+\S+\s+([=!<>])\s+(\d+|-):\s+\S+")
+
+
+def _parse_range_diff(text: str) -> list[tuple[str, str, str]]:
+    """(left_index, marker, right_index) for every pairing line in range-diff output."""
+    out = []
+    for line in text.splitlines():
+        m = _RANGE_DIFF_LINE.match(line)
+        if m:
+            out.append((m.group(1), m.group(2), m.group(3)))
+    return out
+
+
+def _series_all_equal(pairs, expected_count: int) -> bool:
+    """True iff range-diff paired exactly expected_count commits, every pair is '=',
+    and pair k pairs left commit k with right commit k (no reordering)."""
+    if expected_count < 1 or len(pairs) != expected_count:
+        return False
+    for pos, (left, marker, right) in enumerate(pairs, start=1):
+        if marker != "=" or left != str(pos) or right != str(pos):
+            return False
+    return True
+
+
+def patch_series_equivalent(local_sha, remote_sha, worktree, *, run_git=None,
+                            master_ref="origin/master") -> bool:
+    """True iff remote_sha is the same patch series as local_sha rebased onto a newer
+    master. Every arm fails closed: any git rc != 0, unparseable output, timeout or
+    OSError returns False.
+
+    Arms, in order:
+      1. bl = merge-base(local, master), br = merge-base(remote, master) both resolve.
+      2. bl and br are ancestors of master, and bl is an ancestor of br (remote base
+         is at or after the local base — a rebase onto *newer* master, never older).
+      3. rev-list --count bl..local == rev-list --count br..remote, and >= 1.
+      4. git range-diff bl..local br..remote pairs every commit '=' in position
+         (same patch, same message, same order). '!', '<', '>' or a cross-position
+         pairing all fail.
+    """
+    if not local_sha or not remote_sha:
+        return False
+    _run = run_git or _default_run_git
+
+    def _text(r):
+        return r.stdout.strip() if r.returncode == 0 and r.stdout.strip() else ""
+
+    try:
+        if _run(["fetch", "origin"], worktree).returncode != 0:
+            log.warning("patch_series_equivalent: git fetch failed — treating as not equivalent")
+            return False
+        bl = _text(_run(["merge-base", local_sha, master_ref], worktree))
+        br = _text(_run(["merge-base", remote_sha, master_ref], worktree))
+        if not bl or not br:
+            return False
+        for anc, desc in ((bl, master_ref), (br, master_ref), (bl, br)):
+            if _run(["merge-base", "--is-ancestor", anc, desc], worktree).returncode != 0:
+                return False
+        n_l = _text(_run(["rev-list", "--count", f"{bl}..{local_sha}"], worktree))
+        n_r = _text(_run(["rev-list", "--count", f"{br}..{remote_sha}"], worktree))
+        try:
+            n, nr = int(n_l), int(n_r)
+        except ValueError:
+            return False
+        if n < 1 or n != nr:
+            return False
+        rd = _run(["range-diff", "--no-color", f"{bl}..{local_sha}", f"{br}..{remote_sha}"],
+                  worktree)
+        if rd.returncode != 0:
+            return False
+        return _series_all_equal(_parse_range_diff(rd.stdout), n)
+    except (subprocess.TimeoutExpired, OSError):
+        return False
+
+
 def sync_to_remote(branch, worktree, *, run_git=None) -> str:
-    """Reset the worktree HEAD to origin/<branch>. Precondition: content_equivalent is True."""
+    """Reset the worktree HEAD to origin/<branch>. Precondition: content_equivalent or patch_series_equivalent is True."""
     _run = run_git or _default_run_git
     try:
         _run(["fetch", "origin"], worktree)
@@ -122,7 +202,7 @@ def reconcile_remote_head(pr, expected_sha, local_sha, branch, worktree, *,
     """Single decision function. Every guarded site calls this one function.
 
     match   — remote head equals expected_sha; no mutation.
-    synced  — remote moved but tree is equivalent; worktree reset to remote head.
+    synced  — remote moved but is tree-equivalent, or is the same patch series rebased onto newer master; worktree reset to remote head.
     diverged — remote head has different content; caller must fail closed.
     """
     ok, remote = remote_head_matches(pr, expected_sha, gh_cmd=gh_cmd, sleep=sleep)
@@ -150,15 +230,20 @@ def reconcile_remote_head(pr, expected_sha, local_sha, branch, worktree, *,
         except (subprocess.TimeoutExpired, OSError):
             pass
 
-    if content_equivalent(local_sha, remote, worktree, run_git=run_git):
-        _b = _branch or (run_git or _default_run_git)(
-            ["rev-parse", "--abbrev-ref", "HEAD"], worktree).stdout.strip()
+    def _adopt(kind: str) -> Reconcile:
+        _b = _branch or _run(["rev-parse", "--abbrev-ref", "HEAD"], worktree).stdout.strip()
         new_sha = sync_to_remote(_b, worktree, run_git=run_git)
         return Reconcile(
             "synced", new_sha,
-            f"remote head moved {expected_sha[:8]} -> {remote[:8]}; "
-            "tree-equivalent; synced"
+            f"remote head moved {expected_sha[:8]} -> {remote[:8]}; {kind}; synced"
         )
+
+    if content_equivalent(local_sha, remote, worktree, run_git=run_git):
+        return _adopt("tree-equivalent")
+    if patch_series_equivalent(local_sha, remote, worktree, run_git=run_git):
+        log.info("reconcile_remote_head: remote %s is the same patch series as %s rebased "
+                 "onto newer master; adopting", remote[:8], local_sha[:8])
+        return _adopt("patch-series-equivalent (rebased onto newer master)")
     log.error(
         "reconcile_remote_head: remote head %s diverged from %s with different content",
         remote[:8] if remote else "?", expected_sha[:8] if expected_sha else "?"

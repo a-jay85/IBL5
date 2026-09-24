@@ -266,6 +266,29 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
         res.classification = cls
         log("phase3 classify:\n" + cls.summary())
 
+        # Conflict probe: predict a rebase conflict before the LLM body check spends a call.
+        # A git error here means "no prediction", so the run falls through and the real
+        # rebase_onto() below stays authoritative. A predicted conflict propagates to the
+        # outer `except HarnessError`, which sets error_kind="rebase-conflict" (exit 3 via
+        # _FAIL_CLOSED_KINDS). This is the same terminal the post-commit rebase arm reaches.
+        if live:
+            try:
+                conflict_files = git.predict_rebase_conflict()
+            except HarnessError as e:
+                conflict_files = ()
+                log(f"phase2: conflict probe git error -- {e.detail}; falling through")
+            if conflict_files:
+                log(f"phase2: merge-tree probe predicted a rebase conflict on {git.branch()}")
+                log("phase2: conflicted paths (probe) = "
+                    f"{', '.join(conflict_files) or '-'}")
+                if getattr(git, 'llm', None) is None:
+                    log("phase2: no LLM resolver -- stopping before body check (exit 3)")
+                    raise HarnessError(
+                        "rebase-conflict",
+                        f"predicted by merge-tree probe vs origin/master: "
+                        f"{', '.join(conflict_files)}")
+                log("phase2: LLM resolver active -- probe is advisory, falling through to rebase_onto()")
+
         copy, copy_degraded = _pr_copy(llm, git, gh, fixture, slug, cls, plan, log)
         summary, stripped = strip_manual_testing_section(copy["summary_md"])
         if stripped:

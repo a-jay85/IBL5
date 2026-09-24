@@ -2,7 +2,7 @@
 name: pr-ready-phase6
 description: Pinned Opus 5.5 plan-intent fidelity reviewer for /pr-ready runtime Phase 6. Spawned exactly once per run by the /pr-ready orchestrator; performs the _plan-fidelity-review.md 6b-6e review over the post-rebase diff and writes a verdict file. Never spawns a delegate, never edits repo files, never pushes.
 model: claude-opus-5-5
-last_verified: 2026-09-18
+last_verified: 2026-09-22
 disallowedTools: Agent, Edit, NotebookEdit, EnterWorktree, ExitWorktree, Skill, EnterPlanMode, ExitPlanMode
 ---
 
@@ -25,7 +25,7 @@ discrepancy in one line of your verdict under `procedure-source:` and continue.
 
 Run, substituting the `<MASTER_SHA>` literal from your prompt:
 
-    git show <MASTER_SHA>:.claude/skills/pr-ready/_plan-fidelity-review.md
+    git show <MASTER_SHA>:.claude/review-shared/_plan-fidelity-review.md
 
 Declared fallback (exactly one, per the SKILL.md include-fallback clause): if `git show`
 fails and the file is present in the worktree path given in your prompt, `Read` it by path

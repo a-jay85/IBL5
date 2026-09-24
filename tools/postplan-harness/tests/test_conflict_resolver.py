@@ -31,7 +31,7 @@ _REPO_ROOT = os.path.dirname(
     os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 )
 _COLLAPSE = os.path.join(
-    _REPO_ROOT, ".claude", "skills", "pr-ready", "scripts", "collapse-guard.sh"
+    _REPO_ROOT, ".claude", "review-shared", "scripts", "collapse-guard.sh"
 )
 _LOSTWORK_EQUIV = (
     "#!/usr/bin/env bash\n"
@@ -312,7 +312,7 @@ def _make_marker_planted_repo():
     _sh(d, "commit", "-m", "base")
 
     # Proof scripts committed to master
-    scripts_dir = os.path.join(d, ".claude", "skills", "pr-ready", "scripts")
+    scripts_dir = os.path.join(d, ".claude", "review-shared", "scripts")
     os.makedirs(scripts_dir, exist_ok=True)
     open(os.path.join(scripts_dir, "lostwork.sh"), "w").write(_LOSTWORK_EQUIV)
     shutil.copy(_COLLAPSE, os.path.join(scripts_dir, "collapse-guard.sh"))

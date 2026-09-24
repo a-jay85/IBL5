@@ -11,7 +11,7 @@
 # The `_digest_labels` awk below moved here out of bin/pr-cycle when the
 # ~/IBL5-merge-digest.md ledger was replaced by a per-merge DM. The `### Merge digest`
 # block shape it parses is a contract documented in
-# .claude/skills/pr-ready/_phase7-verdict.md: exactly five bold labels, and the block
+# .claude/review-shared/_phase7-verdict.md: exactly five bold labels, and the block
 # ends at the next heading or horizontal rule.
 #
 # Budget: Discord caps a DM at 2000 characters and .github/actions/notify-discord does

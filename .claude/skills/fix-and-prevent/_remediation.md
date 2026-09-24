@@ -3,7 +3,7 @@
 Shared include. Two callers:
 
 - `.claude/skills/fix-and-prevent/SKILL.md` reads it by path (same directory).
-- `.claude/skills/pr-ready/SKILL.md` Phase 6.5 loads it with
+- `.claude/review-shared/_phase65-remediation.md` loads it with
   `git show <MASTER_SHA>:.claude/skills/fix-and-prevent/_remediation.md`.
 
 **Callers MUST declare their mode at invocation.** Write one of these two lines

@@ -4,7 +4,7 @@
 # bin/fleet-status — one-page view of every background headless Claude run.
 #
 # WHY THIS EXISTS. Several bin/ producers fire detached headless `claude -p`
-# sessions (bin/post-plan-now, bin/plan-now, bin/pr-ready-now, bin/docfix-run via
+# sessions (bin/post-plan-now, bin/plan-now, bin/post-plan-fleet, bin/docfix-run via
 # launchd one-shots; bin/automouse/run via its own runner). Each leaves state in a
 # different place, so answering "what is running and how far along is it?" meant
 # three or four ad-hoc commands. This prints the answer and exits.
@@ -480,7 +480,7 @@ render_launchd() {
                     ident_note="  ${DIM}${suffix#plan-now-}${R}"
                 fi
                 ;;
-            pr-ready-now-*) producer="pr-ready"; log="$LOG_DIR/${suffix}.log" ;;
+            post-plan-fleet-*) producer="fleet"; log="$LOG_DIR/${suffix}.log" ;;
             docfix-*)       producer="docfix";   log="$LOG_DIR/${suffix}.log" ;;
         esac
 

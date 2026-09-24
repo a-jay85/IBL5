@@ -270,7 +270,7 @@ class LiveGit:
         """Load lostwork.sh from a pinned master SHA. Returns the path, or None if absent."""
         lostwork_path = Path(f"/tmp/postplan-lostwork-{key}.sh")
         lostwork_content = self._run(
-            "show", f"{master_sha}:.claude/skills/pr-ready/scripts/lostwork.sh",
+            "show", f"{master_sha}:.claude/review-shared/scripts/lostwork.sh",
             check=False,
         )
         if not lostwork_content.strip():
@@ -518,7 +518,7 @@ class LiveGit:
 
         collapse_guard_path = Path(f"/tmp/postplan-collapse-guard-{key}.sh")
         collapse_content = self._run(
-            "show", f"{master_sha}:.claude/skills/pr-ready/scripts/collapse-guard.sh",
+            "show", f"{master_sha}:.claude/review-shared/scripts/collapse-guard.sh",
             check=False,
         )
         if not collapse_content.strip():
@@ -687,7 +687,7 @@ class LiveGit:
     def prove_lostwork(self, key: str) -> tuple[bool, str]:
         master_sha = self._run("rev-parse", "origin/master").strip()
         content = self._run(
-            "show", f"{master_sha}:.claude/skills/pr-ready/scripts/lostwork.sh",
+            "show", f"{master_sha}:.claude/review-shared/scripts/lostwork.sh",
             check=False)
         if not content.strip():
             return False, "lostwork.sh not found at pinned master SHA"

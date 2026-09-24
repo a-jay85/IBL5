@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-09-21
+last_verified: 2026-09-22
 ---
 
 # Post-Plan Orchestrator
@@ -205,7 +205,7 @@ fi
    > **Files-changed block:** the PR body must carry a machine-generated scope block, so the hand-written Scope prose can never silently disagree with the diff. Build it from `git diff --name-status origin/master...HEAD` and include it in the body at creation, delimited exactly by `<!-- files-changed:begin -->` / `<!-- files-changed:end -->`, one `- \`<status>\` \`<path>\`` bullet per file. On any later body write (including Phase 6 below), regenerate the block and **replace what sits between the two markers** rather than appending a second copy; if only one marker is present, append a fresh block and leave the orphan alone. Generated data cannot drift — the prose Scope line then carries *why*, not *what*.
    > **Voice check, once.** After writing the Scope why-paragraph, pipe it through `bin/check-digest-prose` (`printf '%s\n' "$SCOPE_PROSE" | bin/check-digest-prose`). If it reports a violation, rewrite that paragraph **once** to address the named rule, then continue. Do not loop twice and do not abort: `bin/check-digest-prose` always exits 0 and never blocks the PR — ship whatever the single rewrite produces. <!-- slop-ok -->
 
-   > **Scope-expansion justification:** when the diff touches production module code under `ibl5/modules/`, the files-changed block records *what* changed but never *why* a production file was in a non-feature PR. The body must then carry a short `**Scope expansion:**` paragraph naming each such file and the reason it changed. Place it **immediately above** the `<!-- files-changed:begin -->` marker — **outside** the marker pair, never between the markers. Anything between the markers is destroyed on the next regeneration (Phase 6 here, and `/pr-ready` Phase 5.9), so a justification written inside them silently disappears on the next body write. Norm and per-title-type expectations: `.claude/rules/scope-expansion-justification.md` — NEW in this PR.
+   > **Scope-expansion justification:** when the diff touches production module code under `ibl5/modules/`, the files-changed block records *what* changed but never *why* a production file was in a non-feature PR. The body must then carry a short `**Scope expansion:**` paragraph naming each such file and the reason it changed. Place it **immediately above** the `<!-- files-changed:begin -->` marker — **outside** the marker pair, never between the markers. Anything between the markers is destroyed on the next regeneration (Phase 6 here), so a justification written inside them silently disappears on the next body write. Norm and per-title-type expectations: `.claude/rules/scope-expansion-justification.md` — NEW in this PR.
    > Run the same one-shot `bin/check-digest-prose` voice check on this paragraph and rewrite once on a violation.
 
    > **Retrospective-origin block:** if `git diff origin/master...HEAD` **adds** a row to the `## Class registry` table in `ibl5/docs/retrospective-class-registry.md`, this branch is a Phase 9 retrospective routing that got materialized as its own PR — usually because the origin PR had already merged. The body must then carry a `## Why this PR exists` section immediately above `## Manual Testing`. Without it the PR reads as an unexplained doc edit: the files-changed block shows *what* row was added, never why the class exists. Derive the section from the **added row alone** — it is self-sufficient (`#<origin PR>`, `class:`, `routed to: Rung <n>`, `prior:`), so this works on a plan-blind run, or a run months later that never saw the retrospective. Four required elements:
@@ -524,9 +524,7 @@ To post it:
    PATCH it with `-F body=@<file>` if found, else `gh pr comment <PR> --body-file <file>`.
    The marker is `<!-- post-plan-conflict-hold -->` and **never** `<!-- pr-fast-canary -->` or
    `<!-- pr-ready-verdict -->` — reuse the shape, not the string, or the conflict hold
-   overwrites an unrelated verdict on the same PR. Do **not** call `/pr-ready`'s
-   `scripts/post-verdict.sh`: it is keyed to the PR-number `/tmp/pr-ready-verdict-` namespace a
-   concurrent `/pr-ready` run would collide on.
+   overwrites an unrelated verdict on the same PR.
 
 The Phase 7 re-rebase loop can hit a *second* conflict after auto-merge is already armed; that
 path disarms and posts through this same marker, so the existing comment is updated in place

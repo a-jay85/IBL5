@@ -1794,7 +1794,7 @@ have   "§5.9f: the squash-trap rule is cited"                "$CRES_TXT" '.clau
 # The fixtures need a real refs/remotes/origin/master — the script hardcodes
 # `git diff origin/master...HEAD` and ignores every seam, so without the ref its
 # post-diff is empty and a DIVERGED case would pass for the wrong reason.
-LW="$REPO_ROOT/.claude/skills/pr-ready/scripts/lostwork.sh"
+LW="$REPO_ROOT/.claude/review-shared/scripts/lostwork.sh"
 mk_lostwork_repo() {
     local d; d="$(mktemp -d "$BASE_TMP/lw-XXXXXX")"
     git -C "$d" init --quiet -b main

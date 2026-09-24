@@ -37,12 +37,10 @@ REVIEW_ALLOWED_TOOLS = ("Read", "Grep", "Glob")
 REVIEW_DENIED_TOOLS = ("Bash", "Write", "Edit", "NotebookEdit", "Agent")
 
 PROCEDURE_PATHS = (
-    ".claude/skills/pr-ready/_plan-fidelity-review.md",
     ".claude/review-shared/_plan-fidelity-review.md",
 )
 
 REMEDIATION_PATHS = (
-    ".claude/skills/pr-ready/_phase65-remediation.md",
     ".claude/review-shared/_phase65-remediation.md",
 )
 
@@ -667,7 +665,7 @@ def file_note_issues(gh, notes: list[dict], pr_number: int, log=None) -> list[in
 
 # --- Phase 5: sticky verdict comment composers -------------------------------
 
-# Byte-for-byte from .claude/skills/pr-ready/scripts/digest.sh. bin/digest-dm-build
+# Byte-for-byte from .claude/review-shared/scripts/digest.sh. bin/digest-dm-build
 # reads these five labels out of the posted comment, so a drift here silently empties
 # the merge DM.
 LABELS = (
@@ -679,7 +677,6 @@ LABELS = (
 )
 
 DIGEST_SCRIPT_PATHS = (
-    ".claude/skills/pr-ready/scripts/digest.sh",
     ".claude/review-shared/scripts/digest.sh",
 )
 

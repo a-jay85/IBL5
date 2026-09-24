@@ -135,6 +135,54 @@ class SnapshotPlrStepTest extends TestCase
         $this->assertStringContainsString('; playoffs: ', $result->detail);
     }
 
+    public function testAlsoWritesPreseasonSnapshotDuringPreseason(): void
+    {
+        $this->stubResolver->method('getContents')->willReturn('plr-bytes');
+        $this->stubJsbRepo->method('hasChampionForSeason')->willReturn(false);
+
+        /** @var list<?string> $phases */
+        $phases = [];
+        /** @var PlrParserServiceInterface&\PHPUnit\Framework\MockObject\MockObject */
+        $mockPlrService = $this->createMock(PlrParserServiceInterface::class);
+        $mockPlrService->expects($this->exactly(2))
+            ->method('processPlrDataForYear')
+            ->willReturnCallback(static function (string $data, int $year, PlrImportMode $mode, ?string $phase) use (&$phases): PlrParseResult {
+                $phases[] = $phase;
+                return new PlrParseResult();
+            });
+
+        $step = new SnapshotPlrStep($mockPlrService, $this->stubJsbRepo, 2026, $this->stubResolver, 'Preseason');
+        $result = $step->execute();
+
+        $this->assertTrue($result->success);
+        $this->assertSame(['mid-season', 'preseason'], $phases);
+        $this->assertStringContainsString('preseason: ', $result->detail);
+    }
+
+    public function testDoesNotWritePreseasonSnapshotOutsidePreseason(): void
+    {
+        $this->stubResolver->method('getContents')->willReturn('plr-bytes');
+        $this->stubJsbRepo->method('hasChampionForSeason')->willReturn(false);
+
+        /** @var PlrParserServiceInterface&\PHPUnit\Framework\MockObject\MockObject */
+        $mockPlrService = $this->createMock(PlrParserServiceInterface::class);
+        $mockPlrService->expects($this->once())
+            ->method('processPlrDataForYear')
+            ->with(
+                'plr-bytes',
+                2026,
+                PlrImportMode::Snapshot,
+                'mid-season',
+                'current-season',
+            )
+            ->willReturn(new PlrParseResult());
+
+        $step = new SnapshotPlrStep($mockPlrService, $this->stubJsbRepo, 2026, $this->stubResolver, 'HEAT');
+        $result = $step->execute();
+
+        $this->assertTrue($result->success);
+    }
+
     public function testReturnsSuccessWithResultSummary(): void
     {
         $this->stubResolver->method('getContents')->willReturn('plr-bytes');

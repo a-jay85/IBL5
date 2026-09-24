@@ -234,6 +234,73 @@ def test_committed_round_ignores_the_body_entirely(tmp_path, git_shim):
         _cleanup(9934, "9934-2")
 
 
+# ---------------------------------------------------------------------------
+# A body-only label never reaches a git-object consumer (Phase 6.5 / Phase 7)
+# ---------------------------------------------------------------------------
+# Live failure 2026-09-24, PR #2369: every round was body-only, so
+# fid["remediation_sha"] read "body-only" and runner.run() handed it to the Phase 6.5
+# remote-head check as the expected sha. The check compared the real PR head against
+# the literal string and failed closed as remote-head-diverged.
+
+def test_last_remediation_commit_ignores_body_only_label():
+    assert runner._last_remediation_commit({}) is None
+    assert runner._last_remediation_commit({"remediation_sha": None}) is None
+    assert runner._last_remediation_commit({"remediation_sha": "abc123"}) == "abc123"
+    only_body = {"remediation_sha": "body-only",
+                 "rounds": [{"remediation_sha": "body-only"},
+                            {"remediation_sha": "body-only"}]}
+    assert runner._last_remediation_commit(only_body) is None
+    mixed = {"remediation_sha": "body-only",
+             "rounds": [{"remediation_sha": "round-sha-1"},
+                        {"remediation_sha": "body-only"}]}
+    assert runner._last_remediation_commit(mixed) == "round-sha-1"
+
+
+def test_all_body_only_rounds_yield_no_head_commit(tmp_path, git_shim):
+    gh = _BodySeqGh(str(tmp_path), [_BEFORE_PROSE, _AFTER_PROSE, _AFTER_PROSE],
+                    fixture={"pr_number": 9937})
+    git = _counting_git(commit_returns=[""])
+    llm = FixtureLlm(UsageLedger(), {
+        "plan-fidelity-review": NOT_READY,
+        "fidelity-remediation": "answered in the body",
+        "plan-fidelity-re-review-2": "READY\n",
+    })
+    res = _Res()
+    try:
+        runner._run_fidelity(llm, str(tmp_path), str(tmp_path), git, gh, _plan(),
+                             "diff", "original-body", 9937, "dead" * 10, TREE_1, False,
+                             lambda _m: None, res)
+        assert res.fidelity["remediation_sha"] == "body-only"
+        assert runner._last_remediation_commit(res.fidelity) is None
+    finally:
+        _cleanup(9937, "9937-2")
+
+
+def test_body_only_round_after_a_commit_keeps_the_commit_as_head(tmp_path, git_shim):
+    gh = _BodySeqGh(str(tmp_path),
+                    [_BEFORE_PROSE, _BEFORE_PROSE, _BEFORE_PROSE, _AFTER_PROSE,
+                     _AFTER_PROSE],
+                    fixture={"pr_number": 9938})
+    git = _counting_git(commit_returns=["round-sha-1", ""])
+    llm = _ScriptedLlm(UsageLedger(), {
+        "plan-fidelity-review": [NOT_READY],
+        "fidelity-remediation": ["committed a fix", "answered in the body"],
+        "plan-fidelity-re-review-2": [NOT_READY],
+        "plan-fidelity-re-review-3": ["READY\n"],
+    })
+    res = _Res()
+    try:
+        runner._run_fidelity(llm, str(tmp_path), str(tmp_path), git, gh, _plan(),
+                             "diff", "original-body", 9938, "dead" * 10, TREE_1, False,
+                             lambda _m: None, res)
+        outcomes = [r["outcome"] for r in res.fidelity["rounds"]]
+        assert outcomes == ["committed", "body-only"]
+        assert res.fidelity["remediation_sha"] == "body-only"
+        assert runner._last_remediation_commit(res.fidelity) == "round-sha-1"
+    finally:
+        _cleanup(9938, "9938-2", "9938-3")
+
+
 def test_files_changed_block_churn_is_not_a_body_change(tmp_path, git_shim):
     gh = _BodySeqGh(str(tmp_path), [_BEFORE_FC, _AFTER_FC, _AFTER_FC],
                     fixture={"pr_number": 9935})

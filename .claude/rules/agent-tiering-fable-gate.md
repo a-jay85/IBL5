@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand only (no auto-attach trigger) — Fable approval-gate procedure: surface a suggestion, AskUserQuestion gate before any Fable spawn, and the asm-level static-RE exception where Fable is the recommended tier. Parent agent-tiering.md:18 carries the resident stop-text; read this for the full procedure.
-last_verified: 2026-09-19
+last_verified: 2026-09-23
 paths: ".claude/rules/agent-tiering-fable-gate.md"
 ---
 
@@ -17,7 +17,8 @@ Read-on-demand companion to `agent-tiering.md` § Tiers (Fable row). Nothing her
 
 - **What** the task is and which Opus-row trait it exceeds (novel reasoning / exhaustive negative proof / high-blast-radius triage).
 - **Pros**: the specific failure mode Opus risks (missed aliased ref, wrong FK order, an edge case reaching prod) and what one-shot correctness is worth.
-- **Cons**: ~2× cost ($10/$50 vs $5/$25 per MTok); Opus is *likely sufficient* (most tasks are); the gain is a ceiling-raise, not a guarantee.
+- **Cons**: 2.5× cost ($10/$50 vs Opus 5.5 $4/$20 per MTok); Opus is *likely sufficient* (most tasks are); the gain is a raised ceiling with no guarantee.
+- **Cheaper rung first**: if Opus stalled at medium effort, rerun it at high before proposing Fable. High adds roughly 20K thinking tokens (~$0.40 a task), far less than a Fable rerun (Anthropic, "What a task costs on Opus 5.5", 2026).
 - **Recommendation**: a clear "I'd use Fable here" / "Opus is probably fine, flagging it" — not a neutral survey.
 
 Absent approval, proceed on Opus (or the correct lower tier) — flag and continue, don't block. Approval covers that one task; a new task re-triggers the gate. Because Fable is a last resort, any actual intent to run on Fable is itself a genuine fork — **always** use `AskUserQuestion` to get the explicit yes *before* selecting it; never proceed on Fable from an inline suggestion alone.
@@ -28,7 +29,7 @@ An agent def whose frontmatter pins `model: fable` is a standing user yes. The u
 
 ### Exception — asm-level static RE (JSB engine): Fable is the *recommended* tier, not merely last-resort
 
-For **asm-level static reverse-engineering** — the class the Fable row names (argument-binding derivations, NaN/FPU-flag paths, encoded operands; e.g. pinning a `FUN_*`/`+0xNNN` operand or a faithful-vs-divergent port verdict from `objdump`/decompile) — Fable is not a ceiling-raise, it is the **empirically-warranted** tier, because Opus has a **track record of provably-false conclusions here**. Precedents: the 2026-07-23 J24 putback-3pt misread (Ghidra mis-numbered params because `param_6` was a `double` consuming two stack slots → an Opus session recorded, shipped, and then had to *reverse* a remove-the-gate change across an ADR, a golden regen, and test rebaselines) and the 2026-07-07 foul-divisor pin (a Fable session overturned an Opus-era "requires live debugging" premise). One wrong asm verdict that ships costs far more than Fable's ~2× — the redo loop dwarfs the per-call delta.
+For **asm-level static reverse-engineering**, Fable is the **empirically-warranted** tier. This is the class the Fable row names: argument-binding derivations, NaN/FPU-flag paths, encoded operands (e.g. pinning a `FUN_*`/`+0xNNN` operand or a faithful-vs-divergent port verdict from `objdump`/decompile). It is warranted because Opus has a **track record of provably-false conclusions here**. Precedents: the 2026-07-23 J24 putback-3pt misread (Ghidra mis-numbered params because `param_6` was a `double` consuming two stack slots → an Opus session recorded, shipped, and then had to *reverse* a remove-the-gate change across an ADR, a golden regen, and test rebaselines) and the 2026-07-07 foul-divisor pin (a Fable session overturned an Opus-era "requires live debugging" premise). One wrong asm verdict that ships costs far more than Fable's 2.5×. The redo loop dwarfs the per-call delta.
 
 **How to apply** (the gate still holds — surface the suggestion, get the explicit `AskUserQuestion` yes; never self-select):
 

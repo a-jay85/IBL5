@@ -109,6 +109,12 @@ class RecordingGh:
     def pr_meta(self) -> dict:
         return dict(self.fixture.get("pr_meta") or {})
 
+    def pr_closing_refs(self, pr: int) -> tuple[str, list[tuple[str, int]]]:
+        """(baseRefName, [(owner/repo, number)]) GitHub will close on merge."""
+        cr = self.fixture.get("closing_refs") or {}
+        return (cr.get("base", "master"),
+                [(r["repo"], int(r["number"])) for r in cr.get("refs", [])])
+
     def pr_title(self) -> str:
         return (self.fixture.get("pr_meta") or {}).get("title") or self.fixture.get("title", "")
 
@@ -411,6 +417,16 @@ class LiveGh(RecordingGh):
 
     def pr_meta(self) -> dict:
         return dict(self._fetch_meta())
+
+    def pr_closing_refs(self, pr: int) -> tuple[str, list[tuple[str, int]]]:
+        data = json.loads(self._gh("pr", "view", str(pr), "--json",
+                                   "baseRefName,closingIssuesReferences") or "{}")
+        refs = []
+        for it in data.get("closingIssuesReferences") or []:
+            m = re.search(r"github\.com/([^/]+/[^/]+)/issues/(\d+)", it.get("url", ""))
+            if m:
+                refs.append((m.group(1), int(m.group(2))))
+        return data.get("baseRefName", ""), refs
 
     def pr_title(self) -> str:
         return self._fetch_meta().get("title", "")

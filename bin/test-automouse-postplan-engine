@@ -4,7 +4,7 @@
 # bin/test-automouse-postplan-engine — regression tests for the automouse post-plan
 # invocation wiring added in the automouse-postplan-harness-engine branch.
 #
-# Covers Verification Matrix rows 8-11:
+# Covers Verification Matrix rows 8-12:
 #
 #   8  The postplan block cd's into the handoff worktree and invokes
 #      $SELF_DIR/../post-plan-now --foreground --plan <abs>
@@ -14,6 +14,10 @@
 #      before the slice read, so phase_env_error still fires
 #  11  Static negative — bin/automouse/run never sets/exports HARNESS
 #      (ADR-0092) and never passes --auto to post-plan-now
+#  12  post-plan-now rc=3 (terminal BLOCKED) → plan to skipped/ with a report
+#      quoting the RESULT: line; no refund, no env-stop, no break. 12b: no
+#      RESULT line → fallback text. 12c: rc=1 fast exit still trips the
+#      breaker. 12-neg: breaker alone (no arm) reproduces the defect.
 #
 # Extraction idiom: awk pulls the live blocks from bin/automouse/run and
 # bin/automouse/run so tests cannot drift from the real code.
@@ -60,6 +64,31 @@ ENV_ERR_FN=$(awk '/^phase_env_error\(\)/,/^}/' "$REPO_ROOT/bin/automouse/run")
 # the eval'd block below dies on `command not found`.
 WT_FN=$(awk '/^automouse_worktree_for_plan\(\) \{/,/^\}/' "$REPO_ROOT/bin/automouse/run")
 eval "$WT_FN"
+
+# rc=3 terminal arm + the environmental breaker it must pre-empt. Unique comment
+# anchors delimit both spans. Never anchor on an indent token like `fi`.
+RUN_FILE="$REPO_ROOT/bin/automouse/run"
+PP_TERMINAL_SPAN=$(awk '/# postplan-rc3-terminal: begin/,/# postplan-env-breaker: end/' "$RUN_FILE")
+PP_BREAKER_ONLY=$(awk '/# postplan-env-breaker: begin/,/# postplan-env-breaker: end/' "$RUN_FILE")
+BLOCKED_FN=$(awk '/^dispose_plan_postplan_blocked\(\) \{/,/^\}/' "$RUN_FILE")
+REFUND_FN=$(awk '/^refund_attempt\(\) \{/,/^\}/' "$RUN_FILE")
+STALLED_FN=$(awk '/^phase_stalled\(\) \{/,/^\}/' "$RUN_FILE")
+ENVSTOP_FN=$(awk '/^write_env_stop_report\(\) \{/,/^\}/' "$RUN_FILE")
+eval "$REFUND_FN"; eval "$STALLED_FN"; eval "$ENVSTOP_FN"; eval "$BLOCKED_FN"
+
+# Anchor uniqueness: if an anchor is missing, the awk range reads to EOF.
+# If it is duplicated, the range starts at the wrong place.
+for anchor in '# postplan-rc3-terminal: begin' \
+              '# postplan-env-breaker: begin' \
+              '# postplan-env-breaker: end'; do
+    n=$(grep -cF -e "$anchor" "$RUN_FILE" || true)
+    assert_eq "$n" "1" "anchor '$anchor' appears exactly once in bin/automouse/run"
+done
+assert_contains "$PP_TERMINAL_SPAN" '"$PP_STATUS" -eq 3' "rc3 span tests PP_STATUS against 3"
+assert_contains "$PP_TERMINAL_SPAN" 'dispose_plan_postplan_blocked' "rc3 span calls the blocked disposer"
+assert_contains "$PP_BREAKER_ONLY" 'refund_attempt' "breaker span is the environmental breaker"
+assert_contains "$PP_BREAKER_ONLY" '"$PP_TERMINAL" -eq 0' "breaker is guarded by PP_TERMINAL"
+assert_contains "$BLOCKED_FN" 'dispose_plan_postplan_blocked() {' "blocked disposer extracted"
 
 # Sanity: confirm extraction captured the right block before evaling anything.
 assert_contains "$PP_BLOCK" 'PP_WORKTREE=$(automouse_worktree_for_plan' "PP block starts with the worktree resolution"
@@ -273,5 +302,125 @@ else
     printf '  FAIL row 11: --foreground not found in the postplan invocation block\n'
     FAILED=1
 fi
+
+echo
+echo "-- row 12: post-plan-now rc=3 (terminal BLOCKED) → skipped/, no refund, no env-stop, no break --"
+
+RC3_RESULT_LINE='RESULT: post-plan BLOCKED — rebase conflict, human required; ERROR terminal=failed, no PR opened.'
+
+# Builds a fresh sandbox and runs the LIVE PP block against a stub post-plan-now
+# that exits $1 instantly. When $2 = yes, the stub also prints RC3_RESULT_LINE to stdout.
+# shellcheck disable=SC2034  # globals are read by the eval'd spans
+rc3_sandbox() {
+    local stub_rc=$1 print_result=$2
+    SB=$(mktemp -d)
+    NIGHTLY_DIR="$SB/nightly"; QUEUE_DIR="$NIGHTLY_DIR/queue"
+    mkdir -p "$SB/run-dir/bin" "$SB/worktree" "$SB/plans" "$SB/handoff" "$QUEUE_DIR"
+    LOG="$SB/log"; : > "$LOG"
+    HANDOFF_DIR="$SB/handoff"
+    PLAN_NAME="test-plan.md"; PLAN_SLUG="test-plan"
+    HANDOFF_FILE="$HANDOFF_DIR/$PLAN_NAME.json"
+    WORKTREES_ROOT="$SB/no-such-worktrees-root"
+    PLANS_DIR="$SB/plans"; CMDPID_FILE="$SB/cmdpid"; REMAINING_SECS=30
+    SELF_DIR="$SB/run-dir/bin"
+    printf '# plan\n' > "$PLANS_DIR/$PLAN_NAME"
+    ln -s "$PLANS_DIR/$PLAN_NAME" "$QUEUE_DIR/$PLAN_NAME"   # queue entries are symlinks
+    NEXT_PLAN="$QUEUE_DIR/$PLAN_NAME"
+    # attempts=2 on purpose: refund_attempt DECREMENTS to 1 (file survives), so
+    # "attempt file absent" separates the rc=3 arm from a breaker refund.
+    ATTEMPT_FILE="$QUEUE_DIR/$PLAN_NAME.attempts"; echo 2 > "$ATTEMPT_FILE"
+    FAILURE_FILE="$QUEUE_DIR/$PLAN_NAME.failure"
+    CAP_REFUND_FILE="$QUEUE_DIR/$PLAN_NAME.cap-refunds"; echo 1 > "$CAP_REFUND_FILE"
+    MIN_VIABLE_SECS=60; STALL_KILL_SECS=1800
+    printf '{"worktree": "%s"}\n' "$SB/worktree" > "$HANDOFF_FILE"
+    STUB_RECORD="$SB/stub-record"; : > "$STUB_RECORD"
+    cat > "$SB/run-dir/post-plan-now" <<STUBEOF
+#!/bin/sh
+printf 'STUB-INVOKED\n' >> "$STUB_RECORD"
+[ "$print_result" = yes ] && printf '%s\n' '$RC3_RESULT_LINE'
+exit $stub_rc
+STUBEOF
+    chmod +x "$SB/run-dir/post-plan-now"
+    PP_LOG_BEFORE=$(wc -l < "$LOG")
+    PP_STATUS=0
+    eval "$PP_BLOCK"
+    PP_DUR=2   # instant exit: under MIN_VIABLE_SECS, so the breaker's fast-exit clause is live
+}
+
+# Runs a span under the runner's own `set -euo pipefail` inside a one-shot loop,
+# so the breaker's `break` is legal. The sentinel only prints when nothing broke out.
+run_span() {
+    ( set -euo pipefail
+      # shellcheck disable=SC2043  # intentional one-shot loop — `break` exits the subshell cleanly
+      for _pp_once in 1; do
+          eval "$1"
+          echo "SPAN-FELL-THROUGH"
+      done ) > "$SB/span.out" 2>&1
+    SPAN_RC=$?
+}
+
+yn() { if "$@"; then echo yes; else echo no; fi; }
+count_envstop() { find "$NIGHTLY_DIR" -name '*-env-stop-*' 2>/dev/null | wc -l | tr -d ' '; }
+skipped_report() { for f in "$NIGHTLY_DIR"/reports/*-skipped-"$PLAN_SLUG".md; do [ -f "$f" ] && echo "$f"; done; }
+
+# --- Row 12: rc=3 + RESULT line → terminal disposition ---
+rc3_sandbox 3 yes
+assert_eq "$PP_STATUS" "3" "row 12: PP_STATUS captures post-plan-now exit 3"
+run_span "$PP_TERMINAL_SPAN"
+assert_eq "$SPAN_RC" "0" "row 12: span completes under set -euo pipefail"
+assert_eq "$(grep -c '^STUB-INVOKED$' "$STUB_RECORD")" "1" "row 12: post-plan-now invoked exactly once"
+assert_eq "$(yn test -L "$NIGHTLY_DIR/skipped/$PLAN_NAME")" "yes" "row 12: plan symlink moved to skipped/"
+assert_eq "$(yn test -L "$QUEUE_DIR/$PLAN_NAME")" "no" "row 12: plan no longer in queue/"
+RPT=$(skipped_report)
+assert_eq "$(yn test -n "$RPT")" "yes" "row 12: skipped report written"
+assert_contains "$(cat "$RPT" 2>/dev/null)" "$RC3_RESULT_LINE" "row 12: report quotes the RESULT: line"
+assert_eq "$(yn test -e "$CAP_REFUND_FILE")" "no" "row 12: no .cap-refunds left in QUEUE_DIR"
+assert_eq "$(count_envstop)" "0" "row 12: no env-stop report"
+assert_eq "$(yn test -e "$ATTEMPT_FILE")" "no" "row 12: attempt file removed (not refunded)"
+assert_eq "$(yn test -e "$HANDOFF_FILE")" "no" "row 12: handoff removed"
+assert_contains "$(cat "$SB/span.out")" "SPAN-FELL-THROUGH" "row 12: breaker did NOT break the loop"
+assert_contains "$(cat "$LOG")" "postplan terminal (rc=3)" "row 12: arm logs its disposition"
+if grep -qF -e "Environmental failure during postplan" "$LOG"; then
+    printf '  FAIL row 12: env-breaker log line present\n'; FAILED=1
+else
+    printf '  ok   row 12: env-breaker log line absent\n'
+fi
+rm -rf "$SB"
+
+# --- Row 12b (boundary): rc=3 but no RESULT line → still terminal, fallback text ---
+rc3_sandbox 3 no
+run_span "$PP_TERMINAL_SPAN"
+assert_eq "$SPAN_RC" "0" "row 12b: no-RESULT grep miss does not abort under set -e"
+assert_eq "$(yn test -L "$NIGHTLY_DIR/skipped/$PLAN_NAME")" "yes" "row 12b: plan still dispositioned to skipped/"
+assert_contains "$(cat "$(skipped_report)" 2>/dev/null)" "printed no RESULT: line" "row 12b: report carries fallback text"
+rm -rf "$SB"
+
+# --- Row 12c (negative path): rc=1 fast exit → breaker unchanged ---
+rc3_sandbox 1 no
+run_span "$PP_TERMINAL_SPAN"
+assert_eq "$(yn test -L "$QUEUE_DIR/$PLAN_NAME")" "yes" "row 12c: rc=1 leaves plan in queue/"
+assert_eq "$(yn test -L "$NIGHTLY_DIR/skipped/$PLAN_NAME")" "no" "row 12c: rc=1 does not skip"
+assert_eq "$(count_envstop)" "1" "row 12c: rc=1 fast exit still writes env-stop report"
+assert_eq "$(cat "$ATTEMPT_FILE" 2>/dev/null)" "1" "row 12c: rc=1 refunds the attempt (2 -> 1)"
+if grep -qF -e "SPAN-FELL-THROUGH" "$SB/span.out"; then
+    printf '  FAIL row 12c: breaker did not break on rc=1 fast exit\n'; FAILED=1
+else
+    printf '  ok   row 12c: breaker broke the loop on rc=1 fast exit\n'
+fi
+rm -rf "$SB"
+
+# --- Row 12-neg (mutation control): rc=3 through the breaker ALONE ---
+# Simulates the pre-fix loop, with the arm removed or placed after the breaker,
+# where the breaker's `break` fires first. Row 12's assertions must be able to fail.
+rc3_sandbox 3 yes
+# shellcheck disable=SC2034  # PP_TERMINAL read by the eval'd PP_BREAKER_ONLY span
+PP_TERMINAL=0   # pre-fix code has no arm, so nothing sets it
+run_span "$PP_BREAKER_ONLY"
+assert_eq "$(yn test -L "$NIGHTLY_DIR/skipped/$PLAN_NAME")" "no" "row 12-neg: without arm, plan NOT in skipped/"
+assert_eq "$(yn test -L "$QUEUE_DIR/$PLAN_NAME")" "yes" "row 12-neg: without arm, plan stays in queue/"
+assert_eq "$(count_envstop)" "1" "row 12-neg: without arm, env-stop report written (the defect)"
+assert_eq "$(yn test -e "$CAP_REFUND_FILE")" "yes" "row 12-neg: without arm, .cap-refunds survives"
+assert_eq "$(cat "$ATTEMPT_FILE" 2>/dev/null)" "1" "row 12-neg: without arm, attempt refunded not cleared"
+rm -rf "$SB"
 
 exit "$FAILED"

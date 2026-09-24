@@ -1,7 +1,7 @@
 ---
 name: plan-prompt
 description: "Draft a /plan prompt distilled from the current conversation — ground-truth pointers, already-measured evidence, scope, constraints, verification, and the Step-3 architect tier — then, unless the Step-1.5 size triage says the work clears the ad-hoc bar, fire it as a detached headless Sonnet 4.6 run via bin/plan-now. Use after a design discussion when the planning run should be offloaded off the expensive session."
-last_verified: 2026-09-18
+last_verified: 2026-09-23
 ---
 
 # Draft a `/plan` handoff prompt and fire it headless
@@ -124,7 +124,8 @@ fences) only in the draft-only case where you do print it.
 
 4. **Hard constraints** — ADR references, invariants and orderings to preserve, PII
    boundaries, `auto_merge: false` when the change wants human signoff, whether
-   a resolved GitHub Issue should be closed in this PR (via `gh issue close`).
+   a resolved GitHub Issue should be closed in this PR (via a `## Backlog issues` section in the
+   plan, which post-plan turns into `Closes a-jay85/IBL5-backlog#N` in the PR body).
 
 5. **Blocking questions to resolve inside the plan** — unknowns that *change the
    design*. Mark them "resolve inside the plan"; don't leave them implicit and don't

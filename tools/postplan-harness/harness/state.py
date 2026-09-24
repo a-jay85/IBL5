@@ -109,6 +109,7 @@ class PlanInfo:
     planned_test_paths: list[str] = field(default_factory=list)
     critical_files: list[tuple] = field(default_factory=list)  # (path, annotation, exempt)
     required_test_methods: list[str] = field(default_factory=list)
+    backlog_issues: list[tuple] = field(default_factory=list)  # (kind, number); kind in {"closes", "refs"}
     truly_manual_rows: list[ManualRow] = field(default_factory=list)
     security_section: str = ""
     reuse_section: str = ""
@@ -266,6 +267,8 @@ class RunResult:
                 d["plan"].pop("rejected", None)
             if not d["plan"].get("required_test_methods"):
                 d["plan"].pop("required_test_methods", None)
+            if not d["plan"].get("backlog_issues"):
+                d["plan"].pop("backlog_issues", None)
             if not d["plan"].get("slug_drift"):
                 d["plan"].pop("slug_drift", None)
             if not d["plan"].get("plan_source"):

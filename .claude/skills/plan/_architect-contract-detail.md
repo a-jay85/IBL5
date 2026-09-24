@@ -1,6 +1,6 @@
 ---
 description: Read-on-demand detail for _architect-contract.md — incident callbacks, counter-examples, procedure elaboration, and taxonomy rationale moved from the rules spine. The plan-architect never reads it; load only when editing the contract.
-last_verified: 2026-09-08
+last_verified: 2026-09-23
 ---
 
 Read-on-demand companion to `_architect-contract.md` (the plan-architect's output contract). This file holds the incident callbacks, counter-examples, procedure elaboration, and extended rationale for each operative rule in the spine. The plan-architect never reads it — the spine's pointer lines name the specific section to open when editing the contract.
@@ -72,9 +72,13 @@ Silence is not coverage, and "we'll see once it's live" is not a plan. Dissolvin
 
 ### Backlog — GitHub Issue bookkeeping
 
-Findings live as GitHub Issues in `a-jay85/IBL5-backlog` (ADR-0121); the in-repo markdown backlog corpus and its table-status format are retired. There is no row to flip, no archive to move an evidence cell into, and no tracking doc to add to **Critical Files** — the bookkeeping is one `gh issue close` call, which is why the parent contract states it in a single bullet.
+Findings live as GitHub Issues in `a-jay85/IBL5-backlog` (ADR-0121). A plan records the issues it touches in a `## Backlog issues` section, and the PR that ships the plan closes them through GitHub's cross-repo closing keyword. Nothing closes an issue at implementation time.
 
-Resolve the Issue number while authoring (`bin/backlog search "<term>"`) and quote it in the step, so the closing call needs no lookup at implementation time.
+The earlier contract asked for an impl-time close step. It closed the issue when implementation finished, before review or merge, so an abandoned or reverted PR left a closed issue for unshipped work. A `Closes a-jay85/IBL5-backlog#N` line in the PR body closes the issue only when the PR merges into `master`. A stacked PR keeps its lines as written: GitHub retargets it to `master` when its parent merges, and the keywords fire on its own merge.
+
+Both post-plan engines read the section. The harness parses it with `parse_backlog_issues` in `tools/postplan-harness/harness/planfile.py` and rewrites the body with `normalize_backlog_closes` in `tools/postplan-harness/harness/classify.py`. The skill fallback runs the same two functions through the snippet in `.claude/skills/post-plan/_pr-body-claims.md`. The normalizer strips any closing keyword the PR-copy model writes in front of a `refs` issue, so `refs` is safe for partial work.
+
+Resolve the Issue number while authoring (`bin/backlog search "<term>"`) and write the full repo path. A bare `#N` points at IBL5's own issue N, and gate `[U]` rejects it.
 
 ### Post-merge — watcher setup procedure
 

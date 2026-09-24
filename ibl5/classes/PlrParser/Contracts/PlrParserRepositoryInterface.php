@@ -32,4 +32,13 @@ interface PlrParserRepositoryInterface
      * @return int Rows promoted (0 when already promoted or nothing to copy)
      */
     public function promotePriorSeasonSnapshots(int $priorYear): int;
+
+    /**
+     * Load every snapshot row for one season and phase, keyed by pid.
+     *
+     * @param int $seasonYear Season ending year
+     * @param string $phase snapshot_phase value, e.g. 'preseason'
+     * @return array<int, array<string, mixed>> Rows keyed by pid; empty when none exist
+     */
+    public function getSnapshotsByPhase(int $seasonYear, string $phase): array;
 }

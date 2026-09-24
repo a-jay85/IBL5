@@ -22,6 +22,11 @@ use Updater\StepResult;
  * keep overwriting the season's 'mid-season' row, so 'playoffs' is the last
  * snapshot of the season that nothing overwrites later.
  *
+ * During the Preseason phase it also writes a 'preseason' snapshot. Each
+ * Preseason run upserts it, so the row holds the last Preseason .plr state.
+ * PreseasonContinuityCheckStep compares it against the HEAT and Regular
+ * Season .plr to flag manual Preseason edits that were lost.
+ *
  * IBL-only — Olympics league does not use this step.
  */
 final class SnapshotPlrStep implements PipelineStepInterface
@@ -54,6 +59,8 @@ final class SnapshotPlrStep implements PipelineStepInterface
         ];
         if ($this->seasonPhase === 'Playoffs') {
             $phases[] = 'playoffs';
+        } elseif ($this->seasonPhase === 'Preseason') {
+            $phases[] = 'preseason';
         }
 
         $details = [];

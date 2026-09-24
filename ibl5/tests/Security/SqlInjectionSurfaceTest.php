@@ -24,6 +24,12 @@ class SqlInjectionSurfaceTest extends TestCase
     private const ESCAPE_ALLOWLIST = ['classes/Migration/SchemaValidator.php'];
 
     /**
+     * No leading \b: `mysqli_real_escape_string(` has no word boundary
+     * between `_` and `real`, and the procedural form must match too.
+     */
+    private const ESCAPE_PATTERN = '/(real_escape_string|escapeString)\s*\(/';
+
+    /**
      * Scan the repository's production roots.
      *
      * @param list<string> $allowlist
@@ -104,7 +110,7 @@ class SqlInjectionSurfaceTest extends TestCase
 
     public function testNoMysqliStringEscapingOutsideAllowlist(): void
     {
-        $hits = $this->scan('/\b(real_escape_string|escapeString)\s*\(/', self::ESCAPE_ALLOWLIST);
+        $hits = $this->scan(self::ESCAPE_PATTERN, self::ESCAPE_ALLOWLIST);
         self::assertSame([], $hits, "mysqli string escaping found; bind the value instead:\n" . implode("\n", $hits));
     }
 
@@ -122,10 +128,16 @@ class SqlInjectionSurfaceTest extends TestCase
         $dir = sys_get_temp_dir() . '/sqli-surface-' . bin2hex(random_bytes(4));
         mkdir($dir . '/classes', 0777, true);
         mkdir($dir . '/modules', 0777, true);
-        file_put_contents($dir . '/classes/Planted.php', "<?php\n\$db->real_escape_string(\$x);\n");
+        file_put_contents(
+            $dir . '/classes/Planted.php',
+            "<?php\n\$db->real_escape_string(\$x);\nmysqli_real_escape_string(\$db, \$x);\n"
+        );
         try {
-            $hits = $this->scanIn($dir, '/\b(real_escape_string|escapeString)\s*\(/');
-            self::assertSame(['classes/Planted.php:2: $db->real_escape_string($x);'], $hits);
+            $hits = $this->scanIn($dir, self::ESCAPE_PATTERN);
+            self::assertSame([
+                'classes/Planted.php:2: $db->real_escape_string($x);',
+                'classes/Planted.php:3: mysqli_real_escape_string($db, $x);',
+            ], $hits);
         } finally {
             unlink($dir . '/classes/Planted.php');
             rmdir($dir . '/classes');

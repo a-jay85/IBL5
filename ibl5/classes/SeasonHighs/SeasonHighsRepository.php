@@ -235,11 +235,12 @@ class SeasonHighsRepository extends \BaseMysqliRepository implements SeasonHighs
     }
 
     /**
-     * Characters a stat expression may contain: column names in backticks,
-     * digits, parentheses, `+`, `*`, and whitespace. Everything else
-     * (quotes, `;`, `-`, `/`, `#`) fails closed.
+     * Tokens a stat expression may contain: column names inside balanced
+     * backticks, bare integers, parentheses, `+`, `*`, and whitespace.
+     * Bare words (UNION, SELECT), unbalanced backticks, and everything else
+     * (quotes, `;`, `-`, `/`, `#`) fail closed.
      */
-    private const STAT_EXPRESSION_PATTERN = '/^[A-Za-z0-9_`()+*\s]+$/';
+    private const STAT_EXPRESSION_PATTERN = '/^(?:`[A-Za-z0-9_]+`|\d+|[()+*\s])+$/';
 
     /**
      * Strip the stat name down to the characters legal in a column alias.

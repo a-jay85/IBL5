@@ -98,7 +98,7 @@ class SeasonHighsRepositoryTest extends WideUnitTestCase
         ]);
 
         $result = $this->repo()->getSeasonHighsBatch(
-            ['POINTS' => 'gamePTS', 'ASSISTS' => 'gameAST'],
+            ['POINTS' => '`game_pts`', 'ASSISTS' => '`game_ast`'],
             '',
             '2025-01-01',
             '2025-01-31'
@@ -118,7 +118,7 @@ class SeasonHighsRepositoryTest extends WideUnitTestCase
         ]);
 
         $result = $this->repo()->getSeasonHighsBatch(
-            ['POINTS' => 'gamePTS'],
+            ['POINTS' => '`game_pts`'],
             '',
             '2025-01-01',
             '2025-02-28'
@@ -141,7 +141,7 @@ class SeasonHighsRepositoryTest extends WideUnitTestCase
         $this->mockDb->onQuery('ibl_box_scores', []);
 
         $result = $this->repo()->getSeasonHighsBatch(
-            ['POINTS' => 'gamePTS', 'ASSISTS' => 'gameAST'],
+            ['POINTS' => '`game_pts`', 'ASSISTS' => '`game_ast`'],
             '',
             '2025-01-01',
             '2025-01-31'
@@ -172,6 +172,26 @@ class SeasonHighsRepositoryTest extends WideUnitTestCase
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->repo()->getSeasonHighs('1; DROP TABLE ibl_plr; -- ', 'POINTS', '', '2025-01-01', '2025-01-31');
+    }
+
+    /**
+     * Payloads built only from allowlisted characters that the token pattern
+     * must still reject.
+     *
+     * @return iterable<string, array{string}>
+     */
+    public static function tokenOutsideAllowlistProvider(): iterable
+    {
+        yield 'bare word subquery' => ['(SELECT `pid` FROM `ibl_plr`)'];
+        yield 'bare column name' => ['game_ast'];
+        yield 'unbalanced backtick' => ['`game_ast` + `1 '];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('tokenOutsideAllowlistProvider')]
+    public function testGetSeasonHighsRejectsBareWordsAndUnbalancedBackticks(string $expression): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->repo()->getSeasonHighs($expression, 'POINTS', '', '2025-01-01', '2025-01-31');
     }
 
     public function testGetSeasonHighsBatchRejectsExpressionOutsideAllowlist(): void

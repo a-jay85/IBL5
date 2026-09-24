@@ -1,12 +1,21 @@
 ---
 description: Depth chart submission form, validation, and database update for GM team management; positions and offensive sets simplified.
-last_verified: 2026-09-22
+last_verified: 2026-09-23
 ---
 
 # Depth Chart Entry Module - Refactoring Documentation
 
 ## Overview
 The Depth Chart Entry module has been refactored to follow best practices for testability, maintainability, and separation of concerns.
+
+## Recent Updates (2026)
+
+**Security: IDOR Close + Roster Validation (September 2026)**
+- Closed IDOR in `updatePlayerDepthChart()`: WHERE clause now keys on `pid AND teamid` instead of player name, so a request cannot update a player on a different team
+- `DepthChartEntrySubmissionHandler` resolves `teamid` from the session before any DB write and passes it to every write method; `getPlayersOnTeam()` uses the session-derived id, not POST data
+- Added `validateRoster()` to `DepthChartEntryValidator`: rejects foreign pids, duplicate pids, and omissions of any roster player before writes begin
+- `DepthChartEntryProcessor` now extracts `pid` from POST for each player row (0 when absent or non-numeric)
+- Added 9 roster-validation tests in `DepthChartEntrySubmissionHandlerRosterTest`
 
 ## Recent Updates (2025)
 

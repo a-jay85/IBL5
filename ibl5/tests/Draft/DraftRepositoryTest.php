@@ -29,7 +29,7 @@ class DraftRepositoryTest extends TestCase
             ['player' => 'John Doe']
         ]);
 
-        $result = $this->repository->getCurrentDraftSelection(1, 5);
+        $result = $this->repository->getCurrentDraftSelection(2025, 1, 5);
 
         $this->assertSame('John Doe', $result);
     }
@@ -39,7 +39,7 @@ class DraftRepositoryTest extends TestCase
         $this->mockDb->setMockData([]);
         $this->mockDb->setNumRows(0);
 
-        $result = $this->repository->getCurrentDraftSelection(1, 5);
+        $result = $this->repository->getCurrentDraftSelection(2025, 1, 5);
 
         $this->assertNull($result);
     }
@@ -51,6 +51,7 @@ class DraftRepositoryTest extends TestCase
         $result = $this->repository->updateDraftTable(
             'John Doe',
             '2024-01-15 10:30:00',
+            2025,
             1,
             5
         );
@@ -70,6 +71,7 @@ class DraftRepositoryTest extends TestCase
         $result = $this->repository->updateDraftTable(
             "D'Angelo Russell",
             '2024-01-15 10:30:00',
+            2025,
             1,
             5
         );

@@ -16,6 +16,7 @@ use Repositories\TeamIdentityRepository;
 use Repositories\Contracts\TeamIdentityRepositoryInterface;
 use Season\Season;
 use Security\CsrfGuard;
+use Tests\Clock\FixedClock;
 
 /**
  * submitSelection() check (4) against real ibl_draft / ibl_draft_picks rows:
@@ -33,8 +34,8 @@ class DraftControllerOwnershipTest extends DatabaseTestCase
         // commit the outer one anyway; commit explicitly and clean up in tearDown().
         $this->db->commit();
         // Pre-clean any stale ibl_draft rows for the round/pick slots used by these tests.
-        // getOriginTeamIdForPick() has no year filter by design, so leftover rows from a
-        // prior interrupted run would shadow our freshly-inserted test rows.
+        // Clear these slots so rows left behind by an interrupted run cannot
+        // collide with the freshly-inserted YEAR / YEAR-1 test rows.
         $this->db->query('DELETE FROM `ibl_draft` WHERE `round` = 1 AND `pick` IN (1, 2, 3, 4, 5)');
         $_SESSION = [];
         $_POST = [];
@@ -44,7 +45,7 @@ class DraftControllerOwnershipTest extends DatabaseTestCase
     {
         $this->db->query("DELETE FROM ibl_plr WHERE name LIKE 'OwnershipTest %'");
         $this->db->query("DELETE FROM ibl_draft_class WHERE name LIKE 'OwnershipTest %'");
-        $this->db->query('DELETE FROM ibl_draft WHERE year = ' . self::YEAR);
+        $this->db->query('DELETE FROM ibl_draft WHERE year IN (' . (self::YEAR - 1) . ', ' . self::YEAR . ')');
         $this->db->query('DELETE FROM ibl_draft_picks WHERE year IN (' . (self::YEAR - 1) . ', ' . self::YEAR . ')');
         $_SESSION = [];
         $_POST = [];
@@ -52,7 +53,7 @@ class DraftControllerOwnershipTest extends DatabaseTestCase
         parent::tearDown();
     }
 
-    private function metrosController(): DraftController
+    private function metrosController(?\Clock\ClockInterface $clock = null): DraftController
     {
         $session = self::createStub(TeamIdentityRepositoryInterface::class);
         $session->method('getTeamnameFromUsername')->willReturn('Metros');
@@ -80,13 +81,14 @@ class DraftControllerOwnershipTest extends DatabaseTestCase
             self::createStub(DraftServiceInterface::class),
             null,
             null,
-            $nuke
+            $nuke,
+            $clock
         );
     }
 
-    private function submit(int $round, int $pick, string $player): string
+    private function submit(int $round, int $pick, string $player, ?\Clock\ClockInterface $clock = null): string
     {
-        return $this->metrosController()->submitSelection(
+        return $this->metrosController($clock)->submitSelection(
             ['teamname' => 'Metros', 'player' => $player, 'draft_round' => (string) $round, 'draft_pick' => (string) $pick],
             'user-cookie'
         );
@@ -128,6 +130,95 @@ class DraftControllerOwnershipTest extends DatabaseTestCase
         self::assertStringNotContainsString('You do not own this draft pick.', $result);
         self::assertSame('OwnershipTest Own', $this->draftedPlayerInSlot(1, 1));
         self::assertSame(1, $this->playerRowCount('OwnershipTest Own'));
+    }
+
+    public function testSubmittedPickStoresWellFormedDateTime(): void
+    {
+        $this->insertDraftClassRow('OwnershipTest Stamp', 'C');
+        $this->insertDraftRow(self::YEAR, 1, 1, 1, '');
+        $this->insertDraftPickRow(1, 1, self::YEAR, 1);
+
+        $this->submit(1, 1, 'OwnershipTest Stamp');
+
+        $result = $this->db->query(
+            'SELECT `date` FROM `ibl_draft` WHERE `year` = ' . self::YEAR
+            . ' AND `round` = 1 AND `pick` = 1'
+        );
+        self::assertInstanceOf(\mysqli_result::class, $result);
+        $row = $result->fetch_assoc();
+        self::assertIsArray($row);
+        self::assertMatchesRegularExpression(
+            '/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/',
+            (string) $row['date']
+        );
+    }
+
+    public function testPriorYearDraftedSlotDoesNotBlockCurrentYearPick(): void
+    {
+        $this->insertDraftClassRow('OwnershipTest Current', 'SF');
+        $this->insertDraftRow(self::YEAR - 1, 1, 1, 1, 'OwnershipTest Prior');
+        $this->insertDraftRow(self::YEAR, 1, 1, 1, '');
+        $this->insertDraftPickRow(1, 1, self::YEAR, 1);
+
+        $result = $this->submit(1, 1, 'OwnershipTest Current');
+
+        self::assertStringNotContainsString('You do not own this draft pick.', $result);
+        self::assertSame('OwnershipTest Current', $this->draftedPlayerInSlot(1, 1));
+        $priorRow = $this->db->query(
+            'SELECT player FROM ibl_draft WHERE year = ' . (self::YEAR - 1) . ' AND round = 1 AND pick = 1'
+        );
+        self::assertInstanceOf(\mysqli_result::class, $priorRow);
+        $priorData = $priorRow->fetch_assoc();
+        self::assertIsArray($priorData);
+        self::assertSame('OwnershipTest Prior', (string) $priorData['player']);
+    }
+
+    public function testSlotPresentOnlyInPriorYearIsRejected(): void
+    {
+        $this->insertDraftClassRow('OwnershipTest Ghost', 'PF');
+        $this->insertDraftRow(self::YEAR - 1, 1, 2, 1, '');
+        $this->insertDraftPickRow(1, 1, self::YEAR, 1);
+
+        $result = $this->submit(1, 2, 'OwnershipTest Ghost');
+
+        self::assertStringContainsString('That draft slot does not exist.', $result);
+        self::assertSame(0, $this->playerRowCount('OwnershipTest Ghost'));
+    }
+
+    public function testSubmittedPickStoresTwentyFourHourTimestamp(): void
+    {
+        $this->insertDraftClassRow('OwnershipTest Clock', 'C');
+        $this->insertDraftRow(self::YEAR, 1, 3, 1, '');
+        $this->insertDraftPickRow(1, 1, self::YEAR, 1);
+        $clock = new FixedClock((int) mktime(15, 30, 45, 6, 15, self::YEAR));
+        $this->submit(1, 3, 'OwnershipTest Clock', $clock);
+
+        $result = $this->db->query(
+            'SELECT `date` FROM `ibl_draft` WHERE `year` = ' . self::YEAR
+            . ' AND `round` = 1 AND `pick` = 3'
+        );
+        self::assertInstanceOf(\mysqli_result::class, $result);
+        $row = $result->fetch_assoc();
+        self::assertIsArray($row);
+        self::assertSame(self::YEAR . '-06-15 15:30:45', (string) $row['date']);
+    }
+
+    public function testSubmittedPickStoresMidnightHourAsZeroZero(): void
+    {
+        $this->insertDraftClassRow('OwnershipTest Midnight', 'PF');
+        $this->insertDraftRow(self::YEAR, 1, 4, 1, '');
+        $this->insertDraftPickRow(1, 1, self::YEAR, 1);
+        $clock = new FixedClock((int) mktime(0, 5, 7, 6, 15, self::YEAR));
+        $this->submit(1, 4, 'OwnershipTest Midnight', $clock);
+
+        $result = $this->db->query(
+            'SELECT `date` FROM `ibl_draft` WHERE `year` = ' . self::YEAR
+            . ' AND `round` = 1 AND `pick` = 4'
+        );
+        self::assertInstanceOf(\mysqli_result::class, $result);
+        $row = $result->fetch_assoc();
+        self::assertIsArray($row);
+        self::assertSame(self::YEAR . '-06-15 00:05:07', (string) $row['date']);
     }
 
     public function testGmSubmittingAnotherTeamsSlotIsRejectedWithNoPlayerInsert(): void

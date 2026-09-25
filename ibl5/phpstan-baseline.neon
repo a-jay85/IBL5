@@ -199,12 +199,6 @@ parameters:
 			path: classes/DepthChartEntry/DepthChartEntryView.php
 
 		-
-			rawMessage: 'Direct now-returning time call is banned outside the Clock seam. Inject Clock\ClockInterface (constructor for instance classes; settable static clock with factory fallback for static classes) and call $clock->now(). Pass an explicit timestamp to date()/strtotime() for deterministic formatting.'
-			identifier: ibl.directTime
-			count: 1
-			path: classes/Draft/DraftController.php
-
-		-
 			rawMessage: 'Parameter #3 $pickOwner of method Draft\Contracts\DraftViewInterface::renderDraftInterface() expects string, string|null given.'
 			identifier: argument.type
 			count: 1

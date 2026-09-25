@@ -12,6 +12,18 @@
 #   bin/plan-now --model opus <prompt-file> # orchestrator model (default claude-sonnet-4-6)
 #   bin/plan-now --no-dm <prompt-file>      # ... and skip the finish DM
 #   bin/plan-now --tier-ok "reason" ...     # suppress the tier mismatch gate with a reason
+#   bin/plan-now --resume <run-id>          # continue a FAILED run's own claude session
+#                                           #   instead of starting over. <run-id> is the
+#                                           #   <TS> of /tmp/plan-now-<TS>.log (the full
+#                                           #   com.ibl5.plan-now-<TS> label works too).
+#                                           #   Inherits that run's --model and disposition
+#                                           #   unless given again; skips the dup and tier
+#                                           #   gates (the prompt already passed them);
+#                                           #   refuses when the run's .sh or .session is
+#                                           #   gone, its label is still loaded, or its log
+#                                           #   does not end in a RESULT failed verdict.
+#                                           #   Every failed run's log and DM print the
+#                                           #   exact command. All queue-path gates stay.
 #   Pre-flight duplicate gate (--queue only): if the prompt's branch slug already has a
 #   planning artifact on disk (queue, plans dir, done, or skipped), plan-now declines
 #   before spending a model run and exits 3. --implement always bypasses the gate.
@@ -22,8 +34,8 @@
 #   false-positives on security words sitting inside negations. Gate skips silently
 #   when: the hint is not executable, no `MUST route to` directive, the hint exits
 #   non-zero, or it returns an unknown value.
-#   Exit codes: 0 ok, 1 internal error, 2 bad flag or missing file, 3 declined by dup
-#   gate, 4 declined by tier gate.
+#   Exit codes: 0 ok, 1 internal error, 2 bad flag, missing file, or a --resume that
+#   was refused, 3 declined by dup gate, 4 declined by tier gate.
 # ---
 # EVERY terminal outcome DMs you through bin/discord-dm — icon, verdict, elapsed,
 # what to do next, the plan path and the log path — so learning that a run
@@ -110,18 +122,26 @@ DISPOSITION="queue"
 NOTIFY=1
 PROMPT_SRC=""
 TIER_OK_REASON=""
+RESUME_ID=""        # old run's TS under --resume; empty on a normal fire
+MODEL_SET=0         # 1 when --model was given explicitly (resume keeps the old value otherwise)
+DISPOSITION_SET=0   # 1 when --queue/--implement was given explicitly
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        --queue)     DISPOSITION="queue"; shift ;;
-        --implement) DISPOSITION="implement"; shift ;;
-        --model)     MODEL="${2:?--model needs a value}"; shift 2 ;;
+        --queue)     DISPOSITION="queue"; DISPOSITION_SET=1; shift ;;
+        --implement) DISPOSITION="implement"; DISPOSITION_SET=1; shift ;;
+        --model)     MODEL="${2:?--model needs a value}"; MODEL_SET=1; shift 2 ;;
         --no-dm)     NOTIFY=0; shift ;;
         --tier-ok)
             if [ $# -lt 2 ] || [ -z "${2:-}" ]; then
                 echo "plan-now: --tier-ok requires a non-empty reason string." >&2; exit 2
             fi
             TIER_OK_REASON="$2"; shift 2 ;;
+        --resume)
+            if [ $# -lt 2 ] || [ -z "${2:-}" ]; then
+                echo "plan-now: --resume needs a run id: the <TS> of /tmp/plan-now-<TS>.log, or the full com.ibl5.plan-now-<TS> label." >&2; exit 2
+            fi
+            RESUME_ID="${2#com.ibl5.plan-now-}"; shift 2 ;;
         -h|--help)
             sed -n '/^# Usage:/,/^#$/p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         -*)
@@ -132,22 +152,92 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-[ -n "$PROMPT_SRC" ] || { echo "plan-now: usage: bin/plan-now [--queue|--implement] [--model M] [--no-dm] <prompt-file>" >&2; exit 2; }
-[ -s "$PROMPT_SRC" ] || { echo "plan-now: prompt file '$PROMPT_SRC' is missing or empty." >&2; exit 2; }
+if [ -n "$RESUME_ID" ]; then
+    [ -z "$PROMPT_SRC" ] || { echo "plan-now: --resume takes no prompt file; the resumed session already holds its prompt." >&2; exit 2; }
+    # YYYYMMDD-HHMMSS-PID, exactly the shape TS= below mints. Anything else is
+    # refused before it is interpolated into a /tmp path.
+    case "$RESUME_ID" in
+        [0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9][0-9][0-9]-[0-9]*) ;;
+        *) echo "plan-now: --resume id '$RESUME_ID' is not a plan-now run id (expected YYYYMMDD-HHMMSS-PID)." >&2; exit 2 ;;
+    esac
+    case "${RESUME_ID##*-}" in
+        *[!0-9]*) echo "plan-now: --resume id '$RESUME_ID' is not a plan-now run id (expected YYYYMMDD-HHMMSS-PID)." >&2; exit 2 ;;
+    esac
+else
+    [ -n "$PROMPT_SRC" ] || { echo "plan-now: usage: bin/plan-now [--queue|--implement] [--model M] [--no-dm] <prompt-file> | bin/plan-now --resume <run-id>" >&2; exit 2; }
+    [ -s "$PROMPT_SRC" ] || { echo "plan-now: prompt file '$PROMPT_SRC' is missing or empty." >&2; exit 2; }
 
-grep -q '^/plan' "$PROMPT_SRC" \
-    || { echo "plan-now: '$PROMPT_SRC' has no line starting with '/plan' — that is not a plan prompt." >&2; exit 2; }
+    grep -q '^/plan' "$PROMPT_SRC" \
+        || { echo "plan-now: '$PROMPT_SRC' has no line starting with '/plan' — that is not a plan prompt." >&2; exit 2; }
+fi
 
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) \
     || { echo "plan-now: not inside a git repo." >&2; exit 1; }
+
+# Source the library beside THIS script, never under $ROOT. $ROOT comes from
+# `git rev-parse --show-toplevel` of the CALLER's cwd, so running bin/plan-now
+# from a different worktree sends the source at that other worktree's bin/lib/
+# and the script dies before it mints anything. Found by the Phase 7e smoke:
+# `cd ../h2h-records-polish && <this worktree>/bin/plan-now ...` failed with
+# "bin/lib/session-id.sh: No such file or directory" under the $ROOT form.
+# shellcheck source=bin/lib/session-id.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib/session-id.sh"
 
 # Overridable for the smoke test only — ~/claude-plans is the single source of truth
 # (workflow-continuity.md), same shape as bug-pipeline-tick's BUG_PIPELINE_PLANS_DIR.
 PLANS_DIR="${PLAN_NOW_PLANS_DIR:-$HOME/claude-plans}"
 mkdir -p "$PLANS_DIR"
 
-# --- pre-flight duplicate gate (--queue only; --implement always proceeds) ---
-if [ "$DISPOSITION" = "queue" ] && [ -n "$PROMPT_SRC" ] && [ -f "$PROMPT_SRC" ]; then
+# --- resume resolution (--resume only) ---
+# Everything the old run left in /tmp is read here, before any gate or mint:
+# refuse loudly on the four unrecoverable states, then inherit MODEL and
+# DISPOSITION unless the resume call overrode them. NOTIFY and --tier-ok are
+# NOT inherited: the DM default is 1 as on any fire, and the tier gate is
+# skipped below, so the old override has nothing to override.
+if [ -n "$RESUME_ID" ]; then
+    OLD_LABEL="com.ibl5.plan-now-$RESUME_ID"
+    OLD_LOG="/tmp/plan-now-$RESUME_ID.log"
+    OLD_RUNNER="/tmp/plan-now-$RESUME_ID.sh"
+    OLD_SIDECAR=$(session_sidecar_path "$OLD_LOG")
+    resume_refuse() { echo "plan-now: cannot resume $RESUME_ID: $1" >&2; exit 2; }
+
+    [ -f "$OLD_RUNNER" ] || resume_refuse "no runner at $OLD_RUNNER (macOS clears /tmp; that run's settings are gone)."
+    [ -f "$OLD_SIDECAR" ] || resume_refuse "no session sidecar at $OLD_SIDECAR; the session id is unknown."
+    RESUME_SESSION=$(head -1 "$OLD_SIDECAR" | tr -d '[:space:]')
+    is_session_id "$RESUME_SESSION" || resume_refuse "sidecar $OLD_SIDECAR does not hold a session uuid."
+    # A loaded label means the run is still going (or launchd has not reaped it).
+    # `launchctl list <label>` exits 0 only for a loaded job. No launchctl (Linux
+    # CI) reads as not loaded.
+    if command -v launchctl >/dev/null 2>&1 && launchctl list "$OLD_LABEL" >/dev/null 2>&1; then
+        resume_refuse "label $OLD_LABEL is still loaded in launchd; that run has not finished. Wait for its finish DM."
+    fi
+    [ -f "$OLD_LOG" ] || resume_refuse "no log at $OLD_LOG; with no verdict the run is not known to have failed."
+    LAST_VERDICT=$(grep '^plan-now: RESULT ' "$OLD_LOG" | tail -1) || LAST_VERDICT=""
+    case "$LAST_VERDICT" in
+        "plan-now: RESULT failed"*) ;;
+        "")  resume_refuse "log $OLD_LOG carries no RESULT verdict; only a failed run is resumable." ;;
+        *)   resume_refuse "log $OLD_LOG ends in '$LAST_VERDICT'; only a failed run is resumable." ;;
+    esac
+
+    # The runner wrote these with printf %q. Both are plain tokens in practice;
+    # anything %q had to escape fails the shape check and is refused rather
+    # than eval'd.
+    OLD_MODEL=$(sed -n 's/^MODEL=//p' "$OLD_RUNNER" | head -1)
+    OLD_DISPOSITION=$(sed -n 's/^DISPOSITION=//p' "$OLD_RUNNER" | head -1)
+    case "$OLD_MODEL" in
+        '' | *[!A-Za-z0-9._-]*) resume_refuse "runner $OLD_RUNNER has no parseable MODEL= line." ;;
+    esac
+    case "$OLD_DISPOSITION" in
+        queue | implement) ;;
+        *) resume_refuse "runner $OLD_RUNNER has no parseable DISPOSITION= line." ;;
+    esac
+    [ "$MODEL_SET" = 1 ]       || MODEL="$OLD_MODEL"
+    [ "$DISPOSITION_SET" = 1 ] || DISPOSITION="$OLD_DISPOSITION"
+    echo "plan-now: resuming run $RESUME_ID (session $RESUME_SESSION, model $MODEL, disposition $DISPOSITION)."
+fi
+
+# --- pre-flight duplicate gate (--queue only; --implement and --resume always proceed) ---
+if [ -z "$RESUME_ID" ] && [ "$DISPOSITION" = "queue" ] && [ -n "$PROMPT_SRC" ] && [ -f "$PROMPT_SRC" ]; then
     DUP_CHECK="${PLAN_NOW_DUP_CHECK:-$ROOT/bin/plan-dup-check}"
     if [ -x "$DUP_CHECK" ]; then
         DUP_RC=0
@@ -170,9 +260,9 @@ if [ "$DISPOSITION" = "queue" ] && [ -n "$PROMPT_SRC" ] && [ -f "$PROMPT_SRC" ];
     fi
 fi
 
-# --- pre-flight architect-tier mismatch gate ---
+# --- pre-flight architect-tier mismatch gate (skipped under --resume: the prompt already ran) ---
 TIER_HINT="${PLAN_NOW_TIER_HINT:-$ROOT/bin/plan-tier-hint}"
-if [ -x "$TIER_HINT" ]; then
+if [ -z "$RESUME_ID" ] && [ -x "$TIER_HINT" ]; then
     TASK_LINE=$(grep -m1 '^/plan' "$PROMPT_SRC" || true)
     if [ -n "$TASK_LINE" ]; then
         DIRECTIVE_LINE=$(grep -m1 'MUST route to' "$PROMPT_SRC" 2>/dev/null || true)
@@ -245,21 +335,28 @@ PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 # can see a live label with no sidecar. Derived from $LOG (launchd's StandardOutPath),
 # never $OUT — fleet-status resolves the row's log from the label, so only
 # ${LOG%.log}.session is findable.
-# Source the library beside THIS script, never under $ROOT. $ROOT comes from
-# `git rev-parse --show-toplevel` of the CALLER's cwd, so running bin/plan-now
-# from a different worktree sends the source at that other worktree's bin/lib/
-# and the script dies before it mints anything. Found by the Phase 7e smoke:
-# `cd ../h2h-records-polish && <this worktree>/bin/plan-now ...` failed with
-# "bin/lib/session-id.sh: No such file or directory" under the $ROOT form.
-# shellcheck source=bin/lib/session-id.sh
-. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)/lib/session-id.sh"
-SESSION_ID=$(mint_session_id) || {
-    echo "plan-now: could not mint a session uuid — no uuidgen, no /proc uuid, no python3." >&2
-    exit 1
-}
+if [ -n "$RESUME_ID" ]; then
+    # Same uuid, no fork: `claude --resume <id>` continues that session in place,
+    # so the transcript bin/fleet-status resolves through the NEW sidecar is the
+    # old session's transcript, which is the one that has the work in it.
+    SESSION_ID="$RESUME_SESSION"
+else
+    SESSION_ID=$(mint_session_id) || {
+        echo "plan-now: could not mint a session uuid — no uuidgen, no /proc uuid, no python3." >&2
+        exit 1
+    }
+fi
 write_session_sidecar "$LOG" "$SESSION_ID" \
     || { echo "plan-now: could not write the session sidecar next to $LOG." >&2; exit 1; }
 
+if [ -n "$RESUME_ID" ]; then
+    # The resumed session already holds the original prompt and coda; nothing is
+    # re-sent. $PROMPT stays defined because the runner's run_slug() reads it for
+    # draft recovery; point it at the old run's copy. If macOS has cleared that
+    # file, run_slug() finds nothing and both recovery legs no-op, which is the
+    # existing slugless-prompt behaviour.
+    PROMPT="/tmp/plan-now-$RESUME_ID.prompt"
+else
 # Own a private copy: the caller's mktemp block may be cleaned up long before
 # launchd gets around to running the job.
 if [ -e "$PROMPT" ]; then
@@ -328,6 +425,15 @@ conflicting default in the skill):**
   already started one, collect it before you finish.
 - $DISPOSITION_LINE
 CODA
+fi
+
+# The resume turn's whole prompt. Short on purpose: the session already holds the
+# original prompt and the headless coda, so this restates only what a cut-off
+# turn loses: where it was, what is already on disk, and the marker contract.
+CONTINUE_MSG=""
+if [ -n "$RESUME_ID" ]; then
+    CONTINUE_MSG="Your previous turn was cut off before it finished (a usage limit or the run timeout). Continue exactly where you stopped. Do not restart exploration and do not re-plan from scratch: any file under $PLANS_DIR (including $PLANS_DIR/.drafts/) that belongs to this task is your own partial work; index it with bin/plan-index, read it by range, and finish it. Every headless run constraint from the original prompt still applies: never ask a question, run every sub-agent in the foreground, never run bin/automouse/queue yourself, and run bin/check-plan then bin/check-plan-staleness on the finished plan before you stop. The last line of your final message must be exactly: PLAN_FILE: $PLANS_DIR/<slug>.md"
+fi
 
 # ---------------------------------------------------------------------------
 # The detached job. The plist invokes this runner by path rather than inlining
@@ -355,6 +461,9 @@ REVIEW_ROUTE_DEFAULT=$(grep -oE "'/discordPlanReviewDM'" \
     printf 'LABEL=%q\n'      "$LABEL"
     printf 'PLIST=%q\n'      "$PLIST"
     printf 'SESSION_ID=%q\n' "$SESSION_ID"
+    printf 'TS=%q\n'           "$TS"
+    printf 'RESUME_FROM=%q\n'  "$RESUME_ID"
+    printf 'CONTINUE_MSG=%q\n' "$CONTINUE_MSG"
     printf 'DISPOSITION=%q\n' "$DISPOSITION"
     printf 'LOG=%q\n'         "$LOG"
     printf 'NOTIFY=%q\n'         "$NOTIFY"
@@ -392,6 +501,7 @@ DM_NEXT=""      # what happens next: queued, or waiting on you
 DM_PLAN=""      # the plan this run produced, when it is known
 DM_REVIEW_BUTTONS=""  # "queue discard", "discard", or "" — set per outcome, never inherited
 DM_REVIEW_PLAN=""     # plan path for the review DM; never aliased from DM_PLAN
+DM_RESUME=""          # "bin/plan-now --resume <TS>" on a failed exit, else empty
 
 # Draft recovery. A run whose plan-architect was backgrounded and cut off leaves
 # a complete draft in $PLANS_DIR/.drafts/ while printing no PLAN_FILE: line.
@@ -497,12 +607,25 @@ promote_draft() {
 # BASH shell is killed after a 5s grace regardless of this value — which is why the coda
 # above forbids backgrounding outright and ~/.claude/hooks/bash-guard.sh check 17 denies it
 # under CLAUDE_HEADLESS.
+# Session binding. A fresh run pins a minted uuid with --session-id and sends the
+# prompt file. A resume continues the OLD session with --resume and sends only
+# the continue message: the prompt and the coda are already in that session, and
+# re-sending them is how a resumed run restarts from scratch. Same uuid either
+# way, so ${LOG%.log}.session always names the transcript bin/fleet-status wants.
+if [ -n "${RESUME_FROM:-}" ]; then
+    echo "plan-now: resuming session $SESSION_ID from run $RESUME_FROM"
+    PROMPT_TEXT="$CONTINUE_MSG"
+    SESSION_ARGS=(--resume "$SESSION_ID")
+else
+    PROMPT_TEXT=$(cat "$PROMPT")
+    SESSION_ARGS=(--session-id "$SESSION_ID")
+fi
 CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
     CLAUDE_HEADLESS=1 caffeinate -s \
-    timeout "$RUN_TIMEOUT" "$CLAUDE_BIN" -p "$(cat "$PROMPT")" \
+    timeout "$RUN_TIMEOUT" "$CLAUDE_BIN" -p "$PROMPT_TEXT" \
     --dangerously-skip-permissions \
     --model "$MODEL" \
-    --session-id "$SESSION_ID" \
+    "${SESSION_ARGS[@]}" \
     --effort high \
     --name "$LABEL" > "$OUT" 2>&1
 rc=$?
@@ -548,6 +671,11 @@ if [ "$rc" -ne 0 ]; then
         echo "plan-now: it had claimed $plan — treat that file as PARTIAL; a human must read it."
     fi
     echo "plan-now: check-plan deliberately NOT run — it can pass on a truncated plan. NOT queued."
+    # Every failed exit gets the resume line, not only a usage-limit kill: the
+    # runner cannot tell the two apart from rc, and the pre-flight in bin/plan-now
+    # refuses anything that is not actually resumable.
+    echo "plan-now: to continue this session where it stopped: bin/plan-now --resume $TS"
+    DM_RESUME="bin/plan-now --resume $TS"
 elif [ -n "$plan" ]; then
     echo "plan-now: new plan -> $plan"
     if "$CHECK_PLAN" "$plan"; then
@@ -791,6 +919,10 @@ ${DM_PLAN/#$HOME/~}"
         msg="$msg
 tier-ok: $TIER_OVERRIDE"
     fi
+    if [ -n "${DM_RESUME:-}" ]; then
+        msg="$msg
+resume: $DM_RESUME"
+    fi
     msg="$msg
 log: $LOG"
 
@@ -870,6 +1002,7 @@ if [ "${PLAN_NOW_DRY_RUN:-0}" = "1" ]; then
     echo "  runner: $RUNNER"
     echo "  plist:  $PLIST"
     echo "  prompt: $PROMPT"
+    if [ -n "$RESUME_ID" ]; then echo "  resume: $RESUME_ID"; fi
     exit 0
 fi
 
@@ -878,6 +1011,9 @@ launchctl bootstrap "gui/$(id -u)" "$PLIST"
 
 echo "plan-now: fired a detached headless /plan run."
 echo "  model:       $MODEL   (orchestrator; the Step-3 architect tier is set by the prompt)"
+if [ -n "$RESUME_ID" ]; then
+    echo "  resume:      run $RESUME_ID, session $SESSION_ID (no prompt re-sent; dup and tier gates skipped)"
+fi
 if [ "$DISPOSITION" = "queue" ]; then
     echo "  disposition: queue   (this job queues the plan for automouse if it exits clean AND check-plan passes)"
 else

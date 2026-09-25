@@ -56,6 +56,40 @@ test.describe('ASG Voting', () => {
   test('no PHP errors on ASG ballot', async ({ page }) => {
     await assertNoPhpErrors(page, 'on ASG ballot');
   });
+
+  test('responsive-table class survives collapse-then-resize on ballot category', async ({ page }) => {
+    // Narrow viewport so ballot tables overflow and get responsive treatment
+    await page.setViewportSize({ width: 320, height: 800 });
+
+    // Expand the ECF category
+    const ecfHeader = page.locator('.voting-category').first();
+    await ecfHeader.click();
+
+    const ecfTable = page.locator('#ECF');
+    await expect(ecfTable).toBeVisible();
+
+    // Process at the narrow viewport — table should overflow and get responsive-table
+    await page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).IBL_refreshResponsiveTables();
+    });
+    await expect(ecfTable).toHaveClass(/responsive-table/);
+
+    // Collapse the category so the table is hidden
+    await ecfHeader.click();
+    await expect(ecfTable).not.toBeVisible();
+
+    // Simulate a resize while the table is hidden — the class must not be stripped
+    await page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).IBL_refreshResponsiveTables();
+    });
+
+    // Re-expand and confirm responsive state survived
+    await ecfHeader.click();
+    await expect(ecfTable).toBeVisible();
+    await expect(ecfTable).toHaveClass(/responsive-table/);
+  });
 });
 
 // ============================================================

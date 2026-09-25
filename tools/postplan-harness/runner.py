@@ -45,9 +45,10 @@ from harness.classify import (BACKLOG_REPO, FILES_CHANGED_BEGIN, FILES_CHANGED_E
                               name_status_text, normalize_backlog_closes, numstat_text,
                               qualify_backlog_refs,
                               render_files_changed, render_manual_confirmation,
-                              render_reviewer_verification, strip_manual_testing_section,
+                              render_residual_phases, render_reviewer_verification,
+                              strip_manual_testing_section,
                               upsert_files_changed, upsert_manual_confirmation,
-                              upsert_reviewer_verification)
+                              upsert_residual_phases, upsert_reviewer_verification)
 from harness.planfile import locate_plan, split_hold_justification
 from harness.review import ReviewPhase
 from harness.state import (HarnessError, RunResult, TerminalState, UsageLedger)
@@ -305,6 +306,7 @@ def run(fixture: dict | None, out_dir: str, llm, *, mode: str = "replay",
             copy["summary_md"] = check["corrected_body"]
             for f in check.get("findings", []):
                 log(f"phase2 body-check finding: {f}")
+        _inject_residual_phases(copy, plan, files, log)
         _commit_with_adr_draft(git, log, "phase2", llm=llm, worktree=worktree,
                                out_dir=out_dir, res=res)
         sha = _commit_with_gate_remediation(
@@ -1226,6 +1228,22 @@ def _check_backlog_closes(gh, pr, plan, log) -> None:
         return
     msg = backlog_closes_mismatch(closes, base, refs)
     log(msg)
+
+
+def _inject_residual_phases(copy: dict, plan, files: list[str], log) -> list[str]:
+    """Phase 2: upsert `## Residual Phases` into copy["summary_md"] from phase-omission items.
+
+    Runs AFTER _body_check so an LLM-corrected body cannot drop the block, and BEFORE the
+    commit so the commit body and the PR body carry it. Idempotent: an empty item list
+    removes a stale block. Never raises on a plan-blind run (phase_omission_items returns
+    [] when plan.found is False). Returns the items for the caller's log line.
+    """
+    items = conformance.phase_omission_items(plan, files)
+    copy["summary_md"] = upsert_residual_phases(copy["summary_md"],
+                                                render_residual_phases(items))
+    for it in items:
+        log(f"phase2 residual-phase: {it}")
+    return items
 
 
 def _body_check(llm, git, gh, copy, copy_degraded, cls, log) -> tuple[dict, bool]:

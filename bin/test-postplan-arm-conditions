@@ -151,6 +151,7 @@ run_cond3() {
         empty) : > "$bridge" ;;
         items) echo 'MISSING: ibl5/tests/FooTest.php (matrix planned a test the diff never wrote)' > "$bridge" ;;
         fileitems) echo 'MISSING-FILE: bin/check-plan (plan Critical File never appeared in the diff)' > "$bridge" ;;
+        phaseitems) echo 'MISSING-PHASE: 2 — Foo (phase cites harness/b.py; none appeared in the diff)' > "$bridge" ;;
     esac
     DONE_MARK="$mark" BRIDGE="$bridge" bash -c "$1" 2>&1
 }
@@ -533,6 +534,8 @@ expect_block "(3) marker + absent bridge -> NONE (5.0 skipped, plan-blind)" NONE
 # arming exactly as a MISSING: test item does. Requirement 5.
 expect_block "(3) marker + unresolved MISSING-FILE -> BLOCK" BLOCK \
     "$(run_cond3 "$B3" yes fileitems)"
+expect_block "(3) marker + unresolved MISSING-PHASE -> BLOCK" BLOCK \
+    "$(run_cond3 "$B3" yes phaseitems)"
 
 # --- condition (3) on the COMPILED-HARNESS path (run-dir-keyed handoff) ---
 # Same block, same three states, but driven through the real filenames

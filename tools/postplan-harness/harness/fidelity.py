@@ -166,9 +166,12 @@ def build_work_list(verdict_path: str,
     # UNMET-CONTRACT entries are deliberately excluded: they name evidence the plan
     # declared, and a fixer that "adds" such evidence is the fabrication conformance
     # exists to catch.
+    # MISSING-PHASE is excluded for the same reason: the fix is a whole plan phase, which
+    # is human work, and the item still holds arming through condition (3).
     for entry in (unresolved_conformance or []):
-        if str(entry).startswith("MISSING"):
-            items.append({"hold": "3", "text": str(entry)})
+        text = str(entry)
+        if text.startswith("MISSING") and not text.startswith("MISSING-PHASE"):
+            items.append({"hold": "3", "text": text})
     for fail in (meta_check_failures or []):
         items.append({"hold": "16",
                       "text": f"{fail.get('name', 'unknown')}\n{fail.get('output', '')}"})
@@ -219,7 +222,13 @@ OVERRIDE = (
     "Emit the COMPLETE verdict document as your final message: the full 6d checks, the "
     "6e verdict word on a line of its own (exactly one of `READY`, `READY WITH NOTES`, "
     "or `NOT READY`), and the 6e(b) digest below a `## DIGEST` line. Read your inputs "
-    "from the packet files named in the prompt."
+    "from the packet files named in the prompt. `plan-index.txt` in the packet is the "
+    "`bin/plan-index` output for the plan; use it as the authoritative phase roster and "
+    "read `plan.md` by those line ranges. `bin/check-digest-prose` does not run on this "
+    "path, so apply `.claude/review-shared/_prose-voice-contract.md` to the digest by "
+    "hand. These are the designed tool budget, not gaps: never list the missing Write "
+    "or Bash tools, the verdict-file save, plan indexing, or the digest linter under a "
+    "\"Couldn't do\" heading or anywhere else in the verdict."
 )
 
 PLAN_BLIND_MARKER = (
@@ -304,6 +313,28 @@ def _find_procedure(worktree: str, master_sha: str, paths, kind: str) -> str:
     raise HarnessError(kind, f"{master_sha}: none of {', '.join(paths)}")
 
 
+PLAN_INDEX_BLIND = "(plan-blind run: no plan, so no index)\n"
+
+
+def _plan_index(worktree: str, plan_path: str) -> str:
+    """`bin/plan-index` output for the packet's plan copy.
+
+    The reviewer has no Bash, so the harness runs the index for it. Any failure becomes a
+    marker telling the reviewer to find `## ` headings with Grep instead; it never
+    aborts the packet.
+    """
+    script = os.path.join(worktree, "bin", "plan-index")
+    try:
+        proc = subprocess.run([script, plan_path], cwd=worktree,
+                              capture_output=True, text=True)
+    except OSError as e:
+        return f"(bin/plan-index unavailable: {e}; Grep plan.md for '^## ' instead)\n"
+    if proc.returncode != 0:
+        return (f"(bin/plan-index exited {proc.returncode}: {proc.stderr.strip()}; "
+                "Grep plan.md for '^## ' instead)\n")
+    return proc.stdout
+
+
 def build_packet(out_dir: str, master_sha: str, reviewed_tree: str, plan, diff: str,
                  pr_body: str, pr_number: int | str, phase4b_ran: bool, *,
                  worktree: str = ".", packet_name: str = "fidelity-packet",
@@ -325,10 +356,13 @@ def build_packet(out_dir: str, master_sha: str, reviewed_tree: str, plan, diff: 
         try:
             with open(plan.path) as fh:
                 _write("plan.md", fh.read())
+            _write("plan-index.txt", _plan_index(worktree, os.path.join(packet, "plan.md")))
         except OSError:
             _write("plan.md", PLAN_BLIND_MARKER)
+            _write("plan-index.txt", PLAN_INDEX_BLIND)
     else:
         _write("plan.md", PLAN_BLIND_MARKER)
+        _write("plan-index.txt", PLAN_INDEX_BLIND)
 
     _write("diff.patch", diff or "")
     _write("pr-body.md", pr_body or "")
@@ -353,6 +387,7 @@ def _pointer_prompt(packet_dir: str, pr_number: int | str) -> str:
         "Every input is already on disk. Read these files:\n"
         f"  - {os.path.join(packet_dir, 'procedure.md')}  — the 6b-6e procedure; follow it exactly\n"
         f"  - {os.path.join(packet_dir, 'plan.md')}       — the plan (or a plan-blind marker)\n"
+        f"  - {os.path.join(packet_dir, 'plan-index.txt')} — `bin/plan-index` output for plan.md\n"
         f"  - {os.path.join(packet_dir, 'diff.patch')}    — the post-rebase diff under review\n"
         f"  - {os.path.join(packet_dir, 'pr-body.md')}    — the PR body\n"
         f"  - {os.path.join(packet_dir, 'context.md')}    — run context\n\n"

@@ -7,8 +7,8 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from harness.conformance import check
-from harness.state import PlanInfo
+from harness.conformance import check, phase_omission_items
+from harness.state import PhaseInfo, PlanInfo
 
 
 def _plan_with_test(path: str) -> PlanInfo:
@@ -140,3 +140,158 @@ def test_empty_token_is_missing():
     plan = _plan_with_test("/")
     items = check(plan, ["any/file.py"])
     assert any("MISSING" in i for i in items)
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: phase_omission_items / check integration (post-impl)
+# ---------------------------------------------------------------------------
+
+def _plan_with_phases(phases, deferred=()):
+    return PlanInfo(found=True, has_matrix=True,
+                    phases=list(phases),
+                    deferred_phase_numbers=list(deferred))
+
+
+def test_phase_with_untouched_evidence_is_missing():
+    """Untouched evidence path → one MISSING-PHASE item naming the path.
+
+    Mutation caught: inverting `if any(...)` to `if not any(...)` yields zero items.
+    """
+    ph = PhaseInfo(number=2, heading="Phase 2: Do stuff", evidence_paths=["harness/x.py"])
+    plan = _plan_with_phases([ph])
+    items = phase_omission_items(plan, ["harness/y.py"])
+    assert len(items) == 1
+    assert items[0].startswith("MISSING-PHASE: 2 —")
+    assert "harness/x.py" in items[0]
+
+
+def test_phase_with_any_touched_evidence_ships():
+    """Suffix match on ANY evidence path → no item.
+
+    Mutation caught: requiring all() instead of any() emits an item.
+    """
+    ph = PhaseInfo(number=2, heading="Phase 2: Do stuff",
+                   evidence_paths=["harness/x.py", "harness/z.py"])
+    plan = _plan_with_phases([ph])
+    items = phase_omission_items(plan, ["tools/postplan-harness/harness/z.py"])
+    assert items == []
+
+
+def test_phase_basename_ambiguous_hit_counts_as_shipped():
+    """2+ files with same basename → shipped (contrast _resolve's unique-hit rule).
+
+    Mutation caught: replacing _touched with _resolve(...) is not None emits an item.
+    """
+    ph = PhaseInfo(number=3, heading="Phase 3: A", evidence_paths=["tests/test_a.py"])
+    plan = _plan_with_phases([ph])
+    items = phase_omission_items(plan, ["a/tests/test_a.py", "b/tests/test_a.py"])
+    assert items == []
+
+
+def test_bookkeeping_phase_is_exempt():
+    """bookkeeping=True → no item even with untouched evidence.
+
+    Mutation caught: dropping `ph.bookkeeping or` emits an item.
+    """
+    ph = PhaseInfo(number=4, heading="Close backlog [phases: S]",
+                   evidence_paths=["docs/x.md"], bookkeeping=True)
+    plan = _plan_with_phases([ph])
+    items = phase_omission_items(plan, [])
+    assert items == []
+
+
+def test_deferred_phase_is_exempt():
+    """Phase number in deferred_phase_numbers → no item; different number is not exempt.
+
+    Mutation caught: dropping `ph.number in deferred` fails the first assertion.
+    """
+    ph = PhaseInfo(number=5, heading="Phase 5: Defer me", evidence_paths=["bin/x"])
+    plan_deferred = _plan_with_phases([ph], deferred=[5])
+    assert phase_omission_items(plan_deferred, []) == []
+
+    plan_other = _plan_with_phases([ph], deferred=[6])
+    items = phase_omission_items(plan_other, [])
+    assert len(items) == 1
+
+
+def test_phase_without_evidence_is_exempt():
+    """evidence_paths=[] → no item (cannot verify = skip).
+
+    Mutation caught: dropping `not ph.evidence_paths` emits an item.
+    """
+    ph = PhaseInfo(number=7, heading="ADR", evidence_paths=[])
+    plan = _plan_with_phases([ph])
+    assert phase_omission_items(plan, []) == []
+
+
+def test_check_includes_phase_items_for_matrixless_plan():
+    """has_matrix=False plan still gets MISSING-PHASE items from check().
+
+    Mutation caught: moving items.extend(...) below the has_matrix early return drops it.
+    """
+    ph = PhaseInfo(number=2, heading="Phase 2: B", evidence_paths=["bin/b"])
+    plan = PlanInfo(found=True, has_matrix=False, phases=[ph])
+    items = check(plan, [])
+    assert any(i.startswith("MISSING-PHASE: 2") for i in items)
+
+
+def test_check_not_found_plan_yields_nothing():
+    """found=False → check returns [] even with untouched phases.
+
+    Mutation caught: removing the plan.found guard in phase_omission_items emits an item.
+    """
+    ph = PhaseInfo(number=3, heading="Phase 3: C", evidence_paths=["harness/c.py"])
+    plan = PlanInfo(found=False, phases=[ph])
+    assert check(plan, []) == []
+
+
+def test_phase_omission_end_to_end_positive_and_negative():
+    """locate_plan + check: exactly one MISSING-PHASE: 2 on negative diff, zero on positive.
+
+    Exemptions tested: phase 3 bookkeeping, phase 4 deferred, phase 5 no evidence.
+    Mutation caught: any one exemption dropped raises the negative count above one;
+    dropping the locate_plan wiring drops it to zero.
+    """
+    from harness.planfile import locate_plan
+
+    plan_text = """---
+impl_model: sonnet
+---
+
+# Test plan
+
+## Phase 1: A
+
+`harness/a.py`
+
+## Phase 2: B
+
+`harness/b.py`
+
+## Phase 3: Close backlog [phases: S]
+
+`docs/x.md`
+
+## Phase 4: D
+
+`bin/d`
+
+## Phase 5: E
+
+No backticked path here.
+
+## Out of Scope
+
+- Phase 4 is deferred.
+"""
+    plan_info = locate_plan("x", content_override=plan_text)
+
+    # negative: only phase 1 shipped → phase 2 is missing (3=bookkeeping, 4=deferred, 5=no evidence)
+    items_neg = check(plan_info, ["tools/postplan-harness/harness/a.py"])
+    missing_phase = [i for i in items_neg if i.startswith("MISSING-PHASE:")]
+    assert len(missing_phase) == 1
+    assert missing_phase[0].startswith("MISSING-PHASE: 2 —")
+
+    # positive: both phases shipped → no MISSING-PHASE items
+    items_pos = check(plan_info, ["harness/a.py", "harness/b.py"])
+    assert not any(i.startswith("MISSING-PHASE:") for i in items_pos)

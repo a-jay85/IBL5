@@ -1,6 +1,6 @@
 {
     "phpstan-baseline.neon": {
-        "argument.type": 357,
+        "argument.type": 355,
         "binaryOp.invalid": 18,
         "booleanAnd.leftNotBoolean": 1,
         "booleanAnd.rightNotBoolean": 1,
@@ -21,7 +21,7 @@
         "function.nameCase": 2,
         "function.strict": 1,
         "ibl.bannedAddslashes": 4,
-        "ibl.bannedNukeGlobal": 62,
+        "ibl.bannedNukeGlobal": 61,
         "ibl.castFunction": 1,
         "ibl.deprecatedHtmlTag": 1,
         "ibl.directHeader": 2,

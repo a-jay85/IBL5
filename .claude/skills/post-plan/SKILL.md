@@ -5,7 +5,7 @@ disallowed-tools:
   - EnterPlanMode
   - ExitPlanMode
   - Skill
-last_verified: 2026-09-22
+last_verified: 2026-09-25
 ---
 
 # Post-Plan Orchestrator
@@ -219,6 +219,25 @@ fi
    > Run the same one-shot `bin/check-digest-prose` voice check over the four elements above and rewrite once on a violation. All four are narrative prose and are the most rule-1-prone text in the body.
 
    **Stacked PRs:** If branched from a feature branch (not `master`), use `--base <parent-branch>`. Skip if a PR already exists. **Merge-order dependency:** When this PR shares files with, or must merge after, a sibling PR that is also based on `master` (so stacking via `--base` is unavailable / fragile under squash-merge), add a `Depends-on: #<n>[, #<n>...]` line to the PR body — **on its own line** (the parser anchors to start-of-line, so an inline prose mention of the marker is ignored). Phase 6.5 condition (6) reads it and refuses to arm auto-merge until every named PR is `MERGED`, so the series cannot ship out of order. Use this rather than stacking when the repo squash-merges (a squash collapses the parent's commits, leaving a stacked child's branch carrying the pre-squash commits → conflict on auto-retarget).
+
+   **ADR bypass markers from plan:** On first create only (this step), carry any `<!-- no-adr: ... -->` marker the plan declares into the new PR body, so the ADR gate sees the same bypass the plan author wrote. Skip this entirely when `$PLAN_FILE` is empty or unreadable (a plan-blind run). The body is then composed exactly as it is today. Extract the markers outside fenced code blocks, so a marker quoted inside a plan's example fence is never carried:
+
+   ```bash
+   # phase 2 plan no-adr marker carry-over (first create only)
+   PLAN_NOADR_MARKERS=""
+   if [ -n "$PLAN_FILE" ] && [ -r "$PLAN_FILE" ]; then
+       PLAN_NOADR_MARKERS=$(awk '
+         /^[[:space:]]*```/          { fence = !fence; next }
+         fence                       { next }
+         /<!--[[:space:]]*no-adr:/   { inc = 1 }
+         inc                         { print; if ($0 ~ /-->/) inc = 0 }
+       ' "$PLAN_FILE" 2>/dev/null || true)
+   fi
+   echo "PLAN_NOADR_MARKERS=$(printf '%s' "$PLAN_NOADR_MARKERS" | grep -c 'no-adr:' || true)"
+   printf '%s\n' "$PLAN_NOADR_MARKERS"
+   ```
+
+   Treat the printed marker lines as literal text. Put each one verbatim at the very top of the PR body, before the first `## ` heading and outside the `<!-- files-changed:begin -->` / `<!-- files-changed:end -->` block. Do not reword, merge, or dedent them. When the count is `0`, add nothing. This complements Phase 6's body-marker capture, which re-emits markers already in the body on later edits; this step is what puts them there on first create. The awk matcher uses the same multi-line `inc` shape as that capture block, so a marker that spans lines survives both.
 
 Post an in-flight status badge so the PR shows the run is active (best-effort — never blocks Phase 2 if it fails):
 

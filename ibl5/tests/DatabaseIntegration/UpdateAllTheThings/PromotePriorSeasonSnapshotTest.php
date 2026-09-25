@@ -361,6 +361,33 @@ class PromotePriorSeasonSnapshotTest extends DatabaseTestCase
     }
 
     /**
+     * Offseason runs rewrite 'mid-season', and PromotePriorSeasonSnapshotStep copies it
+     * into 'end-of-season', so both can carry post-playoffs ratings. The 'playoffs' row
+     * is never rewritten, so it must win a stats_gm tie against either.
+     */
+    public function testPlayoffsWinsOverEndOfSeasonOnEqualStatsGm(): void
+    {
+        $this->seedSnapshot(202099903, 2008, 'playoffs',      ['stats_gm' => 82, 'stats_pts' => 111, 'phantom_games' => 5]);
+        $this->seedSnapshot(202099903, 2008, 'end-of-season', ['stats_gm' => 82, 'stats_pts' => 222, 'phantom_games' => 0]);
+
+        $row = $this->rankedIblHistRowFor(202099903);
+
+        self::assertNotNull($row);
+        self::assertSame(111, (int) $row['pts'], 'Phase rank must pick the playoffs row over end-of-season.');
+    }
+
+    public function testPlayoffsWinsOverHigherIdMidSeasonOnEqualStatsGm(): void
+    {
+        $this->seedSnapshot(202099904, 2008, 'playoffs',   ['stats_gm' => 82, 'stats_pts' => 111, 'phantom_games' => 5]);
+        $this->seedSnapshot(202099904, 2008, 'mid-season', ['stats_gm' => 82, 'stats_pts' => 222, 'phantom_games' => 0]);
+
+        $row = $this->rankedIblHistRowFor(202099904);
+
+        self::assertNotNull($row);
+        self::assertSame(111, (int) $row['pts'], 'Phase rank must pick the playoffs row despite its lower id.');
+    }
+
+    /**
      * Run the production ranking query — RefreshIblHistStep::SELECT_SQL, the exact
      * string the step feeds into `INSERT INTO ibl_hist` — and return the single
      * winning row for one pid. Reading the constant (rather than restating the SQL)

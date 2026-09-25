@@ -1387,3 +1387,98 @@ def test_arm_inputs_see_post_remediation_conformance(tmp_path, monkeypatch):
     assert res.arm is not None
     assert 3 not in {c.number for c in res.arm.holds}, \
         "condition (3) must not hold when remediation added the planned file"
+
+
+# ---------------------------------------------------------------------------
+# Live-shaped Phase 6.7 ticking seam
+# ---------------------------------------------------------------------------
+
+_TICK_ROW_BODY = "## Manual Testing\n\n- [ ] **Row 1** — `bin/test-foo`\n"
+
+
+def _run_live_shaped_ticking(monkeypatch, tmp_path, *, llm, github_ticks=True):
+    """Live-shaped run with Phase 6.7 faked. The tick step rewrites the body GitHub
+    holds (RecordingGh.fixture['pr_meta']['body']) from the harness's own last write and
+    leaves _body_override alone, which is the state LiveGh is in after tick-rows.sh."""
+    import copy
+    from pathlib import Path
+    from harness import manual_testing as mt
+    from harness.adapters.ghad import RecordingGh
+    from harness.adapters.probe import FixtureProbe
+
+    fx = copy.deepcopy(_INLINE_FIXTURE)
+    fx["pr_meta"]["body"] = _TICK_ROW_BODY
+    created = []
+
+    class _CapturingGh(RecordingGh):
+        def __init__(self, out_dir, fixture=None):
+            super().__init__(out_dir, fixture)
+            created.append(self)
+
+    def fake_run_script(path, args, timeout_s, cwd=None):
+        name = str(path)
+        if "bring-up" in name:
+            return 0, "BRINGUP: UP\nBRINGUP-COMPLETE\n", ""
+        if "tick" in name:
+            if github_ticks:
+                gh = created[0]
+                gh.fixture["pr_meta"]["body"] = (gh._body_override or "").replace(
+                    "- [ ] **Row 1**", "- [x] **Row 1**")
+            return 0, "TICKED: 1\nTICKED-ROW: Row 1\nTICK-COMPLETE\n", ""
+        return 0, "ROW Row 1 PASS\nMANUAL-ROWS-COMPLETE\n", ""
+
+    monkeypatch.setattr(runner, "ReplayGit", _LiveShapedGit)
+    monkeypatch.setattr(runner, "RecordingGh", _CapturingGh)
+    monkeypatch.setattr(mt, "_run_script", fake_run_script)
+    monkeypatch.setattr(mt, "_load_script", lambda show, sha, paths, pr: Path(paths[0]))
+    monkeypatch.setattr(mt, "docker_available", lambda: (True, ""))
+    monkeypatch.setattr(mt, "resolve_slug", lambda w: ("inline-phase6-test", ""))
+    monkeypatch.setattr(mt, "ROWS_TMPFILE", str(tmp_path / "rows-{pr}.txt"))
+    monkeypatch.setattr(ciwatch, "start_background_watch", lambda *a, **k: None)
+    monkeypatch.setattr(ciwatch, "watch_live",
+                        lambda *a, **k: ciwatch.CiOutcome(0, [], "stub watch_live"))
+    monkeypatch.setattr(ciwatch, "probe_failed_checks", lambda w, pr: [])
+    monkeypatch.setattr(ciwatch, "reap_background_watch", lambda *a, **k: None)
+    out = str(tmp_path / "out")
+    res = runner.run(fx, out, llm, mode="replay", headless=True, live=True,
+                     probe=FixtureProbe(fx))
+    return res, out
+
+
+def test_live_shaped_out_of_band_tick_clears_condition_1(monkeypatch, tmp_path):
+    res, _ = _run_live_shaped_ticking(
+        monkeypatch, tmp_path, llm=FixtureLlm(UsageLedger(), CANNED))
+    c1 = next(c for c in res.arm.conditions if c.number == 1)
+    assert c1.blocked is False
+    assert res.manual_testing["all_ticked"] is True
+
+
+def test_live_shaped_review_unavailable_append_keeps_out_of_band_ticks(monkeypatch, tmp_path):
+    llm = DegradingLlm(UsageLedger(), CANNED, ["review-agent-a"])
+    res, out = _run_live_shaped_ticking(monkeypatch, tmp_path, llm=llm)
+    edits = [a for a in _actions(out) if a["action"] == "pr_edit_body"]
+    final = edits[-1]["body"]
+    assert "## Review Unavailable" in final
+    assert "- [x] **Row 1**" in final
+    assert "- [ ] **Row 1**" not in final
+    assert final.count("## Review Unavailable") == 1
+
+
+def test_live_shaped_unconfirmed_tick_keeps_condition_1_held(monkeypatch, tmp_path):
+    res, _ = _run_live_shaped_ticking(
+        monkeypatch, tmp_path, llm=FixtureLlm(UsageLedger(), CANNED), github_ticks=False)
+    c1 = next(c for c in res.arm.conditions if c.number == 1)
+    assert c1.blocked is True
+    assert res.manual_testing["all_ticked"] is False
+    assert "tick-unconfirmed:Row 1" in res.manual_testing["errors"]
+
+
+def test_replay_review_unavailable_append_keeps_phase6_writes(tmp_path):
+    fx = _fixture(pr_meta={"number": 9999, "title": "fix: synthetic",
+                           "body": "## Summary\n\nx\n", "headRefOid": "deadbeef"})
+    out = str(tmp_path / "out")
+    llm = DegradingLlm(UsageLedger(), CANNED, ["review-agent-a"])
+    res = runner.run(fx, out, llm, mode="replay")
+    final = [a for a in _actions(out) if a["action"] == "pr_edit_body"][-1]["body"]
+    assert "No manual testing needed" in final
+    assert "## Review Unavailable" in final

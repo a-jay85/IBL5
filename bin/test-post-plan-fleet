@@ -1007,7 +1007,7 @@ grep -q 'slot left occupied' <<< "$out" || fail "stop-fails-closed: no fail-clos
 clean_slots
 end_case stop-fails-closed
 
-# === DM-dispatch cases (driver slice, 37–48) =============================================
+# === DM-dispatch cases (driver slice, 37–52) =============================================
 # Shared setup: PR 9901 with headRefName=branch-live (already in WTL_FIXTURE at line 58),
 # a DM-capture stub, a caffeinate shim (strips -s + timeout SECS; execs the remainder),
 # and derive_status sourced from the driver for the cross-slice guards in cases 44 and 47.
@@ -1232,6 +1232,175 @@ _bootout_line="$(grep -Fn 'launchctl bootout' "$_DM_RUNNER" | head -1 | cut -d: 
 [[ "$_notify_line" -lt "$_bootout_line" ]] \
     || fail "dm-teardown-order-static: notify (line $_notify_line) must precede bootout (line $_bootout_line)"
 end_case dm-teardown-order-static
+
+# --- DM result.json helper (cases 49–52) --------------------------------------------------
+# Writes stdin to <per-case run dir>/result.json, builds a claude stub that logs
+# `harness-run-dir=<dir>` plus the given RESULT: line, then runs driver + runner so the DM
+# lands in $_DM_CAPTURE. Same driver/runner invocation as cases 37–40.
+_dm_result_case() {  # $1 = case number, $2 = RESULT: line to log; stdin = result.json body
+    local n="$1" result_line="$2"
+    local dir="$SCRATCH/harness-run-$n" stub="$SCRATCH/.local/bin/dm-cs-$n"
+    clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+    rm -rf "$dir"; mkdir -p "$dir"
+    cat > "$dir/result.json"
+    {
+        printf '#!/usr/bin/env bash\n'
+        printf 'echo %q\n' "harness-run-dir=$dir"
+        printf 'echo %q\n' "$result_line"
+    } > "$stub"
+    chmod +x "$stub"
+    POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
+        POST_PLAN_FLEET_DISCORD_DM="$_DM_STUB" POST_PLAN_FLEET_CLAUDE="$stub" \
+        run_dm_driver --go >/dev/null 2>&1
+    HOME="$SCRATCH" bash "$_DM_RUNNER" >/dev/null 2>&1 || true
+}
+
+# --- case 49: dm-latest-round-verdict-wins ------------------------------------------------
+# Round 1 said NOT READY, a remediation round re-reviewed to READY, and the run armed.
+# The DM must report the latest round, not verdict_1.
+begin_case
+_dm_result_case 49 'RESULT: terminal=shipped-armed' <<'RJSON'
+{
+  "terminal": "shipped-armed",
+  "fidelity": {
+    "verdict_1": "NOT READY",
+    "verdict_2": "READY",
+    "rounds": [{"round": 1, "verdict": "READY"}],
+    "reviewed_tree_2": "abc123",
+    "error_kind": null,
+    "remediation_sha": "def456"
+  }
+}
+RJSON
+[[ -f "$_DM_CAPTURE" ]] || fail "dm-latest-round-verdict-wins: no DM sent"
+grep -q 'RESULT READY' "$_DM_CAPTURE" \
+    || fail "dm-latest-round-verdict-wins: DM did not report the latest-round READY ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+! grep -q 'NOT READY' "$_DM_CAPTURE" \
+    || fail "dm-latest-round-verdict-wins: DM reported stale verdict_1 NOT READY"
+grep -q "merge when you're ready" "$_DM_CAPTURE" \
+    || fail "dm-latest-round-verdict-wins: armed READY missing 'merge when you're ready'"
+end_case dm-latest-round-verdict-wins
+
+# --- case 50: dm-null-latest-round-is-unconfirmed -----------------------------------------
+# A round ran but verdict_2 is null (re-review never confirmed). The DM must say
+# unconfirmed and must NOT fall back to verdict_1's READY, and must NOT consult the
+# RESULT: line either: a parsed result.json is authoritative.
+begin_case
+_dm_result_case 50 'RESULT: terminal=shipped-held' <<'RJSON'
+{
+  "terminal": "shipped-held",
+  "fidelity": {
+    "verdict_1": "READY",
+    "verdict_2": null,
+    "rounds": [{"round": 1, "verdict": null}],
+    "reviewed_tree_2": null,
+    "error_kind": null,
+    "remediation_sha": "def456"
+  }
+}
+RJSON
+[[ -f "$_DM_CAPTURE" ]] || fail "dm-null-latest-round-is-unconfirmed: no DM sent"
+grep -q 'unconfirmed' "$_DM_CAPTURE" \
+    || fail "dm-null-latest-round-is-unconfirmed: DM not classified unconfirmed ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+! grep -q 'RESULT READY' "$_DM_CAPTURE" \
+    || fail "dm-null-latest-round-is-unconfirmed: DM fell back to verdict_1 READY"
+! grep -q 'RESULT HELD' "$_DM_CAPTURE" \
+    || fail "dm-null-latest-round-is-unconfirmed: DM fell through to the RESULT: line despite a parsed result.json"
+end_case dm-null-latest-round-is-unconfirmed
+
+# --- case 51: dm-held-terminal-reports-held -----------------------------------------------
+# No round ran (rounds == [] boundary), verdict READY, but the run ended shipped-held.
+# The DM must say HELD / check the holds, never "merge when ready".
+begin_case
+_dm_result_case 51 'RESULT: terminal=shipped-held' <<'RJSON'
+{
+  "terminal": "shipped-held",
+  "fidelity": {
+    "verdict_1": "READY",
+    "verdict_2": null,
+    "rounds": [],
+    "reviewed_tree_2": null,
+    "error_kind": null,
+    "remediation_sha": null
+  }
+}
+RJSON
+[[ -f "$_DM_CAPTURE" ]] || fail "dm-held-terminal-reports-held: no DM sent"
+grep -q 'RESULT HELD' "$_DM_CAPTURE" \
+    || fail "dm-held-terminal-reports-held: held READY not reported as HELD ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+grep -q 'check the holds' "$_DM_CAPTURE" \
+    || fail "dm-held-terminal-reports-held: HELD DM missing 'check the holds'"
+! grep -q "merge when you're ready" "$_DM_CAPTURE" \
+    || fail "dm-held-terminal-reports-held: held run told the user to merge"
+end_case dm-held-terminal-reports-held
+
+# --- case 52: dm-malformed-result-json-falls-back -----------------------------------------
+# Truncated result.json that still carries a greppable "verdict_1": "NOT READY" line.
+# JSON parsing fails -> non-fatal -> RESULT: fallback maps shipped-held to HELD. The DM
+# must still be sent exactly once, and the half-file's NOT READY must never leak through.
+begin_case
+_dm_result_case 52 'RESULT: terminal=shipped-held' <<'RJSON'
+{
+  "terminal": "shipped-armed",
+  "fidelity": {
+    "verdict_1": "NOT READY",
+    "rounds": [
+RJSON
+[[ -f "$_DM_CAPTURE" ]] || fail "dm-malformed-result-json-falls-back: no DM sent — parse failure aborted notify"
+_dm52_count="$(grep -c 'post-plan-fleet: PR #9901' "$_DM_CAPTURE" 2>/dev/null || echo 0)"
+[[ "$_dm52_count" -eq 1 ]] \
+    || fail "dm-malformed-result-json-falls-back: expected 1 DM header, got $_dm52_count"
+grep -q 'RESULT HELD' "$_DM_CAPTURE" \
+    || fail "dm-malformed-result-json-falls-back: fallback did not map shipped-held to HELD ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+! grep -q 'NOT READY' "$_DM_CAPTURE" \
+    || fail "dm-malformed-result-json-falls-back: grep-scraped verdict_1 leaked from malformed JSON"
+end_case dm-malformed-result-json-falls-back
+
+# --- case 53: dm-held-fallback ------------------------------------------------------------
+# The RESULT: line fallback (no harness-run-dir in the log) maps terminal=shipped-held to
+# HELD. Case 52 exercises this incidentally (malformed JSON); this case exercises it
+# directly (no result.json path emitted at all).
+begin_case
+clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+_cs53="$SCRATCH/.local/bin/dm-cs-53"
+printf '#!/usr/bin/env bash\nprintf "RESULT: terminal=shipped-held\n"\n' > "$_cs53"
+chmod +x "$_cs53"
+POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
+    POST_PLAN_FLEET_DISCORD_DM="$_DM_STUB" POST_PLAN_FLEET_CLAUDE="$_cs53" \
+    run_dm_driver --go >/dev/null 2>&1
+HOME="$SCRATCH" bash "$_DM_RUNNER" >/dev/null 2>&1 || true
+[[ -f "$_DM_CAPTURE" ]] || fail "dm-held-fallback: no DM sent"
+grep -q 'RESULT HELD' "$_DM_CAPTURE" \
+    || fail "dm-held-fallback: fallback did not map shipped-held to HELD ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+! grep -q 'READY WITH NOTES' "$_DM_CAPTURE" \
+    || fail "dm-held-fallback: old READY WITH NOTES mapping leaked through"
+end_case dm-held-fallback
+
+# --- case 54: dm-held-not-ready-unchanged ------------------------------------------------
+# HELD must not suppress a failing verdict. terminal=shipped-held with verdict_1=NOT READY
+# must report NOT READY, not HELD.
+begin_case
+clean_slots; rm -f "$_DM_LOG" "$_DM_MARKER" "$_DM_CAPTURE"
+_cs54_dir="$SCRATCH/harness-run-54"; mkdir -p "$_cs54_dir"
+printf '%s\n' '{"terminal":"shipped-held","fidelity":{"verdict_1":"NOT READY","verdict_2":null,"rounds":[],"reviewed_tree_2":null,"error_kind":null,"remediation_sha":null}}' \
+    > "$_cs54_dir/result.json"
+_cs54="$SCRATCH/.local/bin/dm-cs-54"
+cat > "$_cs54" <<STUB
+#!/usr/bin/env bash
+printf 'harness-run-dir=$_cs54_dir\n'
+printf 'RESULT: terminal=shipped-held\n'
+STUB
+chmod +x "$_cs54"
+POST_PLAN_FLEET_PR_JSON="$_DM_JSON" POST_PLAN_FLEET_DRY_RUN=1 \
+    POST_PLAN_FLEET_DISCORD_DM="$_DM_STUB" POST_PLAN_FLEET_CLAUDE="$_cs54" \
+    run_dm_driver --go >/dev/null 2>&1
+HOME="$SCRATCH" bash "$_DM_RUNNER" >/dev/null 2>&1 || true
+[[ -f "$_DM_CAPTURE" ]] || fail "dm-held-not-ready-unchanged: no DM sent"
+grep -q 'RESULT NOT READY' "$_DM_CAPTURE" \
+    || fail "dm-held-not-ready-unchanged: held+NOT READY did not report NOT READY ($(cat "$_DM_CAPTURE" 2>/dev/null))"
+! grep -q 'RESULT HELD' "$_DM_CAPTURE" \
+    || fail "dm-held-not-ready-unchanged: HELD suppressed a failing verdict"
+end_case dm-held-not-ready-unchanged
 
 
 # --- Phase 9: push-form proof against a local bare origin ---------------------------------
@@ -2249,15 +2418,18 @@ grep -qE '\[ -f.*result\.json' "$SCRIPT_DIR/../bin/post-plan-fleet" \
 # An absent result produces 'unconfirmed' (holds the PR, never emits READY).
 grep -qF 'unconfirmed' "$SCRIPT_DIR/../bin/post-plan-fleet" \
   || fail "6c.3 absent: 'unconfirmed' verdict absent — absent result not treated as a hold"
+# A null latest-round verdict must block the RESULT: fallback (never borrow a stale word).
+grep -qF '[ -z "$latest_unconfirmed" ]' "$SCRIPT_DIR/../bin/post-plan-fleet" \
+  || fail "6c.3 absent: RESULT fallback not gated on latest_unconfirmed — null verdict_2 would fall back"
 end_case result-absent-holds
 
 # --- 6c.4: unparseable result.json produces a hold (static assertion) --------------------
 begin_case
 # The verdict extraction must be guarded so a parse failure does not propagate non-zero.
-grep -qF '"verdict_1"' "$SCRIPT_DIR/../bin/post-plan-fleet" \
-  || fail "6c.4 unparseable: no verdict_1 extraction from result.json — parse missing entirely"
-grep -qF '|| true)' "$SCRIPT_DIR/../bin/post-plan-fleet" \
-  || fail "6c.4 unparseable: no '|| true' guard on the parse pipeline — malformed JSON would abort"
+grep -qF 'import json' "$SCRIPT_DIR/../bin/post-plan-fleet" \
+  || fail "6c.4 unparseable: no python3 json parse of result.json — parse missing entirely"
+grep -qF 'result.json" 2>/dev/null || true)' "$SCRIPT_DIR/../bin/post-plan-fleet" \
+  || fail "6c.4 unparseable: result.json parse not guarded by '|| true' — malformed JSON would abort"
 end_case result-unparseable-holds
 
 # --- 6c.5: --wait timeout prints 'TIMED OUT waiting for' on stderr and exits 0 ------

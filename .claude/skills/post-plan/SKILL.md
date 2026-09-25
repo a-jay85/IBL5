@@ -489,7 +489,7 @@ Enable auto-merge **before** watching CI. This is the earliest point all gating 
 
 1. Manual testing cleared — the PR body carries the `No manual testing needed` sentinel Phase 6 writes.
 2. No review/audit finding scored `>= 80` (scored in Phase 4).
-3. No unresolved `MISSING:` planned-test, `MISSING-FILE:` planned-file, `UNPLANNED-FILE:` unplanned-path **or** `UNMET-CONTRACT:` autonomy-contract items from Phase 5.0, **and Phase 5.0 provably finished:** the done-marker `/tmp/post-plan-conformance-done-$PPID` exists AND the bridge `/tmp/post-plan-missing-tests-$PPID` is absent or empty. Marker absent = indeterminate = BLOCKED (an empty bridge file alone means nothing; 5.0 truncates it at START).
+3. No unresolved `MISSING:` planned-test, `MISSING-FILE:` planned-file, `MISSING-PHASE:` phase-omission, `UNPLANNED-FILE:` unplanned-path **or** `UNMET-CONTRACT:` autonomy-contract items from Phase 5.0, **and Phase 5.0 provably finished:** the done-marker `/tmp/post-plan-conformance-done-$PPID` exists AND the bridge `/tmp/post-plan-missing-tests-$PPID` is absent or empty. Marker absent = indeterminate = BLOCKED (an empty bridge file alone means nothing; 5.0 truncates it at START).
 4. Phase 5 did not deterministically fail — `PHASE5_VERIFY_STATUS` is `pass` or `skipped`, **not** `fail`.
 5. Golden-snapshot safety — a change to `engine/internal/sim/testdata/golden.json` does NOT auto-ship unattended (headless-only block).
 6. Merge-order — every PR named in a `Depends-on:` line is already `MERGED`.

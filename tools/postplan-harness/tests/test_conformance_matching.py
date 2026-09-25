@@ -243,3 +243,55 @@ def test_check_not_found_plan_yields_nothing():
     ph = PhaseInfo(number=3, heading="Phase 3: C", evidence_paths=["harness/c.py"])
     plan = PlanInfo(found=False, phases=[ph])
     assert check(plan, []) == []
+
+
+def test_phase_omission_end_to_end_positive_and_negative():
+    """locate_plan + check: exactly one MISSING-PHASE: 2 on negative diff, zero on positive.
+
+    Exemptions tested: phase 3 bookkeeping, phase 4 deferred, phase 5 no evidence.
+    Mutation caught: any one exemption dropped raises the negative count above one;
+    dropping the locate_plan wiring drops it to zero.
+    """
+    from harness.planfile import locate_plan
+
+    plan_text = """---
+impl_model: sonnet
+---
+
+# Test plan
+
+## Phase 1: A
+
+`harness/a.py`
+
+## Phase 2: B
+
+`harness/b.py`
+
+## Phase 3: Close backlog [phases: S]
+
+`docs/x.md`
+
+## Phase 4: D
+
+`bin/d`
+
+## Phase 5: E
+
+No backticked path here.
+
+## Out of Scope
+
+- Phase 4 is deferred.
+"""
+    plan_info = locate_plan("x", content_override=plan_text)
+
+    # negative: only phase 1 shipped → phase 2 is missing (3=bookkeeping, 4=deferred, 5=no evidence)
+    items_neg = check(plan_info, ["tools/postplan-harness/harness/a.py"])
+    missing_phase = [i for i in items_neg if i.startswith("MISSING-PHASE:")]
+    assert len(missing_phase) == 1
+    assert missing_phase[0].startswith("MISSING-PHASE: 2 —")
+
+    # positive: both phases shipped → no MISSING-PHASE items
+    items_pos = check(plan_info, ["harness/a.py", "harness/b.py"])
+    assert not any(i.startswith("MISSING-PHASE:") for i in items_pos)

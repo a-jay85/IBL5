@@ -43,7 +43,7 @@ run                       entry wrapper: replay | demo | isolated | test
 harness/
   classify.py             Phase 3 port (flags, filtered diff, module extraction)
   planfile.py             plan location + frontmatter/matrix/Critical-Files parsing
-  conformance.py          Phase 5.0 MISSING/MISSING-FILE detection (suffix + unique-basename resolver)
+  conformance.py          Phase 5.0 MISSING/MISSING-FILE/MISSING-PHASE detection (suffix + unique-basename resolver; phase omission = any-hit resolver)
   armable.py              twelve ported arming conditions (numbered 1–12, no gap; the skill's condition (11), unresolved review-thread findings, stays skill-only)
   review.py               Phase 4 launch gates + bounded review/security/scoring calls
   ciwatch.py              Phase 7 outcome interpretation

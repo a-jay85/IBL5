@@ -437,3 +437,27 @@ def test_auto_merge_false_plan_with_clean_loop_still_holds():
                         plan_auto_merge_false=True))
     assert d.armed is False
     assert any(c.number == 7 for c in d.holds)
+
+
+def test_condition_3_blocks_on_missing_phase_item():
+    """MISSING-PHASE: entry in unresolved_conformance → condition (3) blocked.
+
+    Mutation caught: a future filter that only counts MISSING:/MISSING-FILE: prefixes
+    fails the block assertion.
+    """
+    # Build a minimal ArmInputs with a MISSING-PHASE entry — copy keyword pattern from a
+    # neighbouring condition-(3) test, changing only unresolved_conformance.
+    blocked_inputs = inputs(
+        unresolved_conformance=[
+            "MISSING-PHASE: 2 — B (phase cites harness/b.py; none appeared in the diff)"
+        ],
+    )
+    result_blocked = evaluate(blocked_inputs)
+    cond3 = next(c for c in result_blocked.conditions if c.number == 3)
+    assert cond3.blocked is True
+    assert "MISSING-PHASE: 2" in cond3.reason
+
+    clean_inputs = inputs(unresolved_conformance=[])
+    result_clean = evaluate(clean_inputs)
+    cond3_clean = next(c for c in result_clean.conditions if c.number == 3)
+    assert cond3_clean.blocked is False

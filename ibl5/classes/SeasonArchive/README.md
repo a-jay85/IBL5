@@ -1,6 +1,6 @@
 ---
 description: Displays historical season archives including stats, standings, and awards for past seasons.
-last_verified: 2026-07-26
+last_verified: 2026-09-25
 ---
 
 # SeasonArchive

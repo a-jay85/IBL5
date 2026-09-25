@@ -281,16 +281,18 @@ _NO_ADR_RE = re.compile(r"^[ \t]*<!--\s*no-adr:.*?-->", re.DOTALL | re.M)
 
 
 def parse_backlog_issues(content: str) -> list[tuple]:
-    """[(kind, number)] from `## Backlog issues`. kind is "closes" or "refs".
+    """[(kind, number)] from backlog bullets anywhere in the plan. kind is "closes" or "refs".
 
+    Scans the whole plan, not only `## Backlog issues`, so a closes bullet in a
+    bookkeeping-only phase body still reaches the PR body. Only lines matching
+    _BACKLOG_LINE_RE count: a bullet naming the full a-jay85/IBL5-backlog path.
     Fenced blocks are stripped first so a grammar example inside a fence never
     yields a phantom close. Bullets that do not match the grammar are skipped
     silently; bin/check-plan rejects them at plan time. Deduped by number in
     first-seen order; when one number appears as both kinds, "closes" wins.
     """
-    section = _section("\n".join(_strip_fenced(content)), r"Backlog issues")
     kinds: dict[int, str] = {}
-    for line in section.splitlines():
+    for line in _strip_fenced(content):
         m = _BACKLOG_LINE_RE.match(line)
         if not m:
             continue

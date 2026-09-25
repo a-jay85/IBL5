@@ -45,7 +45,7 @@ Never run `/post-plan` **inline** — it re-reads full implementation context ev
 
 **Plan-driven work** (session has a `/plan`): when verified clean, fire `bin/post-plan-now --auto` with no confirmation prompt. The "confirm before outward-facing actions" default is **durably overridden** for plan-driven work. Shipping is pre-authorized.
 
-**Ad-hoc work** (no plan): when verified clean, commit with `/commit-commands:commit` and stop. Don't fire post-plan; end with `cd <abs worktree path> && bin/post-plan-now` to paste. Ships only when the user arms the branch (never arm it or suggest arming; the paste line is the only hint) or says ship. A skill ending in shipping (e.g. `/fix-and-prevent`, `/ship`) is the instruction. When armed or told, fire `bin/post-plan-now --auto` on the dirty tree:
+**Ad-hoc work** (no plan): if this session created the worktree, shipping is pre-authorized. If it already existed, hold: when verified clean, commit with `/commit-commands:commit`, don't fire post-plan, and end with `cd <abs worktree path> && bin/post-plan-now` to paste. It ships only when the user arms the branch (never arm it or suggest arming) or says ship. A skill ending in shipping is the instruction. To ship, fire `bin/post-plan-now --auto` on the dirty tree:
 
 ```bash
 bin/post-plan-now --auto

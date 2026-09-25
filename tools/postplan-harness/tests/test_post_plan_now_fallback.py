@@ -46,6 +46,7 @@ def _fb(code):
 def test_success_and_sentinel_do_not_fall_back():
     assert _fb(0) == "1"   # success → should_fallback returns 1 (false) → no skill fallback
     assert _fb(3) == "1"   # rebase-conflict sentinel → NO fallback (the fix)
+    assert _fb(7) == "1"   # main-checkout refusal → NO fallback (nothing ran)
 
 def test_generic_failures_fall_back():            # negative path: real failures still degrade
     assert _fb(1) == "0"
@@ -551,8 +552,10 @@ def test_prompt_assignment_count_is_still_two():
 
 def test_should_fallback_body_unchanged():
     src = open(PPN).read()
-    assert 'should_fallback() { case "$1" in 0|3) return 1 ;; *) return 0 ;; esac; }' in src
+    assert 'should_fallback() { case "$1" in 0|3|7) return 1 ;; *) return 0 ;; esac; }' in src
     assert _fb(4) == "0"     # 4 escalates to the full skill like any other non-0/3 code
+    assert _fb(6) == "0"     # neighbours of 7 still escalate: the arm is exact, not a range
+    assert _fb(8) == "0"
 
 def test_bare_invocation_cmd_has_no_plan_slug_export(tmp_path):
     """Bare invocation (no --pr) must not inject PLAN_SLUG into $CMD."""
@@ -990,7 +993,7 @@ def test_pr_flag_plan_blind_when_no_plan_file_exists(tmp_path):
 
 
 def test_refuses_to_run_in_the_main_checkout(tmp_path):
-    """post-plan-now exits 1 with ADR-0062 message when run from main checkout."""
+    """post-plan-now exits 7 with ADR-0062 message when run from main checkout."""
     main_root, _ = _fixture_worktree(tmp_path, "some-branch")
     home = tmp_path / "home"
     (home / "Library" / "LaunchAgents").mkdir(parents=True)
@@ -1004,11 +1007,13 @@ def test_refuses_to_run_in_the_main_checkout(tmp_path):
     r = subprocess.run(["bash", PPN],
                        capture_output=True, text=True,
                        cwd=str(main_root), env=env)
-    assert r.returncode == 1
+    assert r.returncode == 7
     assert "refusing to run in the main checkout" in r.stderr
     assert "ADR-0062" in r.stderr
     plists = list((home / "Library" / "LaunchAgents").glob("*.plist"))
     assert plists == [], "no plist should be written when refusing"
+    src = open(PPN).read()
+    assert len(re.findall(r'^\s*exit 7\b', src, re.M)) == 1
 
 
 # ---------------------------------------------------------------------------

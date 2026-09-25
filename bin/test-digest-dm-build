@@ -208,17 +208,21 @@ LONG_T="$(printf 't%.0s' $(seq 1 900))"
     printf '**Watch:** %s\n' "$LONG_T"
 } > "$SCRATCH/f10"
 BIGTITLE="$(printf 'T%.0s' $(seq 1 200))"
+BIGBRANCH="$(printf 'b%.0s' $(seq 1 200))"
 OUT="$(bash "$DRIVER" --pr-number 2200 --title "$BIGTITLE" \
-        --url 'https://github.com/o/r/pull/2200' < "$SCRATCH/f10")"
+        --url 'https://github.com/o/r/pull/2200' --branch "$BIGBRANCH" < "$SCRATCH/f10")"
 _w="$(printf '%s\n' "$OUT" | sed -n 's/^\*\*What changed:\*\* //p')"
 _t="$(printf '%s\n' "$OUT" | sed -n 's/^\*\*Watch:\*\* //p')"
 _h="$(printf '%s\n' "$OUT" | sed -n 's/^\*\*Merged #2200: \(.*\)\*\*$/\1/p')"
+_b="$(printf '%s\n' "$OUT" | sed -n 's/^`\(b.*\)`$/\1/p')"
 eq "what changed is 1000 chars" "${#_w}" "1000"
-eq "watch is 700 chars"         "${#_t}" "700"
+eq "watch is 650 chars"         "${#_t}" "650"
 eq "title is 80 chars"          "${#_h}" "80"
+eq "branch is 60 chars"         "${#_b}" "60"
 want "what changed elided" "$_w" '…'
 want "watch elided"        "$_t" '…'
 want "title elided"        "$_h" '…'
+want "branch elided"       "$_b" '…'
 eq "whole DM under the Discord cap" "$([ "${#OUT}" -lt 2000 ] && echo under || echo over)" "under"
 
 # ---------------------------------------------------------------------------
@@ -239,6 +243,33 @@ printf '%s' "$_m" | iconv -f UTF-8 -t UTF-8 >/dev/null 2>&1 \
     && ok || fail "truncated value is not valid UTF-8"
 jq -n --arg m "$_m" '{content:{message:$m}}' >/dev/null 2>&1 \
     && ok || fail "jq --arg rejected the truncated value"
+
+# ---------------------------------------------------------------------------
+# 11b — --branch prints as a code span directly under the header, on both the
+#       digest and the fallback paths; absent or empty means no line at all.
+# ---------------------------------------------------------------------------
+begin_case "11b branch line"
+run "$SCRATCH/f1" --branch 'fix-the-thing'
+eq "exit 0" "$RC" "0"
+eq "line 2 is the branch" "$(printf '%s\n' "$OUT" | sed -n 2p)" '`fix-the-thing`'
+eq "line 1 is still the header" "$(printf '%s\n' "$OUT" | sed -n 1p)" '**Merged #2200: Fix the thing**'
+
+run "$SCRATCH/f7" --branch 'fix-the-thing'
+eq "fallback line 2 is the branch" "$(printf '%s\n' "$OUT" | sed -n 2p)" '`fix-the-thing`'
+want "fallback still carried" "$OUT" '(No /pr-ready digest'
+
+run "$SCRATCH/f1"
+eq "no --branch: line 2 blank" "$(printf '%s\n' "$OUT" | sed -n 2p)" ''
+
+run "$SCRATCH/f1" --branch ''
+eq "empty --branch: line 2 blank" "$(printf '%s\n' "$OUT" | sed -n 2p)" ''
+
+run "$SCRATCH/f1" --branch 'a`b'
+eq "backtick stripped" "$(printf '%s\n' "$OUT" | sed -n 2p)" '`ab`'
+
+WF_NOTIFY="$ROOT/.github/workflows/merge-digest-notify.yml"
+eq "workflow passes --branch" "$(grep -c -- '--branch "$PR_BRANCH"' "$WF_NOTIFY")" "1"
+eq "workflow sources head.ref" "$(grep -c 'PR_BRANCH: ${{ github.event.pull_request.head.ref }}' "$WF_NOTIFY")" "1"
 
 # ---------------------------------------------------------------------------
 # 12 — flag parsing: every rejected form fails loudly, never silently.

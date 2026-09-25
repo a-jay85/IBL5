@@ -180,6 +180,98 @@ function ShowAndHideGM() {
         $this->assertStringNotContainsString('type="radio"', $html);
     }
 
+    public function testAsgSelectionChecksOnlyMatchingCandidate(): void
+    {
+        $categories = [[
+            'code' => 'GM',
+            'title' => 'GM of the Year',
+            'instruction' => 'Select THREE.',
+            'candidates' => [
+                ['type' => 'gm', 'name' => 'Ann Lee', 'teamName' => 'Team A'],
+                ['type' => 'gm', 'name' => 'Bob Ray', 'teamName' => 'Team B'],
+            ],
+        ]];
+
+        $html = $this->view->renderBallotForm('action.php', 'Voter Team', 1, 'Regular Season', $categories, ['GM' => ['Ann Lee, Team A']]);
+
+        $this->assertStringContainsString('value="Ann Lee, Team A" checked', $html);
+        $this->assertStringContainsString('value="Bob Ray, Team B">', $html);
+        $this->assertSame(1, substr_count($html, ' checked'));
+    }
+
+    public function testEoyRankSelectionChecksOnlyThatRankRadio(): void
+    {
+        $categories = [[
+            'code' => 'GM',
+            'title' => 'GM of the Year',
+            'instruction' => 'Select THREE.',
+            'candidates' => [
+                ['type' => 'gm', 'name' => 'Ann Lee', 'teamName' => 'Team A'],
+                ['type' => 'gm', 'name' => 'Bob Ray', 'teamName' => 'Team B'],
+            ],
+        ]];
+
+        $html = $this->view->renderBallotForm('action.php', 'Voter Team', 1, 'Playoffs', $categories, ['GM' => [2 => 'Ann Lee, Team A']]);
+
+        $this->assertStringContainsString('name="GM[2]" value="Ann Lee, Team A" checked', $html);
+        $this->assertStringContainsString('name="GM[1]" value="Ann Lee, Team A">', $html);
+        $this->assertStringContainsString('name="GM[3]" value="Ann Lee, Team A">', $html);
+        $this->assertSame(1, substr_count($html, ' checked'));
+    }
+
+    public function testSelectionMatchesRawDbValueNotEscapedValue(): void
+    {
+        $categories = [[
+            'code' => 'GM',
+            'title' => 'GM of the Year',
+            'instruction' => 'Select THREE.',
+            'candidates' => [
+                ['type' => 'gm', 'name' => "O'Brien & Co", 'teamName' => 'Team A'],
+            ],
+        ]];
+
+        $html = $this->view->renderBallotForm('action.php', 'Voter Team', 1, 'Regular Season', $categories, ['GM' => ["O'Brien & Co, Team A"]]);
+
+        $this->assertStringContainsString('value="O&apos;Brien &amp; Co, Team A" checked', $html);
+        $this->assertStringNotContainsString("O'Brien & Co, Team A", $html);
+    }
+
+    public function testUnknownSelectionValueIsNeverWrittenToHtml(): void
+    {
+        $categories = [[
+            'code' => 'GM',
+            'title' => 'GM of the Year',
+            'instruction' => 'Select THREE.',
+            'candidates' => [
+                ['type' => 'gm', 'name' => 'Ann Lee', 'teamName' => 'Team A'],
+                ['type' => 'gm', 'name' => 'Bob Ray', 'teamName' => 'Team B'],
+            ],
+        ]];
+
+        $html = $this->view->renderBallotForm('action.php', 'Voter Team', 1, 'Regular Season', $categories, ['GM' => ['<script>alert(1)</script>, Team A', 'Nobody, Nowhere']]);
+
+        $this->assertStringNotContainsString('<script>alert', $html);
+        $this->assertStringNotContainsString('Nobody', $html);
+        $this->assertSame(0, substr_count($html, ' checked'));
+    }
+
+    public function testSameTeamCandidateIgnoresSelection(): void
+    {
+        $categories = [[
+            'code' => 'GM',
+            'title' => 'GM of the Year',
+            'instruction' => 'Select THREE.',
+            'candidates' => [
+                ['type' => 'gm', 'name' => 'Ann Lee', 'teamName' => 'Team A'],
+            ],
+        ]];
+
+        $html = $this->view->renderBallotForm('action.php', 'Team A', 1, 'Regular Season', $categories, ['GM' => ['Ann Lee, Team A']]);
+
+        $this->assertStringNotContainsString(' checked', $html);
+        $this->assertStringNotContainsString('type="checkbox"', $html);
+    }
+
     /**
      * Two GM candidates on non-voter teams so both ASG (checkbox) and EOY
      * (radio) input rows render. GM rows need no PlayerStats, so the fixture

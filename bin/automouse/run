@@ -1199,6 +1199,23 @@ dispose_plan_done() {
     echo "Loop-side disposition ($site): PR $pr_state ($pr_url) — moved $plan_name to done/." >> "$LOG"
 }
 
+# Postplan no-worktree disposition. Called when the postplan phase has no worktree
+# to run in: the pre-call resolver found none, or post-plan-now exited 7. A plan
+# whose branch PR is already MERGED has shipped, and its worktree was reaped after
+# merge, so the missing tree is expected and the plan is done. Disposes it through
+# dispose_plan_done and returns 0. Every other outcome returns 1 and touches
+# nothing: an OPEN PR (the tree should still exist, so a human must look), a
+# CLOSED-only or absent PR, or a gh failure (automouse_pr_state is fail-closed).
+# Args: plan_name slug site. Caller owns control flow and lock release.
+postplan_no_worktree_dispose_if_merged() {
+    local plan_name=$1 slug=$2 site=$3 branch pr
+    branch=$(automouse_branch_for_plan "$plan_name" "$slug")
+    pr=$(automouse_pr_state "$branch") || return 1
+    [ "${pr%% *}" = "MERGED" ] || return 1
+    dispose_plan_done "$plan_name" "$slug" MERGED "${pr#* }" "$site"
+    return 0
+}
+
 # Print the newest Phase 5.5 fidelity verdict file for PR $1 (empty when none exist).
 # Newest wins: Phase 5.5 writes `-<N>.md` on first review and an ADDITIONAL `-<N>-2.md`
 # on re-review; it never rewrites verdict 1
@@ -2067,11 +2084,17 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
         # checkout's post-plan-now, matching append_cost_row's pricer resolution. HARNESS is
         # deliberately NOT exported — post-plan-now's own default pins the MAIN checkout
         # (ADR-0092) and a worktree harness must never judge its own change.
+        PP_NOWT_DISPOSED=0
         PP_WORKTREE=$(automouse_worktree_for_plan "$PLAN_NAME" "$PLAN_SLUG") || PP_WORKTREE=""
         if [ -z "$PP_WORKTREE" ]; then
             printf '[%s] %s postplan: no usable worktree — %s has none and %s/%s does not exist — skipping\n' \
                 "$(date +%H:%M:%S)" "$PLAN_SLUG" "$HANDOFF_FILE" "$WORKTREES_ROOT" "$PLAN_SLUG" >> "$LOG"
-            PP_STATUS=1
+            if postplan_no_worktree_dispose_if_merged "$PLAN_NAME" "$PLAN_SLUG" \
+                   postplan-no-worktree; then
+                PP_NOWT_DISPOSED=1
+            else
+                PP_STATUS=1
+            fi
         else
             CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 \
             NIGHTLY_CMDPID_FILE="$CMDPID_FILE" \
@@ -2101,6 +2124,30 @@ PRIOR_FAILURE_REPORT=$FAILURE_FILE"
             PP_TERMINAL=1
             dispose_plan_postplan_blocked "$PLAN_NAME" "$PLAN_SLUG" "$PP_LOG_BEFORE"
         fi
+        # postplan-no-worktree-merged: begin
+        # A no-worktree postplan exit (pre-call resolver miss, or post-plan-now rc=7)
+        # whose branch PR is MERGED already went to done/ via
+        # postplan_no_worktree_dispose_if_merged. Mark it terminal so the env-breaker
+        # below cannot refund-and-stop the night. The plan left queue/, so the
+        # terminal-disposition block is skipped and the loop-bottom attempt sweep and
+        # lock release run as usual.
+        if [ "${PP_NOWT_DISPOSED:-0}" -eq 1 ]; then
+            PP_TERMINAL=1
+        elif [ "$PP_STATUS" -eq 7 ]; then
+            PP_TERMINAL=1
+            if ! postplan_no_worktree_dispose_if_merged "$PLAN_NAME" "$PLAN_SLUG" \
+                     postplan-rc7; then
+                printf '[%s] %s postplan terminal (rc=7) — no worktree and branch PR not MERGED — refunding, stopping loop\n' \
+                    "$(date +%H:%M:%S)" "$PLAN_SLUG" >> "$LOG"
+                refund_attempt
+                write_env_stop_report "$PLAN_NAME" postplan \
+                    "post-plan-now exited 7 (no worktree) and the branch PR is not MERGED" \
+                    "$PP_LOG_BEFORE"
+                rm -f "$PP_START_MARKER"
+                break
+            fi
+        fi
+        # postplan-no-worktree-merged: end
         # postplan-env-breaker: begin
         # Environmental-failure breaker (mirrors impl). A successful post-plan
         # removes the handoff (the agent moves the plan to done/ and deletes it),

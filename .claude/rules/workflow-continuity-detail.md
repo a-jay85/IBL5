@@ -1,6 +1,6 @@
 ---
 description: Post-plan engine internals — compiled harness vs. Sonnet skill fallback, what `--auto`'s skip gate does, and where the auto-merge arming decision is made. Lazy companion to workflow-continuity.md; loads only when a post-plan surface is in play.
-last_verified: 2026-09-22
+last_verified: 2026-09-24
 paths:
   - ".claude/skills/post-plan/SKILL.md"
   - ".claude/skills/ship/SKILL.md"
@@ -57,6 +57,13 @@ An ad-hoc branch with no plan file makes post-plan run **plan-blind**. That is e
 not an error. The merge-arming decision still happens at `/post-plan` Phase 6.5, so
 auto-opening the PR never auto-merges a `feat:` / `auto_merge: false` / visual PR without
 human signoff.
+
+The per-branch arming marker is `$(git rev-parse --absolute-git-dir)/postplan-ready`. Only
+`~/.claude/hooks/auto-commit-reminder.sh` reads it, using it to decide which nudge to show
+at turn-end: unarmed shows commit-only; armed shows `bin/post-plan-now --auto`. Nothing else
+watches the marker or fires post-plan when it appears. The arming requirement was added after
+PR [#2340](https://github.com/a-jay85/IBL5/pull/2340) (2026-09-22), where a post-plan nudge
+caused a model to ship half-done ad-hoc work.
 
 ## No deadlock
 
